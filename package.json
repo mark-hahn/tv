@@ -1,0 +1,32 @@
+{
+  "name": "tv",
+  "version": "1.0.0",
+  "description": "Hahn TV Controller",
+  "main": "tv-server.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mark-hahn/tv"
+  },
+  "keywords": [
+    "tv",
+    "plex",
+    "roku",
+    "mobile"
+  ],
+  "author": "Mark Hahn",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mark-hahn/tv/issues"
+  },
+  "homepage": "https://github.com/mark-hahn/tv",
+  "dependencies": {
+    "beefy": "*",
+    "browserify": "^10.0.0",
+    "coffeeify": "*",
+    "domify": "^1.3.3",
+    "lodash": "^3.7.0",
+    "teacup": "*",
+    "vue": "*",
+    "teacup-camel-to-kebab": "*"
+  }
+}

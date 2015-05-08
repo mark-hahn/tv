@@ -32,8 +32,8 @@ document.head.innerHTML = render ->
   """
   
 document.body.innerHTML = render ->
-  div '#header', vComponent: 'header'
-  div '#page',   vComponent: '{{curPage}}', keepAlive: ''
+  div vComponent: 'header-comp'
+  div vComponent: '{{curPage}}', keepAlive: ''
 
 
 #### page components ####

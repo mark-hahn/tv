@@ -25,15 +25,46 @@ document.head.innerHTML = render ->
     }
     html, body { 
       overflow: hidden; 
-      margin:0; 
-      font-size: 48px; 
       background-color: #ddd;
-    }  
+      user-select: none;
+    }
+    #page-outer {
+      overflow: hidden; 
+      position: relative;
+      margin: 0.3rem;
+    }
   """
   
 document.body.innerHTML = render ->
-  div vComponent: 'header-comp'
-  div vComponent: '{{curPage}}', keepAlive: ''
+  div '#page-outer', ->
+    div vComponent: 'header-comp', vWith: 'curPage: curPage'
+    div vComponent: '{{curPage}}', keepAlive: ''
+
+
+#### window resizing ####
+
+htmlEle = document.documentElement
+htmlEle.style['font-size'] = fontSize = '48px'
+pageEle = document.querySelector '#page-outer'
+pageEle.style.width  = (bodyWidInRems = 24) + 'rem'
+pageEle.style.height = (bodyHgtInRems = 38) + 'rem'
+resizeTimeout = null
+  
+do resize = ->
+  newFontSize = 0.95 * (
+    Math.min window.innerWidth  / bodyWidInRems,
+             window.innerHeight / bodyHgtInRems
+  ) + 'px'
+  if newFontSize isnt fontSize
+    fontSize = newFontSize
+    if resizeTimeout
+      clearTimeout resizeTimeout
+    resizeTimeout = setTimeout ->
+      htmlEle.style['font-size'] = fontSize
+      resizeTimeout = null
+    , 75
+
+window.addEventListener 'resize', resize
 
 
 #### page components ####
@@ -45,9 +76,9 @@ require './watch'
 require './lights'
 
 
-#### body/page view/model ####
+#### body view-model ####
 
-page = new Vue
+new Vue
   el: 'body'
   data:
     curPage: 'show'

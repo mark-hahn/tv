@@ -1,8 +1,6 @@
 
 Vue = require 'vue'
-teacup = require 'teacup'
-
-{render, div} = teacup
+{render, div} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """
   .header {

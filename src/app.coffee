@@ -5,7 +5,6 @@ Vue = require 'vue'
 teacup = require 'teacup'
 camelToKebab = require 'teacup-camel-to-kebab'
 teacup.use camelToKebab()
-
 {render, meta, title, style, div} = teacup
 
 

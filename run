@@ -3,8 +3,8 @@
 kill $(pgrep -f "node tv-server.js") > /dev/null 2>&1
 killall tail > /dev/null 2>&1
 set -e
-coffee -co . src/tv-server.coffee
+coffee -co host-js host-src/tv-server.coffee host-src/ajax.coffee host-src/plex.coffee
 cd ~/Dropbox/apps/tv
 echo >> ~/logs/tv.log
 tail -fn 0 ~/logs/tv.log &
-nohup node tv-server.js >> ~/logs/tv.log 2>&1 &
+nohup node host-js/tv-server.js >> ~/logs/tv.log 2>&1 &

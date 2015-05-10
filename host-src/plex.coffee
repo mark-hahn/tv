@@ -3,7 +3,7 @@
 ###
 
 request = require 'request'
-log     = require('bows') 'plex'
+log     = require('debug') 'plex'
 
 plexServerIp    = '192.168.1.103'
 plexServerPort  = 32400

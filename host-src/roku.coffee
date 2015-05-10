@@ -4,7 +4,7 @@
 
 request = require 'request'
 plex    = require './plex'
-log     = require('bows') 'roku'
+log     = require('debug') 'roku'
 
 plexServerIp    = null
 plexServerPort  = null

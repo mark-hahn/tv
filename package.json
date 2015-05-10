@@ -21,14 +21,15 @@
   "homepage": "https://github.com/mark-hahn/tv",
   "dependencies": {
     "beefy": "*",
-    "bows": "^1.4.2",
     "browserify": "^10.0.0",
     "coffeeify": "*",
+    "debug": "^2.1.3",
     "domify": "^1.3.3",
     "lodash": "^3.7.0",
     "request": "*",
     "teacup": "*",
     "teacup-camel-to-kebab": "*",
-    "vue": "*"
+    "vue": "*",
+    "superagent": "*"
   }
 }

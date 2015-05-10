@@ -1,19 +1,24 @@
 
 # src/app
 
+window.appDebug = require 'debug'
+appDebug.enable '*'
+
 Vue = require 'vue'
+log = require('debug') 'app'
 teacup = require 'teacup'
 camelToKebab = require 'teacup-camel-to-kebab'
 teacup.use camelToKebab()
 {render, meta, title, style, div} = teacup
 
+log 'starting'
 
 #### intial html ####
 
 document.head.innerHTML = render ->
-  meta
-    name: 'viewport'
-    content: 'width=device-width, initial-scale=1, user-scalable=no'
+  meta name: 'viewport', \
+    content: 'width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, ' +
+             'user-scalable=no'
   title 'Hahn TV'
   style """
     html { 
@@ -32,24 +37,27 @@ document.head.innerHTML = render ->
       -ms-user-select: none;
       user-select: none;
     }
-    #page-outer {
+    #page {
       overflow: hidden; 
       position: relative;
       margin: 0.3rem;
     }
+    #header-comp {
+      width: 100%;
+    }
   """
   
 document.body.innerHTML = render ->
-  div '#page-outer', ->
-    div vComponent: 'header-comp', vWith: 'curPage: curPage'
-    div vComponent: '{{curPage}}', keepAlive: ''
+  div '#page', ->
+    div '#header-comp', vComponent: 'header', vWith: 'curPage: curPage'
+    div '#page-comp',   vComponent: '{{curPage}}', keepAlive: ''
 
 
 #### window resizing ####
 
 htmlEle = document.documentElement
 htmlEle.style['font-size'] = fontSize = '48px'
-pageEle = document.querySelector '#page-outer'
+pageEle = document.querySelector '#page'
 pageEle.style.width  = (bodyWidInRems = 24) + 'rem'
 pageEle.style.height = (bodyHgtInRems = 38) + 'rem'
 resizeTimeout = null
@@ -61,20 +69,25 @@ do resize = ->
   ) + 'px'
   if newFontSize isnt fontSize
     fontSize = newFontSize
-    if resizeTimeout
-      clearTimeout resizeTimeout
+    # document.body.style.height = (window.outerHeight + 50) + 'px'
+    if resizeTimeout then clearTimeout resizeTimeout
     resizeTimeout = setTimeout ->
       htmlEle.style['font-size'] = fontSize
       resizeTimeout = null
+      # window.scrollTo 0, 1
     , 75
-
+    
 window.addEventListener 'resize', resize
 
 
 #### page components ####
 
 require './header'
-require './show'
+
+require './show-info'
+require './show-left'
+require './show-page'
+
 require './episode'
 require './watch'
 require './lights'
@@ -87,7 +100,7 @@ new Vue
   data:
     curPage: 'show'
   components:
-    show:    Vue.component 'show-comp'
+    show:    Vue.component 'show-page'
     episode: Vue.component 'episode-comp'
     watch:   Vue.component 'watch-comp'
     lights:  Vue.component 'lights-comp'

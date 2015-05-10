@@ -1,10 +1,12 @@
 #   -*-  grammar-ext: sh  -*-
 
-kill $(pgrep -f "node tv-server.js") > /dev/null 2>&1
+kill $(pgrep -f "tv-server.js") > /dev/null 2>&1
 killall tail > /dev/null 2>&1
 set -e
-coffee -co host-js host-src/tv-server.coffee host-src/ajax.coffee host-src/plex.coffee
 cd ~/Dropbox/apps/tv
-echo >> ~/logs/tv.log
-tail -fn 0 ~/logs/tv.log &
-nohup node host-js/tv-server.js >> ~/logs/tv.log 2>&1 &
+coffee -co host-js host-src
+echo >> tv.log
+tail -fn 0 tv.log &
+export DEBUG=ajax
+nohup node host-js/tv-server.js >> tv.log 2>&1 &
+# node host-js/tv-server.js &

@@ -50,11 +50,12 @@ document.head.innerHTML = render ->
       background-color: #ee8; 
     }
     #page {
-      overflow: hidden; 
       position: relative;
       margin: 0.3rem;
     }
     #header-comp {
+      position: relative;
+      top: -0.3rem;
       width: 100%;
     }
   """
@@ -71,7 +72,8 @@ htmlEle = document.documentElement
 htmlEle.style['font-size'] = fontSize = '48px'
 pageEle = document.querySelector '#page'
 pageEle.style.width  = (bodyWidInRems = 24) + 'rem'
-pageEle.style.height = (bodyHgtInRems = 40) + 'rem'
+midRowHeight         =                 '35rem'
+pageEle.style.height = (bodyHgtInRems = 40.5) + 'rem'
 resizeTimeout = null
   
 do resize = ->
@@ -96,6 +98,8 @@ window.addEventListener 'resize', resize
 
 require './header'
 
+require './two-btns'
+
 require './show-info'
 require './show-left'
 require './show-page'
@@ -111,6 +115,8 @@ new Vue
   el: 'body'
   data:
     curPage: 'show'
+    midRowStyle:  
+      height: midRowHeight
   components:
     show:    Vue.component 'show-page'
     episode: Vue.component 'episode-comp'

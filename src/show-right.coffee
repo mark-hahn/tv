@@ -9,18 +9,18 @@ log     = require('debug') 'slf'
     width: 100%;
     height: 34rem;
   }
-  .lft-sel-btn-row {
+  .two-btns {
     padding-top: 0.7rem;
     width: 100%;
   }
-  .lft-sel-btn-row .btn {
+  .two-btns .btn {
     width: 50%;
   }
 """
 
 Vue.component 'left-select-btns',
   template: render ->
-    div '.lft-sel-btn-row',  ->
+    div '.two-btns',  ->
       div '.btn', vOn: 'click: play', 'Play'
       div '.btn', vOn: 'click: tags', 'Tags'
   methods:
@@ -29,7 +29,7 @@ Vue.component 'left-select-btns',
       
 Vue.component 'left-tags-btns',
   template: render ->
-    div '.lft-sel-btn-row',  ->
+    div '.two-btns',  ->
       div '.btn', vOn: 'click: prev', 'Prev'
       div '.btn', vOn: 'click: next', 'Next'
   methods:

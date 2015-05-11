@@ -6,23 +6,16 @@ log = require('debug') 'hdr'
 (document.head.appendChild document.createElement('style')).textContent = """
   .header {
     position:relative;
-    height: 3rem;
+    height: 2.6rem;
   }
   .header .btn {
-    display: inline-block;
     width: 25%;
-    height: 2.2rem;
-    border: 2px solid #ddd; 
-    background-color: #ccc;
-    text-align: center;
-    font-size: 1.4rem;
-    cursor: pointer;
-    border-radius: 0.6rem;
-  }
-  .header .btn.selected {
-    background-color: #ee8; 
   }
 """
+
+Vue.component 'left-select-btns',
+  template: render ->
+    
 
 Vue.component 'header', 
   template: render ->

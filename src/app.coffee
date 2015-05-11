@@ -37,6 +37,18 @@ document.head.innerHTML = render ->
       -ms-user-select: none;
       user-select: none;
     }
+    .btn {
+      display: inline-block;
+      border: 2px solid #ddd; 
+      background-color: #ccc;
+      text-align: center;
+      font-size: 1.4rem;
+      cursor: pointer;
+      border-radius: 0.6rem;
+    }
+    .btn.selected {
+      background-color: #ee8; 
+    }
     #page {
       overflow: hidden; 
       position: relative;
@@ -59,7 +71,7 @@ htmlEle = document.documentElement
 htmlEle.style['font-size'] = fontSize = '48px'
 pageEle = document.querySelector '#page'
 pageEle.style.width  = (bodyWidInRems = 24) + 'rem'
-pageEle.style.height = (bodyHgtInRems = 38) + 'rem'
+pageEle.style.height = (bodyHgtInRems = 40) + 'rem'
 resizeTimeout = null
   
 do resize = ->

@@ -8,8 +8,8 @@ coffee -co host-js host-src
 echo >> tv.log
 tail -fn 0 tv.log &
 # export DEBUG=*
-# export DEBUG=tv:*
-export DEBUG=tv:*,xmpp:*
+export DEBUG=tv:*
+# export DEBUG=tv:*,xmpp:*
 # export DEBUG=tv:*,xmpp:client:*
 nohup node host-js/tv-server.js >> tv.log 2>&1 &
 # node host-js/tv-server.js &

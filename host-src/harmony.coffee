@@ -7,7 +7,7 @@ log        = require('debug') 'tv:hmny'
 # require('request-debug') request
 
 identity = oldClient = oldJId = null
-fakeClientName = '1vm7ATw/tN6HXGpQcCs/A5MkuvI#iOS6.0.1#iPhone'
+fakeClientName = Date.now() + '/' + Math.floor(Math.random() * 1e6) + '#hahnTvApp.1.0#servr'
 
 getToken = (cb) ->
   opts =
@@ -78,8 +78,8 @@ transaction = (opts, cb) ->
     if (child = stanza.children?[0])?.name is 'oa'
       if (errCode = (child?.attrs?.errorcode isnt '200')) or stanza.attrs.id isnt jid
         log '\n\nERROR', (if errCode then ': ' + child?.attrs?.errorstring \
-                                else (', wrong id:\n' + stanza.attrs.id + '\n' + jid)), 
-            '\n' + xml + '\n'
+                                else (', bad sequence id:\n' + stanza.attrs.id + '\n' + jid)), 
+            '\n\n' + xml + '\n'
         cb? 'stanza oa error'
         clearTimeout timeout
         return

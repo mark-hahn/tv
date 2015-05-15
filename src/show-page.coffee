@@ -1,6 +1,6 @@
 
 Vue     = require 'vue'
-log     = require('debug') 'shw'
+log     = require('debug') 'tv:shw'
 
 ajaxPfx = 'http://192.168.1.103:1344/'
 plexPfx = 'http://192.168.1.103:32400'

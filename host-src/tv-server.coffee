@@ -1,7 +1,7 @@
 
 beefy = require("beefy")
 http  = require("http")
-log   = require('debug') 'tsrv'
+log   = require('debug') 'tv:tsrv'
 require './ajax'
 
 log 'starting tv beefy'

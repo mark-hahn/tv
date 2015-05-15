@@ -1,6 +1,6 @@
 
 Vue = require 'vue'
-log = require('debug') 'hdr'
+log = require('debug') 'tv:hdr'
 {render, div} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """

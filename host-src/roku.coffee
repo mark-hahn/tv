@@ -4,7 +4,7 @@
 
 request = require 'request'
 plex    = require './plex'
-log     = require('debug') 'roku'
+log     = require('debug') 'tv:roku'
 
 plexServerIp    = null
 plexServerPort  = null

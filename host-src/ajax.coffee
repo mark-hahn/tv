@@ -2,10 +2,24 @@
 http = require 'http'
 plex = require './plex'
 roku = require './roku'
-log  = require('debug') 'ajax'
+hmny = require './harmony'
+log  = require('debug') 'tv:ajax'
 
 ajaxServerPort  = 1344
 tvShowsKey = null
+
+
+
+# uql = require 'unqlite'
+# db = new uql.Database 'plexdb2/plex2.db'
+# 
+# db.open (err) ->
+#   if err then throw err 
+#   db.store 'key', JSON.stringify({a:1, b:2}), (err, key, value) ->
+#     log {err, key, value}
+#     
+#   db.fetch 'key', (error, key, value) ->
+#     log {error, key, value}
 
 error = (res, msg, code = 500) ->
   log msg

@@ -1,44 +1,38 @@
 
-Vue     = require 'vue'
-log     = require('debug') 'slf'
+Vue = require 'vue'
+log = require('debug') 'tv:slr'
+
+
+return
 
 {render, div} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """
-  .show-info-comp {
-    width: 100%;
-    height: 34rem;
-  }
-  .two-btns {
-    padding-top: 0.7rem;
-    width: 100%;
-  }
-  .two-btns .btn {
-    width: 50%;
-  }
 """
 
-Vue.component 'left-select-btns',
-  template: render ->
-    div '.two-btns',  ->
-      div '.btn', vOn: 'click: play', 'Play'
-      div '.btn', vOn: 'click: tags', 'Tags'
-  methods:
-    play: (e) -> log 'play'
-    tags: (e) -> log 'tags'
-      
-Vue.component 'left-tags-btns',
-  template: render ->
-    div '.two-btns',  ->
-      div '.btn', vOn: 'click: prev', 'Prev'
-      div '.btn', vOn: 'click: next', 'Next'
-  methods:
-    prev: (e) -> log 'prev'
-    next: (e) -> log 'next'
-
 Vue.component 'show-left', 
+  inherit: true
+  
   template: render ->
-    div '.show-info-comp', vComponent: 'show-info', vWith: 'showMode: showMode'
-    div '.left-select-btns-comp', vShow: 'showMode == "select"', vComponent: 'left-select-btns'
-    div '.left-tags-btns-comp',   vShow: 'showMode == "tags"',   vComponent: 'left-tags-btns'
+    div '.show-info-comp', vStyle: 'midRowStyle', vComponent: 'show-info'
+    div '.two-btns-comp',  vComponent: 'two-btns' 
     
+  data: ->
+    twoBtnClk: (e) -> 
+      switch e.target.innerText
+        when 'Play' then ->
+        when 'Tags' then ->
+        when 'Prev' then ->
+        when 'Next' then ->
+
+  computed:
+    lftBtnTxt: -> 
+      switch @showMode
+        when 'select' then 'Play' 
+        when 'tags'   then 'Prev'
+    rgtBtnTxt: ->
+      switch @showMode
+        when 'select' then 'Tags' 
+        when 'tags'   then 'Next'
+        
+        

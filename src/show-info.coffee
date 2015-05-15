@@ -1,7 +1,7 @@
 
 Vue     = require 'vue'
 request = require 'superagent'
-log     = require('debug') 'snf'
+log     = require('debug') 'tv:snf'
 
 serverIp = '192.168.1.103'
 ajaxPfx = "http://#{serverIp}:1344/"
@@ -46,6 +46,7 @@ Vue.component 'show-info',
 
   created: ->
     showInfo = @
+    
     request
       .get ajaxPfx + 'shows'
       .set 'Content-Type', 'text/plain'

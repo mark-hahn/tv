@@ -1,6 +1,6 @@
 
 Vue = require 'vue'
-log     = require('debug') 'lts'
+log     = require('debug') 'tv:lts'
 
 Vue.component 'lights-comp', 
   template: "I'm the LIGHTS page"

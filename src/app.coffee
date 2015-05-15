@@ -5,7 +5,7 @@ window.appDebug = require 'debug'
 appDebug.enable '*'
 
 Vue = require 'vue'
-log = require('debug') 'app'
+log = require('debug') 'tv:app'
 teacup = require 'teacup'
 camelToKebab = require 'teacup-camel-to-kebab'
 teacup.use camelToKebab()
@@ -102,6 +102,7 @@ require './two-btns'
 
 require './show-info'
 require './show-left'
+require './show-right'
 require './show-page'
 
 require './episode'

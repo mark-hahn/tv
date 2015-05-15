@@ -1,4 +1,8 @@
 
+db
+  tags per show
+  {watched, lastPosition, filePaths} per episode
+
 top nav buttons
   --- lights ----
   show  - episode

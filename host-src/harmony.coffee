@@ -10,7 +10,6 @@ log        = require('debug') 'tv:hmny'
 host = '192.168.1.5'
 port = 5222
 
-identity = oldClient = oldJId = null
 fakeClientName = Date.now() + '/' + Math.floor(Math.random() * 1e6) + '#hahnTvApp.1.0#servr'
 
 getToken = (cb) ->
@@ -30,75 +29,90 @@ getToken = (cb) ->
       return
     token = body.GetUserAuthTokenResult.UserAuthToken
     cb? null, token
-
-getClient = (jid, password) ->
-  if oldClient then oldClient.end()
-  oldClient = new XmppClient {jid, password, host, port, preferred: 'PLAIN'}
   
-  # if jid is oldJId then return oldClient
-  # if oldJId then oldClient.end()
-  # oldJId = jid
-  # oldClient = new XmppClient {jid, password, host, port, preferred: 'PLAIN'}
+online   = no
+identity = xml = timeout = client = transCallback = null
+clientCreatedAt = transactionCount = 0
   
-transactionCount = 0
-
-transaction = (opts, cb) ->
-  {password, from, mime, mime1, mime2, mimeCmd, cdata} = opts
-  jid       = fakeClientName + '-' + (++transactionCount)
-  password ?= identity
+transaction = (opts, transCallbackIn) ->
+  transCallback = transCallbackIn
+  
+  {from, mime, mime1, mime2, mimeCmd, cdata} = opts
   from     ?= identity
   mime1    ?= 'harmony'
   mime2    ?= 'harmony.engine?' + mimeCmd
   mime     ?= "vnd.logitech.#{mime1}/vnd.logitech.#{mime2}"
-  cdata    ?= ''
   
-  log '\n\n----- trans request -----\n', {password, from, mime1, mime2, mime, mimeCmd, cdata}, '\n'
+  if transactionCount is 4
+    log 'too many trans'
+    process.exit()
   
+  log '\n\n----- transaction request -----\n', {from, mime, cdata}, '\n'
+  
+  clientJid = fakeClientName + '-' + (++transactionCount)
   xml = """
-    <iq type="get" id="#{jid}" from="#{from}">
+    <iq type="get" id="#{clientJid}" from="#{from}">
       <oa xmlns="connect.logitech.com" mime="#{mime}"> 
       #{if cdata then '  ' + cdata + '\n  ' else ''}</oa>
     </iq>
   """
   
-  client = getClient 'guest@connect.logitech.com/gatorade.', 'gatorade.'
+  timeout = setTimeout ->
+    log '\n\nERROR, transaction timeout:\n' + xml + '\n'
+    oldCB = transCallback
+    transCallback = null
+    oldCB? 'transaction timeout'
+  , 5000
   
-  log 'sending xml'
+  if client then client.send xml; return
   
-  client.on 'online',     -> client.send xml
-  client.on 'offline',    -> log 'trans offline'
-  client.on 'connect',    -> log 'trans connect'
-  client.on 'reconnect',  -> log 'trans reconnect'
-  client.on 'disconnect', -> log 'trans disconnect'
-  client.on 'exit',       -> log 'trans exit'
-  client.on 'error', (e) -> log '\n\ntrans ERROR:', e.message, '\n' + xml + '\n'; return e.message
+  log 'new client'
+  clientCreatedAt = Date.now()
+  client = new XmppClient {
+    jid:       'guest@connect.logitech.com/gatorade.'
+    password:  'gatorade.'
+    preferred: 'PLAIN'
+    host, port
+  }
+  client.on 'online', -> 
+    log 'transaction online'
+    if not online then client.send xml
+    online = yes
+    
+  client.on 'error', (e) -> 
+    clearTimeout timeout
+    log '\n\ntransaction ERROR:', e.message, '\n' + xml + '\n'
+    return e.message
+    
   client.on 'stanza', (stanza) ->
-    # log 'trans stanza:\n', xml, '\n' + util.inspect stanza, depth: null
     if (child = stanza.children?[0])?.name is 'oa'
-      if (errCode = (child?.attrs?.errorcode isnt '200')) or stanza.attrs.id isnt jid
-        log '\n\nERROR', (if errCode then ': ' + child?.attrs?.errorstring \
-                                else (', bad sequence id:\n' + stanza.attrs.id + '\n' + jid)), 
-            '\n\n' + xml + '\n'
-        cb? 'stanza oa error'
-        clearTimeout timeout
-        return
       clearTimeout timeout
+      if (errCode = (child?.attrs?.errorcode isnt '200')) or 
+          +stanza.attrs.id.split('-')[-1..-1][0] isnt transactionCount
+        log '\n\nERROR',
+           (if errCode then ': ' + child?.attrs?.errorstring \
+            else (', bad sequence id:\n' + stanza.attrs.id + '\n' + transactionCount)), 
+           '\n\n' + xml + '\n'
+        transCallback? 'stanza oa error'
+        return
       results = {}
       for res in child.children[0].split ':'
         [key,val] = res.split '='
         results[key] = val
-      log 'trans stanza jid/req/res:', jid, '\n' + xml, '\n' + util.inspect results, depth: 2
-      cb? null, results, stanza
-  
-  timeout = setTimeout ->
-    log '\n\nERROR, transaction timeout:\n' + xml + '\n'
-    cb? 'transaction timeout'
-    cb = null
-  , 5000
+      log 'transaction count/req/res:', transactionCount, 
+          '\n' + xml, '\n' + util.inspect results, depth: 2
+      transCallback? null, results, stanza
+    # else
+      # log 'non-OA stanza ignored:\n', util.inspect stanza, depth: null
+      
+  client.on 'offline',    -> log 'transaction offline'
+  client.on 'connect',    -> log 'transaction connect'
+  client.on 'reconnect',  -> log 'transaction reconnect'
+  client.on 'disconnect', -> log 'transaction disconnect'
+  client.on 'exit',       -> log 'transaction exit'
   
 getIdentity = (token, cb) ->
   opts = 
-    password: 'neededButIgnored'
     from:     'guest'
     mime1:    'connect'
     mime2:    'pair'
@@ -110,12 +124,8 @@ getIdentity = (token, cb) ->
     identity = results.identity
     cb? null, identity
     
-    # identity = '886b47d6-b376-4c00-0dd0-7cf8f473c0f0'
-    # cb? null, identity
-    
 doPair = (cb) ->
   opts = 
-    password: 'neededButIgnored'
     mime1:    'connect'
     mime2:    'pair'
     cdata:    "method=pair:name=#{fakeClientName}"
@@ -129,7 +139,7 @@ irCommand = (device, key, cb) ->
   opts = 
     mimeCmd: 'holdAction'
     cdata:   "action={\"command\"::\"#{key}\",\"type\"::\"IRCommand\",\"deviceId\"::\"#{device}\"}" +
-             ':status=press:timestamp=42617'
+             ':status=press:timestamp=' + (Date.now() - clientCreatedAt)
   transaction opts, cb
 
 getToken (err, token) ->

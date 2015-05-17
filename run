@@ -4,12 +4,10 @@ kill $(pgrep -f "tv-server.js") > /dev/null 2>&1
 killall tail > /dev/null 2>&1
 set -e
 cd ~/Dropbox/apps/tv
-coffee -co host-js host-src
+coffee -co server-js server
 echo >> tv.log
 tail -fn 0 tv.log &
 # export DEBUG=*
 export DEBUG=tv:*
-# export DEBUG=tv:*,xmpp:*
-# export DEBUG=tv:*,xmpp:client:*
-nohup node host-js/tv-server.js >> tv.log 2>&1 &
-# node host-js/tv-server.js &
+nohup node server-js/tv-server.js >> tv.log 2>&1 &
+# node server-js/tv-server.js &

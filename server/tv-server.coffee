@@ -7,7 +7,7 @@ require './ajax'
 log 'starting tv beefy'
 
 http.createServer(beefy(
-  entries: [ "../src/app.coffee" ]
+  entries: [ "../client/app.coffee" ]
   cwd: __dirname
   live: true
   quiet: false

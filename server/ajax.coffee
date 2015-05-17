@@ -2,7 +2,6 @@
 http = require 'http'
 plex = require './plex'
 roku = require './roku'
-hmny = require './harmony'
 log  = require('debug') 'tv:ajax'
 
 ajaxServerPort  = 1344

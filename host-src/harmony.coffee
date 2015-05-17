@@ -11,6 +11,7 @@ host = '192.168.1.5'
 port = 5222
 
 fakeClientName = Date.now() + '/' + Math.floor(Math.random() * 1e6) + '#hahnTvApp.1.0#servr'
+activityId = '9319436'
 
 getToken = (cb) ->
   opts =
@@ -32,48 +33,46 @@ getToken = (cb) ->
   
 online   = no
 identity = xml = timeout = client = transCallback = null
-clientCreatedAt = transactionCount = 0
+transactionCount = 0
+startTime = Date.now()
   
 transaction = (opts, transCallbackIn) ->
   transCallback = transCallbackIn
   
-  {from, mime, mime1, mime2, mimeCmd, cdata} = opts
-  from     ?= identity
-  mime1    ?= 'harmony'
-  mime2    ?= 'harmony.engine?' + mimeCmd
-  mime     ?= "vnd.logitech.#{mime1}/vnd.logitech.#{mime2}"
-  
-  if transactionCount is 4
-    log 'too many trans'
-    process.exit()
-  
-  log '\n\n----- transaction request -----\n', {from, mime, cdata}, '\n'
-  
-  clientJid = fakeClientName + '-' + (++transactionCount)
-  xml = """
-    <iq type="get" id="#{clientJid}" from="#{from}">
-      <oa xmlns="connect.logitech.com" mime="#{mime}"> 
-      #{if cdata then '  ' + cdata + '\n  ' else ''}</oa>
-    </iq>
-  """
-  
-  timeout = setTimeout ->
-    log '\n\nERROR, transaction timeout:\n' + xml + '\n'
-    oldCB = transCallback
-    transCallback = null
-    oldCB? 'transaction timeout'
-  , 5000
-  
-  if client then client.send xml; return
-  
+  if not opts.presence
+    {from, mime, mime1, mime2, mimeCmd, cdata} = opts
+    from     ?= identity
+    mime1    ?= 'harmony'
+    mime2    ?= 'harmony.engine?' + mimeCmd
+    mime     ?= "vnd.logitech.#{mime1}/vnd.logitech.#{mime2}"
+    
+    log '\n\n----- transaction request -----\n', {from, mime, cdata}, '\n'
+    
+    clientJid = fakeClientName + '-' + (++transactionCount)
+    xml = """
+      <iq type="get" id="#{clientJid}" from="#{from}">
+        <oa xmlns="connect.logitech.com" mime="#{mime}"> 
+        #{if cdata then '  ' + cdata + '\n  ' else ''}</oa>
+      </iq>
+    """
+    
+    timeout = setTimeout ->
+      log '\n\nERROR, transaction timeout:\n' + xml + '\n'
+      oldCB = transCallback
+      transCallback = null
+      oldCB? 'transaction timeout'
+    , 5000
+    
+    if client then client.send xml; return
+    
   log 'new client'
-  clientCreatedAt = Date.now()
   client = new XmppClient {
     jid:       'guest@connect.logitech.com/gatorade.'
     password:  'gatorade.'
     preferred: 'PLAIN'
     host, port
   }
+  
   client.on 'online', -> 
     log 'transaction online'
     if not online then client.send xml
@@ -110,6 +109,19 @@ transaction = (opts, transCallbackIn) ->
   client.on 'reconnect',  -> log 'transaction reconnect'
   client.on 'disconnect', -> log 'transaction disconnect'
   client.on 'exit',       -> log 'transaction exit'
+
+  if opts.presence
+    xml = """
+      <presence id="pI80G-2">
+      </presence>
+    """
+    client.send xml
+    return
+  
+newClient = ->
+  client.end()
+  client = null
+  online = no
   
 getIdentity = (token, cb) ->
   opts = 
@@ -134,17 +146,71 @@ doPair = (cb) ->
 getConfig = (cb) ->
   opts =  mimeCmd: 'config'
   transaction opts, (err, results, stanza) -> cb? err, stanza
+  
+###
+    IQ [id="88413ad726cb858#hltetmo#sm-n900t-28-3" type="get" from="886b47d6-b376-4c00-0dd0-7cf8f473c0f0"]
+        id: 88413ad726cb858#hltetmo#sm-n900t-28-3
+        type: get
+        from: 886b47d6-b376-4c00-0dd0-7cf8f473c0f0
+        OA [mime="connect.statedigest?get" xmlns="connect.logitech.com"]
+            mime: connect.statedigest?get
+            xmlns: connect.logitech.com
+            CDATA: format=json
+###
 
+sendPresence = -> transaction presence:yes
+  
+setJson = (cb) ->
+  opts=
+    mime:  'connect.statedigest?get'
+    cdata: 'format=json'
+  transaction opts, cb
+  
+###
+    IQ [id="88413ad726cb858#hltetmo#sm-n900t-28-4" type="get" from="886b47d6-b376-4c00-0dd0-7cf8f473c0f0"]
+        id: 88413ad726cb858#hltetmo#sm-n900t-28-4
+        type: get
+        from: 886b47d6-b376-4c00-0dd0-7cf8f473c0f0
+        OA [mime="vnd.logitech.connect/vnd.logitech.deviceinfo?get" xmlns="connect.logitech.com"]
+            mime: vnd.logitech.connect/vnd.logitech.deviceinfo?get
+            xmlns: connect.logitech.com
+###
+
+getDeviceInfo = (cb) ->
+  opts=
+    mime1: 'connect'
+    mime2: 'deviceinfo?get'
+  transaction opts, cb
+  
+###
+    IQ [id="88413ad726cb858#hltetmo#sm-n900t-28-6" type="get" from="886b47d6-b376-4c00-0dd0-7cf8f473c0f0"]
+        id: 88413ad726cb858#hltetmo#sm-n900t-28-6
+        type: get
+        from: 886b47d6-b376-4c00-0dd0-7cf8f473c0f0
+        OA [mime="harmony.engine?startactivity" xmlns="connect.logitech.com"]
+            mime: harmony.engine?startactivity
+            xmlns: connect.logitech.com
+            CDATA: activityId=9319436:timestamp=3177
+###
+
+startActivity = (cb) ->
+  opts=
+    mime: 'harmony.engine?startactivity'
+    cdata: 'activityId=' + activityId + ':timestamp=' + (Date.now() - startTime)
+  transaction opts, cb
+  
 irCommand = (device, key, cb) ->
   opts = 
     mimeCmd: 'holdAction'
     cdata:   "action={\"command\"::\"#{key}\",\"type\"::\"IRCommand\",\"deviceId\"::\"#{device}\"}" +
-             ':status=press:timestamp=' + (Date.now() - clientCreatedAt)
+             ':status=press:timestamp=' + (Date.now() - startTime)
   transaction opts, cb
 
 getToken (err, token) ->
   if err then log 'getToken call err', err; return
   
+  sendPresence()
+    
   getIdentity token, (err) ->
     if err then log 'getIdentity call err', err; return
     
@@ -156,7 +222,18 @@ getToken (err, token) ->
         # jsonTxt = JSON.stringify stanza.children[0].children
         # todo: convert to legal json
         # fs.writeFileSync 'harmony-config.json', jsonTxt
-      
-      irCommand '19685842', 'Display', (err) ->
-        if err then log 'irCommand call err', err; return
+        
+      newClient()
+        
+      setJson (err) ->
+        if err then log 'setJson call err', err; return
+        
+        getDeviceInfo (err) ->
+          if err then log 'getDeviceInfo call err', err; return
+          
+          startActivity (err) ->
+            if err then log 'startActivity call err', err; return
+          
+            irCommand '19685842', 'Muting', (err) ->
+              if err then log 'irCommand call err', err; return
       

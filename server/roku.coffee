@@ -14,6 +14,8 @@ rokuIp          = null
 rokuPort        = null
 rokuMachineId   = null
 
+roku = exports
+
 exports.init = (cb) ->
   plex.findRoku rokuName, (err, client, plexServerIpIn, plexServerPortIn) ->
     if err then cb? err; return
@@ -56,3 +58,29 @@ exports.playAction = (action, cb) ->
     log 'playAction', {action, res}
     cb? null, res
 
+roku.init (err) ->
+  log 'starting test'
+  plex.getSectionKeys (err, keys) ->
+    if err then cb? err; return
+    # log 'getSectionKeys', keys
+    {tvShowsKey} = keys
+    plex.getShowList tvShowsKey, (err, shows) ->
+      if err then cb? err; return
+      # log 'shows', shows
+      for show, idx in shows when show.type is 'show' and show.title is 'Backstrom'
+        log 'show', show
+        plex.getSeasonList show.key, (err, seasons) ->
+          if err then cb? err; return
+          season = seasons[0]
+          plex.getVideoList season.key, (err, videos) ->
+            if err then cb? err; return
+            video = videos[0]
+            log 'starting', video.title
+            roku.startVideo video.key, 2.5e6-2.5e6, (err) ->
+              log 'starting timeout'
+              setTimeout ->
+                roku.playAction 'pause'
+                # setTimeout ->
+                #   roku.playAction 'stop'
+                # , 3000
+              , 100000

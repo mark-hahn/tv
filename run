@@ -6,8 +6,9 @@ set -e
 cd ~/Dropbox/apps/tv
 coffee -co server-js server
 echo >> tv.log
-tail -fn 0 tv.log &
+# tail -fn 0 tv.log &
 # export DEBUG=*
 export DEBUG=tv:*
-nohup node server-js/tv-server.js >> tv.log 2>&1 &
+node server-js/ir.js
+# nohup node server-js/tv-server.js >> tv.log 2>&1 &
 # node server-js/tv-server.js &

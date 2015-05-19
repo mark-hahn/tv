@@ -5,6 +5,7 @@
 request = require 'request'
 log     = require('debug') 'tv:plex'
 
+# plexServerIp    = '192.168.1.11'
 plexServerIp    = '192.168.1.103'
 plexServerPort  = 32400
 
@@ -13,6 +14,7 @@ getPlexData = (path, eleType, cb) ->
     url: "http://#{plexServerIp}:#{plexServerPort}#{path}"
     headers: Accept: 'application/json'
   request opts, (err, resp, body) ->
+    # log {err, resp, body}
     if err or resp.statusCode isnt 200
       log 'getPlexData req error:', opts, resp.statusCode, err.message
       cb? err

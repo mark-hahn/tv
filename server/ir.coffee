@@ -7,20 +7,29 @@ log = require('debug') 'tv:-ir-'
 
 itachHost = '192.168.1.18'
 
-# for standard sony tv (tested on KDL-60R520A, remote RM-YD096)
+# for standard sony tv remote
+irPfx1 = 'sendir,1:1,'
+irPfx2 = ',40000,1,1,'
+irSfx  = ',24,24,24,24,24,24'
 irDataByCmd =
-  mute:   '96,24,24,24,24,24,48,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,24,24,24'
-  pwrTog: '96,24,48,24,24,24,48,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,24,24,24'
-  volUp:  '96,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,24,24,24'
-  volDn:  '96,24,48,24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,24,24,24'
+  hdmi1:  '24,24,24,24,24,24,24,48,24,24,24,24,24,48,24,48,24,24' # BD Home Theatre
+  hdmi2:  '24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,48,24,24' # Chromecast
+  hdmi3:  '24,24,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,48,24,48' # DVR
+  hdmi4:  '24,48,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,48,24,48' # Roku
+  pwrOff: '24,48,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24'
+  pwrOn:  '24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24'
+  volUp:  '24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,24'
+  volDn:  '24,48,24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,24'
+  mute:   '24,24,24,24,24,48,24,24,24,48,24,24,24,24,24,48,24,24'
 
 idCount = 0
 itach = timeout = null
 
 writeToItach = (irData, cb) ->
   idCount = ++idCount % 6553
-  itach.write 'sendir,1:1,' + idCount + ',40000,10,1,' + 
-              irData + ',1035,' + irData + ',1035,' + irData + ',4000\r', 'utf8', (err) ->
+  data = '96,' + irData + irSfx
+  itach.write irPfx1 + idCount + irPfx2 + data + ',1035,' + data + ',1035,' + data + ',4000\r', \
+              'utf8', (err) ->
     if err then log 'write err: ' + err.message; cb err; return
     cb()
 
@@ -73,12 +82,12 @@ exports.sendCmd = (cmd, cb) ->
 
 i = 0
 do one = ->
-  # log 'start'
-  exports.sendCmd 'volUp', (err) ->
-    if err then log 'sendCmd err: ', err.message
-    else 
-      log 'finish'
-      if ++i < 1 then one()
-      else process.exit()
-    
-    
+  if not (code = ['hdmi1','hdmi2','hdmi3','hdmi4','pwrOff'][i++]) 
+    log 'finished'
+    process.exit()
+  log 'sending ' + code
+  exports.sendCmd code, (err) ->
+    if err then log 'sendCmd err: ', err.message; process.exit()
+    else setTimeout one, 2000
+      
+      

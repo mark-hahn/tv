@@ -12,21 +12,21 @@ irPfx1 = 'sendir,1:1,'
 irPfx2 = ',40000,1,1,'
 irSfx  = ',24,24,24,24,24,24'
 irDataByCmd =
-  hdmi1:  '24,24,24,24,24,24,24,48,24,24,24,24,24,48,24,48,24,24' # BD Home Theatre
-  hdmi2:  '24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,48,24,24' # Chromecast
-  hdmi3:  '24,24,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,48,24,48' # DVR
-  hdmi4:  '24,48,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,48,24,48' # Roku
   pwrOff: '24,48,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24'
   pwrOn:  '24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24'
   volUp:  '24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,24'
   volDn:  '24,48,24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,24'
   mute:   '24,24,24,24,24,48,24,24,24,48,24,24,24,24,24,48,24,24'
+  hdmi1:  '24,24,24,24,24,24,24,48,24,24,24,24,24,48,24,48,24,24' # BD Home Theatre
+  hdmi2:  '24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,48,24,24' # Chromecast
+  hdmi3:  '24,24,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,48,24,48' # DVR
+  hdmi4:  '24,48,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,48,24,48' # Roku
 
-idCount = 0
+idCount = 65534
 itach = timeout = null
 
 writeToItach = (irData, cb) ->
-  idCount = ++idCount % 6553
+  idCount = ++idCount % 65536
   data = '96,' + irData + irSfx
   itach.write irPfx1 + idCount + irPfx2 + data + ',1035,' + data + ',1035,' + data + ',4000\r', \
               'utf8', (err) ->
@@ -42,7 +42,6 @@ sendIR = (irData, cb) ->
     if err then err = message: err
     if not cb then console.trace()
     cb? err, data
-    # cb = null
     
   timeout = setTimeout (-> endSendIR 'sendIR timeout'), 3000
 
@@ -82,9 +81,12 @@ exports.sendCmd = (cmd, cb) ->
 
 i = 0
 do one = ->
-  if not (code = ['hdmi1','hdmi2','hdmi3','hdmi4','pwrOff'][i++]) 
+  if not (code = ['pwrOn', 12000, 'hdmi1','hdmi2','hdmi3','hdmi4','pwrOff'][i++]) 
     log 'finished'
     process.exit()
+  if typeof code isnt 'string'
+    setTimeout one, code
+    return
   log 'sending ' + code
   exports.sendCmd code, (err) ->
     if err then log 'sendCmd err: ', err.message; process.exit()

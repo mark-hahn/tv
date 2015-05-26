@@ -14,7 +14,6 @@ teacup.use camelToKebab()
 log 'starting'
 
 #### intial html ####
-
 document.head.innerHTML = render ->
   meta name: 'viewport', \
     content: 'width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, ' +
@@ -65,9 +64,7 @@ document.body.innerHTML = render ->
     div '#header-comp', vComponent: 'header', vWith: 'curPage: curPage'
     div '#page-comp',   vComponent: '{{curPage}}', keepAlive: ''
 
-
 #### window resizing ####
-
 htmlEle = document.documentElement
 htmlEle.style['font-size'] = fontSize = '48px'
 pageEle = document.querySelector '#page'
@@ -93,25 +90,18 @@ do resize = ->
     
 window.addEventListener 'resize', resize
 
-
 #### page components ####
-
-require './header'
-
-require './two-btns'
-
-require './show-info'
-require './show-left'
-require './show-right'
-require './show-page'
-
-require './episode'
-require './watch'
-require './lights'
-
+require './page/header'
+require './page/two-btns'
+require './show/show-info'
+require './show/show-left'
+require './show/show-right'
+require './show/show-page'
+require './episode/episode'
+require './watch/watch'
+require './lights/lights'
 
 #### body view-model ####
-
 new Vue
   el: 'body'
   data:
@@ -123,4 +113,7 @@ new Vue
     episode: Vue.component 'episode-comp'
     watch:   Vue.component 'watch-comp'
     lights:  Vue.component 'lights-comp'
-    
+  methods:
+    turnOn:  -> log 'on'
+    turnOff: -> log 'off'
+

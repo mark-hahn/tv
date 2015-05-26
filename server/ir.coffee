@@ -22,7 +22,7 @@ irDataByCmd =
   hdmi3:  '24,24,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,48,24,48' # DVR
   hdmi4:  '24,48,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,48,24,48' # Roku
 
-idCount = 65534
+idCount = 0
 itach = timeout = null
 
 writeToItach = (irData, cb) ->
@@ -79,17 +79,17 @@ exports.sendCmd = (cmd, cb) ->
     # log 'sendIR result: ' + data
     cb()
 
-i = 0
-do one = ->
-  if not (code = ['pwrOn', 12000, 'hdmi1','hdmi2','hdmi3','hdmi4','pwrOff'][i++]) 
-    log 'finished'
-    process.exit()
-  if typeof code isnt 'string'
-    setTimeout one, code
-    return
-  log 'sending ' + code
-  exports.sendCmd code, (err) ->
-    if err then log 'sendCmd err: ', err.message; process.exit()
-    else setTimeout one, 2000
-      
+# i = 0
+# do one = ->
+#   if not (code = ['pwrOn', 12000, 'hdmi1','hdmi2','hdmi3','hdmi4','pwrOff'][i++]) 
+#     log 'finished'
+#     process.exit()
+#   if typeof code isnt 'string'
+#     setTimeout one, code
+#     return
+#   log 'sending ' + code
+#   exports.sendCmd code, (err) ->
+#     if err then log 'sendCmd err: ', err.message; process.exit()
+#     else setTimeout one, 2000
+#       
       

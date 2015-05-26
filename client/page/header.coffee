@@ -6,28 +6,39 @@ log = require('debug') 'tv:hdr'
 (document.head.appendChild document.createElement('style')).textContent = """
   .header {
     position:relative;
+    display:inline-block;
+    width: 80%;
     height: 2.6rem;
   }
   .header .btn {
     width: 25%;
   }
+  .btn.onoff {
+    width: 10%;
+  }
 """
 
-Vue.component 'left-select-btns',
-  template: render ->
-    
+btnTimeout = null
+timeoutOff = ->
+  if btnTimeout then clearTimeout btnTimeout
+  btnTimeout = null
 
 Vue.component 'header', 
   template: render ->
-    div '.header', vOn: 'click: click', ->
+    div '.btn.onoff', vOn: 'mousedown: onOffDown, mouseup: onOffUp', 'On'
+    div '.header', vOn: 'mousedown: selPage', ->
       div '.btn', vClass: 'selected: curPage == "show"',    'Show'
       div '.btn', vClass: 'selected: curPage == "episode"', 'Episode'
       div '.btn', vClass: 'selected: curPage == "watch"',   'Watch'
       div '.btn', vClass: 'selected: curPage == "lights"',  'Lights'
+    div '.btn.onoff', vOn: 'mousedown: onOffDown, mouseup: onOffUp', 'Off'
   methods:
-    click: (e) ->
-      @curPage = e.target.innerText.toLowerCase()
-      
-    
-  
+    selPage: (e) -> @curPage = e.target.innerText.toLowerCase()
+    onOffDown: (e) -> 
+      timeoutOff()
+      body = @$parent
+      btnTimeout = setTimeout ->
+        if e.target.innerText is 'On' then body.turnOn() else body.turnOff()
+      , 500
+    onOffUp: timeoutOff
   

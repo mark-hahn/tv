@@ -5,6 +5,7 @@ window.appDebug = require 'debug'
 appDebug.enable '*'
 
 Vue = require 'vue'
+request = require 'superagent'
 log = require('debug') 'tv:app'
 teacup = require 'teacup'
 camelToKebab = require 'teacup-camel-to-kebab'
@@ -101,6 +102,19 @@ require './episode/episode'
 require './watch/watch'
 require './lights/lights'
 
+#### ajax ####
+serverIp = '192.168.1.103'
+ajaxPfx = "http://#{serverIp}:1344/"
+ajaxCmd = (cmd) ->
+  request
+    .get ajaxPfx + cmd
+    .set 'Content-Type', 'text/plain'
+    .set 'Accept', 'application/json'
+    .end (err, res) ->
+      if err then log 'ajax cmd get err: ' + err.message; return
+      # shows = JSON.parse res.text
+      # log 'got ' + shows.length + ' shows'
+
 #### body view-model ####
 new Vue
   el: 'body'
@@ -114,6 +128,6 @@ new Vue
     watch:   Vue.component 'watch-comp'
     lights:  Vue.component 'lights-comp'
   methods:
-    turnOn:  -> log 'on'
-    turnOff: -> log 'off'
+    turnOn:  -> ajaxCmd 'trnon'
+    turnOff: -> ajaxCmd 'trnof'
 

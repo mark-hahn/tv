@@ -1,6 +1,8 @@
 
-Vue = require 'vue'
-log = require('debug') 'tv:hdr'
+Vue     = require 'vue'
+log     = require('debug') 'tv:hdr'
+request = require 'superagent'
+
 {render, div} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """

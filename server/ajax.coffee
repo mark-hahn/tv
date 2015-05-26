@@ -1,13 +1,12 @@
 
 http = require 'http'
+ir   = require './ir'
 plex = require './plex'
 roku = require './roku'
 log  = require('debug') 'tv:ajax'
 
 ajaxServerPort  = 1344
 tvShowsKey = null
-
-
 
 # uql = require 'unqlite'
 # db = new uql.Database 'plexdb2/plex2.db'
@@ -23,7 +22,9 @@ tvShowsKey = null
 error = (res, msg, code = 500) ->
   log msg
   if res
-    res.writeHead code, {'Content-Type': 'text/plain'}
+    res.writeHead code, 
+      'Content-Type': 'text/plain'
+      'Access-Control-Allow-Origin': '*'
     res.end 'Error: ' + msg
 
 plex.getSectionKeys (err, keys) ->
@@ -38,7 +39,8 @@ srvr = http.createServer (req, res) ->
     'Content-Type': 'text/json'
     'Access-Control-Allow-Origin': '*'
   switch req.url[1..5]
-    
+    when 'favic'
+      error res, 'no favicon'
     when 'shows'
       if not tvShowsKey
         error res, 'tvShowsKey missing, ignoring ajax shows req'
@@ -54,6 +56,15 @@ srvr = http.createServer (req, res) ->
     # for insteon, see ...
     #   /root/Dropbox/apps/hvac/src/commands.coffee
     #   /root/Dropbox/apps/insteon-hub/src/main.coffee
+    
+    when 'trnon'
+      ir.sendCmd 'pwrOn', (err) ->
+        if err then error res, err.message
+        else res.end()
+    when 'trnof'
+      ir.sendCmd 'pwrOff', (err) ->
+        if err then error res, err.message
+        else res.end()
 
     else
       error res, 'invalid request: ' + req.url, 404

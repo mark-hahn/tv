@@ -40,7 +40,8 @@ Vue.component 'header',
       timeoutOff()
       body = @$parent
       btnTimeout = setTimeout ->
+        log 'timout'
         if e.target.innerText is 'On' then body.turnOn() else body.turnOff()
-      , 500
+      , 300
     onOffUp: timeoutOff
   

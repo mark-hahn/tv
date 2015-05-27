@@ -105,15 +105,13 @@ require './lights/lights'
 #### ajax ####
 serverIp = '192.168.1.103'
 ajaxPfx = "http://#{serverIp}:1344/"
-ajaxCmd = (cmd) ->
+ajaxCmd = (cmd, data) ->
   request
-    .get ajaxPfx + cmd
+    .get ajaxPfx + cmd + (if data then '/' + data else '')
     .set 'Content-Type', 'text/plain'
     .set 'Accept', 'application/json'
     .end (err, res) ->
       if err then log 'ajax cmd get err: ' + err.message; return
-      # shows = JSON.parse res.text
-      # log 'got ' + shows.length + ' shows'
 
 #### body view-model ####
 new Vue
@@ -128,6 +126,6 @@ new Vue
     watch:   Vue.component 'watch-comp'
     lights:  Vue.component 'lights-comp'
   methods:
-    turnOn:  -> ajaxCmd 'trnon'
-    turnOff: -> ajaxCmd 'trnof'
+    turnOn:  -> ajaxCmd 'turnon'
+    turnOff: -> ajaxCmd 'ircmd', 'pwrOff'
 

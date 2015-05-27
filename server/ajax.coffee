@@ -29,17 +29,23 @@ error = (res, msg, code = 500) ->
 
 plex.getSectionKeys (err, keys) ->
   if err then error null, 'getSectionKeys err: ' + err.message; return
-  log 'have SectionKeys', keys
+  # log 'have SectionKeys', keys
   {tvShowsKey} = keys
 
-log 'starting'
+# log 'starting'
+
+poweringUp = no
 
 srvr = http.createServer (req, res) ->
+  # log 'http req: ' + req.url
+  
   res.writeHead 200, 
     'Content-Type': 'text/json'
     'Access-Control-Allow-Origin': '*'
-  switch req.url[1..5]
-    when 'favic'
+    
+  [__, reqCmd, reqData] = req.url.split '/'
+  switch reqCmd
+    when 'favicon'
       error res, 'no favicon'
     when 'shows'
       if not tvShowsKey
@@ -57,14 +63,21 @@ srvr = http.createServer (req, res) ->
     #   /root/Dropbox/apps/hvac/src/commands.coffee
     #   /root/Dropbox/apps/insteon-hub/src/main.coffee
     
-    when 'trnon'
+    when 'turnon'
+      poweringUp = yes
       ir.sendCmd 'pwrOn', (err) ->
-        if err then error res, err.message
-        else res.end()
-    when 'trnof'
-      ir.sendCmd 'pwrOff', (err) ->
-        if err then error res, err.message
-        else res.end()
+        if err then error res, err.message; poweringUp = no; return
+        setTimeout ->
+          ir.sendCmd 'hdmi2', (err) ->
+            poweringUp = no
+            if err then error res, err.message; return
+            res.end '{}'
+        , 15000
+    when 'ircmd'
+      if poweringUp then res.end '{}'; return
+      ir.sendCmd reqData, (err) ->
+        if err then error res, err.message; return
+        res.end '{}'
 
     else
       error res, 'invalid request: ' + req.url, 404

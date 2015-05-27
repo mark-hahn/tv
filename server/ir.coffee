@@ -33,15 +33,19 @@ writeToItach = (irData, cb) ->
     if err then log 'write err: ' + err.message; cb err; return
     cb()
 
+sendIrCb = null
+
+# not re-entrant
 sendIR = (irData, cb) ->
+  sendIrCb = cb
   
   endSendIR = (err, data) ->
     if timeout then clearTimeout timeout
     timeout = null
-    # if data then log 'endSendIR data: ' + data
+    # if data then log 'endSendIR data: ' + data[0..80]
     if err then err = message: err
-    if not cb then console.trace()
-    cb? err, data
+    sendIrCb? err, data
+    sendIrCb = null
     
   timeout = setTimeout (-> endSendIR 'sendIR timeout'), 3000
 
@@ -63,7 +67,6 @@ sendIR = (irData, cb) ->
       
     itach.on 'end', (err) ->
       if err then endSendIR 'end err: ' + err.message;  return
-      log 'itach end'
       endSendIR()
     return
       
@@ -73,11 +76,12 @@ sendIR = (irData, cb) ->
       return
 
 exports.sendCmd = (cmd, cb) ->
+  # log 'sending cmd: ' + cmd
   sendIR irDataByCmd[cmd], (err, data) ->
     if err or data[0..2] is 'ERR' 
-      log 'sendIR err: ' + (err?.message ? data); cb err; return
-    # log 'sendIR result: ' + data
-    cb()
+      log 'sendIR err: ' + (err?.message ? data); cb? err; return
+    # log 'received cmd: ' + cmd
+    cb?()
 
 # i = 0
 # do one = ->

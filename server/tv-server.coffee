@@ -2,12 +2,12 @@
 beefy = require("beefy")
 http  = require("http")
 log   = require('debug') 'tv:tsrv'
-require './ajax'
+require './server-js/ajax'
 
 log 'starting tv beefy'
 
 http.createServer(beefy(
-  entries: [ "../client/app.coffee" ]
+  entries: '/client-app': 'client/app.coffee'
   cwd: __dirname
   live: true
   quiet: false

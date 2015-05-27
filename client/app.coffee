@@ -117,7 +117,7 @@ ajaxCmd = (cmd, data) ->
 new Vue
   el: 'body'
   data:
-    curPage: 'show'
+    curPage: 'lights'
     midRowStyle:  
       height: midRowHeight
   components:

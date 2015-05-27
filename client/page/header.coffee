@@ -12,6 +12,20 @@ request = require 'superagent'
     width: 80%;
     height: 2.6rem;
   }
+  .header .pwrOverlay {
+    position:absolute;
+    left:0;
+    top:7%;
+    width: 100%;
+    height: 60%;
+    color:white;
+    background-color: #00c;
+    opacity:0.8;
+    border-radius: 1rem;
+    font-size: 1.3rem;
+    font-weight: bold;
+    text-align: center;
+  }
   .header .btn {
     width: 25%;
   }
@@ -33,15 +47,21 @@ Vue.component 'header',
       div '.btn', vClass: 'selected: curPage == "episode"', 'Episode'
       div '.btn', vClass: 'selected: curPage == "watch"',   'Watch'
       div '.btn', vClass: 'selected: curPage == "lights"',  'Lights'
+      div '.pwrOverlay', vIf: 'pwrText',  vText: 'pwrText'
     div '.btn.onoff', vOn: 'mousedown: onOffDown, mouseup: onOffUp', 'Off'
+  data: ->
+    pwrText: ''
   methods:
     selPage: (e) -> @curPage = e.target.innerText.toLowerCase()
     onOffDown: (e) -> 
+      if @pwrText then return
+      onDown = e.target.innerText is 'On'
       timeoutOff()
       body = @$parent
-      btnTimeout = setTimeout ->
-        log 'timout'
-        if e.target.innerText is 'On' then body.turnOn() else body.turnOff()
-      , 300
+      btnTimeout = setTimeout =>
+        @pwrText = 'Power O' + (if onDown then 'n ...' else 'ff ...')
+        setTimeout (=> @pwrText = ''), (if onDown then 16000 else 500)
+        if onDown then body.turnOn() else body.turnOff()
+      , 200
     onOffUp: timeoutOff
   

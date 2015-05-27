@@ -9,7 +9,7 @@ request = require 'superagent'
   .header {
     position:relative;
     display:inline-block;
-    width: 80%;
+    width: 68%;
     height: 2.6rem;
   }
   .header .pwrOverlay {
@@ -22,7 +22,7 @@ request = require 'superagent'
     background-color: #00c;
     opacity:0.5;
     border-radius:0.5rem;
-    font-size: 1rem;
+    font-size: 1.2rem;
     font-weight: bold;
     text-align: center;
     z-index:10;
@@ -31,7 +31,7 @@ request = require 'superagent'
     width: 25%;
   }
   .btn.onoff {
-    width: 10%;
+    width: 16%;
   }
 """
 
@@ -45,22 +45,29 @@ Vue.component 'header',
     div '.btn.onoff', vOn: 'mousedown: onOffDown, mouseup: onOffUp', 'On'
     div '.header', vOn: 'mousedown: selPage', ->
       div '.btn', vClass: 'selected: curPage == "show"',    'Show'
-      div '.btn', vClass: 'selected: curPage == "episode"', 'Episode'
+      div '.btn', vClass: 'selected: curPage == "episode"', 'Episo'
       div '.btn', vClass: 'selected: curPage == "watch"',   'Watch'
-      div '.btn', vClass: 'selected: curPage == "lights"',  'Lights'
+      div '.btn', vClass: 'selected: curPage == "lights"',  'Light'
       div '.pwrOverlay', vIf: 'pwrText',  vText: 'pwrText'
     div '.btn.onoff', vOn: 'mousedown: onOffDown, mouseup: onOffUp', 'Off'
   data: ->
     pwrText: ''
   methods:
-    selPage: (e) -> @curPage = e.target.innerText.toLowerCase()
+    selPage: (e) -> 
+      @curPage = switch e.target.innerText[0..3]
+        when 'Show' then 'show'
+        when 'Epis' then 'episode'
+        when 'Watc' then 'watch'
+        when 'Ligh' then 'lights'
+        else @curPage
+    
     onOffDown: (e) -> 
       if @pwrText then return
       onBtn = e.target.innerText is 'On'
       timeoutOff()
       body = @$parent
       btnTimeout = setTimeout =>
-        @pwrText = 'Powering O' + (if onBtn then 'n ...' else 'ff ...')
+        @pwrText = 'Turning TV O' + (if onBtn then 'n ...' else 'ff ...')
         setTimeout (=> @pwrText = ''), (if onBtn then 16000 else 500)
         if onBtn then body.turnOn() else body.turnOff()
       , 200

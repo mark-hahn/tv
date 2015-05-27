@@ -15,16 +15,17 @@ request = require 'superagent'
   .header .pwrOverlay {
     position:absolute;
     left:0;
-    top:7%;
+    top:1.6rem;
     width: 100%;
     height: 60%;
     color:white;
     background-color: #00c;
-    opacity:0.8;
-    border-radius: 1rem;
-    font-size: 1.3rem;
+    opacity:0.5;
+    border-radius:0.5rem;
+    font-size: 1rem;
     font-weight: bold;
     text-align: center;
+    z-index:10;
   }
   .header .btn {
     width: 25%;
@@ -55,13 +56,13 @@ Vue.component 'header',
     selPage: (e) -> @curPage = e.target.innerText.toLowerCase()
     onOffDown: (e) -> 
       if @pwrText then return
-      onDown = e.target.innerText is 'On'
+      onBtn = e.target.innerText is 'On'
       timeoutOff()
       body = @$parent
       btnTimeout = setTimeout =>
-        @pwrText = 'Power O' + (if onDown then 'n ...' else 'ff ...')
-        setTimeout (=> @pwrText = ''), (if onDown then 16000 else 500)
-        if onDown then body.turnOn() else body.turnOff()
+        @pwrText = 'Powering O' + (if onBtn then 'n ...' else 'ff ...')
+        setTimeout (=> @pwrText = ''), (if onBtn then 16000 else 500)
+        if onBtn then body.turnOn() else body.turnOff()
       , 200
     onOffUp: timeoutOff
   

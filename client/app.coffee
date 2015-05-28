@@ -1,18 +1,19 @@
 
 # src/app
 
+window.tvGlobal = {}
+
 window.appDebug = require 'debug'
 appDebug.enable '*'
 
 Vue = require 'vue'
 request = require 'superagent'
 log = require('debug') 'tv:app'
+
 teacup = require 'teacup'
 camelToKebab = require 'teacup-camel-to-kebab'
 teacup.use camelToKebab()
 {render, meta, title, style, div} = teacup
-
-log 'starting'
 
 #### intial html ####
 document.head.innerHTML = render ->
@@ -105,16 +106,20 @@ require './lights/lights'
 #### ajax ####
 serverIp = '192.168.1.103'
 ajaxPfx = "http://#{serverIp}:1344/"
-ajaxCmd = (cmd, data) ->
+ajaxCmd = (cmd, data, cb) ->
+  if not data then cd = data; data = null
   request
     .get ajaxPfx + cmd + (if data then '/' + data else '')
     .set 'Content-Type', 'text/plain'
     .set 'Accept', 'application/json'
     .end (err, res) ->
-      if err then log 'ajax cmd get err: ' + err.message; return
+      console.log 'ajaxCmd ret', {cmd, data, err, res}
+      if err then log 'ajax cmd get err: ' + err; cb? err; return
+      if res then cb? null, JSON.parse res
 
 #### body view-model ####
-new Vue
+tvGlobal.vmBody = new Vue
+  name: 'app-body'
   el: 'body'
   data:
     curPage: 'lights'
@@ -126,6 +131,5 @@ new Vue
     watch:   Vue.component 'watch-comp'
     lights:  Vue.component 'lights-comp'
   methods:
-    turnOn:  -> ajaxCmd 'turnon'
-    turnOff: -> ajaxCmd 'ircmd', 'pwrOff'
+    ajax: ajaxCmd
 

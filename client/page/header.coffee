@@ -41,6 +41,7 @@ timeoutOff = ->
   btnTimeout = null
 
 Vue.component 'header', 
+  name: 'header-comp'
   template: render ->
     div '.btn.onoff', vOn: 'mousedown: onOffDown, mouseup: onOffUp', 'On'
     div '.header', vOn: 'mousedown: selPage', ->
@@ -69,7 +70,7 @@ Vue.component 'header',
       btnTimeout = setTimeout =>
         @pwrText = 'Turning TV O' + (if onBtn then 'n ...' else 'ff ...')
         setTimeout (=> @pwrText = ''), (if onBtn then 16000 else 500)
-        if onBtn then body.turnOn() else body.turnOff()
+        if onBtn then body.ajax 'turnOn' else body.ajax 'ircmd', 'pwrOff'
       , 200
     onOffUp: timeoutOff
   

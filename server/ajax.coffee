@@ -1,9 +1,10 @@
 
-http = require 'http'
-ir   = require './ir'
-plex = require './plex'
-roku = require './roku'
-log  = require('debug') 'tv:ajax'
+http    = require 'http'
+ir      = require './ir'
+plex    = require './plex'
+roku    = require './roku'
+insteon = require './insteon'
+log     = require('debug') 'tv:ajax'
 
 ajaxServerPort  = 1344
 tvShowsKey = null
@@ -20,13 +21,22 @@ tvShowsKey = null
 #     log {error, key, value}
 
 error = (res, msg, code = 500) ->
-  log msg
+  log 'ajax error: ' +  msg
   if res
     res.writeHead code, 
       'Content-Type': 'text/plain'
       'Access-Control-Allow-Origin': '*'
-    res.end 'Error: ' + msg
+    res.end JSON.stringify err: msg, status: code
 
+success: (res, data) ->
+  if res
+    res.writeHead code, 
+      'Content-Type': 'text/plain'
+      'Access-Control-Allow-Origin': '*'
+    result = status: 200
+    if data then result.res = data
+    res.end JSON.stringify result
+  
 plex.getSectionKeys (err, keys) ->
   if err then error null, 'getSectionKeys err: ' + err.message; return
   # log 'have SectionKeys', keys
@@ -46,7 +56,7 @@ srvr = http.createServer (req, res) ->
   [__, reqCmd, reqData] = req.url.split '/'
   switch reqCmd
     when 'favicon'
-      error res, 'no favicon'
+      error res, 'no favicon', 404
     when 'shows'
       if not tvShowsKey
         error res, 'tvShowsKey missing, ignoring ajax shows req'
@@ -57,13 +67,14 @@ srvr = http.createServer (req, res) ->
         for show in shows
           {title, summary, thumb} = show
           result.push {title, summary, thumb}
-        res.end JSON.stringify result
+        success res, result
 
     # for insteon, see ...
     #   /root/Dropbox/apps/hvac/src/commands.coffee
     #   /root/Dropbox/apps/insteon-hub/src/main.coffee
     
-    when 'turnon'
+    when 'turnOn'
+      if poweringUp then success res, 'skipped'; return
       poweringUp = yes
       ir.sendCmd 'pwrOn', (err) ->
         if err then error res, err.message; poweringUp = no; return
@@ -71,16 +82,21 @@ srvr = http.createServer (req, res) ->
           ir.sendCmd 'hdmi2', (err) ->
             poweringUp = no
             if err then error res, err.message; return
-            res.end '{}'
+            success res, 'done'
         , 15000
-    when 'ircmd'
-      if poweringUp then res.end '{}'; return
+    when 'irCmd'
+      if poweringUp then success res, 'skipped'; return
       ir.sendCmd reqData, (err) ->
         if err then error res, err.message; return
-        res.end '{}'
+        success res, 'sent'
 
+    when getAllLights
+      insteon.getAllLights (err, result) ->
+        if err then error res, 'getAllLights err: ' + err.message; return
+        success res, result
+        
     else
-      error res, 'invalid request: ' + req.url, 404
+      error res, 'bad request cmd: ' + req.url, 400
 
 srvr.listen ajaxServerPort
 log 'srvr.listen ajaxServerPort ' + ajaxServerPort

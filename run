@@ -12,5 +12,5 @@ tail -fn 0 tv.log &
 export DEBUG=*
 export DEBUG=tv:*
 # nohup node tv-server.js >> tv.log 2>&1 &
-# node tv-server.js &
-node tv-server.js
+node tv-server.js &
+# node tv-server.js

@@ -20,7 +20,7 @@ tvShowsKey = null
 #   db.fetch 'key', (error, key, value) ->
 #     log {error, key, value}
 
-error = (res, msg, code = 500) ->
+error = (res, msg, code=500) ->
   log 'ajax error: ' +  msg
   if res
     res.writeHead code, 
@@ -28,13 +28,13 @@ error = (res, msg, code = 500) ->
       'Access-Control-Allow-Origin': '*'
     res.end JSON.stringify err: msg, status: code
 
-success: (res, data) ->
+success = (res, data) ->
   if res
-    res.writeHead code, 
-      'Content-Type': 'text/plain'
+    res.writeHead 200, 
+      'Content-Type': 'text/json'
       'Access-Control-Allow-Origin': '*'
     result = status: 200
-    if data then result.res = data
+    if data then result.data = data
     res.end JSON.stringify result
   
 plex.getSectionKeys (err, keys) ->
@@ -84,16 +84,17 @@ srvr = http.createServer (req, res) ->
             if err then error res, err.message; return
             success res, 'done'
         , 15000
+        
     when 'irCmd'
       if poweringUp then success res, 'skipped'; return
       ir.sendCmd reqData, (err) ->
         if err then error res, err.message; return
         success res, 'sent'
 
-    when getAllLights
-      insteon.getAllLights (err, result) ->
+    when 'getLightLevels'
+      insteon.getLightLevels (err, lightLevels) ->
         if err then error res, 'getAllLights err: ' + err.message; return
-        success res, result
+        success res, lightLevels
         
     else
       error res, 'bad request cmd: ' + req.url, 400

@@ -1,7 +1,7 @@
 
 # src/app
 
-window.tvGlobal = {}
+window.tvGlobal = tvGlobal = {}
 
 window.appDebug = require 'debug'
 appDebug.enable '*'
@@ -106,19 +106,20 @@ require './lights/lights'
 #### ajax ####
 serverIp = '192.168.1.103'
 ajaxPfx = "http://#{serverIp}:1344/"
-ajaxCmd = (cmd, data, cb) ->
-  if not data then cd = data; data = null
+
+tvGlobal.ajaxCmd = (cmd, data, cb) ->
+  if typeof data is 'function' then cb = data; data = null
   request
     .get ajaxPfx + cmd + (if data then '/' + data else '')
     .set 'Content-Type', 'text/plain'
     .set 'Accept', 'application/json'
     .end (err, res) ->
       console.log 'ajaxCmd ret', {cmd, data, err, res}
-      if err then log 'ajax cmd get err: ' + err; cb? err; return
-      if res then cb? null, JSON.parse res
+      if err or res.status isnt 200 then log 'ajax err', (err ? res.status); cb? err ? res; return
+      cb? null, JSON.parse res.text
 
 #### body view-model ####
-tvGlobal.vmBody = new Vue
+new Vue
   name: 'app-body'
   el: 'body'
   data:
@@ -130,6 +131,3 @@ tvGlobal.vmBody = new Vue
     episode: Vue.component 'episode-comp'
     watch:   Vue.component 'watch-comp'
     lights:  Vue.component 'lights-comp'
-  methods:
-    ajax: ajaxCmd
-

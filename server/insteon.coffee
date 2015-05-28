@@ -22,19 +22,30 @@ exports.lightCmd = (light, cmd, args...) ->
 		if arg is 'async' then async = yes; continue
 		if typeof arg is 'function' then cb = arg; break
 		argStr += '/' + arg
-  opts =
-    url: "http://#{hubIp}:#{hubPort}/light/#{cmd}/#{lightIds[light-1]}#{argStr}" + 
-		     (if async then '?async=1' else '')
-    headers: Accept: 'application/json'
-  request opts, (err, resp, body) ->
+	opts =
+		url: "http://#{hubIp}:#{hubPort}/light/#{cmd}/#{lightIds[light-1]}#{argStr}" + 
+		       (if async then '?async=1' else '')
+		headers: Accept: 'application/json'
+	request opts, (err, resp, body) ->
     if err or resp.statusCode isnt 200
       log 'lightCmd error', opts, resp?.statusCode, err?.message
       cb? message: 'lightCmd error'
       return
     cb? null, JSON.parse body ? '{}'
 	
-i=-1
-do one = ->
-	exports.lightCmd 1, 'level', Math.round((++i)*25), -> if i < 4 then one()
-	
-	
+exports.getLightLevels = (cb) ->
+	i = 0; allLevels = []
+	do one = ->
+		exports.lightCmd ++i, 'level', 'async', (err, resp) -> 
+			if err then log 'getLightLevels error', err; cb err; return
+			allLevels.push resp
+			# log 'light', i + ' is set to ', resp
+			if i is 6 then cb null, allLevels
+			else one()
+
+# exports.getLightLevels (err, levels) -> 
+# 	log 'levels', levels
+exports.lightCmd 1, 'turnOn', 100, 5000
+		# exports.getLightLevels (err, levels) -> 
+			# log 'levels', levels
+

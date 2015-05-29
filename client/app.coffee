@@ -110,12 +110,13 @@ ajaxPfx = "http://#{serverIp}:1344/"
 tvGlobal.ajaxCmd = (cmd, data, cb) ->
   if typeof data is 'function' then cb = data; data = null
   request
-    .get ajaxPfx + cmd + (if data then '/' + data else '')
+    .get ajaxPfx + cmd + (if data then '/' + encodeURI data else '')
     .set 'Content-Type', 'text/plain'
     .set 'Accept', 'application/json'
     .end (err, res) ->
-      console.log 'ajaxCmd ret', {cmd, data, err, res}
-      if err or res.status isnt 200 then log 'ajax err', (err ? res.status); cb? err ? res; return
+      # console.log 'ajaxCmd ret', {cmd, data, err, res}
+      if err or res.status isnt 200
+        log 'ajax err', (err ? res.status); cb? err ? res; return
       cb? null, JSON.parse res.text
 
 #### body view-model ####

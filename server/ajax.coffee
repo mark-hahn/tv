@@ -91,6 +91,13 @@ srvr = http.createServer (req, res) ->
         if err then error res, err.message; return
         success res, 'sent'
 
+    when 'lightCmd'
+      try
+        insteon.lightCmd JSON.parse(decodeURI reqData)...
+        success res
+      catch e
+        error res, 'invalid lightCmd URL' + req.url
+        
     when 'getLightLevels'
       insteon.getLightLevels (err, lightLevels) ->
         if err then error res, 'getAllLights err: ' + err.message; return

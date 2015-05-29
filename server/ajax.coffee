@@ -57,6 +57,11 @@ srvr = http.createServer (req, res) ->
   switch reqCmd
     when 'favicon'
       error res, 'no favicon', 404
+      
+    when 'log'
+      console.log 'tvGlobal.log: ' + decodeURI reqData
+      success res
+      
     when 'shows'
       if not tvShowsKey
         error res, 'tvShowsKey missing, ignoring ajax shows req'

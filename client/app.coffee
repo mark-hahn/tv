@@ -119,6 +119,11 @@ tvGlobal.ajaxCmd = (cmd, data, cb) ->
         log 'ajax err', (err ? res.status); cb? err ? res; return
       cb? null, JSON.parse res.text
 
+tvGlobal.log = (args...) ->
+  msg = args.join ', '
+  console.log 'tvGlobal.log: ' + msg
+  tvGlobal.ajaxCmd 'log', msg
+  
 #### body view-model ####
 new Vue
   name: 'app-body'

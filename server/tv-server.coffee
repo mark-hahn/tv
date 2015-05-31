@@ -1,10 +1,15 @@
 
+fs = require 'fs'
 beefy = require("beefy")
 http  = require("http")
-log   = require('debug') 'tv:tsrv'
-require './server-js/ajax'
+log   = require('debug') 'tv:srvr'
+cfg   = require('parent-config') 'apps-config.json'
 
-log 'starting tv beefy'
+src = fs.readFileSync 'client/app.coffee', 'utf8'
+src.replace /tvGlobal.ajaxPort.=.\d+/, 'tvGlobal.ajaxPort = ' + cfg.tvAjax_port
+fs.writeFileSync 'client/app.coffee', src
+
+require './server-js/ajax'
 
 http.createServer(beefy(
   entries: '/client-app': 'client/app.coffee'
@@ -17,4 +22,5 @@ http.createServer(beefy(
     "--extension", ".coffee"
   ]
   
-)).listen 1340
+)).listen cfg.tv_port
+log 'tv app  listening on port ' + cfg.tv_port

@@ -49,10 +49,10 @@ Vue.component 'header',
       div '.btn', vClass: 'selected: curPage == "episode"', 'Episo'
       div '.btn', vClass: 'selected: curPage == "watch"',   'Watch'
       div '.btn', vClass: 'selected: curPage == "lights"',  'Light'
-      div '.pwrOverlay', vIf: 'pwrText',  vText: 'pwrText'
+      div '.pwrOverlay', vIf: 'powerText',  vText: 'powerText'
     div '.btn.onoff', vOn: 'mousedown: onOffDown, mouseup: onOffUp', 'Off'
   data: ->
-    pwrText: ''
+    powerText: ''
   methods:
     selPage: (e) -> 
       @curPage = switch e.target.innerText[0..3]
@@ -63,13 +63,13 @@ Vue.component 'header',
         else @curPage
     
     onOffDown: (e) -> 
-      if @pwrText then return
+      if @powerText then return
       onBtn = e.target.innerText is 'On'
       timeoutOff()
       body = @$parent
       btnTimeout = setTimeout =>
-        @pwrText = 'Turning TV O' + (if onBtn then 'n ...' else 'ff ...')
-        setTimeout (=> @pwrText = ''), (if onBtn then 16000 else 500)
+        @powerText = 'Turning TV O' + (if onBtn then 'n ...' else 'ff ...')
+        setTimeout (=> @powerText = ''), (if onBtn then 16000 else 500)
         if onBtn then body.ajax 'turnOn' else body.ajax 'ircmd', 'pwrOff'
       , 200
     onOffUp: timeoutOff

@@ -24,7 +24,7 @@ exports.lightCmd = (light, cmd, args...) ->
 		argStr += '/' + arg
 	opts =
 		url: "http://#{hubIp}:#{hubPort}/light/#{cmd}/#{lightIds[light-1]}#{argStr}" + 
-		       (if async then '?async=1' else '')
+		       (if async then '?async=1&cancel=1' else '?cancel=1')
 		headers: Accept: 'application/json'
 	request opts, (err, resp, body) ->
     if err or resp.statusCode isnt 200

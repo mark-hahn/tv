@@ -1,14 +1,16 @@
 
 # src/app
 
-window.tvGlobal = tvGlobal = {}
+window.tvGlobal = {}
 
-window.appDebug = require 'debug'
-appDebug.enable '*'
+#this line is replaced on every run
+tvGlobal.ajaxPort = 2344
 
-Vue = require 'vue'
+require('debug').enable '*'
+
+Vue     = require 'vue'
 request = require 'superagent'
-log = require('debug') 'tv:app'
+log     = require('debug') 'tv:app'
 
 teacup = require 'teacup'
 camelToKebab = require 'teacup-camel-to-kebab'
@@ -16,6 +18,7 @@ teacup.use camelToKebab()
 {render, meta, title, style, div} = teacup
 
 #### intial html ####
+
 document.head.innerHTML = render ->
   meta name: 'viewport', \
     content: 'width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, ' +
@@ -67,11 +70,11 @@ document.body.innerHTML = render ->
     div '#page-comp',   vComponent: '{{curPage}}', keepAlive: ''
 
 #### window resizing ####
+
 htmlEle = document.documentElement
 htmlEle.style['font-size'] = fontSize = '48px'
 pageEle = document.querySelector '#page'
-pageEle.style.width  = (bodyWidInRems = 24) + 'rem'
-midRowHeight         =                 '35rem'
+pageEle.style.width  = (bodyWidInRems = 24  ) + 'rem'
 pageEle.style.height = (bodyHgtInRems = 40.5) + 'rem'
 resizeTimeout = null
   
@@ -93,6 +96,7 @@ do resize = ->
 window.addEventListener 'resize', resize
 
 #### page components ####
+
 require './page/header'
 require './page/two-btns'
 require './show/show-info'
@@ -104,8 +108,9 @@ require './watch/watch'
 require './lights/lights'
 
 #### ajax ####
+
 serverIp = '192.168.1.103'
-ajaxPfx = "http://#{serverIp}:1344/"
+ajaxPfx = "http://#{serverIp}:#{tvGlobal.ajaxPort}/"
 
 tvGlobal.ajaxCmd = (cmd, data, cb) ->
   if typeof data is 'function' then cb = data; data = null
@@ -119,21 +124,20 @@ tvGlobal.ajaxCmd = (cmd, data, cb) ->
         log 'ajax err', (err ? res.status); cb? err ? res; return
       cb? null, JSON.parse res.text
 
-tvGlobal.log = (args...) ->
+tvGlobal.ajaxLog = (args...) ->
   msg = args.join ', '
   console.log 'tvGlobal.log: ' + msg
   tvGlobal.ajaxCmd 'log', msg
   
 #### body view-model ####
+
 new Vue
-  name: 'app-body'
   el: 'body'
   data:
     curPage: 'lights'
-    midRowStyle:  
-      height: midRowHeight
   components:
     show:    Vue.component 'show-page'
     episode: Vue.component 'episode-comp'
     watch:   Vue.component 'watch-comp'
     lights:  Vue.component 'lights-comp'
+    

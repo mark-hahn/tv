@@ -3,7 +3,7 @@ Vue = require 'vue'
 log = require('debug') 'tv:lts'
 {render, div, img} = require 'teacup'
 
-### SINGLE LIGHT SWITCH COMPONENT ####
+### single light switch component ####
 (document.head.appendChild document.createElement('style')).textContent = """
   .switch-comp {
     position:relative;
@@ -96,7 +96,7 @@ Vue.component 'light-sw-comp',
       @stopMouseAction()
       if duration < 200 then @setBrt @pressTop
     
-#### LIGHTS PAGE COMPONENT ####      
+#### lights page component ####      
 (document.head.appendChild document.createElement('style')).textContent = """
   .sw-row {
     position:relative;
@@ -118,7 +118,7 @@ Vue.component 'lights-comp',
       [ {brt:0, idx:4}, {brt:0, idx:5}, {brt:0, idx:6} ]
     ]
 
-#### KEEP LIGHTS ON SCREEN SYNCED WITH REAL LIGHTS ####
+#### keep lights on screen synced with real lights ####
 setTimeout one = ->  
   if tvGlobal.lightChanging then setTimeout one, 500; return
   tvGlobal.ajaxCmd 'getLightLevels', (err, resp) ->
@@ -132,7 +132,9 @@ setTimeout one = ->
     one()
 , 100
 
-#### DETECT MOUSE UP EVENT ANYWHERE ####
+#### detect mouse up event anywhere ####
 document.onmouseup = document.ondragend = document.ontouchend = (e) ->
   for sw in document.querySelectorAll '.switch-comp'
     sw.__vue__.globalMouseUp e
+    
+    

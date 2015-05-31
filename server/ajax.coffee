@@ -5,8 +5,8 @@ plex    = require './plex'
 roku    = require './roku'
 insteon = require './insteon'
 log     = require('debug') 'tv:ajax'
+port    = require('parent-config')('apps-config.json').tvAjax_port
 
-ajaxServerPort  = 1344
 tvShowsKey = null
 
 # uql = require 'unqlite'
@@ -111,8 +111,8 @@ srvr = http.createServer (req, res) ->
     else
       error res, 'bad request cmd: ' + req.url, 400
 
-srvr.listen ajaxServerPort
-log 'srvr.listen ajaxServerPort ' + ajaxServerPort
+srvr.listen port
+log 'tv ajax listening on port ' + port
 
 ###
 plex.getSectionKeys (err, keys) ->

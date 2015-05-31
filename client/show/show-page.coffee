@@ -2,7 +2,7 @@
 Vue     = require 'vue'
 log     = require('debug') 'tv:shw'
 
-ajaxPfx = 'http://192.168.1.103:1344/'
+ajaxPfx = "http://192.168.1.103:#{tvGlobal.ajaxPort}/"
 plexPfx = 'http://192.168.1.103:32400'
 
 {render, div} = require 'teacup'

@@ -4,7 +4,7 @@ request = require 'superagent'
 log     = require('debug') 'tv:snf'
 
 serverIp = '192.168.1.103'
-ajaxPfx = "http://#{serverIp}:1344/"
+ajaxPfx = "http://#{serverIp}:#{tvGlobal.ajaxPort}/"
 plexPfx = "http://#{serverIp}:32400"
 
 {render, div, img} = require 'teacup'

@@ -112,14 +112,19 @@ require './lights/lights'
 serverIp = '192.168.1.103'
 ajaxPfx = "http://#{serverIp}:#{tvGlobal.ajaxPort}/"
 
-tvGlobal.ajaxCmd = (cmd, data, cb) ->
-  if typeof data is 'function' then cb = data; data = null
+tvGlobal.ajaxCmd = (cmd, args..., cb) ->
+  if typeof cb isnt 'function' then args.push cb
+  query = ''
+  sep = '?'
+  for arg, idx in args
+    query += sep + 'q' + idx + '=' +arg.toString()
+    sep = '&'
   request
-    .get ajaxPfx + cmd + (if data then '/' + encodeURI data else '')
+    .get ajaxPfx + cmd + query
     .set 'Content-Type', 'text/plain'
     .set 'Accept', 'application/json'
     .end (err, res) ->
-      # console.log 'ajaxCmd ret', {cmd, data, err, res}
+      # console.log 'ajaxCmd ret', {cmd, args, err, res}
       if err or res.status isnt 200
         log 'ajax err', (err ? res.status); cb? err ? res; return
       cb? null, JSON.parse res.text

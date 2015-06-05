@@ -1,4 +1,5 @@
 
+url     = require 'url'
 http    = require 'http'
 ir      = require './ir'
 plex    = require './plex'
@@ -42,8 +43,6 @@ plex.getSectionKeys (err, keys) ->
   # log 'have SectionKeys', keys
   {tvShowsKey} = keys
 
-# log 'starting'
-
 poweringUp = no
 
 srvr = http.createServer (req, res) ->
@@ -53,13 +52,17 @@ srvr = http.createServer (req, res) ->
     'Content-Type': 'text/json'
     'Access-Control-Allow-Origin': '*'
     
-  [__, reqCmd, reqData] = req.url.split '/'
-  switch reqCmd
+  {pathname, query} = url.parse req.url, true
+  data = []
+  for q, arg of query
+    data[q[1]] = decodeURI arg
+  
+  switch pathname[1..]
     when 'favicon'
       error res, 'no favicon', 404
       
     when 'log'
-      console.log 'tvGlobal.log: ' + decodeURI reqData
+      console.log 'tvGlobal.log: ' + data.join ', '
       success res
       
     when 'shows'
@@ -92,13 +95,13 @@ srvr = http.createServer (req, res) ->
         
     when 'irCmd'
       if poweringUp then success res, 'skipped'; return
-      ir.sendCmd reqData, (err) ->
+      ir.sendCmd data..., (err) ->
         if err then error res, err.message; return
         success res, 'sent'
 
     when 'lightCmd'
       try
-        insteon.lightCmd JSON.parse(decodeURI reqData)...
+        insteon.lightCmd data...
         success res
       catch e
         error res, 'invalid lightCmd URL' + req.url
@@ -109,7 +112,7 @@ srvr = http.createServer (req, res) ->
         success res, lightLevels
         
     else
-      error res, 'bad request cmd: ' + req.url, 400
+      error res, 'bad request cmd: ' + req.url + ',' + pathname, 400
 
 srvr.listen port
 log 'tv ajax listening on port ' + port

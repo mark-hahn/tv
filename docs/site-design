@@ -1,0 +1,70 @@
+
+db
+  tags per show
+  {watched, lastPosition, filePaths} per episode
+
+top nav buttons
+  --- lights ----
+  show  - episode
+  watch - refresh
+  
+show page
+  left, normal and set-tag mode -> selected show details
+    contents (overflow auto)
+      art: '/library/metadata/1863/art/1428290345',
+      title: 'Battle Creek',
+      unwatched count
+      episode count
+      summary: 'Battle Creek stars Josh Duhamel and Dean Winters in a drama about two mismatched law enforcement officers whose polar opposite views of the world and crime-solving breed frustration, disdain, humor and possibly a grudging respect as they clean up the hardscrabble streets of Battle Creek, Michigan.',
+      tags + unwatched - all watched
+      studio: 'CBS'
+      year: 2015,
+      duration: 3600000,
+      #thumb: '/library/metadata/1863/thumb/1428290345',
+      #banner: '/library/metadata/1863/banner/1428290345',
+      #theme: '/library/metadata/1863/theme/1428290345',
+      #originallyAvailableAt: '2015-03-01'
+      last watched
+      watched count
+      
+    buttons below: play - tags
+    buttons below, set-tags mode:  prev - next
+    
+  left, filter mode -> filter tag checkbox scroll list
+    show list on right changes live
+    list contents, each: normal, must not, must
+      new (auto-set)
+      mark
+      linda
+      foreign (auto-set?)
+      drama (auto-set)
+      comedy (auto-set)
+      stupid
+      | favorite
+      | old favorite
+      | on the fence
+      watched (auto-set once)
+      deleted 
+      unmatched (auto-set)
+      
+    buttons below
+      reset - done
+
+  right, normal and filter mode -> show names scrolling list
+    cursor only in normal mode
+      selected show highlighted and arrow on left
+    deleted(red X) indicator on right
+    
+    buttons below
+      filter - title/added sort toggle
+    
+  right, set-tags mode -> tag checkbox scrolling list
+      tag settings shown live inside left show pane
+    list contents
+      (see above)
+      
+    buttons below
+      ??? - done
+      
+      
+      

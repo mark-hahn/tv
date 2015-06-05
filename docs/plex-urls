@@ -1,0 +1,655 @@
+
+###
+roku.init (err) ->
+  log 'starting test'
+  plex.getSectionKeys (err, keys) ->
+    if err then cb? err; return
+    # log 'getSectionKeys', keys
+    {tvShowsKey} = keys
+    plex.getShowList tvShowsKey, (err, shows) ->
+      if err then cb? err; return
+      # log 'shows', shows
+      for show, idx in shows when show.type is 'show' and idx is 10
+        # log 'show', show
+        plex.getSeasonList show.key, (err, seasons) ->
+          if err then cb? err; return
+          season = seasons[0]
+          plex.getVideoList season.key, (err, videos) ->
+            if err then cb? err; return
+            video = videos[0]
+            log 'starting', video.title
+            roku.startVideo video.key, 2e6, (err) ->
+              log 'starting timeout'
+              setTimeout ->
+                roku.playAction 'pause'
+                setTimeout ->
+                  roku.playAction 'stop'
+                , 3000
+              , 6000
+
+###
+###
+# doesn't work but defined
+# setParameters also shuffle=0/1, repeat=0/1/2
+volLevel = (volume, cb) ->
+  playerCtrl '/playback/setParameters', {volume}, (err, res) ->
+    if err then cb? err; return
+    log 'volLevel', {volume, res}
+    cb? null, res
+  
+# doesn't work, but defined, use startVideo instead
+seekTo = (offset, cb) ->
+  playerCtrl '/playback/seekTo', {offset}, (err, res) ->
+    if err then cb? err; return
+    log 'seekTo', {offset, res}
+    cb? null, res
+
+# doesn't work -- undefined, use pause/play instead
+toggleOSD = (cb) ->
+  playerCtrl '/navigation/toggleOSD', null, (err, res) ->
+    if err then cb? err; return
+    log 'toggleOSD', {res}
+    cb? null, res
+###
+      
+  
+###  show ...
+
+{ _elementType: 'Directory',
+  ratingKey: 1863,
+  key: '/library/metadata/1863/children',  (SEASONS LIST)
+  studio: 'CBS',
+  type: 'show',
+  title: 'Battle Creek',
+  contentRating: 'TV-14',
+  summary: 'Battle Creek stars Josh Duhamel and Dean Winters in a drama about two mismatched law enforcement officers whose polar opposite views of the world and crime-solving breed frustration, disdain, humor and possibly a grudging respect as they clean up the hardscrabble streets of Battle Creek, Michigan.',
+  index: 1,
+  rating: '6.0',
+  year: 2015,
+  thumb: '/library/metadata/1863/thumb/1428290345',
+  art: '/library/metadata/1863/art/1428290345',
+  banner: '/library/metadata/1863/banner/1428290345',
+  theme: '/library/metadata/1863/theme/1428290345',
+  duration: 3600000,
+  originallyAvailableAt: '2015-03-01',
+  leafCount: 6,
+  viewedLeafCount: 0,
+  childCount: 1,
+  addedAt: 1427060389,
+  updatedAt: 1428290345,
+  _children: 
+   [ { _elementType: 'Genre', tag: 'Crime' },
+     { _elementType: 'Genre', tag: 'Drama' },
+     { _elementType: 'Role', tag: 'Dean Winters' },
+     { _elementType: 'Role', tag: 'Josh Duhamel' },
+     { _elementType: 'Role', tag: 'Kal Penn' } 
+   ] 
+}
+###
+
+### season ...
+{ _elementType: 'Directory',
+  ratingKey: 1864,
+  key: '/library/metadata/1864/children',  (VIDEOS LIST)
+  parentRatingKey: 1863,
+  type: 'season',
+  title: 'Season 1',
+  parentKey: '/library/metadata/1863',
+  summary: '',
+  index: 1,
+  thumb: '/library/metadata/1864/thumb/1428290345',
+  leafCount: 6,
+  viewedLeafCount: 0,
+  addedAt: 1427060389,
+  updatedAt: 1428290345,
+  _children: [] 
+} 
+###   
+
+### video ...
+
+{ _elementType: 'Video',
+  ratingKey: 2657,
+  key: '/library/metadata/2657',  (VIDEO KEY FOR ROKU)
+  parentRatingKey: 1864,
+  type: 'episode',
+  title: 'The Battle Creek Way',
+  titleSort: 'Battle Creek Way',
+  parentKey: '/library/metadata/1864',
+  summary: 'Jaded Det. Russ Agnew reluctantly partners with charming FBI Agent Milt Chamberlain to solve a drug-related double homicide, but while Milt investigates with the high-tech resources of the FBI, Russ prefers old-school police work and instinct.',
+  index: 1,
+  rating: '6.7',
+  year: 2015,
+  thumb: '/library/metadata/2657/thumb/1428743281',
+  duration: 2467113,
+  originallyAvailableAt: '2015-03-01',
+  addedAt: 1427060407,
+  updatedAt: 1428743281,
+  chapterSource: '',
+  _children: 
+   [ { _elementType: 'Media',
+       videoResolution: 'sd',
+       id: 2055,
+       duration: 2467113,
+       bitrate: 884,
+       width: 720,
+       height: 404,
+       aspectRatio: '1.78',
+       audioChannels: 2,
+       audioCodec: 'aac',
+       videoCodec: 'h264',
+       container: 'mp4',
+       videoFrameRate: '24p',
+       optimizedForStreaming: 1,
+       has64bitOffsets: '0',
+       _children: [Object] },
+     { _elementType: 'Writer', tag: 'Vince Gilligan' },
+     { _elementType: 'Writer', tag: 'David Shore' },
+     { _elementType: 'Director', tag: 'Bryan Singer' } ] } { _elementType: 'Video',
+   ] 
+}
+###
+
+--- find clients
+http://192.168.1.103:32400/clients
+
+--- on deck
+http://192.168.1.103:32400/library/onDeck
+
+--- play through client
+https://code.google.com/p/plex-api/wiki/PlaybackControl
+
+required ...
+http://192.168.1.3:8324/player/playback/playMedia
+?key=/library/metadata/2971
+&machineIdentifier=1GS43G106961
+&address=192.168.1.103
+&port=32400
+
+optional ... (offset in seconds)
+
+&offset=1000000
+&protocol=http
+&path=http://192.168.1.103:32400/library/metadata/2971
+&X-Plex-Client-Identifier=???????
+&containerKey=/playQueues/13/own%3D1%26window%3D200
+&commandID=5
+
+example with old mark phone...
+http://192.168.1.4:32400/player/playback/playMedia?key=/library/metadata/2971&offset=2000000&machineIdentifier=77c8ad0db09115be562f4265661e93794801b1e9&address=192.168.1.103&port=32400&protocol=http&path=http://192.168.1.103:32400/library/metadata/2971
+
+http://192.168.1.4:32400/player/playback/playMedia?key=/library/metadata/2971&machineIdentifier=77c8ad0db09115be562f4265661e93794801b1e9&address=192.168.1.103&port=32400
+
+
+example with roku...
+http://192.168.1.3:8324/player/playback/playMedia?key=/library/metadata/2971&offset=1000000&machineIdentifier=1GS43G106961&address=192.168.1.103&port=32400&protocol=http&path=http://192.168.1.103:32400/library/metadata/2971
+
+http://192.168.1.3:32400/player/playback/playMedia?key=/library/metadata/2971&machineIdentifier=1GS43G106961&address=192.168.1.103&port=32400
+
+
+--- from inspector
+
+http://192.168.1.103:32400/?X-Plex-Product=Plex+Web&X-Plex-Version=2.3.24&X-Plex-Client-Identifier=04b24c74-55f9-4c49-beba-96254dc9e50b&X-Plex-Platform=Chrome&X-Plex-Platform-Version=41.0&X-Plex-Device=Linux&X-Plex-Device-Name=Plex+Web+(Chrome)&X-Plex-Token=DmpemmnvJhihWJ6zmSnW&X-Plex-Username=mchahn&Accept-Language=en
+
+http://192.168.1.103:32400/status/sessions
+
+
+
+#####  http://192.168.1.103:32400/status/sessions  from plex in chrome dev inspector
+
+This XML file does not appear to have any style information associated with it. The document tree is shown below.
+<MediaContainer size="1">
+<Video addedAt="1427060407" art="/library/metadata/1863/art/1428895814" chapterSource="" contentRating="TV-14" duration="2467113" grandparentArt="/library/metadata/1863/art/1428895814" grandparentKey="/library/metadata/1863" grandparentRatingKey="1863" grandparentTheme="/library/metadata/1863/theme/1428895814" grandparentThumb="/library/metadata/1863/thumb/1428895814" grandparentTitle="Battle Creek" guid="com.plexapp.agents.thetvdb://274802/1/1?lang=en" index="1" key="/library/metadata/2657" lastViewedAt="1428911314" librarySectionID="4" originallyAvailableAt="2015-03-01" parentIndex="1" parentKey="/library/metadata/1864" parentRatingKey="1864" parentThumb="/library/metadata/1864/thumb/1428895813" rating="6.7" ratingKey="2657" sessionKey="158" summary="Jaded Det. Russ Agnew reluctantly partners with charming FBI Agent Milt Chamberlain to solve a drug-related double homicide, but while Milt investigates with the high-tech resources of the FBI, Russ prefers old-school police work and instinct." thumb="/library/metadata/2657/thumb/1428895813" title="The Battle Creek Way" titleSort="Battle Creek Way" type="episode" updatedAt="1428895813" viewCount="3" viewOffset="2022341" year="2015">
+
+title="The Battle Creek Way" titleSort="Battle Creek Way" type="episode" updatedAt="1428895813" viewCount="3" viewOffset="2022341" year="2015"
+
+<Media aspectRatio="1.78" audioChannels="2" audioCodec="aac" bitrate="884" container="mp4" duration="2467113" has64bitOffsets="0" height="404" id="2055" optimizedForStreaming="1" videoCodec="h264" videoFrameRate="24p" videoResolution="sd" width="720">
+<Part container="mp4" duration="2467113" file="/mnt/media/videos/battle.creek.s01e01.hdtv.x264-2hd.mp4" has64bitOffsets="0" id="2057" key="/library/parts/2057/file.mp4" optimizedForStreaming="1" size="272688290">
+<Stream bitDepth="8" bitrate="758" cabac="1" chromaSubsampling="4:2:0" codec="h264" codecID="avc1" colorSpace="yuv" duration="2467045" frameRate="23.976" frameRateMode="cfr" hasScalingMatrix="0" height="404" id="4463" index="0" level="31" profile="high" refFrames="5" scanType="progressive" streamIdentifier="1" streamType="1" title="" width="720"/>
+<Stream bitrate="122" bitrateMode="vbr" channels="2" codec="aac" codecID="40" duration="2467113" id="4464" index="1" profile="lc" samplingRate="48000" selected="1" streamIdentifier="2" streamType="2" title=""/>
+</Part>
+</Media>
+<Writer count="5" id="119" tag="Vince Gilligan"/>
+<Writer count="2" id="120" tag="David Shore"/>
+<Director id="121" tag="Bryan Singer"/>
+<User id="1" thumb="http://www.gravatar.com/avatar/e02c4a24302746f0598c77bbb8044e5d?d=https%3A%2F%2Fplex.tv%2Favatars%2F75AE94%2F4d%2F1" title="mchahn"/>
+<Player machineIdentifier="04b24c74-55f9-4c49-beba-96254dc9e50b" platform="Chrome" product="Plex Web" state="paused" title="Plex Web (Chrome)"/>
+</Video>
+</MediaContainer>
+
+####################################################
+panic!  Just close this tab and carry on.
+
+Type 'help' for a list of commands.
+
+crosh> shell
+
+012531-crb(/) srv
+Welcome to Ubuntu 14.04.2 LTS (GNU/Linux 3.16.0-30-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com/
+
+  System information as of Mon Apr 13 01:21:52 PDT 2015
+
+  System load:  0.06               Processes:          174
+  Usage of /:   27.5% of 29.11GB   Users logged in:    1
+  Memory usage: 24%                IP address for em1: 192.168.1.103
+  Swap usage:   0%
+
+  Graph this data and manage this system at:
+    https://landscape.canonical.com/
+
+38 packages can be updated.
+18 updates are security updates.
+
+4.0K drwxr-xr-x 4 4.0K Apr 13 01:06 .live-archive
+4.0K drwxr-xr-x 7 4.0K Apr 12 16:59 node_modules
+1.7M -rw------- 1 1.7M Apr 13 01:25 nohup.out
+4.0K -rw-r--r-- 1  264 Apr 12 16:58 package.json
+ 20K -rw-r--r-- 1  20K Apr 13 01:15 plex-urls
+4.0K -rwxr-xr-x 1  301 Apr 12 20:37 run
+4.0K drwxr-xr-x 2 4.0K Apr 13 01:19 src
+1.8M -rw-r--r-- 1 1.8M Apr 13 01:25 tv.log
+4.0K drwxr-xr-x 5 4.0K Apr 12 21:10 www
+
+/root/apps/tv
+13M     .
+
+
+
+
+
+012537-srv(~/apps/tv). ./run
+
+012547-srv(~/apps/tv). nohup: appending output to ‘nohup.out’
+tv: listening on port 1340
+
+tv: starting Speakeasy Rider
+tv: startVideo { key: '/library/metadata/2667', offset: 1000000, res: '' }
+
+
+############## start ################         
+[ 
+  { _elementType: 'Video',
+    addedAt: '1427060408',
+    art: '/library/metadata/1889/art/1427159852',
+    chapterSource: '',
+    contentRating: 'TV-14',
+    duration: '1290623',
+    grandparentArt: '/library/metadata/1889/art/1427159852',
+    grandparentKey: '/library/metadata/1889',
+    grandparentRatingKey: '1889',
+    grandparentTheme: '/library/metadata/1889/theme/1427159852',
+    grandparentThumb: '/library/metadata/1889/thumb/1427159852',
+    grandparentTitle: 'Bob\'s Burgers',
+    guid: 'com.plexapp.agents.thetvdb://194031/5/9?lang=en',
+    index: '9',
+    key: '/library/metadata/2667',
+    lastViewedAt: '1428913551',
+    librarySectionID: '4',
+    originallyAvailableAt: '2015-01-11',
+    parentIndex: '5',
+    parentKey: '/library/metadata/1890',
+    parentRatingKey: '1890',
+    parentThumb: '/library/metadata/1890/thumb/1427159852',
+    rating: '7.3',
+    ratingKey: '2667',
+    sessionKey: '165',
+    summary: 'Tina, Gene and Louise are ready to put the pedal to the metal when they join a go-kart league. Meanwhile, back at the restaurant Bob and Teddy partner up to serve Teddy\'s home-brewed beer on the sly.',
+    thumb: '/library/metadata/2667/thumb/1428910138',
+    title: 'Speakeasy Rider',
+    type: 'episode',
+    updatedAt: '1428910138',
+    viewCount: '1',
+    viewOffset: '999000',
+    year: '2015',
+    _children: 
+     [ { _elementType: 'Media',
+         aspectRatio: '1.78',
+         audioChannels: '2',
+         audioCodec: 'aac',
+         bitrate: '714',
+         container: 'mp4',
+         duration: '1290623',
+         has64bitOffsets: '0',
+         height: '404',
+         id: '2063',
+         optimizedForStreaming: '1',
+         videoCodec: 'h264',
+         videoFrameRate: '24p',
+         videoResolution: 'sd',
+         width: '720',
+         _children: 
+          [ { _elementType: 'Part',
+              container: 'mp4',
+              duration: '1290623',
+              file: '/mnt/media/videos/bobs.burgers.s05e09.hdtv.x264-2hd.mp4',
+              has64bitOffsets: '0',
+              id: '2065',
+              key: '/library/parts/2065/file.mp4',
+              optimizedForStreaming: '1',
+              size: '115224595',
+              _children: 
+               [ { _elementType: 'Stream',
+                   bitDepth: '8',
+                   bitrate: '578',
+                   cabac: '1',
+                   chromaSubsampling: '4:2:0',
+                   codec: 'h264',
+                   codecID: 'avc1',
+                   colorSpace: 'yuv',
+                   duration: '1290538',
+                   frameRate: '23.976',
+                   frameRateMode: 'cfr',
+                   hasScalingMatrix: '0',
+                   height: '404',
+                   id: '4480',
+                   index: '0',
+                   level: '31',
+                   profile: 'high',
+                   refFrames: '5',
+                   scanType: 'progressive',
+                   streamIdentifier: '1',
+                   streamType: '1',
+                   title: '',
+                   width: '720' },
+                 { _elementType: 'Stream',
+                   bitrate: '132',
+                   bitrateMode: 'vbr',
+                   channels: '2',
+                   codec: 'aac',
+                   codecID: '40',
+                   duration: '1290623',
+                   id: '4481',
+                   index: '1',
+                   profile: 'lc',
+                   samplingRate: '48000',
+                   selected: '1',
+                   streamIdentifier: '2',
+                   streamType: '2',
+                   title: '' } ] } ] },
+       { _elementType: 'Writer', id: '220', tag: 'Rich Rinaldi' },
+       { _elementType: 'Director',
+         count: '2',
+         id: '222',
+         tag: 'Jennifer Coyle' },
+       { _elementType: 'User', title: '' },
+       { _elementType: 'Player',
+         machineIdentifier: '1GS43G106961',
+         platform: 'Roku',
+         product: 'Plex for Roku',
+         state: 'playing',
+         title: 'Roku 3' 
+        } 
+     ] 
+  } 
+]
+         
+         
+############## 5 secs ################         
+tv: status null 
+[ 
+  { _elementType: 'Video',
+    addedAt: '1427060408',
+    art: '/library/metadata/1889/art/1427159852',
+    chapterSource: '',
+    contentRating: 'TV-14',
+    duration: '1290623',
+    grandparentArt: '/library/metadata/1889/art/1427159852',
+    grandparentKey: '/library/metadata/1889',
+    grandparentRatingKey: '1889',
+    grandparentTheme: '/library/metadata/1889/theme/1427159852',
+    grandparentThumb: '/library/metadata/1889/thumb/1427159852',
+    grandparentTitle: 'Bob\'s Burgers',
+    guid: 'com.plexapp.agents.thetvdb://194031/5/9?lang=en',
+    index: '9',
+    key: '/library/metadata/2667',
+    lastViewedAt: '1428913551',
+    librarySectionID: '4',
+    originallyAvailableAt: '2015-01-11',
+    parentIndex: '5',
+    parentKey: '/library/metadata/1890',
+    parentRatingKey: '1890',
+    parentThumb: '/library/metadata/1890/thumb/1427159852',
+    rating: '7.3',
+    ratingKey: '2667',
+    sessionKey: '165',
+    summary: 'Tina, Gene and Louise are ready to put the pedal to the metal when they join a go-kart league. Meanwhile, back at the restaurant Bob and Teddy partner up to serve Teddy\'s home-brewed beer on the sly.',
+    thumb: '/library/metadata/2667/thumb/1428910138',
+    title: 'Speakeasy Rider',
+    type: 'episode',
+    updatedAt: '1428910138',
+    viewCount: '1',
+    viewOffset: '999000',
+    year: '2015',
+    _children: 
+     [ { _elementType: 'Media',
+         aspectRatio: '1.78',
+         audioChannels: '2',
+         audioCodec: 'aac',
+         bitrate: '714',
+         container: 'mp4',
+         duration: '1290623',
+         has64bitOffsets: '0',
+         height: '404',
+         id: '2063',
+         optimizedForStreaming: '1',
+         videoCodec: 'h264',
+         videoFrameRate: '24p',
+         videoResolution: 'sd',
+         width: '720',
+         _children: 
+          [ { _elementType: 'Part',
+              container: 'mp4',
+              duration: '1290623',
+              file: '/mnt/media/videos/bobs.burgers.s05e09.hdtv.x264-2hd.mp4',
+              has64bitOffsets: '0',
+              id: '2065',
+              key: '/library/parts/2065/file.mp4',
+              optimizedForStreaming: '1',
+              size: '115224595',
+              _children: 
+               [ { _elementType: 'Stream',
+                   bitDepth: '8',
+                   bitrate: '578',
+                   cabac: '1',
+                   chromaSubsampling: '4:2:0',
+                   codec: 'h264',
+                   codecID: 'avc1',
+                   colorSpace: 'yuv',
+                   duration: '1290538',
+                   frameRate: '23.976',
+                   frameRateMode: 'cfr',
+                   hasScalingMatrix: '0',
+                   height: '404',
+                   id: '4480',
+                   index: '0',
+                   level: '31',
+                   profile: 'high',
+                   refFrames: '5',
+                   scanType: 'progressive',
+                   streamIdentifier: '1',
+                   streamType: '1',
+                   title: '',
+                   width: '720' },
+                 { _elementType: 'Stream',
+                   bitrate: '132',
+                   bitrateMode: 'vbr',
+                   channels: '2',
+                   codec: 'aac',
+                   codecID: '40',
+                   duration: '1290623',
+                   id: '4481',
+                   index: '1',
+                   profile: 'lc',
+                   samplingRate: '48000',
+                   selected: '1',
+                   streamIdentifier: '2',
+                   streamType: '2',
+                   title: '' } ] } ] },
+       { _elementType: 'Writer', id: '220', tag: 'Rich Rinaldi' },
+       { _elementType: 'Director',
+         count: '2',
+         id: '222',
+         tag: 'Jennifer Coyle' },
+       { _elementType: 'User', title: '' },
+       { _elementType: 'Player',
+         machineIdentifier: '1GS43G106961',
+         platform: 'Roku',
+         product: 'Plex for Roku',
+         state: 'playing',
+         title: 'Roku 3' } ] } ]
+
+
+############## 10 secs ################         
+[ 
+  { _elementType: 'Video',
+    addedAt: '1427060408',
+    art: '/library/metadata/1889/art/1427159852',
+    chapterSource: '',
+    contentRating: 'TV-14',
+    duration: '1290623',
+    grandparentArt: '/library/metadata/1889/art/1427159852',
+    grandparentKey: '/library/metadata/1889',
+    grandparentRatingKey: '1889',
+    grandparentTheme: '/library/metadata/1889/theme/1427159852',
+    grandparentThumb: '/library/metadata/1889/thumb/1427159852',
+    grandparentTitle: 'Bob\'s Burgers',
+    guid: 'com.plexapp.agents.thetvdb://194031/5/9?lang=en',
+    index: '9',
+    key: '/library/metadata/2667',
+    lastViewedAt: '1428913551',
+    librarySectionID: '4',
+    originallyAvailableAt: '2015-01-11',
+    parentIndex: '5',
+    parentKey: '/library/metadata/1890',
+    parentRatingKey: '1890',
+    parentThumb: '/library/metadata/1890/thumb/1427159852',
+    rating: '7.3',
+    ratingKey: '2667',
+    sessionKey: '165',
+    summary: 'Tina, Gene and Louise are ready to put the pedal to the metal when they join a go-kart league. Meanwhile, back at the restaurant Bob and Teddy partner up to serve Teddy\'s home-brewed beer on the sly.',
+    thumb: '/library/metadata/2667/thumb/1428910138',
+    title: 'Speakeasy Rider',
+    type: 'episode',
+    updatedAt: '1428910138',
+    viewCount: '1',
+    viewOffset: '999000',
+    year: '2015',
+    _children: 
+     [ { _elementType: 'Media',
+         aspectRatio: '1.78',
+         audioChannels: '2',
+         audioCodec: 'aac',
+         bitrate: '714',
+         container: 'mp4',
+         duration: '1290623',
+         has64bitOffsets: '0',
+         height: '404',
+         id: '2063',
+         optimizedForStreaming: '1',
+         videoCodec: 'h264',
+         videoFrameRate: '24p',
+         videoResolution: 'sd',
+         width: '720',
+         _children: 
+          [ { _elementType: 'Part',
+              container: 'mp4',
+              duration: '1290623',
+              file: '/mnt/media/videos/bobs.burgers.s05e09.hdtv.x264-2hd.mp4',
+              has64bitOffsets: '0',
+              id: '2065',
+              key: '/library/parts/2065/file.mp4',
+              optimizedForStreaming: '1',
+              size: '115224595',
+              _children: 
+               [ { _elementType: 'Stream',
+                   bitDepth: '8',
+                   bitrate: '578',
+                   cabac: '1',
+                   chromaSubsampling: '4:2:0',
+                   codec: 'h264',
+                   codecID: 'avc1',
+                   colorSpace: 'yuv',
+                   duration: '1290538',
+                   frameRate: '23.976',
+                   frameRateMode: 'cfr',
+                   hasScalingMatrix: '0',
+                   height: '404',
+                   id: '4480',
+                   index: '0',
+                   level: '31',
+                   profile: 'high',
+                   refFrames: '5',
+                   scanType: 'progressive',
+                   streamIdentifier: '1',
+                   streamType: '1',
+                   title: '',
+                   width: '720' },
+                 { _elementType: 'Stream',
+                   bitrate: '132',
+                   bitrateMode: 'vbr',
+                   channels: '2',
+                   codec: 'aac',
+                   codecID: '40',
+                   duration: '1290623',
+                   id: '4481',
+                   index: '1',
+                   profile: 'lc',
+                   samplingRate: '48000',
+                   selected: '1',
+                   streamIdentifier: '2',
+                   streamType: '2',
+                   title: '' } ] } ] },
+       { _elementType: 'Writer', id: '220', tag: 'Rich Rinaldi' },
+       { _elementType: 'Director',
+         count: '2',
+         id: '222',
+         tag: 'Jennifer Coyle' },
+       { _elementType: 'User', title: '' },
+       { _elementType: 'Player',
+         machineIdentifier: '1GS43G106961',
+         platform: 'Roku',
+         product: 'Plex for Roku',
+         state: 'playing',
+         title: 'Roku 3' 
+        } 
+    ] 
+  } 
+]
+
+Video
+  index
+  key
+  type
+  viewCount: '1',
+  viewOffset: '999000',
+  lastViewedAt
+  originallyAvailableAt
+  
+  media   (_children[0])
+    bitrate   714
+    duration  1290623
+
+    part (_children[0])
+      duration: '1290623',
+      file: '/mnt/media/videos/bobs.burgers.s05e09.hdtv.x264-2hd.mp4',
+      
+      stream (_children[0]) video
+      stream (_children[1]) audio
+      
+  Writer   (_children[1]) 
+  Director (_children[2]) 
+  User     (_children[3]) 
+  
+  Player   (_children[4])   
+     machineIdentifier: '1GS43G106961',
+     platform: 'Roku',
+     product: 'Plex for Roku',
+     state: 'playing',
+     title: 'Roku 3'
+
+  
+  
+  
+  

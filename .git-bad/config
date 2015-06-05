@@ -1,0 +1,10 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+[remote "origin"]
+	url = https://github.com/mark-hahn/tv.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[credential]
+	helper = store

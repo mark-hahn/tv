@@ -26,8 +26,8 @@ exports.lightCmd = (light, cmd, args...) ->
 		url: "http://#{hubIp}:#{hubPort}/light/#{cmd}/#{lightIds[light-1]}#{argStr}" + 
 		       (if async then '?async=1&cancel=1' else '?cancel=1')
 		headers: Accept: 'application/json'
+	# log 'insteon hub req: ' + opts.url
 	request opts, (err, resp, body) ->
-		# log 'insteon hub req'
 		if err or resp.statusCode isnt 200
       log 'lightCmd error', opts, resp?.statusCode, err?.message
       cb? message: 'lightCmd error'

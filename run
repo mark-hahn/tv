@@ -1,15 +1,20 @@
 #   -*-  grammar-ext: sh  -*-
 
-kill $(pgrep -f "tv-server.js") > /dev/null 2>&1
+if [ $(pwd) == "/root/dev/apps/tv" ]; then isdev=true; else isdev=false; fi
+if $isdev
+  then kill -9 $(pgrep -f /root/dev/apps/tv/tv-server.js) > /dev/null 2>&1
+  else kill -9 $(pgrep -f /root/apps/tv/tv-server.js)     > /dev/null 2>&1
+fi
 killall tail > /dev/null 2>&1
+tail -fn 0 ~/logs/tv.log &
 set -e
 coffee -co server-js server
 rm -f tv-server.js
 mv server-js/tv-server.js tv-server.js 
-echo >> tv.log
-tail -fn 0 tv.log &
+echo >> ~/logs/tv.log
 export DEBUG=*
 # export DEBUG=tv:*
-# nohup node tv-server.js >> tv.log 2>&1 &
-# node tv-server.js &
-node tv-server.js
+if $isdev
+  then nohup node /root/dev/apps/tv/tv-server.js >> ~/logs/tv.log 2>&1 &
+  else nohup node     /root/apps/tv/tv-server.js >> ~/logs/tv.log 2>&1 &
+fi

@@ -139,7 +139,7 @@ tvGlobal.ajaxLog = (args...) ->
 new Vue
   el: 'body'
   data:
-    curPage: 'lights'
+    curPage: 'show'
   components:
     show:    Vue.component 'show-page'
     episode: Vue.component 'episode-comp'

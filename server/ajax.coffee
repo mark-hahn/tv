@@ -58,8 +58,8 @@ srvr = http.createServer (req, res) ->
     data[q[1]] = decodeURI arg
   
   switch pathname[1..]
-    when 'favicon'
-      error res, 'no favicon', 404
+    # when 'favicon'
+    #   error res, 'no favicon', 404
       
     when 'log'
       console.log 'tvGlobal.log: ' + data.join ', '

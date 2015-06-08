@@ -145,10 +145,11 @@ setTimeout one = ->
     if resp and not tvGlobal.lightChanging
       levels = resp.data
       {switchRows} = document.getElementById('page-comp').__vue__.$data
-      for idx in [0..2] then switchRows[0][idx].brt = levels[idx]
-      for idx in [0..2] then switchRows[1][idx].brt = levels[idx+3]
-      sum = 0; for idx in [0..5] then sum += levels[idx]
-      switchRows[0][3].brt = sum/6
+      if switchRows
+        for idx in [0..2] then switchRows[0][idx].brt = levels[idx]
+        for idx in [0..2] then switchRows[1][idx].brt = levels[idx+3]
+        sum = 0; for idx in [0..5] then sum += levels[idx]
+        switchRows[0][3].brt = sum/6
     one()
 , 100
 

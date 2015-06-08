@@ -5,12 +5,16 @@ window.tvGlobal = {}
 
 #this line is replaced on every run
 tvGlobal.ajaxPort = 2344
+debug = (tvGlobal.ajaxPort is 2344)
+firstPage = (if not debug then 'lights' else 'show')
 
 require('debug').enable '*'
 
 Vue     = require 'vue'
 request = require 'superagent'
 log     = require('debug') 'tv:app'
+
+log debug + firstPage
 
 teacup = require 'teacup'
 camelToKebab = require 'teacup-camel-to-kebab'
@@ -116,7 +120,7 @@ tvGlobal.ajaxCmd = (cmd, args..., cb) ->
   if typeof cb isnt 'function' then args.push cb
   query = ''
   sep = '?'
-  for arg, idx in args
+  for arg, idx in args when arg
     query += sep + 'q' + idx + '=' +arg.toString()
     sep = '&'
   request
@@ -139,7 +143,7 @@ tvGlobal.ajaxLog = (args...) ->
 new Vue
   el: 'body'
   data:
-    curPage: 'show'
+    curPage: firstPage
   components:
     show:    Vue.component 'show-page'
     episode: Vue.component 'episode-comp'

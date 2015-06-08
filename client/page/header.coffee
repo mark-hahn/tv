@@ -70,7 +70,7 @@ Vue.component 'header',
       btnTimeout = setTimeout =>
         @powerText = 'Turning TV O' + (if onBtn then 'n ...' else 'ff ...')
         setTimeout (=> @powerText = ''), (if onBtn then 16000 else 500)
-        if onBtn then body.ajax 'turnOn' else body.ajax 'ircmd', 'pwrOff'
+        if onBtn then tvGlobal.ajaxCmd 'turnOn' else tvGlobal.ajaxCmd 'irCmd', 'pwrOff'
       , 200
     onOffUp: timeoutOff
   

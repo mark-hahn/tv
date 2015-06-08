@@ -46,7 +46,7 @@ plex.getSectionKeys (err, keys) ->
 poweringUp = no
 
 srvr = http.createServer (req, res) ->
-  # log 'http req: ' + req.url
+  # log 'ajax http req: ' + req.url
   
   res.writeHead 200, 
     'Content-Type': 'text/json'
@@ -94,6 +94,7 @@ srvr = http.createServer (req, res) ->
         , 15000
         
     when 'irCmd'
+      # log 'ajax irCmd', data
       if poweringUp then success res, 'skipped'; return
       ir.sendCmd data..., (err) ->
         if err then error res, err.message; return

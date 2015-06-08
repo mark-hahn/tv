@@ -53,8 +53,8 @@ Vue.component 'show-info',
       .set 'Accept', 'application/json'
       .end (err, res) ->
         if err then log 'get err: ' + err.message; return
-        shows = JSON.parse res.text
-        log 'got ' + shows.length + ' shows'
+        shows = JSON.parse(res.text).data
+        # log 'got ' + shows.length + ' shows'
         showInfo.show.thumb   = plexPfx + shows[0].thumb
         showInfo.show.summary = shows[0].summary
 

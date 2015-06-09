@@ -1,6 +1,6 @@
 
 Vue     = require 'vue'
-log     = require('debug') 'tv:slf'
+log     = require('debug') 'tv:twobtn'
 
 {render, div} = require 'teacup'
 
@@ -15,10 +15,12 @@ log     = require('debug') 'tv:slf'
 """
 
 Vue.component 'two-btns',
-  inherit: true
+  paramAttributes: ['lft-btn-txt', 'rgt-btn-txt']
 
   template: render ->
     div '.two-btns',  ->
       div '.btn', vOn: 'click: twoBtnClk', vText: 'lftBtnTxt'
       div '.btn', vOn: 'click: twoBtnClk', vText: 'rgtBtnTxt'
     
+  methods:
+    twoBtnClk: ->

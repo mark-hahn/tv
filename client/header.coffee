@@ -41,18 +41,21 @@ timeoutOff = ->
   btnTimeout = null
 
 Vue.component 'header', 
+  paramAttributes: ['cur-page']
+
   name: 'header-comp'
   template: render ->
     div '.btn.onoff', vOn: 'mousedown: onOffDown, mouseup: onOffUp', 'On'
     div '.header', vOn: 'mousedown: selPage', ->
-      div '.btn', vClass: 'selected: curPage == "show"',    'Show'
-      div '.btn', vClass: 'selected: curPage == "episode"', 'Episo'
-      div '.btn', vClass: 'selected: curPage == "watch"',   'Watch'
-      div '.btn', vClass: 'selected: curPage == "lights"',  'Light'
+      div '.btn', vClass: 'selected: cur-page == "show"',    'Show'
+      div '.btn', vClass: 'selected: cur-page == "episode"', 'Episo'
+      div '.btn', vClass: 'selected: cur-page == "watch"',   'Watch'
+      div '.btn', vClass: 'selected: cur-page == "lights"',  'Light'
       div '.pwrOverlay', vIf: 'powerText',  vText: 'powerText'
     div '.btn.onoff', vOn: 'mousedown: onOffDown, mouseup: onOffUp', 'Off'
   data: ->
     powerText: ''
+    
   methods:
     selPage: (e) -> 
       @curPage = switch e.target.innerText[0..3]

@@ -1,22 +1,30 @@
 
 Vue     = require 'vue'
-log     = require('debug') 'tv:slf'
+log     = require('debug') 'tv:shwlft'
 
 {render, div} = require 'teacup'
 
-# (document.head.appendChild document.createElement('style')).textContent = """
-#   .show-info-comp {
-#     width: 100%;
-#     height: 34rem;
-#   }
-# """
+(document.head.appendChild document.createElement('style')).textContent = """
+  .show-info-comp {
+    width: 100%;
+    height: 35.5rem;
+  }
+"""
+
+require './show-info'
+require '../two-btns'
 
 Vue.component 'show-left', 
-  inherit: true
+  paramAttributes: ['show-mode', 'cur-showkey']
   
   template: render ->
-    div '.show-info-comp', vStyle: 'midRowStyle', vComponent: 'show-info'
-    div '.two-btns-comp',  vComponent: 'two-btns' 
+    div '.show-info-comp', 
+      vComponent: 'show-info'
+      
+    div '.two-btns-comp',  
+      vComponent: 'two-btns'
+      lftBtnTxt: '{{lftBtnTxt}}'
+      rgtBtnTxt: '{{rgtBtnTxt}}'
     
   data: ->
     twoBtnClk: (e) -> 
@@ -32,7 +40,7 @@ Vue.component 'show-left',
         when 'select' then 'Play' 
         when 'tags'   then 'Prev'
     rgtBtnTxt: ->
-      switch @showMode
+      switch  @showMode
         when 'select' then 'Tags' 
         when 'tags'   then 'Next'
         

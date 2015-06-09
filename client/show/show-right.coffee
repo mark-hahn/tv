@@ -1,38 +1,35 @@
 
-Vue = require 'vue'
-log = require('debug') 'tv:slr'
-
-
-return
+Vue     = require 'vue'
+log     = require('debug') 'tv:slf'
 
 {render, div} = require 'teacup'
 
-(document.head.appendChild document.createElement('style')).textContent = """
-"""
+require './show-list'
+require '../two-btns'
 
-Vue.component 'show-left', 
-  inherit: true
+Vue.component 'show-right', 
+  paramAttributes: ['cur-showkey']
   
   template: render ->
-    div '.show-info-comp', vStyle: 'midRowStyle', vComponent: 'show-info'
+    div '.show-list-comp', vComponent: 'show-list'
     div '.two-btns-comp',  vComponent: 'two-btns' 
     
   data: ->
     twoBtnClk: (e) -> 
       switch e.target.innerText
-        when 'Play' then ->
-        when 'Tags' then ->
-        when 'Prev' then ->
-        when 'Next' then ->
+        when 'Filter' then ->
+        when 'Select' then ->
+        when 'Done'   then ->
+        when 'Reset'  then ->
 
   computed:
     lftBtnTxt: -> 
       switch @showMode
-        when 'select' then 'Play' 
-        when 'tags'   then 'Prev'
+        when 'select' then 'Filter' 
+        when 'filter' then 'Done'
     rgtBtnTxt: ->
       switch @showMode
-        when 'select' then 'Tags' 
-        when 'tags'   then 'Next'
+        when 'select' then 'Select' 
+        when 'filter' then 'Reset'
         
         

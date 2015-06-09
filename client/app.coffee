@@ -1,20 +1,17 @@
 
 # src/app
 
-window.tvGlobal = {}
+Vue     = require 'vue'
+request = require 'superagent'
+log     = require('debug') 'tv:app---'
 
+serverIp = '192.168.1.103'
+window.tvGlobal = {}
 #this line is replaced on every run
 tvGlobal.ajaxPort = 2344
 debug = (tvGlobal.ajaxPort is 2344)
-firstPage = (if not debug then 'lights' else 'show')
-
+ajaxPfx = "http://#{serverIp}:#{tvGlobal.ajaxPort}/"
 require('debug').enable '*'
-
-Vue     = require 'vue'
-request = require 'superagent'
-log     = require('debug') 'tv:app'
-
-log debug + firstPage
 
 teacup = require 'teacup'
 camelToKebab = require 'teacup-camel-to-kebab'
@@ -65,13 +62,19 @@ document.head.innerHTML = render ->
       position: relative;
       top: -0.3rem;
       width: 100%;
+      height: 2.5rem;
+    }
+    #page-comp {
+      height: 34rem;
     }
   """
   
+document.body.style.fontSize = '8px'
 document.body.innerHTML = render ->
   div '#page', ->
-    div '#header-comp', vComponent: 'header', vWith: 'curPage: curPage'
-    div '#page-comp',   vComponent: '{{curPage}}', keepAlive: ''
+    div '#header-comp', vComponent: 'header', curPage: 'curPage'
+    div '#page-comp',   vComponent: '{{curPage}}', keepAlive: '', curShowkey: 'curShowkey'
+
 
 #### window resizing ####
 
@@ -101,20 +104,13 @@ window.addEventListener 'resize', resize
 
 #### page components ####
 
-require './page/header'
-require './page/two-btns'
-require './show/show-info'
-require './show/show-left'
-require './show/show-right'
+require './header'
 require './show/show-page'
 require './episode/episode'
 require './watch/watch'
 require './lights/lights'
 
 #### ajax ####
-
-serverIp = '192.168.1.103'
-ajaxPfx = "http://#{serverIp}:#{tvGlobal.ajaxPort}/"
 
 tvGlobal.ajaxCmd = (cmd, args..., cb) ->
   if typeof cb isnt 'function' then args.push cb
@@ -126,7 +122,6 @@ tvGlobal.ajaxCmd = (cmd, args..., cb) ->
   request
     .get ajaxPfx + cmd + query
     .set 'Content-Type', 'text/plain'
-    .set 'Accept', 'application/json'
     .end (err, res) ->
       # console.log 'ajaxCmd ret', {cmd, args, err, res}
       if err or res.status isnt 200
@@ -142,11 +137,26 @@ tvGlobal.ajaxLog = (args...) ->
 
 new Vue
   el: 'body'
+  
   data:
-    curPage: firstPage
+    curPage:   (if not debug then 'lights' else 'show')
+    curShowkey: 0
+    
   components:
     show:    Vue.component 'show-page'
     episode: Vue.component 'episode-comp'
     watch:   Vue.component 'watch-comp'
     lights:  Vue.component 'lights-comp'
     
+  created: ->
+    process.nextTick =>
+      request
+        .get ajaxPfx + 'shows'
+        .set 'Content-Type', 'text/plain'
+        .set 'Accept', 'application/json'
+        .end (err, res) =>
+          if err then log 'show-list get err: ' + err.message; return
+          tvGlobal.allShows = JSON.parse(res.text).data
+          log 'got ' + tvGlobal.allShows.length + ' shows'
+          @$broadcast 'haveAllShows'
+        

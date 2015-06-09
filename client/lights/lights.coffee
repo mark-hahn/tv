@@ -33,6 +33,8 @@ log = require('debug') 'tv:lts'
   }
 """
 Vue.component 'light-sw-comp', 
+  paramAttributes: ['switch']
+
   name: 'light-sw-comp'
   template: render ->
     div '.switch', 
@@ -107,13 +109,12 @@ Vue.component 'light-sw-comp',
     height:20%;
   }
 """
+
 Vue.component 'lights-comp', 
   name: 'lights-comp'
   template: render ->
     div '.sw-row', vRepeat:'switchRow:switchRows' , ->
-      div '.switch-comp', 
-        vComponent:'light-sw-comp'
-        vRepeat:'switch:switchRow'
+      div '.switch-comp', vComponent:'light-sw-comp', vRepeat:'switch:switchRow'
     div '.fun.btn', vOn: 'click:fun', 'fun'
         
   data: ->
@@ -139,20 +140,21 @@ Vue.component 'lights-comp',
       @funning = setInterval fun, 1000
 
 #### keep lights on screen synced with real lights ####
-setTimeout one = ->  
-  if tvGlobal.lightChanging then setTimeout one, 500; return
-  tvGlobal.ajaxCmd 'getLightLevels', (err, resp) ->
-    if resp and not tvGlobal.lightChanging
-      levels = resp.data
-      {switchRows} = document.getElementById('page-comp').__vue__.$data
-      if switchRows
-        for idx in [0..2] then switchRows[0][idx].brt = levels[idx]
-        for idx in [0..2] then switchRows[1][idx].brt = levels[idx+3]
-        sum = 0; for idx in [0..5] then sum += levels[idx]
-        switchRows[0][3].brt = sum/6
-    one()
-, 100
-
+# setTimeout one = ->  
+#   if tvGlobal.lightChanging or 
+#      not (pageCompEle = document.getElementById 'page-comp')
+#        setTimeout one, 500; return
+#   tvGlobal.ajaxCmd 'getLightLevels', (err, resp) ->
+#     if resp and not tvGlobal.lightChanging and pageCompEle.__vue__
+#       levels = resp.data
+#       rows = pageCompEle.__vue__.$data.switchRows
+#       for idx in [0..2] then rows[0][idx].brt = levels[idx]
+#       for idx in [0..2] then rows[1][idx].brt = levels[idx+3]
+#       sum = 0; for idx in [0..5] then sum += levels[idx]
+#       switchRows[0][3].brt = sum/6
+#     one()
+# , 100
+# 
 #### detect mouse up event anywhere ####
 document.onmouseup = document.ondragend = document.ontouchend = (e) ->
   for sw in document.querySelectorAll '.switch-comp'

@@ -1,10 +1,9 @@
 
 Vue     = require 'vue'
 request = require 'superagent'
-log     = require('debug') 'tv:snf'
+log     = require('debug') 'tv:shwinf'
 
 serverIp = '192.168.1.103'
-ajaxPfx = "http://#{serverIp}:#{tvGlobal.ajaxPort}/"
 plexPfx = "http://#{serverIp}:32400"
 
 {render, div, img} = require 'teacup'
@@ -32,6 +31,8 @@ plexPfx = "http://#{serverIp}:32400"
 """
 
 Vue.component 'show-info', 
+  paramAttributes: ['cur-showkey']
+
   template: render ->
     div '.show-info', ->
       div '.show-info-inner', ->
@@ -45,16 +46,6 @@ Vue.component 'show-info',
       title:   null
 
   created: ->
-    showInfo = @
-    
-    request
-      .get ajaxPfx + 'shows'
-      .set 'Content-Type', 'text/plain'
-      .set 'Accept', 'application/json'
-      .end (err, res) ->
-        if err then log 'get err: ' + err.message; return
-        shows = JSON.parse(res.text).data
-        # log 'got ' + shows.length + ' shows'
-        showInfo.show.thumb   = plexPfx + shows[0].thumb
-        showInfo.show.summary = shows[0].summary
-
+    @$once 'haveAllShows', ->
+      @show.thumb   = plexPfx + tvGlobal.allShows[0].thumb
+      @show.summary = tvGlobal.allShows[0].summary

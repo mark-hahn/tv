@@ -20,6 +20,7 @@ log     = require('debug') 'tv:snf'
     border-bottom: none;
     padding: 0.1em;
     cursor: pointer;
+    font-size: 1rem;
   }
   .show.selected {
       background-color: yellow;
@@ -32,6 +33,15 @@ Vue.component 'show-list',
   template: render ->
     div '.show-list', ->
       div '.show-list-inner', ->
-        div '.show', vRepeat:'allShows', vClass:'selected: $index == curShowIdx',  '{{title}}'
-            
+        div '.show', 
+          vRepeat: 'allShows'
+          vClass:  'selected: $index == curShowIdx'
+          vOn:     'click: onClick'
+          vText:   'title'
+  
+  methods:
+    onClick: (e) ->
+      vm = e.targetVM
+      log 'onclick', vm.$index, vm.title 
+      @curShowIdx = vm.$index   
     

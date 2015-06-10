@@ -1,7 +1,7 @@
 
 Vue = require 'vue'
 log = require('debug') 'tv:lts'
-{render, div, img} = require 'teacup'
+{render, tag, div, img} = require 'teacup'
 
 ### single light switch component ####
 (document.head.appendChild document.createElement('style')).textContent = """
@@ -33,7 +33,7 @@ log = require('debug') 'tv:lts'
   }
 """
 Vue.component 'light-sw-comp', 
-  paramAttributes: ['switch']
+  props: ['switch']
 
   name: 'light-sw-comp'
   template: render ->
@@ -114,7 +114,7 @@ Vue.component 'lights-comp',
   name: 'lights-comp'
   template: render ->
     div '.sw-row', vRepeat:'switchRow:switchRows' , ->
-      div '.switch-comp', vComponent:'light-sw-comp', vRepeat:'switch:switchRow'
+      tag 'light-sw-comp', '.switch-comp', vRepeat:'switch:switchRow'
     div '.fun.btn', vOn: 'click:fun', 'fun'
         
   data: ->

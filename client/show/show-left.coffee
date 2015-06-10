@@ -2,10 +2,10 @@
 Vue     = require 'vue'
 log     = require('debug') 'tv:shwlft'
 
-{render, div} = require 'teacup'
+{render, tag, div} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """
-  .show-info-comp {
+  .show-info {
     width: 100%;
     height: 35.5rem;
   }
@@ -15,15 +15,12 @@ require './show-info'
 require '../two-btns'
 
 Vue.component 'show-left', 
-  paramAttributes: ['page-mode', 'cur-show-idx', 'all-shows', 'two-btn-clk']
+  props: ['page-mode', 'cur-show-idx', 'all-shows', 'two-btn-clk']
   
   template: render ->
-    div '.show-info-comp', 
-      vComponent: 'show-info'
-      curShow:    '{{curShow}}'
+    tag 'show-info', '.show-info', curShow: '{{curShow}}'
       
-    div '.two-btns-comp',  
-      vComponent: 'two-btns'
+    tag 'two-btns', '.two-btns',  
       lftBtnTxt: '{{lftBtnTxt}}'
       rgtBtnTxt: '{{rgtBtnTxt}}'
       twoBtnClk: '{{twoBtnClk}}'
@@ -37,8 +34,7 @@ Vue.component 'show-left',
         when 'Next' then ->
 
   computed:
-    curShow: ->
-      @allShows[@curShowIdx]
+    curShow: -> @allShows[@curShowIdx] ? {}
       
     lftBtnTxt: -> 
       switch @pageMode

@@ -7,15 +7,13 @@ serverIp = '192.168.1.103'
 plexPort = 32400
 plexPfx  = "http://#{serverIp}:#{plexPort}"
 
-{render, div, img} = require 'teacup'
+{render, tag, div, img} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """
   .show-info {
     width: 100%;
-    height:100%;
     position: relative;
     overflow: auto;
-    border: 1px solid gray;
   }
   .show-info-inner {
     width: 100%;
@@ -32,7 +30,7 @@ plexPfx  = "http://#{serverIp}:#{plexPort}"
 """
 
 Vue.component 'show-info', 
-  paramAttributes: ['cur-show']
+  props: ['cur-show']
   
   template: render ->
     div '.show-info', ->

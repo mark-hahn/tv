@@ -3,7 +3,7 @@ Vue     = require 'vue'
 log     = require('debug') 'tv:hdr'
 request = require 'superagent'
 
-{render, div} = require 'teacup'
+{render, tag, div} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """
   .header {
@@ -40,8 +40,8 @@ timeoutOff = ->
   if btnTimeout then clearTimeout btnTimeout
   btnTimeout = null
 
-Vue.component 'header', 
-  paramAttributes: ['cur-page']
+Vue.component 'header-comp', 
+  props: ['cur-page']
 
   name: 'header-comp'
   template: render ->

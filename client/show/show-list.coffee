@@ -3,7 +3,7 @@ Vue     = require 'vue'
 request = require 'superagent'
 log     = require('debug') 'tv:snf'
 
-{render, div, img} = require 'teacup'
+{render, tag, div, img} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """
   .show-list {
@@ -28,7 +28,7 @@ log     = require('debug') 'tv:snf'
 """
 
 Vue.component 'show-list', 
-  paramAttributes: ['all-shows', 'cur-show-idx']
+  props: ['all-shows', 'cur-show-idx']
   
   template: render ->
     div '.show-list', ->

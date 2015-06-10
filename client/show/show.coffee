@@ -2,7 +2,7 @@
 Vue     = require 'vue'
 log     = require('debug') 'tv:shwpag'
 
-{render, div} = require 'teacup'
+{render, tag, div} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """
   .show-left-comp, .show-right-comp {
@@ -17,21 +17,19 @@ log     = require('debug') 'tv:shwpag'
 require './show-left'
 require './show-right'
 
-Vue.component 'show-page', 
-  paramAttributes: ['cur-show-idx','all-shows']
+Vue.component 'show-comp', 
+  props: ['cur-show-idx','all-shows']
   
   template: render ->
-    div '.show-page', ->
+    div '.show-comp', ->
       
-      div '.show-left-comp',  
-        vComponent: 'show-left'
+      tag 'show-left', '.show-left-comp',  
         pageMode:   '{{pageMode}}'
         allShows:   '{{allShows}}'
         curShowIdx: '{{curShowIdx}}'
         twoBtnClk:  '{{twoBtnClk}}'
 
-      div '.show-right-comp', 
-        vComponent: 'show-right'
+      tag 'show-right', '.show-right-comp', 
         pageMode:   '{{pageMode}}'
         allShows:   '{{allShows}}'
         curShowIdx: '{{curShowIdx}}'

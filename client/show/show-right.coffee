@@ -2,22 +2,20 @@
 Vue     = require 'vue'
 log     = require('debug') 'tv:slf'
 
-{render, div} = require 'teacup'
+{render, tag, div} = require 'teacup'
 
 require './show-list'
 require '../two-btns'
 
 Vue.component 'show-right', 
-  paramAttributes: ['page-mode', 'all-shows', 'cur-show-idx', 'two-btn-clk']
+  props: ['page-mode', 'all-shows', 'cur-show-idx', 'two-btn-clk']
   
   template: render ->
-    div '.show-list-comp', 
-      vComponent: 'show-list'
+    tag 'show-list', '.show-list-comp', 
       allShows:   '{{allShows}}'
       curShowIdx: '{{curShowIdx}}'
       
-    div '.two-btns-comp',  
-      vComponent: 'two-btns'
+    tag 'two-btns', '.two-btns',  
       lftBtnTxt:  '{{lftBtnTxt}}' 
       rgtBtnTxt:  '{{rgtBtnTxt}}' 
       twoBtnClk:  '{{twoBtnClk}}'

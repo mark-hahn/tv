@@ -5,6 +5,8 @@ Vue     = require 'vue'
 request = require 'superagent'
 log     = require('debug') 'tv:app---'
 
+Vue.config.debug = yes
+
 serverIp = '192.168.1.103'
 window.tvGlobal = {}
 #this line is replaced on every run
@@ -16,7 +18,7 @@ require('debug').enable '*'
 teacup = require 'teacup'
 camelToKebab = require 'teacup-camel-to-kebab'
 teacup.use camelToKebab()
-{render, meta, title, style, div} = teacup
+{render, tag, meta, title, style, div} = teacup
 
 #### intial html ####
 
@@ -67,17 +69,18 @@ document.head.innerHTML = render ->
     #page-comp {
       height: 34rem;
     }
+    [v-cloak] { 
+      display: none;
+    }
   """
 
 document.body.innerHTML = render ->
-  div '#page', ->
+  div '#page', vCloak:'', ->
     
-    div '#header-comp', 
-      vComponent: 'header'
-      curPage:    'curPage'
+    tag 'header-comp', '#header-comp', curPage:'curPage'
       
-    div '#page-comp',   
-      vComponent: '{{curPage}}'
+    tag 'component', '#page-comp',   
+      is:         '{{curPage}}', 
       keepAlive:  ''
       curShowIdx: '{{curShowIdx}}'
       allShows:   '{{allShows}}'
@@ -112,7 +115,7 @@ window.addEventListener 'resize', resize
 #### page components ####
 
 require './header'
-require './show/show-page'
+require './show/show'
 require './episode/episode'
 require './watch/watch'
 require './lights/lights'
@@ -151,18 +154,17 @@ new Vue
     curShowIdx: 10
     
   components:
-    show:    Vue.component 'show-page'
+    show:    Vue.component 'show-comp'
     episode: Vue.component 'episode-comp'
     watch:   Vue.component 'watch-comp'
     lights:  Vue.component 'lights-comp'
     
   created: ->
-    Vue.nextTick =>
-      request
-        .get ajaxPfx + 'shows'
-        .set 'Content-Type', 'text/plain'
-        .set 'Accept', 'application/json'
-        .end (err, res) =>
-          if err then log 'allShows ajax err: ' + err.message; return
-          @$data.allShows = JSON.parse(res.text).data
+    request
+      .get ajaxPfx + 'shows'
+      .set 'Content-Type', 'text/plain'
+      .set 'Accept', 'application/json'
+      .end (err, res) =>
+        if err then log 'allShows ajax err: ' + err.message; return
+        @allShows = JSON.parse(res.text).data
         

@@ -2,7 +2,7 @@
 Vue     = require 'vue'
 log     = require('debug') 'tv:twobtn'
 
-{render, div} = require 'teacup'
+{render, tag, div} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """
   .two-btns {
@@ -15,7 +15,7 @@ log     = require('debug') 'tv:twobtn'
 """
 
 Vue.component 'two-btns',
-  paramAttributes: ['lft-btn-txt', 'rgt-btn-txt', 'two-btn-clk']
+  props: ['lft-btn-txt', 'rgt-btn-txt', 'two-btn-clk']
 
   template: render ->
     div '.two-btns',  ->

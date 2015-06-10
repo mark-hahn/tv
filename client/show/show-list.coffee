@@ -19,6 +19,7 @@ log     = require('debug') 'tv:snf'
     border: 1px solid gray;
     border-bottom: none;
     padding: 0.1em;
+    cursor: pointer;
   }
   .show.selected {
       background-color: yellow;
@@ -26,16 +27,11 @@ log     = require('debug') 'tv:snf'
 """
 
 Vue.component 'show-list', 
-  paramAttributes: ['cur-showkey']
+  paramAttributes: ['all-shows', 'cur-show-idx']
   
   template: render ->
     div '.show-list', ->
       div '.show-list-inner', ->
-        div '.show', 
-          vRepeat:'show:shows'
-          vText:'show.title'
-          vClass:'selected: show.ratingKey == cur-showkey'
+        div '.show', vRepeat:'allShows', vClass:'selected: $index == curShowIdx',  '{{title}}'
             
-  data: ->
-    shows: []
     

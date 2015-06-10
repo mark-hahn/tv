@@ -15,11 +15,12 @@ require './show-info'
 require '../two-btns'
 
 Vue.component 'show-left', 
-  paramAttributes: ['show-mode', 'cur-showkey']
+  paramAttributes: ['page-mode', 'cur-show-idx', 'all-shows']
   
   template: render ->
     div '.show-info-comp', 
       vComponent: 'show-info'
+      curShow:    '{{curShow}}'
       
     div '.two-btns-comp',  
       vComponent: 'two-btns'
@@ -35,12 +36,15 @@ Vue.component 'show-left',
         when 'Next' then ->
 
   computed:
+    curShow: ->
+      @allShows[@curShowIdx]
+      
     lftBtnTxt: -> 
-      switch @showMode
+      switch @pageMode
         when 'select' then 'Play' 
         when 'tags'   then 'Prev'
     rgtBtnTxt: ->
-      switch  @showMode
+      switch  @pageMode
         when 'select' then 'Tags' 
         when 'tags'   then 'Next'
         

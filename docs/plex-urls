@@ -56,7 +56,7 @@ toggleOSD = (cb) ->
 ###  show ...
 
 { _elementType: 'Directory',
-  ratingKey: 1863,
+  show-idx: 1863,
   key: '/library/metadata/1863/children',  (SEASONS LIST)
   studio: 'CBS',
   type: 'show',
@@ -89,9 +89,9 @@ toggleOSD = (cb) ->
 
 ### season ...
 { _elementType: 'Directory',
-  ratingKey: 1864,
+  show-idx: 1864,
   key: '/library/metadata/1864/children',  (VIDEOS LIST)
-  parentRatingKey: 1863,
+  parentshow-idx: 1863,
   type: 'season',
   title: 'Season 1',
   parentKey: '/library/metadata/1863',
@@ -109,9 +109,9 @@ toggleOSD = (cb) ->
 ### video ...
 
 { _elementType: 'Video',
-  ratingKey: 2657,
+  show-idx: 2657,
   key: '/library/metadata/2657',  (VIDEO KEY FOR ROKU)
-  parentRatingKey: 1864,
+  parentshow-idx: 1864,
   type: 'episode',
   title: 'The Battle Creek Way',
   titleSort: 'Battle Creek Way',
@@ -199,7 +199,7 @@ http://192.168.1.103:32400/status/sessions
 
 This XML file does not appear to have any style information associated with it. The document tree is shown below.
 <MediaContainer size="1">
-<Video addedAt="1427060407" art="/library/metadata/1863/art/1428895814" chapterSource="" contentRating="TV-14" duration="2467113" grandparentArt="/library/metadata/1863/art/1428895814" grandparentKey="/library/metadata/1863" grandparentRatingKey="1863" grandparentTheme="/library/metadata/1863/theme/1428895814" grandparentThumb="/library/metadata/1863/thumb/1428895814" grandparentTitle="Battle Creek" guid="com.plexapp.agents.thetvdb://274802/1/1?lang=en" index="1" key="/library/metadata/2657" lastViewedAt="1428911314" librarySectionID="4" originallyAvailableAt="2015-03-01" parentIndex="1" parentKey="/library/metadata/1864" parentRatingKey="1864" parentThumb="/library/metadata/1864/thumb/1428895813" rating="6.7" ratingKey="2657" sessionKey="158" summary="Jaded Det. Russ Agnew reluctantly partners with charming FBI Agent Milt Chamberlain to solve a drug-related double homicide, but while Milt investigates with the high-tech resources of the FBI, Russ prefers old-school police work and instinct." thumb="/library/metadata/2657/thumb/1428895813" title="The Battle Creek Way" titleSort="Battle Creek Way" type="episode" updatedAt="1428895813" viewCount="3" viewOffset="2022341" year="2015">
+<Video addedAt="1427060407" art="/library/metadata/1863/art/1428895814" chapterSource="" contentRating="TV-14" duration="2467113" grandparentArt="/library/metadata/1863/art/1428895814" grandparentKey="/library/metadata/1863" grandparentshow-idx="1863" grandparentTheme="/library/metadata/1863/theme/1428895814" grandparentThumb="/library/metadata/1863/thumb/1428895814" grandparentTitle="Battle Creek" guid="com.plexapp.agents.thetvdb://274802/1/1?lang=en" index="1" key="/library/metadata/2657" lastViewedAt="1428911314" librarySectionID="4" originallyAvailableAt="2015-03-01" parentIndex="1" parentKey="/library/metadata/1864" parentshow-idx="1864" parentThumb="/library/metadata/1864/thumb/1428895813" rating="6.7" show-idx="2657" sessionKey="158" summary="Jaded Det. Russ Agnew reluctantly partners with charming FBI Agent Milt Chamberlain to solve a drug-related double homicide, but while Milt investigates with the high-tech resources of the FBI, Russ prefers old-school police work and instinct." thumb="/library/metadata/2657/thumb/1428895813" title="The Battle Creek Way" titleSort="Battle Creek Way" type="episode" updatedAt="1428895813" viewCount="3" viewOffset="2022341" year="2015">
 
 title="The Battle Creek Way" titleSort="Battle Creek Way" type="episode" updatedAt="1428895813" viewCount="3" viewOffset="2022341" year="2015"
 
@@ -278,7 +278,7 @@ tv: startVideo { key: '/library/metadata/2667', offset: 1000000, res: '' }
     duration: '1290623',
     grandparentArt: '/library/metadata/1889/art/1427159852',
     grandparentKey: '/library/metadata/1889',
-    grandparentRatingKey: '1889',
+    grandparentshow-idx: '1889',
     grandparentTheme: '/library/metadata/1889/theme/1427159852',
     grandparentThumb: '/library/metadata/1889/thumb/1427159852',
     grandparentTitle: 'Bob\'s Burgers',
@@ -290,10 +290,10 @@ tv: startVideo { key: '/library/metadata/2667', offset: 1000000, res: '' }
     originallyAvailableAt: '2015-01-11',
     parentIndex: '5',
     parentKey: '/library/metadata/1890',
-    parentRatingKey: '1890',
+    parentshow-idx: '1890',
     parentThumb: '/library/metadata/1890/thumb/1427159852',
     rating: '7.3',
-    ratingKey: '2667',
+    show-idx: '2667',
     sessionKey: '165',
     summary: 'Tina, Gene and Louise are ready to put the pedal to the metal when they join a go-kart league. Meanwhile, back at the restaurant Bob and Teddy partner up to serve Teddy\'s home-brewed beer on the sly.',
     thumb: '/library/metadata/2667/thumb/1428910138',
@@ -397,7 +397,7 @@ tv: status null
     duration: '1290623',
     grandparentArt: '/library/metadata/1889/art/1427159852',
     grandparentKey: '/library/metadata/1889',
-    grandparentRatingKey: '1889',
+    grandparentshow-idx: '1889',
     grandparentTheme: '/library/metadata/1889/theme/1427159852',
     grandparentThumb: '/library/metadata/1889/thumb/1427159852',
     grandparentTitle: 'Bob\'s Burgers',
@@ -409,10 +409,10 @@ tv: status null
     originallyAvailableAt: '2015-01-11',
     parentIndex: '5',
     parentKey: '/library/metadata/1890',
-    parentRatingKey: '1890',
+    parentshow-idx: '1890',
     parentThumb: '/library/metadata/1890/thumb/1427159852',
     rating: '7.3',
-    ratingKey: '2667',
+    show-idx: '2667',
     sessionKey: '165',
     summary: 'Tina, Gene and Louise are ready to put the pedal to the metal when they join a go-kart league. Meanwhile, back at the restaurant Bob and Teddy partner up to serve Teddy\'s home-brewed beer on the sly.',
     thumb: '/library/metadata/2667/thumb/1428910138',
@@ -511,7 +511,7 @@ tv: status null
     duration: '1290623',
     grandparentArt: '/library/metadata/1889/art/1427159852',
     grandparentKey: '/library/metadata/1889',
-    grandparentRatingKey: '1889',
+    grandparentshow-idx: '1889',
     grandparentTheme: '/library/metadata/1889/theme/1427159852',
     grandparentThumb: '/library/metadata/1889/thumb/1427159852',
     grandparentTitle: 'Bob\'s Burgers',
@@ -523,10 +523,10 @@ tv: status null
     originallyAvailableAt: '2015-01-11',
     parentIndex: '5',
     parentKey: '/library/metadata/1890',
-    parentRatingKey: '1890',
+    parentshow-idx: '1890',
     parentThumb: '/library/metadata/1890/thumb/1427159852',
     rating: '7.3',
-    ratingKey: '2667',
+    show-idx: '2667',
     sessionKey: '165',
     summary: 'Tina, Gene and Louise are ready to put the pedal to the metal when they join a go-kart league. Meanwhile, back at the restaurant Bob and Teddy partner up to serve Teddy\'s home-brewed beer on the sly.',
     thumb: '/library/metadata/2667/thumb/1428910138',

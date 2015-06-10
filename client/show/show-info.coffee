@@ -4,7 +4,8 @@ request = require 'superagent'
 log     = require('debug') 'tv:shwinf'
 
 serverIp = '192.168.1.103'
-plexPfx = "http://#{serverIp}:32400"
+plexPort = 32400
+plexPfx  = "http://#{serverIp}:#{plexPort}"
 
 {render, div, img} = require 'teacup'
 
@@ -31,21 +32,11 @@ plexPfx = "http://#{serverIp}:32400"
 """
 
 Vue.component 'show-info', 
-  paramAttributes: ['cur-showkey']
-
+  paramAttributes: ['cur-show']
+  
   template: render ->
     div '.show-info', ->
       div '.show-info-inner', ->
-        img '.thumb',   vAttr: 'src: show.thumb'
-        div '.summary', vText: 'show.summary'
-            
-  data: ->
-    show: 
-      thumb:   null
-      summary: null
-      title:   null
+        img '.thumb',   vAttr: "src: '#{plexPfx}' + curShow.thumb"
+        div '.summary', vText: 'curShow.summary'
 
-  created: ->
-    @$once 'haveAllShows', ->
-      @show.thumb   = plexPfx + tvGlobal.allShows[0].thumb
-      @show.summary = tvGlobal.allShows[0].summary

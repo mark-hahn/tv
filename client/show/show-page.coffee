@@ -16,12 +16,22 @@ require './show-left'
 require './show-right'
 
 Vue.component 'show-page', 
-  paramAttributes: ['cur-showkey']
+  paramAttributes: ['cur-show-idx','all-shows']
   
   template: render ->
     div '.show-page', ->
-      div '.show-left-comp',  vComponent: 'show-left' , showMode: '{{showMode}}'
-      div '.show-right-comp', vComponent: 'show-right', showMode: '{{showMode}}'
+      
+      div '.show-left-comp',  
+        vComponent: 'show-left'
+        pageMode:   '{{pageMode}}'
+        allShows:   '{{allShows}}'
+        curShowIdx: '{{curShowIdx}}'
+
+      div '.show-right-comp', 
+        vComponent: 'show-right'
+        pageMode:   '{{pageMode}}'
+        allShows:   '{{allShows}}'
+        curShowIdx: '{{curShowIdx}}'
       
   data: ->
-    showMode: 'select'
+    pageMode: 'select'

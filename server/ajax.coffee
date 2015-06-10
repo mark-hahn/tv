@@ -134,7 +134,7 @@ plex.getSectionKeys (err, keys) ->
         plex.getVideoList season.key, (err, videos) ->
           if err then cb? err; return
 
-  ratingKey: 18483,
+  show-idx: 18483,
   key: '/library/metadata/18483/children',
   studio: 'BBC Four',
   type: 'show',

@@ -8,11 +8,19 @@ require './show-list'
 require '../two-btns'
 
 Vue.component 'show-right', 
-  paramAttributes: ['cur-showkey']
+  paramAttributes: ['page-mode', 'all-shows', 'cur-show-idx']
   
   template: render ->
-    div '.show-list-comp', vComponent: 'show-list'
-    div '.two-btns-comp',  vComponent: 'two-btns' 
+    
+    div '.show-list-comp', 
+      vComponent: 'show-list'
+      allShows:   '{{allShows}}'
+      curShowIdx: '{{curShowIdx}}'
+      
+    div '.two-btns-comp',  
+      vComponent: 'two-btns'
+      lftBtnText: '{{lftBtnText}}' 
+      rgtBtnTxt:  '{{rgtBtnTxt}}' 
     
   data: ->
     twoBtnClk: (e) -> 
@@ -24,11 +32,11 @@ Vue.component 'show-right',
 
   computed:
     lftBtnTxt: -> 
-      switch @showMode
+      switch @pageMode
         when 'select' then 'Filter' 
         when 'filter' then 'Done'
     rgtBtnTxt: ->
-      switch @showMode
+      switch @pageMode
         when 'select' then 'Select' 
         when 'filter' then 'Reset'
         

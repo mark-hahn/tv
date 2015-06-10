@@ -68,16 +68,23 @@ document.head.innerHTML = render ->
       height: 34rem;
     }
   """
-  
-document.body.style.fontSize = '8px'
+
 document.body.innerHTML = render ->
   div '#page', ->
-    div '#header-comp', vComponent: 'header', curPage: 'curPage'
-    div '#page-comp',   vComponent: '{{curPage}}', keepAlive: '', curShowkey: 'curShowkey'
-
+    
+    div '#header-comp', 
+      vComponent: 'header'
+      curPage:    'curPage'
+      
+    div '#page-comp',   
+      vComponent: '{{curPage}}'
+      keepAlive:  ''
+      curShowIdx: '{{curShowIdx}}'
+      allShows:   '{{allShows}}'
 
 #### window resizing ####
 
+document.body.style.fontSize = '8px'
 htmlEle = document.documentElement
 htmlEle.style['font-size'] = fontSize = '48px'
 pageEle = document.querySelector '#page'
@@ -140,7 +147,8 @@ new Vue
   
   data:
     curPage:   (if not debug then 'lights' else 'show')
-    curShowkey: 0
+    allShows: []
+    curShowIdx: 10
     
   components:
     show:    Vue.component 'show-page'
@@ -149,14 +157,12 @@ new Vue
     lights:  Vue.component 'lights-comp'
     
   created: ->
-    process.nextTick =>
+    Vue.nextTick =>
       request
         .get ajaxPfx + 'shows'
         .set 'Content-Type', 'text/plain'
         .set 'Accept', 'application/json'
         .end (err, res) =>
-          if err then log 'show-list get err: ' + err.message; return
-          tvGlobal.allShows = JSON.parse(res.text).data
-          log 'got ' + tvGlobal.allShows.length + ' shows'
-          @$broadcast 'haveAllShows'
+          if err then log 'allShows ajax err: ' + err.message; return
+          @$data.allShows = JSON.parse(res.text).data
         

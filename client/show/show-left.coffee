@@ -15,7 +15,7 @@ require './show-info'
 require '../two-btns'
 
 Vue.component 'show-left', 
-  paramAttributes: ['page-mode', 'cur-show-idx', 'all-shows']
+  paramAttributes: ['page-mode', 'cur-show-idx', 'all-shows', 'two-btn-clk']
   
   template: render ->
     div '.show-info-comp', 
@@ -26,6 +26,7 @@ Vue.component 'show-left',
       vComponent: 'two-btns'
       lftBtnTxt: '{{lftBtnTxt}}'
       rgtBtnTxt: '{{rgtBtnTxt}}'
+      twoBtnClk: '{{twoBtnClk}}'
     
   data: ->
     twoBtnClk: (e) -> 

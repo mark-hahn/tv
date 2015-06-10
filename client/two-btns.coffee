@@ -15,12 +15,9 @@ log     = require('debug') 'tv:twobtn'
 """
 
 Vue.component 'two-btns',
-  paramAttributes: ['lft-btn-txt', 'rgt-btn-txt']
+  paramAttributes: ['lft-btn-txt', 'rgt-btn-txt', 'two-btn-clk']
 
   template: render ->
     div '.two-btns',  ->
       div '.btn', vOn: 'click: twoBtnClk', vText: 'lftBtnTxt'
       div '.btn', vOn: 'click: twoBtnClk', vText: 'rgtBtnTxt'
-    
-  methods:
-    twoBtnClk: ->

@@ -12,6 +12,7 @@ Vue.component 'episode-right',
   
   template: render ->
     tag 'episode-list', '.episode-list-comp', 
+      curShow:       '{{curShow}}'
       allEpisodes:   '{{curShow.episodes}}'
       curEpisodeIdx: '{{curEpisodeIdx}}'
       

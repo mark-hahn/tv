@@ -3,12 +3,7 @@ Vue     = require 'vue'
 request = require 'superagent'
 log     = require('debug') 'tv:shwinf'
 
-serverIp = '192.168.1.103'
-plexPort = 32400
-plexPfx  = "http://#{serverIp}:#{plexPort}"
-
 {render, tag, div, img} = require 'teacup'
-
 (document.head.appendChild document.createElement('style')).textContent = """
   .show-info {
     width: 100%;
@@ -35,6 +30,6 @@ Vue.component 'show-info',
   template: render ->
     div '.show-info', ->
       div '.show-info-inner', ->
-        img '.thumb',   vAttr: "src: '#{plexPfx}' + curShow.thumb"
+        img '.thumb',   vAttr: "src: '#{tvGlobal.plexPfx}' + curShow.thumb"
         div '.summary', vText: 'curShow.summary'
 

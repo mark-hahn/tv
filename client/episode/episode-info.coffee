@@ -3,10 +3,6 @@ Vue     = require 'vue'
 request = require 'superagent'
 log     = require('debug') 'tv:epiinf'
 
-serverIp = '192.168.1.103'
-plexPort = 32400
-plexPfx  = "http://#{serverIp}:#{plexPort}"
-
 {render, tag, div, img} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """
@@ -35,6 +31,6 @@ Vue.component 'episode-info',
   template: render ->
     div '.episode-info', ->
       div '.episode-info-inner', ->
-        img '.thumb',   vAttr: "src: '#{plexPfx}' + curEpisode.thumb"
+        img '.thumb',   vAttr: "src: '#{tvGlobal.plexPfx}' + curEpisode.thumb"
         div '.summary', vText: 'curEpisode.summary'
 

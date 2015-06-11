@@ -27,7 +27,7 @@ log     = require('debug') 'tv:snf'
 """
 
 Vue.component 'episode-list', 
-  props: ['all-episodes', 'cur-episode-idx']
+  props: ['cur-show', 'all-episodes', 'cur-episode-idx']
   
   template: render ->
     div '.episode-list', ->
@@ -36,12 +36,13 @@ Vue.component 'episode-list',
           vRepeat: 'allEpisodes'
           vClass:  'selected: $index == curEpisodeIdx'
           vOn:     'click: onClick'
-          vText:   'seasonNumber + "-" + index + " " + title'
+          vText:   'episodeNumber + " " + title'
   
   methods:
     onClick: (e) ->
       vm = e.targetVM
       log 'onclick', vm.$index, vm.title 
-      @curEpisodeIdx = vm.$index   
+      @$dispatch 'chgEpisodeIdx', vm.$index 
+      # @curShow.curEpisodeIdx = vm.$index   
     
     

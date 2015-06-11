@@ -53,10 +53,10 @@ toggleOSD = (cb) ->
 ###
       
   
-###  show ...
+  
+###  PLEX
 
 { _elementType: 'Directory',
-  show-idx: 1863,
   key: '/library/metadata/1863/children',  (SEASONS LIST)
   studio: 'CBS',
   type: 'show',
@@ -89,9 +89,7 @@ toggleOSD = (cb) ->
 
 ### season ...
 { _elementType: 'Directory',
-  show-idx: 1864,
   key: '/library/metadata/1864/children',  (VIDEOS LIST)
-  parentshow-idx: 1863,
   type: 'season',
   title: 'Season 1',
   parentKey: '/library/metadata/1863',

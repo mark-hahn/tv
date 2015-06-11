@@ -1,4 +1,5 @@
 
+util    = require 'util'
 url     = require 'url'
 http    = require 'http'
 ir      = require './ir'
@@ -69,12 +70,8 @@ srvr = http.createServer (req, res) ->
       if not tvShowsKey
         error res, 'tvShowsKey missing, ignoring ajax shows req'
         return
-      plex.getShowList tvShowsKey, (err, shows) ->
+      plex.getShowList tvShowsKey, (err, result) ->
         if err then error res, err.message; return
-        result = []
-        for show in shows
-          {title, summary, thumb} = show
-          result.push {title, summary, thumb}
         success res, result
 
     # for insteon, see ...

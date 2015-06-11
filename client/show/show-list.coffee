@@ -16,8 +16,7 @@ log     = require('debug') 'tv:snf'
     width: 100%;
   }
   .show {
-    border: 1px solid gray;
-    border-bottom: none;
+    border-top: 1px solid gray;
     padding: 0.1em;
     cursor: pointer;
     font-size: 1rem;
@@ -44,4 +43,5 @@ Vue.component 'show-list',
       vm = e.targetVM
       log 'onclick', vm.$index, vm.title 
       @curShowIdx = vm.$index   
+    
     

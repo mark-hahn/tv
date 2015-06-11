@@ -151,7 +151,7 @@ new Vue
   data:
     curPage:   (if not debug then 'lights' else 'show')
     allShows: []
-    curShowIdx: 10
+    curShowIdx: 0
     
   components:
     show:    Vue.component 'show-comp'

@@ -2,6 +2,7 @@
   src/plex.coffee
 ###
 
+util    = require 'util'
 request = require 'request'
 log     = require('debug') 'tv:plex'
 
@@ -16,15 +17,13 @@ getPlexData = (path, eleType, cb) ->
   request opts, (err, resp, body) ->
     # log {err, resp, body}
     if err or resp.statusCode isnt 200
-      log 'getPlexData req error:', opts, resp.statusCode, err.message
+      log 'getPlexData req error:', opts, resp.statusCode, util.inspect err, depth:null
       cb? err
       return
     libResponse = JSON.parse body
-    # log 'getPlexData opts,libResponse:', { opts, libResponse }
     data = []
     for child in libResponse._children when not eleType or child._elementType is eleType
       data.push child
-      # log 'child', child
     cb? null, data
 
 exports.findRoku = (rokuName, cb) ->
@@ -38,7 +37,7 @@ exports.findRoku = (rokuName, cb) ->
     
 exports.getSectionKeys = (cb) ->
   getPlexData '/library/sections', 'Directory', (err, data) ->
-    if err then cb? err; return
+    if err then cb err; return
     for dir in data
       switch dir.title
         when 'TV Shows' then tvShowsKey = dir.key
@@ -51,15 +50,36 @@ exports.getSectionKeys = (cb) ->
     cb null, {tvShowsKey, moviesKey}
 
 exports.getShowList = (key, cb) ->
-  getPlexData "/library/sections/#{key}/all", 'Directory', cb
   
-exports.getSeasonList = (showPath, cb) ->
-  getPlexData showPath, 'Directory', cb
-  
-exports.getVideoList = (seasonPath, cb) ->
-  getPlexData seasonPath, 'Video', cb
+  getPlexData "/library/sections/#{key}/all", 'Directory', (err, shows) ->
+    if err then cb err; return
+    result = []
+    
+    do oneShow = ->
+      if not (show = shows.shift())
+        cb null, result
+        return
 
-exports.getStatus = (cb) ->
-  getPlexData '/status/sessions', 'Video', cb
-  
-  
+      {title, summary, thumb} = show
+      result.push resShow = {title, summary, thumb}
+      
+      getPlexData show.key, 'Directory', (err, seasons) ->
+        if err then cb err; return
+        resShow.episodes = []
+        
+        do oneSeason = ->
+          if not (season = seasons.shift())
+            oneShow()
+            return
+          if season.type isnt 'season' then oneSeason(); return
+          getPlexData season.key, 'Video', (err, episodes) ->
+            if err then cb err; return
+            for episode in episodes when episode.type is 'episode'
+              {title, summary, thumb} = episode
+              resShow.episodes.push {title, summary, thumb}
+            oneSeason()
+            
+# exports.getStatus = (cb) ->
+#   getPlexData '/status/sessions', 'Video', cb
+#   
+# 

@@ -18,15 +18,14 @@ require './show-left'
 require './show-right'
 
 Vue.component 'show-comp', 
-  props: ['cur-show-idx','all-shows']
+  props: ['all-shows', 'cur-show-idx', 'cur-show']
   
   template: render ->
     div '.show-comp', ->
       
       tag 'show-left', '.show-left-comp',  
         pageMode:   '{{pageMode}}'
-        allShows:   '{{allShows}}'
-        curShowIdx: '{{curShowIdx}}'
+        curShow:    '{{curShow}}'
         twoBtnClk:  '{{twoBtnClk}}'
 
       tag 'show-right', '.show-right-comp', 
@@ -37,6 +36,7 @@ Vue.component 'show-comp',
       
   data: ->
     pageMode: 'select'
+    
     twoBtnClk: (e) -> 
       log 'Clicked bottom button: ' + e.target.innerText
       # switch e.target.innerText

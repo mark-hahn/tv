@@ -15,27 +15,18 @@ require './show-info'
 require '../two-btns'
 
 Vue.component 'show-left', 
-  props: ['page-mode', 'cur-show-idx', 'all-shows', 'two-btn-clk']
+  props: ['page-mode', 'cur-show', 'two-btn-clk']
   
   template: render ->
-    tag 'show-info', '.show-info', curShow: '{{curShow}}'
+    tag 'show-info', '.show-info', 
+      curShow: '{{curShow}}'
       
     tag 'two-btns', '.two-btns',  
       lftBtnTxt: '{{lftBtnTxt}}'
       rgtBtnTxt: '{{rgtBtnTxt}}'
       twoBtnClk: '{{twoBtnClk}}'
     
-  data: ->
-    twoBtnClk: (e) -> 
-      switch e.target.innerText
-        when 'Play' then ->
-        when 'Tags' then ->
-        when 'Prev' then ->
-        when 'Next' then ->
-
   computed:
-    curShow: -> @allShows[@curShowIdx] ? {}
-      
     lftBtnTxt: -> 
       switch @pageMode
         when 'select' then 'Play' 

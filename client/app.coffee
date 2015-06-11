@@ -5,13 +5,13 @@ Vue     = require 'vue'
 request = require 'superagent'
 log     = require('debug') 'tv:app---'
 
-Vue.config.debug = yes
 
 serverIp = '192.168.1.103'
 window.tvGlobal = {}
 #this line is replaced on every run
 tvGlobal.ajaxPort = 2344
 debug = (tvGlobal.ajaxPort is 2344)
+Vue.config.debug = debug
 ajaxPfx = "http://#{serverIp}:#{tvGlobal.ajaxPort}/"
 require('debug').enable '*'
 
@@ -77,13 +77,17 @@ document.head.innerHTML = render ->
 document.body.innerHTML = render ->
   div '#page', vCloak:'', ->
     
-    tag 'header-comp', '#header-comp', curPage:'curPage'
+    tag 'header-comp', '#header-comp', 
+      curPage: '{{curPage}}'
       
     tag 'component', '#page-comp',   
-      is:         '{{curPage}}', 
-      keepAlive:  ''
-      curShowIdx: '{{curShowIdx}}'
-      allShows:   '{{allShows}}'
+      is:            '{{curPage}}'
+      keepAlive:     ''
+      allShows:      '{{allShows}}'
+      curShowIdx:    '{{curShowIdx}}'
+      curShow:       '{{curShow}}'
+      curEpisodeIdx: '{{curEpisodeIdx}}'
+      curEpisode:    '{{curEpisode}}'
 
 #### window resizing ####
 
@@ -149,10 +153,15 @@ new Vue
   el: 'body'
   
   data:
-    curPage:   (if not debug then 'lights' else 'show')
-    allShows: []
-    curShowIdx: 0
+    curPage: (if not debug then 'lights' else 'episode')
+    allShows:      []
+    curShowIdx:    0
     
+  computed: 
+    curShow:       -> @allShows[@curShowIdx]             ? {}
+    curEpisodeIdx: -> @curShow?.curEpisodeIdx            ? 0
+    curEpisode:    -> @curShow?.episodes[@curEpisodeIdx] ? {}
+
   components:
     show:    Vue.component 'show-comp'
     episode: Vue.component 'episode-comp'

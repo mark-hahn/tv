@@ -28,8 +28,12 @@ Vue.component 'show-info',
   props: ['cur-show']
   
   template: render ->
-    div '.show-info', ->
+    div '.show-info', vOn: 'click: infoClick', ->
       div '.show-info-inner', ->
-        img '.thumb',   vAttr: "src: '#{tvGlobal.plexPfx}' + curShow.thumb"
+        img '.thumb', vAttr: "src: '#{tvGlobal.plexPfx}' + curShow.thumb"
         div '.summary', vText: 'curShow.summary'
 
+  methods:
+    infoClick: -> @$dispatch 'chgCurPage', 'episode'
+      
+      

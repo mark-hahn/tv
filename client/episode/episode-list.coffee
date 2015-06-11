@@ -16,12 +16,29 @@ log     = require('debug') 'tv:snf'
     width: 100%;
   }
   .episode {
+    white-space:nowrap;
     border-top: 1px solid gray;
-    padding: 0.1em;
+    padding: .1em;
     cursor: pointer;
     font-size: 1rem;
   }
-  .episode.selected {
+  .episode-number, .episode-title {
+    display: inline-block;
+    border-radius: .25rem;
+  }
+  :not(watched) .episode-number {
+    background-color: #cdc;
+  }
+  .watched .episode-number {
+    background-color: #dcc;
+  }
+  .episode-number {
+    padding-right: .2rem;
+  }
+  .episode-title {
+    padding-left: .2rem;
+  }
+  .episode.selected .episode-title{
       background-color: yellow;
   }
 """
@@ -33,11 +50,13 @@ Vue.component 'episode-list',
     div '.episode-list', ->
       div '.episode-list-inner', ->
         div '.episode', 
-          vRepeat: 'allEpisodes'
-          vClass:  'selected: $index == curEpisodeIdx'
-          vOn:     'click: onClick'
-          vText:   'episodeNumber + " " + title'
-  
+            vRepeat: 'allEpisodes'
+            vClass:  'selected: $index == curEpisodeIdx, watched: viewCount'
+            vOn:     'click: onClick'
+        , ->
+          div '.episode-number', '{{episodeNumber}}'
+          div '.episode-title',  '{{title}}'
+          
   methods:
     onClick: (e) ->
       vm = e.targetVM

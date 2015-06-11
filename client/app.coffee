@@ -52,6 +52,7 @@ document.head.innerHTML = render ->
       -moz-user-select: none;
       -ms-user-select: none;
       user-select: none;
+      font-size: 8px;
     }
     .btn {
       display: inline-block;
@@ -134,7 +135,7 @@ new Vue
       
 
   data:
-    curPage: (if not debug then 'lights' else 'episode')
+    curPage: (if not debug then 'lights' else 'show')
     allShows:  []
     curShowIdx: 0
     curEpisodeIdx: 0
@@ -151,6 +152,7 @@ new Vue
     
   created: ->
     @curEpisodeIdx = 0
+    @$on 'chgCurPage', (page)   -> @curPage = page
     @$on 'chgEpisodeIdx', (idx) -> @curEpisodeIdx = idx
       
     request
@@ -161,3 +163,28 @@ new Vue
         if err then log 'allShows ajax err: ' + err.message; return
         @allShows = JSON.parse(res.text).data
         
+#### window resizing ####
+
+htmlEle = document.documentElement
+htmlEle.style['font-size'] = fontSize = '8px'
+pageEle = document.querySelector '#page'
+pageEle.style.width  = (bodyWidInRems = 24  ) + 'rem'
+pageEle.style.height = (bodyHgtInRems = 40.5) + 'rem'
+resizeTimeout = null
+  
+do resize = ->
+  newFontSize = 0.95 * (
+    Math.min window.innerWidth  / bodyWidInRems,
+             window.innerHeight / bodyHgtInRems
+  ) + 'px'
+  if newFontSize isnt fontSize
+    fontSize = newFontSize
+    # document.body.style.height = (window.outerHeight + 50) + 'px'
+    if resizeTimeout then clearTimeout resizeTimeout
+    resizeTimeout = setTimeout ->
+      htmlEle.style['font-size'] = fontSize
+      resizeTimeout = null
+      # window.scrollTo 0, 1
+    , 75
+    
+window.addEventListener 'resize', resize

@@ -33,14 +33,14 @@ Vue.component 'episode-comp',
         twoBtnClk:     '{{twoBtnClk}}'
       
   data: ->
+    startVideo: (vm) ->
+      tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
+      tvGlobal.ajaxCmd 'startVideo', vm.curEpisode.key, 0
+      
     twoBtnClk: (e) -> 
       log 'Clicked bottom button: ' + e.target.innerText
       switch e.target.innerText
-        when 'Play'
-          tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
-          log e
-          log e.targetVM
-          log e.targetVM.$parent
-          log e.targetVM.$parent.curEpisode
-          tvGlobal.ajaxCmd 'startVideo', e.targetVM.$parent.curEpisode.key, 0
-
+        when 'Play' then @startVideo e.targetVM.$parent
+          
+  created: ->
+    @$on 'startVideo', -> @startVideo @

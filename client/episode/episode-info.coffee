@@ -30,7 +30,10 @@ Vue.component 'episode-info',
   
   template: render ->
     div '.episode-info', ->
-      div '.episode-info-inner', ->
+      div '.episode-info-inner', vOn: 'click: epiInfoClick', ->
         img '.thumb',   vAttr: "src: '#{tvGlobal.plexPfx}' + curEpisode.thumb"
         div '.summary', vText: 'curEpisode.summary'
 
+  methods:
+    epiInfoClick: (e) -> @$dispatch 'startVideo'
+    

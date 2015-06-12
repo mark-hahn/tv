@@ -21,7 +21,7 @@ Vue.component 'episode-left',
     tag 'episode-info', '.episode-info', curEpisode: '{{curEpisode}}'
       
     tag 'two-btns', '.two-btns',  
-      lftBtnTxt: 'left'
-      rgtBtnTxt: 'right'
+      lftBtnTxt: 'Play'
+      rgtBtnTxt: '--'
       twoBtnClk: '{{twoBtnClk}}'
 

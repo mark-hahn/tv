@@ -75,9 +75,9 @@ exports.getShowList = (key, cb) ->
           getPlexData season.key, 'Video', (err, episodes) ->
             if err then cb err; return
             for episode in episodes when episode.type is 'episode'
-              {index, title, summary, thumb, viewCount} = episode
+              {index, title, summary, thumb, viewCount, key} = episode
               episodeNumber = season.index + '-' + index
-              resShow.episodes.push {episodeNumber, title, summary, thumb, viewCount}
+              resShow.episodes.push {episodeNumber, title, summary, thumb, viewCount, key}
             oneSeason()
             
 # exports.getStatus = (cb) ->

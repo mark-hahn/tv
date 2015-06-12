@@ -19,6 +19,7 @@ roku = exports
 exports.init = (cb) ->
   plex.findRoku rokuName, (err, client, plexServerIpIn, plexServerPortIn) ->
     if err then cb? err; return
+    log 'findRoku', {client, plexServerIpIn, plexServerPortIn}
     plexServerIp    = plexServerIpIn
     plexServerPort  = plexServerPortIn
     rokuIp          = client.host
@@ -33,7 +34,9 @@ playerCtrl = (cmd, params={}, cb) ->
           "&port=#{plexServerPort}"
   for arg, val of params then url += '&' + arg + '=' + val
   opts ={url, headers: Accept: 'application/json'}
+  log 'roku req', url
   request opts, (err, resp, body) ->
+    log 'roku res', body
     if err or resp.statusCode isnt 200
       log 'playerCtrl error:', {opts, statusCode: resp?.statusCode, error: err?.message}
       cb? err
@@ -44,7 +47,7 @@ exports.startVideo = (key, offset=0, cb) ->
   # all times in ms
   playerCtrl '/playback/playMedia', {key, offset}, (err, res) ->
     if err then cb? err; return
-    # log 'startVideo', {key, offset, res}
+    log 'startVideo', {key, offset, res}
     cb? null, res
 
 exports.playAction = (action, cb) ->

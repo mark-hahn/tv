@@ -11,6 +11,8 @@ port    = require('parent-config')('apps-config.json').tvAjax_port
 
 tvShowsKey = null
 
+roku.init (err) -> if err then log 'roku.init failed'
+
 # uql = require 'unqlite'
 # db = new uql.Database 'plexdb2/plex2.db'
 # 
@@ -108,6 +110,10 @@ srvr = http.createServer (req, res) ->
       insteon.getLightLevels (err, lightLevels) ->
         if err then error res, 'getAllLights err: ' + err.message; return
         success res, lightLevels
+    
+    when 'startVideo'
+      log 'startVideo', data
+      roku.startVideo data[0], +data[1]
         
     else
       error res, 'bad request cmd: ' + req.url + ',' + pathname, 400

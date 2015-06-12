@@ -87,17 +87,18 @@ document.head.innerHTML = render ->
 #### ajax ####
 
 tvGlobal.ajaxCmd = (cmd, args..., cb) ->
+  log 'ajaxCmd ret', {cmd, args}
   if typeof cb isnt 'function' then args.push cb
   query = ''
   sep = '?'
-  for arg, idx in args when arg
+  for arg, idx in args when arg?
     query += sep + 'q' + idx + '=' +arg.toString()
     sep = '&'
   request
     .get ajaxPfx + cmd + query
     .set 'Content-Type', 'text/plain'
     .end (err, res) ->
-      # console.log 'ajaxCmd ret', {cmd, args, err, res}
+      # log 'ajaxCmd ret', {cmd, args, err, res}
       if err or res.status isnt 200
         log 'ajax err', (err ? res.status); cb? err ? res; return
       cb? null, JSON.parse res.text
@@ -171,7 +172,6 @@ pageEle = document.querySelector '#page'
 pageEle.style.width  = (bodyWidInRems = 24  ) + 'rem'
 pageEle.style.height = (bodyHgtInRems = 40.5) + 'rem'
 resizeTimeout = null
-  
 do resize = ->
   newFontSize = 0.95 * (
     Math.min window.innerWidth  / bodyWidInRems,
@@ -186,5 +186,6 @@ do resize = ->
       resizeTimeout = null
       # window.scrollTo 0, 1
     , 75
-    
 window.addEventListener 'resize', resize
+
+

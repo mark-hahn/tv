@@ -35,12 +35,12 @@ Vue.component 'episode-comp',
   data: ->
     twoBtnClk: (e) -> 
       log 'Clicked bottom button: ' + e.target.innerText
-      # switch e.target.innerText
-      #   when 'Play'   then ->
-      #   when 'Tags'   then ->
-      #   when 'Prev'   then ->
-      #   when 'Next'   then ->
-      #   when 'Filter' then ->
-      #   when 'Select' then ->
-      #   when 'Done'   then ->
-      #   when 'Reset'  then ->
+      switch e.target.innerText
+        when 'Play'
+          tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
+          log e
+          log e.targetVM
+          log e.targetVM.$parent
+          log e.targetVM.$parent.curEpisode
+          tvGlobal.ajaxCmd 'startVideo', e.targetVM.$parent.curEpisode.key, 0
+

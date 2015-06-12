@@ -87,7 +87,6 @@ document.head.innerHTML = render ->
 #### ajax ####
 
 tvGlobal.ajaxCmd = (cmd, args..., cb) ->
-  log 'ajaxCmd ret', {cmd, args}
   if typeof cb isnt 'function' then args.push cb
   query = ''
   sep = '?'

@@ -19,7 +19,6 @@ roku = exports
 exports.init = (cb) ->
   plex.findRoku rokuName, (err, client, plexServerIpIn, plexServerPortIn) ->
     if err then cb? err; return
-    log 'findRoku', {client, plexServerIpIn, plexServerPortIn}
     plexServerIp    = plexServerIpIn
     plexServerPort  = plexServerPortIn
     rokuIp          = client.host

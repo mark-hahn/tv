@@ -10,7 +10,8 @@ log     = require('debug') 'tv:snf'
     width: 100%;
     height: 35.5rem;
     position: relative;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
   .episode-list-inner {
     width: 100%;
@@ -62,6 +63,5 @@ Vue.component 'episode-list',
       vm = e.targetVM
       log 'onclick', vm.$index, vm.title 
       @$dispatch 'chgEpisodeIdx', vm.$index 
-      # @curShow.curEpisodeIdx = vm.$index   
     
     

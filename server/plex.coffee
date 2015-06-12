@@ -5,6 +5,7 @@
 util    = require 'util'
 request = require 'request'
 log     = require('debug') 'tv:plex'
+moment  = require 'moment'
 
 # plexServerIp    = '192.168.1.11'
 plexServerIp    = '192.168.1.103'
@@ -60,9 +61,9 @@ exports.getShowList = (key, cb) ->
         cb null, result
         return
 
-      {title, summary, thumb} = show
-      result.push resShow = {title, summary, thumb}
-      
+      {title, summary, thumb, year, duration, leafCount, viewedLeafCount} = show
+      result.push resShow = {title, summary, thumb, year, duration, \
+                             numEpisodes: leafCount, numWatched: viewedLeafCount}
       getPlexData show.key, 'Directory', (err, seasons) ->
         if err then cb err; return
         resShow.episodes = []
@@ -75,9 +76,14 @@ exports.getShowList = (key, cb) ->
           getPlexData season.key, 'Video', (err, episodes) ->
             if err then cb err; return
             for episode in episodes when episode.type is 'episode'
-              {index, title, summary, thumb, viewCount, key} = episode
+              {index, title, summary, thumb, viewCount, key, duration,  \
+               originallyAvailableAt} = episode
               episodeNumber = season.index + '-' + index
-              resShow.episodes.push {episodeNumber, title, summary, thumb, viewCount, key}
+              aired = moment(originallyAvailableAt).format('M/D/YY')
+              # log {duration, aired}
+              resShow.episodes.push {
+                episodeNumber, title, summary, thumb, viewCount, key,   \
+                duration, aired }
             oneSeason()
             
 # exports.getStatus = (cb) ->

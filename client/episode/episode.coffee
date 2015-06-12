@@ -24,8 +24,9 @@ Vue.component 'episode-comp',
     div '.episode-comp', ->
       
       tag 'episode-left', '.episode-left-comp',  
-        curEpisode:    '{{curEpisode}}'
-        twoBtnClk:     '{{twoBtnClk}}'
+        showTitle:  '{{curShow.title}}'
+        curEpisode: '{{curEpisode}}'
+        twoBtnClk:  '{{twoBtnClk}}'
 
       tag 'episode-right', '.episode-right-comp', 
         curShow:       '{{curShow}}'

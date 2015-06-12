@@ -15,10 +15,12 @@ require './episode-info'
 require '../two-btns'
 
 Vue.component 'episode-left', 
-  props: ['cur-episode', 'two-btn-clk']
+  props: ['show-title', 'cur-episode']
   
   template: render ->
-    tag 'episode-info', '.episode-info', curEpisode: '{{curEpisode}}'
+    tag 'episode-info', '.episode-info', 
+      showTitle:  '{{showTitle}}'
+      curEpisode: '{{curEpisode}}'
       
     tag 'two-btns', '.two-btns',  
       lftBtnTxt: 'Play'

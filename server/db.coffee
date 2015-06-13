@@ -6,6 +6,17 @@ db   = require('nano') 'http://localhost:5984/tv'
 
 tvShowsKey = plexDbContinuousSync = null
 
+###
+(doc) ->
+  if doc.type is 'show'
+    emit doc.title, doc
+    
+(doc) ->
+  if doc.type is 'episode'
+    nums = doc.episodeNumber.split '-'
+    emit [doc.showId, nums[0], nums[1]], doc
+###
+
 exports.init = (cb) ->
   plex.getSectionKeys (err, keys) ->
     if err or not (tvShowsKey = keys.tvShowsKey)
@@ -16,31 +27,51 @@ exports.init = (cb) ->
 put = (value, cb) ->
   db.get value._id, (err, readVal) ->
     if readVal?._rev then value._rev = readVal._rev
-    
-    log 'put: --->', value._id, value.type, value.title
+    # log 'put: ---->', value._id, value.type, value.title
     db.insert value, (err) ->
       if err then log 'db put err:', err; cb err; return
       cb()
-    
 
 get = (key, cb) ->
   db.get key, (err, value) ->
     if err 
       if err?.error is 'not_found' 
-        log 'get: <---', key, 'not found'
+        # log 'get: <----', key, 'not found'
         cb()
         return
       log 'db get err:', err
       cb err
       return
-    log 'get: <---', value._id, value.type, value.title
+    # log 'get: <----', value._id, value.type, value.title
     cb null, value
     
-exports.getShowList = ->
-  plex.getShowList tvShowsKey, (err, shows) ->
-    syncErr err, 'getShowList'
-    cb null, shows
+getShows = (cb) ->
+  db.view 'all', 'shows', (err, shows) ->
+    if err then log 'getShows err:', err; cb err; return
+    cb null, (row.value for row in shows.rows)
 
+getEpisodesForShow = (showId, cb) ->
+  params = 
+    startkey: [showId, null, null]
+    endkey:   [showId,   {},   {}]
+  db.view 'all', 'episodes', params, (err, episodes) ->
+    if err then log 'getEpisodesForShow err:', err; cb err; return
+    cb null, (row.value for row in episodes.rows)
+
+exports.getShowList = (cb) ->
+  getShows (err, shows) ->
+    if err then log 'getShowList err:', err; cb err; return
+    
+    resShows = []
+    do oneShow = ->
+      if not (show = shows.shift()) then cb null, resShows; return
+
+      getEpisodesForShow show._id, (err, episodes) -> 
+        if err then log 'getShowList getEpisodesForShow err:', err; cb err; return
+        show.episodes = episodes
+        resShows.push show
+        oneShow()
+  
 syncErr = (err, msg) ->
   if err
     log 'ABORT: plexDbContinuousSync ' + msg + ' err:', err

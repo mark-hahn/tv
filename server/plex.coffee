@@ -86,17 +86,14 @@ exports.getShowList = (key, cb) ->
             for episode in episodes when episode.type is 'episode'
               {index, title, summary, thumb, viewCount, key, duration,  \
                originallyAvailableAt, type} = episode
-               
-              # if show.title.indexOf('Buffy') > -1
-              #   log util.inspect episode, depth:null
 
               _id = key.split('/')[3]
               episodeNumber = season.index + '-' + index
               aired = moment(originallyAvailableAt).format('M/D/YY')
-              # log {duration, aired}
               
               resShow.episodes.push {
-                _id, episodeNumber, title, summary, thumb, viewCount, key,   \
-                duration, aired, type }
+                _id, showId: resShow._id, episodeNumber, title, summary, \
+                thumb, viewCount, key, duration, aired, type 
+              }
             oneSeason()
 

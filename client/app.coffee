@@ -21,7 +21,7 @@ tvGlobal.ajaxPort = 2344
 ajaxPfx = "http://#{serverIp}:#{tvGlobal.ajaxPort}/"
 tvGlobal.plexPfx  = "http://#{serverIp}:#{tvGlobal.plexPort}"
 
-debug = (tvGlobal.ajaxPort is 2344)
+tvGlobal.debug = debug = (tvGlobal.ajaxPort is 2344)
 Vue.config.debug = debug
 require('debug').enable '*'
 

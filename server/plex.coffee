@@ -90,6 +90,9 @@ exports.getShowList = (key, cb) ->
               _id = key.split('/')[3]
               episodeNumber = season.index + '-' + index
               aired = moment(originallyAvailableAt).format('M/D/YY')
+              viewCount ?= 0
+              viewCount = +viewCount
+              duration = +duration
               
               resShow.episodes.push {
                 _id, showId: resShow._id, episodeNumber, title, summary, \

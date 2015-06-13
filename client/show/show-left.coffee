@@ -19,9 +19,9 @@ Vue.component 'show-left',
   
   template: render ->
     tag 'show-info', '.show-info', 
-      curShow: '{{curShow}}'
-      numEpisodes: '{{numEpisodes()}}'
-      numWatched:  '{{numWatched()}}'
+      curShow:     '{{curShow}}'
+      numEpisodes: '{{numEpisodes}}'
+      numWatched:  '{{numWatched}}'
       
     tag 'two-btns', '.two-btns',  
       lftBtnTxt: '{{lftBtnTxt}}'
@@ -34,7 +34,7 @@ Vue.component 'show-left',
     numWatched: ->
       count = 0
       for episode in @curShow.episodes
-        if episode watched then count++
+        if episode.watched then count++
       count
       
     lftBtnTxt: -> 

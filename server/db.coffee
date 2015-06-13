@@ -6,17 +6,6 @@ db   = require('nano') 'http://localhost:5984/tv'
 
 tvShowsKey = plexDbContinuousSync = null
 
-###
-(doc) ->
-  if doc.type is 'show'
-    emit doc.title, doc
-    
-(doc) ->
-  if doc.type is 'episode'
-    nums = doc.episodeNumber.split '-'
-    emit [doc.showId, nums[0], nums[1]], doc
-###
-
 exports.init = (cb) ->
   plex.getSectionKeys (err, keys) ->
     if err or not (tvShowsKey = keys.tvShowsKey)
@@ -88,8 +77,6 @@ plexDbContinuousSync = ->
         
       get show._id, (err, dbShow) ->
         syncErr err, 'get show'
-        if dbShow and dbShow.type isnt 'show'
-          syncErr 'wrong show type "' + dbShow.type + '"'
           
         if not dbShow
           episodeIdList = []
@@ -101,7 +88,7 @@ plexDbContinuousSync = ->
                 oneShow()
               return
             episodeIdList.push episode._id
-            episode.watched = (+episode.viewCount > 0)
+            episode.watched = (+(episode.viewCount ? 0) > 0)
             put episode, (err) ->
               syncErr err, 'put new show episode'
               oneEpisode()
@@ -121,25 +108,32 @@ plexDbContinuousSync = ->
       
           get episode._id, (err, dbEpisode) ->
             syncErr err, 'get episode'
-            if dbEpisode and dbEpisode.type isnt 'episode'
-              syncErr 'wrong episode type "' + dbEpisode.type + '"'
               
             if not dbEpisode
-              episode.watched = (+episode.viewCount > 0)
+              episode.watched = (+(episode.viewCount ? 0) > 0)
               put episode, (err) ->
                 syncErr err, 'put new episode'
                 oneEpisode()
               return
             
-            if (+episode.viewCount ? 0) > (+dbEpisode.viewCount ? 0)
+            if (+(episode.viewCount ? 0)) > (+(dbEpisode.viewCount ? 0))
+              log 'episode now watched', episode.episodeNumber + ' ' + show.title
               episode.watched = yes
               put episode, (err) ->
                 syncErr err, 'put old episode'
                 oneEpisode()
             else
               oneEpisode()
-          
-        
-      
 
-    
+###
+all/shows ...
+(doc) ->
+  if doc.type is 'show'
+    emit doc.title, doc
+all/episodes ...  
+(doc) ->
+  if doc.type is 'episode'
+    nums = doc.episodeNumber.split '-'
+    emit [doc.showId, +nums[0], +nums[1]], doc
+###
+

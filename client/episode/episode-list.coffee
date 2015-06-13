@@ -52,7 +52,7 @@ Vue.component 'episode-list',
       div '.episode-list-inner', ->
         div '.episode', 
             vRepeat: 'allEpisodes'
-            vClass:  'selected: $index == curEpisodeIdx, watched: viewCount'
+            vClass:  'selected: $index == curEpisodeIdx, watched: watched'
             vOn:     'click: onClick'
         , ->
           div '.episode-number', '{{episodeNumber}}'

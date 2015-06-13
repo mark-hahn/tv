@@ -3,7 +3,7 @@
 
 Vue     = require 'vue'
 request = require 'superagent'
-log     = require('debug') 'tv:app---'
+log     = require('debug') 'tv:---app'
 
 teacup = require 'teacup'
 camelToKebab = require 'teacup-camel-to-kebab'
@@ -13,14 +13,13 @@ teacup.use camelToKebab()
 #### app init values ####
 
 window.tvGlobal = {}
-# tvGlobal.serverIp = 'hahnca.com'
-tvGlobal.serverIp = '192.168.1.103'
+serverIp = '192.168.1.103'
+# serverIp = 'hahnca.com'
+tvGlobal.plexPort = 32400
 #this line is replaced on every run
 tvGlobal.ajaxPort = 2344
-ajaxPfx = "http://#{tvGlobal.serverIp}:#{tvGlobal.ajaxPort}/"
-
-tvGlobal.plexPort = 32400
-tvGlobal.plexPfx  = "http://#{tvGlobal.serverIp}:#{tvGlobal.plexPort}"
+ajaxPfx = "http://#{serverIp}:#{tvGlobal.ajaxPort}/"
+tvGlobal.plexPfx  = "http://#{serverIp}:#{tvGlobal.plexPort}"
 
 debug = (tvGlobal.ajaxPort is 2344)
 Vue.config.debug = debug

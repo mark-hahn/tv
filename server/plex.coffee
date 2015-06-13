@@ -61,10 +61,16 @@ exports.getShowList = (key, cb) ->
         cb null, result
         return
 
-      {title, summary, thumb, year, duration, leafCount, viewedLeafCount} = show
-      result.push resShow = {title, summary, thumb, year, duration, \
-                             numEpisodes: leafCount, numWatched: viewedLeafCount}
-      getPlexData show.key, 'Directory', (err, seasons) ->
+      {key, title, summary, thumb, year, duration, leafCount, viewedLeafCount, type} = show
+        
+      _id = key.split('/')[3]
+      tags = {}
+      for child in show._children ? []
+        if child._elementType is 'Genre' then tags[child.tag] = yes
+      
+      result.push resShow = {_id, title, summary, thumb, year, duration, tags, type}
+                             
+      getPlexData key, 'Directory', (err, seasons) ->
         if err then cb err; return
         resShow.episodes = []
         
@@ -73,20 +79,24 @@ exports.getShowList = (key, cb) ->
             oneShow()
             return
           if season.type isnt 'season' then oneSeason(); return
+          
           getPlexData season.key, 'Video', (err, episodes) ->
             if err then cb err; return
+            
             for episode in episodes when episode.type is 'episode'
               {index, title, summary, thumb, viewCount, key, duration,  \
-               originallyAvailableAt} = episode
+               originallyAvailableAt, type} = episode
+               
+              # if show.title.indexOf('Buffy') > -1
+              #   log util.inspect episode, depth:null
+
+              _id = key.split('/')[3]
               episodeNumber = season.index + '-' + index
               aired = moment(originallyAvailableAt).format('M/D/YY')
               # log {duration, aired}
+              
               resShow.episodes.push {
-                episodeNumber, title, summary, thumb, viewCount, key,   \
-                duration, aired }
+                _id, episodeNumber, title, summary, thumb, viewCount, key,   \
+                duration, aired, type }
             oneSeason()
-            
-# exports.getStatus = (cb) ->
-#   getPlexData '/status/sessions', 'Video', cb
-#   
-# 
+

@@ -648,6 +648,45 @@ Video
      title: 'Roku 3'
 
   
-  
-  
-  
+              
+  # exports.getStatus = (cb) ->
+  #   getPlexData '/status/sessions', 'Video', cb
+  #   
+  # 
+  ###
+  { _elementType: 'Video',
+    ratingKey: 20603,
+    key: '/library/metadata/20603',
+    parentRatingKey: 20588,
+    type: 'episode',
+    title: 'Episode 22',
+    parentKey: '/library/metadata/20588',
+    summary: '',
+    index: 22,
+    thumb: '/library/metadata/20603/thumb/-2209046400',
+    duration: 2652152,
+    addedAt: 1434057269,
+    chapterSource: '',
+    _children: 
+     [ { _elementType: 'Media',
+         videoResolution: '480',
+         id: 15447,
+         duration: 2652152,
+         bitrate: 2280,
+         width: 702,
+         height: 476,
+         aspectRatio: '1.33',
+         audioChannels: 2,
+         audioCodec: 'ac3',
+         videoCodec: 'h264',
+         container: 'mkv',
+         videoFrameRate: '24p',
+         _children: 
+          [ { _elementType: 'Part',
+              id: '15512',
+              key: '/library/parts/15512/file.mkv',
+              duration: 2652152,
+              file: '/mnt/media/videos/Buffy.S02.NTSC.DVD.DD2.0.x264hi10-LiGHTSPEED/buffy.s2e22.becoming.part.two.ntsc.dvd.dd2.0.x264hi10-lightspeed.mkv',
+              size: 755936952,
+              container: 'mkv' } ] } ] }
+  ###

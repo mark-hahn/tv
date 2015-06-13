@@ -18,7 +18,6 @@ require './episode-left'
 require './episode-right'
 
 Vue.component 'episode-comp', 
-  props: ['cur-show', 'cur-episode-idx', 'cur-episode']
   
   template: render ->
     div '.episode-comp', ->

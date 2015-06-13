@@ -3,26 +3,14 @@ util    = require 'util'
 url     = require 'url'
 http    = require 'http'
 ir      = require './ir'
-plex    = require './plex'
 roku    = require './roku'
 insteon = require './insteon'
+db      = require './db'
 log     = require('debug') 'tv:ajax'
 port    = require('parent-config')('apps-config.json').tvAjax_port
 
-tvShowsKey = null
-
 roku.init (err) -> if err then log 'roku.init failed'
-
-# uql = require 'unqlite'
-# db = new uql.Database 'plexdb2/plex2.db'
-# 
-# db.open (err) ->
-#   if err then throw err 
-#   db.store 'key', JSON.stringify({a:1, b:2}), (err, key, value) ->
-#     log {err, key, value}
-#     
-#   db.fetch 'key', (error, key, value) ->
-#     log {error, key, value}
+db.init   (err) -> if err then log 'db.init failed'
 
 error = (res, msg, code=500) ->
   log 'ajax error: ' +  msg
@@ -41,11 +29,6 @@ success = (res, data) ->
     if data then result.data = data
     res.end JSON.stringify result
   
-plex.getSectionKeys (err, keys) ->
-  if err then error null, 'getSectionKeys err: ' + err.message; return
-  # log 'have SectionKeys', keys
-  {tvShowsKey} = keys
-
 poweringUp = no
 
 srvr = http.createServer (req, res) ->
@@ -61,24 +44,15 @@ srvr = http.createServer (req, res) ->
     data[q[1]] = decodeURI arg
   
   switch pathname[1..]
-    # when 'favicon'
-    #   error res, 'no favicon', 404
-      
+
     when 'log'
       console.log 'tvGlobal.log: ' + data.join ', '
       success res
       
     when 'shows'
-      if not tvShowsKey
-        error res, 'tvShowsKey missing, ignoring ajax shows req'
-        return
-      plex.getShowList tvShowsKey, (err, result) ->
+      db.getShowList (err, result) ->
         if err then error res, err.message; return
         success res, result
-
-    # for insteon, see ...
-    #   /root/Dropbox/apps/hvac/src/commands.coffee
-    #   /root/Dropbox/apps/insteon-hub/src/main.coffee
     
     when 'turnOn'
       if poweringUp then success res, 'skipped'; return
@@ -120,45 +94,3 @@ srvr = http.createServer (req, res) ->
 
 srvr.listen port
 log 'tv ajax listening on port ' + port
-
-###
-plex.getSectionKeys (err, keys) ->
-  if err then cb? err; return
-  log 'getSectionKeys', keys
-  {tvShowsKey} = keys
-  plex.getShowList tvShowsKey, (err, shows) ->
-    if err then cb? err; return
-    # log 'shows', shows
-    for show, idx in shows when show.type is 'show' and idx is 20
-      log 'show', show
-      plex.getSeasonList show.key, (err, seasons) ->
-        if err then cb? err; return
-        season = seasons[0]
-        plex.getVideoList season.key, (err, videos) ->
-          if err then cb? err; return
-
-  show-idx: 18483,
-  key: '/library/metadata/18483/children',
-  studio: 'BBC Four',
-  type: 'show',
-  title: 'Bob Servant Independent',
-  summary: 'Comedy series originating from the bestselling Bob Servant books and the BBC Radio Scotland comedy, The Bob Servant Emails. Bob launches his political campaign with controversial results. A radio appearance leads to a home visit from the police and protests from local dog owners. Bob\'s campaign lies in tatters, but will he make a humbling on-air apology?',
-  index: 1,
-  rating: '7.0',
-  lastViewedAt: 1430007456,
-  year: 2013,
-  thumb: '/library/metadata/18483/thumb/1430549627',
-  art: '/library/metadata/18483/art/1430549627',
-  banner: '/library/metadata/18483/banner/1430549627',
-  duration: 1800000,
-  originallyAvailableAt: '2013-01-23',
-  leafCount: 3,
-  viewedLeafCount: 3,
-  childCount: 1,
-  addedAt: 1430549530,
-  updatedAt: 1430549627,
-  _children: 
-   [ { _elementType: 'Genre', tag: 'Comedy' },
-     { _elementType: 'Role', tag: 'Brian Cox' },
-     { _elementType: 'Role', tag: 'Jonathan Watson' } ] }
-###

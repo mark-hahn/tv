@@ -26,7 +26,7 @@ getPlexData = (path, eleType, cb) ->
     for child in libResponse._children when not eleType or child._elementType is eleType
       data.push child
     cb? null, data
-
+    
 exports.findRoku = (rokuName, cb) ->
   getPlexData '/clients', 'Server', (err, clients) ->
     if err then cb err; return
@@ -67,6 +67,7 @@ exports.getShowList = (key, cb) ->
       tags = {}
       for child in show._children ? []
         if child._elementType is 'Genre' then tags[child.tag] = yes
+      duration = +duration
       
       result.push resShow = {_id, title, summary, thumb, year, duration, tags, type}
                              
@@ -100,3 +101,21 @@ exports.getShowList = (key, cb) ->
               }
             oneSeason()
 
+exports.getStatus = (cb) ->
+  getPlexData '/status/sessions', 'Video', (err, sessions) ->
+    if err then cb err; return
+    for session, sidx in (sessions ? []) when session?._elementType is 'Video'
+      for player, pidx in session._children when player._elementType is 'Player'
+        # log 'session:' + sidx, 'player:' + pidx, session.grandparentTitle, 
+        #      session.viewOffset, player.title, player.state
+        cb null,
+          _id:        session.key.split('/')[3]
+          viewOffset: session.viewOffset
+          state:      player.state
+        return
+    cb()
+
+# setInterval ->
+#   exports.getStatus (err, session) ->
+#     log 'session', err, session
+# , 2000

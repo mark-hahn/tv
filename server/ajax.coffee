@@ -4,6 +4,7 @@ url     = require 'url'
 http    = require 'http'
 ir      = require './ir'
 roku    = require './roku'
+plex    = require './plex'
 insteon = require './insteon'
 db      = require './db'
 log     = require('debug') 'tv:ajax'
@@ -88,6 +89,12 @@ srvr = http.createServer (req, res) ->
     when 'startVideo'
       log 'startVideo', data
       roku.startVideo data[0], +data[1]
+      success res, ''
+        
+    when 'getPlayStatus'
+      plex.getStatus (err, playStatus) ->
+        if err then error res, 'getPlayStatus err: ' + err.message; return
+        success res, playStatus
         
     else
       error res, 'bad request cmd: ' + req.url + ',' + pathname, 400

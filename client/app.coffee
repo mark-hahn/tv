@@ -13,15 +13,16 @@ teacup.use camelToKebab()
 #### app init values ####
 
 window.tvGlobal = {}
-serverIp = '192.168.1.103'
-# serverIp = 'hahnca.com'
-tvGlobal.plexPort = 32400
-#this line is replaced on every run
-tvGlobal.ajaxPort = 2344
-ajaxPfx = "http://#{serverIp}:#{tvGlobal.ajaxPort}/"
-tvGlobal.plexPfx  = "http://#{serverIp}:#{tvGlobal.plexPort}"
 
-tvGlobal.debug = debug = (tvGlobal.ajaxPort is 2344)
+#these lines are replaced on every run
+serverIp = 'localhost'
+plexServerIp = 'hahnca.com'
+ajaxPort = 2344
+
+ajaxPfx = "http://#{serverIp}:#{ajaxPort}/"
+tvGlobal.plexPfx  = "http://#{plexServerIp}:32400"
+
+tvGlobal.debug = debug = (ajaxPort is 2344)
 Vue.config.debug = debug
 require('debug').enable '*'
 

@@ -4,6 +4,7 @@ util = require 'util'
 log  = require('debug') 'tv:pldb'
 plex = require './plex'
 db   = require('nano') 'http://localhost:5984/tv'
+cfg  = require('parent-config') 'apps-config.json'
 
 tvShowsKey = plexDbContinuousSync = null
 
@@ -11,7 +12,8 @@ exports.init = (cb) ->
   plex.getSectionKeys (err, keys) ->
     if err or not (tvShowsKey = keys.tvShowsKey)
       log 'getSectionKeys err: ' + err.message, keys; cb err; return
-    plexDbContinuousSync()
+    if cfg.plex_server isnt 'hahnca.com'
+      plexDbContinuousSync()
     cb()
 
 exports.getShowList = (cb) ->
@@ -48,6 +50,7 @@ syncErr = (err, msg) ->
     process.exit 1
     
 plexDbContinuousSync = ->
+  log 'starting plexDbContinuousSync'
     
   plex.getShowList tvShowsKey, (err, shows) ->
     syncErr err, 'getShowList'

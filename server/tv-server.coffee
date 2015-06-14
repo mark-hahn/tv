@@ -6,7 +6,9 @@ log   = require('debug') 'tv:srvr'
 cfg   = require('parent-config') 'apps-config.json'
 
 src = fs.readFileSync 'client/app.coffee', 'utf8'
-src.replace /tvGlobal.ajaxPort.=.\d+/, 'tvGlobal.ajaxPort = ' + cfg.tvAjax_port
+src = src.replace /serverIp\s=\s'.*?'/,     "serverIp = '"     + cfg.server_ip   + "'"
+src = src.replace /plexServerIp\s=\s'.*?'/, "plexServerIp = '" + cfg.plex_server + "'"
+src = src.replace /ajaxPort\s=\s\d+/,       "ajaxPort = "      + cfg.tvAjax_port
 fs.writeFileSync 'client/app.coffee', src
 
 require './server-js/ajax'

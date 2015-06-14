@@ -63,13 +63,13 @@ exports.getShowList = (key, cb) ->
 
       {key, title, summary, thumb, year, duration, leafCount, viewedLeafCount, type} = show
         
-      _id = key.split('/')[3]
+      id = key.split('/')[3]
       tags = {}
       for child in show._children ? []
         if child._elementType is 'Genre' then tags[child.tag] = yes
       duration = +duration
       
-      result.push resShow = {_id, title, summary, thumb, year, duration, tags, type}
+      result.push resShow = {id, title, summary, thumb, year, duration, tags, type}
                              
       getPlexData key, 'Directory', (err, seasons) ->
         if err then cb err; return
@@ -88,15 +88,15 @@ exports.getShowList = (key, cb) ->
               {index, title, summary, thumb, viewCount, key, duration,  \
                originallyAvailableAt, type} = episode
 
-              _id = key.split('/')[3]
+              id = key.split('/')[3]
               episodeNumber = season.index + '-' + index
               aired = moment(originallyAvailableAt).format('M/D/YY')
+              duration = +duration
               viewCount ?= 0
               viewCount = +viewCount
-              duration = +duration
               
               resShow.episodes.push {
-                _id, showId: resShow._id, episodeNumber, title, summary, \
+                id, showId: resShow.id, episodeNumber, title, summary, \
                 thumb, viewCount, key, duration, aired, type 
               }
             oneSeason()
@@ -109,13 +109,9 @@ exports.getStatus = (cb) ->
         # log 'session:' + sidx, 'player:' + pidx, session.grandparentTitle, 
         #      session.viewOffset, player.title, player.state
         cb null,
-          _id:        session.key.split('/')[3]
+          id:        session.key.split('/')[3]
           viewOffset: session.viewOffset
           state:      player.state
         return
     cb()
 
-# setInterval ->
-#   exports.getStatus (err, session) ->
-#     log 'session', err, session
-# , 2000

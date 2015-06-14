@@ -1,4 +1,5 @@
 
+fs   = require 'fs'
 util = require 'util'
 log  = require('debug') 'tv:pldb'
 plex = require './plex'
@@ -12,6 +13,13 @@ exports.init = (cb) ->
       log 'getSectionKeys err: ' + err.message, keys; cb err; return
     plexDbContinuousSync()
     cb()
+
+exports.getShowList = (cb) ->
+  cb null, 
+    try 
+      JSON.parse fs.readFileSync 'showListCache', 'utf8'
+    catch e
+      []
 
 put = (value, cb) ->
   db.get value._id, (err, readVal) ->
@@ -34,93 +42,65 @@ get = (key, cb) ->
     # log 'get: <----', value._id, value.type, value.title
     cb null, value
     
-getShows = (cb) ->
-  db.view 'all', 'shows', (err, shows) ->
-    if err then log 'getShows err:', err; cb err; return
-    cb null, (row.value for row in shows.rows)
-
-getEpisodesForShow = (showId, cb) ->
-  params = 
-    startkey: [showId, null, null]
-    endkey:   [showId,   {},   {}]
-  db.view 'all', 'episodes', params, (err, episodes) ->
-    if err then log 'getEpisodesForShow err:', err; cb err; return
-    cb null, (row.value for row in episodes.rows)
-
-exports.getShowList = (cb) ->
-  getShows (err, shows) ->
-    if err then log 'getShowList err:', err; cb err; return
-    
-    resShows = []
-    do oneShow = ->
-      if not (show = shows.shift()) then cb null, resShows; return
-
-      getEpisodesForShow show._id, (err, episodes) -> 
-        if err then log 'getShowList getEpisodesForShow err:', err; cb err; return
-        show.episodes = episodes
-        resShows.push show
-        oneShow()
-  
 syncErr = (err, msg) ->
   if err
     log 'ABORT: plexDbContinuousSync ' + msg + ' err:', err
     process.exit 1
     
 plexDbContinuousSync = ->
+    
   plex.getShowList tvShowsKey, (err, shows) ->
     syncErr err, 'getShowList'
     
+    showIdx = 0
     do oneShow = ->
-      if not (show = shows.shift())
-        setTimeout plexDbContinuousSync, 10*60*1000
+      if not (show = shows[showIdx++])
+        fs.writeFileSync 'showListCache', JSON.stringify shows
+        setTimeout plexDbContinuousSync, 5*60*1000
         return
         
-      get show._id, (err, dbShow) ->
+      get show.id, (err, dbShow) ->
         syncErr err, 'get show'
-          
-        if not dbShow
-          episodeIdList = []
-          do oneEpisode = ->
-            if not (episode = show.episodes.shift())
-              show.episodes = episodeIdList
-              put show, (err) ->
-                syncErr err, 'put new show'
-                oneShow()
-              return
-            episodeIdList.push episode._id
-            episode.watched = (+(episode.viewCount ? 0) > 0)
-            put episode, (err) ->
-              syncErr err, 'put new show episode'
-              oneEpisode()
-          return
         
-        episodeIdList = []
-        do oneEpisode = ->
-          if not (episode = show.episodes.shift())
-            show.episodes = episodeIdList
-            show.tags = dbShow.tags
-            put show, (err) ->
-              syncErr err, 'put old show'
-              oneShow()
-            return
+        if dbShow
+          show.tags = dbShow.tags
+        else
+          dbShow = 
+            _id:  show.id
+            tags: show.tags
+            type: 'show'
             
-          episodeIdList.push episode._id
-      
-          get episode._id, (err, dbEpisode) ->
+          db.insert dbShow, (err) ->
+            syncErr err, 'put new show'
+        
+        episodeIdx = 0
+        do oneEpisode = ->
+          if not (episode = show.episodes[episodeIdx++])
+            oneShow()
+            return
+
+          get episode.id, (err, dbEpisode) ->
             syncErr err, 'get episode'
               
-            if not dbEpisode
-              episode.watched = (+(episode.viewCount ? 0) > 0)
-              put episode, (err) ->
-                syncErr err, 'put new episode'
-                oneEpisode()
-              return
-            
-            episode.watched = 
-              (+(episode.viewCount ? 0)) > (+(dbEpisode.viewCount ? 0)) or
-               dbEpisode.watched
-              
-            put episode, (err) ->
-              syncErr err, 'put old episode'
-              oneEpisode()
+            watched = 
+              if dbEpisode
+                (episode.viewCount > dbEpisode.viewCount) or dbEpisode.watched
+              else 
+                (episode.viewCount > 0)
 
+            if episode.viewCount is dbEpisode?.viewCount and
+                         watched is dbEpisode?.watched
+              oneEpisode()
+              return
+              
+            episode.watched = watched
+            
+            dbEpisode =
+              _id:       episode.id
+              viewCount: episode.viewCount
+              watched:   watched
+              type:     'episode'
+              
+            put dbEpisode, (err) -> 
+              syncErr err, 'put episode'
+              oneEpisode()

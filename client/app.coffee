@@ -15,8 +15,8 @@ teacup.use camelToKebab()
 window.tvGlobal = {}
 
 #these lines are replaced on every run
-serverIp = 'localhost'
-plexServerIp = 'hahnca.com'
+serverIp = '192.168.1.103'
+plexServerIp = '192.168.1.103'
 ajaxPort = 2344
 
 ajaxPfx = "http://#{serverIp}:#{ajaxPort}/"
@@ -97,7 +97,6 @@ tvGlobal.ajaxCmd = (cmd, args..., cb) ->
     .get ajaxPfx + cmd + query
     .set 'Content-Type', 'text/plain'
     .end (err, res) ->
-      # log 'ajaxCmd ret', {cmd, args, err, res}
       if err or res.status isnt 200
         log 'ajax err', (err ? res.status); cb? err ? res; return
       cb? null, JSON.parse res.text
@@ -134,7 +133,7 @@ new Vue
         curEpisode:    '{{curEpisode}}'
       
   data:
-    curPage: (if not debug then 'lights' else 'show')
+    curPage: 'show'
     allShows:  []
     curShowIdx: 0
     curEpisodeIdx: 0
@@ -151,7 +150,7 @@ new Vue
     
   created: ->
     @curEpisodeIdx = 0
-    @$on 'chgCurPage', (page)   -> @curPage = page
+    @$on 'chgCurPage', (page) -> @curPage = page
     @$on 'chgEpisodeIdx', (idx) -> @curEpisodeIdx = idx
       
     request

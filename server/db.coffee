@@ -6,6 +6,8 @@ plex = require './plex'
 db   = require('nano') 'http://localhost:5984/tv'
 cfg  = require('parent-config') 'apps-config.json'
 
+tvShowsCache = '/tmp/tvShowsCache'
+
 tvShowsKey = plexDbContinuousSync = null
 
 exports.init = (cb) ->
@@ -19,7 +21,7 @@ exports.init = (cb) ->
 exports.getShowList = (cb) ->
   cb null, 
     try 
-      JSON.parse fs.readFileSync 'showListCache', 'utf8'
+      JSON.parse fs.readFileSync tvShowsCache, 'utf8'
     catch e
       []
 
@@ -50,15 +52,13 @@ syncErr = (err, msg) ->
     process.exit 1
     
 plexDbContinuousSync = ->
-  log 'starting plexDbContinuousSync'
-    
   plex.getShowList tvShowsKey, (err, shows) ->
     syncErr err, 'getShowList'
     
     showIdx = 0
     do oneShow = ->
       if not (show = shows[showIdx++])
-        fs.writeFileSync 'showListCache', JSON.stringify shows
+        fs.writeFileSync tvShowsCache, JSON.stringify shows
         setTimeout plexDbContinuousSync, 5*60*1000
         return
         

@@ -54,8 +54,7 @@ Vue.component 'episode-info',
   
   template: render ->
     div '.episode-info', ->
-      div '.episode-info-inner', ->
-      # div '.episode-info-inner', vOn: 'click: epiInfoClick', ->
+      div '.episode-info-inner', vOn: 'click: epiInfoClick', ->
         div '.info-show-title',    '{{showTitle}}'
         hr()
         div '.info-episode-title', '{{curEpisode.title}}'
@@ -67,5 +66,5 @@ Vue.component 'episode-info',
         div '.summary', vText: 'curEpisode.summary'
 
   methods:
-    epiInfoClick: (e) -> @$dispatch 'startVideo'
+    epiInfoClick: (e) -> @$dispatch 'chgCurPage', 'show'
     

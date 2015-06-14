@@ -54,7 +54,8 @@ Vue.component 'episode-info',
   
   template: render ->
     div '.episode-info', ->
-      div '.episode-info-inner', vOn: 'click: epiInfoClick', ->
+      div '.episode-info-inner', ->
+      # div '.episode-info-inner', vOn: 'click: epiInfoClick', ->
         div '.info-show-title',    '{{showTitle}}'
         hr()
         div '.info-episode-title', '{{curEpisode.title}}'

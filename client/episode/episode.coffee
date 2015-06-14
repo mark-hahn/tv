@@ -17,6 +17,10 @@ log     = require('debug') 'tv:epipag'
 require './episode-left'
 require './episode-right'
 
+startVideo = (vm) ->
+  tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
+  tvGlobal.ajaxCmd 'startVideo', vm.curEpisode.key, 0
+
 Vue.component 'episode-comp', 
   props: ['cur-show', 'cur-episode-idx', 'cur-episode', 'two-btn-clk']
   
@@ -34,14 +38,12 @@ Vue.component 'episode-comp',
         twoBtnClk:     '{{twoBtnClk}}'
       
   data: ->
-    startVideo: (vm) ->
-      tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
-      tvGlobal.ajaxCmd 'startVideo', vm.curEpisode.key, 0
       
-    twoBtnClk: (e) -> 
-      log 'Clicked bottom button: ' + e.target.innerText
-      switch e.target.innerText
-        when 'Play' then @startVideo e.targetVM.$parent
-          
   created: ->
-    @$on 'startVideo', -> @startVideo @
+    @$on 'startVideo', -> startVideo @
+    @$on 'twoBtnClk',  (btnName) -> 
+      log 'Clicked bottom button: ' + btnName
+      switch btnName
+        when 'Play' then startVideo @
+
+    

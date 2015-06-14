@@ -15,9 +15,13 @@ log     = require('debug') 'tv:twobtn'
 """
 
 Vue.component 'two-btns',
-  props: ['lft-btn-txt', 'rgt-btn-txt', 'two-btn-clk']
+  props: ['lft-btn-txt', 'rgt-btn-txt']
 
   template: render ->
     div '.two-btns',  ->
-      div '.btn', vOn: 'click: twoBtnClk', vText: 'lftBtnTxt'
-      div '.btn', vOn: 'click: twoBtnClk', vText: 'rgtBtnTxt'
+      div '.btn', vOn: 'click: twoBtnClk', '{{lftBtnTxt}}'
+      div '.btn', vOn: 'click: twoBtnClk', '{{rgtBtnTxt}}'
+
+  methods:
+    twoBtnClk: (e) -> 
+      @$dispatch 'twoBtnClk', e.target.innerText

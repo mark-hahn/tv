@@ -36,10 +36,14 @@ Vue.component 'show-comp',
       
   data: ->
     pageMode: 'select'
-    
-    twoBtnClk: (e) -> 
-      log 'Clicked bottom button: ' + e.target.innerText
-      # switch e.target.innerText
+
+  created: ->
+    @$on 'twoBtnClk',  (btnName) -> 
+      log 'Clicked bottom button: ' + btnName
+      switch btnName
+        when 'Filter'
+          @allShows = (show for show in @allShows when show.tags.New)
+              
       #   when 'Play'   then ->
       #   when 'Tags'   then ->
       #   when 'Prev'   then ->

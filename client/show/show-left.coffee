@@ -26,7 +26,7 @@ Vue.component 'show-left',
     tag 'two-btns', '.two-btns',  
       lftBtnTxt: '{{lftBtnTxt}}'
       rgtBtnTxt: '{{rgtBtnTxt}}'
-      twoBtnClk: '{{twoBtnClk}}'
+      twoBtnClk: 'twoBtnClk'
     
   computed:
     numEpisodes: -> 

@@ -132,7 +132,6 @@ new Vue
         curEpisodeIdx: '{{curEpisodeIdx}}'
         curEpisode:    '{{curEpisode}}'
       
-
   data:
     curPage: (if not debug then 'lights' else 'show')
     allShows:  []

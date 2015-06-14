@@ -25,5 +25,5 @@ Vue.component 'episode-left',
     tag 'two-btns', '.two-btns',  
       lftBtnTxt: 'Play'
       rgtBtnTxt: '--'
-      twoBtnClk: '{{twoBtnClk}}'
+      twoBtnClk: 'twoBtnClk'
 

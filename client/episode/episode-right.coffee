@@ -19,5 +19,5 @@ Vue.component 'episode-right',
     tag 'two-btns', '.two-btns',  
       lftBtnTxt:  '--' 
       rgtBtnTxt:  '--' 
-      twoBtnClk:  '{{twoBtnClk}}'
+      twoBtnClk:  'twoBtnClk'
     

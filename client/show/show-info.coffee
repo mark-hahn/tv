@@ -34,6 +34,16 @@ log     = require('debug') 'tv:shwinf'
     float:right;
     padding: none;
   }
+  .show-info-tag {
+    display: inline-block;
+    font-size: .9rem;
+    margin: 0 .5rem .2rem 0;
+    background-color: #eee;
+    border-radius: .5rem;
+    padding: .2rem;
+    height: 1rem;
+    line-height: .7;
+  }
 """
 
 Vue.component 'show-info', 
@@ -45,6 +55,8 @@ Vue.component 'show-info',
         div '.show-dtl.show-info-year', '{{curShow.year}}'
         div '.show-dtl.show-info-dur',  '({{Math.round(+curShow.duration/60000)}} mins)'
         div '.show-dtl.show-info-epis', '{{numWatched}}/{{numEpisodes}}'
+        hr()
+        div '.show-info-tag', vRepeat:'curShow.tags', '{{$key}}'
         hr()
         div '.summary', vText: 'curShow.summary'
 

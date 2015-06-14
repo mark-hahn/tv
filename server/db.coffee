@@ -116,24 +116,11 @@ plexDbContinuousSync = ->
                 oneEpisode()
               return
             
-            if (+(episode.viewCount ? 0)) > (+(dbEpisode.viewCount ? 0))
-              log 'episode now watched', episode.episodeNumber + ' ' + show.title
-              episode.watched = yes
-              put episode, (err) ->
-                syncErr err, 'put old episode'
-                oneEpisode()
-            else
+            episode.watched = 
+              (+(episode.viewCount ? 0)) > (+(dbEpisode.viewCount ? 0)) or
+               dbEpisode.watched
+              
+            put episode, (err) ->
+              syncErr err, 'put old episode'
               oneEpisode()
-
-###
-all/shows ...
-(doc) ->
-  if doc.type is 'show'
-    emit doc.title, doc
-all/episodes ...  
-(doc) ->
-  if doc.type is 'episode'
-    nums = doc.episodeNumber.split '-'
-    emit [doc.showId, +nums[0], +nums[1]], doc
-###
 

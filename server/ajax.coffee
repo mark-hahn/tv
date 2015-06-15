@@ -55,6 +55,13 @@ srvr = http.createServer (req, res) ->
         if err then error res, err.message; return
         success res, result
     
+    when 'setDBField'
+      val = switch data[2]
+        when 'true'  then true
+        when 'false' then false
+        else data[1]
+      db.setField data[0], data[1], val
+
     when 'turnOn'
       if poweringUp then success res, 'skipped'; return
       poweringUp = yes

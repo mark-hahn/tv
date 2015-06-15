@@ -24,6 +24,6 @@ Vue.component 'episode-left',
       
     tag 'two-btns', '.two-btns',  
       lftBtnTxt: 'Play'
-      rgtBtnTxt: '--'
+      rgtBtnTxt: 'Watched'
       twoBtnClk: 'twoBtnClk'
 

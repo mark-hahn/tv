@@ -133,14 +133,14 @@ new Vue
         curEpisode:    '{{curEpisode}}'
       
   data:
-    curPage: 'show'
+    curPage: (if debug then 'episode' else 'show')
     allShows:  []
     curShowIdx: 0
     curEpisodeIdx: 0
     
   computed: 
-    curShow:       -> @allShows[@curShowIdx]              ? {}
-    curEpisode:    -> @curShow?.episodes?[@curEpisodeIdx] ? {}
+    curShow:    -> @allShows[@curShowIdx]              ? {}
+    curEpisode: -> @curShow?.episodes?[@curEpisodeIdx] ? {}
     
   components:
     show:    Vue.component 'show-comp'
@@ -150,17 +150,18 @@ new Vue
     
   created: ->
     @curEpisodeIdx = 0
-    @$on 'chgCurPage', (page) -> @curPage = page
-    @$on 'chgEpisodeIdx', (idx) -> @curEpisodeIdx = idx
+    @$on 'chgCurPage', (page) -> 
+      @curPage = page
+      if page is 'episode'
+        @curEpisodeIdx = Math.max 0, 
+                         Math.min @curShow.episodes.length-1, @curEpisodeIdx
+    @$on 'chgEpisodeIdx', (idx) -> 
+      @curEpisodeIdx = Math.max 0, Math.min @curShow.episodes.length-1, idx
+    
+    tvGlobal.ajaxCmd 'shows', (err, res) => 
+      if err then log 'get all shows err', err.message; return
+      @allShows = res.data
       
-    request
-      .get ajaxPfx + 'shows'
-      .set 'Content-Type', 'text/plain'
-      .set 'Accept', 'application/json'
-      .end (err, res) =>
-        if err then log 'allShows ajax err: ' + err.message; return
-        @allShows = JSON.parse(res.text).data
-        
 #### window resizing ####
 
 htmlEle = document.documentElement

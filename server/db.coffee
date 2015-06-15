@@ -14,7 +14,7 @@ exports.init = (cb) ->
   plex.getSectionKeys (err, keys) ->
     if err or not (tvShowsKey = keys.tvShowsKey)
       log 'getSectionKeys err: ' + err.message, keys; cb err; return
-    if cfg.plex_server isnt 'hahnca.com'
+    if process.cwd().indexOf('/dev/') < 0
       plexDbContinuousSync()
     cb()
 
@@ -25,6 +25,15 @@ exports.getShowList = (cb) ->
     catch e
       []
 
+exports.setField = (id, key, val, cb) ->
+  get id, (err, doc) ->
+    if err then log 'setField get err: ' + err.message, {key, val}; cb err; return
+    if not doc then log 'setField doc missing: ', {id, key, val}; cb 'doc missing'; return
+    log 'setting field:', id, key, val
+    doc[key] = val
+    put doc, (err) ->
+      if err then log 'setField put err: ' + err.message, {key, val}; cb err; return
+  
 put = (value, cb) ->
   db.get value._id, (err, readVal) ->
     if readVal?._rev then value._rev = readVal._rev
@@ -59,7 +68,8 @@ plexDbContinuousSync = ->
     do oneShow = ->
       if not (show = shows[showIdx++])
         fs.writeFileSync tvShowsCache, JSON.stringify shows
-        setTimeout plexDbContinuousSync, 5*60*1000
+        log 'plexDbContinuousSync written'
+        setTimeout plexDbContinuousSync, 10*1000
         return
         
       get show.id, (err, dbShow) ->

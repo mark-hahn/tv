@@ -49,7 +49,7 @@ log     = require('debug') 'tv:shwinf'
 Vue.component 'show-info', 
   props: ['cur-show', 'num-episodes', 'num-watched']
   template: render ->
-    div '.show-info', vOn: 'click: infoClick', ->
+    div '.show-info', vOn: 'click: infoClick', vKeepScroll: true, ->
       div '.show-info-inner', ->
         img '.thumb', vAttr: "src: '#{tvGlobal.plexPfx}' + curShow.thumb"
         div '.show-dtl.show-info-year', '{{curShow.year}}'

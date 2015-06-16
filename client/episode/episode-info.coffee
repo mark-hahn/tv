@@ -53,7 +53,7 @@ Vue.component 'episode-info',
   props: ['show-title', 'cur-episode']
   
   template: render ->
-    div '.episode-info', ->
+    div '.episode-info', vKeepScroll: true, ->
       div '.episode-info-inner', vOn: 'click: epiInfoClick', ->
         div '.info-show-title',    '{{showTitle}}'
         hr()

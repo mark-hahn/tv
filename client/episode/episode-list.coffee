@@ -48,7 +48,7 @@ Vue.component 'episode-list',
   props: ['cur-show', 'all-episodes', 'cur-episode-idx']
   
   template: render ->
-    div '.episode-list', ->
+    div '.episode-list', vKeepScroll: true, ->
       div '.episode-list-inner', ->
         div '.episode', 
             vRepeat: 'allEpisodes'

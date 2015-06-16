@@ -5,6 +5,8 @@ Vue     = require 'vue'
 request = require 'superagent'
 log     = require('debug') 'tv:---app'
 
+Vue.use require 'vue-keep-scroll'
+
 teacup = require 'teacup'
 camelToKebab = require 'teacup-camel-to-kebab'
 teacup.use camelToKebab()
@@ -133,7 +135,7 @@ new Vue
         curEpisode:    '{{curEpisode}}'
       
   data:
-    curPage: (if debug then 'episode' else 'show')
+    curPage: (if debug then 'show' else 'show')
     allShows:  []
     curShowIdx: 0
     curEpisodeIdx: 0
@@ -149,16 +151,18 @@ new Vue
     lights:  Vue.component 'lights-comp'
     
   created: ->
-    
     @curEpisodeIdx = 0
+    
     @$on 'chgCurPage', (page) -> 
       @curPage = page
       if page is 'episode'
         @curEpisodeIdx = Math.max 0, 
-                         Math.min @curShow.episodes.length-1, @curEpisodeIdx
+                         Math.min @curShow.episodes.length-1, 
+                                  @curShow.curEpisodeIdx ? 0
+      
     @$on 'chgEpisodeIdx', (idx) -> 
       @curEpisodeIdx = Math.max 0, Math.min @curShow.episodes.length-1, idx
-    
+      @curShow.curEpisodeIdx = idx
     tvGlobal.ajaxCmd 'shows', (err, res) => 
       if err then log 'get all shows err', err.message; return
       @allShows = res.data

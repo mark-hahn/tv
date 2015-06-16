@@ -30,15 +30,23 @@ Vue.component 'show-list',
   props: ['all-shows', 'cur-show-idx']
   
   template: render ->
-    div '.show-list', ->
+    div '.show-list', vOn:'scroll: onScroll', ->
       div '.show-list-inner', ->
         div '.show', 
           vRepeat: 'allShows'
           vClass:  'selected: $index == curShowIdx'
           vOn:     'click: onClick'
           vText:   'title'
-  
+
+  attached: ->
+    for ele in @$el.querySelectorAll '[data-vuescrlpos]'
+      [ele.scrollLeft, ele.scrollTop] = ele.getAttribute('data-vuescrlpos').split '-'
+    
   methods:
+    onScroll: (e) ->
+      ele = e.target
+      ele.setAttribute 'data-vuescrlpos', "#{ele.scrollLeft}-#{ele.scrollTop}"
+      
     onClick: (e) ->
       vm = e.targetVM
       log 'onclick', vm.$index, vm.title 

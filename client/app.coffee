@@ -124,7 +124,7 @@ new Vue
       tag 'header-comp', '#header-comp', 
         curPage: '{{curPage}}'
       tag 'component', '#page-comp', 
-        keepAlive:     ''
+        keepAlive:     true
         is:            '{{curPage}}'
         allShows:      '{{allShows}}'
         curShowIdx:    '{{curShowIdx}}'
@@ -149,6 +149,7 @@ new Vue
     lights:  Vue.component 'lights-comp'
     
   created: ->
+    
     @curEpisodeIdx = 0
     @$on 'chgCurPage', (page) -> 
       @curPage = page

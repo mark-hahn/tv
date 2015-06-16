@@ -27,11 +27,11 @@ log     = require('debug') 'tv:snf'
     display: inline-block;
     border-radius: .25rem;
   }
-  :not(watched) .episode-number {
-    background-color: #cdc;
-  }
   .watched .episode-number {
     background-color: #dcc;
+  }
+  .watched .episode-title {
+    text-decoration:line-through;
   }
   .episode-number {
     padding-right: .2rem;

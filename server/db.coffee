@@ -6,6 +6,7 @@ plex = require './plex'
 db   = require('nano') 'http://localhost:5984/tv'
 cfg  = require('parent-config') 'apps-config.json'
 
+inDev = (process.cwd().indexOf('/dev/') > -1)
 tvShowsCache = '/tmp/tvShowsCache'
 
 tvShowsKey = plexDbContinuousSync = null
@@ -14,7 +15,7 @@ exports.init = (cb) ->
   plex.getSectionKeys (err, keys) ->
     if err or not (tvShowsKey = keys.tvShowsKey)
       log 'getSectionKeys err: ' + err.message, keys; cb err; return
-    if process.cwd().indexOf('/dev/') < 0
+    if not inDev
       plexDbContinuousSync()
     cb()
 
@@ -69,7 +70,7 @@ plexDbContinuousSync = ->
       if not (show = shows[showIdx++])
         fs.writeFileSync tvShowsCache, JSON.stringify shows
         log 'plexDbContinuousSync written'
-        setTimeout plexDbContinuousSync, 10*1000
+        setTimeout plexDbContinuousSync, 120*1000
         return
         
       get show.id, (err, dbShow) ->
@@ -87,7 +88,7 @@ plexDbContinuousSync = ->
               show.tags.Watched = yes
 
             # temp for release ...
-            if show.tags.Watched
+            if not inDev and show.tags.Watched
               showIdx--
               shows.splice showIdx, 1
               oneShow()

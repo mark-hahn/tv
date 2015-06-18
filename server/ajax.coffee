@@ -63,6 +63,7 @@ srvr = http.createServer (req, res) ->
       db.setField data[0], data[1], val
 
     when 'turnOn'
+      db.syncPlexDB()
       if poweringUp then success res, 'skipped'; return
       poweringUp = yes
       ir.sendCmd 'pwrOn', (err) ->
@@ -98,6 +99,8 @@ srvr = http.createServer (req, res) ->
       roku.startVideo data[0], +data[1]
       success res, ''
         
+    when 'stopVideo' then -> db.syncPlexDB()
+    
     when 'getPlayStatus'
       plex.getStatus (err, playStatus) ->
         if err then error res, 'getPlayStatus err: ' + err.message; return

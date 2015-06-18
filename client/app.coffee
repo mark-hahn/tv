@@ -1,6 +1,7 @@
 
 # src/app
 
+util    = require 'util'
 Vue     = require 'vue'
 request = require 'superagent'
 log     = require('debug') 'tv:---app'
@@ -86,7 +87,14 @@ document.head.innerHTML = render ->
     }
   """
 
-#### ajax ####
+#### global utils (put in seperate file)  ####
+
+tvGlobal.ensureVisible = (outerEle, ele) ->
+  {top, bottom} = ele.getBoundingClientRect()
+  {top: outerTop, bottom: outerBottom} = outerEle.getBoundingClientRect()
+  if not (outerTop < top    < outerBottom and
+          outerTop < bottom < outerBottom)
+    ele.scrollIntoView()
 
 tvGlobal.ajaxCmd = (cmd, args..., cb) ->
   if typeof cb isnt 'function' then args.push cb
@@ -141,9 +149,13 @@ new Vue
     curEpisodeIdx: 0
     
   computed: 
-    curShow:    -> @allShows[@curShowIdx]              ? {}
-    curEpisode: -> @curShow?.episodes?[@curEpisodeIdx] ? {}
-    
+    curShow: -> @allShows[@curShowIdx] ? {}
+    curEpisodeIdx:
+      get: -> Math.max 0, 
+              Math.min (@curShow.episodes?.length ? 1) - 1, @curShow.episodeIdx ? 0
+      set: (idx) -> @curShow.episodeIdx = idx
+    curEpisode: -> @curShow.episodes?[@curEpisodeIdx] ? {}
+  
   components:
     show:    Vue.component 'show-comp'
     episode: Vue.component 'episode-comp'
@@ -151,18 +163,16 @@ new Vue
     lights:  Vue.component 'lights-comp'
     
   created: ->
-    @curEpisodeIdx = 0
-    
     @$on 'chgCurPage', (page) -> 
       @curPage = page
-      if page is 'episode'
-        @curEpisodeIdx = Math.max 0, 
-                         Math.min @curShow.episodes.length-1, 
-                                  @curShow.curEpisodeIdx ? 0
-      
-    @$on 'chgEpisodeIdx', (idx) -> 
-      @curEpisodeIdx = Math.max 0, Math.min @curShow.episodes.length-1, idx
-      @curShow.curEpisodeIdx = idx
+      @curEpisodeIdx = localStorage.getItem('epiForShow' + @curShow.id) ? 
+                       @curShow.episodeIdx ? 0
+
+    @$on 'chgEpisodeIdx', (idx) ->
+      @curShow.episodeIdx = idx
+      tvGlobal.ajaxCmd 'setDBField', @curShow.id, 'episodeIdx', idx
+      localStorage.setItem 'epiForShow' + @curShow.id, idx
+    
     tvGlobal.ajaxCmd 'shows', (err, res) => 
       if err then log 'get all shows err', err.message; return
       @allShows = res.data
@@ -190,5 +200,4 @@ do resize = ->
       # window.scrollTo 0, 1
     , 75
 window.addEventListener 'resize', resize
-
 

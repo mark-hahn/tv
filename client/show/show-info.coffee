@@ -56,11 +56,20 @@ Vue.component 'show-info',
         div '.show-dtl.show-info-dur',  '({{Math.round(+curShow.duration/60000)}} mins)'
         div '.show-dtl.show-info-epis', '{{numWatched}}/{{numEpisodes}}'
         hr()
-        div '.show-info-tag', vRepeat:'curShow.tags', '{{$key}}'
+        div '.show-info-tag', vRepeat:'activeTags', '{{$value}}'
         hr()
         div '.summary', vText: 'curShow.summary'
 
+  computed:
+    activeTags: ->
+      tags = (tag for tag of @curShow.tags when @curShow.tags[tag])
+      log 'activeTags', @curShow.tags, tags
+      tag for tag in @curShow.tags when @curShow.tags[tag] is yes
+      tags
+      
   methods:
     infoClick: -> @$dispatch 'chgCurPage', 'episode'
-      
+    
+  attached: -> 
+    setTimeout (=> log @curShow.tags), 1000
       

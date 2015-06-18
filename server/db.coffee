@@ -9,14 +9,13 @@ cfg  = require('parent-config') 'apps-config.json'
 inDev = (process.cwd().indexOf('/dev/') > -1)
 tvShowsCache = '/tmp/tvShowsCache'
 
-tvShowsKey = plexDbContinuousSync = null
+tvShowsKey = null
 
 exports.init = (cb) ->
   plex.getSectionKeys (err, keys) ->
     if err or not (tvShowsKey = keys.tvShowsKey)
       log 'getSectionKeys err: ' + err.message, keys; cb err; return
-    if not inDev
-      plexDbContinuousSync()
+    exports.syncPlexDB()
     cb()
 
 exports.getShowList = (cb) ->
@@ -27,14 +26,19 @@ exports.getShowList = (cb) ->
       []
 
 exports.setField = (id, key, val, cb) ->
+  if not isNaN val then val = +val;
   get id, (err, doc) ->
-    if err then log 'setField get err: ' + err.message, {key, val}; cb err; return
-    if not doc then log 'setField doc missing: ', {id, key, val}; cb 'doc missing'; return
-    log 'setting field:', id, key, val
-    doc[key] = val
+    if err then log 'setField get err: ' + err.message, {key, val}; cb? err; return
+    if not doc then log 'setField doc missing: ', {id, key, val}; cb? 'doc missing'; return
+    obj = doc
+    for attr in key.split '.'
+      if typeof obj[attr] is 'object' then obj = obj[attr] 
+      else obj[attr] = val
     put doc, (err) ->
-      if err then log 'setField put err: ' + err.message, {key, val}; cb err; return
-  
+      if err then log 'setField put err: ' + err.message, {key, val}; cb? err; return
+      exports.syncPlexDB()
+      cb? doc
+    
 put = (value, cb) ->
   db.get value._id, (err, readVal) ->
     if readVal?._rev then value._rev = readVal._rev
@@ -58,10 +62,16 @@ get = (key, cb) ->
     
 syncErr = (err, msg) ->
   if err
-    log 'ABORT: plexDbContinuousSync ' + msg + ' err:', err
+    log 'ABORT: syncPlexDB ' + msg + ' err:', err
     process.exit 1
     
-plexDbContinuousSync = ->
+inSync = no
+syncTO = null
+exports.syncPlexDB = ->
+  if syncTO then clearTimeout syncTO; syncTO = null
+  if inSync then syncTO = setTimeout exports.syncPlexDB, 10*60*1000; return
+  inSync = yes
+  
   plex.getShowList tvShowsKey, (err, shows) ->
     syncErr err, 'getShowList'
     
@@ -69,36 +79,32 @@ plexDbContinuousSync = ->
     do oneShow = ->
       if not (show = shows[showIdx++])
         fs.writeFileSync tvShowsCache, JSON.stringify shows
-        log 'plexDbContinuousSync written'
-        setTimeout plexDbContinuousSync, 120*1000
+        log 'syncPlexDB written'
+        setTimeout exports.syncPlexDB, 10*60*1000
+        inSync = no
         return
         
       get show.id, (err, dbShow) ->
         syncErr err, 'get show'
         
+        if dbShow
+          show.tags       = dbShow.tags
+          show.episodeIdx = dbShow.episodeIdx ? 0
+          
         episodeIdx = 0
         numWatched = 0
         do oneEpisode = ->
           
           if not (episode = show.episodes[episodeIdx++])
-            show.tags = (if dbShow then dbShow.tags else show.tags)
-            if numWatched is 0
-              show.tags.New = yes
-            if numWatched is episodeIdx - 1
-              show.tags.Watched = yes
+            if numWatched is 0          then show.tags.New = yes
+            if numWatched is episodeIdx then show.tags.Watched = yes
 
-            # temp for release ...
-            if not inDev and show.tags.Watched
-              showIdx--
-              shows.splice showIdx, 1
-              oneShow()
-              return
-              
             if not dbShow or show.tags.New isnt dbShow.tags.New or
                          show.tags.Watched isnt dbShow.tags.Watched
               dbShow = 
-                _id:  show.id
-                tags: show.tags
+                _id:        show.id
+                tags:       show.tags
+                episodeIdx: show.episodeIdx ? 0
                 type: 'show'
               db.insert dbShow, (err) ->
                 syncErr err, 'put new show'

@@ -41,9 +41,11 @@ Vue.component 'show-left',
       switch @pageMode
         when 'select' then 'Play' 
         when 'tags'   then 'Prev'
+        when 'filter' then 'Prev'
     rgtBtnTxt: ->
       switch  @pageMode
         when 'select' then 'Tags' 
         when 'tags'   then 'Next'
+        when 'filter' then 'Next'
         
         

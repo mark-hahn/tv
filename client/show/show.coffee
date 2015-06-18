@@ -21,7 +21,7 @@ Vue.component 'show-comp',
   props: ['all-shows', 'cur-show-idx', 'cur-show']
   
   template: render ->
-    div '.show-comp', vOn: 'scroll: onScroll', ->
+    div '.show-comp', ->
       
       tag 'show-left', '.show-left-comp',  
         pageMode:   '{{pageMode}}'
@@ -32,23 +32,23 @@ Vue.component 'show-comp',
         pageMode:   '{{pageMode}}'
         allShows:   '{{allShows}}'
         curShowIdx: '{{curShowIdx}}'
+        curShow:    '{{curShow}}'
         twoBtnClk:  '{{twoBtnClk}}'
   
   data: ->
-    pageMode: 'select'
+    pageMode: 'tags'
 
   created: ->     
     @$on 'twoBtnClk',  (btnName) -> 
       log 'Clicked bottom button: ' + btnName
       switch btnName
-        when 'Filter'
-          @allShows = (show for show in @allShows when show.tags.New)
+        when 'Tags'   then @pageMode = 'tags'
+        when 'Done'   then @pageMode = 'select'
               
+        # when 'Filter' then ->
       #   when 'Play'   then ->
-      #   when 'Tags'   then ->
       #   when 'Prev'   then ->
       #   when 'Next'   then ->
       #   when 'Filter' then ->
       #   when 'Select' then ->
-      #   when 'Done'   then ->
       #   when 'Reset'  then ->

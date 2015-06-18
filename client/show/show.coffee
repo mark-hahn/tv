@@ -41,7 +41,6 @@ Vue.component 'show-comp',
   created: ->     
     @$on 'clrPageMode', -> @pageMode = 'select'
     @$on 'twoBtnClk',  (btnName) -> 
-      log 'Clicked bottom button: ' + btnName
       if btnName not in ['Tags', 'Filter', 'Prev', 'Next']
         @pageMode = 'select'
       switch btnName

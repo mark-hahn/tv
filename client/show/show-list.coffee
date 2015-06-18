@@ -41,13 +41,20 @@ Vue.component 'show-list',
   methods:      
     onClick: (e) ->
       vm = e.targetVM
-      log 'onclick', vm.$index, vm.title 
       @curShowIdx = vm.$index   
       localStorage.setItem 'vueCurShowIdx', @curShowIdx
       @$dispatch 'clrPageMode'
       
   attached: ->
-    @curShowIdx = +(localStorage.getItem('vueCurShowIdx') ? 0)
     @$dispatch 'clrPageMode'
+    @curShowIdx = +(localStorage.getItem('vueCurShowIdx') ? 0)
+    if @attached then return
+    @attached = yes
+    setTimeout ->
+      if (selShow = document.querySelector '.show.selected') and
+         (list    = document.querySelector '.show-list')
+        tvGlobal.ensureVisible list, selShow
+    , 1000
+      
     
     

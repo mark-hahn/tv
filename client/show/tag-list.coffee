@@ -56,13 +56,14 @@ Vue.component 'tag-list',
       'AllWatched'      
       'Deleted' 
     ]      
+    
   methods:      
     onClick: (e) ->
+      `var tag;`
       tag = e.target.textContent
-      @curShow.tags[tag] = not @curShow.tags[tag]
+      tags = @curShow.tags
+      tags[tag] = not tags[tag]
+      @curShow.tags = tags
+      # log '@curShow tag', tag, tags, @curShow.tags[tag]
       tvGlobal.ajaxCmd 'setDBField', @curShow.id, 'tags.'+tag, @curShow.tags[tag]
-      log 'onclick', tag, @curShow.tags[tag]
-      
-  attached: -> 
-    setTimeout (=> log @curShow.tags), 1000
       

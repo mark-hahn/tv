@@ -69,6 +69,3 @@ Vue.component 'show-info',
         @$dispatch 'chgCurPage', 'episode'
       @$dispatch 'clrPageMode'
     
-  attached: -> 
-    setTimeout (=> log @curShow.tags), 1000
-      

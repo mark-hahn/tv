@@ -153,7 +153,10 @@ new Vue
     curEpisodeIdx:
       get: -> Math.max 0, 
               Math.min (@curShow.episodes?.length ? 1) - 1, @curShow.episodeIdx ? 0
-      set: (idx) -> @curShow.episodeIdx = idx
+      set: (idx) -> 
+        @curShow.episodeIdx = 
+          Math.max 0, Math.min (@curShow.episodes?.length ? 1) - 1, idx ? 0
+        @curShow.episodeIdx = idx
     curEpisode: -> @curShow.episodes?[@curEpisodeIdx] ? {}
   
   components:
@@ -168,6 +171,9 @@ new Vue
       @curEpisodeIdx = localStorage.getItem('epiForShow' + @curShow.id) ? 
                        @curShow.episodeIdx ? 0
 
+    @$on 'chgShowIdx', (idx) ->
+      @curShowIdx = Math.max 0, Math.min (@allShows.length-1), idx
+      
     @$on 'chgEpisodeIdx', (idx) ->
       @curShow.episodeIdx = idx
       tvGlobal.ajaxCmd 'setDBField', @curShow.id, 'episodeIdx', idx

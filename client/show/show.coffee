@@ -39,16 +39,18 @@ Vue.component 'show-comp',
     pageMode: 'tags'
 
   created: ->     
+    @$on 'clrPageMode', -> @pageMode = 'select'
     @$on 'twoBtnClk',  (btnName) -> 
       log 'Clicked bottom button: ' + btnName
+      if btnName not in ['Tags', 'Filter', 'Prev', 'Next']
+        @pageMode = 'select'
       switch btnName
         when 'Tags'   then @pageMode = 'tags'
-        when 'Done'   then @pageMode = 'select'
+        when 'Prev'   then @$dispatch 'chgShowIdx', @curShowIdx-1
+        when 'Next'   then @$dispatch 'chgShowIdx', @curShowIdx+1
               
+        # when 'Play'   then ->
         # when 'Filter' then ->
-      #   when 'Play'   then ->
-      #   when 'Prev'   then ->
-      #   when 'Next'   then ->
       #   when 'Filter' then ->
       #   when 'Select' then ->
       #   when 'Reset'  then ->

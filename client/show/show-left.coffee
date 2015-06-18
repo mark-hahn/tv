@@ -19,6 +19,7 @@ Vue.component 'show-left',
   
   template: render ->
     tag 'show-info', '.show-info', 
+      pageMode:    '{{pageMode}}'
       curShow:     '{{curShow}}'
       numEpisodes: '{{numEpisodes}}'
       numWatched:  '{{numWatched}}'

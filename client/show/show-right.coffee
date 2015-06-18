@@ -31,12 +31,12 @@ Vue.component 'show-right',
     lftBtnTxt: -> 
       switch @pageMode
         when 'select' then 'Filter' 
-        when 'tags'   then 'Done' 
-        when 'filter' then 'Done'
+        when 'tags'   then 'Filter' 
+        when 'filter' then '---'
     rgtBtnTxt: ->
       switch @pageMode
         when 'select' then 'Select' 
-        when 'tags'   then '---' 
-        when 'filter' then '---'
+        when 'tags'   then 'Done' 
+        when 'filter' then 'Done'
         
         

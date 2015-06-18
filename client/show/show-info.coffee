@@ -47,7 +47,7 @@ log     = require('debug') 'tv:shwinf'
 """
 
 Vue.component 'show-info', 
-  props: ['cur-show', 'num-episodes', 'num-watched']
+  props: ['page-mode', 'cur-show', 'num-episodes', 'num-watched']
   template: render ->
     div '.show-info', vOn: 'click: infoClick', vKeepScroll: true, ->
       div '.show-info-inner', ->
@@ -61,14 +61,13 @@ Vue.component 'show-info',
         div '.summary', vText: 'curShow.summary'
 
   computed:
-    activeTags: ->
-      tags = (tag for tag of @curShow.tags when @curShow.tags[tag])
-      log 'activeTags', @curShow.tags, tags
-      tag for tag in @curShow.tags when @curShow.tags[tag] is yes
-      tags
+    activeTags: -> (tag for tag of @curShow.tags when @curShow.tags[tag])
       
-  methods:
-    infoClick: -> @$dispatch 'chgCurPage', 'episode'
+  methods: 
+    infoClick: -> 
+      if @pageMode isnt 'tags'
+        @$dispatch 'chgCurPage', 'episode'
+      @$dispatch 'clrPageMode'
     
   attached: -> 
     setTimeout (=> log @curShow.tags), 1000

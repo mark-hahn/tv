@@ -44,8 +44,10 @@ Vue.component 'show-list',
       log 'onclick', vm.$index, vm.title 
       @curShowIdx = vm.$index   
       localStorage.setItem 'vueCurShowIdx', @curShowIdx
+      @$dispatch 'clrPageMode'
       
   attached: ->
     @curShowIdx = +(localStorage.getItem('vueCurShowIdx') ? 0)
+    @$dispatch 'clrPageMode'
     
     

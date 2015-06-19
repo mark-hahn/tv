@@ -3,7 +3,7 @@ Vue     = require 'vue'
 request = require 'superagent'
 log     = require('debug') 'tv:taglst'
 
-{render, tag, div, img} = require 'teacup'
+{render, div} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """
   .tag-list {
@@ -22,24 +22,33 @@ log     = require('debug') 'tv:taglst'
     border-top: 1px solid gray;
     padding: 0.1em;
     cursor: pointer;
-    font-size: 2.1rem;
+    font-size: 1.7rem;
   }
   .tag.checked {
     background-color: yellow;
   }
+  .tag.always {
+    background-color: #afa;
+  }
+  .tag.never {
+    background-color: #faa;
+  }
 """
 
 Vue.component 'tag-list',
-  props: ['page-mode', 'cur-show']
+  props: ['page-mode', 'cur-show', 'filter-tags']
   template: render ->
     div '.tag-list', ->
-      div '.tag-hdr', 'Select Show Tags'
+      div '.tag-hdr', vShow:'pageMode == "tags"',   'Tags For Show'
+      div '.tag-hdr', vShow:'pageMode == "filter"', 'Filter Show List'
       div '.tag', 
         vRepeat: 'tags'
         vOn:     'click: onClick'
         vText:   '$value'
-        vShow:   'pageMode == "filter" || $value != "New" && $value != "AllWatched"' 
-        vClass:  'checked: curShow.tags[$value]'
+        vShow:   'pageMode == "filter" || $value != "New" && $value != "Watched"' 
+        vClass:  'checked: pageMode == "tags"   && curShow.tags[$value],'           +
+                 'always:  pageMode == "filter" && filterTags[$value] == "always",' +
+                 'never:   pageMode == "filter" && filterTags[$value] == "never"'
   
   data: ->
     tags: [
@@ -47,13 +56,13 @@ Vue.component 'tag-list',
       'Comedy'    
       'Drama'     
       'Crime'     
-      'Mark'      
-      'Linda'     
+      'MarkOnly'      
+      'LindaOnly'     
       'Favorite'  
       'OnTheFence'
-      'Old'       
       'New'       
-      'AllWatched'      
+      'Watched'      
+      'Archive'       
       'Deleted' 
     ]      
     
@@ -61,9 +70,13 @@ Vue.component 'tag-list',
     onClick: (e) ->
       `var tag;`
       tag = e.target.textContent
-      tags = @curShow.tags
-      tags[tag] = not tags[tag]
-      @curShow.tags = tags
-      # log '@curShow tag', tag, tags, @curShow.tags[tag]
-      tvGlobal.ajaxCmd 'setDBField', @curShow.id, 'tags.'+tag, @curShow.tags[tag]
-      
+      if @pageMode is 'tags'
+        @$set 'curShow.tags.'+tag, not @curShow.tags[tag]
+        tvGlobal.ajaxCmd 'setDBField', @curShow.id, 'tags.'+tag, @curShow.tags[tag]
+      if @pageMode is 'filter'
+        @$set 'filterTags.'+tag, 
+          switch @filterTags[tag]
+            when 'always' then 'never'
+            when 'never'  then 'ignore'
+            else               'always' 
+        

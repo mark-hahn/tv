@@ -27,23 +27,22 @@ log     = require('debug') 'tv:snf'
 """
 
 Vue.component 'show-list', 
-  props: ['all-shows', 'cur-show-idx']
+  props: ['page-mode', 'all-shows', 'cur-show-idx']
   
   template: render ->
     div '.show-list', vKeepScroll: true, ->
       div '.show-list-inner', ->
         div '.show', 
           vRepeat: 'allShows'
-          vClass:  'selected: $index == curShowIdx'
+          vClass:  'selected: $index == curShowIdx && pageMode != "filter"'
           vOn:     'click: onClick'
           vText:   'title'
     
   methods:      
     onClick: (e) ->
-      vm = e.targetVM
-      @curShowIdx = vm.$index   
-      localStorage.setItem 'vueCurShowIdx', @curShowIdx
       @$dispatch 'clrPageMode'
+      @curShowIdx = e.targetVM.$index   
+      localStorage.setItem 'vueCurShowIdx', @curShowIdx
       
   attached: ->
     @$dispatch 'clrPageMode'
@@ -54,7 +53,7 @@ Vue.component 'show-list',
       if (selShow = document.querySelector '.show.selected') and
          (list    = document.querySelector '.show-list')
         tvGlobal.ensureVisible list, selShow
-    , 1000
+    , 2000
       
     
     

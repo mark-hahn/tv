@@ -13,9 +13,10 @@ Vue.component 'show-right',
   
   template: render ->
     tag 'show-list', '.show-list-comp', 
+      pageMode:   '{{pageMode}}'
       allShows:   '{{allShows}}'
       curShowIdx: '{{curShowIdx}}'
-      vShow:      'pageMode == "select"'
+      vShow:      'pageMode != "tags"'
       
     tag 'tag-list', '.tag-list-comp', 
       pageMode: '{{pageMode}}'

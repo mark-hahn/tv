@@ -15,7 +15,7 @@ require './show-info'
 require '../two-btns'
 
 Vue.component 'show-left', 
-  props: ['page-mode', 'cur-show', 'two-btn-clk']
+  props: ['page-mode', 'cur-show', 'two-btn-clk', 'filter-tags']
   
   template: render ->
     tag 'show-info', '.show-info', 
@@ -23,6 +23,12 @@ Vue.component 'show-left',
       curShow:     '{{curShow}}'
       numEpisodes: '{{numEpisodes}}'
       numWatched:  '{{numWatched}}'
+      vShow: 'pageMode != "filter"'
+      
+    tag 'tag-list', '.tag-list-comp', 
+      pageMode:   '{{pageMode}}'
+      filterTags: '{{filterTags}}'
+      vShow: 'pageMode == "filter"'
       
     tag 'two-btns', '.two-btns',  
       lftBtnTxt: '{{lftBtnTxt}}'
@@ -42,11 +48,11 @@ Vue.component 'show-left',
       switch @pageMode
         when 'select' then 'Play' 
         when 'tags'   then 'Prev'
-        when 'filter' then 'Prev'
+        when 'filter' then 'Reset'
     rgtBtnTxt: ->
       switch  @pageMode
         when 'select' then 'Tags' 
         when 'tags'   then 'Next'
-        when 'filter' then 'Next'
+        when 'filter' then 'Tags'
         
         

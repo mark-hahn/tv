@@ -25,18 +25,21 @@ Vue.component 'show-comp',
       
       tag 'show-left', '.show-left-comp',  
         pageMode:   '{{pageMode}}'
+        filterTags: '{{filterTags}}'
         curShow:    '{{curShow}}'
         twoBtnClk:  '{{twoBtnClk}}'
 
       tag 'show-right', '.show-right-comp', 
         pageMode:   '{{pageMode}}'
+        filterTags: '{{filterTags}}'
         allShows:   '{{allShows}}'
         curShowIdx: '{{curShowIdx}}'
         curShow:    '{{curShow}}'
         twoBtnClk:  '{{twoBtnClk}}'
   
   data: ->
-    pageMode: 'tags'
+    pageMode: 'select'
+    filterTags: Watched: 'never', Archive: 'never', Deleted: 'never'
 
   created: ->     
     @$on 'clrPageMode', -> @pageMode = 'select'
@@ -45,11 +48,11 @@ Vue.component 'show-comp',
         @pageMode = 'select'
       switch btnName
         when 'Tags'   then @pageMode = 'tags'
+        when 'Filter' then @pageMode = 'filter'
         when 'Prev'   then @$dispatch 'chgShowIdx', @curShowIdx-1
         when 'Next'   then @$dispatch 'chgShowIdx', @curShowIdx+1
               
         # when 'Play'   then ->
-        # when 'Filter' then ->
       #   when 'Filter' then ->
       #   when 'Select' then ->
       #   when 'Reset'  then ->

@@ -27,7 +27,7 @@ log     = require('debug') 'tv:snf'
 """
 
 Vue.component 'show-list', 
-  props: ['page-mode', 'all-shows', 'cur-show-idx']
+  props: ['page-mode', 'all-shows', 'cur-show-idx', 'filter-tags']
   
   template: render ->
     div '.show-list', vKeepScroll: true, ->
@@ -37,8 +37,17 @@ Vue.component 'show-list',
           vClass:  'selected: $index == curShowIdx && pageMode != "filter"'
           vOn:     'click: onClick'
           vText:   'title'
-    
+          vShow:   'showInList($data)'
+  
   methods:      
+    showInList: (show) ->
+      tags = show.tags
+      for filterTag, filterVal of @filterTags
+        if filterVal is 'never'  and     tags[filterTag] or
+           filterVal is 'always' and not tags[filterTag]
+          return no
+      return yes
+    
     onClick: (e) ->
       @$dispatch 'clrPageMode'
       @curShowIdx = e.targetVM.$index   

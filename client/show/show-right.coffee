@@ -9,13 +9,21 @@ require './tag-list'
 require '../two-btns'
 
 Vue.component 'show-right', 
-  props: ['page-mode', 'all-shows', 'cur-show-idx', 'cur-show', 'two-btn-clk']
+  props: [
+    'page-mode'
+    'all-shows'
+    'cur-show-idx'
+    'cur-show'
+    'two-btn-clk'
+    'filter-tags'
+  ]
   
   template: render ->
     tag 'show-list', '.show-list-comp', 
       pageMode:   '{{pageMode}}'
       allShows:   '{{allShows}}'
       curShowIdx: '{{curShowIdx}}'
+      filterTags: '{{filterTags}}'
       vShow:      'pageMode != "tags"'
       
     tag 'tag-list', '.tag-list-comp', 

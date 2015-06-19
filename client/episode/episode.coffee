@@ -37,8 +37,6 @@ Vue.component 'episode-comp',
         curEpisodeIdx: '{{curEpisodeIdx}}'
         twoBtnClk:     '{{twoBtnClk}}'
       
-  data: ->
-      
   created: ->
     @$on 'startVideo', -> startVideo @
     

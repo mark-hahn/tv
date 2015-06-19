@@ -96,8 +96,8 @@ exports.syncPlexDB = ->
         do oneEpisode = ->
           
           if not (episode = show.episodes[episodeIdx++])
-            if numWatched is 0          then show.tags.New = yes
-            if numWatched is episodeIdx then show.tags.Watched = yes
+            if numWatched is 0            then show.tags.New = yes
+            if numWatched is episodeIdx-1 then show.tags.Watched = yes
 
             if not dbShow or show.tags.New isnt dbShow.tags.New or
                          show.tags.Watched isnt dbShow.tags.Watched

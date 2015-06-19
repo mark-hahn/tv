@@ -35,6 +35,7 @@ Vue.component 'show-comp',
         allShows:   '{{allShows}}'
         curShowIdx: '{{curShowIdx}}'
         curShow:    '{{curShow}}'
+        showInList: '{{showInList}}'
         twoBtnClk:  '{{twoBtnClk}}'
   
   data: ->
@@ -56,3 +57,27 @@ Vue.component 'show-comp',
       #   when 'Filter' then ->
       #   when 'Select' then ->
       #   when 'Reset'  then ->
+
+  methods:      
+    showInList: (show) ->
+      if not show then return no
+      tags = show.tags
+      for filterTag, filterVal of @filterTags
+        if filterVal is 'never'  and     tags[filterTag] or
+           filterVal is 'always' and not tags[filterTag]
+          return no
+      return yes
+      
+    setVisibleShow: ->
+      curShowId = localStorage.getItem('vueCurShowId') ? @allShows[0].id
+      for show, idx in @allShows
+        if show.id is curShowId then break
+      while show and not @showInList show
+        show = @allShows[++idx]
+      if not show then idx = 0
+      @curShowIdx = idx
+      localStorage.setItem 'vueCurShowId', @allShows[idx].id
+  
+  watch: pageMode: -> @setVisibleShow()
+  
+  attached: -> setTimeout (=> @setVisibleShow()), 500

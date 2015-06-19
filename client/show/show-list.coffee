@@ -27,7 +27,7 @@ log     = require('debug') 'tv:snf'
 """
 
 Vue.component 'show-list', 
-  props: ['page-mode', 'all-shows', 'cur-show-idx', 'filter-tags']
+  props: ['page-mode', 'all-shows', 'cur-show-idx', 'filter-tags', 'show-in-list']
   
   template: render ->
     div '.show-list', vKeepScroll: true, ->
@@ -38,27 +38,18 @@ Vue.component 'show-list',
           vOn:     'click: onClick'
           vText:   'title'
           vShow:   'showInList($data)'
-  
-  methods:      
-    showInList: (show) ->
-      tags = show.tags
-      for filterTag, filterVal of @filterTags
-        if filterVal is 'never'  and     tags[filterTag] or
-           filterVal is 'always' and not tags[filterTag]
-          return no
-      return yes
-    
+          
+  methods:
     onClick: (e) ->
       @$dispatch 'clrPageMode'
       @curShowIdx = e.targetVM.$index   
-      localStorage.setItem 'vueCurShowIdx', @curShowIdx
+      localStorage.setItem 'vueCurShowId', @allShows[@curShowIdx].id
       
   attached: ->
     @$dispatch 'clrPageMode'
-    @curShowIdx = +(localStorage.getItem('vueCurShowIdx') ? 0)
     if @attached then return
     @attached = yes
-    setTimeout ->
+    setTimeout =>
       if (selShow = document.querySelector '.show.selected') and
          (list    = document.querySelector '.show-list')
         tvGlobal.ensureVisible list, selShow

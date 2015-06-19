@@ -16,6 +16,7 @@ Vue.component 'show-right',
     'cur-show'
     'two-btn-clk'
     'filter-tags'
+    'show-in-list'
   ]
   
   template: render ->
@@ -24,6 +25,7 @@ Vue.component 'show-right',
       allShows:   '{{allShows}}'
       curShowIdx: '{{curShowIdx}}'
       filterTags: '{{filterTags}}'
+      showInList: '{{showInList}}'
       vShow:      'pageMode != "tags"'
       
     tag 'tag-list', '.tag-list-comp', 

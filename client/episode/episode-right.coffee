@@ -17,7 +17,7 @@ Vue.component 'episode-right',
       curEpisodeIdx: '{{curEpisodeIdx}}'
       
     tag 'two-btns', '.two-btns',  
-      lftBtnTxt:  'Down' 
-      rgtBtnTxt:  'Up' 
+      lftBtnTxt:  'Up' 
+      rgtBtnTxt:  'Down' 
       twoBtnClk:  'twoBtnClk'
     

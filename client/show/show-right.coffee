@@ -17,6 +17,7 @@ Vue.component 'show-right',
     'two-btn-clk'
     'filter-tags'
     'show-in-list'
+    'cur-tags'
   ]
   
   template: render ->
@@ -31,7 +32,8 @@ Vue.component 'show-right',
     tag 'tag-list', '.tag-list-comp', 
       pageMode: '{{pageMode}}'
       curShow:  '{{curShow}}'
-      vShow: 'pageMode == "tags"'
+      vShow:    'pageMode == "tags"'
+      curTags:  '{{curTags}}'
       
     tag 'two-btns', '.two-btns',  
       lftBtnTxt:  '{{lftBtnTxt}}' 

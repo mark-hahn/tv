@@ -17,6 +17,15 @@ log     = require('debug') 'tv:shwpag'
 require './show-left'
 require './show-right'
 
+getDefaultFilters = ->
+  filters = new Object
+  for tag in tvGlobal.tagList
+    filters[tag] = 'ignore'
+  filters.Watched = 'never'
+  filters.Archive = 'never'
+  filters.Deleted = 'never'
+  filters
+
 Vue.component 'show-comp', 
   props: ['all-shows', 'cur-show-idx', 'cur-show']
   
@@ -37,10 +46,16 @@ Vue.component 'show-comp',
         curShow:    '{{curShow}}'
         showInList: '{{showInList}}'
         twoBtnClk:  '{{twoBtnClk}}'
+        curTags:    '{{curTags}}'
   
   data: ->
     pageMode:  'select'
-    filterTags: Watched: 'never', Archive: 'never', Deleted: 'never'
+    curTags: {}
+    filterTags: getDefaultFilters()
+
+  watch: 
+    curShow:  -> @curTags = @curShow?.tags ? {}
+    pageMode: -> @setVisibleShow()
 
   created: ->     
     @$on 'clrPageMode', -> @pageMode = 'select'
@@ -52,11 +67,7 @@ Vue.component 'show-comp',
         when 'Filter' then @pageMode = 'filter'
         when 'Prev'   then @$dispatch 'chgShowIdx', @curShowIdx-1
         when 'Next'   then @$dispatch 'chgShowIdx', @curShowIdx+1
-        when 'Reset' 
-          @$set 'filterTags', new Object
-          @$set 'filterTags.Watched', 'never'
-          @$set 'filterTags.Archive', 'never'
-          @$set 'filterTags.Deleted', 'never'
+        when 'Reset'  then @filterTags = getDefaultFilters()
               
   methods:      
     showInList: (show) ->
@@ -69,15 +80,13 @@ Vue.component 'show-comp',
       return yes
       
     setVisibleShow: ->
-      curShowId = localStorage.getItem('vueCurShowId') ? @allShows[0].id
+      curShowId = localStorage.getItem('vueCurShowId') ? @allShows[0]?.id
       for show, idx in @allShows
         if show.id is curShowId then break
       while show and not @showInList show
         show = @allShows[++idx]
       if not show then idx = 0
       @curShowIdx = idx
-      localStorage.setItem 'vueCurShowId', @allShows[idx].id
-  
-  watch: pageMode: -> @setVisibleShow()
+      localStorage.setItem 'vueCurShowId', @allShows[idx]?.id
   
   attached: -> setTimeout (=> @setVisibleShow()), 500

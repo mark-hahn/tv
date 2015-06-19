@@ -11,6 +11,11 @@ tvShowsCache = '/tmp/tvShowsCache'
 
 tvShowsKey = null
 
+tagList = [
+  'Foreign', 'Comedy', 'Drama', 'Crime', 'MarkOnly', 'LindaOnly'     
+  'Favorite', 'OnTheFence', 'Archive', 'Deleted', 'New', 'Watched'
+]      
+
 exports.init = (cb) ->
   plex.getSectionKeys (err, keys) ->
     if err or not (tvShowsKey = keys.tvShowsKey)
@@ -69,7 +74,7 @@ inSync = no
 syncTO = null
 exports.syncPlexDB = ->
   if syncTO then clearTimeout syncTO; syncTO = null
-  if inSync then syncTO = setTimeout exports.syncPlexDB, 10*60*1000; return
+  if inSync then syncTO = setTimeout exports.syncPlexDB, 1000; return
   inSync = yes
   
   plex.getShowList tvShowsKey, (err, shows) ->
@@ -91,14 +96,16 @@ exports.syncPlexDB = ->
           show.tags       = dbShow.tags
           show.episodeIdx = dbShow.episodeIdx ? 0
           
+        for tag in tagList then show.tags[tag] ?= no
+          
         episodeIdx = 0
         numWatched = 0
         do oneEpisode = ->
           
           if not (episode = show.episodes[episodeIdx++])
-            if numWatched is 0            then show.tags.New = yes
+            if numWatched is 0            then show.tags.New     = yes
             if numWatched is episodeIdx-1 then show.tags.Watched = yes
-
+            # log 'numWatched', episodeIdx, numWatched, show.tags.New, show.tags.Watched, show.title
             if not dbShow or show.tags.New isnt dbShow.tags.New or
                          show.tags.Watched isnt dbShow.tags.Watched
               dbShow = 

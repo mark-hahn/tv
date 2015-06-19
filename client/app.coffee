@@ -115,7 +115,12 @@ tvGlobal.ajaxLog = (args...) ->
   msg = args.join ', '
   console.log 'tvGlobal.log: ' + msg
   tvGlobal.ajaxCmd 'log', msg
-  
+
+tvGlobal.tagList = [
+  'Foreign', 'Comedy', 'Drama', 'Crime', 'MarkOnly', 'LindaOnly'     
+  'Favorite', 'OnTheFence', 'New', 'Watched', 'Archive', 'Deleted' 
+]      
+
 #### page components ####
 
 require './header'
@@ -146,18 +151,27 @@ new Vue
     curPage: (if debug then 'show' else 'show')
     allShows:  []
     curShowIdx: 0
+    curShow: {}
     curEpisodeIdx: 0
+    curEpisode: {}
     
-  computed: 
-    curShow: -> @allShows[@curShowIdx] ? {}
-    curEpisodeIdx:
-      get: -> Math.max 0, 
-              Math.min (@curShow.episodes?.length ? 1) - 1, @curShow.episodeIdx ? 0
-      set: (idx) -> 
-        @curShow.episodeIdx = 
-          Math.max 0, Math.min (@curShow.episodes?.length ? 1) - 1, idx ? 0
-        @curShow.episodeIdx = idx
-    curEpisode: -> @curShow.episodes?[@curEpisodeIdx] ? {}
+  watch:
+    curShowIdx: (idx) -> 
+      @curShow = show = @allShows[idx]
+      @curTags = show.tags
+      
+    curEpisodeIdx: (idx) ->
+      @curEpisode = @curShow.episodes[idx] ? 0
+      
+  #     get: -> Math.max 0, 
+  #             Math.min (@curShow.episodes?.length ? 1) - 1, @curShow.episodeIdx ? 0
+  #     set: (idx) -> 
+  #       @curShow.episodeIdx = 
+  #         Math.max 0, Math.min (@curShow.episodes?.length ? 1) - 1, idx ? 0
+  #       @curShow.episodeIdx = idx
+  # computed: 
+  #   # curShow: -> @allShows[@curShowIdx] ? {}
+  #   curEpisode: -> @curShow.episodes?[@curEpisodeIdx] ? {}
   
   components:
     show:    Vue.component 'show-comp'

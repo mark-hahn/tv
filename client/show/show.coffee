@@ -39,25 +39,25 @@ Vue.component 'show-comp',
         twoBtnClk:  '{{twoBtnClk}}'
   
   data: ->
-    pageMode: 'select'
+    pageMode:  'select'
     filterTags: Watched: 'never', Archive: 'never', Deleted: 'never'
 
   created: ->     
     @$on 'clrPageMode', -> @pageMode = 'select'
     @$on 'twoBtnClk',  (btnName) -> 
-      if btnName not in ['Tags', 'Filter', 'Prev', 'Next']
+      if btnName not in ['Tags', 'Filter', 'Prev', 'Next', 'Reset']
         @pageMode = 'select'
       switch btnName
         when 'Tags'   then @pageMode = 'tags'
         when 'Filter' then @pageMode = 'filter'
         when 'Prev'   then @$dispatch 'chgShowIdx', @curShowIdx-1
         when 'Next'   then @$dispatch 'chgShowIdx', @curShowIdx+1
+        when 'Reset' 
+          @$set 'filterTags', new Object
+          @$set 'filterTags.Watched', 'never'
+          @$set 'filterTags.Archive', 'never'
+          @$set 'filterTags.Deleted', 'never'
               
-        # when 'Play'   then ->
-      #   when 'Filter' then ->
-      #   when 'Select' then ->
-      #   when 'Reset'  then ->
-
   methods:      
     showInList: (show) ->
       if not show then return no

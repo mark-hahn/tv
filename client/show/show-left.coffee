@@ -28,7 +28,7 @@ Vue.component 'show-left',
     tag 'tag-list', '.tag-list-comp', 
       pageMode:   '{{pageMode}}'
       filterTags: '{{filterTags}}'
-      vShow: 'pageMode == "filter"'
+      vShow:      'pageMode == "filter"'
       
     tag 'two-btns', '.two-btns',  
       lftBtnTxt: '{{lftBtnTxt}}'

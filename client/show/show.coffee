@@ -80,13 +80,19 @@ Vue.component 'show-comp',
       return yes
       
     setVisibleShow: ->
+      if @allShows.length is 0 then return no
       curShowId = localStorage.getItem('vueCurShowId') ? @allShows[0]?.id
       for show, idx in @allShows
         if show.id is curShowId then break
       while show and not @showInList show
         show = @allShows[++idx]
       if not show then idx = 0
-      @curShowIdx = idx
-      localStorage.setItem 'vueCurShowId', @allShows[idx]?.id
+      if @allShows[idx]?.id?
+        @curShowIdx = idx
+        localStorage.setItem 'vueCurShowId', @allShows[idx]?.id
+      yes
   
-  attached: -> setTimeout (=> @setVisibleShow()), 500
+  attached: -> 
+    do trySetVisShow = =>
+      if not @setVisibleShow()
+        setTimeout trySetVisShow, 300

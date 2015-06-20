@@ -161,6 +161,7 @@ new Vue
       @curTags = show.tags
       
     curEpisodeIdx: (idx) ->
+      if not @curShow.episodes then debugger
       @curEpisode = @curShow.episodes[idx] ? 0
       
   #     get: -> Math.max 0, 
@@ -189,7 +190,7 @@ new Vue
       @curShowIdx = Math.max 0, Math.min (@allShows.length-1), idx
       
     @$on 'chgEpisodeIdx', (idx) ->
-      @curShow.episodeIdx = idx
+      @curEpisodeIdx = idx
       tvGlobal.ajaxCmd 'setDBField', @curShow.id, 'episodeIdx', idx
       localStorage.setItem 'epiForShow' + @curShow.id, idx
     

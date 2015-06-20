@@ -51,15 +51,15 @@ Vue.component 'tag-list',
   
   methods:      
     checked: (tag) -> @pageMode is 'tags'   and    @curTags?[tag] ? no
-    always:  (tag) -> @pageMode is 'filter' and @filterTags?.tags?[tag] is 'always'
-    never:   (tag) -> @pageMode is 'filter' and @filterTags?.tags?[tag] is 'never'
+    always:  (tag) -> @pageMode is 'filter' and @filterTags?[tag] is 'always'
+    never:   (tag) -> @pageMode is 'filter' and @filterTags?[tag] is 'never'
       
     onClick: (e) ->
       `var tag;`
       tag = e.target.textContent
       if @pageMode is 'tags'
         @$set 'curTags.' + tag, not @curTags[tag]
-        tvGlobal.ajaxCmd 'setDBField', @curShow.id, 'tags.'+tag, @curShow.tags[tag]
+        tvGlobal.ajaxCmd 'setDBField', @curShow.id, 'tags.'+tag, @curTags[tag]
       if @pageMode is 'filter'
         @$set 'filterTags.'+tag, 
           switch @filterTags[tag]

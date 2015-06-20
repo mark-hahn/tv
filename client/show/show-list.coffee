@@ -42,8 +42,10 @@ Vue.component 'show-list',
   methods:
     onClick: (e) ->
       @$dispatch 'clrPageMode'
-      @curShowIdx = e.targetVM.$index   
-      localStorage.setItem 'vueCurShowId', @allShows[@curShowIdx].id
+      idx = e.targetVM.$index 
+      @curShowIdx = idx
+      if @allShows[idx]?.id is undefined then debugger
+      localStorage.setItem 'vueCurShowId', @allShows[idx]?.id
       
   attached: ->
     @$dispatch 'clrPageMode'

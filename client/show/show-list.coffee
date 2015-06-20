@@ -25,7 +25,7 @@ log     = require('debug') 'tv:snf'
       background-color: yellow;
   }
   .letter {
-    width: 4rem;
+    width: 3.5rem;
     height: 3rem;
     margin-left: 1rem;
     line-height:1.6;
@@ -49,6 +49,7 @@ Vue.component 'show-list',
           
   data: ->
     alphaMode: no
+    lastAlphaClick: 0
             
   methods:
     showLetter: (show) ->
@@ -82,11 +83,12 @@ Vue.component 'show-list',
             document.querySelector('.show.selected')?.scrollIntoView()
       
   attached: ->
-    @$on 'alpha', -> @alphaMode = not @alphaMode
-      
+    @$on 'alpha', -> 
+      now = Date.now()
+      if now - @lastAlphaClick < 300 then return
+      @alphaMode = not @alphaMode
+      @lastAlphaClick = now
     @$dispatch 'clrPageMode'
-    # if @attached then return
-    # @attached = yes
     tvGlobal.ensureVisible '.show-list', '.show.selected'
       
     

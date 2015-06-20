@@ -99,6 +99,7 @@ new Vue
     show:    Vue.component 'show-comp'
     episode: Vue.component 'episode-comp'
     watch:   Vue.component 'watch-comp'
+    watch:   Vue.component 'lights-comp'
 
   created: ->
     @$on 'chgCurPage', (page) ->

@@ -49,7 +49,7 @@ Vue.component 'show-right',
         when 'filter' then '---'
     rgtBtnTxt: ->
       switch @pageMode
-        when 'select' then 'Select' 
+        when 'select' then 'Alpha' 
         when 'tags'   then 'Done' 
         when 'filter' then 'Done'
         

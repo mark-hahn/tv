@@ -68,6 +68,7 @@ Vue.component 'show-comp',
         when 'Prev'   then @$dispatch 'chgShowIdx', @curShowIdx-1
         when 'Next'   then @$dispatch 'chgShowIdx', @curShowIdx+1
         when 'Reset'  then @filterTags = getDefaultFilters()
+        when 'Alpha'  then @$broadcast 'alpha'
               
   methods:      
     showInList: (show) ->

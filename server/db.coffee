@@ -72,9 +72,9 @@ syncErr = (err, msg) ->
     
 inSync = no
 syncTO = null
-exports.syncPlexDB = (delay = 1000) ->
+exports.syncPlexDB = ->
   if syncTO then clearTimeout syncTO; syncTO = null
-  if inSync then syncTO = setTimeout exports.syncPlexDB, delay; return
+  if inSync then syncTO = setTimeout exports.syncPlexDB, 1000; return
   inSync = yes
   
   plex.getShowList tvShowsKey, (err, shows) ->
@@ -86,7 +86,7 @@ exports.syncPlexDB = (delay = 1000) ->
         fs.writeFileSync tvShowsCache, JSON.stringify shows
         log 'syncPlexDB written'
         inSync = no
-        exports.syncPlexDB 10*60*1000
+        syncTO ?= setTimeout exports.syncPlexDB, 600e3
         return
         
       get show.id, (err, dbShow) ->

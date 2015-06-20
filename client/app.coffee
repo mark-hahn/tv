@@ -7,13 +7,11 @@ Vue     = require 'vue'
 
 require './utils'
 Vue.use require 'vue-keep-scroll'
-
 teacup = require 'teacup'
 camelToKebab = require 'teacup-camel-to-kebab'
 teacup.use camelToKebab()
-{render, tag, meta, title, style, div} = teacup
 
-#### doc header ####
+{render, tag, meta, title, style, div} = teacup
 
 document.head.innerHTML = render ->
   meta name: 'viewport', \
@@ -21,8 +19,6 @@ document.head.innerHTML = render ->
              'user-scalable=no'
   title 'Hahn TV'
   
-#### page styles ####
-
   style """
     html { 
       box-sizing: border-box; 
@@ -54,6 +50,7 @@ document.head.innerHTML = render ->
       background-color: #ee8; 
     }
     #page {
+      visibility: hidden;
       position: relative;
       margin: 0.3rem;
     }
@@ -66,21 +63,13 @@ document.head.innerHTML = render ->
     #page-comp {
       height: 20rem;
     }
-    [v-cloak] { 
-      display: none;
-    }
   """
-
-
-#### page components ####
-
+  
 require './header'
 require './show/show'
 require './episode/episode'
 require './watch/watch'
 require './lights/lights'
-
-#### body view-model ####
 
 new Vue
   el: 'body'
@@ -99,53 +88,49 @@ new Vue
         curEpisode:    '{{curEpisode}}'
       
   data:
-    curPage: (if tvGlobal.debug then 'show' else 'show')
+    curPage:  'show'
     allShows:  []
     curShowIdx: 0
     curShow: {}
     curEpisodeIdx: 0
     curEpisode: {}
-    
+
   watch:
+    curPage: ->
+      @curEpisodeIdx = localStorage.getItem('epiForShow' + @curShow.id) ? 
+                       @curShow.episodeIdx ? 0
+      
     curShowIdx: (idx) -> 
-      @curShow = show = @allShows[idx]
-      @curTags = show.tags
+      @curShow       = show = @allShows[idx]
+      @curTags       = show.tags
+      @curEpisodeIdx = localStorage.getItem('epiForShow' + show.id) ? show.episodeIdx ? 0
+      localStorage.setItem 'vueCurShowId', show.id
       
-    curEpisodeIdx: (idx) -> @curEpisode = @curShow.episodes[idx] ? 0
-      
-  #     get: -> Math.max 0, 
-  #             Math.min (@curShow.episodes?.length ? 1) - 1, @curShow.episodeIdx ? 0
-  #     set: (idx) -> 
-  #       @curShow.episodeIdx = 
-  #         Math.max 0, Math.min (@curShow.episodes?.length ? 1) - 1, idx ? 0
-  #       @curShow.episodeIdx = idx
-  # computed: 
-  #   # curShow: -> @allShows[@curShowIdx] ? {}
-  #   curEpisode: -> @curShow.episodes?[@curEpisodeIdx] ? {}
-  
+    curEpisodeIdx: (idx) -> 
+      @curEpisode = @curShow.episodes[idx]
+      @curShow.episodeIdx = idx
+      tvGlobal.ajaxCmd 'setDBField', @curShow.id, 'episodeIdx', idx
+      localStorage.setItem 'epiForShow' + @curShow.id, idx
+
   components:
     show:    Vue.component 'show-comp'
     episode: Vue.component 'episode-comp'
     watch:   Vue.component 'watch-comp'
     lights:  Vue.component 'lights-comp'
-    
+
   created: ->
-    @$on 'chgCurPage', (page) -> 
-      @curPage = page
-      @curEpisodeIdx = localStorage.getItem('epiForShow' + @curShow.id) ? 
-                       @curShow.episodeIdx ? 0
+    @$on 'chgCurPage', (@curPage) ->
 
     @$on 'chgShowIdx', (idx) ->
       @curShowIdx = Math.max 0, Math.min (@allShows.length-1), idx
-      localStorage.setItem 'vueCurShowId', @allShows[idx]?.id
       
     @$on 'chgEpisodeIdx', (idx) ->
-      @curEpisodeIdx = idx
-      tvGlobal.ajaxCmd 'setDBField', @curShow.id, 'episodeIdx', idx
-      localStorage.setItem 'epiForShow' + @curShow.id, idx
+      @curEpisodeIdx = Math.max 0, Math.min (@curShow.episodes?.length ? 1) - 1, idx ? 0 
     
     tvGlobal.ajaxCmd 'shows', (err, res) => 
       if err then log 'get all shows err', err.message; return
       @allShows = res.data
+      document.querySelector('#page').style.visibility = 'visible'
       
-  attached: -> tvGlobal.windowResize()
+  attached: -> 
+    tvGlobal.windowResize()

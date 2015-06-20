@@ -15,7 +15,7 @@ log     = require('debug') 'tv:taglst'
   .tag-hdr {
     margin: 2rem 0 1rem; 0;
     text-align: center;
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     background-color:#eee;
   }
   .tag {
@@ -40,7 +40,7 @@ Vue.component 'tag-list',
   
   template: render ->
     div '.tag-list', ->
-      div '.tag-hdr', vShow:'pageMode == "tags"',   'Tags For Show'
+      div '.tag-hdr', vShow:'pageMode == "tags"',   'Tags For: {{curShow.title}}'
       div '.tag-hdr', vShow:'pageMode == "filter"', 'Filter Show List'
       div '.tag', 
         vRepeat: 'tags'

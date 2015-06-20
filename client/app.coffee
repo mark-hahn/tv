@@ -188,6 +188,7 @@ new Vue
 
     @$on 'chgShowIdx', (idx) ->
       @curShowIdx = Math.max 0, Math.min (@allShows.length-1), idx
+      localStorage.setItem 'vueCurShowId', @allShows[idx]?.id
       
     @$on 'chgEpisodeIdx', (idx) ->
       @curEpisodeIdx = idx

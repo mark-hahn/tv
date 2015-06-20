@@ -120,6 +120,23 @@ new Vue
       @curEpisode = @curShow.episodes[idx]
       localStorage.setItem 'epiForShow' + @curShow.id, idx
     
+    @$on 'playShow', ->
+      firstUnwatched = null
+      for episode in @curShow.episodes
+        if episode.watched
+          if firstUnwatched 
+            log 'bad watched structure', firstUnwatched.title, episode.title
+            return
+          continue
+        if not episode.watched and not firstUnwatched
+          firstUnwatched = episode
+      if firstUnwatched
+        log 'starting video', firstUnwatched.title
+        tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
+        tvGlobal.ajaxCmd 'startVideo', firstUnwatched.key, 0
+        return
+      log 'all watched'
+
     tvGlobal.ajaxCmd 'shows', (err, res) => 
       if err then log 'get all shows err', err.message; return
       @allShows = res.data

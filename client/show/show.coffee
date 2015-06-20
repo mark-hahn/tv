@@ -60,7 +60,7 @@ Vue.component 'show-comp',
     @$on 'clrPageMode', -> @pageMode = 'select'
     @$on 'twoBtnClk',  (btnName) -> 
       switch btnName
-        when 'Tags'   then @pageMode = 'tags'
+        when 'Play'   then @$dispatch 'playShow'
         when 'Prev'   then @$dispatch 'chgShowIdx', @curShowIdx-1
         when 'Next'   then @$dispatch 'chgShowIdx', @curShowIdx+1
         when 'Filter' then @pageMode = 'filter'

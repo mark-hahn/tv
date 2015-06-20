@@ -58,12 +58,13 @@ Vue.component 'header-comp',
      
   methods:
     selPage: (e) -> 
-      @curPage = switch e.target.innerText[0]
-        when 'S' then 'show'
-        when 'E' then 'episode'
-        when 'W' then 'watch'
-        when 'L' then 'lights'
-        else @curPage
+      @$dispatch 'chgCurPage', 
+        switch e.target.innerText[0]
+          when 'S' then 'show'
+          when 'E' then 'episode'
+          when 'W' then 'watch'
+          when 'L' then 'lights'
+          else @curPage
     
     onOffDown: (e) -> 
       if @powerText then return

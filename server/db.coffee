@@ -94,7 +94,7 @@ exports.syncPlexDB = ->
         
         if dbShow
           show.tags       = dbShow.tags
-          show.episodeIdx = dbShow.episodeIdx ? 0
+          # show.episodeIdx = dbShow.episodeIdx ? 0
           
         for tag in tagList then show.tags[tag] ?= no
           
@@ -111,7 +111,7 @@ exports.syncPlexDB = ->
               dbShow = 
                 _id:        show.id
                 tags:       show.tags
-                episodeIdx: show.episodeIdx ? 0
+                # episodeIdx: show.episodeIdx ? 0
                 type: 'show'
               db.insert dbShow, (err) ->
                 syncErr err, 'put new show'

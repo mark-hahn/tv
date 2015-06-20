@@ -59,9 +59,8 @@ Vue.component 'episode-list',
           div '.episode-title',  '{{title}}'
           
   methods:
-    onClick: (e) ->
-      vm = e.targetVM
-      log 'onclick', vm.$index, vm.title 
-      @$dispatch 'chgEpisodeIdx', vm.$index 
-    
+    onClick: (e) -> @$dispatch 'chgEpisodeIdx', e.targetVM.$index 
+      
+  attached: ->
+    tvGlobal.ensureVisible '.episode-list', '.episode.selected'
     

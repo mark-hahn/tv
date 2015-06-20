@@ -55,7 +55,6 @@ Vue.component 'show-comp',
 
   watch: 
     curShow:  -> @curTags = @curShow?.tags ? {}
-    pageMode: -> @setVisibleShow()
 
   created: ->     
     @$on 'clrPageMode', -> @pageMode = 'select'
@@ -88,12 +87,11 @@ Vue.component 'show-comp',
       while show and not @showInList show
         show = @allShows[++idx]
       if not show then idx = 0
-      if @allShows[idx]?.id?
-        @curShowIdx = idx
-        localStorage.setItem 'vueCurShowId', @allShows[idx]?.id
+      if @allShows[idx]?.id? then @$dispatch 'chgShowIdx', idx
       yes
   
   attached: -> 
+    @$on 'setVisibleShow', @setVisibleShow
     do trySetVisShow = =>
       if not @setVisibleShow()
         setTimeout trySetVisShow, 300

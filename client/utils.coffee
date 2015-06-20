@@ -45,12 +45,16 @@ tvGlobal.windowResize = ->
   window.addEventListener 'resize', resize
 
 
-tvGlobal.ensureVisible = (outerEle, ele) ->
-  {top, bottom} = ele.getBoundingClientRect()
-  {top: outerTop, bottom: outerBottom} = outerEle.getBoundingClientRect()
-  if not (outerTop < top    < outerBottom and
-          outerTop < bottom < outerBottom)
-    ele.scrollIntoView()
+tvGlobal.ensureVisible = (outerSel, sel) ->
+  setTimeout ->
+    if (outerEle = document.querySelector outerSel) and
+       (ele      = document.querySelector sel)
+      {top: outerTop, bottom: outerBottom} = outerEle.getBoundingClientRect()
+      {top, bottom} = ele.getBoundingClientRect()
+      if not (outerTop < top    < outerBottom and
+              outerTop < bottom < outerBottom)
+        ele.scrollIntoView()
+  , 2000
 
 tvGlobal.ajaxCmd = (cmd, args..., cb) ->
   if typeof cb isnt 'function' then args.push cb

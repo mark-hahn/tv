@@ -94,38 +94,30 @@ new Vue
     curShow: {}
     curEpisodeIdx: 0
     curEpisode: {}
-
-  watch:
-    curPage: ->
-      @curEpisodeIdx = localStorage.getItem('epiForShow' + @curShow.id) ? 
-                       @curShow.episodeIdx ? 0
-      
-    curShowIdx: (idx) -> 
-      @curShow       = show = @allShows[idx]
-      @curTags       = show.tags
-      @curEpisodeIdx = localStorage.getItem('epiForShow' + show.id) ? show.episodeIdx ? 0
-      localStorage.setItem 'vueCurShowId', show.id
-      
-    curEpisodeIdx: (idx) -> 
-      @curEpisode = @curShow.episodes[idx]
-      @curShow.episodeIdx = idx
-      tvGlobal.ajaxCmd 'setDBField', @curShow.id, 'episodeIdx', idx
-      localStorage.setItem 'epiForShow' + @curShow.id, idx
-
+    
   components:
     show:    Vue.component 'show-comp'
     episode: Vue.component 'episode-comp'
     watch:   Vue.component 'watch-comp'
-    lights:  Vue.component 'lights-comp'
 
   created: ->
-    @$on 'chgCurPage', (@curPage) ->
+    @$on 'chgCurPage', (page) ->
+      @curPage = page
+      if page is 'show' then @$broadcast 'setVisibleShow'
 
     @$on 'chgShowIdx', (idx) ->
-      @curShowIdx = Math.max 0, Math.min (@allShows.length-1), idx
+      @curShowIdx = idx = Math.max 0, Math.min (@allShows.length-1), idx
+      @curShow    = show = @allShows[idx]
+      @curTags    = show.tags
+      epiIdx      = localStorage.getItem 'epiForShow' + show.id
+      if epiIdx is 'episodeIdx' then epiIdx = 0 # fix corrupt db
+      @$emit 'chgEpisodeIdx', epiIdx ? 0
+      localStorage.setItem 'vueCurShowId', show.id
       
     @$on 'chgEpisodeIdx', (idx) ->
-      @curEpisodeIdx = Math.max 0, Math.min (@curShow.episodes?.length ? 1) - 1, idx ? 0 
+      @curEpisodeIdx = idx = Math.max 0, Math.min (@curShow.episodes?.length ? 1) - 1, idx ? 0 
+      @curEpisode = @curShow.episodes[idx]
+      localStorage.setItem 'epiForShow' + @curShow.id, idx
     
     tvGlobal.ajaxCmd 'shows', (err, res) => 
       if err then log 'get all shows err', err.message; return

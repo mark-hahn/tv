@@ -85,13 +85,9 @@ Vue.component 'show-list',
     @$on 'alpha', -> @alphaMode = not @alphaMode
       
     @$dispatch 'clrPageMode'
-    if @attached then return
-    @attached = yes
-    setTimeout =>
-      if (selShow = document.querySelector '.show.selected') and
-         (list    = document.querySelector '.show-list')
-        tvGlobal.ensureVisible list, selShow
-    , 2000
+    # if @attached then return
+    # @attached = yes
+    tvGlobal.ensureVisible '.show-list', '.show.selected'
       
     
     

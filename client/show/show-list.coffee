@@ -89,7 +89,6 @@ Vue.component 'show-list',
       @alphaMode = not @alphaMode
       @lastAlphaClick = now
     @$dispatch 'clrPageMode'
-    tvGlobal.ensureVisible '.show-list', '.show.selected'
-      
+    @$dispatch 'ensureShowVisible'
     
     

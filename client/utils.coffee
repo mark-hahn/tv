@@ -19,8 +19,6 @@ tvGlobal.debug = (ajaxPort is 2344)
 Vue.config.debug = tvGlobal.debug
 require('debug').enable '*'
 
-
-#### window resizing ####
 tvGlobal.windowResize = ->
   htmlEle = document.documentElement
   htmlEle.style['font-size'] = fontSize = '8px'
@@ -43,7 +41,6 @@ tvGlobal.windowResize = ->
         # window.scrollTo 0, 1
       , 75
   window.addEventListener 'resize', resize
-
 
 tvGlobal.ensureVisible = (outerSel, sel) ->
   setTimeout ->

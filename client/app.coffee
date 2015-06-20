@@ -104,7 +104,7 @@ new Vue
   created: ->
     @$on 'chgCurPage', (page) ->
       @curPage = page
-      if page is 'show' then @$broadcast 'setVisibleShow'
+      if page is 'show' then @$broadcast 'chooseShow'
 
     @$on 'chgShowIdx', (idx) ->
       @curShowIdx = idx = Math.max 0, Math.min (@allShows.length-1), idx

@@ -60,11 +60,12 @@ Vue.component 'tag-list',
         @$set 'curTags.' + tag, not @curTags[tag]
         tvGlobal.ajaxCmd 'setDBField', @curShow.id, 'tags.'+tag, @curTags[tag]
       if @pageMode is 'filter'
-        @$set 'filterTags.'+tag, 
+        @$set 'filterTags.' + tag, 
           switch @filterTags[tag]
             when 'always' then 'never'
             when 'never'  then 'ignore'
             else               'always' 
+        setTimeout (=> @$dispatch 'chooseShow'), 300
         
   data: ->
     tags: tvGlobal.tagList

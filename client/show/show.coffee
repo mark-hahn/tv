@@ -50,7 +50,7 @@ Vue.component 'show-comp',
   
   data: ->
     pageMode:  'select'
-    curTags: {}
+    curTags:    {}
     filterTags: getDefaultFilters()
 
   watch: 
@@ -59,15 +59,14 @@ Vue.component 'show-comp',
   created: ->     
     @$on 'clrPageMode', -> @pageMode = 'select'
     @$on 'twoBtnClk',  (btnName) -> 
-      if btnName not in ['Tags', 'Filter', 'Prev', 'Next', 'Reset']
-        @pageMode = 'select'
       switch btnName
         when 'Tags'   then @pageMode = 'tags'
-        when 'Filter' then @pageMode = 'filter'
         when 'Prev'   then @$dispatch 'chgShowIdx', @curShowIdx-1
         when 'Next'   then @$dispatch 'chgShowIdx', @curShowIdx+1
+        when 'Filter' then @pageMode = 'filter'
         when 'Reset'  then @filterTags = getDefaultFilters()
         when 'Alpha'  then @$broadcast 'alpha'
+        when 'Done'   then @pageMode = 'select'
               
   methods:      
     showInList: (show) ->
@@ -79,7 +78,7 @@ Vue.component 'show-comp',
           return no
       return yes
       
-    setVisibleShow: ->
+    chooseShow: ->
       if @allShows.length is 0 then return no
       curShowId = localStorage.getItem('vueCurShowId') ? @allShows[0]?.id
       for show, idx in @allShows
@@ -88,10 +87,14 @@ Vue.component 'show-comp',
         show = @allShows[++idx]
       if not show then idx = 0
       if @allShows[idx]?.id? then @$dispatch 'chgShowIdx', idx
+      @$emit 'ensureShowVisible'
       yes
   
   attached: -> 
-    @$on 'setVisibleShow', @setVisibleShow
+    @$on 'chooseShow', @chooseShow
+    @$on 'ensureShowVisible', -> 
+      tvGlobal.ensureVisible '.show-list', '.show.selected'
+
     do trySetVisShow = =>
-      if not @setVisibleShow()
+      if not @chooseShow()
         setTimeout trySetVisShow, 300

@@ -61,11 +61,12 @@ Vue.component 'show-comp',
     @$on 'twoBtnClk',  (btnName) -> 
       switch btnName
         when 'Play'   then @$dispatch 'playShow'
+        when 'Tags'   then @pageMode = 'tags'
+        when 'Filter' then @pageMode = 'filter'
+        when 'Alpha'  then @$broadcast 'alpha'
         when 'Prev'   then @$dispatch 'chgShowIdx', @curShowIdx-1
         when 'Next'   then @$dispatch 'chgShowIdx', @curShowIdx+1
-        when 'Filter' then @pageMode = 'filter'
         when 'Reset'  then @filterTags = getDefaultFilters()
-        when 'Alpha'  then @$broadcast 'alpha'
         when 'Done'   then @pageMode = 'select'
               
   methods:      

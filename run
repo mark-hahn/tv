@@ -2,8 +2,8 @@
 
 if [ $(pwd) == "/root/dev/apps/tv" ]; then isdev=true; else isdev=false; fi
 if $isdev
-  then kill -9 $(pgrep -f /root/dev/apps/tv/tv-server.js) > /dev/null 2>&1
-  else kill -9 $(pgrep -f /root/apps/tv/tv-server.js)     > /dev/null 2>&1
+  then pkill -f /root/dev/apps/tv/tv-server.js > /dev/null 2>&1
+  else pkill -f /root/apps/tv/tv-server.js     > /dev/null 2>&1
 fi
 killall tail > /dev/null 2>&1
 tail -fn 0 ~/logs/tv.log &

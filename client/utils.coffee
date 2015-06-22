@@ -54,7 +54,7 @@ tvGlobal.ensureVisible = (outerSel, sel) ->
   , 2000
 
 tvGlobal.ajaxCmd = (cmd, args..., cb) ->
-  if typeof cb isnt 'function' then args.push cb
+  if cb and typeof cb isnt 'function' then args.push cb
   query = ''
   sep = '?'
   for arg, idx in args when arg?
@@ -77,3 +77,5 @@ tvGlobal.tagList = [
   'Foreign', 'Comedy', 'Drama', 'Crime', 'MarkOnly', 'LindaOnly'     
   'Favorite', 'OnTheFence', 'New', 'Watched', 'Archive', 'Deleted' 
 ]      
+
+tvGlobal.syncPlexDB = -> tvGlobal.ajaxCmd 'syncPlexDB'

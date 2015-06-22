@@ -17,13 +17,13 @@ show page
       episode count
       summary: 'Battle Creek stars Josh Duhamel and Dean Winters in a drama about two mismatched law enforcement officers whose polar opposite views of the world and crime-solving breed frustration, disdain, humor and possibly a grudging respect as they clean up the hardscrabble streets of Battle Creek, Michigan.',
       tags + unwatched - all watched
-      studio: 'CBS'
       year: 2015,
       duration: 3600000,
       #thumb: '/library/metadata/1863/thumb/1428290345',
       #banner: '/library/metadata/1863/banner/1428290345',
       #theme: '/library/metadata/1863/theme/1428290345',
       #originallyAvailableAt: '2015-03-01'
+      studio: 'CBS'
       last watched
       watched count
       

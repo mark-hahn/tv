@@ -142,5 +142,7 @@ new Vue
       @allShows = res.data
       document.querySelector('#page').style.visibility = 'visible'
       
+    tvGlobal.syncPlexDB()
+      
   attached: -> 
     tvGlobal.windowResize()

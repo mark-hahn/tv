@@ -98,8 +98,12 @@ srvr = http.createServer (req, res) ->
       log 'startVideo', data
       roku.startVideo data[0], +data[1]
       success res, ''
+      
+    when 'syncPlexDB'
+      db.syncPlexDB()
         
-    when 'stopVideo' then -> db.syncPlexDB()
+    when 'stopVideo'
+      db.syncPlexDB()
     
     when 'getPlayStatus'
       plex.getStatus (err, playStatus) ->

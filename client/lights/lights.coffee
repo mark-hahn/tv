@@ -14,7 +14,7 @@ log = require('debug') 'tv:lts'
   }
   .switch img {
     position:relative;
-    width:100%;
+    width:65%;
   }
   .master {
     position:relative;
@@ -22,9 +22,9 @@ log = require('debug') 'tv:lts'
   }
   .dot {
     position:absolute;
-    left:4.3%;
+    left:2%;
     background-color:#2e2;
-    width:10%;
+    width:6%;
     height:5%;
     border-radius:50%;
   }

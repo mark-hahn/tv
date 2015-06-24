@@ -7,17 +7,20 @@ request = require 'superagent'
 
 window.tvGlobal = {}
 
-#these lines are replaced on every run
-serverIp     = '192.168.1.103'
-plexServerIp = '192.168.1.103'
-ajaxPort     = 2344
+# config vars from server
+# this line is replaced on every run
+serverConfigStr = '{"CHROOT":"","USER":"root","HOME_IP":"173.55.122.217","AT_HOME":"true","SERVER_IP":"192.168.1.103","SERVER_HOST":"192.168.1.103","DEBUG":"*","LOCATION":"server","OFF_SITE":"false"}'
+{CHROOT, USER, HOME_IP, AT_HOME, SERVER_HOST, DEBUG, LOCATION, OFF_SITE} = JSON.parse serverConfigStr
 
-ajaxPfx           = "http://#{serverIp}:#{ajaxPort}/"
-tvGlobal.plexPfx  = "http://#{plexServerIp}:32400"
+serverIp = SERVER_HOST
+tvGlobal.plexServerIp   = plexServerIp   = SERVER_HOST
+tvGlobal.plexServerPort = plexServerPort = (if OFF_SITE isnt 'false' then '17179' else '32400')
+tvGlobal.plexPfx  = "http://#{plexServerIp}:#{plexServerPort}"
+ajaxPort = '2344'
+ajaxPfx  = "http://#{serverIp}:#{ajaxPort}/"
 
-tvGlobal.debug = (ajaxPort is 2344)
-Vue.config.debug = tvGlobal.debug
-require('debug').enable '*'
+require('debug').enable DEBUG
+Vue.config.debug = tvGlobal.debug = (DEBUG is '*')
 
 tvGlobal.windowResize = ->
   htmlEle = document.documentElement

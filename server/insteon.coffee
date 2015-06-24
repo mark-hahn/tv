@@ -5,7 +5,9 @@
 request = require 'request'
 log     = require('debug') 'tv:inst'
 
-hubIp   = '192.168.1.103'
+# hubIp   = '192.168.1.103
+hubIp    = 'hahnca.com'
+
 hubPort = 1342
 lightIds = [
 	'297EBF' # 1 tv Lft Front 

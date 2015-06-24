@@ -70,12 +70,12 @@ syncErr = (err, msg) ->
     log 'ABORT: syncPlexDB ' + msg + ' err:', err
     process.exit 1
     
-inSync = no
+insideSync = no
 syncTO = null
 exports.syncPlexDB = ->
   if syncTO then clearTimeout syncTO; syncTO = null
-  if inSync then syncTO = setTimeout exports.syncPlexDB, 1000; return
-  inSync = yes
+  if insideSync then syncTO = setTimeout exports.syncPlexDB, 1000; return
+  insideSync = yes
   
   plex.getShowList tvShowsKey, (err, shows) ->
     syncErr err, 'getShowList'
@@ -85,35 +85,40 @@ exports.syncPlexDB = ->
       if not (show = shows[showIdx++])
         fs.writeFileSync tvShowsCache, JSON.stringify shows
         log 'syncPlexDB written'
-        inSync = no
+        insideSync = no
         syncTO ?= setTimeout exports.syncPlexDB, 600e3
         return
         
       get show.id, (err, dbShow) ->
         syncErr err, 'get show'
         
-        if dbShow
-          show.tags       = dbShow.tags
-          # show.episodeIdx = dbShow.episodeIdx ? 0
-          
+        # log util.inspect show, depth:null
+        # process.exit 0
+        
+        if dbShow then show.tags = dbShow.tags
         for tag in tagList then show.tags[tag] ?= no
-          
+        
         episodeIdx = 0
         numWatched = 0
         do oneEpisode = ->
           
           if not (episode = show.episodes[episodeIdx++])
-            if numWatched is 0            then show.tags.New     = yes
-            if numWatched is episodeIdx-1 then show.tags.Watched = yes
-            # log 'numWatched', episodeIdx, numWatched, show.tags.New, show.tags.Watched, show.title
+            show.tags.New     = (numWatched is 0)
+            show.tags.Watched = (numWatched is episodeIdx-1)
+            
+            # count = 0
+            # for i of show.tags
+            #   count++
+            # log '', count, numWatched, show.tags.New, show.tags.Watched, show.title
+            # if show.title.indexOf('strong') > -1 then process.exit 0
+            
             if not dbShow or show.tags.New isnt dbShow.tags.New or
                          show.tags.Watched isnt dbShow.tags.Watched
               dbShow = 
                 _id:        show.id
                 tags:       show.tags
-                # episodeIdx: show.episodeIdx ? 0
                 type: 'show'
-              db.insert dbShow, (err) ->
+              put dbShow, (err) ->
                 syncErr err, 'put new show'
                 oneShow()
               return
@@ -135,7 +140,6 @@ exports.syncPlexDB = ->
                                        watched is dbEpisode.watched
               oneEpisode()
               return
-              
             
             dbEpisode =
               _id:       episode.id

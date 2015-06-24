@@ -7,13 +7,15 @@ request = require 'request'
 log     = require('debug') 'tv:plex'
 moment  = require 'moment'
 
-# plexServerIp    = '192.168.1.11'
-plexServerIp    = '192.168.1.103'
-plexServerPort  = 32400
+{CHROOT, USER, HOME_IP, AT_HOME, SERVER_IP, SERVER_HOST, DEBUG, LOCATION, OFF_SITE} = process.env
+
+plexServerIp   = SERVER_HOST
+plexServerPort = (if OFF_SITE isnt 'false' then '17179' else '32400')
+plexPfx  = "http://#{plexServerIp}:#{plexServerPort}"
 
 getPlexData = (path, eleType, cb) ->
   opts =
-    url: "http://#{plexServerIp}:#{plexServerPort}#{path}"
+    url: "#{plexPfx}#{path}"
     headers: Accept: 'application/json'
   request opts, (err, resp, body) ->
     # log {err, resp, body}
@@ -61,7 +63,7 @@ exports.getShowList = (key, cb) ->
         cb null, result
         return
 
-      {key, title, summary, thumb, year, duration, leafCount, viewedLeafCount, type} = show
+      {key, title, summary, thumb, year, duration, leafCount, viewedLeafCount, type, banner} = show
         
       id = key.split('/')[3]
       tags = {}
@@ -69,7 +71,7 @@ exports.getShowList = (key, cb) ->
         if child._elementType is 'Genre' then tags[child.tag] = yes
       duration = +duration
       
-      result.push resShow = {id, title, summary, thumb, year, duration, tags, type}
+      result.push resShow = {id, title, summary, thumb, year, duration, tags, type, banner}
                              
       getPlexData key, 'Directory', (err, seasons) ->
         if err then cb err; return

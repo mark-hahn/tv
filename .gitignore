@@ -4,4 +4,6 @@ node_modules
 *.log
 plexdb**
 .unison**
-showListCache
+tvShowsCache
+*.jpg
+*.mp4

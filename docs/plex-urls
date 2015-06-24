@@ -1,58 +1,44 @@
 
-###
-roku.init (err) ->
-  log 'starting test'
-  plex.getSectionKeys (err, keys) ->
-    if err then cb? err; return
-    # log 'getSectionKeys', keys
-    {tvShowsKey} = keys
-    plex.getShowList tvShowsKey, (err, shows) ->
-      if err then cb? err; return
-      # log 'shows', shows
-      for show, idx in shows when show.type is 'show' and idx is 10
-        # log 'show', show
-        plex.getSeasonList show.key, (err, seasons) ->
-          if err then cb? err; return
-          season = seasons[0]
-          plex.getVideoList season.key, (err, videos) ->
-            if err then cb? err; return
-            video = videos[0]
-            log 'starting', video.title
-            roku.startVideo video.key, 2e6, (err) ->
-              log 'starting timeout'
-              setTimeout ->
-                roku.playAction 'pause'
-                setTimeout ->
-                  roku.playAction 'stop'
-                , 3000
-              , 6000
 
-###
-###
-# doesn't work but defined
-# setParameters also shuffle=0/1, repeat=0/1/2
-volLevel = (volume, cb) ->
-  playerCtrl '/playback/setParameters', {volume}, (err, res) ->
-    if err then cb? err; return
-    log 'volLevel', {volume, res}
-    cb? null, res
-  
-# doesn't work, but defined, use startVideo instead
-seekTo = (offset, cb) ->
-  playerCtrl '/playback/seekTo', {offset}, (err, res) ->
-    if err then cb? err; return
-    log 'seekTo', {offset, res}
-    cb? null, res
+http://192.168.1.103:32400/library/metadata/13528/banner/1430549620
 
-# doesn't work -- undefined, use pause/play instead
-toggleOSD = (cb) ->
-  playerCtrl '/navigation/toggleOSD', null, (err, res) ->
-    if err then cb? err; return
-    log 'toggleOSD', {res}
-    cb? null, res
-###
-      
-  
+--- find clients
+http://192.168.1.103:32400/clients
+
+--- on deck
+http://192.168.1.103:32400/library/onDeck
+
+--- play through client
+https://code.google.com/p/plex-api/wiki/PlaybackControl
+
+required ...
+http://192.168.1.3:8324/player/playback/playMedia
+?key=/library/metadata/2971
+&machineIdentifier=1GS43G106961
+&address=192.168.1.103
+&port=32400
+
+optional ... (offset in seconds)
+
+&offset=1000000
+&protocol=http
+&path=http://192.168.1.103:32400/library/metadata/2971
+&X-Plex-Client-Identifier=???????
+&containerKey=/playQueues/13/own%3D1%26window%3D200
+&commandID=5
+
+example with old mark phone...
+http://192.168.1.4:32400/player/playback/playMedia?key=/library/metadata/2971&offset=2000000&machineIdentifier=77c8ad0db09115be562f4265661e93794801b1e9&address=192.168.1.103&port=32400&protocol=http&path=http://192.168.1.103:32400/library/metadata/2971
+
+http://192.168.1.4:32400/player/playback/playMedia?key=/library/metadata/2971&machineIdentifier=77c8ad0db09115be562f4265661e93794801b1e9&address=192.168.1.103&port=32400
+
+
+example with roku...
+http://192.168.1.3:8324/player/playback/playMedia?key=/library/metadata/2971&offset=1000000&machineIdentifier=1GS43G106961&address=192.168.1.103&port=32400&protocol=http&path=http://192.168.1.103:32400/library/metadata/2971
+
+http://192.168.1.3:32400/player/playback/playMedia?key=/library/metadata/2971&machineIdentifier=1GS43G106961&address=192.168.1.103&port=32400
+
+
   
 ###  PLEX
 
@@ -147,42 +133,6 @@ toggleOSD = (cb) ->
    ] 
 }
 ###
-
---- find clients
-http://192.168.1.103:32400/clients
-
---- on deck
-http://192.168.1.103:32400/library/onDeck
-
---- play through client
-https://code.google.com/p/plex-api/wiki/PlaybackControl
-
-required ...
-http://192.168.1.3:8324/player/playback/playMedia
-?key=/library/metadata/2971
-&machineIdentifier=1GS43G106961
-&address=192.168.1.103
-&port=32400
-
-optional ... (offset in seconds)
-
-&offset=1000000
-&protocol=http
-&path=http://192.168.1.103:32400/library/metadata/2971
-&X-Plex-Client-Identifier=???????
-&containerKey=/playQueues/13/own%3D1%26window%3D200
-&commandID=5
-
-example with old mark phone...
-http://192.168.1.4:32400/player/playback/playMedia?key=/library/metadata/2971&offset=2000000&machineIdentifier=77c8ad0db09115be562f4265661e93794801b1e9&address=192.168.1.103&port=32400&protocol=http&path=http://192.168.1.103:32400/library/metadata/2971
-
-http://192.168.1.4:32400/player/playback/playMedia?key=/library/metadata/2971&machineIdentifier=77c8ad0db09115be562f4265661e93794801b1e9&address=192.168.1.103&port=32400
-
-
-example with roku...
-http://192.168.1.3:8324/player/playback/playMedia?key=/library/metadata/2971&offset=1000000&machineIdentifier=1GS43G106961&address=192.168.1.103&port=32400&protocol=http&path=http://192.168.1.103:32400/library/metadata/2971
-
-http://192.168.1.3:32400/player/playback/playMedia?key=/library/metadata/2971&machineIdentifier=1GS43G106961&address=192.168.1.103&port=32400
 
 
 --- from inspector
@@ -1025,3 +975,56 @@ status/sessions [ null,
            height: 720 } ] } ] ]
            
            
+### ROKU
+
+roku.init (err) ->
+  log 'starting test'
+  plex.getSectionKeys (err, keys) ->
+    if err then cb? err; return
+    # log 'getSectionKeys', keys
+    {tvShowsKey} = keys
+    plex.getShowList tvShowsKey, (err, shows) ->
+      if err then cb? err; return
+      # log 'shows', shows
+      for show, idx in shows when show.type is 'show' and idx is 10
+        # log 'show', show
+        plex.getSeasonList show.key, (err, seasons) ->
+          if err then cb? err; return
+          season = seasons[0]
+          plex.getVideoList season.key, (err, videos) ->
+            if err then cb? err; return
+            video = videos[0]
+            log 'starting', video.title
+            roku.startVideo video.key, 2e6, (err) ->
+              log 'starting timeout'
+              setTimeout ->
+                roku.playAction 'pause'
+                setTimeout ->
+                  roku.playAction 'stop'
+                , 3000
+              , 6000
+
+# doesn't work but defined
+# setParameters also shuffle=0/1, repeat=0/1/2
+volLevel = (volume, cb) ->
+  playerCtrl '/playback/setParameters', {volume}, (err, res) ->
+    if err then cb? err; return
+    log 'volLevel', {volume, res}
+    cb? null, res
+  
+# doesn't work, but defined, use startVideo instead
+seekTo = (offset, cb) ->
+  playerCtrl '/playback/seekTo', {offset}, (err, res) ->
+    if err then cb? err; return
+    log 'seekTo', {offset, res}
+    cb? null, res
+
+# doesn't work -- undefined, use pause/play instead
+toggleOSD = (cb) ->
+  playerCtrl '/navigation/toggleOSD', null, (err, res) ->
+    if err then cb? err; return
+    log 'toggleOSD', {res}
+    cb? null, res
+###
+      
+  

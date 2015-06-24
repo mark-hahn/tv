@@ -5,11 +5,14 @@ http  = require("http")
 log   = require('debug') 'tv:srvr'
 cfg   = require('parent-config') 'apps-config.json'
 
-src = fs.readFileSync 'client/app.coffee', 'utf8'
-src = src.replace /serverIp\s=\s'.*?'/,     "serverIp = '"     + cfg.server_ip   + "'"
-src = src.replace /plexServerIp\s=\s'.*?'/, "plexServerIp = '" + cfg.plex_server + "'"
-src = src.replace /ajaxPort\s=\s\d+/,       "ajaxPort = "      + cfg.tvAjax_port
-fs.writeFileSync 'client/app.coffee', src
+{CHROOT, USER, HOME_IP, AT_HOME, SERVER_IP, SERVER_HOST, DEBUG, LOCATION, OFF_SITE} = process.env
+envStr = JSON.stringify {CHROOT, USER, HOME_IP, AT_HOME, SERVER_IP, SERVER_HOST, DEBUG, LOCATION, OFF_SITE}
+src = fs.readFileSync 'client/utils.coffee', 'utf8'
+src = src.replace /serverConfigStr\s=\s'.*?'/, "serverConfigStr = '" + envStr + "'"
+fs.writeFileSync 'client/utils.coffee', src
+
+env = {CHROOT, USER, HOME_IP, AT_HOME, SERVER_IP, SERVER_HOST, DEBUG, LOCATION, OFF_SITE}
+log env
 
 require './server-js/ajax'
 

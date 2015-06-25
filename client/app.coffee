@@ -88,7 +88,7 @@ new Vue
         curEpisode:    '{{curEpisode}}'
       
   data:
-    curPage:  'show'
+    curPage:  (if tvGlobal.debug then 'watch' else 'show')
     allShows:  []
     curShowIdx: 0
     curShow: {}

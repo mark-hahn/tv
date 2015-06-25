@@ -9,7 +9,7 @@ window.tvGlobal = {}
 
 # config vars from server
 # this line is replaced on every run
-serverConfigStr = '{"CHROOT":"","USER":"root","HOME_IP":"173.55.122.217","AT_HOME":"true","SERVER_IP":"192.168.1.103","SERVER_HOST":"192.168.1.103","DEBUG":"*","LOCATION":"server","OFF_SITE":"false"}'
+serverConfigStr = '{"CHROOT":"roo","USER":"root","HOME_IP":"173.55.122.217","AT_HOME":"false","SERVER_IP":"192.168.1.103","SERVER_HOST":"localhost","DEBUG":"*","LOCATION":"chromebook","OFF_SITE":"true"}'
 {CHROOT, USER, HOME_IP, AT_HOME, SERVER_HOST, DEBUG, LOCATION, OFF_SITE} = JSON.parse serverConfigStr
 
 serverIp = SERVER_HOST

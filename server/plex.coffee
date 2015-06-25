@@ -14,6 +14,8 @@ plexServerPort = (if OFF_SITE isnt 'false' then '17179' else '32400')
 plexPfx  = "http://#{plexServerIp}:#{plexServerPort}"
 
 getPlexData = (path, eleType, cb) ->
+  if SERVER_HOST is 'localhost' then cb null, []; return;
+   
   opts =
     url: "#{plexPfx}#{path}"
     headers: Accept: 'application/json'
@@ -53,6 +55,8 @@ exports.getSectionKeys = (cb) ->
     cb null, {tvShowsKey, moviesKey}
 
 exports.getShowList = (key, cb) ->
+  
+  if AT_HOME isnt 'true' then cb null; return;
   
   getPlexData "/library/sections/#{key}/all", 'Directory', (err, shows) ->
     if err then cb err; return

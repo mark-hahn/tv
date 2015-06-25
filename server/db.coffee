@@ -6,8 +6,10 @@ plex = require './plex'
 db   = require('nano') 'http://localhost:5984/tv'
 cfg  = require('parent-config') 'apps-config.json'
 
+{CHROOT, USER, HOME_IP, AT_HOME, SERVER_IP, SERVER_HOST, DEBUG, LOCATION, OFF_SITE} = process.env
+
 inDev = (process.cwd().indexOf('/dev/') > -1)
-tvShowsCache = '/tmp/tvShowsCache'
+tvShowsCache = (if SERVER_HOST is 'localhost' then 'tvShowsCache' else '/tmp/tvShowsCache')
 
 tvShowsKey = null
 
@@ -79,6 +81,8 @@ exports.syncPlexDB = ->
   
   plex.getShowList tvShowsKey, (err, shows) ->
     syncErr err, 'getShowList'
+    
+    if not shows or shows.length is 0 then insideSync = no; return
     
     showIdx = 0
     do oneShow = ->

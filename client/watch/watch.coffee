@@ -3,10 +3,45 @@ Vue = require 'vue'
 log = require('debug') 'tv:wch'
 
 Vue.component 'watch-comp', 
-  template: "I'm the WATCH page"
+
+{render, tag, div, img} = require 'teacup'
+
+require './scrub'
+
+(document.head.appendChild document.createElement('style')).textContent = """
+  .watch-comp {
+    position:relative;
+    width:100%;
+    height: 35.5rem;
+  }
+ .watch-left {
+    width: 85%;
+    height: 35.5rem;
+    display: inline-block;
+    overflow: hidden;
+ }
+
+"""
+
+Vue.component 'watch-comp', 
+  props: ['watch']
   
-# setInterval ->
-#   tvGlobal.ajaxCmd 'getPlayStatus', (err, playStatus) ->
-#     log 'playStatus', err, playStatus.data
-# , 2000
-# 
+  data: ->
+    tvPos: 0
+    
+  template: render ->
+    div '.watch-left', ->
+      div '.show-banner'
+      div '.episode'
+      div '.video'
+      div '.controls', ->
+        div '.jump-back'
+        div '.play-pause'
+        div '.jump-fwd'
+      div '.audio', ->
+        div '.vol-down'
+        div '.vol-mute'
+        div '.vol-up'
+        
+    tag 'scrub-comp', '.scrub-comp',
+      tvPos: '{{tvPos}}'

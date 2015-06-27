@@ -20,6 +20,12 @@ require './scrub'
     display: inline-block;
     overflow: hidden;
  }
+ scrub-comp {
+    display: inline-block;
+    position:relative;
+    width: 15%;
+    height: 35.5rem;
+ }
 """
 
 Vue.component 'watch-comp', 
@@ -43,6 +49,6 @@ Vue.component 'watch-comp',
         div '.vol-mute'
         div '.vol-up'
         
-    tag 'scrub-comp', '.scrub-comp',
+    tag 'scrub-comp',
       episodeLen: '{{episodeLen}}'
       playPos: '{{playPos}}'

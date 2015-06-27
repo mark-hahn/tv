@@ -54,13 +54,14 @@ document.head.innerHTML = render ->
       position: relative;
       margin: 0.3rem;
     }
-    #header-comp {
+    header-comp {
       position: relative;
       top: -0.3rem;
       width: 100%;
       height: 2.5rem;
     }
     #page-comp {
+      position: relative;
       height: 20rem;
     }
   """
@@ -76,7 +77,7 @@ new Vue
   
   template: render ->
     div '#page', ->
-      tag 'header-comp', '#header-comp', 
+      tag 'header-comp',
         curPage: '{{curPage}}'
       tag 'component', '#page-comp', 
         keepAlive:     true

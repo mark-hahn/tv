@@ -7,12 +7,10 @@ log = require('debug') 'tv:--scrub'
 scrubStyle = document.createElement 'style'
 (document.head.appendChild scrubStyle).textContent = """
   .scrub {
-    width: 15%;
-    height: 35.5rem;
-    display: inline-block;
+    width:100%;
+    height: 100%;
     overflow: hidden;
     border: 1px solid green;
-    position: relative;
     background-color: #eee;
   }
   .mark {
@@ -39,19 +37,36 @@ Vue.component 'scrub-comp',
   props: ['play-pos', 'episode-len']
   
   template: render ->
-    div '.scrub', ->
-      div '.mark.five-min', vRepeat: '96', ->
+    div '.scrub', vOn: 'touchstart,touchmove,mousedown,mousemove: onMouse',  ->
+      div '.mark.five-min', vRepeat: '100', ->
         div '.mark.min', vRepeat: '5'
         div '.time', '{{($index+1)*5}}'
       div '.cursor'
-        
+
+  methods:
+    playPos2PixPos: ->
+      @cursor ?= @scrubEle.querySelector '.cursor'
+      log 'playPos2PixPos', {@cursor, @scrubHgt, @playPos, @episodeLen}
+      @cursor.style.top = (@scrubHgt * @playPos/@episodeLen - 2) + 'px'
+      
+    pixPos2PlayPos: (y) ->
+      @playPos = (@episodeLen / @scrubHgt) * y
+      log 'pixPos2PlayPos', {y, @scrubTop, @scrubHgt, @playPos, @episodeLen}
+    
+    onMouse: (e) ->
+      # if @dragging then return
+      @dragging = yes
+      initY = e.offsetY + e.target.offsetTop
+      log 'inity', initY, e.offsetY, e.target.offsetTop
+      @pixPos2PlayPos initY
+      @playPos2PixPos()
+      
   events:
     resize: ->
-      scrubEle = @$el.querySelector '.scrub'
-      scrubHgt = scrubEle.clientHeight
-      for min5 in scrubEle.querySelectorAll '.mark.five-min'
-        min5.style.height =  (scrubHgt * 5  /  @episodeLen) + 'px'
-      for min1 in scrubEle.querySelectorAll '.mark.min'
-        min1.style.height =  (scrubHgt * 1  /  @episodeLen) + 'px'
-      cursor = scrubEle.querySelector '.cursor'
-      cursor.style.top = (scrubHgt * @playPos/@episodeLen - 2) + 'px'
+      @scrubEle = @$el.querySelector '.scrub'
+      @scrubHgt = @scrubEle.clientHeight
+      for min5 in @scrubEle.querySelectorAll '.mark.five-min'
+        min5.style.height =  (@scrubHgt * 5  /  @episodeLen) + 'px'
+      for min1 in @scrubEle.querySelectorAll '.mark.min'
+        min1.style.height =  (@scrubHgt * 1  /  @episodeLen) + 'px'
+      @playPos2PixPos()

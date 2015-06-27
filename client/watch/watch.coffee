@@ -20,7 +20,6 @@ require './scrub'
     display: inline-block;
     overflow: hidden;
  }
-
 """
 
 Vue.component 'watch-comp', 
@@ -28,7 +27,7 @@ Vue.component 'watch-comp',
   
   data: ->
     episodeLen: 42
-    playPos: 30
+    playPos: 40
     
   template: render ->
     div '.watch-left', ->

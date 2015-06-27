@@ -26,6 +26,13 @@ scrubStyle = document.createElement 'style'
     position: relative;
     top: -1.2rem;
   }
+  .cursor {
+    position:absolute;
+    left:0;
+    width: 100%;
+    height: 2px;
+    background-color: red;
+  }
 """
 
 Vue.component 'scrub-comp',
@@ -36,6 +43,7 @@ Vue.component 'scrub-comp',
       div '.mark.five-min', vRepeat: '96', ->
         div '.mark.min', vRepeat: '5'
         div '.time', '{{($index+1)*5}}'
+      div '.cursor'
         
   events:
     resize: ->
@@ -45,4 +53,5 @@ Vue.component 'scrub-comp',
         min5.style.height =  (scrubHgt * 5  /  @episodeLen) + 'px'
       for min1 in scrubEle.querySelectorAll '.mark.min'
         min1.style.height =  (scrubHgt * 1  /  @episodeLen) + 'px'
-      
+      cursor = scrubEle.querySelector '.cursor'
+      cursor.style.top = (scrubHgt * @playPos/@episodeLen - 2) + 'px'

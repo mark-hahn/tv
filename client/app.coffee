@@ -145,4 +145,5 @@ new Vue
     tvGlobal.syncPlexDB()
       
   attached: -> 
-    tvGlobal.windowResize()
+    tvGlobal.windowResize => @$broadcast 'resize'
+

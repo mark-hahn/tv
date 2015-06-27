@@ -27,7 +27,8 @@ Vue.component 'watch-comp',
   props: ['watch']
   
   data: ->
-    tvPos: 0
+    episodeLen: 42
+    playPos: 30
     
   template: render ->
     div '.watch-left', ->
@@ -44,4 +45,5 @@ Vue.component 'watch-comp',
         div '.vol-up'
         
     tag 'scrub-comp', '.scrub-comp',
-      tvPos: '{{tvPos}}'
+      episodeLen: '{{episodeLen}}'
+      playPos: '{{playPos}}'

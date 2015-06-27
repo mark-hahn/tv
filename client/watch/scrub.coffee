@@ -4,7 +4,8 @@ log = require('debug') 'tv:--scrub'
 
 {render, div, text} = require 'teacup'
 
-(document.head.appendChild document.createElement('style')).textContent = """
+scrubStyle = document.createElement 'style'
+(document.head.appendChild scrubStyle).textContent = """
   .scrub {
     width: 15%;
     height: 35.5rem;
@@ -15,32 +16,33 @@ log = require('debug') 'tv:--scrub'
     background-color: #eee;
   }
   .mark {
-    text-align: right;
-    font-size: .75rem;
-    border-bottom: 2px solid gray;
+    border-bottom: 1px solid gray;
   }
-  .mark.hr       { width: 80%; height: 360px }
-  .mark.hlf-hr   { width: 65%; height: 180px }
-  .mark.ten-min  { width: 65%; height:  60px }
-  .mark.five-min { width: 65%; height:  30px }
-  .mark.min      { width: 50%; height:   6px }
+  .mark.five-min { width: 50% }
+  .mark.min      { width: 25% }
+  .mark.five-min .time { 
+    text-align: right;
+    font-size: 1rem;
+    position: relative;
+    top: -1.2rem;
+  }
 """
 
 Vue.component 'scrub-comp',
-  props: ['tv-pos']
+  props: ['play-pos', 'episode-len']
   
   template: render ->
     div '.scrub', ->
-      div '.hr.mark',    vRepeat: '10', ->
-        div '.hlf-hr.mark', vRepeat: '2', ->
-          div '.ten-min.mark', vRepeat: '3', ->
-            div '.five-min.mark', vRepeat: '2', ->
-              div '.min.mark',      vRepeat: '5'
-              div vIf: '$index%2 < 1', 
-                '{{$parent.$parent.$parent.$index*60+' +
-                  '$parent.$parent.$index*30+($parent.$index)*10+($index+1)*5}}'
-            div vIf: '$index%3 < 2', 
-              '{{$parent.$parent.$index*60+($parent.$index)*30+($index+1)*10}}'
-          div vIf: '$index%2 < 1', '{{$parent.$index*60+($index+1)*30}}'
-        div '{{($index+1)*60}}'
-  
+      div '.mark.five-min', vRepeat: '96', ->
+        div '.mark.min', vRepeat: '5'
+        div '.time', '{{($index+1)*5}}'
+        
+  events:
+    resize: ->
+      scrubEle = @$el.querySelector '.scrub'
+      scrubHgt = scrubEle.clientHeight
+      for min5 in scrubEle.querySelectorAll '.mark.five-min'
+        min5.style.height =  (scrubHgt * 5  /  @episodeLen) + 'px'
+      for min1 in scrubEle.querySelectorAll '.mark.min'
+        min1.style.height =  (scrubHgt * 1  /  @episodeLen) + 'px'
+      

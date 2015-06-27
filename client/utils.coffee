@@ -22,7 +22,7 @@ ajaxPfx  = "http://#{serverIp}:#{ajaxPort}/"
 require('debug').enable DEBUG
 Vue.config.debug = tvGlobal.debug = (DEBUG is '*')
 
-tvGlobal.windowResize = ->
+tvGlobal.windowResize = (cb) ->
   htmlEle = document.documentElement
   htmlEle.style['font-size'] = fontSize = '8px'
   pageEle = document.querySelector '#page'
@@ -40,6 +40,7 @@ tvGlobal.windowResize = ->
       if resizeTimeout then clearTimeout resizeTimeout
       resizeTimeout = setTimeout ->
         htmlEle.style['font-size'] = fontSize
+        cb()
         resizeTimeout = null
         # window.scrollTo 0, 1
       , 75

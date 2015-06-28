@@ -9,7 +9,7 @@ window.tvGlobal = {}
 
 # config vars from server
 # this line is replaced on every run
-serverConfigStr = '{"CHROOT":"roo","USER":"root","HOME_IP":"173.55.122.217","AT_HOME":"false","SERVER_IP":"192.168.1.103","SERVER_HOST":"localhost","DEBUG":"*","LOCATION":"chromebook","OFF_SITE":"true"}'
+serverConfigStr = '{"CHROOT":"","USER":"root","HOME_IP":"173.55.122.217","AT_HOME":"true","SERVER_IP":"192.168.1.103","SERVER_HOST":"192.168.1.103","DEBUG":"*","LOCATION":"server","OFF_SITE":"false"}'
 {CHROOT, USER, HOME_IP, AT_HOME, SERVER_HOST, DEBUG, LOCATION, OFF_SITE} = JSON.parse serverConfigStr
 
 serverIp = SERVER_HOST
@@ -40,10 +40,10 @@ tvGlobal.windowResize = (cb) ->
       if resizeTimeout then clearTimeout resizeTimeout
       resizeTimeout = setTimeout ->
         htmlEle.style['font-size'] = fontSize
-        cb()
         resizeTimeout = null
         # window.scrollTo 0, 1
       , 75
+    cb()
   window.addEventListener 'resize', resize
 
 tvGlobal.ensureVisible = (outerSel, sel) ->

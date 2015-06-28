@@ -112,12 +112,16 @@ exports.getStatus = (cb) ->
     if err then cb err; return
     for session, sidx in (sessions ? []) when session?._elementType is 'Video'
       for player, pidx in session._children when player._elementType is 'Player'
-        # log 'session:' + sidx, 'player:' + pidx, session.grandparentTitle, 
-        #      session.viewOffset, player.title, player.state
-        cb null,
-          id:        session.key.split('/')[3]
-          viewOffset: session.viewOffset
-          state:      player.state
-        return
+        if player.title is 'Roku 3'
+          for media in session._children when media._elementType is 'Media'
+            for part in media._children when part._elementType is 'Part'
+              log 'session:' + sidx, 'player:' + pidx, session.grandparentTitle, 
+                   session.viewOffset, player.title, player.state
+              cb null,
+                id:         session.key.split('/')[3]
+                file:       part.file
+                viewOffset: session.viewOffset
+                state:      player.state
+              return
     cb()
 

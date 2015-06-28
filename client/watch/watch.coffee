@@ -1,20 +1,21 @@
 
 Vue = require 'vue'
-log = require('debug') 'tv:wch'
+log = require('debug') 'tv:wchcmp'
 
-Vue.component 'watch-comp', 
+{render, tag, div, img, video} = require 'teacup'
 
-{render, tag, div, img} = require 'teacup'
-
+require './watch-info'
+require './watch-controls'
 require './scrub'
 
+  # .watch-comp {
+  #   position:relative;
+  #   width:100%;
+  #   height: 35.5rem;
+  # }
+
 (document.head.appendChild document.createElement('style')).textContent = """
-  .watch-comp {
-    position:relative;
-    width:100%;
-    height: 35.5rem;
-  }
- .watch-left {
+ watch-info-comp {
     width: 85%;
     height: 35.5rem;
     display: inline-block;
@@ -29,26 +30,50 @@ require './scrub'
 """
 
 Vue.component 'watch-comp', 
-  props: ['watch']
+  props: ['all-shows', 'cur-show', 'cur-episode', 'all-episodes']
   
   data: ->
+    file:       ''
+    state:      ''
+    playPos:    0
     episodeLen: 42
-    playPos: 40
-    
+
   template: render ->
-    div '.watch-left', ->
-      div '.show-banner'
-      div '.episode'
-      div '.video'
-      div '.controls', ->
-        div '.jump-back'
-        div '.play-pause'
-        div '.jump-fwd'
-      div '.audio', ->
-        div '.vol-down'
-        div '.vol-mute'
-        div '.vol-up'
+    tag 'watch-info-comp',
+      show:    '{{show}}'
+      episode: '{{episode}}'
+      playPos: '{{playPos}}'
         
     tag 'scrub-comp',
       episodeLen: '{{episodeLen}}'
-      playPos: '{{playPos}}'
+      playPos:    '{{playPos}}'
+      
+  attached: ->
+    @chkSessionIntrvl = setInterval =>
+      tvGlobal.ajaxCmd 'getPlayStatus', (err, status) =>
+        {id, @file, @state, viewOffset} = status.data
+        if id isnt @id
+          @id = id
+          @episode = null
+          for show in @allShows
+            for episode in show.episodes
+              if episode.id is id
+                @show    = show
+                @episode = episode
+                @episodeLen = episode.duration / 60e3
+                break
+            if @episode then break
+        if not @episode
+          log 'unable to find episode playing', status.data
+          clearInterval @chkSessionIntrvl
+          return
+        @playPos = viewOffset / 60e3
+        log 'getPlayStatus', {@file, @state, @playPos, \
+                              @episodeLen, title: @episode.title}
+    , 2000
+    
+  detached: ->
+    if @chkSessionIntrvl 
+      log 'stopping getPlayStatus'
+      clearInterval @chkSessionIntrvl
+      @chkSessionIntrvl = null

@@ -37,7 +37,7 @@ Vue.component 'scrub-comp',
   props: ['play-pos', 'episode-len']
   
   template: render ->
-    div '.scrub', vOn: 'touchstart,touchmove,mousedown,mousemove: onMouse',  ->
+    div '.scrub', vOn: 'mousedown: onMouse', ->
       div '.mark.five-min', vRepeat: '100', ->
         div '.mark.min', vRepeat: '5'
         div '.time', '{{($index+1)*5}}'
@@ -46,12 +46,12 @@ Vue.component 'scrub-comp',
   methods:
     playPos2PixPos: ->
       @cursor ?= @scrubEle.querySelector '.cursor'
-      log 'playPos2PixPos', {@cursor, @scrubHgt, @playPos, @episodeLen}
+      # log 'playPos2PixPos', {@cursor, @scrubHgt, @playPos, @episodeLen}
       @cursor.style.top = (@scrubHgt * @playPos/@episodeLen - 2) + 'px'
       
     pixPos2PlayPos: (y) ->
       @playPos = (@episodeLen / @scrubHgt) * y
-      log 'pixPos2PlayPos', {y, @scrubTop, @scrubHgt, @playPos, @episodeLen}
+      # log 'pixPos2PlayPos', {y, @scrubTop, @scrubHgt, @playPos, @episodeLen}
     
     onMouse: (e) ->
       # if @dragging then return

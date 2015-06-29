@@ -46,9 +46,9 @@ Vue.component 'watch-comp',
     show:        null
     episode:     null
     episodeLen:  null
-    playPos:     0
     videoKey:    ''
-    state:       ''
+    playPos:     0
+    playState:   'paused'
 
   template: render ->
     div ->
@@ -58,9 +58,11 @@ Vue.component 'watch-comp',
         div 'press show or episode Play button.'
 
       tag 'watch-info-comp',
-        show:     '{{show}}'
-        episode:  '{{episode}}'
-        videoKey: '{{videoKey}}'
+        show:      '{{show}}'
+        episode:   '{{episode}}'
+        videoKey:  '{{videoKey}}'
+        playPos:   '{{playPos}}'
+        playState: '{{playState}}'
           
       tag 'scrub-comp',
         episodeLen: '{{episodeLen}}'
@@ -70,7 +72,8 @@ Vue.component 'watch-comp',
     @chkSessionIntrvl = setInterval =>
       tvGlobal.ajaxCmd 'getPlayStatus', (err, status) =>
         if status.data
-          {id, @videoKey, @state, viewOffset} = status.data
+          {id, @videoKey, @playPos, @playState} = status.data
+          log 'getPlayStatus status.data',status.data
           if id isnt @id
             @episode = null
             @id = id
@@ -86,12 +89,12 @@ Vue.component 'watch-comp',
           @episode = null
         if not @episode
           @episodeLen = null
+          @playState = 'paused'
           return
-        @playPos = viewOffset / 60e3
         # log 'getPlayStatus', 
-        #   {@videoKey, @state, @playPos, @episodeLen, title: @episode.title}
+        #   {@playState, @playPos, @episodeLen, title: @episode.title}
     , 2000
-    
+
   detached: ->
     if @chkSessionIntrvl 
       log 'stopping getPlayStatus'

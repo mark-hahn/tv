@@ -67,7 +67,7 @@ Vue.component 'scrub-comp',
       if @episodeLen is 0 or not @scrubEle then return
       @scrubHgt = @scrubEle.clientHeight
       for min5 in @scrubEle.querySelectorAll '.mark.five-min'
-        min5.style.height =  (@scrubHgt * 5  /  @episodeLen) + 'px'
+        min5.style.height =  (@scrubHgt * 300  /  @episodeLen) + 'px'
       for min1 in @scrubEle.querySelectorAll '.mark.min'
-        min1.style.height =  (@scrubHgt * 1  /  @episodeLen) + 'px'
+        min1.style.height =  (@scrubHgt * 60  /  @episodeLen) + 'px'
       @playPos2PixPos()

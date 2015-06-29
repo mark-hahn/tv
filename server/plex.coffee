@@ -97,7 +97,7 @@ exports.getShowList = (key, cb) ->
               id = key.split('/')[3]
               episodeNumber = season.index + '-' + index
               aired = moment(originallyAvailableAt).format('M/D/YY')
-              episodeLen = duration / 60e3
+              episodeLen = duration / 1000
               viewCount ?= 0
               viewCount = +viewCount
               
@@ -118,10 +118,10 @@ exports.getStatus = (cb) ->
               log 'session:' + sidx, 'player:' + pidx, session.grandparentTitle, 
                    session.viewOffset, player.title, player.state, part.key
               cb null,
-                id:         session.key.split('/')[3]
-                videoKey:   part.key
-                viewOffset: session.viewOffset
-                state:      player.state
+                id:        session.key.split('/')[3]
+                videoKey:  part.key
+                playPos:   (+session.viewOffset + 400) / 1000
+                playState: player.state
               return
     cb()
 

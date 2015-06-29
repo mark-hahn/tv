@@ -15,6 +15,12 @@ require './scrub'
   # }
 
 (document.head.appendChild document.createElement('style')).textContent = """
+ .noEpisdeMsg {
+   margin-top: 10rem;
+   font-size:1.6rem;
+   font-style:bold;
+   text-align: center;
+ }
  watch-info-comp {
     width: 85%;
     height: 35.5rem;
@@ -30,42 +36,49 @@ require './scrub'
 """
 
 Vue.component 'watch-comp', 
-  props: ['all-shows', 'cur-show', 'cur-episode', 'all-episodes']
+  props: ['all-shows']
   
   data: ->
-    file:       ''
-    state:      ''
-    playPos:    0
-    episodeLen: 42
+    show:        null
+    episode:     null
+    episodeLen:  0
+    playPos:     0
+    file:        ''
+    state:       ''
 
   template: render ->
-    tag 'watch-info-comp',
+    div '.noEpisdeMsg', vIf:'episode == null', ->
+      div 'No show episode is playing.'
+      div 'Make sure Roku is running Plex'
+      div 'and episode play has been started.'
+
+    tag 'watch-info-comp', vIf:'episode!= null',
       show:    '{{show}}'
       episode: '{{episode}}'
       playPos: '{{playPos}}'
         
-    tag 'scrub-comp',
+    tag 'scrub-comp', vIf:'episode != null',
       episodeLen: '{{episodeLen}}'
       playPos:    '{{playPos}}'
       
   attached: ->
     @chkSessionIntrvl = setInterval =>
       tvGlobal.ajaxCmd 'getPlayStatus', (err, status) =>
-        {id, @file, @state, viewOffset} = status.data
-        if id isnt @id
-          @id = id
-          @episode = null
-          for show in @allShows
-            for episode in show.episodes
-              if episode.id is id
-                @show    = show
-                @episode = episode
-                @episodeLen = episode.duration / 60e3
-                break
-            if @episode then break
+        @episode = null
+        if status.data
+          {id, @file, @state, viewOffset} = status.data
+          if id isnt @id
+            @id = id
+            for show in @allShows
+              for episode in show.episodes
+                if episode.id is id
+                  @show    = show
+                  @episode = episode
+                  @episodeLen = episode.duration / 60e3
+                  break
+              if @episode then break
         if not @episode
-          log 'unable to find episode playing', status.data
-          clearInterval @chkSessionIntrvl
+          @episodeLen = 0
           return
         @playPos = viewOffset / 60e3
         log 'getPlayStatus', {@file, @state, @playPos, \

@@ -26,7 +26,7 @@ Vue.component 'watch-info-comp',
       tvGlobal.plexPfx + @episode.banner
   
   template: render ->
-    div '.watch-info', ->
+    div '.watch-info', vIf: 'episode !== null', ->
       img '.show-banner', vAttr: 'src: bannerUrl'
       div '.watch-episode-title', '{{episode.episodeNumber + " " + episode.title}}'
       video '.video', vAttr: 'src: episode.banner'

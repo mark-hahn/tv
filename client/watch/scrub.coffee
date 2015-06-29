@@ -37,7 +37,7 @@ Vue.component 'scrub-comp',
   props: ['play-pos', 'episode-len']
   
   template: render ->
-    div '.scrub', vOn: 'mousedown: onMouse', vIf: 'episodeLen > 0', ->
+    div '.scrub', vOn: 'mousedown: onMouse', vIf: 'episodeLen !== null', ->
       div '.mark.five-min', vRepeat: '100', ->
         div '.mark.min', vRepeat: '5'
         div '.time', '{{($index+1)*5}}'
@@ -63,8 +63,8 @@ Vue.component 'scrub-comp',
       
   events:
     resize: ->
-      if @episodeLen is 0 then return
       @scrubEle = @$el.querySelector '.scrub'
+      if @episodeLen is 0 or not @scrubEle then return
       @scrubHgt = @scrubEle.clientHeight
       for min5 in @scrubEle.querySelectorAll '.mark.five-min'
         min5.style.height =  (@scrubHgt * 5  /  @episodeLen) + 'px'

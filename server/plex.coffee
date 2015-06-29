@@ -97,13 +97,13 @@ exports.getShowList = (key, cb) ->
               id = key.split('/')[3]
               episodeNumber = season.index + '-' + index
               aired = moment(originallyAvailableAt).format('M/D/YY')
-              duration = +duration
+              episodeLen = duration / 60e3
               viewCount ?= 0
               viewCount = +viewCount
               
               resShow.episodes.push {
                 id, showId: resShow.id, episodeNumber, title, summary, \
-                thumb, viewCount, key, duration, aired, type 
+                thumb, viewCount, key, episodeLen, aired, type 
               }
             oneSeason()
 
@@ -116,10 +116,10 @@ exports.getStatus = (cb) ->
           for media in session._children when media._elementType is 'Media'
             for part in media._children when part._elementType is 'Part'
               log 'session:' + sidx, 'player:' + pidx, session.grandparentTitle, 
-                   session.viewOffset, player.title, player.state
+                   session.viewOffset, player.title, player.state, part.key
               cb null,
                 id:         session.key.split('/')[3]
-                file:       part.file
+                videoKey:   part.key
                 viewOffset: session.viewOffset
                 state:      player.state
               return

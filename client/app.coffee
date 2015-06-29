@@ -64,6 +64,7 @@ document.head.innerHTML = render ->
       position: relative;
       height: 20rem;
     }
+    #popup: 
   """
   
 require './header'
@@ -87,6 +88,7 @@ new Vue
         curShow:       '{{curShow}}'
         curEpisodeIdx: '{{curEpisodeIdx}}'
         curEpisode:    '{{curEpisode}}'
+    div '#popup', vIf:'popupMsg', '{{popupMsg}}'
       
   data:
     curPage:  (if tvGlobal.debug then 'watch' else 'show')
@@ -95,6 +97,7 @@ new Vue
     curShow: {}
     curEpisodeIdx: 0
     curEpisode: {}
+    popupMsg: ''
     
   components:
     show:     Vue.component 'show-comp'
@@ -124,6 +127,7 @@ new Vue
     @$on 'playShow', ->
       firstUnwatched = null
       for episode in @curShow.episodes
+        log 'playShow', @curShow.title, episode.title
         if episode.watched
           if firstUnwatched 
             log 'bad watched structure', firstUnwatched.title, episode.title
@@ -141,9 +145,15 @@ new Vue
     tvGlobal.ajaxCmd 'shows', (err, res) => 
       if err then log 'get all shows err', err.message; return
       @allShows = res.data
+      @$emit 'chgShowIdx', 0
+      @$emit 'chgEpisodeIdx', 0
       document.querySelector('#page').style.visibility = 'visible'
       
     tvGlobal.syncPlexDB()
+  
+  methods:
+    popup: (msg) ->
+      @popupMsg = msg
       
   attached: -> 
     tvGlobal.windowResize => @$broadcast 'resize'

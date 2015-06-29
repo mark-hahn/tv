@@ -21,6 +21,10 @@ require './scrub'
    font-style:bold;
    text-align: center;
  }
+ .msgTitle {
+   font-size:2rem;
+   margin-bottom: 2rem;
+ }
  watch-info-comp {
     width: 85%;
     height: 35.5rem;
@@ -41,48 +45,51 @@ Vue.component 'watch-comp',
   data: ->
     show:        null
     episode:     null
-    episodeLen:  0
+    episodeLen:  null
     playPos:     0
-    file:        ''
+    videoKey:    ''
     state:       ''
 
   template: render ->
-    div '.noEpisdeMsg', vIf:'episode == null', ->
-      div 'No show episode is playing.'
-      div 'Make sure Roku is running Plex'
-      div 'and episode play has been started.'
+    div ->
+      div '.noEpisdeMsg', vIf:'episode == null', ->
+        div '.msgTitle', 'No show is playing.'
+        div 'Make sure Roku is running Plex and'
+        div 'press show or episode Play button.'
 
-    tag 'watch-info-comp', vIf:'episode!= null',
-      show:    '{{show}}'
-      episode: '{{episode}}'
-      playPos: '{{playPos}}'
-        
-    tag 'scrub-comp', vIf:'episode != null',
-      episodeLen: '{{episodeLen}}'
-      playPos:    '{{playPos}}'
+      tag 'watch-info-comp',
+        show:     '{{show}}'
+        episode:  '{{episode}}'
+        videoKey: '{{videoKey}}'
+          
+      tag 'scrub-comp',
+        episodeLen: '{{episodeLen}}'
+        playPos:    '{{playPos}}'
       
   attached: ->
     @chkSessionIntrvl = setInterval =>
       tvGlobal.ajaxCmd 'getPlayStatus', (err, status) =>
-        @episode = null
         if status.data
-          {id, @file, @state, viewOffset} = status.data
+          {id, @videoKey, @state, viewOffset} = status.data
           if id isnt @id
+            @episode = null
             @id = id
             for show in @allShows
               for episode in show.episodes
                 if episode.id is id
                   @show    = show
                   @episode = episode
-                  @episodeLen = episode.duration / 60e3
+                  @episodeLen = episode.episodeLen
                   break
               if @episode then break
+        else
+          @episode = null
         if not @episode
-          @episodeLen = 0
+          @episodeLen = null
           return
         @playPos = viewOffset / 60e3
-        log 'getPlayStatus', {@file, @state, @playPos, \
-                              @episodeLen, title: @episode.title}
+        # log 'getPlayStatus', 
+        #   {@videoKey, @state, @playPos, @episodeLen, title: @episode.title}
     , 2000
     
   detached: ->

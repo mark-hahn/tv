@@ -5,7 +5,7 @@ log = require('debug') 'tv:wchcmp'
 {render, tag, div, img, video} = require 'teacup'
 
 require './watch-info'
-require './watch-controls'
+require './watch-ctrl'
 require './scrub'
 
   # .watch-comp {
@@ -15,28 +15,38 @@ require './scrub'
   # }
 
 (document.head.appendChild document.createElement('style')).textContent = """
- .noEpisdeMsg {
-   margin-top: 10rem;
-   font-size:1.6rem;
-   font-style:bold;
-   text-align: center;
- }
- .msgTitle {
-   font-size:2rem;
-   margin-bottom: 2rem;
- }
- watch-info-comp {
+  .noEpisdeMsg {
+    margin-top: 10rem;
+    font-size:1.6rem;
+    font-style:bold;
+    text-align: center;
+  }
+  .noEpisdeMsg .msgTitle {
+    font-size:2rem;
+    margin-bottom: 2rem;
+  }
+  .watch-column {
+    display: flex;
+    flex-direction: row;
+  }
+  .watch-info-ctrl {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
     width: 85%;
     height: 35.5rem;
-    display: inline-block;
-    overflow: hidden;
- }
- scrub-comp {
+  }
+    watch-info-comp {
+      display: block;
+    }
+    watch-ctrl-comp {
+    }
+  scrub-comp {
     display: inline-block;
     position:relative;
     width: 15%;
     height: 35.5rem;
- }
+  }
 """
 
 Vue.component 'watch-comp', 
@@ -49,20 +59,27 @@ Vue.component 'watch-comp',
     videoKey:    ''
     playPos:     0
     playState:   'paused'
+    watchMode:   'playing'
+    webVidMode:  'playing'
 
   template: render ->
-    div ->
+    div '.watch-column', ->
       div '.noEpisdeMsg', vIf:'episode == null', ->
         div '.msgTitle', 'No show is playing.'
         div 'Make sure Roku is running Plex and'
         div 'press show or episode Play button.'
 
-      tag 'watch-info-comp',
-        show:      '{{show}}'
-        episode:   '{{episode}}'
-        videoKey:  '{{videoKey}}'
-        playPos:   '{{playPos}}'
-        playState: '{{playState}}'
+      div '.watch-info-ctrl', ->
+        tag 'watch-info-comp',
+          show:      '{{show}}'
+          episode:   '{{episode}}'
+          videoKey:  '{{videoKey}}'
+          playPos:   '{{playPos}}'
+          playState: '{{playState}}'
+            
+        tag 'watch-ctrl-comp',
+          episode:   '{{episode}}'
+          watchMode: '{{watchMode}}'
           
       tag 'scrub-comp',
         episodeLen: '{{episodeLen}}'
@@ -91,7 +108,10 @@ Vue.component 'watch-comp',
           @episodeLen = null
           @playState = 'paused'
           return
-    , 2000
+    , 4000
+    
+  events:
+    watchCtrlClk: (btn) -> log btn
 
   detached: ->
     if @chkSessionIntrvl 

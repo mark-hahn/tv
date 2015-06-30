@@ -1,2 +1,53 @@
-show-right
 
+play from show or episode
+  start play at 0
+  switch to watch page
+  normal mode
+
+normal mode (playing)
+  tv rolls   
+  web video rolls and follows tv pos
+  click on web video -> 
+    position mode
+  
+position mode (paused)
+  tv paused
+  web video rolls 
+  ruler (& jump back) changes web video pos
+  jump back pauses web video
+  click on web video -> 
+      position tv to web video position
+      normal mode
+      
+ruler click
+  -> position mode (paused)
+  move ruler to click location
+  drag same as multiple clicks
+
+audio ctrl buttons
+  vol -
+  mute/unmute
+  vol +
+  
+bookmark buttons
+  last mark (or 0)
+  toggle mark
+  next mark (or 1 min before end)
+  
+video ctrl buttons
+  stop 
+    stop tv video
+    add mark to history
+    go back to episode page
+  jump back 
+    if playing
+      stepBack tv video (20 secs)
+    if paused 
+      set ruler back by 10 secs
+      stop web video
+  play/pause
+    came as clicking on web video
+    (see above)
+
+  
+  

@@ -15,10 +15,10 @@ log = require('debug') 'tv:wchnfo'
   text-align: center;
   font-size: 1.4rem; 
   max-width: 100%;
-  margin-bottom: .5rem;
+  margin-top:1rem;
  }
  .watch-info video {
-   margin-top: .5rem;
+   margin-top: 1rem;
    width:100%;
  }
 """
@@ -35,7 +35,11 @@ Vue.component 'watch-info-comp',
       img '.show-banner', vAttr: 'src: bannerUrl'
       div '.watch-episode-title', 
             '{{episode.episodeNumber + ": " + episode.title}}'
-      video '.video', vAttr: 'src: videoUrl', autoplay:yes, preload: 'auto',
+      video '.video', 
+        vAttr:'src: videoUrl'
+        autoplay:yes
+        preload:'auto'
+        vOn:'click:onClick'
       div '.controls', ->
         div '.jump-back'
         div '.play-pause'
@@ -46,12 +50,21 @@ Vue.component 'watch-info-comp',
         div '.vol-up'
         
   methods:
+    onClick: ->
+      log 'onClick'
+      tvGlobal.ajaxCmd 'playPauseVideo'
+      if @playState is 'playing'
+        @videoEle?.play()
+      else 
+        @videoEle?.pause()
+        tvGlobal.ajaxCmd 'startVideo', @videoEle.currentTime
+        
     setPlayState: ->
       if @videoEle
         @videoEle.currentTime = @playPos
-        switch @playState
-          when 'playing' then @videoEle?.play()
-          else @videoEle?.pause()
+        # switch @playState
+        #   when 'playing' then @videoEle?.play()
+        #   else @videoEle?.pause()
       
   watch:
     playPos:   -> @setPlayState()

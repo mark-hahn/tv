@@ -36,9 +36,9 @@ playerCtrl = (cmd, params={}, cb) ->
           "&port=#{plexServerPort}"
   for arg, val of params then url += '&' + arg + '=' + val
   opts ={url, headers: Accept: 'application/json'}
-  log 'roku req', url
+  # log 'roku req', url
   request opts, (err, resp, body) ->
-    log 'roku res', body
+    # log 'roku res', body
     if err or resp.statusCode isnt 200
       log 'playerCtrl error:', {opts, statusCode: resp?.statusCode, error: err?.message}
       cb? err

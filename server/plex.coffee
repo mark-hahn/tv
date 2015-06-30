@@ -115,8 +115,8 @@ exports.getStatus = (cb) ->
         if player.title is 'Roku 3'
           for media in session._children when media._elementType is 'Media'
             for part in media._children when part._elementType is 'Part'
-              log 'session:' + sidx, 'player:' + pidx, session.grandparentTitle, 
-                   session.viewOffset, player.title, player.state, part.key
+              # log 'session:' + sidx, 'player:' + pidx, session.grandparentTitle, 
+                  #  session.viewOffset, player.title, player.state, part.key
               cb null,
                 id:        session.key.split('/')[3]
                 videoKey:  part.key

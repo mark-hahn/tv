@@ -73,7 +73,7 @@ Vue.component 'watch-comp',
       tvGlobal.ajaxCmd 'getPlayStatus', (err, status) =>
         if status.data
           {id, @videoKey, @playPos, @playState} = status.data
-          log 'getPlayStatus status.data',status.data
+          # log 'getPlayStatus status.data',status.data
           if id isnt @id
             @episode = null
             @id = id
@@ -91,8 +91,6 @@ Vue.component 'watch-comp',
           @episodeLen = null
           @playState = 'paused'
           return
-        # log 'getPlayStatus', 
-        #   {@playState, @playPos, @episodeLen, title: @episode.title}
     , 2000
 
   detached: ->

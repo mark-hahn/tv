@@ -44,10 +44,10 @@ Vue.component 'scrub-comp',
       div '.cursor'
 
   methods:
-    playPos2PixPos: ->
-      @cursor ?= @scrubEle.querySelector '.cursor'
-      # log 'playPos2PixPos', {@cursor, @scrubHgt, @playPos, @episodeLen}
-      @cursor.style.top = (@scrubHgt * @playPos/@episodeLen - 2) + 'px'
+    setCursorPixPos: ->
+      if @scrubEle
+        @cursor ?= @scrubEle.querySelector '.cursor'
+        @cursor.style.top = (@scrubHgt * @playPos/@episodeLen - 2) + 'px'
       
     pixPos2PlayPos: (y) ->
       @playPos = (@episodeLen / @scrubHgt) * y
@@ -59,15 +59,21 @@ Vue.component 'scrub-comp',
       initY = e.offsetY + e.target.offsetTop
       log 'inity', initY, e.offsetY, e.target.offsetTop
       @pixPos2PlayPos initY
-      @playPos2PixPos()
+      @setCursorPixPos()
       
+  watch:
+    playPos:    -> @setCursorPixPos()
+    episodeLen: -> @setCursorPixPos()
+    
   events:
     resize: ->
-      @scrubEle = @$el.querySelector '.scrub'
-      if @episodeLen is 0 or not @scrubEle then return
-      @scrubHgt = @scrubEle.clientHeight
-      for min5 in @scrubEle.querySelectorAll '.mark.five-min'
-        min5.style.height =  (@scrubHgt * 300  /  @episodeLen) + 'px'
-      for min1 in @scrubEle.querySelectorAll '.mark.min'
-        min1.style.height =  (@scrubHgt * 60  /  @episodeLen) + 'px'
-      @playPos2PixPos()
+      do trySizing = =>
+        @scrubEle ?= @$el.querySelector '.scrub'
+        if @episodeLen is 0 or not @scrubEle then setTimeout trySizing, 200; return
+        @scrubHgt = @scrubEle.clientHeight
+        log '@scrubEle.clientHeight', @scrubEle.clientHeight
+        for min5 in @scrubEle.querySelectorAll '.mark.five-min'
+          min5.style.height =  (@scrubHgt * 300  /  @episodeLen) + 'px'
+        for min1 in @scrubEle.querySelectorAll '.mark.min'
+          min1.style.height =  (@scrubHgt * 60  /  @episodeLen) + 'px'
+        @setCursorPixPos()

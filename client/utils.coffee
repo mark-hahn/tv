@@ -39,11 +39,11 @@ tvGlobal.windowResize = (cb) ->
       # document.body.style.height = (window.outerHeight + 50) + 'px'
       if resizeTimeout then clearTimeout resizeTimeout
       resizeTimeout = setTimeout ->
-        htmlEle.style['font-size'] = fontSize
         resizeTimeout = null
+        htmlEle.style['font-size'] = fontSize
+        cb()
         # window.scrollTo 0, 1
       , 75
-    cb()
   window.addEventListener 'resize', resize
 
 tvGlobal.ensureVisible = (outerSel, sel) ->

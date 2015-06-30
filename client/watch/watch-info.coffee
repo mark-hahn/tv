@@ -35,7 +35,7 @@ Vue.component 'watch-info-comp',
       img '.show-banner', vAttr: 'src: bannerUrl'
       div '.watch-episode-title', 
             '{{episode.episodeNumber + ": " + episode.title}}'
-      video '.video', vAttr: 'src: videoUrl', autoplay:yes, preload: 'auto', controls: yes,
+      video '.video', vAttr: 'src: videoUrl', autoplay:yes, preload: 'auto',
       div '.controls', ->
         div '.jump-back'
         div '.play-pause'
@@ -54,25 +54,14 @@ Vue.component 'watch-info-comp',
           else @videoEle?.pause()
       
   watch:
-    playPos:   -> 
-      log 'playPos chg', @playPos
-      @setPlayState()
-    playState: -> 
-      log 'playState chg', @playState
-      @setPlayState()
+    playPos:   -> @setPlayState()
+    playState: -> @setPlayState()
       
   attached: -> 
     intervalTO = setInterval => 
-      if not (@videoEle = @$el.querySelector 'video')
-        return 
+      if not (@videoEle = @$el.querySelector 'video') then return 
       if intervalTO then clearInterval intervalTO
-      setTimeout =>
-        @setPlayState()
-      , 500
-        
-      # @videoEle.volume = 0.5
-      # @videoEle.muted = no
-      # log 'networkState', @videoEle.type, @videoEle.networkState, @videoEle.NETWORK_NO_SOURCE
+      setTimeout (=> @setPlayState()), 500
     , 300
     
   detached: ->

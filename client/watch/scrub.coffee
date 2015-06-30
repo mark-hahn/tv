@@ -11,14 +11,14 @@ scrubStyle = document.createElement 'style'
     height: 100%;
     overflow: hidden;
     border: 1px solid green;
-    background-color: #eee;
+    background-color: #eec;
   }
-  .mark {
+  .tick {
     border-bottom: 1px solid gray;
   }
-  .mark.five-min { width: 50% }
-  .mark.min      { width: 25% }
-  .mark.five-min .time { 
+  .tick.five-min { width: 50% }
+  .tick.min      { width: 25% }
+  .tick.five-min .time { 
     text-align: right;
     font-size: 1rem;
     position: relative;
@@ -38,8 +38,8 @@ Vue.component 'scrub-comp',
   
   template: render ->
     div '.scrub', vOn: 'mousedown: onMouse', vIf: 'episodeLen !== null', ->
-      div '.mark.five-min', vRepeat: '100', ->
-        div '.mark.min', vRepeat: '5'
+      div '.tick.five-min', vRepeat: '100', ->
+        div '.tick.min', vRepeat: '5'
         div '.time', '{{($index+1)*5}}'
       div '.cursor'
 
@@ -72,8 +72,8 @@ Vue.component 'scrub-comp',
         if @episodeLen is 0 or not @scrubEle then setTimeout trySizing, 200; return
         @scrubHgt = @scrubEle.clientHeight
         log '@scrubEle.clientHeight', @scrubEle.clientHeight
-        for min5 in @scrubEle.querySelectorAll '.mark.five-min'
+        for min5 in @scrubEle.querySelectorAll '.tick.five-min'
           min5.style.height =  (@scrubHgt * 300  /  @episodeLen) + 'px'
-        for min1 in @scrubEle.querySelectorAll '.mark.min'
+        for min1 in @scrubEle.querySelectorAll '.tick.min'
           min1.style.height =  (@scrubHgt * 60  /  @episodeLen) + 'px'
         @setCursorPixPos()

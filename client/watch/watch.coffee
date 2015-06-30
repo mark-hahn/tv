@@ -5,7 +5,7 @@ log = require('debug') 'tv:wchcmp'
 {render, tag, div, img, video} = require 'teacup'
 
 require './watch-info'
-require './watch-ctrl'
+require './tv-ctrls'
 require './scrub'
 
   # .watch-comp {
@@ -38,8 +38,6 @@ require './scrub'
   }
     watch-info-comp {
       display: block;
-    }
-    watch-ctrl-comp {
     }
   scrub-comp {
     display: inline-block;
@@ -109,7 +107,7 @@ Vue.component 'watch-comp',
           @episodeLen = null
           @playState = 'paused'
           return
-    , 2000
+    , 3000
     
   events:
     watchCtrlClk: (btn) -> log btn

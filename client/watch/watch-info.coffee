@@ -6,50 +6,77 @@ log = require('debug') 'tv:wchnfo'
 
 (document.head.appendChild document.createElement('style')).textContent = """
  .watch-info {
-   width:98%;
+   width:100%;
  }
- .show-banner {
-   width:100%
+.show-banner {
+   width:98%
  }
  .watch-episode-title {
   text-align: center;
   font-size: 1.4rem; 
-  max-width: 100%;
-  margin-top:1rem;
+  max-width: 98%;
+  margin-top:0.5rem;
+ }
+ .watch-info .web-video-blk {
+   background-color: #eec;
+   border-left:   1px solid gray;
+   border-top:    1px solid gray;
+   border-bottom: 1px solid gray;
+   margin-top:0.5rem;
+   padding-bottom:4px;
+   width:100%;
  }
  .watch-info video {
-   margin-top: 1rem;
-   width:100%;
+   width:98%;
+   margin:1%
+ }
+ .watch-info .ctrl-row {
+   margin-top: 2%;
+   display: block;
+   height: 33%;
+ }
+ .watch-info .ctrl-row .btn {
+   font-size:2rem;
+   width: 33%;
+   height: 3rem;
  }
 """
 
 Vue.component 'watch-info-comp', 
-  props: ['show', 'episode', 'video-key', 'play-pos', 'play-state']
+  props: ['show', 'episode', 'video-key', 'play-pos', 'play-state', 'web-video-mode']
   
-  computed:
-    bannerUrl: -> tvGlobal.plexPfx + @show.banner
-    videoUrl:  -> tvGlobal.plexPfx + @videoKey
-      
   template: render ->
     div '.watch-info', vIf: 'episode !== null', ->
       img '.show-banner', vAttr: 'src: bannerUrl'
       div '.watch-episode-title', 
             '{{episode.episodeNumber + ": " + episode.title}}'
-      video '.video', 
-        vAttr:'src: videoUrl'
-        autoplay:yes
-        preload:'auto'
-        vOn:'click:onClick'
-      div '.controls', ->
-        div '.jump-back'
-        div '.play-pause'
-        div '.jump-fwd'
-      div '.audio', ->
-        div '.vol-down'
-        div '.vol-mute'
-        div '.vol-up'
-        
+      div '.web-video-blk', ->
+        video '.video', 
+          vAttr:'src: videoUrl'
+          autoplay:yes
+          preload:'auto'
+          vOn:'click:onClick'
+        div '.web-video-ctrls', ->
+          div '.ctrl-row.web-video-ctrls', ->
+            div '.btn', vOn: 'click: vidCtrlClk', '<<'
+            div '.btn', vOn: 'click: vidCtrlClk', '{{vidPlayPauseTxt}}'
+            div '.btn', vOn: 'click: vidCtrlClk', '>>'
+          div '.ctrl-row.web-video.bookmarks', ->
+            div '.btn', vOn: 'click: vidCtrlClk', 'Prev'
+            div '.btn', vOn: 'click: vidCtrlClk', 'Mark'
+            div '.btn', vOn: 'click: vidCtrlClk', 'Next'
+
+  computed:
+    bannerUrl: -> tvGlobal.plexPfx + @show.banner
+    videoUrl:  -> tvGlobal.plexPfx + @videoKey
+    vidPlayPauseTxt: ->
+      switch @webVideoMode
+        when 'paused' then '>'
+        else '| |'
+            
   methods:
+    vidCtrlClk: ->
+      
     onClick: ->
       log 'onClick'
       tvGlobal.ajaxCmd 'playPauseVideo'

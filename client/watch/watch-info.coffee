@@ -68,7 +68,8 @@ Vue.component 'watch-info-comp',
 
   computed:
     bannerUrl: -> tvGlobal.plexPfx + @show.banner
-    videoUrl:  -> tvGlobal.plexPfx + @videoKey
+    # videoUrl:  -> tvGlobal.plexPfx + @videoKey
+    videoUrl:  -> 'http://192.168.1.103:2340/test.mkv'
     vidPlayPauseTxt: ->
       switch @webVideoMode
         when 'paused' then '>'

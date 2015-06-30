@@ -15,17 +15,17 @@ require './scrub'
   # }
 
 (document.head.appendChild document.createElement('style')).textContent = """
-  .noEpisdeMsg {
+  .no-episode {
     margin-top: 10rem;
     font-size:1.6rem;
-    font-style:bold;
     text-align: center;
   }
-  .noEpisdeMsg .msgTitle {
+  .no-episode .msgTitle {
+    font-weight:bold;
     font-size:2rem;
     margin-bottom: 2rem;
   }
-  .watch-column {
+  .have-episode {
     display: flex;
     flex-direction: row;
   }
@@ -63,27 +63,28 @@ Vue.component 'watch-comp',
     webVidMode:  'playing'
 
   template: render ->
-    div '.watch-column', ->
-      div '.noEpisdeMsg', vIf:'episode == null', ->
+    div ->
+      div '.no-episode', vIf:'episode == null', ->
         div '.msgTitle', 'No show is playing.'
         div 'Make sure Roku is running Plex and'
         div 'press show or episode Play button.'
 
-      div '.watch-info-ctrl', ->
-        tag 'watch-info-comp',
-          show:      '{{show}}'
-          episode:   '{{episode}}'
-          videoKey:  '{{videoKey}}'
-          playPos:   '{{playPos}}'
-          playState: '{{playState}}'
+      div '.have-episode', ->
+        div '.watch-info-ctrl', ->
+          tag 'watch-info-comp',
+            show:      '{{show}}'
+            episode:   '{{episode}}'
+            videoKey:  '{{videoKey}}'
+            playPos:   '{{playPos}}'
+            playState: '{{playState}}'
+              
+          tag 'watch-ctrl-comp',
+            episode:   '{{episode}}'
+            watchMode: '{{watchMode}}'
             
-        tag 'watch-ctrl-comp',
-          episode:   '{{episode}}'
-          watchMode: '{{watchMode}}'
-          
-      tag 'scrub-comp',
-        episodeLen: '{{episodeLen}}'
-        playPos:    '{{playPos}}'
+        tag 'scrub-comp',
+          episodeLen: '{{episodeLen}}'
+          playPos:    '{{playPos}}'
       
   attached: ->
     @chkSessionIntrvl = setInterval =>
@@ -108,7 +109,7 @@ Vue.component 'watch-comp',
           @episodeLen = null
           @playState = 'paused'
           return
-    , 4000
+    , 2000
     
   events:
     watchCtrlClk: (btn) -> log btn

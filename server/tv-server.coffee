@@ -15,6 +15,7 @@ env = {CHROOT, USER, HOME_IP, AT_HOME, SERVER_IP, SERVER_HOST, DEBUG, LOCATION, 
 log env
 
 require './server-js/ajax'
+require './server-js/video-proc'
 
 http.createServer(beefy(
   entries: '/client-app': 'client/app.coffee'

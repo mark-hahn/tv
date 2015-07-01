@@ -59,31 +59,32 @@ exports.getSectionKeys = (cb) ->
 
 shrinkOneVideo = (src, dst, cb) ->
   ffmpeg(timeout: 20*60e3, niceness: 20)
+    .input src
     .videoCodec 'libx264'
-    .videoBitrate 100
-    .size '640x480'
+    .videoBitrate 64
+    .size '320x240'
     .audioCodec 'libmp3lame'
     .audioQuality 0
-    .input src
+    .withAudioChannels 1
+    .withAudioBitrate 16
     .addOption '-sn'
     .on 'end', cb
     .save dst
-  
-inGetShowList = no
-shrinkDelayTO = null
-
+    
 do oneShrink = ->
   log 'oneShrink'
-  if shrinkDelayTO then clearTimeout shrinkDelayTO
   allProcPaths = fs.listTreeSync '/mnt/media/videos-processing'
-  for path in allProcPaths
-    fs.removeSync path.replace '/videos-processing/', '/videos-small/'
-    fs.removeSync path
+  for procPath in allProcPaths
+    fs.removeSync procPath.replace '/videos-processing/', '/videos-small/'
+    fs.removeSync procPath
   allPaths = fs.listTreeSync '/mnt/media/videos'
-  for path, idx in allPaths when not fs.isDirectorySync path
+  for path, idx in allPaths 
+    if fs.isDirectorySync path
+      log 'skipping directory', path
+      continue
     shrunkPath = (path.replace '/videos/', '/videos-small/') + '.mkv'
     if not fs.existsSync shrunkPath
-      log '===>', idx+1, 'of', allPaths.length, '-->' + shrunkPath
+      log '===>', idx+1, 'of', allPaths.length, '-->' + path
       procPath =  shrunkPath.replace '/videos-small/', '/videos-processing/'
       fs.writeFileSync procPath, ''
       shrinkOneVideo path, shrunkPath, ->
@@ -91,9 +92,10 @@ do oneShrink = ->
         oneShrink()
       return
   log 'all files shrunk, waiting 5 mins'
-  shrinkDelayTO = setTimeout oneShrink, 300e3
+  setTimeout oneShrink, 300e3
         
-reqShowListTO  = null
+reqShowListTO = null
+inGetShowList = no
 
 exports.getShowList = getList = (key, cb) ->
   if AT_HOME isnt 'true' then cb null; return;

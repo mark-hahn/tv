@@ -139,6 +139,7 @@ new Vue
         log 'starting video', firstUnwatched.title
         tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
         tvGlobal.ajaxCmd 'startVideo', firstUnwatched.key, 0
+        @$emit 'chgCurPage', 'watch'
         return
       log 'all watched'
 

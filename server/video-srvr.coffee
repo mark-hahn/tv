@@ -8,8 +8,9 @@ cfg  = require('parent-config') 'apps-config.json'
 size = null # DEBUG
 
 srvr = http.createServer (req, res) ->
-  log req.headers.range + ' ' + req.url
-  if not (haveRange = req.headers.range?) then log 'no range', req.headers
+  # log req.headers.range + ' ' + req.url
+  haveRange = req.headers.range?
+  # if not haveRange then log 'no range', req.headers
   
   file      = '/mnt/media/videos-small' + req.url
   range     = req.headers.range ?= 'bytes=0'
@@ -22,7 +23,7 @@ srvr = http.createServer (req, res) ->
       res.end 'No such file: ' + file
       return
       
-    if not size then log size = stats.size # DEBUG
+    # if not size then log size = stats.size # DEBUG
     
     start   = +(positions[0]                )
     end     = +(positions[1] or stats.size-1)

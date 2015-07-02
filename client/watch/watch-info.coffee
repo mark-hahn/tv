@@ -40,14 +40,16 @@ log = require('debug') 'tv:wchnfo'
    width: 33%;
    height: 3rem;
  }
+ btn.playCtl {
+   font-weight: bold;
+ }
 """
 
 Vue.component 'watch-info-comp', 
-  props: ['show', 'episode', 'video-file', 'play-pos', 'play-state', 
-          'web-video-mode']
+  props: ['show', 'episode', 'video-file', 'play-pos', 'watch-mode']
   
   template: render ->
-    div '.watch-info', vIf: 'episode !== null', ->
+    div '.watch-info', ->
       img '.show-banner', vAttr: 'src: bannerUrl'
       div '.watch-episode-title', 
             '{{episode.episodeNumber + ": " + episode.title}}'
@@ -59,53 +61,52 @@ Vue.component 'watch-info-comp',
           vOn:'click:onClick'
         div '.web-video-ctrls', ->
           div '.ctrl-row.web-video-ctrls', ->
-            div '.btn', vOn: 'click: vidCtrlClk', '<<'
-            div '.btn', vOn: 'click: vidCtrlClk', '{{vidPlayPauseTxt}}'
-            div '.btn', vOn: 'click: vidCtrlClk', '>>'
+            div '.btn.playCtl', vOn: 'click: vidCtrlClk', '<<'
+            div '.btn.playCtl', vOn: 'click: vidCtrlClk', '{{vidPlayPauseTxt}}'
+            div '.btn.playCtl', vOn: 'click: vidCtrlClk', '>>'
           div '.ctrl-row.web-video.bookmarks', ->
             div '.btn', vOn: 'click: vidCtrlClk', 'Prev'
             div '.btn', vOn: 'click: vidCtrlClk', 'Mark'
             div '.btn', vOn: 'click: vidCtrlClk', 'Next'
 
   computed:
-    bannerUrl: -> tvGlobal.plexPfx   + @show.banner
-    videoUrl:  -> 
-      log 'computing videoUrl', tvGlobal.tvSrvrPfx + @videoFile + '.mp4'
-      tvGlobal.tvSrvrPfx + '/' + @videoFile + '.mp4'
+    bannerUrl: -> tvGlobal.plexPfx + @show.banner
+    videoUrl:  -> tvGlobal.tvSrvrPfx + '/' + @videoFile + '.mp4'
     vidPlayPauseTxt: ->
-      switch @webVideoMode
+      switch @watchMode
         when 'paused' then '>'
-        else '| |'
-            
+        else '||'
+
   methods:
     vidCtrlClk: ->
       
     onClick: ->
-      log 'onClick'
-      tvGlobal.ajaxCmd 'playPauseVideo'
-      if @playState is 'playing'
-        @videoEle?.play()
-      else 
-        @videoEle?.pause()
-        tvGlobal.ajaxCmd 'startVideo', @videoEle.currentTime
+      # log 'onClick'
+      # tvGlobal.ajaxCmd 'playPauseVideo'
+      # if @playState is 'playing'
+      #   @videoEle?.play()
+      # else 
+      #   @videoEle?.pause()
+      #   tvGlobal.ajaxCmd 'startVideo', @videoEle.currentTime
         
-    setPlayState: ->
-      if @videoEle
-        @videoEle.currentTime = @playPos
-        # switch @playState
-        #   when 'playing' then @videoEle?.play()
-        #   else @videoEle?.pause()
-      
   watch:
-    playPos:   -> @setPlayState()
-    playState: -> @setPlayState()
-      
-  attached: -> 
-    intervalTO = setInterval => 
-      if not (@videoEle = @$el.querySelector 'video') then return 
-      if intervalTO then clearInterval intervalTO
-      setTimeout (=> @setPlayState()), 500
-    , 300
-    
-  detached: ->
-    @videoEle?.pause()
+    watchMode: (__, old) -> 
+      log 'watchMode', old, '->', @watchMode
+      switch @watchMode
+        when 'tracking'
+          if old isnt 'tracking'
+            @videoEle?.play()
+            tvGlobal.ajaxCmd 'startVideo', @episode.key, @playPos
+        when 'playing'
+          @videoEle?.play()
+          if old is 'tracking' 
+            @videoEle?.pause()
+            tvGlobal.ajaxCmd 'pauseVideo'
+        when 'paused'
+          @videoEle?.pause()
+          if old is 'tracking' 
+            tvGlobal.ajaxCmd 'pauseVideo'
+            
+  events:
+    setPlayPos: (@playPos) -> 
+      @videoEle?.currentTime = @playPos

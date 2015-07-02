@@ -18,9 +18,10 @@ shrinkOneVideo = (src, dst, cb) ->
     
 do oneShrink = ->
   allProcPaths = fs.listTreeSync '/mnt/media/videos-processing'
-  for procPath in allProcPaths
+  for procPath in allProcPaths when not fs.isDirectorySync procPath
     fs.removeSync procPath.replace '/videos-processing/', '/videos-small/'
     fs.removeSync procPath
+
   allPaths = fs.listTreeSync '/mnt/media/videos'
   for path, idx in allPaths 
     # if /\/\d+-/.test path
@@ -41,5 +42,6 @@ do oneShrink = ->
         fs.removeSync procPath
         oneShrink()
       return
+
   log 'all files shrunk, waiting 5 mins'
   setTimeout oneShrink, 300e3

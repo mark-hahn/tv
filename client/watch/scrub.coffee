@@ -34,46 +34,43 @@ scrubStyle = document.createElement 'style'
 """
 
 Vue.component 'scrub-comp',
-  props: ['play-pos', 'episode-len']
+  props: ['episode']
   
   template: render ->
-    div '.scrub', vOn: 'mousedown: onMouse', vIf: 'episodeLen !== null', ->
+    div '.scrub', vOn: 'mousedown: onMouse', ->
       div '.tick.five-min', vRepeat: '100', ->
         div '.tick.min', vRepeat: '5'
         div '.time', '{{($index+1)*5}}'
       div '.cursor'
 
+  created:  -> @playPos = 0
+  attached: -> @$emit 'resize'
+    
   methods:
-    setCursorPixPos: ->
+    onMouse: (e) ->
+      initY = e.offsetY + e.target.offsetTop
+      if @scrubHgt
+        @playPos = (@episode.episodeLen / @scrubHgt) * initY
+        @$emit 'setScrubPos', @playPos
+        @$dispatch 'scrubPosMoused', @playPos
+
+  events:
+    setPlayPos: (@playPos) ->
       if @scrubEle
         @cursor ?= @scrubEle.querySelector '.cursor'
-        @cursor.style.top = (@scrubHgt * @playPos/@episodeLen - 2) + 'px'
-      
-    pixPos2PlayPos: (y) ->
-      @playPos = (@episodeLen / @scrubHgt) * y
-      # log 'pixPos2PlayPos', {y, @scrubTop, @scrubHgt, @playPos, @episodeLen}
-    
-    onMouse: (e) ->
-      # if @dragging then return
-      @dragging = yes
-      initY = e.offsetY + e.target.offsetTop
-      log 'inity', initY, e.offsetY, e.target.offsetTop
-      @pixPos2PlayPos initY
-      @setCursorPixPos()
-      
-  watch:
-    playPos:    -> @setCursorPixPos()
-    episodeLen: -> @setCursorPixPos()
-    
-  events:
+        @cursor.style.top = (@scrubHgt * @playPos/@episode.episodeLen - 2) + 'px'
+
     resize: ->
       do trySizing = =>
         @scrubEle ?= @$el.querySelector '.scrub'
-        if @episodeLen is 0 or not @scrubEle then setTimeout trySizing, 200; return
+        if not @episode or
+            @episode.episodeLen is 0 or 
+            not @scrubEle
+          setTimeout trySizing, 200; return
         @scrubHgt = @scrubEle.clientHeight
-        log '@scrubEle.clientHeight', @scrubEle.clientHeight
         for min5 in @scrubEle.querySelectorAll '.tick.five-min'
-          min5.style.height =  (@scrubHgt * 300  /  @episodeLen) + 'px'
+          min5.style.height =  (@scrubHgt * 300  /  @episode.episodeLen) + 'px'
         for min1 in @scrubEle.querySelectorAll '.tick.min'
-          min1.style.height =  (@scrubHgt * 60  /  @episodeLen) + 'px'
-        @setCursorPixPos()
+          min1.style.height =  (@scrubHgt * 60  /  @episode.episodeLen) + 'px'
+          
+        if @playPos then @$emit 'setScrubPos', @playPos

@@ -2,7 +2,7 @@
 play from show or episode
   start play at 0
   switch to watch page
-  normal mode
+  normal mode (watchMode == 'playing')
 
 normal mode (playing)
   tv rolls   

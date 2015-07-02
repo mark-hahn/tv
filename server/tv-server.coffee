@@ -12,7 +12,7 @@ src = src.replace /serverConfigStr\s=\s'.*?'/, "serverConfigStr = '" + envStr + 
 fs.writeFileSync 'client/utils.coffee', src
 
 env = {CHROOT, USER, HOME_IP, AT_HOME, SERVER_IP, SERVER_HOST, DEBUG, LOCATION, OFF_SITE}
-log env
+# log env
 
 require './server-js/ajax'
 require './server-js/video-proc'

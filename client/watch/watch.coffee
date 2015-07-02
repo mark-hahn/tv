@@ -8,12 +8,6 @@ require './watch-info'
 require './tv-ctrls'
 require './scrub'
 
-  # .watch-comp {
-  #   position:relative;
-  #   width:100%;
-  #   height: 35.5rem;
-  # }
-
 (document.head.appendChild document.createElement('style')).textContent = """
   .no-episode {
     margin-top: 10rem;
@@ -51,14 +45,10 @@ Vue.component 'watch-comp',
   props: ['all-shows']
   
   data: ->
-    show:        null
-    episode:     null
-    episodeLen:  null
-    videoFile:   ''
-    playPos:     0
-    playState:   'paused'
-    watchMode:   'playing'
-    webVidMode:  'playing'
+    show:      null
+    episode:   null
+    playPos:   0
+    watchMode: 'none'
 
   template: render ->
     div ->
@@ -67,53 +57,53 @@ Vue.component 'watch-comp',
         div 'Make sure Roku is running Plex and'
         div 'press show or episode Play button.'
 
-      div '.have-episode', ->
+      div '.have-episode', vIf:'episode != null', ->
         div '.watch-info-ctrl', ->
           tag 'watch-info-comp',
-            show:      '{{show}}'
-            episode:   '{{episode}}'
-            videoFile: '{{videoFile}}'
-            playPos:   '{{playPos}}'
-            playState: '{{playState}}'
+            show:       '{{show}}'
+            episode:    '{{episode}}'
+            videoFile:  '{{videoFile}}'
+            playPos:    '{{playPos}}'
+            watchMode:  '{{watchMode}}'
               
           tag 'watch-ctrl-comp',
             episode:   '{{episode}}'
             watchMode: '{{watchMode}}'
             
         tag 'scrub-comp',
-          episodeLen: '{{episodeLen}}'
-          playPos:    '{{playPos}}'
-      
-  attached: ->
-    @chkSessionIntrvl = setInterval =>
-      tvGlobal.ajaxCmd 'getPlayStatus', (err, status) =>
-        if status.data
-          {id, @videoFile, @playPos, @playState} = status.data
-          # log 'getPlayStatus status.data',status.data
-          if id isnt @id
-            @episode = null
-            @id = id
-            for show in @allShows
-              for episode in show.episodes
-                if episode.id is id
-                  @show    = show
-                  @episode = episode
-                  @episodeLen = episode.episodeLen
-                  break
-              if @episode then break
-        else
-          @episode = null
-        if not @episode
-          @episodeLen = null
-          @playState = 'paused'
-          return
-    , 3000
-    
+          episode: '{{episode}}'
+  
+  watch:
+    playPos: ->
+      if @watchMode in ['paused', 'playing']
+        @$broadcast 'setScrubPos', @playPos
+            
   events:
-    watchCtrlClk: (btn) -> log btn
-
-  detached: ->
-    if @chkSessionIntrvl 
-      log 'stopping getPlayStatus'
-      clearInterval @chkSessionIntrvl
-      @chkSessionIntrvl = null
+    scrubPosMoused: (playPos) ->
+      if @episode 
+        if @watchMode is 'tracking' then @watchMode = 'paused'
+        @playPos = playPos
+  
+  attached: ->
+    if not @chkSessionIntrvl
+      @chkSessionIntrvl = setInterval =>
+        tvGlobal.ajaxCmd 'getPlayStatus', (err, status) =>
+          if status.data
+            {id, @videoFile, @playPos, playState} = status.data
+            if @watchMode is 'none' then @watchMode = 'tracking'
+            if id isnt @id
+              @episode = null
+              @id = id
+              for show in @allShows
+                for episode in show.episodes
+                  if episode.id is id
+                    @show    = show
+                    @episode = episode
+                    break
+                if @episode then break
+            if @episode and @watchMode is 'tracking'
+              @$broadcast 'setPlayPos', @playPos
+          else
+            @watchMode = 'none'
+            @episode = null
+      , 2000

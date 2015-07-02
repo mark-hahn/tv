@@ -2,7 +2,7 @@
 fs = require 'fs'
 beefy = require("beefy")
 http  = require("http")
-log   = require('debug') 'tv:srvr'
+log   = require('debug') 'tv:tvsrvr'
 cfg   = require('parent-config') 'apps-config.json'
 
 {CHROOT, USER, HOME_IP, AT_HOME, SERVER_IP, SERVER_HOST, DEBUG, LOCATION, OFF_SITE} = process.env
@@ -16,8 +16,9 @@ log env
 
 require './server-js/ajax'
 require './server-js/video-proc'
+require './server-js/video-srvr'
 
-http.createServer(beefy(
+srvr = http.createServer beefy
   entries: '/client-app': 'client/app.coffee'
   cwd: __dirname
   live: true
@@ -28,5 +29,6 @@ http.createServer(beefy(
     "--extension", ".coffee"
   ]
   
-)).listen cfg.tv_port
-log 'tv app  listening on port ' + cfg.tv_port
+srvr.listen cfg.tv_port
+
+log 'tv server listening on port ' + cfg.tv_port

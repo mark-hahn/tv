@@ -5,7 +5,8 @@ if $isdev
   then pkill -f /root/dev/apps/tv/tv-server.js > /dev/null 2>&1
   else pkill -f /root/apps/tv/tv-server.js     > /dev/null 2>&1
 fi
-killall tail > /dev/null 2>&1
+killall ffmpeg > /dev/null 2>&1 
+killall tail   > /dev/null 2>&1
 tail -fn 0 ~/logs/tv.log &
 set -e
 coffee -co server-js server

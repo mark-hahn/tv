@@ -43,7 +43,8 @@ log = require('debug') 'tv:wchnfo'
 """
 
 Vue.component 'watch-info-comp', 
-  props: ['show', 'episode', 'video-key', 'play-pos', 'play-state', 'web-video-mode']
+  props: ['show', 'episode', 'video-file', 'play-pos', 'play-state', 
+          'web-video-mode']
   
   template: render ->
     div '.watch-info', vIf: 'episode !== null', ->
@@ -67,9 +68,10 @@ Vue.component 'watch-info-comp',
             div '.btn', vOn: 'click: vidCtrlClk', 'Next'
 
   computed:
-    bannerUrl: -> tvGlobal.plexPfx + @show.banner
-    # videoUrl:  -> tvGlobal.plexPfx + @videoKey
-    videoUrl:  -> 'http://192.168.1.103:2340/test.mkv'
+    bannerUrl: -> tvGlobal.plexPfx   + @show.banner
+    videoUrl:  -> 
+      log 'computing videoUrl', tvGlobal.tvSrvrPfx + @videoFile + '.mp4'
+      tvGlobal.tvSrvrPfx + '/' + @videoFile + '.mp4'
     vidPlayPauseTxt: ->
       switch @webVideoMode
         when 'paused' then '>'

@@ -54,7 +54,7 @@ Vue.component 'watch-comp',
     show:        null
     episode:     null
     episodeLen:  null
-    videoKey:    ''
+    videoFile:   ''
     playPos:     0
     playState:   'paused'
     watchMode:   'playing'
@@ -72,7 +72,7 @@ Vue.component 'watch-comp',
           tag 'watch-info-comp',
             show:      '{{show}}'
             episode:   '{{episode}}'
-            videoKey:  '{{videoKey}}'
+            videoFile: '{{videoFile}}'
             playPos:   '{{playPos}}'
             playState: '{{playState}}'
               
@@ -88,7 +88,7 @@ Vue.component 'watch-comp',
     @chkSessionIntrvl = setInterval =>
       tvGlobal.ajaxCmd 'getPlayStatus', (err, status) =>
         if status.data
-          {id, @videoKey, @playPos, @playState} = status.data
+          {id, @videoFile, @playPos, @playState} = status.data
           # log 'getPlayStatus status.data',status.data
           if id isnt @id
             @episode = null

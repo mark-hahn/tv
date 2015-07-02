@@ -23,10 +23,16 @@ do oneShrink = ->
     fs.removeSync procPath
   allPaths = fs.listTreeSync '/mnt/media/videos'
   for path, idx in allPaths 
+    # if /\/\d+-/.test path
+    #   fs.removeSync path
+    #   log 'deleted file', path
+    #   continue
     if fs.isDirectorySync path
-      log 'skipping directory', path
+      dir = path.replace '/videos/', '/videos-small/'
+      log 'creating directory', dir
+      fs.makeTreeSync dir
       continue
-    shrunkPath = (path.replace '/videos/', '/videos-small/') + '.mkv'
+    shrunkPath = (path.replace '/videos/', '/videos-small/') + '.mp4'
     if not fs.existsSync shrunkPath
       log '===>', idx+1, 'of', allPaths.length, '-->' + path
       procPath =  shrunkPath.replace '/videos-small/', '/videos-processing/'

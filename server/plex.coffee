@@ -130,7 +130,7 @@ exports.getStatus = (cb) ->
                   #  session.viewOffset, player.title, player.state, part.key
               cb null,
                 id:        session.key.split('/')[3]
-                videoKey:  part.key
+                videoFile: part.file.replace '/mnt/media/videos/', ''
                 playPos:   (+session.viewOffset + 400) / 1000
                 playState: player.state
               return

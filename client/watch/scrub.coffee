@@ -12,6 +12,7 @@ scrubStyle = document.createElement 'style'
     overflow: hidden;
     border: 1px solid green;
     background-color: #eec;
+    cursor: default;
   }
   .tick {
     border-bottom: 1px solid gray;
@@ -43,22 +44,21 @@ Vue.component 'scrub-comp',
         div '.time', '{{($index+1)*5}}'
       div '.cursor'
 
-  created:  -> @playPos = 0
   attached: -> @$emit 'resize'
     
   methods:
     onMouse: (e) ->
       initY = e.offsetY + e.target.offsetTop
       if @scrubHgt
-        @playPos = (@episode.episodeLen / @scrubHgt) * initY
-        @$emit 'setScrubPos', @playPos
-        @$dispatch 'scrubPosMoused', @playPos
+        playPos = (@episode.episodeLen / @scrubHgt) * initY
+        @$emit     'setScrubPos', playPos
+        @$dispatch 'scrubMoused', playPos
 
   events:
-    setPlayPos: (@playPos) ->
-      if @scrubEle
+    setScrubPos: (playPos) ->
+      if @episode and @scrubEle
         @cursor ?= @scrubEle.querySelector '.cursor'
-        @cursor.style.top = (@scrubHgt * @playPos/@episode.episodeLen - 2) + 'px'
+        @cursor.style.top = (@scrubHgt * playPos/@episode.episodeLen - 2) + 'px'
 
     resize: ->
       do trySizing = =>
@@ -67,10 +67,9 @@ Vue.component 'scrub-comp',
             @episode.episodeLen is 0 or 
             not @scrubEle
           setTimeout trySizing, 200; return
+        log 'sizing'
         @scrubHgt = @scrubEle.clientHeight
         for min5 in @scrubEle.querySelectorAll '.tick.five-min'
           min5.style.height =  (@scrubHgt * 300  /  @episode.episodeLen) + 'px'
         for min1 in @scrubEle.querySelectorAll '.tick.min'
           min1.style.height =  (@scrubHgt * 60  /  @episode.episodeLen) + 'px'
-          
-        if @playPos then @$emit 'setScrubPos', @playPos

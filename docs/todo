@@ -1,13 +1,9 @@
 
-
-#first
-#bitstream
-#liberation
-#luxi
-#mesio
-#last
-
 tags/watched are lost
   (change a lot of watched fast and reload)
 
 prev/next isn't filtered
+filter doesn't react to tag changes
+
+reload then start roku video -> bad scrub
+

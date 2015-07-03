@@ -45,26 +45,30 @@ Vue.component 'watch-comp',
   props: ['all-shows']
   
   data: ->
-    show:      null
-    episode:   null
-    playPos:   0
-    watchMode: 'none'
+    show:          null
+    episode:       null
+    playPos:       0
+    watchMode:    'none'
+    tvStartedPlay: 0
+    tvPlaying:     yes
 
   template: render ->
     div ->
-      div '.no-episode', vIf:'episode == null', ->
+      div '.no-episode', vIf:'watchMode == "none"', ->
         div '.msgTitle', 'No show is playing.'
-        div 'Make sure Roku is running Plex and'
+        div 'Ensure Roku is running Plex and'
         div 'press show or episode Play button.'
 
-      div '.have-episode', vIf:'episode != null', ->
+      div '.have-episode', vIf:'watchMode != "none"', ->
         div '.watch-info-ctrl', ->
           tag 'watch-info-comp',
-            show:       '{{show}}'
-            episode:    '{{episode}}'
-            videoFile:  '{{videoFile}}'
-            playPos:    '{{playPos}}'
-            watchMode:  '{{watchMode}}'
+            show:          '{{show}}'
+            episode:       '{{episode}}'
+            videoFile:     '{{videoFile}}'
+            playPos:       '{{playPos}}'
+            watchMode:     '{{watchMode}}'
+            tvStartedPlay: '{{tvStartedPlay}}'
+            tvPlaying:     '{{tvPlaying}}'
               
           tag 'watch-ctrl-comp',
             episode:   '{{episode}}'
@@ -79,18 +83,25 @@ Vue.component 'watch-comp',
         @$broadcast 'setScrubPos', @playPos
             
   events:
-    scrubPosMoused: (playPos) ->
+    scrubMoused: (playPos) ->
       if @episode 
         if @watchMode is 'tracking' then @watchMode = 'paused'
         @playPos = playPos
+        @$broadcast 'setPlayPos', playPos
   
   attached: ->
     if not @chkSessionIntrvl
       @chkSessionIntrvl = setInterval =>
         tvGlobal.ajaxCmd 'getPlayStatus', (err, status) =>
           if status.data
-            {id, @videoFile, @playPos, playState} = status.data
-            if @watchMode is 'none' then @watchMode = 'tracking'
+            {id, @videoFile, playPos, playState} = status.data
+            # log 'tvState', playState
+            @tvPlaying = (playState is 'playing')
+            if @tvPlaying isnt @tvPlaying and
+               Date.now() > @tvStartedPlay + 5e3
+              @tvPlaying = tvPlaying
+              log 'set tvPlaying using status', @tvPlaying
+            # log '@tvPlaying', @tvPlaying
             if id isnt @id
               @episode = null
               @id = id
@@ -101,9 +112,15 @@ Vue.component 'watch-comp',
                     @episode = episode
                     break
                 if @episode then break
-            if @episode and @watchMode is 'tracking'
-              @$broadcast 'setPlayPos', @playPos
-          else
-            @watchMode = 'none'
-            @episode = null
+            if @episode
+              if @watchMode is 'none' then @watchMode = 'tracking'
+              if @watchMode is 'tracking' and playPos isnt @lastPlayPos
+                @playPos = playPos
+                @$broadcast 'setScrubPos', playPos
+                @$broadcast 'setPlayPos',  playPos
+                @lastPlayPos = playPos
+          else 
+            if Date.now() > @tvStartedPlay + 5e3
+              log 'setting watchmode to none using status'
+              @watchMode = 'none'
       , 2000

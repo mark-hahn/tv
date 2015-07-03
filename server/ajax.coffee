@@ -98,7 +98,7 @@ srvr = http.createServer (req, res) ->
       roku.startVideo data[0], +data[1]
       success res, ''
       
-    when 'playPauseVideo'
+    when 'pauseTv'
       roku.playAction 'pause'
       
     when 'stopVideo'

@@ -78,6 +78,10 @@ Vue.component 'watch-comp',
           episode: '{{episode}}'
   
   watch:
+    watchMode: ->
+      if @watchMode is 'none' 
+        @playPos = 0
+        @$broadcast 'setScrubPos', 0
     playPos: ->
       if @watchMode in ['paused', 'playing']
         @$broadcast 'setScrubPos', @playPos
@@ -85,10 +89,36 @@ Vue.component 'watch-comp',
   events:
     scrubMoused: (playPos) ->
       if @episode 
-        if @watchMode is 'tracking' then @watchMode = 'paused'
+        if @watchMode is 'tracking'
+          @watchMode = 'paused'
+          @oldPlayPos = @playPos
         @playPos = playPos
         @$broadcast 'setPlayPos', playPos
-  
+        
+    watchCtrlClk: (text) ->
+      switch text
+        when 'Play' 
+          if Math.abs(@playPos - @oldPlayPos) < 1 and @watchMode is 'paused'
+            @tvPlaying = yes
+            tvGlobal.ajaxCmd 'pauseTv'
+          @watchMode = 'tracking'
+        when 'Cancel' 
+          if Math.abs(@playPos - @oldPlayPos) < 1 and @watchMode is 'paused'
+            @tvPlaying = yes
+            tvGlobal.ajaxCmd 'pauseTv'
+          else
+            @playPos = @oldPlayPos ? 0
+            @$broadcast 'setPlayPos', @playPos
+          @watchMode = 'tracking'
+        when 'Pause' 
+          if @watchMode is 'tracking'
+            @oldPlayPos = @playPos
+            @watchMode = 'paused'
+        when 'Back' 
+          log 'back btn', @watchMode
+          if @watchMode is 'tracking'
+            tvGlobal.ajaxCmd 'stepBackTv'
+          
   attached: ->
     if not @chkSessionIntrvl
       @chkSessionIntrvl = setInterval =>
@@ -114,11 +144,11 @@ Vue.component 'watch-comp',
                 if @episode then break
             if @episode
               if @watchMode is 'none' then @watchMode = 'tracking'
-              if @watchMode is 'tracking' and playPos isnt @lastPlayPos
+              if @watchMode is 'tracking' and playPos isnt @lastTvPos
                 @playPos = playPos
                 @$broadcast 'setScrubPos', playPos
                 @$broadcast 'setPlayPos',  playPos
-                @lastPlayPos = playPos
+                @lastTvPos = playPos
           else 
             if Date.now() > @tvStartedPlay + 5e3
               log 'setting watchmode to none using status'

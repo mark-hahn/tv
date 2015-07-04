@@ -100,10 +100,16 @@ srvr = http.createServer (req, res) ->
       
     when 'pauseTv'
       roku.playAction 'pause'
+      success res, ''
+      
+    when 'stepBackTv'
+      roku.playAction 'stepBack'
+      success res, ''
       
     when 'stopVideo'
       db.syncPlexDB()
       roku.playAction 'stop'
+      success res, ''
       
     when 'syncPlexDB'
       db.syncPlexDB()

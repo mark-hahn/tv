@@ -100,6 +100,7 @@ Vue.component 'watch-info-comp',
     
     watchMode: (__, old) -> 
       log 'watchMode', old, '->', @watchMode
+      if typeof @playPos isnt 'number' then return
       switch @watchMode
         when 'tracking'
           if old isnt 'tracking'
@@ -130,8 +131,9 @@ Vue.component 'watch-info-comp',
     checkPlaying: ->
       
     setPlayPos: (@playPos) -> 
-      if Math.abs(@videoEle?.currentTime - @playPos) > 2
-        log 'adjusting playpos', @videoEle?.currentTime, @playPos
+      videoTime = @videoEle?.currentTime
+      if Math.abs(videoTime - @playPos) > 0.2
+        log 'adjusting playpos', @playPos - videoTime
         @videoEle?.currentTime = @playPos
 
   attached: -> 

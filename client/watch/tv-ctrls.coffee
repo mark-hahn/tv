@@ -32,36 +32,36 @@ log     = require('debug') 'tv:wchctl'
 """
 
 Vue.component 'watch-ctrl-comp',
-  props: ['episode', 'tv-mode']
+  props: ['episode', 'watch-mode']
   
   template: render ->
     div '.watch-ctrl', vIf: 'episode !== null', ->
       
       div '.tv-ctrls', ->
-        div '.ctrl-row.video-ctrls', ->
-          div '.btn', vOn: 'click: watchCtrlClk', 'Stop'
-          div '.btn', vOn: 'click: watchCtrlClk', '{{backResumeTxt}}'
-          div '.btn', vOn: 'click: watchCtrlClk', '{{tvPlayPauseTxt}}'
-
         div '.ctrl-row.audio-ctrls', ->
           div '.btn', vOn: 'click: watchCtrlClk', 'Vol -'
           div '.btn', vOn: 'click: watchCtrlClk', 'Mute'
           div '.btn', vOn: 'click: watchCtrlClk', 'Vol +'
           
+        div '.ctrl-row.video-ctrls', ->
+          div '.btn', vOn: 'click: watchCtrlClk', 'Stop'
+          div '.btn', vOn: 'click: watchCtrlClk', '{{backResumeTxt}}'
+          div '.btn', vOn: 'click: watchCtrlClk', '{{tvPlayPauseTxt}}'
+
         div '.tv-text', ->
           div 'T'
           div 'V'
 
   computed:
     backResumeTxt: ->
-      switch @tvMode
-        when 'playing' then 'Back'
-        else                'Resum'
+      switch @watchMode
+        when 'tracking' then 'Back'
+        else                 'Cancel'
       
     tvPlayPauseTxt: ->
-      switch @tvMode
-        when 'playing' then 'Pause'
-        else                'Play'
+      switch @watchMode
+        when 'tracking' then 'Pause'
+        else                 'Play'
 
   methods:
     watchCtrlClk: (e) -> 

@@ -7,3 +7,4 @@ filter doesn't react to tag changes
 
 reload then start roku video -> bad scrub
 
+watchmode none doesn't start scrub at 0

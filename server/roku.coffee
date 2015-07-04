@@ -46,7 +46,7 @@ playerCtrl = (cmd, params={}, cb) ->
     cb? null, body
           
 exports.startVideo = (key, offset=0, cb) ->
-  # all times in ms
+  offset *= 1000
   playerCtrl '/playback/playMedia', {key, offset}, (err, res) ->
     if err then cb? err; return
     log 'startVideo', {key, offset, res}
@@ -60,6 +60,6 @@ exports.playAction = (action, cb) ->
   # stop (goes back in menu when repeated)
   playerCtrl "/playback/#{action}", null, (err, res) ->
     if err then cb? err; return
-    # log 'playAction', {action, res}
+    log 'playAction', {action, res}
     cb? null, res
 

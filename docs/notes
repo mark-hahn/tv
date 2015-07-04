@@ -2,9 +2,9 @@
 play from show or episode
   start play at 0
   switch to watch page
-  normal mode (watchMode == 'playing')
+  normal mode (watchMode == 'tracking')
 
-normal mode (playing)
+normal mode (tracking)
   tv rolls   
   web video rolls and follows tv pos
   click on web video -> 
@@ -12,7 +12,7 @@ normal mode (playing)
   
 position mode (paused)
   tv paused
-  web video rolls 
+  web video paused 
   ruler (& jump back) changes web video pos
   jump back pauses web video
   click on web video -> 

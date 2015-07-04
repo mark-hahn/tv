@@ -131,7 +131,7 @@ exports.getStatus = (cb) ->
               cb null,
                 id:        session.key.split('/')[3]
                 videoFile: part.file.replace '/mnt/media/videos/', ''
-                playPos:   +session.viewOffset / 1000
+                playPos:   +session.viewOffset/1000 + 1
                 playState: player.state
               return
     cb()

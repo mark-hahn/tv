@@ -1,13 +1,16 @@
 
-Vue = require 'vue'
-log = require('debug') 'tv:wchcmp'
+Vue    = require 'vue'
+log    = require('debug') 'tv:wchcmp'
+TvCtrl = require './tv-ctrl'
 
 {render, tag, div, img, video} = require 'teacup'
 
 require './watch-info'
 require './tv-btns'
 require './scrub'
-require './tv-ctrl'
+
+tvEvents = {}
+tvCtrl = new TvCtrl tvEvents
 
 (document.head.appendChild document.createElement('style')).textContent = """
   .no-episode {
@@ -50,7 +53,6 @@ Vue.component 'watch-comp',
     episode:       null
     playPos:       0
     watchMode:    'none'
-    tvPlaying:     yes
 
   template: render ->
     div ->
@@ -65,9 +67,7 @@ Vue.component 'watch-comp',
             show:          '{{show}}'
             episode:       '{{episode}}'
             videoFile:     '{{videoFile}}'
-            playPos:       '{{playPos}}'
             watchMode:     '{{watchMode}}'
-            tvPlaying:     '{{tvPlaying}}'
               
           tag 'watch-ctrl-comp',
             episode:   '{{episode}}'
@@ -76,32 +76,13 @@ Vue.component 'watch-comp',
         tag 'scrub-comp',
           episode: '{{episode}}'
   
-  watch:
-    watchMode: ->
-      if @watchMode is 'none' 
-        @playPos = 0
-        @$broadcast 'setScrubPos', 0
-    playPos: ->
-      if @watchMode in ['paused', 'playing']
-        @$broadcast 'setScrubPos', @playPos
-  
-  methods:          
-    startTvPlaying: ->
-      log 'starting tv play',  @tvPlaying, @playPos, @episode.key
-      tvGlobal.ajaxCmd 'startVideo', @episode.key, @playPos
-    stopTvPlaying: ->
-      log 'starting tv play',  @tvPlaying, @playPos, @episode.key
-      tvGlobal.ajaxCmd 'startVideo', @episode.key, @playPos
-      
   events:
     scrubMoused: (playPos) ->
-      if @episode 
-        if @watchMode is 'tracking'
-          @watchMode = 'paused'
-          @oldPlayPos = @playPos
-        @playPos = playPos
-        @$broadcast 'setPlayPos', playPos
-        
+      if @watchMode is 'tracking'
+        @oldPlayPos = tvCtrl.getPlayPos()
+        @watchMode = 'paused'
+      @$broadcast 'setPlayPos', playPos
+    
     tvBtnClick: (text) ->
       switch text
         when 'Play' 
@@ -123,53 +104,45 @@ Vue.component 'watch-comp',
           log 'back btn', @watchMode
           if @watchMode is 'tracking'
             tvGlobal.ajaxCmd 'stepBackTv'
+
+  watch:
+    tvPlaying: (__, old) -> log '@tvPlaying:', old, '->', @tvPlaying
+    
+    watchMode: (__, old) -> 
+      log 'watchMode', old, '->', @watchMode
+      if typeof @playPos isnt 'number' then return
+      switch @watchMode
+        when 'tracking'
+          if old isnt 'tracking'
+            if @episode.key and not @tvPlaying
+              log 'starting tv play',  @tvPlaying, @playPos, @episode.key
+              tvGlobal.ajaxCmd 'startTv', @episode.key, @playPos
+              @tvPlaying = yes
+              @tvStartedPlay = Date.now()
+            @videoEle?.currentTime = @playPos
+            @videoEle?.play()
+        when 'playing'
+          @videoEle?.play()
+          if old is 'tracking' 
+            @videoEle?.pause()
+            if @tvPlaying 
+              log 'pausing tv - was playing now paused',  @playPos
+              tvGlobal.ajaxCmd 'pauseTv'
+              @tvPlaying = no
+        when 'paused'
+          @videoEle?.pause()
+          if old is 'tracking' and @tvPlaying
+            log 'pausing tv - was tracking now paused',  @playPos
+            tvGlobal.ajaxCmd 'pauseTv'
+            @tvPlaying = no
           
   attached: ->
-    if not @chkSessionIntrvl
-      @chkSessionIntrvl = setInterval =>
-        tvGlobal.ajaxCmd 'getPlayStatus', (err, status) =>
-          if status.data
-            {id, @videoFile, playPos, playState} = status.data
-            # log 'tvState', playState
-            @tvPlaying = (playState is 'playing')
-            if @tvPlaying isnt @tvPlaying and
-               Date.now() > @tvStartedPlay + 5e3
-              @tvPlaying = tvPlaying
-              log 'set tvPlaying using status', @tvPlaying
-            # log '@tvPlaying', @tvPlaying
-            if id isnt @id
-              @episode = null
-              @id = id
-              for show in @allShows
-                for episode in show.episodes
-                  if episode.id is id
-                    @show    = show
-                    @episode = episode
-                    break
-                if @episode then break  
-            if not @episode
-              log 'no episode, watchmode -> none'
-              @watchMode = 'none'
-              return
-            tvChange = (playState isnt @lastTvState or playPos isnt @lastTvPos)
-            @lastTvState = playState
-            @lastTvPos   = playPos
-            if tvChange
-              log 'tvChange', {playState, @lastTvState, playPos, @lastTvPos}
-              if @watchMode is 'none' 
-                @watchMode = 'tracking'
-              if @watchMode is 'tracking' and playState is 'paused' 
-                log 'tvChange playState is paused'
-                @tvPlaying = no
-                @watchMode = 'paused'
-              else if @watchMode in ['playing','paused'] and playState is 'playing' 
-                @tvPlaying = yes
-                @watchMode = 'tracking'
-              if @watchMode is 'tracking'
-                @playPos = playPos
-                @$broadcast 'setScrubPos', playPos
-                @$broadcast 'setPlayPos',  playPos
-          else 
-            log 'no status.data, watchmode -> none'
-            @watchMode = 'none'
-      , 2000
+    tvEvents.newShow = (@show) ->
+      
+    tvEvents.newEpisode = (@episode) ->
+      
+    tvEvents.newState = (tvState) ->
+      
+    tvEvents.newPos = (tvPlayPos) ->
+      
+    tvEvents.ready = yes

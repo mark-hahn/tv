@@ -94,7 +94,7 @@ srvr = http.createServer (req, res) ->
         success res, lightLevels
     
     when 'startTv'
-      log 'startVideo', data
+      log 'startTv', data
       roku.startVideo data[0], +data[1]
       success res, ''
       

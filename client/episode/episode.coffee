@@ -19,7 +19,7 @@ require './episode-right'
 
 startVideo = (vm) ->
   tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
-  tvGlobal.ajaxCmd 'startVideo', vm.curEpisode.key, 0
+  tvGlobal.ajaxCmd 'startTv', vm.curEpisode.key, 0
 
 Vue.component 'episode-comp', 
   props: ['cur-show', 'cur-episode-idx', 'cur-episode', 'two-btn-clk']

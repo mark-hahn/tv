@@ -46,8 +46,7 @@ log = require('debug') 'tv:wchnfo'
 """
 
 Vue.component 'watch-info-comp', 
-  props: ['show', 'episode', 'video-file', 'play-pos', 'watch-mode', 
-          'tv-started-play', 'tv-playing']
+  props: ['show', 'episode', 'video-file', 'watch-mode']
   
   template: render ->
     div '.watch-info', ->
@@ -78,68 +77,15 @@ Vue.component 'watch-info-comp',
         when 'paused' then '>'
         else '||'
 
-  methods:
-    vidCtrlClk: ->
-      
-    playing: -> @videoEle?.paused ? no
-      
-    onClick: ->
-      # log 'onClick'
-      # tvGlobal.ajaxCmd 'playPauseVideo'
-      # if @playState is 'playing'
-      #   @videoEle?.play()
-      # else 
-      #   @videoEle?.pause()
-      #   tvGlobal.ajaxCmd 'startVideo', @videoEle.currentTime
-  
-  created: -> @tvPlaying = yes
-          
-  watch:
-    tvPlaying: (__, old) -> log '@tvPlaying:', old, '->', @tvPlaying
-    
-    watchMode: (__, old) -> 
-      log 'watchMode', old, '->', @watchMode
-      if typeof @playPos isnt 'number' then return
-      switch @watchMode
-        when 'tracking'
-          if old isnt 'tracking'
-            if @episode.key and not @tvPlaying
-              log 'starting tv play',  @tvPlaying, @playPos, @episode.key
-              tvGlobal.ajaxCmd 'startVideo', @episode.key, @playPos
-              @tvPlaying = yes
-              @tvStartedPlay = Date.now()
-            @videoEle?.currentTime = @playPos
-            @videoEle?.play()
-        when 'playing'
-          @videoEle?.play()
-          if old is 'tracking' 
-            @videoEle?.pause()
-            if @tvPlaying 
-              log 'pausing tv - was playing now paused',  @playPos
-              tvGlobal.ajaxCmd 'pauseTv'
-              @tvPlaying = no
-        when 'paused'
-          @videoEle?.pause()
-          if old is 'tracking' and @tvPlaying
-            log 'pausing tv - was tracking now paused',  @playPos
-            tvGlobal.ajaxCmd 'pauseTv'
-            @tvPlaying = no
-             
   events:
-    checkPlaying: ->
-      
-    setPlayPos: (@playPos) -> 
-      videoTime = @videoEle?.currentTime
-      if Math.abs(videoTime - @playPos) > 0.2
-        log 'adjusting playpos', @playPos - videoTime
-        @videoEle?.currentTime = @playPos
+    setPlayPos: (playPos) -> 
+      videoTime = @videoEle.currentTime
+      if Math.abs(videoTime - playPos) > 0.2
+        log 'adjusting playpos', playPos - videoTime
+        @videoEle.currentTime = playPos
+        
+    setPlayState: (state) ->
+      if state is 'playing' then @videoEle.play()
+      if state is 'paused'  then @videoEle.pause()
 
-  attached: -> 
-    @videoEle = @$el.querySelector 'video'
-    setInterval ->
-      if @watchMode is 'tracking'
-        if @tvPlayMode is 'playing' then @videoEle.play()
-        else @videoEle.pause()
-    , 2000
-    
-    
+  attached: -> @videoEle = @$el.querySelector 'video'

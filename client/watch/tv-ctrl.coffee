@@ -1,8 +1,11 @@
 
 module.exports =
 class TvCtrl
-  constructor: (newShow, newEpisode, newState, newPos) ->
+  constructor: (tvEvents) ->
+
     setInterval =>
+      if not tvEvents.ready then return
+      
       tvGlobal.ajaxCmd 'getTvStatus', (err, status) =>
         if status.data
           {id, @videoFile, playState, playPos} = status.data
@@ -14,33 +17,32 @@ class TvCtrl
             for show in @allShows
               for episode in show.episodes
                 if episode.id is id
-                  newShow(@show = show)
-                  newEpisode(@episode = episode)
+                  tvEvents.newShow(@show = show)
+                  tvEvents.newEpisode(@episode = episode)
                   break
               if @episode then break  
           if not @episode
-            newShow()
-            newEpisode()
+            tvEvents.newShow()
+            tvEvents.newEpisode()
             return
           if playState isnt @curPlayState
             log 'tvStateChange', @curPlayState, '->', playState
             @curPlayState = playState
-            newState playState
+            tvEvents.newState playState
           if playPos isnt @curPlayPos
             log 'tvPosChange', {playPos, @curPlayPos}
             @curPlayPos = playPos
-            newPos playPos
+            tvEvents.newPos playPos
         else 
           playState = 'none'
           if playState isnt @curPlayState
             log 'tvStateChange', @curPlayState, '->', playState
             @curPlayState = playState
-            newState playState
+            tvEvents.newState playState
     , 2000
 
-  getTvStatus: ->
-    playState: @curPlayState
-    playPos: @curPlayPos
+  getPlayPos: -> @curPlayPos
+  geState:    -> @curPlayState
     
   startTv: (episode, playPos) ->
     log 'startTv req', {@curPlayPos, playPos}

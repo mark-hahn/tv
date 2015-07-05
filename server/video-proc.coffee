@@ -2,6 +2,8 @@
 fs     = require 'fs-plus'
 ffmpeg = require 'fluent-ffmpeg'
 log    = require('debug') 'tv:vdproc'
+mkdirp = require 'mkdirp'
+rmrf   = require 'rmrf'
 
 shrinkOneVideo = (src, dst, cb) ->
   ffmpeg(timeout: 20*60e3, niceness: 20)
@@ -17,10 +19,13 @@ shrinkOneVideo = (src, dst, cb) ->
     .save dst
     
 do oneShrink = ->
-  allProcPaths = fs.listTreeSync '/mnt/media/videos-processing'
+  topProcPath = '/mnt/media/videos-processing'
+  allProcPaths = fs.listTreeSync topProcPath
   for procPath in allProcPaths when not fs.isDirectorySync procPath
     fs.removeSync procPath.replace '/videos-processing/', '/videos-small/'
     fs.removeSync procPath
+  rmrf topProcPath
+  mkdirp.sync topProcPath
 
   allPaths = fs.listTreeSync '/mnt/media/videos'
   for path, idx in allPaths 

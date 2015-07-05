@@ -42,8 +42,7 @@ Vue.component 'episode-comp',
       log 'Clicked bottom button: ' + btnName
       switch btnName
         when 'Play'  
-          startVideo @
-          @$dispatch 'chgCurPage', 'watch'
+          @$dispatch 'startWatch'
         when 'Watched'
           @curEpisode.watched = Watched = not @curEpisode.watched
           tvGlobal.ajaxCmd 'setDBField', @curEpisode.id, 'watched', Watched, (err, res) => 

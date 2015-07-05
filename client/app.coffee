@@ -118,42 +118,6 @@ new Vue
     lights:   Vue.component 'lights-comp'
 
   created: ->
-    @$on 'chgCurPage', (page) ->
-      @curPage = page
-      if page is 'show' then @$broadcast 'chooseShow'
-
-    @$on 'chgShowIdx', (idx) ->
-      @curShowIdx = idx = Math.max 0, Math.min (@allShows.length-1), idx
-      @curShow    = show = @allShows[idx]
-      @curTags    = show.tags
-      epiIdx      = localStorage.getItem 'epiForShow' + show.id
-      if epiIdx is 'episodeIdx' then epiIdx = 0 # fix corrupt db
-      @$emit 'chgEpisodeIdx', epiIdx ? 0
-      localStorage.setItem 'vueCurShowId', show.id
-       
-    @$on 'chgEpisodeIdx', (idx) ->
-      @curEpisodeIdx = idx = Math.max 0, Math.min (@curShow.episodes?.length ? 1) - 1, idx ? 0 
-      @curEpisode = @curShow.episodes[idx]
-      localStorage.setItem 'epiForShow' + @curShow.id, idx
-    
-    @$on 'playShow', ->
-      process.nextTick =>
-        firstUnwatched = null
-        for episode in @curShow.episodes
-          log 'playShow', @curShow.title, episode.title
-          if episode.watched
-            if firstUnwatched 
-              @$emit 'popup', 'Cant play show, episode gap.'
-              log 'cant play show, episode gap', 
-                   firstUnwatched.title, episode.title
-              return
-            continue
-          if not episode.watched and not firstUnwatched
-            firstUnwatched = episode
-        if firstUnwatched then @$broadcast 'startWatch', firstUnwatched; return
-        @$emit 'popup', 'All episodes watched.'
-        log 'cant play show, all watched', @curShow.title
-
     tvGlobal.ajaxCmd 'shows', (err, res) => 
       if err then log 'get all shows err', err.message; return
       @allShows = res.data
@@ -164,6 +128,29 @@ new Vue
     tvGlobal.syncPlexDB()
   
   events:
+    chgCurPage: (page) ->
+      @curPage = page
+      if page is 'show' then @$broadcast 'chooseShow'
+
+    chgShowIdx: (idx) ->
+      @curShowIdx = idx = Math.max 0, Math.min (@allShows.length-1), idx
+      @curShow    = show = @allShows[idx]
+      @curTags    = show.tags
+      epiIdx      = localStorage.getItem 'epiForShow' + show.id
+      if epiIdx is 'episodeIdx' then epiIdx = 0 # fix corrupt db
+      @$emit 'chgEpisodeIdx', epiIdx ? 0
+      localStorage.setItem 'vueCurShowId', show.id
+       
+    chgEpisodeIdx: (idx) ->
+      @curEpisodeIdx = idx = Math.max 0, Math.min (@curShow.episodes?.length ? 1) - 1, idx ? 0 
+      @curEpisode = @curShow.episodes[idx]
+      localStorage.setItem 'epiForShow' + @curShow.id, idx
+    
+    startWatch: (episode = @curEpisode) ->
+      log 'start playing in watch page', episode.title
+      @$emit 'chgCurPage', 'watch'
+      @$broadcast 'startWatch', episode
+      
     popup: (msg) -> 
       @popupMsg = msg
       if @popupTO then clearTimeout @popupTO

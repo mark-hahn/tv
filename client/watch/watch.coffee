@@ -79,7 +79,6 @@ Vue.component 'watch-comp',
   events:
     startWatch: (episode) ->
       log 'starting watch of', episode.title
-      @$dispatch 'chgCurPage', 'watch'
       tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
       tvCtrl.startTv episode.key, 0
       

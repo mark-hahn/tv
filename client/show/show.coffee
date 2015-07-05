@@ -60,15 +60,38 @@ Vue.component 'show-comp',
     @$on 'clrPageMode', -> @pageMode = 'select'
     @$on 'twoBtnClk',  (btnName) -> 
       switch btnName
-        when 'Play'   then @$dispatch 'playShow'
+        when 'Play'   then @$emit      'playShow'
         when 'Tags'   then @pageMode = 'tags'
         when 'Filter' then @pageMode = 'filter'
         when 'Alpha'  then @$broadcast 'alpha'
-        when 'Prev'   then @$dispatch 'chgShowIdx', @curShowIdx-1
-        when 'Next'   then @$dispatch 'chgShowIdx', @curShowIdx+1
-        when 'Reset'  then @filterTags = getDefaultFilters()
+        when 'Prev'   then @$dispatch  'chgShowIdx', @curShowIdx-1
+        when 'Next'   then @$dispatch  'chgShowIdx', @curShowIdx+1
         when 'Done'   then @pageMode = 'select'
-              
+        when 'Reset'  then @filterTags = getDefaultFilters()
+        
+  events:
+    playShow: ->
+      process.nextTick =>
+        firstUnwatched = null
+        for episode, epiIdx in @curShow.episodes
+          if episode.watched
+            if firstUnwatched 
+              @$dispatch 'popup', 'Cant play show, episode gap.'
+              log 'cant play show, episode gap', 
+                   firstUnwatched.title, episode.title
+              return
+            continue
+          else if not firstUnwatched
+            firstUnwatched = episode
+            firstEpiIdx = epiIdx
+        if firstUnwatched 
+          log 'playShow', @curShow.title, firstUnwatched.title
+          @$dispatch 'chgEpisodeIdx', firstEpiIdx
+          @$dispatch 'startWatch', firstUnwatched
+          return
+        @$dispatch 'popup', 'All episodes watched.'
+        log 'cant play show, all watched', @curShow.title
+            
   methods:      
     showInList: (show) ->
       if not show then return no

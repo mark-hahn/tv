@@ -5,8 +5,9 @@ log = require('debug') 'tv:wchcmp'
 {render, tag, div, img, video} = require 'teacup'
 
 require './watch-info'
-require './tv-ctrls'
+require './tv-btns'
 require './scrub'
+require './tv-ctrl'
 
 (document.head.appendChild document.createElement('style')).textContent = """
   .no-episode {
@@ -49,7 +50,6 @@ Vue.component 'watch-comp',
     episode:       null
     playPos:       0
     watchMode:    'none'
-    tvStartedPlay: 0
     tvPlaying:     yes
 
   template: render ->
@@ -67,7 +67,6 @@ Vue.component 'watch-comp',
             videoFile:     '{{videoFile}}'
             playPos:       '{{playPos}}'
             watchMode:     '{{watchMode}}'
-            tvStartedPlay: '{{tvStartedPlay}}'
             tvPlaying:     '{{tvPlaying}}'
               
           tag 'watch-ctrl-comp',
@@ -85,7 +84,15 @@ Vue.component 'watch-comp',
     playPos: ->
       if @watchMode in ['paused', 'playing']
         @$broadcast 'setScrubPos', @playPos
-            
+  
+  methods:          
+    startTvPlaying: ->
+      log 'starting tv play',  @tvPlaying, @playPos, @episode.key
+      tvGlobal.ajaxCmd 'startVideo', @episode.key, @playPos
+    stopTvPlaying: ->
+      log 'starting tv play',  @tvPlaying, @playPos, @episode.key
+      tvGlobal.ajaxCmd 'startVideo', @episode.key, @playPos
+      
   events:
     scrubMoused: (playPos) ->
       if @episode 
@@ -95,16 +102,14 @@ Vue.component 'watch-comp',
         @playPos = playPos
         @$broadcast 'setPlayPos', playPos
         
-    watchCtrlClk: (text) ->
+    tvBtnClick: (text) ->
       switch text
         when 'Play' 
-          if Math.abs(@playPos - @oldPlayPos) < 1 and @watchMode is 'paused'
-            @tvPlaying = yes
+          if Math.abs(@playPos - @oldPlayPos) < 2 and @watchMode is 'paused'
             tvGlobal.ajaxCmd 'pauseTv'
           @watchMode = 'tracking'
         when 'Cancel' 
-          if Math.abs(@playPos - @oldPlayPos) < 1 and @watchMode is 'paused'
-            @tvPlaying = yes
+          if Math.abs(@playPos - @oldPlayPos) < 2 and @watchMode is 'paused'
             tvGlobal.ajaxCmd 'pauseTv'
           else
             @playPos = @oldPlayPos ? 0
@@ -141,16 +146,30 @@ Vue.component 'watch-comp',
                     @show    = show
                     @episode = episode
                     break
-                if @episode then break
-            if @episode
-              if @watchMode is 'none' then @watchMode = 'tracking'
-              if @watchMode is 'tracking' and playPos isnt @lastTvPos
+                if @episode then break  
+            if not @episode
+              log 'no episode, watchmode -> none'
+              @watchMode = 'none'
+              return
+            tvChange = (playState isnt @lastTvState or playPos isnt @lastTvPos)
+            @lastTvState = playState
+            @lastTvPos   = playPos
+            if tvChange
+              log 'tvChange', {playState, @lastTvState, playPos, @lastTvPos}
+              if @watchMode is 'none' 
+                @watchMode = 'tracking'
+              if @watchMode is 'tracking' and playState is 'paused' 
+                log 'tvChange playState is paused'
+                @tvPlaying = no
+                @watchMode = 'paused'
+              else if @watchMode in ['playing','paused'] and playState is 'playing' 
+                @tvPlaying = yes
+                @watchMode = 'tracking'
+              if @watchMode is 'tracking'
                 @playPos = playPos
                 @$broadcast 'setScrubPos', playPos
                 @$broadcast 'setPlayPos',  playPos
-                @lastTvPos = playPos
           else 
-            if Date.now() > @tvStartedPlay + 5e3
-              log 'setting watchmode to none using status'
-              @watchMode = 'none'
+            log 'no status.data, watchmode -> none'
+            @watchMode = 'none'
       , 2000

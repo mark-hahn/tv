@@ -95,8 +95,7 @@ Vue.component 'watch-info-comp',
   created: -> @tvPlaying = yes
           
   watch:
-    tvPlaying: (newV, old) -> 
-      log 'watch tvPlaying', {newV, old}
+    tvPlaying: (__, old) -> log '@tvPlaying:', old, '->', @tvPlaying
     
     watchMode: (__, old) -> 
       log 'watchMode', old, '->', @watchMode
@@ -121,12 +120,11 @@ Vue.component 'watch-info-comp',
               @tvPlaying = no
         when 'paused'
           @videoEle?.pause()
-          if old is 'tracking' 
+          if old is 'tracking' and @tvPlaying
             log 'pausing tv - was tracking now paused',  @playPos
-            if @tvPlaying
-              tvGlobal.ajaxCmd 'pauseTv'
-              @tvPlaying = no
-            
+            tvGlobal.ajaxCmd 'pauseTv'
+            @tvPlaying = no
+             
   events:
     checkPlaying: ->
       

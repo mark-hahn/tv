@@ -14,8 +14,11 @@ fs.writeFileSync 'client/utils.coffee', src
 env = {CHROOT, USER, HOME_IP, AT_HOME, SERVER_IP, SERVER_HOST, DEBUG, LOCATION, OFF_SITE}
 # log env
 
+if +cfg.tv_port is 1340 
+  log 'starting video processing'
+  require './server-js/video-proc'
+
 require './server-js/ajax'
-require './server-js/video-proc'
 require './server-js/video-srvr'
 
 srvr = http.createServer beefy

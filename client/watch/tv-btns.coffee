@@ -1,22 +1,22 @@
 
 Vue     = require 'vue'
-log     = require('debug') 'tv:wchctl'
+log     = require('debug') 'tv:tvbtns'
 
 {render, tag, div} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """
-  .watch-ctrl {
+  .watch-btn {
     width: 98%;
     margin: 2% 0 1% 0;
   }
-  .tv-ctrls {
+  .tv-btns {
     background-color: #cce;
     border:1px solid gray;
     padding: 0 0 2px 2px;
     margin-top:1%; 
     position:relative;
   }
-  .watch-ctrl .tv-ctrls .ctrl-row .btn {
+  .watch-btn .tv-btns .btn-row .btn {
     font-size:1.8rem;
     line-height:1.5;
     width: 28%;
@@ -31,22 +31,22 @@ log     = require('debug') 'tv:wchctl'
   }
 """
 
-Vue.component 'watch-ctrl-comp',
+Vue.component 'watch-btn-comp',
   props: ['episode', 'watch-mode']
   
   template: render ->
-    div '.watch-ctrl', vIf: 'episode !== null', ->
+    div '.watch-btn', vIf: 'episode !== null', ->
       
-      div '.tv-ctrls', ->
-        div '.ctrl-row.audio-ctrls', ->
-          div '.btn', vOn: 'click: watchCtrlClk', 'Vol -'
-          div '.btn', vOn: 'click: watchCtrlClk', 'Mute'
-          div '.btn', vOn: 'click: watchCtrlClk', 'Vol +'
+      div '.tv-btns', ->
+        div '.btn-row.audio-btns', ->
+          div '.btn', vOn: 'click: tvBtnClick', 'Vol -'
+          div '.btn', vOn: 'click: tvBtnClick', 'Mute'
+          div '.btn', vOn: 'click: tvBtnClick', 'Vol +'
           
-        div '.ctrl-row.video-ctrls', ->
-          div '.btn', vOn: 'click: watchCtrlClk', 'Stop'
-          div '.btn', vOn: 'click: watchCtrlClk', '{{backResumeTxt}}'
-          div '.btn', vOn: 'click: watchCtrlClk', '{{tvPlayPauseTxt}}'
+        div '.btn-row.video-btns', ->
+          div '.btn', vOn: 'click: tvBtnClick', 'Stop'
+          div '.btn', vOn: 'click: tvBtnClick', '{{backResumeTxt}}'
+          div '.btn', vOn: 'click: tvBtnClick', '{{tvPlayPauseTxt}}'
 
         div '.tv-text', ->
           div 'T'
@@ -64,6 +64,6 @@ Vue.component 'watch-ctrl-comp',
         else                 'Play'
 
   methods:
-    watchCtrlClk: (e) -> 
-      @$dispatch 'watchCtrlClk', e.target.innerText
+    tvBtnClick: (e) -> 
+      @$dispatch 'tvBtnClick', e.target.innerText
       

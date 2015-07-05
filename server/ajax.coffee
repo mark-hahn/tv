@@ -93,7 +93,7 @@ srvr = http.createServer (req, res) ->
         if err then error res, 'getAllLights err: ' + err.message; return
         success res, lightLevels
     
-    when 'startVideo'
+    when 'startTv'
       log 'startVideo', data
       roku.startVideo data[0], +data[1]
       success res, ''
@@ -102,11 +102,11 @@ srvr = http.createServer (req, res) ->
       roku.playAction 'pause'
       success res, ''
       
-    when 'stepBackTv'
+    when 'backTv'
       roku.playAction 'stepBack'
       success res, ''
       
-    when 'stopVideo'
+    when 'stopTv'
       db.syncPlexDB()
       roku.playAction 'stop'
       success res, ''
@@ -115,9 +115,9 @@ srvr = http.createServer (req, res) ->
       db.syncPlexDB()
       success res, ''
         
-    when 'getPlayStatus'
+    when 'getTvStatus'
       plex.getStatus (err, playStatus) ->
-        if err then error res, 'getPlayStatus err: ' + err.message; return
+        if err then error res, 'getTvStatus err: ' + err.message; return
         success res, playStatus
         
     else

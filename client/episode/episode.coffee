@@ -17,9 +17,7 @@ log     = require('debug') 'tv:epipag'
 require './episode-left'
 require './episode-right'
 
-startVideo = (vm) ->
-  tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
-  tvGlobal.ajaxCmd 'startTv', vm.curEpisode.key, 0
+startVideo = (vm) -> @$broadcast 'startWatch', vm.curEpisode
 
 Vue.component 'episode-comp', 
   props: ['cur-show', 'cur-episode-idx', 'cur-episode', 'two-btn-clk']

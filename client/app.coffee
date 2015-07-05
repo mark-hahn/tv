@@ -64,8 +64,20 @@ document.head.innerHTML = render ->
       position: relative;
       height: 20rem;
     }
-    #popup: 
-  """
+    #popup {
+      position: absolute;
+      left: 3.3rem;
+      top: 30rem;
+      width: 20rem;
+      height: 2rem;
+      background-color: white;
+      border: 1px solid black;
+      text-align: center;
+      border-radius: 0.5rem;
+      font-size: 1.4rem;
+      line-height: 1.3;
+    }
+"""
   
 require './header'
 require './show/show'
@@ -118,30 +130,29 @@ new Vue
       if epiIdx is 'episodeIdx' then epiIdx = 0 # fix corrupt db
       @$emit 'chgEpisodeIdx', epiIdx ? 0
       localStorage.setItem 'vueCurShowId', show.id
-      
+       
     @$on 'chgEpisodeIdx', (idx) ->
       @curEpisodeIdx = idx = Math.max 0, Math.min (@curShow.episodes?.length ? 1) - 1, idx ? 0 
       @curEpisode = @curShow.episodes[idx]
       localStorage.setItem 'epiForShow' + @curShow.id, idx
     
     @$on 'playShow', ->
-      firstUnwatched = null
-      for episode in @curShow.episodes
-        log 'playShow', @curShow.title, episode.title
-        if episode.watched
-          if firstUnwatched 
-            log 'bad watched structure', firstUnwatched.title, episode.title
-            return
-          continue
-        if not episode.watched and not firstUnwatched
-          firstUnwatched = episode
-      if firstUnwatched
-        log 'starting video', firstUnwatched.title
-        tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
-        tvGlobal.ajaxCmd 'startTv', firstUnwatched.key, 0
-        @$emit 'chgCurPage', 'watch'
-        return
-      log 'all watched'
+      process.nextTick =>
+        firstUnwatched = null
+        for episode in @curShow.episodes
+          log 'playShow', @curShow.title, episode.title
+          if episode.watched
+            if firstUnwatched 
+              @$emit 'popup', 'Cant play show, episode gap.'
+              log 'cant play show, episode gap', 
+                   firstUnwatched.title, episode.title
+              return
+            continue
+          if not episode.watched and not firstUnwatched
+            firstUnwatched = episode
+        if firstUnwatched then @$broadcast 'startWatch', firstUnwatched; return
+        @$emit 'popup', 'All episodes watched.'
+        log 'cant play show, all watched', @curShow.title
 
     tvGlobal.ajaxCmd 'shows', (err, res) => 
       if err then log 'get all shows err', err.message; return
@@ -152,10 +163,13 @@ new Vue
       
     tvGlobal.syncPlexDB()
   
-  methods:
-    popup: (msg) ->
+  events:
+    popup: (msg) -> 
       @popupMsg = msg
+      if @popupTO then clearTimeout @popupTO
+      @popupTO = setTimeout (=> @popupMsg = ''), 4000
       
   attached: -> 
     tvGlobal.windowResize => @$broadcast 'resize'
+    @$el.addEventListener 'click', => @popupMsg = ''
 

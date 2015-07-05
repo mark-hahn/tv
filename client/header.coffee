@@ -53,6 +53,7 @@ Vue.component 'header-comp',
       div '.btn', vClass: 'selected: curPage == "lights"',  'Light'
       div '.pwrOverlay', vIf: 'powerText',  vText: 'powerText'
     div '.btn.onoff', vOn: 'mousedown: onOffDown, mouseup: onOffUp', 'Off'
+    
   data: ->
     powerText: ''
      

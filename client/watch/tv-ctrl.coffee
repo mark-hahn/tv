@@ -1,4 +1,6 @@
 
+log     = require('debug') 'tv:---app'
+
 module.exports =
 class TvCtrl
   constructor: (tvEvents) ->

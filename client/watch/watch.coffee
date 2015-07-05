@@ -77,10 +77,20 @@ Vue.component 'watch-comp',
           episode: '{{episode}}'
   
   events:
+    startWatch: (episode) ->
+      log 'starting watch of', episode.title
+      @$dispatch 'chgCurPage', 'watch'
+      tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
+      tvCtrl.startTv episode.key, 0
+      
     scrubMoused: (playPos) ->
       if @watchMode is 'tracking'
         @oldPlayPos = tvCtrl.getPlayPos()
-        @watchMode = 'paused'
+        @watchMode = 'paused'        log 'starting video', firstUnwatched.title
+                tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
+                tvGlobal.ajaxCmd 'startTv', firstUnwatched.key, 0
+                @$emit 'chgCurPage', 'watch'
+
       @$broadcast 'setPlayPos', playPos
     
     tvBtnClick: (text) ->
@@ -106,8 +116,6 @@ Vue.component 'watch-comp',
             tvGlobal.ajaxCmd 'stepBackTv'
 
   watch:
-    tvPlaying: (__, old) -> log '@tvPlaying:', old, '->', @tvPlaying
-    
     watchMode: (__, old) -> 
       log 'watchMode', old, '->', @watchMode
       if typeof @playPos isnt 'number' then return

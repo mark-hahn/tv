@@ -15,7 +15,10 @@ require './show-info'
 require '../two-btns'
 
 Vue.component 'show-left', 
-  props: ['page-mode', 'cur-show', 'two-btn-clk', 'filter-tags']
+  props: 
+    pageMode:   String
+    curShow:    Object
+    filterTags: Object
   
   template: render ->
     tag 'show-info', '.show-info', 
@@ -27,20 +30,20 @@ Vue.component 'show-left',
       
     tag 'tag-list', '.tag-list-comp', 
       pageMode:   '{{pageMode}}'
+      curShow:    '{{curShow}}'
       filterTags: '{{filterTags}}'
       vShow:      'pageMode == "filter"'
       
     tag 'two-btns', '.two-btns',  
       lftBtnTxt: '{{lftBtnTxt}}'
       rgtBtnTxt: '{{rgtBtnTxt}}'
-      twoBtnClk: 'twoBtnClk'
     
   computed:
     numEpisodes: -> 
-      @curShow.episodes.length
+      @curShow.episodes?.length ? 0
     numWatched: ->
       count = 0
-      for episode in @curShow.episodes
+      for episode in @curShow.episodes ? []
         if episode.watched then count++
       count
       

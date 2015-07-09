@@ -35,7 +35,7 @@ log     = require('debug') 'tv:taglst'
 """
 
 Vue.component 'tag-list',
-  props: ['page-mode', 'cur-show', 'filter-tags', 'cur-tags']
+  props: ['pageMode', 'curShow', 'filterTags', 'curTags']
   
   template: render ->
     div '.tag-list', ->

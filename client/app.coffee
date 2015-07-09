@@ -87,6 +87,7 @@ require './lights/lights'
 
 new Vue
   el: 'body'
+  replace: false
   
   template: render ->
     div '#page', ->
@@ -103,7 +104,7 @@ new Vue
     div '#popup', vIf:'popupMsg', '{{popupMsg}}'
       
   data:
-    curPage:  (if tvGlobal.debug then 'watch' else 'show')
+    curPage:  (if tvGlobal.debug then 'show' else 'show')
     allShows:  []
     curShowIdx: 0
     curShow: {}

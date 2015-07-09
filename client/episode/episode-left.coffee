@@ -15,7 +15,7 @@ require './episode-info'
 require '../two-btns'
 
 Vue.component 'episode-left', 
-  props: ['show-title', 'cur-episode']
+  props: ['showTitle', 'curEpisode']
   
   template: render ->
     tag 'episode-info', '.episode-info', 

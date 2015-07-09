@@ -50,7 +50,7 @@ log     = require('debug') 'tv:epiinf'
 """
 
 Vue.component 'episode-info', 
-  props: ['show-title', 'cur-episode']
+  props: ['showTitle', 'curEpisode']
   
   template: render ->
     div '.episode-info', vKeepScroll: true, ->

@@ -46,7 +46,7 @@ tvCtrl = new TvCtrl tvEvents
 """
 
 Vue.component 'watch-comp', 
-  props: ['all-shows']
+  props: ['allShows']
   
   data: ->
     show:          null

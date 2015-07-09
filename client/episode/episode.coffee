@@ -20,7 +20,7 @@ require './episode-right'
 startVideo = (vm) -> @$broadcast 'startWatch', vm.curEpisode
 
 Vue.component 'episode-comp', 
-  props: ['cur-show', 'cur-episode-idx', 'cur-episode', 'two-btn-clk']
+  props: ['curShow', 'curEpisodeIdx', 'curEpisode', 'twoBtnClk']
   
   template: render ->
     div '.episode-comp', ->

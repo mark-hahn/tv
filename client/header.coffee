@@ -41,7 +41,7 @@ timeoutOff = ->
   btnTimeout = null
 
 Vue.component 'header-comp', 
-  props: ['cur-page']
+  props: ['curPage']
 
   name: 'header-comp'
   template: render ->

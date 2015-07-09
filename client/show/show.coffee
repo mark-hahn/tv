@@ -27,7 +27,7 @@ getDefaultFilters = ->
   filters
 
 Vue.component 'show-comp', 
-  props: ['all-shows', 'cur-show-idx', 'cur-show']
+  props: ['allShows', 'curShowIdx', 'curShow']
   
   template: render ->
     div '.show-comp', ->
@@ -36,7 +36,6 @@ Vue.component 'show-comp',
         pageMode:   '{{pageMode}}'
         filterTags: '{{filterTags}}'
         curShow:    '{{curShow}}'
-        twoBtnClk:  '{{twoBtnClk}}'
 
       tag 'show-right', '.show-right-comp', 
         pageMode:   '{{pageMode}}'
@@ -45,7 +44,6 @@ Vue.component 'show-comp',
         curShowIdx: '{{curShowIdx}}'
         curShow:    '{{curShow}}'
         showInList: '{{showInList}}'
-        twoBtnClk:  '{{twoBtnClk}}'
         curTags:    '{{curTags}}'
   
   data: ->
@@ -54,7 +52,7 @@ Vue.component 'show-comp',
     filterTags: getDefaultFilters()
 
   watch: 
-    curShow:  -> @curTags = @curShow?.tags ? {}
+    curShow: -> @curTags = @curShow?.tags ? {}
 
   created: ->     
     @$on 'clrPageMode', -> @pageMode = 'select'

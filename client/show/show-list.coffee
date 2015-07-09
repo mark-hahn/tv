@@ -33,7 +33,7 @@ log     = require('debug') 'tv:snf'
 """
 
 Vue.component 'show-list', 
-  props: ['page-mode', 'all-shows', 'cur-show-idx', 'filter-tags', 'show-in-list']
+  props: ['pageMode', 'allShows', 'curShowIdx', 'filterTags', 'showInList']
   
   template: render ->
     div '.show-list', vKeepScroll: true, ->

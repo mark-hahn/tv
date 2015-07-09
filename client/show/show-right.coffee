@@ -10,14 +10,13 @@ require '../two-btns'
 
 Vue.component 'show-right', 
   props: [
-    'page-mode'
-    'all-shows'
-    'cur-show-idx'
-    'cur-show'
-    'two-btn-clk'
-    'filter-tags'
-    'show-in-list'
-    'cur-tags'
+    'pageMode'
+    'allShows'
+    'curShowIdx'
+    'curShow'
+    'filterTags'
+    'showInList'
+    'curTags'
   ]
   
   template: render ->
@@ -39,7 +38,6 @@ Vue.component 'show-right',
     tag 'two-btns', '.two-btns',  
       lftBtnTxt:  '{{lftBtnTxt}}' 
       rgtBtnTxt:  '{{rgtBtnTxt}}' 
-      twoBtnClk:  '{{twoBtnClk}}'
     
   computed:
     lftBtnTxt: -> 

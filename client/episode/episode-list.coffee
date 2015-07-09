@@ -45,7 +45,7 @@ log     = require('debug') 'tv:snf'
 """
 
 Vue.component 'episode-list', 
-  props: ['cur-show', 'all-episodes', 'cur-episode-idx']
+  props: ['curShow', 'allEpisodes', 'curEpisodeIdx']
   
   template: render ->
     div '.episode-list', vKeepScroll: true, ->

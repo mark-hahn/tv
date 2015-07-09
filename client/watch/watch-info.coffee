@@ -46,7 +46,7 @@ log = require('debug') 'tv:wchnfo'
 """
 
 Vue.component 'watch-info-comp', 
-  props: ['show', 'episode', 'video-file', 'watch-mode']
+  props: ['show', 'episode', 'videoFile', 'watchMode']
   
   template: render ->
     div '.watch-info', ->

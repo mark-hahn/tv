@@ -32,7 +32,7 @@ log     = require('debug') 'tv:tvbtns'
 """
 
 Vue.component 'watch-btn-comp',
-  props: ['episode', 'watch-mode']
+  props: ['episode', 'watchMode']
   
   template: render ->
     div '.watch-btn', vIf: 'episode !== null', ->

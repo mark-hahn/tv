@@ -15,7 +15,7 @@ log     = require('debug') 'tv:twobtn'
 """
 
 Vue.component 'two-btns',
-  props: ['lft-btn-txt', 'rgt-btn-txt']
+  props: ['lftBtnTxt', 'rgtBtnTxt']
 
   template: render ->
     div '.two-btns',  ->

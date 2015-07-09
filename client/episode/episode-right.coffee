@@ -8,7 +8,7 @@ require './episode-list'
 require '../two-btns'
 
 Vue.component 'episode-right', 
-  props: ['cur-show', 'cur-episode-idx', 'two-btn-clk']
+  props: ['curShow', 'curEpisodeIdx', 'twoBtnClk']
   
   template: render ->
     tag 'episode-list', '.episode-list-comp', 

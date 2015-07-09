@@ -5,7 +5,7 @@ log     = require('debug') 'tv:taglst'
 {render, div} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """
-  .tag-list {
+  .tag-list-comp {
     width: 100%;
     height: 35.5rem;
     position: relative;
@@ -38,7 +38,7 @@ Vue.component 'tag-list',
   props: ['pageMode', 'curShow', 'filterTags', 'curTags']
   
   template: render ->
-    div '.tag-list', ->
+    div '.tag-list-comp', ->
       div '.tag-hdr', vShow:'pageMode == "tags"',   'Tags For: {{curShow.title}}'
       div '.tag-hdr', vShow:'pageMode == "filter"', 'Filter Show List'
       div '.tag', 

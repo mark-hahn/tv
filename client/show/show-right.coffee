@@ -8,6 +8,13 @@ require './show-list'
 require './tag-list'
 require '../two-btns'
 
+(document.head.appendChild document.createElement('style')).textContent = """
+  .show-right-comp {
+    display: inline-block;
+    width: 49%;
+  }
+"""
+
 Vue.component 'show-right', 
   props: [
     'pageMode'
@@ -20,25 +27,26 @@ Vue.component 'show-right',
   ]
   
   template: render ->
-    tag 'show-list', '.show-list-comp', 
-      pageMode:   '{{pageMode}}'
-      allShows:   '{{allShows}}'
-      curShowIdx: '{{curShowIdx}}'
-      curShow:    '{{curShow}}'
-      filterTags: '{{filterTags}}'
-      showInList: '{{showInList}}'
-      vShow:      'pageMode != "tags"'
+    div '.show-right-comp', ->
+      tag 'show-list',
+        pageMode:   '{{pageMode}}'
+        allShows:   '{{allShows}}'
+        curShowIdx: '{{curShowIdx}}'
+        curShow:    '{{curShow}}'
+        filterTags: '{{filterTags}}'
+        showInList: '{{showInList}}'
+        vShow:      'pageMode != "tags"'
+        
+      tag 'tag-list',
+        pageMode: '{{pageMode}}'
+        curShow:  '{{curShow}}'
+        vShow:    'pageMode == "tags"'
+        curTags:  '{{curTags}}'
+        
+      tag 'two-btns',
+        lftBtnTxt:  '{{lftBtnTxt}}' 
+        rgtBtnTxt:  '{{rgtBtnTxt}}' 
       
-    tag 'tag-list', '.tag-list-comp', 
-      pageMode: '{{pageMode}}'
-      curShow:  '{{curShow}}'
-      vShow:    'pageMode == "tags"'
-      curTags:  '{{curTags}}'
-      
-    tag 'two-btns', '.two-btns',  
-      lftBtnTxt:  '{{lftBtnTxt}}' 
-      rgtBtnTxt:  '{{rgtBtnTxt}}' 
-    
   computed:
     lftBtnTxt: -> 
       switch @pageMode

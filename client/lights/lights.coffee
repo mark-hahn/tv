@@ -12,7 +12,7 @@ log = require('debug') 'tv:lts'
     height:100%;
     display: inline-block;
   }
-  .switch img {
+  .switch-comp img {
     position:relative;
     width:65%;
   }
@@ -37,7 +37,7 @@ Vue.component 'light-sw-comp',
 
   name: 'light-sw-comp'
   template: render ->
-    div '.switch', 
+    div '.switch.switch-comp', 
       vClass:'master:!switch.idx', 
       vOn:'mousedown:onMousedown, touchstart:onMousedown' , ->
         img src:'server/images/switch.png'
@@ -113,9 +113,10 @@ Vue.component 'light-sw-comp',
 Vue.component 'lights-comp', 
   name: 'lights-comp'
   template: render ->
-    div '.sw-row', vRepeat:'switchRow:switchRows' , ->
-      tag 'light-sw-comp', '.switch-comp', vRepeat:'switch:switchRow'
-    div '.fun.btn', vOn: 'click:fun', 'fun'
+    div '.lights-comp', ->
+      div '.sw-row', vRepeat:'switchRow:switchRows' , ->
+        tag 'light-sw-comp', vRepeat:'switch:switchRow'
+      div '.fun.btn', vOn: 'click:fun', 'fun'
         
   data: ->
     switchRows: [

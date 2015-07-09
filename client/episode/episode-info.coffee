@@ -6,6 +6,7 @@ log     = require('debug') 'tv:epiinf'
 
 (document.head.appendChild document.createElement('style')).textContent = """
   .episode-info {
+    height: 35.5rem;
     width: 100%;
     position: relative;
     overflow-x: hidden;

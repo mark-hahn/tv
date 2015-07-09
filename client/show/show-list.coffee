@@ -6,7 +6,7 @@ log     = require('debug') 'tv:snf'
 {render, tag, div, img} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """
-  .show-list {
+  .show-list-comp {
     width: 100%;
     height: 35.5rem;
     position: relative;
@@ -36,7 +36,7 @@ Vue.component 'show-list',
   props: ['pageMode', 'allShows', 'curShowIdx', 'filterTags', 'showInList']
   
   template: render ->
-    div '.show-list', vKeepScroll: true, ->
+    div '.show-list-comp', vKeepScroll: true, ->
       div '.show-list-inner', vShow: '!alphaMode', ->
         div '.show', 
           vRepeat: 'allShows'

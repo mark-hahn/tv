@@ -5,6 +5,11 @@ log     = require('debug') 'tv:shwlft'
 {render, tag, div} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """
+  .show-left-comp {
+    display: inline-block;
+    width: 49%;
+    margin-right:2%;
+  }
   .show-info {
     width: 100%;
     height: 35.5rem;
@@ -21,22 +26,23 @@ Vue.component 'show-left',
     filterTags: Object
   
   template: render ->
-    tag 'show-info', '.show-info', 
-      pageMode:    '{{pageMode}}'
-      curShow:     '{{curShow}}'
-      numEpisodes: '{{numEpisodes}}'
-      numWatched:  '{{numWatched}}'
-      vShow: 'pageMode != "filter"'
-      
-    tag 'tag-list', '.tag-list-comp', 
-      pageMode:   '{{pageMode}}'
-      curShow:    '{{curShow}}'
-      filterTags: '{{filterTags}}'
-      vShow:      'pageMode == "filter"'
-      
-    tag 'two-btns', '.two-btns',  
-      lftBtnTxt: '{{lftBtnTxt}}'
-      rgtBtnTxt: '{{rgtBtnTxt}}'
+    div '.show-left-comp',  ->
+      tag 'show-info',
+        pageMode:    '{{pageMode}}'
+        curShow:     '{{curShow}}'
+        numEpisodes: '{{numEpisodes}}'
+        numWatched:  '{{numWatched}}'
+        vShow: 'pageMode != "filter"'
+        
+      tag 'tag-list',
+        pageMode:   '{{pageMode}}'
+        curShow:    '{{curShow}}'
+        filterTags: '{{filterTags}}'
+        vShow:      'pageMode == "filter"'
+        
+      tag 'two-btns',
+        lftBtnTxt: '{{lftBtnTxt}}'
+        rgtBtnTxt: '{{rgtBtnTxt}}'
     
   computed:
     numEpisodes: -> 

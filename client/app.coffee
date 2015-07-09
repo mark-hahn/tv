@@ -93,7 +93,7 @@ new Vue
     div '#page', ->
       tag 'header-comp',
         curPage: '{{curPage}}'
-      tag 'component', '#page-comp', 
+      tag 'component',
         keepAlive:     true
         is:            '{{curPage}}'
         allShows:      '{{allShows}}'

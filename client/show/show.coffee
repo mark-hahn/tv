@@ -4,16 +4,6 @@ log     = require('debug') 'tv:shwpag'
 
 {render, tag, div} = require 'teacup'
 
-(document.head.appendChild document.createElement('style')).textContent = """
-  .show-left-comp, .show-right-comp {
-    display: inline-block;
-    width: 49%;
-  }
-  .show-left-comp {
-    margin-right:2%;
-  }
-"""
-
 require './show-left'
 require './show-right'
 
@@ -32,12 +22,12 @@ Vue.component 'show-comp',
   template: render ->
     div '.show-comp', ->
       
-      tag 'show-left', '.show-left-comp',  
+      tag 'show-left',
         pageMode:   '{{pageMode}}'
         filterTags: '{{filterTags}}'
         curShow:    '{{curShow}}'
 
-      tag 'show-right', '.show-right-comp', 
+      tag 'show-right',
         pageMode:   '{{pageMode}}'
         filterTags: '{{filterTags}}'
         allShows:   '{{allShows}}'

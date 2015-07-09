@@ -4,16 +4,6 @@ log     = require('debug') 'tv:epipag'
 
 {render, tag, div} = require 'teacup'
 
-(document.head.appendChild document.createElement('style')).textContent = """
-  .episode-left-comp, .episode-right-comp {
-    display: inline-block;
-    width: 49%;
-  }
-  .episode-left-comp {
-    margin-right:2%;
-  }
-"""
-
 require './episode-left'
 require './episode-right'
 
@@ -25,12 +15,12 @@ Vue.component 'episode-comp',
   template: render ->
     div '.episode-comp', ->
       
-      tag 'episode-left', '.episode-left-comp',  
+      tag 'episode-left',
         showTitle:  '{{curShow.title}}'
         curEpisode: '{{curEpisode}}'
         twoBtnClk:  '{{twoBtnClk}}'
 
-      tag 'episode-right', '.episode-right-comp', 
+      tag 'episode-right',
         curShow:       '{{curShow}}'
         curEpisodeIdx: '{{curEpisodeIdx}}'
         twoBtnClk:     '{{twoBtnClk}}'

@@ -15,7 +15,7 @@ require './episode-list'
 require '../two-btns'
 
 Vue.component 'episode-right', 
-  props: ['curShow', 'curEpisodeIdx', 'twoBtnClk']
+  props: ['curShow', 'curEpisodeIdx']
   
   template: render ->
     div '.episode-right-comp', ->
@@ -27,5 +27,4 @@ Vue.component 'episode-right',
       tag 'two-btns',
         lftBtnTxt:  'Up' 
         rgtBtnTxt:  'Down' 
-        twoBtnClk:  'twoBtnClk'
     

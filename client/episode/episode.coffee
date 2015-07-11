@@ -7,10 +7,8 @@ log     = require('debug') 'tv:epipag'
 require './episode-left'
 require './episode-right'
 
-startVideo = (vm) -> @$broadcast 'startWatch', vm.curEpisode
-
 Vue.component 'episode-comp', 
-  props: ['curShow', 'curEpisodeIdx', 'curEpisode', 'twoBtnClk']
+  props: ['curShow', 'curEpisodeIdx', 'curEpisode']
   
   template: render ->
     div '.episode-comp', ->
@@ -18,18 +16,16 @@ Vue.component 'episode-comp',
       tag 'episode-left',
         showTitle:  '{{curShow.title}}'
         curEpisode: '{{curEpisode}}'
-        twoBtnClk:  '{{twoBtnClk}}'
 
       tag 'episode-right',
         curShow:       '{{curShow}}'
         curEpisodeIdx: '{{curEpisodeIdx}}'
-        twoBtnClk:     '{{twoBtnClk}}'
       
-  created: ->
-    @$on 'startVideo', -> startVideo @
+  events:
+    startVideo: -> startVideo @
     
-    @$on 'twoBtnClk',  (btnName) -> 
-      log 'Clicked bottom button: ' + btnName
+    twoBtnClk:  (btnName) -> 
+      log 'Clicked button: ' + btnName
       switch btnName
         when 'Play'  
           @$dispatch 'startWatch'

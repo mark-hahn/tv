@@ -46,7 +46,7 @@ log = require('debug') 'tv:wchnfo'
 """
 
 Vue.component 'watch-info-comp', 
-  props: ['show', 'episode', 'videoFile', 'watchMode']
+  props: ['show', 'episode', 'videoFile', 'watchMode', 'videoEle']
   
   template: render ->
     div '.watch-info', ->
@@ -88,4 +88,5 @@ Vue.component 'watch-info-comp',
       if state is 'playing' then @videoEle.play()
       if state is 'paused'  then @videoEle.pause()
 
-  attached: -> @videoEle = @$el.querySelector 'video'
+  attached: -> 
+    @videoEle = @$el.querySelector 'video'

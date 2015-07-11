@@ -75,8 +75,14 @@ tvGlobal.ajaxCmd = (cmd, args..., cb) ->
     .get ajaxPfx + cmd + query
     .set 'Content-Type', 'text/plain'
     .end (err, res) ->
-      if err or res.status isnt 200
-        log 'ajax err', (err ? res.status); cb? err ? res; return
+      if res.status isnt 200
+        log 'ajax result status err', res.status
+        cb? res.status
+        return
+      if err
+        log 'ajax err', err
+        cb? err
+        return
       cb? null, JSON.parse res.text
 
 tvGlobal.ajaxLog = (args...) ->

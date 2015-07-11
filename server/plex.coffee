@@ -34,6 +34,7 @@ getPlexData = (path, eleType, cb) ->
 exports.findRoku = (rokuName, cb) ->
   getPlexData '/clients', 'Server', (err, clients) ->
     if err then cb err; return
+    # log 'findRoku clients', clients
     for client in clients when client.name is rokuName
       cb null, client, plexServerIp, plexServerPort
       return

@@ -9,9 +9,6 @@ require './watch-info'
 require './tv-btns'
 require './scrub'
 
-tvEvents = {}
-tvCtrl = new TvCtrl tvEvents
-
 (document.head.appendChild document.createElement('style')).textContent = """
   .no-episode {
     margin-top: 10rem;
@@ -49,13 +46,13 @@ Vue.component 'watch-comp',
   props: ['allShows']
   
   data: ->
-    show:          null
-    episode:       null
-    playPos:       0
-    watchMode:    'none'
+    show:       null
+    episode:    null
+    playPos:    0
+    watchMode: 'none'
 
   template: render ->
-    div ->
+    div '.watch-comp', ->
       div '.no-episode', vIf:'watchMode == "none"', ->
         div '.msgTitle', 'No show is playing.'
         div 'Ensure Roku is running Plex and'
@@ -77,30 +74,26 @@ Vue.component 'watch-comp',
           episode: '{{episode}}'
   
   events:
-    startWatch: (episode) ->
-      log 'starting watch of', episode.title
+    startWatchDown: (episode) ->
+      # log 'startWatchDown: starting watch of', episode.title
       tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
-      tvCtrl.startTv episode.key, 0
+      @tvCtrl.startTv episode, 0
       
     scrubMoused: (playPos) ->
       if @watchMode is 'tracking'
-        @oldPlayPos = tvCtrl.getPlayPos()
-        @watchMode = 'paused'        log 'starting video', firstUnwatched.title
-                tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
-                tvGlobal.ajaxCmd 'startTv', firstUnwatched.key, 0
-                @$emit 'chgCurPage', 'watch'
-
+        @oldPlayPos = @tvCtrl.getPlayPos()
+        @watchMode = 'paused'        
       @$broadcast 'setPlayPos', playPos
-    
+      
     tvBtnClick: (text) ->
       switch text
         when 'Play' 
           if Math.abs(@playPos - @oldPlayPos) < 2 and @watchMode is 'paused'
-            tvGlobal.ajaxCmd 'pauseTv'
+            @tvCtrl.unPauseTv() 
           @watchMode = 'tracking'
         when 'Cancel' 
           if Math.abs(@playPos - @oldPlayPos) < 2 and @watchMode is 'paused'
-            tvGlobal.ajaxCmd 'pauseTv'
+            @tvCtrl.unPauseTv()
           else
             @playPos = @oldPlayPos ? 0
             @$broadcast 'setPlayPos', @playPos
@@ -112,7 +105,7 @@ Vue.component 'watch-comp',
         when 'Back' 
           log 'back btn', @watchMode
           if @watchMode is 'tracking'
-            tvGlobal.ajaxCmd 'stepBackTv'
+            @tvCtrl.stepBackTv()
 
   watch:
     watchMode: (__, old) -> 
@@ -123,7 +116,7 @@ Vue.component 'watch-comp',
           if old isnt 'tracking'
             if @episode.key and not @tvPlaying
               log 'starting tv play',  @tvPlaying, @playPos, @episode.key
-              tvGlobal.ajaxCmd 'startTv', @episode.key, @playPos
+              @tvCtrl.startTv episode, @playPos
               @tvPlaying = yes
               @tvStartedPlay = Date.now()
             @videoEle?.currentTime = @playPos
@@ -134,22 +127,33 @@ Vue.component 'watch-comp',
             @videoEle?.pause()
             if @tvPlaying 
               log 'pausing tv - was playing now paused',  @playPos
-              tvGlobal.ajaxCmd 'pauseTv'
+              @tvCtrl.pauseTv()
               @tvPlaying = no
         when 'paused'
           @videoEle?.pause()
           if old is 'tracking' and @tvPlaying
             log 'pausing tv - was tracking now paused',  @playPos
-            tvGlobal.ajaxCmd 'pauseTv'
+            @tvCtrl.pauseTv()
             @tvPlaying = no
-          
-  attached: ->
-    tvEvents.newShow = (@show) ->
+            
+  methods:          
+    newShow:    (@show    ) ->
+    newEpisode: (@episode ) ->
+    newState:   (tvState  ) ->
+    newPos:     (tvPlayPos) ->
       
-    tvEvents.newEpisode = (@episode) ->
-      
-    tvEvents.newState = (tvState) ->
-      
-    tvEvents.newPos = (tvPlayPos) ->
-      
-    tvEvents.ready = yes
+    setEpisodeById: (id) =>
+      episode = null
+      for show in @allShows ? []
+        for episode in show.episodes
+          if episode.id is id
+            @show    = show
+            @episode = episode
+            break
+        if episode then break 
+      if not episode
+        @show    = null
+        @episode = null
+
+  created: -> @tvCtrl = new TvCtrl @
+

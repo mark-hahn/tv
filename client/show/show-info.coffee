@@ -47,11 +47,7 @@ log     = require('debug') 'tv:shwinf'
 """
 
 Vue.component 'show-info', 
-  props: 
-    pageMode:    null
-    curShow:     null
-    numEpisodes: null
-    numWatched:  null
+  props: ['pageMode', 'curShow', 'numEpisodes', 'numWatched']
     
   template: render ->
     div '.show-info', vOn: 'click: infoClick', vKeepScroll: true, ->

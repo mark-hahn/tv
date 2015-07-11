@@ -10,7 +10,12 @@ db      = require './db'
 log     = require('debug') 'tv:ajax'
 port    = require('parent-config')('apps-config.json').tvAjax_port
 
-roku.init (err) -> if err then log 'roku.init failed'
+plexRunningInRoku = yes
+roku.init (err) -> 
+  if err
+    plexRunningInRoku = no
+    log 'roku.init failed'
+  
 db.init   (err) -> if err then log 'db.init failed'
 
 error = (res, msg, code=500) ->
@@ -33,7 +38,8 @@ success = (res, data) ->
 poweringUp = no
 
 srvr = http.createServer (req, res) ->
-  # log 'ajax http req: ' + req.url
+  if req.url isnt '/getTvStatus'
+    log 'ajax http req: ' + req.url
   
   res.writeHead 200, 
     'Content-Type': 'text/json'
@@ -94,7 +100,9 @@ srvr = http.createServer (req, res) ->
         success res, lightLevels
     
     when 'startTv'
-      log 'startTv', data
+      log 'startTv', {plexRunningInRoku, data}
+      if not plexRunningInRoku
+        error res, 'plexNotRunning' + req.url
       roku.startVideo data[0], +data[1]
       success res, ''
       

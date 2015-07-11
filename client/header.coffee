@@ -45,14 +45,15 @@ Vue.component 'header-comp',
 
   name: 'header-comp'
   template: render ->
-    div '.btn.onoff', vOn: 'mousedown: onOffDown, mouseup: onOffUp', 'On'
-    div '.header', vOn: 'mousedown: selPage', ->
-      div '.btn', vClass: 'selected: curPage == "show"',    'Show'
-      div '.btn', vClass: 'selected: curPage == "episode"', 'Episo'
-      div '.btn', vClass: 'selected: curPage == "watch"',   'Watc'
-      div '.btn', vClass: 'selected: curPage == "lights"',  'Light'
-      div '.pwrOverlay', vIf: 'powerText',  vText: 'powerText'
-    div '.btn.onoff', vOn: 'mousedown: onOffDown, mouseup: onOffUp', 'Off'
+    div '.header-comp', ->
+      div '.btn.onoff', vOn: 'mousedown: onOffDown, mouseup: onOffUp', 'On'
+      div '.header', vOn: 'mousedown: selPage', ->
+        div '.btn', vClass: 'selected: curPage == "show"',    'Show'
+        div '.btn', vClass: 'selected: curPage == "episode"', 'Episo'
+        div '.btn', vClass: 'selected: curPage == "watch"',   'Watc'
+        div '.btn', vClass: 'selected: curPage == "lights"',  'Light'
+        div '.pwrOverlay', vIf: 'powerText',  vText: 'powerText'
+      div '.btn.onoff', vOn: 'mousedown: onOffDown, mouseup: onOffUp', 'Off'
     
   data: ->
     powerText: ''

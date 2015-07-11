@@ -91,16 +91,28 @@ new Vue
   
   template: render ->
     div '#page', ->
-      tag 'header-comp',
-        curPage: '{{curPage}}'
-      tag 'component',
-        keepAlive:     true
-        is:            '{{curPage}}'
+      tag 'header-comp', 
+        curPage:       '{{curPage}}'
+      
+      tag 'show-comp',   
+        vShow:         'curPage == "show"',
         allShows:      '{{allShows}}'
         curShowIdx:    '{{curShowIdx}}'
         curShow:       '{{curShow}}'
+        
+      tag 'episode-comp', 
+        vShow:         'curPage == "episode"',
+        curShow:       '{{curShow}}'
         curEpisodeIdx: '{{curEpisodeIdx}}'
         curEpisode:    '{{curEpisode}}'
+        
+      tag 'watch-comp',   
+        vShow:         'curPage == "watch"',
+        allShows:      '{{allShows}}'
+        
+      tag 'lights-comp',  
+        vShow:         'curPage == "lights"'
+        
     div '#popup', vIf:'popupMsg', '{{popupMsg}}'
       
   data:
@@ -112,12 +124,6 @@ new Vue
     curEpisode: {}
     popupMsg: ''
     
-  components:
-    show:     Vue.component 'show-comp'
-    episode:  Vue.component 'episode-comp'
-    watch:    Vue.component 'watch-comp'
-    lights:   Vue.component 'lights-comp'
-
   created: ->
     tvGlobal.ajaxCmd 'shows', (err, res) => 
       if err then log 'get all shows err', err.message; return
@@ -127,7 +133,7 @@ new Vue
       document.querySelector('#page').style.visibility = 'visible'
       
     tvGlobal.syncPlexDB()
-  
+
   events:
     chgCurPage: (page) ->
       @curPage = page
@@ -148,9 +154,10 @@ new Vue
       localStorage.setItem 'epiForShow' + @curShow.id, idx
     
     startWatch: (episode = @curEpisode) ->
-      log 'start playing in watch page', episode.title
+      # log 'start playing in watch page', episode.title
       @$emit 'chgCurPage', 'watch'
-      @$broadcast 'startWatch', episode
+      @curPage = 'watch'
+      @$broadcast 'startWatchDown', episode
       
     popup: (msg) -> 
       @popupMsg = msg

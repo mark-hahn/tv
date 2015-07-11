@@ -31,7 +31,7 @@ log     = require('debug') 'tv:tvbtns'
   }
 """
 
-Vue.component 'watch-btn-comp',
+Vue.component 'tv-btns-comp',
   props: ['episode', 'watchMode']
   
   template: render ->

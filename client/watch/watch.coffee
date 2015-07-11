@@ -31,9 +31,6 @@ require './scrub'
     width: 85%;
     height: 35.5rem;
   }
-  watch-info-comp {
-    display: block;
-  }
 """
 
 Vue.component 'watch-comp', 
@@ -60,7 +57,7 @@ Vue.component 'watch-comp',
             videoFile:     '{{videoFile}}'
             watchMode:     '{{watchMode}}'
               
-          tag 'watch-ctrl-comp',
+          tag 'tv-btns-comp',
             episode:   '{{episode}}'
             watchMode: '{{watchMode}}'
             
@@ -112,7 +109,7 @@ Vue.component 'watch-comp',
           if old isnt 'tracking'
             if @episode.key and not @tvPlaying
               log 'starting tv play',  @tvPlaying, @playPos, @episode.key
-              @tvCtrl.startTv episode, @playPos
+              @tvCtrl.startTv @episode, @playPos
               @tvPlaying = yes
             @videoEle?.currentTime = @playPos
             @videoEle?.play()

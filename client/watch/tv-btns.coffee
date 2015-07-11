@@ -35,7 +35,7 @@ Vue.component 'tv-btns-comp',
   props: ['episode', 'watchMode']
   
   template: render ->
-    div '.watch-btn', vIf: 'episode !== null', ->
+    div '.watch-btn', ->
       
       div '.tv-btns', ->
         div '.btn-row.audio-btns', ->

@@ -32,22 +32,24 @@ class TvCtrl
   getPlayPos: -> @curPlayPos
   geState:    -> @curPlayState
     
-  startTv: (episode, playPos) ->
+  startTv: (episodeKey, playPos) ->
     # log 'startTv req', {@curPlayPos, playPos}
-    if @curPlayState isnt 'playing'
+    if @curPlayState isnt 'playing' or episodeKey isnt @curEpisodeKey
       if @curPlayState is 'paused' and
-          Math.abs(playPos - @curPlayPos) < 2
+          Math.abs(playPos - @curPlayPos) < 2 and
+          episodeKey is @curEpisodeKey
         tvGlobal.ajaxCmd 'pauseTv'
         log 'tv started playing with pauseTv', 
       else
-        tvGlobal.ajaxCmd 'startTv', episode.key, playPos, (err) =>
+        tvGlobal.ajaxCmd 'startTv', episodeKey, playPos, (err) =>
           if err
             log 'tvGlobal.ajaxCmd startTv err', err
             if err is 500
               @watchComp.$dispatch 'popup', 'Start Plex in Roku and refresh'
-        log 'tv started playing with startTv', {key: episode.key, playPos}
-      @curPlayState = 'playing'
-      @curPlayPos   = playPos
+        log 'tv started playing with startTv', {key: episodeKey, playPos}
+      @curPlayState  = 'playing'
+      @curPlayPos    = playPos
+      @curEpisodeKey = episodeKey
     
   stepBackTv: ->
     tvGlobal.ajaxCmd 'backTv'

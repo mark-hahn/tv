@@ -80,11 +80,16 @@ Vue.component 'watch-info-comp',
         else '||'
 
   events:
-    setPlayPos: (playPos) -> 
-      videoTime = @videoEle.currentTime
-      if Math.abs(videoTime - playPos) > 0.2
-        log 'adjusting playpos', playPos - videoTime
-        @videoEle.currentTime = playPos
+    videoCmd: (cmd, playPos) ->
+      if not @videoEle then return
+      switch cmd
+        when 'play'    then @videoEle.play()
+        when 'pause'   then @videoEle.pause()
+        when 'playPos'
+          videoTime = @videoEle.currentTime
+          if Math.abs(videoTime - playPos) > 0.2
+            log 'adjusting playpos', playPos - videoTime
+            @videoEle.currentTime = playPos
         
     setPlayState: (state) ->
       if state is 'playing' then @videoEle.play()

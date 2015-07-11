@@ -68,7 +68,7 @@ Vue.component 'watch-comp',
     startWatchDown: (@episode) ->
       # log 'startWatchDown: starting watch of', episode.title
       tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
-      @tvCtrl.startTv @episode, 0
+      @tvCtrl.startTv @episode.key, 0
       
     scrubMoused: (playPos) ->
       if @watchMode is 'tracking'
@@ -109,36 +109,42 @@ Vue.component 'watch-comp',
           if old isnt 'tracking'
             if @episode.key and not @tvPlaying
               log 'starting tv play',  @tvPlaying, @playPos, @episode.key
-              @tvCtrl.startTv @episode, @playPos
+              @tvCtrl.startTv @episode.key, @playPos
               @tvPlaying = yes
-            @videoEle?.currentTime = @playPos
-            @videoEle?.play()
+            @videoCmd 'playPos', @playPos
+            @videoCmd 'play'
         when 'playing'
-          @videoEle?.play()
+          @videoCmd 'play'
           if old is 'tracking' 
-            @videoEle?.pause()
+            @videoCmd 'pause'
             if @tvPlaying 
               log 'pausing tv - was playing now paused',  @playPos
               @tvCtrl.pauseTv()
               @tvPlaying = no
         when 'paused'
-          @videoEle?.pause()
+          @videoCmd 'pause'
           if old is 'tracking' and @tvPlaying
             log 'pausing tv - was tracking now paused',  @playPos
             @tvCtrl.pauseTv()
             @tvPlaying = no
             
   methods:          
+    videoCmd: (cmd, pos) -> 
+      @$broadcast 'videoCmd', cmd, pos
+    
     newShow:    (@show    ) ->
     newEpisode: (@episode ) ->
       
-    newState:   (tvState  ) ->
-      if tvState is 'playing' 
-        @tvPlaying = yes
+    newState: (tvState  ) ->
+      if tvState is 'playing' then @tvPlaying = yes
+      if @watchMode is 'tracking'
+        if tvState is 'playing' then @videoCmd 'play'
+        else                         @videoCmd 'pause'
         
     newPos: (tvPlayPos) ->
+      # log 'newPos', {tvPlayPos, @watchMode}
       if @watchMode is 'tracking'
-        @videoEle?.currentTime = tvPlayPos
+        @videoCmd 'playPos', tvPlayPos
         @playPos = tvPlayPos
       
     setEpisodeById: (id, @videoFile) ->

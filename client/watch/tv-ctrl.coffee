@@ -8,25 +8,23 @@ class TvCtrl
     setInterval =>
       tvGlobal.ajaxCmd 'getTvStatus', (err, status) =>
         if status.data
-          {id, @videoFile, playState, playPos} = status.data
+          {id, videoFile, playState, playPos} = status.data
           # log 'tvState', playState
-          @tvPlaying = (playState is 'playing')
           if id isnt @id
-            @episode = @watchComp.setEpisodeById id
-          if not @episode
-            return
+            @id = id
+            @watchComp.setEpisodeById id, videoFile
           if playState isnt @curPlayState
-            log 'tvStateChange', @curPlayState, '->', playState
+            # log 'tvStateChange', @curPlayState, '->', playState
             @curPlayState = playState
             @watchComp.newState playState
           if playPos isnt @curPlayPos
-            log 'tvPosChange', {playPos, @curPlayPos}
+            # log 'tvPosChange', {playPos, @curPlayPos}
             @curPlayPos = playPos
             @watchComp.newPos playPos
         else 
           playState = 'none'
           if playState isnt @curPlayState
-            log 'tvStateChange', @curPlayState, '->', playState
+            # log 'tvStateChange', @curPlayState, '->', playState
             @curPlayState = playState
             @watchComp.newState playState
     , 2000

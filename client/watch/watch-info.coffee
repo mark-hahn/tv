@@ -53,12 +53,12 @@ Vue.component 'watch-info-comp',
       img '.show-banner', vAttr: 'src: bannerUrl'
       div '.watch-episode-title', 
             '{{episode.episodeNumber + ": " + episode.title}}'
-      div '.web-video-blk', ->
+      div '.web-video-blk', vIf: 'videoFile',->
         video '.video', 
           vAttr:'src: videoUrl'
           autoplay:yes
           preload:'auto'
-          vOn:'click:onClick'
+          # vOn:'click:onClick'
         div '.web-video-ctrls', ->
           div '.ctrl-row.web-video-ctrls', ->
             div '.btn.playCtl', vOn: 'click: vidCtrlClk', '<<'
@@ -68,10 +68,12 @@ Vue.component 'watch-info-comp',
             div '.btn', vOn: 'click: vidCtrlClk', 'Prev'
             div '.btn', vOn: 'click: vidCtrlClk', 'Mark'
             div '.btn', vOn: 'click: vidCtrlClk', 'Next'
-
+  methods:
+    vidCtrlClk: ->
+      
   computed:
     bannerUrl: -> tvGlobal.plexPfx + @show.banner
-    videoUrl:  -> tvGlobal.tvSrvrPfx + '/' + @videoFile + '.mp4'
+    videoUrl:  -> tvGlobal.tvSrvrPfx + '/' + encodeURIComponent @videoFile + '.mp4'
     vidPlayPauseTxt: ->
       switch @watchMode
         when 'paused' then '>'

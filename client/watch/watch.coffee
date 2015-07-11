@@ -31,14 +31,8 @@ require './scrub'
     width: 85%;
     height: 35.5rem;
   }
-    watch-info-comp {
-      display: block;
-    }
-  scrub-comp {
-    display: inline-block;
-    position:relative;
-    width: 15%;
-    height: 35.5rem;
+  watch-info-comp {
+    display: block;
   }
 """
 
@@ -74,10 +68,10 @@ Vue.component 'watch-comp',
           episode: '{{episode}}'
   
   events:
-    startWatchDown: (episode) ->
+    startWatchDown: (@episode) ->
       # log 'startWatchDown: starting watch of', episode.title
       tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
-      @tvCtrl.startTv episode, 0
+      @tvCtrl.startTv @episode, 0
       
     scrubMoused: (playPos) ->
       if @watchMode is 'tracking'
@@ -112,13 +106,14 @@ Vue.component 'watch-comp',
       log 'watchMode', old, '->', @watchMode
       if typeof @playPos isnt 'number' then return
       switch @watchMode
+        when 'none'
+          @tvPlaying = no
         when 'tracking'
           if old isnt 'tracking'
             if @episode.key and not @tvPlaying
               log 'starting tv play',  @tvPlaying, @playPos, @episode.key
               @tvCtrl.startTv episode, @playPos
               @tvPlaying = yes
-              @tvStartedPlay = Date.now()
             @videoEle?.currentTime = @playPos
             @videoEle?.play()
         when 'playing'
@@ -139,21 +134,29 @@ Vue.component 'watch-comp',
   methods:          
     newShow:    (@show    ) ->
     newEpisode: (@episode ) ->
-    newState:   (tvState  ) ->
-    newPos:     (tvPlayPos) ->
       
-    setEpisodeById: (id) =>
-      episode = null
+    newState:   (tvState  ) ->
+      if tvState is 'playing' 
+        @tvPlaying = yes
+        
+    newPos: (tvPlayPos) ->
+      if @watchMode is 'tracking'
+        @videoEle?.currentTime = tvPlayPos
+        @playPos = tvPlayPos
+      
+    setEpisodeById: (id, @videoFile) ->
       for show in @allShows ? []
         for episode in show.episodes
           if episode.id is id
             @show    = show
             @episode = episode
-            break
-        if episode then break 
-      if not episode
-        @show    = null
-        @episode = null
+            @watchMode = 'tracking'
+            log 'setEpisodeById, have episode', id, @episode.title
+            return
+      @show      = null
+      @episode   = null
+      @watchMode = 'none'
+      log 'setEpisodeById, have no episode', @allShows.length, id
 
   created: -> @tvCtrl = new TvCtrl @
 

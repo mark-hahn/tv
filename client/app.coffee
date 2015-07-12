@@ -116,7 +116,7 @@ new Vue
     div '#popup', vIf:'popupMsg', '{{popupMsg}}'
       
   data:
-    curPage:  (if tvGlobal.debug then 'show' else 'show')
+    curPage:  (if tvGlobal.debug then 'watch' else 'show')
     allShows:  []
     curShowIdx: 0
     curShow: {}
@@ -157,7 +157,7 @@ new Vue
       # log 'start playing in watch page', episode.title
       @$emit 'chgCurPage', 'watch'
       @curPage = 'watch'
-      @$broadcast 'startWatchDown', episode
+      @$broadcast 'startWatch', episode
       
     popup: (msg) -> 
       @popupMsg = msg

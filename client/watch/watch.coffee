@@ -39,8 +39,10 @@ Vue.component 'watch-comp',
   data: ->
     show:       null
     episode:    null
+    videoFile:  ''
     playPos:    0
     watchMode: 'none'
+    getPlayPos: -> 0
 
   template: render ->
     div '.watch-comp', ->
@@ -56,6 +58,7 @@ Vue.component 'watch-comp',
             episode:       '{{episode}}'
             videoFile:     '{{videoFile}}'
             watchMode:     '{{watchMode}}'
+            getPlayPos:    '{{@ getPlayPos}}'
               
           tag 'tv-btns-comp',
             episode:   '{{episode}}'
@@ -65,29 +68,27 @@ Vue.component 'watch-comp',
           episode: '{{episode}}'
   
   events:
-    startWatchDown: (@episode) ->
-      # log 'startWatchDown: starting watch of', episode.title
+    startWatch: (@episode) ->
       tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
       @tvCtrl.startTv @episode.key, 0
       
     scrubMoused: (playPos) ->
       if @watchMode is 'tracking'
         @oldPlayPos = @tvCtrl.getPlayPos()
-        @watchMode = 'paused'        
-      @$broadcast 'setPlayPos', playPos
+        @watchMode = 'paused'
+      @videoCmd 'playPos',   playPos
       
     tvBtnClick: (text) ->
       switch text
         when 'Play' 
-          if Math.abs(@playPos - @oldPlayPos) < 2 and @watchMode is 'paused'
-            @tvCtrl.unPauseTv() 
+          @playPos = @getPlayPos()
           @watchMode = 'tracking'
         when 'Cancel' 
           if Math.abs(@playPos - @oldPlayPos) < 2 and @watchMode is 'paused'
             @tvCtrl.unPauseTv()
           else
             @playPos = @oldPlayPos ? 0
-            @$broadcast 'setPlayPos', @playPos
+            @videoCmd 'playPos', @playPos
           @watchMode = 'tracking'
         when 'Pause' 
           if @watchMode is 'tracking'
@@ -134,30 +135,33 @@ Vue.component 'watch-comp',
     
     newShow:    (@show    ) ->
     newEpisode: (@episode ) ->
-      
+    
     newState: (tvState  ) ->
-      if tvState is 'playing' then @tvPlaying = yes
+      @tvPlaying = (tvState is 'playing')
       if @watchMode is 'tracking'
         if tvState is 'playing' then @videoCmd 'play'
         else                         @videoCmd 'pause'
         
     newPos: (tvPlayPos) ->
-      # log 'newPos', {tvPlayPos, @watchMode}
       if @watchMode is 'tracking'
-        @videoCmd 'playPos', tvPlayPos
-        @playPos = tvPlayPos
+        @videoCmd   'playPos',     tvPlayPos
+        @$broadcast 'setScrubPos', tvPlayPos
+        @playPos =                 tvPlayPos
       
-    setEpisodeById: (id, @videoFile) ->
+    setEpisodeById: (id, videoFile) ->
       for show in @allShows ? []
         for episode in show.episodes
           if episode.id is id
-            @show    = show
-            @episode = episode
+            log 'setEpisodeById, have episode', id, 
+                 episode.title, videoFile
+            @show      = show
+            @episode   = episode
+            @videoFile = videoFile
             @watchMode = 'tracking'
-            log 'setEpisodeById, have episode', id, @episode.title
             return
       @show      = null
       @episode   = null
+      @videoFile = ''
       @watchMode = 'none'
       log 'setEpisodeById, have no episode', @allShows.length, id
 

@@ -9,22 +9,18 @@ class TvCtrl
       tvGlobal.ajaxCmd 'getTvStatus', (err, status) =>
         if status.data
           {id, videoFile, playState, playPos} = status.data
-          # log 'tvState', playState
           if id isnt @id
             @id = id
             @watchComp.setEpisodeById id, videoFile
           if playState isnt @curPlayState
-            # log 'tvStateChange', @curPlayState, '->', playState
             @curPlayState = playState
             @watchComp.newState playState
           if playPos isnt @curPlayPos
-            # log 'tvPosChange', {playPos, @curPlayPos}
             @curPlayPos = playPos
             @watchComp.newPos playPos
         else 
           playState = 'none'
           if playState isnt @curPlayState
-            # log 'tvStateChange', @curPlayState, '->', playState
             @curPlayState = playState
             @watchComp.newState playState
     , 2000
@@ -36,7 +32,7 @@ class TvCtrl
     # log 'startTv req', {@curPlayPos, playPos}
     if @curPlayState isnt 'playing' or episodeKey isnt @curEpisodeKey
       if @curPlayState is 'paused' and
-          Math.abs(playPos - @curPlayPos) < 2 and
+          Math.abs(playPos - @curPlayPos) < 5 and
           episodeKey is @curEpisodeKey
         tvGlobal.ajaxCmd 'pauseTv'
         log 'tv started playing with pauseTv', 

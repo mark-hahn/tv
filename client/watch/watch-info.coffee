@@ -46,14 +46,14 @@ log = require('debug') 'tv:wchnfo'
 """
 
 Vue.component 'watch-info-comp', 
-  props: ['show', 'episode', 'videoFile', 'watchMode', 'videoEle']
+  props: ['show', 'episode', 'videoFile', 'watchMode', 'getPlayPos']
   
   template: render ->
     div '.watch-info', ->
       img '.show-banner', vAttr: 'src: bannerUrl'
       div '.watch-episode-title', 
             '{{episode.episodeNumber + ": " + episode.title}}'
-      div '.web-video-blk', vIf: 'videoFile',->
+      div '.web-video-blk', vIf: 'episode',->
         video '.video', 
           vAttr:'src: videoUrl'
           autoplay:yes
@@ -73,7 +73,9 @@ Vue.component 'watch-info-comp',
       
   computed:
     bannerUrl: -> tvGlobal.plexPfx + @show.banner
-    videoUrl:  -> tvGlobal.tvSrvrPfx + '/' + encodeURIComponent @videoFile + '.mp4'
+    videoUrl: -> 
+      log 'computed videoUrl', @episode, @videoFile
+      tvGlobal.tvSrvrPfx + '/' + encodeURIComponent @videoFile + '.mp4'
     vidPlayPauseTxt: ->
       switch @watchMode
         when 'paused' then '>'
@@ -83,8 +85,8 @@ Vue.component 'watch-info-comp',
     videoCmd: (cmd, playPos) ->
       if not @videoEle then return
       switch cmd
-        when 'play'    then @videoEle.play()
-        when 'pause'   then @videoEle.pause()
+        when 'play'  then @videoEle.play()
+        when 'pause' then @videoEle.pause()
         when 'playPos'
           videoTime = @videoEle.currentTime
           if Math.abs(videoTime - playPos) > 0.2
@@ -97,3 +99,4 @@ Vue.component 'watch-info-comp',
 
   attached: -> 
     @videoEle = @$el.querySelector 'video'
+    @getPlayPos = => @videoEle.currentTime 

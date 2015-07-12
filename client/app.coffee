@@ -128,8 +128,6 @@ new Vue
     tvGlobal.ajaxCmd 'shows', (err, res) => 
       if err then log 'get all shows err', err.message; return
       @allShows = res.data
-      @$emit 'chgShowIdx', 0
-      @$emit 'chgEpisodeIdx', 0
       document.querySelector('#page').style.visibility = 'visible'
       
     tvGlobal.syncPlexDB()
@@ -146,6 +144,7 @@ new Vue
       epiIdx      = localStorage.getItem 'epiForShow' + show.id
       if epiIdx is 'episodeIdx' then epiIdx = 0 # fix corrupt db
       @$emit 'chgEpisodeIdx', epiIdx ? 0
+      log 'set vueCurShowId', show.id
       localStorage.setItem 'vueCurShowId', show.id
        
     chgEpisodeIdx: (idx) ->

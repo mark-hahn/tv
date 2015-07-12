@@ -10,12 +10,12 @@ require './tv-btns'
 require './scrub'
 
 (document.head.appendChild document.createElement('style')).textContent = """
-  .no-episode {
+  .screen-msg {
     margin-top: 10rem;
     font-size:1.6rem;
     text-align: center;
   }
-  .no-episode .msgTitle {
+  .screen-msg .msgTitle {
     font-weight:bold;
     font-size:2rem;
     margin-bottom: 2rem;
@@ -41,17 +41,21 @@ Vue.component 'watch-comp',
     episode:    null
     videoFile:  ''
     playPos:    0
+    loading:    yes
     watchMode: 'none'
     getPlayPos: -> 0
 
   template: render ->
     div '.watch-comp', ->
-      div '.no-episode', vIf:'watchMode == "none"', ->
+      div '.screen-msg', vIf:'loading', ->
+        div '.msgTitle', 'Loading ...'
+
+      div '.screen-msg', vIf:'!loading && watchMode == "none"', ->
         div '.msgTitle', 'No show is playing.'
         div 'Ensure Roku is running Plex and'
         div 'press show or episode Play button.'
 
-      div '.have-episode', vIf:'watchMode != "none"', ->
+      div '.have-episode', vIf:'!loading && watchMode != "none"', ->
         div '.watch-info-ctrl', ->
           tag 'watch-info-comp',
             show:          '{{show}}'
@@ -69,7 +73,7 @@ Vue.component 'watch-comp',
   
   events:
     startWatch: (@episode) ->
-      log 'startWatch', @episode.title
+      @loading = yes
       tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
       @tvCtrl.startTv @episode.key, 0
       @playPos = 0
@@ -151,7 +155,7 @@ Vue.component 'watch-comp',
     newState: (tvState) ->
       @tvPlaying = (tvState is 'playing')
       if @watchMode is 'tracking'
-        log 'newState', {tvState, @watchMode}
+        @loading = no
         switch tvState
           when 'none'    then @$emit 'endWatch'
           when 'playing' then @videoCmd 'play'

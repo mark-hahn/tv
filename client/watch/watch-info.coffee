@@ -100,3 +100,4 @@ Vue.component 'watch-info-comp',
   attached: -> 
     @videoEle = @$el.querySelector 'video'
     @getPlayPos = => @videoEle.currentTime 
+    

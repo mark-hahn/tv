@@ -25,7 +25,6 @@ Vue.component 'episode-comp',
     startVideo: -> startVideo @
     
     twoBtnClk:  (btnName) -> 
-      log 'Clicked button: ' + btnName
       switch btnName
         when 'Play'  
           @$dispatch 'startWatch'

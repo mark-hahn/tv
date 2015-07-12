@@ -116,13 +116,13 @@ new Vue
     div '#popup', vIf:'popupMsg', '{{popupMsg}}'
       
   data:
-    curPage:  (if tvGlobal.debug then 'watch' else 'show')
-    allShows:  []
-    curShowIdx: 0
-    curShow: {}
+    curPage:      'show'
+    allShows:      []
+    curShowIdx:    0
+    curShow:       {}
     curEpisodeIdx: 0
-    curEpisode: {}
-    popupMsg: ''
+    curEpisode:    {}
+    popupMsg:      ''
     
   created: ->
     tvGlobal.ajaxCmd 'shows', (err, res) => 
@@ -154,9 +154,7 @@ new Vue
       localStorage.setItem 'epiForShow' + @curShow.id, idx
     
     startWatch: (episode = @curEpisode) ->
-      # log 'start playing in watch page', episode.title
       @$emit 'chgCurPage', 'watch'
-      @curPage = 'watch'
       @$broadcast 'startWatch', episode
       
     popup: (msg) -> 

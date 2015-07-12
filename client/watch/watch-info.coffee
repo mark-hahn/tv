@@ -74,7 +74,7 @@ Vue.component 'watch-info-comp',
   computed:
     bannerUrl: -> tvGlobal.plexPfx + @show.banner
     videoUrl: -> 
-      log 'computed videoUrl', @episode, @videoFile
+      # log 'computed videoUrl', @episode, @videoFile
       tvGlobal.tvSrvrPfx + '/' + encodeURIComponent @videoFile + '.mp4'
     vidPlayPauseTxt: ->
       switch @watchMode
@@ -90,7 +90,7 @@ Vue.component 'watch-info-comp',
         when 'playPos'
           videoTime = @videoEle.currentTime
           if Math.abs(videoTime - playPos) > 0.2
-            log 'adjusting playpos', playPos - videoTime
+            # log 'adjusting playpos', playPos - videoTime
             @videoEle.currentTime = playPos
         
     setPlayState: (state) ->

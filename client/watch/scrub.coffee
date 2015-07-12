@@ -73,7 +73,6 @@ Vue.component 'scrub-comp',
         if not @episode  or @episode.episodeLen    is 0 or 
            not @scrubEle or @scrubEle.clientHeight is 0
           setTimeout trySizing, 200; return
-        log 'sizing', @scrubEle.clientHeight
         @scrubHgt = @scrubEle.clientHeight
         for min5 in @scrubEle.querySelectorAll '.tick.five-min'
           min5.style.height =  (@scrubHgt * 300  /  @episode.episodeLen) + 'px'

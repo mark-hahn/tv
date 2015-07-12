@@ -1,5 +1,5 @@
 
-log     = require('debug') 'tv:tvctrl'
+log = require('debug') 'tv:tvctrl'
 
 module.exports =
 class TvCtrl
@@ -35,14 +35,14 @@ class TvCtrl
           Math.abs(playPos - @curPlayPos) < 5 and
           episodeKey is @curEpisodeKey
         tvGlobal.ajaxCmd 'pauseTv'
-        log 'tv started playing with pauseTv', 
+        # log 'tv started playing with pauseTv', 
       else
         tvGlobal.ajaxCmd 'startTv', episodeKey, playPos, (err) =>
           if err
             log 'tvGlobal.ajaxCmd startTv err', err
             if err is 500
               @watchComp.$dispatch 'popup', 'Start Plex in Roku and refresh'
-        log 'tv started playing with startTv', {key: episodeKey, playPos}
+        # log 'tv started playing with startTv', {key: episodeKey, playPos}
       @curPlayState  = 'playing'
       @curPlayPos    = playPos
       @curEpisodeKey = episodeKey
@@ -54,18 +54,18 @@ class TvCtrl
     if @curPlayState isnt 'paused'
       tvGlobal.ajaxCmd 'pauseTv'
       @curPlayState = 'paused'
-      log 'tv was paused'
+      # log 'paused tv'
       
   unPauseTv: ->
     if @curPlayState is 'paused'
       tvGlobal.ajaxCmd 'pauseTv'
       @curPlayState = 'playing'
-      log 'tv was unpaused'
+      # log 'unpaused tv'
       
   stopTv: ->
     if @curPlayState isnt 'stopped'
       tvGlobal.ajaxCmd 'stopTv'
       @curPlayState = 'stopped'
-      log 'tv was stopped'
+      # log 'stopped tv'
         
 

@@ -95,13 +95,18 @@ Vue.component 'watch-comp',
             @oldPlayPos = @playPos
             @watchMode = 'paused'
         when 'Back' 
-          log 'back btn', @watchMode
+          # log 'back btn', @watchMode
           if @watchMode is 'tracking'
             @tvCtrl.stepBackTv()
+        when 'Stop' 
+          tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
+          @tvCtrl.stopTv()
+          @watchMode = 'none'
+          @$dispatch 'chgCurPage', 'show'
 
   watch:
     watchMode: (__, old) -> 
-      log 'watchMode', old, '->', @watchMode
+      # log 'watchMode', old, '->', @watchMode
       if typeof @playPos isnt 'number' then return
       switch @watchMode
         when 'none'
@@ -109,7 +114,7 @@ Vue.component 'watch-comp',
         when 'tracking'
           if old isnt 'tracking'
             if @episode.key and not @tvPlaying
-              log 'starting tv play',  @tvPlaying, @playPos, @episode.key
+              # log 'starting tv play',  @tvPlaying, @playPos, @episode.key
               @tvCtrl.startTv @episode.key, @playPos
               @tvPlaying = yes
             @videoCmd 'playPos', @playPos
@@ -119,13 +124,13 @@ Vue.component 'watch-comp',
           if old is 'tracking' 
             @videoCmd 'pause'
             if @tvPlaying 
-              log 'pausing tv - was playing now paused',  @playPos
+              # log 'pausing tv - was playing now paused',  @playPos
               @tvCtrl.pauseTv()
               @tvPlaying = no
         when 'paused'
           @videoCmd 'pause'
           if old is 'tracking' and @tvPlaying
-            log 'pausing tv - was tracking now paused',  @playPos
+            # log 'pausing tv - was tracking now paused',  @playPos
             @tvCtrl.pauseTv()
             @tvPlaying = no
             
@@ -152,8 +157,8 @@ Vue.component 'watch-comp',
       for show in @allShows ? []
         for episode in show.episodes
           if episode.id is id
-            log 'setEpisodeById, have episode', id, 
-                 episode.title, videoFile
+            # log 'setEpisodeById, have episode', id, 
+                #  episode.title, videoFile
             @show      = show
             @episode   = episode
             @videoFile = videoFile
@@ -163,7 +168,7 @@ Vue.component 'watch-comp',
       @episode   = null
       @videoFile = ''
       @watchMode = 'none'
-      log 'setEpisodeById, have no episode', @allShows.length, id
+      # log 'setEpisodeById, have no episode', @allShows.length, id
 
   created: -> @tvCtrl = new TvCtrl @
 

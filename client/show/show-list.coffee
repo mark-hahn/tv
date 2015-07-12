@@ -80,14 +80,18 @@ Vue.component 'show-list',
         for show, idx in @allShows when @showInList show
           if @showLetter(show) is letter
             @$dispatch 'chgShowIdx', idx
-            document.querySelector('.show.selected')?.scrollIntoView()
-      
-  attached: ->
-    @$on 'alpha', -> 
+            setTimeout ->
+              document.querySelector('.show.selected')?.scrollIntoView()
+            , 100
+            break
+  events:
+    alpha: ->
       now = Date.now()
       if now - @lastAlphaClick < 300 then return
       @alphaMode = not @alphaMode
       @lastAlphaClick = now
+      
+  attached: ->
     @$dispatch 'clrPageMode'
     @$dispatch 'ensureShowVisible'
     

@@ -104,6 +104,10 @@ Vue.component 'watch-comp',
           @watchMode = 'none'
           @$dispatch 'chgCurPage', 'show'
 
+        when 'Mute'  then tvGlobal.ajaxCmd 'irCmd', 'mute'
+        when 'Vol +' then tvGlobal.ajaxCmd 'irCmd', 'volUp'
+        when 'Vol -' then tvGlobal.ajaxCmd 'irCmd', 'volDn'
+
   watch:
     watchMode: (__, old) -> 
       # log 'watchMode', old, '->', @watchMode

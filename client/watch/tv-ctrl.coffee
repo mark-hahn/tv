@@ -10,8 +10,9 @@ class TvCtrl
         if status?.data
           {id, videoFile, playState, playPos} = status.data
           if id isnt @id
+            playingWhenLoaded = (not @id and playState is 'playing')
+            @watchComp.setEpisodeById id, videoFile, playingWhenLoaded
             @id = id
-            @watchComp.setEpisodeById id, videoFile
           if playState isnt @curPlayState
             @curPlayState = playState
             @watchComp.newState playState
@@ -26,13 +27,15 @@ class TvCtrl
             @watchComp.newState playState
             @tvIsStarting = no
           @curPlayState = playState
+          @id = yes
     , 2000
 
   getPlayPos: -> @curPlayPos
   geState:    -> @curPlayState
     
-  startTv: (episodeKey, playPos) ->
-    if @curPlayState isnt 'playing' or episodeKey isnt @curEpisodeKey
+  startTv: (episodeKey, playPos, force) ->
+    if @curPlayState isnt 'playing' or 
+          episodeKey isnt @curEpisodeKey or force
       if @curPlayState is 'paused' and
           Math.abs(playPos - @curPlayPos) < 5 and
           episodeKey is @curEpisodeKey
@@ -47,8 +50,6 @@ class TvCtrl
       @curPlayState  = 'playing'
       @curPlayPos    =  playPos
       @curEpisodeKey =  episodeKey
-    
-  stepBackTv: ->
     
   pauseTv: ->
     if @curPlayState isnt 'paused'

@@ -1,8 +1,8 @@
 
-msg for play failure in show
-
 tags/watched are lost
   (change a lot of watched fast and reload)
+
+vol keys buffer up really slow
 
 prev/next isn't filtered
 filter doesn't react to tag changes

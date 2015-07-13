@@ -27,15 +27,14 @@ exports.init = (cb) ->
     rokuIp          = client.host
     rokuPort        = client.port
     rokuMachineId   = client.machineIdentifier
-    # log 'roku.init', {plexServerIp, plexServerPort, rokuIp, rokuPort}
     cb? null
 
 playerCtrl = (cmd, params={}, cb) ->
-  log 'playerCtrl', {cmd, params}
   url = "http://#{rokuIp}:#{rokuPort}/player#{cmd}" +
           "?machineIdentifier=#{rokuMachineId}" +
           "&address=#{plexServerIp}" +
           "&port=#{plexServerPort}"
+  # log 'playerCtrl', {cmd, params, url}
   for arg, val of params then url += '&' + arg + '=' + val
   opts ={url, headers: Accept: 'application/json'}
   # log 'roku req', url

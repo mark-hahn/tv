@@ -51,6 +51,10 @@ class TvCtrl
       @curPlayPos    =  playPos
       @curEpisodeKey =  episodeKey
     
+  stepBackTv: ->
+    if @curPlayState is 'playing'
+      tvGlobal.ajaxCmd 'backTv'
+    
   pauseTv: ->
     if @curPlayState isnt 'paused'
       tvGlobal.ajaxCmd 'pauseTv'

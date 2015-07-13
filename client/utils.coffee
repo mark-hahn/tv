@@ -92,7 +92,7 @@ tvGlobal.ajaxLog = (args...) ->
 
 tvGlobal.tagList = [
   'Foreign', 'Comedy', 'Drama', 'Crime', 'MarkOnly', 'LindaOnly'     
-  'Favorite', 'OnTheFence', 'New', 'Watched', 'Archive', 'Deleted' 
+  'Favorite', 'OnTheFence', 'New', 'LessThan3', 'Watched', 'Archive', 'Deleted' 
 ]      
 
 tvGlobal.syncPlexDB = -> tvGlobal.ajaxCmd 'syncPlexDB'

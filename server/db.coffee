@@ -15,7 +15,7 @@ tvShowsKey = null
 
 tagList = [
   'Foreign', 'Comedy', 'Drama', 'Crime', 'MarkOnly', 'LindaOnly'     
-  'Favorite', 'OnTheFence', 'Archive', 'Deleted', 'New', 'Watched'
+  'Favorite', 'OnTheFence', 'Archive', 'Deleted', 'New', 'LessThan3', 'Watched'
 ]      
 
 exports.init = (cb) ->
@@ -113,8 +113,10 @@ exports.syncPlexDB = ->
         do oneEpisode = ->
           
           if not (episode = show.episodes[episodeIdx++])
-            show.tags.New     = (numWatched is 0)
-            show.tags.Watched = (numWatched is episodeIdx-1)
+            totalEpisodes = episodeIdx-1
+            show.tags.New       = (numWatched is 0)
+            show.tags.Watched   = (numWatched is totalEpisodes)
+            show.tags.LessThan3 = (totalEpisodes < 3)
             
             # count = 0
             # for i of show.tags
@@ -122,8 +124,9 @@ exports.syncPlexDB = ->
             # log '', count, numWatched, show.tags.New, show.tags.Watched, show.title
             # if show.title.indexOf('strong') > -1 then process.exit 0
             
-            if not dbShow or show.tags.New isnt dbShow.tags.New or
-                         show.tags.Watched isnt dbShow.tags.Watched
+            if not dbShow or show.tags.New       isnt dbShow.tags.New     or
+                             show.tags.Watched   isnt dbShow.tags.Watched or
+                             show.tags.LessThan3 isnt dbShow.tags.LessThan3
               dbShow = 
                 _id:        show.id
                 tags:       show.tags

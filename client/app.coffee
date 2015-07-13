@@ -144,7 +144,6 @@ new Vue
       epiIdx      = localStorage.getItem 'epiForShow' + show.id
       if epiIdx is 'episodeIdx' then epiIdx = 0 # fix corrupt db
       @$emit 'chgEpisodeIdx', epiIdx ? 0
-      log 'set vueCurShowId', show.id
       localStorage.setItem 'vueCurShowId', show.id
        
     chgEpisodeIdx: (idx) ->

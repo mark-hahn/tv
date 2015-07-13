@@ -7,6 +7,4 @@ vol keys buffer up really slow
 prev/next isn't filtered
 filter doesn't react to tag changes
 
-reload then start roku video -> bad scrub
-
-watchmode none doesn't start scrub at 0
+shows without small video can't play

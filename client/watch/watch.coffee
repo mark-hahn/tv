@@ -88,6 +88,7 @@ Vue.component 'watch-comp',
       tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
       @watchMode = 'none'
       @$dispatch 'chgCurPage', 'show'
+      setTimeout (=> @tvCtrl.stopTv()), 500
       
     scrubMoused: (@playPos) ->
       if @watchMode is 'tracking'
@@ -117,7 +118,6 @@ Vue.component 'watch-comp',
             @tvCtrl.stepBackTv()
         when 'Stop' 
           @$emit 'endWatch'
-          setTimeout (=> @tvCtrl.stopTv()), 500
 
         when 'Mute'  then tvGlobal.ajaxCmd 'irCmd', 'mute'
         when 'Vol +' then tvGlobal.ajaxCmd 'irCmd', 'volUp'

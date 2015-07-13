@@ -35,7 +35,7 @@ do oneShrink = ->
     #   continue
     if fs.isDirectorySync path
       dir = path.replace '/videos/', '/videos-small/'
-      log 'creating directory', dir
+      # log 'creating directory', dir
       fs.makeTreeSync dir
       continue
     shrunkPath = (path.replace '/videos/', '/videos-small/') + '.mp4'

@@ -32,7 +32,7 @@ class TvCtrl
 
   getPlayPos: -> @curPlayPos
   geState:    -> @curPlayState
-    
+  
   startTv: (episodeKey, playPos, force) ->
     if @curPlayState isnt 'playing' or 
           episodeKey isnt @curEpisodeKey or force

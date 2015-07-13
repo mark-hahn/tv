@@ -100,4 +100,7 @@ Vue.component 'watch-info-comp',
   attached: -> 
     @videoEle = @$el.querySelector 'video'
     @getPlayPos = => @videoEle.currentTime 
+    @videoEle.addEventListener 'error', (args...) =>
+      @$dispatch 'popup', 'Small video missing.'
+      @$dispatch 'endWatch'
     

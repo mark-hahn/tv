@@ -68,14 +68,29 @@ Vue.component 'watch-info-comp',
             div '.btn', vOn: 'click: vidCtrlClk', 'Prev'
             div '.btn', vOn: 'click: vidCtrlClk', 'Mark'
             div '.btn', vOn: 'click: vidCtrlClk', 'Next'
+            
+  data: ->
+    bigVideo: no
+    videoUrl: ''
+    vidPlayPauseTxt: ''
+    
   methods:
     vidCtrlClk: ->
       
   computed:
     bannerUrl: -> tvGlobal.plexPfx + @show.banner
+    
     videoUrl: -> 
-      # log 'computed videoUrl', @episode, @videoFile
-      tvGlobal.tvSrvrPfx + '/' + encodeURIComponent @videoFile + '.mp4'
+      if @bigVideo
+        pfx = '/mnt/media/videos/' 
+        sfx = ''
+      else 
+        pfx = '/mnt/media/videos-small/'
+        sfx = '.mp4'
+      videoUrl = tvGlobal.vidSrvrPfx + pfx + encodeURIComponent(@videoFile) + sfx
+      log 'computed videoUrl', videoUrl
+      videoUrl
+      
     vidPlayPauseTxt: ->
       switch @watchMode
         when 'paused' then '>'
@@ -101,6 +116,6 @@ Vue.component 'watch-info-comp',
     @videoEle = @$el.querySelector 'video'
     @getPlayPos = => @videoEle.currentTime 
     @videoEle.addEventListener 'error', (args...) =>
-      @$dispatch 'popup', 'Small video missing.'
-      @$dispatch 'endWatch'
+      @$dispatch 'popup', 'Using big video'
+      @bigVideo = yes
     

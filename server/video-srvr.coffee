@@ -12,7 +12,7 @@ srvr = http.createServer (req, res) ->
   haveRange = req.headers.range?
   # if not haveRange then log 'no range', req.headers
   
-  file      = '/mnt/media/videos-small' + decodeURIComponent req.url
+  file      = decodeURIComponent req.url
   range     = req.headers.range ?= 'bytes=0'
   positions = range.replace('bytes=', '').split('-')
   

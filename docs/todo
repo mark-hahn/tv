@@ -8,3 +8,7 @@ prev/next isn't filtered
 filter doesn't react to tag changes
 
 shows without small video can't play
+
+New is broken
+
+change episode from local to session storage

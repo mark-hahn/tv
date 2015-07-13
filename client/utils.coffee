@@ -24,7 +24,7 @@ ajaxPfx  = "http://#{serverIp}:#{ajaxPort}/"
 
 tvGlobal.vidSrvrPort = vidSrvrPort = 
   (if OFF_SITE isnt 'false' then '1345' else '2345')
-tvGlobal.tvSrvrPfx  = "http://#{serverIp}:#{vidSrvrPort}"
+tvGlobal.vidSrvrPfx  = "http://#{serverIp}:#{vidSrvrPort}"
 
 require('debug').enable DEBUG
 Vue.config.debug = tvGlobal.debug = (DEBUG is '*')

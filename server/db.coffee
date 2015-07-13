@@ -33,24 +33,30 @@ exports.getShowList = (cb) ->
       []
 
 exports.setField = (id, key, val, cb) ->
-  if not isNaN val then val = +val;
+  # log 'setField', {id, key, val}
+  if typeof val isnt 'boolean' and val isnt '' and
+     not isNaN val then val = +val;
   get id, (err, doc) ->
-    if err then log 'setField get err: ' + err.message, {key, val}; cb? err; return
+    if err then log 'setField get err: ' + err.message, {id, key, val}; cb? err; return
     if not doc then log 'setField doc missing: ', {id, key, val}; cb? 'doc missing'; return
     obj = doc
     for attr in key.split '.'
       if typeof obj[attr] is 'object' then obj = obj[attr] 
       else obj[attr] = val
+    # log 'doc', doc
     put doc, (err) ->
       if err then log 'setField put err: ' + err.message, {key, val}; cb? err; return
       exports.syncPlexDB()
-      cb? doc
+      cb? null, doc
     
 put = (value, cb) ->
   db.get value._id, (err, readVal) ->
     if readVal?._rev then value._rev = readVal._rev
-    # log 'put: ---->', value._id, value.type, value.title
+    # log 'put: ---->', value._id, value.type
     db.insert value, (err) ->
+      if err?.statusCode is 409
+        put value, cb
+        return
       if err then log 'db put err:', err; cb err; return
       cb()
 

@@ -20,7 +20,7 @@ Vue.component 'episode-comp',
       tag 'episode-right',
         curShow:       '{{curShow}}'
         curEpisodeIdx: '{{curEpisodeIdx}}'
-      
+  
   events:
     startVideo: -> startVideo @
     
@@ -29,9 +29,11 @@ Vue.component 'episode-comp',
         when 'Play'  
           @$dispatch 'startWatch'
         when 'Watched'
-          @curEpisode.watched = Watched = not @curEpisode.watched
-          tvGlobal.ajaxCmd 'setDBField', @curEpisode.id, 'watched', Watched, (err, res) => 
+          @curEpisode.watched = watched = not @curEpisode.watched
+          # log 'toggled watched', @curEpisode.id, @curEpisode.watched
+          tvGlobal.ajaxCmd 'setDBField', @curEpisode.id, 'watched', watched, (err, res) => 
             if err then log 'set watched ajax call err', err.message
+            # log 'ajaxCmd setDBField res', res
         when 'Down'  then @$dispatch 'chgEpisodeIdx', @curEpisodeIdx + 1
         when 'Up'    then @$dispatch 'chgEpisodeIdx', @curEpisodeIdx - 1
         

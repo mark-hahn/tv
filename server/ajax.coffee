@@ -39,7 +39,7 @@ poweringUp = no
 
 srvr = http.createServer (req, res) ->
   if req.url isnt '/getTvStatus'
-    log 'ajax http req: ' + req.url
+    log 'http req: ' + req.url
   
   res.writeHead 200, 
     'Content-Type': 'text/json'
@@ -62,11 +62,14 @@ srvr = http.createServer (req, res) ->
         success res, result
     
     when 'setDBField'
+      # log 'setDBField', data
       val = switch data[2]
         when 'true'  then true
         when 'false' then false
         else data[1]
-      db.setField data[0], data[1], val
+      db.setField data[0], data[1], val, (err, doc) ->
+        if err then error res, err.message; return
+        success res, 'done'
 
     when 'turnOn'
       db.syncPlexDB()
@@ -100,7 +103,7 @@ srvr = http.createServer (req, res) ->
         success res, lightLevels
     
     when 'startTv'
-      log 'startTv', {plexRunningInRoku, data}
+      # log 'startTv', {plexRunningInRoku, data}
       if not plexRunningInRoku
         error res, 'plexNotRunning' + req.url
       roku.startVideo data[0], +data[1]

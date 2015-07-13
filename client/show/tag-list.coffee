@@ -45,7 +45,8 @@ Vue.component 'tag-list',
         vRepeat: 'tags'
         vOn:     'click: onClick'
         vText:   '$value'
-        vShow:   'pageMode == "filter" || $value != "New" && $value != "Watched" && $value != "LessThan3"' 
+        vShow:   'pageMode == "filter" || ' +
+                 '$value != "New" && $value != "Watched" && $value != "LessThan3"' 
         vClass:  'checked:checked($value), always:always($value), never:never($value)'
   
   methods:      

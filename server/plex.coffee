@@ -94,7 +94,7 @@ exports.getShowList = getList = (key, cb) ->
         resShow.episodes = []
         
         do oneSeason = ->
-          if not (season = seasons.shift())
+          if not (season = seasons?.shift())
             oneShow()
             return
           if season.type isnt 'season' then oneSeason(); return

@@ -21,7 +21,7 @@ log     = require('debug') 'tv:taglst'
     border-top: 1px solid gray;
     padding: 0.1em;
     cursor: pointer;
-    font-size: 1.7rem;
+    font-size: 1.4rem;
   }
   .tag.checked {
     background-color: yellow;

@@ -1,14 +1,20 @@
 
-tags/watched are lost
-  (change a lot of watched fast and reload)
 
+phone:
+  video doesn't start automatically
+  pause causes stop
+  fixes
+    track whether started
+      send play video on tv play presses
+      send play on any tv ctrl press including tapping video aread
+    
+  
 vol keys buffer up really slow
-
-prev/next isn't filtered
-filter doesn't react to tag changes
-
-shows without small video can't play
 
 New is broken
 
 change episode from local to session storage
+
+episode time (NaN min)
+
+reload app when tv paused --> restart at 0

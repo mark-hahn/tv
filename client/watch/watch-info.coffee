@@ -73,6 +73,7 @@ Vue.component 'watch-info-comp',
     bigVideo: no
     videoUrl: ''
     vidPlayPauseTxt: ''
+    playing: no
     
   methods:
     vidCtrlClk: ->
@@ -100,17 +101,16 @@ Vue.component 'watch-info-comp',
     videoCmd: (cmd, playPos) ->
       if not @videoEle then return
       switch cmd
-        when 'play'  then @videoEle.play()
-        when 'pause' then @videoEle.pause()
+        when 'play'  then @playing = yes; @videoEle.play()
+        when 'pause' then @playing = no;  @videoEle.pause()
         when 'playPos'
-          videoTime = @videoEle.currentTime
-          if Math.abs(videoTime - playPos) > 0.2
-            # log 'adjusting playpos', playPos - videoTime
+          @videoEle.play()
+          if Math.abs(@videoEle.currentTime - playPos) > 0.2
             @videoEle.currentTime = playPos
-        
+          
     setPlayState: (state) ->
-      if state is 'playing' then @videoEle.play()
-      if state is 'paused'  then @videoEle.pause()
+      if state is 'playing' then @$emit 'videoCmd', 'play'
+      if state is 'paused'  then @$emit 'videoCmd', 'pause'
 
   attached: -> 
     @videoEle = @$el.querySelector 'video'

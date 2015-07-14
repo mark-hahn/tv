@@ -12,7 +12,7 @@ require './scrub'
 (document.head.appendChild document.createElement('style')).textContent = """
   .screen-msg {
     margin-top: 10rem;
-    font-size:1.6rem;
+    font-size:1.3rem;
     text-align: center;
   }
   .screen-msg .msgTitle {
@@ -83,6 +83,7 @@ Vue.component 'watch-comp',
       setTimeout =>
         tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
       , 2000
+      @videoCmd 'play'
         
     endWatch: ->
       tvGlobal.ajaxCmd 'irCmd', 'hdmi2'

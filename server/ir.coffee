@@ -75,9 +75,14 @@ sendIR = (irData, cb) ->
       endSendIR 'writeToItach err: ' + err.message
       return
 
+sendingCmd = no
+
 exports.sendCmd = (cmd, cb) ->
   # log 'sending cmd: ' + cmd
+  if sendingCmd then cb?(); return
+  sendingCmd = yes
   sendIR irDataByCmd[cmd], (err, data) ->
+    sendingCmd = no
     if err or data[0..2] is 'ERR' 
       log 'sendIR err: ' + (err?.message ? data); cb? err; return
     # log 'received cmd: ' + cmd

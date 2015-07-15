@@ -11,6 +11,4 @@ phone:
   
 first play after reload does restart
 
-vol keys buffer up really slow
-
-reload app when tv paused --> restart at 0
+reload app when tv paused --> restart

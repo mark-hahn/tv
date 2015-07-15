@@ -133,6 +133,9 @@ new Vue
     tvGlobal.syncPlexDB()
 
   events:
+    videoEnable: ->
+      @$broadcast 'videoEnable'
+    
     chgCurPage: (page) ->
       @curPage = page
       if page is 'show' then @$broadcast 'chooseShow'
@@ -141,15 +144,18 @@ new Vue
       @curShowIdx = idx = Math.max 0, Math.min (@allShows.length-1), idx
       @curShow    = show = @allShows[idx]
       @curTags    = show.tags
-      epiIdx      = localStorage.getItem 'epiForShow' + show.id
-      if epiIdx is 'episodeIdx' then epiIdx = 0 # fix corrupt db
-      @$emit 'chgEpisodeIdx', epiIdx ? 0
+      epiIdx      = sessionStorage.getItem 'epiForShow' + show.id
+      if epiIdx is 'episodeIdx' then epiIdx = null # fix corrupt db
+      @$emit 'chgEpisodeIdx', epiIdx
       localStorage.setItem 'vueCurShowId', show.id
-       
+      
     chgEpisodeIdx: (idx) ->
-      @curEpisodeIdx = idx = Math.max 0, Math.min (@curShow.episodes?.length ? 1) - 1, idx ? 0 
+      if not idx?
+        for episode, idx in @curShow.episodes ? []
+          if not episode.watched then break
+      @curEpisodeIdx = idx = Math.max 0, Math.min (@curShow.episodes?.length ? 1) - 1, idx
       @curEpisode = @curShow.episodes[idx]
-      localStorage.setItem 'epiForShow' + @curShow.id, idx
+      sessionStorage.setItem 'epiForShow' + @curShow.id, idx
     
     startWatch: (episode = @curEpisode) ->
       @$emit 'chgCurPage', 'watch'

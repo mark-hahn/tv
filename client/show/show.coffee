@@ -59,6 +59,8 @@ Vue.component 'show-comp',
         
   events:
     playShow: ->
+      @$dispatch 'videoEnable'
+      
       process.nextTick =>
         firstUnwatched = null
         for episode, epiIdx in @curShow.episodes

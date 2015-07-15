@@ -61,11 +61,14 @@ Vue.component 'episode-info',
         div '.info-episode-title', '{{curEpisode.title}}'
         img '.thumb',   vAttr: "src: '#{tvGlobal.plexPfx}' + curEpisode.thumb"
         div '.epi-info-aired',    '{{curEpisode.aired}}'
-        div '.epi-info-duration', '({{Math.ceil(+curEpisode.duration/60000)}} min)'
+        div '.epi-info-duration', '({{Math.ceil(+curEpisode.episodeLen/60)}} min)'
         div '.epi-info-watched', vShow:'curEpisode.watched', 'Watched'
         hr()
         div '.summary', vText: 'curEpisode.summary'
 
+  watch:
+    curEpisode: -> log @curEpisode
+    
   methods:
     epiInfoClick: (e) -> @$dispatch 'chgCurPage', 'show'
     

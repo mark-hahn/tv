@@ -74,6 +74,7 @@ Vue.component 'watch-info-comp',
     videoUrl: ''
     vidPlayPauseTxt: ''
     playing: no
+    videoState: 'none'
     
   methods:
     vidCtrlClk: ->
@@ -90,6 +91,7 @@ Vue.component 'watch-info-comp',
         sfx = '.mp4'
       videoUrl = tvGlobal.vidSrvrPfx + pfx + encodeURIComponent(@videoFile) + sfx
       log 'computed videoUrl', videoUrl
+      @videoState = 'loaded'
       videoUrl
       
     vidPlayPauseTxt: ->
@@ -98,6 +100,14 @@ Vue.component 'watch-info-comp',
         else '||'
 
   events:
+    videoEnable: ->
+      switch @videoState 
+        when 'none'
+          setTimeout (=> @videoEnable()), 100
+        when 'loaded'
+          @$emit 'videoCmd', 'play'
+          @videoState = 'enabled'
+          
     videoCmd: (cmd, playPos) ->
       if not @videoEle then return
       switch cmd

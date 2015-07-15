@@ -27,6 +27,7 @@ Vue.component 'episode-comp',
     twoBtnClk:  (btnName) -> 
       switch btnName
         when 'Play'  
+          @$dispatch 'videoEnable'
           @$dispatch 'startWatch'
         when 'Watched'
           @curEpisode.watched = watched = not @curEpisode.watched

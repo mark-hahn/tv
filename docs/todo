@@ -9,12 +9,8 @@ phone:
       send play on any tv ctrl press including tapping video aread
     
   
+first play after reload does restart
+
 vol keys buffer up really slow
-
-New is broken
-
-change episode from local to session storage
-
-episode time (NaN min)
 
 reload app when tv paused --> restart at 0

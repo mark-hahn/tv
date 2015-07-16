@@ -1,14 +1,8 @@
 
 
 phone:
-  video doesn't start automatically
   pause causes stop
-  fixes
-    track whether started
-      send play video on tv play presses
-      send play on any tv ctrl press including tapping video aread
-    
   
-first play after reload does restart
+first play (unpause) after reload does roku restart (play?)
 
 reload app when tv paused --> restart

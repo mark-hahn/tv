@@ -46,7 +46,7 @@ log = require('debug') 'tv:wchnfo'
 """
 
 Vue.component 'watch-info-comp', 
-  props: ['show', 'episode', 'videoFile', 'watchMode', 'getPlayPos']
+  props: ['show', 'episode', 'videoFile', 'watchMode', 'getPlayPos', 'chkVidInit']
   
   template: render ->
     div '.watch-info', ->
@@ -58,7 +58,7 @@ Vue.component 'watch-info-comp',
           vAttr:'src: videoUrl'
           autoplay:yes
           preload:'auto'
-          # vOn:'click:onClick'
+          vOn:'click:chkVidInit, playing: vidPlay'
         div '.web-video-ctrls', ->
           div '.ctrl-row.web-video-ctrls', ->
             div '.btn.playCtl', vOn: 'click: vidCtrlClk', '<<'
@@ -73,10 +73,11 @@ Vue.component 'watch-info-comp',
     bigVideo: no
     videoUrl: ''
     vidPlayPauseTxt: ''
-    playing: no
     videoState: 'none'
     
   methods:
+    vidPlay: -> @vidHasPlayed = yes
+      
     vidCtrlClk: ->
       
   computed:
@@ -111,21 +112,30 @@ Vue.component 'watch-info-comp',
     videoCmd: (cmd, playPos) ->
       if not @videoEle then return
       switch cmd
-        when 'play'  then @playing = yes; @videoEle.play()
-        when 'pause' then @playing = no;  @videoEle.pause()
         when 'playPos'
           @videoEle.play()
           if Math.abs(@videoEle.currentTime - playPos) > 0.2
             @videoEle.currentTime = playPos
+        when 'play'  then @videoEle.play()
+        when 'pause' then @videoEle.pause()
+        when 'stop'  then @videoEle.src = ''
           
     setPlayState: (state) ->
       if state is 'playing' then @$emit 'videoCmd', 'play'
       if state is 'paused'  then @$emit 'videoCmd', 'pause'
 
   attached: -> 
+    @chkVidInit = (e) =>
+      if not @vidHasPlayed then @$emit 'videoCmd', 'play'; yes
+      else 
+        if e then @$dispatch 'tvBtnClick', 'togglePlay'
+        no
+
     @videoEle = @$el.querySelector 'video'
-    @getPlayPos = => @videoEle.currentTime 
+    
     @videoEle.addEventListener 'error', (args...) =>
       @$dispatch 'popup', 'Using big video'
       @bigVideo = yes
+    
+    @getPlayPos = => @videoEle.currentTime 
     

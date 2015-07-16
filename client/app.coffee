@@ -161,6 +161,8 @@ new Vue
       @$emit 'chgCurPage', 'watch'
       @$broadcast 'startWatch', episode
       
+    tvTurningOff: -> @$broadcast 'tvTurningOff'
+      
     popup: (msg) -> 
       @popupMsg = msg
       if @popupTO then clearTimeout @popupTO

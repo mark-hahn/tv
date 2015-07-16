@@ -44,6 +44,7 @@ Vue.component 'watch-comp',
     loading:    yes
     watchMode: 'none'
     getPlayPos: -> 0
+    chkVidInit: ->
 
   template: render ->
     div '.watch-comp', ->
@@ -63,6 +64,7 @@ Vue.component 'watch-comp',
             videoFile:     '{{videoFile}}'
             watchMode:     '{{watchMode}}'
             getPlayPos:    '{{@ getPlayPos}}'
+            chkVidInit:    '{{@ chkVidInit}}'
               
           tag 'tv-btns-comp',
             episode:   '{{episode}}'
@@ -84,21 +86,32 @@ Vue.component 'watch-comp',
         tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
       , 2000
       @videoCmd 'play'
+      
+    tvTurningOff: -> @emit 'endWatch', 'tvOff'
         
-    endWatch: ->
+    endWatch: (tvOff) ->
       tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
+      
       @watchMode = 'none'
       @$dispatch 'chgCurPage', 'show'
-      setTimeout (=> @tvCtrl.stopTv()), 500
+      if not tvOff then setTimeout (=> @tvCtrl.stopTv()), 500
       
     scrubMoused: (@playPos) ->
-      if @watchMode is 'tracking'
+      if @chkVidInit()
+        @oldPlayPos = @tvCtrl.getPlayPos()
+        @watchMode = 'paused'
+        setTimeout (=> @$emit 'scrubMoused', @playPos), 300
+      else if @watchMode is 'tracking'
         @oldPlayPos = @tvCtrl.getPlayPos()
         @watchMode = 'paused'
       @videoCmd 'playPos', @playPos
       
     tvBtnClick: (text) ->
+      @chkVidInit()
       switch text
+        when 'togglePlay'
+          if @watchMode is 'tracking' then @$emit 'tvBtnClick', 'Pause'
+          else                             @$emit 'tvBtnClick', 'Play'
         when 'Play' 
           @playPos = @getPlayPos()
           @watchMode = 'tracking'

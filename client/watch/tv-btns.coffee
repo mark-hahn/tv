@@ -48,9 +48,7 @@ Vue.component 'tv-btns-comp',
           div '.btn', vOn: 'click: tvBtnClick', '{{backResumeTxt}}'
           div '.btn', vOn: 'click: tvBtnClick', '{{tvPlayPauseTxt}}'
 
-        div '.tv-text', ->
-          div 'T'
-          div 'V'
+        div '.tv-text', -> div 'T'; div 'V'
 
   computed:
     backResumeTxt: ->

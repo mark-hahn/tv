@@ -6,17 +6,21 @@ mkdirp = require 'mkdirp'
 rmrf   = require 'rmrf'
 
 shrinkOneVideo = (src, dst, cb) ->
-  ffmpeg(timeout: 20*60e3, niceness: 20)
-    .input src
-    .videoCodec 'libx264'
-    .videoBitrate 96
-    .size '640x?'
-    .audioCodec 'libmp3lame'
-    .withAudioChannels 1
-    .withAudioBitrate 16
-    .addOption '-sn'
-    .on 'end', cb
-    .save dst
+  try
+    ffmpeg(timeout: 20*60e3, niceness: 20)
+      .input src
+      .videoCodec 'libx264'
+      .videoBitrate 96
+      .size '640x?'
+      .audioCodec 'libmp3lame'
+      .withAudioChannels 1
+      .withAudioBitrate 16
+      .addOption '-sn'
+      .on 'end', cb
+      .save dst
+  catch e
+    log 'shrinkOneVideo exception', src, e.message
+    cb()
     
 do oneShrink = ->
   topProcPath = '/mnt/media/videos-processing'
@@ -48,5 +52,5 @@ do oneShrink = ->
         oneShrink()
       return
 
-  log 'all files shrunk, waiting 5 mins'
-  setTimeout oneShrink, 300e3
+  # log 'all files shrunk, waiting 4 mins'
+  setTimeout oneShrink, 240e3

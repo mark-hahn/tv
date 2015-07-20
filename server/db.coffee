@@ -94,7 +94,7 @@ exports.syncPlexDB = ->
     do oneShow = ->
       if not (show = shows[showIdx++])
         fs.writeFileSync tvShowsCache, JSON.stringify shows
-        log 'syncPlexDB written'
+        # log 'syncPlexDB written'
         insideSync = no
         syncTO ?= setTimeout exports.syncPlexDB, 600e3
         return

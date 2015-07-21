@@ -116,7 +116,10 @@ Vue.component 'watch-info-comp',
           @videoEle.play()
           if Math.abs(@videoEle.currentTime - playPos) > 0.2
             @videoEle.currentTime = playPos
-        when 'play'  then @videoEle.play()
+        when 'play'
+          @videoEle.muted = yes
+          @videoEle.play()
+
         when 'pause' then @videoEle.pause()
         when 'stop'  then @videoEle.src = ''
           

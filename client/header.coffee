@@ -78,8 +78,9 @@ Vue.component 'header-comp',
         setTimeout (=> @powerText = ''), (if onBtn then 16000 else 500)
         if onBtn then tvGlobal.ajaxCmd 'turnOn' 
         else 
-          @$dispatch 'tvTurningOff'
-          tvGlobal.ajaxCmd 'irCmd', 'pwrOff'
+          tvGlobal.ajaxCmd 'irCmd', 'pwrOff', => 
+            @$dispatch 'tvTurningOff'
+            
       , 200
     onOffUp: timeoutOff
   

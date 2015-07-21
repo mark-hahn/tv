@@ -87,7 +87,7 @@ Vue.component 'watch-comp',
       , 2000
       @videoCmd 'play'
       
-    tvTurningOff: -> @emit 'endWatch', 'tvOff'
+    tvTurningOff: -> @$emit 'endWatch', 'tvOff'
         
     endWatch: (tvOff) ->
       tvGlobal.ajaxCmd 'irCmd', 'hdmi2'

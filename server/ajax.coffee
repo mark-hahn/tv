@@ -11,6 +11,7 @@ log     = require('debug') 'tv:ajax'
 port    = require('parent-config')('apps-config.json').tvAjax_port
 
 plexRunningInRoku = yes
+
 roku.init (err) -> 
   if err
     plexRunningInRoku = no
@@ -39,7 +40,7 @@ poweringUp = no
 
 srvr = http.createServer (req, res) ->
   if req.url isnt '/getTvStatus'
-    log 'http req: ' + req.url
+    # log 'http req: ' + req.url
   
   res.writeHead 200, 
     'Content-Type': 'text/json'
@@ -103,21 +104,24 @@ srvr = http.createServer (req, res) ->
         success res, lightLevels
     
     when 'startTv'
-      # log 'startTv', {plexRunningInRoku, data}
+      # log 'startRoku', {plexRunningInRoku, data}
       if not plexRunningInRoku
         error res, 'plexNotRunning' + req.url
       roku.startVideo data[0], +data[1]
       success res, ''
       
     when 'pauseTv'
+      # log 'pauseRoku', {plexRunningInRoku}
       roku.playAction 'pause'
       success res, ''
       
     when 'backTv'
+      # log 'backRoku', {plexRunningInRoku}
       roku.playAction 'stepBack'
       success res, ''
       
     when 'stopTv'
+      # log 'stopRoku', {plexRunningInRoku}
       db.syncPlexDB()
       roku.playAction 'stop'
       success res, ''

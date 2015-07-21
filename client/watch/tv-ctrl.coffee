@@ -4,7 +4,6 @@ log = require('debug') 'tv:tvctrl'
 module.exports =
 class TvCtrl
   constructor: (@watchComp) ->
-
     setInterval =>
       tvGlobal.ajaxCmd 'getTvStatus', (err, status) =>
         if status?.data
@@ -22,16 +21,13 @@ class TvCtrl
           @tvIsStarting = no
         else 
           playState = 'none'
-          if playState isnt @curPlayState and
-              not @tvIsStarting
+          if playState isnt @curPlayState and not @tvIsStarting
             @watchComp.newState playState
-            @tvIsStarting = no
           @curPlayState = playState
           @id = yes
     , 2000
 
   getPlayPos: -> @curPlayPos
-  geState:    -> @curPlayState
   
   startTv: (episodeKey, playPos, force) ->
     if @curPlayState isnt 'playing' or 
@@ -66,8 +62,8 @@ class TvCtrl
       @curPlayState = 'playing'
       
   stopTv: ->
-    if @curPlayState isnt 'stopped'
+    if @curPlayState not in  ['none', 'stopped']
       tvGlobal.ajaxCmd 'stopTv'
-      @curPlayState = 'stopped'
+    @curPlayState = 'stopped'
         
 

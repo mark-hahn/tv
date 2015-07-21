@@ -87,14 +87,13 @@ Vue.component 'watch-comp',
       , 2000
       @videoCmd 'play'
       
-    tvTurningOff: -> @$emit 'endWatch', 'tvOff'
+    tvTurningOff: -> @$emit 'endWatch',
         
-    endWatch: (tvOff) ->
+    endWatch: ->
       tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
-      
       @watchMode = 'none'
       @$dispatch 'chgCurPage', 'show'
-      if not tvOff then setTimeout (=> @tvCtrl.stopTv()), 500
+      setTimeout (=> @tvCtrl.stopTv()), 500
       
     scrubMoused: (@playPos) ->
       if @chkVidInit()

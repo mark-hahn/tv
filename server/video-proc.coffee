@@ -32,7 +32,7 @@ do oneShrink = ->
   mkdirp.sync topProcPath
 
   allPaths = fs.listTreeSync '/mnt/media/videos'
-  for path, idx in allPaths 
+  for path, idx in allPaths when not /\/\./.test path
     # if /\/\d+-/.test path
     #   fs.removeSync path
     #   log 'deleted file', path

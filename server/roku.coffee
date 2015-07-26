@@ -21,7 +21,10 @@ playerCtrl = null #debug
 
 exports.init = (cb) ->
   plex.findRoku rokuName, (err, client, plexServerIpIn, plexServerPortIn) ->
-    if err then cb? err; return
+    if err 
+      log 'roku.init failed', err
+      cb? err
+      return
     plexServerIp    = plexServerIpIn
     plexServerPort  = plexServerPortIn
     rokuIp          = client.host

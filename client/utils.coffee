@@ -65,12 +65,14 @@ tvGlobal.ensureVisible = (outerSel, sel) ->
   , 2000
 
 tvGlobal.ajaxCmd = (cmd, args..., cb) ->
-  if cb and typeof cb isnt 'function' then args.push cb
+  if cb? and typeof cb isnt 'function' then args.push cb
   query = ''
   sep = '?'
   for arg, idx in args when arg?
     query += sep + 'q' + idx + '=' +arg.toString()
     sep = '&'
+  # if cmd isnt 'getTvStatus'
+  #   log 'ajax call', {cmd, args, cb, query}
   request
     .get ajaxPfx + cmd + query
     .set 'Content-Type', 'text/plain'

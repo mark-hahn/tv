@@ -66,8 +66,8 @@ Vue.component 'episode-info',
         hr()
         div '.summary', vText: 'curEpisode.summary'
 
-  watch:
-    curEpisode: -> log @curEpisode
+  # watch:
+    # curEpisode: -> log @curEpisode
     
   methods:
     epiInfoClick: (e) -> @$dispatch 'chgCurPage', 'show'

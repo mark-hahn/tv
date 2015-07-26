@@ -39,7 +39,7 @@ success = (res, data) ->
 poweringUp = no
 
 srvr = http.createServer (req, res) ->
-  if req.url isnt '/getTvStatus'
+  # if req.url isnt '/getTvStatus'
     # log 'http req: ' + req.url
   
   res.writeHead 200, 

@@ -1,8 +1,6 @@
-
-
-phone:
-  pause causes stop
   
 first play (unpause) after reload does roku restart (play?)
 
 reload app when tv paused --> restart
+
+have to click scrub bar twice

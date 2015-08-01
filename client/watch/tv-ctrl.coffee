@@ -7,6 +7,7 @@ class TvCtrl
     setInterval =>
       tvGlobal.ajaxCmd 'getTvStatus', (err, status) =>
         if status?.data
+          tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
           {id, videoFile, playState, playPos} = status.data
           if id isnt @id
             playingWhenLoaded = (not @id and playState is 'playing')

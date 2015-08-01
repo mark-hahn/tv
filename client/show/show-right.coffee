@@ -32,7 +32,6 @@ Vue.component 'show-right',
         pageMode:   '{{pageMode}}'
         allShows:   '{{allShows}}'
         curShowIdx: '{{curShowIdx}}'
-        curShow:    '{{curShow}}'
         filterTags: '{{filterTags}}'
         showInList: '{{showInList}}'
         vShow:      'pageMode != "tags"'

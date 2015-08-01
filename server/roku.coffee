@@ -37,12 +37,9 @@ playerCtrl = (cmd, params={}, cb) ->
           "?machineIdentifier=#{rokuMachineId}" +
           "&address=#{plexServerIp}" +
           "&port=#{plexServerPort}"
-  # log 'playerCtrl', {cmd, params, url}
   for arg, val of params then url += '&' + arg + '=' + val
   opts ={url, headers: Accept: 'application/json'}
-  # log 'roku req', url
   request opts, (err, resp, body) ->
-    # log 'roku res', body
     if err or resp.statusCode isnt 200
       log 'playerCtrl error:', {opts, statusCode: resp?.statusCode, error: err?.message}
       cb? err
@@ -53,7 +50,6 @@ exports.startVideo = (key, offset=0, cb) ->
   offset *= 1000
   playerCtrl '/playback/playMedia', {key, offset}, (err, res) ->
     if err then cb? err; return
-    log 'startVideo', {key, offset, res}
     cb? null, res
 
 exports.playAction = (action, cb) ->
@@ -64,6 +60,5 @@ exports.playAction = (action, cb) ->
   # stop (goes back in menu when repeated)
   playerCtrl "/playback/#{action}", null, (err, res) ->
     if err then cb? err; return
-    log 'playAction', {action, res}
     cb? null, res
 

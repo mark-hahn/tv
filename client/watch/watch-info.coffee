@@ -59,15 +59,15 @@ Vue.component 'watch-info-comp',
           autoplay:yes
           preload:'auto'
           vOn:'click:chkVidInit, playing: vidPlay'
-        div '.web-video-ctrls', ->
-          div '.ctrl-row.web-video-ctrls', ->
-            div '.btn.playCtl', vOn: 'click: vidCtrlClk', '<<'
-            div '.btn.playCtl', vOn: 'click: vidCtrlClk', '{{vidPlayPauseTxt}}'
-            div '.btn.playCtl', vOn: 'click: vidCtrlClk', '>>'
-          div '.ctrl-row.web-video.bookmarks', ->
-            div '.btn', vOn: 'click: vidCtrlClk', 'Prev'
-            div '.btn', vOn: 'click: vidCtrlClk', 'Mark'
-            div '.btn', vOn: 'click: vidCtrlClk', 'Next'
+        # div '.web-video-ctrls', ->
+        #   div '.ctrl-row.web-video-ctrls', ->
+        #     div '.btn.playCtl', vOn: 'click: vidCtrlClk', '<<'
+        #     div '.btn.playCtl', vOn: 'click: vidCtrlClk', '{{vidPlayPauseTxt}}'
+        #     div '.btn.playCtl', vOn: 'click: vidCtrlClk', '>>'
+        #   div '.ctrl-row.web-video.bookmarks', ->
+        #     div '.btn', vOn: 'click: vidCtrlClk', 'Prev'
+        #     div '.btn', vOn: 'click: vidCtrlClk', 'Mark'
+        #     div '.btn', vOn: 'click: vidCtrlClk', 'Next'
             
   data: ->
     bigVideo: no
@@ -104,15 +104,21 @@ Vue.component 'watch-info-comp',
     videoEnable: ->
       switch @videoState 
         when 'none'
-          setTimeout (=> @videoEnable()), 100
+          setTimeout => 
+            @videoEnable()
+            @videoEle.muted = yes
+          , 100
         when 'loaded'
           @$emit 'videoCmd', 'play'
           @videoState = 'enabled'
+          @videoEle.muted = yes
           
     videoCmd: (cmd, playPos) ->
       if not @videoEle then return
+      @videoEle.muted = yes
       switch cmd
         when 'playPos'
+          @videoEle.muted = yes
           @videoEle.play()
           if Math.abs(@videoEle.currentTime - playPos) > 0.2
             @videoEle.currentTime = playPos
@@ -120,8 +126,8 @@ Vue.component 'watch-info-comp',
           @videoEle.muted = yes
           @videoEle.play()
 
-        when 'pause' then @videoEle.pause()
-        when 'stop'  then @videoEle.src = ''
+        when 'pause' then   @videoEle.muted = yes; @videoEle.pause()
+        when 'stop'  then   @videoEle.muted = yes; @videoEle.src = ''
           
     setPlayState: (state) ->
       if state is 'playing' then @$emit 'videoCmd', 'play'

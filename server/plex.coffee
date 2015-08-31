@@ -35,7 +35,7 @@ exports.findRoku = (rokuName, cb) ->
   getPlexData '/clients', 'Server', (err, clients) ->
     if err then cb err; return
     # log 'findRoku clients', clients
-    for client in clients when client.name is rokuName
+    for client in clients when client.name.indexOf(rokuName) > -1
       cb null, client, plexServerIp, plexServerPort
       return
     log 'findRoku, roku client not found:', clients
@@ -124,7 +124,7 @@ exports.getStatus = (cb) ->
     if err then cb err; return
     for session, sidx in (sessions ? []) when session?._elementType is 'Video'
       for player, pidx in session._children when player._elementType is 'Player'
-        if player.title is 'Roku 3'
+        if player.title.indexOf('Roku 3') > -1
           for media in session._children when media._elementType is 'Media'
             for part in media._children when part._elementType is 'Part'
               # log 'session:' + sidx, 'player:' + pidx, session.grandparentTitle, 

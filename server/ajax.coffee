@@ -132,6 +132,7 @@ srvr = http.createServer (req, res) ->
         
     when 'getTvStatus'
       plex.getStatus (err, playStatus) ->
+        # log 'getTvStatus', {err, playStatus}
         if err then error res, 'getTvStatus err: ' + err.message; return
         success res, playStatus
         

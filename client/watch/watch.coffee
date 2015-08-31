@@ -84,7 +84,7 @@ Vue.component 'watch-comp',
       @tvCtrl.startTv @episode.key, 0, 'tvIsStarting'
       setTimeout =>
         tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
-      , 2000
+      , 1000
       @videoCmd 'play'
       
     tvTurningOff: -> @$emit 'endWatch',

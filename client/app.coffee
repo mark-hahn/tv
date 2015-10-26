@@ -1,17 +1,22 @@
+###
+  app.coffee 
+###
 
-# src/app
+log  = require('debug') 'tv:---app'
+util = require 'util'
+Vue  = require 'vue'
 
-util    = require 'util'
-log     = require('debug') 'tv:---app'
-Vue     = require 'vue'
+log 'app starting'
 
 require './utils'
+require './ajax-client'
+
 Vue.use require 'vue-keep-scroll'
 teacup = require 'teacup'
 camelToKebab = require 'teacup-camel-to-kebab'
 teacup.use camelToKebab()
 
-{render, tag, meta, title, style, div} = teacup
+{render, tag, meta, title, style, div, script} = teacup
 
 document.head.innerHTML = render ->
   meta name: 'viewport', \
@@ -78,13 +83,13 @@ document.head.innerHTML = render ->
       line-height: 1.3;
     }
 """
-  
+
 require './header'
 require './show/show'
 require './episode/episode'
 require './watch/watch'
 require './lights/lights'
-
+  
 new Vue
   el: 'body'
   replace: false
@@ -114,6 +119,10 @@ new Vue
         vShow:         'curPage == "lights"'
         
     div '#popup', vIf:'popupMsg', '{{popupMsg}}'
+    
+    script "function getip(json) { alert(json.ip) }"
+    script src:'http://www.telize.com/jsonip?callback=getip'
+      
       
   data:
     curPage:      'show'

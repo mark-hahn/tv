@@ -46,31 +46,12 @@ Vue.component 'scrub-comp',
   
   template: render ->
     div '.scrub-comp', ->
-      div '.scrub', vOn: 'mousedown:  onMousedown,' +
-                         'mousemove:  onMousemove,' +
-                         'mouseup:    onMouseup,'   +
-                         'mouseleave: onMouseleave', ->
+      div '.scrub', ->
         div '.tick.five-min', vRepeat: '100', ->
           div '.tick.min', vRepeat: '5'
           div '.time', '{{($index+1)*5}}'
         div '.cursor'
 
-  methods:
-    onMousedown: (e) ->
-      if @scrubbing or not @scrubHgt then return
-      @scrubbing = yes
-      @onMousemove e
-      
-    onMousemove: (e) ->
-      if not @scrubbing then return
-      y = e.offsetY + e.target.offsetTop
-      playPos = (@episode.episodeLen / @scrubHgt) * y
-      @$emit     'setScrubPos', playPos
-      @$dispatch 'scrubMoused', playPos
-      
-    onMouseup:    -> @scrubbing = no
-    onMouseleave: -> @scrubbing = no
-    
   attached: ->
     @$emit 'resize'
   

@@ -1,6 +1,6 @@
 
 log = require('debug') 'tv:tvctrl'
-
+ 
 module.exports =
 class TvCtrl
   constructor: (@watchComp) ->
@@ -28,7 +28,7 @@ class TvCtrl
             @watchComp.newState playState
           @curPlayState = playState
           @id = yes
-    , 500
+    , 1000
 
   getPlayPos: -> @curPlayPos
   

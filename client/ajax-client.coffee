@@ -5,12 +5,10 @@
 log     = require('debug') 'tv:ajxcli'
 request = require 'superagent'
 
-log 'location port', location.port
-
 # bug: these are for server, not client
 {SERVER_HOST, DEBUG, OFF_SITE} = tvGlobal.serverConfig
 
-serverIp = SERVER_HOST
+tvGlobal.serverIp = serverIp = SERVER_HOST
 
 tvGlobal.plexServerIp   = plexServerIp   = SERVER_HOST
 tvGlobal.plexServerPort = plexServerPort =

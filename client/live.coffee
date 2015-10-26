@@ -1,0 +1,177 @@
+###
+  live.coffee
+###
+
+log = ->
+  args = undefined
+  args = (if 1 <= arguments_.length then slice.call(arguments_, 0) else [])
+  console.log.apply console, [ "hdr" ].concat(slice.call(args))
+
+interval = 300
+headers =
+  Etag: 1
+  "Last-Modified": 1
+  "Content-Length": 1
+  "Content-Type": 1
+
+resources = {}
+pendingRequests = {}
+currentLinkElements = {}
+oldLinkElements = {}
+loaded = false
+active =
+  html: 1
+  css: 1
+  js: 1
+
+Live =
+  heartbeat: ->
+    if document.body
+      Live.loadresources()  unless loaded
+      Live.checkForChanges()
+    setTimeout Live.heartbeat, interval
+
+  loadresources: ->
+    i = undefined
+    len = undefined
+    uris = undefined
+    url = undefined
+    uris = [ "http://#{tvGlobal.serverIp}:2340/js/bundle.js" ]
+    i = 0
+    len = uris.length
+
+    while i < len
+      url = uris[i]
+      Live.getHead url, (url, info) ->
+        resources[url] = info
+      i++
+    loaded = true
+
+  checkForChanges: ->
+    results = undefined
+    url = undefined
+    results = []
+    for url of resources
+      continue  if pendingRequests[url]
+      results.push Live.getHead(url, (url, newInfo) ->
+        contentType = undefined
+        hasChanged = undefined
+        header = undefined
+        newValue = undefined
+        oldInfo = undefined
+        oldValue = undefined
+        results1 = undefined
+        oldInfo = resources[url]
+        hasChanged = false
+        resources[url] = newInfo
+        results1 = []
+        for header of oldInfo
+          oldValue = oldInfo[header]
+          newValue = newInfo[header]
+          contentType = newInfo["Content-Type"]
+          switch header.toLowerCase()
+            when "etag"
+              break  unless newValue
+            else
+              hasChanged = oldValue isnt newValue
+          if hasChanged
+            Live.refreshResource url, contentType
+            break
+          else
+            results1.push undefined
+        results1
+      )
+    results
+
+  refreshResource: (url, type) ->
+    head = undefined
+    html = undefined
+    link = undefined
+    newLink = undefined
+    next = undefined
+    switch (if type? then type.toLowerCase() else undefined)
+      when "text/css"
+        link = currentLinkElements[url]
+        html = document.body.parentNode
+        head = link.parentNode
+        next = link.nextSibling
+        newLink = document.createElement("link")
+        html.className = html.className.replace(/\s*livejs\-loading/g, "") + " livejs-loading"
+        newLink.setAttribute "type", "text/css"
+        newLink.setAttribute "rel", "stylesheet"
+        newLink.setAttribute "href", url + "?now=" + new Date() * 1
+        if next
+          head.insertBefore newLink, next
+        else
+          head.appendChild newLink
+        currentLinkElements[url] = newLink
+        oldLinkElements[url] = link
+        Live.removeoldLinkElements()
+      when "text/html"
+        url isnt document.location.href
+      when "text/javascript", "application/javascript", "application/x-javascript"
+        document.location.reload()
+
+  removeoldLinkElements: ->
+    e = undefined
+    html = undefined
+    link = undefined
+    oldLink = undefined
+    pending = undefined
+    results = undefined
+    rules = undefined
+    sheet = undefined
+    url = undefined
+    pending = 0
+    results = []
+    for url of oldLinkElements
+      try
+        link = currentLinkElements[url]
+        oldLink = oldLinkElements[url]
+        html = document.body.parentNode
+        sheet = link.sheet or link.styleSheet
+        rules = sheet.rules or sheet.cssRules
+        if rules.length >= 0
+          oldLink.parentNode.removeChild oldLink
+          delete oldLinkElements[url]
+
+          setTimeout (->
+            html.className = html.className.replace(/\s*livejs\-loading/g, "")
+          ), 100
+      catch _error
+        e = _error
+        pending++
+      if pending
+        results.push setTimeout(Live.removeoldLinkElements, 50)
+      else
+        results.push undefined
+    results
+
+  getHead: (url, callback) ->
+    xhr = undefined
+    pendingRequests[url] = true
+    xhr = (if window.XMLHttpRequest then new XMLHttpRequest() else new ActiveXObject("Microsoft.XmlHttp"))
+    xhr.open "HEAD", url, true
+    xhr.onreadystatechange = ->
+      h = undefined
+      info = undefined
+      value = undefined
+      delete pendingRequests[url]
+
+      if xhr.readyState is 4 and xhr.status isnt 304
+        xhr.getAllResponseHeaders()
+        info = {}
+        for h of headers
+          value = xhr.getResponseHeader(h)
+          value = value.replace(/^W\//, "")  if h.toLowerCase() is "etag" and value
+          value = value.replace(/^(.*?);.*?$/i, "$1")  if h.toLowerCase() is "content-type" and value
+          info[h] = value
+        callback url, info
+
+    xhr.send()
+
+if document.location.protocol isnt "file:"
+  Live.heartbeat()  unless window.liveJsLoaded
+  window.liveJsLoaded = true
+else
+  console.log "Live.js doesn't support the file protocol. It needs http."  if window.console

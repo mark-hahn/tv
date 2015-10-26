@@ -1,0 +1,18 @@
+#   -*-  grammar-ext: sh  -*-
+
+if [ $LOCATION == "server" ]; then 
+  echo "Watch cannot be run on the server"
+  exit 1
+fi
+
+echo "Checking watchify"
+
+pkill -f "watchify client/app.coffee" # > /dev/null 2>&1
+coffee -co js server/*.coffee
+if [ $(ps aux | grep watchify | wc -l) != "2" ]; then
+  echo "Starting watchify"
+  # --poll=interval 
+  # coffee -cwo /root/dev/apps/teacss/lib /root/dev/apps/teacss/src/*.coffee &
+  watchify client/app.coffee -v -d --iw x -o js/bundle.js \
+           -t coffeeify --extension=".coffee" &
+fi

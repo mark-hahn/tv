@@ -10,6 +10,7 @@ log 'app starting'
 
 require './utils'
 require './ajax-client'
+require './live'
 
 Vue.use require 'vue-keep-scroll'
 teacup = require 'teacup'

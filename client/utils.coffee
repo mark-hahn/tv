@@ -11,7 +11,7 @@ window.tvGlobal = {}
 # this line is replaced on every run
 serverConfigStr = '{"CHROOT":"","USER":"root","HOME_IP":"173.55.122.217","AT_HOME":"true","SERVER_IP":"192.168.1.103","SERVER_HOST":"192.168.1.103","DEBUG":"*","LOCATION":"server","OFF_SITE":"false"}'
 tvGlobal.serverConfig = JSON.parse serverConfigStr
-log 'serverConfig', tvGlobal.serverConfig
+# log 'serverConfig', tvGlobal.serverConfig
 
 require('debug').enable tvGlobal.serverConfig.DEBUG
 Vue.config.debug = tvGlobal.debug = (tvGlobal.serverConfig.DEBUG is '*')

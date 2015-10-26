@@ -22,8 +22,6 @@ Vue.component 'episode-comp',
         curEpisodeIdx: '{{curEpisodeIdx}}'
   
   events:
-    startVideo: -> startVideo @
-    
     twoBtnClk:  (btnName) -> 
       switch btnName
         when 'Play'  

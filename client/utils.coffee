@@ -19,7 +19,8 @@ tvGlobal.plexServerPort = plexServerPort =
  (if OFF_SITE isnt 'false' then '17179' else '32400')
 tvGlobal.plexPfx  = "http://#{plexServerIp}:#{plexServerPort}"
 
-ajaxPort = '2344'
+log 'location port', location.port
+ajaxPort = +location.port + 4
 ajaxPfx  = "http://#{serverIp}:#{ajaxPort}/"
 
 tvGlobal.vidSrvrPort = vidSrvrPort = 
@@ -71,8 +72,8 @@ tvGlobal.ajaxCmd = (cmd, args..., cb) ->
   for arg, idx in args when arg?
     query += sep + 'q' + idx + '=' +arg.toString()
     sep = '&'
-  # if cmd isnt 'getTvStatus'
-  #   log 'ajax call', {cmd, args, cb, query}
+  if cmd isnt 'getTvStatus'
+    log 'ajax call', {ajaxPfx, cmd, query, args, cb}
   request
     .get ajaxPfx + cmd + query
     .set 'Content-Type', 'text/plain'
@@ -94,7 +95,7 @@ tvGlobal.ajaxLog = (args...) ->
 
 tvGlobal.tagList = [
   'Foreign', 'Comedy', 'Drama', 'Crime', 'MarkOnly', 'LindaOnly'     
-  'Favorite', 'OnTheFence', 'New', 'LessThan3', 'Watched', 'Archive', 'Deleted' 
+  'LindaFavs', 'OnTheFence', 'New', 'LessThan3', 'Watched', 'Archive', 'Deleted' 
 ]      
 
 tvGlobal.syncPlexDB = -> tvGlobal.ajaxCmd 'syncPlexDB'

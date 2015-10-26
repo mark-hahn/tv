@@ -9,6 +9,7 @@ insteon = require './insteon'
 db      = require './db'
 log     = require('debug') 'tv:ajax'
 port    = require('parent-config')('apps-config.json').tvAjax_port
+log 'port', port
 
 plexRunningInRoku = yes
 
@@ -104,10 +105,10 @@ srvr = http.createServer (req, res) ->
         success res, lightLevels
     
     when 'startTv'
-      # log 'startRoku', {plexRunningInRoku, data}
+      log 'startRoku', {plexRunningInRoku, data}
       if not plexRunningInRoku
         error res, 'plexNotRunning' + req.url
-      roku.startVideo data[0], +data[1]
+      roku.startVideo data[0], (data[1] is 'goToStart')
       success res, ''
       
     when 'pauseTv'

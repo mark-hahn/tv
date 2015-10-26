@@ -20,7 +20,7 @@ getPlexData = (path, eleType, cb) ->
     url: "#{plexPfx}#{path}"
     headers: Accept: 'application/json'
   request opts, (err, resp, body) ->
-    # log {err, resp, body}
+    # log 'getPlexData request opts', {err, resp, body}
     if err or resp.statusCode isnt 200
       log 'getPlexData req error:', opts, resp.statusCode, util.inspect err, depth:null
       cb? err
@@ -49,7 +49,7 @@ exports.getSectionKeys = (cb) ->
         when 'TV Shows' then tvShowsKey = dir.key
         when 'Movies'   then moviesKey  = dir.key
         else continue
-    if not tvShowsKey or not moviesKey
+    if not tvShowsKey # or not moviesKey
       log 'getSectionKeys, key missing', data
       cb message: 'key missing'
       return
@@ -79,7 +79,8 @@ exports.getShowList = getList = (key, cb) ->
         inGetShowList = no
         return
 
-      {key, title, summary, thumb, year, duration, leafCount, viewedLeafCount, type, banner} = show
+      {key, title, summary, thumb, year, 
+       duration, leafCount, viewedLeafCount, type, banner} = show
         
       id = key.split('/')[3]
       tags = {}
@@ -127,8 +128,8 @@ exports.getStatus = (cb) ->
         if player.title.indexOf('Roku 3') > -1
           for media in session._children when media._elementType is 'Media'
             for part in media._children when part._elementType is 'Part'
-              # log 'session:' + sidx, 'player:' + pidx, session.grandparentTitle, 
-                  #  session.viewOffset, player.title, player.state, part.key
+              # log 'session:' + sidx, 'player:' + pidx, grandtitle: session.grandparentTitle, \
+              #      sessofs: session.viewOffset, playertitle: player.title, playerstate:player.state, parttkey: part.key
               cb null,
                 id:        session.key.split('/')[3]
                 videoFile: part.file.replace '/mnt/media/videos/', ''

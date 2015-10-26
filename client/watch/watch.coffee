@@ -81,7 +81,7 @@ Vue.component 'watch-comp',
           if @loading then clearTimeout @loading
           @loading = no
         , 6000
-      @tvCtrl.startTv @episode.key, 0, 'tvIsStarting'
+      @tvCtrl.startTv @episode.key, 'goToStart', 'tvIsStarting'
       setTimeout =>
         tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
       , 1000
@@ -144,7 +144,7 @@ Vue.component 'watch-comp',
         when 'tracking'
           if old isnt 'tracking'
             if not @playingWhenLoaded
-              @tvCtrl.startTv @episode.key, @playPos
+              @tvCtrl.startTv @episode.key, 'resume'
             @playingWhenLoaded = no
             @playPos = @getPlayPos()
             @videoCmd 'playPos', @playPos

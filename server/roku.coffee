@@ -39,6 +39,7 @@ playerCtrl = (cmd, params={}, cb) ->
           "&port=#{plexServerPort}"
   for arg, val of params then url += '&' + arg + '=' + val
   opts ={url, headers: Accept: 'application/json'}
+  log 'playerCtrl', opts
   request opts, (err, resp, body) ->
     if err or resp.statusCode isnt 200
       log 'playerCtrl error:', {opts, statusCode: resp?.statusCode, error: err?.message}
@@ -46,12 +47,14 @@ playerCtrl = (cmd, params={}, cb) ->
       return
     cb? null, body
           
-exports.startVideo = (key, offset=0, cb) ->
-  offset *= 1000
+exports.startVideo = (key, goToStart, cb) ->
+  log 'startVideo', goToStart
+  if goToStart then console.trace()
+  offset = (if goToStart then 0 else 1)
   playerCtrl '/playback/playMedia', {key, offset}, (err, res) ->
     if err then cb? err; return
     cb? null, res
-
+    
 exports.playAction = (action, cb) ->
   # play and pause are both play/pause toggles
   # skipNext, skipPrevious (bumps playback speed, back to 1x pauses)

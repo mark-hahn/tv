@@ -10,9 +10,9 @@ hubIp    = 'hahnca.com'
 
 hubPort = 1342
 lightIds = [
-	'297EBF' # 1 tv Lft Front 
+	'2c5134' # 1 tv Lft Front 
 	'29802B' # 2 tv Mid Front 
-	'298243' # 3 tv Rgt Front 
+	'2b4f44' # 3 tv Rgt Front 
 	'2982C1' # 4 tv Lft Rear  
 	'298CDA' # 5 tv Mid Rear  
 	'29814C' # 6 tv Rgt Rear  

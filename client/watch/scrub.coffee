@@ -34,7 +34,7 @@ scrubStyle = document.createElement 'style'
   .cursor {
     position:absolute;
     left:0;
-    width: 40%;
+    width: 27%;
     height: 2px;
     background-color: red;
   }

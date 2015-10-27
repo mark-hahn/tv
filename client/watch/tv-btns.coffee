@@ -5,22 +5,18 @@ log     = require('debug') 'tv:tvbtns'
 {render, tag, div} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """
-  .watch-btn {
-    width: 98%;
-    margin: 2% 0 1% 0;
-  }
   .tv-btns {
-    background-color: #cce;
-    border:1px solid gray;
+    background-color: #ccd;
     padding: 0 0 2px 2px;
     margin-top:1%; 
     position:relative;
+    border-radius: 3%;
   }
   .watch-btn .tv-btns .btn-row .btn {
     font-size:1.8rem;
-    line-height:1.5;
-    width: 30%;
-    height: 3rem;
+    line-height:2;
+    width: 31%;
+    height: 4rem;
     margin:1%; 
   }
 """

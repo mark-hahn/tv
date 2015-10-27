@@ -104,20 +104,16 @@ Vue.component 'watch-comp',
         when 'Play' 
           @playPos = @getPlayPos()
           @watchMode = 'playing'
-        when 'Cancel' 
-          if Math.abs(@playPos - @oldPlayPos) < 2 and 
-               @watchMode is 'paused'
-            @tvCtrl.unPauseTv()
-          else
-            @playPos = @oldPlayPos ? 0
-            @videoCmd 'playPos', @playPos
-          @watchMode = 'playing'
         when 'Pause' 
           if @watchMode is 'playing'
             @oldPlayPos = @playPos
             @watchMode = 'paused'
         when 'Back' 
-          # if @watchMode is 'playing'
+          if @watchMode is 'paused'
+            @playPos = @getPlayPos()
+            @watchMode = 'playing'
+            setTimeout (=> @tvCtrl.stepBackTv()), 500
+          else
             @tvCtrl.stepBackTv()
         when 'Stop' 
           tvGlobal.ajaxCmd 'irCmd', 'hdmi2'

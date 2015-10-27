@@ -19,7 +19,7 @@ fileServer = new nodeStatic.Server (if dev then cache: 0)
 
 bundle = null
 do loadBundle = ->
-  log 'loading bundle'
+  # log 'loading bundle'
   bundle = fs.readFileSync 'js/bundle.js', 'utf8'
   bundleChanged = yes
 if dev

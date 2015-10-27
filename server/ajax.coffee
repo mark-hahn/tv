@@ -41,7 +41,7 @@ poweringUp = no
 
 srvr = http.createServer (req, res) ->
   # if req.url isnt '/getTvStatus'
-    # log 'http req: ' + req.url
+  #   log 'ajax http req: ' + req.url
   
   res.writeHead 200, 
     'Content-Type': 'text/json'

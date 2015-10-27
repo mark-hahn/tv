@@ -1,11 +1,25 @@
 
 log = require('debug') 'tv:tvctrl'
  
+statusCnt = 0
+lastCurPlayState = lastCurPlayPos = lastDataJson = null
+  
 module.exports =
 class TvCtrl
   constructor: (@watchComp) ->
     setInterval =>
       tvGlobal.ajaxCmd 'getTvStatus', (err, status) =>
+        # and ++statusCnt < 
+        (dataJson = JSON.stringify status?.data)
+        if err or
+            dataJson      isnt lastDataJson     or
+            @curPlayState isnt lastCurPlayState or
+            @curPlayPos   isnt lastCurPlayPos
+          lastDataJson     = dataJson
+          lastCurPlayState = @curPlayState
+          lastCurPlayPos   = @curPlayPos
+          log 'getTvStatus', {err, data: status?.data, @curPlayState, @curPlayPos}
+          
         if status?.data
           # tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
           {id, videoFile, playState, playPos} = status.data
@@ -29,7 +43,7 @@ class TvCtrl
           @curPlayState = playState
           @id = yes
     , 500
-
+ 
   getPlayPos: -> @curPlayPos
   
   startTv: (episodeKey, action, force) ->
@@ -39,7 +53,7 @@ class TvCtrl
     if @curPlayState isnt 'playing' or 
           episodeKey isnt @curEpisodeKey or force
       if action is 'resume' and @curPlayState is 'paused' and
-          episodeKey is @curEpisodeKey
+          (not @curEpisodeKey or episodeKey is @curEpisodeKey)
         tvGlobal.ajaxCmd 'pauseTv'
       else
         @tvIsStarting = yes

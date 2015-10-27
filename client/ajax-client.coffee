@@ -30,7 +30,7 @@ tvGlobal.ajaxCmd = (cmd, args..., cb) ->
     query += sep + 'q' + idx + '=' +arg.toString()
     sep = '&'
   if cmd isnt 'getTvStatus'
-    log 'ajax call', {ajaxPfx, cmd, query, args, cb}
+    log 'ajax call', {cmd, query, args}
   request
     .get ajaxPfx + cmd + query
     .set 'Content-Type', 'text/plain'

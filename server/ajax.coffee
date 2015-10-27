@@ -40,8 +40,8 @@ success = (res, data) ->
 poweringUp = no
 
 srvr = http.createServer (req, res) ->
-  # if req.url isnt '/getTvStatus'
-  #   log 'ajax http req: ' + req.url
+  if req.url isnt '/getTvStatus'
+    log 'ajax http req: ' + req.url
   
   res.writeHead 200, 
     'Content-Type': 'text/json'

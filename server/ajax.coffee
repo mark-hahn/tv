@@ -58,6 +58,11 @@ srvr = http.createServer (req, res) ->
       console.log 'tvGlobal.log: ' + data.join ', '
       success res
       
+    when 'getIp'
+      originIp = req.connection.remoteAddress.split ':'
+      originIp = originIp[originIp.length-1]
+      success res, originIp
+      
     when 'shows'
       db.getShowList (err, result) ->
         if err then error res, err.message; return

@@ -98,6 +98,16 @@ Vue.component 'watch-comp',
     tvBtnClick: (text) ->
       @chkVidInit()
       switch text
+        when 'Mute'  then tvGlobal.ajaxCmd 'irCmd', 'mute'
+        when 'Vol +' then tvGlobal.ajaxCmd 'irCmd', 'volUp'
+        when 'Vol -' then tvGlobal.ajaxCmd 'irCmd', 'volDn'
+        when 'Stop' 
+          tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
+          @$emit 'endWatch'
+        when 'Reset' 
+          if @episode
+            @$emit 'startWatch', @episode
+          
         when 'togglePlay'
           if @watchMode is 'playing' then @$emit 'tvBtnClick', 'Pause'
           else                            @$emit 'tvBtnClick', 'Play'
@@ -115,13 +125,6 @@ Vue.component 'watch-comp',
             setTimeout (=> @tvCtrl.stepBackTv()), 500
           else
             @tvCtrl.stepBackTv()
-        when 'Stop' 
-          tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
-          @$emit 'endWatch'
-
-        when 'Mute'  then tvGlobal.ajaxCmd 'irCmd', 'mute'
-        when 'Vol +' then tvGlobal.ajaxCmd 'irCmd', 'volUp'
-        when 'Vol -' then tvGlobal.ajaxCmd 'irCmd', 'volDn'
 
   watch:
     watchMode: (__, old) -> 
@@ -181,4 +184,6 @@ Vue.component 'watch-comp',
       @watchMode = 'none'
 
   created: -> @tvCtrl = new TvCtrl @
+  
+  attached: -> # @tvCtrl.test()
 

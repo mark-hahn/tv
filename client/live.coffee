@@ -6,6 +6,7 @@ log = ->
   args = (if 1 <= arguments_.length then slice.call(arguments_, 0) else [])
   console.log.apply console, [ "hdr" ].concat(slice.call(args))
 
+reloadDelay = 1000
 interval = 300
 headers =
   Etag: 1
@@ -75,7 +76,7 @@ Live =
         oldLinkElements[url] = link
         Live.removeoldLinkElements()
       when "text/javascript", "application/javascript", "application/x-javascript"
-        setTimeout (-> document.location.reload()), 500
+        setTimeout (-> document.location.reload()), reloadDelay
 
   removeoldLinkElements: ->
     pending = 0

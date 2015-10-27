@@ -1,7 +1,6 @@
 
 Vue     = require 'vue'
 log     = require('debug') 'tv:hdr'
-request = require 'superagent'
 
 {render, tag, div} = require 'teacup'
 

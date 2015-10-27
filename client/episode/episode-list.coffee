@@ -1,6 +1,5 @@
 
 Vue     = require 'vue'
-request = require 'superagent'
 log     = require('debug') 'tv:snf'
 
 {render, tag, div, img} = require 'teacup'

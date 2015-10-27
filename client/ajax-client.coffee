@@ -8,7 +8,8 @@ request = require 'superagent'
 # bug: these are for server, not client
 {SERVER_HOST, DEBUG, OFF_SITE} = tvGlobal.serverConfig
 
-tvGlobal.serverIp = serverIp = SERVER_HOST
+tvGlobal.serverIp  = serverIp  = 'hahnca.com'  # SERVER_HOST
+tvGlobal.browserIp = browserIp = 'hahnca.com'
 
 tvGlobal.plexServerIp   = plexServerIp   = SERVER_HOST
 tvGlobal.plexServerPort = plexServerPort =
@@ -22,6 +23,19 @@ tvGlobal.vidSrvrPfx  = "http://#{serverIp}:#{vidSrvrPort}"
 ajaxPort = +location.port + 4
 ajaxPfx  = "http://#{serverIp}:#{ajaxPort}/"
 
+request
+  .get ajaxPfx + 'getIp'
+  .set 'Content-Type', 'text/plain'
+  .end (err, res) ->
+    if res and res.status isnt 200
+      log 'getIp bad status', res.status
+      return
+    if err
+      log 'ajax err', err
+      return
+    tvGlobal.browserIp = JSON.parse(res.text).data
+    log 'serverIp, browserIp', serverIp, browserIp
+
 tvGlobal.ajaxCmd = (cmd, args..., cb) ->
   if cb? and typeof cb isnt 'function' then args.push cb
   query = ''
@@ -29,8 +43,10 @@ tvGlobal.ajaxCmd = (cmd, args..., cb) ->
   for arg, idx in args when arg?
     query += sep + 'q' + idx + '=' +arg.toString()
     sep = '&'
-  if cmd isnt 'getTvStatus'
-    log 'ajax call', {cmd, query, args}
+    
+  # if cmd isnt 'getTvStatus'
+  #   log 'ajax call', {cmd, query, args}
+  
   request
     .get ajaxPfx + cmd + query
     .set 'Content-Type', 'text/plain'

@@ -1,54 +1,76 @@
 
 log = require('debug') 'tv:tvctrl'
  
-statusCnt = 0
-lastCurPlayState = lastCurPlayPos = lastDataJson = null
+# statusCnt = 0
+statusUpdateInterval = 500
+simulatedElapsedTime = 0
+lastSimulatedTimeUpdate = Date.now() / 1e3
+skipSpeedup = lastPlayState = lastPlayPos = lastDataJson = null
   
 module.exports =
 class TvCtrl
   constructor: (@watchComp) ->
     setInterval =>
+      playPosChg = no
       tvGlobal.ajaxCmd 'getTvStatus', (err, status) =>
         # and ++statusCnt < 
-        (dataJson = JSON.stringify status?.data)
-        if err or
-            dataJson      isnt lastDataJson     or
-            @curPlayState isnt lastCurPlayState or
-            @curPlayPos   isnt lastCurPlayPos
-          lastDataJson     = dataJson
-          lastCurPlayState = @curPlayState
-          lastCurPlayPos   = @curPlayPos
-          if (data = status?.data)
-            log 'getTvStatus', {err, data, state:data.playState, pos:data.playPos}
-        
-        if status?.data
-          # tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
-          {id, videoFile, playState, playPos} = status.data
-          # log 'getTvStatus', {playState, playPos}
+        if (data = status?.data)
+          {id, videoFile, playState, playPos} = data
           if playState is 'buffering' then playState = 'playing'
+          
+          playPosChg = (playPos isnt lastPlayPos)
+          dataJson = JSON.stringify data
+          if playPosChg or
+              dataJson  isnt lastDataJson or
+              playState isnt lastPlayState
+            lastDataJson  = dataJson
+            lastPlayState = playState
+            lastPlayPos   = playPos
+            # log 'tv status', {err, data, playState, playPos}
+            
+          now = Date.now() / 1e3
+          if playPosChg
+            # log 'playPosChg'
+            simulatedElapsedTime = 0
+          else
+            speedFactor = 
+              if @skipping then skipSpeedup * @skipping
+              else if playState is 'playing' then 1
+              else 0
+            simulatedElapsedTime += 
+              (now - lastSimulatedTimeUpdate) * speedFactor
+            # log 'simulatedElapsedTime', simulatedElapsedTime
+            playPos = Math.round playPos + simulatedElapsedTime
+          lastSimulatedTimeUpdate = now
+          # log 'pos', {skipSpeedup, simulatedElapsedTime, playPos}
+            
           if id isnt @id
             playingWhenLoaded = (not @id and playState is 'playing')
             @watchComp.setEpisodeById id, videoFile, playingWhenLoaded
             @id = id
+            
           if playState isnt @curPlayState
             @curPlayState = playState
             @watchComp.newState playState
+            
           if playPos isnt @curPlayPos
             @curPlayPos = playPos
             @watchComp.newPos playPos
             # log 'playPos', playState, playPos
+            
           @tvIsStarting = no
+          
         else 
           playState = 'none'
           if playState isnt @curPlayState and not @tvIsStarting
             @watchComp.newState playState
           @curPlayState = playState
           @id = yes
-    , 500
+    , statusUpdateInterval
  
   getPlayPos: -> @curPlayPos
   
-  startTv: (episodeKey, action, force) ->
+  startTv: (episodeKey = @curEpisodeKey, action, force) ->
     log 'startTv', {action, force, @curPlayState, \
                     keymatch: (episodeKey is @curEpisodeKey)
                     episodeKey, @curEpisodeKey }
@@ -90,5 +112,50 @@ class TvCtrl
     if @curPlayState not in  ['none', 'stopped']
       tvGlobal.ajaxCmd 'stopTv'
     @curPlayState = 'stopped'
+    
+  startSkip: (dir) ->
+    if not @skipping
+      @skipping = (if dir is 'Fwd' then 1 else -1)
+      log 'start skipping', dir, '---- tvpos:', @curPlayPos, '----'
+      tvGlobal.ajaxCmd "skip#{dir}Tv"
         
+  stopSkip: ->
+    if @skipping
+      @skipping = 0
+      log 'stop  skipping     ', '---- tvpos:', @curPlayPos, '----'
+      tvGlobal.ajaxCmd 'pauseTv'
+        
+  test: ->
+    delay = 20
+    setTimeout =>
+      log 'testing skip timing for', delay, 'seconds'
+      # @startSkip 'Fwd'
+      @startSkip 'Back'
+      setTimeout (=> @stopSkip()), delay * 1e3
+    , 5000
 
+skipSpeedup = 17.5
+   
+###
+todo: 
+   ignore one status update after stopSkip ?
+   faster web video update when skipping
+   is minus the correct adjustment to end up before?
+   
+ fwd:           removed buffering chk
+    1  -21  +9 |  +9  +2 -22 -12 -13
+    2  -22  +1 |  -8  -8 -12  -9
+    3  +35  +3 | -17  +1  -8  -5
+    4  +56  -6 | -19  -4  -7 -10
+    5  +79 -13 | -12  -8  -5 -22 -9
+   20             -1 -11  +1  -4  0  +1  -1
+    
+ back:
+    1  +11
+    2  +13 
+    3  +12  +4
+    4  +18
+    5  +11 +14
+   20   +6  -2 +11
+    
+###

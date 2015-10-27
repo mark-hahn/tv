@@ -1,5 +1,5 @@
 
-log = (args...) -> console.log 'SERVR:', args...
+log = (args...) -> console.log 'SERVER:', args...
 
 fs          = require 'fs-plus'
 http        = require 'http'
@@ -30,7 +30,7 @@ html = fs.readFileSync 'client/index.html'
 
 srvr = http.createServer (req, res) ->
   if not dev or (
-       req.url.indexOf('favicon') is -1 and 
+      #  req.url.indexOf('favicon') is -1 and 
        req.url isnt '/js/bundle.js')
     log 'URL:', req.url
     
@@ -46,19 +46,15 @@ srvr = http.createServer (req, res) ->
     
     else
       req.addListener('end', ->
-        if req.url[0..5] is '/data/'
-          req.url = req.url[6...]
-          dataServer.serve req, res, (err) ->
-            if err
-              console.log 'data file not found: ' + req.url, err
-              done 'data file not found: ' + req.url
-              return
+        if req.url is '/favicon.ico'
+          log 'serving favicon'
+          res.writeHead 200, 'Content-Type': 'image/vnd.microsoft.icon'
+          res.end fs.readFileSync 'server/images/favicon.ico'
         else
           fileServer.serve req, res, (err) ->
             if err and req.url[-4..-1] not in ['.map', '.ico', 'ined']
               console.log 'fileServer BAD URL:', req.url, err
               done 'fileServer BAD URL: ' + req.url
-              return
       ).resume()
 
 srvr.listen cfg.tv_port

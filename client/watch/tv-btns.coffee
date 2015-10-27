@@ -19,15 +19,9 @@ log     = require('debug') 'tv:tvbtns'
   .watch-btn .tv-btns .btn-row .btn {
     font-size:1.8rem;
     line-height:1.5;
-    width: 28%;
+    width: 30%;
     height: 3rem;
     margin:1%; 
-  }
-  .tv-text {
-    position: absolute;
-    left:18.2rem;
-    top:1.2rem;
-    font-size:2rem;
   }
 """
 
@@ -45,20 +39,18 @@ Vue.component 'tv-btns-comp',
           
         div '.btn-row.video-btns', ->
           div '.btn', vOn: 'click: tvBtnClick', 'Stop'
-          div '.btn', vOn: 'click: tvBtnClick', '{{backResumeTxt}}'
-          div '.btn', vOn: 'click: tvBtnClick', '{{tvPlayPauseTxt}}'
+          div '.btn', vOn: 'click: tvBtnClick', 'Reset'
+          div '.btn', vOn: 'click: tvBtnClick', 'Back'
 
-        div '.tv-text', -> div 'T'; div 'V'
+        div '.btn-row.skip-btns', ->
+          div '.btn', vOn: 'click: tvBtnClick', '<<'
+          div '.btn', vOn: 'click: tvBtnClick', '{{tvPlayPauseTxt}}'
+          div '.btn', vOn: 'click: tvBtnClick', '>>'
 
   computed:
-    backResumeTxt: ->
-      switch @watchMode
-        when 'tracking' then 'Back'
-        else                 'Cancel'
-      
     tvPlayPauseTxt: ->
       switch @watchMode
-        when 'tracking' then 'Pause'
+        when 'playing' then 'Pause'
         else                 'Play'
 
   methods:

@@ -5,7 +5,7 @@ TvCtrl = require './tv-ctrl'
 
 {render, tag, div, img, video} = require 'teacup'
 
-require './watch-info'
+require './web-video'
 require './tv-btns'
 require './scrub'
 
@@ -24,7 +24,7 @@ require './scrub'
     display: flex;
     flex-direction: row;
   }
-  .watch-info-ctrl {
+  .watch-video-ctrl {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -57,8 +57,8 @@ Vue.component 'watch-comp',
         div 'press show or episode Play button.'
 
       div '.have-episode', vIf:'!loading && watchMode != "none"', ->
-        div '.watch-info-ctrl', ->
-          tag 'watch-info-comp',
+        div '.watch-video-ctrl', ->
+          tag 'watch-video-comp',
             show:          '{{show}}'
             episode:       '{{episode}}'
             videoFile:     '{{videoFile}}'
@@ -80,7 +80,7 @@ Vue.component 'watch-comp',
         setTimeout =>
           if @loading then clearTimeout @loading
           @loading = no
-        , 6000
+        , 10*1e3
       @tvCtrl.startTv @episode.key, 'goToStart', 'tvIsStarting'
       setTimeout =>
         tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
@@ -95,25 +95,15 @@ Vue.component 'watch-comp',
       @$dispatch 'chgCurPage', 'show'
       setTimeout (=> @tvCtrl.stopTv()), 500
       
-    scrubMoused: (@playPos) ->
-      if @chkVidInit()
-        @oldPlayPos = @tvCtrl.getPlayPos()
-        @watchMode = 'paused'
-        setTimeout (=> @$emit 'scrubMoused', @playPos), 300
-      else if @watchMode is 'tracking'
-        @oldPlayPos = @tvCtrl.getPlayPos()
-        @watchMode = 'paused'
-      @videoCmd 'playPos', @playPos
-      
     tvBtnClick: (text) ->
       @chkVidInit()
       switch text
         when 'togglePlay'
-          if @watchMode is 'tracking' then @$emit 'tvBtnClick', 'Pause'
-          else                             @$emit 'tvBtnClick', 'Play'
+          if @watchMode is 'playing' then @$emit 'tvBtnClick', 'Pause'
+          else                            @$emit 'tvBtnClick', 'Play'
         when 'Play' 
           @playPos = @getPlayPos()
-          @watchMode = 'tracking'
+          @watchMode = 'playing'
         when 'Cancel' 
           if Math.abs(@playPos - @oldPlayPos) < 2 and 
                @watchMode is 'paused'
@@ -121,13 +111,13 @@ Vue.component 'watch-comp',
           else
             @playPos = @oldPlayPos ? 0
             @videoCmd 'playPos', @playPos
-          @watchMode = 'tracking'
+          @watchMode = 'playing'
         when 'Pause' 
-          if @watchMode is 'tracking'
+          if @watchMode is 'playing'
             @oldPlayPos = @playPos
             @watchMode = 'paused'
         when 'Back' 
-          if @watchMode is 'tracking'
+          # if @watchMode is 'playing'
             @tvCtrl.stepBackTv()
         when 'Stop' 
           tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
@@ -139,25 +129,21 @@ Vue.component 'watch-comp',
 
   watch:
     watchMode: (__, old) -> 
+      log 'watchMode', {@watchMode, @playPos, @playingWhenLoaded}
       if typeof @playPos isnt 'number' then return
       switch @watchMode
-        when 'tracking'
-          if old isnt 'tracking'
+        when 'playing'
+          if old isnt 'playing'
             if not @playingWhenLoaded
               @tvCtrl.startTv @episode.key, 'resume'
             @playingWhenLoaded = no
             @playPos = @getPlayPos()
             @videoCmd 'playPos', @playPos
             @videoCmd 'play'
-        when 'playing'
-          @videoCmd 'play'
-          if old is 'tracking' 
-            @videoCmd 'pause'
-            @tvCtrl.pauseTv()
         when 'paused'
           @videoCmd 'pause'
           @tvCtrl.pauseTv()
-            
+             
   methods:          
     videoCmd: (cmd, pos) -> 
       @$broadcast 'videoCmd', cmd, pos
@@ -166,7 +152,7 @@ Vue.component 'watch-comp',
     newEpisode: (@episode ) ->
     
     newState: (tvState) ->
-      if @watchMode is 'tracking'
+      if @watchMode is 'playing'
         if @loading
           clearTimeout @loading
           @loading = null
@@ -177,7 +163,7 @@ Vue.component 'watch-comp',
           else                @videoCmd 'pause'
         
     newPos: (tvPlayPos) ->
-      if @watchMode is 'tracking'
+      if @watchMode is 'playing'
         @videoCmd   'playPos',     tvPlayPos
         @$broadcast 'setScrubPos', tvPlayPos
         @playPos =                 tvPlayPos
@@ -189,7 +175,7 @@ Vue.component 'watch-comp',
             @show      = show
             @episode   = episode
             @videoFile = videoFile
-            @watchMode = 'tracking'
+            @watchMode = 'playing'
             if @playingWhenLoaded
               @$dispatch 'chgCurPage', 'watch'
             return

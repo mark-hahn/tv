@@ -1,3 +1,6 @@
+###
+  web-video.coffee
+###
 
 Vue = require 'vue'
 log = require('debug') 'tv:wchnfo'
@@ -5,7 +8,7 @@ log = require('debug') 'tv:wchnfo'
 {render, tag, div, img, video} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """
- .watch-info {
+ .watch-video {
    width:100%;
  }
 .show-banner {
@@ -17,7 +20,7 @@ log = require('debug') 'tv:wchnfo'
   max-width: 98%;
   margin-top:0.5rem;
  }
- .watch-info .web-video-blk {
+ .watch-video .web-video-blk {
    background-color: #eec;
    border-left:   1px solid gray;
    border-top:    1px solid gray;
@@ -26,16 +29,16 @@ log = require('debug') 'tv:wchnfo'
    padding-bottom:4px;
    width:100%;
  }
- .watch-info video {
+ .watch-video video {
    width:98%;
    margin:1%
  }
- .watch-info .ctrl-row {
+ .watch-video .ctrl-row {
    margin-top: 2%;
    display: block;
    height: 33%;
  }
- .watch-info .ctrl-row .btn {
+ .watch-video .ctrl-row .btn {
    font-size:2rem;
    width: 33%;
    height: 3rem;
@@ -45,11 +48,11 @@ log = require('debug') 'tv:wchnfo'
  }
 """
 
-Vue.component 'watch-info-comp', 
+Vue.component 'watch-video-comp', 
   props: ['show', 'episode', 'videoFile', 'watchMode', 'getPlayPos', 'chkVidInit']
   
   template: render ->
-    div '.watch-info', ->
+    div '.watch-video', ->
       img '.show-banner', vAttr: 'src: bannerUrl'
       div '.watch-episode-title', 
             '{{episode.episodeNumber + ": " + episode.title}}'
@@ -59,26 +62,14 @@ Vue.component 'watch-info-comp',
           autoplay:yes
           preload:'auto'
           vOn:'click:chkVidInit, playing: vidPlay'
-        # div '.web-video-ctrls', ->
-        #   div '.ctrl-row.web-video-ctrls', ->
-        #     div '.btn.playCtl', vOn: 'click: vidCtrlClk', '<<'
-        #     div '.btn.playCtl', vOn: 'click: vidCtrlClk', '{{vidPlayPauseTxt}}'
-        #     div '.btn.playCtl', vOn: 'click: vidCtrlClk', '>>'
-        #   div '.ctrl-row.web-video.bookmarks', ->
-        #     div '.btn', vOn: 'click: vidCtrlClk', 'Prev'
-        #     div '.btn', vOn: 'click: vidCtrlClk', 'Mark'
-        #     div '.btn', vOn: 'click: vidCtrlClk', 'Next'
             
   data: ->
     bigVideo: no
     videoUrl: ''
-    vidPlayPauseTxt: ''
     videoState: 'none'
     
   methods:
     vidPlay: -> @vidHasPlayed = yes
-      
-    vidCtrlClk: ->
       
   computed:
     bannerUrl: -> tvGlobal.plexPfx + @show.banner
@@ -95,11 +86,6 @@ Vue.component 'watch-info-comp',
       @videoState = 'loaded'
       videoUrl
       
-    vidPlayPauseTxt: ->
-      switch @watchMode
-        when 'paused' then '>'
-        else '||'
-
   events:
     videoEnable: ->
       switch @videoState 
@@ -118,16 +104,15 @@ Vue.component 'watch-info-comp',
       @videoEle.muted = yes
       switch cmd
         when 'playPos'
-          @videoEle.muted = yes
           @videoEle.play()
           if Math.abs(@videoEle.currentTime - playPos) > 0.2
             @videoEle.currentTime = playPos
         when 'play'
-          @videoEle.muted = yes
           @videoEle.play()
-
-        when 'pause' then   @videoEle.muted = yes; @videoEle.pause()
-        when 'stop'  then   @videoEle.muted = yes; @videoEle.src = ''
+        when 'pause'
+          @videoEle.pause()
+        when 'stop' 
+          @videoEle.src = ''
           
     setPlayState: (state) ->
       if state is 'playing' then @$emit 'videoCmd', 'play'

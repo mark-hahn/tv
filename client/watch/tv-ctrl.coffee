@@ -18,12 +18,14 @@ class TvCtrl
           lastDataJson     = dataJson
           lastCurPlayState = @curPlayState
           lastCurPlayPos   = @curPlayPos
-          log 'getTvStatus', {err, data: status?.data, @curPlayState, @curPlayPos}
-          
+          if (data = status?.data)
+            log 'getTvStatus', {err, data, state:data.playState, pos:data.playPos}
+        
         if status?.data
           # tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
           {id, videoFile, playState, playPos} = status.data
           # log 'getTvStatus', {playState, playPos}
+          if playState is 'buffering' then playState = 'playing'
           if id isnt @id
             playingWhenLoaded = (not @id and playState is 'playing')
             @watchComp.setEpisodeById id, videoFile, playingWhenLoaded
@@ -69,6 +71,10 @@ class TvCtrl
   stepBackTv: ->
     if @curPlayState is 'playing'
       tvGlobal.ajaxCmd 'backTv'
+      
+  skipFwdTv: ->
+    
+  skipBackTv: ->
     
   pauseTv: ->
     if @curPlayState isnt 'paused'

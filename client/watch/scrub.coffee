@@ -16,8 +16,8 @@ scrubStyle = document.createElement 'style'
     width:100%;
     height: 100%;
     overflow: hidden;
-    border: 1px solid green;
-    background-color: #eec;
+    margin-left: 5px;
+    border-left: 2px solid green;
     cursor: default;
   }
   .tick {
@@ -34,8 +34,7 @@ scrubStyle = document.createElement 'style'
   .cursor {
     position:absolute;
     left:0;
-    top:0;
-    width: 100%;
+    width: 40%;
     height: 2px;
     background-color: red;
   }

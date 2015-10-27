@@ -116,6 +116,16 @@ srvr = http.createServer (req, res) ->
       roku.playAction 'pause'
       success res, ''
       
+    when 'skipFwdTv'
+      # log 'skipFwdTv', {plexRunningInRoku}
+      roku.playAction 'skipNext'
+      success res, ''
+      
+    when 'skipBackTv'
+      # log 'skipBackTv', {plexRunningInRoku}
+      roku.playAction 'skipPrevious'
+      success res, ''
+      
     when 'backTv'
       # log 'backRoku', {plexRunningInRoku}
       roku.playAction 'stepBack'

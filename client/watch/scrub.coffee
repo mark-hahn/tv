@@ -56,6 +56,7 @@ Vue.component 'scrub-comp',
   
   events:
     setScrubPos: (playPos) ->
+      playPos = Math.max 0, playPos
       if @episode
         @cursor ?= @$el.querySelector '.cursor'
         @cursor.style.top = (@scrubHgt * playPos/@episode.episodeLen - 2) + 'px'

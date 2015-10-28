@@ -2,7 +2,7 @@
   web-video.coffee
 ###
 
-log = require('debug') 'tv:wchnfo'
+log = require('debug') 'tv:webvid'
 Vue = require 'vue'
   
 {render, tag, div, img, video} = require 'teacup'
@@ -86,14 +86,14 @@ Vue.component 'watch-video-comp',
         pfx = '/mnt/media/videos-small/'
         sfx = '.mp4'
       videoUrl = tvGlobal.vidSrvrPfx + pfx + encodeURIComponent(@videoFile) + sfx
-      log 'loading videoUrl', videoUrl
+      # log 'loading videoUrl', videoUrl
       setTimeout (=> @videoState = 'loaded'), 1e3
       videoUrl
       
   events:
     videoEnable: ->
       if @videoState is 'loaded'
-        log 'videoEnable videoCmd play', 
+        # log 'videoEnable videoCmd play', 
         @$emit 'videoCmd', 'play'
         @videoState = 'enabled'
         @videoEle.muted = yes
@@ -108,30 +108,22 @@ Vue.component 'watch-video-comp',
       @videoEle.muted = yes
       switch cmd
         when 'playPos'
-          # log 'videoCmd playPos @videoEle.play()'
           @videoEle.play()
           playPosAdj = playPos
           if tvGlobal.tvCtrl.skipping is -1
             playPosAdj += vidPosOfsBack
-            # log 'vidPosOfs', playPos, playPosAdj
           else if tvGlobal.tvCtrl.skipping is +1
             playPosAdj += vidPosOfsFwd
-            # log 'vidPosOfs', playPos, playPosAdj
           else
             playPosAdj += vidPosOfsPlay
           playPosAdj = Math.max playPosAdj, 0
-          # log 'videoCmd playPos1', @videoEle.currentTime, playPosAdj
           if Math.abs(@videoEle.currentTime - playPosAdj) > 1
-            # log 'videoCmd playPos2', @videoEle.currentTime, playPosAdj
             @videoEle.currentTime = playPosAdj
         when 'play'
-          # log '@videoEle.play()'
           @videoEle.play()
         when 'pause'
-          # log '@videoEle.pause()'
           @videoEle.pause()
         when 'stop' 
-          # log '@videoEle.stop()'
           @videoEle.src = ''
           
     setPlayState: (state) ->

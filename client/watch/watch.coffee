@@ -1,6 +1,6 @@
 
 Vue    = require 'vue'
-log    = require('debug') 'tv:wchcmp'
+log    = require('debug') 'tv:-watch'
 TvCtrl = require './tv-ctrl'
 
 {render, tag, div, img, video} = require 'teacup'
@@ -129,7 +129,7 @@ Vue.component 'watch-comp',
 
   watch:
     watchMode: (__, old) -> 
-      log 'watchMode', {@watchMode, @playPos, @playingWhenLoaded}
+      # log 'watchMode', {@watchMode, @playPos, @playingWhenLoaded}
       if typeof @playPos isnt 'number' then return
       switch @watchMode
         when 'playing'
@@ -186,5 +186,3 @@ Vue.component 'watch-comp',
 
   created: -> @tvCtrl = tvGlobal.tvCtrl = new TvCtrl @
   
-  attached: -> # @tvCtrl.test()
-

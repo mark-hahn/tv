@@ -72,9 +72,9 @@ class TvCtrl
   getPlayPos: -> @curPlayPos
   
   startTv: (episodeKey = @curEpisodeKey, action, force) ->
-    log 'startTv', {action, force, @curPlayState, \
-                    keymatch: (episodeKey is @curEpisodeKey)
-                    episodeKey, @curEpisodeKey }
+    # log 'startTv', {action, force, @curPlayState, \
+    #                 keymatch: (episodeKey is @curEpisodeKey)
+    #                 episodeKey, @curEpisodeKey }
     if @curPlayState isnt 'playing' or 
           episodeKey isnt @curEpisodeKey or force
       if action is 'resume' and @curPlayState is 'paused' and

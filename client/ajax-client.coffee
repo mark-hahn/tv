@@ -8,8 +8,8 @@ request = require 'superagent'
 # bug: these are for server, not client
 {SERVER_HOST, DEBUG, OFF_SITE} = tvGlobal.serverConfig
 
-tvGlobal.serverIp  = serverIp  = 'hahnca.com'  # SERVER_HOST
-tvGlobal.browserIp = browserIp = 'hahnca.com'
+tvGlobal.serverIp  = serverIp  = # 'hahnca.com'  # SERVER_HOST
+tvGlobal.browserIp = browserIp = '192.168.1.103' #'hahnca.com'
 
 tvGlobal.plexServerIp   = plexServerIp   = SERVER_HOST
 tvGlobal.plexServerPort = plexServerPort =

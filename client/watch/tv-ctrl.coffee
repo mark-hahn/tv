@@ -39,10 +39,8 @@ class TvCtrl
               else 0
             simulatedElapsedTime += 
               (now - lastSimulatedTimeUpdate) * speedFactor
-            # log 'simulatedElapsedTime', simulatedElapsedTime
-            playPos = Math.round playPos + simulatedElapsedTime
+            playPos += simulatedElapsedTime
           lastSimulatedTimeUpdate = now
-          # log 'pos', {skipSpeedup, simulatedElapsedTime, playPos}
             
           if id isnt @id
             playingWhenLoaded = (not @id and playState is 'playing')
@@ -120,11 +118,12 @@ class TvCtrl
       tvGlobal.ajaxCmd "skip#{dir}Tv"
         
   stopSkip: ->
-    if @skipping
+    if (wasSkipping = @skipping)
       @skipping = 0
       log 'stop  skipping     ', '---- tvpos:', @curPlayPos, '----'
       tvGlobal.ajaxCmd 'pauseTv'
-        
+    wasSkipping
+    
   test: ->
     delay = 20
     setTimeout =>

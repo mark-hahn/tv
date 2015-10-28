@@ -81,7 +81,7 @@ Vue.component 'watch-comp',
           if @loading then clearTimeout @loading
           @loading = no
         , 10*1e3
-      @tvCtrl.startTv @episode.key, 'goToStart', 'tvIsStarting'
+      @tvCtrl.startTv @episode.key, 'goToStart', yes
       setTimeout =>
         tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
       , 1000
@@ -97,7 +97,11 @@ Vue.component 'watch-comp',
       
     tvBtnClick: (text) ->
       @chkVidInit()
+      if text not in ['<<','>>'] and @tvCtrl.stopSkip() then return
       switch text
+        when 'togglePlay'
+          if @watchMode is 'playing' then @$emit 'tvBtnClick', 'Pause'
+          else                            @$emit 'tvBtnClick', 'Play'
         when 'Mute'  then tvGlobal.ajaxCmd 'irCmd', 'mute'
         when 'Vol +' then tvGlobal.ajaxCmd 'irCmd', 'volUp'
         when 'Vol -' then tvGlobal.ajaxCmd 'irCmd', 'volDn'
@@ -105,19 +109,7 @@ Vue.component 'watch-comp',
           tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
           @$emit 'endWatch'
         when 'Reset' 
-          if @episode
-            @$emit 'startWatch', @episode
-          
-        when 'togglePlay'
-          if @watchMode is 'playing' then @$emit 'tvBtnClick', 'Pause'
-          else                            @$emit 'tvBtnClick', 'Play'
-        when 'Play' 
-          @playPos = @getPlayPos()
-          @watchMode = 'playing'
-        when 'Pause' 
-          if @watchMode is 'playing'
-            @oldPlayPos = @playPos
-            @watchMode = 'paused'
+          @tvCtrl.startTv @episode.key, 'goToStart', yes
         when 'Back' 
           if @watchMode is 'paused'
             @playPos = @getPlayPos()
@@ -125,6 +117,15 @@ Vue.component 'watch-comp',
             setTimeout (=> @tvCtrl.stepBackTv()), 500
           else
             @tvCtrl.stepBackTv()
+        when '<<' then @tvCtrl.startSkip 'Back'
+        when '>>' then @tvCtrl.startSkip 'Fwd'
+        when 'Play' 
+          @playPos = @getPlayPos()
+          @watchMode = 'playing'
+        when 'Pause' 
+          if @watchMode is 'playing'
+            @oldPlayPos = @playPos
+            @watchMode = 'paused'
 
   watch:
     watchMode: (__, old) -> 
@@ -183,7 +184,7 @@ Vue.component 'watch-comp',
       @videoFile = ''
       @watchMode = 'none'
 
-  created: -> @tvCtrl = new TvCtrl @
+  created: -> @tvCtrl = tvGlobal.tvCtrl = new TvCtrl @
   
   attached: -> # @tvCtrl.test()
 

@@ -2,11 +2,15 @@
   web-video.coffee
 ###
 
-Vue = require 'vue'
 log = require('debug') 'tv:wchnfo'
-
+Vue = require 'vue'
+  
 {render, tag, div, img, video} = require 'teacup'
 
+vidPosOfsPlay = -1
+vidPosOfsFwd  =  25
+vidPosOfsBack = -10  
+ 
 (document.head.appendChild document.createElement('style')).textContent = """
  .watch-video {
    width:100%;
@@ -104,14 +108,30 @@ Vue.component 'watch-video-comp',
       @videoEle.muted = yes
       switch cmd
         when 'playPos'
+          log 'videoCmd playPos @videoEle.play()'
           @videoEle.play()
-          if Math.abs(@videoEle.currentTime - playPos) > 0.2
-            @videoEle.currentTime = playPos
+          playPosAdj = playPos
+          if tvGlobal.tvCtrl.skipping is -1
+            playPosAdj += vidPosOfsBack
+            log 'vidPosOfs', playPos, playPosAdj
+          else if tvGlobal.tvCtrl.skipping is +1
+            playPosAdj += vidPosOfsFwd
+            log 'vidPosOfs', playPos, playPosAdj
+          else
+            playPosAdj += vidPosOfsPlay
+          playPosAdj = Math.max playPosAdj, 0
+          log 'videoCmd playPos1', @videoEle.currentTime, playPosAdj
+          if Math.abs(@videoEle.currentTime - playPosAdj) > 1
+            log 'videoCmd playPos2', @videoEle.currentTime, playPosAdj
+            @videoEle.currentTime = playPosAdj
         when 'play'
+          log '@videoEle.play()'
           @videoEle.play()
         when 'pause'
+          log '@videoEle.pause()'
           @videoEle.pause()
         when 'stop' 
+          log '@videoEle.stop()'
           @videoEle.src = ''
           
     setPlayState: (state) ->

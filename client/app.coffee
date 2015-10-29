@@ -181,4 +181,14 @@ new Vue
   attached: -> 
     tvGlobal.windowResize => @$broadcast 'resize'
     @$el.addEventListener 'click', => @popupMsg = ''
-
+    
+    document.body.addEventListener 'keypress', (e) =>
+      if e.charCode is 98 # b
+        window.open 'https://broadcasthe.net/torrents.php?searchstr=' +
+                     encodeURI(@curShow.title), 'GoToShow'
+        return
+      query = encodeURI @curShow.title + ' ' +
+        switch e.charCode 
+          when 103 then 'tv show' # g
+          when 101 then 'tv show episode guide' # e
+      window.open "https://www.google.com/search?q=#{query}",'GoToShow'

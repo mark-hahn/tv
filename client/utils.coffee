@@ -52,7 +52,7 @@ tvGlobal.ensureVisible = (outerSel, sel) ->
   , 2000
 
 tvGlobal.tagList = [
-  'Foreign', 'Comedy', 'Drama', 'Crime', 'MarkOnly', 'LindaOnly'     
+  'Foreign', 'Comedy', 'Drama', 'MarkOnly', 'MarkFavs', 'LindaOnly'     
   'LindaFavs', 'OnTheFence', 'New', 'LessThan3', 'Watched', 'Archive', 'Deleted' 
 ]      
 

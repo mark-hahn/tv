@@ -14,7 +14,7 @@ tvShowsCache = (if SERVER_HOST is 'localhost' then 'tvShowsCache' else '/tmp/tvS
 tvShowsKey = null
 
 tagList = [
-  'Foreign', 'Comedy', 'Drama', 'Crime', 'MarkOnly', 'LindaOnly'     
+  'Foreign', 'Comedy', 'Drama', 'MarkOnly', 'MarkFavs', 'LindaOnly'     
   'LindaFavs', 'OnTheFence', 'Archive', 'Deleted', 'New', 'LessThan3', 'Watched'
 ]      
 

@@ -29,10 +29,10 @@ Vue.component 'episode-comp',
           @$dispatch 'startWatch'
         when 'Watched'
           @curEpisode.watched = watched = not @curEpisode.watched
-          # log 'toggled watched', @curEpisode.id, @curEpisode.watched
           tvGlobal.ajaxCmd 'setDBField', @curEpisode.id, 'watched', watched, (err, res) => 
             if err then log 'set watched ajax call err', err.message
-            # log 'ajaxCmd setDBField res', res
+          @$dispatch 'chgEpisodeIdx', @curEpisodeIdx + 1
+          
         when 'Down'  then @$dispatch 'chgEpisodeIdx', @curEpisodeIdx + 1
         when 'Up'    then @$dispatch 'chgEpisodeIdx', @curEpisodeIdx - 1
         

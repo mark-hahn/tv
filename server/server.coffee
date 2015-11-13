@@ -8,7 +8,6 @@ nodeStatic  = require 'node-static'
 cfg = require("parent-config") "apps-config.json"
 
 if +cfg.tv_port is 1340
-  log "starting video processing"
   require "./video-proc"
   
 require './ajax'
@@ -19,7 +18,6 @@ fileServer = new nodeStatic.Server (if dev then cache: 0)
 
 bundle = null
 do loadBundle = ->
-  # log 'loading bundle'
   bundle = fs.readFileSync 'js/bundle.js', 'utf8'
   bundleChanged = yes
 if dev
@@ -29,10 +27,8 @@ bundleChanged = no
 html = fs.readFileSync 'client/index.html'
 
 srvr = http.createServer (req, res) ->
-  if not dev or (
-      #  req.url.indexOf('favicon') is -1 and 
-       req.url isnt '/js/bundle.js')
-    log 'URL:', req.url
+  # if not dev or req.url isnt '/js/bundle.js'
+    # log 'URL:', req.url
     
   done = (err, doc) ->
     res.writeHead (if err then 404 else 200), 'Content-Type': 'text/json'
@@ -47,7 +43,7 @@ srvr = http.createServer (req, res) ->
     else
       req.addListener('end', ->
         if req.url is '/favicon.ico'
-          log 'serving favicon'
+          # log 'serving favicon'
           res.writeHead 200, 'Content-Type': 'image/vnd.microsoft.icon'
           res.end fs.readFileSync 'server/images/favicon.ico'
         else
@@ -58,6 +54,6 @@ srvr = http.createServer (req, res) ->
       ).resume()
 
 srvr.listen cfg.tv_port
-log 'tv server listening on port ' + cfg.tv_port
+log 'listening on port', cfg.tv_port, '\n'
 
 

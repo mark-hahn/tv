@@ -4,13 +4,18 @@
 
 log  = require('debug') 'tv:---app'
 util = require 'util'
+exec = require('child_process').exec
 Vue  = require 'vue'
+FuzzySet = require 'fuzzyset.js'
+
+log Object.keys require('child_process')
 
 log 'app starting'
 
 require './utils'
 require './ajax-client'
-require './live'
+
+if tvGlobal.debug then require './live'
 
 Vue.use require 'vue-keep-scroll'
 teacup = require 'teacup'
@@ -183,12 +188,52 @@ new Vue
     @$el.addEventListener 'click', => @popupMsg = ''
     
     document.body.addEventListener 'keypress', (e) =>
-      if e.charCode is 98 # b
-        window.open 'https://broadcasthe.net/torrents.php?searchstr=' +
-                     encodeURI(@curShow.title), 'GoToShow'
-        return
-      query = encodeURI @curShow.title + ' ' +
-        switch e.charCode 
-          when 103 then 'tv show' # g
-          when 101 then 'tv show episode guide' # e
-      window.open "https://www.google.com/search?q=#{query}",'GoToShow'
+      # log 'key', e.charCode
+      switch e.charCode
+        
+        when 98 # b   open in btn
+          window.open 'https://broadcasthe.net/torrents.php?searchstr=' +
+                       encodeURI(@curShow.title), 'GoToShow'
+          
+        when 99 # c   show matching config.yml
+          title = @curShow.title
+          title = title.replace(/[^a-z\s&`]/ig, '')
+          title = title.replace(/^\s+/ig, '')
+          title = title.replace(/\s+$/ig, '')
+          title = title.replace(/\s*\bUS\b\s*$/ig, '')
+          console.log '---'
+          console.log '---', title, '---'
+          tvGlobal.ajaxCmd 'usbconfig', (err, res) =>
+            fuzz = FuzzySet res.data
+            if (matches = fuzz.get title) and matches.length
+              matches.sort (a,b) -> a[1] < b[1]
+              for m in matches # when m[0] > .75
+                console.log m[0].toFixed(2), m[1]
+            else
+              console.log title + 'no match'
+            console.log '---'
+            # alert fuzz.get(title).join ', '
+      
+        when 110  # n    next show
+          @$emit 'chgShowIdx', @curShowIdx + 1
+          
+        when 112  # p    prev show
+          @$emit 'chgShowIdx', @curShowIdx - 1
+          
+        when 119  # w    toggle watched
+          @$broadcast 'twoBtnClk', 'Watched'
+          
+        when 117  # u    click up
+          @$broadcast 'twoBtnClk', 'Up'
+          
+        when 100  # d    click down
+          @$broadcast 'twoBtnClk', 'Down'
+          
+        when 101, 103    
+          query = encodeURI @curShow.title + ' ' +
+            switch e.charCode 
+              when 103 then 'tv show' # s
+              when 101 then 'tv show episode list guide' # e
+          window.open "https://www.google.com/search?q=#{query}",'auxtvwin'
+          
+        else log 'invalid key:', e.charCode

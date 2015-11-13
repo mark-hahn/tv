@@ -3,11 +3,14 @@ fs   = require 'fs-plus'
 rmrf = require 'rmrf'
 exec = require('child_process').exec
 
-usbIp = '37.48.119.77'
-user  = 'xobtlu'
+usb_ip     = '37.48.119.77'
+usb2_ip    = '95.211.211.205'
+usb_user   = 'xobtlu'
+usb2_user  = 'mcstorm'
 videosPath = '/mnt/media/videos/'
 
-exec "ssh #{user}@#{usbIp} ls /home4/xobtlu/videos", (err, stdout, stderr) ->
+cmd = "ssh #{usb2_user}@#{usb2_ip} ls /home4/#{usb2_user}/videos"
+exec cmd, (err, stdout, stderr) ->
   if err then throw err
   usbPaths = stdout.split '\n'
   # console.log fs.listTreeSync videosPath

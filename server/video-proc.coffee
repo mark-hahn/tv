@@ -1,11 +1,19 @@
 
+log = (args...) -> console.log.call console, 
+                     moment().toISOString().replace('T', ' ')[0..18],
+                     (['video-proc:'].concat args)...
+
 fs     = require 'fs-plus'
 ffmpeg = require 'fluent-ffmpeg'
-log    = require('debug') 'tv:vdproc'
 mkdirp = require 'mkdirp'
 rmrf   = require 'rmrf'
+moment = require 'moment'
+
+newCount = 0
+count = 0
 
 shrinkOneVideo = (src, dst, cb) ->
+  log 'shrinking', ++count, 'of', newCount, src.replace '/mnt/media/videos/', ''
   try
     ffmpeg(timeout: 20*60e3, niceness: 20)
       .input src
@@ -22,7 +30,14 @@ shrinkOneVideo = (src, dst, cb) ->
     log 'shrinkOneVideo exception', src, e.message
     cb()
     
-do oneShrink = ->
+do onePass = ->
+  if newCount then log 'finished processing', newCount, 'videos'
+  allPaths = fs.listTreeSync '/mnt/media/videos'
+  for path, idx in allPaths when not /\/\./.test path
+    shrunkPath = (path.replace '/videos/', '/videos-small/') + '.mp4'
+    if not fs.existsSync shrunkPath then newCount++
+  if newCount is 0 then setTimeout onePass, 60e3
+
   topProcPath = '/mnt/media/videos-processing'
   allProcPaths = fs.listTreeSync topProcPath
   for procPath in allProcPaths when not fs.isDirectorySync procPath
@@ -30,27 +45,31 @@ do oneShrink = ->
     fs.removeSync procPath
   rmrf topProcPath
   mkdirp.sync topProcPath
-
-  allPaths = fs.listTreeSync '/mnt/media/videos'
-  for path, idx in allPaths when not /\/\./.test path
-    # if /\/\d+-/.test path
-    #   fs.removeSync path
-    #   log 'deleted file', path
-    #   continue
-    if fs.isDirectorySync path
-      dir = path.replace '/videos/', '/videos-small/'
-      # log 'creating directory', dir
-      fs.makeTreeSync dir
-      continue
-    shrunkPath = (path.replace '/videos/', '/videos-small/') + '.mp4'
-    if not fs.existsSync shrunkPath
-      log '===>', idx+1, 'of', allPaths.length, '-->' + path
-      procPath =  shrunkPath.replace '/videos-small/', '/videos-processing/'
-      fs.writeFileSync procPath, ''
-      shrinkOneVideo path, shrunkPath, ->
-        fs.removeSync procPath
+  
+  console.log '\nstarted processing', newCount, 'videos\n'
+  
+  count = 0
+  do oneShrink = ->
+    if not (path = allPaths.shift()) then onePass(); return
+    
+    if not /\/\./.test path
+      
+      if fs.isDirectorySync path
+        dir = path.replace '/videos/', '/videos-small/'
+        fs.makeTreeSync dir
         oneShrink()
+        return
+        
+      shrunkPath = (path.replace '/videos/', '/videos-small/') + '.mp4'
+      if not fs.existsSync shrunkPath
+        procPath =  shrunkPath.replace '/videos-small/', '/videos-processing/'
+        fs.writeFileSync procPath, ''
+        shrinkOneVideo path, shrunkPath, ->
+          fs.removeSync procPath
+          oneShrink()
+        return
+        
+      oneShrink()
       return
-
-  # log 'all files shrunk, waiting 4 mins'
-  setTimeout oneShrink, 240e3
+      
+    oneShrink()

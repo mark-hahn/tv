@@ -2,6 +2,7 @@
 util    = require 'util'
 url     = require 'url'
 http    = require 'http'
+exec    = require('child_process').exec
 ir      = require './ir'
 roku    = require './roku'
 plex    = require './plex'
@@ -151,7 +152,16 @@ srvr = http.createServer (req, res) ->
         # log 'getTvStatus', {err, playStatus}
         if err then error res, 'getTvStatus err: ' + err.message; return
         success res, playStatus
-        
+
+    when 'usbconfig'
+      # exec 'ssh xobtlu@37.48.119.77 sed -n "/^\\ \\ \\ \\ \\ \\ \\-/p" config.yml |
+      exec 'ssh mcstorm@95.211.211.205 sed -n "/^\\ \\ \\ \\ \\ \\ \\-/p" config.yml |
+                                       sed "s/^\\ \\ \\ \\ \\ \\ \\-\\ //" | 
+                                       sed /rss:/d', (err, stdout, stderr) ->
+        if err then error res, 'usbconfig err: ' + err.message; return
+        # log 'usbconfig', {err, stdout, stderr}                
+        success res, stdout.split '\n'
+      
     else
       error res, 'bad request cmd: ' + req.url + ',' + pathname, 400
 

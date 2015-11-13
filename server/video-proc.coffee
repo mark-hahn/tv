@@ -1,6 +1,6 @@
 
 log = (args...) -> console.log.call console, 
-                     moment().toISOString().replace('T', ' ')[0..18],
+                     moment().format().replace('T', ' ')[0..18],
                      (['video-proc:'].concat args)...
 
 fs     = require 'fs-plus'
@@ -13,7 +13,7 @@ newCount = 0
 count = 0
 
 shrinkOneVideo = (src, dst, cb) ->
-  log 'shrinking', ++count, 'of', newCount, src.replace '/mnt/media/videos/', ''
+  log 'shrinking', ++count, 'of', newCount, src.replace('/mnt/media/videos/', '')[0..70]
   try
     ffmpeg(timeout: 20*60e3, niceness: 20)
       .input src

@@ -39,7 +39,7 @@ playerCtrl = (cmd, params={}, cb) ->
           "&port=#{plexServerPort}"
   for arg, val of params then url += '&' + arg + '=' + val
   opts ={url, headers: Accept: 'application/json'}
-  log 'playerCtrl', opts
+  # log 'playerCtrl', opts
   request opts, (err, resp, body) ->
     if err or resp.statusCode isnt 200
       log 'playerCtrl error:', {opts, statusCode: resp?.statusCode, error: err?.message}
@@ -48,8 +48,8 @@ playerCtrl = (cmd, params={}, cb) ->
     cb? null, body
           
 exports.startVideo = (key, goToStart, cb) ->
-  log 'startVideo', goToStart
-  if goToStart then console.trace()
+  # log 'startVideo', goToStart
+  # if goToStart then console.trace()
   offset = (if goToStart then 0 else 1)
   playerCtrl '/playback/playMedia', {key, offset}, (err, res) ->
     if err then cb? err; return

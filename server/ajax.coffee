@@ -41,8 +41,8 @@ success = (res, data) ->
 poweringUp = no
 
 srvr = http.createServer (req, res) ->
-  if req.url isnt '/getTvStatus'
-    log 'ajax http req: ' + req.url
+  # if req.url isnt '/getTvStatus'
+    # log 'ajax http req: ' + req.url
   
   res.writeHead 200, 
     'Content-Type': 'text/json'
@@ -56,7 +56,7 @@ srvr = http.createServer (req, res) ->
   switch pathname[1..]
 
     when 'log'
-      console.log 'tvGlobal.log: ' + data.join ', '
+      # console.log 'tvGlobal.log: ' + data.join ', '
       success res
       
     when 'getIp'
@@ -111,7 +111,7 @@ srvr = http.createServer (req, res) ->
         success res, lightLevels
     
     when 'startTv'
-      log 'startRoku', {plexRunningInRoku, data}
+      # log 'startRoku', {plexRunningInRoku, data}
       if not plexRunningInRoku
         error res, 'plexNotRunning' + req.url
       roku.startVideo data[0], (data[1] is 'goToStart')

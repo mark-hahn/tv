@@ -96,16 +96,16 @@ Vue.component 'watch-video-comp',
         # log 'videoEnable videoCmd play', 
         @$emit 'videoCmd', 'play'
         @videoState = 'enabled'
-        @videoEle.muted = yes
+        # @videoEle.muted = not tvGlobal.debug
       else
         setTimeout => 
           @videoEnable()
-          @videoEle.muted = yes
+          # @videoEle.muted = not tvGlobal.debug
         , 100
           
     videoCmd: (cmd, playPos) ->
       if not @videoEle then return
-      @videoEle.muted = yes
+      # @videoEle.muted = not tvGlobal.debug
       switch cmd
         when 'playPos'
           @videoEle.play()

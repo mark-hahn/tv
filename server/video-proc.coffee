@@ -8,6 +8,7 @@ ffmpeg = require 'fluent-ffmpeg'
 mkdirp = require 'mkdirp'
 rmrf   = require 'rmrf'
 moment = require 'moment'
+mv     = require 'mv'
 
 newCount = 0
 count = 0
@@ -24,19 +25,41 @@ shrinkOneVideo = (src, dst, cb) ->
       .withAudioChannels 1
       .withAudioBitrate 16
       .addOption '-sn'
+      .renice 20
+      .on 'error', (err, stdout, stderr) -> 
+          log 'ffmpeg err', {src, err: err.message, stdout, stderr}
       .on 'end', cb
       .save dst
   catch e
     log 'shrinkOneVideo exception', src, e.message
     cb()
     
+haveList = no
+newCount = 0
+
 do onePass = ->
+  log 'onePass'
   if newCount then log 'finished processing', newCount, 'videos'
+  newCount = 0
   allPaths = fs.listTreeSync '/mnt/media/videos'
-  for path, idx in allPaths when not /\/\./.test path
-    shrunkPath = (path.replace '/videos/', '/videos-small/') + '.mp4'
-    if not fs.existsSync shrunkPath then newCount++
+  for path, idx in allPaths
+    if /\/\.[^\/]+\.\w{6}$/i.test path
+      log 'moving to partials:', path
+      mv path, path.replace('/videos/', '/videos-partials/'), onePass
+      return
+    if fs.isDirectorySync path
+      log 'directory:', path
+      dir = path.replace '/videos/', '/videos-small/'
+      fs.makeTreeSync dir
+      continue
+      return
+    shrunkPath = path.replace('/videos/', '/videos-small/') + '.mp4'
+    if not fs.existsSync shrunkPath 
+      newCount++
+      if not haveList then log 'counting:', newCount, path
   if newCount is 0 then setTimeout onePass, 60e3
+  
+  haveList = yes
 
   topProcPath = '/mnt/media/videos-processing'
   allProcPaths = fs.listTreeSync topProcPath
@@ -50,26 +73,15 @@ do onePass = ->
   
   count = 0
   do oneShrink = ->
-    if not (path = allPaths.shift()) then onePass(); return
+    if not (path = allPaths.shift()) then setImmediate onePass; return
     
-    if not /\/\./.test path
-      
-      if fs.isDirectorySync path
-        dir = path.replace '/videos/', '/videos-small/'
-        fs.makeTreeSync dir
-        oneShrink()
-        return
-        
-      shrunkPath = (path.replace '/videos/', '/videos-small/') + '.mp4'
-      if not fs.existsSync shrunkPath
-        procPath =  shrunkPath.replace '/videos-small/', '/videos-processing/'
-        fs.writeFileSync procPath, ''
-        shrinkOneVideo path, shrunkPath, ->
-          fs.removeSync procPath
-          oneShrink()
-        return
-        
-      oneShrink()
+    shrunkPath = (path.replace '/videos/', '/videos-small/') + '.mp4'
+    if not fs.existsSync shrunkPath
+      procPath =  shrunkPath.replace '/videos-small/', '/videos-processing/'
+      fs.writeFileSync procPath, ''
+      shrinkOneVideo path, shrunkPath, ->
+        fs.removeSync procPath
+        setImmediate oneShrink
       return
       
-    oneShrink()
+    setImmediate oneShrink

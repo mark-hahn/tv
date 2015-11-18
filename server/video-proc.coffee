@@ -28,6 +28,7 @@ shrinkOneVideo = (src, dst, cb) ->
       .renice 20
       .on 'error', (err, stdout, stderr) -> 
           log 'ffmpeg err', {src, err: err.message, stdout, stderr}
+          cb?()
       .on 'end', cb
       .save dst
   catch e
@@ -75,6 +76,10 @@ do onePass = ->
   do oneShrink = ->
     if not (path = allPaths.shift()) then setImmediate onePass; return
     
+    if fs.isDirectorySync path
+      setImmediate oneShrink
+      return
+      
     shrunkPath = (path.replace '/videos/', '/videos-small/') + '.mp4'
     if not fs.existsSync shrunkPath
       procPath =  shrunkPath.replace '/videos-small/', '/videos-processing/'

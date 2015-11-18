@@ -39,7 +39,6 @@ haveList = no
 newCount = 0
 
 do onePass = ->
-  log 'onePass'
   if newCount then log 'finished processing', newCount, 'videos'
   newCount = 0
   allPaths = fs.listTreeSync '/mnt/media/videos'
@@ -49,7 +48,7 @@ do onePass = ->
       mv path, path.replace('/videos/', '/videos-partials/'), onePass
       return
     if fs.isDirectorySync path
-      log 'directory:', path
+      # log 'directory:', path
       dir = path.replace '/videos/', '/videos-small/'
       fs.makeTreeSync dir
       continue
@@ -58,7 +57,9 @@ do onePass = ->
     if not fs.existsSync shrunkPath 
       newCount++
       if not haveList then log 'counting:', newCount, path
-  if newCount is 0 then setTimeout onePass, 60e3
+  if newCount is 0 
+    setTimeout onePass, 60e3
+    return
   
   haveList = yes
 

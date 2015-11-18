@@ -4,12 +4,10 @@ rmrf = require 'rmrf'
 exec = require('child_process').exec
 
 usb_ip     = '37.48.119.77'
-usb2_ip    = '95.211.211.205'
 usb_user   = 'xobtlu'
-usb2_user  = 'mcstorm'
 videosPath = '/mnt/media/videos/'
 
-cmd = "ssh #{usb2_user}@#{usb2_ip} ls /home4/#{usb2_user}/videos"
+cmd = "ssh #{usb_user}@#{usb_ip} ls /home4/#{usb_user}/videos"
 exec cmd, (err, stdout, stderr) ->
   if err then throw err
   usbPaths = stdout.split '\n'

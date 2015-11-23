@@ -30,6 +30,7 @@
     "mkdirp": "^0.5.1",
     "moment": "^2.10.3",
     "nano": "^6.1.3",
+    "node-tvdb": "^1.6.1",
     "parent-config": "^1.0.2",
     "request": "*",
     "rmrf": "^1.0.2",

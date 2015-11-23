@@ -44,15 +44,15 @@ do onePass = ->
   allPaths = fs.listTreeSync '/mnt/media/videos'
   for path, idx in allPaths
     if /\/\.[^\/]+\.\w{6}$/i.test path
-      log 'moving to partials:', path
-      mv path, path.replace('/videos/', '/videos-partials/'), onePass
-      return
+      log 'partials:', path
+      # mv path, path.replace('/videos/', '/videos-partials/'), onePass
+      # return
+      continue
     if fs.isDirectorySync path
       # log 'directory:', path
       dir = path.replace '/videos/', '/videos-small/'
       fs.makeTreeSync dir
       continue
-      return
     shrunkPath = path.replace('/videos/', '/videos-small/') + '.mp4'
     if not fs.existsSync shrunkPath 
       newCount++
@@ -77,6 +77,12 @@ do onePass = ->
   do oneShrink = ->
     if not (path = allPaths.shift()) then setImmediate onePass; return
     
+    if /\/\.[^\/]+\.\w{6}$/i.test path
+      # log 'moving to partials:', path
+      # mv path, path.replace('/videos/', '/videos-partials/'), onePass
+      setImmediate oneShrink
+      return
+      
     if fs.isDirectorySync path
       setImmediate oneShrink
       return

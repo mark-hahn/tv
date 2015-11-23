@@ -166,47 +166,6 @@ title="The Battle Creek Way" titleSort="Battle Creek Way" type="episode" updated
 </MediaContainer>
 
 ####################################################
-panic!  Just close this tab and carry on.
-
-Type 'help' for a list of commands.
-
-crosh> shell
-
-012531-crb(/) srv
-Welcome to Ubuntu 14.04.2 LTS (GNU/Linux 3.16.0-30-generic x86_64)
-
- * Documentation:  https://help.ubuntu.com/
-
-  System information as of Mon Apr 13 01:21:52 PDT 2015
-
-  System load:  0.06               Processes:          174
-  Usage of /:   27.5% of 29.11GB   Users logged in:    1
-  Memory usage: 24%                IP address for em1: 192.168.1.103
-  Swap usage:   0%
-
-  Graph this data and manage this system at:
-    https://landscape.canonical.com/
-
-38 packages can be updated.
-18 updates are security updates.
-
-4.0K drwxr-xr-x 4 4.0K Apr 13 01:06 .live-archive
-4.0K drwxr-xr-x 7 4.0K Apr 12 16:59 node_modules
-1.7M -rw------- 1 1.7M Apr 13 01:25 nohup.out
-4.0K -rw-r--r-- 1  264 Apr 12 16:58 package.json
- 20K -rw-r--r-- 1  20K Apr 13 01:15 plex-urls
-4.0K -rwxr-xr-x 1  301 Apr 12 20:37 run
-4.0K drwxr-xr-x 2 4.0K Apr 13 01:19 src
-1.8M -rw-r--r-- 1 1.8M Apr 13 01:25 tv.log
-4.0K drwxr-xr-x 5 4.0K Apr 12 21:10 www
-
-/root/apps/tv
-13M
-
-012537-srv(~/apps/tv). ./run
-
-012547-srv(~/apps/tv). nohup: appending output to ‘nohup.out’
-tv: listening on port 1340
 
 tv: starting Speakeasy Rider
 tv: startVideo { key: '/library/metadata/2667', offset: 1000000, res: '' }

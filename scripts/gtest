@@ -1,5 +1,5 @@
 
 pkill -f "/root/.nvm/versions/node/v5.0.0/bin/coffee server/guessit.coffee"
 killall tail > /dev/null 2>&1
-tail -fn 0 files/guessit-4.txt & 
-nohup coffee server/guessit.coffee > files/guessit-4.txt 2>&1 &
+tail -fn 0 files/guessit-stdouterr.txt & 
+nohup coffee server/guessit.coffee > files/guessit-stdouterr.txt 2>&1 &

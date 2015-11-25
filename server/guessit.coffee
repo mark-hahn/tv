@@ -17,6 +17,11 @@ dbgExit = (args...) ->
   log args..., '\n\ndbgExit' 
   process.exit 0
 
+deleteNullProps = (obj) ->
+  for k, v of obj when \
+      not v? or v is 'undefined' or v is 'null' or v is NaN
+    delete obj[k]
+
 guessit = (filePath) ->
   fileName = filePath.replace '/mnt/media/videos/', ''
   {stdout, stderr, status, error, output} = 
@@ -32,7 +37,6 @@ guessit = (filePath) ->
       [__, key, val] = match
       res[key] = val
   res
-
 
 exports.guess = (filePath) ->
   guessData = guessit filePath
@@ -90,19 +94,30 @@ exports.matchPlexToFile = (fuzz, showsByShowTitle, filePath) ->
       doc = _id: uuid(), type: 'show', guessTitle: guessData.series
       if show 
         doc.plexTitle = show.title
+        doc.plexId    = show.id
         Object.assign doc, show
       delete doc.id
       delete doc.title
       delete doc.episodes
+      deleteNullProps doc   
       dbShows[key] = doc
-      log 'dbAddShow', doc
+      # log 'dbAddShow', doc
     cb? null, doc._id
     
   # todo, check for duplicates in db
   dbAddEpisode = (doc, cb) ->
     doc._id  = uuid()
     doc.type = 'episode'
-    log 'dbAddEpisode', doc
+    delete doc.id
+    delete doc.episodes
+    delete doc.series
+    delete doc.releaseGroup
+    delete doc.mimetype
+    delete doc.videoCodec
+    delete doc.container
+    delete doc.episodeNumber
+    deleteNullProps doc   
+    # log 'dbAddEpisode', doc
     cb? null, doc._id
 
   if not (guess = exports.guess filePath) then return
@@ -129,20 +144,12 @@ exports.matchPlexToFile = (fuzz, showsByShowTitle, filePath) ->
       fs.appendFileSync 'files/match-' + msg, scoreStr + ' ' + seriesStr + ' ' + titleStr + '\n'
 
   addGuessOnlyEpisode = (showId) ->
-    doc = Object.assign {}, guessData, 
-                        showId:         showId
-                        season:        +guessData.season
-                        episode:       +guessData.episodeNumber
-                        file:           file
-    delete doc.series
-    delete doc.episodeNumber
-    delete doc.releaseGroup
-    delete doc.mimetype
-    delete doc.videoCodec
-    delete doc.container
-    for k, v of doc when \
-        not v or v is 'undefined' or v is 'null' or v is NaN or v is ''
-      delete doc[k]
+    doc = Object.assign {}, 
+                        guessData, 
+                        showId:   showId
+                        season:  +guessData.season
+                        episode: +guessData.episodeNumber
+                        file:     file
     dbAddEpisode doc, (err, episodeId) ->
       fs.appendFileSync 'files/guess-only-episodes', showId + ' ' + episodeId + ' ' + filePath + '\n'
     
@@ -158,25 +165,14 @@ exports.matchPlexToFile = (fuzz, showsByShowTitle, filePath) ->
         guessEpisode      = +guessData.episodeNumber
         if plexSeason  is guessSeason and
            plexEpisode is guessEpisode
-          doc = Object.assign {}, guessData, episode,
-                              showId:         showId
-                              season:         guessSeason
-                              episode:        guessEpisode
-                              file:           file
-          delete doc.episodeNumber
-          delete doc.episodes
-          delete doc.series
-          delete doc.releaseGroup
-          delete doc.mimetype
-          delete doc.videoCodec
-          delete doc.container
-          delete doc.episodeNumber
-          for k, v of doc when \
-              not v or v is 'undefined' or v is 'null' or v is NaN or v is ''
-            delete doc[k]
-          dbAddEpisode doc
+          dbAddEpisode Object.assign {}, 
+                                     guessData, episode,
+                                     showId:  showId
+                                     plexId:  episode.id
+                                     season:  guessSeason
+                                     episode: guessEpisode
+                                     file: file
           return
-          
       addGuessOnlyEpisode showId
       
   else

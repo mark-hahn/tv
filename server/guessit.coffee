@@ -7,6 +7,7 @@ exec = require('child_process').spawnSync
 plex = require './plex'
 tvdb = require './tvdb'
 Fuzz = require 'fuzzyset.js'
+db   = require './db'
 
 uuid = ->
   uuidStr = Date.now() + (Math.random() * 1e13).toFixed 0
@@ -15,13 +16,81 @@ uuid = ->
 
 dbgExit = (args...) ->
   log args..., '\n\ndbgExit' 
-  process.exit 0
+  throw 'debug exit'
 
 deleteNullProps = (obj) ->
   for k, v of obj when \
       not v? or v is 'undefined' or v is 'null' or v is NaN
     delete obj[k]
 
+dbShows        = {}  # todo, load these from db
+
+dbAddShow = (fileData, show, cb) ->
+  setImmediate ->
+    key = show?.title ? fileData.series
+    if (doc = dbShows[key])
+      cb null, doc._id
+      return
+    doc = _id: uuid(), type: 'show' 
+    if fileData
+      doc.fileTitle = fileData.series
+    if show 
+      doc.plexTitle = show.title
+      doc.plexId    = show.id
+      Object.assign doc, show
+    delete doc.id
+    delete doc.title
+    delete doc.episodes
+    delete doc.matched
+    deleteNullProps doc   
+    dbShows[key] = doc
+    db.put doc, ->
+      cb null, doc._id
+  
+# todo, check for duplicates in db
+dbAddEpisode = (doc, cb) ->
+  setImmediate ->
+    doc._id  = uuid()
+    doc.type = 'episode'
+    delete doc.id
+    delete doc.episodes
+    delete doc.series
+    delete doc.cleanSeries
+    delete doc.releaseGroup
+    delete doc.mimetype
+    delete doc.videoCodec
+    delete doc.container
+    delete doc.episodeNumber
+    delete doc.matched
+    deleteNullProps doc   
+    db.put doc, ->
+      cb null, doc._id
+
+addFileOnlyEpisode = (filePath, fileData, showId, cb) ->
+  file = filePath.replace '/mnt/media/videos/', ''
+  doc = Object.assign {}, 
+                      fileData, 
+                      showId:   showId
+                      season:  +fileData.season
+                      episode: +fileData.episodeNumber
+                      file:     file
+  dbAddEpisode doc, (err, episodeId) ->
+    fs.appendFileSync 'files/file-only-episodes', showId + ' ' + episodeId + ' ' + filePath + '\n'
+    cb()
+    
+addPlexOnlyEpisode = (episode, showId, cb) ->
+  showSeasonEpisode = episode.episodeNumber.split '-'
+  plexSeason        = +showSeasonEpisode[0]
+  plexEpisode       = +showSeasonEpisode[1]
+  doc = Object.assign {},
+                      episode, 
+                      showId:   showId
+                      season:   plexSeason
+                      episode:  plexEpisode
+  dbAddEpisode doc, (err, episodeId) ->
+    fs.appendFileSync 'files/plex-only-episodes', showId + ' ' + episodeId + '\n'
+    cb()
+    
 guessit = (filePath) ->
   fileName = filePath.replace '/mnt/media/videos/', ''
   {stdout, stderr, status, error, output} = 
@@ -38,14 +107,14 @@ guessit = (filePath) ->
       res[key] = val
   res
 
-exports.guess = (filePath) ->
-  guessData = guessit filePath
-  if not guessData.series
+exports.getFileData = (filePath) ->
+  fileData = guessit filePath
+  if not fileData.series
     fs.appendFileSync 'files/skipped-files-no-series.txt', 'mv "' + filePath + '" "' + filePath + '"\n'
     return null
-  series = guessData.series.replace /\s*\([^\)]+\)\s*$|\s*\[[^\]]+\]\s*$/g, ''
-  series = series.replace /^the\s+/i, ''
-  series = switch series.toLowerCase()
+  cleanSeries = fileData.series.replace /\s*\([^\)]+\)\s*$|\s*\[[^\]]+\]\s*$/g, ''
+  cleanSeries = cleanSeries.replace /^the\s+/i, ''
+  cleanSeries = switch cleanSeries.toLowerCase()
     when 'buffy'                           then 'Buffy the Vampire Slayer'
     when 'mst3k'                           then 'Mystery Science Theatre 3000'
     when 'cicgc'                           then 'Comedians In Cars Getting Coffee'
@@ -54,12 +123,14 @@ exports.guess = (filePath) ->
     when 'miranda christmas special'       then 'Miranda'
     when 'sex and drugs and rock and roll' then 'Sex, Chips & Rock n\' Roll'
     when 'sex drugs and rock and roll'     then 'Sex, Chips & Rock n\' Roll'
-    else series
-  if (isNaN(guessData.season) or isNaN(guessData.episodeNumber)) and
+    when 'tmawl'                           then 'That Mitchell And Webb Look'
+    else cleanSeries
+  if (isNaN(fileData.season) or isNaN(fileData.episodeNumber)) and
      (matches = /(\d+)x(\d+)/i.exec filePath)
-      guessData.season        = +matches[1]
-      guessData.episodeNumber = +matches[2]
-  {series, guessData}
+      fileData.season        = +matches[1]
+      fileData.episodeNumber = +matches[2]
+  fileData.cleanSeries = cleanSeries
+  fileData
 
 exports.getMatchInitData = (cb) ->
   plex.getSectionKeys (err, res) ->
@@ -76,119 +147,101 @@ exports.getMatchInitData = (cb) ->
         showTitles.push showTitle
         showsByShowTitle[showTitle] = show
       fuzz = new Fuzz showTitles
-      cb null, fuzz, showsByShowTitle
+      cb null, fuzz, showList, showsByShowTitle
 
-dbShows        = {}  # todo, load these from db
 printedMatches = {}
 
-exports.matchPlexToFile = (fuzz, showsByShowTitle, filePath) ->
-  if not fs.isFileSync filePath then return
+exports.matchPlexToFile = (fuzz, showsByShowTitle, filePath, cb) ->
+  if not fs.isFileSync filePath then setImmediate cb; return
   if /\..{6}$/.test filePath
     fs.appendFileSync 'files/skipped-files-partial.txt', 'rm -rf "' + filePath + '"\n'
+    setImmediate cb
     return
   file = filePath.replace '/mnt/media/videos/', ''
   
-  dbAddShow = (guessData, show, cb) ->
-    key = show?.title ? guessData.series
-    if not (doc = dbShows[key])
-      doc = _id: uuid(), type: 'show', guessTitle: guessData.series
-      if show 
-        doc.plexTitle = show.title
-        doc.plexId    = show.id
-        Object.assign doc, show
-      delete doc.id
-      delete doc.title
-      delete doc.episodes
-      deleteNullProps doc   
-      dbShows[key] = doc
-      # log 'dbAddShow', doc
-    cb? null, doc._id
-    
-  # todo, check for duplicates in db
-  dbAddEpisode = (doc, cb) ->
-    doc._id  = uuid()
-    doc.type = 'episode'
-    delete doc.id
-    delete doc.episodes
-    delete doc.series
-    delete doc.releaseGroup
-    delete doc.mimetype
-    delete doc.videoCodec
-    delete doc.container
-    delete doc.episodeNumber
-    deleteNullProps doc   
-    # log 'dbAddEpisode', doc
-    cb? null, doc._id
-
-  if not (guess = exports.guess filePath) then return
-  {series, guessData} = guess
+  if not (fileData = exports.getFileData filePath) then setImmediate cb; return
   
-  fuzzRes   = fuzz.get series
+  fuzzRes   = fuzz.get fileData.cleanSeries
   score     = fuzzRes?[0]?[0]
   showTitle = fuzzRes?[0]?[1]
   show      = showsByShowTitle[showTitle]
   
   if typeof score isnt 'number' 
     fs.appendFileSync 'files/skipped-files-no-fuzz', 'rm -rf "' + filePath + '"\n'
+    setImmediate cb
     return
 
   printMatch = (msg) ->
-    key = guessData.series + ' ~ ' + show.title
+    key = fileData.series + ' ~ ' + show.title
     if score < 1 and key not of printedMatches
       printedMatches[key] = true
       scoreStr = score.toFixed 2
-      seriesStr = guessData.series[0...40]
+      seriesStr = fileData.series[0...40]
       while seriesStr.length < 40 then seriesStr = seriesStr + ' '
       titleStr = show.title[0...40]
       while titleStr.length < 40 then titleStr = titleStr + ' '
       fs.appendFileSync 'files/match-' + msg, scoreStr + ' ' + seriesStr + ' ' + titleStr + '\n'
 
-  addGuessOnlyEpisode = (showId) ->
-    doc = Object.assign {}, 
-                        guessData, 
-                        showId:   showId
-                        season:  +guessData.season
-                        episode: +guessData.episodeNumber
-                        file:     file
-    dbAddEpisode doc, (err, episodeId) ->
-      fs.appendFileSync 'files/guess-only-episodes', showId + ' ' + episodeId + ' ' + filePath + '\n'
-    
   if score >= 0.65
     printMatch 'high-score'
     
-    dbAddShow guessData, show, (err, showId) =>
-      for episode in show.episodes ? []
+    dbAddShow fileData, show, (err, showId) ->
+      show.matched = yes
+      for episode in show.episodes
         showSeasonEpisode = episode.episodeNumber.split '-'
         plexSeason        = +showSeasonEpisode[0]
         plexEpisode       = +showSeasonEpisode[1]
-        guessSeason       = +guessData.season
-        guessEpisode      = +guessData.episodeNumber
-        if plexSeason  is guessSeason and
-           plexEpisode is guessEpisode
-          dbAddEpisode Object.assign {}, 
-                                     guessData, episode,
-                                     showId:  showId
-                                     plexId:  episode.id
-                                     season:  guessSeason
-                                     episode: guessEpisode
-                                     file: file
+        fileSeason        = +fileData.season
+        fileEpisode       = +fileData.episodeNumber
+        if plexSeason  is fileSeason and
+           plexEpisode is fileEpisode
+          doc =
+            showId:  showId
+            plexId:  episode.id
+            season:  fileSeason
+            episode: fileEpisode
+            file:    file
+          dbAddEpisode Object.assign({}, fileData, episode, doc), cb
           return
-      addGuessOnlyEpisode showId
+      addFileOnlyEpisode filePath, fileData, showId, cb
       
   else
     printMatch 'low-score'
     
-    dbAddShow guessData, null, (err, showId) -> 
-      addGuessOnlyEpisode showId
-
+    dbAddShow fileData, null, (err, showId) -> 
+      addFileOnlyEpisode filePath, fileData, showId, cb
 
 ## initial db load -- merges plex and filenames -- writes db shows and episodes
 
-exports.getMatchInitData (err, fuzz, showsByShowTitle) ->
-  log 'getting video file name list'
-  for filePath in fs.listTreeSync '/mnt/media/videos'
-    exports.matchPlexToFile fuzz, showsByShowTitle, filePath
-  log 'done'    
+exports.getMatchInitData (err, fuzz, showList, showsByShowTitle) ->
+  log 'getting file list'
+  files = fs.listTreeSync '/mnt/media/videos'
+  
+  oneFile = ->
+    if not (filePath = files.shift())
+      log 'getting plex shows with no file'
+      oneShow()
+      return
+    exports.matchPlexToFile fuzz, showsByShowTitle, filePath, oneFile
+    
+  showIdx = 0
+  oneShow = ->
+    if not (show = showList[showIdx++])
+      log 'done' 
+      return
+      
+    if not show.matched
+      dbAddShow null, show, (err, showId) ->
+
+        episodeIdx = 0
+        do oneEpisode = ->
+          if not (episode = show.episodes[episodeIdx++])
+            oneShow()
+            return
+          
+          addPlexOnlyEpisode episode, showId, oneEpisode
+          
+  oneFile()
     
 ###
   GUESSIT

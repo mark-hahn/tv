@@ -44,18 +44,18 @@ exports.setField = (id, key, val, cb) ->
       if typeof obj[attr] is 'object' then obj = obj[attr] 
       else obj[attr] = val
     # log 'doc', doc
-    put doc, (err) ->
+    exports.put doc, (err) ->
       if err then log 'setField put err: ' + err.message, {key, val}; cb? err; return
       exports.syncPlexDB()
       cb? null, doc
     
-put = (value, cb) ->
+exports.put = (value, cb) ->
   db.get value._id, (err, readVal) ->
     if readVal?._rev then value._rev = readVal._rev
     # log 'put: ---->', value._id, value.type
     db.insert value, (err) ->
       if err?.statusCode is 409
-        put value, cb
+        exports.put value, cb
         return
       if err then log 'db put err:', err; cb err; return
       cb()
@@ -131,7 +131,7 @@ exports.syncPlexDB = ->
                 _id:        show.id
                 tags:       show.tags
                 type: 'show'
-              put dbShow, (err) ->
+              exports.put dbShow, (err) ->
                 syncErr err, 'put new show'
                 oneShow()
               return
@@ -160,6 +160,6 @@ exports.syncPlexDB = ->
               watched:   watched
               type:     'episode'
               
-            put dbEpisode, (err) -> 
+            exports.put dbEpisode, (err) -> 
               syncErr err, 'put episode'
               oneEpisode()

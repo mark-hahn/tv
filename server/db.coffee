@@ -1,7 +1,9 @@
 
+log = (args...) -> 
+  console.log.apply console, ['db:'].concat args
+
 fs   = require 'fs'
 util = require 'util'
-log  = require('debug') 'tv:pldb'
 plex = require './plex'
 db   = require('nano') 'http://localhost:5984/tv'
 cfg  = require('parent-config') 'apps-config.json'
@@ -33,51 +35,61 @@ exports.getShowList = (cb) ->
       []
 
 exports.setField = (id, key, val, cb) ->
-  # log 'setField', {id, key, val}
   if typeof val isnt 'boolean' and val isnt '' and
      not isNaN val then val = +val;
-  get id, (err, doc) ->
+  exports.get id, (err, doc) ->
     if err then log 'setField get err: ' + err.message, {id, key, val}; cb? err; return
     if not doc then log 'setField doc missing: ', {id, key, val}; cb? 'doc missing'; return
     obj = doc
     for attr in key.split '.'
       if typeof obj[attr] is 'object' then obj = obj[attr] 
       else obj[attr] = val
-    # log 'doc', doc
     exports.put doc, (err) ->
       if err then log 'setField put err: ' + err.message, {key, val}; cb? err; return
       exports.syncPlexDB()
       cb? null, doc
-    
-exports.put = (value, cb) ->
-  db.get value._id, (err, readVal) ->
-    if readVal?._rev then value._rev = readVal._rev
-    # log 'put: ---->', value._id, value.type
-    db.insert value, (err) ->
-      if err?.statusCode is 409
-        exports.put value, cb
-        return
-      if err then log 'db put err:', err; cb err; return
-      cb()
 
-get = (key, cb) ->
-  db.get key, (err, value) ->
+exports.view = (viewName, opts, cb) ->
+  db.view 'all', viewName, opts, cb
+    
+exports.get = (key, cb) ->
+  db.get key, (err, doc) ->
     if err 
       if err?.error is 'not_found' 
-        # log 'get: <----', key, 'not found'
         cb()
         return
       log 'db get err:', err
       cb err
       return
-    # log 'get: <----', value._id, value.type, value.title
-    cb null, value
+    cb null, doc
     
 syncErr = (err, msg) ->
   if err
     log 'ABORT: syncPlexDB ' + msg + ' err:', err
     process.exit 1
     
+exports.put = (doc, cb) ->
+  db.get doc._id, (err, readVal) ->
+    if readVal?._rev then doc._rev = readVal._rev
+    db.insert doc, (err) ->
+      if err?.statusCode is 409
+        exports.put doc, cb
+        return
+      if err then log 'db put err:', err; cb err; return
+      cb()
+
+exports.delete = (doc, cb) ->
+  db.destroy doc._id, doc._rev, (err) ->
+    if err?.statusCode is 409
+      db.get id, (err, doc) ->
+        if err
+          log 'db.delete get err:', err
+          cb err
+          return
+        exports.delete doc, cb
+      return
+    cb?()
+
 insideSync = no
 syncTO = null
 exports.syncPlexDB = ->
@@ -99,7 +111,7 @@ exports.syncPlexDB = ->
         syncTO ?= setTimeout exports.syncPlexDB, 600e3
         return
         
-      get show.id, (err, dbShow) ->
+      exports.get show.id, (err, dbShow) ->
         syncErr err, 'get show'
         
         # log util.inspect show, depth:null
@@ -138,7 +150,7 @@ exports.syncPlexDB = ->
             oneShow()
             return
 
-          get episode.id, (err, dbEpisode) ->
+          exports.get episode.id, (err, dbEpisode) ->
             syncErr err, 'get episode'
               
             watched = 

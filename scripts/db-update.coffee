@@ -1,13 +1,13 @@
 
 log = (args...) -> 
-  console.log.call console, 'guessit:', args...
+  console.log.call console, 'dbupdt:', args...
 
 fs   = require 'fs-plus'
 exec = require('child_process').spawnSync
-plex = require './plex'
-tvdb = require './tvdb'
 Fuzz = require 'fuzzyset.js'
-db   = require './db'
+plex = require '../server/plex'
+tvdb = require '../server/tvdb'
+db   = require '../server/db'
 
 uuid = ->
   uuidStr = Date.now() + (Math.random() * 1e13).toFixed 0
@@ -23,34 +23,88 @@ deleteNullProps = (obj) ->
       not v? or v is 'undefined' or v is 'null' or v is NaN
     delete obj[k]
 
-dbShows        = {}  # todo, load these from db
+  ###
+  function(doc) {  // showByPlexTitle
+    if (doc.type == 'show' && doc.plexTitle)
+      emit(doc.plexTitle, doc);
+  }
+  function(doc) { // showByFileTitle
+    if (doc.type == 'show' && !doc.plexTitle)
+        emit(doc.fileTitle, doc);
+  }
+  function(doc) { // episodeByShowId
+    if (doc.type == 'episode')
+      emit(doc.showId, doc);
+  }
+  function(doc) { // episodeByShowSeasonEpisode
+    if (doc.type == 'episode')
+      emit([doc.showId, doc.season, doc.episode], doc);
+  }
+  ###
+
+getShowByTitle = (isShow, title, cb) ->
+  if not title then setImmediate cb; return
+  if isShow then view = 'showByPlexTitle'
+  else           view = 'showByFileTitle'
+  db.view view, {key: title}, (err, body) ->
+    if err?.status is 404 then cb(); return
+    else if err then throw err
+    if body.rows.length is 0 then cb(); return
+    cb null, body.rows[0].value
 
 dbAddShow = (fileData, show, cb) ->
-  setImmediate ->
-    key = show?.title ? fileData.series
-    if (doc = dbShows[key])
-      cb null, doc._id
-      return
-    doc = _id: uuid(), type: 'show' 
-    if fileData
-      doc.fileTitle = fileData.series
-    if show 
-      doc.plexTitle = show.title
-      doc.plexId    = show.id
-      Object.assign doc, show
-    delete doc.id
-    delete doc.title
-    delete doc.episodes
-    delete doc.matched
-    deleteNullProps doc   
-    dbShows[key] = doc
-    db.put doc, ->
-      cb null, doc._id
+  doc = type: 'show' 
+  if show 
+    doc.plexTitle = show.title
+    doc.plexId    = show.id
+    Object.assign doc, show
+  if fileData
+    doc.fileTitle = fileData.series
+  getShowByTitle yes, doc.plexTitle, (err, plexShow) ->
+    getShowByTitle no, doc.fileTitle, (err, fileShow) ->
+      newDoc = null
+      if not plexShow and not fileShow
+        doc._id = uuid()
+        newDoc = doc
+      else if plexShow and not fileShow
+        newDoc = Object.assign {}, plexShow, doc
+      else if fileShow and not plexShow
+        newDoc = Object.assign {}, fileShow, doc
+      else
+        newDoc = Object.assign {}, fileShow, plexShow, doc
+      delete newDoc.id
+      delete newDoc.title
+      delete newDoc.episodes
+      delete newDoc.matched
+      deleteNullProps newDoc
+      db.put newDoc, (err) -> 
+        if err then throw err
+        if not plexShow or not fileShow
+          cb null, newDoc._id
+          return
+        db.view 'episodeByShowId', {key: fileShow._id}, (err, body) ->
+          if err then throw err
+          do oneRow = ->
+            if not (row = body.rows.shift())
+              db.delete fileShow, (err) ->
+                if err then throw err
+                cb null, newDoc._id
+              return 
+            episodeDoc = row.value
+            episodeDoc.showId = newDoc._id
+            db.put episodeDoc, (err) ->
+              if err then throw err
+              oneRow() 
   
-# todo, check for duplicates in db
 dbAddEpisode = (doc, cb) ->
-  setImmediate ->
-    doc._id  = uuid()
+  db.view 'episodeByShowSeasonEpisode', \
+          {key: [doc.showId, doc.season, doc.episode]}, (err, body) ->
+    if err?.status is 404
+      doc._id = uuid()
+    else if err then throw err
+    else if body.rows.length is 0
+      doc._id = uuid()
+    else doc = Object.assign {}, body.rows[0].value, doc
     doc.type = 'episode'
     delete doc.id
     delete doc.episodes
@@ -62,8 +116,10 @@ dbAddEpisode = (doc, cb) ->
     delete doc.container
     delete doc.episodeNumber
     delete doc.matched
+    delete doc.audioChannels
     deleteNullProps doc   
-    db.put doc, ->
+    db.put doc, (err) ->
+      if err then throw err
       cb null, doc._id
 
 addFileOnlyEpisode = (filePath, fileData, showId, cb) ->
@@ -75,7 +131,7 @@ addFileOnlyEpisode = (filePath, fileData, showId, cb) ->
                       episode: +fileData.episodeNumber
                       file:     file
   dbAddEpisode doc, (err, episodeId) ->
-    fs.appendFileSync 'files/file-only-episodes', showId + ' ' + episodeId + ' ' + filePath + '\n'
+    fs.appendFileSync 'files/file-only-episodes', 'mv ' + filePath + ' ' + filePath + '\n'
     cb()
     
 addPlexOnlyEpisode = (episode, showId, cb) ->
@@ -151,7 +207,7 @@ exports.getMatchInitData = (cb) ->
 
 printedMatches = {}
 
-exports.matchPlexToFile = (fuzz, showsByShowTitle, filePath, cb) ->
+exports.writeDbForFile = (fuzz, showsByShowTitle, filePath, cb) ->
   if not fs.isFileSync filePath then setImmediate cb; return
   if /\..{6}$/.test filePath
     fs.appendFileSync 'files/skipped-files-partial.txt', 'rm -rf "' + filePath + '"\n'
@@ -222,7 +278,7 @@ exports.getMatchInitData (err, fuzz, showList, showsByShowTitle) ->
       log 'getting plex shows with no file'
       oneShow()
       return
-    exports.matchPlexToFile fuzz, showsByShowTitle, filePath, oneFile
+    exports.writeDbForFile fuzz, showsByShowTitle, filePath, oneFile
     
   showIdx = 0
   oneShow = ->

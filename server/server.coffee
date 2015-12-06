@@ -13,7 +13,7 @@ if +cfg.tv_port is 1340
 require './ajax'
 require './video-srvr'
 
-require './vlc'
+require './tvdb'
 
 dev  = (__dirname.indexOf('/dev/') > -1)
 fileServer = new nodeStatic.Server (if dev then cache: 0)

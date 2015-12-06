@@ -6,21 +6,31 @@ exec = require('child_process').execFile
 net  = require 'net'
 
 vlcip = '192.168.1.104'
+socket = null
 
-vlcCmd = (command, cb) ->
+initSocket = ->
+  socket?.end()
+  socket = net.connect 1250, vlcip
+  socket.on 'data', (data) -> log 'socket recvd:', data.toString().replace /\n/g, ' '
+  socket.on 'error', (err) -> 
+    log 'socket error', err
+    cb?()
+  socket.on 'end', (data) -> 
+    if data then log 'socket   end:', data.toString().replace /\n/g, ' '
+
+vlcCmd = (command) ->
   try
-    socket = net.connect 1250, vlcip
-    socket.on 'data', (data) -> log 'socket recvd:', data.toString().replace /\n/g, ' '
-    socket.on 'error', (err) -> 
-      log 'socket error', err
-      cb?()
-    socket.on 'end', -> cb?()
     socket.write command + '\n', ->
       log 'socket sent:', command
-      socket.end()
   catch e
-    log 'vlcCmd err', command, e.message
-
+    log 'retrying', 'command', e.message
+    initSocket()
+    setTimeout (-> vlcCmd command), 1000
+    
+closeSocket = ->
+  socket?.end()
+  socket = null
+  
 ssh = (user, commandLine, cb) ->
   argArr = commandLine.split /\s+/
   argArr.unshift user + '@' + vlcip
@@ -31,37 +41,36 @@ ssh = (user, commandLine, cb) ->
       cb?()
   catch e
     cb?()
+    
+vlcCmdLine = 'DISPLAY=:0 vlc -I rc -f --rc-host 0.0.0.0:1250 --quiet'
 
 exports.play = (file, cb) ->
+  closeSocket()
   exports.stop ->
     ssh 'root', 'sshfs hahnca.com:/mnt/media /mnt/media 
                  -o reconnect,cache=no,direct_io,max_readahead=0x10000000', ->
       ssh 'root', 'bindfs /mnt/media/videos /home/mark/Videos', ->
         setTimeout ->
-          vlcCmd 'f on' 
+          initSocket()
           cb?()
-        , 10e3
-        ssh 'mark', 'DISPLAY=:0 vlc -I rc --rc-host 0.0.0.0:1250 /home/mark/Videos/' + file
+        , 5e3
+        ssh 'mark', vlcCmdLine + ' /home/mark/Videos/' + file
 
 exports.stop = (cb) ->
-  ssh 'root', 'killall vlc', cb
+  # vlcCmd 'shutdown'
+  # closeSocket()
+  # setTimeout ->
+    ssh 'root', 'killall vlc', cb
+  # , 500
 
-exports.play 'About.a.Boy.S02E07.720p.HDTV.X264-DIMENSION.mkv', ->
-  log 'pausing'
-  vlcCmd 'pause'
-
+exports.play 'aaf-coming.of.age.s01e01.avi', ->
+  # setTimeout ->
+    # secs = Math.floor Math.random() * 900 + 150
+    # vlcCmd 'seek ' + secs
+    # vlcCmd 'get_time'
+  # , 1e3
 
 ###
-
-ssh-tvm DISPLAY=:0 vlc -I rc --rc-host 0.0.0.0:1250 /home/mark/About.a.Boy.S02E11.720p.HDTV.X264-DIMENSION.mkv
-xdotool click 1
-echo "f on"   | nc 192.168.1.104 1250
-echo pause    | nc 192.168.1.104 1250
-echo shutdown | nc 192.168.1.104 1250
-
-VLC media player 2.1.6 Rincewind
-Command Line Interface initialized. Type `help' for help.
-> +----[ CLI commands ]
 | add XYZ  . . . . . . . . . . . . . . . . . . . . add XYZ to playlist
 | enqueue XYZ  . . . . . . . . . . . . . . . . . queue XYZ to playlist
 | playlist . . . . . . . . . . . . .  show items currently in playlist
@@ -131,11 +140,4 @@ Command Line Interface initialized. Type `help' for help.
 | logout . . . . . . . . . . . . . .  exit (if in a socket connection)
 | quit . . . . . . . .  quit VLC (or logout if in a socket connection)
 | shutdown . . . . . . . . . . . . . . . . . . . . . . .  shutdown VLC
-+----[ end of help ]
-> Shutting down.
-
-/home/mark/.config/vlc/vlcrc -- line 1661
- # Audio output device (string)
-   alsa-audio-device=hdmi
-
 ###

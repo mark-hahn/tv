@@ -31,16 +31,16 @@ getPlexData = (path, eleType, cb) ->
       data.push child
     cb? null, data
     
-exports.findRoku = (rokuName, cb) ->
-  getPlexData '/clients', 'Server', (err, clients) ->
-    if err then cb err; return
-    # log 'findRoku clients', clients
-    for client in clients when client.name.indexOf(rokuName) > -1
-      cb null, client, plexServerIp, plexServerPort
-      return
-    log 'findRoku, roku client not found:', clients
-    cb? message: 'roku client not found'
-    
+# exports.findRoku = (rokuName, cb) ->
+#   getPlexData '/clients', 'Server', (err, clients) ->
+#     if err then cb err; return
+#     # log 'findRoku clients', clients
+#     for client in clients when client.name.indexOf(rokuName) > -1
+#       cb null, client, plexServerIp, plexServerPort
+#       return
+#     log 'findRoku, roku client not found:', clients
+#     cb? message: 'roku client not found'
+#     
 exports.getSectionKeys = (cb) ->
   getPlexData '/library/sections', 'Directory', (err, data) ->
     if err then cb err; return

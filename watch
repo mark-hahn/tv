@@ -4,7 +4,7 @@ if [ $LOCATION == "server" ]; then
   echo "Watch cannot be run on the server"
   exit 1
 fi
-
+ 
 echo "Checking watchify"
 
 pkill -f "watchify client/app.coffee" # > /dev/null 2>&1

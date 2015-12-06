@@ -20,16 +20,19 @@ roku = exports
 playerCtrl = null #debug
 
 exports.init = (cb) ->
-  plex.findRoku rokuName, (err, client, plexServerIpIn, plexServerPortIn) ->
-    if err 
-      log 'roku.init failed', err
-      cb? err
-      return
+  # plex.findRoku rokuName, (err, client, plexServerIpIn, plexServerPortIn) ->
+  #   if err 
+  #     log 'roku.init failed', err
+  #     cb? err
+  #     return
+    plexServerIpIn   = '192.168.1.103'
+    plexServerPortIn = '32400'
+      
     plexServerIp    = plexServerIpIn
     plexServerPort  = plexServerPortIn
-    rokuIp          = client.host
-    rokuPort        = client.port
-    rokuMachineId   = client.machineIdentifier
+    # rokuIp          = client.host
+    # rokuPort        = client.port
+    # rokuMachineId   = client.machineIdentifier
     cb? null
 
 playerCtrl = (cmd, params={}, cb) ->

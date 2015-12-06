@@ -23,25 +23,6 @@ deleteNullProps = (obj) ->
       not v? or v is 'undefined' or v is 'null' or v is NaN
     delete obj[k]
 
-  ###
-  function(doc) {  // showByPlexTitle
-    if (doc.type == 'show' && doc.plexTitle)
-      emit(doc.plexTitle, doc);
-  }
-  function(doc) { // showByFileTitle
-    if (doc.type == 'show' && !doc.plexTitle)
-        emit(doc.fileTitle, doc);
-  }
-  function(doc) { // episodeByShowId
-    if (doc.type == 'episode')
-      emit(doc.showId, doc);
-  }
-  function(doc) { // episodeByShowSeasonEpisode
-    if (doc.type == 'episode')
-      emit([doc.showId, doc.season, doc.episode], doc);
-  }
-  ###
-
 getShowByTitle = (isShow, title, cb) ->
   if not title then setImmediate cb; return
   if isShow then view = 'showByPlexTitle'
@@ -131,7 +112,7 @@ addFileOnlyEpisode = (filePath, fileData, showId, cb) ->
                       episode: +fileData.episodeNumber
                       file:     file
   dbAddEpisode doc, (err, episodeId) ->
-    fs.appendFileSync 'files/file-only-episodes', 'mv ' + filePath + ' ' + filePath + '\n'
+    fs.appendFileSync 'files/file-only-episodes', 'mv "' + filePath + '" "' + filePath + '"\n'
     cb()
     
 addPlexOnlyEpisode = (episode, showId, cb) ->
@@ -168,11 +149,12 @@ exports.getFileData = (filePath) ->
   if not fileData.series
     fs.appendFileSync 'files/skipped-files-no-series.txt', 'mv "' + filePath + '" "' + filePath + '"\n'
     return null
-  cleanSeries = fileData.series.replace /\s*\([^\)]+\)\s*$|\s*\[[^\]]+\]\s*$/g, ''
-  cleanSeries = cleanSeries.replace /^the\s+/i, ''
+  cleanSeries = fileData.series.replace /\s*\(\d+\)\s*$|\s*\[[^\]]+\]\s*$/g, ''
+  cleanSeries = cleanSeries.replace /^(the\s+|aaf-|daa-)/i, ''
   cleanSeries = switch cleanSeries.toLowerCase()
     when 'buffy'                           then 'Buffy the Vampire Slayer'
-    when 'mst3k'                           then 'Mystery Science Theatre 3000'
+    when 'mst3k'                           then 'Mystery Science Theater 3000'
+    when 'mst3k (cu)'                      then 'Mystery Science Theater 3000'
     when 'cicgc'                           then 'Comedians In Cars Getting Coffee'
     when 'amazon pilot season'             then 'Amazon Pilot Season Fall 2015 Good Girls'
     when 'bob servant'                     then 'Bob Servant Independent'
@@ -188,7 +170,7 @@ exports.getFileData = (filePath) ->
   fileData.cleanSeries = cleanSeries
   fileData
 
-exports.getMatchInitData = (cb) ->
+exports.getInitData = (cb) ->
   plex.getSectionKeys (err, res) ->
     if err then throw err
     {tvShowsKey} = res
@@ -198,7 +180,7 @@ exports.getMatchInitData = (cb) ->
       showTitles       = [] 
       showsByShowTitle = {}
       for show in showList
-        showTitle = show.title.replace /\s*\([^\)]+\)\s*$|\s*\[[^\]]+\]\s*$/g, ''
+        showTitle = show.title.replace /\s*\(\d+\)\s*$|\s*\[[^\]]+\]\s*$/g, ''
         showTitle = showTitle.replace /^the\s+/i, ''
         showTitles.push showTitle
         showsByShowTitle[showTitle] = show
@@ -209,10 +191,12 @@ printedMatches = {}
 
 exports.writeDbForFile = (fuzz, showsByShowTitle, filePath, cb) ->
   if not fs.isFileSync filePath then setImmediate cb; return
-  if /\..{6}$/.test filePath
+  
+  if /(\.[^\.]{6}|\.filepart)$/i.test filePath
     fs.appendFileSync 'files/skipped-files-partial.txt', 'rm -rf "' + filePath + '"\n'
     setImmediate cb
     return
+    
   file = filePath.replace '/mnt/media/videos/', ''
   
   if not (fileData = exports.getFileData filePath) then setImmediate cb; return
@@ -221,6 +205,9 @@ exports.writeDbForFile = (fuzz, showsByShowTitle, filePath, cb) ->
   score     = fuzzRes?[0]?[0]
   showTitle = fuzzRes?[0]?[1]
   show      = showsByShowTitle[showTitle]
+  
+  if fileData.cleanSeries.indexOf('mst3k') > -1
+    log 'fuzzRes mst3k', {fileData, fuzzRes}
   
   if typeof score isnt 'number' 
     fs.appendFileSync 'files/skipped-files-no-fuzz', 'rm -rf "' + filePath + '"\n'
@@ -267,9 +254,8 @@ exports.writeDbForFile = (fuzz, showsByShowTitle, filePath, cb) ->
     dbAddShow fileData, null, (err, showId) -> 
       addFileOnlyEpisode filePath, fileData, showId, cb
 
-## initial db load -- merges plex and filenames -- writes db shows and episodes
-
-exports.getMatchInitData (err, fuzz, showList, showsByShowTitle) ->
+exports.getInitData (err, fuzz, showList, showsByShowTitle) ->
+  if err then throw err
   log 'getting file list'
   files = fs.listTreeSync '/mnt/media/videos'
   
@@ -285,20 +271,38 @@ exports.getMatchInitData (err, fuzz, showList, showsByShowTitle) ->
     if not (show = showList[showIdx++])
       log 'done' 
       return
-      
     if not show.matched
       dbAddShow null, show, (err, showId) ->
-
         episodeIdx = 0
         do oneEpisode = ->
           if not (episode = show.episodes[episodeIdx++])
             oneShow()
             return
-          
           addPlexOnlyEpisode episode, showId, oneEpisode
-          
+    else
+      setImmediate oneShow 
+       
   oneFile()
     
+###
+function(doc) {  // showByPlexTitle
+  if (doc.type == 'show' && doc.plexTitle)
+    emit(doc.plexTitle, doc);
+}
+function(doc) { // showByFileTitle
+  if (doc.type == 'show' && !doc.plexTitle)
+      emit(doc.fileTitle, doc);
+}
+function(doc) { // episodeByShowId
+  if (doc.type == 'episode')
+    emit(doc.showId, doc);
+}
+function(doc) { // episodeByShowSeasonEpisode
+  if (doc.type == 'episode')
+    emit([doc.showId, doc.season, doc.episode], doc);
+}
+###
+
 ###
   GUESSIT
     [ 'mimetype', 'video/mp4' ],

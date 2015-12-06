@@ -12,12 +12,13 @@ log     = require('debug') 'tv:ajax'
 port    = require('parent-config')('apps-config.json').tvAjax_port
 log 'port', port
 
-plexRunningInRoku = yes
+# plexRunningInRoku = yes
+plexRunningInRoku = no
 
 roku.init (err) -> 
-  if err
-    plexRunningInRoku = no
-    log 'roku.init failed'
+  # if err
+  #   plexRunningInRoku = no
+  #   log 'roku.init failed'
   
 db.init   (err) -> if err then log 'db.init failed'
 

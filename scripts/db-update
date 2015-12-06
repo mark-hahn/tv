@@ -1,10 +1,10 @@
 
 rm files/*
-touch files/guessit-stdouterr.txt
+touch files/db-update-stdouterr.txt
 pkill -f "/root/.nvm/versions/node/v5.0.0/bin/coffee scripts/db-update.coffee"
 killall tail > /dev/null 2>&1
 
 coffee -co js server/*.coffee
 
-tail -fn 0 files/guessit-stdouterr.txt & 
-nohup coffee scripts/db-update.coffee > files/guessit-stdouterr.txt 2>&1 &
+tail -fn 0 files/db-update-stdouterr.txt & 
+nohup coffee scripts/db-update.coffee > files/db-update-stdouterr.txt 2>&1 &

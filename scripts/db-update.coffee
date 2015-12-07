@@ -37,10 +37,9 @@ guessit = (filePath) ->
   res
 
 exports.getFileData = (filePath) ->
-  stats       = fs.statSync filePath
+  stats    = fs.statSync filePath
+  fileSize = stats.size
   if not stats.isFile() then cb(); return
-  fileSize    = stats.size
-  fileModTime = stats.mtime 
     
   fileData = guessit filePath
   if not fileData.series
@@ -67,92 +66,102 @@ exports.getFileData = (filePath) ->
       seasonNumber  = +matches[1]
       episodeNumber = +matches[2]
   else
-    fileTitle     =  fileData.fileTitle
     seasonNumber  = +fileData.season
     episodeNumber = +fileData.episodeNumber
-  {filePath, fileSize, fileModTime, fileTitle, seasonNumber, episodeNumber}
+  {filePath, fileSize, fileTitle, seasonNumber, episodeNumber}
 
-seasonsChecked = {}
-dbPutEpisode = (showId, episode, tvdbEpisodes, cb) ->
-  episode._id   ?= uuid()
-  episode.type   = 'episode'
-  episode.showId = showId
+dbPutShow = (show, cb) ->
+  show._id        = uuid()
+  show.type       = 'show'
+  delete show.episodes
+  deleteNullProps show
+  db.put show, cb
+  
+dbPutEpisode = (episode, cb) ->
+  episode._id ?= uuid()
+  episode.type = 'episode'
   deleteNullProps episode
-  db.put episode, (err) ->
+  db.put episode, cb
+  
+seasonsChecked = {}
+checkTvdbEpisodeList = (filePath, showId, episode, tvdbEpisodes, cb) ->
+  episode.showId = showId
+  
+  key = showId + '-' + episode.seasonNumber
+  if seasonsChecked[key] and episode.tvdbId
+    dbPutEpisode episode, cb
+    return
+  seasonsChecked[key] = yes
+  
+  db.view 'episodeByShowSeasonEpisode',
+          {startKey: [showId, episode.seasonNumber, null], \
+           endKey:   [showId, episode.seasonNumber, {}]}
+  , (err, body) -> 
     if err then throw err
     
-    key = showId + '-' + episode.seasonNumber
-    if seasonsChecked[key] then cb(); return
-    seasonsChecked[key] = yes
-    
-    db.view 'episodeByShowSeasonEpisode',
-            {startKey: [showId, episode.seasonNumber, null],
-             endKey:   [showId, episode.seasonNumber, {}]}, (err, body) -> 
-      if err then throw err
-      dbEpisodeNumbers = []
-      for row in body.rows
-        dbEpisodeNumbers.push row.key[2]
+    dbEpisodes = {}
+    dbEpisodeNumbers = []
+    for row in body.rows
+      dbEpisode = row.value
+      dbEpisodeNumber = dbEpisode.episodeNumber
+      if dbEpisodeNumber is episode.episodeNumber
+        episode = Object.assign {}, dbEpisode, episode
         
-      do oneEpisode = ->
-        if not (episode = tvdbEpisodes.shift()) then cb(); return
-        if episode.episodeNumber in dbEpisodeNumbers then oneEpisode(); return
+      dbEpisodeNumbers.push dbEpisodeNumber
+      dbEpisodes[dbEpisodeNumber] = dbEpisode
+      
+    do oneTvdbEpisode = ->
+      if not (tvdbEpisode = tvdbEpisodes.shift())
+        if not episode.tvdbId
+          fs.appendFileSync 'files/no-tvdb.txt', 
+                            'mv "' + filePath + '" "' + filePath + '"\n'
+        dbPutEpisode episode, cb
+        return
         
-        # should we patch episodes with no tvdbId here?   TODO  XXX
+      tvdbEpisodeNumber = tvdbEpisode.episodeNumber
+      if tvdbEpisodeNumber is episode.episodeNumber
+        Object.assign episode, tvdbEpisode
+        oneTvdbEpisode()
+        return
         
-        # what about episodes coming later from files?    TODO  XXX
-        
-        episode._id       = uuid()
-        episode.type      = 'episode'
-        episode.filePaths = []
-        db.put episode, (err) ->
-          if err then throw err
-          oneEpisode()
+      if tvdbEpisode.episodeNumber in dbEpisodeNumbers
+        oneTvdbEpisode()
+        return
+      
+      tvdbEpisode.showId    = showId
+      tvdbEpisode.filePaths = []
+      dbPutEpisode tvdbEpisode, oneTvdbEpisode
 
 buildEpisode = (buildArgs, tvdbEpisodes, cb) ->
-  {newShow, fileData, fileTitle, filePath, show, episode} = buildArgs
+  {newShow, fileTitle, filePath, show, episode} = buildArgs
   
   for tvdbEpisode in tvdbEpisodes ? []
-    if tvdbEpisode.episodeNumber is fileData.episodeNumber
+    if tvdbEpisode.episodeNumber is episode.episodeNumber
       Object.assign episode, tvdbEpisode
       break
       
-  if not episode.tvdbId
-    fs.appendFileSync 'files/files-no-tvdb', 
-                      'mv "' + filePath + '" "' + filePath + '"\n'
   if newShow      
-    show._id        = uuid()
-    show.type       = 'show'
     show.fileTitles = [fileTitle]
-    delete show.episodes
-    deleteNullProps show
-    db.put show, (err) ->
-      if err then throw err
-      dbPutEpisode show._id, episode, tvdbEpisodes, cb
-      
+    dbPutShow show, ->
+      checkTvdbEpisodeList filePath, show._id, episode, tvdbEpisodes, cb
   else
     if not tvdbEpisodes 
       tvdb.getEpisodesByTvdbShowId show.tvdbId, (err, tvdbEpisodes) ->
         if err then throw err
-        dbPutEpisode show._id, episode, tvdbEpisodes, cb
+        checkTvdbEpisodeList filePath, show._id, episode, tvdbEpisodes, cb
     else
-      dbPutEpisode show._id, episode, tvdbEpisodes, cb
+      checkTvdbEpisodeList filePath, show._id, episode, tvdbEpisodes, cb
   
 checkEpisode = (newShow, show, fileData, cb) ->
   db.view 'episodeByShowSeasonEpisode',
-          {key: [show._id, fileData.seasonNumber, fileData.episodeNumber]},
-          (err, body) -> 
+          {key: [show._id, fileData.seasonNumber, fileData.episodeNumber]}
+  , (err, body) -> 
     if err then throw err
     
-    {fileTitle, filePath, fileSize, fileModTime} = fileData
+    {fileTitle, filePath, fileSize} = fileData
     fileSizePath = [fileSize, filePath]
     
-    if body.rows.length is 0 
-      episode = fileData
-      episode.filePaths = [fileSizePath]
-      delete episode.fileTitle
-      delete episode.filePath
-      delete episode.fileSize
-    else
+    if body.rows.length > 0 
       episode = body.rows[0].value
       haveFilePath = no
       for sizePath in episode.filePaths
@@ -160,56 +169,69 @@ checkEpisode = (newShow, show, fileData, cb) ->
           haveFilePath = yes
           break
       if not haveFilePath
+        episode = Object.assign fileData, episode
         episode.filePaths.push fileSizePath
+    else
+      episode = fileData
+      episode.filePaths = [fileSizePath]
+        
+    delete episode.fileTitle
+    delete episode.filePath
+    delete episode.fileSize
     
-    buildArgs = {newShow, fileData, fileTitle, filePath, show, episode}  
-    if not (tvdbEpisodes = show.episodes) and not episode.tvdbId and
-       fileModTime * 1e3 > (Date.now() - 7*24*60*60e3
+    buildArgs = {newShow, fileTitle, filePath, show, episode}  
+    if not (tvdbEpisodes = show.episodes)
       tvdb.getEpisodesByTvdbShowId show.tvdbId, (err, tvdbEpisodes) ->
         if err then throw err
         buildEpisode buildArgs, tvdbEpisodes, cb
-        
     else    
       buildEpisode buildArgs, tvdbEpisodes, cb
-      
+
+addShowFileTitle = (newShow, show, fileData, cb) ->
+  {fileTitle} = fileData
+  if show.fileTitles and fileTitle not in show.fileTitles
+    show.fileTitles.push fileTitle
+    db.put show, (err) ->
+      if err then throw err
+      checkEpisode newShow, show, fileData, cb
+  else
+    checkEpisode newShow, show, fileData, cb
+
 exports.checkFile = (filePath, cb) ->
   if /(\.[^\.]{6}|\.filepart)$/i.test filePath
-    fs.appendFileSync 'files/partial.txt', 'rm -rf "' + filePath + '"\n'
+    fs.appendFileSync 'files/partials.txt', 'rm -rf "' + filePath + '"\n'
     setImmediate cb
     return
     
-  if not (fileData = exports.getFileData filePath) then setImmediate cb; return
+  if not (fileData = exports.getFileData filePath)
+    setImmediate cb
+    return
   {filePath, fileTitle} = fileData
   
   db.view 'episodeByFilePath', {key: filePath}, (err, body) -> 
     if err then throw err
+    
     if body.rows.length > 0
       episode =  body.rows[0].value
       if episode.tvdbId then cb()
       else 
         db.get episode.showId, (err, show) ->
           if err then throw err
-          checkEpisode no, show, fileData, cb
+          addShowFileTitle no, show, fileData, cb
       return
       
     db.view 'showByFileTitle', {key: fileTitle}, (err, body) -> 
       if err then throw err
+      
       if body.rows.length > 0
         show = body.rows[0].value
-        if fileTitle not in show.fileTitles
-          show.fileTitles.push fileTitle
-          db.put show, (err) ->
-            if err then throw err
-            checkEpisode no, show, fileData, cb
-        else
-          checkEpisode no, show, fileData, cb
+        addShowFileTitle no, show, fileData, cb
       else
         tvdb.getShowByName fileTitle, (err, show) ->
           if err then throw err
           if not show then cb(); return
-          checkEpisode yes, show, fileData, cb
+          addShowFileTitle yes, show, fileData, cb
 
-log process.argv
 if process.argv[2] is 'all'      
   files = fs.listTreeSync videosPath
   dbgCnt = 0
@@ -217,7 +239,7 @@ if process.argv[2] is 'all'
     if not (filePath = files.shift()) or ++dbgCnt > 9
       log 'done'
       return
-    exports.checkFile, filePath, oneFile
+    exports.checkFile filePath, oneFile
       
 ###
 {

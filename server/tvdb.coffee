@@ -3,26 +3,30 @@ log = (args...) ->
   console.log.apply console, ['tvdb:'].concat args
 
 fs   = require 'fs-plus'
+Fuzz = require 'fuzzyset.js'
 TVDB = require 'node-tvdb/compat'
 tvdb = new TVDB '2C92771D87CA8718'
-Fuzz = require 'fuzzyset.js'
+parsePipeList = TVDB.utils.parsePipeList
 
 showsByName         = {}
 episodeListByTvdbId = {}
 
 cleanEpisodes = (episodes) ->
-  for episode in episodes
-    {EpisodeId, EpisodeName, EpisodeNumber, FirstAired, GuestStars, IMDB_ID, 
-      Overview, SeasonNumber, filename, thumb_height, thumb_width} = episode
-    {tvdbId: EpisodeId, episodeTitle: EpisodeName, \
-     seasonNumber: +SeasonNumber, episodeNumber: +EpisodeNumber,
-     aired: FirstAired, guestStars: GuestStars, imdbId: IMDB_ID,
-     summary: Overview, thumb: filename, thumbW: +thumb_width, thumbH: +thumb_height}
+  if episodes
+    for episode in episodes
+      {EpisodeId, EpisodeName, EpisodeNumber, FirstAired, GuestStars, IMDB_ID, 
+        Overview, SeasonNumber, filename, thumb_height, thumb_width} = episode
+      {tvdbId: EpisodeId, episodeTitle: EpisodeName, \
+       seasonNumber: +SeasonNumber, episodeNumber: +EpisodeNumber,
+       aired: FirstAired, guestStars: GuestStars, imdbId: IMDB_ID,
+       summary: Overview, thumb: filename, 
+       thumbW: +thumb_width or null, thumbH: +thumb_height or null}
 
 cleanActors = (actors) ->
-  for actor in actors
-    {Image, Name, Role} = actor
-    {thumb: Image, name: Name, role: Role}
+  if actors
+    for actor in actors
+      {Image, Name, Role} = actor
+      {thumb: Image, name: Name, role: Role}
 
 getSeriesIdByName = (showNameIn, cb) ->
   seriesId = null
@@ -54,7 +58,7 @@ exports.getShowByName = (showNameIn, cb) ->
   
   noMatch = (details) ->
     log 'no tvdb match', showNameIn, details
-    fs.appendFileSync 'files/no-tvdb-match.txt', 
+    fs.appendFileSync 'files/no-tvdb.txt', 
                        showNameIn + '  ' + util.inspect(details, depth:null) + '\n'
     showsByName[showNameIn] = null
     setImmediate cb
@@ -74,7 +78,7 @@ exports.getShowByName = (showNameIn, cb) ->
       showRes = {tvdbId: seriesId, tvdbTitle: SeriesName, \
                  imdbId: IMDB_ID, zap2itId: zap2it_id,
                  day: Airs_DayOfWeek, time: Airs_Time, 
-                 started: FirstAired, tags: Genre.split('|'),
+                 started: FirstAired, tags: parsePipeList(Genre),
                  network: Network, summary: Overview, 
                  length: (+Runtime)*60, status: Status}
                  
@@ -99,12 +103,12 @@ exports.getShowByName = (showNameIn, cb) ->
           cb null, showRes
 
 exports.getEpisodesByTvdbShowId = (id, cb) ->
-  if (episodes = episodeListByTvdbId[id]) then cb episodes; return
+  if (episodes = episodeListByTvdbId[id]) then cb null, episodes; return
   
   tvdb.getEpisodesById id, (err, res) ->
     if err then throw err
     episodeListByTvdbId[id] = episodes = cleanEpisodes res
-    cb episodes
+    cb null, episodes
 
 # exports.getShowByName 'About a Boy', (err, show) ->
 #   log 'actors', err, show.actors

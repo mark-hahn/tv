@@ -7,19 +7,24 @@ TVDB = require 'node-tvdb/compat'
 tvdb = new TVDB '2C92771D87CA8718'
 Fuzz = require 'fuzzyset.js'
 
+showsByName         = {}
+episodeListByTvdbId = {}
+
 cleanEpisodes = (episodes) ->
   for episode in episodes
-    {EpisodeName, EpisodeNumber, FirstAired, GuestStars, IMDB_ID, 
+    {EpisodeId, EpisodeName, EpisodeNumber, FirstAired, GuestStars, IMDB_ID, 
       Overview, SeasonNumber, filename, thumb_height, thumb_width} = episode
-    {EpisodeName, EpisodeNumber, FirstAired, GuestStars, imdbId: IMDB_ID, 
-      Overview, SeasonNumber, thumb: filename, thumb_height, thumb_width}
+    {tvdbId: EpisodeId, episodeTitle: EpisodeName, \
+     seasonNumber: +SeasonNumber, episodeNumber: +EpisodeNumber,
+     aired: FirstAired, guestStars: GuestStars, imdbId: IMDB_ID,
+     summary: Overview, thumb: filename, thumbW: +thumb_width, thumbH: +thumb_height}
 
 cleanActors = (actors) ->
   for actor in actors
     {Image, Name, Role} = actor
-    {Image, Name, Role}
+    {thumb: Image, name: Name, role: Role}
 
-exports.getSeriesIdByName = (showNameIn, cb) ->
+getSeriesIdByName = (showNameIn, cb) ->
   seriesId = null
   tvdb.getSeriesByName showNameIn, (err, res) ->
     if err then throw err
@@ -44,15 +49,22 @@ exports.getSeriesIdByName = (showNameIn, cb) ->
     cb null, seriesId
   
 exports.getShowByName = (showNameIn, cb) ->
+  if (show = showsByName[showNameIn]) then cb show; return
+  if show is null then cb(); return
+  
   noMatch = (details) ->
     log 'no tvdb match', showNameIn, details
     fs.appendFileSync 'files/no-tvdb-match.txt', 
                        showNameIn + '  ' + util.inspect(details, depth:null) + '\n'
+    showsByName[showNameIn] = null
     setImmediate cb
     
-  exports.getSeriesIdByName showNameIn, (err, seriesId) ->
+  getSeriesIdByName showNameIn, (err, seriesId) ->
     if err then noMatch err; return
-    if not seriesId then cb(); return
+    if not seriesId
+      showsByName[showNameIn] = null
+      cb()
+      return
     
     tvdb.getSeriesAllById seriesId, (err, tvdbSeries) ->
       if err then throw err
@@ -61,11 +73,15 @@ exports.getShowByName = (showNameIn, cb) ->
         Status, zap2it_id, Episodes} = tvdbSeries
       showRes = {tvdbId: seriesId, tvdbTitle: SeriesName, \
                  imdbId: IMDB_ID, zap2itId: zap2it_id,
-                 Airs_DayOfWeek, Airs_Time, FirstAired, Genre,
-                 Network, Overview, Runtime, Status}
-      showRes.episodes = cleanEpisodes Episodes
-      showRes.banners = {urlPfx: 'http://thetvdb.com/banners/'}
+                 day: Airs_DayOfWeek, time: Airs_Time, 
+                 started: FirstAired, tags: Genre.split('|'),
+                 network: Network, summary: Overview, 
+                 length: (+Runtime)*60, status: Status}
+                 
+      showRes.episodes = episodeListByTvdbId[seriesId] = 
+        cleanEpisodes Episodes
       
+      showRes.banners = {}
       tvdb.getBanners seriesId, (err, banners) ->
         if err then throw err
         for banner in banners
@@ -79,12 +95,16 @@ exports.getShowByName = (showNameIn, cb) ->
           if err then throw err
           showRes.actors = cleanActors actors
           
+          showsByName[showNameIn] = showRes
           cb null, showRes
 
-exports.getEpisodesById = (id, cb) ->
+exports.getEpisodesByTvdbShowId = (id, cb) ->
+  if (episodes = episodeListByTvdbId[id]) then cb episodes; return
+  
   tvdb.getEpisodesById id, (err, res) ->
     if err then throw err
-    cb cleanEpisodes res
+    episodeListByTvdbId[id] = episodes = cleanEpisodes res
+    cb episodes
 
 # exports.getShowByName 'About a Boy', (err, show) ->
 #   log 'actors', err, show.actors

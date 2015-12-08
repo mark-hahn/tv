@@ -5,7 +5,7 @@ log = (args...) ->
 fs   = require 'fs'
 util = require 'util'
 plex = require './plex'
-db   = require('nano') 'http://localhost:5984/tv2'
+db   = require('nano') 'http://localhost:5984/tv'
 cfg  = require('parent-config') 'apps-config.json'
 
 {CHROOT, USER, HOME_IP, AT_HOME, SERVER_IP, SERVER_HOST, DEBUG, LOCATION, OFF_SITE} = process.env

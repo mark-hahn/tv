@@ -39,7 +39,7 @@ guessit = (filePath) ->
 exports.getFileData = (filePath) ->
   stats    = fs.statSync filePath
   fileSize = stats.size
-  if not stats.isFile() then cb(); return
+  # if not stats.isFile() then cb(); return
     
   fileData = guessit filePath
   if not fileData.series
@@ -49,17 +49,18 @@ exports.getFileData = (filePath) ->
   filePath  = filePath.replace videosPath, ''
   fileTitle = fileData.series.replace /\s*\(\d+\)\s*$|\s*\[[^\]]+\]\s*$/g, ''
   fileTitle = fileTitle.replace /^(the\s+|aaf-|daa-)/i, ''
-  fileTitle = switch fileTitle.toLowerCase()
-    when 'buffy'                           then 'Buffy the Vampire Slayer'
-    when 'mst3k'                           then 'Mystery Science Theater 3000'
-    when 'mst3k (cu)'                      then 'Mystery Science Theater 3000'
-    when 'cicgc'                           then 'Comedians In Cars Getting Coffee'
-    when 'amazon pilot season'             then 'Amazon Pilot Season Fall 2015 Good Girls'
-    when 'bob servant'                     then 'Bob Servant Independent'
-    when 'miranda christmas special'       then 'Miranda'
-    when 'sex and drugs and rock and roll' then 'Sex, Chips & Rock n\' Roll'
-    when 'sex drugs and rock and roll'     then 'Sex, Chips & Rock n\' Roll'
-    when 'tmawl'                           then 'That Mitchell And Webb Look'
+  fileTitle = fileTitle.toLowerCase()
+  fileTitle = switch fileTitle
+    when 'buffy'                           then 'buffy the vampire slayer'
+    when 'mst3k'                           then 'mystery science theater 3000'
+    when 'mst3k (cu)'                      then 'mystery science theater 3000'
+    when 'cicgc'                           then 'comedians in cars getting coffee'
+    when 'amazon pilot season'             then 'amazon pilot season fall 2015 good girls'
+    when 'bob servant'                     then 'bob servant independent'
+    when 'miranda christmas special'       then 'miranda'
+    when 'sex and drugs and rock and roll' then 'sex, chips & rock n\' roll'
+    when 'sex drugs and rock and roll'     then 'sex, chips & rock n\' roll'
+    when 'tmawl'                           then 'that mitchell and webb look'
     else fileTitle
   if (isNaN(fileData.season) or isNaN(fileData.episodeNumber)) and
      (matches = /(\d+)x(\d+)/i.exec filePath)
@@ -71,31 +72,37 @@ exports.getFileData = (filePath) ->
   {filePath, fileSize, fileTitle, seasonNumber, episodeNumber}
 
 dbPutShow = (show, cb) ->
-  show._id        = uuid()
+  show._id       ?= uuid()
   show.type       = 'show'
   delete show.episodes
   deleteNullProps show
-  db.put show, cb
+  db.put show, (err) ->
+    if err then throw err
+    # log 'dbPutShow', show
+    cb()
   
 dbPutEpisode = (episode, cb) ->
   episode._id ?= uuid()
   episode.type = 'episode'
   deleteNullProps episode
-  db.put episode, cb
+  db.put episode, (err) ->
+    if err then throw err
+    # log 'dbPutEpisode', episode
+    cb()
   
 seasonsChecked = {}
 checkTvdbEpisodeList = (filePath, showId, episode, tvdbEpisodes, cb) ->
   episode.showId = showId
-  
+
   key = showId + '-' + episode.seasonNumber
-  if seasonsChecked[key] and episode.tvdbId
+  if seasonsChecked[key] and episode.tvdbEpisodeId
     dbPutEpisode episode, cb
     return
   seasonsChecked[key] = yes
-  
+
   db.view 'episodeByShowSeasonEpisode',
-          {startKey: [showId, episode.seasonNumber, null], \
-           endKey:   [showId, episode.seasonNumber, {}]}
+          {startkey: [showId, episode.seasonNumber, null], \
+           endkey:   [showId, episode.seasonNumber, {}]}
   , (err, body) -> 
     if err then throw err
     
@@ -112,10 +119,14 @@ checkTvdbEpisodeList = (filePath, showId, episode, tvdbEpisodes, cb) ->
       
     do oneTvdbEpisode = ->
       if not (tvdbEpisode = tvdbEpisodes.shift())
-        if not episode.tvdbId
+        if not episode.tvdbEpisodeId
           fs.appendFileSync 'files/no-tvdb.txt', 
                             'mv "' + filePath + '" "' + filePath + '"\n'
         dbPutEpisode episode, cb
+        return
+        
+      if tvdbEpisode.seasonNumber isnt episode.seasonNumber
+        oneTvdbEpisode()
         return
         
       tvdbEpisodeNumber = tvdbEpisode.episodeNumber
@@ -128,39 +139,34 @@ checkTvdbEpisodeList = (filePath, showId, episode, tvdbEpisodes, cb) ->
         oneTvdbEpisode()
         return
       
-      tvdbEpisode.showId    = showId
+      tvdbEpisode.showId = showId
       tvdbEpisode.filePaths = []
       dbPutEpisode tvdbEpisode, oneTvdbEpisode
 
-buildEpisode = (buildArgs, tvdbEpisodes, cb) ->
-  {newShow, fileTitle, filePath, show, episode} = buildArgs
+checkEpisode2 = (buildArgs, tvdbEpisodes, cb) ->
+  {fileTitle, filePath, show, episode} = buildArgs
+  show.fileTitles ?= [fileTitle]
   
-  for tvdbEpisode in tvdbEpisodes ? []
-    if tvdbEpisode.episodeNumber is episode.episodeNumber
-      Object.assign episode, tvdbEpisode
-      break
-      
-  if newShow      
-    show.fileTitles = [fileTitle]
-    dbPutShow show, ->
-      checkTvdbEpisodeList filePath, show._id, episode, tvdbEpisodes, cb
+  if tvdbEpisodes
+    for tvdbEpisode in tvdbEpisodes
+      if tvdbEpisode.episodeNumber is episode.episodeNumber
+        Object.assign episode, tvdbEpisode
+        break
+    checkTvdbEpisodeList filePath, show._id, episode, tvdbEpisodes, cb
   else
-    if not tvdbEpisodes 
-      tvdb.getEpisodesByTvdbShowId show.tvdbId, (err, tvdbEpisodes) ->
-        if err then throw err
-        checkTvdbEpisodeList filePath, show._id, episode, tvdbEpisodes, cb
-    else
+    tvdb.getEpisodesByTvdbShowId show.tvdbShowId, (err, tvdbEpisodes) ->
+      if err then throw err
       checkTvdbEpisodeList filePath, show._id, episode, tvdbEpisodes, cb
-  
-checkEpisode = (newShow, show, fileData, cb) ->
+
+checkEpisode1 = (show, fileData, cb) ->
+  {fileTitle, filePath, fileSize} = fileData
+  fileSizePath = [fileSize, filePath]
+    
   db.view 'episodeByShowSeasonEpisode',
-          {key: [show._id, fileData.seasonNumber, fileData.episodeNumber]}
+    {key: [show._id, fileData.seasonNumber, fileData.episodeNumber]}
   , (err, body) -> 
     if err then throw err
-    
-    {fileTitle, filePath, fileSize} = fileData
-    fileSizePath = [fileSize, filePath]
-    
+
     if body.rows.length > 0 
       episode = body.rows[0].value
       haveFilePath = no
@@ -174,28 +180,28 @@ checkEpisode = (newShow, show, fileData, cb) ->
     else
       episode = fileData
       episode.filePaths = [fileSizePath]
-        
+      
     delete episode.fileTitle
     delete episode.filePath
     delete episode.fileSize
     
-    buildArgs = {newShow, fileTitle, filePath, show, episode}  
+    buildArgs = {fileTitle, filePath, show, episode}  
     if not (tvdbEpisodes = show.episodes)
-      tvdb.getEpisodesByTvdbShowId show.tvdbId, (err, tvdbEpisodes) ->
+      tvdb.getEpisodesByTvdbShowId show.tvdbShowId, (err, tvdbEpisodes) ->
         if err then throw err
-        buildEpisode buildArgs, tvdbEpisodes, cb
+        checkEpisode2 buildArgs, tvdbEpisodes, cb
     else    
-      buildEpisode buildArgs, tvdbEpisodes, cb
+      checkEpisode2 buildArgs, tvdbEpisodes, cb
 
-addShowFileTitle = (newShow, show, fileData, cb) ->
+addShowFileTitle = (show, fileData, cb) ->
   {fileTitle} = fileData
   if show.fileTitles and fileTitle not in show.fileTitles
     show.fileTitles.push fileTitle
     db.put show, (err) ->
       if err then throw err
-      checkEpisode newShow, show, fileData, cb
+      checkEpisode1 show, fileData, cb
   else
-    checkEpisode newShow, show, fileData, cb
+    checkEpisode1 show, fileData, cb
 
 exports.checkFile = (filePath, cb) ->
   if /(\.[^\.]{6}|\.filepart)$/i.test filePath
@@ -207,17 +213,17 @@ exports.checkFile = (filePath, cb) ->
     setImmediate cb
     return
   {filePath, fileTitle} = fileData
-  
+
   db.view 'episodeByFilePath', {key: filePath}, (err, body) -> 
     if err then throw err
-    
+
     if body.rows.length > 0
       episode =  body.rows[0].value
-      if episode.tvdbId then cb()
+      if episode.tvdbEpisodeId then cb()
       else 
         db.get episode.showId, (err, show) ->
           if err then throw err
-          addShowFileTitle no, show, fileData, cb
+          addShowFileTitle show, fileData, cb
       return
       
     db.view 'showByFileTitle', {key: fileTitle}, (err, body) -> 
@@ -225,22 +231,27 @@ exports.checkFile = (filePath, cb) ->
       
       if body.rows.length > 0
         show = body.rows[0].value
-        addShowFileTitle no, show, fileData, cb
+        addShowFileTitle show, fileData, cb
+        
       else
         tvdb.getShowByName fileTitle, (err, show) ->
           if err then throw err
           if not show then cb(); return
-          addShowFileTitle yes, show, fileData, cb
+          
+          show.fileTitles = [fileTitle]
+          dbPutShow show, ->
+            checkEpisode1 show, fileData, cb
+
 
 if process.argv[2] is 'all'      
   files = fs.listTreeSync videosPath
   dbgCnt = 0
   do oneFile = ->
-    if not (filePath = files.shift()) or ++dbgCnt > 9
+    if not (filePath = files.shift()) or ++dbgCnt > 25
       log 'done'
       return
     exports.checkFile filePath, oneFile
-      
+
 ###
 {
    "_id": "_design/all",
@@ -250,9 +261,6 @@ if process.argv[2] is 'all'
        "showByFileTitle": {
            "map": "function(doc) { \n  if (doc.type == 'show' && doc.fileTitles)\n    for(i=0; i < doc.fileTitles.length; i++)\n      emit(doc.fileTitles[i], doc);\n}"
        },
-       "episodesByShowId": {
-           "map": "function(doc) {\n  if (doc.type == 'episode')\n    emit(doc.showId, null);\n}"
-       },
        "episodeByShowSeasonEpisode": {
            "map": "function(doc) {\n  if (doc.type == 'episode')\n    emit([doc.showId, doc.seasonNumber, doc.episodeNumber], doc);\n}"
        },
@@ -261,34 +269,4 @@ if process.argv[2] is 'all'
        }
    }
 }
-
-GUESSIT
-    [ 'mimetype', 'video/mp4' ],
-    [ 'episodeNumber', '9' ],
-    [ 'container', 'mp4' ],
-    [ 'format', 'HDTV' ],
-    [ 'series', 'about a boy' ],
-    [ 'releaseGroup', 'lol' ],
-    [ 'season', '2' ]
-
-fileData:    
-  { mimetype: 'video/x-matroska',
-    episodeNumber: '20',
-    videoCodec: 'h264',
-    container: 'mkv',
-    format: 'WEB-DL',
-    releaseGroup: 'NTb',
-    audioChannels: '5.1',
-    screenSize: '720p',
-    season: '2',
-    type: 'episode',
-    series: 'About a Boy' 
-  }
-  
-fileData:    
-  fileTitle: 'About a Boy' 
-  seasonNumber: 2
-  episodeNumber: 20
-  
 ###
-  

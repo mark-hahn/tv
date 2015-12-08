@@ -3,6 +3,7 @@ log = (args...) ->
   console.log.apply console, ['tvdb:'].concat args
 
 fs   = require 'fs-plus'
+util = require 'util'
 Fuzz = require 'fuzzyset.js'
 TVDB = require 'node-tvdb/compat'
 tvdb = new TVDB '2C92771D87CA8718'
@@ -33,14 +34,16 @@ getSeriesIdByName = (showNameIn, cb) ->
   tvdb.getSeriesByName showNameIn, (err, res) ->
     if err then throw err
     allSeries = res
+    if not res then cb(); return
+    
     switch res.length
       when 0 then cb(); return
       when 1 then seriesId = allSeries[0].seriesid
       else
-        titles    = []
+        titles = []
         for series in allSeries
           titles.push series.SeriesName
-        fuzz    = new Fuzz showTitles
+        fuzz    = new Fuzz titles
         fuzzRes = fuzz.get showNameIn
         if fuzzRes.length is 0 then cb {tvdbRes: res, fuzzRes}; return
         score = fuzzRes[0][0]
@@ -58,7 +61,7 @@ exports.getShowByName = (showNameIn, cb) ->
   
   noMatch = (details) ->
     log 'no tvdb match', showNameIn, details
-    fs.appendFileSync 'files/no-tvdb.txt', 
+    fs.appendFileSync 'files/show-no-tvdb.txt', 
                        showNameIn + '  ' + util.inspect(details, depth:null) + '\n'
     showsByName[showNameIn] = null
     setImmediate cb
@@ -78,7 +81,7 @@ exports.getShowByName = (showNameIn, cb) ->
       showRes = {tvdbShowId: seriesId, tvdbTitle: SeriesName, \
                  imdbShowId: IMDB_ID, zap2itShowId: zap2it_id,
                  day: Airs_DayOfWeek, time: Airs_Time, 
-                 started: FirstAired, tags: parsePipeList(Genre),
+                 started: FirstAired, tags: parsePipeList(Genre ? ''),
                  network: Network, summary: Overview, 
                  length: (+Runtime)*60, status: Status}
                  
@@ -88,18 +91,19 @@ exports.getShowByName = (showNameIn, cb) ->
       showRes.banners = {}
       tvdb.getBanners seriesId, (err, banners) ->
         if err then throw err
-        for banner in banners
-          {BannerType, BannerType2, BannerPath,ThumbnailPath} = banner
-          key = BannerType + '-' + BannerType2
-          if key.indexOf('season') > -1 then continue
-          showRes.banners[key] ?= []
-          showRes.banners[key].push  {BannerPath, ThumbnailPath}
-          
+        if banners
+          for banner in banners
+            {BannerType, BannerType2, BannerPath,ThumbnailPath} = banner
+            key = BannerType + '-' + BannerType2
+            if key.indexOf('season') > -1 then continue
+            showRes.banners[key] ?= []
+            showRes.banners[key].push  {BannerPath, ThumbnailPath}
         tvdb.getActors seriesId, (err, actors) ->
           if err then throw err
-          showRes.actors = cleanActors actors
-          
+          if actors
+            showRes.actors = cleanActors actors
           showsByName[showNameIn] = showRes
+          
           cb null, showRes
 
 exports.getEpisodesByTvdbShowId = (id, cb) ->

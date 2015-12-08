@@ -9,6 +9,9 @@ db   = require '../server/db'
 
 videosPath = '/mnt/media/videos/'
 
+episodesChecked = 0
+episodesNoTvdb  = 0
+
 uuid = ->
   uuidStr = Date.now() + (Math.random() * 1e13).toFixed 0
   while uuidStr.length < 28 then uuidStr += (Math.floor Math.random() * 10)
@@ -31,7 +34,6 @@ guessit = (filePath) ->
   res = {}
   for field in resArr
     if (match = /^\s*[\d\.\[\]]+\s"([^"]+)":\s"?([^"]+)"?,/.exec field)
-      # log {match}
       [__, key, val] = match
       res[key] = val
   res
@@ -79,8 +81,10 @@ dbPutShow = (show, cb) ->
   db.put show, (err) ->
     if err then throw err
     # log 'dbPutShow', show
+    log new Date().toString()[0..20], 
+        episodesNoTvdb, episodesChecked, show.tvdbTitle, 
     cb()
-  
+
 dbPutEpisode = (episode, cb) ->
   episode._id ?= uuid()
   episode.type = 'episode'
@@ -89,7 +93,7 @@ dbPutEpisode = (episode, cb) ->
     if err then throw err
     # log 'dbPutEpisode', episode
     cb()
-  
+
 seasonsChecked = {}
 checkTvdbEpisodeList = (filePath, showId, episode, tvdbEpisodes, cb) ->
   episode.showId = showId
@@ -119,9 +123,13 @@ checkTvdbEpisodeList = (filePath, showId, episode, tvdbEpisodes, cb) ->
       
     do oneTvdbEpisode = ->
       if not (tvdbEpisode = tvdbEpisodes.shift())
+        episodesChecked++
         if not episode.tvdbEpisodeId
-          fs.appendFileSync 'files/no-tvdb.txt', 
+          episodesNoTvdb++
+          fs.appendFileSync 'files/episode-no-tvdb.txt', 
                             'mv "' + filePath + '" "' + filePath + '"\n'
+          # log 'episode-no-tvdb tvdbEpisodes', tvdbEpisodes
+          # process.exit 0
         dbPutEpisode episode, cb
         return
         
@@ -149,7 +157,8 @@ checkEpisode2 = (buildArgs, tvdbEpisodes, cb) ->
   
   if tvdbEpisodes
     for tvdbEpisode in tvdbEpisodes
-      if tvdbEpisode.episodeNumber is episode.episodeNumber
+      if tvdbEpisode.seasonNumber  is episode.seasonNumber and
+         tvdbEpisode.episodeNumber is episode.episodeNumber
         Object.assign episode, tvdbEpisode
         break
     checkTvdbEpisodeList filePath, show._id, episode, tvdbEpisodes, cb
@@ -166,7 +175,7 @@ checkEpisode1 = (show, fileData, cb) ->
     {key: [show._id, fileData.seasonNumber, fileData.episodeNumber]}
   , (err, body) -> 
     if err then throw err
-
+    
     if body.rows.length > 0 
       episode = body.rows[0].value
       haveFilePath = no
@@ -213,7 +222,7 @@ exports.checkFile = (filePath, cb) ->
     setImmediate cb
     return
   {filePath, fileTitle} = fileData
-
+  
   db.view 'episodeByFilePath', {key: filePath}, (err, body) -> 
     if err then throw err
 
@@ -247,7 +256,7 @@ if process.argv[2] is 'all'
   files = fs.listTreeSync videosPath
   dbgCnt = 0
   do oneFile = ->
-    if not (filePath = files.shift()) or ++dbgCnt > 25
+    if not (filePath = files.shift()) # or ++dbgCnt > 25
       log 'done'
       return
     exports.checkFile filePath, oneFile

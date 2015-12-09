@@ -3,10 +3,14 @@ log = (args...) ->
   console.log.apply console, ['tvdb:'].concat args
 
 fs   = require 'fs-plus'
+url  = require 'url'
+path = require 'path'
+http = require 'http'
 util = require 'util'
 Fuzz = require 'fuzzyset.js'
 TVDB = require 'node-tvdb/compat'
 tvdb = new TVDB '2C92771D87CA8718'
+request = require 'request'
 parsePipeList = TVDB.utils.parsePipeList
 
 showsByName         = {}
@@ -40,6 +44,7 @@ getSeriesIdByName = (showNameIn, cb) ->
       when 0 then cb(); return
       when 1 then seriesId = allSeries[0].seriesid
       else
+        # log 'allSeries', allSeries
         titles = []
         for series in allSeries
           titles.push series.SeriesName
@@ -56,7 +61,7 @@ getSeriesIdByName = (showNameIn, cb) ->
     cb null, seriesId
   
 exports.getShowByName = (showNameIn, cb) ->
-  if (show = showsByName[showNameIn]) then cb show; return
+  if (show = showsByName[showNameIn]) then cb null, show; return
   if show is null then cb(); return
   
   noMatch = (details) ->
@@ -107,10 +112,122 @@ exports.getShowByName = (showNameIn, cb) ->
           cb null, showRes
 
 exports.getEpisodesByTvdbShowId = (id, cb) ->
+  if not id
+    log 'no id in getEpisodesByTvdbShowId'
+    console.trace()
+    process.exit 0
+    
   if (episodes = episodeListByTvdbId[id]) then cb null, episodes; return
   
   tvdb.getEpisodesById id, (err, res) ->
-    if err then throw err
+    if err  
+      log 'err from getEpisodesById'
+      console.trace()
+      process.exit 0
     episodeListByTvdbId[id] = episodes = cleanEpisodes res
     cb null, episodes
 
+# getBanner = (file, cb) ->
+#   uri      = 'http://thetvdb.com/banners/' + file
+#   filename = '/archive/tvdb-banners/'      + file
+#   metaName = filename + '.json'
+#   try 
+#     stats    = fs.statSync filename
+#     fileSize = stats.size
+#     meta     = JSON.parse fs.readFileSync metaName, 'utf8'
+#     if +meta.length is fileSize then setImmediate ->
+#       # log 'getBanner skipping', file
+#       cb null, meta
+#     return
+#   catch e
+#   if fileSize?
+#     fs.removeSync filename
+#     fs.removeSync metaName
+#     
+#   # log 'getBanner downloading', file
+#   
+#   fs.makeTreeSync path.dirname filename
+#   fileStream = fs.createWriteStream filename
+#   options = 
+#     host: url.parse(uri).host
+#     path: url.parse(uri).pathname
+#   http.get options, (res) ->
+#     res .on 'error', (err) -> 
+#           fileStream.end()
+#           log 'getBanner error', {file, err}
+#           cb err
+#         .on "data", (data) -> fileStream.write data
+#         .on "end", -> 
+#           fileStream.end()
+#           meta = 
+#             type:   res.headers["content-type"]
+#             length: res.headers["content-length"]
+#           fs.writeFileSync metaName, JSON.stringify meta
+#           # log 'getBanner http.get end', file
+#           cb null, meta
+      
+getBanner = (file, cb) ->
+  uri      = 'http://thetvdb.com/banners/' + file
+  filename = '/archive/tvdb-banners/' + file
+  metaName = filename + '.json'
+  fileSize = null
+  try 
+    stats    = fs.statSync filename
+    fileSize = stats.size
+    meta     = JSON.parse fs.readFileSync metaName, 'utf8'
+    if +meta.length is fileSize
+      setImmediate -> cb null, meta 
+      return
+  catch e
+  if fileSize?
+    fs.removeSync filename
+    fs.removeSync metaName
+  fs.makeTreeSync path.dirname filename
+  try
+    request.head uri, (err, res) ->
+      if err then cb err; return
+      request(uri).pipe(fs.createWriteStream(filename)).on "close", -> 
+        meta = 
+          type:   res.headers["content-type"]
+          length: res.headers["content-length"]
+        fs.writeFileSync metaName, JSON.stringify meta
+        cb null, meta
+  catch e
+    cb e
+    
+exports.downloadBannersForShow = (show, cb) ->
+  
+  cbCount = 0
+  doCb = (args...) ->
+    if ++cbCount > 1
+      log 'multiple callbacks in downloadBannersForShow', show
+      console.trace()
+      process.exit 0
+    cb args...
+    
+  if not show.banners
+    # log 'downloadBannersForShow no show.banners'
+    doCb()
+    return
+  
+  ## TODO support any flattened data like actor images
+  
+  allBanners = []
+  for k, v of show.banners
+    for k2, v2 of v
+      for k3, v3 of v2
+        allBanners.push v3
+        
+  do oneBanner = ->
+    if not (banner = allBanners.shift())
+      # log 'oneBanner finished'
+      doCb()
+      return
+      
+    getBanner banner, (err, meta) ->
+      if err
+        log 'getBanner error', banner, err
+        fs.appendFileSync 'files/download-banner-errs.txt', 
+                       show._id + ', ' + banner + ',  ' + err.message + '\n'
+      oneBanner()
+      

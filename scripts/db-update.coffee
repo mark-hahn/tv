@@ -8,6 +8,20 @@ exec = require('child_process').spawnSync
 tvdb = require '../server/tvdb'
 db   = require '../server/db'
 
+mappings = [
+  ['buffy'                           , 'buffy the vampire slayer']
+  ['mst3k'                           , 'mystery science theater 3000']
+  ['mst3k (cu)'                      , 'mystery science theater 3000']
+  ['cicgc'                           , 'comedians in cars getting coffee']
+  ['amazon.pilot.season'             , 'amazon pilot season fall 2015 good girls']
+  ['bob.servant'                     , 'bob servant independent']
+  ['miranda.christmas.special'       , 'miranda']
+  ['sex.and.drugs.and.rock.and.roll' , 'sex, chips & rock n\' roll']
+  ['sex.drugs.and.rock.and.roll'     , 'sex, chips & rock n\' roll']
+  ['tmawl'                           , 'that mitchell and webb look']
+  ['archer'                          , 'archer (2009)']
+]
+  
 videosPath = '/mnt/media/videos/'
 
 incSeq    = 0
@@ -27,7 +41,8 @@ dumpInc = ->
     log incLabels[k] + ': ' + v
 
 fatal = (err) ->
-  log 'fatal err:', util.inspect err, depth:null
+  log 'fatal err...'
+  if err then log util.inspect err, depth:null
   dumpInc()
   console.trace()
   process.exit 0
@@ -42,15 +57,34 @@ deleteNullProps = (obj) ->
       not v? or v is 'undefined' or v is 'null' or v is NaN
     delete obj[k]
 
-    
+getBitRate = (filePath) ->
+  {output, stdErr} = exec 'mediainfo', ['--Output=XML', filePath]
+  # dbg = output.toString()
+  matches = /<track\stype="Video">([\S\s]*?<\/track>)/i.exec output.toString()
+  output = matches?[1] ? ''
+  # if not output
+  #   log 'track err', dbg
+  #   fatal()
+  matches  = /<Overall_bit_rate>(\d+\s+)?([\d\.]+)\s+(\w+)<\/Overall_bit_rate>/i
+              .exec output.toString()
+  matches ?= /<Bit_rate>(\d+\s+)?([\d\.]+)\s+(\w+)<\/Bit_rate>/i
+              .exec output.toString()
+  matches ?= [null, null, 0, 'Kbps']
+  switch matches[3]
+    when 'Kbps' then rate = +matches[2] * 1024
+    when 'Mbps' then rate = +matches[2] * 1024 * 1024
+    else
+      log 'bit rate units err', matches
+      fatal()
+  # if rate > 0 and (rate < 50e3 or rate > 25e6)
+  #   log 'bit rate value err', dbg
+  #   fatal()
+  log 'bit rate', matches[2], matches[3], rate, filePath
+
 guessit = (filePath) ->
   fileName = filePath.replace '/mnt/media/videos/', ''
-  {stdout, stderr, status, error, output} = 
-           exec 'guessit', [fileName], timeout: 60e3
-  stdout = stdout?.toString()
-  stderr = stderr?.toString()
-  output = output?.toString()
-  resArr = output.split '\n'
+  {output} = exec 'guessit', [fileName], timeout: 60e3
+  resArr = output.toString().split '\n'
   res = {}
   for field in resArr
     if (match = /^\s*[\d\.\[\]]+\s"([^"]+)":\s"?([^"]+)"?,/.exec field)
@@ -62,38 +96,32 @@ exports.getFileData = (filePath) ->
   inc 'getFileData'
   stats    = fs.statSync filePath
   fileSize = stats.size
-  # if not stats.isFile() then cb(); return
+  if not stats.isFile() then return 'not-file'
+  
+  file = filePath.toLowerCase()
+  if not file
+    fatal 'not file' + ' ' + filePath
+  file = file.replace videosPath, ''
+  file = file.replace /[\s-]+/g, '.'
+  for map in mappings
+    file = file.replace map[0], map[1]
+  file = file.replace /[\s-]+/g, '.'
     
-  fileData = guessit filePath
-  if not fileData.series
-    fs.appendFileSync 'files/file-no-series.txt', 'mv "' + filePath + '" "' + filePath + '"\n'
-    return null
-    
-  filePath  = filePath.replace videosPath, ''
+  fileData = guessit file
+  if not fileData.series then return 'no-series'
   fileTitle = fileData.series.replace /\s*\(\d+\)\s*$|\s*\[[^\]]+\]\s*$/g, ''
   fileTitle = fileTitle.replace /^(the\s+|aaf-|daa-)/i, ''
-  fileTitle = fileTitle.toLowerCase()
-  fileTitle = switch fileTitle
-    when 'buffy'                           then 'buffy the vampire slayer'
-    when 'mst3k'                           then 'mystery science theater 3000'
-    when 'mst3k (cu)'                      then 'mystery science theater 3000'
-    when 'cicgc'                           then 'comedians in cars getting coffee'
-    when 'amazon pilot season'             then 'amazon pilot season fall 2015 good girls'
-    when 'bob servant'                     then 'bob servant independent'
-    when 'miranda christmas special'       then 'miranda'
-    when 'sex and drugs and rock and roll' then 'sex, chips & rock n\' roll'
-    when 'sex drugs and rock and roll'     then 'sex, chips & rock n\' roll'
-    when 'tmawl'                           then 'that mitchell and webb look'
-    when 'archer'                          then 'archer (2009)'
-    else fileTitle
-  if (isNaN(fileData.season) or isNaN(fileData.episodeNumber)) and
-     (matches = /(\d+)x(\d+)/i.exec filePath)
-      seasonNumber  = +matches[1]
-      episodeNumber = +matches[2]
+  if (isNaN(fileData.season) or isNaN(fileData.episodeNumber)) 
+    if (matches = /(\d+)x(\d+)/i.exec filePath)
+        seasonNumber  = +matches[1]
+        episodeNumber = +matches[2]
+    else
+      return 'bad-number'
   else
     seasonNumber  = +fileData.season
     episodeNumber = +fileData.episodeNumber
-  {filePath, fileSize, fileTitle, seasonNumber, episodeNumber}
+  bitRate = getBitRate filePath
+  {filePath, fileSize, bitRate, fileTitle, seasonNumber, episodeNumber}
 
 dbPutShow = (show, cb) ->
   log new Date().toString()[0..20], show.tvdbTitle
@@ -101,9 +129,7 @@ dbPutShow = (show, cb) ->
   show.type = 'show'
   delete show.episodes
   deleteNullProps show
-  inc 'loading banners'
   tvdb.downloadBannersForShow show, ->
-    inc 'banners loaded'
     db.put show, (err) ->
       if err then fatal err
       inc 'put new show'
@@ -116,11 +142,12 @@ dbPutEpisode = (episode, cb) ->
   delete episode.filePath
   delete episode.fileSize
   deleteNullProps episode
-  db.put episode, (err) ->
-    if err then fatal err
-    inc 'put episode'
-    # log 'dbPutEpisode', episode
-    cb()
+  tvdb.downloadBanner episode.thumb, ->
+    db.put episode, (err) ->
+      if err then fatal err
+      inc 'put episode'
+      # log 'dbPutEpisode', episode
+      cb()
       
 getEpisode = (show, fileData, cb) ->
   {fileTitle, filePath, fileSize} = fileData
@@ -156,7 +183,7 @@ getEpisode = (show, fileData, cb) ->
       cb()
       return
       
-    inc 'new file episode no tvdb'
+    inc 'new episode no tvdb'
     fs.appendFileSync 'files/episode-no-tvdb.txt', 
                       'mv "' + filePath + '" "' + filePath + '"\n'
     episode = fileData
@@ -191,7 +218,7 @@ chkTvdbEpisodes = (show, fileData, cb) ->
     if not show.tvdbShowId
       log 'chkTvdbEpisodes no tvdbShowId', show
       console.trace()
-      process.exit 0
+      fatal()
     tvdb.getEpisodesByTvdbShowId show.tvdbShowId
     , (err, tvdbEpisodes) ->
       if err then fatal err
@@ -206,8 +233,11 @@ exports.checkFile = (filePath, cb) ->
     setImmediate cb
     return
     
-  if not (fileData = exports.getFileData filePath)
-    inc 'no filedata'
+  fileData = exports.getFileData filePath
+  if fileData is 'not-file'  then setImmediate cb; return
+  if typeof fileData is 'string'
+    inc 'bad-file-' + fileData
+    fs.appendFileSync 'files/file-' + fileData + '.txt', 'rm -rf "' + filePath + '"\n'
     setImmediate cb
     return
   {filePath, fileTitle} = fileData
@@ -228,7 +258,7 @@ exports.checkFile = (filePath, cb) ->
           if show.compact_running?
             log 'compact_running', episode
             console.trace()
-            process.exit 0
+            fatal()
           chkTvdbEpisodes show, fileData, cb
       return
       
@@ -296,7 +326,7 @@ if process.argv[2] is 'all'
            "map": "function(doc) { \n  if (doc.type == 'show' && doc.fileTitles)\n    for(i=0; i < doc.fileTitles.length; i++)\n      emit(doc.fileTitles[i], doc);\n}"
        },
        "episodeByShowSeasonEpisode": {
-           "map": "function(doc) {\n  if (doc.type == 'episode')\n    emit([doc.showId, doc.seasonNumber, doc.episodeNumber], doc);\n}"
+           "map": "function(doc) {\n  if (doc.type == 'episode' && doc.showId)\n    emit([doc.showId, doc.seasonNumber, doc.episodeNumber], doc);\n}"
        },
        "episodeByFilePath": {
            "map": "function(doc) { \n  if (doc.type == 'episode' && doc.filePaths)\n    for(i=0; i < doc.filePaths.length; i++)\n      emit(doc.filePaths[i][1], doc);\n}\n"

@@ -65,7 +65,7 @@ exports.getShowByName = (showNameIn, cb) ->
   if show is null then cb(); return
   
   noMatch = (details) ->
-    log 'no tvdb match', showNameIn, details
+    log 'no tvdb match', showNameIn
     fs.appendFileSync 'files/show-no-tvdb.txt', 
                        showNameIn + '  ' + util.inspect(details, depth:null) + '\n'
     showsByName[showNameIn] = null
@@ -111,61 +111,18 @@ exports.getShowByName = (showNameIn, cb) ->
           
           cb null, showRes
 
+exports.clearCache = ->
+  showsByName         = {}
+  episodeListByTvdbId = {}
+  
 exports.getEpisodesByTvdbShowId = (id, cb) ->
-  if not id
-    log 'no id in getEpisodesByTvdbShowId'
-    console.trace()
-    process.exit 0
-    
   if (episodes = episodeListByTvdbId[id]) then cb null, episodes; return
   
   tvdb.getEpisodesById id, (err, res) ->
-    if err  
-      log 'err from getEpisodesById'
-      console.trace()
-      process.exit 0
+    if err then log 'err from getEpisodesById'
     episodeListByTvdbId[id] = episodes = cleanEpisodes res
     cb null, episodes
 
-# getBanner = (file, cb) ->
-#   uri      = 'http://thetvdb.com/banners/' + file
-#   filename = '/archive/tvdb-banners/'      + file
-#   metaName = filename + '.json'
-#   try 
-#     stats    = fs.statSync filename
-#     fileSize = stats.size
-#     meta     = JSON.parse fs.readFileSync metaName, 'utf8'
-#     if +meta.length is fileSize then setImmediate ->
-#       # log 'getBanner skipping', file
-#       cb null, meta
-#     return
-#   catch e
-#   if fileSize?
-#     fs.removeSync filename
-#     fs.removeSync metaName
-#     
-#   # log 'getBanner downloading', file
-#   
-#   fs.makeTreeSync path.dirname filename
-#   fileStream = fs.createWriteStream filename
-#   options = 
-#     host: url.parse(uri).host
-#     path: url.parse(uri).pathname
-#   http.get options, (res) ->
-#     res .on 'error', (err) -> 
-#           fileStream.end()
-#           log 'getBanner error', {file, err}
-#           cb err
-#         .on "data", (data) -> fileStream.write data
-#         .on "end", -> 
-#           fileStream.end()
-#           meta = 
-#             type:   res.headers["content-type"]
-#             length: res.headers["content-length"]
-#           fs.writeFileSync metaName, JSON.stringify meta
-#           # log 'getBanner http.get end', file
-#           cb null, meta
-      
 getBanner = (file, cb) ->
   uri      = 'http://thetvdb.com/banners/' + file
   filename = '/archive/tvdb-banners/' + file
@@ -195,39 +152,34 @@ getBanner = (file, cb) ->
   catch e
     cb e
     
-exports.downloadBannersForShow = (show, cb) ->
+exports.downloadBanner = (banner, cb) ->
+  if not banner then setImmediate cb; return
+  getBanner banner, (err, meta) ->
+    if err
+      log 'getBanner error', banner, err
+      fs.appendFileSync 'files/download-banner-errs.txt', 
+                     show._id + ', ' + banner + ',  ' + err.message + '\n'
+    cb()
   
-  cbCount = 0
-  doCb = (args...) ->
-    if ++cbCount > 1
-      log 'multiple callbacks in downloadBannersForShow', show
-      console.trace()
-      process.exit 0
-    cb args...
-    
-  if not show.banners
-    # log 'downloadBannersForShow no show.banners'
-    doCb()
-    return
+exports.downloadBannersForShow = (show, cb) ->
+  if not show.banners then cb(); return
   
   ## TODO support any flattened data like actor images
   
   allBanners = []
-  for k, v of show.banners
-    for k2, v2 of v
-      for k3, v3 of v2
-        allBanners.push v3
-        
+  addBanners = (obj) ->
+    for k, v of obj
+      if (matches = /\.(jpg|gif|png)$/i.exec v)
+        allBanners.push v
+      else if typeof v is 'object'
+        addBanners v
+  addBanners show.banners
+  addBanners show.actors    
+    
   do oneBanner = ->
     if not (banner = allBanners.shift())
-      # log 'oneBanner finished'
-      doCb()
+      cb()
       return
       
-    getBanner banner, (err, meta) ->
-      if err
-        log 'getBanner error', banner, err
-        fs.appendFileSync 'files/download-banner-errs.txt', 
-                       show._id + ', ' + banner + ',  ' + err.message + '\n'
-      oneBanner()
+    exports.downloadBanner banner, oneBanner
       

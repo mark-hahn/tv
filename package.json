@@ -9,10 +9,12 @@
   },
   "keywords": [
     "tv",
-    "plex",
-    "roku",
+    "home theater",
+    "vlc",
+    "tvdb",
+    "guessit",
     "mobile"
-  ],
+  ], 
   "author": "Mark Hahn",
   "license": "MIT",
   "bugs": {

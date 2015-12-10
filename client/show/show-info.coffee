@@ -51,7 +51,7 @@ Vue.component 'show-info',
   template: render ->
     div '.show-info', vOn: 'click: infoClick', vKeepScroll: true, ->
       div '.show-info-inner', ->
-        img '.thumb', vAttr: "src: '#{tvGlobal.plexPfx}' + curShow.thumb"
+        img '.thumb', vAttr: "src: '#{tvGlobal.bannerPfx}' + curShow.thumb"
         div '.show-dtl.show-info-year', '{{curShow.year}}'
         div '.show-dtl.show-info-dur',  '({{Math.round(+curShow.duration/60000)}} mins)'
         div '.show-dtl.show-info-epis', '{{numWatched}}/{{numEpisodes}}'

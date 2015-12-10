@@ -4,22 +4,12 @@ url     = require 'url'
 http    = require 'http'
 exec    = require('child_process').exec
 ir      = require './ir'
-roku    = require './roku'
-plex    = require './plex'
 insteon = require './insteon'
 db      = require './db'
 log     = require('debug') 'tv:ajax'
 port    = require('parent-config')('apps-config.json').tvAjax_port
 log 'port', port
 
-# plexRunningInRoku = yes
-plexRunningInRoku = no
-
-roku.init (err) -> 
-  # if err
-  #   plexRunningInRoku = no
-  #   log 'roku.init failed'
-  
 db.init   (err) -> if err then log 'db.init failed'
 
 error = (res, msg, code=500) ->
@@ -112,47 +102,47 @@ srvr = http.createServer (req, res) ->
         success res, lightLevels
     
     when 'startTv'
-      # log 'startRoku', {plexRunningInRoku, data}
-      if not plexRunningInRoku
-        error res, 'plexNotRunning' + req.url
-      roku.startVideo data[0], (data[1] is 'goToStart')
+      log 'startRoku', {plexRunningInRoku, data}
+      # if not plexRunningInRoku
+      #   error res, 'plexNotRunning' + req.url
+      # roku.startVideo data[0], (data[1] is 'goToStart')
       success res, ''
       
     when 'pauseTv'
-      # log 'pauseRoku', {plexRunningInRoku}
-      roku.playAction 'pause'
+      log 'pauseRoku', {plexRunningInRoku}
+      # roku.playAction 'pause'
       success res, ''
       
     when 'skipFwdTv'
-      # log 'skipFwdTv', {plexRunningInRoku}
-      roku.playAction 'skipNext'
+      log 'skipFwdTv', {plexRunningInRoku}
+      # roku.playAction 'skipNext'
       success res, ''
       
     when 'skipBackTv'
-      # log 'skipBackTv', {plexRunningInRoku}
-      roku.playAction 'skipPrevious'
+      log 'skipBackTv', {plexRunningInRoku}
+      # roku.playAction 'skipPrevious'
       success res, ''
       
     when 'backTv'
-      # log 'backRoku', {plexRunningInRoku}
-      roku.playAction 'stepBack'
+      log 'backRoku', {plexRunningInRoku}
+      # roku.playAction 'stepBack'
       success res, ''
       
     when 'stopTv'
       # log 'stopRoku', {plexRunningInRoku}
-      db.syncPlexDB()
-      roku.playAction 'stop'
+      # db.syncPlexDB()
+      # roku.playAction 'stop'
       success res, ''
       
     when 'syncPlexDB'
-      db.syncPlexDB()
+      # db.syncPlexDB()
       success res, ''
         
     when 'getTvStatus'
-      plex.getStatus (err, playStatus) ->
+      # plex.getStatus (err, playStatus) ->
         # log 'getTvStatus', {err, playStatus}
-        if err then error res, 'getTvStatus err: ' + err.message; return
-        success res, playStatus
+        # if err then error res, 'getTvStatus err: ' + err.message; return
+        success() # res, playStatus
 
     when 'usbconfig'
       # exec 'ssh xobtlu@37.48.119.77 sed -n "/^\\ \\ \\ \\ \\ \\ \\-/p" config.yml |

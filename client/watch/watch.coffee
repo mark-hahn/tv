@@ -53,7 +53,7 @@ Vue.component 'watch-comp',
 
       div '.screen-msg', vIf:'!loading && watchMode == "none"', ->
         div '.msgTitle', 'No show is playing.'
-        div 'Ensure Roku is running Plex and'
+        div 'Ensure tv player is running and'
         div 'press show or episode Play button.'
 
       div '.have-episode', vIf:'!loading && watchMode != "none"', ->

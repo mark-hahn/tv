@@ -9,7 +9,7 @@ window.tvGlobal = {}
 
 # config vars from server
 # this line is replaced on every run
-serverConfigStr = '{"CHROOT":"","USER":"root","HOME_IP":"108.23.16.49","AT_HOME":"true","SERVER_IP":"192.168.1.103","SERVER_HOST":"192.168.1.103","DEBUG":"*","LOCATION":"server","OFF_SITE":"false"}'
+serverConfigStr = '{"CHROOT":"","USER":"root","HOME_IP":"108.38.125.245","AT_HOME":"true","SERVER_IP":"192.168.1.103","SERVER_HOST":"192.168.1.103","DEBUG":"*","LOCATION":"server","OFF_SITE":"false"}'
 tvGlobal.serverConfig = JSON.parse serverConfigStr
 # log 'serverConfig', tvGlobal.serverConfig
 
@@ -56,4 +56,4 @@ tvGlobal.tagList = [
   'LindaFavs', 'OnTheFence', 'New', 'LessThan3', 'Watched', 'Archive', 'Deleted' 
 ]      
 
-tvGlobal.syncPlexDB = -> tvGlobal.ajaxCmd 'syncPlexDB'
+tvGlobal.syncPlexDB = -> # tvGlobal.ajaxCmd 'syncPlexDB'

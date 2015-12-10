@@ -75,7 +75,7 @@ Vue.component 'watch-video-comp',
     vidPlay: -> @vidHasPlayed = yes
       
   computed:
-    bannerUrl: -> tvGlobal.plexPfx + @show.banner
+    bannerUrl: -> tvGlobal.bannerPfx + @show.banner
     
     videoUrl: -> 
       @videoState = null

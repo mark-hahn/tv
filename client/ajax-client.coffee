@@ -11,11 +11,6 @@ request = require 'superagent'
 tvGlobal.serverIp  = serverIp  = # 'hahnca.com'  # SERVER_HOST
 tvGlobal.browserIp = browserIp = '192.168.1.103' #'hahnca.com'
 
-tvGlobal.plexServerIp   = plexServerIp   = SERVER_HOST
-tvGlobal.plexServerPort = plexServerPort =
-  (if OFF_SITE isnt 'false' then '17179' else '32400')
-tvGlobal.plexPfx  = "http://#{plexServerIp}:#{plexServerPort}"
-
 tvGlobal.vidSrvrPort = vidSrvrPort = 
   (if OFF_SITE isnt 'false' then '1345' else '2345')
 tvGlobal.vidSrvrPfx  = "http://#{serverIp}:#{vidSrvrPort}"

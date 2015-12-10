@@ -2,9 +2,6 @@ node_modules
 *.out
 *.js
 *.log
-plexdb**
-.unison**
-tvShowsCache
 *.jpg
 *.mp4
 *.mkv

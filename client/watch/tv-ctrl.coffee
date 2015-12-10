@@ -87,7 +87,7 @@ class TvCtrl
           if err
             log 'tvGlobal.ajaxCmd startTv err', err
             if err is 500
-              @watchComp.$dispatch 'popup', 'Start Plex in Roku and refresh'
+              @watchComp.$dispatch 'popup', 'Make sure tv player is running.'
       @curPlayState  = 'playing'
       @curEpisodeKey =  episodeKey
     

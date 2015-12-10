@@ -63,12 +63,31 @@ exports.stop = (cb) ->
     ssh 'root', 'killall vlc', cb
   # , 500
 
-exports.play 'aaf-coming.of.age.s01e01.avi', ->
-  # setTimeout ->
-    # secs = Math.floor Math.random() * 900 + 150
-    # vlcCmd 'seek ' + secs
-    # vlcCmd 'get_time'
-  # , 1e3
+exports.startVideo = (key, goToStart, cb) ->
+  # log 'startVideo', goToStart
+  # if goToStart then console.trace()
+  # offset = (if goToStart then 0 else 1)
+  # playerCtrl '/playback/playMedia', {key, offset}, (err, res) ->
+  #   if err then cb? err; return
+  #   cb? null, res
+    
+exports.playAction = (action, cb) ->
+  # play and pause are both play/pause toggles
+  # skipNext, skipPrevious (bumps playback speed, back to 1x pauses)
+  # stepForward (defined but doesn't work)
+  # stepBack (20 secs, adjustable in setup?)
+  # stop (goes back in menu when repeated)
+  # playerCtrl "/playback/#{action}", null, (err, res) ->
+  #   if err then cb? err; return
+  #   cb? null, res
+
+if process.args[2] is 'test'
+  exports.play 'aaf-coming.of.age.s01e01.avi', ->
+    # setTimeout ->
+      # secs = Math.floor Math.random() * 900 + 150
+      # vlcCmd 'seek ' + secs
+      # vlcCmd 'get_time'
+    # , 1e3
 
 ###
 | add XYZ  . . . . . . . . . . . . . . . . . . . . add XYZ to playlist

@@ -64,18 +64,18 @@ exports.getShowByName = (showNameIn, cb) ->
   if (show = showsByName[showNameIn]) then cb null, show; return
   if show is null then cb(); return
   
-  noMatch = (details) ->
-    log 'no tvdb match', showNameIn
-    fs.appendFileSync 'files/show-no-tvdb.txt', 
-                       showNameIn + '  ' + util.inspect(details, depth:null) + '\n'
-    showsByName[showNameIn] = null
-    setImmediate cb
-    
   getSeriesIdByName showNameIn, (err, seriesId) ->
-    if err then noMatch err; return
+    if err
+      log 'no tvdb fuzz match', showNameIn
+      fs.appendFileSync 'files/no-fuzz-match.txt', 
+                         showNameIn + ', ' + util.inspect(err, depth:null) + '\n'
+      showsByName[showNameIn] = null
+      setImmediate cb
+      return
+    
     if not seriesId
       showsByName[showNameIn] = null
-      cb()
+      setImmediate cb
       return
     
     tvdb.getSeriesAllById seriesId, (err, tvdbSeries) ->
@@ -163,8 +163,6 @@ exports.downloadBanner = (banner, cb) ->
   
 exports.downloadBannersForShow = (show, cb) ->
   if not show.banners then cb(); return
-  
-  ## TODO support any flattened data like actor images
   
   allBanners = []
   addBanners = (obj) ->

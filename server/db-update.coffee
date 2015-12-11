@@ -83,7 +83,7 @@ getBitRate = (filePath) ->
       matches[2] + ' ' + matches[3] + ' ' + rate + ' ' + filePath + '\n'
   rate
 
-guessit = (filePath) ->
+exports.guessit = (filePath) ->
   fileName = filePath.replace '/mnt/media/videos/', ''
   fileName = fileName.replace /[^\x20-\x7e]/g, ''
   {output} = exec 'guessit', [fileName], timeout: 10e3
@@ -95,6 +95,8 @@ guessit = (filePath) ->
       output.toString() + '\n' + json + '\n'
     return []
   episodes = []
+  if res.year
+    res.title = res.title + ' (' + res.year + ')'
   switch typeof res.season + typeof res.episode
     when 'objectnumber'
       for seasonNumber in res.season.join(',').split(',')
@@ -120,7 +122,7 @@ exports.getFileData = (filePath) ->
   if not stats.isFile() then return 'not-file'
   bitRate = getBitRate filePath
   
-  episodes = guessit filePath
+  episodes = exports.guessit filePath
   
   # need to hanlde multiple episodes per file  TODO
   if not (fileData = episodes[0]) then return 'no-guessit'
@@ -356,7 +358,6 @@ if process.argv[2] is 'all'
 
 {
    "_id": "_design/all",
-   "_rev": "2-87b6221acd9fc4da4ec6b0b08aef0d63",
    "language": "javascript",
    "views": {
        "showByFileTitle": {

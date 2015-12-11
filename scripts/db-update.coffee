@@ -16,8 +16,9 @@ mappings = [
   ['sex drugs and rock and roll'     , 'Sex&Drugs&Rock&Roll']
   ['tmawl'                           , 'That Mitchell And Webb Look']
   ['archer'                          , 'Archer (2009)']
+  ['Playhouse Presents Psychobitches', 'Psychobitches']
 ]
-  
+
 videosPath = '/mnt/media/videos/'
 
 incSeq    = 0

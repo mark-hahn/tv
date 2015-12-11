@@ -11,6 +11,12 @@ if guess[0]
   console.log 'title:', title
 
   if title
-    tvdb.getShowByName title, (err, res) ->
-      console.log 'tvdb:\n', util.inspect res, depth:null
+    
+    tvdb.getSeriesIdByName title, (err, res, fuzzRes) ->
+      
+      if fuzzRes 
+        console.log 'fuzzRes:\n', util.inspect fuzzRes, depth:null
+      
+      tvdb.getShowByName title, (err, res) ->
+        console.log 'tvdb:\n', util.inspect res, depth:null
 

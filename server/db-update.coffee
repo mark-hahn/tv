@@ -17,6 +17,8 @@ mappings = [
   ['tmawl'                           , 'That Mitchell And Webb Look']
   ['archer'                          , 'Archer (2009)']
   ['Playhouse Presents Psychobitches', 'Psychobitches']
+  ['Last Man Standing',                'Last Man Standing (US)']
+  ['Louie',                            'Louie (2010)']
 ]
 
 videosPath = '/mnt/media/videos/'
@@ -86,7 +88,19 @@ getBitRate = (filePath) ->
 exports.guessit = (filePath) ->
   fileName = filePath.replace '/mnt/media/videos/', ''
   fileName = fileName.replace /[^\x20-\x7e]/g, ''
+                     .replace /\(GB\)/i, '(UK)'
+                     .replace /[\.\s]UK[\.\s]/i, ' (UK) '
+                     .replace 'faks86', ''
+                     
+  if filePath in [
+        'Rik Mayall Presents  - s01e09 - Briefest Encounter.avi'
+        'The.Comedians.US.S01E01.720p.HDTV.x264-KILLERS.mkv'
+      ]
+    fs.appendFileSync 'files/episode-no-tvdb.txt', 
+                      filePath + ' => ' + fileName + '\n'
+  
   {output} = exec 'guessit', [fileName], timeout: 10e3
+  
   json = output.toString().replace /^[\s|\S]*?GuessIt\s+found\:\s+/i, ''
   try
     res = JSON.parse json.replace /[^\}]*$/, ''
@@ -94,23 +108,28 @@ exports.guessit = (filePath) ->
     fs.appendFileSync 'files/guessit-parse-error.txt', 
       output.toString() + '\n' + json + '\n'
     return []
-  episodes = []
+  
   if res.year
     res.title = res.title + ' (' + res.year + ')'
+  if res.country is 'UNITED KINGDOM' and 
+       not /\(UK\)/i.test res.title
+    res.title = res.title + ' (UK)'
+  
+  episodes = []
   switch typeof res.season + typeof res.episode
     when 'objectnumber'
-      for seasonNumber in res.season.join(',').split(',')
+      for seasonNumber in res.season.slice()
         res.season = +seasonNumber
         episodes.push res
     when 'numberobject'
-      for episodeNumber in res.episode.join(',').split(',')
+      for episodeNumber in res.episode.slice()
         res.episode = +episodeNumber
         episodes.push res
     when 'objectobject'
-      epis = res.episode.join(',').split(',')
-      for seasonNumber, idx in res.season.join(',').split(',')
+      episodeNumbers = res.episode.slice()
+      for seasonNumber, idx in res.season.slice()
         res.season  = +seasonNumber
-        res.episode = +epis[idx]
+        res.episode = +episodeNumbers[idx]
         episodes.push res
     else episodes = [res]
   episodes
@@ -124,7 +143,6 @@ exports.getFileData = (filePath) ->
   
   episodes = exports.guessit filePath
   
-  # need to hanlde multiple episodes per file  TODO
   if not (fileData = episodes[0]) then return 'no-guessit'
   if not (series = fileData.title) then return 'no-series'
   
@@ -143,13 +161,18 @@ exports.getFileData = (filePath) ->
   seasonNumber  = +fileData.season
   episodeNumber = +fileData.episode
   
-  if fileTitle is 'the'
-    fs.appendFileSync 'files/the.txt', 
-      filePath + '\n' + util.inspect(fileData, depth: null) + '\n'
-    
-  fileEpisodeTitle = fileData. episode_title
+  if fileTitle is 'the' then fileTitle = 'The Spa'
+  fileCountry = fileData.country
+  if episodes.length > 1
+    multipleEpisodes = 
+      for episode in episodes
+        [episode.seasonNumber, episode.episodeNumber]
+  else
+    multipleEpisodes = null      
+  fileEpisodeTitle = fileData.episode_title
+  
   {filePath, fileSize, bitRate, fileTitle, seasonNumber, 
-   episodeNumber, fileEpisodeTitle}
+   episodeNumber, multipleEpisodes, fileEpisodeTitle, fileCountry}
 
 dbPutShow = (show, cb) ->
   log new Date().toString()[0..20], show.tvdbTitle
@@ -168,7 +191,6 @@ dbPutEpisode = (episode, cb) ->
   episode.type = 'episode'
   episode.episodeTitle ?= episode.fileEpisodeTitle
   delete episode.fileEpisodeTitle
-  delete episode.fileTitle
   delete episode.fileSize
   delete episode.bitRate
   delete episode.filePath
@@ -219,7 +241,7 @@ getEpisode = (show, fileData, cb) ->
     inc 'new episode no tvdb'
     fs.appendFileSync 'files/episode-no-tvdb.txt', 
                       'mv "' + filePath + '" "' + filePath + '"\n'
-    episode = fileData
+    episode           = fileData
     episode.showId    = show._id
     episode.filePaths = [fileSizePath]
     dbPutEpisode episode, cb

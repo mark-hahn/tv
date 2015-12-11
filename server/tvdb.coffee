@@ -33,7 +33,7 @@ cleanActors = (actors) ->
       {Image, Name, Role} = actor
       {thumb: Image, name: Name, role: Role}
 
-getSeriesIdByName = (showNameIn, cb) ->
+exports.getSeriesIdByName = (showNameIn, cb) ->
   seriesId = fuzzRes = null
   tryseq = 0
   do tryit = ->
@@ -57,8 +57,10 @@ getSeriesIdByName = (showNameIn, cb) ->
           titles = []
           for series in allSeries
             titles.push series.SeriesName
-          fuzz    = new Fuzz titles
+            
+          fuzz = new Fuzz titles
           fuzzRes = fuzz.get showNameIn
+          
           if fuzzRes.length is 0 then tryit(); return
           score = fuzzRes[0][0]
           title = fuzzRes[0][1]
@@ -67,13 +69,14 @@ getSeriesIdByName = (showNameIn, cb) ->
             if series.SeriesName is title
               seriesId = series.seriesid
               break
-      cb null, seriesId
+              
+      cb null, seriesId, (if fuzzRes?.length > 1 then fuzzRes)
 
 exports.getShowByName = (showNameIn, cb) ->
   if (show = showsByName[showNameIn]) then cb null, show; return
   if show is null then cb(); return
   
-  getSeriesIdByName showNameIn, (err, seriesId) ->
+  exports.getSeriesIdByName showNameIn, (err, seriesId) ->
     if err then log 'getSeriesIdByName err', err; process.exit 0
     
     if not seriesId

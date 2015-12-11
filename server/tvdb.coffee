@@ -34,44 +34,47 @@ cleanActors = (actors) ->
       {thumb: Image, name: Name, role: Role}
 
 getSeriesIdByName = (showNameIn, cb) ->
-  seriesId = null
-  tvdb.getSeriesByName showNameIn, (err, res) ->
-    if err then throw err
-    allSeries = res
-    if not res then cb(); return
-    
-    switch res.length
-      when 0 then cb(); return
-      when 1 then seriesId = allSeries[0].seriesid
-      else
-        # log 'allSeries', allSeries
-        titles = []
-        for series in allSeries
-          titles.push series.SeriesName
-        fuzz    = new Fuzz titles
-        fuzzRes = fuzz.get showNameIn
-        if fuzzRes.length is 0 then cb {tvdbRes: res, fuzzRes}; return
-        score = fuzzRes[0][0]
-        title = fuzzRes[0][1]
-        if score < 0.65 then cb {tvdbRes: res, fuzzRes}; return
-        for series in allSeries
-          if series.SeriesName is title
-            seriesId = series.seriesid
-            break
-    cb null, seriesId
-  
+  seriesId = fuzzRes = null
+  tryseq = 0
+  do tryit = ->
+    switch ++tryseq
+      when 2 then showNameIn = showNameIn.replace /\./g, ' '
+      when 3 then showNameIn = showNameIn.replace /\([^\)]*\)|\[[^\]]*\]/g, ''
+      when 4
+        fs.appendFileSync 'files/no-tvdb-match.txt', 
+                           showNameIn + ', ' + util.inspect(fuzzRes, depth:null) + '\n'
+        cb()
+        return
+    showNameIn = showNameIn.replace /^\s+|\s+$/g, ''  
+    tvdb.getSeriesByName showNameIn, (err, res) ->
+      if err then throw err
+      if not (allSeries = res) then tryit(); return
+      
+      switch res.length
+        when 0 then tryit(); return
+        when 1 then seriesId = allSeries[0].seriesid
+        else
+          titles = []
+          for series in allSeries
+            titles.push series.SeriesName
+          fuzz    = new Fuzz titles
+          fuzzRes = fuzz.get showNameIn
+          if fuzzRes.length is 0 then tryit(); return
+          score = fuzzRes[0][0]
+          title = fuzzRes[0][1]
+          if score < 0.65 then tryit(); return
+          for series in allSeries
+            if series.SeriesName is title
+              seriesId = series.seriesid
+              break
+      cb null, seriesId
+
 exports.getShowByName = (showNameIn, cb) ->
   if (show = showsByName[showNameIn]) then cb null, show; return
   if show is null then cb(); return
   
   getSeriesIdByName showNameIn, (err, seriesId) ->
-    if err
-      log 'no tvdb fuzz match', showNameIn
-      fs.appendFileSync 'files/no-fuzz-match.txt', 
-                         showNameIn + ', ' + util.inspect(err, depth:null) + '\n'
-      showsByName[showNameIn] = null
-      setImmediate cb
-      return
+    if err then log 'getSeriesIdByName err', err; process.exit 0
     
     if not seriesId
       showsByName[showNameIn] = null

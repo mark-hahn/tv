@@ -9,17 +9,13 @@ tvdb = require '../server/tvdb'
 db   = require '../server/db'
 
 mappings = [
-  ['buffy'                           , 'buffy the vampire slayer']
-  ['mst3k'                           , 'mystery science theater 3000']
-  ['mst3k (cu)'                      , 'mystery science theater 3000']
-  ['cicgc'                           , 'comedians in cars getting coffee']
-  ['amazon.pilot.season'             , 'amazon pilot season fall 2015 good girls']
-  ['bob.servant'                     , 'bob servant independent']
-  ['miranda.christmas.special'       , 'miranda']
-  ['sex.and.drugs.and.rock.and.roll' , 'sex, chips & rock n\' roll']
-  ['sex.drugs.and.rock.and.roll'     , 'sex, chips & rock n\' roll']
-  ['tmawl'                           , 'that mitchell and webb look']
-  ['archer'                          , 'archer (2009)']
+  ['buffy'                           , 'Buffy The Vampire Slayer']
+  ['mst3k'                           , 'Mystery Science Theater 3000']
+  ['cicgc'                           , 'Comedians In Cars Getting Coffee']
+  ['sex and drugs and rock and roll' , 'Sex&Drugs&Rock&Roll']
+  ['sex drugs and rock and roll'     , 'Sex&Drugs&Rock&Roll']
+  ['tmawl'                           , 'That Mitchell And Webb Look']
+  ['archer'                          , 'Archer (2009)']
 ]
   
 videosPath = '/mnt/media/videos/'
@@ -81,15 +77,40 @@ getBitRate = (filePath) ->
     else
       log 'bit rate units err', matches
       fatal()
-  if rate > 15e6
-    log 'bit rate', matches[2], matches[3], rate, filePath
+  if rate > 10e6
+    fs.appendFileSync 'files/high-bitrate.txt', 
+      matches[2] + ' ' + matches[3] + ' ' + rate + ' ' + filePath + '\n'
   rate
 
 guessit = (filePath) ->
   fileName = filePath.replace '/mnt/media/videos/', ''
-  {output} = exec 'guessit', [fileName], timeout: 60e3
-  json = output.toString().replace /^[\s|\S]*?GuessIt\sfound\:\s/i, ''
-  JSON.parse json.replace /[^\}]*$/, ''
+  fileName = fileName.replace /[^\x20-\x7e]/g, ''
+  {output} = exec 'guessit', [fileName], timeout: 10e3
+  json = output.toString().replace /^[\s|\S]*?GuessIt\s+found\:\s+/i, ''
+  try
+    res = JSON.parse json.replace /[^\}]*$/, ''
+  catch e
+    fs.appendFileSync 'files/guessit-parse-error.txt', 
+      output.toString() + '\n' + json + '\n'
+    return []
+  episodes = []
+  switch typeof res.season + typeof res.episode
+    when 'objectnumber'
+      for seasonNumber in res.season.join(',').split(',')
+        res.season = +seasonNumber
+        episodes.push res
+    when 'numberobject'
+      for episodeNumber in res.episode.join(',').split(',')
+        res.episode = +episodeNumber
+        episodes.push res
+    when 'objectobject'
+      epis = res.episode.join(',').split(',')
+      for seasonNumber, idx in res.season.join(',').split(',')
+        res.season  = +seasonNumber
+        res.episode = +epis[idx]
+        episodes.push res
+    else episodes = [res]
+  episodes
 
 exports.getFileData = (filePath) ->
   inc 'getFileData'
@@ -98,28 +119,26 @@ exports.getFileData = (filePath) ->
   if not stats.isFile() then return 'not-file'
   bitRate = getBitRate filePath
   
-  fileData = guessit filePath
+  episodes = guessit filePath
+  
+  # need to hanlde multiple episodes per file  TODO
+  if not (fileData = episodes[0]) then return 'no-guessit'
   if not (series = fileData.title) then return 'no-series'
   
-  fileTitle = series #.replace /[\s-]+/g, '.'
+  fileTitle = series
   for map in mappings
-    if fileTitle.indexOf(map[0]) > -1
+    regex = new RegExp(
+      fileTitle.replace(/[\-\[\]\/\{\}\(\)\*\+\?\\\^\$\|]/g, '\\$&'), 'i')
+    if regex.test map[0]
       fileTitle = map[1]
       break
   fileTitle = fileTitle.replace /\./g, ' '
                        .replace /^(aaf-|daa-)/i, ''
   if (isNaN(fileData.season) or isNaN(fileData.episode)) 
-    # if (matches = /(\d+)x(\d+)/i.exec filePath)
-    #     seasonNumber  = +matches[1]
-    #     episodeNumber = +matches[2]
-    # else
-      fs.appendFileSync 'files/bad-numbers.txt', 
-                         filePath + '\n' + 
-                           util.inspect(fileData, depth:null) + '\n'
-      return 'bad-number'
-  else
-    seasonNumber  = +fileData.season
-    episodeNumber = +fileData.episode
+    return 'bad-number'
+    
+  seasonNumber  = +fileData.season
+  episodeNumber = +fileData.episode
   
   if fileTitle is 'the'
     fs.appendFileSync 'files/the.txt', 
@@ -207,7 +226,7 @@ addTvdbEpisodes = (show, fileData, tvdbEpisodes, cb) ->
     getEpisode show, fileData, cb
     return
   
-  inc 'tvdb episodes'
+  inc 'episode from tvdb'
   db.view 'episodeByShowSeasonEpisode',
           {key: [show._id, tvdbEpisode.seasonNumber, tvdbEpisode.episodeNumber]}
   , (err, body) -> 
@@ -258,7 +277,7 @@ exports.checkFile = (filePath, cb) ->
     if err then fatal err
 
     if body.rows.length > 0
-      inc 'got episodeByFilePath'
+      inc 'got episode by filepath'
       episode =  body.rows[0].value
       if episode.tvdbEpisodeId
         inc 'skipping complete episode'
@@ -295,26 +314,24 @@ exports.checkFile = (filePath, cb) ->
                               'mv "' + filePath + '" "' + filePath + '"\n'
             cb()
             return
-            
+          
           db.view 'showByTvdbShowId', 
             {key: show.tvdbShowId}
           , (err, body) ->
             if err then fatal err
             
-            if body.rows.length > 0
-              inc 'add filetitle to show in db'
-              if not show.fileTitles
-                fatal ['no show.fileTitles', show]
-              if fileTitle not in show.fileTitles
-                show.fileTitles.push fileTitle
-                db.put show, (err) ->
+            if (oldShow = body.rows[0]?.value)
+              inc 'add filetitle to show'
+              if fileTitle not in oldShow.fileTitles
+                oldShow.fileTitles.push fileTitle
+                db.put oldShow, (err) ->
                   if err then fatal err
-                  chkTvdbEpisodes show, fileData, cb
+                  chkTvdbEpisodes oldShow, fileData, cb
               else
-                chkTvdbEpisodes show, fileData, cb
+                chkTvdbEpisodes oldShow, fileData, cb
               return
               
-            inc 'adding new show from tvdb'
+            inc 'new show from tvdb'
             show.fileTitles = [fileTitle]
             dbPutShow show, (err) ->
               if err then fatal err
@@ -326,7 +343,7 @@ exports.checkFile = (filePath, cb) ->
 if process.argv[2] is 'all'
   files = fs.listTreeSync videosPath
   do oneFile = ->
-    if not (filePath = files.shift()) # or filePath.indexOf('Armstrong') > -1
+    if not (filePath = files.shift())
       log 'done'
       dumpInc()
       return
@@ -335,8 +352,10 @@ if process.argv[2] is 'all'
     exports.checkFile filePath, oneFile
 
 ###
+
 {
    "_id": "_design/all",
+   "_rev": "2-87b6221acd9fc4da4ec6b0b08aef0d63",
    "language": "javascript",
    "views": {
        "showByFileTitle": {
@@ -349,11 +368,15 @@ if process.argv[2] is 'all'
            "map": "function(doc) { \n  if (doc.type == 'episode' && doc.filePaths)\n    for(i=0; i < doc.filePaths.length; i++)\n      emit(doc.filePaths[i][2], doc);\n}\n"
        },
        "showByTvdbShowId": {
-           "map": "function(doc) {\n  if(doc.type == 'show' && doc.tvdbShowId)\n    emit(doc.tvdbTitle, null);\n}"
+           "map": "function(doc) {\n  if(doc.type == 'show' && doc.tvdbShowId)\n    emit(doc.tvdbShowId, doc);\n}"
        },
        "fileNoTvdb": {
            "map": "function(doc) { \n  if (doc.type == 'episode' && doc.filePaths && !doc.tvdbEpisodeId)\n    for(i=0; i < doc.filePaths.length; i++)\n      emit(doc.filePaths[i][2], doc);\n}\n"
+       },
+       "showByTvdbTitle": {
+           "map": "function(doc) {\n  if (doc.type == 'show' && doc.tvdbShowId)\n    emit(doc.tvdbTitle, doc);\n}\n"
        }
    }
 }
+
 ###

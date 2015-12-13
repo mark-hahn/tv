@@ -399,8 +399,10 @@ if process.argv[2] is 'all'
        },
        "showByTvdbTitle": {
            "map": "function(doc) {\n  if (doc.type == 'show' && doc.tvdbShowId)\n    emit(doc.tvdbTitle, doc);\n}\n"
+       },
+       "episodeByFilenameSeasonEpisode": {
+           "map": "function(doc) {\n  if (doc.type == 'episode' && doc.filePaths)\n    for (i=0; i < doc.filePaths.length; i++)\n      emit([doc.filePaths[i][2], doc.seasonNumber, doc.episodeNumber], doc);\n}"
        }
    }
 }
-
 ###

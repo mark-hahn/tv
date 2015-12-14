@@ -8,6 +8,7 @@ log = ->
 
 reloadDelay = 1000
 interval = 300
+
 headers =
   Etag: 1
   "Last-Modified": 1
@@ -32,6 +33,9 @@ Live =
     setTimeout Live.heartbeat, interval
 
   loadresources: ->
+    if not tvGlobal.ajaxInit
+      setTimeout Live.loadresources, 100
+      return
     urls = [ "http://#{tvGlobal.serverIp}:2340/js/bundle.js" ]
     for url in urls
       Live.getHead url, (url, info) ->

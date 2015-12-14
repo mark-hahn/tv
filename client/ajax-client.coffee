@@ -4,34 +4,40 @@
 
 log     = require('debug') 'tv:ajxcli'
 request = require 'superagent'
- 
-# bug: these are for server, not client
-{SERVER_HOST, DEBUG, OFF_SITE} = tvGlobal.serverConfig
- 
-tvGlobal.serverIp  = serverIp  = # 'hahnca.com'  # SERVER_HOST
-tvGlobal.browserIp = browserIp = '192.168.1.103' #'hahnca.com'
 
-tvGlobal.vidSrvrPort = vidSrvrPort = 
-  (if OFF_SITE isnt 'false' then '1345' else '2345')
-tvGlobal.vidSrvrPfx  = "http://#{serverIp}:#{vidSrvrPort}"
- 
-ajaxPort = +location.port + 4
-ajaxPfx  = "http://#{serverIp}:#{ajaxPort}/"
+ajaxPort = ajaxPfx = null
 
 request
-  .get ajaxPfx + 'getIp'
+  .get 'http://icanhazip.com'
   .set 'Content-Type', 'text/plain'
   .end (err, res) ->
     if res and res.status isnt 200
-      log 'getIp bad status', res.status
+      log 'icanhazip bad status', res.status
       return
     if err
-      log 'ajax err', err
+      log 'icanhazip err', err
       return
-    tvGlobal.browserIp = JSON.parse(res.text).data
-    log 'serverIp, browserIp', serverIp, browserIp
+    tvGlobal.browserIp = browserIp = res.text[0..12]
+    
+    if browserIp is '173.58.39.204'
+      tvGlobal.atHome = atHome = yes
+      tvGlobal.serverIp = serverIp = '192.168.1.103'
+    else
+      tvGlobal.atHome = atHome = no
+      tvGlobal.serverIp = serverIp = 'hahnca.com'
+      
+    tvGlobal.vidSrvrPort = vidSrvrPort = 
+      (if atHome isnt 'false' then '2345' else '1345')
+    tvGlobal.vidSrvrPfx  = vidSrvrPfx = "http://#{serverIp}:#{vidSrvrPort}"
+    ajaxPort = +location.port + 4
+    ajaxPfx  = "http://#{serverIp}:#{ajaxPort}/"
+    tvGlobal.ajaxInit = yes
+    log 'init', {browserIp, atHome, serverIp, vidSrvrPfx, ajaxPfx}
 
 tvGlobal.ajaxCmd = (cmd, args..., cb) ->
+  if not tvGlobal.ajaxInit
+    setTimeout (-> tvGlobal.ajaxCmd cmd, args..., cb), 100
+    return
   if cb? and typeof cb isnt 'function' then args.push cb
   query = ''
   sep = '?'
@@ -39,8 +45,8 @@ tvGlobal.ajaxCmd = (cmd, args..., cb) ->
     query += sep + 'q' + idx + '=' +arg.toString()
     sep = '&'
     
-  # if cmd isnt 'getTvStatus'
-  #   log 'ajax call', {cmd, query, args}
+  if cmd isnt 'getTvStatus'
+    log 'ajax call', {cmd, query, args}
   
   request
     .get ajaxPfx + cmd + query

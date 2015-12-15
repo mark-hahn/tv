@@ -14,7 +14,7 @@ exports.getShowList = getList = (cb) ->
     
   db.view 'showByFileTitle', (err, body) -> 
     if err then throw err
-    show = (row.value for row in body.rows)
+    shows = (row.value for row in body.rows)
     
     result = []
     do oneShow = ->
@@ -29,8 +29,10 @@ exports.getShowList = getList = (cb) ->
       duration ?= 60
       thumb = null
       for key, val of banners when key.split('-')[0] is 'poster'
-        thumb = val?.BannerPath[0]
+        thumb = val?[0]?.BannerPath
         break
+      banner = banners['series-graphical']?[0]?.BannerPath
+         
       tags = {}
       for tag in taglist then tags[tag] = yes
         
@@ -46,11 +48,11 @@ exports.getShowList = getList = (cb) ->
         for row in body.rows when (row.value.filePaths?.length ? 0) > 0
           {seasonNumber, episodeNumber, episodeTitle: title, summary, \
            thumb, _id: key, length: episodeLen, 
-           aired: originallyAvailableAt} = episode
+           aired: originallyAvailableAt} = row.value
           episodeNumber = seasonNumber + '-' + episodeNumber
           resShow.episodes.push {
             id, showId: resShow.id, episodeNumber, title, summary, \
-            thumb, viewCount: 0, key, episodeLen, aired 
+            thumb, viewCount: 0, key, episodeLen, aired: aired ? null, 
           }
           oneShow()
 

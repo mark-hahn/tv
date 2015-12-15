@@ -5,6 +5,9 @@ if [ $LOCATION != "server" ]; then
   exit 1
 fi
 
+coffee -co js server/*.coffee
+/root/dev/apps/tv/run
+
 while [[ true ]] 
 do
   if [[ `find /root/dev/apps/tv/server -type f \

@@ -2,7 +2,7 @@
   ajax-client.coffee 
 ###
 
-log     = require('debug') 'tv:ajxcli'
+log     = require('debug') 'tv:ajax'
 request = require 'superagent'
 
 ajaxPort = ajaxPfx = null
@@ -20,19 +20,19 @@ request
     tvGlobal.browserIp = browserIp = res.text[0..12]
     
     if browserIp is '173.58.39.204'
-      tvGlobal.atHome = atHome = yes
       tvGlobal.serverIp = serverIp = '192.168.1.103'
     else
-      tvGlobal.atHome = atHome = no
       tvGlobal.serverIp = serverIp = 'hahnca.com'
       
-    tvGlobal.vidSrvrPort = vidSrvrPort = 
-      (if atHome isnt 'false' then '2345' else '1345')
+    tvGlobal.srvrPort    = srvrPort    = +location.port
+    tvGlobal.vidSrvrPort = vidSrvrPort = srvrPort + 5
+    ajaxPort                           = srvrPort + 4
+    tvGlobal.bannerPfx   = bannerPfx = "http://#{serverIp}:#{srvrPort}/tvdb-banners/"
     tvGlobal.vidSrvrPfx  = vidSrvrPfx = "http://#{serverIp}:#{vidSrvrPort}"
-    ajaxPort = +location.port + 4
-    ajaxPfx  = "http://#{serverIp}:#{ajaxPort}/"
+    ajaxPfx              = "http://#{serverIp}:#{ajaxPort}/"
+    
     tvGlobal.ajaxInit = yes
-    log 'init', {browserIp, atHome, serverIp, vidSrvrPfx, ajaxPfx}
+    log 'init', {browserIp, serverIp, vidSrvrPfx, ajaxPfx, bannerPfx}
 
 tvGlobal.ajaxCmd = (cmd, args..., cb) ->
   if not tvGlobal.ajaxInit

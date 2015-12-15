@@ -8,10 +8,16 @@ fi
 echo "Checking watchify"
 
 pkill -f "watchify client/app.coffee" # > /dev/null 2>&1
-if [ $(ps aux | grep watchify | wc -l) != "2" ]; then
+
+watchify="$(ps aux | grep watchify | wc -l)"
+echo "watchify process count: $watchify"
+
+if [ $watchify != "2" ]; then
   echo "Starting watchify"
   # --poll=interval 
   # coffee -cwo /root/dev/apps/teacss/lib /root/dev/apps/teacss/src/*.coffee &
   watchify client/app.coffee -v -d --iw x -o js/bundle.js \
            -t coffeeify --extension=".coffee" &
 fi
+
+echo "watch-client ended"

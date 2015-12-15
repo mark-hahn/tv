@@ -10,8 +10,6 @@ log      = require('debug') 'tv:ajax'
 port     = require('parent-config')('apps-config.json').tvAjax_port
 showList = require './show-list'
 
-log 'port', port
-
 db.init   (err) -> if err then log 'db.init failed'
  
 poweringUp = no

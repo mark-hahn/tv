@@ -8,7 +8,6 @@ fi
 echo "Checking watchify"
 
 pkill -f "watchify client/app.coffee" # > /dev/null 2>&1
-coffee -co js server/*.coffee
 if [ $(ps aux | grep watchify | wc -l) != "2" ]; then
   echo "Starting watchify"
   # --poll=interval 

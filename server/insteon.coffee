@@ -17,7 +17,7 @@ lightIds = [
 	'298CDA' # 5 tv Mid Rear  
 	'29814C' # 6 tv Rgt Rear  
 ]
-
+ 
 exports.lightCmd = (light, cmd, args...) ->
 	cb = null; argStr = ''
 	for arg in args

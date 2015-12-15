@@ -13,7 +13,7 @@ showList = require './show-list'
 log 'port', port
 
 db.init   (err) -> if err then log 'db.init failed'
-
+ 
 poweringUp = no
 
 srvr = http.createServer (req, res) ->

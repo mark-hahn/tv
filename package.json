@@ -2,7 +2,7 @@
   "name": "tv",
   "version": "1.0.0",
   "description": "Hahn TV Controller",
-  "main": "tv-server.js",
+  "main": "server/server.coffee",
   "repository": {
     "type": "git",
     "url": "https://github.com/mark-hahn/tv"

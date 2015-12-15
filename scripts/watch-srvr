@@ -1,0 +1,19 @@
+#   -*-  grammar-ext: sh  -*-
+
+if [ $LOCATION != "server" ]; then 
+  echo "Watch-srvr must be run on the server"
+  exit 1
+fi
+
+while [[ true ]] 
+do
+  if [[ `find /root/dev/apps/tv/server -type f \
+              -cnewer /tmp/watch-srvr-ref` != "" ]]; then 
+    
+    coffee -co js server/*.coffee
+    /root/dev/apps/tv/run
+    
+    touch /tmp/watch-srvr-ref 
+  fi
+  sleep 1
+done

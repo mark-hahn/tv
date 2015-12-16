@@ -380,6 +380,7 @@ if process.argv[2] is 'all'
 
 {
    "_id": "_design/all",
+   "_rev": "2-585f9ed8fd72a86d2fe5633a29731e6e",
    "language": "javascript",
    "views": {
        "showByFileTitle": {
@@ -402,7 +403,11 @@ if process.argv[2] is 'all'
        },
        "episodeByFilenameSeasonEpisode": {
            "map": "function(doc) {\n  if (doc.type == 'episode' && doc.filePaths)\n    for (i=0; i < doc.filePaths.length; i++)\n      emit([doc.filePaths[i][2], doc.seasonNumber, doc.episodeNumber], doc);\n}"
+       },
+       "episodesWithFiles": {
+           "map": "function(doc) {\n  if (doc.type == 'episode' && doc.showId && doc.filePaths && doc.filePaths.length > 0)\n    emit([doc.showId, doc.seasonNumber, doc.episodeNumber], doc);\n}"
        }
    }
 }
+
 ###

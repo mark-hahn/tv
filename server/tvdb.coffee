@@ -89,13 +89,14 @@ exports.getShowByName = (showNameIn, cb) ->
       {Airs_DayOfWeek, Airs_Time, FirstAired, Genre, IMDB_ID, 
         Network, Overview, Runtime, SeriesName, 
         Status, zap2it_id, Episodes} = tvdbSeries
+      tags = {}
+      tags[tag] = yes for tag in parsePipeList Genre ? ''
       showRes = {tvdbShowId: seriesId, tvdbTitle: SeriesName, \
                  imdbShowId: IMDB_ID, zap2itShowId: zap2it_id,
                  day: Airs_DayOfWeek, time: Airs_Time, 
-                 started: FirstAired, tags: parsePipeList(Genre ? ''),
+                 started: FirstAired, tags,
                  network: Network, summary: Overview, 
                  length: (+Runtime)*60, status: Status}
-                 
       showRes.episodes = episodeListByTvdbId[seriesId] = 
         cleanEpisodes Episodes
       

@@ -34,8 +34,7 @@ exports.getShowList = (cb) ->
       []
 
 exports.setField = (id, key, val, cb) ->
-  if typeof val isnt 'boolean' and val isnt '' and
-     not isNaN val then val = +val;
+  if typeof val isnt 'boolean' and val isnt '' and not isNaN val then val = +val;
   exports.get id, (err, doc) ->
     if err then log 'setField get err: ' + err.message, {id, key, val}; cb? err; return
     if not doc then log 'setField doc missing: ', {id, key, val}; cb? 'doc missing'; return
@@ -43,6 +42,7 @@ exports.setField = (id, key, val, cb) ->
     for attr in key.split '.'
       if typeof obj[attr] is 'object' then obj = obj[attr] 
       else obj[attr] = val
+    log 'setField', {id, key, val, obj}
     exports.put doc, (err) ->
       if err then log 'setField put err: ' + err.message, {key, val}; cb? err; return
       # exports.syncPlexDB()

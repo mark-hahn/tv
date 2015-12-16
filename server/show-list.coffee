@@ -7,12 +7,14 @@ db  = require './db'
 
 inGetShowList = no
 
+showListCache = null
+
 exports.getShowList = getList = (cb) ->
   if inGetShowList
     setTimeout (-> getList cb), 100
   inGetShowList = yes
     
-  db.view 'showByFileTitle', (err, body) -> 
+  db.view 'showByTvdbTitle', (err, body) -> 
     if err then throw err
     shows = (row.value for row in body.rows)
     
@@ -32,29 +34,30 @@ exports.getShowList = getList = (cb) ->
         thumb = val?[0]?.BannerPath
         break
       banner = banners['series-graphical']?[0]?.BannerPath
-         
+
       tags = {}
       for tag in taglist then tags[tag] = yes
-        
+
       result.push resShow = 
         {id, title, summary, thumb, year, duration, tags, banner}
-                            
-      resShow.episodes = []
+
       db.view 'episodeByShowSeasonEpisode',
-        keystart: [id, null, null]
-        keyend:   [id, {}, {}]
+        startkey: [id, null, null]
+        endkey:   [id, {}, {}]
       , (err, body) -> 
         if err then throw err
+        resShow.episodes = []
         for row in body.rows when (row.value.filePaths?.length ? 0) > 0
           {seasonNumber, episodeNumber, episodeTitle: title, summary, \
-           thumb, _id: key, length: episodeLen, 
+           thumb, _id: episodeId, length: episodeLen
            aired: originallyAvailableAt} = row.value
           episodeNumber = seasonNumber + '-' + episodeNumber
           resShow.episodes.push {
-            id, showId: resShow.id, episodeNumber, title, summary, \
-            thumb, viewCount: 0, key, episodeLen, aired: aired ? null, 
+            id: episodeId, showId: id, episodeNumber, title
+            summary, thumb, viewCount: 0, key, episodeLen  
+            aired: aired ? null, filePath: row.value.filePaths[0]    
           }
-          oneShow()
+        oneShow()
 
 exports.getStatus = (cb) ->
   cb null,

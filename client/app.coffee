@@ -148,6 +148,7 @@ do init = ->
       tvGlobal.ajaxCmd 'shows', (err, res) => 
         if err then log 'get all shows err', err.message; return
         @allShows = res.data
+        log res.data.episodes
         document.querySelector('#page').style.visibility = 'visible'
         
     events:
@@ -163,7 +164,6 @@ do init = ->
         @curShow    = show = @allShows[idx]
         @curTags    = show.tags
         epiIdx      = sessionStorage.getItem 'epiForShow' + show.id
-        if epiIdx is 'episodeIdx' then epiIdx = null # fix corrupt db
         @$emit 'chgEpisodeIdx', epiIdx
         localStorage.setItem 'vueCurShowId', show.id
         
@@ -192,7 +192,7 @@ do init = ->
       
       document.body.addEventListener 'keypress', (e) =>
         # log 'key', e.charCode
-        switch e.charCode
+        switch e.charCode 
           
           when 98 # b   open in btn
             window.open 'https://broadcasthe.net/torrents.php?searchstr=' +

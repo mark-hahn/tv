@@ -33,11 +33,6 @@ srvr = http.createServer (req, res) ->
     if data then result.data = data
     res.end JSON.stringify result
   
-  
-  res.writeHead 200, 
-    'Content-Type': 'text/json'
-    'Access-Control-Allow-Origin': '*'
-    
   {pathname, query} = url.parse req.url, true
   data = []
   for q, arg of query
@@ -50,12 +45,14 @@ srvr = http.createServer (req, res) ->
       success ''
       
     when 'shows'
+      log 'shows start'
       showList.getShowList (err, result) ->
         if err then error err.message; return
+        log 'shows done', result.length
         success result
     
     when 'setDBField'
-      # log 'setDBField', data
+      log 'setDBField', data
       val = switch data[2]
         when 'true'  then true
         when 'false' then false

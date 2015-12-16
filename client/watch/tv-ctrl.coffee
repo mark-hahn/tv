@@ -67,7 +67,7 @@ class TvCtrl
             @watchComp.newState playState
           @curPlayState = playState
           @id = yes
-    , statusUpdateInterval
+    , 600e3 # statusUpdateInterval
  
   getPlayPos: -> @curPlayPos
   

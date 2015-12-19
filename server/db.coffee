@@ -16,7 +16,7 @@ tvShowsKey = null
 
 tagList = [
   'Foreign', 'Comedy', 'Drama', 'MarkOnly', 'MarkFavs', 'LindaOnly'     
-  'LindaFavs', 'OnTheFence', 'Archive', 'Deleted', 'New', 'LessThan3', 'Watched'
+  'LindaFavs', 'Kids', 'OnTheFence', 'Archive', 'Deleted', 'New', 'LessThan3', 'Watched'
 ]      
 
 exports.init = (cb) ->

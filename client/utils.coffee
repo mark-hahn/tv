@@ -53,7 +53,7 @@ tvGlobal.ensureVisible = (outerSel, sel) ->
 
 tvGlobal.tagList = [
   'Foreign', 'Comedy', 'Drama', 'MarkOnly', 'MarkFavs', 'LindaOnly'     
-  'LindaFavs', 'OnTheFence', 'New', 'LessThan3', 'Watched', 'Archive', 'Deleted' 
+  'LindaFavs', 'Kids', 'OnTheFence', 'New', 'LessThan3', 'Watched', 'Archive', 'Deleted' 
 ]      
 
 tvGlobal.syncPlexDB = -> # tvGlobal.ajaxCmd 'syncPlexDB'

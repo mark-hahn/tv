@@ -1,3 +1,14 @@
-killall ffmpeg
-pkill -f /root/dev/apps/tv/tv-server.js > /dev/null 2>&1
+#   -*-  grammar-ext: sh  -*-
 
+if [ $(pwd) == "/root/dev/apps/tv" ]; then isdev=true; else isdev=false; fi
+  
+if $isdev
+  then
+    pkill -f /root/dev/apps/tv/tv-server.js > /dev/null 2>&1
+    echo "killed debug tv app"
+  else
+    pkill -f /root/apps/tv/tv-server.js > /dev/null 2>&1
+    echo "killed released tv app"
+    killall ffmpeg
+    echo "killed all ffmpeg"
+fi

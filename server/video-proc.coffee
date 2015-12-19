@@ -68,8 +68,8 @@ do onePass = ->
   for procPath in allProcPaths when not fs.isDirectorySync procPath
     fs.removeSync procPath.replace '/videos-processing/', '/videos-small/'
     fs.removeSync procPath
-  rmrf topProcPath
-  mkdirp.sync topProcPath
+  fs.removeSync topProcPath
+  mkdirp.sync   topProcPath
   
   console.log '\nstarted processing', newCount, 'videos\n'
   

@@ -148,7 +148,7 @@ do init = ->
       tvGlobal.ajaxCmd 'shows', (err, res) => 
         if err then log 'get all shows err', err.message; return
         @allShows = res.data
-        log res.data.episodes
+        # log res.data.episodes
         document.querySelector('#page').style.visibility = 'visible'
         
     events:

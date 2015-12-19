@@ -2,8 +2,9 @@
   src/show-list.coffee
 ###
 
-log = require('debug') 'tv:--plex'
-db  = require './db'
+log  = require('debug') 'tv:--plex'
+db   = require './db'
+util = require 'util'
 
 inGetShowList = no
 
@@ -24,9 +25,11 @@ exports.getShowList = getList = (cb) ->
         cb null, result
         inGetShowList = no
         return
+        
+      watchedCount = availCount = 0
 
       {_id: id, tvdbTitle: title, summary, \
-        started: year, length: duration, banners, tags: taglist} = show
+        started: year, length: duration, banners, tags} = show
       year = year?.split('-')[0]
       duration ?= 60
       thumb = null
@@ -34,9 +37,6 @@ exports.getShowList = getList = (cb) ->
         thumb = val?[0]?.BannerPath
         break
       banner = banners['series-graphical']?[0]?.BannerPath
-
-      tags = {}
-      for tag in taglist then tags[tag] = yes
 
       result.push resShow = 
         {id, title, summary, thumb, year, duration, tags, banner}
@@ -48,15 +48,26 @@ exports.getShowList = getList = (cb) ->
         if err then throw err
         resShow.episodes = []
         for row in body.rows when (row.value.filePaths?.length ? 0) > 0
+          availCount++
           {seasonNumber, episodeNumber, episodeTitle: title, summary, \
            thumb, _id: episodeId, length: episodeLen
-           aired: originallyAvailableAt} = row.value
+           aired: originallyAvailableAt, watched} = row.value
+          watched ?= no
+          if watched then watchedCount++
           episodeNumber = seasonNumber + '-' + episodeNumber
           resShow.episodes.push {
             id: episodeId, showId: id, episodeNumber, title
-            summary, thumb, viewCount: 0, key, episodeLen  
+            summary, thumb, viewCount: 0, key, episodeLen, watched
             aired: aired ? null, filePath: row.value.filePaths[0]    
           }
+        tags = resShow.tags
+        if watchedCount is 0 then tags.New = yes
+        else delete tags.New
+        if availCount < 3 then tags.LessThan3 = yes
+        else delete tags.LessThan3
+        if watchedCount is availCount then tags.Watched = yes
+        else delete tags.Watched
+          
         oneShow()
 
 exports.getStatus = (cb) ->

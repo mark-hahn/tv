@@ -53,7 +53,7 @@ Vue.component 'show-info',
       div '.show-info-inner', ->
         img '.thumb', vAttr: "src: '#{tvGlobal.bannerPfx}' + curShow.thumb"
         div '.show-dtl.show-info-year', '{{curShow.year}}'
-        div '.show-dtl.show-info-dur',  '({{Math.round(+curShow.duration/60000)}} mins)'
+        div '.show-dtl.show-info-dur',  '({{Math.round(+curShow.duration/60)}} mins)'
         div '.show-dtl.show-info-epis', '{{numWatched}}/{{numEpisodes}}'
         hr()
         div '.show-info-tag', vRepeat:'activeTags', '{{$value}}'

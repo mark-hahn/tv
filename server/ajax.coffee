@@ -9,8 +9,9 @@ db       = require './db'
 log      = require('debug') 'tv:ajax'
 port     = require('parent-config')('apps-config.json').tvAjax_port
 showList = require './show-list'
+vlc      = require './vlc'
 
-db.init   (err) -> if err then log 'db.init failed'
+# db.init (err) -> if err then log 'db.init failed'
  
 poweringUp = no
 
@@ -41,7 +42,7 @@ srvr = http.createServer (req, res) ->
   switch pathname[1..]
 
     when 'log'
-      # console.log 'tvGlobal.log: ' + data.join ', '
+      console.log 'tvGlobal.log: ' + data.join ', '
       success ''
       
     when 'shows'
@@ -92,37 +93,30 @@ srvr = http.createServer (req, res) ->
         if err then error 'getAllLights err: ' + err.message; return
         success lightLevels
     
-    when 'startTv'
-      log 'startRoku', {plexRunningInRoku, data}
-      # if not plexRunningInRoku
-      #   error 'plexNotRunning' + req.url
-      # roku.startVideo data[0], (data[1] is 'goToStart')
+    when 'startVlc'
+      log 'startVlc'
+      vlc.play data
       success ''
       
-    when 'pauseTv'
-      log 'pauseRoku', {plexRunningInRoku}
-      # roku.playAction 'pause'
+    when 'pauseVlc'
+      log 'pauseVlc'
+      vlc.pause()
       success ''
       
-    when 'skipFwdTv'
-      log 'skipFwdTv', {plexRunningInRoku}
-      # roku.playAction 'skipNext'
+    when 'skipFwdVlc'
+      log 'skipFwdVlc'
       success ''
       
-    when 'skipBackTv'
-      log 'skipBackTv', {plexRunningInRoku}
-      # roku.playAction 'skipPrevious'
+    when 'skipBackVlc'
+      log 'skipBackVlc'
       success ''
       
-    when 'backTv'
-      log 'backRoku', {plexRunningInRoku}
-      # roku.playAction 'stepBack'
+    when 'backVlc'
+      log 'backVlc'
       success ''
       
-    when 'stopTv'
-      # log 'stopRoku', {plexRunningInRoku}
-      # db.syncPlexDB()
-      # roku.playAction 'stop'
+    when 'stopVlc'
+      vlc.stop()
       success ''
       
     when 'syncPlexDB'
@@ -136,12 +130,11 @@ srvr = http.createServer (req, res) ->
         success '' # playStatus
 
     when 'usbconfig'
-      # exec 'ssh xobtlu@37.48.119.77 sed -n "/^\\ \\ \\ \\ \\ \\ \\-/p" config.yml |
-      exec 'ssh mcstorm@95.211.211.205 sed -n "/^\\ \\ \\ \\ \\ \\ \\-/p" config.yml |
+      exec 'ssh xobtlu@37.48.119.77 sed -n "/^\\ \\ \\ \\ \\ \\ \\-/p" config.yml |
                                        sed "s/^\\ \\ \\ \\ \\ \\ \\-\\ //" | 
                                        sed /rss:/d', (err, stdout, stderr) ->
         if err then error 'usbconfig err: ' + err.message; return
-        # log 'usbconfig', {err, stdout, stderr}                
+        log 'usbconfig', {err, stdout, stderr}                
         success stdout.split '\n'
       
     else

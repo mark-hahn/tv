@@ -5,8 +5,8 @@ log = (args...) ->
 fs   = require 'fs-plus'
 util = require 'util'
 exec = require('child_process').spawnSync
-tvdb = require '../server/tvdb'
-db   = require '../server/db'
+tvdb = require './tvdb'
+db   = require './db'
 
 mappings = [
   ['buffy'                           , 'Buffy The Vampire Slayer']
@@ -380,7 +380,6 @@ if process.argv[2] is 'all'
 
 {
    "_id": "_design/all",
-   "_rev": "2-585f9ed8fd72a86d2fe5633a29731e6e",
    "language": "javascript",
    "views": {
        "showByFileTitle": {
@@ -406,8 +405,10 @@ if process.argv[2] is 'all'
        },
        "episodesWithFiles": {
            "map": "function(doc) {\n  if (doc.type == 'episode' && doc.showId && doc.filePaths && doc.filePaths.length > 0)\n    emit([doc.showId, doc.seasonNumber, doc.episodeNumber], doc);\n}"
+       },
+       "all": {
+           "map": "function(doc) {\n  emit(null, null);\n}"
        }
    }
 }
-
 ###

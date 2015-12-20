@@ -2,7 +2,7 @@
   src/show-list.coffee
 ###
 
-log  = require('debug') 'tv:--plex'
+log  = require('debug') 'tv:--list'
 db   = require './db'
 util = require 'util'
 

@@ -41,22 +41,22 @@ Vue.component 'watch-comp',
     episode:    null
     videoFile:  ''
     playPos:    0
-    loading:    yes
+    # loading:    yes
     watchMode: 'none'
     getPlayPos: -> 0
     chkVidInit: ->
 
   template: render ->
     div '.watch-comp', ->
-      div '.screen-msg', vIf:'loading', ->
-        div '.msgTitle', 'Loading ...'
-
-      div '.screen-msg', vIf:'!loading && watchMode == "none"', ->
-        div '.msgTitle', 'No show is playing.'
-        div 'Ensure tv player is running and'
-        div 'press show or episode Play button.'
-
-      div '.have-episode', vIf:'!loading && watchMode != "none"', ->
+      # div '.screen-msg', vIf:'loading', ->
+      #   div '.msgTitle', 'Loading ...'
+      # 
+      # div '.screen-msg', vIf:'!loading && watchMode == "none"', ->
+      #   div '.msgTitle', 'No show is playing.'
+      #   div 'Ensure tv player is running and'
+      #   div 'press show or episode Play button.'
+      # 
+      div '.have-episode', vIf:'watchMode != "none"', ->
         div '.watch-video-ctrl', ->
           tag 'watch-video-comp',
             show:          '{{show}}'
@@ -76,14 +76,17 @@ Vue.component 'watch-comp',
   events:
     startWatch: (@episode) ->
       @playPos = 0
-      @loading = 
-        setTimeout =>
-          if @loading then clearTimeout @loading
-          @loading = no
-        , 10*1e3
-      @tvCtrl.startTv @episode.key, 'goToStart', yes
+      # @loading = 
+      #   setTimeout =>
+      #     if @loading then clearTimeout @loading
+      #     @loading = no
+      #   , 10*1e3
+      filePathIdx = 0
+      log 'startWatch', @episode.filePath[2]
+      if (path = @episode.filePath[2])
+        @tvCtrl.startVlc path, 'goToStart', yes
       setTimeout =>
-        tvGlobal.ajaxCmd 'irCmd', 'hdmi4'
+        tvGlobal.ajaxCmd 'irCmd', 'hdmi3'
       , 1000
       @videoCmd 'play'
       
@@ -93,7 +96,7 @@ Vue.component 'watch-comp',
       # tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
       @watchMode = 'none'
       @$dispatch 'chgCurPage', 'show'
-      setTimeout (=> @tvCtrl.stopTv()), 500
+      setTimeout (=> @tvCtrl.stopVlc()), 500
       
     tvBtnClick: (text) ->
       @chkVidInit()
@@ -109,14 +112,14 @@ Vue.component 'watch-comp',
           tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
           @$emit 'endWatch'
         when 'Reset' 
-          @tvCtrl.startTv @episode.key, 'goToStart', yes
+          @tvCtrl.startVlc @episode.key, 'goToStart', yes
         when 'Back' 
           if @watchMode is 'paused'
             @playPos = @getPlayPos()
             @watchMode = 'playing'
-            setTimeout (=> @tvCtrl.stepBackTv()), 500
+            setTimeout (=> @tvCtrl.stepbackVlc()), 500
           else
-            @tvCtrl.stepBackTv()
+            @tvCtrl.stepbackVlc()
         when '<<' then @tvCtrl.startSkip 'Back'
         when '>>' then @tvCtrl.startSkip 'Fwd'
         when 'Play' 
@@ -135,14 +138,14 @@ Vue.component 'watch-comp',
         when 'playing'
           if old isnt 'playing'
             if not @playingWhenLoaded
-              @tvCtrl.startTv @episode.key, 'resume'
+              @tvCtrl.startVlc @episode.key, 'resume'
             @playingWhenLoaded = no
             @playPos = @getPlayPos()
             @videoCmd 'playPos', @playPos
             @videoCmd 'play'
         when 'paused'
           @videoCmd 'pause'
-          @tvCtrl.pauseTv()
+          @tvCtrl.pauseVlc()
              
   methods:          
     videoCmd: (cmd, pos) -> 
@@ -153,10 +156,10 @@ Vue.component 'watch-comp',
     
     newState: (tvState) ->
       if @watchMode is 'playing'
-        if @loading
-          clearTimeout @loading
-          @loading = null
-          @videoCmd 'playPos', 2
+        # if @loading
+        #   clearTimeout @loading
+        #   @loading = null
+        #   @videoCmd 'playPos', 2
         switch tvState
           when 'none'    then @$emit 'endWatch'
           when 'playing' then @videoCmd 'play'

@@ -1,22 +1,25 @@
 
 log = (args...) -> 
   console.log.apply console, ['vlc:'].concat args
-  
+
 exec = require('child_process').execFile
 net  = require 'net'
 
-vlcip = '192.168.1.104'
+vlcip_wlk = '192.168.1.102'
+vlcip_tv  = '192.168.1.104'
+
 socket = null
 
 initSocket = ->
+  log 'init socket'
   socket?.end()
-  socket = net.connect 1250, vlcip
+  socket = net.connect 1250, vlcip_tv
   socket.on 'data', (data) -> log 'socket recvd:', data.toString().replace /\n/g, ' '
   socket.on 'error', (err) -> 
     log 'socket error', err
     cb?()
   socket.on 'end', (data) -> 
-    if data then log 'socket   end:', data.toString().replace /\n/g, ' '
+    if data then log 'socket end:', data.toString().replace /\n/g, ' '
 
 vlcCmd = (command) ->
   try
@@ -28,66 +31,66 @@ vlcCmd = (command) ->
     setTimeout (-> vlcCmd command), 1000
     
 closeSocket = ->
+  log 'close socket'
   socket?.end()
   socket = null
   
-ssh = (user, commandLine, cb) ->
+ssh = (commandLine, last, cb) ->
   argArr = commandLine.split /\s+/
-  argArr.unshift user + '@' + vlcip
+  argArr.unshift 'mark@' + vlcip_tv
+  argArr.push last
   try
     exec 'ssh', argArr, (err) ->
-      if err and err.message.indexOf('fuse: mountpoint is not empty') is -1
-        log 'ssh err', err.message
+      if err then log 'ssh err', err.message
       cb?()
   catch e
     cb?()
     
 vlcCmdLine = 'DISPLAY=:0 vlc -I rc -f --rc-host 0.0.0.0:1250 --quiet'
 
-exports.play = (file, cb) ->
+exports.play = (file) ->
+  log 'play (ssh)', vlcCmdLine, '/home/mark/Videos/' + file
+  ssh vlcCmdLine, '"/home/mark/Videos/' + file + '"', ->
+    setTimeout ->
+      vlcCmd 'pause'
+      # setTimeout ->
+      #   # vlcCmd 'strack 0'
+      #   vlcCmd 'seek 450'
+      # , 4000
+    , 3000
+
+exports.seek = (timeSecs) ->
+  log 'seek', time
+  vlcCmd 'seek ' + Math.floor timeSecs
+  
+exports.pause = (timeSecs) ->
+  log 'pause'
+  vlcCmd 'pause'
+  
+exports.getTime = ->
+  log 'getTime'
+  vlcCmd 'get_time'
+  
+exports.setVol = (volFrac) ->
+  log 'setVol percent', Math.floor volFrac * 100
+  vlcCmd 'volume ' + Math.floor volFrac * 500
+
+exports.stop = ->
+  log 'stop'
+  vlcCmd 'shutdown'
   closeSocket()
-  exports.stop ->
-    ssh 'root', 'sshfs hahnca.com:/mnt/media /mnt/media 
-                 -o reconnect,cache=no,direct_io,max_readahead=0x10000000', ->
-      ssh 'root', 'bindfs /mnt/media/videos /home/mark/Videos', ->
-        setTimeout ->
-          initSocket()
-          cb?()
-        , 5e3
-        ssh 'mark', vlcCmdLine + ' /home/mark/Videos/' + file
 
-exports.stop = (cb) ->
-  # vlcCmd 'shutdown'
-  # closeSocket()
-  # setTimeout ->
-    ssh 'root', 'killall vlc', cb
-  # , 500
-
-exports.startVideo = (key, goToStart, cb) ->
-  # log 'startVideo', goToStart
-  # if goToStart then console.trace()
-  # offset = (if goToStart then 0 else 1)
-  # playerCtrl '/playback/playMedia', {key, offset}, (err, res) ->
-  #   if err then cb? err; return
-  #   cb? null, res
-    
-exports.playAction = (action, cb) ->
-  # play and pause are both play/pause toggles
-  # skipNext, skipPrevious (bumps playback speed, back to 1x pauses)
-  # stepForward (defined but doesn't work)
-  # stepBack (20 secs, adjustable in setup?)
-  # stop (goes back in menu when repeated)
-  # playerCtrl "/playback/#{action}", null, (err, res) ->
-  #   if err then cb? err; return
-  #   cb? null, res
-
-if process.args[2] is 'test'
-  exports.play 'aaf-coming.of.age.s01e01.avi', ->
-    # setTimeout ->
-      # secs = Math.floor Math.random() * 900 + 150
-      # vlcCmd 'seek ' + secs
-      # vlcCmd 'get_time'
-    # , 1e3
+if process.argv[2] is 'test'
+  exports.play 'Brooklyn.Nine-Nine.S02E13.720p.HDTV.x264-KILLERS.mkv', ->
+    setTimeout ->
+      secs = Math.floor Math.random() * 900 + 150
+      exports.seek secs
+      exports.pause()
+      vlcCmd 'get_time'
+      setTimeout ->
+        exports.stop()
+      , 3e3
+    , 3e3
 
 ###
 | add XYZ  . . . . . . . . . . . . . . . . . . . . add XYZ to playlist

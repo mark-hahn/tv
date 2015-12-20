@@ -19,13 +19,6 @@ tagList = [
   'LindaFavs', 'Kids', 'OnTheFence', 'Archive', 'Deleted', 'New', 'LessThan3', 'Watched'
 ]      
 
-exports.init = (cb) ->
-  # plex.getSectionKeys (err, keys) ->
-  #   if err or not (tvShowsKey = keys.tvShowsKey)
-  #     log 'getSectionKeys err: ' + err.message, keys; cb err; return
-  #   exports.syncPlexDB()
-    cb()
-
 exports.getShowList = (cb) ->
   cb null, 
     try 

@@ -2,83 +2,114 @@
 log = (args...) -> 
   console.log.apply console, ['vlc:'].concat args
 
-exec = require('child_process').execFile
+exec = require 'child_process'
 net  = require 'net'
 
 vlcip_wlk = '192.168.1.102'
 vlcip_tv  = '192.168.1.104'
+vlc_port  = 1250
 
 socket = null
 
 initSocket = ->
   log 'init socket'
-  socket?.end()
-  socket = net.connect 1250, vlcip_tv
+  if socket
+    log 'init open socket'
+    console.trace()
+    return
+  # socket?.end()
+  socket = net.connect vlc_port, vlcip_tv
   socket.on 'data', (data) -> log 'socket recvd:', data.toString().replace /\n/g, ' '
-  socket.on 'error', (err) -> 
+  socket.on 'error', (err) ->
     log 'socket error', err
     cb?()
   socket.on 'end', (data) -> 
     if data then log 'socket end:', data.toString().replace /\n/g, ' '
 
 vlcCmd = (command) ->
+  if not socket 
+    log 'vlcCmd closed socket', command
+    console.trace()
+    return
+
   try
-    socket.write command + '\n', ->
-      log 'socket sent:', command
+    log 'socket sent:', command
+    socket.write command + '\n'
   catch e
     log 'retrying', 'command', e.message
+    closeSocket()
     initSocket()
     setTimeout (-> vlcCmd command), 1000
     
 closeSocket = ->
+  if not socket 
+    log 'closeSocket closed socket'
+    console.trace()
+    return
   log 'close socket'
   socket?.end()
   socket = null
   
-ssh = (commandLine, last, cb) ->
+ssh = (commandLine, last) ->
+  log 'ssh'
   argArr = commandLine.split /\s+/
   argArr.unshift 'mark@' + vlcip_tv
   argArr.push last
   try
-    exec 'ssh', argArr, (err) ->
-      if err then log 'ssh err', err.message
-      cb?()
+    exec.execFile 'ssh', argArr, (err, stdout, stderr) ->
+      log 'ssh done'
+      if err
+        log 'ssh callback err', {err, stdout, stderr}
   catch e
-    cb?()
+    log 'ssh err exception', e.message
     
-vlcCmdLine = 'DISPLAY=:0 vlc -I rc -f --rc-host 0.0.0.0:1250 --quiet'
+vlcCmdLine = 'DISPLAY=:0 vlc -I rc -f --rc-host 0.0.0.0:' + vlc_port + ' --quiet'
 
-exports.play = (file) ->
+exports.play = (file, cb) ->
+  log 'play'
+  if socket
+    log 'play open socket'
+    console.trace()
+    return
+  
   log 'play (ssh)', vlcCmdLine, '/home/mark/Videos/' + file
-  ssh vlcCmdLine, '"/home/mark/Videos/' + file + '"', ->
-    setTimeout ->
-      vlcCmd 'pause'
-      # setTimeout ->
-      #   # vlcCmd 'strack 0'
-      #   vlcCmd 'seek 450'
-      # , 4000
-    , 3000
+  ssh vlcCmdLine, '"/home/mark/Videos/' + file + '"'
+  setTimeout initSocket, 3000
 
 exports.seek = (timeSecs) ->
   log 'seek', time
   vlcCmd 'seek ' + Math.floor timeSecs
   
-exports.pause = (timeSecs) ->
+exports.pause = ->
   log 'pause'
   vlcCmd 'pause'
   
 exports.getTime = ->
   log 'getTime'
   vlcCmd 'get_time'
+
+volume = 250
   
-exports.setVol = (volFrac) ->
-  log 'setVol percent', Math.floor volFrac * 100
-  vlcCmd 'volume ' + Math.floor volFrac * 500
+exports.volinc = (ticks) ->
+  volume += ticks
+  log 'volinc', ticks, volume
+  vlcCmd 'volume ' + volume
+
+exports.mute = ->
+  log 'mute'
+  vlcCmd 'volume 0'
+  
+exports.unmute = ->
+  log 'unmute'
+  vlcCmd 'volume ' + volume
 
 exports.stop = ->
   log 'stop'
   vlcCmd 'shutdown'
   closeSocket()
+
+if process.argv[2] is 'pause'
+  exports.pause()
 
 if process.argv[2] is 'test'
   exports.play 'Brooklyn.Nine-Nine.S02E13.720p.HDTV.x264-KILLERS.mkv', ->

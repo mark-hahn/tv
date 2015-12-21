@@ -56,7 +56,8 @@ Vue.component 'watch-comp',
       #   div 'Ensure tv player is running and'
       #   div 'press show or episode Play button.'
       # 
-      div '.have-episode', vIf:'watchMode != "none"', ->
+      # div '.have-episode', vIf:'watchMode != "none"', ->
+      div '.have-episode', ->
         div '.watch-video-ctrl', ->
           tag 'watch-video-comp',
             show:          '{{show}}'
@@ -82,8 +83,9 @@ Vue.component 'watch-comp',
       #     @loading = no
       #   , 10*1e3
       filePathIdx = 0
-      log 'startWatch', @episode.filePath[2]
-      if (path = @episode.filePath[2])
+      log 'startWatch', @episode.filePaths?[0]?[2]
+      log 'bitrates', @episode.filePaths
+      if (path = @episode.filePaths?[0]?[2])
         @tvCtrl.startVlc path, 'goToStart', yes
       setTimeout =>
         tvGlobal.ajaxCmd 'irCmd', 'hdmi3'
@@ -100,19 +102,23 @@ Vue.component 'watch-comp',
       
     tvBtnClick: (text) ->
       @chkVidInit()
-      if text not in ['<<','>>'] and @tvCtrl.stopSkip() then return
+      # if text not in ['<<','>>'] and @tvCtrl.stopSkip() then return
       switch text
         when 'togglePlay'
           if @watchMode is 'playing' then @$emit 'tvBtnClick', 'Pause'
           else                            @$emit 'tvBtnClick', 'Play'
-        when 'Mute'  then tvGlobal.ajaxCmd 'irCmd', 'mute'
-        when 'Vol +' then tvGlobal.ajaxCmd 'irCmd', 'volUp'
-        when 'Vol -' then tvGlobal.ajaxCmd 'irCmd', 'volDn'
+        when 'Mute'  
+          if (@muted = not @muted)
+            tvGlobal.ajaxCmd 'muteVlc'
+          else
+            tvGlobal.ajaxCmd 'unmuteVlc'
+        when 'Vol +' then tvGlobal.ajaxCmd 'volupVlc'
+        when 'Vol -' then tvGlobal.ajaxCmd 'voldownVlc'
         when 'Stop' 
           tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
           @$emit 'endWatch'
         when 'Reset' 
-          @tvCtrl.startVlc @episode.key, 'goToStart', yes
+          @tvCtrl.startVlc null, 'goToStart', yes
         when 'Back' 
           if @watchMode is 'paused'
             @playPos = @getPlayPos()
@@ -138,7 +144,7 @@ Vue.component 'watch-comp',
         when 'playing'
           if old isnt 'playing'
             if not @playingWhenLoaded
-              @tvCtrl.startVlc @episode.key, 'resume'
+              @tvCtrl.startVlc null, 'resume'
             @playingWhenLoaded = no
             @playPos = @getPlayPos()
             @videoCmd 'playPos', @playPos

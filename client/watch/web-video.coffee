@@ -91,57 +91,58 @@ Vue.component 'watch-video-comp',
       videoUrl
       
   events:
-    videoEnable: ->
-      if @videoState is 'loaded'
-        # log 'videoEnable videoCmd play', 
-        @$emit 'videoCmd', 'play'
-        @videoState = 'enabled'
-        # @videoEle.muted = not tvGlobal.debug
-      else
-        setTimeout => 
-          @videoEnable()
-          # @videoEle.muted = not tvGlobal.debug
-        , 100
-          
-    videoCmd: (cmd, playPos) ->
-      if not @videoEle then return
-      # @videoEle.muted = not tvGlobal.debug
-      switch cmd
-        when 'playPos'
-          @videoEle.play()
-          playPosAdj = playPos
-          if tvGlobal.tvCtrl.skipping is -1
-            playPosAdj += vidPosOfsBack
-          else if tvGlobal.tvCtrl.skipping is +1
-            playPosAdj += vidPosOfsFwd
-          else
-            playPosAdj += vidPosOfsPlay
-          playPosAdj = Math.max playPosAdj, 0
-          if Math.abs(@videoEle.currentTime - playPosAdj) > 1
-            @videoEle.currentTime = playPosAdj
-        when 'play'
-          @videoEle.play()
-        when 'pause'
-          @videoEle.pause()
-        when 'stop' 
-          @videoEle.src = ''
-          
-    setPlayState: (state) ->
-      if state is 'playing' then @$emit 'videoCmd', 'play'
-      if state is 'paused'  then @$emit 'videoCmd', 'pause'
+    xxx: ->
+    # videoEnable: ->
+    #   if @videoState is 'loaded'
+    #     # log 'videoEnable videoCmd play', 
+    #     @$emit 'videoCmd', 'play'
+    #     @videoState = 'enabled'
+    #     # @videoEle.muted = not tvGlobal.debug
+    #   else
+    #     setTimeout => 
+    #       @videoEnable()
+    #       # @videoEle.muted = not tvGlobal.debug
+    #     , 100
+    #       
+    # videoCmd: (cmd, playPos) ->
+    #   if not @videoEle then return
+    #   # @videoEle.muted = not tvGlobal.debug
+    #   switch cmd
+    #     when 'playPos'
+    #       @videoEle.play()
+    #       playPosAdj = playPos
+    #       if tvGlobal.tvCtrl.skipping is -1
+    #         playPosAdj += vidPosOfsBack
+    #       else if tvGlobal.tvCtrl.skipping is +1
+    #         playPosAdj += vidPosOfsFwd
+    #       else
+    #         playPosAdj += vidPosOfsPlay
+    #       playPosAdj = Math.max playPosAdj, 0
+    #       if Math.abs(@videoEle.currentTime - playPosAdj) > 1
+    #         @videoEle.currentTime = playPosAdj
+    #     when 'play'
+    #       @videoEle.play()
+    #     when 'pause'
+    #       @videoEle.pause()
+    #     when 'stop' 
+    #       @videoEle.src = ''
+    #       
+    # setPlayState: (state) ->
+    #   if state is 'playing' then @$emit 'videoCmd', 'play'
+    #   if state is 'paused'  then @$emit 'videoCmd', 'pause'
 
   attached: -> 
-    @chkVidInit = (e) =>
-      if not @vidHasPlayed then @$emit 'videoCmd', 'play'; yes
-      else 
-        if e then @$dispatch 'tvBtnClick', 'togglePlay'
-        no
-
-    @videoEle = @$el.querySelector 'video'
-    
-    @videoEle.addEventListener 'error', (args...) =>
-      @$dispatch 'popup', 'Using big video'
-      @bigVideo = yes
-    
-    @getPlayPos = => @videoEle.currentTime 
-    
+    # @chkVidInit = (e) =>
+    #   if not @vidHasPlayed then @$emit 'videoCmd', 'play'; yes
+    #   else 
+    #     if e then @$dispatch 'tvBtnClick', 'togglePlay'
+    #     no
+    # 
+    # @videoEle = @$el.querySelector 'video'
+    # 
+    # @videoEle.addEventListener 'error', (args...) =>
+    #   @$dispatch 'popup', 'Using big video'
+    #   @bigVideo = yes
+    # 
+    # @getPlayPos = => @videoEle.currentTime 
+    # 

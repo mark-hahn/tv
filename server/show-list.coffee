@@ -46,19 +46,28 @@ exports.getShowList = getList = (cb) ->
         endkey:   [id, {}, {}]
       , (err, body) -> 
         if err then throw err
+        
         resShow.episodes = []
-        for row in body.rows when (row.value.filePaths?.length ? 0) > 0
+        skippingEpisodes = yes
+        for row in body.rows
+          episode = row.value
+          if skippingEpisodes    and 
+             not episode.watched and 
+             not episode.filePaths?[0]?
+               continue
+          skippingEpisodes = no
+          
           availCount++
           {seasonNumber, episodeNumber, episodeTitle: title, summary, \
            thumb, _id: episodeId, length: episodeLen
-           aired: originallyAvailableAt, watched} = row.value
+           aired: originallyAvailableAt, watched, filePaths} = episode
           watched ?= no
           if watched then watchedCount++
           episodeNumber = seasonNumber + '-' + episodeNumber
           resShow.episodes.push {
             id: episodeId, showId: id, episodeNumber, title
-            summary, thumb, viewCount: 0, key, episodeLen, watched
-            aired: aired ? null, filePath: row.value.filePaths[0]    
+            summary, thumb, viewCount:0, episodeLen, watched
+            aired: aired ? null, filePaths
           }
         tags = resShow.tags
         if watchedCount is 0 then tags.New = yes

@@ -71,25 +71,25 @@ class TvCtrl
  
   getPlayPos: -> @curPlayPos
   
-  startVlc: (episodeKey = @curEpisodeKey, action, force) ->
+  startVlc: (path = @curPath, action, force) ->
     log 'startVlc', {action, force, @curPlayState, \
-                    keymatch: (episodeKey is @curEpisodeKey)
-                    episodeKey, @curEpisodeKey }
+                    keymatch: (path is @curPath)
+                    path, @curPath }
     if @curPlayState isnt 'playing' or 
-          episodeKey isnt @curEpisodeKey or force
+          path isnt @curPath or force
       if action is 'resume' and @curPlayState is 'paused' and
-          (not @curEpisodeKey or episodeKey is @curEpisodeKey)
+          (not @curPath or path is @curPath)
         tvGlobal.ajaxCmd 'pauseVlc'
       else
         # @tvIsStarting = yes
         goToStart = (action is 'goToStart')
-        tvGlobal.ajaxCmd 'startVlc', episodeKey, (err) =>
+        tvGlobal.ajaxCmd 'startVlc', path, (err) =>
           if err
             log 'tvGlobal.ajaxCmd startVlc err', err
             if err is 500
               @watchComp.$dispatch 'popup', 'Make sure tv player is running.'
       @curPlayState  = 'playing'
-      @curEpisodeKey =  episodeKey
+      @curPath =  path
      
   # stepbackVlc: ->
   #   if @curPlayState is 'playing'

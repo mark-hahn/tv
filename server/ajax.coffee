@@ -103,6 +103,11 @@ srvr = http.createServer (req, res) ->
       vlc.pause()
       success ''
       
+    when 'seek'
+      log 'seek', data
+      vlc.seek data
+      success ''
+      
     when 'volupVlc'
       log 'volupVlc'
       vlc.volinc +10
@@ -110,7 +115,7 @@ srvr = http.createServer (req, res) ->
       
     when 'voldownVlc'
       log 'voldownVlc'
-      vlc.volinc -10
+      vlc.volinc -10, data
       success ''
       
     when 'muteVlc'

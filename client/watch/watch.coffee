@@ -113,13 +113,13 @@ Vue.component 'watch-comp',
             tvGlobal.ajaxCmd 'muteVlc'
           else
             tvGlobal.ajaxCmd 'unmuteVlc'
-        when 'Vol +' then tvGlobal.ajaxCmd 'volupVlc'
-        when 'Vol -' then tvGlobal.ajaxCmd 'voldownVlc'
+        when 'Vol +' then tvGlobal.ajaxCmd 'volupVlc';   @muted = no
+        when 'Vol -' then tvGlobal.ajaxCmd 'voldownVlc', @muted
         when 'Stop' 
           tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
           @$emit 'endWatch'
         when 'Reset' 
-          @tvCtrl.startVlc null, 'goToStart', yes
+          tvGlobal.ajaxCmd 'seek', 0
         when 'Back' 
           if @watchMode is 'paused'
             @playPos = @getPlayPos()

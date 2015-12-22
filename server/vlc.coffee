@@ -84,7 +84,7 @@ exports.play = (file, cb) ->
   , 3000
 
 exports.seek = (timeSecs) ->
-  log 'seek', time
+  log 'seek', timeSecs
   vlcCmd 'seek ' + Math.floor timeSecs
   
 exports.pause = ->
@@ -98,9 +98,9 @@ exports.getTime = ->
 volume = 250
 muted = no
 
-exports.volinc = (ticks) ->
+exports.volinc = (ticks, mutedIn) ->
   volume += ticks
-  if ticks < 0 and muted then return
+  if ticks < 0 and (muted = mutedIn) then return
   log 'volinc', ticks, volume
   vlcCmd 'volume ' + volume
   muted = no

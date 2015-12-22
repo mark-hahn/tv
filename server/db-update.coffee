@@ -9,16 +9,24 @@ tvdb = require './tvdb'
 db   = require './db'
 
 mappings = [
-  ['buffy'                           , 'Buffy The Vampire Slayer']
-  ['mst3k'                           , 'Mystery Science Theater 3000']
-  ['cicgc'                           , 'Comedians In Cars Getting Coffee']
-  ['sex and drugs and rock and roll' , 'Sex&Drugs&Rock&Roll']
-  ['sex drugs and rock and roll'     , 'Sex&Drugs&Rock&Roll']
-  ['tmawl'                           , 'That Mitchell And Webb Look']
-  ['archer'                          , 'Archer (2009)']
+  ['the',                              'The Spa']
+  ['buffy',                            'Buffy The Vampire Slayer']
+  ['mst3k',                            'Mystery Science Theater 3000']
+  ['cicgc',                            'Comedians In Cars Getting Coffee']
+  ['tmawl',                            'That Mitchell And Webb Look']
+  ['sex and drugs and rock and roll',  'Sex&Drugs&Rock&Roll']
+  ['sex drugs and rock and roll',      'Sex&Drugs&Rock&Roll']
   ['Playhouse Presents Psychobitches', 'Psychobitches']
-  ['Last Man Standing',                'Last Man Standing (US)']
+  ['archer',                           'Archer (2009)']
   ['Louie',                            'Louie (2010)']
+  ['Last Man Standing',                'Last Man Standing (US)']
+  ['Big School',                       'old']
+  ['Coming Of Age',                    'old']
+  ['Mapp and Lucia',                   'old']
+  ['Partners in Crime',                'old']
+  ['Partners in Crime (2014)',         'old']
+  ['The Odd Couple',                   'old']
+  ['Undateable',                       'old']
 ]
 
 videosPath = '/mnt/media/videos/'
@@ -152,6 +160,7 @@ exports.getFileData = (filePath) ->
       fileTitle.replace(/[\-\[\]\/\{\}\(\)\*\+\?\\\^\$\|]/g, '\\$&'), 'i')
     if regex.test map[0]
       fileTitle = map[1]
+      if fileTitle is 'old' then return 'old-series'
       break
   fileTitle = fileTitle.replace /\./g, ' '
                        .replace /^(aaf-|daa-)/i, ''
@@ -161,7 +170,6 @@ exports.getFileData = (filePath) ->
   seasonNumber  = +fileData.season
   episodeNumber = +fileData.episode
   
-  if fileTitle is 'the' then fileTitle = 'The Spa'
   fileCountry = fileData.country
   if episodes.length > 1
     multipleEpisodes = 
@@ -174,7 +182,19 @@ exports.getFileData = (filePath) ->
   {filePath, fileSize, bitRate, fileTitle, seasonNumber, 
    episodeNumber, multipleEpisodes, fileEpisodeTitle, fileCountry}
 
-dbPutShow = (show, cb) ->
+deleteShow = (showId) ->
+  db.view 'episodeByShowSeasonEpisode',
+    {startkey: [showId, null, null]}
+    {endkey:   [showId,   {},   {}]}
+  , (err, body) -> 
+    if err then fatal err
+    for row in body.rows
+      db.destroy row.id, row.rev
+  db.get showId, (err, show) ->
+    db.destroy show._id, show._rev
+    fs.appendFileSync 'files/deletes.txt', show.tvdbTitle + '\n'
+
+dbPutNewShow = (show, cb) ->
   log new Date().toString()[0..20], show.tvdbTitle
   show._id  = uuid()
   show.type = 'show'
@@ -269,6 +289,10 @@ addTvdbEpisodes = (show, fileData, tvdbEpisodes, cb) ->
       addTvdbEpisodes show, fileData, tvdbEpisodes, cb
 
 chkTvdbEpisodes = (show, fileData, cb) ->
+  if mappings[show.tvdbTitle?] is 'old'
+    deleteShow show._id
+    cb()
+    return
   if not (tvdbEpisodes = show.episodes)
     inc 'tvdb get episodes'
     if not show.tvdbShowId
@@ -305,6 +329,10 @@ exports.checkFile = (filePath, cb) ->
       inc 'got episode by filepath'
       episode =  body.rows[0].value
       if episode.tvdbEpisodeId
+        if mappings[show.tvdbTitle?] is 'old'
+          deleteShow episode.showId
+          cb()
+          return
         inc 'skipping complete episode'
         cb()
       else 
@@ -358,7 +386,7 @@ exports.checkFile = (filePath, cb) ->
               
             inc 'new show from tvdb'
             show.fileTitles = [fileTitle]
-            dbPutShow show, (err) ->
+            dbPutNewShow show, (err) ->
               if err then fatal err
               chkTvdbEpisodes show, fileData, cb
 

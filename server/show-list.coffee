@@ -18,10 +18,17 @@ exports.getShowList = getList = (cb) ->
   db.view 'showByTvdbTitle', (err, body) -> 
     if err then throw err
     shows = (row.value for row in body.rows)
+     
+    showSortStr = (show) ->
+      title = show.tvdbTitle ? show.fileTitle ? show.title
+      if not title
+        log show.tvdbTitle, show.fileTitle, show.title
+      title.replace /^The\s/i, ''
     
     result = []
     do oneShow = ->
       if not (show = shows.shift())
+        result.sort (a,b) -> (if showSortStr(a) > showSortStr(b) then +1 else -1)
         cb null, result
         inGetShowList = no
         return

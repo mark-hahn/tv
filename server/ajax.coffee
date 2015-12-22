@@ -116,10 +116,17 @@ srvr = http.createServer (req, res) ->
     when 'muteVlc'
       log 'muteVlc'
       vlc.mute()
+      success ''
+      
+    when 'nosubVlc'
+      log 'nosubVlc'
+      vlc.nosub()
+      success ''
       
     when 'unmuteVlc'
       log 'unmuteVlc'
       vlc.unmute()
+      success ''
       
     when 'skipFwdVlc'
       log 'skipFwdVlc'

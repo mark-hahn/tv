@@ -27,7 +27,7 @@ shrinkOneVideo = (src, dst, cb) ->
       .addOption '-sn'
       .renice 20
       .on 'error', (err, stdout, stderr) -> 
-          log 'ffmpeg err', {src, err: err.message, stdout, stderr}
+          log 'ffmpeg err', err.message
           cb?()
       .on 'end', cb
       .save dst
@@ -43,10 +43,9 @@ do onePass = ->
   newCount = 0
   allPaths = fs.listTreeSync '/mnt/media/videos'
   for path, idx in allPaths
-    if /\/\.[^\/]+\.\w{6}$/i.test path
-      log 'partials:', path
-      # mv path, path.replace('/videos/', '/videos-partials/'), onePass
-      # return
+    if /\/\.[^\/]+\.\w{6}$/i.test(path) or
+       path.indexOf('.srt') > -1
+      log 'partial or srt:', path
       continue
     if fs.isDirectorySync path
       # log 'directory:', path

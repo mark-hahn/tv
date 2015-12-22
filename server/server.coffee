@@ -8,8 +8,8 @@ fs          = require 'fs-plus'
 http        = require 'http'
 nodeStatic  = require 'node-static'
 cfg = require("parent-config") "apps-config.json"
-if +cfg.tv_port is 1340
-  require "./video-proc"
+# if +cfg.tv_port is 1340
+#   require "./video-proc"
 require './ajax'
 require './video-srvr'
 require './tvdb'

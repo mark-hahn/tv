@@ -87,9 +87,10 @@ Vue.component 'watch-comp',
       log 'bitrates', @episode.filePaths
       if (path = @episode.filePaths?[0]?[2])
         @tvCtrl.startVlc path, 'goToStart', yes
+        @watchMode = 'playing'
       setTimeout =>
         tvGlobal.ajaxCmd 'irCmd', 'hdmi3'
-      , 1000
+      , 3000
       @videoCmd 'play'
       
     tvTurningOff: -> @$emit 'endWatch',

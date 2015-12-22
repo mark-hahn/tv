@@ -36,6 +36,7 @@ request
 
 tvGlobal.ajaxCmd = (cmd, args..., cb) ->
   if not tvGlobal.ajaxInit
+    log 'not tvGlobal.ajaxInit'
     setTimeout (-> tvGlobal.ajaxCmd cmd, args..., cb), 100
     return
   if cb? and typeof cb isnt 'function' then args.push cb
@@ -46,7 +47,7 @@ tvGlobal.ajaxCmd = (cmd, args..., cb) ->
     sep = '&'
     
   if cmd isnt 'getTvStatus'
-    log 'ajax call', {cmd, query, args}
+    log 'ajax called', {cmd, args}
   
   request
     .get ajaxPfx + cmd + query
@@ -60,6 +61,7 @@ tvGlobal.ajaxCmd = (cmd, args..., cb) ->
         log 'ajax err', err
         cb? err
         return
+      log 'ajax returned', cmd
       cb? null, JSON.parse res.text
 
 tvGlobal.ajaxLog = (args...) ->

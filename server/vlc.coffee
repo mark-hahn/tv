@@ -40,6 +40,10 @@ vlcCmd = (command) ->
     closeSocket()
     initSocket()
     setTimeout (-> vlcCmd command), 1000
+
+nosub = ->
+  log 'nosub'
+  vlcCmd 'strack 0'
     
 closeSocket = ->
   if not socket 
@@ -74,7 +78,10 @@ exports.play = (file, cb) ->
   
   log 'play (ssh)', vlcCmdLine, '/home/mark/Videos/' + file
   ssh vlcCmdLine, '"/home/mark/Videos/' + file + '"'
-  setTimeout initSocket, 3000
+  setTimeout ->
+    initSocket()
+    nosub()
+  , 3000
 
 exports.seek = (timeSecs) ->
   log 'seek', time
@@ -89,19 +96,24 @@ exports.getTime = ->
   vlcCmd 'get_time'
 
 volume = 250
-  
+muted = no
+
 exports.volinc = (ticks) ->
   volume += ticks
+  if ticks < 0 and muted then return
   log 'volinc', ticks, volume
   vlcCmd 'volume ' + volume
+  muted = no
 
 exports.mute = ->
   log 'mute'
   vlcCmd 'volume 0'
+  muted = yes
   
 exports.unmute = ->
   log 'unmute'
   vlcCmd 'volume ' + volume
+  muted = no
 
 exports.stop = ->
   log 'stop'

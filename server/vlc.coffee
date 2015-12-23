@@ -58,11 +58,11 @@ ssh = (commandLine, last) ->
   log 'ssh'
   argArr = commandLine.split /\s+/
   argArr.unshift 'mark@' + vlcip_tv
-  argArr.push last
+  if last then argArr.push last
   try
     exec.execFile 'ssh', argArr, (err, stdout, stderr) ->
       log 'ssh done'
-      if err
+      if err and stderr isnt 'vlc: no process found\n'
         log 'ssh callback err', {err, stdout, stderr}
   catch e
     log 'ssh err exception', e.message
@@ -83,6 +83,10 @@ exports.play = (file, cb) ->
     nosub()
   , 3000
 
+killAllVlc = ->
+  log 'killAllVlc'
+  ssh 'killall vlc'
+  
 exports.seek = (timeSecs) ->
   log 'seek', timeSecs
   vlcCmd 'seek ' + Math.floor timeSecs
@@ -118,6 +122,7 @@ exports.stop = ->
   log 'stop'
   vlcCmd 'shutdown'
   closeSocket()
+  setTimeout killAllVlc, 300
 
 if process.argv[2] is 'pause'
   exports.pause()

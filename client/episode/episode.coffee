@@ -25,6 +25,9 @@ Vue.component 'episode-comp',
     twoBtnClk:  (btnName) -> 
       switch btnName
         when 'Play'  
+          if @curEpisode.noFile
+            @$dispatch 'popup', 'Episode not downloaded'
+            return
           @$dispatch 'videoEnable'
           @$dispatch 'startWatch'
         when 'Watched'

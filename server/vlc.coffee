@@ -95,25 +95,24 @@ exports.getTime = ->
   log 'getTime'
   vlcCmd 'get_time'
 
+muted  = no
 volume = 250
-muted = no
 
-exports.volinc = (ticks, mutedIn) ->
+exports.volinc = (ticks) ->
   volume += ticks
-  if ticks < 0 and (muted = mutedIn) then return
+  if ticks < 0 and muted then return
   log 'volinc', ticks, volume
   vlcCmd 'volume ' + volume
   muted = no
 
-exports.mute = ->
-  log 'mute'
-  vlcCmd 'volume 0'
-  muted = yes
-  
-exports.unmute = ->
-  log 'unmute'
-  vlcCmd 'volume ' + volume
-  muted = no
+exports.toggleMute = ->
+  log 'toggleMute'
+  if not muted
+    vlcCmd 'volume 0'
+    muted = yes
+  else
+    vlcCmd 'volume ' + volume
+    muted = no
 
 exports.stop = ->
   log 'stop'

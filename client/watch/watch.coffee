@@ -108,13 +108,9 @@ Vue.component 'watch-comp',
         when 'togglePlay'
           if @watchMode is 'playing' then @$emit 'tvBtnClick', 'Pause'
           else                            @$emit 'tvBtnClick', 'Play'
-        when 'Mute'  
-          if (@muted = not @muted)
-            tvGlobal.ajaxCmd 'muteVlc'
-          else
-            tvGlobal.ajaxCmd 'unmuteVlc'
-        when 'Vol +' then tvGlobal.ajaxCmd 'volupVlc';   @muted = no
-        when 'Vol -' then tvGlobal.ajaxCmd 'voldownVlc', @muted
+        when 'Mute'  then tvGlobal.ajaxCmd 'toggleMuteVlc'
+        when 'Vol +' then tvGlobal.ajaxCmd 'volupVlc'
+        when 'Vol -' then tvGlobal.ajaxCmd 'voldownVlc'
         when 'Stop' 
           tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
           @$emit 'endWatch'

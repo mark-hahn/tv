@@ -68,13 +68,16 @@ exports.getShowList = getList = (cb) ->
           {seasonNumber, episodeNumber, episodeTitle: title, summary, \
            thumb, _id: episodeId, length: episodeLen
            aired: originallyAvailableAt, watched, filePaths} = episode
+           
+          noFile = (not filePaths or filePaths.length is 0)
+          
           watched ?= no
           if watched then watchedCount++
           episodeNumber = seasonNumber + '-' + episodeNumber
           resShow.episodes.push {
             id: episodeId, showId: id, episodeNumber, title
             summary, thumb, viewCount:0, episodeLen, watched
-            aired: aired ? null, filePaths
+            aired: aired ? null, filePaths, noFile
           }
         tags = resShow.tags
         if watchedCount is 0 then tags.New = yes

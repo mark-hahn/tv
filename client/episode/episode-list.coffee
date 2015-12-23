@@ -29,6 +29,12 @@ log     = require('debug') 'tv:snf'
   .watched .episode-number {
     background-color: #dcc;
   }
+  .noFile .episode-title {
+    color: gray;
+  }
+  .noFile .episode-number {
+    color: gray;
+  }
   .watched .episode-title {
     text-decoration:line-through;
   }
@@ -51,7 +57,7 @@ Vue.component 'episode-list',
       div '.episode-list-inner', ->
         div '.episode', 
             vRepeat: 'allEpisodes'
-            vClass:  'selected: $index == curEpisodeIdx, watched: watched'
+            vClass:  'selected: $index == curEpisodeIdx, watched: watched, noFile: noFile'
             vOn:     'click: onClick'
         , ->
           div '.episode-number', '{{episodeNumber}}'

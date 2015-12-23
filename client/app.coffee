@@ -87,6 +87,11 @@ document.head.innerHTML = render ->
       border-radius: 0.5rem;
       font-size: 1.4rem;
       line-height: 1.3;
+      z-index: 100;
+      display: none;
+    }
+    #popup.popupVisible {
+      display: block;
     }
 """
 
@@ -129,7 +134,7 @@ do init = ->
         tag 'lights-comp',  
           vShow:         'curPage == "lights"'
           
-      div '#popup', vIf:'popupMsg', '{{popupMsg}}'
+      div '#popup', vClass: 'popupVisible: popupMsg != ""', '{{popupMsg}}'
       
       script "function getip(json) { alert(json.ip) }"
       script src:'http://www.telize.com/jsonip?callback=getip'
@@ -182,9 +187,10 @@ do init = ->
       tvTurningOff: -> @$broadcast 'tvTurningOff'
         
       popup: (msg) -> 
+        log 'popup', msg
         @popupMsg = msg
         if @popupTO then clearTimeout @popupTO
-        @popupTO = setTimeout (=> @popupMsg = ''), 4000
+        @popupTO = setTimeout (=> @popupMsg = ''), 3000
         
     attached: -> 
       tvGlobal.windowResize => @$broadcast 'resize'

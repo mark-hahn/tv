@@ -60,27 +60,27 @@ Vue.component 'show-comp',
   events:
     playShow: ->
       @$dispatch 'videoEnable'
-      
+       
       process.nextTick =>
-        firstUnwatched = null
+        haveWatchable = null
         for episode, epiIdx in @curShow.episodes
           if episode.watched
-            if firstUnwatched 
-              @$dispatch 'popup', 'Cant play show, episode gap.'
-              log 'cant play show, episode gap', 
-                   firstUnwatched.title, episode.title
+            if haveWatchable 
+              @$dispatch 'popup', 'Old episode not watched.'
               return
             continue
-          else if not firstUnwatched
-            firstUnwatched = episode
-            firstEpiIdx = epiIdx
-        if firstUnwatched 
-          log 'playShow', @curShow.title, firstUnwatched.title
+          else if not haveWatchable
+            if not episode.noFile
+              haveWatchable = episode
+              firstEpiIdx = epiIdx
+            else
+              @$dispatch 'popup', 'Old/next episode not downloaded.'
+              return
+        if haveWatchable 
           @$dispatch 'chgEpisodeIdx', firstEpiIdx
-          @$dispatch 'startWatch', firstUnwatched
+          @$dispatch 'startWatch', haveWatchable
           return
-        @$dispatch 'popup', 'All episodes watched.'
-        log 'cant play show, all watched', @curShow.title
+        @$dispatch 'popup', 'All downloaded episodes watched.'
             
   methods:      
     showInList: (show) ->

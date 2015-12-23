@@ -72,7 +72,7 @@ exports.put = (doc, cb) ->
 
 exports.delete = (doc, cb) ->
   db.destroy doc._id, doc._rev, (err) ->
-    if err?.statusCode is 409
+    if err?.statusCode is 409 or not doc._rev
       db.get id, (err, doc) ->
         if err
           log 'db.delete get err:', err
@@ -80,6 +80,7 @@ exports.delete = (doc, cb) ->
           return
         exports.delete doc, cb
       return
+    if err then log 'delete err', err.message
     cb?()
 
 insideSync = no

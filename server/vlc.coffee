@@ -69,7 +69,10 @@ ssh = (commandLine, last) ->
     
 vlcCmdLine = 'DISPLAY=:0 vlc -I rc -f --rc-host 0.0.0.0:' + vlc_port + ' --quiet'
 
-exports.play = (file, cb) ->
+muted  = no
+volume = 150
+
+exports.play = (file) ->
   log 'play'
   if socket
     log 'play open socket'
@@ -81,6 +84,8 @@ exports.play = (file, cb) ->
   setTimeout ->
     initSocket()
     nosub()
+    muted  = no
+    vlcCmd 'volume ' + volume
   , 3000
 
 killAllVlc = ->
@@ -98,9 +103,6 @@ exports.pause = ->
 exports.getTime = ->
   log 'getTime'
   vlcCmd 'get_time'
-
-muted  = no
-volume = 250
 
 exports.volinc = (ticks) ->
   volume += ticks

@@ -8,6 +8,7 @@ count = 0
 
 db.view 'all', (res, data) ->
   log 'Processing', data.rows.length, 'docs.'
+  
   do oneRow = ->
     if not (row = data.rows.shift())
       log 'Done'
@@ -18,6 +19,13 @@ db.view 'all', (res, data) ->
     db.get row.id, (err, doc) ->
       if err then throw err
       chgd = no
+      
+    #   
+    #   if doc.type is 'episode' and doc.showId is '1450222381338798910984769520'
+    #     db.delete doc, oneRow
+    #     return
+    #   
+    
       if doc.filePaths?
         newPathArrays = []
         for pathArr in doc.filePaths
@@ -33,6 +41,7 @@ db.view 'all', (res, data) ->
             chgd = yes
             continue
           newPathArrays.push pathArr
+    
       if chgd
         doc.filePaths = newPathArrays
         db.put doc, (err) ->
@@ -40,3 +49,5 @@ db.view 'all', (res, data) ->
           oneRow()
       else
         oneRow()
+          
+          

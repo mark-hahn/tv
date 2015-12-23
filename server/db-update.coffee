@@ -31,6 +31,8 @@ mappings = [
 
 videosPath = '/mnt/media/videos/'
 
+totalFiles = null
+
 incSeq    = 0
 incLabels = {}
 incs      = {}
@@ -39,12 +41,16 @@ inc = (lbl) ->
   if not (incsLbl = incs[lbl])
     seqTxt = ++incSeq + ''
     if seqTxt.length < 2 then seqTxt = ' ' + seqTxt
-    incLabels[lbl] = seqTxt + ' ' + lbl
+    incLabels[lbl] = lbl
     incs[lbl] = 0
   incs[lbl]++
+  
 dumpInc = ->
-  console.log()
-  for k, v of incs then log incLabels[k] + ': ' + v
+  total = incs.checkFile
+  console.log
+  console.log (new Date).toString()[16..20], total, 'of', totalFiles
+  for k, v of incs when k isnt 'checkFile' 
+    log incLabels[k] + ': ' + v
   bad = 0
   for badLbl in [
       'file no tvdb show' 
@@ -52,8 +58,7 @@ dumpInc = ->
       'bad-file-bad-number'
       'new episode no tvdb']
     bad += incs[badLbl] ? 0
-  total = incs.checkFile
-  log bad, 'of', total, 'bad, ', Math.round(bad*100/total) + '%'
+  log bad, 'bad,', Math.round(bad*100/total) + '%'
   console.log()
 
 fatal = (err) ->
@@ -93,19 +98,17 @@ getBitRate = (filePath) ->
       matches[2] + ' ' + matches[3] + ' ' + rate + ' ' + filePath + '\n'
   rate
 
-exports.guessit = (filePath) ->
-  fileName = filePath.replace '/mnt/media/videos/', ''
+exports.guessit = (fileName) ->
   fileName = fileName.replace /[^\x20-\x7e]/g, ''
                      .replace /\(GB\)/i, '(UK)'
                      .replace /[\.\s]UK[\.\s]/i, ' (UK) '
                      .replace 'faks86', ''
                      
-  if filePath in [
+  if fileName in [
         'Rik Mayall Presents  - s01e09 - Briefest Encounter.avi'
         'The.Comedians.US.S01E01.720p.HDTV.x264-KILLERS.mkv'
       ]
-    fs.appendFileSync 'files/episode-no-tvdb.txt', 
-                      filePath + ' => ' + fileName + '\n'
+    fs.appendFileSync 'files/episode-no-tvdb.txt', fileName + '\n'
   
   {output} = exec 'guessit', [fileName], timeout: 10e3
   
@@ -144,12 +147,15 @@ exports.guessit = (filePath) ->
 
 exports.getFileData = (filePath) ->
   inc 'getFileData'
+  fileName = filePath.replace '/mnt/media/videos/', ''
+  
   stats    = fs.statSync filePath
   fileSize = stats.size
   if not stats.isFile() then return 'not-file'
   bitRate = getBitRate filePath
   
-  episodes = exports.guessit filePath
+  
+  episodes = exports.guessit fileName
   
   if not (fileData = episodes[0]) then return 'no-guessit'
   if not (series = fileData.title) then return 'no-series'
@@ -179,7 +185,7 @@ exports.getFileData = (filePath) ->
     multipleEpisodes = null      
   fileEpisodeTitle = fileData.episode_title
   
-  {filePath, fileSize, bitRate, fileTitle, seasonNumber, 
+  {fileName, fileSize, bitRate, fileTitle, seasonNumber, 
    episodeNumber, multipleEpisodes, fileEpisodeTitle, fileCountry}
 
 deleteShow = (showId) ->
@@ -213,13 +219,9 @@ dbPutEpisode = (episode, cb) ->
   delete episode.fileEpisodeTitle
   delete episode.fileSize
   delete episode.bitRate
-  delete episode.filePath
+  delete episode.fileName
   deleteNullProps episode
   
-  if not episode.showId
-    log 'no episode.showId', filePath
-    fatal episode
-
   tvdb.downloadBanner episode.thumb, ->
     db.put episode, (err) ->
       if err then fatal err
@@ -228,8 +230,8 @@ dbPutEpisode = (episode, cb) ->
       cb()
       
 getEpisode = (show, fileData, cb) ->
-  {fileTitle, filePath, fileSize, bitRate} = fileData
-  fileSizePath = [fileSize, bitRate, filePath]
+  {fileTitle, fileName, fileSize, bitRate} = fileData
+  fileSizeRateName = [fileSize, bitRate, fileName]
     
   db.view 'episodeByShowSeasonEpisode',
     {key: [show._id, fileData.seasonNumber, fileData.episodeNumber]}
@@ -238,19 +240,19 @@ getEpisode = (show, fileData, cb) ->
     
     if (episode = body.rows[0]?.value)
       if episode.tvdbEpisodeId
-        haveFilePath = no
+        havefileName = no
         for sizePath in episode.filePaths
-          if sizePath[2] is filePath
-            haveFilePath = yes
+          if sizePath[2] is fileName
+            havefileName = yes
             break
-        if haveFilePath
+        if havefileName
           inc 'complete old episode'
           cb()
           return
           
         inc 'add file to tvdb episode'
         episode = Object.assign fileData, episode
-        episode.filePaths.push fileSizePath
+        episode.filePaths.push fileSizeRateName
         dbPutEpisode episode, cb
         return
         
@@ -259,11 +261,10 @@ getEpisode = (show, fileData, cb) ->
       return
       
     inc 'new episode no tvdb'
-    fs.appendFileSync 'files/episode-no-tvdb.txt', 
-                      'mv "' + filePath + '" "' + filePath + '"\n'
+    fs.appendFileSync 'files/episode-no-tvdb.txt', fileName + '"\n'
     episode           = fileData
     episode.showId    = show._id
-    episode.filePaths = [fileSizePath]
+    episode.filePaths = [fileSizeRateName]
     dbPutEpisode episode, cb
 
 addTvdbEpisodes = (show, fileData, tvdbEpisodes, cb) ->
@@ -320,25 +321,25 @@ exports.checkFile = (filePath, cb) ->
     fs.appendFileSync 'files/file-' + fileData + '.txt', 'rm -rf "' + filePath + '"\n'
     setImmediate cb
     return
-  {filePath, fileTitle} = fileData
+  {fileName, fileTitle} = fileData
   
-  db.view 'episodeByFilePath', {key: filePath}, (err, body) -> 
+  db.view 'episodeByFilePath', {key: fileName}, (err, body) -> 
     if err then fatal err
 
     if body.rows.length > 0
-      inc 'got episode by filepath'
+      inc 'got episode by fileName'
       episode =  body.rows[0].value
       if episode.tvdbEpisodeId
-        if mappings[show.tvdbTitle?] is 'old'
-          deleteShow episode.showId
-          cb()
-          return
+        # if mappings[show.tvdbTitle?] is 'old'
+        #   deleteShow episode.showId
+        #   cb()
+        #   return
         inc 'skipping complete episode'
         cb()
       else 
         inc 're-checking episode with no tvdb'
         if not episode.showId
-          log 'no episode.showId', filePath
+          log 'no episode.showId', fileName
           fatal body
         db.get episode.showId, (err, show) ->
           if err then fatal err
@@ -363,8 +364,7 @@ exports.checkFile = (filePath, cb) ->
           
           if not show
             inc 'file no tvdb show'
-            fs.appendFileSync 'files/file-no-tvdb-show.txt', 
-                              'mv "' + filePath + '" "' + filePath + '"\n'
+            fs.appendFileSync 'files/file-no-tvdb-show.txt', fileName + '"\n'
             cb()
             return
           
@@ -395,6 +395,7 @@ exports.checkFile = (filePath, cb) ->
 
 if process.argv[2] is 'all'
   files = fs.listTreeSync videosPath
+  totalFiles = files.length
   do oneFile = ->
     if not (filePath = files.shift())
       log 'done'
@@ -408,6 +409,7 @@ if process.argv[2] is 'all'
 
 {
    "_id": "_design/all",
+   "_rev": "4-e5c847bda73f4540627b9b32fe10fb56",
    "language": "javascript",
    "views": {
        "showByFileTitle": {
@@ -436,7 +438,11 @@ if process.argv[2] is 'all'
        },
        "all": {
            "map": "function(doc) {\n  emit(null, null);\n}"
+       },
+       "tvdbNoFile": {
+           "map": "function(doc) { \n  if (doc.tvdbEpisodeId && (!doc.filePaths || doc.filePaths.length == 0))\n    emit(doc._id, doc);\n}"
        }
    }
 }
+
 ###

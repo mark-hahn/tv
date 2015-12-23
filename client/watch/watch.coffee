@@ -87,6 +87,7 @@ Vue.component 'watch-comp',
       log 'bitrates', @episode.filePaths
       if (path = @episode.filePaths?[0]?[2])
         @tvCtrl.startVlc path, 'goToStart', yes
+        log 'startWatch @watchMode set playing', @watchMode
         @watchMode = 'playing'
       setTimeout =>
         tvGlobal.ajaxCmd 'irCmd', 'hdmi3'
@@ -97,6 +98,7 @@ Vue.component 'watch-comp',
         
     endWatch: ->
       # tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
+      log 'endWatch to @watchMode none', @watchMode
       @watchMode = 'none'
       @$dispatch 'chgCurPage', 'show'
       setTimeout (=> @tvCtrl.stopVlc()), 500
@@ -119,6 +121,7 @@ Vue.component 'watch-comp',
         when 'Back' 
           if @watchMode is 'paused'
             @playPos = @getPlayPos()
+            log 'back @watchMode to playing', @watchMode
             @watchMode = 'playing'
             setTimeout (=> @tvCtrl.stepbackVlc()), 500
           else
@@ -127,15 +130,17 @@ Vue.component 'watch-comp',
         when '>>' then @tvCtrl.startSkip 'Fwd'
         when 'Play' 
           @playPos = @getPlayPos()
+          log 'play click @watchMode to playing', @watchMode
           @watchMode = 'playing'
         when 'Pause' 
           if @watchMode is 'playing'
             @oldPlayPos = @playPos
+            log 'pause watchmode to paused', @watchMode
             @watchMode = 'paused'
 
   watch:
     watchMode: (__, old) -> 
-      # log 'watchMode', {@watchMode, @playPos, @playingWhenLoaded}
+      log 'watchMode watch old, new', old, @watchMode
       if typeof @playPos isnt 'number' then return
       switch @watchMode
         when 'playing'
@@ -158,15 +163,15 @@ Vue.component 'watch-comp',
     newEpisode: (@episode ) ->
     
     newState: (tvState) ->
-      if @watchMode is 'playing'
+      # if @watchMode is 'playing'
         # if @loading
         #   clearTimeout @loading
         #   @loading = null
         #   @videoCmd 'playPos', 2
-        switch tvState
-          when 'none'    then @$emit 'endWatch'
-          when 'playing' then @videoCmd 'play'
-          else                @videoCmd 'pause'
+        # switch tvState
+        #   when 'none'    then @$emit 'endWatch'
+        #   when 'playing' then @videoCmd 'play'
+        #   else                @videoCmd 'pause'
         
     newPos: (tvPlayPos) ->
       if @watchMode is 'playing'
@@ -181,6 +186,7 @@ Vue.component 'watch-comp',
             @show      = show
             @episode   = episode
             @videoFile = videoFile
+            log 'setEpisodeById @watchMode to playing', @watchMode
             @watchMode = 'playing'
             if @playingWhenLoaded
               @$dispatch 'chgCurPage', 'watch'
@@ -188,6 +194,7 @@ Vue.component 'watch-comp',
       @show      = null
       @episode   = null
       @videoFile = ''
+      log 'setEpisodeById @watchMode to none', @watchMode
       @watchMode = 'none'
 
   created: -> @tvCtrl = tvGlobal.tvCtrl = new TvCtrl @

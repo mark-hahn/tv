@@ -39,7 +39,6 @@ Vue.component 'watch-comp',
   data: ->
     show:       null
     episode:    null
-    videoFile:  ''
     playPos:    0
     # loading:    yes
     watchMode: 'none'
@@ -62,7 +61,6 @@ Vue.component 'watch-comp',
           tag 'watch-video-comp',
             show:          '{{show}}'
             episode:       '{{episode}}'
-            videoFile:     '{{videoFile}}'
             watchMode:     '{{watchMode}}'
             getPlayPos:    '{{@ getPlayPos}}'
             chkVidInit:    '{{@ chkVidInit}}'
@@ -179,13 +177,12 @@ Vue.component 'watch-comp',
         @$broadcast 'setScrubPos', tvPlayPos
         @playPos =                 tvPlayPos
       
-    setEpisodeById: (id, videoFile, @playingWhenLoaded) ->
+    setEpisodeById: (id, @playingWhenLoaded) ->
       for show in @allShows ? []
         for episode in show.episodes
           if episode.id is id
             @show      = show
             @episode   = episode
-            @videoFile = videoFile
             log 'setEpisodeById @watchMode to playing', @watchMode
             @watchMode = 'playing'
             if @playingWhenLoaded
@@ -193,7 +190,6 @@ Vue.component 'watch-comp',
             return
       @show      = null
       @episode   = null
-      @videoFile = ''
       log 'setEpisodeById @watchMode to none', @watchMode
       @watchMode = 'none'
 

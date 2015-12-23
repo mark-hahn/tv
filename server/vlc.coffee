@@ -9,20 +9,28 @@ vlcip_wlk = '192.168.1.102'
 vlcip_tv  = '192.168.1.104'
 vlc_port  = 1250
 
-socket = null
+socket = playPos = null
+gettingPlayPos = no
 
 initSocket = ->
-  log 'init socket'
   if socket
     log 'init open socket'
     console.trace()
     return
   # socket?.end()
   socket = net.connect vlc_port, vlcip_tv
-  socket.on 'data', (data) -> log 'socket recvd:', data.toString().replace /\n/g, ' '
+  
+  socket.on 'data', (data) -> 
+    res = data.toString()
+    # log 'socket recvd:', res.replace /\n/g, ' '
+    if gettingPlayPos
+      matches = /^\s*(\d+)\s*$/.exec res
+      if matches then playPos = +matches[1]
+      
   socket.on 'error', (err) ->
     log 'socket error', err
     cb?()
+    
   socket.on 'end', (data) -> 
     if data then log 'socket end:', data.toString().replace /\n/g, ' '
 
@@ -31,9 +39,8 @@ vlcCmd = (command) ->
     log 'vlcCmd closed socket', command
     console.trace()
     return
-
   try
-    log 'socket sent:', command
+    # log 'socket sent:', command
     socket.write command + '\n'
   catch e
     log 'retrying', 'command', e.message
@@ -42,7 +49,6 @@ vlcCmd = (command) ->
     setTimeout (-> vlcCmd command), 1000
 
 nosub = ->
-  log 'nosub'
   vlcCmd 'strack 0'
     
 closeSocket = ->
@@ -100,9 +106,30 @@ exports.pause = ->
   log 'pause'
   vlcCmd 'pause'
   
-exports.getTime = ->
-  log 'getTime'
+getPlayPosQueue = []
+exports.getPlayPos = (cb) ->
+  getPlayPosQueue.push cb
+  if gettingPlayPos then return
+  gettingPlayPos = yes
+  
+  playPos = null
+  loopCount = 0
   vlcCmd 'get_time'
+  do check = ->
+    if playPos?
+      tmpGetPlayPosQueue = getPlayPosQueue
+      getPlayPosQueue = []
+      gettingPlayPos = no
+      for cb in tmpGetPlayPosQueue
+        cb null, playPos
+    else if ++loopCount > 80
+      tmpGetPlayPosQueue = getPlayPosQueue
+      getPlayPosQueue = []
+      gettingPlayPos = no
+      for cb in tmpGetPlayPosQueue
+        cb 'loopCount timeout'
+    else
+      setTimeout check, 50
 
 exports.volinc = (ticks) ->
   volume += ticks
@@ -126,7 +153,16 @@ exports.stop = ->
   closeSocket()
   setTimeout killAllVlc, 300
 
+
+if process.argv[2] is 'pos'
+  initSocket()
+  setInterval ->
+    exports.getPlayPos (err, time) ->
+      log 'getPlayPos result', err?.message, time
+  , 1000
+  
 if process.argv[2] is 'pause'
+  initSocket()
   exports.pause()
 
 if process.argv[2] is 'test'

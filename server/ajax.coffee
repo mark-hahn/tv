@@ -95,11 +95,11 @@ srvr = http.createServer (req, res) ->
     
     when 'startVlc'
       log 'startVlc'
-      vlc.play data
+      vlc.play data...
       success ''
       
-    when 'pauseVlc'
-      log 'pauseVlc'
+    when 'playPauseVlc'
+      log 'playPauseVlc'
       vlc.pause()
       success ''
       

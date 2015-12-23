@@ -40,7 +40,7 @@ Vue.component 'tv-btns-comp',
 
         div '.btn-row.skip-btns', ->
           div '.btn', vOn: 'click: tvBtnClick', '<<'
-          div '.btn', vOn: 'click: tvBtnClick', '{{tvPlayPauseTxt}}'
+          div '.btn', vOn: 'click: tvBtnClick', '> ||'
           div '.btn', vOn: 'click: tvBtnClick', '>>'
 
   computed:

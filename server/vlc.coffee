@@ -9,7 +9,7 @@ vlcip_wlk = '192.168.1.102'
 vlcip_tv  = '192.168.1.104'
 vlc_port  = 1250
 
-socket = playPos = null
+socket = playPos = file = showId = episodeId = null
 gettingPlayPos = no
 
 initSocket = ->
@@ -78,8 +78,17 @@ vlcCmdLine = 'DISPLAY=:0 vlc -I rc -f --rc-host 0.0.0.0:' + vlc_port + ' --quiet
 muted  = no
 volume = 150
 
-exports.play = (file) ->
-  log 'play'
+killAllVlc = ->
+  log 'killAllVlc'
+  ssh 'killall vlc'
+  
+exports.play = (showIdIn, episodeIdIn, fileIn) ->
+  log 'play', fileIn
+  
+  showId    = showIdIn
+  episodeId = episodeIdIn
+  file      = fileIn
+  
   if socket
     log 'play open socket'
     console.trace()
@@ -94,10 +103,6 @@ exports.play = (file) ->
     vlcCmd 'volume ' + volume
   , 3000
 
-killAllVlc = ->
-  log 'killAllVlc'
-  ssh 'killall vlc'
-  
 exports.seek = (timeSecs) ->
   log 'seek', timeSecs
   vlcCmd 'seek ' + Math.floor timeSecs
@@ -105,9 +110,16 @@ exports.seek = (timeSecs) ->
 exports.pause = ->
   log 'pause'
   vlcCmd 'pause'
-  
+
+exports.stop = ->
+  log 'stop'
+  file = null
+  vlcCmd 'shutdown'
+  closeSocket()
+  setTimeout killAllVlc, 300
+
 getPlayPosQueue = []
-exports.getPlayPos = (cb) ->
+exports.getPlayInfo = (cb) ->
   getPlayPosQueue.push cb
   if gettingPlayPos then return
   gettingPlayPos = yes
@@ -121,13 +133,15 @@ exports.getPlayPos = (cb) ->
       getPlayPosQueue = []
       gettingPlayPos = no
       for cb in tmpGetPlayPosQueue
-        cb null, playPos
+        cb null, showId, episodeId, file, playPos
+        
     else if ++loopCount > 80
       tmpGetPlayPosQueue = getPlayPosQueue
       getPlayPosQueue = []
       gettingPlayPos = no
       for cb in tmpGetPlayPosQueue
         cb 'loopCount timeout'
+        
     else
       setTimeout check, 50
 
@@ -147,18 +161,16 @@ exports.toggleMute = ->
     vlcCmd 'volume ' + volume
     muted = no
 
-exports.stop = ->
-  log 'stop'
-  vlcCmd 'shutdown'
-  closeSocket()
-  setTimeout killAllVlc, 300
-
+###
+    Unit Tests
+###
 
 if process.argv[2] is 'pos'
   initSocket()
   setInterval ->
-    exports.getPlayPos (err, time) ->
-      log 'getPlayPos result', err?.message, time
+    exports.getPlayPos (err, showId, episodeId, file, playPos) ->
+      log 'getPlayPos result', err?.message, 
+           showId, episodeId, file, playPos
   , 1000
   
 if process.argv[2] is 'pause'
@@ -166,18 +178,20 @@ if process.argv[2] is 'pause'
   exports.pause()
 
 if process.argv[2] is 'test'
-  exports.play 'Brooklyn.Nine-Nine.S02E13.720p.HDTV.x264-KILLERS.mkv', ->
+  # initSocket()
+  # exports.play 'Brooklyn.Nine-Nine.S02E13.720p.HDTV.x264-KILLERS.mkv', ->
+  secs = Math.floor Math.random() * 900 + 150
+  exports.seek secs
+  setTimeout ->
+    exports.pause()
     setTimeout ->
-      secs = Math.floor Math.random() * 900 + 150
-      exports.seek secs
-      exports.pause()
-      vlcCmd 'get_time'
-      setTimeout ->
-        exports.stop()
-      , 3e3
+      exports.play()
     , 3e3
+  , 3e3
 
 ###
+    VLC CTL COMMANDS
+    
 | add XYZ  . . . . . . . . . . . . . . . . . . . . add XYZ to playlist
 | enqueue XYZ  . . . . . . . . . . . . . . . . . queue XYZ to playlist
 | playlist . . . . . . . . . . . . .  show items currently in playlist

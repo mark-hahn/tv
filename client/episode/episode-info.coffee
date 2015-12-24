@@ -50,7 +50,7 @@ log     = require('debug') 'tv:epiinf'
 """
 
 Vue.component 'episode-info', 
-  props: ['showTitle', 'curEpisode']
+  props: ['showTitle', 'curEpisode', 'playPos']
   
   template: render ->
     div '.episode-info', vKeepScroll: true, ->
@@ -61,7 +61,8 @@ Vue.component 'episode-info',
         img '.thumb',   vAttr: "src: '#{tvGlobal.bannerPfx}' + curEpisode.thumb"
         div '.epi-info-aired',    '{{curEpisode.aired}}'
         div '.epi-info-duration', '({{Math.ceil(+curEpisode.duration/60)}} min)'
-        div '.epi-info-watched', vShow:'curEpisode.watched', 'Watched'
+        div '.epi-info-playPos',  '{{playPos}}'
+        div '.epi-info-watched', vShow:'!playPos && curEpisode.watched', 'Watched'
         hr()
         div '.summary', vText: 'curEpisode.summary'
 

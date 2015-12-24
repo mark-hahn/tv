@@ -106,6 +106,10 @@ exports.play = (showIdIn, episodeIdIn, fileIn) ->
 exports.seek = (timeSecs) ->
   log 'seek', timeSecs
   vlcCmd 'seek ' + Math.floor timeSecs
+
+exports.playRate = (playRate) ->
+  log 'rate', playRate
+  vlcCmd 'rate ' + playRate
   
 exports.pause = ->
   log 'pause'
@@ -136,7 +140,7 @@ exports.getPlayInfo = (cb) ->
       getPlayPosQueue = []
       gettingPlayPos = no
       for cb in tmpGetPlayPosQueue
-        cb null, showId, episodeId, file, playPos, volume
+        cb null, showId, episodeId, file, playPos, volume, muted
         
     else if ++loopCount > 80
       tmpGetPlayPosQueue = getPlayPosQueue

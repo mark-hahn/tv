@@ -112,6 +112,11 @@ srvr = http.createServer (req, res) ->
       vlc.seek data
       success ''
       
+    when 'playRateVlc'
+      log 'playRateVlc', data
+      vlc.playRate data
+      success ''
+      
     when 'volupVlc'
       log 'volupVlc'
       vlc.volinc +10

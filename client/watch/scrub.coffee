@@ -58,10 +58,10 @@ Vue.component 'scrub-comp',
         playPos = (@episode.duration / @scrubHgt) * initY
         log 'scrub click playPos', playPos
         @$emit 'setScrubPos', playPos
-        tvGlobal.ajaxCmd 'seekVlc', playPos
+        tvGlobal.ajaxCmd 'seekVlc', Math.floor playPos
         
   attached: ->
-   @$emit 'resize'
+    @$emit 'resize'
   
   events:
     setScrubPos: (playPos) ->

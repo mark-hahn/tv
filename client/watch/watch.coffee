@@ -26,10 +26,13 @@ Vue.component 'watch-comp',
   props: ['allShows']
   
   data: ->
-    showTitle:  null
-    episode:    null
-    playPos:    0
-    volume:     0
+    showTitle:   null
+    episode:     null
+    playPos:     0
+    playRate:    1
+    revInterval: null
+    volume:      0
+    muted:       no
 
   template: render ->
     div '.watch-comp', ->
@@ -55,32 +58,71 @@ Vue.component 'watch-comp',
       setTimeout =>
         tvGlobal.ajaxCmd 'irCmd', 'hdmi3'
       , 3000
-      
+    
     tvBtnClick: (text) ->
       switch text
-        when '> ||'  then tvGlobal.ajaxCmd 'playPauseVlc'
+        when '> ||'
+          if @playRate isnt 1
+            @stopSkipping()
+          else
+            tvGlobal.ajaxCmd 'playPauseVlc'
         when 'Mute'  then tvGlobal.ajaxCmd 'toggleMuteVlc'
         when 'Vol +' then tvGlobal.ajaxCmd 'volupVlc'
         when 'Vol -' then tvGlobal.ajaxCmd 'voldownVlc'
         when 'Stop' 
+          @stopSkipping()
           tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
           @$dispatch 'chgCurPage', 'show'
           setTimeout ->
             tvGlobal.ajaxCmd 'stopVlc'
           , 500
         when 'Reset' 
+          @stopSkipping()
           tvGlobal.ajaxCmd 'seekVlc', 0
         when 'Back' 
           log 'back'
-        # when '<<' then @tvCtrl.startSkip 'Back'
-        # when '>>' then @tvCtrl.startSkip 'Fwd'
+          @stopSkipping()
+          @playPos = Math.max 0, @playPos - 10
+          tvGlobal.ajaxCmd 'seekVlc', @playPos
+        when '<<', '>>' 
+          factor = switch
+            when text is '>>' and @playRate <  1
+              @stopSkipping() 
+              @playRate = +1; 1.5
+            when text is '>>' and @playRate >= 1 then +1.5
+            when text is '<<' and @playRate >= 1 then @playRate = -1; 1 
+            when text is '<<' and @playRate <  1 then +1.5
+            else 1
+          @playRate *= factor
+          @playRate = Math.max -3, Math.min 3, @playRate
+          if @playRate >= 1
+            tvGlobal.ajaxCmd 'playRateVlc', @playRate
+          else
+            if not @revInterval
+              @revInterval = setInterval =>
+                @playPos += @playRate * 2
+                @playPos = Math.max 0, @playPos
+                log 'reverse', @playRate, @playPos
+                tvGlobal.ajaxCmd 'seekVlc', @playPos
+              , 1500
+
+  methods:     
+    stopSkipping: ->
+      log 'stopSkipping'
+      if @revInterval
+        clearInterval @revInterval
+      if @playRate isnt 1
+        @playRate = 1
+        tvGlobal.ajaxCmd 'playRateVlc', @playRate
 
   attached: ->
-    setInterval ->
+    setInterval =>
       tvGlobal.ajaxCmd 'getPlayInfo', (err, res) => 
         if err then log 'getPlayInfo err', err.message; return
-        [showId, episodeId, file, @playPos, @volume] = res
+        if @revInterval then return
+        [showId, episodeId, file, @playPos, @volume, @muted] = res.data
         if showId is 'notShowing' then return
-        # log 'getPlayInfo', {showId, episodeId, file, @playPos, @volume}
-    , 5000
+        # log 'getPlayInfo', {res, showId, episodeId, file, @playPos, @volume}
+        @$broadcast 'setScrubPos', @playPos
+    , 1000
 

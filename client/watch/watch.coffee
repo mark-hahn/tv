@@ -2,28 +2,17 @@
 Vue    = require 'vue'
 log    = require('debug') 'tv:-watch'
 
-{render, tag, div, img, video} = require 'teacup'
+{render, tag, div, img} = require 'teacup'
 
-require './web-video'
 require './tv-btns'
 require './scrub'
 
 (document.head.appendChild document.createElement('style')).textContent = """
-  .screen-msg {
-    margin-top: 10rem;
-    font-size:1.3rem;
-    text-align: center;
-  }
-  .screen-msg .msgTitle {
-    font-weight:bold;
-    font-size:2rem;
-    margin-bottom: 2rem;
-  }
-  .have-episode {
+  .watch-comp {
     display: flex;
     flex-direction: row;
   }
-  .watch-video-ctrl {
+  .info-column {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -41,17 +30,12 @@ Vue.component 'watch-comp',
     playPos:    0
 
   template: render ->
-    div '.watch-comp', ->
-      div '.have-episode', ->
-        div '.watch-video-ctrl', ->
-          tag 'watch-video-comp',
-            show:          '{{show}}'
-            episode:       '{{episode}}'
-            getPlayPos:    '{{@ getPlayPos}}'
-            # chkVidInit:    '{{@ chkVidInit}}'
+    # div '.watch-comp', ->
+      div '.watch-comp', ->
+        div '.info-column', ->
               
           tag 'tv-btns-comp',
-            episode:   '{{episode}}'
+            episode: '{{episode}}'
             
         tag 'scrub-comp',
           episode: '{{episode}}'
@@ -66,11 +50,8 @@ Vue.component 'watch-comp',
       setTimeout =>
         tvGlobal.ajaxCmd 'irCmd', 'hdmi3'
       , 3000
-      # @videoCmd 'play'
       
     tvBtnClick: (text) ->
-      # @chkVidInit()
-      # if text not in ['<<','>>'] and @tvCtrl.stopSkip() then return
       switch text
         when '> ||'  then tvGlobal.ajaxCmd 'playPauseVlc'
         when 'Mute'  then tvGlobal.ajaxCmd 'toggleMuteVlc'
@@ -83,21 +64,12 @@ Vue.component 'watch-comp',
             tvGlobal.ajaxCmd 'stopVlc'
           , 500
         when 'Reset' 
-          tvGlobal.ajaxCmd 'seek', 0
+          tvGlobal.ajaxCmd 'seekVlc', 0
         when 'Back' 
           log 'back'
         # when '<<' then @tvCtrl.startSkip 'Back'
         # when '>>' then @tvCtrl.startSkip 'Fwd'
 
-  methods:          
-    # videoCmd: (cmd, pos) -> 
-    #   @$broadcast 'videoCmd', cmd, pos
-    
-    newPos: (tvPlayPos) ->
-      # @videoCmd   'playPos',     tvPlayPos
-      # @$broadcast 'setScrubPos', tvPlayPos
-      # @playPos =                 tvPlayPos
-      
   attached: ->
     setInterval ->
       tvGlobal.ajaxCmd 'getPlayInfo', (err, res) => 

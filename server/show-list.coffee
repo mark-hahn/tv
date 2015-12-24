@@ -66,8 +66,7 @@ exports.getShowList = getList = (cb) ->
           
           availCount++
           {seasonNumber, episodeNumber, episodeTitle: title, summary, \
-           thumb, _id: episodeId, duration
-           aired: originallyAvailableAt, watched, filePaths} = episode
+           thumb, _id: episodeId, duration, aired, watched, filePaths} = episode
            
           noFile = (not filePaths or filePaths.length is 0)
           
@@ -75,10 +74,9 @@ exports.getShowList = getList = (cb) ->
           if watched then watchedCount++
           episodeNumber = seasonNumber + '-' + episodeNumber
           resShow.episodes.push {
-            id: episodeId, showId: id, episodeNumber, title
-            summary, thumb, viewCount:0, duration, watched
-            aired: aired ? null, filePaths, noFile
-          }
+            id: episodeId, showId: id, episodeNumber, title, summary, 
+            thumb, viewCount:0, duration, watched, aired, filePaths, noFile}
+
         tags = resShow.tags
         if watchedCount is 0 then tags.New = yes
         else delete tags.New

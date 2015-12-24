@@ -57,15 +57,15 @@ Vue.component 'watch-video-comp',
   
   template: render ->
     div '.watch-video', ->
-      img '.show-banner', vAttr: 'src: bannerUrl'
-      div '.watch-episode-title', 
-            '{{episode.episodeNumber + ": " + episode.title}}'
-      div '.web-video-blk', vIf: 'episode',->
-        video '.video', 
-          vAttr:'src: videoUrl'
-          # autoplay:yes
-          # preload:'auto'
-          vOn:'click:chkVidInit, playing: vidPlay'
+      # img '.show-banner', vAttr: 'src: bannerUrl'
+      # div '.watch-episode-title', 
+      #       '{{episode.episodeNumber + ": " + episode.title}}'
+      # div '.web-video-blk', vIf: 'episode',->
+      #   video '.video', 
+      #     vAttr:'src: videoUrl'
+      #     # autoplay:yes
+      #     # preload:'auto'
+      #     vOn:'click:chkVidInit, playing: vidPlay'
             
   data: ->
     bigVideo: no

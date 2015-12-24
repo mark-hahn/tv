@@ -46,7 +46,7 @@ tvGlobal.ajaxCmd = (cmd, args..., cb) ->
     query += sep + 'q' + idx + '=' +arg.toString()
     sep = '&'
     
-  if cmd isnt 'getTvStatus'
+  if cmd isnt 'getPlayInfo'
     log 'ajax called', {cmd, args}
   
   request
@@ -61,7 +61,7 @@ tvGlobal.ajaxCmd = (cmd, args..., cb) ->
         log 'ajax err', err
         cb? err
         return
-      log 'ajax returned', cmd
+      # log 'ajax returned', cmd
       cb? null, JSON.parse res.text
 
 tvGlobal.ajaxLog = (args...) ->

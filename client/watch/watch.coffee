@@ -63,7 +63,6 @@ Vue.component 'watch-comp',
       log 'bitrates', @episode.filePaths
       if (path = @episode.filePaths?[0]?[2])
         tvGlobal.ajaxCmd 'startVlc', @episode.showId, @episode.id, path
-        @watchMode = 'playing'
       setTimeout =>
         tvGlobal.ajaxCmd 'irCmd', 'hdmi3'
       , 3000
@@ -105,6 +104,6 @@ Vue.component 'watch-comp',
         if err then log 'getPlayInfo err', err.message; return
         [showId, episodeId, file, playPos, volume] = res
         if showId is 'notShowing' then return
-        log 'getPlayInfo', {showId, episodeId, file, playPos, volume}
+        # log 'getPlayInfo', {showId, episodeId, file, playPos, volume}
     , 5000
 

@@ -66,7 +66,7 @@ exports.getShowList = getList = (cb) ->
           
           availCount++
           {seasonNumber, episodeNumber, episodeTitle: title, summary, \
-           thumb, _id: episodeId, length: episodeLen
+           thumb, _id: episodeId, duration
            aired: originallyAvailableAt, watched, filePaths} = episode
            
           noFile = (not filePaths or filePaths.length is 0)
@@ -76,7 +76,7 @@ exports.getShowList = getList = (cb) ->
           episodeNumber = seasonNumber + '-' + episodeNumber
           resShow.episodes.push {
             id: episodeId, showId: id, episodeNumber, title
-            summary, thumb, viewCount:0, episodeLen, watched
+            summary, thumb, viewCount:0, duration, watched
             aired: aired ? null, filePaths, noFile
           }
         tags = resShow.tags

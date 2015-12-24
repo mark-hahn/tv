@@ -60,7 +60,7 @@ Vue.component 'episode-info',
         div '.info-episode-title', '{{curEpisode.title}}'
         img '.thumb',   vAttr: "src: '#{tvGlobal.bannerPfx}' + curEpisode.thumb"
         div '.epi-info-aired',    '{{curEpisode.aired}}'
-        div '.epi-info-duration', '({{Math.ceil(+curEpisode.episodeLen/60)}} min)'
+        div '.epi-info-duration', '({{Math.ceil(+curEpisode.duration/60)}} min)'
         div '.epi-info-watched', vShow:'curEpisode.watched', 'Watched'
         hr()
         div '.summary', vText: 'curEpisode.summary'

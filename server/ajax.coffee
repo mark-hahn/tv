@@ -15,7 +15,7 @@ vlc      = require './vlc'
 poweringUp = no
 
 srvr = http.createServer (req, res) ->
-  if req.url not in ['/getTvStatus','/getPlayInfo']
+  if req.url isnt '/getPlayInfo'
     log 'ajax http req: ' + req.url
 
   error = (msg, code=500) ->
@@ -107,8 +107,8 @@ srvr = http.createServer (req, res) ->
       vlc.pause()
       success ''
       
-    when 'seek'
-      log 'seek', data
+    when 'seekVlc'
+      log 'seekVlc', data
       vlc.seek data
       success ''
       
@@ -152,12 +152,6 @@ srvr = http.createServer (req, res) ->
       # db.syncPlexDB()
       success ''
         
-    when 'getTvStatus'
-      # plex.getStatus (err, playStatus) ->
-        # log 'getTvStatus', {err, playStatus}
-        # if err then error 'getTvStatus err: ' + err.message; return
-        success '' # playStatus
-
     when 'usbconfig'
       exec 'ssh xobtlu@37.48.119.77 sed -n "/^\\ \\ \\ \\ \\ \\ \\-/p" config.yml |
                                        sed "s/^\\ \\ \\ \\ \\ \\ \\-\\ //" | 

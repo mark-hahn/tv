@@ -11,6 +11,7 @@ getDefaultFilters = ->
   filters = new Object
   for tag in tvGlobal.tagList
     filters[tag] = 'ignore'
+  filters.Kids    = 'never'
   filters.Watched = 'never'
   filters.Archive = 'never'
   filters.Deleted = 'never'

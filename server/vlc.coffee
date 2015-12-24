@@ -120,6 +120,9 @@ exports.stop = ->
 
 getPlayPosQueue = []
 exports.getPlayInfo = (cb) ->
+  if not socket
+    cb null, 'notShowing'
+    return
   getPlayPosQueue.push cb
   if gettingPlayPos then return
   gettingPlayPos = yes
@@ -133,7 +136,7 @@ exports.getPlayInfo = (cb) ->
       getPlayPosQueue = []
       gettingPlayPos = no
       for cb in tmpGetPlayPosQueue
-        cb null, showId, episodeId, file, playPos
+        cb null, showId, episodeId, file, playPos, volume
         
     else if ++loopCount > 80
       tmpGetPlayPosQueue = getPlayPosQueue

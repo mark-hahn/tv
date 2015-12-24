@@ -99,3 +99,12 @@ Vue.component 'watch-comp',
       # @$broadcast 'setScrubPos', tvPlayPos
       # @playPos =                 tvPlayPos
       
+  attached: ->
+    setInterval ->
+      tvGlobal.ajaxCmd 'getPlayInfo', (err, res) => 
+        if err then log 'getPlayInfo err', err.message; return
+        [showId, episodeId, file, playPos, volume] = res
+        if showId is 'notShowing' then return
+        log 'getPlayInfo', {showId, episodeId, file, playPos, volume}
+    , 5000
+

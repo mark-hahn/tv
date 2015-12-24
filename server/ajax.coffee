@@ -1,4 +1,6 @@
 
+log      = require('debug') 'tv:ajax'
+
 util     = require 'util'
 url      = require 'url'
 http     = require 'http'
@@ -6,17 +8,14 @@ exec     = require('child_process').exec
 ir       = require './ir'
 insteon  = require './insteon'
 db       = require './db'
-log      = require('debug') 'tv:ajax'
 port     = require('parent-config')('apps-config.json').tvAjax_port
 showList = require './show-list'
 vlc      = require './vlc'
 
-# db.init (err) -> if err then log 'db.init failed'
- 
 poweringUp = no
 
 srvr = http.createServer (req, res) ->
-  if req.url isnt '/getTvStatus'
+  if req.url not in ['/getTvStatus','/getPlayInfo']
     log 'ajax http req: ' + req.url
 
   error = (msg, code=500) ->
@@ -49,8 +48,13 @@ srvr = http.createServer (req, res) ->
       log 'shows start'
       showList.getShowList (err, result) ->
         if err then error err.message; return
-        log 'shows done', result.length
+        # log 'shows done', result.length
         success result
+    
+    when 'getPlayInfo'
+      vlc.getPlayInfo (err, args...) ->
+        if err then error err.message; return
+        success args
     
     when 'setDBField'
       log 'setDBField', data

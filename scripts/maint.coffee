@@ -41,9 +41,9 @@ db.view 'all', (res, data) ->
             chgd = yes
             continue
           newPathArrays.push pathArr
+        doc.filePaths = newPathArrays
     
       if chgd
-        doc.filePaths = newPathArrays
         db.put doc, (err) ->
           if err then throw err
           oneRow()

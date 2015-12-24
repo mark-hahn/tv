@@ -4,6 +4,7 @@ log    = require('debug') 'tv:-watch'
 
 {render, tag, div, img} = require 'teacup'
 
+require '../episode/episode-info'
 require './tv-btns'
 require './scrub'
 
@@ -25,23 +26,27 @@ Vue.component 'watch-comp',
   props: ['allShows']
   
   data: ->
-    show:       null
+    showTitle:  null
     episode:    null
     playPos:    0
+    volume:     0
 
   template: render ->
-    # div '.watch-comp', ->
-      div '.watch-comp', ->
-        div '.info-column', ->
-              
-          tag 'tv-btns-comp',
-            episode: '{{episode}}'
-            
-        tag 'scrub-comp',
+    div '.watch-comp', ->
+      div '.info-column', ->
+        
+        tag 'episode-info',
+          showTitle:  '{{showTitle}}'
+          curEpisode: '{{episode}}'
+          
+        tag 'tv-btns-comp',
           episode: '{{episode}}'
+          
+      tag 'scrub-comp',
+        episode: '{{episode}}'
   
   events:
-    startWatch: (@episode) ->
+    startWatch: (@showTitle, @episode) ->
       @playPos = 0
       log 'startWatch', @episode.filePaths?[0]?[2]
       log 'bitrates', @episode.filePaths
@@ -74,8 +79,8 @@ Vue.component 'watch-comp',
     setInterval ->
       tvGlobal.ajaxCmd 'getPlayInfo', (err, res) => 
         if err then log 'getPlayInfo err', err.message; return
-        [showId, episodeId, file, playPos, volume] = res
+        [showId, episodeId, file, @playPos, @volume] = res
         if showId is 'notShowing' then return
-        # log 'getPlayInfo', {showId, episodeId, file, playPos, volume}
+        # log 'getPlayInfo', {showId, episodeId, file, @playPos, @volume}
     , 5000
 

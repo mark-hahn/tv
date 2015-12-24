@@ -182,7 +182,7 @@ do init = ->
       
       startWatch: (episode = @curEpisode) ->
         @$emit 'chgCurPage', 'watch'
-        @$broadcast 'startWatch', episode
+        @$broadcast 'startWatch', @curShow.title, episode
         
       tvTurningOff: -> @$broadcast 'tvTurningOff'
         

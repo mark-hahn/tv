@@ -63,7 +63,7 @@ srvr = http.createServer (req, res) ->
       val = switch data[2]
         when 'true'  then true
         when 'false' then false
-        else data[1]
+        else data[2]
       db.setField data[0], data[1], val, (err, doc) ->
         if err then error err.message; return
         success 'done'

@@ -123,6 +123,9 @@ Vue.component 'watch-comp',
         [showId, episodeId, file, @playPos, @volume, @muted] = res.data
         if showId is 'notShowing' then return
         # log 'getPlayInfo', {res, showId, episodeId, file, @playPos, @volume}
+        if not @episode.watched and @playPos > @episode.duration * 0.9
+          @episode.watched = yes
+          tvGlobal.ajaxCmd 'setDBField', @episode.id, 'watched', yes
         @$broadcast 'setScrubPos', @playPos
     , 1000
 

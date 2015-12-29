@@ -100,7 +100,7 @@ srvr = http.createServer (req, res) ->
         success lightLevels
     
     when 'vlcCmd'
-      log 'vlcCmd', data
+      # log 'vlcCmd', data
       vlc[data[0]] data[1..]...
       success ''
       

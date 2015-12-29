@@ -12,23 +12,16 @@ socket = playPos = file = showId = episodeId = null
 gettingPlayPos = no
 
 initSocket = ->
-  if socket
-    log 'init open socket'
-    console.trace()
-    return
   socket = net.connect vlc_port, vlcip_tv
-  
   socket.on 'data', (data) -> 
     res = data.toString()
     # log 'socket recvd:', res.replace /\n/g, ' '
     if gettingPlayPos
       matches = /^\s*(\d+)\s*$/.exec res
       if matches then playPos = +matches[1]
-      
   socket.on 'error', (err) ->
     log 'socket error', err
     cb?()
-    
   socket.on 'end', (data) -> 
     if data then log 'socket end:', data.toString().replace /\n/g, ' '
 
@@ -38,8 +31,9 @@ vlcCmd = (command) ->
     console.trace()
     return
   try
-    # log 'socket sent:', command
+    # log 'socket write:', command
     socket.write command + '\n'
+    # log 'socket written:', command
   catch e
     log 'retrying', 'command', e.message
     closeSocket()
@@ -56,6 +50,7 @@ closeSocket = ->
     return
   log 'close socket'
   socket?.end()
+  # log 'socket closed'
   socket = null
   
 ssh = (commandLine, last) ->

@@ -2,6 +2,9 @@
 
 if [ $(pwd) == "/root/dev/apps/tv" ]; then isdev=true; else isdev=false; fi
   
+pkill -f "scripts/db-update.coffee"
+echo "killed db-update"
+
 if $isdev
   then
     pkill -f /root/dev/apps/tv/tv-server.js > /dev/null 2>&1

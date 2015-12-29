@@ -1,10 +1,10 @@
 coffee -co js server/*
 
 touch files/db-update-stdouterr.txt
-pkill -f "/root/.nvm/versions/node/v5.0.0/bin/coffee scripts/db-update.coffee"
+pkill -f "scripts/db-update.coffee"
 killall tail > /dev/null 2>&1
 
 coffee -co js server/*.coffee
 
 tail -fn 0 files/db-update-stdouterr.txt & 
-nohup coffee server/db-update.coffee all >> files/db-update-stdouterr.txt 2>&1 &
+nohup coffee scripts/db-update.coffee all >> files/db-update-stdouterr.txt 2>&1 &

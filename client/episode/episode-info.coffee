@@ -36,7 +36,7 @@ log     = require('debug') 'tv:epiinf'
   }
   .epi-info-aired, .epi-info-duration, .epi-info-watched {
     padding-right: 0.3rem;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     display: inline-block;
   }
   .epi-info-watched {
@@ -61,7 +61,6 @@ Vue.component 'episode-info',
         img '.thumb',   vAttr: "src: '#{tvGlobal.bannerPfx}' + curEpisode.thumb"
         div '.epi-info-aired',    '{{curEpisode.aired}}'
         div '.epi-info-duration', '({{Math.ceil(+curEpisode.duration/60)}} min)'
-        div '.epi-info-playPos',  '{{playPos}}'
         div '.epi-info-watched', vShow:'!playPos && curEpisode.watched', 'Watched'
         hr()
         div '.summary', vText: 'curEpisode.summary'

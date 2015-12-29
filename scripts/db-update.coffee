@@ -47,6 +47,14 @@ inc = (lbl) ->
     incs[lbl] = 0
   incs[lbl]++
   
+if typeof Object.assign isnt "function"
+  Object.assign = (target, args...) ->
+    output = Object target
+    while source in args when source?
+      for own nextKey of source
+        output[nextKey] = source[nextKey]  
+    output
+  
 dumpInc = ->
   total = incs.checkFile
   console.log

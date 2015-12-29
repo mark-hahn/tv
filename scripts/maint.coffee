@@ -1,7 +1,5 @@
 
-log = (args...) -> 
-  console.log.apply console, ['maint:'].concat args
-
+log = require('../server/utils') 'dbup'
 db = require '../server/db'
 
 count = 0

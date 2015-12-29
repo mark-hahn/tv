@@ -1,6 +1,6 @@
 
 Vue     = require 'vue'
-log     = require('debug') 'tv:tvbtns'
+log     = require('../debug') 'tvbtns'
 
 {render, tag, div} = require 'teacup'
 

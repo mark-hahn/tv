@@ -1,6 +1,6 @@
 
 Vue     = require 'vue'
-log     = require('debug') 'tv:shwpag'
+log     = require('../debug') 'shwpag'
 
 {render, tag, div} = require 'teacup'
 

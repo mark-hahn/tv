@@ -2,7 +2,7 @@
   app.coffee 
 ###
 
-log  = require('debug') 'tv:---app'
+log  = require('./debug') '---app'
 util = require 'util'
 exec = require('child_process').exec
 Vue  = require 'vue'

@@ -1,6 +1,6 @@
 
 Vue = require 'vue'
-log = require('debug') 'tv:lts'
+log = require('../debug') 'lts'
 {render, tag, div, img} = require 'teacup'
 
 ### single light switch component ####

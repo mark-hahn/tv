@@ -1,6 +1,6 @@
 
 Vue     = require 'vue'
-log     = require('debug') 'tv:snf'
+log     = require('../debug') 'snf'
 
 {render, tag, div, img} = require 'teacup'
 

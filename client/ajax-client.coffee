@@ -2,7 +2,7 @@
   ajax-client.coffee 
 ###
 
-log     = require('debug') 'tv:ajax'
+log     = require('./debug') 'ajax'
 request = require 'superagent'
 
 ajaxPort = ajaxPfx = null

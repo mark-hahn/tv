@@ -1,6 +1,6 @@
 
 Vue     = require 'vue'
-log     = require('debug') 'tv:epilft'
+log     = require('../debug') 'epilft'
 
 {render, tag, div} = require 'teacup'
 

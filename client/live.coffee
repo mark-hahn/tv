@@ -2,9 +2,7 @@
   live.coffee
 ###
 
-log = ->
-  args = (if 1 <= arguments_.length then slice.call(arguments_, 0) else [])
-  console.log.apply console, [ "hdr" ].concat(slice.call(args))
+log = require('./debug') 'live'
 
 reloadDelay = 1000
 interval = 300

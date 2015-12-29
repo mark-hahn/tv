@@ -1,6 +1,6 @@
 
 Vue     = require 'vue'
-log     = require('debug') 'tv:epiinf'
+log     = require('../debug') 'epiinf'
 {render, tag, div, img, hr} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """

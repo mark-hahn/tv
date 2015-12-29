@@ -3,7 +3,7 @@
 ###
 
 net = require 'net'
-log = require('debug') 'tv:-ir-'
+log = require('./utils') '  ir'
 
 itachHost = '192.168.1.168'
 

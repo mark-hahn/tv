@@ -2,7 +2,7 @@
   src/show-list.coffee
 ###
 
-log  = require('debug') 'tv:--list'
+log = require('./utils') 'list'
 db   = require './db'
 util = require 'util'
 

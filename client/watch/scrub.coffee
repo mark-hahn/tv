@@ -1,6 +1,6 @@
 
 Vue = require 'vue'
-log = require('debug') 'tv:--scrub'
+log = require('../debug') '--scrub'
 
 {render, div, text} = require 'teacup'
 
@@ -58,7 +58,7 @@ Vue.component 'scrub-comp',
         playPos = (@episode.duration / @scrubHgt) * initY
         log 'scrub click playPos', playPos
         @$emit 'setScrubPos', playPos
-        tvGlobal.ajaxCmd 'seekVlc', Math.floor playPos
+        tvGlobal.ajaxCmd 'vlcCmd', 'seek', Math.floor playPos
         
   attached: ->
     @$emit 'resize'

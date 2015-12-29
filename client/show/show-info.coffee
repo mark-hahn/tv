@@ -1,6 +1,6 @@
 
 Vue     = require 'vue'
-log     = require('debug') 'tv:shwinf'
+log     = require('../debug') 'shwinf'
 
 {render, tag, div, img, hr} = require 'teacup'
 

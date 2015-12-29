@@ -1,6 +1,5 @@
 
-log = (args...) -> 
-  console.log.apply console, ['tvdb:'].concat args
+log = require('./utils') 'tvdb'
 
 fs   = require 'fs-plus'
 url  = require 'url'

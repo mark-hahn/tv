@@ -3,7 +3,7 @@
 ###
 
 request = require 'request'
-log     = require('debug') 'tv:inst'
+log = require('./utils') 'inst'
 
 hubIp   = '192.168.1.103'
 hubPort = 1342

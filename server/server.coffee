@@ -1,5 +1,5 @@
 
-log = (args...) -> console.log 'SERVER:', args...
+log = require('./utils') 'srvr'
 
 # process.on "uncaughtException", (err) ->
 #   log "Uncaught Exception: " + err

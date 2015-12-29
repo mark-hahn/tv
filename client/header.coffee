@@ -1,6 +1,6 @@
 
 Vue     = require 'vue'
-log     = require('debug') 'tv:hdr'
+log     = require('./debug') 'hdr'
 
 {render, tag, div} = require 'teacup'
 

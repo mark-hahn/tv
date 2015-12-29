@@ -1,6 +1,5 @@
 
-log = (args...) -> 
-  console.log.apply console, ['vlc:'].concat args
+log = require('./utils') ' vlc'
 
 exec = require 'child_process'
 net  = require 'net'
@@ -17,7 +16,6 @@ initSocket = ->
     log 'init open socket'
     console.trace()
     return
-  # socket?.end()
   socket = net.connect vlc_port, vlcip_tv
   
   socket.on 'data', (data) -> 
@@ -82,18 +80,7 @@ killAllVlc = ->
   log 'killAllVlc'
   ssh 'killall vlc'
   
-exports.play = (showIdIn, episodeIdIn, fileIn) ->
-  log 'play', fileIn
-  
-  showId    = showIdIn
-  episodeId = episodeIdIn
-  file      = fileIn
-  
-  if socket
-    log 'play open socket'
-    console.trace()
-    return
-  
+sshPlay = ->
   log 'play (ssh)', vlcCmdLine, '/home/mark/Videos/' + file
   ssh vlcCmdLine, '"/home/mark/Videos/' + file + '"'
   setTimeout ->
@@ -101,7 +88,25 @@ exports.play = (showIdIn, episodeIdIn, fileIn) ->
     nosub()
     muted  = no
     vlcCmd 'volume ' + volume
-  , 3000
+  , 2000
+  
+exports.start = (showIdIn, episodeIdIn, fileIn) ->
+  log 'play', fileIn
+  
+  showId    = showIdIn
+  episodeId = episodeIdIn
+  file      = fileIn
+  
+  if socket
+    log 'play called with open socket'
+    closeSocket()
+    setTimeout ->
+      initSocket()
+      vlcCmd 'shutdown'
+      setTimeout sshPlay, 2000
+    , 1000
+  else
+    setTimeout sshPlay, 2000
 
 exports.seek = (timeSecs) ->
   log 'seek', timeSecs
@@ -111,7 +116,7 @@ exports.playRate = (playRate) ->
   log 'rate', playRate
   vlcCmd 'rate ' + playRate
   
-exports.pause = ->
+exports.playPause = ->
   log 'pause'
   vlcCmd 'pause'
 
@@ -152,13 +157,16 @@ exports.getPlayInfo = (cb) ->
     else
       setTimeout check, 50
 
-exports.volinc = (ticks) ->
+volinc = (ticks) ->
   volume += ticks
   if ticks < 0 and muted then return
   log 'volinc', ticks, volume
   vlcCmd 'volume ' + volume
   muted = no
 
+exports.volup   = -> volinc +10
+exports.voldown = -> volinc -10
+  
 exports.toggleMute = ->
   log 'toggleMute'
   if not muted

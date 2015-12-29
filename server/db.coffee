@@ -1,6 +1,5 @@
 
-log = (args...) -> 
-  console.log.apply console, ['db:'].concat args
+log = require('./utils') '  db'
 
 fs   = require 'fs'
 util = require 'util'

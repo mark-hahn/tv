@@ -1,6 +1,6 @@
 
 Vue    = require 'vue'
-log    = require('debug') 'tv:-watch'
+log    = require('../debug') '-watch'
 
 {render, tag, div, img} = require 'teacup'
 
@@ -54,7 +54,7 @@ Vue.component 'watch-comp',
       log 'startWatch', @episode.filePaths?[0]?[2]
       log 'bitrates', @episode.filePaths
       if (path = @episode.filePaths?[0]?[2])
-        tvGlobal.ajaxCmd 'startVlc', @episode.showId, @episode.id, path
+        tvGlobal.ajaxCmd 'vlcCmd', 'start', @episode.showId, @episode.id, path
       setTimeout =>
         tvGlobal.ajaxCmd 'irCmd', 'hdmi3'
       , 3000
@@ -65,25 +65,25 @@ Vue.component 'watch-comp',
           if @playRate isnt 1
             @stopSkipping()
           else
-            tvGlobal.ajaxCmd 'playPauseVlc'
-        when 'Mute'  then tvGlobal.ajaxCmd 'toggleMuteVlc'
-        when 'Vol +' then tvGlobal.ajaxCmd 'volupVlc'
-        when 'Vol -' then tvGlobal.ajaxCmd 'voldownVlc'
+            tvGlobal.ajaxCmd 'vlcCmd', 'playPause'
+        when 'Mute'  then tvGlobal.ajaxCmd 'vlcCmd', 'toggleMute'
+        when 'Vol +' then tvGlobal.ajaxCmd 'vlcCmd', 'volup'
+        when 'Vol -' then tvGlobal.ajaxCmd 'vlcCmd', 'voldown'
         when 'Stop' 
           @stopSkipping()
           tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
-          @$dispatch 'chgCurPage', 'show'
+          @$dispatch 'chgCurPage', 'episode'
           setTimeout ->
-            tvGlobal.ajaxCmd 'stopVlc'
+            tvGlobal.ajaxCmd 'vlcCmd', 'stop'
           , 500
         when 'Reset' 
           @stopSkipping()
-          tvGlobal.ajaxCmd 'seekVlc', 0
+          tvGlobal.ajaxCmd 'vlcCmd', 'seek', 0
         when 'Back' 
           log 'back'
           @stopSkipping()
           @playPos = Math.max 0, @playPos - 10
-          tvGlobal.ajaxCmd 'seekVlc', @playPos
+          tvGlobal.ajaxCmd 'vlcCmd', 'seek', @playPos
         when '<<', '>>' 
           factor = switch
             when text is '>>' and @playRate <  1
@@ -96,14 +96,14 @@ Vue.component 'watch-comp',
           @playRate *= factor
           @playRate = Math.max -3, Math.min 3, @playRate
           if @playRate >= 1
-            tvGlobal.ajaxCmd 'playRateVlc', @playRate
+            tvGlobal.ajaxCmd 'vlcCmd', 'playRate', @playRate
           else
             if not @revInterval
               @revInterval = setInterval =>
                 @playPos += @playRate * 2
                 @playPos = Math.max 0, @playPos
                 log 'reverse', @playRate, @playPos
-                tvGlobal.ajaxCmd 'seekVlc', @playPos
+                tvGlobal.ajaxCmd 'vlcCmd', 'seek', @playPos
               , 1500
 
   methods:     
@@ -113,7 +113,7 @@ Vue.component 'watch-comp',
         clearInterval @revInterval
       if @playRate isnt 1
         @playRate = 1
-        tvGlobal.ajaxCmd 'playRateVlc', @playRate
+        tvGlobal.ajaxCmd 'vlcCmd', 'playRate', @playRate
 
   attached: ->
     setInterval =>

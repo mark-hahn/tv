@@ -1,6 +1,5 @@
 
-log = (args...) -> 
-  console.log.call console, 'dbupdt:', args...
+log = require('../server/utils') 'dbup'
 
 fs   = require 'fs-plus'
 util = require 'util'

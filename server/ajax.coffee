@@ -1,5 +1,5 @@
 
-log      = require('debug') 'tv:ajax'
+log = require('./utils') 'ajax'
 
 util     = require 'util'
 url      = require 'url'
@@ -53,7 +53,9 @@ srvr = http.createServer (req, res) ->
     
     when 'getPlayInfo'
       vlc.getPlayInfo (err, args...) ->
-        if err then error err.message; return
+        if err 
+          log 'getPlayInfo err:', err
+          error err; return
         success args
     
     when 'setDBField'
@@ -97,60 +99,9 @@ srvr = http.createServer (req, res) ->
         if err then error 'getAllLights err: ' + err.message; return
         success lightLevels
     
-    when 'startVlc'
-      log 'startVlc'
-      vlc.play data...
-      success ''
-      
-    when 'playPauseVlc'
-      log 'playPauseVlc'
-      vlc.pause()
-      success ''
-      
-    when 'seekVlc'
-      log 'seekVlc', data
-      vlc.seek data
-      success ''
-      
-    when 'playRateVlc'
-      log 'playRateVlc', data
-      vlc.playRate data
-      success ''
-      
-    when 'volupVlc'
-      log 'volupVlc'
-      vlc.volinc +10
-      success ''
-      
-    when 'voldownVlc'
-      log 'voldownVlc'
-      vlc.volinc -10
-      success ''
-      
-    when 'toggleMuteVlc'
-      log 'toggleMuteVlc'
-      vlc.toggleMute()
-      success ''
-      
-    when 'nosubVlc'
-      log 'nosubVlc'
-      vlc.nosub()
-      success ''
-      
-    when 'skipFwdVlc'
-      log 'skipFwdVlc'
-      success ''
-      
-    when 'skipBackVlc'
-      log 'skipBackVlc'
-      success ''
-      
-    when 'backVlc'
-      log 'backVlc'
-      success ''
-      
-    when 'stopVlc'
-      vlc.stop()
+    when 'vlcCmd'
+      log 'vlcCmd', data
+      vlc[data[0]] data[1..]...
       success ''
       
     when 'syncPlexDB'

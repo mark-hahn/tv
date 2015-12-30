@@ -116,16 +116,44 @@ Vue.component 'watch-comp',
         tvGlobal.ajaxCmd 'vlcCmd', 'playRate', @playRate
 
   attached: ->
-    setInterval =>
-      tvGlobal.ajaxCmd 'getPlayInfo', (err, res) => 
-        if err then log 'getPlayInfo err', err.message; return
-        if @revInterval then return
-        [showId, episodeId, file, @playPos, @volume, @muted] = res.data
-        if showId is 'notShowing' then return
-        # log 'getPlayInfo', {res, showId, episodeId, file, @playPos, @volume}
-        if not @episode.watched and @playPos > @episode.duration * 0.9
-          @episode.watched = yes
-          tvGlobal.ajaxCmd 'setDBField', @episode.id, 'watched', yes
-        @$broadcast 'setScrubPos', @playPos
-    , 1000
-
+    evtSource = new EventSource "http://#{tvGlobal.serverIp}:2340/channel"
+    log 'evtSource', evtSource
+    
+    evtSource.onopen = (e) ->
+      log 'evtSource.onopen1:', e
+      
+    evtSource.onmessage = (e) ->
+      log 'evtSource.onmessage:', e
+      
+    evtSource.onerror = (e) ->
+      log 'evtSource.error:', e
+      
+    evtSource.addEventListener 'open', (e) ->
+      log 'evtSource.onopen2:', e
+      
+    evtSource.addEventListener 'message', (e) ->
+      log 'evtSource.onmessage:', e
+      
+    evtSource.addEventListener 'error', (e) ->
+      log 'evtSource.error:', e
+      
+    setInterval ->
+      log 'evtSource', evtSource
+    , 5000
+      
+    # 
+    # 
+    # 
+    # setInterval =>
+    #   tvGlobal.ajaxCmd 'getPlayInfo', (err, res) => 
+    #     if err then log 'getPlayInfo err', err.message; return
+    #     if @revInterval then return
+    #     [showId, episodeId, file, @playPos, @volume, @muted] = res.data
+    #     if showId is 'notShowing' then return
+    #     # log 'getPlayInfo', {res, showId, episodeId, file, @playPos, @volume}
+    #     if not @episode.watched and @playPos > @episode.duration * 0.9
+    #       @episode.watched = yes
+    #       tvGlobal.ajaxCmd 'setDBField', @episode.id, 'watched', yes
+    #     @$broadcast 'setScrubPos', @playPos
+    # , 1000
+    # 

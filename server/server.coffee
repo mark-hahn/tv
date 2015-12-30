@@ -7,6 +7,15 @@ log = require('./utils') 'srvr'
 fs          = require 'fs-plus'
 http        = require 'http'
 nodeStatic  = require 'node-static'
+SseChannel  = require 'sse-channel'
+vlc         = require './vlc'
+
+channel = new SseChannel
+  historySize: 10
+  retryTimeout: 250
+  pingInterval: 5000
+  jsonEncode: yes
+  
 cfg = require("parent-config") "apps-config.json"
 
 require './ajax'
@@ -39,6 +48,12 @@ srvr = http.createServer (req, res) ->
     when '/favicon.ico'
       res.writeHead 200, 'Content-Type': 'image/vnd.microsoft.icon'
       res.end fs.readFileSync 'server/images/favicon.ico'
+      
+    when '/channel'
+      res.setHeader 'Transfer-Encoding', 'identity'
+      channel.addClient req, res, (err) ->
+        if err then log 'channel.addClient err:', err.message
+      
     else
       req.addListener('end', ->
         if req.url[0..13] is '/tvdb-banners/'
@@ -58,6 +73,18 @@ srvr = http.createServer (req, res) ->
                 console.log 'fileServer BAD URL:', req.url, err
               done 'fileServer BAD URL: ' + req.url
       ).resume()
+      
+do sendStatus = ->
+  vlc.status (err, status) ->
+    if err then log 'sendStatus err: ', err
+    else
+      log 'channel.send', channel.getConnectionCount(), status
+      channel.send 
+        event: 'status'
+        id:     Date.now()
+        data:   status
+        retry:  5000
+    setTimeout sendStatus, 2000
 
 srvr.listen cfg.tv_port
 log 'listening on port', cfg.tv_port, '\n'

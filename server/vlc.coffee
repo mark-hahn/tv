@@ -123,7 +123,7 @@ exports.stop = ->
   setTimeout killAllVlc, 300
 
 getPlayPosQueue = []
-exports.getPlayInfo = (cb) ->
+exports.status = (cb) ->
   if not socket
     cb null, 'notShowing'
     return
@@ -140,7 +140,7 @@ exports.getPlayInfo = (cb) ->
       getPlayPosQueue = []
       gettingPlayPos = no
       for cb in tmpGetPlayPosQueue
-        cb null, showId, episodeId, file, playPos, volume, muted
+        cb null, {showId, episodeId, file, playPos, volume, muted}
         
     else if ++loopCount > 80
       tmpGetPlayPosQueue = getPlayPosQueue

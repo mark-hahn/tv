@@ -39,8 +39,10 @@ Vue.component 'watch-comp',
       div '.info-column', ->
         
         tag 'episode-info',
-          showTitle:  '{{showTitle}}'
-          curEpisode: '{{episode}}'
+          showTitle:   '{{showTitle}}'
+          curEpisode:  '{{episode}}'
+          playPos:     '{{playPos}}'
+          watchScreen:  'true'
           
         tag 'tv-btns-comp',
           episode: '{{episode}}'
@@ -114,17 +116,29 @@ Vue.component 'watch-comp',
       if @playRate isnt 1
         @playRate = 1
         tvGlobal.ajaxCmd 'vlcCmd', 'playRate', @playRate
-
+ 
     gotStatusEvent: (status) ->
       log 'gotStatus', status
-      if status.notShowing then @$broadcast 'notShowing'; return
+      if status.notShowing 
+        @showTitle = ''
+        @episode = null
+        return
       if @revInterval then return
-      
       {showId, episodeId, file, @playPos, @volume, @muted} = status
-      if @episode
-        if not @episode.watched and @playPos > @episode.duration * 0.9
-          @episode.watched = yes
-          tvGlobal.ajaxCmd 'setDBField', @episode.id, 'watched', yes
+      show = null
+      if showId
+        for show2 in @allShows when show2.id is showId
+          show = show2
+          @showTitle = show.tvdbTitle ? show.fileTitles?[0] ? ''
+          break
+      @episode = null
+      if show
+        for episode2 in show.episodes when episode2.id is episodeId
+          @episode = episode2
+          break
+      if @episode and not @episode.watched and @playPos > @episode.duration * 0.9
+        @episode.watched = yes
+        tvGlobal.ajaxCmd 'setDBField', @episode.id, 'watched', yes
       @$broadcast 'setScrubPos', @playPos
 
   attached: ->

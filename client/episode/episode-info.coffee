@@ -12,6 +12,13 @@ log     = require('../debug') 'epiinf'
     overflow-y: auto;
     font-size: 1rem;
   }
+  .episode-info-msg {
+    text-align: center;
+    font-size: 1.9rem;
+    position: absolute;
+    width: 100%;
+    top:10rem;
+  }
   .episode-info-inner {
     width: 100%;
     padding: 0.1rem;
@@ -50,11 +57,12 @@ log     = require('../debug') 'epiinf'
 """
 
 Vue.component 'episode-info', 
-  props: ['showTitle', 'curEpisode', 'playPos']
+  props: ['showTitle', 'curEpisode', 'playPos', 'watchScreen']
   
   template: render ->
     div '.episode-info', vKeepScroll: true, ->
-      div '.episode-info-inner', vOn: 'click: epiInfoClick', ->
+      div '.episode-info-msg', vShow:'showMsg', 'No Show Playing'
+      div '.episode-info-inner', vOn: 'click: epiInfoClick', vShow:'!showMsg', ->
         div '.info-show-title',    '{{showTitle}}'
         hr()
         div '.info-episode-title', '{{curEpisode.title}}'
@@ -67,8 +75,13 @@ Vue.component 'episode-info',
 
   watch:
     curEpisode: -> 
-      {aired, watched, duration} = @curEpisode
-      log {aired, watched, duration}
+      log 'curEpisode', {showMsg: @watchScreen and not @curEpisode?, \
+                         @showTitle, curEpisode: @curEpisode?, @playPos, @watchScreen}
+      @showMsg = @watchScreen and not @curEpisode?
+      if not @curEpisode then log 'no episode'
+      else
+        {aired, watched, duration} = @curEpisode
+        log {aired, watched, duration}
     
   methods:
     epiInfoClick: (e) -> @$dispatch 'chgCurPage', 'show'

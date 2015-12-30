@@ -21,8 +21,10 @@ Vue.component 'episode-left',
   template: render ->
     div  '.episode-left-comp',  ->
       tag 'episode-info',
-        showTitle:  '{{showTitle}}'
-        curEpisode: '{{curEpisode}}'
+        showTitle:   '{{showTitle}}'
+        curEpisode:  '{{curEpisode}}'
+        playPos:      0
+        watchScreen:  'false'
         
       tag 'two-btns',
         lftBtnTxt: 'Play'

@@ -7,8 +7,15 @@ exec = require('child_process').spawnSync
 tvdb = require '../server/tvdb'
 db   = require '../server/db'
 
-disableOutput = yes
+disableOutput = no
 
+if disableOutput
+  console.log ''
+  console.log '***************'
+  console.log 'OUTPUT DISABLED'
+  console.log '***************'
+  console.log ''
+  
 mappings = [
   ['the',                              'The Spa']
   ['buffy',                            'Buffy The Vampire Slayer']
@@ -301,7 +308,7 @@ getEpisode = (show, fileData, cb) ->
       return
     
     inc 'new episode no tvdb'
-    fs.appendFileSync 'files/episode-no-tvdb.txt', fileName + '"\n'
+    fs.appendFileSync 'files/episode-no-tvdb.txt', show._id + ', ' + fileName + '"\n'
     episode           = fileData
     episode.showId    = show._id
     episode.filePaths = [fileSizeRateName]
@@ -450,7 +457,6 @@ if process.argv[2] is 'all'
 
 {
    "_id": "_design/all",
-   "_rev": "4-e5c847bda73f4540627b9b32fe10fb56",
    "language": "javascript",
    "views": {
        "showByFileTitle": {
@@ -482,6 +488,15 @@ if process.argv[2] is 'all'
        },
        "tvdbNoFile": {
            "map": "function(doc) { \n  if (doc.tvdbEpisodeId && (!doc.filePaths || doc.filePaths.length == 0))\n    emit(doc._id, doc);\n}"
+       },
+       "showByTitle": {
+           "map": "function(doc) { \n  if (doc.type == 'show' && (doc.fileTitles || doc.tvdbTitle))\n    if (doc.tvdbTitle)\n      emit(doc.tvdbTitle, doc);\n    else\n      emit(doc.fileTitles[0], doc);\n}"
+       },
+       "allShows": {
+           "map": "function(doc) { \n  if (doc.type == 'show')\n     emit(doc.tvdbTitle + ', ' + (doc.fileTitles && doc.fileTitles[0]), doc);\n}"
+       },
+       "episodeByShowId": {
+           "map": "function(doc) { \n  if (doc.type == 'episode')\n    emit(doc.showId, doc);\n}\n"
        }
    }
 }

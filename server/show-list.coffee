@@ -15,9 +15,10 @@ exports.getShowList = getList = (cb) ->
     setTimeout (-> getList cb), 100
   inGetShowList = yes
     
-  db.view 'showByTvdbTitle', (err, body) -> 
+  db.view 'showByTitle', (err, body) -> 
     if err then throw err
-    shows = (row.value for row in body.rows)
+    titles = (row.key   for row in body.rows)
+    shows  = (row.value for row in body.rows)
      
     showSortStr = (show) ->
       title = show.tvdbTitle ? show.fileTitle ? show.title
@@ -32,11 +33,11 @@ exports.getShowList = getList = (cb) ->
         cb null, result
         inGetShowList = no
         return
-        
+      show.title = titles.shift()
+      
       watchedCount = availCount = 0
 
-      {_id: id, tvdbTitle: title, summary, \
-        started: year, length: duration, banners, tags} = show
+      {_id: id, title, summary, started: year, length: duration, banners, tags} = show
       year = year?.split('-')[0]
       duration ?= 60
       thumb = null

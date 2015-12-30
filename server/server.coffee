@@ -9,13 +9,15 @@ http        = require 'http'
 nodeStatic  = require 'node-static'
 SseChannel  = require 'sse-channel'
 vlc         = require './vlc'
+_           = require 'lodash'
 
 channel = new SseChannel
   historySize: 10
   retryTimeout: 250
   pingInterval: 5000
   jsonEncode: yes
-  
+newSse = no
+
 cfg = require("parent-config") "apps-config.json"
 
 require './ajax'
@@ -50,6 +52,7 @@ srvr = http.createServer (req, res) ->
       res.end fs.readFileSync 'server/images/favicon.ico'
       
     when '/channel'
+      newSse = yes
       res.setHeader 'Transfer-Encoding', 'identity'
       channel.addClient req, res, (err) ->
         if err then log 'channel.addClient err:', err.message
@@ -73,18 +76,22 @@ srvr = http.createServer (req, res) ->
                 console.log 'fileServer BAD URL:', req.url, err
               done 'fileServer BAD URL: ' + req.url
       ).resume()
-      
-do sendStatus = ->
+
+lastStatus = null  
+
+do sendStatus = ->    
   vlc.status (err, status) ->
     if err then log 'sendStatus err: ', err
-    else
-      log 'channel.send', channel.getConnectionCount(), status
+    else if not status.busy and (not _.isEqual(lastStatus, status) or newSse)
+      lastStatus = status
+      newSse = no
+      log 'channel.send', status
       channel.send 
         event: 'status'
         id:     Date.now()
         data:   status
         retry:  5000
-    setTimeout sendStatus, 2000
+    setTimeout sendStatus, 1000
 
 srvr.listen cfg.tv_port
 log 'listening on port', cfg.tv_port, '\n'

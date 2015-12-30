@@ -46,8 +46,7 @@ tvGlobal.ajaxCmd = (cmd, args..., cb) ->
     query += sep + 'q' + idx + '=' +arg.toString()
     sep = '&'
     
-  if cmd isnt 'getPlayInfo'
-    log 'ajax called', {cmd, args}
+  log 'ajax called', {cmd, args}
   
   request
     .get ajaxPfx + cmd + query

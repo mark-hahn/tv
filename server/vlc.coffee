@@ -125,30 +125,21 @@ exports.stop = ->
 getPlayPosQueue = []
 exports.status = (cb) ->
   if not socket
-    cb null, 'notShowing'
+    cb null, notShowing: yes
     return
-  getPlayPosQueue.push cb
-  if gettingPlayPos then return
+  if gettingPlayPos then cb null, busy: yes; return
   gettingPlayPos = yes
-  
   playPos = null
   loopCount = 0
   vlcCmd 'get_time'
   do check = ->
     if playPos?
-      tmpGetPlayPosQueue = getPlayPosQueue
-      getPlayPosQueue = []
       gettingPlayPos = no
-      for cb in tmpGetPlayPosQueue
-        cb null, {showId, episodeId, file, playPos, volume, muted}
-        
-    else if ++loopCount > 80
-      tmpGetPlayPosQueue = getPlayPosQueue
-      getPlayPosQueue = []
+      cb null, {showId, episodeId, file, playPos, volume, muted}
+    else if ++loopCount > 40
       gettingPlayPos = no
-      for cb in tmpGetPlayPosQueue
-        cb 'loopCount timeout'
-        
+      log 'get_time call timed out'
+      cb 'timeout'
     else
       setTimeout check, 50
 

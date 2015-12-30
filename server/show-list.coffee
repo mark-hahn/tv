@@ -87,11 +87,3 @@ exports.getShowList = getList = (cb) ->
         else delete tags.Watched
           
         oneShow()
-
-exports.getStatus = (cb) ->
-  cb null,
-    id:        null
-    videoFile: ''
-    playPos:   0
-    playState: 'stopped'
-

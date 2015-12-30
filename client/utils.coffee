@@ -13,7 +13,7 @@ serverConfigStr = '{"CHROOT":"","USER":"root","HOME_IP":"173.58.39.204","AT_HOME
 tvGlobal.serverConfig = JSON.parse serverConfigStr
 # log 'serverConfig', tvGlobal.serverConfig
 
-Vue.config.debug = tvGlobal.debug = (tvGlobal.serverConfig.DEBUG is '*')
+Vue.config.debug = no # tvGlobal.debug = (tvGlobal.serverConfig.DEBUG is '*')
 
 tvGlobal.windowResize = (cb) ->
   htmlEle = document.documentElement

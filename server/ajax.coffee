@@ -15,8 +15,7 @@ vlc      = require './vlc'
 poweringUp = no
 
 srvr = http.createServer (req, res) ->
-  if req.url isnt '/getPlayInfo'
-    log 'ajax http req: ' + req.url
+  log 'ajax http req: ' + req.url
 
   error = (msg, code=500) ->
     log 'ajax error: ' +  msg
@@ -50,13 +49,6 @@ srvr = http.createServer (req, res) ->
         if err then error err.message; return
         # log 'shows done', result.length
         success result
-    
-    when 'getPlayInfo'
-      vlc.getPlayInfo (err, args...) ->
-        if err 
-          log 'getPlayInfo err:', err
-          error err; return
-        success args
     
     when 'setDBField'
       log 'setDBField', data

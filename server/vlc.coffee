@@ -27,7 +27,7 @@ initSocket = ->
 
 vlcCmd = (command) ->
   if not socket 
-    log 'vlcCmd closed socket', command
+    # log 'vlcCmd closed socket', command
     console.trace()
     return
   try
@@ -45,7 +45,7 @@ nosub = ->
     
 closeSocket = ->
   if not socket 
-    log 'closeSocket closed socket'
+    # log 'closeSocket closed socket'
     console.trace()
     return
   log 'close socket'
@@ -122,7 +122,6 @@ exports.stop = ->
   closeSocket()
   setTimeout killAllVlc, 300
 
-getPlayPosQueue = []
 exports.status = (cb) ->
   if not socket
     cb null, notShowing: yes

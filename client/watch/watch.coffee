@@ -120,10 +120,11 @@ Vue.component 'watch-comp',
       if status.notShowing then @$broadcast 'notShowing'; return
       if @revInterval then return
       
-      [showId, episodeId, file, @playPos, @volume, @muted] = status
-      if not @episode.watched and @playPos > @episode.duration * 0.9
-        @episode.watched = yes
-        tvGlobal.ajaxCmd 'setDBField', @episode.id, 'watched', yes
+      {showId, episodeId, file, @playPos, @volume, @muted} = status
+      if @episode
+        if not @episode.watched and @playPos > @episode.duration * 0.9
+          @episode.watched = yes
+          tvGlobal.ajaxCmd 'setDBField', @episode.id, 'watched', yes
       @$broadcast 'setScrubPos', @playPos
 
   attached: ->

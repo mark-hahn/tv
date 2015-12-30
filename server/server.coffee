@@ -12,10 +12,10 @@ vlc         = require './vlc'
 _           = require 'lodash'
 
 channel = new SseChannel
-  historySize: 10
-  retryTimeout: 250
+  historySize:     1
+  retryTimeout:  250
   pingInterval: 5000
-  jsonEncode: yes
+  jsonEncode:    yes
 newSse = no
 
 cfg = require("parent-config") "apps-config.json"
@@ -82,17 +82,19 @@ lastStatus = null
 do sendStatus = ->    
   vlc.status (err, status) ->
     if err then log 'sendStatus err: ', err
-    else if not status.busy and (not _.isEqual(lastStatus, status) or newSse)
+    else if status.busy then setTimeout sendStatus, 100; return
+    else if newSse or not _.isEqual lastStatus, status
       lastStatus = status
       newSse = no
-      log 'channel.send', status
+      # log 'channel.send', status
       channel.send 
         event: 'status'
         id:     Date.now()
         data:   status
-        retry:  5000
+        retry:  3000
+    
     setTimeout sendStatus, 1000
-
+  
 srvr.listen cfg.tv_port
 log 'listening on port', cfg.tv_port, '\n'
 

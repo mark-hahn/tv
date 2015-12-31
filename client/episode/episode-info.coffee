@@ -73,16 +73,11 @@ Vue.component 'episode-info',
         hr()
         div '.summary', vText: 'curEpisode.summary'
 
+  data: ->
+    showMsg: yes
+    
   watch:
-    curEpisode: -> 
-      log 'curEpisode', {showMsg: @watchScreen and not @curEpisode?, \
-                         @showTitle, curEpisode: @curEpisode?, @playPos, @watchScreen}
-      @showMsg = @watchScreen and not @curEpisode?
-      if not @curEpisode then log 'no episode'
-      else
-        {aired, watched, duration} = @curEpisode
-        log {aired, watched, duration}
+    curEpisode: -> @showMsg = @watchScreen and not @curEpisode?
     
   methods:
     epiInfoClick: (e) -> @$dispatch 'chgCurPage', 'show'
-    

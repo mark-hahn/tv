@@ -42,7 +42,7 @@ Vue.component 'watch-comp',
           showTitle:   '{{showTitle}}'
           curEpisode:  '{{episode}}'
           playPos:     '{{playPos}}'
-          watchScreen:  'true'
+          watchScreen:  yes
           
         tag 'tv-btns-comp',
           episode: '{{episode}}'
@@ -53,8 +53,6 @@ Vue.component 'watch-comp',
   events:
     startWatch: (@showTitle, @episode) ->
       @playPos = 0
-      log 'startWatch', @episode.filePaths?[0]?[2]
-      log 'bitrates', @episode.filePaths
       if (path = @episode.filePaths?[0]?[2])
         tvGlobal.ajaxCmd 'vlcCmd', 'start', @episode.showId, @episode.id, path
       setTimeout =>
@@ -82,7 +80,6 @@ Vue.component 'watch-comp',
           @stopSkipping()
           tvGlobal.ajaxCmd 'vlcCmd', 'seek', 0
         when 'Back' 
-          log 'back'
           @stopSkipping()
           @playPos = Math.max 0, @playPos - 10
           tvGlobal.ajaxCmd 'vlcCmd', 'seek', @playPos
@@ -104,13 +101,11 @@ Vue.component 'watch-comp',
               @revInterval = setInterval =>
                 @playPos += @playRate * 2
                 @playPos = Math.max 0, @playPos
-                log 'reverse', @playRate, @playPos
                 tvGlobal.ajaxCmd 'vlcCmd', 'seek', @playPos
               , 1500
 
   methods:     
     stopSkipping: ->
-      log 'stopSkipping'
       if @revInterval
         clearInterval @revInterval
       if @playRate isnt 1
@@ -118,7 +113,6 @@ Vue.component 'watch-comp',
         tvGlobal.ajaxCmd 'vlcCmd', 'playRate', @playRate
  
     gotStatusEvent: (status) ->
-      log 'gotStatus', status
       if status.notShowing 
         @showTitle = ''
         @episode = null
@@ -143,9 +137,6 @@ Vue.component 'watch-comp',
 
   attached: ->
     evtSource = new EventSource "http://#{tvGlobal.serverIp}:2340/channel"
-    
-    evtSource.addEventListener 'open', (e) ->
-      log 'evtSource.onopen:', e
       
     evtSource.addEventListener 'status', (e) =>
       @gotStatusEvent JSON.parse e.data

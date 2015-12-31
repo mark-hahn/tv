@@ -23,8 +23,7 @@ Vue.component 'episode-left',
       tag 'episode-info',
         showTitle:   '{{showTitle}}'
         curEpisode:  '{{curEpisode}}'
-        playPos:      0
-        watchScreen:  'false'
+        watchScreen:  no
         
       tag 'two-btns',
         lftBtnTxt: 'Play'

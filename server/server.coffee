@@ -36,8 +36,8 @@ if dev
 html = fs.readFileSync 'client/index.html'
 
 srvr = http.createServer (req, res) ->
-  if not dev or req.url isnt '/js/bundle.js'
-    log 'URL:', req.url
+  # if not dev or req.url isnt '/js/bundle.js'
+  #   log 'URL:', req.url
     
   done = (err, doc) ->
     res.writeHead (if err then 404 else 200), 'Content-Type': 'text/json'

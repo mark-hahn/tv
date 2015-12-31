@@ -15,7 +15,7 @@ vlc      = require './vlc'
 poweringUp = no
 
 srvr = http.createServer (req, res) ->
-  log 'ajax http req: ' + req.url
+  # log 'ajax http req: ' + req.url
 
   error = (msg, code=500) ->
     log 'ajax error: ' +  msg
@@ -44,14 +44,14 @@ srvr = http.createServer (req, res) ->
       success ''
       
     when 'shows'
-      log 'shows start'
+      # log 'shows start'
       showList.getShowList (err, result) ->
         if err then error err.message; return
         # log 'shows done', result.length
         success result
     
     when 'setDBField'
-      log 'setDBField', data
+      # log 'setDBField', data
       val = switch data[2]
         when 'true'  then true
         when 'false' then false
@@ -105,7 +105,7 @@ srvr = http.createServer (req, res) ->
                                        sed "s/^\\ \\ \\ \\ \\ \\ \\-\\ //" | 
                                        sed /rss:/d', (err, stdout, stderr) ->
         if err then error 'usbconfig err: ' + err.message; return
-        log 'usbconfig', {err, stdout, stderr}                
+        # log 'usbconfig', {err, stdout, stderr}                
         success stdout.split '\n'
       
     else

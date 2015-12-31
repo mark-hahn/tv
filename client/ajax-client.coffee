@@ -32,7 +32,7 @@ request
     ajaxPfx              = "http://#{serverIp}:#{ajaxPort}/"
     
     tvGlobal.ajaxInit = yes
-    log 'init', {browserIp, serverIp, vidSrvrPfx, ajaxPfx, bannerPfx}
+    # log 'init', {browserIp, serverIp, vidSrvrPfx, ajaxPfx, bannerPfx}
 
 tvGlobal.ajaxCmd = (cmd, args..., cb) ->
   if not tvGlobal.ajaxInit
@@ -46,7 +46,7 @@ tvGlobal.ajaxCmd = (cmd, args..., cb) ->
     query += sep + 'q' + idx + '=' +arg.toString()
     sep = '&'
     
-  log 'ajax called', {cmd, args}
+  # log 'ajax called', {cmd, args}
   
   request
     .get ajaxPfx + cmd + query

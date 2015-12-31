@@ -53,11 +53,11 @@ tvGlobal.ajaxCmd = (cmd, args..., cb) ->
     .set 'Content-Type', 'text/plain'
     .end (err, res) ->
       if res and res.status isnt 200
-        log 'ajax result status err', res.status
+        log 'ajax result status err:', res.status, cmd, query
         cb? res.status
         return
       if err
-        log 'ajax err', err
+        log 'ajax err:', cmd, query, err
         cb? err
         return
       # log 'ajax returned', cmd

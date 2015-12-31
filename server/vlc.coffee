@@ -12,6 +12,7 @@ socket = playPos = file = showId = episodeId = null
 gettingPlayPos = no
 
 initSocket = ->
+  # log 'vlc initSocket'
   socket = net.connect vlc_port, vlcip_tv
   socket.on 'data', (data) -> 
     res = data.toString()
@@ -28,7 +29,7 @@ initSocket = ->
 vlcCmd = (command) ->
   if not socket 
     # log 'vlcCmd closed socket', command
-    console.trace()
+    # console.trace()
     return
   try
     # log 'socket write:', command
@@ -46,7 +47,7 @@ nosub = ->
 closeSocket = ->
   if not socket 
     # log 'closeSocket closed socket'
-    console.trace()
+    # console.trace()
     return
   log 'close socket'
   socket?.end()
@@ -54,13 +55,13 @@ closeSocket = ->
   socket = null
   
 ssh = (commandLine, last) ->
-  log 'ssh'
   argArr = commandLine.split /\s+/
   argArr.unshift 'mark@' + vlcip_tv
   if last then argArr.push last
   try
+    # log 'ssh'
     exec.execFile 'ssh', argArr, (err, stdout, stderr) ->
-      log 'ssh done'
+      # log 'ssh done'
       if err and stderr isnt 'vlc: no process found\n'
         log 'ssh callback err', {err, stdout, stderr}
   catch e
@@ -68,26 +69,24 @@ ssh = (commandLine, last) ->
     
 vlcCmdLine = 'DISPLAY=:0 vlc -I rc -f --rc-host 0.0.0.0:' + vlc_port + ' --quiet'
 
-muted  = no
-volume = 150
+muted  = delayAudio = no
+volume = 120
 
 killAllVlc = ->
   log 'killAllVlc'
   ssh 'killall vlc'
   
 sshPlay = ->
-  log 'play (ssh)', vlcCmdLine, '/home/mark/Videos/' + file
+  # log 'play (ssh)', 'mark@' + vlcip_tv, vlcCmdLine, '/home/mark/Videos/' + file
   ssh vlcCmdLine, '"/home/mark/Videos/' + file + '"'
   setTimeout ->
     initSocket()
     nosub()
-    muted  = no
-    vlcCmd 'volume ' + volume
+    muted = no
+    delayAudio = yes
   , 2000
   
 exports.start = (showIdIn, episodeIdIn, fileIn) ->
-  log 'play', fileIn
-  
   showId    = showIdIn
   episodeId = episodeIdIn
   file      = fileIn
@@ -104,19 +103,19 @@ exports.start = (showIdIn, episodeIdIn, fileIn) ->
     setTimeout sshPlay, 2000
 
 exports.seek = (timeSecs) ->
-  log 'seek', timeSecs
+  # log 'seek', timeSecs
   vlcCmd 'seek ' + Math.floor timeSecs
 
 exports.playRate = (playRate) ->
-  log 'rate', playRate
+  # log 'rate', playRate
   vlcCmd 'rate ' + playRate
   
 exports.playPause = ->
-  log 'pause'
+  # log 'pause'
   vlcCmd 'pause'
 
 exports.stop = ->
-  log 'stop'
+  # log 'stop'
   file = null
   vlcCmd 'shutdown'
   closeSocket()
@@ -134,6 +133,12 @@ exports.status = (cb) ->
   do check = ->
     if playPos?
       gettingPlayPos = no
+      # log 'do check:', playPos, delayAudio
+      if playPos > 0 and delayAudio
+        delayAudio = no
+        vlcCmd 'volume ' + volume
+        # log 'delayAudio volume muted:', volume, muted
+      # log 'check cb', {showId, episodeId, file, playPos, volume, muted}
       cb null, {showId, episodeId, file, playPos, volume, muted}
     else if ++loopCount > 40
       gettingPlayPos = no
@@ -145,21 +150,23 @@ exports.status = (cb) ->
 volinc = (ticks) ->
   volume += ticks
   if ticks < 0 and muted then return
-  log 'volinc', ticks, volume
   vlcCmd 'volume ' + volume
+  # log 'volinc volume, muted', ticks, volume, muted
   muted = no
 
 exports.volup   = -> volinc +10
 exports.voldown = -> volinc -10
   
 exports.toggleMute = ->
-  log 'toggleMute'
+  # log 'toggleMute'
   if not muted
-    vlcCmd 'volume 0'
     muted = yes
+    vlcCmd 'volume 0'
+    # log 'toggleMute volume muted:', volume, muted
   else
-    vlcCmd 'volume ' + volume
     muted = no
+    vlcCmd 'volume ' + volume
+    # log 'toggleMute volume muted:', volume, muted
 
 ###
     Unit Tests
@@ -169,8 +176,8 @@ if process.argv[2] is 'pos'
   initSocket()
   setInterval ->
     exports.getPlayPos (err, showId, episodeId, file, playPos) ->
-      log 'getPlayPos result', err?.message, 
-           showId, episodeId, file, playPos
+      # log 'getPlayPos result', err?.message, 
+          #  showId, episodeId, file, playPos
   , 1000
   
 if process.argv[2] is 'pause'

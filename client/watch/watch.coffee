@@ -48,6 +48,7 @@ Vue.component 'watch-comp',
           episode: '{{episode}}'
           
       tag 'scrub-comp',
+        vShow: 'episode'
         episode: '{{episode}}'
   
   events:
@@ -81,7 +82,9 @@ Vue.component 'watch-comp',
           tvGlobal.ajaxCmd 'vlcCmd', 'seek', 0
         when 'Back' 
           @stopSkipping()
+          # log 'back1', @playPos
           @playPos = Math.max 0, @playPos - 10
+          # log 'back2', @playPos
           tvGlobal.ajaxCmd 'vlcCmd', 'seek', @playPos
         when '<<', '>>' 
           factor = switch
@@ -109,10 +112,10 @@ Vue.component 'watch-comp',
       if @revInterval
         clearInterval @revInterval
       if @playRate isnt 1
-        @playRate = 1
-        tvGlobal.ajaxCmd 'vlcCmd', 'playRate', @playRate
+        tvGlobal.ajaxCmd 'vlcCmd', 'playRate', (@playRate = 1)
  
     gotStatusEvent: (status) ->
+      # log 'gotStatusEvent playPos', status.playPos
       if status.notShowing 
         @showTitle = ''
         @episode = null

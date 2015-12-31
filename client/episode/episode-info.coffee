@@ -60,9 +60,9 @@ Vue.component 'episode-info',
   props: ['showTitle', 'curEpisode', 'playPos', 'watchScreen']
   
   template: render ->
-    div '.episode-info', vKeepScroll: true, ->
+    div '.episode-info', vKeepScroll: true, vOn: 'click: epiInfoClick', ->
       div '.episode-info-msg', vShow:'showMsg', 'No Show Playing'
-      div '.episode-info-inner', vOn: 'click: epiInfoClick', vShow:'!showMsg', ->
+      div '.episode-info-inner', vShow:'!showMsg', ->
         div '.info-show-title',    '{{showTitle}}'
         hr()
         div '.info-episode-title', '{{curEpisode.title}}'
@@ -80,4 +80,8 @@ Vue.component 'episode-info',
     curEpisode: -> @showMsg = @watchScreen and not @curEpisode?
     
   methods:
-    epiInfoClick: (e) -> @$dispatch 'chgCurPage', 'show'
+    epiInfoClick: (e) -> 
+      if not @watchScreen or @showMsg
+        @$dispatch 'chgCurPage', 'show'
+      else
+        @$dispatch 'tvBtnClick', '> ||'

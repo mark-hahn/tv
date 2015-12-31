@@ -28,6 +28,8 @@ itach = timeout = null
 writeToItach = (irData, cb) ->
   idCount = ++idCount % 65536
   data = '96,' + irData + irSfx
+  # log 'itach write', irPfx1 + idCount + irPfx2 + data + ',1035,' + data + ',1035,' + data + ',4000'
+                    
   itach.write irPfx1 + idCount + irPfx2 + data + ',1035,' + data + ',1035,' + data + ',4000\r', \
               'utf8', (err) ->
     if err then log 'write err: ' + err.message; cb err; return
@@ -50,7 +52,9 @@ sendIR = (irData, cb) ->
   timeout = setTimeout (-> endSendIR 'sendIR timeout'), 3000
 
   if not itach
+    # log 'itach createConnection'
     itach = net.createConnection {host:itachHost, port:4998}, (err) ->
+      # log 'itach createConnection res:', err
       if err then endSendIR 'connect err: ' + err.message;  return
       writeToItach irData, (err) ->
         if err then endSendIR 'writeToItach err: ' + err.message;  return
@@ -58,7 +62,7 @@ sendIR = (irData, cb) ->
     itach.on 'data', (data) ->
       data = data.toString().replace /\r\n?/g, '\n'
       if data?[-1..-1][0] is '\n' then data = data[0..-2]
-      # log 'data', data
+      # log 'itach data', data
       parts = /^(.{15})(\d+)$/.exec data
       if parts and parts[1] is 'completeir,1:1,' and +parts[2] is idCount
         endSendIR null, data
@@ -66,6 +70,7 @@ sendIR = (irData, cb) ->
       log 'itach data error: ' + idCount + ', ' + data
       
     itach.on 'end', (err) ->
+      # log 'itach end', err
       if err then endSendIR 'end err: ' + err.message;  return
       endSendIR()
     return

@@ -1,8 +1,8 @@
 
 log = require('./utils') 'srvr'
 
-# process.on "uncaughtException", (err) ->
-#   log "Uncaught Exception: " + err
+process.on "uncaughtException", (err) ->
+  log "Uncaught Exception: " + err
   
 fs          = require 'fs-plus'
 http        = require 'http'
@@ -16,7 +16,8 @@ channel = new SseChannel
   retryTimeout:  250
   pingInterval: 5000
   jsonEncode:    yes
-newSse = no
+  
+lastStatus = null  
 
 cfg = require("parent-config") "apps-config.json"
 
@@ -52,9 +53,11 @@ srvr = http.createServer (req, res) ->
       res.end fs.readFileSync 'server/images/favicon.ico'
       
     when '/channel'
-      newSse = yes
       res.setHeader 'Transfer-Encoding', 'identity'
+      log 'channel.addClient'
+      lastStatus = null
       channel.addClient req, res, (err) ->
+        lastStatus = null
         if err then log 'channel.addClient err:', err.message
       
     else
@@ -77,16 +80,17 @@ srvr = http.createServer (req, res) ->
               done 'fileServer BAD URL: ' + req.url
       ).resume()
 
-lastStatus = null  
-
 do sendStatus = ->    
   vlc.status (err, status) ->
-    if err then log 'sendStatus err: ', err
-    else if status.busy then setTimeout sendStatus, 100; return
-    else if newSse or not _.isEqual lastStatus, status
+    # log 'vlc.status', {err, status}
+    retry = ->
+      lastStatus = null
+      setTimeout sendStatus, 500
+    if err then log 'sendStatus err: ', err; retry(); return
+    else if status.busy then retry(); return
+    else if not _.isEqual lastStatus, status
       lastStatus = status
-      newSse = no
-      # log 'channel.send', status
+      # log 'channel.send', status.file
       channel.send 
         event: 'status'
         id:     Date.now()

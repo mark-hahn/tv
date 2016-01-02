@@ -113,7 +113,7 @@ Vue.component 'watch-comp',
         clearInterval @revInterval
       if @playRate isnt 1
         tvGlobal.ajaxCmd 'vlcCmd', 'playRate', (@playRate = 1)
- 
+
     gotStatusEvent: (status) ->
       # log 'gotStatusEvent playPos', status.playPos
       if status.notShowing 
@@ -136,12 +136,14 @@ Vue.component 'watch-comp',
       if @episode and not @episode.watched and @playPos > @episode.duration * 0.9
         @episode.watched = yes
         tvGlobal.ajaxCmd 'setDBField', @episode.id, 'watched', yes
+      # log 'gotStatus setScrubPos', @playPos
       @$broadcast 'setScrubPos', @playPos
 
   attached: ->
-    evtSource = new EventSource "http://#{tvGlobal.serverIp}:2340/channel"
+    evtSource = new EventSource "/channel"  
       
     evtSource.addEventListener 'status', (e) =>
+      # log 'status event', e
       @gotStatusEvent JSON.parse e.data
       
     evtSource.addEventListener 'error', (e) ->

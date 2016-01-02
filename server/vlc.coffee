@@ -92,7 +92,7 @@ exports.start = (showIdIn, episodeIdIn, fileIn) ->
   file      = fileIn
   
   if socket
-    log 'play called with open socket'
+    # log 'play called with open socket'
     closeSocket()
     setTimeout ->
       initSocket()
@@ -133,7 +133,7 @@ exports.status = (cb) ->
   do check = ->
     if playPos?
       gettingPlayPos = no
-      # log 'do check:', playPos, delayAudio
+      # log 'check have playpos:', playPos, delayAudio
       if playPos > 0 and delayAudio
         delayAudio = no
         vlcCmd 'volume ' + volume

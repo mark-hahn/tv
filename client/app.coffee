@@ -105,6 +105,7 @@ do init = ->
   require './episode/episode'
   require './watch/watch'
   require './lights/lights'
+  require './record/record'
     
   new Vue
     el: 'body'
@@ -133,6 +134,9 @@ do init = ->
           
         tag 'lights-comp',  
           vShow:         'curPage == "lights"'
+          
+        tag 'record-comp',  
+          vShow:         'curPage == "record"'
           
       div '#popup', vClass: 'popupVisible: popupMsg != ""', '{{popupMsg}}'
       

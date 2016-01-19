@@ -46,7 +46,7 @@ exports.getSeriesIdByName = (showNameIn, cb) ->
         return
     showNameIn = showNameIn.replace /^\s+|\s+$/g, ''  
     tvdb.getSeriesByName showNameIn, (err, res) ->
-      if err then throw err
+      if err then cb err; return
       if not (allSeries = res) then tryit(); return
       
       switch res.length
@@ -76,7 +76,7 @@ exports.getShowByName = (showNameIn, cb) ->
   if show is null then cb(); return
   
   exports.getSeriesIdByName showNameIn, (err, seriesId) ->
-    if err then log 'getSeriesIdByName err', err; process.exit 0
+    if err then cb err; return
     
     if not seriesId
       showsByName[showNameIn] = null
@@ -84,7 +84,7 @@ exports.getShowByName = (showNameIn, cb) ->
       return
     
     tvdb.getSeriesAllById seriesId, (err, tvdbSeries) ->
-      if err then throw err
+      if err then cb err; return
       {Airs_DayOfWeek, Airs_Time, FirstAired, Genre, IMDB_ID, 
         Network, Overview, Runtime, SeriesName, 
         Status, zap2it_id, Episodes} = tvdbSeries
@@ -101,7 +101,7 @@ exports.getShowByName = (showNameIn, cb) ->
       
       showRes.banners = {}
       tvdb.getBanners seriesId, (err, banners) ->
-        if err then throw err
+        if err then cb err; return
         if banners
           for banner in banners
             {BannerType, BannerType2, BannerPath,ThumbnailPath} = banner
@@ -110,7 +110,7 @@ exports.getShowByName = (showNameIn, cb) ->
             showRes.banners[key] ?= []
             showRes.banners[key].push  {BannerPath, ThumbnailPath}
         tvdb.getActors seriesId, (err, actors) ->
-          if err then throw err
+          if err then cb err; return
           if actors
             showRes.actors = cleanActors actors
           showsByName[showNameIn] = showRes

@@ -60,18 +60,9 @@ srvr = http.createServer (req, res) ->
         if err then error err.message; return
         success 'done'
 
-    when 'turnOn'
-      db.syncPlexDB()
-      if poweringUp then success 'skipped'; return
-      poweringUp = yes
-      ir.sendCmd 'pwrOn', (err) ->
-        if err then error err.message; poweringUp = no; return
-        setTimeout ->
-          ir.sendCmd 'hdmi2', (err) ->
-            poweringUp = no
-            if err then error err.message; return
-            success 'done'
-        , 15000
+    when 'power'
+      ir.sendCmd 'power', (err) ->
+        if err then error err.message; return
         
     when 'irCmd'
       if poweringUp then success 'skipped'; return

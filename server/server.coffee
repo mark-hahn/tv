@@ -22,7 +22,7 @@ lastStatus = null
 cfg = require("parent-config") "apps-config.json"
 
 require './ajax'
-require './tvdb'
+# require './tvdb'
 
 dev  = (__dirname.indexOf('/dev/') > -1)
 fileServer   = new nodeStatic.Server (if dev then cache: 0)

@@ -1,4 +1,5 @@
 
+util   = require 'util'
 moment = require 'moment'
 
 logWithTime = (args...) -> 
@@ -6,5 +7,8 @@ logWithTime = (args...) ->
   console.log time, args...
 
 module.exports = (modName) ->
-  
-  (args...) -> logWithTime modName.toLowerCase() + ' ', args...
+  (args...) -> 
+    try
+      if args[0][0..1] is 'i '
+        args = [args[0][2...], util.inspect args[1], depth:null]
+    logWithTime modName.toLowerCase() + ' ', args...

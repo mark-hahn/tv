@@ -5,13 +5,14 @@
 net = require 'net'
 log = require('./utils') '  ir'
 
-itachHost = '192.168.1.163'
+itachHost = '192.168.1.165'
 
 # for standard sony tv remote
 irPfx1 = 'sendir,1:1,'
 irPfx2 = ',40000,1,1,'
 irSfx  = ',24,24,24,24,24,24'
 irDataByCmd =
+  power:  '24,48,24,24,24,48,24,24,24,48,24,24,24,24,24,48,24,24'
   pwrOff: '24,48,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24'
   pwrOn:  '24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24'
   volUp:  '24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,24'
@@ -44,7 +45,7 @@ sendIR = (irData, cb) ->
   endSendIR = (err, data) ->
     if timeout then clearTimeout timeout
     timeout = null
-    # if data then log 'endSendIR data: ' + data[0..80]
+    if data then log 'endSendIR data: ' + data[0..80]
     if err then err = message: err
     sendIrCb? err, data
     sendIrCb = null
@@ -54,7 +55,7 @@ sendIR = (irData, cb) ->
   if not itach
     # log 'itach createConnection'
     itach = net.createConnection {host:itachHost, port:4998}, (err) ->
-      # log 'itach createConnection res:', err
+      log 'itach createConnection res:', err
       if err then endSendIR 'connect err: ' + err.message;  return
       writeToItach irData, (err) ->
         if err then endSendIR 'writeToItach err: ' + err.message;  return

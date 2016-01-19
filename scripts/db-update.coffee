@@ -69,6 +69,7 @@ dumpInc = ->
     log incLabels[k] + ': ' + v
   bad = 0
   for badLbl in [
+      'tvdb hard error'
       'file no tvdb show' 
       'bad-file-no-series' 
       'bad-file-bad-number'
@@ -77,8 +78,8 @@ dumpInc = ->
   log bad, 'bad,', Math.round(bad*100/total) + '%'
   console.log()
 
-fatal = (err) ->
-  log 'fatal err...'
+fatal = (err, args...) ->
+  log 'fatal err:', util.inspect args, depth:null
   if err then log util.inspect err, depth:null
   dumpInc()
   console.trace()
@@ -199,12 +200,15 @@ exports.getFileData = (filePath) ->
   {bitRate, duration} = exports.getBitRateDuration filePath
   
   episodes = exports.guessit fileName
-  
+    
   if not (fileData = episodes[0]) then return 'no-guessit'
+  if typeof fileData.title isnt 'string'
+    fileData.title = fileData.title[0]
   if not (series = fileData.title) then return 'no-series'
   
   fileTitle = series
   for map in mappings
+    # log 'i fileTitle', {fileTitle, type: typeof fileTitle}
     regex = new RegExp(
       fileTitle.replace(/[\-\[\]\/\{\}\(\)\*\+\?\\\^\$\|]/g, '\\$&'), 'i')
     if regex.test map[0]
@@ -237,7 +241,7 @@ deleteShow = (showId) ->
       {startkey: [showId, null, null]}
       {endkey:   [showId,   {},   {}]}
     , (err, body) -> 
-      if err then fatal err
+      if err then fatal err, {showId}
       for row in body.rows
         db.destroy row.id, row.rev
     db.get showId, (err, show) ->
@@ -351,7 +355,12 @@ chkTvdbEpisodes = (show, fileData, cb) ->
     tvdb.getEpisodesByTvdbShowId show.tvdbShowId
     , (err, tvdbEpisodes) ->
       if err then fatal err
-      addTvdbEpisodes show, fileData, tvdbEpisodes, cb
+      if not tvdbEpisodes
+        log 'chkTvdbEpisodes, tvdbEpisodes isnt array',
+          util.inspect {show, fileData, tvdbEpisodes}, depth:null
+        cb()
+      else
+        addTvdbEpisodes show, fileData, tvdbEpisodes, cb
   else    
     delete show.episodes
     addTvdbEpisodes show, fileData, tvdbEpisodes, cb
@@ -408,7 +417,13 @@ exports.checkFile = (filePath, cb) ->
       else
         inc 'tvdb show lookup'
         tvdb.getShowByName fileTitle, (err, show) ->
-          if err then fatal err
+          # if err then fatal err, {fileTitle, fileData, body, show}
+          if err 
+            log 'tvdb getShowByName err', 
+                 util.inspect {fileTitle, fileData, body, show}, depth:null
+            inc 'tvdb hard error'
+            cb()
+            return
           
           if not show
             inc 'file no tvdb show'

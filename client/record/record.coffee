@@ -67,17 +67,14 @@ log    = require('../debug') 'rec'
     left: 0.5rem;
     top: -.2rem;
   }
-  .recording > .start-time {
+  .recording > .rec-time {
+    font-family: monospace;
+    font-size: 0.95rem;
     display: inline-block;
-    width: 48%;
+    width: 70%;
     position: relative;
     top: -0.7rem;
-  }
-  .recording > .duration {
-      display: inline-block;
-      width: 30%;
-      position: relative;
-      top: -0.7rem;
+    left: 0.5rem;
   }
 """
 
@@ -104,34 +101,38 @@ Vue.component 'record-comp',
             vClass:'chan-pad: recording.channel != "cbs", ' +
                     'fox-pad: recording.channel == "fox"' 
                   
-        div '.start-time', "{{'Tue 1/20/70, 2:19 am, '" +
-                              "+ recording.duration}} mins"
-        
+        div '.rec-time', "{{{daysOfWeek[new Date(recording.start).getDay()] + " +
+                            "', ' + " +
+                            "new Date(recording.start).toLocaleDateString() + " +
+                            "', ' + recording.duration + ' mins'}}}"
   data: ->
     recordings: [ {
        channel: 'abc'
-       start: new Date().getTime()
+       start: 1678769876
        duration: 120
       },{
        channel: 'cbs'
-       start: new Date().getTime()
+       start: 2678769876
        duration: 90
       },{
        channel: 'nbc'
-       start: new Date().getTime()
+       start: 3678769876
        duration: 90
       },{
        channel: 'fox'
-       start: new Date().getTime()
+       start: 4678769876
        duration: 90
       }
     ]
+    daysOfWeek: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    recTime: 100
     
   computed:
-    startDate: -> 
-      dateStr = moment recording.start, 'MMM DDD, h:mm a'
-      log dateStr
-      dateStr
+    recTime: ->
+      log 'recording.start', @recording.start
+      # dateStr = moment recording.start, 'MMM DDD, h:mm a'
+      # log 'dateStr', dateStr
+      @recording.start
 
   methods:
     createRecording: (chan) ->

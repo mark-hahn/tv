@@ -2,7 +2,7 @@
 Vue    = require 'vue'
 moment = require 'moment'
 log    = require('../debug') 'rec'
-{render, tag, div, img} = require 'teacup'
+{render, tag, div, img, input} = require 'teacup'
 
 (document.head.appendChild document.createElement('style')).textContent = """
   .net-btns {
@@ -12,11 +12,23 @@ log    = require('../debug') 'rec'
     border-radius: 1rem;
     margin-top: 0.5rem;
   }
-  .net-btns-hdr {
+  .record-cbl {
+    display: inline-block;
+    width: 50%;
     color: red;
     font-size: 1.4rem;
-    text-align: center;
-    padding-top: 1rem;
+    padding: 1rem 0 0 2rem;
+  }
+  .rec-input {
+    width: 40%;
+    font-size: 1.2rem;
+  }
+  .rec-input {
+    width: 50%;
+    font-size: 1.0rem;
+    position: relative;
+    right: 1rem;
+    top: -.15rem;
   }
   .net-btn {
     height: 6rem;
@@ -74,11 +86,16 @@ Vue.component 'record-comp',
   template: render ->
     div '.record-comp', ->
       div '.net-btns', ->
-        div '.net-btns-hdr', 'Record Network Channel'
-        img '.net-btn',     vOn:"click:btnClick", src:'/server/images/abc.png'
-        img '.net-btn',     vOn:"click:btnClick", src:'/server/images/cbs.png'
-        img '.net-btn',     vOn:"click:btnClick", src:'/server/images/nbc.png'
-        img '.net-btn.fox', vOn:"click:btnClick", src:'/server/images/fox.png'
+        div '.net-btns-hdr', ->
+          div '.record-cbl', 'Record Cable'
+          input '.rec-input', 
+            vOn: 'keypress:chanKey'
+            placeholder:'Optional Channel Number'
+        div '.net-btns', ->
+          img '.net-btn',     vOn:"click:btnClick", src:'/server/images/abc.png'
+          img '.net-btn',     vOn:"click:btnClick", src:'/server/images/cbs.png'
+          img '.net-btn',     vOn:"click:btnClick", src:'/server/images/nbc.png'
+          img '.net-btn.fox', vOn:"click:btnClick", src:'/server/images/fox.png'
     div '.rec-list', ->
       div '.recording', vRepeat:'recording:recordings' , ->
         div '.chan-div', ->
@@ -87,14 +104,14 @@ Vue.component 'record-comp',
             vClass:'chan-pad: recording.channel != "cbs", ' +
                     'fox-pad: recording.channel == "fox"' 
                   
-        div '.start-time', '{{startDate}}'
-        div '.duration',   '({{recording.duration}} mins)'
+        div '.start-time', "{{'Tue 1/20/70, 2:19 am, '" +
+                              "+ recording.duration}} mins"
         
   data: ->
     recordings: [ {
        channel: 'abc'
        start: new Date().getTime()
-       duration: 90
+       duration: 120
       },{
        channel: 'cbs'
        start: new Date().getTime()
@@ -111,10 +128,28 @@ Vue.component 'record-comp',
     ]
     
   computed:
-    startDate: -> @recording.start # moment @recording.start, 'MMM DDD, h:mm a'
+    startDate: -> 
+      dateStr = moment recording.start, 'MMM DDD, h:mm a'
+      log dateStr
+      dateStr
 
   methods:
+    createRecording: (chan) ->
+      log 'createRecording', chan
+      
+    chanKey: (e) ->
+      if e.which is 13
+        channel = e.target.value
+        if /^\d{3}$/.test channel
+          e.target.blur()
+          @createRecording +channel
+      e.stopPropagation()
+        
     btnClick: (e) ->
-      net = e.target.getAttribute('src')[15..17]
+      @createRecording switch e.target.getAttribute('src')[15..17]
+        when 'cbs' then 502 
+        when 'nbc' then 504
+        when 'abc' then 507
+        when 'fox' then 511
       
-      
+log moment(1678769876).format('ddd M/DD/YY, h:mm a')

@@ -145,7 +145,7 @@ do init = ->
         
         
     data:
-      curPage:      'show'
+      curPage:      'record'
       allShows:      []
       curShowIdx:    0
       curShow:       {}

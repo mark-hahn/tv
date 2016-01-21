@@ -36,6 +36,7 @@
     "node-tvdb": "^1.6.1",
     "node-uuid": "^1.4.7",
     "parent-config": "^1.0.2",
+    "pikaday": "^1.4.0",
     "request": "*",
     "rmrf": "^1.0.2",
     "sse-channel": "^2.0.0",

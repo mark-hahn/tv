@@ -141,10 +141,9 @@ do init = ->
       div '#popup', vClass: 'popupVisible: popupMsg != ""', '{{popupMsg}}'
       
       script "function getip(json) { alert(json.ip) }"
-      script src:'http://www.telize.com/jsonip?callback=getip'
+      # script src:'http://www.telize.com/jsonip?callback=getip'        
         
-        
-    data:
+    data: 
       curPage:      'record'
       allShows:      []
       curShowIdx:    0

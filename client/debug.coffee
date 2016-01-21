@@ -7,4 +7,6 @@ logWithTime = (args...) ->
 
 module.exports = (modName) ->
   
-  (args...) -> logWithTime modName.toLowerCase() + ' ', args...
+  (args...) -> 
+    logWithTime modName.toLowerCase() + ' ', args...
+    args[0]

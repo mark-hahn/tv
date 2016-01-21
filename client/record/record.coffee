@@ -53,7 +53,15 @@ log    = require('../debug') 'rec'
   }
   .chan-div {
     display: inline-block;
-    width:22%;
+    width: 20%;
+    position: relative;
+    height: 1.7rem;
+  }
+  .chan-num {
+    position: absolute;
+    top: 0;
+    left: 1.2rem;
+    display: inline-block;
   }
   .chan-img {
     height: 2rem;
@@ -71,10 +79,10 @@ log    = require('../debug') 'rec'
     font-family: monospace;
     font-size: 0.95rem;
     display: inline-block;
-    width: 70%;
+    width: 80%;
     position: relative;
+    left: 0.35rem;
     top: -0.7rem;
-    left: 0.5rem;
   }
 """
 
@@ -89,52 +97,66 @@ Vue.component 'record-comp',
             vOn: 'keypress:chanKey'
             placeholder:'Optional Channel Number'
         div '.net-btns', ->
-          img '.net-btn',     vOn:"click:btnClick", src:'/server/images/abc.png'
-          img '.net-btn',     vOn:"click:btnClick", src:'/server/images/cbs.png'
-          img '.net-btn',     vOn:"click:btnClick", src:'/server/images/nbc.png'
-          img '.net-btn.fox', vOn:"click:btnClick", src:'/server/images/fox.png'
+          img '.net-btn',     vOn:"click:btnClick", src:'/server/images/507.png'
+          img '.net-btn',     vOn:"click:btnClick", src:'/server/images/502.png'
+          img '.net-btn',     vOn:"click:btnClick", src:'/server/images/504.png'
+          img '.net-btn.fox', vOn:"click:btnClick", src:'/server/images/511.png'
     div '.rec-list', ->
       div '.recording', vRepeat:'recording:recordings' , ->
         div '.chan-div', ->
+          div '.chan-num', vShow:'!isImg(recording.channel)', "{{recording.channel}}"
           img '.chan-img', 
+            vShow: 'isImg(recording.channel)'
             src:"/server/images/{{recording.channel}}.png"
-            vClass:'chan-pad: recording.channel != "cbs", ' +
-                    'fox-pad: recording.channel == "fox"' 
+            vClass:'chan-pad: recording.channel != 502, ' +
+                    'fox-pad: recording.channel == 511' 
                   
-        div '.rec-time', "{{{daysOfWeek[new Date(recording.start).getDay()] + " +
-                            "', ' + " +
-                            "new Date(recording.start).toLocaleDateString() + " +
-                            "', ' + recording.duration + ' mins'}}}"
+        div '.rec-time', "{{{dateStr(recording.start,recording.duration)}}}"
   data: ->
     recordings: [ {
-       channel: 'abc'
-       start: 1678769876
+       channel: 570
+       start: 121678769876
        duration: 120
       },{
-       channel: 'cbs'
-       start: 2678769876
+       channel: 502
+       start: 232678769876
        duration: 90
       },{
-       channel: 'nbc'
-       start: 3678769876
+       channel: 504
+       start: 343678769876
        duration: 90
       },{
-       channel: 'fox'
-       start: 4678769876
+       channel: 511
+       start: 454678769876
        duration: 90
       }
     ]
-    daysOfWeek: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    recTime: 100
     
-  computed:
-    recTime: ->
-      log 'recording.start', @recording.start
-      # dateStr = moment recording.start, 'MMM DDD, h:mm a'
-      # log 'dateStr', dateStr
-      @recording.start
-
   methods:
+    isImg: (chan) -> chan in [502, 504, 507, 511]
+      
+    dateStr: (ms, dur) ->
+      daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      date = new Date ms
+      [mo, da, yr] = date.toLocaleDateString().split '/'
+      if mo.length < 2 then mo = '&nbsp;' + mo
+      if da.length < 2 then da = '0' + da
+      dmyStr = "#{mo}/#{da}/#{yr[2...]}"
+      hrs = date.getHours()
+      ampm = 'am'
+      if hrs > 12 then hrs -= 12; ampm = 'pm'
+      if hrs is 0 then hrs = 12
+      hrs = '' + hrs
+      if hrs.length < 2 then hrs = '&nbsp;' + hrs
+      mins = '' + date.getMinutes()
+      if mins.length < 2 then mins = '0' + mins
+      dur = '' + dur
+      if dur.length < 3 then dur = '&nbsp;' + dur
+      "#{daysOfWeek[date.getDay()]} " +
+        "#{dmyStr} " +
+        "#{hrs}:#{mins} #{ampm} " +
+        "(#{dur})"
+        
     createRecording: (chan) ->
       log 'createRecording', chan
       
@@ -142,15 +164,9 @@ Vue.component 'record-comp',
       if e.which is 13
         channel = e.target.value
         if /^\d{3}$/.test channel
-          e.target.blur()
+          # e.target.blur()
           @createRecording +channel
       e.stopPropagation()
         
-    btnClick: (e) ->
-      @createRecording switch e.target.getAttribute('src')[15..17]
-        when 'cbs' then 502 
-        when 'nbc' then 504
-        when 'abc' then 507
-        when 'fox' then 511
+    btnClick: (e) -> @createRecording +e.target.getAttribute('src')[15..17]
       
-log moment(1678769876).format('ddd M/DD/YY, h:mm a')

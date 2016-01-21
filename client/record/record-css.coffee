@@ -43,7 +43,7 @@
     border: .1rem solid gray;
     margin: 1rem;
     padding: 0.55rem 0 0 0.5rem;
-    font-size: 1.2rem;
+    font-size: 1.1rem;
   }
   .chan-div {
     display: inline-block;

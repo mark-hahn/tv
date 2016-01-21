@@ -15,84 +15,17 @@ Vue.component 'recording-tile',
   props: ['recording']
   name: 'recording-tile-comp'
   template: render ->
-    div '.recording-tile-div', ->
+    div '.recording', ->
       div '.chan-div', ->
-        div '.chan-num', vShow:'!isImg(recording.channel)', "{{recording.channel}}"
+        div '.chan-num', vShow:'!isImg(recording.channel)', 
+                           "{{recording.channel}}"
         img '.chan-img', 
           vShow: 'isImg(recording.channel)'
-          src:"/server/images/{{recording.channel}}.png"
+          src:"/client/record/images/{{recording.channel}}.png"
           vClass:'chan-pad: recording.channel != 502, ' +
                   'fox-pad: recording.channel == 511' 
       div '.rec-time', "{{{dateStr(recording.start,recording.duration)}}}"
-
-Vue.component 'record-comp', 
-  name: 'record-comp'
-  template: render ->
-    div vShow:"!popupShowing", ->
-      div '.net-btns', ->
-        div '.net-btns-hdr', ->
-          div '.record-cbl', 'Record Cable'
-          input '.rec-input', 
-            vOn: 'keypress:chanKey'
-            placeholder:'Optional Channel Number'
-        div '.net-btns', ->
-          img '.net-btn',     vOn:"click:netClick", src:'/client/record/images/507.png'
-          img '.net-btn',     vOn:"click:netClick", src:'/client/record/images/502.png'
-          img '.net-btn',     vOn:"click:netClick", src:'/client/record/images/504.png'
-          img '.net-btn.fox', vOn:"click:netClick", src:'/client/record/images/511.png'
-      div '.rec-list', ->
-        div '.recording', vRepeat:'recording:recordings' , ->
-          tag 'recording-tile', recording: '{{recording}}'
-
-    div '.popup-show', vShow:"popupShowing", ->
-      div '.popup-hdr', 'Recording Details ...'
-      button '.now-btn', vOn:'click:nowButton', 'Now'
-      div '.picker-input-div', ->
-        label '.picker-input-lbl', for:"datepicker", 'Date: '
-        input type:"text", id:"datepicker"
-      div '.date-picker'
-      div ->
-        div '.time-sel-lbl', 'Start Time: '
-        select '.hr-sel.time-sel', ->
-          option '1'; option  '2'; option  '3'; option  '4'; 
-          option '5'; option  '6'; option  '7'; option  '8'; 
-          option '9'; option '10'; option '11'; option '12'
-        select '.min-sel.time-sel', ->
-          option ':00'; option ':30'
-        select '.ampm-sel.time-sel', ->
-          option 'AM'; option 'PM'
-      div ->  
-        div '.time-sel-lbl', 'Duration Hours, Mins:'
-        select '.duration-sel.time-sel', ->
-          option '0:30'; option '1:00'; option '1:30'; option '2:00'; 
-          option '2:30'; option '3:00'; option '3:30'; option '4:00'; 
-          option '4:30'; option '5:00'; option '5:30'; option '6:00'; 
-      hr()
-      div 'rec-popup-btns', ->
-        button '.rec-btn', vOn:'click:delButton', 'Delete'
-        button '.rec-btn', vOn:'click:saveButton', 'Save'
-        
-  data: ->
-    recordings: [ {
-       channel: 570
-       start: 121678769876
-       duration: 120
-      },{
-       channel: 502
-       start: 232678769876
-       duration: 90
-      },{
-       channel: 504
-       start: 343678769876
-       duration: 90
-      },{
-       channel: 511
-       start: 454678769876
-       duration: 90
-      }
-    ]
-    popupShowing: yes
-    
+      
   methods:
     isImg: (chan) -> chan in [502, 504, 507, 511]
     
@@ -118,6 +51,77 @@ Vue.component 'record-comp',
         "#{hrs}:#{mins} #{ampm} " +
         "(#{dur})"
         
+
+Vue.component 'record-comp', 
+  name: 'record-comp'
+  template: render ->
+    div '.record-comp', ->
+      div vShow:"!popupShowing", ->
+        div '.net-btns', ->
+          div '.net-btns-hdr', ->
+            div '.record-cbl', 'Record Cable'
+            input '.rec-input', 
+              vOn: 'keypress:chanKey'
+              placeholder:'Optional Channel Number'
+          div '.net-btns', ->
+            img '.net-btn',     vOn:"click:netClick", src:'/client/record/images/507.png'
+            img '.net-btn',     vOn:"click:netClick", src:'/client/record/images/502.png'
+            img '.net-btn',     vOn:"click:netClick", src:'/client/record/images/504.png'
+            img '.net-btn.fox', vOn:"click:netClick", src:'/client/record/images/511.png'
+        div '.rec-list', ->
+          div vRepeat:'recording:recordings', ->
+            tag 'recording-tile', recording: '{{recording}}'
+
+      div '.popup-show', vShow:"popupShowing", ->
+        div '.popup-hdr', 'Recording Details ...'
+        button '.now-btn', vOn:'click:nowButton', 'Now'
+        div '.picker-input-div', ->
+          label '.picker-input-lbl', for:"datepicker", 'Date: '
+          input type:"text", id:"datepicker"
+        div '.date-picker'
+        div ->
+          div '.time-sel-lbl', 'Start Time: '
+          select '.hr-sel.time-sel', ->
+            option '1'; option  '2'; option  '3'; option  '4'; 
+            option '5'; option  '6'; option  '7'; option  '8'; 
+            option '9'; option '10'; option '11'; option '12'
+          select '.min-sel.time-sel', ->
+            option ':00'; option ':30'
+          select '.ampm-sel.time-sel', ->
+            option 'AM'; option 'PM'
+        div ->  
+          div '.time-sel-lbl', 'Duration Hours, Mins:'
+          select '.duration-sel.time-sel', ->
+            option '0:30'; option '1:00'; option '1:30'; option '2:00'; 
+            option '2:30'; option '3:00'; option '3:30'; option '4:00'; 
+            option '4:30'; option '5:00'; option '5:30'; option '6:00'; 
+        hr()
+        div 'rec-popup-btns', ->
+          button '.rec-btn', vOn:'click:delButton', 'Delete'
+          button '.rec-btn', vOn:'click:saveButton', 'Save'
+          
+  data: ->
+    recordings: [ {
+       channel: 570
+       start: 121678769876
+       duration: 120
+      },{
+       channel: 502
+       start: 232678769876
+       duration: 90
+      },{
+       channel: 504
+       start: 343678769876
+       duration: 90
+      },{
+       channel: 511
+       start: 454678769876
+       duration: 90
+      }
+    ]
+    popupShowing: no
+    
+  methods:
     createRecording: (chan) ->
       log 'createRecording', chan
       
@@ -129,7 +133,7 @@ Vue.component 'record-comp',
           @createRecording +channel
       e.stopPropagation()
         
-    netClick: (e) -> @createRecording +e.target.getAttribute('src')[15..17]
+    netClick: (e) -> @createRecording +e.target.getAttribute('src')[22..24]
     
     nowButton: (e) -> @picker.setMoment moment()
     

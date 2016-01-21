@@ -12,7 +12,7 @@ require './pikadate-css'
   require 'teacup'
   
 Vue.component 'recording-tile', 
-  props: ['recording']
+  props: ['recording','isPopup']
   name: 'recording-tile-comp'
   template: render ->
     div '.recording', ->
@@ -51,6 +51,10 @@ Vue.component 'recording-tile',
         "#{hrs}:#{mins} #{ampm} " +
         "(#{dur})"
         
+  events:
+    setPopupChanTimeDur: (chan, time, dur) ->   
+      if @isPopup
+        log 'setPopupChanTimeDur', {chan, time, dur}
 
 Vue.component 'record-comp', 
   name: 'record-comp'
@@ -70,7 +74,9 @@ Vue.component 'record-comp',
             img '.net-btn.fox', vOn:"click:netClick", src:'/client/record/images/511.png'
         div '.rec-list', ->
           div vRepeat:'recording:recordings', ->
-            tag 'recording-tile', recording: '{{recording}}'
+            tag 'recording-tile', 
+              recording: '{{recording}}'
+              isPopup:   '{{false}}'
 
       div '.popup-show', vShow:"popupShowing", ->
         div '.popup-hdr', 'Recording Details ...'
@@ -95,12 +101,18 @@ Vue.component 'record-comp',
             option '0:30'; option '1:00'; option '1:30'; option '2:00'; 
             option '2:30'; option '3:00'; option '3:30'; option '4:00'; 
             option '4:30'; option '5:00'; option '5:30'; option '6:00'; 
-        hr()
+        # hr()
+        tag 'recording-tile', 
+          recording: '{{recordings[recordingId]}}'
+          isPopup:   '{{true}}'
+        # hr()
         div 'rec-popup-btns', ->
           button '.rec-btn', vOn:'click:delButton', 'Delete'
           button '.rec-btn', vOn:'click:saveButton', 'Save'
           
   data: ->
+    popupShowing: no
+    recordingId: 1
     recordings: [ {
        channel: 570
        start: 121678769876
@@ -113,32 +125,28 @@ Vue.component 'record-comp',
        channel: 504
        start: 343678769876
        duration: 90
-      },{
-       channel: 511
-       start: 454678769876
-       duration: 90
       }
     ]
-    popupShowing: no
     
   methods:
-    createRecording: (chan) ->
-      log 'createRecording', chan
+    createNewRecording: (chan) ->
+      log 'createNewRecording', chan
+      @popupShowing = yes
+      @$broadcast 'setPopupChanTimeDur', chan, new Date().getTime(), 120
       
     chanKey: (e) ->
       if e.which is 13
         channel = e.target.value
         if /^\d{3}$/.test channel
           # e.target.blur()
-          @createRecording +channel
+          @createNewRecording +channel
       e.stopPropagation()
         
-    netClick: (e) -> @createRecording +e.target.getAttribute('src')[22..24]
+    netClick: (e) -> 
+      @createNewRecording +e.target.getAttribute('src')[22..24]
     
     nowButton: (e) -> @picker.setMoment moment()
     
-    delButton: ->
-      
     setTimeInForm: (time, dur) ->
       
     getTimeFromForm: ->
@@ -154,9 +162,13 @@ Vue.component 'record-comp',
       durMs = (+hr * 60 + +min) * 60 * 1e3
       [dateMs, durMs]
        
+    delButton: ->
+      @popupShowing = no
+      
     saveButton: (e) ->
       [time, dur] = @getTimeFromForm()
-      log new Date(time), '\n', dur
+      log 'saveButton', new Date(time), '\n', dur
+      @popupShowing = no
       
   attached: ->
     @picker = new Pikaday

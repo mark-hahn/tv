@@ -63,6 +63,7 @@ document.head.innerHTML = render ->
     #page {
       visibility: hidden;
       position: relative;
+      left:0.5rem;
       margin: 0.3rem;
     }
     header-comp {

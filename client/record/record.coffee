@@ -10,6 +10,20 @@ require './pikadate-css'
 
 {render, tag, div, img, input, select, option, label, text, button, hr} = 
   require 'teacup'
+  
+Vue.component 'recording-tile', 
+  props: ['recording']
+  name: 'recording-tile-comp'
+  template: render ->
+    div '.recording-tile-div', ->
+      div '.chan-div', ->
+        div '.chan-num', vShow:'!isImg(recording.channel)', "{{recording.channel}}"
+        img '.chan-img', 
+          vShow: 'isImg(recording.channel)'
+          src:"/server/images/{{recording.channel}}.png"
+          vClass:'chan-pad: recording.channel != 502, ' +
+                  'fox-pad: recording.channel == 511' 
+      div '.rec-time', "{{{dateStr(recording.start,recording.duration)}}}"
 
 Vue.component 'record-comp', 
   name: 'record-comp'
@@ -22,20 +36,13 @@ Vue.component 'record-comp',
             vOn: 'keypress:chanKey'
             placeholder:'Optional Channel Number'
         div '.net-btns', ->
-          img '.net-btn',     vOn:"click:netClick", src:'/server/images/507.png'
-          img '.net-btn',     vOn:"click:netClick", src:'/server/images/502.png'
-          img '.net-btn',     vOn:"click:netClick", src:'/server/images/504.png'
-          img '.net-btn.fox', vOn:"click:netClick", src:'/server/images/511.png'
+          img '.net-btn',     vOn:"click:netClick", src:'/client/record/images/507.png'
+          img '.net-btn',     vOn:"click:netClick", src:'/client/record/images/502.png'
+          img '.net-btn',     vOn:"click:netClick", src:'/client/record/images/504.png'
+          img '.net-btn.fox', vOn:"click:netClick", src:'/client/record/images/511.png'
       div '.rec-list', ->
         div '.recording', vRepeat:'recording:recordings' , ->
-          div '.chan-div', ->
-            div '.chan-num', vShow:'!isImg(recording.channel)', "{{recording.channel}}"
-            img '.chan-img', 
-              vShow: 'isImg(recording.channel)'
-              src:"/server/images/{{recording.channel}}.png"
-              vClass:'chan-pad: recording.channel != 502, ' +
-                      'fox-pad: recording.channel == 511' 
-          div '.rec-time', "{{{dateStr(recording.start,recording.duration)}}}"
+          tag 'recording-tile', recording: '{{recording}}'
 
     div '.popup-show', vShow:"popupShowing", ->
       div '.popup-hdr', 'Recording Details ...'
@@ -51,18 +58,18 @@ Vue.component 'record-comp',
           option '5'; option  '6'; option  '7'; option  '8'; 
           option '9'; option '10'; option '11'; option '12'
         select '.min-sel.time-sel', ->
-          option ':00'; option ':15'; option ':30'; option ':45'
+          option ':00'; option ':30'
         select '.ampm-sel.time-sel', ->
           option 'AM'; option 'PM'
       div ->  
         div '.time-sel-lbl', 'Duration Hours, Mins:'
         select '.duration-sel.time-sel', ->
-          option '0:30'; option  '1:00'; option  '1:30'; option  '2:00'; 
-          option '2:30'; option  '3:00'; option  '3:30'; option  '4:00'; 
-          option '4:30'; option  '5:00'; option  '5:30'; option  '6:00'; 
+          option '0:30'; option '1:00'; option '1:30'; option '2:00'; 
+          option '2:30'; option '3:00'; option '3:30'; option '4:00'; 
+          option '4:30'; option '5:00'; option '5:30'; option '6:00'; 
       hr()
       div 'rec-popup-btns', ->
-        button '.rec-btn', vOn:'click:delButton', 'Cancel/Delete'
+        button '.rec-btn', vOn:'click:delButton', 'Delete'
         button '.rec-btn', vOn:'click:saveButton', 'Save'
         
   data: ->
@@ -124,7 +131,28 @@ Vue.component 'record-comp',
         
     netClick: (e) -> @createRecording +e.target.getAttribute('src')[15..17]
     
-    nowButton: (e) -> @picker.gotoToday()
+    nowButton: (e) -> @picker.setMoment moment()
+    
+    delButton: ->
+      
+    setTimeInForm: (time, dur) ->
+      
+    getTimeFromForm: ->
+      daysMs = @picker.getDate().getTime()
+      hrs = +(document.querySelector '.hr-sel').value
+      mins = +((document.querySelector '.min-sel').value[1...])
+      ampm = document.querySelector('.ampm-sel').value
+      if hrs is 12 then hrs = 0
+      if ampm is 'PM' then hrs += 12
+      dateMs = daysMs + (hrs * 60 + mins) * 60 * 1e3
+      dur = document.querySelector '.duration-sel'
+      [hr, min] = dur.value.split ':'
+      durMs = (+hr * 60 + +min) * 60 * 1e3
+      [dateMs, durMs]
+       
+    saveButton: (e) ->
+      [time, dur] = @getTimeFromForm()
+      log new Date(time), '\n', dur
       
   attached: ->
     @picker = new Pikaday
@@ -137,11 +165,7 @@ Vue.component 'record-comp',
       bound: false
       showDaysInNextAndPreviousMonths: yes
       container: document.querySelector '.date-picker'
-      onSelect: (date) -> log date
       
-    # pickInput = document.querySelector '.picker-input'
-    # pickInput.value = moment().format('YYYY-MM-DD')
-    
-    
-    
-    
+      onSelect: (date) -> 
+        log date
+      

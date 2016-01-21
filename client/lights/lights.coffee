@@ -40,7 +40,7 @@ Vue.component 'light-sw-comp',
     div '.switch.switch-comp', 
       vClass:'master:!switch.idx', 
       vOn:'mousedown:onMousedown, touchstart:onMousedown' , ->
-        img src:'server/images/switch.png'
+        img src:'/client/lights/images/switch.png'
         div '.dot', vAttr:'style:dotTop(switch.brt,switch.idx)'
   methods:
     dotTop: (brt,idx) ->

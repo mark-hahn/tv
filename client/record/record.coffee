@@ -52,9 +52,9 @@ Vue.component 'recording-tile',
         "(#{dur})"
         
   events:
-    setPopupChanTimeDur: (chan, time, dur) ->   
+    setTileChanTimeDur: (chan, time, dur) ->   
       if @isPopup
-        log 'setPopupChanTimeDur', {chan, time, dur}
+        log 'setTileChanTimeDur', {chan, time, dur}
 
 Vue.component 'record-comp', 
   name: 'record-comp'
@@ -103,7 +103,7 @@ Vue.component 'record-comp',
             option '4:30'; option '5:00'; option '5:30'; option '6:00'; 
         # hr()
         tag 'recording-tile', 
-          recording: '{{recordings[recordingId]}}'
+          recording: '{{recordings[@recordingIdx]}}'
           isPopup:   '{{true}}'
         # hr()
         div 'rec-popup-btns', ->
@@ -112,7 +112,7 @@ Vue.component 'record-comp',
           
   data: ->
     popupShowing: no
-    recordingId: 1
+    recordingIdx: 1
     recordings: [ {
        channel: 570
        start: 121678769876
@@ -127,12 +127,15 @@ Vue.component 'record-comp',
        duration: 90
       }
     ]
-    
+  
   methods:
     createNewRecording: (chan) ->
       log 'createNewRecording', chan
+      @recordingIdx = recordings.length
+      @recordings[@recordingIdx] {}
       @popupShowing = yes
-      @$broadcast 'setPopupChanTimeDur', chan, new Date().getTime(), 120
+      
+      @$broadcast 'setTileChanTimeDur', chan, new Date().getTime(), 120
       
     chanKey: (e) ->
       if e.which is 13
@@ -147,9 +150,32 @@ Vue.component 'record-comp',
     
     nowButton: (e) -> @picker.setMoment moment()
     
-    setTimeInForm: (time, dur) ->
+    dateDaysMs = (time) -> 
+      msInDay = 24 * 60 * 60 * 1e3
+      Math.Floor(time / msInDay) * msInDay
+
+    setRecPopupData: (time, dur) ->
+      dayMs = dateDaysMs time
+      @picker.setMoment moment dayMs
+      timeOfDayMs = time - dayMs
+      timeOfDayHr = Math.floor timeOfDayMs / (60 * 60e3)
+      isPm = timeOfDayHr >= 12
+      displayHr = timeOfDayHr - (if isPm then 12 else 0)
+      (document.querySelector '.hr-sel').value = '' + displayHr
+      displayHlfHr = Math.floor(timeOfDayMs / (30 * 60e3)) * 30
+      if displayHlfHr is 0 then displayHlfHr = '00'
+      (document.querySelector '.min-sel').value = ':' + displayHlfHr
+      document.querySelector('.ampm-sel').value =
+        (if isPm then 'PM' else 'AM')
       
-    getTimeFromForm: ->
+      durEle = document.querySelector '.duration-sel'
+      durStr = '' +  (dur & 60)
+      if dur < 60 then durStr = '0' + durStr
+      durEle.value = (dur/60) + ':' + durStr
+      
+      # @$broadcast 'setTileChanTimeDur', @recordings[@recordingIdx]
+      
+    getRecPopupData: ->
       daysMs = @picker.getDate().getTime()
       hrs = +(document.querySelector '.hr-sel').value
       mins = +((document.querySelector '.min-sel').value[1...])
@@ -159,15 +185,17 @@ Vue.component 'record-comp',
       dateMs = daysMs + (hrs * 60 + mins) * 60 * 1e3
       dur = document.querySelector '.duration-sel'
       [hr, min] = dur.value.split ':'
-      durMs = (+hr * 60 + +min) * 60 * 1e3
-      [dateMs, durMs]
+      durMins = (+hr * 60 + +min) * 60
+      [dateMs, durMins]
        
     delButton: ->
+      @recordings = @recordings.splice @recordingIndex, 1
       @popupShowing = no
       
     saveButton: (e) ->
-      [time, dur] = @getTimeFromForm()
-      log 'saveButton', new Date(time), '\n', dur
+      [time, durMins] = @getRecPopupData()
+      @recordings[@recordingIndex].start    = time
+      @recordings[@recordingIndex].duration = durMins
       @popupShowing = no
       
   attached: ->
@@ -181,7 +209,10 @@ Vue.component 'record-comp',
       bound: false
       showDaysInNextAndPreviousMonths: yes
       container: document.querySelector '.date-picker'
-      
       onSelect: (date) -> 
-        log date
-      
+        oldTime = @recordings[@recordingIndex].start
+        timeOfDayMs = oldTime - @dateDaysMs oldTime
+        @recordings[@recordingIndex].start = 
+          @dateDaysMs(date.getTime) + timeOfDayMs
+        
+

@@ -16,6 +16,8 @@ if disableOutput
   console.log '***************'
   console.log ''
   
+log 'starting db-update'
+
 mappings = [
   ['the',                              'The Spa']
   ['buffy',                            'Buffy The Vampire Slayer']
@@ -193,8 +195,10 @@ exports.guessit = (fileName) ->
 exports.getFileData = (filePath) ->
   inc 'getFileData'
   fileName = filePath.replace '/mnt/media/videos/', ''
-  
-  stats    = fs.statSync filePath
+  try
+    stats = fs.statSync filePath
+  catch e
+    return 'not-file'
   fileSize = stats.size
   if not stats.isFile() then return 'not-file'
   {bitRate, duration} = exports.getBitRateDuration filePath

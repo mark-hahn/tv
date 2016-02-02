@@ -4,7 +4,6 @@ db
   {watched, lastPosition, filePaths} per episode
 
 top nav buttons
-  --- lights ----
   show  - episode
   watch - refresh
   

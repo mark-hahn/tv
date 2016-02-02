@@ -105,7 +105,6 @@ do init = ->
   require './show/show'
   require './episode/episode'
   require './watch/watch'
-  require './lights/lights'
   require './record/record'
     
   new Vue
@@ -129,15 +128,12 @@ do init = ->
           curEpisodeIdx: '{{curEpisodeIdx}}'
           curEpisode:    '{{curEpisode}}'
           
+        tag 'record-comp',  
+          vShow: 'curPage == "record"'
+          
         tag 'watch-comp',   
           vShow:         'curPage == "watch"',
           allShows:      '{{allShows}}'
-          
-        tag 'lights-comp',  
-          vShow:         'curPage == "lights"'
-          
-        tag 'record-comp',  
-          vShow:         'curPage == "record"'
           
       div '#popup', vClass: 'popupVisible: popupMsg != ""', '{{popupMsg}}'
       
@@ -152,7 +148,7 @@ do init = ->
       curEpisodeIdx: 0
       curEpisode:    {}
       popupMsg:      ''
-      
+       
     created: ->
       tvGlobal.ajaxCmd 'shows', (err, res) => 
         if err then log 'get all shows err', err.message; return

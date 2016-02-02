@@ -12,7 +12,7 @@ log     = require('./debug') 'hdr'
     height: 2.6rem;
   }
   .header .btn {
-    width: 20%;
+    width: 25%;
   }
   .btn.onoff {
     width: 16%;
@@ -34,9 +34,8 @@ Vue.component 'header-comp',
       div '.header', vOn: 'mousedown: selPage', ->
         div '.btn', vClass: 'selected: curPage == "show"',    'Show'
         div '.btn', vClass: 'selected: curPage == "episode"', 'Episo'
+        div '.btn', vClass: 'selected: curPage == "record"',  'Cable'
         div '.btn', vClass: 'selected: curPage == "watch"',   'Watc'
-        div '.btn', vClass: 'selected: curPage == "lights"',  'Light'
-        div '.btn', vClass: 'selected: curPage == "record"',  'Rec'
     
   data: ->
     powerText: ''
@@ -47,9 +46,8 @@ Vue.component 'header-comp',
         switch e.target.innerText[0]
           when 'S' then 'show'
           when 'E' then 'episode'
+          when 'C' then 'record'
           when 'W' then 'watch'
-          when 'L' then 'lights'
-          when 'R' then 'record'
           else @curPage
     
     onOff: (e) -> 

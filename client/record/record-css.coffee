@@ -1,10 +1,23 @@
 (document.head.appendChild document.createElement('style')).textContent = """
-  .net-btns {
-    width: 100%;
-    height: 45%;
+  .net-btns-outer {
+    width: 75%;
+    height: 32rem;
     background-color: white;
     border-radius: 1rem;
     margin-top: 0.5rem;
+    overflow: auto;
+  }
+  .net-btns-inner {
+    width: 90%;
+    border: 1px sold gray;
+    margin-left:5%;
+  }
+  .net-btn {
+    padding:0.3rem;
+  }
+  .chan-img {
+    padding:0.2rem;
+    display:none;
   }
   .record-cbl {
     display: inline-block;
@@ -23,15 +36,6 @@
     position: relative;
     right: 1rem;
     top: -.15rem;
-  }
-  .net-btn {
-    height: 6rem;
-    margin: .6rem;
-    position: relative;
-    left: 2rem;
-  }
-  .net-btn.fox {
-    top:-0.6rem;
   }
   .rec-list {
     overflow: auto;
@@ -57,8 +61,37 @@
     left: 1.2rem;
     display: inline-block;
   }
-  .chan-img {
+  .net-btn.chan-sel {
+    background-color: #ddd;
+    border-radius: 0.5rem;
+  }
+  .rec-chan-img-div {
     height: 2rem;
+    width:4rem;
+    display:inline-block;
+    position:relative;
+    top:0.4rem;
+  }
+  .rec-empty-img {
+    position:absolute;
+    height: 3rem;
+    width:4rem;
+  }
+  .rec-chan-img {
+    position:absolute;
+    height: 3rem;
+    width:4rem;
+    display:none;
+  }
+  .rec-chan-txt {
+    height: 3rem;
+    margin-left:1rem;
+    display:inline-block;
+    position:relative;
+    top:0.35rem;
+  }
+  .chan-txt {
+    font-size:1.3rem;
   }
   .chan-img.chan-pad {
     position:relative;

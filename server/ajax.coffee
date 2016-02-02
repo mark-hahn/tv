@@ -6,7 +6,6 @@ url      = require 'url'
 http     = require 'http'
 exec     = require('child_process').exec
 ir       = require './ir'
-insteon  = require './insteon'
 db       = require './db'
 port     = require('parent-config')('apps-config.json').tvAjax_port
 showList = require './show-list'
@@ -70,18 +69,6 @@ srvr = http.createServer (req, res) ->
         if err then error err.message; return
         success 'sent'
 
-    when 'lightCmd'
-      try
-        insteon.lightCmd data...
-        success ''
-      catch e
-        error 'invalid lightCmd URL' + req.url
-        
-    when 'getLightLevels'
-      insteon.getLightLevels (err, lightLevels) ->
-        if err then error 'getAllLights err: ' + err.message; return
-        success lightLevels
-    
     when 'vlcCmd'
       # log 'vlcCmd', data
       vlc[data[0]] data[1..]...

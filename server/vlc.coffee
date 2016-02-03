@@ -70,10 +70,6 @@ ssh = (commandLine, last) ->
 muted  = delayAudio = no
 volume = 120
 
-killAllVlc = ->
-  # log 'killAllVlc'
-  # ssh 'killall vlc'
-  
 sshLive = (chan) ->
   cmd = 'DISPLAY=:0 vlc -I rc -f --rc-host 0.0.0.0:' + vlc_port + 
         ' http://192.168.1.185:5004/auto/v' + chan
@@ -142,7 +138,6 @@ exports.stop = ->
   file = null
   vlcCmd 'shutdown'
   closeSocket()
-  setTimeout killAllVlc, 300
 
 exports.status = (cb) ->
   if not socket

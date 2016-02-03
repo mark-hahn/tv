@@ -33,12 +33,12 @@ Vue.component 'tv-btns-comp',
           div '.btn', vOn: 'click: tvBtnClick', 'Mute'
           div '.btn', vOn: 'click: tvBtnClick', 'Vol +'
           
-        div '.btn-row.video-btns', ->
+        div '.btn-row.video-btns', vShow:"episode", ->
           div '.btn', vOn: 'click: tvBtnClick', 'Stop'
           div '.btn', vOn: 'click: tvBtnClick', 'Reset'
           div '.btn', vOn: 'click: tvBtnClick', 'Back'
 
-        div '.btn-row.skip-btns', ->
+        div '.btn-row.skip-btns', vShow:"episode", ->
           div '.btn', vOn: 'click: tvBtnClick', '<<'
           div '.btn', vOn: 'click: tvBtnClick', '> ||'
           div '.btn', vOn: 'click: tvBtnClick', '>>'

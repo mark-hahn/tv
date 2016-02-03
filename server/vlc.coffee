@@ -66,8 +66,6 @@ ssh = (commandLine, last) ->
         log 'ssh callback err', {err, stdout, stderr}
   catch e
     log 'ssh err exception', e.message
-    
-vlcCmdLine = 'DISPLAY=:0 vlc -I rc -f --rc-host 0.0.0.0:' + vlc_port + ' --quiet'
 
 muted  = delayAudio = no
 volume = 120
@@ -76,6 +74,31 @@ killAllVlc = ->
   log 'killAllVlc'
   ssh 'killall vlc'
   
+sshLive = (chan) ->
+  cmd = 'DISPLAY=:0 vlc -I rc -f --rc-host 0.0.0.0:' + vlc_port + 
+        ' http://192.168.1.185:5004/auto/v' + chan
+  log cmd
+  ssh cmd
+  setTimeout ->
+    initSocket()
+    nosub()
+    muted = no
+    delayAudio = yes
+  , 2000
+  
+exports.live = (chan) ->
+  if socket
+    log 'live called with open socket'
+    closeSocket()
+    setTimeout ->
+      initSocket()
+      vlcCmd 'shutdown'
+      setTimeout sshLive(chan), 2000
+    , 1000
+  else
+    setTimeout sshLive(chan), 2000
+
+vlcCmdLine = 'DISPLAY=:0 vlc -I rc -f --rc-host 0.0.0.0:' + vlc_port + ' --quiet'
 sshPlay = ->
   # log 'play (ssh)', 'mark@' + vlcip_tv, vlcCmdLine, '/home/mark/Videos/' + file
   ssh vlcCmdLine, '"/home/mark/Videos/' + file + '"'
@@ -92,7 +115,7 @@ exports.start = (showIdIn, episodeIdIn, fileIn) ->
   file      = fileIn
   
   if socket
-    # log 'play called with open socket'
+    log 'play called with open socket'
     closeSocket()
     setTimeout ->
       initSocket()

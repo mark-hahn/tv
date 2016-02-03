@@ -184,6 +184,8 @@ do init = ->
         @$emit 'chgCurPage', 'watch'
         @$broadcast 'startWatch', @curShow.title, episode
         
+      stopWatch: -> @$broadcast 'stopWatch'
+        
       tvTurningOff: -> @$broadcast 'tvTurningOff'
         
       popup: (msg) -> 

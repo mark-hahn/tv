@@ -46,6 +46,7 @@ Vue.component 'record-comp',
   methods:
     startLive: ->
       if @rightSel is 'live' and @curChannel
+        @$dispatch 'stopWatch'
         tvGlobal.ajaxCmd 'vlcCmd', 'live', @curChannel
       setTimeout =>
         tvGlobal.ajaxCmd 'irCmd', 'hdmi3'
@@ -56,21 +57,20 @@ Vue.component 'record-comp',
       for netBtn in innerDiv.querySelectorAll '.net-btn'
         netBtn.classList.remove 'chan-sel'
       e.currentTarget.classList.add 'chan-sel'
-      log @curChannel = e.currentTarget.getAttribute 'channel'
+      @curChannel = e.currentTarget.getAttribute 'channel'
       @startLive()
         
     liveClick: (e) ->
-      @rightSel = 'live'
-      @startLive()      
-
+      if @rightSel isnt 'live'
+        @rightSel = 'live'
+        @startLive()      
+      else
+        @$dispatch 'stopWatch'
+        rightSel = null
+        
   events:
     tvBtnClick: (text) ->
       switch text
-        when '> ||'
-          if @playRate isnt 1
-            @stopSkipping()
-          else
-            tvGlobal.ajaxCmd 'vlcCmd', 'playPause'
         when 'Mute'  then tvGlobal.ajaxCmd 'vlcCmd', 'toggleMute'
         when 'Vol +' then tvGlobal.ajaxCmd 'vlcCmd', 'volup'
         when 'Vol -' then tvGlobal.ajaxCmd 'vlcCmd', 'voldown'

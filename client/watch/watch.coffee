@@ -62,7 +62,6 @@ Vue.component 'watch-comp',
       
     stopWatch: ->
       @stopSkipping()
-      tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
       setTimeout ->
         tvGlobal.ajaxCmd 'vlcCmd', 'stop'
       , 500
@@ -78,6 +77,7 @@ Vue.component 'watch-comp',
         when 'Vol +' then tvGlobal.ajaxCmd 'vlcCmd', 'volup'
         when 'Vol -' then tvGlobal.ajaxCmd 'vlcCmd', 'voldown'
         when 'Stop' 
+          tvGlobal.ajaxCmd 'irCmd', 'hdmi2'
           @$dispatch 'chgCurPage', 'episode'
           @$emit 'stopWatch'
         when 'Reset' 

@@ -71,8 +71,8 @@ muted  = delayAudio = no
 volume = 120
 
 killAllVlc = ->
-  log 'killAllVlc'
-  ssh 'killall vlc'
+  # log 'killAllVlc'
+  # ssh 'killall vlc'
   
 sshLive = (chan) ->
   cmd = 'DISPLAY=:0 vlc -I rc -f --rc-host 0.0.0.0:' + vlc_port + 

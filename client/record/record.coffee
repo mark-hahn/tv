@@ -66,7 +66,7 @@ Vue.component 'record-comp',
         @startLive()      
       else
         @$dispatch 'stopWatch'
-        rightSel = null
+        @rightSel = null
         
   events:
     tvBtnClick: (text) ->

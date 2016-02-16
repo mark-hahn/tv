@@ -61,8 +61,10 @@ Vue.component 'show-comp',
   events:
     playShow: ->
       @$dispatch 'videoEnable'
-       
-      process.nextTick =>
+      
+      tvGlobal.ajaxCmd 'episodes', @curShow.id, (err, res) => 
+        if err then log 'get episodes err', err.message; return
+        @curShow.episodes = res.data
         haveWatchable = null
         for episode, epiIdx in @curShow.episodes
           if episode.watched

@@ -8,10 +8,6 @@ exec = require('child_process').exec
 Vue  = require 'vue'
 FuzzySet = require 'fuzzyset.js'
 
-log Object.keys require('child_process')
-
-log 'app starting'
-
 require './utils'
 require './ajax-client'
 
@@ -149,13 +145,6 @@ do init = ->
       curEpisode:    {}
       popupMsg:      ''
        
-    created: ->
-      tvGlobal.ajaxCmd 'shows', (err, res) => 
-        if err then log 'get all shows err', err.message; return
-        @allShows = res.data
-        # log res.data.episodes
-        document.querySelector('#page').style.visibility = 'visible'
-        
     events:
       videoEnable: ->
         @$broadcast 'videoEnable'
@@ -172,13 +161,23 @@ do init = ->
         @$emit 'chgEpisodeIdx', epiIdx
         localStorage.setItem 'vueCurShowId', show.id
         
-      chgEpisodeIdx: (idx) ->
-        if not idx?
-          for episode, idx in @curShow.episodes ? []
-            if not episode.watched then break
-        @curEpisodeIdx = idx = Math.max 0, Math.min (@curShow.episodes?.length ? 1) - 1, idx
-        @curEpisode = @curShow.episodes[idx]
-        sessionStorage.setItem 'epiForShow' + @curShow.id, idx
+      chgEpisodeIdx: (idx, cb) ->
+        tvGlobal.ajaxCmd 'episodes', @curShow.id, (err, res) => 
+          if err then log 'get episodes err', err.message; return
+          {watchedCount, availCount, episodes} = res.data
+          tags = @curShow.tags
+          if watchedCount is 0 then tags.New = yes
+          else delete tags.New
+          if availCount < 3 then tags.LessThan3 = yes
+          else delete tags.LessThan3
+          if watchedCount is availCount then tags.Watched = yes
+          else delete tags.Watched
+          @curShow.episodes = episodes
+          @curEpisodeIdx = idx = 
+            Math.max 0, Math.min (@curShow.episodes?.length ? 1) - 1, idx
+          @curEpisode = @curShow.episodes[idx]
+          # log '@curEpisode', @curEpisode.title, idx, '/', @curShow.episodes.length
+          sessionStorage.setItem 'epiForShow' + @curShow.id, idx
       
       startWatch: (episode = @curEpisode) ->
         @$emit 'chgCurPage', 'watch'
@@ -193,6 +192,14 @@ do init = ->
         @popupMsg = msg
         if @popupTO then clearTimeout @popupTO
         @popupTO = setTimeout (=> @popupMsg = ''), 3000
+        
+    created: ->
+      log 'loading all'
+      tvGlobal.ajaxCmd 'shows', (err, res) => 
+        if err then log 'get all shows err', err.message; return
+        @allShows = res.data
+        log 'all shows loaded', @allShows.length
+        document.querySelector('#page').style.visibility = 'visible'
         
     attached: -> 
       tvGlobal.windowResize => @$broadcast 'resize'
@@ -248,3 +255,27 @@ do init = ->
             window.open "https://www.google.com/search?q=#{query}",'auxtvwin'
             
           else log 'invalid key:', e.charCode
+            
+      showIdx = 0
+      do oneShow = => 
+        if not @allShows?.length
+          setTimeout oneShow, 200
+          return
+        if not (show = @allShows[showIdx++]) 
+          log 'all episodes loaded'
+          return
+        if show.episodes.length
+          setTimeout oneShow, 0
+          return
+        tvGlobal.ajaxCmd 'episodes', show.id, (err, res) => 
+          if err then log 'get episodes err', err.message; return
+          {watchedCount, availCount, episodes} = res.data
+          tags = show.tags
+          if watchedCount is 0 then tags.New = yes
+          else delete tags.New
+          if availCount < 3 then tags.LessThan3 = yes
+          else delete tags.LessThan3
+          if watchedCount is availCount then tags.Watched = yes
+          else delete tags.Watched
+          show.episodes = episodes
+          oneShow()

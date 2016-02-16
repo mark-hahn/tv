@@ -43,10 +43,15 @@ srvr = http.createServer (req, res) ->
       success ''
       
     when 'shows'
-      # log 'shows start'
+      log 'shows start'
       showList.getShowList (err, result) ->
         if err then error err.message; return
-        # log 'shows done', result.length
+        log 'shows done', result.length
+        success result
+    
+    when 'episodes'
+      showList.getEpisodeList data[0], (err, result) ->
+        if err then error err.message; return
         success result
     
     when 'setDBField'

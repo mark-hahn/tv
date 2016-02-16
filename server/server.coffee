@@ -37,8 +37,8 @@ if dev
 html = fs.readFileSync 'client/index.html'
 
 srvr = http.createServer (req, res) ->
-  if not dev or req.url isnt '/js/bundle.js'
-    log 'URL:', req.url
+  # if not dev or req.url isnt '/js/bundle.js'
+  #   log 'URL:', req.url
     
   done = (err, doc) ->
     res.writeHead (if err then 404 else 200), 'Content-Type': 'text/json'
@@ -60,24 +60,24 @@ srvr = http.createServer (req, res) ->
         lastStatus = null
         if err then log 'channel.addClient err:', err.message
       
-    else
+    else 
       req.addListener('end', ->
         if req.url[0..13] is '/tvdb-banners/'
           bannerServer.serve req, res, (err) ->
             if err
-              if err.status is 404
-                console.log 'banner 404:', req.url
-              else
-                console.log 'bannerServer BAD URL:', req.url, err
-            done 'bannerServer BAD URL: ' + req.url
+              # if err.status isnt 404
+              #   console.log 'banner 404:', req.url
+              # else
+                # console.log 'bannerServer BAD URL:', req.url, err
+              done 'bannerServer BAD URL: ' + req.url
         else
-          console.log 'fileServer:', req.url
+          # log 'fileServer:', req.url
           fileServer.serve req, res, (err) ->
             if err and req.url[-4..-1] not in ['.map', '.ico', 'ined']
-              if err.status is 404
-                console.log 'file 404:', req.url
-              else
-                console.log 'fileServer BAD URL:', req.url, err
+              # if err.status isnt 404
+              #   console.log 'file 404:', req.url
+              # else
+                # console.log 'fileServer BAD URL:', req.url, err
               done 'fileServer BAD URL: ' + req.url
       ).resume()
 
@@ -101,6 +101,6 @@ do sendStatus = ->
     setTimeout sendStatus, 1000
   
 srvr.listen cfg.tv_port
-log 'listening on port', cfg.tv_port, '\n'
+log 'listening on port', cfg.tv_port
 
 

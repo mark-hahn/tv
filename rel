@@ -1,0 +1,14 @@
+#   -*-  grammar-ext: sh  -*-
+
+if [ $LOCATION != "server" ]; then 
+  echo "rel must be run on the server"
+  exit 1
+fi
+
+pkill -f /root/apps/tv/js/server.js > /dev/null 2>&1
+killall ffmpeg > /dev/null 2>&1
+killall tail   > /dev/null 2>&1
+rsync -av --exclude .git --exclude bundle.js ~/dev/apps/tv/ ~/apps/tv/
+uglifyjs ~/dev/apps/tv/js/bundle.js \
+      -o ~/apps/tv/js/bundle.js     \
+      --screw-ie8 -c -m

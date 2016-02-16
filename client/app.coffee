@@ -141,7 +141,7 @@ do init = ->
       # script src:'http://www.telize.com/jsonip?callback=getip'        
         
     data: 
-      curPage:      'record'
+      curPage:      'show'
       allShows:      []
       curShowIdx:    0
       curShow:       {}

@@ -35,6 +35,7 @@ request
     # log 'init', {browserIp, serverIp, vidSrvrPfx, ajaxPfx, bannerPfx}
 
 tvGlobal.ajaxCmd = (cmd, args..., cb) ->
+  # log 'ajaxCmd', cmd, args
   if not tvGlobal.ajaxInit
     log 'not tvGlobal.ajaxInit'
     setTimeout (-> tvGlobal.ajaxCmd cmd, args..., cb), 100

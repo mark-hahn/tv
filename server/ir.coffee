@@ -3,9 +3,9 @@
 ###
 
 net = require 'net'
-log = require('./utils') '  ir'
+log = require('./utils') '  IR'
 
-itachHost = '192.168.1.165'
+itachHost = '192.168.1.192'
 
 # for standard sony tv remote
 irPfx1 = 'sendir,1:1,'
@@ -20,7 +20,7 @@ irDataByCmd =
   mute:   '24,24,24,24,24,48,24,24,24,48,24,24,24,24,24,48,24,24'
   hdmi1:  '24,24,24,24,24,24,24,48,24,24,24,24,24,48,24,48,24,24' # BD Home Theatre
   hdmi2:  '24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,48,24,24' # Chromecast
-  hdmi3:  '24,24,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,48,24,48' # nothing
+  hdmi3:  '24,24,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,48,24,48' # tv pc
   hdmi4:  '24,48,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,48,24,48' # Roku
 
 idCount = 0
@@ -40,15 +40,20 @@ sendIrCb = null
 
 # not re-entrant
 sendIR = (irData, cb) ->
+  # log 'sendIR enter (not re-entrant)', irData
   sendIrCb = cb
   
   endSendIR = (err, data) ->
     if timeout then clearTimeout timeout
     timeout = null
     if data then log 'endSendIR data: ' + data[0..80]
-    if err then err = message: err
+    if err
+      # log 'endSendIR err', err.message
+      err = message: err
     sendIrCb? err, data
     sendIrCb = null
+    # log 'sendIR exit 0 (endSendIR)', data
+    
     
   timeout = setTimeout (-> endSendIR 'sendIR timeout'), 3000
 
@@ -59,7 +64,7 @@ sendIR = (irData, cb) ->
       if err then endSendIR 'connect err: ' + err.message;  return
       writeToItach irData, (err) ->
         if err then endSendIR 'writeToItach err: ' + err.message;  return
-      
+    itach.setTimeout 0
     itach.on 'data', (data) ->
       data = data.toString().replace /\r\n?/g, '\n'
       if data?[-1..-1][0] is '\n' then data = data[0..-2]

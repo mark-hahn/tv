@@ -1,5 +1,10 @@
 #   -*-  grammar-ext: sh  -*-
 
+if [ $LOCATION != "server" ]; then 
+  echo "run must be run on the server"
+  exit 1
+fi
+
 if [ $(pwd) == "/root/dev/apps/tv" ]; then isdev=true; else isdev=false; fi
 if $isdev
   then 

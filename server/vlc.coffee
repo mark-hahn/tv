@@ -9,7 +9,7 @@ vlcip_tv  = '192.168.1.104'
 vlc_port  = 1250
 
 socket = playPos = file = showId = episodeId = null
-gettingPlayPos = no
+gettingPlayPos = vlcLoaded = no
 
 initSocket = ->
   # log 'vlc initSocket'
@@ -27,7 +27,7 @@ initSocket = ->
     if data then log 'socket end:', data.toString().replace /\n/g, ' '
 
 vlcCmd = (command) ->
-  if not socket 
+  if not socket or not vlcLoaded
     # log 'vlcCmd closed socket', command
     # console.trace()
     return
@@ -42,7 +42,8 @@ vlcCmd = (command) ->
     setTimeout (-> vlcCmd command), 1000
 
 nosub = ->
-  vlcCmd 'strack 0'
+  if vlcLoaded
+    vlcCmd 'strack 0'
     
 closeSocket = ->
   if not socket 
@@ -93,6 +94,7 @@ exports.live = (chan) ->
     , 1000
   else
     setTimeout sshLive(chan), 2000
+  vlcLoaded = true
 
 vlcCmdLine = 'DISPLAY=:0 vlc -I rc -f --rc-host 0.0.0.0:' + vlc_port + ' --quiet'
 sshPlay = ->
@@ -104,6 +106,7 @@ sshPlay = ->
     muted = no
     delayAudio = yes
   , 2000
+  vlcLoaded = true
   
 exports.start = (showIdIn, episodeIdIn, fileIn) ->
   showId    = showIdIn
@@ -126,21 +129,26 @@ exports.seek = (timeSecs) ->
   vlcCmd 'seek ' + Math.floor timeSecs
 
 exports.playRate = (playRate) ->
+  if not vlcLoaded then return
+  
   # log 'rate', playRate
   vlcCmd 'rate ' + playRate
   
 exports.playPause = ->
+  if not vlcLoaded then return
   # log 'pause'
   vlcCmd 'pause'
 
 exports.stop = ->
   # log 'stop'
+  if not vlcLoaded then return
   file = null
   vlcCmd 'shutdown'
   closeSocket()
+  vlcLoaded = no
 
 exports.status = (cb) ->
-  if not socket
+  if not vlcLoaded or not socket
     cb null, notShowing: yes
     return
   if gettingPlayPos then cb null, busy: yes; return
@@ -166,6 +174,8 @@ exports.status = (cb) ->
       setTimeout check, 50
 
 volinc = (ticks) ->
+  if not vlcLoaded then return
+  
   volume += ticks
   if ticks < 0 and muted then return
   vlcCmd 'volume ' + volume
@@ -176,6 +186,8 @@ exports.volup   = -> volinc +10
 exports.voldown = -> volinc -10
   
 exports.toggleMute = ->
+  if not vlcLoaded then return
+  
   # log 'toggleMute'
   if not muted
     muted = yes

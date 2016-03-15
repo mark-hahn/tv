@@ -51,6 +51,7 @@ Vue.component 'header-comp',
           else @curPage
     
     onOff: (e) -> 
+      # log 'onOff'
       tvGlobal.ajaxCmd 'power'
       
         

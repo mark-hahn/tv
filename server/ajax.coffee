@@ -67,9 +67,12 @@ srvr = http.createServer (req, res) ->
     when 'power'
       ir.sendCmd 'power', (err) ->
         if err then error err.message; return
+        success 'done'
         
     when 'irCmd'
+      # log 'ajaxCmd power (poweringUp)', data, poweringUp
       if poweringUp then success 'skipped'; return
+      
       ir.sendCmd data..., (err) ->
         if err then error err.message; return
         success 'sent'

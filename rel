@@ -6,7 +6,6 @@ if [ $LOCATION != "server" ]; then
 fi
 
 pkill -f /root/apps/tv/js/server.js > /dev/null 2>&1
-killall ffmpeg > /dev/null 2>&1
 killall tail   > /dev/null 2>&1
 rsync -av --exclude .git --exclude bundle.js ~/dev/apps/tv/ ~/apps/tv/
 uglifyjs ~/dev/apps/tv/js/bundle.js \

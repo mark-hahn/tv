@@ -21,7 +21,7 @@ loaded = false
 active =
   html: 1
   css: 1
-  js: 1
+  js: 1 
 
 Live =
   heartbeat: ->
@@ -31,10 +31,7 @@ Live =
     setTimeout Live.heartbeat, interval
 
   loadresources: ->
-    if not tvGlobal.ajaxInit
-      setTimeout Live.loadresources, 100
-      return
-    urls = [ "http://#{tvGlobal.serverIp}:2340/js/bundle.js" ]
+    urls = [ "http://hahnca.com/tv/js/bundle.js" ]
     for url in urls
       Live.getHead url, (url, info) ->
         resources[url] = info

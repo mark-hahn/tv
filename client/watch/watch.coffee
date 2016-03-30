@@ -143,7 +143,7 @@ Vue.component 'watch-comp',
       @$broadcast 'setScrubPos', @playPos
 
   attached: ->
-    evtSource = new EventSource "/channel"  
+    evtSource = new EventSource "channel"  
       
     evtSource.addEventListener 'status', (e) =>
       # log 'status event', e

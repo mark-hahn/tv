@@ -8,6 +8,10 @@ exec = require('child_process').exec
 Vue  = require 'vue'
 FuzzySet = require 'fuzzyset.js'
 
+tvGlobal = window.tvGlobal = {}
+tvGlobal.base = location.pathname.replace /\//g, ''
+tvGlobal.debug = (tvGlobal.base is 'tvd')
+
 require './utils'
 require './ajax-client'
 
@@ -18,13 +22,14 @@ teacup = require 'teacup'
 camelToKebab = require 'teacup-camel-to-kebab'
 teacup.use camelToKebab()
 
-{render, tag, meta, title, style, div, script} = teacup
+{render, tag, meta, title, base, style, div, script} = teacup
 
 document.head.innerHTML = render ->
   meta name: 'viewport', \
     content: 'width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, ' +
              'user-scalable=no'
   title 'Hahn TV'
+  base href:"http://hahnca.com/#{tvGlobal.base}/"
   
   style """
     html { 
@@ -93,10 +98,7 @@ document.head.innerHTML = render ->
 """
 
 do init = ->
-  if not tvGlobal.ajaxInit
-    setTimeout init, 100
-    return
-
+  log 'do init'
   require './header'
   require './show/show'
   require './episode/episode'

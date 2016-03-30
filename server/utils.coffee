@@ -1,4 +1,6 @@
 
+console.log 'hi'
+
 util   = require 'util'
 moment = require 'moment'
 

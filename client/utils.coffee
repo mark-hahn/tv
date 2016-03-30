@@ -5,15 +5,13 @@
 log     = require('./debug') '-utils'
 Vue     = require 'vue'
 
-window.tvGlobal = {}
-
 # config vars from server
 # this line is replaced on every run
-serverConfigStr = '{"CHROOT":"","USER":"root","HOME_IP":"173.58.39.204","AT_HOME":"true","SERVER_IP":"192.168.1.103","SERVER_HOST":"192.168.1.103","DEBUG":"*","LOCATION":"server","OFF_SITE":"false"}'
+serverConfigStr = '{"CHROOT":"","USER":"root","HOME_IP":"173.58.39.204","AT_HOME":"true","DEBUG":"*","LOCATION":"server","OFF_SITE":"false"}'
 tvGlobal.serverConfig = JSON.parse serverConfigStr
 # log 'serverConfig', tvGlobal.serverConfig
 
-Vue.config.debug = no # tvGlobal.debug = (tvGlobal.serverConfig.DEBUG is '*')
+Vue.config.debug = tvGlobal.debug
 
 tvGlobal.windowResize = (cb) ->
   htmlEle = document.documentElement

@@ -20,6 +20,8 @@ channel = new SseChannel
 lastStatus = null  
 
 cfg = require("parent-config") "apps-config.json"
+debug = (+cfg.tv_port is 2340)
+log 'debug:', debug
 
 require './ajax'
 # require './tvdb'
@@ -27,17 +29,19 @@ require './ajax'
 dev  = (__dirname.indexOf('/dev/') > -1)
 fileServer   = new nodeStatic.Server (if dev then cache: 0)
 bannerServer = new nodeStatic.Server '/archive'
-  
+
 bundle = null
 do loadBundle = ->
   bundle = fs.readFileSync 'js/bundle.js', 'utf8'
 if dev
   fs.watchFile 'js/bundle.js', {interval: 100}, loadBundle
 
-html = fs.readFileSync 'client/index.html'
+
+html = fs.readFileSync (if debug then 'client/index-dbg.html' else 'client/index.html')
 
 srvr = http.createServer (req, res) ->
   # if not dev or req.url isnt '/js/bundle.js'
+  # if req.url isnt '/js/bundle.js'
   #   log 'URL:', req.url
     
   done = (err, doc) ->

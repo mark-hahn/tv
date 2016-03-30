@@ -25,9 +25,9 @@ Vue.component 'record-comp',
           , ->
             div '.rec-chan-img-div', ->
               img '.rec-empty-img', 
-                src:   '/client/record/images/empty.png'
+                src:   'client/record/images/empty.png'
               img '.rec-chan-img', 
-                src:   '/client/record/images/{{chan[0]}}.png'
+                src:   'client/record/images/{{chan[0]}}.png'
                 onload:"this.style.display = 'inline-block'"
             div '.rec-chan-txt', ->
               div '.chan-txt', '{{chan[1]}}'

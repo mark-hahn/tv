@@ -2,7 +2,7 @@
 
 if [ $LOCATION != "server" ]; then 
   echo "run must be run on the server"
-  exit 1
+  exit 1 
 fi
 
 if [ $(pwd) == "/root/dev/apps/tv" ]; then isdev=true; else isdev=false; fi
@@ -14,7 +14,6 @@ if $isdev
     echo "Running TV in normal mode"
     pkill -f /root/apps/tv/js/server.js     > /dev/null 2>&1
 fi
-killall ffmpeg > /dev/null 2>&1 
 killall tail   > /dev/null 2>&1
 if $isdev
   then tail -fn 0 ~/logs/tv-dev.log &

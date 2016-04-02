@@ -335,7 +335,13 @@ addTvdbEpisodes = (show, fileData, tvdbEpisodes, cb) ->
     if err then fatal err
     
     if body.rows.length > 0
-      addTvdbEpisodes show, fileData, tvdbEpisodes, cb
+      dbEpisode = body.rows[0].value
+      if not dbEpisode.summary and tvdbEpisode.summary
+        Object.assign dbEpisode, tvdbEpisode
+        dbPutEpisode dbEpisode, ->
+          addTvdbEpisodes show, fileData, tvdbEpisodes, cb
+      else
+        cb()
       return
       
     inc 'new tvdb episode'
@@ -390,7 +396,7 @@ exports.checkFile = (filePath, cb) ->
     if body.rows.length > 0
       inc 'got episode by fileName'
       episode =  body.rows[0].value
-      if episode.tvdbEpisodeId
+      if episode.tvdbEpisodeId and episode.summary
         # if mappings[show.tvdbTitle?] is 'old'
         #   deleteShow episode.showId
         #   cb()
@@ -457,9 +463,9 @@ exports.checkFile = (filePath, cb) ->
               if err then fatal err
               chkTvdbEpisodes show, fileData, cb
 
-# log exports.getFileData videosPath + 'The.Soup.S1E1.HDTV.x264-FiHTV.mp4'
-# exports.checkFile videosPath + 'The.Soup.S1E1.HDTV.x264-FiHTV.mp4', ->
-
+# log exports.getFileData videosPath + 'iZombie.S02E13.720p.HDTV.X264-DIMENSION.mkv'
+# exports.checkFile videosPath + 'iZombie.S02E13.720p.HDTV.X264-DIMENSION.mkv', ->
+  # dumpInc()
 if process.argv[2] is 'all'
   files = fs.listTreeSync videosPath
   totalFiles = files.length

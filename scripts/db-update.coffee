@@ -336,12 +336,14 @@ addTvdbEpisodes = (show, fileData, tvdbEpisodes, cb) ->
     
     if body.rows.length > 0
       dbEpisode = body.rows[0].value
-      if not dbEpisode.summary and tvdbEpisode.summary
-        Object.assign dbEpisode, tvdbEpisode
-        dbPutEpisode dbEpisode, ->
-          addTvdbEpisodes show, fileData, tvdbEpisodes, cb
-      else
-        cb()
+
+      for val,key of tvdbEpisode when val?
+        if dbEpisode[key] isnt val
+          Object.assign dbEpisode, tvdbEpisode
+          dbPutEpisode dbEpisode, ->
+            addTvdbEpisodes show, fileData, tvdbEpisodes, cb
+          return
+      addTvdbEpisodes show, fileData, tvdbEpisodes, cb
       return
       
     inc 'new tvdb episode'

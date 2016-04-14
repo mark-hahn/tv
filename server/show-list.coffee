@@ -55,5 +55,16 @@ exports.getEpisodeList = (showId, cb) ->
       episodes.push {
         id: episodeId, episodeNumber, title, summary, thumb, viewCount:0, 
         duration, watched, aired, filePaths, noFile, showId}
+    
+    if watchedCount is availCount    
+      db.get showId, (err, doc) ->
+        if err then throw err
+        tags = doc.tags
+        if not tags.Watched
+          tags.Watched = yes
+          db.put doc, ->
+            cb? null, {watchedCount, availCount, episodes}
+          return
+        cb? null, {watchedCount, availCount, episodes}
+      return
     cb? null, {watchedCount, availCount, episodes}
-          

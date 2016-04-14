@@ -5,7 +5,8 @@
 net = require 'net'
 log = require('./utils') '  IR'
 
-itachHost = '192.168.1.192'
+# scan cmd: Global Cache 00:0C:1E:03:6A:7E
+itachHost = '192.168.1.195'
 
 # for standard sony tv remote
 irPfx1 = 'sendir,1:1,'

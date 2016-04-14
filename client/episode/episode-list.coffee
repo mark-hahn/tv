@@ -30,7 +30,7 @@ log     = require('../debug') 'snf'
     background-color: #dcc;
   }
   .noFile .episode-title {
-    color: gray;
+    color: #008;
   }
   .noFile .episode-number {
     color: gray;

@@ -29,11 +29,14 @@ log     = require('../debug') 'snf'
   .watched .episode-number {
     background-color: #dcc;
   }
+  .watched .episode-title {
+    background-color: #dcc;
+  }
   .noFile .episode-title {
-    color: #008;
+    color: #88F;
   }
   .noFile .episode-number {
-    color: gray;
+    color: #88F;
   }
   .watched .episode-title {
     text-decoration:line-through;

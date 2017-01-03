@@ -15,7 +15,7 @@ if disableOutput
   console.log 'OUTPUT DISABLED'
   console.log '***************'
   console.log ''
-  
+
 log 'starting db-update'
 
 mappings = [
@@ -46,7 +46,7 @@ totalFiles = null
 incSeq    = 0
 incLabels = {}
 incs      = {}
-inc = (lbl) -> 
+inc = (lbl) ->
   # log lbl
   if not (incsLbl = incs[lbl])
     seqTxt = ++incSeq + ''
@@ -54,26 +54,26 @@ inc = (lbl) ->
     incLabels[lbl] = lbl
     incs[lbl] = 0
   incs[lbl]++
-  
+
 if typeof Object.assign isnt "function"
   Object.assign = (target, args...) ->
     output = Object target
     for source in args when source?
       for own nextKey of source
-        output[nextKey] = source[nextKey]  
+        output[nextKey] = source[nextKey]
     output
-  
+
 dumpInc = ->
   total = incs.checkFile
   console.log
   console.log (new Date).toString()[16..20], total, 'of', totalFiles
-  for k, v of incs when k isnt 'checkFile' 
+  for k, v of incs when k isnt 'checkFile'
     log incLabels[k] + ': ' + v
   bad = 0
   for badLbl in [
       'tvdb hard error'
-      'file no tvdb show' 
-      'bad-file-no-series' 
+      'file no tvdb show'
+      'bad-file-no-series'
       'bad-file-bad-number'
       'new episode no tvdb']
     bad += incs[badLbl] ? 0
@@ -101,7 +101,7 @@ exports.getBitRateDuration = (filePath) ->
   {output, stdErr} = exec 'mediainfo', ['--Output=XML', filePath]
   matches = /<track\stype="Video">([\S\s]*?)<\/track>/i.exec output.toString()
   videoTrack = matches?[1] ? ''
-    
+
   matches  = /<Overall_bit_rate>(\d+\s+)?([\d\.]+)\s+(\w+)<\/Overall_bit_rate>/i
               .exec videoTrack
   matches ?= /<Bit_rate>(\d+\s+)?([\d\.]+)\s+(\w+)<\/Bit_rate>/i
@@ -114,10 +114,10 @@ exports.getBitRateDuration = (filePath) ->
       log 'bit rate units err', matches
       fatal()
   if rate > 10e6
-    fs.appendFileSync 'files/high-bitrate.txt', 
+    fs.appendFileSync 'files/high-bitrate.txt',
       matches[2] + ' ' + matches[3] + ' ' + rate + ' ' + filePath + '\n'
-  
-  parseDuration = (track) ->    
+
+  parseDuration = (track) ->
     durRegex = /// <Duration>
                       ((\d+)h)?\s*
                       ((\d+)mn)?\s*
@@ -125,7 +125,7 @@ exports.getBitRateDuration = (filePath) ->
                    <\/Duration>///i
     matches = durRegex.exec(track) or []
     +(matches[2] or 0) * 3600 + +(matches[4] or 0) * 60 + +(matches[6] or 0)
-  
+
   duration = parseDuration videoTrack
   if not duration
     matches = /<track\stype="Audio">([\S\s]*?)<\/track>/i.exec output.toString()
@@ -135,8 +135,8 @@ exports.getBitRateDuration = (filePath) ->
     stats = fs.statSync filePath
     duration = Math.ceil (stats.size * 8) / rate
     log 'guessing duration by rate', stats.size, rate, duration, filePath
-    fs.appendFileSync 'files/duration-by-rate.txt', 
-                                     stats.size + ', ' + rate     + ', ' + 
+    fs.appendFileSync 'files/duration-by-rate.txt',
+                                     stats.size + ', ' + rate     + ', ' +
                                      duration   + ', ' + filePath + '\n'
   if not duration
     duration = 1260
@@ -150,29 +150,29 @@ exports.guessit = (fileName) ->
                      .replace /\(GB\)/i, '(UK)'
                      .replace /[\.\s]UK[\.\s]/i, ' (UK) '
                      .replace 'faks86', ''
-                     
+
   if fileName in [
         'Rik Mayall Presents  - s01e09 - Briefest Encounter.avi'
         'The.Comedians.US.S01E01.720p.HDTV.x264-KILLERS.mkv'
       ]
     fs.appendFileSync 'files/episode-no-tvdb.txt', fileName + '\n'
-  
+
   {output} = exec 'guessit', [fileName], timeout: 10e3
-  
+
   json = output.toString().replace /^[\s|\S]*?GuessIt\s+found\:\s+/i, ''
   try
     res = JSON.parse json.replace /[^\}]*$/, ''
   catch e
-    fs.appendFileSync 'files/guessit-parse-error.txt', 
+    fs.appendFileSync 'files/guessit-parse-error.txt',
       output.toString() + '\n' + json + '\n'
     return []
-  
+
   if res.year
     res.title = res.title + ' (' + res.year + ')'
-  if res.country is 'UNITED KINGDOM' and 
+  if res.country is 'UNITED KINGDOM' and
        not /\(UK\)/i.test res.title
     res.title = res.title + ' (UK)'
-  
+
   episodes = []
   switch typeof res.season + typeof res.episode
     when 'objectnumber'
@@ -202,14 +202,14 @@ exports.getFileData = (filePath) ->
   fileSize = stats.size
   if not stats.isFile() then return 'not-file'
   {bitRate, duration} = exports.getBitRateDuration filePath
-  
+
   episodes = exports.guessit fileName
-    
+
   if not (fileData = episodes[0]) then return 'no-guessit'
   if typeof fileData.title isnt 'string'
     fileData.title = fileData.title[0]
   if not (series = fileData.title) then return 'no-series'
-  
+
   fileTitle = series
   for map in mappings
     # log 'i fileTitle', {fileTitle, type: typeof fileTitle}
@@ -221,22 +221,22 @@ exports.getFileData = (filePath) ->
       break
   fileTitle = fileTitle.replace /\./g, ' '
                        .replace /^(aaf-|daa-)/i, ''
-  if (isNaN(fileData.season) or isNaN(fileData.episode)) 
+  if (isNaN(fileData.season) or isNaN(fileData.episode))
     return 'bad-number'
-    
+
   seasonNumber  = +fileData.season
   episodeNumber = +fileData.episode
-  
+
   fileCountry = fileData.country
   if episodes.length > 1
-    multipleEpisodes = 
+    multipleEpisodes =
       for episode in episodes
         [episode.seasonNumber, episode.episodeNumber]
   else
-    multipleEpisodes = null      
+    multipleEpisodes = null
   fileEpisodeTitle = fileData.episode_title
-  
-  {fileName, fileSize, bitRate, duration, fileTitle, seasonNumber, 
+
+  {fileName, fileSize, bitRate, duration, fileTitle, seasonNumber,
    episodeNumber, multipleEpisodes, fileEpisodeTitle, fileCountry}
 
 deleteShow = (showId) ->
@@ -244,7 +244,7 @@ deleteShow = (showId) ->
     db.view 'episodeByShowSeasonEpisode',
       {startkey: [showId, null, null]}
       {endkey:   [showId,   {},   {}]}
-    , (err, body) -> 
+    , (err, body) ->
       if err then fatal err, {showId}
       for row in body.rows
         db.destroy row.id, row.rev
@@ -274,7 +274,7 @@ dbPutEpisode = (episode, cb) ->
   delete episode.bitRate
   delete episode.fileName
   deleteNullProps episode
-  
+
   tvdb.downloadBanner episode.thumb, ->
     if disableOutput then cb(); return
     db.put episode, (err) ->
@@ -282,16 +282,16 @@ dbPutEpisode = (episode, cb) ->
       inc 'put episode'
       # log 'dbPutEpisode', episode
       cb()
-      
+
 getEpisode = (show, fileData, cb) ->
   {fileTitle, fileName, fileSize, bitRate} = fileData
   fileSizeRateName = [fileSize, bitRate, fileName]
-    
+
   db.view 'episodeByShowSeasonEpisode',
     {key: [show._id, fileData.seasonNumber, fileData.episodeNumber]}
-  , (err, body) -> 
+  , (err, body) ->
     if err then fatal err
-    
+
     if (episode = body.rows[0]?.value)
       if episode.tvdbEpisodeId
         havefileName = no
@@ -303,18 +303,18 @@ getEpisode = (show, fileData, cb) ->
           inc 'complete old episode'
           cb()
           return
-          
+
         inc 'add file to tvdb episode'
         episode = Object.assign fileData, episode
         episode.filePaths.push fileSizeRateName
         log 'add file to tvdb episode', episode
         dbPutEpisode episode, cb
         return
-        
+
       inc 'old episode no tvdb'
       cb()
       return
-    
+
     inc 'new episode no tvdb'
     fs.appendFileSync 'files/episode-no-tvdb.txt', show._id + ', ' + fileName + '"\n'
     episode           = fileData
@@ -327,13 +327,13 @@ addTvdbEpisodes = (show, fileData, tvdbEpisodes, cb) ->
   if not (tvdbEpisode = tvdbEpisodes.shift())
     getEpisode show, fileData, cb
     return
-  
+
   inc 'episode from tvdb'
   db.view 'episodeByShowSeasonEpisode',
           {key: [show._id, tvdbEpisode.seasonNumber, tvdbEpisode.episodeNumber]}
-  , (err, body) -> 
+  , (err, body) ->
     if err then fatal err
-    
+
     if body.rows.length > 0
       dbEpisode = body.rows[0].value
 
@@ -345,7 +345,7 @@ addTvdbEpisodes = (show, fileData, tvdbEpisodes, cb) ->
           return
       addTvdbEpisodes show, fileData, tvdbEpisodes, cb
       return
-      
+
     inc 'new tvdb episode'
     Object.assign tvdbEpisode,
       showId:    show._id
@@ -373,7 +373,7 @@ chkTvdbEpisodes = (show, fileData, cb) ->
         cb()
       else
         addTvdbEpisodes show, fileData, tvdbEpisodes, cb
-  else    
+  else
     delete show.episodes
     addTvdbEpisodes show, fileData, tvdbEpisodes, cb
 
@@ -382,7 +382,7 @@ exports.checkFile = (filePath, cb) ->
     fs.appendFileSync 'files/partials.txt', 'rm -rf "' + filePath + '"\n'
     setImmediate cb
     return
-    
+
   fileData = exports.getFileData filePath
   if fileData is 'not-file'  then setImmediate cb; return
   if typeof fileData is 'string'
@@ -391,8 +391,8 @@ exports.checkFile = (filePath, cb) ->
     setImmediate cb
     return
   {fileName, fileTitle} = fileData
-  
-  db.view 'episodeByFilePath', {key: fileName}, (err, body) -> 
+
+  db.view 'episodeByFilePath', {key: fileName}, (err, body) ->
     if err then fatal err
 
     if body.rows.length > 0
@@ -405,7 +405,7 @@ exports.checkFile = (filePath, cb) ->
         #   return
         inc 'skipping complete episode'
         cb()
-      else 
+      else
         inc 're-checking episode with no tvdb'
         if not episode.showId
           log 'no episode.showId', fileName
@@ -417,37 +417,37 @@ exports.checkFile = (filePath, cb) ->
             fatal()
           chkTvdbEpisodes show, fileData, cb
       return
-      
-    db.view 'showByFileTitle', {key: fileTitle}, (err, body) -> 
+
+    db.view 'showByFileTitle', {key: fileTitle}, (err, body) ->
       if err then fatal err
-      
+
       if body.rows.length > 0
         inc 'got showByFileTitle'
         show = body.rows[0].value
         chkTvdbEpisodes show, fileData, cb
-        
+
       else
         inc 'tvdb show lookup'
         tvdb.getShowByName fileTitle, (err, show) ->
           # if err then fatal err, {fileTitle, fileData, body, show}
-          if err 
-            log 'tvdb getShowByName err', 
+          if err
+            log 'tvdb getShowByName err',
                  util.inspect {fileTitle, fileData, body, show}, depth:null
             inc 'tvdb hard error'
             cb()
             return
-          
+
           if not show
             inc 'file no tvdb show'
             fs.appendFileSync 'files/file-no-tvdb-show.txt', fileName + '"\n'
             cb()
             return
-          
-          db.view 'showByTvdbShowId', 
+
+          db.view 'showByTvdbShowId',
             {key: show.tvdbShowId}
           , (err, body) ->
             if err then fatal err
-            
+
             if (oldShow = body.rows[0]?.value)
               inc 'add filetitle to show'
               if fileTitle not in oldShow.fileTitles
@@ -458,7 +458,7 @@ exports.checkFile = (filePath, cb) ->
               else
                 chkTvdbEpisodes oldShow, fileData, cb
               return
-              
+
             inc 'new show from tvdb'
             show.fileTitles = [fileTitle]
             dbPutNewShow show, (err) ->

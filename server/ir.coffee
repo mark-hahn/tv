@@ -2,115 +2,24 @@
   src/ir.coffee
 ###
 
-net = require 'net'
 log = require('./utils') '  IR'
+request = require('request')
 
-# scan cmd: Global Cache 00:0C:1E:03:6A:7E
-itachHost = '192.168.1.195'
-
-# for standard sony tv remote
-irPfx1 = 'sendir,1:1,'
-irPfx2 = ',40000,1,1,'
-irSfx  = ',24,24,24,24,24,24'
-irDataByCmd =
-  power:  '24,48,24,24,24,48,24,24,24,48,24,24,24,24,24,48,24,24'
-  pwrOff: '24,48,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24'
-  pwrOn:  '24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24'
-  volUp:  '24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,24'
-  volDn:  '24,48,24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,24'
-  mute:   '24,24,24,24,24,48,24,24,24,48,24,24,24,24,24,48,24,24'
-  hdmi1:  '24,24,24,24,24,24,24,48,24,24,24,24,24,48,24,48,24,24' # BD Home Theatre
-  hdmi2:  '24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,48,24,24' # Chromecast
-  hdmi3:  '24,24,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,48,24,48' # tv pc
-  hdmi4:  '24,48,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,48,24,48' # Roku
-
-idCount = 0
-itach = timeout = null
-
-writeToItach = (irData, cb) ->
-  idCount = ++idCount % 65536
-  data = '96,' + irData + irSfx
-  # log 'itach write', irPfx1 + idCount + irPfx2 + data + ',1035,' + data + ',1035,' + data + ',4000'
-                    
-  itach.write irPfx1 + idCount + irPfx2 + data + ',1035,' + data + ',1035,' + data + ',4000\r', \
-              'utf8', (err) ->
-    if err then log 'write err: ' + err.message; cb err; return
-    cb()
-
-sendIrCb = null
-
-# not re-entrant
-sendIR = (irData, cb) ->
-  # log 'sendIR enter (not re-entrant)', irData
-  sendIrCb = cb
-  
-  endSendIR = (err, data) ->
-    if timeout then clearTimeout timeout
-    timeout = null
-    if data then log 'endSendIR data: ' + data[0..80]
-    if err
-      # log 'endSendIR err', err.message
-      err = message: err
-    sendIrCb? err, data
-    sendIrCb = null
-    # log 'sendIR exit 0 (endSendIR)', data
-    
-    
-  timeout = setTimeout (-> endSendIR 'sendIR timeout'), 3000
-
-  if not itach
-    # log 'itach createConnection'
-    itach = net.createConnection {host:itachHost, port:4998}, (err) ->
-      log 'itach createConnection res:', err
-      if err then endSendIR 'connect err: ' + err.message;  return
-      writeToItach irData, (err) ->
-        if err then endSendIR 'writeToItach err: ' + err.message;  return
-    itach.setTimeout 0
-    itach.on 'data', (data) ->
-      data = data.toString().replace /\r\n?/g, '\n'
-      if data?[-1..-1][0] is '\n' then data = data[0..-2]
-      # log 'itach data', data
-      parts = /^(.{15})(\d+)$/.exec data
-      if parts and parts[1] is 'completeir,1:1,' and +parts[2] is idCount
-        endSendIR null, data
-        return
-      log 'itach data error: ' + idCount + ', ' + data
-      
-    itach.on 'end', (err) ->
-      # log 'itach end', err
-      if err then endSendIR 'end err: ' + err.message;  return
-      endSendIR()
-    return
-      
-  writeToItach irData, (err) ->
-    if err 
-      endSendIR 'writeToItach err: ' + err.message
-      return
-
-sendingCmd = no
+codeByCmd =
+  power:  0
+  pwrOff: 1
+  pwrOn:  2
+  volUp:  3
+  volDn:  4
+  mute:   5
+  hdmi1:  6
+  hdmi2:  7
+  hdmi3:  8
+  hdmi4:  9
 
 exports.sendCmd = (cmd, cb) ->
-  # log 'sending cmd: ' + cmd
-  if sendingCmd then cb?(); return
-  sendingCmd = yes
-  sendIR irDataByCmd[cmd], (err, data) ->
-    sendingCmd = no
-    if err or data[0..2] is 'ERR' 
-      log 'sendIR err: ' + (err?.message ? data); cb? err; return
-    # log 'received cmd: ' + cmd
+  log 'sending cmd: ' + cmd
+  request "http://192.168.1.242/?code=" + codeByCmd[cmd], (error, response, body) ->
+    if (!error && response.statusCode == 200) then log 'send ok: ', cmd
+    else log 'send failed: ', cmd
     cb?()
-
-# i = 0
-# do one = ->
-#   if not (code = ['pwrOn', 12000, 'hdmi1','hdmi2','hdmi3','hdmi4','pwrOff'][i++]) 
-#     log 'finished'
-#     process.exit()
-#   if typeof code isnt 'string'
-#     setTimeout one, code
-#     return
-#   log 'sending ' + code
-#   exports.sendCmd code, (err) ->
-#     if err then log 'sendCmd err: ', err.message; process.exit()
-#     else setTimeout one, 2000
-#       
-      

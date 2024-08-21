@@ -105,19 +105,11 @@ checkFileExists = checkFile = chkTvDB = null
 #######################################
 # get the api token
 
-# tvDbPin = 'HXEVSDFF'
-# old apiKey             = '2C92771D87CA8718'
-# v4 legacy type api key = 'ad42c85592acd18e340c8f371f47b29f'
-# new v4 api key         = 'd7fa8c90-36e3-4335-a7c0-6cbb7b0320df'
-
 theTvDbToken = null
 request.post 'https://api4.thetvdb.com/v4/login',
  {json:true, body: {
     "apikey": "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df",
     "pin": "HXEVSDFF"}},
-
-#request.post 'https://api.thetvdb.com/login',
-#  {json:true, body: {apikey: "2C92771D87CA8718"}},
   (error, response, body) =>
     if error or response.statusCode != 200
       console.error 'theTvDb login error:', error
@@ -188,7 +180,7 @@ tvDbErrCount = 0
 
 checkFiles = =>
   usbFiles = exec(findUsb, {timeout:300000}).toString().split '\n'
-  # fs.writeFileSync 'tv-files.txt', usbFiles.join('\n')
+  fs.writeFileSync 'tv-files.txt', usbFiles.join('\n')
   if filterRegex
     console.log usbFiles
   process.nextTick checkFile
@@ -277,10 +269,10 @@ tvdbCache = {}
 tvdburl = ''
 
 chkTvDB = =>
-  if title.includes('Faraway')
-    seriesName = 'Faraway Downs'
-    setTimeout checkFileExists, rsyncDelay
-    return
+  # if title.includes('Faraway')
+  #   seriesName = 'Faraway Downs'
+  #   setTimeout checkFileExists, rsyncDelay
+  #   return
 
   if tvdbCache[title]
     seriesName = tvdbCache[title]

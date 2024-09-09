@@ -180,7 +180,7 @@ tvDbErrCount = 0
 
 checkFiles = =>
   usbFiles = exec(findUsb, {timeout:300000}).toString().split '\n'
-  fs.writeFileSync 'tv-files.txt', usbFiles.join('\n')
+  # fs.writeFileSync 'tv-files.txt', usbFiles.join('\n')
   if filterRegex
     console.log usbFiles
   process.nextTick checkFile

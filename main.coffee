@@ -255,12 +255,12 @@ checkFile = () =>
     console.log 'elapsed(mins):   ',
                ((Date.now()-startTime)/(60*1000)).toFixed(1)
  
-    if downloadCount > 0 
-      fs.writeFileSync('scanLibraryFlag', 'scan')
-    else if fs.readFileSync('scanLibraryFlag','utf8') is 'scan'
-      console.log 'scanning library'
-      await emby.scanLibrary()
-      fs.writeFileSync('scanLibraryFlag', 'noscan')
+    # if downloadCount > 0 
+    #   fs.writeFileSync('scanLibraryFlag', 'scan')
+    # else if fs.readFileSync('scanLibraryFlag','utf8') is 'scan'
+    #   console.log 'scanning library'
+    #   await emby.scanLibrary()
+    #   fs.writeFileSync('scanLibraryFlag', 'noscan')
 
     if (deleteCount + existsCount + errCount + downloadCount + blockedCount) > 0
       console.log "***********************************************************"

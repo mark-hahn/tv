@@ -11,7 +11,9 @@
   if (process.argv.length === 3) {
     filterRegex = process.argv[2];
   } else {
-    console.log("usage: regex for filename missing");
+    console.log("usage: regex for filename missing", {
+      argv: process.argv
+    });
     process.exit();
   }
 

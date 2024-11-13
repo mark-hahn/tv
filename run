@@ -16,9 +16,10 @@ if [ ${#s} -gt 1 ] ; then
   exit
 fi
 
+cd /root/dev/apps/tv-proc
+
 coffee -c main.coffee
 
-cd /root/dev/apps/tv-proc
 /root/.nvm/versions/node/v16.15.1/bin/node \
          /root/dev/apps/tv-proc/main.js $1 \
     >> /root/dev/apps/tv-proc/tv.log 

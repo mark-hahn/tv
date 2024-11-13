@@ -18,8 +18,8 @@ rsyncDelay = 3000  # 3 secs
 
 usbHost =  "xobtlu@oracle.usbx.me"
 
-usbAgeLimit = Date.now() - 2*7*24*60*60*1000 # 2 weeks ago
-recentLimit = new Date(Date.now() - 3*7*24*60*60*1000) # 3 weeks ago
+# usbAgeLimit = Date.now() - 4*7*24*60*60*1000  # 4 weeks ago
+recentLimit = new Date(Date.now() - 3*4*7*24*60*60*1000) # 3 months ago
 fileTimeout = {timeout: 2*60*60*1000} # 2 hours
 
 fs   = require 'fs-plus'

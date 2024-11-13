@@ -14,7 +14,7 @@ date >> tv.log
 /root/.nvm/versions/node/v16.15.1/bin/node /root/dev/apps/tv-proc/main.js $1 >> tv.log 
 chmod -R 774  /mnt/media/tv
 chown -R emby /mnt/media/tv
-/root/.nvm/versions/node/v16.15.1/bin/node /root/dev/apps/tv-proc/prune-dupes.js >> tv.log
-date >> tv.log
-chmod -R 774  /mnt/media/tv
-chown -R emby /mnt/media/tv
+# /root/.nvm/versions/node/v16.15.1/bin/node /root/dev/apps/tv-proc/prune-dupes.js >> tv.log
+# date >> tv.log
+# chmod -R 774  /mnt/media/tv
+# chown -R emby /mnt/media/tv

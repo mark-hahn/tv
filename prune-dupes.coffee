@@ -1,4 +1,6 @@
 
+# this is NOT USED ANY MORE
+
 fs   = require 'fs-plus'
 exec = require('child_process').execSync
 

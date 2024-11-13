@@ -18,8 +18,9 @@ rsyncDelay = 3000  # 3 secs
 
 usbHost =  "xobtlu@oracle.usbx.me"
 
-# usbAgeLimit = Date.now() - 4*7*24*60*60*1000  # 4 weeks ago
-recentLimit = new Date(Date.now() - 3*4*7*24*60*60*1000) # 3 months ago
+# prune script deletes files older than 30 days
+# tv-recent files limited to 35 days
+recentLimit = new Date(Date.now() - 5*7*24*60*60*1000) # 5 weeks ago
 fileTimeout = {timeout: 2*60*60*1000} # 2 hours
 
 fs   = require 'fs-plus'
@@ -129,37 +130,11 @@ request.post 'https://api4.thetvdb.com/v4/login',
 # delete old files in usb/files
 
 delOldFiles = =>
-  # console.log ".... checking for files to delete ...."
-  # try
-  #   usbFiles = exec(findUsb, {timeout:300000}).toString().split '\n'
-  # catch e
-  #   console.log "\nvvvvvvvv\nrsync find files to delete error: \n" +
-  #               "#{e.message}^^^^^^^^^"
-  #   process.nextTick checkFiles
-  #   return;
-
-  # for usbLine in usbFiles
-  #   debug = false
-  #   # if usbLine.indexOf('Island') > -1
-  #   #   console.log 'DEBUG:', usbLine
-  #   #   debug = true
-    
-  #   try
-  #     usbDate = new Date(usbLine.slice 0,10).getTime()
-  #     if usbDate < usbAgeLimit
-  #       usbFilePath = usbLine.slice 11
-  #       deleteCount++
-  #       console.log 'removing old file from usb:', usbFilePath
-  #       res = exec("ssh #{usbHost} rm #{escQuotes "files/" + usbFilePath}",
-  #                       {timeout:300000}).toString()
-  #       if res == ''
-  #         console.log "\nvvvvvvvv\nrsync remove old file from usb error: \n" +
-  #               "rm #{escQuotes "files/" + usbFilePath}\n#{usbFilePath}\n#{e.message}^^^^^^^^^"
-  #   catch e
-  #     console.log "\nvvvvvvvv\nrsync remove old file from usb error: \n" +
-  #           "#{usbFilePath}\n#{e.message}^^^^^^^^^"
-
-# ssh xobtlu@oracle.usbx.me rm -rf "Bob\'s.Burgers.S10E19.The.Handyman.Can.(1080p.HULU.Webrip.x265.10bit.EAC3.5.1.-.Goki)[TAoE]/Season 13/Bob\'s Burgers - S13E15 - The Show \(And Tell\) Must Go On WEBDL-1080p.mkv"
+  # prune script deletes files older than 30 days
+  # console.log ".... deleting old files in usb ~/files ...."
+  res = exec("ssh #{usbHost} /home/xobtlu/prune", {timeout:300000}).toString()
+  if not res.startsWith('prune ok')
+    console.log "Prune error: #{res}"
 
   recentChgd = no
   for recentFname, recentTime of recent when new Date(recentTime) < recentLimit

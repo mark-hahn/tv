@@ -162,9 +162,10 @@ checkFiles = =>
   for usbLine in usbFiles
     if usbLine.endsWith '!unrar.lock'
       skipPaths.push usbLine.slice(11,-12)
-      # console.log "skipPaths", skipPaths
-  if filterRegex
-    console.log usbFiles
+  if skipPaths.length > 0
+    console.log "skipping locked paths", skipPaths
+  # if filterRegex
+  #   console.log usbFiles.join('\n')
   process.nextTick checkFile
 
 checkFile = () =>
@@ -174,7 +175,7 @@ checkFile = () =>
 
     for skipPath in skipPaths
       if usbFilePath.startsWith skipPath
-        console.log "skipping locked #{usbFilePath}\n"
+        console.log "skipping locked #{usbFilePath}"
         process.nextTick checkFile
         return
 
@@ -206,7 +207,7 @@ checkFile = () =>
       # console.log '------', downloadCount,'/', chkCount, 'SKIPPING *ERROR*:', fname
       process.nextTick checkFile
       return
-    console.log '\n>>>>>>', downloadCount,'/', chkCount, errCount, fname
+    console.log '\n>>>>>>', downloadCount+1,'/', chkCount, errCount, fname
 
     guessItRes = exec("/usr/local/bin/guessit -js '#{fname.replace /'|`/g, ''}'",
                       {timeout:300000}).toString()
@@ -218,7 +219,7 @@ checkFile = () =>
         process.nextTick badFile
         return
       if not Number.isInteger season
-        console.log '\nno season integer for ' + fname + ', defaulting to season 1'
+        console.log '\nno season integer for ' + usbLine + ', defaulting to season 1', {title, season, type}
         season = 1
     catch
       console.error '\nerror parsing:' + fname

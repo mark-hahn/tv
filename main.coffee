@@ -132,7 +132,8 @@ request.post 'https://api4.thetvdb.com/v4/login',
 delOldFiles = =>
   # prune script deletes files older than 30 days
   # console.log ".... deleting old files in usb ~/files ...."
-  res = exec("ssh #{usbHost} /home/xobtlu/prune", {timeout:300000}).toString()
+  res = exec("ssh #{usbHost} /home/xobtlu/prune.sh", 
+              {timeout:300000}).toString()
   if not res.startsWith('prune ok')
     console.log "Prune error: #{res}"
 
@@ -152,10 +153,16 @@ delOldFiles = =>
 usbFilePath = usbFiles = seriesName = season = fname =
 title = season = type = null
 tvDbErrCount = 0
+skipPaths = null
 
 checkFiles = =>
   usbFiles = exec(findUsb, {timeout:300000}).toString().split '\n'
   # fs.writeFileSync 'tv-files.txt', usbFiles.join('\n')
+  skipPaths = []
+  for usbLine in usbFiles
+    if usbLine.endsWith '!unrar.lock'
+      skipPaths.push usbLine.slice(11,-12)
+      # console.log "skipPaths", skipPaths
   if filterRegex
     console.log usbFiles
   process.nextTick checkFile
@@ -163,8 +170,15 @@ checkFiles = =>
 checkFile = () =>
   tvDbErrCount = 0
   if usbLine = usbFiles.shift()
-    chkCount++
     usbFilePath = usbLine.slice(11)
+
+    for skipPath in skipPaths
+      if usbFilePath.startsWith skipPath
+        console.log "skipping locked #{usbFilePath}\n"
+        process.nextTick checkFile
+        return
+
+    chkCount++
     parts = usbFilePath.split '/'
     fname = parts[parts.length-1]
     parts = fname.split '.'

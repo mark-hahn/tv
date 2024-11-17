@@ -143,7 +143,6 @@ delOldFiles = =>
     recentChgd = yes
   if recentChgd
     writeMap 'tv-recent.json', recent
-    # fs.writeFileSync 'tv-recent.json', JSON.stringify recent
 
   process.nextTick checkFiles
 
@@ -316,11 +315,6 @@ checkFileExists = =>
     mkdirp.sync tvSeasonPath
 
     console.log "usb path: #{usbFilePath}\nlocalPath: #{tvFilePath}"
-    # if usbFilePath.indexOf('/') > -1
-    #   console.log "downloading file (dir: #{usbFilePath}"
-    # else
-      # console.log "... downloading file ..."
-    # console.log "\nrsync -av #{escQuotes usbLongPath} #{escQuotes tvFilePath}\n"
 
     try
       console.log(exec("rsync -av #{escQuotes usbLongPath} #{escQuotes tvFilePath}",
@@ -336,12 +330,10 @@ checkFileExists = =>
 
   recent[fname] = Date.now()
   writeMap 'tv-recent.json', recent
-  # fs.writeFileSync 'tv-recent.json', JSON.stringify recent
   process.nextTick checkFile
 
 badFile = =>
   errCount++
   errors[fname] = Date.now()
   writeMap 'tv-errors', errors
-  # fs.writeFileSync 'tv-errors', JSON.stringify errors
   process.nextTick checkFile

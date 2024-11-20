@@ -5,6 +5,8 @@ import * as cp          from 'child_process';
 import moment           from 'moment';
 import Websocket        from 'ws';
 
+const ws = new Websocket({ port: 8734 });
+
 // debug
 const dontupload  = true;
 const forceUpload = false;
@@ -12,7 +14,6 @@ const forceUpload = false;
 const tvDir = '/mnt/media/tv';
 
 const exec = util.promisify(cp.exec);
-const ws  = new Websocket();
 
 // const dat = () => typeof(new Date())//.replace(/T|\..*$/, ' ');
 const dat = () => moment().format('MM/DD HH-mm-ss:');
@@ -192,11 +193,39 @@ if(forceUpload) {
   reload();
 }
 
-//////////////////  EXPRESS SERVER  //////////////////
+//////////////////  WEBSOCKET SERVER  //////////////////
 
-app.get('/', function (req, res) {
-  res.send('invalid url')
-});
+ws.on('connection', (socket) => {
+  console.log(dat(), 'ws connected');
+  socket.send('connected');
+
+  socket.on('message', (msg) => {
+    console.log(dat(), 'received: %s', msg);
+    if(msg === 'ping') {
+      socket.send('pong');
+      return;
+    }
+
+    const [id, fname, paramsJson] = msg.split(':',3);
+
+    const promise = new Promise(
+      (id, result) => {
+        socket.send(`$(id):ok:${JSON.stringify(result)}`); 
+      },
+      (id, error) => {
+        socket.send(`$(id)):err:${JSON.stringify(error)}`); 
+      }
+    );
+
+    const params = JSON.parse(paramsJson);
+
+    switch fname {
+      case 'test': test(id, params); break;
+      default: socket.send(
+          `$(id)):err:${id}:err:{"error":"unknown function"}`); 
+    }
+
+}
 
 app.get('/rejects.json', function (req, res) {
   res.send(fs.readFileSync('config/config2-rejects.json', 'utf8'));

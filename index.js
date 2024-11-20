@@ -193,40 +193,6 @@ if(forceUpload) {
   reload();
 }
 
-//////////////////  WEBSOCKET SERVER  //////////////////
-
-ws.on('connection', (socket) => {
-  console.log(dat(), 'ws connected');
-  socket.send('connected');
-
-  socket.on('message', (msg) => {
-    console.log(dat(), 'received: %s', msg);
-    if(msg === 'ping') {
-      socket.send('pong');
-      return;
-    }
-
-    const [id, fname, paramsJson] = msg.split(':',3);
-
-    const promise = new Promise(
-      (id, result) => {
-        socket.send(`$(id):ok:${JSON.stringify(result)}`); 
-      },
-      (id, error) => {
-        socket.send(`$(id)):err:${JSON.stringify(error)}`); 
-      }
-    );
-
-    const params = JSON.parse(paramsJson);
-
-    switch fname {
-      case 'test': test(id, params); break;
-      default: socket.send(
-          `$(id)):err:${id}:err:{"error":"unknown function"}`); 
-    }
-
-}
-
 app.get('/rejects.json', function (req, res) {
   res.send(fs.readFileSync('config/config2-rejects.json', 'utf8'));
 });
@@ -325,6 +291,74 @@ app.delete('/pickups/:name', function (req, res) {
   else res.send(saveConfigYml());
 })
 
-app.listen(8734, () => {
-  console.log(dat(), 'server listening on port 8734');
-})
+
+
+
+const test = (id, params, promise) => {
+  promise.resolve([id, params]);
+}
+
+//////////////////  WEBSOCKET SERVER  //////////////////
+
+ws.on('connection', (socket) => {
+  console.log(dat(), 'ws connected');
+  socket.send('0:ok:{connected:true}');
+
+  socket.on('message', (msg) => {
+    console.log(dat(), 'received: %s', msg);
+
+    const [id, fname, paramsJson] = msg.split(':',3);
+
+    const promise = new Promise(
+      (idResult) => {
+        const [id, result] = idResult;
+        socket.send(`${id}:ok:${JSON.stringify(result)}`); 
+      },
+      (idError) => {
+        const [id, error] = idError;
+        socket.send(`${id}:err:${JSON.stringify(error)}`); 
+      }
+    );
+    
+    const params = JSON.parse(paramsJson);
+
+    switch (fname) {
+      case 'test': test(id, params, promise); break;
+
+      default: socket.send(
+          `$(id):err:{"error":"unknown function"}`); 
+    };
+  });
+
+  ws.on('error', console.error );
+  ws.on('close', console.log);
+});
+
+/*
+import { WebSocketServer } from 'ws';
+
+function heartbeat() {
+  this.isAlive = true;
+}
+
+const wss = new WebSocketServer({ port: 8080 });
+
+wss.on('connection', function connection(ws) {
+  ws.isAlive = true;
+  ws.on('error', console.error);
+  ws.on('pong', heartbeat);
+});
+
+const interval = setInterval(function ping() {
+  wss.clients.forEach(function each(ws) {
+    if (ws.isAlive === false) return ws.terminate();
+
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 30000);
+
+wss.on('close', function close() {
+  clearInterval(interval);
+});
+*/

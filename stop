@@ -1,0 +1,3 @@
+pm2 flush   tv-series-srvr
+pm2 delete  tv-series-srvr
+pm2 save

@@ -5,195 +5,203 @@ import * as cp             from 'child_process';
 import moment              from 'moment';
 import { WebSocketServer } from 'ws';
 
-const ws = new WebSocketServer({ port: 8736 });
-console.log('ws listening on port 8736');
-// debug
+const showdates   = false;
 const dontupload  = true;
 const forceUpload = false;
 
-const dat = () => moment().format('MM/DD HH-mm-ss:');
+const ws = new WebSocketServer({ port: 8736 });
+console.log('ws listening on port 8736');
+// debug
 
-// const tvDir = '/mnt/media/tv';
+const tvDir = '/mnt/media/tv';
+const exec  = util.promisify(cp.exec);
+const dat   = () => {
+  if(!showdates) return '';
+  return moment().format('MM/DD HH-mm-ss:');
+}
 
-// const exec = util.promisify(cp.exec);
+const headerStr = fs.readFileSync('config/config1-header.txt',   'utf8');
+const rejectStr = fs.readFileSync('config/config2-rejects.json', 'utf8');
+const middleStr = fs.readFileSync('config/config3-middle.txt',   'utf8');
+const pickupStr = fs.readFileSync('config/config4-pickups.json', 'utf8');
+const footerStr = fs.readFileSync('config/config5-footer.txt',   'utf8');
 
-// // const dat = () => typeof(new Date())//.replace(/T|\..*$/, ' ');
-// const dat = () => moment().format('MM/DD HH-mm-ss:');
+const rejects = JSON.parse(rejectStr);
+const pickups = JSON.parse(pickupStr);
 
-// const headerStr = fs.readFileSync('config/config1-header.txt',   'utf8');
-// const rejectStr = fs.readFileSync('config/config2-rejects.json', 'utf8');
-// const middleStr = fs.readFileSync('config/config3-middle.txt',   'utf8');
-// const pickupStr = fs.readFileSync('config/config4-pickups.json', 'utf8');
-// const footerStr = fs.readFileSync('config/config5-footer.txt',   'utf8');
+const nameHash = (name) =>
+  ('name-' + name
+    .toLowerCase()
+    .replace(/^the\s/, '')
+    .replace(/[^a-zA-Z0-9]*/g, ''))
 
-// const rejects = JSON.parse(rejectStr);
-// const pickups = JSON.parse(pickupStr);
+const folderDates =  async (id, params, resolve, reject) => {
+  console.log(dat(), 'folderDates', {id, params});
+  const dateList = {};
+  try {
+    const dir = await readdir(tvDir);
+    for await (const dirent of dir) {
+      const showPath = tvDir + '/' + dirent;
+      const date     = (await stat(showPath)).mtime;
+      const dateStr  = date.toISOString()
+                        .substring(0,10).replace(/-/g, '/');
+      const hash     =  nameHash(dirent);
+      if(hash.length > 7) dateList[hash] = dateStr;
+    }
+  }
+  catch (err) {
+    reject([id, err]);
+  }
+  // console.log(dat(), {dateList});
+  resolve([id, dateList]);
+}
 
-// const nameHash = (name) =>
-//   ('name-' + name
-//     .toLowerCase()
-//     .replace(/^the\s/, '')
-//     .replace(/[^a-zA-Z0-9]*/g, ''))
+const recentDates =  async (id, params, resolve, reject) => {
+  console.log(dat(), 'recentDates', {id, params});
+  let mostRecentDate;
+  let dirSize;
+  let errFlg = null;
+  const recentDates = {};
+  const recurs = async (path) => {
+    if(errFlg || path == tvDir + '/.stfolder') return;
+    try {
+      const fstat = await stat(path);
+      const [sfx] = path.split('.').slice(-1);
+      dirSize += fstat.size;
 
-// const folderDates =  async () => {
-//   const dateList = {};
-//   try {
-//     const dir = await readdir(tvDir);
-//     for await (const dirent of dir) {
-//       const showPath = tvDir + '/' + dirent;
-//       const date     = (await stat(showPath)).mtime;
-//       const dateStr  = date.toISOString()
-//                         .substring(0,10).replace(/-/g, '/');
-//       const hash     =  nameHash(dirent);
-//       if(hash.length > 7) dateList[hash] = dateStr;
-//     }
-//   }
-//   catch (err) {
-//     console.error(err);
-//   }
-//   // console.log(dat(), {dateList});
-//   return dateList;
-// }
+      if(['mkv','flv','vob','avi','mov','wmv','mp4',
+          'mpg','mpeg','m2v','mp2'].includes(sfx)) {
+        // console.log(dat(), 'video file',{path, fstat});
+        const dateStr = fstat.mtime.toISOString()
+                        .substring(0,10).replace(/-/g, '/');
+        if(dateStr > '2050') return;
+        if(dateStr > mostRecentDate) mostRecentDate = dateStr;
+      }
 
-// const recentDates =  async () => {
-//   let mostRecentDate;
-//   let dirSize;
-//   let errFlg = false;
-//   const recentDates = {};
-//   const recurs = async (path) => {
-//     if(errFlg || path == tvDir + '/.stfolder') return;
-//     try {
-//       const fstat = await stat(path);
-//       const [sfx] = path.split('.').slice(-1);
-//       dirSize += fstat.size;
-
-//       if(['mkv','flv','vob','avi','mov','wmv','mp4',
-//           'mpg','mpeg','m2v','mp2'].includes(sfx)) {
-//         // console.log(dat(), 'video file',{path, fstat});
-//         const dateStr = fstat.mtime.toISOString()
-//                         .substring(0,10).replace(/-/g, '/');
-//         if(dateStr > '2050') return;
-//         if(dateStr > mostRecentDate) mostRecentDate = dateStr;
-//       }
-
-//       if(fstat.isDirectory()) {
-//         const dir = await readdir(path);
-//         for (const dirent of dir) {
-//           await recurs(path + '/' + dirent);
-//         }
-//       }
-//     }
-//     catch (err) {
-//       console.error(err);
-//       errFlg = true;
-//     }
-//   }
-//   const dir = await readdir(tvDir);
-//   for (const dirent of dir) {
-//     const topLevelPath = tvDir + '/' + dirent;
-//     mostRecentDate = '0000/00/00';
-//     dirSize = 0;
-//     await recurs(topLevelPath);
-//     // console.log({dirent, mostRecentDate, dirSize});
-//     // process.exit();
-//     recentDates[nameHash(dirent)] = mostRecentDate + '|' + dirSize;
-//   }
-//   if(errFlg) return {};
-//   else       return recentDates;
-// }
+      if(fstat.isDirectory()) {
+        const dir = await readdir(path);
+        for (const dirent of dir) {
+          await recurs(path + '/' + dirent);
+        }
+      }
+    }
+    catch (err) {
+      // console.error(err);
+      errFlg = err;
+    }
+  }
+  const dir = await readdir(tvDir);
+  for (const dirent of dir) {
+    const topLevelPath = tvDir + '/' + dirent;
+    mostRecentDate = '0000/00/00';
+    dirSize = 0;
+    await recurs(topLevelPath);
+    // console.log({dirent, mostRecentDate, dirSize});
+    // process.exit();
+    recentDates[nameHash(dirent)] = mostRecentDate + '|' + dirSize;
+  }
+  if(errFlg) {
+    reject([id, errFlg]);
+    return;
+  }
+  else {
+    resolve([id, recentDates]);
+    return;
+  }
+}
  
-// const upload = async () => {
-//   let str = headerStr;
-//   for(let name of rejects)
-//     str += '        - "' + name.replace(/"/g, '') + '"\n';
-//   str += middleStr;
-//   for(let name of pickups)
-//     str += '        - "' + name.replace(/"/g, '') + '"\n';
-//   str += footerStr;
-//   console.log(dat(), '\n\ncreating config.yml');
-//   fs.writeFileSync('config/config.yml', str);
+const upload = async () => {
+  let str = headerStr;
+  for(let name of rejects)
+    str += '        - "' + name.replace(/"/g, '') + '"\n';
+  str += middleStr;
+  for(let name of pickups)
+    str += '        - "' + name.replace(/"/g, '') + '"\n';
+  str += footerStr;
+  console.log(dat(), '\n\ncreating config.yml');
+  fs.writeFileSync('config/config.yml', str);
 
-//   if(dontupload) {
-//     console.log(dat(), "---- didn't upload config.yml ----");
-//     return 'ok';
-//   }
-//   const {stdout} = await exec(
-//           'rsync -av config/config.yml xobtlu@oracle.usbx.me:' +
-//           '/home/xobtlu/.config/flexget/config.yml');
-//   const rx = new RegExp('total size is ([0-9,]*)');
-//   const matches = rx.exec(stdout);
-//   if(!matches || parseInt(matches[1].replace(',', '')) < 1000) {
-//     console.log(dat(), '\nERROR: config.yml upload failed\n', stdout, '\n');
-//     return `config.yml upload failed: ${stdout}`;
-//   }
-//   console.log(dat(), 'uploaded config.yml, size:', matches[1]);
-//   return 'ok';
-// }
+  if(dontupload) {
+    console.log(dat(), "---- didn't upload config.yml ----");
+    return 'ok';
+  }
+  const {stdout} = await exec(
+          'rsync -av config/config.yml xobtlu@oracle.usbx.me:' +
+          '/home/xobtlu/.config/flexget/config.yml');
+  const rx = new RegExp('total size is ([0-9,]*)');
+  const matches = rx.exec(stdout);
+  if(!matches || parseInt(matches[1].replace(',', '')) < 1000) {
+    console.log(dat(), '\nERROR: config.yml upload failed\n', stdout, '\n');
+    return `config.yml upload failed: ${stdout}`;
+  }
+  console.log(dat(), 'uploaded config.yml, size:', matches[1]);
+  return 'ok';
+}
 
-// const reload = async () => {
-//   // console.log(dat(), "\n\nPlease reload manually ----\n");
+const reload = async () => {
+  // console.log(dat(), "\n\nPlease reload manually ----\n");
 
-//   if(dontupload) {
-//     console.log(dat(), "---- didn't reload ----");
-//     return 'ok';
-//   }
+  if(dontupload) {
+    console.log(dat(), "---- didn't reload ----");
+    return 'ok';
+  }
 
-//   const {stdout} = await exec(
-//     'ssh xobtlu@oracle.usbx.me /home/xobtlu/reload-cmd');
+  const {stdout} = await exec(
+    'ssh xobtlu@oracle.usbx.me /home/xobtlu/reload-cmd');
   
-//   if(!stdout.includes('Config successfully reloaded'))  {
-//     console.log(dat(), '\nERROR: config.yml reload failed\n', stdout, '\n');
-//     return `config.yml reload failed: ${stdout}`;
-//   }
-//   console.log(dat(), 'reloaded config.yml');
-//   return 'ok';
-// }
+  if(!stdout.includes('Config successfully reloaded'))  {
+    console.log(dat(), '\nERROR: config.yml reload failed\n', stdout, '\n');
+    return `config.yml reload failed: ${stdout}`;
+  }
+  console.log(dat(), 'reloaded config.yml');
+  return 'ok';
+}
 
-// let saveTimeout = null;
-// let saveResult  = 'ok';
-// let saving      = false;
+let saveTimeout = null;
+let saveResult  = 'ok';
+let saving      = false;
 
-// const saveConfigYml = () => {
-//   console.log(dat(), 'saving config.yml');
-//   rejects.sort((a,b) => { 
-//     return (a.toLowerCase() > b.toLowerCase() ? +1 : -1);
-//   });
-//   pickups.sort((a,b) => { 
-//     const aname = a.replace(/The\s/i, '');
-//     const bname = b.replace(/The\s/i, '');
-//     return (aname.toLowerCase() > bname.toLowerCase() ? +1 : -1);
-//   });
-//   fs.writeFileSync('config/config2-rejects.json', JSON.stringify(rejects)); 
-//   fs.writeFileSync('config/config4-pickups.json', JSON.stringify(pickups)); 
-//   if(saveTimeout) clearTimeout(saveTimeout);
-//   saveTimeout = setTimeout( async () => {
-//     saveTimeout = null;
-//     if(saving) {
-//       setTimeout(saveConfigYml, 10000);
-//       return;
-//     }
-//     saving = true;
-//     const uploadRes = await upload();
-//     if(uploadRes != 'ok') saveResult = uploadRes;
-//     else {
-//       const reloadRes = await reload();
-//       if(reloadRes != 'ok') saveResult = reloadRes;
-//     }
-//     saving = false;
-//   }, 10000);  
+const saveConfigYml = () => {
+  console.log(dat(), 'saving config.yml');
+  rejects.sort((a,b) => { 
+    return (a.toLowerCase() > b.toLowerCase() ? +1 : -1);
+  });
+  pickups.sort((a,b) => { 
+    const aname = a.replace(/The\s/i, '');
+    const bname = b.replace(/The\s/i, '');
+    return (aname.toLowerCase() > bname.toLowerCase() ? +1 : -1);
+  });
+  fs.writeFileSync('config/config2-rejects.json', JSON.stringify(rejects)); 
+  fs.writeFileSync('config/config4-pickups.json', JSON.stringify(pickups)); 
+  if(saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout( async () => {
+    saveTimeout = null;
+    if(saving) {
+      setTimeout(saveConfigYml, 10000);
+      return;
+    }
+    saving = true;
+    const uploadRes = await upload();
+    if(uploadRes != 'ok') saveResult = uploadRes;
+    else {
+      const reloadRes = await reload();
+      if(reloadRes != 'ok') saveResult = reloadRes;
+    }
+    saving = false;
+  }, 10000);  
 
-//   // PROBLEM:  returns 'ok' before upload and reload are done
+  // PROBLEM:  returns 'ok' before upload and reload are done
 
-//   const result = saveResult;
-//   saveResult = 'ok';
-//   return result;
-// };
+  const result = saveResult;
+  saveResult = 'ok';
+  return result;
+};
 
-// // debug
-// if(forceUpload) {
-//   upload();
-//   reload();
-// }
+// debug
+if(forceUpload) {
+  upload();
+  reload();
+}
 
 // app.get('/rejects.json', function (req, res) {
 //   res.send(fs.readFileSync('config/config2-rejects.json', 'utf8'));
@@ -201,12 +209,6 @@ const dat = () => moment().format('MM/DD HH-mm-ss:');
 
 // app.get('/pickups.json', function (req, res) {
 //   res.send(fs.readFileSync('config/config4-pickups.json', 'utf8'));
-// });
-
-// app.get('/folderDates', async function (req, res) {
-//   const str = JSON.stringify(await folderDates());
-//   // console.log(dat(), str);
-//   res.send(str);
 // });
 
 // app.get('/recentDates', async function (req, res) {
@@ -296,17 +298,6 @@ const dat = () => moment().format('MM/DD HH-mm-ss:');
 
 
 
-
-
-//////////////////  PROMISE TEST  //////////////////
-
-const test = (id, params, resolve, reject) => {
-  console.log(dat(), 'test', {id, params});
-
-  resolve([id, {"test":"ok", params}]);
-}
-
-
 //////////////////  WEBSOCKET SERVER  //////////////////
 
 ws.on('connection', (socket) => {
@@ -319,8 +310,6 @@ ws.on('connection', (socket) => {
 
     const [id, fname, paramsJson] = msg.toString().split('`');
 
-    console.log(dat(), {id, fname, paramsJson});
-
     let resolve = null;
     let reject  = null;
 
@@ -330,24 +319,25 @@ ws.on('connection', (socket) => {
           resolve = resolveIn; reject = rejectIn;});
 
     promise.then((idResult) => {
-      console.log(dat(), 'resolve', {idResult});
+      console.log(dat(), 'resolve', idResult);
       const [id, result] = idResult;
-      socket.send(`${id}:ok:${JSON.stringify(result)}`); 
+      socket.send(`${id}\`ok\`${JSON.stringify(result)}`); 
     })
     .catch((idError) => {
-      console.log(dat(), 'rejected', {idError});
+      console.log(dat(), 'rejected', idError);
       const [id, error] = idError;
-      socket.send(`${id}:err:${JSON.stringify(error)}`); 
+      socket.send(`${id}\`err\`${JSON.stringify(error)}`); 
     });
 
     const params = JSON.parse(paramsJson);
 
     // call function fname
     switch (fname) {
-      case 'test': test(id, params, resolve, reject); break;
+      case 'folderDates': folderDates(id, params, resolve, reject); break;
+      case 'test': recentDates(id, params, resolve, reject); break;
 
       default: socket.send(
-          `$(id):err:{"error":"unknown function"}`); 
+          `${id}\`err\`{"error":"unknown function: ${fname}"}`); 
     };
   });
 
@@ -355,34 +345,4 @@ ws.on('connection', (socket) => {
   ws.on('close', console.log);
 });
 
-/*
-
-https://github.com/websockets/ws?tab=readme-ov-file
-
-import { WebSocketServer } from 'ws';
-
-function heartbeat() {
-  this.isAlive = true;
-}
-
-const wss = new WebSocketServer({ port: 8080 });
-
-wss.on('connection', function connection(ws) {
-  ws.isAlive = true;
-  ws.on('error', console.error);
-  ws.on('pong', heartbeat);
-});
-
-const interval = setInterval(function ping() {
-  wss.clients.forEach(function each(ws) {
-    if (ws.isAlive === false) return ws.terminate();
-
-    ws.isAlive = false;
-    ws.ping();
-  });
-}, 30000);
-
-wss.on('close', function close() {
-  clearInterval(interval);
-});
-*/
+// https://github.com/websockets/ws?tab=readme-ov-file

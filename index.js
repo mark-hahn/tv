@@ -173,7 +173,6 @@ const saveConfigYml = () => {
   });
   fs.writeFileSync('config/config2-rejects.json', JSON.stringify(rejects)); 
   fs.writeFileSync('config/config4-pickups.json', JSON.stringify(pickups)); 
-  if(saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout( async () => {
     saveTimeout = null;
     if(saving) {
@@ -328,16 +327,22 @@ ws.on('connection', (socket) => {
       const [id, error] = idError;
       socket.send(`${id}\`err\`${JSON.stringify(error)}`); 
     });
-
-    const params = JSON.parse(paramsJson);
-
+    let params
+    try {
+      params = JSON.parse(paramsJson);
+    }
+    catch(e) {
+      socket.send(
+          `${id}\`err\`${JSON.stringify(e)}`); 
+      return;
+    }
     // call function fname
     switch (fname) {
       case 'folderDates': folderDates(id, params, resolve, reject); break;
       case 'test': recentDates(id, params, resolve, reject); break;
 
       default: socket.send(
-          `${id}\`err\`{"error":"unknown function: ${fname}"}`); 
+          `${id}\`err\`{"unknownfunction": "${fname}"}`); 
     };
   });
 

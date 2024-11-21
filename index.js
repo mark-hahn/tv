@@ -132,7 +132,7 @@ const upload = async () => {
   const matches = rx.exec(stdout);
   if(!matches || parseInt(matches[1].replace(',', '')) < 1000) {
     console.log(dat(), '\nERROR: config.yml upload failed\n', stdout, '\n');
-    return `config.yml upload failed: ${stdout}`;
+    return `config.yml upload failed: ${stdout.toString()}`;
   }
   console.log(dat(), 'uploaded config.yml, size:', matches[1]);
   return 'ok';
@@ -151,17 +151,18 @@ const reload = async () => {
   
   if(!stdout.includes('Config successfully reloaded'))  {
     console.log(dat(), '\nERROR: config.yml reload failed\n', stdout, '\n');
-    return `config.yml reload failed: ${stdout}`;
+    return `config.yml reload failed: ${stdout.toString()}`;
   }
   console.log(dat(), 'reloaded config.yml');
   return 'ok';
 }
 
-let saveTimeout = null;
-let saveResult  = 'ok';
-let saving      = false;
+let saving = false;
 
-const saveConfigYml = () => {
+const trySaveConfigYml = async () => {
+  if(saving) return 'busy';
+  saving = true;
+  
   console.log(dat(), 'saving config.yml');
   rejects.sort((a,b) => { 
     return (a.toLowerCase() > b.toLowerCase() ? +1 : -1);
@@ -173,28 +174,34 @@ const saveConfigYml = () => {
   });
   fs.writeFileSync('config/config2-rejects.json', JSON.stringify(rejects)); 
   fs.writeFileSync('config/config4-pickups.json', JSON.stringify(pickups)); 
-  saveTimeout = setTimeout( async () => {
-    saveTimeout = null;
-    if(saving) {
-      setTimeout(saveConfigYml, 10000);
-      return;
-    }
-    saving = true;
-    const uploadRes = await upload();
-    if(uploadRes != 'ok') saveResult = uploadRes;
-    else {
-      const reloadRes = await reload();
-      if(reloadRes != 'ok') saveResult = reloadRes;
-    }
+
+  let errResult = null;
+
+  const uploadRes = await upload();
+  if(uploadRes != 'ok') errResult = uploadRes;
+  if(!errResult) {
+    const reloadRes = await reload();
+    if(reloadRes != 'ok') errResult = reloadRes;
+  }
+
+  if(errResult) {
+    console.log(dat(), 'saveConfigYml error:', errResult);
     saving = false;
-  }, 10000);  
+    return errResult;
+  }
 
-  // PROBLEM:  returns 'ok' before upload and reload are done
-
-  const result = saveResult;
-  saveResult = 'ok';
-  return result;
+  saving = false;
+  return 'ok';
 };
+
+const saveConfigYml = async (id, resolve, reject) => {
+  const tryRes = await trySaveConfigYml();    
+  switch(tryRes) {
+    case 'busy': setTimeout(()=> saveConfigYml(id, resolve, reject), 1000); break;
+    case 'ok':   resolve([id, {ok:'ok'}]   ); break;
+    default:     reject( [id, {err:tryRes}]); break;
+  }
+}
 
 // debug
 if(forceUpload) {

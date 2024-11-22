@@ -4,11 +4,10 @@ import util                from "util";
 import * as cp             from 'child_process';
 import moment              from 'moment';
 import { WebSocketServer } from 'ws';
-import {resolve} from "path";
 
 const showdates   = false;
-const dontupload  = true;
-const dontdelete  = true;
+const dontupload  = false;
+const dontdelete  = false;
 const forceUpload = false;
 
 const ws = new WebSocketServer({ port: 8736 });
@@ -54,7 +53,6 @@ const folderDates =  async (id, _params, resolve, reject) => {
   catch (err) {
     reject([id, err]);
   }
-  // console.log(dat(), {dateList});
   resolve([id, dateList]);
 }
 
@@ -141,8 +139,6 @@ const upload = async () => {
 }
 
 const reload = async () => {
-  // console.log(dat(), "\n\nPlease reload manually ----\n");
-
   if(dontupload) {
     console.log(dat(), "---- didn't reload ----");
     return 'ok';
@@ -246,12 +242,12 @@ const deleteFile = (id, params, resolve, reject) => {
   try {
     let {path} = params;
     if(path === 'undefined') {
-      reject([id, {"err" : "skipping delete of undefined path"}]);
+      reject([id, {"err" : "undefined name"}]);
       return;
-    }  
+    }
     path = decodeURI(path).replaceAll('@', '/').replaceAll('~', '?');
     if(dontdelete) 
-      console.log(dat(), `---- didn't delete ${path} ----`);
+      console.log(dat(), `---- not deleting ${path} ----`);
     else {
       console.log('deleting:', path);
       fs.unlinkSync(path); 
@@ -264,68 +260,87 @@ const deleteFile = (id, params, resolve, reject) => {
   resolve([id, {"ok":"ok"}]);
 };
 
+const addReject = (id, params, resolve, reject) => {
+  console.log(dat(), 'addReject', id, params);
+  let {name} = params;
+  if(name === 'undefined') {
+    reject([id, {"err" : "addReject: undefined name"}]);
+    return;
+  }  
+  for(const [idx, rejectNameStr] of rejects.entries()) {
+    if(rejectNameStr.toLowerCase() === name.toLowerCase()) {
+      console.log(dat(), '-- removing old matching reject:', rejectNameStr);
+      rejects.splice(idx, 1);
+    }
+  }
+  console.log(dat(), '-- adding reject:', name);
+  rejects.push(name);
+  saveConfigYml (id, {"ok":"ok"}, resolve, reject);
+}
 
-// app.post('/rejects/:name', function (req, res) {
-//   const name = req.params.name;
-//   for(const [idx, rejectNameStr] of rejects.entries()) {
-//     if(rejectNameStr.toLowerCase() === name.toLowerCase()) {
-//       console.log(dat(), '-- removing old matching reject:', rejectNameStr);
-//       rejects.splice(idx, 1);
-//     }
-//   }
-//   console.log(dat(), '-- adding reject:', name);
-//   rejects.push(name);
-//   res.send(saveConfigYml());
-// })
+const delReject = (id, params, resolve, reject) => {
+  console.log(dat(), 'delReject', id, params);
+  let {name} = params;
+  if(name === 'undefined') {
+    reject([id, {"err" : "delReject: undefined name"}]);
+    return;
+  }  
+  let deletedOne = false;
+  for(const [idx, rejectNameStr] of rejects.entries()) {
+    if(rejectNameStr.toLowerCase() === name.toLowerCase()) {
+      console.log(dat(), '-- deleting reject:', rejectNameStr);
+      rejects.splice(idx, 1);
+      deletedOne = true;
+    }
+  }
+  if(!deletedOne) {
+    console.log(dat(), '-- reject not deleted -- no match:', name);
+    reject([id, {"err":"not found"}]);
+    return
+  }
+  saveConfigYml (id, {"ok":"ok"}, resolve, reject);
+}
 
-// app.delete('/rejects/:name', function (req, res) {
-//   const name = req.params.name;
-//   let deletedOne = false;
-//   for(const [idx, rejectNameStr] of rejects.entries()) {
-//     if(rejectNameStr.toLowerCase() === name.toLowerCase()) {
-//       console.log(dat(), '-- deleting reject:', rejectNameStr);
-//       rejects.splice(idx, 1);
-//       deletedOne = true;
-//     }
-//   }
-//   if(!deletedOne) {
-//     console.log(dat(), '-- reject not deleted -- no match:', name);
-//     res.send('ok');
-//   }
-//   else res.send(saveConfigYml());
-// })
+const addPickup = (id, params, resolve, reject) => {
+  console.log(dat(), 'addPickup', id, params);
+  let {name} = params;
+  if(name === 'undefined') {
+    reject([id, {"err" : "addPickup: undefined name"}]);
+    return;
+  }  
+  for(const [idx, pickupNameStr] of pickups.entries()) {
+    if(pickupNameStr.toLowerCase() === name.toLowerCase()) {
+      console.log(dat(), '-- removing old matching pickup:', pickupNameStr);
+      pickups.splice(idx, 1);
+    }
+  }
+  console.log(dat(), '-- adding pickup:', name);
+  pickups.push(name);
+  saveConfigYml (id, {"ok":"ok"}, resolve, reject);
+}
 
-// app.post('/pickups/:name', function (req, res) {
-//   const name = req.params.name;
-//   for(const [idx, pickupNameStr] of pickups.entries()) {
-//     if(pickupNameStr.toLowerCase() === name.toLowerCase()) {
-//       console.log(dat(), '-- removing old matching pickup:', pickupNameStr);
-//       pickups.splice(idx, 1);
-//     }
-//   }
-//   console.log(dat(), '-- adding pickup:', name);
-//   pickups.push(name);
-//   res.send(saveConfigYml());
-// })
-
-// app.delete('/pickups/:name', function (req, res) {
-//   const name = req.params.name;
-//   let deletedOne = false;
-//   for(const [idx, pickupNameStr] of pickups.entries()) {
-//     if(pickupNameStr.toLowerCase() === name.toLowerCase()) {
-//       console.log(dat(), '-- deleting pickup:', pickupNameStr);
-//       pickups.splice(idx, 1);
-//       deletedOne = true;
-//     }
-//   }
-//   if(!deletedOne) {
-//     console.log(dat(), '-- pickup not deleted -- no match:', name);
-//     res.send('ok');
-//   }
-//   else res.send(saveConfigYml());
-// })
-
-
+const delPickup = (id, params, resolve, reject) => {
+  console.log(dat(), 'delPickup', id, params);
+  let {name} = params;
+  if(name === 'undefined') {
+    reject([id, {"err" : "delPickup: undefined name"}]);
+    return;
+  }  
+  let deletedOne = false;
+  for(const [idx, pickupNameStr] of pickups.entries()) {
+    if(pickupNameStr.toLowerCase() === name.toLowerCase()) {
+      console.log(dat(), '-- deleting pickup:', pickupNameStr);
+      pickups.splice(idx, 1);
+      deletedOne = true;
+    }
+  }
+  if(!deletedOne) {
+    console.log(dat(), '-- pickup not deleted -- no match:', name);
+    reject([id, {"err":"not found"}]);
+    return;
+  }
+  saveConfigYml (id, {"ok":"ok"}, resolve, reject);
+}
 
 
 //////////////////  WEBSOCKET SERVER  //////////////////
@@ -351,7 +366,7 @@ ws.on('connection', (socket) => {
     });
 
     promise.then((idResult) => {
-      console.log(dat(), 'resolve', idResult);
+      console.log(dat(), 'resolved', idResult);
       const [id, result] = idResult;
       socket.send(`${id}\`ok\`${JSON.stringify(result)}`); 
     })
@@ -366,25 +381,28 @@ ws.on('connection', (socket) => {
       params = JSON.parse(paramsJson);
     }
     catch(e) {
-      socket.send(`${id}\`err\`${JSON.stringify(e)}`); 
+      reject([id, {"err": `parse error: ${paramsJson}`}]);
       return;
     }
+
     // call function fname
     switch (fname) {
       case 'folderDates': folderDates(id, params, resolve, reject); break;
       case 'recentDates': recentDates(id, params, resolve, reject); break;
       case 'getRejects':   getRejects(id, params, resolve, reject); break;
       case 'getPickups':   getPickups(id, params, resolve, reject); break;
-      case 'test':   deleteFile(id, params, resolve, reject); break;
-
-
-      default: socket.send(
-          `${id}\`err\`{"unknownfunction": "${fname}"}`); 
+      case 'deleteFile':   deleteFile(id, params, resolve, reject); break;
+      case 'addReject':     addReject(id, params, resolve, reject); break;
+      case 'delReject':     delReject(id, params, resolve, reject); break;
+      case 'addPickup':     addPickup(id, params, resolve, reject); break;
+      case 'delPickup':     delPickup(id, params, resolve, reject); break;
+      default: reject([id, {unknownfunction: fname}]);
     };
   });
 
-  ws.on('error', console.error );
-  ws.on('close', console.log);
+  ws.on('error', (err) => console.log(dat(), 'ws error:', err));
+  ws.on('close', () => console.log(dat(), 'ws closed'));
 });
 
 // https://github.com/websockets/ws?tab=readme-ov-file
+  

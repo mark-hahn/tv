@@ -204,20 +204,6 @@ const getPickups = (id, _param, resolve, reject) => {
   saveConfigYml(id, {pickups:res}, resolve, reject);
 };
 
-const deleteFile = (id, path, resolve, reject) => {
-  console.log(dat(), 'deleteFile', id, path);
-  try {
-    path = decodeURI(path).replaceAll('@', '/').replaceAll('~', '?');
-    console.log('deleting:', path);
-    fs.unlinkSync(path); 
-  } 
-  catch(e) {
-    reject([id, e]);
-    return
-  }
-  resolve([id, {"ok":"ok"}]);
-};
-
 const addReject = (id, name, resolve, reject) => {
   console.log(dat(), 'addReject', id, name);
   for(const [idx, rejectNameStr] of rejects.entries()) {
@@ -280,6 +266,20 @@ const delPickup = (id, name, resolve, reject) => {
   saveConfigYml(id, {"ok":"ok"}, resolve, reject);
 }
 
+const deleteFile = (id, path, resolve, reject) => {
+  console.log(dat(), 'deleteFile', id, path);
+  try {
+    path = decodeURI(path).replaceAll('@', '/').replaceAll('~', '?');
+    console.log('deleting:', path);
+    fs.unlinkSync(path); 
+  } 
+  catch(e) {
+    reject([id, e]);
+    return
+  }
+  resolve([id, {"ok":"ok"}]);
+};
+
 
 //////////////////  WEBSOCKET SERVER  //////////////////
 
@@ -316,14 +316,14 @@ ws.on('connection', (socket) => {
 
     // call function fname
     switch (fname) {
-      case 'getSeries':   getSeries(id, param, resolve, reject); break;
-      case 'getRejects': getRejects(id, param, resolve, reject); break;
-      case 'getPickups': getPickups(id, param, resolve, reject); break;
-      case 'deleteFile': deleteFile(id, param, resolve, reject); break;
+      case 'getSeries':   getSeries(id, '',   resolve, reject); break;
+      case 'getRejects': getRejects(id, '',   resolve, reject); break;
+      case 'getPickups': getPickups(id, '',   resolve, reject); break;
       case 'addReject':   addReject(id, param, resolve, reject); break;
       case 'delReject':   delReject(id, param, resolve, reject); break;
       case 'addPickup':   addPickup(id, param, resolve, reject); break;
       case 'delPickup':   delPickup(id, param, resolve, reject); break;
+      case 'deleteFile': deleteFile(id, param, resolve, reject); break;
       default: reject([id, {unknownfunction: fname}]);
     };
   });

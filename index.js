@@ -4,9 +4,11 @@ import util                from "util";
 import * as cp             from 'child_process';
 import moment              from 'moment';
 import { WebSocketServer } from 'ws';
+import {resolve} from "path";
 
 const showdates   = false;
 const dontupload  = true;
+const dontdelete  = true;
 const forceUpload = false;
 
 const ws = new WebSocketServer({ port: 8736 });
@@ -35,8 +37,8 @@ const nameHash = (name) =>
     .replace(/^the\s/, '')
     .replace(/[^a-zA-Z0-9]*/g, ''))
 
-const folderDates =  async (id, params, resolve, reject) => {
-  console.log(dat(), 'folderDates', {id, params});
+const folderDates =  async (id, _params, resolve, reject) => {
+  console.log(dat(), 'folderDates', id);
   const dateList = {};
   try {
     const dir = await readdir(tvDir);
@@ -56,8 +58,8 @@ const folderDates =  async (id, params, resolve, reject) => {
   resolve([id, dateList]);
 }
 
-const recentDates =  async (id, params, resolve, reject) => {
-  console.log(dat(), 'recentDates', {id, params});
+const recentDates = async (id, _params, resolve, reject) => {
+  console.log(dat(), 'recentDates', id);
   let mostRecentDate;
   let dirSize;
   let errFlg = null;
@@ -157,13 +159,17 @@ const reload = async () => {
   return 'ok';
 }
 
+// debug
+if(forceUpload) {
+  upload();
+  reload();
+}
+
 let saving = false;
 
-const trySaveConfigYml = async () => {
-  if(saving) return 'busy';
+const trySaveConfigYml = async (id, result, resolve, reject) => {
+  if(saving) return ['busy', id, result, resolve, reject];
   saving = true;
-  
-  console.log(dat(), 'saving config.yml');
   rejects.sort((a,b) => { 
     return (a.toLowerCase() > b.toLowerCase() ? +1 : -1);
   });
@@ -187,59 +193,77 @@ const trySaveConfigYml = async () => {
   if(errResult) {
     console.log(dat(), 'saveConfigYml error:', errResult);
     saving = false;
-    return errResult;
+    return ['err', id, errResult, resolve, reject];
   }
 
   saving = false;
-  return 'ok';
+  return ['ok', id, result, resolve, reject];
 };
 
-const saveConfigYml = async (id, resolve, reject) => {
-  const tryRes = await trySaveConfigYml();    
-  switch(tryRes) {
-    case 'busy': setTimeout(()=> saveConfigYml(id, resolve, reject), 1000); break;
-    case 'ok':   resolve([id, {ok:'ok'}]   ); break;
-    default:     reject( [id, {err:tryRes}]); break;
+// this always sends a response to the client
+// can be called and forgotten
+const saveConfigYml = async (idIn, resultIn, resolveIn, rejectIn) => {
+  console.log(dat(), 'saving config.yml');
+  const tryRes = await trySaveConfigYml(idIn, resultIn, resolveIn, rejectIn);    
+  const [status, id, result, resolve, reject] = tryRes;
+  switch(status) {
+    case 'busy': 
+      setTimeout(() => saveConfigYml(id, result, resolve, reject), 1000); 
+      break;
+    case 'ok':  resolve([id, result]);       break;
+    case 'err': reject( [id, {err:tryRes}]); break;
   }
 }
 
-// debug
-if(forceUpload) {
-  upload();
-  reload();
-}
+const getRejects = (id, _params, resolve, reject) => {
+  console.log(dat(), 'getRejects', id);
+  let rejRes;
+  try {
+    rejRes = fs.readFileSync('config/config2-rejects.json', 'utf8');
+  } 
+  catch(e) {
+    reject([id, e]);
+    return
+  }
+  saveConfigYml (id, rejRes, resolve, reject);
+};
 
-// app.get('/rejects.json', function (req, res) {
-//   res.send(fs.readFileSync('config/config2-rejects.json', 'utf8'));
-// });
+const getPickups = (id, _params, resolve, reject) => {
+  console.log(dat(), 'getPickups', id);
+  let res;
+  try {
+    res = fs.readFileSync('config/config4-pickups.json', 'utf8');
+  } 
+  catch(e) {
+    reject([id, e]);
+    return
+  }
+  saveConfigYml (id, res, resolve, reject);
+};
 
-// app.get('/pickups.json', function (req, res) {
-//   res.send(fs.readFileSync('config/config4-pickups.json', 'utf8'));
-// });
+const deleteFile = (id, params, resolve, reject) => {
+  console.log(dat(), 'deleteFile', id, params);
+  try {
+    let {path} = params;
+    if(path === 'undefined') {
+      reject([id, {"err" : "skipping delete of undefined path"}]);
+      return;
+    }  
+    path = decodeURI(path).replaceAll('@', '/').replaceAll('~', '?');
+    if(dontdelete) 
+      console.log(dat(), `---- didn't delete ${path} ----`);
+    else {
+      console.log('deleting:', path);
+      fs.unlinkSync(path); 
+    }
+  } 
+  catch(e) {
+    reject([id, e]);
+    return
+  }
+  resolve([id, {"ok":"ok"}]);
+};
 
-// app.get('/recentDates', async function (req, res) {
-//   const str = JSON.stringify(await recentDates());
-//   fs.writeFileSync('recentDates-dbg.json', str);
-//   res.send(str);
-// });
-
-// app.get('/deleteFile/:path', function (req, res) {
-//   let {path} = req.params;
-//   if(path === 'undefined') {
-//     res.send('{"status" : "skipping delete of undefined path"}');
-//     return;
-//   }
-//   path = decodeURI(path).replaceAll('`', '/').replaceAll('~', '?');
-//   let resStr = `{"status":"ok", "path":"${path.replaceAll('"', "'")}"}`;
-//   try { 
-//     console.log('deleting:', path);
-//     fs.unlinkSync(path); 
-//   }
-//   catch(e) {
-//     resStr = `{"status":"${e.message.replaceAll('"', "'")}", "path":"${path.replaceAll('"', "'")}"}`;
-//   }
-//   res.send(resStr);
-// })
 
 // app.post('/rejects/:name', function (req, res) {
 //   const name = req.params.name;
@@ -322,7 +346,9 @@ ws.on('connection', (socket) => {
     // param called when promise is resolved or rejected
     // there is one unique promise for each function call
     const promise = new Promise((resolveIn, rejectIn) => {
-          resolve = resolveIn; reject = rejectIn;});
+      resolve = resolveIn; 
+      reject = rejectIn;
+    });
 
     promise.then((idResult) => {
       console.log(dat(), 'resolve', idResult);
@@ -334,19 +360,23 @@ ws.on('connection', (socket) => {
       const [id, error] = idError;
       socket.send(`${id}\`err\`${JSON.stringify(error)}`); 
     });
+
     let params
     try {
       params = JSON.parse(paramsJson);
     }
     catch(e) {
-      socket.send(
-          `${id}\`err\`${JSON.stringify(e)}`); 
+      socket.send(`${id}\`err\`${JSON.stringify(e)}`); 
       return;
     }
     // call function fname
     switch (fname) {
       case 'folderDates': folderDates(id, params, resolve, reject); break;
-      case 'test': recentDates(id, params, resolve, reject); break;
+      case 'recentDates': recentDates(id, params, resolve, reject); break;
+      case 'getRejects':   getRejects(id, params, resolve, reject); break;
+      case 'getPickups':   getPickups(id, params, resolve, reject); break;
+      case 'test':   deleteFile(id, params, resolve, reject); break;
+
 
       default: socket.send(
           `${id}\`err\`{"unknownfunction": "${fname}"}`); 

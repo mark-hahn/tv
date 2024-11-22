@@ -61,11 +61,11 @@ templates:
 
     series:
       settings:
-        group 720i-1080p:
+        group 720p-1080p:
           exact: yes
           season_packs: no
-          upgrade: no
-      720i-1080p:
+          upgrade: yes
+      720p-1080p:
         - "A Gentleman in Moscow"
         - "A Good Girl's Guide to Murder"
         - "A Spy Among Friends"

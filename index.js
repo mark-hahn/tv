@@ -32,7 +32,7 @@ const pickups = JSON.parse(pickupStr);
 let dirTime;
 let dirSize;
 
-const getSeries = async (id, _params, resolve, reject) => {
+const getSeries = async (id, _param, resolve, reject) => {
   // console.log(dat(), 'getSeries', id);
   let   errFlg = null;
   const series = {};
@@ -154,7 +154,7 @@ const trySaveConfigYml = async (id, result, resolve, reject) => {
   }
 
   if(errResult) {
-    console.log(dat(), 'saveConfigYml error:', errResult);
+    console.log(dat(), 'trySaveConfigYml error:', errResult);
     saving = false;
     return ['err', id, errResult, resolve, reject];
   }
@@ -174,11 +174,11 @@ const saveConfigYml = async (idIn, resultIn, resolveIn, rejectIn) => {
       setTimeout(() => saveConfigYml(id, result, resolve, reject), 1000); 
       break;
     case 'ok':  resolve([id, result]);       break;
-    case 'err': reject( [id, {err:tryRes}]); break;
+    case 'err': reject( [id, tryRes]); break;
   }
 }
 
-const getRejects = (id, _params, resolve, reject) => {
+const getRejects = (id, _param, resolve, reject) => {
   console.log(dat(), 'getRejects', id);
   let rejRes;
   try {
@@ -188,10 +188,10 @@ const getRejects = (id, _params, resolve, reject) => {
     reject([id, e]);
     return
   }
-  saveConfigYml (id, rejRes, resolve, reject);
+  saveConfigYml(id, rejRes, resolve, reject);
 };
 
-const getPickups = (id, _params, resolve, reject) => {
+const getPickups = (id, _param, resolve, reject) => {
   console.log(dat(), 'getPickups', id);
   let res;
   try {
@@ -201,17 +201,12 @@ const getPickups = (id, _params, resolve, reject) => {
     reject([id, e]);
     return
   }
-  saveConfigYml (id, res, resolve, reject);
+  saveConfigYml(id, {pickups:res}, resolve, reject);
 };
 
-const deleteFile = (id, params, resolve, reject) => {
-  console.log(dat(), 'deleteFile', id, params);
+const deleteFile = (id, path, resolve, reject) => {
+  console.log(dat(), 'deleteFile', id, path);
   try {
-    let {path} = params;
-    if(path === 'undefined') {
-      reject([id, {"err" : "undefined name"}]);
-      return;
-    }
     path = decodeURI(path).replaceAll('@', '/').replaceAll('~', '?');
     console.log('deleting:', path);
     fs.unlinkSync(path); 
@@ -223,13 +218,8 @@ const deleteFile = (id, params, resolve, reject) => {
   resolve([id, {"ok":"ok"}]);
 };
 
-const addReject = (id, params, resolve, reject) => {
-  console.log(dat(), 'addReject', id, params);
-  let {name} = params;
-  if(name === 'undefined') {
-    reject([id, {"err" : "addReject: undefined name"}]);
-    return;
-  }  
+const addReject = (id, name, resolve, reject) => {
+  console.log(dat(), 'addReject', id, name);
   for(const [idx, rejectNameStr] of rejects.entries()) {
     if(rejectNameStr.toLowerCase() === name.toLowerCase()) {
       console.log(dat(), '-- removing old matching reject:', rejectNameStr);
@@ -238,16 +228,11 @@ const addReject = (id, params, resolve, reject) => {
   }
   console.log(dat(), '-- adding reject:', name);
   rejects.push(name);
-  saveConfigYml (id, {"ok":"ok"}, resolve, reject);
+  saveConfigYml(id, {"ok":"ok"}, resolve, reject);
 }
 
-const delReject = (id, params, resolve, reject) => {
-  console.log(dat(), 'delReject', id, params);
-  let {name} = params;
-  if(name === 'undefined') {
-    reject([id, {"err" : "delReject: undefined name"}]);
-    return;
-  }  
+const delReject = (id, name, resolve, reject) => {
+  console.log(dat(), 'delReject', id, name);
   let deletedOne = false;
   for(const [idx, rejectNameStr] of rejects.entries()) {
     if(rejectNameStr.toLowerCase() === name.toLowerCase()) {
@@ -258,19 +243,14 @@ const delReject = (id, params, resolve, reject) => {
   }
   if(!deletedOne) {
     console.log(dat(), '-- reject not deleted -- no match:', name);
-    reject([id, {"err":"not found"}]);
+    reject([id, {"delReject":"not found"]);
     return
   }
-  saveConfigYml (id, {"ok":"ok"}, resolve, reject);
+  saveConfigYml(id, {"ok":"ok"}, resolve, reject);
 }
 
-const addPickup = (id, params, resolve, reject) => {
-  console.log(dat(), 'addPickup', id, params);
-  let {name} = params;
-  if(name === 'undefined') {
-    reject([id, {"err" : "addPickup: undefined name"}]);
-    return;
-  }  
+const addPickup = (id, name, resolve, reject) => {
+  console.log(dat(), 'addPickup', id, name);
   for(const [idx, pickupNameStr] of pickups.entries()) {
     if(pickupNameStr.toLowerCase() === name.toLowerCase()) {
       console.log(dat(), '-- removing old matching pickup:', pickupNameStr);
@@ -279,16 +259,11 @@ const addPickup = (id, params, resolve, reject) => {
   }
   console.log(dat(), '-- adding pickup:', name);
   pickups.push(name);
-  saveConfigYml (id, {"ok":"ok"}, resolve, reject);
+  saveConfigYml(id, {"ok":"ok"}, resolve, reject);
 }
 
-const delPickup = (id, params, resolve, reject) => {
-  console.log(dat(), 'delPickup', id, params);
-  let {name} = params;
-  if(name === 'undefined') {
-    reject([id, {"err" : "delPickup: undefined name"}]);
-    return;
-  }  
+const delPickup = (id, name, resolve, reject) => {
+  console.log(dat(), 'delPickup', id, name);
   let deletedOne = false;
   for(const [idx, pickupNameStr] of pickups.entries()) {
     if(pickupNameStr.toLowerCase() === name.toLowerCase()) {
@@ -299,10 +274,10 @@ const delPickup = (id, params, resolve, reject) => {
   }
   if(!deletedOne) {
     console.log(dat(), '-- pickup not deleted -- no match:', name);
-    reject([id, {"err":"not found"}]);
+    reject([id,{"delPickup":"not found"}]);
     return;
   }
-  saveConfigYml (id, {"ok":"ok"}, resolve, reject);
+  saveConfigYml(id, {"ok":"ok"}, resolve, reject);
 }
 
 
@@ -316,7 +291,7 @@ ws.on('connection', (socket) => {
   socket.on('message', (msg) => {
     console.log(dat(), 'received', msg.toString());
 
-    const [id, fname, paramsJson] = msg.toString().split('`');
+    const [id, fname, param] = msg.toString().split('`');
 
     let resolve = null;
     let reject  = null;
@@ -339,31 +314,22 @@ ws.on('connection', (socket) => {
       socket.send(`${id}\`err\`${JSON.stringify(error)}`); 
     });
 
-    let params
-    try {
-      params = JSON.parse(paramsJson);
-    }
-    catch(e) {
-      reject([id, {"err": `parse error: ${paramsJson}`}]);
-      return;
-    }
-
     // call function fname
     switch (fname) {
-      case 'getSeries':   getSeries(id, params, resolve, reject); break;
-      case 'getRejects': getRejects(id, params, resolve, reject); break;
-      case 'getPickups': getPickups(id, params, resolve, reject); break;
-      case 'deleteFile': deleteFile(id, params, resolve, reject); break;
-      case 'addReject':   addReject(id, params, resolve, reject); break;
-      case 'delReject':   delReject(id, params, resolve, reject); break;
-      case 'addPickup':   addPickup(id, params, resolve, reject); break;
-      case 'delPickup':   delPickup(id, params, resolve, reject); break;
+      case 'getSeries':   getSeries(id, param, resolve, reject); break;
+      case 'getRejects': getRejects(id, param, resolve, reject); break;
+      case 'getPickups': getPickups(id, param, resolve, reject); break;
+      case 'deleteFile': deleteFile(id, param, resolve, reject); break;
+      case 'addReject':   addReject(id, param, resolve, reject); break;
+      case 'delReject':   delReject(id, param, resolve, reject); break;
+      case 'addPickup':   addPickup(id, param, resolve, reject); break;
+      case 'delPickup':   delPickup(id, param, resolve, reject); break;
       default: reject([id, {unknownfunction: fname}]);
     };
   });
 
   ws.on('error', (err) => console.log(dat(), 'ws error:', err));
-  ws.on('close', () => console.log(dat(), 'ws closed'));
+  ws.on('close', () =>    console.log(dat(), 'ws closed'));
 });
 
 // https://github.com/websockets/ws?tab=readme-ov-file

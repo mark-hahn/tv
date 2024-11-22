@@ -8,7 +8,6 @@ import { WebSocketServer } from 'ws';
 const showdates   = false;
 const dontupload  = false;
 const dontdelete  = false;
-const forceUpload = false;
 
 const ws = new WebSocketServer({ port: 8736 });
 console.log('ws listening on port 8736');
@@ -30,53 +29,27 @@ const footerStr = fs.readFileSync('config/config5-footer.txt',   'utf8');
 const rejects = JSON.parse(rejectStr);
 const pickups = JSON.parse(pickupStr);
 
-const nameHash = (name) =>
-  ('name-' + name
-    .toLowerCase()
-    .replace(/^the\s/, '')
-    .replace(/[^a-zA-Z0-9]*/g, ''))
+let dirTime;
+let dirSize;
 
-const folderDates =  async (id, _params, resolve, reject) => {
-  console.log(dat(), 'folderDates', id);
-  const dateList = {};
-  try {
-    const dir = await readdir(tvDir);
-    for await (const dirent of dir) {
-      const showPath = tvDir + '/' + dirent;
-      const date     = (await stat(showPath)).mtime;
-      const dateStr  = date.toISOString()
-                        .substring(0,10).replace(/-/g, '/');
-      const hash     =  nameHash(dirent);
-      if(hash.length > 7) dateList[hash] = dateStr;
-    }
-  }
-  catch (err) {
-    reject([id, err]);
-  }
-  resolve([id, dateList]);
-}
+const getSeries = async (id, _params, resolve, reject) => {
+  // console.log(dat(), 'getSeries', id);
+  let   errFlg = null;
+  const series = {};
 
-const recentDates = async (id, _params, resolve, reject) => {
-  console.log(dat(), 'recentDates', id);
-  let mostRecentDate;
-  let dirSize;
-  let errFlg = null;
-  const recentDates = {};
   const recurs = async (path) => {
     if(errFlg || path == tvDir + '/.stfolder') return;
     try {
       const fstat = await stat(path);
-      const [sfx] = path.split('.').slice(-1);
+      const time  = Math.round(new Date(fstat.mtime).getTime() / 1000);
+      if(time > 2524608000 /*2050*/) return;     
       dirSize += fstat.size;
+      dirTime  = Math.max(dirTime, time);
 
-      if(['mkv','flv','vob','avi','mov','wmv','mp4',
-          'mpg','mpeg','m2v','mp2'].includes(sfx)) {
-        // console.log(dat(), 'video file',{path, fstat});
-        const dateStr = fstat.mtime.toISOString()
-                        .substring(0,10).replace(/-/g, '/');
-        if(dateStr > '2050') return;
-        if(dateStr > mostRecentDate) mostRecentDate = dateStr;
-      }
+      // if(['mkv','flv','vob','avi','mov','wmv','mp4',
+      //     'mpg','mpeg','m2v','mp2'].includes(sfx)) {
+      //   console.log(dat(), 'video file',{path, fstat});
+      // }
 
       if(fstat.isDirectory()) {
         const dir = await readdir(path);
@@ -86,26 +59,26 @@ const recentDates = async (id, _params, resolve, reject) => {
       }
     }
     catch (err) {
-      // console.error(err);
       errFlg = err;
     }
   }
+
   const dir = await readdir(tvDir);
   for (const dirent of dir) {
-    const topLevelPath = tvDir + '/' + dirent;
-    mostRecentDate = '0000/00/00';
+    const seriesPath = tvDir + '/' + dirent;
     dirSize = 0;
-    await recurs(topLevelPath);
-    // console.log({dirent, mostRecentDate, dirSize});
+    dirTime = 0;
+    await recurs(seriesPath);
+    // console.log({dirent, dirTime, dirSize});
     // process.exit();
-    recentDates[nameHash(dirent)] = mostRecentDate + '|' + dirSize;
+    series[dirent] = [dirSize, dirTime];
   }
   if(errFlg) {
     reject([id, errFlg]);
     return;
   }
   else {
-    resolve([id, recentDates]);
+    resolve([id, series]);
     return;
   }
 }
@@ -153,12 +126,6 @@ const reload = async () => {
   }
   console.log(dat(), 'reloaded config.yml');
   return 'ok';
-}
-
-// debug
-if(forceUpload) {
-  upload();
-  reload();
 }
 
 let saving = false;
@@ -246,12 +213,8 @@ const deleteFile = (id, params, resolve, reject) => {
       return;
     }
     path = decodeURI(path).replaceAll('@', '/').replaceAll('~', '?');
-    if(dontdelete) 
-      console.log(dat(), `---- not deleting ${path} ----`);
-    else {
-      console.log('deleting:', path);
-      fs.unlinkSync(path); 
-    }
+    console.log('deleting:', path);
+    fs.unlinkSync(path); 
   } 
   catch(e) {
     reject([id, e]);
@@ -387,15 +350,14 @@ ws.on('connection', (socket) => {
 
     // call function fname
     switch (fname) {
-      case 'folderDates': folderDates(id, params, resolve, reject); break;
-      case 'recentDates': recentDates(id, params, resolve, reject); break;
-      case 'getRejects':   getRejects(id, params, resolve, reject); break;
-      case 'getPickups':   getPickups(id, params, resolve, reject); break;
-      case 'deleteFile':   deleteFile(id, params, resolve, reject); break;
-      case 'addReject':     addReject(id, params, resolve, reject); break;
-      case 'delReject':     delReject(id, params, resolve, reject); break;
-      case 'addPickup':     addPickup(id, params, resolve, reject); break;
-      case 'delPickup':     delPickup(id, params, resolve, reject); break;
+      case 'getSeries':   getSeries(id, params, resolve, reject); break;
+      case 'getRejects': getRejects(id, params, resolve, reject); break;
+      case 'getPickups': getPickups(id, params, resolve, reject); break;
+      case 'deleteFile': deleteFile(id, params, resolve, reject); break;
+      case 'addReject':   addReject(id, params, resolve, reject); break;
+      case 'delReject':   delReject(id, params, resolve, reject); break;
+      case 'addPickup':   addPickup(id, params, resolve, reject); break;
+      case 'delPickup':   delPickup(id, params, resolve, reject); break;
       default: reject([id, {unknownfunction: fname}]);
     };
   });

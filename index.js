@@ -188,7 +188,7 @@ const getRejects = (id, _param, resolve, reject) => {
     reject([id, e]);
     return
   }
-  saveConfigYml(id, rejRes, resolve, reject);
+  resolve([id, {rejects:rejRes});
 };
 
 const getPickups = (id, _param, resolve, reject) => {
@@ -201,7 +201,7 @@ const getPickups = (id, _param, resolve, reject) => {
     reject([id, e]);
     return
   }
-  saveConfigYml(id, {pickups:res}, resolve, reject);
+  resolve([id,{pickups:res}]);
 };
 
 const addReject = (id, name, resolve, reject) => {
@@ -229,7 +229,7 @@ const delReject = (id, name, resolve, reject) => {
   }
   if(!deletedOne) {
     console.log(dat(), '-- reject not deleted -- no match:', name);
-    reject([id, {"delReject":"not found"]);
+    reject([id, {"delReject":"not found"}]);
     return
   }
   saveConfigYml(id, {"ok":"ok"}, resolve, reject);
@@ -317,7 +317,7 @@ ws.on('connection', (socket) => {
     // call function fname
     switch (fname) {
       case 'getSeries':   getSeries(id, '',   resolve, reject); break;
-      case 'getRejects': getRejects(id, '',   resolve, reject); break;
+      case 'test': getRejects(id, '',   resolve, reject); break;
       case 'getPickups': getPickups(id, '',   resolve, reject); break;
       case 'addReject':   addReject(id, param, resolve, reject); break;
       case 'delReject':   delReject(id, param, resolve, reject); break;

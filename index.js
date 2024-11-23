@@ -29,7 +29,7 @@ const footerStr = fs.readFileSync('config/config5-footer.txt',   'utf8');
 const rejects = JSON.parse(rejectStr);
 const pickups = JSON.parse(pickupStr);
 
-let dirTime;
+let dirDate;
 let dirSize;
 
 const getSeries = async (id, _param, resolve, reject) => {
@@ -41,10 +41,10 @@ const getSeries = async (id, _param, resolve, reject) => {
     if(errFlg || path == tvDir + '/.stfolder') return;
     try {
       const fstat = await stat(path);
-      const time  = Math.round(new Date(fstat.mtime).getTime() / 1000);
-      if(time > 2524608000 /*2050*/) return;     
+      const date  = fstat.mtime.toISOString().substring(0,10);
+      if(date.substring(0,4) > '2050') return;     
+      dirDate  = Math.max(dirDate, date);
       dirSize += fstat.size;
-      dirTime  = Math.max(dirTime, time);
 
       // if(['mkv','flv','vob','avi','mov','wmv','mp4',
       //     'mpg','mpeg','m2v','mp2'].includes(sfx)) {
@@ -66,12 +66,12 @@ const getSeries = async (id, _param, resolve, reject) => {
   const dir = await readdir(tvDir);
   for (const dirent of dir) {
     const seriesPath = tvDir + '/' + dirent;
+    dirDate = 0;
     dirSize = 0;
-    dirTime = 0;
     await recurs(seriesPath);
-    // console.log({dirent, dirTime, dirSize});
+    // console.log({dirent, dirDate, dirSize});
     // process.exit();
-    series[dirent] = [dirSize, dirTime];
+    series[dirent] = [dirDate, dirSize];
   }
   if(errFlg) {
     reject([id, errFlg]);
@@ -180,28 +180,12 @@ const saveConfigYml = async (idIn, resultIn, resolveIn, rejectIn) => {
 
 const getRejects = (id, _param, resolve, reject) => {
   console.log(dat(), 'getRejects', id);
-  let rejRes;
-  try {
-    rejRes = fs.readFileSync('config/config2-rejects.json', 'utf8');
-  } 
-  catch(e) {
-    reject([id, e]);
-    return
-  }
-  resolve([id, {rejects:rejRes}]);
+  resolve([id, rejects]);
 };
 
 const getPickups = (id, _param, resolve, reject) => {
   console.log(dat(), 'getPickups', id);
-  let res;
-  try {
-    res = fs.readFileSync('config/config4-pickups.json', 'utf8');
-  } 
-  catch(e) {
-    reject([id, e]);
-    return
-  }
-  resolve([id,{pickups:res}]);
+  resolve([id, pickups]);
 };
 
 const addReject = (id, name, resolve, reject) => {

@@ -3,7 +3,7 @@ const ws = new WebSocket('ws://192.168.1.103:8736');
 let handleMsg = null;
 
 ws.onmessage = (event) => {
-  console.log("onmessage:" + event.data);
+  // console.log("onmessage:" + event.data);
   handleMsg(event.data);
 }
 
@@ -16,7 +16,7 @@ ws.onclose = () => {() =>
 };
 
 ws.onerror = (err) => {
-  console.log("Error", err);
+  console.error(err);
 };
 
 const calls = {};
@@ -32,7 +32,7 @@ const funcCall = (fname, param) => {
 }
 
 handleMsg = (msg) => { 
-  console.log("handleMsg: " + msg);
+  // console.log("handleMsg: " + msg);
   const [id, status, result] = msg.split('`');
   const [resolve, reject]    = calls[id]; 
   delete calls[id];
@@ -42,7 +42,7 @@ handleMsg = (msg) => {
     else                 reject(res);
   }
   catch(err) {
-    console.log("Error parsing ws result:", {id, result, err});
+    console.error("parsing ws result:", {id, result, err});
   } 
 }
 

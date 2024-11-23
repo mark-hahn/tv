@@ -1,4 +1,5 @@
-import axios from "axios"
+import axios     from "axios"
+import * as srvr from "./srvr.js";
 
 const name      = "mark";
 const pwd       = "90-MNBbnmyui";
@@ -21,8 +22,8 @@ const getToken = async () => {
     headers: { Authorization: authHdr },
     data: { Username: name, Pw: pwd },
   };
-  const showsRes = await axios(config);
-  token = showsRes.data.AccessToken;
+  const embyShows = await axios(config);
+  token = embyShows.data.AccessToken;
 }
 
 export async function init() {
@@ -54,15 +55,32 @@ export async function recentDates() {
 
 export async function loadAllShows() {
   console.log('entering loadAllShows');
-  const showsRes = await axios.get(showListUrl());
+
+  const promise1 = axios.get(showListUrl(0, 10000));
+  const promise2 = srvr.getSeries();
+  const [embyShows, srvrShows] = 
+          await Promise.all([promise1, promise2]);
+
   const shows = [];
 
-  for(let key in showsRes.data.Items) {
-    let show = showsRes.data.Items[key];
+  for(let key in embyShows.data.Items) {
+    let show = embyShows.data.Items[key];
     Object.assign(show, show.UserData);
     delete show.UserData;
     for(const k of ['DateCreated', 'PremiereDate'])
       if(show[k]) show[k] = show[k].replace(/T.*/, '');
+
+    const showSizeTime = srvrShows[show.Name];
+    if(!showSizeTime) {
+      show.noFiles = true;
+      show.dirSize = 0;
+      show.dirTime = 0;
+    }
+    else {
+      const [dirSize, dirTime] = showSizeTime;
+      show.dirSize = dirSize;
+      show.dirTime = dirTime;
+    }
 
     const gap = await findGap(show.Name, show.Id);
     if(gap) show.gap = gap;

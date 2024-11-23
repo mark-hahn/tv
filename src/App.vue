@@ -87,6 +87,7 @@ div
 
 <script>
 import * as emby           from "./emby.js";
+import * as srvr           from "./srvr.js";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library }         from "@fortawesome/fontawesome-svg-core";
 import { faLaughBeam, faSadCry, faClock, faHeart, } 
@@ -504,6 +505,7 @@ export default {
   },
 };
 </script>
+
 
 <style scoped>
 tr:nth-child(even) {

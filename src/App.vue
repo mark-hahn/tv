@@ -43,7 +43,7 @@ div
              @click="copyNameToClipboard(show)")
           font-awesome-icon(icon="copy" style="color:#ccc")
         td(style="width:30px; text-align:center;" )
-          div(v-show="!show.Id.startsWith('nodb-')" 
+          div(v-show="!show.Id.startsWith('noemby-')" 
                  @click="seriesMapAction('open', show)")
             font-awesome-icon(icon="border-all" style="color:#ccc")
         td(v-if="sortByDate" style="width:150px;font-size:16px;") 
@@ -117,13 +117,13 @@ export default {
     const toggleFavorite = async (show) => {
       this.saveVisShow(show.Name);
       show.IsFavorite = await emby.toggleFav(show.Id, show.IsFavorite);
-      // if (show.Id.startsWith("nodb-")) console.log(show);
+      // if (show.Id.startsWith("noemby-")) console.log(show);
     };
 
     const toggleReject = async (show) => {
       this.saveVisShow(show.Name);
       show.Reject = await emby.toggleReject(show.Name, show.Reject);
-      if (!show.Reject && show.Id.startsWith("nodb-")) {
+      if (!show.Reject && show.Id.startsWith("noemby-")) {
         console.log("toggled reject, removing row");
         const id = show.Id;
         allShows   = allShows.filter(  (show) => show.Id != id);
@@ -134,7 +134,7 @@ export default {
     const togglePickup = async (show) => {
       this.saveVisShow(show.Name);
       show.Pickup = await emby.togglePickUp(show.Name, show.Pickup);
-      if (!show.Pickup && show.Id.startsWith("nodb-")) {
+      if (!show.Pickup && show.Id.startsWith("noemby-")) {
         console.log("toggled pickUp, removing row");
         const id = show.Id;
         allShows   = allShows.filter(  (show) => show.Id != id);
@@ -160,7 +160,7 @@ export default {
         show.RunTimeTicks = 0;
         show.UnplayedItemCount = 0;
         show.IsFavorite = false;
-        show.Id = "nodb-" + Math.random();
+        show.Id = "noemby-" + Math.random();
         console.log("deleted db, keeping row");
       } else {
         console.log("deleted db, removing row");
@@ -218,7 +218,7 @@ export default {
           click(show) { togglePickup(show); },
         }, {
           color: "#a66", filter: 0, icon: ["fas", "tv"],
-          cond(show)  { return !show.Id.startsWith("nodb-"); },
+          cond(show)  { return !show.Id.startsWith("noemby-"); },
           click(show) { deleteShowFromEmby(show); },
         },
       ],
@@ -231,7 +231,7 @@ export default {
     async pruneAllShows() {
       if(!confirm("ARE YOU SURE YOU WANT TO PRUNE ALL SHOWS?")) return;
       for (let show of allShows) {
-        if(show.Id.slice(0,5) != 'nodb-') {
+        if(show.Id.slice(0,5) != 'noemby-') {
           console.log('calling justPruneShow', {show});
           const numDeleted = await emby.justPruneShow(show.Id);
           if(numDeleted != 0) return; // debug
@@ -423,7 +423,7 @@ export default {
         allShows.push({
           Name: name,
           Pickup: true,
-          Id: "nodb-" + Math.random(),
+          Id: "noemby-" + Math.random(),
         });
         this.highlightName = name;
         this.sortShows();
@@ -467,7 +467,7 @@ export default {
     async showInExternal(show, event) {
       console.log("showInExternal", show);
       this.saveVisShow(show.Name);
-      if (!show.Id.startsWith("nodb-")) {
+      if (!show.Id.startsWith("noemby-")) {
         if (event.ctrlKey) {
           if (imdbWin) imdbWin.close();
           const providers = await emby.providers(show);

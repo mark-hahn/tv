@@ -53,13 +53,19 @@ export async function recentDates() {
 
 ////////////////////////  MAIN FUNCTIONS  ///////////////////////
 
+// merge emby db shows with srvr dir shows
+// handle rejects and pickups which may add shows
 export async function loadAllShows() {
   console.log('entering loadAllShows');
 
-  const promise1 = axios.get(showListUrl(0, 10000));
-  const promise2 = srvr.getSeries();
-  const [embyShows, srvrShows] = 
-          await Promise.all([promise1, promise2]);
+  const time1 = new Date().getTime();
+
+  const listPromise   = axios.get(showListUrl(0, 10000));
+  const seriesPromise = srvr.getSeries();
+  const rejPromise    = srvr.getRejects();
+  const pkupPromise   = srvr.getPickups();
+  const [embyShows, srvrShows, rejects, pickups] = await Promise.all(
+    [listPromise, seriesPromise, rejPromise, pkupPromise]);
 
   const shows = [];
 
@@ -67,77 +73,102 @@ export async function loadAllShows() {
     let show = embyShows.data.Items[key];
     Object.assign(show, show.UserData);
     delete show.UserData;
-    for(const k of ['DateCreated', 'PremiereDate'])
-      if(show[k]) show[k] = show[k].replace(/T.*/, '');
+    for(const date of ['DateCreated', 'PremiereDate'])
+      if(show[date]) show[date] = show[date].replace(/T.*/, '');
 
-    const showSizeTime = srvrShows[show.Name];
-    if(!showSizeTime) {
-      show.noFiles = true;
-      show.dirSize = 0;
-      show.dirTime = 0;
+    // TODO:  check and fix emby show not in srvr
+
+    const showDateSize = srvrShows[show.Name];
+    if(!showDateSize) {
+      console.log('emby show not in srvr:', show.Name);
+      show.NoSrvr  = true;
+      show.DirDate = 0;
+      show.DirSize = 0;
     }
     else {
-      const [dirSize, dirTime] = showSizeTime;
-      show.dirSize = dirSize;
-      show.dirTime = dirTime;
+      const [DirDate, DirSize] = showDateSize;
+      show.DirDate = DirDate;
+      show.DirSize = DirSize;
     }
 
-    const gap = await findGap(show.Name, show.Id);
-    if(gap) show.gap = gap;
+  // TODO:  add gap to show only when needed
+  //   const gap = await findGap(show.Name, show.Id);
+  //   if(gap) show.gap = gap;
+
     shows.push(show);
   }
 
-  const showNames = shows.map(show => show.Name);
-  const rejects = (await axios.get(
-        'http://hahnca.com/tv/rejects.json')).data;
-  for(let reject of rejects) {
-    let gotReject = false;
-    for(let showName of showNames) {
-      if(showName == reject) {
-        const show = shows.find(show => show.Name == showName);
-        show.Reject = true;
-        gotReject = true;
-      }
-    }
-    if(!gotReject) {
-      shows.push( {
-        Name:  reject,
-        Reject:true,
-        Id:   'nodb-' + Math.random(),
-      });
-    }
-  }
-  const pickups = (await axios.get(
-        'http://hahnca.com/tv/pickups.json')).data;
-  for(let pickup of pickups) {
-    let gotPickup = false;
-    for(let showName of showNames) {
-      if(showName == pickup) {
-        const show = shows.find(show => show.Name == showName);
-        show.Pickup = true;
-        gotPickup = true;
-      }
-    }
-    if(!gotPickup) {
-      shows.push( {
-        Name:  pickup,
-        Pickup:true,
-        Id:   'nodb-' + Math.random(),
-      });
-    }
-  }
-  const toTryRes = await axios.get(toTryListUrl());
-  const toTryIds = [];
-  for(let tryEntry of toTryRes.data.Items)
-    toTryIds.push(tryEntry.Id);
-  for(let show of shows)
-    show.InToTry = toTryIds.includes(show.Id);
+  let showNames = shows.map(show => show.Name);
 
-  shows.sort((a,b) => {
-    const aname = a.Name.replace(/The\s/i, '');
-    const bname = b.Name.replace(/The\s/i, '');
-    return (aname.toLowerCase() > bname.toLowerCase() ? +1 : -1);
-  });
+  // TODO:  check and fix srvr show not in emby
+
+  for(let name in srvrShows) {
+    if(showNames.includes(name)) continue;
+    console.log('srvr show not in emby', name);
+    const [DirDate, DirSize] = srvrShows[name];
+    const Id = 'noemby-' + Math.random();
+    const show = {Id, Name: name, Noemby: true, DirDate, DirSize};
+    shows.push(show);
+    showNames.push(name);
+  }
+
+  for(let rejectName of rejects) {
+    const show = shows.find((show) => show.Name === rejectName);
+    if(show) show.Reject = true;
+    else {
+      console.log('reject not in shows:', rejectName);
+      let DirDate, DirSize;
+      const showDateSize = srvrShows[rejectName];
+      if(showDateSize) [DirDate, DirSize] = showDateSize;
+      else             [DirDate, DirSize] = [0, 0];
+      shows.push( {
+        Name:   rejectName,
+        Reject: true,
+        Id: 'reject-' + Math.random(),
+        DirDate, DirSize
+      });
+      showNames.push(rejectName);
+    }
+  }
+
+  for(let pickupName of pickups) {
+    const show = shows.find((show) => show.Name === pickupName);
+    if(show) show.Pickup = true;
+    else {
+      console.log('pickup not in shows:', pickupName);
+      let DirDate, DirSize;
+      const showDateSize = srvrShows[pickupName];
+      if(showDateSize) [DirDate, DirSize] = showDateSize;
+      else             [DirDate, DirSize] = [0, 0];
+      shows.push( {
+        Name:   pickupName,
+        Pickup: true,
+        Id: 'pickup-' + Math.random(),
+        DirDate, DirSize
+      });
+      showNames.push(pickupName);
+    }
+  }
+
+  // TODO:  add toTries to shows only when needed
+
+  // const toTryRes = await axios.get(toTryListUrl());
+  // const toTryIds = [];
+  // for(let tryEntry of toTryRes.data.Items)
+  //   toTryIds.push(tryEntry.Id);
+  // for(let show of shows)
+  //   show.InToTry = toTryIds.includes(show.Id);
+
+  // sort not needed if no alpha sort
+  // shows.sort((a,b) => {
+  //   const aname = a.Name.replace(/The\s/i, '');
+  //   const bname = b.Name.replace(/The\s/i, '');
+  //   return (aname.toLowerCase() > bname.toLowerCase() ? +1 : -1);
+  // });
+
+
+  console.log('load time:', new Date().getTime() - time1);
+
   console.log('all shows loaded');
   return shows;
 }
@@ -548,7 +579,7 @@ function showListUrl (startIdx=0, limit=10000) {
     ?SortBy=SortName
     &SortOrder=Ascending
     &IncludeItemTypes=Series
-    &Recursive=true
+    &Recursive=true 
     &Fields= Name              %2c Id                %2c
              IsFavorite        %2c Played            %2c 
              UnplayedItemCount %2c DateCreated       %2c 
@@ -694,7 +725,7 @@ http://hahnca.com:8096/emby/Users/${markUsrId}/Items/?ParentId=141&X-Emby-Token=
             "Name": "A scintillating conversation about a lethal pesticide",
             "ServerId": "ae3349983dbe45d9aa1d317a7753483e",
             "Id": "4689622",
-            "DateCreated": "2022-05-31T21:50:04.0000000Z",
+            // "DateCreated": "2022-05-31T21:50:04.0000000Z",
             "Container": "mkv",
             "PremiereDate": "2022-04-14T07:00:00.0000000Z",
             "ExternalUrls": [],
@@ -825,7 +856,9 @@ http://hahnca.com:8096/emby/Users/${markUsrId}/Items/?ParentId=141&X-Emby-Token=
 }
 
 
-------      series     -----------
+------   series   ------------
+    one item from data.Items object
+    key of data.Items object is the series id
 
 AirDays: []
 BackdropImageTags: ["dd2d6479fc843d9a6e834d3f3f965ffe"]

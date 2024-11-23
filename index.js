@@ -188,7 +188,7 @@ const getRejects = (id, _param, resolve, reject) => {
     reject([id, e]);
     return
   }
-  resolve([id, {rejects:rejRes});
+  resolve([id, {rejects:rejRes}]);
 };
 
 const getPickups = (id, _param, resolve, reject) => {
@@ -316,9 +316,9 @@ ws.on('connection', (socket) => {
 
     // call function fname
     switch (fname) {
-      case 'getSeries':   getSeries(id, '',   resolve, reject); break;
-      case 'test': getRejects(id, '',   resolve, reject); break;
-      case 'getPickups': getPickups(id, '',   resolve, reject); break;
+      case 'getSeries':   getSeries(id, '',    resolve, reject); break;
+      case 'getRejects': getRejects(id, '',    resolve, reject); break;
+      case 'getPickups': getPickups(id, '',    resolve, reject); break;
       case 'addReject':   addReject(id, param, resolve, reject); break;
       case 'delReject':   delReject(id, param, resolve, reject); break;
       case 'addPickup':   addPickup(id, param, resolve, reject); break;
@@ -327,7 +327,7 @@ ws.on('connection', (socket) => {
       default: reject([id, {unknownfunction: fname}]);
     };
   });
-
+ 
   ws.on('error', (err) => console.log(dat(), 'ws error:', err));
   ws.on('close', () =>    console.log(dat(), 'ws closed'));
 });

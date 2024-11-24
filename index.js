@@ -1,9 +1,9 @@
-import fs                              from "fs";
-import {readdir, stat, rename, unlink} from 'fs/promises';
-import util                            from "util";
-import * as cp                         from 'child_process';
-import moment                          from 'moment';
-import { WebSocketServer }             from 'ws';
+import fs                                 from "fs";
+import {readdir, stat, writeFile, unlink} from 'fs/promises';
+import util                               from "util";
+import * as cp                            from 'child_process';
+import moment                             from 'moment';
+import { WebSocketServer }                from 'ws';
 
 const showdates   = false;
 const dontupload  = false;
@@ -274,8 +274,32 @@ const delPickup = (id, name, resolve, reject) => {
 //   resolve([id, {"ok":"ok"}]);
 // }
 
-const deleteFile = async (id, path, resolve, reject) => {
-  console.log(dat(), 'deleteFile', id, path);
+const setEmbyName = async (id, names, resolve, reject) => {
+  const parts = /^(.*):::(.*)$/.exec(names);
+  if(!parts) {
+    console.error(dat(), 'setEmbyName no path regex match:', {names});
+    reject([id, {setEmbyName:'no path regex match'}]);
+    return;
+  }
+  const [_, pathName, embyName] = parts;
+  console.log(dat(), 'setting emby name:', pathName, embyName);
+  if(!pathName || !embyName) {
+    console.error('setEmbyName missing name', {names, pathName, embyName});
+    reject([id, {setEmbyName:'missing path', pathName, embyName}]);
+    return;
+  }
+  try {
+    await writeFile(`${tvDir}/${pathName}/.embyName`, embyName);
+  }
+  catch(e) {
+    reject([id, e]);
+    return;
+  }
+  resolve([id, {"ok":"ok"}]);
+}
+
+const deletePath = async (id, path, resolve, reject) => {
+  console.log(dat(), 'deletePath', id, path);
   try {
     path = decodeURI(path).replaceAll('@', '/').replaceAll('~', '?');
     console.log('deleting:', path);
@@ -324,16 +348,21 @@ ws.on('connection', (socket) => {
 
     // call function fname
     switch (fname) {
-      case 'getSeries':   getSeries(id, '',    resolve, reject); break;
-      case 'getRejects': getRejects(id, '',    resolve, reject); break;
-      case 'getPickups': getPickups(id, '',    resolve, reject); break;
-      case 'addReject':   addReject(id, param, resolve, reject); break;
-      case 'delReject':   delReject(id, param, resolve, reject); break;
-      case 'addPickup':   addPickup(id, param, resolve, reject); break;
-      case 'delPickup':   delPickup(id, param, resolve, reject); break;
-      // case 'renameFile': renameFile(id, param, resolve, reject); break;
-      case 'deleteFile': deleteFile(id, param, resolve, reject); break;
+      case 'getRejects':  getRejects(id, '',     resolve, reject); break;
+      case 'addReject':   addReject(id, param,   resolve, reject); break;
+      case 'delReject':   delReject(id, param,   resolve, reject); break;
+
+      case 'getPickups':  getPickups(id, '',     resolve, reject); break;
+      case 'addPickup':   addPickup(id, param,   resolve, reject); break;
+      case 'delPickup':   delPickup(id, param,   resolve, reject); break;
+      
+      case 'setEmbyName': setEmbyName(id, param, resolve, reject); break;
+      case 'deletePath':  deletePath(id, param,  resolve, reject); break;
+
       default: reject([id, {unknownfunction: fname}]);
+
+      // case 'getSeries':   getSeries(id, '',    resolve, reject); break;
+      // case 'renameFile': renameFile(id, param, resolve, reject); break;
     };
   });
  

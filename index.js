@@ -28,8 +28,8 @@ const footerStr = fs.readFileSync('config/config5-footer.txt',   'utf8');
 const rejects = JSON.parse(rejectStr);
 const pickups = JSON.parse(pickupStr);
 
-let dirDate;
-let dirSize;
+let date;
+let size;
 
 const getSeries = async (id, _param, resolve, reject) => {
   let   errFlg = null;
@@ -39,10 +39,10 @@ const getSeries = async (id, _param, resolve, reject) => {
     if(errFlg || path == tvDir + '/.stfolder') return;
     try {
       const fstat = await fsp.stat(path);
-      const date  = fstat.mtime.toISOString().substring(0,10);
+      const dates = fstat.mtime.toISOString().substring(0,10);
       if(date.substring(0,4) > '2050') return;     
-      dirDate  = Math.max(dirDate, date);
-      dirSize += fstat.size;
+      date  = Math.max(date, dates);
+      size += fstat.size;
       if(fstat.isDirectory()) {
         const dir = await fsp.readdir(path);
         for (const dirent of dir) 
@@ -57,10 +57,10 @@ const getSeries = async (id, _param, resolve, reject) => {
   const dir = await fsp.readdir(tvDir);
   for (const dirent of dir) {
     const seriesPath = tvDir + '/' + dirent;
-    dirDate = 0;
-    dirSize = 0;
+    date = 0;
+    size = 0;
     await recurs(seriesPath);
-    series[dirent] = [dirDate, dirSize];
+    series[dirent] = [date, size];
   }
   if(errFlg) {
     reject([id, errFlg]);

@@ -1,9 +1,9 @@
-import fs                  from "fs";
-import {readdir, stat}     from 'fs/promises';
-import util                from "util";
-import * as cp             from 'child_process';
-import moment              from 'moment';
-import { WebSocketServer } from 'ws';
+import fs                              from "fs";
+import {readdir, stat, rename, unlink} from 'fs/promises';
+import util                            from "util";
+import * as cp                         from 'child_process';
+import moment                          from 'moment';
+import { WebSocketServer }             from 'ws';
 
 const showdates   = false;
 const dontupload  = false;
@@ -33,7 +33,6 @@ let dirDate;
 let dirSize;
 
 const getSeries = async (id, _param, resolve, reject) => {
-  // console.log(dat(), 'getSeries', id);
   let   errFlg = null;
   const series = {};
 
@@ -66,6 +65,8 @@ const getSeries = async (id, _param, resolve, reject) => {
   const dir = await readdir(tvDir);
   for (const dirent of dir) {
     const seriesPath = tvDir + '/' + dirent;
+    if(dirent.includes('Archer')) 
+      console.log(dat(), 'Archer:', {dirent, seriesPath});
     dirDate = 0;
     dirSize = 0;
     await recurs(seriesPath);
@@ -178,13 +179,11 @@ const saveConfigYml = async (idIn, resultIn, resolveIn, rejectIn) => {
   }
 }
 
-const getRejects = (id, _param, resolve, reject) => {
-  console.log(dat(), 'getRejects', id);
+const getRejects = (id, _param, resolve, _reject) => {
   resolve([id, rejects]);
 };
 
-const getPickups = (id, _param, resolve, reject) => {
-  console.log(dat(), 'getPickups', id);
+const getPickups = (id, _param, resolve, _reject) => {
   resolve([id, pickups]);
 };
 
@@ -250,13 +249,38 @@ const delPickup = (id, name, resolve, reject) => {
   saveConfigYml(id, {"ok":"ok"}, resolve, reject);
 }
 
-const deleteFile = (id, path, resolve, reject) => {
+const renameFile = async (id, paths, resolve, reject) => {
+  const parts = /^(.*):::(.*)$/.exec(paths);
+  if(!parts) {
+    console.log(dat(), 'missing path', {paths});
+    reject([id, {renameFile:'missing path regex match'}]);
+    return;
+  }
+  console.log({parts, paths});
+  const [_, oldPath, newPath] = parts;
+  console.log(dat(), 'renaming:', oldPath, newPath);
+  if(!oldPath || !newPath) {
+    console.log('missing path', {paths, oldPath, newPath});
+    reject([id, {renameFile:'missing path', oldPath, newPath}]);
+    return;
+  }
+  try {
+    await rename(tvDir+'/'+oldPath, tvDir+'/'+newPath);
+  }
+  catch(e) {
+    reject([id, e]);
+    return;
+  }
+  resolve([id, {"ok":"ok"}]);
+}
+
+const deleteFile = async (id, path, resolve, reject) => {
   console.log(dat(), 'deleteFile', id, path);
   try {
     path = decodeURI(path).replaceAll('@', '/').replaceAll('~', '?');
     console.log('deleting:', path);
-    fs.unlinkSync(path); 
-  } 
+    await unlink(path); 
+  }
   catch(e) {
     reject([id, e]);
     return
@@ -270,7 +294,7 @@ const deleteFile = (id, path, resolve, reject) => {
 ws.on('connection', (socket) => {
   console.log(dat(), 'ws connected');
 
-  socket.send('0:ok:{connected:true}');
+  socket.send('0`ok`{connected:true}');
 
   socket.on('message', (msg) => {
     console.log(dat(), 'received', msg.toString());
@@ -288,13 +312,13 @@ ws.on('connection', (socket) => {
     });
 
     promise.then((idResult) => {
-      console.log(dat(), 'resolved', idResult);
       const [id, result] = idResult;
+      console.log(dat(), 'resolved', id);
       socket.send(`${id}\`ok\`${JSON.stringify(result)}`); 
     })
     .catch((idError) => {
-      console.log(dat(), 'rejected', idError);
       const [id, error] = idError;
+      console.log(dat(), 'rejected', id);
       socket.send(`${id}\`err\`${JSON.stringify(error)}`); 
     });
 
@@ -307,6 +331,7 @@ ws.on('connection', (socket) => {
       case 'delReject':   delReject(id, param, resolve, reject); break;
       case 'addPickup':   addPickup(id, param, resolve, reject); break;
       case 'delPickup':   delPickup(id, param, resolve, reject); break;
+      case 'renameFile': renameFile(id, param, resolve, reject); break;
       case 'deleteFile': deleteFile(id, param, resolve, reject); break;
       default: reject([id, {unknownfunction: fname}]);
     };

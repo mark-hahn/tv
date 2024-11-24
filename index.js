@@ -249,30 +249,30 @@ const delPickup = (id, name, resolve, reject) => {
   saveConfigYml(id, {"ok":"ok"}, resolve, reject);
 }
 
-const renameFile = async (id, paths, resolve, reject) => {
-  const parts = /^(.*):::(.*)$/.exec(paths);
-  if(!parts) {
-    console.log(dat(), 'missing path', {paths});
-    reject([id, {renameFile:'missing path regex match'}]);
-    return;
-  }
-  console.log({parts, paths});
-  const [_, oldPath, newPath] = parts;
-  console.log(dat(), 'renaming:', oldPath, newPath);
-  if(!oldPath || !newPath) {
-    console.log('missing path', {paths, oldPath, newPath});
-    reject([id, {renameFile:'missing path', oldPath, newPath}]);
-    return;
-  }
-  try {
-    await rename(tvDir+'/'+oldPath, tvDir+'/'+newPath);
-  }
-  catch(e) {
-    reject([id, e]);
-    return;
-  }
-  resolve([id, {"ok":"ok"}]);
-}
+// const renameFile = async (id, paths, resolve, reject) => {
+//   const parts = /^(.*):::(.*)$/.exec(paths);
+//   if(!parts) {
+//     console.log(dat(), 'missing path', {paths});
+//     reject([id, {renameFile:'missing path regex match'}]);
+//     return;
+//   }
+//   console.log({parts, paths});
+//   const [_, oldPath, newPath] = parts;
+//   console.log(dat(), 'renaming:', oldPath, newPath);
+//   if(!oldPath || !newPath) {
+//     console.log('missing path', {paths, oldPath, newPath});
+//     reject([id, {renameFile:'missing path', oldPath, newPath}]);
+//     return;
+//   }
+//   try {
+//     await rename(tvDir+'/'+oldPath, tvDir+'/'+newPath);
+//   }
+//   catch(e) {
+//     reject([id, e]);
+//     return;
+//   }
+//   resolve([id, {"ok":"ok"}]);
+// }
 
 const deleteFile = async (id, path, resolve, reject) => {
   console.log(dat(), 'deleteFile', id, path);
@@ -331,7 +331,7 @@ ws.on('connection', (socket) => {
       case 'delReject':   delReject(id, param, resolve, reject); break;
       case 'addPickup':   addPickup(id, param, resolve, reject); break;
       case 'delPickup':   delPickup(id, param, resolve, reject); break;
-      case 'renameFile': renameFile(id, param, resolve, reject); break;
+      // case 'renameFile': renameFile(id, param, resolve, reject); break;
       case 'deleteFile': deleteFile(id, param, resolve, reject); break;
       default: reject([id, {unknownfunction: fname}]);
     };

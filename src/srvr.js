@@ -35,7 +35,7 @@ ws.onerror = (err) => {
 const calls = {};
 let nextId  = 0;
 
-const funcCall = (fname, param) => {
+const fCall = (fname, param) => {
   const id = ++nextId;
   console.log("calling:", id, fname);
   const promise = new Promise((resolve, reject) => {
@@ -63,14 +63,18 @@ handleMsg = (msg) => {
   } 
 }
 
-export function getSeries()       {return funcCall('getSeries',  '')}
-export function getRejects()      {return funcCall('getRejects', '')}
-export function getPickups()      {return funcCall('getPickups', '')}
-export function addReject(name)   {return funcCall('addReject',  name)}
-export function delReject(name)   {return funcCall('delReject',  name)}
-export function addPickup(name)   {return funcCall('addPickup',  name)}
-export function delPickup(name)   {return funcCall('delPickup',  name)}
-export function renameFile(paths) {return funcCall('renameFile', paths)}
-export function deleteFile(path)  {return funcCall('deleteFile', path)}
+export function getRejects()       {return fCall('getRejects',  '')}
+export function addReject(name)    {return fCall('addReject',   name)}
+export function delReject(name)    {return fCall('delReject',   name)}
+
+export function getPickups()       {return fCall('getPickups',  '')}
+export function addPickup(name)    {return fCall('addPickup',   name)}
+export function delPickup(name)    {return fCall('delPickup',   name)}
+
+export function setEmbyName(names) {return fCall('setEmbyName', names)}
+export function deletePath(path)   {return fCall('deletePath',  path)}
+
+// export function getSeries()       {return fCall('getSeries',  '')}
+// export function renameFile(paths) {return fCall('renameFile', paths)}
 
 // ws.close();

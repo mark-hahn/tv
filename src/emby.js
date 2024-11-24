@@ -1,9 +1,7 @@
 import axios     from "axios"
 import * as srvr from "./srvr.js";
 
-const SHOW_MISMATCH     = false;
-
-// const REPAIR_SRVR_NAMES = false; // no no no
+const SET_EMBY_NAMES = true;
 
 const name      = "mark";
 const pwd       = "90-MNBbnmyui";
@@ -57,6 +55,8 @@ export async function recentDates() {
 
 ////////////////////////  MAIN FUNCTIONS  ///////////////////////
 
+const pathToName = {};
+
 // merge emby db shows with srvr dir shows
 // handle rejects and pickups which may add shows
 export async function loadAllShows() {
@@ -65,68 +65,59 @@ export async function loadAllShows() {
   const time1 = new Date().getTime();
 
   const listPromise   = axios.get(showListUrl(0, 10000));
-  const seriesPromise = srvr.getSeries();
+  // const seriesPromise = srvr.getSeries();
   const rejPromise    = srvr.getRejects();
   const pkupPromise   = srvr.getPickups();
-  const [embyShows, srvrShows, rejects, pickups] = await Promise.all(
-    [listPromise, seriesPromise, rejPromise, pkupPromise]);
+  const [embyShows, rejects, pickups] = await Promise.all(
+          [listPromise, rejPromise, pkupPromise]);
+
+  // const [embyShows, srvrShows, rejects, pickups] = await Promise.all(
+  // [listPromise, seriesPromise, rejPromise, pkupPromise]);
 
   const shows = [];
 
   for(let key in embyShows.data.Items) {
     let show = embyShows.data.Items[key];
 
-    if(show.Name == "Big Bad World (2013)") {
-      console.log(show);
+    if(SET_EMBY_NAMES) { 
+      if(!show.Path || !show.Name) {
+        console.log('no Name or Path in show:', 
+                      {Name:show.Name, Path:show.Path});
+      }
+      else {
+        const embyName = show.Name;
+        const pathName = show.Path.split('/').pop();
+        if(embyName != pathName) {
+          console.log('setting emby name in srvr:', {pathName, embyName});
+          try {
+            await srvr.setEmbyName(pathName+':::'+embyName);
+          }
+          catch(e) {
+            console.error('setEmbyName', e);
+            continue;
+          }
+        }
+      }
     }
-
-    // if(REPAIR_SRVR_NAMES) { 
-    //   if(!srvrShows[show.Name]) {
-    //     if(!show.Path) {
-    //       console.log('no Path in show:', show);
-    //       continue;
-    //     }
-    //     if(!show.Name) {
-    //       console.log('no Name in show:', show);
-    //       continue;
-    //     }
-    //     const name     = show.Name;
-    //     const pathName = show.Path.split('/').pop();
-    //     if(name != pathName) {
-    //       console.log('repairing srvr name:', pathName, '->', name);
-    //       try {
-    //         await srvr.renameFile(pathName+':::'+name);
-    //       }
-    //       catch(e) {
-    //         console.log(e);
-    //         continue;
-    //       }
-    //       srvrShows[name] = srvrShows[pathName];
-    //       delete srvrShows[pathName];
-    //     }
-    //   }
-    // }
 
     Object.assign(show, show.UserData);
     delete show.UserData;
     for(const date of ['DateCreated', 'PremiereDate'])
       if(show[date]) show[date] = show[date].replace(/T.*/, '');
 
-    // TODO:  check and fix emby show not in srvr
-
-    const showDateSize = srvrShows[show.Name];
-    if(!showDateSize) {
-      if(SHOW_MISMATCH)
-        console.log('emby show not in srvr:', show.Name);
-      show.NoSrvr  = true;
-      show.DirDate = 0;
-      show.DirSize = 0;
-    }
-    else {
-      const [DirDate, DirSize] = showDateSize;
-      show.DirDate = DirDate;
-      show.DirSize = DirSize;
-    }
+    // const showDateSize = srvrShows[show.Name];
+    // if(!showDateSize) {
+    //   if(SHOW_MISMATCH)
+    //     console.log('emby show not in srvr:', show.Name);
+    //   show.NoSrvr  = true;
+    //   show.DirDate = 0;
+    //   show.DirSize = 0;
+    // }
+    // else {
+    //   const [DirDate, DirSize] = showDateSize;
+    //   show.DirDate = DirDate;
+    //   show.DirSize = DirSize;
+    // }
 
   // TODO:  add gap to show only when needed
   //   const gap = await findGap(show.Name, show.Id);
@@ -137,16 +128,16 @@ export async function loadAllShows() {
 
   // TODO:  check and fix srvr show not in emby
 
-  let showNames = shows.map(show => show.Name);
-  for(let name in srvrShows) {
-    if(showNames.includes(name)) continue;
-    if(SHOW_MISMATCH)
-        console.log('srvr show not in emby', name);
-    const [DirDate, DirSize] = srvrShows[name];
-    const Id = 'noemby-' + Math.random();
-    const show = {Id, Name: name, Noemby: true, DirDate, DirSize};
-    shows.push(show);
-  }
+  // let showNames = shows.map(show => show.Name);
+  // for(let name in srvrShows) {
+  //   if(showNames.includes(name)) continue;
+  //   if(SHOW_MISMATCH)
+  //       console.log('srvr show not in emby', name);
+  //   const [DirDate, DirSize] = srvrShows[name];
+  //   const Id = 'noemby-' + Math.random();
+  //   const show = {Id, Name: name, Noemby: true, DirDate, DirSize};
+  //   shows.push(show);
+  // }
 
   for(let rejectName of rejects) {
     const show = shows.find((show) => show.Name === rejectName);
@@ -157,17 +148,17 @@ export async function loadAllShows() {
     const show = shows.find((show) => show.Name === pickupName);
     if(show) show.Pickup = true;
     else {
-      if(SHOW_MISMATCH)
-        console.log('pickup not in shows:', pickupName);
-      let DirDate, DirSize;
-      const showDateSize = srvrShows[pickupName];
-      if(showDateSize) [DirDate, DirSize] = showDateSize;
-      else             [DirDate, DirSize] = [0, 0];
+      // if(SHOW_MISMATCH)
+      //   console.log('pickup not in shows:', pickupName);
+      // let DirDate, DirSize;
+      // const showDateSize = srvrShows[pickupName];
+      // if(showDateSize) [DirDate, DirSize] = showDateSize;
+      // else             [DirDate, DirSize] = [0, 0];
       shows.push( {
         Name:   pickupName,
         Pickup: true,
         Id: 'pickup-' + Math.random(),
-        DirDate, DirSize
+        // DirDate, DirSize
       });
     }
   }
@@ -201,7 +192,7 @@ const deleteOneFile = async (path) => {
                                       .replaceAll('?', '~');
   console.log('deleting file:', path);
   const delres = (await axios.get(
-        `http://hahnca.com/tv/deleteFile/${encodedPath}`)).data;
+        `http://hahnca.com/tv/deletePath/${encodedPath}`)).data;
   if(delres.status != 'ok')
       console.log('---- file deletion ERROR:', delres);
 }

@@ -1,6 +1,10 @@
 import axios     from "axios"
 import * as srvr from "./srvr.js";
 
+const SHOW_MISMATCH     = false;
+
+// const REPAIR_SRVR_NAMES = false; // no no no
+
 const name      = "mark";
 const pwd       = "90-MNBbnmyui";
 const apiKey    = "1c399bd079d549cba8c916244d3add2b"
@@ -71,6 +75,38 @@ export async function loadAllShows() {
 
   for(let key in embyShows.data.Items) {
     let show = embyShows.data.Items[key];
+
+    if(show.Name == "Big Bad World (2013)") {
+      console.log(show);
+    }
+
+    // if(REPAIR_SRVR_NAMES) { 
+    //   if(!srvrShows[show.Name]) {
+    //     if(!show.Path) {
+    //       console.log('no Path in show:', show);
+    //       continue;
+    //     }
+    //     if(!show.Name) {
+    //       console.log('no Name in show:', show);
+    //       continue;
+    //     }
+    //     const name     = show.Name;
+    //     const pathName = show.Path.split('/').pop();
+    //     if(name != pathName) {
+    //       console.log('repairing srvr name:', pathName, '->', name);
+    //       try {
+    //         await srvr.renameFile(pathName+':::'+name);
+    //       }
+    //       catch(e) {
+    //         console.log(e);
+    //         continue;
+    //       }
+    //       srvrShows[name] = srvrShows[pathName];
+    //       delete srvrShows[pathName];
+    //     }
+    //   }
+    // }
+
     Object.assign(show, show.UserData);
     delete show.UserData;
     for(const date of ['DateCreated', 'PremiereDate'])
@@ -80,7 +116,8 @@ export async function loadAllShows() {
 
     const showDateSize = srvrShows[show.Name];
     if(!showDateSize) {
-      console.log('emby show not in srvr:', show.Name);
+      if(SHOW_MISMATCH)
+        console.log('emby show not in srvr:', show.Name);
       show.NoSrvr  = true;
       show.DirDate = 0;
       show.DirSize = 0;
@@ -98,44 +135,30 @@ export async function loadAllShows() {
     shows.push(show);
   }
 
-  let showNames = shows.map(show => show.Name);
-
   // TODO:  check and fix srvr show not in emby
 
+  let showNames = shows.map(show => show.Name);
   for(let name in srvrShows) {
     if(showNames.includes(name)) continue;
-    console.log('srvr show not in emby', name);
+    if(SHOW_MISMATCH)
+        console.log('srvr show not in emby', name);
     const [DirDate, DirSize] = srvrShows[name];
     const Id = 'noemby-' + Math.random();
     const show = {Id, Name: name, Noemby: true, DirDate, DirSize};
     shows.push(show);
-    showNames.push(name);
   }
 
   for(let rejectName of rejects) {
     const show = shows.find((show) => show.Name === rejectName);
     if(show) show.Reject = true;
-    else {
-      console.log('reject not in shows:', rejectName);
-      let DirDate, DirSize;
-      const showDateSize = srvrShows[rejectName];
-      if(showDateSize) [DirDate, DirSize] = showDateSize;
-      else             [DirDate, DirSize] = [0, 0];
-      shows.push( {
-        Name:   rejectName,
-        Reject: true,
-        Id: 'reject-' + Math.random(),
-        DirDate, DirSize
-      });
-      showNames.push(rejectName);
-    }
   }
 
   for(let pickupName of pickups) {
     const show = shows.find((show) => show.Name === pickupName);
     if(show) show.Pickup = true;
     else {
-      console.log('pickup not in shows:', pickupName);
+      if(SHOW_MISMATCH)
+        console.log('pickup not in shows:', pickupName);
       let DirDate, DirSize;
       const showDateSize = srvrShows[pickupName];
       if(showDateSize) [DirDate, DirSize] = showDateSize;
@@ -146,7 +169,6 @@ export async function loadAllShows() {
         Id: 'pickup-' + Math.random(),
         DirDate, DirSize
       });
-      showNames.push(pickupName);
     }
   }
 

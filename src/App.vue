@@ -221,8 +221,7 @@ export default {
       for (let show of allShows) {
         if(show.Id.slice(0,5) != 'noemby-') {
           console.log('calling justPruneShow', {show});
-          const numDeleted = await emby.justPruneShow(show.Id);
-          if(numDeleted != 0) return; // debug
+          await emby.justPruneShow(show.Id);
         }
       }
     },

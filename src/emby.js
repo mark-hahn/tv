@@ -40,26 +40,13 @@ export async function providers (show) {
   return item?.ProviderIds;
 }
 
-export async function loadDates() {
-  return (await axios.get(
-        'http://hahnca.com/tv/folderDates')).data;
-}
-
-export async function recentDates() {
-  return (await axios.get(
-        'http://hahnca.com/tv/recentDates')).data;
-}
-
 
 ////////////////////////  MAIN FUNCTIONS  ///////////////////////
 
 const pathToName = {};
 
-// merge emby db shows with srvr dir shows
-// handle rejects and pickups which may add shows
 export async function loadAllShows() {
   console.log('entering loadAllShows');
-
   const time1 = new Date().getTime();
 
   const listPromise   = axios.get(showListUrl(0, 10000));
@@ -73,25 +60,24 @@ export async function loadAllShows() {
 
   for(let key in embyShows.data.Items) {
     let show = embyShows.data.Items[key];
-
     Object.assign(show, show.UserData);
     delete show.UserData;
     for(const date of ['DateCreated', 'PremiereDate'])
       if(show[date]) show[date] = show[date].replace(/T.*/, '');
 
-    const embyPath = show.Path.split('/').pop();
+    const embyPath     = show.Path.split('/').pop();
     const showDateSize = srvrShows[embyPath];
     if(!showDateSize) {
       console.log('emby show not in srvr:',   
-                    {Name: show.Name, Path: show.Path});
+                    {Name:show.Name, Path:show.Path});
       show.NoSrvr  = true;
-      show.DirDate = 0;
-      show.DirSize = 0;
+      show.Date = 0;
+      show.Size = 0;
     }
     else {
-      const [DirDate, DirSize] = showDateSize;
-      show.DirDate = DirDate;
-      show.DirSize = DirSize;
+      const [date, Size] = showDateSize;
+      show.Date = date;
+      show.Size = Size;
     }
     shows.push(show);
   }
@@ -109,9 +95,9 @@ export async function loadAllShows() {
   const toTryRes = await axios.get(toTryListUrl());
   const toTryIds = [];
   for(let tryEntry of toTryRes.data.Items)
-    toTryIds.push(tryEntry.Id);
+       toTryIds.push(tryEntry.Id);
   for(let show of shows)
-    show.InToTry = toTryIds.includes(show.Id);
+       show.InToTry = toTryIds.includes(show.Id);
 
   const elapsed = new Date().getTime() - time1;
   console.log('all shows loaded, elapsed:', elapsed);
@@ -123,12 +109,15 @@ const deleteOneFile = async (path) => {
   const encodedPath = encodeURI(path) .replaceAll('/', '@')
                                       .replaceAll('?', '~');
   console.log('deleting file:', path);
-  const delres = (await axios.get(
-        `http://hahnca.com/tv/deletePath/${encodedPath}`)).data;
-  if(delres.status != 'ok')
-      console.log('---- file deletion ERROR:', delres);
+  try {
+    await srvr.deletePath(encodedPath);
+  }
+  catch (e) {
+    console.error('deletePath:', path, e);
+  }
 }
 
+// action from click on episode in map
 export const editEpisode = async (seriesId, 
               seasonNumIn, episodeNumIn, delFile = false) => {
   let lastWatchedRec = null;
@@ -154,7 +143,8 @@ export const editEpisode = async (seriesId,
 
       if(delFile) {
         const path = episodeRec?.MediaSources?.[0]?.Path;
-        await deleteOneFile(path);
+        try { await srvr.deletePath(path); }
+        catch(e) { console.error('deleteOneFile:', path, e); }
         return;
       }
 
@@ -169,7 +159,7 @@ export const editEpisode = async (seriesId,
         data:    userData
       });
       console.log("toggled watched", {
-                    epi: `S${seasonNumber} E${episodeNumber}`, 
+                    epi: `S${seasonNumber}E${episodeNumber}`, 
                     post_url: url,
                     post_res: setDataRes
                   });
@@ -177,6 +167,7 @@ export const editEpisode = async (seriesId,
   }
 }
 
+// reset last Watched to first unwatched episode
 export const setLastWatched = async (seriesId) => {
   let seasonNumber;
   let lastWatchedEpisodeRec = null;
@@ -215,9 +206,9 @@ seasonLoop:
   }
 }
 
+// delete all files before first unwatched episode
 export const justPruneShow = async (seriesId) => { 
   console.log('entering justPruneShow', seriesId);
-  let numDeleted = 0;
   const seasonsRes = await axios.get(childrenUrl(seriesId));
   for(let key in seasonsRes.data.Items) {
     let   seasonRec   =  seasonsRes.data.Items[key];
@@ -229,14 +220,12 @@ export const justPruneShow = async (seriesId) => {
       const played     = !!episodeRec?.UserData?.Played;
       const avail      =   episodeRec?.LocationType != "Virtual";
 
-      if(!played && avail) return numDeleted;
+      if(!played && avail) return;
       else {
         await deleteOneFile(path);
-        numDeleted++;
       }
     }
   }
-  return numDeleted;
 }
 
 export const getSeriesMap = async (seriesId, prune = false) => { 
@@ -267,7 +256,7 @@ export const getSeriesMap = async (seriesId, prune = false) => {
 
       if(avail && !path)
         console.log('warning, avail without path', 
-                    `S${seasonNumber} E${episodeNumber}`);
+                    `S${seasonNumber}E${episodeNumber}`);
 
       if(pruning) {
         if(!played && avail) pruning = false;
@@ -337,7 +326,7 @@ export const findGap = async (series, seriesId) => {
       /////////// aired epi after unaired /////////
       if(hadUnaired && !unaired) {
         console.log(`-- aired after unaired -- ${series} ` + 
-                    `S${seasonIdx} E${epiIndex}`);
+                    `S${seasonIdx}E${epiIndex}`);
         return([seasonIdx, epiIndex, 'aired after unaired']);
       }
       // unaired at end are ignored
@@ -380,7 +369,7 @@ export const findGap = async (series, seriesId) => {
         console.log(`-- file gap -- ${series}, S${seasonIdx} E${epiIndex}`);
         return([seasonIdx, epiIndex, "file gap"]);
       }
-      lastEpiNums    = [seasonIdx, epiIndex];
+      lastEpiNums = [seasonIdx, epiIndex];
     }
     firstEpisodeInSeason = false;
   }
@@ -407,18 +396,9 @@ export async function toggleFav(id, isFav) {
 
 export async function addReject(name) {
   if(name == "") return false;
-  const config = {
-    method: 'post',
-    url: `http://hahnca.com/tv/rejects/` + encodeURI(name),
-  };
-  let rejectRes;
-  let err = null;
-  try { rejectRes = await axios(config); }
-  catch (e) { err = e.message; }
-  if(err || rejectRes?.data !== 'ok') {
-    if(!err) err = rejectRes?.data;
-    alert('Error: unable to add reject to server. ' +
-          'Please tell mark.\n\nError: ' + err);
+  try { await srvr.addReject(name); }
+  catch (e) {
+    alert('Error: unable to add reject to server' + e);
     return false;
   }
   return true;
@@ -426,57 +406,48 @@ export async function addReject(name) {
 
 export async function addPickUp(name) {
   if(name == "") return false;
-  const config = {
-    method: 'post',
-    url: `http://hahnca.com/tv/pickups/` + encodeURI(name),
-  };
-  let pickUpRes;
-  let err = null;
-  try { pickUpRes = await axios(config); }
-  catch (e) { err = e.message; }
-  if(err || pickUpRes?.data !== 'ok') {
-    if(!err) err = pickUpRes?.data;
-    alert('Error: unable to add pickup to server. ' +
-          'Please tell mark.\n\nError: ' + err);
+    try { await srvr.addPickup(name); }
+  catch (e) {
+    alert('Error: unable to add pickUp to server' + e);
     return false;
   }
   return true;
 }
 
 export async function toggleReject(name, reject) {
-  const config = {
-    method: (reject ? 'delete' : 'post'),
-    url:    `http://hahnca.com/tv/rejects/` + encodeURI(name),
-  };
-  let rejectRes;
-  try { rejectRes = await axios(config); }
-  catch (e) { return reject; }
-  if(rejectRes.data !== 'ok') {
-    alert('Error: unable to save change to server. ' +
-          'Please tell mark.\n\nError: ' + rejectRes.data);
-    return reject;
+  if(reject) {
+    try { await srvr.delReject(name); }
+    catch (e) {
+      alert('Error: unable to delete reject from server' + e);
+      return reject;
+    }
   }
   else {
-    return !reject;
+    try { await srvr.addReject(name); }
+    catch (e) { 
+      alert('Error: unable to add reject to server' + e);
+      return reject;
+    }
   }
+  return !reject;
 }
 
-export async function togglePickUp(name, pickup) {
-  const config = {
-    method: (pickup ? 'delete' : 'post'),
-    url:    `http://hahnca.com/tv/pickups/` + encodeURI(name),
-  };
-  let pickUpRes;
-  try { pickUpRes = await axios(config); }
-  catch (e) { return pickup; }
-  if(pickUpRes.data !== 'ok') {
-    alert('Error: unable to save change to server. ' +
-          'Please tell mark.\n\nError: ' + pickUpRes.data);
-    return pickup;
+export async function togglePickup(name, pickup) {
+  if(pickup) {
+    try { await srvr.delPickup(name); }
+    catch (e) {
+      alert('Error: unable to delete pickup from server' + e);
+      return pickup;
+    }
   }
   else {
-    return !pickup;
+    try { await srvr.addPickup(name); }
+    catch (e) { 
+      alert('Error: unable to add pickup to server' + e);
+      return pickup;
+    }
   }
+  return !pickup;
 }
 
 export async function deleteShowFromEmby(id) {
@@ -484,8 +455,7 @@ export async function deleteShowFromEmby(id) {
   const res = delRes.status;
   let err = 'ok';
   if(res != 204) {
-    err = 'Error: unable to delete show. ' +
-          'Please tell mark.\n\nError: ' + delRes.data;
+    err = 'Error: unable to delete show' + delRes.data;
     alert(err);
   }
   return err;

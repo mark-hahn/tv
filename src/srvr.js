@@ -4,7 +4,7 @@ let ws;
 const openWs = () => {ws = new WebSocket(URL)};
 openWs();
 
-let handleMsg = null;
+let handleMsg  = null;
 let haveSocket = false;
 
 const waitingSends = [];
@@ -16,7 +16,7 @@ ws.onmessage = (event) => {
 
 ws.onopen = () => {
   console.log("opened websocket");
-  haveSocket = true;
+  haveSocket = true;www
   for(const msg of waitingSends) ws.send(msg);
   waitingSends.length = 0;
 };
@@ -58,7 +58,12 @@ handleMsg = (msg) => {
 
   console.log("handleMsg:", id, status);
   if(id == '0') return;
+
   const [resolve, reject] = calls[id]; 
+  if(!resolve) {
+    console.error("no matching id from msg:", id);
+    return;
+  }
   delete calls[id];
   try { 
     const res = JSON.parse(result);
@@ -80,6 +85,5 @@ export function getPickups()       {return fCall('getPickups',  '')}
 export function addPickup(name)    {return fCall('addPickup',   name)}
 export function delPickup(name)    {return fCall('delPickup',   name)}
 
-export function setEmbyName(names) {return fCall('setEmbyName', names)}
 export function deletePath(path)   {return fCall('deletePath',  path)}
 

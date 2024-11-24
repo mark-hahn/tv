@@ -41,14 +41,20 @@ const fCall = (fname, param) => {
   const promise = new Promise((resolve, reject) => {
     calls[id] = [resolve, reject];
   });
-  const msg = `${id}\`${fname}\`${param}`;
+  const msg = `${id}...${fname}...${param}`;
   if(!haveSocket) waitingSends.push(msg);
   else ws.send(msg);
   return promise;
 }
 
 handleMsg = (msg) => { 
-  const [id, status, result] = msg.split('`');
+  const parts = /^(.*)\.\.\.(.*)\.\.\.(.*)$/.exec(msg);
+  if(!parts) {
+    console.error('skipping bad message:', msg);
+    return;
+  }
+  const [id, status, result] = parts.slice(1);
+
   console.log("handleMsg:", id, status);
   if(id == '0') return;
   const [resolve, reject] = calls[id]; 

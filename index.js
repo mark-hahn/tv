@@ -1,13 +1,12 @@
-import fs                                 from "fs";
-import {readdir, stat, writeFile, unlink} from 'fs/promises';
-import util                               from "util";
-import * as cp                            from 'child_process';
-import moment                             from 'moment';
-import { WebSocketServer }                from 'ws';
+import fs                  from "fs";
+import * as fsp            from 'fs/promises';
+import util                from "util";
+import * as cp             from 'child_process';
+import moment              from 'moment';
+import { WebSocketServer } from 'ws';
 
 const showdates   = false;
 const dontupload  = false;
-const dontdelete  = false;
 
 const ws = new WebSocketServer({ port: 8736 });
 console.log('ws listening on port 8736');
@@ -39,22 +38,15 @@ const getSeries = async (id, _param, resolve, reject) => {
   const recurs = async (path) => {
     if(errFlg || path == tvDir + '/.stfolder') return;
     try {
-      const fstat = await stat(path);
+      const fstat = await fsp.stat(path);
       const date  = fstat.mtime.toISOString().substring(0,10);
       if(date.substring(0,4) > '2050') return;     
       dirDate  = Math.max(dirDate, date);
       dirSize += fstat.size;
-
-      // if(['mkv','flv','vob','avi','mov','wmv','mp4',
-      //     'mpg','mpeg','m2v','mp2'].includes(sfx)) {
-      //   console.log(dat(), 'video file',{path, fstat});
-      // }
-
       if(fstat.isDirectory()) {
-        const dir = await readdir(path);
-        for (const dirent of dir) {
+        const dir = await fsp.readdir(path);
+        for (const dirent of dir) 
           await recurs(path + '/' + dirent);
-        }
       }
     }
     catch (err) {
@@ -62,16 +54,12 @@ const getSeries = async (id, _param, resolve, reject) => {
     }
   }
 
-  const dir = await readdir(tvDir);
+  const dir = await fsp.readdir(tvDir);
   for (const dirent of dir) {
     const seriesPath = tvDir + '/' + dirent;
-    if(dirent.includes('Archer')) 
-      console.log(dat(), 'Archer:', {dirent, seriesPath});
     dirDate = 0;
     dirSize = 0;
     await recurs(seriesPath);
-    // console.log({dirent, dirDate, dirSize});
-    // process.exit();
     series[dirent] = [dirDate, dirSize];
   }
   if(errFlg) {
@@ -183,10 +171,6 @@ const getRejects = (id, _param, resolve, _reject) => {
   resolve([id, rejects]);
 };
 
-const getPickups = (id, _param, resolve, _reject) => {
-  resolve([id, pickups]);
-};
-
 const addReject = (id, name, resolve, reject) => {
   console.log(dat(), 'addReject', id, name);
   for(const [idx, rejectNameStr] of rejects.entries()) {
@@ -217,6 +201,10 @@ const delReject = (id, name, resolve, reject) => {
   }
   saveConfigYml(id, {"ok":"ok"}, resolve, reject);
 }
+
+const getPickups = (id, _param, resolve, _reject) => {
+  resolve([id, pickups]);
+};
 
 const addPickup = (id, name, resolve, reject) => {
   console.log(dat(), 'addPickup', id, name);
@@ -249,61 +237,12 @@ const delPickup = (id, name, resolve, reject) => {
   saveConfigYml(id, {"ok":"ok"}, resolve, reject);
 }
 
-// const renameFile = async (id, paths, resolve, reject) => {
-//   const parts = /^(.*):::(.*)$/.exec(paths);
-//   if(!parts) {
-//     console.log(dat(), 'missing path', {paths});
-//     reject([id, {renameFile:'missing path regex match'}]);
-//     return;
-//   }
-//   console.log({parts, paths});
-//   const [_, oldPath, newPath] = parts;
-//   console.log(dat(), 'renaming:', oldPath, newPath);
-//   if(!oldPath || !newPath) {
-//     console.log('missing path', {paths, oldPath, newPath});
-//     reject([id, {renameFile:'missing path', oldPath, newPath}]);
-//     return;
-//   }
-//   try {
-//     await rename(tvDir+'/'+oldPath, tvDir+'/'+newPath);
-//   }
-//   catch(e) {
-//     reject([id, e]);
-//     return;
-//   }
-//   resolve([id, {"ok":"ok"}]);
-// }
-
-const setEmbyName = async (id, names, resolve, reject) => {
-  const parts = /^(.*):::(.*)$/.exec(names);
-  if(!parts) {
-    console.error(dat(), 'setEmbyName no path regex match:', {names});
-    reject([id, {setEmbyName:'no path regex match'}]);
-    return;
-  }
-  const [_, pathName, embyName] = parts;
-  console.log(dat(), 'setting emby name:', pathName, embyName);
-  if(!pathName || !embyName) {
-    console.error('setEmbyName missing name', {names, pathName, embyName});
-    reject([id, {setEmbyName:'missing path', pathName, embyName}]);
-    return;
-  }
-  try {
-    await writeFile(`${tvDir}/${pathName}/.embyName`, embyName);
-  }
-  catch(e) {
-    reject([id, e]);
-    return;
-  }
-  resolve([id, {"ok":"ok"}]);
-}
-
 const deletePath = async (id, path, resolve, reject) => {
   console.log(dat(), 'deletePath', id, path);
   try {
     path = decodeURI(path).replaceAll('@', '/').replaceAll('~', '?');
     console.log('deleting:', path);
-    await unlink(path); 
+    await fsp.unlink(path); 
   }
   catch(e) {
     reject([id, e]);
@@ -321,9 +260,14 @@ ws.on('connection', (socket) => {
   socket.send('0`ok`{connected:true}');
 
   socket.on('message', (msg) => {
-    console.log(dat(), 'received', msg.toString());
+    console.log(dat(), 'received', msg);
 
-    const [id, fname, param] = msg.toString().split('`');
+    const parts = /^(.*)\.\.\.(.*)\.\.\.(.*)$/.exec(msg);
+    if(!parts) {
+      console.error(dat(), 'skipping bad message:', msg);
+      return;
+    }
+    const [id, fname, param] = parts.slice(1);
 
     let resolve = null;
     let reject  = null;
@@ -338,16 +282,18 @@ ws.on('connection', (socket) => {
     promise.then((idResult) => {
       const [id, result] = idResult;
       console.log(dat(), 'resolved', id);
-      socket.send(`${id}\`ok\`${JSON.stringify(result)}`); 
+      socket.send(`${id}...ok...${JSON.stringify(result)}`); 
     })
     .catch((idError) => {
       const [id, error] = idError;
       console.log(dat(), 'rejected', id);
-      socket.send(`${id}\`err\`${JSON.stringify(error)}`); 
+      socket.send(`${id}...err...${JSON.stringify(error)}`); 
     });
 
     // call function fname
     switch (fname) {
+      case 'getSeries':   getSeries(id, '',      resolve, reject); break;
+
       case 'getRejects':  getRejects(id, '',     resolve, reject); break;
       case 'addReject':   addReject(id, param,   resolve, reject); break;
       case 'delReject':   delReject(id, param,   resolve, reject); break;
@@ -356,13 +302,9 @@ ws.on('connection', (socket) => {
       case 'addPickup':   addPickup(id, param,   resolve, reject); break;
       case 'delPickup':   delPickup(id, param,   resolve, reject); break;
       
-      case 'setEmbyName': setEmbyName(id, param, resolve, reject); break;
       case 'deletePath':  deletePath(id, param,  resolve, reject); break;
 
       default: reject([id, {unknownfunction: fname}]);
-
-      // case 'getSeries':   getSeries(id, '',    resolve, reject); break;
-      // case 'renameFile': renameFile(id, param, resolve, reject); break;
     };
   });
  

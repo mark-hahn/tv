@@ -48,6 +48,7 @@ const fCall = (fname, param) => {
 }
 
 handleMsg = (msg) => { 
+  msg = msg.toString()
   const parts = /^(.*)\.\.\.(.*)\.\.\.(.*)$/.exec(msg);
   if(!parts) {
     console.error('skipping bad message:', msg);

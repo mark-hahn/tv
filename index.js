@@ -260,11 +260,11 @@ ws.on('connection', (socket) => {
   socket.send('0`ok`{connected:true}');
 
   socket.on('message', (msg) => {
-    console.log(dat(), 'received', msg);
+    console.log(dat(), 'received', msg.toString());
 
-    const parts = /^(.*)\.\.\.(.*)\.\.\.(.*)$/.exec(msg);
+    const parts = /^(.*)\.\.\.(.*)\.\.\.(.*)$/.exec(msg.toString());
     if(!parts) {
-      console.error(dat(), 'skipping bad message:', msg);
+      console.error(dat(), 'skipping bad message:', msg.toString());
       return;
     }
     const [id, fname, param] = parts.slice(1);

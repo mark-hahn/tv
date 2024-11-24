@@ -27,8 +27,6 @@ div
              style="width:120px; text-align:left; font-size:large;") New Shows
           td(v-else-if="sortBySize" 
              style="width:120px; text-align:left; font-size:large;") Size
-          td(v-else                   
-             style="width:30px; text-align:left; font-size:large;") Alpha
           td(style="padding:0 4px;text-align:right;") Filters:
           td( v-for="cond in conds"
               :style="{width:'30px',textAlign:'center'}"
@@ -49,7 +47,7 @@ div
         td(v-if="sortByDate" style="width:150px;font-size:16px;") 
           | {{ show.date }}
         td(v-if="sortBySize" style="margin-right:200px;width:60px;font-size:16px;text-align:right") 
-          | {{ parseInt(show.size/1e9) + 'G&nbsp;&nbsp;&nbsp;' }}
+          | {{ parseInt(show.Size/1e9) + 'G&nbsp;&nbsp;&nbsp;' }}
         td(@click="showInExternal(show, $event)"
            :style="{padding:'4px', backgroundColor: highlightName == show.Name ? 'yellow' : 'white'}" :id="nameHash(show.Name)") {{show.Name}}
         td( v-for="cond in conds" 
@@ -173,7 +171,7 @@ export default {
       shows:            [],
       searchStr:        "",
       pkupEditName:     "",
-      sortByDate:    false,
+      sortByDate:    true,
       sortBySize:    false,
       highlightName:    "",
       allShowsLength:    0,
@@ -252,8 +250,7 @@ export default {
     },
 
     async sortClick() {
-      if (this.sortBySize) this.sortBySize = false;
-      else if (this.sortByDate) {
+      if (this.sortByDate) {
         this.sortByDate   = false;
         this.sortBySize = true;
         if (!recentDates) {
@@ -264,9 +261,9 @@ export default {
                 recentDates[this.nameHash(show.Name)]?.split('|');
             if (!recentDateSize) {
               show.recentDate = "01/01/01";
-              show.size = 0;
+              show.Size = 0;
             }
-            else [show.recentDate, show.size] = recentDateSize;
+            else [show.recentDate, show.Size] = recentDateSize;
           }
         }
       } else {
@@ -393,13 +390,8 @@ export default {
       allShows.sort((a, b) => {
         if (this.sortByDate) return a.date > b.date ? -1 : +1;
         // else if (this.sortBySize) return a.recentDate > b.recentDate ? -1 : +1;
-        else if (this.sortBySize) 
-          return parseInt(a.size) > parseInt(b.size) ? -1 : +1;
-        else {
-          const aname = a.Name.replace(/The\s/i, "");
-          const bname = b.Name.replace(/The\s/i, "");
-          return aname.toLowerCase() > bname.toLowerCase() ? +1 : -1;
-        }
+        if (this.sortBySize) 
+          return parseInt(a.Size) > parseInt(b.Size) ? -1 : +1;
       });
     },
 
@@ -446,10 +438,6 @@ export default {
     showAll() {
       this.searchStr = "";
       for (let cond of this.conds) cond.filter = 0;
-      if(!this.sortByDate && !this.sortBySize) {
-        const banCond = this.conds[this.conds.length-3];
-        banCond.filter = -1;
-      }
       this.scrollSavedVisShowIntoView();
       this.select();
     },

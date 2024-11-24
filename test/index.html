@@ -20,12 +20,12 @@
 
         ws.onmessage = function(event) {
             var leng;
-            if (event.data.size === undefined) {
+            if (event.data.Size === undefined) {
                 leng = event.data.length
             } else {
-                leng = event.data.size
+                leng = event.data.Size
             }
-            console.log("onmessage. size: " + leng + ", content: " + event.data);
+            console.log("onmessage, size: " + leng + ", content: " + event.data);
         }
 
         ws.onopen = function(evt) {

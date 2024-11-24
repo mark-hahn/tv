@@ -79,7 +79,8 @@ export async function loadAllShows() {
     for(const date of ['DateCreated', 'PremiereDate'])
       if(show[date]) show[date] = show[date].replace(/T.*/, '');
 
-    const showDateSize = srvrShows[show.Path];
+    const embyPath = show.Path.split('/').pop();
+    const showDateSize = srvrShows[embyPath];
     if(!showDateSize) {
       console.log('emby show not in srvr:',   
                     {Name: show.Name, Path: show.Path});
@@ -92,44 +93,28 @@ export async function loadAllShows() {
       show.DirDate = DirDate;
       show.DirSize = DirSize;
     }
-
-  // TODO:  add gap to show only when needed
-  //   const gap = await findGap(show.Name, show.Id);
-  //   if(gap) show.gap = gap;
-
     shows.push(show);
   }
 
   for(let rejectName of rejects) {
-    const show = shows.find((show) => show.Name === rejectName);
+    const show = shows.find((show) => show.Name == rejectName);
     if(show) show.Reject = true;
   }
 
   for(let pickupName of pickups) {
-    const show = shows.find((show) => show.Name === pickupName);
+    const show = shows.find((show) => show.Name == pickupName);
     if(show) show.Pickup = true;
   }
 
-  // TODO:  add toTries to shows only when needed
+  const toTryRes = await axios.get(toTryListUrl());
+  const toTryIds = [];
+  for(let tryEntry of toTryRes.data.Items)
+    toTryIds.push(tryEntry.Id);
+  for(let show of shows)
+    show.InToTry = toTryIds.includes(show.Id);
 
-  // const toTryRes = await axios.get(toTryListUrl());
-  // const toTryIds = [];
-  // for(let tryEntry of toTryRes.data.Items)
-  //   toTryIds.push(tryEntry.Id);
-  // for(let show of shows)
-  //   show.InToTry = toTryIds.includes(show.Id);
-
-  // sort not needed if no alpha sort
-  // shows.sort((a,b) => {
-  //   const aname = a.Name.replace(/The\s/i, '');
-  //   const bname = b.Name.replace(/The\s/i, '');
-  //   return (aname.toLowerCase() > bname.toLowerCase() ? +1 : -1);
-  // });
-
-
-  console.log('load time:', new Date().getTime() - time1);
-
-  console.log('all shows loaded');
+  const elapsed = new Date().getTime() - time1;
+  console.log('all shows loaded, elapsed:', elapsed);
   return shows;
 }
 
@@ -337,7 +322,7 @@ export const findGap = async (series, seriesId) => {
       let   episodeRec = episRes.data.Items[key];
       const epiIndex   = +episodeRec.IndexNumber;
       const userData   = episodeRec?.UserData;
-      const watched     = !!userData?.Played;
+      const watched    = !!userData?.Played;
       const haveFile   = (episodeRec.LocationType != "Virtual");
       const unaired    = !!unairedObj[epiIndex] && !watched && !haveFile;
 
@@ -361,9 +346,6 @@ export const findGap = async (series, seriesId) => {
         continue;
       }
 
-      // if(series.includes('Daisy'))
-      //   console.log(1,{epi:epiIndex, watched, lastEpiWatched, cnt: missingEndFileCnt});
-
       if(watched || haveFile) missingEndFileCnt = -1;
       else {
         if(missingEndFileCnt == -1 && 
@@ -372,9 +354,6 @@ export const findGap = async (series, seriesId) => {
           !watched && !haveFile)                    missingEndFileCnt++;
       }
       lastEpiWatched = watched;
-
-      // if(series.includes('Daisy'))
-      //   console.log(2,{epi:epiIndex, watched, lastEpiWatched, cnt: missingEndFileCnt});
 
       ///////// not watched at beginning of season /////////
       if(firstEpisodeInSeasonNotWatched && watched && 

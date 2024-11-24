@@ -59,10 +59,10 @@ handleMsg = (msg) => {
   if(id == '0') return;
   const [resolve, reject] = calls[id]; 
   delete calls[id];
-  try {
+  try { 
     const res = JSON.parse(result);
-    if(status === 'ok') resolve(res);
-    else                 reject(res);
+    if(status == 'ok') resolve(res);
+    else                reject(res);
   }
   catch(err) {
     console.error("parsing ws result:", {id, result, err});

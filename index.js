@@ -257,14 +257,15 @@ const deletePath = async (id, path, resolve, reject) => {
 ws.on('connection', (socket) => {
   console.log(dat(), 'ws connected');
 
-  socket.send('0`ok`{connected:true}');
+  socket.send('0...ok...{connected:true}');
 
   socket.on('message', (msg) => {
-    console.log(dat(), 'received', msg.toString());
+    msg = msg.toString();
+    console.log(dat(), 'received', msg);
 
-    const parts = /^(.*)\.\.\.(.*)\.\.\.(.*)$/.exec(msg.toString());
+    const parts = /^(.*)\.\.\.(.*)\.\.\.(.*)$/.exec(msg);
     if(!parts) {
-      console.error(dat(), 'skipping bad message:', msg.toString());
+      console.error(dat(), 'skipping bad message:', msg);
       return;
     }
     const [id, fname, param] = parts.slice(1);
@@ -292,25 +293,23 @@ ws.on('connection', (socket) => {
 
     // call function fname
     switch (fname) {
-      case 'getSeries':   getSeries(id, '',      resolve, reject); break;
+      case 'getSeries':   getSeries( id, '',    resolve, reject); break;
 
-      case 'getRejects':  getRejects(id, '',     resolve, reject); break;
-      case 'addReject':   addReject(id, param,   resolve, reject); break;
-      case 'delReject':   delReject(id, param,   resolve, reject); break;
+      case 'getRejects':  getRejects(id, '',    resolve, reject); break;
+      case 'addReject':   addReject( id, param, resolve, reject); break;
+      case 'delReject':   delReject( id, param, resolve, reject); break;
 
-      case 'getPickups':  getPickups(id, '',     resolve, reject); break;
-      case 'addPickup':   addPickup(id, param,   resolve, reject); break;
-      case 'delPickup':   delPickup(id, param,   resolve, reject); break;
+      case 'getPickups':  getPickups(id, '',    resolve, reject); break;
+      case 'addPickup':   addPickup( id, param, resolve, reject); break;
+      case 'delPickup':   delPickup( id, param, resolve, reject); break;
       
-      case 'deletePath':  deletePath(id, param,  resolve, reject); break;
+      case 'deletePath':  deletePath(id, param, resolve, reject); break;
 
       default: reject([id, {unknownfunction: fname}]);
     };
   });
  
   ws.on('error', (err) => console.log(dat(), 'ws error:', err));
-  ws.on('close', () =>    console.log(dat(), 'ws closed'));
+  ws.on('close', ()    => console.log(dat(), 'ws closed'));
 });
-
-// https://github.com/websockets/ws?tab=readme-ov-file
   

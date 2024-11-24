@@ -16,7 +16,7 @@ const tvDir = '/mnt/media/tv';
 const exec  = util.promisify(cp.exec);
 const dat   = () => {
   if(!showdates) return '';
-  return moment().format('MM/DD HH-mm-ss:');
+  return moment().format('MM/DD HH:mm:ss:');
 }
 
 const headerStr = fs.readFileSync('config/config1-header.txt',   'utf8');

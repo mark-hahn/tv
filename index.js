@@ -40,7 +40,7 @@ const getSeries = async (id, _param, resolve, reject) => {
     try {
       const fstat = await fsp.stat(path);
       const dates = fstat.mtime.toISOString().substring(0,10);
-      if(date.substring(0,4) > '2050') return;     
+      if(dates.substring(0,4) > '2050') return;     
       date  = Math.max(date, dates);
       size += fstat.size;
       if(fstat.isDirectory()) {

@@ -63,6 +63,8 @@ handleMsg = (msg) => {
   } 
 }
 
+export function getSeries()        {return fCall('getSeries',  '')}
+
 export function getRejects()       {return fCall('getRejects',  '')}
 export function addReject(name)    {return fCall('addReject',   name)}
 export function delReject(name)    {return fCall('delReject',   name)}
@@ -74,7 +76,3 @@ export function delPickup(name)    {return fCall('delPickup',   name)}
 export function setEmbyName(names) {return fCall('setEmbyName', names)}
 export function deletePath(path)   {return fCall('deletePath',  path)}
 
-// export function getSeries()       {return fCall('getSeries',  '')}
-// export function renameFile(paths) {return fCall('renameFile', paths)}
-
-// ws.close();

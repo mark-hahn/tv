@@ -1,8 +1,6 @@
 import axios     from "axios"
 import * as srvr from "./srvr.js";
 
-const SET_EMBY_NAMES = true;
-
 const name      = "mark";
 const pwd       = "90-MNBbnmyui";
 const apiKey    = "1c399bd079d549cba8c916244d3add2b"
@@ -65,59 +63,35 @@ export async function loadAllShows() {
   const time1 = new Date().getTime();
 
   const listPromise   = axios.get(showListUrl(0, 10000));
-  // const seriesPromise = srvr.getSeries();
+  const seriesPromise = srvr.getSeries();
   const rejPromise    = srvr.getRejects();
   const pkupPromise   = srvr.getPickups();
-  const [embyShows, rejects, pickups] = await Promise.all(
-          [listPromise, rejPromise, pkupPromise]);
-
-  // const [embyShows, srvrShows, rejects, pickups] = await Promise.all(
-  // [listPromise, seriesPromise, rejPromise, pkupPromise]);
+  const [embyShows, srvrShows, rejects, pickups] = await Promise.all(
+        [listPromise, seriesPromise, rejPromise, pkupPromise]);
 
   const shows = [];
 
   for(let key in embyShows.data.Items) {
     let show = embyShows.data.Items[key];
 
-    if(SET_EMBY_NAMES) { 
-      if(!show.Path || !show.Name) {
-        console.log('no Name or Path in show:', 
-                      {Name:show.Name, Path:show.Path});
-      }
-      else {
-        const embyName = show.Name;
-        const pathName = show.Path.split('/').pop();
-        if(embyName != pathName) {
-          console.log('setting emby name in srvr:', {pathName, embyName});
-          try {
-            await srvr.setEmbyName(pathName+':::'+embyName);
-          }
-          catch(e) {
-            console.error('setEmbyName', e);
-            continue;
-          }
-        }
-      }
-    }
-
     Object.assign(show, show.UserData);
     delete show.UserData;
     for(const date of ['DateCreated', 'PremiereDate'])
       if(show[date]) show[date] = show[date].replace(/T.*/, '');
 
-    // const showDateSize = srvrShows[show.Name];
-    // if(!showDateSize) {
-    //   if(SHOW_MISMATCH)
-    //     console.log('emby show not in srvr:', show.Name);
-    //   show.NoSrvr  = true;
-    //   show.DirDate = 0;
-    //   show.DirSize = 0;
-    // }
-    // else {
-    //   const [DirDate, DirSize] = showDateSize;
-    //   show.DirDate = DirDate;
-    //   show.DirSize = DirSize;
-    // }
+    const showDateSize = srvrShows[show.Path];
+    if(!showDateSize) {
+      console.log('emby show not in srvr:',   
+                    {Name: show.Name, Path: show.Path});
+      show.NoSrvr  = true;
+      show.DirDate = 0;
+      show.DirSize = 0;
+    }
+    else {
+      const [DirDate, DirSize] = showDateSize;
+      show.DirDate = DirDate;
+      show.DirSize = DirSize;
+    }
 
   // TODO:  add gap to show only when needed
   //   const gap = await findGap(show.Name, show.Id);
@@ -125,19 +99,6 @@ export async function loadAllShows() {
 
     shows.push(show);
   }
-
-  // TODO:  check and fix srvr show not in emby
-
-  // let showNames = shows.map(show => show.Name);
-  // for(let name in srvrShows) {
-  //   if(showNames.includes(name)) continue;
-  //   if(SHOW_MISMATCH)
-  //       console.log('srvr show not in emby', name);
-  //   const [DirDate, DirSize] = srvrShows[name];
-  //   const Id = 'noemby-' + Math.random();
-  //   const show = {Id, Name: name, Noemby: true, DirDate, DirSize};
-  //   shows.push(show);
-  // }
 
   for(let rejectName of rejects) {
     const show = shows.find((show) => show.Name === rejectName);
@@ -147,20 +108,6 @@ export async function loadAllShows() {
   for(let pickupName of pickups) {
     const show = shows.find((show) => show.Name === pickupName);
     if(show) show.Pickup = true;
-    else {
-      // if(SHOW_MISMATCH)
-      //   console.log('pickup not in shows:', pickupName);
-      // let DirDate, DirSize;
-      // const showDateSize = srvrShows[pickupName];
-      // if(showDateSize) [DirDate, DirSize] = showDateSize;
-      // else             [DirDate, DirSize] = [0, 0];
-      shows.push( {
-        Name:   pickupName,
-        Pickup: true,
-        Id: 'pickup-' + Math.random(),
-        // DirDate, DirSize
-      });
-    }
   }
 
   // TODO:  add toTries to shows only when needed

@@ -156,7 +156,6 @@ export default {
       const res = await emby.deleteShowFromEmby(id);
       if (res != "ok") return;
       if (show.Pickup || show.Reject) {
-        delete show.Genres;
         show.RunTimeTicks = 0;
         show.UnplayedItemCount = 0;
         show.IsFavorite = false;
@@ -184,15 +183,6 @@ export default {
       seriesMap:        {},
 
       conds: [ {
-          color: "teal", filter: 0, icon: ["far", "laugh-beam"],
-          cond(show)  { return show.Genres?.includes("Comedy"); },
-          click(show) {},
-        }, {
-          color: "blue", filter: 0, icon: ["far", "sad-cry"],
-          cond(show)  { return show.Genres?.includes("Drama"); },
-          click(show) {},
-        },
-        {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],
           cond(show)  { return show.UnplayedItemCount > 0; },
           click(show) {},

@@ -25,7 +25,7 @@ div
             button(@click="sortClick" style="width:90px; text-align:right;") Sort By:
           td(v-if="sortByDate"
              style="width:120px; text-align:left; font-size:large;") New Shows
-          td(v-else-if="sortBySize" 
+          td(v-if="sortBySize" 
              style="width:120px; text-align:left; font-size:large;") Size
           td(style="padding:0 4px;text-align:right;") Filters:
           td( v-for="cond in conds"
@@ -45,9 +45,9 @@ div
                  @click="seriesMapAction('open', show)")
             font-awesome-icon(icon="border-all" style="color:#ccc")
         td(v-if="sortByDate" style="width:150px;font-size:16px;") 
-          | {{ show.date }}
+          | {{ show.Date }}
         td(v-if="sortBySize" style="margin-right:200px;width:60px;font-size:16px;text-align:right") 
-          | {{ parseInt(show.Size/1e9) + 'G&nbsp;&nbsp;&nbsp;' }}
+          | {{ Math.round(how.Size/1e9) + 'G&nbsp;&nbsp;&nbsp;' }}
         td(@click="showInExternal(show, $event)"
            :style="{padding:'4px', backgroundColor: highlightName == show.Name ? 'yellow' : 'white'}" :id="nameHash(show.Name)") {{show.Name}}
         td( v-for="cond in conds" 
@@ -74,7 +74,7 @@ div
         td(style="font-weight:bold; width:20px; text-align:left;") {{season}}
         td(v-for="episode in seriesMapEpis" 
              :style="{cursor:'default', width:'30px', textAlign:'center', backgroundColor: (seriesMap?.gap?.[0] == season && seriesMap?.gap?.[1] == episode ? 'yellow' : (seriesMap?.[season]?.[episode]?.missing ? '#f88' :'white') ) }"
-           key="episode" @click="episodeClick( $event, mapShow, season, episode)")
+           key="episode" @click="episodeClick($event, mapShow, season, episode)")
           span(v-if="seriesMap?.[season]?.[episode]?.deleted") d
           span(v-if="seriesMap?.[season]?.[episode]?.played")  w
           span(v-if="seriesMap?.[season]?.[episode]?.avail")   +
@@ -85,7 +85,6 @@ div
 
 <script>
 import * as emby           from "./emby.js";
-import * as srvr           from "./srvr.js";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library }         from "@fortawesome/fontawesome-svg-core";
 import { faLaughBeam, faSadCry, faClock, faHeart, } 
@@ -98,11 +97,11 @@ library.add([
   faMinus, faArrowDown, faTv, faSearch, faQuestion, faCopy, 
   faBan, faBorderAll, ]);
  
-let allShows = [];
-let dates = null;
+let allShows    = [];
+let dates       = null;
 let recentDates = null;
-let embyWin = null;
-let imdbWin = null;
+let embyWin     = null;
+let imdbWin     = null;
 
 export default {
   name: "App",
@@ -115,7 +114,6 @@ export default {
     const toggleFavorite = async (show) => {
       this.saveVisShow(show.Name);
       show.IsFavorite = await emby.toggleFav(show.Id, show.IsFavorite);
-      // if (show.Id.startsWith("noemby-")) console.log(show);
     };
 
     const toggleReject = async (show) => {
@@ -123,7 +121,7 @@ export default {
       show.Reject = await emby.toggleReject(show.Name, show.Reject);
       if (!show.Reject && show.Id.startsWith("noemby-")) {
         console.log("toggled reject, removing row");
-        const id = show.Id;
+        const id   = show.Id;
         allShows   = allShows.filter(  (show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);
       }
@@ -134,7 +132,7 @@ export default {
       show.Pickup = await emby.togglePickUp(show.Name, show.Pickup);
       if (!show.Pickup && show.Id.startsWith("noemby-")) {
         console.log("toggled pickUp, removing row");
-        const id = show.Id;
+        const id   = show.Id;
         allShows   = allShows.filter(  (show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);
       }
@@ -154,9 +152,9 @@ export default {
       const res = await emby.deleteShowFromEmby(id);
       if (res != "ok") return;
       if (show.Pickup || show.Reject) {
-        show.RunTimeTicks = 0;
+        show.RunTimeTicks      = 0;
         show.UnplayedItemCount = 0;
-        show.IsFavorite = false;
+        show.IsFavorite        = false;
         show.Id = "noemby-" + Math.random();
         console.log("deleted db, keeping row");
       } else {
@@ -171,7 +169,7 @@ export default {
       shows:            [],
       searchStr:        "",
       pkupEditName:     "",
-      sortByDate:    true,
+      sortByDate:     true,
       sortBySize:    false,
       highlightName:    "",
       allShowsLength:    0,
@@ -220,7 +218,7 @@ export default {
       if(!confirm("ARE YOU SURE YOU WANT TO PRUNE ALL SHOWS?")) return;
       for (let show of allShows) {
         if(show.Id.slice(0,5) != 'noemby-') {
-          console.log('calling justPruneShow', {show});
+          // console.log('calling justPruneShow', {show});
           await emby.justPruneShow(show.Id);
         }
       }
@@ -250,32 +248,12 @@ export default {
 
     async sortClick() {
       if (this.sortByDate) {
-        this.sortByDate   = false;
+        this.sortByDate = false;
         this.sortBySize = true;
-        if (!recentDates) {
-          recentDates = await emby.recentDates();
-          console.log("loaded recentDates", recentDates);
-          for (let show of allShows) {
-            const recentDateSize = 
-                recentDates[this.nameHash(show.Name)]?.split('|');
-            if (!recentDateSize) {
-              show.recentDate = "01/01/01";
-              show.Size = 0;
-            }
-            else [show.recentDate, show.Size] = recentDateSize;
-          }
-        }
-      } else {
+      }
+      else {
         this.sortByDate = true;
-        if (!dates) {
-          dates = await emby.loadDates();
-          console.log("loaded dates", dates);
-          for (let show of allShows) {
-            show.date = dates[this.nameHash(show.Name)];
-            if (!show.date) show.date = "01/01/01";
-            // console.log(show.date);
-          }
-        }
+        this.sortBySize = false;
       }
       this.sortShows();
       this.showAll();
@@ -290,7 +268,6 @@ export default {
         const ele = document.getElementById(id);
         if (ele) {
           ele.scrollIntoView(true);
-          const hdrEle = document.getElementById("hdr");
           window.scrollBy(0, -80);
         } else {
           console.log(`show ${id} not in show list, finding nearest match`);
@@ -320,7 +297,7 @@ export default {
       let deleted = null;
       if(e.ctrlKey) {
         const ok = 
-          confirm(`OK to delete file for ${show.Name} S${season} E${episode} ?`);
+          confirm(`OK to delete file for ${show.Name} S${season}E${episode} ?`);
         if(!ok) return;
         // delete episode file
         await emby.editEpisode(show.Id, season, episode, true);
@@ -387,20 +364,20 @@ export default {
 
     sortShows() {
       allShows.sort((a, b) => {
-        if (this.sortByDate) return a.date > b.date ? -1 : +1;
-        // else if (this.sortBySize) return a.recentDate > b.recentDate ? -1 : +1;
+        if (this.sortByDate) return a.Date > b.Date ? -1 : +1;
         if (this.sortBySize) 
           return parseInt(a.Size) > parseInt(b.Size) ? -1 : +1;
       });
     },
 
-    addPickUp() {
+    // add pickup from input field
+    async addPickUp() {
       const name = this.pkupEditName;
       if (allShows.some((show) => show.Name == name)) {
         console.log("addPickUp: skipping duplicate show name", name);
         return;
       }
-      if (name && emby.addPickUp(name)) {
+      if (name && await emby.addPickUp(name)) {
         allShows.push({
           Name: name,
           Pickup: true,
@@ -420,10 +397,12 @@ export default {
       return "#ddd";
     },
 
+    // filter shows based on search string and conditions
     select() {
       const srchStrLc = this.searchStr == "" ? null : this.searchStr.toLowerCase();
       this.shows = allShows.filter((show) => {
-        if (srchStrLc && !show.Name.toLowerCase().includes(srchStrLc)) return false;
+        if (srchStrLc && !show.Name.toLowerCase().includes(srchStrLc)) 
+              return false;
         for (let cond of this.conds) {
           if ( cond.filter ===  0) continue;
           if ((cond.filter === +1) != (!!cond.cond(show))) return false;

@@ -33,6 +33,7 @@ export async function init() {
 
 ////////////////////////  UTILITIES  ///////////////////////
 
+// TODO broken
 export async function providers (show) {
   const url = `http://hahnca.com:8096/emby/Items?Recursive=true&Fields=ProviderIds&Ids=${show.Id}&api_key=ba7d62f79cbd4a539b675b05b5663607`;
   const item = (await axios.get(url)).data.Items[0];

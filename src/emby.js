@@ -1,5 +1,9 @@
 import axios     from "axios"
 import * as srvr from "./srvr.js";
+import * as urls from "./urls.js";
+
+const seasonsWorker = 
+        new Worker('src/seasons-worker.js', {type: 'module'});
 
 const name      = "mark";
 const pwd       = "90-MNBbnmyui";
@@ -9,7 +13,7 @@ const authHdr   = `UserId="${markUsrId}", `                +
                   'Client="MyClient", Device="myDevice", ' +
                   'DeviceId="123456", Version="1.0.0"';
 let token = '';
-
+let cred  = null;
 
 ////////////////////////  INIT  ///////////////////////
 
@@ -28,6 +32,8 @@ const getToken = async () => {
 
 export async function init() {
   await getToken();
+  cred = {markUsrId, token};
+  urls.init(cred);
 }
 
 
@@ -40,7 +46,15 @@ export async function providers (show) {
   return item?.ProviderIds;
 }
 
+export function getSeasons(allShows) {
+  console.log('starting getSeasons', allShows[0].Name);
+  seasonsWorker.onerror = (err) => {
+    console.error('Worker error:', err.message);
+  }
+  seasonsWorker.postMessage({cred, allShows});
+}
 
+ 
 ////////////////////////  MAIN FUNCTIONS  ///////////////////////
 
 const pathToName = {};
@@ -49,7 +63,7 @@ export async function loadAllShows() {
   console.log('entering loadAllShows');
   const time1 = new Date().getTime();
 
-  const listPromise   = axios.get(showListUrl(0, 10000));
+  const listPromise   = axios.get(urls.showListUrl(cred, 0, 10000));
   const seriesPromise = srvr.getSeries();
   const rejPromise    = srvr.getRejects();
   const pkupPromise   = srvr.getPickups();
@@ -92,7 +106,7 @@ export async function loadAllShows() {
     if(show) show.Pickup = true;
   }
 
-  const toTryRes = await axios.get(toTryListUrl());
+  const toTryRes = await axios.get(urls.toTryListUrl(cred));
   const toTryIds = [];
   for(let tryEntry of toTryRes.data.Items)
        toTryIds.push(tryEntry.Id);
@@ -122,14 +136,14 @@ export const editEpisode = async (seriesId,
               seasonNumIn, episodeNumIn, delFile = false) => {
   let lastWatchedRec = null;
 
-  const seasonsRes = await axios.get(childrenUrl(seriesId));
+  const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
   for(let key in seasonsRes.data.Items) {
     let   seasonRec    =  seasonsRes.data.Items[key];
     const seasonNumber = +seasonRec.IndexNumber;
     if(seasonNumber != seasonNumIn) continue;
 
     const seasonId    =  seasonRec.Id;
-    const episodesRes = await axios.get(childrenUrl(seasonId));
+    const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
     for(let key in episodesRes.data.Items) {
       const episodeRec     = episodesRes.data.Items[key];
       const episodeNumber  = +episodeRec.IndexNumber;
@@ -152,7 +166,7 @@ export const editEpisode = async (seriesId,
       userData.Played = !watched;
       if(!userData.LastPlayedDate)
         userData.LastPlayedDate = new Date().toISOString();
-      const url = postUserDataUrl(episodeId);
+      const url = postUserDataUrl(cred, episodeId);
       const setDataRes = await axios({
         method: 'post',
         url:     url,
@@ -171,13 +185,13 @@ export const editEpisode = async (seriesId,
 export const setLastWatched = async (seriesId) => {
   let seasonNumber;
   let lastWatchedEpisodeRec = null;
-  const seasonsRes = await axios.get(childrenUrl(seriesId));
+  const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
 seasonLoop: 
   for(let key in seasonsRes.data.Items) {
     let   seasonRec    =  seasonsRes.data.Items[key];
     seasonNumber       = +seasonRec.IndexNumber;
     const seasonId     = +seasonRec.Id;
-    const episodesRes  = await axios.get(childrenUrl(seasonId));
+    const episodesRes  = await axios.get(urls.childrenUrl(cred, seasonId));
     for(let key in episodesRes.data.Items) {
       const episodeRec = episodesRes.data.Items[key];
       const userData   = episodeRec?.UserData;
@@ -194,7 +208,7 @@ seasonLoop:
     const userData      =  lastWatchedEpisodeRec?.UserData;
 
     userData.LastPlayedDate = new Date().toISOString();
-    const url = postUserDataUrl(episodeId);
+    const url = postUserDataUrl(cred, episodeId);
     const setDateRes = await axios({
       method: 'post',
       url:     url,
@@ -209,11 +223,11 @@ seasonLoop:
 // delete all files before first unwatched episode
 export const justPruneShow = async (seriesId) => { 
   console.log('entering justPruneShow', seriesId);
-  const seasonsRes = await axios.get(childrenUrl(seriesId));
+  const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
   for(let key in seasonsRes.data.Items) {
     let   seasonRec   =  seasonsRes.data.Items[key];
     let   seasonId    =  seasonRec.Id;
-    const episodesRes = await axios.get(childrenUrl(seasonId));
+    const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
     for(let key in episodesRes.data.Items) {
       let   episodeRec =   episodesRes.data.Items[key];
       const path       =   episodeRec?.MediaSources?.[0]?.Path;
@@ -231,20 +245,20 @@ export const justPruneShow = async (seriesId) => {
 export const getSeriesMap = async (seriesId, prune = false) => { 
   const seriesMap = [];
   let pruning = prune;
-  const seasonsRes = await axios.get(childrenUrl(seriesId));
+  const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
   for(let key in seasonsRes.data.Items) {
     let   seasonRec    =  seasonsRes.data.Items[key];
     let   seasonId     =  seasonRec.Id;
     const seasonNumber = +seasonRec.IndexNumber;
     const unairedObj   = {};
-    const unairedRes   = await axios.get(childrenUrl(seasonId, true));
+    const unairedRes   = await axios.get(urls.childrenUrl(cred, seasonId, true));
     for(let key in unairedRes.data.Items) {
       const episodeRec    = unairedRes.data.Items[key];
       const episodeNumber = +episodeRec.IndexNumber;
       unairedObj[episodeNumber] = true;
     }
     const episodes    = [];
-    const episodesRes = await axios.get(childrenUrl(seasonId));
+    const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
     for(let key in episodesRes.data.Items) {
       let   episodeRec    =  episodesRes.data.Items[key];
       const episodeNumber = +episodeRec.IndexNumber;
@@ -289,14 +303,14 @@ export const findGap = async (series, seriesId) => {
   let lastEpiNums       = null;
   let lastEpiWatched    = false;
 
-  const seasonsRes = await axios.get(childrenUrl(seriesId));
+  const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
   for(let key in seasonsRes.data.Items) {
     let   seasonRec = seasonsRes.data.Items[key];
     const seasonId  = seasonRec.Id;
     const seasonIdx = +seasonRec.IndexNumber;
 
     const unairedObj = {};
-    const unairedRes = await axios.get(childrenUrl(seasonId, true));
+    const unairedRes = await axios.get(urls.childrenUrl(cred, seasonId, true));
     for(let key in unairedRes.data.Items) {
       const episodeRec    = unairedRes.data.Items[key];
       const episodeNumber = +episodeRec.IndexNumber;
@@ -306,7 +320,7 @@ export const findGap = async (series, seriesId) => {
     let firstEpisodeInSeasonNotWatched = false;
     let firstEpisodeInSeason           = true;
 
-    const episRes = await axios.get(childrenUrl(seasonId));
+    const episRes = await axios.get(urls.childrenUrl(cred, seasonId));
     for(let key in episRes.data.Items) {
       let   episodeRec = episRes.data.Items[key];
       const epiIndex   = +episodeRec.IndexNumber;
@@ -451,7 +465,7 @@ export async function togglePickup(name, pickup) {
 }
 
 export async function deleteShowFromEmby(id) {
-  const delRes = await axios.delete(deleteShowUrl(id));
+  const delRes = await axios.delete(urls.deleteShowUrl(cred, id));
   const res = delRes.status;
   let err = 'ok';
   if(res != 204) {
@@ -464,7 +478,7 @@ export async function deleteShowFromEmby(id) {
 export async function toggleToTry(id, inToTry) {
   const config = {
     method: (inToTry ? 'delete' : 'post'),
-    url:     toTryUrl(id),
+    url:     urls.toTryUrl(cred, id),
   };
   let toTryRes;
   try { toTryRes = await axios(config); }
@@ -477,105 +491,6 @@ export async function toggleToTry(id, inToTry) {
   console.log(`toggled inToTry to ${!inToTry}`);
   return !inToTry;
 }
-
-
-/////////////////////  URLS  ///////////////////////
-
-
-function showListUrl (startIdx=0, limit=10000) {
-  return `http://hahnca.com:8096 / emby
-      / Users / ${markUsrId} / Items
-    ?SortBy=SortName
-    &SortOrder=Ascending
-    &IncludeItemTypes=Series
-    &Recursive=true 
-    &Fields= Name              %2c Id                %2c
-             IsFavorite        %2c Played            %2c 
-             UnplayedItemCount %2c DateCreated       %2c 
-             ExternalUrls      %2c Genres            %2c 
-             Overview          %2c Path              %2c 
-             People            %2c PremiereDate      %2c 
-             IsUnaired
-    &StartIndex=${startIdx}
-    &ParentId=4514ec850e5ad0c47b58444e17b6346c
-    &Limit=${limit}
-    &X-Emby-Token=${token}
-  `.replace(/\s*/g, "");
-}
-
-function childrenUrl (parentId = '', unAired = false) {
-  return `http://hahnca.com:8096 / emby
-      / Users / ${markUsrId} / Items /
-    ? ParentId=${parentId}
-    ${unAired ? '& IsUnaired = true' : ''}
-    & Fields       = MediaSources
-    & X-Emby-Token = ${token}
-  `.replace(/\s*/g, "");
-}
-
-function postUserDataUrl (id) {
-  return `http://hahnca.com:8096 / emby / Users / ${markUsrId} 
-          / Items / ${id} / UserData
-          ? X-Emby-Token=${token}
-  `.replace(/\s*/g, "");
-}
-
-function favoriteUrl (id) {
-  return encodeURI(`http://hahnca.com:8096 / emby
-          / Users / ${markUsrId} 
-          / FavoriteItems / ${id}
-    ?X-Emby-Client=Emby Web
-    &X-Emby-Device-Name=Chrome
-    &X-Emby-Device-Id=f4079adb-6e48-4d54-9185-5d92d3b7176b
-    &X-Emby-Client-Version=1.0.0
-    &X-Emby-Token=${token}
-  `.replace(/\s*/g, ""));
-}
-
-function deleteShowUrl(id) {
-  return `http://hahnca.com:8096 / emby / Items / ${id}
-    ?X-Emby-Client=EmbyWeb
-    &X-Emby-Device-Name=Chrome
-    &X-Emby-Device-Id=f4079adb-6e48-4d54-9185-5d92d3b7176b
-    &X-Emby-Client-Version=4.6.4.0
-    &X-Emby-Token=${token}
-  `.replace(/\s*/g, "");
-}
-
-export function embyPageUrl(id) {
-  return `http://hahnca.com:8096 / web / index.html #! / item
-    ?id=${id}&serverId=ae3349983dbe45d9aa1d317a7753483e
-    `.replace(/\s*/g, "");
-}
-
-function toTryListUrl() {
-  return `http://hahnca.com:8096 / emby / Users / 
-          ${markUsrId} / Items
-    ?ParentId=1468316
-    &ImageTypeLimit=1
-    &Fields=PrimaryImageAspectRatio,ProductionYear,CanDelete
-    &EnableTotalRecordCount=false
-    &X-Emby-Client=EmbyWeb
-    &X-Emby-Device-Name=Chrome
-    &X-Emby-Device-Id=f4079adb-6e48-4d54-9185-5d92d3b7176b
-    &X-Emby-Client-Version=4.6.4.0
-    &X-Emby-Token=${token}
-  `.replace(/\s*/g, "");
-}
-
-function toTryUrl(id) {
-  return `http://hahnca.com:8096 / emby / 
-          Collections / 1468316 / Items
-    ?Ids=${id}
-    &userId=${markUsrId}
-    &X-Emby-Client=Emby Web
-    &X-Emby-Device-Name=Chrome
-    &X-Emby-Device-Id=f4079adb-6e48-4d54-9185-5d92d3b7176b
-    &X-Emby-Client-Version=4.6.4.0
-    &X-Emby-Token=${token}
-  `.replace(/\s*/g, "");
-}
-
 
 /////////////////////  RANDOM RESULTS  ///////////////////////
 

@@ -465,6 +465,8 @@ export default {
       const banCond = this.conds[this.conds.length-3];
       banCond.filter = -1;
       this.select();
+
+      emby.getSeasons(allShows);
     })();
   },
 };

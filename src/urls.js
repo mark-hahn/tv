@@ -3,8 +3,8 @@ let cred;
 export async function init(credIn) { cred = credIn; }
 
 export function showListUrl(cred, startIdx=0, limit=10000) {
-  return `http://hahnca.com:8096 / emby
-      / Users / ${cred.markUsrId} / Items
+  return `http://hahnca.com:8096 / emby / Users 
+          / ${cred.markUsrId} / Items
     ?SortBy=SortName
     &SortOrder=Ascending
     &IncludeItemTypes=Series
@@ -23,9 +23,9 @@ export function showListUrl(cred, startIdx=0, limit=10000) {
   `.replace(/\s*/g, "");
 }
 
-export function childrenUrl(cred, parentId = '', unAired = false) {
-  return `http://hahnca.com:8096 / emby
-      / Users / ${cred.markUsrId} / Items /
+export function childrenUrl(cred, parentId='', unAired=false) {
+  return `http://hahnca.com:8096 / emby / Users 
+          / ${cred.markUsrId} / Items /
     ? ParentId=${parentId}
     ${unAired ? '& IsUnaired = true' : ''}
     & Fields       = MediaSources
@@ -34,16 +34,15 @@ export function childrenUrl(cred, parentId = '', unAired = false) {
 }
 
 export function postUserDataUrl(cred, id) {
-  return `http://hahnca.com:8096 / emby / Users / ${cred.markUsrId} 
-          / Items / ${id} / UserData
-          ? X-Emby-Token=${cred.token}
+  return `http://hahnca.com:8096 / emby / Users 
+          / ${cred.markUsrId} / Items / ${id} / UserData
+    ? X-Emby-Token=${cred.token}
   `.replace(/\s*/g, "");
 }
 
 export function favoriteUrl(cred, id) {
-  return encodeURI(`http://hahnca.com:8096 / emby
-          / Users / ${cred.markUsrId} 
-          / FavoriteItems / ${id}
+  return encodeURI(`http://hahnca.com:8096 / emby / Users 
+          / ${cred.markUsrId} / FavoriteItems / ${id}
     ?X-Emby-Client=Emby Web
     &X-Emby-Device-Name=Chrome
     &X-Emby-Device-Id=f4079adb-6e48-4d54-9185-5d92d3b7176b
@@ -62,10 +61,10 @@ export function deleteShowUrl(cred, id) {
   `.replace(/\s*/g, "");
 }
 
-export function embyPageUrl(cred, id) {
+export function embyPageUrl(id) {
   return `http://hahnca.com:8096 / web / index.html #! / item
     ?id=${id}&serverId=ae3349983dbe45d9aa1d317a7753483e
-    `.replace(/\s*/g, "");
+  `.replace(/\s*/g, "");
 }
 
 export function toTryListUrl(cred, ) {

@@ -47,7 +47,6 @@ export async function providers (show) {
 }
 
 export function getSeasons(allShows) {
-  console.log('starting getSeasons', allShows[0].Name);
   seasonsWorker.onerror = (err) => {
     console.error('Worker error:', err.message);
   }
@@ -63,12 +62,14 @@ export async function loadAllShows() {
   console.log('entering loadAllShows');
   const time1 = new Date().getTime();
 
-  const listPromise   = axios.get(urls.showListUrl(cred, 0, 10000));
+  const listPromise   = axios.get(
+                        urls.showListUrl(cred, 0, 10000));
   const seriesPromise = srvr.getSeries();
   const rejPromise    = srvr.getRejects();
   const pkupPromise   = srvr.getPickups();
-  const [embyShows, srvrShows, rejects, pickups] = await Promise.all(
-        [listPromise, seriesPromise, rejPromise, pkupPromise]);
+  const [embyShows, srvrShows, rejects, pickups] = 
+    await Promise.all(
+      [listPromise, seriesPromise, rejPromise, pkupPromise]);
 
   const shows = [];
 
@@ -166,7 +167,7 @@ export const editEpisode = async (seriesId,
       userData.Played = !watched;
       if(!userData.LastPlayedDate)
         userData.LastPlayedDate = new Date().toISOString();
-      const url = postUserDataUrl(cred, episodeId);
+      const url = urls.postUserDataUrl(cred, episodeId);
       const setDataRes = await axios({
         method: 'post',
         url:     url,
@@ -208,7 +209,7 @@ seasonLoop:
     const userData      =  lastWatchedEpisodeRec?.UserData;
 
     userData.LastPlayedDate = new Date().toISOString();
-    const url = postUserDataUrl(cred, episodeId);
+    const url = urls.postUserDataUrl(cred, episodeId);
     const setDateRes = await axios({
       method: 'post',
       url:     url,
@@ -400,7 +401,7 @@ export const findGap = async (series, seriesId) => {
 export async function toggleFav(id, isFav) {
   const config = {
     method: (isFav ? 'delete' : 'post'),
-    url:     favoriteUrl(id),
+    url:     urls.favoriteUrl(cred, id),
   };
   let favRes;
   try { favRes = await axios(config); }

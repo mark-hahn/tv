@@ -441,7 +441,8 @@ export default {
           }
         } else {
           if (embyWin) embyWin.close();
-          embyWin = window.open(emby.embyPageUrl(show.Id), "embyWebPage");
+          embyWin = window.open(
+              emby.embyPageUrl(show.Id), "embyWebPage");
         }
       }
     },

@@ -447,8 +447,8 @@ export default {
       }
     },
 
-    addSeasonsToShow(seasonData) {
-      const {showId, seasons} = seasonData;
+    addSeasonsToShow(event) {
+      const {showId, seasons} = event.data;
       console.log(`received ${seasons.length} seasons ` +
                   `for show ${showId}`);
       const show   = allShows.find((show) => show.Id == showId);

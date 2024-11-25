@@ -50,12 +50,10 @@ export function getSeasons(allShows, cb) {
   seasonsWorker.onerror = (err) => {
     console.error('Worker error:', err.message);
   }
-  seasonsWorker.postMessage({cred, allShows});
+  const allShowIds = allShows.map((show) => show.Id);
+  seasonsWorker.postMessage({cred, allShowIds});
 
-  seasonsWorker.onmessage = (event) => {
-    cb(event.data);
-    seasonsWorker.terminate();
-  }
+  seasonsWorker.onmessage = cb;
 }
  
 ////////////////////////  MAIN FUNCTIONS  ///////////////////////

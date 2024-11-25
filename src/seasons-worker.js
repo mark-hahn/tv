@@ -48,13 +48,14 @@ const getSeasons = async (showId) => {
 };
 
 self.onmessage = async (event) => {
-  cred           = event.data.cred;
-  const allShows = event.data.allShows;
+  cred             = event.data.cred;
+  const allShowIds = event.data.allShowIds;
 
-  console.log(`seasons-worker started, ${allShows.length} shows`);
+  console.log(
+      `seasons-worker started, ${allShowIds.length} shows`);
 
-  for (let i = 0; i < allShows.length; i++) {
-    const showId  = allShows[i].Id;
+  for (let i = 0; i < allShowIds.length; i++) {
+    const showId  = allShowIds[i];
     const seasons = await getSeasons(showId);
     self.postMessage({showId, seasons});
   }

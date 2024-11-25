@@ -46,13 +46,17 @@ export async function providers (show) {
   return item?.ProviderIds;
 }
 
-export function getSeasons(allShows) {
+export function getSeasons(allShows, cb) {
   seasonsWorker.onerror = (err) => {
     console.error('Worker error:', err.message);
   }
   seasonsWorker.postMessage({cred, allShows});
-}
 
+  seasonsWorker.onmessage = (event) => {
+    cb(event.data);
+    seasonsWorker.terminate();
+  }
+}
  
 ////////////////////////  MAIN FUNCTIONS  ///////////////////////
 

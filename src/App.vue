@@ -446,6 +446,15 @@ export default {
         }
       }
     },
+
+    addSeasonsToShow(seasonData) {
+      const {showId, seasons} = seasonData;
+      console.log(`received ${seasons.length} seasons ` +
+                  `for show ${showId}`);
+      const show   = allShows.find((show) => show.Id == showId);
+      show.Seasons = seasons;
+      console.log(show);
+    },
   },
 
   /////////////////  MOUNTED  /////////////////
@@ -467,7 +476,7 @@ export default {
       banCond.filter = -1;
       this.select();
 
-      emby.getSeasons(allShows);
+      emby.getSeasons(allShows, this.addSeasonsToShow);
     })();
   },
 };

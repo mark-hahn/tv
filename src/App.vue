@@ -44,12 +44,12 @@ div
           div(v-show="!show.Id.startsWith('noemby-')" 
                  @click="seriesMapAction('open', show)")
             font-awesome-icon(icon="border-all" style="color:#ccc")
-        td(v-if="sortByDate" style="width:150px;font-size:16px;") 
+        td(v-if="sortByDate" style="width:80px;font-size:16px;") 
           | {{ show.Date }}
         td(v-if="sortBySize" style="margin-right:200px;width:60px;font-size:16px;text-align:right") 
-          | {{ Math.round(how.Size/1e9) + 'G&nbsp;&nbsp;&nbsp;' }}
+          | {{ show.Size/1e9 + 'G&nbsp;&nbsp;&nbsp;' }}
         td(@click="showInExternal(show, $event)"
-           :style="{padding:'4px', backgroundColor: highlightName == show.Name ? 'yellow' : 'white'}" :id="nameHash(show.Name)") {{show.Name}}
+           :style="{padding:'4px', backgroundColor: highlightName == show.Name ? 'yellow' : 'white', fontWeight:'bold', fontSize:'20px'}" :id="nameHash(show.Name)") {{show.Name}}
         td( v-for="cond in conds" 
             style="width:30px; text-align:center;"
            @click="cond.click(show)" )
@@ -250,10 +250,12 @@ export default {
       if (this.sortByDate) {
         this.sortByDate = false;
         this.sortBySize = true;
+        console.log("sort by size");
       }
       else {
         this.sortByDate = true;
         this.sortBySize = false;
+        console.log("sort by date");
       }
       this.sortShows();
       this.showAll();
@@ -365,8 +367,7 @@ export default {
     sortShows() {
       allShows.sort((a, b) => {
         if (this.sortByDate) return a.Date > b.Date ? -1 : +1;
-        if (this.sortBySize) 
-          return parseInt(a.Size) > parseInt(b.Size) ? -1 : +1;
+        if (this.sortBySize) return a.Size > b.Size ? -1 : +1;
       });
     },
 

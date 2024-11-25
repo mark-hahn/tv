@@ -47,7 +47,7 @@ div
         td(v-if="sortByDate" style="width:80px;font-size:16px;") 
           | {{ show.Date }}
         td(v-if="sortBySize" style="margin-right:200px;width:60px;font-size:16px;text-align:right") 
-          | {{ show.Size/1e9 + 'G&nbsp;&nbsp;&nbsp;' }}
+          | {{ formatSize(show) + '&nbsp;&nbsp;&nbsp;' }}
         td(@click="showInExternal(show, $event)"
            :style="{padding:'4px', backgroundColor: highlightName == show.Name ? 'yellow' : 'white', fontWeight:'bold', fontSize:'20px'}" :id="nameHash(show.Name)") {{show.Name}}
         td( v-for="cond in conds" 
@@ -213,6 +213,13 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
+
+    formatSize (show) {
+      const size = show.Size;
+      if (size < 1e6) return size;
+      if (size < 1e9) return Math.round(size / 1e6) + "M";
+                      return Math.round(size / 1e9) + "G";
+    },
 
     async pruneAllShows() {
       if(!confirm("ARE YOU SURE YOU WANT TO PRUNE ALL SHOWS?")) return;

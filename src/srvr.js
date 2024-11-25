@@ -16,7 +16,7 @@ ws.onmessage = (event) => {
 
 ws.onopen = () => {
   console.log("opened websocket");
-  haveSocket = true;www
+  haveSocket = true;
   for(const msg of waitingSends) ws.send(msg);
   waitingSends.length = 0;
 };

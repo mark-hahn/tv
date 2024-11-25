@@ -41,7 +41,7 @@ const getSeries = async (id, _param, resolve, reject) => {
       const fstat = await fsp.stat(path);
       const fdate = fstat.mtime.toISOString().substring(0,10);
       if(fdate.substring(0,4) > '2050') return;     
-      date  = Math.max(date, fdate);
+      date  = (date > fdate) ? date : fdate;
       size += fstat.size;
       if(fstat.isDirectory()) {
         const dir = await fsp.readdir(path);

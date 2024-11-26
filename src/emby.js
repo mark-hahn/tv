@@ -245,22 +245,30 @@ export const getSeriesMap = async (seriesId, prune = false) => {
       const episodeNumber = +episodeRec.IndexNumber;
       if(!episodeNumber) continue;
 
-      const path          =  episodeRec?.MediaSources?.[0]?.Path;
-      const played        = !!episodeRec?.UserData?.Played;
-      const avail         =   episodeRec?.LocationType != "Virtual";
+      const path = episodeRec?.MediaSources?.[0]?.Path;
+      if (!path) {
+        console.error('no episode path', 
+                      `S${seasonNumber}E${episodeNumber}`);
+        continue;
+      }
+      const played     = !!episodeRec?.UserData?.Played;
+      const avail      =   episodeRec?.LocationType != "Virtual";
       const unaired = 
               !!unairedObj[episodeNumber] && !played && !avail;
-      let deleted = false;
 
       if(avail && !path) {
         console.error('avail without path', 
                     `S${seasonNumber}E${episodeNumber}`);
         continue;
       }
+      let deleted = false;
       if(pruning) {
         if(!played && avail) pruning = false;
         else {
-          await deleteOneFile(path);
+          const seasonPath =  path?.split('/').slice(0, -1).join('/')
+                                   .replaceAll('/', '@')
+                                   .replaceAll('?', '~');
+          await srvr.deleteVideos(seasonPath);
           deleted = avail;     // set even if error
         }
       }

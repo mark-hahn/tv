@@ -85,13 +85,14 @@ handleMsg = (msg) => {
 
 export function getSeries()        {return fCall('getSeries',  '')}
 
-export function getRejects()       {return fCall('getRejects',  '')}
-export function addReject(name)    {return fCall('addReject',   name)}
-export function delReject(name)    {return fCall('delReject',   name)}
+export function getRejects()       {return fCall('getRejects','')}
+export function addReject(name)    {return fCall('addReject',  name)}
+export function delReject(name)    {return fCall('delReject',  name)}
 
-export function getPickups()       {return fCall('getPickups',  '')}
-export function addPickup(name)    {return fCall('addPickup',   name)}
-export function delPickup(name)    {return fCall('delPickup',   name)}
+export function getPickups()       {return fCall('getPickups', '')}
+export function addPickup(name)    {return fCall('addPickup',  name)}
+export function delPickup(name)    {return fCall('delPickup',  name)}
 
-export function deletePath(path)   {return fCall('deletePath',  path)}
+export function deleteVideos(path) {return fCall('deleteVideos', path)}
+export function deletePath(path)   {return fCall('deletePath',   path)}
 

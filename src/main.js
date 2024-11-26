@@ -1,5 +1,6 @@
 /*
-Broken ...
+bugs ...
+  need more date precision
   screen too wide
   pickup doesn't toggle
   clipboard

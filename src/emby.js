@@ -238,7 +238,6 @@ export const getSeriesMap = async (seriesId, prune = false) => {
       const episodeNumber = +episodeRec.IndexNumber;
       unairedObj[episodeNumber] = true;
     }
-    let seasonPath = null;
     const episodes    = [];
     const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
     for(let key in episodesRes.data.Items) {
@@ -246,38 +245,26 @@ export const getSeriesMap = async (seriesId, prune = false) => {
       const episodeNumber = +episodeRec.IndexNumber;
       if(!episodeNumber) continue;
 
-      const epiFilePath = episodeRec?.MediaSources?.[0]?.Path;
-      if (!epiFilePath) {
-        console.error('no episode file path', 
-                      `S${seasonNumber}E${episodeNumber}`);
-        continue;
-      }
-      const played     = !!episodeRec?.UserData?.Played;
-      const avail      =   episodeRec?.LocationType != "Virtual";
+      const path          =  episodeRec?.MediaSources?.[0]?.Path;
+      const played        = !!episodeRec?.UserData?.Played;
+      const avail         =   episodeRec?.LocationType != "Virtual";
       const unaired = 
               !!unairedObj[episodeNumber] && !played && !avail;
+      let deleted = false;
 
-      if(avail && !epiFilePath) {
+      if(avail && !path) {
         console.error('avail without path', 
                     `S${seasonNumber}E${episodeNumber}`);
         continue;
       }
-      let deleted = false;
       if(pruning) {
         if(!played && avail) pruning = false;
         else {
-          seasonPath =  
-            epiFilePath?.split('/').slice(0, -1).join('/')
-                        .replaceAll('/', '@')
-                        .replaceAll('?', '~');
-          deleted = avail;
+          await deleteOneFile(path);
+          deleted = avail;     // set even if error
         }
       }
       episodes.push([episodeNumber, [played, avail, unaired, deleted]]);
-    }
-    if(seasonPath) {
-      console.log('deleting season:', seasonPath);
-      await srvr.deleteVideos(seasonPath);
     }
     seriesMap.push([seasonNumber, episodes]);
   }

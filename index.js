@@ -31,6 +31,11 @@ const pickups = JSON.parse(pickupStr);
 let date;
 let size;
 
+const videoFileExtensions = [
+  "mp4", "mkv", "avi", "mov", "wmv", "flv", "mpeg",
+  "3gp", "m4v", "ts", "rm", "vob", "ogv", "divx"
+];
+
 const getSeries = async (id, _param, resolve, reject) => {
   let   errFlg = null;
   const series = {};
@@ -39,15 +44,20 @@ const getSeries = async (id, _param, resolve, reject) => {
     if(errFlg || path == tvDir + '/.stfolder') return;
     try {
       const fstat = await fsp.stat(path);
-      const fdate = fstat.mtime.toISOString().substring(0,10);
-      if(fdate.substring(0,4) > '2050') return;     
-      date  = (date > fdate) ? date : fdate;
-      size += fstat.size;
       if(fstat.isDirectory()) {
         const dir = await fsp.readdir(path);
         for (const dirent of dir) 
           await recurs(path + '/' + dirent);
+        return;
       }
+      const sfx   = path.split('.').pop();
+      if(!videoFileExtensions.includes(sfx)) return;
+      const tstr  = fstat.mtime.toISOString();
+      const fdate = 
+          `${tstr.substring(0,10)} ${tstr.substring(11,19)}`;
+      if(fdate.substring(0,4) > '2050') return;     
+      date  = (date > fdate) ? date : fdate;
+      size += fstat.size;
     }
     catch (err) {
       errFlg = err;
@@ -57,7 +67,7 @@ const getSeries = async (id, _param, resolve, reject) => {
   const dir = await fsp.readdir(tvDir);
   for (const dirent of dir) {
     const seriesPath = tvDir + '/' + dirent;
-    date = 0;
+    date = '0000-00-00 00:00:00';
     size = 0;
     await recurs(seriesPath);
     series[dirent] = [date, size];

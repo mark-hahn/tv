@@ -276,19 +276,25 @@ const deletePath = async (id, path, resolve, reject) => {
   resolve([id, {"ok":"ok"}]);
 };
 
+const nonVideos = ['nfo', 'srt', 'jpg', 'png'];
+
 const deleteVideos = async (id, path, resolve, reject) => {
-  console.log(dat(), 'delete videos', id, path);
-  try {
-    path = decodeURI(path).replaceAll('@', '/').replaceAll('~', '?');
-
-    // delete all video files in path
-
-    // console.log('deleting:', path);
-    // await fsp.unlink(path); 
-  }
-  catch(e) {
-    reject([id, e]);
-    return
+  console.log(dat(), 'delete videos in season', id, path);
+  const seasonPath = 
+      decodeURI(path).replaceAll('@', '/').replaceAll('~', '?');
+  const dir = await fsp.readdir(seasonPath);
+  for (const dirent of dir) {
+    const sfx = dirent.split('.').pop();
+    if(nonVideos.includes(sfx)) continue;
+    try {
+      const filePath = `${path}/${dirent}`;
+      console.log('deleting:', filePath);
+      // await fsp.unlink(filePath); 
+    }
+    catch(e) {
+      reject([id, e]);
+      return
+    }
   }
   resolve([id, {"ok":"ok"}]);
 };
@@ -346,7 +352,7 @@ ws.on('connection', (socket) => {
       case 'delPickup':   delPickup( id, param, resolve, reject); break;
       
       case 'deleteVideos': deleteVideos(id, param, resolve, reject); break;
-      case 'deletePath':   deletePath(id, param, resolve, reject);   break;
+      case 'deletePath':   deletePath(  id, param, resolve, reject); break;
 
       default: reject([id, {unknownfunction: fname}]);
     };

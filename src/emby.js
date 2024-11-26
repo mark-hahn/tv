@@ -238,6 +238,7 @@ export const getSeriesMap = async (seriesId, prune = false) => {
       const episodeNumber = +episodeRec.IndexNumber;
       unairedObj[episodeNumber] = true;
     }
+    let seasonPath = null;
     const episodes    = [];
     const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
     for(let key in episodesRes.data.Items) {
@@ -245,9 +246,9 @@ export const getSeriesMap = async (seriesId, prune = false) => {
       const episodeNumber = +episodeRec.IndexNumber;
       if(!episodeNumber) continue;
 
-      const path = episodeRec?.MediaSources?.[0]?.Path;
-      if (!path) {
-        console.error('no episode path', 
+      const epiFilePath = episodeRec?.MediaSources?.[0]?.Path;
+      if (!epiFilePath) {
+        console.error('no episode file path', 
                       `S${seasonNumber}E${episodeNumber}`);
         continue;
       }
@@ -256,7 +257,7 @@ export const getSeriesMap = async (seriesId, prune = false) => {
       const unaired = 
               !!unairedObj[episodeNumber] && !played && !avail;
 
-      if(avail && !path) {
+      if(avail && !epiFilePath) {
         console.error('avail without path', 
                     `S${seasonNumber}E${episodeNumber}`);
         continue;
@@ -265,14 +266,18 @@ export const getSeriesMap = async (seriesId, prune = false) => {
       if(pruning) {
         if(!played && avail) pruning = false;
         else {
-          const seasonPath =  path?.split('/').slice(0, -1).join('/')
-                                   .replaceAll('/', '@')
-                                   .replaceAll('?', '~');
-          await srvr.deleteVideos(seasonPath);
-          deleted = avail;     // set even if error
+          seasonPath =  
+            epiFilePath?.split('/').slice(0, -1).join('/')
+                        .replaceAll('/', '@')
+                        .replaceAll('?', '~');
+          deleted = avail;
         }
       }
       episodes.push([episodeNumber, [played, avail, unaired, deleted]]);
+    }
+    if(seasonPath) {
+      console.log('deleting season:', seasonPath);
+      await srvr.deleteVideos(seasonPath);
     }
     seriesMap.push([seasonNumber, episodes]);
   }

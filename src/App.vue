@@ -45,7 +45,7 @@ div
                  @click="seriesMapAction('open', show)")
             font-awesome-icon(icon="border-all" style="color:#ccc")
         td(v-if="sortByDate" style="width:80px;font-size:16px;") 
-          | {{ show.Date }}
+          | {{ show.Date.substring(0,10) }}
         td(v-if="sortBySize" style="margin-right:200px;width:60px;font-size:16px;text-align:right") 
           | {{ formatSize(show) + '&nbsp;&nbsp;&nbsp;' }}
         td(@click="showInExternal(show, $event)"
@@ -85,6 +85,7 @@ div
 
 <script>
 import * as emby           from "./emby.js";
+import * as urls           from "./urls.js";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library }         from "@fortawesome/fontawesome-svg-core";
 import { faLaughBeam, faSadCry, faClock, faHeart, } 
@@ -129,7 +130,7 @@ export default {
 
     const togglePickup = async (show) => {
       this.saveVisShow(show.Name);
-      show.Pickup = await emby.togglePickUp(show.Name, show.Pickup);
+      show.Pickup = await emby.togglePickup(show.Name, show.Pickup);
       if (!show.Pickup && show.Id.startsWith("noemby-")) {
         console.log("toggled pickUp, removing row");
         const id   = show.Id;
@@ -442,18 +443,18 @@ export default {
         } else {
           if (embyWin) embyWin.close();
           embyWin = window.open(
-              emby.embyPageUrl(show.Id), "embyWebPage");
+              urls.embyPageUrl(show.Id), "embyWebPage");
         }
       }
     },
 
     addSeasonsToShow(event) {
       const {showId, seasons} = event.data;
-      console.log(`received ${seasons.length} seasons ` +
-                  `for show ${showId}`);
+      // console.log(`received ${seasons.length} seasons ` +
+      //             `for show ${showId}`);
       const show   = allShows.find((show) => show.Id == showId);
       show.Seasons = seasons;
-      console.log(show);
+      // console.log(show);
     },
   },
 

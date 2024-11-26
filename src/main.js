@@ -1,8 +1,8 @@
 /*
 bugs ...
   need more date precision
+  show dates change
   screen too wide
-  pickup doesn't toggle
   clipboard
   broken emby click on app load
   broken sort on app load

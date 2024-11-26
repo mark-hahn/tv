@@ -223,28 +223,6 @@ seasonLoop:
   }
 }
 
-// delete all files before first unwatched episode
-export const justPruneShow = async (seriesId) => { 
-  console.log('entering justPruneShow', seriesId);
-  const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
-  for(let key in seasonsRes.data.Items) {
-    let   seasonRec   =  seasonsRes.data.Items[key];
-    let   seasonId    =  seasonRec.Id;
-    const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
-    for(let key in episodesRes.data.Items) {
-      let   episodeRec =   episodesRes.data.Items[key];
-      const path       =   episodeRec?.MediaSources?.[0]?.Path;
-      const played     = !!episodeRec?.UserData?.Played;
-      const avail      =   episodeRec?.LocationType != "Virtual";
-
-      if(!played && avail) return;
-      else {
-        await deleteOneFile(path);
-      }
-    }
-  }
-}
-
 export const getSeriesMap = async (seriesId, prune = false) => { 
   const seriesMap = [];
   let pruning = prune;

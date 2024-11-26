@@ -13,8 +13,6 @@ div
       button(@click="addPickUp") +
       button(@click="showAll" style="margin-left:20px") 
         | Show All
-      button(@click="pruneAllShows" style="margin-left:20px") 
-        | Prune All
 
     div(style="width:100%;")
       table(style="background-color:white; padding:0 14px; width:100%;")
@@ -220,16 +218,6 @@ export default {
       if (size < 1e6) return size;
       if (size < 1e9) return Math.round(size / 1e6) + "M";
                       return Math.round(size / 1e9) + "G";
-    },
-
-    async pruneAllShows() {
-      if(!confirm("ARE YOU SURE YOU WANT TO PRUNE ALL SHOWS?")) return;
-      for (let show of allShows) {
-        if(show.Id.slice(0,5) != 'noemby-') {
-          // console.log('calling justPruneShow', {show});
-          await emby.justPruneShow(show.Id);
-        }
-      }
     },
 
     nameHash(name) {

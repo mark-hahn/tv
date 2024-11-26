@@ -34,6 +34,14 @@ ws.onerror = (err) => {
 
 const calls = {};
 let nextId  = 0;
+let clint   = null;
+
+if(!clint)
+  clint = setInterval(() => {
+    const length = Object.keys(calls).length;
+    if(length)
+      console.log("calls length:",  Object.keys(calls).length);
+  }, 5000);
 
 const fCall = (fname, param) => {
   const id = ++nextId;

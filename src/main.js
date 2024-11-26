@@ -1,5 +1,6 @@
 /*
 bugs ...
+  
   prune should delete all files except nfo, srt, jpg, png
  
   gap

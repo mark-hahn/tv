@@ -1,25 +1,27 @@
 /*
 bugs ...
-  need more date precision
-  show dates change
-  screen too wide
-  clipboard
-  broken emby click on app load
-  broken sort on app load
-  font sizes and families
+  prune should delete all files except nfo, srt, jpg, png
+ 
   gap
-  ban
   show in emby (computer icon)
+  clipboard
+  broken click to emby on app load
+  broken sort on app load
+  ban
   ctrl-click(imdb) (providers)
   highlight wrong after line deleted
   blank episode at end of line in map
-  prune doesn't work (e.g. Rake)
 
 new features ...
+  font sizes and families
+  screen too wide
   clicks on season numbers for whole row
   add rest of collections
   move show-all to left
   scrape rotten tomatoes score
+
+test ...
+  setLastWatched
 */
 
 import {createApp} from 'vue'

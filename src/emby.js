@@ -265,10 +265,13 @@ export const getSeriesMap = async (seriesId, prune = false) => {
     for(let key in episodesRes.data.Items) {
       let   episodeRec    =  episodesRes.data.Items[key];
       const episodeNumber = +episodeRec.IndexNumber;
+      if(!episodeNumber) continue;
+
       const path          =  episodeRec?.MediaSources?.[0]?.Path;
       const played        = !!episodeRec?.UserData?.Played;
       const avail         =   episodeRec?.LocationType != "Virtual";
-      const unaired       = !!unairedObj[episodeNumber] && !played && !avail;
+      const unaired = 
+              !!unairedObj[episodeNumber] && !played && !avail;
       let deleted = false;
 
       if(avail && !path)
@@ -282,11 +285,8 @@ export const getSeriesMap = async (seriesId, prune = false) => {
           deleted = avail;     // set even if error
         }
       }
-      // console.log(
-      //  {s:seasonNumber, e:episodeNumber, played, avail, unaired, deleted});
       episodes.push([episodeNumber, [played, avail, unaired, deleted]]);
     }
-    // console.log({episodes});
     seriesMap.push([seasonNumber, episodes]);
   }
   return seriesMap;

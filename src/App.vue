@@ -333,7 +333,7 @@ export default {
       const seriesMapSeasons = [];
       const seriesMapEpis    = [];
       const seriesMap        = {gap:show.gap};
-      const seriesMapIn      = 
+      const seriesMapIn = 
             await emby.getSeriesMap(show.Id, action == 'prune');
       for(const season of seriesMapIn) {
         const [seasonNum, episodes] = season;

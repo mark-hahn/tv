@@ -274,10 +274,11 @@ export const getSeriesMap = async (seriesId, prune = false) => {
               !!unairedObj[episodeNumber] && !played && !avail;
       let deleted = false;
 
-      if(avail && !path)
-        console.log('warning, avail without path', 
+      if(avail && !path) {
+        console.error('avail without path', 
                     `S${seasonNumber}E${episodeNumber}`);
-
+        continue;
+      }
       if(pruning) {
         if(!played && avail) pruning = false;
         else {

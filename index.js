@@ -5,7 +5,7 @@ import * as cp             from 'child_process';
 import moment              from 'moment';
 import { WebSocketServer } from 'ws';
 
-const showdates   = false;
+const showdates   = true;
 const dontupload  = false;
 
 const ws = new WebSocketServer({ port: 8736 });
@@ -67,7 +67,13 @@ const getSeries = async (id, _param, resolve, reject) => {
   const dir = await fsp.readdir(tvDir);
   for (const dirent of dir) {
     const seriesPath = tvDir + '/' + dirent;
-    date = '0000-00-00 00:00:00';
+    const fstat = await fsp.stat(seriesPath);
+    const tstr  = fstat.mtime.toISOString();
+    const fdate = 
+        `${tstr.substring(0,10)} ${tstr.substring(11,19)}`;
+    if(fdate.substring(0,4) > '2050') 
+      date = '0000-00-00 00:00:00';     
+    else date = fdate;
     size = 0;
     await recurs(seriesPath);
     series[dirent] = [date, size];
@@ -90,20 +96,26 @@ const upload = async () => {
   for(let name of pickups)
     str += '        - "' + name.replace(/"/g, '') + '"\n';
   str += footerStr;
-  console.log(dat(), '\n\ncreating config.yml');
+  console.log(dat(), 'creating config.yml');
   fs.writeFileSync('config/config.yml', str);
 
   if(dontupload) {
     console.log(dat(), "---- didn't upload config.yml ----");
     return 'ok';
   }
+
+  console.log(dat(), 'uploading config.yml');
+  const timeBeforeUSB = new Date().getTime();
   const {stdout} = await exec(
           'rsync -av config/config.yml xobtlu@oracle.usbx.me:' +
           '/home/xobtlu/.config/flexget/config.yml');
+  console.log(dat(), 
+      'upload delay:', new Date().getTime() - timeBeforeUSB);
+
   const rx = new RegExp('total size is ([0-9,]*)');
   const matches = rx.exec(stdout);
   if(!matches || parseInt(matches[1].replace(',', '')) < 1000) {
-    console.log(dat(), '\nERROR: config.yml upload failed\n', stdout, '\n');
+    console.error(dat(), '\nERROR: config.yml upload failed\n', stdout, '\n');
     return `config.yml upload failed: ${stdout.toString()}`;
   }
   console.log(dat(), 'uploaded config.yml, size:', matches[1]);
@@ -116,9 +128,13 @@ const reload = async () => {
     return 'ok';
   }
 
+  console.log(dat(), 'reloading config.yml');
+  const timeBeforeUSB = new Date().getTime();
   const {stdout} = await exec(
     'ssh xobtlu@oracle.usbx.me /home/xobtlu/reload-cmd');
-  
+  console.log(dat(), 
+      'reload delay:', new Date().getTime() - timeBeforeUSB);
+
   if(!stdout.includes('Config successfully reloaded'))  {
     console.log(dat(), '\nERROR: config.yml reload failed\n', stdout, '\n');
     return `config.yml reload failed: ${stdout.toString()}`;
@@ -165,7 +181,6 @@ const trySaveConfigYml = async (id, result, resolve, reject) => {
 // this always sends a response to the client
 // can be called and forgotten
 const saveConfigYml = async (idIn, resultIn, resolveIn, rejectIn) => {
-  console.log(dat(), 'saving config.yml');
   const tryRes = await trySaveConfigYml(idIn, resultIn, resolveIn, rejectIn);    
   const [status, id, result, resolve, reject] = tryRes;
   switch(status) {
@@ -260,6 +275,20 @@ const deletePath = async (id, path, resolve, reject) => {
   }
   resolve([id, {"ok":"ok"}]);
 };
+
+// const deleteVideo = async (id, path, resolve, reject) => {
+//   console.log(dat(), 'deletePath', id, path);
+//   try {
+//     path = decodeURI(path).replaceAll('@', '/').replaceAll('~', '?');
+//     console.log('deleting:', path);
+//     await fsp.unlink(path); 
+//   }
+//   catch(e) {
+//     reject([id, e]);
+//     return
+//   }
+//   resolve([id, {"ok":"ok"}]);
+// };
 
 
 //////////////////  WEBSOCKET SERVER  //////////////////

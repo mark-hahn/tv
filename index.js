@@ -5,6 +5,8 @@ import * as cp             from 'child_process';
 import moment              from 'moment';
 import { WebSocketServer } from 'ws';
 
+process.setMaxListeners(50);
+
 const showdates   = true;
 const dontupload  = false;
 
@@ -28,13 +30,12 @@ const footerStr = fs.readFileSync('config/config5-footer.txt',   'utf8');
 const rejects = JSON.parse(rejectStr);
 const pickups = JSON.parse(pickupStr);
 
-let date;
-let size;
-
 const videoFileExtensions = [
   "mp4", "mkv", "avi", "mov", "wmv", "flv", "mpeg",
   "3gp", "m4v", "ts", "rm", "vob", "ogv", "divx"
 ];
+
+let date, size;
 
 const getSeries = async (id, _param, resolve, reject) => {
   let   errFlg = null;
@@ -69,11 +70,9 @@ const getSeries = async (id, _param, resolve, reject) => {
     const seriesPath = tvDir + '/' + dirent;
     const fstat = await fsp.stat(seriesPath);
     const tstr  = fstat.mtime.toISOString();
-    const fdate = 
-        `${tstr.substring(0,10)} ${tstr.substring(11,19)}`;
-    if(fdate.substring(0,4) > '2050') 
-      date = '0000-00-00 00:00:00';     
-    else date = fdate;
+    date = `${tstr.substring(0,10)} ${tstr.substring(11,19)}`;
+    if(date.substring(0,4) > '2050') 
+        date = '0000-00-00 00:00:00';     
     size = 0;
     await recurs(seriesPath);
     series[dirent] = [date, size];
@@ -284,12 +283,12 @@ const deleteVideos = async (id, path, resolve, reject) => {
       decodeURI(path).replaceAll('@', '/').replaceAll('~', '?');
   const dir = await fsp.readdir(seasonPath);
   for (const dirent of dir) {
-    const sfx = dirent.split('.').pop();
+    const sfx = dirent.split('.').pop().toLowerCase();
     if(nonVideos.includes(sfx)) continue;
     try {
-      const filePath = `${path}/${dirent}`;
+      const filePath = `${seasonPath}/${dirent}`;
       console.log('deleting:', filePath);
-      // await fsp.unlink(filePath); 
+      await fsp.unlink(filePath); 
     }
     catch(e) {
       reject([id, e]);
@@ -298,7 +297,7 @@ const deleteVideos = async (id, path, resolve, reject) => {
   }
   resolve([id, {"ok":"ok"}]);
 };
-
+ 
 
 //////////////////  WEBSOCKET SERVER  //////////////////
 

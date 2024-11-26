@@ -276,19 +276,22 @@ const deletePath = async (id, path, resolve, reject) => {
   resolve([id, {"ok":"ok"}]);
 };
 
-// const deleteVideo = async (id, path, resolve, reject) => {
-//   console.log(dat(), 'deletePath', id, path);
-//   try {
-//     path = decodeURI(path).replaceAll('@', '/').replaceAll('~', '?');
-//     console.log('deleting:', path);
-//     await fsp.unlink(path); 
-//   }
-//   catch(e) {
-//     reject([id, e]);
-//     return
-//   }
-//   resolve([id, {"ok":"ok"}]);
-// };
+const deleteVideos = async (id, path, resolve, reject) => {
+  console.log(dat(), 'delete videos', id, path);
+  try {
+    path = decodeURI(path).replaceAll('@', '/').replaceAll('~', '?');
+
+    // delete all video files in path
+
+    // console.log('deleting:', path);
+    // await fsp.unlink(path); 
+  }
+  catch(e) {
+    reject([id, e]);
+    return
+  }
+  resolve([id, {"ok":"ok"}]);
+};
 
 
 //////////////////  WEBSOCKET SERVER  //////////////////
@@ -342,7 +345,8 @@ ws.on('connection', (socket) => {
       case 'addPickup':   addPickup( id, param, resolve, reject); break;
       case 'delPickup':   delPickup( id, param, resolve, reject); break;
       
-      case 'deletePath':  deletePath(id, param, resolve, reject); break;
+      case 'deleteVideos': deleteVideos(id, param, resolve, reject); break;
+      case 'deletePath':   deletePath(id, param, resolve, reject);   break;
 
       default: reject([id, {unknownfunction: fname}]);
     };

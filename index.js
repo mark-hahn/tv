@@ -35,11 +35,11 @@ const videoFileExtensions = [
   "3gp", "m4v", "ts", "rm", "vob", "ogv", "divx"
 ];
 
-let date, size;
-
-const getSeries = async (id, _param, resolve, reject) => {
+const getAllShows = async (id, _param, resolve, reject) => {
   let   errFlg = null;
-  const series = {};
+  const shows = {};
+
+  let maxDate, totalSize;
 
   const recurs = async (path) => {
     if(errFlg || path == tvDir + '/.stfolder') return;
@@ -52,13 +52,14 @@ const getSeries = async (id, _param, resolve, reject) => {
         return;
       }
       const sfx   = path.split('.').pop();
-      if(!videoFileExtensions.includes(sfx)) return;
-      const tstr  = fstat.mtime.toISOString();
-      const fdate = 
-          `${tstr.substring(0,10)} ${tstr.substring(11,19)}`;
-      if(fdate.substring(0,4) > '2050') return;     
-      date  = (date > fdate) ? date : fdate;
-      size += fstat.size;
+      if(videoFileExtensions.includes(sfx)) {
+        const tstr  = fstat.mtime.toISOString();
+        const fdate = 
+            `${tstr.substring(0,10)} ${tstr.substring(11,19)}`;
+        if(fdate.substring(0,4) > '2050') return;     
+        maxDate  = (maxDate > fdate) ? maxDate : fdate;
+      }
+      totalSize += fstat.size;
     }
     catch (err) {
       errFlg = err;
@@ -67,22 +68,28 @@ const getSeries = async (id, _param, resolve, reject) => {
 
   const dir = await fsp.readdir(tvDir);
   for (const dirent of dir) {
-    const seriesPath = tvDir + '/' + dirent;
-    const fstat = await fsp.stat(seriesPath);
+    const showPath = tvDir + '/' + dirent;
+    const fstat = await fsp.stat(showPath);
     const tstr  = fstat.mtime.toISOString();
-    date = `${tstr.substring(0,10)} ${tstr.substring(11,19)}`;
-    if(date.substring(0,4) > '2050') 
-        date = '0000-00-00 00:00:00';     
-    size = 0;
-    await recurs(seriesPath);
-    series[dirent] = [date, size];
+    maxDate = `${tstr.substring(0,10)} ${tstr.substring(11,19)}`;
+    if(maxDate.substring(0,4) > '2050') {
+        console.log(dat(), 'bad date:', maxDate, showPath);
+        maxDate = '0000-00-00 00:00:00'; 
+    }
+    totalSize = 0;
+    await recurs(showPath);
+    shows[dirent] = [maxDate, totalSize];
+
+    if(totalSize == 0) {
+      console.log(dat(), 'empty show:', dirent);
+    }
   }
   if(errFlg) {
     reject([id, errFlg]);
     return;
   }
   else {
-    resolve([id, series]);
+    resolve([id, shows]);
     return;
   }
 }
@@ -318,7 +325,7 @@ ws.on('connection', (socket) => {
 
     // call function fname
     switch (fname) {
-      case 'getSeries':   getSeries( id, '',    resolve, reject); break;
+      case 'getAllShows': getAllShows( id, '',  resolve, reject); break;
 
       case 'getRejects':  getRejects(id, '',    resolve, reject); break;
       case 'addReject':   addReject( id, param, resolve, reject); break;

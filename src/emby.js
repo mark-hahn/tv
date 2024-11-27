@@ -75,18 +75,19 @@ export async function loadAllShows() {
     const embyPath     = show.Path.split('/').pop();
     const showDateSize = srvrShows[embyPath];
     if(!showDateSize) {
-      console.log('emby show not in srvr:',   
-                    {Name:show.Name, Path:show.Path});
-      show.NoSrvr  = true;
-      show.Date = 0;
-      show.Size = 0;
+      continue
+      // console.log('emby show not in srvr:',   
+      //               {Name:show.Name, Path:show.Path});
+      // show.NoSrvr  = true;
+      // show.Date = 0;
+      // show.Size = 0;
     }
     else {
       const [date, Size] = showDateSize;
       show.Date = date;
       show.Size = Size;
     }
-    shows.push(show);
+    if(show.Date) shows.push(show);
   }
 
   for(let rejectName of rejects) {

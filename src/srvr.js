@@ -1,6 +1,8 @@
-const URL = 'ws://192.168.1.103:8736';
-let ws;
+// const URL = 'ws://hahnca.com:8736';
+// const URL = 'ws://127.0.0.1:8736';
+const URL = 'ws://172.28.195.222:8736';
 
+let ws;
 const openWs = () => {ws = new WebSocket(URL)};
 openWs();
 

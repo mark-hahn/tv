@@ -2,6 +2,7 @@
 bugs ...
   gap
   ban
+  no highlight after line deleted from pickup toggle
   blank episode at end of line in map
 
 new features ...

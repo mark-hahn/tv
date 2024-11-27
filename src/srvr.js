@@ -32,22 +32,31 @@ ws.onerror = (err) => {
   haveSocket = false;
 };
 
-const calls = {};
-let nextId  = 0;
-let clint   = null;
+const calls      = [];
+const fCallQueue = [];
+let   nextId     = 0;
+let   clint      = null;
 
-if(!clint)
+if(!clint) {
   clint = setInterval(() => {
     const length = Object.keys(calls).length;
     if(length)
       console.log("calls length:",  Object.keys(calls).length);
   }, 5000);
+}
 
-const fCall = (fname, param) => {
+const fCall = (fname, param, payld) => {
+  const callIdx = 
+          calls.findIndex((call) => call.fname == fname);
+  if(callIdx > -1) {
+    fCallQueue.push({fname, param, payld});
+    console.log("queued:", fname);
+    return;
+  }
   const id = ++nextId;
-  console.log("calling:", id, fname);
+  console.log("calling:", {id, fname});
   const promise = new Promise((resolve, reject) => {
-    calls[id] = [resolve, reject];
+    calls.push({id, fname, resolve, reject, payld});
   });
   const msg = `${id}...${fname}...${param}`;
   if(!haveSocket) waitingSends.push(msg);
@@ -56,42 +65,60 @@ const fCall = (fname, param) => {
 }
 
 handleMsg = (msg) => { 
-  msg = msg.toString()
+  msg = msg.toString();
   const parts = /^(.*)\.\.\.(.*)\.\.\.(.*)$/.exec(msg);
   if(!parts) {
     console.error('skipping bad message:', msg);
     return;
   }
   const [id, status, result] = parts.slice(1);
-
-  console.log("handleMsg:", id, status);
+  console.log("handling msg:", id, status);
   if(id == '0') return;
 
-  const [resolve, reject] = calls[id]; 
-  if(!resolve) {
+  const callIdx = calls.findIndex((call) => call.id == id);
+  if(callIdx < 0) {
     console.error("no matching id from msg:", id);
     return;
   }
-  delete calls[id];
+  const call = calls[callIdx];
+  delete calls[callIdx];
+  const {fname, resolve, reject, payld} = call;
   try { 
     const res = JSON.parse(result);
+    res.payld = payld
     if(status == 'ok') resolve(res);
     else                reject(res);
   }
   catch(err) {
     console.error("parsing ws result:", {id, result, err});
-  } 
+  }
+  
+  const queuelIdx = fCallQueue.findIndex(
+                    (entry) => entry.fname == fname);
+  if(queuelIdx < 0) return;
+  console.log("dequeuing:", fname);
+  const entry = fCallQueue[queuelIdx];
+  delete fCallQueue[queuelIdx];
+  fCall(entry.fname, entry.param, entry.payld);
 }
 
-export function getAllShows()      {return fCall('getAllShows', '')}
+export function getAllShows(payld)      
+            {return fCall('getAllShows', '', payld)}
 
-export function getRejects()       {return fCall('getRejects','')}
-export function addReject(name)    {return fCall('addReject',  name)}
-export function delReject(name)    {return fCall('delReject',  name)}
+export function getRejects(payld)       
+            {return fCall('getRejects',  '', payld)}
+export function addReject(name, payld)    
+            {return fCall('addReject', name, payld)}
+export function delReject(name, payld)    
+            {return fCall('delReject', name, payld)}
 
-export function getPickups()       {return fCall('getPickups', '')}
-export function addPickup(name)    {return fCall('addPickup',  name)}
-export function delPickup(name)    {return fCall('delPickup',  name)}
+export function getPickups(payld)       
+            {return fCall('getPickups',   '', payld)}
+export function addPickup(name, payld)    
+            {return fCall('addPickup',  name, payld)}
+export function delPickup(name, payld)    
+            {return fCall('delPickup',  name, payld)}
 
-export function deletePath(path)   {return fCall('deletePath',   path)}
+export function deletePath(path, payld)   
+            {return fCall('deletePath', path, payld)}
 

@@ -5,7 +5,6 @@ bugs ...
   ban
   highlight wrong after line deleted
   blank episode at end of line in map
-  clipboard
 
 new features ...
   font sizes and families

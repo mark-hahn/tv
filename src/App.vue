@@ -480,10 +480,6 @@ export default {
 
       emby.getSeasons(allShows, this.addSeasonsToShow);
 
-      for (let show of allShows)
-        if (show.ProviderIds)
-          console.log("got ProviderIds for", show.Name, {show});
-          
       this.sortByDate = true;
       this.sortShows();
       this.showAll();

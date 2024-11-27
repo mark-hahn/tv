@@ -276,7 +276,7 @@ export default {
         const name = window.localStorage.getItem("lastVisShow");
         const id = this.nameHash(name);
         this.highlightName = name;
-        console.log(`srolling ${id} into view`);
+        // console.log(`srolling ${id} into view`);
         const ele = document.getElementById(id);
         if (ele) {
           ele.scrollIntoView(true);

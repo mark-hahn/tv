@@ -46,8 +46,10 @@ if(!clint) {
 }
 
 const fCall = (fname, param, payld) => {
-  const callIdx = 
-          calls.findIndex((call) => call.fname == fname);
+  const callIdx = calls.findIndex( (call) => {
+                      if(!call) return false;
+                      return call.fname == fname;
+                    });
   if(callIdx > -1) {
     fCallQueue.push({fname, param, payld});
     console.log("queued:", fname);
@@ -81,7 +83,6 @@ handleMsg = (msg) => {
       else      return (call.id == id);
     }
   );
-
   if(callIdx < 0) {
     console.error("no matching id from msg:", id);
     return;
@@ -89,7 +90,7 @@ handleMsg = (msg) => {
   const call = calls[callIdx];
   delete calls[callIdx];
   const {fname, resolve, reject, payld} = call;
-  try { 
+  try {
     const res = JSON.parse(result);
     res.payld = payld
     if(status == 'ok') resolve(res);

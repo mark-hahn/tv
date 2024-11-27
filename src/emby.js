@@ -36,16 +36,6 @@ export async function init() {
   urls.init(cred);
 }
 
-
-////////////////////////  UTILITIES  ///////////////////////
-
-export async function providers (show) {
-  const url = `http://hahnca.com:8096/emby/Items?Recursive=true&Fields=ProviderIds&Ids=${show.Id}&api_key=ba7d62f79cbd4a539b675b05b5663607`;
-  const item = (await axios.get(url)).data.Items[0];
-  console.log("providers", {url, show, item});
-  return item?.ProviderIds;
-}
-
 export function getSeasons(allShows, cb) {
   seasonsWorker.onerror = (err) => {
     console.error('Worker error:', err.message);
@@ -66,7 +56,7 @@ export async function loadAllShows() {
 
   const listPromise   = axios.get(
                         urls.showListUrl(cred, 0, 10000));
-  const seriesPromise = srvr.getSeries();
+  const seriesPromise = srvr.getAllShows(); 
   const rejPromise    = srvr.getRejects();
   const pkupPromise   = srvr.getPickups();
   const [embyShows, srvrShows, rejects, pickups] = 

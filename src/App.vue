@@ -422,16 +422,29 @@ export default {
       this.saveVisShow(show.Name);
       if (!show.Id.startsWith("noemby-")) {
         if (event.ctrlKey) {
+          console.log("closing old imdb page");
           if (imdbWin) imdbWin.close();
-          const providers = await emby.providers(show);
-          if (providers?.Imdb) {
-            const url = `https://www.imdb.com/title/${providers.Imdb}`;
+          const imdbProviderId = show?.ProviderIds?.Imdb;
+          if (imdbProviderId) {
+            console.log("got imdbProviderId, opening imdb page", 
+                            show?.ProviderIds);
+            const url = `https://www.imdb.com/title/${imdbProviderId}`;
             imdbWin = window.open(url, "imdbWebPage");
           }
-        } else {
-          if (embyWin) embyWin.close();
-          embyWin = window.open(
-              urls.embyPageUrl(show.Id), "embyWebPage");
+          else console.log("no imdb Provider Id for show:", show);
+        } 
+        else {
+          console.log("opening emby page for", show.Name);
+
+          const url = urls.embyPageUrl(show.Id);
+          if (embyWin) {
+            console.log("closing old emby page", show.Name);
+            embyWin.close();
+            embyWin = window.open(url, "embyWin");
+          }
+          else embyWin = window.open(url, "_blank");
+
+          console.log("done opening emby page", url);
         }
       }
     },
@@ -466,6 +479,14 @@ export default {
       this.select();
 
       emby.getSeasons(allShows, this.addSeasonsToShow);
+
+      for (let show of allShows)
+        if (show.ProviderIds)
+          console.log("got ProviderIds for", show.Name, {show});
+          
+      this.sortByDate = true;
+      this.sortShows();
+      this.showAll();
     })();
   },
 };

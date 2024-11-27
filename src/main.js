@@ -2,13 +2,10 @@
 bugs ...
   gap
   show in emby (computer icon)
-  clipboard
-  broken click to emby on app load
-  broken sort on app load
   ban
-  ctrl-click(imdb) (providers)
   highlight wrong after line deleted
   blank episode at end of line in map
+  clipboard
 
 new features ...
   font sizes and families

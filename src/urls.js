@@ -15,7 +15,7 @@ export function showListUrl(cred, startIdx=0, limit=10000) {
              ExternalUrls      %2c Genres            %2c 
              Overview          %2c Path              %2c 
              People            %2c PremiereDate      %2c 
-             IsUnaired
+             IsUnaired         %2c ProviderIds
     &StartIndex=${startIdx}
     &ParentId=4514ec850e5ad0c47b58444e17b6346c
     &Limit=${limit}

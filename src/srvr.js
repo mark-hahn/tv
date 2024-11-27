@@ -75,7 +75,13 @@ handleMsg = (msg) => {
   console.log("handling msg:", id, status);
   if(id == '0') return;
 
-  const callIdx = calls.findIndex((call) => call.id == id);
+  const callIdx = calls.findIndex(
+    (call) => {
+      if(!call) return false;
+      else      return (call.id == id);
+    }
+  );
+
   if(callIdx < 0) {
     console.error("no matching id from msg:", id);
     return;

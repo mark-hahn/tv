@@ -4,6 +4,7 @@ bugs ...
   ban
   no highlight after line deleted from pickup toggle
   blank episode at end of line in map
+  scroll into view broken
 
 new features ...
   font sizes and families

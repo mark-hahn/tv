@@ -157,7 +157,21 @@ export default {
         show.Id = "noemby-" + Math.random();
         console.log("deleted db, keeping row");
       } else {
-        console.log("deleted db, removing row");
+        console.log("deleted db, no pickup, removing row");
+        for(let i = 0; i < allShows.length; i++) {
+          if(allShows[i].Id == id) {
+            let nextShow           = allShows[i+1];
+            if(!nextShow) nextShow = allShows[i-1];
+            this.saveVisShow(nextShow.Name);
+            break;
+          }
+        }
+        for(show of allShows) {
+          if(show.Id == id) {
+            allShows.splice(allShows.indexOf(show), 1);
+            break;
+          }
+        }
         allShows   = allShows.filter(  (show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);
         this.scrollSavedVisShowIntoView();
@@ -268,7 +282,7 @@ export default {
           ele.scrollIntoView(true);
           window.scrollBy(0, -80);
         } else {
-          console.log(`show ${id} not in show list, finding nearest match`);
+          console.log(`show ${id} not in show list, finding best match`);
           for (let show of allShows) {
             const hash = this.nameHash(show.Name);
             if (hash > id) {

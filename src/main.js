@@ -1,9 +1,7 @@
 /*
 bugs ...
   gap
-  show in emby (computer icon)
   ban
-  highlight wrong after line deleted
   blank episode at end of line in map
 
 new features ...

@@ -326,7 +326,7 @@ ws.on('connection', (socket) => {
 
     // call function fname
     switch (fname) {
-      case 'getAllShows': getAllShows( id, '',  resolve, reject); break;
+      case 'getAllShows': getAllShows(id, '',  resolve, reject); break;
 
       case 'getRejects':  getRejects(id, '',    resolve, reject); break;
       case 'addReject':   addReject( id, param, resolve, reject); break;

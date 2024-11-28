@@ -61,7 +61,7 @@ const fCall = (fname, param, sema4) => {
   const promise = new Promise((resolve, reject) => {
     calls.push({id, fname, resolve, reject, sema4});
   });
-  const msg = `${id}...${fname}...${param}`;
+  const msg = `${id}~~~${fname}~~~${param}`;
   if(!haveSocket) waitingSends.push(msg);
   else ws.send(msg);
   return promise;
@@ -69,7 +69,7 @@ const fCall = (fname, param, sema4) => {
 
 handleMsg = (msg) => { 
   msg = msg.toString();
-  const parts = /^(.*)\.\.\.(.*)\.\.\.(.*)$/.exec(msg);
+  const parts = /^(.*)~~~(.*)~~~(.*)$/.exec(msg);
   if(!parts) {
     console.error('skipping bad message:', msg);
     return;

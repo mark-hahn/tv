@@ -1,6 +1,5 @@
 // const URL = 'ws://hahnca.com:8736';
-// const URL = 'ws://127.0.0.1:8736';
-const URL = 'ws://172.28.195.222:8736';
+const URL = 'ws://127.0.0.1:8736';
 
 let ws;
 const openWs = () => {ws = new WebSocket(URL)};
@@ -47,20 +46,20 @@ if(!clint) {
   }, 5000);
 }
 
-const fCall = (fname, param, payld) => {
-  const callIdx = calls.findIndex( (call) => {
-                      if(!call) return false;
-                      return call.fname == fname;
-                    });
-  if(callIdx > -1) {
-    fCallQueue.push({fname, param, payld});
-    console.log("queued:", fname);
-    return;
+const fCall = (fname, param, sema4) => {
+  if(sema4) { 
+    const callIdx = calls.findIndex(
+                            call => call.sema4 == sema4);
+    if(callIdx > -1) {
+      fCallQueue.push({fname, param, sema4});
+      console.log("queued:", fname);
+      return;
+    }
   }
   const id = ++nextId;
   console.log("calling:", {id, fname});
   const promise = new Promise((resolve, reject) => {
-    calls.push({id, fname, resolve, reject, payld});
+    calls.push({id, fname, resolve, reject, sema4});
   });
   const msg = `${id}...${fname}...${param}`;
   if(!haveSocket) waitingSends.push(msg);
@@ -80,21 +79,16 @@ handleMsg = (msg) => {
   if(id == '0') return;
 
   const callIdx = calls.findIndex(
-    (call) => {
-      if(!call) return false;
-      else      return (call.id == id);
-    }
-  );
+                     call =>  call.id == id);
   if(callIdx < 0) {
     console.error("no matching id from msg:", id);
     return;
   }
   const call = calls[callIdx];
-  delete calls[callIdx];
-  const {fname, resolve, reject, payld} = call;
+  calls.splice(callIdx, 1);
+  const {fname, resolve, reject, sema4} = call;
   try {
     const res = JSON.parse(result);
-    res.payld = payld
     if(status == 'ok') resolve(res);
     else                reject(res);
   }
@@ -103,31 +97,31 @@ handleMsg = (msg) => {
   }
   
   const queuelIdx = fCallQueue.findIndex(
-                    (entry) => entry.fname == fname);
+                      entry => entry.sema4 == sema4);
   if(queuelIdx < 0) return;
   console.log("dequeuing:", fname);
   const entry = fCallQueue[queuelIdx];
-  delete fCallQueue[queuelIdx];
-  fCall(entry.fname, entry.param, entry.payld);
+  fCallQueue.splice(queuelIdx, 1);
+  fCall(entry.fname, entry.param, entry.sema4);
 }
 
-export function getAllShows(payld)      
-            {return fCall('getAllShows', '', payld)}
+export function getAllShows()      
+            {return fCall('getAllShows')}
 
-export function getRejects(payld)       
-            {return fCall('getRejects',  '', payld)}
-export function addReject(name, payld)    
-            {return fCall('addReject', name, payld)}
-export function delReject(name, payld)    
-            {return fCall('delReject', name, payld)}
+export function getRejects()       
+            {return fCall('getRejects')}
+export function addReject(name)    
+            {return fCall('addReject', name, 'rej')}
+export function delReject(name)    
+            {return fCall('delReject', name, 'rej')}
 
-export function getPickups(payld)       
-            {return fCall('getPickups',   '', payld)}
-export function addPickup(name, payld)    
-            {return fCall('addPickup',  name, payld)}
-export function delPickup(name, payld)    
-            {return fCall('delPickup',  name, payld)}
+export function getPickups()       
+            {return fCall('getPickups')}
+export function addPickup(name)    
+            {return fCall('addPickup', name, 'pkup')}
+export function delPickup(name)    
+            {return fCall('delPickup', name, 'pkup')}
 
-export function deletePath(path, payld)   
-            {return fCall('deletePath', path, payld)}
+export function deletePath(path)   
+            {return fCall('deletePath', path)}
 

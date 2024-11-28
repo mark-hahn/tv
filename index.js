@@ -12,9 +12,10 @@ const dontupload  = false;
 
 const ws = new WebSocketServer({ port: 8736 });
 console.log('ws listening on port 8736');
-// debug
 
-const tvDir = '/mnt/media/tv';
+// const tvDir = '/mnt/media/tv';
+const tvDir = '/mnt/c/Users/mark/apps/tv-series-srvr/media/tv';
+
 const exec  = util.promisify(cp.exec);
 const dat   = () => {
   if(!showdates) return '';

@@ -1,10 +1,7 @@
 /*
 bugs ...
   gap
-  ban
-  no highlight after line deleted from pickup toggle
-  blank episode at end of line in map
-  scroll into view broken
+  setLastWatched broken
 
 new features ...
   font sizes and families
@@ -15,7 +12,7 @@ new features ...
   scrape rotten tomatoes score
 
 test ...
-  setLastWatched
+  scroll into view broken
 */
 
 import {createApp} from 'vue'

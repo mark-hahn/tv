@@ -124,9 +124,18 @@ export default {
               console.error("late saveReject error:", err);
               show.Reject = !show.Reject;
            });
+      const id = show.Id;
       if (!show.Reject && show.Id.startsWith("noemby-")) {
         console.log("turned off reject, removing row");
-        const id   = show.Id;
+        for(let i = 0; i < allShows.length; i++) {
+          if(allShows[i].Id == id) {
+            let nextShow           = allShows[i+1];
+            if(!nextShow) nextShow = allShows[i-1];
+            if(!nextShow) break;
+            this.saveVisShow(nextShow.Name);
+            break;
+          }
+        }
         allShows   = allShows.filter(  (show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);
       }
@@ -143,6 +152,15 @@ export default {
       if (!show.Pickup && show.Id.startsWith("noemby-")) {
         console.log("toggled pickUp, removing row");
         const id   = show.Id;
+        for(let i = 0; i < allShows.length; i++) {
+          if(allShows[i].Id == id) {
+            let nextShow           = allShows[i+1];
+            if(!nextShow) nextShow = allShows[i-1];
+            if(!nextShow) break;
+            this.saveVisShow(nextShow.Name);
+            break;
+          }
+        }
         allShows   = allShows  .filter((show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);
       }
@@ -178,6 +196,7 @@ export default {
           if(allShows[i].Id == id) {
             let nextShow           = allShows[i+1];
             if(!nextShow) nextShow = allShows[i-1];
+            if(!nextShow) break;
             this.saveVisShow(nextShow.Name);
             break;
           }
@@ -366,7 +385,7 @@ export default {
       this.seriesMapSeasons = 
            seriesMapSeasons.filter(x => x !== null);
       this.seriesMapEpis = 
-           seriesMapEpis.filter(x => x !== null).unshift('');
+           seriesMapEpis.filter(x => x !== null);
       this.seriesMap = seriesMap;
       this.saveVisShow(show.Name);
     },

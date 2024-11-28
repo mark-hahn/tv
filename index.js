@@ -290,13 +290,13 @@ const deletePath = async (id, path, resolve, reject) => {
 ws.on('connection', (socket) => {
   console.log(dat(), 'ws connected');
 
-  socket.send('0...ok...{connected:true}');
+  socket.send('0~~~ok~~~{connected:true}');
 
   socket.on('message', (msg) => {
     msg = msg.toString();
     console.log(dat(), 'received', msg);
 
-    const parts = /^(.*)\.\.\.(.*)\.\.\.(.*)$/.exec(msg);
+    const parts = /^(.*)~~~(.*)~~~(.*)$/.exec(msg);
     if(!parts) {
       console.error(dat(), 'skipping bad message:', msg);
       return;
@@ -316,12 +316,12 @@ ws.on('connection', (socket) => {
     promise.then((idResult) => {
       const [id, result] = idResult;
       console.log(dat(), 'resolved', id);
-      socket.send(`${id}...ok...${JSON.stringify(result)}`); 
+      socket.send(`${id}~~~ok~~~${JSON.stringify(result)}`); 
     })
     .catch((idError) => {
       const [id, error] = idError;
       console.log(dat(), 'rejected', id);
-      socket.send(`${id}...err...${JSON.stringify(error)}`); 
+      socket.send(`${id}~~~err~~~${JSON.stringify(error)}`); 
     });
 
     // call function fname

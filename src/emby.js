@@ -38,7 +38,8 @@ export async function init() {
 
 export function getSeasons(allShows, cb) {
   seasonsWorker.onerror = (err) => {
-    console.error('Worker error:', err.message);
+    console.error('Worker:', err.message);
+    throw err;
   }
   const allShowIds = allShows.map((show) => show.Id);
   seasonsWorker.postMessage({cred, allShowIds});
@@ -122,6 +123,7 @@ const deleteOneFile = async (path) => {
   }
   catch (e) {
     console.error('deletePath:', path, e);
+    throw e;
   }
 }
 
@@ -152,8 +154,10 @@ export const editEpisode = async (seriesId,
       if(delFile) {
         const path = episodeRec?.MediaSources?.[0]?.Path;
         try { await srvr.deletePath(path); }
-        catch(e) { console.error('deleteOneFile:', path, e); }
-        return;
+        catch(e) { 
+          console.error('deleteOneFile:', path, e);
+          throw e;
+         }
       }
 
       const episodeId = episodeRec.Id;
@@ -370,99 +374,76 @@ export const findGap = async (series, seriesId) => {
   return null;
 }
 
-export async function toggleFav(id, isFav) {
+export async function saveFav(id, fav) {
   const config = {
-    method: (isFav ? 'delete' : 'post'),
+    method: (fav ? 'post' : 'delete'),
     url:     urls.favoriteUrl(cred, id),
   };
-  let favRes;
-  try { favRes = await axios(config); }
-  catch (e) { return isFav; }
-  return (favRes.status == 200 ? favRes.data.IsFavorite : isFav);
+  let favRes = await axios(config);
+  if(favRes.status != 200) 
+      throw new Error('unable to save favorite');
 }
 
 export async function addReject(name) {
   if(name == "") return false;
   try { await srvr.addReject(name); }
   catch (e) {
-    alert('Error: unable to add reject to server' + e);
-    return false;
+    console.error('unable to add reject to server' + e);
+    throw e;
   }
   return true;
 }
 
-export async function addPickUp(name) {
-  if(name == "") return false;
-    try { await srvr.addPickup(name); }
-  catch (e) {
-    alert('Error: unable to add pickUp to server' + e);
-    return false;
-  }
-  return true;
+export async function saveReject(name, reject) {
+  if(reject) await srvr.addReject(name);
+  else       await srvr.delReject(name);
 }
 
-export async function toggleReject(name, reject) {
-  if(reject) {
-    try { await srvr.delReject(name); }
-    catch (e) {
-      alert('Error: unable to delete reject from server' + e);
-      return reject;
-    }
-  }
-  else {
-    try { await srvr.addReject(name); }
-    catch (e) { 
-      alert('Error: unable to add reject to server' + e);
-      return reject;
-    }
-  }
-  return !reject;
-}
-
-export async function togglePickup(name, pickup) {
+export async function savePickup(name, pickup) {
   if(pickup) {
-    try { await srvr.delPickup(name); }
+    try { await srvr.addPickup(name); }
     catch (e) {
-      alert('Error: unable to delete pickup from server' + e);
-      return pickup;
+      console.error('unable to add pickup from server' + e);
+      throw e;
     }
   }
   else {
-    try { await srvr.addPickup(name); }
+    try { await srvr.delPickup(name); }
     catch (e) { 
-      alert('Error: unable to add pickup to server' + e);
-      return pickup;
+      console.error('unable to delete pickup to server' + e);
+      throw e;
     }
   }
-  return !pickup;
 }
 
 export async function deleteShowFromEmby(id) {
   const delRes = await axios.delete(urls.deleteShowUrl(cred, id));
   const res = delRes.status;
-  let err = 'ok';
   if(res != 204) {
-    err = 'Error: unable to delete show' + delRes.data;
-    alert(err);
+    const err = 'unable to delete show' + delRes.data;
+    console.error(err);
+    throw new Error(err);
   }
-  return err;
+  return 'ok';
 }
 
-export async function toggleToTry(id, inToTry) {
+export async function saveToTry(id, inToTry) {
   const config = {
-    method: (inToTry ? 'delete' : 'post'),
+    method: (inToTry ? 'post' : 'delete'),
     url:     urls.toTryUrl(cred, id),
   };
   let toTryRes;
   try { toTryRes = await axios(config); }
   catch (e) {  
-    console.log(
-        `Error toggleToTry, id:${id}, inToTry:${inToTry}`);
-    return inToTry; 
+    console.error(
+        `saveToTry, id:${id}, inToTry:${inToTry}`);
+    throw e; 
   } 
-  if(toTryRes.status !== 204) return inToTry;
-  console.log(`toggled inToTry to ${!inToTry}`);
-  return !inToTry;
+  if(toTryRes.status !== 204) {
+    const err = 'unable to save to-try' + toTryRes.data;
+    console.error(err);
+    throw new Error(err);
+  }
 }
 
 /////////////////////  RANDOM RESULTS  ///////////////////////

@@ -7,10 +7,6 @@ div
             style="border:1px solid black; width:100px;")
       button(@click="select")
         font-awesome-icon(icon="search")
-      input(v-model="pkupEditName" 
-            style="border:1px solid black; margin-left:20px; width:100px;"
-             @change="addPickUp")
-      button(@click="addPickUp") +
       button(@click="showAll" style="margin-left:20px") 
         | Show All
 
@@ -112,14 +108,24 @@ export default {
 
     const toggleFavorite = async (show) => {
       this.saveVisShow(show.Name);
-      show.IsFavorite = await emby.toggleFav(show.Id, show.IsFavorite);
+      show.IsFavorite = !show.IsFavorite;
+      emby.saveFav(show.Id, show.IsFavorite)
+          .catch((err) => {
+              console.error("late saveFavorite error:", err);
+              show.IsFavorite = !show.IsFavorite;
+           });
     };
 
     const toggleReject = async (show) => {
       this.saveVisShow(show.Name);
-      show.Reject = await emby.toggleReject(show.Name, show.Reject);
+      show.Reject = !show.Reject; 
+      emby.saveReject(show.Name, show.Reject) 
+          .catch((err) => {
+              console.error("late saveReject error:", err);
+              show.Reject = !show.Reject;
+           });
       if (!show.Reject && show.Id.startsWith("noemby-")) {
-        console.log("toggled reject, removing row");
+        console.log("turned off reject, removing row");
         const id   = show.Id;
         allShows   = allShows.filter(  (show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);
@@ -128,18 +134,28 @@ export default {
 
     const togglePickup = async (show) => {
       this.saveVisShow(show.Name);
-      show.Pickup = await emby.togglePickup(show.Name, show.Pickup);
+      show.Pickup = !show.Pickup;
+      emby.savePickup(show.Name, show.Pickup)
+          .catch((err) => {
+              console.error("late savePickup error:", err);
+              show.Pickup = !show.Pickup;
+            });
       if (!show.Pickup && show.Id.startsWith("noemby-")) {
         console.log("toggled pickUp, removing row");
         const id   = show.Id;
-        allShows   = allShows.filter(  (show) => show.Id != id);
+        allShows   = allShows  .filter((show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);
       }
     };
 
     const toggleToTry = async (show) => {
       this.saveVisShow(show.Name);
-      show.InToTry = await emby.toggleToTry(show.Id, show.InToTry);
+      show.InToTry = !show.InToTry;
+      emby.saveToTry(show.Id, show.InToTry)
+          .catch((err) => {
+              console.error("late toggleToTry error:", err);
+              show.InToTry = !show.InToTry;
+            });
     };
 
     const deleteShowFromEmby = async (show) => {
@@ -166,13 +182,7 @@ export default {
             break;
           }
         }
-        for(show of allShows) {
-          if(show.Id == id) {
-            allShows.splice(allShows.indexOf(show), 1);
-            break;
-          }
-        }
-        allShows   = allShows.filter(  (show) => show.Id != id);
+        allShows   = allShows.filter  ((show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);
         this.scrollSavedVisShowIntoView();
       }
@@ -379,28 +389,6 @@ export default {
         if (this.sortByDate) return a.Date > b.Date ? -1 : +1;
         if (this.sortBySize) return a.Size > b.Size ? -1 : +1;
       });
-    },
-
-    // add pickup from input field
-    async addPickUp() {
-      const name = this.pkupEditName;
-      if (allShows.some((show) => show.Name == name)) {
-        console.log("addPickUp: skipping duplicate show name", name);
-        return;
-      }
-      if (name && await emby.addPickUp(name)) {
-        allShows.push({
-          Name: name,
-          Pickup: true,
-          Id: "noemby-" + Math.random(),
-        });
-        this.highlightName = name;
-        this.sortShows();
-        this.saveVisShow(name);
-        this.scrollSavedVisShowIntoView();
-        console.log("added pickup", name);
-      }
-      this.pkupEditName = "";
     },
 
     condColor(show, cond) {

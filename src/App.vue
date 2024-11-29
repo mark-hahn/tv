@@ -1,6 +1,6 @@
 <template lang="pug">
 div
-  #hdr(style="width:60%; background-color:#ccc; margin-left:20%; padding:10px; position:fixed; top:0; z-index:1")
+  #hdr(style="width:667px; background-color:#ccc; margin-left:11%; padding:10px; position:fixed; top:0; z-index:1")
     div(style="margin:3px 10px; display:inline-block;width:100%")
       #lbl TV Series
       input(v-model="searchStr" @input="select"
@@ -28,7 +28,7 @@ div
             font-awesome-icon(:icon="cond.icon"
               :style="{color:condFltrColor(cond)}")
 
-  div(style="margin-top:85px; width:60%; margin-left:20%;")
+  div(style="margin-top:85px; width:700px; margin-left:10%;")
     table(style="padding:0 5px; width:100%; font-size:18px")
       tr(v-for="show in shows" key="show.Id" style="outline:thin solid;")
         td(style="width:30px; text-align:center;"
@@ -470,11 +470,14 @@ export default {
 
     addSeasonsToShow(event) {
       const {showId, seasons, gap} = event.data;
-      const show   = allShows.find((show) => show.Id == showId);
-      // if(gap) console.log(`received ${seasons.length} seasons ` +
-      //                     `for ${show.Name}, with gap ${gap}`);
+      let show = allShows.find((show) => show.Id == showId);
       show.Seasons = seasons;
       show.Gap     = gap;
+      show = this.shows.find((show) => show.Id == showId);
+      if(show) {
+        show.Seasons = seasons;
+        show.Gap     = gap;
+      }
     },
   },
 

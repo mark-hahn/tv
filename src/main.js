@@ -1,9 +1,13 @@
 /*
 bugs ...
   setLastWatched broken
-  gap not visible
 
 new features ...
+  move-to-top button
+  move scroll bar to middle
+  move error in map to top right
+  change sort to 2 buttons
+  add % display for gap progress
   font sizes and families
   screen too wide
   clicks on season numbers for whole row

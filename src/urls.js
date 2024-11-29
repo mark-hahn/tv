@@ -1,5 +1,9 @@
 let cred;
 
+const testCred = 
+{markUsrId: "894c752d448f45a3a1260ccaabd0adff",
+token:      "aad53eb6d92243c3b8ebd3151233260c"}
+
 export async function init(credIn) { cred = credIn; }
 
 export function showListUrl(cred, startIdx=0, limit=10000) {
@@ -82,6 +86,54 @@ export function toTryListUrl(cred, ) {
   `.replace(/\s*/g, "");
 }
 
+export function continueListUrl(cred, ) {
+  return `http://hahnca.com:8096 / emby / Users / 
+          ${cred.markUsrId} / Items
+    ?ParentId=4719143
+    &ImageTypeLimit=1
+    &Fields=PrimaryImageAspectRatio,ProductionYear,CanDelete
+    &EnableTotalRecordCount=false
+    &X-Emby-Client=EmbyWeb
+    &X-Emby-Device-Name=Chrome
+    &X-Emby-Device-Id=f4079adb-6e48-4d54-9185-5d92d3b7176b
+    &X-Emby-Client-Version=4.6.4.0
+    &X-Emby-Token=${cred.token}
+  `.replace(/\s*/g, "");
+}
+
+export function markListUrl(cred, ) {
+  return `http://hahnca.com:8096 / emby / Users / 
+          ${cred.markUsrId} / Items
+    ?ParentId=4697672
+    &ImageTypeLimit=1
+    &Fields=PrimaryImageAspectRatio,ProductionYear,CanDelete
+    &EnableTotalRecordCount=false
+    &X-Emby-Client=EmbyWeb
+    &X-Emby-Device-Name=Chrome
+    &X-Emby-Device-Id=f4079adb-6e48-4d54-9185-5d92d3b7176b
+    &X-Emby-Client-Version=4.6.4.0
+    &X-Emby-Token=${cred.token}
+  `.replace(/\s*/g, "");
+}
+
+export function lindaListUrl(cred, ) {
+  return `http://hahnca.com:8096 / emby / Users / 
+          ${cred.markUsrId} / Items
+    ?ParentId=4706186
+    &ImageTypeLimit=1
+    &Fields=PrimaryImageAspectRatio,ProductionYear,CanDelete
+    &EnableTotalRecordCount=false
+    &X-Emby-Client=EmbyWeb
+    &X-Emby-Device-Name=Chrome
+    &X-Emby-Device-Id=f4079adb-6e48-4d54-9185-5d92d3b7176b
+    &X-Emby-Client-Version=4.6.4.0
+    &X-Emby-Token=${cred.token}
+  `.replace(/\s*/g, "");
+}
+
+console.log(lindaListUrl(testCred));
+
+// id is show id
 export function toTryUrl(cred, id) {
   return `http://hahnca.com:8096 / emby / 
           Collections / 1468316 / Items
@@ -95,3 +147,4 @@ export function toTryUrl(cred, id) {
   `.replace(/\s*/g, "");
 }
 
+console.log(toTryUrl(testCred, "1468316"));

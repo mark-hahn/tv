@@ -34,6 +34,7 @@ export async function init() {
   await getToken();
   cred = {markUsrId, token};
   urls.init(cred);
+  console.log({cred});
 }
 
 export function getSeasons(allShows, cb) {
@@ -333,7 +334,64 @@ export async function saveToTry(id, inToTry) {
     throw e; 
   } 
   if(toTryRes.status !== 204) {
-    const err = 'unable to save to-try' + toTryRes.data;
+    const err = 'unable to save totry' + toTryRes.data;
+    console.error(err);
+    throw new Error(err);
+  }
+}
+
+export async function saveContinue(id, inContinue) {
+  const config = {
+    method: (inContinue ? 'post' : 'delete'),
+    url:     urls.continueUrl(cred, id),
+  };
+  let continueRes;
+  try { continueRes = await axios(config); }
+  catch (e) {  
+    console.error(
+        `saveContinue, id:${id}, inContinue:${inContinue}`);
+    throw e; 
+  } 
+  if(continueRes.status !== 204) {
+    const err = 'unable to save Continue' + continueRes.data;
+    console.error(err);
+    throw new Error(err);
+  }
+}
+
+export async function saveMark(id, inMark) {
+  const config = {
+    method: (inMark ? 'post' : 'delete'),
+    url:     urls.markUrl(cred, id),
+  };
+  let markRes;
+  try { markRes = await axios(config); }
+  catch (e) {  
+    console.error(
+        `saveMark, id:${id}, inMark:${inMark}`);
+    throw e; 
+  } 
+  if(markRes.status !== 204) {
+    const err = 'unable to save Mark' + markRes.data;
+    console.error(err);
+    throw new Error(err);
+  }
+}
+
+export async function saveLinda(id, inLinda) {
+  const config = {
+    method: (inLinda ? 'post' : 'delete'),
+    url:     urls.lindaUrl(cred, id),
+  };
+  let lindaRes;
+  try { lindaRes = await axios(config); }
+  catch (e) {  
+    console.error(
+        `saveLinda, id:${id}, inLinda:${inLinda}`);
+    throw e; 
+  } 
+  if(lindaRes.status !== 204) {
+    const err = 'unable to save Linda' + lindaRes.data;
     console.error(err);
     throw new Error(err);
   }
@@ -342,6 +400,11 @@ export async function saveToTry(id, inToTry) {
 /////////////////////  RANDOM RESULTS  ///////////////////////
 
 /*
+
+4706186 linda
+4719143 continue
+4697672 mark
+1468316 to-try  
 
 https://dev.emby.media/doc/restapi/index.html
 https://dev.emby.media/reference/RestAPI.html

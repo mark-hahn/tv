@@ -45,7 +45,7 @@ div
         td(@click="showInExternal(show, $event)"
            :style="{padding:'4px', backgroundColor: highlightName == show.Name ? 'yellow' : 'white', fontWeight:'bold', fontSize:'20px'}" :id="nameHash(show.Name)") {{show.Name}}
         td( v-for="cond in conds" 
-            style="width:30px; text-align:center;"
+            style="width:33px; text-align:center;"
            @click="cond.click(show)" )
           font-awesome-icon(:icon="cond.icon"
               :style="{color:condColor(show,cond)}")
@@ -84,13 +84,17 @@ import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library }         from "@fortawesome/fontawesome-svg-core";
 import { faLaughBeam, faSadCry, faClock, faHeart, } 
                            from "@fortawesome/free-regular-svg-icons"; 
-import { faCheck, faPlus, faMinus, faArrowDown, 
-         faTv, faSearch, faQuestion, faCopy, faBorderAll, faBan} 
+import { faCheck, faPlus, faMinus, faArrowDown, faArrowRight,
+         faTv, faSearch, faQuestion, faCopy, faBorderAll, faBan,
+         faMars, faVenus} 
                            from "@fortawesome/free-solid-svg-icons";
+
+console.log("faArrowRight", faArrowRight);
+
 library.add([  
   faLaughBeam, faSadCry, faClock, faHeart, faCheck, faPlus, 
   faMinus, faArrowDown, faTv, faSearch, faQuestion, faCopy, 
-  faBan, faBorderAll, ]);
+  faBan, faBorderAll, faArrowRight, faMars, faVenus]);
  
 let allShows    = [];
 let embyWin     = null;
@@ -174,6 +178,36 @@ export default {
             });
     };
 
+    const toggleContinue = async (show) => {
+      this.saveVisShow(show.Name);
+      show.InContinue = !show.InContinue;
+      emby.saveContinue(show.Id, show.InContinue)
+          .catch((err) => {
+              console.error("late toggleContinue error:", err);
+              show.InContinue = !show.InContinue;
+            });
+    };
+
+    const toggleMark = async (show) => {
+      this.saveVisShow(show.Name);
+      show.InMark = !show.InMark;
+      emby.saveMark(show.Id, show.InMark)
+          .catch((err) => {
+              console.error("late toggleMark error:", err);
+              show.InMark = !show.InMark;
+            });
+    };
+
+    const toggleLinda = async (show) => {
+      this.saveVisShow(show.Name);
+      show.InLinda = !show.InLinda;
+      emby.saveLinda(show.Id, show.InLinda)
+          .catch((err) => {
+              console.error("late toggleLinda error:", err);
+              show.InLinda = !show.InLinda;
+            });
+    };
+
     const deleteShowFromEmby = async (show) => {
       this.saveVisShow(show.Name);
       console.log("delete Show From Emby:", show.Name);
@@ -230,6 +264,18 @@ export default {
           color: "lime", filter: 0, icon: ["fas", "question"],
           cond(show)  { return show.InToTry; },
           click(show) { toggleToTry(show); },
+        }, {
+          color: "lime", filter: 0, icon: ["fas", "arrow-right"],
+          cond(show)  { return show.InContinue; },
+          click(show) { toggleContinue(show); },
+        }, {
+          color: "lime", filter: 0, icon: ["fas", "mars"],
+          cond(show)  { return show.InMark; },
+          click(show) { toggleMark(show); },
+        }, {
+          color: "lime", filter: 0, icon: ["fas", "venus"],
+          cond(show)  { return show.InLinda; },
+          click(show) { toggleLinda(show); },
         }, {
           color: "red", filter: 0, icon: ["far", "heart"],
           cond(show)  { return show.IsFavorite; },

@@ -11,8 +11,8 @@ div
         | Show All
 
     div(style="width:100%;")
-      table(style="background-color:white; padding:0 14px; width:100%;")
-        tr  
+      table(style="background-color:white; padding:0 20px; width:700px;")
+        tr(style="width:260px;")
           td(style="width:60px;font-size:large;") 
             | {{shows.length + '/' + allShowsLength}}
           td(style="width:100px;")
@@ -21,9 +21,9 @@ div
              style="width:120px; text-align:left; font-size:large;") New Shows
           td(v-if="sortBySize" 
              style="width:120px; text-align:left; font-size:large;") Size
-          td(style="padding:0 4px;text-align:right;") Filters:
+          td(style="padding:0 4px; text-align:right;") Filters:
           td( v-for="cond in conds"
-              :style="{width:'30px',textAlign:'center'}"
+              :style="{width:'22px',textAlign:'center'}"
               @click="condFltrClick(cond)" )
             font-awesome-icon(:icon="cond.icon"
               :style="{color:condFltrColor(cond)}")
@@ -45,7 +45,7 @@ div
         td(@click="showInExternal(show, $event)"
            :style="{padding:'4px', backgroundColor: highlightName == show.Name ? 'yellow' : 'white', fontWeight:'bold', fontSize:'20px'}" :id="nameHash(show.Name)") {{show.Name}}
         td( v-for="cond in conds" 
-            style="width:33px; text-align:center;"
+            style="width:22px; text-align:center;"
            @click="cond.click(show)" )
           font-awesome-icon(:icon="cond.icon"
               :style="{color:condColor(show,cond)}")

@@ -2,9 +2,9 @@
 bugs ...
   setLastWatched broken
   bans not showing
+  scroll into view broken
 
 new features ...
-  add rest of collections
   add % display for gap progress
   move-to-top button
   move scroll bar to middle
@@ -14,9 +14,6 @@ new features ...
   map: clicks on season numbers for whole row
   move show-all to left
   scrape rotten tomatoes score
-
-test ...
-  scroll into view broken
 */
 
 import {createApp} from 'vue'

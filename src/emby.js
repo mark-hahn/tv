@@ -51,6 +51,11 @@ export function getSeasons(allShows, cb) {
  
 ////////////////////////  MAIN FUNCTIONS  ///////////////////////
 
+const toTryCollId    = '1468316';
+const continueCollId = '4719143';
+const markCollId     = '4697672';
+const lindaCollId    = '4706186';
+
 const pathToName = {};
 
 export async function loadAllShows() {
@@ -102,13 +107,38 @@ export async function loadAllShows() {
     const show = shows.find((show) => show.Name == pickupName);
     if(show) show.Pickup = true;
   }
-
-  const toTryRes = await axios.get(urls.toTryListUrl(cred));
+   
+  const toTryRes = await axios.get(
+        urls.collectionListUrl(cred, toTryCollId));
   const toTryIds = [];
   for(let tryEntry of toTryRes.data.Items)
        toTryIds.push(tryEntry.Id);
   for(let show of shows)
        show.InToTry = toTryIds.includes(show.Id);
+
+  const continueRes = await axios.get(
+        urls.collectionListUrl(cred, continueCollId));
+  const continueIds = [];
+  for(let tryEntry of continueRes.data.Items)
+       continueIds.push(tryEntry.Id);
+  for(let show of shows)
+       show.InContinue = continueIds.includes(show.Id);
+
+  const markRes = await axios.get(
+        urls.collectionListUrl(cred, markCollId));
+  const markIds = [];
+  for(let tryEntry of markRes.data.Items)
+       markIds.push(tryEntry.Id);
+  for(let show of shows)
+       show.InMark = markIds.includes(show.Id);
+
+  const lindaRes = await axios.get(
+        urls.collectionListUrl(cred, lindaCollId));
+  const lindaIds = [];
+  for(let tryEntry of lindaRes.data.Items)
+       lindaIds.push(tryEntry.Id);
+  for(let show of shows)
+       show.InLinda = lindaIds.includes(show.Id);
 
   const elapsed = new Date().getTime() - time1;
   console.log('all shows loaded, elapsed:', elapsed);
@@ -324,7 +354,7 @@ export async function deleteShowFromEmby(id) {
 export async function saveToTry(id, inToTry) {
   const config = {
     method: (inToTry ? 'post' : 'delete'),
-    url:     urls.toTryUrl(cred, id),
+    url:     urls.collectionUrl(cred, id, toTryCollId),
   };
   let toTryRes;
   try { toTryRes = await axios(config); }
@@ -343,7 +373,7 @@ export async function saveToTry(id, inToTry) {
 export async function saveContinue(id, inContinue) {
   const config = {
     method: (inContinue ? 'post' : 'delete'),
-    url:     urls.continueUrl(cred, id),
+    url:     urls.collectionUrl(cred, id, continueCollId),
   };
   let continueRes;
   try { continueRes = await axios(config); }
@@ -362,7 +392,7 @@ export async function saveContinue(id, inContinue) {
 export async function saveMark(id, inMark) {
   const config = {
     method: (inMark ? 'post' : 'delete'),
-    url:     urls.markUrl(cred, id),
+    url:     urls.collectionUrl(cred, id, markCollId),
   };
   let markRes;
   try { markRes = await axios(config); }
@@ -372,7 +402,7 @@ export async function saveMark(id, inMark) {
     throw e; 
   } 
   if(markRes.status !== 204) {
-    const err = 'unable to save Mark' + markRes.data;
+    const err = 'unable to save Mark ' + markRes.data;
     console.error(err);
     throw new Error(err);
   }
@@ -381,7 +411,7 @@ export async function saveMark(id, inMark) {
 export async function saveLinda(id, inLinda) {
   const config = {
     method: (inLinda ? 'post' : 'delete'),
-    url:     urls.lindaUrl(cred, id),
+    url:     urls.collectionUrl(cred, id, lindaCollId),
   };
   let lindaRes;
   try { lindaRes = await axios(config); }
@@ -400,11 +430,6 @@ export async function saveLinda(id, inLinda) {
 /////////////////////  RANDOM RESULTS  ///////////////////////
 
 /*
-
-4706186 linda
-4719143 continue
-4697672 mark
-1468316 to-try  
 
 https://dev.emby.media/doc/restapi/index.html
 https://dev.emby.media/reference/RestAPI.html

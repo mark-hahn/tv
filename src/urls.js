@@ -71,10 +71,10 @@ export function embyPageUrl(id) {
   `.replace(/\s*/g, "");
 }
 
-export function toTryListUrl(cred, ) {
+export function collectionListUrl(cred, collId) {
   return `http://hahnca.com:8096 / emby / Users / 
           ${cred.markUsrId} / Items
-    ?ParentId=1468316
+    ?ParentId=${collId}
     &ImageTypeLimit=1
     &Fields=PrimaryImageAspectRatio,ProductionYear,CanDelete
     &EnableTotalRecordCount=false
@@ -86,58 +86,10 @@ export function toTryListUrl(cred, ) {
   `.replace(/\s*/g, "");
 }
 
-export function continueListUrl(cred, ) {
-  return `http://hahnca.com:8096 / emby / Users / 
-          ${cred.markUsrId} / Items
-    ?ParentId=4719143
-    &ImageTypeLimit=1
-    &Fields=PrimaryImageAspectRatio,ProductionYear,CanDelete
-    &EnableTotalRecordCount=false
-    &X-Emby-Client=EmbyWeb
-    &X-Emby-Device-Name=Chrome
-    &X-Emby-Device-Id=f4079adb-6e48-4d54-9185-5d92d3b7176b
-    &X-Emby-Client-Version=4.6.4.0
-    &X-Emby-Token=${cred.token}
-  `.replace(/\s*/g, "");
-}
-
-export function markListUrl(cred, ) {
-  return `http://hahnca.com:8096 / emby / Users / 
-          ${cred.markUsrId} / Items
-    ?ParentId=4697672
-    &ImageTypeLimit=1
-    &Fields=PrimaryImageAspectRatio,ProductionYear,CanDelete
-    &EnableTotalRecordCount=false
-    &X-Emby-Client=EmbyWeb
-    &X-Emby-Device-Name=Chrome
-    &X-Emby-Device-Id=f4079adb-6e48-4d54-9185-5d92d3b7176b
-    &X-Emby-Client-Version=4.6.4.0
-    &X-Emby-Token=${cred.token}
-  `.replace(/\s*/g, "");
-}
-
-export function lindaListUrl(cred, ) {
-  return `http://hahnca.com:8096 / emby / Users / 
-          ${cred.markUsrId} / Items
-    ?ParentId=4706186
-    &ImageTypeLimit=1
-    &Fields=PrimaryImageAspectRatio,ProductionYear,CanDelete
-    &EnableTotalRecordCount=false
-    &X-Emby-Client=EmbyWeb
-    &X-Emby-Device-Name=Chrome
-    &X-Emby-Device-Id=f4079adb-6e48-4d54-9185-5d92d3b7176b
-    &X-Emby-Client-Version=4.6.4.0
-    &X-Emby-Token=${cred.token}
-  `.replace(/\s*/g, "");
-}
-
-console.log(lindaListUrl(testCred));
-
-// id is show id
-export function toTryUrl(cred, id) {
+export function collectionUrl(cred, showId, collId) {
   return `http://hahnca.com:8096 / emby / 
-          Collections / 1468316 / Items
-    ?Ids=${id}
+          Collections / ${collId} / Items
+    ?Ids=${showId}
     &userId=${cred.markUsrId}
     &X-Emby-Client=Emby Web
     &X-Emby-Device-Name=Chrome
@@ -147,4 +99,4 @@ export function toTryUrl(cred, id) {
   `.replace(/\s*/g, "");
 }
 
-console.log(toTryUrl(testCred, "1468316"));
+console.log(collectionUrl(testCred, "1468316"));

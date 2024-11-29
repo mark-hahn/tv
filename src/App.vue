@@ -473,8 +473,8 @@ export default {
     addSeasonsToShow(event) {
       const {showId, seasons, gap} = event.data;
       const show   = allShows.find((show) => show.Id == showId);
-      console.log(`received ${seasons.length} seasons ` +
-                  `for ${show.Name} with gap ${gap}`);
+      // if(gap) console.log(`received ${seasons.length} seasons ` +
+      //                     `for ${show.Name}, with gap ${gap}`);
       show.Seasons = seasons;
       show.Gap     = gap;
     },

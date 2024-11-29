@@ -1,6 +1,5 @@
 /*
 bugs ...
-  gap
   setLastWatched broken
 
 new features ...

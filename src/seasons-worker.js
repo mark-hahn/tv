@@ -72,15 +72,16 @@ const getGap = (seasons) => {
       const episode = season[epiIndex];
       if(!episode) continue;
 
-      const [watched, haveFile, unaired] = episode;
+      // console.log({seasonIdx, epiIndex, episode});
+
+      const {watched, haveFile, unaired} = episode;
 
       if(firstEpisodeInSeason && !watched) 
           firstEpisodeInSeasonNotWatched = true;
       if(watched) hadWatched = true;
 
-      if(DBG) console.log(1, 
-          {seasonIdx, epiIndex, watched, haveFile, unaired,
-           firstEpisodeInSeason, firstEpisodeInSeasonNotWatched});
+      // console.log({seasonIdx, epiIndex, watched, haveFile, unaired,
+      //      firstEpisodeInSeason, firstEpisodeInSeasonNotWatched});
 
       /////////// aired epi after unaired /////////
       if(hadUnaired && !unaired) {

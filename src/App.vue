@@ -471,12 +471,12 @@ export default {
     },
 
     addSeasonsToShow(event) {
-      const {showId, seasons} = event.data;
-      // console.log(`received ${seasons.length} seasons ` +
-      //             `for show ${showId}`);
+      const {showId, seasons, gap} = event.data;
       const show   = allShows.find((show) => show.Id == showId);
+      console.log(`received ${seasons.length} seasons ` +
+                  `for ${show.Name} with gap ${gap}`);
       show.Seasons = seasons;
-      // console.log(show);
+      show.Gap     = gap;
     },
   },
 

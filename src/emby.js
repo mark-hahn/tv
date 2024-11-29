@@ -41,8 +41,9 @@ export function getSeasons(allShows, cb) {
     console.error('Worker:', err.message);
     throw err;
   }
-  const allShowIds = allShows.map((show) => show.Id);
-  seasonsWorker.postMessage({cred, allShowIds});
+  const allShowsIdName = 
+          allShows.map((show) => [show.Id, show.Name]);
+  seasonsWorker.postMessage({cred, allShowsIdName});
 
   seasonsWorker.onmessage = cb;
 }

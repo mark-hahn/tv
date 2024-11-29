@@ -1,6 +1,8 @@
 import axios     from "axios"
 import * as urls from "./urls.js";
 
+const DBG = true;
+
 let cred;
 
 const getEpisodes = async (seasonId) => {
@@ -47,12 +49,9 @@ const getSeasons = async (showId) => {
   return Seasons;
 };
 
-const getGap = (_seasons) => {
-  return null;
-  
-  const dbg = (series == "");
-  if(dbg) console.log('debugging ' + series);
+let showName;
 
+const getGap = (seasons) => {
   let hadNotWatched     = false;
   let hadWatched        = false;
   let hadNoFile         = false;
@@ -62,45 +61,32 @@ const getGap = (_seasons) => {
   let lastEpiNums       = null;
   let lastEpiWatched    = false;
 
-  const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
-  for(let key in seasonsRes.data.Items) {
-    let   seasonRec = seasonsRes.data.Items[key];
-    const seasonId  = seasonRec.Id;
-    const seasonIdx = +seasonRec.IndexNumber;
-
-    const unairedObj = {};
-    const unairedRes = await axios.get(urls.childrenUrl(cred, seasonId, true));
-    for(let key in unairedRes.data.Items) {
-      const episodeRec    = unairedRes.data.Items[key];
-      const episodeNumber = +episodeRec.IndexNumber;
-      unairedObj[episodeNumber] = true;
-    }
+  for(let seasonIdx = 0; seasonIdx < seasons.length; seasonIdx++) {
+    const season = seasons[seasonIdx];
+    if(!season) continue;
 
     let firstEpisodeInSeasonNotWatched = false;
     let firstEpisodeInSeason           = true;
 
-    const episRes = await axios.get(urls.childrenUrl(cred, seasonId));
-    for(let key in episRes.data.Items) {
-      let   episodeRec = episRes.data.Items[key];
-      const epiIndex   = +episodeRec.IndexNumber;
-      const userData   = episodeRec?.UserData;
-      const watched    = !!userData?.Played;
-      const haveFile   = (episodeRec.LocationType != "Virtual");
-      const unaired    = !!unairedObj[epiIndex] && !watched && !haveFile;
+    for(let epiIndex = 1; epiIndex < season.length; epiIndex++) {
+      const episode = season[epiIndex];
+      if(!episode) continue;
+
+      const [watched, haveFile, unaired] = episode;
 
       if(firstEpisodeInSeason && !watched) 
           firstEpisodeInSeasonNotWatched = true;
       if(watched) hadWatched = true;
 
-      if(dbg) console.log(1, {seasonIdx, epiIndex, seasonRec, episodeRec,
-                              userData, watched, haveFile, unaired,
-                              firstEpisodeInSeason,firstEpisodeInSeasonNotWatched});
+      if(DBG) console.log(1, 
+          {seasonIdx, epiIndex, watched, haveFile, unaired,
+           firstEpisodeInSeason, firstEpisodeInSeasonNotWatched});
 
       /////////// aired epi after unaired /////////
       if(hadUnaired && !unaired) {
-        console.log(`-- aired after unaired -- ${series} ` + 
-                    `S${seasonIdx}E${epiIndex}`);
-        return([seasonIdx, epiIndex, 'aired after unaired']);
+        console.log(`-- aired after unaired: ${showName}, `+
+                                  `S${seasonIdx}E${epiIndex}`);
+        return [seasonIdx, epiIndex, 'aired after unaired'];
       }
       // unaired at end are ignored
       if(unaired) {
@@ -120,16 +106,17 @@ const getGap = (_seasons) => {
       ///////// not watched at beginning of season /////////
       if(firstEpisodeInSeasonNotWatched && watched && 
             !firstEpisodeInSeason) {
-        console.log(`-- not watched at beginning -- ` +
-                    `${series}, S${seasonIdx} E${epiIndex}`);
-        return([seasonIdx, epiIndex, "not watched at beginning"]);
+        console.log(`-- not watched at beginning: ` +
+                    `${showName}, S${seasonIdx}E${epiIndex}`);
+        return [seasonIdx, epiIndex, 'not watched at beginning'];
       }
 
       ///////// watched gap /////////
       if(hadWatched && !watched) hadNotWatched = true;
       else if(hadNotWatched && watched) {
-        console.log(`-- watched gap -- ${series}, S${seasonIdx} E${epiIndex}`);
-        return([seasonIdx, epiIndex, "watch gap"]);
+        console.log(`-- watched gap: ` +
+                    `${showName}, S${seasonIdx}E${epiIndex}`);
+        return [seasonIdx, epiIndex, 'watched gap'];
       }
 
       ///////// file gap /////////
@@ -139,8 +126,9 @@ const getGap = (_seasons) => {
       }
       if(hadFile && !haveFile) hadNoFile = true;
       else if(hadNoFile) {
-        console.log(`-- file gap -- ${series}, S${seasonIdx} E${epiIndex}`);
-        return([seasonIdx, epiIndex, "file gap"]);
+        console.log(`-- file gap: ${showName}, ` +
+                        `S${seasonIdx}E${epiIndex}`);
+        return [seasonIdx, epiIndex, "file gap"];
       }
       lastEpiNums = [seasonIdx, epiIndex];
     }
@@ -149,7 +137,8 @@ const getGap = (_seasons) => {
 
   ///////// recent episodes missing ///////// 
   if(missingEndFileCnt > 1) {
-    console.log(`-- ${missingEndFileCnt} end episodes missing -- ${series}`);
+    console.log(`-- ${missingEndFileCnt} end episodes missing: ` +
+                    `${showName}`);
     lastEpiNums.push(`${missingEndFileCnt} end episodes missing`);
     return lastEpiNums;
   }
@@ -157,16 +146,17 @@ const getGap = (_seasons) => {
 }
 
 self.onmessage = async (event) => {
-  cred             = event.data.cred;
-  const allShowIds = event.data.allShowIds;
+  cred                 = event.data.cred;
+  const allShowsIdName = event.data.allShowsIdName;
 
   console.log(
-      `seasons-worker started, ${allShowIds.length} shows`);
+      `seasons-worker started, ${allShowsIdName.length} shows`);
 
-  for (let i = 0; i < allShowIds.length; i++) {
-    const showId  = allShowIds[i];
+  for (let i = 0; i < allShowsIdName.length; i++) {
+    const [showId, showNameIn] = allShowsIdName[i];
+    showName = showNameIn;
     const seasons = await getSeasons(showId);
-    const gap = getGap(seasons);
+    const gap     = getGap(seasons);
     self.postMessage({showId, seasons, gap});
   }
 

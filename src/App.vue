@@ -1,6 +1,6 @@
 <template lang="pug">
 div
-  #hdr(style="width:100%; background-color:#ccc; ")
+  #hdr(style="width:60%; background-color:#ccc; margin-left:20%; padding:10px; position:fixed; top:0; z-index:1")
     div(style="margin:3px 10px; display:inline-block;width:100%")
       #lbl TV Series
       input(v-model="searchStr" @input="select"
@@ -28,7 +28,7 @@ div
             font-awesome-icon(:icon="cond.icon"
               :style="{color:condFltrColor(cond)}")
 
-  div(style="margin-top:85px; width:100%;")
+  div(style="margin-top:85px; width:60%; margin-left:20%;")
     table(style="padding:0 5px; width:100%; font-size:18px")
       tr(v-for="show in shows" key="show.Id" style="outline:thin solid;")
         td(style="width:30px; text-align:center;"
@@ -93,8 +93,6 @@ library.add([
   faBan, faBorderAll, ]);
  
 let allShows    = [];
-let dates       = null;
-let recentDates = null;
 let embyWin     = null;
 let imdbWin     = null;
 
@@ -226,7 +224,7 @@ export default {
           click(show) {},
         }, {
           color: "#f88", filter: 0, icon: ["fas", "minus"],
-          cond(show)  { return !!show.gap; },
+          cond(show)  { return !!show.Gap; },
           click(show) { dataGapClick(show); },
         }, {
           color: "lime", filter: 0, icon: ["fas", "question"],
@@ -363,7 +361,7 @@ export default {
       this.mapShow           = show;
       const seriesMapSeasons = [];
       const seriesMapEpis    = [];
-      const seriesMap        = {gap:show.gap};
+      const seriesMap        = {gap:show.Gap};
       const seriesMapIn = 
             await emby.getSeriesMap(show.Id, action == 'prune');
       for(const season of seriesMapIn) {

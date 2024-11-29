@@ -1,6 +1,7 @@
 /*
 bugs ...
   setLastWatched broken
+  gap not visible
 
 new features ...
   font sizes and families

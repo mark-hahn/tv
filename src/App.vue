@@ -9,7 +9,8 @@ div
         font-awesome-icon(icon="search")
       button(@click="showAll" style="margin-left:20px") 
         | Show All
-      #err(style="width:350px; height:23px; display:inline-block; margin-left:10px; font-size:20px;color:red;background-color:white;position:relative;top:3px;") {{errMsg}}
+      #err(style="width:350px; display:inline-block; margin-left:10px; font-size:16px;color:red;background-color:white") {{errMsg}}
+
     div(style="width:100%;")
       table(style="background-color:white; padding:0 20px; width:710px;")
         tr(style="width:100px;")
@@ -89,16 +90,15 @@ import { faCheck, faPlus, faMinus, faArrowDown, faArrowRight,
          faMars, faVenus} 
                            from "@fortawesome/free-solid-svg-icons";
 
-console.log("faArrowRight", faArrowRight);
-
 library.add([  
   faLaughBeam, faSadCry, faClock, faHeart, faCheck, faPlus, 
   faMinus, faArrowDown, faTv, faSearch, faQuestion, faCopy, 
   faBan, faBorderAll, faArrowRight, faMars, faVenus]);
  
-let allShows    = [];
-let embyWin     = null;
-let imdbWin     = null;
+let allShows = [];
+let embyWin  = null;
+let imdbWin  = null;
+let showErr  = null
 
 export default {
   name: "App",
@@ -113,7 +113,7 @@ export default {
       show.IsFavorite = !show.IsFavorite;
       emby.saveFav(show.Id, show.IsFavorite)
           .catch((err) => {
-              console.error("late saveFavorite error:", err);
+              showErr("late saveFavorite error:", err);
               show.IsFavorite = !show.IsFavorite;
            });
     };
@@ -123,7 +123,7 @@ export default {
       show.Reject = !show.Reject; 
       emby.saveReject(show.Name, show.Reject) 
           .catch((err) => {
-              console.error("late saveReject error:", err);
+              showErr("late saveReject error:", err);
               show.Reject = !show.Reject;
            });
       const id = show.Id;
@@ -148,7 +148,7 @@ export default {
       show.Pickup = !show.Pickup;
       emby.savePickup(show.Name, show.Pickup)
           .catch((err) => {
-              console.error("late savePickup error:", err);
+              showErr("late savePickup error:", err);
               show.Pickup = !show.Pickup;
             });
       if (!show.Pickup && show.Id.startsWith("noemby-")) {
@@ -173,7 +173,7 @@ export default {
       show.InToTry = !show.InToTry;
       emby.saveToTry(show.Id, show.InToTry)
           .catch((err) => {
-              console.error("late toggleToTry error:", err);
+              showErr("late toggleToTry error:", err);
               show.InToTry = !show.InToTry;
             });
     };
@@ -183,7 +183,7 @@ export default {
       show.InContinue = !show.InContinue;
       emby.saveContinue(show.Id, show.InContinue)
           .catch((err) => {
-              console.error("late toggleContinue error:", err);
+              showErr("late toggleContinue error:", err);
               show.InContinue = !show.InContinue;
             });
     };
@@ -193,7 +193,7 @@ export default {
       show.InMark = !show.InMark;
       emby.saveMark(show.Id, show.InMark)
           .catch((err) => {
-              console.error("late toggleMark error:", err);
+              showErr("late toggleMark error:", err);
               show.InMark = !show.InMark;
             });
     };
@@ -203,7 +203,7 @@ export default {
       show.InLinda = !show.InLinda;
       emby.saveLinda(show.Id, show.InLinda)
           .catch((err) => {
-              console.error("late toggleLinda error:", err);
+              showErr("late toggleLinda error:", err);
               show.InLinda = !show.InLinda;
             });
     };
@@ -301,8 +301,17 @@ export default {
   /////////////  METHODS  ////////////
   methods: {
   
-    showErr (err) {
-      console.error("showErr", err);
+    showErr (...params) {
+      let err = "";
+      for (let param of params) {
+        if (param instanceof Error)
+             err += param.message    + " -- ";
+        else if (typeof param == "object") 
+             err += JSON.stringify(param, null, 2) + " -- ";
+        else err += param.toString() + " -- ";
+      }
+      err = err.slice(0, -4)
+      console.error(err);
       this.errMsg = err;
     },
 
@@ -330,7 +339,7 @@ export default {
 
     saveVisShow(name) {
       const hash = this.nameHash(name);
-      console.log(`saving ${hash} as last visible show`);
+      // console.log(`saving ${hash} as last visible show`);
       this.highlightName = name;
       window.localStorage.setItem("lastVisShow", name);
     },
@@ -514,8 +523,7 @@ export default {
             embyWin = window.open(url, "embyWin");
           }
           else embyWin = window.open(url, "_blank");
-
-          console.log("done opening emby page", url);
+          // console.log("done opening emby page", url);
         }
       }
     },
@@ -536,27 +544,32 @@ export default {
   /////////////////  MOUNTED  /////////////////
   mounted() {
     (async () => {
-      await emby.init();
-      allShows = await emby.loadAllShows();
-      this.shows = allShows;
-      const name = window.localStorage.getItem("lastVisShow");
-      let lastVisShow;
-      if(name) lastVisShow = this.nameHash(name);
-      if (!name || !lastVisShow) {
-        const name = allShows[0].Name;
-        this.highlightName = name;
-        this.saveVisShow(name);
-      } else this.scrollSavedVisShowIntoView();
+      try {
+        await emby.init(this.showErr);
+        showErr = this.showErr;
+        allShows = await emby.loadAllShows();
+        this.shows = allShows;
+        const name = window.localStorage.getItem("lastVisShow");
+        let lastVisShow;
+        if(name) lastVisShow = this.nameHash(name);
+        if (!name || !lastVisShow) {
+          const name = allShows[0].Name;
+          this.highlightName = name;
+          this.saveVisShow(name);
+        } else this.scrollSavedVisShowIntoView();
 
-      const banCond = this.conds[this.conds.length-3];
-      banCond.filter = -1;
-      this.select();
+        const banCond = this.conds[this.conds.length-3];
+        banCond.filter = -1;
+        this.select();
 
-      emby.getSeasons(allShows, this.addSeasonsToShow);
+        emby.getSeasons(allShows, this.addSeasonsToShow);
 
-      this.sortByDate = true;
-      this.sortShows();
-      this.showAll();
+        this.sortByDate = true;
+        this.sortShows();
+        this.showAll();
+      } catch (err) {
+        showErr("Mounted:", err);
+      }
     })();
   },
 };

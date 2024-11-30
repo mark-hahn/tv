@@ -98,5 +98,3 @@ export function collectionUrl(cred, showId, collId) {
     &X-Emby-Token=${cred.token}
   `.replace(/\s*/g, "");
 }
-
-console.log(collectionUrl(testCred, "1468316"));

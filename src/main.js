@@ -1,14 +1,16 @@
 /*
 bugs ...
+  gap broken again
   setLastWatched broken
   bans not showing
   scroll into view broken
 
 new features ...
   show errors
-  separate buttons for emby, imdb, and rotten
-  add % display for gap progress
   move-to-top button
+
+  buttons for imdb (and rotten?)
+  add % display for gap progress
   move scroll bar to middle
   move error in map to top right
   change sort to 2 buttons

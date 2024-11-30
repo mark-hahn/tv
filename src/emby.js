@@ -12,8 +12,10 @@ const markUsrId = "894c752d448f45a3a1260ccaabd0adff";
 const authHdr   = `UserId="${markUsrId}", `                +
                   'Client="MyClient", Device="myDevice", ' +
                   'DeviceId="123456", Version="1.0.0"';
-let token = '';
-let cred  = null;
+
+let token       = '';
+let cred        = null;
+let showErr = null;
 
 ////////////////////////  INIT  ///////////////////////
 
@@ -30,16 +32,17 @@ const getToken = async () => {
   token = embyShows.data.AccessToken;
 }
 
-export async function init() {
+export async function init(showErrIn) {
+  showErr = showErrIn;
+  srvr.init(showErr);
   await getToken();
   cred = {markUsrId, token};
   urls.init(cred);
-  console.log({cred});
 }
 
 export function getSeasons(allShows, cb) {
   seasonsWorker.onerror = (err) => {
-    console.error('Worker:', err.message);
+    showErr('Worker:', err.message);
     throw err;
   }
   const allShowsIdName = 
@@ -154,7 +157,7 @@ const deleteOneFile = async (path) => {
     await srvr.deletePath(encodedPath);
   }
   catch (e) {
-    console.error('deletePath:', path, e);
+    showErr('deletePath:', path, e);
     throw e;
   }
 }
@@ -187,7 +190,7 @@ export const editEpisode = async (seriesId,
         const path = episodeRec?.MediaSources?.[0]?.Path;
         try { await srvr.deletePath(path); }
         catch(e) { 
-          console.error('deleteOneFile:', path, e);
+          showErr('deleteOneFile:', path, e);
           throw e;
          }
       }
@@ -280,7 +283,7 @@ export const getSeriesMap = async (seriesId, prune = false) => {
       let deleted = false;
 
       if(avail && !path) {
-        console.error('avail without path', 
+        showErr('avail without path', 
                     `S${seasonNumber}E${episodeNumber}`);
         continue;
       }
@@ -312,7 +315,7 @@ export async function addReject(name) {
   if(name == "") return false;
   try { await srvr.addReject(name); }
   catch (e) {
-    console.error('unable to add reject to server' + e);
+    showErr('unable to add reject to server' + e);
     throw e;
   }
   return true;
@@ -327,14 +330,14 @@ export async function savePickup(name, pickup) {
   if(pickup) {
     try { await srvr.addPickup(name); }
     catch (e) {
-      console.error('unable to add pickup from server' + e);
+      showErr('unable to add pickup from server' + e);
       throw e;
     }
   }
   else {
     try { await srvr.delPickup(name); }
     catch (e) { 
-      console.error('unable to delete pickup to server' + e);
+      showErr('unable to delete pickup to server' + e);
       throw e;
     }
   }
@@ -345,7 +348,7 @@ export async function deleteShowFromEmby(id) {
   const res = delRes.status;
   if(res != 204) {
     const err = 'unable to delete show' + delRes.data;
-    console.error(err);
+    showErr(err);
     throw new Error(err);
   }
   return 'ok';
@@ -359,13 +362,13 @@ export async function saveToTry(id, inToTry) {
   let toTryRes;
   try { toTryRes = await axios(config); }
   catch (e) {  
-    console.error(
+    showErr(
         `saveToTry, id:${id}, inToTry:${inToTry}`);
     throw e; 
   } 
   if(toTryRes.status !== 204) {
     const err = 'unable to save totry' + toTryRes.data;
-    console.error(err);
+    showErr(err);
     throw new Error(err);
   }
 }
@@ -378,13 +381,13 @@ export async function saveContinue(id, inContinue) {
   let continueRes;
   try { continueRes = await axios(config); }
   catch (e) {  
-    console.error(
+    showErr(
         `saveContinue, id:${id}, inContinue:${inContinue}`);
     throw e; 
   } 
   if(continueRes.status !== 204) {
     const err = 'unable to save Continue' + continueRes.data;
-    console.error(err);
+    showErr(err);
     throw new Error(err);
   }
 }
@@ -397,13 +400,13 @@ export async function saveMark(id, inMark) {
   let markRes;
   try { markRes = await axios(config); }
   catch (e) {  
-    console.error(
+    showErr(
         `saveMark, id:${id}, inMark:${inMark}`);
     throw e; 
   } 
   if(markRes.status !== 204) {
     const err = 'unable to save Mark ' + markRes.data;
-    console.error(err);
+    showErr(err);
     throw new Error(err);
   }
 }
@@ -416,13 +419,13 @@ export async function saveLinda(id, inLinda) {
   let lindaRes;
   try { lindaRes = await axios(config); }
   catch (e) {  
-    console.error(
+    showErr(
         `saveLinda, id:${id}, inLinda:${inLinda}`);
     throw e; 
   } 
   if(lindaRes.status !== 204) {
     const err = 'unable to save Linda' + lindaRes.data;
-    console.error(err);
+    showErr(err);
     throw new Error(err);
   }
 }

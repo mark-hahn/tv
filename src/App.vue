@@ -9,7 +9,7 @@ div
         font-awesome-icon(icon="search")
       button(@click="showAll" style="margin-left:20px") 
         | Show All
-      #err(style="width:350px; height:23px; display:inline-block; margin-left:10px; font-size:20px;color:red;background-color:white;position:relative;top:3px;")  
+      #err(style="width:350px; height:23px; display:inline-block; margin-left:10px; font-size:20px;color:red;background-color:white;position:relative;top:3px;") {{errMsg}}
     div(style="width:100%;")
       table(style="background-color:white; padding:0 20px; width:710px;")
         tr(style="width:100px;")
@@ -243,6 +243,7 @@ export default {
       shows:            [],
       searchStr:        "",
       pkupEditName:     "",
+      errMsg:           "",
       sortByDate:     true,
       sortBySize:    false,
       highlightName:    "",
@@ -299,6 +300,11 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
+  
+    showErr (err) {
+      console.error("showErr", err);
+      this.errMsg = err;
+    },
 
     formatSize (show) {
       const size = show.Size;

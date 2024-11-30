@@ -1,12 +1,10 @@
 /*
 bugs ...
-  gap broken again
   setLastWatched broken
   bans not showing
   scroll into view broken
 
 new features ...
-  show errors
   move-to-top button
 
   buttons for imdb (and rotten?)

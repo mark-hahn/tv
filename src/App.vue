@@ -9,7 +9,7 @@ div
         font-awesome-icon(icon="search")
       button(@click="showAll" style="margin-left:20px") 
         | Show All
-      #err(style="width:350px; display:inline-block; margin-left:10px; font-size:16px;color:red;background-color:white") {{errMsg}}
+      #err(@click="errClick" style="width:350px; display:inline-block; margin-left:10px; font-size:16px;color:red;background-color:white;cursor:default;") {{errMsg}}
 
     div(style="width:100%;")
       table(style="background-color:white; padding:0 20px; width:710px;")
@@ -95,10 +95,11 @@ library.add([
   faMinus, faArrowDown, faTv, faSearch, faQuestion, faCopy, 
   faBan, faBorderAll, faArrowRight, faMars, faVenus]);
  
-let allShows = [];
-let embyWin  = null;
-let imdbWin  = null;
-let showErr  = null
+let allShows  = [];
+let embyWin   = null;
+let imdbWin   = null;
+let showErr   = null;
+const errFifo = [];
 
 export default {
   name: "App",
@@ -312,7 +313,20 @@ export default {
       }
       err = err.slice(0, -4)
       console.error(err);
-      this.errMsg = err;
+      if(this.errMsg) 
+        errFifo.push(err);
+      else this.errMsg = err;
+    },
+
+    errClick (evt) {
+      if(evt.ctrlKey) {
+        errFifo.length = 0;
+        this.errMsg = "";
+      }
+      else if (errFifo.length) 
+        this.errMsg = errFifo.shift();
+      else
+        this.errMsg = "";
     },
 
     formatSize (show) {

@@ -1,7 +1,7 @@
 <template lang="pug">
 div
-  #hdr(style="width:667px; background-color:#ccc; margin-left:11%; padding:10px; position:fixed; top:0; z-index:1")
-    div(style="margin:3px 10px; display:inline-block;width:100%")
+  #hdr(style="width:700px; background-color:#ccc; margin-left:11%;  position:fixed; top:0; z-index:1")
+    div(style="display:inline-block;width:100%;")
       #lbl TV Series
       input(v-model="searchStr" @input="select"
             style="border:1px solid black; width:100px;")
@@ -9,10 +9,10 @@ div
         font-awesome-icon(icon="search")
       button(@click="showAll" style="margin-left:20px") 
         | Show All
-
+      #err(style="width:350px; height:23px; display:inline-block; margin-left:10px; font-size:20px;color:red;background-color:white;position:relative;top:3px;")  
     div(style="width:100%;")
-      table(style="background-color:white; padding:0 20px; width:700px;")
-        tr(style="width:260px;")
+      table(style="background-color:white; padding:0 20px; width:710px;")
+        tr(style="width:100px;")
           td(style="width:60px;font-size:large;") 
             | {{shows.length + '/' + allShowsLength}}
           td(style="width:100px;")
@@ -28,7 +28,7 @@ div
             font-awesome-icon(:icon="cond.icon"
               :style="{color:condFltrColor(cond)}")
 
-  div(style="margin-top:85px; width:700px; margin-left:10%;")
+  div(style="margin-top:65px; width:700px; margin-left:10%;")
     table(style="padding:0 5px; width:100%; font-size:18px")
       tr(v-for="show in shows" key="show.Id" style="outline:thin solid;")
         td(style="width:30px; text-align:center;"

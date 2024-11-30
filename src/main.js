@@ -5,6 +5,8 @@ bugs ...
   scroll into view broken
 
 new features ...
+  show errors
+  separate buttons for emby, imdb, and rotten
   add % display for gap progress
   move-to-top button
   move scroll bar to middle

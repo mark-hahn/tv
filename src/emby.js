@@ -59,8 +59,6 @@ const continueCollId = '4719143';
 const markCollId     = '4697672';
 const lindaCollId    = '4706186';
 
-const pathToName = {};
-
 export async function loadAllShows() {
   console.log('entering loadAllShows');
   const time1 = new Date().getTime();
@@ -103,7 +101,8 @@ export async function loadAllShows() {
 
   for(let rejectName of rejects) {
     const show = shows.find((show) => show.Name == rejectName);
-    if(show) show.Reject = true;
+    if(show) 
+      show.Reject = true;
   }
 
   for(let pickupName of pickups) {
@@ -221,7 +220,7 @@ export const setLastWatched = async (seriesId) => {
   const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
 seasonLoop: 
   for(let key in seasonsRes.data.Items) {
-    let   seasonRec    =  seasonsRes.data.Items[key];
+    let seasonRec      =  seasonsRes.data.Items[key];
     seasonNumber       = +seasonRec.IndexNumber;
     const seasonId     = +seasonRec.Id;
     const episodesRes  = await axios.get(urls.childrenUrl(cred, seasonId));

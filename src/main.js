@@ -1,8 +1,5 @@
 /*
 bugs ...
-  setLastWatched broken
-  bans not showing
-  scroll into view broken
 
 new features ...
   move-to-top button

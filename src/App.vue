@@ -2,14 +2,15 @@
 div
   #hdr(style="width:700px; background-color:#ccc; margin-left:11%;  position:fixed; top:0; z-index:1")
     div(style="display:inline-block;width:100%;")
-      #lbl TV Series
+      button(@click="showAll" style="margin-left:5px;margin-right:5px;") 
+        | All
       input(v-model="searchStr" @input="select"
             style="border:1px solid black; width:100px;")
       button(@click="select")
         font-awesome-icon(icon="search")
-      button(@click="showAll" style="margin-left:20px") 
-        | Show All
-      #err(@click="errClick" style="width:350px; display:inline-block; margin-left:10px; font-size:16px;color:red;background-color:white;cursor:default;") {{errMsg}}
+      button(@click="topClick" style="margin-left:5px;margin-right:5px;") 
+        | Top
+      #err(@click="errClick" style="width:450px; display:inline-block; margin-left:10px; font-size:16px;color:red;background-color:white;cursor:default;") {{errMsg}}
 
     div(style="width:100%;")
       table(style="background-color:white; padding:0 20px; width:710px;")
@@ -124,11 +125,12 @@ export default {
       show.Reject = !show.Reject; 
       emby.saveReject(show.Name, show.Reject) 
           .catch((err) => {
-              showErr("late saveReject error:", err);
+              showErr("late saveReject:", err);
               show.Reject = !show.Reject;
            });
       const id = show.Id;
-      if (!show.Reject && show.Id.startsWith("noemby-")) {
+      if (!show.Reject && !show.Pickup && 
+              show.Id.startsWith("noemby-")) {
         console.log("turned off reject, removing row");
         for(let i = 0; i < allShows.length; i++) {
           if(allShows[i].Id == id) {
@@ -327,6 +329,13 @@ export default {
         this.errMsg = errFifo.shift();
       else
         this.errMsg = "";
+    },
+    
+    topClick () {
+      window.scrollTo(0,0)
+      const name = allShows[0].Name;
+      this.highlightName = name;
+      this.saveVisShow(name);
     },
 
     formatSize (show) {

@@ -113,6 +113,13 @@ handleMsg = (msg) => {
 export function getAllShows()      
             {return fCall('getAllShows')}
 
+export function getWaiting()        
+            {return fCall('getWaiting')}
+export function addWaiting(name)        
+            {return fCall('addWaiting', name, 'wait')}
+export function delWaiting(name)  
+            {return fCall('delWaiting', name, 'wait')}
+
 export function getRejects()       
             {return fCall('getRejects')}
 export function addReject(name)    

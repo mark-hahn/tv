@@ -52,7 +52,7 @@ export function getSeasons(allShows, cb) {
   seasonsWorker.onmessage = cb;
 }
  
-////////////////////////  MAIN FUNCTIONS  ///////////////////////
+////////////////  MAIN FUNCTIONS  /////////////////
 
 const toTryCollId    = '1468316';
 const continueCollId = '4719143';
@@ -66,11 +66,12 @@ export async function loadAllShows() {
   const listPromise   = axios.get(
                         urls.showListUrl(cred, 0, 10000));
   const seriesPromise = srvr.getAllShows(); 
+  const waitPromise   = srvr.getWaiting();
   const rejPromise    = srvr.getRejects();
   const pkupPromise   = srvr.getPickups();
-  const [embyShows, srvrShows, rejects, pickups] = 
-    await Promise.all(
-      [listPromise, seriesPromise, rejPromise, pkupPromise]);
+  const [embyShows, srvrShows, waitingShows, rejects, pickups] = 
+    await Promise.all([listPromise, seriesPromise, 
+                       rejPromise, waitPromise, pkupPromise]);
 
   const shows = [];
 
@@ -83,14 +84,7 @@ export async function loadAllShows() {
 
     const embyPath     = show.Path.split('/').pop();
     const showDateSize = srvrShows[embyPath];
-    if(!showDateSize) {
-      continue
-      // console.log('emby show not in srvr:',   
-      //               {Name:show.Name, Path:show.Path});
-      // show.NoSrvr  = true;
-      // show.Date = 0;
-      // show.Size = 0;
-    }
+    if(!showDateSize) continue
     else {
       const [date, Size] = showDateSize;
       show.Date = date;
@@ -101,8 +95,12 @@ export async function loadAllShows() {
 
   for(let rejectName of rejects) {
     const show = shows.find((show) => show.Name == rejectName);
-    if(show) 
-      show.Reject = true;
+    if(show) show.Reject = true;
+  }
+
+  for(let waitingName of waitingShows) {
+    const show = shows.find((show) => show.Waiting == waitingName);
+    if(show) show.Waiting = true;
   }
 
   for(let pickupName of pickups) {
@@ -323,6 +321,11 @@ export async function addReject(name) {
 export async function saveReject(name, reject) {
   if(reject) await srvr.addReject(name);
   else       await srvr.delReject(name);
+}
+
+export async function saveWaiting(name, wait) {
+  if(wait) await srvr.addWaiting(name);
+  else     await srvr.delWaiting(name);
 }
 
 export async function savePickup(name, pickup) {

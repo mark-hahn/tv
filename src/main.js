@@ -2,8 +2,7 @@
 bugs ...
 
 new features ...
-  move-to-top button
-
+  watching
   buttons for imdb (and rotten?)
   add % display for gap progress
   move scroll bar to middle

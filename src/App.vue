@@ -88,14 +88,14 @@ import { faLaughBeam, faSadCry, faClock, faHeart, }
                            from "@fortawesome/free-regular-svg-icons"; 
 import { faCheck, faPlus, faMinus, faArrowDown, faArrowRight,
          faTv, faSearch, faQuestion, faCopy, faBorderAll, faBan,
-         faMars, faVenus} 
+         faMars, faVenus, faEye} 
                            from "@fortawesome/free-solid-svg-icons";
 
 library.add([  
   faLaughBeam, faSadCry, faClock, faHeart, faCheck, faPlus, 
   faMinus, faArrowDown, faTv, faSearch, faQuestion, faCopy, 
-  faBan, faBorderAll, faArrowRight, faMars, faVenus]);
- 
+  faBan, faBorderAll, faArrowRight, faMars, faVenus, faEye]);
+
 let allShows  = [];
 let embyWin   = null;
 let imdbWin   = null;
@@ -108,6 +108,16 @@ export default {
   data() {
     const dataGapClick = async (show) => {
       this.gapClick(show);
+    };
+
+    const toggleWaiting = async (show) => {
+      this.saveVisShow(show.Name);
+      show.Waiting = !show.Waiting;
+      emby.saveWaiting(show.Name, show.Waiting)
+          .catch((err) => {
+              showErr("late saveFavorite error:", err);
+              show.Waiting = !show.Waiting;
+           });
     };
 
     const toggleFavorite = async (show) => {
@@ -264,6 +274,10 @@ export default {
           color: "#f88", filter: 0, icon: ["fas", "minus"],
           cond(show)  { return !!show.Gap; },
           click(show) { dataGapClick(show); },
+        }, {
+          color: "#lime", filter: 0, icon: ["fas", "eye"],
+          cond(show)  { return !!show.Waiting; },
+          click(show) { toggleWaiting(show); },
         }, {
           color: "lime", filter: 0, icon: ["fas", "question"],
           cond(show)  { return show.InToTry; },

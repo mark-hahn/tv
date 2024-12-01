@@ -13,8 +13,8 @@ const authHdr   = `UserId="${markUsrId}", `                +
                   'Client="MyClient", Device="myDevice", ' +
                   'DeviceId="123456", Version="1.0.0"';
 
-let token       = '';
-let cred        = null;
+let token   = '';
+let cred    = null;
 let showErr = null;
 
 ////////////////////////  INIT  ///////////////////////

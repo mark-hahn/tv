@@ -14,6 +14,7 @@ div
 
     div(style="width:100%;")
       table(style="background-color:white; padding:0 20px; width:710px;")
+       tbody
         tr(style="width:100px;")
           td(style="width:60px;font-size:large;") 
             | {{shows.length + '/' + allShowsLength}}
@@ -32,6 +33,7 @@ div
 
   div(style="margin-top:65px; width:700px; margin-left:10%;")
     table(style="padding:0 5px; width:100%; font-size:18px")
+     tbody 
       tr(v-for="show in shows" key="show.Id" style="outline:thin solid;")
         td(style="width:30px; text-align:center;"
              @click="copyNameToClipboard(show)")
@@ -62,6 +64,7 @@ div
       | {{'&nbsp;&nbsp;&nbsp;'+mapShow.Name}}
       div(v-if="seriesMap?.gap" style="color:red;") &nbsp; -- &nbsp; {{seriesMap?.gap?.[2]}} &nbsp; -- 
     table(style="padding:0 5px; width:100%; font-size:16px" )
+     tbody
       tr(style="font-weight:bold;")
         td
         td(v-for="episode in seriesMapEpis" style="width:30px; text-align:center;"
@@ -88,13 +91,13 @@ import { faLaughBeam, faSadCry, faClock, faHeart, }
                            from "@fortawesome/free-regular-svg-icons"; 
 import { faCheck, faPlus, faMinus, faArrowDown, faArrowRight,
          faTv, faSearch, faQuestion, faCopy, faBorderAll, faBan,
-         faMars, faVenus, faEye} 
+         faMars, faVenus, faCalendar} 
                            from "@fortawesome/free-solid-svg-icons";
 
 library.add([  
   faLaughBeam, faSadCry, faClock, faHeart, faCheck, faPlus, 
   faMinus, faArrowDown, faTv, faSearch, faQuestion, faCopy, 
-  faBan, faBorderAll, faArrowRight, faMars, faVenus, faEye]);
+  faBan, faBorderAll, faArrowRight, faMars, faVenus, faCalendar]);
 
 let allShows  = [];
 let embyWin   = null;
@@ -275,7 +278,7 @@ export default {
           cond(show)  { return !!show.Gap; },
           click(show) { dataGapClick(show); },
         }, {
-          color: "#lime", filter: 0, icon: ["fas", "eye"],
+          color: "#lime", filter: 0, icon: ["fas", "calendar"],
           cond(show)  { return !!show.Waiting; },
           click(show) { toggleWaiting(show); },
         }, {
@@ -513,7 +516,8 @@ export default {
 
     // filter shows based on search string and conditions
     select() {
-      const srchStrLc = this.searchStr == "" ? null : this.searchStr.toLowerCase();
+      const srchStrLc = this.searchStr == 
+            "" ? null : this.searchStr.toLowerCase();
       this.shows = allShows.filter((show) => {
         if (srchStrLc && !show.Name.toLowerCase().includes(srchStrLc)) 
               return false;
@@ -570,11 +574,11 @@ export default {
       let show = allShows.find((show) => show.Id == showId);
       show.Seasons = seasons;
       show.Gap     = gap;
-      show = this.shows.find((show) => show.Id == showId);
-      if(show) {
-        show.Seasons = seasons;
-        show.Gap     = gap;
-      }
+      // show = this.shows.find((show) => show.Id == showId);
+      // if(show) {
+      //   show.Seasons = seasons;
+      //   show.Gap     = gap;
+      // }
     },
   },
 

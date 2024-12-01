@@ -13,8 +13,8 @@ const dontupload  = false;
 const ws = new WebSocketServer({ port: 8736 });
 console.log('ws listening on port 8736');
 
-// const tvDir = '/mnt/media/tv';
-const tvDir = '/mnt/c/Users/mark/apps/tv-series-srvr/media/tv';
+const tvDir = '/mnt/media/tv';
+// const tvDir = '/mnt/c/Users/mark/apps/tv-series-srvr/media/tv';
 
 const exec  = util.promisify(cp.exec);
 const dat   = () => {
@@ -22,14 +22,16 @@ const dat   = () => {
   return moment().format('MM/DD HH:mm:ss:');
 }
 
-const headerStr = fs.readFileSync('config/config1-header.txt',   'utf8');
-const rejectStr = fs.readFileSync('config/config2-rejects.json', 'utf8');
-const middleStr = fs.readFileSync('config/config3-middle.txt',   'utf8');
-const pickupStr = fs.readFileSync('config/config4-pickups.json', 'utf8');
-const footerStr = fs.readFileSync('config/config5-footer.txt',   'utf8');
+const headerStr  = fs.readFileSync('config/config1-header.txt',   'utf8');
+const rejectStr  = fs.readFileSync('config/config2-rejects.json', 'utf8');
+const middleStr  = fs.readFileSync('config/config3-middle.txt',   'utf8');
+const pickupStr  = fs.readFileSync('config/config4-pickups.json', 'utf8');
+const footerStr  = fs.readFileSync('config/config5-footer.txt',   'utf8');
+const waitingStr = fs.readFileSync('config/waiting.json',         'utf8');
 
-const rejects = JSON.parse(rejectStr);
-const pickups = JSON.parse(pickupStr);
+const waitings = JSON.parse(waitingStr);
+const rejects  = JSON.parse(rejectStr);
+const pickups  = JSON.parse(pickupStr);
 
 const videoFileExtensions = [
   "mp4", "mkv", "avi", "mov", "wmv", "flv", "mpeg",
@@ -194,9 +196,47 @@ const saveConfigYml = async (idIn, resultIn, resolveIn, rejectIn) => {
     case 'busy': 
       setTimeout(() => saveConfigYml(id, result, resolve, reject), 1000); 
       break;
-    case 'ok':  resolve([id, result]);       break;
+    case 'ok':  resolve([id, result]); break;
     case 'err': reject( [id, tryRes]); break;
   }
+}
+
+const getWaiting = (id, _param, resolve) => {
+  resolve([id, waitings]);
+};
+
+const addWaiting = (id, name, resolve, _reject) => {
+  console.log(dat(), 'addWaiting', id, name);
+  for(const [idx, waitingNameStr] of waitings.entries()) {
+    if(waitingNameStr.toLowerCase() === name.toLowerCase()) {
+      console.log(dat(), 
+          '-- removing old matching waiting:', waitingNameStr);
+      waitings.splice(idx, 1);
+    }
+  }
+  console.log(dat(), '-- adding waiting:', name);
+  waitings.push(name);
+  fs.writeFileSync('config/waiting.json', JSON.stringify(waitings));
+  resolve([id, 'ok']);
+}
+
+const delWaiting = (id, name, resolve, reject) => {
+  console.log(dat(), 'delWaiting', id, name);
+  let deletedOne = false;
+  for(const [idx, waitingNameStr] of waitings.entries()) {
+    if(waitingNameStr.toLowerCase() === name.toLowerCase()) {
+      console.log(dat(), '-- deleting waiting:', waitingNameStr);
+      waitings.splice(idx, 1);
+      deletedOne = true;
+    }
+  }
+  if(!deletedOne) {
+    console.log(dat(), '-- waiting not deleted -- no match:', name);
+    reject([id, {"delWaiting":"not found"}]);
+    return
+  }
+  fs.writeFileSync('config/waiting.json', JSON.stringify(waitings));
+  resolve([id, 'ok']);
 }
 
 const getRejects = (id, _param, resolve, _reject) => {
@@ -326,7 +366,11 @@ ws.on('connection', (socket) => {
 
     // call function fname
     switch (fname) {
-      case 'getAllShows': getAllShows(id, '',  resolve, reject); break;
+      case 'getAllShows': getAllShows(id, '',   resolve, reject); break;
+
+      case 'getWaiting':  getWaiting(id, '',    resolve, reject); break;
+      case 'addWaiting':  addWaiting(id, param, resolve, reject); break;
+      case 'delWaiting':  delWaiting(id, param, resolve, reject); break;
 
       case 'getRejects':  getRejects(id, '',    resolve, reject); break;
       case 'addReject':   addReject( id, param, resolve, reject); break;
@@ -336,7 +380,7 @@ ws.on('connection', (socket) => {
       case 'addPickup':   addPickup( id, param, resolve, reject); break;
       case 'delPickup':   delPickup( id, param, resolve, reject); break;
       
-      case 'deletePath':   deletePath(  id, param, resolve, reject); break;
+      case 'deletePath':   deletePath(id, param, resolve, reject); break;
 
       default: reject([id, {unknownfunction: fname}]);
     };

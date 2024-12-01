@@ -318,7 +318,7 @@ export default {
   /////////////  METHODS  ////////////
   methods: {
   
-    showErr (...params) {
+   showErr (...params) {
       let err = "";
       for (let param of params) {
         if (param instanceof Error)

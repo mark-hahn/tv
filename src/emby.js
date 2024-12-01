@@ -71,7 +71,7 @@ export async function loadAllShows() {
   const pkupPromise   = srvr.getPickups();
   const [embyShows, srvrShows, waitingShows, rejects, pickups] = 
     await Promise.all([listPromise, seriesPromise, 
-                       rejPromise, waitPromise, pkupPromise]);
+                       waitPromise, rejPromise, pkupPromise]);
 
   const shows = [];
 
@@ -99,7 +99,7 @@ export async function loadAllShows() {
   }
 
   for(let waitingName of waitingShows) {
-    const show = shows.find((show) => show.Waiting == waitingName);
+    const show = shows.find((show) => show.Name == waitingName);
     if(show) show.Waiting = true;
   }
 

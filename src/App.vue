@@ -14,7 +14,6 @@ div
 
     div(style="width:100%;")
       table(style="background-color:white; padding:0 20px; width:710px;")
-       tbody
         tr(style="width:100px;")
           td(style="width:60px;font-size:large;") 
             | {{shows.length + '/' + allShowsLength}}
@@ -33,7 +32,6 @@ div
 
   div(style="margin-top:65px; width:700px; margin-left:10%;")
     table(style="padding:0 5px; width:100%; font-size:18px")
-     tbody 
       tr(v-for="show in shows" key="show.Id" style="outline:thin solid;")
         td(style="width:30px; text-align:center;"
              @click="copyNameToClipboard(show)")
@@ -64,7 +62,6 @@ div
       | {{'&nbsp;&nbsp;&nbsp;'+mapShow.Name}}
       div(v-if="seriesMap?.gap" style="color:red;") &nbsp; -- &nbsp; {{seriesMap?.gap?.[2]}} &nbsp; -- 
     table(style="padding:0 5px; width:100%; font-size:16px" )
-     tbody
       tr(style="font-weight:bold;")
         td
         td(v-for="episode in seriesMapEpis" style="width:30px; text-align:center;"

@@ -270,10 +270,10 @@ export default {
           cond(show)  { return !!show.Gap; },
           click() {},
         }, {
-          color: "#lime", filter: 0, icon: ["fas", "calendar"],
-          cond(show)  { return show.Waiting; },
-          click(show) { toggleWaiting(show); },
-        }, {
+        //   color: "#lime", filter: 0, icon: ["fas", "calendar"],
+        //   cond(show)  { return show.Waiting; },
+        //   click(show) { toggleWaiting(show); },
+        // }, {
           color: "lime", filter: 0, icon: ["fas", "question"],
           cond(show)  { return show.InToTry; },
           click(show) { toggleToTry(show); },
@@ -599,7 +599,7 @@ export default {
         banCond.filter = -1;
         this.select();
 
-        emby.getSeasons(allShows, this.addSeasonsToShow);
+        // emby.getSeasons(allShows, this.addSeasonsToShow);
 
         this.sortByDate = true;
         this.sortShows();

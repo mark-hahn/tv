@@ -1,5 +1,6 @@
 /*
 bugs ...
+gap dashes don't show until this.shows reloads
 
 new features ...
   watching

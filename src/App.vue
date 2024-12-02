@@ -115,7 +115,7 @@ export default {
       show.Waiting = !show.Waiting;
       emby.saveWaiting(show.Name, show.Waiting)
           .catch((err) => {
-              showErr("late saveFavorite error:", err);
+              showErr("late saveWaiting error:", err);
               show.Waiting = !show.Waiting;
            });
     };
@@ -276,7 +276,7 @@ export default {
           click(show) { dataGapClick(show); },
         }, {
           color: "#lime", filter: 0, icon: ["fas", "calendar"],
-          cond(show)  { return !!show.Waiting; },
+          cond(show)  { return show.Waiting; },
           click(show) { toggleWaiting(show); },
         }, {
           color: "lime", filter: 0, icon: ["fas", "question"],
@@ -362,7 +362,7 @@ export default {
     nameHash(name) {
       this.allShowsLength = allShows.length;
       if(!name) {
-        console.log('nameHash name param null', {name});
+        showErr('nameHash name param null:', name);
         console.trace();
       }
       return (
@@ -375,8 +375,6 @@ export default {
     },
 
     saveVisShow(name) {
-      const hash = this.nameHash(name);
-      // console.log(`saving ${hash} as last visible show`);
       this.highlightName = name;
       window.localStorage.setItem("lastVisShow", name);
     },
@@ -507,7 +505,12 @@ export default {
     },
 
     condColor(show, cond) {
-      if (cond.cond(show)) return cond.color;
+      if (cond.cond(show)) {
+        const color = cond.color;
+        if(show.Name == 'Workaholics' && cond.icon[1] == 'calendar')      
+          console.log('', color);
+        return color;
+      }
       return "#ddd";
     },
 
@@ -568,14 +571,16 @@ export default {
 
     addSeasonsToShow(event) {
       const {showId, seasons, gap} = event.data;
-      let show = allShows.find((show) => show.Id == showId);
-      show.Seasons = seasons;
-      show.Gap     = gap;
-      // show = this.shows.find((show) => show.Id == showId);
-      // if(show) {
-      //   show.Seasons = seasons;
-      //   show.Gap     = gap;
-      // }
+      const allShow = allShows.find((show) => show.Id == showId);
+      allShow.Seasons = seasons;
+      allShow.Gap     = gap;
+      const thisShow = this.shows.find((show) => show.Id == showId); 
+      // this.shows.find returns proxy, so different objects
+      if(thisShow) {
+        thisShow.Seasons = seasons;
+        thisShow.Gap     = gap;
+      }
+      this.shows = allShows;
     },
   },
 

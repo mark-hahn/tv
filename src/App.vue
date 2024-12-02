@@ -106,10 +106,6 @@ export default {
   name: "App",
   components: { FontAwesomeIcon },
   data() {
-    const dataGapClick = async (show) => {
-      this.gapClick(show);
-    };
-
     const toggleWaiting = async (show) => {
       this.saveVisShow(show.Name);
       show.Waiting = !show.Waiting;
@@ -255,7 +251,6 @@ export default {
     return {
       shows:            [],
       searchStr:        "",
-      pkupEditName:     "",
       errMsg:           "",
       sortByDate:     true,
       sortBySize:    false,
@@ -269,11 +264,11 @@ export default {
       conds: [ {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],
           cond(show)  { return show.UnplayedItemCount > 0; },
-          click(show) {},
+          click() {},
         }, {
           color: "#f88", filter: 0, icon: ["fas", "minus"],
           cond(show)  { return !!show.Gap; },
-          click(show) { dataGapClick(show); },
+          click() {},
         }, {
           color: "#lime", filter: 0, icon: ["fas", "calendar"],
           cond(show)  { return show.Waiting; },
@@ -514,7 +509,6 @@ export default {
       return "#ddd";
     },
 
-    // filter shows based on search string and conditions
     select() {
       const srchStrLc = this.searchStr == 
             "" ? null : this.searchStr.toLowerCase();

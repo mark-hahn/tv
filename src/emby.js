@@ -142,6 +142,7 @@ export async function loadAllShows() {
 
   const elapsed = new Date().getTime() - time1;
   console.log('all shows loaded, elapsed:', elapsed);
+
   return shows;
 }
 

@@ -136,4 +136,3 @@ export function delPickup(name)
 
 export function deletePath(path)   
             {return fCall('deletePath', path)}
-

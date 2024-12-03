@@ -270,10 +270,10 @@ export default {
           cond(show)  { return !!show.Gap; },
           click() {},
         }, {
-          color: "#lime", filter: 0, icon: ["fas", "calendar"],
-          cond(show)  { return show.Waiting; },
-          click(show) { toggleWaiting(show); },
-        }, {
+          // color: "#lime", filter: 0, icon: ["fas", "calendar"],
+          // cond(show)  { return show.Waiting; },
+          // click(show) { toggleWaiting(show); },
+        // }, {
           color: "lime", filter: 0, icon: ["fas", "question"],
           cond(show)  { return show.InToTry; },
           click(show) { toggleToTry(show); },
@@ -579,7 +579,6 @@ export default {
         thisShow.Seasons = seasons;
         thisShow.Gap     = gap;
       }
-      // this.shows = allShows;
     },
   },
 
@@ -599,10 +598,6 @@ export default {
           this.highlightName = name;
           this.saveVisShow(name);
         } else this.scrollSavedVisShowIntoView();
-
-        const banCond = this.conds[this.conds.length-3];
-        banCond.filter = -1;
-        this.select();
 
         emby.getSeasons(allShows, this.addSeasonsToShow);
 

@@ -41,7 +41,7 @@ div
                  @click="seriesMapAction('open', show)")
             font-awesome-icon(icon="border-all" style="color:#ccc")
         td(v-if="sortByDate" style="width:80px;font-size:16px;") 
-          | {{ show.Date.substring(0,10) }}
+          | {{ show.DateCreated.substring(0,10) }}
         td(v-if="sortBySize" style="margin-right:200px;width:60px;font-size:16px;text-align:right") 
           | {{ formatSize(show) + '&nbsp;&nbsp;&nbsp;' }}
         td(@click="showInExternal(show, $event)"
@@ -270,10 +270,10 @@ export default {
           cond(show)  { return !!show.Gap; },
           click() {},
         }, {
-        //   color: "#lime", filter: 0, icon: ["fas", "calendar"],
-        //   cond(show)  { return show.Waiting; },
-        //   click(show) { toggleWaiting(show); },
-        // }, {
+          color: "#lime", filter: 0, icon: ["fas", "calendar"],
+          cond(show)  { return show.Waiting; },
+          click(show) { toggleWaiting(show); },
+        }, {
           color: "lime", filter: 0, icon: ["fas", "question"],
           cond(show)  { return show.InToTry; },
           click(show) { toggleToTry(show); },
@@ -312,8 +312,13 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
-  
-   showErr (...params) {
+
+    waitstr(show) {
+      if(show.Waiting) return show.WaitStr;
+      return '';
+    },
+
+    showErr (...params) {
       let err = "";
       for (let param of params) {
         if (param instanceof Error)
@@ -494,7 +499,7 @@ export default {
 
     sortShows() {
       allShows.sort((a, b) => {
-        if (this.sortByDate) return a.Date > b.Date ? -1 : +1;
+        if (this.sortByDate) return a.DateCreated > b.DateCreated ? -1 : +1;
         if (this.sortBySize) return a.Size > b.Size ? -1 : +1;
       });
     },
@@ -574,7 +579,7 @@ export default {
         thisShow.Seasons = seasons;
         thisShow.Gap     = gap;
       }
-      this.shows = allShows;
+      // this.shows = allShows;
     },
   },
 
@@ -599,7 +604,7 @@ export default {
         banCond.filter = -1;
         this.select();
 
-        // emby.getSeasons(allShows, this.addSeasonsToShow);
+        emby.getSeasons(allShows, this.addSeasonsToShow);
 
         this.sortByDate = true;
         this.sortShows();

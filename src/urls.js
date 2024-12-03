@@ -1,5 +1,12 @@
 let cred;
 
+/*
+https://dev.emby.media/doc/restapi/index.html
+https://dev.emby.media/doc/restapi/Item-Information.html
+https://dev.emby.media/reference/RestAPI.html
+https://dev.emby.media/home/sdk/apiclients/index.html
+*/
+
 const testCred = 
 {markUsrId: "894c752d448f45a3a1260ccaabd0adff",
 token:      "aad53eb6d92243c3b8ebd3151233260c"}
@@ -32,7 +39,7 @@ export function childrenUrl(cred, parentId='', unAired=false) {
           / ${cred.markUsrId} / Items /
     ? ParentId=${parentId}
     ${unAired ? '& IsUnaired = true' : ''}
-    & Fields       = MediaSources
+    & Fields = MediaSources,DateCreated,Genres,Overview,People,ProviderIds,ExternalUrls,Path,SortName,ProductionYear,Status,UserData,PlayAccess,IsFolder,Type,Tags
     & X-Emby-Token = ${cred.token}
   `.replace(/\s*/g, "");
 }

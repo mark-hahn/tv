@@ -2,8 +2,8 @@ import axios     from "axios"
 import * as srvr from "./srvr.js";
 import * as urls from "./urls.js";
 
-// const seasonsWorker = 
-//         new Worker('src/seasons-worker.js', {type: 'module'});
+const seasonsWorker = 
+        new Worker('src/seasons-worker.js', {type: 'module'});
 
 const name      = "mark";
 const pwd       = "90-MNBbnmyui";
@@ -40,18 +40,18 @@ export async function init(showErrIn) {
   urls.init(cred);
 }
 
-// export function getSeasons(allShows, cb) {
-//   seasonsWorker.onerror = (err) => {
-//     showErr('Worker:', err.message);
-//     throw err;
-//   }
-//   const allShowsIdName = 
-//           allShows.map((show) => [show.Id, show.Name]);
-//   seasonsWorker.postMessage({cred, allShowsIdName});
+export function getSeasons(allShows, cb) {
+  seasonsWorker.onerror = (err) => {
+    showErr('Worker:', err.message);
+    throw err;
+  }
+  const allShowsIdName = 
+          allShows.map((show) => [show.Id, show.Name]);
+  seasonsWorker.postMessage({cred, allShowsIdName});
 
-//   seasonsWorker.onmessage = cb;
-// }
- 
+  seasonsWorker.onmessage = cb;
+}
+
 ////////////////  MAIN FUNCTIONS  /////////////////
 
 const toTryCollId    = '1468316';
@@ -90,6 +90,7 @@ export async function loadAllShows() {
       show.Date = date;
       show.Size = Size;
     }
+    if(!show.DateCreated) show.DateCreated = show.Date;
     if(show.Date) shows.push(show);
   }
 
@@ -100,7 +101,10 @@ export async function loadAllShows() {
 
   for(let waitingName of waitingShows) {
     const show = shows.find((show) => show.Name == waitingName);
-    if(show) show.Waiting = true;
+    if(show) {
+      show.Waiting = true;
+      show.WaitStr = ' >> Waiting';
+    }
   }
 
   for(let pickupName of pickups) {
@@ -438,6 +442,7 @@ export async function saveLinda(id, inLinda) {
 /*
 
 https://dev.emby.media/doc/restapi/index.html
+https://dev.emby.media/doc/restapi/Item-Information.html
 https://dev.emby.media/reference/RestAPI.html
 https://dev.emby.media/home/sdk/apiclients/index.html
 

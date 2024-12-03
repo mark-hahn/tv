@@ -1,9 +1,11 @@
 /*
 bugs ...
-gap dashes don't show until this.shows reloads
-
+  gap dashes don't show until this.shows reloads
+  wating icon broken
+  
 new features ...
   watching
+  remember old highlighted rows after select
   buttons for imdb (and rotten?)
   add % display for gap progress
   move scroll bar to middle

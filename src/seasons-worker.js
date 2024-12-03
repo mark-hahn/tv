@@ -4,8 +4,10 @@ import * as urls from "./urls.js";
 const DBG = true;
 
 let cred;
+let epiShown = false;
 
-const getEpisodes = async (seasonId) => {
+const getEpisodes = 
+        async (seasonId, showNumber, seasonNumber) => {
   const unairedObj = {};
   const unairedRes = await axios.get(
             urls.childrenUrl(cred, seasonId, true));
@@ -20,6 +22,12 @@ const getEpisodes = async (seasonId) => {
         .data.Items;
   for(let key in episodes) {
     const episode       = episodes[key];
+
+    // if( !epiShown) {
+    //   epiShown = true;
+    //   console.log(episode);
+    // } 
+
     const episodeNumber = +episode.IndexNumber;
     // const showId        = episode.SeriesId;
     // const seasonId      = episode.SeasonId;
@@ -30,13 +38,13 @@ const getEpisodes = async (seasonId) => {
         !!unairedObj[episodeNumber] && !watched && !haveFile;
     Episodes[episodeNumber] = {
         //  showId, seasonId, 
-         watched, haveFile, unaired 
+         watched, /*watchStr,*/ haveFile, unaired 
     };
   }
   return Episodes;
 }
 
-const getSeasons = async (showId) => {
+const getSeasons = async (showId, showNumber) => {
   const Seasons = [];
   const seasons =
         (await axios.get(urls.childrenUrl(cred, showId)))
@@ -44,7 +52,8 @@ const getSeasons = async (showId) => {
   for(let key in seasons) {
     let   season          = seasons[key];
     const seasonNumber    = +season.IndexNumber;
-    Seasons[seasonNumber] = await getEpisodes(season.Id);
+    Seasons[seasonNumber] = 
+        await getEpisodes(season.Id, showNumber, seasonNumber);
   }
   return Seasons;
 };
@@ -156,7 +165,7 @@ self.onmessage = async (event) => {
   for (let i = 0; i < allShowsIdName.length; i++) {
     const [showId, showNameIn] = allShowsIdName[i];
     showName = showNameIn;
-    const seasons = await getSeasons(showId);
+    const seasons = await getSeasons(showId, i);
     const gap     = getGap(seasons);
     self.postMessage({showId, seasons, gap});
   }

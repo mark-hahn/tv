@@ -1,0 +1,83 @@
+{
+    "Name": "Pilot",
+    "ServerId": "ae3349983dbe45d9aa1d317a7753483e",
+    "Id": "4787319",
+    "DateCreated": "2024-11-08T23:29:51.0000000Z",
+    "SortName": "Pilot",
+    "ExternalUrls": [
+        {
+            "Name": "TheTVDB",
+            "Url": "https://thetvdb.com/?tab=episode&id=8083737"
+        }
+    ],
+    "MediaSources": [
+        {
+            "Protocol": "File",
+            "Id": "05694886977020a312326ba2e6080d3a",
+            "Type": "Placeholder",
+            "Size": 0,
+            "Name": "Pilot",
+            "IsRemote": false,
+            "SupportsTranscoding": true,
+            "SupportsDirectStream": true,
+            "SupportsDirectPlay": true,
+            "IsInfiniteStream": false,
+            "RequiresOpening": false,
+            "RequiresClosing": false,
+            "RequiresLooping": false,
+            "SupportsProbing": false,
+            "MediaStreams": [],
+            "Formats": [],
+            "RequiredHttpHeaders": {},
+            "ReadAtNativeFramerate": false
+        }
+    ],
+    "Overview": "When he's hired at Acapulco's hottest resort, Maximo thinks he's scored his dream job-but quickly learns there's more to it than he thought.",
+    "Genres": [],
+    "Size": 0,
+    "ProductionYear": 2021,
+    "IndexNumber": 1,
+    "ParentIndexNumber": 1,
+    "ProviderIds": {
+        "Tvdb": "8083737",
+        "Official Website": "https://tv.apple.com/episode/umc.cmc.4dcg4330l3mdb6yf2ysxqt56i"
+    },
+    "IsFolder": false,
+    "Type": "Episode",
+    "People": [
+        {
+            "Name": "Richard Shepard",
+            "Id": "4778670",
+            "Type": "Director"
+        }
+    ],
+    "GenreItems": [],
+    "TagItems": [],
+    "ParentLogoItemId": "4759942",
+    "ParentBackdropItemId": "4759942",
+    "ParentBackdropImageTags": [
+        "40c0a1a40ad10cf72d034bdf66271cf5"
+    ],
+    "LocalTrailerCount": 0,
+    "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 0,
+        "IsFavorite": false,
+        "Played": true
+    },
+    "SeriesName": "Acapulco (2021)",
+    "SeriesId": "4759942",
+    "SeasonId": "4759943",
+    "SpecialFeatureCount": 0,
+    "DisplayPreferencesId": "26dd4a82b00c839c498471cdba80a99c",
+    "SeriesPrimaryImageTag": "699304709bb8752ecbe67a2601c01514",
+    "SeasonName": "Season 1",
+    "MediaStreams": [],
+    "ImageTags": {},
+    "BackdropImageTags": [],
+    "ParentLogoImageTag": "9edd0cc08f2d67c7cb9bd088b53e0e63",
+    "ParentThumbItemId": "4759942",
+    "ParentThumbImageTag": "64f49a5c32a13e3832672391b9457c23",
+    "LocationType": "Virtual",
+    "MediaType": "Video"
+}

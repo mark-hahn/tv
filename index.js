@@ -39,11 +39,13 @@ const rejectStr  = fs.readFileSync('config/config2-rejects.json', 'utf8');
 const middleStr  = fs.readFileSync('config/config3-middle.txt',   'utf8');
 const pickupStr  = fs.readFileSync('config/config4-pickups.json', 'utf8');
 const footerStr  = fs.readFileSync('config/config5-footer.txt',   'utf8');
-const waitingStr = fs.readFileSync('config/waiting.json',         'utf8');
+const waitingStr = fs.readFileSync('data/waiting.json',           'utf8');
+const noEmbyStr  = fs.readFileSync('data/noemby.json',            'utf8');
 
 const waitings = JSON.parse(waitingStr);
 const rejects  = JSON.parse(rejectStr);
 const pickups  = JSON.parse(pickupStr);
+const noEmbys  = JSON.parse(noEmbyStr);
 
 const videoFileExtensions = [
   "mp4", "mkv", "avi", "mov", "wmv", "flv", "mpeg",
@@ -118,7 +120,7 @@ const upload = async () => {
     str += '        - "' + name.replace(/"/g, '') + '"\n';
   str += footerStr;
   console.log(dat(), 'creating config.yml');
-  fs.writeFileSync('config/config.yml', str);
+  await fsp.writeFile('config/config.yml', str);
 
   if(dontupload) {
     console.log(dat(), "---- didn't upload config.yml ----");
@@ -177,9 +179,10 @@ const trySaveConfigYml = async (id, result, resolve, reject) => {
     const bname = b.replace(/The\s/i, '');
     return (aname.toLowerCase() > bname.toLowerCase() ? +1 : -1);
   });
-  fs.writeFileSync('config/config2-rejects.json', JSON.stringify(rejects)); 
-  fs.writeFileSync('config/config4-pickups.json', JSON.stringify(pickups)); 
-
+  await fsp.writeFile('config/config2-rejects.json', 
+                           JSON.stringify(rejects)); 
+  await fsp.writeFile('config/config4-pickups.json', 
+                           JSON.stringify(pickups)); 
   let errResult = null;
 
   const uploadRes = await upload();
@@ -217,7 +220,7 @@ const getWaiting = (id, _param, resolve) => {
   resolve([id, waitings]);
 };
 
-const addWaiting = (id, name, resolve, _reject) => {
+const addWaiting = async (id, name, resolve, _reject) => {
   console.log(dat(), 'addWaiting', id, name);
   for(const [idx, waitingNameStr] of waitings.entries()) {
     if(waitingNameStr.toLowerCase() === name.toLowerCase()) {
@@ -228,11 +231,11 @@ const addWaiting = (id, name, resolve, _reject) => {
   }
   console.log(dat(), '-- adding waiting:', name);
   waitings.push(name);
-  fs.writeFileSync('config/waiting.json', JSON.stringify(waitings));
+  await fsp.writeFile('data/waiting.json', JSON.stringify(waitings));
   resolve([id, 'ok']);
 }
 
-const delWaiting = (id, name, resolve, reject) => {
+const delWaiting = async (id, name, resolve, reject) => {
   console.log(dat(), 'delWaiting', id, name);
   let deletedOne = false;
   for(const [idx, waitingNameStr] of waitings.entries()) {
@@ -244,10 +247,10 @@ const delWaiting = (id, name, resolve, reject) => {
   }
   if(!deletedOne) {
     console.log(dat(), '-- waiting not deleted -- no match:', name);
-    reject([id, {"delWaiting":"not found"}]);
+    reject([id, {"delWaiting":`${name} not found`}]);
     return
   }
-  fs.writeFileSync('config/waiting.json', JSON.stringify(waitings));
+  await fsp.writeFile('data/waiting.json', JSON.stringify(waitings));
   resolve([id, 'ok']);
 }
 
@@ -321,6 +324,47 @@ const delPickup = (id, name, resolve, reject) => {
   saveConfigYml(id, {"ok":"ok"}, resolve, reject);
 }
 
+const getNoEmbys = (id, _param, resolve, _reject) => {
+  resolve([id, noEmbys]);
+};
+/*
+5~~~addNoEmby~~~{"Name":"The Nanny","Id":"noemby-0.7793004790297076","DateCreated":"2024-12-04","Waiting":true,"WaitStr":"<Ready>","InToTry":false,"InContinue":false,"InMark":false,"InLinda":false,"Reject":false,"Pickup":true,"Seasons":[]}
+*/
+const addNoEmby = async (id, showStr, resolve) => {
+  const show = JSON.parse(showStr);
+  const name = show.Name;
+  console.log(dat(), 'addNoEmby', id, name);
+  for(const [idx, show] of noEmbys.entries()) {
+    if(show.Name.toLowerCase() === name.toLowerCase()) {
+      console.log(dat(), 'removing old noemby:', name);
+      noEmbys.splice(idx, 1);
+    }
+  }
+  console.log(dat(), 'adding noemby:', name);
+  noEmbys.push(show);
+  await fsp.writeFile('data/noemby.json', JSON.stringify(noEmbys)); 
+  resolve([id, {"ok":"ok"}]);
+}
+
+const delNoEmby = async (id, name, resolve, reject) => {
+  console.log(dat(), 'delNoEmby', id, name);
+  let deletedOne = false;
+  for(const [idx, show] of noEmbys.entries()) {
+    if(show.Name.toLowerCase() === name.toLowerCase()) {
+      console.log(dat(), '-- deleting noembys:', name);
+      noEmbys.splice(idx, 1);
+      deletedOne = true;
+    }
+  }
+  if(!deletedOne) {
+    console.log(dat(), '-- noembys not deleted -- no match:', name);
+    reject([id,{"delNoEmby":"not found"}]);
+    return;
+  }
+  await fsp.writeFile('data/noemby.json', JSON.stringify(noEmbys)); 
+  resolve([id, {"ok":"ok"}]);
+}
+
 const deletePath = async (id, path, resolve, reject) => {
   console.log(dat(), 'deletePath', id, path);
   try {
@@ -371,6 +415,7 @@ ws.on('connection', (socket) => {
       socket.send(`${id}~~~ok~~~${JSON.stringify(result)}`); 
     })
     .catch((idError) => {
+      console.log({idError});
       const [id, error] = idError;
       console.log(dat(), 'rejected', id);
       socket.send(`${id}~~~err~~~${JSON.stringify(error)}`); 
@@ -391,6 +436,10 @@ ws.on('connection', (socket) => {
       case 'getPickups':  getPickups(id, '',    resolve, reject); break;
       case 'addPickup':   addPickup( id, param, resolve, reject); break;
       case 'delPickup':   delPickup( id, param, resolve, reject); break;
+      
+      case 'getNoEmbys':  getNoEmbys(id, '',    resolve, reject); break;
+      case 'addNoEmby':   addNoEmby( id, param, resolve, reject); break;
+      case 'delNoEmby':   delNoEmby( id, param, resolve, reject); break;
       
       case 'deletePath':   deletePath(id, param, resolve, reject); break;
 

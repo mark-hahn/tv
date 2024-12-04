@@ -1,0 +1,981 @@
+{
+  "status": "success",
+  "data": {
+    "id": 385730,
+    "name": "Somebody Somewhere",
+    "slug": "somebody-somewhere",
+    "image": "https://artworks.thetvdb.com/banners/v4/series/385730/posters/670a459298ada.jpg",
+    "nameTranslations": [
+      "eng",
+      "fra",
+      "spa",
+      "rus",
+      "deu",
+      "pt",
+      "heb",
+      "fin"
+    ],
+    "overviewTranslations": [
+      "eng",
+      "fra",
+      "spa",
+      "rus",
+      "deu",
+      "pt",
+      "heb",
+      "fin"
+    ],
+    "aliases": [
+      {
+        "language": "eng",
+        "name": "Somebody Somewhere (2022)"
+      }
+    ],
+    "firstAired": "2022-01-16",
+    "lastAired": "2024-12-08",
+    "nextAired": "2024-12-08",
+    "score": 16369,
+    "status": {
+      "id": 1,
+      "name": "Continuing",
+      "recordType": "series",
+      "keepUpdated": true
+    },
+    "originalCountry": "usa",
+    "originalLanguage": "eng",
+    "defaultSeasonType": 1,
+    "isOrderRandomized": false,
+    "lastUpdated": "2024-11-27 22:02:10",
+    "averageRuntime": 27,
+    "episodes": null,
+    "overview": "Sam is a true Kansan on the surface but beneath it all struggles to fit the hometown mold. As she grapples with loss and acceptance, singing is Sam’s saving grace and leads her on a journey to discover herself and a community of outsiders that don’t fit in but don’t give up, showing that finding your people, and finding your voice, is possible. Anywhere. Somewhere.",
+    "year": "2022",
+    "artworks": [
+      {
+        "id": 64120094,
+        "image": "https://artworks.thetvdb.com/banners/v4/series/385730/posters/670a459298ada.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/385730/posters/670a459298ada_t.jpg",
+        "language": "eng",
+        "type": 2,
+        "score": 100001,
+        "width": 680,
+        "height": 1000,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 64142759,
+        "image": "https://artworks.thetvdb.com/banners/v4/series/385730/posters/6723df5b6a81a.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/385730/posters/6723df5b6a81a_t.jpg",
+        "language": "eng",
+        "type": 2,
+        "score": 100001,
+        "width": 680,
+        "height": 1000,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 63482454,
+        "image": "https://artworks.thetvdb.com/banners/v4/series/385730/backgrounds/644f976fd009b.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/385730/backgrounds/644f976fd009b_t.jpg",
+        "language": null,
+        "type": 3,
+        "score": 100000,
+        "width": 1920,
+        "height": 1080,
+        "includesText": false,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 64125567,
+        "image": "https://artworks.thetvdb.com/banners/v4/series/385730/backgrounds/67101d30f1d27.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/385730/backgrounds/67101d30f1d27_t.jpg",
+        "language": null,
+        "type": 3,
+        "score": 100000,
+        "width": 1920,
+        "height": 1080,
+        "includesText": false,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 62971782,
+        "image": "https://artworks.thetvdb.com/banners/v4/series/385730/backgrounds/61e65e565db9f.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/385730/backgrounds/61e65e565db9f_t.jpg",
+        "language": null,
+        "type": 3,
+        "score": 100000,
+        "width": 1920,
+        "height": 1080,
+        "includesText": false,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 64142761,
+        "image": "https://artworks.thetvdb.com/banners/v4/series/385730/backgrounds/6723dfe1106e8.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/385730/backgrounds/6723dfe1106e8_t.jpg",
+        "language": null,
+        "type": 3,
+        "score": 100000,
+        "width": 1920,
+        "height": 1080,
+        "includesText": false,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 64136386,
+        "image": "https://artworks.thetvdb.com/banners/v4/series/385730/backgrounds/671cd27fe18c1.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/385730/backgrounds/671cd27fe18c1_t.jpg",
+        "language": "eng",
+        "type": 3,
+        "score": 100000,
+        "width": 1920,
+        "height": 1080,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 62972644,
+        "image": "https://artworks.thetvdb.com/banners/v4/series/385730/backgrounds/61e7502fdb4e6.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/385730/backgrounds/61e7502fdb4e6_t.jpg",
+        "language": null,
+        "type": 3,
+        "score": 100000,
+        "width": 1920,
+        "height": 1080,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 62977059,
+        "image": "https://artworks.thetvdb.com/banners/v4/season/1969868/posters/61ee318fd9948.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/v4/season/1969868/posters/61ee318fd9948_t.jpg",
+        "language": "eng",
+        "type": 7,
+        "score": 100000,
+        "width": 680,
+        "height": 1000,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "seasonId": 1969868,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 62959457,
+        "image": "https://artworks.thetvdb.com/banners/v4/series/385730/posters/61d5cfbf213cc.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/385730/posters/61d5cfbf213cc_t.jpg",
+        "language": "eng",
+        "type": 2,
+        "score": 100000,
+        "width": 680,
+        "height": 1000,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 62942123,
+        "image": "https://artworks.thetvdb.com/banners/v4/series/385730/posters/61bb2656b3338.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/385730/posters/61bb2656b3338_t.jpg",
+        "language": "eng",
+        "type": 2,
+        "score": 100000,
+        "width": 680,
+        "height": 1000,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 63465655,
+        "image": "https://artworks.thetvdb.com/banners/v4/series/385730/posters/6441584254274.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/385730/posters/6441584254274_t.jpg",
+        "language": "eng",
+        "type": 2,
+        "score": 100000,
+        "width": 680,
+        "height": 1000,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 63918497,
+        "image": "https://artworks.thetvdb.com/banners/v4/series/385730/banners/66184c13202f4.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/385730/banners/66184c13202f4_t.jpg",
+        "language": "eng",
+        "type": 1,
+        "score": 100000,
+        "width": 758,
+        "height": 140,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 62957987,
+        "image": "https://artworks.thetvdb.com/banners/v4/series/385730/banners/61d3aeaae1f97.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/385730/banners/61d3aeaae1f97_t.jpg",
+        "language": "eng",
+        "type": 1,
+        "score": 100000,
+        "width": 758,
+        "height": 140,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 62920881,
+        "image": "https://artworks.thetvdb.com/banners/v4/series/385730/banners/61a8e0a647e5e.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/385730/banners/61a8e0a647e5e_t.jpg",
+        "language": "eng",
+        "type": 1,
+        "score": 100000,
+        "width": 758,
+        "height": 140,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      }
+    ],
+    "companies": [
+      {
+        "id": 328,
+        "name": "HBO",
+        "slug": "hbo",
+        "nameTranslations": [
+          "eng",
+          "nld",
+          "pt",
+          "spa"
+        ],
+        "overviewTranslations": [
+          "pt",
+          "spa"
+        ],
+        "aliases": [
+          {
+            "language": "eng",
+            "name": "Home Box Office"
+          }
+        ],
+        "country": "usa",
+        "primaryCompanyType": 1,
+        "activeDate": "1972-11-08",
+        "inactiveDate": null,
+        "companyType": {
+          "companyTypeId": 1,
+          "companyTypeName": "Network"
+        },
+        "parentCompany": {
+          "id": null,
+          "name": null,
+          "relation": {
+            "id": null,
+            "typeName": null
+          }
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 14295,
+        "name": "Duplass Brothers Productions",
+        "slug": "duplass-brothers-productions",
+        "nameTranslations": [
+          "eng"
+        ],
+        "overviewTranslations": [],
+        "aliases": [],
+        "country": "usa",
+        "primaryCompanyType": 3,
+        "activeDate": null,
+        "inactiveDate": null,
+        "companyType": {
+          "companyTypeId": 3,
+          "companyTypeName": "Production Company"
+        },
+        "parentCompany": {
+          "id": null,
+          "name": null,
+          "relation": {
+            "id": null,
+            "typeName": null
+          }
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 49055,
+        "name": "The Mighty Mint",
+        "slug": "the-mighty-mint",
+        "nameTranslations": [
+          "eng"
+        ],
+        "overviewTranslations": [],
+        "aliases": [],
+        "country": "usa",
+        "primaryCompanyType": 3,
+        "activeDate": null,
+        "inactiveDate": null,
+        "companyType": {
+          "companyTypeId": 3,
+          "companyTypeName": "Production Company"
+        },
+        "parentCompany": {
+          "id": null,
+          "name": null,
+          "relation": {
+            "id": null,
+            "typeName": null
+          }
+        },
+        "tagOptions": null
+      }
+    ],
+    "originalNetwork": {
+      "id": 328,
+      "name": "HBO",
+      "slug": "hbo",
+      "nameTranslations": [
+        "eng",
+        "nld",
+        "pt",
+        "spa"
+      ],
+      "overviewTranslations": [
+        "pt",
+        "spa"
+      ],
+      "aliases": [
+        {
+          "language": "eng",
+          "name": "Home Box Office"
+        }
+      ],
+      "country": "usa",
+      "primaryCompanyType": 1,
+      "activeDate": "1972-11-08",
+      "inactiveDate": null,
+      "companyType": {
+        "companyTypeId": 1,
+        "companyTypeName": "Network"
+      },
+      "parentCompany": {
+        "id": null,
+        "name": null,
+        "relation": {
+          "id": null,
+          "typeName": null
+        }
+      },
+      "tagOptions": [
+        {
+          "id": 494,
+          "tag": 24,
+          "tagName": "Company Type",
+          "name": "Premium Cable",
+          "helpText": "Subscription based premium networks. Examples: HBO, Starz, Showtime"
+        }
+      ]
+    },
+    "latestNetwork": {
+      "id": 328,
+      "name": "HBO",
+      "slug": "hbo",
+      "nameTranslations": [
+        "eng",
+        "nld",
+        "pt",
+        "spa"
+      ],
+      "overviewTranslations": [
+        "pt",
+        "spa"
+      ],
+      "aliases": [
+        {
+          "language": "eng",
+          "name": "Home Box Office"
+        }
+      ],
+      "country": "usa",
+      "primaryCompanyType": 1,
+      "activeDate": "1972-11-08",
+      "inactiveDate": null,
+      "companyType": {
+        "companyTypeId": 1,
+        "companyTypeName": "Network"
+      },
+      "parentCompany": {
+        "id": null,
+        "name": null,
+        "relation": {
+          "id": null,
+          "typeName": null
+        }
+      },
+      "tagOptions": [
+        {
+          "id": 494,
+          "tag": 24,
+          "tagName": "Company Type",
+          "name": "Premium Cable",
+          "helpText": "Subscription based premium networks. Examples: HBO, Starz, Showtime"
+        }
+      ]
+    },
+    "genres": [
+      {
+        "id": 12,
+        "name": "Drama",
+        "slug": "drama"
+      },
+      {
+        "id": 15,
+        "name": "Comedy",
+        "slug": "comedy"
+      }
+    ],
+    "trailers": [],
+    "lists": [],
+    "remoteIds": [
+      {
+        "id": "tt12759100",
+        "type": 2,
+        "sourceName": "IMDB"
+      },
+      {
+        "id": "https://www.hbo.com/somebody-somewhere",
+        "type": 4,
+        "sourceName": "Official Website"
+      },
+      {
+        "id": "106308",
+        "type": 12,
+        "sourceName": "TheMovieDB.com"
+      }
+    ],
+    "characters": [
+      {
+        "id": 65594765,
+        "name": "Sam Miller",
+        "peopleId": 296662,
+        "seriesId": 385730,
+        "series": null,
+        "movie": null,
+        "movieId": null,
+        "episodeId": null,
+        "type": 3,
+        "image": "https://artworks.thetvdb.com/banners/v4/actor/296662/photo/61e65ed274e88.jpg",
+        "sort": 1,
+        "isFeatured": true,
+        "url": "https://thetvdb.com/people/296662-bridget-everett",
+        "nameTranslations": null,
+        "overviewTranslations": null,
+        "aliases": null,
+        "peopleType": "Actor",
+        "personName": "Bridget Everett",
+        "tagOptions": null,
+        "personImgURL": "https://artworks.thetvdb.com/banners/v4/actor/296662/photo/670190fa1877c.jpg"
+      },
+      {
+        "id": 68370857,
+        "name": "Joel",
+        "peopleId": 488113,
+        "seriesId": 385730,
+        "series": null,
+        "movie": null,
+        "movieId": null,
+        "episodeId": null,
+        "type": 3,
+        "image": "https://artworks.thetvdb.com/banners/v4/actor/488113/photo/61e65fa9eea3c.jpg",
+        "sort": 2,
+        "isFeatured": true,
+        "url": "https://thetvdb.com/people/488113-jeff-hiller",
+        "nameTranslations": null,
+        "overviewTranslations": null,
+        "aliases": null,
+        "peopleType": "Actor",
+        "personName": "Jeff Hiller",
+        "tagOptions": null,
+        "personImgURL": null
+      },
+      {
+        "id": 68370858,
+        "name": "Tricia Miller",
+        "peopleId": 341318,
+        "seriesId": 385730,
+        "series": null,
+        "movie": null,
+        "movieId": null,
+        "episodeId": null,
+        "type": 3,
+        "image": "https://artworks.thetvdb.com/banners/v4/actor/341318/photo/6239c3d1d3a33.jpg",
+        "sort": 3,
+        "isFeatured": true,
+        "url": "https://thetvdb.com/people/341318-mary-catherine-garrison",
+        "nameTranslations": null,
+        "overviewTranslations": null,
+        "aliases": null,
+        "peopleType": "Actor",
+        "personName": "Mary Catherine Garrison",
+        "tagOptions": null,
+        "personImgURL": null
+      },
+      {
+        "id": 68370859,
+        "name": "Rick",
+        "peopleId": 337936,
+        "seriesId": 385730,
+        "series": null,
+        "movie": null,
+        "movieId": null,
+        "episodeId": null,
+        "type": 3,
+        "image": "https://artworks.thetvdb.com/banners/v4/actor/337936/photo/6239c386e3d26.jpg",
+        "sort": 4,
+        "isFeatured": false,
+        "url": "https://thetvdb.com/people/337936-danny-mccarthy",
+        "nameTranslations": null,
+        "overviewTranslations": null,
+        "aliases": null,
+        "peopleType": "Actor",
+        "personName": "Danny McCarthy",
+        "tagOptions": null,
+        "personImgURL": null
+      },
+      {
+        "id": 68370860,
+        "name": "Ed Miller",
+        "peopleId": 7910115,
+        "seriesId": 385730,
+        "series": null,
+        "movie": null,
+        "movieId": null,
+        "episodeId": null,
+        "type": 3,
+        "image": "https://artworks.thetvdb.com/banners/v4/actor/346722/photo/6239c41441997.jpg",
+        "sort": 5,
+        "isFeatured": false,
+        "url": "https://thetvdb.com/people/7910115-michael-g-hagerty",
+        "nameTranslations": null,
+        "overviewTranslations": null,
+        "aliases": null,
+        "peopleType": "Actor",
+        "personName": "Michael G. Hagerty",
+        "tagOptions": null,
+        "personImgURL": null
+      },
+      {
+        "id": 68672896,
+        "name": "Fred Rococo",
+        "peopleId": 8534517,
+        "seriesId": 385730,
+        "series": null,
+        "movie": null,
+        "movieId": null,
+        "episodeId": null,
+        "type": 3,
+        "image": "https://artworks.thetvdb.com/banners/v4/actor/8534517/photo/6239c4c8741ec.jpg",
+        "sort": 6,
+        "isFeatured": false,
+        "url": "https://thetvdb.com/people/8534517-murray-hill",
+        "nameTranslations": null,
+        "overviewTranslations": null,
+        "aliases": null,
+        "peopleType": "Actor",
+        "personName": "Murray Hill",
+        "tagOptions": null,
+        "personImgURL": "https://artworks.thetvdb.com/banners/v4/actor/8534517/photo/64c8a30674df2.jpg"
+      },
+      {
+        "id": 68672897,
+        "name": "Charity",
+        "peopleId": 8102882,
+        "seriesId": 385730,
+        "series": null,
+        "movie": null,
+        "movieId": null,
+        "episodeId": null,
+        "type": 3,
+        "image": "https://artworks.thetvdb.com/banners/v4/actor/8102882/photo/6239c52b4710f.jpg",
+        "sort": 7,
+        "isFeatured": false,
+        "url": "https://thetvdb.com/people/8102882-heidi-johanningmerier",
+        "nameTranslations": null,
+        "overviewTranslations": null,
+        "aliases": null,
+        "peopleType": "Actor",
+        "personName": "Heidi Johanningmerier",
+        "tagOptions": null,
+        "personImgURL": null
+      },
+      {
+        "id": 68672898,
+        "name": "Mary Jo",
+        "peopleId": 441346,
+        "seriesId": 385730,
+        "series": null,
+        "movie": null,
+        "movieId": null,
+        "episodeId": null,
+        "type": 3,
+        "image": "https://artworks.thetvdb.com/banners/v4/actor/441346/photo/6239c5e373682.jpg",
+        "sort": 8,
+        "isFeatured": false,
+        "url": "https://thetvdb.com/people/441346-jane-brody",
+        "nameTranslations": null,
+        "overviewTranslations": null,
+        "aliases": null,
+        "peopleType": "Actor",
+        "personName": "Jane Brody",
+        "tagOptions": null,
+        "personImgURL": null
+      },
+      {
+        "id": 68672900,
+        "name": "Michael",
+        "peopleId": 7915970,
+        "seriesId": 385730,
+        "series": null,
+        "movie": null,
+        "movieId": null,
+        "episodeId": null,
+        "type": 3,
+        "image": "https://artworks.thetvdb.com/banners/v4/actor/7915970/photo/6239c65caada7.jpg",
+        "sort": 9,
+        "isFeatured": false,
+        "url": "https://thetvdb.com/people/7915970-jon-hudson-odom",
+        "nameTranslations": null,
+        "overviewTranslations": null,
+        "aliases": null,
+        "peopleType": "Actor",
+        "personName": "Jon Hudson Odom",
+        "tagOptions": null,
+        "personImgURL": null
+      }
+    ],
+    "airsDays": {
+      "sunday": true,
+      "monday": false,
+      "tuesday": false,
+      "wednesday": false,
+      "thursday": false,
+      "friday": false,
+      "saturday": false
+    },
+    "airsTime": "22:30",
+    "seasons": [
+      {
+        "id": 1917171,
+        "seriesId": 385730,
+        "type": {
+          "id": 3,
+          "name": "Absolute Order",
+          "type": "absolute",
+          "alternateName": null
+        },
+        "number": 1,
+        "nameTranslations": [],
+        "overviewTranslations": [],
+        "companies": {
+          "studio": null,
+          "network": null,
+          "production": null,
+          "distributor": null,
+          "special_effects": null
+        },
+        "lastUpdated": "2021-04-07 16:42:21"
+      },
+      {
+        "id": 1969868,
+        "seriesId": 385730,
+        "type": {
+          "id": 1,
+          "name": "Aired Order",
+          "type": "official",
+          "alternateName": null
+        },
+        "number": 1,
+        "nameTranslations": [],
+        "overviewTranslations": [],
+        "image": "https://artworks.thetvdb.com/banners/v4/season/1969868/posters/61ee318fd9948.jpg",
+        "imageType": 7,
+        "companies": {
+          "studio": null,
+          "network": null,
+          "production": null,
+          "distributor": null,
+          "special_effects": null
+        },
+        "lastUpdated": "2023-04-25 23:10:11"
+      },
+      {
+        "id": 2050714,
+        "seriesId": 385730,
+        "type": {
+          "id": 1,
+          "name": "Aired Order",
+          "type": "official",
+          "alternateName": null
+        },
+        "number": 2,
+        "nameTranslations": [],
+        "overviewTranslations": [],
+        "companies": {
+          "studio": null,
+          "network": null,
+          "production": null,
+          "distributor": null,
+          "special_effects": null
+        },
+        "lastUpdated": "2023-07-11 22:05:44"
+      },
+      {
+        "id": 2144059,
+        "seriesId": 385730,
+        "type": {
+          "id": 1,
+          "name": "Aired Order",
+          "type": "official",
+          "alternateName": null
+        },
+        "number": 3,
+        "nameTranslations": [],
+        "overviewTranslations": [],
+        "companies": {
+          "studio": null,
+          "network": null,
+          "production": null,
+          "distributor": null,
+          "special_effects": null
+        },
+        "lastUpdated": "2024-11-27 22:02:09"
+      }
+    ],
+    "translations": {
+      "nameTranslations": [
+        {
+          "name": "Somebody Somewhere",
+          "language": "eng",
+          "isPrimary": true
+        },
+        {
+          "name": "Somebody Somewhere",
+          "language": "fra"
+        },
+        {
+          "name": "Somebody Somewhere",
+          "language": "spa"
+        },
+        {
+          "name": "Кто-то где-то",
+          "language": "rus"
+        },
+        {
+          "name": "Somebody Somewhere",
+          "language": "deu"
+        },
+        {
+          "name": "Alguém em Algum Lugar",
+          "language": "pt"
+        },
+        {
+          "name": "מישהו איפשהו",
+          "language": "heb"
+        },
+        {
+          "name": "Somebody Somewhere",
+          "language": "fin"
+        },
+        {
+          "name": "Somebody Somewhere (2022)",
+          "isAlias": true,
+          "language": "eng"
+        }
+      ],
+      "overviewTranslations": [
+        {
+          "overview": "Sam is a true Kansan on the surface but beneath it all struggles to fit the hometown mold. As she grapples with loss and acceptance, singing is Sam’s saving grace and leads her on a journey to discover herself and a community of outsiders that don’t fit in but don’t give up, showing that finding your people, and finding your voice, is possible. Anywhere. Somewhere.",
+          "language": "eng",
+          "isPrimary": true
+        },
+        {
+          "overview": "Sam retourne dans sa ville natale au Kansas. Alors qu'elle éprouve des difficultés à se faire une place au sein de sa communauté, le chant représente sa seule échappatoire. C'est grâce à la musique qu'elle rencontrera d'autres marginaux et trouvera sa voie.",
+          "language": "fra"
+        },
+        {
+          "overview": "A pesar de sus inmensas llanuras y sus interminables praderas, Kansas puede resultar agobiante para alguien como Sam\r\nMiller. Esta comedia nos cuenta la vida de Sam, una kanseña que se esfuerza para encajar en su pueblo natal.",
+          "language": "spa"
+        },
+        {
+          "overview": "Терапевтический сериал о поиске себя, спродюсированный братьями Дюпласс. «Кто-то где-то» знакомит нас с Сэм — женщиной, которая не чувствует себя как дома в родном городе. Но у нее есть любимое дело — пение, которое спасает женщину от одиночества. Когда в ее жизнь приходит потеря, она начинает заново открывать мир. Оказывается, в нем можно найти близких по духу людей, таких же неустроенных, но отчаянно мечтающих обрести свой голос.",
+          "language": "rus"
+        },
+        {
+          "overview": "Nach außen ist Sam (Bridget Everett) ein „Kansas-Girl“ durch und durch, aber in Wirklichkeit tut sie sich mit der Enge ihrer ländlichen Heimatstadt schwer. Singen ist das einzige Hobby, das ihr über Verluste und Existenzängste hinweghilft – und es ist es auch, was sie schließlich mit Menschen bekanntmacht, die ähnlich mit sich und allem um sie herum hadern wie sie selbst. (Text: JN)",
+          "language": "deu"
+        },
+        {
+          "overview": "Acompanha a história de Sam, uma moradora do Kansas que, no fundo, sofre para conseguir se encaixar.",
+          "language": "pt"
+        },
+        {
+          "overview": "סם מילר (ברידג'ט אוורט) היא בחורה צעירה מקנזס שעל פני השטח נראית כמו מקומית טיפוסית אך בתוך תוכה לא מרגישה באמת שייכת. סם מתמודדת עם אבדן ושירה מהווה את הנחמה היחידה שלה ומובילה אותה למסע של גילוי עצמי ואל קבוצה של אאוטסיידרים שגם לא מרגישים שייכים לשום מקום אבל מאמינים שכל אחד שייך לאנשהו או למישהו. כל מה שצריך לעשות זה לא להרים ידיים. הסדרה מבוססת חלקית על חייה של הזמרת והקומיקאית ברידג'ט אוורט, שגם מככבת בה. לצידה מככבים בין השאר: מייק הגרטי (\"חברים\"), ג'ף הילר (\"גרטה\"), דני מקרת'י (\"נמלטים\"), מארי קת'רין גאריסון (\"VEEP\") והקומיקאי מארי היל.",
+          "language": "heb"
+        },
+        {
+          "overview": "Jopa loputtoman avara Kansas voi tuntua tukahduttavalta Sam Millerin kaltaisen henkilön mielestä. Tämä komediasarja seuraa Samia, täysiveriseltä kansasilaiselta vaikuttavaa henkilöä, jolla on vaikeuksia sopia kotikaupunkiinsa.",
+          "language": "fin"
+        }
+      ],
+      "aliases": [
+        "Somebody Somewhere (2022)"
+      ]
+    },
+    "tags": [
+      {
+        "id": 65,
+        "tag": 3,
+        "tagName": "TV Type or Format",
+        "name": "Story-based Comedy",
+        "helpText": "Comedy series where you must watch all episodes in order. Ex: The Marvelous Mrs. Maisel, Veep, The Good Place"
+      },
+      {
+        "id": 10,
+        "tag": 1,
+        "tagName": "Sub-Genre",
+        "name": "Dark Comedy",
+        "helpText": null
+      }
+    ],
+    "contentRatings": [
+      {
+        "id": 220,
+        "name": "16",
+        "country": "esp",
+        "description": "Not recommended for viewers under the age of 16",
+        "contentType": "",
+        "order": 0,
+        "fullname": null
+      },
+      {
+        "id": 247,
+        "name": "TV-MA",
+        "country": "usa",
+        "description": "Not suitable for children and teens under 17",
+        "contentType": "",
+        "order": 0,
+        "fullname": null
+      }
+    ],
+    "seasonTypes": [
+      {
+        "id": 1,
+        "name": "Aired Order",
+        "type": "official",
+        "alternateName": null
+      }
+    ]
+  }
+}

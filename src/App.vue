@@ -81,7 +81,9 @@ div
 
 <script>
 import * as emby           from "./emby.js";
+import * as tvdb           from "./tvdb.js";
 import * as urls           from "./urls.js";
+
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library }         from "@fortawesome/fontawesome-svg-core";
 import { faLaughBeam, faSadCry, faClock, faHeart, } 
@@ -270,10 +272,10 @@ export default {
           cond(show)  { return !!show.Gap; },
           click() {},
         }, {
-          // color: "#lime", filter: 0, icon: ["fas", "calendar"],
-          // cond(show)  { return show.Waiting; },
-          // click(show) { toggleWaiting(show); },
-        // }, {
+          color: "#lime", filter: 0, icon: ["fas", "calendar"],
+          cond(show)  { return show.Waiting; },
+          click(show) { toggleWaiting(show); },
+        }, {
           color: "lime", filter: 0, icon: ["fas", "question"],
           cond(show)  { return show.InToTry; },
           click(show) { toggleToTry(show); },
@@ -586,8 +588,10 @@ export default {
   mounted() {
     (async () => {
       try {
-        await emby.init(this.showErr);
         showErr = this.showErr;
+        await emby.init(showErr);
+        await tvdb.init(showErr);
+
         allShows = await emby.loadAllShows();
         this.shows = allShows;
         const name = window.localStorage.getItem("lastVisShow");

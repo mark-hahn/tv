@@ -1,4 +1,5 @@
 import axios     from "axios"
+import * as tvdb from "./tvdb.js";
 import * as srvr from "./srvr.js";
 import * as urls from "./urls.js";
 
@@ -69,6 +70,7 @@ export async function loadAllShows() {
   const waitPromise   = srvr.getWaiting();
   const rejPromise    = srvr.getRejects();
   const pkupPromise   = srvr.getPickups();
+
   const [embyShows, srvrShows, waitingShows, rejects, pickups] = 
     await Promise.all([listPromise, seriesPromise, 
                        waitPromise, rejPromise, pkupPromise]);
@@ -103,7 +105,7 @@ export async function loadAllShows() {
     const show = shows.find((show) => show.Name == waitingName);
     if(show) {
       show.Waiting = true;
-      show.WaitStr = ' >> Waiting';
+      show.WaitStr = await tvdb.getLastDate(waitingName);
     }
   }
 
@@ -179,6 +181,9 @@ export const editEpisode = async (seriesId,
     const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
     for(let key in episodesRes.data.Items) {
       const episodeRec     = episodesRes.data.Items[key];
+
+      console.log({episodeRec});
+
       const episodeNumber  = +episodeRec.IndexNumber;
       const userData       = episodeRec?.UserData;
       const watched        = userData?.Played;

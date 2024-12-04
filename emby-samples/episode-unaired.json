@@ -1,0 +1,73 @@
+{
+    "episodeRec": {
+        "Name": "Agg",
+        "ServerId": "ae3349983dbe45d9aa1d317a7753483e",
+        "Id": "4786409",
+        "DateCreated": "2024-10-28T13:32:37.0000000Z",
+        "SortName": "Agg",
+        "ExternalUrls": [
+            {
+                "Name": "TheTVDB",
+                "Url": "https://thetvdb.com/?tab=episode&id=10764770"
+            }
+        ],
+        "MediaSources": [
+            {
+                "Protocol": "File",
+                "Id": "77c4e884517901030ecb35df0d2388ba",
+                "Type": "Placeholder",
+                "Size": 0,
+                "Name": "Agg",
+                "IsRemote": false,
+                "SupportsTranscoding": true,
+                "SupportsDirectStream": true,
+                "SupportsDirectPlay": true,
+                "IsInfiniteStream": false,
+                "RequiresOpening": false,
+                "RequiresClosing": false,
+                "RequiresLooping": false,
+                "SupportsProbing": false,
+                "MediaStreams": [],
+                "Formats": [],
+                "RequiredHttpHeaders": {},
+                "ReadAtNativeFramerate": false
+            }
+        ],
+        "Overview": "Joel returns to church after recognizing a fundamental hole in his life. Sam and Tricia reach a surprising understanding on Holly’s birthday, and later, Sam takes a chance with Iceland.",
+        "Genres": [],
+        "Size": 0,
+        "ProductionYear": 2024,
+        "IndexNumber": 7,
+        "ParentIndexNumber": 3,
+        "ProviderIds": {
+            "Tvdb": "10764770"
+        },
+        "IsFolder": false,
+        "Type": "Episode",
+        "People": [],
+        "GenreItems": [],
+        "TagItems": [],
+        "ParentLogoItemId": "4583860",
+        "ParentBackdropItemId": "4583860",
+        "ParentBackdropImageTags": [
+            "7477c3586b6a47facb16dd778234a6b8"
+        ],
+        "UserData": {
+            "PlaybackPositionTicks": 0,
+            "PlayCount": 0,
+            "IsFavorite": false,
+            "Played": true,
+            "LastPlayedDate": "2024-12-03T23:07:39.776Z"
+        },
+        "SeriesName": "Somebody Somewhere",
+        "SeriesId": "4583860",
+        "SeasonId": "4786401",
+        "SeriesPrimaryImageTag": "656dfe70359b35456a6e3ebff97a3dc7",
+        "SeasonName": "Season 3",
+        "ImageTags": {},
+        "BackdropImageTags": [],
+        "ParentLogoImageTag": "b3172681126c189c4d71168e8bf36705",
+        "LocationType": "Virtual",
+        "MediaType": "Video"
+    }
+}

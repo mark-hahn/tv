@@ -60,6 +60,18 @@ const continueCollId = '4719143';
 const markCollId     = '4697672';
 const lindaCollId    = '4706186';
 
+export async function setWait(show) {
+  if(show) {
+    show.Waiting = true;
+    show.WaitStr = await tvdb.getWaitStr(show.Name);
+    console.log('waiting:', show.Name, show.WaitStr);
+  }
+  else {
+    delete show.Waiting;
+    delete show.WaitStr;
+    showErr('waiting show not found:', show.Name);
+  }
+}
 export async function loadAllShows() {
   console.log('entering loadAllShows');
   const time1 = new Date().getTime();
@@ -103,14 +115,7 @@ export async function loadAllShows() {
 
   for(let waitingName of waitingShows) {
     const show = shows.find((show) => show.Name == waitingName);
-    if(show) {
-      show.Waiting = true;
-      show.WaitStr = await tvdb.getLastDate(waitingName);
-    }
-    else {
-      show.Waiting = false;
-      showErr('waiting not found:', waitingName);
-    }
+    await setWait(show);
   }
 
   for(let pickupName of pickups) {

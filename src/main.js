@@ -1,11 +1,14 @@
 /*
 bugs ...
   gap dashes don't show until this.shows reloads
-  
+  waiting icon color broken
+
 new features ...
+  create new waiting show from name
+  add activity sort (from srvr)
+  popup on ctrl click with all providers
   add % display for gap progress
   esc key closes map
-  buttons for imdb (and rotten?)
   move scroll bar to middle
   move error in map to top right
   change sort to 2 buttons

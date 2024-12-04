@@ -44,8 +44,10 @@ div
           | {{ show.DateCreated.substring(0,10) }}
         td(v-if="sortBySize" style="margin-right:200px;width:60px;font-size:16px;text-align:right") 
           | {{ formatSize(show) + '&nbsp;&nbsp;&nbsp;' }}
+
         td(@click="showInExternal(show, $event)"
-           :style="{padding:'4px', backgroundColor: highlightName == show.Name ? 'yellow' : 'white', fontWeight:'bold', fontSize:'20px'}" :id="nameHash(show.Name)") {{show.Name}}
+           :style="{padding:'4px', backgroundColor: highlightName == show.Name ? 'yellow' : 'white',fontSize:'16px'}" :id="nameHash(show.Name)") {{show.Name}} {{show.Waiting ? show.WaitStr : ''}}
+
         td( v-for="cond in conds" 
             style="width:22px; text-align:center;"
            @click="cond.click(show)" )
@@ -108,13 +110,16 @@ export default {
   name: "App",
   components: { FontAwesomeIcon },
   data() {
+
     const toggleWaiting = async (show) => {
       this.saveVisShow(show.Name);
       show.Waiting = !show.Waiting;
+      show.WaitStr = await tvdb.getWaitStr(show.Name);
       emby.saveWaiting(show.Name, show.Waiting)
-          .catch((err) => {
+          .catch(async (err) => {
               showErr("late saveWaiting error:", err);
               show.Waiting = !show.Waiting;
+              show.WaitStr = await tvdb.getWaitStr(show.Name);
            });
     };
 
@@ -314,11 +319,6 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
-
-    waitstr(show) {
-      if(show.Waiting) return show.WaitStr;
-      return '';
-    },
 
     showErr (...params) {
       let err = "";
@@ -594,14 +594,17 @@ export default {
 
         allShows = await emby.loadAllShows();
         this.shows = allShows;
+
+        console.log("allShows[0]",     allShows[0]);
+        console.log("this.shows[0]", this.shows[0]);
+
         const name = window.localStorage.getItem("lastVisShow");
-        let lastVisShow;
-        if(name) lastVisShow = this.nameHash(name);
-        if (!name || !lastVisShow) {
+        if (!name) {
           const name = allShows[0].Name;
           this.highlightName = name;
           this.saveVisShow(name);
-        } else this.scrollSavedVisShowIntoView();
+        }
+        this.scrollSavedVisShowIntoView();
 
         emby.getSeasons(allShows, this.addSeasonsToShow);
 

@@ -107,6 +107,10 @@ export async function loadAllShows() {
       show.Waiting = true;
       show.WaitStr = await tvdb.getLastDate(waitingName);
     }
+    else {
+      show.Waiting = false;
+      showErr('waiting not found:', waitingName);
+    }
   }
 
   for(let pickupName of pickups) {

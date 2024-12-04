@@ -7,12 +7,13 @@
 let showErr      = null;
 let theTvDbToken = null;
 
+export const init = (showErrIn) => {
+  showErr = showErrIn;
+}
 
 ///////////// get the api token //////////////
  
-export const init = async (showErrIn) => {
-  showErr = showErrIn;
-
+const getToken = async () => {
   const loginResp = await fetch(
     'https://api4.thetvdb.com/v4/login', 
     { method: 'POST',
@@ -42,8 +43,6 @@ export const getLastDate = async (seriesName) => {
   const cacheStr = window.localStorage.getItem("tvdbNameCache");
   if(cacheStr) cache = JSON.parse(cacheStr);
 
-  console.log({cache});
-
   const cachedDate = cache.find(c => c.seriesName === seriesName);
   if(cachedDate && 
       (Date.now() - cachedDate.saved) < 48*60*60*1000) { // 2 days
@@ -56,6 +55,8 @@ export const getLastDate = async (seriesName) => {
       {cache, seriesName, lastAired, 
               saved:new Date(cachedDate.saved)} :
       {cache, seriesName});
+
+  if(!theTvDbToken) await getToken();
 
   const srchUrl = 'https://api4.thetvdb.com/v4/' +
                   'search?type=series&query='    + 

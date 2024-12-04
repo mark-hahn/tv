@@ -590,7 +590,7 @@ export default {
       try {
         showErr = this.showErr;
         await emby.init(showErr);
-        await tvdb.init(showErr);
+        tvdb.init(showErr);
 
         allShows = await emby.loadAllShows();
         this.shows = allShows;

@@ -114,7 +114,8 @@ export async function loadAllShows() {
   }
 
   for(const show of noEmbys) {
-    shows.push(show);
+    const showTst = shows.find((s) => s.Name == show.Name);
+    if(!showTst) shows.push(show);
   }
 
   for(let rejectName of rejects) {

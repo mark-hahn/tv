@@ -643,7 +643,6 @@ export default {
         allShows = await emby.loadAllShows();
         this.shows = allShows;
 
-
         const name = 
               window.localStorage.getItem("lastVisShow");
         if (!name) {

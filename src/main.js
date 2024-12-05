@@ -1,11 +1,8 @@
 /*
 bugs ...
-  gap dashes don't show until end of loadallshows
   waiting icon color broken
-  layout, font sizes, and families
 
 new features ...
-  add % display for gap progress
   add activity sort (from srvr)
   popup on ctrl click with all providers
   esc key closes map

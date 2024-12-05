@@ -18,25 +18,21 @@ div
           | {{shows.length + '/' + allShowsLength}}
         div(style="display:inline-block; margin-top:4px;") 
           | {{gapPercent+'%'}}
+
         div(style="display:inline-block;")
-          button(@click='sortClick' 
-                 style={display:'inlineBlock', fontSize:'15px', margin:'4px', backgroundColor:'if(sortByNew)yellow'}) Added
-          button(@click="sortClick" 
-                 style={display:'inlineBlock', fontSize:'15px', margin:'4px', color:'if(sortByActive) yellow'}) Activity
-          button(@click="sortClick" 
-                 style={display:'inlineBlock', fontSize:'15px', margin:'4px', color:'if(sortBySize) yellow'}) Size
-        //- div(v-if="sortByNew"
-        //-     style="width:30px; display:inline-block; text-align:left; ") New 
-        //- div(v-if="sortByActive"
-        //-     style="width:60px; display:inline-block; text-align:left; ") Active 
-        //- div(v-if="sortBySize" 
-        //-     style="width:60px; display:inline-block; text-align:left; margin-left:10px;") Size
+          button(@click='sortClickAdded' 
+                 :style="{display:'inlineBlock', fontSize:'15px', margin:'4px', backgroundColor: sortByNew ? 'yellow' : 'white'}") Added
+          button(@click="sortClickActivity" 
+                 :style="{display:'inlineBlock', fontSize:'15px', margin:'4px', backgroundColor: sortByActivity ? 'yellow' : 'white'}") Active
+          button(@click="sortClickSize" 
+                 :style="{display:'inlineBlock', fontSize:'15px', margin:'4px', backgroundColor: sortBySize ? 'yellow' : 'white'}") Size
+
         div(style="width:60px; display:inline-block;text-align:left;")
           button(@click="addClick" style={display:'inlineBlock', fontSize:'15px', margin:'4px'}) Add
         div(style="padding:0 4px; display:inline-block; text-align:right;")
         div(style="display:inline-block; text-align:left;  margin-right:10px; ")
           div( v-for="cond in conds"
-              :style="{width:'25px',textAlign:'center',display:'inline-block', flexBasis: '20px'}"
+              :style="{width:'1.6em',textAlign:'center',display:'inline-block', flexBasis: '20px'}"
               @click="condFltrClick(cond)" )
             font-awesome-icon(:icon="cond.icon"
               :style="{color:condFltrColor(cond)}")
@@ -52,7 +48,9 @@ div
                  @click="seriesMapAction('open', show)")
             font-awesome-icon(icon="border-all" style="color:#ccc")
         td(v-if="sortByNew" style="width:80px;font-size:16px;") 
-          | {{ show.DateCreated.substring(0,10) }}
+          | {{ show.DateCreated }}
+        td(v-if="sortByActivity" style="width:80px;font-size:16px;") 
+          | {{ show.Date }}
         td(v-if="sortBySize" style="margin-right:200px;width:60px;font-size:16px;text-align:right") 
           | {{ formatSize(show) + '&nbsp;&nbsp;&nbsp;' }}
 
@@ -273,19 +271,19 @@ export default {
     };
 
     return {
-      shows:            [],
-      searchStr:        "",
-      errMsg:           "",
-      sortByNew:      true,
-      sortByActive:  false,
-      sortBySize:    false,
-      highlightName:    "",
-      allShowsLength:    0,
-      mapShow:        null,
-      seriesMapSeasons: [],
-      seriesMapEpis:    [],
-      seriesMap:        {},
-      gapPercent:       0,
+      shows:             [],
+      searchStr:         "",
+      errMsg:            "",
+      sortByNew:       true,
+      sortByActivity: false,
+      sortBySize:     false,
+      highlightName:     "",
+      allShowsLength:     0,
+      mapShow:         null,
+      seriesMapSeasons:  [],
+      seriesMapEpis:     [],
+      seriesMap:         {},
+      gapPercent:         0,
 
       conds: [ {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],
@@ -423,8 +421,10 @@ export default {
     },
 
     formatSize (show) {
+      if(show.Id.startsWith("noemby-")) return "";
       const size = show.Size;
-      if (size < 1e6) return size;
+      if (size < 1e3) return size;
+      if (size < 1e6) return Math.round(size / 1e3) + "K";
       if (size < 1e9) return Math.round(size / 1e6) + "M";
                       return Math.round(size / 1e9) + "G";
     },
@@ -449,19 +449,25 @@ export default {
       window.localStorage.setItem("lastVisShow", name);
     },
 
-    async sortClick() {
-      if (this.sortByNew) {
-        this.sortByNew = false;
-        this.sortBySize = true;
-        console.log("sort by size");
-      }
-      else {
-        this.sortByNew = true;
-        this.sortBySize = false;
-        console.log("sort by date");
-      }
-      this.sortShows();
-      this.showAll();
+    async sortClickAdded() {
+      this.sortByNew      = true;
+      this.sortByActivity = false;
+      this.sortBySize     = false;
+      console.log("sort by Added");
+    },
+
+    async sortClickActivity() {
+      this.sortByNew      = false;
+      this.sortByActivity = true;
+      this.sortBySize     = false;
+      console.log("sort by Activity");
+    },
+
+    async sortClickSize() {
+      this.sortByNew      = false;
+      this.sortByActivity = false;
+      this.sortBySize     = true;
+      console.log("sort by Size");
     },
 
     scrollSavedVisShowIntoView() {
@@ -571,6 +577,8 @@ export default {
       allShows.sort((a, b) => {
         if (this.sortByNew) 
               return a.DateCreated > b.DateCreated ? -1 : +1;
+        if (this.sortByActivity) 
+              return a.Date > b.Date ? -1 : +1;
         if (this.sortBySize) 
               return a.Size > b.Size ? -1 : +1;
       });

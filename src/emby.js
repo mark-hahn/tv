@@ -102,16 +102,15 @@ export async function loadAllShows() {
     Object.assign(show, show.UserData);
     delete show.UserData;
     for(const date of ['DateCreated', 'PremiereDate'])
-      if(show[date]) show[date] = show[date].replace(/T.*/, '');
+      if(show[date]) show[date] = show[date].substring(0, 10);
 
     const embyPath     = show.Path.split('/').pop();
     const showDateSize = srvrShows[embyPath];
     if(!showDateSize) continue
-    else {
-      const [date, Size] = showDateSize;
-      show.Date = date;
-      show.Size = Size;
-    }
+    const [date, size] = showDateSize;
+    show.Date = date;
+    show.Size = size;
+    console.log('show:', show.Name, {date, size});
     if(!show.DateCreated) show.DateCreated = show.Date;
     if(show.Date) shows.push(show);
   }

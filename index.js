@@ -246,8 +246,8 @@ const delWaiting = async (id, name, resolve) => {
     }
   }
   if(!deletedOne) {
-    console.log(dat(), '-- waiting not deleted -- no match:', name);
-    // reject([id, {"delWaiting":`${name} not found`}]);
+    console.log(dat(), 'waiting not deleted -- no match:', name);
+    resolve([id, 'ok']);
     return
   }
   await fsp.writeFile('data/waiting.json', JSON.stringify(waitings));

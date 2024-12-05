@@ -1,27 +1,22 @@
 /*
 bugs ...
-  gap dashes don't show until this.shows reloads
+  gap dashes don't show until end of loadallshows
   waiting icon color broken
-  move unaired check to getgap
-    process waiting shows first in getgap
+  layout, font sizes, and families
 
 new features ...
-  check seasons for no unaired before setting waiting
+  add % display for gap progress
   add activity sort (from srvr)
   popup on ctrl click with all providers
-  add % display for gap progress
   esc key closes map
-  move scroll bar to middle
   move error in map to top right
-  change sort to 2 buttons
+  change sort to 3 buttons
   map: clicks on season numbers for whole row
-  remember old highlighted rows after select
-  font sizes and families
 
 tabled ...
-  wating
-  wating icon broken
-
+  check seasons for no unaired before setting waiting
+    move unaired check to getgap
+  move scroll bar to middle
 */
 
 import {createApp} from 'vue'

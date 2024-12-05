@@ -46,10 +46,13 @@ export function getSeasons(allShows, cb) {
     showErr('Worker:', err.message);
     throw err;
   }
-  const allShowsIdName = 
-          allShows.map((show) => [show.Id, show.Name]);
+  const allShowsIdName = [];
+  for(let show of allShows) {
+    const id = show.Id;
+    if(id.startsWith('noemby-')) continue;
+    allShowsIdName.push([id, show.Name]);
+  }
   seasonsWorker.postMessage({cred, allShowsIdName});
-
   seasonsWorker.onmessage = cb;
 }
 

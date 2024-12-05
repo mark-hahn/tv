@@ -6,8 +6,7 @@ const DBG = true;
 let cred;
 let epiShown = false;
 
-const getEpisodes = 
-        async (seasonId, showNumber, seasonNumber) => {
+const getEpisodes = async (seasonId) => {
   const unairedObj = {};
   const unairedRes = await axios.get(
             urls.childrenUrl(cred, seasonId, true));
@@ -158,10 +157,9 @@ const getGap = (seasons) => {
 self.onmessage = async (event) => {
   cred                 = event.data.cred;
   const allShowsIdName = event.data.allShowsIdName;
-
+  const startTime      = Date.now();
   console.log(
       `seasons-worker started, ${allShowsIdName.length} shows`);
-
   for (let i = 0; i < allShowsIdName.length; i++) {
     const [showId, showNameIn] = allShowsIdName[i];
     showName = showNameIn;
@@ -169,6 +167,6 @@ self.onmessage = async (event) => {
     const gap     = getGap(seasons);
     self.postMessage({showId, seasons, gap});
   }
-
-  console.log("seasons-worker done");
+  const elapsed = Math.round((Date.now() - startTime) / 1000);
+  console.log(`seasons-worker done, ${elapsed} secs`);
 };

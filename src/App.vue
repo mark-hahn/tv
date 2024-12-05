@@ -13,21 +13,28 @@ div
       #err(@click="errClick" style="width:450px; display:inline-block; margin-left:10px; font-size:16px;color:red;background-color:white;cursor:default;") {{errMsg}}
 
     div(style="width:100%;")
-      div(style="display:flex; justify-content: space-around;background-color:white; padding:0 20px; width:710px;")
-        div(style="display:inline-block; width:60px; ") 
+      div(style="display:flex; justify-content: space-around; background-color: rgb(204, 204, 204); width:710px; margin-top: 5px;margin-bottom: 5px;")
+        div(style="display:inline-block;") 
           | {{shows.length + '/' + allShowsLength}}
-        div(style="width:100px; display:inline-block;")
-          button(@click="sortClick" style="width:60px; text-align:center;") Sort
-        div(v-if="sortByNew"
-            style="width:30px; display:inline-block; text-align:left; ") New 
-        div(v-if="sortByActive"
-            style="width:60px; display:inline-block; text-align:left; ") Active 
-        div(v-if="sortBySize" 
-            style="width:60px; display:inline-block; text-align:left; margin-left:10px;") Size
+        div(style="display:inline-block;") 
+          | {{gapPercent+'%'}}
+        div(style="display:inline-block;")
+          button(@click="sortClick" 
+                 style="width:60px;display:inline-block;display:inline-block; text-align:center;") Sort
+          button(@click="sortClick" 
+                 style="width:60px; text-align:center;") Sort
+          button(@click="sortClick" 
+                 style="width:60px;v text-align:center;") Sort
+        //- div(v-if="sortByNew"
+        //-     style="width:30px; display:inline-block; text-align:left; ") New 
+        //- div(v-if="sortByActive"
+        //-     style="width:60px; display:inline-block; text-align:left; ") Active 
+        //- div(v-if="sortBySize" 
+        //-     style="width:60px; display:inline-block; text-align:left; margin-left:10px;") Size
         div(style="width:60px; display:inline-block;text-align:left;")
           button(@click="addClick") Add
-        div(style="padding:0 4px; display:inline-block; text-align:right;") Filters:
-        div(style="width:300px; display:inline-block; text-align:left;  margin-right:10px;")
+        div(style="padding:0 4px; display:inline-block; text-align:right;")
+        div(style="display:inline-block; text-align:left;  margin-right:10px; background-color: rgb(204, 204, 204);")
           div( v-for="cond in conds"
               :style="{width:'25px',textAlign:'center',display:'inline-block', flexBasis: '20px'}"
               @click="condFltrClick(cond)" )
@@ -104,11 +111,12 @@ library.add([
   faMinus, faArrowDown, faTv, faSearch, faQuestion, faCopy, 
   faBan, faBorderAll, faArrowRight, faMars, faVenus, faCalendar]);
 
-let allShows  = [];
-let embyWin   = null;
-let imdbWin   = null;
-let showErr   = null;
-const errFifo = [];
+let   allShows  = [];
+let   embyWin   = null;
+let   imdbWin   = null;
+let   showErr   = null;
+const errFifo   = [];
+let   gapCount  = 0;
 
 export default {
   name: "App",
@@ -277,6 +285,7 @@ export default {
       seriesMapSeasons: [],
       seriesMapEpis:    [],
       seriesMap:        {},
+      gapPercent:       0,
 
       conds: [ {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],
@@ -463,8 +472,8 @@ export default {
         // console.log(`srolling ${id} into view`);
         const ele = document.getElementById(id);
         if (ele) {
-          ele.scrollIntoView(true);
           window.scrollBy(0, -80);
+          ele.scrollIntoView(true);
         } else {
           console.log(`show ${id} not in show list, finding best match`);
           for (let show of allShows) {
@@ -577,11 +586,12 @@ export default {
       return "#ddd";
     },
 
-    select() {
+    select(scroll = true) {
       const srchStrLc = this.searchStr == 
             "" ? null : this.searchStr.toLowerCase();
       this.shows = allShows.filter((show) => {
-        if (srchStrLc && !show.Name.toLowerCase().includes(srchStrLc)) 
+        if (srchStrLc && 
+           !show.Name.toLowerCase().includes(srchStrLc)) 
               return false;
         for (let cond of this.conds) {
           if ( cond.filter ===  0) continue;
@@ -589,7 +599,7 @@ export default {
         }
         return true;
       });
-      this.scrollSavedVisShowIntoView();
+      if (scroll) this.scrollSavedVisShowIntoView();
     },
 
     /////////////////  UPDATE METHODS  /////////////////
@@ -632,15 +642,18 @@ export default {
     },
 
     addSeasonsToShow(event) {
+      this.gapPercent = 
+            Math.ceil(++gapCount * 100 / allShows.length);
       const {showId, seasons, gap} = event.data;
-      const allShow = allShows.find((show) => show.Id == showId);
-      allShow.Seasons = seasons;
-      allShow.Gap     = gap;
-      const thisShow = this.shows.find((show) => show.Id == showId); 
-      // this.shows.find returns proxy, so different objects
-      if(thisShow) {
-        thisShow.Seasons = seasons;
-        thisShow.Gap     = gap;
+      let  show = allShows.find((show) => show.Id == showId);
+      if(show) {
+        show.Seasons = seasons;
+        show.Gap     = gap;
+      }
+      show = this.shows.find((show) => show.Id == showId); 
+      if(show) {
+        show.Seasons = seasons;
+        show.Gap     = gap;
       }
     },
   },
@@ -665,7 +678,8 @@ export default {
         }
         this.scrollSavedVisShowIntoView();
 
-        // emby.getSeasons(allShows, this.addSeasonsToShow);
+        gapCount = 0;
+        emby.getSeasons(allShows, this.addSeasonsToShow);
 
         this.sortByNew = true;
         this.sortShows();

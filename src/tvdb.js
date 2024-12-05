@@ -31,12 +31,11 @@ const getToken = async () => {
 
 //////////// get WaitStr //////////////
 
-const cache = [];
+let cache = [];
 const cacheStr = window.localStorage.getItem("tvdbNameCache");
 if(cacheStr) {
   try {
-    const cacheArr = JSON.parse(cacheStr);
-    cacheArr.forEach(c => cache.push(c));
+    cache = JSON.parse(cacheStr);
   } catch(e) {
     showErr(`cache parse error: ${e}`);
     cache.length = 0;
@@ -44,14 +43,85 @@ if(cacheStr) {
 }
 
 const formatWaitStr = (lastAired) => {
-  if(!lastAired) return '<Unknown>';
+  if(!lastAired) return '{Unknown}';
   const today = new Date().toISOString().substring(0, 10);
-  console.log("formatWaitStr: ", {lastAired, today});
+  // console.log("formatWaitStr: ", {lastAired, today});
   if(lastAired > today) return `{${lastAired}}`;
   else return '{Ready}';
 }
 
 export const getWaitData = async (searchStr) => {
+  const cacheEntry = cache.find(c => 
+                        c.searchStr === searchStr || 
+                        c.exactName === searchStr);
+  if(cacheEntry && 
+      (Date.now() - cacheEntry.saved) < 48*60*60*1000) { // 2 days
+    const lastAired = cacheEntry.lastAired;
+    // console.log("cache hit: ", {searchStr});
+    return {waitStr: formatWaitStr(lastAired), 
+            exactName: cacheEntry.exactName, lastAired};
+  }
+  // console.log("cache miss: ", {searchStr});
+
+  if(!theTvDbToken) await getToken();
+
+  const srchUrl = 'https://api4.thetvdb.com/v4/' +
+                  'search?type=series&query='    + 
+                   encodeURIComponent(searchStr);
+  const srchResp = await fetch(srchUrl,
+                    {headers: {
+                      'Content-Type': 'application/json',
+                      Authorization:'Bearer ' + theTvDbToken}
+                    });
+  if (!srchResp.ok) {
+    showErr(`tvdb search: ${srchResp.status}`);
+    return {waitStr: "", exactName: "", lastAired: ""};
+  }
+  const srchJSON = await srchResp.json();
+  if(!srchJSON.data[0]) {
+    showErr(`No series found for ${searchStr}`);
+    return {waitStr: "", exactName: "", lastAired: ""};
+  }
+  const tvdbId    = srchJSON.data[0].tvdb_id;
+  const exactName = srchJSON.data[0].name;
+
+  const extUrl = 
+    `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
+  const extResp = await fetch(extUrl,
+                    {headers: {
+                        'Content-Type': 'application/json',
+                         Authorization:'Bearer ' + theTvDbToken
+                    }});
+  if (!extResp.ok) {
+    showErr(`tvdb extended: ${extResp.status}`);
+    return {waitStr: "", exactName: "", lastAired: ""};
+  }
+  const extJSON   = await extResp.json();
+  const lastAired = extJSON.data.lastAired;
+  if(!lastAired) {
+    showErr(`no lastAired for ${searchStr}`);
+    return {waitStr: "", exactName: "", lastAired: ""};
+  }
+
+  while(cache.length) {
+    const oldIdx = cache.findIndex(
+                    c => c.searchStr === searchStr || 
+                         c.exactName === exactName);
+    if(oldIdx > -1) cache.splice(oldIdx, 1);
+    else break;
+  }
+  const dateStr = new Date(lastAired)
+                      .toISOString().substring(0, 10);
+  cache.push({searchStr, lastAired: dateStr, 
+              saved:Date.now(), exactName: exactName});
+
+  window.localStorage.setItem(
+                "tvdbNameCache", JSON.stringify(cache));
+
+  return {waitStr: formatWaitStr(lastAired), 
+          exactName, lastAired};
+}
+
   // let searchStr = show;
   // if(typeof searchStr !== 'string') {
   //   searchStr = show.Name;
@@ -68,65 +138,3 @@ export const getWaitData = async (searchStr) => {
     //   }
     // }
   // }
-  const cacheEntry = cache.find(c => c.searchStr === searchStr);
-  if(cacheEntry && 
-      (Date.now() - cacheEntry.saved) < 48*60*60*1000) { // 2 days
-    const lastAired = cacheEntry.lastAired;
-    return [formatWaitStr(lastAired), 
-            cacheEntry.seriesName, lastAired];
-  }
-  if(!theTvDbToken) await getToken();
-
-  const srchUrl = 'https://api4.thetvdb.com/v4/' +
-                  'search?type=series&query='    + 
-                   encodeURIComponent(searchStr)
-  const srchResp = await fetch(srchUrl,
-    {headers: {
-      'Content-Type': 'application/json',
-       Authorization:'Bearer ' + theTvDbToken}
-    }
-  );
-  if (!srchResp.ok) {
-    showErr(`tvdb search: ${srchResp.status}`);
-    return formatWaitStr();
-  }
-  const srchJSON = await srchResp.json();
-  if(!srchJSON.data[0]) {
-    showErr(`No series found for ${searchStr}`);
-    return formatWaitStr();
-  }
-  const seriesId   = srchJSON.data[0].tvdb_id;
-  const seriesName = srchJSON.data[0].name;
-
-  const extUrl = 
-    `https://api4.thetvdb.com/v4/series/${seriesId}/extended`;
-  const extResp = await fetch(extUrl,
-    {headers: {
-        'Content-Type': 'application/json',
-        Authorization:'Bearer ' + theTvDbToken
-      }
-    }
-  );
-  if (!extResp.ok) {
-    showErr(`tvdb extended: ${extResp.status}`);
-    return formatWaitStr();
-  }
-  const extJSON   = await extResp.json();
-  const lastAired = extJSON.data.lastAired;
-  if(!lastAired) {
-    showErr(`no lastAired for ${searchStr}`);
-    return formatWaitStr();
-  }
-
-  const oldIdx = cache.findIndex(c => c.searchStr === searchStr);
-  if(oldIdx > -1) cache.splice(oldIdx, 1);
-  const dateStr = new Date(lastAired)
-                      .toISOString().substring(0, 10);
-  cache.push({searchStr, lastAired: dateStr, 
-              saved:Date.now(), seriesName});
-
-  window.localStorage.setItem(
-                "tvdbNameCache", JSON.stringify(cache));
-
-  return [formatWaitStr(lastAired), seriesName, lastAired];
-}

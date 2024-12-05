@@ -118,13 +118,14 @@ export default {
     const toggleWaiting = async (show) => {
       this.saveVisShow(show.Name);
       show.Waiting = !show.Waiting;
-      show.WaitStr = (await tvdb.getWaitData(show.Name))[0];
+      show.WaitStr = 
+            (await tvdb.getWaitData(show.Name)).waitStr;
       emby.saveWaiting(show.Name, show.Waiting)
           .catch(async (err) => {
               showErr("late saveWaiting error:", err);
               show.Waiting = !show.Waiting;
               show.WaitStr = 
-                      (await tvdb.getWaitData(show.Name))[0];
+                  (await tvdb.getWaitData(show.Name)).waitStr;
            });
     };
 
@@ -331,14 +332,16 @@ export default {
 
     // https://sweetalert2.github.io/#download
     async addClick () {
-      const srchTxt = prompt("Enter series name. It is used as an approximate search string.");
+      const srchTxt = prompt(
+                "Enter series name. " +
+                "It is used as an approximate search string.");
       if (!srchTxt) {
         showErr("Search string is empty");
         return;
       }
 
-      const [waitStr, exactName, lastAired] = 
-                await tvdb.getWaitData(srchTxt);
+      const {waitStr, exactName, lastAired} = 
+                     await tvdb.getWaitData(srchTxt);
 
       const test = allShows.find((s) => s.Name == exactName);
       if(test) {  

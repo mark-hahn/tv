@@ -71,7 +71,7 @@ const fCall = (fname, param, sema4) => {
 
   if(!haveSocket) waitingSends.push(msg);
   else {
-    console.log("sending:", msg);
+    // console.log("sending:", msg);
     ws.send(msg);
   }
   return promise;
@@ -85,7 +85,7 @@ handleMsg = (msg) => {
     return;
   }
   const [id, status, result] = parts.slice(1);
-  console.log("handling msg:", id, status);
+  // console.log("handling msg:", id, status);
   if(id == '0') return;
 
   const callIdx = calls.findIndex(

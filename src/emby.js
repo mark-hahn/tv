@@ -66,8 +66,8 @@ export async function addNoEmby(show) {
 export async function setWait(show) {
   if(show) {
     show.Waiting = true;
-    show.WaitStr = (await tvdb.getWaitData(show.Name))[0];
-    console.log('waiting:', show.Name, show.WaitStr);
+    show.WaitStr = (await tvdb.getWaitData(show.Name)).waitStr;
+    // console.log('waiting:', show.Name, show.WaitStr);
   }
   else {
     delete show.Waiting;

@@ -53,17 +53,20 @@ export function getSeasons(allShows, cb) {
   seasonsWorker.onmessage = cb;
 }
 
-////////////////  MAIN FUNCTIONS  /////////////////
-
 const toTryCollId    = '1468316';
 const continueCollId = '4719143';
 const markCollId     = '4697672';
 const lindaCollId    = '4706186';
 
+export async function addNoEmby(show) {
+  await srvr.addWaiting(show.Name);
+  await srvr.addNoEmby(show);
+}
+
 export async function setWait(show) {
   if(show) {
     show.Waiting = true;
-    show.WaitStr = await tvdb.getWaitStr(show.Name);
+    show.WaitStr = (await tvdb.getWaitData(show.Name))[0];
     console.log('waiting:', show.Name, show.WaitStr);
   }
   else {
@@ -82,11 +85,13 @@ export async function loadAllShows() {
   const waitPromise   = srvr.getWaiting();
   const rejPromise    = srvr.getRejects();
   const pkupPromise   = srvr.getPickups();
+  const noEmbyPromise = srvr.getNoEmbys();
 
-  const [embyShows, srvrShows, waitingShows, rejects, pickups] = 
+  const [embyShows, srvrShows, waitingShows, 
+          rejects, pickups, noEmbys] = 
     await Promise.all([listPromise, seriesPromise, 
-                       waitPromise, rejPromise, pkupPromise]);
-
+                       waitPromise, rejPromise, pkupPromise, 
+                       noEmbyPromise]);
   const shows = [];
 
   for(let key in embyShows.data.Items) {
@@ -108,6 +113,10 @@ export async function loadAllShows() {
     if(show.Date) shows.push(show);
   }
 
+  for(const show of noEmbys) {
+    shows.push(show);
+  }
+
   for(let rejectName of rejects) {
     const show = shows.find((show) => show.Name == rejectName);
     if(show) show.Reject = true;
@@ -115,14 +124,14 @@ export async function loadAllShows() {
 
   for(let waitingName of waitingShows) {
     const show = shows.find((show) => show.Name == waitingName);
-    await setWait(show);
+    if(show) await setWait(show);
   }
 
   for(let pickupName of pickups) {
     const show = shows.find((show) => show.Name == pickupName);
     if(show) show.Pickup = true;
   }
-   
+
   const toTryRes = await axios.get(
         urls.collectionListUrl(cred, toTryCollId));
   const toTryIds = [];
@@ -351,14 +360,17 @@ export async function savePickup(name, pickup) {
   if(pickup) {
     try { await srvr.addPickup(name); }
     catch (e) {
-      showErr('unable to add pickup from server' + e);
+      showErr('unable to add pickup' + e);
       throw e;
     }
   }
   else {
-    try { await srvr.delPickup(name); }
+    try { 
+      await srvr.delPickup(name); 
+    }
     catch (e) { 
-      showErr('unable to delete pickup to server' + e);
+      showErr('unable to save pickup to server: ' +
+               e.Message);
       throw e;
     }
   }
@@ -449,6 +461,12 @@ export async function saveLinda(id, inLinda) {
     showErr(err);
     throw new Error(err);
   }
+}
+
+export const deleteWaitAndNoemby = async (name) => {
+  console.log('deleteWaitAndNoemby:', name);
+  await srvr.delWaiting(name);
+  await srvr.delNoEmby(name);
 }
 
 /////////////////////  RANDOM RESULTS  ///////////////////////

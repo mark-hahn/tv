@@ -62,13 +62,18 @@ const fCall = (fname, param, sema4) => {
     }
   }
   const id = ++nextId;
-  console.log("calling:", {id, fname});
   const promise = new Promise((resolve, reject) => {
     calls.push({id, fname, resolve, reject, sema4});
   });
+  if(typeof param == 'object') 
+        param = JSON.stringify(param);
   const msg = `${id}~~~${fname}~~~${param}`;
+
   if(!haveSocket) waitingSends.push(msg);
-  else ws.send(msg);
+  else {
+    console.log("sending:", msg);
+    ws.send(msg);
+  }
   return promise;
 }
 
@@ -133,6 +138,13 @@ export function addPickup(name)
             {return fCall('addPickup', name, 'pkup')}
 export function delPickup(name)    
             {return fCall('delPickup', name, 'pkup')}
-
+            
+export function getNoEmbys()       
+            {return fCall('getNoEmbys')}
+export function addNoEmby(show)    
+            {return fCall('addNoEmby', show, 'noemby')}
+export function delNoEmby(name)    
+            {return fCall('delNoEmby', name, 'noemby')}
+            
 export function deletePath(path)   
             {return fCall('deletePath', path)}

@@ -13,19 +13,23 @@ div
       #err(@click="errClick" style="width:450px; display:inline-block; margin-left:10px; font-size:16px;color:red;background-color:white;cursor:default;") {{errMsg}}
 
     div(style="width:100%;")
-      table(style="background-color:white; padding:0 20px; width:710px;")
-        tr(style="width:100px;")
-          td(style="width:60px;font-size:large;") 
-            | {{shows.length + '/' + allShowsLength}}
-          td(style="width:100px;")
-            button(@click="sortClick" style="width:90px; text-align:right;") Sort By:
-          td(v-if="sortByDate"
-             style="width:120px; text-align:left; font-size:large;") New Shows
-          td(v-if="sortBySize" 
-             style="width:120px; text-align:left; font-size:large;") Size
-          td(style="padding:0 4px; text-align:right;") Filters:
-          td( v-for="cond in conds"
-              :style="{width:'22px',textAlign:'center'}"
+      div(style="display:flex; justify-content: space-around;background-color:white; padding:0 20px; width:710px;")
+        div(style="display:inline-block; width:60px; ") 
+          | {{shows.length + '/' + allShowsLength}}
+        div(style="width:100px; display:inline-block;")
+          button(@click="sortClick" style="width:60px; text-align:center;") Sort
+        div(v-if="sortByNew"
+            style="width:30px; display:inline-block; text-align:left; ") New 
+        div(v-if="sortByActive"
+            style="width:60px; display:inline-block; text-align:left; ") Active 
+        div(v-if="sortBySize" 
+            style="width:60px; display:inline-block; text-align:left; margin-left:10px;") Size
+        div(style="width:60px; display:inline-block;text-align:left;")
+          button(@click="addClick") Add
+        div(style="padding:0 4px; display:inline-block; text-align:right;") Filters:
+        div(style="width:300px; display:inline-block; text-align:left;  margin-right:10px;")
+          div( v-for="cond in conds"
+              :style="{width:'25px',textAlign:'center',display:'inline-block', flexBasis: '20px'}"
               @click="condFltrClick(cond)" )
             font-awesome-icon(:icon="cond.icon"
               :style="{color:condFltrColor(cond)}")
@@ -40,7 +44,7 @@ div
           div(v-show="!show.Id.startsWith('noemby-')" 
                  @click="seriesMapAction('open', show)")
             font-awesome-icon(icon="border-all" style="color:#ccc")
-        td(v-if="sortByDate" style="width:80px;font-size:16px;") 
+        td(v-if="sortByNew" style="width:80px;font-size:16px;") 
           | {{ show.DateCreated.substring(0,10) }}
         td(v-if="sortBySize" style="margin-right:200px;width:60px;font-size:16px;text-align:right") 
           | {{ formatSize(show) + '&nbsp;&nbsp;&nbsp;' }}
@@ -82,9 +86,9 @@ div
 
 
 <script>
-import * as emby           from "./emby.js";
-import * as tvdb           from "./tvdb.js";
-import * as urls           from "./urls.js";
+import * as emby  from "./emby.js";
+import * as tvdb  from "./tvdb.js";
+import * as urls  from "./urls.js";
 
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library }         from "@fortawesome/fontawesome-svg-core";
@@ -114,12 +118,13 @@ export default {
     const toggleWaiting = async (show) => {
       this.saveVisShow(show.Name);
       show.Waiting = !show.Waiting;
-      show.WaitStr = await tvdb.getWaitStr(show.Name);
+      show.WaitStr = (await tvdb.getWaitData(show.Name))[0];
       emby.saveWaiting(show.Name, show.Waiting)
           .catch(async (err) => {
               showErr("late saveWaiting error:", err);
               show.Waiting = !show.Waiting;
-              show.WaitStr = await tvdb.getWaitStr(show.Name);
+              show.WaitStr = 
+                      (await tvdb.getWaitData(show.Name))[0];
            });
     };
 
@@ -154,6 +159,7 @@ export default {
             break;
           }
         }
+        emby.deleteWaitAndNoemby(show.Name);
         allShows   = allShows.filter(  (show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);
       }
@@ -169,7 +175,7 @@ export default {
             });
       if (!show.Pickup && show.Id.startsWith("noemby-")) {
         console.log("toggled pickUp, removing row");
-        const id   = show.Id;
+        const id = show.Id;
         for(let i = 0; i < allShows.length; i++) {
           if(allShows[i].Id == id) {
             let nextShow           = allShows[i+1];
@@ -179,6 +185,7 @@ export default {
             break;
           }
         }
+        emby.deleteWaitAndNoemby(show.Name);
         allShows   = allShows  .filter((show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);
       }
@@ -249,6 +256,7 @@ export default {
             break;
           }
         }
+        emby.deleteWaitAndNoemby(show.Name);
         allShows   = allShows.filter  ((show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);
         this.scrollSavedVisShowIntoView();
@@ -259,7 +267,8 @@ export default {
       shows:            [],
       searchStr:        "",
       errMsg:           "",
-      sortByDate:     true,
+      sortByNew:      true,
+      sortByActive:  false,
       sortBySize:    false,
       highlightName:    "",
       allShowsLength:    0,
@@ -319,6 +328,43 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
+
+    // https://sweetalert2.github.io/#download
+    async addClick () {
+      const srchTxt = prompt("Enter series name. It is used as an approximate search string.");
+      if (!srchTxt) {
+        showErr("Search string is empty");
+        return;
+      }
+      const [waitStr, exactName] = 
+                await tvdb.getWaitData(srchTxt);
+      const date    = new Date().toISOString();
+      const dateStr = date.substring(0, 10);
+      const show = {
+        Name: exactName,
+        Id: "noemby-" + Math.random(),
+        DateCreated: dateStr,
+        Waiting: true,
+        WaitStr :waitStr,
+        InToTry: false,
+        InContinue: false,
+        InMark: false,
+        InLinda: false,
+        Reject: false,
+        Pickup: true,
+        Date: dateStr,
+        Size: 0,
+        Seasons: [],
+      };
+      allShows.unshift(show);
+      this.shows.unshift(show);
+
+      this.highlightName = exactName;
+      this.saveVisShow(exactName);
+      this.scrollSavedVisShowIntoView();
+
+      await emby.addNoEmby(show);
+    },
 
     showErr (...params) {
       let err = "";
@@ -382,13 +428,13 @@ export default {
     },
 
     async sortClick() {
-      if (this.sortByDate) {
-        this.sortByDate = false;
+      if (this.sortByNew) {
+        this.sortByNew = false;
         this.sortBySize = true;
         console.log("sort by size");
       }
       else {
-        this.sortByDate = true;
+        this.sortByNew = true;
         this.sortBySize = false;
         console.log("sort by date");
       }
@@ -501,8 +547,10 @@ export default {
 
     sortShows() {
       allShows.sort((a, b) => {
-        if (this.sortByDate) return a.DateCreated > b.DateCreated ? -1 : +1;
-        if (this.sortBySize) return a.Size > b.Size ? -1 : +1;
+        if (this.sortByNew) 
+              return a.DateCreated > b.DateCreated ? -1 : +1;
+        if (this.sortBySize) 
+              return a.Size > b.Size ? -1 : +1;
       });
     },
 
@@ -595,10 +643,9 @@ export default {
         allShows = await emby.loadAllShows();
         this.shows = allShows;
 
-        console.log("allShows[0]",     allShows[0]);
-        console.log("this.shows[0]", this.shows[0]);
 
-        const name = window.localStorage.getItem("lastVisShow");
+        const name = 
+              window.localStorage.getItem("lastVisShow");
         if (!name) {
           const name = allShows[0].Name;
           this.highlightName = name;
@@ -606,9 +653,9 @@ export default {
         }
         this.scrollSavedVisShowIntoView();
 
-        emby.getSeasons(allShows, this.addSeasonsToShow);
+        // emby.getSeasons(allShows, this.addSeasonsToShow);
 
-        this.sortByDate = true;
+        this.sortByNew = true;
         this.sortShows();
         this.showAll();
       } catch (err) {

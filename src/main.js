@@ -2,9 +2,11 @@
 bugs ...
   gap dashes don't show until this.shows reloads
   waiting icon color broken
+  move unaired check to getgap
+    process waiting shows first in getgap
 
 new features ...
-  create new waiting show from name
+  check seasons for no unaired before setting waiting
   add activity sort (from srvr)
   popup on ctrl click with all providers
   add % display for gap progress

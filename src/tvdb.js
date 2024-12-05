@@ -31,21 +31,49 @@ const getToken = async () => {
 
 //////////// get WaitStr //////////////
 
+const cache = [];
+const cacheStr = window.localStorage.getItem("tvdbNameCache");
+if(cacheStr) {
+  try {
+    const cacheArr = JSON.parse(cacheStr);
+    cacheArr.forEach(c => cache.push(c));
+  } catch(e) {
+    showErr(`cache parse error: ${e}`);
+    cache.length = 0;
+  }
+}
+
 const formatWaitStr = (lastAired) => {
   if(!lastAired) return '<Unknown>';
-  const waitTime = new Date(lastAired).getTime();
-  const nowTime  = Date.now();
-  if(waitTime > nowTime) return `<${lastAired}>`;
-  else return '<Ready>';
+  const today = new Date().toISOString().substring(0, 10);
+  console.log("formatWaitStr: ", {lastAired, today});
+  if(lastAired > today) return `{${lastAired}}`;
+  else return '{Ready}';
 }
 
 export const getWaitData = async (searchStr) => {
-  let cache = [];
+  // let searchStr = show;
+  // if(typeof searchStr !== 'string') {
+  //   searchStr = show.Name;
+    // console.log("getWait show.Seasons: ", show.Seasons);
+    // const Seasons = show.Seasons;
+    // if(Seasons && Seasons.length) {
+    //   const lastSeason = Seasons[Seasons.length-1];
+    //   if(lastSeason.length) {
+    //     const lastEp = lastSeason[lastSeason.length-1];
+    //     if(!lastEp.unaired) {
+    //       console.log("getWait lastEp: ", lastEp);
+    //       return ['{Ready}', searchStr, lastEp.date];
+    //     }
+    //   }
+    // }
+  // }
   const cacheEntry = cache.find(c => c.searchStr === searchStr);
   if(cacheEntry && 
       (Date.now() - cacheEntry.saved) < 48*60*60*1000) { // 2 days
     const lastAired = cacheEntry.lastAired;
-    return [formatWaitStr(lastAired), cacheEntry.seriesName];
+    return [formatWaitStr(lastAired), 
+            cacheEntry.seriesName, lastAired];
   }
   if(!theTvDbToken) await getToken();
 
@@ -92,11 +120,13 @@ export const getWaitData = async (searchStr) => {
 
   const oldIdx = cache.findIndex(c => c.searchStr === searchStr);
   if(oldIdx > -1) cache.splice(oldIdx, 1);
-  cache.push({searchStr, lastAired, 
+  const dateStr = new Date(lastAired)
+                      .toISOString().substring(0, 10);
+  cache.push({searchStr, lastAired: dateStr, 
               saved:Date.now(), seriesName});
 
   window.localStorage.setItem(
                 "tvdbNameCache", JSON.stringify(cache));
 
-  return [formatWaitStr(lastAired), seriesName];
+  return [formatWaitStr(lastAired), seriesName, lastAired];
 }

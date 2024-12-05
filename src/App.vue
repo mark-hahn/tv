@@ -337,7 +337,7 @@ export default {
         return;
       }
 
-      const [waitStr, exactName] = 
+      const [waitStr, exactName, lastAired] = 
                 await tvdb.getWaitData(srchTxt);
 
       const test = allShows.find((s) => s.Name == exactName);
@@ -351,9 +351,10 @@ export default {
       const show = {
         Name: exactName,
         Id: "noemby-" + Math.random(),
-        DateCreated: dateStr,
+        DateCreated: dateStr, 
+        LastAired: lastAired, 
         Waiting: true,
-        WaitStr :waitStr,
+        WaitStr: waitStr,
         InToTry: false,
         InContinue: false,
         InMark: false,

@@ -68,13 +68,11 @@ const getAllShows = async (id, _param, resolve, reject) => {
           await recurs(path + '/' + dirent);
         return;
       }
-      const sfx   = path.split('.').pop();
+      const sfx = path.split('.').pop();
       if(videoFileExtensions.includes(sfx)) {
-        const tstr  = fstat.mtime.toISOString();
-        const fdate = 
-            `${tstr.substring(0,10)} ${tstr.substring(11,19)}`;
-        if(fdate.substring(0,4) > '2050') return;     
-        maxDate  = (maxDate > fdate) ? maxDate : fdate;
+        const date  = 
+              fstat.mtime.toISOString().substring(0,10);
+        maxDate = (maxDate > date) ? maxDate : date;
       }
       totalSize += fstat.size;
     }
@@ -88,15 +86,12 @@ const getAllShows = async (id, _param, resolve, reject) => {
     const showPath = tvDir + '/' + dirent;
     const fstat = await fsp.stat(showPath);
     const tstr  = fstat.mtime.toISOString();
-    maxDate = `${tstr.substring(0,10)} ${tstr.substring(11,19)}`;
-    if(maxDate.substring(0,4) > '2050') {
-        console.log(dat(), 'bad date:', maxDate, showPath);
-        maxDate = '0000-00-00 00:00:00'; 
-    }
+    maxDate = tstr.substring(0,10);
     totalSize = 0;
-    await recurs(showPath);
-    shows[dirent] = [maxDate, totalSize];
 
+    await recurs(showPath);
+
+    shows[dirent] = [maxDate, totalSize];
     if(totalSize == 0) {
       console.log(dat(), 'empty show:', dirent);
     }

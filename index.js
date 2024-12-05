@@ -235,7 +235,7 @@ const addWaiting = async (id, name, resolve, _reject) => {
   resolve([id, 'ok']);
 }
 
-const delWaiting = async (id, name, resolve, reject) => {
+const delWaiting = async (id, name, resolve) => {
   console.log(dat(), 'delWaiting', id, name);
   let deletedOne = false;
   for(const [idx, waitingNameStr] of waitings.entries()) {
@@ -247,7 +247,7 @@ const delWaiting = async (id, name, resolve, reject) => {
   }
   if(!deletedOne) {
     console.log(dat(), '-- waiting not deleted -- no match:', name);
-    reject([id, {"delWaiting":`${name} not found`}]);
+    // reject([id, {"delWaiting":`${name} not found`}]);
     return
   }
   await fsp.writeFile('data/waiting.json', JSON.stringify(waitings));
@@ -317,8 +317,7 @@ const delPickup = (id, name, resolve, reject) => {
     }
   }
   if(!deletedOne) {
-    console.log(dat(), '-- pickup not deleted -- no match:', name);
-    reject([id,{"delPickup":"not found"}]);
+    console.log(dat(), 'pickup not deleted, no match:', name);
     return;
   }
   saveConfigYml(id, {"ok":"ok"}, resolve, reject);

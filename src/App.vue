@@ -1,7 +1,7 @@
 <template lang="pug">
 div
-  #hdr(style="width:700px; background-color:#ccc; margin-left:11%;  position:fixed; top:0; z-index:1")
-    div(style="display:inline-block;width:100%;")
+  #hdr(style="width:700px; background-color:#ccc; margin-left:11%;  position:fixed; top:0; z-index:1; background-color: rgb(230, 230, 230);")
+    div(style="display:inline-block; width:100%;")
       button(@click="showAll" style="margin-left:5px;margin-right:5px;") 
         | All
       input(v-model="searchStr" @input="select"
@@ -13,18 +13,18 @@ div
       #err(@click="errClick" style="width:450px; display:inline-block; margin-left:10px; font-size:16px;color:red;background-color:white;cursor:default;") {{errMsg}}
 
     div(style="width:100%;")
-      div(style="display:flex; justify-content: space-around; background-color: rgb(204, 204, 204); width:710px; margin-top: 5px;margin-bottom: 5px;")
-        div(style="display:inline-block;") 
+      div(style="display:flex; justify-content: space-around; width:710px; margin-top: 5px;margin-bottom: 5px;")
+        div(style="display:inline-block; margin-top:4px;") 
           | {{shows.length + '/' + allShowsLength}}
-        div(style="display:inline-block;") 
+        div(style="display:inline-block; margin-top:4px;") 
           | {{gapPercent+'%'}}
         div(style="display:inline-block;")
+          button(@click='sortClick' 
+                 style={display:'inlineBlock', fontSize:'15px', margin:'4px', backgroundColor:'if(sortByNew)yellow'}) Added
           button(@click="sortClick" 
-                 style="width:60px;display:inline-block;display:inline-block; text-align:center;") Sort
+                 style={display:'inlineBlock', fontSize:'15px', margin:'4px', color:'if(sortByActive) yellow'}) Activity
           button(@click="sortClick" 
-                 style="width:60px; text-align:center;") Sort
-          button(@click="sortClick" 
-                 style="width:60px;v text-align:center;") Sort
+                 style={display:'inlineBlock', fontSize:'15px', margin:'4px', color:'if(sortBySize) yellow'}) Size
         //- div(v-if="sortByNew"
         //-     style="width:30px; display:inline-block; text-align:left; ") New 
         //- div(v-if="sortByActive"
@@ -32,9 +32,9 @@ div
         //- div(v-if="sortBySize" 
         //-     style="width:60px; display:inline-block; text-align:left; margin-left:10px;") Size
         div(style="width:60px; display:inline-block;text-align:left;")
-          button(@click="addClick") Add
+          button(@click="addClick" style={display:'inlineBlock', fontSize:'15px', margin:'4px'}) Add
         div(style="padding:0 4px; display:inline-block; text-align:right;")
-        div(style="display:inline-block; text-align:left;  margin-right:10px; background-color: rgb(204, 204, 204);")
+        div(style="display:inline-block; text-align:left;  margin-right:10px; ")
           div( v-for="cond in conds"
               :style="{width:'25px',textAlign:'center',display:'inline-block', flexBasis: '20px'}"
               @click="condFltrClick(cond)" )

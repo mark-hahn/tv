@@ -116,6 +116,7 @@ export async function loadAllShows() {
   for(const show of noEmbys) {
     const showTst = shows.find((s) => s.Name == show.Name);
     if(!showTst) shows.push(show);
+    else await srvr.delNoEmby(show.Name);
   }
 
   for(let rejectName of rejects) {

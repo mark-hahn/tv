@@ -336,8 +336,16 @@ export default {
         showErr("Search string is empty");
         return;
       }
+
       const [waitStr, exactName] = 
                 await tvdb.getWaitData(srchTxt);
+
+      const test = allShows.find((s) => s.Name == exactName);
+      if(test) {  
+        showErr('Show already exists: ' + test.Name);
+        return;
+      }
+
       const date    = new Date().toISOString();
       const dateStr = date.substring(0, 10);
       const show = {
@@ -356,6 +364,7 @@ export default {
         Size: 0,
         Seasons: [],
       };
+
       allShows.unshift(show);
       this.shows.unshift(show);
 

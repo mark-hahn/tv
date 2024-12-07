@@ -5,18 +5,6 @@ import * as cp             from 'child_process';
 import moment              from 'moment';
 import { WebSocketServer } from 'ws';
 
-//  https://blog.logrocket.com/best-node-js-web-scrapers-use-case/
-//  https://www.npmjs.com/package/x-ray
-//  https://www.npmjs.com/package/cheerio   
-//  https://www.npmjs.com/package/jsdom
-
-//  https://www.npmjs.com/package/crawlee  (captchas & anti-bot)
-//  https://www.npmjs.com/package/zenrows  (captchas & anti-bot)
-//  https://www.npmjs.com/package/puppeteer (browser control, dynamic pages)
-//  https://www.npmjs.com/package/playwright (microsoft, uses chromium)
-//  https://www.npmjs.com/package/osmosis  (dom browser)
-//  https://www.npmjs.com/package/nightmare  (clicks, etc., uses electron
-
 process.setMaxListeners(50);
 
 const showdates   = true;

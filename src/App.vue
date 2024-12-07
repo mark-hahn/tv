@@ -650,9 +650,9 @@ export default {
     },
 
     addSeasonsToShow(event) {
-      this.gapPercent = 
-            Math.ceil(++gapCount * 100 / allShows.length);
-      const {showId, seasons, gap} = event.data;
+      const {showId, seasons, gap, progress} = event.data;
+      this.gapPercent = progress;
+      
       let  show = allShows.find((show) => show.Id == showId);
       if(show) {
         show.Seasons = seasons;

@@ -165,7 +165,9 @@ self.onmessage = async (event) => {
     showName = showNameIn;
     const seasons = await getSeasons(showId, i);
     const gap     = getGap(seasons);
-    self.postMessage({showId, seasons, gap});
+    const progress = Math.ceil( (i+1) * 100 / allShowsIdName.length );
+    if(progress > 98) console.log(`progress: ${progress}%`);
+    self.postMessage({showId, seasons, gap, progress});
   }
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   console.log(`seasons-worker done, ${elapsed} secs`);

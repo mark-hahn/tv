@@ -1,13 +1,12 @@
 /*
 bugs ...
   waiting icon color broken
+  size sort
 
 new features ...
-  add activity sort (from srvr)
   popup on ctrl click with all providers
   esc key closes map
   move error in map to top right
-  change sort to 3 buttons
   map: clicks on season numbers for whole row
 
 tabled ...

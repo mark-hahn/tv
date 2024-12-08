@@ -113,7 +113,7 @@ export const getWaitData = async (searchStr) => {
   const dateStr = new Date(lastAired)
                       .toISOString().substring(0, 10);
   cache.push({searchStr, lastAired: dateStr, 
-              saved:Date.now(), exactName: exactName});
+              saved:Date.now(), exactName});
 
   window.localStorage.setItem(
                 "tvdbNameCache", JSON.stringify(cache));

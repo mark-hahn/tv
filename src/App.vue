@@ -32,7 +32,7 @@ div
         div(style="padding:0 4px; display:inline-block; text-align:right;")
         div(style="display:inline-block; text-align:left;  margin-right:10px; ")
           div( v-for="cond in conds"
-              :style="{width:'1.6em',textAlign:'center',display:'inline-block', flexBasis: '20px'}"
+              :style="{width:'1.45em',textAlign:'center',display:'inline-block', flexBasis: '20px'}"
               @click="condFltrClick(cond)" )
             font-awesome-icon(:icon="cond.icon"
               :style="{color:condFltrColor(cond)}")
@@ -467,6 +467,7 @@ export default {
       this.sortByNew      = false;
       this.sortByActivity = false;
       this.sortBySize     = true;
+      this.sortShows();
       console.log("sort by Size");
     },
 
@@ -580,7 +581,7 @@ export default {
         if (this.sortByActivity) 
               return a.Date > b.Date ? -1 : +1;
         if (this.sortBySize) 
-              return a.Size > b.Size ? -1 : +1;
+              return b.Size - a.Size ? -1 : +1;
       });
     },
 

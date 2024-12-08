@@ -110,7 +110,7 @@ export async function loadAllShows() {
     const [date, size] = showDateSize;
     show.Date = date;
     show.Size = size;
-    console.log('show:', show.Name, {date, size});
+    // console.log('show:', show.Name, {date, size});
     if(!show.DateCreated) show.DateCreated = show.Date;
     if(show.Date) shows.push(show);
   }

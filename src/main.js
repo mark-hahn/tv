@@ -1,10 +1,13 @@
 /*
 bugs ...
-  waiting icon color broken
+  waiting icon color
   size sort
+  ban
 
 new features ...
   popup on ctrl click with all providers
+
+map ...
   esc key closes map
   move error in map to top right
   map: clicks on season numbers for whole row

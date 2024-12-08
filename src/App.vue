@@ -36,7 +36,7 @@ div
               @click="condFltrClick(cond)" )
             font-awesome-icon(:icon="cond.icon"
               :style="{color:condFltrColor(cond)}")
-
+ 
   div(style="margin-top:65px; width:700px; margin-left:10%;")
     table(style="padding:0 5px; width:100%; font-size:18px")
       tr(v-for="show in shows" key="show.Id" style="outline:thin solid;")

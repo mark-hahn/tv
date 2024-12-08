@@ -412,7 +412,7 @@ export default {
         this.errMsg = "";
     },
     
-    topClick () {
+    topClick() {
       window.scrollTo(0,0)
       const name = allShows[0].Name;
       this.highlightName = name;
@@ -454,6 +454,7 @@ export default {
       this.sortBySize     = false;
       this.sortShows();
       this.showAll();
+      this.topClick()
       console.log("sort by Added");
     },
 
@@ -463,6 +464,7 @@ export default {
       this.sortBySize     = false;
       this.sortShows();
       this.showAll();
+      this.topClick()
       console.log("sort by Activity");
     },
 
@@ -471,8 +473,8 @@ export default {
       this.sortByActivity = false;
       this.sortBySize     = true;
       this.sortShows();
-      // this.showAll();
-      // this.select();
+      this.showAll();
+      this.topClick()
       console.log("sort by Size");
     },
 
@@ -581,12 +583,16 @@ export default {
 
     sortShows() {
       allShows.sort((a, b) => {
-        if (this.sortByNew) 
-              return a.DateCreated > b.DateCreated ? -1 : +1;
-        if (this.sortByActivity) 
-              return a.Date > b.Date ? -1 : +1;
+        if (this.sortByNew) {
+          if (a.DateCreated == b.DateCreated) return 0;
+          return a.DateCreated > b.DateCreated ? -1 : +1;
+        }
+        if (this.sortByActivity) {
+          if (a.Date == b.Date) return 0;
+          return a.Date > b.Date ? -1 : +1;
+        }
         if (this.sortBySize) 
-              return a.Size - b.Size ? -1 : +1;
+          return b.Size - a.Size;
       });
     },
 

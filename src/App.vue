@@ -114,7 +114,6 @@ let   embyWin   = null;
 let   imdbWin   = null;
 let   showErr   = null;
 const errFifo   = [];
-let   gapCount  = 0;
 
 export default {
   name: "App",
@@ -166,7 +165,7 @@ export default {
             break;
           }
         }
-        emby.deleteWaitAndNoemby(show.Name);
+        await emby.deleteWaitAndNoemby(show.Name);
         allShows   = allShows.filter(  (show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);
       }
@@ -192,7 +191,7 @@ export default {
             break;
           }
         }
-        emby.deleteWaitAndNoemby(show.Name);
+        await emby.deleteWaitAndNoemby(show.Name);
         allShows   = allShows  .filter((show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);
       }
@@ -263,7 +262,7 @@ export default {
             break;
           }
         }
-        emby.deleteWaitAndNoemby(show.Name);
+        await emby.deleteWaitAndNoemby(show.Name);
         allShows   = allShows.filter  ((show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);
         this.scrollSavedVisShowIntoView();
@@ -453,6 +452,8 @@ export default {
       this.sortByNew      = true;
       this.sortByActivity = false;
       this.sortBySize     = false;
+      this.sortShows();
+      this.showAll();
       console.log("sort by Added");
     },
 
@@ -460,6 +461,8 @@ export default {
       this.sortByNew      = false;
       this.sortByActivity = true;
       this.sortBySize     = false;
+      this.sortShows();
+      this.showAll();
       console.log("sort by Activity");
     },
 
@@ -468,6 +471,8 @@ export default {
       this.sortByActivity = false;
       this.sortBySize     = true;
       this.sortShows();
+      // this.showAll();
+      // this.select();
       console.log("sort by Size");
     },
 
@@ -581,7 +586,7 @@ export default {
         if (this.sortByActivity) 
               return a.Date > b.Date ? -1 : +1;
         if (this.sortBySize) 
-              return b.Size - a.Size ? -1 : +1;
+              return a.Size - b.Size ? -1 : +1;
       });
     },
 
@@ -654,7 +659,7 @@ export default {
       const {showId, seasons, gap, progress} = event.data;
       this.gapPercent = progress;
       
-      let  show = allShows.find((show) => show.Id == showId);
+      let show = allShows.find((show) => show.Id == showId);
       if(show) {
         show.Seasons = seasons;
         show.Gap     = gap;
@@ -687,10 +692,11 @@ export default {
         }
         this.scrollSavedVisShowIntoView();
 
-        gapCount = 0;
         emby.getSeasons(allShows, this.addSeasonsToShow);
 
-        this.sortByNew = true;
+        this.sortByNew      = true;
+        this.sortByActivity = false;
+        this.sortBySize     = false;
         this.sortShows();
         this.showAll();
       } catch (err) {

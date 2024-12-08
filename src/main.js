@@ -3,7 +3,8 @@ bugs ...
   waiting icon color
   size sort
   ban
-
+  2097 dates
+  
 new features ...
   popup on ctrl click with all providers
 

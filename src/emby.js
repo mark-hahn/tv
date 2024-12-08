@@ -107,6 +107,7 @@ export async function loadAllShows() {
     const embyPath     = show.Path.split('/').pop();
     const showDateSize = srvrShows[embyPath];
     if(!showDateSize) continue
+
     const [date, size] = showDateSize;
     show.Date = date;
     show.Size = size;

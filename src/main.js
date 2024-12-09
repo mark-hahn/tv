@@ -1,13 +1,11 @@
 /*
 bugs ...
-  highlight on app load
-  map click
   waiting icon color
   ban
-  row didn't dissapear upon series deletion
   show with 1.5 seasons down marked as not ready (silo)  
        store info in waiting.json?
   first click to show emby page doesn't work
+  filters width changes on click
 
 new features ...
   popup on ctrl click with all providers

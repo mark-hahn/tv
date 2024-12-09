@@ -312,21 +312,11 @@ export default {
         console.log("deleted db, keeping row");
       } else {
         console.log("deleted db, no pickup, removing row");
-        for(let i = 0; i < allShows.length; i++) {
-          if(allShows[i].Id == id) {
-            let nextShow           = allShows[i+1];
-            if(!nextShow) nextShow = allShows[i-1];
-            if(!nextShow) break;
-            this.saveVisShow(nextShow.Name);
-            break;
-          }
-        }
         await emby.deleteWaitAndNoemby(show.Name);
-        allShows   = allShows.filter  ((show) => show.Id != id);
+        allShows   = allShows  .filter((show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);
-        this.scrollSavedVisShowIntoView();
       }
-    };
+    }
 
     return {
       shows:             [],

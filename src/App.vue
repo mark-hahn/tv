@@ -730,6 +730,10 @@ export default {
   /////////////////  MOUNTED  /////////////////
   mounted() {
     (async () => {
+      document.addEventListener('keydown', (event) => {
+        if(event.code == 'Escape') 
+          this.seriesMapAction('close');
+      }); 
       try {
         showErr = this.showErr;
         await emby.init(showErr);

@@ -13,13 +13,11 @@ new features ...
   popup on ctrl click with all providers
 
 map ...
-  esc key closes map
   map: clicks on season numbers for whole row
 
 tabled ...
   check seasons for no unaired before setting waiting
     move unaired check to getgap
-  move scroll bar to middle
 */
 
 import {createApp} from 'vue'

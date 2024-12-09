@@ -7,16 +7,13 @@ bugs ...
   row didn't dissapear upon series deletion
   show with 1.5 seasons down marked as not ready (silo)  
        store info in waiting.json?
-  chg sort leaves highlight above top
   first click to show emby page doesn't work
 
 new features ...
-  widen display
   popup on ctrl click with all providers
 
 map ...
   esc key closes map
-  move error in map to top right
   map: clicks on season numbers for whole row
 
 tabled ...

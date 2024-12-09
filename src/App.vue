@@ -130,7 +130,7 @@
       button(@click="seriesMapAction('prune', mapShow)") prune
       button(@click="seriesMapAction('date',  mapShow)") set date
       | {{'&nbsp;&nbsp;&nbsp;'+mapShow.Name}}
-      div(v-if="seriesMap?.gap" style="color:red;") &nbsp; -- &nbsp; {{seriesMap?.gap?.[2]}} &nbsp; -- 
+      div(v-if="seriesMap?.gap" style="display:inline-block;color:red;") &nbsp; -- &nbsp; {{seriesMap?.gap?.[2]}} &nbsp; -- 
     table(style="padding:0 5px; width:100%; font-size:16px" )
       tr(style="font-weight:bold;")
         td

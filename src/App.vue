@@ -54,8 +54,16 @@ div
         td(v-if="sortBySize" style="margin-right:200px;width:60px;font-size:16px;text-align:right") 
           | {{ formatSize(show) + '&nbsp;&nbsp;&nbsp;' }}
 
-        td(@click="showInExternal(show, $event)"
-           :style="{padding:'4px', backgroundColor: highlightName == show.Name ? 'yellow' : 'white',fontSize:'16px'}" :id="nameHash(show.Name)") {{show.Name}} {{show.Waiting ? show.WaitStr : ''}}
+        td(@click="showInExternal(show, $event)" 
+           :style="{display:'flex', justifyContent:'space-between', padding:'5px', backgroundColor: highlightName == show.Name ? 'yellow':'white'}")
+
+           div(style="padding:2px; fontSize:16px; font-weight:bold;" 
+              @click="showInExternal(show, $event)" 
+           ) {{show.Name}} 
+
+           div(v-if="show.Waiting" style="padding:2px; color: #00f; fontSize:16px;" 
+              @click="showInExternal(show, $event)" :id="nameHash(show.Name)"
+           ) {{show.WaitStr}}
 
         td( v-for="cond in conds" 
             style="width:22px; text-align:center;"

@@ -2,17 +2,14 @@
 bugs ...
   waiting icon color
   ban
-  2097 dates
   row didn't dissapear upon series deletion
   show with 1.5 seasons down marked as not ready (silo)  
        store info in waiting.json?
-  some waiting uses angle bkts instead of braces
   chg sort leaves highlight above top
 
 new features ...
   widen display
   popup on ctrl click with all providers
-  show waiting on the right in other color
 
 map ...
   esc key closes map

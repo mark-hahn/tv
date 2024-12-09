@@ -6,29 +6,31 @@
               display:flex; flex-direction:column;  
               border:1px solid black; position:fixed; top:0;`)
 
-    #hdrtop(style="width:100%; display:flex; " +
-                  "flex-direction:row; justify-content:space-between;")
-        button(@click="showAll" 
-                style="margin-left:5px;margin-right:5px;") All
-        div
-          input(v-model="searchStr" 
-                @input="select"
-                  style="border:1px solid black; width:100px;")
-          button(@click="select")
-            font-awesome-icon(icon="search")
-        button(@click="topClick" 
-                style="margin-left:5px;margin-right:5px;") Top
-        #err(@click="errClick" 
-              style=`width:540px; display:inline-block; 
-                    margin-right:5px; font-size:20px; color:red;
-                    cursor:default; height:20px;`) {{errMsg}}
+    #hdrtop(style=`width:100%; display:flex;
+                   flex-direction:row; justify-content:space-between;`)
+      button(@click="showAll" 
+              style=`margin-left:10px; margin-right:5px;
+                     fontSize:15px; margin:4px;
+                     background-color:white;`) All
+      #srch(style=`margin-top:3px;`)
+        input(v-model="searchStr" 
+              @input="select"
+                style="border:1px solid black; width:100px;")
+        button(@click="select" 
+                style="margin-left:1px;")
+          font-awesome-icon(icon="search")
+      button(@click="topClick" 
+              style=`margin-left:10px; margin-right:5px;
+                     fontSize:15px; margin:4px;
+                     background-color:white;`) Top
+      #err(@click="errClick" 
+            style=`width:540px; display:inline-block; 
+                  margin-right:5px; font-size:20px; color:red;
+                  cursor:default; height:20px;`) {{errMsg}}
 
     #hdrbottom(style=`width:100%; background-color:#ccc; 
-                      display:flex; justify-content:space-around;
-                      margin-top:5px; margin-bottom:5px;`)
-      div(style=`width:100%; background-color:#ccc; 
                       display:flex; justify-content:space-between;
-                      margin-top:5px;`)
+                      margin-top:5px; margin-bottom:5px;`)
         #botlft(style=`width:400px;  
                        display:flex; justify-content:space-between;`)
           #nums(style=`background-color:#ccc; 

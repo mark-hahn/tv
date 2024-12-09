@@ -477,7 +477,8 @@ export default {
     },
     
     topClick() {
-      window.scrollTo(0,0)
+      const container = document.querySelector("#shows");
+      container.scrollTop = 0;
       const name = allShows[0].Name;
       this.highlightName = name;
       this.saveVisShow(name);

@@ -77,9 +77,11 @@
   
     #shows(style="width:100%; flex-grow: 1; overflow-y:scroll;")
       table(style="width:100%; font-size:18px")
-        tr(v-for="show in shows" key="show.Id" style="outline:thin solid;")
+        tr(v-for="show in shows" key="show.Id" 
+           style="outline:thin solid;" 
+             :id="nameHash(show.Name)")
           td(style="width:30px; text-align:center;"
-              @click="copyNameToClipboard(show)")
+            @click="copyNameToClipboard(show)")
             font-awesome-icon(icon="copy" style="color:#ccc")
           td(style="width:30px; text-align:center;" )
             div(v-show="!show.Id.startsWith('noemby-')" 
@@ -111,7 +113,7 @@
             ) {{show.Name}} 
 
             div(v-if="show.Waiting" style="padding:2px; color: #00f; fontSize:16px;" 
-                @click="showInExternal(show, $event)" :id="nameHash(show.Name)"
+                @click="showInExternal(show, $event)"
             ) {{show.WaitStr}}
 
           td( v-for="cond in conds" 
@@ -444,7 +446,7 @@ export default {
 
       this.highlightName = exactName;
       this.saveVisShow(exactName);
-      this.scrollSavedVisShowIntoView();
+      this.scrollToSavedShow();
 
       await emby.addNoEmby(show);
     },
@@ -543,31 +545,14 @@ export default {
       console.log("sort by Size");
     },
 
-    scrollSavedVisShowIntoView() {
+    scrollToSavedShow() {
       this.$nextTick(() => {
         const name = window.localStorage.getItem("lastVisShow");
         const id = this.nameHash(name);
         this.highlightName = name;
-        // console.log(`srolling ${id} into view`);
+        // console.log(`srolling ${name} into view`);
         const ele = document.getElementById(id);
-        if (ele) {
-          window.scrollBy(0, -80);
-          ele.scrollIntoView(true);
-        } else {
-          console.log(`show ${id} not in show list, finding best match`);
-          for (let show of allShows) {
-            const hash = this.nameHash(show.Name);
-            if (hash > id) {
-              const ele = document.getElementById(hash);
-              if (ele) {
-                ele.scrollIntoView(true);
-                window.scrollBy(0, -160);
-                this.saveVisShow(show.Name);
-              }
-              break;
-            }
-          }
-        }
+        if (ele) ele.scrollIntoView({block: "center"});
       });
     },
 
@@ -684,15 +669,14 @@ export default {
         }
         return true;
       });
-      if (scroll) this.scrollSavedVisShowIntoView();
+      if (scroll) this.scrollToSavedShow();
     },
 
     /////////////////  UPDATE METHODS  /////////////////
     showAll() {
       this.searchStr = "";
       for (let cond of this.conds) cond.filter = 0;
-      this.scrollSavedVisShowIntoView();
-      this.select();
+      this.select(true);
     },
 
     async showInExternal(show, event) {
@@ -761,7 +745,7 @@ export default {
           this.highlightName = name;
           this.saveVisShow(name);
         }
-        this.scrollSavedVisShowIntoView();
+        this.scrollToSavedShow();
 
         emby.getSeasons(allShows, this.addSeasonsToShow);
 

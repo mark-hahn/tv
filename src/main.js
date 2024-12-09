@@ -1,5 +1,7 @@
 /*
 bugs ...
+  highlight on app load
+  map click
   waiting icon color
   ban
   row didn't dissapear upon series deletion

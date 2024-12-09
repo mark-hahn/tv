@@ -67,10 +67,10 @@
                           font-size:15px; margin:4px 4px 4px 20px;backgroundColor:white`) Add
 
           #botrgt(style=`display:flex; justify-content:space-between;
-                        margin-top:5px;`)
+                         margin: 5px 17px 0 0;`)
             #fltr(v-for="cond in conds"
                 @click="condFltrClick(cond)"
-                :style=`{width:'1.45em',textAlign:'center',
+                :style=`{width:'1.435em',textAlign:'center',
                           display:'inline-block'}`)
               font-awesome-icon(:icon="cond.icon"
                               :style="{color:condFltrColor(cond)}")

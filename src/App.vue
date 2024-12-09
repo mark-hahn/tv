@@ -1,43 +1,76 @@
 <template lang="pug">
-div
-  #hdr(style="width:700px; background-color:#ccc; margin-left:11%;  position:fixed; top:0; z-index:1; background-color: rgb(230, 230, 230);")
-    div(style="display:inline-block; width:100%;")
-      button(@click="showAll" style="margin-left:5px;margin-right:5px;") 
-        | All
-      input(v-model="searchStr" @input="select"
-            style="border:1px solid black; width:100px;")
-      button(@click="select")
-        font-awesome-icon(icon="search")
-      button(@click="topClick" style="margin-left:5px;margin-right:5px;") 
-        | Top
-      #err(@click="errClick" style="width:450px; display:inline-block; margin-left:10px; font-size:16px;color:red;background-color:white;cursor:default;") {{errMsg}}
 
-    div(style="width:100%;")
-      div(style="display:flex; justify-content: space-around; width:710px; margin-top: 5px;margin-bottom: 5px;")
-        div(style="display:inline-block; margin-top:4px;") 
-          | {{shows.length + '/' + allShowsLength}}
-        div(style="display:inline-block; margin-top:4px;") 
-          | {{gapPercent+'%'}}
+#outer(style=`width:100%; display:flex; flex-direction:column;
+              align-items:center;`)
+  #hdr(style=`width:800px; background-color:#ccc;
+              display:flex; flex-direction:column;  
+              border:1px solid black; position:fixed; top:0;`)
 
-        div(style="display:inline-block;")
-          button(@click='sortClickAdded' 
-                 :style="{display:'inlineBlock', fontSize:'15px', margin:'4px', backgroundColor: sortByNew ? 'yellow' : 'white'}") Added
-          button(@click="sortClickActivity" 
-                 :style="{display:'inlineBlock', fontSize:'15px', margin:'4px', backgroundColor: sortByActivity ? 'yellow' : 'white'}") Active
-          button(@click="sortClickSize" 
-                 :style="{display:'inlineBlock', fontSize:'15px', margin:'4px', backgroundColor: sortBySize ? 'yellow' : 'white'}") Size
+    #hdrtop(style="width:100%; display:flex; " +
+                  "flex-direction:row; justify-content:space-between;")
+        button(@click="showAll" 
+                style="margin-left:5px;margin-right:5px;") All
+        div
+          input(v-model="searchStr" 
+                @input="select"
+                  style="border:1px solid black; width:100px;")
+          button(@click="select")
+            font-awesome-icon(icon="search")
+        button(@click="topClick" 
+                style="margin-left:5px;margin-right:5px;") Top
+        #err(@click="errClick" 
+              style=`width:540px; display:inline-block; 
+                    margin-right:5px; font-size:20px; color:red;
+                    cursor:default; height:20px;`) {{errMsg}}
 
-        div(style="width:60px; display:inline-block;text-align:left;")
-          button(@click="addClick" style={display:'inlineBlock', fontSize:'15px', margin:'4px'}) Add
-        div(style="padding:0 4px; display:inline-block; text-align:right;")
-        div(style="display:inline-block; text-align:left;  margin-right:10px; ")
-          div( v-for="cond in conds"
-              :style="{width:'1.45em',textAlign:'center',display:'inline-block', flexBasis: '20px'}"
-              @click="condFltrClick(cond)" )
+    #hdrbottom(style=`width:100%; background-color:#ccc; 
+                      display:flex; justify-content:space-around;
+                      margin-top:5px; margin-bottom:5px;`)
+      div(style=`width:100%; background-color:#ccc; 
+                      display:flex; justify-content:space-between;
+                      margin-top:5px;`)
+        #botlft(style=`width:400px;  
+                       display:flex; justify-content:space-between;`)
+          #nums(style=`background-color:#ccc; 
+                        display:flex; justify-content:space-around;`)
+            #count(style="display:inline-block; margin:4px 5px 4px 15px;") 
+              | {{shows.length + '/' + allShowsLength}}
+            #prog(style=`display:inline-block; 
+                        margin:4px 10px 4px 5px;`) 
+              | {{gapPercent+'%'}}
+
+          #sorts(style=`display:inline-block;
+                        display:flex; justify-content:space-between;`)
+            button(@click='sortClickAdded' 
+                    :style=`{display:'inlineBlock', 
+                            fontSize:'15px', margin:'4px', 
+                            backgroundColor: 
+                              sortByNew ? 'yellow' : 'white'}`) Added
+            button(@click='sortClickActivity' 
+                   :style=`{display:'inlineBlock', 
+                            fontSize:'15px', margin:'4px', 
+                            backgroundColor: 
+                              sortByActivity ? 'yellow' : 'white'}`) Active
+            button(@click='sortClickSize' 
+                   :style=`{display:'inlineBlock', 
+                            fontSize:'15px', margin:'4px', 
+                            backgroundColor: 
+                              sortBySize ? 'yellow' : 'white'}`) Size
+
+          button(@click="addClick" 
+                  style=`display:inline-block'; 
+                         font-size:15px; margin:4px 4px 4px 20px;backgroundColor:white`) Add
+
+        #botrgt(style=`display:flex; justify-content:space-between;
+                       margin-top:5px;`)
+          #fltr(v-for="cond in conds"
+              @click="condFltrClick(cond)"
+              :style=`{width:'1.45em',textAlign:'center',
+                        display:'inline-block'}`)
             font-awesome-icon(:icon="cond.icon"
-              :style="{color:condFltrColor(cond)}")
+                            :style="{color:condFltrColor(cond)}")
  
-  div(style="margin-top:65px; width:700px; margin-left:10%;")
+  #rows(style="margin-top:65px; width:700px; margin-left:10%;")
     table(style="padding:0 5px; width:100%; font-size:18px")
       tr(v-for="show in shows" key="show.Id" style="outline:thin solid;")
         td(style="width:30px; text-align:center;"
@@ -737,12 +770,6 @@ input {
 }
 button {
   font-size:18px;
-}
-#hdr {
-  border: 1px solid black;
-  position: fixed;
-  left: 0;
-  top: 0;
 }
 #map {
   border: 1px solid black;

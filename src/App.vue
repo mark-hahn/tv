@@ -85,15 +85,26 @@
             div(v-show="!show.Id.startsWith('noemby-')" 
                   @click="seriesMapAction('open', show)")
               font-awesome-icon(icon="border-all" style="color:#ccc")
-          td(v-if="sortByNew" style="width:80px;font-size:16px;") 
+
+          td(@click="setHilite(show)"
+               v-if="sortByNew" 
+             :style=`{width:'80px', fontSize:'16px',
+                      backgroundColor: hilite(show)}`) 
             | {{ show.DateCreated }}
-          td(v-if="sortByActivity" style="width:80px;font-size:16px;") 
+            
+          td(@click="setHilite(show)"
+               v-if="sortByActivity" 
+             :style=`{width:'80px', fontSize:'16px',
+                      backgroundColor: hilite(show)}`) 
             | {{ show.Date }}
-          td(v-if="sortBySize" style="margin-right:200px;width:60px;font-size:16px;text-align:right") 
+
+          td(@click="setHilite(show)"
+             v-if="sortBySize" 
+             :style=`{width:'80px', fontSize:'16px',
+                      backgroundColor: hilite(show)}`) 
             | {{ formatSize(show) + '&nbsp;&nbsp;&nbsp;' }}
 
-          td(@click="showInExternal(show, $event)" 
-            :style="{display:'flex', justifyContent:'space-between', padding:'5px', backgroundColor: highlightName == show.Name ? 'yellow':'white'}")
+          td(:style="{display:'flex', justifyContent:'space-between', padding:'5px', backgroundColor: hilite(show)}")
 
             div(style="padding:2px; fontSize:16px; font-weight:bold;" 
                 @click="showInExternal(show, $event)" 
@@ -381,8 +392,15 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
+    hilite(show) {
+      return this.highlightName == show.Name ? "yellow" : "white";
+    },
 
-    // https://sweetalert2.github.io/#download
+    setHilite(show) {
+      this.highlightName = show.Name;
+      this.saveVisShow(show.Name);
+    },
+
     async addClick () {
       const srchTxt = prompt(
                 "Enter series name. " +

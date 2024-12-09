@@ -6,6 +6,7 @@ bugs ...
   show with 1.5 seasons down marked as not ready (silo)  
        store info in waiting.json?
   chg sort leaves highlight above top
+  first click to show emby page doesn't work
 
 new features ...
   widen display

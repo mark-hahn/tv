@@ -1,110 +1,113 @@
 <template lang="pug">
 
-#outer(style=`width:100%; display:flex; flex-direction:column;
-              align-items:center;`)
-  #hdr(style=`width:800px; background-color:#ccc;
-              display:flex; flex-direction:column;  
-              border:1px solid black; position:fixed; top:0;`)
+#all(style=`width:100%; height:95dvh; box-sizing: border-box;
+            padding:0; margin:0;
+            display:flex; flex-direction:column;
+            align-items:center;`)
+  #center(style=`max-width:800px; height:100%; 
+                 display:flex; flex-direction:column;`)             
+    #hdr(style=`width:100%; background-color:#ccc;
+                display:flex; flex-direction:column;`)
 
-    #hdrtop(style=`width:100%; display:flex;
-                   flex-direction:row; justify-content:space-between;`)
-      button(@click="showAll" 
-              style=`margin-left:10px; margin-right:5px;
-                     fontSize:15px; margin:4px;
-                     background-color:white;`) All
-      #srch(style=`margin-top:3px;`)
-        input(v-model="searchStr" 
-              @input="select"
-                style="border:1px solid black; width:100px;")
-        button(@click="select" 
-                style="margin-left:1px;")
-          font-awesome-icon(icon="search")
-      button(@click="topClick" 
-              style=`margin-left:10px; margin-right:5px;
-                     fontSize:15px; margin:4px;
-                     background-color:white;`) Top
-      #err(@click="errClick" 
-            style=`width:540px; display:inline-block; 
-                  margin-right:5px; font-size:20px; color:red;
-                  cursor:default; height:20px;`) {{errMsg}}
+      #hdrtop(style=`width:100%; display:flex;
+                    flex-direction:row; justify-content:space-between;`)
+        button(@click="showAll" 
+                style=`margin-left:10px; margin-right:5px;
+                      fontSize:15px; margin:4px;
+                      background-color:white;`) All
+        #srch(style=`margin-top:3px;`)
+          input(v-model="searchStr" 
+                @input="select"
+                  style="border:1px solid black; width:100px;")
+          button(@click="select" 
+                  style="margin-left:1px;")
+            font-awesome-icon(icon="search")
+        button(@click="topClick" 
+                style=`margin-left:10px; margin-right:5px;
+                      fontSize:15px; margin:4px;
+                      background-color:white;`) Top
+        #err(@click="errClick" 
+              style=`flex-grow:1; display:inline-block; 
+                    font-size:20px; color:red;
+                    cursor:default; height:20px;`) {{errMsg}}
 
-    #hdrbottom(style=`width:100%; background-color:#ccc; 
-                      display:flex; justify-content:space-between;
-                      margin-top:5px; margin-bottom:5px;`)
-        #botlft(style=`width:400px;  
-                       display:flex; justify-content:space-between;`)
-          #nums(style=`background-color:#ccc; 
-                        display:flex; justify-content:space-around;`)
-            #count(style="display:inline-block; margin:4px 5px 4px 15px;") 
-              | {{shows.length + '/' + allShowsLength}}
-            #prog(style=`display:inline-block; 
-                        margin:4px 10px 4px 5px;`) 
-              | {{gapPercent+'%'}}
-
-          #sorts(style=`display:inline-block;
+      #hdrbottom(style=`width:100%; background-color:#ccc; 
+                        display:flex; justify-content:space-between;
+                        margin-top:5px; margin-bottom:5px;`)
+          #botlft(style=`width:400px;  
                         display:flex; justify-content:space-between;`)
-            button(@click='sortClickAdded' 
+            #nums(style=`background-color:#ccc; 
+                          display:flex; justify-content:space-around;`)
+              #count(style="display:inline-block; margin:4px 5px 4px 15px;") 
+                | {{shows.length + '/' + allShowsLength}}
+              #prog(style=`display:inline-block; 
+                          margin:4px 10px 4px 5px;`) 
+                | {{gapPercent+'%'}}
+
+            #sorts(style=`display:inline-block;
+                          display:flex; justify-content:space-between;`)
+              button(@click='sortClickAdded' 
+                      :style=`{display:'inlineBlock', 
+                              fontSize:'15px', margin:'4px', 
+                              backgroundColor: 
+                                sortByNew ? 'yellow' : 'white'}`) Added
+              button(@click='sortClickActivity' 
                     :style=`{display:'inlineBlock', 
-                            fontSize:'15px', margin:'4px', 
-                            backgroundColor: 
-                              sortByNew ? 'yellow' : 'white'}`) Added
-            button(@click='sortClickActivity' 
-                   :style=`{display:'inlineBlock', 
-                            fontSize:'15px', margin:'4px', 
-                            backgroundColor: 
-                              sortByActivity ? 'yellow' : 'white'}`) Active
-            button(@click='sortClickSize' 
-                   :style=`{display:'inlineBlock', 
-                            fontSize:'15px', margin:'4px', 
-                            backgroundColor: 
-                              sortBySize ? 'yellow' : 'white'}`) Size
+                              fontSize:'15px', margin:'4px', 
+                              backgroundColor: 
+                                sortByActivity ? 'yellow' : 'white'}`) Active
+              button(@click='sortClickSize' 
+                    :style=`{display:'inlineBlock', 
+                              fontSize:'15px', margin:'4px', 
+                              backgroundColor: 
+                                sortBySize ? 'yellow' : 'white'}`) Size
 
-          button(@click="addClick" 
-                  style=`display:inline-block'; 
-                         font-size:15px; margin:4px 4px 4px 20px;backgroundColor:white`) Add
+            button(@click="addClick" 
+                    style=`display:inline-block'; 
+                          font-size:15px; margin:4px 4px 4px 20px;backgroundColor:white`) Add
 
-        #botrgt(style=`display:flex; justify-content:space-between;
-                       margin-top:5px;`)
-          #fltr(v-for="cond in conds"
-              @click="condFltrClick(cond)"
-              :style=`{width:'1.45em',textAlign:'center',
-                        display:'inline-block'}`)
+          #botrgt(style=`display:flex; justify-content:space-between;
+                        margin-top:5px;`)
+            #fltr(v-for="cond in conds"
+                @click="condFltrClick(cond)"
+                :style=`{width:'1.45em',textAlign:'center',
+                          display:'inline-block'}`)
+              font-awesome-icon(:icon="cond.icon"
+                              :style="{color:condFltrColor(cond)}")
+  
+    #shows(style="width:100%; flex-grow: 1; overflow-y:scroll;")
+      table(style="width:100%; font-size:18px")
+        tr(v-for="show in shows" key="show.Id" style="outline:thin solid;")
+          td(style="width:30px; text-align:center;"
+              @click="copyNameToClipboard(show)")
+            font-awesome-icon(icon="copy" style="color:#ccc")
+          td(style="width:30px; text-align:center;" )
+            div(v-show="!show.Id.startsWith('noemby-')" 
+                  @click="seriesMapAction('open', show)")
+              font-awesome-icon(icon="border-all" style="color:#ccc")
+          td(v-if="sortByNew" style="width:80px;font-size:16px;") 
+            | {{ show.DateCreated }}
+          td(v-if="sortByActivity" style="width:80px;font-size:16px;") 
+            | {{ show.Date }}
+          td(v-if="sortBySize" style="margin-right:200px;width:60px;font-size:16px;text-align:right") 
+            | {{ formatSize(show) + '&nbsp;&nbsp;&nbsp;' }}
+
+          td(@click="showInExternal(show, $event)" 
+            :style="{display:'flex', justifyContent:'space-between', padding:'5px', backgroundColor: highlightName == show.Name ? 'yellow':'white'}")
+
+            div(style="padding:2px; fontSize:16px; font-weight:bold;" 
+                @click="showInExternal(show, $event)" 
+            ) {{show.Name}} 
+
+            div(v-if="show.Waiting" style="padding:2px; color: #00f; fontSize:16px;" 
+                @click="showInExternal(show, $event)" :id="nameHash(show.Name)"
+            ) {{show.WaitStr}}
+
+          td( v-for="cond in conds" 
+              style="width:22px; text-align:center;"
+            @click="cond.click(show)" )
             font-awesome-icon(:icon="cond.icon"
-                            :style="{color:condFltrColor(cond)}")
- 
-  #rows(style="margin-top:65px; width:700px; margin-left:10%;")
-    table(style="padding:0 5px; width:100%; font-size:18px")
-      tr(v-for="show in shows" key="show.Id" style="outline:thin solid;")
-        td(style="width:30px; text-align:center;"
-             @click="copyNameToClipboard(show)")
-          font-awesome-icon(icon="copy" style="color:#ccc")
-        td(style="width:30px; text-align:center;" )
-          div(v-show="!show.Id.startsWith('noemby-')" 
-                 @click="seriesMapAction('open', show)")
-            font-awesome-icon(icon="border-all" style="color:#ccc")
-        td(v-if="sortByNew" style="width:80px;font-size:16px;") 
-          | {{ show.DateCreated }}
-        td(v-if="sortByActivity" style="width:80px;font-size:16px;") 
-          | {{ show.Date }}
-        td(v-if="sortBySize" style="margin-right:200px;width:60px;font-size:16px;text-align:right") 
-          | {{ formatSize(show) + '&nbsp;&nbsp;&nbsp;' }}
-
-        td(@click="showInExternal(show, $event)" 
-           :style="{display:'flex', justifyContent:'space-between', padding:'5px', backgroundColor: highlightName == show.Name ? 'yellow':'white'}")
-
-           div(style="padding:2px; fontSize:16px; font-weight:bold;" 
-              @click="showInExternal(show, $event)" 
-           ) {{show.Name}} 
-
-           div(v-if="show.Waiting" style="padding:2px; color: #00f; fontSize:16px;" 
-              @click="showInExternal(show, $event)" :id="nameHash(show.Name)"
-           ) {{show.WaitStr}}
-
-        td( v-for="cond in conds" 
-            style="width:22px; text-align:center;"
-           @click="cond.click(show)" )
-          font-awesome-icon(:icon="cond.icon"
-              :style="{color:condColor(show,cond)}")
+                :style="{color:condColor(show,cond)}")
 
   #map(v-if="mapShow !== null" 
         style="width:60%; background-color:#eee; padding:20px;")

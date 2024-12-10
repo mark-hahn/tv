@@ -215,7 +215,7 @@ const addWaiting = async (id, name, resolve, _reject) => {
   console.log(dat(), '-- adding waiting:', name);
   waitings.push(name);
   await fsp.writeFile('data/waiting.json', JSON.stringify(waitings));
-  resolve([id, 'ok']);
+  resolve([id, {"ok":"ok"}]);
 }
 
 const delWaiting = async (id, name, resolve) => {
@@ -230,11 +230,11 @@ const delWaiting = async (id, name, resolve) => {
   }
   if(!deletedOne) {
     console.log(dat(), 'waiting not deleted -- no match:', name);
-    resolve([id, 'ok']);
+    resolve([id, {"ok":"ok"}]);
     return
   }
   await fsp.writeFile('data/waiting.json', JSON.stringify(waitings));
-  resolve([id, 'ok']);
+  resolve([id, {"ok":"ok"}]);
 }
 
 const getRejects = (id, _param, resolve, _reject) => {
@@ -266,7 +266,7 @@ const delReject = (id, name, resolve, reject) => {
   }
   if(!deletedOne) {
     console.log(dat(), '-- reject not deleted -- no match:', name);
-    reject([id, {"delReject":"not found"}]);
+    resolve([id, {"ok":"ok"}]);
     return
   }
   saveConfigYml(id, {"ok":"ok"}, resolve, reject);
@@ -340,7 +340,7 @@ const delNoEmby = async (id, name, resolve, reject) => {
   }
   if(!deletedOne) {
     console.log(dat(), '-- noembys not deleted -- no match:', name);
-    reject([id,{"delNoEmby":"not found"}]);
+    resolve([id, {"ok":"ok"}]);
     return;
   }
   await fsp.writeFile('data/noemby.json', JSON.stringify(noEmbys)); 

@@ -6,7 +6,9 @@ bugs ...
        store info in waiting.json?
   first click to show emby page doesn't work
   some waitstr have angle brackets
-  
+  waiting row deleted when only pickup deleted
+  worker doesn't start from hahnca
+
 new features ...
   popup on ctrl click with all providers
 

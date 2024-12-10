@@ -5,6 +5,7 @@ import * as urls from "./urls.js";
 
 const seasonsWorker = 
         new Worker('src/seasons-worker.js', {type: 'module'});
+console.log('worker:', seasonsWorker);
 
 const name      = "mark";
 const pwd       = "90-MNBbnmyui";
@@ -44,7 +45,6 @@ export async function init(showErrIn) {
 export function getSeasons(allShows, cb) {
   seasonsWorker.onerror = (err) => {
     showErr('Worker:', err.message);
-    throw err;
   }
   const allShowsIdName = [];
   for(let show of allShows) {
@@ -52,8 +52,10 @@ export function getSeasons(allShows, cb) {
     if(id.startsWith('noemby-')) continue;
     allShowsIdName.push([id, show.Name]);
   }
-  seasonsWorker.postMessage({cred, allShowsIdName});
   seasonsWorker.onmessage = cb;
+
+  console.log('posting to worker', seasonsWorker);
+  seasonsWorker.postMessage({cred, allShowsIdName});
 }
 
 const toTryCollId    = '1468316';

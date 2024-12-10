@@ -332,8 +332,9 @@ const delNoEmby = async (id, name, resolve, reject) => {
   console.log(dat(), 'delNoEmby', id, name);
   let deletedOne = false;
   for(const [idx, show] of noEmbys.entries()) {
-    if(show.Name.toLowerCase() === name.toLowerCase()) {
-      console.log(dat(), '-- deleting noembys:', name);
+    if(!show.Name ||
+        show.Name.toLowerCase() === name.toLowerCase()) {
+      console.log(dat(), '-- deleting noemby:', name);
       noEmbys.splice(idx, 1);
       deletedOne = true;
     }

@@ -103,7 +103,7 @@
 
           td(@click="setHilite(show)"
              v-if="sortBySize" 
-             :style=`{width:'80px', fontSize:'16px',
+             :style=`{width:'80px', fontSize:'16px', textAlign:'center',
                       backgroundColor: hilite(show)}`) 
             | {{ formatSize(show) + '&nbsp;&nbsp;&nbsp;' }}
 

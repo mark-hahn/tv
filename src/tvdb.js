@@ -74,13 +74,13 @@ export const getWaitData = async (searchStr) => {
                       Authorization:'Bearer ' + theTvDbToken}
                     });
   if (!srchResp.ok) {
-    showErr(`tvdb search: ${srchResp.status}`);
-    return {waitStr: "", exactName: "", lastAired: ""};
+    showErr(`tvdb search:`, {searchStr}, srchResp.status);
+    return null;
   }
   const srchJSON = await srchResp.json();
   if(!srchJSON.data[0]) {
     showErr(`No series found for ${searchStr}`);
-    return {waitStr: "", exactName: "", lastAired: ""};
+    return null;
   }
   const tvdbId    = srchJSON.data[0].tvdb_id;
   const exactName = srchJSON.data[0].name;
@@ -94,13 +94,13 @@ export const getWaitData = async (searchStr) => {
                     }});
   if (!extResp.ok) {
     showErr(`tvdb extended: ${extResp.status}`);
-    return {waitStr: "", exactName: "", lastAired: ""};
+    return null;
   }
   const extJSON   = await extResp.json();
   const lastAired = extJSON.data.lastAired;
   if(!lastAired) {
     showErr(`no lastAired for ${searchStr}`);
-    return {waitStr: "", exactName: "", lastAired: ""};
+    return null;
   }
 
   while(cache.length) {

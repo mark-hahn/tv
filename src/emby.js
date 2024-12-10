@@ -67,9 +67,14 @@ export async function addNoEmby(show) {
 }
 
 export async function setWait(show) {
-  if(show) {
-    show.Waiting = true;
-    show.WaitStr = (await tvdb.getWaitData(show.Name)).waitStr;
+  if(show?.Name) {
+    show.Waiting = true;      
+    const waitRes = await tvdb.getWaitData(show.Name);
+    if(!waitRes) {
+      showErr('No series found for:', show.Name);
+      return;
+    }
+    show.WaitStr = waitRes.waitStr;
     // console.log('waiting:', show.Name, show.WaitStr);
   }
   else {
@@ -128,8 +133,14 @@ export async function loadAllShows() {
   }
 
   for(let waitingName of waitingShows) {
-    const show = shows.find((show) => show.Name == waitingName);
-    if(show) await setWait(show);
+    const i = shows.findIndex((show) => show.Name == waitingName);
+    const show = shows[i];
+    if(show?.Name) await setWait(show);
+    else {
+      console.log('show or name missing, deleting waiting:', waitingName);
+      await srvr.delWaiting(waitingName);
+      waitingShows.splice(i, 1);
+    }
   }
 
   for(let pickupName of pickups) {

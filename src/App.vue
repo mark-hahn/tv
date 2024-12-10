@@ -183,8 +183,12 @@ export default {
     const toggleWaiting = async (show) => {
       this.saveVisShow(show.Name);
       show.Waiting = !show.Waiting;
-      show.WaitStr = 
-            (await tvdb.getWaitData(show.Name)).waitStr;
+      const waitRes = await tvdb.getWaitData(show.Name);
+      if(!waitRes) {
+        showErr('No series found for:', show.Name);
+        return;
+      }
+      show.WaitStr = waitRes.waitStr;
       emby.saveWaiting(show.Name, show.Waiting)
           .catch(async (err) => {
               showErr("late saveWaiting error:", err);
@@ -399,12 +403,17 @@ export default {
                 "Enter series name. " +
                 "It is used as an approximate search string.");
       if (!srchTxt) {
-        showErr("Search string is empty");
+        //- showErr("Search string is empty");
         return;
       }
 
-      const {waitStr, exactName, lastAired} = 
-                     await tvdb.getWaitData(srchTxt);
+      const waitRes = await tvdb.getWaitData(srchTxt);
+      if(!waitRes) {
+        showErr('No series found for:', srchTxt);
+        return;
+      }
+      const {waitStr, exactName, lastAired} = waitRes;
+                     
 
       const test = allShows.find((s) => s.Name == exactName);
       if(test) {  
@@ -489,8 +498,8 @@ export default {
     nameHash(name) {
       this.allShowsLength = allShows.length;
       if(!name) {
-        showErr('nameHash name param null:', name);
-        console.trace();
+        //- showErr('nameHash name param null:', name);
+        return null;
       }
       return (
         "name-" +
@@ -540,6 +549,7 @@ export default {
       this.$nextTick(() => {
         const name = window.localStorage.getItem("lastVisShow");
         const id = this.nameHash(name);
+        if (!id) return;
         this.highlightName = name;
         // console.log(`srolling ${name} into view`);
         const ele = document.getElementById(id);

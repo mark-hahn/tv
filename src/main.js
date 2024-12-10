@@ -5,7 +5,7 @@ bugs ...
   show with 1.5 seasons down marked as not ready (silo)  
        store info in waiting.json?
   first click to show emby page doesn't work
-  filters width changes on click
+  no hilite on load when no saved hilite
 
 new features ...
   popup on ctrl click with all providers

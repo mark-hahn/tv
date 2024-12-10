@@ -4,7 +4,7 @@
             padding:0; margin:0;
             display:flex; flex-direction:column;
             align-items:center;`)
-  #center(style=`max-width:800px; height:100%; 
+  #center(style=`height:100%; width:800px;
                  display:flex; flex-direction:column;`)             
     #hdr(style=`width:100%; background-color:#ccc;
                 display:flex; flex-direction:column;`)
@@ -34,7 +34,7 @@
       #hdrbottom(style=`width:100%; background-color:#ccc; 
                         display:flex; justify-content:space-between;
                         margin-top:5px; margin-bottom:5px;`)
-          #botlft(style=`width:400px;  
+          #botlft(style=`overflow:hidden;
                         display:flex; justify-content:space-between;`)
             #nums(style=`background-color:#ccc; 
                           display:flex; justify-content:space-around;`)
@@ -70,10 +70,11 @@
                          margin: 5px 17px 0 0;`)
             #fltr(v-for="cond in conds"
                 @click="condFltrClick(cond)"
-                :style=`{width:'1.435em',textAlign:'center',
-                          display:'inline-block'}`)
+                :style=`{width:'1.435em', textAlign:'center',
+                         display:'inline-block', 
+                         color:condFltrColor(cond)}`)
               font-awesome-icon(:icon="cond.icon"
-                              :style="{color:condFltrColor(cond)}")
+                               :style="{}")
   
     #shows(style="width:100%; flex-grow: 1; overflow-y:scroll;")
       table(style="width:100%; font-size:18px")
@@ -732,15 +733,6 @@ export default {
         allShows = await emby.loadAllShows();
         this.shows = allShows;
 
-        const name = 
-              window.localStorage.getItem("lastVisShow");
-        if (!name) {
-          const name = allShows[0].Name;
-          this.highlightName = name;
-          this.saveVisShow(name);
-        }
-        this.scrollToSavedShow();
-
         emby.getSeasons(allShows, this.addSeasonsToShow);
 
         this.sortByNew      = true;
@@ -748,6 +740,15 @@ export default {
         this.sortBySize     = false;
         this.sortShows();
         this.showAll();
+
+        const name = window.localStorage.getItem("lastVisShow");
+        if (!name) {
+          const name = allShows[0].Name;
+          this.highlightName = name;
+          this.saveVisShow(name);
+        }
+        this.scrollToSavedShow();
+
       } catch (err) {
         showErr("Mounted:", err);
       }

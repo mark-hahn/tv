@@ -122,9 +122,13 @@ export async function loadAllShows() {
   }
 
   for(const show of noEmbys) {
-    const showTst = shows.find((s) => s.Name == show.Name);
-    if(!showTst) shows.push(show);
-    else await srvr.delNoEmby(show.Name);
+    if(show?.Name) {
+      const showTst = shows.find((s) => s.Name == show.Name);
+      if(!showTst) shows.push(show);
+      else await srvr.delNoEmby(show.Name);
+      continue;
+    }
+    else await srvr.delNoEmby("");
   }
 
   for(let rejectName of rejects) {

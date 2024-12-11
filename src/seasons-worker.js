@@ -155,7 +155,6 @@ const getGap = (seasons) => {
 }
 
 self.onmessage = async (event) => {
-  console.log('onmessage in worker');
   cred                 = event.data.cred;
   const allShowsIdName = event.data.allShowsIdName;
   const startTime      = Date.now();

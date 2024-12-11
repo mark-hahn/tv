@@ -219,9 +219,6 @@ export const editEpisode = async (seriesId,
     const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
     for(let key in episodesRes.data.Items) {
       const episodeRec     = episodesRes.data.Items[key];
-
-      console.log({episodeRec});
-
       const episodeNumber  = +episodeRec.IndexNumber;
       const userData       = episodeRec?.UserData;
       const watched        = userData?.Played;

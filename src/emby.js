@@ -4,8 +4,8 @@ import * as srvr from "./srvr.js";
 import * as urls from "./urls.js";
 
 const seasonsWorker = 
-        new Worker('src/seasons-worker.js', {type: 'module'});
-console.log('worker:', seasonsWorker);
+  new Worker(new URL('seasons-worker.js', import.meta.url), 
+              {type: 'module'});
 
 const name      = "mark";
 const pwd       = "90-MNBbnmyui";
@@ -53,8 +53,6 @@ export function getSeasons(allShows, cb) {
     allShowsIdName.push([id, show.Name]);
   }
   seasonsWorker.onmessage = cb;
-
-  console.log('posting to worker', seasonsWorker);
   seasonsWorker.postMessage({cred, allShowsIdName});
 }
 

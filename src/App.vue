@@ -78,6 +78,7 @@
   
     #shows(style="width:100%; flex-grow: 1; overflow-y:scroll;")
       table(style="width:100%; font-size:18px")
+       tbody
         tr(v-for="show in shows" key="show.Id" 
            style="outline:thin solid;" 
              :id="nameHash(show.Name)")
@@ -133,6 +134,7 @@
       | {{'&nbsp;&nbsp;&nbsp;'+mapShow.Name}}
       div(v-if="seriesMap?.gap" style="display:inline-block;color:red;") &nbsp; -- &nbsp; {{seriesMap?.gap?.[2]}} &nbsp; -- 
     table(style="padding:0 5px; width:100%; font-size:16px" )
+     tbody
       tr(style="font-weight:bold;")
         td
         td(v-for="episode in seriesMapEpis" style="width:30px; text-align:center;"

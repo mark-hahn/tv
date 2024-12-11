@@ -1,4 +1,6 @@
 /*
+vite-plugin-html: 2.1.1 => 3.2.2
+
 bugs ...
   waiting icon color
   ban
@@ -7,7 +9,6 @@ bugs ...
   first click to show emby page doesn't work
   some waitstr have angle brackets
   waiting row deleted when only pickup deleted
-  worker doesn't start from hahnca
 
 new features ...
   popup on ctrl click with all providers

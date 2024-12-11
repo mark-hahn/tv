@@ -3,7 +3,7 @@ import path from 'path';
 import vue from '@vitejs/plugin-vue';
 import vueJsx from '@vitejs/plugin-vue-jsx';
 import envCompatible from 'vite-plugin-env-compatible';
-import { injectHtml } from 'vite-plugin-html';
+// import { injectHtml } from 'vite-plugin-html';
 import { viteCommonjs } from '@originjs/vite-plugin-commonjs';
 
 // https://vitejs.dev/config/
@@ -34,7 +34,7 @@ export default defineConfig({
     vueJsx(),
     viteCommonjs(),
     envCompatible(),
-    injectHtml()
+    // injectHtml()
   ],
   server: {
     strictPort: false,

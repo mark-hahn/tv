@@ -219,7 +219,7 @@ export default {
               show.Reject = !show.Reject;
            });
       const id = show.Id;
-      if (!show.Reject && !show.Pickup && 
+      if (!show.Reject && !show.Pickup && !show.Waiting &&
               show.Id.startsWith("noemby-")) {
         console.log("turned off reject, removing row");
         for(let i = 0; i < allShows.length; i++) {
@@ -311,14 +311,14 @@ export default {
       const id = show.Id;
       const res = await emby.deleteShowFromEmby(id);
       if (res != "ok") return;
-      if (show.Pickup || show.Reject) {
+      if (show.Pickup || show.Reject || show.Waiting) {
         show.RunTimeTicks      = 0;
         show.UnplayedItemCount = 0;
         show.IsFavorite        = false;
         show.Id = "noemby-" + Math.random();
         console.log("deleted db, keeping row");
       } else {
-        console.log("deleted db, no pickup, removing row");
+        console.log("deleted db, removing row");
         await emby.deleteWaitAndNoemby(show.Name);
         allShows   = allShows  .filter((show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);

@@ -100,6 +100,8 @@ export async function loadAllShows() {
     await Promise.all([listPromise, seriesPromise, 
                        waitPromise, rejPromise, pkupPromise, 
                        noEmbyPromise]);
+  // console.log({rejects});
+
   const shows = [];
 
   for(let key in embyShows.data.Items) {
@@ -116,7 +118,6 @@ export async function loadAllShows() {
     const [date, size] = showDateSize;
     show.Date = date;
     show.Size = size;
-    // console.log('show:', show.Name, {date, size});
     if(!show.DateCreated) show.DateCreated = show.Date;
     if(show.Date) shows.push(show);
   }
@@ -132,8 +133,29 @@ export async function loadAllShows() {
   }
 
   for(let rejectName of rejects) {
-    const show = shows.find((show) => show.Name == rejectName);
+    let show = shows.find((show) => show.Name == rejectName);
     if(show) show.Reject = true;
+    else {
+      const date = '2017-12-05';
+      show = {
+        Name: rejectName,
+        Id: "noemby-" + Math.random(),
+        DateCreated: date,
+        LastAired: date, 
+        Waiting: false,
+        WaitStr: '',
+        InToTry: false,
+        InContinue: false,
+        InMark: false,
+        InLinda: false,
+        Reject: true,
+        Pickup: true,
+        Date: date,
+        Size: 0,
+        Seasons: [],
+      };
+      shows.push(show);
+    }
   }
 
   for(let waitingName of waitingShows) {

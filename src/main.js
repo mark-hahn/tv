@@ -1,18 +1,15 @@
 /*
-vite-plugin-html: 2.1.1 => 3.2.2
-
 bugs ...
   waiting icon color
-  ban
   show with 1.5 seasons down marked as not ready (silo)  
        store info in waiting.json?
-  first click to show emby page doesn't work
   some waitstr have angle brackets
   waiting row deleted when only pickup deleted
 
 new features ...
+  cache gap data
   popup on ctrl click with all providers
-
+ 
 map ...
   map: clicks on season numbers for whole row
 

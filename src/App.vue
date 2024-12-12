@@ -349,7 +349,7 @@ export default {
           cond(show)  { return !!show.Gap; },
           click() {},
         }, {
-          color: "#lime", filter: 0, icon: ["fas", "calendar"],
+          color: "lime", filter: 0, icon: ["fas", "calendar"],
           cond(show)  { return show.Waiting; },
           click(show) { toggleWaiting(show); },
         }, {

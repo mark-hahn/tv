@@ -1,9 +1,7 @@
 /*
 bugs ...
-  waiting icon color
   show with 1.5 seasons down marked as not ready (silo)  
        store info in waiting.json?
-  some waitstr have angle brackets
   waiting row deleted when only pickup deleted
 
 new features ...

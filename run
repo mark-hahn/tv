@@ -20,7 +20,7 @@ cd /root/dev/apps/tv-proc
 
 coffee -c main.coffee
 
-/root/.nvm/versions/node/v16.15.1/bin/node \
+/root/.nvm/versions/node/v22.12.0/bin/node \
          /root/dev/apps/tv-proc/main.js $1 \
     >> /root/dev/apps/tv-proc/tv.log 
 

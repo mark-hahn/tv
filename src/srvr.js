@@ -150,3 +150,11 @@ export function delNoEmby(name)
             
 export function deletePath(path)   
             {return fCall('deletePath', path)}
+
+export async function deleteShow(show) {
+  await delWaiting(show.Name);
+  await delPickup(show.Name);
+  await delNoEmby(show.Name);
+  await deletePath(show.Path);
+  // don't ever delete from rejects
+}

@@ -272,20 +272,22 @@ export default {
             });
     };
 
-    const deleteShowFromEmby = async (show) => {
+    const deleteShow = async (show) => {
       this.saveVisShow(show.Name);
       console.log("delete Show From Emby?", show.Name);
-      if (!window.confirm(`Do you really want to delete series ${show.Name} from Emby?`))
+      if (!window.confirm(
+          `Do you really want to delete series ${show.Name}?`)) 
         return;
-      const res = await emby.deleteShowFromEmby(show.Id);
-      if (res != "ok") return;
-      console.log("deleted db:", show.Name);
-      if(! await this.chkRowDelete(show)){
+      if(!await this.chkRowDelete(show)){
         show.RunTimeTicks      = 0;
         show.UnplayedItemCount = 0;
         show.IsFavorite        = false;
         show.Id = "noemby-" + Math.random();
+        return
       }
+      await emby.deleteShowFromEmby(show);
+      await emby.deleteShowFromServer(show);
+      console.log("app: deleted show:", show.Name);
     }
 
     return {
@@ -346,7 +348,7 @@ export default {
         }, {
           color: "#a66", filter: 0, icon: ["fas", "tv"],
           cond(show)  { return !show.Id.startsWith("noemby-"); },
-          click(show) { deleteShowFromEmby(show); },
+          click(show) { deleteShow(show); },
         },
       ],
     };

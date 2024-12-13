@@ -83,6 +83,22 @@ export async function setWait(show) {
     showErr('waiting show not found:', show.Name);
   }
 }
+
+export async function deleteShowFromEmby(show) {
+  const delRes = await axios.delete(
+           urls.deleteShowUrl(cred, show.Id));
+  const res = delRes.status;
+  if(res != 204) {
+    const err = 
+      `unable to delete ${show.Name} from db: ${delRes.data}`;
+    showErr(err);
+  }
+}
+
+export async function deleteShowFromServer(show){
+  return await srvr.deleteShow(show);
+}
+
 export async function loadAllShows() {
   console.log('entering loadAllShows');
   const time1 = new Date().getTime();
@@ -100,8 +116,6 @@ export async function loadAllShows() {
     await Promise.all([listPromise, seriesPromise, 
                        waitPromise, rejPromise, pkupPromise, 
                        noEmbyPromise]);
-  // console.log({rejects});
-
   const shows = [];
 
   for(let key in embyShows.data.Items) {
@@ -122,6 +136,36 @@ export async function loadAllShows() {
     if(show.Date) shows.push(show);
   }
 
+  for(let rejectName of rejects) {
+    const matchingShow = 
+          shows.find((show) => show.Name == rejectName);
+    if(matchingShow) {
+      console.log('reject: deleting existing:', rejectName);
+      await deleteShowFromEmby(matchingShow);
+      await deleteShowFromServer(matchingShow);
+      shows.splice(shows.indexOf(matchingShow), 1);
+    }
+    const date = '2017-12-05';
+    const rejShow = {
+      Name: rejectName,
+      Id: "noemby-" + Math.random(),
+      DateCreated: date,
+      LastAired: date, 
+      Waiting: false,
+      WaitStr: '',
+      InToTry: false,
+      InContinue: false,
+      InMark: false,
+      InLinda: false,
+      Reject: true,
+      Pickup: false,
+      Date: date,
+      Size: 0,
+      Seasons: [],
+    };
+    shows.push(rejShow);
+  }
+
   for(const show of noEmbys) {
     if(show?.Name) {
       const showTst = shows.find((s) => s.Name == show.Name);
@@ -130,32 +174,6 @@ export async function loadAllShows() {
       continue;
     }
     else await srvr.delNoEmby("");
-  }
-
-  for(let rejectName of rejects) {
-    let show = shows.find((show) => show.Name == rejectName);
-    if(show) show.Reject = true;
-    else {
-      const date = '2017-12-05';
-      show = {
-        Name: rejectName,
-        Id: "noemby-" + Math.random(),
-        DateCreated: date,
-        LastAired: date, 
-        Waiting: false,
-        WaitStr: '',
-        InToTry: false,
-        InContinue: false,
-        InMark: false,
-        InLinda: false,
-        Reject: true,
-        Pickup: false,
-        Date: date,
-        Size: 0,
-        Seasons: [],
-      };
-      shows.push(show);
-    }
   }
 
   for(let waitingName of waitingShows) {
@@ -413,17 +431,6 @@ export async function savePickup(name, pickup) {
       throw e;
     }
   }
-}
-
-export async function deleteShowFromEmby(id) {
-  const delRes = await axios.delete(urls.deleteShowUrl(cred, id));
-  const res = delRes.status;
-  if(res != 204) {
-    const err = 'unable to delete show' + delRes.data;
-    showErr(err);
-    throw new Error(err);
-  }
-  return 'ok';
 }
 
 export async function saveToTry(id, inToTry) {

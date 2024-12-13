@@ -661,15 +661,18 @@ export default {
     },
 
     /////////////////  UPDATE METHODS  /////////////////
-    showAll(init = false) {
+    showAll(dontClrFilters = false) {
+      if(dontClrFilters?.altKey !== undefined) dontClrFilters = false;
+      console.log("showAll", dontClrFilters);
       this.searchStr = "";
-      if(!init)
+      if(!dontClrFilters) {
         for (let cond of this.conds) cond.filter = 0;
+      }
       this.select(true);
     },
 
     async showInExternal(show, event) {
-      console.log("showInExternal", show);
+      console.log("showInExternal", show.Name);
       this.saveVisShow(show.Name);
       if (!show.Id.startsWith("noemby-")) {
         if (event.ctrlKey) {

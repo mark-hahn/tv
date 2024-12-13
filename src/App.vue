@@ -159,17 +159,17 @@ import * as urls  from "./urls.js";
 
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library }         from "@fortawesome/fontawesome-svg-core";
-import { faLaughBeam, faSadCry, faClock, faHeart, } 
+import { faLaughBeam, faSadCry, faHeart, faClock } 
                            from "@fortawesome/free-regular-svg-icons"; 
 import { faCheck, faPlus, faMinus, faArrowDown, faArrowRight,
          faTv, faSearch, faQuestion, faCopy, faBorderAll, faBan,
-         faMars, faVenus, faCalendar} 
+         faMars, faVenus} 
                            from "@fortawesome/free-solid-svg-icons";
 
 library.add([  
   faLaughBeam, faSadCry, faClock, faHeart, faCheck, faPlus, 
   faMinus, faArrowDown, faTv, faSearch, faQuestion, faCopy, 
-  faBan, faBorderAll, faArrowRight, faMars, faVenus, faCalendar]);
+  faBan, faBorderAll, faArrowRight, faMars, faVenus, faClock]);
 
 let   allShows  = [];
 let   embyWin   = null;
@@ -312,7 +312,7 @@ export default {
           cond(show)  { return !!show.Gap; },
           click() {},
         }, {
-          color: "lime", filter: 0, icon: ["fas", "calendar"],
+          color: "#0c0", filter: 0, icon: ["far", "clock"],
           cond(show)  { return show.Waiting; },
           click(show) { toggleWaiting(show); },
         }, {
@@ -619,7 +619,7 @@ export default {
     condFltrColor(cond) {
       switch (cond.filter) {
         case  0: return "gray";
-        case -1: return "pink";
+        case -1: return "red";
         case +1: return cond.color;
       }
     },
@@ -653,7 +653,8 @@ export default {
               return false;
         for (let cond of this.conds) {
           if ( cond.filter ===  0) continue;
-          if ((cond.filter === +1) != (!!cond.cond(show))) return false;
+          if ((cond.filter === +1) != (!!cond.cond(show))) 
+            return false;
         }
         return true;
       });

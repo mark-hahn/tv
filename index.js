@@ -85,7 +85,7 @@ const getAllShows = async (id, _param, resolve, reject) => {
     }
   }
   if(errFlg) {
-    reject([id, errFlg]);
+    reject([id, 'empty show:' + dirent]);
     return;
   }
   else {
@@ -218,7 +218,7 @@ const addWaiting = async (id, name, resolve, _reject) => {
   resolve([id, {"ok":"ok"}]);
 }
 
-const delWaiting = async (id, name, resolve) => {
+const delWaiting = async (id, name, resolve, reject) => {
   console.log(dat(), 'delWaiting', id, name);
   let deletedOne = false;
   for(const [idx, waitingNameStr] of waitings.entries()) {
@@ -230,7 +230,7 @@ const delWaiting = async (id, name, resolve) => {
   }
   if(!deletedOne) {
     console.log(dat(), 'waiting not deleted -- no match:', name);
-    resolve([id, {"ok":"ok"}]);
+    reject([id, 'delWaiting no match:' + name]);
     return
   }
   await fsp.writeFile('data/waiting.json', JSON.stringify(waitings));
@@ -266,7 +266,7 @@ const delReject = (id, name, resolve, reject) => {
   }
   if(!deletedOne) {
     console.log(dat(), '-- reject not deleted -- no match:', name);
-    resolve([id, {"ok":"ok"}]);
+    reject([id, 'delReject not deleted: ' + name]);
     return
   }
   saveConfigYml(id, {"ok":"ok"}, resolve, reject);
@@ -300,6 +300,7 @@ const delPickup = (id, name, resolve, reject) => {
     }
   }
   if(!deletedOne) {
+    reject([id, 'delPickup no match: ' + name]);
     console.log(dat(), 'pickup not deleted, no match:', name);
     return;
   }
@@ -341,7 +342,7 @@ const delNoEmby = async (id, name, resolve, reject) => {
   }
   if(!deletedOne) {
     console.log(dat(), '-- noembys not deleted -- no match:', name);
-    resolve([id, {"ok":"ok"}]);
+    reject([id, 'delNoEmby no match:' + name]);
     return;
   }
   await fsp.writeFile('data/noemby.json', JSON.stringify(noEmbys)); 
@@ -361,7 +362,6 @@ const deletePath = async (id, path, resolve, reject) => {
   }
   resolve([id, {"ok":"ok"}]);
 };
-
 
 
 //////////////////  WEBSOCKET SERVER  //////////////////
@@ -426,7 +426,7 @@ ws.on('connection', (socket) => {
       
       case 'deletePath':   deletePath(id, param, resolve, reject); break;
 
-      default: reject([id, {unknownfunction: fname}]);
+      default: reject([id, 'unknownfunction: ' + fname]);
     };
   });
  

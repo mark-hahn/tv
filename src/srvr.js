@@ -1,5 +1,4 @@
-const URL = 'ws://hahnca.com/tv-series-srvr';
-// const URL = 'ws://127.0.0.1:8736';
+const URL = 'wss://hahnca.com/tv-series-srvr';
 
 let ws;
 const openWs = () => {ws = new WebSocket(URL)};

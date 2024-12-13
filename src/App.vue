@@ -549,9 +549,9 @@ export default {
       });
     },
 
-    copyNameToClipboard(show) {
+    async copyNameToClipboard(show) {
       console.log(`copying ${show.Name} to clipboard`);
-      navigator.clipboard.writeText(show.Name);
+      await navigator.clipboard.writeText(show.Name);
       this.saveVisShow(show.Name);
     },
 

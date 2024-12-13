@@ -46,8 +46,11 @@ let   clint      = null;
 if(!clint) {
   clint = setInterval(() => {
     const length = Object.keys(calls).length;
-    if(length)
-      console.log("calls length:",  Object.keys(calls).length);
+    if(length) {
+      let fnameList = '';
+      calls.forEach(call => {fnameList += call.fname + ' '});
+      console.log("pending calls:", fnameList);
+    }
   }, 5000);
 }
 

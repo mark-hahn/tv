@@ -1,6 +1,3 @@
 npm run build-vite
-rsync -av                   \
-   --exclude '.git'         \
-   --exclude '.vscode'      \
-   --exclude 'node_modules' \
-   ./shows 192.168.1.103:/root/dev/apps/tv-series-client
+rsync -av --delete  \
+   ./shows  hahnca.com:/root/dev/apps/tv-series-client

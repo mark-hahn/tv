@@ -149,7 +149,7 @@ export async function loadAllShows() {
         InMark: false,
         InLinda: false,
         Reject: true,
-        Pickup: true,
+        Pickup: false,
         Date: date,
         Size: 0,
         Seasons: [],
@@ -408,7 +408,7 @@ export async function savePickup(name, pickup) {
       await srvr.delPickup(name); 
     }
     catch (e) { 
-      showErr('unable to save pickup to server: ' +
+      console.log('unable to save pickup to server: ' +
                e.Message);
       throw e;
     }
@@ -502,9 +502,8 @@ export async function saveLinda(id, inLinda) {
   }
 }
 
-export const deleteWaitAndNoemby = async (name) => {
-  console.log('deleteWaitAndNoemby:', name);
-  await srvr.delWaiting(name);
+export const deleteNoemby = async (name) => {
+  console.log('deleteNoemby:', name);
   await srvr.delNoEmby(name);
 }
 

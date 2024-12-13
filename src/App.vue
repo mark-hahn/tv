@@ -184,17 +184,17 @@ export default {
 
     const toggleWaiting = async (show) => {
       this.saveVisShow(show.Name);
-      show.Waiting = !show.Waiting;
       const waitRes = await tvdb.getWaitData(show.Name);
       if(!waitRes) {
-        showErr('No series found for:', show.Name);
+        console.log('toggleWaiting, no series:', show.Name);
         return;
       }
+      show.Waiting = !show.Waiting;
       show.WaitStr = waitRes.waitStr;
       emby.saveWaiting(show.Name, show.Waiting)
           .catch(async (err) => {
-              showErr("late saveWaiting error:", err);
-              show.Waiting = !show.Waiting;
+              console.log("late saveWaiting error:", err);
+              //- show.Waiting = !show.Waiting;
               show.WaitStr = 
                   (await tvdb.getWaitData(show.Name)).waitStr;
            });
@@ -205,8 +205,8 @@ export default {
       show.IsFavorite = !show.IsFavorite;
       emby.saveFav(show.Id, show.IsFavorite)
           .catch((err) => {
-              showErr("late saveFavorite error:", err);
-              show.IsFavorite = !show.IsFavorite;
+              console.log("late saveFavorite error:", err);
+              //- show.IsFavorite = !show.IsFavorite;
            });
     };
 
@@ -215,26 +215,10 @@ export default {
       show.Reject = !show.Reject; 
       emby.saveReject(show.Name, show.Reject) 
           .catch((err) => {
-              showErr("late saveReject:", err);
-              show.Reject = !show.Reject;
+              console.log("late saveReject:", err);
+              //- show.Reject = !show.Reject;
            });
-      const id = show.Id;
-      if (!show.Reject && !show.Pickup && !show.Waiting &&
-              show.Id.startsWith("noemby-")) {
-        console.log("turned off reject, removing row");
-        for(let i = 0; i < allShows.length; i++) {
-          if(allShows[i].Id == id) {
-            let nextShow           = allShows[i+1];
-            if(!nextShow) nextShow = allShows[i-1];
-            if(!nextShow) break;
-            this.saveVisShow(nextShow.Name);
-            break;
-          }
-        }
-        await emby.deleteWaitAndNoemby(show.Name);
-        allShows   = allShows.filter(  (show) => show.Id != id);
-        this.shows = this.shows.filter((show) => show.Id != id);
-      }
+      await this.chkRowDelete(show);
     };
 
     const togglePickup = async (show) => {
@@ -242,25 +226,10 @@ export default {
       show.Pickup = !show.Pickup;
       emby.savePickup(show.Name, show.Pickup)
           .catch((err) => {
-              showErr("late savePickup error:", err);
-              show.Pickup = !show.Pickup;
+              console.log("late savePickup error:", err);
+              //- show.Pickup = !show.Pickup;
             });
-      if (!show.Pickup && show.Id.startsWith("noemby-")) {
-        console.log("toggled pickUp, removing row");
-        const id = show.Id;
-        for(let i = 0; i < allShows.length; i++) {
-          if(allShows[i].Id == id) {
-            let nextShow           = allShows[i+1];
-            if(!nextShow) nextShow = allShows[i-1];
-            if(!nextShow) break;
-            this.saveVisShow(nextShow.Name);
-            break;
-          }
-        }
-        await emby.deleteWaitAndNoemby(show.Name);
-        allShows   = allShows  .filter((show) => show.Id != id);
-        this.shows = this.shows.filter((show) => show.Id != id);
-      }
+      await this.chkRowDelete(show);
     };
 
     const toggleToTry = async (show) => {
@@ -268,8 +237,8 @@ export default {
       show.InToTry = !show.InToTry;
       emby.saveToTry(show.Id, show.InToTry)
           .catch((err) => {
-              showErr("late toggleToTry error:", err);
-              show.InToTry = !show.InToTry;
+              console.log("late toggleToTry error:", err);
+              //- show.InToTry = !show.InToTry;
             });
     };
 
@@ -278,8 +247,8 @@ export default {
       show.InContinue = !show.InContinue;
       emby.saveContinue(show.Id, show.InContinue)
           .catch((err) => {
-              showErr("late toggleContinue error:", err);
-              show.InContinue = !show.InContinue;
+              console.log("late toggleContinue error:", err);
+              //- show.InContinue = !show.InContinue;
             });
     };
 
@@ -288,8 +257,8 @@ export default {
       show.InMark = !show.InMark;
       emby.saveMark(show.Id, show.InMark)
           .catch((err) => {
-              showErr("late toggleMark error:", err);
-              show.InMark = !show.InMark;
+              console.log("late toggleMark error:", err);
+              //- show.InMark = !show.InMark;
             });
     };
 
@@ -298,30 +267,24 @@ export default {
       show.InLinda = !show.InLinda;
       emby.saveLinda(show.Id, show.InLinda)
           .catch((err) => {
-              showErr("late toggleLinda error:", err);
-              show.InLinda = !show.InLinda;
+              console.log("late toggleLinda error:", err);
+              //- show.InLinda = !show.InLinda;
             });
     };
 
     const deleteShowFromEmby = async (show) => {
       this.saveVisShow(show.Name);
-      console.log("delete Show From Emby:", show.Name);
+      console.log("delete Show From Emby?", show.Name);
       if (!window.confirm(`Do you really want to delete series ${show.Name} from Emby?`))
         return;
-      const id = show.Id;
-      const res = await emby.deleteShowFromEmby(id);
+      const res = await emby.deleteShowFromEmby(show.Id);
       if (res != "ok") return;
-      if (show.Pickup || show.Reject || show.Waiting) {
+      console.log("deleted db:", show.Name);
+      if(! await this.chkRowDelete(show)){
         show.RunTimeTicks      = 0;
         show.UnplayedItemCount = 0;
         show.IsFavorite        = false;
         show.Id = "noemby-" + Math.random();
-        console.log("deleted db, keeping row");
-      } else {
-        console.log("deleted db, removing row");
-        await emby.deleteWaitAndNoemby(show.Name);
-        allShows   = allShows  .filter((show) => show.Id != id);
-        this.shows = this.shows.filter((show) => show.Id != id);
       }
     }
 
@@ -391,6 +354,33 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
+    async chkRowDelete(show, force) {
+      if (!show.Reject && !show.Pickup && !show.Waiting &&
+              show.Id.startsWith("noemby-")) {
+        console.log("no reason to keep row, deleting it:", show.Name);
+        const id = show.Id;
+        for(let i = 0; i < allShows.length; i++) {
+          if(allShows[i].Id == id) {
+            let nextShow           = allShows[i+1];
+            if(!nextShow) nextShow = allShows[i-1];
+            if(!nextShow) break;
+            this.saveVisShow(nextShow.Name);
+            break;
+          }
+        }
+        allShows   = allShows.filter(  (show) => show.Id != id);
+        this.shows = this.shows.filter((show) => show.Id != id);
+        try {
+          await emby.deleteNoemby(show.Name);
+        } catch (err) {
+          console.log("deleteNoemby error:", err);
+          return force;
+        }
+        return true;
+      }
+      return false;
+    },
+
     hilite(show) {
       return this.highlightName == show.Name ? "yellow" : "white";
     },
@@ -457,10 +447,10 @@ export default {
       let err = "";
       for (let param of params) {
         if (param instanceof Error)
-             err += param.message    + " -- ";
+             err += param.message    + " ";
         else if (typeof param == "object") 
-             err += JSON.stringify(param, null, 2) + " -- ";
-        else err += param.toString() + " -- ";
+             err += JSON.stringify(param, null, 2) + " ";
+        else err += param.toString() + " ";
       }
       err = err.slice(0, -4)
       console.error(err);
@@ -650,12 +640,7 @@ export default {
     },
 
     condColor(show, cond) {
-      if (cond.cond(show)) {
-        const color = cond.color;
-        if(show.Name == 'Workaholics' && cond.icon[1] == 'calendar')      
-          console.log('', color);
-        return color;
-      }
+      if (cond.cond(show)) return cond.color;
       return "#ddd";
     },
 
@@ -745,7 +730,7 @@ export default {
         allShows = await emby.loadAllShows();
         this.shows = allShows;
 
-        emby.getSeasons(allShows, this.addSeasonsToShow);
+        //- emby.getSeasons(allShows, this.addSeasonsToShow);
 
         this.sortByNew      = true;
         this.sortByActivity = false;

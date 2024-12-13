@@ -99,7 +99,7 @@ export const getWaitData = async (searchStr) => {
   const extJSON   = await extResp.json();
   const lastAired = extJSON.data.lastAired;
   if(!lastAired) {
-    showErr(`no lastAired for ${searchStr}`);
+    console.log(`getWaitData, no lastAired:`, {searchStr, exactName});
     return null;
   }
 

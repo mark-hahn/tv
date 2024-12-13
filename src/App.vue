@@ -661,9 +661,10 @@ export default {
     },
 
     /////////////////  UPDATE METHODS  /////////////////
-    showAll() {
+    showAll(init = false) {
       this.searchStr = "";
-      for (let cond of this.conds) cond.filter = 0;
+      if(!init)
+        for (let cond of this.conds) cond.filter = 0;
       this.select(true);
     },
 
@@ -736,7 +737,7 @@ export default {
         this.sortByActivity = false;
         this.sortBySize     = false;
         this.sortShows();
-        this.showAll();
+        this.showAll(true);
 
         const name = window.localStorage.getItem("lastVisShow");
         if (!name) {

@@ -65,9 +65,10 @@ const getRemoteUrls = (extData) => {
         url = `https://www.imdb.com/title/${remoteId.id}`;
         break;
 
-        
+
     }
     remoteUrls[remoteId.sourceName] = url;
+    console.log("remote", remoteId.sourceName, url);
   }
   return remoteUrls;
 }

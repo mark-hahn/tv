@@ -24,7 +24,7 @@ let showErr = null;
 const getToken = async () => {
   const config = {
     method: 'post',
-    url: "http://hahnca.com:8096" +
+    url: "https://hahnca.com:8920" +
          "/emby/Users/AuthenticateByName" +
          `?api_key=${apiKey}`,
     headers: { Authorization: authHdr },
@@ -41,6 +41,160 @@ export async function init(showErrIn) {
   cred = {markUsrId, token};
   urls.init(cred);
 }
+
+//////// load all shows from emby and server //////////
+
+export async function loadAllShows() {
+  console.log('entering loadAllShows');
+  const time1 = new Date().getTime();
+
+  const listPromise   = axios.get(
+                        urls.showListUrl(cred, 0, 10000));
+  const seriesPromise = srvr.getAllShows(); 
+  const waitPromise   = srvr.getWaiting();
+  const rejPromise    = srvr.getRejects();
+  const pkupPromise   = srvr.getPickups();
+  const noEmbyPromise = srvr.getNoEmbys();
+
+  const [embyShows, srvrShows, waitingShows, 
+          rejects, pickups, noEmbys] = 
+    await Promise.all([listPromise, seriesPromise, 
+                       waitPromise, rejPromise, pkupPromise, 
+                       noEmbyPromise]);
+  const shows = [];
+
+////////// get shows from emby ////////////
+
+// includes id, name, dates, haveShows, favorites, etc.
+
+  for(let key in embyShows.data.Items) {
+    let show = embyShows.data.Items[key];
+    Object.assign(show, show.UserData);
+    delete show.UserData;
+    for(const date of ['DateCreated', 'PremiereDate'])
+      if(show[date]) show[date] = show[date].substring(0, 10);
+
+    const embyPath     = show.Path.split('/').pop();
+    const showDateSize = srvrShows[embyPath];
+    if(!showDateSize) continue
+
+    const [date, size] = showDateSize;
+    show.Date = date;
+    show.Size = size;
+    if(!show.DateCreated) show.DateCreated = show.Date;
+    if(show.Date) shows.push(show);
+  }
+
+//////////  add shows from srvr ////////////
+
+  for(const show of noEmbys) {
+    if(show?.Name) {
+      const showTst = shows.find((s) => s.Name == show.Name);
+      if(!showTst) shows.push(show);
+      else await srvr.delNoEmby(show.Name);
+      continue;
+    }
+    else await srvr.delNoEmby("");
+  }
+
+//////////  process waiting from srvr ////////////
+
+  for(let waitingName of waitingShows) {
+    const i = shows.findIndex((show) => show.Name == waitingName);
+    if(i > -1) await setWait(shows[i]);
+    else {
+      console.log('no show, deleting from waiting list:',   
+                   waitingName);
+      await srvr.delWaiting(waitingName);
+    }
+  }
+//////////  process toTry collection  ////////////
+
+  const toTryRes = await axios.get(
+        urls.collectionListUrl(cred, toTryCollId));
+  const toTryIds = [];
+  for(let tryEntry of toTryRes.data.Items)
+       toTryIds.push(tryEntry.Id);
+  for(let show of shows)
+       show.InToTry = toTryIds.includes(show.Id);
+
+//////////  process continue collection  ////////////
+
+  const continueRes = await axios.get(
+        urls.collectionListUrl(cred, continueCollId));
+  const continueIds = [];
+  for(let tryEntry of continueRes.data.Items)
+       continueIds.push(tryEntry.Id);
+  for(let show of shows)
+       show.InContinue = continueIds.includes(show.Id);
+
+//////////  process mark collection  ////////////
+
+  const markRes = await axios.get(
+        urls.collectionListUrl(cred, markCollId));
+  const markIds = [];
+  for(let tryEntry of markRes.data.Items)
+       markIds.push(tryEntry.Id);
+  for(let show of shows)
+       show.InMark = markIds.includes(show.Id);
+
+//////////  process linda collection  ////////////
+
+  const lindaRes = await axios.get(
+        urls.collectionListUrl(cred, lindaCollId));
+  const lindaIds = [];
+  for(let tryEntry of lindaRes.data.Items)
+       lindaIds.push(tryEntry.Id);
+  for(let show of shows)
+       show.InLinda = lindaIds.includes(show.Id);
+
+  const elapsed = new Date().getTime() - time1;
+  console.log('all shows loaded, elapsed:', elapsed);
+
+//////////  process rejects for usb ////////////
+
+  for(let rejectName of rejects) {
+    const matchingShow = 
+          shows.find((show) => show.Name == rejectName);
+    if(matchingShow) {
+      console.log('reject: deleting existing:', rejectName);
+      await deleteShowFromEmby(matchingShow);
+      await deleteShowFromServer(matchingShow);
+      shows.splice(shows.indexOf(matchingShow), 1);
+    }
+    const date = '2017-12-05';
+    const rejShow = {
+      Name: rejectName,
+      Id: "noemby-" + Math.random(),
+      DateCreated: date,
+      LastAired: date, 
+      Waiting: false,
+      WaitStr: '',
+      InToTry: false,
+      InContinue: false,
+      InMark: false,
+      InLinda: false,
+      Reject: true,
+      Pickup: false,
+      Date: date,
+      Size: 0,
+      Seasons: [],
+    };
+    shows.push(rejShow);
+  }
+
+//////////  process pickups for usb ////////////
+
+  for(let pickupName of pickups) {
+    const show = shows.find((show) => show.Name == pickupName);
+    if(show) show.Pickup = true;
+  }
+
+  return shows;
+}
+
+
+//////////// misc functions //////////////
 
 export function getSeasons(allShows, cb) {
   seasonsWorker.onerror = (err) => {
@@ -97,137 +251,6 @@ export async function deleteShowFromEmby(show) {
 
 export async function deleteShowFromServer(show){
   return await srvr.deleteShow(show);
-}
-
-export async function loadAllShows() {
-  console.log('entering loadAllShows');
-  const time1 = new Date().getTime();
-
-  const listPromise   = axios.get(
-                        urls.showListUrl(cred, 0, 10000));
-  const seriesPromise = srvr.getAllShows(); 
-  const waitPromise   = srvr.getWaiting();
-  const rejPromise    = srvr.getRejects();
-  const pkupPromise   = srvr.getPickups();
-  const noEmbyPromise = srvr.getNoEmbys();
-
-  const [embyShows, srvrShows, waitingShows, 
-          rejects, pickups, noEmbys] = 
-    await Promise.all([listPromise, seriesPromise, 
-                       waitPromise, rejPromise, pkupPromise, 
-                       noEmbyPromise]);
-  const shows = [];
-
-  for(let key in embyShows.data.Items) {
-    let show = embyShows.data.Items[key];
-    Object.assign(show, show.UserData);
-    delete show.UserData;
-    for(const date of ['DateCreated', 'PremiereDate'])
-      if(show[date]) show[date] = show[date].substring(0, 10);
-
-    const embyPath     = show.Path.split('/').pop();
-    const showDateSize = srvrShows[embyPath];
-    if(!showDateSize) continue
-
-    const [date, size] = showDateSize;
-    show.Date = date;
-    show.Size = size;
-    if(!show.DateCreated) show.DateCreated = show.Date;
-    if(show.Date) shows.push(show);
-  }
-
-  for(let rejectName of rejects) {
-    const matchingShow = 
-          shows.find((show) => show.Name == rejectName);
-    if(matchingShow) {
-      console.log('reject: deleting existing:', rejectName);
-      await deleteShowFromEmby(matchingShow);
-      await deleteShowFromServer(matchingShow);
-      shows.splice(shows.indexOf(matchingShow), 1);
-    }
-    const date = '2017-12-05';
-    const rejShow = {
-      Name: rejectName,
-      Id: "noemby-" + Math.random(),
-      DateCreated: date,
-      LastAired: date, 
-      Waiting: false,
-      WaitStr: '',
-      InToTry: false,
-      InContinue: false,
-      InMark: false,
-      InLinda: false,
-      Reject: true,
-      Pickup: false,
-      Date: date,
-      Size: 0,
-      Seasons: [],
-    };
-    shows.push(rejShow);
-  }
-
-  for(const show of noEmbys) {
-    if(show?.Name) {
-      const showTst = shows.find((s) => s.Name == show.Name);
-      if(!showTst) shows.push(show);
-      else await srvr.delNoEmby(show.Name);
-      continue;
-    }
-    else await srvr.delNoEmby("");
-  }
-
-  for(let waitingName of waitingShows) {
-    const i = shows.findIndex((show) => show.Name == waitingName);
-    const show = shows[i];
-    if(show?.Name) await setWait(show);
-    else {
-      console.log('show or name missing, deleting waiting:', waitingName);
-      await srvr.delWaiting(waitingName);
-      waitingShows.splice(i, 1);
-    }
-  }
-
-  for(let pickupName of pickups) {
-    const show = shows.find((show) => show.Name == pickupName);
-    if(show) show.Pickup = true;
-  }
-
-  const toTryRes = await axios.get(
-        urls.collectionListUrl(cred, toTryCollId));
-  const toTryIds = [];
-  for(let tryEntry of toTryRes.data.Items)
-       toTryIds.push(tryEntry.Id);
-  for(let show of shows)
-       show.InToTry = toTryIds.includes(show.Id);
-
-  const continueRes = await axios.get(
-        urls.collectionListUrl(cred, continueCollId));
-  const continueIds = [];
-  for(let tryEntry of continueRes.data.Items)
-       continueIds.push(tryEntry.Id);
-  for(let show of shows)
-       show.InContinue = continueIds.includes(show.Id);
-
-  const markRes = await axios.get(
-        urls.collectionListUrl(cred, markCollId));
-  const markIds = [];
-  for(let tryEntry of markRes.data.Items)
-       markIds.push(tryEntry.Id);
-  for(let show of shows)
-       show.InMark = markIds.includes(show.Id);
-
-  const lindaRes = await axios.get(
-        urls.collectionListUrl(cred, lindaCollId));
-  const lindaIds = [];
-  for(let tryEntry of lindaRes.data.Items)
-       lindaIds.push(tryEntry.Id);
-  for(let show of shows)
-       show.InLinda = lindaIds.includes(show.Id);
-
-  const elapsed = new Date().getTime() - time1;
-  console.log('all shows loaded, elapsed:', elapsed);
-
-  return shows;
 }
 
 const deleteOneFile = async (path) => {

@@ -666,7 +666,6 @@ export default {
     /////////////////  UPDATE METHODS  /////////////////
     showAll(dontClrFilters = false) {
       if(dontClrFilters?.altKey !== undefined) dontClrFilters = false;
-      console.log("showAll", dontClrFilters);
       this.searchStr = "";
       if(!dontClrFilters) {
         for (let cond of this.conds) cond.filter = 0;

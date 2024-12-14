@@ -1,6 +1,8 @@
 /*
 bugs ...
-
+  ban filter color when off
+  setting wait broken
+  
 new features ...
   cache gap data
   popup on ctrl click with all providers

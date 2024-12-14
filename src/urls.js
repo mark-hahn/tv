@@ -14,7 +14,7 @@ token:      "aad53eb6d92243c3b8ebd3151233260c"}
 export async function init(credIn) { cred = credIn; }
 
 export function showListUrl(cred, startIdx=0, limit=10000) {
-  return `http://hahnca.com:8096 / emby / Users 
+  return `https://hahnca.com:8920 / emby / Users 
           / ${cred.markUsrId} / Items
     ?SortBy=SortName
     &SortOrder=Ascending
@@ -35,7 +35,7 @@ export function showListUrl(cred, startIdx=0, limit=10000) {
 }
 
 export function childrenUrl(cred, parentId='', unAired=false) {
-  return `http://hahnca.com:8096 / emby / Users 
+  return `https://hahnca.com:8920 / emby / Users 
           / ${cred.markUsrId} / Items /
     ? ParentId=${parentId}
     ${unAired ? '& IsUnaired = true' : ''}
@@ -45,14 +45,14 @@ export function childrenUrl(cred, parentId='', unAired=false) {
 }
 
 export function postUserDataUrl(cred, id) {
-  return `http://hahnca.com:8096 / emby / Users 
+  return `https://hahnca.com:8920 / emby / Users 
           / ${cred.markUsrId} / Items / ${id} / UserData
     ? X-Emby-Token=${cred.token}
   `.replace(/\s*/g, "");
 }
 
 export function favoriteUrl(cred, id) {
-  return encodeURI(`http://hahnca.com:8096 / emby / Users 
+  return encodeURI(`https://hahnca.com:8920 / emby / Users 
           / ${cred.markUsrId} / FavoriteItems / ${id}
     ?X-Emby-Client=Emby Web
     &X-Emby-Device-Name=Chrome
@@ -63,7 +63,7 @@ export function favoriteUrl(cred, id) {
 }
 
 export function deleteShowUrl(cred, id) {
-  return `http://hahnca.com:8096 / emby / Items / ${id}
+  return `https://hahnca.com:8920 / emby / Items / ${id}
     ?X-Emby-Client=EmbyWeb
     &X-Emby-Device-Name=Chrome
     &X-Emby-Device-Id=f4079adb-6e48-4d54-9185-5d92d3b7176b
@@ -73,13 +73,13 @@ export function deleteShowUrl(cred, id) {
 }
 
 export function embyPageUrl(id) {
-  return `http://hahnca.com:8096 / web / index.html #! / item
+  return `https://hahnca.com:8920 / web / index.html #! / item
     ?id=${id}&serverId=ae3349983dbe45d9aa1d317a7753483e
   `.replace(/\s*/g, "");
 }
 
 export function collectionListUrl(cred, collId) {
-  return `http://hahnca.com:8096 / emby / Users / 
+  return `https://hahnca.com:8920 / emby / Users / 
           ${cred.markUsrId} / Items
     ?ParentId=${collId}
     &ImageTypeLimit=1
@@ -94,7 +94,7 @@ export function collectionListUrl(cred, collId) {
 }
 
 export function collectionUrl(cred, showId, collId) {
-  return `http://hahnca.com:8096 / emby / 
+  return `https://hahnca.com:8920 / emby / 
           Collections / ${collId} / Items
     ?Ids=${showId}
     &userId=${cred.markUsrId}

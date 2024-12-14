@@ -3,31 +3,37 @@
         "id": "tt13567344",
         "type": 2,
         "sourceName": "IMDB"
+         https://www.imdb.com/title/${id}
     },
     "3": {
         "id": "EP02179102",
         "type": 3,
-        "sourceName": "TMS (Zap2It)"
+        "sourceName": "TMS (Zap2It)",
+        https://tvlistings.zap2it.com/overview.html?programSeriesId=SH03415789&tmsId=${id}&from=showcard&aid=gapzap
     },
     "4": {
         "id": "https://tv.apple.com/show/umc.cmc.8xrkg9zywke7g6a9ahmvpr3l",
         "type": 4,
         "sourceName": "Official Website"
+         id
     },
     "5": {
         "id": "NorafromQueens/",
         "type": 5,
         "sourceName": "Facebook"
+        skip
     },
     "6": {
         "id": "norafromqueens",
         "type": 6,
         "sourceName": "X (Twitter)"
+        skip
     },
     "7": {
         "id": "Apples_Never_Fall",
         "type": 7,
         "sourceName": "Reddit"
+        https://www.reddit.com/r/${id}/
     },
     "8": {
         "id": "https://tvtropes.org/pmwiki/pmwiki.php/Series/ColinFromAccounts",
@@ -38,26 +44,32 @@
         "id": "norafromqueens/",
         "type": 9,
         "sourceName": "Instagram"
+        https://www.instagram.com/norafromqueens/
     },
     "11": {
         "id": "UCwyCwL-apAJQjmSp5jKGzaw",
         "type": 11,
         "sourceName": "Youtube"
+        https://www.youtube.com/channel/${id}
     },
     "12": {
         "id": "133727",
         "type": 12,
         "sourceName": "TheMovieDB.com"
+        https://www.themoviedb.org/tv/${id}?language=en-US
+
     },
     "13": {
         "id": "10.5240/CC4F-E170-4CBD-3BC7-F241-L",
         "type": 13,
         "sourceName": "EIDR"
+        skip
     },
     "18": {
         "id": "Q106639092",
         "type": 18,
         "sourceName": "Wikidata"
+        https://www.wikidata.org/wiki/${id}
     },
     "19": {
         "id": "52193",

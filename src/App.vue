@@ -184,7 +184,7 @@ export default {
 
     const toggleWaiting = async (show) => {
       this.saveVisShow(show.Name);
-      const waitRes = await tvdb.getWaitData(show.Name);
+      const waitRes = await tvdb.getTvDbData(show.Name);
       if(!waitRes) {
         console.log('toggleWaiting, no series:', show.Name);
         return;
@@ -196,7 +196,7 @@ export default {
               console.log("late saveWaiting error:", err);
               //- show.Waiting = !show.Waiting;
               show.WaitStr = 
-                  (await tvdb.getWaitData(show.Name)).waitStr;
+                  (await tvdb.getTvDbData(show.Name)).waitStr;
            });
     };
 
@@ -401,7 +401,7 @@ export default {
         return;
       }
 
-      const waitRes = await tvdb.getWaitData(srchTxt);
+      const waitRes = await tvdb.getTvDbData(srchTxt);
       if(!waitRes) {
         showErr('No series found for:', srchTxt);
         return;
@@ -621,7 +621,7 @@ export default {
     condFltrColor(cond) {
       switch (cond.filter) {
         case  0: return "gray";
-        case -1: return "red";
+        case -1: return "pink";
         case +1: return cond.color;
       }
     },

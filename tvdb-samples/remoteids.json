@@ -1,0 +1,72 @@
+{
+    "2": {
+        "id": "tt13567344",
+        "type": 2,
+        "sourceName": "IMDB"
+    },
+    "3": {
+        "id": "EP02179102",
+        "type": 3,
+        "sourceName": "TMS (Zap2It)"
+    },
+    "4": {
+        "id": "https://tv.apple.com/show/umc.cmc.8xrkg9zywke7g6a9ahmvpr3l",
+        "type": 4,
+        "sourceName": "Official Website"
+    },
+    "5": {
+        "id": "NorafromQueens/",
+        "type": 5,
+        "sourceName": "Facebook"
+    },
+    "6": {
+        "id": "norafromqueens",
+        "type": 6,
+        "sourceName": "X (Twitter)"
+    },
+    "7": {
+        "id": "Apples_Never_Fall",
+        "type": 7,
+        "sourceName": "Reddit"
+    },
+    "8": {
+        "id": "https://tvtropes.org/pmwiki/pmwiki.php/Series/ColinFromAccounts",
+        "type": 8,
+        "sourceName": "Fan Site"
+    },
+    "9": {
+        "id": "norafromqueens/",
+        "type": 9,
+        "sourceName": "Instagram"
+    },
+    "11": {
+        "id": "UCwyCwL-apAJQjmSp5jKGzaw",
+        "type": 11,
+        "sourceName": "Youtube"
+    },
+    "12": {
+        "id": "133727",
+        "type": 12,
+        "sourceName": "TheMovieDB.com"
+    },
+    "13": {
+        "id": "10.5240/CC4F-E170-4CBD-3BC7-F241-L",
+        "type": 13,
+        "sourceName": "EIDR"
+    },
+    "18": {
+        "id": "Q106639092",
+        "type": 18,
+        "sourceName": "Wikidata"
+    },
+    "19": {
+        "id": "52193",
+        "type": 19,
+        "sourceName": "TV Maze"
+    },
+    "24": {
+        "id": "Alice & Jack",
+        "type": 24,
+        "sourceName": "Wikipedia"
+    }
+}

@@ -1,7 +1,9 @@
 /*
 bugs ...
-  ban filter color when off
-  setting wait broken
+  no hilite on load when no saved hilite
+  when show hidden by select, no hilite
+  show with 1.5 seasons down marked as not ready (silo)  
+       store info in waiting.json?
   
 new features ...
   cache gap data
@@ -11,10 +13,6 @@ new features ...
 tabled ...
   check seasons for no unaired before setting waiting
     move unaired check to getgap
-  no hilite on load when no saved hilite
-  when show hidden by select, no hilite
-  show with 1.5 seasons down marked as not ready (silo)  
-       store info in waiting.json?
 */
 
 import {createApp} from 'vue'

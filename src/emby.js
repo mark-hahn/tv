@@ -191,6 +191,24 @@ export async function loadAllShows() {
   const elapsed = new Date().getTime() - time1;
   console.log('all shows loaded, elapsed:', elapsed);
 
+
+  // const remoteIds = {};
+  // let count = 0;
+  // for (const show of shows) {
+  //   const tvData = await tvdb.getTvDbData(show.Name);
+  //   if(!tvData) continue;
+
+  //   const {remoteUrls} = tvData;
+  //   for(const remoteId of remoteUrls) {
+  //     if(!remoteIds[remoteId.type]) {
+  //         remoteIds[remoteId.type] = remoteId;
+  //         console.log(++count);
+  //     }
+  //   }
+  // }
+  // console.log('remoteIds:', remoteIds);
+
+
   return shows;
 }
 
@@ -224,7 +242,7 @@ export async function addNoEmby(show) {
 export async function setWait(show) {
   if(show?.Name) {
     show.Waiting = true;      
-    const waitRes = await tvdb.getWaitData(show.Name);
+    const waitRes = await tvdb.getTvDbData(show.Name);
     if(!waitRes) {
       showErr('No series found for:', show.Name);
       return;

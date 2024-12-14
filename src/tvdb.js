@@ -6,7 +6,6 @@ export const init = (showErrIn) => {
   showErr = showErrIn;
 }
 
-
 ///////////// get api token //////////////
  
 const getToken = async () => {
@@ -49,8 +48,31 @@ const formatWaitStr = (lastAired) => {
   if(lastAired > today) return `{${lastAired}}`;
   else return '{Ready}';
 }
+/*
+        "id": "https://www.hbo.com/somebody-somewhere",
+        "type": 4,
+        "sourceName": "Official Website"
+*/
 
-export const getWaitData = async (searchStr) => {
+const getRemoteUrls = (extData) => {
+  const remoteIds  = extData.remoteIds;
+  const remoteUrls = {};
+  for(let i=0; i < remoteIds.length; i++) {
+    const remoteId = remoteIds[i];
+    let url ='';
+    switch (remoteId.id) {
+      case 2:
+        url = `https://www.imdb.com/title/${remoteId.id}`;
+        break;
+
+        
+    }
+    remoteUrls[remoteId.sourceName] = url;
+  }
+  return remoteUrls;
+}
+
+export const getTvDbData = async (searchStr) => {
   const cacheEntry = cache.find(c => 
                         c.searchStr === searchStr || 
                         c.exactName === searchStr);
@@ -99,9 +121,10 @@ export const getWaitData = async (searchStr) => {
   const extJSON   = await extResp.json();
   const lastAired = extJSON.data.lastAired;
   if(!lastAired) {
-    console.log(`getWaitData, no lastAired:`, {searchStr, exactName});
+    console.log(`getTvDbData, no lastAired:`, {searchStr, exactName});
     return null;
   }
+  const remoteUrls = getRemoteUrls(extJSON.data);
 
   while(cache.length) {
     const oldIdx = cache.findIndex(
@@ -119,22 +142,44 @@ export const getWaitData = async (searchStr) => {
                 "tvdbNameCache", JSON.stringify(cache));
 
   return {waitStr: formatWaitStr(lastAired), 
-          exactName, lastAired};
+          exactName, lastAired, remoteUrls};
 }
 
-  // let searchStr = show;
-  // if(typeof searchStr !== 'string') {
-  //   searchStr = show.Name;
-    // console.log("getWait show.Seasons: ", show.Seasons);
-    // const Seasons = show.Seasons;
-    // if(Seasons && Seasons.length) {
-    //   const lastSeason = Seasons[Seasons.length-1];
-    //   if(lastSeason.length) {
-    //     const lastEp = lastSeason[lastSeason.length-1];
-    //     if(!lastEp.unaired) {
-    //       console.log("getWait lastEp: ", lastEp);
-    //       return ['{Ready}', searchStr, lastEp.date];
-    //     }
-    //   }
-    // }
-  // }
+
+/*
+  let searchStr = show;
+  if(typeof searchStr !== 'string') {
+    searchStr = show.Name;
+    console.log("getWait show.Seasons: ", show.Seasons);
+    const Seasons = show.Seasons;
+    if(Seasons && Seasons.length) {
+      const lastSeason = Seasons[Seasons.length-1];
+      if(lastSeason.length) {
+        const lastEp = lastSeason[lastSeason.length-1];
+        if(!lastEp.unaired) {
+          console.log("getWait lastEp: ", lastEp);
+          return ['{Ready}', searchStr, lastEp.date];
+        }
+      }
+    }
+  }
+
+      "remoteIds": [
+      {
+        "id": "tt12759100",
+        "type": 2,
+        "sourceName": "IMDB"
+      },
+      {
+        "id": "https://www.hbo.com/somebody-somewhere",
+        "type": 4,
+        "sourceName": "Official Website"
+      },
+      {
+        "id": "106308",
+        "type": 12,
+        "sourceName": "TheMovieDB.com"
+      }
+    ],
+
+*/

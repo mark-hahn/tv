@@ -71,9 +71,9 @@ export async function loadAllShows() {
     let show = embyShows.data.Items[key];
     Object.assign(show, show.UserData);
     delete show.UserData;
-    for(const date of ['DateCreated', 'PremiereDate'])
+    for(const date of ['DateCreated', 'PremiereDate']) {
       if(show[date]) show[date] = show[date].substring(0, 10);
-
+    }
     const embyPath     = show.Path.split('/').pop();
     const showDateSize = srvrShows[embyPath];
     if(!showDateSize) continue
@@ -108,6 +108,7 @@ export async function loadAllShows() {
       await srvr.delWaiting(waitingName);
     }
   }
+
 //////////  process toTry collection  ////////////
 
   const toTryRes = await axios.get(
@@ -148,9 +149,6 @@ export async function loadAllShows() {
   for(let show of shows)
        show.InLinda = lindaIds.includes(show.Id);
 
-  const elapsed = new Date().getTime() - time1;
-  console.log('all shows loaded, elapsed:', elapsed);
-
 //////////  process rejects for usb ////////////
 
   for(let rejectName of rejects) {
@@ -189,6 +187,9 @@ export async function loadAllShows() {
     const show = shows.find((show) => show.Name == pickupName);
     if(show) show.Pickup = true;
   }
+
+  const elapsed = new Date().getTime() - time1;
+  console.log('all shows loaded, elapsed:', elapsed);
 
   return shows;
 }

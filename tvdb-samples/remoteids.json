@@ -70,15 +70,24 @@
         "type": 18,
         "sourceName": "Wikidata"
         https://www.wikidata.org/wiki/${id}
+
+        https://www.wikidata.org/wiki/Q106639092
+          Rotten Tomatoes ID
+          en Wikipedia(5 entries) 
+          RatingGraph TV show ID
+          TMDB TV series ID
+          Trakt.tv ID
     },
     "19": {
         "id": "52193",
         "type": 19,
         "sourceName": "TV Maze"
+        https://www.tvmaze.com/shows/${id}
     },
     "24": {
         "id": "Alice & Jack",
         "type": 24,
         "sourceName": "Wikipedia"
+        skip (see above)
     }
 }

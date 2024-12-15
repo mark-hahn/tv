@@ -48,30 +48,79 @@ const formatWaitStr = (lastAired) => {
   if(lastAired > today) return `{${lastAired}}`;
   else return '{Ready}';
 }
-/*
-        "id": "https://www.hbo.com/somebody-somewhere",
-        "type": 4,
-        "sourceName": "Official Website"
-*/
 
-const getRemoteUrls = (extData) => {
-  const remoteIds  = extData.remoteIds;
+const getRemoteUrls = async (extData) => {
+  const remoteIds = extData.remoteIds;
   const remoteUrls = {};
   for(let i=0; i < remoteIds.length; i++) {
     const remoteId = remoteIds[i];
-    let url ='';
-    switch (remoteId.id) {
-      case 2:
-        url = `https://www.imdb.com/title/${remoteId.id}`;
+    const {id, type, sourceName} = remoteId;
+    let url ='';  
+
+///// special handling for TheMovieDB.com and Wikidata /////
+
+// process browser headers
+// ^:?([^:]*):\n(.*?)$
+// '$1':'$2',
+
+//     if(type == 18) {
+//       const wdataUrl = `https://www.wikidata.org/wiki/${id}`;
+//       // const wdataUrl = `https://www.wikidata.org/wiki/Special:EntityData/${id}.json`
+//       // const wdataUrl = `http://www.wikidata.org/entity/${id}`
+//       // const wdataUrl = `https://www.wikidata.org/w/api.php?format=json&action=wbgetentities&ids=${id}`
+//       // const wdataUrl = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${id}&languages=en&format=json`
+
+//       const wdataResp = await fetch(wdataUrl,
+//         {method: "GET",
+//          mode: 'no-cors',
+//          headers: {
+//           'Content-Type': 'application/json',
+//            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+//                          'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+//                          'Chrome/131.0.0.0 Safari/537.36'}
+//         });
+
+//       const wdataText = await wdataResp.text();
+//       console.log({wdataUrl, remoteId, wdataResp, wdataText});
+
+//       // const parser = new DOMParser()
+//       // const doc = parser.parseFromString(wdataText, "text/html")
+//       // console.log(doc.doc)
+
+//       if (!wdataResp.ok) {
+//         console.error(
+//           `getRemoteUrls, wdataResp: ${wdataResp.status}`);
+//         continue;
+//       }
+//       console.log("wdataResp: ", wdataResp);
+// }
+    // else 
+    switch (type) {
+      case 2:  url = `https://www.imdb.com/title/${id}`; break;
+      case 3:
+       url = `https://tvlistings.zap2it.com/overview.html` +
+             `?programSeriesId=SH03415789&tmsId=${id}` +
+             `&from=showcard&aid=gapzap`
         break;
-
-
+      case 4:  url = id; break;
+      case 7:  url = `https://www.reddit.com/r/${id}`; break;
+      case 8:  url = id; break;
+      case 9:  url = `https://www.instagram.com/${id}`; break;
+      case 11: url = `https://www.youtube.com/channel/${id}`; break;
+      case 12:
+        url = `https://www.themoviedb.org/tv/${id}?language=en-US`;
+        break;
+      case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
+      default: continue
     }
-    remoteUrls[remoteId.sourceName] = url;
-    console.log("remote", remoteId.sourceName, url);
+    remoteUrls[sourceName] = url;
+    console.log({sourceName, url});
   }
   return remoteUrls;
 }
+
+
+//////////// get TvDb Data //////////////
 
 export const getTvDbData = async (searchStr) => {
   const cacheEntry = cache.find(c => 
@@ -125,7 +174,7 @@ export const getTvDbData = async (searchStr) => {
     console.log(`getTvDbData, no lastAired:`, {searchStr, exactName});
     return null;
   }
-  const remoteUrls = getRemoteUrls(extJSON.data);
+  const remoteUrls = await getRemoteUrls(extJSON.data);
 
   while(cache.length) {
     const oldIdx = cache.findIndex(

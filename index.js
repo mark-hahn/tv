@@ -4,10 +4,9 @@ import util                from "util";
 import * as cp             from 'child_process';
 import moment              from 'moment';
 import { WebSocketServer } from 'ws';
+import fetch               from 'node-fetch';
 
 process.setMaxListeners(50);
-
-const showdates   = true;
 const dontupload  = false;
 
 const ws = new WebSocketServer({ port: 8736 });
@@ -17,10 +16,6 @@ const tvDir = '/mnt/media/tv';
 // const tvDir = '/mnt/c/Users/mark/apps/tv-series-srvr/media/tv';
 
 const exec  = util.promisify(cp.exec);
-const dat   = () => {
-  if(!showdates) return '';
-  return moment().format('MM/DD HH:mm:ss:');
-}
 
 const headerStr  = fs.readFileSync('config/config1-header.txt',   'utf8');
 const rejectStr  = fs.readFileSync('config/config2-rejects.json', 'utf8');
@@ -81,7 +76,7 @@ const getAllShows = async (id, _param, resolve, reject) => {
 
     shows[dirent] = [maxDate, totalSize];
     if(totalSize == 0) {
-      console.log(dat(), 'empty show:', dirent);
+      console.log('empty show:', dirent);
     }
   }
   if(errFlg) {
@@ -102,50 +97,50 @@ const upload = async () => {
   for(let name of pickups)
     str += '        - "' + name.replace(/"/g, '') + '"\n';
   str += footerStr;
-  console.log(dat(), 'creating config.yml');
+  console.log('creating config.yml');
   await fsp.writeFile('config/config.yml', str);
 
   if(dontupload) {
-    console.log(dat(), "---- didn't upload config.yml ----");
+    console.log("---- didn't upload config.yml ----");
     return 'ok';
   }
 
-  console.log(dat(), 'uploading config.yml');
+  console.log('uploading config.yml');
   const timeBeforeUSB = new Date().getTime();
   const {stdout} = await exec(
           'rsync -av config/config.yml xobtlu@oracle.usbx.me:' +
           '/home/xobtlu/.config/flexget/config.yml');
-  console.log(dat(), 
+  console.log(
       'upload delay:', new Date().getTime() - timeBeforeUSB);
 
   const rx = new RegExp('total size is ([0-9,]*)');
   const matches = rx.exec(stdout);
   if(!matches || parseInt(matches[1].replace(',', '')) < 1000) {
-    console.error(dat(), '\nERROR: config.yml upload failed\n', stdout, '\n');
+    console.error('\nERROR: config.yml upload failed\n', stdout, '\n');
     return `config.yml upload failed: ${stdout.toString()}`;
   }
-  console.log(dat(), 'uploaded config.yml, size:', matches[1]);
+  console.log('uploaded config.yml, size:', matches[1]);
   return 'ok';
 }
 
 const reload = async () => {
   if(dontupload) {
-    console.log(dat(), "---- didn't reload ----");
+    console.log("---- didn't reload ----");
     return 'ok';
   }
 
-  console.log(dat(), 'reloading config.yml');
+  console.log('reloading config.yml');
   const timeBeforeUSB = new Date().getTime();
   const {stdout} = await exec(
     'ssh xobtlu@oracle.usbx.me /home/xobtlu/reload-cmd');
-  console.log(dat(), 
+  console.log(
       'reload delay:', new Date().getTime() - timeBeforeUSB);
 
   if(!stdout.includes('Config successfully reloaded'))  {
-    console.log(dat(), '\nERROR: config.yml reload failed\n', stdout, '\n');
+    console.log('\nERROR: config.yml reload failed\n', stdout, '\n');
     return `config.yml reload failed: ${stdout.toString()}`;
   }
-  console.log(dat(), 'reloaded config.yml');
+  console.log('reloaded config.yml');
   return 'ok';
 }
 
@@ -176,7 +171,7 @@ const trySaveConfigYml = async (id, result, resolve, reject) => {
   }
 
   if(errResult) {
-    console.log(dat(), 'trySaveConfigYml error:', errResult);
+    console.log('trySaveConfigYml error:', errResult);
     saving = false;
     return ['err', id, errResult, resolve, reject];
   }
@@ -204,32 +199,32 @@ const getWaiting = (id, _param, resolve) => {
 };
 
 const addWaiting = async (id, name, resolve, _reject) => {
-  console.log(dat(), 'addWaiting', id, name);
+  console.log('addWaiting', id, name);
   for(const [idx, waitingNameStr] of waitings.entries()) {
     if(waitingNameStr.toLowerCase() === name.toLowerCase()) {
-      console.log(dat(), 
+      console.log(
           '-- removing old matching waiting:', waitingNameStr);
       waitings.splice(idx, 1);
     }
   }
-  console.log(dat(), '-- adding waiting:', name);
+  console.log('-- adding waiting:', name);
   waitings.push(name);
   await fsp.writeFile('data/waiting.json', JSON.stringify(waitings));
   resolve([id, {"ok":"ok"}]);
 }
 
 const delWaiting = async (id, name, resolve, reject) => {
-  console.log(dat(), 'delWaiting', id, name);
+  console.log('delWaiting', id, name);
   let deletedOne = false;
   for(const [idx, waitingNameStr] of waitings.entries()) {
     if(waitingNameStr.toLowerCase() === name.toLowerCase()) {
-      console.log(dat(), '-- deleting waiting:', waitingNameStr);
+      console.log('-- deleting waiting:', waitingNameStr);
       waitings.splice(idx, 1);
       deletedOne = true;
     }
   }
   if(!deletedOne) {
-    console.log(dat(), 'waiting not deleted -- no match:', name);
+    console.log('waiting not deleted -- no match:', name);
     reject([id, 'delWaiting no match:' + name]);
     return
   }
@@ -242,30 +237,30 @@ const getRejects = (id, _param, resolve, _reject) => {
 };
 
 const addReject = (id, name, resolve, reject) => {
-  console.log(dat(), 'addReject', id, name);
+  console.log('addReject', id, name);
   for(const [idx, rejectNameStr] of rejects.entries()) {
     if(rejectNameStr.toLowerCase() === name.toLowerCase()) {
-      console.log(dat(), '-- removing old matching reject:', rejectNameStr);
+      console.log('-- removing old matching reject:', rejectNameStr);
       rejects.splice(idx, 1);
     }
   }
-  console.log(dat(), '-- adding reject:', name);
+  console.log('-- adding reject:', name);
   rejects.push(name);
   saveConfigYml(id, {"ok":"ok"}, resolve, reject);
 }
 
 const delReject = (id, name, resolve, reject) => {
-  console.log(dat(), 'delReject', id, name);
+  console.log('delReject', id, name);
   let deletedOne = false;
   for(const [idx, rejectNameStr] of rejects.entries()) {
     if(rejectNameStr.toLowerCase() === name.toLowerCase()) {
-      console.log(dat(), '-- deleting reject:', rejectNameStr);
+      console.log('-- deleting reject:', rejectNameStr);
       rejects.splice(idx, 1);
       deletedOne = true;
     }
   }
   if(!deletedOne) {
-    console.log(dat(), '-- reject not deleted -- no match:', name);
+    console.log('-- reject not deleted -- no match:', name);
     reject([id, 'delReject not deleted: ' + name]);
     return
   }
@@ -277,31 +272,31 @@ const getPickups = (id, _param, resolve, _reject) => {
 };
 
 const addPickup = (id, name, resolve, reject) => {
-  console.log(dat(), 'addPickup', id, name);
+  console.log('addPickup', id, name);
   for(const [idx, pickupNameStr] of pickups.entries()) {
     if(pickupNameStr.toLowerCase() === name.toLowerCase()) {
-      console.log(dat(), '-- removing old matching pickup:', pickupNameStr);
+      console.log('-- removing old matching pickup:', pickupNameStr);
       pickups.splice(idx, 1);
     }
   }
-  console.log(dat(), '-- adding pickup:', name);
+  console.log('-- adding pickup:', name);
   pickups.push(name);
   saveConfigYml(id, {"ok":"ok"}, resolve, reject);
 }
 
 const delPickup = (id, name, resolve, reject) => {
-  console.log(dat(), 'delPickup', id, name);
+  console.log('delPickup', id, name);
   let deletedOne = false;
   for(const [idx, pickupNameStr] of pickups.entries()) {
     if(pickupNameStr.toLowerCase() === name.toLowerCase()) {
-      console.log(dat(), '-- deleting pickup:', pickupNameStr);
+      console.log('-- deleting pickup:', pickupNameStr);
       pickups.splice(idx, 1);
       deletedOne = true;
     }
   }
   if(!deletedOne) {
     reject([id, 'delPickup no match: ' + name]);
-    console.log(dat(), 'pickup not deleted, no match:', name);
+    console.log('pickup not deleted, no match:', name);
     return;
   }
   saveConfigYml(id, {"ok":"ok"}, resolve, reject);
@@ -316,32 +311,32 @@ const getNoEmbys = (id, _param, resolve, _reject) => {
 const addNoEmby = async (id, showStr, resolve) => {
   const show = JSON.parse(showStr);
   const name = show.Name;
-  console.log(dat(), 'addNoEmby', id, name);
+  console.log('addNoEmby', id, name);
   for(const [idx, show] of noEmbys.entries()) {
     if(show.Name.toLowerCase() === name.toLowerCase()) {
-      console.log(dat(), 'removing old noemby:', name);
+      console.log('removing old noemby:', name);
       noEmbys.splice(idx, 1);
     }
   }
-  console.log(dat(), 'adding noemby:', name);
+  console.log('adding noemby:', name);
   noEmbys.push(show);
   await fsp.writeFile('data/noemby.json', JSON.stringify(noEmbys)); 
   resolve([id, {"ok":"ok"}]);
 }
 
 const delNoEmby = async (id, name, resolve, reject) => {
-  console.log(dat(), 'delNoEmby', id, name);
+  console.log('delNoEmby', id, name);
   let deletedOne = false;
   for(const [idx, show] of noEmbys.entries()) {
     if(!show.Name ||
         show.Name.toLowerCase() === name.toLowerCase()) {
-      console.log(dat(), '-- deleting noemby:', name);
+      console.log('-- deleting noemby:', name);
       noEmbys.splice(idx, 1);
       deletedOne = true;
     }
   }
   if(!deletedOne) {
-    console.log(dat(), '-- noembys not deleted -- no match:', name);
+    console.log('-- noembys not deleted -- no match:', name);
     reject([id, 'delNoEmby no match:' + name]);
     return;
   }
@@ -350,7 +345,7 @@ const delNoEmby = async (id, name, resolve, reject) => {
 }
 
 const deletePath = async (id, path, resolve, reject) => {
-  console.log(dat(), 'deletePath', id, path);
+  console.log('deletePath', id, path);
   try {
     path = decodeURI(path).replaceAll('@', '/').replaceAll('~', '?');
     console.log('deleting:', path);
@@ -363,21 +358,45 @@ const deletePath = async (id, path, resolve, reject) => {
   resolve([id, {"ok":"ok"}]);
 };
 
+const getUrls = async (id, urlReq, resolve, reject) => {
+  // console.log('getUrls', {id});
+  let [type, url] = urlReq.split('||');
+  const resp = await fetch(url);
+  if (!resp.ok) {
+    console.error(`getUrls resp: ${resp.status}`);
+    reject([id, {type, url}]);
+    return
+  }
+  const text = await resp.text();
+  if(type == 18) { // wikidata
+    let parts;
+    try{
+      parts = /lang="en"><a href="(.*?)"\shreflang="en"/i.exec(text);
+      if(parts === null) throw 'wikidata parse error';
+    }
+    catch (e) {
+      reject([id, {type, url, e}]);
+      return
+    }
+    resolve([id, parts[1]]);
+  }
+  resolve([id, 'no wikipedia']);
+}
 
 //////////////////  WEBSOCKET SERVER  //////////////////
 
 ws.on('connection', (socket) => {
-  console.log(dat(), 'ws connected');
+  console.log('ws connected');
 
   socket.send('0~~~ok~~~{connected:true}');
 
   socket.on('message', (msg) => {
     msg = msg.toString();
-    console.log(dat(), 'received', msg);
+    console.log('received', msg);
 
     const parts = /^(.*)~~~(.*)~~~(.*)$/.exec(msg);
     if(!parts) {
-      console.error(dat(), 'skipping bad message:', msg);
+      console.error('skipping bad message:', msg);
       return;
     }
     const [id, fname, param] = parts.slice(1);
@@ -394,13 +413,13 @@ ws.on('connection', (socket) => {
 
     promise.then((idResult) => {
       const [id, result] = idResult;
-      console.log(dat(), 'resolved', id);
+      console.log('resolved', id);
       socket.send(`${id}~~~ok~~~${JSON.stringify(result)}`); 
     })
     .catch((idError) => {
       console.log({idError});
       const [id, error] = idError;
-      console.log(dat(), 'rejected', id);
+      console.log('rejected', id);
       socket.send(`${id}~~~err~~~${JSON.stringify(error)}`); 
     });
 
@@ -424,13 +443,26 @@ ws.on('connection', (socket) => {
       case 'addNoEmby':   addNoEmby( id, param, resolve, reject); break;
       case 'delNoEmby':   delNoEmby( id, param, resolve, reject); break;
       
-      case 'deletePath':   deletePath(id, param, resolve, reject); break;
+      case 'deletePath':  deletePath( id, param, resolve, reject); break;
+
+      case 'getUrls':     getUrls(    id, param, resolve, reject); break;
 
       default: reject([id, 'unknownfunction: ' + fname]);
     };
   });
  
-  ws.on('error', (err) => console.log(dat(), 'ws error:', err));
-  ws.on('close', ()    => console.log(dat(), 'ws closed'));
+  ws.on('error', (err) => console.log('ws error:', err));
+  ws.on('close', ()    => console.log('ws closed'));
 });
-  
+/* 
+      // const wdataUrl = `https://www.wikidata.org/wiki/Special:EntityData/${id}.json`
+      // const wdataUrl = `http://www.wikidata.org/entity/${id}`
+      // const wdataUrl = `https://www.wikidata.org/w/api.php?format=json&action=wbgetentities&ids=${id}`
+      // const wdataUrl = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${id}&languages=en&format=json`
+
+  headers: {
+  'Content-Type': 'application/json',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+                  'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+                  'Chrome/131.0.0.0 Safari/537.36'}
+*/

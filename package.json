@@ -19,6 +19,7 @@
   "homepage": "https://github.com/mark-hahn/tv-series-srvr#readme",
   "dependencies": {
     "moment": "^2.29.4",
+    "node-fetch": "^3.3.2",
     "ws": "^8.18.0"
   },
   "nodemonConfig": {

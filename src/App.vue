@@ -80,7 +80,7 @@
       table(style="width:100%; font-size:18px")
        tbody
         tr(v-for="show in shows" key="show.Id" 
-           style="outline:thin solid;" 
+              style="outline:thin solid;" 
              :id="nameHash(show.Name)")
           td(style="width:30px; text-align:center;"
             @click="copyNameToClipboard(show)")
@@ -90,25 +90,27 @@
                   @click="seriesMapAction('open', show)")
               font-awesome-icon(icon="border-all" style="color:#ccc")
 
-          td(@click="setHilite(show)"
+          td(@click="rowClick(show)"
                v-if="sortByNew" 
              :style=`{width:'80px', fontSize:'16px',
                       backgroundColor: hilite(show)}`) 
             | {{ show.DateCreated }}
             
-          td(@click="setHilite(show)"
+          td(@click="rowClick(show)"
                v-if="sortByActivity" 
              :style=`{width:'80px', fontSize:'16px',
                       backgroundColor: hilite(show)}`) 
             | {{ show.Date }}
 
-          td(@click="setHilite(show)"
+          td(@click="rowClick(show)"
              v-if="sortBySize" 
              :style=`{width:'80px', fontSize:'16px', textAlign:'center',
                       backgroundColor: hilite(show)}`) 
             | {{ formatSize(show) + '&nbsp;&nbsp;&nbsp;' }}
 
-          td(:style="{display:'flex', justifyContent:'space-between', padding:'5px', backgroundColor: hilite(show)}")
+          td(:style=`{display:'flex', justifyContent:'space-between',
+                      padding:'5px', backgroundColor: hilite(show)}`
+              @click="rowClick(show)")
 
             div(style="padding:2px; fontSize:16px; font-weight:bold;" 
                 @click="showInExternal(show)" 
@@ -584,6 +586,11 @@ export default {
         await emby.editEpisode(show.Id, season, episode);
 
       this.seriesMapAction('', show, deleted);
+    },
+
+    async rowClick(show) {
+      this.setHilite(show);
+      this.showInExternal(show);
     },
 
     async remotesAction(action, remote, name, id, noemby) {

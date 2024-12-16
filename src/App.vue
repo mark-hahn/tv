@@ -80,7 +80,7 @@
       table(style="width:100%; font-size:18px")
        tbody
         tr(v-for="show in shows" key="show.Id" 
-              style="outline:thin solid;" 
+              style="outline:thin solid; cursor:default" 
              :id="nameHash(show.Name)")
           td(style="width:30px; text-align:center;"
             @click="copyNameToClipboard(show)")
@@ -93,20 +93,23 @@
           td(@click="rowClick(show)"
                v-if="sortByNew" 
              :style=`{width:'80px', fontSize:'16px',
-                      backgroundColor: hilite(show)}`) 
+                      backgroundColor: hilite(show),
+                      cursor:'default'}`) 
             | {{ show.DateCreated }}
             
           td(@click="rowClick(show)"
                v-if="sortByActivity" 
              :style=`{width:'80px', fontSize:'16px',
-                      backgroundColor: hilite(show)}`) 
+                      backgroundColor: hilite(show),
+                      cursor:'default'}`) 
             | {{ show.Date }}
 
           td(@click="rowClick(show)"
              v-if="sortBySize" 
              :style=`{width:'80px', fontSize:'16px', textAlign:'center',
-                      backgroundColor: hilite(show)}`) 
-            | {{ formatSize(show) + '&nbsp;&nbsp;&nbsp;' }}
+                      backgroundColor: hilite(show), 
+                      cursor:'default'}`) 
+            | {{ formatSize(show) }}
 
           td(:style=`{display:'flex', justifyContent:'space-between',
                       padding:'5px', backgroundColor: hilite(show)}`
@@ -121,22 +124,22 @@
             ) {{show.WaitStr}}
 
           td( v-for="cond in conds" 
-              style="width:22px; text-align:center;"
-            @click="cond.click(show)" )
+                style="width:22px; text-align:center;"
+               @click="cond.click(show)" )
             font-awesome-icon(:icon="cond.icon"
                 :style="{color:condColor(show,cond)}")
 
   #remotes(v-if="remotes.length" 
         style=`width:200px; background-color:#eee; padding:20px;
                border: 1px solid black; position: fixed; 
-               left: 30%; top: 200px;
+               left: 55%; top: 200px;
                display:flex; flex-direction:column;`) 
     div(v-for="remote in remotes" 
-        style=`margin:3px 10px; padding:10px;
+        style=`margin:3px 10px; padding:10px; 
+               background-color:white; text-align:center;
                border: 1px solid black; font-weight:bold;`
         @click="remotesAction('click', remote)") 
       | {{remote.name}}
-
 
   #map(v-if="showMap !== null" 
         style="width:60%; background-color:#eee; padding:20px;")
@@ -595,14 +598,16 @@ export default {
 
     async remotesAction(action, remote, name, id, noemby) {
       let tvdbData, url;
+      console.log('remotesAction:', action, name);
       switch(action) {
 
         case 'open':  
           try {  
             tvdbData = await tvdb.getTvDbData(name);
+            console.log('remotesAction open:', {tvdbData});
             if(!tvdbData)
               throw 'remotesAction open: no series: ' + name;
-            this.remotes = tvdbData.remotes;
+            this.remotes = tvdbData.remotes.slice();
             url = urls.embyPageUrl(id);
             if(url && !noemby) 
                 this.remotes.unshift({name:'Emby', url});
@@ -768,7 +773,7 @@ export default {
         allShows = await emby.loadAllShows();
         this.shows = allShows;
 
-        emby.getSeasons(allShows, this.addSeasonsToShow);
+        //- emby.getSeasons(allShows, this.addSeasonsToShow);
 
         this.sortByNew      = true;
         this.sortByActivity = false;

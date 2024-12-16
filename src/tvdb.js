@@ -32,15 +32,15 @@ const getToken = async () => {
 //////////// get WaitStr //////////////
 
 let cache = [];
-const cacheStr = window.localStorage.getItem("tvdbNameCache");
-if(cacheStr) {
-  try {
-    cache = JSON.parse(cacheStr);
-  } catch(e) {
-    showErr(`cache parse error: ${e}`);
-    cache.length = 0;
-  }
-}
+// const cacheStr = window.localStorage.getItem("tvdbNameCache");
+// if(cacheStr) {
+//   try {
+//     cache = JSON.parse(cacheStr);
+//   } catch(e) {
+//     showErr(`cache parse error: ${e}`);
+//     cache.length = 0;
+//   }
+// }
  
 const formatWaitStr = (lastAired) => {
   if(!lastAired) return '{Unknown}';
@@ -82,6 +82,7 @@ const getRemotes = async (extData) => {
     }
     remotes.push({name, url});
   }
+  console.log("get remotes: ", remotes);
   return remotes;
 }
 
@@ -94,12 +95,13 @@ export const getTvDbData = async (searchStr) => {
                         c.exactName === searchStr);
   if(cacheEntry && 
       (Date.now() - cacheEntry.saved) < 48*60*60*1000) { // 2 days
-    // console.log("cache hit: ", {searchStr});
+    console.log("cache hit: ", {searchStr, cacheEntry,
+                                 cachelength:cache.length});
     const {exactName, lastAired, remotes} = cacheEntry;
     return {waitStr: formatWaitStr(lastAired), 
             exactName, lastAired, remotes};
   }
-  console.log("cache miss: ", {searchStr});
+  console.log("cache miss:", {searchStr});
 
   if(!theTvDbToken) await getToken();
 
@@ -141,11 +143,8 @@ export const getTvDbData = async (searchStr) => {
     return null;
   }
   const remotes = await getRemotes(extJSON.data);
-
-  const cacheCopy = cache.filter(c => 
-       c.searchStr !== searchStr && 
-       c.exactName !== exactName);
-  cache.splice(0, cache.length, ...cacheCopy)
+  console.log("tvdb: ", 
+      {searchStr, exactName, lastAired, remotes});
 
   const dateStr = new Date(lastAired)
                       .toISOString().substring(0, 10);

@@ -32,15 +32,15 @@ const getToken = async () => {
 //////////// get WaitStr //////////////
 
 let cache = [];
-// const cacheStr = window.localStorage.getItem("tvdbNameCache");
-// if(cacheStr) {
-//   try {
-//     cache = JSON.parse(cacheStr);
-//   } catch(e) {
-//     showErr(`cache parse error: ${e}`);
-//     cache.length = 0;
-//   }
-// }
+const cacheStr = window.localStorage.getItem("tvdbNameCache");
+if(cacheStr) {
+  try {
+    cache = JSON.parse(cacheStr);
+  } catch(e) {
+    showErr(`cache parse error: ${e}`);
+    cache.length = 0;
+  }
+}
  
 const formatWaitStr = (lastAired) => {
   if(!lastAired) return '{Unknown}';

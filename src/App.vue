@@ -123,10 +123,11 @@
             @click="cond.click(show)" )
             font-awesome-icon(:icon="cond.icon"
                 :style="{color:condColor(show,cond)}")
+  //- #remotes(v-if="remoteShow !== null" 
+  //-         style="width:60%; background-color:#eee; padding:20px;")
 
   #map(v-if="mapShow !== null" 
         style="width:60%; background-color:#eee; padding:20px;")
-    //- div(style="display:inline-block;")x {{mapShow.Name}} 
     div(style="margin:3px 10px; display:inline-block;")
       button(@click="seriesMapAction('close')")          close
       button(@click="seriesMapAction('prune', mapShow)") prune
@@ -183,6 +184,7 @@ export default {
   data() {
 
     const toggleWaiting = async (show) => {
+      console.log("toggleWaiting", show.Name);
       this.saveVisShow(show.Name);
       const waitRes = await tvdb.getTvDbData(show.Name);
       if(!waitRes) {
@@ -729,6 +731,9 @@ export default {
           this.seriesMapAction('close');
       }); 
       try {
+      
+       console.log("mounted try");
+
         showErr = this.showErr;
         await emby.init(showErr);
         tvdb.init(showErr);

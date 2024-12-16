@@ -151,6 +151,9 @@ export function delNoEmby(name)
 export function deletePath(path)   
             {return fCall('deletePath', path)}
 
+export function getUrls(urlReq)   
+            {return fCall('getUrls', urlReq)}
+
 export async function deleteShow(show) {
   await delWaiting(show.Name);
   await delPickup(show.Name);

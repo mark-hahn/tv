@@ -123,8 +123,19 @@
             @click="cond.click(show)" )
             font-awesome-icon(:icon="cond.icon"
                 :style="{color:condColor(show,cond)}")
-  //- #remotes(v-if="remoteShow !== null" 
-  //-         style="width:60%; background-color:#eee; padding:20px;")
+
+
+  #remotes(v-if="remoteShow" 
+        style=`width:200px; background-color:#eee; padding:20px;
+               border: 1px solid black; position: fixed; 
+               left: 30%; top: 200px;
+               display:flex; flex-direction:column;`) 
+    div(v-for="remote in remotes" 
+        style=`width:100%; margin:3px 10px;
+               border: 1px solid black;`
+        @click="remotesAction('change', remote.url)") 
+      | {{remote.sourceName}}
+
 
   #map(v-if="mapShow !== null" 
         style="width:60%; background-color:#eee; padding:20px;")
@@ -293,19 +304,22 @@ export default {
     }
 
     return {
-      shows:             [],
-      searchStr:         "",
-      errMsg:            "",
-      sortByNew:       true,
-      sortByActivity: false,
-      sortBySize:     false,
-      highlightName:     "",
-      allShowsLength:     0,
-      mapShow:         null,
-      seriesMapSeasons:  [],
-      seriesMapEpis:     [],
-      seriesMap:         {},
-      gapPercent:         0,
+      shows:                [],
+      searchStr:            "",
+      errMsg:               "",
+      sortByNew:          true,
+      sortByActivity:    false,
+      sortBySize:        false,
+      highlightName:        "",
+      allShowsLength:        0,
+      remoteShow:        false,
+      remotes:              [],
+      remoteUrl:            "",
+      mapShow:            null,
+      seriesMapSeasons:     [],
+      seriesMapEpis:        [],
+      seriesMap:            {},
+      gapPercent:            0,
 
       conds: [ {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],
@@ -575,6 +589,29 @@ export default {
       this.seriesMapAction('', show, deleted);
     },
 
+    async remotesAction(action, name) {
+      console.log('remotesAction:', {action, name});
+
+      switch(action) {
+        case 'open':
+          this.remotes = 
+                 tvdb.getTvDbData(name).remotes;
+          console.log('remotesAction open:', 
+                        name, this.remotes);
+          this.remoteShow = true;
+          break;
+
+        case 'change':
+          console.log('selected url:', this.remoteUrl);
+          break; 
+
+        case 'close':
+          this.remoteShow = false;
+          break;
+
+      }
+    },
+
     async seriesMapAction(action, show, wasDeleted) {
       if((action == 'open' && this.mapShow === show) ||
           action == 'close') {
@@ -676,34 +713,37 @@ export default {
     },
 
     async showInExternal(show, event) {
-      console.log("showInExternal", show.Name);
-      this.saveVisShow(show.Name);
-      if (!show.Id.startsWith("noemby-")) {
-        if (event.ctrlKey) {
-          console.log("closing old imdb page");
-          if (imdbWin) imdbWin.close();
-          const imdbProviderId = show?.ProviderIds?.Imdb;
-          if (imdbProviderId) {
-            console.log("got imdbProviderId, opening imdb page", 
-                            show?.ProviderIds);
-            const url = `https://www.imdb.com/title/${imdbProviderId}`;
-            imdbWin = window.open(url, "imdbWebPage");
-          }
-          else console.log("no imdb Provider Id for show:", show);
-        } 
-        else {
-          console.log("opening emby page for", show.Name);
+      const name = show.Name
+      console.log("showInExternal", name);
+      this.saveVisShow(name);
+      this.remotesAction('open', name);
 
-          const url = urls.embyPageUrl(show.Id);
-          if (embyWin) {
-            console.log("closing old emby page", show.Name);
-            embyWin.close();
-            embyWin = window.open(url, "embyWin");
-          }
-          else embyWin = window.open(url, "_blank");
-          // console.log("done opening emby page", url);
-        }
-      }
+      //- if (!show.Id.startsWith("noemby-")) {
+      //-   if (event.ctrlKey) {
+      //-     console.log("closing old imdb page");
+      //-     if (imdbWin) imdbWin.close();
+      //-     const imdbProviderId = show?.ProviderIds?.Imdb;
+      //-     if (imdbProviderId) {
+      //-       console.log("got imdbProviderId, opening imdb page", 
+      //-                       show?.ProviderIds);
+      //-       const url = `https://www.imdb.com/title/${imdbProviderId}`;
+      //-       imdbWin = window.open(url, "imdbWebPage");
+      //-     }
+      //-     else console.log("no imdb Provider Id for show:", show);
+      //-   } 
+      //-   else {
+      //-     console.log("opening emby page for", show.Name);
+
+      //-     const url = urls.embyPageUrl(show.Id);
+      //-     if (embyWin) {
+      //-       console.log("closing old emby page", show.Name);
+      //-       embyWin.close();
+      //-       embyWin = window.open(url, "embyWin");
+      //-     }
+      //-     else embyWin = window.open(url, "_blank");
+      //-     // console.log("done opening emby page", url);
+      //-   }
+      //- }
     },
 
     addSeasonsToShow(event) {
@@ -731,9 +771,6 @@ export default {
           this.seriesMapAction('close');
       }); 
       try {
-      
-       console.log("mounted try");
-
         showErr = this.showErr;
         await emby.init(showErr);
         tvdb.init(showErr);
@@ -741,7 +778,7 @@ export default {
         allShows = await emby.loadAllShows();
         this.shows = allShows;
 
-        emby.getSeasons(allShows, this.addSeasonsToShow);
+        //- emby.getSeasons(allShows, this.addSeasonsToShow);
 
         this.sortByNew      = true;
         this.sortByActivity = false;

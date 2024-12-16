@@ -41,7 +41,7 @@ if(cacheStr) {
     cache.length = 0;
   }
 }
-
+ 
 const formatWaitStr = (lastAired) => {
   if(!lastAired) return '{Unknown}';
   const today = new Date().toISOString().substring(0, 10);
@@ -50,9 +50,9 @@ const formatWaitStr = (lastAired) => {
   else return '{Ready}';
 }
 
-const getRemoteUrls = async (extData) => {
+const getRemotes = async (extData) => {
   const remoteIds = extData.remoteIds;
-  const remoteUrls = {};
+  const remotes = [];
   for(let i=0; i < remoteIds.length; i++) {
     const remoteId = remoteIds[i];
     const {id, type, sourceName} = remoteId;
@@ -79,10 +79,10 @@ const getRemoteUrls = async (extData) => {
       case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
       default: continue
     }
-    remoteUrls[sourceName] = url;
+    remotes.push({sourceName, url});
     console.log({sourceName, url});
   }
-  return remoteUrls;
+  return remotes;
 }
 
 
@@ -95,9 +95,9 @@ export const getTvDbData = async (searchStr) => {
   if(cacheEntry && 
       (Date.now() - cacheEntry.saved) < 48*60*60*1000) { // 2 days
     // console.log("cache hit: ", {searchStr});
-    const {exactName, lastAired, remoteUrls} = cacheEntry;
+    const {exactName, lastAired, remotes} = cacheEntry;
     return {waitStr: formatWaitStr(lastAired), 
-            exactName, lastAired, remoteUrls};
+            exactName, lastAired, remotes};
   }
   // console.log("cache miss: ", {searchStr});
 
@@ -140,22 +140,21 @@ export const getTvDbData = async (searchStr) => {
     console.error(`getTvDbData, no lastAired:`, {searchStr, exactName});
     return null;
   }
-  const remoteUrls = await getRemoteUrls(extJSON.data);
-  console.log('getTvDbData', {remoteUrls});
+  const remotes = await getRemotes(extJSON.data);
+  console.log('getTvDbData', {remotes});
 
-  while(cache.length) {
-    const oldIdx = cache.findIndex(
-                    c => c.searchStr === searchStr || 
-                         c.exactName === exactName);
-    if(oldIdx > -1) cache.splice(oldIdx, 1);
-  }
+  const cacheCopy = cache.filter(c => 
+       c.searchStr !== searchStr && 
+       c.exactName !== exactName);
+  cache.splice(0, cache.length, ...cacheCopy)
+
   const dateStr = new Date(lastAired)
                       .toISOString().substring(0, 10);
   cache.push({searchStr, lastAired: dateStr, 
-              saved:Date.now(), exactName, remoteUrls});
+              saved:Date.now(), exactName, remotes});
   window.localStorage.setItem(
                 "tvdbNameCache", JSON.stringify(cache));
 
   return {waitStr: formatWaitStr(lastAired), 
-          exactName, lastAired, remoteUrls};
+          exactName, lastAired, remotes};
 }

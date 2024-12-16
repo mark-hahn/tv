@@ -198,8 +198,8 @@ export async function loadAllShows() {
   //   const tvData = await tvdb.getTvDbData(show.Name);
   //   if(!tvData) continue;
 
-  //   const {remoteUrls} = tvData;
-  //   for(const remoteId of remoteUrls) {
+  //   const {remotes} = tvData;
+  //   for(const remoteId of remotes) {
   //     if(!remoteIds[remoteId.type]) {
   //         remoteIds[remoteId.type] = remoteId;
   //         console.log(++count);

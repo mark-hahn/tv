@@ -89,17 +89,17 @@ const getRemotes = async (extData) => {
 //////////// get TvDb Data //////////////
 
 export const getTvDbData = async (searchStr) => {
-  // const cacheEntry = cache.find(c => 
-  //                       c.searchStr === searchStr || 
-  //                       c.exactName === searchStr);
-  // if(cacheEntry && 
-  //     (Date.now() - cacheEntry.saved) < 48*60*60*1000) { // 2 days
-  //   // console.log("cache hit: ", {searchStr});
-  //   const {exactName, lastAired, remotes} = cacheEntry;
-  //   return {waitStr: formatWaitStr(lastAired), 
-  //           exactName, lastAired, remotes};
-  // }
-  // console.log("cache miss: ", {searchStr});
+  const cacheEntry = cache.find(c => 
+                        c.searchStr === searchStr || 
+                        c.exactName === searchStr);
+  if(cacheEntry && 
+      (Date.now() - cacheEntry.saved) < 48*60*60*1000) { // 2 days
+    // console.log("cache hit: ", {searchStr});
+    const {exactName, lastAired, remotes} = cacheEntry;
+    return {waitStr: formatWaitStr(lastAired), 
+            exactName, lastAired, remotes};
+  }
+  console.log("cache miss: ", {searchStr});
 
   if(!theTvDbToken) await getToken();
 

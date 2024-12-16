@@ -4,10 +4,10 @@ bugs ...
   when show hidden by select, no hilite
   show with 1.5 seasons down marked as not ready (silo)  
        store info in waiting.json?
+  click on show name
   
 new features ...
   cache gap data
-  popup on ctrl click with all providers
   map: clicks on season numbers for whole row
 
 tabled ...

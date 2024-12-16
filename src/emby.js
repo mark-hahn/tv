@@ -191,24 +191,6 @@ export async function loadAllShows() {
   const elapsed = new Date().getTime() - time1;
   console.log('all shows loaded, elapsed:', elapsed);
 
-
-  // const remoteIds = {};
-  // let count = 0;
-  // for (const show of shows) {
-  //   const tvData = await tvdb.getTvDbData(show.Name);
-  //   if(!tvData) continue;
-
-  //   const {remotes} = tvData;
-  //   for(const remoteId of remotes) {
-  //     if(!remoteIds[remoteId.type]) {
-  //         remoteIds[remoteId.type] = remoteId;
-  //         console.log(++count);
-  //     }
-  //   }
-  // }
-  // console.log('remoteIds:', remoteIds);
-
-
   return shows;
 }
 
@@ -253,7 +235,7 @@ export async function setWait(show) {
   else {
     delete show.Waiting;
     delete show.WaitStr;
-    showErr('waiting show not found:', show.Name);
+    showErr('Show not found:', show.Name);
   }
 }
 

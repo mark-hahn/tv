@@ -111,7 +111,7 @@
           td(:style="{display:'flex', justifyContent:'space-between', padding:'5px', backgroundColor: hilite(show)}")
 
             div(style="padding:2px; fontSize:16px; font-weight:bold;" 
-                @click="showInExternal(show, $event)" 
+                @click="showInExternal(show)" 
             ) {{show.Name}} 
 
             div(v-if="show.Waiting" style="padding:2px; color: #00f; fontSize:16px;" 
@@ -124,26 +124,25 @@
             font-awesome-icon(:icon="cond.icon"
                 :style="{color:condColor(show,cond)}")
 
-
-  #remotes(v-if="remoteShow" 
+  #remotes(v-if="remotes.length" 
         style=`width:200px; background-color:#eee; padding:20px;
                border: 1px solid black; position: fixed; 
                left: 30%; top: 200px;
                display:flex; flex-direction:column;`) 
     div(v-for="remote in remotes" 
-        style=`width:100%; margin:3px 10px;
-               border: 1px solid black;`
-        @click="remotesAction('change', remote.url)") 
-      | {{remote.sourceName}}
+        style=`margin:3px 10px; padding:10px;
+               border: 1px solid black; font-weight:bold;`
+        @click="remotesAction('click', remote)") 
+      | {{remote.name}}
 
 
-  #map(v-if="mapShow !== null" 
+  #map(v-if="showMap !== null" 
         style="width:60%; background-color:#eee; padding:20px;")
     div(style="margin:3px 10px; display:inline-block;")
       button(@click="seriesMapAction('close')")          close
-      button(@click="seriesMapAction('prune', mapShow)") prune
-      button(@click="seriesMapAction('date',  mapShow)") set date
-      | {{'&nbsp;&nbsp;&nbsp;'+mapShow.Name}}
+      button(@click="seriesMapAction('prune', showMap)") prune
+      button(@click="seriesMapAction('date',  showMap)") set date
+      | {{'&nbsp;&nbsp;&nbsp;'+showMap.Name}}
       div(v-if="seriesMap?.gap" style="display:inline-block;color:red;") &nbsp; -- &nbsp; {{seriesMap?.gap?.[2]}} &nbsp; -- 
     table(style="padding:0 5px; width:100%; font-size:16px" )
      tbody
@@ -155,7 +154,7 @@
         td(style="font-weight:bold; width:20px; text-align:left;") {{season}}
         td(v-for="episode in seriesMapEpis" 
              :style="{cursor:'default', width:'30px', textAlign:'center', backgroundColor: (seriesMap?.gap?.[0] == season && seriesMap?.gap?.[1] == episode ? 'yellow' : (seriesMap?.[season]?.[episode]?.missing ? '#f88' :'white') ) }"
-           key="episode" @click="episodeClick($event, mapShow, season, episode)")
+           key="episode" @click="episodeClick($event, showMap, season, episode)")
           span(v-if="seriesMap?.[season]?.[episode]?.deleted") d
           span(v-if="seriesMap?.[season]?.[episode]?.played")  w
           span(v-if="seriesMap?.[season]?.[episode]?.avail")   +
@@ -199,7 +198,7 @@ export default {
       this.saveVisShow(show.Name);
       const waitRes = await tvdb.getTvDbData(show.Name);
       if(!waitRes) {
-        console.log('toggleWaiting, no series:', show.Name);
+        console.error('toggleWaiting, no series:', show.Name);
         return;
       }
       show.Waiting = !show.Waiting;
@@ -312,10 +311,8 @@ export default {
       sortBySize:        false,
       highlightName:        "",
       allShowsLength:        0,
-      remoteShow:        false,
       remotes:              [],
-      remoteUrl:            "",
-      mapShow:            null,
+      showMap:            null,
       seriesMapSeasons:     [],
       seriesMapEpis:        [],
       seriesMap:            {},
@@ -589,40 +586,52 @@ export default {
       this.seriesMapAction('', show, deleted);
     },
 
-    async remotesAction(action, name) {
-      console.log('remotesAction:', {action, name});
-
+    async remotesAction(action, remote, name, id, noemby) {
+      let tvdbData, url;
       switch(action) {
-        case 'open':
-          this.remotes = 
-                 tvdb.getTvDbData(name).remotes;
-          console.log('remotesAction open:', 
-                        name, this.remotes);
-          this.remoteShow = true;
+
+        case 'open':  
+          try {  
+            tvdbData = await tvdb.getTvDbData(name);
+            if(!tvdbData)
+              throw 'remotesAction open: no series: ' + name;
+            this.remotes = tvdbData.remotes;
+            url = urls.embyPageUrl(id);
+            if(url && !noemby) 
+                this.remotes.unshift({name:'Emby', url});
+            this.remotes.push({name:'Close', url:null});
+          } catch(err) {
+            console.error('remotesAction open:', err);
+          }
           break;
 
-        case 'change':
-          console.log('selected url:', this.remoteUrl);
+        case 'click':
+          console.log('remote clicked:', remote.name);
+          if(!remote.url) {
+            this.remotes = [];
+            break;
+          }
+          window.open(remote.url, "_blank");
           break; 
 
         case 'close':
-          this.remoteShow = false;
+          this.remotes = [];
           break;
 
       }
     },
 
     async seriesMapAction(action, show, wasDeleted) {
-      if((action == 'open' && this.mapShow === show) ||
+      if((action == 'open' && this.showMap === show) ||
           action == 'close') {
-        this.mapShow = null;
+        this.showMap = null;
         return;
       }
       if(action == 'date') {
         console.log('setting last watched to cur date');
         await emby.setLastWatched(show.Id);
       }
-      this.mapShow           = show;
+      this.showMap           = show;
       const seriesMapSeasons = [];
       const seriesMapEpis    = [];
       const seriesMap        = {gap:show.Gap};
@@ -712,38 +721,12 @@ export default {
       this.select(true);
     },
 
-    async showInExternal(show, event) {
-      const name = show.Name
-      console.log("showInExternal", name);
-      this.saveVisShow(name);
-      this.remotesAction('open', name);
-
-      //- if (!show.Id.startsWith("noemby-")) {
-      //-   if (event.ctrlKey) {
-      //-     console.log("closing old imdb page");
-      //-     if (imdbWin) imdbWin.close();
-      //-     const imdbProviderId = show?.ProviderIds?.Imdb;
-      //-     if (imdbProviderId) {
-      //-       console.log("got imdbProviderId, opening imdb page", 
-      //-                       show?.ProviderIds);
-      //-       const url = `https://www.imdb.com/title/${imdbProviderId}`;
-      //-       imdbWin = window.open(url, "imdbWebPage");
-      //-     }
-      //-     else console.log("no imdb Provider Id for show:", show);
-      //-   } 
-      //-   else {
-      //-     console.log("opening emby page for", show.Name);
-
-      //-     const url = urls.embyPageUrl(show.Id);
-      //-     if (embyWin) {
-      //-       console.log("closing old emby page", show.Name);
-      //-       embyWin.close();
-      //-       embyWin = window.open(url, "embyWin");
-      //-     }
-      //-     else embyWin = window.open(url, "_blank");
-      //-     // console.log("done opening emby page", url);
-      //-   }
-      //- }
+    async showInExternal(show) {
+      const name = show.Name;
+      const id   = show.Id;
+      this.saveVisShow(name);    
+      this.remotesAction('open', null, name, id,
+                          show.Id.startsWith("noemby-"));
     },
 
     addSeasonsToShow(event) {

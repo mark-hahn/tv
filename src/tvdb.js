@@ -55,7 +55,7 @@ const getRemotes = async (extData) => {
   const remotes = [];
   for(let i=0; i < remoteIds.length; i++) {
     const remoteId = remoteIds[i];
-    const {id, type, sourceName} = remoteId;
+    let {id, type, sourceName:name} = remoteId;
     let url ='';  
     switch (type) {
       case 2:  url = `https://www.imdb.com/title/${id}`; break;
@@ -73,14 +73,14 @@ const getRemotes = async (extData) => {
         url = `https://www.themoviedb.org/tv/${id}?language=en-US`;
         break;
       case 18:
-        url = await srvr.getUrls(`18||https://www.wikidata.org/wiki/${id}`);
-        console.log({sourceName, url});
+        url = await srvr.getUrls(
+                `18||https://www.wikidata.org/wiki/${id}`);
+        name = 'Wikipedia';
         break;
       case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
       default: continue
     }
-    remotes.push({sourceName, url});
-    console.log({sourceName, url});
+    remotes.push({name, url});
   }
   return remotes;
 }
@@ -89,16 +89,16 @@ const getRemotes = async (extData) => {
 //////////// get TvDb Data //////////////
 
 export const getTvDbData = async (searchStr) => {
-  const cacheEntry = cache.find(c => 
-                        c.searchStr === searchStr || 
-                        c.exactName === searchStr);
-  if(cacheEntry && 
-      (Date.now() - cacheEntry.saved) < 48*60*60*1000) { // 2 days
-    // console.log("cache hit: ", {searchStr});
-    const {exactName, lastAired, remotes} = cacheEntry;
-    return {waitStr: formatWaitStr(lastAired), 
-            exactName, lastAired, remotes};
-  }
+  // const cacheEntry = cache.find(c => 
+  //                       c.searchStr === searchStr || 
+  //                       c.exactName === searchStr);
+  // if(cacheEntry && 
+  //     (Date.now() - cacheEntry.saved) < 48*60*60*1000) { // 2 days
+  //   // console.log("cache hit: ", {searchStr});
+  //   const {exactName, lastAired, remotes} = cacheEntry;
+  //   return {waitStr: formatWaitStr(lastAired), 
+  //           exactName, lastAired, remotes};
+  // }
   // console.log("cache miss: ", {searchStr});
 
   if(!theTvDbToken) await getToken();
@@ -126,10 +126,10 @@ export const getTvDbData = async (searchStr) => {
   const extUrl = 
     `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
   const extResp = await fetch(extUrl,
-                    {headers: {
-                        'Content-Type': 'application/json',
-                         Authorization:'Bearer ' + theTvDbToken
-                    }});
+                {headers: {
+                    'Content-Type': 'application/json',
+                      Authorization:'Bearer ' + theTvDbToken
+                }});
   if (!extResp.ok) {
     showErr(`tvdb extended: ${extResp.status}`);
     return null;
@@ -141,7 +141,6 @@ export const getTvDbData = async (searchStr) => {
     return null;
   }
   const remotes = await getRemotes(extJSON.data);
-  console.log('getTvDbData', {remotes});
 
   const cacheCopy = cache.filter(c => 
        c.searchStr !== searchStr && 

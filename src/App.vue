@@ -428,9 +428,11 @@ export default {
       const {waitStr, exactName, lastAired} = waitRes;
                      
 
-      const test = allShows.find((s) => s.Name == exactName);
-      if(test) {  
-        showErr('Show already exists: ' + test.Name);
+      const matchShow = allShows.find((s) => s.Name == exactName);
+      if(matchShow) {  
+        console.log('Show already exists: ' + matchShow.Name);
+        this.setHilite(matchShow);
+        this.scrollToSavedShow();
         return;
       }
 

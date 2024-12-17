@@ -1,10 +1,15 @@
 /*
 bugs ...
-  if add => show exists, hilite it
   if show with all seasons before last watched
       and last show in last season is unaired
         last row should show waiting
-  show with 1.5 seasons down marked as not ready (silo)  
+  show with 1.5 seasons down marked as not ready (silo) 
+
+  bad show gaps
+    strike
+    The Bastard Son & The Devil Himself
+    The Lazarus Project
+
   
 new features ...
   cache gap data

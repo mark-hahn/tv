@@ -1,4 +1,8 @@
 /*
+reminder ...
+  restore gap checks
+  restore cache
+
 bugs ...
   chg gap calc to use last seen (userdata?)
   can't set played on lincoln lawer
@@ -7,7 +11,6 @@ bugs ...
     The Bastard Son & The Devil Himself
     The Lazarus Project
 
-  
 new features ...
   hover hints over cond icons
   cache gap data

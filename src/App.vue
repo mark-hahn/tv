@@ -784,8 +784,10 @@ export default {
   mounted() {
     (async () => {
       document.addEventListener('keydown', (event) => {
-        if(event.code == 'Escape') 
+        if(event.code == 'Escape') {
+          this.remotesAction('close');
           this.seriesMapAction('close');
+        }
       }); 
       try {
         showErr = this.showErr;

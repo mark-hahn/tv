@@ -4,10 +4,9 @@ reminder ...
   restore cache
 
 bugs ...
-  chg gap calc to use last seen (userdata?)
+  new gap calc
   bad show gaps
     strike
-    The Bastard Son & The Devil Himself
     The Lazarus Project
 
 new features ...

@@ -22,19 +22,13 @@ const getEpisodes = async (seasonId) => {
   for(let key in episodes) {
     const episode       = episodes[key];
 
-    // if( !epiShown) {
-    //   epiShown = true;
-    //   console.log(episode);
-    // } 
-
     const episodeNumber = +episode.IndexNumber;
     // const showId        = episode.SeriesId;
     // const seasonId      = episode.SeasonId;
-    const userData      = episode?.UserData;
-    const watched       = !!userData?.Played;
-    const haveFile      = (episode.LocationType != "Virtual");
-    const unaired = 
-        !!unairedObj[episodeNumber] && !watched && !haveFile;
+    const userData = episode?.UserData;
+    const watched  = !!userData?.Played;
+    const haveFile = (episode.LocationType != "Virtual");
+    const unaired  = !!unairedObj[episodeNumber];
     Episodes[episodeNumber] = {
         //  showId, seasonId, 
          watched, /*watchStr,*/ haveFile, unaired 

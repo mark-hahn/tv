@@ -64,13 +64,10 @@ export async function loadAllShows() {
   const shows = [];
 
 ////////// get shows from emby ////////////
-
 // includes id, name, dates, haveShows, favorites, etc.
 
   for(let key in embyShows.data.Items) {
     let show = embyShows.data.Items[key];
-
-    console.log({name:show.Name, UserData:show.UserData});
 
     Object.assign(show, show.UserData);
     delete show.UserData;
@@ -334,7 +331,8 @@ seasonLoop:
     let seasonRec      =  seasonsRes.data.Items[key];
     seasonNumber       = +seasonRec.IndexNumber;
     const seasonId     = +seasonRec.Id;
-    const episodesRes  = await axios.get(urls.childrenUrl(cred, seasonId));
+    const episodesRes  = 
+            await axios.get(urls.childrenUrl(cred, seasonId));
     for(let key in episodesRes.data.Items) {
       const episodeRec = episodesRes.data.Items[key];
       const userData   = episodeRec?.UserData;

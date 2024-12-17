@@ -96,8 +96,8 @@ export const getTvDbData = async (searchStr) => {
                         c.exactName === searchStr);
   if(cacheEntry && 
       (Date.now() - cacheEntry.saved) < 48*60*60*1000) { // 2 days
-    console.log("cache hit: ", {searchStr, cacheEntry,
-                                 cachelength:cache.length});
+    // console.log("cache hit: ", {searchStr, cacheEntry,
+    //                              cachelength:cache.length});
     const {exactName, lastAired, remotes, saved} = cacheEntry;
     const remaining = cache.filter(c =>
                         c.searchStr !== searchStr &&
@@ -110,7 +110,7 @@ export const getTvDbData = async (searchStr) => {
     return {waitStr: formatWaitStr(lastAired), 
             exactName, lastAired, remotes, saved};
   }
-  console.log("cache miss:", {searchStr});
+  // console.log("cache miss:", {searchStr});
 
   if(!theTvDbToken) await getToken();
 

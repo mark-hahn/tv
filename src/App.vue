@@ -106,7 +106,8 @@
 
           td(@click="rowClick(show)"
              v-if="sortBySize" 
-             :style=`{width:'80px', fontSize:'16px', textAlign:'center',
+             :style=`{width:'80px', fontSize:'16px', 
+                      textAlign:'center',
                       backgroundColor: hilite(show), 
                       cursor:'default'}`) 
             | {{ formatSize(show) }}
@@ -116,12 +117,11 @@
               @click="rowClick(show)")
 
             div(style="padding:2px; fontSize:16px; font-weight:bold;" 
-                @click="rowClick(show)" 
             ) {{show.Name}} 
 
-            div(v-if="show.Waiting" style="padding:2px; color: #00f; fontSize:16px;" 
-                @click="rowClick(show, $event)"
-            ) {{show.WaitStr}}
+            div(v-if="show.Waiting" 
+                style="padding:2px; color: #00f; fontSize:16px;") 
+              |  {{show.WaitStr}}
 
           td( v-for="cond in conds" 
                 style="width:22px; text-align:center;"
@@ -134,11 +134,14 @@
                border: 1px solid black; position: fixed; 
                left: 55%; top: 200px;
                display:flex; flex-direction:column;`) 
-    div(v-for="remote in remotes" 
-        style=`margin:3px 10px; padding:10px; 
-               background-color:white; text-align:center;
-               border: 1px solid black; font-weight:bold;`
-        @click="remotesAction('click', remote)") 
+    div(style=`text-align:center;
+               margin-bottom:12px; font-weight:bold;`) 
+      | {{remoteShowName}}
+    div( v-for="remote in remotes"
+            style=`margin:3px 10px; padding:10px; 
+                  background-color:white; text-align:center;
+                  border: 1px solid black; font-weight:bold;`
+          @click="remotesAction('click', remote)") 
       | {{remote.name}}
 
   #map(v-if="showMap !== null" 
@@ -192,7 +195,6 @@ let   embyWin   = null;
 let   imdbWin   = null;
 let   showErr   = null;
 const errFifo   = [];
-let inRowClick  = false;
 
 export default {
   name: "App",
@@ -318,6 +320,7 @@ export default {
       highlightName:        "",
       allShowsLength:        0,
       remotes:              [],
+      remoteShowName:       "",
       showMap:            null,
       seriesMapSeasons:     [],
       seriesMapEpis:        [],
@@ -595,27 +598,30 @@ export default {
     },
 
     async rowClick(show) {
-      if(inRowClick) return;
-      inRowClick = true;
-      this.setHilite(show);
-      await this.showInExternal(show);
-      inRowClick = false;
+      console.log('rowClick:', show.Name);
+      if(show.Name == this.remoteShowName) {
+        await this.remotesAction('close');
+      }
+      else {
+        this.setHilite(show);
+        this.remoteShowName = show.Name;
+        this.saveVisShow(show.Name);    
+        await this.remotesAction('open', null, show);
+      }
     },
 
-    async remotesAction(action, remote, name, id, noemby) {
-      let tvdbData, url;
-      console.log('remotesAction:', action, name);
+    async remotesAction(action, remote, show) {
+      console.log('remotesAction:', action, show?.Name);
       switch(action) {
-
         case 'open':  
           try {  
-            tvdbData = await tvdb.getTvDbData(name);
-            // console.log('remotesAction open:', {tvdbData});
+            const name = show.Name;
+            const tvdbData = await tvdb.getTvDbData(name);
             if(!tvdbData)
               throw 'remotesAction open: no series: ' + name;
             this.remotes = tvdbData.remotes.slice();
-            url = urls.embyPageUrl(id);
-            if(url && !noemby) 
+            const url = urls.embyPageUrl(show.Id);
+            if(url && !show.Id.startsWith("noemby-"))
                 this.remotes.unshift({name:'Emby', url});
             this.remotes.push({name:'Close', url:null});
           } catch(err) {
@@ -624,18 +630,14 @@ export default {
           break;
 
         case 'click':
-          console.log('remote clicked:', remote.name);
-          if(!remote.url) {
-            this.remotes = [];
-            break;
-          }
-          window.open(remote.url, "_blank");
+          if(!remote.url) this.remotesAction('close');
+          else window.open(remote.url, "_blank");
           break; 
 
         case 'close':
           this.remotes = [];
+          this.remoteShowName = "";
           break;
-
       }
     },
 
@@ -730,6 +732,7 @@ export default {
     },
 
     /////////////////  UPDATE METHODS  /////////////////
+
     showAll(dontClrFilters = false) {
       if(dontClrFilters?.altKey !== undefined) dontClrFilters = false;
       this.searchStr = "";
@@ -737,15 +740,6 @@ export default {
         for (let cond of this.conds) cond.filter = 0;
       }
       this.select(true);
-    },
-
-    async showInExternal(show) {
-      const name = show.Name;
-      const id   = show.Id;
-      this.saveVisShow(name);    
-      await this.remotesAction(
-              'open', null, name, id, 
-              show.Id.startsWith("noemby-"));
     },
 
     addSeasonsToShow(event) {
@@ -780,7 +774,7 @@ export default {
         allShows = await emby.loadAllShows();
         this.shows = allShows;
 
-        emby.getSeasons(allShows, this.addSeasonsToShow);
+        // emby.getSeasons(allShows, this.addSeasonsToShow);
 
         this.sortByNew      = true;
         this.sortByActivity = false;

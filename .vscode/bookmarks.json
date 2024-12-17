@@ -4,9 +4,9 @@
 			"path": "src/App.vue",
 			"bookmarks": [
 				{
-					"line": 117,
-					"column": 14,
-					"label": "#show.Name"
+					"line": 118,
+					"column": 13,
+					"label": ""
 				},
 				{
 					"line": 131,
@@ -14,27 +14,22 @@
 					"label": ""
 				},
 				{
-					"line": 319,
+					"line": 321,
 					"column": 13,
 					"label": ""
 				},
 				{
-					"line": 596,
+					"line": 599,
 					"column": 6,
 					"label": ""
 				},
 				{
-					"line": 604,
+					"line": 612,
 					"column": 14,
 					"label": ""
 				},
 				{
-					"line": 752,
-					"column": 7,
-					"label": ""
-				},
-				{
-					"line": 782,
+					"line": 776,
 					"column": 7,
 					"label": ""
 				}

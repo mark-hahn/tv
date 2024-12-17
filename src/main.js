@@ -1,15 +1,7 @@
 /*
 bugs ...
-  if show with all seasons before last watched
-      and last show in last season is unaired
-        last row should show waiting
-  show with 1.5 seasons down marked as not ready (silo) 
-  can't delete unless in emby
-  toggle remote popup
-  hover hints over cond icons
+  chg gap calc to use last seen (userdata?)
   can't set played on lincoln lawer
-  clicking to-try with no-emby
-
   bad show gaps
     strike
     The Bastard Son & The Devil Himself
@@ -17,6 +9,7 @@ bugs ...
 
   
 new features ...
+  hover hints over cond icons
   cache gap data
   map: clicks on season numbers for whole row
 

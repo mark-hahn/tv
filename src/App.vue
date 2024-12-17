@@ -219,9 +219,12 @@ export default {
               show.WaitStr = 
                   (await tvdb.getTvDbData(show.Name)).waitStr;
            });
+      await this.chkRowDelete(show);
     };
 
     const toggleFavorite = async (show) => {
+      if(show.Id.startsWith("noemby-") &&
+           !show.IsFavorite) return
       this.saveVisShow(show.Name);
       show.IsFavorite = !show.IsFavorite;
       emby.saveFav(show.Id, show.IsFavorite)
@@ -229,6 +232,7 @@ export default {
               console.log("late saveFavorite error:", err);
               //- show.IsFavorite = !show.IsFavorite;
            });
+      await this.chkRowDelete(show);
     };
 
     const toggleReject = async (show) => {
@@ -254,6 +258,8 @@ export default {
     };
 
     const toggleToTry = async (show) => {
+      if(show.Id.startsWith("noemby-") &&
+           !show.InToTry) return;
       this.saveVisShow(show.Name);
       show.InToTry = !show.InToTry;
       emby.saveToTry(show.Id, show.InToTry)
@@ -261,9 +267,12 @@ export default {
               console.log("late toggleToTry error:", err);
               //- show.InToTry = !show.InToTry;
             });
+      await this.chkRowDelete(show);
     };
 
     const toggleContinue = async (show) => {
+      if(show.Id.startsWith("noemby-") &&
+           !show.InContinue) return;
       this.saveVisShow(show.Name);
       show.InContinue = !show.InContinue;
       emby.saveContinue(show.Id, show.InContinue)
@@ -271,9 +280,12 @@ export default {
               console.log("late toggleContinue error:", err);
               //- show.InContinue = !show.InContinue;
             });
+      await this.chkRowDelete(show);
     };
 
     const toggleMark = async (show) => {
+      if(show.Id.startsWith("noemby-") &&
+           !show.InMark) return;
       this.saveVisShow(show.Name);
       show.InMark = !show.InMark;
       emby.saveMark(show.Id, show.InMark)
@@ -281,9 +293,12 @@ export default {
               console.log("late toggleMark error:", err);
               //- show.InMark = !show.InMark;
             });
+      await this.chkRowDelete(show);
     };
 
     const toggleLinda = async (show) => {
+      if(show.Id.startsWith("noemby-") &&
+           !show.InLinda) return;
       this.saveVisShow(show.Name);
       show.InLinda = !show.InLinda;
       emby.saveLinda(show.Id, show.InLinda)
@@ -291,9 +306,11 @@ export default {
               console.log("late toggleLinda error:", err);
               //- show.InLinda = !show.InLinda;
             });
+      await this.chkRowDelete(show);
     };
 
     const deleteShow = async (show) => {
+      if(show.Id.startsWith("noemby-")) return;
       this.saveVisShow(show.Name);
       console.log("delete Show From Emby?", show.Name);
       if (!window.confirm(
@@ -309,6 +326,7 @@ export default {
       await emby.deleteShowFromEmby(show);
       await emby.deleteShowFromServer(show);
       console.log("app: deleted show:", show.Name);
+      await this.chkRowDelete(show);
     }
 
     return {

@@ -90,6 +90,7 @@ const getRemotes = async (extData) => {
 //////////// get TvDb Data //////////////
 
 export const getTvDbData = async (searchStr) => {
+  // console.log("enter getTvDbData cache: ", {searchStr,cache});
   const cacheEntry = cache.find(c => 
                         c.searchStr === searchStr || 
                         c.exactName === searchStr);
@@ -97,9 +98,17 @@ export const getTvDbData = async (searchStr) => {
       (Date.now() - cacheEntry.saved) < 48*60*60*1000) { // 2 days
     console.log("cache hit: ", {searchStr, cacheEntry,
                                  cachelength:cache.length});
-    const {exactName, lastAired, remotes} = cacheEntry;
+    const {exactName, lastAired, remotes, saved} = cacheEntry;
+    const remaining = cache.filter(c =>
+                        c.searchStr !== searchStr &&
+                        c.exactName !== searchStr);
+    if(remaining.length != cache.length - 1) {
+      cache = remaining;  
+      window.localStorage.setItem(
+                "tvdbNameCache", JSON.stringify(remaining));
+    }
     return {waitStr: formatWaitStr(lastAired), 
-            exactName, lastAired, remotes};
+            exactName, lastAired, remotes, saved};
   }
   console.log("cache miss:", {searchStr});
 
@@ -139,12 +148,13 @@ export const getTvDbData = async (searchStr) => {
   const extJSON   = await extResp.json();
   const lastAired = extJSON.data.lastAired;
   if(!lastAired) {
-    console.error(`getTvDbData, no lastAired:`, {searchStr, exactName});
+    console.error(`getTvDbData, no lastAired:`, 
+                  {searchStr, exactName, data:extJSON.data});
     return null;
   }
   const remotes = await getRemotes(extJSON.data);
-  console.log("tvdb: ", 
-      {searchStr, exactName, lastAired, remotes});
+  // console.log("tvdb: ", 
+  //     {searchStr, exactName, lastAired, remotes});
 
   const dateStr = new Date(lastAired)
                       .toISOString().substring(0, 10);

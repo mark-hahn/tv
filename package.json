@@ -48,7 +48,8 @@
     "rules": {
       "no-unused-vars": "off",
       "no-debugger": "off",
-      "no-empty": "off"
+      "no-empty": "off",
+      "no-constant-condition": "off"
     }
   },
   "browserslist": [

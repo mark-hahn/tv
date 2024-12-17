@@ -1,16 +1,18 @@
 /*
 bugs ...
-  no hilite on load when no saved hilite
-  when show hidden by select, no hilite
+  if add => show exists, hilite it
+  if show with all seasons before last watched
+      and last show in last season is unaired
+        last row should show waiting
   show with 1.5 seasons down marked as not ready (silo)  
-       store info in waiting.json?
-  click on show name
   
 new features ...
   cache gap data
   map: clicks on season numbers for whole row
 
 tabled ...
+  no hilite on load when no saved hilite
+  when show hidden by select, no hilite
   check seasons for no unaired before setting waiting
     move unaired check to getgap
 */

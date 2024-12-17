@@ -116,11 +116,11 @@
               @click="rowClick(show)")
 
             div(style="padding:2px; fontSize:16px; font-weight:bold;" 
-                @click="showInExternal(show)" 
+                @click="rowClick(show)" 
             ) {{show.Name}} 
 
             div(v-if="show.Waiting" style="padding:2px; color: #00f; fontSize:16px;" 
-                @click="showInExternal(show, $event)"
+                @click="rowClick(show, $event)"
             ) {{show.WaitStr}}
 
           td( v-for="cond in conds" 
@@ -192,6 +192,7 @@ let   embyWin   = null;
 let   imdbWin   = null;
 let   showErr   = null;
 const errFifo   = [];
+let inRowClick  = false;
 
 export default {
   name: "App",
@@ -592,8 +593,11 @@ export default {
     },
 
     async rowClick(show) {
+      if(inRowClick) return;
+      inRowClick = true;
       this.setHilite(show);
-      this.showInExternal(show);
+      await this.showInExternal(show);
+      inRowClick = false;
     },
 
     async remotesAction(action, remote, name, id, noemby) {
@@ -604,7 +608,7 @@ export default {
         case 'open':  
           try {  
             tvdbData = await tvdb.getTvDbData(name);
-            console.log('remotesAction open:', {tvdbData});
+            // console.log('remotesAction open:', {tvdbData});
             if(!tvdbData)
               throw 'remotesAction open: no series: ' + name;
             this.remotes = tvdbData.remotes.slice();
@@ -737,8 +741,9 @@ export default {
       const name = show.Name;
       const id   = show.Id;
       this.saveVisShow(name);    
-      this.remotesAction('open', null, name, id,
-                          show.Id.startsWith("noemby-"));
+      await this.remotesAction(
+              'open', null, name, id, 
+              show.Id.startsWith("noemby-"));
     },
 
     addSeasonsToShow(event) {

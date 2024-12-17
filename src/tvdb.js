@@ -53,6 +53,7 @@ const formatWaitStr = (lastAired) => {
 const getRemotes = async (extData) => {
   const remoteIds = extData.remoteIds;
   const remotes = [];
+  const names   = {};
   for(let i=0; i < remoteIds.length; i++) {
     const remoteId = remoteIds[i];
     let {id, type, sourceName:name} = remoteId;
@@ -70,19 +71,23 @@ const getRemotes = async (extData) => {
       case 9:  url = `https://www.instagram.com/${id}`; break;
       case 11: url = `https://www.youtube.com/channel/${id}`; break;
       case 12:
+        console.log("The Movie DB: ", {name});
+        name = 'The Movie DB';
         url = `https://www.themoviedb.org/tv/${id}?language=en-US`;
         break;
       case 18:
+        name = 'Wikipedia';
         url = await srvr.getUrls(
                 `18||https://www.wikidata.org/wiki/${id}`);
-        name = 'Wikipedia';
         break;
       case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
       default: continue
     }
+    if(names[name]) continue;
     remotes.push({name, url});
+    names[name] = true;
   }
-  console.log("get remotes: ", remotes);
+  // console.log("get remotes: ", remotes);
   return remotes;
 }
 

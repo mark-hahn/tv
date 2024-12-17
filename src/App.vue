@@ -195,6 +195,7 @@ let   embyWin   = null;
 let   imdbWin   = null;
 let   showErr   = null;
 const errFifo   = [];
+let   openedWindow = null;
 
 export default {
   name: "App",
@@ -630,8 +631,10 @@ export default {
           break;
 
         case 'click':
+          if(openedWindow) openedWindow.close();
+          openedWindow = null;
           if(!remote.url) this.remotesAction('close');
-          else window.open(remote.url, "_blank");
+          else openedWindow = window.open(remote.url, "_blank");
           break; 
 
         case 'close':

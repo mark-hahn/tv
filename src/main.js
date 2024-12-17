@@ -5,7 +5,6 @@ reminder ...
 
 bugs ...
   chg gap calc to use last seen (userdata?)
-  can't set played on lincoln lawer
   bad show gaps
     strike
     The Bastard Son & The Devil Himself

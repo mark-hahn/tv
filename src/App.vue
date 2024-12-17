@@ -797,7 +797,7 @@ export default {
         allShows = await emby.loadAllShows();
         this.shows = allShows;
 
-        // emby.getSeasons(allShows, this.addSeasonsToShow);
+        emby.getSeasons(allShows, this.addSeasonsToShow);
 
         this.sortByNew      = true;
         this.sortByActivity = false;

@@ -42,7 +42,7 @@ export async function init(showErrIn) {
   urls.init(cred);
 }
 
-//////// load all shows from emby and server //////////
+// load all shows from emby and server //////////
 
 export async function loadAllShows() {
   console.log('entering loadAllShows');
@@ -69,6 +69,9 @@ export async function loadAllShows() {
 
   for(let key in embyShows.data.Items) {
     let show = embyShows.data.Items[key];
+
+    console.log({name:show.Name, UserData:show.UserData});
+
     Object.assign(show, show.UserData);
     delete show.UserData;
     for(const date of ['DateCreated', 'PremiereDate']) {
@@ -191,6 +194,7 @@ export async function loadAllShows() {
   const elapsed = new Date().getTime() - time1;
   console.log('all shows loaded, elapsed:', elapsed);
 
+  // console.log('shows:', shows);
   return shows;
 }
 

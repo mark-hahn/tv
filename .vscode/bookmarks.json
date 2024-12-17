@@ -14,23 +14,8 @@
 					"label": ""
 				},
 				{
-					"line": 340,
-					"column": 13,
-					"label": ""
-				},
-				{
-					"line": 618,
-					"column": 6,
-					"label": ""
-				},
-				{
-					"line": 631,
-					"column": 14,
-					"label": ""
-				},
-				{
 					"line": 799,
-					"column": 7,
+					"column": 12,
 					"label": ""
 				}
 			]
@@ -61,6 +46,26 @@
 				{
 					"line": 153,
 					"column": 23,
+					"label": ""
+				}
+			]
+		},
+		{
+			"path": "src/emby.js",
+			"bookmarks": [
+				{
+					"line": 44,
+					"column": 3,
+					"label": ""
+				}
+			]
+		},
+		{
+			"path": "src/seasons-worker.js",
+			"bookmarks": [
+				{
+					"line": 37,
+					"column": 31,
 					"label": ""
 				}
 			]

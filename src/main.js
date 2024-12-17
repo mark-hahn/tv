@@ -4,6 +4,11 @@ bugs ...
       and last show in last season is unaired
         last row should show waiting
   show with 1.5 seasons down marked as not ready (silo) 
+  can't delete unless in emby
+  toggle remote popup
+  hover hints over cond icons
+  can't set played on lincoln lawer
+  clicking to-try with no-emby
 
   bad show gaps
     strike

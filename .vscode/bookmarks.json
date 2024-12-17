@@ -1,0 +1,74 @@
+{
+	"files": [
+		{
+			"path": "src/App.vue",
+			"bookmarks": [
+				{
+					"line": 117,
+					"column": 14,
+					"label": "#show.Name"
+				},
+				{
+					"line": 131,
+					"column": 0,
+					"label": ""
+				},
+				{
+					"line": 319,
+					"column": 13,
+					"label": ""
+				},
+				{
+					"line": 596,
+					"column": 6,
+					"label": ""
+				},
+				{
+					"line": 604,
+					"column": 14,
+					"label": ""
+				},
+				{
+					"line": 752,
+					"column": 7,
+					"label": ""
+				},
+				{
+					"line": 782,
+					"column": 7,
+					"label": ""
+				}
+			]
+		},
+		{
+			"path": "src/tvdb.js",
+			"bookmarks": [
+				{
+					"line": 52,
+					"column": 9,
+					"label": ""
+				},
+				{
+					"line": 91,
+					"column": 10,
+					"label": ""
+				},
+				{
+					"line": 154,
+					"column": 3,
+					"label": ""
+				}
+			]
+		},
+		{
+			"path": "src/srvr.js",
+			"bookmarks": [
+				{
+					"line": 153,
+					"column": 23,
+					"label": ""
+				}
+			]
+		}
+	]
+}

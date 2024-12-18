@@ -43,11 +43,11 @@ if(cacheStr) {
 }
  
 const formatWaitStr = (lastAired) => {
-  if(!lastAired) return '{Unknown}';
+  if(!lastAired) return '';
   const today = new Date().toISOString().substring(0, 10);
   // console.log("formatWaitStr: ", {lastAired, today});
   if(lastAired > today) return `{${lastAired}}`;
-  else return '{Ready}';
+  else return '';
 }
 
 const getRemotes = async (extData) => {
@@ -131,10 +131,7 @@ export const getTvDbData = async (searchStr) => {
     return null;
   }
   const srchJSON = await srchResp.json();
-  if(!srchJSON.data[0]) {
-    showErr(`No series found for ${searchStr}`);
-    return null;
-  }
+  if(!srchJSON.data[0]) return null;
   const tvdbId    = srchJSON.data[0].tvdb_id;
   const exactName = srchJSON.data[0].name;
 
@@ -151,11 +148,7 @@ export const getTvDbData = async (searchStr) => {
   }
   const extJSON   = await extResp.json();
   const lastAired = extJSON.data.lastAired;
-  if(!lastAired) {
-    console.error(`getTvDbData, no lastAired:`, 
-                  {searchStr, exactName, data:extJSON.data});
-    return null;
-  }
+  if(!lastAired) return null;
   const remotes = await getRemotes(extJSON.data);
   // console.log("tvdb: ", 
   //     {searchStr, exactName, lastAired, remotes});

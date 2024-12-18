@@ -443,7 +443,7 @@ export default {
 
       const waitRes = await tvdb.getTvDbData(srchTxt);
       if(!waitRes) {
-        showErr('No series found for:', srchTxt);
+        showErr('No series found in tvdb for:', srchTxt);
         return;
       }
       const {waitStr, exactName, lastAired} = waitRes;
@@ -496,7 +496,7 @@ export default {
              err += JSON.stringify(param, null, 2) + " ";
         else err += param.toString() + " ";
       }
-      err = err.slice(0, -4)
+      // err = err.slice(0, -4)
       console.error(err);
       if(this.errMsg) 
         errFifo.push(err);
@@ -635,9 +635,8 @@ export default {
           try {  
             const name = show.Name;
             const tvdbData = await tvdb.getTvDbData(name);
-            if(!tvdbData)
-              throw 'remotesAction open: no series: ' + name;
-            this.remotes = tvdbData.remotes.slice();
+            if(!tvdbData) this.remotes = [];
+            else          this.remotes = tvdbData.remotes.slice();
             const url = urls.embyPageUrl(show.Id);
             if(url && !show.Id.startsWith("noemby-"))
                 this.remotes.unshift({name:'Emby', url});

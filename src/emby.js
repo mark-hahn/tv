@@ -229,7 +229,7 @@ export async function setWaitStr(show) {
   if(show?.Name) {
     const waitRes = await tvdb.getTvDbData(show.Name);
     if(!waitRes) {
-      showErr('setWaitStr, no series found for:', show.Name);
+      show.WaitStr = '';
       return;
     }
     show.WaitStr = waitRes.waitStr;

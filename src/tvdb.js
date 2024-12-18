@@ -71,7 +71,6 @@ const getRemotes = async (extData) => {
       case 9:  url = `https://www.instagram.com/${id}`; break;
       case 11: url = `https://www.youtube.com/channel/${id}`; break;
       case 12:
-        console.log("The Movie DB: ", {name});
         name = 'The Movie DB';
         url = `https://www.themoviedb.org/tv/${id}?language=en-US`;
         break;

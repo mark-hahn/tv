@@ -120,12 +120,12 @@ handleMsg = (msg) => {
 export function getAllShows()      
             {return fCall('getAllShows')}
 
-export function getWaiting()        
-            {return fCall('getWaiting')}
-export function addWaiting(name)        
-            {return fCall('addWaiting', name, 'wait')}
-export function delWaiting(name)  
-            {return fCall('delWaiting', name, 'wait')}
+export function getBlockedWaits()        
+            {return fCall('getBlockedWaits')}
+export function addBlockedWait(name)        
+            {return fCall('addBlockedWait', name, 'wait')}
+export function delBlockedWait(name)  
+            {return fCall('delBlockedWait', name, 'wait')}
 
 export function getRejects()       
             {return fCall('getRejects')}
@@ -155,7 +155,7 @@ export function getUrls(urlReq)
             {return fCall('getUrls', urlReq)}
 
 export async function deleteShow(show) {
-  await delWaiting(show.Name);
+  await delBlockedWait(show.Name);
   await delPickup(show.Name);
   await delNoEmby(show.Name);
   await deletePath(show.Path);

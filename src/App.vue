@@ -190,11 +190,10 @@ library.add([
   faMinus, faArrowDown, faTv, faSearch, faQuestion, faCopy, 
   faBan, faBorderAll, faArrowRight, faMars, faVenus, faClock]);
 
-let   allShows  = [];
-let   embyWin   = null;
-let   imdbWin   = null;
-let   showErr   = null;
-const errFifo   = [];
+let   allShows     = [];
+let   blockedWaitShows = null;
+let   showErr      = null;
+const errFifo      = [];
 let   openedWindow = null;
 
 export default {
@@ -763,20 +762,24 @@ export default {
       this.select(true);
     },
 
-    addSeasonsToShow(event) {
-      const {showId, seasons, gap, progress} = event.data;
+    addGapsToShow(event) {
+      const {showId, progress,
+             seasonNum, episodeNum, 
+             watchGap, missing, waiting} = event.data;
       this.gapPercent = progress;
       
-      let show = allShows.find((show) => show.Id == showId);
-      if(show) {
-        show.Seasons = seasons;
-        show.Gap     = gap;
+      const show = allShows.find((show) => show.Id == showId);
+      if(!show) return;
+      show.GapSeason   = seasonNum;
+      show.GapEpisode  = episodeNum;
+      show.WatchGap    = watchGap; 
+      show.Missing     = missing;
+      show.BlockedWait = blockedWaitShows.includes(show.Name);
+      show.Waiting     = !show.BlockedWait && waiting;
+      if(watchGap || missing || show.BlockedWait) {
+        console.log('addGapsToShow:', show);
       }
-      show = this.shows.find((show) => show.Id == showId); 
-      if(show) {
-        show.Seasons = seasons;
-        show.Gap     = gap;
-      }
+      emby.setWaitStr(show);
     },
   },
 
@@ -794,10 +797,13 @@ export default {
         await emby.init(showErr);
         tvdb.init(showErr);
 
-        allShows = await emby.loadAllShows();
-        this.shows = allShows;
+        const showsBlocks = await emby.loadAllShows();
+        allShows         = showsBlocks.shows;
+        this.shows       = allShows;
+        blockedWaitShows = showsBlocks.blockedWaitShows;
 
-        emby.getSeasons(allShows, this.addSeasonsToShow);
+        // must be set before getGaps
+        emby.getGaps(allShows, this.addGapsToShow);
 
         this.sortByNew      = true;
         this.sortByActivity = false;

@@ -51,12 +51,12 @@ export async function loadAllShows() {
   const listPromise   = axios.get(
                         urls.showListUrl(cred, 0, 10000));
   const seriesPromise = srvr.getAllShows(); 
-  const waitPromise   = srvr.getWaiting();
+  const waitPromise   = srvr.getBlockedWaits();
   const rejPromise    = srvr.getRejects();
   const pkupPromise   = srvr.getPickups();
   const noEmbyPromise = srvr.getNoEmbys();
 
-  const [embyShows, srvrShows, waitingShows, 
+  const [embyShows, srvrShows, blockedWaitShows, 
           rejects, pickups, noEmbys] = 
     await Promise.all([listPromise, seriesPromise, 
                        waitPromise, rejPromise, pkupPromise, 
@@ -97,15 +97,15 @@ export async function loadAllShows() {
     else await srvr.delNoEmby("");
   }
 
-//////////  process waiting from srvr ////////////
+//////////  process blockedWaitShows from srvr ////////////
 
-  for(let waitingName of waitingShows) {
-    const i = shows.findIndex((show) => show.Name == waitingName);
-    if(i > -1) await setWait(shows[i]);
+  for(let blockedWaitName of blockedWaitShows) {
+    const i = shows.findIndex((show) => show.Name == blockedWaitName);
+    if(i > -1) await setWaitStr(shows[i]);
     else {
-      console.log('no show, deleting from waiting list:',   
-                   waitingName);
-      await srvr.delWaiting(waitingName);
+      console.log('no show, deleting from blockedWaitShows list:',   
+                   blockedWaitName);
+      await srvr.delBlockedWait(blockedWaitName);
     }
   }
 
@@ -166,7 +166,10 @@ export async function loadAllShows() {
       Id: "noemby-" + Math.random(),
       DateCreated: date,
       LastAired: date, 
+      BlockedWait: false,
       Waiting: false,
+      WatchGap: false,
+      Missing: false,
       WaitStr: '',
       InToTry: false,
       InContinue: false,
@@ -192,13 +195,13 @@ export async function loadAllShows() {
   console.log('all shows loaded, elapsed:', elapsed);
 
   // console.log('shows:', shows);
-  return shows;
+  return {shows, blockedWaitShows};
 }
 
 
 //////////// misc functions //////////////
 
-export function getSeasons(allShows, cb) {
+export function getGaps(allShows, cb) {
   seasonsWorker.onerror = (err) => {
     showErr('Worker:', err.message);
   }
@@ -218,25 +221,27 @@ const markCollId     = '4697672';
 const lindaCollId    = '4706186';
 
 export async function addNoEmby(show) {
-  await srvr.addWaiting(show.Name);
+  await srvr.addBlockedWait(show.Name);
   await srvr.addNoEmby(show);
 }
 
-export async function setWait(show) {
+export async function setWaitStr(show) {
   if(show?.Name) {
-    show.Waiting = true;      
     const waitRes = await tvdb.getTvDbData(show.Name);
     if(!waitRes) {
-      showErr('No series found for:', show.Name);
+      showErr('setWaitStr, no series found for:', show.Name);
       return;
     }
     show.WaitStr = waitRes.waitStr;
-    // console.log('waiting:', show.Name, show.WaitStr);
+    // console.log('setWaitStr:', show.Name, show.WaitStr);
   }
   else {
+    delete show.BlockedWait;
     delete show.Waiting;
+    delete show.Missing;
+    delete show.WatchGap;
     delete show.WaitStr;
-    showErr('Show not found:', show.Name);
+    showErr('setWaitStr, no series found for:', show.Name);
   }
 }
 
@@ -434,9 +439,9 @@ export async function saveReject(name, reject) {
   else       await srvr.delReject(name);
 }
 
-export async function saveWaiting(name, wait) {
-  if(wait) await srvr.addWaiting(name);
-  else     await srvr.delWaiting(name);
+export async function saveBlockedWait(name, blockedWait) {
+  if(blockedWait) await srvr.addBlockedWait(name);
+  else            await srvr.delBlockedWait(name);
 }
 
 export async function savePickup(name, pickup) {

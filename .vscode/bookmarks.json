@@ -64,8 +64,18 @@
 			"path": "src/seasons-worker.js",
 			"bookmarks": [
 				{
-					"line": 26,
-					"column": 31,
+					"line": 5,
+					"column": 15,
+					"label": ""
+				},
+				{
+					"line": 35,
+					"column": 15,
+					"label": ""
+				},
+				{
+					"line": 93,
+					"column": 13,
 					"label": ""
 				}
 			]

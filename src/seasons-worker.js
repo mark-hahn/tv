@@ -65,8 +65,18 @@ const getActiveSeason = async (showId) => {
     activeSeasonNumber   = seasonNumber;
     activeSeasonEpisodes = episodes;
   } 
-  return {activeSeasonNumber, 
-          activeSeasonEpisodes, afterWatchedIdx};
+  let   missing     = !episodes[afterWatchedIdx].haveFile;
+  const waiting     =  episodes[episodes.length-1].unaired;
+  let   episodeNum  = missing ? afterWatchedIdx : episodes.length-1;
+  for(let idx = 0; idx < afterWatchedIdx-1; idx++) {
+    if(!episodes[idx].watched) {
+      missing = true;
+      episodeNum = idx;
+      break;
+    }
+  }
+  return {seasonNum: activeSeasonNumber, episodeNum,
+          missing, waiting};
 };
 
 self.onmessage = async (event) => {
@@ -77,13 +87,8 @@ self.onmessage = async (event) => {
       `seasons-worker started, ${allShowsIdName.length} shows`);
   for (let i = 0; i < allShowsIdName.length; i++) {
     const [showId, _showName] = allShowsIdName[i];
-    const {activeSeasonNumber:   seasonNum, 
-           activeSeasonEpisodes: episodes, 
-           afterWatchedIdx:      afterIdx} = 
-        await getActiveSeason(showId);
-    const missing    = !episodes[afterIdx].haveFile;
-    const waiting    =  episodes[episodes.length-1].unaired;
-    const episodeNum = missing ? afterIdx : episodes.length-1;
+    const {seasonNum, episodeNum,
+           missing, waiting} = await getActiveSeason(showId);
     const progress = Math.ceil( (i+1) * 100 / allShowsIdName.length );
     self.postMessage({showId, progress,
                       seasonNum, episodeNum, 

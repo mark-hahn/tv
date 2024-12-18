@@ -22,10 +22,10 @@ const rejectStr  = fs.readFileSync('config/config2-rejects.json', 'utf8');
 const middleStr  = fs.readFileSync('config/config3-middle.txt',   'utf8');
 const pickupStr  = fs.readFileSync('config/config4-pickups.json', 'utf8');
 const footerStr  = fs.readFileSync('config/config5-footer.txt',   'utf8');
-const waitingStr = fs.readFileSync('data/waiting.json',           'utf8');
+const waitingStr = fs.readFileSync('data/blockedWaits.json',      'utf8');
 const noEmbyStr  = fs.readFileSync('data/noemby.json',            'utf8');
 
-const waitings = JSON.parse(waitingStr);
+const blockedWaits = JSON.parse(waitingStr);
 const rejects  = JSON.parse(rejectStr);
 const pickups  = JSON.parse(pickupStr);
 const noEmbys  = JSON.parse(noEmbyStr);
@@ -194,41 +194,44 @@ const saveConfigYml = async (idIn, resultIn, resolveIn, rejectIn) => {
   }
 }
 
-const getWaiting = (id, _param, resolve) => {
-  resolve([id, waitings]);
+const getBlockedWaits = (id, _param, resolve) => {
+  resolve([id, blockedWaits]);
 };
 
-const addWaiting = async (id, name, resolve, _reject) => {
-  console.log('addWaiting', id, name);
-  for(const [idx, waitingNameStr] of waitings.entries()) {
-    if(waitingNameStr.toLowerCase() === name.toLowerCase()) {
+const addBlockedWait = async (id, name, resolve, _reject) => {
+  console.log('addBlockedWait', id, name);
+  for(const [idx, blockedWaitStr] of blockedWaits.entries()) {
+    if(blockedWaitStr.toLowerCase() === name.toLowerCase()) {
       console.log(
-          '-- removing old matching waiting:', waitingNameStr);
-      waitings.splice(idx, 1);
+          '-- removing matching blockedWaits:', blockedWaitStr);
+      blockedWaits.splice(idx, 1);
+      break;
     }
   }
-  console.log('-- adding waiting:', name);
-  waitings.push(name);
-  await fsp.writeFile('data/waiting.json', JSON.stringify(waitings));
+  console.log('-- adding blockedWait:', name);
+  blockedWaits.push(name);
+  await fsp.writeFile('data/blockedWaits.json', 
+                        JSON.stringify(blockedWaits));
   resolve([id, {"ok":"ok"}]);
 }
 
-const delWaiting = async (id, name, resolve, reject) => {
-  console.log('delWaiting', id, name);
+const delBlockedWait = async (id, name, resolve, reject) => {
+  console.log('delBlockedWait', id, name);
   let deletedOne = false;
-  for(const [idx, waitingNameStr] of waitings.entries()) {
-    if(waitingNameStr.toLowerCase() === name.toLowerCase()) {
-      console.log('-- deleting waiting:', waitingNameStr);
-      waitings.splice(idx, 1);
+  for(const [idx, blockedWaitStr] of blockedWaits.entries()) {
+    if(blockedWaitStr.toLowerCase() === name.toLowerCase()) {
+      console.log('-- deleting blockedWait:', blockedWaitStr);
+      blockedWaits.splice(idx, 1);
       deletedOne = true;
+      break;
     }
   }
   if(!deletedOne) {
-    console.log('waiting not deleted -- no match:', name);
-    reject([id, 'delWaiting no match:' + name]);
+    console.log('blockedWait not deleted -- no match:', name);
+    reject([id, 'delBlockedWait no match:' + name]);
     return
   }
-  await fsp.writeFile('data/waiting.json', JSON.stringify(waitings));
+  await fsp.writeFile('data/blockedWaits.json', JSON.stringify(blockedWaits));
   resolve([id, {"ok":"ok"}]);
 }
 
@@ -427,9 +430,9 @@ ws.on('connection', (socket) => {
     switch (fname) {
       case 'getAllShows': getAllShows(id, '',   resolve, reject); break;
 
-      case 'getWaiting':  getWaiting(id, '',    resolve, reject); break;
-      case 'addWaiting':  addWaiting(id, param, resolve, reject); break;
-      case 'delWaiting':  delWaiting(id, param, resolve, reject); break;
+      case 'getBlockedWaits': getBlockedWaits(id, '',   resolve, reject); break;
+      case 'addBlockedWait':  addBlockedWait(id, param, resolve, reject); break;
+      case 'delBlockedWait':  delBlockedWait(id, param, resolve, reject); break;
 
       case 'getRejects':  getRejects(id, '',    resolve, reject); break;
       case 'addReject':   addReject( id, param, resolve, reject); break;
@@ -454,15 +457,3 @@ ws.on('connection', (socket) => {
   ws.on('error', (err) => console.log('ws error:', err));
   ws.on('close', ()    => console.log('ws closed'));
 });
-/* 
-      // const wdataUrl = `https://www.wikidata.org/wiki/Special:EntityData/${id}.json`
-      // const wdataUrl = `http://www.wikidata.org/entity/${id}`
-      // const wdataUrl = `https://www.wikidata.org/w/api.php?format=json&action=wbgetentities&ids=${id}`
-      // const wdataUrl = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${id}&languages=en&format=json`
-
-  headers: {
-  'Content-Type': 'application/json',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
-                  'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-                  'Chrome/131.0.0.0 Safari/537.36'}
-*/

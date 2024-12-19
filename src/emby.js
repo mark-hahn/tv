@@ -157,7 +157,7 @@ export async function loadAllShows() {
     if(matchingShow) {
       console.log('reject: deleting existing:', rejectName);
       await deleteShowFromEmby(matchingShow);
-      await deleteShowFromServer(matchingShow);
+      await srvr.deleteShow(matchingShow);
       shows.splice(shows.indexOf(matchingShow), 1);
     }
     const date = '2017-12-05';
@@ -220,11 +220,6 @@ const continueCollId = '4719143';
 const markCollId     = '4697672';
 const lindaCollId    = '4706186';
 
-export async function addNoEmby(show) {
-  await srvr.addBlockedWait(show.Name);
-  await srvr.addNoEmby(show);
-}
-
 export async function setWaitStr(show) {
   if(show?.Name) {
     const waitRes = await tvdb.getTvDbData(show.Name);
@@ -251,13 +246,9 @@ export async function deleteShowFromEmby(show) {
   const res = delRes.status;
   if(res != 204) {
     const err = 
-      `unable to delete ${show.Name} from db: ${delRes.data}`;
+      `unable to delete ${show.Name} from emby: ${delRes.data}`;
     showErr(err);
   }
-}
-
-export async function deleteShowFromServer(show){
-  return await srvr.deleteShow(show);
 }
 
 const deleteOneFile = async (path) => {
@@ -422,46 +413,6 @@ export async function saveFav(id, fav) {
   let favRes = await axios(config);
   if(favRes.status != 200) 
       throw new Error('unable to save favorite');
-}
-
-export async function addReject(name) {
-  if(name == "") return false;
-  try { await srvr.addReject(name); }
-  catch (e) {
-    showErr('unable to add reject to server' + e);
-    throw e;
-  }
-  return true;
-}
-
-export async function saveReject(name, reject) {
-  if(reject) await srvr.addReject(name);
-  else       await srvr.delReject(name);
-}
-
-export async function saveBlockedWait(name, blockedWait) {
-  if(blockedWait) await srvr.addBlockedWait(name);
-  else            await srvr.delBlockedWait(name);
-}
-
-export async function savePickup(name, pickup) {
-  if(pickup) {
-    try { await srvr.addPickup(name); }
-    catch (e) {
-      showErr('unable to add pickup' + e);
-      throw e;
-    }
-  }
-  else {
-    try { 
-      await srvr.delPickup(name); 
-    }
-    catch (e) { 
-      console.log('unable to save pickup to server: ' +
-               e.Message);
-      throw e;
-    }
-  }
 }
 
 export async function saveToTry(id, inToTry) {

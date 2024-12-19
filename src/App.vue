@@ -113,13 +113,15 @@
             | {{ formatSize(show) }}
 
           td(:style=`{display:'flex', justifyContent:'space-between',
-                      padding:'5px', backgroundColor: hilite(show)}`
-              @click="rowClick(show)")
+                      padding:'5px', backgroundColor: hilite(show)}`)
 
-            div(style="padding:2px; fontSize:16px; font-weight:bold;" 
+            div(style=`padding:2px; 
+                        fontSize:16px; font-weight:bold;` 
+               @click="rowClick(show)"
             ) {{show.Name}} 
 
-            div(v-if="show.Waiting" 
+            div(v-if="show.WaitStr?.length" 
+                @click="waitStrClick(show)"
                 style="padding:2px; color: #00f; fontSize:16px;") 
               |  {{show.WaitStr}}
 
@@ -172,9 +174,10 @@
 
 
 <script>
-import * as emby  from "./emby.js";
-import * as tvdb  from "./tvdb.js";
-import * as urls  from "./urls.js";
+import * as emby from "./emby.js";
+import * as tvdb from "./tvdb.js";
+import * as urls from "./urls.js";
+import * as srvr from "./srvr.js";
 
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library }         from "@fortawesome/fontawesome-svg-core";
@@ -204,56 +207,15 @@ export default {
     const toggleWaiting = async (show) => {
       console.log("toggleWaiting", show.Name);
       this.saveVisShow(show.Name);
-      const waitRes = await tvdb.getTvDbData(show.Name);
-      if(!waitRes) {
-        console.error('toggleWaiting, no series:', show.Name);
-        return;
+
+      if(show.Waiting) {
+        show.Waiting = false;
+        srvr.addBlockedWait(show.Name);
       }
-      show.Waiting = !show.Waiting;
-      show.WaitStr = waitRes.waitStr;
-      emby.saveWaiting(show.Name, show.Waiting)
-          .catch(async (err) => {
-              console.log("late saveWaiting error:", err);
-              //- show.Waiting = !show.Waiting;
-              show.WaitStr = 
-                  (await tvdb.getTvDbData(show.Name)).waitStr;
-           });
-      await this.chkRowDelete(show);
-    };
-
-    const toggleFavorite = async (show) => {
-      if(show.Id.startsWith("noemby-") &&
-           !show.IsFavorite) return
-      this.saveVisShow(show.Name);
-      show.IsFavorite = !show.IsFavorite;
-      emby.saveFav(show.Id, show.IsFavorite)
-          .catch((err) => {
-              console.log("late saveFavorite error:", err);
-              //- show.IsFavorite = !show.IsFavorite;
-           });
-      await this.chkRowDelete(show);
-    };
-
-    const toggleReject = async (show) => {
-      this.saveVisShow(show.Name);
-      show.Reject = !show.Reject; 
-      emby.saveReject(show.Name, show.Reject) 
-          .catch((err) => {
-              console.log("late saveReject:", err);
-              //- show.Reject = !show.Reject;
-           });
-      await this.chkRowDelete(show);
-    };
-
-    const togglePickup = async (show) => {
-      this.saveVisShow(show.Name);
-      show.Pickup = !show.Pickup;
-      emby.savePickup(show.Name, show.Pickup)
-          .catch((err) => {
-              console.log("late savePickup error:", err);
-              //- show.Pickup = !show.Pickup;
-            });
-      await this.chkRowDelete(show);
+      else if (show.WaitStr?.length > 0) {
+        show.Waiting = true;
+        srvr.delBlockedWait(show.Name); 
+      }
     };
 
     const toggleToTry = async (show) => {
@@ -308,6 +270,54 @@ export default {
       await this.chkRowDelete(show);
     };
 
+    const toggleFavorite = async (show) => {
+      if(show.Id.startsWith("noemby-") &&
+           !show.IsFavorite) return
+      this.saveVisShow(show.Name);
+      show.IsFavorite = !show.IsFavorite;
+      emby.saveFav(show.Id, show.IsFavorite)
+          .catch((err) => {
+              console.log("late saveFavorite error:", err);
+              //- show.IsFavorite = !show.IsFavorite;
+           });
+      await this.chkRowDelete(show);
+    };
+
+    const toggleReject = async (show) => {
+      this.saveVisShow(show.Name);
+      show.Reject = !show.Reject; 
+      if(show.Reject) 
+           srvr.addReject(show.Name) 
+               .catch((err) => {
+                   console.log("late addReject:", err);
+                   //- show.Reject = !show.Reject;
+               });
+      else srvr.delReject(show.Name)
+            .catch((err) => {
+                console.log("late delReject:", err);
+                //- show.Reject = !show.Reject;
+            });
+      await this.chkRowDelete(show);
+    };
+
+    const togglePickup = async (show) => {
+      this.saveVisShow(show.Name);
+      show.Pickup = !show.Pickup;
+      if(show.Pickup) 
+           srvr.addPickup(show.Name) 
+               .catch((err) => {
+                   console.log("late addPickup:", err);
+                   //- show.Pickup = !show.Pickup;
+               });
+      else srvr.delPickup(show.Name)
+            .catch((err) => {
+                console.log("late delPickup:", err);
+                //- show.Pickup = !show.Pickup;
+            });
+      await this.chkRowDelete(show);
+    };
+
+
     const deleteShow = async (show) => {
       if(show.Id.startsWith("noemby-")) return;
       this.saveVisShow(show.Name);
@@ -323,7 +333,7 @@ export default {
         return
       }
       await emby.deleteShowFromEmby(show);
-      await emby.deleteShowFromServer(show);
+      await srvr.deleteShow(show)
       console.log("app: deleted show:", show.Name);
       await this.chkRowDelete(show);
     }
@@ -484,7 +494,8 @@ export default {
       this.saveVisShow(exactName);
       this.scrollToSavedShow();
 
-      await emby.addNoEmby(show);
+      await srvr.addBlockedWait(show.Name);
+      await srvr.addNoEmby(show);
     },
 
     showErr (...params) {
@@ -625,6 +636,15 @@ export default {
         this.remoteShowName = show.Name;
         this.saveVisShow(show.Name);    
         await this.remotesAction('open', null, show);
+      }
+    },
+
+    async waitStrClick(show) {
+      console.log("waitStrClick", show.Name);
+      this.saveVisShow(show.Name);
+      if (show.WaitStr?.length > 0) {
+        show.Waiting = true;
+        srvr.delBlockedWait(show.Name); 
       }
     },
 
@@ -802,7 +822,7 @@ export default {
         blockedWaitShows = showsBlocks.blockedWaitShows;
 
         // must be set before getGaps
-        emby.getGaps(allShows, this.addGapsToShow);
+        // emby.getGaps(allShows, this.addGapsToShow);
 
         this.sortByNew      = true;
         this.sortByActivity = false;

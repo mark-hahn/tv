@@ -161,3 +161,5 @@ export async function deleteShow(show) {
   await deletePath(show.Path);
   // don't ever delete from rejects
 }
+
+

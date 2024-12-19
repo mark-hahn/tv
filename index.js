@@ -80,7 +80,7 @@ const getAllShows = async (id, _param, resolve, reject) => {
     }
   }
   if(errFlg) {
-    reject([id, 'empty show:' + dirent]);
+    reject([id, `getAllShows: ${dirent}, ${err.message}`]);
     return;
   }
   else {
@@ -228,7 +228,7 @@ const delBlockedWait = async (id, name, resolve, reject) => {
   }
   if(!deletedOne) {
     console.log('blockedWait not deleted -- no match:', name);
-    reject([id, 'delBlockedWait no match:' + name]);
+    resolve([id, {"ok":"ok"}]);
     return
   }
   await fsp.writeFile('data/blockedWaits.json', JSON.stringify(blockedWaits));

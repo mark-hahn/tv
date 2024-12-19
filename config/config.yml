@@ -3,8 +3,6 @@ templates:
   tv:
     regexp:
       reject:
-        - "AIW: Go For Broke"
-        - "Apocalypse.Code.The.Bible.Prediction"
         - "Beirut to Bosnia"
         - "Castle Builders"
         - "Class Act"
@@ -252,6 +250,7 @@ templates:
         - "The Neighborhood"
         - "Never Have I Ever"
         - "Newsreaders"
+        - "The Night Agent"
         - "The Night Manager"
         - "Nine Perfect Strangers"
         - "No Offence"
@@ -304,6 +303,7 @@ templates:
         - "Scott & Bailey"
         - "Severance"
         - "Sex Education"
+        - "The Sex Lives of College Girls"
         - "Shakespeare & Hathaway - Private Investigators"
         - "Shakespeare And Hathaway"
         - "Shining Vale"
@@ -372,6 +372,7 @@ templates:
         - "White Van Man (2011)"
         - "Whites"
         - "Why Didn't They Ask Evans"
+        - "Will Trent"
         - "The Witchfinder"
         - "Wolf Like Me"
         - "The Woman in the House Across the Street from the Girl in the Window"

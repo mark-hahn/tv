@@ -361,7 +361,7 @@ export default {
           click() {},
         }, {
           color: "#f88", filter: 0, icon: ["fas", "minus"],
-          cond(show)  { return !!show.Gap; },
+          cond(show)  { return show.Missing; },
           click() {},
         }, {
           color: "#0c0", filter: 0, icon: ["far", "clock"],
@@ -822,7 +822,7 @@ export default {
         blockedWaitShows = showsBlocks.blockedWaitShows;
 
         // must be set before getGaps
-        // emby.getGaps(allShows, this.addGapsToShow);
+        emby.getGaps(allShows, this.addGapsToShow);
 
         this.sortByNew      = true;
         this.sortByActivity = false;

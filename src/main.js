@@ -3,12 +3,11 @@ reminder ...
   restore gap checks
   restore cache
 
-bugs ...
-  new gap calc
-  bad show gaps
-    strike
-    The Lazarus Project
+todo ...
 
+bugs ...
+  delReject
+  
 new features ...
   hover hints over cond icons
   cache gap data

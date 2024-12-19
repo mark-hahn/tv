@@ -5,14 +5,16 @@ reminder ...
 
 todo ...
   show gaps in map
-  keep highlight when changing sort
   consider any missing episode after last watched a gap
-  sort remote names
+  waiting on new added?
 
 bugs ...
   clicking the middle of a row doen't close remotes
 
 new features ...
+  sort remote names
+  keep highlight when changing sort
+  goto hilight row button
   add wikipedia remote the hard way
   map: clicks on season numbers for whole row
   prev/next

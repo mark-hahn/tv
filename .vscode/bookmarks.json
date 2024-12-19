@@ -24,12 +24,12 @@
 					"label": ""
 				},
 				{
-					"line": 784,
-					"column": 14,
+					"line": 783,
+					"column": 6,
 					"label": ""
 				},
 				{
-					"line": 824,
+					"line": 825,
 					"column": 11,
 					"label": ""
 				}
@@ -39,12 +39,12 @@
 			"path": "src/tvdb.js",
 			"bookmarks": [
 				{
-					"line": 52,
+					"line": 46,
 					"column": 9,
 					"label": ""
 				},
 				{
-					"line": 95,
+					"line": 88,
 					"column": 10,
 					"label": ""
 				},
@@ -74,7 +74,7 @@
 					"label": ""
 				},
 				{
-					"line": 193,
+					"line": 192,
 					"column": 29,
 					"label": ""
 				}

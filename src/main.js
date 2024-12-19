@@ -4,14 +4,20 @@ reminder ...
   restore cache
 
 todo ...
+  show gaps in map
+  keep highlight when changing sort
+  consider any missing episode after last watched a gap
+  sort remote names
 
 bugs ...
-  delReject
-  
+  clicking the middle of a row doen't close remotes
+
 new features ...
+  add wikipedia remote the hard way
+  map: clicks on season numbers for whole row
+  prev/next
   hover hints over cond icons
   cache gap data
-  map: clicks on season numbers for whole row
 
 tabled ...
   no hilite on load when no saved hilite

@@ -456,8 +456,7 @@ export default {
         showErr('No series found in tvdb for:', srchTxt);
         return;
       }
-      const {waitStr, exactName, lastAired} = waitRes;
-                     
+      const {exactName, waitStr} = waitRes;
 
       const matchShow = allShows.find((s) => s.Name == exactName);
       if(matchShow) {  
@@ -473,9 +472,10 @@ export default {
         Name: exactName,
         Id: "noemby-" + Math.random(),
         DateCreated: dateStr, 
-        LastAired: lastAired, 
-        Waiting: true,
+        Waiting: false,
         WaitStr: waitStr,
+        Missing: false,
+        WatchGap: false,
         InToTry: false,
         InContinue: false,
         InMark: false,
@@ -795,9 +795,9 @@ export default {
       show.Missing     = missing;
       show.BlockedWait = blockedWaitShows.includes(show.Name);
       show.Waiting     = !show.BlockedWait && waiting;
-      if(watchGap || missing || show.BlockedWait) {
-        console.log('addGapsToShow:', show);
-      }
+      // if(watchGap || missing || show.BlockedWait) {
+      //   console.log('addGapsToShow:', show);
+      // }
       emby.setWaitStr(show);
     },
   },
@@ -819,10 +819,11 @@ export default {
         const showsBlocks = await emby.loadAllShows();
         allShows         = showsBlocks.shows;
         this.shows       = allShows;
+
+        // must be set before startWorker
         blockedWaitShows = showsBlocks.blockedWaitShows;
 
-        // must be set before getGaps
-        emby.getGaps(allShows, this.addGapsToShow);
+        emby.startWorker(allShows, this.addGapsToShow);
 
         this.sortByNew      = true;
         this.sortByActivity = false;

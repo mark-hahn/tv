@@ -165,7 +165,6 @@ export async function loadAllShows() {
       Name: rejectName,
       Id: "noemby-" + Math.random(),
       DateCreated: date,
-      LastAired: date, 
       BlockedWait: false,
       Waiting: false,
       WatchGap: false,
@@ -201,7 +200,7 @@ export async function loadAllShows() {
 
 //////////// misc functions //////////////
 
-export function getGaps(allShows, cb) {
+export function startWorker(allShows, cb) {
   seasonsWorker.onerror = (err) => {
     showErr('Worker:', err.message);
   }
@@ -221,23 +220,12 @@ const markCollId     = '4697672';
 const lindaCollId    = '4706186';
 
 export async function setWaitStr(show) {
-  if(show?.Name) {
-    const waitRes = await tvdb.getTvDbData(show.Name);
-    if(!waitRes) {
-      show.WaitStr = '';
-      return;
-    }
-    show.WaitStr = waitRes.waitStr;
-    // console.log('setWaitStr:', show.Name, show.WaitStr);
+  const waitRes = await tvdb.getTvDbData(show.Name);
+  if(!waitRes) {
+    show.WaitStr = '';
+    return;
   }
-  else {
-    delete show.BlockedWait;
-    delete show.Waiting;
-    delete show.Missing;
-    delete show.WatchGap;
-    delete show.WaitStr;
-    showErr('setWaitStr, no series found for:', show.Name);
-  }
+  show.WaitStr = waitRes.waitStr;
 }
 
 export async function deleteShowFromEmby(show) {

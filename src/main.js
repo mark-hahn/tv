@@ -5,20 +5,19 @@ reminder ...
 
 todo ...
   consider any missing episode after last watched a gap
-  waiting on new added?
+  waiting on new added row?
   move close button to left in map
   refresh filtered rows when dash and new gap loaded
   season number too wide in map
 
 bugs ...
-  clicking the middle of a row doen't close remotes
+  keep highlight when changing sort
   shows waiting when unaired in later row (The Neighborhood)
   no dash on waiting (shrinking, yellowjackets)
 
 new features ...
   up/down arrows
   sort remote names
-  keep highlight when changing sort
   goto hilight row button
   add wikipedia remote the hard way
   map: clicks on season numbers for whole row

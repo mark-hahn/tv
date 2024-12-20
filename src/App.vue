@@ -604,7 +604,7 @@ export default {
       this.sortBySize     = false;
       this.sortShows();
       this.showAll();
-      this.topClick()
+      // this.topClick()
       console.log("sort by Added");
     },
 
@@ -614,7 +614,7 @@ export default {
       this.sortBySize     = false;
       this.sortShows();
       this.showAll();
-      this.topClick()
+      // this.topClick()
       console.log("sort by Activity");
     },
 
@@ -624,7 +624,7 @@ export default {
       this.sortBySize     = true;
       this.sortShows();
       this.showAll();
-      this.topClick()
+      // this.topClick()
       console.log("sort by Size");
     },
 
@@ -805,6 +805,8 @@ export default {
         }
         return true;
       });
+      if (this.shows.length === 1) 
+        this.setHilite(this.shows[0]);
       if (scroll) this.scrollToSavedShow();
     },
 

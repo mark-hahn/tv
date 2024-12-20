@@ -6,9 +6,13 @@ reminder ...
 todo ...
   consider any missing episode after last watched a gap
   waiting on new added?
+  move close button to left in map
+  refresh filtered rows when dash and new gap loaded
 
 bugs ...
   clicking the middle of a row doen't close remotes
+  shows waiting when unaired in later row (The Neighborhood)
+  no dash on waiting (shrinking, yellowjackets)
 
 new features ...
   up/down arrows

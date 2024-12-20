@@ -403,12 +403,11 @@ export const getSeriesMap = async (show, prune = false) => {
       }
 
       episodes.push([episodeNumber, 
-          {error, played, avail, noFile:!path, 
+          {error, played, avail, noFile:!path && !unaired, 
             unaired, deleted}]); 
     }
     seriesMap.push([seasonNumber, episodes]);
   }
-  if(show.Name == 'The Great') console.log({seriesMap});
   return seriesMap;
 }
 

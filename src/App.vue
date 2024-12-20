@@ -173,7 +173,7 @@
         | {{`Missing File`}}
       div(v-if="showMap.WaitStr?.length" 
           style="display:inline-block; margin 3px 10px")
-        | {{'Waiting' + showMap.WaitStr}}
+        | {{'Waiting ' + showMap.WaitStr}}
 
     table(style="padding:0 5px; width:100%; font-size:16px" )
      tbody
@@ -828,9 +828,9 @@ export default {
       show.Missing     = missing;
       show.BlockedWait = blockedWaitShows.includes(show.Name);
       show.Waiting     = !show.BlockedWait && waiting;
-      // if(watchGap || missing || show.BlockedWait) {
-      //   console.log('addGapsToShow:', show);
-      // }
+      if(watchGap || missing || waiting) {
+        console.log('addGapsToShow:', show);
+      }
       emby.setWaitStr(show);
     },
   },

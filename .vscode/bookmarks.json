@@ -24,12 +24,17 @@
 					"label": ""
 				},
 				{
-					"line": 243,
+					"line": 211,
+					"column": 3,
+					"label": ""
+				},
+				{
+					"line": 244,
 					"column": 30,
 					"label": ""
 				},
 				{
-					"line": 403,
+					"line": 404,
 					"column": 25,
 					"label": ""
 				},
@@ -54,12 +59,12 @@
 			"path": "src/tvdb.js",
 			"bookmarks": [
 				{
-					"line": 46,
+					"line": 47,
 					"column": 9,
 					"label": ""
 				},
 				{
-					"line": 94,
+					"line": 95,
 					"column": 10,
 					"label": ""
 				}
@@ -79,12 +84,12 @@
 			"path": "src/emby.js",
 			"bookmarks": [
 				{
-					"line": 44,
+					"line": 45,
 					"column": 3,
 					"label": ""
 				},
 				{
-					"line": 346,
+					"line": 347,
 					"column": 3,
 					"label": ""
 				}

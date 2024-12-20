@@ -2,6 +2,7 @@ import axios     from "axios"
 import * as tvdb from "./tvdb.js";
 import * as srvr from "./srvr.js";
 import * as urls from "./urls.js";
+import * as util from "./util.js";
 
 const seasonsWorker = 
   new Worker(new URL('seasons-worker.js', import.meta.url), 
@@ -288,7 +289,7 @@ export const editEpisode = async (seriesId,
       const episodeId = episodeRec.Id;
       userData.Played = !watched;
       if(!userData.LastPlayedDate)
-        userData.LastPlayedDate = new Date().toISOString();
+          userData.LastPlayedDate = util.fmtDate();
       const url = urls.postUserDataUrl(cred, episodeId);
       const setDataRes = await axios({
         method: 'post',
@@ -331,7 +332,7 @@ seasonLoop:
     const episodeNumber = +lastWatchedEpisodeRec.IndexNumber;
     const userData      =  lastWatchedEpisodeRec?.UserData;
 
-    userData.LastPlayedDate = new Date().toISOString();
+    userData.LastPlayedDate = util.fmtDate();
     const url = urls.postUserDataUrl(cred, episodeId);
     const setDateRes = await axios({
       method: 'post',

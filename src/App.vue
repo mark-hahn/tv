@@ -214,6 +214,7 @@ import * as emby from "./emby.js";
 import * as tvdb from "./tvdb.js";
 import * as urls from "./urls.js";
 import * as srvr from "./srvr.js";
+import * as util from "./util.js";
 
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library }         from "@fortawesome/fontawesome-svg-core";
@@ -502,8 +503,7 @@ export default {
         return;
       }
 
-      const date    = new Date().toISOString();
-      const dateStr = date.substring(0, 10);
+      const dateStr = util.fmtDate();
       const show = {
         Name: exactName,
         Id: "noemby-" + Math.random(),

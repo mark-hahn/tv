@@ -1,4 +1,5 @@
 import * as srvr from "./srvr.js";
+import * as util from "./util.js";
 
 let showErr      = null;
 let theTvDbToken = null;
@@ -149,11 +150,9 @@ export const getTvDbData = async (searchStr) => {
   const extJSON     = await extResp.json();
   const lastAiredIn = extJSON.data.lastAired;
   if(!lastAiredIn) return null;
-  const lastAired =
-     new Date(lastAiredIn).toISOString().substring(0, 10);
-  const today = new Date().toISOString().substring(0, 10);
+  const lastAired = util.fmtDate(lastAiredIn);
+  const today     = util.fmtDate();
   if(lastAired >= today) waitStr = `{${lastAired}}`;
-  
   const remotes = await getRemotes(extJSON.data);
 
   cache.push({searchStr, saved:Date.now(), 

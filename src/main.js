@@ -4,28 +4,25 @@ reminder ...
   restore cache
 
 todo ...
-  waiting on new added row?
-  move close button to left in map
-  refresh filtered rows when dash and new gap loaded
-  season number too wide in map
 
 bugs ...
-  map error not hilighting if loaded late
-
+  delete show doesn't work if dash (uncle buck)
+  
 new features ...
-  up/down arrows
-  goto hilight row button
-  add wikipedia remote the hard way
-  map: clicks on season numbers for whole row
-  prev/next
-  hover hints over cond icons
-  cache gap data
+  one worker call per show from loop or when needed
+  calculate waiting on newly added row
+  refresh filtered rows when new gap loaded
+  show hilight row button
+  map: click on season numbers for whole row
 
 tabled ...
-  no hilite on load when no saved hilite
-  when show hidden by select, no hilite
-  check seasons for no unaired before setting waiting
-    move unaired check to getgap
+  add wikipedia remote the hard way
+  up/down arrows
+  prev/next hilite
+  hover hints over cond icons
+  cache gap data
+  bug: no hilite on load when no saved hilite
+  bug: when show hidden by select, no hilite
 */
 
 import {createApp} from 'vue'

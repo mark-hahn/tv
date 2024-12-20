@@ -4,7 +4,6 @@ reminder ...
   restore cache
 
 todo ...
-  show gaps in map
   consider any missing episode after last watched a gap
   waiting on new added?
 
@@ -12,6 +11,7 @@ bugs ...
   clicking the middle of a row doen't close remotes
 
 new features ...
+  up/down arrows
   sort remote names
   keep highlight when changing sort
   goto hilight row button

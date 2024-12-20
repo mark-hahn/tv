@@ -147,29 +147,60 @@
       | {{remote.name}}
 
   #map(v-if="showMap !== null" 
-        style="width:60%; background-color:#eee; padding:20px;")
-    div(style="margin:3px 10px; display:inline-block;")
-      button(@click="seriesMapAction('close')")          close
-      button(@click="seriesMapAction('prune', showMap)") prune
-      button(@click="seriesMapAction('date',  showMap)") set date
-      | {{'&nbsp;&nbsp;&nbsp;'+showMap.Name}}
-      div(v-if="seriesMap?.gap" style="display:inline-block;color:red;") &nbsp; -- &nbsp; {{seriesMap?.gap?.[2]}} &nbsp; -- 
+        style=`width:60%; background-color:#eee; padding:10px;
+               display:flex; flex-direction:column;`)
+    div(style=`margin:0 5px;display:flex; 
+                justify-content:space-between;`)
+      div(style=`margin:6px; font-size:22px;
+                 font-weight:bold; flex-grow:4;`)
+        | {{showMap.Name}}
+      button(@click="seriesMapAction('close')"
+             style="margin:5px;")                     Close
+      button(@click="seriesMapAction('prune', showMap)"
+             style="margin:5px;")                     Prune
+      button(@click="seriesMapAction('date',  showMap)"
+             style="margin:5px;")                     Set Date
+
+    div(v-if=`showMap.WatchGap ||
+              showMap.Missing  || showMap.WaitStr?.length`
+        style=`display:flex; justify-content:space-around; 
+               color:red; margin: 0 10px; 4px 10px; width:400px;`)
+      div(v-if="showMap.WatchGap" 
+          style="display:inline-block;")
+        | {{`Watch Gap`}}
+      div(v-if="showMap.Missing"
+          style="display:inline-block; margin 3px 10px")
+        | {{`Missing File`}}
+      div(v-if="showMap.WaitStr?.length" 
+          style="display:inline-block; margin 3px 10px")
+        | {{'Waiting' + showMap.WaitStr}}
+
     table(style="padding:0 5px; width:100%; font-size:16px" )
      tbody
       tr(style="font-weight:bold;")
         td
-        td(v-for="episode in seriesMapEpis" style="width:30px; text-align:center;"
-              key="episode") {{episode}}
-      tr(v-for="season in seriesMapSeasons" key="season" style="outline:thin solid;")
-        td(style="font-weight:bold; width:20px; text-align:left;") {{season}}
         td(v-for="episode in seriesMapEpis" 
-             :style="{cursor:'default', width:'30px', textAlign:'center', backgroundColor: (seriesMap?.gap?.[0] == season && seriesMap?.gap?.[1] == episode ? 'yellow' : (seriesMap?.[season]?.[episode]?.missing ? '#f88' :'white') ) }"
-           key="episode" @click="episodeClick($event, showMap, season, episode)")
-          span(v-if="seriesMap?.[season]?.[episode]?.deleted") d
+           style="width:30px; text-align:center;"
+           key="episode") {{episode}}
+      tr(v-for="season in seriesMapSeasons" key="season"
+                style="outline:thin solid;")
+        td(style="font-weight:bold; width:20px; text-align:left;")
+          | {{season}}
+
+        td(v-for="episode in seriesMapEpis" key="series+'.'+episode" 
+            @click="episodeClick($event, showMap, season, episode)"
+            :style=`{cursor:'default', width:'30px',
+                     textAlign:'center', 
+                     backgroundColor:  
+                      (seriesMap[season]?.[episode]?.error) 
+                          ? 'yellow': 
+                      (seriesMap[season]?.[episode]?.noFile) 
+                          ? '#faa' : 'white'}`)
           span(v-if="seriesMap?.[season]?.[episode]?.played")  w
           span(v-if="seriesMap?.[season]?.[episode]?.avail")   +
-          span(v-if="seriesMap?.[season]?.[episode]?.missing") -
+          span(v-if="seriesMap?.[season]?.[episode]?.noFile")  -
           span(v-if="seriesMap?.[season]?.[episode]?.unaired") u
+          span(v-if="seriesMap?.[season]?.[episode]?.deleted") d
 </template>
 
 
@@ -693,23 +724,25 @@ export default {
       this.showMap           = show;
       const seriesMapSeasons = [];
       const seriesMapEpis    = [];
-      const seriesMap        = {gap:show.Gap};
+      const seriesMap        = {};
       const seriesMapIn = 
-            await emby.getSeriesMap(show.Id, action == 'prune');
+            await emby.getSeriesMap(show, action == 'prune');
       for(const season of seriesMapIn) {
         const [seasonNum, episodes] = season;
         seriesMapSeasons[seasonNum] = seasonNum;
         const seasonMap = {};
         seriesMap[seasonNum] = seasonMap;
         for(const episode of episodes) {
-          let [episodeNum, [played, avail, unaired, deleted]] = episode;
+          let [episodeNum, epiObj] = episode;
+          const {error, played, avail, noFile, 
+                 unaired, deleted} = epiObj;
           seriesMapEpis[episodeNum] = episodeNum;
-          if(wasDeleted &&
-              wasDeleted.season == seasonNum && wasDeleted.episode == episodeNum) {
-            deleted = true;
-          }
-          const missing = !avail && !unaired;
-          seasonMap[episodeNum] = {played, avail, missing, unaired, deleted};
+          // if(wasDeleted &&
+          //     wasDeleted.season  == seasonNum && 
+          //     wasDeleted.episode == episodeNum)
+          //   deleted = true;
+          seasonMap[episodeNum] = 
+              {error, played, avail, noFile, unaired, deleted};
         }
       }
       this.seriesMapSeasons = 

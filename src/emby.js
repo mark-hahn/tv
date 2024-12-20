@@ -345,40 +345,45 @@ seasonLoop:
   }
 }
 
-export const getSeriesMap = async (seriesId, prune = false) => { 
+export const getSeriesMap = async (show, prune = false) => { 
+  const seriesId  = show.Id;
   const seriesMap = [];
   let pruning = prune;
-  const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
+  const seasonsRes = 
+        await axios.get(urls.childrenUrl(cred, seriesId));
   for(let key in seasonsRes.data.Items) {
     let   seasonRec    =  seasonsRes.data.Items[key];
     let   seasonId     =  seasonRec.Id;
     const seasonNumber = +seasonRec.IndexNumber;
     const unairedObj   = {};
-    const unairedRes   = await axios.get(urls.childrenUrl(cred, seasonId, true));
+    const unairedRes = 
+          await axios.get(urls.childrenUrl(cred, seasonId, true));
     for(let key in unairedRes.data.Items) {
       const episodeRec    = unairedRes.data.Items[key];
       const episodeNumber = +episodeRec.IndexNumber;
       unairedObj[episodeNumber] = true;
     }
     const episodes    = [];
-    const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
+    const episodesRes = 
+          await axios.get(urls.childrenUrl(cred, seasonId));
     for(let key in episodesRes.data.Items) {
       let   episodeRec    =  episodesRes.data.Items[key];
       const episodeNumber = +episodeRec.IndexNumber;
       if(!episodeNumber) continue;
 
-      const path          =  episodeRec?.MediaSources?.[0]?.Path;
-      const played        = !!episodeRec?.UserData?.Played;
-      const avail         =   episodeRec?.LocationType != "Virtual";
-      const unaired = 
-              !!unairedObj[episodeNumber] && !played && !avail;
+      const path    =  episodeRec?.MediaSources?.[0]?.Path;
+      const played  = !!episodeRec?.UserData?.Played;
+      const avail   =   episodeRec?.LocationType != "Virtual";
+      const unaired = !!unairedObj[episodeNumber];
+
       let deleted = false;
 
       if(avail && !path) {
         showErr('avail without path', 
-                    `S${seasonNumber}E${episodeNumber}`);
+                 `S${seasonNumber}E${episodeNumber}`);
         continue;
       }
+
       if(pruning) {
         if(!played && avail) pruning = false;
         else {
@@ -386,10 +391,24 @@ export const getSeriesMap = async (seriesId, prune = false) => {
           deleted = avail;     // set even if error
         }
       }
-      episodes.push([episodeNumber, [played, avail, unaired, deleted]]);
+
+      let error   = false;
+      let missing = false;
+
+      if(seasonNumber  == show.GapSeason  &&
+         episodeNumber == show.GapEpisode &&
+         (show.WatchGap || show.Missing || show.Waiting)) {
+        error = true;
+        missing = show.Missing;
+      }
+
+      episodes.push([episodeNumber, 
+          {error, played, avail, noFile:!path, 
+            unaired, deleted}]); 
     }
     seriesMap.push([seasonNumber, episodes]);
   }
+  if(show.Name == 'The Great') console.log({seriesMap});
   return seriesMap;
 }
 

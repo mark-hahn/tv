@@ -71,16 +71,6 @@
 			]
 		},
 		{
-			"path": "src/srvr.js",
-			"bookmarks": [
-				{
-					"line": 153,
-					"column": 23,
-					"label": ""
-				}
-			]
-		},
-		{
 			"path": "src/emby.js",
 			"bookmarks": [
 				{

@@ -35,6 +35,11 @@ const videoFileExtensions = [
   "3gp", "m4v", "ts", "rm", "vob", "ogv", "divx"
 ];
 
+const fmtDate = (dateStr = null) => {
+  const date = dateStr ? new Date(dateStr) : new Date();
+  return date.toISOString().slice(5,10).replace(/^0/,' ');
+}
+
 const getAllShows = async (id, _param, resolve, reject) => {
   let   errFlg = null;
   const shows = {};
@@ -53,8 +58,7 @@ const getAllShows = async (id, _param, resolve, reject) => {
       }
       const sfx = path.split('.').pop();
       if(videoFileExtensions.includes(sfx)) {
-        const date  = 
-              fstat.mtime.toISOString().substring(0,10);
+        const date = fmtDate(fstat.mtime);
         maxDate = (maxDate > date) ? maxDate : date;
       }
       totalSize += fstat.size;
@@ -67,9 +71,8 @@ const getAllShows = async (id, _param, resolve, reject) => {
   const dir = await fsp.readdir(tvDir);
   for (const dirent of dir) {
     const showPath = tvDir + '/' + dirent;
-    const fstat = await fsp.stat(showPath);
-    const tstr  = fstat.mtime.toISOString();
-    maxDate = tstr.substring(0,10);
+    const fstat   = await fsp.stat(showPath);
+    const maxDate = fmtDate(fstat.mtime);
     totalSize = 0;
 
     await recurs(showPath);
@@ -308,9 +311,7 @@ const delPickup = (id, name, resolve, reject) => {
 const getNoEmbys = (id, _param, resolve, _reject) => {
   resolve([id, noEmbys]);
 };
-/*
-5~~~addNoEmby~~~{"Name":"The Nanny","Id":"noemby-0.7793004790297076","DateCreated":"2024-12-04","Waiting":true,"WaitStr":"<Ready>","InToTry":false,"InContinue":false,"InMark":false,"InLinda":false,"Reject":false,"Pickup":true,"Seasons":[]}
-*/
+
 const addNoEmby = async (id, showStr, resolve) => {
   const show = JSON.parse(showStr);
   const name = show.Name;

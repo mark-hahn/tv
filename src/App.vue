@@ -154,9 +154,9 @@
   #map(v-if="showMap !== null" 
         style=`background-color:#eee; padding:10px;
                display:flex; flex-direction:column;`)
-    div(style=`margin:0 5px;display:flex; 
+    div(style=`margin:0 5px; display:flex; 
                 justify-content:space-between;`)
-      div(style=`font-size:22px;
+      div(style=`font-size:20px; margin:6px 20px 0 0;
                  font-weight:bold; flex-grow:4;`)
         | {{showMap.Name}}
       button(@click="seriesMapAction('prune', showMap)"
@@ -189,7 +189,7 @@
            key="episode") {{episode}}
       tr(v-for="season in seriesMapSeasons" key="season"
                 style="outline:thin solid;")
-        td(style="font-weight:bold; width:10px; text-align:left;")
+        td(style="font-weight:bold; width:10px; text-align:center;")
           | {{season}}
 
         td(v-for="episode in seriesMapEpis" key="series+'.'+episode" 

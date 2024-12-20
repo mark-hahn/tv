@@ -81,7 +81,7 @@ const getActiveSeason = async (showId, showName) => {
   for(let idx = afterWatchedIdx; idx < episodes.length; idx++) {
     if(episodes[idx].unaired) break;
     if(!episodes[idx].haveFile) {
-      missing = true;
+      missing    = true;
       episodeNum = episodes[idx].episodeNumber;
       break;
     }

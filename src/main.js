@@ -4,14 +4,12 @@ reminder ...
   restore cache
 
 todo ...
-  consider any missing episode after last watched a gap
   waiting on new added row?
   move close button to left in map
   refresh filtered rows when dash and new gap loaded
   season number too wide in map
 
 bugs ...
-  no dash on waiting (shrinking, yellowjackets)
   map error not hilighting if loaded late
 
 new features ...

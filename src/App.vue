@@ -120,6 +120,11 @@
                @click="rowClick(show)"
             ) {{show.Name}} 
 
+            div(style=`padding:2px; flex-grow:1;
+                        fontSize:16px; font-weight:bold;` 
+               @click="rowClick(show)"
+            )
+
             div(v-if="show.WaitStr?.length" 
                 @click="waitStrClick(show)"
                 style="padding:2px; color: #00f; fontSize:16px;") 
@@ -147,24 +152,24 @@
       | {{remote.name}}
 
   #map(v-if="showMap !== null" 
-        style=`width:60%; background-color:#eee; padding:10px;
+        style=`background-color:#eee; padding:10px;
                display:flex; flex-direction:column;`)
     div(style=`margin:0 5px;display:flex; 
                 justify-content:space-between;`)
-      div(style=`margin:6px; font-size:22px;
+      div(style=`font-size:22px;
                  font-weight:bold; flex-grow:4;`)
         | {{showMap.Name}}
-      button(@click="seriesMapAction('close')"
-             style="margin:5px;")                     Close
       button(@click="seriesMapAction('prune', showMap)"
              style="margin:5px;")                     Prune
       button(@click="seriesMapAction('date',  showMap)"
              style="margin:5px;")                     Set Date
+      button(@click="seriesMapAction('close')"
+             style="margin:5px;")                     Close
 
     div(v-if=`showMap.WatchGap ||
               showMap.Missing  || showMap.WaitStr?.length`
         style=`display:flex; justify-content:space-around; 
-               color:red; margin: 0 10px; 4px 10px; width:400px;`)
+               color:red; margin: 0 10px; 4px 10px;`)
       div(v-if="showMap.WatchGap" 
           style="display:inline-block;")
         | {{`Watch Gap`}}
@@ -175,21 +180,21 @@
           style="display:inline-block; margin 3px 10px")
         | {{'Waiting ' + showMap.WaitStr}}
 
-    table(style="padding:0 5px; width:100%; font-size:16px" )
+    table(style="padding:0 5px; font-size:16px" )
      tbody
       tr(style="font-weight:bold;")
         td
         td(v-for="episode in seriesMapEpis" 
-           style="width:30px; text-align:center;"
+           style="text-align:center;"
            key="episode") {{episode}}
       tr(v-for="season in seriesMapSeasons" key="season"
                 style="outline:thin solid;")
-        td(style="font-weight:bold; width:20px; text-align:left;")
+        td(style="font-weight:bold; width:10px; text-align:left;")
           | {{season}}
 
         td(v-for="episode in seriesMapEpis" key="series+'.'+episode" 
             @click="episodeClick($event, showMap, season, episode)"
-            :style=`{cursor:'default', width:'30px',
+            :style=`{cursor:'default', width:'10px',
                      textAlign:'center', 
                      backgroundColor:  
                       (seriesMap[season]?.[episode]?.error) 
@@ -828,9 +833,9 @@ export default {
       show.Missing     = missing;
       show.BlockedWait = blockedWaitShows.includes(show.Name);
       show.Waiting     = !show.BlockedWait && waiting;
-      if(watchGap || missing || waiting) {
-        console.log('addGapsToShow:', show);
-      }
+      // if(watchGap || missing || waiting) {
+      //   console.log('addGapsToShow:', show);
+      // }
       emby.setWaitStr(show);
     },
   },

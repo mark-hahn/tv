@@ -8,6 +8,7 @@ todo ...
   waiting on new added?
   move close button to left in map
   refresh filtered rows when dash and new gap loaded
+  season number too wide in map
 
 bugs ...
   clicking the middle of a row doen't close remotes

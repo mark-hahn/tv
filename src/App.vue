@@ -397,7 +397,7 @@ export default {
           click() {},
         }, {
           color: "#f88", filter: 0, icon: ["fas", "minus"],
-          cond(show)  { return show.Missing; },
+          cond(show)  { return show.Missing || show.WatchGap},
           click() {},
         }, {
           color: "#0c0", filter: 0, icon: ["far", "clock"],

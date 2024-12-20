@@ -11,13 +11,11 @@ todo ...
   season number too wide in map
 
 bugs ...
-  keep highlight when changing sort
   shows waiting when unaired in later row (The Neighborhood)
   no dash on waiting (shrinking, yellowjackets)
 
 new features ...
   up/down arrows
-  sort remote names
   goto hilight row button
   add wikipedia remote the hard way
   map: clicks on season numbers for whole row

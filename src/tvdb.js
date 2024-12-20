@@ -59,28 +59,34 @@ const getRemotes = async (extData) => {
              `?programSeriesId=SH03415789&tmsId=${id}` +
              `&from=showcard&aid=gapzap`
         break;
-      case 4:  url = id; break;
+      case 4:  name = 'Official Website';
+               url = id; 
+               break;
       case 7:  url = `https://www.reddit.com/r/${id}`; break;
       case 8:  url = id; break;
       case 9:  url = `https://www.instagram.com/${id}`; break;
       case 11: url = `https://www.youtube.com/channel/${id}`; break;
-      case 12:
-        name = 'The Movie DB';
-        url = `https://www.themoviedb.org/tv/${id}?language=en-US`;
-        break;
-      case 18:
-        name = 'Wikipedia';
-        url = await srvr.getUrls(
-                `18||https://www.wikidata.org/wiki/${id}`);
-        break;
+      case 12: name = 'The Movie DB';
+               url = `https://www.themoviedb.org/tv/${id}?language=en-US`;
+               break;
+      case 18: name = 'Wikipedia';
+               url = await srvr.getUrls(
+                      `18||https://www.wikidata.org/wiki/${id}`);
+               break;
       case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
       default: continue
     }
     if(names[name]) continue;
-    remotes.push({name, url});
     names[name] = true;
+    remotes.push({name, url});
   }
-  // console.log("get remotes: ", remotes);
+  remotes.sort((a, b) => 
+            a.name.toLowerCase().replace(/^the /, '') > 
+            b.name.toLowerCase().replace(/^the /, '') ? 1 : -1);
+
+  // console.log("get remotes: ", remotes[0].type, remotes[0].name, 
+  //                   remotes[0].name.toLowerCase().replace(/^the /, ''));
+
   return remotes;
 }
 

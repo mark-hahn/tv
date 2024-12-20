@@ -176,7 +176,7 @@
       div(v-if="showMap.Missing"
           style="display:inline-block; margin 3px 10px")
         | {{`Missing File`}}
-      div(v-if="showMap.WaitStr?.length" 
+      div(v-if="showMap.Waiting" 
           style="display:inline-block; margin 3px 10px")
         | {{'Waiting ' + showMap.WaitStr}}
 
@@ -821,7 +821,7 @@ export default {
       this.select(true);
     },
 
-    addGapsToShow(event) {
+    addGapToShow(event) {
       const {showId, progress,
              seasonNum, episodeNum, 
              watchGap, missing, waiting} = event.data;
@@ -829,12 +829,12 @@ export default {
       
       const show = allShows.find((show) => show.Id == showId);
       if(!show) return;
-      show.GapSeason   = seasonNum;
-      show.GapEpisode  = episodeNum;
-      show.WatchGap    = watchGap; 
-      show.Missing     = missing;
-      show.BlockedWait = blockedWaitShows.includes(show.Name);
-      show.Waiting     = !show.BlockedWait && waiting;
+      show.GapSeason    = seasonNum;
+      show.GapEpisode   = episodeNum;
+      show.WatchGap     = watchGap; 
+      show.Missing      = missing;
+      const blockedWait = blockedWaitShows.includes(show.Name);
+      show.Waiting      = !blockedWait && waiting;
       // if(watchGap || missing || waiting) {
       //   console.log('addGapsToShow:', show);
       // }
@@ -863,7 +863,7 @@ export default {
         // must be set before startWorker
         blockedWaitShows = showsBlocks.blockedWaitShows;
 
-        emby.startWorker(allShows, this.addGapsToShow);
+        emby.startWorker(allShows, this.addGapToShow);
 
         this.sortByNew      = true;
         this.sortByActivity = false;

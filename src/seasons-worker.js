@@ -74,12 +74,18 @@ const getActiveSeason = async (showId, showName) => {
   }
   seasonNum = activeSeasonNumber
   episodes  = activeSeasonEpisodes;
-  let  episodeNum = episodes[episodes.length-1].episodeNumber;
-  const waiting = episodes[episodes.length-1].unaired;
-  const missing = (afterWatchedIdx !== episodes.length) &&
-                !episodes[afterWatchedIdx].unaired    &&
-                !episodes[afterWatchedIdx].haveFile;
-  if(missing) episodeNum = episodes[afterWatchedIdx].episodeNumber;
+  let   episodeNum = episodes[episodes.length-1].episodeNumber;
+  const waiting    = episodes[episodes.length-1].unaired;
+
+  let missing = false;
+  for(let idx = afterWatchedIdx; idx < episodes.length; idx++) {
+    if(episodes[idx].unaired) break;
+    if(!episodes[idx].haveFile) {
+      missing = true;
+      episodeNum = episodes[idx].episodeNumber;
+      break;
+    }
+  }
   let watchGap = false;
   for(let idx = 0; idx < afterWatchedIdx-1; idx++) {
     if(!episodes[idx].watched) {

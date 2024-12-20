@@ -165,7 +165,6 @@ export async function loadAllShows() {
       Name: rejectName,
       Id: "noemby-" + Math.random(),
       DateCreated: date,
-      BlockedWait: false,
       Waiting: false,
       WatchGap: false,
       Missing: false,

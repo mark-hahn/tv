@@ -11,8 +11,8 @@ todo ...
   season number too wide in map
 
 bugs ...
-  shows waiting when unaired in later row (The Neighborhood)
   no dash on waiting (shrinking, yellowjackets)
+  map error not hilighting if loaded late
 
 new features ...
   up/down arrows

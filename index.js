@@ -244,6 +244,7 @@ const addReject = (id, name, resolve, reject) => {
     if(rejectNameStr.toLowerCase() === name.toLowerCase()) {
       console.log('-- removing old matching reject:', rejectNameStr);
       rejects.splice(idx, 1);
+      break;
     }
   }
   console.log('-- adding reject:', name);
@@ -259,11 +260,12 @@ const delReject = (id, name, resolve, reject) => {
       console.log('-- deleting reject:', rejectNameStr);
       rejects.splice(idx, 1);
       deletedOne = true;
+      break;
     }
   }
   if(!deletedOne) {
     console.log('-- reject not deleted -- no match:', name);
-    reject([id, 'delReject not deleted: ' + name]);
+    resolve([id, 'delReject not deleted: ' + name]);
     return
   }
   saveConfigYml(id, {"ok":"ok"}, resolve, reject);
@@ -279,6 +281,7 @@ const addPickup = (id, name, resolve, reject) => {
     if(pickupNameStr.toLowerCase() === name.toLowerCase()) {
       console.log('-- removing old matching pickup:', pickupNameStr);
       pickups.splice(idx, 1);
+      break;
     }
   }
   console.log('-- adding pickup:', name);
@@ -294,10 +297,11 @@ const delPickup = (id, name, resolve, reject) => {
       console.log('-- deleting pickup:', pickupNameStr);
       pickups.splice(idx, 1);
       deletedOne = true;
+      break;
     }
   }
   if(!deletedOne) {
-    reject([id, 'delPickup no match: ' + name]);
+    resolve([id, 'delPickup no match: ' + name]);
     console.log('pickup not deleted, no match:', name);
     return;
   }
@@ -316,11 +320,12 @@ const addNoEmby = async (id, showStr, resolve) => {
     if(show.Name.toLowerCase() === name.toLowerCase()) {
       console.log('removing old noemby:', name);
       noEmbys.splice(idx, 1);
+      break;
     }
   }
   console.log('adding noemby:', name);
   noEmbys.push(show);
-  await fsp.writeFile('data/noemby.json', JSON.stringify(noEmbys)); 
+  // await fsp.writeFile('data/noemby.json', JSON.stringify(noEmbys)); 
   resolve([id, {"ok":"ok"}]);
 }
 
@@ -333,14 +338,15 @@ const delNoEmby = async (id, name, resolve, reject) => {
       console.log('-- deleting noemby:', name);
       noEmbys.splice(idx, 1);
       deletedOne = true;
+      break;
     }
   }
   if(!deletedOne) {
     console.log('-- noembys not deleted -- no match:', name);
-    reject([id, 'delNoEmby no match:' + name]);
+    resolve([id, 'delNoEmby no match:' + name]);
     return;
   }
-  await fsp.writeFile('data/noemby.json', JSON.stringify(noEmbys)); 
+  // await fsp.writeFile('data/noemby.json', JSON.stringify(noEmbys)); 
   resolve([id, {"ok":"ok"}]);
 }
 

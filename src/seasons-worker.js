@@ -34,7 +34,6 @@ const getEpisodes = async (season) => {
 }
 
 const getActiveSeason = async (showId, showName) => {
-  // if(showName.includes("Thin")) debugger;
   let activeSeasonNumber, activeSeasonEpisodes;
   let seasonNum, episodes;
   let afterWatchedIdx = 0;
@@ -77,15 +76,28 @@ const getActiveSeason = async (showId, showName) => {
   let   episodeNum = episodes[episodes.length-1].episodeNumber;
   const waiting    = episodes[episodes.length-1].unaired;
 
-  let missing = false;
-  for(let idx = afterWatchedIdx; idx < episodes.length; idx++) {
+  let missing   = false;
+  let hadNoFile = false;
+  let idx;
+  for(idx = afterWatchedIdx; idx < episodes.length; idx++) {
     if(episodes[idx].unaired) break;
-    if(!episodes[idx].haveFile) {
-      missing    = true;
-      episodeNum = episodes[idx].episodeNumber;
-      break;
+    if(idx == afterWatchedIdx) {
+      if(!episodes[idx].haveFile) {
+        missing = true;
+        break;
+      }
+    }
+    else {
+      if(!episodes[idx].haveFile) 
+        hadNoFile = true;
+      else if(hadNoFile) {
+        missing = true;
+        break;
+      }
     }
   }
+  if(missing) episodeNum = episodes[idx].episodeNumber;
+
   let watchGap = false;
   for(let idx = 0; idx < afterWatchedIdx-1; idx++) {
     if(!episodes[idx].watched) {

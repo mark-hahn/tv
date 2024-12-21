@@ -4,7 +4,6 @@ reminder ...
   restore cache
 
 todo ...
-  delete show doesn't work if dash (uncle buck)
   file misses only when gap
   add drama
   calculate waiting on newly added row

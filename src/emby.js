@@ -236,7 +236,9 @@ export async function deleteShowFromEmby(show) {
     const err = 
       `unable to delete ${show.Name} from emby: ${delRes.data}`;
     showErr(err);
+    return;
   }
+  console.log("deleted show from emby:", show.Name);
 }
 
 const deleteOneFile = async (path) => {

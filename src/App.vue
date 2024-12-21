@@ -354,7 +354,7 @@ export default {
       await this.chkRowDelete(show);
     };
 
-
+    // from dom click
     const deleteShow = async (show) => {
       if(show.Id.startsWith("noemby-")) return;
       this.saveVisShow(show.Name);
@@ -362,17 +362,14 @@ export default {
       if (!window.confirm(
           `Do you really want to delete series ${show.Name}?`)) 
         return;
-      show.Id = "noemby-" + Math.random();
-      if(!await this.chkRowDelete(show)){
+      if(!await this.chkRowDelete(show, true)){
         show.RunTimeTicks      = 0;
         show.UnplayedItemCount = 0;
         show.IsFavorite        = false;
         return
       }
       await emby.deleteShowFromEmby(show);
-      await srvr.deleteShow(show)
-      console.log("app: deleted show:", show.Name);
-      await this.chkRowDelete(show);
+      await srvr.deleteShowFromSrvr(show)
     }
 
     return {
@@ -444,8 +441,8 @@ export default {
   /////////////  METHODS  ////////////
   methods: {
     async chkRowDelete(show, force) {
-      if (!show.Reject && !show.Pickup &&
-              show.Id.startsWith("noemby-")) {
+      if (force || (!show.Reject && !show.Pickup &&
+                     show.Id.startsWith("noemby-"))) {
         console.log("no reason to keep row, deleting it:", show.Name);
         const id = show.Id;
         for(let i = 0; i < allShows.length; i++) {
@@ -459,12 +456,6 @@ export default {
         }
         allShows   = allShows.filter(  (show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);
-        try {
-          await emby.deleteNoemby(show.Name);
-        } catch (err) {
-          console.log("deleteNoemby error:", err);
-          return force;
-        }
         return true;
       }
       return false;

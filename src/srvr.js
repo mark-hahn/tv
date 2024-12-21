@@ -154,12 +154,11 @@ export function deletePath(path)
 export function getUrls(urlReq)   
             {return fCall('getUrls', urlReq, 'getUrls')}
 
-export async function deleteShow(show) {
+export async function deleteShowFromSrvr(show) {
   await delBlockedWait(show.Name);
   await delPickup(show.Name);
   await delNoEmby(show.Name);
   await deletePath(show.Path);
   // don't ever delete from rejects
+  console.log("deleted show from server:", show.Name);
 }
-
-

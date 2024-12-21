@@ -397,7 +397,7 @@ const getUrls = async (id, urlReq, resolve, reject) => {
     try {
       parts = rtRegEx.exec(text.replace(/(\r\n|\n|\r)/gm, ""));
       if(parts === null) {
-        await fsp.writeFile('data/rotten-parse.txt', text);
+        // await fsp.writeFile('data/rotten-parse.txt', text);
         console.log('rotten tomatoes no match:', url);
         resolve([id, 'no match: ' + url]);
         return;

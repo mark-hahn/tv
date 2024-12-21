@@ -35,9 +35,9 @@ const videoFileExtensions = [
   "3gp", "m4v", "ts", "rm", "vob", "ogv", "divx"
 ];
 
-const fmtDate = (dateStr = null) => {
+const fmtDate = (dateStr) => {
   const date = dateStr ? new Date(dateStr) : new Date();
-  return date.toISOString().slice(5,10).replace(/^0/,' ');
+  return date.toISOString().slice(0,10);
 }
 
 const getAllShows = async (id, _param, resolve, reject) => {

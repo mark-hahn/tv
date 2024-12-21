@@ -45,8 +45,11 @@ if(cacheStr) {
 
 ///////////// get remotes (name and url) //////////////
 
-const getRemotes = async (extData) => {
+const getRemotes = async (extData, exactName) => {
   const remoteIds = extData.remoteIds;
+  remoteIds.push({id:exactName, type:99, 
+                  sourceName:'Rotten Tomatoes'});
+
   const remotes = [];
   const names   = {};
   for(let i=0; i < remoteIds.length; i++) {
@@ -68,13 +71,18 @@ const getRemotes = async (extData) => {
       case 9:  url = `https://www.instagram.com/${id}`; break;
       case 11: url = `https://www.youtube.com/channel/${id}`; break;
       case 12: name = 'The Movie DB';
-               url = `https://www.themoviedb.org/tv/${id}?language=en-US`;
+                url = `https://www.themoviedb.org/tv/${id}` +
+                      `?language=en-US`;
                break;
       case 18: name = 'Wikipedia';
-               url = await srvr.getUrls(
-                      `18||https://www.wikidata.org/wiki/${id}`);
+        url = await srvr.getUrls(
+               `18||https://www.wikidata.org/wiki/${id}`);
                break;
       case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
+      case 99: url = await srvr.getUrls(
+                      `99||https://www.rottentomatoes.com/search` +
+                      `?search=${encodeURI(id)}`);
+               break;
       default: continue
     }
     if(names[name]) continue;
@@ -153,7 +161,8 @@ export const getTvDbData = async (searchStr) => {
   const lastAired = util.fmtDate(lastAiredIn);
   const today     = util.fmtDate();
   if(lastAired >= today) waitStr = `{${lastAired}}`;
-  const remotes = await getRemotes(extJSON.data);
+  
+  const remotes = await getRemotes(extJSON.data, exactName);
 
   cache.push({searchStr, saved:Date.now(), 
               exactName, waitStr, remotes});

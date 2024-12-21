@@ -149,10 +149,10 @@ export function delNoEmby(name)
             {return fCall('delNoEmby', name, 'noemby')}
             
 export function deletePath(path)   
-            {return fCall('deletePath', path)}
+            {return fCall('deletePath', path, 'deletePath')}
 
 export function getUrls(urlReq)   
-            {return fCall('getUrls', urlReq)}
+            {return fCall('getUrls', urlReq, 'getUrls')}
 
 export async function deleteShow(show) {
   await delBlockedWait(show.Name);

@@ -91,8 +91,8 @@ const getRemotes = async (extData, exactName) => {
       continue;
     }
     if(names[name]) {
-      console.log(
-        `getRemotes, skipping duplicate: ${name} ${url}`,{remoteIds});
+      // console.log(
+      //   `getRemotes, skipping duplicate: ${name} ${url}`,{remoteIds});
       continue;
     }
     names[name] = true;

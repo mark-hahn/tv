@@ -9,13 +9,15 @@ bugs ...
   delete show doesn't work if dash (uncle buck)
   
 new features ...
-  one worker call per show from loop or when needed
+  don't getRemotes until needed
+  show waitstr as {12-12  2-12}
   calculate waiting on newly added row
   refresh filtered rows when new gap loaded
   show hilight row button
   map: click on season numbers for whole row
 
 tabled ...
+  one worker call per show from loop or when needed
   add wikipedia remote the hard way
   up/down arrows
   prev/next hilite

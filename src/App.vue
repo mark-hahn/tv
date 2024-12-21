@@ -444,7 +444,7 @@ export default {
   /////////////  METHODS  ////////////
   methods: {
     async chkRowDelete(show, force) {
-      if (!show.Reject && !show.Pickup && !show.Waiting &&
+      if (!show.Reject && !show.Pickup &&
               show.Id.startsWith("noemby-")) {
         console.log("no reason to keep row, deleting it:", show.Name);
         const id = show.Id;
@@ -821,7 +821,7 @@ export default {
       this.select(true);
     },
 
-    addGapToShow(event) {
+    async addGapToShow(event) {
       const {showId, progress,
              seasonNum, episodeNum, 
              watchGap, missing, waiting} = event.data;
@@ -838,7 +838,7 @@ export default {
       // if(watchGap || missing || waiting) {
       //   console.log('addGapsToShow:', show);
       // }
-      emby.setWaitStr(show);
+      await emby.setWaitStr(show);
     },
   },
 

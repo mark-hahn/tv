@@ -220,12 +220,14 @@ const markCollId     = '4697672';
 const lindaCollId    = '4706186';
 
 export async function setWaitStr(show) {
-  const waitRes = await tvdb.getTvDbData(show.Name);
-  if(!waitRes) {
+  try {
+    const waitRes = await tvdb.getTvDbData(show.Name);
+    if(waitRes) show.WaitStr = waitRes.waitStr;
+    else show.WaitStr = '';
+  } catch(e) {
+    console.log('setWaitStr, tvdb data error:', show.Name, e);
     show.WaitStr = '';
-    return;
   }
-  show.WaitStr = waitRes.waitStr;
 }
 
 export async function deleteShowFromEmby(show) {

@@ -74,8 +74,10 @@ const getRemotes = async (extData, exactName) => {
                 url = `https://www.themoviedb.org/tv/${id}` +
                       `?language=en-US`;
                break;
+      case 13: name = 'EIDR';
+               continue;
       case 18: name = 'Wikipedia';
-        url = await srvr.getUrls(
+               url = await srvr.getUrls(
                `18||https://www.wikidata.org/wiki/${id}`);
                break;
       case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
@@ -85,7 +87,14 @@ const getRemotes = async (extData, exactName) => {
                break;
       default: continue
     }
-    if(names[name]) continue;
+    if(url.startsWith('no match:')) {
+      console.log(`getRemotes, no match: ${name} ${url}`);
+      continue;
+    }
+    if(names[name]) {
+      console.log(`getRemotes, skipping duplicate: ${name} ${url}`);
+      continue;
+    }
     names[name] = true;
     remotes.push({name, url});
   }

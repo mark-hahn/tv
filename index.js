@@ -2,15 +2,11 @@ import fs                  from "fs";
 import * as fsp            from 'fs/promises';
 import util                from "util";
 import * as cp             from 'child_process';
-import moment              from 'moment';
 import { WebSocketServer } from 'ws';
 import fetch               from 'node-fetch';
 
 process.setMaxListeners(50);
 const dontupload  = false;
-
-const ws = new WebSocketServer({ port: 8736 });
-console.log('ws listening on port 8736');
 
 const tvDir = '/mnt/media/tv';
 // const tvDir = '/mnt/c/Users/mark/apps/tv-series-srvr/media/tv';
@@ -218,7 +214,7 @@ const addBlockedWait = async (id, name, resolve, _reject) => {
   resolve([id, {"ok":"ok"}]);
 }
 
-const delBlockedWait = async (id, name, resolve, reject) => {
+const delBlockedWait = async (id, name, resolve, _reject) => {
   console.log('delBlockedWait', id, name);
   let deletedOne = false;
   for(const [idx, blockedWaitStr] of blockedWaits.entries()) {
@@ -416,18 +412,23 @@ const getUrls = async (id, urlReq, resolve, reject) => {
 
 //////////////////  WEBSOCKET SERVER  //////////////////
 
-ws.on('connection', (socket) => {
-  console.log('ws connected');
+const wss = new WebSocketServer({ port: 8736 });
+console.log('wss listening on port 8736');
 
-  socket.send('0~~~ok~~~{connected:true}');
+wss.on('connection', (ws, req) => {
+  const clientId = Math.floor(Math.random() * 1e6);
+  console.log(clientId, 'client connected');
+  ws.send(`0~~~ok~~~ws connected: ${clientId}`);
 
-  socket.on('message', (msg) => {
+  ws.on('error', console.error);
+
+  ws.on('message', (msg) => {
     msg = msg.toString();
-    // console.log('received', msg);
+    console.log(clientId, 'received:', msg);
 
     const parts = /^(.*)~~~(.*)~~~(.*)$/.exec(msg);
     if(!parts) {
-      console.error('skipping bad message:', msg);
+      console.error(clientId, 'skipping bad message:', msg);
       return;
     }
     const [id, fname, param] = parts.slice(1);
@@ -439,19 +440,19 @@ ws.on('connection', (socket) => {
     // there is one unique promise for each function call
     const promise = new Promise((resolveIn, rejectIn) => {
       resolve = resolveIn; 
-      reject = rejectIn;
+      reject  = rejectIn;
     });
 
     promise.then((idResult) => {
       const [id, result] = idResult;
-      // console.log('resolved', id);
-      socket.send(`${id}~~~ok~~~${JSON.stringify(result)}`); 
+      console.log(clientId, 'resolved:', id);
+      ws.send(`${id}~~~ok~~~${JSON.stringify(result)}`); 
     })
     .catch((idError) => {
-      console.log({idError});
+      console.log(clientId, 'idResult err:', {idError});
       const [id, error] = idError;
-      console.log('rejected', id);
-      socket.send(`${id}~~~err~~~${JSON.stringify(error)}`); 
+      console.log(clientId, 'rejected:', id);
+      ws.send(`${id}~~~err~~~${JSON.stringify(error)}`); 
     });
 
     // call function fname
@@ -482,6 +483,5 @@ ws.on('connection', (socket) => {
     };
   });
  
-  ws.on('error', (err) => console.log('ws error:', err));
-  ws.on('close', ()    => console.log('ws closed'));
+  ws.on('close', () => console.log(clientId, 'wss closed'));
 });

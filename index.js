@@ -363,15 +363,22 @@ const deletePath = async (id, path, resolve, reject) => {
 };
 
 const getUrls = async (id, urlReq, resolve, reject) => {
-  // console.log('getUrls', {id});
   let [type, url] = urlReq.split('||');
-  const resp = await fetch(url);
+
+  // if(url.toLowerCase().includes('lincoln'))
+  //     console.log('getUrls:', {id, url});
+
+ const resp = await fetch(url);
   if (!resp.ok) {
     console.error(`getUrls resp: ${resp.status}`);
     reject([id, {type, url}]);
     return
   }
   const text = await resp.text();
+
+  if(url.toLowerCase().includes('lincoln'))
+      await fsp.writeFile('data/rotten.txt', text);
+
   if(type == 18) { // wikidata
     let parts;
     try{
@@ -383,8 +390,40 @@ const getUrls = async (id, urlReq, resolve, reject) => {
       return
     }
     resolve([id, parts[1]]);
+    return;
   }
-  resolve([id, 'no wikipedia']);
+
+/*
+<h2 slot="title" data-qa="search-result-title">TV shows</h2>
+
+<a href="https://www.rottentomatoes.com/tv/the_lincoln_lawyer" class="unset" data-qa="info-name" slot="title">
+
+<h2 slot="title" data-qa="search-result-title">TV shows<\/h2>.*?<h2 slot="title" data-qa="search-result-title">TV shows<\/h2>.*?<a href="(.*?)".*?data-qa="info-name" slot="title">
+
+*/
+  else if(type == 99) { // rotten tomatoes
+    let parts;
+
+    const rtRegEx = new RegExp(
+      '<h2 slot="title" ' +
+          'data-qa="search-result-title">TV shows</h2>.*?' +
+      '<a href="(.*?)".*?' +
+          'data-qa="info-name" slot="title">', 'i');
+    try {
+      parts = rtRegEx.exec(text.replace(/(\r\n|\n|\r)/gm, ""));
+      // if(url.toLowerCase().includes('lincoln'))
+      //     console.log({p1:parts[1]});
+      if(parts === null) throw 'rotten tomatoes parse error';
+    }
+    catch (e) {rtRegEx
+      reject([id, {type, url, e}]);
+      return
+    }
+    resolve([id, parts[1]]);
+    return;
+  }
+
+  resolve([id, 'getUrls no type: ' + type]);
 }
 
 //////////////////  WEBSOCKET SERVER  //////////////////
@@ -396,7 +435,7 @@ ws.on('connection', (socket) => {
 
   socket.on('message', (msg) => {
     msg = msg.toString();
-    console.log('received', msg);
+    // console.log('received', msg);
 
     const parts = /^(.*)~~~(.*)~~~(.*)$/.exec(msg);
     if(!parts) {
@@ -417,7 +456,7 @@ ws.on('connection', (socket) => {
 
     promise.then((idResult) => {
       const [id, result] = idResult;
-      console.log('resolved', id);
+      // console.log('resolved', id);
       socket.send(`${id}~~~ok~~~${JSON.stringify(result)}`); 
     })
     .catch((idError) => {

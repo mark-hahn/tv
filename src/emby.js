@@ -156,10 +156,8 @@ export async function loadAllShows() {
     const matchingShow = 
           shows.find((show) => show.Name == rejectName);
     if(matchingShow) {
-      console.log('reject: deleting existing:', rejectName);
-      await deleteShowFromEmby(matchingShow);
-      await srvr.deleteShow(matchingShow);
-      shows.splice(shows.indexOf(matchingShow), 1);
+      matchingShow.Reject = true;
+      continue;
     }
     const date = '2017-12-05';
     const rejShow = {

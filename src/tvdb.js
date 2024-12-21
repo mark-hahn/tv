@@ -86,13 +86,17 @@ const getRemotes = async (extData, exactName) => {
                break;
       default: continue
     }
+    if(!url) {
+      console.log(`getRemotes, no url: ${extData.name}, ${name} ${url}`);
+      continue;
+    }
     if(url.startsWith('no match:')) {
-      console.log(`getRemotes, no match: ${name} ${url}`);
+      console.log(`getRemotes, no match: ${extData.name}, ${name}, ${url}`);
       continue;
     }
     if(names[name]) {
-      // console.log(
-      //   `getRemotes, skipping duplicate: ${name} ${url}`,{remoteIds});
+      console.log(
+        `getRemotes, skipping duplicate: ${extData.name}, ${name} ${url}`,{remoteIds});
       continue;
     }
     names[name] = true;
@@ -102,7 +106,7 @@ const getRemotes = async (extData, exactName) => {
             a.name.toLowerCase().replace(/^the /, '') > 
             b.name.toLowerCase().replace(/^the /, '') ? 1 : -1);
 
-  // console.log("get remotes: ", remotes[0].type, remotes[0].name, 
+  // console.log("get remotes: ", ${extData.name}, remotes[0].type, remotes[0].name, 
   //                   remotes[0].name.toLowerCase().replace(/^the /, ''));
 
   return remotes;

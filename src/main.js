@@ -4,14 +4,17 @@ reminder ...
   restore cache
 
 todo ...
+  delete show doesn't work if dash (uncle buck)
+  file misses only when gap
+  add drama
+  multiple users
+  calculate waiting on newly added row
 
 bugs ...
-  delete show doesn't work if dash (uncle buck)
-  
+
 new features ...
   don't getRemotes until needed
   show waitstr as {12-12  2-12}
-  calculate waiting on newly added row
   refresh filtered rows when new gap loaded
   show hilight row button
   map: click on season numbers for whole row

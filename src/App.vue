@@ -362,11 +362,11 @@ export default {
       if (!window.confirm(
           `Do you really want to delete series ${show.Name}?`)) 
         return;
+      show.Id = "noemby-" + Math.random();
       if(!await this.chkRowDelete(show)){
         show.RunTimeTicks      = 0;
         show.UnplayedItemCount = 0;
         show.IsFavorite        = false;
-        show.Id = "noemby-" + Math.random();
         return
       }
       await emby.deleteShowFromEmby(show);

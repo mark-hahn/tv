@@ -7,9 +7,8 @@ todo ...
   delete show doesn't work if dash (uncle buck)
   file misses only when gap
   add drama
-  multiple users
   calculate waiting on newly added row
-
+  filters don't line up
 bugs ...
 
 new features ...

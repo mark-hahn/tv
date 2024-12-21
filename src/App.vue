@@ -147,7 +147,8 @@
     div( v-for="remote in remotes"
             style=`margin:3px 10px; padding:10px; 
                   background-color:white; text-align:center;
-                  border: 1px solid black; font-weight:bold;`
+                  border: 1px solid black; font-weight:bold;
+                  cursor:default;`
           @click="remotesAction('click', remote)") 
       | {{remote.name}}
 
@@ -401,6 +402,10 @@ export default {
           color: "#0c0", filter: 0, icon: ["far", "clock"],
           cond(show)  { return show.Waiting; },
           click(show) { toggleWaiting(show); },
+        }, {
+          color: "blue", filter: 0, icon: ["far", "sad-cry"],
+          cond(show)  { return show.Genres?.includes("Drama"); },
+          click(show) {},
         }, {
           color: "lime", filter: 0, icon: ["fas", "question"],
           cond(show)  { return show.InToTry; },

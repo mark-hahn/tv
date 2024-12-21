@@ -231,11 +231,20 @@ library.add([
   faMinus, faArrowDown, faTv, faSearch, faQuestion, faCopy, 
   faBan, faBorderAll, faArrowRight, faMars, faVenus, faClock]);
 
-let   allShows     = [];
+let   allShows         = [];
 let   blockedWaitShows = null;
-let   showErr      = null;
-const errFifo      = [];
-let   openedWindow = null;
+let   showErr          = null;
+const errFifo          = [];
+let   openedWindow     = null;
+
+let gapCache    = [];
+let gapCacheTxt = window.localStorage.getItem("gapCache")
+if(!gapCacheTxt) gapCacheTxt = "[]";
+try {
+  gapCache = JSON.parse(gapCacheTxt);
+} catch(err) {
+  gapCache = [];
+}
 
 export default {
   name: "App",
@@ -817,24 +826,43 @@ export default {
       this.select(true);
     },
 
+    async updateGapCache(data) {
+      const {ShowId}   = data;
+      const gapCacheIdx = gapCache.findIndex(
+                         (entry) => entry.ShowId == ShowId);
+      if(gapCacheIdx == -1) gapCache.push(data);
+      else gapCache[gapCacheIdx] = data.slice();
+    },
+
     async addGapToShow(event) {
-      const {showId, progress,
+      const {showId, progress, done, 
              seasonNum, episodeNum, 
              watchGap, missing, waiting} = event.data;
       this.gapPercent = progress;
       
       const show = allShows.find((show) => show.Id == showId);
       if(!show) return;
-      show.GapSeason    = seasonNum;
-      show.GapEpisode   = episodeNum;
-      show.WatchGap     = watchGap; 
-      show.Missing      = missing;
-      const blockedWait = blockedWaitShows.includes(show.Name);
-      show.Waiting      = !blockedWait && waiting;
+
+      const gapData = {};
+      const blockedWait  = blockedWaitShows.includes(show.Name);
+      gapData.GapSeason  = seasonNum;
+      gapData.GapEpisode = episodeNum;
+      gapData.WatchGap   = watchGap; 
+      gapData.Missing    = missing;
+      gapData.Waiting    = !blockedWait && waiting;
+      gapData.ShowId     = showId;
+      Object.assign(show, gapData);
+      this.updateGapCache(gapData);
+
       // if(watchGap || missing || waiting) {
       //   console.log('addGapsToShow:', show);
-      // }
+
       await emby.setWaitStr(show);
+
+      if(done) {
+        window.localStorage.setItem("gapCache", 
+                             JSON.stringify(gapCache));
+      }
     },
   },
 
@@ -852,9 +880,9 @@ export default {
         await emby.init(showErr);
         tvdb.init(showErr);
 
-        const showsBlocks = await emby.loadAllShows();
-        allShows         = showsBlocks.shows;
-        this.shows       = allShows;
+        const showsBlocks = await emby.loadAllShows(gapCache);
+        allShows          = showsBlocks.shows;
+        this.shows        = allShows;
 
         // must be set before startWorker
         blockedWaitShows = showsBlocks.blockedWaitShows;

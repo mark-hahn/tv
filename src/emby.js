@@ -45,7 +45,7 @@ export async function init(showErrIn) {
 
 // load all shows from emby and server //////////
 
-export async function loadAllShows() {
+export async function loadAllShows(gapCache) {
   console.log('entering loadAllShows');
   const time1 = new Date().getTime();
 
@@ -83,6 +83,10 @@ export async function loadAllShows() {
     show.Date = date;
     show.Size = size;
     if(!show.DateCreated) show.DateCreated = show.Date;
+
+    const gapData = gapCache.find((gap) => gap.showId == show.Id);
+    if(gapData) show = Object.assign(show, gapData);
+
     if(show.Date) shows.push(show);
   }
 

@@ -126,7 +126,8 @@ self.onmessage = async (event) => {
 //                  seasonNum, episodeNum, 
 //                  watchGap, missing, waiting});
 
-    self.postMessage({showId, progress,
+    self.postMessage({showId, progress, 
+                      done: i == allShowsIdName.length-1,
                       seasonNum, episodeNum, 
                       watchGap, missing, waiting});
   }

@@ -364,20 +364,13 @@ const deletePath = async (id, path, resolve, reject) => {
 
 const getUrls = async (id, urlReq, resolve, reject) => {
   let [type, url] = urlReq.split('||');
-
-  // if(url.toLowerCase().includes('lincoln'))
-  //     console.log('getUrls:', {id, url});
-
- const resp = await fetch(url);
+  const resp = await fetch(url);
   if (!resp.ok) {
     console.error(`getUrls resp: ${resp.status}`);
     reject([id, {type, url}]);
     return
   }
   const text = await resp.text();
-
-  if(url.toLowerCase().includes('lincoln'))
-      await fsp.writeFile('data/rotten.txt', text);
 
   if(type == 18) { // wikidata
     let parts;
@@ -393,14 +386,6 @@ const getUrls = async (id, urlReq, resolve, reject) => {
     return;
   }
 
-/*
-<h2 slot="title" data-qa="search-result-title">TV shows</h2>
-
-<a href="https://www.rottentomatoes.com/tv/the_lincoln_lawyer" class="unset" data-qa="info-name" slot="title">
-
-<h2 slot="title" data-qa="search-result-title">TV shows<\/h2>.*?<h2 slot="title" data-qa="search-result-title">TV shows<\/h2>.*?<a href="(.*?)".*?data-qa="info-name" slot="title">
-
-*/
   else if(type == 99) { // rotten tomatoes
     let parts;
 
@@ -411,9 +396,12 @@ const getUrls = async (id, urlReq, resolve, reject) => {
           'data-qa="info-name" slot="title">', 'i');
     try {
       parts = rtRegEx.exec(text.replace(/(\r\n|\n|\r)/gm, ""));
-      // if(url.toLowerCase().includes('lincoln'))
-      //     console.log({p1:parts[1]});
-      if(parts === null) throw 'rotten tomatoes parse error';
+      if(parts === null) {
+        await fsp.writeFile('data/rotten-parse.txt', text);
+        console.log('rotten tomatoes no match:', url);
+        resolve([id, 'no match: ' + url]);
+        return;
+      }
     }
     catch (e) {rtRegEx
       reject([id, {type, url, e}]);

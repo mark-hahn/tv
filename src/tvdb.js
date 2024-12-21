@@ -33,7 +33,7 @@ const getToken = async () => {
 ///////////// init cache //////////////  
 
 let cache = [];
-const cacheStr = window.localStorage.getItem("tvdbNameCache");
+const cacheStr = window.localStorage.getItem("tvdbDataCache");
 if(cacheStr) {
   try {
     cache = JSON.parse(cacheStr);
@@ -125,7 +125,7 @@ export const getTvDbData = async (searchStr) => {
     if(remaining.length != cache.length - 1) {
       cache = remaining;  
       window.localStorage.setItem(
-                "tvdbNameCache", JSON.stringify(remaining));
+                "tvdbDataCache", JSON.stringify(remaining));
     }
     return {exactName, waitStr, remotes, saved};
   }
@@ -176,7 +176,7 @@ export const getTvDbData = async (searchStr) => {
   cache.push({searchStr, saved:Date.now(), 
               exactName, waitStr, remotes});
   window.localStorage.setItem(
-                "tvdbNameCache", JSON.stringify(cache));
+                "tvdbDataCache", JSON.stringify(cache));
 
   return {exactName, waitStr, remotes};
 }

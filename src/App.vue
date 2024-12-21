@@ -504,7 +504,7 @@ export default {
         Name: exactName,
         Id: "noemby-" + Math.random(),
         DateCreated: dateStr, 
-        Waiting: false,
+        Waiting: !!waitStr,
         WaitStr: waitStr,
         Missing: false,
         WatchGap: false,

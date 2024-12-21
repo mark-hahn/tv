@@ -86,16 +86,16 @@ export async function loadAllShows() {
     if(show.Date) shows.push(show);
   }
 
-//////////  add shows from srvr ////////////
+//////////  add noemby shows from srvr ////////////
 
-  for(const show of noEmbys) {
-    if(show?.Name) {
-      const showTst = shows.find((s) => s.Name == show.Name);
-      if(!showTst) shows.push(show);
-      else await srvr.delNoEmby(show.Name);
+  for(const noEmbyShow of noEmbys) {
+    const idx = shows.findIndex(
+                  (s) => s.Name == noEmbyShow.Name);
+    if(idx != -1) {
+      await srvr.delNoEmby(noEmbyShow.Name);
       continue;
     }
-    else await srvr.delNoEmby("");
+    shows.push(noEmbyShow);
   }
 
 //////////  process blockedWaitShows from srvr ////////////

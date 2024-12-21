@@ -49,7 +49,6 @@ const getRemotes = async (extData, exactName) => {
   const remoteIds = extData.remoteIds;
   remoteIds.push({id:exactName, type:99, 
                   sourceName:'Rotten Tomatoes'});
-
   const remotes = [];
   const names   = {};
   for(let i=0; i < remoteIds.length; i++) {
@@ -66,10 +65,10 @@ const getRemotes = async (extData, exactName) => {
       case 4:  name = 'Official Website';
                url = id; 
                break;
-      case 7:  url = `https://www.reddit.com/r/${id}`; break;
-      case 8:  url = id; break;
-      case 9:  url = `https://www.instagram.com/${id}`; break;
-      case 11: url = `https://www.youtube.com/channel/${id}`; break;
+      case 7:   url = `https://www.reddit.com/r/${id}`; break;
+      case 8:   url = id; break;
+      case 9:   url = `https://www.instagram.com/${id}`; break;
+      case 11:  url = `https://www.youtube.com/channel/${id}`; break;
       case 12: name = 'The Movie DB';
                 url = `https://www.themoviedb.org/tv/${id}` +
                       `?language=en-US`;
@@ -92,7 +91,8 @@ const getRemotes = async (extData, exactName) => {
       continue;
     }
     if(names[name]) {
-      console.log(`getRemotes, skipping duplicate: ${name} ${url}`);
+      console.log(
+        `getRemotes, skipping duplicate: ${name} ${url}`,{remoteIds});
       continue;
     }
     names[name] = true;
@@ -164,12 +164,13 @@ export const getTvDbData = async (searchStr) => {
   }
 
   let waitStr = '';
-  const extJSON     = await extResp.json();
-  const lastAiredIn = extJSON.data.lastAired;
+  const extJSON       = await extResp.json();
+  const lastAiredIn   = extJSON.data.lastAired;
   if(!lastAiredIn) return null;
-  const lastAired = util.fmtDate(lastAiredIn);
-  const today     = util.fmtDate();
-  if(lastAired >= today) waitStr = `{${lastAired}}`;
+  const lastAired     = util.fmtDate(lastAiredIn);
+  const today         = util.fmtDate();
+  const lastAiredNoYr = util.fmtDate(lastAiredIn, false);
+  if(lastAired >= today) waitStr = `{${lastAiredNoYr}}`;
   
   const remotes = await getRemotes(extJSON.data, exactName);
 

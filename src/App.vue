@@ -237,13 +237,13 @@ let   showErr          = null;
 const errFifo          = [];
 let   openedWindow     = null;
 
-let gapCache    = [];
+let gapCache    = {};
 let gapCacheTxt = window.localStorage.getItem("gapCache")
-if(!gapCacheTxt) gapCacheTxt = "[]";
+if(!gapCacheTxt) gapCacheTxt = "{}";
 try {
   gapCache = JSON.parse(gapCacheTxt);
 } catch(err) {
-  gapCache = [];
+  gapCache = {};
 }
 
 export default {
@@ -826,14 +826,6 @@ export default {
       this.select(true);
     },
 
-    async updateGapCache(data) {
-      const {ShowId}   = data;
-      const gapCacheIdx = gapCache.findIndex(
-                         (entry) => entry.ShowId == ShowId);
-      if(gapCacheIdx == -1) gapCache.push(data);
-      else gapCache[gapCacheIdx] = data.slice();
-    },
-
     async addGapToShow(event) {
       const {showId, progress, done, 
              seasonNum, episodeNum, 
@@ -851,13 +843,14 @@ export default {
       gapData.Missing    = missing;
       gapData.Waiting    = !blockedWait && waiting;
       gapData.ShowId     = showId;
+      gapData.WaitStr    = await emby.getWaitStr(show.Name);
       Object.assign(show, gapData);
-      this.updateGapCache(gapData);
+      gapCache[showId]  = gapData;
 
       // if(watchGap || missing || waiting) {
       //   console.log('addGapsToShow:', show);
 
-      await emby.setWaitStr(show);
+      await emby.getWaitStr(show);
 
       if(done) {
         window.localStorage.setItem("gapCache", 

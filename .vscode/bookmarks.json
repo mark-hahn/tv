@@ -4,12 +4,12 @@
 			"path": "src/App.vue",
 			"bookmarks": [
 				{
-					"line": 865,
+					"line": 858,
 					"column": 33,
 					"label": ""
 				},
 				{
-					"line": 889,
+					"line": 882,
 					"column": 27,
 					"label": ""
 				}
@@ -26,11 +26,6 @@
 				{
 					"line": 116,
 					"column": 10,
-					"label": ""
-				},
-				{
-					"line": 178,
-					"column": 33,
 					"label": ""
 				}
 			]

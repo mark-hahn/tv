@@ -174,7 +174,8 @@ export const getTvDbData = async (searchStr) => {
   const lastAired     = util.fmtDate(lastAiredIn);
   const today         = util.fmtDate();
   const lastAiredNoYr = util.fmtDate(lastAiredIn, false);
-  if(lastAired >= today) waitStr = `{${lastAiredNoYr}}`;
+  if(lastAiredNoYr && lastAired >= today) 
+            waitStr = `{${lastAiredNoYr}}`;
   
   const remotes = await getRemotes(extJSON.data, exactName);
 

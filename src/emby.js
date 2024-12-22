@@ -84,8 +84,8 @@ export async function loadAllShows(gapCache) {
     show.Size = size;
     if(!show.DateCreated) show.DateCreated = show.Date;
 
-    const gapData = gapCache.find((gap) => gap.showId == show.Id);
-    if(gapData) show = Object.assign(show, gapData);
+    const gapData = gapCache[show.Id];
+    if(gapData) Object.assign(show, gapData);
 
     if(show.Date) shows.push(show);
   }
@@ -106,7 +106,7 @@ export async function loadAllShows(gapCache) {
 
   for(let blockedWaitName of blockedWaitShows) {
     const i = shows.findIndex((show) => show.Name == blockedWaitName);
-    if(i > -1) await setWaitStr(shows[i]);
+    if(i > -1) await getWaitStr(shows[i]);
     else {
       console.log('no show, deleting from blockedWaitShows list:',   
                    blockedWaitName);
@@ -221,14 +221,14 @@ const continueCollId = '4719143';
 const markCollId     = '4697672';
 const lindaCollId    = '4706186';
 
-export async function setWaitStr(show) {
+export async function getWaitStr(show) {
   try {
     const waitRes = await tvdb.getTvDbData(show.Name);
-    if(waitRes) show.WaitStr = waitRes.waitStr;
-    else show.WaitStr = '';
+    if(waitRes) return waitRes.waitStr;
+    else        return '';
   } catch(e) {
-    console.log('setWaitStr, tvdb data error:', show.Name, e);
-    show.WaitStr = '';
+    console.log('getWaitStr, tvdb data error:', show.Name, e);
+    return '';
   }
 }
 

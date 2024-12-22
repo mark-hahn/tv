@@ -33,7 +33,7 @@ const getEpisodes = async (season) => {
   return episodes;
 }
 
-const getActiveSeason = async (showId, showName) => {
+const getActiveSeason = async (showId, _showName) => {
   let activeSeasonNumber, activeSeasonEpisodes;
   let seasonNum, episodes;
   let afterWatchedIdx = 0;

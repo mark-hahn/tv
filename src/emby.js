@@ -375,7 +375,7 @@ export const getSeriesMap = async (show, prune = false) => {
     for(let key in episodesRes.data.Items) {
       let   episodeRec    =  episodesRes.data.Items[key];
       const episodeNumber = +episodeRec.IndexNumber;
-      if(!episodeNumber) continue;
+      if(episodeNumber === undefined) continue;
 
       const path    =  episodeRec?.MediaSources?.[0]?.Path;
       const played  = !!episodeRec?.UserData?.Played;

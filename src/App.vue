@@ -237,6 +237,7 @@ let   showErr          = null;
 const errFifo          = [];
 let   openedWindow     = null;
 
+let gapShowIds  = {};
 let gapCache    = {};
 let gapCacheTxt = window.localStorage.getItem("gapCache")
 if(!gapCacheTxt) gapCacheTxt = "{}";
@@ -835,6 +836,8 @@ export default {
       const show = allShows.find((show) => show.Id == showId);
       if(!show) return;
 
+      gapShowIds[showId] = true;
+
       const gapData = {};
       const blockedWait  = blockedWaitShows.includes(show.Name);
       gapData.GapSeason  = seasonNum;
@@ -853,6 +856,14 @@ export default {
       await emby.getWaitStr(show);
 
       if(done) {
+        gapCacheLoop:
+        for(let gapCacheId in gapCache) {
+          for(let show of allShows) {
+            if(show.Id == gapCacheId) 
+                continue gapCacheLoop;
+          }
+          delete gapCache[gapCacheId];
+        }
         window.localStorage.setItem("gapCache", 
                              JSON.stringify(gapCache));
       }

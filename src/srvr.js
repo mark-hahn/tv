@@ -152,7 +152,7 @@ export function deletePath(path)
             {return fCall('deletePath', path, 'deletePath')}
 
 export function getUrls(urlReq)   
-            {return fCall('getUrls', urlReq)}
+            {return fCall('getUrls', urlReq, 'getUrls')}
 
 export async function deleteShowFromSrvr(show) {
   await delBlockedWait(show.Name);

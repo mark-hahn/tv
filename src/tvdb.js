@@ -1,6 +1,8 @@
 import * as srvr from "./srvr.js";
 import * as util from "./util.js";
 
+const tvdbDataCacheName = "tvdbDataCache2";
+
 let showErr      = null;
 let theTvDbToken = null;
 
@@ -33,12 +35,12 @@ const getToken = async () => {
 ///////////// init cache //////////////  
 
 let tvDbCache = [];
-const cacheStr = window.localStorage.getItem("tvdbDataCache");
+const cacheStr = window.localStorage.getItem(tvdbDataCacheName);
 if(cacheStr) {
   try {
     tvDbCache = JSON.parse(cacheStr);
   } catch(e) {
-    showErr(`cache parse error: ${e}`);
+    showErr(`tvDbCache parse error: ${e}`);
     tvDbCache.length = 0;
   }
 }
@@ -139,7 +141,7 @@ export const getTvDbData = async (searchStr) => {
     if(remaining.length != tvDbCache.length - 1) {
       tvDbCache = remaining;  
       window.localStorage.setItem(
-                "tvdbDataCache", JSON.stringify(remaining));
+                tvdbDataCacheName, JSON.stringify(remaining));
     }
     return {exactName, waitStr, remoteIds};
   }
@@ -190,7 +192,7 @@ export const getTvDbData = async (searchStr) => {
   tvDbCache.push({exactName, waitStr, remoteIds,
                   searchStr, saved:Date.now()});
   window.localStorage.setItem(
-                "tvdbDataCache", JSON.stringify(tvDbCache));
+                tvdbDataCacheName, JSON.stringify(tvDbCache));
 
   return {exactName, waitStr, remoteIds};
 }

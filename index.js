@@ -4,9 +4,24 @@ import util                from "util";
 import * as cp             from 'child_process';
 import { WebSocketServer } from 'ws';
 import fetch               from 'node-fetch';
+// import {publicIpv4}        from 'public-ip';
 
 process.setMaxListeners(50);
 const dontupload  = false;
+
+// (async () => {
+//   try {
+//     const ip = await publicIpv4();
+//     console.log(`\nwan ip: {${ip}}\n`); 
+//     if(ip !== '102.129.146.67') {
+//       console.log('FATAL, ip is not 102.129.146.67, stopping');
+//       process.exit;
+//     }
+//   } catch (error) {
+//     console.error('FATAL, Error fetching IP:', error);
+//     process.exit;
+//   }
+// })();
 
 const tvDir = '/mnt/media/tv';
 // const tvDir = '/mnt/c/Users/mark/apps/tv-series-srvr/media/tv';
@@ -20,11 +35,13 @@ const pickupStr  = fs.readFileSync('config/config4-pickups.json', 'utf8');
 const footerStr  = fs.readFileSync('config/config5-footer.txt',   'utf8');
 const waitingStr = fs.readFileSync('data/blockedWaits.json',      'utf8');
 const noEmbyStr  = fs.readFileSync('data/noemby.json',            'utf8');
+const allRemStr  = fs.readFileSync('data/remotes.json',           'utf8');
 
 const blockedWaits = JSON.parse(waitingStr);
-const rejects  = JSON.parse(rejectStr);
-const pickups  = JSON.parse(pickupStr);
-const noEmbys  = JSON.parse(noEmbyStr);
+const rejects      = JSON.parse(rejectStr);
+const pickups      = JSON.parse(pickupStr);
+const noEmbys      = JSON.parse(noEmbyStr);
+const allRemotes   = JSON.parse(allRemStr);
 
 const videoFileExtensions = [
   "mp4", "mkv", "avi", "mov", "wmv", "flv", "mpeg",
@@ -350,11 +367,34 @@ const delNoEmby = async (id, name, resolve, reject) => {
   resolve([id, {"ok":"ok"}]);
 }
 
+const getRemotes = (id, name, resolve, _reject) => {
+  resolve([id, allRemotes[name]]);
+};
+
+const addRemotes = async (id, nameRems, resolve) => {
+  const {name, remotes:remotesStr} = nameRems.split('|||');
+  const remotes = JSON.parse(remotesStr);
+  console.log('addRemotes', id, name);
+  allRemotes[name] = remotes;
+  await fsp.writeFile('data/remotes.json', JSON.stringify(allRemotes)); 
+  resolve([id, {"ok":"ok"}]);
+}
+
+const delRemotes = async (id, name, resolve, reject) => {
+  console.log('delRemotes', id, name);
+  if(!allRemotes[name]) {
+    console.log('-- remotes not deleted -- no match:', name);
+    resolve([id, 'delRemotes no match:' + name]);
+    return;
+  }
+  delete allRemotes[name];
+  await fsp.writeFile('data/remotes.json', JSON.stringify(allRemotes)); 
+  resolve([id, {"ok":"ok"}]);
+}
+
 const deletePath = async (id, path, resolve, reject) => {
   console.log('deletePath', id, path);
   try {
-    path = decodeURI(path).replaceAll('@', '/').replaceAll('~', '?');
-    console.log('deleting:', path);
     await fsp.unlink(path); 
   }
   catch(e) {
@@ -373,7 +413,6 @@ const getUrls = async (id, urlReq, resolve, reject) => {
     return
   }
   const text = await resp.text();
-
   if(type == 18) { // wikidata
     let parts;
     try{
@@ -390,7 +429,6 @@ const getUrls = async (id, urlReq, resolve, reject) => {
 
   else if(type == 99) { // rotten tomatoes
     let parts;
-
     const rtRegEx = new RegExp(
       '<h2 slot="title" ' +
           'data-qa="search-result-title">TV shows</h2>.*?' +
@@ -405,7 +443,7 @@ const getUrls = async (id, urlReq, resolve, reject) => {
         return;
       }
     }
-    catch (e) {rtRegEx
+    catch (e) {
       reject([id, {type, url, e}]);
       return
     }
@@ -480,6 +518,10 @@ wss.on('connection', (ws, req) => {
       case 'getNoEmbys':  getNoEmbys(id, '',    resolve, reject); break;
       case 'addNoEmby':   addNoEmby( id, param, resolve, reject); break;
       case 'delNoEmby':   delNoEmby( id, param, resolve, reject); break;
+      
+      case 'getRemotes':  getRemotes(id, param, resolve, reject); break;
+      case 'addRemotes':  addRemotes(id, param, resolve, reject); break;
+      case 'delRemotes':  delRemotes(id, param, resolve, reject); break;
       
       case 'deletePath':  deletePath( id, param, resolve, reject); break;
 

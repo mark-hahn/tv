@@ -368,12 +368,23 @@ const delNoEmby = async (id, name, resolve, reject) => {
 }
 
 const getRemotes = (id, name, resolve, _reject) => {
+  if(!allRemotes[name]) {
+    resolve([id, {noMatch: true}]);
+    return
+  }
   resolve([id, allRemotes[name]]);
 };
 
 const addRemotes = async (id, nameRems, resolve) => {
-  const {name, remotes:remotesStr} = nameRems.split('|||');
-  const remotes = JSON.parse(remotesStr);
+  const [name, remotesStr] = nameRems.split('|||');
+  let remotes;
+  try {
+    remotes = JSON.parse(remotesStr);
+  }
+  catch (e) {
+    reject([id, addRemotes+e.message]);
+    return;
+  }
   console.log('addRemotes', id, name);
   allRemotes[name] = remotes;
   await fsp.writeFile('data/remotes.json', JSON.stringify(allRemotes)); 

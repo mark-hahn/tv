@@ -144,7 +144,8 @@
     div(style=`text-align:center;
                margin-bottom:12px; font-weight:bold;`) 
       | {{remoteShowName}}
-    div( v-for="remote in remotes"
+    div( v-if="remotes.length !== 1" 
+         v-for="remote in remotes"
             style=`margin:3px 10px; padding:10px; 
                   background-color:white; text-align:center;
                   border: 1px solid black; font-weight:bold;
@@ -494,12 +495,12 @@ export default {
         return;
       }
 
-      const waitRes = await tvdb.getTvDbData(srchTxt);
-      if(!waitRes) {
+      const tvDbData = await tvdb.getTvDbData(srchTxt);
+      if(!tvDbData) {
         showErr('No series found in tvdb for:', srchTxt);
         return;
       }
-      const {exactName, waitStr} = waitRes;
+      const {exactName, waitStr} = tvDbData;
 
       const matchShow = allShows.find((s) => s.Name == exactName);
       if(matchShow) {  
@@ -695,10 +696,11 @@ export default {
       switch(action) {
         case 'open':  
           try {  
-            const name = show.Name;
-            const tvdbData = await tvdb.getTvDbData(name);
-            if(!tvdbData) this.remotes = [];
-            else          this.remotes = tvdbData.remotes.slice();
+            const name    = show.Name;
+            this.remotes = [1];
+            const remotes = await tvdb.getRemotes(name);
+            if(!remotes) this.remotes = [];
+            else         this.remotes = remotes;
             const url = urls.embyPageUrl(show.Id);
             if(url && !show.Id.startsWith("noemby-"))
                 this.remotes.unshift({name:'Emby', url});

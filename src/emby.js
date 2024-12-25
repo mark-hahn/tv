@@ -223,9 +223,9 @@ const lindaCollId    = '4706186';
 
 export async function getWaitStr(show) {
   try {
-    const waitRes = await tvdb.getTvDbData(show.Name);
-    if(waitRes) return waitRes.waitStr;
-    else        return '';
+    const tvDbData = await tvdb.getTvDbData(show.Name);
+    if(tvDbData) return tvDbData.waitStr;
+    else         return '';
   } catch(e) {
     console.log('getWaitStr, tvdb data error:', show.Name, e);
     return '';

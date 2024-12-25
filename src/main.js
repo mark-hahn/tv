@@ -5,11 +5,14 @@ reminder ...
 
 todo ...
   prev/next hilite
+  get drama from tvdb (as many as possible)
+  delete remotes
 
 bugs ...
+  delete emby broken (only child)
+  rotten
   
 new features ...
-  don't getRemotes until needed
   show waitstr as {12-12  2-12}
   refresh filtered rows when new gap loaded
   show hilight row button

@@ -38,15 +38,19 @@ const getToken = async () => {
 export const getRemotes = async (showName) => {
   let remotes = await srvr.getRemotes(showName);
   if(!remotes.noMatch) return remotes;
-  
-  const {remoteIds} = await getTvdbData(showName);
+  const tvdbData = await getTvdbData(showName);
+  if(!tvdbData) {
+    console.log(`getRemotes, no tvdbData: ${showName}`);
+    return null;
+  }
+  const {remoteIds} = tvdbData;
   if(!remoteIds || remoteIds.noMatch) {
     console.log(`getRemotes, no remoteIds: ${showName}`);
     return null;
   }
   // console.log(`getRemotes, remoteIds: ${showName}`, {remoteIds});
   remoteIds.push({id:showName, type:99, 
-                  name:'Rotten Tomatoes'});
+                  sourceName:'Rotten Tomatoes'});
   remotes     = [];
   const names = {};
   for(let i=0; i < remoteIds.length; i++) {
@@ -54,11 +58,7 @@ export const getRemotes = async (showName) => {
     let url ='';  
     switch (type) {
       case 2:  url = `https://www.imdb.com/title/${id}`; break;
-      case 3:
-       url = `https://tvlistings.zap2it.com/overview.html` +
-             `?programSeriesId=SH03415789&tmsId=${id}` +
-             `&from=showcard&aid=gapzap`
-        break;
+      case 3:  break;
       case 4:  name = 'Official Website';
                url = id; 
                break;
@@ -77,10 +77,12 @@ export const getRemotes = async (showName) => {
                `18||https://www.wikidata.org/wiki/${id}`);
                break;
       case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
-      case 99: url = await srvr.getUrls(
-                      `99||https://www.rottentomatoes.com/search` +
-                      `?search=${encodeURI(id)}`);
-               break;
+      case 99:  
+        url = await srvr.getUrls(
+                `99||https://www.rottentomatoes.com/search` +
+                `?search=${encodeURI(id)}`);
+        console.log(`getRemotes, rotten: ${showName}, ${name}, ${url}`);
+        break;
       default: continue
     }
     if(!url) {

@@ -32,39 +32,25 @@ const getToken = async () => {
   theTvDbToken = loginJSON.data.token;
 }
 
-///////////// init cache //////////////  
-
-let tvDbCache = [];
-const cacheStr = window.localStorage.getItem(tvdbDataCacheName);
-if(cacheStr) {
-  try {
-    tvDbCache = JSON.parse(cacheStr);
-  } catch(e) {
-    showErr(`tvDbCache parse error: ${e}`);
-    tvDbCache.length = 0;
-  }
-}
 
 ///////////// get remote (name and url) //////////////
 
 export const getRemotes = async (showName) => {
-  let cachedRemotes = await srvr.getRemotes(showName);
-  if(!cachedRemotes.noMatch) return cachedRemotes;
+  let remotes = await srvr.getRemotes(showName);
+  if(!remotes.noMatch) return remotes;
   
-  const {remoteIds} = await getTvDbData(showName);
+  const {remoteIds} = await getTvdbData(showName);
   if(!remoteIds || remoteIds.noMatch) {
     console.log(`getRemotes, no remoteIds: ${showName}`);
     return null;
   }
-  console.log(`getRemotes, remoteIds: ${showName}`,
-              {remoteIds});
-  remoteIds.push({id:showName, type:99, 
-                  sourceName:'Rotten Tomatoes'});
-  const remotes = [];
-  const names   = {};
+  console.log(`getRemotes, remoteIds: ${showName}`, {remoteIds});
+  // remoteIds.push({id:showName, type:99, 
+  //                 name:'Rotten Tomatoes'});
+  remotes     = [];
+  const names = {};
   for(let i=0; i < remoteIds.length; i++) {
-    const remoteId = remoteIds[i];
-    let {type, id, sourceName:name} = remoteId;
+    let {id, type, name} = remoteIds[i];    
     let url ='';  
     switch (type) {
       case 2:  url = `https://www.imdb.com/title/${id}`; break;
@@ -126,73 +112,65 @@ export const getRemotes = async (showName) => {
 
 //////////// get TvDb Data //////////////
 
-export const getTvDbData = async (searchStr) => {
-  const cacheEntry = tvDbCache.find(c => 
-                        c.searchStr === searchStr || 
-                        c.exactName === searchStr);
-  if(cacheEntry && 
-      (Date.now() - cacheEntry.saved) < 48*60*60*1000) { // 2 days
-    // console.log("cache hit: ", {searchStr, cacheEntry,
-    //                              cachelength:cache.length});
-    const {exactName, waitStr, remoteIds} = cacheEntry;
-    const remaining = tvDbCache.filter(c =>
-                        c.searchStr !== searchStr &&
-                        c.exactName !== searchStr);
-    if(remaining.length != tvDbCache.length - 1) {
-      tvDbCache = remaining;  
-      window.localStorage.setItem(
-                tvdbDataCacheName, JSON.stringify(remaining));
+export const getTvdbData = async (searchStr) => {
+  const nameIn   = searchStr;
+  const tvdbData = await srvr.getTvdb(nameIn);
+  if(tvdbData) {
+    // console.log("getTvdbData, from cache:", {nameIn});
+    const twoDays = 48*60*60*1000;
+    if ((Date.now() - tvdbData.saved) < 
+         (twoDays + Math.round(Math.random() * twoDays))) {
+      return tvdbData;
     }
-    return {exactName, waitStr, remoteIds};
+    else await srvr.delTvdb(nameIn);
   }
-  // console.log("cache miss:", {searchStr});
 
   if(!theTvDbToken) await getToken();
 
   const srchUrl = 'https://api4.thetvdb.com/v4/' +
                   'search?type=series&query='    + 
                    encodeURIComponent(searchStr);
-  const srchResp = await fetch(srchUrl,
+  const srchRes = await fetch(srchUrl,
                     {headers: {
                       'Content-Type': 'application/json',
                       Authorization:'Bearer ' + theTvDbToken}
                     });
-  if (!srchResp.ok) {
-    showErr(`tvdb search:`, {searchStr}, srchResp.status);
+  if (!srchRes.ok) {
+    showErr(`tvdb search:`, {searchStr}, srchRes.status);
     return null;
   }
-  const srchJSON = await srchResp.json();
-  if(!srchJSON.data[0]) return null;
+  const srchResObj = await srchRes.json();
+  if(!srchResObj.data[0]) return null;
 
-  const tvdbId    = srchJSON.data[0].tvdb_id;
-  const exactName = srchJSON.data[0].name;
+  // console.log("srchResObj.data[0]:", srchResObj.data[0]);
+  const tvdbId   = srchResObj.data[0].tvdb_id;
+  const showName = srchResObj.data[0].name;
 
   const extUrl = 
     `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
-  const extResp = await fetch(extUrl,
+  const extRes = await fetch(extUrl,
                 {headers: {
                     'Content-Type': 'application/json',
                       Authorization:'Bearer ' + theTvDbToken
                 }});
-  if (!extResp.ok) {
-    showErr(`tvdb extended: ${extResp.status}`);
+  if (!extRes.ok) {
+    showErr(`tvdb extended: ${extRes.status}`);
     return null;
   }
 
   let waitStr = '';
-  const extJSON  = await extResp.json();
-  const {lastAired:lastAiredIn, remoteIds} = extJSON.data;
+  const extResObj  = await extRes.json();
+  const {lastAired:lastAiredIn, remoteIds} = extResObj.data;
   if(!lastAiredIn) return null;
   const lastAired     = util.fmtDate(lastAiredIn);
   const today         = util.fmtDate();
   const lastAiredNoYr = util.fmtDate(lastAiredIn, false);
   if(lastAiredNoYr && lastAired >= today) 
                         waitStr = `{${lastAiredNoYr}}`;
-  
-  tvDbCache.push({exactName, waitStr, remoteIds,
-                  searchStr, saved:Date.now()});
-  window.localStorage.setItem(
-                tvdbDataCacheName, JSON.stringify(tvDbCache));
-
-  return {exactName, waitStr, remoteIds};
+  const saved = Date.now();
+  const nameWaitRemsSave = 
+   `${showName}|||${waitStr}|||${JSON.stringify(remoteIds)}|||${saved}`;
+  // console.log("addTvdb:", {showName, nameWaitRemsSave});
+  srvr.addTvdb(nameWaitRemsSave);
+  return {showName, waitStr, remoteIds};
 }

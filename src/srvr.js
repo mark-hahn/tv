@@ -59,7 +59,7 @@ const fCall = (fname, param, sema4) => {
                             call => call.sema4 == sema4);
     if(callIdx > -1) {
       fCallQueue.push({fname, param, sema4});
-      console.log("queued:", fname);
+      // console.log("queued:", fname);
       return;
     }
   }
@@ -100,6 +100,7 @@ handleMsg = (msg) => {
   calls.splice(callIdx, 1);
   const {fname, resolve, reject, sema4} = call;
   try {
+    // console.log("parsing ws result:", {id, result});
     const res = JSON.parse(result);
     if(status == 'ok') resolve(res);
     else                reject(res);
@@ -111,7 +112,7 @@ handleMsg = (msg) => {
   const queuelIdx = fCallQueue.findIndex(
                       entry => entry.sema4 == sema4);
   if(queuelIdx < 0) return;
-  console.log("dequeuing:", fname);
+  // console.log("dequeuing:", fname);
   const entry = fCallQueue[queuelIdx];
   fCallQueue.splice(queuelIdx, 1);
   fCall(entry.fname, entry.param, entry.sema4);
@@ -148,6 +149,13 @@ export function addNoEmby(show)
 export function delNoEmby(name)    
             {return fCall('delNoEmby', name, 'noemby')}
 
+export function getTvdb(name)      
+            {return fCall('getTvdb', name, 'tvdb')}
+export function addTvdb(nameWaitRemsSaved)    
+            {return fCall('addTvdb', nameWaitRemsSaved, 'tvdb')}
+export function delTvdb(name)    
+            {return fCall('delTvdb', name, 'tvdb')}
+
 export function getRemotes(name)    
             {return fCall('getRemotes', name,     'remotes')}
 export function addRemotes(nameRems)    
@@ -165,6 +173,7 @@ export async function deleteShowFromSrvr(show) {
   await delBlockedWait(show.Name);
   await delPickup(show.Name);
   await delNoEmby(show.Name);
+  await delTvdb(show.Name);
   await delRemotes(show.Name);
   await deletePath(show.Path);
   // don't ever delete from rejects

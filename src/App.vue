@@ -495,14 +495,14 @@ export default {
         return;
       }
 
-      const tvDbData = await tvdb.getTvDbData(srchTxt);
-      if(!tvDbData) {
+      const tvdbData = await tvdb.getTvdbData(srchTxt);
+      if(!tvdbData) {
         showErr('No series found in tvdb for:', srchTxt);
         return;
       }
-      const {exactName, waitStr} = tvDbData;
+      const {name, waitStr} = tvdbData;
 
-      const matchShow = allShows.find((s) => s.Name == exactName);
+      const matchShow = allShows.find((s) => s.Name == name);
       if(matchShow) {  
         console.log('Show already exists: ' + matchShow.Name);
         this.setHilite(matchShow);
@@ -512,7 +512,7 @@ export default {
 
       const dateStr = util.fmtDate();
       const show = {
-        Name: exactName,
+        Name: name,
         Id: "noemby-" + Math.random(),
         DateCreated: dateStr, 
         Waiting: !!waitStr,
@@ -533,8 +533,8 @@ export default {
       allShows.unshift(show);
       this.shows.unshift(show);
 
-      this.highlightName = exactName;
-      this.saveVisShow(exactName);
+      this.highlightName = name;
+      this.saveVisShow(name);
       this.scrollToSavedShow();
 
       await srvr.addBlockedWait(show.Name);
@@ -848,7 +848,7 @@ export default {
       gapData.Missing    = missing;
       gapData.Waiting    = !blockedWait && waiting;
       gapData.ShowId     = showId;
-      gapData.WaitStr    = await emby.getWaitStr(show.Name);
+      gapData.WaitStr    = await emby.getWaitStr(show);
       Object.assign(show, gapData);
       gapCache[showId]  = gapData;
 

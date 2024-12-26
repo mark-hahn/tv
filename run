@@ -3,6 +3,6 @@ cd /root/dev/apps/tv-series-srvr
 # node index.js
 pm2 flush   tv-series-srvr
 pm2 delete  tv-series-srvr
-pm2 start index.js --watch index.js -f --name tv-series-srvr # --time
+pm2 start index.js --watch index.js -f --name tv-series-srvr --time
 pm2 save
 pm2 --time --lines 32 logs tv-series-srvr

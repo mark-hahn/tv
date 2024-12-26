@@ -44,13 +44,13 @@ export const getRemotes = async (showName) => {
     console.log(`getRemotes, no remoteIds: ${showName}`);
     return null;
   }
-  console.log(`getRemotes, remoteIds: ${showName}`, {remoteIds});
-  // remoteIds.push({id:showName, type:99, 
-  //                 name:'Rotten Tomatoes'});
+  // console.log(`getRemotes, remoteIds: ${showName}`, {remoteIds});
+  remoteIds.push({id:showName, type:99, 
+                  name:'Rotten Tomatoes'});
   remotes     = [];
   const names = {};
   for(let i=0; i < remoteIds.length; i++) {
-    let {id, type, name} = remoteIds[i];    
+    let {id, type, sourceName:name} = remoteIds[i];    
     let url ='';  
     switch (type) {
       case 2:  url = `https://www.imdb.com/title/${id}`; break;
@@ -99,6 +99,7 @@ export const getRemotes = async (showName) => {
     names[name] = true;
     remotes.push({name, url});
   }
+  // console.log(`getRemotes, remotes: ${showName}`, {remotes});
   remotes.sort((a, b) => 
             a.name.toLowerCase().replace(/^the /, '') > 
             b.name.toLowerCase().replace(/^the /, '') ? 1 : -1);
@@ -116,10 +117,11 @@ export const getTvdbData = async (searchStr) => {
   const nameIn   = searchStr;
   const tvdbData = await srvr.getTvdb(nameIn);
   if(tvdbData) {
+    if(tvdbData.noMatch) return null;
     // console.log("getTvdbData, from cache:", {nameIn});
     const twoDays = 48*60*60*1000;
     if ((Date.now() - tvdbData.saved) < 
-         (twoDays + Math.round(Math.random() * twoDays))) {
+        (twoDays + Math.round(Math.random() * twoDays))) {
       return tvdbData;
     }
     else await srvr.delTvdb(nameIn);

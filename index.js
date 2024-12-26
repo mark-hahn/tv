@@ -395,7 +395,6 @@ const addTvdb = async (id, nameWaitRemsSaved, resolve, reject) => {
 }
 
 const delTvdb = async (id, name, resolve, _reject) => {
-  // console.log('delTvdb', id, name);
   if(!allTvdb[name]) {
     console.log('-- tvdb not deleted -- no match:', name);
     resolve([id, 'delTvdb no match:' + name]);

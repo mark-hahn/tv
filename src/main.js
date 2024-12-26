@@ -1,7 +1,7 @@
 /*
-reminder ...
-  restore gap checks
-  restore cache
+reminder, restore ...
+  gap checks
+  cache
 
 todo ...
   prev/next hilite
@@ -9,14 +9,16 @@ todo ...
   put imdb/rotten at top of list
 
 bugs ...
+  delNoEmby (Only Child)
+  no tvdb data (Lessons in Chemistry)
   
 new features ...
-  show waitstr as {12-12  2-12}
   refresh filtered rows when new gap loaded
   show hilight row button
   map: click on season numbers for whole row
 
 tabled ...
+  show waitstr as {12-12  2-12}
   one worker call per show from loop or when needed
   add wikipedia remote the hard way
   up/down arrows

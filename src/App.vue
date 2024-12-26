@@ -698,7 +698,7 @@ export default {
           try {  
             const name    = show.Name;
             this.remotes = [1];
-            const remotes = await tvdb.getRemotes(name);
+            const [remotes] = await tvdb.getRemotes(name);
             if(!remotes) this.remotes = [];
             else         this.remotes = remotes;
             const url = urls.embyPageUrl(show.Id);
@@ -908,6 +908,26 @@ export default {
           this.saveVisShow(name);
         }
         this.scrollToSavedShow();
+
+        // let showIdx = 0;
+        // const intvl = setInterval(async () => {
+        //   while(showIdx < allShows.length) {
+        //     if(showIdx % 10 == 0) 
+        //       console.log(new Date().toISOString(), 
+        //                  'showIdx:', showIdx);
+        //     // if(Math.random() < 0.75) break;
+        //     const show = allShows[showIdx++];
+        //     const remotes = await tvdb.getRemotes(show.Name);
+        //     if(!remotes) continue;
+        //     const [_remotes, cached] = remotes
+        //     if(cached) continue;
+        //     break;
+        //   }
+        //   if(showIdx == allShows.length) {
+        //      clearInterval(intvl);
+        //      console.log('load remotes done:', showIdx);
+        //   }
+        // }, 30*1000);
 
       } catch (err) {
         showErr("Mounted:", err);

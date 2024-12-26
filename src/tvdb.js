@@ -4,7 +4,7 @@ import * as util from "./util.js";
 const tvdbDataCacheName = "tvdbDataCache2";
 
 let showErr      = null;
-let theTvDbToken = null;
+let theTvdbToken = null;
 
 export const init = (showErrIn) => {
   showErr = showErrIn;
@@ -29,7 +29,7 @@ const getToken = async () => {
     process.exit();
   }
   const loginJSON = await loginResp.json();
-  theTvDbToken = loginJSON.data.token;
+  theTvdbToken = loginJSON.data.token;
 }
 
 
@@ -37,7 +37,8 @@ const getToken = async () => {
 
 export const getRemotes = async (showName) => {
   let remotes = await srvr.getRemotes(showName);
-  if(!remotes.noMatch) return remotes;
+  if(remotes && !remotes.noMatch) return [remotes, true];
+
   const tvdbData = await getTvdbData(showName);
   if(!tvdbData) {
     console.log(`getRemotes, no tvdbData: ${showName}`);
@@ -83,7 +84,7 @@ export const getRemotes = async (showName) => {
                 `?search=${encodeURI(id)}`);
         console.log(`getRemotes, rotten: ${showName}, ${name}, ${url}`);
         break;
-      default: continue
+      default: continue;
     }
     if(!url) {
       console.log(`getRemotes, no url: ${showName}, ${name} ${url}`);
@@ -110,7 +111,7 @@ export const getRemotes = async (showName) => {
   //                   remotes[0].name.toLowerCase().replace(/^the /, ''));
 
   srvr.addRemotes(showName + '|||' + JSON.stringify(remotes));
-  return remotes;
+  return [remotes, false];
 }
 
 //////////// get TvDb Data //////////////
@@ -129,7 +130,7 @@ export const getTvdbData = async (searchStr) => {
     else await srvr.delTvdb(nameIn);
   }
 
-  if(!theTvDbToken) await getToken();
+  if(!theTvdbToken) await getToken();
 
   const srchUrl = 'https://api4.thetvdb.com/v4/' +
                   'search?type=series&query='    + 
@@ -137,7 +138,7 @@ export const getTvdbData = async (searchStr) => {
   const srchRes = await fetch(srchUrl,
                     {headers: {
                       'Content-Type': 'application/json',
-                      Authorization:'Bearer ' + theTvDbToken}
+                      Authorization:'Bearer ' + theTvdbToken}
                     });
   if (!srchRes.ok) {
     showErr(`tvdb search:`, {searchStr}, srchRes.status);
@@ -155,7 +156,7 @@ export const getTvdbData = async (searchStr) => {
   const extRes = await fetch(extUrl,
                 {headers: {
                     'Content-Type': 'application/json',
-                      Authorization:'Bearer ' + theTvDbToken
+                      Authorization:'Bearer ' + theTvdbToken
                 }});
   if (!extRes.ok) {
     showErr(`tvdb extended: ${extRes.status}`);

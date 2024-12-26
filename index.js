@@ -35,12 +35,14 @@ const pickupStr  = fs.readFileSync('config/config4-pickups.json', 'utf8');
 const footerStr  = fs.readFileSync('config/config5-footer.txt',   'utf8');
 const waitingStr = fs.readFileSync('data/blockedWaits.json',      'utf8');
 const noEmbyStr  = fs.readFileSync('data/noemby.json',            'utf8');
+const allTvdbStr = fs.readFileSync('data/tvdb.json',              'utf8');
 const allRemStr  = fs.readFileSync('data/remotes.json',           'utf8');
 
 const blockedWaits = JSON.parse(waitingStr);
 const rejects      = JSON.parse(rejectStr);
 const pickups      = JSON.parse(pickupStr);
 const noEmbys      = JSON.parse(noEmbyStr);
+const allTvdb      = JSON.parse(allTvdbStr);
 const allRemotes   = JSON.parse(allRemStr);
 
 const videoFileExtensions = [
@@ -367,6 +369,43 @@ const delNoEmby = async (id, name, resolve, reject) => {
   resolve([id, {"ok":"ok"}]);
 }
 
+const getTvdb = (id, name, resolve, _reject) => {
+  if(!allTvdb[name]) {
+    resolve([id, {noMatch: true}]);
+    return
+  }
+  resolve([id, allTvdb[name]]);
+};
+
+const addTvdb = async (id, nameWaitRemsSaved, resolve, reject) => {
+  const [name, waitStr, remoteIdStr, saved] = 
+                                  nameWaitRemsSaved.split('|||');
+  let remoteIds;
+  try {
+    remoteIds = JSON.parse(remoteIdStr);
+  }
+  catch (e) {
+    reject([id, 'addTvdb: '+e.message]);
+    return;
+  }
+  // console.log('addTvdb:', id, nameWaitRemsSaved);
+  allTvdb[name] = {name, waitStr, remoteIds, saved};
+  await fsp.writeFile('data/tvdb.json', JSON.stringify(allTvdb)); 
+  resolve([id, {"ok":"ok"}]);
+}
+
+const delTvdb = async (id, name, resolve, _reject) => {
+  // console.log('delTvdb', id, name);
+  if(!allTvdb[name]) {
+    console.log('-- tvdb not deleted -- no match:', name);
+    resolve([id, 'delTvdb no match:' + name]);
+    return;
+  }
+  delete allTvdb[name];
+  await fsp.writeFile('data/tvdb.json', JSON.stringify(allTvdb)); 
+  resolve([id, {"ok":"ok"}]);
+}
+
 const getRemotes = (id, name, resolve, _reject) => {
   if(!allRemotes[name]) {
     resolve([id, {noMatch: true}]);
@@ -375,14 +414,14 @@ const getRemotes = (id, name, resolve, _reject) => {
   resolve([id, allRemotes[name]]);
 };
 
-const addRemotes = async (id, nameRems, resolve) => {
+const addRemotes = async (id, nameRems, resolve, reject) => {
   const [name, remotesStr] = nameRems.split('|||');
   let remotes;
   try {
     remotes = JSON.parse(remotesStr);
   }
   catch (e) {
-    reject([id, addRemotes+e.message]);
+    reject([id, 'addRemotes: '+e.message]);
     return;
   }
   console.log('addRemotes', id, name);
@@ -479,7 +518,7 @@ wss.on('connection', (ws, req) => {
 
   ws.on('message', (msg) => {
     msg = msg.toString();
-    console.log(clientId, 'received:', msg);
+    // console.log(clientId, 'received:', msg);
 
     const parts = /^(.*)~~~(.*)~~~(.*)$/.exec(msg);
     if(!parts) {
@@ -500,7 +539,7 @@ wss.on('connection', (ws, req) => {
 
     promise.then((idResult) => {
       const [id, result] = idResult;
-      console.log(clientId, 'resolved:', id);
+      // console.log(clientId, 'resolved:', id);
       ws.send(`${id}~~~ok~~~${JSON.stringify(result)}`); 
     })
     .catch((idError) => {
@@ -529,6 +568,10 @@ wss.on('connection', (ws, req) => {
       case 'getNoEmbys':  getNoEmbys(id, '',    resolve, reject); break;
       case 'addNoEmby':   addNoEmby( id, param, resolve, reject); break;
       case 'delNoEmby':   delNoEmby( id, param, resolve, reject); break;
+      
+      case 'getTvdb':  getTvdb(id, param, resolve, reject); break;
+      case 'addTvdb':  addTvdb(id, param, resolve, reject); break;
+      case 'delTvdb':  delTvdb(id, param, resolve, reject); break;
       
       case 'getRemotes':  getRemotes(id, param, resolve, reject); break;
       case 'addRemotes':  addRemotes(id, param, resolve, reject); break;

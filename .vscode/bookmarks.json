@@ -4,7 +4,17 @@
 			"path": "index.js",
 			"bookmarks": [
 				{
-					"line": 417,
+					"line": 371,
+					"column": 7,
+					"label": ""
+				},
+				{
+					"line": 408,
+					"column": 14,
+					"label": ""
+				},
+				{
+					"line": 456,
 					"column": 9,
 					"label": ""
 				}

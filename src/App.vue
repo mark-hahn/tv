@@ -697,16 +697,17 @@ export default {
         case 'open':  
           try {  
             const name    = show.Name;
-            this.remotes = [1];
+            this.remotes = [{name:'error', url:null}];
             const [remotes] = await tvdb.getRemotes(name);
             if(!remotes) this.remotes = [];
             else         this.remotes = remotes;
+            console.log('remotesAction open1:', {'this.remotes':this.remotes});
             const url = urls.embyPageUrl(show.Id);
             if(url && !show.Id.startsWith("noemby-"))
                 this.remotes.unshift({name:'Emby', url});
             this.remotes.push({name:'Close', url:null});
           } catch(err) {
-            console.error('remotesAction open:', err);
+            console.error('remotesAction open2:', err);
           }
           break;
 

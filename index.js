@@ -4,28 +4,10 @@ import util                from "util";
 import * as cp             from 'child_process';
 import { WebSocketServer } from 'ws';
 import fetch               from 'node-fetch';
-// import {publicIpv4}        from 'public-ip';
 
 process.setMaxListeners(50);
 const dontupload  = false;
-
-// (async () => {
-//   try {
-//     const ip = await publicIpv4();
-//     console.log(`\nwan ip: {${ip}}\n`); 
-//     if(ip !== '102.129.146.67') {
-//       console.log('FATAL, ip is not 102.129.146.67, stopping');
-//       process.exit;
-//     }
-//   } catch (error) {
-//     console.error('FATAL, Error fetching IP:', error);
-//     process.exit;
-//   }
-// })();
-
 const tvDir = '/mnt/media/tv';
-// const tvDir = '/mnt/c/Users/mark/apps/tv-series-srvr/media/tv';
-
 const exec  = util.promisify(cp.exec);
 
 const headerStr  = fs.readFileSync('config/config1-header.txt',   'utf8');
@@ -408,14 +390,17 @@ const delTvdb = async (id, name, resolve, _reject) => {
 }
 
 const getRemotes = (id, name, resolve, _reject) => {
-  console.log(`getRemotes1`,{id, name, allRemotes:JSON.stringify(allRemotes, 2)});
-  if(!allRemotes[name]) {
-    console.log(`getRemotes2`, {id, name});
+  // console.log(`getRemotes enter`,
+              // {id, name, allRemotes:JSON.stringify(allRemotes, 2)});
+  const remotes = allRemotes[name];
+  console.log(`getRemotes`, {remotes});
+  if(!remotes) {
+    console.log(`getRemotes noMatch`, {id, name});
     resolve([id, {noMatch: true}]);
     return
   } 
-  console.log(`getRemotes3`,  {id, name, url});
-  resolve([id,  {id, name, url}]);
+  console.log(`getRemotes leave`,  {id, name, remotes});
+  resolve([id, remotes]);
 };
 
 const addRemotes = async (id, nameRems, resolve, reject) => {
@@ -428,7 +413,7 @@ const addRemotes = async (id, nameRems, resolve, reject) => {
     reject([id, 'addRemotes: '+e.message]);
     return;
   }
-  console.log('addRemotes', id, name);
+  // console.log('addRemotes', id, name);
   allRemotes[name] = remotes;
   await fsp.writeFile('data/remotes.json', JSON.stringify(allRemotes)); 
   resolve([id, {"ok":"ok"}]);
@@ -578,7 +563,9 @@ wss.on('connection', (ws, req) => {
       case 'addTvdb':  addTvdb(id, param, resolve, reject); break;
       case 'delTvdb':  delTvdb(id, param, resolve, reject); break;
       
-      case 'getRemotes':  getRemotes(id, param, resolve, reject); break;
+      case 'getRemotes':  
+              console.log('-srvr getRemotes', {id, param});
+              getRemotes(id, param, resolve, reject); break;
       case 'addRemotes':  addRemotes(id, param, resolve, reject); break;
       case 'delRemotes':  delRemotes(id, param, resolve, reject); break;
       

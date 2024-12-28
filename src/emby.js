@@ -94,7 +94,7 @@ export async function loadAllShows(gapCache) {
 
   for(const noEmbyShow of noEmbys) {
     const idx = shows.findIndex(
-                  (s) => s.Name == noEmbyShow.Name);
+                  (show) => show.Name == noEmbyShow.Name);
     if(idx != -1) {
       await srvr.delNoEmby(noEmbyShow.Name);
       continue;

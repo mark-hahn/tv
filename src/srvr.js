@@ -118,6 +118,17 @@ handleMsg = (msg) => {
   fCall(entry.fname, entry.param, entry.sema4);
 }
 
+export async function deleteShowFromSrvr(show) {
+  await delBlockedWait(show.Name);
+  await delPickup(show.Name);
+  await delNoEmby(show.Name);
+  await delTvdb(show.Name);
+  await delRemotes(show.Name);
+  await deletePath(show.Path);
+  // don't ever delete from rejects
+  console.log("deleted show from server:", show.Name);
+}
+
 export function getAllShows()      
             {return fCall('getAllShows')}
 
@@ -170,13 +181,3 @@ export function deletePath(path)
 export function getUrls(urlReq)   
             {return fCall('getUrls', urlReq, 'getUrls')}
 
-export async function deleteShowFromSrvr(show) {
-  await delBlockedWait(show.Name);
-  await delPickup(show.Name);
-  await delNoEmby(show.Name);
-  await delTvdb(show.Name);
-  await delRemotes(show.Name);
-  await deletePath(show.Path);
-  // don't ever delete from rejects
-  console.log("deleted show from server:", show.Name);
-}

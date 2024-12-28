@@ -5,12 +5,11 @@ reminder, restore ...
 
 todo ...
   prev/next hilite
-  get drama from tvdb (as many as possible)
+  get drama field from tvdb (as many fields as possible)
   put imdb/rotten at top of list
 
 bugs ...
-  delNoEmby (Only Child)
-  no tvdb data (Lessons in Chemistry)
+  delNoEmby (Only Child)  ???
   
 new features ...
   refresh filtered rows when new gap loaded

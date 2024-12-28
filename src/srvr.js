@@ -157,7 +157,8 @@ export function delTvdb(name)
             {return fCall('delTvdb', name, 'tvdb')}
 
 export function getRemotes(name)    
-            {return fCall('getRemotes', name,     'remotes')}
+            {console.log('srvr.getRemotes', name);
+            return fCall('getRemotes', name,     'remotes')}
 export function addRemotes(nameRems)    
             {return fCall('addRemotes',  nameRems, 'remotes')}
 export function delRemotes(name)    

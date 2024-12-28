@@ -144,7 +144,7 @@
     div(style=`text-align:center;
                margin-bottom:12px; font-weight:bold;`) 
       | {{remoteShowName}}
-    div( v-if="remotes.length !== 1" 
+    div( v-if="remotes[0] !== 1" 
          v-for="remote in remotes"
             style=`margin:3px 10px; padding:10px; 
                   background-color:white; text-align:center;
@@ -696,8 +696,8 @@ export default {
       switch(action) {
         case 'open':  
           try {  
-            const name    = show.Name;
-            this.remotes = [{name:'error', url:null}];
+            const name      = show.Name;
+            this.remotes    = [1];
             const [remotes] = await tvdb.getRemotes(name);
             if(!remotes) this.remotes = [];
             else         this.remotes = remotes;

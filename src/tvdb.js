@@ -49,7 +49,7 @@ export const getRemotes = async (showName) => {
     console.log(`getRemotes, no remoteIds: ${showName}`);
     return null;
   }
-  console.log(`getRemotes, remoteIds: ${showName}`, {remoteIds});
+  // console.log(`getRemotes, remoteIds: ${showName}`, {remoteIds});
   remoteIds.push({id:showName, type:99, 
                   sourceName:'Rotten Tomatoes'});
   remotes     = [];
@@ -102,7 +102,6 @@ export const getRemotes = async (showName) => {
     names[name] = true;
     remotes.push({name, url});
   }
-  // console.log(`getRemotes, remotes: ${showName}`, {remotes});
   remotes.sort((a, b) => 
             a.name.toLowerCase().replace(/^the /, '') > 
             b.name.toLowerCase().replace(/^the /, '') ? 1 : -1);

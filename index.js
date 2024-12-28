@@ -352,14 +352,16 @@ const delNoEmby = async (id, name, resolve, reject) => {
   console.log('delNoEmby', id, name);
   let deletedOne = false;
   for(const [idx, show] of noEmbys.entries()) {
+    console.log('-- deleting noemby1:', {name, noEmbys});
     if(!show.Name ||
         show.Name.toLowerCase() === name.toLowerCase()) {
-      console.log('-- deleting noemby:', name);
+      console.log('-- deleting noemby2:', {name, noEmbys});
       noEmbys.splice(idx, 1);
       deletedOne = true;
       break;
     }
   }
+  console.log('-- deleting noemby3:', {name, noEmbys});
   if(!deletedOne) {
     console.log('-- noembys not deleted -- no match:', name);
     resolve([id, 'delNoEmby no match:' + name]);
@@ -406,11 +408,14 @@ const delTvdb = async (id, name, resolve, _reject) => {
 }
 
 const getRemotes = (id, name, resolve, _reject) => {
+  console.log(`getRemotes1`,{id, name, allRemotes:JSON.stringify(allRemotes, 2)});
   if(!allRemotes[name]) {
+    console.log(`getRemotes2`, {id, name});
     resolve([id, {noMatch: true}]);
     return
-  }
-  resolve([id, allRemotes[name]]);
+  } 
+  console.log(`getRemotes3`,  {id, name, url});
+  resolve([id,  {id, name, url}]);
 };
 
 const addRemotes = async (id, nameRems, resolve, reject) => {
@@ -547,6 +552,7 @@ wss.on('connection', (ws, req) => {
       console.log(clientId, 'rejected:', id);
       ws.send(`${id}~~~err~~~${JSON.stringify(error)}`); 
     });
+  console.log(`call function`,{id, fname});
 
     // call function fname
     switch (fname) {

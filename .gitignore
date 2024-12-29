@@ -29,3 +29,5 @@ pnpm-debug.log*
 node_modules-new
 node_modules-old
 node_modules-no-jxs
+
+bookmarks.json

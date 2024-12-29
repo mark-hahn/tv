@@ -331,6 +331,7 @@ templates:
         - "The South Westerlies"
         - "Splitting Up Together"
         - "Sprung"
+        - "St. Denis Medical"
         - "Staged"
         - "Starstruck"
         - "State of the Union"
@@ -393,7 +394,6 @@ templates:
         - "Yellowjackets"
         - "You"
         - "You're the Worst"
-        - "The Young Offenders"
 
     qbittorrent:
       path: /home/xobtlu/files

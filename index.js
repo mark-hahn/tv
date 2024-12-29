@@ -326,7 +326,7 @@ const addNoEmby = async (id, showStr, resolve) => {
   }
   console.log('adding noemby:', name);
   noEmbys.push(show);
-  // await fsp.writeFile('data/noemby.json', JSON.stringify(noEmbys)); 
+  await fsp.writeFile('data/noemby.json', JSON.stringify(noEmbys)); 
   resolve([id, {"ok":"ok"}]);
 }
 
@@ -334,26 +334,25 @@ const delNoEmby = async (id, name, resolve, reject) => {
   console.log('delNoEmby', id, name);
   let deletedOne = false;
   for(const [idx, show] of noEmbys.entries()) {
-    console.log('-- deleting noemby1:', {name, noEmbys});
     if(!show.Name ||
         show.Name.toLowerCase() === name.toLowerCase()) {
-      console.log('-- deleting noemby2:', {name, noEmbys});
+      console.log('deleting existing:', {name, noEmbys});
       noEmbys.splice(idx, 1);
       deletedOne = true;
       break;
     }
   }
-  console.log('-- deleting noemby3:', {name, noEmbys});
   if(!deletedOne) {
-    console.log('-- noembys not deleted -- no match:', name);
+    console.log('no noembys deleted, no match:', name);
     resolve([id, 'delNoEmby no match:' + name]);
     return;
   }
-  // await fsp.writeFile('data/noemby.json', JSON.stringify(noEmbys)); 
+  await fsp.writeFile('data/noemby.json', JSON.stringify(noEmbys)); 
   resolve([id, {"ok":"ok"}]);
 }
 
 const getTvdb = (id, name, resolve, _reject) => {
+  console.log('getTvdb', id, name);
   if(!allTvdb[name]) {
     resolve([id, {noMatch: true}]);
     return
@@ -362,6 +361,7 @@ const getTvdb = (id, name, resolve, _reject) => {
 };
 
 const addTvdb = async (id, nameWaitRemsSaved, resolve, reject) => {
+  console.log('addTvdb', id, nameWaitRemsSaved);
   const [name, waitStr, remoteIdStr, saved] = 
                                   nameWaitRemsSaved.split('|||');
   let remoteIds;
@@ -379,6 +379,7 @@ const addTvdb = async (id, nameWaitRemsSaved, resolve, reject) => {
 }
 
 const delTvdb = async (id, name, resolve, _reject) => {
+  console.log('delTvdb', id, name);
   if(!allTvdb[name]) {
     console.log('-- tvdb not deleted -- no match:', name);
     resolve([id, 'delTvdb no match:' + name]);
@@ -390,20 +391,17 @@ const delTvdb = async (id, name, resolve, _reject) => {
 }
 
 const getRemotes = (id, name, resolve, _reject) => {
-  // console.log(`getRemotes enter`,
-              // {id, name, allRemotes:JSON.stringify(allRemotes, 2)});
+  console.log(`getRemotes`, {id, name});
   const remotes = allRemotes[name];
-  console.log(`getRemotes`, {remotes});
   if(!remotes) {
-    console.log(`getRemotes noMatch`, {id, name});
     resolve([id, {noMatch: true}]);
     return
   } 
-  console.log(`getRemotes leave`,  {id, name, remotes});
   resolve([id, remotes]);
 };
 
 const addRemotes = async (id, nameRems, resolve, reject) => {
+  console.log(`addRemotes`, {id, nameRems});
   const [name, remotesStr] = nameRems.split('|||');
   let remotes;
   try {
@@ -444,6 +442,7 @@ const deletePath = async (id, path, resolve, reject) => {
 };
 
 const getUrls = async (id, urlReq, resolve, reject) => {
+  console.log('getUrls', id, urlReq);
   let [type, url] = urlReq.split('||');
   const resp = await fetch(url);
   if (!resp.ok) {
@@ -537,9 +536,9 @@ wss.on('connection', (ws, req) => {
       console.log(clientId, 'rejected:', id);
       ws.send(`${id}~~~err~~~${JSON.stringify(error)}`); 
     });
-  console.log(`call function`,{id, fname});
 
     // call function fname
+    console.log(`call function`,{id, fname, param});
     switch (fname) {
       case 'getAllShows': getAllShows(id, '',   resolve, reject); break;
 
@@ -559,19 +558,17 @@ wss.on('connection', (ws, req) => {
       case 'addNoEmby':   addNoEmby( id, param, resolve, reject); break;
       case 'delNoEmby':   delNoEmby( id, param, resolve, reject); break;
       
-      case 'getTvdb':  getTvdb(id, param, resolve, reject); break;
-      case 'addTvdb':  addTvdb(id, param, resolve, reject); break;
-      case 'delTvdb':  delTvdb(id, param, resolve, reject); break;
+      case 'getTvdb':     getTvdb(   id, param, resolve, reject); break;
+      case 'addTvdb':     addTvdb(   id, param, resolve, reject); break;
+      case 'delTvdb':     delTvdb(   id, param, resolve, reject); break;
       
-      case 'getRemotes':  
-              console.log('-srvr getRemotes', {id, param});
-              getRemotes(id, param, resolve, reject); break;
+      case 'getRemotes':  getRemotes(id, param, resolve, reject); break;
       case 'addRemotes':  addRemotes(id, param, resolve, reject); break;
       case 'delRemotes':  delRemotes(id, param, resolve, reject); break;
       
-      case 'deletePath':  deletePath( id, param, resolve, reject); break;
+      case 'deletePath':  deletePath(id, param, resolve, reject); break;
 
-      case 'getUrls':     getUrls(    id, param, resolve, reject); break;
+      case 'getUrls':     getUrls(   id, param, resolve, reject); break;
 
       default: reject([id, 'unknownfunction: ' + fname]);
     };

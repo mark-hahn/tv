@@ -30,4 +30,5 @@ node_modules-new
 node_modules-old
 node_modules-no-jxs
 
-bookmarks.json
+.vscode/bookmarks.json
+

@@ -254,7 +254,7 @@ export default {
   data() {
 
     const toggleWaiting = async (show) => {
-      console.log("toggleWaiting", show.Name);
+      // console.log("toggleWaiting", show.Name);
       this.saveVisShow(show.Name);
 
       if(show.Waiting) {
@@ -274,7 +274,7 @@ export default {
       show.InToTry = !show.InToTry;
       emby.saveToTry(show.Id, show.InToTry)
           .catch((err) => {
-              console.log("late toggleToTry error:", err);
+              console.error("late toggleToTry error:", err);
               //- show.InToTry = !show.InToTry;
             });
       await this.chkRowDelete(show);
@@ -287,7 +287,7 @@ export default {
       show.InContinue = !show.InContinue;
       emby.saveContinue(show.Id, show.InContinue)
           .catch((err) => {
-              console.log("late toggleContinue error:", err);
+              console.error("late toggleContinue error:", err);
               //- show.InContinue = !show.InContinue;
             });
       await this.chkRowDelete(show);
@@ -300,7 +300,7 @@ export default {
       show.InMark = !show.InMark;
       emby.saveMark(show.Id, show.InMark)
           .catch((err) => {
-              console.log("late toggleMark error:", err);
+              console.error("late toggleMark error:", err);
               //- show.InMark = !show.InMark;
             });
       await this.chkRowDelete(show);
@@ -313,7 +313,7 @@ export default {
       show.InLinda = !show.InLinda;
       emby.saveLinda(show.Id, show.InLinda)
           .catch((err) => {
-              console.log("late toggleLinda error:", err);
+              console.error("late toggleLinda error:", err);
               //- show.InLinda = !show.InLinda;
             });
       await this.chkRowDelete(show);
@@ -326,7 +326,7 @@ export default {
       show.IsFavorite = !show.IsFavorite;
       emby.saveFav(show.Id, show.IsFavorite)
           .catch((err) => {
-              console.log("late saveFavorite error:", err);
+              console.error("late saveFavorite error:", err);
               //- show.IsFavorite = !show.IsFavorite;
            });
       await this.chkRowDelete(show);
@@ -338,12 +338,12 @@ export default {
       if(show.Reject) 
            srvr.addReject(show.Name) 
                .catch((err) => {
-                   console.log("late addReject:", err);
+                   console.error("late addReject:", err);
                    //- show.Reject = !show.Reject;
                });
       else srvr.delReject(show.Name)
             .catch((err) => {
-                console.log("late delReject:", err);
+                console.error("late delReject:", err);
                 //- show.Reject = !show.Reject;
             });
       await this.chkRowDelete(show);
@@ -355,12 +355,12 @@ export default {
       if(show.Pickup) 
            srvr.addPickup(show.Name) 
                .catch((err) => {
-                   console.log("late addPickup:", err);
+                   console.error("late addPickup:", err);
                    //- show.Pickup = !show.Pickup;
                });
       else srvr.delPickup(show.Name)
             .catch((err) => {
-                console.log("late delPickup:", err);
+                console.error("late delPickup:", err);
                 //- show.Pickup = !show.Pickup;
             });
       await this.chkRowDelete(show);
@@ -370,7 +370,7 @@ export default {
     const deleteShow = async (show) => {
       if(show.Id.startsWith("noemby-")) return;
       this.saveVisShow(show.Name);
-      console.log("delete Show From Emby?", show.Name);
+      // console.log("delete Show From Emby?", show.Name);
       if (!window.confirm(
           `Do you really want to delete series ${show.Name}?`)) 
         return;
@@ -612,7 +612,7 @@ export default {
       this.sortShows();
       this.showAll();
       // this.topClick()
-      console.log("sort by Added");
+      // console.log("sort by Added");
     },
 
     async sortClickActivity() {
@@ -622,7 +622,7 @@ export default {
       this.sortShows();
       this.showAll();
       // this.topClick()
-      console.log("sort by Activity");
+      // console.log("sort by Activity");
     },
 
     async sortClickSize() {
@@ -632,7 +632,7 @@ export default {
       this.sortShows();
       this.showAll();
       // this.topClick()
-      console.log("sort by Size");
+      // console.log("sort by Size");
     },
 
     scrollToSavedShow() {
@@ -692,7 +692,7 @@ export default {
     },
 
     async remotesAction(action, remote, show) {
-      console.log('remotesAction:', action, show?.Name);
+      // console.log('remotesAction:', action, show?.Name);
       switch(action) {
         case 'open':  
           try {  
@@ -701,13 +701,12 @@ export default {
             const [remotes] = await tvdb.getRemotes(name);
             if(!remotes) this.remotes = [];
             else         this.remotes = remotes;
-            console.log('remotesAction open1:', {'this.remotes':this.remotes});
             const url = urls.embyPageUrl(show.Id);
             if(url && !show.Id.startsWith("noemby-"))
                 this.remotes.unshift({name:'Emby', url});
             this.remotes.push({name:'Close', url:null});
           } catch(err) {
-            console.error('remotesAction open2:', err);
+            console.error('remotesAction open:', err);
           }
           break;
 

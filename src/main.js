@@ -10,8 +10,11 @@ todo ...
 
 bugs ...
   prune broken (Death in Paradise)
+  uneven season lengths break file missing 
+          (Interview with the Vampire)
   
 new features ...
+  show last episode date in map (each season?)
   refresh filtered rows when new gap loaded
   show hilight row button
   map: click on season numbers for whole row

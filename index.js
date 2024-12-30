@@ -17,6 +17,7 @@ const pickupStr  = fs.readFileSync('config/config4-pickups.json', 'utf8');
 const footerStr  = fs.readFileSync('config/config5-footer.txt',   'utf8');
 const waitingStr = fs.readFileSync('data/blockedWaits.json',      'utf8');
 const noEmbyStr  = fs.readFileSync('data/noemby.json',            'utf8');
+const gapsStr    = fs.readFileSync('data/gaps.json',              'utf8');
 const allTvdbStr = fs.readFileSync('data/tvdb.json',              'utf8');
 const allRemStr  = fs.readFileSync('data/remotes.json',           'utf8');
 
@@ -24,6 +25,7 @@ const blockedWaits = JSON.parse(waitingStr);
 const rejects      = JSON.parse(rejectStr);
 const pickups      = JSON.parse(pickupStr);
 const noEmbys      = JSON.parse(noEmbyStr);
+const gaps         = JSON.parse(gapsStr);
 const allTvdb      = JSON.parse(allTvdbStr);
 const allRemotes   = JSON.parse(allRemStr);
 
@@ -212,7 +214,7 @@ const addBlockedWait = async (id, name, resolve, _reject) => {
   blockedWaits.push(name);
   await fsp.writeFile('data/blockedWaits.json', 
                         JSON.stringify(blockedWaits));
-  resolve([id, {"ok":"ok"}]);
+  resolve([id, 'ok']);
 }
 
 const delBlockedWait = async (id, name, resolve, _reject) => {
@@ -228,11 +230,11 @@ const delBlockedWait = async (id, name, resolve, _reject) => {
   }
   if(!deletedOne) {
     console.log('blockedWait not deleted -- no match:', name);
-    resolve([id, {"ok":"ok"}]);
+    resolve([id, 'ok']);
     return
   }
   await fsp.writeFile('data/blockedWaits.json', JSON.stringify(blockedWaits));
-  resolve([id, {"ok":"ok"}]);
+  resolve([id, 'ok']);
 }
 
 const getRejects = (id, _param, resolve, _reject) => {
@@ -250,7 +252,7 @@ const addReject = (id, name, resolve, reject) => {
   }
   console.log('-- adding reject:', name);
   rejects.push(name);
-  saveConfigYml(id, {"ok":"ok"}, resolve, reject);
+  saveConfigYml(id, 'ok', resolve, reject);
 }
 
 const delReject = (id, name, resolve, reject) => {
@@ -269,7 +271,7 @@ const delReject = (id, name, resolve, reject) => {
     resolve([id, 'delReject not deleted: ' + name]);
     return
   }
-  saveConfigYml(id, {"ok":"ok"}, resolve, reject);
+  saveConfigYml(id, 'ok', resolve, reject);
 }
 
 const getPickups = (id, _param, resolve, _reject) => {
@@ -287,7 +289,7 @@ const addPickup = (id, name, resolve, reject) => {
   }
   console.log('-- adding pickup:', name);
   pickups.push(name);
-  saveConfigYml(id, {"ok":"ok"}, resolve, reject);
+  saveConfigYml(id, 'ok', resolve, reject);
 }
 
 const delPickup = (id, name, resolve, reject) => {
@@ -306,7 +308,7 @@ const delPickup = (id, name, resolve, reject) => {
     console.log('pickup not deleted, no match:', name);
     return;
   }
-  saveConfigYml(id, {"ok":"ok"}, resolve, reject);
+  saveConfigYml(id, 'ok', resolve, reject);
 }
 
 const getNoEmbys = (id, _param, resolve, _reject) => {
@@ -327,7 +329,7 @@ const addNoEmby = async (id, showStr, resolve) => {
   console.log('adding noemby:', name);
   noEmbys.push(show);
   await fsp.writeFile('data/noemby.json', JSON.stringify(noEmbys)); 
-  resolve([id, {"ok":"ok"}]);
+  resolve([id, 'ok']);
 }
 
 const delNoEmby = async (id, name, resolve, reject) => {
@@ -348,7 +350,26 @@ const delNoEmby = async (id, name, resolve, reject) => {
     return;
   }
   await fsp.writeFile('data/noemby.json', JSON.stringify(noEmbys)); 
-  resolve([id, {"ok":"ok"}]);
+  resolve([id, 'ok']);
+}
+
+const getGaps = (id, _param, resolve, _reject) => {
+  resolve([id, gaps]);
+};
+
+const addGap = async (id, idGapStr, resolve, _reject) => {
+  console.log('addGap', {id, gapStr});
+  const [gapId, gap] = JSON.parse(idGapStr);
+  gaps[gapId] = gap;
+  await fsp.writeFile('data/gaps.json', JSON.stringify(gaps)); 
+  resolve([id, 'ok']);
+}
+
+const delGap = async (id, gapId, resolve, _reject) => {
+  console.log('delGap', {id, gapId});
+  delete gaps[gapId];
+  await fsp.writeFile('data/gaps.json', JSON.stringify(gaps)); 
+  resolve([id, 'ok']);
 }
 
 const getTvdb = (id, name, resolve, _reject) => {
@@ -375,7 +396,7 @@ const addTvdb = async (id, nameWaitRemsSaved, resolve, reject) => {
   // console.log('addTvdb:', id, nameWaitRemsSaved);
   allTvdb[name] = {name, waitStr, remoteIds, saved};
   await fsp.writeFile('data/tvdb.json', JSON.stringify(allTvdb)); 
-  resolve([id, {"ok":"ok"}]);
+  resolve([id, 'ok']);
 }
 
 const delTvdb = async (id, name, resolve, _reject) => {
@@ -387,7 +408,7 @@ const delTvdb = async (id, name, resolve, _reject) => {
   }
   delete allTvdb[name];
   await fsp.writeFile('data/tvdb.json', JSON.stringify(allTvdb)); 
-  resolve([id, {"ok":"ok"}]);
+  resolve([id, 'ok']);
 }
 
 const getRemotes = (id, name, resolve, _reject) => {
@@ -414,7 +435,7 @@ const addRemotes = async (id, nameRems, resolve, reject) => {
   // console.log('addRemotes', id, name);
   allRemotes[name] = remotes;
   await fsp.writeFile('data/remotes.json', JSON.stringify(allRemotes)); 
-  resolve([id, {"ok":"ok"}]);
+  resolve([id, 'ok']);
 }
 
 const delRemotes = async (id, name, resolve, reject) => {
@@ -426,7 +447,7 @@ const delRemotes = async (id, name, resolve, reject) => {
   }
   delete allRemotes[name];
   await fsp.writeFile('data/remotes.json', JSON.stringify(allRemotes)); 
-  resolve([id, {"ok":"ok"}]);
+  resolve([id, 'ok']);
 }
 
 const deletePath = async (id, path, resolve, reject) => {
@@ -438,7 +459,7 @@ const deletePath = async (id, path, resolve, reject) => {
     reject([id, e]);
     return
   }
-  resolve([id, {"ok":"ok"}]);
+  resolve([id, 'ok']);
 };
 
 const getUrls = async (id, urlReq, resolve, reject) => {
@@ -538,7 +559,7 @@ wss.on('connection', (ws, req) => {
     });
 
     // call function fname
-    console.log(`call function`,{id, fname, param});
+    console.log(`call function`, {id, fname, param});
     switch (fname) {
       case 'getAllShows': getAllShows(id, '',   resolve, reject); break;
 
@@ -557,6 +578,10 @@ wss.on('connection', (ws, req) => {
       case 'getNoEmbys':  getNoEmbys(id, '',    resolve, reject); break;
       case 'addNoEmby':   addNoEmby( id, param, resolve, reject); break;
       case 'delNoEmby':   delNoEmby( id, param, resolve, reject); break;
+      
+      case 'getGaps':     getGaps(   id, '',    resolve, reject); break;
+      case 'addGap':      addGap(    id, param, resolve, reject); break;
+      case 'delGap':      delGap(    id, param, resolve, reject); break;
       
       case 'getTvdb':     getTvdb(   id, param, resolve, reject); break;
       case 'addTvdb':     addTvdb(   id, param, resolve, reject); break;

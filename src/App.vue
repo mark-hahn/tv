@@ -153,34 +153,34 @@
           @click="remotesAction('click', remote)") 
       | {{remote.name}}
 
-  #map(v-if="showMap !== null" 
+  #map(v-if="mapShow !== null" 
         style=`background-color:#eee; padding:10px;
                display:flex; flex-direction:column;`)
     div(style=`margin:0 5px; display:flex; 
                 justify-content:space-between;`)
       div(style=`font-size:20px; margin:6px 20px 0 0;
                  font-weight:bold; flex-grow:4;`)
-        | {{showMap.Name}}
-      button(@click="seriesMapAction('prune', showMap)"
+        | {{mapShow.Name}}
+      button(@click="seriesMapAction('prune', mapShow)"
              style="margin:5px;")                     Prune
-      button(@click="seriesMapAction('date',  showMap)"
+      button(@click="seriesMapAction('date',  mapShow)"
              style="margin:5px;")                     Set Date
       button(@click="seriesMapAction('close')"
              style="margin:5px;")                     Close
 
-    div(v-if=`showMap.WatchGap ||
-              showMap.Missing  || showMap.WaitStr?.length`
+    div(v-if=`mapShow.WatchGap ||
+              mapShow.Missing  || mapShow.WaitStr?.length`
         style=`display:flex; justify-content:space-around; 
                color:red; margin: 0 10px; 4px 10px;`)
-      div(v-if="showMap.WatchGap" 
+      div(v-if="mapShow.WatchGap" 
           style="display:inline-block;")
         | {{`Watch Gap`}}
-      div(v-if="showMap.Missing"
+      div(v-if="mapShow.Missing"
           style="display:inline-block; margin 3px 10px")
         | {{`Missing File`}}
-      div(v-if="showMap.Waiting" 
+      div(v-if="mapShow.Waiting" 
           style="display:inline-block; margin 3px 10px")
-        | {{'Waiting ' + showMap.WaitStr}}
+        | {{'Waiting ' + mapShow.WaitStr}}
 
     table(style="padding:0 5px; font-size:16px" )
      tbody
@@ -195,7 +195,7 @@
           | {{season}}
 
         td(v-for="episode in seriesMapEpis" key="series+'.'+episode" 
-            @click="episodeClick($event, showMap, season, episode)"
+            @click="episodeClick($event, mapShow, season, episode)"
             :style=`{cursor:'default', width:'10px',
                      textAlign:'center', 
                      backgroundColor:  
@@ -395,7 +395,7 @@ export default {
       allShowsLength:        0,
       remotes:              [],
       remoteShowName:       "",
-      showMap:            null,
+      mapShow:            null,
       seriesMapSeasons:     [],
       seriesMapEpis:        [],
       seriesMap:            {},
@@ -725,21 +725,21 @@ export default {
     },
 
     async seriesMapAction(action, show, wasDeleted) {
-      if((action == 'open' && this.showMap === show) ||
+      if((action == 'open' && this.mapShow === show) ||
           action == 'close') {
-        this.showMap = null;
+        this.mapShow = null;
         return;
       }
       if(action == 'date') {
         console.log('setting last watched to cur date');
         await emby.setLastWatched(show.Id);
       }
-      this.showMap           = show;
+      this.mapShow           = show;
       const seriesMapSeasons = [];
       const seriesMapEpis    = [];
       const seriesMap        = {};
       const seriesMapIn = 
-            await emby.getSeriesMap(show, action == 'prune');
+          await emby.getSeriesMap(show, action == 'prune');
       for(const season of seriesMapIn) {
         const [seasonNum, episodes] = season;
         seriesMapSeasons[seasonNum] = seasonNum;
@@ -748,20 +748,20 @@ export default {
         for(const episode of episodes) {
           let [episodeNum, epiObj] = episode;
           const {error, played, avail, noFile, 
-                 unaired, deleted} = epiObj;
+                 unaired, deleted:epiDeleted} = epiObj;
           seriesMapEpis[episodeNum] = episodeNum;
-          // if(wasDeleted &&
-          //     wasDeleted.season  == seasonNum && 
-          //     wasDeleted.episode == episodeNum)
-          //   deleted = true;
+          const deleted = epiDeleted ||
+              (wasDeleted?.season  == seasonNum && 
+               wasDeleted?.episode == episodeNum);
           seasonMap[episodeNum] = 
-              {error, played, avail, noFile, unaired, deleted};
+              {error, played, avail,
+               noFile, unaired, deleted};
         }
       }
       this.seriesMapSeasons = 
            seriesMapSeasons.filter(x => x !== null);
       this.seriesMapEpis = 
-           seriesMapEpis.filter(x => x !== null);
+           seriesMapEpis   .filter(x => x !== null);
       this.seriesMap = seriesMap;
       this.saveVisShow(show.Name);
     },
@@ -908,28 +908,8 @@ export default {
           this.saveVisShow(name);
         }
         this.scrollToSavedShow();
-
-        // let showIdx = 0;
-        // const intvl = setInterval(async () => {
-        //   while(showIdx < allShows.length) {
-        //     if(showIdx % 10 == 0) 
-        //       console.log(new Date().toISOString(), 
-        //                  'showIdx:', showIdx);
-        //     // if(Math.random() < 0.75) break;
-        //     const show = allShows[showIdx++];
-        //     const remotes = await tvdb.getRemotes(show.Name);
-        //     if(!remotes) continue;
-        //     const [_remotes, cached] = remotes
-        //     if(cached) continue;
-        //     break;
-        //   }
-        //   if(showIdx == allShows.length) {
-        //      clearInterval(intvl);
-        //      console.log('load remotes done:', showIdx);
-        //   }
-        // }, 30*1000);
-
-      } catch (err) {
+      } 
+      catch (err) {
         showErr("Mounted:", err);
       }
     })();

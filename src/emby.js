@@ -5,7 +5,7 @@ import * as urls from "./urls.js";
 import * as util from "./util.js";
 
 const seasonsWorker = 
-  new Worker(new URL('seasons-worker.js', import.meta.url), 
+  new Worker(new URL('gap-worker.js', import.meta.url), 
               {type: 'module'});
 
 const name      = "mark";
@@ -247,11 +247,9 @@ export async function deleteShowFromEmby(show) {
 
 const deleteOneFile = async (path) => {
   if(!path) return;
-  const encodedPath = encodeURI(path) .replaceAll('/', '@')
-                                      .replaceAll('?', '~');
   console.log('deleting file:', path);
   try {
-    await srvr.deletePath(encodedPath);
+    await srvr.deletePath(path);
   }
   catch (e) {
     showErr('deletePath:', path, e);
@@ -382,14 +380,13 @@ export const getSeriesMap = async (show, prune = false) => {
       const avail   =   episodeRec?.LocationType != "Virtual";
       const unaired = !!unairedObj[episodeNumber];
 
-      let deleted = false;
-
       if(avail && !path) {
         showErr('avail without path', 
                  `S${seasonNumber}E${episodeNumber}`);
         continue;
       }
 
+      let deleted = false;
       if(pruning) {
         if(!played && avail) pruning = false;
         else {
@@ -398,15 +395,10 @@ export const getSeriesMap = async (show, prune = false) => {
         }
       }
 
-      let error   = false;
-      let missing = false;
-
-      if(seasonNumber  == show.GapSeason  &&
-         episodeNumber == show.GapEpisode &&
-         (show.WatchGap || show.Missing || show.Waiting)) {
-        error = true;
-        missing = show.Missing;
-      }
+      const error = 
+          (seasonNumber  == show.GapSeason  &&
+           episodeNumber == show.GapEpisode &&
+          (show.WatchGap || show.Missing || show.Waiting));
 
       episodes.push([episodeNumber, 
           {error, played, avail, noFile:!path && !unaired, 

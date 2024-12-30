@@ -56,17 +56,17 @@ export async function loadAllShows(gapCache) {
   const rejPromise    = srvr.getRejects();
   const pkupPromise   = srvr.getPickups();
   const noEmbyPromise = srvr.getNoEmbys();
+  const gapPromise    = srvr.getGaps();
 
   const [embyShows, srvrShows, blockedWaitShows, 
-          rejects, pickups, noEmbys] = 
+          rejects, pickups, noEmbys, gaps] = 
     await Promise.all([listPromise, seriesPromise, 
                        waitPromise, rejPromise, pkupPromise, 
-                       noEmbyPromise]);
+                       noEmbyPromise, gapPromise]);
   const shows = [];
 
 ////////// get shows from emby ////////////
-// includes id, name, dates, haveShows, favorites, etc.
-
+// includes id, name, dates, haveShows, favorites, gaps, etc.
   for(let key in embyShows.data.Items) {
     let show = embyShows.data.Items[key];
 
@@ -77,21 +77,34 @@ export async function loadAllShows(gapCache) {
     }
     const embyPath     = show.Path.split('/').pop();
     const showDateSize = srvrShows[embyPath];
-    if(!showDateSize) continue
+    if(!showDateSize) {
+      show.NoFiles = true;
+      show.Date = '2017-12-05';
+      show.Size = 0;
+    }
+    else {
+      const [date, size] = showDateSize;
+      show.Date = date;
+      show.Size = size;
+    }
 
-    const [date, size] = showDateSize;
-    show.Date = date;
-    show.Size = size;
     if(!show.DateCreated) show.DateCreated = show.Date;
 
-    const gapData = gapCache[show.Id];
-    if(gapData) Object.assign(show, gapData);
+    const gapData = gaps[show.Id];
+    if(gapData) {
+      Object.assign(show, gapData);
+      delete gaps[show.Id];
+    }
 
-    if(show.Date) shows.push(show);
+    shows.push(show);
+  }
+
+////////  remove gaps with no matching show /////////
+  for(const gapId in gaps) {
+    await srvr.delGap(gapId);
   }
 
 //////////  add noemby shows from srvr ////////////
-
   for(const noEmbyShow of noEmbys) {
     const idx = shows.findIndex(
                   (show) => show.Name == noEmbyShow.Name);
@@ -103,7 +116,6 @@ export async function loadAllShows(gapCache) {
   }
 
 //////////  process blockedWaitShows from srvr ////////////
-
   for(let blockedWaitName of blockedWaitShows) {
     const i = shows.findIndex((show) => show.Name == blockedWaitName);
     if(i > -1) await getWaitStr(shows[i]);
@@ -227,7 +239,8 @@ export async function getWaitStr(show) {
     if(tvdbData) return tvdbData.waitStr;
     else         return '';
   } catch(e) {
-    console.log('getWaitStr, tvdb data error:', show.Name, e);
+    console.error(
+            'getWaitStr, tvdb data error:', show.Name, e);
     return '';
   }
 }

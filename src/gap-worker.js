@@ -114,17 +114,17 @@ self.onmessage = async (event) => {
   const allShowsIdName = event.data.allShowsIdName;
   const startTime      = Date.now();
   console.log(
-      `seasons-worker started, ${allShowsIdName.length} shows`);
+      `gap-worker started, ${allShowsIdName.length} shows`);
   for (let i = 0; i < allShowsIdName.length; i++) {
     const [showId, showName] = allShowsIdName[i];
     const {seasonNum, episodeNum, watchGap, missing, waiting} = 
            await getActiveSeason(showId, showName);
     const progress = Math.ceil( (i+1) * 100 / allShowsIdName.length );
 
-    self.postMessage({showId, progress, 
-                      done: i == allShowsIdName.length-1,
-                      seasonNum, episodeNum, 
-                      watchGap, missing, waiting});
+    if(watchGap || missing || waiting || progress === 100)
+      self.postMessage({showId, progress,
+                        seasonNum, episodeNum, 
+                        watchGap, missing, waiting});
   }
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   console.log(`seasons-worker done, ${elapsed} secs`);

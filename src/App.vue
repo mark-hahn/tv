@@ -238,16 +238,6 @@ let   showErr          = null;
 const errFifo          = [];
 let   openedWindow     = null;
 
-let gapShowIds  = {};
-let gapCache    = {};
-let gapCacheTxt = window.localStorage.getItem("gapCache")
-if(!gapCacheTxt) gapCacheTxt = "{}";
-try {
-  gapCache = JSON.parse(gapCacheTxt);
-} catch(err) {
-  gapCache = {};
-}
-
 export default {
   name: "App",
   components: { FontAwesomeIcon },
@@ -830,46 +820,29 @@ export default {
     },
 
     async addGapToShow(event) {
-      const {showId, progress, done, 
+      const {showId, progress, 
              seasonNum, episodeNum, 
              watchGap, missing, waiting} = event.data;
       this.gapPercent = progress;
-      
+
+      if(!watchGap && !missing && !waiting) return;
       const show = allShows.find((show) => show.Id == showId);
       if(!show) return;
 
-      gapShowIds[showId] = true;
+      const blockedWait = blockedWaitShows.includes(show.Name);
 
-      const gapData = {};
-      const blockedWait  = blockedWaitShows.includes(show.Name);
-      gapData.GapSeason  = seasonNum;
-      gapData.GapEpisode = episodeNum;
-      gapData.WatchGap   = watchGap; 
-      gapData.Missing    = missing;
-      gapData.Waiting    = !blockedWait && waiting;
-      gapData.ShowId     = showId;
-      gapData.WaitStr    = await emby.getWaitStr(show);
-      Object.assign(show, gapData);
-      gapCache[showId]  = gapData;
-
-      // if(watchGap || missing || waiting) {
-      //   console.log('addGapsToShow:', show);
-
-      await emby.getWaitStr(show);
-
-      if(done) {
-        gapCacheLoop:
-        for(let gapCacheId in gapCache) {
-          for(let show of allShows) {
-            if(show.Id == gapCacheId) 
-                continue gapCacheLoop;
-          }
-          delete gapCache[gapCacheId];
-        }
-        window.localStorage.setItem("gapCache", 
-                             JSON.stringify(gapCache));
-      }
-    },
+      const gap = {};
+      gap.ShowId     = showId;
+      gap.GapSeason  = seasonNum;
+      gap.GapEpisode = episodeNum;
+      gap.WatchGap   = watchGap; 
+      gap.Missing    = missing;
+      gap.Waiting    = !blockedWait && waiting;
+      gap.WaitStr    = await emby.getWaitStr(show);
+      Object.assign(show, gap);
+      const idGapStr = JSON.stringify([show.Id, gap]);
+      await srvr.addGap(idGapStr);
+    }
   },
 
   /////////////////  MOUNTED  /////////////////
@@ -886,7 +859,7 @@ export default {
         await emby.init(showErr);
         tvdb.init(showErr);
 
-        const showsBlocks = await emby.loadAllShows(gapCache);
+        const showsBlocks = await emby.loadAllShows();
         allShows          = showsBlocks.shows;
         this.shows        = allShows;
 

@@ -160,6 +160,13 @@ export function addNoEmby(show)
 export function delNoEmby(name)    
             {return fCall('delNoEmby', name, 'noemby')}
 
+export function getGaps()       
+            {return fCall('getGaps')}
+export function addGap(idGapStr)    
+            {return fCall('addGap', idGapStr, 'gap')}
+export function delGap(gapId)    
+            {return fCall('delGap', gapId, 'gap')}
+
 export function getTvdb(name)      
             {return fCall('getTvdb', name, 'tvdb')}
 export function addTvdb(nameWaitRemsSaved)    

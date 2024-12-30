@@ -6,9 +6,12 @@ reminder, restore ...
 bugs ...
   uneven season lengths break file missing 
           (Interview with the Vampire)
-  missing file gap data not updating (The Great)
+  no hit on tvdb (Daddy Issues)
 
 todo ...
+  if emby show has no files and has pickup, set to noemby
+  files with no emby should be added as pickup if in tvdb
+  show meta on right
   prev/next hilite
   get drama field from tvdb (as many fields as possible)
   put imdb/rotten at top of list

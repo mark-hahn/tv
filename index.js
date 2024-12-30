@@ -358,8 +358,8 @@ const getGaps = (id, _param, resolve, _reject) => {
 };
 
 const addGap = async (id, idGapStr, resolve, _reject) => {
-  console.log('addGap', {id, gapStr});
   const [gapId, gap] = JSON.parse(idGapStr);
+  console.log('addGap', {id, gap});
   gaps[gapId] = gap;
   await fsp.writeFile('data/gaps.json', JSON.stringify(gaps)); 
   resolve([id, 'ok']);
@@ -519,19 +519,17 @@ const wss = new WebSocketServer({ port: 8736 });
 console.log('wss listening on port 8736');
 
 wss.on('connection', (ws, req) => {
-  const clientId = Math.floor(Math.random() * 1e6);
-  console.log(clientId, 'client connected');
-  ws.send(`0~~~ok~~~ws connected: ${clientId}`);
+  console.log('client connected');
 
   ws.on('error', console.error);
 
   ws.on('message', (msg) => {
     msg = msg.toString();
-    // console.log(clientId, 'received:', msg);
+    // console.log('received:', msg);
 
     const parts = /^(.*)~~~(.*)~~~(.*)$/.exec(msg);
     if(!parts) {
-      console.error(clientId, 'skipping bad message:', msg);
+      console.error('skipping bad message:', msg);
       return;
     }
     const [id, fname, param] = parts.slice(1);
@@ -548,13 +546,13 @@ wss.on('connection', (ws, req) => {
 
     promise.then((idResult) => {
       const [id, result] = idResult;
-      // console.log(clientId, 'resolved:', id);
+      // console.log('resolved:', id);
       ws.send(`${id}~~~ok~~~${JSON.stringify(result)}`); 
     })
     .catch((idError) => {
-      console.log(clientId, 'idResult err:', {idError});
+      console.log('idResult err:', {idError});
       const [id, error] = idError;
-      console.log(clientId, 'rejected:', id);
+      console.log('rejected:', id);
       ws.send(`${id}~~~err~~~${JSON.stringify(error)}`); 
     });
 
@@ -599,5 +597,5 @@ wss.on('connection', (ws, req) => {
     };
   });
  
-  ws.on('close', () => console.log(clientId, 'wss closed'));
+  ws.on('close', () => console.log('wss closed'));
 });

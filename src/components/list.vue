@@ -246,7 +246,7 @@ export default {
 
     const toggleWaiting = async (show) => {
       // console.log("toggleWaiting", show.Name);
-      this.saveVisShow(show.Name);
+      this.saveVisShow(show);
 
       if(show.Waiting) {
         show.Waiting = false;
@@ -261,7 +261,7 @@ export default {
     const toggleToTry = async (show) => {
       if(show.Id.startsWith("noemby-") &&
            !show.InToTry) return;
-      this.saveVisShow(show.Name);
+      this.saveVisShow(show);
       show.InToTry = !show.InToTry;
       emby.saveToTry(show.Id, show.InToTry)
           .catch((err) => {
@@ -274,7 +274,7 @@ export default {
     const toggleContinue = async (show) => {
       if(show.Id.startsWith("noemby-") &&
            !show.InContinue) return;
-      this.saveVisShow(show.Name);
+      this.saveVisShow(show);
       show.InContinue = !show.InContinue;
       emby.saveContinue(show.Id, show.InContinue)
           .catch((err) => {
@@ -287,7 +287,7 @@ export default {
     const toggleMark = async (show) => {
       if(show.Id.startsWith("noemby-") &&
            !show.InMark) return;
-      this.saveVisShow(show.Name);
+      this.saveVisShow(show);
       show.InMark = !show.InMark;
       emby.saveMark(show.Id, show.InMark)
           .catch((err) => {
@@ -300,7 +300,7 @@ export default {
     const toggleLinda = async (show) => {
       if(show.Id.startsWith("noemby-") &&
            !show.InLinda) return;
-      this.saveVisShow(show.Name);
+      this.saveVisShow(show);
       show.InLinda = !show.InLinda;
       emby.saveLinda(show.Id, show.InLinda)
           .catch((err) => {
@@ -313,7 +313,7 @@ export default {
     const toggleFavorite = async (show) => {
       if(show.Id.startsWith("noemby-") &&
            !show.IsFavorite) return
-      this.saveVisShow(show.Name);
+      this.saveVisShow(show);
       show.IsFavorite = !show.IsFavorite;
       emby.saveFav(show.Id, show.IsFavorite)
           .catch((err) => {
@@ -324,7 +324,7 @@ export default {
     };
 
     const toggleReject = async (show) => {
-      this.saveVisShow(show.Name);
+      this.saveVisShow(show);
       show.Reject = !show.Reject; 
       if(show.Reject) 
            srvr.addReject(show.Name) 
@@ -341,7 +341,7 @@ export default {
     };
 
     const togglePickup = async (show) => {
-      this.saveVisShow(show.Name);
+      this.saveVisShow(show);
       show.Pickup = !show.Pickup;
       if(show.Pickup) 
            srvr.addPickup(show.Name) 
@@ -360,7 +360,7 @@ export default {
     // from dom click
     const deleteShow = async (show) => {
       if(show.Id.startsWith("noemby-")) return;
-      this.saveVisShow(show.Name);
+      this.saveVisShow(show);
       // console.log("delete Show From Emby?", show.Name);
       if (!window.confirm(
           `Do you really want to delete series ${show.Name}?`)) 
@@ -457,7 +457,7 @@ export default {
             let nextShow           = allShows[i+1];
             if(!nextShow) nextShow = allShows[i-1];
             if(!nextShow) break;
-            this.saveVisShow(nextShow.Name);
+            this.saveVisShow(nextShow);
             break;
           }
         }
@@ -470,13 +470,6 @@ export default {
 
     hilite(show) {
       return this.highlightName == show.Name ? "yellow" : "white";
-    },
-
-    setHilite(show) {
-      console.log('setHilite:', show.Name);
-      evtBus.emit('showSelected', show);
-      this.highlightName = show.Name;
-      this.saveVisShow(show.Name);
     },
 
     async addClick () {
@@ -497,9 +490,9 @@ export default {
 
       const matchShow = allShows.find((s) => s.Name == name);
       if(matchShow) {  
-        console.log('Show already exists: ' + matchShow.Name);
-        this.setHilite(matchShow);
-        this.scrollToSavedShow();
+        alert(matchShow.Name + ' already exists.');
+        console.log(matchShow.Name + ' already exists.');
+        this.saveVisShow(matchShow, true);
         return;
       }
 
@@ -526,9 +519,7 @@ export default {
       allShows.unshift(show);
       this.shows.unshift(show);
 
-      this.highlightName = name;
-      this.saveVisShow(name);
-      this.scrollToSavedShow();
+      this.saveVisShow(show, true);
 
       await srvr.addBlockedWait(show.Name);
       await srvr.addNoEmby(show);
@@ -564,9 +555,7 @@ export default {
     topClick() {
       const container = document.querySelector("#shows");
       container.scrollTop = 0;
-      const name = allShows[0].Name;
-      this.highlightName = name;
-      this.saveVisShow(name);
+      this.saveVisShow(allShows[0]);
     },
 
     formatSize (show) {
@@ -593,9 +582,11 @@ export default {
       );
     },
 
-    saveVisShow(name) {
-      this.highlightName = name;
-      window.localStorage.setItem("lastVisShow", name);
+    saveVisShow(show, scroll = false) {
+      this.highlightName = show.Name;
+      window.localStorage.setItem("lastVisShow", show.Name);
+      if(scroll) this.scrollToSavedShow();
+      evtBus.emit('showSelected', show);
     },
 
     async sortClickAdded() {
@@ -627,14 +618,20 @@ export default {
       // this.topClick()
       // console.log("sort by Size");
     },
-
-    scrollToSavedShow() {
+  
+    scrollToSavedShow(saveVis = false) {
       this.$nextTick(() => {
         const name = window.localStorage.getItem("lastVisShow");
-        const id = this.nameHash(name);
-        if (!id) return;
-        this.highlightName = name;
-        // console.log(`srolling ${name} into view`);
+        let defaultShow = false;
+        let show = allShows.find(
+                (shw) => shw.Name == name);
+        if (show === -1) {
+          showErr("scrollToSavedShow: show not found:", name);
+          show = allShows[0];
+          defaultShow = true;
+        }
+        if(saveVis || defaultShow) this.saveVisShow(show);
+        const id = this.nameHash(show.Name);
         const ele = document.getElementById(id);
         if (ele) ele.scrollIntoView({block: "center"});
       });
@@ -643,7 +640,7 @@ export default {
     async copyNameToClipboard(show) {
       console.log(`copying ${show.Name} to clipboard`);
       await navigator.clipboard.writeText(show.Name);
-      this.saveVisShow(show.Name);
+      this.saveVisShow(show);
     },
 
     async episodeClick(e, show, season, episode) {
@@ -668,16 +665,15 @@ export default {
         await this.remotesAction('close');
       }
       else {
-        this.setHilite(show);
         this.remoteShowName = show.Name;
-        this.saveVisShow(show.Name);    
+        this.saveVisShow(show);    
         await this.remotesAction('open', null, show);
       }
     },
 
     async waitStrClick(show) {
       console.log("waitStrClick", show.Name);
-      this.saveVisShow(show.Name);
+      this.saveVisShow(show);
       if (show.WaitStr?.length > 0) {
         show.Waiting = true;
         srvr.delBlockedWait(show.Name); 
@@ -756,7 +752,7 @@ export default {
       this.seriesMapEpis = 
            seriesMapEpis   .filter(x => x !== null);
       this.seriesMap = seriesMap;
-      this.saveVisShow(show.Name);
+      this.saveVisShow(show);
     },
 
     condFltrClick(cond) {
@@ -807,7 +803,7 @@ export default {
         return true;
       });
       if (this.shows.length === 1) 
-        this.setHilite(this.shows[0]);
+        this.saveVisShow(this.shows[0]);
       if (scroll) this.scrollToSavedShow();
     },
 
@@ -878,12 +874,9 @@ export default {
         this.showAll(true);
 
         const name = window.localStorage.getItem("lastVisShow");
-        if (!name) {
-          const name = allShows[0].Name;
-          this.highlightName = name;
-          this.saveVisShow(name);
-        }
-        this.scrollToSavedShow();
+        if (!name)   window.localStorage.setItem("lastVisShow",
+                       allShows[0].Name);
+        this.scrollToSavedShow(true);
       } 
       catch (err) {
         showErr("Mounted:", err);

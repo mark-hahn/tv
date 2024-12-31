@@ -1,6 +1,6 @@
 <template lang="pug">
 
-#list(style=`width:60%; height:95dvh; 
+#list(style=`height:95dvh; 
                  padding:0; margin:0;
                  display:flex; flex-direction:column;
                  align-items:center;`)
@@ -217,6 +217,7 @@ import * as tvdb from "../tvdb.js";
 import * as urls from "../urls.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
+import    evtBus from '../evtBus.js';
 
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library }         from "@fortawesome/fontawesome-svg-core";
@@ -241,7 +242,6 @@ let   openedWindow     = null;
 export default {
   name: "List",
   components: { FontAwesomeIcon },
-  inject: ['evtBus'],
   data() {
 
     const toggleWaiting = async (show) => {
@@ -474,7 +474,7 @@ export default {
 
     setHilite(show) {
       console.log('setHilite:', show.Name);
-      this.evtBus.emit('showSelected', show);
+      evtBus.emit('showSelected', show);
       this.highlightName = show.Name;
       this.saveVisShow(show.Name);
     },

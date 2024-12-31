@@ -1,37 +1,56 @@
 <template lang="pug">
 
-#meta(style=`width:40%; height:95dvh;
+#meta(style=`height:95dvh;
                  padding:0; margin:0; display:flex;`)
-  div(style=`border:0.5px solid gray;`) {{show}}
-
+  div(style=`border:0.5px solid gray;`) name: {{show.Name}}
+  #poster()
 </template>
 
 <script>
-const imgNames = ['clearlogo', 'landscape', 'poster'];
-const imgUrl = (show, imgName) =>
-        `https://hahnca.com/tv/${encodeURI(show.Name)}/${imgName}`
-//- console.log(imgUrl({Name: 'Dollface'}, 'clearlogo.png'));
+import evtBus from '../evtBus.js';
+
+const images = ['/poster.jpg', '/landscape.jpg', '/clearlogo.png'];
 
 export default {
   name: "Meta",
-  components: {},
-  inject: ['evtBus'],
-
   data() {
     return {
-      show: '<No Show Selected>',
+      show: {Name:'<No Show Selected>'},
     }
   },
   
   methods: {
-  
-    mounted() {
-      this.evtBus.on('showSelected', (show) => { 
-        console.log('Meta: showSelected:', show);
-        this.show = show;
-      });
-    }
-
+    setPoster() {
+      const img = new Image();
+      let imgIdx = 0;
+      const tryImg = () => {
+        console.log('Meta: trying img:',  images[imgIdx]);
+        img.src = 'https://hahnca.com/tv/' +
+              encodeURI(this.show.Name) + images[imgIdx]; 
+      };
+      tryImg();
+      img.onload = () => {
+        console.log('Meta: showing img:',  images[imgIdx]);
+        document.getElementById('poster').replaceChildren(img);
+      };
+      img.onerror = () => {
+        console.log('Meta: no img:',  images[imgIdx]);
+        if(++imgIdx == images.length) {
+          console.log('Meta: no image found');
+          return;
+        }
+        tryImg();
+      };
+    },
   },
+
+  mounted() {
+    evtBus.on('showSelected', (show) => { 
+      console.log('Meta: showSelected:', show.Name);
+      this.show = show;
+      this.setPoster();
+    });
+  },
+    
 };
 </script>

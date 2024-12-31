@@ -7,8 +7,9 @@ bugs ...
   uneven season lengths break file missing 
           (Interview with the Vampire)
   no hit on tvdb (Daddy Issues)
-
+  
 todo ...
+  chg no show in tvdb err to pop-up notification
   if emby show has no files and has pickup, set to noemby
   files with no emby should be added as pickup if in tvdb
   show meta on right
@@ -32,6 +33,9 @@ tabled ...
 */
 
 import {createApp} from 'vue'
-import App from './App.vue'
+import App         from './App.vue'
+import mitt        from 'mitt'     
 
-createApp(App).mount('#app');
+const app = createApp(App);
+app.provide('evtBus', mitt()); 
+app.mount('#app')

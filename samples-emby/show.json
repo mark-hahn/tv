@@ -1,0 +1,161 @@
+{
+    "Name": "Acapulco (2021)",
+    "ServerId": "ae3349983dbe45d9aa1d317a7753483e",
+    "Id": "4759942",
+    "DateCreated": "2024-05-15",
+    "PremiereDate": "2021-10-08",
+    "ExternalUrls": [
+        {
+            "Name": "IMDb",
+            "Url": "https://www.imdb.com/title/tt13567344"
+        },
+        {
+            "Name": "MovieDb",
+            "Url": "https://www.themoviedb.org/tv/133727"
+        },
+        {
+            "Name": "TheTVDB",
+            "Url": "https://thetvdb.com/?tab=series&id=393155"
+        },
+        {
+            "Name": "Trakt",
+            "Url": "https://trakt.tv/search/tmdb/133727?id_type=show"
+        }
+    ],
+    "Path": "/mnt/media/tv/Acapulco (2021)",
+    "Overview": "A young Mexican man's dream comes true when he gets the job of a lifetime at the hottest resort in Acapulco. But he soon realizes the job is far more complicated than he ever imagined as all of his beliefs and morals start to be questioned.",
+    "Genres": [
+        "Comedy"
+    ],
+    "ProviderIds": {
+        "Tvdb": "393155",
+        "EIDR": "10.5240/CC4F-E170-4CBD-3BC7-F241-L",
+        "Official Website": "https://tv.apple.com/show/umc.cmc.8xrkg9zywke7g6a9ahmvpr3l",
+        "TV Maze": "52193",
+        "Wikidata": "Q106639092",
+        "IMDB": "tt13567344",
+        "Tmdb": "133727"
+    },
+    "IsFolder": true,
+    "Type": "Series",
+    "People": [
+        {
+            "Name": "Eugenio Derbez",
+            "Id": "4759966",
+            "Role": "Máximo Gallardo",
+            "Type": "Actor",
+            "PrimaryImageTag": "7492d5296f4cfc110ac2cd915ae36009"
+        },
+        {
+            "Name": "Enrique Arrizon",
+            "Id": "4759967",
+            "Role": "Máximo Gallardo (Young)",
+            "Type": "Actor",
+            "PrimaryImageTag": "329ed412128c98d506e1c1fde6cb2476"
+        },
+        {
+            "Name": "Damián Alcázar",
+            "Id": "4759968",
+            "Role": "Don Pablo",
+            "Type": "Actor",
+            "PrimaryImageTag": "49e38f3a2868014b892d9505855219ea"
+        },
+        {
+            "Name": "Jessica Collins",
+            "Id": "774036",
+            "Role": "Diane",
+            "Type": "Actor",
+            "PrimaryImageTag": "19255168469138ad0305193ffdcecc99"
+        },
+        {
+            "Name": "Camila Perez",
+            "Id": "4759969",
+            "Role": "Julia",
+            "Type": "Actor",
+            "PrimaryImageTag": "75afa5c83f384ce256d64fab8e5d2a79"
+        },
+        {
+            "Name": "Chord Overstreet",
+            "Id": "4759970",
+            "Role": "Chad",
+            "Type": "Actor",
+            "PrimaryImageTag": "e69b34e5aead3e51f42cb6bf5b7a0f15"
+        },
+        {
+            "Name": "Fernando Carsa",
+            "Id": "4759971",
+            "Role": "Memo",
+            "Type": "Actor",
+            "PrimaryImageTag": "4be946e02d59045821fd42072be04acf"
+        },
+        {
+            "Name": "Vanessa Bauche",
+            "Id": "4759972",
+            "Role": "Nora",
+            "Type": "Actor",
+            "PrimaryImageTag": "db7e7d9a431e6b7ede6dd8d34cf161bf"
+        },
+        {
+            "Name": "Regina Reynoso",
+            "Id": "4759973",
+            "Role": "Sara",
+            "Type": "Actor",
+            "PrimaryImageTag": "f0272e4bcc6d5f8348b9878d0d08b023"
+        },
+        {
+            "Name": "Rafael Cebrián",
+            "Id": "4759974",
+            "Role": "Hector",
+            "Type": "Actor",
+            "PrimaryImageTag": "9d05ec6225cf803cf8831f7756193171"
+        },
+        {
+            "Name": "Raphael Alejandro",
+            "Id": "4759975",
+            "Role": "Hugo",
+            "Type": "Actor",
+            "PrimaryImageTag": "208058387c7fa20578884065a5e665d1"
+        },
+        {
+            "Name": "Carlos Corona",
+            "Id": "4759976",
+            "Role": "Esteban",
+            "Type": "Actor",
+            "PrimaryImageTag": "f4412dd26d3a75b113c56e95f3b1abbe"
+        },
+        {
+            "Name": "Jessica Ann Collins",
+            "Id": "4759977",
+            "Role": "Diane",
+            "Type": "Actor",
+            "PrimaryImageTag": "76a458bd853ce676b8c0cb6947bdaa0e"
+        }
+    ],
+    "GenreItems": [
+        {
+            "Name": "Comedy",
+            "Id": 8009
+        }
+    ],
+    "AirDays": [],
+    "ImageTags": {
+        "Primary": "699304709bb8752ecbe67a2601c01514",
+        "Logo": "9edd0cc08f2d67c7cb9bd088b53e0e63",
+        "Thumb": "64f49a5c32a13e3832672391b9457c23"
+    },
+    "BackdropImageTags": [
+        "40c0a1a40ad10cf72d034bdf66271cf5"
+    ],
+    "UnplayedItemCount": 0,
+    "PlaybackPositionTicks": 0,
+    "PlayCount": 0,
+    "IsFavorite": true,
+    "Played": true,
+    "Date": "2024-07-01",
+    "Size": 4299407,
+    "InToTry": false,
+    "InContinue": false,
+    "InMark": false,
+    "InLinda": false,
+    "Pickup": true
+}

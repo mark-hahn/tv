@@ -1,9 +1,15 @@
 <template lang="pug">
 
-#meta(style=`height:95dvh;
-                 padding:0; margin:0; display:flex;`)
-  div(style=`border:0.5px solid gray;`) name: {{show.Name}}
-  #poster()
+#meta(style=`height:95dvh; padding:0; margin:0; 
+              display:flex; flex-direction:column;
+              padding:5px;`)
+
+  #top(style=`display:flex; flex-direction:row`)
+    #poster()
+    #toprgt()
+
+  #bot(style=``) {{show.Overview}}
+
 </template>
 
 <script>
@@ -78,7 +84,7 @@ export default {
           tryEmbyImg();
         }
         else {
-          img.src = 'https://hahnca.com/tv/no-image.png'; 
+          img.src = 'https://hahnca.com/tv/no-image-icon-23485.png'; 
           // console.log( `Meta default img: ` + img.src);
           return;
         }

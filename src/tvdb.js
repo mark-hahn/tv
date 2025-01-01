@@ -37,10 +37,21 @@ const getToken = async () => {
 
 const getRemote = async (tvdbRemote) => {
   let {id, type, sourceName:name} = tvdbRemote;
-  let url ='';  
+  let url     = null;  
+  let ratings = null;
+  let urlRatings;
   switch (type) {
-    case 2:  url = `https://www.imdb.com/title/${id}`; break;
+    case 2:  
+      name = 'IMDB';
+      url = `https://www.imdb.com/title/${id}`;
+      urlRatings = await srvr.getUrls(
+            `99||https://www.rottentomatoes.com/search` +
+            `?search=${encodeURI(id)}`);
+      ratings = urlRatings.ratings;
+      break;
+
     case 4:  name = 'Official Website'; url = id; break;
+
     // case 7:   url = `https://www.reddit.com/r/${id}`; break;
     // case 8:   url = id; name = 'Instagram'; break;
     // case 9:   url = `https://www.instagram.com/${id}`; break;
@@ -50,28 +61,36 @@ const getRemote = async (tvdbRemote) => {
     //                 `?language=en-US`;
     //          break;
     // case 13: name = 'EIDR'; continue;
-    case 18: name = 'Wikipedia';
-              url = await srvr.getUrls(
-              `18||https://www.wikidata.org/wiki/${id}`);
-              break;
+
+    case 18: 
+      name = 'Wikipedia';
+      urlRatings = await srvr.getUrls(
+                  `18||https://www.wikidata.org/wiki/${id}`);
+      url = urlRatings.url;
+      break;
+      
     // case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
+
     case 99:  
-      url = await srvr.getUrls(
+      urlRatings = await srvr.getUrls(
               `99||https://www.rottentomatoes.com/search` +
               `?search=${encodeURI(id)}`);
-      console.log(`getRemote, rotten: ${name}, ${url}`);
+      url     = urlRatings.url;
+      ratings = urlRatings.ratings;
+      console.log(`getRemote, rotten: ` +
+                  `${name}, ${url}, ${ratings}`);
       break;
     default: return null;
   }
   if(!url) {
-    console.log(`getRemote, no url: ${showName}, ${name} ${url}`);
+    console.log(`getRemote, no url: ${name}`);
     return null;
   }
   if(url.startsWith('no match:')) {
-    console.log(`getRemote, no match: ${showName}, ${name}, ${url}`);
+    console.log(`getRemote, no match: ${name}`);
     return null;
   }
-  return {name, url};
+  return {name, url, ratings};
 }
 
 ///////////// get remotes  //////////////

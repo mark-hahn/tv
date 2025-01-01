@@ -139,7 +139,7 @@
   #remotes(v-if="remotes.length" 
         style=`width:200px; background-color:#eee; padding:20px;
                border: 1px solid black; position: fixed; 
-               left: 55%; top: 200px;
+               left: 41%; top: 150px;
                display:flex; flex-direction:column;`) 
     div(style=`text-align:center;
                margin-bottom:12px; font-weight:bold;`) 

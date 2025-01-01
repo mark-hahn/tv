@@ -43,10 +43,9 @@ const getRemote = async (tvdbRemote) => {
   switch (type) {
     case 2:  
       name = 'IMDB';
-      url = `https://www.imdb.com/title/${id}`;
-      urlRatings = await srvr.getUrls(
-            `99||https://www.rottentomatoes.com/search` +
-            `?search=${encodeURI(id)}`);
+      url  = `https://www.imdb.com/title/${id}`;
+      urlRatings = await srvr.getUrls(`2||${url}` +
+                       `?search=${encodeURI(id)}`);
       ratings = urlRatings.ratings;
       break;
 
@@ -90,6 +89,7 @@ const getRemote = async (tvdbRemote) => {
     console.log(`getRemote, no match: ${name}`);
     return null;
   }
+  console.log(`getRemote`, {name, url, ratings});
   return {name, url, ratings};
 }
 

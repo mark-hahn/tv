@@ -46,11 +46,11 @@ export default {
       const trySrvrImg = () => {
         img.src = 'https://hahnca.com/tv/' +
                      encodeURI(srvrPath) + srvrImages[imgIdx]; 
-        console.log('Meta: trying srvr img:',  img.src);
+        // console.log('Meta: trying srvr img:',  img.src);
       };
       const tryEmbyImg = () => {
         img.src = embyImages[imgIdx-srvrImages.length]; 
-        console.log('Meta: trying emby img:',  img.src);
+        // console.log('Meta: trying emby img:',  img.src);
       }
 
       if(showPath) {
@@ -64,7 +64,7 @@ export default {
       }
 
       img.onload = () => {
-        console.log('Meta showing img:',  img.src);
+        // console.log('Meta showing img:',  img.src);
         document.getElementById('poster').replaceChildren(img);
       };
 
@@ -79,7 +79,7 @@ export default {
         }
         else {
           img.src = 'https://hahnca.com/tv/no-image.png'; 
-          console.log( `Meta default img: ` + img.src);
+          // console.log( `Meta default img: ` + img.src);
           return;
         }
       };

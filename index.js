@@ -359,7 +359,7 @@ const getGaps = (id, _param, resolve, _reject) => {
 
 const addGap = async (id, idGapStr, resolve, _reject) => {
   const [gapId, gap] = JSON.parse(idGapStr);
-  console.log('addGap', {id, gap});
+  console.log('addGap', id, {showId:id});
   gaps[gapId] = gap;
   await fsp.writeFile('data/gaps.json', JSON.stringify(gaps)); 
   resolve([id, 'ok']);
@@ -557,7 +557,7 @@ wss.on('connection', (ws, req) => {
     });
 
     // call function fname
-    console.log(`call function`, {id, fname, param});
+    // console.log(`call function`, {id, fname, param});
     switch (fname) {
       case 'getAllShows': getAllShows(id, '',   resolve, reject); break;
 

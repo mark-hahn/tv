@@ -112,12 +112,9 @@ export default {
         const name      = this.show.Name;
         const id = this.show.Id;
         this.remotes    = [1];
-        const [remotes] = await tvdb.getRemotes(name);
+        const [remotes] = await tvdb.getRemotes(this.show);
         if(!remotes) this.remotes = [];
         else         this.remotes = remotes;
-        const url = urls.embyPageUrl(id);
-        if(url && !id.startsWith("noemby-"))
-            this.remotes.unshift({name:'Emby', url});
       } catch(err) {
         console.error('setRemotes:', err);
       }

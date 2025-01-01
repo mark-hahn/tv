@@ -1,5 +1,6 @@
 import * as srvr from "./srvr.js";
 import * as util from "./util.js";
+import * as urls from "../urls.js";
 
 const tvdbDataCacheName = "tvdbDataCache2";
 
@@ -35,9 +36,15 @@ const getToken = async () => {
 
 ///////////// get remote (name and url) //////////////
 
-export const getRemotes = async (showName) => {
-  let remotes = await srvr.getRemotes(showName);
+export const getRemotes = async (show) => {
+  const showName = show.Name;
+  const remotes = await srvr.getRemotes(showName);
   if(remotes && !remotes.noMatch) return [remotes, true];
+
+  const tvdbRemotes = [];
+  const url = urls.embyPageUrl(show.Id);
+  if(url && !id.startsWith("noemby-"))
+    tvdbRemotes[0]={name:'Emby', url};
 
   const tvdbData = await getTvdbData(showName);
   if(!tvdbData) {
@@ -46,16 +53,31 @@ export const getRemotes = async (showName) => {
   }
   const {remoteIds} = tvdbData;
   if(!remoteIds || remoteIds.noMatch) {
-    console.log(`getRemotes, no remoteIds: ${showName}`);
+    console.log(`getRemotes, no tvdb remoteIds: ${showName}`);
     return null;
   }
-  // console.log(`getRemotes, remoteIds: ${showName}`, {remoteIds});
-  remoteIds.push({id:showName, type:99, 
-                  sourceName:'Rotten Tomatoes'});
+  const showRemoteId = remoteIds[showName];
+  if(showRemoteId.IMDB) tvdbRemotes.push(showRemoteId.IMDB);
+  if(tvdbRemotes.id == 99)
+    console.log(`getRemotes, no showRemoteId: ${showName}`);
+    return null;
+  }
+
+  // console.log(`getRemotes, tvdbRemotes: ${showName}`, {tvdbRemotes});
+  const imdbIdx      = tvdbRemotes.findIndex((r) => r.type ===  2);
+  const rottenIdx    = tvdbRemotes.findIndex((r) => r.type === 99);
+  const rottenRemote = 
+      {id:showName, type:99, sourceName:'Rotten Tomatoes'}
+    if(imdbIdx !== -1) {
+      tvdbRemotes.splice(imdbIdx+1, 1, rottenRemote);
+    }
+
+  }
+  tvdbRemotes.push();
   remotes     = [];
   const names = {};
-  for(let i=0; i < remoteIds.length; i++) {
-    let {id, type, sourceName:name} = remoteIds[i];    
+  for(let i=0; i < tvdbRemotes.length; i++) {
+    let {id, type, sourceName:name} = tvdbRemotes[i];    
     let url ='';  
     switch (type) {
       case 2:  url = `https://www.imdb.com/title/${id}`; break;
@@ -92,7 +114,7 @@ export const getRemotes = async (showName) => {
     }
     if(names[name]) {
       console.log(
-        `getRemotes, skipping duplicate: ${showName}, ${name} ${url}`,{remoteIds});
+        `getRemotes, skipping duplicate: ${showName}, ${name} ${url}`,{tvdbRemotes});
       continue;
     }
     names[name] = true;
@@ -160,7 +182,7 @@ export const getTvdbData = async (searchStr) => {
 
   let waitStr = '';
   const extResObj  = await extRes.json();
-  const {lastAired:lastAiredIn, remoteIds} = extResObj.data;
+  const {lastAired:lastAiredIn, tvdbRemotes} = extResObj.data;
   if(!lastAiredIn) return null;
   const lastAired     = util.fmtDate(lastAiredIn);
   const today         = util.fmtDate();
@@ -169,8 +191,8 @@ export const getTvdbData = async (searchStr) => {
                         waitStr = `{${lastAiredNoYr}}`;
   const saved = Date.now();
   const nameWaitRemsSave = 
-   `${showName}|||${waitStr}|||${JSON.stringify(remoteIds)}|||${saved}`;
+   `${showName}|||${waitStr}|||${JSON.stringify(tvdbRemotes)}|||${saved}`;
   // console.log("addTvdb:", {showName, nameWaitRemsSave});
   srvr.addTvdb(nameWaitRemsSave);
-  return {showName, waitStr, remoteIds};
+  return {showName, waitStr, tvdbRemotes};
 }

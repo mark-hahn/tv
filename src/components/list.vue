@@ -136,23 +136,6 @@
             font-awesome-icon(:icon="cond.icon"
                 :style="{color:condColor(show,cond)}")
 
-  #remotes(v-if="remotes.length" 
-        style=`width:200px; background-color:#eee; padding:20px;
-               border: 1px solid black; position: fixed; 
-               left: 52%; top: 150px;
-               display:flex; flex-direction:column;`) 
-    div(style=`text-align:center;
-               margin-bottom:12px; font-weight:bold;`) 
-      | {{remoteShowName}}
-    div( v-if="remotes[0] !== 1" 
-         v-for="remote in remotes"
-            style=`margin:3px 10px; padding:10px; 
-                  background-color:white; text-align:center;
-                  border: 1px solid black; font-weight:bold;
-                  cursor:default;`
-          @click="remotesAction('click', remote)") 
-      | {{remote.name}}
-
   #map(v-if="mapShow !== null" 
         style=`background-color:#eee; padding:10px;
                display:flex; flex-direction:column;`)
@@ -214,7 +197,6 @@
 <script>
 import * as emby from "../emby.js";
 import * as tvdb from "../tvdb.js";
-import * as urls from "../urls.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
 import    evtBus from '../evtBus.js';
@@ -384,8 +366,6 @@ export default {
       sortBySize:        false,
       highlightName:        "",
       allShowsLength:        0,
-      remotes:              [],
-      remoteShowName:       "",
       mapShow:            null,
       seriesMapSeasons:     [],
       seriesMapEpis:        [],
@@ -677,39 +657,6 @@ export default {
       if (show.WaitStr?.length > 0) {
         show.Waiting = true;
         srvr.delBlockedWait(show.Name); 
-      }
-    },
-
-    async remotesAction(action, remote, show) {
-      // console.log('remotesAction:', action, show?.Name);
-      switch(action) {
-        case 'open':  
-          try {  
-            const name      = show.Name;
-            this.remotes    = [1];
-            const [remotes] = await tvdb.getRemotes(name);
-            if(!remotes) this.remotes = [];
-            else         this.remotes = remotes;
-            const url = urls.embyPageUrl(show.Id);
-            if(url && !show.Id.startsWith("noemby-"))
-                this.remotes.unshift({name:'Emby', url});
-            this.remotes.push({name:'Close', url:null});
-          } catch(err) {
-            console.error('remotesAction open:', err);
-          }
-          break;
-
-        case 'click':
-          if(openedWindow) openedWindow.close();
-          openedWindow = null;
-          if(!remote.url) this.remotesAction('close');
-          else openedWindow = window.open(remote.url, "_blank");
-          break; 
-
-        case 'close':
-          this.remotes = [];
-          this.remoteShowName = "";
-          break;
       }
     },
 

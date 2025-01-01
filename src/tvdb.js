@@ -59,25 +59,21 @@ export const getRemotes = async (showName) => {
     let url ='';  
     switch (type) {
       case 2:  url = `https://www.imdb.com/title/${id}`; break;
-      case 3:  break;
-      case 4:  name = 'Official Website';
-               url = id; 
-               break;
-      case 7:   url = `https://www.reddit.com/r/${id}`; break;
-      case 8:   url = id; break;
-      case 9:   url = `https://www.instagram.com/${id}`; break;
-      case 11:  url = `https://www.youtube.com/channel/${id}`; break;
-      case 12: name = 'The Movie DB';
-                url = `https://www.themoviedb.org/tv/${id}` +
-                      `?language=en-US`;
-               break;
-      case 13: name = 'EIDR';
-               continue;
+      case 4:  name = 'Official Website'; url = id; break;
+      // case 7:   url = `https://www.reddit.com/r/${id}`; break;
+      // case 8:   url = id; name = 'Instagram'; break;
+      // case 9:   url = `https://www.instagram.com/${id}`; break;
+      // case 11:  url = `https://www.youtube.com/channel/${id}`; break;
+      // case 12: name = 'The Movie DB';
+      //           url = `https://www.themoviedb.org/tv/${id}` +
+      //                 `?language=en-US`;
+      //          break;
+      // case 13: name = 'EIDR'; continue;
       case 18: name = 'Wikipedia';
                url = await srvr.getUrls(
                `18||https://www.wikidata.org/wiki/${id}`);
                break;
-      case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
+      // case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
       case 99:  
         url = await srvr.getUrls(
                 `99||https://www.rottentomatoes.com/search` +

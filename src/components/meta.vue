@@ -7,27 +7,48 @@
   #top(style=`display:flex; flex-direction:row`)
     #poster()
     #toprgt()
+      #remotes(style=`width:200px; margin-left:20px;
+                      display:flex; flex-direction:column;`) 
+        div(style=`text-align:center; font-weight:bold;
+                   margin-bottom:20px;`) {{show.Name}}
+        div( v-if="remotes[0] !== 1" 
+            v-for="remote in remotes"
+            @click="remoteClick(remote)"
+            style=`margin:3px 10px; padding:10px; 
+                   background-color:white; text-align:center;
+                   border: 1px solid black; font-weight:bold;
+                   cursor:default;`)
+          | {{remote.name}}
 
-  #bot(style=``) {{show.Overview}}
+  #bot(style=`font-size:20px; padding:10px;`) {{show.Overview}}
 
 </template>
 
 <script>
 import evtBus from '../evtBus.js';
+import * as urls from "../urls.js";
+import * as tvdb from "../tvdb.js";
 
 export default {
   name: "Meta",
   data() {
     return {
-      show: {Name:'<No Show Selected>'},
+      show:    {Name:'<No Show Selected>'},
+      remotes: [],
     }
   },
   
   methods: {
+
+    async remoteClick(remote) {
+      console.log('Meta: remoteClick:', {remote});
+      const url = remote.url;
+      if(url) window.open(url, 'tv-series');
+    },
+
     setPoster() {
       const show   = this.show;
       let showPath = show.Path;
-      
       const srvrImages = 
          ['/poster.jpg', '/landscape.jpg', '/clearlogo.png'];
       let embyImages = [];
@@ -41,14 +62,11 @@ export default {
               `tag=${show.BackdropImageTags[0]}&quality=70`
           ];
       }
-
       let srvrPath;
       let imgIdx;
-
       const img = new Image();
       img.style.maxWidth  = "300px"; 
       img.style.maxHeight = "400px"; 
-      
       const trySrvrImg = () => {
         img.src = 'https://hahnca.com/tv/' +
                      encodeURI(srvrPath) + srvrImages[imgIdx]; 
@@ -58,7 +76,6 @@ export default {
         img.src = embyImages[imgIdx-srvrImages.length]; 
         // console.log('Meta: trying emby img:',  img.src);
       }
-
       if(showPath) {
         srvrPath = showPath.split('/').pop();
         imgIdx = 0;
@@ -68,12 +85,10 @@ export default {
         imgIdx = srvrImages.length - 1;
         tryEmbyImg();
       }
-
       img.onload = () => {
         // console.log('Meta showing img:',  img.src);
         document.getElementById('poster').replaceChildren(img);
       };
-
       img.onerror = () => {
         // console.log('Meta no img:', img.src);
         if(++imgIdx < srvrImages.length) {
@@ -90,15 +105,35 @@ export default {
         }
       };
     },
+
+    async setRemotes() {
+      this.remoteShowName = this.show.Name;
+      try {
+        const name      = this.show.Name;
+        const id = this.show.Id;
+        this.remotes    = [1];
+        const [remotes] = await tvdb.getRemotes(name);
+        if(!remotes) this.remotes = [];
+        else         this.remotes = remotes;
+        const url = urls.embyPageUrl(id);
+        if(url && !id.startsWith("noemby-"))
+            this.remotes.unshift({name:'Emby', url});
+      } catch(err) {
+        console.error('setRemotes:', err);
+      }
+    },
   },
 
-  mounted() {
-    evtBus.on('showSelected', (show) => { 
+  async mounted() {
+    evtBus.on('showSelected', async (show) => { 
+      this.remotes[0] = 1;
       console.log('Meta: showSelected:', show.Name);
       this.show = show;
       this.setPoster();
+      await this.setRemotes();
     });
   },
     
 };
+
 </script>

@@ -465,6 +465,7 @@ const deletePath = async (id, path, resolve, reject) => {
 const getUrls = async (id, urlReq, resolve, reject) => {
   console.log('getUrls', id, urlReq);
   let [type, url] = urlReq.split('||');
+
   const resp = await fetch(url);
   if (!resp.ok) {
     console.error(`getUrls resp: ${resp.status}`);
@@ -472,7 +473,24 @@ const getUrls = async (id, urlReq, resolve, reject) => {
     return
   }
   const text = await resp.text();
-  if(type == 18) { // wikidata
+
+  if(type == 2) { // IMDB
+    await fsp.writeFile('data/imdb-page.txt', text);
+    let ratings = null;
+    // let parts;
+    // try{
+    //   parts = /lang="en"><a href="(.*?)"\shreflang="en"/i.exec(text);
+    //   if(parts === null) throw 'wikidata parse error';
+    // }
+    // catch (e) {
+    //   reject([id, {type, url, e}]);
+    //   return
+    // }
+    resolve([id, {url: null, ratings}]);
+    return;
+  }
+
+  else if(type == 18) { // wikidata
     let parts;
     try{
       parts = /lang="en"><a href="(.*?)"\shreflang="en"/i.exec(text);
@@ -482,12 +500,12 @@ const getUrls = async (id, urlReq, resolve, reject) => {
       reject([id, {type, url, e}]);
       return
     }
-    resolve([id, parts[1]]);
+    resolve([id, {url:parts[1], ratings:null}]);
     return;
   }
 
   else if(type == 99) { // rotten tomatoes
-    let parts;
+    let parts, ratings = null;
     const rtRegEx = new RegExp(
       '<h2 slot="title" ' +
           'data-qa="search-result-title">TV shows</h2>.*?' +
@@ -506,7 +524,7 @@ const getUrls = async (id, urlReq, resolve, reject) => {
       reject([id, {type, url, e}]);
       return
     }
-    resolve([id, parts[1]]);
+    resolve([id, {url:parts[1], ratings}]);
     return;
   }
 

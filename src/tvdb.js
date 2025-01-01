@@ -1,6 +1,6 @@
 import * as srvr from "./srvr.js";
 import * as util from "./util.js";
-import * as urls from "../urls.js";
+import * as urls from "./urls.js";
 
 const tvdbDataCacheName = "tvdbDataCache2";
 
@@ -33,100 +33,88 @@ const getToken = async () => {
   theTvdbToken = loginJSON.data.token;
 }
 
-
 ///////////// get remote (name and url) //////////////
+
+const getRemote = async (tvdbRemote) => {
+  let {id, type, sourceName:name} = tvdbRemote;
+  let url ='';  
+  switch (type) {
+    case 2:  url = `https://www.imdb.com/title/${id}`; break;
+    case 4:  name = 'Official Website'; url = id; break;
+    // case 7:   url = `https://www.reddit.com/r/${id}`; break;
+    // case 8:   url = id; name = 'Instagram'; break;
+    // case 9:   url = `https://www.instagram.com/${id}`; break;
+    // case 11:  url = `https://www.youtube.com/channel/${id}`; break;
+    // case 12: name = 'The Movie DB';
+    //           url = `https://www.themoviedb.org/tv/${id}` +
+    //                 `?language=en-US`;
+    //          break;
+    // case 13: name = 'EIDR'; continue;
+    case 18: name = 'Wikipedia';
+              url = await srvr.getUrls(
+              `18||https://www.wikidata.org/wiki/${id}`);
+              break;
+    // case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
+    case 99:  
+      url = await srvr.getUrls(
+              `99||https://www.rottentomatoes.com/search` +
+              `?search=${encodeURI(id)}`);
+      console.log(`getRemote, rotten: ${name}, ${url}`);
+      break;
+    default: return null;
+  }
+  if(!url) {
+    console.log(`getRemote, no url: ${showName}, ${name} ${url}`);
+    return null;
+  }
+  if(url.startsWith('no match:')) {
+    console.log(`getRemote, no match: ${showName}, ${name}, ${url}`);
+    return null;
+  }
+  return {name, url};
+}
+
+///////////// get remotes  //////////////
 
 export const getRemotes = async (show) => {
   const showName = show.Name;
-  const remotes = await srvr.getRemotes(showName);
+  const showId   = show.Id;
+  let remotes = await srvr.getRemotes(showName);
   if(remotes && !remotes.noMatch) return [remotes, true];
 
-  const tvdbRemotes = [];
-  const url = urls.embyPageUrl(show.Id);
-  if(url && !id.startsWith("noemby-"))
-    tvdbRemotes[0]={name:'Emby', url};
+  remotes = [];
 
-  const tvdbData = await getTvdbData(showName);
-  if(!tvdbData) {
-    console.log(`getRemotes, no tvdbData: ${showName}`);
+  if(!showId.startsWith("noemby-"))
+    remotes[0] = {name:'Emby', url: urls.embyPageUrl(showId)};
+
+  const tvdbShowData = await getTvdbData(showName);
+  if(!tvdbShowData) {
+    console.log(`getRemotes, no tvdbShowData: ${showName}`);
     return null;
   }
-  const {remoteIds} = tvdbData;
-  if(!remoteIds || remoteIds.noMatch) {
-    console.log(`getRemotes, no tvdb remoteIds: ${showName}`);
-    return null;
-  }
-  const showRemoteId = remoteIds[showName];
-  if(showRemoteId.IMDB) tvdbRemotes.push(showRemoteId.IMDB);
-  if(tvdbRemotes.id == 99)
-    console.log(`getRemotes, no showRemoteId: ${showName}`);
+  const {remoteIds: tvdbShowIds} = tvdbShowData;
+  if(!tvdbShowIds || tvdbShowIds.noMatch) {
+    console.log(`getRemotes, no tvdbShowIds: ${showName}`);
     return null;
   }
 
-  // console.log(`getRemotes, tvdbRemotes: ${showName}`, {tvdbRemotes});
-  const imdbIdx      = tvdbRemotes.findIndex((r) => r.type ===  2);
-  const rottenIdx    = tvdbRemotes.findIndex((r) => r.type === 99);
-  const rottenRemote = 
-      {id:showName, type:99, sourceName:'Rotten Tomatoes'}
-    if(imdbIdx !== -1) {
-      tvdbRemotes.splice(imdbIdx+1, 1, rottenRemote);
-    }
-
+  const remotesByName = {};
+  for(const tvdbShowId of tvdbShowIds) {
+    const remote = await getRemote(tvdbShowId);
+    if(remote) remotesByName[remote.name] = remote;
   }
-  tvdbRemotes.push();
-  remotes     = [];
-  const names = {};
-  for(let i=0; i < tvdbRemotes.length; i++) {
-    let {id, type, sourceName:name} = tvdbRemotes[i];    
-    let url ='';  
-    switch (type) {
-      case 2:  url = `https://www.imdb.com/title/${id}`; break;
-      case 4:  name = 'Official Website'; url = id; break;
-      // case 7:   url = `https://www.reddit.com/r/${id}`; break;
-      // case 8:   url = id; name = 'Instagram'; break;
-      // case 9:   url = `https://www.instagram.com/${id}`; break;
-      // case 11:  url = `https://www.youtube.com/channel/${id}`; break;
-      // case 12: name = 'The Movie DB';
-      //           url = `https://www.themoviedb.org/tv/${id}` +
-      //                 `?language=en-US`;
-      //          break;
-      // case 13: name = 'EIDR'; continue;
-      case 18: name = 'Wikipedia';
-               url = await srvr.getUrls(
-               `18||https://www.wikidata.org/wiki/${id}`);
-               break;
-      // case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
-      case 99:  
-        url = await srvr.getUrls(
-                `99||https://www.rottentomatoes.com/search` +
-                `?search=${encodeURI(id)}`);
-        console.log(`getRemotes, rotten: ${showName}, ${name}, ${url}`);
-        break;
-      default: continue;
-    }
-    if(!url) {
-      console.log(`getRemotes, no url: ${showName}, ${name} ${url}`);
-      continue;
-    }
-    if(url.startsWith('no match:')) {
-      console.log(`getRemotes, no match: ${showName}, ${name}, ${url}`);
-      continue;
-    }
-    if(names[name]) {
-      console.log(
-        `getRemotes, skipping duplicate: ${showName}, ${name} ${url}`,{tvdbRemotes});
-      continue;
-    }
-    names[name] = true;
-    remotes.push({name, url});
+
+  const imdbRemote = remotesByName["IMDB"];
+  if(imdbRemote) remotes.push(imdbRemote);
+
+  const rottenRemote = await getRemote(
+        {id:showName, type:99, sourceName:"Rotten Tomatoes"});
+  if(rottenRemote) remotes.push(rottenRemote);
+
+  for(const [name, remote] of Object.entries(remotesByName)) {
+    if(name !== "IMDB" && name !== "Rotten Tomatoes")
+      remotes.push(remote);
   }
-  remotes.sort((a, b) => 
-            a.name.toLowerCase().replace(/^the /, '') > 
-            b.name.toLowerCase().replace(/^the /, '') ? 1 : -1);
-
-  // console.log("get remotes: ", ${extData.name}, remotes[0].type, remotes[0].name, 
-  //                   remotes[0].name.toLowerCase().replace(/^the /, ''));
-
   srvr.addRemotes(showName + '|||' + JSON.stringify(remotes));
   return [remotes, false];
 }

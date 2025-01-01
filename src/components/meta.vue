@@ -109,8 +109,6 @@ export default {
     async setRemotes() {
       this.remoteShowName = this.show.Name;
       try {
-        const name      = this.show.Name;
-        const id = this.show.Id;
         this.remotes    = [1];
         const [remotes] = await tvdb.getRemotes(this.show);
         if(!remotes) this.remotes = [];

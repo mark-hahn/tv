@@ -382,7 +382,7 @@ const getTvdb = (id, name, resolve, _reject) => {
 };
 
 const addTvdb = async (id, tvdbDataStr, resolve, reject) => {
-  console.log('addTvdb', id, tvdbDataStr);
+  console.log('addTvdb', id);
   let tvdbData;
   try { tvdbData = JSON.parse(tvdbDataStr); }
   catch (e) { reject([id, 'addTvdb: ' + e.message]); return; }

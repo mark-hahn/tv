@@ -71,13 +71,13 @@ const getRemote = async (tvdbRemote) => {
     // case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
 
     case 99:  
+      url = `https://www.rottentomatoes.com/search` +
+                    `?search=${encodeURI(id)}`;
       urlRatings = await srvr.getUrls(
-              `99||https://www.rottentomatoes.com/search` +
-              `?search=${encodeURI(id)}`);
+                    `99||${url}?search=${encodeURI(id)}`);
       url     = urlRatings.url;
-      ratings = urlRatings.ratings;
       console.log(`getRemote, rotten: ` +
-                  `${name}, ${url}, ${ratings}`);
+                  `${name}, ${url}`);
       break;
     default: return null;
   }
@@ -120,6 +120,7 @@ export const getRemotes = async (show) => {
   const remotesByName = {};
   for(const tvdbShowId of tvdbShowIds) {
     const remote = await getRemote(tvdbShowId);
+    if(!remote.ratings) delete remote.ratings;
     if(remote) remotesByName[remote.name] = remote;
   }
 

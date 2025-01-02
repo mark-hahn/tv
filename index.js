@@ -381,20 +381,14 @@ const getTvdb = (id, name, resolve, _reject) => {
   resolve([id, allTvdb[name]]);
 };
 
-const addTvdb = async (id, nameWaitRemsSaved, resolve, reject) => {
-  console.log('addTvdb', id, nameWaitRemsSaved);
-  const [name, waitStr, remoteIdStr, saved] = 
-                                  nameWaitRemsSaved.split('|||');
-  let remoteIds;
-  try {
-    remoteIds = JSON.parse(remoteIdStr);
-  }
-  catch (e) {
-    reject([id, 'addTvdb: '+e.message]);
-    return;
-  }
-  // console.log('addTvdb:', id, nameWaitRemsSaved);
-  allTvdb[name] = {name, waitStr, remoteIds, saved};
+const addTvdb = async (id, tvdbDataStr, resolve, reject) => {
+  console.log('addTvdb', id, tvdbDataStr);
+  let tvdbData;
+  try { tvdbData = JSON.parse(tvdbDataStr); }
+  catch (e) { reject([id, 'addTvdb: ' + e.message]); return; }
+  const name = tvdbData.name;
+  delete tvdbData.name;
+  allTvdb[name] = tvdbData;
   await fsp.writeFile('data/tvdb.json', JSON.stringify(allTvdb)); 
   resolve([id, 'ok']);
 }

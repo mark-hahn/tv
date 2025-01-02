@@ -121,8 +121,9 @@ export default {
                 d.getDate() + '/'     + 
                 d.getFullYear();
       };
+      const show = this.show;
       const tvdbData = 
-          await tvdb.getTvdbData(this.show);
+          await tvdb.getTvdbData(show);
       const {firstAired, lastAired, status} = tvdbData;
       this.dates = fmt(firstAired) + ' -- ' + 
                     fmt(lastAired) + ' (' + status + ')';

@@ -161,6 +161,8 @@ export const srchTvdbData = async (searchStr) => {
   const srchResObj = await srchRes.json();
   if(!srchResObj.data[0]) return null;
 
+  // todo -- popup identify choice
+  
   const name   = srchResObj.data[0].name;
   const tvdbId = srchResObj.data[0].tvdb_id;
   const show = {Name:name, 
@@ -171,6 +173,8 @@ export const srchTvdbData = async (searchStr) => {
 //////////// get TvDb Data //////////////
 
 export const getTvdbData = async (show) => {
+  const name = show.Name;
+
   let tvdbData = await srvr.getTvdb(show.Name);
   if(tvdbData && !tvdbData.noMatch) {
     // console.log("getTvdbData, from cache:", {nameIn});

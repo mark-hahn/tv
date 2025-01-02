@@ -4,6 +4,7 @@ reminder, restore ...
   cache
 
 bugs ...
+  extra shows from getTvdbData
   uneven season lengths break file missing 
           (Interview with the Vampire)
   no hit on tvdb (Daddy Issues)

@@ -144,10 +144,9 @@ export const getRemotes = async (show) => {
 //////////// get TvDb Data //////////////
 
 export const getTvdbData = async (searchStr) => {
-  const nameIn   = searchStr;
-  let   tvdbData = await srvr.getTvdb(nameIn);
-  if(tvdbData) {
-    if(tvdbData.noMatch) return null;
+  const nameIn = searchStr;
+  let tvdbData = await srvr.getTvdb(nameIn);
+  if(tvdbData && !tvdbData.noMatch) {
     // console.log("getTvdbData, from cache:", {nameIn});
     const twoDays = 48*60*60*1000;
     if ((Date.now() - tvdbData.saved) < 
@@ -192,7 +191,7 @@ export const getTvdbData = async (searchStr) => {
   let waitStr = '';
   const extResObj  = await extRes.json();
   const {firstAired, lastAired, nextAired, 
-         tvdbRemotes, status:statusIn} = extResObj.data;
+         remoteIds:tvdbRemotes, status:statusIn} = extResObj.data;
   const status = statusIn.name; // e.g. continuing
 
   let lastAiredTmp = lastAired;

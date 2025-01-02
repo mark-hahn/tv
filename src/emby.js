@@ -117,7 +117,8 @@ export async function loadAllShows(gapCache) {
 
 //////////  process blockedWaitShows from srvr ////////////
   for(let blockedWaitName of blockedWaitShows) {
-    const i = shows.findIndex((show) => show.Name == blockedWaitName);
+    const i = shows.findIndex(
+                (show) => show.Name == blockedWaitName);
     if(i > -1) await getWaitStr(shows[i]);
     else {
       console.log('no show, deleting from blockedWaitShows list:',   
@@ -240,7 +241,7 @@ export async function getWaitStr(show) {
     else         return '';
   } catch(e) {
     console.error(
-            'getWaitStr, tvdb data error:', show.Name, e);
+        'getWaitStr, tvdb data error:', show.Name, e);
     return '';
   }
 }

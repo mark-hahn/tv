@@ -5,8 +5,13 @@
               padding:5px;`)
 
   #top(style=`display:flex; flex-direction:row`)
-    #poster()
-    #toprgt()
+    #topLeft(style=`display:flex; flex-direction:column;
+                    text-align:center;`) 
+      #poster()
+      #dates(style=`font-size:18px; min-height:24px;
+                    margin:10px; font-weight:bold;`)
+        | {{dates}}
+    #topRight(style=`display:flex; flex-direction:column`)
       #remotes(style=`width:200px; margin-left:20px;
                       display:flex; flex-direction:column;`) 
         div(style=`text-align:center; font-weight:bold;
@@ -34,6 +39,8 @@ export default {
   data() {
     return {
       show: {Name:''},
+      dates: '',
+      remoteShowName: '',
       remotes: [],
     }
   },
@@ -46,7 +53,7 @@ export default {
       if(url) window.open(url, 'tv-series');
     },
 
-    setPoster() {
+    async setPoster() {
       const show   = this.show;
       let showPath = show.Path;
       const srvrImages = 
@@ -106,6 +113,21 @@ export default {
       };
     },
 
+    async setDates() {
+      const fmt = (date) => {
+        if(!date) return '';
+        const d = new Date(date);
+        return (d.getMonth()+1) + '/' +
+                d.getDate() + '/'     + 
+                d.getFullYear();
+      };
+      const tvdbData = 
+          await tvdb.getTvdbData(this.show.Name);
+      const {firstAired, lastAired, status} = tvdbData;
+      this.dates = fmt(firstAired) + ' -- ' + 
+                    fmt(lastAired) + ' (' + status + ')';
+    },
+
     async setRemotes() {
       this.remoteShowName = this.show.Name;
       try {
@@ -124,7 +146,8 @@ export default {
       this.remotes[0] = 1;
       console.log('Meta: showSelected:', show.Name);
       this.show = show;
-      this.setPoster();
+      await this.setPoster();
+      await this.setDates();
       await this.setRemotes();
     });
   },

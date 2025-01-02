@@ -459,13 +459,13 @@ const deletePath = async (id, path, resolve, reject) => {
   resolve([id, 'ok']);
 };
 
-const getUrls = async (id, urlReq, resolve, reject) => {
-  console.log('getUrls', id, urlReq);
-  let [type, url] = urlReq.split('||');
+const getUrls = async (id, typeUrlName, resolve, reject) => {
+  console.log('typeUrlName', id, typeUrlName);
+  const [type, url, name] = typeUrlName.split('||');
 
   let resp = await fetch(url);
   if (!resp.ok) {
-    console.error(`getUrls resp: ${urlReq}, ${resp.status}`);
+    console.error(`getUrls resp: ${typeUrlName}, ${resp.status}`);
     reject([id, {type, url}]);
     return
   }
@@ -503,26 +503,40 @@ const getUrls = async (id, urlReq, resolve, reject) => {
   }
 
   else if(type == 99) { // rotten tomatoes
-    let parts, ratings = null;
-    let rtRegEx = new RegExp(
-      '<h2 slot="title" ' +
-          'data-qa="search-result-title">TV shows</h2>.*?' +
-      '<a href="(.*?)".*?' +
-          'data-qa="info-name" slot="title">', 'i');
-    try {
-      parts = rtRegEx.exec(text.replace(/(\r\n|\n|\r)/gm, ""));
-      if(parts === null) {
-        console.log('no rotten match:', {urlReq});
-        resolve([id, 'no match: ' + urlReq]);
+    // await fsp.writeFile('samples/rotten-search.html', 
+    //                       JSON.stringify(text, null, 2));
+                          
+    const pfxNameParts = /^(.*?)(\s+\(.*?\))?$/i.exec(name);
+    if(!pfxNameParts) {
+      console.log('no rotten name pfx match:', name);
+      resolve([id, 'no match: ' + name]);
+      return;
+    }
+    const namePfx = pfxNameParts[1];
+
+    let titleRegx = new RegExp(/search-result-title">TV shows</gm);
+    titleRegx.index = 0;
+    const titleParts = titleRegx.exec(text);
+    if(titleParts === null) {
+      console.log('no rotten title match:', name);
+      resolve([id, 'no match: ' + name]);
+      return;
+    }
+
+    const nameRegx = new RegExp(
+            /<a href="(.*?)".*?data-qa="info-name" slot="title">/gm);
+    nameRegx.index = titleRegx.index;
+    let textName;
+    while(true) {
+      const nameParts = nameRegx.exec(text);
+      if(nameParts === null) {
+        console.log('no rotten name match:', name);
+        resolve([id, 'no match: ' + name]);
         return;
       }
+      textName = nameParts.slice(1);
+      if(textName.startsWith(namePfx)) break;
     }
-    catch (e) {
-      reject([id, {type, urlReq, e}]);
-      return
-    }
-    console.log(`getUrls rotten: parts`, parts.slice(1));
-    url = parts[1];
 
     // const pageUrl = url;
     // console.error(`getUrls page url: ${pageUrl}`);
@@ -552,7 +566,7 @@ const getUrls = async (id, urlReq, resolve, reject) => {
     //   return
     // }
     console.log('geturls rotten', {url});
-    resolve([id, {url, ratings}]);
+    resolve([id, {ur}]);
     return;
   }
 

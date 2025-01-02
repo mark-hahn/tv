@@ -73,11 +73,9 @@ const getRemote = async (tvdbRemote) => {
     case 99:  
       url = `https://www.rottentomatoes.com/search` +
                     `?search=${encodeURI(id)}`;
-      urlRatings = await srvr.getUrls(
-                    `99||${url}?search=${encodeURI(id)}`);
-      url     = urlRatings.url;
-      console.log(`getRemote, rotten: ` +
-                  `${name}, ${url}`);
+      urlRatings = await srvr.getUrls(`99||${url}`);
+      url = urlRatings.url;
+      console.log(`getRemote, rotten: ` + `${name}, ${url}`);
       break;
     default: return null;
   }
@@ -120,15 +118,19 @@ export const getRemotes = async (show) => {
   const remotesByName = {};
   for(const tvdbShowId of tvdbShowIds) {
     const remote = await getRemote(tvdbShowId);
-    if(!remote.ratings) delete remote.ratings;
-    if(remote) remotesByName[remote.name] = remote;
+    if(remote) {
+      if(!remote.ratings) delete remote.ratings;
+      remotesByName[remote.name] = remote;
+    }
   }
 
   const imdbRemote = remotesByName["IMDB"];
+  imdbRemote.name += ' (' + imdbRemote.ratings + ')';
   if(imdbRemote) remotes.push(imdbRemote);
 
   const rottenRemote = await getRemote(
         {id:showName, type:99, sourceName:"Rotten Tomatoes"});
+  if(!rottenRemote.ratings) delete rottenRemote.ratings;
   if(rottenRemote) remotes.push(rottenRemote);
 
   for(const [name, remote] of Object.entries(remotesByName)) {

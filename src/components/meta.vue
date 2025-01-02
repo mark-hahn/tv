@@ -10,7 +10,7 @@
       #remotes(style=`width:200px; margin-left:20px;
                       display:flex; flex-direction:column;`) 
         div(style=`text-align:center; font-weight:bold;
-                   margin-bottom:20px;`) {{show.Name}}
+                   margin-bottom:20px; font-size:20px;`) {{show.Name}}
         div( v-if="remotes[0] !== 1" 
             v-for="remote in remotes"
             @click="remoteClick(remote)"
@@ -33,7 +33,7 @@ export default {
   name: "Meta",
   data() {
     return {
-      show:    {Name:'<No Show Selected>'},
+      show: {Name:''},
       remotes: [],
     }
   },

@@ -338,7 +338,7 @@ const delNoEmby = async (id, name, resolve, reject) => {
   for(const [idx, show] of noEmbys.entries()) {
     if(!show.Name ||
         show.Name.toLowerCase() === name.toLowerCase()) {
-      console.log('deleting existing:', {name, noEmbys});
+      console.log('deleting existing:', name);
       noEmbys.splice(idx, 1);
       deletedOne = true;
       break;
@@ -432,6 +432,9 @@ const addRemotes = async (id, nameRems, resolve, reject) => {
     reject([id, 'addRemotes: '+e.message]);
     return;
   }
+  remotes.forEach((remote) => {
+    if(remote.ratings === null) delete remote.ratings;
+  });
   // console.log('addRemotes', id, name);
   allRemotes[name] = remotes;
   await fsp.writeFile('data/remotes.json', JSON.stringify(allRemotes)); 
@@ -466,27 +469,28 @@ const getUrls = async (id, urlReq, resolve, reject) => {
   console.log('getUrls', id, urlReq);
   let [type, url] = urlReq.split('||');
 
-  const resp = await fetch(url);
+  let resp = await fetch(url);
   if (!resp.ok) {
-    console.error(`getUrls resp: ${resp.status}`);
+    console.error(`getUrls resp: ${urlReq}, ${resp.status}`);
     reject([id, {type, url}]);
     return
   }
   const text = await resp.text();
 
+  console.log('await fetch(url)', text.length);
+
   if(type == 2) { // IMDB
     await fsp.writeFile('data/imdb-page.txt', text);
-    let ratings = null;
-    // let parts;
-    // try{
-    //   parts = /lang="en"><a href="(.*?)"\shreflang="en"/i.exec(text);
-    //   if(parts === null) throw 'wikidata parse error';
-    // }
-    // catch (e) {
-    //   reject([id, {type, url, e}]);
-    //   return
-    // }
-    resolve([id, {url: null, ratings}]);
+    let parts;
+    try{
+      parts = /imUuxf">(\d\.\d)<\/span>/i.exec(text);
+      if(parts === null) throw 'wikidata parse error';
+    }
+    catch (e) {
+      reject([id, {type, url, e}]);
+      return
+    }
+    resolve([id, {ratings:parts[1]}]);
     return;
   }
 
@@ -500,13 +504,13 @@ const getUrls = async (id, urlReq, resolve, reject) => {
       reject([id, {type, url, e}]);
       return
     }
-    resolve([id, {url:parts[1], ratings:null}]);
+    resolve([id, {url:parts[1]}]);
     return;
   }
 
   else if(type == 99) { // rotten tomatoes
     let parts, ratings = null;
-    const rtRegEx = new RegExp(
+    let rtRegEx = new RegExp(
       '<h2 slot="title" ' +
           'data-qa="search-result-title">TV shows</h2>.*?' +
       '<a href="(.*?)".*?' +
@@ -514,8 +518,7 @@ const getUrls = async (id, urlReq, resolve, reject) => {
     try {
       parts = rtRegEx.exec(text.replace(/(\r\n|\n|\r)/gm, ""));
       if(parts === null) {
-        // await fsp.writeFile('data/rotten-parse.txt', text);
-        console.log('no rotten match:', {url, urlReq, text});
+        console.log('no rotten match:', {url, urlReq});
         resolve([id, 'no match: ' + url]);
         return;
       }
@@ -524,7 +527,37 @@ const getUrls = async (id, urlReq, resolve, reject) => {
       reject([id, {type, url, e}]);
       return
     }
-    resolve([id, {url:parts[1], ratings}]);
+    url = parts[1];
+
+    // const pageUrl = url;
+    // console.error(`getUrls page url: ${pageUrl}`);
+    // resp = await fetch(pageUrl);
+    // if (!resp.ok) {
+    //   console.error(`getUrls rotten page resp: ${resp.status}`);
+    //   reject([id, {fetch:'rotten page', pageUrl}]);
+    //   return
+    // }
+    // const pageText = await resp.text();
+    // await fsp.writeFile('data/rotten-page.txt', text);
+
+    // console.log('rotten fetch page text length', pageText.length);
+
+    // rtRegEx = new RegExp('>(\d\d)%<\/rt-text>.*?>(\d\d)%<\/rt-text>');
+    // try {
+    //   parts = rtRegEx.exec(pageText.replace(/(\r\n|\n|\r)/gm, ""));
+    //   if(parts === null) {
+    //     console.log('no rotten page match:', url);
+    //     resolve([id, 'no match: ' + url]);
+    //     return;
+    //   }
+    //   ratings = parts[1] + '/' + parts[2];
+    // }
+    // catch (e) {
+    //   reject([id, {fetch:'rotten page', type, url, e}]);
+    //   return
+    // }
+    console.log('geturls rotten', {url});
+    resolve([id, {url, ratings}]);
     return;
   }
 

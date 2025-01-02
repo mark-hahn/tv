@@ -518,15 +518,16 @@ const getUrls = async (id, urlReq, resolve, reject) => {
     try {
       parts = rtRegEx.exec(text.replace(/(\r\n|\n|\r)/gm, ""));
       if(parts === null) {
-        console.log('no rotten match:', {url, urlReq});
-        resolve([id, 'no match: ' + url]);
+        console.log('no rotten match:', {urlReq});
+        resolve([id, 'no match: ' + urlReq]);
         return;
       }
     }
     catch (e) {
-      reject([id, {type, url, e}]);
+      reject([id, {type, urlReq, e}]);
       return
     }
+    console.log(`getUrls rotten: parts`, parts.slice(1));
     url = parts[1];
 
     // const pageUrl = url;

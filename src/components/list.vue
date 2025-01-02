@@ -461,7 +461,7 @@ export default {
         return;
       }
 
-      const tvdbData = await tvdb.getTvdbData(srchTxt);
+      const tvdbData = await tvdb.srchTvdbData(srchTxt);
       if(!tvdbData) {
         showErr('No series found in tvdb for:', srchTxt);
         return;

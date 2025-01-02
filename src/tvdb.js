@@ -104,7 +104,7 @@ export const getRemotes = async (show) => {
   if(!showId.startsWith("noemby-"))
     remotes[0] = {name:'Emby', url: urls.embyPageUrl(showId)};
 
-  const tvdbdata = await getTvdbData(showName);
+  const tvdbdata = await getTvdbData(show);
   if(!tvdbdata) {
     console.log(`getRemotes, no tvdbdata: ${showName}`);
     return null;
@@ -141,23 +141,11 @@ export const getRemotes = async (show) => {
   return [remotes, false];
 }
 
-//////////// get TvDb Data //////////////
 
-export const getTvdbData = async (searchStr) => {
-  const nameIn = searchStr;
-  let tvdbData = await srvr.getTvdb(nameIn);
-  if(tvdbData && !tvdbData.noMatch) {
-    // console.log("getTvdbData, from cache:", {nameIn});
-    const twoDays = 48*60*60*1000;
-    if ((Date.now() - tvdbData.saved) < 
-        (twoDays + Math.round(Math.random() * twoDays))) {
-      return tvdbData;
-    }
-    else await srvr.delTvdb(nameIn);
-  }
+//////////// search for TvDb Data //////////////
 
+export const srchTvdbData = async (searchStr) => {
   if(!theTvdbToken) await getToken();
-
   const srchUrl = 'https://api4.thetvdb.com/v4/' +
                   'search?type=series&query='    + 
                    encodeURIComponent(searchStr);
@@ -175,7 +163,28 @@ export const getTvdbData = async (searchStr) => {
 
   const name   = srchResObj.data[0].name;
   const tvdbId = srchResObj.data[0].tvdb_id;
+  const show = {Name:name, 
+                ProviderIds: {Tvdb: tvdbId}};
+  return await getTvdbData(show);
+}
 
+//////////// get TvDb Data //////////////
+
+export const getTvdbData = async (show) => {
+  let tvdbData = await srvr.getTvdb(show.Name);
+  if(tvdbData && !tvdbData.noMatch) {
+    // console.log("getTvdbData, from cache:", {nameIn});
+    const twoDays = 48*60*60*1000;
+    if ((Date.now() - tvdbData.saved) < 
+        (twoDays + Math.round(Math.random() * twoDays))) {
+      return tvdbData;
+    }
+    else await srvr.delTvdb(show.Name);
+  }
+
+  if(!theTvdbToken) await getToken();
+
+  const tvdbId = show.ProviderIds.Tvdb;
   const extUrl = 
     `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
   const extRes = await fetch(extUrl,

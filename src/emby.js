@@ -95,7 +95,8 @@ export async function loadAllShows(gapCache) {
       Object.assign(show, gapData);
       delete gaps[show.Id];
     }
-
+    // if(show.Name == 'The Middle') 
+    //     console.log(JSON.stringify(show, null, 2)); 
     shows.push(show);
   }
 
@@ -236,7 +237,7 @@ const lindaCollId    = '4706186';
 
 export async function getWaitStr(show) {
   try {
-    const tvdbData = await tvdb.getTvdbData(show.Name);
+    const tvdbData = await tvdb.getTvdbData(show);
     if(tvdbData) return tvdbData.waitStr;
     else         return '';
   } catch(e) {

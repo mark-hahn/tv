@@ -4,12 +4,16 @@ reminder, restore ...
   cache
 
 bugs ...
-  extra shows from getTvdbData
   uneven season lengths break file missing 
           (Interview with the Vampire)
-  no hit on tvdb (Daddy Issues)
+  add-new broken: no hit on tvdb (Daddy Issues)
+  tvdb.json name blank (the middle)
+  official remote broken (the middle)
+  rotten tomatoes: the middle -> malcom in the middle 
+  alread exists broken ("middle")
   
 todo ...
+  add identify to show search
   chg no show in tvdb err to pop-up notification
   if emby show has no files and has pickup, set to noemby
   files with no emby should be added as pickup if in tvdb

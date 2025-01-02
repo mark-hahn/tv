@@ -104,19 +104,19 @@ export const getRemotes = async (show) => {
   if(!showId.startsWith("noemby-"))
     remotes[0] = {name:'Emby', url: urls.embyPageUrl(showId)};
 
-  const tvdbShowData = await getTvdbData(showName);
-  if(!tvdbShowData) {
-    console.log(`getRemotes, no tvdbShowData: ${showName}`);
+  const tvdbdata = await getTvdbData(showName);
+  if(!tvdbdata) {
+    console.log(`getRemotes, no tvdbdata: ${showName}`);
     return null;
   }
-  const {remoteIds: tvdbShowIds} = tvdbShowData;
-  if(!tvdbShowIds || tvdbShowIds.noMatch) {
-    console.log(`getRemotes, no tvdbShowIds: ${showName}`);
+  const remoteIds = tvdbdata.tvdbRemotes;
+  if(!remoteIds) {
+    console.log(`getRemotes, no remoteIds: ${showName}`);
     return null;
   }
 
   const remotesByName = {};
-  for(const tvdbShowId of tvdbShowIds) {
+  for(const tvdbShowId of remoteIds) {
     const remote = await getRemote(tvdbShowId);
     if(remote) {
       if(!remote.ratings) delete remote.ratings;
@@ -145,7 +145,7 @@ export const getRemotes = async (show) => {
 
 export const getTvdbData = async (searchStr) => {
   const nameIn   = searchStr;
-  const tvdbData = await srvr.getTvdb(nameIn);
+  let   tvdbData = await srvr.getTvdb(nameIn);
   if(tvdbData) {
     if(tvdbData.noMatch) return null;
     // console.log("getTvdbData, from cache:", {nameIn});
@@ -174,9 +174,8 @@ export const getTvdbData = async (searchStr) => {
   const srchResObj = await srchRes.json();
   if(!srchResObj.data[0]) return null;
 
-  // console.log("srchResObj.data[0]:", srchResObj.data[0]);
-  const tvdbId   = srchResObj.data[0].tvdb_id;
-  const showName = srchResObj.data[0].name;
+  const name   = srchResObj.data[0].name;
+  const tvdbId = srchResObj.data[0].tvdb_id;
 
   const extUrl = 
     `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
@@ -192,17 +191,24 @@ export const getTvdbData = async (searchStr) => {
 
   let waitStr = '';
   const extResObj  = await extRes.json();
-  const {lastAired:lastAiredIn, tvdbRemotes} = extResObj.data;
-  if(!lastAiredIn) return null;
-  const lastAired     = util.fmtDate(lastAiredIn);
+  const {firstAired, lastAired, nextAired, 
+         tvdbRemotes, status:statusIn} = extResObj.data;
+  const status = statusIn.name; // e.g. continuing
+
+  let lastAiredTmp = lastAired;
+  if(!lastAiredTmp) return null;
+  const lastAiredDay  = util.fmtDate(lastAiredTmp);
+  const lastAiredNoYr = util.fmtDate(lastAiredTmp, false);
   const today         = util.fmtDate();
-  const lastAiredNoYr = util.fmtDate(lastAiredIn, false);
-  if(lastAiredNoYr && lastAired >= today) 
+  if(lastAiredNoYr && lastAiredDay >= today) 
                         waitStr = `{${lastAiredNoYr}}`;
   const saved = Date.now();
-  const nameWaitRemsSave = 
-   `${showName}|||${waitStr}|||${JSON.stringify(tvdbRemotes)}|||${saved}`;
-  // console.log("addTvdb:", {showName, nameWaitRemsSave});
-  srvr.addTvdb(nameWaitRemsSave);
-  return {showName, waitStr, tvdbRemotes};
+
+  tvdbData = {
+      tvdbId, name, status,
+      firstAired, lastAired, nextAired, 
+      tvdbRemotes, waitStr, saved};
+  console.log("tvdbData:", JSON.stringify(tvdbData, null, 2));
+  srvr.addTvdb(JSON.stringify(tvdbData));
+  return tvdbData;
 }

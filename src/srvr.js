@@ -169,8 +169,8 @@ export function delGap(gapId)
 
 export function getTvdb(name)      
             {return fCall('getTvdb', name, 'tvdb')}
-export function addTvdb(nameWaitRemsSaved)    
-            {return fCall('addTvdb', nameWaitRemsSaved, 'tvdb')}
+export function addTvdb(tvdbData)    
+            {return fCall('addTvdb', tvdbData, 'tvdb')}
 export function delTvdb(name)    
             {return fCall('delTvdb', name, 'tvdb')}
 

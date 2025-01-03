@@ -459,7 +459,7 @@ const deletePath = async (id, path, resolve, reject) => {
 };
 
 const getUrls = async (id, typeUrlName, resolve, reject) => {
-  console.log('typeUrlName', id, typeUrlName);
+  console.log('getUrls', id, typeUrlName);
   const [type, url, name] = typeUrlName.split('||');
 
   let resp = await fetch(url);
@@ -471,8 +471,6 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
   const text = (await resp.text())
                 .replaceAll(/(\r\n|\n|\r)/gm, "")
                 .replaceAll(/\s+/gm, " ");
-
-  console.log('await fetch(url)', text.length);
 
   if(type == 2) { // IMDB
     // await fsp.writeFile('data/imdb-page.txt', text);
@@ -527,7 +525,6 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
       resolve([id, 'no match: ' + {type, url, name}]);
       return;
     }
-    // console.log('\n\ntitleRegx', {namePfx});
 
 // need escaping: ] ( ) [ { } * + ? / $ . | ^ \
 
@@ -547,10 +544,8 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
       let textName;
       [textUrl, textName] = nameParts.slice(1);
       const textNamePfx = stripParenSfx(textName);
-      console.log('rotten compare', {textNamePfx, namePfx});
       if(textNamePfx == namePfx) break;
     }
-    console.log('rotten name url', {name:"Rotten Tomatoes", url:textUrl});
     resolve([id, {name:"Rotten Tomatoes", url:textUrl}]);
     return;
   }

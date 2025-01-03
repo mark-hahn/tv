@@ -90,21 +90,21 @@
                   @click="seriesMapAction('open', show)")
               font-awesome-icon(icon="border-all" style="color:#ccc")
 
-          td(@click="rowClick(show)"
+          td(@click="saveVisShow(show)"
                v-if="sortByNew" 
              :style=`{width:'80px', fontSize:'16px',
                       backgroundColor: hilite(show),
                       cursor:'default'}`) 
             | {{ show.DateCreated }}
             
-          td(@click="rowClick(show)"
+          td(@click="saveVisShow(show)"
                v-if="sortByActivity" 
              :style=`{width:'80px', fontSize:'16px',
                       backgroundColor: hilite(show),
                       cursor:'default'}`) 
             | {{ show.Date }}
 
-          td(@click="rowClick(show)"
+          td(@click="saveVisShow(show)"
              v-if="sortBySize" 
              :style=`{width:'80px', fontSize:'16px', 
                       textAlign:'center',
@@ -117,12 +117,12 @@
 
             div(style=`padding:2px; 
                         fontSize:16px; font-weight:bold;` 
-               @click="rowClick(show)"
+               @click="saveVisShow(show)"
             ) {{show.Name}} 
 
             div(style=`padding:2px; flex-grow:1;
                         fontSize:16px; font-weight:bold;` 
-               @click="rowClick(show)"
+               @click="saveVisShow(show)"
             )
 
             div(v-if="show.WaitStr?.length" 
@@ -137,8 +137,9 @@
                 :style="{color:condColor(show,cond)}")
 
   #map(v-if="mapShow !== null" 
-        style=`background-color:#eee; padding:10px;
-               display:flex; flex-direction:column;`)
+        style=`background-color:#ffe; padding:10px;
+               display:flex; flex-direction:column;
+               position:fixed; top:100px; left:220px; z-index:2`)
     div(style=`margin:0 5px; display:flex; 
                 justify-content:space-between;`)
       div(style=`font-size:20px; margin:6px 20px 0 0;
@@ -637,18 +638,6 @@ export default {
         await emby.editEpisode(show.Id, season, episode);
 
       this.seriesMapAction('', show, deleted);
-    },
-
-    async rowClick(show) {
-      console.log('rowClick:', show.Name);
-      if(show.Name == this.remoteShowName) {
-        await this.remotesAction('close');
-      }
-      else {
-        this.remoteShowName = show.Name;
-        this.saveVisShow(show);    
-        await this.remotesAction('open', null, show);
-      }
     },
 
     async waitStrClick(show) {

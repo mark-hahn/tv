@@ -42,16 +42,16 @@ const fCallQueue = [];
 let   nextId     = 0;
 let   clint      = null;
 
-if(!clint) {
-  clint = setInterval(() => {
-    const length = Object.keys(calls).length;
-    if(length) {
-      let fnameList = '';
-      calls.forEach(call => {fnameList += call.fname + ' '});
-      console.log("pending calls:", fnameList);
-    }
-  }, 5000);
-}
+// if(!clint) {
+//   clint = setInterval(() => {
+//     const length = Object.keys(calls).length;
+//     if(length) {
+//       let fnameList = '';
+//       calls.forEach(call => {fnameList += call.fname + ' '});
+//       console.log("pending calls:", fnameList);
+//     }
+//   }, 5000);
+// }
 
 const fCall = (fname, param, sema4) => {
   if(sema4) { 
@@ -175,8 +175,7 @@ export function delTvdb(name)
             {return fCall('delTvdb', name, 'tvdb')}
 
 export function getRemotes(name)    
-            {console.log('srvr.getRemotes', name);
-            return fCall('getRemotes', name,     'remotes')}
+            {return fCall('getRemotes', name,     'remotes')}
 export function addRemotes(nameRems)    
             {return fCall('addRemotes',  nameRems, 'remotes')}
 export function delRemotes(name)    

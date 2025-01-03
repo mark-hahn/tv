@@ -76,20 +76,20 @@ const getRemote = async (tvdbRemote, showName) => {
       urlRatings = await srvr.getUrls(`99||${url}||${showName}`);
       name = urlRatings.name;
       url  = urlRatings.url;
-      console.log(`getRemote rotten name url: ${name}, ${url}`);
+      // console.log(`getRemote rotten name url: ${name}, ${url}`);
       break;
     default: return null;
   }
   
   if(!url) {
-    console.log(`getRemote, no url: ${name}`);
+    // console.log(`getRemote, no url: ${name}`);
     return null;
   }
   if(url.startsWith('no match:')) {
-    console.log(`getRemote, no match: ${name}`);
+    // console.log(`getRemote, no match: ${name}`);
     return null;
   }
-  console.log(`getRemote`, {name, url, ratings});
+  // console.log(`getRemote`, {name, url, ratings});
   return {name, url, ratings};
 }
 
@@ -197,7 +197,12 @@ export const getTvdbData = async (show) => {
 
   if(!theTvdbToken) await getToken();
 
-  const tvdbId = show.ProviderIds.Tvdb;
+  const tvdbId = show?.ProviderIds?.Tvdb;
+  if(!tvdbId) {
+    console.error(`getTvdbData, no tvdbId:`, {show});
+    return null;
+  }
+  
   const extUrl = 
     `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
   const extRes = await fetch(extUrl,

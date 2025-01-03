@@ -124,6 +124,11 @@ export default {
       const show = this.show;
       const tvdbData = 
           await tvdb.getTvdbData(show);
+      if(!tvdbData) {
+        console.error('Meta: setDates: no tvdbData:', show);
+        this.dates = '';
+        return;
+      }
       const {firstAired, lastAired, status} = tvdbData;
       this.dates = fmt(firstAired) + ' -- ' + 
                     fmt(lastAired) + ' (' + status + ')';

@@ -8,8 +8,10 @@ bugs ...
           (Interview with the Vampire)
   add-new broken: no hit on tvdb (Daddy Issues)
   alread exists broken ("middle")
+  getRemotes, no tvdbdata: No Good Deed
   
 todo ...
+  update imdb rating periodicaly
   find matching name in tvdb search
   add identify to show search
   chg no show in tvdb err to pop-up notification

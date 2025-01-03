@@ -6,15 +6,16 @@ reminder, restore ...
 bugs ...
   uneven season lengths break file missing 
           (Interview with the Vampire)
+  
+add ...
   add-new broken: no hit on tvdb (Daddy Issues)
   alread exists broken ("middle")
-  getRemotes, no tvdbdata: No Good Deed
-  
-todo ...
-  update imdb rating periodicaly
   find matching name in tvdb search
   add identify to show search
   chg no show in tvdb err to pop-up notification
+
+todo ...
+  update imdb rating periodicaly
   if emby show has no files and has pickup, set to noemby
   files with no emby should be added as pickup if in tvdb
   prev/next hilite

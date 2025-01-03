@@ -46,7 +46,7 @@ const getRemote = async (tvdbRemote, showName) => {
       url  = `https://www.imdb.com/title/${id}`;
       urlRatings = await srvr.getUrls(
             `2||${url}?search=${encodeURI(id)}||${showName}`);
-      ratings = urlRatings.ratings;
+      ratings = urlRatings?.ratings;
       break;
 
     case 4:  name = 'Official Website'; url = id; break;
@@ -65,7 +65,7 @@ const getRemote = async (tvdbRemote, showName) => {
       name = 'Wikipedia';
       urlRatings = await srvr.getUrls(
             `18||https://www.wikidata.org/wiki/${id}||${showName}`);
-      url = urlRatings.url;
+      url = urlRatings?.url;
       break;
       
     // case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
@@ -74,8 +74,8 @@ const getRemote = async (tvdbRemote, showName) => {
       url = `https://www.rottentomatoes.com/search` +
                     `?search=${encodeURI(id)}`;
       urlRatings = await srvr.getUrls(`99||${url}||${showName}`);
-      name = urlRatings.name;
-      url  = urlRatings.url;
+      name = urlRatings?.name;
+      url  = urlRatings?.url;
       // console.log(`getRemote rotten name url: ${name}, ${url}`);
       break;
     default: return null;
@@ -107,9 +107,10 @@ export const getRemotes = async (show) => {
 
   remotes = [];
 
-  if(!showId.startsWith("noemby-"))
+  if(!showId.startsWith("noemby-")) {
     remotes[0] = {name:'Emby', url: urls.embyPageUrl(showId)};
-
+    return null
+  }
   const tvdbdata = await getTvdbData(show);
   if(!tvdbdata) {
     console.log(`getRemotes, no tvdbdata: ${showName}`);

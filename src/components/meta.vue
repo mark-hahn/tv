@@ -24,6 +24,10 @@
                    border: 1px solid black; font-weight:bold;
                    cursor:default;`)
           | {{remote.name}}
+        div(v-if="remotes[0] === 1")
+          img(src="../../loading.gif"
+              style=`width:100px; height:100px;
+                     position:relative; top:20px; left:45px;`)
 
   #bot(style=`font-size:20px; padding:10px;`) {{show.Overview}}
 

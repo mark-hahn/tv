@@ -505,15 +505,20 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
   }
 
   else if(type == 99) { // rotten tomatoes
-    await fsp.writeFile('samples/rotten-search-noline.html', text);
-                          
-    const pfxNameParts = /^(.*?)(\s+\(.*?\))?$/i.exec(name);
-    if(!pfxNameParts) {
-      console.log('no rotten name pfx match:', {type, url, name});
-      resolve([id, 'no match: ' + {type, url, name}]);
-      return;
+    // await fsp.writeFile('samples/rotten-search-noline.html', text);
+
+    const stripParenSfx = (name) => {
+      name = name.trim();
+      const pfxNameParts = /^(.*?)(\s+\(.*?\))?$/i.exec(name);
+      if(!pfxNameParts) {
+        console.log('no rotten name pfx match:', {type, url, name});
+        resolve([id, 'no match: ' + {type, url, name}]);
+        return;
+      }
+      return pfxNameParts[1];
     }
-    const namePfx = pfxNameParts[1];
+
+    const namePfx = stripParenSfx(name);
 
     let titleRegx = new RegExp(/search-result-title">TV shows</g);
     titleRegx.lastIndex = 0;
@@ -523,27 +528,30 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
       resolve([id, 'no match: ' + {type, url, name}]);
       return;
     }
+    // console.log('\n\ntitleRegx', {namePfx});
 
-    console.log('titleRegx text.slice', titleRegx.lastIndex,
-                 text.slice(titleRegx.lastIndex, titleRegx.lastIndex+100));
+// need escaping: ] ( ) [ { } * + ? / $ . | ^ \
 
     const urlNameRegx = new RegExp(
-  /<a href="(.*?)" class="unset" data-qa="info-name" slot="title">(.*?)<\/a>/g);
+  /<a href="([^"]*)" class="unset" data-qa="info-name" slot="title">([^<]*)<\/a>/g
+  );
+
     urlNameRegx.lastIndex = titleRegx.lastIndex;
     let textUrl;
     for(let i=0; i<3; i++) {
       const nameParts = urlNameRegx.exec(text);
-      if(nameParts === null) {
+      if(nameParts === null || i == 3) {
         console.log('no rotten url name match:', {type, url, name});
         resolve([id, 'no match: ' + {type, url, name}]);
         return;
       }
-      // console.log('nameParts.slice', nameParts.slice(1,3));
       let textName;
-      [textUrl, textName] = nameParts.slice(1,3);
-      if(textName.startsWith(namePfx)) break;
+      [textUrl, textName] = nameParts.slice(1);
+      const textNamePfx = stripParenSfx(textName);
+      console.log('rotten compare', {textNamePfx, namePfx});
+      if(textNamePfx == namePfx) break;
     }
-    console.log('rotten url', textUrl);
+    console.log('rotten name url', {name:"Rotten Tomatoes", url:textUrl});
     resolve([id, {name:"Rotten Tomatoes", url:textUrl}]);
     return;
   }

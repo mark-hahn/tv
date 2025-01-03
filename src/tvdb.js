@@ -36,7 +36,7 @@ const getToken = async () => {
 ///////////// get remote (name and url) //////////////
 
 const getRemote = async (tvdbRemote) => {
-  let {id, type, sourceName:name} = tvdbRemote;
+  const {id, type, sourceName:name} = tvdbRemote;
   let url     = null;  
   let ratings = null;
   let urlRatings;
@@ -44,8 +44,8 @@ const getRemote = async (tvdbRemote) => {
     case 2:  
       name = 'IMDB';
       url  = `https://www.imdb.com/title/${id}`;
-      urlRatings = await srvr.getUrls(`2||${url}` +
-                       `?search=${encodeURI(id)}`);
+      urlRatings = await srvr.getUrls(
+            `2||${url}?search=${encodeURI(id)}||${name}`);
       ratings = urlRatings.ratings;
       break;
 
@@ -64,7 +64,7 @@ const getRemote = async (tvdbRemote) => {
     case 18: 
       name = 'Wikipedia';
       urlRatings = await srvr.getUrls(
-                  `18||https://www.wikidata.org/wiki/${id}`);
+            `18||https://www.wikidata.org/wiki/${id}||${name}`);
       url = urlRatings.url;
       break;
       
@@ -73,12 +73,13 @@ const getRemote = async (tvdbRemote) => {
     case 99:  
       url = `https://www.rottentomatoes.com/search` +
                     `?search=${encodeURI(id)}`;
-      urlRatings = await srvr.getUrls(`99||${url}`);
+      urlRatings = await srvr.getUrls(`99||${url}||${name}`);
       url = urlRatings.url;
-      console.log(`getRemote, rotten: ` + `${name}, ${url}`);
+      console.log(`getRemote rotten name url: ${name}, ${url}`);
       break;
     default: return null;
   }
+  
   if(!url) {
     console.log(`getRemote, no url: ${name}`);
     return null;
@@ -174,8 +175,7 @@ export const srchTvdbData = async (searchStr) => {
 
 export const getTvdbData = async (show) => {
   const name = show.Name;
-
-  let tvdbData = await srvr.getTvdb(show.Name);
+  let tvdbData = await srvr.getTvdb(name);
   if(tvdbData && !tvdbData.noMatch) {
     // console.log("getTvdbData, from cache:", {nameIn});
     const twoDays = 48*60*60*1000;

@@ -185,6 +185,6 @@ export function delRemotes(name)
 export function deletePath(path)   
             {return fCall('deletePath', path, 'deletePath')}
 
-export function getUrls(urlReq)   
-            {return fCall('getUrls', urlReq, 'getUrls')}
+export function getUrls(typeUrlName)   
+            {return fCall('getUrls', typeUrlName, 'getUrls')}
 

@@ -503,8 +503,7 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
   }
 
   else if(type == 99) { // rotten tomatoes
-    // await fsp.writeFile('samples/rotten-search.html', 
-    //                       JSON.stringify(text, null, 2));
+    await fsp.writeFile('samples/rotten-search.html', text);
                           
     const pfxNameParts = /^(.*?)(\s+\(.*?\))?$/i.exec(name);
     if(!pfxNameParts) {
@@ -523,50 +522,23 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
       return;
     }
 
-    const nameRegx = new RegExp(
-            /<a href="(.*?)".*?data-qa="info-name" slot="title">/gm);
-    nameRegx.index = titleRegx.index;
-    let textName;
+    const urlNameRegx = new RegExp(
+                '<a href="(.*?)" class="unset" data-qa="info-name"' +
+                ' slot="title">(.*?)</a>', 'gm');
+    urlNameRegx.index = titleRegx.index;
+    let textUrl, textName;
     while(true) {
       const nameParts = nameRegx.exec(text);
       if(nameParts === null) {
-        console.log('no rotten name match:', name);
+        console.log('no rotten url name match:', name);
         resolve([id, 'no match: ' + name]);
         return;
       }
-      textName = nameParts.slice(1);
+      [textUrl, textName] = nameParts.slice(1);
       if(textName.startsWith(namePfx)) break;
     }
-
-    // const pageUrl = url;
-    // console.error(`getUrls page url: ${pageUrl}`);
-    // resp = await fetch(pageUrl);
-    // if (!resp.ok) {
-    //   console.error(`getUrls rotten page resp: ${resp.status}`);
-    //   reject([id, {fetch:'rotten page', pageUrl}]);
-    //   return
-    // }
-    // const pageText = await resp.text();
-    // await fsp.writeFile('data/rotten-page.txt', text);
-
-    // console.log('rotten fetch page text length', pageText.length);
-
-    // rtRegEx = new RegExp('>(\d\d)%<\/rt-text>.*?>(\d\d)%<\/rt-text>');
-    // try {
-    //   parts = rtRegEx.exec(pageText.replace(/(\r\n|\n|\r)/gm, ""));
-    //   if(parts === null) {
-    //     console.log('no rotten page match:', url);
-    //     resolve([id, 'no match: ' + url]);
-    //     return;
-    //   }
-    //   ratings = parts[1] + '/' + parts[2];
-    // }
-    // catch (e) {
-    //   reject([id, {fetch:'rotten page', type, url, e}]);
-    //   return
-    // }
-    console.log('geturls rotten', {url});
-    resolve([id, {ur}]);
+    console.log('url name rotten', {textUrl, textName});
+    resolve([id, {textUrl, textName}]);
     return;
   }
 

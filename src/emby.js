@@ -352,6 +352,14 @@ seasonLoop:
   }
 }
 
+export const getSeasonCount = async (show) => {
+  const seriesId = show.Id;
+  const seasonsRes = 
+        await axios.get(urls.childrenUrl(cred, seriesId));
+  if(!seasonsRes?.data?.Items) return 0;
+  return seasonsRes.data.Items.length;
+}
+
 export const getSeriesMap = async (show, prune = false) => { 
   const seriesId  = show.Id;
   const seriesMap = [];

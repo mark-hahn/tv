@@ -9,8 +9,14 @@
                     text-align:center;`) 
       #poster()
       #dates(style=`font-size:18px; min-height:24px;
-                    margin:10px; font-weight:bold;`)
+                    margin-top:10px; font-weight:bold;`)
         | {{dates}}
+      #seasons(@click="openMap(show)"
+                style=`cursor:pointer; 
+                       font-size:20px; min-height:24px;
+                       font-weight:bold; font-color:gray;
+                       text-align:center;`)
+        | {{seasonsTxt}}
     #topRight(style=`display:flex; flex-direction:column`)
       #remotes(style=`width:200px; margin-left:20px;
                       display:flex; flex-direction:column;`) 
@@ -35,21 +41,26 @@
 
 <script>
 import evtBus from '../evtBus.js';
-import * as urls from "../urls.js";
 import * as tvdb from "../tvdb.js";
+import * as emby from "../emby.js";
 
 export default {
   name: "Meta",
+
   data() {
     return {
       show: {Name:''},
       dates: '',
       remoteShowName: '',
       remotes: [],
+      seasonsTxt: '',
     }
   },
   
   methods: {
+    openMap(show) {
+      evtBus.emit('openMap', show);
+    },
 
     async remoteClick(remote) {
       console.log('Meta: remoteClick:', {remote});
@@ -126,8 +137,7 @@ export default {
                 d.getFullYear();
       };
       const show = this.show;
-      const tvdbData = 
-          await tvdb.getTvdbData(show);
+      const tvdbData = await tvdb.getTvdbData(show);
       if(!tvdbData) {
         console.error('Meta: setDates: no tvdbData:', show);
         this.dates = '';
@@ -136,6 +146,22 @@ export default {
       const {firstAired, lastAired, status} = tvdbData;
       this.dates = fmt(firstAired) + ' -- ' + 
                     fmt(lastAired) + ' (' + status + ')';
+    },
+
+    async setSeasonsTxt() {
+      this.seasonsTxt = ``;
+      const show = this.show;
+      const count = await emby.getSeasonCount(show);
+      switch (count) {
+        case 0:  
+          console.error('setSeasonsTxt no count', show.Name);
+          return;
+        case 1:  
+          this.seasonsTxt = `1 Season`;
+          return;
+        default: 
+          this.seasonsTxt = `${count} Seasons`;
+      }
     },
 
     async setRemotes() {
@@ -151,7 +177,9 @@ export default {
     },
   },
 
-  async mounted() {
+  /////////////////  MOUNTED  /////////////////
+
+  mounted() {
     evtBus.on('showSelected', async (show) => { 
       this.remotes[0] = 1;
       console.log('Meta: showSelected:', show.Name);
@@ -159,9 +187,9 @@ export default {
       await this.setPoster();
       await this.setDates();
       await this.setRemotes();
+      await this.setSeasonsTxt();
     });
   },
-    
-};
+}
 
 </script>

@@ -139,7 +139,7 @@
   #map(v-if="mapShow !== null" 
         style=`background-color:#ffe; padding:10px;
                display:flex; flex-direction:column;
-               position:fixed; top:100px; left:220px; z-index:2`)
+               position:fixed; top:100px; left:300px; z-index:2`)
     div(style=`margin:0 5px; display:flex; 
                 justify-content:space-between;`)
       div(style=`font-size:20px; margin:6px 20px 0 0;
@@ -782,6 +782,10 @@ export default {
 
   /////////////////  MOUNTED  /////////////////
   mounted() {
+    evtBus.on('openMap', (show) => {
+      this.seriesMapAction('open', show);
+    });
+
     (async () => {
       document.addEventListener('keydown', (event) => {
         if(event.code == 'Escape') {
@@ -789,6 +793,8 @@ export default {
           this.seriesMapAction('close');
         }
       }); 
+
+
       try {
         showErr = this.showErr;
         await emby.init(showErr);

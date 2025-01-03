@@ -120,7 +120,7 @@ export async function loadAllShows(gapCache) {
   for(let blockedWaitName of blockedWaitShows) {
     const i = shows.findIndex(
                 (show) => show.Name == blockedWaitName);
-    if(i > -1) await getWaitStr(shows[i]);
+    if(i > -1) await tvdb.getWaitStr(shows[i]);
     else {
       console.log('no show, deleting from blockedWaitShows list:',   
                    blockedWaitName);
@@ -234,18 +234,6 @@ const toTryCollId    = '1468316';
 const continueCollId = '4719143';
 const markCollId     = '4697672';
 const lindaCollId    = '4706186';
-
-export async function getWaitStr(show) {
-  try {
-    const tvdbData = await tvdb.getTvdbData(show);
-    if(tvdbData) return tvdbData.waitStr;
-    else         return '';
-  } catch(e) {
-    console.error(
-        'getWaitStr, tvdb data error:', show.Name, e);
-    return '';
-  }
-}
 
 export async function deleteShowFromEmby(show) {
   const delRes = await axios.delete(

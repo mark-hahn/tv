@@ -784,7 +784,7 @@ export default {
       gap.WatchGap   = watchGap; 
       gap.Missing    = missing;
       gap.Waiting    = !blockedWait && waiting;
-      gap.WaitStr    = await emby.getWaitStr(show);
+      gap.WaitStr    = await tvdb.getWaitStr(show);
       Object.assign(show, gap);
       const idGapStr = JSON.stringify([show.Id, gap]);
       await srvr.addGap(idGapStr);

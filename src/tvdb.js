@@ -205,27 +205,37 @@ export const getTvdbData = async (show) => {
     showErr(`tvdb extended: ${extRes.status}`);
     return null;
   }
-
-  let waitStr = '';
   const extResObj  = await extRes.json();
   const {firstAired, lastAired, nextAired, 
          remoteIds:tvdbRemotes, status:statusIn} = extResObj.data;
   const status = statusIn.name; // e.g. continuing
-
-  let lastAiredTmp = lastAired;
-  if(!lastAiredTmp) return null;
-  const lastAiredDay  = util.fmtDate(lastAiredTmp);
-  const lastAiredNoYr = util.fmtDate(lastAiredTmp, false);
-  const today         = util.fmtDate();
-  if(lastAiredNoYr && lastAiredDay >= today) 
-                        waitStr = `{${lastAiredNoYr}}`;
   const saved = Date.now();
-
-  tvdbData = {
-      tvdbId, name, status,
-      firstAired, lastAired, nextAired, 
-      tvdbRemotes, waitStr, saved};
-  console.log("tvdbData:", JSON.stringify(tvdbData, null, 2));
+  tvdbData = { tvdbId, name, status,
+               firstAired, lastAired, nextAired, 
+               tvdbRemotes, saved };
   srvr.addTvdb(JSON.stringify(tvdbData));
   return tvdbData;
 }
+
+//////////// get waitStr //////////////
+
+export async function getWaitStr(show) {
+  try {
+    const tvdbData = await tvdb.getTvdbData(show);
+    if(tvdbData) {
+      let waitStr = '';
+      const lastAired = tvdbData.lastAired;
+      if(!lastAired) return '';
+      const lastAiredDay  = util.fmtDate(lastAired);
+      const lastAiredNoYr = util.fmtDate(lastAired, false);
+      const today         = util.fmtDate();
+      if(lastAiredNoYr && lastAiredDay >= today) 
+        waitStr = `{${lastAiredNoYr}}`;
+      return waitStr;
+    }
+  } catch(e) {
+    console.error('getWaitStr, tvdb data error:', show.Name, e);
+    return '';
+  }
+}
+

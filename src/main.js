@@ -7,9 +7,6 @@ bugs ...
   uneven season lengths break file missing 
           (Interview with the Vampire)
   add-new broken: no hit on tvdb (Daddy Issues)
-  tvdb.json name blank (the middle)
-  official remote broken (the middle)
-  rotten tomatoes: the middle -> malcom in the middle 
   alread exists broken ("middle")
   
 todo ...
@@ -18,10 +15,8 @@ todo ...
   chg no show in tvdb err to pop-up notification
   if emby show has no files and has pickup, set to noemby
   files with no emby should be added as pickup if in tvdb
-  show meta on right
   prev/next hilite
   get drama field from tvdb (as many fields as possible)
-  put imdb/rotten at top of list
   add wikipedia remote the hard way
 
 new features ...
@@ -34,7 +29,6 @@ tabled ...
   show waitstr as {12-12  2-12}
   up/down arrows
   hover hints over cond icons
-  add hilite on load when non saved
   move hilite when show hidden by select
 */
 

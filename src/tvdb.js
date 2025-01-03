@@ -221,7 +221,7 @@ export const getTvdbData = async (show) => {
 
 export async function getWaitStr(show) {
   try {
-    const tvdbData = await tvdb.getTvdbData(show);
+    const tvdbData = await getTvdbData(show);
     if(tvdbData) {
       let waitStr = '';
       const lastAired = tvdbData.lastAired;

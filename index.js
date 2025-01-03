@@ -387,7 +387,6 @@ const addTvdb = async (id, tvdbDataStr, resolve, reject) => {
   try { tvdbData = JSON.parse(tvdbDataStr); }
   catch (e) { reject([id, 'addTvdb: ' + e.message]); return; }
   const name = tvdbData.name;
-  delete tvdbData.name;
   allTvdb[name] = tvdbData;
   await fsp.writeFile('data/tvdb.json', JSON.stringify(allTvdb)); 
   resolve([id, 'ok']);

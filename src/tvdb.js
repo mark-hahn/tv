@@ -35,17 +35,17 @@ const getToken = async () => {
 
 ///////////// get remote (name and url) //////////////
 
-const getRemote = async (tvdbRemote) => {
-  const {id, type, sourceName:name} = tvdbRemote;
+const getRemote = async (tvdbRemote, showName) => {
+  let {id, type} = tvdbRemote;
   let url     = null;  
   let ratings = null;
-  let urlRatings;
+  let urlRatings, name;
   switch (type) {
     case 2:  
       name = 'IMDB';
       url  = `https://www.imdb.com/title/${id}`;
       urlRatings = await srvr.getUrls(
-            `2||${url}?search=${encodeURI(id)}||${name}`);
+            `2||${url}?search=${encodeURI(id)}||${showName}`);
       ratings = urlRatings.ratings;
       break;
 
@@ -64,7 +64,7 @@ const getRemote = async (tvdbRemote) => {
     case 18: 
       name = 'Wikipedia';
       urlRatings = await srvr.getUrls(
-            `18||https://www.wikidata.org/wiki/${id}||${name}`);
+            `18||https://www.wikidata.org/wiki/${id}||${showName}`);
       url = urlRatings.url;
       break;
       
@@ -73,7 +73,7 @@ const getRemote = async (tvdbRemote) => {
     case 99:  
       url = `https://www.rottentomatoes.com/search` +
                     `?search=${encodeURI(id)}`;
-      urlRatings = await srvr.getUrls(`99||${url}||${name}`);
+      urlRatings = await srvr.getUrls(`99||${url}||${showName}`);
       url = urlRatings.url;
       console.log(`getRemote rotten name url: ${name}, ${url}`);
       break;
@@ -118,7 +118,7 @@ export const getRemotes = async (show) => {
 
   const remotesByName = {};
   for(const tvdbShowId of remoteIds) {
-    const remote = await getRemote(tvdbShowId);
+    const remote = await getRemote(tvdbShowId, showName);
     if(remote) {
       if(!remote.ratings) delete remote.ratings;
       remotesByName[remote.name] = remote;
@@ -130,8 +130,8 @@ export const getRemotes = async (show) => {
   if(imdbRemote) remotes.push(imdbRemote);
 
   const rottenRemote = await getRemote(
-        {id:showName, type:99, sourceName:"Rotten Tomatoes"});
-  if(!rottenRemote.ratings) delete rottenRemote.ratings;
+        {id:showName, type:99}, showName);
+  if(!rottenRemote?.ratings) delete rottenRemote.ratings;
   if(rottenRemote) remotes.push(rottenRemote);
 
   for(const [name, remote] of Object.entries(remotesByName)) {

@@ -74,7 +74,8 @@ const getRemote = async (tvdbRemote, showName) => {
       url = `https://www.rottentomatoes.com/search` +
                     `?search=${encodeURI(id)}`;
       urlRatings = await srvr.getUrls(`99||${url}||${showName}`);
-      url = urlRatings.url;
+      name = urlRatings.name;
+      url  = urlRatings.url;
       console.log(`getRemote rotten name url: ${name}, ${url}`);
       break;
     default: return null;
@@ -131,7 +132,6 @@ export const getRemotes = async (show) => {
 
   const rottenRemote = await getRemote(
         {id:showName, type:99}, showName);
-  if(!rottenRemote?.ratings) delete rottenRemote.ratings;
   if(rottenRemote) remotes.push(rottenRemote);
 
   for(const [name, remote] of Object.entries(remotesByName)) {

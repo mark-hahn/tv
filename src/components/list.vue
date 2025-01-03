@@ -812,7 +812,7 @@ export default {
         // must be set before startWorker
         blockedWaitShows = showsBlocks.blockedWaitShows;
 
-        emby.startWorker(allShows, this.addGapToShow);
+        // emby.startWorker(allShows, this.addGapToShow);
 
         this.sortByNew      = true;
         this.sortByActivity = false;
@@ -826,25 +826,25 @@ export default {
         this.scrollToSavedShow(true);
 
         ////////// TEMP //////////
-        // let showIdx = 0;
-        // const intvl = setInterval(async () => {
-        //   while(showIdx < allShows.length) {
-        //     if(showIdx % 10 == 0) 
-        //       console.log(new Date().toISOString(), 
-        //                  'showIdx:', showIdx);
-        //     // if(Math.random() < 0.75) break;
-        //     const show = allShows[showIdx++];
-        //     const remotes = await tvdb.getRemotes(show.Name);
-        //     if(!remotes) continue;
-        //     const [_remotes, cached] = remotes
-        //     if(cached) continue;
-        //     break;
-        //   }
-        //   if(showIdx == allShows.length) {
-        //      clearInterval(intvl);
-        //      console.log('load remotes done:', showIdx);
-        //   }
-        // }, 30*1000);
+        let showIdx = 0;
+        const intvl = setInterval(async () => {
+          while(showIdx < allShows.length) {
+            if(showIdx % 10 == 0) 
+              console.log(new Date().toISOString(), 
+                         showIdx + ' of ' +allShows.length);
+            // if(Math.random() < 0.75) break;
+            const show = allShows[showIdx++];
+            const remotes = await tvdb.getRemotes(show.Name);
+            if(!remotes) continue;
+            const [_remotes, cached] = remotes
+            if(cached) continue;
+            break;
+          }
+          if(showIdx == allShows.length) {
+             clearInterval(intvl);
+             console.log('load remotes done:', showIdx);
+          }
+        }, 45*1000);
 
       } 
       catch (err) {

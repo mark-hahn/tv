@@ -98,6 +98,10 @@ const getRemote = async (tvdbRemote, showName) => {
 export const getRemotes = async (show) => {
   const showName = show.Name;
   const showId   = show.Id;
+  if(!showId) {
+    console.error(`getRemotes, no showId:`, {show});
+    return null;
+  }
   let remotes = await srvr.getRemotes(showName);
   if(remotes && !remotes.noMatch) return [remotes, true];
 

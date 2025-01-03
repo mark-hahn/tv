@@ -834,7 +834,7 @@ export default {
                          showIdx + ' of ' +allShows.length);
             // if(Math.random() < 0.75) break;
             const show = allShows[showIdx++];
-            const remotes = await tvdb.getRemotes(show.Name);
+            const remotes = await tvdb.getRemotes(show);
             if(!remotes) continue;
             const [_remotes, cached] = remotes
             if(cached) continue;

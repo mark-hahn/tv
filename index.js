@@ -466,10 +466,12 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
   let resp = await fetch(url);
   if (!resp.ok) {
     console.error(`getUrls resp: ${typeUrlName}, ${resp.status}`);
-    reject([id, {type, url}]);
+    reject([id, {type, url, name}]);
     return
   }
-  const text = await resp.text();
+  const text = (await resp.text())
+                .replaceAll(/(\r\n|\n|\r)/gm, "")
+                .replaceAll(/\s+/gm, " ");
 
   console.log('await fetch(url)', text.length);
 
@@ -481,7 +483,7 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
       if(parts === null) throw 'wikidata parse error';
     }
     catch (e) {
-      reject([id, {type, url, e}]);
+      reject([id, {type, url, name, e}]);
       return
     }
     resolve([id, {ratings:parts[1]}]);
@@ -495,7 +497,7 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
       if(parts === null) throw 'wikidata parse error';
     }
     catch (e) {
-      reject([id, {type, url, e}]);
+      reject([id, {type, url, name, e}]);
       return
     }
     resolve([id, {url:parts[1]}]);
@@ -503,43 +505,46 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
   }
 
   else if(type == 99) { // rotten tomatoes
-    // await fsp.writeFile('samples/rotten-search.html', text);
+    await fsp.writeFile('samples/rotten-search-noline.html', text);
                           
     const pfxNameParts = /^(.*?)(\s+\(.*?\))?$/i.exec(name);
     if(!pfxNameParts) {
-      console.log('no rotten name pfx match:', name);
-      resolve([id, 'no match: ' + name]);
+      console.log('no rotten name pfx match:', {type, url, name});
+      resolve([id, 'no match: ' + {type, url, name}]);
       return;
     }
     const namePfx = pfxNameParts[1];
 
-    let titleRegx = new RegExp(/search-result-title">TV shows</gm);
-    titleRegx.index = 0;
+    let titleRegx = new RegExp(/search-result-title">TV shows</g);
+    titleRegx.lastIndex = 0;
     const titleParts = titleRegx.exec(text);
     if(titleParts === null) {
-      console.log('no rotten title match:', name);
-      resolve([id, 'no match: ' + name]);
+      console.log('no rotten title match:', {type, url, name});
+      resolve([id, 'no match: ' + {type, url, name}]);
       return;
     }
 
+    console.log('titleRegx text.slice', titleRegx.lastIndex,
+                 text.slice(titleRegx.lastIndex, titleRegx.lastIndex+100));
+
     const urlNameRegx = new RegExp(
-                '<a href="(.*?)" class="unset" data-qa="info-name"' +
-                ' slot="title">(.*?)</a>', 'gm');
-    urlNameRegx.index = titleRegx.index;
+  /<a href="(.*?)" class="unset" data-qa="info-name" slot="title">(.*?)<\/a>/g);
+    urlNameRegx.lastIndex = titleRegx.lastIndex;
     let textUrl;
-    while(true) {
-      const nameParts = nameRegx.exec(text);
+    for(let i=0; i<3; i++) {
+      const nameParts = urlNameRegx.exec(text);
       if(nameParts === null) {
-        console.log('no rotten url name match:', name);
-        resolve([id, 'no match: ' + name]);
+        console.log('no rotten url name match:', {type, url, name});
+        resolve([id, 'no match: ' + {type, url, name}]);
         return;
       }
+      // console.log('nameParts.slice', nameParts.slice(1,3));
       let textName;
-      [textUrl, textName] = nameParts.slice(1);
+      [textUrl, textName] = nameParts.slice(1,3);
       if(textName.startsWith(namePfx)) break;
     }
     console.log('rotten url', textUrl);
-    resolve([id, {url:textUrl}]);
+    resolve([id, {name:"Rotten Tomatoes", url:textUrl}]);
     return;
   }
 

@@ -138,6 +138,11 @@ export const getRemotes = async (show) => {
     if(name !== "IMDB" && name !== "Rotten Tomatoes")
       remotes.push(remote);
   }
+
+  remotes.push({name:'Google', 
+                 url: `https://www.google.com/search` +
+                      `?q=${encodeURI(showName)}%20tv%20show`});
+
   srvr.addRemotes(showName + '|||' + JSON.stringify(remotes));
   return [remotes, false];
 }

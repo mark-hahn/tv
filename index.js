@@ -474,7 +474,7 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
   console.log('await fetch(url)', text.length);
 
   if(type == 2) { // IMDB
-    await fsp.writeFile('data/imdb-page.txt', text);
+    // await fsp.writeFile('data/imdb-page.txt', text);
     let parts;
     try{
       parts = /imUuxf">(\d\.\d)<\/span>/i.exec(text);
@@ -503,7 +503,7 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
   }
 
   else if(type == 99) { // rotten tomatoes
-    await fsp.writeFile('samples/rotten-search.html', text);
+    // await fsp.writeFile('samples/rotten-search.html', text);
                           
     const pfxNameParts = /^(.*?)(\s+\(.*?\))?$/i.exec(name);
     if(!pfxNameParts) {
@@ -526,7 +526,7 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
                 '<a href="(.*?)" class="unset" data-qa="info-name"' +
                 ' slot="title">(.*?)</a>', 'gm');
     urlNameRegx.index = titleRegx.index;
-    let textUrl, textName;
+    let textUrl;
     while(true) {
       const nameParts = nameRegx.exec(text);
       if(nameParts === null) {
@@ -534,11 +534,12 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
         resolve([id, 'no match: ' + name]);
         return;
       }
+      let textName;
       [textUrl, textName] = nameParts.slice(1);
       if(textName.startsWith(namePfx)) break;
     }
-    console.log('url name rotten', {textUrl, textName});
-    resolve([id, {textUrl, textName}]);
+    console.log('rotten url', textUrl);
+    resolve([id, {url:textUrl}]);
     return;
   }
 

@@ -319,11 +319,11 @@ export const getCurrentlyWatching = async (player = 'roku') => {
   const res = await axios.get(url);
   const nowPlaying = res.data[0].NowPlayingItem;
   if(!nowPlaying) {
-    console.log(`Currently Watching on ${player}: nothing`);
+    // console.log(`Watching on ${player}: nothing`);
     return null;
   }
   const showName = nowPlaying.SeriesName;
-  console.log(`Currently Watching on ${player}: ${showName}`);
+  // console.log(`Watching on ${player}: ${showName}`);
   return showName;
 }
 

@@ -45,52 +45,68 @@
       #hdrbottom(style=`width:100%; background-color:#ccc; 
                         display:flex; justify-content:space-between;
                         margin-top:5px; margin-bottom:5px;`)
-          #botlft(style=`overflow:hidden;
+          #botlft(style=`width:400px;
+                        overflow:hidden;
                         display:flex; justify-content:space-between;`)
-            #sorts(style=`display:inline-block;
-                          display:flex; justify-content:space-between;`)
-              button(@click='sortClickAdded' 
-                      :style=`{display:'inlineBlock', 
-                              fontSize:'15px', margin:'4px', 
-                              backgroundColor: 
-                                sortByNew ? 'yellow' : 'white'}`) Added
-              button(@click='sortClickActivity' 
-                    :style=`{display:'inlineBlock', 
-                              fontSize:'15px', margin:'4px', 
-                              backgroundColor: 
-                                sortByActivity ? 'yellow' : 'white'}`) Active
-              button(@click='sortClickSize' 
-                    :style=`{display:'inlineBlock', 
-                              fontSize:'15px', margin:'4px', 
-                              backgroundColor: 
-                                sortBySize ? 'yellow' : 'white'}`) Size
 
             button(@click="addClick" 
                     style=`display:inline-block'; 
                           font-size:15px; margin:4px 4px 4px 20px;backgroundColor:white`) Add
-
+            div()
             #sortFltr(style=`display:inline-block;
                           display:flex; justify-content:space-between;`)
-              button(@click='sortClick' 
+              button(@click='sortClick'
                      :style=`{width:'100px', 
                               fontSize:'15px', margin:'4px'}`) 
-                | Sort
+                | {{sortChoice}}
 
               button(@click='filterClick' 
                      :style=`{width:'100px', 
                               fontSize:'15px', margin:'4px'}`)
-                | Filter
+                | {{fltrChoice}}
             
-          #botrgt(style=`display:flex; justify-content:space-between;
+          #botrgt(style=`display:flex;
+                         justify-content:space-between;
                          margin: 5px 17px 0 0;`)
-            #fltr(v-for="cond in conds"
+            #fltrs(v-for="cond in conds"
                 @click="condFltrClick(cond)"
                 :style=`{width:'1.435em', textAlign:'center',
-                         display:'inline-block', 
-                         color:condFltrColor(cond)}`)
+                          display:'inline-block', 
+                          color:condFltrColor(cond)}`)
               font-awesome-icon(:icon="cond.icon"
-                               :style="{}")
-  
+                                :style="{}")
+    #sortpop(v-if="sortPopped" 
+          style=`width:200px; background-color:#eee;
+                border: 1px solid black; position: fixed; 
+                display:flex; flex-direction:column;
+                left: 200px; top: 75px;`) 
+      div(style=`text-align:center;
+                margin:10px; font-weight:bold;`) 
+        | Sort
+      div(v-for="sortChoice in sortChoices"
+          style=`margin:3px 10px; padding:10px; 
+                background-color:white; text-align:center;
+                border: 1px solid black; font-weight:bold;
+                cursor:default;`
+          @click="sortAction(sortChoice)") 
+        | {{sortChoice}}
+
+    #fltrpop(v-if="fltrPopped" 
+          style=`width:200px; background-color:#eee; padding:0px;
+                border: 1px solid black; position: fixed; 
+                display:flex; flex-direction:column;
+                left: 200px; top: 75px;`) 
+      div(style=`text-align:center;
+                 margin:10px; font-weight:bold;`) 
+        | Filter
+      div(v-for="fltrChoice in fltrChoices"
+          style=`margin:3px 10px; padding:10px; 
+                background-color:white; text-align:center;
+                border: 1px solid black; font-weight:bold;
+                cursor:default;`
+          @click="fltrAction(fltrChoice)") 
+        | {{fltrChoice}}
+
     #shows(style="width:100%; flex-grow: 1; overflow-y:scroll;")
       table(style="width:100%; font-size:18px")
        tbody
@@ -375,9 +391,6 @@ export default {
       shows:                [],
       searchStr:            "",
       errMsg:               "",
-      sortByNew:          true,
-      sortByActivity:    false,
-      sortBySize:        false,
       highlightName:        "",
       allShowsLength:        0,
       mapShow:            null,
@@ -386,6 +399,17 @@ export default {
       seriesMap:            {},
       gapPercent:            0,
       watchingName:      '---',
+
+      sortPopped:        false,
+      sortChoices:          
+        ['Alpha', 'Added', 'Activity', 'Size', 'Viewed'],
+      sortChoice:     'Viewed', 
+
+      fltrPopped:        false,
+      fltrChoices:          
+        ['All', 'ToTry', 'Continue', 'Mark', 'Linda'],
+      fltrChoice:        'All',          
+
       conds: [ {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],
           cond(show)  { return show.UnplayedItemCount > 0; },
@@ -556,36 +580,25 @@ export default {
       evtBus.emit('showSelected', show);
     },
 
-    async sortClickAdded() {
-      this.sortByNew      = true;
-      this.sortByActivity = false;
-      this.sortBySize     = false;
-      this.sortShows();
-      this.showAll();
-      // this.topClick()
-      // console.log("sort by Added");
+    async sortClick() {
+      this.sortPopped = !this.sortPopped;
+      this.fltrPopped = false;
+    },
+    async sortAction(sortChoice) {
+      console.log('sortAction', sortChoice);
+      this.sortChoice = sortChoice;
+      this.sortPopped = false;
+    },
+    async filterClick() {
+      this.fltrPopped = !this.fltrPopped
+      this.sortPopped = false;
+    },
+    async fltrAction(fltrChoice) {
+      console.log('fltrAction', fltrChoice);
+      this.fltrChoice = fltrChoice;
+      this.fltrPopped = false;
     },
 
-    async sortClickActivity() {
-      this.sortByNew      = false;
-      this.sortByActivity = true;
-      this.sortBySize     = false;
-      this.sortShows();
-      this.showAll();
-      // this.topClick()
-      // console.log("sort by Activity");
-    },
-
-    async sortClickSize() {
-      this.sortByNew      = false;
-      this.sortByActivity = false;
-      this.sortBySize     = true;
-      this.sortShows();
-      this.showAll();
-      // this.topClick()
-      // console.log("sort by Size");
-    },
-  
     scrollToSavedShow(saveVis = false) {
       this.$nextTick(() => {
         const name = window.localStorage.getItem("lastVisShow");
@@ -809,7 +822,7 @@ export default {
         // must be set before startWorker
         blockedWaitShows = showsBlocks.blockedWaitShows;
 
-        emby.startWorker(allShows, this.addGapToShow);
+        // emby.startWorker(allShows, this.addGapToShow);
 
         this.sortByNew      = true;
         this.sortByActivity = false;

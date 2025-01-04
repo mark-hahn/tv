@@ -588,6 +588,8 @@ export default {
       console.log('sortAction', sortChoice);
       this.sortChoice = sortChoice;
       this.sortPopped = false;
+      this.fltrPopped = false;
+      this.sortShows();
     },
     async filterClick() {
       this.fltrPopped = !this.fltrPopped
@@ -596,7 +598,9 @@ export default {
     async fltrAction(fltrChoice) {
       console.log('fltrAction', fltrChoice);
       this.fltrChoice = fltrChoice;
+      this.sortPopped = false;
       this.fltrPopped = false;
+      this.sortShows();
     },
 
     scrollToSavedShow(saveVis = false) {
@@ -705,16 +709,46 @@ export default {
 
     sortShows() {
       allShows.sort((a, b) => {
-        if (this.sortByNew) {
-          if (a.DateCreated == b.DateCreated) return 0;
-          return a.DateCreated > b.DateCreated ? -1 : +1;
+        switch (this.sortChoice) {
+          case 'Alpha':
+            if (a.Name == b.Name) return 0;
+            return a.Name > b.Name ? -1 : +1;
+          case 'Added': 
+            if (a.DateCreated == b.DateCreated) return 0;
+            return a.DateCreated > b.DateCreated ? -1 : +1;
+          case 'Activity':
+            if (a.DateCreated == b.DateCreated) return 0;
+            return a.DateCreated > b.DateCreated ? -1 : +1;
+          case 'Size':
+            if (a.DateCreated == b.DateCreated) return 0;
+            return a.DateCreated > b.DateCreated ? -1 : +1;
+          case 'Viewed':
+            if (a.DateCreated == b.DateCreated) return 0;
+            return a.DateCreated > b.DateCreated ? -1 : +1;
+
+          default: console.error(
+              'unknown sortChoice:', this.sortChoice);
         }
-        if (this.sortByActivity) {
-          if (a.Date == b.Date) return 0;
-          return a.Date > b.Date ? -1 : +1;
+        switch (this.fltrChoice) {
+          case 'Alpha':
+            if (a.Name == b.Name) return 0;
+            return a.Name > b.Name ? -1 : +1;
+          case 'Added': 
+            if (a.DateCreated == b.DateCreated) return 0;
+            return a.DateCreated > b.DateCreated ? -1 : +1;
+          case 'Activity':
+            if (a.DateCreated == b.DateCreated) return 0;
+            return a.DateCreated > b.DateCreated ? -1 : +1;
+          case 'Size':
+            if (a.DateCreated == b.DateCreated) return 0;
+            return a.DateCreated > b.DateCreated ? -1 : +1;
+          case 'Viewed':
+            if (a.DateCreated == b.DateCreated) return 0;
+            return a.DateCreated > b.DateCreated ? -1 : +1;
+
+          default: console.error(
+              'unknown sortChoice:', this.sortChoice);
         }
-        if (this.sortBySize) 
-          return b.Size - a.Size;
       });
     },
 

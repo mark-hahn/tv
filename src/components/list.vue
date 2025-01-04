@@ -11,10 +11,14 @@
 
       #hdrtop(style=`width:100%; display:flex;
                     flex-direction:row; justify-content:start;`)
-        button(@click="showAll" 
-                style=`margin-left:10px; margin-right:5px;
-                       fontSize:15px; margin:4px;
-                       background-color:white;`) All
+        #nums(style=`background-color:#ccc; 
+                      display:flex; justify-content:space-around;`)
+          #count(style="display:inline-block; margin:4px 5px 4px 15px;") 
+            | {{shows.length + '/' + allShowsLength}}
+          #prog(style=`display:inline-block; 
+                      margin:4px 10px 4px 5px;`) 
+            | {{gapPercent+'%'}}
+
         #srch(style=`margin-top:3px;`)
           input(v-model="searchStr" 
                 @input="select"
@@ -23,6 +27,10 @@
                   style="margin-left:1px;")
             font-awesome-icon(icon="search")
 
+        button(@click="showAll" 
+                style=`margin-left:10px; margin-right:5px;
+                       fontSize:15px; margin:4px;
+                       background-color:white;`) All
         button(@click="topClick" 
                 style=`margin-left:10px; margin-right:5px;
                       fontSize:15px; margin:4px;
@@ -39,14 +47,6 @@
                         margin-top:5px; margin-bottom:5px;`)
           #botlft(style=`overflow:hidden;
                         display:flex; justify-content:space-between;`)
-            #nums(style=`background-color:#ccc; 
-                          display:flex; justify-content:space-around;`)
-              #count(style="display:inline-block; margin:4px 5px 4px 15px;") 
-                | {{shows.length + '/' + allShowsLength}}
-              #prog(style=`display:inline-block; 
-                          margin:4px 10px 4px 5px;`) 
-                | {{gapPercent+'%'}}
-
             #sorts(style=`display:inline-block;
                           display:flex; justify-content:space-between;`)
               button(@click='sortClickAdded' 
@@ -69,6 +69,18 @@
                     style=`display:inline-block'; 
                           font-size:15px; margin:4px 4px 4px 20px;backgroundColor:white`) Add
 
+            #sortFltr(style=`display:inline-block;
+                          display:flex; justify-content:space-between;`)
+              button(@click='sortClick' 
+                     :style=`{width:'100px', 
+                              fontSize:'15px', margin:'4px'}`) 
+                | Sort
+
+              button(@click='filterClick' 
+                     :style=`{width:'100px', 
+                              fontSize:'15px', margin:'4px'}`)
+                | Filter
+            
           #botrgt(style=`display:flex; justify-content:space-between;
                          margin: 5px 17px 0 0;`)
             #fltr(v-for="cond in conds"

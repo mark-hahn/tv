@@ -16,6 +16,8 @@ add ...
   chg no show in tvdb err to pop-up notification
 
 todo ...
+  button for watching now
+  show watched/total avail
   update imdb rating periodicaly
   if emby show has no files and has pickup, set to noemby
   files with no emby should be added as pickup if in tvdb

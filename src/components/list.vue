@@ -22,10 +22,13 @@
           button(@click="select" 
                   style="margin-left:1px;")
             font-awesome-icon(icon="search")
-        button(@click="topClick" 
+
+        button(@click="watchClick" 
                 style=`margin-left:10px; margin-right:5px;
                       fontSize:15px; margin:4px;
-                      background-color:white;`) Top
+                      background-color:white;`) 
+          | {{ watchingName }}
+
         #err(@click="errClick" 
               style=`flex-grow:1; display:inline-block; 
                     font-size:20px; color:red;
@@ -372,7 +375,7 @@ export default {
       seriesMapEpis:        [],
       seriesMap:            {},
       gapPercent:            0,
-
+      watchingName:      '---',
       conds: [ {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],
           cond(show)  { return show.UnplayedItemCount > 0; },
@@ -743,6 +746,16 @@ export default {
       if (scroll) this.scrollToSavedShow();
     },
 
+    watchClick() {
+      console.log('watchClick');
+      if(this.watchingName !== '---') {
+        window.localStorage.setItem(
+                      "lastVisShow", this.watchingName);
+        this.scrollToSavedShow(true);
+      }
+    },
+
+
     /////////////////  UPDATE METHODS  /////////////////
 
     showAll(dontClrFilters = false) {
@@ -785,6 +798,12 @@ export default {
     evtBus.on('openMap', (show) => {
       this.seriesMapAction('open', show);
     });
+
+    setInterval(async () => {
+      const watchingName = await emby.getCurrentlyWatching();
+      if(watchingName === null)  this.watchingName = '----';
+      else                       this.watchingName = watchingName;
+    }, 5*1000);
 
     (async () => {
       document.addEventListener('keydown', (event) => {

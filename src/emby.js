@@ -312,6 +312,24 @@ export const editEpisode = async (seriesId,
   }
 }
 
+// get currently watching show
+export const getCurrentlyWatching = async (player = 'roku') => {
+  let url;
+  if(player == 'roku')
+      url = "https://hahnca.com:8920/emby/Sessions?DeviceId=9f53d43e-e5f7-5161-881a-d91843d0d372&api_key=9863c23d912349599e395950609c84cc"
+  if(player == 'mlap')
+      url = "https://hahnca.com:8920/emby/Sessions?DeviceId=ca632bcd-7279-4fc2-b5b8-6f92ae6ddb08&api_key=9863c23d912349599e395950609c84cc"
+  const res = await axios.get(url);
+  const nowPlaying = res.data[0].NowPlayingItem;
+  if(!nowPlaying) {
+    console.log(`Currently Watching on ${player}: nothing`);
+    return null;
+  }
+  const showName = nowPlaying.SeriesName;
+  console.log(`Currently Watching on ${player}: ${showName}`);
+  return showName;
+}
+
 // reset last Watched to first unwatched episode
 export const setLastWatched = async (seriesId) => {
   let seasonNumber;

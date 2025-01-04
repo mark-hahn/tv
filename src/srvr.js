@@ -33,7 +33,7 @@ ws.onclose = () => {() =>
 };
 
 ws.onerror = (err) => {
-  showErr(("websocket error:", err));
+  console.error(("websocket error:", err));
   haveSocket = false;
 };
 
@@ -83,7 +83,7 @@ handleMsg = (msg) => {
   msg = msg.toString();
   const parts = /^(.*)~~~(.*)~~~(.*)$/.exec(msg);
   if(!parts) {
-    showErr('skipping bad message:', msg);
+    console.error('skipping bad message:', msg);
     return;
   }
   const [id, status, result] = parts.slice(1);
@@ -93,7 +93,7 @@ handleMsg = (msg) => {
   const callIdx = calls.findIndex(
                      call =>  call.id == id);
   if(callIdx < 0) {
-    showErr("no matching id from msg:", id);
+    console.error("no matching id from msg:", id);
     return;
   }
   const call = calls[callIdx];
@@ -106,7 +106,7 @@ handleMsg = (msg) => {
     else                reject(res);
   }
   catch(err) {
-    showErr("parsing ws result:", {id, result, err});
+    console.error("parsing ws result:", {id, result, err});
   }
   
   const queuelIdx = fCallQueue.findIndex(

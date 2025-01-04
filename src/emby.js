@@ -18,7 +18,6 @@ const authHdr   = `UserId="${markUsrId}", `                +
 
 let token   = '';
 let cred    = null;
-let showErr = null;
 
 ////////////////////////  INIT  ///////////////////////
 
@@ -35,9 +34,7 @@ const getToken = async () => {
   token = embyShows.data.AccessToken;
 }
 
-export async function init(showErrIn) {
-  showErr = showErrIn;
-  srvr.init(showErr);
+export async function init() {
   await getToken();
   cred = {markUsrId, token};
   urls.init(cred);
@@ -218,7 +215,7 @@ export async function loadAllShows(gapCache) {
 
 export function startWorker(allShows, cb) {
   seasonsWorker.onerror = (err) => {
-    showErr('Worker:', err.message);
+    console.error('Worker:', err.message);
   }
   const allShowsIdName = [];
   for(let show of allShows) {
@@ -242,7 +239,7 @@ export async function deleteShowFromEmby(show) {
   if(res != 204) {
     const err = 
       `unable to delete ${show.Name} from emby: ${delRes.data}`;
-    showErr(err);
+    console.error(err);
     return;
   }
   console.log("deleted show from emby:", show.Name);
@@ -255,7 +252,7 @@ const deleteOneFile = async (path) => {
     await srvr.deletePath(path);
   }
   catch (e) {
-    showErr('deletePath:', path, e);
+    console.error('deletePath:', path, e);
     throw e;
   }
 }
@@ -288,7 +285,7 @@ export const editEpisode = async (seriesId,
         const path = episodeRec?.MediaSources?.[0]?.Path;
         try { await srvr.deletePath(path); }
         catch(e) { 
-          showErr('deleteOneFile:', path, e);
+          console.error('deleteOneFile:', path, e);
           throw e;
          }
       }
@@ -410,7 +407,7 @@ export const getSeriesMap = async (show, prune = false) => {
       const unaired = !!unairedObj[episodeNumber];
 
       if(avail && !path) {
-        showErr('avail without path', 
+        console.error('avail without path', 
                  `S${seasonNumber}E${episodeNumber}`);
         continue;
       }
@@ -456,13 +453,13 @@ export async function saveToTry(id, inToTry) {
   let toTryRes;
   try { toTryRes = await axios(config); }
   catch (e) {  
-    showErr(
+    console.error(
         `saveToTry, id:${id}, inToTry:${inToTry}`);
     throw e; 
   } 
   if(toTryRes.status !== 204) {
     const err = 'unable to save totry' + toTryRes.data;
-    showErr(err);
+    console.error(err);
     throw new Error(err);
   }
 }
@@ -475,13 +472,13 @@ export async function saveContinue(id, inContinue) {
   let continueRes;
   try { continueRes = await axios(config); }
   catch (e) {  
-    showErr(
+    console.error(
         `saveContinue, id:${id}, inContinue:${inContinue}`);
     throw e; 
   } 
   if(continueRes.status !== 204) {
     const err = 'unable to save Continue' + continueRes.data;
-    showErr(err);
+    console.error(err);
     throw new Error(err);
   }
 }
@@ -494,13 +491,13 @@ export async function saveMark(id, inMark) {
   let markRes;
   try { markRes = await axios(config); }
   catch (e) {  
-    showErr(
+    console.error(
         `saveMark, id:${id}, inMark:${inMark}`);
     throw e; 
   } 
   if(markRes.status !== 204) {
     const err = 'unable to save Mark ' + markRes.data;
-    showErr(err);
+    console.error(err);
     throw new Error(err);
   }
 }
@@ -513,13 +510,13 @@ export async function saveLinda(id, inLinda) {
   let lindaRes;
   try { lindaRes = await axios(config); }
   catch (e) {  
-    showErr(
+    console.error(
         `saveLinda, id:${id}, inLinda:${inLinda}`);
     throw e; 
   } 
   if(lindaRes.status !== 204) {
     const err = 'unable to save Linda' + lindaRes.data;
-    showErr(err);
+    console.error(err);
     throw new Error(err);
   }
 }

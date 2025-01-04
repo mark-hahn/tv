@@ -10,7 +10,7 @@
                 display:flex; flex-direction:column;`)
 
       #hdrtop(style=`width:100%; display:flex;
-                    flex-direction:row; justify-content:space-between;`)
+                    flex-direction:row; justify-content:start;`)
         button(@click="showAll" 
                 style=`margin-left:10px; margin-right:5px;
                        fontSize:15px; margin:4px;
@@ -23,16 +23,16 @@
                   style="margin-left:1px;")
             font-awesome-icon(icon="search")
 
+        button(@click="topClick" 
+                style=`margin-left:10px; margin-right:5px;
+                      fontSize:15px; margin:4px;
+                      background-color:white;`) Top
+
         button(@click="watchClick" 
                 style=`margin-left:10px; margin-right:5px;
                       fontSize:15px; margin:4px;
                       background-color:white;`) 
           | {{ watchingName }}
-
-        #err(@click="errClick" 
-              style=`flex-grow:1; display:inline-block; 
-                    font-size:20px; color:red;
-                    cursor:default; height:20px;`) {{errMsg}}
 
       #hdrbottom(style=`width:100%; background-color:#ccc; 
                         display:flex; justify-content:space-between;
@@ -222,8 +222,6 @@ library.add([
 let   allShows         = [];
 let   blockedWaitShows = null;
 let   showErr          = null;
-const errFifo          = [];
-let   openedWindow     = null;
 
 export default {
   name: "List",
@@ -461,13 +459,13 @@ export default {
                 "Enter series name. " +
                 "It is used as an approximate search string.");
       if (!srchTxt) {
-        //- showErr("Search string is empty");
+        //- console.error("Search string is empty");
         return;
       }
 
       const tvdbData = await tvdb.srchTvdbData(srchTxt);
       if(!tvdbData) {
-        showErr('No series found in tvdb for:', srchTxt);
+        console.error('No series found in tvdb for:', srchTxt);
         return;
       }
       const {name, waitStr} = tvdbData;
@@ -509,33 +507,6 @@ export default {
       await srvr.addNoEmby(show);
     },
 
-    showErr (...params) {
-      let err = "";
-      for (let param of params) {
-        if (param instanceof Error)
-             err += param.message    + " ";
-        else if (typeof param == "object") 
-             err += JSON.stringify(param, null, 2) + " ";
-        else err += param.toString() + " ";
-      }
-      // err = err.slice(0, -4)
-      console.error(err);
-      if(this.errMsg) 
-        errFifo.push(err);
-      else this.errMsg = err;
-    },
-
-    errClick (evt) {
-      if(evt.ctrlKey) {
-        errFifo.length = 0;
-        this.errMsg = "";
-      }
-      else if (errFifo.length) 
-        this.errMsg = errFifo.shift();
-      else
-        this.errMsg = "";
-    },
-    
     topClick() {
       const container = document.querySelector("#shows");
       container.scrollTop = 0;
@@ -554,7 +525,7 @@ export default {
     nameHash(name) {
       this.allShowsLength = allShows.length;
       if(!name) {
-        //- showErr('nameHash name param null:', name);
+        //- console.error('nameHash name param null:', name);
         return null;
       }
       return (
@@ -610,7 +581,7 @@ export default {
         let show = allShows.find(
                 (shw) => shw.Name == name);
         if (show === -1) {
-          showErr("scrollToSavedShow: show not found:", name);
+          console.error("scrollToSavedShow: show not found:", name);
           show = allShows[0];
           defaultShow = true;
         }
@@ -862,7 +833,7 @@ export default {
 
       } 
       catch (err) {
-        showErr("Mounted:", err);
+        console.error("Mounted:", err);
       }
     })();
   },

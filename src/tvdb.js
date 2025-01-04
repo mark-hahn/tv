@@ -26,7 +26,7 @@ const getToken = async () => {
     }
   );
   if (!loginResp.ok) {
-    showErr(`FATAL: TvDbToken Response: ${loginResp.status}`);
+    console.error(`FATAL: TvDbToken Response: ${loginResp.status}`);
     process.exit();
   }
   const loginJSON = await loginResp.json();
@@ -166,7 +166,7 @@ export const srchTvdbData = async (searchStr) => {
                       Authorization:'Bearer ' + theTvdbToken}
                     });
   if (!srchRes.ok) {
-    showErr(`tvdb search:`, {searchStr}, srchRes.status);
+    console.error(`tvdb search:`, {searchStr}, srchRes.status);
     return null;
   }
   const srchResObj = await srchRes.json();
@@ -212,7 +212,7 @@ export const getTvdbData = async (show) => {
                       Authorization:'Bearer ' + theTvdbToken
                 }});
   if (!extRes.ok) {
-    showErr(`tvdb extended: ${extRes.status}`);
+    console.error(`tvdb extended: ${extRes.status}`);
     return null;
   }
   const extResObj  = await extRes.json();

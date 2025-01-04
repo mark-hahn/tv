@@ -22,7 +22,7 @@
         #srch(style=`margin-top:3px;`)
           input(v-model="searchStr" 
                 @input="select"
-                  style="border:1px solid black; width:100px;")
+                 style="border:1px solid black; width:120px;")
           button(@click="select" 
                   style="margin-left:1px;")
             font-awesome-icon(icon="search")
@@ -600,6 +600,8 @@ export default {
       this.fltrChoice = fltrChoice;
       this.sortPopped = false;
       this.fltrPopped = false;
+      this.searchStr = "";
+      this.select();
       this.sortShows();
     },
 
@@ -708,31 +710,13 @@ export default {
     },
 
     sortShows() {
-      allShows.sort((a, b) => {
+      this.shows.sort((a, b) => {
         switch (this.sortChoice) {
           case 'Alpha':
-            if (a.Name == b.Name) return 0;
-            return a.Name > b.Name ? -1 : +1;
-          case 'Added': 
-            if (a.DateCreated == b.DateCreated) return 0;
-            return a.DateCreated > b.DateCreated ? -1 : +1;
-          case 'Activity':
-            if (a.DateCreated == b.DateCreated) return 0;
-            return a.DateCreated > b.DateCreated ? -1 : +1;
-          case 'Size':
-            if (a.DateCreated == b.DateCreated) return 0;
-            return a.DateCreated > b.DateCreated ? -1 : +1;
-          case 'Viewed':
-            if (a.DateCreated == b.DateCreated) return 0;
-            return a.DateCreated > b.DateCreated ? -1 : +1;
-
-          default: console.error(
-              'unknown sortChoice:', this.sortChoice);
-        }
-        switch (this.fltrChoice) {
-          case 'Alpha':
-            if (a.Name == b.Name) return 0;
-            return a.Name > b.Name ? -1 : +1;
+            a = a.Name.replace(/^the\s/, "").toLowerCase();
+            b = b.Name.replace(/^the\s/, "").toLowerCase();
+            if (a == b) return 0;
+            return a > b ? +1 : -1;
           case 'Added': 
             if (a.DateCreated == b.DateCreated) return 0;
             return a.DateCreated > b.DateCreated ? -1 : +1;

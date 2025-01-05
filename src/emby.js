@@ -18,5 +18,3 @@ export const getCurrentlyWatching = async (player='roku') => {
   console.log(`Watching on ${player}: ${showName}`);
   return showName;
 }
-
-await getCurrentlyWatching();

@@ -16,7 +16,8 @@ add ...
   chg no show in tvdb err to pop-up notification
 
 todo ...
-  button for watching now
+  move common code to srvr?
+  show actors
   show watched/total avail
   update imdb rating periodicaly
   if emby show has no files and has pickup, set to noemby

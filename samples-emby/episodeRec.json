@@ -1,0 +1,41 @@
+{
+    "Name": "Season 1",
+    "ServerId": "ae3349983dbe45d9aa1d317a7753483e",
+    "Id": "4794921",
+    "DateCreated": "2025-01-03T11:48:05.0000000Z",
+    "SortName": "Season 1",
+    "PremiereDate": "2018-03-27T07:00:00.0000000Z",
+    "ExternalUrls": [],
+    "Path": "/mnt/media/tv/Splitting Up Together (US)/Season 1",
+    "Genres": [],
+    "ProductionYear": 2018,
+    "IndexNumber": 1,
+    "ProviderIds": {},
+    "IsFolder": true,
+    "Type": "Season",
+    "People": [],
+    "GenreItems": [],
+    "TagItems": [],
+    "ParentLogoItemId": "4794920",
+    "ParentBackdropItemId": "4794920",
+    "ParentBackdropImageTags": [
+        "7beebbb5bb7df4ed78687bfb63ea9175"
+    ],
+    "UserData": {
+        "UnplayedItemCount": 7,
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 0,
+        "IsFavorite": false,
+        "Played": false
+    },
+    "SeriesName": "Splitting Up Together (US)",
+    "SeriesId": "4794920",
+    "SeriesPrimaryImageTag": "fb7ad94997976e8796891075d57aaa1a",
+    "ImageTags": {
+        "Primary": "3cfffd950e65b47df2bc48a36b4d038c"
+    },
+    "BackdropImageTags": [],
+    "ParentLogoImageTag": "5874c5e68ea1d487612f494f770e3c47",
+    "ParentThumbItemId": "4794920",
+    "ParentThumbImageTag": "243f7dbdb0cd7d6cef43f857d1d1cff9"
+}

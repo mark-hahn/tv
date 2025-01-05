@@ -2,7 +2,6 @@ import axios     from "axios"
 import * as tvdb from "./tvdb.js";
 import * as srvr from "./srvr.js";
 import * as urls from "./urls.js";
-import * as util from "./util.js";
 
 const seasonsWorker = 
   new Worker(new URL('gap-worker.js', import.meta.url), 
@@ -310,12 +309,8 @@ export const editEpisode = async (seriesId,
 }
 
 // get currently watching show
-export const getCurrentlyWatching = async (player = 'roku') => {
-  let url;
-  if(player == 'roku')
-      url = "https://hahnca.com:8920/emby/Sessions?DeviceId=9f53d43e-e5f7-5161-881a-d91843d0d372&api_key=9863c23d912349599e395950609c84cc"
-  if(player == 'mlap')
-      url = "https://hahnca.com:8920/emby/Sessions?DeviceId=ca632bcd-7279-4fc2-b5b8-6f92ae6ddb08&api_key=9863c23d912349599e395950609c84cc"
+export const getCurrentlyWatching = async (player='roku') => {
+  const url = urls.watchingUrl(player);
   const res = await axios.get(url);
   const nowPlaying = res.data[0].NowPlayingItem;
   if(!nowPlaying) {

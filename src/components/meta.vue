@@ -59,6 +59,7 @@ export default {
   
   methods: {
     openMap(show) {
+      console.log('Meta: openMap:', show);
       evtBus.emit('openMap', show);
     },
 

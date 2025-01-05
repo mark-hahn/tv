@@ -1,0 +1,105 @@
+{
+    "Name": "Dollface",
+    "ServerId": "ae3349983dbe45d9aa1d317a7753483e",
+    "Id": "4794560",
+    "DateCreated": "2024-12-27",
+    "PremiereDate": "2019-11-15",
+    "ExternalUrls": [
+        {
+            "Name": "IMDb",
+            "Url": "https://www.imdb.com/title/tt7661046"
+        },
+        {
+            "Name": "MovieDb",
+            "Url": "https://www.themoviedb.org/tv/84584"
+        },
+        {
+            "Name": "TheTVDB",
+            "Url": "https://thetvdb.com/?tab=series&id=367553"
+        },
+        {
+            "Name": "Trakt",
+            "Url": "https://trakt.tv/search/tmdb/84584?id_type=show"
+        }
+    ],
+    "Path": "/mnt/media/tv/Dollface",
+    "Overview": "After being dumped by her longtime boyfriend, a young woman must deal with her own imagination in order to literally and metaphorically re-enter the world of women, and rekindle the female friendships she left behind.",
+    "Genres": [
+        "Comedy"
+    ],
+    "ProviderIds": {
+        "Tvdb": "367553",
+        "Official Website": "https://hulu.tv/3HXTGn2",
+        "X (Twitter)": "DollfaceOnHulu",
+        "Reddit": "Dollface/",
+        "Instagram": "dollfaceonhulu/",
+        "Tmdb": "84584",
+        "EIDR": "10.5240/6689-E47E-9B56-29E8-CFA6-8",
+        "IMDB": "tt7661046"
+    },
+    "IsFolder": true,
+    "Type": "Series",
+    "People": [
+        {
+            "Name": "Kat Dennings",
+            "Id": "4780678",
+            "Role": "Jules Wiley",
+            "Type": "Actor",
+            "PrimaryImageTag": "36b4b4fef6f32a6e454145793f82f388"
+        },
+        {
+            "Name": "Shay Mitchell",
+            "Id": "4716546",
+            "Role": "Stella Cole",
+            "Type": "Actor",
+            "PrimaryImageTag": "a9bfc5229d0b7d4d39016674035ad7b0"
+        },
+        {
+            "Name": "Brenda Song",
+            "Id": "4794688",
+            "Role": "Madison Maxwell",
+            "Type": "Actor",
+            "PrimaryImageTag": "3cba321a6dacfb6ce1fa3ab801b3da7e"
+        },
+        {
+            "Name": "Esther Povitsky",
+            "Id": "4794689",
+            "Role": "Izzy Levine",
+            "Type": "Actor",
+            "PrimaryImageTag": "f562b23af0a51d14adf0bdfc47627821"
+        },
+        {
+            "Name": "Beth Grant",
+            "Id": "4758302",
+            "Role": "Cat Lady",
+            "Type": "Actor",
+            "PrimaryImageTag": "f47f56d986fb9f443cccb497b9df7b20"
+        }
+    ],
+    "GenreItems": [
+        {
+            "Name": "Comedy",
+            "Id": 8009
+        }
+    ],
+    "AirDays": [],
+    "ImageTags": {
+        "Primary": "53e91a646507bb7c609281cde34b61d6",
+        "Logo": "232f7ab5afa8a900cc41ccd7482ed074",
+        "Thumb": "d4bc4593656409bc553a870a6641534f"
+    },
+    "BackdropImageTags": [
+        "aec79f0e37690b11c020f68f299f2fad"
+    ],
+    "UnplayedItemCount": 8,
+    "PlaybackPositionTicks": 0,
+    "PlayCount": 0,
+    "IsFavorite": false,
+    "Played": false,
+    "Date": "2024-12-27",
+    "Size": 4588081343,
+    "InToTry": true,
+    "InContinue": false,
+    "InMark": false,
+    "InLinda": false
+}

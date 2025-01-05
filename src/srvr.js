@@ -129,6 +129,17 @@ export async function deleteShowFromSrvr(show) {
   console.log("deleted show from server:", show.Name);
 }
 
+let lastGetLastViewed      = 0;
+let lastGetLastViewedCache = {};
+export async function getLastViewed() {
+  if((Date.now() - lastGetLastViewed) > 10000) {
+    lastGetLastViewedCache = await fCall('getLastViewed');
+    lastGetLastViewed = Date.now();
+    console.log("refreshed last viewed cache");
+  }
+  return lastGetLastViewedCache;
+}
+
 export function getAllShows()      
             {return fCall('getAllShows')}
 

@@ -122,27 +122,11 @@
               font-awesome-icon(icon="border-all" style="color:#ccc")
 
           td(@click="saveVisShow(show)"
-               v-if="sortByNew" 
              :style=`{width:'80px', fontSize:'16px',
                       backgroundColor: hilite(show),
                       cursor:'default'}`) 
-            | {{ show.DateCreated }}
+            | {{  getValBySortChoice(show) }}
             
-          td(@click="saveVisShow(show)"
-               v-if="sortByActivity" 
-             :style=`{width:'80px', fontSize:'16px',
-                      backgroundColor: hilite(show),
-                      cursor:'default'}`) 
-            | {{ show.Date }}
-
-          td(@click="saveVisShow(show)"
-             v-if="sortBySize" 
-             :style=`{width:'80px', fontSize:'16px', 
-                      textAlign:'center',
-                      backgroundColor: hilite(show), 
-                      cursor:'default'}`) 
-            | {{ formatSize(show) }}
-
           td(:style=`{display:'flex', justifyContent:'space-between',
                       padding:'5px', backgroundColor: hilite(show)}`)
 
@@ -402,7 +386,7 @@ export default {
 
       sortPopped:        false,
       sortChoices:          
-        ['Alpha', 'Added', 'Activity', 'Size', 'Viewed'],
+        ['Alpha', 'Added', 'Updated', 'Size', 'Viewed'],
       sortChoice:     'Viewed', 
 
       fltrPopped:        false,
@@ -465,6 +449,21 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
+    getValBySortChoice(show, forSort = false) {
+      switch(this.sortChoice) {
+        case 'Alpha':   
+          if(!forSort) return '';
+          return show.Name.replace(/^the\s/, "").toLowerCase();
+        case 'Added':   return util.fmtDate(show.DateCreated);
+        case 'Updated': return util.fmtDate(show.Date);
+        case 'Size':    return util.fmtSize(show);
+        case 'Viewed':  
+          if(forSort) 
+            return util.lastViewedCache[show.Name] || 0;
+          return util.fmtDate(util.lastViewedCache[show.Name]);
+      }
+    },
+
     async chkRowDelete(show, force) {
       if (force || (!show.Reject && !show.Pickup &&
                      show.Id.startsWith("noemby-"))) {
@@ -547,15 +546,6 @@ export default {
       const container = document.querySelector("#shows");
       container.scrollTop = 0;
       this.saveVisShow(allShows[0]);
-    },
-
-    formatSize (show) {
-      if(show.Id.startsWith("noemby-")) return "";
-      const size = show.Size;
-      if (size < 1e3) return size;
-      if (size < 1e6) return Math.round(size / 1e3) + "K";
-      if (size < 1e9) return Math.round(size / 1e6) + "M";
-                      return Math.round(size / 1e9) + "G";
     },
 
     nameHash(name) {
@@ -711,28 +701,10 @@ export default {
 
     sortShows() {
       this.shows.sort((a, b) => {
-        switch (this.sortChoice) {
-          case 'Alpha':
-            a = a.Name.replace(/^the\s/, "").toLowerCase();
-            b = b.Name.replace(/^the\s/, "").toLowerCase();
-            if (a == b) return 0;
-            return a > b ? +1 : -1;
-          case 'Added': 
-            if (a.DateCreated == b.DateCreated) return 0;
-            return a.DateCreated > b.DateCreated ? -1 : +1;
-          case 'Activity':
-            if (a.DateCreated == b.DateCreated) return 0;
-            return a.DateCreated > b.DateCreated ? -1 : +1;
-          case 'Size':
-            if (a.DateCreated == b.DateCreated) return 0;
-            return a.DateCreated > b.DateCreated ? -1 : +1;
-          case 'Viewed':
-            if (a.DateCreated == b.DateCreated) return 0;
-            return a.DateCreated > b.DateCreated ? -1 : +1;
-
-          default: console.error(
-              'unknown sortChoice:', this.sortChoice);
-        }
+        a = this.getValBySortChoice(a, true);
+        b = this.getValBySortChoice(b, true);
+        if (a == b) return 0;
+        return a > b ? -1 : +1;
       });
     },
 
@@ -840,10 +812,10 @@ export default {
         // must be set before startWorker
         blockedWaitShows = showsBlocks.blockedWaitShows;
 
-        // emby.startWorker(allShows, this.addGapToShow);
+        emby.startWorker(allShows, this.addGapToShow);
 
         this.sortByNew      = true;
-        this.sortByActivity = false;
+        this.sortByUpdated = false;
         this.sortBySize     = false;
         this.sortShows();
         this.showAll(true);

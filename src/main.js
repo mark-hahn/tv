@@ -7,7 +7,9 @@ bugs ...
   uneven season lengths break file missing 
           (Interview with the Vampire)
   pickup delete not permanent
-  
+  noemby doesn't alpha sort right
+  bogus file gap (strike)
+
 add ...
   add-new broken: no hit on tvdb (Daddy Issues)
   alread exists broken ("middle")

@@ -1,5 +1,3 @@
-import * as srvr from "./srvr.js";
-
 export function fmtDate(dateStr, includeYear = true) {
   if(!dateStr) return "";
   const date     = dateStr ? new Date(dateStr) : new Date();
@@ -16,13 +14,3 @@ export function fmtSize(show) {
                   return Math.round(size / 1e9) + "G";
 }
 
-export const lastViewedCache = {};
-
-const updateLastViewedCache = async () => {
-  const lastViewed = await srvr.getLastViewed();
-  Object.assign(lastViewedCache, lastViewed);
-}
-
-await updateLastViewedCache();
-
-setInterval(updateLastViewedCache, 60*1000); // 1 minute

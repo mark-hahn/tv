@@ -124,7 +124,7 @@
           td(@click="saveVisShow(show)"
              :style=`{width:'80px', fontSize:'16px',
                       backgroundColor: hilite(show),
-                      cursor:'default'}`) 
+                      cursor:'default', textAlign:'center'}`) 
             | {{  getValBySortChoice(show) }}
             
           td(:style=`{display:'flex', justifyContent:'space-between',
@@ -456,11 +456,13 @@ export default {
           return show.Name.replace(/^the\s/, "").toLowerCase();
         case 'Added':   return util.fmtDate(show.DateCreated);
         case 'Updated': return util.fmtDate(show.Date);
-        case 'Size':    return util.fmtSize(show);
+        case 'Size':    
+          if(forSort) return show.Size;
+          return util.fmtSize(show);
         case 'Viewed':  
           if(forSort) 
-            return util.lastViewedCache[show.Name] || 0;
-          return util.fmtDate(util.lastViewedCache[show.Name]);
+            return srvr.lastViewedCache[show.Name] || 0;
+          return util.fmtDate(srvr.lastViewedCache[show.Name]);
       }
     },
 
@@ -704,6 +706,8 @@ export default {
         a = this.getValBySortChoice(a, true);
         b = this.getValBySortChoice(b, true);
         if (a == b) return 0;
+        if(this.sortChoice == 'Alpha')
+          return a > b ? +1 : -1;
         return a > b ? -1 : +1;
       });
     },

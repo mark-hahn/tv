@@ -39,7 +39,7 @@ export function childrenUrl(cred, parentId='', unAired=false) {
           / ${cred.markUsrId} / Items /
     ? ParentId=${parentId}
     ${unAired ? '& IsUnaired = true' : ''}
-    & Fields = MediaSources,DateCreated,Genres,Overview,People,ProviderIds,ExternalUrls,Path,SortName,ProductionYear,Status,UserData,PlayAccess,IsFolder,Type,Tags,PremiereDate 
+    & Fields = MediaSources,DateCreated,Genres,Overview,People,ProviderIds,ExternalUrls,Path,SortName,ProductionYear,Status,UserData,PlayAccess,IsFolder,Type,Tags,PremiereDate,LastPlayedDate
     & X-Emby-Token = ${cred.token}
   `.replace(/\s*/g, "");
 }

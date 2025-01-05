@@ -9,6 +9,7 @@ bugs ...
   pickup delete not permanent
   noemby doesn't alpha sort right
   bogus file gap (strike)
+  did i break set-date in map with new fmtdate?
 
 add ...
   add-new broken: no hit on tvdb (Daddy Issues)

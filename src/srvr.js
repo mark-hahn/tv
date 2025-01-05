@@ -87,6 +87,8 @@ handleMsg = (msg) => {
     return;
   }
   const [id, status, result] = parts.slice(1);
+  if(status != 'ok') 
+    console.error('Reject from server:', {id, status, result});
   // console.log("handling msg:", id, status);
   if(id == '0') return;
 

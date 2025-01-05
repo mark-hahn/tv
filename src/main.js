@@ -19,6 +19,7 @@ add ...
   chg no show in tvdb err to pop-up notification
 
 todo ...
+  save sort and filter in local storage
   move common code to srvr?
   show actors
   show watched/total avail

@@ -107,18 +107,17 @@ export const getRemotes = async (show) => {
 
   remotes = [];
 
-  if(!showId.startsWith("noemby-")) {
-    remotes[0] = {name:'Emby', url: urls.embyPageUrl(showId)};
-    return null
-  }
+  if(!showId.startsWith("noemby-")) remotes[0] = 
+            {name:'Emby', url: urls.embyPageUrl(showId)};
+
   const tvdbdata = await getTvdbData(show);
   if(!tvdbdata) {
-    console.log(`getRemotes, no tvdbdata: ${showName}`);
+    console.error(`getRemotes, no tvdbdata: ${showName}`);
     return null;
   }
   const remoteIds = tvdbdata.tvdbRemotes;
   if(!remoteIds) {
-    console.log(`getRemotes, no remoteIds: ${showName}`);
+    console.error(`getRemotes, no remoteIds: ${showName}`);
     return null;
   }
 
@@ -132,9 +131,10 @@ export const getRemotes = async (show) => {
   }
 
   const imdbRemote = remotesByName["IMDB"];
-  imdbRemote.name += ' (' + imdbRemote.ratings + ')';
-  if(imdbRemote) remotes.push(imdbRemote);
-
+  if(imdbRemote) {
+    imdbRemote.name += ' (' + imdbRemote.ratings + ')';
+    remotes.push(imdbRemote);
+  } 
   const rottenRemote = await getRemote(
         {id:showName, type:99}, showName);
   if(rottenRemote) remotes.push(rottenRemote);

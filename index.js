@@ -409,9 +409,11 @@ const getRemotes = (id, name, resolve, _reject) => {
   console.log(`getRemotes`, {id, name});
   const remotes = allRemotes[name];
   if(!remotes) {
+    console.error(`getRemotes no match`, {id, name});
     resolve([id, {noMatch: true}]);
     return
   } 
+  // console.log(`getRemotes success`, remotes);
   resolve([id, remotes]);
 };
 

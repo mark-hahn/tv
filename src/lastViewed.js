@@ -16,8 +16,8 @@ const checkWatch = async () => {
   }
   lastShowName = showName;
   
-  console.log({lastShowName, showName, 
-                    lastViewed: JSON.stringify(lastViewed, null,2)});
+  // console.log({lastShowName, showName, 
+  //                   lastViewed: JSON.stringify(lastViewed, null,2)});
 }
 
 let lastShowName = null;

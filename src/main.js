@@ -4,6 +4,8 @@ reminder, restore ...
   cache
 
 bugs ...
+  mark all as favorite (do once)
+  shows-all-watched show in ready (chg meaning of +)
   uneven season lengths break file missing 
           (Interview with the Vampire)
   pickup delete not permanent
@@ -19,8 +21,7 @@ add ...
   chg no show in tvdb err to pop-up notification
 
 todo ...
-  save sort and filter in local storage
-  move common code to srvr?
+  move common code from client to srvr
   show actors
   show watched/total avail
   update imdb rating periodicaly
@@ -33,7 +34,7 @@ todo ...
 new features ...
   show last episode date in map (each season?)
   refresh filtered rows when new gap loaded
-  show hilight row button
+  button: set hilighted row to vis 
   map: click on season numbers for whole row
 
 tabled ...

@@ -1,6 +1,6 @@
 <template lang="pug">
 
-#meta(style=`height:95dvh; padding:0; margin:0; 
+#series(style=`height:95dvh; padding:0; margin:0; 
               display:flex; flex-direction:column;
               padding:5px;`)
 
@@ -45,7 +45,7 @@ import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 
 export default {
-  name: "Meta",
+  name: "Series",
 
   data() {
     return {
@@ -59,12 +59,12 @@ export default {
   
   methods: {
     openMap(show) {
-      console.log('Meta: openMap:', show);
+      console.log('Series: openMap:', show);
       evtBus.emit('openMap', show);
     },
 
     async remoteClick(remote) {
-      console.log('Meta: remoteClick:', {remote});
+      console.log('Series: remoteClick:', {remote});
       const url = remote.url;
       if(url) window.open(url, 'tv-series');
     },
@@ -93,11 +93,11 @@ export default {
       const trySrvrImg = () => {
         img.src = 'https://hahnca.com/tv/' +
                      encodeURI(srvrPath) + srvrImages[imgIdx]; 
-        // console.log('Meta: trying srvr img:',  img.src);
+        // console.log('Series: trying srvr img:',  img.src);
       };
       const tryEmbyImg = () => {
         img.src = embyImages[imgIdx-srvrImages.length]; 
-        // console.log('Meta: trying emby img:',  img.src);
+        // console.log('Series: trying emby img:',  img.src);
       }
       if(showPath) {
         srvrPath = showPath.split('/').pop();
@@ -109,11 +109,11 @@ export default {
         tryEmbyImg();
       }
       img.onload = () => {
-        // console.log('Meta showing img:',  img.src);
+        // console.log('Series showing img:',  img.src);
         document.getElementById('poster').replaceChildren(img);
       };
       img.onerror = () => {
-        // console.log('Meta no img:', img.src);
+        // console.log('Series no img:', img.src);
         if(++imgIdx < srvrImages.length) {
           trySrvrImg();
         }
@@ -123,7 +123,7 @@ export default {
         }
         else {
           img.src = 'https://hahnca.com/tv/no-image-icon-23485.png'; 
-          // console.log( `Meta default img: ` + img.src);
+          // console.log( `Series default img: ` + img.src);
           return;
         }
       };
@@ -140,7 +140,7 @@ export default {
       const show = this.show;
       const tvdbData = await tvdb.getTvdbData(show);
       if(!tvdbData) {
-        console.error('Meta: setDates: no tvdbData:', show);
+        console.error('Series: setDates: no tvdbData:', show);
         this.dates = '';
         return;
       }
@@ -183,7 +183,7 @@ export default {
   mounted() {
     evtBus.on('showSelected', async (show) => { 
       this.remotes[0] = 1;
-      console.log('Meta: showSelected:', show.Name);
+      console.log('Series: showSelected:', show.Name);
       this.show = show;
       await this.setPoster();
       await this.setDates();

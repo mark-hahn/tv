@@ -27,10 +27,6 @@
                   style="margin-left:1px;")
             font-awesome-icon(icon="search")
 
-        button(@click="showAll" 
-                style=`margin-left:10px; margin-right:5px;
-                       fontSize:15px; margin:4px;
-                       background-color:white;`) All
         button(@click="topClick" 
                 style=`margin-left:10px; margin-right:5px;
                       fontSize:15px; margin:4px;
@@ -386,7 +382,7 @@ export default {
       watchingName:      '---',
       sortPopped:        false,
       sortChoices:          
-        ['Alpha', 'Added', 'Updated', 'Size', 'Viewed'],
+        ['Alpha', 'Viewed', 'Added', 'Updated', 'Size'],
       sortChoice:     'Viewed', 
       fltrPopped:        false,
       fltrChoices:          

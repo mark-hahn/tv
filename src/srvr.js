@@ -134,7 +134,7 @@ const updateLastViewedCache = async () => {
   const lastViewed = await fCall('getLastViewed');
   Object.assign(lastViewedCache, lastViewed);
 }
-await updateLastViewedCache();
+updateLastViewedCache();
 setInterval(updateLastViewedCache, 60*1000); // 1 minute
 
 export function getAllShows()      

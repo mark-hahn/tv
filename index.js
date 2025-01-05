@@ -4,6 +4,7 @@ import util                from "util";
 import * as cp             from 'child_process';
 import { WebSocketServer } from 'ws';
 import fetch               from 'node-fetch';
+import * as view           from './src/lastViewed.js';
 
 process.setMaxListeners(50);
 const dontupload  = false;
@@ -599,11 +600,15 @@ wss.on('connection', (ws, req) => {
     // call function fname
     // console.log(`call function`, {id, fname, param});
     switch (fname) {
-      case 'getAllShows': getAllShows(id, '',   resolve, reject); break;
+      case 'getAllShows':   getAllShows(id,    '', resolve, reject); break;
+      case 'deletePath':    deletePath( id, param, resolve, reject); break;
+      case 'getUrls':       getUrls(    id, param, resolve, reject); break;
+      case 'getLastViewed':  
+                     view.getLastViewed(id,    '', resolve, reject); break;
 
       case 'getBlockedWaits': getBlockedWaits(id, '',   resolve, reject); break;
       case 'addBlockedWait':  addBlockedWait(id, param, resolve, reject); break;
-      case 'delBlockedWait':  delBlockedWait(id, param, resolve, reject); break;
+      case 'delBlockedWait': delBlockedWait(id, param, resolve, reject); break;
 
       case 'getRejects':  getRejects(id, '',    resolve, reject); break;
       case 'addReject':   addReject( id, param, resolve, reject); break;
@@ -629,9 +634,6 @@ wss.on('connection', (ws, req) => {
       case 'addRemotes':  addRemotes(id, param, resolve, reject); break;
       case 'delRemotes':  delRemotes(id, param, resolve, reject); break;
       
-      case 'deletePath':  deletePath(id, param, resolve, reject); break;
-
-      case 'getUrls':     getUrls(   id, param, resolve, reject); break;
 
       default: reject([id, 'unknownfunction: ' + fname]);
     };

@@ -79,7 +79,7 @@
           style=`width:200px; background-color:#eee;
                 border: 1px solid black; position: fixed; 
                 display:flex; flex-direction:column;
-                left: 200px; top: 75px;`) 
+                left: 144px; top: 75px;`) 
       div(style=`text-align:center;
                 margin:10px; font-weight:bold;`) 
         | Sort
@@ -92,10 +92,11 @@
         | {{sortChoice}}
 
     #fltrpop(v-if="fltrPopped" 
-          style=`width:200px; background-color:#eee; padding:0px;
+          style=`width:200px;
+                background-color:#eee; padding:0px;
                 border: 1px solid black; position: fixed; 
                 display:flex; flex-direction:column;
-                left: 200px; top: 75px;`) 
+                left: 253px; top: 75px;`) 
       div(style=`text-align:center;
                  margin:10px; font-weight:bold;`) 
         | Filter
@@ -383,65 +384,72 @@ export default {
       seriesMap:            {},
       gapPercent:            0,
       watchingName:      '---',
-
       sortPopped:        false,
       sortChoices:          
         ['Alpha', 'Added', 'Updated', 'Size', 'Viewed'],
       sortChoice:     'Viewed', 
-
       fltrPopped:        false,
       fltrChoices:          
-        ['All', 'ToTry', 'Continue', 'Mark', 'Linda'],
+        ['All', 'Ready', 'To-Try', 'Try Drama', 'Continue', 'Mark', 'Linda'],
       fltrChoice:        'All',          
 
       conds: [ {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],
           cond(show)  { return show.UnplayedItemCount > 0; },
-          click() {},
+          click() {}, name: "unplayed",
         }, {
           color: "#f88", filter: 0, icon: ["fas", "minus"],
           cond(show)  { return show.Missing || show.WatchGap},
-          click() {},
+          click() {}, name: "gap",
         }, {
           color: "#0c0", filter: 0, icon: ["far", "clock"],
           cond(show)  { return show.Waiting; },
           click(show) { toggleWaiting(show); },
+          name: "waiting",
         }, {
           color: "blue", filter: 0, icon: ["far", "sad-cry"],
           cond(show)  { return show.Genres?.includes("Drama"); },
-          click(show) {},
+          click(show) {}, name: "drama",
         }, {
           color: "lime", filter: 0, icon: ["fas", "question"],
           cond(show)  { return show.InToTry; },
           click(show) { toggleToTry(show); },
+           name: "totry",
         }, {
           color: "lime", filter: 0, icon: ["fas", "arrow-right"],
           cond(show)  { return show.InContinue; },
           click(show) { toggleContinue(show); },
+           name: "continue",
         }, {
           color: "lime", filter: 0, icon: ["fas", "mars"],
           cond(show)  { return show.InMark; },
           click(show) { toggleMark(show); },
+           name: "mark",
         }, {
           color: "lime", filter: 0, icon: ["fas", "venus"],
           cond(show)  { return show.InLinda; },
           click(show) { toggleLinda(show); },
+          name: "linda",
         }, {
           color: "red", filter: 0, icon: ["far", "heart"],
           cond(show)  { return show.IsFavorite; },
           click(show) { toggleFavorite(show); },
+          name: "favorite",
         }, {
           color: "red", filter: -1, icon: ["fas", "ban"],
           cond(show)  { return show.Reject; },
           click(show) { toggleReject(show); },
+          name: "ban",
         }, {
           color: "#5ff", filter: 0, icon: ["fas", "arrow-down"],
           cond(show)  { return show.Pickup; },
           click(show) { togglePickup(show); },
+          name: "pickup",
         }, {
           color: "#a66", filter: 0, icon: ["fas", "tv"],
           cond(show)  { return !show.Id.startsWith("noemby-"); },
           click(show) { deleteShow(show); },
+          name: "hasemby",
         },
       ],
     };
@@ -578,6 +586,7 @@ export default {
     },
     async sortAction(sortChoice) {
       console.log('sortAction', sortChoice);
+      window.localStorage.setItem("sortChoice", sortChoice);
       this.sortChoice = sortChoice;
       this.sortPopped = false;
       this.fltrPopped = false;
@@ -589,10 +598,15 @@ export default {
     },
     async fltrAction(fltrChoice) {
       console.log('fltrAction', fltrChoice);
+      window.localStorage.setItem("fltrChoice", fltrChoice);
       this.fltrChoice = fltrChoice;
       this.sortPopped = false;
       this.fltrPopped = false;
       this.searchStr = "";
+      for (let cond of this.conds) {
+         util.setCondFltr(cond, this.fltrChoice);
+         console.log('cond:', cond.name, cond.filter);
+      }
       this.select();
       this.sortShows();
     },
@@ -821,6 +835,8 @@ export default {
         this.sortByNew      = true;
         this.sortByUpdated = false;
         this.sortBySize     = false;
+        this.sortChoice = 
+          window.localStorage.getItem("sortChoice") || 'Viewed';
         this.sortShows();
         this.showAll(true);
 

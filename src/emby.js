@@ -2,6 +2,7 @@ import axios     from "axios"
 import * as tvdb from "./tvdb.js";
 import * as srvr from "./srvr.js";
 import * as urls from "./urls.js";
+import * as util from "./util.js";
 
 const seasonsWorker = 
   new Worker(new URL('gap-worker.js', import.meta.url), 

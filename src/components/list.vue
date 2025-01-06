@@ -118,7 +118,7 @@
                   @click="seriesMapAction('open', show)")
               font-awesome-icon(icon="border-all" style="color:#ccc")
 
-          td(@click="saveVisShow(show)"
+          td(@click="saveVisShow(show, false, true)"
              :style=`{width:'80px', fontSize:'16px',
                       backgroundColor: hilite(show),
                       cursor:'default', textAlign:'center'}`) 
@@ -129,12 +129,12 @@
 
             div(style=`padding:2px; 
                         fontSize:16px; font-weight:bold;` 
-               @click="saveVisShow(show)"
+               @click="saveVisShow(show, false, true)"
             ) {{show.Name}} 
 
             div(style=`padding:2px; flex-grow:1;
                         fontSize:16px; font-weight:bold;` 
-               @click="saveVisShow(show)"
+               @click="saveVisShow(show, false, true)"
             )
 
             div(v-if="show.WaitStr?.length" 
@@ -234,6 +234,8 @@ let   showErr          = null;
 
 export default {
   name: "List",
+  props: ['showEpiNotSeries'],
+
   components: { FontAwesomeIcon },
   data() {
 
@@ -569,11 +571,22 @@ export default {
       );
     },
 
-    saveVisShow(show, scroll = false) {
+    saveVisShow(show, scroll = false, fromDom = false) {
+      if(fromDom) {
+        if(this.highlightName == show.Name)
+          evtBus.emit('showEpiNotSeries', !this.showEpiNotSeries);
+        else
+          evtBus.emit('showEpiNotSeries', false);
+      }
       this.highlightName = show.Name;
       window.localStorage.setItem("lastVisShow", show.Name);
       if(scroll) this.scrollToSavedShow();
-      evtBus.emit('showSelected', show);
+      this.$nextTick(() => {
+        if(!this.showEpiNotSeries)
+          evtBus.emit('setUpSeries', show);
+        else
+          evtBus.emit('setUpEpisode', show);
+      });
     },
 
     async sortClick() {

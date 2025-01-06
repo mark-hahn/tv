@@ -40,7 +40,7 @@
 </template>
 
 <script>
-import evtBus from '../evtBus.js';
+import evtBus    from '../evtBus.js';
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 
@@ -195,8 +195,8 @@ export default {
   /////////////////  MOUNTED  /////////////////
 
   mounted() {
-    evtBus.on('showSelected', async (show) => { 
-      console.log('Series: showSelected:', show.Name);
+    evtBus.on('setUpSeries', async (show) => { 
+      console.log('Series: setUpSeries:', show.Name);
       this.show = show;
       await this.setPoster();
       await this.setDates();

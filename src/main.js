@@ -4,6 +4,7 @@ reminder, restore ...
   cache
 
 bugs ...
+  problem if hilite show doesn't exist on boot
   waitstr broken
   shows-all-watched show in ready (chg meaning of +)
   uneven season lengths break file missing 

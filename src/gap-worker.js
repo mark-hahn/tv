@@ -3,8 +3,8 @@ import * as urls from "./urls.js";
 
 let cred;
 
-const getEpisodes = async (season) => {
-  let   notReady = true;
+const getEpisodes = async (season, showName) => {
+  let   ready = true;
   const seasonId = season.Id;
   const unairedObj = {};
   const unairedRes = await axios.get(
@@ -28,18 +28,18 @@ const getEpisodes = async (season) => {
     const watched  = !!userData?.Played;
     const haveFile = (episode.LocationType != "Virtual");
     const unaired  = !!unairedObj[episodeNumber];
-    notReady     &&= !(!watched && haveFile);
+    ready        ||= (!watched && haveFile);
     episodes.push({showId, seasonId, episodeNumber, 
                    watched, haveFile, unaired});
   }
-  return {episodes, notReady};
+  return {episodes, ready};
 }
 
-const getShowState = async (showId, _showName) => {
+const getShowState = async (showId, showName) => {
   let activeSeasonNumber, activeSeasonEpisodes;
   let seasonNum, episodes;
   let afterWatchedIdx = 0;
-  let notReady        = false;
+  let ready           = false;
   let gapChecking     = true;
   const seasons =
         (await axios.get(urls.childrenUrl(cred, showId)))
@@ -47,11 +47,13 @@ const getShowState = async (showId, _showName) => {
   for(let seasonIdx = seasons.length-1;
           seasonIdx >= 0; seasonIdx--) {
     const season = seasons[seasonIdx];
-    seasonNum    = +season.IndexNumber;
-    const {episodes, notReadyIn} = await getEpisodes(season);
-    notReady ||= notReadyIn;
-    if(!gapChecking) continue
+    const {episodes:episodesIn, ready: readyIn } = 
+                await getEpisodes(season, showName);
+    ready ||= readyIn;
+    if(!gapChecking) continue;
 
+    episodes = episodesIn;
+    seasonNum    = +season.IndexNumber;
     const lastWatchedIdx = episodes.findLastIndex(
                                episode => episode.watched);
     if(lastWatchedIdx === -1) {
@@ -78,10 +80,10 @@ const getShowState = async (showId, _showName) => {
     activeSeasonNumber   = seasonNum;
     activeSeasonEpisodes = episodes;
   }
-  seasonNum = activeSeasonNumber
+  seasonNum = activeSeasonNumber;
   episodes  = activeSeasonEpisodes;
-  let   episodeNum = episodes[episodes.length-1].episodeNumber;
-  const waiting    = episodes[episodes.length-1].unaired;
+  let episodeNum = episodes[episodes.length-1].episodeNumber;
+  const waiting  = episodes[episodes.length-1].unaired;
 
   let missing   = false;
   let hadNoFile = false;
@@ -114,7 +116,7 @@ const getShowState = async (showId, _showName) => {
     }
   }
   return {seasonNum, episodeNum, 
-          watchGap, missing, waiting, notReady};
+          watchGap, missing, waiting, notReady: !ready};
 };
 
 self.onmessage = async (event) => {

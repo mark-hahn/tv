@@ -362,7 +362,6 @@ export default {
         return;
       if(!await this.chkRowDelete(show, true)){
         show.RunTimeTicks      = 0;
-        show.UnplayedItemCount = 0;
         show.IsFavorite        = false;
         return
       }
@@ -393,7 +392,7 @@ export default {
 
       conds: [ {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],
-          cond(show)  { return show.UnplayedItemCount > 0; },
+          cond(show)  { return !show.NotReady },
           click() {}, name: "unplayed",
         }, {
           color: "#f88", filter: 0, icon: ["fas", "minus"],

@@ -21,6 +21,7 @@ add ...
   chg no show in tvdb err to pop-up notification
 
 todo ...
+  sort by imdb ratings
   move common code from client to srvr
   show actors
   show watched/total avail

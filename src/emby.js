@@ -301,7 +301,7 @@ export const editEpisode = async (seriesId,
         data:    userData
       });
       console.log("toggled watched", {
-                    epi: `S${seasonNumber}E${episodeNumber}`, 
+                    episode: `S${seasonNumber}E${episodeNumber}`, 
                     post_url: url,
                     post_res: setDataRes
                   });

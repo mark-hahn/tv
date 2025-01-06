@@ -4,7 +4,7 @@ reminder, restore ...
   cache
 
 bugs ...
-  mark all as favorite (do once)
+  remotes flicker when opening map from right
   shows-all-watched show in ready (chg meaning of +)
   uneven season lengths break file missing 
           (Interview with the Vampire)

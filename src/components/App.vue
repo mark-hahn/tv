@@ -11,7 +11,7 @@
 <script>
 import List   from './list.vue';
 import Series   from './series.vue';
-import Episode    from './epi.vue';
+import Episode    from './episode.vue';
 import evtBus from '../evtBus.js';
 
 export default {
@@ -19,7 +19,7 @@ export default {
   components: { List, Series, Episode },
   data() {
     return {
-      showEpiNotMeta: true,
+      showEpiNotMeta: false,
     }
   },
   mounted() {

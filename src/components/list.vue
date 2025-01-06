@@ -842,6 +842,14 @@ export default {
         this.scrollToSavedShow(true);
 
         ////////// TEMP //////////
+        // set all favorites
+        // allShows.forEach(async (show) => {
+        //   if(show.Id.startsWith("noemby-")) return;
+        //   await emby.saveFav(show.Id, true);
+        //   console.log('saved fav:', show.Name);
+        // });
+        // 
+        // calculate all gaps
         // let showIdx = 0;
         // const intvl = setInterval(async () => {
         //   while(showIdx < allShows.length) {

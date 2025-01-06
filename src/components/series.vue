@@ -22,7 +22,11 @@
                       display:flex; flex-direction:column;`) 
         div(style=`text-align:center; font-weight:bold;
                    margin-bottom:20px; font-size:20px;`) {{show.Name}}
-        div( v-if="remotes[0] !== 1" 
+        div(v-if="showSpinner")
+          img(src="../../loading.gif"
+              style=`width:100px; height:100px;
+                     position:relative; top:20px; left:45px;`)
+        div( v-if="showRemotes" 
             v-for="remote in remotes"
             @click="remoteClick(remote)"
             style=`margin:3px 10px; padding:10px; 
@@ -30,10 +34,6 @@
                    border: 1px solid black; font-weight:bold;
                    cursor:default;`)
           | {{remote.name}}
-        div(v-if="remotes[0] === 1")
-          img(src="../../loading.gif"
-              style=`width:100px; height:100px;
-                     position:relative; top:20px; left:45px;`)
 
   #bot(style=`font-size:20px; padding:10px;`) {{show.Overview}}
 
@@ -54,6 +54,8 @@ export default {
       remoteShowName: '',
       remotes: [],
       seasonsTxt: '',
+      showSpinner: false,
+      showRemotes: false,
     }
   },
   
@@ -166,12 +168,24 @@ export default {
     },
 
     async setRemotes() {
-      this.remoteShowName = this.show.Name;
+      this.remoteShowName  = this.show.Name;
+      this.showSpinner     = false;
+      this.showRemotes     = false;
+      let  delayingSpinner = true;
+      this.remotes         = [];
+      setTimeout(() => {
+        if(delayingSpinner)
+          this.showSpinner = true;
+        delayingSpinner = false;
+      }, 1000);
       try {
-        this.remotes    = [1];
         const [remotes] = await tvdb.getRemotes(this.show);
-        if(!remotes) this.remotes = [];
-        else         this.remotes = remotes;
+        if(remotes) {
+          this.remotes     = remotes;
+          this.showSpinner = false;
+          this.showRemotes = true;
+          delayingSpinner  = false;
+        }
       } catch(err) {
         console.error('setRemotes:', err);
       }
@@ -182,7 +196,6 @@ export default {
 
   mounted() {
     evtBus.on('showSelected', async (show) => { 
-      this.remotes[0] = 1;
       console.log('Series: showSelected:', show.Name);
       this.show = show;
       await this.setPoster();

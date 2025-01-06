@@ -783,10 +783,10 @@ export default {
     async addGapToShow(event) {
       const {showId, progress, 
              seasonNum, episodeNum, 
-             watchGap, missing, waiting} = event.data;
+             watchGap, missing, waiting, notReady} = event.data;
       this.gapPercent = progress;
 
-      if(!watchGap && !missing && !waiting) return;
+      if(!watchGap && !missing && !waiting && !notReady) return;
       const show = allShows.find((show) => show.Id == showId);
       if(!show) return;
 
@@ -798,8 +798,10 @@ export default {
       gap.GapEpisode = episodeNum;
       gap.WatchGap   = watchGap; 
       gap.Missing    = missing;
+      gap.NotReady   = notReady;
       gap.Waiting    = !blockedWait && waiting;
       gap.WaitStr    = await tvdb.getWaitStr(show);
+
       Object.assign(show, gap);
       const idGapStr = JSON.stringify([show.Id, gap]);
       await srvr.addGap(idGapStr);
@@ -839,7 +841,7 @@ export default {
         // must be set before startWorker
         blockedWaitShows = showsBlocks.blockedWaitShows;
 
-        // emby.startWorker(allShows, this.addGapToShow);
+        emby.startWorker(allShows, this.addGapToShow);
 
         this.sortByNew      = true;
         this.sortByUpdated = false;

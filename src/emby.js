@@ -92,8 +92,6 @@ export async function loadAllShows(gapCache) {
       Object.assign(show, gapData);
       delete gaps[show.Id];
     }
-    // if(show.Name == 'The Middle') 
-    //     console.log(JSON.stringify(show, null, 2)); 
     shows.push(show);
   }
 

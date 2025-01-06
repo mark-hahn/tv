@@ -4,6 +4,7 @@ import * as urls from "./urls.js";
 let cred;
 
 const getEpisodes = async (season) => {
+  let   notReady = true;
   const seasonId = season.Id;
   const unairedObj = {};
   const unairedRes = await axios.get(
@@ -27,16 +28,19 @@ const getEpisodes = async (season) => {
     const watched  = !!userData?.Played;
     const haveFile = (episode.LocationType != "Virtual");
     const unaired  = !!unairedObj[episodeNumber];
+    notReady     &&= !(!watched && haveFile);
     episodes.push({showId, seasonId, episodeNumber, 
                    watched, haveFile, unaired});
   }
-  return episodes;
+  return {episodes, notReady};
 }
 
-const getActiveSeason = async (showId, _showName) => {
+const getShowState = async (showId, _showName) => {
   let activeSeasonNumber, activeSeasonEpisodes;
   let seasonNum, episodes;
   let afterWatchedIdx = 0;
+  let notReady        = false;
+  let gapChecking     = true;
   const seasons =
         (await axios.get(urls.childrenUrl(cred, showId)))
         .data.Items;
@@ -44,7 +48,10 @@ const getActiveSeason = async (showId, _showName) => {
           seasonIdx >= 0; seasonIdx--) {
     const season = seasons[seasonIdx];
     seasonNum    = +season.IndexNumber;
-    episodes     = await getEpisodes(season);
+    const {episodes, notReadyIn} = await getEpisodes(season);
+    notReady ||= notReadyIn;
+    if(!gapChecking) continue
+
     const lastWatchedIdx = episodes.findLastIndex(
                                episode => episode.watched);
     if(lastWatchedIdx === -1) {
@@ -65,7 +72,7 @@ const getActiveSeason = async (showId, _showName) => {
       afterWatchedIdx = (seasonIdx === seasons.length-1) 
                           ? episodes.length : 0;
     }
-    break;
+    gapChecking = false;
   }
   if(!activeSeasonEpisodes) {
     activeSeasonNumber   = seasonNum;
@@ -105,8 +112,9 @@ const getActiveSeason = async (showId, _showName) => {
       episodeNum = episodes[idx].episodeNumber;
       break;
     }
-  } 
-  return {seasonNum, episodeNum, watchGap, missing, waiting};
+  }
+  return {seasonNum, episodeNum, 
+          watchGap, missing, waiting, notReady};
 };
 
 self.onmessage = async (event) => {
@@ -117,14 +125,16 @@ self.onmessage = async (event) => {
       `gap-worker started, ${allShowsIdName.length} shows`);
   for (let i = 0; i < allShowsIdName.length; i++) {
     const [showId, showName] = allShowsIdName[i];
-    const {seasonNum, episodeNum, watchGap, missing, waiting} = 
-           await getActiveSeason(showId, showName);
+    const {seasonNum, episodeNum, watchGap, 
+           missing, waiting, notReady} = 
+              await getShowState(showId, showName);
     const progress = Math.ceil( (i+1) * 100 / allShowsIdName.length );
 
-    if(watchGap || missing || waiting || progress === 100)
+    if(watchGap || missing  || waiting 
+                || notReady || progress === 100)
       self.postMessage({showId, progress,
                         seasonNum, episodeNum, 
-                        watchGap, missing, waiting});
+                        watchGap, missing, waiting, notReady});
   }
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   console.log(`seasons-worker done, ${elapsed} secs`);

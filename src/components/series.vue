@@ -96,7 +96,7 @@ export default {
         img.src = 'https://hahnca.com/tv/' +
                      encodeURI(srvrPath) + srvrImages[imgIdx]; 
         // console.log('Series: trying srvr img:',  img.src);
-      };
+      }
       const tryEmbyImg = () => {
         img.src = embyImages[imgIdx-srvrImages.length]; 
         // console.log('Series: trying emby img:',  img.src);

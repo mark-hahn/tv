@@ -136,7 +136,7 @@ export default {
         if(!date) return '';
         const d = new Date(date);
         return (d.getMonth()+1) + '/' +
-                d.getDate() + '/'     + 
+                d.getDate()     + '/' + 
                 d.getFullYear();
       };
       const show = this.show;
@@ -157,7 +157,7 @@ export default {
       const count = await emby.getSeasonCount(show);
       switch (count) {
         case 0:  
-          this.seasonsTxt = `No Seasons`;
+          this.seasonsTxt = '';
           console.error('setSeasonsTxt no count', show.Name);
           return;
         case 1:  

@@ -50,6 +50,7 @@ const getShowState = async (showId, showName) => {
     const {episodes:episodesIn, ready: readyIn } = 
                 await getEpisodes(season, showName);
     ready ||= readyIn;
+    if(ready && !gapChecking) break;
     if(!gapChecking) continue;
 
     episodes = episodesIn;

@@ -1,9 +1,47 @@
-export function fmtDate(dateStr, includeYear = true) {
-  if(!dateStr) return "";
-  const date     = dateStr ? new Date(dateStr) : new Date();
-  const startIdx = includeYear ? 0 : 5;
-  return date.toISOString().slice(startIdx,10).replace(/^0/,' ');
+function fmtDateWithTZ(date, utcOut = false) {
+  let year, month, day;
+  if(utcOut) {
+    year = date.getUTCFullYear();
+    month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    day = String(date.getUTCDate()).padStart(2, '0');
+  } else {
+    year = date.getFullYear();
+    month = String(date.getMonth() + 1).padStart(2, '0');
+    day = String(date.getDate()).padStart(2, '0');
+  }
+  return `${year}-${month}-${day}`;
 }
+
+export function fmtDate(dateIn, includeYear = true, utcIn = false) {
+  if(dateIn === '' || dateIn === undefined) return "";
+  let date;
+  if(dateIn === 0) date = new Date();
+  else if(dateIn instanceof Number) 
+     date = new Date( dateIn + 
+                (utcIn ? Date.getTimezoneOffset()*60*1000 : 0));
+  else
+     date = new Date(dateIn); // strings always local
+
+  const isoStr = date.toISOString();
+  const locStr = fmtDateWithTZ(date);
+  const utcStr = fmtDateWithTZ(date, true);
+
+  if(dateIn === '2024-05-09') 
+    console.log('-------- 2024-05-09 fmtDate ---------', 
+                {dateIn, isoStr, locStr, utcStr});
+
+  const startIdx = includeYear ? 0 : 5;
+  const str = fmtDateWithTZ(date);
+  const res = str.slice(startIdx, 10).replace(/^0/,' ');
+  // console.log(`fmtDate: ${dateStr}, ${res}`);
+  return res
+}
+// {
+//     "dateStr": "2024-05-09",
+//     "isoStr": "2024-05-09T00:00:00.000Z",
+//     "locStr": "2024-05-08",
+//     "utcStr": "2024-05-09"
+// }
 
 export function fmtSize(show) {
   if(show.Id.startsWith("noemby-")) return "";

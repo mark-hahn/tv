@@ -115,7 +115,10 @@ export async function loadAllShows(gapCache) {
   for(let blockedWaitName of blockedWaitShows) {
     const i = shows.findIndex(
                 (show) => show.Name == blockedWaitName);
-    if(i > -1) await tvdb.getWaitStr(shows[i]);
+    if(i > -1) {
+      const show = shows[i];
+      show.WaitStr = await tvdb.getWaitStr(show);
+    }
     else {
       console.log('no show, deleting from blockedWaitShows list:',   
                    blockedWaitName);
@@ -172,7 +175,7 @@ export async function loadAllShows(gapCache) {
       matchingShow.Reject = true;
       continue;
     }
-    const date = '2017-12-05';
+    const date = '2001-01-01';
     const rejShow = {
       Name: rejectName,
       Id: "noemby-" + Math.random(),
@@ -181,6 +184,7 @@ export async function loadAllShows(gapCache) {
       WatchGap: false,
       Missing: false,
       WaitStr: '',
+      NotReady: true,
       InToTry: false,
       InContinue: false,
       InMark: false,
@@ -189,7 +193,6 @@ export async function loadAllShows(gapCache) {
       Pickup: false,
       Date: date,
       Size: 0,
-      Seasons: [],
     };
     shows.push(rejShow);
   }
@@ -291,7 +294,7 @@ export const editEpisode = async (seriesId,
       const episodeId = episodeRec.Id;
       userData.Played = !watched;
       if(!userData.LastPlayedDate)
-          userData.LastPlayedDate = util.fmtDate();
+          userData.LastPlayedDate = util.fmtDate(0);
       const url = urls.postUserDataUrl(cred, episodeId);
       const setDataRes = await axios({
         method: 'post',
@@ -348,7 +351,7 @@ seasonLoop:
     const episodeNumber = +lastWatchedEpisodeRec.IndexNumber;
     const userData      =  lastWatchedEpisodeRec?.UserData;
 
-    userData.LastPlayedDate = util.fmtDate();
+    userData.LastPlayedDate = util.fmtDate(0);
     const url = urls.postUserDataUrl(cred, episodeId);
     const setDateRes = await axios({
       method: 'post',

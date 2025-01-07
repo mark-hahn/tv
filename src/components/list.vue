@@ -510,7 +510,7 @@ export default {
         console.error('No series found in tvdb for:', srchTxt);
         return;
       }
-      const {name, waitStr} = tvdbData;
+      const {name} = tvdbData;
 
       const matchShow = allShows.find((s) => s.Name == name);
       if(matchShow) {  
@@ -520,13 +520,13 @@ export default {
         return;
       }
 
-      const dateStr = util.fmtDate();
+      const dateStr = util.fmtDate(0);
       const show = {
         Name: name,
         Id: "noemby-" + Math.random(),
         DateCreated: dateStr, 
-        Waiting: !!waitStr,
-        WaitStr: waitStr,
+        Waiting: false,
+        WaitStr: '',
         Missing: false,
         WatchGap: false,
         InToTry: false,
@@ -848,7 +848,7 @@ export default {
         // must be set before startWorker
         blockedWaitShows = showsBlocks.blockedWaitShows;
 
-        emby.startWorker(allShows, this.addGapToShow);
+        // emby.startWorker(allShows, this.addGapToShow);
 
         this.sortByNew      = true;
         this.sortByUpdated = false;

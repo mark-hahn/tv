@@ -21,6 +21,7 @@ add ...
   did i break set-date in map with new fmtdate?
 
 todo ...
+  get ratings from google
   implement episode pane
   show season meta on noemby
   show watched/total avail
@@ -46,7 +47,6 @@ tabled ...
   emby with no files and has pickup, set to noemby
   add wikipedia remote the hard way
   get drama field from tvdb (as many fields as possible)
-  show waitstr as {12-12  2-12}
   up/down arrows
   hover hints over cond icons
 */

@@ -27,11 +27,6 @@
                   style="margin-left:1px;")
             font-awesome-icon(icon="search")
 
-        button(@click="topClick" 
-                style=`margin-left:10px; margin-right:5px;
-                      fontSize:15px; margin:4px;
-                      background-color:white;`) Top
-
         button(@click="watchClick" 
                 style=`margin-left:10px; margin-right:5px;
                       fontSize:15px; margin:4px;
@@ -48,7 +43,10 @@
             button(@click="addClick" 
                     style=`display:inline-block'; 
                           font-size:15px; margin:4px 4px 4px 20px;backgroundColor:white`) Add
-            div()
+            button(@click="topClick" 
+                    style=`margin-left:10px; margin-right:5px;
+                          fontSize:15px; margin:4px;
+                          background-color:white;`) Top
             #sortFltr(style=`display:inline-block;
                           display:flex; justify-content:space-between;`)
               button(@click='sortClick'

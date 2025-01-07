@@ -6,21 +6,18 @@ const lastViewedStr =
   fs.readFileSync('data/lastViewed.json', 'utf8');
 const lastViewed = JSON.parse(lastViewedStr);
 
+let lastShowName = null;
 const checkWatch = async () => {
   const showName = await emby.getCurrentlyWatching();
-  if (showName !== null)
+  if(showName !== null)
     lastViewed[showName] = Date.now();
-  if (showName != lastShowName) {
+  if(showName != lastShowName) {
     await fsp.writeFile('data/lastViewed.json',
-      JSON.stringify(lastViewed));
+                JSON.stringify(lastViewed));
   }
   lastShowName = showName;
-
-  // console.log({lastShowName, showName, 
-  //                   lastViewed: JSON.stringify(lastViewed, null,2)});
 }
 
-let lastShowName = null;
 setInterval(async () => {
   await checkWatch();
 }, 5 * 60 * 1000);  // 5 mins

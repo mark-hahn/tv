@@ -59,7 +59,7 @@ const getAllShows = async (id, _param, resolve, reject) => {
       const sfx = path.split('.').pop();
       if(videoFileExtensions.includes(sfx)) {
         const date = fmtDate(fstat.mtime);
-        maxDate = (maxDate > date) ? maxDate : date;
+        maxDate    = Math.max(maxDate, date);
       }
       totalSize += fstat.size;
     }

@@ -459,7 +459,7 @@ export default {
       switch(this.sortChoice) {
         case 'Alpha':   
           if(!forSort) return '';
-          return show.Name.replace(/^the\s/, "").toLowerCase();
+          return show.Name.replace(/^the\s*/i, "").toLowerCase();
         case 'Added':   return util.fmtDate(show.DateCreated);
         case 'Updated': return util.fmtDate(show.Date);
         case 'Size':    

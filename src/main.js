@@ -4,12 +4,16 @@ reminder, restore ...
   cache
 
 bugs ...
+  all watched still have + (black doves)
+  try drama not showing for bad sisters
   did i break set-date in map with new fmtdate?
   when hilited show is deleted shows old season meta
   dates in datefmt are one day off
-  still counts shows all watch as Pluses (Bob Hearts Abishola)
+  still counts shows all watch as Pluses 
+        (black doves, Bob Hearts Abishola)
 
 add ...
+  no series info (No Good Deed)
   add-new broken: no hit on tvdb (Daddy Issues)
   alread exists broken ("middle")
   find matching name in tvdb search

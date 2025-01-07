@@ -363,10 +363,16 @@ seasonLoop:
 
 export const getSeasonCount = async (show) => {
   const seriesId = show.Id;
-  const seasonsRes = 
-        await axios.get(urls.childrenUrl(cred, seriesId));
-  if(!seasonsRes?.data?.Items) return 0;
-  return seasonsRes.data.Items.length;
+  let seasonsRes;
+  try {
+    seasonsRes = 
+          await axios.get(urls.childrenUrl(cred, seriesId));
+    return seasonsRes.data.Items.length;
+  }
+  catch(e) { 
+    console.error('getSeasonCount:', e);
+    return 0;
+  }
 }
 
 export const getSeriesMap = async (show, prune = false) => { 

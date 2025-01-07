@@ -157,6 +157,7 @@ export default {
       const count = await emby.getSeasonCount(show);
       switch (count) {
         case 0:  
+          this.seasonsTxt = `No Seasons`;
           console.error('setSeasonsTxt no count', show.Name);
           return;
         case 1:  
@@ -179,13 +180,16 @@ export default {
         delayingSpinner = false;
       }, 1000);
       try {
-        const [remotes] = await tvdb.getRemotes(this.show);
-        if(remotes) {
-          this.remotes     = remotes;
-          this.showSpinner = false;
-          this.showRemotes = true;
-          delayingSpinner  = false;
+        const remCached = await tvdb.getRemotes(this.show);
+        if (!remCached) {
+          console.error('setRemotes: getRemotes null:', this.show.Name);
+          return;
         }
+        const [remotes] = remCached;
+        this.remotes     = remotes;
+        this.showSpinner = false;
+        this.showRemotes = true;
+        delayingSpinner  = false;
       } catch(err) {
         console.error('setRemotes:', err);
       }

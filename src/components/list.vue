@@ -339,33 +339,34 @@ export default {
       this.saveVisShow(show);
       show.Pickup = !show.Pickup;
       if(show.Pickup) 
-           srvr.addPickup(show.Name) 
-               .catch((err) => {
-                   console.error("late addPickup:", err);
-                   //- show.Pickup = !show.Pickup;
-               });
-      else srvr.delPickup(show.Name)
+        srvr.addPickup(show.Name) 
             .catch((err) => {
-                console.error("late delPickup:", err);
+                console.error("late addPickup:", err);
                 //- show.Pickup = !show.Pickup;
             });
-      await this.chkRowDelete(show);
+      else srvr.delPickup(show.Name)
+          .catch((err) => {
+              console.error("late delPickup:", err);
+              //- show.Pickup = !show.Pickup;
+          });
+      if(await this.chkRowDelete(show))
+        deleteShow(show);
     };
 
     // from dom click
     const deleteShow = async (show) => {
-      if(show.Id.startsWith("noemby-")) return;
-      this.saveVisShow(show);
-      // console.log("delete Show From Emby?", show.Name);
-      if (!window.confirm(
-          `Do you really want to delete series ${show.Name}?`)) 
-        return;
-      if(!await this.chkRowDelete(show, true)){
-        show.RunTimeTicks      = 0;
-        show.IsFavorite        = false;
-        return
+      if(!show.Id.startsWith("noemby-")) {
+        this.saveVisShow(show);
+        if (!window.confirm(
+            `Do you really want to delete series ${show.Name}?`)) 
+          return;
+        if(!await this.chkRowDelete(show, true)){
+          show.RunTimeTicks = 0;
+          show.IsFavorite   = false;
+          return
+        }
+        await emby.deleteShowFromEmby(show);
       }
-      await emby.deleteShowFromEmby(show);
       await srvr.deleteShowFromSrvr(show)
     }
 
@@ -620,18 +621,26 @@ export default {
     },
 
     scrollToSavedShow(saveVis = false) {
+      let show = null;
       this.$nextTick(() => {
         const name = window.localStorage.getItem("lastVisShow");
-        let defaultShow = false;
-        let show = allShows.find(
-                (shw) => shw.Name == name);
-        if (show === -1) {
-          console.error("scrollToSavedShow: show not found:", name);
-          show = allShows[0];
-          defaultShow = true;
+        if(!name) {
+          console.error(
+            "scrollToSavedShow: lastVisShow missing, ignoring");
+        } 
+        else {
+          show = allShows.find((shw) => shw.Name == name);
+          if (!show) {
+            console.error("scrollToSavedShow: show not found", name);
+            show =allShows.find(() => true);
+            if(!show) {
+              console.error("scrollToSavedShow: no show found", name);
+              return;
+            }
+          }
         }
-        if(saveVis || defaultShow) this.saveVisShow(show);
-        const id = this.nameHash(show.Name);
+        if(saveVis) this.saveVisShow(show);
+        const id  = this.nameHash(show.Name);
         const ele = document.getElementById(id);
         if (ele) ele.scrollIntoView({block: "center"});
       });

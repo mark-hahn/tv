@@ -39,9 +39,24 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.drama    =  0;
       tmp.totry    =  0;
       tmp.continue =  0;
-      tmp.mark     = -1;
-      tmp.linda    = -1;
+      tmp.mark     =  0;
+      tmp.linda    =  0;
       tmp.favorite =  1;
+      tmp.ban      = -1;
+      tmp.pickup   =  0;
+      tmp.hasemby  =  1;
+      break;
+
+    case 'Drama': 
+      tmp.unplayed =  1;
+      tmp.gap      =  0;
+      tmp.waiting  =  0;
+      tmp.drama    =  1;
+      tmp.totry    =  0;
+      tmp.continue =  0;
+      tmp.mark     =  0;
+      tmp.linda    =  0;
+      tmp.favorite =  0;
       tmp.ban      = -1;
       tmp.pickup   =  0;
       tmp.hasemby  =  1;
@@ -54,8 +69,8 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.drama    =  0;
       tmp.totry    =  1;
       tmp.continue =  0;
-      tmp.mark     = -1;
-      tmp.linda    = -1;
+      tmp.mark     =  0;
+      tmp.linda    =  0;
       tmp.favorite =  0;
       tmp.ban      = -1;
       tmp.pickup   =  0;
@@ -69,8 +84,8 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.drama    =  1;
       tmp.totry    =  1;
       tmp.continue =  0;
-      tmp.mark     = -1;
-      tmp.linda    = -1;
+      tmp.mark     =  0;
+      tmp.linda    =  0;
       tmp.favorite =  0;
       tmp.ban      = -1;
       tmp.pickup   =  0;
@@ -84,8 +99,8 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.drama    =  0;
       tmp.totry    =  0;
       tmp.continue =  1;
-      tmp.mark     = -1;
-      tmp.linda    = -1;
+      tmp.mark     =  0;
+      tmp.linda    =  0;
       tmp.favorite =  1;
       tmp.ban      = -1;
       tmp.pickup   =  0;
@@ -100,7 +115,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.totry    =  0;
       tmp.continue =  0;
       tmp.mark     =  1;
-      tmp.linda    = -1;
+      tmp.linda    =  0;
       tmp.favorite =  0;
       tmp.ban      = -1;
       tmp.pickup   =  0;
@@ -114,9 +129,9 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.drama    =  0;
       tmp.totry    =  0;
       tmp.continue =  0;
-      tmp.mark     = -1;
+      tmp.mark     =  0;
       tmp.linda    =  1;
-      tmp.favorite =  1;
+      tmp.favorite =  0;
       tmp.ban      = -1;
       tmp.pickup   =  0;
       tmp.hasemby  =  1;

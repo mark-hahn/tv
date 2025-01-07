@@ -4,7 +4,7 @@ import * as urls from "./urls.js";
 let cred;
 
 const getEpisodes = async (season, showName) => {
-  let   ready = true;
+  let   ready = false;
   const seasonId = season.Id;
   const unairedObj = {};
   const unairedRes = await axios.get(

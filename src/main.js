@@ -4,13 +4,12 @@ reminder, restore ...
   cache
 
 bugs ...
-  all watched still have + (black doves)
-  try drama not showing for bad sisters
-  did i break set-date in map with new fmtdate?
   when hilited show is deleted shows old season meta
   dates in datefmt are one day off
   still counts shows all watch as Pluses 
         (black doves, Bob Hearts Abishola)
+  fixed gaps don't go away (blunt talk)
+  top button in viewed
 
 add ...
   no series info (No Good Deed)
@@ -19,6 +18,7 @@ add ...
   find matching name in tvdb search
   add identify to show search
   chg no show in tvdb err to pop-up notification
+  did i break set-date in map with new fmtdate?
 
 todo ...
   implement episode pane
@@ -26,17 +26,18 @@ todo ...
   show watched/total avail
 
 new features ..
-  hide gao with dash click
+  chg filter button to dashes when filters chg
+  save all settings to local storage
+  hide gap with dash click
   blink copy-name button
   prev/next hilite
-  chg filter button to dashes when filters chg
   sort by imdb ratings
   show actors
   refresh filtered rows when new gap loaded
   button: set hilighted row to vis 
   map: click on season numbers for whole row
   move hilite when show hidden by select
-  update imdb rating and  periodicaly
+  update imdb rating et. al. periodicaly
 
 tabled ...
   show last episode date in map (each season?)

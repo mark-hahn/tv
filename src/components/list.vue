@@ -388,7 +388,8 @@ export default {
       sortChoice:     'Viewed', 
       fltrPopped:        false,
       fltrChoices:          
-        ['All', 'Ready', 'To-Try', 'Try Drama', 'Continue', 'Mark', 'Linda'],
+        ['All', 'Ready', 'Drama', 'To-Try', 'Try Drama', 
+                            'Continue', 'Mark', 'Linda'],
       fltrChoice:        'All',          
 
       conds: [ {

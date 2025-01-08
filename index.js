@@ -35,9 +35,23 @@ const videoFileExtensions = [
   "3gp", "m4v", "ts", "rm", "vob", "ogv", "divx"
 ];
 
+function fmtDateWithTZ(date, utcOut = false) {
+  let year, month, day;
+  if(utcOut) {
+    year = date.getUTCFullYear();
+    month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    day = String(date.getUTCDate()).padStart(2, '0');
+  } else {
+    year = date.getFullYear();
+    month = String(date.getMonth() + 1).padStart(2, '0');
+    day = String(date.getDate()).padStart(2, '0');
+  }
+  return `${year}-${month}-${day}`;
+}
+
 const fmtDate = (dateStr) => {
   const date = dateStr ? new Date(dateStr) : new Date();
-  return date.toISOString().slice(0,10);
+  return fmtDateWithTZ(date);
 }
 
 const getAllShows = async (id, _param, resolve, reject) => {
@@ -58,7 +72,7 @@ const getAllShows = async (id, _param, resolve, reject) => {
       }
       const sfx = path.split('.').pop();
       if(videoFileExtensions.includes(sfx)) {
-        const date = fmtDate(fstat.mtime);
+        const date = fmtDateWithTZ(fstat.mtime);
         maxDate    = Math.max(maxDate, date);
       }
       totalSize += fstat.size;
@@ -72,7 +86,7 @@ const getAllShows = async (id, _param, resolve, reject) => {
   for (const dirent of dir) {
     const showPath = tvDir + '/' + dirent;
     const fstat   = await fsp.stat(showPath);
-    const maxDate = fmtDate(fstat.mtime);
+    const maxDate = fmtDateWithTZ(fstat.mtime);
     totalSize = 0;
 
     await recurs(showPath);

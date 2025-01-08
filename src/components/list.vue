@@ -459,8 +459,8 @@ export default {
         case 'Alpha':   
           if(!forSort) return '';
           return show.Name.replace(/^the\s*/i, "").toLowerCase();
-        case 'Added':   return util.fmtDate(show.DateCreated);
-        case 'Updated': return util.fmtDate(show.Date);
+        case 'Added':   return show.DateCreated;
+        case 'Updated': return show.Date;
         case 'Size':    
           if(forSort) return show.Size;
           return util.fmtSize(show);
@@ -848,7 +848,7 @@ export default {
         // must be set before startWorker
         blockedWaitShows = showsBlocks.blockedWaitShows;
 
-        // emby.startWorker(allShows, this.addGapToShow);
+        emby.startWorker(allShows, this.addGapToShow);
 
         this.sortByNew      = true;
         this.sortByUpdated = false;

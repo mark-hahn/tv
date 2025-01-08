@@ -21,15 +21,6 @@ export function fmtDate(dateIn, includeYear = true, utcIn = false) {
                 (utcIn ? Date.getTimezoneOffset()*60*1000 : 0));
   else
      date = new Date(dateIn); // strings always local
-
-  const isoStr = date.toISOString();
-  const locStr = fmtDateWithTZ(date);
-  const utcStr = fmtDateWithTZ(date, true);
-
-  if(dateIn === '2024-05-09') 
-    console.log('-------- 2024-05-09 fmtDate ---------', 
-                {dateIn, isoStr, locStr, utcStr});
-
   const startIdx = includeYear ? 0 : 5;
   const str = fmtDateWithTZ(date);
   const res = str.slice(startIdx, 10).replace(/^0/,' ');

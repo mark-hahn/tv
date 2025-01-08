@@ -132,13 +132,6 @@ export default {
     },
 
     async setDates() {
-      const fmt = (date) => {
-        if(!date) return '';
-        const d = new Date(date);
-        return (d.getMonth()+1) + '/' +
-                d.getDate()     + '/' + 
-                d.getFullYear();
-      };
       const show = this.show;
       const tvdbData = await tvdb.getTvdbData(show);
       if(!tvdbData) {
@@ -147,8 +140,8 @@ export default {
         return;
       }
       const {firstAired, lastAired, status} = tvdbData;
-      this.dates = fmt(firstAired) + ' -- ' + 
-                    fmt(lastAired) + ' (' + status + ')';
+      this.dates = firstAired + ' -- ' + lastAired 
+                      + ' (' + status + ')';
     },
 
     async setSeasonsTxt() {

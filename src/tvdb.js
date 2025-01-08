@@ -1,6 +1,7 @@
 import * as srvr from "./srvr.js";
 import * as util from "./util.js";
 import * as urls from "./urls.js";
+import      Fuse from 'fuse.js'
 
 const tvdbDataCacheName = "tvdbDataCache2";
 
@@ -166,16 +167,31 @@ export const srchTvdbData = async (searchStr) => {
                       Authorization:'Bearer ' + theTvdbToken}
                     });
   if (!srchRes.ok) {
-    console.error(`tvdb search:`, {searchStr}, srchRes.status);
+    console.error(`tvdb search error:`, {searchStr}, srchRes.status);
     return null;
   }
   const srchResObj = await srchRes.json();
-  if(!srchResObj.data[0]) return null;
-
-  // todo -- popup identify choice
+  const data = srchResObj.data;
+  if(!data || data.length == 0) return null;
   
-  const name   = srchResObj.data[0].name;
-  const tvdbId = srchResObj.data[0].tvdb_id;
+  // todo -- popup identify choice
+
+  // console.log('srchTvdbData:', {searchStr}, data);
+  
+  const fuseOptions = {includeScore: true, keys: ['name']}
+  const fuse = new Fuse(data, fuseOptions);
+  const fuseRes = fuse.search(searchStr);
+  let minScore = Math.min();
+  let matchRes = null;
+  for(const res of fuseRes) {
+    if(res.score < minScore) {
+      minScore = res.score;
+      matchRes = res.item;
+    } 
+  }
+  if(!matchRes)  matchRes = data[0];
+  const name   = matchRes.name;
+  const tvdbId = matchRes.tvdb_id;
   const show = {Name:name, 
                 ProviderIds: {Tvdb: tvdbId}};
   return await getTvdbData(show);
@@ -203,7 +219,8 @@ export const getTvdbData = async (show) => {
     console.error(`getTvdbData, no tvdbId:`, {show});
     return null;
   }
-  
+  show.TvdbId = tvdbId;
+
   const extUrl = 
     `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
   const extRes = await fetch(extUrl,

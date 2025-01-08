@@ -508,9 +508,10 @@ export default {
       const tvdbData = await tvdb.srchTvdbData(srchTxt);
       if(!tvdbData) {
         console.error('No series found in tvdb for:', srchTxt);
+        alert(`No tv series found using search text: ${srchTxt}`);
         return;
       }
-      const {name} = tvdbData;
+      const {name, tvdbId} = tvdbData;
 
       const matchShow = allShows.find((s) => s.Name == name);
       if(matchShow) {  
@@ -538,6 +539,7 @@ export default {
         Date: dateStr,
         Size: 0,
         Seasons: [],
+        TvdbId: tvdbId,
       };
 
       allShows.unshift(show);
@@ -552,7 +554,7 @@ export default {
     topClick() {
       const container = document.querySelector("#shows");
       container.scrollTop = 0;
-      this.saveVisShow(allShows[0]);
+      this.saveVisShow(this.shows[0], true);
     },
 
     nameHash(name) {
@@ -599,6 +601,9 @@ export default {
       this.sortPopped = false;
       this.fltrPopped = false;
       this.sortShows();
+      if(sortChoice != 'Alpha')
+           this.saveVisShow(this.shows[0], true);
+      this.scrollToSavedShow();
     },
     async filterClick() {
       this.fltrPopped = !this.fltrPopped
@@ -848,7 +853,7 @@ export default {
         // must be set before startWorker
         blockedWaitShows = showsBlocks.blockedWaitShows;
 
-        emby.startWorker(allShows, this.addGapToShow);
+        // emby.startWorker(allShows, this.addGapToShow);
 
         this.sortByNew      = true;
         this.sortByUpdated = false;

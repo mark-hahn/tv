@@ -4,21 +4,9 @@ reminder, restore ...
   cache
 
 bugs ...
-  when hilited show is deleted shows old season meta
-  dates in datefmt are one day off
-  still counts shows all watch as Pluses 
-        (black doves, Bob Hearts Abishola)
-  fixed gaps don't go away (blunt talk)
-  top button in viewed
-
-add ...
-  no series info (No Good Deed)
-  add-new broken: no hit on tvdb (Daddy Issues)
-  alread exists broken ("middle")
-  find matching name in tvdb search
-  add identify to show search
-  chg no show in tvdb err to pop-up notification
-  did i break set-date in map with new fmtdate?
+  noemby has plus sign (How to Get Away with Murder)
+  emby page doesn't change (emby problem)
+  when hilited show is deleted, shows old season meta
 
 todo ...
   get ratings from google
@@ -31,9 +19,6 @@ new features ..
   save all settings to local storage
   hide gap with dash click
   blink copy-name button
-  prev/next hilite
-  sort by imdb ratings
-  show actors
   refresh filtered rows when new gap loaded
   button: set hilighted row to vis 
   map: click on season numbers for whole row
@@ -41,6 +26,10 @@ new features ..
   update imdb rating et. al. periodicaly
 
 tabled ...
+  sort by imdb ratings
+  show actors
+  prev/next hilite
+  add identify to show search
   show last episode date in map (each season?)
   move common code from client to srvr
   files with no emby should be added as pickup if in tvdb

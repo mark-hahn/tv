@@ -44,6 +44,8 @@ import evtBus    from '../evtBus.js';
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 
+let openedTab = null;
+
 export default {
   name: "Series",
 
@@ -68,7 +70,12 @@ export default {
     async remoteClick(remote) {
       console.log('Series: remoteClick:', {remote});
       const url = remote.url;
-      if(url) window.open(url, 'tv-series');
+      if(url) 
+        openedTab = window.open(url, 'tv-series');
+      //- else if(openedTab) {
+      //-   window.close(openedTab);
+      //-   openedTab = null;
+      //- }
     },
 
     async setPoster() {
@@ -192,6 +199,15 @@ export default {
   /////////////////  MOUNTED  /////////////////
 
   mounted() {
+    document.addEventListener("visibilitychange", (event) => {
+      console.log('visibilitychange:', document.visibilityState);
+      // if(document.visibilityState !== 'visible' && openedTab) {
+      //   window.close(openedTab);
+      //   openedTab = null;
+      //   this.setRemotes();
+      // }
+    });
+
     evtBus.on('setUpSeries', async (show) => { 
       console.log('Series: setUpSeries:', show.Name);
       this.show = show;

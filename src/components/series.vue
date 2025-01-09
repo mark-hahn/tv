@@ -67,17 +67,6 @@ export default {
       evtBus.emit('openMap', show);
     },
 
-    async remoteClick(remote) {
-      console.log('Series: remoteClick:', {remote});
-      const url = remote.url;
-      if(url) 
-        openedTab = window.open(url, 'tv-series');
-      //- else if(openedTab) {
-      //-   window.close(openedTab);
-      //-   openedTab = null;
-      //- }
-    },
-
     async setPoster() {
       const show   = this.show;
       let showPath = show.Path;

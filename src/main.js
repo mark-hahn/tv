@@ -4,6 +4,7 @@ reminder, restore ...
   cache
 
 bugs ...
+  map too tall
   noemby has plus sign (How to Get Away with Murder)
   emby page doesn't change (emby problem)
   when hilited show is deleted, shows old season meta

@@ -63,7 +63,7 @@ export default {
   
   methods: {
     openMap(show) {
-      console.log('Series: openMap:', show);
+      // console.log('Series: openMap:', show);
       evtBus.emit('openMap', show);
     },
 
@@ -143,18 +143,24 @@ export default {
     async setSeasonsTxt() {
       this.seasonsTxt = ``;
       const show = this.show;
-      const count = await emby.getSeasonCount(show);
-      switch (count) {
+      const {seasonCount, episodeCount, watchedCount} = 
+                await emby.getEpisodeCounts(show);
+      let seasonsTxt = '';
+      switch (seasonCount) {
         case 0:  
-          this.seasonsTxt = '';
-          console.error('setSeasonsTxt no count', show.Name);
-          return;
+          seasonsTxt = '';
+          console.error('setSeasonsTxt no seasonCount', show.Name);
+          break;
         case 1:  
-          this.seasonsTxt = `1 Season`;
-          return;
+          seasonsTxt = `1 Season`;
+          break;
         default: 
-          this.seasonsTxt = `${count} Seasons`;
+          seasonsTxt = `${seasonCount} Seasons`;
       }
+      const watchedTxt = (watchedCount == episodeCount) 
+              ? ' (All Watched)' 
+              :` (${watchedCount}/${episodeCount} Watched)`;
+      this.seasonsTxt = seasonsTxt + watchedTxt
     },
 
     async setRemotes() {

@@ -364,18 +364,33 @@ seasonLoop:
   }
 }
 
-export const getSeasonCount = async (show) => {
-  const seriesId = show.Id;
-  let seasonsRes;
+export const getEpisodeCounts = async (show) => {
+  const showId = show.Id;
+  let seasonCount  = 0;
+  let episodeCount = 0;
+  let watchedCount = 0;
   try {
-    seasonsRes = 
-          await axios.get(urls.childrenUrl(cred, seriesId));
-    return seasonsRes.data.Items.length;
+    const seasonsRes = 
+          await axios.get(urls.childrenUrl(cred, showId));
+    for(let key in seasonsRes.data.Items) {
+      seasonCount++;
+      const seasonRec   =  seasonsRes.data.Items[key];
+      const seasonId    =  seasonRec.Id;
+      const episodesRes = 
+              await axios.get(urls.childrenUrl(cred, seasonId));
+      for(let key in episodesRes.data.Items) {
+        episodeCount++;
+        const episodeRec = episodesRes.data.Items[key];
+        const userData   = episodeRec?.UserData;
+        if(userData?.Played) watchedCount++;
+      }
+    }
   }
   catch(e) { 
-    console.error('getSeasonCount:', e);
-    return 0;
+    console.error('getEpisodeCounts:', e);
+    return {seasonCount:0, episodeCount:0, watchedCount:0};
   }
+  return {seasonCount, episodeCount, watchedCount};
 }
 
 export const getSeriesMap = async (show, prune = false) => { 

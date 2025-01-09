@@ -232,7 +232,6 @@ let   showErr          = null;
 
 export default {
   name: "List",
-  props: ['showEpiNotSeries'],
 
   components: { FontAwesomeIcon },
   data() {
@@ -572,22 +571,12 @@ export default {
       );
     },
 
-    saveVisShow(show, scroll = false, fromDom = false) {
-      if(fromDom) {
-        if(this.highlightName == show.Name)
-          evtBus.emit('showEpiNotSeries', !this.showEpiNotSeries);
-        else
-          evtBus.emit('showEpiNotSeries', false);
-      }
+    saveVisShow(show, scroll = false) {
       this.highlightName = show.Name;
       window.localStorage.setItem("lastVisShow", show.Name);
       if(scroll) this.scrollToSavedShow();
-      this.$nextTick(() => {
-        if(!this.showEpiNotSeries)
-          evtBus.emit('setUpSeries', show);
-        else
-          evtBus.emit('setUpEpisode', show);
-      });
+      this.$nextTick(() =>
+        evtBus.emit('setUpSeries', show);
     },
 
     async sortClick() {

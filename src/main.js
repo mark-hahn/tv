@@ -11,11 +11,11 @@ bugs ...
 
 todo ...
   get ratings from google
-  implement episode pane
   show season meta on noemby
   show watched/total avail
 
 new features ..
+  click anywhere to close popup
   chg filter button to dashes when filters chg
   save all settings to local storage
   hide gap with dash click

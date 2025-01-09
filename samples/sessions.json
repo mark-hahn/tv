@@ -1,0 +1,52 @@
+[
+  {
+    "PlayState": {
+      "CanSeek": false,
+      "IsPaused": false,
+      "IsMuted": false,
+      "RepeatMode": "RepeatNone",
+      "SubtitleOffset": 0,
+      "PlaybackRate": 1
+    },
+    "AdditionalUsers": [],
+    "RemoteEndPoint": "192.168.1.44",
+    "Protocol": "HTTP/1.1",
+    "PlayableMediaTypes": [
+      "Audio",
+      "Video",
+      "Photo"
+    ],
+    "PlaylistIndex": 0,
+    "PlaylistLength": 0,
+    "Id": "f1fd0596d93fc5ad959006d3cdafcc71",
+    "ServerId": "ae3349983dbe45d9aa1d317a7753483e",
+    "UserId": "894c752d448f45a3a1260ccaabd0adff",
+    "UserName": "mark",
+    "Client": "Roku SG",
+    "LastActivityDate": "2025-01-08T18:51:40.2437172Z",
+    "DeviceName": "Roku Ultra",
+    "InternalDeviceId": 33,
+    "DeviceId": "9f53d43e-e5f7-5161-881a-d91843d0d372",
+    "ApplicationVersion": "4.1.31",
+    "AppIconUrl": "https://github.com/MediaBrowser/Emby.Resources/raw/master/images/devices/roku.jpg",
+    "SupportedCommands": [
+      "GoHome",
+      "SendString",
+      "GoToSearch",
+      "GoToSettings",
+      "DisplayContent",
+      "DisplayMessage",
+      "SetAudioStreamIndex",
+      "SetSubtitleStreamIndex",
+      "PlayMediaSource",
+      "Mute",
+      "Unmute",
+      "ToggleMute",
+      "VolumeUp",
+      "VolumeDown",
+      "SetVolume",
+      "ToggleOsdMenu"
+    ],
+    "SupportsRemoteControl": true
+  }
+]

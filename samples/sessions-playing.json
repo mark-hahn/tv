@@ -1,0 +1,266 @@
+[
+  {
+    "PlayState": {
+      "PositionTicks": 4350000000,
+      "CanSeek": true,
+      "IsPaused": false,
+      "IsMuted": false,
+      "AudioStreamIndex": 1,
+      "SubtitleStreamIndex": 2,
+      "MediaSourceId": "d32472ba46a0cb977c224d5645307288",
+      "PlayMethod": "DirectPlay",
+      "RepeatMode": "RepeatNone",
+      "SubtitleOffset": 0,
+      "PlaybackRate": 1
+    },
+    "AdditionalUsers": [],
+    "RemoteEndPoint": "192.168.1.44",
+    "Protocol": "HTTP/1.1",
+    "PlayableMediaTypes": [
+      "Audio",
+      "Video",
+      "Photo"
+    ],
+    "PlaylistIndex": 0,
+    "PlaylistLength": 1,
+    "Id": "f1fd0596d93fc5ad959006d3cdafcc71",
+    "ServerId": "ae3349983dbe45d9aa1d317a7753483e",
+    "UserId": "894c752d448f45a3a1260ccaabd0adff",
+    "UserName": "mark",
+    "Client": "Roku SG",
+    "LastActivityDate": "2025-01-08T18:53:56.6040434Z",
+    "DeviceName": "Roku Ultra",
+    "NowPlayingItem": {
+      "Name": "XIV",
+      "ServerId": "ae3349983dbe45d9aa1d317a7753483e",
+      "Id": "4785434",
+      "DateCreated": "2024-10-18T07:11:11.0000000Z",
+      "PresentationUniqueKey": "367392-en-4514ec850e5ad0c47b58444e17b6346c-002 - 0007",
+      "Container": "mkv",
+      "PremiereDate": "2024-10-17T07:00:00.0000000Z",
+      "ExternalUrls": [
+        {
+          "Name": "IMDb",
+          "Url": "https://www.imdb.com/title/tt32750200"
+        },
+        {
+          "Name": "TheTVDB",
+          "Url": "https://thetvdb.com/?tab=episode&id=10585986"
+        },
+        {
+          "Name": "Trakt",
+          "Url": "https://trakt.tv/search/imdb/tt32750200"
+        }
+      ],
+      "Path": "/mnt/media/tv/The Old Man/Season 2/the.old.man.s02e07.1080p.web.h264-successfulcrab.mkv",
+      "Overview": "Chase is taken captive by Suleyman Pavlovich as he risks everything to save Zoe. Harper must go to the opposite end of the earth to confront his past.",
+      "Taglines": [],
+      "Genres": [],
+      "RunTimeTicks": 28277440000,
+      "Size": 1601682632,
+      "FileName": "the.old.man.s02e07.1080p.web.h264-successfulcrab.mkv",
+      "Bitrate": 4531337,
+      "ProductionYear": 2024,
+      "IndexNumber": 7,
+      "ParentIndexNumber": 2,
+      "ProviderIds": {
+        "Tvdb": "10585986",
+        "IMDB": "tt32750200"
+      },
+      "IsFolder": false,
+      "ParentId": "4784183",
+      "Type": "Episode",
+      "Studios": [],
+      "GenreItems": [],
+      "ParentLogoItemId": "4692721",
+      "ParentBackdropItemId": "4692721",
+      "ParentBackdropImageTags": [
+        "eff8a616376f6f3dacbc7fb4e50c9eab"
+      ],
+      "SeriesName": "The Old Man",
+      "SeriesId": "4692721",
+      "SeasonId": "4784183",
+      "PrimaryImageAspectRatio": 1.7777777777777777,
+      "SeriesPrimaryImageTag": "26c3f00231652d41f2f5770ac09e02d2",
+      "SeasonName": "Season 2",
+      "MediaStreams": [
+        {
+          "Codec": "h264",
+          "ColorTransfer": "bt709",
+          "ColorPrimaries": "bt709",
+          "ColorSpace": "bt709",
+          "TimeBase": "1/1000",
+          "VideoRange": "SDR",
+          "DisplayTitle": "1080p H264",
+          "NalLengthSize": "4",
+          "IsInterlaced": false,
+          "BitRate": 4531337,
+          "BitDepth": 8,
+          "RefFrames": 1,
+          "IsDefault": true,
+          "IsForced": false,
+          "Height": 1080,
+          "Width": 1920,
+          "AverageFrameRate": 23.976025,
+          "RealFrameRate": 23.976025,
+          "Profile": "High",
+          "Type": "Video",
+          "AspectRatio": "16:9",
+          "Index": 0,
+          "IsExternal": false,
+          "IsTextSubtitleStream": false,
+          "SupportsExternalStream": false,
+          "Protocol": "File",
+          "PixelFormat": "yuv420p",
+          "Level": 40,
+          "IsAnamorphic": false,
+          "ExtendedVideoType": "None",
+          "ExtendedVideoSubType": "None",
+          "ExtendedVideoSubTypeDescription": "None",
+          "AttachmentSize": 0
+        },
+        {
+          "Codec": "eac3",
+          "Language": "eng",
+          "TimeBase": "1/1000",
+          "DisplayTitle": "English EAC3 5.1 (Default)",
+          "DisplayLanguage": "English",
+          "IsInterlaced": false,
+          "ChannelLayout": "5.1",
+          "BitRate": 256000,
+          "Channels": 6,
+          "SampleRate": 48000,
+          "IsDefault": true,
+          "IsForced": false,
+          "Type": "Audio",
+          "Index": 1,
+          "IsExternal": false,
+          "IsTextSubtitleStream": false,
+          "SupportsExternalStream": false,
+          "Protocol": "File",
+          "ExtendedVideoType": "None",
+          "ExtendedVideoSubType": "None",
+          "ExtendedVideoSubTypeDescription": "None",
+          "AttachmentSize": 0
+        },
+        {
+          "Codec": "subrip",
+          "Language": "eng",
+          "TimeBase": "1/1000",
+          "Title": "English [SDH]",
+          "DisplayTitle": "English (SUBRIP)",
+          "DisplayLanguage": "English",
+          "IsInterlaced": false,
+          "IsDefault": false,
+          "IsForced": false,
+          "Type": "Subtitle",
+          "Index": 2,
+          "IsExternal": false,
+          "IsTextSubtitleStream": true,
+          "SupportsExternalStream": true,
+          "Protocol": "File",
+          "ExtendedVideoType": "None",
+          "ExtendedVideoSubType": "None",
+          "ExtendedVideoSubTypeDescription": "None",
+          "AttachmentSize": 0,
+          "SubtitleLocationType": "InternalStream"
+        }
+      ],
+      "ImageTags": {
+        "Primary": "00faefe9d7eae3580ee031cd44286e83"
+      },
+      "BackdropImageTags": [],
+      "ParentLogoImageTag": "16945e975ea039baf0a30645c411cba8",
+      "ParentThumbItemId": "4692721",
+      "ParentThumbImageTag": "1f9692c6fdaed96f93f76421a38d8f25",
+      "Chapters": [
+        {
+          "StartPositionTicks": 0,
+          "Name": "Chapter 1",
+          "MarkerType": "Chapter",
+          "ChapterIndex": 0
+        },
+        {
+          "StartPositionTicks": 3000000000,
+          "Name": "Chapter 2",
+          "MarkerType": "Chapter",
+          "ChapterIndex": 1
+        },
+        {
+          "StartPositionTicks": 6000000000,
+          "Name": "Chapter 3",
+          "MarkerType": "Chapter",
+          "ChapterIndex": 2
+        },
+        {
+          "StartPositionTicks": 9000000000,
+          "Name": "Chapter 4",
+          "MarkerType": "Chapter",
+          "ChapterIndex": 3
+        },
+        {
+          "StartPositionTicks": 12000000000,
+          "Name": "Chapter 5",
+          "MarkerType": "Chapter",
+          "ChapterIndex": 4
+        },
+        {
+          "StartPositionTicks": 15000000000,
+          "Name": "Chapter 6",
+          "MarkerType": "Chapter",
+          "ChapterIndex": 5
+        },
+        {
+          "StartPositionTicks": 18000000000,
+          "Name": "Chapter 7",
+          "MarkerType": "Chapter",
+          "ChapterIndex": 6
+        },
+        {
+          "StartPositionTicks": 21000000000,
+          "Name": "Chapter 8",
+          "MarkerType": "Chapter",
+          "ChapterIndex": 7
+        },
+        {
+          "StartPositionTicks": 24000000000,
+          "Name": "Chapter 9",
+          "MarkerType": "Chapter",
+          "ChapterIndex": 8
+        },
+        {
+          "StartPositionTicks": 27000000000,
+          "Name": "Chapter 10",
+          "MarkerType": "Chapter",
+          "ChapterIndex": 9
+        }
+      ],
+      "MediaType": "Video",
+      "Width": 1920,
+      "Height": 1080
+    },
+    "InternalDeviceId": 33,
+    "DeviceId": "9f53d43e-e5f7-5161-881a-d91843d0d372",
+    "ApplicationVersion": "4.1.31",
+    "AppIconUrl": "https://github.com/MediaBrowser/Emby.Resources/raw/master/images/devices/roku.jpg",
+    "SupportedCommands": [
+      "GoHome",
+      "SendString",
+      "GoToSearch",
+      "GoToSettings",
+      "DisplayContent",
+      "DisplayMessage",
+      "SetAudioStreamIndex",
+      "SetSubtitleStreamIndex",
+      "PlayMediaSource",
+      "Mute",
+      "Unmute",
+      "ToggleMute",
+      "VolumeUp",
+      "VolumeDown",
+      "SetVolume",
+      "ToggleOsdMenu"
+    ],
+    "SupportsRemoteControl": true
+  }
+]

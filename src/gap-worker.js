@@ -24,13 +24,14 @@ const getEpisodes = async (season, _showName) => {
     const showId        = episode.SeriesId;
     const seasonId      = episode.SeasonId;
     const episodeNumber = +episode.IndexNumber;
-    const userData = episode?.UserData;
-    const watched  = !!userData?.Played;
-    const haveFile = (episode.LocationType != "Virtual");
-    const unaired  = !!unairedObj[episodeNumber];
-    ready        ||= (!watched && haveFile);
-    episodes.push({showId, seasonId, episodeNumber, 
-                   watched, haveFile, unaired, episode});
+    const userData      = episode?.UserData;
+    const watched       = !!userData?.Played;
+    const haveFile      = (episode.LocationType != "Virtual");
+    const unaired       = !!unairedObj[episodeNumber];
+    ready             ||= (!watched && haveFile);
+    const imageTag      = episode?.ImageTags?.Primary;
+    episodes.push({showId, imageTag, seasonId, episodeNumber, 
+                   watched, haveFile, unaired});
   }
   return {episodes, ready};
 }
@@ -38,11 +39,9 @@ const getEpisodes = async (season, _showName) => {
 const getShowState = async (showId, showName) => {
   let activeSeasonNumber, activeSeasonEpisodes;
   let seasonNum, episodes;
-  let afterWatchedIdx       = 0;
-  let afterWatchedSeasonNum = null;
-  let afterWatchedEpisode   = null;
-  let ready                 = false;
-  let gapChecking           = true;
+  let afterWatchedIdx = 0;
+  let ready           = false;
+  let gapChecking     = true;
   const seasons =
         (await axios.get(urls.childrenUrl(cred, showId)))
         .data.Items;
@@ -70,30 +69,11 @@ const getShowState = async (showId, showName) => {
       // last not watched
       activeSeasonNumber   = seasonNum;
       activeSeasonEpisodes = episodes;
-      afterWatchedIdx      = lastWatchedIdx + 1;
-      if(afterWatchedSeasonNum === null) {
-        afterWatchedSeasonNum   = seasonNum;
-        afterWatchedEpisode  = 
-            episodes[afterWatchedIdx].episode;
-      }
     }
     else {
       // last episode watched
       afterWatchedIdx = (seasonIdx === seasons.length-1) 
                           ? episodes.length : 0;
-
-      if(afterWatchedSeasonNum === null &&
-          episodes[afterWatchedIdx]     &&
-          episodes[afterWatchedIdx].episode) {
-
-        afterWatchedSeasonNum = seasonNum;
-        // console.log(`afterWatchedEpisode:`, 
-        //       episodes[afterWatchedIdx], 
-        //       episodes.length,
-        //       {seasonNum, episodes, afterWatchedIdx});
-        afterWatchedEpisode   = 
-              episodes[afterWatchedIdx].episode;
-      }
     }
     gapChecking = false;
   }
@@ -137,7 +117,6 @@ const getShowState = async (showId, showName) => {
     }
   }
   return {seasonNum, episodeNum, 
-          afterWatchedSeasonNum, afterWatchedEpisode,
           watchGap, missing, waiting, notReady: !ready};
 };
 
@@ -149,9 +128,6 @@ self.onmessage = async (event) => {
       `gap-worker started, ${allShowsIdName.length} shows`);
   for (let i = 0; i < allShowsIdName.length; i++) {
     const [showId, showName] = allShowsIdName[i];
-
-    // if(showName !== "Family Guy") continue;
-
     const showState = await getShowState(showId, showName);
     showState.showId   = showId
     showState.showName = showName

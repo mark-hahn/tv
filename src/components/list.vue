@@ -576,7 +576,7 @@ export default {
       window.localStorage.setItem("lastVisShow", show.Name);
       if(scroll) this.scrollToSavedShow();
       this.$nextTick(() =>
-        evtBus.emit('setUpSeries', show);
+        evtBus.emit('setUpSeries', show));
     },
 
     async sortClick() {
@@ -782,12 +782,8 @@ export default {
     },
 
     async addGapToShow(event) {
-
-      // console.log('addGapToShow', event.data);
-
       const {showId, progress, 
              seasonNum, episodeNum, 
-             afterWatchedSeasonNum, afterWatchedEpisode,
              watchGap, missing, waiting, notReady} = event.data;
       this.gapPercent = progress;
 
@@ -805,8 +801,6 @@ export default {
       gap.NotReady      = notReady;
       gap.Waiting       = !blockedWait && waiting;
       gap.WaitStr       = await tvdb.getWaitStr(show);
-      gap.NextSeasonNum = afterWatchedSeasonNum;
-      gap.NextEpisode   = afterWatchedEpisode;
 
       Object.assign(show, gap);
       const idGapStr = JSON.stringify([show.Id, gap]);
@@ -834,7 +828,6 @@ export default {
         }
       }); 
 
-
       try {
         showErr = this.showErr;
         await emby.init(showErr);
@@ -849,9 +842,9 @@ export default {
 
         emby.startWorker(allShows, this.addGapToShow);
 
-        this.sortByNew      = true;
+        this.sortByNew     = true;
         this.sortByUpdated = false;
-        this.sortBySize     = false;
+        this.sortBySize    = false;
         this.sortChoice = 
           window.localStorage.getItem("sortChoice") || 'Viewed';
         this.sortShows();

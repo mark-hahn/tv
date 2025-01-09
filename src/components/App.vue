@@ -13,7 +13,7 @@ import evtBus  from '../evtBus.js';
 
 export default {
   name: "App",
-  components: { List, Series, Episode },
+  components: { List, Series },
   data() {
     return {
     }

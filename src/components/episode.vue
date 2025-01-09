@@ -8,15 +8,6 @@
     #topLeft(style=`display:flex; flex-direction:column;
                     text-align:center;`) 
       #poster()
-      #dates(style=`font-size:18px; min-height:24px;
-                    margin-top:10px; font-weight:bold;`)
-        | {{dates}}
-      #seasons(@click="openMap(show)"
-                style=`cursor:pointer; 
-                       font-size:20px; min-height:24px;
-                       font-weight:bold; font-color:gray;
-                       text-align:center;`)
-        | {{seasonsTxt}}
     #topRight(style=`display:flex; flex-direction:column`)
       #overview(style=`font-size:20px; padding:10px;`)
         | {{show.Overview}}        
@@ -37,22 +28,6 @@ export default {
   },
   
   methods: {
-    openMap(show) {
-      console.log('Series: openMap:', show);
-      evtBus.emit('openMap', show);
-    },
-
-    async remoteClick(remote) {
-      console.log('Series: remoteClick:', {remote});
-      const url = remote.url;
-      if(url) 
-        openedTab = window.open(url, 'tv-series');
-      //- else if(openedTab) {
-      //-   window.close(openedTab);
-      //-   openedTab = null;
-      //- }
-    },
-
     async setPoster() {
       const show   = this.show;
       let showPath = show.Path;
@@ -118,9 +93,28 @@ export default {
 
   mounted() {
     evtBus.on('setUpEpisode', async (show) => { 
-      console.log('Episode: setUpEpisode:', show.Name);
+
+        console.log('setUpEpisode:',  show);
+
       this.show = show;
-      await this.setPoster();
+      const episodeRec = show.NextEpisode;
+      // console.log('Episode: setUpEpisode:', {episodeRec});
+      // await this.setPoster();
+
+      const img = new Image();
+      img.style.maxWidth  = "300px"; 
+      img.style.maxHeight = "400px"; 
+      img.onload = () => {
+        console.log('episode showing img:',  img.src);
+        document.getElementById('poster').replaceChildren(img);
+      };
+      img.onerror = () => {
+        console.log('episode no img:', img.src);
+      }
+      if(episodeRec)
+        img.src = `https://hahnca.com:8920/emby/Items/${episodeRec.Id}` + `/Images/Primary?tag=${episodeRec.ImageTags.Primary}`
+
+
     });
   },
 }

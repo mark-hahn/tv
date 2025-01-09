@@ -149,7 +149,7 @@
   #map(v-if="mapShow !== null" 
         style=`background-color:#ffe; padding:10px;
                display:flex; flex-direction:column;
-               position:fixed; top:100px; left:300px; z-index:2`)
+               position:fixed; top:10px; left:300px; z-index:2`)
     div(style=`margin:0 5px; display:flex; 
                 justify-content:space-between;`)
       div(style=`font-size:20px; margin:6px 20px 0 0;
@@ -793,6 +793,9 @@ export default {
     },
 
     async addGapToShow(event) {
+
+      // console.log('addGapToShow', event.data);
+
       const {showId, progress, 
              seasonNum, episodeNum, 
              afterWatchedSeasonNum, afterWatchedEpisode,
@@ -805,14 +808,14 @@ export default {
 
       const blockedWait = blockedWaitShows.includes(show.Name);
       const gap = {};
-      gap.ShowId     = showId;
-      gap.GapSeason  = seasonNum;
-      gap.GapEpisode = episodeNum;
-      gap.WatchGap   = watchGap; 
-      gap.Missing    = missing;
-      gap.NotReady   = notReady;
-      gap.Waiting    = !blockedWait && waiting;
-      gap.WaitStr    = await tvdb.getWaitStr(show);
+      gap.ShowId        = showId;
+      gap.GapSeason     = seasonNum;
+      gap.GapEpisode    = episodeNum;
+      gap.WatchGap      = watchGap; 
+      gap.Missing       = missing;
+      gap.NotReady      = notReady;
+      gap.Waiting       = !blockedWait && waiting;
+      gap.WaitStr       = await tvdb.getWaitStr(show);
       gap.NextSeasonNum = afterWatchedSeasonNum;
       gap.NextEpisode   = afterWatchedEpisode;
 

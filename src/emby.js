@@ -401,6 +401,9 @@ export const getSeriesMap = async (show, prune = false) => {
           await axios.get(urls.childrenUrl(cred, seasonId));
     for(let key in episodesRes.data.Items) {
       let   episodeRec    =  episodesRes.data.Items[key];
+
+      // console.log({episodeRec});
+
       const episodeNumber = +episodeRec.IndexNumber;
       if(episodeNumber === undefined) continue;
 

@@ -198,7 +198,7 @@ export default {
     });
 
     evtBus.on('setUpSeries', async (show) => { 
-      console.log('Series: setUpSeries:', show.Name);
+      // console.log('Series: setUpSeries:', {show});
       this.show = show;
       await this.setPoster();
       await this.setDates();

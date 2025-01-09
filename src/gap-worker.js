@@ -30,7 +30,7 @@ const getEpisodes = async (season, _showName) => {
     const unaired  = !!unairedObj[episodeNumber];
     ready        ||= (!watched && haveFile);
     episodes.push({showId, seasonId, episodeNumber, 
-                   watched, haveFile, unaired});
+                   watched, haveFile, unaired, episode});
   }
   return {episodes, ready};
 }
@@ -73,16 +73,26 @@ const getShowState = async (showId, showName) => {
       afterWatchedIdx      = lastWatchedIdx + 1;
       if(afterWatchedSeasonNum === null) {
         afterWatchedSeasonNum   = seasonNum;
-        afterWatchedEpisode  = episodes[afterWatchedIdx];
+        afterWatchedEpisode  = 
+            episodes[afterWatchedIdx].episode;
       }
     }
     else {
       // last episode watched
       afterWatchedIdx = (seasonIdx === seasons.length-1) 
                           ? episodes.length : 0;
-      if(afterWatchedSeasonNum === null) {
+
+      if(afterWatchedSeasonNum === null &&
+          episodes[afterWatchedIdx]     &&
+          episodes[afterWatchedIdx].episode) {
+
         afterWatchedSeasonNum = seasonNum;
-        afterWatchedEpisode   = episodes[afterWatchedIdx];
+        // console.log(`afterWatchedEpisode:`, 
+        //       episodes[afterWatchedIdx], 
+        //       episodes.length,
+        //       {seasonNum, episodes, afterWatchedIdx});
+        afterWatchedEpisode   = 
+              episodes[afterWatchedIdx].episode;
       }
     }
     gapChecking = false;
@@ -139,6 +149,9 @@ self.onmessage = async (event) => {
       `gap-worker started, ${allShowsIdName.length} shows`);
   for (let i = 0; i < allShowsIdName.length; i++) {
     const [showId, showName] = allShowsIdName[i];
+
+    // if(showName !== "Family Guy") continue;
+
     const showState = await getShowState(showId, showName);
     showState.showId   = showId
     showState.showName = showName

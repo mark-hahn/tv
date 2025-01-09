@@ -1,0 +1,200 @@
+{
+    "seasonNum": 22,
+    "episodeNum": 15,
+    "afterWatchedSeasonNum": 22,
+    "afterWatchedEpisode": {
+        "Name": "Supermarket Pete",
+        "ServerId": "ae3349983dbe45d9aa1d317a7753483e",
+        "Id": "4739516",
+        "DateCreated": "2023-10-08T20:59:24.0000000Z",
+        "Container": "mkv",
+        "SortName": "Supermarket Pete",
+        "PremiereDate": "2023-10-08T07:00:00.0000000Z",
+        "ExternalUrls": [
+            {
+                "Name": "IMDb",
+                "Url": "https://www.imdb.com/title/tt29141909"
+            },
+            {
+                "Name": "TheTVDB",
+                "Url": "https://thetvdb.com/?tab=episode&id=10052213"
+            },
+            {
+                "Name": "Trakt",
+                "Url": "https://trakt.tv/search/imdb/tt29141909"
+            }
+        ],
+        "MediaSources": [
+            {
+                "Protocol": "File",
+                "Id": "2e15109d3c7db4c77ac22666bf7efbc7",
+                "Path": "/mnt/media/tv/Family Guy/Season 22/Family.Guy.S22E02.720p.WEB.h264-BAE.mkv",
+                "Type": "Default",
+                "Container": "mkv",
+                "Size": 294976197,
+                "Name": "Family.Guy.S22E02.720p.WEB.h264-BAE",
+                "IsRemote": false,
+                "RunTimeTicks": 12979220000,
+                "SupportsTranscoding": true,
+                "SupportsDirectStream": true,
+                "SupportsDirectPlay": true,
+                "IsInfiniteStream": false,
+                "RequiresOpening": false,
+                "RequiresClosing": false,
+                "RequiresLooping": false,
+                "SupportsProbing": false,
+                "MediaStreams": [
+                    {
+                        "Codec": "h264",
+                        "Language": "eng",
+                        "ColorTransfer": "bt709",
+                        "ColorPrimaries": "bt709",
+                        "ColorSpace": "bt709",
+                        "TimeBase": "1/1000",
+                        "VideoRange": "SDR",
+                        "DisplayTitle": "720p H264",
+                        "DisplayLanguage": "English",
+                        "NalLengthSize": "4",
+                        "IsInterlaced": false,
+                        "BitRate": 1818144,
+                        "BitDepth": 8,
+                        "RefFrames": 1,
+                        "IsDefault": true,
+                        "IsForced": false,
+                        "Height": 720,
+                        "Width": 1280,
+                        "AverageFrameRate": 23.976025,
+                        "RealFrameRate": 23.976025,
+                        "Profile": "High",
+                        "Type": "Video",
+                        "AspectRatio": "16:9",
+                        "Index": 0,
+                        "IsExternal": false,
+                        "IsTextSubtitleStream": false,
+                        "SupportsExternalStream": false,
+                        "Protocol": "File",
+                        "PixelFormat": "yuv420p",
+                        "Level": 31,
+                        "IsAnamorphic": false,
+                        "ExtendedVideoType": "None",
+                        "ExtendedVideoSubType": "None",
+                        "ExtendedVideoSubTypeDescription": "None",
+                        "AttachmentSize": 0
+                    },
+                    {
+                        "Codec": "aac",
+                        "Language": "eng",
+                        "TimeBase": "1/1000",
+                        "DisplayTitle": "English AAC stereo (Default)",
+                        "DisplayLanguage": "English",
+                        "IsInterlaced": false,
+                        "ChannelLayout": "stereo",
+                        "BitRate": 192000,
+                        "Channels": 2,
+                        "SampleRate": 48000,
+                        "IsDefault": true,
+                        "IsForced": false,
+                        "Profile": "HE-AAC",
+                        "Type": "Audio",
+                        "Index": 1,
+                        "IsExternal": false,
+                        "IsTextSubtitleStream": false,
+                        "SupportsExternalStream": false,
+                        "Protocol": "File",
+                        "ExtendedVideoType": "None",
+                        "ExtendedVideoSubType": "None",
+                        "ExtendedVideoSubTypeDescription": "None",
+                        "AttachmentSize": 0
+                    },
+                    {
+                        "Codec": "subrip",
+                        "Language": "eng",
+                        "TimeBase": "1/1000",
+                        "DisplayTitle": "English (SUBRIP)",
+                        "DisplayLanguage": "English",
+                        "IsInterlaced": false,
+                        "IsDefault": false,
+                        "IsForced": false,
+                        "Type": "Subtitle",
+                        "Index": 2,
+                        "IsExternal": false,
+                        "IsTextSubtitleStream": true,
+                        "SupportsExternalStream": true,
+                        "Protocol": "File",
+                        "ExtendedVideoType": "None",
+                        "ExtendedVideoSubType": "None",
+                        "ExtendedVideoSubTypeDescription": "None",
+                        "AttachmentSize": 0,
+                        "SubtitleLocationType": "InternalStream"
+                    }
+                ],
+                "Formats": [],
+                "Bitrate": 1818144,
+                "RequiredHttpHeaders": {},
+                "ReadAtNativeFramerate": false,
+                "DefaultAudioStreamIndex": 1,
+                "DefaultSubtitleStreamIndex": 2
+            }
+        ],
+        "Path": "/mnt/media/tv/Family Guy/Season 22/Family.Guy.S22E02.720p.WEB.h264-BAE.mkv",
+        "Overview": "With the brewery under construction, Lois implores Peter to take a new job, but grows irate when he begins work at the grocery store. Meanwhile, armed with his police stories, Joe and Brian team up to write their own true crime novel.",
+        "Genres": [],
+        "RunTimeTicks": 12979220000,
+        "Size": 294976197,
+        "Bitrate": 1818144,
+        "ProductionYear": 2023,
+        "IndexNumber": 2,
+        "ParentIndexNumber": 22,
+        "ProviderIds": {
+            "Tvdb": "10052213",
+            "EIDR": "10.5240/F0A2-911A-02EA-BBC5-3319-M",
+            "IMDB": "tt29141909",
+            "TV Maze": "2652985"
+        },
+        "IsFolder": false,
+        "Type": "Episode",
+        "People": [
+            {
+                "Name": "Greg Colton",
+                "Id": "9304",
+                "Type": "Director"
+            }
+        ],
+        "GenreItems": [],
+        "TagItems": [],
+        "ParentLogoItemId": "64",
+        "ParentBackdropItemId": "64",
+        "ParentBackdropImageTags": [
+            "6cc7a438ed8bd794b9f8156a2b08aa84"
+        ],
+        "UserData": {
+            "PlaybackPositionTicks": 0,
+            "PlayCount": 0,
+            "IsFavorite": false,
+            "Played": false
+        },
+        "SeriesName": "Family Guy",
+        "SeriesId": "64",
+        "SeasonId": "4739355",
+        "SeriesPrimaryImageTag": "9628a274406ed79aab0900850badbf7a",
+        "SeasonName": "Season 22",
+
+        "comment":"https://hahnca.com:8920/emby/Items/4739516/Images/Primary?tag=f59f882c0cfe32717b384deba7d667fa",
+
+        "ImageTags": {
+            "Primary": "f59f882c0cfe32717b384deba7d667fa"
+        },
+        "BackdropImageTags": [],
+        "ParentLogoImageTag": "23358d105239cf97f275116ca8e31a14",
+        "ParentThumbItemId": "64",
+        "ParentThumbImageTag": "283b54dfc4b196dbc98a46701574b483",
+        "MediaType": "Video"
+    },
+    "watchGap": false,
+    "missing": false,
+    "waiting": false,
+    "notReady": false,
+    "showId": "64",
+    "showName": "Family Guy",
+    "progress": 26
+}

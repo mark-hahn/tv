@@ -570,7 +570,7 @@ export const startStopRoku = async (show) => {
     // console.log('stopRoku:', showName, {res});
   }
   else {
-    const episodeId = show.afterWatchedEpisodeId;
+    const episodeId = show.NextEpisodeId;
     console.log('roku:', episodeId, 'play');
     const {url, body} = urls.playRokuUrl(
                 sessionId, episodeId, mediaSourceId);
@@ -580,4 +580,7 @@ export const startStopRoku = async (show) => {
   }
 }
 
-// setTimeout(startStopRoku, 1000);
+// setTimeout(() => {startStopRoku({
+//     NextEpisodeId:"4794200" })
+//   }
+// , 1000);

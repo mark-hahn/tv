@@ -543,7 +543,6 @@ const getSession = async (player='roku') => {
 // get currently watching show
 export const getCurrentlyWatching = async (player='roku') => {
   const data = await getSession(player);
-  
   const nowPlaying = data.NowPlayingItem;
   if(!nowPlaying) {
     // console.log(`Watching on ${player}: nothing`);
@@ -558,16 +557,13 @@ export const startStopRoku = async (show) => {
   // const showName      = show.Name;
   const session       = await getSession();
   const sessionId     = session.Id;
-  const mediaSourceId = session.PlayState.MediaSourceId;
   const nowPlaying    = session.NowPlayingItem;
   if(nowPlaying) {
-    // console.log('roku:', showName, 'stop');
     const {url, body} = urls.stopRokuUrl(sessionId);
-    // console.log('stopRoku:', showName, {url, body});
     const res = await axios({method: 'post', url, data: body});
-    // console.log('stopRoku:', showName, {res});
   }
   else {
+    const mediaSourceId = session.PlayState.MediaSourceId;
     const episodeId = show.NextEpisodeId;
     console.log('roku:', episodeId, 'play');
     const {url, body} = urls.playRokuUrl(
@@ -591,11 +587,12 @@ export const getLastWatched = async (showId) => {
       const episode       = episodesRes[key].Items[0];
       const userData      = episode.UserData;
       const watched       = userData.Played;
-      const haveFile      = (episode.LocationType != "Virtual");
+      if(watched) continue;
       const episodeNumber = episode.IndexNumber;
       const episodeId     = episode.Id;
-      if(!watched) return {seasonNumber, episodeNumber, episodeId, 
-                           status: (haveFile ? 'ok' : 'missing')};
+      const haveFile      = (episode.LocationType != "Virtual");
+      return {seasonNumber, episodeNumber, episodeId, 
+              status: (haveFile ? 'ok' : 'missing')};
     }
   }
   return {status: 'allWatched'};

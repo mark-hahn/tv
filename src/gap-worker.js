@@ -41,8 +41,6 @@ const getShowState = async (showId, showName) => {
   let activeSeasonNumber, activeSeasonEpisodes;
   let seasonNum, episodes;
   let afterWatchedIdx = 0;
-  let afterWatchedSeasonNum = null;
-  let afterWatchedEpisodeId = null;
   let ready                 = false;
   let gapChecking           = true;
   const seasons =
@@ -73,8 +71,6 @@ const getShowState = async (showId, showName) => {
         activeSeasonNumber   = seasonNum;
         activeSeasonEpisodes = episodes;
       }
-      afterWatchedSeasonNum = seasonNum;
-      afterWatchedEpisodeId = episodes[afterWatchedIdx].episodeId;
     }
     else {
       // last episode watched
@@ -84,19 +80,8 @@ const getShowState = async (showId, showName) => {
     gapChecking = false;
   }
   if(!activeSeasonEpisodes) {
-    // if(gapChecking) {
       activeSeasonNumber   = seasonNum;
       activeSeasonEpisodes = episodes;
-    // }
-    afterWatchedSeasonNum = seasonNum;
-        
-      // if(showName === "Anxious People") debugger;
-
-    if(afterWatchedIdx >= episodes.length) 
-      afterWatchedEpisodeId = null;
-    else
-      afterWatchedEpisodeId = 
-            episodes[afterWatchedIdx].episodeId;
   }
   seasonNum = activeSeasonNumber;
   episodes  = activeSeasonEpisodes;
@@ -134,7 +119,6 @@ const getShowState = async (showId, showName) => {
     }
   }
   return {seasonNum, episodeNum, 
-          afterWatchedSeasonNum, afterWatchedEpisodeId,
           watchGap, missing, waiting, notReady: !ready};
 };
 
@@ -147,21 +131,19 @@ self.onmessage = async (event) => {
   for (let i = 0; i < allShowsIdName.length; i++) {
     const [showId, showName] = allShowsIdName[i];
     const {seasonNum, episodeNum, watchGap, 
-           afterWatchedSeasonNum, afterWatchedEpisodeId,
            missing, waiting, notReady} = 
               await getShowState(showId, showName);
     const progress = Math.ceil( 
                       (i+1) * 100 / allShowsIdName.length );
 
-    // if(watchGap || missing  || waiting 
-    //             || (afterWatchedSeasonNum !== null)
-    //             || notReady || progress === 100)
+    if(watchGap || missing  || waiting 
+                || notReady || progress === 100) {
       self.postMessage(
              {showId, progress,
               seasonNum, episodeNum, 
-              afterWatchedSeasonNum, afterWatchedEpisodeId,
               watchGap, missing, waiting, notReady}
       );
+    };
   }
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   console.log(`seasons-worker done, ${elapsed} secs`);

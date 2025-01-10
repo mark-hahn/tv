@@ -556,21 +556,21 @@ export const getCurrentlyWatching = async (player='roku') => {
   return showName;
 }
 
-export const startStopRoku = async (episodeId) => {
+export const startStopRoku = async (show) => {
+  // const showName      = show.Name;
   const session       = await getSession();
   const sessionId     = session.Id;
   const mediaSourceId = session.PlayState.MediaSourceId;
   const nowPlaying    = session.NowPlayingItem;
   if(nowPlaying) {
-    const itemId = nowPlaying.Id;
-    const showName = nowPlaying.SeriesName;
-    console.log('roku:', showName, 'stop');
+    // console.log('roku:', showName, 'stop');
     const {url, body} = urls.stopRokuUrl(sessionId);
-    console.log('stopRoku:', {url, body});
+    // console.log('stopRoku:', showName, {url, body});
     const res = await axios({method: 'post', url, data: body});
-    console.log('stopRoku:', {res});
+    // console.log('stopRoku:', showName, {res});
   }
   else {
+    const episodeId = show.afterWatchedEpisodeId;
     console.log('roku:', episodeId, 'play');
     const {url, body} = urls.playRokuUrl(
                 sessionId, episodeId, mediaSourceId);
@@ -580,4 +580,4 @@ export const startStopRoku = async (episodeId) => {
   }
 }
 
-setTimeout(startStopRoku, 1000);
+// setTimeout(startStopRoku, 1000);

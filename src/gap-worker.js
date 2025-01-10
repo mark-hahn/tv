@@ -29,9 +29,10 @@ const getEpisodes = async (season, _showName) => {
     const haveFile      = (episode.LocationType != "Virtual");
     const unaired       = !!unairedObj[episodeNumber];
     ready             ||= (!watched && haveFile);
+    const episodeId     = episode.Id;
     const imageTag      = episode?.ImageTags?.Primary;
-    episodes.push({showId, imageTag, seasonId, episodeNumber, 
-                   watched, haveFile, unaired});
+    episodes.push({showId, imageTag, seasonId, episodeNumber,
+                   episodeId, watched, haveFile, unaired});
   }
   return {episodes, ready};
 }
@@ -40,8 +41,10 @@ const getShowState = async (showId, showName) => {
   let activeSeasonNumber, activeSeasonEpisodes;
   let seasonNum, episodes;
   let afterWatchedIdx = 0;
-  let ready           = false;
-  let gapChecking     = true;
+  let afterWatchedSeasonNum = null;
+  let afterWatchedEpisodeId = null;
+  let ready                 = false;
+  let gapChecking           = true;
   const seasons =
         (await axios.get(urls.childrenUrl(cred, showId)))
         .data.Items;
@@ -50,25 +53,28 @@ const getShowState = async (showId, showName) => {
     const season = seasons[seasonIdx];
     const {episodes:episodesIn, ready: readyIn } = 
                 await getEpisodes(season, showName);
-    ready ||= readyIn;
-    if(ready && !gapChecking) break;
-    if(!gapChecking) continue;
-
+    ready   ||= readyIn;
     episodes  = episodesIn;
     seasonNum = +season.IndexNumber;
     const lastWatchedIdx = episodes.findLastIndex(
                                episode => episode.watched);
     if(lastWatchedIdx === -1) {
       // no watched episodes in this season
-      activeSeasonNumber   = seasonNum;
-      activeSeasonEpisodes = episodes;
+      if(gapChecking) {
+        activeSeasonNumber   = seasonNum;
+        activeSeasonEpisodes = episodes;
+      }
       continue
     }
     if(lastWatchedIdx !== episodes.length-1) {
       // some episodes watched in this season
       // last not watched
-      activeSeasonNumber   = seasonNum;
-      activeSeasonEpisodes = episodes;
+      if(gapChecking) {
+        activeSeasonNumber   = seasonNum;
+        activeSeasonEpisodes = episodes;
+      }
+      afterWatchedSeasonNum = seasonNum;
+      afterWatchedEpisodeId = episodes[afterWatchedIdx].episodeId;
     }
     else {
       // last episode watched
@@ -78,8 +84,19 @@ const getShowState = async (showId, showName) => {
     gapChecking = false;
   }
   if(!activeSeasonEpisodes) {
-    activeSeasonNumber   = seasonNum;
-    activeSeasonEpisodes = episodes;
+    // if(gapChecking) {
+      activeSeasonNumber   = seasonNum;
+      activeSeasonEpisodes = episodes;
+    // }
+    afterWatchedSeasonNum = seasonNum;
+        
+      // if(showName === "Anxious People") debugger;
+
+    if(afterWatchedIdx >= episodes.length) 
+      afterWatchedEpisodeId = null;
+    else
+      afterWatchedEpisodeId = 
+            episodes[afterWatchedIdx].episodeId;
   }
   seasonNum = activeSeasonNumber;
   episodes  = activeSeasonEpisodes;
@@ -117,6 +134,7 @@ const getShowState = async (showId, showName) => {
     }
   }
   return {seasonNum, episodeNum, 
+          afterWatchedSeasonNum, afterWatchedEpisodeId,
           watchGap, missing, waiting, notReady: !ready};
 };
 
@@ -129,6 +147,7 @@ self.onmessage = async (event) => {
   for (let i = 0; i < allShowsIdName.length; i++) {
     const [showId, showName] = allShowsIdName[i];
     const {seasonNum, episodeNum, watchGap, 
+           afterWatchedSeasonNum, afterWatchedEpisodeId,
            missing, waiting, notReady} = 
               await getShowState(showId, showName);
     const progress = Math.ceil( 
@@ -136,10 +155,14 @@ self.onmessage = async (event) => {
 
     if(watchGap || missing  || waiting 
                 || notReady || progress === 100)
-      self.postMessage({showId, progress,
-                        seasonNum, episodeNum, 
-                        watchGap, missing, waiting, notReady});
+      self.postMessage(
+             {showId, progress,
+              seasonNum, episodeNum, 
+              afterWatchedSeasonNum, afterWatchedEpisodeId,
+              watchGap, missing, waiting, notReady}
+      );
   }
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   console.log(`seasons-worker done, ${elapsed} secs`);
 };
+

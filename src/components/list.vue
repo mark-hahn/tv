@@ -840,7 +840,7 @@ export default {
         // must be set before startWorker
         blockedWaitShows = showsBlocks.blockedWaitShows;
 
-        emby.startWorker(allShows, this.addGapToShow);
+        // emby.startWorker(allShows, this.addGapToShow);
 
         this.sortByNew     = true;
         this.sortByUpdated = false;

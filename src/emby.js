@@ -3,6 +3,7 @@ import * as tvdb from "./tvdb.js";
 import * as srvr from "./srvr.js";
 import * as urls from "./urls.js";
 import * as util from "./util.js";
+import {now} from "lodash";
 
 const seasonsWorker = 
   new Worker(new URL('gap-worker.js', import.meta.url), 
@@ -310,20 +311,6 @@ export const editEpisode = async (seriesId,
   }
 }
 
-// get currently watching show
-export const getCurrentlyWatching = async (player='roku') => {
-  const url = urls.watchingUrl(player);
-  const res = await axios.get(url);
-  const nowPlaying = res.data[0].NowPlayingItem;
-  if(!nowPlaying) {
-    // console.log(`Watching on ${player}: nothing`);
-    return null;
-  }
-  const showName = nowPlaying.SeriesName;
-  // console.log(`Watching on ${player}: ${showName}`);
-  return showName;
-}
-
 // reset last Watched to first unwatched episode
 export const setLastWatched = async (seriesId) => {
   let seasonNumber;
@@ -546,3 +533,51 @@ export const deleteNoemby = async (name) => {
   console.log('deleteNoemby:', name);
   await srvr.delNoEmby(name);
 }
+
+const getSession = async (player='roku') => {
+  const url = urls.sessionUrl(player);
+  const res = await axios.get(url);
+  const session = res.data[0];
+  // console.log(`getSession:`, session);
+  return session;
+}
+
+// get currently watching show
+export const getCurrentlyWatching = async (player='roku') => {
+  const data = await getSession(player);
+  
+  const nowPlaying = data.NowPlayingItem;
+  if(!nowPlaying) {
+    // console.log(`Watching on ${player}: nothing`);
+    return null;
+  }
+  const showName = nowPlaying.SeriesName;
+  // console.log(`Watching on ${player}: ${showName}`);
+  return showName;
+}
+
+export const startStopRoku = async (episodeId) => {
+  const session       = await getSession();
+  const sessionId     = session.Id;
+  const mediaSourceId = session.PlayState.MediaSourceId;
+  const nowPlaying    = session.NowPlayingItem;
+  if(nowPlaying) {
+    const itemId = nowPlaying.Id;
+    const showName = nowPlaying.SeriesName;
+    console.log('roku:', showName, 'stop');
+    const {url, body} = urls.stopRokuUrl(sessionId);
+    console.log('stopRoku:', {url, body});
+    const res = await axios({method: 'post', url, data: body});
+    console.log('stopRoku:', {res});
+  }
+  else {
+    console.log('roku:', episodeId, 'play');
+    const {url, body} = urls.playRokuUrl(
+                sessionId, episodeId, mediaSourceId);
+    console.log('playRoku:', {url, body});
+    const res = await axios({method: 'post', url, data: body});
+    console.log('playRoku:', {res});
+  }
+}
+
+setTimeout(startStopRoku, 1000);

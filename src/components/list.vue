@@ -787,8 +787,8 @@ export default {
              afterWatchedSeasonNum, afterWatchedEpisodeId,
              watchGap, missing, waiting, notReady} = event.data;
       this.gapPercent = progress;
-      if(!watchGap && !missing && !waiting && !notReady &&
-              !afterWatchedSeasonNum) return;
+      // if(!watchGap && !missing && !waiting && !notReady &&
+      //         afterWatchedSeasonNum === null) return;
       
       const show = allShows.find((show) => show.Id == showId);
       if(!show) return;

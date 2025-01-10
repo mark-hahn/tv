@@ -153,8 +153,9 @@ self.onmessage = async (event) => {
     const progress = Math.ceil( 
                       (i+1) * 100 / allShowsIdName.length );
 
-    if(watchGap || missing  || waiting 
-                || notReady || progress === 100)
+    // if(watchGap || missing  || waiting 
+    //             || (afterWatchedSeasonNum !== null)
+    //             || notReady || progress === 100)
       self.postMessage(
              {showId, progress,
               seasonNum, episodeNum, 

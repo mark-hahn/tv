@@ -3,7 +3,6 @@ import * as tvdb from "./tvdb.js";
 import * as srvr from "./srvr.js";
 import * as urls from "./urls.js";
 import * as util from "./util.js";
-import {now} from "lodash";
 
 const seasonsWorker = 
   new Worker(new URL('gap-worker.js', import.meta.url), 
@@ -538,7 +537,6 @@ const getSession = async (player='roku') => {
   const url = urls.sessionUrl(player);
   const res = await axios.get(url);
   const session = res.data[0];
-  // console.log(`getSession:`, session);
   return session;
 }
 
@@ -580,7 +578,31 @@ export const startStopRoku = async (show) => {
   }
 }
 
-// setTimeout(() => {startStopRoku({
-//     NextEpisodeId:"4794200" })
+export const getLastWatched = async (showId) => {
+  const seasonsRes = 
+        await axios.get(urls.childrenUrl(cred, showId));
+  for(let key in seasonsRes.data.Items) {
+    let   seasonRec    = seasonsRes.data.Items[key];
+    const seasonNumber = seasonRec.IndexNumber;
+    const seasonId     = seasonRec.Id;
+    const episodesRes = 
+           await axios.get(urls.childrenUrl(cred, seasonId));
+    for(let key in episodesRes) {
+      const episode       = episodesRes[key].Items[0];
+      const userData      = episode.UserData;
+      const watched       = userData.Played;
+      const haveFile      = (episode.LocationType != "Virtual");
+      const episodeNumber = episode.IndexNumber;
+      const episodeId     = episode.Id;
+      if(!watched) return {seasonNumber, episodeNumber, episodeId, 
+                           status: (haveFile ? 'ok' : 'missing')};
+    }
+  }
+  return {status: 'allWatched'};
+}
+
+// setTimeout(
+//   async () => {
+//     console.log('getLastWatched',  await getLastWatched("64"));
 //   }
 // , 1000);

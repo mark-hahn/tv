@@ -23,7 +23,6 @@ new features ..
 tabled ...
   show season meta on noemby
   when hilited show is deleted, shows old season meta
-  emby page doesn't change (emby problem)
   map too tall
   sort by imdb ratings
   show actors

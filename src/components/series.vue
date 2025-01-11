@@ -58,6 +58,8 @@ import evtBus    from '../evtBus.js';
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 
+let windowId = null;
+
 export default {
   name: "Series",
 
@@ -78,6 +80,7 @@ export default {
   
   methods: {
     openMap(show) {
+      if(show.Id.startsWith('noemby-')) return;
       // console.log('Series: openMap:', show);
       evtBus.emit('openMap', show);
     },
@@ -85,7 +88,19 @@ export default {
     async remoteClick(remote) {
       console.log('Series: remoteClick:', {remote});
       const url = remote.url;
-      if(url) window.open(url, 'tv-series');
+      if(!url) return
+      if(windowId !== null) {
+        setTimeout(() => {
+          windowId.close();
+          windowId = null;
+        }, 500);
+      }
+      setTimeout(()=> {
+        console.log('before');
+        windowId = window.open(url, 'tv-series');
+        console.log('after');
+      //- })
+      }, 1000);
     },
 
     async setPoster() {

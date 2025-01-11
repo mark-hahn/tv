@@ -17,6 +17,13 @@
                        font-weight:bold; font-color:gray;
                        text-align:center;`)
         | {{seasonsTxt}}
+      #nextup(v-if="nextUpTxt.length > 0"
+             @click="openMap(show)"
+              style=`cursor:pointer; 
+                      font-size:20px; min-height:24px;
+                      font-weight:bold; font-color:gray;
+                      text-align:center; margin-top:5px;`)
+        | {{nextUpTxt}}
     #topRight(style=`display:flex; flex-direction:column`)
       #remotes(style=`width:200px; margin-left:20px;
                       display:flex; flex-direction:column;`) 
@@ -26,6 +33,13 @@
           img(src="../../loading.gif"
               style=`width:100px; height:100px;
                      position:relative; top:20px; left:45px;`)
+        div(v-if="watchButtonTxt.length > 0" 
+            @click="watchButtonClick(show)"
+            style=`margin:3px 10px; padding:10px; 
+                   background-color:white; text-align:center;
+                   border: 1px solid black; font-weight:bold;
+                   cursor:default;`)
+          | {{watchButtonTxt}}
         div( v-if="showRemotes" 
             v-for="remote in remotes"
             @click="remoteClick(remote)"
@@ -58,6 +72,9 @@ export default {
       seasonsTxt: '',
       showSpinner: false,
       showRemotes: false,
+      nextUpTxt: '',
+      watchButtonTxt: '',
+      episodeId: ''
     }
   },
   
@@ -189,28 +206,56 @@ export default {
         console.error('setRemotes:', err);
       }
     },
+
+    async setNextWatch() {
+      const fmtSE = (season, episode) => {
+        return `S${(''+season) .padStart(2, "0")} ` +
+              `E${(''+episode).padStart(2, "0")}`;
+      }
+      this.nextUpTxt      = '';
+      this.watchButtonTxt = '';
+      const watching = await emby.getCurrentlyWatching();
+      if(watching === null) {
+        const afterWatched = await emby.afterLastWatched(this.show.Id);
+        const status = afterWatched.status;
+        let seasonNumber, episodeNumber, episodeId;
+        if(status !== 'allWatched') {
+          ({seasonNumber, episodeNumber, episodeId} = afterWatched);
+        }
+        switch(status) {
+          case 'ok': // next avail & haveFile
+            this.episodeId = episodeId;
+            this.watchButtonTxt = 
+                    `Play ${fmtSE(seasonNumber, episodeNumber)}`;
+            break;
+          case 'missing':   // next avail & !haveFile
+            this.nextUpTxt = 
+                `Next Up: ${fmtSE(seasonNumber, episodeNumber)}` +
+                              ' (File Missing)';
+            break;
+        }
+      }
+      else {
+        this.watchButtonTxt = 'Stop';
+      }
+    }
   },
 
   /////////////////  MOUNTED  /////////////////
 
   mounted() {
-    document.addEventListener("visibilitychange", (event) => {
-      console.log('visibilitychange:', document.visibilityState);
-      // if(document.visibilityState !== 'visible' && openedTab) {
-      //   window.close(openedTab);
-      //   openedTab = null;
-      //   this.setRemotes();
-      // }
-    });
-
     evtBus.on('setUpSeries', async (show) => { 
-      // console.log('Series: setUpSeries:', {show});
       this.show = show;
       await this.setPoster();
       await this.setDates();
       await this.setRemotes();
       await this.setSeasonsTxt();
+      await this.setNextWatch();
     });
+    // evtBus.on('setNextWatch', async () => { 
+    //   console.log('Series setNextWatch:', this.show.Name);
+    //   await setNextWatch();
+    // });
   },
 }
 

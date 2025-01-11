@@ -814,9 +814,14 @@ export default {
     });
 
     setInterval(async () => {
-      const watchingName = await emby.getCurrentlyWatching();
-      if(watchingName === null)  this.watchingName = '----';
-      else                       this.watchingName = watchingName;
+      const curWatch = await emby.getCurrentlyWatching();
+      if(!curWatch) {
+        this.watchingName = '---';
+        return;
+      }
+      const  {showName} = curWatch;
+      if(showName === null)  this.watchingName = '----';
+      else                   this.watchingName = showName;
     }, 5*1000);
 
     (async () => {

@@ -543,14 +543,17 @@ const getSession = async (player='roku') => {
 // get currently watching show
 export const getCurrentlyWatching = async (player='roku') => {
   const data = await getSession(player);
-  const nowPlaying = data.NowPlayingItem;
-  if(!nowPlaying) {
+  const episodeRec = data.NowPlayingItem;
+  if(!episodeRec) {
     // console.log(`Watching on ${player}: nothing`);
     return null;
   }
-  const showName = nowPlaying.SeriesName;
+  const showName   = episodeRec.SeriesName;
+  const seasonNum  = episodeRec.ParentIndexNumber;
+  const episodeNum = episodeRec.IndexNumber;
+  const episodeId  = episodeRec.Id;
   // console.log(`Watching on ${player}: ${showName}`);
-  return showName;
+  return {showName, seasonNum, episodeNum, episodeId}
 }
 
 export const startStopRoku = async (show) => {
@@ -574,23 +577,25 @@ export const startStopRoku = async (show) => {
   }
 }
 
-export const getLastWatched = async (showId) => {
+export const afterLastWatched = async (showId) => {
   const seasonsRes = 
         await axios.get(urls.childrenUrl(cred, showId));
-  for(let key in seasonsRes.data.Items) {
-    let   seasonRec    = seasonsRes.data.Items[key];
+  const seasonItems = seasonsRes.data.Items;
+  for(let key in seasonItems) {
+    let   seasonRec    = seasonItems[key];
     const seasonNumber = seasonRec.IndexNumber;
     const seasonId     = seasonRec.Id;
     const episodesRes = 
            await axios.get(urls.childrenUrl(cred, seasonId));
-    for(let key in episodesRes) {
-      const episode       = episodesRes[key].Items[0];
-      const userData      = episode.UserData;
-      const watched       = userData.Played;
+    const episodeItems = episodesRes.data.Items;
+    for(let key in episodeItems) {
+      const episodeRec = episodeItems[key];
+      const userData   = episodeRec.UserData;
+      const watched    = userData.Played;
       if(watched) continue;
-      const episodeNumber = episode.IndexNumber;
-      const episodeId     = episode.Id;
-      const haveFile      = (episode.LocationType != "Virtual");
+      const episodeNumber = episodeRec.IndexNumber;
+      const episodeId     = episodeRec.Id;
+      const haveFile      = (episodeRec.LocationType != "Virtual");
       return {seasonNumber, episodeNumber, episodeId, 
               status: (haveFile ? 'ok' : 'missing')};
     }

@@ -405,7 +405,7 @@ export default {
         }, {
           color: "blue", filter: 0, icon: ["far", "sad-cry"],
           cond(show)  { return show.Genres?.includes("Drama"); },
-          click(show) {}, name: "drama",
+          click() {}, name: "drama",
         }, {
           color: "lime", filter: 0, icon: ["fas", "question"],
           cond(show)  { return show.InToTry; },
@@ -713,6 +713,7 @@ export default {
     },
 
     condFltrClick(cond) {
+      this.fltrChoice = '- - - - -';
       if (++cond.filter == 2) cond.filter = -1;
       this.select();
     },

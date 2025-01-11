@@ -4,12 +4,8 @@ reminder, restore ...
   cache
 
 bugs ...
-  when hilited show is deleted, shows old season meta
 
 todo ...
-  show --- on filter button when filter invalid
-  show season meta on noemby
-  show watched/total avail
 
 new features ..
   get ratings from google
@@ -25,6 +21,8 @@ new features ..
   update imdb rating et. al. periodicaly
 
 tabled ...
+  show season meta on noemby
+  when hilited show is deleted, shows old season meta
   emby page doesn't change (emby problem)
   map too tall
   sort by imdb ratings

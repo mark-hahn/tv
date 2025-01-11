@@ -813,16 +813,16 @@ export default {
       this.seriesMapAction('open', show);
     });
 
-    // setInterval(async () => {
-    //   const curWatch = await emby.getCurrentlyWatching();
-    //   if(!curWatch) {
-    //     this.watchingName = '---';
-    //     return;
-    //   }
-    //   const  {showName} = curWatch;
-    //   if(showName === null)  this.watchingName = '----';
-    //   else                   this.watchingName = showName;
-    // }, 5*1000);
+    setInterval(async () => {
+      const curWatch = await emby.getCurrentlyWatching();
+      if(!curWatch) {
+        this.watchingName = '---';
+        return;
+      }
+      const  {showName} = curWatch;
+      if(showName === null)  this.watchingName = '----';
+      else                   this.watchingName = showName;
+    }, 5*1000);
 
     (async () => {
       document.addEventListener('keydown', (event) => {

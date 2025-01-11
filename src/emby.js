@@ -602,9 +602,3 @@ export const afterLastWatched = async (showId) => {
   }
   return {status: 'allWatched'};
 }
-
-// setTimeout(
-//   async () => {
-//     console.log('getLastWatched',  await getLastWatched("64"));
-//   }
-// , 1000);

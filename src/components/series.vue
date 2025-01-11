@@ -263,10 +263,6 @@ export default {
       await this.setSeasonsTxt();
       await this.setNextWatch();
     });
-    // evtBus.on('setNextWatch', async () => { 
-    //   console.log('Series setNextWatch:', this.show.Name);
-    //   await setNextWatch();
-    // });
   },
 }
 

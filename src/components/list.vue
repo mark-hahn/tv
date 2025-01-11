@@ -58,7 +58,9 @@
                      :style=`{width:'100px', 
                               fontSize:'15px', margin:'4px'}`)
                 | {{fltrChoice}}
-            
+          button(@click="allClick" 
+                  style=`display:inline-block'; width:40px;
+                        font-size:15px; margin:4px 30px 4px 20px;backgroundColor:white`) All
           #botrgt(style=`display:flex;
                          justify-content:space-between;
                          margin: 5px 17px 0 0;`)
@@ -556,6 +558,10 @@ export default {
       this.saveVisShow(this.shows[0], true);
     },
 
+    allClick() {
+      this.fltrAction('All');
+    },
+
     nameHash(name) {
       this.allShowsLength = allShows.length;
       if(!name) {
@@ -743,6 +749,8 @@ export default {
     },
 
     select(scroll = true) {
+      if(this.searchStr.length > 0) 
+            this.fltrChoice = '- - - - -';
       const srchStrLc = this.searchStr == 
             "" ? null : this.searchStr.toLowerCase();
       this.shows = allShows.filter((show) => {

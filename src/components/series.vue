@@ -84,6 +84,12 @@ export default {
       evtBus.emit('openMap', show);
     },
 
+    async remoteClick(remote) {
+      console.log('Series: remoteClick:', {remote});
+      const url = remote.url;
+      if(url) window.open(url, 'tv-series');
+    },
+
     async setPoster() {
       const show   = this.show;
       let showPath = show.Path;
@@ -238,12 +244,14 @@ export default {
       else {
         this.watchButtonTxt = 'Stop';
       }
-    }
-  },
+    },
 
-  async watchButtonClick(show) {
-    await emby.startStopRoku(show);
-    await this.setNextWatch();
+    async watchButtonClick(show) {
+      await emby.startStopRoku(show);
+      setTimeout(async () => {
+        await this.setNextWatch();
+      }, 1000);
+    },
   },
 
   /////////////////  MOUNTED  /////////////////

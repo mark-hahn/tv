@@ -556,24 +556,23 @@ export const getCurrentlyWatching = async (player='roku') => {
   return {showName, seasonNum, episodeNum, episodeId}
 }
 
-export const startStopRoku = async (show) => {
+export const startStopRoku = async (show, episodeId) => {
   // const showName      = show.Name;
   const session       = await getSession();
   const sessionId     = session.Id;
   const nowPlaying    = session.NowPlayingItem;
   if(nowPlaying) {
     const {url, body} = urls.stopRokuUrl(sessionId);
-    const res = await axios({method: 'post', url, data: body});
+    await axios({method: 'post', url, data: body});
     return 'stopped';
   }
   else {
-    const episodeId = show.NextEpisodeId;
-    console.log('roku:', episodeId, 'play');
+    console.log('roku play',);
     const {url, body} = urls.playRokuUrl(
-                sessionId, episodeId);
+                              sessionId, episodeId);
     console.log('playRoku:', {url, body});
-    const res = await axios({method: 'post', url, data: body});
-    console.log('playRoku:', {res});
+    await axios({method: 'post', url, data: body});
+    console.log('playRoku', show.Name);
     return 'playing';
   }
 }
@@ -586,7 +585,7 @@ export const afterLastWatched = async (showId) => {
     let   seasonRec    = seasonItems[key];
     const seasonNumber = seasonRec.IndexNumber;
     const seasonId     = seasonRec.Id;
-    const episodesRes = 
+    const episodesRes  = 
            await axios.get(urls.childrenUrl(cred, seasonId));
     const episodeItems = episodesRes.data.Items;
     for(let key in episodeItems) {

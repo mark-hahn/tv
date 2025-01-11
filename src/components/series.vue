@@ -58,8 +58,6 @@ import evtBus    from '../evtBus.js';
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 
-let openedTab = null;
-
 export default {
   name: "Series",
 
@@ -216,7 +214,7 @@ export default {
     async setNextWatch() {
       const fmtSE = (season, episode) => {
         return `S${(''+season) .padStart(2, "0")} ` +
-              `E${(''+episode).padStart(2, "0")}`;
+               `E${(''+episode).padStart(2, "0")}`;
       }
       this.nextUpTxt      = '';
       this.watchButtonTxt = '';
@@ -247,7 +245,7 @@ export default {
     },
 
     async watchButtonClick(show) {
-      await emby.startStopRoku(show);
+      await emby.startStopRoku(show, this.episodeId);
       setTimeout(async () => {
         await this.setNextWatch();
       }, 1000);

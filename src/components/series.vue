@@ -59,6 +59,7 @@ import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 
 let windowId = null;
+let windowLabel = Math.random();
 
 export default {
   name: "Series",
@@ -96,10 +97,7 @@ export default {
         }, 500);
       }
       setTimeout(()=> {
-        console.log('before');
-        windowId = window.open(url, 'tv-series');
-        console.log('after');
-      //- })
+        windowId = window.open(url, windowLabel);
       }, 1000);
     },
 

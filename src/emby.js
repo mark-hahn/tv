@@ -564,6 +564,7 @@ export const startStopRoku = async (show) => {
   if(nowPlaying) {
     const {url, body} = urls.stopRokuUrl(sessionId);
     const res = await axios({method: 'post', url, data: body});
+    return 'stopped';
   }
   else {
     const mediaSourceId = session.PlayState.MediaSourceId;
@@ -574,6 +575,7 @@ export const startStopRoku = async (show) => {
     console.log('playRoku:', {url, body});
     const res = await axios({method: 'post', url, data: body});
     console.log('playRoku:', {res});
+    return 'playing';
   }
 }
 

@@ -33,7 +33,7 @@
           img(src="../../loading.gif"
               style=`width:100px; height:100px;
                      position:relative; top:20px; left:45px;`)
-        div(v-if="watchButtonTxt.length > 0" 
+        #watchButton(v-if="watchButtonTxt.length > 0" 
             @click="watchButtonClick(show)"
             style=`margin:3px 10px; padding:10px; 
                    background-color:white; text-align:center;
@@ -239,6 +239,11 @@ export default {
         this.watchButtonTxt = 'Stop';
       }
     }
+  },
+
+  async watchButtonClick(show) {
+    await emby.startStopRoku(show);
+    await this.setNextWatch();
   },
 
   /////////////////  MOUNTED  /////////////////

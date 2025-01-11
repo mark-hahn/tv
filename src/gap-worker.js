@@ -143,7 +143,7 @@ self.onmessage = async (event) => {
               seasonNum, episodeNum, 
               watchGap, missing, waiting, notReady}
       );
-    };
+    }
   }
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   console.log(`seasons-worker done, ${elapsed} secs`);

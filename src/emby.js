@@ -567,11 +567,10 @@ export const startStopRoku = async (show) => {
     return 'stopped';
   }
   else {
-    const mediaSourceId = session.PlayState.MediaSourceId;
     const episodeId = show.NextEpisodeId;
     console.log('roku:', episodeId, 'play');
     const {url, body} = urls.playRokuUrl(
-                sessionId, episodeId, mediaSourceId);
+                sessionId, episodeId);
     console.log('playRoku:', {url, body});
     const res = await axios({method: 'post', url, data: body});
     console.log('playRoku:', {res});

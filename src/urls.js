@@ -126,8 +126,7 @@ export function sessionUrl(player) {
         .replace(/\s*/g, "");
 }
 
-export function playRokuUrl(
-          sessionId, episodeId, mediaSourceId, ) {
+export function playRokuUrl( sessionId, episodeId) {
   return {url: `${hahnca}  Sessions /
                 ${sessionId} / Playing
                 ? ItemIds     = ${episodeId} 
@@ -138,7 +137,6 @@ export function playRokuUrl(
             ControllingUserId:   markUsrId,
             SubtitleStreamIndex: 1,
             AudioStreamIndex:    1,
-            MediaSourceId:       mediaSourceId,
             StartIndex:          1,
           }
         };

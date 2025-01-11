@@ -4,17 +4,17 @@ reminder, restore ...
   cache
 
 bugs ...
-  map too tall
-  noemby has plus sign (How to Get Away with Murder)
-  emby page doesn't change (emby problem)
+  always plays episode 1 (daddy issues)
+  some shows cannot play (sex lives of college)
   when hilited show is deleted, shows old season meta
 
 todo ...
-  get ratings from google
+  show --- on filter button when filter invalid
   show season meta on noemby
   show watched/total avail
 
 new features ..
+  get ratings from google
   click anywhere to close popup
   chg filter button to dashes when filters chg
   save all settings to local storage
@@ -27,6 +27,8 @@ new features ..
   update imdb rating et. al. periodicaly
 
 tabled ...
+  emby page doesn't change (emby problem)
+  map too tall
   sort by imdb ratings
   show actors
   prev/next hilite

@@ -1,16 +1,12 @@
 /*
 reminder, restore ...
-  gap checks
-  cache
+  start gap running
 
 bugs ...
-
-todo ...
 
 new features ..
   get ratings from google
   click anywhere to close popup
-  chg filter button to dashes when filters chg
   save all settings to local storage
   hide gap with dash click
   blink copy-name button

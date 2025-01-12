@@ -3,9 +3,11 @@ import * as urls from "./urls.js";
 
 let cred;
 
-const getShowState = async (showId, _showName) => {
+const getShowState = async (showId, showName) => {
   // active rows have watched with no watched at end
   // or last epi in last row watched
+
+  if(showName.includes('Guy')) debugger;
 
   let ready                 = false;
   let checkedReady          = false;
@@ -48,7 +50,6 @@ const getShowState = async (showId, _showName) => {
         const episode       = episodes[episodeIdx];
         const episodeNumber = episode.IndexNumber;
         if(episodeNumber === undefined) continue;
-        const seasonId      = episode.SeasonId;
         const userData      = episode?.UserData;
         const watched       = !!userData?.Played;
         const haveFile      = (episode.LocationType != "Virtual");
@@ -95,6 +96,7 @@ const getShowState = async (showId, _showName) => {
         // let noFileAfterFile = false; // per show
         // let fileGap         = false; // per show
         // let haveFileShow    = false; // per show
+        haveFileShow ||= haveFile;
         if(haveFileShow && !haveFile)
           noFileAfterFile = true;
         if(!fileGap && noFileAfterFile && haveFile){

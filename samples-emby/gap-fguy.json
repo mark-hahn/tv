@@ -191,7 +191,7 @@
         "MediaType": "Video"
     },
     "watchGap": false,
-    "missing": false,
+    "filegap": false,
     "waiting": false,
     "notReady": false,
     "showId": "64",

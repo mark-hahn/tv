@@ -182,7 +182,7 @@ export async function loadAllShows(gapCache) {
       DateCreated: date,
       Waiting: false,
       WatchGap: false,
-      Missing: false,
+      FileGap: false,
       WaitStr: '',
       NotReady: true,
       InToTry: false,
@@ -431,7 +431,7 @@ export const getSeriesMap = async (show, prune = false) => {
       const error = 
           (seasonNumber  == show.GapSeason  &&
            episodeNumber == show.GapEpisode &&
-          (show.WatchGap || show.Missing || show.Waiting));
+          (show.WatchGap || show.FileGap || show.Waiting));
 
       episodes.push([episodeNumber, 
           {error, played, avail, noFile:!path && !unaired, 

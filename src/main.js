@@ -3,7 +3,9 @@ reminder, restore ...
   start gap running
 
 bugs ...
-
+  google ampersand
+  grid lines in map
+  
 new features ..
   get ratings from google
   click anywhere to close popup

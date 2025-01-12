@@ -165,13 +165,13 @@
              style="margin:5px;")                     Close
 
     div(v-if=`mapShow.WatchGap ||
-              mapShow.Missing  || mapShow.WaitStr?.length`
+              mapShow.FileGap  || mapShow.WaitStr?.length`
         style=`display:flex; justify-content:space-around; 
                color:red; margin: 0 10px; 4px 10px;`)
       div(v-if="mapShow.WatchGap" 
           style="display:inline-block;")
         | {{`Watch Gap`}}
-      div(v-if="mapShow.Missing"
+      div(v-if="mapShow.FileGap"
           style="display:inline-block; margin 3px 10px")
         | {{`Missing File`}}
       div(v-if="mapShow.Waiting" 
@@ -397,7 +397,7 @@ export default {
           click() {}, name: "unplayed",
         }, {
           color: "#f88", filter: 0, icon: ["fas", "minus"],
-          cond(show)  { return show.Missing || show.WatchGap},
+          cond(show)  { return show.FileGap || show.WatchGap},
           click() {}, name: "gap",
         }, {
           color: "#0c0", filter: 0, icon: ["far", "clock"],
@@ -529,7 +529,7 @@ export default {
         DateCreated: dateStr, 
         Waiting: false,
         WaitStr: '',
-        Missing: false,
+        FileGap: false,
         WatchGap: false,
         InToTry: false,
         InContinue: false,
@@ -792,8 +792,8 @@ export default {
 
     async addGapToShow(event) {
       const {showId, progress, 
-             seasonNum, episodeNum, 
-             watchGap, missing, waiting, notReady} = event.data;
+             gapSeasonNumber, gapEpisodeNumber, 
+             watchGap, filegap, waiting, notReady} = event.data;
       this.gapPercent = progress;
       
       const show = allShows.find((show) => show.Id == showId);
@@ -802,10 +802,10 @@ export default {
       const blockedWait = blockedWaitShows.includes(show.Name);
       const gap = {};
       gap.ShowId        = showId;
-      gap.GapSeason     = seasonNum;
-      gap.GapEpisode    = episodeNum;
+      gap.GapSeason     = gapSeasonNumber;
+      gap.GapEpisode    = gapEpisodeNumber;
       gap.WatchGap      = watchGap; 
-      gap.Missing       = missing;
+      gap.FileGap       = filegap;
       gap.NotReady      = notReady;
       gap.Waiting       = !blockedWait && waiting;
       gap.WaitStr       = await tvdb.getWaitStr(show);

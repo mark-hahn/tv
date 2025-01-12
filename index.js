@@ -372,18 +372,21 @@ const getGaps = (id, _param, resolve, _reject) => {
   resolve([id, gaps]);
 };
 
-const addGap = async (id, idGapStr, resolve, _reject) => {
-  const [gapId, gap] = JSON.parse(idGapStr);
-  console.log('addGap', id, {showId:id});
+const addGap = async (id, gapIdGapSave, resolve, _reject) => {
+  const [gapId, gap, save] = JSON.parse(gapIdGapSave);
+  console.log('addGap', id, {gapIdGapSave});
   gaps[gapId] = gap;
-  await fsp.writeFile('data/gaps.json', JSON.stringify(gaps)); 
+  if(save) 
+    await fsp.writeFile('data/gaps.json', JSON.stringify(gaps)); 
   resolve([id, 'ok']);
 }
 
-const delGap = async (id, gapId, resolve, _reject) => {
-  console.log('delGap', {id, gapId});
-  delete gaps[gapId];
-  await fsp.writeFile('data/gaps.json', JSON.stringify(gaps)); 
+const delGap = async (id, gapIdSave, resolve, _reject) => {
+  const [gapId, save] = JSON.parse(gapIdSave);
+  console.log('delGap', id, {gapIdSave});
+  if(gapId !== null) delete gaps[gapId];
+  if(save) 
+    await fsp.writeFile('data/gaps.json', JSON.stringify(gaps)); 
   resolve([id, 'ok']);
 }
 

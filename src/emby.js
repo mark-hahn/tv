@@ -429,9 +429,12 @@ export const getSeriesMap = async (show, prune = false) => {
       }
 
       const error = 
-          (seasonNumber  == show.GapSeason  &&
-           episodeNumber == show.GapEpisode &&
-          (show.WatchGap || show.FileGap || show.Waiting));
+          (seasonNumber  == show.WatchGapSeason  &&
+           episodeNumber == show.WatchGapEpisode &&
+              show.WatchGap) ||
+          (seasonNumber  == show.FileGapSeason  &&
+           episodeNumber == show.FileGapEpisode &&
+              show.FileGap);
 
       episodes.push([episodeNumber, 
           {error, played, avail, noFile:!path && !unaired, 

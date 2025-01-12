@@ -7,22 +7,23 @@ const getShowState = async (showId, showName) => {
   // active rows have watched with no watched at end
   // or last epi in last row watched
 
-  if(showName.includes('Guy')) debugger;
+  // if(showName.includes('Guy')) debugger;
 
   let ready                 = false;
   let checkedReady          = false;
   let lastWatched           = false;
   let watchedShow           = false;
   let watchedLastEpiLastSea = true; 
-  let allWatchedShow        = true; 
-  let waitingShow           = false;
+  let waiting               = false;
   let unwatchedAfterWatched = false;
   let watchGap              = false;
   let haveFileShow          = false;
   let noFileAfterFile       = false;
   let fileGap               = false;
-  let gapSeasonNumber       = null; 
-  let gapEpisodeNumber      = null; 
+  let watchGapSeason        = null; 
+  let watchGapEpisode       = null; 
+  let fileGapSeason         = null; 
+  let fileGapEpisode        = null; 
 
   try {
     const seasonsRes = 
@@ -52,7 +53,8 @@ const getShowState = async (showId, showName) => {
         if(episodeNumber === undefined) continue;
         const userData      = episode?.UserData;
         const watched       = !!userData?.Played;
-        const haveFile      = (episode.LocationType != "Virtual");
+        const haveFile      = 
+              watched || (episode.LocationType != "Virtual");
         const unaired       = !!unairedObj[episodeNumber];
 
         // ready -- plus sign
@@ -66,18 +68,16 @@ const getShowState = async (showId, showName) => {
 
         // let watchedShow     = false; // per show
         // let watchedSeason   = false; // per season (row)
-        // let allWatchedShow  = true;  // per show
         if(watched) {
           watchedShow   = true;
           watchedSeason = true;
         }
-        else allWatchedShow  = false;
 
         // let watchedLastEpiLastSea = true; // per show
         if(episodeIdx == episodes.length-1) {
           // last epi in season
           if(unaired && (watchedLastEpiLastSea || watchedSeason))
-            waitingShow = true;
+            waiting = true;
           watchedLastEpiLastSea = watched;
         }
 
@@ -86,9 +86,9 @@ const getShowState = async (showId, showName) => {
         if(watchedShow && !watched)
           unwatchedAfterWatched = true;
         if(!watchGap && unwatchedAfterWatched && watched) {
-          if(gapSeasonNumber === null) {
-            gapSeasonNumber  = seasonNumber;
-            gapEpisodeNumber = episodeNumber
+          if(watchGapSeason === null) {
+            watchGapSeason  = seasonNumber;
+            watchGapEpisode = episodeNumber
           }
           watchGap = true;
         }
@@ -100,9 +100,9 @@ const getShowState = async (showId, showName) => {
         if(haveFileShow && !haveFile)
           noFileAfterFile = true;
         if(!fileGap && noFileAfterFile && haveFile){
-          if(gapSeasonNumber === null) {
-            gapSeasonNumber  = seasonNumber;
-            gapEpisodeNumber = episodeNumber
+          if(fileGapSeason === null) {
+            fileGapSeason  = seasonNumber;
+            fileGapEpisode = episodeNumber
           }
           fileGap = true;
         }
@@ -115,9 +115,9 @@ const getShowState = async (showId, showName) => {
     console.error('getShowState', {error});
     return null;
   }
-  return {notReady:!ready, allWatched:allWatchedShow,
-          waiting: waitingShow, watchGap, fileGap,
-          gapSeasonNumber, gapEpisodeNumber};
+  return {notReady:!ready, waiting, 
+          watchGap, watchGapSeason, watchGapEpisode, 
+          fileGap,  fileGapSeason,  fileGapEpisode};
 }
 
 
@@ -129,19 +129,19 @@ self.onmessage = async (event) => {
       `gap-worker started, ${allShowsIdName.length} shows`);
   for (let i = 0; i < allShowsIdName.length; i++) {
     const [showId, showName] = allShowsIdName[i];
-    const {notReady, allWatched,
-           waiting, watchGap, fileGap,
-           gapSeasonNumber, gapEpisodeNumber} = 
+    const {notReady, waiting, 
+           watchGap, watchGapSeason, watchGapEpisode, 
+           fileGap,  fileGapSeason,  fileGapEpisode} = 
               await getShowState(showId, showName);
     const progress = Math.ceil( 
                       (i+1) * 100 / allShowsIdName.length );
 
-    if(watchGap || fileGap  || waiting || allWatched
+    if(watchGap || fileGap  || waiting 
                 || notReady || progress === 100) {
       self.postMessage(
-             {showId, progress, 
-              gapSeasonNumber, gapEpisodeNumber, 
-              watchGap, fileGap, waiting, allWatched, notReady}
+           {showId, progress, notReady, waiting, 
+           watchGap, watchGapSeason, watchGapEpisode, 
+           fileGap,  fileGapSeason,  fileGapEpisode}
       );
     }
   }

@@ -791,9 +791,10 @@ export default {
     },
 
     async addGapToShow(event) {
-      const {showId, progress, 
-             gapSeasonNumber, gapEpisodeNumber, 
-             watchGap, filegap, waiting, notReady} = event.data;
+      const {showId, progress, notReady, waiting, 
+             watchGap, watchGapSeason, watchGapEpisode, 
+             fileGap,  fileGapSeason,  fileGapEpisode}
+                          = event.data;
       this.gapPercent = progress;
       
       const show = allShows.find((show) => show.Id == showId);
@@ -801,14 +802,16 @@ export default {
 
       const blockedWait = blockedWaitShows.includes(show.Name);
       const gap = {};
-      gap.ShowId        = showId;
-      gap.GapSeason     = gapSeasonNumber;
-      gap.GapEpisode    = gapEpisodeNumber;
-      gap.WatchGap      = watchGap; 
-      gap.FileGap       = filegap;
-      gap.NotReady      = notReady;
-      gap.Waiting       = !blockedWait && waiting;
-      gap.WaitStr       = await tvdb.getWaitStr(show);
+      gap.ShowId          = showId;
+      gap.FileGapSeason   = fileGapSeason;
+      gap.FileGapEpisode  = fileGapEpisode;
+      gap.WatchGapSeason  = watchGapSeason;
+      gap.WatchGapEpisode = watchGapEpisode;
+      gap.WatchGap        = watchGap; 
+      gap.FileGap         = fileGap;
+      gap.NotReady        = notReady;
+      gap.Waiting         = !blockedWait && waiting;
+      gap.WaitStr         = await tvdb.getWaitStr(show);
 
       Object.assign(show, gap);
       const idGapStr = JSON.stringify([show.Id, gap]);

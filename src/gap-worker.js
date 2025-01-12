@@ -6,26 +6,31 @@ let cred;
 const getShowState = async (showId, _showName) => {
   // active rows have watched with no watched at end
   // or last epi in last row watched
-  let watchedInLastEpi = false;
-  let inActiveRow      = false;
 
-  let waiting = false;  // unaired in active row (inc last epi)
-
-  let haveWatched            = false;
-  let nonWatchedAfterWatched = false;
-  let watchedGap             = false;  
-  let allWatched             = true;
-  let ready = false;
-
-  let nonFileAfterFile = false;
-  let fileGap          = false; 
+  let ready                 = false;
+  let checkedReady          = false;
+  let lastWatched           = false;
+  let watchedShow           = false;
+  let watchedLastEpiLastSea = true; 
+  let allWatchedShow        = true; 
+  let waitingShow           = false;
+  let unwatchedAfterWatched = false;
+  let watchGap              = false;
+  let haveFileShow          = false;
+  let noFileAfterFile       = false;
+  let fileGap               = false;
+  let gapSeasonNumber       = null; 
+  let gapEpisodeNumber      = null; 
 
   try {
     const seasonsRes = 
           await axios.get(urls.childrenUrl(cred, showId));
-    for(let key in seasonsRes.data.Items) {
-      const season   = seasonsRes.data.Items[key];
-      const seasonId = season.Id;
+    const seasons = seasonsRes.data.Items;
+    for(let seasonIdx=0; seasonIdx < seasons.length; seasonIdx++) {
+      const season       = seasons[seasonIdx];
+      const seasonId     = season.Id;
+      const seasonNumber = season.IndexNumber;
+      let watchedSeason = false;
 
       const unairedObj = {};
       const unairedRes = await axios.get(
@@ -38,30 +43,67 @@ const getShowState = async (showId, _showName) => {
 
       const episodesRes = 
               await axios.get(urls.childrenUrl(cred, seasonId));
-      const episodes =  episodesRes.data.Items;
-      for(let key in episodes) {
-        const episode       = episodes[key];
-        if(episode.IndexNumber === undefined) continue;
-        const showId        = episode.SeriesId;
+      const episodes = episodesRes.data.Items;
+      for(let episodeIdx=0;  episodeIdx < episodes.length; episodeIdx++) {
+        const episode       = episodes[episodeIdx];
+        const episodeNumber = episode.IndexNumber;
+        if(episodeNumber === undefined) continue;
         const seasonId      = episode.SeasonId;
-        const episodeId     = episode.Id;
-        const episodeNumber = +episode.IndexNumber;
         const userData      = episode?.UserData;
         const watched       = !!userData?.Played;
         const haveFile      = (episode.LocationType != "Virtual");
         const unaired       = !!unairedObj[episodeNumber];
-        const imageTag      = episode?.ImageTags?.Primary;
 
-        let checkedReady = false;
-        let lastWatched  = false;
-
+        // ready -- plus sign
+        // let ready        = false; // per show
+        // let checkedReady = false; // per show
+        // let lastWatched  = false; // per show
         if(!checkedReady && lastWatched && !watched) {
            checkedReady = true;
            ready        = haveFile;
         }
 
-        if(watched) haveWatched = true;
-        else        allWatched = false;
+        // let watchedShow     = false; // per show
+        // let watchedSeason   = false; // per season (row)
+        // let allWatchedShow  = true;  // per show
+        if(watched) {
+          watchedShow   = true;
+          watchedSeason = true;
+        }
+        else allWatchedShow  = false;
+
+        // let watchedLastEpiLastSea = true; // per show
+        if(episodeIdx == episodes.length-1) {
+          // last epi in season
+          if(unaired && (watchedLastEpiLastSea || watchedSeason))
+            waitingShow = true;
+          watchedLastEpiLastSea = watched;
+        }
+
+        // let unwatchedAfterWatched = false; // per show
+        // let watchGap = false;              // per show
+        if(watchedShow && !watched)
+          unwatchedAfterWatched = true;
+        if(!watchGap && unwatchedAfterWatched && watched) {
+          if(gapSeasonNumber === null) {
+            gapSeasonNumber  = seasonNumber;
+            gapEpisodeNumber = episodeNumber
+          }
+          watchGap = true;
+        }
+
+        // let noFileAfterFile = false; // per show
+        // let fileGap         = false; // per show
+        // let haveFileShow    = false; // per show
+        if(haveFileShow && !haveFile)
+          noFileAfterFile = true;
+        if(!fileGap && noFileAfterFile && haveFile){
+          if(gapSeasonNumber === null) {
+            gapSeasonNumber  = seasonNumber;
+            gapEpisodeNumber = episodeNumber
+          }
+          fileGap = true;
+        }
 
         lastWatched = watched;
       }
@@ -71,7 +113,9 @@ const getShowState = async (showId, _showName) => {
     console.error('getShowState', {error});
     return null;
   }
-  return {};
+  return {notReady:!ready, allWatched:allWatchedShow,
+          waiting: waitingShow, watchGap, fileGap,
+          gapSeasonNumber, gapEpisodeNumber};
 }
 
 
@@ -83,18 +127,19 @@ self.onmessage = async (event) => {
       `gap-worker started, ${allShowsIdName.length} shows`);
   for (let i = 0; i < allShowsIdName.length; i++) {
     const [showId, showName] = allShowsIdName[i];
-    const {seasonNum, episodeNum, watchGap, 
-           missing, waiting, notReady} = 
+    const {notReady, allWatched,
+           waiting, watchGap, fileGap,
+           gapSeasonNumber, gapEpisodeNumber} = 
               await getShowState(showId, showName);
     const progress = Math.ceil( 
                       (i+1) * 100 / allShowsIdName.length );
 
-    if(watchGap || missing  || waiting 
+    if(watchGap || fileGap  || waiting || allWatched
                 || notReady || progress === 100) {
       self.postMessage(
-             {showId, progress,
-              seasonNum, episodeNum, 
-              watchGap, missing, waiting, notReady}
+             {showId, progress, 
+              gapSeasonNumber, gapEpisodeNumber, 
+              watchGap, fileGap, waiting, allWatched, notReady}
       );
     }
   }

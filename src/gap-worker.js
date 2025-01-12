@@ -53,8 +53,7 @@ const getShowState = async (showId, showName) => {
         if(episodeNumber === undefined) continue;
         const userData      = episode?.UserData;
         const watched       = !!userData?.Played;
-        const haveFile      = 
-              watched || (episode.LocationType != "Virtual");
+        const haveFile      = (episode.LocationType != "Virtual");
         const unaired       = !!unairedObj[episodeNumber];
 
         // ready -- plus sign
@@ -136,14 +135,11 @@ self.onmessage = async (event) => {
     const progress = Math.ceil( 
                       (i+1) * 100 / allShowsIdName.length );
 
-    if(watchGap || fileGap  || waiting 
-                || notReady || progress === 100) {
-      self.postMessage(
-           {showId, progress, notReady, waiting, 
-           watchGap, watchGapSeason, watchGapEpisode, 
-           fileGap,  fileGapSeason,  fileGapEpisode}
-      );
-    }
+    self.postMessage(
+          {showId, progress, notReady, waiting, 
+          watchGap, watchGapSeason, watchGapEpisode, 
+          fileGap,  fileGapSeason,  fileGapEpisode}
+    );
   }
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   console.log(`seasons-worker done, ${elapsed} secs`);

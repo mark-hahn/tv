@@ -796,6 +796,7 @@ export default {
              fileGap,  fileGapSeason,  fileGapEpisode}
                           = event.data;
       this.gapPercent = progress;
+      const save = progress == 100;
       
       const show = allShows.find((show) => show.Id == showId);
       if(!show) return;
@@ -814,8 +815,8 @@ export default {
       gap.WaitStr         = await tvdb.getWaitStr(show);
 
       Object.assign(show, gap);
-      const idGapStr = JSON.stringify([show.Id, gap]);
-      await srvr.addGap(idGapStr);
+      const gapIdGapSave = JSON.stringify([show.Id, gap, save]);
+      await srvr.addGap(gapIdGapSave);
     }
   },
 
@@ -856,7 +857,9 @@ export default {
         // must be set before startWorker
         blockedWaitShows = showsBlocks.blockedWaitShows;
 
-        emby.startWorker(allShows, this.addGapToShow);
+        const justFG = allShows.filter((show) => show.Id == "64");
+        console.log('justFG:', justFG);
+        emby.startWorker(justFG, this.addGapToShow);
 
         this.sortByNew     = true;
         this.sortByUpdated = false;

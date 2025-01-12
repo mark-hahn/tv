@@ -97,8 +97,9 @@ export async function loadAllShows(gapCache) {
 
 ////////  remove gaps with no matching show /////////
   for(const gapId in gaps) {
-    await srvr.delGap(gapId);
+    await srvr.delGap(gapId, false);
   }
+  await srvr.delGap(null, true);
 
 //////////  add noemby shows from srvr ////////////
   for(const noEmbyShow of noEmbys) {

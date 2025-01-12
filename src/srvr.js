@@ -172,10 +172,10 @@ export function delNoEmby(name)
 
 export function getGaps()       
             {return fCall('getGaps')}
-export function addGap(idGapStr)    
-            {return fCall('addGap', idGapStr, 'gap')}
-export function delGap(gapId)    
-            {return fCall('delGap', gapId, 'gap')}
+export function addGap(gapIdGapSave)    
+            {return fCall('addGap', gapIdGapSave, 'gap')}
+export function delGap(gapIdSave)    
+            {return fCall('delGap', gapIdSave, 'gap')}
 
 export function getTvdb(name)      
             {return fCall('getTvdb', name, 'tvdb')}

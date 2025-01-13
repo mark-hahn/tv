@@ -857,9 +857,7 @@ export default {
         // must be set before startWorker
         blockedWaitShows = showsBlocks.blockedWaitShows;
 
-        const justFG = allShows.filter((show) => show.Id == "64");
-        console.log('justFG:', justFG);
-        emby.startWorker(justFG, this.addGapToShow);
+        emby.startWorker(allShows, this.addGapToShow);
 
         this.sortByNew     = true;
         this.sortByUpdated = false;

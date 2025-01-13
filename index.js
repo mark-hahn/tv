@@ -382,14 +382,9 @@ const addGap = async (id, gapIdGapSave, resolve, _reject) => {
 }
 
 const delGap = async (id, gapIdSave, resolve, _reject) => {
-  console.log('delGap', id, {gapIdSave});
   const [gapId, save] = JSON.parse(gapIdSave);
-  try{
-    if(gapId !== null) delete gaps[gapId];
-  }
-  catch(e){
-    console.error('delGap', e.message);
-  }
+  console.log('delGap', id, {gapIdSave});
+  if(gapId !== null) delete gaps[gapId];
   if(save) 
     await fsp.writeFile('data/gaps.json', JSON.stringify(gaps)); 
   resolve([id, 'ok']);
@@ -477,7 +472,7 @@ const deletePath = async (id, path, resolve, reject) => {
     await fsp.unlink(path); 
   }
   catch(e) {
-    resolve([id, e.message]);
+    reject([id, e]);
     return
   }
   resolve([id, 'ok']);

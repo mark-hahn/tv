@@ -493,89 +493,92 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
     reject([id, {type, url, name}]);
     return
   }
-  const text = (await resp.text())
+  const html = (await resp.text())
                 .replaceAll(/(\r\n|\n|\r)/gm, "")
                 .replaceAll(/\s+/gm, " ");
 
-  if(type == 2) { // IMDB
-    // await fsp.writeFile('data/imdb-page.txt', text);
-    let parts;
-    try{
-      parts = /imUuxf">(\d\.\d)<\/span>/i.exec(text);
-      if(parts === null) throw 'wikidata parse error';
-    }
-    catch (e) {
-      reject([id, {type, url, name, e}]);
-      return
-    }
-    resolve([id, {ratings:parts[1]}]);
-    return;
-  }
-
-  else if(type == 18) { // wikidata
-    let parts;
-    try{
-      parts = /lang="en"><a href="(.*?)"\shreflang="en"/i.exec(text);
-      if(parts === null) throw 'wikidata parse error';
-    }
-    catch (e) {
-      reject([id, {type, url, name, e}]);
-      return
-    }
-    resolve([id, {url:parts[1]}]);
-    return;
-  }
-
-  else if(type == 99) { // rotten tomatoes
-    // await fsp.writeFile('samples/rotten-search-noline.html', text);
-
-    const stripParenSfx = (name) => {
-      name = name.trim();
-      const pfxNameParts = /^(.*?)(\s+\(.*?\))?$/i.exec(name);
-      if(!pfxNameParts) {
-        console.log('no rotten name pfx match:', {type, url, name});
-        resolve([id, 'no match: ' + {type, url, name}]);
-        return;
-      }
-      return pfxNameParts[1];
-    }
-
-    const namePfx = stripParenSfx(name);
-
-    let titleRegx = new RegExp(/search-result-title">TV shows</g);
-    titleRegx.lastIndex = 0;
-    const titleParts = titleRegx.exec(text);
-    if(titleParts === null) {
-      console.log('no rotten title match:', {type, url, name});
+  const rottenStripSfx = (name) => {
+    name = name.trim();
+    const pfxNameParts = /^(.*?)(\s+\(.*?\))?$/i.exec(name);
+    if(!pfxNameParts) {
+      console.log('no rotten name pfx match:', {type, url, name});
       resolve([id, 'no match: ' + {type, url, name}]);
       return;
     }
+    return pfxNameParts[1];
+  }
 
-// need escaping: ] ( ) [ { } * + ? / $ . | ^ \
+  let parts;
 
-    const urlNameRegx = new RegExp(
-  /<a href="([^"]*)" class="unset" data-qa="info-name" slot="title">([^<]*)<\/a>/g
-  );
+  switch (type) {
+    case 2:  // IMDB
+      // fs.writeFile('data/imdb-page.txt', text);
+      try{
+        parts = /imUuxf">(\d\.\d)<\/span>/i.exec(html);
+        if(parts === null) throw 'wikidata parse error';
+      }
+      catch (e) {
+        reject([id, {type, url, name, e}]);
+        return
+      }
+      resolve([id, {ratings:parts[1]}]);
+      return;
 
-    urlNameRegx.lastIndex = titleRegx.lastIndex;
-    let textUrl;
-    for(let i=0; i<3; i++) {
-      const nameParts = urlNameRegx.exec(text);
-      if(nameParts === null || i == 3) {
-        console.log('no rotten url name match:', {type, url, name});
+    case 18:  // wikidata
+      try{
+        parts = /lang="en"><a href="(.*?)"\shreflang="en"/i.exec(html);
+        if(parts === null) throw 'wikidata parse error';
+      }
+      catch (e) {
+        reject([id, {type, url, name, e}]);
+        return
+      }
+      resolve([id, {url:parts[1]}]);
+      return;
+
+    case 98:  // google
+      if(name == 'The Crow Girl')
+        fs.writeFile('samples/google-Eilean-search.html', html);
+      return
+
+    case 99:  // rotten tomatoes
+      // fs.writeFile('samples/rotten-search-noline.html', text);
+
+      const namePfx = rottenStripSfx(name);
+      let titleRegx = new RegExp(/search-result-title">TV shows</g);
+      titleRegx.lastIndex = 0;
+      const titleParts = titleRegx.exec(html);
+      if(titleParts === null) {
+        console.log('no rotten title match:', {type, url, name});
         resolve([id, 'no match: ' + {type, url, name}]);
         return;
       }
-      let textName;
-      [textUrl, textName] = nameParts.slice(1);
-      const textNamePfx = stripParenSfx(textName);
-      if(textNamePfx == namePfx) break;
-    }
-    resolve([id, {name:"Rotten Tomatoes", url:textUrl}]);
-    return;
-  }
 
-  resolve([id, 'getUrls no type: ' + type]);
+  // need escaping: ] ( ) [ { } * + ? / $ . | ^ \
+
+      const urlNameRegx = new RegExp(
+    /<a href="([^"]*)" class="unset" data-qa="info-name" slot="title">([^<]*)<\/a>/g
+    );
+
+      urlNameRegx.lastIndex = titleRegx.lastIndex;
+      let textUrl;
+      for(let i=0; i<3; i++) {
+        const nameParts = urlNameRegx.exec(html);
+        if(nameParts === null || i == 3) {
+          console.log('no rotten url name match:', {type, url, name});
+          resolve([id, 'no match: ' + {type, url, name}]);
+          return;
+        }
+        let textName;
+        [textUrl, textName] = nameParts.slice(1);
+        const textNamePfx = rottenStripSfx(textName);
+        if(textNamePfx == namePfx) break;
+      }
+      resolve([id, {name:"Rotten Tomatoes", url:textUrl}]);
+      return;
+
+    default: resolve([id, 'getUrls no type: ' + type]);
+  }
 }
 
 //////////////////  WEBSOCKET SERVER  //////////////////

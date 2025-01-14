@@ -132,7 +132,8 @@ export const getRemotes = async (show) => {
 
     const imdbRemote = remotesByName["IMDB"];
     if(imdbRemote) {
-      imdbRemote.name += ' (' + imdbRemote.ratings + ')';
+      imdbRemote.name += (imdbRemote.ratings !== undefined) ?
+                   ' (' + imdbRemote.ratings + ')' : '';
       remotes.push(imdbRemote);
     } 
 

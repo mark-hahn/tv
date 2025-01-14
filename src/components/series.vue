@@ -191,7 +191,8 @@ export default {
         default: 
           seasonsTxt = `${seasonCount} Seasons`;
       }
-      const watchedTxt = (watchedCount == episodeCount) 
+      const watchedTxt = (episodeCount > 0  &&
+                          watchedCount == episodeCount) 
               ? ' (All Watched)' 
               :` (${watchedCount}/${episodeCount} Watched)`;
       this.seasonsTxt = seasonsTxt + watchedTxt

@@ -356,6 +356,8 @@ export const getEpisodeCounts = async (show) => {
   let seasonCount  = 0;
   let episodeCount = 0;
   let watchedCount = 0;
+  if(show.Id.startsWith('noemby-')) 
+    return {seasonCount, episodeCount, watchedCount};
   try {
     const seasonsRes = 
           await axios.get(urls.childrenUrl(cred, showId));
@@ -582,6 +584,8 @@ export const startStopRoku = async (show, episodeId) => {
 }
 
 export const afterLastWatched = async (showId) => {
+  if(showId.startsWith('noemby-')) 
+    return {status: 'noemby'};
   const seasonsRes = 
         await axios.get(urls.childrenUrl(cred, showId));
   const seasonItems = seasonsRes.data.Items;

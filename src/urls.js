@@ -37,6 +37,10 @@ export function showListUrl(cred, startIdx=0, limit=10000) {
 }
 
 export function childrenUrl(cred, parentId='', unAired=false) {
+  if(parentId.startsWith("noemby-")) {
+    console.error(`childrenUrl, noemby parentId: ${parentId}`);
+    return '';
+  }
   return `https://hahnca.com:8920 / emby / Users 
           / ${cred.markUsrId} / Items /
     ? ParentId=${parentId}

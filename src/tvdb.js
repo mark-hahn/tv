@@ -201,6 +201,10 @@ export const srchTvdbData = async (searchStr) => {
 
 export const getTvdbData = async (show) => {
   const name = show.Name;
+
+  // if(name == 'The Crow Girl'); 
+  //   console.log('getTvdbData:', {name, show});
+  
   let tvdbData = await srvr.getTvdb(name);
   if(tvdbData && !tvdbData.noMatch) {
     // console.log("getTvdbData, from cache:", {nameIn});
@@ -214,7 +218,7 @@ export const getTvdbData = async (show) => {
 
   if(!theTvdbToken) await getToken();
 
-  const tvdbId = show?.ProviderIds?.Tvdb;
+  const tvdbId = show?.ProviderIds?.Tvdb || show?.TvdbId;
   if(!tvdbId) {
     console.error(`getTvdbData, no tvdbId:`, {show});
     return null;

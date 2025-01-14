@@ -7,10 +7,9 @@ bugs ...
   grid lines in map
   
 new features ..
-  get ratings from google
+  hide gap with dash click
   click anywhere to close popup
   save all settings to local storage
-  hide gap with dash click
   blink copy-name button
   refresh filtered rows when new gap loaded
   button: set hilighted row to vis 

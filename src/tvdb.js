@@ -106,44 +106,44 @@ export const getRemotes = async (show) => {
   let remotes = await srvr.getRemotes(showName);
   if(remotes && !remotes.noMatch) return [remotes, true];
 
+        // if(show.Name === 'The Crow Girl') debugger;
+
   remotes = [];
 
   if(!showId.startsWith("noemby-")) remotes[0] = 
             {name:'Emby', url: urls.embyPageUrl(showId)};
 
   const tvdbdata = await getTvdbData(show);
-  if(!tvdbdata) {
-    console.error(`getRemotes, no tvdbdata: ${showName}`);
-    return null;
-  }
-  const remoteIds = tvdbdata.tvdbRemotes;
-  if(!remoteIds) {
-    console.error(`getRemotes, no remoteIds: ${showName}`);
-    return null;
-  }
+  if(tvdbdata) {
+    const remoteIds = tvdbdata.tvdbRemotes;
+    if(!remoteIds) {
+      console.error(`getRemotes, no remoteIds: ${showName}`);
+      return null;
+    }
 
-  const remotesByName = {};
-  for(const tvdbShowId of remoteIds) {
-    const remote = await getRemote(tvdbShowId, showName);
-    if(remote) {
-      if(!remote.ratings) delete remote.ratings;
-      remotesByName[remote.name] = remote;
+    const remotesByName = {};
+    for(const tvdbShowId of remoteIds) {
+      const remote = await getRemote(tvdbShowId, showName);
+      if(remote) {
+        if(!remote.ratings) delete remote.ratings;
+        remotesByName[remote.name] = remote;
+      }
+    }
+
+    const imdbRemote = remotesByName["IMDB"];
+    if(imdbRemote) {
+      imdbRemote.name += ' (' + imdbRemote.ratings + ')';
+      remotes.push(imdbRemote);
+    } 
+
+    for(const [name, remote] of Object.entries(remotesByName)) {
+      if(name !== "IMDB" && name !== "Rotten Tomatoes")
+        remotes.push(remote);
     }
   }
-
-  const imdbRemote = remotesByName["IMDB"];
-  if(imdbRemote) {
-    imdbRemote.name += ' (' + imdbRemote.ratings + ')';
-    remotes.push(imdbRemote);
-  } 
   const rottenRemote = await getRemote(
         {id:showName, type:99}, showName);
   if(rottenRemote) remotes.push(rottenRemote);
-
-  for(const [name, remote] of Object.entries(remotesByName)) {
-    if(name !== "IMDB" && name !== "Rotten Tomatoes")
-      remotes.push(remote);
-  }
 
   remotes.push({name:'Google', 
                  url: `https://www.google.com/search` +

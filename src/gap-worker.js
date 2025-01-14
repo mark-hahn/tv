@@ -9,6 +9,7 @@ const getShowState = async (showId, showName) => {
 
   // if(showName.includes('Guy')) debugger;
 
+  let firstEpisode          = true;
   let ready                 = false;
   let checkedReady          = false;
   let lastWatched           = false;
@@ -56,10 +57,11 @@ const getShowState = async (showId, showName) => {
         const haveFile      = (episode.LocationType != "Virtual");
         const unaired       = !!unairedObj[episodeNumber];
 
-        // ready -- plus sign
-        // let ready        = false; // per show
-        // let checkedReady = false; // per show
-        // let lastWatched  = false; // per show
+        if(firstEpisode && haveFile && !watched) {
+           checkedReady = true;
+           ready        = true;
+        }
+        firstEpisode = false;
         if(!checkedReady && lastWatched && !watched) {
            checkedReady = true;
            ready        = haveFile;

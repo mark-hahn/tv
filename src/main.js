@@ -4,10 +4,12 @@ reminder, restore ...
 
 bugs ...
   google ampersand
+
+todo  ...
   grid lines in map
+  hide gap with dash click
   
 new features ..
-  hide gap with dash click
   click anywhere to close popup
   save all settings to local storage
   blink copy-name button

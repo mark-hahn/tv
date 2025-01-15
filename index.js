@@ -17,12 +17,14 @@ const middleStr  = fs.readFileSync('config/config3-middle.txt',   'utf8');
 const pickupStr  = fs.readFileSync('config/config4-pickups.json', 'utf8');
 const footerStr  = fs.readFileSync('config/config5-footer.txt',   'utf8');
 const waitingStr = fs.readFileSync('data/blockedWaits.json',      'utf8');
+const blkGapsStr = fs.readFileSync('data/blockedGaps.json',      ' utf8');
 const noEmbyStr  = fs.readFileSync('data/noemby.json',            'utf8');
 const gapsStr    = fs.readFileSync('data/gaps.json',              'utf8');
 const allTvdbStr = fs.readFileSync('data/tvdb.json',              'utf8');
 const allRemStr  = fs.readFileSync('data/remotes.json',           'utf8');
 
 const blockedWaits = JSON.parse(waitingStr);
+const blockedGaps  = JSON.parse(blkGapsStr);
 const rejects      = JSON.parse(rejectStr);
 const pickups      = JSON.parse(pickupStr);
 const noEmbys      = JSON.parse(noEmbyStr);
@@ -249,6 +251,48 @@ const delBlockedWait = async (id, name, resolve, _reject) => {
     return
   }
   await fsp.writeFile('data/blockedWaits.json', JSON.stringify(blockedWaits));
+  resolve([id, 'ok']);
+}
+
+const getBlockedGaps = (id, _param, resolve) => {
+  resolve([id, blockedGaps]);
+};
+
+const addBlockedGap = async (id, name, resolve, _reject) => {
+  console.log('addBlockedGap', id, name);
+  for(const [idx, blockedGapStr] of blockedGaps.entries()) {
+    if(blockedGapStr.toLowerCase() === name.toLowerCase()) {
+      console.log(
+          '-- removing matching blockedGap:', blockedGapStr);
+      blockedGaps.splice(idx, 1);
+      break;
+    }
+  }
+  console.log('-- adding blockedGap:', name);
+  blockedGaps.push(name);
+  await fsp.writeFile('data/blockedGaps.json', 
+                        JSON.stringify(blockedGaps));
+  resolve([id, 'ok']);
+}
+
+const delBlockedGap = async (id, name, resolve, _reject) => {
+  console.log('delBlockedGap', id, name);
+  let deletedOne = false;
+  for(const [idx, blockedGapStr] of blockedGaps.entries()) {
+    if(blockedGapStr.toLowerCase() === name.toLowerCase()) {
+      console.log('-- deleting blockedGap:', blockedGapStr);
+      blockedGaps.splice(idx, 1);
+      deletedOne = true;
+      break;
+    }
+  }
+  if(!deletedOne) {
+    console.log('blockedGap not deleted -- no match:', name);
+    resolve([id, 'ok']);
+    return
+  }
+  await fsp.writeFile('data/blockedGaps.json', 
+                            JSON.stringify(blockedGaps));
   resolve([id, 'ok']);
 }
 
@@ -635,7 +679,11 @@ wss.on('connection', (ws, req) => {
 
       case 'getBlockedWaits': getBlockedWaits(id, '',   resolve, reject); break;
       case 'addBlockedWait':  addBlockedWait(id, param, resolve, reject); break;
-      case 'delBlockedWait': delBlockedWait(id, param, resolve, reject); break;
+      case 'delBlockedWait':  delBlockedWait(id, param, resolve, reject); break;
+
+      case 'getBlockedGaps': getBlockedGaps(id, '',   resolve, reject); break;
+      case 'addBlockedGap':  addBlockedGap(id, param, resolve, reject); break;
+      case 'delBlockedGap':  delBlockedGap(id, param, resolve, reject); break;
 
       case 'getRejects':  getRejects(id, '',    resolve, reject); break;
       case 'addReject':   addReject( id, param, resolve, reject); break;

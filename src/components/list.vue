@@ -405,7 +405,7 @@ export default {
           click(show) { toggleWaiting(show); },
           name: "waiting",
         }, {
-          color: "88f", filter: 0, icon: ["far", "sad-cry"],
+          color: "#88f", filter: 0, icon: ["far", "sad-cry"],
           cond(show)  { return show.Genres?.includes("Drama"); },
           click() {}, name: "drama",
         }, {

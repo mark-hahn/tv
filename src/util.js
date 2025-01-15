@@ -130,7 +130,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.hasemby  =  1;
       break;
 
-    case 'drama': 
+    case 'Drama': 
       tmp.foreign  =  0;
       tmp.unplayed =  1;
       tmp.gap      =  0;
@@ -163,7 +163,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.hasemby  =  1;
       break;
 
-    case 'Try drama': 
+    case 'Try Drama': 
       tmp.foreign  =  0;
       tmp.unplayed =  1;
       tmp.gap      =  0;

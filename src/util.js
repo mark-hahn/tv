@@ -15,9 +15,6 @@ export async function listCountries(allShows) {
     console.log('countries:', countries);
   }, 10000);
 }
-// ["usa", "aus", "gbr", "deu", "nzl", 
-// "can", "swe", "irl", "ita", "fra", "prt"]
-
 
 ////////// temp one-time mass operation //////////
 export async function setAllFavs(allShows) {

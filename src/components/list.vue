@@ -389,7 +389,7 @@ export default {
       fltrChoices:          
         ['All', 'Ready', 'Drama', 'To-Try', 'Try Drama', 
                             'Continue', 'Mark', 'Linda'],
-      fltrChoice:        'All',          
+      fltrChoice: 'All',          
 
       conds: [ {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],

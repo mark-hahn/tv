@@ -103,6 +103,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.gap      =  0;
       tmp.waiting  =  0;
       tmp.drama    =  0;
+      tmp.foreign  =  0;
       tmp.totry    =  0;
       tmp.continue =  0;
       tmp.mark     =  0;
@@ -118,6 +119,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.gap      =  0;
       tmp.waiting  =  0;
       tmp.drama    =  0;
+      tmp.foreign  =  0;
       tmp.totry    =  0;
       tmp.continue =  0;
       tmp.mark     =  0;
@@ -128,11 +130,13 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.hasemby  =  1;
       break;
 
-    case 'Drama': 
+    case 'drama': 
+      tmp.foreign  =  0;
       tmp.unplayed =  1;
       tmp.gap      =  0;
       tmp.waiting  =  0;
       tmp.drama    =  1;
+      tmp.foreign  =  0;
       tmp.totry    =  0;
       tmp.continue =  0;
       tmp.mark     =  0;
@@ -148,6 +152,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.gap      =  0;
       tmp.waiting  =  0;
       tmp.drama    =  0;
+      tmp.foreign  =  0;
       tmp.totry    =  1;
       tmp.continue =  0;
       tmp.mark     =  0;
@@ -158,11 +163,13 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.hasemby  =  1;
       break;
 
-    case 'Try Drama': 
+    case 'Try drama': 
+      tmp.foreign  =  0;
       tmp.unplayed =  1;
       tmp.gap      =  0;
       tmp.waiting  =  0;
       tmp.drama    =  1;
+      tmp.foreign  =  0;
       tmp.totry    =  1;
       tmp.continue =  0;
       tmp.mark     =  0;
@@ -178,6 +185,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.gap      =  0;
       tmp.waiting  =  0;
       tmp.drama    =  0;
+      tmp.foreign  =  0;
       tmp.totry    =  0;
       tmp.continue =  1;
       tmp.mark     =  0;
@@ -193,6 +201,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.gap      =  0;
       tmp.waiting  =  0;
       tmp.drama    =  0;
+      tmp.foreign  =  0;
       tmp.totry    =  0;
       tmp.continue =  0;
       tmp.mark     =  1;
@@ -208,6 +217,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.gap      =  0;
       tmp.waiting  =  0;
       tmp.drama    =  0;
+      tmp.foreign  =  0;
       tmp.totry    =  0;
       tmp.continue =  0;
       tmp.mark     =  0;

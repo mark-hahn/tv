@@ -221,7 +221,7 @@ export const getTvdbData = async (show) => {
 
   const tvdbId = show?.ProviderIds?.Tvdb || show?.TvdbId;
   if(!tvdbId) {
-    console.error(`getTvdbData, no tvdbId:`, {show});
+    // console.error(`getTvdbData, no tvdbId:`, {show});
     return null;
   }
   show.TvdbId = tvdbId;
@@ -237,7 +237,7 @@ export const getTvdbData = async (show) => {
                   }});
     if (!extRes.ok) throw new Error(`tvdb extended: ${extRes.status}`);
   } catch(e) {  
-    console.error('getTvdbData, tvdb extended error:', show.Name, e);
+    console.log('getTvdbData, tvdb extended error:', show.Name, e);
     return null;
   }
   const extResObj  = await extRes.json();

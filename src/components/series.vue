@@ -110,8 +110,9 @@ export default {
       if(!show.Id.startsWith('noemby-')) {
         embyImages = [
             `https://hahnca.com:8920/emby/Items/${show.Id}` +
-              `/Images/Primary?tag=${show.ImageTags.Primary}`               +
+              `/Images/Primary?tag=${show.ImageTags.Primary}` +
               `&keepAnimation=true&quality=90`,
+              
             `https://hahnca.com:8920/emby/Items/${show.Id}` +
               `/Images/Backdrop/0?`+
               `tag=${show.BackdropImageTags[0]}&quality=70`
@@ -122,15 +123,30 @@ export default {
       const img = new Image();
       img.style.maxWidth  = "300px"; 
       img.style.maxHeight = "400px"; 
+
       const trySrvrImg = () => {
-        img.src = 'https://hahnca.com/tv/' +
-                     encodeURI(srvrPath) + srvrImages[imgIdx]; 
-        // console.log('Series: trying srvr img:',  img.src);
+        try {
+          img.src = 'https://hahnca.com/tv/' +
+                      encodeURI(srvrPath) + srvrImages[imgIdx]; 
+        }
+        catch(err) {
+          console.log('Series: srvr img err:',  img.src);
+          return false;
+        }
+        return true;
       }
+
       const tryEmbyImg = () => {
-        img.src = embyImages[imgIdx-srvrImages.length]; 
-        // console.log('Series: trying emby img:',  img.src);
+        try {
+          img.src = embyImages[imgIdx-srvrImages.length]; 
+        } 
+        catch(err) {
+          console.log('Series: emby img err:',  img.src);
+          return false;
+        }
+        return true;
       }
+      
       if(showPath) {
         srvrPath = showPath.split('/').pop();
         imgIdx = 0;
@@ -147,11 +163,11 @@ export default {
       img.onerror = () => {
         // console.log('Series no img:', img.src);
         if(++imgIdx < srvrImages.length) {
-          trySrvrImg();
+          if(!trySrvrImg()) return;
         }
         else if(++imgIdx < srvrImages.length + 
                            embyImages.length) {
-          tryEmbyImg();
+          if(!tryEmbyImg()) return;
         }
         else {
           img.src = 'https://hahnca.com/tv/no-image-icon-23485.png'; 
@@ -165,7 +181,6 @@ export default {
       const show = this.show;
       const tvdbData = await tvdb.getTvdbData(show);
       if(!tvdbData) {
-        console.error('Series: setDates: no tvdbData:', show);
         this.dates = '';
         return;
       }

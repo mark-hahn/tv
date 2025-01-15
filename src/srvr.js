@@ -149,6 +149,13 @@ export function addBlockedWait(name)
 export function delBlockedWait(name)  
             {return fCall('delBlockedWait', name, 'wait')}
 
+export function getBlockedGaps()        
+            {return fCall('getBlockedGaps')}
+export function addBlockedGap(name)        
+            {return fCall('addBlockedGap', name, 'gap')}
+export function delBlockedGap(name)  
+            {return fCall('delBlockedGap', name, 'gap')}
+
 export function getRejects()       
             {return fCall('getRejects')}
 export function addReject(name)    

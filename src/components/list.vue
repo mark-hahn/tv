@@ -146,7 +146,7 @@
                 style="width:22px; text-align:center;"
                @click="cond.click(show)" )
             font-awesome-icon(:icon="cond.icon"
-                :style="{color:condColor(show,cond)}")
+                :style="{color:condColor(show, cond)}")
 
   #map(v-if="mapShow !== null" 
         style=`background-color:#ffe; padding:10px;
@@ -230,6 +230,7 @@ library.add([
 
 let   allShows         = [];
 let   blockedWaitShows = null;
+let   blockedGapShows  = null;
 let   showErr          = null;
 
 export default {
@@ -241,7 +242,6 @@ export default {
     const toggleWaiting = async (show) => {
       // console.log("toggleWaiting", show.Name);
       this.saveVisShow(show);
-
       if(show.Waiting) {
         show.Waiting = false;
         srvr.addBlockedWait(show.Name);
@@ -252,6 +252,19 @@ export default {
       }
     };
 
+    const toggleBlkGap = async (show) => {
+      // console.log("toggleBlkGap", show.Name);
+      this.saveVisShow(show);
+      if(show.BlockedGap) {
+        show.BlockedGap = false;
+        srvr.delBlockedGap(show.Name);
+      }
+      else {
+        show.BlockedGap = true;
+        srvr.addBlockedGap(show.Name); 
+      }
+    };
+    
     const toggleToTry = async (show) => {
       if(show.Id.startsWith("noemby-") &&
            !show.InToTry) return;
@@ -397,8 +410,11 @@ export default {
           click() {}, name: "unplayed",
         }, {
           color: "#f88", filter: 0, icon: ["fas", "minus"],
-          cond(show)  { return show.FileGap || show.WatchGap},
-          click() {}, name: "gap",
+          cond(show)  { 
+            return (show.FileGap || show.WatchGap) && 
+                   !show.BlockedGap},
+          click(show) { toggleBlkGap(show); },
+          name: "gap",
         }, {
           color: "#0c0", filter: 0, icon: ["far", "clock"],
           cond(show)  { return show.Waiting; },
@@ -531,6 +547,7 @@ export default {
         Name: name,
         Id: "noemby-" + Math.random(),
         DateCreated: dateStr, 
+        BlockedGap: false,
         Waiting: false,
         WaitStr: '',
         FileGap: false,
@@ -814,7 +831,9 @@ export default {
           });
       }
 
+      const blockedGap  = blockedGapShows .includes(show.Name);
       const blockedWait = blockedWaitShows.includes(show.Name);
+
       const gap = {};
       gap.ShowId          = showId;
       gap.FileGapSeason   = fileGapSeason;
@@ -824,6 +843,7 @@ export default {
       gap.WatchGap        = watchGap; 
       gap.FileGap         = fileGap;
       gap.NotReady        = notReady;
+      gap.BlockedGap      = blockedGap;
       gap.Waiting         = !blockedWait && waiting;
       gap.WaitStr         = await tvdb.getWaitStr(show);
 
@@ -869,10 +889,7 @@ export default {
 
         // must be set before startWorker
         blockedWaitShows = showsBlocks.blockedWaitShows;
-
-        // const debugShow = allShows.find((show) => 
-        //                      show.Name == 'The Affair');
-        // emby.startWorker([debugShow], this.addGapToShow);
+        blockedGapShows  = showsBlocks.blockedGapShows;
 
         emby.startWorker(allShows, this.addGapToShow);
 

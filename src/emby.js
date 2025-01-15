@@ -50,15 +50,18 @@ export async function loadAllShows(gapCache) {
                         urls.showListUrl(cred, 0, 10000));
   const seriesPromise = srvr.getAllShows(); 
   const waitPromise   = srvr.getBlockedWaits();
+  const blkGapPromise = srvr.getBlockedGaps();
   const rejPromise    = srvr.getRejects();
   const pkupPromise   = srvr.getPickups();
   const noEmbyPromise = srvr.getNoEmbys();
   const gapPromise    = srvr.getGaps();
 
-  const [embyShows, srvrShows, blockedWaitShows, 
-          rejects, pickups, noEmbys, gaps] = 
+  const [embyShows, srvrShows, 
+         blockedWaitShows, blockedGapShows,
+         rejects, pickups, noEmbys, gaps] = 
     await Promise.all([listPromise, seriesPromise, 
-                       waitPromise, rejPromise, pkupPromise, 
+                       waitPromise, blkGapPromise, 
+                       rejPromise, pkupPromise,
                        noEmbyPromise, gapPromise]);
   const shows = [];
 
@@ -127,6 +130,20 @@ export async function loadAllShows(gapCache) {
     }
   }
 
+//////////  process blockedGapShows from srvr ////////////
+  for(let blockedGapName of blockedGapShows) {
+    const i = shows.findIndex(
+                (show) => show.Name == blockedGapName);
+    if(i > -1) {
+      shows[i].BlockedGap = true;
+    }
+    else {
+      console.log('deleting from blockedGapShows list:',   
+                   blockedGapName);
+      await srvr.delBlockedGap(blockedGapName);
+    }
+  }
+
 //////////  process toTry collection  ////////////
 
   const toTryRes = await axios.get(
@@ -184,6 +201,7 @@ export async function loadAllShows(gapCache) {
       Waiting: false,
       WatchGap: false,
       FileGap: false,
+      BlockedGap: false,
       WaitStr: '',
       NotReady: true,
       InToTry: false,
@@ -209,9 +227,8 @@ export async function loadAllShows(gapCache) {
   console.log('all shows loaded, elapsed:', elapsed);
 
   // console.log('shows:', shows);
-  return {shows, blockedWaitShows};
+  return {shows, blockedWaitShows, blockedGapShows};
 }
-
 
 //////////// misc functions //////////////
 

@@ -4,10 +4,11 @@ reminder, restore ...
 
 bugs ...
   google ampersand
+  plus on nonemby (Younger)
+  setSeasonsTxt no seasonCount (The Crow Girl)
 
 todo  ...
   grid lines in map
-  hide gap with dash click
   
 new features ..
   click anywhere to close popup

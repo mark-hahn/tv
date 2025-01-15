@@ -225,24 +225,27 @@ export const getTvdbData = async (show) => {
     return null;
   }
   show.TvdbId = tvdbId;
-
-  const extUrl = 
-    `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
-  const extRes = await fetch(extUrl,
-                {headers: {
-                    'Content-Type': 'application/json',
-                      Authorization:'Bearer ' + theTvdbToken
-                }});
-  if (!extRes.ok) {
-    console.error(`tvdb extended: ${extRes.status}`);
+  
+  let extRes;
+  try{
+    const extUrl = 
+      `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
+    extRes = await fetch(extUrl,
+                  {headers: {
+                      'Content-Type': 'application/json',
+                        Authorization:'Bearer ' + theTvdbToken
+                  }});
+    if (!extRes.ok) throw new Error(`tvdb extended: ${extRes.status}`);
+  } catch(e) {  
+    console.error('getTvdbData, tvdb extended error:', show.Name, e);
     return null;
   }
   const extResObj  = await extRes.json();
-  const {firstAired, lastAired, nextAired, 
+  const {firstAired, lastAired, nextAired, originalCountry,
          remoteIds:tvdbRemotes, status:statusIn} = extResObj.data;
   const status = statusIn.name; // e.g. Ended
   const saved = Date.now();
-  tvdbData = { tvdbId, name, status,
+  tvdbData = { tvdbId, name, status, originalCountry,
                firstAired, lastAired, nextAired, 
                tvdbRemotes, saved };
   srvr.addTvdb(JSON.stringify(tvdbData));

@@ -876,36 +876,11 @@ export default {
                        allShows[0].Name);
         this.scrollToSavedShow(true);
 
-        ////////// TEMP //////////
-        // set all favorites
-        // allShows.forEach(async (show) => {
-        //   if(show.Id.startsWith("noemby-")) return;
-        //   await emby.saveFav(show.Id, true);
-        //   console.log('saved fav:', show.Name);
-        // });
-        // 
-        // calculate all gaps
-        // let showIdx = 0;
-        // const intvl = setInterval(async () => {
-        //   while(showIdx < allShows.length) {
-        //     if(showIdx % 10 == 0) 
-        //       console.log(new Date().toISOString(), 
-        //                  showIdx + ' of ' +allShows.length);
-        //     // if(Math.random() < 0.75) break;
-        //     const show = allShows[showIdx++];
-        //     const remotes = await tvdb.getRemotes(show);
-        //     if(!remotes) continue;
-        //     const [_remotes, cached] = remotes
-        //     if(cached) continue;
-        //     break;
-        //   }
-        //   if(showIdx == allShows.length) {
-        //      clearInterval(intvl);
-        //      console.log('load remotes done:', showIdx);
-        //   }
-        // }, 45*1000);
-
-      } 
+        // temp one-time mass operations ...
+        // await util.listCountries(allShows);
+        // await util.setAllFavs(allShows);
+        // await util.loadAllRemotes(allShows); // takes many hours
+      }
       catch (err) {
         console.error("Mounted:", err);
       }

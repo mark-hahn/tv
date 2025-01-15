@@ -3,18 +3,22 @@ import * as tvdb from "./tvdb.js";
 import * as srvr from "./srvr.js";
 
 ////////// temp one-time mass operation //////////
-const countries = new Set();
 export async function listCountries(allShows) {
-  // allShows.forEach(async (show) => {
-    // const tvdbdata = await tvdb.getTvdbDataRec(show);
-    const tvdbData = await tvdb.getTvdbDataRec(allShows[0]);
+  const countries = new Set();
+  allShows.forEach(async (show) => {
+    const tvdbData = await tvdb.getTvdbData(show);
     if(tvdbData) {
       countries.add(tvdbData.originalCountry);
-      // srvr.addTvdb(JSON.stringify(tvdbData));
+      // console.log('listCountries:', {tvdbData});
     }
-  // })
-  console.log('countries:', countries);
+  })
+  setTimeout(() => {
+    console.log('countries:', countries);
+  }, 10000);
 }
+// ["usa", "aus", "gbr", "deu", "nzl", 
+// "can", "swe", "irl", "ita", "fra", "prt"]
+
 
 ////////// temp one-time mass operation //////////
 export async function setAllFavs(allShows) {

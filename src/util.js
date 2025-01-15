@@ -9,7 +9,6 @@ export async function listCountries(allShows) {
     const tvdbData = await tvdb.getTvdbData(show);
     if(tvdbData) {
       countries.add(tvdbData.originalCountry);
-      // console.log('listCountries:', {tvdbData});
     }
   })
   setTimeout(() => {

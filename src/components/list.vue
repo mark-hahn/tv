@@ -220,11 +220,11 @@ import { faLaughBeam, faSadCry, faHeart, faClock }
                            from "@fortawesome/free-regular-svg-icons"; 
 import { faCheck, faPlus, faMinus, faArrowDown, faArrowRight,
          faTv, faSearch, faQuestion, faCopy, faBorderAll, faBan,
-         faMars, faVenus} 
+         faMars, faVenus, faGlobe }
                            from "@fortawesome/free-solid-svg-icons";
 
 library.add([  
-  faLaughBeam, faSadCry, faClock, faHeart, faCheck, faPlus, 
+  faLaughBeam, faSadCry, faClock, faHeart, faCheck, faPlus, faGlobe,
   faMinus, faArrowDown, faTv, faSearch, faQuestion, faCopy, 
   faBan, faBorderAll, faArrowRight, faMars, faVenus, faClock]);
 
@@ -405,9 +405,13 @@ export default {
           click(show) { toggleWaiting(show); },
           name: "waiting",
         }, {
-          color: "blue", filter: 0, icon: ["far", "sad-cry"],
+          color: "88f", filter: 0, icon: ["far", "sad-cry"],
           cond(show)  { return show.Genres?.includes("Drama"); },
           click() {}, name: "drama",
+        }, {
+          color: "#88f", filter: 0, icon: ["fas", "globe"],
+          cond(show)  { return show.OriginalCountry != 'usa'; },
+          click()  {}, name: "foreign",
         }, {
           color: "lime", filter: 0, icon: ["fas", "question"],
           cond(show)  { return show.InToTry; },

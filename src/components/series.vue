@@ -112,7 +112,7 @@ export default {
             `https://hahnca.com:8920/emby/Items/${show.Id}` +
               `/Images/Primary?tag=${show.ImageTags.Primary}` +
               `&keepAnimation=true&quality=90`,
-              
+
             `https://hahnca.com:8920/emby/Items/${show.Id}` +
               `/Images/Backdrop/0?`+
               `tag=${show.BackdropImageTags[0]}&quality=70`
@@ -210,7 +210,12 @@ export default {
                           watchedCount == episodeCount) 
               ? ' (All Watched)' 
               :` (${watchedCount}/${episodeCount} Watched)`;
-      this.seasonsTxt = seasonsTxt + watchedTxt
+              
+      let {originalCountry} = await tvdb.getTvdbData(show);
+      if(originalCountry == 'gbr') originalCountry = 'UK';
+      const foreignTxt = ' ' + originalCountry.toUpperCase();
+
+      this.seasonsTxt = seasonsTxt + watchedTxt + foreignTxt
     },
 
     async setRemotes() {

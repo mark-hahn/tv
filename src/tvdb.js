@@ -106,8 +106,6 @@ export const getRemotes = async (show) => {
   let remotes = await srvr.getRemotes(showName);
   if(remotes && !remotes.noMatch) return [remotes, true];
 
-        // if(show.Name === 'The Crow Girl') debugger;
-
   remotes = [];
 
   if(!showId.startsWith("noemby-")) remotes[0] = 
@@ -212,6 +210,7 @@ export const getTvdbData = async (show) => {
     const twoDays = 48*60*60*1000;
     if ((Date.now() - tvdbData.saved) < 
         (twoDays + Math.round(Math.random() * twoDays))) {
+      show.OriginalCountry = tvdbData.originalCountry;
       return tvdbData;
     }
     else await srvr.delTvdb(show.Name);
@@ -249,6 +248,7 @@ export const getTvdbData = async (show) => {
                firstAired, lastAired, nextAired, 
                tvdbRemotes, saved };
   srvr.addTvdb(JSON.stringify(tvdbData));
+  show.OriginalCountry = originalCountry;
   return tvdbData;
 }
 

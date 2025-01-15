@@ -216,7 +216,7 @@ import    evtBus from '../evtBus.js';
 
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library }         from "@fortawesome/fontawesome-svg-core";
-import { faLaughBeam, faSadCry, faHeart, faClock } 
+import { faLaughBeam, faSadCry, faHeart, faClock, faSmileWink } 
                            from "@fortawesome/free-regular-svg-icons"; 
 import { faCheck, faPlus, faMinus, faArrowDown, faArrowRight,
          faTv, faSearch, faQuestion, faCopy, faBorderAll, faBan,
@@ -795,7 +795,7 @@ export default {
     },
 
     async addGapToShow(event) {
-      const {showId, progress, notReady, waiting, 
+      const {showId, progress, notReady, waiting, anyWatched,
              watchGap, watchGapSeason, watchGapEpisode, 
              fileGap,  fileGapSeason,  fileGapEpisode}
                           = event.data;
@@ -804,6 +804,15 @@ export default {
       
       const show = allShows.find((show) => show.Id == showId);
       if(!show) return;
+
+      if(anyWatched && show.InToTry) {
+        show.InToTry = false;
+        emby.saveToTry(show.Id, false)
+          .catch((err) => {
+              console.error(
+                "addGapToShow, late saveToTry error:", err);
+          });
+      }
 
       const blockedWait = blockedWaitShows.includes(show.Name);
       const gap = {};

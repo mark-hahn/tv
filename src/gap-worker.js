@@ -12,6 +12,7 @@ const getShowState = async (showId, showName) => {
   let firstEpisode          = true;
   let ready                 = false;
   let checkedReady          = false;
+  let anyWatched            = false;
   let lastWatched           = false;
   let watchedShow           = false;
   let watchedLastEpiLastSea = true; 
@@ -56,6 +57,8 @@ const getShowState = async (showId, showName) => {
         const watched       = !!userData?.Played;
         const haveFile      = (episode.LocationType != "Virtual");
         const unaired       = !!unairedObj[episodeNumber];
+
+        if(watched) anyWatched = true;
 
         if(firstEpisode && haveFile && !watched) {
            checkedReady = true;
@@ -116,7 +119,7 @@ const getShowState = async (showId, showName) => {
     console.error('getShowState', {error});
     return null;
   }
-  return {notReady:!ready, waiting, 
+  return {notReady:!ready, waiting, anyWatched,
           watchGap, watchGapSeason, watchGapEpisode, 
           fileGap,  fileGapSeason,  fileGapEpisode};
 }
@@ -130,7 +133,7 @@ self.onmessage = async (event) => {
       `gap-worker started, ${allShowsIdName.length} shows`);
   for (let i = 0; i < allShowsIdName.length; i++) {
     const [showId, showName] = allShowsIdName[i];
-    const {notReady, waiting, 
+    const {notReady, waiting, anyWatched,
            watchGap, watchGapSeason, watchGapEpisode, 
            fileGap,  fileGapSeason,  fileGapEpisode} = 
               await getShowState(showId, showName);
@@ -138,7 +141,7 @@ self.onmessage = async (event) => {
                       (i+1) * 100 / allShowsIdName.length );
 
     self.postMessage(
-          {showId, progress, notReady, waiting, 
+          {showId, progress, notReady, waiting, anyWatched,
           watchGap, watchGapSeason, watchGapEpisode, 
           fileGap,  fileGapSeason,  fileGapEpisode}
     );

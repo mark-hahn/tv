@@ -134,7 +134,7 @@
             | {{srchChoice.name}}
           #srchDtl(style=`font-size:18px;
                    margin:15px;`)
-            | {{srchChoice.year + ',&nbsp;'+ srchChoice.country.toUpperCase() + ',&nbsp;'+ srchChoice.primary_language.toUpperCase()}}
+            | {{srchChoice.year + ',&nbsp;'+ (srchChoice?.country?.toUpperCase() || '') + ',&nbsp;'+ (srchChoice?.primary_language?.toUpperCase()) || ''}}
 
     #shows(style="width:100%; flex-grow: 1; overflow-y:scroll;")
       table(style="width:100%; font-size:18px")

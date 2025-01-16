@@ -184,7 +184,10 @@
   #map(v-if="mapShow !== null" 
         style=`background-color:#ffe; padding:10px;
                display:flex; flex-direction:column;
-               position:fixed; top:10px; left:300px; z-index:2`)
+               position:fixed; top:70px; left:260px; z-index:2;
+               max-height:85%; max-width:500px; 
+               border: 2px solid black;
+               overflow-y:scroll;`)
     div(style=`margin:0 5px; display:flex; 
                 justify-content:space-between;`)
       div(style=`font-size:20px; margin:6px 20px 0 0;
@@ -196,47 +199,48 @@
              style="margin:5px;")                     Set Date
       button(@click="seriesMapAction('close')"
              style="margin:5px;")                     Close
+    div(v-if="!hideMapBottom")
+      div(v-if=`mapShow.WatchGap ||
+                mapShow.FileGap  || mapShow.WaitStr?.length`
+          style=`display:flex; justify-content:space-around; 
+                color:red; margin: 0 10px; 4px 10px;`)
+        div(v-if="mapShow.WatchGap" 
+            style="display:inline-block;")
+          | {{`Watch Gap`}}
+        div(v-if="mapShow.FileGap"
+            style="display:inline-block; margin 3px 10px")
+          | {{`Missing File`}}
+        div(v-if="mapShow.Waiting" 
+            style="display:inline-block; margin 3px 10px")
+          | {{'Waiting ' + mapShow.WaitStr}}
 
-    div(v-if=`mapShow.WatchGap ||
-              mapShow.FileGap  || mapShow.WaitStr?.length`
-        style=`display:flex; justify-content:space-around; 
-               color:red; margin: 0 10px; 4px 10px;`)
-      div(v-if="mapShow.WatchGap" 
-          style="display:inline-block;")
-        | {{`Watch Gap`}}
-      div(v-if="mapShow.FileGap"
-          style="display:inline-block; margin 3px 10px")
-        | {{`Missing File`}}
-      div(v-if="mapShow.Waiting" 
-          style="display:inline-block; margin 3px 10px")
-        | {{'Waiting ' + mapShow.WaitStr}}
+      table(style="padding:0 5px; font-size:16px" )
+      tbody
+        tr(style="font-weight:bold;")
+          td
+          td(v-for="episode in seriesMapEpis" 
+            style="text-align:center;"
+            key="episode") {{episode}}
+        tr(v-for="season in seriesMapSeasons" key="season"
+                  style="outline:thin solid;")
+          td(style="font-weight:bold; width:10px; text-align:center;")
+            | {{season}}
 
-    table(style="padding:0 5px; font-size:16px" )
-     tbody
-      tr(style="font-weight:bold;")
-        td
-        td(v-for="episode in seriesMapEpis" 
-           style="text-align:center;"
-           key="episode") {{episode}}
-      tr(v-for="season in seriesMapSeasons" key="season"
-                style="outline:thin solid;")
-        td(style="font-weight:bold; width:10px; text-align:center;")
-          | {{season}}
-
-        td(v-for="episode in seriesMapEpis" key="series+'.'+episode" 
-            @click="episodeClick($event, mapShow, season, episode)"
-            :style=`{cursor:'default', width:'10px',
-                     textAlign:'center', 
-                     backgroundColor:  
-                      (seriesMap[season]?.[episode]?.error) 
-                          ? 'yellow': 
-                      (seriesMap[season]?.[episode]?.noFile) 
-                          ? '#faa' : 'white'}`)
-          span(v-if="seriesMap?.[season]?.[episode]?.played")  w
-          span(v-if="seriesMap?.[season]?.[episode]?.avail")   +
-          span(v-if="seriesMap?.[season]?.[episode]?.noFile")  -
-          span(v-if="seriesMap?.[season]?.[episode]?.unaired") u
-          span(v-if="seriesMap?.[season]?.[episode]?.deleted") d
+          td(v-for="episode in seriesMapEpis" key="series+'.'+episode" 
+              @click="episodeClick($event, mapShow, season, episode)"
+              :style=`{cursor:'default',
+                      padding:'0 4px',
+                      textAlign:'center', border:'1px solid #ccc',
+                      backgroundColor:  
+                        (seriesMap[season]?.[episode]?.error) 
+                            ? 'yellow': 
+                        (seriesMap[season]?.[episode]?.noFile) 
+                            ? '#faa' : 'white'}`)
+            span(v-if="seriesMap?.[season]?.[episode]?.played")  w
+            span(v-if="seriesMap?.[season]?.[episode]?.avail")   +
+            span(v-if="seriesMap?.[season]?.[episode]?.noFile")  -
+            span(v-if="seriesMap?.[season]?.[episode]?.unaired") u
+            span(v-if="seriesMap?.[season]?.[episode]?.deleted") d
 </template>
 
 
@@ -422,6 +426,7 @@ export default {
       highlightName:        "",
       allShowsLength:        0,
       mapShow:            null,
+      hideMapBottom:      true,
       seriesMapSeasons:     [],
       seriesMapEpis:        [],
       seriesMap:            {},
@@ -762,6 +767,7 @@ export default {
         console.log('setting last watched to cur date');
         await emby.setLastWatched(show.Id);
       }
+      this.hideMapBottom     = true;
       this.mapShow           = show;
       const seriesMapSeasons = [];
       const seriesMapEpis    = [];
@@ -791,6 +797,7 @@ export default {
       this.seriesMapEpis = 
            seriesMapEpis   .filter(x => x !== null);
       this.seriesMap = seriesMap;
+      this.hideMapBottom = false;
       this.saveVisShow(show);
     },
 
@@ -957,7 +964,7 @@ export default {
 
         let showList = allShows;
         // showList = [allShows.find((show) => 
-        //                 show.Name == 'The White Lotus')];
+        //                 show.Name == 'The Agency (2024)')];
         emby.startWorker(showList, this.addGapToShow);
 
         this.sortByNew     = true;

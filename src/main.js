@@ -3,13 +3,12 @@ reminder, restore ...
   start gap running
 
 bugs ...
-  waiting broken (The Agency (2024))
-  series pane flashes while waiting for map (St. Denis Medical)
-  delete show from emby leaves old series meta
-  map too tall (max-height:90%; y-overflow:scroll;)
-  google ampersand
+  series pane flashes while waiting for map (St. Denis)
 
 todo  ...
+  delete show from emby leaves old series meta
+  show waiting on noemby
+  show unaired show instead of File Missing
   grid lines in map
   add language to series meta
   

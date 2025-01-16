@@ -3,7 +3,6 @@ reminder, restore ...
   start gap running
 
 bugs ...
-  series pane flashes while waiting for map (St. Denis)
 
 todo  ...
   delete show from emby leaves old series meta
@@ -23,6 +22,7 @@ new features ..
   update imdb rating et. al. periodicaly
 
 tabled ...
+  series pane flashes while waiting for map (St. Denis)
   show season meta on noemby
   when hilited show is deleted, shows old season meta
   map too tall

@@ -613,6 +613,14 @@ export const afterLastWatched = async (showId) => {
     let   seasonRec    = seasonItems[key];
     const seasonNumber = seasonRec.IndexNumber;
     const seasonId     = seasonRec.Id;
+    const unairedObj = {};
+    const unairedRes = await axios.get(
+              urls.childrenUrl(cred, seasonId, true));
+    for(let key in unairedRes.data.Items) {
+      const episode       = unairedRes.data.Items[key];
+      const episodeNumber = +episode.IndexNumber;
+      unairedObj[episodeNumber] = true;
+    }
     const episodesRes  = 
            await axios.get(urls.childrenUrl(cred, seasonId));
     const episodeItems = episodesRes.data.Items;
@@ -624,8 +632,10 @@ export const afterLastWatched = async (showId) => {
       const episodeNumber = episodeRec.IndexNumber;
       const episodeId     = episodeRec.Id;
       const haveFile      = (episodeRec.LocationType != "Virtual");
+      const unaired       = !!unairedObj[episodeNumber];
       return {seasonNumber, episodeNumber, episodeId, 
-              status: (haveFile ? 'ok' : 'missing')};
+              status: unaired ? 'unaired' :
+                    (haveFile ? 'ok' : 'missing')};
     }
   }
   return {status: 'allWatched'};

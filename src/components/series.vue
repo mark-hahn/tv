@@ -272,6 +272,11 @@ export default {
                 `Next Up: ${fmtSE(seasonNumber, episodeNumber)}` +
                               ' (File Missing)';
             break;
+          case 'unaired':   // next avail & !haveFile
+            this.nextUpTxt = 
+                `Next Up: ${fmtSE(seasonNumber, episodeNumber)}` +
+                              ' (Unaired)';
+            break;
         }
       }
       else {

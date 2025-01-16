@@ -128,13 +128,14 @@
                 display:flex;`)
         img(:src="srchChoice.thumbnail" 
             style=`max-width:80px; max-height:120px;`)
-        #srchTxt(style=`font-size:20px;
-                        display:flex; margin:5px;flex-direction:column;`)
+        #srchTxt(style=`font-size:20px; max-width:230px;
+                        display:flex; margin:5px; 
+                        flex-direction:column;`)
           #srchName(style=`font-weight:bold;`)
             | {{srchChoice.name}}
           #srchDtl(style=`font-size:18px;
                    margin:15px;`)
-            | {{srchChoice.year + ',&nbsp;'+ (srchChoice?.country?.toUpperCase() || '') + ',&nbsp;'+ (srchChoice?.primary_language?.toUpperCase()) || ''}}
+            | {{srchChoice.year + ',&nbsp;'+ (srchChoice?.country?.toUpperCase() || '') + ',&nbsp;'+ (srchChoice?.originalLanguage?.toUpperCase()) || ''}}
 
     #shows(style="width:100%; flex-grow: 1; overflow-y:scroll;")
       table(style="width:100%; font-size:18px")
@@ -215,7 +216,7 @@
           | {{'Waiting ' + mapShow.WaitStr}}
 
       table(style="padding:0 5px; font-size:16px" )
-      tbody
+       tbody
         tr(style="font-weight:bold;")
           td
           td(v-for="episode in seriesMapEpis" 
@@ -580,8 +581,6 @@ export default {
         if(show.country == 'gbr') show.country = 'uk';
       });
       this.searchList = tvdbData;
-      // name, tvdbId, country, primary_language,
-      //         year, poster_url, thumbnail
     },
 
     async searchAction(srchChoice) {

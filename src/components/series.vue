@@ -5,25 +5,31 @@
               padding:5px;`)
 
   #top(style=`display:flex; flex-direction:row`)
-    #topLeft(style=`display:flex; flex-direction:column;
-                    text-align:center;`) 
+    #topLeft(@click="openMap(show)"
+              style=`display:flex; flex-direction:column;
+                     text-align:center;`) 
       #poster()
-      #dates(style=`font-size:18px; min-height:24px;
-                    margin-top:10px; font-weight:bold;`)
-        | {{dates}}
-      #seasons(@click="openMap(show)"
-                style=`cursor:pointer; 
-                       font-size:20px; min-height:24px;
-                       font-weight:bold; font-color:gray;
-                       text-align:center;`)
-        | {{seasonsTxt}}
-      #nextup(v-if="nextUpTxt.length > 0"
-             @click="openMap(show)"
-              style=`cursor:pointer; 
-                      font-size:20px; min-height:24px;
+      #dates(v-html="dates"
+             style=`font-size:18px; min-height:24px;
+                    margin-top:10px; font-weight:bold;
+                    text-align:left;`)
+      #seasons(v-html="seasonsTxt"
+               style=`cursor:pointer; 
+                      font-size:18px; min-height:24px;
                       font-weight:bold; font-color:gray;
-                      text-align:center; margin-top:5px;`)
-        | {{nextUpTxt}}
+                      text-align:left;`)
+      #cntrylang(v-if="cntryLangTxt.length > 0"
+                 v-html="cntryLangTxt"
+                 style=`cursor:pointer; 
+                        font-size:18px; min-height:24px;
+                        font-weight:bold; font-color:gray;
+                        text-align:left;`)
+      #nextup(v-if="nextUpTxt.length > 0"
+              v-html="nextUpTxt"
+              style=`cursor:pointer; 
+                      font-size:18px; min-height:24px;
+                      font-weight:bold; font-color:gray;
+                      text-align:left; margin-top:5px;`)
     #topRight(style=`display:flex; flex-direction:column`)
       #remotes(style=`width:200px; margin-left:20px;
                       display:flex; flex-direction:column;`) 
@@ -71,6 +77,7 @@ export default {
       remoteShowName: '',
       remotes: [],
       seasonsTxt: '',
+      cntryLangTxt: '',
       showSpinner: false,
       showRemotes: false,
       nextUpTxt: '',
@@ -185,8 +192,8 @@ export default {
         return;
       }
       const {firstAired, lastAired, status} = tvdbData;
-      this.dates = firstAired + ' -- ' + lastAired 
-                      + ' (' + status + ')';
+      this.dates = ' &nbsp; ' + firstAired + '&nbsp;&nbsp;' + lastAired 
+                      + '&nbsp; ' + status + ' &nbsp; ';
     },
 
     async setSeasonsTxt() {
@@ -209,14 +216,57 @@ export default {
       }
       const watchedTxt = (episodeCount > 0  &&
                           watchedCount == episodeCount) 
-              ? ' (All Watched)' 
-              :` (${watchedCount}/${episodeCount} Watched)`;
-              
-      let {originalCountry} = await tvdb.getTvdbData(show);
-      if(originalCountry == 'gbr') originalCountry = 'UK';
-      const foreignTxt = ' ' + originalCountry.toUpperCase();
+              ? ' &nbsp; All Watched' 
+              :`  &nbsp; ${watchedCount}/${episodeCount} Watched`;
+      this.seasonsTxt = ' &nbsp; ' + seasonsTxt + watchedTxt;
+    },
 
-      this.seasonsTxt = seasonsTxt + watchedTxt + foreignTxt
+    async setCntryLangTxt() {
+      this.cntryLangTxt = ``;
+      let {originalCountry, originalLanguage} = 
+                    await tvdb.getTvdbData(this.show);
+      if(originalCountry == 'gbr') originalCountry = 'UK';
+      this.cntryLangTxt = 
+        ` &nbsp; Country: ${originalCountry.toUpperCase()} &nbsp;` +
+        ` &nbsp; Language: ${originalLanguage.toUpperCase()}&nbsp;`;
+    },
+
+    async setNextWatch() {
+      const fmtSE = (season, episode) => {
+        return `S${(''+season) .padStart(2, "0")} ` +
+               `E${(''+episode).padStart(2, "0")}`;
+      }
+      this.nextUpTxt      = '';
+      this.watchButtonTxt = '';
+      const watching = await emby.getCurrentlyWatching();
+      if(watching === null) {
+        const afterWatched = await emby.afterLastWatched(this.show.Id);
+        const status = afterWatched.status;
+        let seasonNumber, episodeNumber, episodeId;
+        if(status !== 'allWatched') {
+          ({seasonNumber, episodeNumber, episodeId} = afterWatched);
+        }
+        switch(status) {
+          case 'ok': // next avail & haveFile
+            this.episodeId = episodeId;
+            this.watchButtonTxt = 
+                    `Play ${fmtSE(seasonNumber, episodeNumber)}`;
+            break;
+          case 'missing':   // next avail & !haveFile
+            this.nextUpTxt = 
+                ` &nbsp; Next Up: ${fmtSE(seasonNumber, episodeNumber)}` +
+                              ' &nbsp; File Missing';
+            break;
+          case 'unaired':   // next avail & !haveFile
+            this.nextUpTxt = 
+                ` &nbsp; Next Up: ${fmtSE(seasonNumber, episodeNumber)}` +
+                              ' &nbsp; Unaired';
+            break;
+        }
+      }
+      else {
+        this.watchButtonTxt = 'Stop';
+      }
     },
 
     async setRemotes() {
@@ -246,44 +296,6 @@ export default {
       }
     },
 
-    async setNextWatch() {
-      const fmtSE = (season, episode) => {
-        return `S${(''+season) .padStart(2, "0")} ` +
-               `E${(''+episode).padStart(2, "0")}`;
-      }
-      this.nextUpTxt      = '';
-      this.watchButtonTxt = '';
-      const watching = await emby.getCurrentlyWatching();
-      if(watching === null) {
-        const afterWatched = await emby.afterLastWatched(this.show.Id);
-        const status = afterWatched.status;
-        let seasonNumber, episodeNumber, episodeId;
-        if(status !== 'allWatched') {
-          ({seasonNumber, episodeNumber, episodeId} = afterWatched);
-        }
-        switch(status) {
-          case 'ok': // next avail & haveFile
-            this.episodeId = episodeId;
-            this.watchButtonTxt = 
-                    `Play ${fmtSE(seasonNumber, episodeNumber)}`;
-            break;
-          case 'missing':   // next avail & !haveFile
-            this.nextUpTxt = 
-                `Next Up: ${fmtSE(seasonNumber, episodeNumber)}` +
-                              ' (File Missing)';
-            break;
-          case 'unaired':   // next avail & !haveFile
-            this.nextUpTxt = 
-                `Next Up: ${fmtSE(seasonNumber, episodeNumber)}` +
-                              ' (Unaired)';
-            break;
-        }
-      }
-      else {
-        this.watchButtonTxt = 'Stop';
-      }
-    },
-
     async watchButtonClick(show) {
       await emby.startStopRoku(show, this.episodeId);
       setTimeout(async () => {
@@ -301,6 +313,7 @@ export default {
       await this.setDates();
       await this.setRemotes();
       await this.setSeasonsTxt();
+      await this.setCntryLangTxt();
       await this.setNextWatch();
     });
   },

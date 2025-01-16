@@ -7,10 +7,8 @@ bugs ...
 todo  ...
   delete show from emby leaves old series meta
   show waiting on noemby
-  show unaired show instead of File Missing
-  grid lines in map
-  add language to series meta
-  
+  search list text broken
+    
 new features ..
   click anywhere to close popup
   save all settings to local storage

@@ -6,6 +6,10 @@ bugs ...
   google ampersand
   plus on nonemby (Younger)
   setSeasonsTxt no seasonCount (The Crow Girl)
+  imdb ratings broken
+  waiting broken (The Agency (2024))
+  waiting for unaired says missing file (The White Lotus)
+  series pane flashes while waiting for map (St. Denis Medical)
 
 todo  ...
   grid lines in map

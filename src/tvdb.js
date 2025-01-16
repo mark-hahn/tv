@@ -1,7 +1,6 @@
 import * as srvr from "./srvr.js";
 import * as util from "./util.js";
 import * as urls from "./urls.js";
-import      Fuse from 'fuse.js'
 
 const tvdbDataCacheName = "tvdbDataCache2";
 
@@ -172,28 +171,7 @@ export const srchTvdbData = async (searchStr) => {
   const srchResObj = await srchRes.json();
   const data = srchResObj.data;
   if(!data || data.length == 0) return null;
-  
-  // todo -- popup identify choice
-
-  // console.log('srchTvdbData:', {searchStr}, data);
-  
-  const fuseOptions = {includeScore: true, keys: ['name']}
-  const fuse = new Fuse(data, fuseOptions);
-  const fuseRes = fuse.search(searchStr);
-  let minScore = Math.min();
-  let matchRes = null;
-  for(const res of fuseRes) {
-    if(res.score < minScore) {
-      minScore = res.score;
-      matchRes = res.item;
-    } 
-  }
-  if(!matchRes)  matchRes = data[0];
-  const name   = matchRes.name;
-  const tvdbId = matchRes.tvdb_id;
-  const show = {Name:name, 
-                ProviderIds: {Tvdb: tvdbId}};
-  return await getTvdbData(show);
+  return data.slice(0, 9);
 }
 
 //////////// get TvDb Data //////////////

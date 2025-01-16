@@ -104,6 +104,38 @@
           @click="fltrAction(fltrChoice)") 
         | {{fltrChoice}}
 
+    #searchList( v-if="showingSrchList"
+          style=`background-color:#eee; padding:0px;
+                border: 1px solid black; height:85%;
+                position: fixed; overflow-y:scroll;
+                display:flex; flex-direction:column;
+                left: 253px; top: 75px;
+                cursor:pointer; min-width:280px;`) 
+      div(@click="cancelSrchList()"
+           style=`font-weight:bold; text-align:center;
+                  margin:10px;background-color:white;`)
+        | Cancel
+      div(v-if="showingSrchList && searchList === null")
+        img(src="../../loading.gif"
+            style=`width:100px; height:100px;
+                    position:relative; top:20px; left:80px;`)
+      div(v-for="srchChoice in searchList"
+          v-if="searchList !== null"
+          @click="searchAction(srchChoice)"
+          style=`margin:3px 10px; padding:10px; width:230px;
+                background-color:white; text-align:center;
+                border: 1px solid black; 
+                display:flex;`)
+        img(:src="srchChoice.thumbnail" 
+            style=`max-width:80px; max-height:120px;`)
+        #srchTxt(style=`font-size:20px;
+                        display:flex; margin:5px;flex-direction:column;`)
+          #srchName(style=`font-weight:bold;`)
+            | {{srchChoice.name}}
+          #srchDtl(style=`font-size:18px;
+                   margin:15px;`)
+            | {{srchChoice.year + ',&nbsp;'+ srchChoice.country.toUpperCase() + ',&nbsp;'+ srchChoice.primary_language.toUpperCase()}}
+
     #shows(style="width:100%; flex-grow: 1; overflow-y:scroll;")
       table(style="width:100%; font-size:18px")
        tbody
@@ -124,8 +156,9 @@
                       cursor:'default', textAlign:'center'}`) 
             | {{  getValBySortChoice(show) }}
             
-          td(:style=`{display:'flex', justifyContent:'space-between',
-                      padding:'5px', backgroundColor: hilite(show)}`)
+          td(:style=`{display:'flex', padding:'5px', 
+                      justifyContent:'space-between',
+                      backgroundColor: hilite(show)}`)
 
             div(style=`padding:2px; 
                         fontSize:16px; font-weight:bold;` 
@@ -402,8 +435,9 @@ export default {
       fltrChoices:          
         ['All', 'Ready', 'Drama', 'To-Try', 'Try Drama', 
                             'Continue', 'Mark', 'Linda'],
-      fltrChoice: 'All',          
-
+      fltrChoice: 'All',  
+      showingSrchList:  false,
+      searchList:  null,        
       conds: [ {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],
           cond(show)  { return !show.NotReady },
@@ -518,22 +552,37 @@ export default {
     },
 
     async addClick () {
+      this.cancelSrchList();
       const srchTxt = prompt(
                 "Enter series name. " +
                 "It is used as an approximate search string.");
       if (!srchTxt) {
-        //- console.error("Search string is empty");
+        console.error("Search string is empty");
         return;
       }
-
+      this.showingSrchList = true;
       const tvdbData = await tvdb.srchTvdbData(srchTxt);
       if(!tvdbData) {
-        console.error('No series found in tvdb for:', srchTxt);
-        alert(`No tv series found using search text: ${srchTxt}`);
+        this.cancelSrchList();
+        setTimeout(() => {
+          console.error('No series found in tvdb for:', srchTxt);
+          alert(`No tv series found using search text: ` +
+                `${srchTxt}`);
+        }, 100);
         return;
       }
-      const {name, tvdbId} = tvdbData;
+      tvdbData.forEach((show) => {
+        if(show.country == 'gbr') show.country = 'uk';
+      });
+      this.searchList = tvdbData;
+      // name, tvdbId, country, primary_language,
+      //         year, poster_url, thumbnail
+    },
 
+    async searchAction(srchChoice) {
+      const {name, tvdbId} = srchChoice;
+      console.log('searchAction:', name);
+      this.cancelSrchList();
       const matchShow = allShows.find((s) => s.Name == name);
       if(matchShow) {  
         alert(matchShow.Name + ' already exists.');
@@ -571,6 +620,12 @@ export default {
 
       await srvr.addBlockedWait(show.Name);
       await srvr.addNoEmby(show);
+    },
+    
+    cancelSrchList() {
+      console.log('closing searchlist');
+      this.showingSrchList = false;
+      this.searchList      = null;
     },
 
     topClick() {

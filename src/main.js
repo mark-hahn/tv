@@ -3,16 +3,15 @@ reminder, restore ...
   start gap running
 
 bugs ...
-  google ampersand
-  plus on nonemby (Younger)
-  setSeasonsTxt no seasonCount (The Crow Girl)
-  imdb ratings broken
   waiting broken (The Agency (2024))
-  waiting for unaired says missing file (The White Lotus)
   series pane flashes while waiting for map (St. Denis Medical)
+  delete show from emby leaves old series meta
+  map too tall (max-height:90%; y-overflow:scroll;)
+  google ampersand
 
 todo  ...
   grid lines in map
+  add language to series meta
   
 new features ..
   click anywhere to close popup

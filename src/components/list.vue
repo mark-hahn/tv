@@ -955,7 +955,10 @@ export default {
         blockedWaitShows = showsBlocks.blockedWaitShows;
         blockedGapShows  = showsBlocks.blockedGapShows;
 
-        emby.startWorker(allShows, this.addGapToShow);
+        let showList = allShows;
+        // showList = [allShows.find((show) => 
+        //                 show.Name == 'The White Lotus')];
+        emby.startWorker(showList, this.addGapToShow);
 
         this.sortByNew     = true;
         this.sortByUpdated = false;

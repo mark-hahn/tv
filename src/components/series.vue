@@ -191,6 +191,7 @@ export default {
 
     async setSeasonsTxt() {
       this.seasonsTxt = ``;
+      if(this.show.Id.startsWith('noemby-')) return;
       const show = this.show;
       const {seasonCount, episodeCount, watchedCount} = 
                 await emby.getEpisodeCounts(show);

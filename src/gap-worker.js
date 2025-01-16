@@ -76,8 +76,6 @@ const getShowState = async (showId, showName) => {
           watchedShow   = true;
           watchedSeason = true;
         }
-
-        // let watchedLastEpiLastSea = true; // per show
         if(episodeIdx == episodes.length-1) {
           // last epi in season
           if(unaired && (watchedLastEpiLastSea || watchedSeason))
@@ -123,7 +121,6 @@ const getShowState = async (showId, showName) => {
           watchGap, watchGapSeason, watchGapEpisode, 
           fileGap,  fileGapSeason,  fileGapEpisode};
 }
-
 
 self.onmessage = async (event) => {
   cred                 = event.data.cred;

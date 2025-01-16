@@ -4,7 +4,7 @@ import * as srvr from "./srvr.js";
 import * as urls from "./urls.js";
 import * as util from "./util.js";
 
-const seasonsWorker = 
+const gapWorker = 
   new Worker(new URL('gap-worker.js', import.meta.url), 
               {type: 'module'});
 
@@ -233,17 +233,20 @@ export async function loadAllShows(gapCache) {
 //////////// misc functions //////////////
 
 export function startWorker(allShows, cb) {
-  seasonsWorker.onerror = (err) => {
+  gapWorker.onerror = (err) => {
     console.error('Worker:', err.message);
   }
   const allShowsIdName = [];
   for(let show of allShows) {
     const id = show.Id;
-    if(id.startsWith('noemby-')) continue;
+    if(id.startsWith('noemby-')) {
+      show.NotReady = true;
+      continue;
+    }
     allShowsIdName.push([id, show.Name]);
   }
-  seasonsWorker.onmessage = cb;
-  seasonsWorker.postMessage({cred, allShowsIdName});
+  gapWorker.onmessage = cb;
+  gapWorker.postMessage({cred, allShowsIdName});
 }
 
 const toTryCollId    = '1468316';

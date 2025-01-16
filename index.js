@@ -418,7 +418,7 @@ const getGaps = (id, _param, resolve, _reject) => {
 
 const addGap = async (id, gapIdGapSave, resolve, _reject) => {
   const [gapId, gap, save] = JSON.parse(gapIdGapSave);
-  console.log('addGap', id, {gapIdGapSave});
+  // console.logapIdGapSaveg('addGap', id, {gapIdGapSave});
   gaps[gapId] = gap;
   if(save) 
     await fsp.writeFile('data/gaps.json', JSON.stringify(gaps)); 
@@ -484,7 +484,7 @@ const getRemotes = (id, name, resolve, _reject) => {
 };
 
 const addRemotes = async (id, nameRems, resolve, reject) => {
-  console.log(`addRemotes`, {id, nameRems});
+  // console.log(`addRemotes`, {id, nameRems});
   const [name, remotesStr] = nameRems.split('|||');
   let remotes;
   try {
@@ -554,9 +554,10 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
 
   let parts;
 
-  switch (type) {
+  switch (+type) {
     case 2:  // IMDB
-      // fs.writeFile('data/imdb-page.txt', text);
+      // console.log('samples/imdb-page.html');
+      // fs.writeFileSync('samples/imdb-page.html', html);
       try{
         parts = /imUuxf">(\d\.\d)<\/span>/i.exec(html);
         if(parts === null) throw 'wikidata parse error';

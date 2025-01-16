@@ -65,7 +65,7 @@
                          justify-content:space-between;
                          margin: 5px 17px 0 0;`)
             #fltrs(v-for="cond in conds"
-                @click="condFltrClick(cond)"
+                @click="condFltrClick(cond, $event)"
                 :style=`{width:'1.435em', textAlign:'center',
                           display:'inline-block', 
                           color:condFltrColor(cond)}`)
@@ -739,9 +739,18 @@ export default {
       this.saveVisShow(show);
     },
 
-    condFltrClick(cond) {
+    condFltrClick(cond, event) {
       this.fltrChoice = '- - - - -';
-      if (++cond.filter == 2) cond.filter = -1;
+      if(cond.name == 'gap' && event.ctrlKey) {
+        allShows.forEach((show) =>  {
+          if(show.BlockedGap) {
+            show.BlockedGap = false;
+            srvr.delBlockedGap(show.Name);
+            cond.filter = 1;
+          }
+        });
+      }
+      else if (++cond.filter == 2) cond.filter = -1;
       this.select();
     },
 

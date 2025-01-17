@@ -188,8 +188,6 @@ export const getTvdbData = async (show) => {
     const twoDays = 48*60*60*1000;
     if ((Date.now() - tvdbData.saved) < 
         (twoDays + Math.round(Math.random() * twoDays))) {
-      show.OriginalCountry  = tvdbData.originalCountry;
-      show.OriginalLanguage = tvdbData.originalLanguage;
       return tvdbData;
     }
     else await srvr.delTvdb(show.Name);
@@ -219,17 +217,20 @@ export const getTvdbData = async (show) => {
     return null;
   }
   const extResObj  = await extRes.json();
-  const {firstAired, lastAired, nextAired, originalCountry,
-         remoteIds:tvdbRemotes, status:statusIn,
-         originalLanguage} = extResObj.data;
+  const {firstAired, lastAired, nextAired, 
+         originalCountry, originalLanguage,
+         remoteIds:tvdbRemotes, status:statusIn} 
+            = extResObj.data;
   const status = statusIn.name; // e.g. Ended
   const saved = Date.now();
-  tvdbData = { tvdbId, name, status, originalCountry,
+  tvdbData = { tvdbId, name, saved,
                firstAired, lastAired, nextAired, 
-               tvdbRemotes, saved, originalLanguage};
+               originalCountry, originalLanguage,
+               tvdbRemotes, status};
   srvr.addTvdb(JSON.stringify(tvdbData));
-  show.OriginalCountry  = originalCountry;
-  show.OriginalLanguage = originalLanguage;
+  show.country  = originalCountry;
+  show.language = originalLanguage;
+  // console.log('getTvdbData:', {tvdbData});
   return tvdbData;
 }
 

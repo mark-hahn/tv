@@ -223,8 +223,9 @@ export default {
 
     async setCntryLangTxt() {
       this.cntryLangTxt = ``;
-      let {originalCountry, originalLanguage} = 
-                    await tvdb.getTvdbData(this.show);
+      const orig = await tvdb.getTvdbData(this.show);
+      if(!orig) return;
+      let {originalCountry, originalLanguage} = orig;
       if(originalCountry == 'gbr') originalCountry = 'UK';
       this.cntryLangTxt = 
         ` &nbsp; Country: ${originalCountry.toUpperCase()} &nbsp;` +

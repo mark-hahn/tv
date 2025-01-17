@@ -128,14 +128,14 @@
                 display:flex;`)
         img(:src="srchChoice.thumbnail" 
             style=`max-width:80px; max-height:120px;`)
-        #srchTxt(style=`font-size:20px; max-width:230px;
+        #srchTxt(style=`max-width:230px;
                         display:flex; margin:5px; 
                         flex-direction:column;`)
-          #srchName(style=`font-weight:bold;`)
+          #srchName(style=`font-weight:bold;
+                           font-size:20px; `)
             | {{srchChoice.name}}
-          #srchDtl(style=`font-size:18px;
-                   margin:15px;`)
-            | {{srchChoice.year + ',&nbsp;'+ (srchChoice?.country?.toUpperCase() || '') + ',&nbsp;'+ (srchChoice?.originalLanguage?.toUpperCase()) || ''}}
+          #srchDtl(style=`font-size:18px; margin:10px 0 0 10px;`)
+            | {{srchChoice.searchDtlTxt}}
 
     #shows(style="width:100%; flex-grow: 1; overflow-y:scroll;")
       table(style="width:100%; font-size:18px")
@@ -436,14 +436,14 @@ export default {
       sortPopped:        false,
       sortChoices:          
         ['Alpha', 'Viewed', 'Added', 'Updated', 'Size'],
-      sortChoice:     'Viewed', 
-      fltrPopped:        false,
+      sortChoice: 'Viewed', 
+      fltrPopped:  false,
       fltrChoices:          
         ['All', 'Ready', 'Drama', 'To-Try', 'Try Drama', 
                             'Continue', 'Mark', 'Linda'],
-      fltrChoice: 'All',  
+      fltrChoice:      'All',  
       showingSrchList:  false,
-      searchList:  null,        
+      searchList:       null,        
       conds: [ {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],
           cond(show)  { return !show.NotReady },
@@ -579,7 +579,11 @@ export default {
       }
       tvdbData.forEach((show) => {
         if(show.country == 'gbr') show.country = 'uk';
+        show.searchDtlTxt = ` ${show.year}, 
+              ${show.country ?.toUpperCase() || ''}, 
+              ${show.primary_language?.toUpperCase() || ''}`;
       });
+      // console.log('searchList:', tvdbData);
       this.searchList = tvdbData;
     },
 
@@ -605,6 +609,7 @@ export default {
         WaitStr: '',
         FileGap: false,
         WatchGap: false,
+        NotReady: true,
         InToTry: false,
         InContinue: false,
         InMark: false,

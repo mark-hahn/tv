@@ -3,11 +3,11 @@ reminder, restore ...
   start gap running
 
 bugs ...
-
+  no meta for noemby (Red Rose) 
+   
 todo  ...
   delete show from emby leaves old series meta
   show waiting on noemby
-  search list text broken
     
 new features ..
   click anywhere to close popup

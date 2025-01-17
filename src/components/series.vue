@@ -322,10 +322,10 @@ export default {
       this.show = show;
       await this.setPoster();
       await this.setDates();
-      await this.setRemotes();
       await this.setSeasonsTxt();
       await this.setCntryLangTxt();
       await this.setNextWatch();
+      await this.setRemotes();
     });
   },
 }

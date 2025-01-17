@@ -418,6 +418,7 @@ export default {
         await emby.deleteShowFromEmby(show);
       }
       await srvr.deleteShowFromSrvr(show)
+      this.setHighlightAfterDel(show.Id);
     }
 
     return {
@@ -533,20 +534,23 @@ export default {
       }
     },
 
+    setHighlightAfterDel(id) {
+      for(let i = 0; i < allShows.length; i++) {
+        if(allShows[i].Id == id) {
+          let nextShow           = allShows[i+1];
+          if(!nextShow) nextShow = allShows[i-1];
+          if(!nextShow) nextShow = allShows[0];
+          this.saveVisShow(nextShow, true);
+          break;
+        }
+      }
+    },
     async chkRowDelete(show, force) {
       if (force || (!show.Reject && !show.Pickup &&
                      show.Id.startsWith("noemby-"))) {
         console.log("no reason to keep row, deleting it:", show.Name);
         const id = show.Id;
-        for(let i = 0; i < allShows.length; i++) {
-          if(allShows[i].Id == id) {
-            let nextShow           = allShows[i+1];
-            if(!nextShow) nextShow = allShows[i-1];
-            if(!nextShow) break;
-            this.saveVisShow(nextShow);
-            break;
-          }
-        }
+        this.setHighlightAfterDel(id);
         allShows   = allShows.filter(  (show) => show.Id != id);
         this.shows = this.shows.filter((show) => show.Id != id);
         return true;
@@ -670,7 +674,7 @@ export default {
           .replace(/[^a-zA-Z0-9]*/g, "")
       );
     },
-
+ 
     saveVisShow(show, scroll = false) {
       this.highlightName = show.Name;
       window.localStorage.setItem("lastVisShow", show.Name);

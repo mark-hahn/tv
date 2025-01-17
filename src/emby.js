@@ -94,6 +94,14 @@ export async function loadAllShows(gapCache) {
       Object.assign(show, gapData);
       delete gaps[show.Id];
     }
+
+    const tvdbId = show?.ProviderIds?.Tvdb || show?.TvdbId;
+    if(!tvdbId || tvdbId == '0') {
+      console.log(`loadAllShows, no tvdbId:`, show.Name, {show});
+      continue;
+    }
+    show.TvdbId = tvdbId;
+
     const tvdbShowData = await tvdb.getTvdbData(show);
     show.OriginalCountry  = tvdbShowData?.originalCountry;
     show.OriginalLanguage = tvdbShowData?.originalLanguage;
@@ -112,6 +120,7 @@ export async function loadAllShows(gapCache) {
     const idx = shows.findIndex(
                   (show) => show.Name == noEmbyShow.Name);
     if(idx != -1) {
+      console.log('upgrading noEmby:', noEmbyShow.Name);
       await srvr.delNoEmby(noEmbyShow.Name);
       await srvr.delRemotes(noEmbyShow.Name);
       continue;
@@ -128,7 +137,7 @@ export async function loadAllShows(gapCache) {
       show.WaitStr = await tvdb.getWaitStr(show);
     }
     else {
-      console.log('no show, deleting from blockedWaitShows list:',   
+      console.log('no show, deleting blockedWaitShows:',   
                    blockedWaitName);
       await srvr.delBlockedWait(blockedWaitName);
     }

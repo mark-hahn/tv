@@ -10,10 +10,12 @@
                      text-align:center;`) 
       #poster()
       #dates(v-html="dates"
+             v-if="dates.length > 0"
              style=`font-size:18px; min-height:24px;
                     margin-top:10px; font-weight:bold;
                     text-align:left;`)
       #seasons(v-html="seasonsTxt"
+               v-if="seasonsTxt.length > 0"
                style=`cursor:pointer; 
                       font-size:18px; min-height:24px;
                       font-weight:bold; font-color:gray;
@@ -109,7 +111,18 @@ export default {
     },
 
     async setPoster() {
-      const show   = this.show;
+      let srvrPath;
+      let imgIdx;
+      const img = new Image();
+      img.style.maxWidth  = "300px"; 
+      img.style.maxHeight = "400px"; 
+
+      const show = this.show;
+      if(show.ThumbNail) {
+        img.src = show.ThumbNail;
+        document.getElementById('poster').replaceChildren(img);
+        return;
+      }
       let showPath = show.Path;
       const srvrImages = 
          ['/poster.jpg', '/landscape.jpg', '/clearlogo.png'];
@@ -125,11 +138,6 @@ export default {
               `tag=${show.BackdropImageTags[0]}&quality=70`
           ];
       }
-      let srvrPath;
-      let imgIdx;
-      const img = new Image();
-      img.style.maxWidth  = "300px"; 
-      img.style.maxHeight = "400px"; 
 
       const trySrvrImg = () => {
         try {
@@ -219,6 +227,7 @@ export default {
                           watchedCount == episodeCount) 
               ? ' &nbsp; All Watched' 
               :`  &nbsp; ${watchedCount}/${episodeCount} Watched`;
+      if(!seasonsTxt) return;
       this.seasonsTxt = ' &nbsp; ' + seasonsTxt + watchedTxt;
     },
 

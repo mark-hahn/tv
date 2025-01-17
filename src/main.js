@@ -3,12 +3,11 @@ reminder, restore ...
   start gap running
 
 bugs ...
-  no meta for noemby (Red Rose) 
   ctrl-click on episode in map broken
 
 todo  ...
   up/dn arrows
-  delete show from emby leaves old series meta
+  delete show from emby leaves old series meta visible
   show waiting on noemby
     
 new features ..

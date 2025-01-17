@@ -585,13 +585,15 @@ export default {
          ` ${tvdbSrchShow.year}, 
            ${tvdbSrchShow.country ?.toUpperCase() || ''}, 
            ${tvdbSrchShow.primary_language?.toUpperCase() || ''}`;
+        tvdbSrchShow.tvdbId    = tvdbSrchShow.tvdb_id
+        tvdbSrchShow.thumbNail = tvdbSrchShow.image_url;
       });
       // console.log('searchList:', tvdbData);
       this.searchList = tvdbSrchData;
     },
 
     async searchAction(srchChoice) {
-      const {name, tvdbId} = srchChoice;
+      const {name, tvdbId, thumbNail, overview} = srchChoice;
       console.log('searchAction:', name);
       this.cancelSrchList();
       const matchShow = allShows.find((s) => s.Name == name);
@@ -625,6 +627,8 @@ export default {
         Size: 0,
         Seasons: [],
         TvdbId: tvdbId,
+        ThumbNail: thumbNail,
+        Overview: overview,
       };
 
       allShows.unshift(show);
@@ -720,12 +724,8 @@ export default {
         else {
           show = allShows.find((shw) => shw.Name == name);
           if (!show) {
-            console.error("scrollToSavedShow: show not found", name);
-            show =allShows.find(() => true);
-            if(!show) {
-              console.error("scrollToSavedShow: no show found", name);
-              return;
-            }
+            console.log("scrollToSavedShow: show not found", name);
+            show = allShows[0];
           }
         }
         if(saveVis) this.saveVisShow(show);
@@ -736,6 +736,10 @@ export default {
     },
 
     async copyNameToClipboard(show) {
+
+      // const tvdbData = await tvdb.getTvdbData(show.TvdbId);
+      console.log('copyNameToClipboard', {show});
+
       console.log(`copying ${show.Name} to clipboard`);
       await navigator.clipboard.writeText(show.Name);
       this.saveVisShow(show);
@@ -964,8 +968,12 @@ export default {
         tvdb.init(showErr);
 
         const showsBlocks = await emby.loadAllShows();
-        allShows          = showsBlocks.shows;
-        this.shows        = allShows;
+        if(!showsBlocks) {
+          console.error("No shows from loadAllShows");
+          return;
+        }
+        allShows   = showsBlocks.shows;
+        this.shows = allShows;
 
         // must be set before startWorker
         blockedWaitShows = showsBlocks.blockedWaitShows;

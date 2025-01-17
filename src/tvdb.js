@@ -179,8 +179,11 @@ export const srchTvdbData = async (searchStr) => {
 export const getTvdbData = async (show) => {
   const name = show.Name;
 
-  // if(name == 'The Crow Girl'); 
-  //   console.log('getTvdbData:', {name, show});
+  if(!show.TvdbId) {
+    console.error(`getTvdbData, no tvdbId:`, name, {show});
+    return null;
+  }
+  const tvdbId = show.TvdbId;
   
   let tvdbData = await srvr.getTvdb(name);
   if(tvdbData && !tvdbData.noMatch) {
@@ -194,26 +197,24 @@ export const getTvdbData = async (show) => {
   }
 
   if(!theTvdbToken) await getToken();
-
-  const tvdbId = show?.ProviderIds?.Tvdb || show?.TvdbId;
-  if(!tvdbId) {
-    // console.error(`getTvdbData, no tvdbId:`, {show});
-    return null;
-  }
-  show.TvdbId = tvdbId;
   
-  let extRes;
+  let extRes, extUrl;
   try{
-    const extUrl = 
+    extUrl = 
       `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
     extRes = await fetch(extUrl,
                   {headers: {
                       'Content-Type': 'application/json',
                         Authorization:'Bearer ' + theTvdbToken
                   }});
-    if (!extRes.ok) throw new Error(`tvdb extended: ${extRes.status}`);
-  } catch(e) {  
-    console.error('getTvdbData, tvdb extended error:', show.Name, e);
+    if (!extRes.ok) {
+      console.error(`getTvdbData, extended status:`, 
+                        show.Name, {extUrl, extRes});
+      return null;
+    }
+  } catch(err) {  
+    console.error('getTvdbData, extended caught:', show.Name, 
+                      {extUrl, extRes, err});
     return null;
   }
   const extResObj  = await extRes.json();

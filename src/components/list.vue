@@ -466,7 +466,8 @@ export default {
           click() {}, name: "drama",
         }, {
           color: "#88f", filter: 0, icon: ["fas", "globe"],
-          cond(show)  { return show.OriginalCountry != 'usa'; },
+          cond(show)  { return show.OriginalCountry != 'usa' &&
+                               show.OriginalCountry != '';},
           click()  {}, name: "foreign",
         }, {
           color: "lime", filter: 0, icon: ["fas", "question"],
@@ -606,6 +607,8 @@ export default {
         Name: name,
         Id: "noemby-" + Math.random(),
         DateCreated: dateStr, 
+        OriginalCountry:  '',
+        OriginalLanguage: '',
         BlockedGap: false,
         Waiting: false,
         WaitStr: '',

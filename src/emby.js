@@ -87,7 +87,6 @@ export async function loadAllShows(gapCache) {
       show.Date = date;
       show.Size = size;
     }
-
     if(!show.DateCreated) show.DateCreated = show.Date;
 
     const gapData = gaps[show.Id];
@@ -98,7 +97,7 @@ export async function loadAllShows(gapCache) {
     const tvdbShowData = await tvdb.getTvdbData(show);
     show.OriginalCountry  = tvdbShowData?.originalCountry;
     show.OriginalLanguage = tvdbShowData?.originalLanguage;
-    
+
     shows.push(show);
   }
 
@@ -114,6 +113,7 @@ export async function loadAllShows(gapCache) {
                   (show) => show.Name == noEmbyShow.Name);
     if(idx != -1) {
       await srvr.delNoEmby(noEmbyShow.Name);
+      await srvr.delRemotes(noEmbyShow.Name);
       continue;
     }
     shows.push(noEmbyShow);

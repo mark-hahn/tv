@@ -5,9 +5,9 @@ reminder, restore ...
 bugs ...
   no meta for noemby (Red Rose) 
   ctrl-click on episode in map broken
-  missing emby button (Shifting Gears)
 
 todo  ...
+  up/dn arrows
   delete show from emby leaves old series meta
   show waiting on noemby
     

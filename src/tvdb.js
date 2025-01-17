@@ -171,7 +171,7 @@ export const srchTvdbData = async (searchStr) => {
   const srchResObj = await srchRes.json();
   const data = srchResObj.data;
   if(!data || data.length == 0) return null;
-  return data.slice(0, 9);
+  return data;
 }
 
 //////////// get TvDb Data //////////////
@@ -213,7 +213,7 @@ export const getTvdbData = async (show) => {
                   }});
     if (!extRes.ok) throw new Error(`tvdb extended: ${extRes.status}`);
   } catch(e) {  
-    console.log('getTvdbData, tvdb extended error:', show.Name, e);
+    console.error('getTvdbData, tvdb extended error:', show.Name, e);
     return null;
   }
   const extResObj  = await extRes.json();
@@ -228,8 +228,6 @@ export const getTvdbData = async (show) => {
                originalCountry, originalLanguage,
                tvdbRemotes, status};
   srvr.addTvdb(JSON.stringify(tvdbData));
-  show.country  = originalCountry;
-  show.language = originalLanguage;
   // console.log('getTvdbData:', {tvdbData});
   return tvdbData;
 }
@@ -245,7 +243,7 @@ export async function getWaitStr(show) {
       if(!lastAired) return '';
       const lastAiredDay  = lastAired;
       const lastAiredNoYr = lastAired.slice(5).replace(/^0/, ' ');  
-      const today         = util.fmtDate(0);
+      const today = util.fmtDate(0);
       if(lastAiredDay >= today) waitStr = `{${lastAiredNoYr}}`;
       // console.log('getWaitStr:', show.Name, 
       //     {waitStr, lastAiredDay, lastAiredNoYr, today}); 

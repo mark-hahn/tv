@@ -567,8 +567,8 @@ export default {
         return;
       }
       this.showingSrchList = true;
-      const tvdbData = await tvdb.srchTvdbData(srchTxt);
-      if(!tvdbData) {
+      const tvdbSrchData = await tvdb.srchTvdbData(srchTxt);
+      if(!tvdbSrchData) {
         this.cancelSrchList();
         setTimeout(() => {
           console.error('No series found in tvdb for:', srchTxt);
@@ -577,14 +577,16 @@ export default {
         }, 100);
         return;
       }
-      tvdbData.forEach((show) => {
-        if(show.country == 'gbr') show.country = 'uk';
-        show.searchDtlTxt = ` ${show.year}, 
-              ${show.country ?.toUpperCase() || ''}, 
-              ${show.primary_language?.toUpperCase() || ''}`;
+      tvdbSrchData.forEach((tvdbSrchShow) => {
+        if(tvdbSrchShow.country == 'gbr') 
+           tvdbSrchShow.country  = 'uk';
+        tvdbSrchShow.searchDtlTxt = 
+         ` ${tvdbSrchShow.year}, 
+           ${tvdbSrchShow.country ?.toUpperCase() || ''}, 
+           ${tvdbSrchShow.primary_language?.toUpperCase() || ''}`;
       });
       // console.log('searchList:', tvdbData);
-      this.searchList = tvdbData;
+      this.searchList = tvdbSrchData;
     },
 
     async searchAction(srchChoice) {

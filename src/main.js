@@ -6,7 +6,6 @@ bugs ...
   no meta for noemby (Red Rose) 
   ctrl-click on episode in map broken
   missing emby button (Shifting Gears)
-  all shows marked foreign (Shifting Gears)
 
 todo  ...
   delete show from emby leaves old series meta

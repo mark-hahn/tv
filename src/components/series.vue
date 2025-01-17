@@ -186,14 +186,15 @@ export default {
 
     async setDates() {
       const show = this.show;
-      const tvdbData = await tvdb.getTvdbData(show);
-      if(!tvdbData) {
+      const tvdbShowData = await tvdb.getTvdbData(show);
+      if(!tvdbShowData) {
         this.dates = '';
         return;
       }
-      const {firstAired, lastAired, status} = tvdbData;
-      this.dates = ' &nbsp; ' + firstAired + '&nbsp;&nbsp;' + lastAired 
-                      + '&nbsp; ' + status + ' &nbsp; ';
+      const {firstAired, lastAired, status} = tvdbShowData;
+      this.dates = ' &nbsp; '      + firstAired + 
+                    '&nbsp;&nbsp;' + lastAired +
+                    '&nbsp; '      + status + ' &nbsp; ';
     },
 
     async setSeasonsTxt() {

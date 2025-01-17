@@ -95,6 +95,10 @@ export async function loadAllShows(gapCache) {
       Object.assign(show, gapData);
       delete gaps[show.Id];
     }
+    const tvdbShowData = await tvdb.getTvdbData(show);
+    show.OriginalCountry  = tvdbShowData?.originalCountry;
+    show.OriginalLanguage = tvdbShowData?.originalLanguage;
+    
     shows.push(show);
   }
 

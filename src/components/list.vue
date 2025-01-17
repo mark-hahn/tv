@@ -535,16 +535,17 @@ export default {
     },
 
     setHighlightAfterDel(id) {
-      for(let i = 0; i < allShows.length; i++) {
-        if(allShows[i].Id == id) {
-          let nextShow           = allShows[i+1];
-          if(!nextShow) nextShow = allShows[i-1];
-          if(!nextShow) nextShow = allShows[0];
+      for(let i = 0; i < this.shows.length; i++) {
+        if(this.shows[i].Id == id) {
+          let nextShow           = this.shows[i+1];
+          if(!nextShow) nextShow = this.shows[i-1];
+          if(!nextShow) nextShow = this.shows[0];
           this.saveVisShow(nextShow, true);
           break;
         }
       }
     },
+
     async chkRowDelete(show, force) {
       if (force || (!show.Reject && !show.Pickup &&
                      show.Id.startsWith("noemby-"))) {

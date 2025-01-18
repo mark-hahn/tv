@@ -8,13 +8,13 @@ todo  ...
 
 new features ..
   update imdb rating et. al. periodicaly
-  click anywhere to close popup
   blink copy-name button
   refresh filtered rows when new gap loaded
   button: scroll hilighted row to vis 
   map: click on season numbers for whole row
 
 tabled ...
+  click anywhere to close popup
   up/dn arrows
   series pane flashes while waiting for map (St. Denis)
   sort by imdb ratings

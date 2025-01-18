@@ -26,7 +26,9 @@
           button(@click="select" 
                   style="margin-left:1px;")
             font-awesome-icon(icon="search")
-
+        button(@click="addClick" 
+                style=`display:inline-block'; 
+                      font-size:15px; margin:4px 4px 4px 20px;backgroundColor:white`) Add
         button(@click="watchClick" 
                 style=`margin-left:10px; margin-right:5px;
                       fontSize:15px; margin:4px;
@@ -40,13 +42,18 @@
                         overflow:hidden;
                         display:flex; justify-content:space-between;`)
 
-            button(@click="addClick" 
-                    style=`display:inline-block'; 
-                          font-size:15px; margin:4px 4px 4px 20px;backgroundColor:white`) Add
             button(@click="topClick" 
                     style=`margin-left:10px; margin-right:5px;
                           fontSize:15px; margin:4px;
                           background-color:white;`) Top
+            button(@click="prevNextClick(false)" 
+                    style=`margin-left:10px; margin-right:5px;
+                          fontSize:15px; margin:4px;
+                          background-color:white;`) Prev
+            button(@click="prevNextClick(true)" 
+                    style=`margin-left:10px; margin-right:5px;
+                          fontSize:15px; margin:4px;
+                          background-color:white;`) Next
             #sortFltr(style=`display:inline-block;
                           display:flex; justify-content:space-between;`)
               button(@click='sortClick'
@@ -151,7 +158,7 @@
                   @click="seriesMapAction('open', show)")
               font-awesome-icon(icon="border-all" style="color:#ccc")
 
-          td(@click="saveVisShow(show, false, true)"
+          td(@click="saveVisShow(show, false)"
              :style=`{width:'80px', fontSize:'16px',
                       backgroundColor: hilite(show),
                       cursor:'default', textAlign:'center'}`) 
@@ -266,10 +273,12 @@ library.add([
   faMinus, faArrowDown, faTv, faSearch, faQuestion, faCopy, 
   faBan, faBorderAll, faArrowRight, faMars, faVenus, faClock]);
 
-let   allShows         = [];
-let   blockedWaitShows = null;
-let   blockedGapShows  = null;
-let   showErr          = null;
+let allShows         = [];
+let showHistory      = [];
+let showHistoryPtr   = -1;
+let blockedWaitShows = null;
+let blockedGapShows  = null;
+let showErr          = null;
 
 export default {
   name: "List",
@@ -657,6 +666,15 @@ export default {
       this.saveVisShow(this.shows[0], true);
     },
 
+    prevNextClick(next) {
+      if(showHistory.length == 0) return;
+      const newPtr = showHistoryPtr + (next ? 1 : -1);
+      if(newPtr < 0 || newPtr >= showHistory.length) return;
+      showHistoryPtr = newPtr;
+      const show = showHistory[showHistoryPtr];
+      this.saveVisShow(show, true);
+    },
+
     allClick() {
       this.fltrAction('All');
     },
@@ -675,10 +693,18 @@ export default {
           .replace(/[^a-zA-Z0-9]*/g, "")
       );
     },
- 
+
     saveVisShow(show, scroll = false) {
-      this.highlightName = show.Name;
-      window.localStorage.setItem("lastVisShow", show.Name);
+      const showName = show.Name;
+      if(showHistoryPtr == -1 ||
+           showName != showHistory[showHistoryPtr].Name) {
+        console.log("adding show to history:", showName);
+        showHistory.push(show);
+        showHistoryPtr = showHistory.length - 1;
+        // showHistory = showHistory.slice(0, showHistoryPtr+1);
+      }
+      this.highlightName = showName;
+      window.localStorage.setItem("lastVisShow", showName);
       if(scroll) this.scrollToSavedShow();
       this.$nextTick(() =>
         evtBus.emit('setUpSeries', show));

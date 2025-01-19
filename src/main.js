@@ -3,15 +3,14 @@ reminder, restore ...
   start gap running
 
 bugs ...
-                       ^
+
 todo  ...
   auto-del dead
   history
-  blink copy-name button
   map: click on season numbers for whole row
 
 new features ..
-  update imdb rating et. al. periodicaly
+  update imdb rating (all remotes) periodicaly
   refresh filtered rows when new gap loaded
   button: scroll hilighted row to vis 
 

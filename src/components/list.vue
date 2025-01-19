@@ -150,9 +150,12 @@
         tr(v-for="show in shows" key="show.Id" 
               style="outline:thin solid; cursor:default" 
              :id="nameHash(show.Name)")
+
           td(style="width:30px; text-align:center;"
-            @click="copyNameToClipboard(show)")
-            font-awesome-icon(icon="copy" style="color:#ccc")
+            @click="copyNameToClipboard(show, $event)")
+            font-awesome-icon(id="cpbrd" icon="copy" 
+                              style="color:#ccc")
+
           td(style="width:30px; text-align:center;" )
             div(v-show="!show.Id.startsWith('noemby-')" 
                   @click="seriesMapAction('open', show)")
@@ -765,14 +768,14 @@ export default {
       });
     },
 
-    async copyNameToClipboard(show) {
-
-      // const tvdbData = await tvdb.getTvdbData(show.TvdbId);
-      console.log('copyNameToClipboard', {show});
-
-      console.log(`copying ${show.Name} to clipboard`);
+    async copyNameToClipboard(show, event) {
+      console.log('copyNameToClipboard', show.Name);
+      const ele = event.target;
+      const color = ele.style.color;
+      ele.style.color = "#f00";
       await navigator.clipboard.writeText(show.Name);
       this.saveVisShow(show);
+      ele.style.color = color
     },
 
     async episodeClick(e, show, season, episode) {

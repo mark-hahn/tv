@@ -184,12 +184,12 @@ export function addGap(gapIdGapSave)
 export function delGap(gapIdSave)    
             {return fCall('delGap', gapIdSave, 'gap')}
 
+export function getTvdbNames()    
+            {return fCall('getTvdbNames',  '', 'tvdb')}
 export function getTvdb(name)      
-            {return fCall('getTvdb', name, 'tvdb')}
+            {return fCall('getTvdb',     name, 'tvdb')}
 export function addTvdb(tvdbData)    
             {return fCall('addTvdb', tvdbData, 'tvdb')}
-export function delTvdb(name)    
-            {return fCall('delTvdb', name, 'tvdb')}
 
 export function getRemotes(name)    
             {return fCall('getRemotes', name,     'remotes')}

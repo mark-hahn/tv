@@ -193,7 +193,6 @@ export const getTvdbData = async (show) => {
         (twoDays + Math.round(Math.random() * twoDays))) {
       return tvdbData;
     }
-    else await srvr.delTvdb(show.Name);
   }
 
   if(!theTvdbToken) await getToken();

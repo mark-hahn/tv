@@ -124,7 +124,6 @@ export async function deleteShowFromSrvr(show) {
   await delBlockedWait(show.Name);
   await delPickup(show.Name);
   await delNoEmby(show.Name);
-  await delTvdb(show.Name);
   await delRemotes(show.Name);
   await deletePath(show.Path);
   // don't ever delete from rejects

@@ -1,8 +1,7 @@
 import * as srvr from "./srvr.js";
 import * as util from "./util.js";
 import * as urls from "./urls.js";
-
-const tvdbDataCacheName = "tvdbDataCache2";
+import * as emby from "./emby.js";
 
 let showErr      = null;
 let theTvdbToken = null;
@@ -217,20 +216,23 @@ export const getTvdbData = async (show) => {
                       {extUrl, extRes, err});
     return null;
   }
+  const {seasonCount, episodeCount, watchedCount} = 
+              await emby.getEpisodeCounts(show);
   const extResObj  = await extRes.json();
   const {firstAired, lastAired, image, score,
          originalCountry, originalLanguage, overview,
          remoteIds:tvdbRemotes, status:statusIn,
          seasons:seasonsIn} 
             = extResObj.data;
-  const status     = statusIn.name; // e.g. Ended
+  const status   = statusIn.name; // e.g. Ended
   let numSeasons = 0;
   seasonsIn.forEach((season) => {
     numSeasons = Math.max(numSeasons, +season.number);
   });
   const saved = Date.now();
-  tvdbData = { tvdbId, name, saved,
-               image, score, overview, numSeasons,
+  tvdbData = { tvdbId, name, saved, 
+               seasonCount, episodeCount, watchedCount,
+               image, score, overview, 
                firstAired, lastAired,
                originalCountry, originalLanguage,
                tvdbRemotes, status};

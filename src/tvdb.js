@@ -142,9 +142,10 @@ export const getRemotes = async (show) => {
         {id:showName, type:99}, showName);
   if(rottenRemote) remotes.push(rottenRemote);
 
-  remotes.push({name:'Google', 
-                 url: `https://www.google.com/search` +
-                      `?q=${encodeURI(showName)}%20tv%20show`});
+  const encoded = encodeURI(showName).replaceAll('&', '%26');
+  const url = `https://www.google.com/search` +
+               `?q=${encoded}%20tv%20show`;
+  remotes.push({name:'Google', url});
 
   srvr.addRemotes(showName + '|||' + JSON.stringify(remotes));
   return [remotes, false];

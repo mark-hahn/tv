@@ -3,18 +3,20 @@ reminder, restore ...
   start gap running
 
 bugs ...
-
+                       ^
 todo  ...
-  speed up boot
-  
-new features ..
-  update imdb rating et. al. periodicaly
+  auto-del dead
+  history
   blink copy-name button
-  refresh filtered rows when new gap loaded
-  button: scroll hilighted row to vis 
   map: click on season numbers for whole row
 
+new features ..
+  update imdb rating et. al. periodicaly
+  refresh filtered rows when new gap loaded
+  button: scroll hilighted row to vis 
+
 tabled ...
+  speed up boot
   click anywhere to close popup
   up/dn arrows
   series pane flashes while waiting for map (St. Denis)

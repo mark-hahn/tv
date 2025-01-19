@@ -133,7 +133,7 @@
                 background-color:white; text-align:center;
                 border: 1px solid black; 
                 display:flex;`)
-        img(:src="srchChoice.thumbnail" 
+        img(:src="srchChoice.image" 
             style=`max-width:80px; max-height:120px;`)
         #srchTxt(style=`max-width:230px;
                         display:flex; margin:5px; 
@@ -599,15 +599,15 @@ export default {
          ` ${tvdbSrchShow.year}, 
            ${tvdbSrchShow.country ?.toUpperCase() || ''}, 
            ${tvdbSrchShow.primary_language?.toUpperCase() || ''}`;
-        tvdbSrchShow.tvdbId    = tvdbSrchShow.tvdb_id
-        tvdbSrchShow.thumbNail = tvdbSrchShow.image_url;
+        tvdbSrchShow.tvdbId = tvdbSrchShow.tvdb_id;
+        tvdbSrchShow.image  = tvdbSrchShow.thumbnail;
       });
       // console.log('searchList:', tvdbData);
       this.searchList = tvdbSrchData;
     },
 
     async searchAction(srchChoice) {
-      const {name, tvdbId, thumbNail, overview} = srchChoice;
+      const {name, tvdbId, overview} = srchChoice;
       console.log('searchAction:', name);
       this.cancelSrchList();
       const matchShow = allShows.find((s) => s.Name == name);
@@ -641,7 +641,6 @@ export default {
         Size: 0,
         Seasons: [],
         TvdbId: tvdbId,
-        ThumbNail: thumbNail,
         Overview: overview,
       };
 

@@ -218,14 +218,20 @@ export const getTvdbData = async (show) => {
     return null;
   }
   const extResObj  = await extRes.json();
-  const {firstAired, lastAired, nextAired, 
-         originalCountry, originalLanguage,
-         remoteIds:tvdbRemotes, status:statusIn} 
+  const {firstAired, lastAired, image, score,
+         originalCountry, originalLanguage, overview,
+         remoteIds:tvdbRemotes, status:statusIn,
+         seasons:seasonsIn} 
             = extResObj.data;
-  const status = statusIn.name; // e.g. Ended
+  const status     = statusIn.name; // e.g. Ended
+  let numSeasons = 0;
+  seasonsIn.forEach((season) => {
+    numSeasons = Math.max(numSeasons, +season.number);
+  });
   const saved = Date.now();
   tvdbData = { tvdbId, name, saved,
-               firstAired, lastAired, nextAired, 
+               image, score, overview, numSeasons,
+               firstAired, lastAired,
                originalCountry, originalLanguage,
                tvdbRemotes, status};
   srvr.addTvdb(JSON.stringify(tvdbData));

@@ -449,6 +449,15 @@ const getTvdb = (id, name, resolve, _reject) => {
   resolve([id, allTvdbName]);
 };
 
+const getTvdbNames = (id, _name, resolve, _reject) => {
+  console.log('getTvdbNames', id);
+  const names = [];
+  allTvdbName.forEach((show)=> {
+    names.push(show.name);
+  });
+  resolve([id, names]);
+};
+
 const addTvdb = async (id, tvdbDataStr, resolve, reject) => {
   console.log('addTvdb', id);
   let tvdbData;
@@ -460,17 +469,17 @@ const addTvdb = async (id, tvdbDataStr, resolve, reject) => {
   resolve([id, 'ok']);
 }
 
-const delTvdb = async (id, name, resolve, _reject) => {
-  console.log('delTvdb', id, name);
-  if(!allTvdb[name]) {
-    console.log('-- tvdb not deleted -- no match:', name);
-    resolve([id, 'delTvdb no match:' + name]);
-    return;
-  }
-  delete allTvdb[name];
-  await fsp.writeFile('data/tvdb.json', JSON.stringify(allTvdb)); 
-  resolve([id, 'ok']);
-}
+// const delTvdb = async (id, name, resolve, _reject) => {
+//   console.log('delTvdb', id, name);
+//   if(!allTvdb[name]) {
+//     console.log('-- tvdb not deleted -- no match:', name);
+//     resolve([id, 'delTvdb no match:' + name]);
+//     return;
+//   }
+//   delete allTvdb[name];
+//   await fsp.writeFile('data/tvdb.json', JSON.stringify(allTvdb)); 
+//   resolve([id, 'ok']);
+// }
 
 const getRemotes = (id, name, resolve, _reject) => {
   console.log(`getRemotes`, {id, name});
@@ -703,9 +712,9 @@ wss.on('connection', (ws, req) => {
       case 'addGap':      addGap(    id, param, resolve, reject); break;
       case 'delGap':      delGap(    id, param, resolve, reject); break;
       
-      case 'getTvdb':     getTvdb(   id, param, resolve, reject); break;
-      case 'addTvdb':     addTvdb(   id, param, resolve, reject); break;
-      case 'delTvdb':     delTvdb(   id, param, resolve, reject); break;
+      case 'getTvdbNames': getTvdbNames(id, param, resolve, reject); break;
+      case 'getTvdb':      getTvdb(     id, param, resolve, reject); break;
+      case 'addTvdb':      addTvdb(     id, param, resolve, reject); break;
       
       case 'getRemotes':  getRemotes(id, param, resolve, reject); break;
       case 'addRemotes':  addRemotes(id, param, resolve, reject); break;

@@ -5,7 +5,8 @@ reminder, restore ...
 bugs ...
 
 todo  ...
-
+  speed up boot
+  
 new features ..
   update imdb rating et. al. periodicaly
   blink copy-name button

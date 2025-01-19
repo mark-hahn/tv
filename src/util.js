@@ -1,6 +1,5 @@
 import * as emby from "./emby.js";
 import * as tvdb from "./tvdb.js";
-import * as srvr from "./srvr.js";
 
 ////////// temp one-time mass operation //////////
 export async function listCountries(allShows) {

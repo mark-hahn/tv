@@ -929,6 +929,7 @@ export default {
     async addGapToShow(event) {
       const {showId, progress, notReady, waiting, anyWatched,
              watchGap, watchGapSeason, watchGapEpisode, 
+             fileEndError, seasonWatchedThenNofile,
              fileGap,  fileGapSeason,  fileGapEpisode}
                           = event.data;
       this.gapPercent = progress;
@@ -936,6 +937,9 @@ export default {
       
       const show = allShows.find((show) => show.Id == showId);
       if(!show) return;
+
+      if(seasonWatchedThenNofile)
+        console.log('seasonWatchedThenNofile', show.Name);
 
       if(anyWatched && show.InToTry) {
         show.InToTry = false;
@@ -956,11 +960,12 @@ export default {
       gap.WatchGapSeason  = watchGapSeason;
       gap.WatchGapEpisode = watchGapEpisode;
       gap.WatchGap        = watchGap; 
-      gap.FileGap         = fileGap;
       gap.NotReady        = notReady;
       gap.BlockedGap      = blockedGap;
       gap.Waiting         = !blockedWait && waiting;
       gap.WaitStr         = await tvdb.getWaitStr(show);
+      gap.FileGap = 
+          fileGap || fileEndError || seasonWatchedThenNofile;
 
       Object.assign(show, gap);
       const gapIdGapSave = JSON.stringify([show.Id, gap, save]);
@@ -1011,8 +1016,8 @@ export default {
         blockedGapShows  = showsBlocks.blockedGapShows;
 
         let showList = allShows;
-        // showList = [allShows.find((show) => 
-        //                 show.Name == 'The Agency (2024)')];
+        // showList = [allShows.find((show) => // for testing
+        //                 show.Name == 'Splitting Up Together (US)')]; 
         emby.startWorker(showList, this.addGapToShow);
 
         this.sortByNew     = true;

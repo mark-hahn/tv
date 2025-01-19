@@ -467,7 +467,7 @@ export const getSeriesMap = async (show, prune = false) => {
       const error = 
           (seasonNumber  == show.WatchGapSeason  &&
            episodeNumber == show.WatchGapEpisode &&
-              show.WatchGap) ||
+                            show.WatchGap) ||
           (seasonNumber  == show.FileGapSeason  &&
            episodeNumber == show.FileGapEpisode &&
               show.FileGap);

@@ -65,6 +65,7 @@
 import evtBus    from '../evtBus.js';
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
+import * as srvr from "../srvr.js";
 
 let windowId = null;
 let windowLabel = Math.random();
@@ -111,18 +112,89 @@ export default {
     },
 
     async setPoster(tvdbShowData) {
+      let srvrPath;
+      let imgIdx;
       const img = new Image();
       img.style.maxWidth  = "300px"; 
       img.style.maxHeight = "400px"; 
-      
-      if(tvdbShowData.image) {
-        img.src = tvdbShowData.image;
-      } else {
-        console.error('image missing from tvdbShowData',
-                       tvdbShowData);
-        img.src = './question-mark.png';
+      const show = this.show;
+      let showPath = show.Path;
+      const srvrImages = 
+         ['/poster.jpg', '/landscape.jpg', '/clearlogo.png'];
+      let embyImages = [];
+      if(!show.Id.startsWith('noemby-')) {
+        embyImages = [
+            `https://hahnca.com:8920/emby/Items/${show.Id}` +
+              `/Images/Primary?tag=${show.ImageTags.Primary}` +
+              `&keepAnimation=true&quality=90`,
+
+            `https://hahnca.com:8920/emby/Items/${show.Id}` +
+              `/Images/Backdrop/0?`+
+              `tag=${show.BackdropImageTags[0]}&quality=70`
+          ];
       }
-      document.getElementById('poster').replaceChildren(img);
+      const trySrvrImg = () => {
+        try {
+          img.src = 'https://hahnca.com/tv/' +
+                      encodeURI(srvrPath) + srvrImages[imgIdx]; 
+        }
+        catch(err) {
+          console.log('Series: srvr img err:',  img.src);
+          return false;
+        }
+        return true;
+      }
+      const tryEmbyImg = () => {
+        try {
+          img.src = embyImages[imgIdx-srvrImages.length]; 
+        } 
+        catch(err) {
+          console.log('Series: emby img err:',  img.src);
+          return false;
+        }
+        return true;
+      }
+      const chkSaveImage = () => {
+        if(tvdbShowData.image !== img.src) {
+          console.log('Series: chaning tvdb image:', img.src);
+          tvdbShowData.image = img.src;
+          srvr.addTvdb(JSON.stringify(tvdbShowData));
+        }
+        document.getElementById('poster').replaceChildren(img);
+      }
+
+      if(showPath) {
+        srvrPath = showPath.split('/').pop();
+        imgIdx = 0;
+        trySrvrImg();
+      }
+      else {
+        imgIdx = srvrImages.length - 1;
+        tryEmbyImg();
+      }
+      img.onload = () => {
+        // console.log('Series showing img:',  img.src);
+        chkSaveImage();
+      };
+      img.onerror = () => {
+        if(++imgIdx < srvrImages.length) {
+          if(!trySrvrImg()) return;
+        }
+        else if(++imgIdx < srvrImages.length + 
+                           embyImages.length) {
+          if(!tryEmbyImg()) return;
+        }
+        else {
+          if(tvdbShowData.image) {
+            img.src = tvdbShowData.image;
+          } else {
+            console.error('image missing', show.Name);
+            img.src = './question-mark.png';
+            chkSaveImage();
+            return;
+          }
+        }
+      }
     },
 
     async setDates(tvdbShowData) {

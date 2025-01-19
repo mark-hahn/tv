@@ -218,12 +218,24 @@ export const getTvdbData = async (show) => {
   }
   const {seasonCount, episodeCount, watchedCount} = 
               await emby.getEpisodeCounts(show);
-  const extResObj  = await extRes.json();
-  const {firstAired, lastAired, image, score,
+  const data = (await extRes.json()).data;
+
+  // if(data.name == 'Until I Kill You') 
+  //   console.error(`getTvdbData`, data);
+
+  const artworks = data.artworks;
+  let image = null;
+  for (const artwork of artworks) {
+    if(artwork.language == "eng") {
+      image = artwork.thumbnail;
+      break;
+    }
+  }
+  image = image || data.image
+  const {firstAired, lastAired, score,
          originalCountry, originalLanguage, overview,
          remoteIds:tvdbRemotes, status:statusIn,
-         seasons:seasonsIn} 
-            = extResObj.data;
+         seasons:seasonsIn} = data;
   const status   = statusIn.name; // e.g. Ended
   let numSeasons = 0;
   seasonsIn.forEach((season) => {

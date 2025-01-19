@@ -1,0 +1,805 @@
+{
+    "status": "success",
+    "data": {
+        "id": 423023,
+        "name": "Wedding Season",
+        "slug": "wedding-season-2022",
+        "image": "https://artworks.thetvdb.com/banners/v4/series/423023/posters/648f1018c50fc.jpg",
+        "nameTranslations": [
+            "eng",
+            "fra",
+            "spa",
+            "por",
+            "deu",
+            "rus",
+            "pt",
+            "fin"
+        ],
+        "overviewTranslations": [
+            "eng",
+            "fra",
+            "spa",
+            "por",
+            "deu",
+            "rus",
+            "pt",
+            "fin"
+        ],
+        "aliases": [],
+        "firstAired": "2022-09-08",
+        "lastAired": "2022-09-08",
+        "nextAired": "",
+        "score": 10547,
+        "status": {
+            "id": 2,
+            "name": "Ended",
+            "recordType": "series",
+            "keepUpdated": false
+        },
+        "originalCountry": "gbr",
+        "originalLanguage": "eng",
+        "defaultSeasonType": 1,
+        "isOrderRandomized": false,
+        "lastUpdated": "2024-01-17 13:48:32",
+        "averageRuntime": 36,
+        "episodes": null,
+        "overview": "Katie and Stefan fall in love with each other after they meet at a wedding. Bliss is nice but Katie is already engaged to be married, but their affair kicks off anyway. Katie’s wedding comes two months later, but her fiancé, and now new husband, and his entire family are murdered at the event. Both lovers blame each other for the incident and soon the law is already after the truth as the police come in. The search to unearth the truth begins.",
+        "year": "2022",
+        "artworks": [
+            {
+                "id": 63536208,
+                "image": "https://artworks.thetvdb.com/banners/v4/series/423023/backgrounds/648f110a47f21.jpg",
+                "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/423023/backgrounds/648f110a47f21_t.jpg",
+                "language": null,
+                "type": 3,
+                "score": 100000,
+                "width": 1920,
+                "height": 1080,
+                "includesText": false,
+                "thumbnailWidth": 0,
+                "thumbnailHeight": 0,
+                "updatedAt": 0,
+                "status": {
+                    "id": 0,
+                    "name": null
+                },
+                "tagOptions": null
+            },
+            {
+                "id": 63192913,
+                "image": "https://artworks.thetvdb.com/banners/v4/series/423023/backgrounds/631ca3ba9d445.jpg",
+                "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/423023/backgrounds/631ca3ba9d445_t.jpg",
+                "language": null,
+                "type": 3,
+                "score": 100000,
+                "width": 1920,
+                "height": 1080,
+                "includesText": false,
+                "thumbnailWidth": 0,
+                "thumbnailHeight": 0,
+                "updatedAt": 0,
+                "status": {
+                    "id": 0,
+                    "name": null
+                },
+                "tagOptions": null
+            },
+            {
+                "id": 63536209,
+                "image": "https://artworks.thetvdb.com/banners/v4/series/423023/backgrounds/648f111dbc777.jpg",
+                "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/423023/backgrounds/648f111dbc777_t.jpg",
+                "language": null,
+                "type": 3,
+                "score": 100000,
+                "width": 1920,
+                "height": 1080,
+                "includesText": false,
+                "thumbnailWidth": 0,
+                "thumbnailHeight": 0,
+                "updatedAt": 0,
+                "status": {
+                    "id": 0,
+                    "name": null
+                },
+                "tagOptions": null
+            },
+            {
+                "id": 63192914,
+                "image": "https://artworks.thetvdb.com/banners/v4/series/423023/backgrounds/631ca3cc6b85d.jpg",
+                "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/423023/backgrounds/631ca3cc6b85d_t.jpg",
+                "language": null,
+                "type": 3,
+                "score": 100000,
+                "width": 1920,
+                "height": 1080,
+                "includesText": false,
+                "thumbnailWidth": 0,
+                "thumbnailHeight": 0,
+                "updatedAt": 0,
+                "status": {
+                    "id": 0,
+                    "name": null
+                },
+                "tagOptions": null
+            },
+            {
+                "id": 63153336,
+                "image": "https://artworks.thetvdb.com/banners/v4/series/423023/backgrounds/62e9bb53b7cbc.jpg",
+                "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/423023/backgrounds/62e9bb53b7cbc_t.jpg",
+                "language": null,
+                "type": 3,
+                "score": 100000,
+                "width": 1920,
+                "height": 1080,
+                "includesText": false,
+                "thumbnailWidth": 0,
+                "thumbnailHeight": 0,
+                "updatedAt": 0,
+                "status": {
+                    "id": 0,
+                    "name": null
+                },
+                "tagOptions": null
+            },
+            {
+                "id": 63184475,
+                "image": "https://artworks.thetvdb.com/banners/v4/series/423023/posters/6311e9e0aba99.jpg",
+                "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/423023/posters/6311e9e0aba99_t.jpg",
+                "language": "eng",
+                "type": 2,
+                "score": 100000,
+                "width": 680,
+                "height": 1000,
+                "includesText": true,
+                "thumbnailWidth": 0,
+                "thumbnailHeight": 0,
+                "updatedAt": 0,
+                "status": {
+                    "id": 0,
+                    "name": null
+                },
+                "tagOptions": null
+            },
+            {
+                "id": 63190668,
+                "image": "https://artworks.thetvdb.com/banners/v4/series/423023/banners/63194a609017c.jpg",
+                "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/423023/banners/63194a609017c_t.jpg",
+                "language": "eng",
+                "type": 1,
+                "score": 100000,
+                "width": 758,
+                "height": 140,
+                "includesText": true,
+                "thumbnailWidth": 0,
+                "thumbnailHeight": 0,
+                "updatedAt": 0,
+                "status": {
+                    "id": 0,
+                    "name": null
+                },
+                "tagOptions": null
+            },
+            {
+                "id": 63536204,
+                "image": "https://artworks.thetvdb.com/banners/v4/series/423023/posters/648f1018c50fc.jpg",
+                "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/423023/posters/648f1018c50fc_t.jpg",
+                "language": "pt",
+                "type": 2,
+                "score": 0,
+                "width": 680,
+                "height": 1000,
+                "includesText": true,
+                "thumbnailWidth": 0,
+                "thumbnailHeight": 0,
+                "updatedAt": 0,
+                "status": {
+                    "id": 0,
+                    "name": null
+                },
+                "tagOptions": null
+            }
+        ],
+        "companies": [
+            {
+                "id": 1293,
+                "name": "Disney+",
+                "slug": "disney-plus",
+                "nameTranslations": [
+                    "ara",
+                    "eng",
+                    "fra",
+                    "heb",
+                    "hun",
+                    "nld",
+                    "spa"
+                ],
+                "overviewTranslations": [
+                    "eng",
+                    "fra",
+                    "hun",
+                    "spa"
+                ],
+                "aliases": [
+                    {
+                        "language": "spa",
+                        "name": "Disney Plus"
+                    },
+                    {
+                        "language": "heb",
+                        "name": "דיסני פלוס"
+                    },
+                    {
+                        "language": "ara",
+                        "name": "ديزني بلس"
+                    },
+                    {
+                        "language": "eng",
+                        "name": "Disney Plus"
+                    },
+                    {
+                        "language": "eng",
+                        "name": "DSNP"
+                    },
+                    {
+                        "language": "eng",
+                        "name": "Disney+ Star"
+                    },
+                    {
+                        "language": "eng",
+                        "name": "Star"
+                    }
+                ],
+                "country": "usa",
+                "primaryCompanyType": 1,
+                "activeDate": "2019-11-12",
+                "inactiveDate": null,
+                "companyType": {
+                    "companyTypeId": 1,
+                    "companyTypeName": "Network"
+                },
+                "parentCompany": {
+                    "id": 45764,
+                    "name": "Walt Disney Company",
+                    "relation": {
+                        "id": null,
+                        "typeName": null
+                    }
+                },
+                "tagOptions": null
+            }
+        ],
+        "originalNetwork": {
+            "id": 1293,
+            "name": "Disney+",
+            "slug": "disney-plus",
+            "nameTranslations": [
+                "ara",
+                "eng",
+                "fra",
+                "heb",
+                "hun",
+                "nld",
+                "spa"
+            ],
+            "overviewTranslations": [
+                "eng",
+                "fra",
+                "hun",
+                "spa"
+            ],
+            "aliases": [
+                {
+                    "language": "spa",
+                    "name": "Disney Plus"
+                },
+                {
+                    "language": "heb",
+                    "name": "דיסני פלוס"
+                },
+                {
+                    "language": "ara",
+                    "name": "ديزني بلس"
+                },
+                {
+                    "language": "eng",
+                    "name": "Disney Plus"
+                },
+                {
+                    "language": "eng",
+                    "name": "DSNP"
+                },
+                {
+                    "language": "eng",
+                    "name": "Disney+ Star"
+                },
+                {
+                    "language": "eng",
+                    "name": "Star"
+                }
+            ],
+            "country": "usa",
+            "primaryCompanyType": 1,
+            "activeDate": "2019-11-12",
+            "inactiveDate": null,
+            "companyType": {
+                "companyTypeId": 1,
+                "companyTypeName": "Network"
+            },
+            "parentCompany": {
+                "id": 45764,
+                "name": "Walt Disney Company",
+                "relation": {
+                    "id": null,
+                    "typeName": null
+                }
+            },
+            "tagOptions": [
+                {
+                    "id": 489,
+                    "tag": 24,
+                    "tagName": "Company Type",
+                    "name": "SVOD",
+                    "helpText": "Subscription video on demand. Examples: Netflix Amazon Prime Video, Disney+."
+                }
+            ]
+        },
+        "latestNetwork": {
+            "id": 1293,
+            "name": "Disney+",
+            "slug": "disney-plus",
+            "nameTranslations": [
+                "ara",
+                "eng",
+                "fra",
+                "heb",
+                "hun",
+                "nld",
+                "spa"
+            ],
+            "overviewTranslations": [
+                "eng",
+                "fra",
+                "hun",
+                "spa"
+            ],
+            "aliases": [
+                {
+                    "language": "spa",
+                    "name": "Disney Plus"
+                },
+                {
+                    "language": "heb",
+                    "name": "דיסני פלוס"
+                },
+                {
+                    "language": "ara",
+                    "name": "ديزني بلس"
+                },
+                {
+                    "language": "eng",
+                    "name": "Disney Plus"
+                },
+                {
+                    "language": "eng",
+                    "name": "DSNP"
+                },
+                {
+                    "language": "eng",
+                    "name": "Disney+ Star"
+                },
+                {
+                    "language": "eng",
+                    "name": "Star"
+                }
+            ],
+            "country": "usa",
+            "primaryCompanyType": 1,
+            "activeDate": "2019-11-12",
+            "inactiveDate": null,
+            "companyType": {
+                "companyTypeId": 1,
+                "companyTypeName": "Network"
+            },
+            "parentCompany": {
+                "id": 45764,
+                "name": "Walt Disney Company",
+                "relation": {
+                    "id": null,
+                    "typeName": null
+                }
+            },
+            "tagOptions": [
+                {
+                    "id": 489,
+                    "tag": 24,
+                    "tagName": "Company Type",
+                    "name": "SVOD",
+                    "helpText": "Subscription video on demand. Examples: Netflix Amazon Prime Video, Disney+."
+                }
+            ]
+        },
+        "genres": [
+            {
+                "id": 15,
+                "name": "Comedy",
+                "slug": "comedy"
+            },
+            {
+                "id": 24,
+                "name": "Thriller",
+                "slug": "thriller"
+            },
+            {
+                "id": 28,
+                "name": "Romance",
+                "slug": "romance"
+            }
+        ],
+        "trailers": [
+            {
+                "id": 168627,
+                "name": "Trailer",
+                "url": "https://www.youtube.com/watch?v=pSUBbIpfc0o",
+                "language": "eng",
+                "runtime": 0
+            },
+            {
+                "id": 168628,
+                "name": "Trailer",
+                "url": "https://www.youtube.com/watch?v=jzyog9osaoI",
+                "language": "fra",
+                "runtime": 0
+            }
+        ],
+        "lists": [],
+        "remoteIds": [
+            {
+                "id": "tt15114768",
+                "type": 2,
+                "sourceName": "IMDB"
+            },
+            {
+                "id": "131836",
+                "type": 12,
+                "sourceName": "TheMovieDB.com"
+            }
+        ],
+        "characters": [
+            {
+                "id": 68754889,
+                "name": "Stefan",
+                "peopleId": 514927,
+                "seriesId": 423023,
+                "series": null,
+                "movie": null,
+                "movieId": null,
+                "episodeId": null,
+                "type": 3,
+                "image": null,
+                "sort": 0,
+                "isFeatured": true,
+                "url": "https://thetvdb.com/people/514927-gavin-drea",
+                "nameTranslations": null,
+                "overviewTranslations": null,
+                "aliases": null,
+                "peopleType": "Actor",
+                "personName": "Gavin Drea",
+                "tagOptions": null,
+                "personImgURL": null
+            },
+            {
+                "id": 68754890,
+                "name": "Katie",
+                "peopleId": 472219,
+                "seriesId": 423023,
+                "series": null,
+                "movie": null,
+                "movieId": null,
+                "episodeId": null,
+                "type": 3,
+                "image": null,
+                "sort": 0,
+                "isFeatured": true,
+                "url": "https://thetvdb.com/people/472219-rosa-salazar",
+                "nameTranslations": null,
+                "overviewTranslations": null,
+                "aliases": null,
+                "peopleType": "Actor",
+                "personName": "Rosa Salazar",
+                "tagOptions": null,
+                "personImgURL": "https://artworks.thetvdb.com/banners/person/472219/primary.jpg"
+            },
+            {
+                "id": 68807094,
+                "name": "Anil",
+                "peopleId": 8332138,
+                "seriesId": 423023,
+                "series": null,
+                "movie": null,
+                "movieId": null,
+                "episodeId": null,
+                "type": 3,
+                "image": null,
+                "sort": 0,
+                "isFeatured": true,
+                "url": "https://thetvdb.com/people/8332138-bhav-joshi",
+                "nameTranslations": null,
+                "overviewTranslations": null,
+                "aliases": null,
+                "peopleType": "Actor",
+                "personName": "Bhav Joshi",
+                "tagOptions": null,
+                "personImgURL": "https://artworks.thetvdb.com/banners/v4/actor/8332138/photo/637dcb1724b55.jpg"
+            },
+            {
+                "id": 68807095,
+                "name": "Leila",
+                "peopleId": 9088874,
+                "seriesId": 423023,
+                "series": null,
+                "movie": null,
+                "movieId": null,
+                "episodeId": null,
+                "type": 3,
+                "image": null,
+                "sort": 0,
+                "isFeatured": false,
+                "url": "https://thetvdb.com/people/9088874-callie-cooke",
+                "nameTranslations": null,
+                "overviewTranslations": null,
+                "aliases": null,
+                "peopleType": "Actor",
+                "personName": "Callie Cooke",
+                "tagOptions": null,
+                "personImgURL": "https://artworks.thetvdb.com/banners/v4/actor/9088874/photo/6202f4742ac8e.jpg"
+            },
+            {
+                "id": 68807096,
+                "name": "Suji",
+                "peopleId": 9096084,
+                "seriesId": 423023,
+                "series": null,
+                "movie": null,
+                "movieId": null,
+                "episodeId": null,
+                "type": 3,
+                "image": null,
+                "sort": 0,
+                "isFeatured": false,
+                "url": "https://thetvdb.com/people/9096084-ioanna-kimbook",
+                "nameTranslations": null,
+                "overviewTranslations": null,
+                "aliases": null,
+                "peopleType": "Actor",
+                "personName": "Ioanna Kimbook",
+                "tagOptions": null,
+                "personImgURL": null
+            },
+            {
+                "id": 68807097,
+                "name": "Donahue",
+                "peopleId": 350611,
+                "seriesId": 423023,
+                "series": null,
+                "movie": null,
+                "movieId": null,
+                "episodeId": null,
+                "type": 3,
+                "image": null,
+                "sort": 0,
+                "isFeatured": false,
+                "url": "https://thetvdb.com/people/350611-jamie-michie",
+                "nameTranslations": null,
+                "overviewTranslations": null,
+                "aliases": null,
+                "peopleType": "Actor",
+                "personName": "Jamie Michie",
+                "tagOptions": null,
+                "personImgURL": "https://artworks.thetvdb.com/banners/v4/actor/350611/photo/648f119fafdfc.jpg"
+            },
+            {
+                "id": 68807098,
+                "name": "Hugo Delaney",
+                "peopleId": 8078544,
+                "seriesId": 423023,
+                "series": null,
+                "movie": null,
+                "movieId": null,
+                "episodeId": null,
+                "type": 3,
+                "image": null,
+                "sort": 0,
+                "isFeatured": false,
+                "url": "https://thetvdb.com/people/8078544-george-webster",
+                "nameTranslations": null,
+                "overviewTranslations": null,
+                "aliases": null,
+                "peopleType": "Actor",
+                "personName": "George Webster",
+                "tagOptions": null,
+                "personImgURL": "https://artworks.thetvdb.com/banners/v4/actor/8078544/photo/66f61302d523d.jpg"
+            },
+            {
+                "id": 68807103,
+                "name": "Mr. Delaney",
+                "peopleId": 406476,
+                "seriesId": 423023,
+                "series": null,
+                "movie": null,
+                "movieId": null,
+                "episodeId": null,
+                "type": 3,
+                "image": null,
+                "sort": 0,
+                "isFeatured": false,
+                "url": "https://thetvdb.com/people/406476-ivan-kaye",
+                "nameTranslations": null,
+                "overviewTranslations": null,
+                "aliases": null,
+                "peopleType": "Actor",
+                "personName": "Ivan Kaye",
+                "tagOptions": null,
+                "personImgURL": "https://artworks.thetvdb.com/banners/v4/actor/406476/photo/64da6c8f138d1.jpg"
+            },
+            {
+                "id": 68807104,
+                "name": "Conrad Lennox",
+                "peopleId": 490074,
+                "seriesId": 423023,
+                "series": null,
+                "movie": null,
+                "movieId": null,
+                "episodeId": null,
+                "type": 3,
+                "image": null,
+                "sort": 0,
+                "isFeatured": false,
+                "url": "https://thetvdb.com/people/490074-richard-gadd",
+                "nameTranslations": null,
+                "overviewTranslations": null,
+                "aliases": null,
+                "peopleType": "Actor",
+                "personName": "Richard Gadd",
+                "tagOptions": null,
+                "personImgURL": "https://artworks.thetvdb.com/banners/v4/actor/490074/photo/638fb1b22b58e.jpg"
+            },
+            {
+                "id": 68807106,
+                "name": "Metts",
+                "peopleId": 9103233,
+                "seriesId": 423023,
+                "series": null,
+                "movie": null,
+                "movieId": null,
+                "episodeId": null,
+                "type": 3,
+                "image": null,
+                "sort": 0,
+                "isFeatured": false,
+                "url": "https://thetvdb.com/people/9103233-jade-harrisson",
+                "nameTranslations": null,
+                "overviewTranslations": null,
+                "aliases": null,
+                "peopleType": "Actor",
+                "personName": "Jade Harrisson",
+                "tagOptions": null,
+                "personImgURL": "https://artworks.thetvdb.com/banners/v4/actor/9103233/photo/648f11fb4a921.jpg"
+            },
+            {
+                "id": 68807107,
+                "name": "Jackson",
+                "peopleId": 9103234,
+                "seriesId": 423023,
+                "series": null,
+                "movie": null,
+                "movieId": null,
+                "episodeId": null,
+                "type": 3,
+                "image": null,
+                "sort": 0,
+                "isFeatured": false,
+                "url": "https://thetvdb.com/people/9103234-omar-baroud",
+                "nameTranslations": null,
+                "overviewTranslations": null,
+                "aliases": null,
+                "peopleType": "Actor",
+                "personName": "Omar Baroud",
+                "tagOptions": null,
+                "personImgURL": null
+            }
+        ],
+        "airsDays": {
+            "sunday": false,
+            "monday": false,
+            "tuesday": false,
+            "wednesday": false,
+            "thursday": true,
+            "friday": false,
+            "saturday": false
+        },
+        "airsTime": "03:00",
+        "seasons": [
+            {
+                "id": 2012570,
+                "seriesId": 423023,
+                "type": {
+                    "id": 1,
+                    "name": "Aired Order",
+                    "type": "official",
+                    "alternateName": null
+                },
+                "number": 0,
+                "nameTranslations": [],
+                "overviewTranslations": [],
+                "companies": {
+                    "studio": null,
+                    "network": null,
+                    "production": null,
+                    "distributor": null,
+                    "special_effects": null
+                },
+                "lastUpdated": "2022-08-02 23:47:09"
+            },
+            {
+                "id": 2012571,
+                "seriesId": 423023,
+                "type": {
+                    "id": 1,
+                    "name": "Aired Order",
+                    "type": "official",
+                    "alternateName": null
+                },
+                "number": 1,
+                "nameTranslations": [],
+                "overviewTranslations": [
+                    "por,pt,spa"
+                ],
+                "companies": {
+                    "studio": null,
+                    "network": null,
+                    "production": null,
+                    "distributor": null,
+                    "special_effects": null
+                },
+                "lastUpdated": "2023-04-01 19:45:11"
+            },
+            {
+                "id": 2012572,
+                "seriesId": 423023,
+                "type": {
+                    "id": 3,
+                    "name": "Absolute Order",
+                    "type": "absolute",
+                    "alternateName": null
+                },
+                "number": 1,
+                "nameTranslations": [],
+                "overviewTranslations": [],
+                "companies": {
+                    "studio": null,
+                    "network": null,
+                    "production": null,
+                    "distributor": null,
+                    "special_effects": null
+                },
+                "lastUpdated": "2022-08-02 23:47:10"
+            }
+        ],
+        "tags": null,
+        "contentRatings": [],
+        "seasonTypes": [
+            {
+                "id": 1,
+                "name": "Aired Order",
+                "type": "official",
+                "alternateName": null
+            },
+            {
+                "id": 3,
+                "name": "Absolute Order",
+                "type": "absolute",
+                "alternateName": null
+            }
+        ]
+    }
+}

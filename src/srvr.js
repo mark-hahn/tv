@@ -127,6 +127,7 @@ export async function deleteShowFromSrvr(show) {
   await delRemotes(show.Name);
   await deletePath(show.Path);
   // don't ever delete from rejects
+  // don't ever delete from tvdb
   console.log("deleted show from server:", show.Name);
 }
 

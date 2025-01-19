@@ -1,5 +1,0 @@
-
-templates:
-  tv:
-    regexp:
-      reject:

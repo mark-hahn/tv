@@ -441,11 +441,12 @@ const delGap = async (id, gapIdSave, resolve, _reject) => {
 
 const getTvdb = (id, name, resolve, _reject) => {
   console.log('getTvdb', id, name);
-  if(!allTvdb[name]) {
+  const allTvdbName = allTvdb[name];
+  if(!allTvdbName) {
     resolve([id, {noMatch: true}]);
     return
   }
-  resolve([id, allTvdb[name]]);
+  resolve([id, allTvdbName]);
 };
 
 const addTvdb = async (id, tvdbDataStr, resolve, reject) => {

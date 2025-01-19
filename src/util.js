@@ -191,7 +191,23 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.pickup   =  0;
       tmp.hasemby  =  1;
       break;
-
+      
+    case 'Download': 
+      tmp.unplayed =  0;
+      tmp.gap      =  1;
+      tmp.waiting  =  0;
+      tmp.drama    =  0;
+      tmp.foreign  =  0;
+      tmp.totry    = -1;
+      tmp.continue =  0;
+      tmp.mark     =  0;
+      tmp.linda    =  0;
+      tmp.favorite =  1;
+      tmp.ban      = -1;
+      tmp.pickup   =  0;
+      tmp.hasemby  =  1;
+      break;
+      
     case 'Mark': 
       tmp.unplayed =  1;
       tmp.gap      =  0;

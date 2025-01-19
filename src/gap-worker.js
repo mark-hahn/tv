@@ -99,6 +99,10 @@ const getShowState = async (showId, _showName) => {
           watchGap = true;
         }
 
+        if(!haveFile && !watched && !unaired) 
+             fileEndCount++;
+        else fileEndCount = 0;
+
         haveFileShow ||= haveFile;
         if(haveFileShow && !haveFile)
           noFileAfterFile = true;

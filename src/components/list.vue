@@ -449,8 +449,8 @@ export default {
       sortChoice: 'Viewed', 
       fltrPopped:  false,
       fltrChoices:          
-        ['All', 'Ready', 'Drama', 'To-Try', 'Try Drama', 
-                            'Continue', 'Mark', 'Linda'],
+        ['All', 'Ready', 'Drama', 'To-Try', 
+         'Try Drama', 'Continue', 'Download', 'Mark', 'Linda'],
       fltrChoice:      'All',  
       showingSrchList:  false,
       searchList:       null,        
@@ -938,8 +938,8 @@ export default {
       const show = allShows.find((show) => show.Id == showId);
       if(!show) return;
 
-      if(seasonWatchedThenNofile)
-        console.log('seasonWatchedThenNofile', show.Name);
+      // if(fileEndError)
+      //   console.log('fileEndError', show.Name);
 
       if(anyWatched && show.InToTry) {
         show.InToTry = false;

@@ -261,7 +261,7 @@ import    evtBus from '../evtBus.js';
 
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library }         from "@fortawesome/fontawesome-svg-core";
-import { faLaughBeam, faSadCry, faHeart, faClock, faSmileWink } 
+import { faLaughBeam, faSadCry, faHeart, faClock } 
                            from "@fortawesome/free-regular-svg-icons"; 
 import { faCheck, faPlus, faMinus, faArrowDown, faArrowRight,
          faTv, faSearch, faQuestion, faCopy, faBorderAll, faBan,
@@ -698,7 +698,7 @@ export default {
       const showName = show.Name;
       if(showHistoryPtr == -1 ||
            showName != showHistory[showHistoryPtr].Name) {
-        console.log("adding show to history:", showName);
+        // console.log("adding show to history:", showName);
         showHistory.push(show);
         showHistoryPtr = showHistory.length - 1;
         // showHistory = showHistory.slice(0, showHistoryPtr+1);

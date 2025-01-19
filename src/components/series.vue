@@ -110,107 +110,35 @@ export default {
       }, 1000);
     },
 
-    async setPoster() {
-      let srvrPath;
-      let imgIdx;
+    async setPoster(tvdbShowData) {
       const img = new Image();
       img.style.maxWidth  = "300px"; 
       img.style.maxHeight = "400px"; 
-
-      const show = this.show;
-      if(show.ThumbNail) {
-        img.src = show.ThumbNail;
-        document.getElementById('poster').replaceChildren(img);
-        return;
-      }
-      let showPath = show.Path;
-      const srvrImages = 
-         ['/poster.jpg', '/landscape.jpg', '/clearlogo.png'];
-      let embyImages = [];
-      if(!show.Id.startsWith('noemby-')) {
-        embyImages = [
-            `https://hahnca.com:8920/emby/Items/${show.Id}` +
-              `/Images/Primary?tag=${show.ImageTags.Primary}` +
-              `&keepAnimation=true&quality=90`,
-
-            `https://hahnca.com:8920/emby/Items/${show.Id}` +
-              `/Images/Backdrop/0?`+
-              `tag=${show.BackdropImageTags[0]}&quality=70`
-          ];
-      }
-
-      const trySrvrImg = () => {
-        try {
-          img.src = 'https://hahnca.com/tv/' +
-                      encodeURI(srvrPath) + srvrImages[imgIdx]; 
-        }
-        catch(err) {
-          console.log('Series: srvr img err:',  img.src);
-          return false;
-        }
-        return true;
-      }
-
-      const tryEmbyImg = () => {
-        try {
-          img.src = embyImages[imgIdx-srvrImages.length]; 
-        } 
-        catch(err) {
-          console.log('Series: emby img err:',  img.src);
-          return false;
-        }
-        return true;
-      }
       
-      if(showPath) {
-        srvrPath = showPath.split('/').pop();
-        imgIdx = 0;
-        trySrvrImg();
+      if(tvdbShowData.image) {
+        img.src = tvdbShowData.image;
+      } else {
+        console.error('image missing from tvdbShowData',
+                       tvdbShowData);
+        img.src = './question-mark.png';
       }
-      else {
-        imgIdx = srvrImages.length - 1;
-        tryEmbyImg();
-      }
-      img.onload = () => {
-        // console.log('Series showing img:',  img.src);
-        document.getElementById('poster').replaceChildren(img);
-      };
-      img.onerror = () => {
-        // console.log('Series no img:', img.src);
-        if(++imgIdx < srvrImages.length) {
-          if(!trySrvrImg()) return;
-        }
-        else if(++imgIdx < srvrImages.length + 
-                           embyImages.length) {
-          if(!tryEmbyImg()) return;
-        }
-        else {
-          img.src = 'https://hahnca.com/tv/no-image-icon-23485.png'; 
-          // console.log( `Series default img: ` + img.src);
-          return;
-        }
-      };
+      document.getElementById('poster').replaceChildren(img);
     },
 
-    async setDates() {
+    async setDates(tvdbShowData) {
       const show = this.show;
-      const tvdbShowData = await tvdb.getTvdbData(show);
-      if(!tvdbShowData) {
-        this.dates = '';
-        return;
-      }
       const {firstAired, lastAired, status} = tvdbShowData;
       this.dates = ' &nbsp; '      + firstAired + 
                     '&nbsp;&nbsp;' + lastAired +
                     '&nbsp; '      + status + ' &nbsp; ';
     },
 
-    async setSeasonsTxt() {
+    async setSeasonsTxt(tvdbShowData) {
       this.seasonsTxt = ``;
       if(this.show.Id.startsWith('noemby-')) return;
       const show = this.show;
-      const {seasonCount, episodeCount, watchedCount} = 
-                await emby.getEpisodeCounts(show);
+      const {seasonCount, episodeCount, 
+             watchedCount} = tvdbShowData;
       let seasonsTxt = '';
       switch (seasonCount) {
         case 0:  
@@ -231,11 +159,9 @@ export default {
       this.seasonsTxt = ' &nbsp; ' + seasonsTxt + watchedTxt;
     },
 
-    async setCntryLangTxt() {
+    async setCntryLangTxt(tvdbShowData) {
       this.cntryLangTxt = ``;
-      const orig = await tvdb.getTvdbData(this.show);
-      if(!orig) return;
-      let {originalCountry, originalLanguage} = orig;
+      let {originalCountry, originalLanguage} = tvdbShowData;
       if(originalCountry == 'gbr') originalCountry = 'UK';
       this.cntryLangTxt = 
         ` &nbsp; Country: ${originalCountry.toUpperCase()} &nbsp;` +
@@ -320,10 +246,11 @@ export default {
   mounted() {
     evtBus.on('setUpSeries', async (show) => { 
       this.show = show;
-      await this.setPoster();
-      await this.setDates();
-      await this.setSeasonsTxt();
-      await this.setCntryLangTxt();
+      const tvdbShowData = await tvdb.getTvdbData(show);
+      await this.setPoster(tvdbShowData);
+      await this.setDates(tvdbShowData);
+      await this.setSeasonsTxt(tvdbShowData);
+      await this.setCntryLangTxt(tvdbShowData);
       await this.setNextWatch();
       await this.setRemotes();
     });

@@ -179,7 +179,7 @@ export default {
       this.cntryLangTxt = 
         ` &nbsp; ${originalCountry.toUpperCase()} / ` +
                 `${originalLanguage.toUpperCase()}`   +
-        ` &nbsp; ${originalNetwork.toUpperCase()}`    +
+        ` &nbsp; ${originalNetwork}`    +
         ` &nbsp; ${averageRuntime 
                   ? ' ' + averageRuntime + ' mins'
                   : ''}` 

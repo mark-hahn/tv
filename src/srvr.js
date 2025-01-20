@@ -53,19 +53,10 @@ let   clint      = null;
 //   }, 5000);
 // }
 
-const fCall = (fname, param, sema4) => {
-  if(sema4) { 
-    const callIdx = calls.findIndex(
-                            call => call.sema4 == sema4);
-    if(callIdx > -1) {
-      fCallQueue.push({fname, param, sema4});
-      // console.log("queued:", fname);
-      return;
-    }
-  }
+const fCall = (fname, param) => {
   const id = ++nextId;
   const promise = new Promise((resolve, reject) => {
-    calls.push({id, fname, resolve, reject, sema4});
+    calls.push({id, fname, resolve, reject});
   });
   if(typeof param == 'object') 
         param = JSON.stringify(param);
@@ -100,7 +91,7 @@ handleMsg = (msg) => {
   }
   const call = calls[callIdx];
   calls.splice(callIdx, 1);
-  const {fname, resolve, reject, sema4} = call;
+  const {fname, resolve, reject} = call;
   try {
     // console.log("parsing ws result:", {id, result});
     const res = JSON.parse(result);
@@ -110,14 +101,6 @@ handleMsg = (msg) => {
   catch(err) {
     console.error("parsing ws result:", {id, result, err});
   }
-  
-  const queuelIdx = fCallQueue.findIndex(
-                      entry => entry.sema4 == sema4);
-  if(queuelIdx < 0) return;
-  // console.log("dequeuing:", fname);
-  const entry = fCallQueue[queuelIdx];
-  fCallQueue.splice(queuelIdx, 1);
-  fCall(entry.fname, entry.param, entry.sema4);
 }
 
 export async function deleteShowFromSrvr(show) {
@@ -145,62 +128,62 @@ export function getAllShows()
 export function getBlockedWaits()        
             {return fCall('getBlockedWaits')}
 export function addBlockedWait(name)        
-            {return fCall('addBlockedWait', name, 'wait')}
+            {return fCall('addBlockedWait', name)}
 export function delBlockedWait(name)  
-            {return fCall('delBlockedWait', name, 'wait')}
+            {return fCall('delBlockedWait', name)}
 
 export function getBlockedGaps()        
             {return fCall('getBlockedGaps')}
 export function addBlockedGap(name)        
-            {return fCall('addBlockedGap', name, 'gap')}
+            {return fCall('addBlockedGap', name)}
 export function delBlockedGap(name)  
-            {return fCall('delBlockedGap', name, 'gap')}
+            {return fCall('delBlockedGap', name)}
 
 export function getRejects()       
             {return fCall('getRejects')}
 export function addReject(name)    
-            {return fCall('addReject', name, 'rej')}
+            {return fCall('addReject', name)}
 export function delReject(name)    
-            {return fCall('delReject', name, 'rej')}
+            {return fCall('delReject', name)}
 
 export function getPickups()       
             {return fCall('getPickups')}
 export function addPickup(name)    
-            {return fCall('addPickup', name, 'pkup')}
+            {return fCall('addPickup', name)}
 export function delPickup(name)    
-            {return fCall('delPickup', name, 'pkup')}
+            {return fCall('delPickup', name)}
             
 export function getNoEmbys()       
             {return fCall('getNoEmbys')}
 export function addNoEmby(show)    
-            {return fCall('addNoEmby', show, 'noemby')}
+            {return fCall('addNoEmby', show)}
 export function delNoEmby(name)    
-            {return fCall('delNoEmby', name, 'noemby')}
+            {return fCall('delNoEmby', name)}
 
 export function getGaps()       
             {return fCall('getGaps')}
 export function addGap(gapIdGapSave)    
-            {return fCall('addGap', gapIdGapSave, 'gap')}
+            {return fCall('addGap', gapIdGapSave)}
 export function delGap(gapIdSave)    
-            {return fCall('delGap', gapIdSave, 'gap')}
+            {return fCall('delGap', gapIdSave)}
 
 export function getTvdbNames()    
-            {return fCall('getTvdbNames',  '', 'tvdb')}
+            {return fCall('getTvdbNames',  '')}
 export function getTvdb(name)      
-            {return fCall('getTvdb',     name, 'tvdb')}
+            {return fCall('getTvdb',     name)}
 export function addTvdb(tvdbData)    
-            {return fCall('addTvdb', tvdbData, 'tvdb')}
+            {return fCall('addTvdb', tvdbData)}
 
 export function getRemotes(name)    
-            {return fCall('getRemotes', name,     'remotes')}
+            {return fCall('getRemotes', name)}
 export function addRemotes(nameRems)    
-            {return fCall('addRemotes',  nameRems, 'remotes')}
+            {return fCall('addRemotes', nameRems)}
 export function delRemotes(name)    
-            {return fCall('delRemotes',  name,     'remotes')}
+            {return fCall('delRemotes', name)}
             
 export function deletePath(path)   
-            {return fCall('deletePath', path, 'deletePath')}
+            {return fCall('deletePath', path)}
 
 export function getUrls(typeUrlName)   
-            {return fCall('getUrls', typeUrlName, 'getUrls')}
+            {return fCall('getUrls', typeUrlName)}
 

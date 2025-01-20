@@ -64,6 +64,8 @@ export async function loadAllShows(gapCache) {
                        waitPromise, blkGapPromise, 
                        rejPromise, pkupPromise,
                        noEmbyPromise, gapPromise, allTvPromise]);
+  tvdb.initAllTvdb(allTvdb);
+  
   const shows = [];
 
 ////////// get shows from emby ////////////

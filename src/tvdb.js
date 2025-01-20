@@ -5,9 +5,14 @@ import * as emby from "./emby.js";
 
 let showErr      = null;
 let theTvdbToken = null;
+let allTvdb      = null;
 
 export const init = (showErrIn) => {
   showErr = showErrIn;
+}
+
+export const initAllTvdb = (allTvdbIn) => {
+  allTvdb = allTvdbIn;
 }
 
 ///////////// get api token //////////////
@@ -185,14 +190,9 @@ export const getTvdbData = async (show) => {
   }
   const tvdbId = show.TvdbId;
   
-  let tvdbData = await srvr.getTvdb(name);
-  if(tvdbData && !tvdbData.noMatch) {
-    // console.log("getTvdbData, from cache:", {nameIn});
-    const twoDays = 48*60*60*1000;
-    if ((Date.now() - tvdbData.saved) < 
-        (twoDays + Math.round(Math.random() * twoDays))) {
+  let tvdbData = allTvdb[name];
+  if(tvdbData) {
       return tvdbData;
-    }
   }
 
   if(!theTvdbToken) await getToken();
@@ -241,6 +241,8 @@ export const getTvdbData = async (show) => {
                tvdbRemotes, status};
 
   srvr.addTvdb(JSON.stringify(tvdbData));
+  allTvdb[name] = tvdbData;
+
   // console.log('getTvdbData:', {tvdbData});
   return tvdbData;
 }

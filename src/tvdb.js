@@ -218,36 +218,28 @@ export const getTvdbData = async (show) => {
   }
   const {seasonCount, episodeCount, watchedCount} = 
               await emby.getEpisodeCounts(show);
-  const data = (await extRes.json()).data;
-
-  // if(data.name == 'Until I Kill You') 
-  //   console.error(`getTvdbData`, data);
-
-  const artworks = data.artworks;
-  let image = null;
-  for (const artwork of artworks) {
-    if(artwork.language == "eng") {
-      image = artwork.thumbnail;
-      break;
-    }
-  }
-  image = image || data.image
-  const {firstAired, lastAired, score,
+  const extResObj  = await extRes.json();
+  const {firstAired, lastAired, image, score,
          originalCountry, originalLanguage, overview,
          remoteIds:tvdbRemotes, status:statusIn,
-         seasons:seasonsIn} = data;
+         seasons:seasonsIn, averageRuntime,
+         originalNetwork:originalNetworkIn} 
+            = extResObj.data;
+  let originalNetwork = 
+    originalNetworkIn?.name || '';
   const status   = statusIn.name; // e.g. Ended
   let numSeasons = 0;
   seasonsIn.forEach((season) => {
     numSeasons = Math.max(numSeasons, +season.number);
   });
   const saved = Date.now();
-  tvdbData = { tvdbId, name, saved, 
+  tvdbData = { tvdbId, name, saved, originalNetwork,
                seasonCount, episodeCount, watchedCount,
                image, score, overview, 
-               firstAired, lastAired,
+               firstAired, lastAired, averageRuntime,
                originalCountry, originalLanguage,
                tvdbRemotes, status};
+
   srvr.addTvdb(JSON.stringify(tvdbData));
   // console.log('getTvdbData:', {tvdbData});
   return tvdbData;

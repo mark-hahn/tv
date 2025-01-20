@@ -4,6 +4,9 @@
               display:flex; flex-direction:column;
               padding:5px;`)
 
+  div(style=`text-align:center; font-weight:bold;
+            margin-bottom:20px; font-size:25px;`) {{show.Name}}
+
   #top(style=`display:flex; flex-direction:row`)
     #topLeft(@click="openMap(show)"
               style=`display:flex; flex-direction:column;
@@ -35,8 +38,6 @@
     #topRight(style=`display:flex; flex-direction:column`)
       #remotes(style=`width:200px; margin-left:20px;
                       display:flex; flex-direction:column;`) 
-        div(style=`text-align:center; font-weight:bold;
-                   margin-bottom:20px; font-size:20px;`) {{show.Name}}
         div(v-if="showSpinner")
           img(src="../../loading.gif"
               style=`width:100px; height:100px;
@@ -129,9 +130,9 @@ export default {
     async setDates(tvdbShowData) {
       const show = this.show;
       const {firstAired, lastAired, status} = tvdbShowData;
-      this.dates = ' &nbsp; '      + firstAired + 
-                    '&nbsp;&nbsp;' + lastAired +
-                    '&nbsp; '      + status + ' &nbsp; ';
+      this.dates = ' &nbsp; ' + firstAired + 
+                    '&nbsp; ' + lastAired +
+                   ' &nbsp; ' + status;
     },
 
     async setSeasonsTxt(tvdbShowData) {
@@ -162,11 +163,26 @@ export default {
 
     async setCntryLangTxt(tvdbShowData) {
       this.cntryLangTxt = ``;
-      let {originalCountry, originalLanguage} = tvdbShowData;
+      let {originalCountry, originalLanguage, 
+           averageRuntime,
+           originalNetwork} = tvdbShowData;
+           
       if(originalCountry == 'gbr') originalCountry = 'UK';
+
+      const longNets = ['Amazon', 'Paramount+'];
+      longNets.forEach((net) => {
+        if(originalNetwork.includes(net))
+          originalNetwork = net;
+      });
+      originalNetwork = originalNetwork.substr(0, 10);
+
       this.cntryLangTxt = 
-        ` &nbsp; Country: ${originalCountry.toUpperCase()} &nbsp;` +
-        ` &nbsp; Language: ${originalLanguage.toUpperCase()}&nbsp;`;
+        ` &nbsp; ${originalCountry.toUpperCase()} / ` +
+                `${originalLanguage.toUpperCase()}`   +
+        ` &nbsp; ${originalNetwork.toUpperCase()}`    +
+        ` &nbsp; ${averageRuntime 
+                  ? ' ' + averageRuntime + ' mins'
+                  : ''}` 
     },
 
     async setNextWatch() {

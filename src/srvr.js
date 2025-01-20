@@ -167,10 +167,8 @@ export function addGap(gapIdGapSave)
 export function delGap(gapIdSave)    
             {return fCall('delGap', gapIdSave)}
 
-export function getTvdbNames()    
-            {return fCall('getTvdbNames',  '')}
-export function getTvdb(name)      
-            {return fCall('getTvdb',     name)}
+export function getAllTvdb()      
+            {return fCall('getAllTvdb')}
 export function addTvdb(tvdbData)    
             {return fCall('addTvdb', tvdbData)}
 

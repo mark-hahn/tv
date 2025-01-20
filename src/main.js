@@ -3,7 +3,6 @@ reminder, restore ...
   start gap running
 
 bugs ...
-  thumbnails have wrong language (Wedding Season)
 
 todo  ...
   auto-del dead
@@ -14,9 +13,10 @@ new features ..
   update imdb rating (all remotes) periodicaly
   refresh filtered rows when new gap loaded
   button: scroll hilighted row to vis 
+  speed up boot
 
 tabled ...
-  speed up boot
+  thumbnails have wrong language (Wedding Season)
   click anywhere to close popup
   up/dn arrows
   series pane flashes while waiting for map (St. Denis)

@@ -55,14 +55,15 @@ export async function loadAllShows(gapCache) {
   const pkupPromise   = srvr.getPickups();
   const noEmbyPromise = srvr.getNoEmbys();
   const gapPromise    = srvr.getGaps();
+  const allTvPromise  = srvr.getAllTvdb();
 
   const [embyShows, srvrShows, 
          blockedWaitShows, blockedGapShows,
-         rejects, pickups, noEmbys, gaps] = 
+         rejects, pickups, noEmbys, gaps, allTvdb] = 
     await Promise.all([listPromise, seriesPromise, 
                        waitPromise, blkGapPromise, 
                        rejPromise, pkupPromise,
-                       noEmbyPromise, gapPromise]);
+                       noEmbyPromise, gapPromise, allTvPromise]);
   const shows = [];
 
 ////////// get shows from emby ////////////
@@ -102,9 +103,9 @@ export async function loadAllShows(gapCache) {
     }
     show.TvdbId = tvdbId;
 
-    const tvdbShowData = await tvdb.getTvdbData(show);
-    show.OriginalCountry  = tvdbShowData?.originalCountry;
-    show.OriginalLanguage = tvdbShowData?.originalLanguage;
+    const tvDbData = allTvdb[show.Name];
+    show.OriginalCountry  = tvDbData?.originalCountry;
+    show.OriginalLanguage = tvDbData?.originalLanguage;
 
     shows.push(show);
   }

@@ -8,6 +8,7 @@ bugs ...
     at series.vue:267:18
 
 todo  ...
+  clean up config.yml
   history
   map: click on season numbers for whole row
 

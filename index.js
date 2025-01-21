@@ -181,20 +181,20 @@ const trySaveConfigYml = async (id, result, resolve, reject) => {
                            JSON.stringify(rejects)); 
   await fsp.writeFile('config/config4-pickups.json', 
                            JSON.stringify(pickups)); 
-  // let errResult = null;
+  let errResult = null;
 
-  // const uploadRes = await upload();
-  // if(uploadRes != 'ok') errResult = uploadRes;
-  // if(!errResult) {
-  //   const reloadRes = await reload();
-  //   if(reloadRes != 'ok') errResult = reloadRes;
-  // }
+  const uploadRes = await upload();
+  if(uploadRes != 'ok') errResult = uploadRes;
+  if(!errResult) {
+    const reloadRes = await reload();
+    if(reloadRes != 'ok') errResult = reloadRes;
+  }
 
-  // if(errResult) {
-  //   console.log('trySaveConfigYml error:', errResult);
-  //   saving = false;
-  //   return ['err', id, errResult, resolve, reject];
-  // }
+  if(errResult) {
+    console.log('trySaveConfigYml error:', errResult);
+    saving = false;
+    return ['err', id, errResult, resolve, reject];
+  }
 
   saving = false;
   return ['ok', id, result, resolve, reject];

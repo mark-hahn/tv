@@ -732,7 +732,7 @@ export default {
       this.sortPopped = false;
     },
     async fltrAction(fltrChoice) {
-      console.log('fltrAction', fltrChoice);
+      // console.log('fltrAction', fltrChoice);
       window.localStorage.setItem("fltrChoice", fltrChoice);
       this.fltrChoice = fltrChoice;
       this.sortPopped = false;
@@ -740,7 +740,7 @@ export default {
       this.searchStr = "";
       for (let cond of this.conds) {
          util.setCondFltr(cond, this.fltrChoice);
-         console.log('cond:', cond.name, cond.filter);
+        //  console.log('cond:', cond.name, cond.filter);
       }
       this.select();
       this.sortShows();

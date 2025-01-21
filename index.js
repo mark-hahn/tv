@@ -488,18 +488,6 @@ const addRemotes = async (id, nameRems, resolve, reject) => {
   resolve([id, 'ok']);
 }
 
-const delRemotes = async (id, name, resolve, reject) => {
-  console.log('delRemotes', id, name);
-  if(!allRemotes[name]) {
-    console.log('-- remotes not deleted -- no match:', name);
-    resolve([id, 'delRemotes no match:' + name]);
-    return;
-  }
-  delete allRemotes[name];
-  await fsp.writeFile('data/remotes.json', JSON.stringify(allRemotes)); 
-  resolve([id, 'ok']);
-}
-
 const deletePath = async (id, path, resolve, _reject) => {
   // console.log('deletePath', id, path);
   try {
@@ -693,8 +681,6 @@ wss.on('connection', (ws, req) => {
       
       case 'getRemotes':  getRemotes(id, param, resolve, reject); break;
       case 'addRemotes':  addRemotes(id, param, resolve, reject); break;
-      case 'delRemotes':  delRemotes(id, param, resolve, reject); break;
-      
 
       default: reject([id, 'unknownfunction: ' + fname]);
     };

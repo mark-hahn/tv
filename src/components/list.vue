@@ -29,7 +29,10 @@
         button(@click="addClick" 
                 style=`display:inline-block'; 
                       font-size:15px; margin:4px 4px 4px 20px;backgroundColor:white`) Add
-        button(@click="watchClick" 
+        button(@click="addClick(true)"
+                style=`display:inline-block'; 
+                      font-size:15px; margin:4px 4px 4px 8px;backgroundColor:white`) Hist
+        button(@click="watchClick"
                 style=`margin-left:10px; margin-right:5px;
                       fontSize:15px; margin:4px;
                       background-color:white;`) 
@@ -574,35 +577,47 @@ export default {
       return this.highlightName == show.Name ? "yellow" : "white";
     },
 
-    async addClick () {
+    async addClick(history = false) {
+      const show = this.show;
       this.cancelSrchList();
-      const srchTxt = prompt(
-                "Enter series name. " +
-                "It is used as an approximate search string.");
-      if (!srchTxt) {
-        console.error("Search string is empty");
-        return;
+      let srchTxt, tvdbSrchData;
+      if(!history) {    
+          srchTxt = prompt(
+                  "Enter series name. " +
+                  "It is used as an approximate search string.");
+        if (!srchTxt) {
+          console.error("Search string is empty");
+          return;
+        }
       }
       this.showingSrchList = true;
-      const tvdbSrchData = await tvdb.srchTvdbData(srchTxt);
-      if(!tvdbSrchData) {
-        this.cancelSrchList();
-        setTimeout(() => {
-          console.error('No series found in tvdb for:', srchTxt);
-          alert(`No tv series found using search text: ` +
-                `${srchTxt}`);
-        }, 100);
-        return;
+      if(!history) {
+        tvdbSrchData = await tvdb.srchTvdbData(srchTxt);
+        if(!tvdbSrchData) {
+          this.cancelSrchList();
+          setTimeout(() => {
+            console.error('No series found in tvdb for:', srchTxt);
+            alert(`No tv series found using search text: ` +
+                  `${srchTxt}`);
+          }, 100);
+          return;
+        }
       }
-      tvdbSrchData.forEach((tvdbSrchShow) => {
-        if(tvdbSrchShow.country == 'gbr') 
-           tvdbSrchShow.country  = 'uk';
-        tvdbSrchShow.searchDtlTxt = 
-         ` ${tvdbSrchShow.year}, 
-           ${tvdbSrchShow.country ?.toUpperCase() || ''}, 
-           ${tvdbSrchShow.primary_language?.toUpperCase() || ''}`;
-        tvdbSrchShow.tvdbId = tvdbSrchShow.tvdb_id;
-        tvdbSrchShow.image  = tvdbSrchShow.thumbnail;
+      if(history) {
+        const tvdbData = srvr.getAllTvdb(show);
+        const tvdbDataArr = Object.entries(tvdbData);
+        tvdbSrchData = tvdbDataArr.sort(
+                            (a, b) => a[0] > b[0] ? 1 : -1);
+      }
+      tvdbSrchData.forEach((tvdbData) => {
+        if(tvdbData.country == 'gbr') 
+           tvdbData.country  = 'uk';
+        tvdbData.searchDtlTxt = 
+         ` ${tvdbData.year}, 
+           ${tvdbData.country ?.toUpperCase() || ''}, 
+           ${tvdbData.primary_language?.toUpperCase() || ''}`;
+        tvdbData.tvdbId = tvdbData.tvdb_id;
+        tvdbData.image  = tvdbData.thumbnail;
       });
       // console.log('searchList:', tvdbData);
       this.searchList = tvdbSrchData;

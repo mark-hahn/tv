@@ -116,7 +116,11 @@ export default {
       const img = new Image();
       img.style.maxWidth  = "300px"; 
       img.style.maxHeight = "400px"; 
-      
+      if(!tvdbShowData) {
+        console.error('setPoster: tvdbShowData missing');
+        img.src = './question-mark.png';
+        return;
+      }
       if(tvdbShowData.image) {
         img.src = tvdbShowData.image;
       } else {

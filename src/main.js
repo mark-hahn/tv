@@ -3,17 +3,18 @@ reminder, restore ...
   start gap running
 
 bugs ...
-
+  no series meta in banned (Castle Builders)
+  
 todo  ...
   history
-  map: click on season numbers for whole row
 
 new features ..
-  update imdb rating (all remotes) periodicaly
   refresh filtered rows when new gap loaded
   button: scroll hilighted row to vis 
 
 tabled ...
+  map: click on season numbers for whole row
+  update imdb rating (all remotes) periodicaly
   thumbnails have wrong language (Wedding Season)
   click anywhere to close popup
   up/dn arrows

@@ -151,23 +151,24 @@ export const getRemotes = async (show) => {
   return [remotes, false];
 }
 
-export const setImdbRatings = async (show) => {
-  const name       = show.Name;
-  const tvdbData   = await getTvdbData(show);
-  const tvdbRemote = tvdbData?.tvdbRemotes?.find(
-                        (rem) => rem.sourceName == "IMDB");
-  if(!tvdbRemote) return null;
+// export const setGetRemotes = async (show) => {
+//   const name       = show.Name;
+//   const tvdbData   = await getTvdbData(show);
+//   const tvdbRemote = tvdbData?.tvdbRemotes?.find(
+//                         (rem) => rem.sourceName == "IMDB");
+//   if(!tvdbRemote) return null;
 
-  const remotes = await srvr.getRemotes(name);
-  const remote  = await getRemote(tvdbRemote, name);
-  if(!remote || !remotes) return null;
+//   const remotes = await srvr.getRemotes(name);
+//   const remote  = await getRemote(tvdbRemote, name);
+//   if(!remote || !remotes) return null;
 
-  const {url, ratings} = remote;
-  const imdbRemote = {name:`IMDB (${ratings})`, ratings, url};
-  remotes[name] = imdbRemote;
-  await srvr.addRemotes(
-              name + '|||' + JSON.stringify(remotes));
-}
+//   const {url, ratings} = remote;
+//   const imdbRemote = {name:`IMDB (${ratings})`, ratings, url};
+//   remotes[name]    = imdbRemote;
+//   await srvr.addRemotes(
+//               name + '|||' + JSON.stringify(remotes));
+//   return remotes;
+// }
 
 //////////// search for TvDb Data //////////////
 

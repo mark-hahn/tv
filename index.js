@@ -5,6 +5,7 @@ import * as cp             from 'child_process';
 import { WebSocketServer } from 'ws';
 import fetch               from 'node-fetch';
 import * as view           from './src/lastViewed.js';
+import {rimraf}            from 'rimraf'
 
 process.setMaxListeners(50);
 const dontupload  = false;
@@ -180,20 +181,20 @@ const trySaveConfigYml = async (id, result, resolve, reject) => {
                            JSON.stringify(rejects)); 
   await fsp.writeFile('config/config4-pickups.json', 
                            JSON.stringify(pickups)); 
-  let errResult = null;
+  // let errResult = null;
 
-  const uploadRes = await upload();
-  if(uploadRes != 'ok') errResult = uploadRes;
-  if(!errResult) {
-    const reloadRes = await reload();
-    if(reloadRes != 'ok') errResult = reloadRes;
-  }
+  // const uploadRes = await upload();
+  // if(uploadRes != 'ok') errResult = uploadRes;
+  // if(!errResult) {
+  //   const reloadRes = await reload();
+  //   if(reloadRes != 'ok') errResult = reloadRes;
+  // }
 
-  if(errResult) {
-    console.log('trySaveConfigYml error:', errResult);
-    saving = false;
-    return ['err', id, errResult, resolve, reject];
-  }
+  // if(errResult) {
+  //   console.log('trySaveConfigYml error:', errResult);
+  //   saving = false;
+  //   return ['err', id, errResult, resolve, reject];
+  // }
 
   saving = false;
   return ['ok', id, result, resolve, reject];
@@ -499,12 +500,13 @@ const delRemotes = async (id, name, resolve, reject) => {
   resolve([id, 'ok']);
 }
 
-const deletePath = async (id, path, resolve, reject) => {
-  console.log('deletePath', id, path);
+const deletePath = async (id, path, resolve, _reject) => {
+  // console.log('deletePath', id, path);
   try {
-    await fsp.unlink(path); 
+    await rimraf(path);
   }
   catch(e) {
+    console.log('error removing path:', path, e.message)
     resolve([id, e.message]);
     return
   }

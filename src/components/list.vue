@@ -281,7 +281,6 @@ let showHistory      = [];
 let showHistoryPtr   = -1;
 let blockedWaitShows = null;
 let blockedGapShows  = null;
-let showErr          = null;
 
 export default {
   name: "List",
@@ -1001,9 +1000,7 @@ export default {
       }); 
 
       try {
-        showErr = this.showErr;
-        await emby.init(showErr);
-        tvdb.init(showErr);
+        await emby.init();
 
         const showsBlocks = await emby.loadAllShows();
         if(!showsBlocks) {
@@ -1034,6 +1031,11 @@ export default {
         if (!name)   window.localStorage.setItem("lastVisShow",
                        allShows[0].Name);
         this.scrollToSavedShow(true);
+
+        setTimeout(async () => {
+          console.log('ImdbRemote', 
+                        await tvdb.getImdbRemote(allShows[0]));
+        }, 2000);
 
         // ... temp one-time mass operations ...
         // util.removeDeadShows(allShows);

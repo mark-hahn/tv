@@ -3,13 +3,8 @@ import * as util from "./util.js";
 import * as urls from "./urls.js";
 import * as emby from "./emby.js";
 
-let showErr      = null;
 let theTvdbToken = null;
 let allTvdb      = null;
-
-export const init = (showErrIn) => {
-  showErr = showErrIn;
-}
 
 export const initAllTvdb = (allTvdbIn) => {
   allTvdb = allTvdbIn;
@@ -156,6 +151,23 @@ export const getRemotes = async (show) => {
   return [remotes, false];
 }
 
+export const setImdbRatings = async (show) => {
+  const name       = show.Name;
+  const tvdbData   = await getTvdbData(show);
+  const tvdbRemote = tvdbData?.tvdbRemotes?.find(
+                        (rem) => rem.sourceName == "IMDB");
+  if(!tvdbRemote) return null;
+
+  const remotes = await srvr.getRemotes(name);
+  const remote  = await getRemote(tvdbRemote, name);
+  if(!remote || !remotes) return null;
+
+  const {url, ratings} = remote;
+  const imdbRemote = {name:`IMDB (${ratings})`, ratings, url};
+  remotes[name] = imdbRemote;
+  await srvr.addRemotes(
+              name + '|||' + JSON.stringify(remotes));
+}
 
 //////////// search for TvDb Data //////////////
 

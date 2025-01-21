@@ -3,12 +3,8 @@ reminder, restore ...
   start gap running
 
 bugs ...
-  noemby: Cannot read properties of null (reading 'image')
-    at Proxy.setPoster (series.vue:120:23)
-    at series.vue:267:18
 
 todo  ...
-  clean up config.yml
   history
   map: click on season numbers for whole row
 

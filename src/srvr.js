@@ -9,11 +9,6 @@ let haveSocket = false;
 
 const waitingSends = [];
 
-let showErr = null;
-export function init(showErrIn) {
-  showErr = showErrIn;
-}
-
 ws.onmessage = (event) => {
   // console.log("onmessage:" + event.data);
   handleMsg(event.data);

@@ -1036,6 +1036,7 @@ export default {
         this.scrollToSavedShow(true);
 
         // ... temp one-time mass operations ...
+        // util.removeDeadShows(allShows);
         // await util.listCountries(allShows);
         // await util.setAllFavs(allShows);
         // await util.loadAllRemotes(allShows); // takes many hours

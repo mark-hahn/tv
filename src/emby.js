@@ -65,7 +65,7 @@ export async function loadAllShows(gapCache) {
                        rejPromise, pkupPromise,
                        noEmbyPromise, gapPromise, allTvPromise]);
   tvdb.initAllTvdb(allTvdb);
-  
+
   const shows = [];
 
 ////////// get shows from emby ////////////
@@ -280,7 +280,7 @@ export async function deleteShowFromEmby(show) {
     console.error(err);
     return;
   }
-  console.log("deleted show from emby:", show.Name);
+  // console.log("deleted show from emby:", show.Name);
 }
 
 const deleteOneFile = async (path) => {

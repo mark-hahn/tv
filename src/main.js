@@ -5,7 +5,6 @@ reminder, restore ...
 bugs ...
 
 todo  ...
-  auto-del dead
   history
   map: click on season numbers for whole row
 
@@ -13,7 +12,6 @@ new features ..
   update imdb rating (all remotes) periodicaly
   refresh filtered rows when new gap loaded
   button: scroll hilighted row to vis 
-  speed up boot
 
 tabled ...
   thumbnails have wrong language (Wedding Season)

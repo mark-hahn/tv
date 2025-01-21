@@ -1,5 +1,32 @@
 import * as emby from "./emby.js";
 import * as tvdb from "./tvdb.js";
+import * as srvr from "./srvr.js";
+
+////////// temp one-time mass operation //////////
+export async function removeDeadShows(allShows) {
+  let count = 0;
+  for(let show of allShows) {
+    try {
+      const name = show.Name;
+      console.log('checking:', name);
+      const tvdbData= await tvdb.getTvdbData(show);
+      if(!tvdbData) continue;
+
+      const {status, episodeCount, watchedCount} = tvdbData
+      if(status != "Ended" || watchedCount < episodeCount) 
+        continue;
+
+      await srvr.deleteShowFromSrvr(show);
+      await emby.deleteShowFromEmby(show);
+
+      console.log('>>>> removed:', ++count, name);
+    }
+    catch(e) {
+      console.error('removeDeadShows error:', e.message);
+      return;
+    }
+  }
+}
 
 ////////// temp one-time mass operation //////////
 export async function listCountries(allShows) {

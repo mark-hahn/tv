@@ -598,6 +598,89 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
     default: resolve([id, 'getUrls no type: ' + type]);
   }
 }
+//////////////////  CALL FUNCTION SYNCHRONOUSLY  //////////////////
+
+const queue = [];
+let running = false;
+
+const runOne = () => {
+  if(running || queue.length == 0) return;
+  running == true;
+
+  const {parts, ws} = queue.pop();
+  if(ws.readyState !== WebSocket.OPEN) return;
+
+  const [id, fname, param] = parts.slice(1);
+
+  let resolve = null;
+  let reject  = null;
+
+  // param called when promise is resolved or rejected
+  // there is one unique promise for each function call
+  const promise = new Promise((resolveIn, rejectIn) => {
+    resolve = resolveIn; 
+    reject  = rejectIn;
+  });
+
+  promise
+  .then((idResult) => {
+    const [id, result] = idResult;
+    // console.log('resolved:', id);
+    ws.send(`${id}~~~ok~~~${JSON.stringify(result)}`); 
+    running == false;
+    runOne();
+  })
+  .catch((idError) => {
+    console.log('idResult err:', {idError});
+    const [id, error] = idError;
+    console.log('rejected:', id);
+    ws.send(`${id}~~~err~~~${JSON.stringify(error)}`); 
+    running == false;
+    runOne();
+  });
+
+  // call function fname
+  // console.log(`call function`, {id, fname, param});
+  switch (fname) {
+    case 'getAllShows':   getAllShows(id,    '', resolve, reject); break;
+    case 'deletePath':    deletePath( id, param, resolve, reject); break;
+    case 'getUrls':       getUrls(    id, param, resolve, reject); break;
+    case 'getLastViewed':  
+                    view.getLastViewed(id,    '', resolve, reject); break;
+
+    case 'getBlockedWaits': getBlockedWaits(id, '',   resolve, reject); break;
+    case 'addBlockedWait':  addBlockedWait(id, param, resolve, reject); break;
+    case 'delBlockedWait':  delBlockedWait(id, param, resolve, reject); break;
+
+    case 'getBlockedGaps': getBlockedGaps(id, '',   resolve, reject); break;
+    case 'addBlockedGap':  addBlockedGap(id, param, resolve, reject); break;
+    case 'delBlockedGap':  delBlockedGap(id, param, resolve, reject); break;
+
+    case 'getRejects':  getRejects(id, '',    resolve, reject); break;
+    case 'addReject':   addReject( id, param, resolve, reject); break;
+    case 'delReject':   delReject( id, param, resolve, reject); break;
+
+    case 'getPickups':  getPickups(id, '',    resolve, reject); break;
+    case 'addPickup':   addPickup( id, param, resolve, reject); break;
+    case 'delPickup':   delPickup( id, param, resolve, reject); break;
+    
+    case 'getNoEmbys':  getNoEmbys(id, '',    resolve, reject); break;
+    case 'addNoEmby':   addNoEmby( id, param, resolve, reject); break;
+    case 'delNoEmby':   delNoEmby( id, param, resolve, reject); break;
+    
+    case 'getGaps':     getGaps(   id, '',    resolve, reject); break;
+    case 'addGap':      addGap(    id, param, resolve, reject); break;
+    case 'delGap':      delGap(    id, param, resolve, reject); break;
+    
+    case 'getAllTvdb':   getAllTvdb(  id, param, resolve, reject); break;
+    case 'addTvdb':      addTvdb(     id, param, resolve, reject); break;
+    
+    case 'getRemotes':  getRemotes(id, param, resolve, reject); break;
+    case 'addRemotes':  addRemotes(id, param, resolve, reject); break;
+
+    default: reject([id, 'unknownfunction: ' + fname]);
+  };
+}
 
 //////////////////  WEBSOCKET SERVER  //////////////////
 
@@ -615,74 +698,11 @@ wss.on('connection', (ws, req) => {
 
     const parts = /^(.*)~~~(.*)~~~(.*)$/.exec(msg);
     if(!parts) {
-      console.error('skipping bad message:', msg);
+      console.error('ignoring bad message:', msg);
       return;
     }
-    const [id, fname, param] = parts.slice(1);
-
-    let resolve = null;
-    let reject  = null;
-
-    // param called when promise is resolved or rejected
-    // there is one unique promise for each function call
-    const promise = new Promise((resolveIn, rejectIn) => {
-      resolve = resolveIn; 
-      reject  = rejectIn;
-    });
-
-    promise.then((idResult) => {
-      const [id, result] = idResult;
-      // console.log('resolved:', id);
-      ws.send(`${id}~~~ok~~~${JSON.stringify(result)}`); 
-    })
-    .catch((idError) => {
-      console.log('idResult err:', {idError});
-      const [id, error] = idError;
-      console.log('rejected:', id);
-      ws.send(`${id}~~~err~~~${JSON.stringify(error)}`); 
-    });
-
-    // call function fname
-    // console.log(`call function`, {id, fname, param});
-    switch (fname) {
-      case 'getAllShows':   getAllShows(id,    '', resolve, reject); break;
-      case 'deletePath':    deletePath( id, param, resolve, reject); break;
-      case 'getUrls':       getUrls(    id, param, resolve, reject); break;
-      case 'getLastViewed':  
-                     view.getLastViewed(id,    '', resolve, reject); break;
-
-      case 'getBlockedWaits': getBlockedWaits(id, '',   resolve, reject); break;
-      case 'addBlockedWait':  addBlockedWait(id, param, resolve, reject); break;
-      case 'delBlockedWait':  delBlockedWait(id, param, resolve, reject); break;
-
-      case 'getBlockedGaps': getBlockedGaps(id, '',   resolve, reject); break;
-      case 'addBlockedGap':  addBlockedGap(id, param, resolve, reject); break;
-      case 'delBlockedGap':  delBlockedGap(id, param, resolve, reject); break;
-
-      case 'getRejects':  getRejects(id, '',    resolve, reject); break;
-      case 'addReject':   addReject( id, param, resolve, reject); break;
-      case 'delReject':   delReject( id, param, resolve, reject); break;
-
-      case 'getPickups':  getPickups(id, '',    resolve, reject); break;
-      case 'addPickup':   addPickup( id, param, resolve, reject); break;
-      case 'delPickup':   delPickup( id, param, resolve, reject); break;
-      
-      case 'getNoEmbys':  getNoEmbys(id, '',    resolve, reject); break;
-      case 'addNoEmby':   addNoEmby( id, param, resolve, reject); break;
-      case 'delNoEmby':   delNoEmby( id, param, resolve, reject); break;
-      
-      case 'getGaps':     getGaps(   id, '',    resolve, reject); break;
-      case 'addGap':      addGap(    id, param, resolve, reject); break;
-      case 'delGap':      delGap(    id, param, resolve, reject); break;
-      
-      case 'getAllTvdb':   getAllTvdb(  id, param, resolve, reject); break;
-      case 'addTvdb':      addTvdb(     id, param, resolve, reject); break;
-      
-      case 'getRemotes':  getRemotes(id, param, resolve, reject); break;
-      case 'addRemotes':  addRemotes(id, param, resolve, reject); break;
-
-      default: reject([id, 'unknownfunction: ' + fname]);
-    };
+    queue.unshift({ws, parts});
+    runOne();
   });
  
   ws.on('close', () => console.log('wss closed'));

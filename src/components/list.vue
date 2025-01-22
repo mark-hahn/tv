@@ -23,9 +23,6 @@
           input(v-model="searchStr" 
                 @input="select"
                  style="border:1px solid black; width:120px;")
-          button(@click="select" 
-                  style="margin-left:1px;")
-            font-awesome-icon(icon="search")
         button(@click="addClick(false)" 
                 style=`display:inline-block'; 
                       font-size:15px; margin:4px 4px 4px 20px;backgroundColor:white`) Add
@@ -519,6 +516,8 @@ export default {
   methods: {
 
     async deleteShow(show) {
+        // console.log('list, deleteShow:', show.Name);
+
       if(!show.Id.startsWith("noemby-")) {
         this.saveVisShow(show);
         if (!window.confirm(
@@ -1016,8 +1015,15 @@ export default {
     evtBus.on('openMap', (show) => {
       this.seriesMapAction('open', show);
     });
+
     evtBus.on('deleteShow', (show) => {
+      // console.log('evtBus deleteShow', show.Name);
       this.deleteShow(show);
+      this.removeRow(show);
+    });
+
+    evtBus.on('deleteRow', (show) => {
+      // console.log('evtBus deleteRow', show.Name);
       this.removeRow(show);
     });
 

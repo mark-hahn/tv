@@ -4,17 +4,22 @@
               display:flex; flex-direction:column;
               padding:5px;`)
 
-  div(style=`display:flex; justify-content:center; 
-             font-weight:bold; 
-             margin-bottom:20px; font-size:25px;`)
-    div(style=`text-align:center; margin-right:20px;`) {{show.Name}}
-    div(v-if="isDeleted"
-        style=`font-weight:bold; color:red; 
-               font-size:20px; margin-top:4px;`) {{deletedTxt}}
+  #hdr(style=`display:flex; justify-content:space-between; 
+              font-weight:bold; font-size:25px;
+              margin-bottom:20px; max-width:495px;`)
+    div(style=`margin-left:20px; max-width:450px`) {{show.Name}}
+    div(v-if="deletedTxt !== ''" style=``)
+      div(style=`font-weight:bold; color:red; 
+                  font-size:20px; margin-top:4px;
+                  max-height:24px;`) {{deletedTxt}}
+      button(@click="hideClick"
+              style=`font-size:15px; max-height:24px;
+                     left:1245px;`) Hide
     button(v-else @click="deleteClick"
-           style=`font-size:15px;`) Delete
+            style=`font-size:15px; margin-left:20px;
+                   max-height:24px;`) Delete
 
-  #top(style=`display:flex; flex-direction:row`)
+  #body(style=`display:flex;`)
     #topLeft(@click="openMap(show)"
               style=`display:flex; flex-direction:column;
                      text-align:center;`) 
@@ -94,7 +99,6 @@ export default {
       nextUpTxt: '',
       watchButtonTxt: '',
       episodeId: '',
-      isDeleted: true,
       deletedTxt: '',
     }
   },
@@ -107,8 +111,13 @@ export default {
     },
 
     async deleteClick() {
-      console.log('Series, delete show:', this.show.Name);
+      console.log('Series, deleteClick:', this.show.Name);
       evtBus.emit('deleteShow', this.show);
+    },
+
+    async hideClick() {
+      //- console.log('Series, hideClick:', this.show.Name);
+      evtBus.emit('deleteRow', this.show);
     },
 
     async remoteClick(remote) {
@@ -127,8 +136,12 @@ export default {
     },
 
     async setDeleted(tvdbShowData) {
-      this.deletedTxt = 'Deleted ' + tvdbShowData.deleted;
-      this.isDeleted  = !!tvdbShowData.deleted;
+      const deleted = !!tvdbShowData.deleted;
+      const noEmby  = this.show.Id.startsWith('noemby-');
+      //- console.log('series, setDeleted:', {deleted, noEmby})
+      if(deleted) this.deletedTxt = 'Deleted ' + 
+                       tvdbShowData.deleted;
+      else        this.deletedTxt = '';
     },
 
     async setPoster(tvdbShowData) {

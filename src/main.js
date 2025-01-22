@@ -3,20 +3,22 @@ reminder, restore ...
   start gap running
 
 bugs ...
-  no series meta in banned (Castle Builders)
   file missing (in meta) doesn't have dash (St. Denis Medical)
   watched info didn't update (Bad Sisters)
   search list sorts THE incorrectly
+  no series meta in banned (Castle Builders)
 
 todo  ...
-
-new features ..
-  refresh filtered rows when new gap loaded
-  button: scroll hilighted row to vis 
+  don't delete show when remove pickup
+  remove show from tvdb.json (how?)
+  text input for add/hist
+  don't scroll Cancel button at top of choice list
+  update tvdb data periodicaly (bad sisters)
 
 tabled ...
+  button: scroll hilighted row to vis 
+  refresh filtered rows when new gap loaded
   map: click on season numbers for whole row
-  update imdb rating (all remotes) periodicaly
   thumbnails have wrong language (Wedding Season)
   click anywhere to close popup
   up/dn arrows

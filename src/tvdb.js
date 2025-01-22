@@ -262,11 +262,13 @@ export const getTvdbData = async (show) => {
 export const markTvdbDeleted = 
   async (showName, markDelete) => {
     const tvdbData = allTvdb[showName];
-    if(!tvdbData) 
-      return;
+    if(!tvdbData) return;
     if(markDelete) tvdbData.deleted = util.dateWithTZ();
     else    delete tvdbData.deleted;
-    await srvr.addTvdb(JSON.stringify(tvdbData));
+    const str = JSON.stringify(tvdbData);
+    // console.log('markTvdbDeleted:', 
+    //     {showName, markDelete, str: str.substring(-100, 100)});
+    await srvr.addTvdb(str);
     allTvdb[showName] = tvdbData;
   };
 

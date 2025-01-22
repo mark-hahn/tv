@@ -100,10 +100,12 @@ handleMsg = (msg) => {
 
 export async function deleteShowFromSrvr(show) {
   await delBlockedWait(show.Name);
+  await delBlockedGap(show.Name);
+  await delGap([show.Id, true]);
   await delPickup(show.Name);
   await delNoEmby(show.Name);
-  await delRemotes(show.Name);
   await deletePath(show.Path);
+  // don't ever delete from remotes
   // don't ever delete from rejects
   // don't ever delete from tvdb
   console.log("deleted show from server:", show.Name);

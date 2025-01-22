@@ -79,6 +79,7 @@ export async function loadAllRemotes(allShows) {
 }
 
 ////////// temp one-time mass operation //////////
+// LEAVES GARBAGE AT END OF tvdb.json
 export async function setTvdbDeleted(allShows) {
   const allTvdbNames = Object.keys(allTvdb);
   for(let showName of allTvdbNames) 

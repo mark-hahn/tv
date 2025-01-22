@@ -418,27 +418,8 @@ export default {
               //- show.Pickup = !show.Pickup;
           });
       if(await this.chkRowDelete(show))
-        deleteShow(show);
+        this.deleteShow(show);
     };
-
-    // from dom click
-    const deleteShow = async (show) => {
-      if(!show.Id.startsWith("noemby-")) {
-        this.saveVisShow(show);
-        if (!window.confirm(
-            `Do you really want to delete series ${show.Name}?`)) 
-          return;
-        if(!await this.chkRowDelete(show, true)){
-          show.RunTimeTicks = 0;
-          show.IsFavorite   = false;
-          return
-        }
-        await emby.deleteShowFromEmby(show);
-      }
-      await tvdb.markTvdbDeleted(show.Name, true);
-      await srvr.deleteShowFromSrvr(show);
-      this.setHighlightAfterDel(show.Id);
-    }
 
     return {
       shows:                [],
@@ -527,7 +508,7 @@ export default {
         }, {
           color: "#a66", filter: 0, icon: ["fas", "tv"],
           cond(show)  { return !show.Id.startsWith("noemby-"); },
-          click(show) { deleteShow(show); },
+          click(show) { this.deleteShow(show) },
           name: "hasemby",
         },
       ],
@@ -536,6 +517,26 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
+
+    async deleteShow(show) {
+      if(!show.Id.startsWith("noemby-")) {
+        this.saveVisShow(show);
+        if (!window.confirm(
+            `Do you really want to delete series ${show.Name}?`)) 
+          return;
+        if(!await this.chkRowDelete(show, true)){
+          show.RunTimeTicks = 0;
+          show.IsFavorite   = false;
+          return
+        }
+        await emby.deleteShowFromEmby(show);
+      }
+      await tvdb.markTvdbDeleted(show.Name, true);
+      await srvr.deleteShowFromSrvr(show);
+      this.setHighlightAfterDel(show.Id);
+    },
+
+
     getValBySortChoice(show, forSort = false) {
       switch(this.sortChoice) {
         case 'Alpha':   
@@ -565,14 +566,19 @@ export default {
       }
     },
 
+    removeRow(show) {
+      console.log("removeRow", show.Name);
+      const id = show.Id;
+      this.setHighlightAfterDel(id);
+      allShows   = allShows.filter(  (show) => show.Id != id);
+      this.shows = this.shows.filter((show) => show.Id != id);
+    },
+
     async chkRowDelete(show, force) {
       if (force || (!show.Reject && !show.Pickup &&
                      show.Id.startsWith("noemby-"))) {
         console.log("no reason to keep row, deleting it:", show.Name);
-        const id = show.Id;
-        this.setHighlightAfterDel(id);
-        allShows   = allShows.filter(  (show) => show.Id != id);
-        this.shows = this.shows.filter((show) => show.Id != id);
+        this.removeRow(show);
         return true;
       }
       return false;
@@ -1009,6 +1015,10 @@ export default {
   mounted() {
     evtBus.on('openMap', (show) => {
       this.seriesMapAction('open', show);
+    });
+    evtBus.on('deleteShow', (show) => {
+      this.deleteShow(show);
+      this.removeRow(show);
     });
 
     setInterval(async () => {

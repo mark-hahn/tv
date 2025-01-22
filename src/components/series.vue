@@ -11,7 +11,8 @@
     div(v-if="isDeleted"
         style=`font-weight:bold; color:red; 
                font-size:20px; margin-top:4px;`) {{deletedTxt}}
-    button(v-else style=`font-size:15px;`) Delete
+    button(v-else @click="deleteClick"
+           style=`font-size:15px;`) Delete
 
   #top(style=`display:flex; flex-direction:row`)
     #topLeft(@click="openMap(show)"
@@ -103,6 +104,11 @@ export default {
       if(show.Id.startsWith('noemby-')) return;
       // console.log('Series: openMap:', show);
       evtBus.emit('openMap', show);
+    },
+
+    async deleteClick() {
+      console.log('Series, delete show:', this.show.Name);
+      evtBus.emit('deleteShow', this.show);
     },
 
     async remoteClick(remote) {

@@ -65,6 +65,7 @@ export async function loadAllShows(gapCache) {
                        rejPromise, pkupPromise,
                        noEmbyPromise, gapPromise, allTvPromise]);
   tvdb.initAllTvdb(allTvdb);
+  util.initAllTvdb(allTvdb);
 
   const shows = [];
 

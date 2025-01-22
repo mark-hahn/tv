@@ -2,6 +2,11 @@ import * as emby from "./emby.js";
 import * as tvdb from "./tvdb.js";
 import * as srvr from "./srvr.js";
 
+let allTvdb = null;
+export const initAllTvdb = (allTvdbIn) => {
+  allTvdb = allTvdbIn;
+}
+
 ////////// temp one-time mass operation //////////
 export async function removeDeadShows(allShows) {
   let count = 0;
@@ -73,7 +78,17 @@ export async function loadAllRemotes(allShows) {
   }, 45*1000);
 }
 
-function fmtDateWithTZ(date, utcOut = false) {
+////////// temp one-time mass operation //////////
+export async function setTvdbDeleted(allShows) {
+  const allTvdbNames = Object.keys(allTvdb);
+  for(let showName of allTvdbNames) 
+    await tvdb.markTvdbDeleted(showName, true);
+  allShows.forEach(async (show) => {
+    await tvdb.markTvdbDeleted(show.Name, false)});
+}
+
+export function 
+          dateWithTZ(date = new Date(), utcOut = false) {
   let year, month, day;
   if(utcOut) {
     year = date.getUTCFullYear();
@@ -97,7 +112,7 @@ export function fmtDate(dateIn, includeYear = true, utcIn = false) {
   else
      date = new Date(dateIn); // strings always local
   const startIdx = includeYear ? 0 : 5;
-  const str = fmtDateWithTZ(date);
+  const str = dateWithTZ(date);
   const res = str.slice(startIdx, 10).replace(/^0/,' ');
   // console.log(`fmtDate: ${dateStr}, ${res}`);
   return res

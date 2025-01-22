@@ -26,7 +26,7 @@
           button(@click="select" 
                   style="margin-left:1px;")
             font-awesome-icon(icon="search")
-        button(@click="addClick" 
+        button(@click="addClick(false)" 
                 style=`display:inline-block'; 
                       font-size:15px; margin:4px 4px 4px 20px;backgroundColor:white`) Add
         button(@click="addClick(true)"
@@ -431,7 +431,8 @@ export default {
         }
         await emby.deleteShowFromEmby(show);
       }
-      await srvr.deleteShowFromSrvr(show)
+      await tvdb.markTvdbDeleted(show.Name, true);
+      await srvr.deleteShowFromSrvr(show);
       this.setHighlightAfterDel(show.Id);
     }
 
@@ -578,7 +579,10 @@ export default {
     },
 
     async addClick(history = false) {
-      const show = this.show;
+      if(this.searchList !== null) {
+        this.cancelSrchList();
+        return;
+      }
       this.cancelSrchList();
       let srchTxt, tvdbSrchData;
       if(!history) {    
@@ -604,18 +608,27 @@ export default {
         }
       }
       if(history) {
-        const tvdbData = srvr.getAllTvdb(show);
-        const tvdbDataArr = Object.entries(tvdbData);
+        const allTvdb = await srvr.getAllTvdb();
+        const tvdbDataArr = Object.entries(allTvdb);
         tvdbSrchData = tvdbDataArr.sort(
                             (a, b) => a[0] > b[0] ? 1 : -1);
+        tvdbSrchData = tvdbSrchData.map(
+          (item) => {
+            const tvdbData = item[1];
+            tvdbData.year = 
+                    tvdbData.firstAired.substring(0, 4);
+            tvdbData.country   = tvdbData.originalCountry;
+            tvdbData.thumbnail = tvdbData.image;
+            return tvdbData;
+          }
+        );
       }
       tvdbSrchData.forEach((tvdbData) => {
         if(tvdbData.country == 'gbr') 
            tvdbData.country  = 'uk';
         tvdbData.searchDtlTxt = 
          ` ${tvdbData.year}, 
-           ${tvdbData.country ?.toUpperCase() || ''}, 
-           ${tvdbData.primary_language?.toUpperCase() || ''}`;
+           ${tvdbData.country ?.toUpperCase() || ''}`;
         tvdbData.tvdbId = tvdbData.tvdb_id;
         tvdbData.image  = tvdbData.thumbnail;
       });
@@ -1047,12 +1060,13 @@ export default {
                        allShows[0].Name);
         this.scrollToSavedShow(true);
 
-        setTimeout(async () => {
-          console.log('ImdbRemote', 
-                        await tvdb.getImdbRemote(allShows[0]));
-        }, 2000);
+        // setTimeout(async () => {
+        //   console.log('ImdbRemote', 
+        //                 await tvdb.getImdbRemote(allShows[0]));
+        // }, 2000);
 
         // ... temp one-time mass operations ...
+        // await util.setTvdbDeleted(allShows);
         // util.removeDeadShows(allShows);
         // await util.listCountries(allShows);
         // await util.setAllFavs(allShows);

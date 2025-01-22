@@ -252,13 +252,23 @@ export const getTvdbData = async (show) => {
                firstAired, lastAired, averageRuntime,
                originalCountry, originalLanguage,
                tvdbRemotes, status};
-
+  delete tvdbData.deleted;
   srvr.addTvdb(JSON.stringify(tvdbData));
   allTvdb[name] = tvdbData;
-
   // console.log('getTvdbData:', {tvdbData});
   return tvdbData;
 }
+
+export const markTvdbDeleted = 
+  async (showName, markDelete) => {
+    const tvdbData = allTvdb[showName];
+    if(!tvdbData) 
+      return;
+    if(markDelete) tvdbData.deleted = util.dateWithTZ();
+    else    delete tvdbData.deleted;
+    await srvr.addTvdb(JSON.stringify(tvdbData));
+    allTvdb[showName] = tvdbData;
+  };
 
 //////////// get waitStr //////////////
 

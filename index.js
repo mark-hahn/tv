@@ -1,5 +1,4 @@
 import fs                  from "fs";
-import * as fsp            from 'fs/promises';
 import util                from "util";
 import * as cp             from 'child_process';
 import { WebSocketServer } from 'ws';
@@ -66,9 +65,9 @@ const getAllShows = async (id, _param, resolve, reject) => {
   const recurs = async (path) => {
     if(errFlg || path == tvDir + '/.stfolder') return;
     try {
-      const fstat = await fsp.stat(path);
+      const fstat = fs.statSync(path);
       if(fstat.isDirectory()) {
-        const dir = await fsp.readdir(path);
+        const dir = fs.readdirSync(path);
         for (const dirent of dir) 
           await recurs(path + '/' + dirent);
         return;
@@ -85,10 +84,10 @@ const getAllShows = async (id, _param, resolve, reject) => {
     }
   }
 
-  const dir = await fsp.readdir(tvDir);
+  const dir =  fs.readdirSync(tvDir);
   for (const dirent of dir) {
     const showPath = tvDir + '/' + dirent;
-    const fstat   = await fsp.stat(showPath);
+    const fstat   = fs.statSync(showPath);
     const maxDate = fmtDateWithTZ(fstat.mtime);
     totalSize = 0;
 
@@ -118,7 +117,7 @@ const upload = async () => {
     str += '        - "' + name.replace(/"/g, '') + '"\n';
   str += footerStr;
   console.log('creating config.yml');
-  await fsp.writeFile('config/config.yml', str);
+  fs.writeFileSync('config/config.yml', str);
 
   if(dontupload) {
     console.log("---- didn't upload config.yml ----");
@@ -177,9 +176,9 @@ const trySaveConfigYml = async (id, result, resolve, reject) => {
     const bname = b.replace(/The\s/i, '');
     return (aname.toLowerCase() > bname.toLowerCase() ? +1 : -1);
   });
-  await fsp.writeFile('config/config2-rejects.json', 
+  fs.writeFileSync('config/config2-rejects.json', 
                            JSON.stringify(rejects)); 
-  await fsp.writeFile('config/config4-pickups.json', 
+  fs.writeFileSync('config/config4-pickups.json', 
                            JSON.stringify(pickups)); 
   let errResult = null;
 
@@ -230,7 +229,7 @@ const addBlockedWait = async (id, name, resolve, _reject) => {
   }
   console.log('-- adding blockedWait:', name);
   blockedWaits.push(name);
-  await fsp.writeFile('data/blockedWaits.json', 
+  fs.writeFileSync('data/blockedWaits.json', 
                         JSON.stringify(blockedWaits));
   resolve([id, 'ok']);
 }
@@ -251,7 +250,7 @@ const delBlockedWait = async (id, name, resolve, _reject) => {
     resolve([id, 'ok']);
     return
   }
-  await fsp.writeFile('data/blockedWaits.json', JSON.stringify(blockedWaits));
+  fs.writeFileSync('data/blockedWaits.json', JSON.stringify(blockedWaits));
   resolve([id, 'ok']);
 }
 
@@ -271,7 +270,7 @@ const addBlockedGap = async (id, name, resolve, _reject) => {
   }
   console.log('-- adding blockedGap:', name);
   blockedGaps.push(name);
-  await fsp.writeFile('data/blockedGaps.json', 
+  fs.writeFileSync('data/blockedGaps.json', 
                         JSON.stringify(blockedGaps));
   resolve([id, 'ok']);
 }
@@ -292,7 +291,7 @@ const delBlockedGap = async (id, name, resolve, _reject) => {
     resolve([id, 'ok']);
     return
   }
-  await fsp.writeFile('data/blockedGaps.json', 
+   fs.writeFileSync('data/blockedGaps.json', 
                             JSON.stringify(blockedGaps));
   resolve([id, 'ok']);
 }
@@ -388,7 +387,7 @@ const addNoEmby = async (id, showStr, resolve) => {
   }
   console.log('adding noemby:', name);
   noEmbys.push(show);
-  await fsp.writeFile('data/noemby.json', JSON.stringify(noEmbys)); 
+  fs.writeFileSync('data/noemby.json', JSON.stringify(noEmbys)); 
   resolve([id, 'ok']);
 }
 
@@ -409,7 +408,7 @@ const delNoEmby = async (id, name, resolve, reject) => {
     resolve([id, 'delNoEmby no match:' + name]);
     return;
   }
-  await fsp.writeFile('data/noemby.json', JSON.stringify(noEmbys)); 
+  fs.writeFileSync('data/noemby.json', JSON.stringify(noEmbys)); 
   resolve([id, 'ok']);
 }
 
@@ -422,7 +421,7 @@ const addGap = async (id, gapIdGapSave, resolve, _reject) => {
   // console.logapIdGapSaveg('addGap', id, {gapIdGapSave});
   gaps[gapId] = gap;
   if(save) 
-    await fsp.writeFile('data/gaps.json', JSON.stringify(gaps)); 
+    fs.writeFileSync('data/gaps.json', JSON.stringify(gaps)); 
   resolve([id, 'ok']);
 }
 
@@ -436,7 +435,7 @@ const delGap = async (id, gapIdSave, resolve, _reject) => {
     console.error('delGap', e.message);
   }
   if(save) 
-    await fsp.writeFile('data/gaps.json', JSON.stringify(gaps)); 
+    fs.writeFileSync('data/gaps.json', JSON.stringify(gaps)); 
   resolve([id, 'ok']);
 }
 
@@ -452,7 +451,7 @@ const addTvdb = async (id, tvdbDataStr, resolve, reject) => {
   catch (e) { reject([id, 'addTvdb: ' + e.message]); return; }
   const name = tvdbData.name;
   allTvdb[name] = tvdbData;
-  await fsp.writeFile('data/tvdb.json', JSON.stringify(allTvdb)); 
+  fs.writeFileSync('data/tvdb.json', JSON.stringify(allTvdb)); 
   resolve([id, 'ok']);
 }
 
@@ -484,7 +483,7 @@ const addRemotes = async (id, nameRems, resolve, reject) => {
   });
   // console.log('addRemotes', id, name);
   allRemotes[name] = remotes;
-  await fsp.writeFile('data/remotes.json', JSON.stringify(allRemotes)); 
+  fs.writeFileSync('data/remotes.json', JSON.stringify(allRemotes)); 
   resolve([id, 'ok']);
 }
 

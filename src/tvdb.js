@@ -195,19 +195,16 @@ export const srchTvdbData = async (searchStr) => {
 //////////// get TvDb Data //////////////
 
 export const getTvdbData = async (show) => {
-  const name = show.Name;
+  const name     = show.Name;
+  let   tvdbData = allTvdb[name];
+  if(tvdbData) return tvdbData;
 
-  if(!show.TvdbId) {
-    console.error(`getTvdbData, no tvdbId:`, name, {show});
+  const tvdbId = show.TvdbId;
+  if(!tvdbId) {
+    console.error(`getTvdbData error, no tvdbId:`, name, {show});
     return null;
   }
-  const tvdbId = show.TvdbId;
   
-  let tvdbData = allTvdb[name];
-  if(tvdbData) {
-      return tvdbData;
-  }
-
   if(!theTvdbToken) await getToken();
   
   let extRes, extUrl;

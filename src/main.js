@@ -4,11 +4,11 @@ reminder, restore ...
 
 bugs ...
   no series meta in banned (Castle Builders)
-  no series meta in noemby (just Anxious People)
   file missing (in meta) doesn't have dash (St. Denis Medical)
-  
+  watched info didn't update (Bad Sisters)
+  search list sorts THE incorrectly
+
 todo  ...
-  show deleted in history buttons and series meta
 
 new features ..
   refresh filtered rows when new gap loaded

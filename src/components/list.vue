@@ -146,6 +146,10 @@
             | {{srchChoice.name}}
           #srchDtl(style=`font-size:18px; margin:10px 0 0 10px;`)
             | {{srchChoice.searchDtlTxt}}
+          #srchDel(v-if="srchChoice.deleted"
+                   style=`font-size:18px; 
+                          margin:10px 0 0 10px; color:red;`)
+            | Deleted
 
     #shows(style="width:100%; flex-grow: 1; overflow-y:scroll;")
       table(style="width:100%; font-size:18px")
@@ -642,7 +646,6 @@ export default {
       this.cancelSrchList();
       const matchShow = allShows.find((s) => s.Name == name);
       if(matchShow) {  
-        alert(matchShow.Name + ' already exists.');
         console.log(matchShow.Name + ' already exists.');
         this.saveVisShow(matchShow, true);
         return;
@@ -1067,7 +1070,7 @@ export default {
 
         // ... temp one-time mass operations ...
         // await util.setTvdbDeleted(allShows);
-        // util.removeDeadShows(allShows);
+        // await util.removeDeadShows(allShows);
         // await util.listCountries(allShows);
         // await util.setAllFavs(allShows);
         // await util.loadAllRemotes(allShows); // takes many hours

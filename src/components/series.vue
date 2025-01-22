@@ -4,8 +4,14 @@
               display:flex; flex-direction:column;
               padding:5px;`)
 
-  div(style=`text-align:center; font-weight:bold;
-            margin-bottom:20px; font-size:25px;`) {{show.Name}}
+  div(style=`display:flex; justify-content:center; 
+             font-weight:bold; 
+             margin-bottom:20px; font-size:25px;`)
+    div(style=`text-align:center; margin-right:20px;`) {{show.Name}}
+    div(v-if="isDeleted"
+        style=`font-weight:bold; color:red; 
+               font-size:20px; margin-top:4px;`) {{deletedTxt}}
+    button(v-else style=`font-size:15px;`) Delete
 
   #top(style=`display:flex; flex-direction:row`)
     #topLeft(@click="openMap(show)"
@@ -86,7 +92,9 @@ export default {
       showRemotes: false,
       nextUpTxt: '',
       watchButtonTxt: '',
-      episodeId: ''
+      episodeId: '',
+      isDeleted: true,
+      deletedTxt: '',
     }
   },
   
@@ -110,6 +118,11 @@ export default {
       setTimeout(()=> {
         windowId = window.open(url, windowLabel);
       }, 1000);
+    },
+
+    async setDeleted(tvdbShowData) {
+      this.deletedTxt = 'Deleted ' + tvdbShowData.deleted;
+      this.isDeleted  = !!tvdbShowData.deleted;
     },
 
     async setPoster(tvdbShowData) {
@@ -268,6 +281,7 @@ export default {
     evtBus.on('setUpSeries', async (show) => { 
       this.show = show;
       const tvdbShowData = await tvdb.getTvdbData(show);
+      await this.setDeleted(tvdbShowData);
       await this.setPoster(tvdbShowData);
       await this.setDates(tvdbShowData);
       await this.setSeasonsTxt(tvdbShowData);

@@ -31,8 +31,13 @@ const getShowState = async (showId, _showName) => {
   let seasonWatchedThenNofile = false;
 
   try {
-    const seasonsRes = 
-          await axios.get(urls.childrenUrl(cred, showId));
+    let seasonsRes;
+    let url = urls.childrenUrl(cred, showId);
+    try { seasonsRes = await axios.get(url); }
+    catch(error) {
+      console.error('getShowState axios error', error.message, {url});
+      return null;
+    }
     const seasons = seasonsRes.data.Items;
     for(let seasonIdx=0; seasonIdx < seasons.length; seasonIdx++) {
       const season       = seasons[seasonIdx];
@@ -45,16 +50,27 @@ const getShowState = async (showId, _showName) => {
       let allSeasonWatched        = true;
 
       const unairedObj = {};
-      const unairedRes = await axios.get(
-                urls.childrenUrl(cred, seasonId, true));
+
+      let unairedRes;
+      url = urls.childrenUrl(cred, seasonId, true);
+      try { unairedRes = await axios.get(url); }
+      catch(error) {
+        console.error('getShowState axios error', error.message, {url});
+        return null;
+      }
       for(let key in unairedRes.data.Items) {
         const episode       = unairedRes.data.Items[key];
         const episodeNumber = +episode.IndexNumber;
         unairedObj[episodeNumber] = true;
       }
 
-      const episodesRes = 
-              await axios.get(urls.childrenUrl(cred, seasonId));
+      let episodesRes;
+      url = urls.childrenUrl(cred, seasonId);
+      try {episodesRes = await axios.get(url)}
+      catch(error) {
+        console.error('getShowState axios error', error.message, {url});
+        return null;
+      }
       const episodes = episodesRes.data.Items;
       for(let episodeIdx=0;  episodeIdx < episodes.length; episodeIdx++) {
         const episode       = episodes[episodeIdx];
@@ -128,7 +144,7 @@ const getShowState = async (showId, _showName) => {
     }
   }
   catch(error) { 
-    console.error('getShowState', {error});
+    console.error('getShowState error:', error.message);
     return null;
   }
   return {notReady:!ready, waiting, anyWatched, 

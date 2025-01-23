@@ -197,8 +197,8 @@ export default {
       }
       const watchedTxt = (episodeCount > 0  &&
                           watchedCount == episodeCount) 
-              ? ' &nbsp; All Watched' 
-              :`  &nbsp; ${watchedCount}/${episodeCount} Watched`;
+              ? ' &nbsp; &nbsp; Watched All Episodes' 
+              :`  &nbsp;Watched ${watchedCount} of ${episodeCount} Episodes`;
       if(!seasonsTxt) return;
       this.seasonsTxt = ' &nbsp; ' + seasonsTxt + watchedTxt;
     },

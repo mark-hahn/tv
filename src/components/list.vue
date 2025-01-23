@@ -429,6 +429,15 @@ export default {
 
     const deleteShow = async (show) => {
       // console.log('list, deleteShow:', show.Name);
+      if(show.Reject) {
+        srvr.delReject(show.Name)
+          .catch((err) => {
+            console.error("late delReject error:", err);
+          });
+        await this.removeRow(show)
+        return;
+      }
+      else
       if(!show.Id.startsWith("noemby-")) {
         this.saveVisShow(show);
         if (!window.confirm(
@@ -438,10 +447,14 @@ export default {
       }
       await tvdb.markTvdbDeleted(show.Name, true);
       await srvr.deleteShowFromSrvr(show);
-      this.setHighlightAfterDel(show.Id);
+      await this.removeRow(show);
     };
 
-
+    evtBus.on('deleteShow', (show) => {
+      // console.log('evtBus deleteShow', show.Name);
+      if(!show) return;
+      deleteShow(show);
+    });
 
     return {
       shows:                [],
@@ -1021,12 +1034,6 @@ export default {
   mounted() {
     evtBus.on('openMap', (show) => {
       this.seriesMapAction('open', show);
-    });
-
-    evtBus.on('deleteShow', (show) => {
-      // console.log('evtBus deleteShow', show.Name);
-      this.deleteShow(show);
-      this.removeRow(show);
     });
 
     evtBus.on('deleteRow', (show) => {

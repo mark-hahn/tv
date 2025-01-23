@@ -8,14 +8,15 @@
               font-weight:bold; font-size:25px;
               margin-bottom:20px; max-width:495px;`)
     div(style=`margin-left:20px; max-width:450px`) {{show.Name}}
-    div(v-if="deletedTxt !== ''" style=`display:flex;`)
+    div(v-if="deletedTxt !== '' && notReject" 
+        style=`display:flex;`)
       div(style=`font-weight:bold; color:red; 
                   font-size:18px; max-height:24px;
                   margin-top:4px; margin-right:10px;`) {{deletedTxt}}
       button(@click="hideClick"
               style=`font-size:15px; max-height:24px;`) Hide
     div(v-else style=`display:flex;`)
-      div(v-if="notInEmby" 
+      div(v-if="notInEmby && notReject" 
           style=`font-weight:bold; color:red; 
                   font-size:18px; margin-top:4px;
                   max-height:24px;`) Not in Emby
@@ -24,7 +25,7 @@
                     margin-left:20px; margin-top:3px;
                     max-height:24px;`) Delete
 
-  #body(v-if="showBody" style=`display:flex;`)
+  #body(v-if="notReject" style=`display:flex;`)
     #topLeft(@click="openMap(show)"
               style=`display:flex; flex-direction:column;
                      text-align:center;`) 
@@ -95,7 +96,7 @@ export default {
     return {
       show: {Name:''},
       dates: '',
-      showBody: true,
+      notReject: true,
       remoteShowName: '',
       remotes: [],
       seasonsTxt: '',
@@ -123,7 +124,7 @@ export default {
     },
 
     async hideClick() {
-      //- console.log('Series, hideClick:', this.show.Name);
+      // console.log('Series, hideClick:', this.show.Name);
       evtBus.emit('deleteRow', this.show);
     },
 
@@ -144,11 +145,11 @@ export default {
 
     async setDeleted(tvdbData) {
       const deleted = !!tvdbData.deleted;
-      //- console.log('series, setDeleted:', {deleted, noEmby})
+      //- console.log('series, setDeleted:', deleted)
       if(deleted) this.deletedTxt = 'Deleted ' + 
                        tvdbData.deleted;
       else        this.deletedTxt = '';
-      this.notInEmby  = this.show.Id.startsWith('noemby-');
+      this.notInEmby = this.show.Id.startsWith('noemby-');
     },
 
     async setPoster(tvdbData) {
@@ -316,7 +317,7 @@ export default {
     evtBus.on('setUpSeries', async (show) => { 
       this.show = show;
       if(show.Reject) {
-        this.showBody = false;
+        this.notReject = false;
         return;
       }
       this.showBody = true;

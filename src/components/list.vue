@@ -39,8 +39,7 @@
                         padding-top:3px; padding-left:5px;
                         background-color:#eee;
                         height:31px;`)
-          input(v-model="webHistStr" 
-               @input="webHistAction" placeholder="Search..."
+          input(v-model="webHistStr" placeholder="Search..."
                 style=`width:120px;`)
           button(@click="addClick(false)" 
                   style=`display:inline-block'; 
@@ -431,6 +430,7 @@ export default {
     return {
       shows:                [],
       filterStr:            "",
+      webHistStr:           "",
       errMsg:               "",
       highlightName:        "",
       allShowsLength:        0,
@@ -583,45 +583,43 @@ export default {
     },
 
     async addClick(history = false) {
-      if(this.searchList !== null) {
-        this.cancelSrchList();
-        return;
-      }
       this.cancelSrchList();
-      let srchTxt, tvdbSrchData;
-      if(!history) {    
-          srchTxt = prompt(
-                  "Enter series name. " +
-                  "It is used as an approximate search string.");
-        if (!srchTxt) {
-          console.error("Search string is empty");
-          return;
-        }
-      }
+      const srchTxt = this.webHistStr;
+      if(srchTxt.length == 0) return;
+      
+      let tvdbSrchData;
       this.showingSrchList = true;
+
       if(!history) {
         tvdbSrchData = await tvdb.srchTvdbData(srchTxt);
         if(!tvdbSrchData) {
           this.cancelSrchList();
           setTimeout(() => {
-            console.error('No series found in tvdb for:', srchTxt);
-            alert(`No tv series found using search text: ` +
-                  `${srchTxt}`);
+            console.error('No results for web search:', srchTxt);
+            this.webHistStr = `No series.`;
           }, 100);
           return;
         }
       }
+
       if(history) {
-        const allTvdb = await srvr.getAllTvdb();
+        const allTvdb     = await srvr.getAllTvdb();
         const tvdbDataArr = Object.entries(allTvdb);
-        tvdbSrchData = tvdbDataArr.sort( (a, b) => 
+        const srchTvdb    = tvdbDataArr.filter((tvdbDataItem) =>
+                                tvdbDataItem[0].toLowerCase()
+                                .includes(srchTxt.toLowerCase()));
+        if(srchTvdb.length == 0) {
+          this.webHistStr = `No series.`;
+          this.cancelSrchList();
+          return;
+        }
+        tvdbSrchData = srchTvdb.sort((a, b) => 
             a[0].replace(/^the\s/i, '') > 
-            b[0].replace(/^the\s/i, '')   ? 1 : -1);
+            b[0].replace(/^the\s/i, '') ? 1 : -1);
         tvdbSrchData = tvdbSrchData.map(
           (item) => {
-            const tvdbData = item[1];
-            tvdbData.year = 
-                    tvdbData.firstAired.substring(0, 4);
+            const tvdbData     = item[1];
+            tvdbData.year      = tvdbData.firstAired.substring(0, 4);
             tvdbData.country   = tvdbData.originalCountry;
             tvdbData.thumbnail = tvdbData.image;
             return tvdbData;
@@ -762,6 +760,7 @@ export default {
       this.fltrPopped = !this.fltrPopped
       this.sortPopped = false;
     },
+    
     async fltrAction(fltrChoice) {
       // console.log('fltrAction', fltrChoice);
       window.localStorage.setItem("fltrChoice", fltrChoice);

@@ -9,10 +9,9 @@
     #hdr(style=`width:100%; background-color:#ccc;
                 display:flex; flex-direction:column;`)
 
-      #hdrtop(style=`width:100%; display:flex;
-                     background-color:#ccc; 
-                     justify-content:space-between;
-                     flex-direction:row; justify-content:start;`)
+      #hdrtop(style=`width:100%; height:40px;
+                     display:flex; justify-content:space-start;
+                     background-color:#ccc;`)
         div(style=`display:flex; justify-content:space-between;
                    margin-bottom:10px;`)
           #nums(style=`display:flex; justify-content:space-around;
@@ -131,7 +130,7 @@
     #searchList( v-if="showingSrchList"
           style=`background-color:#eee; padding:0px;
                 border: 1px solid black; height:85%;
-                position: fixed; overflow-y:scroll;
+                position: fixed;
                 display:flex; flex-direction:column;
                 left: 253px; top: 75px;
                 cursor:pointer; min-width:280px;`) 
@@ -139,31 +138,32 @@
            style=`font-weight:bold; text-align:center;
                   margin:10px;background-color:white;`)
         | Cancel
-      div(v-if="showingSrchList && searchList === null")
-        img(src="../../loading.gif"
-            style=`width:100px; height:100px;
-                    position:relative; top:20px; left:80px;`)
-      div(v-for="srchChoice in searchList"
-          v-if="searchList !== null"
-          @click="searchAction(srchChoice)"
-          style=`margin:3px 10px; padding:10px; width:230px;
-                background-color:white; text-align:center;
-                border: 1px solid black; 
-                display:flex;`)
-        img(:src="srchChoice.image" 
-            style=`max-width:80px; max-height:120px;`)
-        #srchTxt(style=`max-width:230px;
-                        display:flex; margin:5px; 
-                        flex-direction:column;`)
-          #srchName(style=`font-weight:bold;
-                           font-size:20px; `)
-            | {{srchChoice.name}}
-          #srchDtl(style=`font-size:18px; margin:10px 0 0 10px;`)
-            | {{srchChoice.searchDtlTxt}}
-          #srchDel(v-if="srchChoice.deleted"
-                   style=`font-size:18px; 
-                          margin:10px 0 0 10px; color:red;`)
-            | Deleted
+      div(style="overflow-y:scroll")
+        div(v-if="showingSrchList && searchList === null")
+          img(src="../../loading.gif"
+              style=`width:100px; height:100px; overflow-y:scroll;
+                      position:relative; top:20px; left:80px;`)
+        div(v-for="srchChoice in searchList"
+            v-if="searchList !== null"
+            @click="searchAction(srchChoice)"
+            style=`margin:3px 10px; padding:10px; width:230px;
+                  background-color:white; text-align:center;
+                  border: 1px solid black; 
+                  display:flex;`)
+          img(:src="srchChoice.image" 
+              style=`max-width:80px; max-height:120px;`)
+          #srchTxt(style=`max-width:230px;
+                          display:flex; margin:5px; 
+                          flex-direction:column;`)
+            #srchName(style=`font-weight:bold;
+                            font-size:20px; `)
+              | {{srchChoice.name}}
+            #srchDtl(style=`font-size:18px; margin:10px 0 0 10px;`)
+              | {{srchChoice.searchDtlTxt}}
+            #srchDel(v-if="srchChoice.deleted"
+                    style=`font-size:18px; 
+                            margin:10px 0 0 10px; color:red;`)
+              | Deleted
 
     #shows(style="width:100%; flex-grow: 1; overflow-y:scroll;")
       table(style="width:100%; font-size:18px")
@@ -586,7 +586,7 @@ export default {
       this.cancelSrchList();
       const srchTxt = this.webHistStr;
       if(srchTxt.length == 0) return;
-      
+
       let tvdbSrchData;
       this.showingSrchList = true;
 

@@ -10,8 +10,6 @@ bugs ...
   changing map doesn't change gaps
 
 todo  ...
-  text input for add/hist
-  don't scroll Cancel button at top of choice list
   remove show from tvdb.json (how?)
   update tvdb data periodicaly (bad sisters)
 

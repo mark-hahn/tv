@@ -24,7 +24,7 @@
                     margin-left:20px; margin-top:3px;
                     max-height:24px;`) Delete
 
-  #body(style=`display:flex;`)
+  #body(v-if="showBody" style=`display:flex;`)
     #topLeft(@click="openMap(show)"
               style=`display:flex; flex-direction:column;
                      text-align:center;`) 
@@ -95,6 +95,7 @@ export default {
     return {
       show: {Name:''},
       dates: '',
+      showBody: true,
       remoteShowName: '',
       remotes: [],
       seasonsTxt: '',
@@ -164,6 +165,7 @@ export default {
       } else {
         console.error('image missing from tvdbData',
                        tvdbData.name);
+        alert('image missing from tvdbData: ' + tvdbData.name);
         img.src = './question-mark.png';
       }
       document.getElementById('poster').replaceChildren(img);
@@ -313,6 +315,11 @@ export default {
   mounted() {
     evtBus.on('setUpSeries', async (show) => { 
       this.show = show;
+      if(show.Reject) {
+        this.showBody = false;
+        return;
+      }
+      this.showBody = true;
       const tvdbData = await tvdb.getTvdbData(show);
       await this.setDeleted(tvdbData);
       await this.setPoster(tvdbData);

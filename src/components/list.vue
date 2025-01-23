@@ -427,6 +427,22 @@ export default {
           });
     };
 
+    const deleteShow = async (show) => {
+      // console.log('list, deleteShow:', show.Name);
+      if(!show.Id.startsWith("noemby-")) {
+        this.saveVisShow(show);
+        if (!window.confirm(
+            `Do you really want to delete series ${show.Name}?`)) 
+          return;
+        await emby.deleteShowFromEmby(show);
+      }
+      await tvdb.markTvdbDeleted(show.Name, true);
+      await srvr.deleteShowFromSrvr(show);
+      this.setHighlightAfterDel(show.Id);
+    };
+
+
+
     return {
       shows:                [],
       filterStr:            "",
@@ -515,7 +531,7 @@ export default {
         }, {
           color: "#a66", filter: 0, icon: ["fas", "tv"],
           cond(show)  { return !show.Id.startsWith("noemby-"); },
-          click(show) { this.deleteShow(show) },
+          click(show) { deleteShow(show) },
           name: "hasemby",
         },
       ],
@@ -524,22 +540,6 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
-
-    async deleteShow(show) {
-        // console.log('list, deleteShow:', show.Name);
-
-      if(!show.Id.startsWith("noemby-")) {
-        this.saveVisShow(show);
-        if (!window.confirm(
-            `Do you really want to delete series ${show.Name}?`)) 
-          return;
-        await emby.deleteShowFromEmby(show);
-      }
-      await tvdb.markTvdbDeleted(show.Name, true);
-      await srvr.deleteShowFromSrvr(show);
-      this.setHighlightAfterDel(show.Id);
-    },
-
 
     getValBySortChoice(show, forSort = false) {
       switch(this.sortChoice) {

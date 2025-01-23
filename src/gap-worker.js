@@ -6,9 +6,6 @@ let cred;
 const getShowState = async (showId, _showName) => {
   // active rows have watched with no watched at end
   // or last epi in last row watched
-
-  // if(showName.includes('Guy')) debugger;
-
   let firstEpisode            = true;
   let ready                   = false;
   let checkedReady            = false;

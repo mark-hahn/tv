@@ -182,13 +182,13 @@ export default {
       if(this.show.Id.startsWith('noemby-')) return;
       const show = this.show;
       const epiCounts = await emby.getEpisodeCounts(show);
-      let {seasonCount, episodeCount, watchedCount} = epiCounts;
+      const {seasonCount, episodeCount, watchedCount} 
+                                        = epiCounts;
       if(seasonCount  != tvdbData.seasonCount  ||
          episodeCount != tvdbData.episodeCount ||
          watchedCount != tvdbData.watchedCount) {
         Object.assign(tvdbData, epiCounts);
         tvdb.updateTvdbData(tvdbData);
-        console.log({epiCounts, tvdbData});
       }
       let seasonsTxt = '';
       switch (seasonCount) {
@@ -204,10 +204,12 @@ export default {
       }
       const watchedTxt = (episodeCount > 0  &&
                           watchedCount == episodeCount) 
-              ? ' &nbsp; &nbsp; Watched All Episodes' 
-              :`  &nbsp;Watched ${watchedCount} of ${episodeCount} Episodes`;
+              ? ' &nbsp; &nbsp; Watched All' 
+              :`  &nbsp  
+                  Watched ${watchedCount} of ${episodeCount}`;
       if(!seasonsTxt) return;
-      this.seasonsTxt = ' &nbsp; ' + seasonsTxt + watchedTxt;
+      this.seasonsTxt = ' &nbsp;  &nbsp; ' + 
+                          seasonsTxt + watchedTxt;
     },
 
     async setCntryLangTxt(tvdbData) {

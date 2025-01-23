@@ -5,15 +5,13 @@ reminder, restore ...
 bugs ...
   file missing (in meta) doesn't have dash (St. Denis Medical)
   watched info didn't update (Bad Sisters)
-  search list sorts THE incorrectly
   no series meta in banned (Castle Builders)
   changing map doesn't change gaps
 
 todo  ...
-  don't delete show when remove pickup
-  remove show from tvdb.json (how?)
   text input for add/hist
   don't scroll Cancel button at top of choice list
+  remove show from tvdb.json (how?)
   update tvdb data periodicaly (bad sisters)
 
 tabled ...

@@ -10,25 +10,39 @@
                 display:flex; flex-direction:column;`)
 
       #hdrtop(style=`width:100%; display:flex;
-                    flex-direction:row; justify-content:start;`)
-        #nums(style=`background-color:#ccc; 
-                      display:flex; justify-content:space-around;`)
-          #count(style="display:inline-block; margin:4px 5px 4px 15px;") 
-            | {{shows.length + '/' + allShowsLength}}
-          #prog(style=`display:inline-block; 
-                      margin:4px 10px 4px 5px;`) 
-            | {{gapPercent+'%'}}
+                     background-color:#ccc; 
+                     justify-content:space-between;
+                     flex-direction:row; justify-content:start;`)
+        div(style=`display:flex; justify-content:space-between;
+                   margin-top:4px;`)
+          #nums(style=`display:flex; justify-content:space-around;
+                      width:150px;`)
+            #count(style=`display:inline-block; margin:4px 5px 4px 15px;
+                          width:75px;`) 
+              | {{shows.length + '/' + allShowsLength}}
+            #prog(style=`display:inline-block; 
+                        margin:4px 10px 4px 5px; width:75px;`) 
+              | {{gapPercent+'%'}}
 
-        #srch(style=`margin-top:3px;`)
-          input(v-model="searchStr" 
-                @input="select"
-                 style="border:1px solid black; width:120px;")
-        button(@click="addClick(false)" 
-                style=`display:inline-block'; 
-                      font-size:15px; margin:4px 4px 4px 20px;backgroundColor:white`) Add
-        button(@click="addClick(true)"
-                style=`display:inline-block'; 
-                      font-size:15px; margin:4px 4px 4px 8px;backgroundColor:white`) Hist
+          #srch(style=`margin-top:2px;`)
+            input(v-model="searchStr" 
+                  @input="select" placeholder="Filter..."
+                  style=`border:1px solid black; 
+                  width:120px; height:24px;`)
+
+        #webHist(style=`border:1.5px solid black;
+                        margin: 2px 10px 0 20px;
+                        padding-top:3px; padding-left:5px;
+                        background-color:#eee;`)
+          input(v-model="webHistStr" 
+               @input="webHistAction" placeholder="Search..."
+                style=`width:120px;`)
+          button(@click="addClick(false)" 
+                  style=`display:inline-block'; 
+                        font-size:15px; margin:2px 4px 4px 10px;backgroundColor:white`) Web
+          button(@click="addClick(true)"
+                  style=`display:inline-block'; 
+                        font-size:15px; margin:2px 4px 4px 0;backgroundColor:white`) Hist
         button(@click="watchClick"
                 style=`margin-left:10px; margin-right:5px;
                       fontSize:15px; margin:4px;
@@ -596,8 +610,9 @@ export default {
       if(history) {
         const allTvdb = await srvr.getAllTvdb();
         const tvdbDataArr = Object.entries(allTvdb);
-        tvdbSrchData = tvdbDataArr.sort(
-                            (a, b) => a[0] > b[0] ? 1 : -1);
+        tvdbSrchData = tvdbDataArr.sort( (a, b) => 
+            a[0].replace(/^the\s/i, '') > 
+            b[0].replace(/^the\s/i, '')   ? 1 : -1);
         tvdbSrchData = tvdbSrchData.map(
           (item) => {
             const tvdbData = item[1];

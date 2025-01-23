@@ -141,48 +141,55 @@ export default {
       }, 1000);
     },
 
-    async setDeleted(tvdbShowData) {
-      const deleted = !!tvdbShowData.deleted;
+    async setDeleted(tvdbData) {
+      const deleted = !!tvdbData.deleted;
       //- console.log('series, setDeleted:', {deleted, noEmby})
       if(deleted) this.deletedTxt = 'Deleted ' + 
-                       tvdbShowData.deleted;
+                       tvdbData.deleted;
       else        this.deletedTxt = '';
       this.notInEmby  = this.show.Id.startsWith('noemby-');
     },
 
-    async setPoster(tvdbShowData) {
+    async setPoster(tvdbData) {
       const img = new Image();
       img.style.maxWidth  = "300px"; 
       img.style.maxHeight = "400px"; 
-      if(!tvdbShowData) {
-        console.error('setPoster: tvdbShowData missing');
+      if(!tvdbData) {
+        console.error('setPoster: tvdbData missing');
         img.src = './question-mark.png';
         return;
       }
-      if(tvdbShowData.image) {
-        img.src = tvdbShowData.image;
+      if(tvdbData.image) {
+        img.src = tvdbData.image;
       } else {
-        console.error('image missing from tvdbShowData',
-                       tvdbShowData.name);
+        console.error('image missing from tvdbData',
+                       tvdbData.name);
         img.src = './question-mark.png';
       }
       document.getElementById('poster').replaceChildren(img);
     },
 
-    async setDates(tvdbShowData) {
+    async setDates(tvdbData) {
       const show = this.show;
-      const {firstAired, lastAired, status} = tvdbShowData;
+      const {firstAired, lastAired, status} = tvdbData;
       this.dates = ' &nbsp; ' + firstAired + 
                     '&nbsp; ' + lastAired +
                    ' &nbsp; ' + status;
     },
 
-    async setSeasonsTxt(tvdbShowData) {
+    async setSeasonsTxt(tvdbData) {
       this.seasonsTxt = ``;
       if(this.show.Id.startsWith('noemby-')) return;
       const show = this.show;
-      const {seasonCount, episodeCount, 
-             watchedCount} = tvdbShowData;
+      const epiCounts = await emby.getEpisodeCounts(show);
+      let {seasonCount, episodeCount, watchedCount} = epiCounts;
+      if(seasonCount  != tvdbData.seasonCount  ||
+         episodeCount != tvdbData.episodeCount ||
+         watchedCount != tvdbData.watchedCount) {
+        Object.assign(tvdbData, epiCounts);
+        tvdb.updateTvdbData(tvdbData);
+        console.log({epiCounts, tvdbData});
+      }
       let seasonsTxt = '';
       switch (seasonCount) {
         case 0:  
@@ -203,11 +210,11 @@ export default {
       this.seasonsTxt = ' &nbsp; ' + seasonsTxt + watchedTxt;
     },
 
-    async setCntryLangTxt(tvdbShowData) {
+    async setCntryLangTxt(tvdbData) {
       this.cntryLangTxt = ``;
       let {originalCountry, originalLanguage, 
            averageRuntime,
-           originalNetwork} = tvdbShowData;
+           originalNetwork} = tvdbData;
            
       if(originalCountry == 'gbr') originalCountry = 'UK';
 
@@ -305,12 +312,12 @@ export default {
   mounted() {
     evtBus.on('setUpSeries', async (show) => { 
       this.show = show;
-      const tvdbShowData = await tvdb.getTvdbData(show);
-      await this.setDeleted(tvdbShowData);
-      await this.setPoster(tvdbShowData);
-      await this.setDates(tvdbShowData);
-      await this.setSeasonsTxt(tvdbShowData);
-      await this.setCntryLangTxt(tvdbShowData);
+      const tvdbData = await tvdb.getTvdbData(show);
+      await this.setDeleted(tvdbData);
+      await this.setPoster(tvdbData);
+      await this.setDates(tvdbData);
+      await this.setSeasonsTxt(tvdbData);
+      await this.setCntryLangTxt(tvdbData);
       await this.setNextWatch();
       await this.setRemotes();
     });

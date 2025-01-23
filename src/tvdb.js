@@ -256,6 +256,12 @@ export const getTvdbData = async (show) => {
   return tvdbData;
 }
 
+export const updateTvdbData = async (tvdbData) => {
+  console.log('updateTvdbData:', tvdbData);
+  allTvdb[tvdbData.name] = tvdbData;
+  srvr.addTvdb(tvdbData);
+}
+
 export const markTvdbDeleted = 
   async (showName, markDelete) => {
     const tvdbData = allTvdb[showName];

@@ -7,13 +7,11 @@ bugs ...
   file missing (in meta) doesn't have dash (St. Denis Medical)
   watched info didn't update (Bad Sisters)
   no series meta in banned (Castle Builders)
-  changing map doesn't change gaps
-  no highlight to prev without selected
   
 todo  ...
-  select row when selected filtered out
 
 tabled ...
+  changing map doesn't change gaps
   remove show from tvdb.json (how?)
   button: scroll hilighted row to vis 
   refresh filtered rows when new gap loaded

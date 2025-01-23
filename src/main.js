@@ -3,6 +3,7 @@ reminder, restore ...
   start gap running
 
 bugs ...
+  lincoln Lawyer missing in linda
   file missing (in meta) doesn't have dash (St. Denis Medical)
   watched info didn't update (Bad Sisters)
   no series meta in banned (Castle Builders)

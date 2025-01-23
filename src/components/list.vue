@@ -14,9 +14,9 @@
                      justify-content:space-between;
                      flex-direction:row; justify-content:start;`)
         div(style=`display:flex; justify-content:space-between;
-                   margin-top:4px;`)
+                   margin-bottom:10px;`)
           #nums(style=`display:flex; justify-content:space-around;
-                      width:150px;`)
+                      width:120px;`)
             #count(style=`display:inline-block; margin:4px 5px 4px 15px;
                           width:75px;`) 
               | {{shows.length + '/' + allShowsLength}}
@@ -24,29 +24,33 @@
                         margin:4px 10px 4px 5px; width:75px;`) 
               | {{gapPercent+'%'}}
 
-          #srch(style=`margin-top:2px;`)
-            input(v-model="searchStr" 
+          #srch(style=`border:1.5px solid black;
+                        width:132px;
+                        margin: 3px 10px 0 20px;
+                        padding-top:3px; padding-left:5px;
+                        background-color:#eee;
+                        height:31px;`)
+            input(v-model="filterStr" 
                   @input="select" placeholder="Filter..."
-                  style=`border:1px solid black; 
-                  width:120px; height:24px;`)
+                  style=`width:120px;`)
 
         #webHist(style=`border:1.5px solid black;
-                        margin: 2px 10px 0 20px;
+                        margin: 2px 10px 0 10px;
                         padding-top:3px; padding-left:5px;
-                        background-color:#eee;`)
+                        background-color:#eee;
+                        height:31px;`)
           input(v-model="webHistStr" 
                @input="webHistAction" placeholder="Search..."
                 style=`width:120px;`)
           button(@click="addClick(false)" 
                   style=`display:inline-block'; 
-                        font-size:15px; margin:2px 4px 4px 10px;backgroundColor:white`) Web
+                        font-size:15px; margin:2px 4px 0 10px;backgroundColor:white`) Web
           button(@click="addClick(true)"
                   style=`display:inline-block'; 
-                        font-size:15px; margin:2px 4px 4px 0;backgroundColor:white`) Hist
+                        font-size:15px; margin:2px 4px 0 0;backgroundColor:white`) Hist
         button(@click="watchClick"
-                style=`margin-left:10px; margin-right:5px;
-                      fontSize:15px; margin:4px;
-                      background-color:white;`) 
+                style=`height:29px; background-color:white;
+                       fontSize:15px; margin:6px 5px 4px 10px;`) 
           | {{ watchingName }}
 
       #hdrbottom(style=`width:100%; background-color:#ccc; 
@@ -426,7 +430,7 @@ export default {
 
     return {
       shows:                [],
-      searchStr:            "",
+      filterStr:            "",
       errMsg:               "",
       highlightName:        "",
       allShowsLength:        0,
@@ -764,7 +768,7 @@ export default {
       this.fltrChoice = fltrChoice;
       this.sortPopped = false;
       this.fltrPopped = false;
-      this.searchStr = "";
+      this.filterStr = "";
       for (let cond of this.conds) {
          util.setCondFltr(cond, this.fltrChoice);
         //  console.log('cond:', cond.name, cond.filter);
@@ -914,10 +918,10 @@ export default {
     },
 
     select(scroll = true) {
-      if(this.searchStr.length > 0) 
+      if(this.filterStr.length > 0) 
             this.fltrChoice = '- - - - -';
-      const srchStrLc = this.searchStr == 
-            "" ? null : this.searchStr.toLowerCase();
+      const srchStrLc = this.filterStr == 
+            "" ? null : this.filterStr.toLowerCase();
       this.shows = allShows.filter((show) => {
         if (srchStrLc && 
            !show.Name.toLowerCase().includes(srchStrLc)) 
@@ -948,7 +952,7 @@ export default {
 
     showAll(dontClrFilters = false) {
       if(dontClrFilters?.altKey !== undefined) dontClrFilters = false;
-      this.searchStr = "";
+      this.filterStr = "";
       if(!dontClrFilters) {
         for (let cond of this.conds) cond.filter = 0;
       }

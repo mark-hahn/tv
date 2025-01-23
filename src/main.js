@@ -8,8 +8,10 @@ bugs ...
   watched info didn't update (Bad Sisters)
   no series meta in banned (Castle Builders)
   changing map doesn't change gaps
-
+  no highlight to prev without selected
+  
 todo  ...
+  select row when selected filtered out
 
 tabled ...
   remove show from tvdb.json (how?)

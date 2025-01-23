@@ -703,6 +703,11 @@ export default {
       if(newPtr < 0 || newPtr >= showHistory.length) return;
       showHistoryPtr = newPtr;
       const show = showHistory[showHistoryPtr];
+      const showArr = this.shows.filter(
+              (showIn) => showIn.Name == show.Name);
+      if (showArr.length == 0) {
+        this.fltrAction('All');
+      }
       this.saveVisShow(show, true);
     },
 
@@ -935,6 +940,12 @@ export default {
       });
       if (this.shows.length === 1) 
         this.saveVisShow(this.shows[0]);
+      else {
+        const showArr = this.shows.filter(
+                (show) => show.Name == this.highlightName);
+        if (showArr.length == 0)
+          this.saveVisShow(this.shows[0]);
+      }
       if (scroll) this.scrollToSavedShow();
     },
 

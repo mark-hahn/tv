@@ -10,10 +10,9 @@ bugs ...
   changing map doesn't change gaps
 
 todo  ...
-  remove show from tvdb.json (how?)
-  update tvdb data periodicaly (bad sisters)
 
 tabled ...
+  remove show from tvdb.json (how?)
   button: scroll hilighted row to vis 
   refresh filtered rows when new gap loaded
   map: click on season numbers for whole row

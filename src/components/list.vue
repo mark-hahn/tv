@@ -812,7 +812,8 @@ export default {
       let deleted = null;
       if(e.ctrlKey) {
         const ok = 
-          confirm(`OK to delete file for ${show.Name} S${season}E${episode} ?`);
+          confirm(`OK to delete file for ${show.Name} ` +
+                     `S${season}E${episode} ?`);
         if(!ok) return;
         // delete episode file
         await emby.editEpisode(show.Id, season, episode, true);

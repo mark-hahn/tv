@@ -339,11 +339,11 @@ export const editEpisode = async (seriesId,
         url:     url,
         data:    userData
       });
-      console.log("toggled watched", {
-                    episode: `S${seasonNumber}E${episodeNumber}`, 
-                    post_url: url,
-                    post_res: setDataRes
-                  });
+      // console.log("toggled watched", {
+      //               episode: `S${seasonNumber}E${episodeNumber}`, 
+      //               post_url: url,
+      //               post_res: setDataRes
+      //             });
     }
   }
 }

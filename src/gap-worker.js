@@ -79,7 +79,8 @@ const getShowState = async (showId, _showName) => {
         const userData      = episode?.UserData;
         const watched       = !!userData?.Played;
         const haveFile      = (episode.LocationType != "Virtual");
-        const unaired       = !!unairedObj[episodeNumber];
+        let   unaired       = !!unairedObj[episodeNumber];
+        if(watched) unaired = false;
 
         allSeasonWatched &&= watched;
         if(watched) anyWatched = true;
@@ -93,10 +94,9 @@ const getShowState = async (showId, _showName) => {
            checkedReady = true;
            ready        = haveFile;
         }
-
         if(watched) {
-          watchedShow             = true;
-          watchedSeason           = true;
+          watchedShow   = true;
+          watchedSeason = true;
         }
         if(episodeIdx == episodes.length-1) {
           // last epi in season

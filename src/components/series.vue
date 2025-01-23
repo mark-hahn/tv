@@ -208,8 +208,7 @@ export default {
               :`  &nbsp  
                   Watched ${watchedCount} of ${episodeCount}`;
       if(!seasonsTxt) return;
-      this.seasonsTxt = ' &nbsp;  &nbsp; ' + 
-                          seasonsTxt + watchedTxt;
+      this.seasonsTxt = ' &nbsp; ' + seasonsTxt + watchedTxt;
     },
 
     async setCntryLangTxt(tvdbData) {
@@ -259,13 +258,13 @@ export default {
             break;
           case 'missing':   // next avail & !haveFile
             this.nextUpTxt = 
-                ` &nbsp; Next Up: ${fmtSE(seasonNumber, episodeNumber)}` +
-                              ' &nbsp; File Missing';
+                ` &nbsp; Next Up: ${fmtSE(seasonNumber, episodeNumber)} 
+                  &nbsp; No File`;
             break;
           case 'unaired':   // next avail & !haveFile
             this.nextUpTxt = 
-                ` &nbsp; Next Up: ${fmtSE(seasonNumber, episodeNumber)}` +
-                              ' &nbsp; Unaired';
+                ` &nbsp; Next Up: ${fmtSE(seasonNumber, episodeNumber)}
+                  &nbsp; Unaired`;
             break;
         }
       }

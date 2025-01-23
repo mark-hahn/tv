@@ -8,16 +8,21 @@
               font-weight:bold; font-size:25px;
               margin-bottom:20px; max-width:495px;`)
     div(style=`margin-left:20px; max-width:450px`) {{show.Name}}
-    div(v-if="deletedTxt !== ''" style=``)
+    div(v-if="deletedTxt !== ''" style=`display:flex;`)
       div(style=`font-weight:bold; color:red; 
-                  font-size:20px; margin-top:4px;
-                  max-height:24px;`) {{deletedTxt}}
+                  font-size:18px; max-height:24px;
+                  margin-top:4px; margin-right:10px;`) {{deletedTxt}}
       button(@click="hideClick"
-              style=`font-size:15px; max-height:24px;
-                     left:1245px;`) Hide
-    button(v-else @click="deleteClick"
-            style=`font-size:15px; margin-left:20px;
-                   max-height:24px;`) Delete
+              style=`font-size:15px; max-height:24px;`) Hide
+    div(v-else style=`display:flex;`)
+      div(v-if="notInEmby" 
+          style=`font-weight:bold; color:red; 
+                  font-size:18px; margin-top:4px;
+                  max-height:24px;`) Not in Emby
+      button(@click="deleteClick"
+              style=`font-size:15px; 
+                    margin-left:20px; margin-top:3px;
+                    max-height:24px;`) Delete
 
   #body(style=`display:flex;`)
     #topLeft(@click="openMap(show)"
@@ -100,6 +105,7 @@ export default {
       watchButtonTxt: '',
       episodeId: '',
       deletedTxt: '',
+      notInEmby: false,
     }
   },
   
@@ -137,11 +143,11 @@ export default {
 
     async setDeleted(tvdbShowData) {
       const deleted = !!tvdbShowData.deleted;
-      const noEmby  = this.show.Id.startsWith('noemby-');
       //- console.log('series, setDeleted:', {deleted, noEmby})
       if(deleted) this.deletedTxt = 'Deleted ' + 
                        tvdbShowData.deleted;
       else        this.deletedTxt = '';
+      this.notInEmby  = this.show.Id.startsWith('noemby-');
     },
 
     async setPoster(tvdbShowData) {

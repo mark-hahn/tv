@@ -328,7 +328,6 @@ export default {
               console.error("late toggleToTry error:", err);
               //- show.InToTry = !show.InToTry;
             });
-      await this.chkRowDelete(show);
     };
 
     const toggleContinue = async (show) => {
@@ -341,7 +340,6 @@ export default {
               console.error("late toggleContinue error:", err);
               //- show.InContinue = !show.InContinue;
             });
-      await this.chkRowDelete(show);
     };
 
     const toggleMark = async (show) => {
@@ -354,7 +352,6 @@ export default {
               console.error("late toggleMark error:", err);
               //- show.InMark = !show.InMark;
             });
-      await this.chkRowDelete(show);
     };
 
     const toggleLinda = async (show) => {
@@ -367,7 +364,6 @@ export default {
               console.error("late toggleLinda error:", err);
               //- show.InLinda = !show.InLinda;
             });
-      await this.chkRowDelete(show);
     };
 
     const toggleFavorite = async (show) => {
@@ -380,7 +376,6 @@ export default {
               console.error("late saveFavorite error:", err);
               //- show.IsFavorite = !show.IsFavorite;
            });
-      await this.chkRowDelete(show);
     };
 
     const toggleReject = async (show) => {
@@ -397,7 +392,6 @@ export default {
                 console.error("late delReject:", err);
                 //- show.Reject = !show.Reject;
             });
-      await this.chkRowDelete(show);
     };
 
     const togglePickup = async (show) => {
@@ -414,8 +408,6 @@ export default {
               console.error("late delPickup:", err);
               //- show.Pickup = !show.Pickup;
           });
-      if(await this.chkRowDelete(show))
-        this.deleteShow(show);
     };
 
     return {
@@ -523,11 +515,6 @@ export default {
         if (!window.confirm(
             `Do you really want to delete series ${show.Name}?`)) 
           return;
-        if(!await this.chkRowDelete(show, true)){
-          show.RunTimeTicks = 0;
-          show.IsFavorite   = false;
-          return
-        }
         await emby.deleteShowFromEmby(show);
       }
       await tvdb.markTvdbDeleted(show.Name, true);
@@ -571,16 +558,6 @@ export default {
       this.setHighlightAfterDel(id);
       allShows   = allShows.filter(  (show) => show.Id != id);
       this.shows = this.shows.filter((show) => show.Id != id);
-    },
-
-    async chkRowDelete(show, force) {
-      if (force || (!show.Reject && !show.Pickup &&
-                     show.Id.startsWith("noemby-"))) {
-        console.log("no reason to keep row, deleting it:", show.Name);
-        this.removeRow(show);
-        return true;
-      }
-      return false;
     },
 
     hilite(show) {
@@ -674,7 +651,7 @@ export default {
         InMark: false,
         InLinda: false,
         Reject: false,
-        Pickup: true,
+        Pickup: false,
         Date: dateStr,
         Size: 0,
         Seasons: [],

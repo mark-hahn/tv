@@ -7,6 +7,7 @@ bugs ...
   watched info didn't update (Bad Sisters)
   search list sorts THE incorrectly
   no series meta in banned (Castle Builders)
+  changing map doesn't change gaps
 
 todo  ...
   don't delete show when remove pickup

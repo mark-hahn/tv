@@ -4,8 +4,8 @@ reminder, restore ...
 
 bugs ...
   lincoln Lawyer missing in linda
-  no series meta in banned (Castle Builders)
-  
+  deleted rejected shows stay in noemby.json
+
 todo  ...
   update imdb ratings
 

@@ -399,16 +399,12 @@ export default {
       this.saveVisShow(show);
       show.Reject = !show.Reject; 
       if(show.Reject) 
-           srvr.addReject(show.Name) 
-               .catch((err) => {
-                   console.error("late addReject:", err);
-                   //- show.Reject = !show.Reject;
-               });
-      else srvr.delReject(show.Name)
+        srvr.addReject(show.Name) 
             .catch((err) => {
-                console.error("late delReject:", err);
+                console.error("late addReject:", err);
                 //- show.Reject = !show.Reject;
             });
+      else deleteShow(show);
     };
 
     const togglePickup = async (show) => {

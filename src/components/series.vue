@@ -217,23 +217,26 @@ export default {
     async setCntryLangTxt(tvdbData) {
       this.cntryLangTxt = ``;
       let {originalCountry, originalLanguage, 
-           averageRuntime,
-           originalNetwork} = tvdbData;
+           averageRuntime,  originalNetwork} = tvdbData;
            
-      if(originalCountry == 'gbr') originalCountry = 'UK';
 
       const longNets = ['Amazon', 'Paramount+'];
       longNets.forEach((net) => {
         if(originalNetwork.includes(net))
           originalNetwork = net;
       });
-      originalNetwork = originalNetwork.substr(0, 10);
-
+      if(originalCountry == 'gbr') originalCountry = 'UK';
+      originalNetwork    = originalNetwork.substr(0, 10); 
+      averageRuntime     = '' + averageRuntime;
+      const origCountry  = originalCountry?.toUpperCase()  || '';
+      const origLanguage = originalLanguage?.toUpperCase() || '';
+      const OrigNetwork  = originalNetwork?.toUpperCase()  || '';
+      const avgRuntime   = averageRuntime?.toUpperCase()   || '';
       this.cntryLangTxt = 
-        ` &nbsp; ${originalCountry.toUpperCase()} / ` +
-                `${originalLanguage.toUpperCase()}`   +
-        ` &nbsp; ${originalNetwork}`    +
-        ` &nbsp; ${averageRuntime 
+        ` &nbsp; ${origCountry} 
+                 ${origCountry != '' ? '/' : ''} ${origLanguage}
+          &nbsp; ${OrigNetwork}
+          &nbsp; ${avgRuntime != '' 
                   ? ' ' + averageRuntime + ' mins'
                   : ''}` 
     },

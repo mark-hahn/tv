@@ -5,10 +5,14 @@ reminder, restore ...
 bugs ...
   deleted rejected shows stay in noemby.json
   adding web show that's in noemby stays in noemby
+  a waiting noemby show doesn't set globe
 
 todo  ...
+  move search popup down page
   update imdb ratings
-  keep all map info for deleted shows
+  show counts when reloading a deleted show
+    (keep all map info for deleted shows)
+  show noemby's in download popup button
 
 tabled ...
   changing map doesn't change gaps

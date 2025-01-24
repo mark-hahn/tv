@@ -3,7 +3,6 @@ reminder, restore ...
   start gap running
 
 bugs ...
-  lincoln Lawyer missing in linda
   deleted rejected shows stay in noemby.json
   adding web show that's in noemby stays in noemby
 

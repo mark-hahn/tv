@@ -583,6 +583,7 @@ const getSession = async (player='roku') => {
 // get currently watching show
 export const getCurrentlyWatching = async (player='roku') => {
   const data = await getSession(player);
+  if(!data) return null;
   const episodeRec = data.NowPlayingItem;
   if(!episodeRec) {
     // console.log(`Watching on ${player}: nothing`);

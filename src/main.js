@@ -8,6 +8,7 @@ bugs ...
   a waiting noemby show doesn't set globe
 
 todo  ...
+  remove updated sort
   move search popup down page
   update imdb ratings
   show counts when reloading a deleted show

@@ -7,10 +7,6 @@ https://dev.emby.media/reference/RestAPI.html
 https://dev.emby.media/home/sdk/apiclients/index.html
 */
 
-const testCred = 
-{markUsrId: "894c752d448f45a3a1260ccaabd0adff",
-token:      "aad53eb6d92243c3b8ebd3151233260c"}
-
 export async function init(credIn) { 
   cred = credIn; 
 }

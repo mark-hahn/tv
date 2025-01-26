@@ -1,5 +1,5 @@
 const URL = 'wss://hahnca.com/tv-series-srvr';
-
+ 
 let ws;
 const openWs = () => {ws = new WebSocket(URL)};
 openWs();

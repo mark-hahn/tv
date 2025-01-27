@@ -4,7 +4,8 @@
               display:flex; flex-direction:column;
               padding:5px;`)
 
-  #hdr(style=`display:flex; justify-content:space-between; 
+  #hdr(v-if="showHdr"
+       style=`display:flex; justify-content:space-between; 
               font-weight:bold; font-size:25px;
               margin-bottom:20px; max-width:495px;`)
     div(style=`margin-left:20px; max-width:450px`) {{show.Name}}
@@ -20,6 +21,11 @@
           style=`font-weight:bold; color:red; 
                   font-size:18px; margin-top:4px;
                   max-height:24px;`) Not in Emby
+      button(@click="ccClick"
+              style=`font-size:16px; font-style:bold;
+                    margin-left:20px; margin-top:3px;
+                    max-height:24px;`) CC
+
       button(@click="deleteClick"
               style=`font-size:15px; 
                     margin-left:20px; margin-top:3px;
@@ -95,6 +101,7 @@ export default {
   data() {
     return {
       show: {Name:''},
+      showHdr: false,
       dates: '',
       notReject: true,
       remoteShowName: '',
@@ -116,6 +123,11 @@ export default {
       if(show.Id.startsWith('noemby-')) return;
       // console.log('Series: openMap:', show);
       evtBus.emit('openMap', show);
+    },
+
+    async ccClick() {
+      console.log('Series, ccClick:', this.show.Name);
+      // evtBus.emit('deleteShow', this.show);
     },
 
     async deleteClick() {
@@ -146,8 +158,8 @@ export default {
     async setDeleted(tvdbData) {
       const deleted = !!tvdbData.deleted;
       //- console.log('series, setDeleted:', deleted)
-      if(deleted) this.deletedTxt = 'Deleted ' + 
-                       tvdbData.deleted;
+      if(deleted) this.deletedTxt = 'Deleted '
+                      //  + tvdbData.deleted;
       else        this.deletedTxt = '';
       this.notInEmby = this.show.Id.startsWith('noemby-');
     },
@@ -333,6 +345,9 @@ export default {
       await this.setNextWatch();
       await this.setRemotes();
     });
+    setTimeout(() => {
+      this.showHdr = true;
+    }, 1000);
   },
 }
 

@@ -208,9 +208,8 @@ checkFile = () =>
       return
     console.log '\n>>>>>>', downloadCount+1,'/', chkCount, errCount, fname
 
-    guessItRes = exec("/usr/local/bin/guessit -js '#{fname.replace /'|`/g, ''}'",
-                      {timeout:300000}).toString()
-    # console.log {guessItRes}
+    cmd = "/usr/local/bin/guessit -js '#{fname.replace /'|`/g, ''}'"
+    guessItRes = exec(cmd, {timeout:300000}).toString()
     try
       {title, season, type} = JSON.parse guessItRes
       if not type == 'episode'

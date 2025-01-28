@@ -1,5 +1,5 @@
 const URL = 'wss://hahnca.com/tv-series-srvr';
- 
+
 let ws;
 const openWs = () => {ws = new WebSocket(URL)};
 openWs();
@@ -175,10 +175,11 @@ export function addRemotes(nameRems)
             {return fCall('addRemotes', nameRems)}
 export function delRemotes(name)    
             {return fCall('delRemotes', name)}
-            
-export function deletePath(path)   
-            {return fCall('deletePath', path)}
-
 export function getUrls(typeUrlName)   
             {return fCall('getUrls', typeUrlName)}
 
+export function syncSubs(namePath)   
+            {return fCall('syncSubs', namePath)}
+         
+export function deletePath(path)   
+            {return fCall('deletePath', path)}

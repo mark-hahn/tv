@@ -126,8 +126,9 @@ export default {
     },
 
     async ccClick() {
-      console.log('Series, ccClick:', this.show.Name);
-      // evtBus.emit('deleteShow', this.show);
+      const data = {name:this.show.Name, path:this.show.Path};
+      console.log('Series, ccClick:', data);
+      srvr.syncSubs(data);
     },
 
     async deleteClick() {

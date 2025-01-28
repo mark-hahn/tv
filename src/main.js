@@ -6,6 +6,7 @@ bugs ...
   deleted rejected shows stay in noemby.json
   adding web show that's in noemby stays in noemby
   a waiting noemby show doesn't set globe
+  getRemotes called twice
 
 todo  ...
   remove updated sort

@@ -2,9 +2,10 @@ import fs                  from "fs";
 import util                from "util";
 import * as cp             from 'child_process';
 import { WebSocketServer } from 'ws';
+import {rimraf}            from 'rimraf'
 import fetch               from 'node-fetch';
 import * as view           from './src/lastViewed.js';
-import {rimraf}            from 'rimraf'
+import * as subs           from "./src/subs.js";
 
 process.setMaxListeners(50);
 const dontupload  = false;
@@ -31,6 +32,8 @@ const noEmbys      = JSON.parse(noEmbyStr);
 const gaps         = JSON.parse(gapsStr);
 const allTvdb      = JSON.parse(allTvdbStr);
 const allRemotes   = JSON.parse(allRemStr);
+
+console.log({rejects});
 
 const videoFileExtensions = [
   "mp4", "mkv", "avi", "mov", "wmv", "flv", "mpeg",
@@ -110,8 +113,10 @@ const getAllShows = async (id, _param, resolve, reject) => {
  
 const upload = async () => {
   let str = headerStr;
+  str += '        - "dummy"\n';
   for(let name of rejects)
     str += '        - "' + name.replace(/"/g, '') + '"\n';
+  console.log({str});
   str += middleStr;
   for(let name of pickups)
     str += '        - "' + name.replace(/"/g, '') + '"\n';
@@ -376,6 +381,7 @@ const getNoEmbys = (id, _param, resolve, _reject) => {
 
 const addNoEmby = async (id, showStr, resolve) => {
   const show = JSON.parse(showStr);
+  // if(show.Reject) return;
   const name = show.Name;
   console.log('addNoEmby', id, name);
   for(const [idx, show] of noEmbys.entries()) {
@@ -692,9 +698,14 @@ wss.on('connection', (ws, req) => {
 
   ws.on('error', console.error);
 
-  ws.on('message', (msg) => {
-    msg = msg.toString();
+  ws.on('message', (data) => {
+    const msg = data.toString();
     // console.log('received:', msg);
+
+    if(msg.startsWith('from-subs:' ) {
+      subs.onMessage(msg.slice(10));
+      return;
+    }
 
     const parts = /^(.*)~~~(.*)~~~(.*)$/.exec(msg);
     if(!parts) {

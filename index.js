@@ -33,8 +33,6 @@ const gaps         = JSON.parse(gapsStr);
 const allTvdb      = JSON.parse(allTvdbStr);
 const allRemotes   = JSON.parse(allRemStr);
 
-console.log({rejects});
-
 const videoFileExtensions = [
   "mp4", "mkv", "avi", "mov", "wmv", "flv", "mpeg",
   "3gp", "m4v", "ts", "rm", "vob", "ogv", "divx"
@@ -531,33 +529,33 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
     return pfxNameParts[1];
   }
 
-  let parts;
+  let idFnameParam;
 
   switch (+type) {
     case 2:  // IMDB
       // console.log('samples/imdb-page.html');
       // fs.writeFileSync('samples/imdb-page.html', html);
       try{
-        parts = /imUuxf">(\d\.\d)<\/span>/i.exec(html);
-        if(parts === null) throw 'wikidata parse error';
+        idFnameParam = /imUuxf">(\d\.\d)<\/span>/i.exec(html);
+        if(idFnameParam === null) throw 'wikidata parse error';
       }
       catch (e) {
         reject([id, {type, url, name, e}]);
         return
       }
-      resolve([id, {ratings:parts[1]}]);
+      resolve([id, {ratings:idFnameParam[1]}]);
       return;
 
     case 18:  // wikidata
       try{
-        parts = /lang="en"><a href="(.*?)"\shreflang="en"/i.exec(html);
-        if(parts === null) throw 'wikidata parse error';
+        idFnameParam = /lang="en"><a href="(.*?)"\shreflang="en"/i.exec(html);
+        if(idFnameParam === null) throw 'wikidata parse error';
       }
       catch (e) {
         reject([id, {type, url, name, e}]);
         return
       }
-      resolve([id, {url:parts[1]}]);
+      resolve([id, {url:idFnameParam[1]}]);
       return;
 
     case 98:  // google
@@ -613,10 +611,10 @@ const runOne = () => {
   if(running || queue.length == 0) return;
   running == true;
 
-  const {parts, ws} = queue.pop();
+  const {idFnameParam, ws} = queue.pop();
   if(ws.readyState !== WebSocket.OPEN) return;
 
-  const [id, fname, param] = parts.slice(1);
+  const [id, fname, param] = idFnameParam;
 
   let resolve = null;
   let reject  = null;
@@ -648,19 +646,19 @@ const runOne = () => {
   // call function fname
   // console.log(`call function`, {id, fname, param});
   switch (fname) {
-    case 'getAllShows':   getAllShows(id,    '', resolve, reject); break;
-    case 'deletePath':    deletePath( id, param, resolve, reject); break;
-    case 'getUrls':       getUrls(    id, param, resolve, reject); break;
-    case 'getLastViewed':  
-                    view.getLastViewed(id,    '', resolve, reject); break;
+    case 'getAllShows':   getAllShows(       id,    '', resolve, reject); break;
+    case 'deletePath':    deletePath(        id, param, resolve, reject); break;
+    case 'getUrls':       getUrls(           id, param, resolve, reject); break;
+    case 'getLastViewed': view.getLastViewed(id,    '', resolve, reject); break;
+    case 'syncSubs':      subs.syncSubs(     id, param, resolve, reject)
 
-    case 'getBlockedWaits': getBlockedWaits(id, '',   resolve, reject); break;
-    case 'addBlockedWait':  addBlockedWait(id, param, resolve, reject); break;
-    case 'delBlockedWait':  delBlockedWait(id, param, resolve, reject); break;
+    case 'getBlockedWaits': getBlockedWaits( id, '',    resolve, reject); break;
+    case 'addBlockedWait':  addBlockedWait(  id, param, resolve, reject); break;
+    case 'delBlockedWait':  delBlockedWait(  id, param, resolve, reject); break;
 
-    case 'getBlockedGaps': getBlockedGaps(id, '',   resolve, reject); break;
-    case 'addBlockedGap':  addBlockedGap(id, param, resolve, reject); break;
-    case 'delBlockedGap':  delBlockedGap(id, param, resolve, reject); break;
+    case 'getBlockedGaps': getBlockedGaps(id, '',    resolve, reject); break;
+    case 'addBlockedGap':  addBlockedGap( id, param, resolve, reject); break;
+    case 'delBlockedGap':  delBlockedGap( id, param, resolve, reject); break;
 
     case 'getRejects':  getRejects(id, '',    resolve, reject); break;
     case 'addReject':   addReject( id, param, resolve, reject); break;
@@ -702,17 +700,14 @@ wss.on('connection', (ws, req) => {
     const msg = data.toString();
     // console.log('received:', msg);
 
-    if(msg.startsWith('from-subs:' ) {
-      subs.onMessage(msg.slice(10));
-      return;
-    }
-
     const parts = /^(.*)~~~(.*)~~~(.*)$/.exec(msg);
     if(!parts) {
       console.error('ignoring bad message:', msg);
       return;
     }
-    queue.unshift({ws, parts});
+    const idFnameParam = parts.slice(1);
+
+    queue.unshift({ws, idFnameParam});
     runOne();
   });
  

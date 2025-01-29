@@ -650,7 +650,7 @@ const runOne = () => {
     case 'deletePath':    deletePath(        id, param, resolve, reject); break;
     case 'getUrls':       getUrls(           id, param, resolve, reject); break;
     case 'getLastViewed': view.getLastViewed(id,    '', resolve, reject); break;
-    case 'syncSubs':      subs.syncSubs( id, ws, param, resolve, reject); break;
+    case 'syncSubs':      subs.syncSubs(     id, param, resolve, reject); break;
 
     case 'getBlockedWaits': getBlockedWaits( id, '',    resolve, reject); break;
     case 'addBlockedWait':  addBlockedWait(  id, param, resolve, reject); break;
@@ -691,30 +691,49 @@ const runOne = () => {
 const wss = new WebSocketServer({ port: 8736 });
 console.log('wss listening on port 8736');
 
+const subSocketName = 'subtitle server websocket';
+const appSocketName = 'web app websocket';
+const chkSubsClosed = (src) => {
+  if(src = subSocketName) subs.setWs(null);
+}
+
 wss.on('connection', (ws) => {
   console.log('client connected');
-
-  ws.on('error', console.error);
+  let socketName = 'unknown websocket';
 
   ws.on('message', (data) => {
     const msg = data.toString();
-    // console.log('received:', msg);
-
     const parts = /^(.*)~~~(.*)~~~(.*)$/.exec(msg);
     if(!parts) {
       console.error('ignoring bad message:', msg);
       return;
     }
-    if(parts[2] == 'sub') {
-      subs.fromSubSrvr(parts[3]);
-      return;
+    if(parts[2] == 'subSrvr') {
+      if(socketName != subSocketName) {
+        console.log(subSocketName, 'first msg');
+        socketName = subSocketName;
+      }
+      if(parts[3] == 'hello from sub server') subs.setWs(ws);
+      else subs.fromSubSrvr(parts[3]);
     }
-    const idFnameParam = parts.slice(1);
-    queue.unshift({ws, idFnameParam});
-    runOne();
+    else {
+      if(socketName != appSocketName) {
+        console.log(appSocketName, 'first msg');
+        socketName = appSocketName;
+      }
+      const idFnameParam = parts.slice(1);
+      queue.unshift({ws, idFnameParam});
+      runOne();
+    }
   });
- 
-  ws.on('close', () => console.log('wss closed'));
-});
 
-// test commit
+  ws.on('error', (err) => {
+    chkSubsClosed(socketName);
+    console.error(socketName, 'error:', err.message);
+  });
+
+  ws.on('close', () => {
+    chkSubsClosed(socketName);
+    console.log(socketName + ' closed');
+  });
+});

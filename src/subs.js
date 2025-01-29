@@ -1,10 +1,10 @@
-import fs     from "fs";
-import {util} from "./util.";
+import fs       from "fs";
+import {jParse} from "./util.js";
 
 const videoSfxs = [ "mp4", "mkv", "avi" ];
 
 const subReqQueueStr = fs.readFileSync('data/subReqs.json', 'utf8');
-let subReqQueue = util.jParse(subReqQueueStr, 'subs queue') ?? [];
+let subReqQueue = jParse(subReqQueueStr, 'subs queue') ?? [];
 
 let ws = null;
 
@@ -13,9 +13,6 @@ var view = new Uint8Array(sendFinishedArr);
 for(var i = 0; i < 16; i++) view[i] = i;
 
 let onDrainCb = () => {};
-ws.on('drain', onDrainCb);
-
-let srtPath = null;
 
 const pathToSrtPath = (path) =>  
         path.split('.').slice(0, -1).join('.') + '.en-gen.srt';
@@ -23,19 +20,17 @@ const pathToSrtPath = (path) =>
 let sending = false;
 const sendOneFile = () => {
   if(!ws) {
-    console.error('sendOneFile called before fromSubSrvr');
+    console.error('sendOneFile called before syncSubs');
     return;
   }
   if(sending) return;
   sending = true;
 
-  const path = subReqQueue.shift();
+  const path = subReqQueue[0];
   if(path === undefined) { 
     sending = false;
     return;
   }
-
-  srtPath = pathToSrtPath(path);
 
   const wsWriteStream = new Writable({
     write(chunk, _encoding, callback) {
@@ -53,13 +48,16 @@ const sendOneFile = () => {
     fs.unlinkSync(path);
     onDrainCb = sendOneFile;
     ws.send(sendFinishedArr);
-    sending = false;
   });
 }
 
-export const fromSubSrvr = (wsIn, data) => {
-  if(wsIn) ws = wsIn;
-  fs.writeFileSync(srtPath, data);
+export const fromSubSrvr = (data) => {
+  if(!data.startsWith('error')) {
+    const pathSent = subReqQueue.shift();
+    fs.writeFileSync(pathToSrtPath(pathSent), data);
+  }
+  else console.error(data);
+  sending = false;
 }
 
 const addSubReq = (name, path) => {
@@ -109,10 +107,13 @@ const getSubStatus = (name) => {
   };
 }
 
-export const syncSubs = (id, namePath, resolve, reject) => {
+export const syncSubs = (id, wsIn, namePath, resolve, reject) => {
   console.log('syncSubs:', namePath);
-  ws = wsIn;
-  let namePathObj = util.jParse(namePath, 'syncSubs');
+  if(wsIn != ws) {
+    ws = wsIn; 
+    ws.on('drain', onDrainCb);
+  }
+  let namePathObj = jParse(namePath, 'syncSubs');
   if(!namePathObj) reject([id, 'syncSubs parse error']);
   else {
     const {name, path} = namePathObj;

@@ -650,7 +650,7 @@ const runOne = () => {
     case 'deletePath':    deletePath(        id, param, resolve, reject); break;
     case 'getUrls':       getUrls(           id, param, resolve, reject); break;
     case 'getLastViewed': view.getLastViewed(id,    '', resolve, reject); break;
-    case 'syncSubs':      subs.syncSubs(     id, param, resolve, reject); break;
+    case 'syncSubs':      subs.syncSubs( id, ws, param, resolve, reject); break;
 
     case 'getBlockedWaits': getBlockedWaits( id, '',    resolve, reject); break;
     case 'addBlockedWait':  addBlockedWait(  id, param, resolve, reject); break;
@@ -706,7 +706,7 @@ wss.on('connection', (ws) => {
       return;
     }
     if(parts[2] == 'sub') {
-      subs.fromSubSrvr(ws, parts[3]);
+      subs.fromSubSrvr(parts[3]);
       return;
     }
     const idFnameParam = parts.slice(1);

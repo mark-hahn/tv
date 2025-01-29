@@ -7,10 +7,12 @@ bugs ...
   adding web show that's in noemby stays in noemby
   a waiting noemby show doesn't set globe
   getRemotes called twice
+  play button shows when emby not running
 
 todo  ...
   remove updated sort
   move search popup down page
+  make popups modal with closing by clicking anywhere
   update imdb ratings
   show counts when reloading a deleted show
     (keep all map info for deleted shows)

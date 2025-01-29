@@ -8,19 +8,19 @@ const subReqQueueStr = fs.readFileSync('data/subReqs.json', 'utf8');
 let subReqQueue = jParse(subReqQueueStr, 'subs queue') ?? [];
 
 let ws = null;
-let onDrainCb = () => {};
 
 let statusName    = '';
 let statusMinutes = 0;
 
-var sendFinishedArr = new ArrayBuffer(16);
-var view = new Uint8Array(sendFinishedArr);
-for(var i = 0; i < 16; i++) view[i] = i;
+const eofArr = new Uint32Array(1);
+eofArr[0] = 0x07162534;
 
 const pathToSrtPath = (path) =>  
         path.split('.').slice(0, -1).join('.') + '.en-gen.srt';
 
+let sendEndTime;
 let sending = false;
+
 const sendOneFile = () => {
   const namePath = subReqQueue[0];
   if(!ws || sending || namePath === undefined) return;
@@ -28,6 +28,9 @@ const sendOneFile = () => {
 
   const path = namePath.path;
   console.log('subs, sending file:', path);
+  const sendStartTime = Date.now();
+
+  let chunkFinishedCb = null;
 
   const writeStream = new  Writable({
     write(chunk, _encoding, next) {
@@ -39,7 +42,7 @@ const sendOneFile = () => {
       }
       console.log('subs, writeStream chunk:', 
                     chunk.constructor.name, chunk.length);
-      onDrainCb = next;
+      chunkFinishedCb = next;
       ws.send(chunk);
     }
   });
@@ -50,10 +53,11 @@ const sendOneFile = () => {
         console.error('subs, error in readStream:', err.message)})
     .on('close', () => {
       console.log('subs, finished sending', path);
-      onDrainCb = sendOneFile;
-      ws.send(sendFinishedArr);
-    }
-  );
+      ws.send(eofArr);
+      sendEndTime = Date.now();
+      console.log(`subs, send time: ${
+            ((sendEndTime - sendStartTime) / 1000).toFixed(0)} secs`);
+    });
 }
 
 export const setWs = (wsIn) => {
@@ -70,7 +74,15 @@ export const setWs = (wsIn) => {
 export const fromSubSrvr = (data) => {
   const dataObj = jParse(data, "fromSubSrvr data");
   if(dataObj !== null) {
-    if(dataObj.error) 
+    if(dataObj.ack) {
+      if(chunkFinishedCb) {
+        chunkFinishedCb();
+        chunkFinishedCb = null;
+      }
+      else console.log('subs, ack received with no chunk callback');
+      return;
+    }
+    else if(dataObj.error) 
       console.error('error fromSubSrvr', dataObj.error);
     else {
       const namePath = subReqQueue[0];
@@ -79,8 +91,12 @@ export const fromSubSrvr = (data) => {
       statusName    = namePath.name;
       statusMinutes = dataObj.mins;
       if(!dataObj.srt) return;
+      console.log('received srt file');
       fs.writeFileSync(pathToSrtPath(namePath.path), dataObj.srt);
       subReqQueue.shift();
+      const processEndTime = Date.now();
+      console.log(`subs, conversion time: ${
+                  ((processEndTime - sendEndTime)/(60*1000))} mins`);
     }
   }
   sending = false;

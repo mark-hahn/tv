@@ -602,6 +602,7 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
     default: resolve([id, 'getUrls no type: ' + type]);
   }
 }
+
 //////////////////  CALL FUNCTION SYNCHRONOUSLY  //////////////////
 
 const queue = [];
@@ -635,9 +636,8 @@ const runOne = () => {
     runOne();
   })
   .catch((idError) => {
-    console.log('idResult err:', {idError});
+    console.error('idResult err:', {idError});
     const [id, error] = idError;
-    console.log('rejected:', id);
     ws.send(`${id}~~~err~~~${JSON.stringify(error)}`); 
     running == false;
     runOne();
@@ -650,7 +650,7 @@ const runOne = () => {
     case 'deletePath':    deletePath(        id, param, resolve, reject); break;
     case 'getUrls':       getUrls(           id, param, resolve, reject); break;
     case 'getLastViewed': view.getLastViewed(id,    '', resolve, reject); break;
-    case 'syncSubs':      subs.syncSubs(     id, param, resolve, reject)
+    case 'syncSubs':      subs.syncSubs(     id, param, resolve, reject); break;
 
     case 'getBlockedWaits': getBlockedWaits( id, '',    resolve, reject); break;
     case 'addBlockedWait':  addBlockedWait(  id, param, resolve, reject); break;
@@ -691,7 +691,7 @@ const runOne = () => {
 const wss = new WebSocketServer({ port: 8736 });
 console.log('wss listening on port 8736');
 
-wss.on('connection', (ws, req) => {
+wss.on('connection', (ws) => {
   console.log('client connected');
 
   ws.on('error', console.error);
@@ -705,8 +705,11 @@ wss.on('connection', (ws, req) => {
       console.error('ignoring bad message:', msg);
       return;
     }
+    if(parts[2] == 'sub') {
+      subs.fromSubSrvr(ws, parts[3]);
+      return;
+    }
     const idFnameParam = parts.slice(1);
-
     queue.unshift({ws, idFnameParam});
     runOne();
   });

@@ -65,7 +65,12 @@ const fCall = (fname, param) => {
   return promise;
 }
 
-handleMsg = (msg) => { 
+handleMsg = async (msg) => { 
+  if(msg instanceof Blob) {
+    const text = await msg.text();
+    console.log("blob msg length:", text.length);
+    return;
+  }
   msg = msg.toString();
   const parts = /^(.*)~~~(.*)~~~(.*)$/.exec(msg);
   if(!parts) {

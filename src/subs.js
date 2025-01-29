@@ -32,20 +32,26 @@ const sendOneFile = () => {
     return;
   }
 
-  const wsWriteStream = new Writable({
-    write(chunk, _encoding, callback) {
-      onDrainCb = callback;
-      ws.send(chunk);
-    }
-  });
+  // const writeStream = new  WritableStream({
+  //   write(chunk) {
 
-  const wsReadStream = fs.createReadStream(path);
-  wsReadStream.pipe(wsWriteStream);
-  wsReadStream.on('error', (err) => {
+  //     console.log('chunk.length:', chunk.length);
+
+  //     return new Promise((resolve, _reject) => {
+  //       onDrainCb = resolve;
+  //       ws.send(chunk);
+  //     });
+  //   }
+  // });
+
+  const writeStream = fs.createWriteStream('writeStream.mkv');
+
+  const readStream = fs.createReadStream(path, {highWaterMark: 1e7});
+  readStream.pipe(writeStream);
+  readStream.on('error', (err) => {
         console.error('subs, error in readStream:', err.message)});
-  wsReadStream.on('close', () => {
+  readStream.on('close', () => {
     console.log('finished sending', path);
-    fs.unlinkSync(path);
     onDrainCb = sendOneFile;
     ws.send(sendFinishedArr);
   });
@@ -62,7 +68,7 @@ export const fromSubSrvr = (data) => {
 
 const addSubReq = (name, path) => {
   console.log('subs addSubReq:', {name, path});
-  let pathAdded = false;
+  let pathAddedCount = 0;
   let errmSG = null;
   const recurs = (path) => {
     if(errmSG) return;
@@ -78,9 +84,9 @@ const addSubReq = (name, path) => {
       const sfx = pathParts.pop().toLowerCase();
       if(videoSfxs.includes(sfx)) {
         const srtPath = pathToSrtPath(path);
-        if(!fs.existsSync(srtPath)) {
+        if(!subReqQueue.includes(path) && !fs.existsSync(srtPath)) {
           subReqQueue.push(path);
-          pathAdded = true;
+          pathAddedCount++;
         }
       }
     }
@@ -88,8 +94,9 @@ const addSubReq = (name, path) => {
   }
   recurs(path);
   if(errmSG) return errmSG;
-  if(pathAdded) fs.writeSync('data/subReqs.json', 
-                              JSON.stringify(subReqQueue));
+  if(pathAddedCount > 0) 
+      fs.writeFileSync('data/subReqs.json', JSON.stringify(subReqQueue));
+  console.log({pathAddedCount, subReqQueue});
   // console.log({subReqQueue});
   sendOneFile();
   return null;
@@ -101,7 +108,7 @@ let statusMinutes = 0;
 const getSubStatus = (name) => {
   console.log('subs getSubStatus:', name);
   return {
-    count: subReqQueue[name]?.length ?? 0,
+    count: subReqQueue.length,
     mins: ((name == statusName) ? statusMinutes : 0),
     ok: true,
   };
@@ -123,7 +130,7 @@ export const syncSubs = (id, wsIn, namePath, resolve, reject) => {
     if(addErr === null && status?.ok) 
       resolve([id, status]);
     else
-      reject( [id, status]);
+      reject( [id, {addErr, status}]);
   }
 }
 

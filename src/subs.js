@@ -1,6 +1,8 @@
 import fs         from "fs";
 import {Writable} from "stream"; 
 import {jParse}   from "./util.js";
+import date       from 'date-and-time';
+
 
 const videoSfxs = [ "mp4", "mkv", "avi" ];
 
@@ -18,7 +20,8 @@ eofArr[0] = 0x07162534;
 const log = (msg, err = false) => {
   if(err) console.error('subs, ' + msg);
   else    console.log(  'subs, ' + msg);
-  fs.appendFileSync('subs.log', msg + '\n')
+  fs.appendFileSync('subs.log', 
+          date.format(now, 'MM/DD HH:mm:ss ') + msg + '\n')
 }
 
 const pathToSrtPath = (path) =>  
@@ -85,11 +88,12 @@ export const fromSubSrvr = (data) => {
       }
       else {
         log('ack received with no chunk callback', true);
-        return;
+        sending = false;
       }
     }
     else if(dataObj.error) {
       log('error fromSubSrvr: ' + dataObj.error, true);
+      sending = false;
     }
     else {
       const namePath = subReqQueue[0];
@@ -104,10 +108,10 @@ export const fromSubSrvr = (data) => {
       const processEndTime = Date.now();
       log(`conversion time: ${
                   ((processEndTime - sendEndTime)/(60*1000)).toFixed(0)} mins`);
+      sending = false;
       sendOneFile();
     }
   }
-  sending = false;
 }
 
 const addSubReq = (name, path) => {

@@ -6,6 +6,7 @@ import {rimraf}            from 'rimraf'
 import fetch               from 'node-fetch';
 import * as view           from './src/lastViewed.js';
 import * as subs           from "./src/subs.js";
+import {jParse, log}       from "./util.js";
 
 process.setMaxListeners(50);
 const dontupload  = false;
@@ -710,12 +711,16 @@ wss.on('connection', (ws) => {
     }
     if(parts[2] == 'subSrvr') {
       if(socketName != subSocketName) {
-        console.log(subSocketName, 'init subs ws');
+        console.log(subSocketName, 'init ws');
         socketName = subSocketName;
+      }
+      const paramObj = jParse(parts[3], 'server msg handler');
+      if(!paramObj) return;
+      if(paramObj.hello) {
         subs.setWs(ws);
         return;
       }
-      subs.fromSubSrvr(parts[3]);
+      subs.fromSubSrvr(paramObj);
     }
     else {
       if(socketName != appSocketName) {

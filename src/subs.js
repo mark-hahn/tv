@@ -22,9 +22,9 @@ let sendEndTime;
 let sending = false;
 let chunkFinishedCb = null;
 
-const sendOneFile = () => {
+const trySendOneFile = () => {
   const namePath = subReqQueue[0];
-  console.log('sendOneFile:', {ws, sending, namePath});
+  console.log('trySendOneFile:', {ws, sending, namePath});
   if(!ws || sending || namePath === undefined) return;
   sending = true;
 
@@ -35,12 +35,11 @@ const sendOneFile = () => {
   const writeStream = new  Writable({
     write(chunk, _encoding, next) {
       if(ws.readyState !== WebSocket.OPEN) {
-        log('ws not open in writeStream write', true);
+        const errMsg = 'ws not open in writeStream write';
+        log(errMsg, true);
         next(Error(errMsg));
         return;
       }
-      // console.log('writeStream chunk:', 
-      //               chunk.constructor.name, chunk.length);
       chunkFinishedCb = next;
       ws.send(chunk);
     }
@@ -64,46 +63,43 @@ export const setWs = (wsIn) => {
     ws = wsIn; 
     if(ws) {
       log('connected: subs server websocket set', false, true);
-      sendOneFile();
+      trySendOneFile();
     }
   }
 }
 
-export const fromSubSrvr = (data) => {
-  const dataObj = jParse(data, "fromSubSrvr data");
-  if(dataObj !== null) {
-    if(dataObj.ack) {
-      if(chunkFinishedCb) {
-        chunkFinishedCb();
-        chunkFinishedCb = null;
-      }
-      else {
-        log('ack received with no chunk callback', true);
-        sending = false;
-      }
-    }
-    else if(dataObj.error) {
-      log('error fromSubSrvr: ' + dataObj.error, true);
-      sending = false;
+export const fromSubSrvr = (paramObj) => {
+  if(paramObj.ack) {
+    if(chunkFinishedCb) {
+      chunkFinishedCb();
+      chunkFinishedCb = null;
     }
     else {
-      const namePath = subReqQueue[0];
-      statusName     = namePath.name;
-      statusMinutes  = dataObj.mins;
-      console.log('fromSubSrvr:', statusMinutes, 'minutes');
-      if(!dataObj.srt) return;
-
-      log('writing srt file, length: ' + dataObj.srt.length);
-      fs.writeFileSync(pathToSrtPath(namePath.path), dataObj.srt);
-      subReqQueue.shift();
-      fs.writeFileSync('data/subReqs.json', JSON.stringify(subReqQueue));
-      const processEndTime = Date.now();
-      log(`conversion time: ${
-                  ((processEndTime - sendEndTime)/(60*1000)).toFixed(0)} mins`);
+      log('ack received with no chunk callback', true);
       sending = false;
-      sendOneFile();
     }
   }
+  else if(paramObj.error) {
+    log('error fromSubSrvr: ' + paramObj.error, true);
+    sending = false;
+  }
+  else if(paramObj.data) {
+    const namePath = subReqQueue[0];
+    statusName     = namePath.name;
+    statusMinutes  = paramObj.mins;
+    console.log('fromSubSrvr:', statusMinutes, 'minutes');
+    if(!paramObj.srt) return;
+
+    log('writing srt file, length: ' + paramObj.srt.length);
+    fs.writeFileSync(pathToSrtPath(namePath.path), paramObj.srt);
+    subReqQueue.shift();
+    fs.writeFileSync('data/subReqs.json', JSON.stringify(subReqQueue));
+    const processEndTime = Date.now();
+    log(`conversion time: ${
+                ((processEndTime - sendEndTime)/(60*1000)).toFixed(0)} mins`);
+    sending = false;
+  }
+  trySendOneFile();
 }
 
 const addSubReq = (name, path) => {
@@ -143,7 +139,7 @@ const addSubReq = (name, path) => {
   if(pathAddedCount !== 0) 
       fs.writeFileSync('data/subReqs.json', JSON.stringify(subReqQueue));
   log(`added ${pathAddedCount} files to queue for ${name}`); 
-  sendOneFile();
+  trySendOneFile();
   return null;
 }
 

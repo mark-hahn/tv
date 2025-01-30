@@ -21,7 +21,7 @@ const log = (msg, err = false) => {
   if(err) console.error('subs, ' + msg);
   else    console.log(  'subs, ' + msg);
   fs.appendFileSync('subs.log', 
-          date.format(now, 'MM/DD HH:mm:ss ') + msg + '\n')
+          date.format(new Date(), 'MM/DD HH:mm:ss ') + msg + '\n')
 }
 
 const pathToSrtPath = (path) =>  

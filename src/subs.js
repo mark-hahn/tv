@@ -15,33 +15,38 @@ let statusMinutes = 0;
 const eofArr = new Uint32Array(1);
 eofArr[0] = 0x07162534;
 
+const log = (msg, err = false) => {
+  if(err) console.error('subs, ' + msg);
+  else    console.log(  'subs, ' + msg);
+  fs.appendFileSync('subs.log', msg + '\n')
+}
+
 const pathToSrtPath = (path) =>  
         path.split('.').slice(0, -1).join('.') + '.en-gen.srt';
 
 let sendEndTime;
 let sending = false;
+let chunkFinishedCb = null;
 
 const sendOneFile = () => {
   const namePath = subReqQueue[0];
+  console.log('sendOneFile:', {ws, sending, namePath});
   if(!ws || sending || namePath === undefined) return;
   sending = true;
 
   const path = namePath.path;
-  console.log('subs, sending file:', path);
+  log('sending file: ' + path);
   const sendStartTime = Date.now();
-
-  let chunkFinishedCb = null;
 
   const writeStream = new  Writable({
     write(chunk, _encoding, next) {
       if(ws.readyState !== WebSocket.OPEN) {
-        const errMsg = 'subs, ws not open in writeStream write';
-        console.error(errMsg);
+        log('ws not open in writeStream write', true);
         next(Error(errMsg));
         return;
       }
-      console.log('subs, writeStream chunk:', 
-                    chunk.constructor.name, chunk.length);
+      // console.log('writeStream chunk:', 
+      //               chunk.constructor.name, chunk.length);
       chunkFinishedCb = next;
       ws.send(chunk);
     }
@@ -50,22 +55,21 @@ const sendOneFile = () => {
   fs.createReadStream(path, {highWaterMark: 1e7})
     .pipe(writeStream)
     .on('error', (err) => {
-        console.error('subs, error in readStream:', err.message)})
+      log('error in readStream: ' + err.message, true);
+    })
     .on('close', () => {
-      console.log('subs, finished sending', path);
       ws.send(eofArr);
       sendEndTime = Date.now();
-      console.log(`subs, send time: ${
+      log(`send time: ${
             ((sendEndTime - sendStartTime) / 1000).toFixed(0)} secs`);
-    });
+   });
 }
 
 export const setWs = (wsIn) => {
   if(wsIn != ws) {
     ws = wsIn; 
     if(ws) {
-      ws.on('drain', onDrainCb);
-      console.log('subs server websocket set');
+      log('\nconnected: subs server websocket set');
       sendOneFile();
     }
   }
@@ -79,31 +83,35 @@ export const fromSubSrvr = (data) => {
         chunkFinishedCb();
         chunkFinishedCb = null;
       }
-      else console.log('subs, ack received with no chunk callback');
-      return;
+      else {
+        log('ack received with no chunk callback', true);
+        return;
+      }
     }
-    else if(dataObj.error) 
-      console.error('error fromSubSrvr', dataObj.error);
+    else if(dataObj.error) {
+      log('error fromSubSrvr: ' + dataObj.error, true);
+    }
     else {
       const namePath = subReqQueue[0];
-      console.log('subs, fromSubSrvr:', 
-                        Object.assign({}, namePath, dataObj));
-      statusName    = namePath.name;
-      statusMinutes = dataObj.mins;
+      statusName     = namePath.name;
+      statusMinutes  = dataObj.mins;
+      console.log('fromSubSrvr:', statusMinutes, 'minutes');
       if(!dataObj.srt) return;
-      console.log('received srt file');
-      fs.writeFileSync(pathToSrtPath(namePath.path), dataObj.srt);
+
+      log('received srt file, length: ' + dataObj.srt.length);
       subReqQueue.shift();
+      fs.writeFileSync('data/subReqs.json', JSON.stringify(subReqQueue));
       const processEndTime = Date.now();
-      console.log(`subs, conversion time: ${
-                  ((processEndTime - sendEndTime)/(60*1000))} mins`);
+      log(`conversion time: ${
+                  ((processEndTime - sendEndTime)/(60*1000)).toFixed(0)} mins`);
+      sendOneFile();
     }
   }
   sending = false;
 }
 
 const addSubReq = (name, path) => {
-  console.log('subs, addSubReq:', {name, path});
+  console.log('addSubReq:', {name, path});
   let pathAddedCount = 0;
   let errMsg = null;
   const recurs = (path) => {
@@ -153,14 +161,17 @@ const getSubStatus = (name) => {
     mins: ((name == statusName) ? statusMinutes : 0),
     ok: true,
   };
-  console.log('subs, getSubStatus:', name, status);
+  console.log('getSubStatus:', name, status);
   return status;
 }
 
 export const syncSubs = (id, namePath, resolve, reject) => {
-  console.log('subs, syncSubs:', namePath);
+  log('syncSubs from web app: ' + namePath);
   let namePathObj = jParse(namePath, 'syncSubs');
-  if(!namePathObj) reject([id, 'syncSubs parse error']);
+  if(!namePathObj) {
+    log('syncSubs parse error', true);
+    reject([id, 'syncSubs parse error']);
+  }
   else {
     const {name, path} = namePathObj;
     let addErr = null;
@@ -172,4 +183,3 @@ export const syncSubs = (id, namePath, resolve, reject) => {
       reject( [id, {addErr, status}]);
   }
 }
-

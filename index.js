@@ -710,11 +710,12 @@ wss.on('connection', (ws) => {
     }
     if(parts[2] == 'subSrvr') {
       if(socketName != subSocketName) {
-        console.log(subSocketName, 'first msg');
+        console.log(subSocketName, 'init subs ws');
         socketName = subSocketName;
+        subs.setWs(ws);
+        return;
       }
-      if(parts[3] == 'hello from sub server') subs.setWs(ws);
-      else subs.fromSubSrvr(parts[3]);
+      subs.fromSubSrvr(parts[3]);
     }
     else {
       if(socketName != appSocketName) {

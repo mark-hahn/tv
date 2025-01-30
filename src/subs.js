@@ -1,7 +1,6 @@
-import fs         from "fs";
-import {Writable} from "stream"; 
-import {jParse}   from "./util.js";
-import date       from 'date-and-time';
+import fs            from "fs";
+import {Writable}    from "stream"; 
+import {jParse, log} from "./util.js";
 
 const videoSfxs = [ "mp4", "mkv", "avi" ];
 
@@ -15,14 +14,6 @@ let statusMinutes = 0;
 
 const eofArr = new Uint32Array(1);
 eofArr[0] = 0x07162534;
-
-const log = (msg, err = false, spacing = false) => {
-  if(err) console.error('subs, ' + msg);
-  else    console.log(  'subs, ' + msg);
-  if(spacing) fs.appendFileSync('subs.log', '');
-  fs.appendFileSync('subs.log', 
-          date.format(new Date(), 'MM/DD HH:mm:ss ') + msg + '\n')
-}
 
 const pathToSrtPath = (path) =>  
         path.split('.').slice(0, -1).join('.') + '.en-gen.srt';
@@ -150,7 +141,7 @@ const addSubReq = (name, path) => {
   if(errMsg) return errMsg;
   if(pathAddedCount !== 0) 
       fs.writeFileSync('data/subReqs.json', JSON.stringify(subReqQueue));
-  // console.log('addSubReq', {pathAddedCount, subReqQueue});
+  log(`added ${pathAddedCount} files to queue for ${name}`); 
   sendOneFile();
   return null;
 }
@@ -170,7 +161,7 @@ const getSubStatus = (name) => {
 }
 
 export const syncSubs = (id, namePath, resolve, reject) => {
-  log('syncSubs from web app: ' + namePath);
+  log('cc request from web app: ' + namePath, false, true);
   let namePathObj = jParse(namePath, 'syncSubs');
   if(!namePathObj) {
     log('syncSubs parse error', true);

@@ -3,7 +3,6 @@ import {Writable} from "stream";
 import {jParse}   from "./util.js";
 import date       from 'date-and-time';
 
-
 const videoSfxs = [ "mp4", "mkv", "avi" ];
 
 const subReqQueueStr = fs.readFileSync('data/subReqs.json', 'utf8');
@@ -17,9 +16,10 @@ let statusMinutes = 0;
 const eofArr = new Uint32Array(1);
 eofArr[0] = 0x07162534;
 
-const log = (msg, err = false) => {
+const log = (msg, err = false, spacing = false) => {
   if(err) console.error('subs, ' + msg);
   else    console.log(  'subs, ' + msg);
+  if(spacing) fs.appendFileSync('subs.log', '');
   fs.appendFileSync('subs.log', 
           date.format(new Date(), 'MM/DD HH:mm:ss ') + msg + '\n')
 }
@@ -38,7 +38,7 @@ const sendOneFile = () => {
   sending = true;
 
   const path = namePath.path;
-  log('sending file: ' + path);
+  log('sending file: ' + path, false, true);
   const sendStartTime = Date.now();
 
   const writeStream = new  Writable({
@@ -72,7 +72,7 @@ export const setWs = (wsIn) => {
   if(wsIn != ws) {
     ws = wsIn; 
     if(ws) {
-      log('\nconnected: subs server websocket set');
+      log('connected: subs server websocket set', false, true);
       sendOneFile();
     }
   }

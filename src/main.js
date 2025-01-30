@@ -10,6 +10,7 @@ bugs ...
   play button shows when emby not running
 
 todo  ...
+  add cancel to CC
   remove updated sort
   move search popup down page
   make popups modal with closing by clicking anywhere

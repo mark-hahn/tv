@@ -93,7 +93,8 @@ export const fromSubSrvr = (data) => {
       console.log('fromSubSrvr:', statusMinutes, 'minutes');
       if(!dataObj.srt) return;
 
-      log('received srt file, length: ' + dataObj.srt.length);
+      log('writing srt file, length: ' + dataObj.srt.length);
+      fs.writeFileSync(pathToSrtPath(namePath.path), dataObj.srt);
       subReqQueue.shift();
       fs.writeFileSync('data/subReqs.json', JSON.stringify(subReqQueue));
       const processEndTime = Date.now();

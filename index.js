@@ -6,7 +6,7 @@ import {rimraf}            from 'rimraf'
 import fetch               from 'node-fetch';
 import * as view           from './src/lastViewed.js';
 import * as subs           from "./src/subs.js";
-import {jParse, log}       from "./util.js";
+import {jParse, log}       from "./src/util.js";
 
 process.setMaxListeners(50);
 const dontupload  = false;
@@ -711,8 +711,8 @@ wss.on('connection', (ws) => {
     }
     if(parts[2] == 'subSrvr') {
       if(socketName != subSocketName) {
-        console.log(subSocketName, 'init ws');
         socketName = subSocketName;
+        log(socketName + ' connected', false, true);
       }
       const paramObj = jParse(parts[3], 'server msg handler');
       if(!paramObj) return;
@@ -740,6 +740,6 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     chkSubsClosed(socketName);
-    console.log(socketName + ' closed');
+    log(socketName + ' closed');
   });
 });

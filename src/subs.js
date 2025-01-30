@@ -21,14 +21,25 @@ const pathToSrtPath = (path) =>
 let sendEndTime;
 let sending = false;
 let chunkFinishedCb = null;
+let fileSizeFromStats = 0;
 
 const trySendOneFile = () => {
+  let sendByteCount = 0;
   const namePath = subReqQueue[0];
-  console.log('trySendOneFile:', {ws, sending, namePath});
   if(!ws || sending || namePath === undefined) return;
   sending = true;
 
   const path = namePath.path;
+  let stats;
+  try {
+    stats = fs.statSync(path);
+    fileSizeFromStats = stats.size;
+  }
+  catch {
+    log('error doing stat on file:', path);
+    sending = false;
+    return;
+  }
   log('sending file: ' + path, false, true);
   const sendStartTime = Date.now();
 
@@ -42,6 +53,7 @@ const trySendOneFile = () => {
       }
       chunkFinishedCb = next;
       ws.send(chunk);
+      sendByteCount += chunk.length;
     }
   });
 
@@ -52,20 +64,20 @@ const trySendOneFile = () => {
     })
     .on('close', () => {
       ws.send(eofArr);
+      if(sendByteCount != fileSizeFromStats) {
+        log(`error, wrong num bytes sent: sent: ${sendByteCount}, ` +
+                                    `file size: ${fileSizeFromStats}`);
+      }
       sendEndTime = Date.now();
-      log(`send time: ${
+      log(`sent: ${sendByteCount} bytes, time: ${
             ((sendEndTime - sendStartTime) / 1000).toFixed(0)} secs`);
    });
 }
 
 export const setWs = (wsIn) => {
-  if(wsIn != ws) {
-    ws = wsIn; 
-    if(ws) {
-      log('connected: subs server websocket set', false, true);
-      trySendOneFile();
-    }
-  }
+  ws = wsIn; 
+  sending = false;
+  setTimeout(trySendOneFile, 1000);
 }
 
 export const fromSubSrvr = (paramObj) => {
@@ -76,12 +88,12 @@ export const fromSubSrvr = (paramObj) => {
     }
     else {
       log('ack received with no chunk callback', true);
-      sending = false;
     }
   }
   else if(paramObj.error) {
     log('error fromSubSrvr: ' + paramObj.error, true);
     sending = false;
+    return;
   }
   else if(paramObj.data) {
     const namePath = subReqQueue[0];

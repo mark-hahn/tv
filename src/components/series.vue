@@ -21,11 +21,16 @@
           style=`font-weight:bold; color:red; 
                   font-size:18px; margin-top:4px;
                   max-height:24px;`) Not in Emby
-      button(@click="ccClick"
+      button(v-if="subsActive"
+             @click="ccCancel"
+              style=`font-size:16px; font-style:bold;
+                    margin-left:20px; margin-top:3px;
+                    max-height:24px;`) CC Cancel
+      button(v-if="!subsActive"
+             @click="ccClick"
               style=`font-size:16px; font-style:bold;
                     margin-left:20px; margin-top:3px;
                     max-height:24px;`) CC
-
       button(@click="deleteClick"
               style=`font-size:15px; 
                     margin-left:20px; margin-top:3px;
@@ -59,6 +64,12 @@
                       font-size:18px; min-height:24px;
                       font-weight:bold; font-color:gray;
                       text-align:left; margin-top:5px;`)
+      #subs(v-if="subsActive"
+              v-html="subs"
+              style=`cursor:pointer; 
+                      font-size:18px; min-height:24px;
+                      font-weight:bold; font-color:gray;
+                      text-align:left; margin-top:2px;`)
     #topRight(style=`display:flex; flex-direction:column`)
       #remotes(style=`width:200px; margin-left:20px;
                       display:flex; flex-direction:column;`) 
@@ -73,7 +84,7 @@
                    border: 1px solid black; font-weight:bold;
                    cursor:default;`)
           | {{watchButtonTxt}}
-        div( v-if="showRemotes" 
+        div(v-if="showRemotes" 
             v-for="remote in remotes"
             @click="remoteClick(remote)"
             style=`margin:3px 10px; padding:10px; 
@@ -108,6 +119,8 @@ export default {
       remotes: [],
       seasonsTxt: '',
       cntryLangTxt: '',
+      subs: '',
+      subsActive:  false,
       showSpinner: false,
       showRemotes: false,
       nextUpTxt: '',
@@ -129,6 +142,13 @@ export default {
       const data = {name:this.show.Name, path:this.show.Path};
       console.log('Series, ccClick:', data);
       srvr.syncSubs(data);
+    },
+
+    async ccCancel() {
+      console.log('ccCancel');
+      srvr.syncSubs({cancel:1, name:this.show.Name});
+      this.subs = '';
+      this.subsActive = false;
     },
 
     async deleteClick() {
@@ -292,6 +312,19 @@ export default {
       }
     },
 
+    async setSubs(status) {
+      if(status === null || !status.ok ||
+         (status.count == 0 && status.mins === null)) {
+        this.subs = '';
+        this.subsActive = false;
+        return;
+      }
+      this.subsActive = true;
+      this.subs = ` &nbsp; CC  &nbsp; &nbsp; ${status.count} In Queue
+                      ${status.mins !== null ? '&nbsp; &nbsp;' + 
+                        status.mins + ' mins' : ''}`;    
+    },
+
     async setRemotes() {
       this.remoteShowName  = this.show.Name;
       this.showSpinner     = false;
@@ -346,8 +379,13 @@ export default {
       await this.setNextWatch();
       await this.setRemotes();
     });
+
     setTimeout(() => {
       this.showHdr = true;
+    }, 1000);
+
+    setInterval(async () => {
+      this.setSubs(await srvr.syncSubs({name:this.show.Name, path:null}));
     }, 1000);
   },
 }

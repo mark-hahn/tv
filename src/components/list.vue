@@ -1021,8 +1021,7 @@ export default {
           fileGap || fileEndError || seasonWatchedThenNofile;
 
       Object.assign(show, gap);
-      const gapIdGapSave = JSON.stringify([show.Id, gap, save]);
-      await srvr.addGap(gapIdGapSave);
+      await srvr.addGap([show.Id, gap, save]);
     }
   },
 

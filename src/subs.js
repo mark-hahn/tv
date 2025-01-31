@@ -20,6 +20,8 @@ const cancelArr = new Uint32Array(1);
 cancelArr[0]    = 0xab398745;
 const eofArr    = new Uint32Array(1);
 eofArr[0]       = 0x07162534;
+const pingArr   = new Uint32Array(1);
+pingArr[0]      = 0x01020304;
 
 export const setWs = (wsIn) => {
   ws = wsIn; 
@@ -31,27 +33,10 @@ export const setWs = (wsIn) => {
 const pathToSrtPath = (path) =>  
         path.split('.').slice(0, -1).join('.') + '.en-gen.srt';
 
-let lastWs      = null;
-let lastSending = null;
-let lastName    = null;
-
 const trySendOneFile = () => {
   let sendByteCount = 0;
   const namePath = subReqQueue[0];
-  if(!ws || sending || namePath === undefined) {
-    const wsL      = !!ws;
-    const sendingL = sending;
-    const nameL    = namePath?.nName;
-    if(wsL != lastWs || sendingL != lastSending || nameL != lastName)
-        log(`trySendOneFile ignored, ws: ${wsL}, sending: ${sendingL}, name: ${nameL}`);
-    lastWs      = wsL;      
-    lastSending = sendingL; 
-    lastName    = nameL;    
-    return;
-  }
-  lastWs      = null;
-  lastSending = null;
-  lastName    = null;
+  if(!ws || sending || namePath === undefined) return;
 
   sending = true;
   sendingName = namePath.name;
@@ -112,8 +97,30 @@ export const fromSubSrvr = (paramObj) => {
       log('ack received with no chunk callback', true);
     }
   }
+  else if(paramObj.pong) {
+    log('pong from sub srvr');
+    return;
+  }
   else if(paramObj.error) {
-    log('error fromSubSrvr: ' + paramObj.error, true);
+    log('error from sub srvr: ' + paramObj.error, true);
+    sending = false;
+    sendingName = '';
+    return;
+  }
+  else if(paramObj.stdout) {
+    const lines = paramObj.stdout.toString().split("\n");
+    for(let line of lines) console.log(line);
+    const lastLine = lines[lines.length-2];
+    const timeParts = /^.*?--> (\d+):/.exec(lastLine);
+    if(timeParts) {
+      const namePath = subReqQueue[0];
+      statusName     = namePath?.name;
+      statusMinutes  = +timeParts[1];
+    }
+    return;
+  }
+  else if(paramObj.stderr) {
+    log('stderr from sub srvr: ' + paramObj.stderr, true);
     sending = false;
     sendingName = '';
     return;
@@ -148,6 +155,11 @@ const cancelShow = (name) => {
     sendingName = '';
     trySendOneFile();
   }
+}
+
+export const sendPing = () => {
+  log('pinging sub server');
+  ws.send(pingArr);
 }
 
 const addSubReq = (name, path) => {
@@ -191,7 +203,6 @@ const addSubReq = (name, path) => {
   return null;
 }
 
-let lastMins = 0;
 const getSubStatus = (name) => {
   let nameCount = 0;
   for(let namePath of subReqQueue) {

@@ -734,12 +734,14 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('error', (err) => {
-    chkSubsClosed(socketName);
     console.error(socketName, 'error:', err.message);
+    chkSubsClosed(socketName);
+    socketName = 'unknown websocket';
   });
 
   ws.on('close', () => {
-    chkSubsClosed(socketName);
     log(socketName + ' closed');
+    chkSubsClosed(socketName);
+    socketName = 'unknown websocket';
   });
 });

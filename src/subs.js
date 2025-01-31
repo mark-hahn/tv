@@ -10,7 +10,7 @@ let subReqQueue = jParse(subReqQueueStr, 'subs queue') ?? [];
 let ws = null;
 let sending = false;
 let sendingName = '';
-let statusName = '';
+let statusName = ''; // actually used below
 let statusMinutes = null;
 let chunkFinishedCb = null;
 let fileSizeFromStats = 0;
@@ -25,15 +25,19 @@ pingArr[0]      = 0x01020304;
 
 export const setWs = (wsIn) => {
   ws = wsIn; 
-  sending = false;
   sendingName = '';
-  setTimeout(trySendOneFile, 1000);
+  setTimeout(() => trySendOneFile(true), 1000);
 }
 
 const pathToSrtPath = (path) =>  
         path.split('.').slice(0, -1).join('.') + '.en-gen.srt';
 
-const trySendOneFile = () => {
+const trySendOneFile = (force = false) => {
+  if(force) {
+    ws.send(cancelArr);
+    sending = false;
+    sendingName = '';
+  }
   let sendByteCount = 0;
   const namePath = subReqQueue[0];
   if(!ws || sending || namePath === undefined) return;
@@ -87,6 +91,7 @@ const trySendOneFile = () => {
    });
 }
 
+let lastMins;
 export const fromSubSrvr = (paramObj) => {
   if(paramObj.ack) {
     if(chunkFinishedCb) {
@@ -99,13 +104,7 @@ export const fromSubSrvr = (paramObj) => {
   }
   else if(paramObj.pong) {
     log('pong from sub srvr');
-    return;
-  }
-  else if(paramObj.error) {
-    log('error from sub srvr: ' + paramObj.error, true);
-    sending = false;
-    sendingName = '';
-    return;
+    trySendOneFile();
   }
   else if(paramObj.stdout) {
     const lines = paramObj.stdout.toString().split("\n");
@@ -113,36 +112,38 @@ export const fromSubSrvr = (paramObj) => {
     const lastLine = lines[lines.length-2];
     const timeParts = /^.*?--> (\d+):/.exec(lastLine);
     if(timeParts) {
-      const namePath = subReqQueue[0];
-      statusName     = namePath?.name;
-      statusMinutes  = +timeParts[1];
+      statusName    = subReqQueue[0]?.name;
+      statusMinutes = +timeParts[1];
+      if(lastMins !== statusMinutes)
+        console.log(`Progress ${statusMinutes} minutes.`);
+      lastMins = statusMinutes;
     }
-    return;
   }
   else if(paramObj.stderr) {
     log('stderr from sub srvr: ' + paramObj.stderr, true);
-    sending = false;
-    sendingName = '';
-    return;
+    trySendOneFile(true);
+  }
+  else if(paramObj.error) {
+    log('error from sub srvr: ' + paramObj.error, true);
+    trySendOneFile(true);
   }
   else if(paramObj.data) {
     const namePath = subReqQueue[0];
     statusName     = namePath?.name;
     statusMinutes  = paramObj.mins;
-    console.log('fromSubSrvr:', statusMinutes, 'minutes');
-    if(!paramObj.srt) return;
-
-    log('writing srt file, length: ' + paramObj.srt.length);
-    fs.writeFileSync(pathToSrtPath(namePath.path), paramObj.srt);
-    subReqQueue.shift();
-    fs.writeFileSync('data/subReqs.json', JSON.stringify(subReqQueue));
-    const processEndTime = Date.now();
-    log(`conversion time: ${
-                ((processEndTime - sendEndTime)/(60*1000)).toFixed(0)} mins`);
-    sending = false;
-    sendingName = '';
+    if(statusMinutes !== null)
+        console.log('fromSubSrvr:', statusMinutes, 'minutes');
+    if(paramObj.srt) {
+      log('writing srt file, length: ' + paramObj.srt.length);
+      fs.writeFileSync(pathToSrtPath(namePath.path), paramObj.srt);
+      subReqQueue.shift();
+      fs.writeFileSync('data/subReqs.json', JSON.stringify(subReqQueue));
+      const processEndTime = Date.now();
+      log(`conversion time: ${
+         ((processEndTime - sendEndTime)/(60*1000)).toFixed(0)} mins`);
+      trySendOneFile(true);
+    }
   }
-  trySendOneFile();
 }
 
 const cancelShow = (name) => {
@@ -151,9 +152,7 @@ const cancelShow = (name) => {
   fs.writeFileSync('data/subReqs.json', JSON.stringify(subReqQueue));
   if(sendingName == name) { 
     ws.send(cancelArr);
-    sending = false;
-    sendingName = '';
-    trySendOneFile();
+    trySendOneFile(true);
   }
 }
 
@@ -219,13 +218,10 @@ const getSubStatus = (name) => {
 
 export const syncSubs = (id, namePath, resolve, reject) => {
   // log('cc request from web app: ' + namePath, false, true);
-  let namePathObj = jParse(namePath, 'syncSubs');
-  if(!namePathObj) {
-    log('syncSubs parse error', true);
-    reject([id, 'syncSubs parse error']);
-  }
+  let namePathCancObj = jParse(namePath, 'syncSubs');
+  if(!namePathCancObj) reject([id, 'syncSubs parse error']);
   else {
-    const {name, path, cancel} = namePathObj;
+    const {name, path, cancel} = namePathCancObj;
     if(cancel) {
       cancelShow(name);
       resolve([id, 'ok']);

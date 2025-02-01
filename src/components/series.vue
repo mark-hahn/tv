@@ -139,14 +139,23 @@ export default {
     },
 
     async ccClick() {
-      const data = {name:this.show.Name, path:this.show.Path};
+      const data = {
+        name:    this.show.Name, 
+        path:    this.show.Path,
+        episode: 0, 
+        season:  0, 
+      };
       console.log('Series, ccClick:', data);
       srvr.syncSubs(data);
     },
 
     async ccCancel() {
       console.log('ccCancel');
-      srvr.syncSubs({cancel:1, name:this.show.Name});
+      const data = {
+        cancel: true,
+        name:   this.show.Name, 
+      };
+      srvr.syncSubs(data);
       this.subs = '';
       this.subsActive = false;
     },

@@ -574,6 +574,7 @@ export const deleteNoemby = async (name) => {
 
 const getSession = async (player='roku') => {
   const url = urls.sessionUrl(player);
+  if(!url) return null;
   const res = await axios.get(url);
   const session = res.data[0];
   return session;
@@ -597,10 +598,10 @@ export const getCurrentlyWatching = async (player='roku') => {
 }
 
 export const startStopRoku = async (show, episodeId) => {
-  // const showName      = show.Name;
-  const session       = await getSession();
-  const sessionId     = session.Id;
-  const nowPlaying    = session.NowPlayingItem;
+  const session = await getSession();
+  if(!session) return;
+  const sessionId  = session.Id;
+  const nowPlaying = session.NowPlayingItem;
   if(nowPlaying) {
     const {url, body} = urls.stopRokuUrl(sessionId);
     await axios({method: 'post', url, data: body});

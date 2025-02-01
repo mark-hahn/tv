@@ -699,7 +699,6 @@ const chkSubsClosed = (src) => {
 }
 
 wss.on('connection', (ws) => {
-  console.log('client connected');
   let socketName = 'unknown websocket';
 
   ws.on('message', (data) => {
@@ -724,8 +723,8 @@ wss.on('connection', (ws) => {
     }
     else {
       if(socketName != appSocketName) {
-        console.log(appSocketName, 'first msg');
         socketName = appSocketName;
+        console.log(socketName + ' connected', false, true);
       }
       const idFnameParam = parts.slice(1);
       queue.unshift({ws, idFnameParam});

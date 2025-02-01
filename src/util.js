@@ -11,11 +11,21 @@ export const jParse = (str, label) => {
   return obj;
 }
 
+let lastMsg     = null;
+let repeatCount = 0;
 export const log = (msg, err = false, spacing = false) => {
-  if(err) console.error('subs, ' + msg);
-  else    console.log(  'subs, ' + msg);
+  if(msg == lastMsg) {
+    repeatCount++;
+    return;
+  }
+  lastMsg = msg;
+  msg = date.format(new Date(), 'MM/DD HH:mm:ss ') +
+            (repeatCount ? (''+repeatCount).padStart(4, ' ')
+                         : '    ') + ' ' + msg;
+  if(err) console.error(msg);
+  else    console.log(msg);
   if(spacing) fs.appendFileSync('srvr.log', '\n');
-  fs.appendFileSync('srvr.log', 
-          date.format(new Date(), 'MM/DD HH:mm:ss ') + msg + '\n')
+  fs.appendFileSync('srvr.log', msg + '\n');
+  repeatCount = 0;
 }
 

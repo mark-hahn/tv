@@ -52,12 +52,13 @@ const trySendOneFile = (force = false) => {
     sendingName = '';
     return;
   }
-  log('sending file: ' + path, false, true);
+  const fname = path.split('/').pop();
+  log('sending file: ' + fname, false, true);
   const sendStartTime = Date.now();
 
   const writeStream = new  Writable({
     write(chunk, _encoding, next) {
-      if(ws.readyState !== WebSocket.OPEN) {
+      if(ws?.readyState !== WebSocket.OPEN) {
         const errMsg = 'ws not open in writeStream write';
         log(errMsg, true);
         next(Error(errMsg));
@@ -92,7 +93,6 @@ export const setWs = (wsIn) => {
   setTimeout(() => trySendOneFile(true), 1000);
 }
 
-let lastMins;
 export const fromSubSrvr = (paramObj) => {
   if(paramObj.ack) {
     if(chunkFinishedCb) {
@@ -115,9 +115,6 @@ export const fromSubSrvr = (paramObj) => {
     if(timeParts) {
       statusName    = subReqQueue[0]?.name;
       statusMinutes = +timeParts[1];
-      if(lastMins !== statusMinutes)
-        console.log(`Progress ${statusMinutes} minutes.`);
-      lastMins = statusMinutes;
     }
   }
   else if(paramObj.stderr) {
@@ -253,7 +250,7 @@ export const syncSubs = (id, namePath, resolve, reject) => {
       return;
     } 
     let addErr = null;
-    if(path) addErr = addSubReq(name, path, season, episode);
+    if(path !== null) addErr = addSubReq(name, path, season, episode);
     const    status = getSubStatus(name);
     if(addErr === null && status?.ok) 
       resolve([id, status]);

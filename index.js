@@ -740,7 +740,7 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
-    log(socketName + ' closed');
+    // log(socketName + ' closed');
     chkSubsClosed(socketName);
     socketName = 'unknown websocket';
   });

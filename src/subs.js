@@ -1,6 +1,7 @@
-import fs            from "fs";
-import {Writable}    from "stream"; 
-import {jParse, log} from "./util.js";
+import fs                 from "fs";
+import {Writable}         from "stream"; 
+import {execSync as exec} from 'child_process'
+import {jParse, log}      from "./util.js";
 
 const videoSfxs = [ "mp4", "mkv", "avi" ];
 
@@ -161,7 +162,7 @@ export const sendPing = () => {
   ws.send(pingArr);
 }
 
-const addSubReq = (name, path) => {
+const addSubReq = (name, path, minSeason, minEpisode) => {
   console.log('addSubReq:', {name, path});
   let pathAddedCount = 0;
   let errMsg = null;
@@ -184,10 +185,33 @@ const addSubReq = (name, path) => {
             break;
           }
         }
-        if(!pathAlreadyInQueue && 
-           !fs.existsSync(pathToSrtPath(path))) {
-          subReqQueue.push({name, path});
-          pathAddedCount++;
+        if(!pathAlreadyInQueue) {
+          const srtExists = 
+                    fs.existsSync(pathToSrtPath(path));
+          if(!srtExists) {
+            let tooOld = false;
+            if(!pathAlreadyInQueue && !srtExists) {
+              const fName = path.split('/').pop();
+              const cmd = `/usr/local/bin/guessit -js 
+                          '${ fName.replaceAll(/'|\`/, '') }'`;
+              const guessItRes = 
+                      exec(cmd, {timeout:5000}).toString();
+              const pathInfo = jParse(guessItRes, 'guessit');
+              if(pathInfo?.season !== undefined) {
+                const pathSeason  = pathInfo.season;
+                const pathEpisode = pathInfo.episode ?? 0;
+                if(pathSeason  < minSeason ||
+                  (pathSeason == minSeason && 
+                   pathEpisode < minEpisode)) {
+                  tooOld = true;
+                }
+              } 
+            }
+            if(!tooOld) {
+              subReqQueue.push({name, path});
+              pathAddedCount++;
+            }
+          }
         }
       }
     }
@@ -196,7 +220,8 @@ const addSubReq = (name, path) => {
   recurs(path);
   if(errMsg) return errMsg;
   if(pathAddedCount !== 0) 
-      fs.writeFileSync('data/subReqs.json', JSON.stringify(subReqQueue));
+      fs.writeFileSync('data/subReqs.json', 
+                        JSON.stringify(subReqQueue));
   log(`added ${pathAddedCount} file(s) to queue for ${name}`); 
   trySendOneFile();
   return null;
@@ -221,14 +246,14 @@ export const syncSubs = (id, namePath, resolve, reject) => {
   let namePathCancObj = jParse(namePath, 'syncSubs');
   if(!namePathCancObj) reject([id, 'syncSubs parse error']);
   else {
-    const {name, path, cancel} = namePathCancObj;
+    const {name, path, season, episode, cancel} = namePathCancObj;
     if(cancel) {
       cancelShow(name);
       resolve([id, 'ok']);
       return;
     } 
     let addErr = null;
-    if(path) addErr = addSubReq(name, path);
+    if(path) addErr = addSubReq(name, path, season, episode);
     const    status = getSubStatus(name);
     if(addErr === null && status?.ok) 
       resolve([id, status]);

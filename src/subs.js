@@ -119,7 +119,7 @@ export const fromSubSrvr = (paramObj) => {
   }
   else if(paramObj.stderr) {
     log('stderr from sub srvr: ' + paramObj.stderr, true);
-    trySendOneFile(true);
+    trySendOneFile();
   }
   else if(paramObj.error) {
     log('error from sub srvr: ' + paramObj.error, true);

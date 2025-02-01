@@ -329,8 +329,8 @@ export default {
         return;
       }
       this.subsActive = true;
-      this.subs = ` &nbsp; CC  &nbsp; &nbsp; ${status.count} In Queue
-                      ${status.mins !== null ? '&nbsp; &nbsp;' + 
+      this.subs = ` &nbsp; CC  &nbsp; &nbsp; ${status.count} In Queue ` +
+                  ` ${status.mins !== null ? '&nbsp; &nbsp;' + 
                         status.mins + ' mins' : ''}`;    
     },
 

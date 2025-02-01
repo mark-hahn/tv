@@ -3,6 +3,7 @@ reminder, restore ...
   start gap running
 
 bugs ...
+  cc processing not starting
   cancel kills subs srvr?
   setting nopickup then deleting a show doesn't keep nopickup
   deleted rejected shows stay in noemby.json (no example)

@@ -328,8 +328,7 @@ export default {
     },
 
     async setSubs(status) {
-      if(status === null || !status.ok ||
-         (status.count == 0 && status.mins === null)) {
+      if(status === null || !status.ok ||status.count == 0) { 
         this.subs = '';
         this.subsActive = false;
         return;
@@ -400,7 +399,8 @@ export default {
     }, 1000);
 
     setInterval(async () => {
-      this.setSubs(await srvr.syncSubs({name:this.show.Name, path:null}));
+      this.setSubs(await srvr.syncSubs(
+            {name:this.show.Name, path:null}));
     }, 1000);
   },
 }

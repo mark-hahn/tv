@@ -561,8 +561,8 @@ export default {
         case 'Size':    
           if(forSort) return show.Size;
           return util.fmtSize(show);
-        case 'Viewed':  
-          lastViewed = srvr.lastViewedByShow[show.Name];
+        case 'Viewed': 
+          lastViewed = srvr.lastViewedCache[show.Name];
           if(forSort) return lastViewed || 0;
           return util.fmtDate(lastViewed);
       }

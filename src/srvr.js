@@ -118,9 +118,6 @@ export async function deleteShowFromSrvr(show) {
 
 export const lastViewedCache = {};
 
-export const lastViewedByShow = 
-              (name) => lastViewedCache[name];
-
 const updateLastViewedCache = async () => {
   const lastViewed = await getLastViewed();
   Object.assign(lastViewedCache, lastViewed);

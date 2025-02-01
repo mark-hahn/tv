@@ -9,6 +9,7 @@ bugs ...
   getRemotes called twice
   play button shows when emby not running
   setting nopickup then deleting a show doesn't keep nopickup
+  cancel kills subs srvr?
 
 todo  ...
   add cancel to CC

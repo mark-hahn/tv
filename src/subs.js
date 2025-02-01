@@ -24,12 +24,6 @@ eofArr[0]       = 0x07162534;
 const pingArr   = new Uint32Array(1);
 pingArr[0]      = 0x01020304;
 
-export const setWs = (wsIn) => {
-  ws = wsIn; 
-  sendingName = '';
-  setTimeout(() => trySendOneFile(true), 1000);
-}
-
 const pathToSrtPath = (path) =>  
         path.split('.').slice(0, -1).join('.') + '.en-gen.srt';
 
@@ -90,6 +84,12 @@ const trySendOneFile = (force = false) => {
       log(`sent: ${sendByteCount} bytes, time: ${
             ((sendEndTime - sendStartTime) / 1000).toFixed(0)} secs`);
    });
+}
+
+export const setWs = (wsIn) => {
+  ws = wsIn; 
+  sendingName = '';
+  setTimeout(() => trySendOneFile(true), 1000);
 }
 
 let lastMins;
@@ -192,8 +192,8 @@ const addSubReq = (name, path, minSeason, minEpisode) => {
             let tooOld = false;
             if(!pathAlreadyInQueue && !srtExists) {
               const fName = path.split('/').pop();
-              const cmd = `/usr/local/bin/guessit -js 
-                          '${ fName.replaceAll(/'|\`/, '') }'`;
+              const cmd = `/usr/local/bin/guessit -js ` +
+                          `'${ fName.replaceAll(/'|\`/g, '') }'`;
               const guessItRes = 
                       exec(cmd, {timeout:5000}).toString();
               const pathInfo = jParse(guessItRes, 'guessit');

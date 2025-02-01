@@ -4,11 +4,10 @@ reminder, restore ...
 
 bugs ...
   cancel kills subs srvr?
-  play button shows when emby not running
   setting nopickup then deleting a show doesn't keep nopickup
-  getRemotes called twice
   deleted rejected shows stay in noemby.json (no example)
   a waiting noemby show doesn't set globe (no example)
+  getRemotes called twice
 
 todo  ...
   add cancel to CC

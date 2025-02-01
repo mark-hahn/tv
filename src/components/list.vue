@@ -1039,7 +1039,8 @@ export default {
 
     setInterval(async () => {
       const curWatch = await emby.getCurrentlyWatching();
-      if(!curWatch) {
+      if(curWatch == 'rokuOff' ||
+         curWatch == 'nothingPlaying') {
         this.watchingName = '---';
         return;
       }

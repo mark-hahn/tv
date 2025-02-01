@@ -292,7 +292,8 @@ export default {
       this.nextUpTxt      = '';
       this.watchButtonTxt = '';
       const watching = await emby.getCurrentlyWatching();
-      if(watching === null) {
+      if(watching == 'rokuOff' || 
+         watching == 'nothingPlaying') {
         const afterWatched = await emby.afterLastWatched(this.show.Id);
         const status = afterWatched.status;
         let seasonNumber, episodeNumber, episodeId;
@@ -302,8 +303,12 @@ export default {
         switch(status) {
           case 'ok': // next avail & haveFile
             this.episodeId = episodeId;
-            this.watchButtonTxt = 
+            if(watching != 'rokuOff')
+              this.watchButtonTxt = 
                     `Play ${fmtSE(seasonNumber, episodeNumber)}`;
+            this.nextUpTxt = 
+                ` &nbsp; Next Up: ${
+                          fmtSE(seasonNumber, episodeNumber)}` 
             break;
           case 'missing':   // next avail & !haveFile
             this.nextUpTxt = 

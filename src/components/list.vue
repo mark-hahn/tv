@@ -551,6 +551,7 @@ export default {
   methods: {
 
     getValBySortChoice(show, forSort = false) {
+      let lastViewed;
       switch(this.sortChoice) {
         case 'Alpha':   
           if(!forSort) return '';
@@ -561,9 +562,9 @@ export default {
           if(forSort) return show.Size;
           return util.fmtSize(show);
         case 'Viewed':  
-          if(forSort) 
-            return srvr.lastViewedCache[show.Name] || 0;
-          return util.fmtDate(srvr.lastViewedCache[show.Name]);
+          lastViewed = srvr.lastViewedByShow[show.Name];
+          if(forSort) return lastViewed || 0;
+          return util.fmtDate(lastViewed);
       }
     },
 

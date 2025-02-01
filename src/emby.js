@@ -126,7 +126,6 @@ export async function loadAllShows(gapCache) {
     if(idx != -1) {
       console.log('upgrading noEmby:', noEmbyShow.Name);
       await srvr.delNoEmby(noEmbyShow.Name);
-      await srvr.delRemotes(noEmbyShow.Name);
       continue;
     }
     shows.push(noEmbyShow);

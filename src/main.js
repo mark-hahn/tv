@@ -8,6 +8,7 @@ bugs ...
   a waiting noemby show doesn't set globe
   getRemotes called twice
   play button shows when emby not running
+  setting nopickup then deleting a show doesn't keep nopickup
 
 todo  ...
   add cancel to CC

@@ -117,8 +117,12 @@ export async function deleteShowFromSrvr(show) {
 }
 
 export const lastViewedCache = {};
+
+export const lastViewedByShow = 
+              (name) => lastViewedCache[name];
+
 const updateLastViewedCache = async () => {
-  const lastViewed = await fCall('getLastViewed');
+  const lastViewed = await getLastViewed();
   Object.assign(lastViewedCache, lastViewed);
 }
 updateLastViewedCache();
@@ -126,6 +130,14 @@ setInterval(updateLastViewedCache, 60*1000); // 1 minute
 
 export function getAllShows()      
             {return fCall('getAllShows')}
+export function deletePath(path)   
+            {return fCall('deletePath', path)}
+export function getUrls(typeUrlName)   
+            {return fCall('getUrls', typeUrlName)}
+export function getLastViewed()      
+            {return fCall('getLastViewed')}
+export function syncSubs(namePath)   
+            {return fCall('syncSubs', namePath)}
 
 export function getBlockedWaits()        
             {return fCall('getBlockedWaits')}
@@ -178,13 +190,3 @@ export function getRemotes(name)
             {return fCall('getRemotes', name)}
 export function addRemotes(nameRems)    
             {return fCall('addRemotes', nameRems)}
-export function delRemotes(name)    
-            {return fCall('delRemotes', name)}
-export function getUrls(typeUrlName)   
-            {return fCall('getUrls', typeUrlName)}
-
-export function syncSubs(namePath)   
-            {return fCall('syncSubs', namePath)}
-         
-export function deletePath(path)   
-            {return fCall('deletePath', path)}

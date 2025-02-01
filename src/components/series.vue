@@ -25,7 +25,8 @@
              @click="ccCancel"
               style=`font-size:16px; font-style:bold;
                     margin-left:20px; margin-top:3px;
-                    max-height:24px;`) CC Cancel
+                    max-height:24px;
+                    min-width:110px;`) CC Cancel
       button(v-if="!subsActive"
              @click="ccClick"
               style=`font-size:16px; font-style:bold;

@@ -3,13 +3,12 @@ reminder, restore ...
   start gap running
 
 bugs ...
-  deleted rejected shows stay in noemby.json
-  adding web show that's in noemby stays in noemby
-  a waiting noemby show doesn't set globe
-  getRemotes called twice
+  cancel kills subs srvr?
   play button shows when emby not running
   setting nopickup then deleting a show doesn't keep nopickup
-  cancel kills subs srvr?
+  getRemotes called twice
+  deleted rejected shows stay in noemby.json (no example)
+  a waiting noemby show doesn't set globe (no example)
 
 todo  ...
   add cancel to CC

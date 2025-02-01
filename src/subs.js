@@ -34,7 +34,7 @@ const pathToSrtPath = (path) =>
         path.split('.').slice(0, -1).join('.') + '.en-gen.srt';
 
 const trySendOneFile = (force = false) => {
-  if(force) {
+  if(!!ws & force) {
     ws.send(cancelArr);
     sending = false;
     sendingName = '';

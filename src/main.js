@@ -6,16 +6,12 @@ bugs ...
   setting nopickup then deleting a show doesn't keep nopickup
   deleted rejected shows stay in noemby.json (no example)
   a waiting noemby show doesn't set globe (no example)
-  chainging shows doesn't update map
-  cc processing not starting
-  how to delete a show not in emby?
+  changing shows doesn't update map
 
 todo  ...
-  restarting tv-series-srvr restarts sub processing
-  remove updated sort
-  move search popup down page
   make popups modal with closing by clicking anywhere
-  update imdb ratings
+  move search popup down page
+  update imdb ratings (refresh button)
   show counts when reloading a deleted show
     (keep all map info for deleted shows)
   show noemby's in download popup button

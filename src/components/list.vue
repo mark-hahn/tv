@@ -462,7 +462,7 @@ export default {
       watchingName:      '---',
       sortPopped:        false,
       sortChoices:          
-        ['Alpha', 'Viewed', 'Added', 'Updated', 'Size'],
+        ['Alpha', 'Viewed', 'Added', 'Size'],
       sortChoice: 'Viewed', 
       fltrPopped:  false,
       fltrChoices:          
@@ -551,7 +551,6 @@ export default {
           if(!forSort) return '';
           return show.Name.replace(/^the\s*/i, "").toLowerCase();
         case 'Added':   return show.DateCreated;
-        case 'Updated': return show.Date;
         case 'Size':    
           if(forSort) return show.Size;
           return util.fmtSize(show);
@@ -1073,7 +1072,6 @@ export default {
         emby.startWorker(showList, this.addGapToShow);
 
         this.sortByNew     = true;
-        this.sortByUpdated = false;
         this.sortBySize    = false;
         this.sortChoice = 
           window.localStorage.getItem("sortChoice") || 'Viewed';

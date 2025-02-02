@@ -235,14 +235,9 @@ export const getTvdbData = async (show) => {
          seasons:seasonsIn, averageRuntime,
          originalNetwork:originalNetworkIn} 
             = extResObj.data;
-  let originalNetwork = 
-    originalNetworkIn?.name || '';
-  const status   = statusIn.name; // e.g. Ended
-  let numSeasons = 0;
-  seasonsIn.forEach((season) => {
-    numSeasons = Math.max(numSeasons, +season.number);
-  });
-  const saved = Date.now();
+  let originalNetwork = originalNetworkIn?.name ?? '';
+  const status = statusIn.name; // e.g. Ended
+  const saved  = Date.now();
   tvdbData = { tvdbId, name, saved, originalNetwork,
                seasonCount, episodeCount, watchedCount,
                image, score, overview, 

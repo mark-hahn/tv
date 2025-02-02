@@ -20,7 +20,7 @@
       div(v-if="notInEmby && notReject" 
           style=`font-weight:bold; color:red; 
                   font-size:18px; margin-top:4px;
-                  max-height:24px;`) Not in Emby
+                  max-height:24px;`) Not Yet In Emby
       button(@click="deleteClick"
               style=`font-size:15px; 
                     margin-left:20px; margin-top:3px;

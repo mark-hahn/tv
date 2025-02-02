@@ -110,7 +110,7 @@ export async function loadAllShows(gapCache) {
     show.OriginalCountry  = tvDbData?.originalCountry;
     show.OriginalLanguage = tvDbData?.originalLanguage;
 
-    if(!tvDbData.deleted) shows.push(show);
+    if(!tvDbData?.deleted) shows.push(show);
   }
 
 ////////  remove gaps with no matching show /////////

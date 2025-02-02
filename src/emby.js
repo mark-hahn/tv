@@ -110,7 +110,7 @@ export async function loadAllShows(gapCache) {
     show.OriginalCountry  = tvDbData?.originalCountry;
     show.OriginalLanguage = tvDbData?.originalLanguage;
 
-    shows.push(show);
+    if(!tvDbData.deleted) shows.push(show);
   }
 
 ////////  remove gaps with no matching show /////////
@@ -128,7 +128,9 @@ export async function loadAllShows(gapCache) {
       await srvr.delNoEmby(noEmbyShow.Name);
       continue;
     }
-    shows.push(noEmbyShow);
+    const tvDbData = allTvdb[noEmbyShow.Name];
+
+    if(!tvDbData.deleted) shows.push(noEmbyShow);
   }
 
 //////////  process blockedWaitShows from srvr ////////////

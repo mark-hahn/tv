@@ -3,15 +3,15 @@ reminder, restore ...
   start gap running
 
 bugs ...
-  cc processing not starting
-  cancel kills subs srvr?
   setting nopickup then deleting a show doesn't keep nopickup
   deleted rejected shows stay in noemby.json (no example)
   a waiting noemby show doesn't set globe (no example)
   getRemotes called twice
+  
+  cc processing not starting
 
 todo  ...
-  add cancel to CC
+  restarting tv-series-srvr restarts sub processing
   remove updated sort
   move search popup down page
   make popups modal with closing by clicking anywhere

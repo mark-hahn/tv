@@ -400,11 +400,14 @@ export default {
       show.Reject = !show.Reject; 
       if(show.Reject) 
         srvr.addReject(show.Name) 
-            .catch((err) => {
-                console.error("late addReject:", err);
-                //- show.Reject = !show.Reject;
-            });
-      else deleteShow(show);
+                .catch((err) => {
+                    console.error("late addReject:", err);
+                });
+      else
+        srvr.delReject(show.Name) 
+                .catch((err) => {
+                    console.error("late delReject:", err);
+                });
     };
 
     const togglePickup = async (show) => {
@@ -425,15 +428,6 @@ export default {
 
     const deleteShow = async (show) => {
       // console.log('list, deleteShow:', show.Name);
-      if(show.Reject) {
-        srvr.delReject(show.Name)
-          .catch((err) => {
-            console.error("late delReject error:", err);
-          });
-        await this.removeRow(show)
-        return;
-      }
-      else
       if(!show.Id.startsWith("noemby-")) {
         this.saveVisShow(show);
         if (!window.confirm(
@@ -443,7 +437,7 @@ export default {
       }
       await tvdb.markTvdbDeleted(show.Name, true);
       await srvr.deleteShowFromSrvr(show);
-      await this.removeRow(show);
+      if(!show.Reject) await this.removeRow(show);
     };
 
     evtBus.on('deleteShow', (show) => {
@@ -962,8 +956,7 @@ export default {
     watchClick() {
       console.log('watchClick');
       if(this.watchingName !== '---') {
-        window.localStorage.setItem(
-                      "lastVisShow", this.watchingName);
+        window.localStorage.setItem("lastVisShow", this.watchingName);
         this.scrollToSavedShow(true);
       }
     },
@@ -972,12 +965,14 @@ export default {
     /////////////////  UPDATE METHODS  /////////////////
 
     showAll(dontClrFilters = false) {
-      if(dontClrFilters?.altKey !== undefined) dontClrFilters = false;
+      // if(dontClrFilters?.altKey !== undefined) dontClrFilters = false;
       this.filterStr = "";
       if(!dontClrFilters) {
         for (let cond of this.conds) cond.filter = 0;
       }
-      this.select(true);
+      this.fltrChoice = 'All';
+      this.shows = allShows
+      // this.select(true);
     },
 
     async addGapToShow(event) {

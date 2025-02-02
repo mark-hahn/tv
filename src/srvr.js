@@ -133,8 +133,6 @@ export function getUrls(typeUrlName)
             {return fCall('getUrls', typeUrlName)}
 export function getLastViewed()      
             {return fCall('getLastViewed')}
-export function syncSubs(namePath)   
-            {return fCall('syncSubs', namePath)}
 
 export function getBlockedWaits()        
             {return fCall('getBlockedWaits')}

@@ -21,17 +21,6 @@
           style=`font-weight:bold; color:red; 
                   font-size:18px; margin-top:4px;
                   max-height:24px;`) Not in Emby
-      button(v-if="subsActive"
-             @click="ccCancel"
-              style=`font-size:16px; font-style:bold;
-                    margin-left:20px; margin-top:3px;
-                    max-height:24px;
-                    min-width:110px;`) CC Cancel
-      button(v-if="!subsActive"
-             @click="ccClick"
-              style=`font-size:16px; font-style:bold;
-                    margin-left:20px; margin-top:3px;
-                    max-height:24px;`) CC
       button(@click="deleteClick"
               style=`font-size:15px; 
                     margin-left:20px; margin-top:3px;
@@ -137,28 +126,6 @@ export default {
       if(show.Id.startsWith('noemby-')) return;
       // console.log('Series: openMap:', show);
       evtBus.emit('openMap', show);
-    },
-
-    async ccClick() {
-      const data = {
-        name:    this.show.Name, 
-        path:    this.show.Path,
-        episode: 0, 
-        season:  0, 
-      };
-      console.log('Series, ccClick:', data);
-      srvr.syncSubs(data);
-    },
-
-    async ccCancel() {
-      console.log('ccCancel');
-      const data = {
-        cancel: true,
-        name:   this.show.Name, 
-      };
-      srvr.syncSubs(data);
-      this.subs = '';
-      this.subsActive = false;
     },
 
     async deleteClick() {
@@ -330,18 +297,6 @@ export default {
       }
     },
 
-    async setSubs(status) {
-      if(status === null || !status.ok ||status.count == 0) { 
-        this.subs = '';
-        this.subsActive = false;
-        return;
-      }
-      this.subsActive = true;
-      this.subs = ` &nbsp; CC  &nbsp; &nbsp; ${status.count} In Queue ` +
-                  ` ${status.mins !== null ? '&nbsp; &nbsp;' + 
-                        status.mins + ' mins' : ''}`;    
-    },
-
     async setRemotes() {
       this.remoteShowName  = this.show.Name;
       this.showSpinner     = false;
@@ -399,11 +354,6 @@ export default {
 
     setTimeout(() => {
       this.showHdr = true;
-    }, 1000);
-
-    setInterval(async () => {
-      this.setSubs(await srvr.syncSubs(
-            {name:this.show.Name, path:null}));
     }, 1000);
   },
 }

@@ -5,7 +5,6 @@ import { WebSocketServer } from 'ws';
 import {rimraf}            from 'rimraf'
 import fetch               from 'node-fetch';
 import * as view           from './src/lastViewed.js';
-import * as subs           from "./src/subs.js";
 import {jParse, log}       from "./src/util.js";
 
 process.setMaxListeners(50);
@@ -651,7 +650,6 @@ const runOne = () => {
     case 'deletePath':    deletePath(        id, param, resolve, reject); break;
     case 'getUrls':       getUrls(           id, param, resolve, reject); break;
     case 'getLastViewed': view.getLastViewed(id,    '', resolve, reject); break;
-    case 'syncSubs':      subs.syncSubs(     id, param, resolve, reject); break;
 
     case 'getBlockedWaits': getBlockedWaits( id, '',    resolve, reject); break;
     case 'addBlockedWait':  addBlockedWait(  id, param, resolve, reject); break;
@@ -692,11 +690,7 @@ const runOne = () => {
 const wss = new WebSocketServer({ port: 8736 });
 console.log('wss listening on port 8736');
 
-const subSocketName = 'subtitle server websocket';
 const appSocketName = 'web app websocket';
-const chkSubsClosed = (src) => {
-  if(src = subSocketName) subs.setWs(null);
-}
 
 wss.on('connection', (ws) => {
   let socketName = 'unknown websocket';
@@ -708,39 +702,22 @@ wss.on('connection', (ws) => {
       console.error('ignoring bad message:', msg);
       return;
     }
-    if(parts[2] == 'subSrvr') {
-      if(socketName != subSocketName) {
-        socketName = subSocketName;
-        log(socketName + ' connected', false, true);
-      }
-      const paramObj = jParse(parts[3], 'server msg handler');
-      if(!paramObj) return;
-      if(paramObj.hello) {
-        subs.setWs(ws);
-        return;
-      }
-      subs.fromSubSrvr(paramObj);
+    if(socketName != appSocketName) {
+      socketName = appSocketName;
+      console.log(socketName + ' connected', false, true);
     }
-    else {
-      if(socketName != appSocketName) {
-        socketName = appSocketName;
-        console.log(socketName + ' connected', false, true);
-      }
-      const idFnameParam = parts.slice(1);
-      queue.unshift({ws, idFnameParam});
-      runOne();
-    }
+    const idFnameParam = parts.slice(1);
+    queue.unshift({ws, idFnameParam});
+    runOne();
   });
 
   ws.on('error', (err) => {
     console.error(socketName, 'error:', err.message);
-    chkSubsClosed(socketName);
     socketName = 'unknown websocket';
   });
 
   ws.on('close', () => {
     // log(socketName + ' closed');
-    chkSubsClosed(socketName);
     socketName = 'unknown websocket';
   });
 });

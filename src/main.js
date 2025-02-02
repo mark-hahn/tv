@@ -6,9 +6,9 @@ bugs ...
   setting nopickup then deleting a show doesn't keep nopickup
   deleted rejected shows stay in noemby.json (no example)
   a waiting noemby show doesn't set globe (no example)
-  getRemotes called twice
-  
+  chainging shows doesn't update map
   cc processing not starting
+  how to delete a show not in emby?
 
 todo  ...
   restarting tv-series-srvr restarts sub processing
@@ -21,6 +21,7 @@ todo  ...
   show noemby's in download popup button
 
 tabled ...
+  getRemotes called twice
   changing map doesn't change gaps
   remove show from tvdb.json (how?)
   button: scroll hilighted row to vis 

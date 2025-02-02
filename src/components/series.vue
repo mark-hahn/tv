@@ -291,6 +291,9 @@ export default {
       }
       this.nextUpTxt      = '';
       this.watchButtonTxt = '';
+      const {watchedCount} = await emby.getEpisodeCounts(this.show);
+      if(watchedCount == 0) return;  
+
       const watching = await emby.getCurrentlyWatching();
       if(watching == 'rokuOff' || 
          watching == 'nothingPlaying') {

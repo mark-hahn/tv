@@ -229,13 +229,15 @@ export const getTvdbData = async (show) => {
   const {seasonCount, episodeCount, watchedCount} = 
               await emby.getEpisodeCounts(show);
   const extResObj  = await extRes.json();
-  const {firstAired, lastAired, image, score,
+  const {firstAired, lastAired: lastAiredIn, image, score,
          originalCountry, originalLanguage, overview,
          remoteIds:tvdbRemotes, status:statusIn,
          seasons:seasonsIn, averageRuntime,
          originalNetwork:originalNetworkIn} 
             = extResObj.data;
-  let originalNetwork = originalNetworkIn?.name ?? '';
+  let lastAired       = lastAiredIn ?? firstAired;
+  lastAired = lastAired ?? '';
+  let   originalNetwork = originalNetworkIn?.name ?? '';
   const status = statusIn.name; // e.g. Ended
   const saved  = Date.now();
   tvdbData = { tvdbId, name, saved, originalNetwork,

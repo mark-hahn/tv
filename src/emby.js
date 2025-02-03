@@ -211,26 +211,7 @@ export async function loadAllShows(gapCache) {
       matchingShow.Reject = true;
       continue;
     }
-    const date = '2001-01-01';
-    const rejShow = {
-      Name: rejectName,
-      Id: "noemby-" + Math.random(),
-      DateCreated: date,
-      Waiting: false,
-      WatchGap: false,
-      FileGap: false,
-      BlockedGap: false,
-      WaitStr: '',
-      NotReady: true,
-      InToTry: false,
-      InContinue: false,
-      InMark: false,
-      InLinda: false,
-      Reject: true,
-      Pickup: false,
-      Date: date,
-      Size: 0,
-    };
+    const rejShow = createNoemby({Name: rejectName});
     shows.push(rejShow);
   }
 
@@ -567,6 +548,18 @@ export async function saveLinda(id, inLinda) {
     console.error(err);
     throw new Error(err);
   }
+}
+export const createNoemby = async (show) => {
+  const dateStr = util.fmtDate(0);
+  Object.assign(show, {
+    Id: "noemby-" + Math.random(),
+    DateCreated: dateStr, 
+    NotReady: true,
+    Date: dateStr,
+    Seasons: [],
+  });
+  srvr.addNoEmby(show);
+  return show;
 }
 
 export const deleteNoemby = async (name) => {

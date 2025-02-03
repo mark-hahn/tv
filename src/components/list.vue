@@ -652,38 +652,16 @@ export default {
         this.saveVisShow(matchShow, true);
         return;
       }
-      const dateStr = util.fmtDate(0);
-      const show = {
+      let show = {
+        newNoEmby: true,
         Name: name,
-        Id: "noemby-" + Math.random(),
-        DateCreated: dateStr, 
-        OriginalCountry:  '',
-        OriginalLanguage: '',
-        BlockedGap: false,
-        Waiting: false,
-        WaitStr: '',
-        FileGap: false,
-        WatchGap: false,
-        NotReady: true,
-        InToTry: false,
-        InContinue: false,
-        InMark: false,
-        InLinda: false,
-        Reject: false,
-        Pickup: false,
-        Date: dateStr,
-        Size: 0,
-        Seasons: [],
         TvdbId: tvdbId,
         Overview: overview,
       };
-
-      allShows.unshift(show);
-
-      this.saveVisShow(show, true);
-
+      show = await srvr.addNoEmby(show);
       await srvr.addBlockedWait(show.Name);
-      await srvr.addNoEmby(show);
+      allShows.unshift(show);
+      this.saveVisShow(show, true);
     },
     
     cancelSrchList() {

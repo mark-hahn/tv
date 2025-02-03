@@ -14,8 +14,8 @@
       div(style=`font-weight:bold; color:red; 
                   font-size:18px; max-height:24px;
                   margin-top:4px; margin-right:10px;`) {{deletedTxt}}
-      button(@click="hideClick"
-              style=`font-size:15px; max-height:24px;`) Hide
+      button(@click="undelClick"
+              style=`font-size:15px; max-height:24px;`) Undelete
     div(v-else style=`display:flex;`)
       div(v-if="notInEmby && notReject" 
           style=`font-weight:bold; color:red; 
@@ -31,37 +31,9 @@
               style=`display:flex; flex-direction:column;
                      text-align:center;`) 
       #poster()
-      #dates(v-html="dates"
-             v-if="dates.length > 0"
-             style=`font-size:18px; min-height:24px;
-                    margin-top:10px; font-weight:bold;
-                    text-align:left;`)
-      #seasons(v-html="seasonsTxt"
-               v-if="seasonsTxt.length > 0"
-               style=`cursor:pointer; 
-                      font-size:18px; min-height:24px;
-                      font-weight:bold; font-color:gray;
-                      text-align:left;`)
-      #cntrylang(v-if="cntryLangTxt.length > 0"
-                 v-html="cntryLangTxt"
-                 style=`cursor:pointer; 
-                        font-size:18px; min-height:24px;
-                        font-weight:bold; font-color:gray;
-                        text-align:left;`)
-      #nextup(v-if="nextUpTxt.length > 0"
-              v-html="nextUpTxt"
-              style=`cursor:pointer; 
-                      font-size:18px; min-height:24px;
-                      font-weight:bold; font-color:gray;
-                      text-align:left; margin-top:5px;`)
-      #subs(v-if="subsActive"
-              v-html="subs"
-              style=`cursor:pointer; 
-                      font-size:18px; min-height:24px;
-                      font-weight:bold; font-color:gray;
-                      text-align:left; margin-top:2px;`)
-    #topRight(style=`display:flex; flex-direction:column`)
-      #remotes(style=`width:200px; margin-left:20px;
+    #topRight(style=`display:flex; flex-direction:column;
+                    width:300px; margin-left:10px;`)
+      #remotes(style=`width:200px; margin-left:30px;
                       display:flex; flex-direction:column;`) 
         div(v-if="showSpinner")
           img(src="../../loading.gif"
@@ -82,7 +54,36 @@
                    border: 1px solid black; font-weight:bold;
                    cursor:default;`)
           | {{remote.name}}
-
+      #infoBox(@click="openMap(show)"
+                  style=`margin-top:10px; margin-left:5px;
+                         width:260px; font-size:17px; 
+                         display:flex; flex-direction:column;
+                         border: 1px solid gray;
+                         text-align:center;`)
+        #dates(v-html="dates"
+              v-if="dates.length > 0"
+              style=`min-height:24px;
+                      margin-top:10px; font-weight:bold; `)
+        #seasons(v-html="seasonsTxt"
+                v-if="seasonsTxt.length > 0"
+                style=`cursor:pointer; min-height:24px;
+                        font-weight:bold; font-color:gray;
+                        `)
+        #cntrylang(v-if="cntryLangTxt.length > 0"
+                  v-html="cntryLangTxt"
+                  style=`cursor:pointer; min-height:24px;
+                          font-weight:bold; font-color:gray;
+                          `)
+        #nextup(v-if="nextUpTxt.length > 0"
+                v-html="nextUpTxt"
+                style=`cursor:pointer; min-height:24px;
+                        font-weight:bold; font-color:gray;
+                        `)
+        #subs(v-if="subsActive"
+                v-html="subs"
+                style=`cursor:pointer; min-height:24px;
+                        font-weight:bold; font-color:gray;
+                         margin-top:2px;`)
   #bot(style=`font-size:20px; padding:10px;`) {{show.Overview}}
 
 </template>
@@ -92,6 +93,7 @@ import evtBus    from '../evtBus.js';
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
+import * as util from '../util.js';
 
 let windowId = null;
 let windowLabel = Math.random();
@@ -133,9 +135,13 @@ export default {
       evtBus.emit('deleteShow', this.show);
     },
 
-    async hideClick() {
-      // console.log('Series, hideClick:', this.show.Name);
-      evtBus.emit('deleteRow', this.show);
+    async undelClick() {
+      // console.log('Series, undelClick:', this.show.Name);
+      const show = this.show;
+      const tvdbData = tvdb.getTvdbData(show);
+      delete tvdbData.deleted;
+      srvr.addTvdb(tvdbData);
+      emby.createNoemby({Name: show.Name});
     },
 
     async remoteClick(remote) {
@@ -173,9 +179,8 @@ export default {
       if(tvdbData.image) {
         img.src = tvdbData.image;
       } else {
-        console.error('image missing from tvdbData',
-                       tvdbData.name);
-        alert('image missing from tvdbData: ' + tvdbData.name);
+        console.error(
+              'image missing from tvdbData', tvdbData.name);
         img.src = './question-mark.png';
       }
       document.getElementById('poster').replaceChildren(img);

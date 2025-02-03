@@ -6,8 +6,11 @@ bugs ...
   deleted rejected shows stay in noemby.json (no example)
   a waiting noemby show doesn't set globe (no example)
   changing shows doesn't update map
+  remote buttons hop when map opened
 
 todo  ...
+  show episode being watched (next up line)
+  clnup noemby/deleted handling
   make popups modal with closing by clicking anywhere
   update imdb ratings (refresh button)
   show counts when reloading a deleted show

@@ -115,15 +115,8 @@ export function fmtDate(dateIn, includeYear = true, utcIn = false) {
   const startIdx = includeYear ? 0 : 5;
   const str = dateWithTZ(date);
   const res = str.slice(startIdx, 10).replace(/^0/,' ');
-  // console.log(`fmtDate: ${dateStr}, ${res}`);
   return res
 }
-// {
-//     "dateStr": "2024-05-09",
-//     "isoStr": "2024-05-09T00:00:00.000Z",
-//     "locStr": "2024-05-08",
-//     "utcStr": "2024-05-09"
-// }
 
 export function fmtSize(show) {
   if(show.Id.startsWith("noemby-")) return "";

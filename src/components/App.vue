@@ -9,7 +9,6 @@
 <script>
 import List    from './list.vue';
 import Series  from './series.vue';
-import evtBus  from '../evtBus.js';
 
 export default {
   name: "App",

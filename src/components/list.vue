@@ -589,8 +589,10 @@ export default {
       console.log("removeRow", show.Name);
       const id = show.Id;
       this.setHighlightAfterDel(id);
-      allShows   = allShows.filter(  (show) => show.Id != id);
       this.shows = this.shows.filter((show) => show.Id != id);
+      if(this.shows !== allShows)
+        allShows = allShows.filter((show) => show.Id != id);
+      this.saveVisShow(show, true);
     },
 
     hilite(show) {

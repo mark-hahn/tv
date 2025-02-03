@@ -263,7 +263,7 @@ export async function deleteShowFromEmby(show) {
     console.error(err);
     return;
   }
-  // console.log("deleted show from emby:", show.Name);
+  console.log("deleted show from emby:", show.Name);
 }
 
 const deleteOneFile = async (path) => {

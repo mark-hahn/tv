@@ -549,16 +549,17 @@ export async function saveLinda(id, inLinda) {
     throw new Error(err);
   }
 }
-export const createNoemby = async (show) => {
+
+export const createNoemby = async (show, save = true) => {
   const dateStr = util.fmtDate(0);
   Object.assign(show, {
     Id: "noemby-" + Math.random(),
     DateCreated: dateStr, 
-    NotReady: true,
     Date: dateStr,
+    NotReady: true,
     Seasons: [],
   });
-  srvr.addNoEmby(show);
+  if(save) srvr.addNoEmby(show);
   return show;
 }
 

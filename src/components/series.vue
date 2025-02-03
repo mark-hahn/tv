@@ -11,7 +11,7 @@
     div(style=`margin-left:20px; max-width:450px`) {{show.Name}}
     div(v-if="deletedTxt !== '' && notReject" 
         style=`display:flex;`)
-      div(style=`font-weight:bold; color:red; 
+      div(style=`font-weight:bold; color:green; 
                   font-size:18px; max-height:24px;
                   margin-top:4px; margin-right:10px;`) {{deletedTxt}}
       button(@click="undelClick"
@@ -160,7 +160,7 @@ export default {
     },
 
     async setDeleted(tvdbData) {
-      const deleted = !!tvdbData.deleted;
+      const deleted = !!tvdbData?.deleted;
       // console.log('series, setDeleted:', deleted)
       if(deleted) this.deletedTxt = 'Deleted ' + tvdbData.deleted;
       else        this.deletedTxt = '';

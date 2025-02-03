@@ -7,6 +7,7 @@ bugs ...
   a waiting noemby show doesn't set globe (no example)
   changing shows doesn't update map
   remote buttons hop when map opened
+  keep deleted date in ghost show
 
 todo  ...
   show episode being watched (next up line)

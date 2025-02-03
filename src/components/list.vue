@@ -40,10 +40,10 @@
                         height:31px;`)
           input(v-model="webHistStr" placeholder="Search..."
                 style=`width:120px;`)
-          button(@click="addClick(false)" 
+          button(@click="searchClick(false)" 
                   style=`display:inline-block'; 
                         font-size:15px; margin:2px 4px 0 10px;backgroundColor:white`) Web
-          button(@click="addClick(true)"
+          button(@click="searchClick(true)"
                   style=`display:inline-block'; 
                         font-size:15px; margin:2px 4px 0 0;backgroundColor:white`) Hist
         button(@click="watchClick"
@@ -583,10 +583,11 @@ export default {
     },
 
     hilite(show) {
-      return this.highlightName == show.Name ? "yellow" : "white";
+      return this.highlightName == show.Name ? 
+        (show.HighlightColor ? show.HighlightColor : "yellow") : "white";
     },
 
-    async addClick(history = false) {
+    async searchClick(history = false) {
       this.cancelSrchList();
       const srchTxt = this.webHistStr;
       if(srchTxt.length == 0) return;
@@ -653,12 +654,12 @@ export default {
         return;
       }
       let show = {
-        newNoEmby: true,
         Name: name,
         TvdbId: tvdbId,
         Overview: overview,
+        HighlightColor: '#8f8',
       };
-      show = await srvr.addNoEmby(show);
+      show = await emby.createNoemby(show, true);
       await srvr.addBlockedWait(show.Name);
       allShows.unshift(show);
       this.saveVisShow(show, true);
@@ -718,7 +719,7 @@ export default {
         showHistoryPtr = showHistory.length - 1;
         // showHistory = showHistory.slice(0, showHistoryPtr+1);
       }
-      this.highlightName = showName;
+      this.highlightName  = showName;
       window.localStorage.setItem("lastVisShow", showName);
       if(scroll) this.scrollToSavedShow();
       this.$nextTick(() =>

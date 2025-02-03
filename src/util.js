@@ -78,16 +78,6 @@ export async function loadAllRemotes(allShows) {
   }, 45*1000);
 }
 
-////////// temp one-time mass operation //////////
-// LEAVES GARBAGE AT END OF tvdb.json
-export async function setTvdbDeleted(allShows) {
-  const allTvdbNames = Object.keys(allTvdb);
-  for(let showName of allTvdbNames) 
-    await tvdb.markTvdbDeleted(showName, true);
-  allShows.forEach(async (show) => {
-    await tvdb.markTvdbDeleted(show.Name, false)});
-}
-
 export function 
           dateWithTZ(date = new Date(), utcOut = false) {
   let year, month, day;

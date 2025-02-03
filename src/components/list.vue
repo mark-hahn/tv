@@ -162,7 +162,7 @@
               | {{srchChoice.searchDtlTxt}}
             #srchDel(v-if="srchChoice.deleted"
                     style=`font-size:18px; 
-                            margin:10px 0 0 10px; color:#8f8;`)
+                            margin:10px 0 0 10px; color:red`)
               | Deleted
 
     #shows(style="width:100%; flex-grow: 1; overflow-y:scroll;")
@@ -428,49 +428,24 @@ export default {
 
     const deleteShow = async (show) => {
       console.log('list, deleteShow:', show.Name);
-      if(show.Id.startsWith('noemby-')) {
-        srvr.delNoEmby(show.Name);
-        const tvdbData = await tvdb.getTvdbData(show);
-        tvdbData.deleted = util.fmtDate(0);
-        srvr.addTvdb(tvdbData);
-        return;
-      }
-      else {
+      if(!show.Id.startsWith('noemby-')) {
         this.saveVisShow(show);
         if (!window.confirm(
             `Do you really want to delete series ${show.Name}?`)) 
           return;
         await emby.deleteShowFromEmby(show);
       }
-      await tvdb.markTvdbDeleted(show.Name, true);
+      const tvdbData = await tvdb.getTvdbData(show);
+      tvdbData.deleted = util.fmtDate(0);
+      srvr.addTvdb(tvdbData);
       await srvr.deleteShowFromSrvr(show);
       if(!show.Reject) await this.removeRow(show);
-    }
-
-    const unDelShow = async (show) => {
-      console.log('list, unDelShow:', show.Name);
-      const tvdbData = await tvdb.getTvdbData(show);
-      delete tvdbData.deleted;
-      srvr.addTvdb(tvdbData);
-      show = emby.createNoemby({
-        Name:     show.Name,
-        TvdbId:   tvdbData.tvdbId,
-        Overview: tvdbData.overview,
-        Deleted:  false,
-      });
-      this.saveVisShow(show);
     }
 
     evtBus.on('deleteShow', (show) => {
       // console.log('evtBus deleteShow', show.Name);
       if(!show) return;
       deleteShow(show);
-    });
-
-    evtBus.on('unDelShow', (show) => {
-      console.log('evtBus unDelShow', show.Name);
-      if(!show) return;
-      unDelShow(show);
     });
 
     return {
@@ -601,6 +576,15 @@ export default {
       }
     },
 
+    addRow(show) {
+      console.log("addRow", show.Name);
+      const id = show.Id;
+      this.shows.unshift(show);
+      if(allShows !== this.shows)
+        allShows.unshift(show);
+      this.saveVisShow(show, true);
+    },
+
     removeRow(show) {
       console.log("removeRow", show.Name);
       const id = show.Id;
@@ -610,8 +594,7 @@ export default {
     },
 
     hilite(show) {
-      return this.highlightName == show.Name ? 
-        (show.HighlightColor ? show.HighlightColor : "yellow") : "white";
+      return (this.highlightName == show.Name) ? "yellow" : "white";
     },
 
     async searchClick(history = false) {
@@ -684,13 +667,12 @@ export default {
         Name: name,
         TvdbId: tvdbId,
         Overview: overview,
-        HighlightColor: '#8f8',
       };
       show = await emby.createNoemby(show, false);
       await srvr.addBlockedWait(show.Name);
-      allShows.unshift(show);
-      this.saveVisShow(show, true);
+      this.addRow(show);
       this.sortShows();
+      this.saveVisShow(show, true);
     },
     
     cancelSrchList() {
@@ -1029,11 +1011,6 @@ export default {
   mounted() {
     evtBus.on('openMap', (show) => {
       this.seriesMapAction('open', show);
-    });
-
-    evtBus.on('deleteRow', (show) => {
-      // console.log('evtBus deleteRow', show.Name);
-      this.removeRow(show);
     });
 
     setInterval(async () => {

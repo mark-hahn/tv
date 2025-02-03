@@ -271,14 +271,13 @@ export const markTvdbDeleted =
     if(!tvdbData) return;
     if(markDelete) tvdbData.deleted = util.dateWithTZ();
     else    delete tvdbData.deleted;
-    const str = JSON.stringify(tvdbData);
     // console.log('markTvdbDeleted:', 
     //     {showName, markDelete, str: str.substring(-100, 100)});
     if(!tvdbData.image) {
       alert('no image in tvdbData');
       return;
     }
-    await srvr.addTvdb(str);
+    await srvr.addTvdb(tvdbData);
     allTvdb[showName] = tvdbData;
   };
 

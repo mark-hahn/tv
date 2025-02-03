@@ -7,16 +7,11 @@ bugs ...
   a waiting noemby show doesn't set globe (no example)
   changing shows doesn't update map
   remote buttons hop when map opened
-  newly undeleted show not visible
-  newly undeleted show still green
-  deleted noemby show not visible
-  deleted show has emby button (heartburn hotel)
   word deleted in search list is green
 
 todo  ...
-  keep deleted date in ghost show
+  keep deleted date forever
   show episode being watched (next up line)
-  clnup noemby/deleted handling
   make popups modal with closing by clicking anywhere
   update imdb ratings (refresh button)
   show counts when reloading a deleted show

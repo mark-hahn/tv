@@ -9,22 +9,16 @@
               font-weight:bold; font-size:25px;
               margin-bottom:20px; max-width:495px;`)
     div(style=`margin-left:20px; max-width:450px`) {{show.Name}}
-    div(v-if="deletedTxt !== '' && notReject" 
-        style=`display:flex;`)
-      div(style=`font-weight:bold; color:green; 
-                  font-size:18px; max-height:24px;
-                  margin-top:4px; margin-right:10px;`) {{deletedTxt}}
-      button(@click="undelClick"
-              style=`font-size:15px; max-height:24px;`) Undelete
-    div(v-else style=`display:flex;`)
-      div(v-if="notInEmby && notReject" 
-          style=`font-weight:bold; color:red; 
-                  font-size:18px; margin-top:4px;
-                  max-height:24px;`) Not In Emby
-      button(@click="deleteClick"
-              style=`font-size:15px; 
-                    margin-left:20px; margin-top:3px;
-                    max-height:24px;`) Delete
+    
+    div(v-if="notInEmby && notReject" 
+        style=`font-weight:bold; color:red; 
+                font-size:18px; margin-top:4px;
+                max-height:24px;`) Not In Emby
+                
+    button(@click="deleteClick"
+            style=`font-size:15px; 
+                  margin-left:20px; margin-top:3px;
+                  max-height:24px;`) Delete
 
   #body(v-if="notReject" style=`display:flex;`)
     #topLeft(@click="openMap(show)"
@@ -69,7 +63,7 @@
                  style=`min-height:24px;`)
         #cntrylang(v-if="cntryLangTxt.length > 0"
                    v-html="cntryLangTxt"
-                   style=`min-height:24px;`)
+                   style=`min-height:20px; font-size:15px;`)
         #nextup(v-if="nextUpTxt.length > 0"
                 v-html="nextUpTxt"
                 style=`min-height:24px;`)
@@ -120,11 +114,6 @@ export default {
     async deleteClick() {
       console.log('Series, deleteClick:', this.show.Name);
       evtBus.emit('deleteShow', this.show);
-    },
-
-    async undelClick() {
-      console.log('Series, undelClick:', this.show.Name);
-      evtBus.emit('unDelShow', this.show);
     },
 
     async remoteClick(remote) {

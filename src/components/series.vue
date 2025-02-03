@@ -24,7 +24,7 @@
     #topLeft(@click="openMap(show)"
               style=`display:flex; flex-direction:column;
                      text-align:center;`) 
-      #poster()
+      #poster(style=`margin-left:20px;`)  
     #topRight(style=`display:flex; flex-direction:column;
                     width:300px; margin-left:10px;`)
       #remotes(style=`width:200px; margin-left:30px;

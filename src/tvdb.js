@@ -45,8 +45,7 @@ const getRemote = async (tvdbRemote, showName) => {
       url  = `https://www.imdb.com/title/${id}`;
       urlRatings = await srvr.getUrls(
             `2||${url}?search=${encodeURI(id)}||${showName}`);
-      if(urlRatings == 'not found') ratings = '';
-      else  ratings = urlRatings.ratings;
+      ratings = urlRatings?.ratings;
       break;
 
     case 4:  name = 'Official Website'; url = id; break;
@@ -129,7 +128,7 @@ export const getRemotes = async (show) => {
 
     const imdbRemote = remotesByName["IMDB"];
     if(imdbRemote) {
-      imdbRemote.name += (imdbRemote.ratings !== undefined) ?
+      imdbRemote.name += (imdbRemote.ratings) ?
                    ' (' + imdbRemote.ratings + ')' : '';
       remotes.push(imdbRemote);
     } 

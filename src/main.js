@@ -9,6 +9,7 @@ bugs ...
   changing shows doesn't update map
   remote buttons hop when map opened
   web add creates 2 rows,  (clean slate)
+  no quesion mark (amandaland
 
 todo  ...
   keep deleted date forever

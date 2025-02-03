@@ -51,7 +51,7 @@ let   clint      = null;
 const fCall = (fname, param) => {
   const id = ++nextId;
   const promise = new Promise((resolve, reject) => {
-    calls.push({id, fname, resolve, reject});
+    calls.push({id, fname, param, resolve, reject});
   });
   if(typeof param == 'object') 
         param = JSON.stringify(param);
@@ -78,20 +78,20 @@ handleMsg = async (msg) => {
     return;
   }
   const [id, status, result] = parts.slice(1);
-  if(status != 'ok') 
-    console.error('Reject from server:', {id, status, result});
   // console.log("handling msg:", id, status);
   if(id == '0') return;
 
-  const callIdx = calls.findIndex(
-                     call =>  call.id == id);
+  const callIdx = calls.findIndex(call =>  call.id == id);
   if(callIdx < 0) {
     console.error("no matching id from msg:", id);
     return;
   }
   const call = calls[callIdx];
   calls.splice(callIdx, 1);
-  const {fname, resolve, reject} = call;
+  const {fname, param, resolve, reject} = call;
+  if(status != 'ok') 
+    console.error('Reject from server:', 
+                    {id, fname, param, status, result});
   try {
     // console.log("parsing ws result:", {id, result});
     const res = JSON.parse(result);

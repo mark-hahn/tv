@@ -3,11 +3,11 @@ reminder, restore ...
   start gap running
 
 bugs ...
+  added web shows are in noemby but not in tvdb
   deleted rejected shows stay in noemby.json (no example)
   a waiting noemby show doesn't set globe (no example)
   changing shows doesn't update map
   remote buttons hop when map opened
-  word deleted in search list is green
 
 todo  ...
   keep deleted date forever
@@ -15,7 +15,7 @@ todo  ...
   make popups modal with closing by clicking anywhere
   update imdb ratings (refresh button)
   show counts when reloading a deleted show
-    (keep all map info for deleted shows)
+  keep all map info for deleted shows
 
 tabled ...
   getRemotes called twice

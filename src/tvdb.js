@@ -45,7 +45,8 @@ const getRemote = async (tvdbRemote, showName) => {
       url  = `https://www.imdb.com/title/${id}`;
       urlRatings = await srvr.getUrls(
             `2||${url}?search=${encodeURI(id)}||${showName}`);
-      ratings = urlRatings?.ratings;
+      if(urlRatings == 'not found') ratings = '';
+      else  ratings = urlRatings.ratings;
       break;
 
     case 4:  name = 'Official Website'; url = id; break;
@@ -245,10 +246,10 @@ export const getTvdbData = async (show) => {
                originalCountry, originalLanguage,
                tvdbRemotes, status};
   delete tvdbData.deleted;
-    if(!tvdbData.image) {
-      alert('no image in tvdbData');
-      return;
-    }
+    // if(!tvdbData.image) {
+    //   alert('no image in tvdbData');
+    //   return;
+    // }
   srvr.addTvdb(JSON.stringify(tvdbData));
   allTvdb[name] = tvdbData;
   // console.log('getTvdbData:', {tvdbData});
@@ -257,10 +258,10 @@ export const getTvdbData = async (show) => {
 
 export const updateTvdbData = async (tvdbData) => {
   console.log('updateTvdbData:', tvdbData);
-    if(!tvdbData.image) {
-      alert('no image in tvdbData');
-      return;
-    }
+    // if(!tvdbData.image) {
+    //   alert('no image in tvdbData');
+    //   return;
+    // }
   allTvdb[tvdbData.name] = tvdbData;
   srvr.addTvdb(tvdbData);
 }
@@ -273,10 +274,10 @@ export const markTvdbDeleted =
     else    delete tvdbData.deleted;
     // console.log('markTvdbDeleted:', 
     //     {showName, markDelete, str: str.substring(-100, 100)});
-    if(!tvdbData.image) {
-      alert('no image in tvdbData');
-      return;
-    }
+    // if(!tvdbData.image) {
+    //   alert('no image in tvdbData');
+    //   return;
+    // }
     await srvr.addTvdb(tvdbData);
     allTvdb[showName] = tvdbData;
   };

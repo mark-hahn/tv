@@ -550,7 +550,7 @@ export async function saveLinda(id, inLinda) {
   }
 }
 
-export const createNoemby = async (show, save = true) => {
+export const createNoemby = async (show) => {
   const dateStr = util.fmtDate(0);
   Object.assign(show, {
     Id: "noemby-" + Math.random(),
@@ -559,7 +559,7 @@ export const createNoemby = async (show, save = true) => {
     NotReady: true,
     Seasons: [],
   });
-  if(save) srvr.addNoEmby(show);
+  srvr.addNoEmby(show);
   return show;
 }
 

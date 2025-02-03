@@ -437,7 +437,7 @@ export default {
       }
       const tvdbData = await tvdb.getTvdbData(show);
       tvdbData.deleted = util.fmtDate(0);
-      srvr.addTvdb(tvdbData);
+      await srvr.addTvdb(tvdbData);
       await srvr.deleteShowFromSrvr(show);
       if(!show.Reject) await this.removeRow(show);
     }
@@ -636,6 +636,7 @@ export default {
         tvdbSrchData = tvdbSrchData.map(
           (item) => {
             const tvdbData     = item[1];
+            tvdbData.tvdbId    = tvdbData.tvdb_id;
             tvdbData.year      = tvdbData.firstAired.substring(0, 4);
             tvdbData.country   = tvdbData.originalCountry;
             tvdbData.thumbnail = tvdbData.image;
@@ -644,6 +645,7 @@ export default {
         );
       }
       tvdbSrchData.forEach((tvdbData) => {
+        tvdbData.tvdbId = tvdbData.tvdb_id;
         if(tvdbData.country == 'gbr') 
            tvdbData.country  = 'uk';
         tvdbData.searchDtlTxt = 
@@ -670,7 +672,7 @@ export default {
         TvdbId: tvdbId,
         Overview: overview,
       };
-      show = await emby.createNoemby(show, false);
+      show = await emby.createNoemby(show);
       await srvr.addBlockedWait(show.Name);
       this.addRow(show);
       this.sortShows();

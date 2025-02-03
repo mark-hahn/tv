@@ -535,24 +535,18 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
     case 2:  // IMDB
       // console.log('samples/imdb-page.html');
       // fs.writeFileSync('samples/imdb-page.html', html);
-      try{
-        idFnameParam = /imUuxf">(\d\.\d)<\/span>/i.exec(html);
-        if(idFnameParam === null) throw 'wikidata parse error';
-      }
-      catch (e) {
-        reject([id, {type, url, name, e}]);
+      idFnameParam = /imUuxf">(\d\.\d)<\/span>/i.exec(html);
+      if(idFnameParam === null) {
+        resolve([id, {ratings:null}]);
         return
       }
       resolve([id, {ratings:idFnameParam[1]}]);
       return;
 
     case 18:  // wikidata
-      try{
-        idFnameParam = /lang="en"><a href="(.*?)"\shreflang="en"/i.exec(html);
-        if(idFnameParam === null) throw 'wikidata parse error';
-      }
-      catch (e) {
-        reject([id, {type, url, name, e}]);
+      idFnameParam = /lang="en"><a href="(.*?)"\shreflang="en"/i.exec(html);
+      if(idFnameParam === null) {
+        resolve([id, {url:null}]);
         return
       }
       resolve([id, {url:idFnameParam[1]}]);

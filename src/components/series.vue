@@ -155,9 +155,8 @@ export default {
 
     async setDeleted(tvdbData) {
       const deleted = !!tvdbData.deleted;
-      //- console.log('series, setDeleted:', deleted)
-      if(deleted) this.deletedTxt = 'Deleted '
-                      //  + tvdbData.deleted;
+      // console.log('series, setDeleted:', deleted)
+      if(deleted) this.deletedTxt = 'Deleted ' + tvdbData.deleted;
       else        this.deletedTxt = '';
       this.notInEmby = this.show.Id.startsWith('noemby-');
     },

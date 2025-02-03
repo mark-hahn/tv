@@ -132,11 +132,11 @@
                 border: 1px solid black; height:85%;
                 position: fixed;
                 display:flex; flex-direction:column;
-                left: 253px; top: 75px;
+                left: 253px; top: 88px;
                 cursor:pointer; min-width:280px;`) 
       div(@click="cancelSrchList()"
            style=`font-weight:bold; text-align:center;
-                  margin:10px;background-color:white;`)
+                  margin:10px; padding:10px; height:20px; background-color:white;`)
         | Cancel
       div(style="overflow-y:scroll")
         div(v-if="showingSrchList && searchList === null")
@@ -478,7 +478,8 @@ export default {
         }, {
           color: "#f88", filter: 0, icon: ["fas", "minus"],
           cond(show)  { 
-            return (show.FileGap || show.WatchGap) && 
+            return (show.FileGap || show.WatchGap ||
+                    show.Id.startsWith("noemby-")) && 
                    !show.BlockedGap},
           click(show) { toggleBlkGap(show); },
           name: "gap",
@@ -635,7 +636,6 @@ export default {
         tvdbData.searchDtlTxt = 
          ` ${tvdbData.year}, 
            ${tvdbData.country ?.toUpperCase() || ''}`;
-        tvdbData.tvdbId = tvdbData.tvdb_id;
         tvdbData.image  = tvdbData.thumbnail;
       });
       // console.log('searchList:', tvdbData);
@@ -652,7 +652,6 @@ export default {
         this.saveVisShow(matchShow, true);
         return;
       }
-
       const dateStr = util.fmtDate(0);
       const show = {
         Name: name,
@@ -680,7 +679,6 @@ export default {
       };
 
       allShows.unshift(show);
-      this.shows.unshift(show);
 
       this.saveVisShow(show, true);
 

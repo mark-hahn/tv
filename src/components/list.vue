@@ -162,7 +162,7 @@
               | {{srchChoice.searchDtlTxt}}
             #srchDel(v-if="srchChoice.deleted"
                     style=`font-size:18px; 
-                            margin:10px 0 0 10px; color:red;`)
+                            margin:10px 0 0 10px; color:#8f8;`)
               | Deleted
 
     #shows(style="width:100%; flex-grow: 1; overflow-y:scroll;")
@@ -659,10 +659,11 @@ export default {
         Overview: overview,
         HighlightColor: '#8f8',
       };
-      show = await emby.createNoemby(show, true);
+      show = await emby.createNoemby(show, false);
       await srvr.addBlockedWait(show.Name);
       allShows.unshift(show);
       this.saveVisShow(show, true);
+      this.sortShows();
     },
     
     cancelSrchList() {

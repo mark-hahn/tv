@@ -59,31 +59,23 @@
                          width:260px; font-size:17px; 
                          display:flex; flex-direction:column;
                          border: 1px solid gray;
-                         text-align:center;`)
+                         text-align:center; font-weight:bold;
+                         cursor:pointer; `)
         #dates(v-html="dates"
               v-if="dates.length > 0"
-              style=`min-height:24px;
-                      margin-top:10px; font-weight:bold; `)
+              style=`min-height:24px; margin-top:10px; `)
         #seasons(v-html="seasonsTxt"
                 v-if="seasonsTxt.length > 0"
-                style=`cursor:pointer; min-height:24px;
-                        font-weight:bold; font-color:gray;
-                        `)
+                style=`min-height:24px;`)
         #cntrylang(v-if="cntryLangTxt.length > 0"
                   v-html="cntryLangTxt"
-                  style=`cursor:pointer; min-height:24px;
-                          font-weight:bold; font-color:gray;
-                          `)
+                  style=`min-height:24px;`)
         #nextup(v-if="nextUpTxt.length > 0"
                 v-html="nextUpTxt"
-                style=`cursor:pointer; min-height:24px;
-                        font-weight:bold; font-color:gray;
-                        `)
+                style=`min-height:24px;`)
         #subs(v-if="subsActive"
                 v-html="subs"
-                style=`cursor:pointer; min-height:24px;
-                        font-weight:bold; font-color:gray;
-                         margin-top:2px;`)
+                style=`min-height:24px; margin-top:2px;`)
   #bot(style=`font-size:20px; padding:10px;`) {{show.Overview}}
 
 </template>

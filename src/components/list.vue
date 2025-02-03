@@ -427,8 +427,15 @@ export default {
     };
 
     const deleteShow = async (show) => {
-      // console.log('list, deleteShow:', show.Name);
-      if(!show.Id.startsWith("noemby-")) {
+      console.log('list, deleteShow:', show.Name);
+      if(show.Id.startsWith('noemby-')) {
+        srvr.delNoEmby(show.Name);
+        const tvdbData = await tvdb.getTvdbData(show);
+        tvdbData.deleted = util.fmtDate(0);
+        srvr.addTvdb(tvdbData);
+        return;
+      }
+      else {
         this.saveVisShow(show);
         if (!window.confirm(
             `Do you really want to delete series ${show.Name}?`)) 
@@ -438,12 +445,32 @@ export default {
       await tvdb.markTvdbDeleted(show.Name, true);
       await srvr.deleteShowFromSrvr(show);
       if(!show.Reject) await this.removeRow(show);
-    };
+    }
+
+    const unDelShow = async (show) => {
+      console.log('list, unDelShow:', show.Name);
+      const tvdbData = await tvdb.getTvdbData(show);
+      delete tvdbData.deleted;
+      srvr.addTvdb(tvdbData);
+      show = emby.createNoemby({
+        Name:     show.Name,
+        TvdbId:   tvdbData.tvdbId,
+        Overview: tvdbData.overview,
+        Deleted:  false,
+      });
+      this.saveVisShow(show);
+    }
 
     evtBus.on('deleteShow', (show) => {
       // console.log('evtBus deleteShow', show.Name);
       if(!show) return;
       deleteShow(show);
+    });
+
+    evtBus.on('unDelShow', (show) => {
+      console.log('evtBus unDelShow', show.Name);
+      if(!show) return;
+      unDelShow(show);
     });
 
     return {

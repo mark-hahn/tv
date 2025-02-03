@@ -81,8 +81,6 @@
 import evtBus    from '../evtBus.js';
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
-import * as srvr from "../srvr.js";
-import * as util from '../util.js';
 
 let windowId = null;
 let windowLabel = Math.random();
@@ -125,12 +123,8 @@ export default {
     },
 
     async undelClick() {
-      // console.log('Series, undelClick:', this.show.Name);
-      const show = this.show;
-      const tvdbData = tvdb.getTvdbData(show);
-      delete tvdbData.deleted;
-      srvr.addTvdb(tvdbData);
-      emby.createNoemby({Name: show.Name});
+      console.log('Series, undelClick:', this.show.Name);
+      evtBus.emit('unDelShow', this.show);
     },
 
     async remoteClick(remote) {

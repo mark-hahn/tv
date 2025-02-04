@@ -440,7 +440,6 @@ export default {
       await srvr.addTvdb(tvdbData);
       await srvr.deleteShowFromSrvr(show);
       await this.removeRow(show);
-
     }
 
     evtBus.on('deleteShow', (show) => {

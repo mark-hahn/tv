@@ -208,10 +208,12 @@ export async function loadAllShows(gapCache) {
     const matchingShow = 
           shows.find((show) => show.Name == rejectName);
     if(matchingShow) {
-      matchingShow.Reject = true;
+      await srvr.delReject(rejectName);
       continue;
     }
-    const rejShow = await createNoemby({Name: rejectName});
+    const rejShow = await createNoemby(
+      {Name: rejectName, Reject: true}
+    );
     
     shows.push(rejShow);
   }

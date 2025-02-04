@@ -422,7 +422,7 @@ export default {
       else srvr.delPickup(show.Name)
           .catch((err) => {
               console.error("late delPickup:", err);
-              //- show.Pickup = !show.Pickup;
+              // show.Pickup = !show.Pickup;
           });
     };
 
@@ -780,8 +780,9 @@ export default {
       this.$nextTick(() => {
         const name = window.localStorage.getItem("lastVisShow");
         if(!name) {
-          console.error(
-            "scrollToSavedShow: lastVisShow missing, ignoring");
+          console.log(
+              "scrollToSavedShow: lastVisShow missing, ignoring");
+          show = allShows[0];
         } 
         else {
           show = allShows.find((shw) => shw.Name == name);

@@ -675,6 +675,9 @@ export default {
         Reject: emby.isReject(name),
       };
       show = await emby.createNoemby(show);
+      const tvdbData = await tvdb.getTvdbData(show);
+      delete tvdbData.deleted;
+      await srvr.addTvdb(tvdbData);
       await srvr.addBlockedWait(show.Name);
       this.addRow(show);
       this.sortShows();

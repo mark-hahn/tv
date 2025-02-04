@@ -962,7 +962,7 @@ export default {
         for (let cond of this.conds) cond.filter = 0;
       }
       this.fltrChoice = 'All';
-      this.shows = allShows
+      this.shows = [...allShows];
       // this.select(true);
     },
 
@@ -1046,8 +1046,8 @@ export default {
           console.error("No shows from loadAllShows");
           return;
         }
-        allShows   = showsBlocks.shows;
-        this.shows = allShows;
+        allShows = showsBlocks.shows;
+        this.shows = [...allShows];
 
         // must be set before startWorker
         blockedWaitShows = showsBlocks.blockedWaitShows;

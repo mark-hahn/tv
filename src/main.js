@@ -8,8 +8,9 @@ bugs ...
   a waiting noemby show doesn't set globe (no example)
   changing shows doesn't update map
   remote buttons hop when map opened
-  web add creates 2 rows,  (clean slate)
-  no quesion mark (amandaland)
+  web add creates 2 rows
+  no question mark (amandaland)
+  toggle reject loses series meta and doesn't add to rejects
 
 todo  ...
   keep deleted date forever

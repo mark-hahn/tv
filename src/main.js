@@ -3,13 +3,13 @@ reminder, restore ...
   start gap running
 
 bugs ...
-  added web shows are in noemby but not in tvdb
-  deleted rejected shows stay in noemby.json (no example)
+  not in emby doesn't show waiting
+  deleted rejected shows stay in noemby.json (young sheldon)
   a waiting noemby show doesn't set globe (no example)
   changing shows doesn't update map
   remote buttons hop when map opened
   web add creates 2 rows,  (clean slate)
-  no quesion mark (amandaland
+  no quesion mark (amandaland)
 
 todo  ...
   keep deleted date forever

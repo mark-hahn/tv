@@ -211,7 +211,8 @@ export async function loadAllShows(gapCache) {
       matchingShow.Reject = true;
       continue;
     }
-    const rejShow = createNoemby({Name: rejectName});
+    const rejShow = await createNoemby({Name: rejectName});
+    
     shows.push(rejShow);
   }
 
@@ -559,7 +560,7 @@ export const createNoemby = async (show) => {
     NotReady: true,
     Seasons: [],
   });
-  srvr.addNoEmby(show);
+  await srvr.addNoEmby(show);
   return show;
 }
 

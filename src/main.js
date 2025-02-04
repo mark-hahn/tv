@@ -4,13 +4,10 @@ reminder, restore ...
 
 bugs ...
   not in emby doesn't show waiting
-  deleted rejected shows stay in noemby.json (young sheldon)
   a waiting noemby show doesn't set globe (no example)
   changing shows doesn't update map
   remote buttons hop when map opened
-  web add creates 2 rows
   no question mark (amandaland)
-  toggle reject loses series meta and doesn't add to rejects
 
 todo  ...
   keep deleted date forever
@@ -23,14 +20,11 @@ todo  ...
 tabled ...
   getRemotes called twice
   changing map doesn't change gaps
-  remove show from tvdb.json (how?)
   button: scroll hilighted row to vis 
   refresh filtered rows when new gap loaded
   map: click on season numbers for whole row
   thumbnails have wrong language (Wedding Season)
-  click anywhere to close popup
   up/dn arrows
-  series pane flashes while waiting for map (St. Denis)
   sort by imdb ratings
   show actors
   show last episode date in map (each season?)

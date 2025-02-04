@@ -439,7 +439,8 @@ export default {
       tvdbData.deleted = util.fmtDate(0);
       await srvr.addTvdb(tvdbData);
       await srvr.deleteShowFromSrvr(show);
-      if(!show.Reject) await this.removeRow(show);
+      await this.removeRow(show);
+
     }
 
     evtBus.on('deleteShow', (show) => {
@@ -571,9 +572,10 @@ export default {
           if(!nextShow) nextShow = this.shows[i-1];
           if(!nextShow) nextShow = this.shows[0];
           this.saveVisShow(nextShow, true);
-          break;
+          return nextShow;
         }
       }
+      return null;
     },
 
     addRow(show) {
@@ -588,11 +590,11 @@ export default {
     removeRow(show) {
       console.log("removeRow", show.Name);
       const id = show.Id;
-      this.setHighlightAfterDel(id);
+      const newShow = this.setHighlightAfterDel(id);
       this.shows = this.shows.filter((show) => show.Id != id);
       if(this.shows !== allShows)
         allShows = allShows.filter((show) => show.Id != id);
-      this.saveVisShow(show, true);
+      if(newShow) this.saveVisShow(newShow, true);
     },
 
     hilite(show) {
@@ -626,7 +628,7 @@ export default {
                                 tvdbDataItem[0].toLowerCase()
                                 .includes(srchTxt.toLowerCase()));
         if(srchTvdb.length == 0) {
-          this.webHistStr = `No series.`;
+          this.webHistStr = `-- No Series --`;
           this.cancelSrchList();
           return;
         }
@@ -671,6 +673,7 @@ export default {
         Name: name,
         TvdbId: tvdbId,
         Overview: overview,
+        Reject: emby.isReject(name),
       };
       show = await emby.createNoemby(show);
       await srvr.addBlockedWait(show.Name);
@@ -733,7 +736,7 @@ export default {
         showHistoryPtr = showHistory.length - 1;
         // showHistory = showHistory.slice(0, showHistoryPtr+1);
       }
-      this.highlightName  = showName;
+      this.highlightName = showName;
       window.localStorage.setItem("lastVisShow", showName);
       if(scroll) this.scrollToSavedShow();
       this.$nextTick(() =>

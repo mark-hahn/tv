@@ -40,8 +40,11 @@ export async function init() {
   urls.init(cred);
 }
 
-// load all shows from emby and server //////////
 
+let rejects = null;
+export const isReject = (name) => rejects.includes(name);
+
+// load all shows from emby and server //////////
 export async function loadAllShows(gapCache) {
   console.log('entering loadAllShows');
   const time1 = new Date().getTime();
@@ -59,14 +62,16 @@ export async function loadAllShows(gapCache) {
 
   const [embyShows, srvrShows, 
          blockedWaitShows, blockedGapShows,
-         rejects, pickups, noEmbys, gaps, allTvdb] = 
+         rejectsIn, pickups, noEmbys, gaps, allTvdb] = 
     await Promise.all([listPromise, seriesPromise, 
                        waitPromise, blkGapPromise, 
                        rejPromise, pkupPromise,
                        noEmbyPromise, gapPromise, allTvPromise]);
+  rejects = rejectsIn
+  
   tvdb.initAllTvdb(allTvdb);
   util.initAllTvdb(allTvdb);
-
+  
   const shows = [];
 
 ////////// get shows from emby ////////////
@@ -207,15 +212,7 @@ export async function loadAllShows(gapCache) {
   for(let rejectName of rejects) {
     const matchingShow = 
           shows.find((show) => show.Name == rejectName);
-    if(matchingShow) {
-      await srvr.delReject(rejectName);
-      continue;
-    }
-    const rejShow = await createNoemby(
-      {Name: rejectName, Reject: true}
-    );
-    
-    shows.push(rejShow);
+    if(matchingShow) matchingShow.Reject = true;
   }
 
 //////////  process pickups for usb ////////////

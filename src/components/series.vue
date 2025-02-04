@@ -10,17 +10,22 @@
               margin-bottom:20px; max-width:495px;`)
     div(style=`margin-left:20px; max-width:450px`) {{show.Name}}
     
-    div(v-if="notInEmby && notReject" 
+    div(v-if="notInEmby" 
         style=`font-weight:bold; color:red; 
                 font-size:18px; margin-top:4px;
                 max-height:24px;`) Not In Emby
+                
+    div(v-if="show?.Reject" 
+        style=`font-weight:bold; color:red; 
+                font-size:18px; margin-top:4px;
+                max-height:24px;`) Banned From Download
                 
     button(@click="deleteClick"
             style=`font-size:15px; 
                   margin-left:20px; margin-top:3px;
                   max-height:24px;`) Delete
 
-  #body(v-if="notReject" style=`display:flex;`)
+  #body(style=`display:flex;`)
     #topLeft(@click="openMap(show)"
               style=`display:flex; flex-direction:column;
                      text-align:center;`) 
@@ -87,7 +92,6 @@ export default {
       show: {Name:''},
       showHdr: false,
       dates: '',
-      notReject: true,
       remoteShowName: '',
       remotes: [],
       seasonsTxt: '',
@@ -310,12 +314,8 @@ export default {
 
   mounted() {
     evtBus.on('setUpSeries', async (show) => { 
-      this.show = show;
-      if(show.Reject) {
-        this.notReject = false;
-        return;
-      }
-      this.showBody = true;
+      this.show      = show;
+      this.showBody  = true;
       const tvdbData = await tvdb.getTvdbData(show);
       await this.setDeleted(tvdbData);
       await this.setPoster(tvdbData);

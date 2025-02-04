@@ -1081,6 +1081,8 @@ export default {
         // }, 2000);
 
         // ... temp one-time mass operations ...
+        // await util.delPickups(allShows);
+        // await util.setPickups(allShows);
         // await util.setTvdbDeleted(allShows);
         // await util.removeDeadShows(allShows);
         // await util.listCountries(allShows);

@@ -34,6 +34,40 @@ export async function removeDeadShows(allShows) {
 }
 
 ////////// temp one-time mass operation //////////
+export async function setPickups(allShows) {
+  let count = 0;
+  for(let show of allShows) {
+    try {
+      const name = show.Name;
+      const tvdbData= await tvdb.getTvdbData(show);
+      if(!tvdbData) continue;
+
+      const {status} = tvdbData
+      if( (status == 'Continuing' ||
+            status == 'Upcoming') &&
+          (show.Name.startsWith("noemby-") || 
+           show.InToTry                    || 
+           show.IsFavorite                 || 
+           show.InLinda                    || 
+           show.InMark)) {
+        if(show.Pickup) continue;
+        console.log('>>>> set pickup:', ++count, name);
+        await srvr.addPickup(name)
+      }
+      else {
+        if(!show.Pickup) continue;
+        console.log('>>>> del pickup:', ++count, name);
+        await srvr.delPickup(name)
+      }
+    }
+    catch(e) {
+      console.error('setPickups error:', e.message);
+      return;
+    }
+  }
+}
+
+////////// temp one-time mass operation //////////
 export async function listCountries(allShows) {
   const countries = new Set();
   allShows.forEach(async (show) => {
@@ -55,7 +89,7 @@ export async function setAllFavs(allShows) {
     console.log('saved fav:', show.Name);
   });
 }
-////////// temp one-time mass operation //////////
+////////// temp one-time mass operation (VERY SLOW) //////////
 export async function loadAllRemotes(allShows) {
   let showIdx = 0;
   const intvl = setInterval(async () => {

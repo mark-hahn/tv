@@ -496,8 +496,8 @@ export default {
           click() {}, name: "drama",
         }, {
           color: "#88f", filter: 0, icon: ["fas", "globe"],
-          cond(show)  { return show.OriginalCountry != 'usa' &&
-                               show.OriginalCountry != '';},
+          cond(show)  { 
+            return show?.OriginalCountry?.toUpperCase() != 'USA';},
           click()  {}, name: "foreign",
         }, {
           color: "lime", filter: 0, icon: ["fas", "question"],

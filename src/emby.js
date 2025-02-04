@@ -112,7 +112,7 @@ export async function loadAllShows(gapCache) {
     show.TvdbId = tvdbId;
 
     const tvDbData = allTvdb[show.Name];
-    show.OriginalCountry  = tvDbData?.originalCountry;
+    show.OriginalCountry  = tvDbData.originalCountry;
     show.OriginalLanguage = tvDbData?.originalLanguage;
 
     if(!tvDbData?.deleted) shows.push(show);
@@ -134,6 +134,8 @@ export async function loadAllShows(gapCache) {
       continue;
     }
     const tvDbData = allTvdb[noEmbyShow.Name];
+    noEmbyShow.OriginalCountry  = tvDbData.originalCountry;
+    noEmbyShow.OriginalLanguage = tvDbData.originalLanguage;
 
     if(!tvDbData.deleted) shows.push(noEmbyShow);
   }

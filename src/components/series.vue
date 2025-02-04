@@ -218,9 +218,10 @@ export default {
       const OrigNetwork  = originalNetwork?.toUpperCase()  ?? '';
       const avgRuntime   = averageRuntime?.toString().toUpperCase();
       this.cntryLangTxt = 
-                `${origCountry}`                  +
-                `${origCountry != '' ? '/' : ''}` +
-                `${origLanguage} ${OrigNetwork}&nbsp;${avgRuntime !== undefined
+                `${origCountry}`                      +
+                `${origCountry != '' ? '/' : ''}`     +
+                `${origLanguage} ${OrigNetwork}&nbsp;`+
+                `${avgRuntime !== undefined
                       ? ' ' + avgRuntime + ' Mins' : ''}` 
     },
 

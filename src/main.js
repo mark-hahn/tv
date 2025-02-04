@@ -3,11 +3,7 @@ reminder, restore ...
   start gap running
 
 bugs ...
-  not in emby doesn't show waiting
-  a waiting noemby show doesn't set globe (no example)
   changing shows doesn't update map
-  remote buttons hop when map opened
-  no question mark (amandaland)
 
 todo  ...
   keep deleted date forever
@@ -18,6 +14,8 @@ todo  ...
   keep all map info for deleted shows
 
 tabled ...
+  remote buttons hop when map opened
+  not in emby doesn't show waiting
   getRemotes called twice
   changing map doesn't change gaps
   button: scroll hilighted row to vis 

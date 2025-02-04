@@ -21,11 +21,11 @@
                 max-height:24px;`) Banned From Download
                 
     button(@click="deleteClick"
-            style=`font-size:15px; 
+            style=`font-size:15px;  cursor:pointer;
                   margin-left:20px; margin-top:3px;
                   max-height:24px;`) Delete
 
-  #body(style=`display:flex;`)
+  #body(style=`display:flex; cursor:pointer;`)
     #topLeft(@click="openMap(show)"
               style=`display:flex; flex-direction:column;
                      text-align:center;`) 
@@ -38,28 +38,19 @@
           img(src="../../loading.gif"
               style=`width:100px; height:100px;
                      position:relative; top:20px; left:45px;`)
-        #watchButton(v-if="watchButtonTxt.length > 0" 
-            @click="watchButtonClick(show)"
-            style=`margin:3px 10px; padding:10px; 
-                   background-color:white; text-align:center;
-                   border: 1px solid black; font-weight:bold;
-                   cursor:default;`)
-          | {{watchButtonTxt}}
         div(v-if="showRemotes" 
             v-for="remote in remotes"
             @click="remoteClick(remote)"
             style=`margin:3px 10px; padding:10px; 
                    background-color:white; text-align:center;
-                   border: 1px solid black; font-weight:bold;
-                   cursor:default;`)
+                   border: 1px solid black; font-weight:bold;`)
           | {{remote.name}}
       #infoBox(@click="openMap(show)"
                 style=`margin-top:10px; margin-left:5px;
-                       width:260px; font-size:17px; 
+                       width:270px; font-size:17px; 
                        display:flex; flex-direction:column;
                        border: 1px solid gray;
-                       text-align:center; font-weight:bold;
-                       cursor:pointer; `)
+                       text-align:center; font-weight:bold;`)
         #dates(v-html="dates"
                v-if="dates.length > 0"
                style=`min-height:24px; margin-top:10px; `)
@@ -68,10 +59,16 @@
                  style=`min-height:24px;`)
         #cntrylang(v-if="cntryLangTxt.length > 0"
                    v-html="cntryLangTxt"
-                   style=`min-height:20px; font-size:15px;`)
+                   style=`min-height:20px; font-size:16px;`)
         #nextup(v-if="nextUpTxt.length > 0"
                 v-html="nextUpTxt"
-                style=`min-height:24px;`)
+                style=`min-height:32px;`)
+      #watchButton(v-if="watchButtonTxt.length > 0" 
+          @click="watchButtonClick(show)"
+          style=`margin:10px 10px; padding:10px; max-width:245px;
+                  background-color:white; text-align:center;
+                  border: 1px solid black; font-weight:bold;`)
+        | {{watchButtonTxt}}
   #bot(style=`font-size:20px; padding:10px;`) {{show.Overview}}
 
 </template>
@@ -331,5 +328,10 @@ export default {
     }, 1000);
   },
 }
-
 </script>
+
+<style>
+  button {
+    cursor:pointer;
+  }
+</style>

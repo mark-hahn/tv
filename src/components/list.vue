@@ -226,11 +226,11 @@
                  font-weight:bold; flex-grow:4;`)
         | {{mapShow.Name}}
       button(@click="seriesMapAction('prune', mapShow)"
-             style="margin:5px;")                     Prune
+             style="margin:5px;")           Prune
       button(@click="seriesMapAction('date',  mapShow)"
-             style="margin:5px;")                     Set Date
+             style="margin:5px;")           Set Date
       button(@click="seriesMapAction('close')"
-             style="margin:5px;")                     Close
+             style="margin:5px;")            Close
     div(v-if="!hideMapBottom")
       div(v-if=`mapShow.WatchGap ||
                 mapShow.FileGap  || mapShow.WaitStr?.length`
@@ -463,16 +463,16 @@ export default {
       gapPercent:            0,
       watchingName:      '---',
       sortPopped:        false,
+      sortChoice:     'Viewed', 
+      fltrPopped:        false,
+      fltrChoice:        'All',  
+      showingSrchList:   false,
+      searchList:         null,        
       sortChoices:          
         ['Alpha', 'Viewed', 'Added', 'Size'],
-      sortChoice: 'Viewed', 
-      fltrPopped:  false,
       fltrChoices:          
         ['All', 'Ready', 'Drama', 'To-Try', 
          'Try Drama', 'Continue', 'Download', 'Mark', 'Linda'],
-      fltrChoice:      'All',  
-      showingSrchList:  false,
-      searchList:       null,        
       conds: [ {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],
           cond(show)  { return !show.NotReady },

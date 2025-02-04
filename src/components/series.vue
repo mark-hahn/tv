@@ -213,17 +213,15 @@ export default {
       });
       if(originalCountry == 'gbr') originalCountry = 'UK';
       originalNetwork    = originalNetwork.substr(0, 10); 
-      averageRuntime     = averageRuntime;
       const origCountry  = originalCountry?.toUpperCase()  ?? '';
       const origLanguage = originalLanguage?.toUpperCase() ?? '';
       const OrigNetwork  = originalNetwork?.toUpperCase()  ?? '';
       const avgRuntime   = averageRuntime?.toString().toUpperCase();
       this.cntryLangTxt = 
-        ` &nbsp; ${origCountry} 
-                 ${origCountry != '' ? '/' : ''} ${origLanguage}
-          &nbsp; ${OrigNetwork}
-          &nbsp; ${avgRuntime !== undefined
-                      ? ' ' + avgRuntime + ' mins' : ''}` 
+                `${origCountry}`                  +
+                `${origCountry != '' ? '/' : ''}` +
+                `${origLanguage} ${OrigNetwork}&nbsp;${avgRuntime !== undefined
+                      ? ' ' + avgRuntime + ' Mins' : ''}` 
     },
 
     async setNextWatch() {

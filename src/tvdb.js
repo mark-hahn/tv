@@ -239,8 +239,7 @@ export const getTvdbData = async (show) => {
   lastAired = lastAired ?? '';
   let   originalNetwork = originalNetworkIn?.name ?? '';
   const status = statusIn.name; // e.g. Ended
-  const saved  = Date.now();
-  tvdbData = { tvdbId, name, saved, originalNetwork,
+  tvdbData = { tvdbId, name, originalNetwork,
                seasonCount, episodeCount, watchedCount,
                image, score, overview, 
                firstAired, lastAired, averageRuntime,

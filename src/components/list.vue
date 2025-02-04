@@ -1061,7 +1061,7 @@ export default {
         let showList = allShows;
         // showList = [allShows.find((show) => // for testing
         //                 show.Name == 'Splitting Up Together (US)')]; 
-        emby.startWorker(showList, this.addGapToShow);
+        emby.startGapWorker(showList, this.addGapToShow);
 
         this.sortByNew     = true;
         this.sortBySize    = false;

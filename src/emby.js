@@ -233,7 +233,24 @@ export async function loadAllShows(gapCache) {
 
 //////////// misc functions //////////////
 
-export function startWorker(allShows, cb) {
+export function startGapWorker(allShows, cb) {
+  gapWorker.onerror = (err) => {
+    console.error('Worker:', err.message);
+  }
+  const allShowsIdName = [];
+  for(let show of allShows) {
+    const id = show.Id;
+    if(id.startsWith('noemby-')) {
+      show.NotReady = true;
+      continue;
+    }
+    allShowsIdName.push([id, show.Name]);
+  }
+  gapWorker.onmessage = cb;
+  gapWorker.postMessage({cred, allShowsIdName});
+}
+
+export function startUpdateWorker(allShows, cb) {
   gapWorker.onerror = (err) => {
     console.error('Worker:', err.message);
   }

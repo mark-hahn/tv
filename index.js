@@ -559,8 +559,10 @@ const runOne = () => {
     case 'addGap':      addGap(    id, param, resolve, reject); break;
     case 'delGap':      delGap(    id, param, resolve, reject); break;
     
-    case 'getAllTvdb':   tvdb.getAllTvdb(id, param, resolve, reject); break;
-    
+    case 'getAllTvdb':    tvdb.getAllTvdb(   id, param, resolve, reject); break;
+    case 'getNewTvdb':    tvdb.getNewTvdb(   id, param, resolve, reject); break;
+    case 'setTvdbFields': tvdb.setTvdbFields(id, param, resolve, reject); break;
+
     case 'getRemotes':  getRemotes(id, param, resolve, reject); break;
     case 'addRemotes':  addRemotes(id, param, resolve, reject); break;
 

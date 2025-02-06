@@ -1,11 +1,10 @@
 import fs                  from "fs";
-import util                from "util";
 import * as cp             from 'child_process';
 import { WebSocketServer } from 'ws';
 import {rimraf}            from 'rimraf'
-import fetch               from 'node-fetch';
 import * as view           from './src/lastViewed.js';
-import {jParse, log}       from "./src/util.js";
+import util                from "util";
+import tvdb                from './src/tvdb.js';
 
 process.setMaxListeners(50);
 const dontupload  = false;
@@ -32,6 +31,8 @@ const noEmbys      = JSON.parse(noEmbyStr);
 const gaps         = JSON.parse(gapsStr);
 const allTvdb      = JSON.parse(allTvdbStr);
 const allRemotes   = JSON.parse(allRemStr);
+
+tvdb.initTvdb(allTvdb, allRemotes);
 
 const videoFileExtensions = [
   "mp4", "mkv", "avi", "mov", "wmv", "flv", "mpeg",
@@ -120,7 +121,7 @@ const upload = async () => {
     str += '        - "' + name.replace(/"/g, '') + '"\n';
   str += footerStr;
   console.log('creating config.yml');
-  fs.writeFileSync('config/config.yml', str);
+  await util.writeFile('config/config.yml', str);
 
   if(dontupload) {
     console.log("---- didn't upload config.yml ----");
@@ -179,10 +180,9 @@ const trySaveConfigYml = async (id, result, resolve, reject) => {
     const bname = b.replace(/The\s/i, '');
     return (aname.toLowerCase() > bname.toLowerCase() ? +1 : -1);
   });
-  fs.writeFileSync('config/config2-rejects.json', 
-                           JSON.stringify(rejects)); 
-  fs.writeFileSync('config/config4-pickups.json', 
-                           JSON.stringify(pickups)); 
+  await util.writeFile('config/config2-rejects.json', rejects);
+  await util.writeFile('config/config4-pickups.json', pickups);
+
   let errResult = null;
 
   const uploadRes = await upload();
@@ -232,8 +232,7 @@ const addBlockedWait = async (id, name, resolve, _reject) => {
   }
   console.log('-- adding blockedWait:', name);
   blockedWaits.push(name);
-  fs.writeFileSync('data/blockedWaits.json', 
-                        JSON.stringify(blockedWaits));
+  await util.writeFile('data/blockedWaits.json', blockedWaits);
   resolve([id, 'ok']);
 }
 
@@ -253,7 +252,7 @@ const delBlockedWait = async (id, name, resolve, _reject) => {
     resolve([id, 'ok']);
     return
   }
-  fs.writeFileSync('data/blockedWaits.json', JSON.stringify(blockedWaits));
+  await util.writeFile('data/blockedWaits.json', blockedWaits);
   resolve([id, 'ok']);
 }
 
@@ -273,8 +272,7 @@ const addBlockedGap = async (id, name, resolve, _reject) => {
   }
   console.log('-- adding blockedGap:', name);
   blockedGaps.push(name);
-  fs.writeFileSync('data/blockedGaps.json', 
-                        JSON.stringify(blockedGaps));
+  await util.writeFile('data/blockedGaps.json', blockedGaps);
   resolve([id, 'ok']);
 }
 
@@ -294,8 +292,7 @@ const delBlockedGap = async (id, name, resolve, _reject) => {
     resolve([id, 'ok']);
     return
   }
-   fs.writeFileSync('data/blockedGaps.json', 
-                            JSON.stringify(blockedGaps));
+   await util.writeFile('data/blockedGaps.json', blockedGaps);
   resolve([id, 'ok']);
 }
 
@@ -391,7 +388,7 @@ const addNoEmby = async (id, showStr, resolve) => {
   }
   console.log('adding noemby:', name);
   noEmbys.push(show);
-  fs.writeFileSync('data/noemby.json', JSON.stringify(noEmbys)); 
+  await util.writeFile('data/noemby.json', noEmbys); 
   resolve([id, 'ok']);
 }
 
@@ -412,7 +409,7 @@ const delNoEmby = async (id, name, resolve, reject) => {
     resolve([id, 'delNoEmby no match:' + name]);
     return;
   }
-  fs.writeFileSync('data/noemby.json', JSON.stringify(noEmbys)); 
+  await util.writeFile('data/noemby.json', noEmbys); 
   resolve([id, 'ok']);
 }
 
@@ -424,8 +421,7 @@ const addGap = async (id, gapIdGapSave, resolve, _reject) => {
   const [gapId, gap, save] = JSON.parse(gapIdGapSave);
   // console.logapIdGapSaveg('addGap', id, {gapIdGapSave});
   gaps[gapId] = gap;
-  if(save) 
-    fs.writeFileSync('data/gaps.json', JSON.stringify(gaps)); 
+  if(save) await util.writeFile('data/gaps.json', gaps); 
   resolve([id, 'ok']);
 }
 
@@ -439,7 +435,7 @@ const delGap = async (id, gapIdSave, resolve, _reject) => {
     console.error('delGap', e.message);
   }
   if(save) 
-    fs.writeFileSync('data/gaps.json', JSON.stringify(gaps)); 
+    await util.writeFile('data/gaps.json', gaps); 
   resolve([id, 'ok']);
 }
 
@@ -455,7 +451,7 @@ const addTvdb = async (id, tvdbDataStr, resolve, reject) => {
   catch (e) { reject([id, 'addTvdb: ' + e.message]); return; }
   const name = tvdbData.name;
   allTvdb[name] = tvdbData;
-  fs.writeFileSync('data/tvdb.json', JSON.stringify(allTvdb)); 
+  await util.writeFile('data/tvdb.json', allTvdb); 
   resolve([id, 'ok']);
 }
 
@@ -487,7 +483,7 @@ const addRemotes = async (id, nameRems, resolve, reject) => {
   });
   // console.log('addRemotes', id, name);
   allRemotes[name] = remotes;
-  fs.writeFileSync('data/remotes.json', JSON.stringify(allRemotes)); 
+  await util.writeFile('data/remotes.json', allRemotes); 
   resolve([id, 'ok']);
 }
 
@@ -504,98 +500,6 @@ const deletePath = async (id, path, resolve, _reject) => {
   resolve([id, 'ok']);
 };
 
-const getUrls = async (id, typeUrlName, resolve, reject) => {
-  console.log('getUrls', id, typeUrlName);
-  const [type, url, name] = typeUrlName.split('||');
-
-  let resp = await fetch(url);
-  if (!resp.ok) {
-    console.error(`getUrls resp: ${typeUrlName}, ${resp.status}`);
-    reject([id, {type, url, name}]);
-    return
-  }
-  const html = (await resp.text())
-                .replaceAll(/(\r\n|\n|\r)/gm, "")
-                .replaceAll(/\s+/gm, " ");
-
-  const rottenStripSfx = (name) => {
-    name = name.trim();
-    const pfxNameParts = /^(.*?)(\s+\(.*?\))?$/i.exec(name);
-    if(!pfxNameParts) {
-      console.log('no rotten name pfx match:', {type, url, name});
-      resolve([id, 'no match: ' + {type, url, name}]);
-      return;
-    }
-    return pfxNameParts[1];
-  }
-
-  let idFnameParam;
-
-  switch (+type) {
-    case 2:  // IMDB
-      // console.log('samples/imdb-page.html');
-      // fs.writeFileSync('samples/imdb-page.html', html);
-      idFnameParam = /imUuxf">(\d\.\d)<\/span>/i.exec(html);
-      if(idFnameParam === null) {
-        resolve([id, {ratings:null}]);
-        return
-      }
-      resolve([id, {ratings:idFnameParam[1]}]);
-      return;
-
-    case 18:  // wikidata
-      idFnameParam = /lang="en"><a href="(.*?)"\shreflang="en"/i.exec(html);
-      if(idFnameParam === null) {
-        resolve([id, {url:null}]);
-        return
-      }
-      resolve([id, {url:idFnameParam[1]}]);
-      return;
-
-    case 98:  // google
-      if(name == 'The Crow Girl')
-        fs.writeFile('samples/google-Eilean-search.html', html);
-      return
-
-    case 99:  // rotten tomatoes
-      // fs.writeFile('samples/rotten-search-noline.html', text);
-
-      const namePfx = rottenStripSfx(name);
-      let titleRegx = new RegExp(/search-result-title">TV shows</g);
-      titleRegx.lastIndex = 0;
-      const titleParts = titleRegx.exec(html);
-      if(titleParts === null) {
-        console.log('no rotten title match:', {type, url, name});
-        resolve([id, 'no match: ' + {type, url, name}]);
-        return;
-      }
-
-  // need escaping: ] ( ) [ { } * + ? / $ . | ^ \
-
-      const urlNameRegx = new RegExp(
-    /<a href="([^"]*)" class="unset" data-qa="info-name" slot="title">([^<]*)<\/a>/g
-    );
-
-      urlNameRegx.lastIndex = titleRegx.lastIndex;
-      let textUrl;
-      for(let i=0; i<3; i++) {
-        const nameParts = urlNameRegx.exec(html);
-        if(nameParts === null || i == 3) {
-          console.log('no rotten url name match:', {type, url, name});
-          resolve([id, 'no match: ' + {type, url, name}]);
-          return;
-        }
-        let textName;
-        [textUrl, textName] = nameParts.slice(1);
-        const textNamePfx = rottenStripSfx(textName);
-        if(textNamePfx == namePfx) break;
-      }
-      resolve([id, {name:"Rotten Tomatoes", url:textUrl}]);
-      return;
-
-    default: resolve([id, 'getUrls no type: ' + type]);
-  }
-}
 
 //////////////////  CALL FUNCTION SYNCHRONOUSLY  //////////////////
 
@@ -642,8 +546,8 @@ const runOne = () => {
   switch (fname) {
     case 'getAllShows':   getAllShows(       id,    '', resolve, reject); break;
     case 'deletePath':    deletePath(        id, param, resolve, reject); break;
-    case 'getUrls':       getUrls(           id, param, resolve, reject); break;
     case 'getLastViewed': view.getLastViewed(id,    '', resolve, reject); break;
+    case 'updateTvdb':    tvdb.updateTvdb(   id, param, resolve, reject); break;
 
     case 'getBlockedWaits': getBlockedWaits( id, '',    resolve, reject); break;
     case 'addBlockedWait':  addBlockedWait(  id, param, resolve, reject); break;

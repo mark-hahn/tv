@@ -1,4 +1,5 @@
 import fs   from "fs";
+import fsp  from 'fs/promises' 
 import date from 'date-and-time';
 
 export const jParse = (str, label) => {
@@ -29,3 +30,37 @@ export const log = (msg, err = false, spacing = false) => {
   repeatCount = 0;
 }
 
+let busyByPath     = {};
+let dataByPath     = {};
+let resolvesByPath = {};
+
+const chkWriteFile = async() => {
+  let anyWritten = false;
+  for (const [path, data] of 
+          Object.entries(dataByPath)) {
+    if(busyByPath[path]) continue;
+    busyByPath[path] = true;
+    let data = dataByPath[path];
+    if(typeof data == 'object')
+          data = JSON.stringify(data);
+    await fsp.writeFile(path, data);
+    resolvesByPath[path].forEach(
+             (resolve) => resolve());
+    resolvesByPath[path] = [];
+    delete dataByPath[path];
+    anyWritten = true;
+    busyByPath[path] = false;
+  }
+  if(anyWritten) await chkWriteFile();
+}
+
+export const writeFile = (path, data) => {
+  dataByPath[path] = data;
+  if(!resolvesByPath[path]) 
+      resolvesByPath[path] = [];
+  const promise = new Promise((resolve) => {
+    resolvesByPath[path].push(resolve);
+  });
+  chkWriteFile();
+  return promise;
+}

@@ -1,10 +1,11 @@
-import fs from "fs";
-import * as fsp from 'fs/promises';
+import fs        from "fs";
+import * as fsp  from 'fs/promises';
 import * as emby from "./emby.js";
+import {jParse}  from "./src/util.js";
 
 const lastViewedStr =
   fs.readFileSync('data/lastViewed.json', 'utf8');
-const lastViewed = JSON.parse(lastViewedStr);
+const lastViewed = jParse(lastViewedStr, 'lastViewed');
 
 let lastShowName = null;
 const checkWatch = async () => {

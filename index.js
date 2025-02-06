@@ -500,6 +500,36 @@ const deletePath = async (id, path, resolve, _reject) => {
   resolve([id, 'ok']);
 };
 
+//////////////////  UPDATE TVDB FUNCTION  //////////////////
+
+const updateTvdbQueue = [];
+let tvdbQueueRunning = false;
+
+const runOneTvdb = () => {
+  if(tvdbQueueRunning || updateTvdbQueue.length == 0) return;
+  tvdbQueueRunning == true;
+  const {idFnameParam, ws} = updateTvdbQueue.pop();
+  if(ws.readyState !== WebSocket.OPEN) return;
+
+  const [id, param] = idFnameParam;
+  let resolve = null;
+  let reject  = null;
+
+  const promise = new Promise((resolveIn, rejectIn) => {
+    resolve = resolveIn; 
+    reject  = rejectIn;
+  });
+  promise.then((idResult) => {
+    const [id, result] = idResult;
+    console.log('updateTvdb resolved:', id);
+    const resStr = JSON.stringify(result);
+    util.writeFile('updateTvdb-result.json', resStr);
+    ws.send(`${id}~~~ok~~~${resStr}`); 
+    tvdbQueueRunning == false;
+    runOneTvdb();
+  })
+  tvdb.updateTvdb(id, param, resolve, reject);
+}
 
 //////////////////  CALL FUNCTION SYNCHRONOUSLY  //////////////////
 
@@ -544,10 +574,10 @@ const runOne = () => {
   // call function fname
   // console.log(`call function`, {id, fname, param});
   switch (fname) {
+
     case 'getAllShows':   getAllShows(       id,    '', resolve, reject); break;
     case 'deletePath':    deletePath(        id, param, resolve, reject); break;
     case 'getLastViewed': view.getLastViewed(id,    '', resolve, reject); break;
-    case 'updateTvdb':    tvdb.updateTvdb(   id, param, resolve, reject); break;
 
     case 'getBlockedWaits': getBlockedWaits( id, '',    resolve, reject); break;
     case 'addBlockedWait':  addBlockedWait(  id, param, resolve, reject); break;
@@ -605,8 +635,14 @@ wss.on('connection', (ws) => {
       console.log(socketName + ' connected', false, true);
     }
     const idFnameParam = parts.slice(1);
-    queue.unshift({ws, idFnameParam});
-    runOne();
+    if(parts[1] == 'updateTvdb') {
+      updateTvdbQueue.unshift({ws, idFnameParam});
+      runOneTvdb();
+    }
+    else {
+      queue.unshift({ws, idFnameParam});
+      runOne();
+    }
   });
 
   ws.on('error', (err) => {

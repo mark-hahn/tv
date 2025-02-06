@@ -4,24 +4,77 @@ import * as urls from "./urls.js";
 import * as emby from "./emby.js";
 import     fetch from 'node-fetch';
 
-let theTvdbToken = null;
-let allTvdb      = null;
-let remotes      = null;
+let allTvdb    = null;
+let allRemotes = null;
 
 export const initTvdb = (allTvdbIn, remotesIn) => {
-  allTvdb = allTvdbIn;
-  remotes = remotesIn;
+  allTvdb    = allTvdbIn;
+  allRemotes = remotesIn;
 }
 
-const getUrls = async (id, typeUrlName, resolve, reject) => {
-  console.log('getUrls', id, typeUrlName);
-  const [type, url, name] = typeUrlName.split('||');
+//////////// GET TVDB DATA //////////////
+
+export const getTvdbData = async (paramObj) => {
+  const {show, theTvdbToken,
+         seasonCount, episodeCount, watchedCount} = paramObj;
+  const name   = show.Name;
+  const tvdbId = show.TvdbId;
+  
+  let extRes, extUrl;
+  try{
+    extUrl = 
+      `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
+    extRes = await fetch(extUrl,
+                  {headers: {
+                      'Content-Type': 'application/json',
+                        Authorization:'Bearer ' + theTvdbToken
+                  }});
+    if (!extRes.ok) {
+      console.error(`getTvdbData error, extended status:`, 
+                        show.Name, {extUrl, extRes});
+      return null;
+    }
+  } catch(err) {  
+    console.error('getTvdbData extended catch error:', show.Name, 
+                      {extUrl, extRes, err});
+    return null;
+  }
+  const extResObj  = await extRes.json();
+  const {firstAired, lastAired: lastAiredIn, image, score,
+         originalCountry, originalLanguage, overview,
+         remoteIds:tvdbRemotes, status:statusIn,
+         seasons:seasonsIn, averageRuntime,
+         originalNetwork:originalNetworkIn} 
+            = extResObj.data;
+  let lastAired = lastAiredIn ?? firstAired;
+  lastAired = lastAired ?? '';
+  let originalNetwork = originalNetworkIn?.name ?? '';
+  const status = statusIn.name; // e.g. Ended
+  tvdbData = { tvdbId, name, originalNetwork,
+               seasonCount, episodeCount, watchedCount,
+               image, score, overview, 
+               firstAired, lastAired, averageRuntime,
+               originalCountry, originalLanguage,
+               tvdbRemotes, status};
+    
+  allTvdb[name] = tvdbData;
+  util.writeFile('../data/tvdb.json', allTvdb);
+
+  // console.log('getTvdbData:', {tvdbData});
+  return tvdbData;
+}
+
+
+///////////////////// GET REMOTES ////////////////////
+
+const getUrlRatings = async (type, url, name) => {
+  console.log('getUrlRatings', id, {type, url, name});
 
   let resp = await fetch(url);
   if (!resp.ok) {
-    console.error(`getUrls resp: ${typeUrlName}, ${resp.status}`);
-    reject([id, {type, url, name}]);
-    return
+    console.error(
+      `getUrlRatings fetch error: ${{type, url, name}}, ${resp.status}`);
+    return null;
   }
   const html = (await resp.text())
                 .replaceAll(/(\r\n|\n|\r)/gm, "")
@@ -31,9 +84,8 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
     name = name.trim();
     const pfxNameParts = /^(.*?)(\s+\(.*?\))?$/i.exec(name);
     if(!pfxNameParts) {
-      console.log('no rotten name pfx match:', {type, url, name});
-      resolve([id, 'no match: ' + {type, url, name}]);
-      return;
+      console.error('no rotten name pfx match:', {type, url, name});
+      return null;
     }
     return pfxNameParts[1];
   }
@@ -45,26 +97,13 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
       // console.log('samples/imdb-page.html');
       // await util.writeFile('samples/imdb-page.html', html);
       idFnameParam = /imUuxf">(\d\.\d)<\/span>/i.exec(html);
-      if(idFnameParam === null) {
-        resolve([id, {ratings:null}]);
-        return
-      }
-      resolve([id, {ratings:idFnameParam[1]}]);
-      return;
+      if(idFnameParam === null) return {ratings:null};
+      return {ratings: idFnameParam[1]};
 
     case 18:  // wikidata
       idFnameParam = /lang="en"><a href="(.*?)"\shreflang="en"/i.exec(html);
-      if(idFnameParam === null) {
-        resolve([id, {url:null}]);
-        return
-      }
-      resolve([id, {url:idFnameParam[1]}]);
-      return;
-
-    case 98:  // google
-      if(name == 'The Crow Girl')
-        fs.writeFile('samples/google-Eilean-search.html', html);
-      return
+      if(idFnameParam === null) return {url: null};
+      return {url: idFnameParam[1]};
 
     case 99:  // rotten tomatoes
       // fs.writeFile('samples/rotten-search-noline.html', text);
@@ -75,8 +114,7 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
       const titleParts = titleRegx.exec(html);
       if(titleParts === null) {
         console.log('no rotten title match:', {type, url, name});
-        resolve([id, 'no match: ' + {type, url, name}]);
-        return;
+        return {url:'no match'};
       }
 
   // need escaping: ] ( ) [ { } * + ? / $ . | ^ \
@@ -91,35 +129,32 @@ const getUrls = async (id, typeUrlName, resolve, reject) => {
         const nameParts = urlNameRegx.exec(html);
         if(nameParts === null || i == 3) {
           console.log('no rotten url name match:', {type, url, name});
-          resolve([id, 'no match: ' + {type, url, name}]);
-          return;
+          return {url:'no match'};
         }
         let textName;
         [textUrl, textName] = nameParts.slice(1);
         const textNamePfx = rottenStripSfx(textName);
         if(textNamePfx == namePfx) break;
       }
-      resolve([id, {name:"Rotten Tomatoes", url:textUrl}]);
-      return;
+      return {url:textUrl};
 
-    default: resolve([id, 'getUrls no type: ' + type]);
+    default: return 'getUrlRatings invalid type: ' + type;
   }
 }
 
 
-///////////// get remote (name and url) //////////////
+///////////// get remote (name, url, & ratings) //////////////
 
-const getRemote = async (tvdbRemote, showName) => {
-  let {id, type} = tvdbRemote;
+const getRemote = async (id, type, showName) => {
   let url     = null;  
   let ratings = null;
   let urlRatings, name;
+  
   switch (type) {
     case 2:  
       name = 'IMDB';
       url  = `https://www.imdb.com/title/${id}`;
-      urlRatings = await getUrls(
-            `2||${url}?search=${encodeURI(id)}||${showName}`);
+      urlRatings = await getUrlRatings(2, url, name);
       ratings = urlRatings?.ratings;
       break;
 
@@ -137,8 +172,8 @@ const getRemote = async (tvdbRemote, showName) => {
 
     case 18: 
       name = 'Wikipedia';
-      urlRatings = await getUrls(
-            `18||https://www.wikidata.org/wiki/${id}||${showName}`);
+      urlRatings = await getUrlRatings(18, 
+                    `https://www.wikidata.org/wiki/${id}`, showName);
       url = urlRatings?.url;
       break;
       
@@ -147,20 +182,17 @@ const getRemote = async (tvdbRemote, showName) => {
     case 99:  
       url = `https://www.rottentomatoes.com/search` +
                     `?search=${encodeURI(id)}`;
-      urlRatings = await getUrls(`99||${url}||${showName}`);
+      urlRatings = await getUrlRatings(99, url, showName);
       name = urlRatings?.name;
       url  = urlRatings?.url;
       // console.log(`getRemote rotten name url: ${name}, ${url}`);
       break;
+
     default: return null;
   }
   
   if(!url) {
     // console.log(`getRemote, no url: ${name}`);
-    return null;
-  }
-  if(url.startsWith('no match:')) {
-    // console.log(`getRemote, no match: ${name}`);
     return null;
   }
   // console.log(`getRemote`, {name, url, ratings});
@@ -170,31 +202,26 @@ const getRemote = async (tvdbRemote, showName) => {
 ///////////// get remotes  //////////////
 
 export const getRemotes = async (show) => {
-  const showName = show.Name;
-  const showId   = show.Id;
-  if(!showId) {
-    console.error(`getRemotes, no showId:`, {show});
-    return null;
-  }
-  let remotes = await getRemotes(showName);
-  if(remotes && !remotes.noMatch) return [remotes, true];
+  const name   = show.Name;
+  const showId = show.Id;
 
-  remotes = [];
+  const remotes = [];
 
-  if(!showId.startsWith("noemby-")) remotes[0] = 
-            {name:'Emby', url: urls.embyPageUrl(showId)};
+  if(!showId.startsWith("noemby-")) remotes.push( 
+            {name:'Emby', url: urls.embyPageUrl(showId)});
 
-  const tvdbdata = await getTvdbData(show);
+  const tvdbdata = allTvdb[name];
   if(tvdbdata) {
     const remoteIds = tvdbdata.tvdbRemotes;
     if(!remoteIds) {
-      console.error(`getRemotes, no remoteIds: ${showName}`);
+      console.error(`getRemotes, tvdbdata has no remoteIds: ${name}`);
       return null;
     }
 
     const remotesByName = {};
-    for(const tvdbShowId of remoteIds) {
-      const remote = await getRemote(tvdbShowId, showName);
+    for(const idTypeName of remoteIds) {
+      const remote = await getRemote(
+              idTypeName.id, idTypeName.type, idTypeName.sourceName);
       if(remote) {
         if(!remote.ratings) delete remote.ratings;
         remotesByName[remote.name] = remote;
@@ -213,109 +240,25 @@ export const getRemotes = async (show) => {
         remotes.push(remote);
     }
   }
-  const rottenRemote = await getRemote(
-        {id:showName, type:99}, showName);
+  const rottenRemote = await getRemote(name, 99, name);
   if(rottenRemote) remotes.push(rottenRemote);
 
-  const encoded = encodeURI(showName).replaceAll('&', '%26');
+  const encoded = encodeURI(name).replaceAll('&', '%26');
   const url = `https://www.google.com/search` +
-               `?q=${encoded}%20tv%20show`;
+                       `?q=${encoded}%20tv%20show`;
   remotes.push({name:'Google', url});
 
-  addRemotes(showName + '|||' + JSON.stringify(remotes));
-  return [remotes, false];
+  allRemotes[name] = remotes;
+  util.writeFile('../data/remotes.json', allRemotes);
+
+  return remotes;
 }
 
-//////////// search for TvDb Data //////////////
-
-export const srchTvdbData = async (searchStr) => {
-  if(!theTvdbToken) await getToken();
-  const srchUrl = 'https://api4.thetvdb.com/v4/' +
-                  'search?type=series&query='    + 
-                   encodeURIComponent(searchStr);
-  const srchRes = await fetch(srchUrl,
-                    {headers: {
-                      'Content-Type': 'application/json',
-                      Authorization:'Bearer ' + theTvdbToken}
-                    });
-  if (!srchRes.ok) {
-    console.error(`tvdb search error:`, {searchStr}, srchRes.status);
-    return null;
-  }
-  const srchResObj = await srchRes.json();
-  const data = srchResObj.data;
-  if(!data || data.length == 0) return null;
-  return data;
-}
-
-//////////// get TvDb Data //////////////
-
-export const getTvdbData = async (show) => {
-  const name     = show.Name;
-  let   tvdbData = allTvdb[name];
-  if(tvdbData) return tvdbData;
-
-  const tvdbId = show.TvdbId;
-  if(!tvdbId) {
-    console.error(`getTvdbData error, no tvdbId:`, name, {show});
-    return null;
-  }
-  
-  if(!theTvdbToken) await getToken();
-  
-  let extRes, extUrl;
-  try{
-    extUrl = 
-      `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
-    extRes = await fetch(extUrl,
-                  {headers: {
-                      'Content-Type': 'application/json',
-                        Authorization:'Bearer ' + theTvdbToken
-                  }});
-    if (!extRes.ok) {
-      console.error(`getTvdbData, extended status:`, 
-                        show.Name, {extUrl, extRes});
-      return null;
-    }
-  } catch(err) {  
-    console.error('getTvdbData, extended caught:', show.Name, 
-                      {extUrl, extRes, err});
-    return null;
-  }
-  const {seasonCount, episodeCount, watchedCount} = 
-              await emby.getEpisodeCounts(show);
-  const extResObj  = await extRes.json();
-  const {firstAired, lastAired: lastAiredIn, image, score,
-         originalCountry, originalLanguage, overview,
-         remoteIds:tvdbRemotes, status:statusIn,
-         seasons:seasonsIn, averageRuntime,
-         originalNetwork:originalNetworkIn} 
-            = extResObj.data;
-  let lastAired = lastAiredIn ?? firstAired;
-  lastAired = lastAired ?? '';
-  let   originalNetwork = originalNetworkIn?.name ?? '';
-  const status = statusIn.name; // e.g. Ended
-  tvdbData = { tvdbId, name, originalNetwork,
-               seasonCount, episodeCount, watchedCount,
-               image, score, overview, 
-               firstAired, lastAired, averageRuntime,
-               originalCountry, originalLanguage,
-               tvdbRemotes, status};
-  delete tvdbData.deleted;
-    // if(!tvdbData.image) {
-    //   alert('no image in tvdbData');
-    //   return;
-    // }
-  allTvdb[name] = tvdbData;
-  util.writeFile('../data/tvdb.json', allTvdb);
-  // console.log('getTvdbData:', {tvdbData});
-  return tvdbData;
-}
-
-export const updateTvdb = async (param) => {
+export const updateTvdb = 
+         async (id, param, resolve, _reject) => {
   console.log('updateTvdb:', param);
-  
-
-
-
+  const paramObj = jParse(param, 'updateTvdb');
+  const tvdb    = await getTvdbData(paramObj); // must be first
+  const remotes = await getRemotes(paramObj.show);
+  resolve([id, {tvdb, remotes}]);
 }

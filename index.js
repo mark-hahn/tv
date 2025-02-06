@@ -21,7 +21,6 @@ const blkGapsStr = fs.readFileSync('data/blockedGaps.json',       'utf8');
 const noEmbyStr  = fs.readFileSync('data/noemby.json',            'utf8');
 const gapsStr    = fs.readFileSync('data/gaps.json',              'utf8');
 const allTvdbStr = fs.readFileSync('data/tvdb.json',              'utf8');
-const allRemStr  = fs.readFileSync('data/remotes.json',           'utf8');
 
 const blockedWaits = JSON.parse(waitingStr);
 const blockedGaps  = JSON.parse(blkGapsStr);
@@ -30,9 +29,6 @@ const pickups      = JSON.parse(pickupStr);
 const noEmbys      = JSON.parse(noEmbyStr);
 const gaps         = JSON.parse(gapsStr);
 const allTvdb      = JSON.parse(allTvdbStr);
-const allRemotes   = JSON.parse(allRemStr);
-
-tvdb.initTvdb(allTvdb, allRemotes);
 
 const videoFileExtensions = [
   "mp4", "mkv", "avi", "mov", "wmv", "flv", "mpeg",
@@ -500,37 +496,6 @@ const deletePath = async (id, path, resolve, _reject) => {
   resolve([id, 'ok']);
 };
 
-//////////////////  UPDATE TVDB FUNCTION  //////////////////
-
-const updateTvdbQueue = [];
-let tvdbQueueRunning = false;
-
-const runOneTvdb = () => {
-  if(tvdbQueueRunning || updateTvdbQueue.length == 0) return;
-  tvdbQueueRunning == true;
-  const {idFnameParam, ws} = updateTvdbQueue.pop();
-  if(ws.readyState !== WebSocket.OPEN) return;
-
-  const [id, param] = idFnameParam;
-  let resolve = null;
-  let reject  = null;
-
-  const promise = new Promise((resolveIn, rejectIn) => {
-    resolve = resolveIn; 
-    reject  = rejectIn;
-  });
-  promise.then((idResult) => {
-    const [id, result] = idResult;
-    console.log('updateTvdb resolved:', id);
-    const resStr = JSON.stringify(result);
-    util.writeFile('updateTvdb-result.json', resStr);
-    ws.send(`${id}~~~ok~~~${resStr}`); 
-    tvdbQueueRunning == false;
-    runOneTvdb();
-  })
-  tvdb.updateTvdb(id, param, resolve, reject);
-}
-
 //////////////////  CALL FUNCTION SYNCHRONOUSLY  //////////////////
 
 const queue = [];
@@ -540,10 +505,8 @@ const runOne = () => {
   if(running || queue.length == 0) return;
   running == true;
 
-  const {idFnameParam, ws} = queue.pop();
+  const {ws, id, param} = queue.pop();
   if(ws.readyState !== WebSocket.OPEN) return;
-
-  const [id, fname, param] = idFnameParam;
 
   let resolve = null;
   let reject  = null;
@@ -577,6 +540,7 @@ const runOne = () => {
 
     case 'getAllShows':   getAllShows(       id,    '', resolve, reject); break;
     case 'deletePath':    deletePath(        id, param, resolve, reject); break;
+    case 'initTvdb':      tvdb.initTvdb(     id, param, resolve, reject); break;
     case 'getLastViewed': view.getLastViewed(id,    '', resolve, reject); break;
 
     case 'getBlockedWaits': getBlockedWaits( id, '',    resolve, reject); break;
@@ -634,13 +598,12 @@ wss.on('connection', (ws) => {
       socketName = appSocketName;
       console.log(socketName + ' connected', false, true);
     }
-    const idFnameParam = parts.slice(1);
-    if(parts[1] == 'updateTvdb') {
-      updateTvdbQueue.unshift({ws, idFnameParam});
-      runOneTvdb();
+    const [id, fName, param] = parts.slice(1);
+    if(fName == 'getNewTvdb') {
+      tvdb.getNewTvdb(ws, id, param) 
     }
     else {
-      queue.unshift({ws, idFnameParam});
+      queue.unshift({ws, id, param});
       runOne();
     }
   });

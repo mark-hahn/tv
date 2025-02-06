@@ -4,65 +4,33 @@ import * as urls from "./urls.js";
 import * as emby from "./emby.js";
 import     fetch from 'node-fetch';
 
-let allTvdb    = null;
-let allRemotes = null;
+let theTvdbToken = null;
+let allTvdb      = null;
 
-export const initTvdb = (allTvdbIn, remotesIn) => {
-  allTvdb    = allTvdbIn;
-  allRemotes = remotesIn;
+export const initTvdb = (allTvdbIn) => {
+  allTvdb = allTvdbIn;
 }
 
-//////////// GET TVDB DATA //////////////
-
-export const getTvdbData = async (paramObj) => {
-  const {show, theTvdbToken,
-         seasonCount, episodeCount, watchedCount} = paramObj;
-  const name   = show.Name;
-  const tvdbId = show.TvdbId;
-  
-  let extRes, extUrl;
-  try{
-    extUrl = 
-      `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
-    extRes = await fetch(extUrl,
-                  {headers: {
-                      'Content-Type': 'application/json',
-                        Authorization:'Bearer ' + theTvdbToken
-                  }});
-    if (!extRes.ok) {
-      console.error(`getTvdbData error, extended status:`, 
-                        show.Name, {extUrl, extRes});
-      return null;
+///////////// get theTvdbToken //////////////
+(async () => {
+  const loginResp = await fetch(
+    'https://api4.thetvdb.com/v4/login', 
+    { method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: 
+        JSON.stringify({
+            "apikey": "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df",
+            "pin": "HXEVSDFF"
+        })
     }
-  } catch(err) {  
-    console.error('getTvdbData extended catch error:', show.Name, 
-                      {extUrl, extRes, err});
-    return null;
+  );
+  if (!loginResp.ok) {
+    console.error(`FATAL: TvDbToken Response: ${loginResp.status}`);
+    process.exit();
   }
-  const extResObj  = await extRes.json();
-  const {firstAired, lastAired: lastAiredIn, image, score,
-         originalCountry, originalLanguage, overview,
-         remoteIds:tvdbRemotes, status:statusIn,
-         seasons:seasonsIn, averageRuntime,
-         originalNetwork:originalNetworkIn} 
-            = extResObj.data;
-  let lastAired = lastAiredIn ?? firstAired;
-  lastAired = lastAired ?? '';
-  let originalNetwork = originalNetworkIn?.name ?? '';
-  const status = statusIn.name; // e.g. Ended
-  tvdbData = { tvdbId, name, originalNetwork,
-               seasonCount, episodeCount, watchedCount,
-               image, score, overview, 
-               firstAired, lastAired, averageRuntime,
-               originalCountry, originalLanguage,
-               tvdbRemotes, status};
-    
-  allTvdb[name] = tvdbData;
-  util.writeFile('../data/tvdb.json', allTvdb);
-
-  // console.log('getTvdbData:', {tvdbData});
-  return tvdbData;
-}
+  const loginJSON = await loginResp.json();
+  theTvdbToken = loginJSON.data.token;
+})();
 
 
 ///////////////////// GET REMOTES ////////////////////
@@ -201,7 +169,7 @@ const getRemote = async (id, type, showName) => {
 
 ///////////// get remotes  //////////////
 
-export const getRemotes = async (show) => {
+export const getRemotes = async (show, tvdbRemotes) => {
   const name   = show.Name;
   const showId = show.Id;
 
@@ -210,36 +178,28 @@ export const getRemotes = async (show) => {
   if(!showId.startsWith("noemby-")) remotes.push( 
             {name:'Emby', url: urls.embyPageUrl(showId)});
 
-  const tvdbdata = allTvdb[name];
-  if(tvdbdata) {
-    const remoteIds = tvdbdata.tvdbRemotes;
-    if(!remoteIds) {
-      console.error(`getRemotes, tvdbdata has no remoteIds: ${name}`);
-      return null;
-    }
-
-    const remotesByName = {};
-    for(const idTypeName of remoteIds) {
-      const remote = await getRemote(
-              idTypeName.id, idTypeName.type, idTypeName.sourceName);
-      if(remote) {
-        if(!remote.ratings) delete remote.ratings;
-        remotesByName[remote.name] = remote;
-      }
-    }
-
-    const imdbRemote = remotesByName["IMDB"];
-    if(imdbRemote) {
-      imdbRemote.name += (imdbRemote.ratings) ?
-                   ' (' + imdbRemote.ratings + ')' : '';
-      remotes.push(imdbRemote);
-    } 
-
-    for(const [name, remote] of Object.entries(remotesByName)) {
-      if(name !== "IMDB" && name !== "Rotten Tomatoes")
-        remotes.push(remote);
+  const remotesByName = {};
+  for(const tvdbRemote of tvdbRemotes) {
+    const remote = await getRemote(
+            tvdbRemote.id, tvdbRemote.type, tvdbRemote.sourceName);
+    if(remote) {
+      if(!remote.ratings) delete remote.ratings;
+      remotesByName[remote.name] = remote;
     }
   }
+
+  const imdbRemote = remotesByName["IMDB"];
+  if(imdbRemote) {
+    imdbRemote.name += (imdbRemote.ratings) ?
+                  ' (' + imdbRemote.ratings + ')' : '';
+    remotes.push(imdbRemote);
+  } 
+
+  for(const [name, remote] of Object.entries(remotesByName)) {
+    if(name !== "IMDB" && name !== "Rotten Tomatoes")
+      remotes.push(remote);
+  }
+
   const rottenRemote = await getRemote(name, 99, name);
   if(rottenRemote) remotes.push(rottenRemote);
 
@@ -248,17 +208,140 @@ export const getRemotes = async (show) => {
                        `?q=${encoded}%20tv%20show`;
   remotes.push({name:'Google', url});
 
-  allRemotes[name] = remotes;
-  util.writeFile('../data/remotes.json', allRemotes);
-
   return remotes;
 }
 
-export const updateTvdb = 
-         async (id, param, resolve, _reject) => {
-  console.log('updateTvdb:', param);
-  const paramObj = jParse(param, 'updateTvdb');
-  const tvdb    = await getTvdbData(paramObj); // must be first
-  const remotes = await getRemotes(paramObj.show);
-  resolve([id, {tvdb, remotes}]);
+
+//////////// GET TVDB DATA //////////////
+
+export const getTvdbData = async (paramObj, resolve, _reject) => {
+  const {show, seasonCount, episodeCount, watchedCount} = paramObj;
+  const name   = show.Name;
+  const tvdbId = show.TvdbId;
+  
+  let extRes, extUrl;
+  try{
+    extUrl = 
+      `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
+    extRes = await fetch(extUrl,
+                  {headers: {
+                      'Content-Type': 'application/json',
+                        Authorization:'Bearer ' + theTvdbToken
+                  }});
+    if (!extRes.ok) {
+      console.error(`getTvdbData error, extended status:`, 
+                        show.Name, {extUrl, extRes});
+      return null;
+    }
+  } catch(err) {  
+    console.error('getTvdbData extended catch error:', show.Name, 
+                      {extUrl, extRes, err});
+    return null;
+  }
+  const extResObj = await extRes.json();
+  const {firstAired, lastAired:lastAiredIn, image, score,
+         overview, remoteIds, averageRuntime,
+         originalCountry, originalLanguage, 
+         originalNetwork:originalNetworkIn,
+         status:statusIn}      = extResObj.data;
+
+  let lastAired = lastAiredIn ?? firstAired;
+  lastAired = lastAired ?? '';
+  let originalNetwork = originalNetworkIn?.name ?? '';
+  const status = statusIn.name; // e.g. Ended
+  const remotes = await getRemotes(show, remoteIds);
+  const saved = Date.now();
+
+  tvdbData = { tvdbId, name, originalNetwork,
+               seasonCount, episodeCount, watchedCount,
+               image, score, overview, 
+               firstAired, lastAired, averageRuntime,
+               originalCountry, originalLanguage,
+               status, remotes, saved};
+  // console.log('getTvdbData:', tvdbData);
+
+  resolve(tvdbData);
 }
+
+
+//////////////////  NEW TVDB  //////////////////
+
+const newTvdbQueue        = [];
+let   chkTvdbQueueRunning = false;
+
+const chkTvdbQueue = () => {
+  if(chkTvdbQueueRunning || 
+     newTvdbQueue.length == 0) return;
+  chkTvdbQueueRunning == true;
+  const {ws, id, paramObj, send} = newTvdbQueue.pop();
+  if(send && ws.readyState !== WebSocket.OPEN) return;
+
+  let resolve = null;
+  let reject  = null;
+  const promise = new Promise((resolveIn, rejectIn) => {
+    resolve = resolveIn; 
+    reject  = rejectIn;
+  });
+  promise.then((tvdbData) => {
+    console.log('tvdbData resolved:', id);
+    const tvdbDataStr = JSON.stringify(tvdbData);
+    util.writeFile('updateTvdb-result.json', tvdbDataStr);
+
+    if(send) ws.send(`${id}~~~ok~~~${tvdbDataStr}`);
+
+    allTvdb[tvdbData.name] = tvdbData;
+    util.writeFile('../data/tvdb.json', allTvdb);
+ 
+    chkTvdbQueueRunning == false;
+    chkTvdbQueue();
+  });
+  getTvdbData(paramObj, resolve, reject);
+}
+
+// paramObj ...
+//   {theTvdbToken, show, seasonCount, episodeCount, watchedCount}
+
+export const getNewTvdb = async (ws, id, param) => {
+  const paramObj = jParse(param, 'getNewTvdb');
+  console.log('getNewTvdb:', paramObj.show.Name);
+  newTvdbQueue.unshift({ws, id, paramObj, send:true});
+  chkTvdbQueue();
+}
+
+let tryLocalGetTvdbBusy = false;
+
+const tryLocalGetTvdb = () => {
+  if(!theTvdbToken || tryLocalGetTvdbBusy) return;
+  tryLocalGetTvdbBusy = true;
+
+  let minSaved = Math.max();
+  let minTvdb     = null;
+  try {
+    allTvdb.forEach((tvdb) => {
+      const saved = tvdb.saved;
+      if(saved === undefined) {
+        minTvdb = tvdb;
+        throw BreakException;
+      }
+      if(saved < minSaved) {
+        minSaved = saved;
+        minTvdb  = tvdb;
+      }
+    });
+  }
+  catch(e){};
+  const paramObj = {
+    show: {
+      name: minTvdb.name,
+    },
+    seasonCount:  minTvdb.seasonCount, 
+    episodeCount: minTvdb.episodeCount, 
+    watchedCount: minTvdb.watchedCount,
+  };
+  newTvdbQueue.unshift({ws, id, paramObj, send:true});
+  chkTvdbQueue();
+  tryLocalGetTvdbBusy = false;
+}
+
+setInterval( tryLocalGetTvdb , 6*60*1000);  // every 6 mins
+tryLocalGetTvdb();

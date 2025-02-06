@@ -5,11 +5,9 @@ import * as emby from "./emby.js";
 import     fetch from 'node-fetch';
 
 let theTvdbToken = null;
-let allTvdb      = null;
 
-export const initTvdb = (allTvdbIn) => {
-  allTvdb = allTvdbIn;
-}
+let allTvdb = jParse(
+      fs.readFileSync('data/tvdb.json', 'utf8'));
 
 ///////////// get theTvdbToken //////////////
 (async () => {
@@ -301,6 +299,11 @@ const chkTvdbQueue = () => {
 // paramObj ...
 //   {theTvdbToken, show, seasonCount, episodeCount, watchedCount}
 
+export const getAllTvdb = (id, _param, resolve, _reject) => {
+  console.log('getAllTvdb', id);
+  resolve([id, allTvdb]);
+};
+
 export const getNewTvdb = async (ws, id, param) => {
   const paramObj = jParse(param, 'getNewTvdb');
   console.log('getNewTvdb:', paramObj.show.Name);
@@ -308,20 +311,27 @@ export const getNewTvdb = async (ws, id, param) => {
   chkTvdbQueue();
 }
 
-let tryLocalGetTvdbBusy = false;
+export const setTvdbFields = (id, param, resolve, _reject) => {
+  console.log('setTvdbFields', id, param);
+  const paramObj = jParse(param, 'setTvdbFields');
+  Object.assign(allTvdb, paramObj);
+  util.writeFile('../data/tvdb.json', allTvdb);
+  resolve([id, 'ok']);
+};
 
+let tryLocalGetTvdbBusy = false;
 const tryLocalGetTvdb = () => {
-  if(!theTvdbToken || tryLocalGetTvdbBusy) return;
+  if(tryLocalGetTvdbBusy) return;
   tryLocalGetTvdbBusy = true;
 
   let minSaved = Math.max();
-  let minTvdb     = null;
+  let minTvdb  = null;
   try {
     allTvdb.forEach((tvdb) => {
-      const saved = tvdb.saved;
+      const {saved} = tvdb;
       if(saved === undefined) {
         minTvdb = tvdb;
-        throw BreakException;
+        throw true;
       }
       if(saved < minSaved) {
         minSaved = saved;
@@ -338,10 +348,17 @@ const tryLocalGetTvdb = () => {
     episodeCount: minTvdb.episodeCount, 
     watchedCount: minTvdb.watchedCount,
   };
-  newTvdbQueue.unshift({ws, id, paramObj, send:true});
+  newTvdbQueue.unshift({ws, id, paramObj, send:false});
   chkTvdbQueue();
   tryLocalGetTvdbBusy = false;
 }
 
-setInterval( tryLocalGetTvdb , 6*60*1000);  // every 6 mins
-tryLocalGetTvdb();
+const waitForTvdbToken = () => {
+  if(!theTvdbToken) {
+    setTimeout(waitForTvdbToken, 1000);
+    return;
+  }
+  setInterval(tryLocalGetTvdb, 6*60*1000);  // every 6 mins
+  tryLocalGetTvdb();
+}
+waitForTvdbToken();

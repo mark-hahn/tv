@@ -20,7 +20,6 @@ const waitingStr = fs.readFileSync('data/blockedWaits.json',      'utf8');
 const blkGapsStr = fs.readFileSync('data/blockedGaps.json',       'utf8');
 const noEmbyStr  = fs.readFileSync('data/noemby.json',            'utf8');
 const gapsStr    = fs.readFileSync('data/gaps.json',              'utf8');
-const allTvdbStr = fs.readFileSync('data/tvdb.json',              'utf8');
 
 const blockedWaits = JSON.parse(waitingStr);
 const blockedGaps  = JSON.parse(blkGapsStr);
@@ -28,7 +27,6 @@ const rejects      = JSON.parse(rejectStr);
 const pickups      = JSON.parse(pickupStr);
 const noEmbys      = JSON.parse(noEmbyStr);
 const gaps         = JSON.parse(gapsStr);
-const allTvdb      = JSON.parse(allTvdbStr);
 
 const videoFileExtensions = [
   "mp4", "mkv", "avi", "mov", "wmv", "flv", "mpeg",
@@ -435,11 +433,6 @@ const delGap = async (id, gapIdSave, resolve, _reject) => {
   resolve([id, 'ok']);
 }
 
-const getAllTvdb = (id, _param, resolve, _reject) => {
-  console.log('getAllTvdb', id);
-  resolve([id, allTvdb]);
-};
-
 const addTvdb = async (id, tvdbDataStr, resolve, reject) => {
   console.log('addTvdb', id);
   let tvdbData;
@@ -540,7 +533,6 @@ const runOne = () => {
 
     case 'getAllShows':   getAllShows(       id,    '', resolve, reject); break;
     case 'deletePath':    deletePath(        id, param, resolve, reject); break;
-    case 'initTvdb':      tvdb.initTvdb(     id, param, resolve, reject); break;
     case 'getLastViewed': view.getLastViewed(id,    '', resolve, reject); break;
 
     case 'getBlockedWaits': getBlockedWaits( id, '',    resolve, reject); break;
@@ -567,8 +559,7 @@ const runOne = () => {
     case 'addGap':      addGap(    id, param, resolve, reject); break;
     case 'delGap':      delGap(    id, param, resolve, reject); break;
     
-    case 'getAllTvdb':   getAllTvdb(  id, param, resolve, reject); break;
-    case 'addTvdb':      addTvdb(     id, param, resolve, reject); break;
+    case 'getAllTvdb':   tvdb.getAllTvdb(id, param, resolve, reject); break;
     
     case 'getRemotes':  getRemotes(id, param, resolve, reject); break;
     case 'addRemotes':  addRemotes(id, param, resolve, reject); break;

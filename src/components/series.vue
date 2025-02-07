@@ -173,23 +173,27 @@ export default {
       this.seasonsTxt = ``;
       if(this.show.Id.startsWith('noemby-')) return;
       const show = this.show;
+      const name = show.Name
       const epiCounts = await emby.getEpisodeCounts(show);
       const {seasonCount, episodeCount, watchedCount} 
                                         = epiCounts;
       if(seasonCount  != tvdbData.seasonCount  ||
          episodeCount != tvdbData.episodeCount ||
          watchedCount != tvdbData.watchedCount) {
-        const getNewTvdbParam = {
-          show, seasonCount, episodeCount, watchedCount, 
-        };
-        tvdbData = await srvr.getNewTvdb(getNewTvdbParam);
-        allTvdb[show.Name] = tvdbData;
+        tvdbData = await srvr.setTvdbFields({
+            name, save:true,
+            seasonCount, episodeCount, watchedCount});
+        if(!tvdbData) {
+          console.error('setSeasonsTxt, setTvdbFields, no tvb for:', name);
+          return;
+        }
+        allTvdb[name] = tvdbData;
       }
       let seasonsTxt = '';
       switch (seasonCount) {
         case 0:  
           seasonsTxt = '';
-          console.error('setSeasonsTxt no seasonCount', show.Name);
+          console.error('setSeasonsTxt no seasonCount', name);
           break;
         case 1:  
           seasonsTxt = `1 Season`;

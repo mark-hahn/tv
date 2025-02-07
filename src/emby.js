@@ -41,7 +41,6 @@ export async function init() {
   urls.init(cred);
 }
 
-
 let rejects = null;
 export const isReject = (name) => rejects.includes(name);
 
@@ -113,7 +112,7 @@ export async function loadAllShows(gapCache) {
 
     let tvdbData = allTvdb[show.Name];
     if(!tvdbData) {
-      console.log(`loadAllShows, no tvdbData:`, show.Name);
+      console.log(`loadAllShows, no allTvdb[${show.Name}]`);
       const {seasonCount, episodeCount, watchedCount} 
               = await getEpisodeCounts(show);
       const getNewTvdbParam = {

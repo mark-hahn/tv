@@ -97,7 +97,7 @@ export async function setAllTvdbShowIds(allShows) {
       showId: show.Id,
     });
   });
-  await srvr.setTvdbFields({finished:true});
+  await srvr.setTvdbFields({save:true});
 }
 
 ////////// temp one-time mass operation (VERY SLOW) //////////

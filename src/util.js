@@ -89,6 +89,18 @@ export async function setAllFavs(allShows) {
     console.log('saved fav:', show.Name);
   });
 }
+
+////////// temp one-time mass operation //////////
+export async function setAllTvdbShowIds(allShows) {
+  allShows.forEach(async (show) => {
+    await srvr.setTvdbFields({
+      name:   show.Name,
+      showId: show.Id,
+    });
+  });
+  await srvr.setTvdbFields({finished:true});
+}
+
 ////////// temp one-time mass operation (VERY SLOW) //////////
 export async function loadAllRemotes(allShows) {
   let showIdx = 0;

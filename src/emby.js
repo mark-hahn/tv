@@ -112,10 +112,11 @@ export async function loadAllShows(gapCache) {
     show.TvdbId = tvdbId;
 
     const tvDbData = allTvdb[show.Name];
-    show.OriginalCountry  = tvDbData.originalCountry;
-    show.OriginalLanguage = tvDbData?.originalLanguage;
-
-    if(!tvDbData?.deleted) shows.push(show);
+    if(tvDbData) {
+      show.OriginalCountry  = tvDbData.originalCountry;
+      show.OriginalLanguage = tvDbData?.originalLanguage;
+      if(!tvDbData?.deleted) shows.push(show);
+    }
   }
 
 ////////  remove gaps with no matching show /////////

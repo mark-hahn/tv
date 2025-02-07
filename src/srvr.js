@@ -129,10 +129,10 @@ export function getAllShows()
             {return fCall('getAllShows')}
 export function deletePath(path)   
             {return fCall('deletePath', path)}
-export function getUrls(typeUrlName)   
-            {return fCall('getUrls', typeUrlName)}
-export function getLastViewed()      
+       function getLastViewed()      
             {return fCall('getLastViewed')}
+export function updateTvdb()      
+            {return fCall('updateTvdb')}
 
 export function getBlockedWaits()        
             {return fCall('getBlockedWaits')}
@@ -176,10 +176,12 @@ export function addGap(gapIdGapSave)
 export function delGap(gapIdSave)    
             {return fCall('delGap', gapIdSave)}
 
-export function getAllTvdb()      
+export function getAllTvdb()          
             {return fCall('getAllTvdb')}
-export function addTvdb(tvdbData)    
-            {return fCall('addTvdb', tvdbData)}
+export function getNewTvdb(params)    
+            {return fCall('getNewTvdb', params)}
+export function setTvdbFields(params) 
+              {return fCall('setTvdbFields', params)}
 
 export function getRemotes(name)    
             {return fCall('getRemotes', name)}

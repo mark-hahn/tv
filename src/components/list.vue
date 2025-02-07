@@ -1024,15 +1024,15 @@ export default {
     });
 
     setInterval(async () => {
-      const curWatch = await emby.getCurrentlyWatching();
-      if(curWatch == 'rokuOff' ||
-         curWatch == 'nothingPlaying') {
-        this.watchingName = '---';
-        return;
-      }
-      const  {showName} = curWatch;
-      if(showName === null)  this.watchingName = '----';
-      else                   this.watchingName = showName;
+      // const curWatch = await emby.getCurrentlyWatching();
+      // if(curWatch == 'rokuOff' ||
+      //    curWatch == 'nothingPlaying') {
+      //   this.watchingName = '---';
+      //   return;
+      // }
+      // const  {showName} = curWatch;
+      // if(showName === null)  this.watchingName = '----';
+      // else                   this.watchingName = showName;
     }, 5*1000);
 
     (async () => {
@@ -1087,6 +1087,7 @@ export default {
         // await util.removeDeadShows(allShows);
         // await util.listCountries(allShows);
         // await util.setAllFavs(allShows);
+        await util.setAllTvdbShowIds(allShows);
         // await util.loadAllRemotes(allShows); // takes many hours
       }
       catch (err) {

@@ -182,8 +182,3 @@ export function getNewTvdb(params)
             {return fCall('getNewTvdb', params)}
 export function setTvdbFields(params) 
               {return fCall('setTvdbFields', params)}
-
-export function getRemotes(name)    
-            {return fCall('getRemotes', name)}
-export function addRemotes(nameRems)    
-            {return fCall('addRemotes', nameRems)}

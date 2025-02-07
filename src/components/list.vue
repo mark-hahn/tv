@@ -435,7 +435,7 @@ export default {
           return;
         await emby.deleteShowFromEmby(show);
       }
-      const tvdbData = await tvdb.getTvdbData(show);
+      const tvdbData = allTvdb[show.Name];
       tvdbData.deleted = util.fmtDate(0);
       await srvr.addTvdb(tvdbData);
       await srvr.deleteShowFromSrvr(show);
@@ -638,7 +638,6 @@ export default {
         tvdbSrchData = tvdbSrchData.map(
           (item) => {
             const tvdbData     = item[1];
-            tvdbData.tvdbId    = tvdbData.tvdb_id;
             tvdbData.year      = tvdbData.firstAired.substring(0, 4);
             tvdbData.country   = tvdbData.originalCountry;
             tvdbData.thumbnail = tvdbData.image;
@@ -676,9 +675,16 @@ export default {
         Reject: emby.isReject(name),
       };
       show = await emby.createNoemby(show);
-      const tvdbData = await tvdb.getTvdbData(show);
+      const paramObj = {
+        show,
+        seasonCount:  0, 
+        episodeCount: 0, 
+        watchedCount: 0, 
+      };
+      // const tvdbData = allTvdb[show.Name];
+      const tvdbData = await srvr.getNewTvdb(paramObj);
       delete tvdbData.deleted;
-      await srvr.addTvdb(tvdbData);
+      allTvdb[show.Name] = tvdbData;
       await srvr.addBlockedWait(show.Name);
       this.addRow(show);
       this.sortShows();
@@ -731,6 +737,10 @@ export default {
     },
 
     saveVisShow(show, scroll = false) {
+      if(!show) {
+        console.error('saveVisShow show param null');
+        return;
+      }
       const showName = show.Name;
       if(showHistoryPtr == -1 ||
            showName != showHistory[showHistoryPtr].Name) {

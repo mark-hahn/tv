@@ -111,12 +111,20 @@ export async function loadAllShows(gapCache) {
     }
     show.TvdbId = tvdbId;
 
-    const tvDbData = allTvdb[show.Name];
-    if(tvDbData) {
-      show.OriginalCountry  = tvDbData.originalCountry;
-      show.OriginalLanguage = tvDbData?.originalLanguage;
-      if(!tvDbData?.deleted) shows.push(show);
+    let tvdbData = allTvdb[show.Name];
+    if(!tvdbData) {
+      console.log(`loadAllShows, no tvdbData:`, show.Name);
+      const {seasonCount, episodeCount, watchedCount} 
+              = await getEpisodeCounts(show);
+      const getNewTvdbParam = {
+        show, seasonCount, episodeCount, watchedCount, 
+      };
+      tvdbData = await srvr.getNewTvdb(getNewTvdbParam);
+      allTvdb[show.Name] = tvdbData;
     }
+    show.OriginalCountry  = tvdbData.originalCountry;
+    show.OriginalLanguage = tvdbData?.originalLanguage;
+    if(!tvdbData?.deleted) shows.push(show);
   }
 
 ////////  remove gaps with no matching show /////////
@@ -134,11 +142,11 @@ export async function loadAllShows(gapCache) {
       await srvr.delNoEmby(noEmbyShow.Name);
       continue;
     }
-    const tvDbData = allTvdb[noEmbyShow.Name];
-    noEmbyShow.OriginalCountry  = tvDbData.originalCountry;
-    noEmbyShow.OriginalLanguage = tvDbData.originalLanguage;
+    const tvdbData = allTvdb[noEmbyShow.Name];
+    noEmbyShow.OriginalCountry  = tvdbData.originalCountry;
+    noEmbyShow.OriginalLanguage = tvdbData.originalLanguage;
 
-    if(!tvDbData.deleted) shows.push(noEmbyShow);
+    if(!tvdbData.deleted) shows.push(noEmbyShow);
   }
 
 //////////  process blockedWaitShows from srvr ////////////

@@ -2,14 +2,17 @@ import * as emby from "./emby.js";
 import * as tvdb from "./tvdb.js";
 import * as srvr from "./srvr.js";
 
+let allTvdb = null;
+
 ////////// temp one-time mass operation //////////
 export async function removeDeadShows(allShows) {
+  allTvdb = await tvdb.getAllTvdb();
   let count = 0;
   for(let show of allShows) {
     try {
       const name = show.Name;
       console.log('checking:', name);
-      const tvdbData= await tvdb.getTvdbData(show);
+      const tvdbData= await allTvdb[show.Name];
       if(!tvdbData) continue;
 
       const {status, episodeCount, watchedCount} = tvdbData
@@ -30,11 +33,12 @@ export async function removeDeadShows(allShows) {
 
 ////////// temp one-time mass operation //////////
 export async function setPickups(allShows) {
+  allTvdb = await tvdb.getAllTvdb();
   let count = 0;
   for(let show of allShows) {
     try {
       const name = show.Name;
-      const tvdbData= await tvdb.getTvdbData(show);
+      const tvdbData= await allTvdb[show.Name];
       if(!tvdbData) continue;
 
       const {status} = tvdbData
@@ -66,7 +70,7 @@ export async function setPickups(allShows) {
 export async function listCountries(allShows) {
   const countries = new Set();
   allShows.forEach(async (show) => {
-    const tvdbData = await tvdb.getTvdbData(show);
+    const tvdbData = await allTvdb[show.Name];
     if(tvdbData) {
       countries.add(tvdbData.originalCountry);
     }

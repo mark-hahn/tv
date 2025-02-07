@@ -77,6 +77,7 @@
 import evtBus    from '../evtBus.js';
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
+import * as srvr from "../srvr.js";
 
 let allTvdb = null;
 let windowId = null;
@@ -178,8 +179,11 @@ export default {
       if(seasonCount  != tvdbData.seasonCount  ||
          episodeCount != tvdbData.episodeCount ||
          watchedCount != tvdbData.watchedCount) {
-        Object.assign(tvdbData, epiCounts);
-        tvdb.updateTvdbData(tvdbData);
+        const getNewTvdbParam = {
+          show, seasonCount, episodeCount, watchedCount, 
+        };
+        tvdbData = await srvr.getNewTvdb(getNewTvdbParam);
+        allTvdb[show.Name] = tvdbData;
       }
       let seasonsTxt = '';
       switch (seasonCount) {

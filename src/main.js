@@ -3,13 +3,17 @@ reminder, restore ...
   start gap running
 
 bugs ...
+  no rotten title match: (After The Party)
+  history not working on deleted shows (The Afterparty)
+  viewed not sorted on load
+  url:"no match" in remotes
+  viewed data wrong
 
 todo  ...
   if totry and at least one show to watch, ignore gap
   keep deleted date forever
   show episode being watched (next up line)
   make popups modal with closing by clicking anywhere
-  update imdb ratings (refresh button)
   show counts when reloading a deleted show
   keep all map info for deleted shows
 

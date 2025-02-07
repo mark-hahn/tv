@@ -16,8 +16,9 @@ const authHdr   = `UserId="${markUsrId}", `                +
                   'Client="MyClient", Device="myDevice", ' +
                   'DeviceId="123456", Version="1.0.0"';
 
-let token   = '';
-let cred    = null;
+let token    = '';
+let cred     = null;
+let allTvdb  = null;
 
 ////////////////////////  INIT  ///////////////////////
 
@@ -47,6 +48,9 @@ export const isReject = (name) => rejects.includes(name);
 // load all shows from emby and server //////////
 export async function loadAllShows(gapCache) {
   console.log('entering loadAllShows');
+
+  allTvdb = await tvdb.getAllTvdb();
+
   const time1 = new Date().getTime();
 
   const listPromise   = axios.get(
@@ -58,19 +62,15 @@ export async function loadAllShows(gapCache) {
   const pkupPromise   = srvr.getPickups();
   const noEmbyPromise = srvr.getNoEmbys();
   const gapPromise    = srvr.getGaps();
-  const allTvPromise  = srvr.getAllTvdb();
 
   const [embyShows, srvrShows, 
          blockedWaitShows, blockedGapShows,
-         rejectsIn, pickups, noEmbys, gaps, allTvdb] = 
+         rejectsIn, pickups, noEmbys, gaps] = 
     await Promise.all([listPromise, seriesPromise, 
                        waitPromise, blkGapPromise, 
                        rejPromise, pkupPromise,
-                       noEmbyPromise, gapPromise, allTvPromise]);
+                       noEmbyPromise, gapPromise]);
   rejects = rejectsIn
-  
-  tvdb.initAllTvdb(allTvdb);
-  util.initAllTvdb(allTvdb);
   
   const shows = [];
 

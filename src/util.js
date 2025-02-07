@@ -2,11 +2,6 @@ import * as emby from "./emby.js";
 import * as tvdb from "./tvdb.js";
 import * as srvr from "./srvr.js";
 
-let allTvdb = null;
-export const initAllTvdb = (allTvdbIn) => {
-  allTvdb = allTvdbIn;
-}
-
 ////////// temp one-time mass operation //////////
 export async function removeDeadShows(allShows) {
   let count = 0;

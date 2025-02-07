@@ -1,13 +1,12 @@
 import * as srvr from "./srvr.js";
 import * as util from "./util.js";
-import * as urls from "./urls.js";
-import * as emby from "./emby.js";
 
 let theTvdbToken = null;
-let allTvdb      = null;
 
-export const initAllTvdb = (allTvdbIn) => {
-  allTvdb = allTvdbIn;
+let allTvdb = null;
+export const getAllTvdb = async () => {
+  if(!allTvdb) allTvdb = await srvr.getAllTvdb();
+  return allTvdb;
 }
 
 ///////////// get theTvdbToken //////////////

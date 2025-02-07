@@ -174,6 +174,6 @@ self.onmessage = async (event) => {
     );
   }
   const elapsed = Math.round((Date.now() - startTime) / 1000);
-  console.log(`seasons-worker done, ${elapsed} secs`);
+  console.log(`gap-worker done, ${elapsed} secs`);
 };
 

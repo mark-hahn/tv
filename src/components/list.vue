@@ -291,12 +291,12 @@ import { faCheck, faPlus, faMinus, faArrowDown, faArrowRight,
          faTv, faSearch, faQuestion, faCopy, faBorderAll, faBan,
          faMars, faVenus, faGlobe }
                            from "@fortawesome/free-solid-svg-icons";
-
 library.add([  
   faLaughBeam, faSadCry, faClock, faHeart, faCheck, faPlus, faGlobe,
   faMinus, faArrowDown, faTv, faSearch, faQuestion, faCopy, 
   faBan, faBorderAll, faArrowRight, faMars, faVenus, faClock]);
 
+let allTvdb         = null;
 let allShows         = [];
 let showHistory      = [];
 let showHistoryPtr   = -1;
@@ -601,6 +601,8 @@ export default {
     },
 
     async searchClick(history = false) {
+      allTvdb = await tvdb.getAllTvdb();
+
       this.cancelSrchList();
       const srchTxt = this.webHistStr;
       if(srchTxt.length == 0) return;
@@ -621,7 +623,6 @@ export default {
       }
 
       if(history) {
-        const allTvdb     = await srvr.getAllTvdb();
         const tvdbDataArr = Object.entries(allTvdb);
         const srchTvdb    = tvdbDataArr.filter((tvdbDataItem) =>
                                 tvdbDataItem[0].toLowerCase()
@@ -1075,11 +1076,6 @@ export default {
                        allShows[0].Name);
         this.scrollToSavedShow(true);
 
-        // setTimeout(async () => {
-        //   console.log('ImdbRemote', 
-        //                 await tvdb.getImdbRemote(allShows[0]));
-        // }, 2000);
-
         // ... temp one-time mass operations ...
         // await util.delPickups(allShows);
         // await util.setPickups(allShows);
@@ -1087,7 +1083,7 @@ export default {
         // await util.removeDeadShows(allShows);
         // await util.listCountries(allShows);
         // await util.setAllFavs(allShows);
-        await util.setAllTvdbShowIds(allShows);
+        // await util.setAllTvdbShowIds(allShows);
         // await util.loadAllRemotes(allShows); // takes many hours
       }
       catch (err) {

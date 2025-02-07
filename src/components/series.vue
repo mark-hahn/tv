@@ -78,6 +78,7 @@ import evtBus    from '../evtBus.js';
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 
+let allTvdb = null;
 let windowId = null;
 let windowLabel = Math.random();
 
@@ -278,17 +279,18 @@ export default {
       let  delayingSpinner = true;
       this.remotes         = [];
       setTimeout(() => {
-        if(delayingSpinner)
-          this.showSpinner = true;
+        if(delayingSpinner) this.showSpinner = true;
         delayingSpinner = false;
       }, 1000);
       try {
-        const remCached = await tvdb.getRemotes(this.show);
-        if (!remCached) {
-          console.error('setRemotes: getRemotes null:', this.show.Name);
+        const remotes = allTvdb[this.show.Name]?.remotes;
+        if (!remotes) {
+          console.error('setRemotes: no allTvdb:', this.show.Name);
+          this.showSpinner = false;
+          this.showRemotes = false;
+          delayingSpinner  = false;
           return;
         }
-        const [remotes] = remCached;
         this.remotes     = remotes;
         this.showSpinner = false;
         this.showRemotes = true;
@@ -310,9 +312,10 @@ export default {
 
   mounted() {
     evtBus.on('setUpSeries', async (show) => { 
+      allTvdb        = await tvdb.getAllTvdb();
       this.show      = show;
       this.showBody  = true;
-      const tvdbData = await tvdb.getTvdbData(show);
+      const tvdbData = allTvdb[show.Name];
       await this.setDeleted(tvdbData);
       await this.setPoster(tvdbData);
       await this.setDates(tvdbData);

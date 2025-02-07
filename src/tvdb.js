@@ -9,7 +9,7 @@ export const allTvdb =
 ///////////////////// GET REMOTES ////////////////////
 
 const getUrlRatings = async (type, url, name) => {
-  console.log('getUrlRatings', id, {type, url, name});
+  console.log('getUrlRatings', {type, url, name});
 
   let resp = await fetch(url);
   if (!resp.ok) {
@@ -225,12 +225,12 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   const remotes = await getRemotes(show, remoteIds);
   const saved = Date.now();
 
-  tvdbData = { tvdbId, name, originalNetwork,
-               seasonCount, episodeCount, watchedCount,
-               image, score, overview, 
-               firstAired, lastAired, averageRuntime,
-               originalCountry, originalLanguage,
-               status, remotes, saved};
+  let tvdbData = {tvdbId, name, originalNetwork,
+                  seasonCount, episodeCount, watchedCount,
+                  image, score, overview, 
+                  firstAired, lastAired, averageRuntime,
+                  originalCountry, originalLanguage,
+                  status, remotes, saved};
   // console.log('getTvdbData:', tvdbData);
 
   resolve(tvdbData);
@@ -256,9 +256,7 @@ const chkTvdbQueue = () => {
     reject  = rejectIn;
   });
   promise.then((tvdbData) => {
-    console.log('tvdbData resolved:', id);
     const tvdbDataStr = JSON.stringify(tvdbData);
-    util.writeFile('updateTvdb-result.json', tvdbDataStr);
 
     if(ws) ws.send(`${id}~~~ok~~~${tvdbDataStr}`);
 
@@ -304,7 +302,7 @@ const tryLocalGetTvdb = () => {
     episodeCount: minTvdb.episodeCount ?? 0, 
     watchedCount: minTvdb.watchedCount ?? 0, 
   };
-  newTvdbQueue.unshift({ws:null, id, paramObj});
+  newTvdbQueue.unshift({ws:null, id:null, paramObj});
   chkTvdbQueue();
   tryLocalGetTvdbBusy = false;
 }
@@ -346,7 +344,7 @@ const waitForTvdbToken = () => {
   tryLocalGetTvdb();
   setTimeout(waitForTvdbToken, 6*60*1000);  // 6 mins
 }
-// waitForTvdbToken();
+waitForTvdbToken();
 
 export const getAllTvdb = (id, _param, resolve, _reject) => {
   console.log('getAllTvdb', id);
@@ -354,7 +352,7 @@ export const getAllTvdb = (id, _param, resolve, _reject) => {
 };
 
 export const getNewTvdb = async (ws, id, param) => {
-  const paramObj = jParse(param, 'getNewTvdb');
+  const paramObj = util.jParse(param, 'getNewTvdb');
   console.log('getNewTvdb:', paramObj.show.Name);
   newTvdbQueue.unshift({ws, id, paramObj});
   chkTvdbQueue();

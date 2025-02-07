@@ -430,38 +430,6 @@ const delGap = async (id, gapIdSave, resolve, _reject) => {
   resolve([id, 'ok']);
 }
 
-const getRemotes = (id, name, resolve, _reject) => {
-  console.log(`getRemotes`, {id, name});
-  const remotes = allRemotes[name];
-  if(!remotes) {
-    console.error(`getRemotes no match`, {id, name});
-    resolve([id, {noMatch: true}]);
-    return
-  } 
-  // console.log(`getRemotes success`, remotes);
-  resolve([id, remotes]);
-};
-
-const addRemotes = async (id, nameRems, resolve, reject) => {
-  // console.log(`addRemotes`, {id, nameRems});
-  const [name, remotesStr] = nameRems.split('|||');
-  let remotes;
-  try {
-    remotes = JSON.parse(remotesStr);
-  }
-  catch (e) {
-    reject([id, 'addRemotes: '+e.message]);
-    return;
-  }
-  remotes.forEach((remote) => {
-    if(remote.ratings === null) delete remote.ratings;
-  });
-  // console.log('addRemotes', id, name);
-  allRemotes[name] = remotes;
-  await util.writeFile('data/remotes.json', allRemotes); 
-  resolve([id, 'ok']);
-}
-
 const deletePath = async (id, path, resolve, _reject) => {
   // console.log('deletePath', id, path);
   try {
@@ -546,9 +514,6 @@ const runOne = () => {
     case 'getAllTvdb':    tvdb.getAllTvdb(   id, param, resolve, reject); break;
     case 'getNewTvdb':    tvdb.getNewTvdb(   id, param, resolve, reject); break;
     case 'setTvdbFields': tvdb.setTvdbFields(id, param, resolve, reject); break;
-
-    case 'getRemotes':  getRemotes(id, param, resolve, reject); break;
-    case 'addRemotes':  addRemotes(id, param, resolve, reject); break;
 
     default: reject([id, 'unknownfunction: ' + fname]);
   };

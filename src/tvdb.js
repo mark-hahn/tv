@@ -302,6 +302,7 @@ const tryLocalGetTvdb = () => {
     episodeCount: minTvdb.episodeCount ?? 0, 
     watchedCount: minTvdb.watchedCount ?? 0, 
   };
+  console.log('tryLocalGetTvdb', new Date().toTimeString(), {paramObj});
   newTvdbQueue.unshift({ws:null, id:null, paramObj});
   chkTvdbQueue();
   tryLocalGetTvdbBusy = false;
@@ -332,19 +333,19 @@ const getTheTvdbToken = async () => {
 }
 
 // calls tryLocalGetTvdb every 6 mins
-const waitForTvdbToken = () => {
+const updateTvdbs = () => {
   if(Date.now() > gotTokenTime + 14*24*60*60*1000) { // 2 weeks
     theTvdbToken = null;
     getTheTvdbToken();
   }
   if(!theTvdbToken) {
-    setTimeout(waitForTvdbToken, 1000);
+    setTimeout(updateTvdbs, 1000);
     return;
   }
   tryLocalGetTvdb();
-  setTimeout(waitForTvdbToken, 6*60*1000);  // 6 mins
+  setTimeout(updateTvdbs, 6*60*1000);  // 6 mins
 }
-waitForTvdbToken();
+updateTvdbs();
 
 export const getAllTvdb = (id, _param, resolve, _reject) => {
   console.log('getAllTvdb', id);

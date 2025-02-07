@@ -279,7 +279,7 @@ const tryLocalGetTvdb = () => {
   try {
     const tvdbs = Object.values(allTvdb);
     tvdbs.forEach((tvdb) => {
-      if(tvdb.deleted) return;
+      if(!tvdb.showId || tvdb.deleted) return;
       const saved = tvdb?.saved;
       if(saved === undefined) {
         minTvdb = tvdb;
@@ -363,20 +363,21 @@ export const setTvdbFields =
               async (id, param, resolve, _reject) => {
   console.log('setTvdbFields', id, param);
   const paramObj = util.jParse(param, 'setTvdbFields');
-  if(paramObj.finished) {
-    console.log('setTvdbFields finished', id, param);
-    await util.writeFile('./data/tvdb.json', allTvdb);
-    resolve([id, 'ok']);
-    return;
+  const name = paramObj.name;
+  let tvdb
+  if(name) {
+    const tvdb = allTvdb[name];
+    if(!tvdb) { 
+      console.error('setTvdbFields missing tvdb', id, name);
+      resolve([id, null]); 
+      return; 
+    }
+    Object.assign(tvdb, paramObj);
+    allTvdb[name] = tvdb;
   }
-  const tvdb = allTvdb[paramObj.name];
-  if(!tvdb) { 
-    console.error('setTvdbFields missing tvdb', id, paramObj.name);
-    resolve([id, 'ok']); 
-    return; 
-  }
-  Object.assign(tvdb, paramObj);
-  resolve([id, 'ok']);
+  if(paramObj.save) 
+      await util.writeFile('./data/tvdb.json', allTvdb);
+  resolve([id, tvdb]);
 };
 
 

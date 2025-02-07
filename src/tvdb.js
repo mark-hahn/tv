@@ -1,10 +1,9 @@
-import * as srvr from "./srvr.js";
+import fs        from "fs";
 import * as util from "./util.js";
 import * as urls from "./urls.js";
-import * as emby from "./emby.js";
-import     fetch from 'node-fetch';
+import fetch     from 'node-fetch';
 
-let allTvdb = jParse(
+let allTvdb = util.jParse(
       fs.readFileSync('data/tvdb.json', 'utf8'));
 
 ///////////////////// GET REMOTES ////////////////////
@@ -264,7 +263,7 @@ const chkTvdbQueue = () => {
     if(ws) ws.send(`${id}~~~ok~~~${tvdbDataStr}`);
 
     allTvdb[tvdbData.name] = tvdbData;
-    util.writeFile('../data/tvdb.json', allTvdb);
+    util.writeFile('./data/tvdb.json', allTvdb);
  
     chkTvdbQueueRunning == false;
     chkTvdbQueue();
@@ -277,10 +276,11 @@ const tryLocalGetTvdb = () => {
   if(tryLocalGetTvdbBusy) return;
   tryLocalGetTvdbBusy = true;
 
-  let minSaved = Math.max();
+  let minSaved = Math.min();
   let minTvdb  = null;
   try {
-    allTvdb.forEach((tvdb) => {
+    const tvdbs = Object.values(allTvdb);
+    tvdbs.forEach((tvdb) => {
       if(tvdb.deleted) return;
       const saved = tvdb?.saved;
       if(saved === undefined) {
@@ -346,7 +346,7 @@ const waitForTvdbToken = () => {
   tryLocalGetTvdb();
   setTimeout(waitForTvdbToken, 6*60*1000);  // 6 mins
 }
-waitForTvdbToken();
+// waitForTvdbToken();
 
 export const getAllTvdb = (id, _param, resolve, _reject) => {
   console.log('getAllTvdb', id);
@@ -364,22 +364,29 @@ export const setTvdbFields =
               async (id, param, resolve, _reject) => {
   console.log('setTvdbFields', id, param);
   const paramObj = jParse(param, 'setTvdbFields');
-  Object.assign(allTvdb[paramObj.name], paramObj);
-  await util.writeFile('../data/tvdb.json', allTvdb);
+  const tvdb = allTvdb[paramObj.name];
+  if(!tvdb) { 
+    console.error('setTvdbFields missing tvdb', id, paramObj.name);
+    resolve([id, 'ok']); 
+    return; 
+  }
+  Object.assign(tvdb, paramObj);
+  await util.writeFile('./data/tvdb.json', allTvdb);
   resolve([id, 'ok']);
 };
 
 
 ////////// temp one-time mass operation //////////
 // console.log('one-time adding remotes to allTvdb');
-// let allRemotes = jParse(
+// let allRemotes = util.jParse(
 //       fs.readFileSync('data/remotes.json', 'utf8'));
-// allTvdb.forEach((tvdb)=> {
+// const tvdbs = Object.values(allTvdb);
+// tvdbs.forEach((tvdb)=> {
 //   const remotes = allRemotes[tvdb.name];
 //   if(remotes) {
 //     allTvdb[tvdb.name].remotes = remotes;
 //     delete allTvdb[tvdb.name].tvdbRemotes;
 //   }
 // });
-// util.writeFile('../data/tvdb.json', allTvdb);
+// util.writeFile('./data/tvdb.json', allTvdb);
 // console.log('end of one-time adding remotes to allTvdb');

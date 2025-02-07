@@ -54,7 +54,7 @@ const chkWriteFile = async() => {
   if(anyWritten) await chkWriteFile();
 }
 
-export const writeFile = (path, data) => {
+export const writeFile = async (path, data) => {
   dataByPath[path] = data;
   if(!resolvesByPath[path]) 
       resolvesByPath[path] = [];

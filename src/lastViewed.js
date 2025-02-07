@@ -1,7 +1,7 @@
 import fs        from "fs";
 import * as fsp  from 'fs/promises';
 import * as emby from "./emby.js";
-import {jParse}  from "./src/util.js";
+import {jParse}  from "./util.js";
 
 const lastViewedStr =
   fs.readFileSync('data/lastViewed.json', 'utf8');

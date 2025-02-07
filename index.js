@@ -3,13 +3,14 @@ import * as cp             from 'child_process';
 import { WebSocketServer } from 'ws';
 import {rimraf}            from 'rimraf'
 import * as view           from './src/lastViewed.js';
-import util                from "util";
-import tvdb                from './src/tvdb.js';
+import * as utilNode       from "util";
+import * as util           from "./src/util.js";
+import * as tvdb           from './src/tvdb.js';
 
 process.setMaxListeners(50);
 const dontupload  = false;
 const tvDir = '/mnt/media/tv';
-const exec  = util.promisify(cp.exec);
+const exec  = utilNode.promisify(cp.exec);
 
 const headerStr  = fs.readFileSync('config/config1-header.txt',   'utf8');
 const rejectStr  = fs.readFileSync('config/config2-rejects.json', 'utf8');
@@ -422,14 +423,10 @@ const addGap = async (id, gapIdGapSave, resolve, _reject) => {
 const delGap = async (id, gapIdSave, resolve, _reject) => {
   console.log('delGap', id, {gapIdSave});
   const [gapId, save] = JSON.parse(gapIdSave);
-  try{
-    if(gapId !== null) delete gaps[gapId];
-  }
-  catch(e){
-    console.error('delGap', e.message);
-  }
-  if(save) 
+  if(gapId !== null) delete gaps[gapId];
+  if(save) {
     await util.writeFile('data/gaps.json', gaps); 
+  }
   resolve([id, 'ok']);
 }
 
@@ -498,7 +495,7 @@ const runOne = () => {
   if(running || queue.length == 0) return;
   running == true;
 
-  const {ws, id, param} = queue.pop();
+  const {ws, id, fname, param} = queue.pop();
   if(ws.readyState !== WebSocket.OPEN) return;
 
   let resolve = null;
@@ -528,9 +525,7 @@ const runOne = () => {
   });
 
   // call function fname
-  // console.log(`call function`, {id, fname, param});
   switch (fname) {
-
     case 'getAllShows':   getAllShows(       id,    '', resolve, reject); break;
     case 'deletePath':    deletePath(        id, param, resolve, reject); break;
     case 'getLastViewed': view.getLastViewed(id,    '', resolve, reject); break;
@@ -591,12 +586,12 @@ wss.on('connection', (ws) => {
       socketName = appSocketName;
       console.log(socketName + ' connected', false, true);
     }
-    const [id, fName, param] = parts.slice(1);
-    if(fName == 'getNewTvdb') {
+    const [id, fname, param] = parts.slice(1);
+    if(fname == 'getNewTvdb') {
       tvdb.getNewTvdb(ws, id, param) 
     }
     else {
-      queue.unshift({ws, id, param});
+      queue.unshift({ws, id, fname, param});
       runOne();
     }
   });

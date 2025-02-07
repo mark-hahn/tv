@@ -3,8 +3,8 @@ import * as util from "./util.js";
 import * as urls from "./urls.js";
 import fetch     from 'node-fetch';
 
-let allTvdb = util.jParse(
-      fs.readFileSync('data/tvdb.json', 'utf8'));
+export const allTvdb = 
+      util.jParse(fs.readFileSync('data/tvdb.json', 'utf8'));
 
 ///////////////////// GET REMOTES ////////////////////
 
@@ -363,7 +363,13 @@ export const getNewTvdb = async (ws, id, param) => {
 export const setTvdbFields = 
               async (id, param, resolve, _reject) => {
   console.log('setTvdbFields', id, param);
-  const paramObj = jParse(param, 'setTvdbFields');
+  const paramObj = util.jParse(param, 'setTvdbFields');
+  if(paramObj.finished) {
+    console.log('setTvdbFields finished', id, param);
+    await util.writeFile('./data/tvdb.json', allTvdb);
+    resolve([id, 'ok']);
+    return;
+  }
   const tvdb = allTvdb[paramObj.name];
   if(!tvdb) { 
     console.error('setTvdbFields missing tvdb', id, paramObj.name);
@@ -371,7 +377,6 @@ export const setTvdbFields =
     return; 
   }
   Object.assign(tvdb, paramObj);
-  await util.writeFile('./data/tvdb.json', allTvdb);
   resolve([id, 'ok']);
 };
 

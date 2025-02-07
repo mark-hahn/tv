@@ -430,17 +430,6 @@ const delGap = async (id, gapIdSave, resolve, _reject) => {
   resolve([id, 'ok']);
 }
 
-const addTvdb = async (id, tvdbDataStr, resolve, reject) => {
-  console.log('addTvdb', id);
-  let tvdbData;
-  try { tvdbData = JSON.parse(tvdbDataStr); }
-  catch (e) { reject([id, 'addTvdb: ' + e.message]); return; }
-  const name = tvdbData.name;
-  allTvdb[name] = tvdbData;
-  await util.writeFile('data/tvdb.json', allTvdb); 
-  resolve([id, 'ok']);
-}
-
 const getRemotes = (id, name, resolve, _reject) => {
   console.log(`getRemotes`, {id, name});
   const remotes = allRemotes[name];

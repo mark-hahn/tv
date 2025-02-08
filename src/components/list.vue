@@ -580,7 +580,6 @@ export default {
 
     addRow(show) {
       console.log("addRow", show.Name);
-      const id = show.Id;
       this.shows.unshift(show);
       if(allShows !== this.shows)
         allShows.unshift(show);

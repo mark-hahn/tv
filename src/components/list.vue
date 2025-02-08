@@ -1094,6 +1094,7 @@ export default {
         // await util.listCountries(allShows);
         // await util.setAllFavs(allShows);
         // await util.setAllTvdbShowIds(allShows);
+        await util.removeNoShowsFromTvdbJson()
         // await util.loadAllRemotes(allShows); // takes many hours
       }
       catch (err) {

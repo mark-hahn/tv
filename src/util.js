@@ -68,15 +68,15 @@ export async function setPickups(allShows) {
 
 ////////// temp one-time mass operation //////////
 export async function removeNoShowsFromTvdbJson() {
-  Object.entries(allTvdb).forEach((tvdbArr) => {
-    const [name, tvdb] = tvdbArr;
+  allTvdb = await tvdb.getAllTvdb();
+  Object.values(allTvdb).forEach(async (tvdb) => {
+    if(tvdb?.remotes?.length === undefined) return;
     for(const remote of tvdb.remotes) {
       if(!remote?.url) continue;
-      if(remote.url === "no match") {
-        tvdb.remotes =
-          tvdb.remotes.filter((r) => r.url !== "no match");
-        
-      }
+      const remotes = tvdb.remotes.filter(
+              (r) => r.url !== "no match");
+      await srvr.setTvdbFields(
+            {name:tvdb.name, remotes});
     }
   });
 }

@@ -363,7 +363,6 @@ export const getNewTvdb = async (ws, id, param) => {
 
 export const setTvdbFields = 
               async (id, param, resolve, _reject) => {
-  // console.log('setTvdbFields', id, param);
   const paramObj = util.jParse(param, 'setTvdbFields');
   const name = paramObj.name;
   let tvdb;

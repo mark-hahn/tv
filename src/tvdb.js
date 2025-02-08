@@ -155,7 +155,7 @@ const getRemotes = async (show, tvdbRemotes) => {
   for(const tvdbRemote of tvdbRemotes) {
     const remote = await getRemote(
             tvdbRemote.id, tvdbRemote.type, tvdbRemote.sourceName);
-    if(remote) {
+    if(remote && remote.url != "no match") {
       if(!remote.ratings) delete remote.ratings;
       remotesByName[remote.name] = remote;
     }
@@ -174,7 +174,9 @@ const getRemotes = async (show, tvdbRemotes) => {
   }
 
   const rottenRemote = await getRemote(name, 99, name);
-  if(rottenRemote) remotes.push(rottenRemote);
+  // if(rottenRemote?.url === 'no match') debugger
+  if(rottenRemote && rottenRemote.url !== 'no match') 
+      remotes.push(rottenRemote);
 
   const encoded = encodeURI(name).replaceAll('&', '%26');
   const url = `https://www.google.com/search` +
@@ -361,7 +363,7 @@ export const getNewTvdb = async (ws, id, param) => {
 
 export const setTvdbFields = 
               async (id, param, resolve, _reject) => {
-  console.log('setTvdbFields', id, param);
+  // console.log('setTvdbFields', id, param);
   const paramObj = util.jParse(param, 'setTvdbFields');
   const name = paramObj.name;
   let tvdb;

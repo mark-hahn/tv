@@ -192,7 +192,11 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   const {show, seasonCount, episodeCount, watchedCount} = paramObj;
   const name   = show.Name;
   const tvdbId = show.TvdbId;
-  
+  if(!tvdbId) {
+    console.error('getTvdbData no tvdbId:', show);
+    resolve(null);
+    return;
+  }
   let extRes, extUrl;
   try{
     extUrl = 

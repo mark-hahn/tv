@@ -47,8 +47,7 @@ const getUrlRatings = async (type, url, name) => {
       return {url: idFnameParam[1]};
 
     case 99:  // rotten tomatoes
-      // fs.writeFile('samples/rotten-search-noline.html', text);
-
+      // util.writeFile('samples/rotten-search.html', html);
       const namePfx = rottenStripSfx(name);
       let titleRegx = new RegExp(/search-result-title">TV shows</g);
       titleRegx.lastIndex = 0;
@@ -205,7 +204,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
                   }});
     if (!extRes.ok) {
       console.error(`getTvdbData error, extended status:`, 
-                        name, {extUrl, extRes});
+                        name, {extUrl}, JSON.stringify(extRes,null,2));
       return null;
     }
   } catch(err) {  

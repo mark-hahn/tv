@@ -1074,12 +1074,12 @@ export default {
         //                 show.Name == 'Splitting Up Together (US)')]; 
         emby.startGapWorker(showList, this.addGapToShow);
 
-        this.sortByNew     = true;
-        this.sortBySize    = false;
+        this.sortByNew  = true;
+        this.sortBySize = false;
         this.sortChoice = 
-          window.localStorage.getItem("sortChoice") || 'Viewed';
-        this.sortShows();
+          window.localStorage.getItem("sortChoice") ?? 'Viewed';
         this.showAll(true);
+        this.sortShows();
 
         const name = window.localStorage.getItem("lastVisShow");
         if (!name)   window.localStorage.setItem("lastVisShow",
@@ -1094,7 +1094,7 @@ export default {
         // await util.listCountries(allShows);
         // await util.setAllFavs(allShows);
         // await util.setAllTvdbShowIds(allShows);
-        await util.removeNoShowsFromTvdbJson()
+        // await util.removeNoShowsFromTvdbJson()
         // await util.loadAllRemotes(allShows); // takes many hours
       }
       catch (err) {

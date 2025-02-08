@@ -655,7 +655,7 @@ export default {
     },
 
     async searchAction(srchChoice) {
-      const {name, tvdbId, overview} = srchChoice;
+      const {name, tvdb_id, overview} = srchChoice;
       console.log('searchAction:', name);
       this.cancelSrchList();
       const matchShow = allShows.find((s) => s.Name == name);
@@ -666,7 +666,7 @@ export default {
       }
       let show = {
         Name: name,
-        TvdbId: tvdbId,
+        TvdbId: tvdb_id,
         Overview: overview,
         Reject: emby.isReject(name),
       };
@@ -677,8 +677,12 @@ export default {
         episodeCount: 0, 
         watchedCount: 0, 
       };
-      // const tvdbData = allTvdb[show.Name];
       const tvdbData = await srvr.getNewTvdb(paramObj);
+      if(tvdbData === '') {
+        console.error('searchAction, no tvdbId', {show});
+        await srvr.delNoEmby(show.Name);
+        return;
+      }
       delete tvdbData.deleted;
       allTvdb[show.Name] = tvdbData;
       await srvr.addBlockedWait(show.Name);
@@ -1083,7 +1087,7 @@ export default {
         this.scrollToSavedShow(true);
 
         // ... temp one-time mass operations ...
-        await util.adjustDeletedFlags(allShows);
+        // await util.adjustDeletedFlags(allShows);
         // await util.delPickups(allShows);
         // await util.setPickups(allShows);
         // await util.setTvdbDeleted(allShows);

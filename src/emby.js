@@ -122,6 +122,8 @@ export async function loadAllShows(gapCache) {
       await srvr.delNoEmby(noEmbyShow.Name);
       continue;
     }
+    
+
     shows.push(noEmbyShow);
   }
 
@@ -143,16 +145,19 @@ export async function loadAllShows(gapCache) {
       tvdbData = await srvr.getNewTvdb(getNewTvdbParam);
       allTvdb[name] = tvdbData;
     }
+    show.TvdbId = tvdbData.tvdbId;
     tvdbData.showId = show.Id;
     allTvdb[name] = tvdbData;
     show.OriginalCountry = tvdbData.originalCountry;
   }
 
 ////////  remove gaps with no matching show /////////
+  let deletedGap = false;
   for(const gapId in gaps) {
     await srvr.delGap([gapId, false]);
+    deletedGap = true;
   }
-  await srvr.delGap([null, true]);
+  if(deletedGap) await srvr.delGap([null, true]);
 
 //////////  process blockedWaitShows from srvr ////////////
   for(let blockedWaitName of blockedWaitShows) {

@@ -36,13 +36,10 @@ let resolvesByPath = {};
 
 const chkWriteFile = async() => {
   let anyWritten = false;
-  for (const [path, data] of 
-          Object.entries(dataByPath)) {
+  for (let path in dataByPath) {
     if(busyByPath[path]) continue;
     busyByPath[path] = true;
-    let data = dataByPath[path];
-    if(typeof data == 'object')
-          data = JSON.stringify(data);
+    const data = JSON.stringify(dataByPath[path]);
     await fsp.writeFile(path, data);
     resolvesByPath[path].forEach(
              (resolve) => resolve());

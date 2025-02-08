@@ -364,20 +364,20 @@ export const setTvdbFields =
   console.log('setTvdbFields', id, param);
   const paramObj = util.jParse(param, 'setTvdbFields');
   const name = paramObj.name;
-  let tvdb
+  let tvdb;
   if(name) {
-    const tvdb = allTvdb[name];
+    tvdb = allTvdb[name];
     if(!tvdb) { 
       console.error('setTvdbFields missing tvdb', id, name);
-      resolve([id, null]); 
+      resolve([id, 'no tvdb']); 
       return; 
     }
     Object.assign(tvdb, paramObj);
     allTvdb[name] = tvdb;
   }
-  if(paramObj.save) 
+  if(!paramObj.dontSave) 
       await util.writeFile('./data/tvdb.json', allTvdb);
-  resolve([id, tvdb]);
+  resolve([id, tvdb ?? 'ok']);
 };
 
 

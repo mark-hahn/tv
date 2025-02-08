@@ -8,7 +8,7 @@ import * as util           from "./src/util.js";
 import * as tvdb           from './src/tvdb.js';
 
 process.setMaxListeners(50);
-const dontupload  = false;
+const dontupload  = true;
 const tvDir = '/mnt/media/tv';
 const exec  = utilNode.promisify(cp.exec);
 
@@ -502,7 +502,7 @@ const runOne = () => {
     case 'getPickups':  getPickups(id, '',    resolve, reject); break;
     case 'addPickup':   addPickup( id, param, resolve, reject); break;
     case 'delPickup':   delPickup( id, param, resolve, reject); break;
-    
+
     case 'getNoEmbys':  getNoEmbys(id, '',    resolve, reject); break;
     case 'addNoEmby':   addNoEmby( id, param, resolve, reject); break;
     case 'delNoEmby':   delNoEmby( id, param, resolve, reject); break;

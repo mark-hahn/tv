@@ -437,7 +437,7 @@ export default {
         await emby.deleteShowFromEmby(show);
       }
       const tvdbData = allTvdb[show.Name];
-      const deleted = tvdbData.deleted = util.fmtDate(0);
+      const deleted = tvdbData.deleted = util.fmtDate();
       srvr.setTvdbFields({name:show.Name, deleted});
       await srvr.deleteShowFromSrvr(show);
       await this.removeRow(show);
@@ -1079,10 +1079,11 @@ export default {
 
         const name = window.localStorage.getItem("lastVisShow");
         if (!name)   window.localStorage.setItem("lastVisShow",
-                       allShows[0].Name);
+                                       allShows[0].Name);
         this.scrollToSavedShow(true);
 
         // ... temp one-time mass operations ...
+        await util.adjustDeletedFlags(allShows);
         // await util.delPickups(allShows);
         // await util.setPickups(allShows);
         // await util.setTvdbDeleted(allShows);
@@ -1090,7 +1091,7 @@ export default {
         // await util.listCountries(allShows);
         // await util.setAllFavs(allShows);
         // await util.setAllTvdbShowIds(allShows);
-        // await util.removeNoShowsFromTvdbJson()
+        // await util.removeNoMatchsFromTvdbJson()
         // await util.loadAllRemotes(allShows); // takes many hours
       }
       catch (err) {

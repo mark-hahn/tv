@@ -80,7 +80,7 @@ export async function getWaitStr(show) {
       if(!lastAired) return '';
       const lastAiredDay  = lastAired;
       const lastAiredNoYr = lastAired.slice(5).replace(/^0/, ' ');  
-      const today = util.fmtDate(0);
+      const today = util.fmtDate();
       if(lastAiredDay >= today) waitStr = `{${lastAiredNoYr}}`;
       // console.log('getWaitStr:', show.Name, 
       //     {waitStr, lastAiredDay, lastAiredNoYr, today}); 

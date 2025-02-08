@@ -127,17 +127,24 @@ export async function loadAllShows(gapCache) {
 
 //////////  create tvdbs ////////////
   for(const show of shows) {
-    let tvdbData = allTvdb[show.Name];
+    if(!show.TvdbId) {
+      console.log(`loadAllShows no tvdbId:`, show.Name, {show});
+      continue;
+    }
+    const name = show.Name;
+    let tvdbData = allTvdb[name];
     if(!tvdbData) {
-      console.log(`loadAllShows creating tvdb`, show.Name);
+      console.log(`loadAllShows creating tvdb`, name);
       const {seasonCount, episodeCount, watchedCount} 
               = await getEpisodeCounts(show);
       const getNewTvdbParam = {
         show, seasonCount, episodeCount, watchedCount, 
       };
       tvdbData = await srvr.getNewTvdb(getNewTvdbParam);
-      allTvdb[show.Name] = tvdbData;
+      allTvdb[name] = tvdbData;
     }
+    tvdbData.showId = show.Id;
+    allTvdb[name] = tvdbData;
     show.OriginalCountry = tvdbData.originalCountry;
   }
 
@@ -177,7 +184,6 @@ export async function loadAllShows(gapCache) {
   }
 
 //////////  process toTry collection  ////////////
-
   const toTryRes = await axios.get(
         urls.collectionListUrl(cred, toTryCollId));
   const toTryIds = [];
@@ -187,7 +193,6 @@ export async function loadAllShows(gapCache) {
        show.InToTry = toTryIds.includes(show.Id);
 
 //////////  process continue collection  ////////////
-
   const continueRes = await axios.get(
         urls.collectionListUrl(cred, continueCollId));
   const continueIds = [];
@@ -197,7 +202,6 @@ export async function loadAllShows(gapCache) {
        show.InContinue = continueIds.includes(show.Id);
 
 //////////  process mark collection  ////////////
-
   const markRes = await axios.get(
         urls.collectionListUrl(cred, markCollId));
   const markIds = [];
@@ -207,7 +211,6 @@ export async function loadAllShows(gapCache) {
        show.InMark = markIds.includes(show.Id);
 
 //////////  process linda collection  ////////////
-
   const lindaRes = await axios.get(
         urls.collectionListUrl(cred, lindaCollId));
   const lindaIds = [];
@@ -217,7 +220,6 @@ export async function loadAllShows(gapCache) {
        show.InLinda = lindaIds.includes(show.Id);
 
 //////////  process rejects for usb ////////////
-
   for(let rejectName of rejects) {
     const matchingShow = 
           shows.find((show) => show.Name == rejectName);
@@ -225,7 +227,6 @@ export async function loadAllShows(gapCache) {
   }
 
 //////////  process pickups for usb ////////////
-
   for(let pickupName of pickups) {
     const show = shows.find((show) => show.Name == pickupName);
     if(show) show.Pickup = true;
@@ -340,7 +341,7 @@ export const editEpisode = async (seriesId,
       const episodeId = episodeRec.Id;
       userData.Played = !watched;
       if(!userData.LastPlayedDate)
-          userData.LastPlayedDate = util.fmtDate(0);
+          userData.LastPlayedDate = util.fmtDate();
       const url = urls.postUserDataUrl(cred, episodeId);
       const setDataRes = await axios({
         method: 'post',
@@ -383,7 +384,7 @@ seasonLoop:
     const episodeNumber = +lastWatchedEpisodeRec.IndexNumber;
     const userData      =  lastWatchedEpisodeRec?.UserData;
 
-    userData.LastPlayedDate = util.fmtDate(0);
+    userData.LastPlayedDate = util.fmtDate();
     const url = urls.postUserDataUrl(cred, episodeId);
     const setDateRes = await axios({
       method: 'post',
@@ -577,7 +578,7 @@ export async function saveLinda(id, inLinda) {
 }
 
 export const createNoemby = async (show) => {
-  const dateStr = util.fmtDate(0);
+  const dateStr = util.fmtDate();
   Object.assign(show, {
     Id: "noemby-" + Math.random(),
     DateCreated: dateStr, 

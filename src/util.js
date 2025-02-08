@@ -67,7 +67,7 @@ export async function setPickups(allShows) {
 }
 
 ////////// temp one-time mass operation //////////
-export async function removeNoShowsFromTvdbJson() {
+export async function removeNoMatchsFromTvdbJson() {
   allTvdb = await tvdb.getAllTvdb();
   Object.values(allTvdb).forEach(async (tvdb) => {
     if(tvdb?.remotes?.length === undefined) return;
@@ -79,6 +79,27 @@ export async function removeNoShowsFromTvdbJson() {
             {name:tvdb.name, remotes});
     }
   });
+}
+
+////////// adjustDeletedFlags //////////
+export async function adjustDeletedFlags(allShows) {
+  allTvdb = await tvdb.getAllTvdb();
+  Object.values(allTvdb).forEach(async (tvdb) => {
+    const name = tvdb.name;
+    const haveShow = allShows.find(
+                        (show) => show.Name == name);
+    if(!haveShow && !tvdb.deleted) {
+      console.log('setting deleted flag:', name);
+      // await srvr.setTvdbFields(
+      //         {name, deleted:fmtDate(), dontSave:true});
+    }
+    else if(!!haveShow && !!tvdb.deleted) {
+      console.log('clearing deleted flag:', name);
+      // await srvr.setTvdbFields(
+      //         {name, $delete:['deleted'], dontSave:true});
+    }
+  });
+  // srvr.setTvdbFields({});
 }
 
 ////////// temp one-time mass operation //////////
@@ -154,14 +175,13 @@ export function
 }
 
 export function fmtDate(dateIn, includeYear = true, utcIn = false) {
-  if(dateIn === '' || dateIn === undefined) return "";
   let date;
-  if(dateIn === 0) date = new Date();
+  if(dateIn === undefined) date = new Date();
   else if(dateIn instanceof Number) 
-     date = new Date( dateIn + 
+    date = new Date( dateIn + 
                 (utcIn ? Date.getTimezoneOffset()*60*1000 : 0));
   else
-     date = new Date(dateIn); // strings always local
+     date = new Date(dateIn);
   const startIdx = includeYear ? 0 : 5;
   const str = dateWithTZ(date);
   const res = str.slice(startIdx, 10).replace(/^0/,' ');

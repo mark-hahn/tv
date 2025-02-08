@@ -372,7 +372,12 @@ export const setTvdbFields =
       resolve([id, 'no tvdb']); 
       return; 
     }
-    Object.assign(tvdb, paramObj);
+    for(const [key, value] of Object.entries(paramObj)) {
+      if(key === '$delete') {
+        for(const field of value) delete tvdb[field];
+      }
+      else tvdb[key] = value;
+    }
     allTvdb[name] = tvdb;
   }
   if(!paramObj.dontSave) 

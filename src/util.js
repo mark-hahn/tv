@@ -67,6 +67,21 @@ export async function setPickups(allShows) {
 }
 
 ////////// temp one-time mass operation //////////
+export async function removeNoShowsFromTvdbJson() {
+  Object.entries(allTvdb).forEach((tvdbArr) => {
+    const [name, tvdb] = tvdbArr;
+    for(const remote of tvdb.remotes) {
+      if(!remote?.url) continue;
+      if(remote.url === "no match") {
+        tvdb.remotes =
+          tvdb.remotes.filter((r) => r.url !== "no match");
+        
+      }
+    }
+  });
+}
+
+////////// temp one-time mass operation //////////
 export async function listCountries(allShows) {
   const countries = new Set();
   allShows.forEach(async (show) => {
@@ -97,7 +112,7 @@ export async function setAllTvdbShowIds(allShows) {
       showId: show.Id,
     });
   });
-  await srvr.setTvdbFields({save:true});
+  await srvr.setTvdbFields({dontSave:false});
 }
 
 ////////// temp one-time mass operation (VERY SLOW) //////////

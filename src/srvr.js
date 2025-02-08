@@ -99,7 +99,9 @@ handleMsg = async (msg) => {
     else                reject(res);
   }
   catch(err) {
-    console.error("parsing ws result:", {id, result, err});
+    const msg = `handleMsg, error parsing ws result:`;
+    console.error(msg, {id, result, err});
+    reject(msg);
   }
 }
 
@@ -107,7 +109,7 @@ export async function deleteShowFromSrvr(show) {
   await delBlockedWait(show.Name);
   await delBlockedGap(show.Name);
   await delGap([show.Id, true]);
-  await delPickup(show.Name);
+  if(show.Pickup)  await delPickup(show.Name);
   await delNoEmby(show.Name);
   await deletePath(show.Path);
   // don't ever delete from remotes

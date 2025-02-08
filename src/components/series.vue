@@ -181,10 +181,9 @@ export default {
          episodeCount != tvdbData.episodeCount ||
          watchedCount != tvdbData.watchedCount) {
         tvdbData = await srvr.setTvdbFields({
-            name, save:true,
-            seasonCount, episodeCount, watchedCount});
-        if(!tvdbData) {
-          console.error('setSeasonsTxt, setTvdbFields, no tvb for:', name);
+             name, seasonCount, episodeCount, watchedCount});
+        if(!(tvdbData instanceof Object)) {
+          console.error('setSeasonsTxt, setTvdbFields, no tvb for:', name, {tvdbData});
           return;
         }
         allTvdb[name] = tvdbData;

@@ -427,6 +427,7 @@ export default {
     };
 
     const deleteShow = async (show) => {
+      allTvdb = await tvdb.getAllTvdb();
       console.log('list, deleteShow:', show.Name);
       if(!show.Id.startsWith('noemby-')) {
         this.saveVisShow(show);
@@ -436,8 +437,8 @@ export default {
         await emby.deleteShowFromEmby(show);
       }
       const tvdbData = allTvdb[show.Name];
-      tvdbData.deleted = util.fmtDate(0);
-      await srvr.addTvdb(tvdbData);
+      const deleted = tvdbData.deleted = util.fmtDate(0);
+      srvr.setTvdbFields({name:show.Name, deleted});
       await srvr.deleteShowFromSrvr(show);
       await this.removeRow(show);
     }
@@ -646,13 +647,12 @@ export default {
         );
       }
       tvdbSrchData.forEach((tvdbData) => {
-        tvdbData.tvdbId = tvdbData.tvdb_id;
         if(tvdbData.country == 'gbr') 
            tvdbData.country  = 'uk';
         tvdbData.searchDtlTxt = 
          ` ${tvdbData.year}, 
            ${tvdbData.country ?.toUpperCase() || ''}`;
-        tvdbData.image  = tvdbData.thumbnail;
+        tvdbData.image = tvdbData.thumbnail;
       });
       // console.log('searchList:', tvdbData);
       this.searchList = tvdbSrchData;
@@ -1035,15 +1035,15 @@ export default {
     });
 
     setInterval(async () => {
-      // const curWatch = await emby.getCurrentlyWatching();
-      // if(curWatch == 'rokuOff' ||
-      //    curWatch == 'nothingPlaying') {
-      //   this.watchingName = '---';
-      //   return;
-      // }
-      // const  {showName} = curWatch;
-      // if(showName === null)  this.watchingName = '----';
-      // else                   this.watchingName = showName;
+      const curWatch = await emby.getCurrentlyWatching();
+      if(curWatch == 'rokuOff' ||
+         curWatch == 'nothingPlaying') {
+        this.watchingName = '---';
+        return;
+      }
+      const  {showName} = curWatch;
+      if(showName === null)  this.watchingName = '----';
+      else                   this.watchingName = showName;
     }, 5*1000);
 
     (async () => {
@@ -1093,7 +1093,7 @@ export default {
         // await util.removeDeadShows(allShows);
         // await util.listCountries(allShows);
         // await util.setAllFavs(allShows);
-        await util.setAllTvdbShowIds(allShows);
+        // await util.setAllTvdbShowIds(allShows);
         // await util.loadAllRemotes(allShows); // takes many hours
       }
       catch (err) {

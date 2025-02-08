@@ -4,10 +4,8 @@ reminder, restore ...
 
 bugs ...
   no rotten title match: (After The Party)
-  history not working on deleted shows (The Afterparty)
   viewed not sorted on load
   url:"no match" in remotes
-  viewed data wrong
 
 todo  ...
   if totry and at least one show to watch, ignore gap

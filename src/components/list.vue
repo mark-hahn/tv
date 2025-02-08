@@ -637,21 +637,18 @@ export default {
             b[0].replace(/^the\s/i, '') ? 1 : -1);
         tvdbSrchData = tvdbSrchData.map(
           (item) => {
-            const tvdbData     = item[1];
-            tvdbData.year      = tvdbData.firstAired.substring(0, 4);
-            tvdbData.country   = tvdbData.originalCountry;
-            tvdbData.thumbnail = tvdbData.image;
+            const tvdbData = item[1];
+            tvdbData.year  = tvdbData.firstAired.substring(0, 4);
             return tvdbData;
           }
         );
       }
       tvdbSrchData.forEach((tvdbData) => {
-        if(tvdbData.country == 'gbr') 
-           tvdbData.country  = 'uk';
+        if(tvdbData.originalCountry == 'gbr') 
+           tvdbData.originalCountry  = 'uk';
         tvdbData.searchDtlTxt = 
          ` ${tvdbData.year}, 
-           ${tvdbData.country ?.toUpperCase() || ''}`;
-        tvdbData.image = tvdbData.thumbnail;
+           ${tvdbData.originalCountry?.toUpperCase() || ''}`;
       });
       // console.log('searchList:', tvdbData);
       this.searchList = tvdbSrchData;

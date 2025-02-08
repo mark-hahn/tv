@@ -110,27 +110,8 @@ export async function loadAllShows(gapCache) {
     }
     show.TvdbId = tvdbId;
 
-    let tvdbData = allTvdb[show.Name];
-    if(!tvdbData) {
-      console.log(`loadAllShows, no allTvdb[${show.Name}]`);
-      const {seasonCount, episodeCount, watchedCount} 
-              = await getEpisodeCounts(show);
-      const getNewTvdbParam = {
-        show, seasonCount, episodeCount, watchedCount, 
-      };
-      tvdbData = await srvr.getNewTvdb(getNewTvdbParam);
-      allTvdb[show.Name] = tvdbData;
-    }
-    show.OriginalCountry  = tvdbData.originalCountry;
-    show.OriginalLanguage = tvdbData?.originalLanguage;
-    if(!tvdbData?.deleted) shows.push(show);
+    shows.push(show);
   }
-
-////////  remove gaps with no matching show /////////
-  for(const gapId in gaps) {
-    await srvr.delGap([gapId, false]);
-  }
-  await srvr.delGap([null, true]);
 
 //////////  add noemby shows from srvr ////////////
   for(const noEmbyShow of noEmbys) {
@@ -141,12 +122,30 @@ export async function loadAllShows(gapCache) {
       await srvr.delNoEmby(noEmbyShow.Name);
       continue;
     }
-    const tvdbData = allTvdb[noEmbyShow.Name];
-    noEmbyShow.OriginalCountry  = tvdbData.originalCountry;
-    noEmbyShow.OriginalLanguage = tvdbData.originalLanguage;
-
-    if(!tvdbData.deleted) shows.push(noEmbyShow);
+    shows.push(noEmbyShow);
   }
+
+//////////  create tvdbs ////////////
+  for(const show of shows) {
+    let tvdbData = allTvdb[show.Name];
+    if(!tvdbData) {
+      console.log(`loadAllShows creating tvdb`, show.Name);
+      const {seasonCount, episodeCount, watchedCount} 
+              = await getEpisodeCounts(show);
+      const getNewTvdbParam = {
+        show, seasonCount, episodeCount, watchedCount, 
+      };
+      tvdbData = await srvr.getNewTvdb(getNewTvdbParam);
+      allTvdb[show.Name] = tvdbData;
+    }
+    show.OriginalCountry = tvdbData.originalCountry;
+  }
+
+////////  remove gaps with no matching show /////////
+  for(const gapId in gaps) {
+    await srvr.delGap([gapId, false]);
+  }
+  await srvr.delGap([null, true]);
 
 //////////  process blockedWaitShows from srvr ////////////
   for(let blockedWaitName of blockedWaitShows) {

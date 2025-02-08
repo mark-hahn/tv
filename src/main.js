@@ -1,8 +1,9 @@
 /*
 reminder, restore ...
   start gap running
-
+  
 bugs ...
+  web load doesn't show, like hist (school spirits)
 
 todo  ...
   make popups modal with closing by clicking anywhere

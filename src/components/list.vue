@@ -428,7 +428,8 @@ export default {
 
     const deleteShow = async (show) => {
       allTvdb = await tvdb.getAllTvdb();
-      console.log('list, deleteShow:', show.Name);
+      const name = show.Name;
+      // console.log('list, deleteShow:', name);
       if(show.Reject) {
         alert("Show is banned, ignoring delete");
         return;
@@ -436,13 +437,13 @@ export default {
       if(!show.Id.startsWith('noemby-')) {
         this.saveVisShow(show);
         if (!window.confirm(
-            `Do you really want to delete series ${show.Name}?`)) 
+            `Do you really want to delete series ${name}?`)) 
           return;
         await emby.deleteShowFromEmby(show);
       }
-      const tvdbData = allTvdb[show.Name];
+      const tvdbData = allTvdb[name];
       const deleted = tvdbData.deleted = util.fmtDate();
-      srvr.setTvdbFields({name:show.Name, deleted});
+      allTvdb[name] = srvr.setTvdbFields({name, deleted});
       await srvr.deleteShowFromSrvr(show);
       await this.removeRow(show);
     }

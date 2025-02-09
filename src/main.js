@@ -3,11 +3,12 @@ reminder, restore ...
   start gap running
   
 bugs ...
-  have to hit delete twice
+  have to hit delete twice ?
   
 todo  ...
   map: click on season numbers for whole row
   show episode being watched (next up line)
+  enter in search field should do hist
 
 tabled ...
   make popups modal with closing by clicking anywhere

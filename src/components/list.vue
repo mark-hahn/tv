@@ -429,6 +429,10 @@ export default {
     const deleteShow = async (show) => {
       allTvdb = await tvdb.getAllTvdb();
       console.log('list, deleteShow:', show.Name);
+      if(show.Reject) {
+        alert("Show is banned, ignoring delete");
+        return;
+      }
       if(!show.Id.startsWith('noemby-')) {
         this.saveVisShow(show);
         if (!window.confirm(

@@ -1025,8 +1025,8 @@ export default {
       gap.BlockedGap      = blockedGap;
       gap.Waiting         = !blockedWait && waiting;
       gap.WaitStr         = await tvdb.getWaitStr(show);
-      gap.FileGap = 
-          fileGap || fileEndError || seasonWatchedThenNofile;
+      gap.FileGap = !(!notReady && show.InToTry) &&
+                     (fileGap || fileEndError || seasonWatchedThenNofile);
 
       Object.assign(show, gap);
       await srvr.addGap([show.Id, gap, save]);

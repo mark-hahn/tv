@@ -170,42 +170,35 @@ export default {
     },
 
     async setSeasonsTxt(tvdbData) {
-      this.seasonsTxt = ``;
-      if(this.show.Id.startsWith('noemby-')) return;
-      const show = this.show;
-      const name = show.Name
-      const epiCounts = await emby.getEpisodeCounts(show);
-      const {seasonCount, episodeCount, watchedCount} 
-                                        = epiCounts;
-      if(seasonCount  != tvdbData.seasonCount  ||
-         episodeCount != tvdbData.episodeCount ||
-         watchedCount != tvdbData.watchedCount) {
-        tvdbData = await srvr.setTvdbFields({
-             name, seasonCount, episodeCount, watchedCount});
-        if(!(tvdbData instanceof Object)) {
-          console.error('setSeasonsTxt, setTvdbFields, no tvb for:', name, {tvdbData});
-          return;
-        }
-        allTvdb[name] = tvdbData;
+      if(!(tvdbData instanceof Object)) {
+        console.error('setSeasonsTxt, tvdbData:', 
+                       name, {tvdbData});
+        return;
       }
-      let seasonsTxt = '';
+      this.seasonsTxt = ``;
+      const show = this.show;
+      const name = show.Name;
+      if(!this.show.Id.startsWith('noemby-')) {
+        const epiCounts = await emby.getEpisodeCounts(show);
+        Object.assign(tvdbData, epiCounts);
+        const fields = Object.assign({name}, epiCounts);
+        tvdbData = await srvr.setTvdbFields(fields);
+      }
+      allTvdb[name] = tvdbData;
+      let seasonsTxt;
+      const {episodeCount, seasonCount, watchedCount} = tvdbData;
       switch (seasonCount) {
         case 0:  
-          seasonsTxt = '';
-          console.error('setSeasonsTxt no seasonCount', name);
-          break;
-        case 1:  
-          seasonsTxt = `1 Season`;
-          break;
-        default: 
-          seasonsTxt = `${seasonCount} Seasons`;
+          console.error('setSeasonsTxt, no seasonCount:', name);
+          return;
+        case 1:  seasonsTxt = `1 Season`; break;
+        default: seasonsTxt = `${seasonCount} Seasons`;
       }
       const watchedTxt = (episodeCount > 0  &&
                           watchedCount == episodeCount) 
               ? ' &nbsp; &nbsp; Watched All' 
               :`  &nbsp  
                   Watched ${watchedCount} of ${episodeCount}`;
-      if(!seasonsTxt) return;
       this.seasonsTxt = ' &nbsp; ' + seasonsTxt + watchedTxt;
     },
 

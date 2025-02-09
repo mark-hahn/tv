@@ -130,25 +130,21 @@ export async function loadAllShows(gapCache) {
 //////////  create tvdbs ////////////
   for(const show of shows) {
     if(!show.TvdbId) {
-      console.log(`loadAllShows no tvdbId:`, show.Name, {show});
+      console.log(`loadAllShows, no tvdbId:`, show.Name, {show});
       continue;
     }
     const name = show.Name;
     let tvdbData = allTvdb[name];
     if(!tvdbData) {
       console.log(`loadAllShows creating tvdb`, name);
-      const {seasonCount, episodeCount, watchedCount} 
-              = await getEpisodeCounts(show);
-      const getNewTvdbParam = {
-        show, seasonCount, episodeCount, watchedCount, 
-      };
-      tvdbData = await srvr.getNewTvdb(getNewTvdbParam);
-      allTvdb[name] = tvdbData;
+      const epicounts = await getEpisodeCounts(show);
+      const param = Object.assign({name}, epicounts);
+      tvdbData = await srvr.getNewTvdb(param);
     }
-    show.TvdbId = tvdbData.tvdbId;
     tvdbData.showId = show.Id;
-    allTvdb[name] = tvdbData;
+    show.TvdbId = tvdbData.tvdbId;
     show.OriginalCountry = tvdbData.originalCountry;
+    allTvdb[name] = tvdbData;
   }
 
 ////////  remove gaps with no matching show /////////
@@ -427,7 +423,7 @@ export const getEpisodeCounts = async (show) => {
     }
   }
   catch(e) { 
-    console.error('getEpisodeCounts:', e);
+    console.error('getEpisodeCounts error:', e);
     return {seasonCount:0, episodeCount:0, watchedCount:0};
   }
   return {seasonCount, episodeCount, watchedCount};

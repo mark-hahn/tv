@@ -679,12 +679,13 @@ export default {
         episodeCount: 0, 
         watchedCount: 0, 
       };
-      const tvdbData = await srvr.getNewTvdb(paramObj);
-      if(tvdbData === '') {
-        console.error('searchAction, no tvdbId', {show});
-        await srvr.delNoEmby(show.Name);
-        return;
+      let tvdbData = allTvdb[show.Name];
+      if(tvdbData) {
+        const {seasonCount, episodeCount, watchedCount} = tvdbData;
+        Object.assign(paramObj, 
+              {seasonCount, episodeCount, watchedCount});
       }
+      tvdbData = await srvr.getNewTvdb(paramObj);
       delete tvdbData.deleted;
       allTvdb[show.Name] = tvdbData;
       await srvr.addBlockedWait(show.Name);

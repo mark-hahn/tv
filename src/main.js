@@ -6,11 +6,11 @@ bugs ...
 
 
 todo  ...
+  double-click on web/hist closes list
   make popups modal with closing by clicking anywhere
   if totry and at least one show to watch, ignore gap
   keep deleted date forever
   show episode being watched (next up line)
-  show counts when reloading a deleted show
   keep all map info for deleted shows
 
 tabled ...

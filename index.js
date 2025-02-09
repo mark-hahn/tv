@@ -48,11 +48,6 @@ function fmtDateWithTZ(date, utcOut = false) {
   return `${year}-${month}-${day}`;
 }
 
-const fmtDate = (dateStr) => {
-  const date = dateStr ? new Date(dateStr) : new Date();
-  return fmtDateWithTZ(date);
-}
-
 const getAllShows = async (id, _param, resolve, reject) => {
   let   errFlg = null;
   const shows = {};

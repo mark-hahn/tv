@@ -39,7 +39,9 @@ const chkWriteFile = async() => {
   for (let path in dataByPath) {
     if(busyByPath[path]) continue;
     busyByPath[path] = true;
-    const data = JSON.stringify(dataByPath[path]);
+    let data = dataByPath[path];
+    if((typeof data) != 'string') 
+      data = JSON.stringify(data);
     await fsp.writeFile(path, data);
     resolvesByPath[path].forEach(
              (resolve) => resolve());

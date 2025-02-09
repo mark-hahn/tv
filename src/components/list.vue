@@ -38,14 +38,15 @@
                         padding-top:3px; padding-left:5px;
                         background-color:#eee;
                         height:31px;`)
-          input(v-model="webHistStr" placeholder="Search..."
-                style=`width:120px;`)
-          button(@click="searchClick(false)" 
-                  style=`display:inline-block'; 
-                        font-size:15px; margin:2px 4px 0 10px;backgroundColor:white`) Web
-          button(@click="searchClick(true)"
+          input(v-model="webHistStr"
+                v-on:keyup.enter="searchClick('enter')" 
+                placeholder="Search..." style=`width:120px;`)
+          button(@click="searchClick('hist')"
                   style=`display:inline-block'; 
                         font-size:15px; margin:2px 4px 0 0;backgroundColor:white`) Hist
+          button(@click="searchClick('web')" 
+                  style=`display:inline-block'; 
+                        font-size:15px; margin:2px 4px 0 10px;backgroundColor:white`) Web
         button(@click="watchClick"
                 style=`height:29px; background-color:white;
                        fontSize:15px; margin:6px 5px 4px 10px;`) 
@@ -605,14 +606,14 @@ export default {
       return (this.highlightName == show.Name) ? "yellow" : "white";
     },
 
-    async searchClick(history) {
+    async searchClick(source) {
       allTvdb = await tvdb.getAllTvdb();
       const srchTxt = this.webHistStr;
       const justClose = this.showingSrchList || srchTxt.length == 0;
       this.cancelSrchList();
       if(justClose) return;
       let tvdbSrchData;
-      if(!history) {
+      if(source == 'web') {
         tvdbSrchData = await tvdb.srchTvdbData(srchTxt);
         if(!tvdbSrchData) {
           this.cancelSrchList();
@@ -624,7 +625,7 @@ export default {
         }
       }
 
-      if(history) {
+      if(source == 'hist' || source == 'enter') {
         const tvdbDataArr = Object.entries(allTvdb);
         const srchTvdb    = tvdbDataArr.filter((tvdbDataItem) =>
                                 tvdbDataItem[0].toLowerCase()

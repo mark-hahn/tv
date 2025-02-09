@@ -7,10 +7,9 @@ bugs ...
   
 todo  ...
   map: click on season numbers for whole row
-  show episode being watched (next up line)
-  enter in search field should do hist
 
 tabled ...
+  show episode being watched (next up line)
   make popups modal with closing by clicking anywhere
   keep deleted date forever
   keep all map info for deleted shows

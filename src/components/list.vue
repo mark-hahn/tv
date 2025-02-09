@@ -600,16 +600,13 @@ export default {
       return (this.highlightName == show.Name) ? "yellow" : "white";
     },
 
-    async searchClick(history = false) {
+    async searchClick(history) {
       allTvdb = await tvdb.getAllTvdb();
-
-      this.cancelSrchList();
       const srchTxt = this.webHistStr;
-      if(srchTxt.length == 0) return;
-
+      const justClose = this.showingSrchList || srchTxt.length == 0;
+      this.cancelSrchList();
+      if(justClose) return;
       let tvdbSrchData;
-      this.showingSrchList = true;
-
       if(!history) {
         tvdbSrchData = await tvdb.srchTvdbData(srchTxt);
         if(!tvdbSrchData) {
@@ -654,6 +651,7 @@ export default {
       });
       // console.log('searchList:', tvdbData);
       this.searchList = tvdbSrchData;
+      this.showingSrchList = true;
     },
 
     async searchAction(srchChoice) {

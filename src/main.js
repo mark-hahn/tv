@@ -6,14 +6,13 @@ bugs ...
 
 
 todo  ...
-  double-click on web/hist closes list
   make popups modal with closing by clicking anywhere
   if totry and at least one show to watch, ignore gap
   keep deleted date forever
   show episode being watched (next up line)
-  keep all map info for deleted shows
 
 tabled ...
+  keep all map info for deleted shows
   changing shows doesn't update map
   remote buttons hop when map opened
   not in emby doesn't show waiting

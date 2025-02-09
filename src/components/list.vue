@@ -646,6 +646,8 @@ export default {
       tvdbSrchData.forEach((tvdbData) => {
         if(tvdbData.originalCountry == 'gbr') 
            tvdbData.originalCountry  = 'uk';
+        if(tvdbData.tvdb_id) 
+           tvdbData.tvdbId = tvdbData.tvdb_id;
         tvdbData.searchDtlTxt = 
          ` ${tvdbData.year}, 
            ${tvdbData.originalCountry?.toUpperCase() || ''}`;
@@ -655,7 +657,7 @@ export default {
     },
 
     async searchAction(srchChoice) {
-      const {name, tvdb_id, overview} = srchChoice;
+      const {name, tvdbId, overview} = srchChoice;
       console.log('searchAction:', name);
       this.cancelSrchList();
       const matchShow = allShows.find((s) => s.Name == name);
@@ -666,7 +668,7 @@ export default {
       }
       let show = {
         Name: name,
-        TvdbId: tvdb_id,
+        TvdbId: tvdbId,
         Overview: overview,
         Reject: emby.isReject(name),
       };

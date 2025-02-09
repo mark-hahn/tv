@@ -6,10 +6,35 @@ import fetch     from 'node-fetch';
 export const allTvdb = 
       util.jParse(fs.readFileSync('data/tvdb.json', 'utf8'));
 
-///////////////////// GET REMOTES ////////////////////
+///////////// get theTvdbToken //////////////
+let theTvdbToken = null;
+let gotTokenTime = 0;
+const getTheTvdbToken = async () => {
+  const loginResp = await fetch(
+    'https://api4.thetvdb.com/v4/login', 
+    { method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: 
+        JSON.stringify({
+            "apikey": "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df",
+            "pin": "HXEVSDFF"
+        })
+    }
+  );
+  if (!loginResp.ok) {
+    console.error(`FATAL: TvDbToken Response: ${loginResp.status}`);
+    process.exit();
+  }
+  const loginJSON = await loginResp.json();
+  theTvdbToken = loginJSON.data.token;
+  gotTokenTime = Date.now();
+}
+
+
+///////////////////// GET REMOTES ///////////////////////
 
 const getUrlRatings = async (type, url, name) => {
-  console.log('getUrlRatings', {type, url, name});
+  // console.log('getUrlRatings', {type, url, name});
 
   let resp = await fetch(url);
   if (!resp.ok) {
@@ -21,15 +46,15 @@ const getUrlRatings = async (type, url, name) => {
                 .replaceAll(/(\r\n|\n|\r)/gm, "")
                 .replaceAll(/\s+/gm, " ");
 
-  const rottenStripSfx = (name) => {
-    name = name.trim();
-    const pfxNameParts = /^(.*?)(\s+\(.*?\))?$/i.exec(name);
-    if(!pfxNameParts) {
-      console.error('no rotten name pfx match:', {type, url, name});
-      return null;
-    }
-    return pfxNameParts[1];
-  }
+  // const rottenStripSfx = (name) => {
+  //   name = name.trim();
+  //   const pfxNameParts = /^(.*?)(\s+\(.*?\))?$/i.exec(name);
+  //   if(!pfxNameParts) {
+  //     console.error('no rotten name pfx match:', {type, url, name});
+  //     return null;
+  //   }
+  //   return pfxNameParts[1];
+  // }
 
   let idFnameParam;
 
@@ -46,37 +71,37 @@ const getUrlRatings = async (type, url, name) => {
       if(idFnameParam === null) return {url: null};
       return {url: idFnameParam[1]};
 
-    case 99:  // rotten tomatoes
-      // util.writeFile('samples/rotten-search.html', html);
-      const namePfx = rottenStripSfx(name);
-      let titleRegx = new RegExp(/search-result-title">TV shows</g);
-      titleRegx.lastIndex = 0;
-      const titleParts = titleRegx.exec(html);
-      if(titleParts === null) {
-        console.log('no rotten title match:', {type, url, name});
-        return {url:'no match'};
-      }
+    // case 99:  // rotten tomatoes
+    //   // util.writeFile('samples/rotten-search.html', html);
+    //   const namePfx = rottenStripSfx(name);
+    //   let titleRegx = new RegExp(/search-result-title">TV shows</g);
+    //   titleRegx.lastIndex = 0;
+    //   const titleParts = titleRegx.exec(html);
+    //   if(titleParts === null) {
+    //     console.error('no rotten title match:', {type, url, name});
+    //     return {url:'no match'};
+    //   }
 
   // need escaping: ] ( ) [ { } * + ? / $ . | ^ \
 
-      const urlNameRegx = new RegExp(
-         /<a href="([^"]*)" class="unset" data-qa="info-name" slot="title">([^<]*)<\/a>/g
-    );
+    //   const urlNameRegx = new RegExp(
+    //      /<a href="([^"]*)" class="unset" data-qa="info-name" slot="title">([^<]*)<\/a>/g
+    // );
 
-      urlNameRegx.lastIndex = titleRegx.lastIndex;
-      let textUrl;
-      for(let i=0; i<3; i++) {
-        const nameParts = urlNameRegx.exec(html);
-        if(nameParts === null || i == 3) {
-          console.log('no rotten url name match:', {type, url, name});
-          return {url:'no match'};
-        }
-        let textName;
-        [textUrl, textName] = nameParts.slice(1);
-        const textNamePfx = rottenStripSfx(textName);
-        if(textNamePfx == namePfx) break;
-      }
-      return {url:textUrl};
+    //   urlNameRegx.lastIndex = titleRegx.lastIndex;
+    //   let textUrl;
+    //   for(let i=0; i<3; i++) {
+    //     const nameParts = urlNameRegx.exec(html);
+    //     if(nameParts === null || i == 3) {
+    //       console.log('no rotten url name match:', {type, url, name});
+    //       return {url:'no match'};
+    //     }
+    //     let textName;
+    //     [textUrl, textName] = nameParts.slice(1);
+    //     const textNamePfx = rottenStripSfx(textName);
+    //     if(textNamePfx == namePfx) break;
+    //   }
+    //   return {url:textUrl};
 
     default: return 'getUrlRatings invalid type: ' + type;
   }
@@ -119,14 +144,14 @@ const getRemote = async (id, type, showName) => {
       
     // case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
 
-    case 99:  
-      url = `https://www.rottentomatoes.com/search` +
-                    `?search=${encodeURI(id)}`;
-      urlRatings = await getUrlRatings(99, url, showName);
-      name = urlRatings?.name;
-      url  = urlRatings?.url;
-      // console.log(`getRemote rotten name url: ${name}, ${url}`);
-      break;
+    // case 99:  
+    //   url = `https://www.rottentomatoes.com/search` +
+    //                 `?search=${encodeURI(id)}`;
+    //   urlRatings = await getUrlRatings(99, url, showName);
+    //   name = urlRatings?.name;
+    //   url  = urlRatings?.url;
+    //   // console.log(`getRemote rotten name url: ${name}, ${url}`);
+    //   break;
 
     default: return null;
   }
@@ -172,10 +197,10 @@ const getRemotes = async (show, tvdbRemotes) => {
       remotes.push(remote);
   }
 
-  const rottenRemote = await getRemote(name, 99, name);
-  // if(rottenRemote?.url === 'no match') debugger
-  if(rottenRemote && rottenRemote.url !== 'no match') 
-      remotes.push(rottenRemote);
+  // const rottenRemote = await getRemote(name, 99, name);
+  // // if(rottenRemote?.url === 'no match') debugger
+  // if(rottenRemote && rottenRemote.url !== 'no match') 
+  //     remotes.push(rottenRemote);
 
   const encoded = encodeURI(name).replaceAll('&', '%26');
   const url = `https://www.google.com/search` +
@@ -187,7 +212,6 @@ const getRemotes = async (show, tvdbRemotes) => {
 
 
 //////////// GET TVDB DATA //////////////
-
 const getTvdbData = async (paramObj, resolve, _reject) => {
   const {show, seasonCount, episodeCount, watchedCount} = paramObj;
   const name   = show.Name;
@@ -242,9 +266,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 }
 
 
-//////////////////  NEW TVDB  //////////////////
-
-const newTvdbQueue        = [];
+//////////////////  GET/UPDATE TVDB FOR WEB ////////////////////
+const newTvdbQueue = [];
 let   chkTvdbQueueRunning = false;
 
 const chkTvdbQueue = () => {
@@ -274,6 +297,8 @@ const chkTvdbQueue = () => {
   getTvdbData(paramObj, resolve, reject);
 }
 
+
+//////////// UPDATE TVDB LOOP ////////////////
 let tryLocalGetTvdbBusy = false;
 const tryLocalGetTvdb = () => {
   if(tryLocalGetTvdbBusy) return;
@@ -297,6 +322,8 @@ const tryLocalGetTvdb = () => {
     });
   }
   catch(e){};
+  console.log(new Date().toTimeString().slice(0,8),
+            `updating tvdb locally:`, minTvdb.name);  
   const paramObj = {
     show: {
       Name:   minTvdb.name,
@@ -307,34 +334,9 @@ const tryLocalGetTvdb = () => {
     episodeCount: minTvdb.episodeCount ?? 0, 
     watchedCount: minTvdb.watchedCount ?? 0, 
   };
-  console.log('tryLocalGetTvdb', new Date().toTimeString(), {paramObj});
   newTvdbQueue.unshift({ws:null, id:null, paramObj});
   chkTvdbQueue();
   tryLocalGetTvdbBusy = false;
-}
-
-///////////// get theTvdbToken //////////////
-let theTvdbToken = null;
-let gotTokenTime = 0;
-const getTheTvdbToken = async () => {
-  const loginResp = await fetch(
-    'https://api4.thetvdb.com/v4/login', 
-    { method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: 
-        JSON.stringify({
-            "apikey": "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df",
-            "pin": "HXEVSDFF"
-        })
-    }
-  );
-  if (!loginResp.ok) {
-    console.error(`FATAL: TvDbToken Response: ${loginResp.status}`);
-    process.exit();
-  }
-  const loginJSON = await loginResp.json();
-  theTvdbToken = loginJSON.data.token;
-  gotTokenTime = Date.now();
 }
 
 // calls tryLocalGetTvdb every 6 mins
@@ -352,6 +354,8 @@ const updateTvdbs = () => {
 }
 updateTvdbs();
 
+
+///////////////////  FUNCTION CALLS FROM CLIENT  ////////////////////
 export const getAllTvdb = (id, _param, resolve, _reject) => {
   console.log('getAllTvdb', id);
   resolve([id, allTvdb]);

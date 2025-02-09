@@ -4,14 +4,13 @@ reminder, restore ...
   
 bugs ...
 
-
 todo  ...
   make popups modal with closing by clicking anywhere
   if totry and at least one show to watch, ignore gap
-  keep deleted date forever
   show episode being watched (next up line)
 
 tabled ...
+  keep deleted date forever
   keep all map info for deleted shows
   changing shows doesn't update map
   remote buttons hop when map opened

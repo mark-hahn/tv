@@ -136,6 +136,21 @@ export async function setAllTvdbShowIds(allShows) {
   await srvr.setTvdbFields({dontSave:false});
 }
 
+////////// temp one-time mass operation //////////
+export async function setAllNoEmbyTvdbIds(allShows) {
+  allTvdb = await tvdb.getAllTvdb();
+  allShows.forEach(async (show) => {
+    if(show.Id.startsWith("noemby-")) {
+      const tvdb = allTvdb[show.Name];
+      if(!tvdb) return;
+      delete show.tvdbId;
+      show.TvdbId = tvdb.tvdbId;
+      console.log('setting tvdbId:', show.Name, show.tvdbId);
+      await srvr.addNoEmby(show);
+    }
+  });
+}
+
 ////////// temp one-time mass operation (VERY SLOW) //////////
 export async function loadAllRemotes(allShows) {
   let showIdx = 0;

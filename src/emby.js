@@ -45,7 +45,7 @@ let rejects = null;
 export const isReject = (name) => rejects.includes(name);
 
 // load all shows from emby and server //////////
-export async function loadAllShows(gapCache) {
+export async function loadAllShows() {
   console.log('entering loadAllShows');
 
   allTvdb = await tvdb.getAllTvdb();
@@ -122,8 +122,6 @@ export async function loadAllShows(gapCache) {
       await srvr.delNoEmby(noEmbyShow.Name);
       continue;
     }
-    
-
     shows.push(noEmbyShow);
   }
 
@@ -231,6 +229,12 @@ export async function loadAllShows(gapCache) {
   for(let pickupName of pickups) {
     const show = shows.find((show) => show.Name == pickupName);
     if(show) show.Pickup = true;
+  }
+
+//////////  save all noembys ////////////
+  for(const show of shows) {
+    if(show.Id.startsWith('noemby-'))
+       await srvr.addNoEmby(show);
   }
 
   const elapsed = new Date().getTime() - time1;

@@ -617,7 +617,9 @@ export default {
       const justClose = this.showingSrchList || srchTxt.length == 0;
       this.cancelSrchList();
       if(justClose) return;
+      
       let tvdbSrchData;
+
       if(source == 'web') {
         tvdbSrchData = await tvdb.srchTvdbData(srchTxt);
         if(!tvdbSrchData) {
@@ -652,6 +654,9 @@ export default {
         );
       }
       tvdbSrchData.forEach((tvdbData) => {
+        tvdbData.image = tvdbData.image ?? 
+                           tvdbData.image_url;
+        delete tvdbData.image_url;
         if(tvdbData.originalCountry == 'gbr') 
            tvdbData.originalCountry  = 'uk';
         if(tvdbData.tvdb_id) 

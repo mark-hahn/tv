@@ -4,9 +4,12 @@ reminder, restore ...
   
 bugs ...
   have to hit delete twice ?
-  
+  changing filter screws up sort
+  non-viewed shows display today's date
+
 todo  ...
   map: click on season numbers for whole row
+  sort by waiting date
 
 tabled ...
   show episode being watched (next up line)

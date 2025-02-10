@@ -290,12 +290,13 @@ import { faLaughBeam, faSadCry, faHeart, faClock }
                            from "@fortawesome/free-regular-svg-icons"; 
 import { faCheck, faPlus, faMinus, faArrowDown, faArrowRight,
          faTv, faSearch, faQuestion, faCopy, faBorderAll, faBan,
-         faMars, faVenus, faGlobe }
+         faMars, faVenus, faGlobe, faTrafficLight }
                            from "@fortawesome/free-solid-svg-icons";
 library.add([  
-  faLaughBeam, faSadCry, faClock, faHeart, faCheck, faPlus, faGlobe,
-  faMinus, faArrowDown, faTv, faSearch, faQuestion, faCopy, 
-  faBan, faBorderAll, faArrowRight, faMars, faVenus, faClock]);
+  faLaughBeam, faSadCry, faClock, faHeart, faCheck, faPlus, 
+  faGlobe, faMinus, faArrowDown, faTv, faSearch, faQuestion, 
+  faCopy, faBan, faBorderAll, faArrowRight, faMars, faVenus, 
+  faClock,faTrafficLight]);
 
 let allTvdb          = null;
 let allShows         = [];
@@ -498,6 +499,11 @@ export default {
           cond(show)  { return show.Waiting; },
           click(show) { toggleWaiting(show); },
           name: "waiting",
+        }, {
+          color: "#0c0", filter: 0, 
+          icon: ["fas", "traffic-light"],
+          cond(show)  { return show.Ended; },
+          click() {}, name: "ended",
         }, {
           color: "#88f", filter: 0, icon: ["far", "sad-cry"],
           cond(show)  { return show.Genres?.includes("Drama"); },
@@ -954,7 +960,9 @@ export default {
                     ? null : this.filterStr.toLowerCase();
       }
       const filteredShows = [];
-      for(const show of this.shows) {
+      fltrLoop:
+      for(const show of allShows) {
+        if(show.Name == 'St. Denis Medical') debugger;
         if(this.fltrChoice === 'Finished') {
           const tvdbData = allTvdb[show.Name];
           if(!tvdbData) continue;
@@ -964,13 +972,14 @@ export default {
           if(finished) filteredShows.push(show);
           continue;
         }
+        if(show.Name == 'St. Denis Medical') debugger;
         if (srchStrLc && 
-           !show.Name.toLowerCase().includes(srchStrLc)) 
-              continue;
+           !show.Name.toLowerCase().includes(srchStrLc)) continue;
+        if(show.Name == 'Juice (2023)') debugger;
         for (let cond of this.conds) {
           if ( cond.filter ===  0) continue;
           if ((cond.filter === +1) != (!!cond.cond(show))) 
-            continue;
+            continue fltrLoop;
         }
         filteredShows.push(show);
       }

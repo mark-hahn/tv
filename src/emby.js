@@ -139,10 +139,11 @@ export async function loadAllShows() {
       const param = Object.assign({name}, epicounts);
       tvdbData = await srvr.getNewTvdb(param);
     }
-    tvdbData.showId = show.Id;
-    show.TvdbId = tvdbData.tvdbId;
+    tvdbData.showId      = show.Id;
+    show.TvdbId          = tvdbData.tvdbId;
     show.OriginalCountry = tvdbData.originalCountry;
-    allTvdb[name] = tvdbData;
+    show.Ended           = (tvdbData.status == 'Ended');
+    allTvdb[name]        = tvdbData;
   }
 
 ////////  remove gaps with no matching show /////////

@@ -84,7 +84,7 @@
                 | {{fltrChoice}}
           button(@click="allClick" 
                   style=`display:inline-block'; width:40px;
-                        font-size:15px; margin:4px 30px 4px 20px;backgroundColor:white`) All
+                        font-size:15px; margin:4px 10px 4px 10px;backgroundColor:white`) All
           #botrgt(style=`display:flex;
                          justify-content:space-between;
                          margin: 5px 17px 0 0;`)
@@ -495,12 +495,12 @@ export default {
           click(show) { toggleBlkGap(show); },
           name: "gap",
         }, {
-          color: "#0c0", filter: 0, icon: ["far", "clock"],
+          color: "#080", filter: 0, icon: ["far", "clock"],
           cond(show)  { return show.Waiting; },
           click(show) { toggleWaiting(show); },
           name: "waiting",
         }, {
-          color: "#0c0", filter: 0, 
+          color: "#faa", filter: 0, 
           icon: ["fas", "traffic-light"],
           cond(show)  { return show.Ended; },
           click() {}, name: "ended",

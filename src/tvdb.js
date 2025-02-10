@@ -3,7 +3,9 @@ import * as util from "./util.js";
 import * as urls from "./urls.js";
 import fetch     from 'node-fetch';
 
-export const allTvdb = 
+const UPDATE_DATA = true;
+
+const allTvdb = 
       util.jParse(fs.readFileSync('data/tvdb.json', 'utf8'));
 
 ///////////// get theTvdbToken //////////////
@@ -213,8 +215,10 @@ const getRemotes = async (show, tvdbRemotes) => {
 
 //////////// GET TVDB DATA //////////////
 const getTvdbData = async (paramObj, resolve, _reject) => {
-  const {show, seasonCount, episodeCount, watchedCount} = paramObj;
+  const {show, deleted,
+         seasonCount, episodeCount, watchedCount} = paramObj;
   const name   = show.Name;
+  const showId = show.Id;
   const tvdbId = show.TvdbId;
   if(!tvdbId) {
     console.error('getTvdbData no tvdbId:', show);
@@ -246,7 +250,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
          originalCountry, originalLanguage, 
          originalNetwork:originalNetworkIn,
          status:statusIn}      = extResObj.data;
-
   let lastAired = lastAiredIn ?? firstAired;
   lastAired = lastAired ?? '';
   let originalNetwork = originalNetworkIn?.name ?? '';
@@ -256,17 +259,19 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   let tvdbData = {tvdbId, name, originalNetwork,
                   seasonCount, episodeCount, watchedCount,
-                  image, score, overview, 
+                  image, score, overview, showId,
                   firstAired, lastAired, averageRuntime,
                   originalCountry, originalLanguage,
                   status, remotes, saved};
-  // console.log('getTvdbData:', tvdbData);
+  if(deleted !== undefined)
+    tvdbData.deleted = deleted;
 
+  // console.log('getTvdbData:', tvdbData);
   resolve(tvdbData);
 }
 
 
-//////////////////  GET/UPDATE TVDB FOR WEB ////////////////////
+/////////  GET/UPDATE TVDB FOR WEB AND LOCAL //////
 const newTvdbQueue = [];
 let   chkTvdbQueueRunning = false;
 
@@ -285,7 +290,6 @@ const chkTvdbQueue = () => {
   });
   promise.then((tvdbData) => {
     const tvdbDataStr = JSON.stringify(tvdbData);
-
     if(ws) ws.send(`${id}~~~ok~~~${tvdbDataStr}`);
 
     allTvdb[tvdbData.name] = tvdbData;
@@ -309,8 +313,8 @@ const tryLocalGetTvdb = () => {
   try {
     const tvdbs = Object.values(allTvdb);
     tvdbs.forEach((tvdb) => {
-      if(!tvdb.showId || tvdb.deleted) return;
-      const saved = tvdb?.saved;
+      if(!tvdb.showId) return;
+      const saved = tvdb.saved;
       if(saved === undefined) {
         minTvdb = tvdb;
         throw true;
@@ -339,6 +343,7 @@ const tryLocalGetTvdb = () => {
     seasonCount:  minTvdb.seasonCount  ?? 0, 
     episodeCount: minTvdb.episodeCount ?? 0, 
     watchedCount: minTvdb.watchedCount ?? 0, 
+    deleted:      minTvdb.deleted,
   };
   newTvdbQueue.unshift({ws:null, id:null, paramObj});
   chkTvdbQueue();
@@ -355,12 +360,12 @@ const updateTvdbs = () => {
     setTimeout(updateTvdbs, 1000);
     return;
   }
-  // disable this to not update tvdb
-  // tryLocalGetTvdb();
-
+  if (UPDATE_DATA) tryLocalGetTvdb();
   setTimeout(updateTvdbs, 6*60*1000);  // 6 mins
+  console.log(new Date().toTimeString().slice(0,8), 
+              'tvdb local update finished', );
 }
-updateTvdbs();  // don't disable this
+updateTvdbs();
 
 
 ///////////////////  FUNCTION CALLS FROM CLIENT  ////////////////////
@@ -400,19 +405,3 @@ export const setTvdbFields =
       await util.writeFile('./data/tvdb.json', allTvdb);
   resolve([id, tvdb ?? 'ok']);
 };
-
-
-////////// temp one-time mass operation //////////
-// console.log('one-time adding remotes to allTvdb');
-// let allRemotes = util.jParse(
-//       fs.readFileSync('data/remotes.json', 'utf8'));
-// const tvdbs = Object.values(allTvdb);
-// tvdbs.forEach((tvdb)=> {
-//   const remotes = allRemotes[tvdb.name];
-//   if(remotes) {
-//     allTvdb[tvdb.name].remotes = remotes;
-//     delete allTvdb[tvdb.name].tvdbRemotes;
-//   }
-// });
-// util.writeFile('./data/tvdb.json', allTvdb);
-// console.log('end of one-time adding remotes to allTvdb');

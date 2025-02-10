@@ -967,8 +967,9 @@ export default {
           const tvdbData = allTvdb[show.Name];
           if(!tvdbData) continue;
           const {status, episodeCount, watchedCount} = tvdbData;
-          const finished = 
-            (status == "Ended" && watchedCount == episodeCount);
+          const finished = (status == "Ended"            && 
+                            watchedCount == episodeCount &&
+                            !show.Reject);
           if(finished) filteredShows.push(show);
           continue;
         }
@@ -1122,6 +1123,7 @@ export default {
         this.scrollToSavedShow(true);
 
         // ... temp one-time mass operations ...
+        // await util.fixShowidInTvdbs(allShows);
         // await util.clrEndedContinues(allShows);
         // await util.adjustDeletedFlags(allShows);
         // await util.delPickups(allShows);

@@ -136,7 +136,7 @@ export async function loadAllShows() {
     if(!tvdbData) {
       console.log(`loadAllShows creating tvdb`, name);
       const epicounts = await getEpisodeCounts(show);
-      const param = Object.assign({name}, epicounts);
+      const param = Object.assign({show}, epicounts);
       tvdbData = await srvr.getNewTvdb(param);
     }
     tvdbData.showId      = show.Id;

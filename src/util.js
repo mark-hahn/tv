@@ -138,6 +138,26 @@ export async function clrEndedContinues(allShows) {
 }
 
 ////////// temp one-time mass operation //////////
+export async function fixShowidInTvdbs(allShows) {
+  console.log('fixShowidInTvdbs');
+  allTvdb = await tvdb.getAllTvdb();
+  let count = 0;
+  Object.values(allTvdb).forEach(async (tvdb) => {
+    const name = tvdb.name;
+    const show = allShows.find((show) => show.Name == name);
+    if(tvdb.deleted) return;
+    if(!show) {
+      console.log('no show for tvdb:', name, tvdb.deleted);
+      return;
+    }
+    tvdb.showId = show.Id;
+    await srvr.setTvdbFields({name, showId:show.Id});
+    count++;
+  });
+  console.log(`fixed showId in ${count} tvdbs`);
+}
+
+////////// temp one-time mass operation //////////
 export async function setAllTvdbShowIds(allShows) {
   allShows.forEach(async (show) => {
     await srvr.setTvdbFields({

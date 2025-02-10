@@ -322,6 +322,12 @@ const tryLocalGetTvdb = () => {
     });
   }
   catch(e){};
+  if(minTvdb === null) {
+    console.error(new Date().toTimeString().slice(0,8),
+                   `tryLocalGetTvdbBusy, minTvdb is null`);  
+    tryLocalGetTvdbBusy = false;
+    return;
+  }
   console.log(new Date().toTimeString().slice(0,8),
             `updating tvdb locally:`, minTvdb.name);  
   const paramObj = {

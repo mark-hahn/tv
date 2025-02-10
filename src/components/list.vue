@@ -304,6 +304,7 @@ let showHistory      = [];
 let showHistoryPtr   = -1;
 let blockedWaitShows = null;
 let blockedGapShows  = null;
+let srchListWeb      = null;
 
 export default {
   name: "List",
@@ -613,14 +614,15 @@ export default {
 
     async searchClick(source) {
       allTvdb = await tvdb.getAllTvdb();
-      const srchTxt = this.webHistStr;
-      const justClose = this.showingSrchList || srchTxt.length == 0;
+      const srchTxt   = this.webHistStr;
+      const srcIsWeb  = (source == 'web');
+      const justClose = (srchTxt.length == 0) || 
+           (this.showingSrchList && (srchListWeb == srcIsWeb));
       this.cancelSrchList();
       if(justClose) return;
-      
+      srchListWeb = srcIsWeb;
       let tvdbSrchData;
-
-      if(source == 'web') {
+      if(srcIsWeb) {
         tvdbSrchData = await tvdb.srchTvdbData(srchTxt);
         if(!tvdbSrchData) {
           this.cancelSrchList();
@@ -631,8 +633,7 @@ export default {
           return;
         }
       }
-
-      if(source == 'hist' || source == 'enter') {
+      else {
         const tvdbDataArr = Object.entries(allTvdb);
         const srchTvdb    = tvdbDataArr.filter((tvdbDataItem) =>
                                 tvdbDataItem[0].toLowerCase()
@@ -712,6 +713,7 @@ export default {
       console.log('closing searchlist');
       this.showingSrchList = false;
       this.searchList      = null;
+      srchListWeb          = null;
     },
 
     topClick() {

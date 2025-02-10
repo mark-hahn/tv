@@ -232,7 +232,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
                   }});
     if (!extRes.ok) {
       console.error(`getTvdbData error, extended status:`, 
-                        name, {extUrl}, JSON.stringify(extRes,null,2));
+                        name, {extUrl}, JSON.stringify(extRes, null, 2));
       return null;
     }
   } catch(err) {  
@@ -355,10 +355,12 @@ const updateTvdbs = () => {
     setTimeout(updateTvdbs, 1000);
     return;
   }
-  tryLocalGetTvdb();
+  // disable this to not update tvdb
+  // tryLocalGetTvdb();
+
   setTimeout(updateTvdbs, 6*60*1000);  // 6 mins
 }
-updateTvdbs();
+updateTvdbs();  // don't disable this
 
 
 ///////////////////  FUNCTION CALLS FROM CLIENT  ////////////////////

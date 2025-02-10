@@ -477,8 +477,8 @@ export default {
       showingSrchList:   false,
       searchList:         null,        
       sortChoices:          
-        ['Alpha', 'Viewed', 'Added', 'Size'],
-      fltrChoices:          
+        ['Alpha', 'Viewed', 'Added', 'Ratings', 'Size'],
+      fltrChoices:
         ['All', 'Ready', 'Drama', 'To-Try', 
          'Try Drama', 'Continue', 'Download', 
          'Finished', 'Mark', 'Linda'],
@@ -557,7 +557,7 @@ export default {
   methods: {
 
     getValBySortChoice(show, forSort = false) {
-      let lastViewed;
+      let lastViewed, ratings;
       switch(this.sortChoice) {
         case 'Alpha':   
           if(!forSort) return '';
@@ -566,6 +566,9 @@ export default {
         case 'Size':    
           if(forSort) return show.Size;
           return util.fmtSize(show);
+        case 'Ratings':  
+          ratings = show?.Ratings;
+          return ((ratings !== undefined) ? +ratings : 0);
         case 'Viewed': 
           lastViewed = srvr.lastViewedCache[show.Name];
           if(forSort) return lastViewed || 0;

@@ -139,10 +139,17 @@ export async function loadAllShows() {
       const param = Object.assign({show}, epicounts);
       tvdbData = await srvr.getNewTvdb(param);
     }
+    let ratings = 0;
+    for(const remote of tvdbData.remotes) {
+      if(!remote?.ratings) continue;
+      ratings = remote.ratings ?? 0;
+    }
+    tvdbData?.remotes?.ratings;
     tvdbData.showId      = show.Id;
     show.TvdbId          = tvdbData.tvdbId;
     show.OriginalCountry = tvdbData.originalCountry;
     show.Ended           = (tvdbData.status == 'Ended');
+    show.Ratings         = ratings;
     allTvdb[name]        = tvdbData;
   }
 

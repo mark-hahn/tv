@@ -495,11 +495,6 @@ export default {
           click(show) { toggleBlkGap(show); },
           name: "gap",
         }, {
-          color: "#080", filter: 0, icon: ["far", "clock"],
-          cond(show)  { return show.Waiting; },
-          click(show) { toggleWaiting(show); },
-          name: "waiting",
-        }, {
           color: "#faa", filter: 0, 
           icon: ["fas", "traffic-light"],
           cond(show)  { return show.Ended; },
@@ -1019,7 +1014,7 @@ export default {
     },
 
     async addGapToShow(event) {
-      const {showId, progress, notReady, waiting, anyWatched,
+      const {showId, progress, notReady, anyWatched,
              watchGap, watchGapSeason, watchGapEpisode, 
              fileEndError, seasonWatchedThenNofile,
              fileGap,  fileGapSeason,  fileGapEpisode}
@@ -1054,7 +1049,7 @@ export default {
       gap.WatchGap        = watchGap; 
       gap.NotReady        = notReady;
       gap.BlockedGap      = blockedGap;
-      gap.Waiting         = !blockedWait && waiting;
+      gap.Waiting         = !blockedWait;
       gap.WaitStr         = await tvdb.getWaitStr(show);
       gap.FileGap = !(!notReady && show.InToTry) &&
                      (fileGap || fileEndError || seasonWatchedThenNofile);

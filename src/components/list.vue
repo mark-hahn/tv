@@ -297,7 +297,7 @@ library.add([
   faMinus, faArrowDown, faTv, faSearch, faQuestion, faCopy, 
   faBan, faBorderAll, faArrowRight, faMars, faVenus, faClock]);
 
-let allTvdb         = null;
+let allTvdb          = null;
 let allShows         = [];
 let showHistory      = [];
 let showHistoryPtr   = -1;
@@ -479,7 +479,8 @@ export default {
         ['Alpha', 'Viewed', 'Added', 'Size'],
       fltrChoices:          
         ['All', 'Ready', 'Drama', 'To-Try', 
-         'Try Drama', 'Continue', 'Download', 'Mark', 'Linda'],
+         'Try Drama', 'Continue', 'Download', 
+         'Finished', 'Mark', 'Linda'],
       conds: [ {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],
           cond(show)  { return !show.NotReady },
@@ -767,6 +768,7 @@ export default {
       this.sortPopped = !this.sortPopped;
       this.fltrPopped = false;
     },
+
     async sortAction(sortChoice) {
       console.log('sortAction', sortChoice);
       window.localStorage.setItem("sortChoice", sortChoice);
@@ -778,13 +780,15 @@ export default {
            this.saveVisShow(this.shows[0], true);
       this.scrollToSavedShow();
     },
+
     async filterClick() {
       this.fltrPopped = !this.fltrPopped
       this.sortPopped = false;
     },
     
     async fltrAction(fltrChoice) {
-      // console.log('fltrAction', fltrChoice);
+      console.log('fltrAction', fltrChoice);
+      this.showAll();
       window.localStorage.setItem("fltrChoice", fltrChoice);
       this.fltrChoice = fltrChoice;
       this.sortPopped = false;
@@ -940,22 +944,37 @@ export default {
       return "#ddd";
     },
 
-    select(scroll = true) {
-      if(this.filterStr.length > 0) 
-            this.fltrChoice = '- - - - -';
-      const srchStrLc = this.filterStr == 
-            "" ? null : this.filterStr.toLowerCase();
-      this.shows = allShows.filter((show) => {
+    async select(scroll = true) {
+      allTvdb = await tvdb.getAllTvdb();
+      let srchStrLc;
+      if(this.fltrChoice !== 'Finished') {
+        if(this.filterStr.length > 0) 
+              this.fltrChoice = '- - - - -';
+        srchStrLc = this.filterStr == "" 
+                    ? null : this.filterStr.toLowerCase();
+      }
+      const filteredShows = [];
+      for(const show of this.shows) {
+        if(this.fltrChoice === 'Finished') {
+          const tvdbData = allTvdb[show.Name];
+          if(!tvdbData) continue;
+          const {status, episodeCount, watchedCount} = tvdbData;
+          const finished = 
+            (status == "Ended" && watchedCount == episodeCount);
+          if(finished) filteredShows.push(show);
+          continue;
+        }
         if (srchStrLc && 
            !show.Name.toLowerCase().includes(srchStrLc)) 
-              return false;
+              continue;
         for (let cond of this.conds) {
           if ( cond.filter ===  0) continue;
           if ((cond.filter === +1) != (!!cond.cond(show))) 
-            return false;
+            continue;
         }
-        return true;
-      });
+        filteredShows.push(show);
+      }
+      this.shows = filteredShows;
       if (this.shows.length === 1) 
         this.saveVisShow(this.shows[0]);
       else {

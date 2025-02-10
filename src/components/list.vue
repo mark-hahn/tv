@@ -796,7 +796,7 @@ export default {
       this.fltrPopped = !this.fltrPopped
       this.sortPopped = false;
     },
-    
+
     async fltrAction(fltrChoice) {
       console.log('fltrAction', fltrChoice);
       this.showAll();
@@ -809,7 +809,7 @@ export default {
          util.setCondFltr(cond, this.fltrChoice);
         //  console.log('cond:', cond.name, cond.filter);
       }
-      this.select();
+      await this.select();
       this.sortShows();
     },
 
@@ -967,7 +967,6 @@ export default {
       const filteredShows = [];
       fltrLoop:
       for(const show of allShows) {
-        if(show.Name == 'St. Denis Medical') debugger;
         if(this.fltrChoice === 'Finished') {
           const tvdbData = allTvdb[show.Name];
           if(!tvdbData) continue;
@@ -978,10 +977,8 @@ export default {
           if(finished) filteredShows.push(show);
           continue;
         }
-        if(show.Name == 'St. Denis Medical') debugger;
         if (srchStrLc && 
            !show.Name.toLowerCase().includes(srchStrLc)) continue;
-        if(show.Name == 'Juice (2023)') debugger;
         for (let cond of this.conds) {
           if ( cond.filter ===  0) continue;
           if ((cond.filter === +1) != (!!cond.cond(show))) 
@@ -999,6 +996,7 @@ export default {
           this.saveVisShow(this.shows[0]);
       }
       if (scroll) this.scrollToSavedShow();
+      this.sortShows();
     },
 
     watchClick() {

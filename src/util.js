@@ -126,6 +126,18 @@ export async function setAllFavs(allShows) {
 }
 
 ////////// temp one-time mass operation //////////
+export async function clrEndedContinues(allShows) {
+  allTvdb = await tvdb.getAllTvdb();
+  allShows.forEach(async (show) => {
+    const tvdbData = allTvdb[show.Name];
+    if(tvdbData.status == "Ended" && show.InContinue) {
+      console.log('clr ended:', show.Name);
+      await emby.saveContinue(show.Id, false);
+    }
+  });
+}
+
+////////// temp one-time mass operation //////////
 export async function setAllTvdbShowIds(allShows) {
   allShows.forEach(async (show) => {
     await srvr.setTvdbFields({

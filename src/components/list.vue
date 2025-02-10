@@ -356,7 +356,7 @@ export default {
       show.InContinue = !show.InContinue;
       emby.saveContinue(show.Id, show.InContinue)
           .catch((err) => {
-              console.error("late toggleContinue error:", err);
+              console.error("late saveContinue error:", err);
               //- show.InContinue = !show.InContinue;
             });
     };
@@ -1122,6 +1122,7 @@ export default {
         this.scrollToSavedShow(true);
 
         // ... temp one-time mass operations ...
+        // await util.clrEndedContinues(allShows);
         // await util.adjustDeletedFlags(allShows);
         // await util.delPickups(allShows);
         // await util.setPickups(allShows);

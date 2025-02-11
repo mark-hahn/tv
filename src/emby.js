@@ -135,30 +135,32 @@ export async function loadAllShows() {
   }
 
 //////////  create tvdbs ////////////
-  for(const show of shows) {
-    if(!show.TvdbId) {
-      console.log(`loadAllShows, no tvdbId:`, show.Name, {show});
-      continue;
+  if(!pruneTvdb) {
+    for(const show of shows) {
+      if(!show.TvdbId) {
+        console.log(`loadAllShows, no tvdbId:`, show.Name, {show});
+        continue;
+      }
+      const name = show.Name;
+      let tvdbData = allTvdb[name];
+      if(!tvdbData) {
+        console.log(`loadAllShows creating tvdb`, name);
+        const epicounts = await getEpisodeCounts(show);
+        const param = Object.assign({show}, epicounts);
+        tvdbData = await srvr.getNewTvdb(param);
+      }
+      let ratings = 0;
+      for(const remote of tvdbData.remotes) {
+        if(!remote?.ratings) continue;
+        ratings = remote.ratings ?? 0;
+      }
+      tvdbData.showId      = show.Id;
+      show.TvdbId          = tvdbData.tvdbId;
+      show.OriginalCountry = tvdbData.originalCountry;
+      show.Ended           = (tvdbData.status == 'Ended');
+      show.Ratings         = ratings;
+      allTvdb[name]        = tvdbData;
     }
-    const name = show.Name;
-    let tvdbData = allTvdb[name];
-    if(!tvdbData) {
-      console.log(`loadAllShows creating tvdb`, name);
-      const epicounts = await getEpisodeCounts(show);
-      const param = Object.assign({show}, epicounts);
-      tvdbData = await srvr.getNewTvdb(param);
-    }
-    let ratings = 0;
-    for(const remote of tvdbData.remotes) {
-      if(!remote?.ratings) continue;
-      ratings = remote.ratings ?? 0;
-    }
-    tvdbData.showId      = show.Id;
-    show.TvdbId          = tvdbData.tvdbId;
-    show.OriginalCountry = tvdbData.originalCountry;
-    show.Ended           = (tvdbData.status == 'Ended');
-    show.Ratings         = ratings;
-    allTvdb[name]        = tvdbData;
   }
 
   if(pruneTvdb) {

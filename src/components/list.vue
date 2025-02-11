@@ -305,6 +305,7 @@ let showHistoryPtr   = -1;
 let blockedWaitShows = null;
 let blockedGapShows  = null;
 let srchListWeb      = null;
+const pruneTvdb = (window.location.href.slice(-5) == 'prune');
 
 export default {
   name: "List",
@@ -445,8 +446,15 @@ export default {
         await emby.deleteShowFromEmby(show);
       }
       const tvdbData = allTvdb[name];
-      const deleted = tvdbData.deleted = util.fmtDate();
-      allTvdb[name] = srvr.setTvdbFields({name, deleted});
+
+      if(pruneTvdb) {
+        delete allTvdb[name];
+        srvr.setTvdbFields({name, $delTvdb:true});
+      }
+      else {
+        const deleted = tvdbData.deleted = util.fmtDate();
+        allTvdb[name] = srvr.setTvdbFields({name, deleted});
+      }
       await srvr.deleteShowFromSrvr(show);
       await this.removeRow(show);
     }
@@ -675,6 +683,7 @@ export default {
       const {name, tvdbId, overview} = srchChoice;
       console.log('searchAction:', name);
       this.cancelSrchList();
+      if(pruneTvdb) return;
       const matchShow = allShows.find((s) => s.Name == name);
       if(matchShow) {  
         console.log(matchShow.Name + ' already exists.');
@@ -1061,7 +1070,6 @@ export default {
       gap.WaitStr         = await tvdb.getWaitStr(show);
       gap.FileGap = !(!notReady && show.InToTry) &&
                      (fileGap || fileEndError || seasonWatchedThenNofile);
-
       Object.assign(show, gap);
       await srvr.addGap([show.Id, gap, save]);
     }
@@ -1111,7 +1119,8 @@ export default {
         let showList = allShows;
         // showList = [allShows.find((show) => // for testing
         //                 show.Name == 'Splitting Up Together (US)')]; 
-        emby.startGapWorker(showList, this.addGapToShow);
+        if(!pruneTvdb) 
+          emby.startGapWorker(showList, this.addGapToShow);
 
         this.sortByNew  = true;
         this.sortBySize = false;

@@ -624,6 +624,7 @@ export default {
       allTvdb = await tvdb.getAllTvdb();
       const srchTxt   = this.webHistStr;
       const srcIsWeb  = (source == 'web');
+      if(srcIsWeb && pruneTvdb) return;
       const justClose = (srchTxt.length == 0) || 
            (this.showingSrchList && (srchListWeb == srcIsWeb));
       this.cancelSrchList();
@@ -683,12 +684,13 @@ export default {
       const {name, tvdbId, overview} = srchChoice;
       console.log('searchAction:', name);
       this.cancelSrchList();
-      if(pruneTvdb) return;
-      const matchShow = allShows.find((s) => s.Name == name);
-      if(matchShow) {  
-        console.log(matchShow.Name + ' already exists.');
-        this.saveVisShow(matchShow, true);
-        return;
+      if(!pruneTvdb) {
+        const matchShow = allShows.find((s) => s.Name == name);
+        if(matchShow) {  
+          console.log(matchShow.Name + ' already exists.');
+          this.saveVisShow(matchShow, true);
+          return;
+        }
       }
       let show = {
         Name: name,

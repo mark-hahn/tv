@@ -95,11 +95,11 @@ export async function adjustDeletedFlags(allShows) {
     }
     else if(!!haveShow && !!tvdb.deleted) {
       console.log('clearing deleted flag:', name);
-      // await srvr.setTvdbFields(
-      //         {name, $delete:['deleted'], dontSave:true});
+      await srvr.setTvdbFields(
+              {name, $delete:['deleted'], dontSave:true});
     }
   });
-  // srvr.setTvdbFields({});
+  srvr.setTvdbFields({});
 }
 
 ////////// temp one-time mass operation //////////

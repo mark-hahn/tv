@@ -50,7 +50,7 @@ export async function loadAllShows() {
 
   allTvdb = await tvdb.getAllTvdb();
 
-  const time1 = new Date().getTime();
+  const loadAllShowsStartTime = new Date().getTime();
 
   const listPromise   = axios.get(
                         urls.showListUrl(cred, 0, 10000));
@@ -114,15 +114,23 @@ export async function loadAllShows() {
   }
 
 //////////  add noemby shows from srvr ////////////
+  const prunedNoEmbyIds = [];
   for(const noEmbyShow of noEmbys) {
     const idx = shows.findIndex(
                   (show) => show.Name == noEmbyShow.Name);
     if(idx != -1) {
-      console.log('upgrading noEmby:', noEmbyShow.Name);
+      console.log('upgrading noEmby by deleting it:', 
+                    noEmbyShow.Name);
       await srvr.delNoEmby(noEmbyShow.Name);
+      prunedNoEmbyIds.push(noEmbyShow.Id);
       continue;
     }
     shows.push(noEmbyShow);
+  }
+  for(const prunedNoEmbyId of prunedNoEmbyIds) {
+    const idx = noEmbys.findIndex(
+        (noEmbyShow) => noEmbyShow.Id == prunedNoEmbyId);
+    if(idx != -1) noEmbys.splice(idx, 1);
   }
 
 //////////  create tvdbs ////////////
@@ -239,14 +247,9 @@ export async function loadAllShows() {
     if(show) show.Pickup = true;
   }
 
-//////////  save all noembys ////////////
-  for(const show of shows) {
-    if(show.Id.startsWith('noemby-'))
-       await srvr.addNoEmby(show);
-  }
-
-  const elapsed = new Date().getTime() - time1;
-  console.log('all shows loaded, elapsed:', elapsed);
+//////////  finished loadAllShows ////////////
+  const elapsed = new Date().getTime() - loadAllShowsStartTime;
+  console.log('all shows loaded, elapsed ms:', elapsed);
 
   // console.log('shows:', shows);
   return {shows, blockedWaitShows, blockedGapShows};

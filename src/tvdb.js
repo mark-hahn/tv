@@ -384,22 +384,29 @@ export const getNewTvdb = async (ws, id, param) => {
 export const setTvdbFields = 
               async (id, param, resolve, _reject) => {
   const paramObj = util.jParse(param, 'setTvdbFields');
+  let tvdb = null;
   const name = paramObj.name;
-  let tvdb;
   if(name) {
-    tvdb = allTvdb[name];
-    if(!tvdb) { 
-      console.error('setTvdbFields missing tvdb', id, name);
-      resolve([id, 'no tvdb']); 
-      return; 
+    if(paramObj.$delTvdb) {
+      delete allTvdb[name];
     }
-    for(const [key, value] of Object.entries(paramObj)) {
-      if(key === '$delete') {
-        for(const field of value) delete tvdb[field];
+    else {
+      tvdb = allTvdb[name];
+      if(!tvdb) { 
+        console.error('setTvdbFields no tvdb for', name);
+        resolve([id, 'no tvdb']); 
+        return; 
       }
-      else if(key != 'dontSave') tvdb[key] = value;
+      if(paramObj.$delete) {
+        for(const delName of paramObj.$delete) 
+          delete tvdb[delName];
+      }
+      for(const [key, value] of Object.entries(paramObj)) {
+        if(key != 'dontSave' && key != '$delete') 
+          tvdb[key] = value;
+      }
+      allTvdb[name] = tvdb;
     }
-    allTvdb[name] = tvdb;
   }
   if(!paramObj.dontSave) 
       await util.writeFile('./data/tvdb.json', allTvdb);

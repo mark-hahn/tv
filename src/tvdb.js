@@ -397,7 +397,7 @@ export const setTvdbFields =
       if(key === '$delete') {
         for(const field of value) delete tvdb[field];
       }
-      else tvdb[key] = value;
+      else if(key != 'dontSave') tvdb[key] = value;
     }
     allTvdb[name] = tvdb;
   }

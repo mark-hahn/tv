@@ -533,7 +533,7 @@ wss.on('connection', (ws) => {
     }
     if(socketName != appSocketName) {
       socketName = appSocketName;
-      console.log(socketName + ' connected', false, true);
+      console.log(socketName + ' connected');
     }
     const [id, fname, param] = parts.slice(1);
     if(fname == 'getNewTvdb') {

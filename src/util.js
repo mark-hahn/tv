@@ -222,6 +222,7 @@ export function
 }
 
 export function fmtDate(dateIn, includeYear = true, utcIn = false) {
+  if(dateIn === 0) return '';
   let date;
   if(dateIn === undefined) date = new Date();
   else if(dateIn instanceof Number) 

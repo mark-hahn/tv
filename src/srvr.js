@@ -125,7 +125,8 @@ const updateLastViewedCache = async () => {
   Object.assign(lastViewedCache, lastViewed);
 }
 updateLastViewedCache();
-setInterval(updateLastViewedCache, 60*1000); // 1 minute
+
+setInterval(updateLastViewedCache, 30*1000); // every 30 secs
 
 export function getAllShows()      
             {return fCall('getAllShows')}

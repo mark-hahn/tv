@@ -5,7 +5,7 @@ let theTvdbToken = null;
 
 let allTvdb = null;
 export const getAllTvdb = async () => {
-  if(!allTvdb) allTvdb = await srvr.getAllTvdb();
+  allTvdb ??= await srvr.getAllTvdb();
   return allTvdb;
 }
 

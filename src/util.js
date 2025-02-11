@@ -81,6 +81,16 @@ export async function removeNoMatchsFromTvdbJson() {
   });
 }
 
+////////// temp one-time mass operation //////////
+export async function removeDontSavesFromTvdbJson() {
+  allTvdb = await tvdb.getAllTvdb();
+  Object.values(allTvdb).forEach(async (tvdb) => {
+    await srvr.setTvdbFields(
+      {name:tvdb.name, $delete:['dontSave'], dontSave:true});
+  });
+  await srvr.setTvdbFields({});
+}
+
 ////////// adjustDeletedFlags //////////
 export async function adjustDeletedFlags(allShows) {
   allTvdb = await tvdb.getAllTvdb();

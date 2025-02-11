@@ -13,11 +13,7 @@ import Series  from './series.vue';
 export default {
   name: "App",
   components: { List, Series },
-  data() {
-    return {
-    }
-  },
-  mounted() {
-  },
+  data() { return { } },
+  mounted() { },
 }
 </script>

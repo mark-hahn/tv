@@ -1138,6 +1138,7 @@ export default {
         // await util.setAllTvdbShowIds(allShows);
         // await util.setAllNoEmbyTvdbIds(allShows);
         // await util.removeNoMatchsFromTvdbJson()
+        // await util.removeDontSavesFromTvdbJson()
         // await util.loadAllRemotes(allShows); // takes many hours
       }
       catch (err) {

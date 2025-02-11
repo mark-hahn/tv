@@ -15,6 +15,7 @@ const markUsrId = "894c752d448f45a3a1260ccaabd0adff";
 const authHdr   = `UserId="${markUsrId}", `                +
                   'Client="MyClient", Device="myDevice", ' +
                   'DeviceId="123456", Version="1.0.0"';
+const pruneTvdb = (window.location.href.slice(-5) == 'prune');
 
 let token    = '';
 let cred     = null;
@@ -71,7 +72,7 @@ export async function loadAllShows() {
                        noEmbyPromise, gapPromise]);
   rejects = rejectsIn
   
-  const shows = [];
+  let shows = [];
 
 ////////// get shows from emby ////////////
 // includes id, name, dates, haveShows, favorites, gaps, etc.
@@ -152,13 +153,31 @@ export async function loadAllShows() {
       if(!remote?.ratings) continue;
       ratings = remote.ratings ?? 0;
     }
-    tvdbData?.remotes?.ratings;
     tvdbData.showId      = show.Id;
     show.TvdbId          = tvdbData.tvdbId;
     show.OriginalCountry = tvdbData.originalCountry;
     show.Ended           = (tvdbData.status == 'Ended');
     show.Ratings         = ratings;
     allTvdb[name]        = tvdbData;
+  }
+
+  if(pruneTvdb) {
+    const showsFromTvdb = [];
+    for(const name in allTvdb) {
+      const tvdb = allTvdb[name];
+      if(tvdb.deleted) {
+        const show = {
+          Name:            tvdb.name,
+          Id:              'noemby-' + Math.random(),
+          TvdbId:          tvdb.tvdbId,     
+          OriginalCountry: tvdb.originalCountry,
+          Ended:          (tvdb.status == 'Ended'),
+          Ratings:         tvdb.ratings,
+        }
+        showsFromTvdb.push(show);
+      }
+    }
+    shows = showsFromTvdb;
   }
 
 ////////  remove gaps with no matching show /////////

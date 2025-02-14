@@ -581,6 +581,7 @@ export default {
         case 'Viewed': 
           lastViewed = srvr.lastViewedCache[show.Name];
           if(forSort) return lastViewed || 0;
+          if(lastViewed === undefined) return "";
           return util.fmtDate(lastViewed);
       }
     },

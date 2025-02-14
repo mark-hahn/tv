@@ -165,19 +165,19 @@ export async function loadAllShows() {
 
   if(pruneTvdb) {
     const showsFromTvdb = [];
-    for(const name in allTvdb) {
-      const tvdb = allTvdb[name];
-      if(tvdb.deleted) {
-        const show = {
-          Name:            tvdb.name,
-          Id:              'noemby-' + Math.random(),
-          TvdbId:          tvdb.tvdbId,     
-          OriginalCountry: tvdb.originalCountry,
-          Ended:          (tvdb.status == 'Ended'),
-          Ratings:         tvdb.ratings,
-        }
-        showsFromTvdb.push(show);
+    for(const tvdb of Object.values(allTvdb)) {
+      const showIdx = shows.findIndex(
+                  (show) => show.Name === tvdb.name);
+      if(showIdx !== -1) continue;
+      const show = {
+        Name:            tvdb.name,
+        Id:              'noemby-' + Math.random(),
+        TvdbId:          tvdb.tvdbId,     
+        OriginalCountry: tvdb.originalCountry,
+        Ended:          (tvdb.status == 'Ended'),
+        Ratings:         tvdb.ratings,
       }
+      showsFromTvdb.push(show);
     }
     shows = showsFromTvdb;
   }

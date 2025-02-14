@@ -332,7 +332,7 @@ const tryLocalGetTvdb = () => {
     tryLocalGetTvdbBusy = false;
     return;
   }
-  console.log(new Date().toTimeString().slice(0,8),
+  console.log('------', new Date().toTimeString().slice(0,8),
             `updating tvdb locally:`, minTvdb.name);  
   const paramObj = {
     show: {

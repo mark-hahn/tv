@@ -174,8 +174,8 @@ const getRemotes = async (show, tvdbRemotes) => {
 
   const remotes = [];
 
-  if(!showId.startsWith("noemby-")) remotes.push( 
-            {name:'Emby', url: urls.embyPageUrl(showId)});
+  if(showId && !showId.startsWith("noemby-")) 
+    remotes.push({name:'Emby', url: urls.embyPageUrl(showId)});
 
   const remotesByName = {};
   for(const tvdbRemote of tvdbRemotes) {
@@ -259,10 +259,12 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   let tvdbData = {tvdbId, name, originalNetwork,
                   seasonCount, episodeCount, watchedCount,
-                  image, score, overview, showId,
+                  image, score, overview,
                   firstAired, lastAired, averageRuntime,
                   originalCountry, originalLanguage,
                   status, remotes, saved};
+  if(showId !== undefined) 
+    tvdbData.showId = showId;
   if(deleted !== undefined)
     tvdbData.deleted = deleted;
 
@@ -313,9 +315,16 @@ const tryLocalGetTvdb = () => {
   try {
     const tvdbs = Object.values(allTvdb);
     tvdbs.forEach((tvdb) => {
-      if(!tvdb.showId) return;
+      if(!tvdb.showId && !tvdb.deleted) {
+        console.error(
+          'tryLocalGetTvdb no showId and not deleted:', 
+          tvdb.name, {tvdb});
+        return;
+      }
       const saved = tvdb.saved;
       if(saved === undefined) {
+        console.log('tryLocalGetTvdb, saved is undefined:', 
+                     tvdb.name);
         minTvdb = tvdb;
         throw true;
       }
@@ -333,13 +342,14 @@ const tryLocalGetTvdb = () => {
     return;
   }
   console.log('------', new Date().toTimeString().slice(0,8),
-            `updating tvdb locally:`, minTvdb.name);  
+            `updating tvdb locally:`, minTvdb.name); 
+  const show = {
+    Name:   minTvdb.name,
+    TvdbId: minTvdb.tvdbId,
+  }; 
+  if(minTvdb.showId) show.Id = minTvdb.showId;
   const paramObj = {
-    show: {
-      Name:   minTvdb.name,
-      Id:     minTvdb.showId,
-      TvdbId: minTvdb.tvdbId,
-    },
+    show,
     seasonCount:  minTvdb.seasonCount  ?? 0, 
     episodeCount: minTvdb.episodeCount ?? 0, 
     watchedCount: minTvdb.watchedCount ?? 0, 

@@ -7,8 +7,9 @@ import * as utilNode       from "util";
 import * as util           from "./src/util.js";
 import * as tvdb           from './src/tvdb.js';
 
-process.setMaxListeners(50);
 const dontupload  = false;
+
+process.setMaxListeners(50);
 const tvDir = '/mnt/media/tv';
 const exec  = utilNode.promisify(cp.exec);
 

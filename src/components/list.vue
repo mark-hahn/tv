@@ -453,7 +453,7 @@ export default {
       }
       else {
         const deleted = tvdbData.deleted = util.fmtDate();
-        allTvdb[name] = srvr.setTvdbFields({name, deleted});
+        allTvdb[name] = await srvr.setTvdbFields({name, deleted});
       }
       await srvr.deleteShowFromSrvr(show);
       await this.removeRow(show);

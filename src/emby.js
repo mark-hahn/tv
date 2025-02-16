@@ -106,13 +106,12 @@ export async function loadAllShows() {
 
     const tvdbId = show?.ProviderIds?.Tvdb || show?.TvdbId;
     if(!tvdbId || tvdbId == '0') {
-      console.log(`loadAllShows, no tvdbId:`, show.Name, {show});
+      console.error(`loadAllShows, no tvdbId:`, show.Name, {show});
       continue;
     }
     show.TvdbId = tvdbId;
-
     shows.push(show);
-  }
+  } 
 
 //////////  add noemby shows from srvr ////////////
   const prunedNoEmbyIds = [];
@@ -134,6 +133,28 @@ export async function loadAllShows() {
     if(idx != -1) noEmbys.splice(idx, 1);
   }
 
+//////////  mark tvdbs with no show as deleted ////////////
+  for(const tvdb of Object.values(allTvdb)) {
+    if(!tvdb.deleted) {
+      const matchingShow = shows.find(
+            (show) => show.Name == tvdb.name);
+      if(matchingShow && !tvdb.showId) {
+        const name   = matchingShow.Name;
+        const showId = matchingShow.Id;
+        console.log(
+            `loadAllShows, tvdb has no showid and not deleted:`, 
+               name, {show:matchingShow, tvdb});
+        allTvdb[name] =
+          await srvr.setTvdbFields({name, showId});
+      }
+      if(matchingShow) continue;
+      console.log(`loadAllShows, !tvdb.deleted with no show:`,
+                  tvdb.name, {tvdb});
+      allTvdb[tvdb.name] = await srvr.setTvdbFields(
+          {name:tvdb.name, deleted:util.fmtDate()});
+    }
+  }
+
 //////////  create tvdbs ////////////
   if(!pruneTvdb) {
     for(const show of shows) {
@@ -142,27 +163,28 @@ export async function loadAllShows() {
         continue;
       }
       const name = show.Name;
-      let tvdbData = allTvdb[name];
-      if(!tvdbData) {
+      let tvdb = allTvdb[name];
+      if(!tvdb) {
         console.log(`loadAllShows creating tvdb`, name);
         const epicounts = await getEpisodeCounts(show);
         const param = Object.assign({show}, epicounts);
-        tvdbData = await srvr.getNewTvdb(param);
+        tvdb = await srvr.getNewTvdb(param);
       }
       let ratings = 0;
-      for(const remote of tvdbData.remotes) {
-        if(!remote?.ratings) continue;
-        ratings = remote.ratings ?? 0;
+      for(const remote of tvdb.remotes) {
+        if(remote.ratings) 
+            ratings = remote.ratings;
       }
-      tvdbData.showId      = show.Id;
-      show.TvdbId          = tvdbData.tvdbId;
-      show.OriginalCountry = tvdbData.originalCountry;
-      show.Ended           = (tvdbData.status == 'Ended');
+      tvdb.showId          = show.Id;
+      show.TvdbId          = tvdb.tvdbId;
+      show.OriginalCountry = tvdb.originalCountry;
+      show.Ended           = (tvdb.status == 'Ended');
       show.Ratings         = ratings;
-      allTvdb[name]        = tvdbData;
+      allTvdb[name]        = tvdb;
     }
   }
 
+//////////  pruneTvdb show tvdbs without a show  ////////////
   if(pruneTvdb) {
     const showsFromTvdb = [];
     for(const tvdb of Object.values(allTvdb)) {

@@ -237,7 +237,7 @@ export default {
       if(watchedCount == 0) return;  
 
       const watching = await emby.getCurrentlyWatching();
-      if(watching == 'rokuOff' || 
+      if(watching == 'off' || 
          watching == 'nothingPlaying') {
         const afterWatched = await emby.afterLastWatched(this.show.Id);
         const status = afterWatched.status;
@@ -248,7 +248,7 @@ export default {
         switch(status) {
           case 'ok': // next avail & haveFile
             this.episodeId = episodeId;
-            if(watching != 'rokuOff')
+            if(watching != 'off')
               this.watchButtonTxt = 
                     `Play ${fmtSE(seasonNumber, episodeNumber)}`;
             this.nextUpTxt = 
@@ -301,7 +301,7 @@ export default {
     },
 
     async watchButtonClick(show) {
-      await emby.startStopRoku(show, this.episodeId);
+      await emby.startStop(show, this.episodeId);
       setTimeout(async () => {
         await this.setNextWatch();
       }, 1000);

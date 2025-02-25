@@ -654,7 +654,7 @@ export const deleteNoemby = async (name) => {
   await srvr.delNoEmby(name);
 }
 
-const getSession = async (player='roku') => {
+const getSession = async (player='chromecast') => {
   const url = urls.sessionUrl(player);
   if(!url) return null;
   const res = await axios.get(url);
@@ -663,9 +663,9 @@ const getSession = async (player='roku') => {
 }
 
 // get currently watching show
-export const getCurrentlyWatching = async (player='roku') => {
+export const getCurrentlyWatching = async (player='chromecast') => {
   const data = await getSession(player);
-  if(data === undefined) return 'rokuOff';
+  if(data === undefined) return 'off';
   const episodeRec = data.NowPlayingItem;
   if(!episodeRec) {
     // console.log(`Watching on ${player}: nothing`);
@@ -679,23 +679,20 @@ export const getCurrentlyWatching = async (player='roku') => {
   return {showName, seasonNum, episodeNum, episodeId}
 }
 
-export const startStopRoku = async (show, episodeId) => {
+export const startStop = async (show, episodeId) => {
   const session = await getSession();
   if(!session) return;
   const sessionId  = session.Id;
   const nowPlaying = session.NowPlayingItem;
   if(nowPlaying) {
-    const {url, body} = urls.stopRokuUrl(sessionId);
+    const {url, body} = urls.stopUrl(sessionId);
     await axios({method: 'post', url, data: body});
     return 'stopped';
   }
   else {
-    console.log('roku play',);
-    const {url, body} = urls.playRokuUrl(
-                              sessionId, episodeId);
-    console.log('playRoku:', {url, body});
+    const {url, body} = urls.playUrl(sessionId, episodeId);
     await axios({method: 'post', url, data: body});
-    console.log('playRoku', show.Name);
+    console.log('playing', show.Name);
     return 'playing';
   }
 }

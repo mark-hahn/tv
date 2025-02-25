@@ -7,24 +7,30 @@ const lastViewedStr =
   fs.readFileSync('data/lastViewed.json', 'utf8');
 const lastViewed = jParse(lastViewedStr, 'lastViewed');
 
-let lastShowName = null;
-const checkWatch = async () => {
-  const showName = await emby.getCurrentlyWatching();
-  if(showName !== null)
-    lastViewed[showName] = Date.now();
-  if(showName != lastShowName) {
-    await fsp.writeFile('data/lastViewed.json',
-                JSON.stringify(lastViewed));
+let lastShowNameByDevice = {};
+const checkWatch  = async () => {
+  const shows = await emby.getCurrentlyWatching();
+  for(const device of emby.devices) {
+    const [_, deviceName] = device;
+    const show = shows.find(
+                (show) => show.deviceName === deviceName);
+    const showName     = show?.showName;
+    const lastShowName = lastShowNameByDevice[deviceName];
+    if(showName) lastViewed[showName] = Date.now();
+    if(showName != lastShowName) {
+      await fsp.writeFile('data/lastViewed.json',
+                            JSON.stringify(lastViewed));
+    }
+    lastShowNameByDevice[deviceName] = showName;
   }
-  lastShowName = showName;
 }
 
 setInterval(async () => {
   await checkWatch();
-}, 5 * 60 * 1000);  // 5 mins
+}, 60 * 1000);  // 1 minute
 
 export const getLastViewed = (id, _param, resolve, _reject) => {
   resolve([id, lastViewed]);
 }
 
-await checkWatch();
+setTimeout(checkWatch, 1000);

@@ -20,6 +20,7 @@ export const log = (msg, err = false, spacing = false) => {
     return;
   }
   lastMsg = msg;
+  // https://github.com/knowledgecode/date-and-time
   msg = date.format(new Date(), 'MM/DD HH:mm:ss ') +
             (repeatCount ? (''+repeatCount).padStart(4, ' ')
                          : '    ') + ' ' + msg;

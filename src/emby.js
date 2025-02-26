@@ -21,7 +21,7 @@ export const devices = [
 ];
 */
 
-export const deviceIsOn = async (deviceId) => {
+const deviceIsOn = async (deviceId) => {
   let  resp = await fetch(urls.sessionUrl(deviceId));
   if (resp.status !== 200) {
     console.error(`error deviceIsOff resp: ${resp.statusText}`);
@@ -64,7 +64,7 @@ export const getOnDevices = async () => {
   return devicesOn;
 }
 
-export const getShowing = async (id, _param, resolve, _reject) => {
+export const getDevices = async (id, _param, resolve, _reject) => {
   const onDevices = await getOnDevices();
   resolve([id, onDevices]);
 }

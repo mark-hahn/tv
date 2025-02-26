@@ -483,7 +483,7 @@ const runOne = () => {
     case 'getAllShows':   getAllShows(       id,    '', resolve, reject); break;
     case 'deletePath':    deletePath(        id, param, resolve, reject); break;
 
-    case 'getShowing':    emby.getShowing(   id,    '', resolve, reject); break;
+    case 'getDevices':    emby.getDevices(   id,    '', resolve, reject); break;
     case 'getLastViewed': view.getLastViewed(id,    '', resolve, reject); break;
 
     case 'getBlockedWaits': getBlockedWaits( id, '',    resolve, reject); break;

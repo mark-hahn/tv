@@ -1085,16 +1085,15 @@ export default {
     });
 
     setInterval(async () => {
-      const curWatch = await emby.getCurrentlyWatching();
-      if(curWatch == 'off' ||
-         curWatch == 'nothingPlaying') {
-        this.watchingName = '---';
-        return;
+      const devices  = await srvr.getDevices();
+      let   showName = null; 
+      for(const device of devices) {
+        if(!device.showName) continue;
+        showName = device.showName;
+        if(device.deviceName == 'chromecast') break;
       }
-      const  {showName} = curWatch;
-      if(showName === null)  this.watchingName = '----';
-      else                   this.watchingName = showName;
-    }, 5*1000);
+      this.watchingName = showName ?? '---';
+    }, 10*1000);
 
     (async () => {
       document.addEventListener('keydown', (event) => {

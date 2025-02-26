@@ -654,46 +654,26 @@ export const deleteNoemby = async (name) => {
   await srvr.delNoEmby(name);
 }
 
-const getSession = async (player='chromecast') => {
-  const url = urls.sessionUrl(player);
-  if(!url) return null;
-  const res = await axios.get(url);
-  const session = res.data[0];
-  return session;
-}
-
-// get currently watching show
-export const getCurrentlyWatching = async (player='chromecast') => {
-  const data = await getSession(player);
-  if(data === undefined) return 'off';
-  const episodeRec = data.NowPlayingItem;
-  if(!episodeRec) {
-    // console.log(`Watching on ${player}: nothing`);
-    return 'nothingPlaying';
-  }
-  const showName   = episodeRec.SeriesName;
-  const seasonNum  = episodeRec.ParentIndexNumber;
-  const episodeNum = episodeRec.IndexNumber;
-  const episodeId  = episodeRec.Id;
-  // console.log(`Watching on ${player}: ${showName}`);
-  return {showName, seasonNum, episodeNum, episodeId}
-}
-
-export const startStop = async (show, episodeId) => {
-  const session = await getSession();
-  if(!session) return;
-  const sessionId  = session.Id;
-  const nowPlaying = session.NowPlayingItem;
-  if(nowPlaying) {
-    const {url, body} = urls.stopUrl(sessionId);
-    await axios({method: 'post', url, data: body});
-    return 'stopped';
-  }
-  else {
-    const {url, body} = urls.playUrl(sessionId, episodeId);
-    await axios({method: 'post', url, data: body});
-    console.log('playing', show.Name);
-    return 'playing';
+export const startStop = async (show, episodeId, watchButtonTxt) => {
+  const devices = await srvr.getDevices();
+  for(const device of devices) {
+    const {deviceName, sessionId} = device;
+    if(watchButtonTxt.startsWith('Stop')) {
+      const buttonDeviceName = watchButtonTxt.split(' ')[1];
+      if(buttonDeviceName != deviceName) continue;
+      const {url, body} = urls.stopUrl(sessionId);
+      await axios({method: 'post', url, data: body});
+      console.log(`stopped ${deviceName}`);
+      return;
+    }
+    else {
+      const buttonDeviceName = watchButtonTxt.split(' ')[2];
+      if(buttonDeviceName != deviceName) continue;
+      const {url, body} = urls.playUrl(sessionId, episodeId);
+      await axios({method: 'post', url, data: body});
+      console.log(`playing ${show.Name} on  ${deviceName}`);
+      return;
+    }
   }
 }
 

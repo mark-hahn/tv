@@ -113,23 +113,6 @@ const markUsrId = "894c752d448f45a3a1260ccaabd0adff";
 const apiKey    ='9863c23d912349599e395950609c84cc';
 const hahnca    = 'https://hahnca.com:8920/emby/';
 
-
-const deviceId = (player) => {
-  switch (player) {
-      case 'roku':        return 'f4079adb-6e48-4d54-9185-5d92d3b7176b';
-      case 'chromecast' : return '2095c65339b60175';
-      default:            return '2095c65339b60175';
-  }
-}
-
-export function sessionUrl(player = 'chromecast') {
-        return `${hahnca}   Sessions
-        ? ControllableByUserId = ${cred.markUsrId}
-        & deviceId = ${deviceId(player)} 
-        & api_key  = ${apiKey}`
-        .replace(/\s*/g, "");
-}
-
 export function playUrl(sessionId, episodeId) {
   return {url: `${hahnca}  Sessions /
                 ${sessionId} / Playing
@@ -158,17 +141,3 @@ export function stopUrl(sessionId) {
           }
         };
 }
-
-/*
-  export const devices = [
-    ["ca632bcd-7279-4fc2-b5b8-6f92ae6ddb08", "mlap2",                      ],
-    [    "ae3349983dbe45d9aa1d317a7753483e", "tvMaint_chrome",             ],
-    [                    "2095c65339b60175", "chromecast",                 ],  
-    ["f4079adb-6e48-4d54-9185-5d92d3b7176b", "embyWeb_chrome",             ],
-    [                    "aab13fa6d995d7cc", "embyForAndroid_SM_X700",     ], // phone?
-    ["990deeb0-2421-4136-b888-cd8abf09830a", "embyWeb_chromeWindows",      ],
-    ["9f53d43e-e5f7-5161-881a-d91843d0d372", "roku",                       ],
-    ["a20a0d2a-efa0-4da9-a715-29fbc7ccacab", "embyWeb_googleChromeWindows",],
-  ];
-*/
-

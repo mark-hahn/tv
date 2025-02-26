@@ -63,8 +63,8 @@
         #nextup(v-if="nextUpTxt.length > 0"
                 v-html="nextUpTxt"
                 style=`min-height:32px;`)
-      #watchButton(v-if="watchButtonTxt.length > 0" 
-          @click="watchButtonClick(show)"
+      #watchButton(v-for="watchButtonTxt in watchButtonTxtArr"
+          @click="watchButtonClick(show, watchButtonTxt)"
           style=`margin:10px 10px; padding:10px; max-width:245px;
                   background-color:white; text-align:center;
                   border: 1px solid black; font-weight:bold;`)
@@ -100,7 +100,7 @@ export default {
       showSpinner: false,
       showRemotes: false,
       nextUpTxt: '',
-      watchButtonTxt: '',
+      watchButtonTxtArr: [],
       episodeId: '',
       deletedTxt: '',
       notInEmby: false,
@@ -227,49 +227,35 @@ export default {
     },
 
     async setNextWatch() {
-      const fmtSE = (season, episode) => {
-        return `S${(''+season) .padStart(2, "0")} ` +
-               `E${(''+episode).padStart(2, "0")}`;
-      }
-      this.nextUpTxt      = '';
-      this.watchButtonTxt = '';
-      const {watchedCount} = await emby.getEpisodeCounts(this.show);
-      if(watchedCount == 0) return;  
-
-      const watching = await emby.getCurrentlyWatching();
-      if(watching == 'off' || 
-         watching == 'nothingPlaying') {
-        const afterWatched = await emby.afterLastWatched(this.show.Id);
-        const status = afterWatched.status;
-        let seasonNumber, episodeNumber, episodeId;
-        if(status !== 'allWatched') {
-          ({seasonNumber, episodeNumber, episodeId} = afterWatched);
-        }
-        switch(status) {
-          case 'ok': // next avail & haveFile
+      this.nextUpTxt = '';
+      this.watchButtonTxtArr = [];
+      
+      const afterWatched = await emby.afterLastWatched(this.show.Id);
+      const status       = afterWatched.status;
+      const readyToWatch = (status === 'ok');
+      if(status !== 'allWatched') {
+        const {seasonNumber, episodeNumber, episodeId} = afterWatched;
+        const seaEpiTxt = `S${(''+seasonNumber) .padStart(2, "0")} ` +
+                          `E${(''+episodeNumber).padStart(2, "0")}`;
+        if (readyToWatch) {
             this.episodeId = episodeId;
-            if(watching != 'off')
-              this.watchButtonTxt = 
-                    `Play ${fmtSE(seasonNumber, episodeNumber)}`;
-            this.nextUpTxt = 
-                ` &nbsp; Next Up: ${
-                          fmtSE(seasonNumber, episodeNumber)}` 
-            break;
-          case 'missing':   // next avail & !haveFile
-            this.nextUpTxt = 
-                ` &nbsp; Next Up: ${fmtSE(seasonNumber, episodeNumber)} 
-                  &nbsp; No File`;
-            break;
-          case 'unaired':   // next avail & !haveFile
-            this.nextUpTxt = 
-                ` &nbsp; Next Up: ${fmtSE(seasonNumber, episodeNumber)}
-                  &nbsp; Unaired`;
-            break;
+            this.nextUpTxt = ` &nbsp; Next Up: ${seaEpiTxt}`;
         }
+        else this.nextUpTxt = ` 
+            &nbsp; Next Up: ${seaEpiTxt} 
+            &nbsp; ${status === 'missing' ? 'No File' : 'Unaired'}`;
       }
-      else {
-        this.watchButtonTxt = 'Stop';
+
+      const watchButtonTxtArr = [];
+      const devices = await srvr.getDevices();
+      for(const device of devices) {
+        if(!device.showName) {
+          if(readyToWatch)
+            watchButtonTxtArr.push(`Play on ${device.deviceName}`);
+        }
+        else watchButtonTxtArr.push(`Stop ${device.deviceName}`);
       }
+      this.watchButtonTxtArr = watchButtonTxtArr.sort();
     },
 
     async setRemotes() {
@@ -300,8 +286,8 @@ export default {
       }
     },
 
-    async watchButtonClick(show) {
-      await emby.startStop(show, this.episodeId);
+    async watchButtonClick(show, watchButtonTxt) {
+      await emby.startStop(show, this.episodeId, watchButtonTxt);
       setTimeout(async () => {
         await this.setNextWatch();
       }, 1000);

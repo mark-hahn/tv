@@ -132,10 +132,13 @@ export function getAllShows()
             {return fCall('getAllShows')}
 export function deletePath(path)   
             {return fCall('deletePath', path)}
-       function getLastViewed()      
-            {return fCall('getLastViewed')}
 export function updateTvdb()      
             {return fCall('updateTvdb')}
+
+export function getDevices()      
+            {return fCall('getDevices')}
+export function getLastViewed()      
+            {return fCall('getLastViewed')}
 
 export function getBlockedWaits()        
             {return fCall('getBlockedWaits')}

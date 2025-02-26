@@ -5,8 +5,9 @@ const apiKey='9863c23d912349599e395950609c84cc';
 const hahnca = 'https://hahnca.com:8920/emby/';
 
 export function watchingUrl() {
-  return `${hahnca} Sessions ? api_key = ${apiKey}`
-          .replace(/\s*/g, "");
+  return `${hahnca} Sessions 
+    ? api_key = ${apiKey}`
+    .replace(/\s*/g, "");
 }
 
 export function embyPageUrl(id) {

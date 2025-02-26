@@ -4,8 +4,9 @@ import { WebSocketServer } from 'ws';
 import {rimraf}            from 'rimraf'
 import * as view           from './src/lastViewed.js';
 import * as utilNode       from "util";
-import * as util           from "./src/util.js";
+import * as emby           from './src/emby.js';
 import * as tvdb           from './src/tvdb.js';
+import * as util           from "./src/util.js";
 
 const dontupload  = false;
 
@@ -481,6 +482,8 @@ const runOne = () => {
   switch (fname) {
     case 'getAllShows':   getAllShows(       id,    '', resolve, reject); break;
     case 'deletePath':    deletePath(        id, param, resolve, reject); break;
+
+    case 'getShowing':    emby.getShowing(   id,    '', resolve, reject); break;
     case 'getLastViewed': view.getLastViewed(id,    '', resolve, reject); break;
 
     case 'getBlockedWaits': getBlockedWaits( id, '',    resolve, reject); break;

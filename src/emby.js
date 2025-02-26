@@ -21,7 +21,7 @@ export const devices = [
 ];
 */
 
-export const DeviceIsOn = async (deviceId) => {
+export const deviceIsOn = async (deviceId) => {
   let  resp = await fetch(urls.sessionUrl(deviceId));
   if (resp.status !== 200) {
     console.error(`error deviceIsOff resp: ${resp.statusText}`);
@@ -45,15 +45,15 @@ export const getOnDevices = async () => {
     const {Id, DeviceId, DeviceName, Client, 
            NowPlayingItem, PlayState} = deviceState;
     if(!NowPlayingItem) {
-      const deviceIsOn = await DeviceIsOn(DeviceId);
-      if(deviceIsOn) devicesOn.push({deviceId, deviceName});
+      if(await deviceIsOn(DeviceId)) 
+          devicesOn.push({deviceId, deviceName});
       continue;
     }
     const deviceId   = DeviceId;
     const deviceName = deviceNameByDeviceId[DeviceId] 
            ?? `${DeviceName}_${Client}`.replaceAll(/\s/g, '');  
-    const sessionId     = Id;
-    const showName      = NowPlayingItem.SeriesName;
+    const sessionId = Id;
+    const showName  = NowPlayingItem.SeriesName;
     // (13185330000-12584950000) == (60*1000*1000*10), (tick == 100ns)
     const positionTicks = PlayState.PositionTicks;
     console.log(
@@ -65,8 +65,8 @@ export const getOnDevices = async () => {
 }
 
 export const getShowing = async (id, _param, resolve, _reject) => {
-  const states = await getOnDevices();
-  resolve([id, states]);
+  const onDevices = await getOnDevices();
+  resolve([id, onDevices]);
 }
 
 // getCurrentlyWatching().then(console.log);

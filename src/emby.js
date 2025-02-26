@@ -21,7 +21,17 @@ export const devices = [
 ];
 */
 
-export const getCurrentlyWatching = async () => {
+export const DeviceIsOn = async (deviceId) => {
+  let  resp = await fetch(urls.sessionUrl(deviceId));
+  if (resp.status !== 200) {
+    console.error(`error deviceIsOff resp: ${resp.statusText}`);
+    return true;
+  }
+  const session = await resp.json();
+  return !!session?.Data;
+}
+
+export const getOnDevices = async () => {
   const url = urls.watchingUrl();
   let  resp = await fetch(url);
   if (resp.status !== 200) {
@@ -30,25 +40,30 @@ export const getCurrentlyWatching = async () => {
   }
   const respData = await resp.json();
   if(!respData || respData.length === 0) return [];
-  const states = [];
+  const devicesOn = [];
   for(const deviceState of respData) {
     const {Id, DeviceId, DeviceName, Client, 
            NowPlayingItem, PlayState} = deviceState;
-    if(!NowPlayingItem) continue;
+    if(!NowPlayingItem) {
+      const deviceIsOn = await DeviceIsOn(DeviceId);
+      if(deviceIsOn) devicesOn.push({deviceId, deviceName});
+      continue;
+    }
     if((PlayState.PositionTicks ?? 0) === 0) continue;
-    const sessionId = Id;
+    const deviceId = DeviceId;
     const deviceName = deviceNameByDeviceId[DeviceId] 
            ?? `${DeviceName}_${Client}`.replaceAll(/\s/g, '');  
+    const sessionId = Id;
     const showName = NowPlayingItem.SeriesName;
     console.log(
         `Watching ${showName} on ${deviceName}, session:${sessionId}`);
-    states.push({sessionId, deviceName, showName});
+    devicesOn.push({deviceId, deviceName, sessionId, showName});
   }
-  return states;
+  return devicesOn;
 }
 
 export const getShowing = async (id, _param, resolve, _reject) => {
-  const states = await getCurrentlyWatching();
+  const states = await getOnDevices();
   resolve([id, states]);
 }
 

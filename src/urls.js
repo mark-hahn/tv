@@ -10,6 +10,14 @@ export function watchingUrl() {
     .replace(/\s*/g, "");
 }
 
+// ? ControllableByUserId = ${cred.markUsrId}
+export function sessionUrl(deviceId) {
+  return `${hahnca}   Sessions
+    ? deviceId = ${deviceId}
+    & api_key  = ${apiKey}`
+    .replace(/\s*/g, "");
+}
+
 export function embyPageUrl(id) {
   return `https://hahnca.com:8920 / web / index.html #! / item
     ?id=${id}&serverId=ae3349983dbe45d9aa1d317a7753483e

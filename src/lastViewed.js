@@ -13,9 +13,10 @@ export const getLastViewed = (id, _param, resolve, _reject) => {
 
 let lastShowNameByDeviceName = {};
 const checkWatch  = async () => {
-  const states = await emby.getCurrentlyWatching();
-  for(const state of states) {
-    const {deviceName, showName} = state;
+  const onDevices = await emby.getOnDevices();
+  for(const onDevice of onDevices) {
+    if(!onDevice.showName) continue;
+    const {deviceName, showName} = onDevice;
     const lastShowName = lastShowNameByDeviceName[deviceName];
     if(showName) lastViewed[showName] = Date.now();
     if(showName != lastShowName) {

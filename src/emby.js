@@ -36,13 +36,13 @@ export const getCurrentlyWatching = async () => {
            NowPlayingItem, PlayState} = deviceState;
     if(!NowPlayingItem) continue;
     if((PlayState.PositionTicks ?? 0) === 0) continue;
+    const sessionId = Id;
     const deviceName = deviceNameByDeviceId[DeviceId] 
            ?? `${DeviceName}_${Client}`.replaceAll(/\s/g, '');  
     const showName = NowPlayingItem.SeriesName;
-    const sessionId = Id;
     console.log(
         `Watching ${showName} on ${deviceName}, session:${sessionId}`);
-    states.push({deviceName, showName, sessionId});
+    states.push({sessionId, deviceName, showName});
   }
   return states;
 }

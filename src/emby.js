@@ -35,7 +35,7 @@ export const getOnDevices = async () => {
   const url = urls.watchingUrl();
   let  resp = await fetch(url);
   if (resp.status !== 200) {
-    console.error(`error getCurrentlyWatching resp: ${resp.statusText}`);
+    console.error(`error getOnDevices resp: ${resp.statusText}`);
     return [];
   }
   const respData = await resp.json();
@@ -49,15 +49,17 @@ export const getOnDevices = async () => {
       if(deviceIsOn) devicesOn.push({deviceId, deviceName});
       continue;
     }
-    if((PlayState.PositionTicks ?? 0) === 0) continue;
-    const deviceId = DeviceId;
+    const deviceId   = DeviceId;
     const deviceName = deviceNameByDeviceId[DeviceId] 
            ?? `${DeviceName}_${Client}`.replaceAll(/\s/g, '');  
-    const sessionId = Id;
-    const showName = NowPlayingItem.SeriesName;
+    const sessionId     = Id;
+    const showName      = NowPlayingItem.SeriesName;
+    // (13185330000-12584950000) == (60*1000*1000*10), (tick == 100ns)
+    const positionTicks = PlayState.PositionTicks;
     console.log(
-        `Watching ${showName} on ${deviceName}, session:${sessionId}`);
-    devicesOn.push({deviceId, deviceName, sessionId, showName});
+        `Watching ${showName} on ${deviceName} at ${positionTicks}`);
+    devicesOn.push({deviceId, deviceName, 
+                    sessionId, showName, positionTicks});
   }
   return devicesOn;
 }

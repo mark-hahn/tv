@@ -1,8 +1,9 @@
 /////////////////// api key urls ////////////////////////
 // copied from client urls.js
 
-const apiKey='9863c23d912349599e395950609c84cc';
-const hahnca = 'https://hahnca.com:8920/emby/';
+const apiKey    = '9863c23d912349599e395950609c84cc';
+const hahnca    = 'https://hahnca.com:8920/emby/';
+const markUsrId = "894c752d448f45a3a1260ccaabd0adff";
 
 export function watchingUrl() {
   return `${hahnca} Sessions 
@@ -10,12 +11,12 @@ export function watchingUrl() {
     .replace(/\s*/g, "");
 }
 
-// ? ControllableByUserId = ${cred.markUsrId}
 export function sessionUrl(deviceId) {
-  return `${hahnca}   Sessions
-    ? deviceId = ${deviceId}
-    & api_key  = ${apiKey}`
-    .replace(/\s*/g, "");
+        return `${hahnca}   Sessions
+        ? ControllableByUserId = ${markUsrId}
+        & deviceId = ${deviceId} 
+        & api_key  = ${apiKey}`
+        .replace(/\s*/g, "");
 }
 
 export function embyPageUrl(id) {

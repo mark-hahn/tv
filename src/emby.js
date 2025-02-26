@@ -24,11 +24,11 @@ export const devices = [
 const deviceIsOn = async (deviceId) => {
   let  resp = await fetch(urls.sessionUrl(deviceId));
   if (resp.status !== 200) {
-    console.error(`error deviceIsOff resp: ${resp.statusText}`);
+    console.error(`error deviceIsOn resp: ${resp.statusText}`);
     return true;
   }
   const session = await resp.json();
-  return !!session?.Data;
+  return !!session.length;
 }
 
 export const getOnDevices = async () => {
@@ -49,7 +49,7 @@ export const getOnDevices = async () => {
     const deviceName = deviceNameByDeviceId[DeviceId] 
            ?? `${DeviceName}_${Client}`.replaceAll(/\s/g, '');  
     const sessionId = Id;
-    
+
     if(!NowPlayingItem) {
       if(await deviceIsOn(DeviceId)) 
           devicesOn.push({deviceId, deviceName, sessionId});

@@ -122,9 +122,9 @@ export function playUrl(sessionId, episodeId) {
                 .replace(/\s*/g, ""),
           body: {
             ControllingUserId:   markUsrId,
-            SubtitleStreamIndex: 1,
-            AudioStreamIndex:    1,
-            StartIndex:          1,
+            SubtitleStreamIndex: 0,
+            AudioStreamIndex:    0,
+            StartIndex:          0,
           }
         };
 }

@@ -126,7 +126,7 @@ const updateLastViewedCache = async () => {
 }
 updateLastViewedCache();
 
-setInterval(updateLastViewedCache, 30*1000); // every 30 secs
+setInterval(updateLastViewedCache, 10*1000); // every 10 secs
 
 export function getAllShows()      
             {return fCall('getAllShows')}

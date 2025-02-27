@@ -655,6 +655,7 @@ export const deleteNoemby = async (name) => {
 }
 
 export const startStop = async (show, episodeId, watchButtonTxt) => {
+  console.log('startStop:', show, episodeId, watchButtonTxt);
   const devices = await srvr.getDevices();
   for(const device of devices) {
     const {deviceName, sessionId} = device;
@@ -663,7 +664,11 @@ export const startStop = async (show, episodeId, watchButtonTxt) => {
       if(buttonDeviceName != deviceName) continue;
       const {url, body} = urls.stopUrl(sessionId);
       await axios({method: 'post', url, data: body});
-      console.log(`stopped ${deviceName}`);
+      console.log(`stopped1 ${deviceName}`);
+      setTimeout(() => {
+        axios({method: 'post', url, data: body});
+        console.log(`stopped2 ${deviceName}`);
+      }, 1000);
       return;
     }
     else {
@@ -671,7 +676,11 @@ export const startStop = async (show, episodeId, watchButtonTxt) => {
       if(buttonDeviceName != deviceName) continue;
       const {url, body} = urls.playUrl(sessionId, episodeId);
       await axios({method: 'post', url, data: body});
-      console.log(`playing ${show.Name} on  ${deviceName}`);
+      console.log(`playing1 ${show.Name} on  ${deviceName}`);
+      setTimeout(() => {
+        axios({method: 'post', url, data: body});
+        console.log(`playing2 ${show.Name} on  ${deviceName}`);
+      }, 1000);
       return;
     }
   }

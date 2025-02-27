@@ -5,7 +5,8 @@ reminder, restore ...
 bugs ...
   blocked shows appear on boot
   noemby.json has reject field which disagrees with config2-rejects.json
-  play button broken
+  mlap2 play doesn't start
+  device change doesn't update buttons automatically
   
 todo  ...
   map: click on season numbers for whole row

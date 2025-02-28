@@ -401,20 +401,27 @@ export default {
 
     const toggleReject = async (show) => {
       this.saveVisShow(show);
-      show.Reject = !show.Reject; 
-      if(show.Reject) {
+      if(!show.Reject && !show.Id.startsWith('noemby-')) {
+        if (!window.confirm(
+            `Do you really want to delete series ${show.Name}?`)) 
+          return;
         await emby.deleteShowFromEmby(show);
         srvr.addReject(show.Name) 
                 .catch((err) => {
                     console.error("late addReject:", err);
                 });
         await this.removeRow(show);
+        show.Reject = true;
+        return;
       }
-      else
+      if(show.Reject) {
         srvr.delReject(show.Name) 
                 .catch((err) => {
                     console.error("late delReject:", err);
                 });
+        show.Reject = false;
+        return;
+      }
     };
 
     const togglePickup = async (show) => {

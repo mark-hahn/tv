@@ -227,9 +227,6 @@ export default {
     },
 
     async setNextWatch() {
-      this.nextUpTxt = '';
-      this.watchButtonTxtArr = [];
-      
       const afterWatched = await emby.afterLastWatched(this.show.Id);
       const status       = afterWatched.status;
       const readyToWatch = (status === 'ok');
@@ -309,6 +306,9 @@ export default {
       await this.setCntryLangTxt(tvdbData);
       await this.setNextWatch();
       await this.setRemotes();
+      setInterval( () => {
+        this.setNextWatch(true);
+      }, 5000);
     });
 
     setTimeout(() => {

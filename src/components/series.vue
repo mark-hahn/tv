@@ -7,7 +7,7 @@
   #hdr(v-if="showHdr"
        style=`display:flex; justify-content:space-between; 
               font-weight:bold; font-size:25px;
-              margin-bottom:20px; max-width:495px;`)
+              margin-bottom:20px; max-width:565px;`)
     div(style=`margin-left:20px; max-width:450px`) {{show.Name}}
     
     div(v-if="notInEmby" 
@@ -23,7 +23,7 @@
     button(@click="deleteClick"
             style=`font-size:15px;  cursor:pointer;
                   margin-left:20px; margin-top:3px;
-                  max-height:24px;`) Delete
+                  max-height:24px; border-radius: 7px;`) Delete
 
   #body(style=`display:flex; cursor:pointer;`)
     #topLeft(@click="openMap(show)"
@@ -32,24 +32,11 @@
       #poster(style=`margin-left:20px;`)  
     #topRight(style=`display:flex; flex-direction:column;
                     width:300px; margin-left:10px;`)
-      #remotes(style=`width:200px; margin-left:30px;
-                      display:flex; flex-direction:column;`) 
-        div(v-if="showSpinner")
-          img(src="../../loading.gif"
-              style=`width:100px; height:100px;
-                     position:relative; top:20px; left:45px;`)
-        div(v-if="showRemotes" 
-            v-for="remote in remotes"
-            @click="remoteClick(remote)"
-            style=`margin:3px 10px; padding:10px; 
-                   background-color:white; text-align:center;
-                   border: 1px solid black; font-weight:bold;`)
-          | {{remote.name}}
       #infoBox(@click="openMap(show)"
-                style=`margin-top:10px; margin-left:5px;
-                       width:270px; font-size:17px; 
+                style=`margin:0 0 7px 12px;
+                       width:250px; font-size:17px; 
                        display:flex; flex-direction:column;
-                       border: 1px solid gray;
+                       border: 2px solid gray;
                        text-align:center; font-weight:bold;`)
         #dates(v-html="dates"
                v-if="dates.length > 0"
@@ -63,12 +50,31 @@
         #nextup(v-if="nextUpTxt.length > 0"
                 v-html="nextUpTxt"
                 style=`min-height:32px;`)
-      #watchButton(v-for="watchButtonTxt in watchButtonTxtArr"
-          @click="watchButtonClick(show, watchButtonTxt)"
-          style=`margin:10px 10px; padding:10px; max-width:245px;
-                  background-color:white; text-align:center;
-                  border: 1px solid black; font-weight:bold;`)
-        | {{watchButtonTxt}}
+
+      #remotes(style=`width:260px; margin:5px 0 0 10px;
+                      justify-content:space-space-between;
+                      display:flex; flex-wrap:wrap;`) 
+        div(v-if="showSpinner")
+          img(src="../../loading.gif"
+              style=`width:100px; height:100px;
+                     position:relative; top:20px; left:45px;`)
+        div(v-if="showRemotes" 
+            v-for="remote in remotes"
+            @click="remoteClick(remote)"
+            style=`margin:5px 5px; padding:10px;
+                   background-color:#eee; border-radius: 7px;
+                   text-align:center;
+                   border: 1px solid black; font-weight:bold;`)
+          | {{remote.name}}
+      #buttons(style=`display:flex; flex-wrap:wrap; margin-top:15px;
+                      width:280px; justify-content:space-around;`)
+        #watchButton(v-for="watchButtonTxt in watchButtonTxtArr"
+            @click="watchButtonClick(show, watchButtonTxt)"
+            style=`margin:5px 10px 10px 7px; border-radius: 10px;
+                    padding:3px; max-width:110px;
+                    background-color:#eee; text-align:center;
+                    border: 1px solid black; font-weight:bold;`)
+          | {{watchButtonTxt}}
   #bot(style=`font-size:20px; padding:10px;`) {{show.Overview}}
 
 </template>

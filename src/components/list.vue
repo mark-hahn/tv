@@ -402,11 +402,14 @@ export default {
     const toggleReject = async (show) => {
       this.saveVisShow(show);
       show.Reject = !show.Reject; 
-      if(show.Reject) 
+      if(show.Reject) {
+        await emby.deleteShowFromEmby(show);
         srvr.addReject(show.Name) 
                 .catch((err) => {
                     console.error("late addReject:", err);
                 });
+        await this.removeRow(show);
+      }
       else
         srvr.delReject(show.Name) 
                 .catch((err) => {

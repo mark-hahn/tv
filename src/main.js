@@ -6,10 +6,12 @@ bugs ...
   blocked shows appear on boot
   noemby.json has reject field, disagrees with rejects.json
   mlap2 play doesn't start
+  simpsons undefined
   
 todo  ...
-  map: click on season numbers for whole row
   sort by waiting date
+  add unwatched at beginning to watched count
+  map: click on season numbers for whole row
 
 tabled ...
   show episode being watched (next up line)

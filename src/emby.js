@@ -59,8 +59,8 @@ export const getOnDevices = async () => {
     // (13185330000-12584950000) == (60*1000*1000*10), (tick == 100ns)
     const positionTicks = PlayState.PositionTicks;
     
-    console.log(
-        `Watching ${showName} on ${deviceName} at ${positionTicks}`);
+    // console.log(
+    //     `Watching ${showName} on ${deviceName} at ${positionTicks}`);
     devicesOn.push({deviceId, deviceName, sessionId, 
                     showName, positionTicks});
   }

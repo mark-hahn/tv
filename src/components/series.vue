@@ -52,7 +52,7 @@
                 style=`min-height:32px;`)
 
       #remotes(style=`width:260px; margin:5px 0 0 10px;
-                      justify-content:space-space-between;
+                      justify-content:space-between;
                       display:flex; flex-wrap:wrap;`) 
         div(v-if="showSpinner")
           img(src="../../loading.gif"

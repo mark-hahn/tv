@@ -1,0 +1,70 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "objectID": "series-385730",
+      "aliases": [
+        "Somebody Somewhere (2022)"
+      ],
+      "country": "usa",
+      "id": "series-385730",
+      "image_url": "https://artworks.thetvdb.com/banners/v4/series/385730/posters/670a459298ada.jpg",
+      "name": "Somebody Somewhere",
+      "first_air_time": "2022-01-16",
+      "overview": "Sam is a true Kansan on the surface but beneath it all struggles to fit the hometown mold. As she grapples with loss and acceptance, singing is Sam’s saving grace and leads her on a journey to discover herself and a community of outsiders that don’t fit in but don’t give up, showing that finding your people, and finding your voice, is possible. Anywhere. Somewhere.",
+      "primary_language": "eng",
+      "primary_type": "series",
+      "status": "Continuing",
+      "type": "series",
+      "tvdb_id": "385730",
+      "year": "2022",
+      "slug": "somebody-somewhere",
+      "overviews": {
+        "deu": "Nach außen ist Sam (Bridget Everett) ein „Kansas-Girl“ durch und durch, aber in Wirklichkeit tut sie sich mit der Enge ihrer ländlichen Heimatstadt schwer. Singen ist das einzige Hobby, das ihr über Verluste und Existenzängste hinweghilft – und es ist es auch, was sie schließlich mit Menschen bekanntmacht, die ähnlich mit sich und allem um sie herum hadern wie sie selbst. (Text: JN)",
+        "eng": "Sam is a true Kansan on the surface but beneath it all struggles to fit the hometown mold. As she grapples with loss and acceptance, singing is Sam’s saving grace and leads her on a journey to discover herself and a community of outsiders that don’t fit in but don’t give up, showing that finding your people, and finding your voice, is possible. Anywhere. Somewhere.",
+        "fin": "Jopa loputtoman avara Kansas voi tuntua tukahduttavalta Sam Millerin kaltaisen henkilön mielestä. Tämä komediasarja seuraa Samia, täysiveriseltä kansasilaiselta vaikuttavaa henkilöä, jolla on vaikeuksia sopia kotikaupunkiinsa.",
+        "fra": "Sam retourne dans sa ville natale au Kansas. Alors qu'elle éprouve des difficultés à se faire une place au sein de sa communauté, le chant représente sa seule échappatoire. C'est grâce à la musique qu'elle rencontrera d'autres marginaux et trouvera sa voie.",
+        "heb": "סם מילר (ברידג'ט אוורט) היא בחורה צעירה מקנזס שעל פני השטח נראית כמו מקומית טיפוסית אך בתוך תוכה לא מרגישה באמת שייכת. סם מתמודדת עם אבדן ושירה מהווה את הנחמה היחידה שלה ומובילה אותה למסע של גילוי עצמי ואל קבוצה של אאוטסיידרים שגם לא מרגישים שייכים לשום מקום אבל מאמינים שכל אחד שייך לאנשהו או למישהו. כל מה שצריך לעשות זה לא להרים ידיים. הסדרה מבוססת חלקית על חייה של הזמרת והקומיקאית ברידג'ט אוורט, שגם מככבת בה. לצידה מככבים בין השאר: מייק הגרטי (\"חברים\"), ג'ף הילר (\"גרטה\"), דני מקרת'י (\"נמלטים\"), מארי קת'רין גאריסון (\"VEEP\") והקומיקאי מארי היל.",
+        "pt": "Acompanha a história de Sam, uma moradora do Kansas que, no fundo, sofre para conseguir se encaixar.",
+        "rus": "Терапевтический сериал о поиске себя, спродюсированный братьями Дюпласс. «Кто-то где-то» знакомит нас с Сэм — женщиной, которая не чувствует себя как дома в родном городе. Но у нее есть любимое дело — пение, которое спасает женщину от одиночества. Когда в ее жизнь приходит потеря, она начинает заново открывать мир. Оказывается, в нем можно найти близких по духу людей, таких же неустроенных, но отчаянно мечтающих обрести свой голос.",
+        "spa": "A pesar de sus inmensas llanuras y sus interminables praderas, Kansas puede resultar agobiante para alguien como Sam\r\nMiller. Esta comedia nos cuenta la vida de Sam, una kanseña que se esfuerza para encajar en su pueblo natal."
+      },
+      "translations": {
+        "deu": "Somebody Somewhere",
+        "eng": "Somebody Somewhere",
+        "fin": "Somebody Somewhere",
+        "fra": "Somebody Somewhere",
+        "heb": "מישהו איפשהו",
+        "pt": "Alguém em Algum Lugar",
+        "rus": "Кто-то где-то",
+        "spa": "Somebody Somewhere"
+      },
+      "network": "HBO",
+      "remote_ids": [
+        {
+          "id": "tt12759100",
+          "type": 2,
+          "sourceName": "IMDB"
+        },
+        {
+          "id": "https://www.hbo.com/somebody-somewhere",
+          "type": 4,
+          "sourceName": "Official Website"
+        },
+        {
+          "id": "106308",
+          "type": 12,
+          "sourceName": "TheMovieDB.com"
+        }
+      ],
+      "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/385730/posters/670a459298ada_t.jpg"
+    }
+  ],
+  "links": {
+    "prev": null,
+    "self": "https://api4.thetvdb.com/v4/search?query=Somebody Somewhere&type=series&limit=50&page=0",
+    "next": null,
+    "total_items": 1,
+    "page_size": 50
+  }
+}

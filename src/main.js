@@ -5,15 +5,17 @@ reminder, restore ...
 bugs ...
   blocked shows appear on boot
   noemby.json has reject field, disagrees with rejects.json
-  mlap2 play doesn't start
   simpsons undefined
+  next up shows undefined when no emby
   
 todo  ...
+  allow putting in collection before show is in emby
   sort by waiting date
   add unwatched at beginning to watched count
   map: click on season numbers for whole row
 
 tabled ...
+  laptop play doesn't start
   show episode being watched (next up line)
   make popups modal with closing by clicking anywhere
   keep deleted date forever

@@ -3,6 +3,7 @@ reminder, restore ...
   start gap running
   
 bugs ...
+  the rookie has no emby button
   blocked shows appear on boot
   noemby.json has reject field, disagrees with rejects.json
   simpsons undefined

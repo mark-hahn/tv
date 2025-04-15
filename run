@@ -3,6 +3,17 @@
 echo >> /root/dev/apps/tv-proc/tv.log
 date >> /root/dev/apps/tv-proc/tv.log
 
+if [ -f /mnt/media/nomount ]; then
+  printf "\n---- tv-proc: media drive is not mounted\n"
+  /root/.nvm/versions/node/v22.12.0/bin/node \
+         ~/dev/apps/mailit/index.js "tv-proc: media drive is not mounted"
+fi 
+if [ -f /mnt/m-bkup/nomount ]; then
+  printf "\n---- tv-proc: m-bkup drive is not mounted\n"
+  /root/.nvm/versions/node/v22.12.0/bin/node \
+         ~/dev/apps/mailit/index.js "tv-proc: m-bkup drive is not mounted"
+fi 
+
 s="$(pgrep -f tv-proc/main.js)"
 if [ ${#s} -gt 1 ] ; then
   echo "--  tv-proc not started, main.js already running  --"
@@ -11,19 +22,12 @@ if [ ${#s} -gt 1 ] ; then
 fi
 
 cd /root/dev/apps/tv-proc
-
 coffee -c main.coffee
 
-/root/.nvm/versions/node/v22.12.0/bin/node \
-         /root/dev/apps/tv-proc/main.js $1 \
+/root/.nvm/versions/node/v22.12.0/bin/node  \
+        --no-deprecation                    \
+         /root/dev/apps/tv-proc/main.js $1  \
     >> /root/dev/apps/tv-proc/tv.log 
 
 chmod -R 774  /mnt/media/tv
 chown -R emby /mnt/media/tv
-
-# /root/.nvm/versions/node/v16.15.1/bin/node \
-#        /root/dev/apps/tv-proc/prune-dupes.js \
-#     >> /root/dev/apps/tv-proc/tv.log
-# date >> /root/dev/apps/tv-proc/tv.log
-# chmod -R 774  /mnt/media/tv
-# chown -R emby /mnt/media/tv

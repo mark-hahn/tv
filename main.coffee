@@ -20,7 +20,6 @@ usbHost =  "xobtlu@oracle.usbx.me"
 
 # prune script deletes files older than 30 days
 # tv-recent files limited to 35 days
-recentLimit = new Date(Date.now() - 5*7*24*60*60*1000) # 5 weeks ago
 fileTimeout = {timeout: 2*60*60*1000} # 2 hours
 
 fs   = require 'fs-plus'
@@ -127,16 +126,19 @@ request.post 'https://api4.thetvdb.com/v4/login',
       process.nextTick delOldFiles
 
 ######################################################
-# delete old files in usb/files
+# delete old files in usb/files and entries in tv-recent.json
 
 delOldFiles = =>
-  # prune script deletes files older than 30 days
+  # prune script deletes files older than 60 days
   # console.log ".... deleting old files in usb ~/files ...."
   res = exec("ssh #{usbHost} /home/xobtlu/prune.sh", 
               {timeout:300000}).toString()
   if not res.startsWith('prune ok')
     console.log "Prune error: #{res}"
 
+# delete old entries in tv-recent.json
+# tv-recent files limited to 80 days
+  recentLimit = new Date(Date.now() - 80*24*60*60*1000) # 80 days ago
   recentChgd = no
   for recentFname, recentTime of recent when new Date(recentTime) < recentLimit
     delete recent[recentFname]

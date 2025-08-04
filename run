@@ -5,12 +5,12 @@ date >> /root/dev/apps/tv-proc/tv.log
 
 if [ -f /mnt/media/nomount ]; then
   printf "\n---- tv-proc: media drive is not mounted\n"
-  /root/.nvm/versions/node/v22.12.0/bin/node \
+  /root/.nvm/versions/node/v22.18.0/bin/node \
          ~/dev/apps/mailit/index.js "tv-proc: media drive is not mounted"
 fi 
 if [ -f /mnt/m-bkup/nomount ]; then
   printf "\n---- tv-proc: m-bkup drive is not mounted\n"
-  /root/.nvm/versions/node/v22.12.0/bin/node \
+  /root/.nvm/versions/node/v22.18.0/bin/node \
          ~/dev/apps/mailit/index.js "tv-proc: m-bkup drive is not mounted"
 fi 
 
@@ -24,7 +24,7 @@ fi
 cd /root/dev/apps/tv-proc
 coffee -c main.coffee
 
-/root/.nvm/versions/node/v22.12.0/bin/node  \
+/root/.nvm/versions/node/v22.18.0/bin/node  \
         --no-deprecation                    \
          /root/dev/apps/tv-proc/main.js $1  \
     >> /root/dev/apps/tv-proc/tv.log 

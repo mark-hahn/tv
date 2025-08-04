@@ -210,7 +210,7 @@ checkFile = () =>
       return
     console.log '\n>>>>>>', downloadCount+1,'/', chkCount, errCount, fname
 
-    cmd = "/usr/local/bin/guessit -js '#{fname.replace /'|`/g, ''}'"
+    cmd = "guessit -js '#{fname.replace /'|`/g, ''}'"
     guessItRes = exec(cmd, {timeout:300000}).toString()
     try
       {title, season, type} = JSON.parse guessItRes
@@ -306,7 +306,7 @@ checkFileExists = =>
   usbLongPath  = "#{usbHost}:#{videoPath}"
   if fs.existsSync tvFilePath
     existsCount++
-    console.log "-- EXISTING: " + fname
+    console.log "-- EXISTING: #{tvPath}#{seriesName}/Season #{season}"
   else
     # console.log escQuotes tvSeasonPath
     # console.log escQuotes tvFilePath

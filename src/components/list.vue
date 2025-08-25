@@ -59,12 +59,14 @@
       div(style="text-align:center; margin:10px; font-weight:bold;") 
         | Sort
       div(v-for="sortChoice in sortChoices"
-          style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="sortAction(sortChoice)") | {{sortChoice}}           
+          style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="sortAction(sortChoice)") 
+        | {{sortChoice}}           
     #fltrpop(v-if="fltrPopped" style="width:200px; background-color:#eee; padding:0px; border: 1px solid black; position: fixed; display:flex; flex-direction:column; left: 253px; top: 75px;") 
       div(style="text-align:center; margin:10px; font-weight:bold;") 
         | Filter
       div(v-for="fltrChoice in fltrChoices"
-          style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="fltrAction(fltrChoice)") | {{fltrChoice}} 
+          style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="fltrAction(fltrChoice)") 
+        | {{fltrChoice}} 
     #searchList( v-if="showingSrchList" style="background-color:#eee; padding:0px; border: 1px solid black; height:85%; position: fixed; display:flex; flex-direction:column; left: 253px; top: 88px; cursor:pointer; min-width:280px;") 
       div(@click="cancelSrchList()"
            style="font-weight:bold; text-align:center; margin:10px; padding:10px; height:20px; background-color:white;")
@@ -115,7 +117,8 @@
 
             div(style="padding:2px; flex-grow:1; fontSize:16px; font-weight:bold;" @click="saveVisShow(show, false, true)" ) 
 
-            div(v-if="show.WaitStr?.length" @click="waitStrClick(show)" style="padding:2px; color: #00f; fontSize:16px;") | {{show.WaitStr}} 
+            div(v-if="show.WaitStr?.length" @click="waitStrClick(show)" style="padding:2px; color: #00f; fontSize:16px;") 
+            | {{show.WaitStr}} 
 
           td( v-for="cond in conds" style="width:22px; text-align:center;" @click="cond.click(show)")
             font-awesome-icon(:icon="cond.icon" :style="{color:condColor(show, cond)}") 

@@ -209,7 +209,7 @@ export default {
       const afterWatched = await emby.afterLastWatched(this.show.Id);
       const status       = afterWatched.status;
       const readyToWatch = (status === 'ok');
-      if(status !== 'allWatched') {
+      if(seaEpiTxt && status !== 'allWatched') {
         const {seasonNumber, episodeNumber, episodeId} = afterWatched;
         const seaEpiTxt = `S${(''+seasonNumber) .padStart(2, "0")} ` +
                           `E${(''+episodeNumber).padStart(2, "0")}`;

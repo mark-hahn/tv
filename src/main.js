@@ -7,7 +7,6 @@ bugs ...
   blocked shows appear on boot
   noemby.json has reject field, disagrees with rejects.json
   simpsons undefined
-  next up shows undefined when no emby
   
 todo  ...
   allow putting in collection before show is in emby

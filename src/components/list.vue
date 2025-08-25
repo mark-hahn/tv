@@ -1,169 +1,91 @@
 <template lang="pug">
 
-#list(style=`height:95dvh; 
-                 padding:0; margin:0;
-                 display:flex; flex-direction:column;
-                 align-items:center;`)
-  #center(style=`height:100%; width:800px;
-                 display:flex; flex-direction:column;`)             
-    #hdr(style=`width:100%; background-color:#ccc;
-                display:flex; flex-direction:column;`)
+#list(style="height:95dvh; padding:0; margin:0; display:flex; flex-direction:column; align-items:center;")
+  #center(style="height:100%; width:800px; display:flex; flex-direction:column;")             
+    #hdr(style="width:100%; background-color:#ccc; display:flex; flex-direction:column;")
 
-      #hdrtop(style=`width:100%; height:40px;
-                     display:flex; justify-content:space-start;
-                     background-color:#ccc;`)
-        div(style=`display:flex; justify-content:space-between;
-                   margin-bottom:10px;`)
-          #nums(style=`display:flex; justify-content:space-around;
-                      width:120px;`)
-            #count(style=`display:inline-block; margin:4px 5px 4px 15px;
-                          width:75px;`) 
+      #hdrtop(style="width:100%; height:40px; display:flex; justify-content:space-start; background-color:#ccc;")
+        div(style="display:flex; justify-content:space-between; margin-bottom:10px;")
+          #nums(style="display:flex; justify-content:space-around; width:120px;")
+            #count(style="display:inline-block; margin:4px 5px 4px 15px; width:75px;") 
               | {{shows.length + '/' + allShowsLength}}
-            #prog(style=`display:inline-block; 
-                        margin:4px 10px 4px 5px; width:75px;`) 
+            #prog(style="display:inline-block; margin:4px 10px 4px 5px; width:75px;") 
               | {{gapPercent+'%'}}
 
-          #srch(style=`border:1.5px solid black;
-                        width:132px;
-                        margin: 3px 10px 0 20px;
-                        padding-top:3px; padding-left:5px;
-                        background-color:#eee;
-                        height:31px;`)
+          #srch(style="border:1.5px solid black; width:132px; margin: 3px 10px 0 20px; padding-top:3px; padding-left:5px; background-color:#eee; height:31px;")
             input(v-model="filterStr" 
                   @input="select" placeholder="Filter..."
-                  style=`width:120px;`)
+                  style="width:120px;")
 
-        #webHist(style=`border:1.5px solid black;
-                        margin: 2px 10px 0 10px;
-                        padding-top:3px; padding-left:5px;
-                        background-color:#eee;
-                        height:31px;`)
+        #webHist(style="border:1.5px solid black; margin: 2px 10px 0 10px; padding-top:3px; padding-left:5px; background-color:#eee; height:31px;")
           input(v-model="webHistStr"
                 v-on:keyup.enter="searchClick('enter')" 
-                placeholder="Search..." style=`width:120px;`)
+                placeholder="Search..." style="width:120px;")
           button(@click="searchClick('hist')"
-                  style=`display:inline-block'; 
-                        font-size:15px; margin:2px 4px 0 0;backgroundColor:white`) Hist
+                  style="display:inline-block'; font-size:15px; margin:2px 4px 0 0;backgroundColor:white") Hist
           button(@click="searchClick('web')" 
-                  style=`display:inline-block'; 
-                        font-size:15px; margin:2px 4px 0 10px;backgroundColor:white`) Web
+                  style="display:inline-block'; font-size:15px; margin:2px 4px 0 10px;backgroundColor:white") Web
         button(@click="watchClick"
-                style=`height:29px; background-color:white;
-                       fontSize:15px; margin:6px 5px 4px 10px;`) 
+                style="height:29px; background-color:white; fontSize:15px; margin:6px 5px 4px 10px;") 
           | {{ watchingName }}
 
-      #hdrbottom(style=`width:100%; background-color:#ccc; 
-                        display:flex; justify-content:space-between;
-                        margin-top:5px; margin-bottom:5px;`)
-          #botlft(style=`width:400px;
-                        overflow:hidden;
-                        display:flex; justify-content:space-between;`)
+      #hdrbottom(style="width:100%; background-color:#ccc; display:flex; justify-content:space-between; margin-top:5px; margin-bottom:5px;")
+          #botlft(style="width:400px; overflow:hidden; display:flex; justify-content:space-between;")
 
             button(@click="topClick" 
-                    style=`margin-left:10px; margin-right:5px;
-                          fontSize:15px; margin:4px;
-                          background-color:white;`) Top
+                    style="margin-left:10px; margin-right:5px; fontSize:15px; margin:4px; background-color:white;") Top
             button(@click="prevNextClick(false)" 
-                    style=`margin-left:10px; margin-right:5px;
-                          fontSize:15px; margin:4px;
-                          background-color:white;`) Prev
+                    style="margin-left:10px; margin-right:5px; fontSize:15px; margin:4px; background-color:white;") Prev
             button(@click="prevNextClick(true)" 
-                    style=`margin-left:10px; margin-right:5px;
-                          fontSize:15px; margin:4px;
-                          background-color:white;`) Next
-            #sortFltr(style=`display:inline-block;
-                          display:flex; justify-content:space-between;`)
+                    style="margin-left:10px; margin-right:5px; fontSize:15px; margin:4px; background-color:white;") Next
+            #sortFltr(style="display:inline-block; display:flex; justify-content:space-between;")
               button(@click='sortClick'
-                     :style=`{width:'100px', 
-                              fontSize:'15px', margin:'4px'}`) 
+                     :style="{width:'100px', fontSize:'15px', margin:'4px'}") 
                 | {{sortChoice}}
 
               button(@click='filterClick' 
-                     :style=`{width:'100px', 
-                              fontSize:'15px', margin:'4px'}`)
+                     :style="{width:'100px', fontSize:'15px', margin:'4px'}")
                 | {{fltrChoice}}
           button(@click="allClick" 
-                  style=`display:inline-block'; width:40px;
-                        font-size:15px; margin:4px 10px 4px 10px;backgroundColor:white`) All
-          #botrgt(style=`display:flex;
-                         justify-content:space-between;
-                         margin: 5px 17px 0 0;`)
+                  style="display:inline-block'; width:40px; font-size:15px; margin:4px 10px 4px 10px;backgroundColor:white") All
+          #botrgt(style="display:flex; justify-content:space-between; margin: 5px 17px 0 0;")
             #fltrs(v-for="cond in conds"
                 @click="condFltrClick(cond, $event)"
-                :style=`{width:'1.435em', textAlign:'center',
-                          display:'inline-block', 
-                          color:condFltrColor(cond)}`)
+                :style="{width:'1.435em', textAlign:'center', display:'inline-block', color:condFltrColor(cond)}")
               font-awesome-icon(:icon="cond.icon"
                                 :style="{}")
     #sortpop(v-if="sortPopped" 
-          style=`width:200px; background-color:#eee;
-                border: 1px solid black; position: fixed; 
-                display:flex; flex-direction:column;
-                left: 144px; top: 75px;`) 
-      div(style=`text-align:center;
-                margin:10px; font-weight:bold;`) 
+          style="width:200px; background-color:#eee; border: 1px solid black; position: fixed; display:flex; flex-direction:column; left: 144px; top: 75px;") 
+      div(style="text-align:center; margin:10px; font-weight:bold;") 
         | Sort
       div(v-for="sortChoice in sortChoices"
-          style=`margin:3px 10px; padding:10px; 
-                background-color:white; text-align:center;
-                border: 1px solid black; font-weight:bold;
-                cursor:default;`
-          @click="sortAction(sortChoice)") 
-        | {{sortChoice}}
-
-    #fltrpop(v-if="fltrPopped" 
-          style=`width:200px;
-                background-color:#eee; padding:0px;
-                border: 1px solid black; position: fixed; 
-                display:flex; flex-direction:column;
-                left: 253px; top: 75px;`) 
-      div(style=`text-align:center;
-                 margin:10px; font-weight:bold;`) 
+          style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="sortAction(sortChoice)") | {{sortChoice}}           
+    #fltrpop(v-if="fltrPopped" style="width:200px; background-color:#eee; padding:0px; border: 1px solid black; position: fixed; display:flex; flex-direction:column; left: 253px; top: 75px;") 
+      div(style="text-align:center; margin:10px; font-weight:bold;") 
         | Filter
       div(v-for="fltrChoice in fltrChoices"
-          style=`margin:3px 10px; padding:10px; 
-                background-color:white; text-align:center;
-                border: 1px solid black; font-weight:bold;
-                cursor:default;`
-          @click="fltrAction(fltrChoice)") 
-        | {{fltrChoice}}
-
-    #searchList( v-if="showingSrchList"
-          style=`background-color:#eee; padding:0px;
-                border: 1px solid black; height:85%;
-                position: fixed;
-                display:flex; flex-direction:column;
-                left: 253px; top: 88px;
-                cursor:pointer; min-width:280px;`) 
+          style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="fltrAction(fltrChoice)") | {{fltrChoice}} 
+    #searchList( v-if="showingSrchList" style="background-color:#eee; padding:0px; border: 1px solid black; height:85%; position: fixed; display:flex; flex-direction:column; left: 253px; top: 88px; cursor:pointer; min-width:280px;") 
       div(@click="cancelSrchList()"
-           style=`font-weight:bold; text-align:center;
-                  margin:10px; padding:10px; height:20px; background-color:white;`)
+           style="font-weight:bold; text-align:center; margin:10px; padding:10px; height:20px; background-color:white;")
         | Cancel
       div(style="overflow-y:scroll")
         div(v-if="showingSrchList && searchList === null")
           img(src="../../loading.gif"
-              style=`width:100px; height:100px; overflow-y:scroll;
-                      position:relative; top:20px; left:80px;`)
+              style="width:100px; height:100px; overflow-y:scroll; position:relative; top:20px; left:80px;")
         div(v-for="srchChoice in searchList"
             v-if="searchList !== null"
             @click="searchAction(srchChoice)"
-            style=`margin:3px 10px; padding:10px; width:230px;
-                  background-color:white; text-align:center;
-                  border: 1px solid black; 
-                  display:flex;`)
+            style="margin:3px 10px; padding:10px; width:230px; background-color:white; text-align:center; border: 1px solid black; display:flex;")
           img(:src="srchChoice.image" 
-              style=`max-width:80px; max-height:120px;`)
-          #srchTxt(style=`max-width:230px;
-                          display:flex; margin:5px; 
-                          flex-direction:column;`)
-            #srchName(style=`font-weight:bold;
-                            font-size:20px; `)
+              style="max-width:80px; max-height:120px;")
+          #srchTxt(style="max-width:230px; display:flex; margin:5px; flex-direction:column;")
+            #srchName(style="font-weight:bold; font-size:20px;")
               | {{srchChoice.name}}
-            #srchDtl(style=`font-size:18px; margin:10px 0 0 10px;`)
+            #srchDtl(style="font-size:18px; margin:10px 0 0 10px;")
               | {{srchChoice.searchDtlTxt}}
             #srchDel(v-if="srchChoice.deleted"
-                    style=`font-size:18px; 
-                            margin:10px 0 0 10px; color:red`)
+                    style="font-size:18px; margin:10px 0 0 10px; color:red")
               | Deleted
 
     #shows(style="width:100%; flex-grow: 1; overflow-y:scroll;")
@@ -184,68 +106,47 @@
               font-awesome-icon(icon="border-all" style="color:#ccc")
 
           td(@click="saveVisShow(show, false)"
-             :style=`{width:'80px', fontSize:'16px',
-                      backgroundColor: hilite(show),
-                      cursor:'default', textAlign:'center'}`) 
+             :style="{width:'80px', fontSize:'16px', backgroundColor: hilite(show), cursor:'default', textAlign:'center'}") 
             | {{  getValBySortChoice(show) }}
             
-          td(:style=`{display:'flex', padding:'5px', 
-                      justifyContent:'space-between',
-                      backgroundColor: hilite(show)}`)
+          td(:style="{display:'flex', padding:'5px', justifyContent:'space-between', backgroundColor: hilite(show)}")
 
-            div(style=`padding:2px; 
-                        fontSize:16px; font-weight:bold;` 
-               @click="saveVisShow(show, false, true)"
-            ) {{show.Name}} 
+            div(style="padding:2px; fontSize:16px; font-weight:bold;" @click="saveVisShow(show, false, true)") {{show.Name}} 
 
-            div(style=`padding:2px; flex-grow:1;
-                        fontSize:16px; font-weight:bold;` 
-               @click="saveVisShow(show, false, true)"
-            )
+            div(style="padding:2px; flex-grow:1; fontSize:16px; font-weight:bold;" @click="saveVisShow(show, false, true)" ) 
 
-            div(v-if="show.WaitStr?.length" 
-                @click="waitStrClick(show)"
-                style="padding:2px; color: #00f; fontSize:16px;") 
-              |  {{show.WaitStr}}
+            div(v-if="show.WaitStr?.length" @click="waitStrClick(show)" style="padding:2px; color: #00f; fontSize:16px;") | {{show.WaitStr}} 
 
-          td( v-for="cond in conds" 
-                style="width:22px; text-align:center;"
-               @click="cond.click(show)" )
-            font-awesome-icon(:icon="cond.icon"
-                :style="{color:condColor(show, cond)}")
+          td( v-for="cond in conds" style="width:22px; text-align:center;" @click="cond.click(show)")
+            font-awesome-icon(:icon="cond.icon" :style="{color:condColor(show, cond)}") 
 
-  #map(v-if="mapShow !== null" 
-        style=`background-color:#ffe; padding:10px;
-               display:flex; flex-direction:column;
-               position:fixed; top:70px; left:260px; z-index:2;
-               max-height:85%; max-width:500px; 
-               border: 2px solid black;
-               overflow-y:scroll;`)
-    div(style=`margin:0 5px; display:flex; 
-                justify-content:space-between;`)
-      div(style=`font-size:20px; margin:6px 20px 0 0;
-                 font-weight:bold; flex-grow:4;`)
-        | {{mapShow.Name}}
+  #map(v-if="mapShow !== null" style="background-color:#ffe; padding:10px; display:flex; flex-direction:column; position:fixed; top:70px; left:260px; z-index:2; max-height:85%; max-width:500px; border: 2px solid black; overflow-y:scroll;")
+
+    div(style="margin:0 5px; display:flex; justify-content:space-between;")
+      div(style="font-size:20px; margin:6px 20px 0 0; font-weight:bold; flex-grow:4;")
+        | {{mapShow?.Name}}
       button(@click="seriesMapAction('prune', mapShow)"
-             style="margin:5px;")           Prune
+              style="margin:5px;")            Prune
       button(@click="seriesMapAction('date',  mapShow)"
-             style="margin:5px;")           Set Date
+              style="margin:5px;")            Set Date
       button(@click="seriesMapAction('close')"
-             style="margin:5px;")            Close
+              style="margin:5px;")            Close
+
     div(v-if="!hideMapBottom")
-      div(v-if=`mapShow.WatchGap ||
-                mapShow.FileGap  || mapShow.WaitStr?.length`
-          style=`display:flex; justify-content:space-around; 
-                color:red; margin: 0 10px; 4px 10px;`)
-        div(v-if="mapShow.WatchGap" 
+      div(v-if="mapShow?.WatchGap || mapShow?.FileGap  || mapShow?.WaitStr?.length"
+          style="display:flex; justify-content:space-around; color:red; margin: 0 10px; 4px 10px;")
+
+        div(v-if="mapShow?.WatchGap" 
             style="display:inline-block;")
-          | {{`Watch Gap`}}
-        div(v-if="mapShow.FileGap"
+          | {{"Watch Gap"}}
+
+        div(v-if="mapShow?.FileGap"
             style="display:inline-block; margin 3px 10px")
-          | {{`Missing File`}}
-        div(v-if="mapShow.Waiting" 
+          | {{"Missing File"}}
+
+        div(v-if="mapShow?.Waiting" 
             style="display:inline-block; margin 3px 10px")
-          | {{'Waiting ' + mapShow.WaitStr}}
+          | {{'Waiting ' + mapShow?.WaitStr}}
 
       table(style="padding:0 5px; font-size:16px" )
        tbody
@@ -261,14 +162,7 @@
 
           td(v-for="episode in seriesMapEpis" key="series+'.'+episode" 
               @click="episodeClick($event, mapShow, season, episode)"
-              :style=`{cursor:'default',
-                      padding:'0 4px',
-                      textAlign:'center', border:'1px solid #ccc',
-                      backgroundColor:  
-                        (seriesMap[season]?.[episode]?.error) 
-                            ? 'yellow': 
-                        (seriesMap[season]?.[episode]?.noFile) 
-                            ? '#faa' : 'white'}`)
+              :style="{cursor:'default', padding:'0 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor: (seriesMap[season]?.[episode]?.error) ? 'yellow': (seriesMap[season]?.[episode]?.noFile) ? '#faa' : 'white'}")
             span(v-if="seriesMap?.[season]?.[episode]?.played")  w
             span(v-if="seriesMap?.[season]?.[episode]?.avail")   +
             span(v-if="seriesMap?.[season]?.[episode]?.noFile")  -
@@ -648,7 +542,7 @@ export default {
           this.cancelSrchList();
           setTimeout(() => {
             console.error('No results for web search:', srchTxt);
-            this.webHistStr = `No series.`;
+            this.webHistStr = "No series.";
           }, 100);
           return;
         }
@@ -659,7 +553,7 @@ export default {
                                 tvdbDataItem[0].toLowerCase()
                                 .includes(srchTxt.toLowerCase()));
         if(srchTvdb.length == 0) {
-          this.webHistStr = `-- No Series --`;
+          this.webHistStr = "-- No Series --";
           this.cancelSrchList();
           return;
         }

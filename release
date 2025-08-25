@@ -1,3 +1,9 @@
-npm run build-vite
-rsync -av --delete  \
-   ./shows  hahnca.com:/root/dev/apps/tv-series-client
+powershell.exe -File release.ps1
+
+# rsync -av --delete  \
+#    ./shows  hahnca.com:/root/dev/apps/tv-series-client
+
+rsync -av --delete \
+      -e "ssh -i $HOME/.ssh/id_rsa -o IdentitiesOnly=yes" \
+      /mnt/c/Users/mark/apps/tv-series-client/shows       \
+      root@hahnca.com:/root/dev/apps/tv-series-client/shows

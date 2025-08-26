@@ -12,7 +12,24 @@ convert to js:
 #  add episode dupes to counter summary
 #  move episode dupes code to this file
 
-# debug = true
+debug = false
+
+log = (...x) => 
+  if debug
+    console.log '\nLOG:', ...x
+loge = (...x) => console.error '\nLOGE:', ...x  
+sizeStr = (n, {digits=1, base=1000, suffix=""} = {}) ->
+  UNITS = ["", "K", "M", "G", "T", "P", "E", "Z", "Y"]
+  sign = if n < 0 then "-" else ""
+  num = Math.abs n
+  i = 0
+  while num >= base and i < UNITS.length - 1
+    num /= base
+    i++
+  str = num.toFixed(digits).replace(/\.0+$|(\.\d*[1-9])0+$/, "$1")
+  "#{sign}#{str}#{UNITS[i]}#{suffix}"
+
+log 'starting....'
 
 rsyncDelay = 3000  # 3 secs
 
@@ -33,23 +50,25 @@ emby = require './emby.js'
 await emby.init()
 fs.writeFileSync('scanLibraryFlag', 'noscan')
 
+downloadTime = Date.now()
+
 filterRegex = null
 filterRegexTxt = ''
 if process.argv.length == 3
   filterRegex = process.argv[2]
   filterRegexTxt = 'filter:' + filterRegex
 
-# console.log ".... starting tv.coffee v4 #{filterRegexTxt} ...."
+log ".... starting tv.coffee v4 #{filterRegexTxt} ...."
 startTime = time = Date.now()
 deleteCount = chkCount = recentCount = 0
 existsCount = errCount = downloadCount = blockedCount = 0;
 
-findUsb = "ssh #{usbHost} find files -type f -printf '%CY-%Cm-%Cd-%P\\\\\\n' | grep -v .r[0-9][0-9]$ | grep -v .rar$"
+findUsb = "ssh #{usbHost} find files -type f -printf '%CY-%Cm-%Cd-%P-%s\\\\\\n' | grep -Ev .r[0-9]+-[0-9]+$ | grep -Ev .rar-[0-9]+$"
 
 if filterRegex
   findUsb += " | grep -i " + filterRegex
 
-# console.log findUsb
+log {findUsb}
 
 dateStr = (date) =>
   date    = new Date date
@@ -89,8 +108,8 @@ for line in mapLines
 tvPath    = '/mnt/media/tv/'
 
 escQuotes = (str) ->
-  '"' + str.replace(/\\/g, '\\\\')
-           .replace(/"/g,  '\\"') + '"'
+  "'" + str.replace(/\\/g, '\\\\')
+           .replace(/"/g,  '\\"') + "'"
           #  .replace(/'|`/g,  "\\'")
           #  .replace(/\(/g, "\\(")
           #  .replace(/\)/g, "\\)")
@@ -117,10 +136,9 @@ request.post 'https://api4.thetvdb.com/v4/login',
       process.exit()
     else
       theTvDbToken = body.data.token
-      # console.log({theTvDbToken});
+      # log({theTvDbToken});
       # process.exit();
-      # if debug
-      # console.log 'tvdb login', {error, response, body}
+      # log 'tvdb login', {error, response, body}
       #   process.exit()
 
       process.nextTick delOldFiles
@@ -130,11 +148,11 @@ request.post 'https://api4.thetvdb.com/v4/login',
 
 delOldFiles = =>
   # prune script deletes files older than 60 days
-  # console.log ".... deleting old files in usb ~/files ...."
+  log ".... deleting old files in usb ~/files ...."
   res = exec("ssh #{usbHost} /home/xobtlu/prune.sh", 
               {timeout:300000}).toString()
   if not res.startsWith('prune ok')
-    console.log "Prune error: #{res}"
+    loge "Prune error: #{res}"
 
 # delete old entries in tv-recent.json
 # tv-recent files limited to 80 days
@@ -159,24 +177,30 @@ skipPaths = null
 checkFiles = =>
   usbFiles = exec(findUsb, {timeout:300000}).toString().split '\n'
   # fs.writeFileSync 'tv-files.txt', usbFiles.join('\n')
+  
   skipPaths = []
   for usbLine in usbFiles
+    usbLine = usbLine.split('-').slice(0,-1).join('-')
     if usbLine.endsWith '!unrar.lock'
       skipPaths.push usbLine.slice(11,-12)
   if skipPaths.length > 0
-    console.log "skipping locked paths", skipPaths
+    log "skipping locked paths", skipPaths
   # if filterRegex
-  #   console.log usbFiles.join('\n')
+  #   log usbFiles.join('\n')
   process.nextTick checkFile
 
 checkFile = () =>
   tvDbErrCount = 0
   if usbLine = usbFiles.shift()
-    usbFilePath = usbLine.slice(11)
+    usbLineParts = usbLine.split('-')
+    usbFileSize  = usbLineParts.pop()
+    usbLine      = usbLineParts.join('-')
+    usbFilePath  = usbLine.slice(11)
+    usbFileSize  = sizeStr parseInt(usbFileSize), {digits:2, suffix:'B'}  
 
     for skipPath in skipPaths
       if usbFilePath.startsWith skipPath
-        console.log "skipping locked #{usbFilePath}"
+        log "skipping locked #{usbFilePath}"
         process.nextTick checkFile
         return
 
@@ -190,36 +214,38 @@ checkFile = () =>
       return
     if recent[fname]
       recentCount++
-      # console.log '------', downloadCount,'/', chkCount, 'SKIPPING RECENT:', fname
+      log '------', downloadCount,'/', chkCount, 'SKIPPING RECENT:', fname
       process.nextTick checkFile
       return
-    # console.log('not recent', usbLine);
+    log('not recent', usbLine);
     for blkName of blocked
       if fname.indexOf(blkName) > -1
         recent[fname] = Date.now()
         writeMap 'tv-recent.json', recent
         # fs.writeFileSync 'tv-recent.json', JSON.stringify recent
         blockedCount++
-        console.log '-- BLOCKED:', {blkName, fname}
+        log '-- BLOCKED:', {blkName, fname}
         process.nextTick checkFile
         return
-    # console.log('not blocked', usbLine);
+    log('not blocked', usbLine);
     if errors[fname]
-      # console.log '------', downloadCount,'/', chkCount, 'SKIPPING *ERROR*:', fname
+      log '------', downloadCount,'/', chkCount, 'SKIPPING *ERROR*:', fname
       process.nextTick checkFile
       return
-    console.log '\n>>>>>>', downloadCount+1,'/', chkCount, errCount, fname
+    console.log '\n>>>>>>', downloadCount+1,'/', chkCount, errCount, fname, usbFileSize
+    downloadTime = Date.now()
 
     cmd = "guessit -js '#{fname.replace /'|`/g, ''}'"
     guessItRes = exec(cmd, {timeout:300000}).toString()
+    log 'guessit:', guessItRes
     try
       {title, season, type} = JSON.parse guessItRes
       if not type == 'episode'
-        console.log '\nskipping non-episode:', fname
+        log '\nskipping non-episode:', fname
         process.nextTick badFile
         return
       if not Number.isInteger season
-        console.log '\nno season integer for ' + usbLine + ', defaulting to season 1', {title, season, type}
+        loge '\nno season integer for ' + usbLine + ', defaulting to season 1', {title, season, type}
         season = 1
     catch
       console.error '\nerror parsing:' + fname
@@ -227,7 +253,7 @@ checkFile = () =>
       return
     process.nextTick chkTvDB
   else
-    # console.log '.... done ....'
+    log '.... done ....'
     if (deleteCount + existsCount + errCount + downloadCount + blockedCount) > 0
       console.log "***********************************************************"
     if (recentCount > 0)
@@ -248,12 +274,12 @@ checkFile = () =>
     # if downloadCount > 0 
     #   fs.writeFileSync('scanLibraryFlag', 'scan')
     # else if fs.readFileSync('scanLibraryFlag','utf8') is 'scan'
-    #   console.log 'scanning library'
+    #   log 'scanning library'
     #   await emby.scanLibrary()
     #   fs.writeFileSync('scanLibraryFlag', 'noscan')
 
     if (deleteCount + existsCount + errCount + downloadCount + blockedCount) > 0
-      console.log "***********************************************************"
+      log "***********************************************************"
 
 tvdbCache = {}
 tvdburl = ''
@@ -270,13 +296,13 @@ chkTvDB = =>
     setTimeout checkFileExists, rsyncDelay
     return
     
-  # console.log('search:', title);
+  log('search:', title);
   tvdburl = 'https://api4.thetvdb.com/v4/search?type=series&q=' + 
               encodeURIComponent(title)
   request tvdburl,
     {json:true, headers: {Authorization: 'Bearer ' + theTvDbToken}},
     (error, response, body) =>
-      # console.log 'thetvdb', {tvdburl, error, response, body}
+      # log 'thetvdb', {tvdburl, error, response, body}
       if error or not body.data?[0] or (response?.statusCode != 200)
         console.error 'no series name found in theTvDB:', {fname, tvdburl}
         console.error 'search error:', error
@@ -292,8 +318,9 @@ chkTvDB = =>
           process.nextTick badFile
       else
         seriesName = body.data[0].name
+        log 'tvdb got:', {seriesName, title}
         if map[seriesName]
-          console.log '+++ Mapping', seriesName, 'to', map[seriesName]
+          log '+++ Mapping', seriesName, 'to', map[seriesName]
           seriesName = map[seriesName]
         tvdbCache[title] = seriesName
         # process.nextTick checkFileExists
@@ -306,29 +333,27 @@ checkFileExists = =>
   usbLongPath  = "#{usbHost}:#{videoPath}"
   if fs.existsSync tvFilePath
     existsCount++
-    console.log "-- EXISTING: #{tvPath}#{seriesName}/Season #{season}"
+    log "-- EXISTING: #{tvPath}#{seriesName}/Season #{season}"
   else
-    # console.log escQuotes tvSeasonPath
-    # console.log escQuotes tvFilePath
-    # console.log escQuotes videoPath
-    # console.log escQuotes usbLongPath
-
     mkdirp.sync tvSeasonPath
 
-    console.log "usb path: #{usbFilePath}\nlocalPath: #{tvFilePath}"
+    rsyncCmd = "rsync -av --timeout=20 #{escQuotes usbLongPath} #{escQuotes tvFilePath}"
+
+    log "downloading ... usb path: \n#{usbFilePath}\nlocalPath: #{tvFilePath}\nrsyncCmd: #{rsyncCmd}"
 
     try
-      console.log(exec("rsync -av #{escQuotes usbLongPath} #{escQuotes tvFilePath}",
-                        fileTimeout).toString().replace('\n\n', '\n'),
+      log(exec(rsyncCmd, fileTimeout).toString().replace('\n\n', '\n'),
                       ((Date.now() - time)/1000).toFixed(0) + ' secs')
     catch e
-      console.log "\nvvvvvvvv\nrsync download error: \n#{e.message}^^^^^^^^^"
+      loge "\nvvvvvvvv\nrsync download error: \n#{e.message}^^^^^^^^^"
       badFile();
       return;
       
     downloadCount++
     time = Date.now()
-
+    log "rsync finished"
+    console.log "download finished: elapsed(mins):",
+               ((Date.now()-downloadTime)/(60*1000)).toFixed(1)
   recent[fname] = Date.now()
   writeMap 'tv-recent.json', recent
   process.nextTick checkFile

@@ -209,7 +209,7 @@ export default {
       const afterWatched = await emby.afterLastWatched(this.show.Id);
       const status       = afterWatched.status;
       const readyToWatch = (status === 'ok');
-      if(seaEpiTxt && status !== 'allWatched') {
+      if(!this.show.Id.startsWith('noemby') && status !== 'allWatched') {
         const {seasonNumber, episodeNumber, episodeId} = afterWatched;
         const seaEpiTxt = `S${(''+seasonNumber) .padStart(2, "0")} ` +
                           `E${(''+episodeNumber).padStart(2, "0")}`;
@@ -271,7 +271,8 @@ export default {
   },
 
   /////////////////  MOUNTED  /////////////////
-
+  // series vue component at mounted phase
+  // set everything in html
   mounted() {
     evtBus.on('setUpSeries', async (show) => { 
       allTvdb        = await tvdb.getAllTvdb();

@@ -5,12 +5,15 @@ let theTvdbToken = null;
 
 let allTvdb = null;
 export const getAllTvdb = async () => {
+  // all data in tvdb.json
+  // cached in allTvdb
   allTvdb ??= await srvr.getAllTvdb();
   return allTvdb;
 }
 
 ///////////// get theTvdbToken //////////////
- 
+// this is a duplicate of the server
+// both access tvdb.com independently
 const getToken = async () => {
   const loginResp = await fetch(
     'https://api4.thetvdb.com/v4/login', 
@@ -65,6 +68,7 @@ export const markTvdbDeleted =
     //   alert('no image in tvdbData');
     //   return;
     // }
+    // addTvdb can add or update tvdb.json
     await srvr.addTvdb(tvdbData);
     allTvdb[showName] = tvdbData;
   };

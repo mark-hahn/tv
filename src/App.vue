@@ -633,7 +633,7 @@ export default {
             imdbWin = window.open(url, "imdbWebPage");
           }
           else console.log("no imdb Provider Id for show:", show);
-        } 
+        }
         else {
           console.log("opening emby page for", show.Name);
 

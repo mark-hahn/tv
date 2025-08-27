@@ -27,7 +27,7 @@ coffee -c main.coffee
 /root/.nvm/versions/node/v22.18.0/bin/node  \
         --no-deprecation                    \
          /root/dev/apps/tv-proc/main.js $1  \
-    2>&1 | tee -a /root/dev/apps/tv-proc/tv.log
+    2>&1 >> /root/dev/apps/tv-proc/tv.log
 
 chmod -R 774  /mnt/media/tv
 chown -R emby /mnt/media/tv

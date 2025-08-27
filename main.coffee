@@ -109,7 +109,7 @@ tvPath    = '/mnt/media/tv/'
 
 escQuotes = (str) ->
   "'" + str.replace(/\\/g, '\\\\')
-           .replace(/"/g,  '\\"') + "'"
+           .replace(/'/g,  "'\\''") + "'"
           #  .replace(/'|`/g,  "\\'")
           #  .replace(/\(/g, "\\(")
           #  .replace(/\)/g, "\\)")
@@ -236,7 +236,7 @@ checkFile = () =>
     downloadTime = Date.now()
 
     cmd = "guessit -js '#{fname.replace /'|`/g, ''}'"
-    guessItRes = exec(cmd, {timeout:300000}).toString()
+    guessItRes = exec(cmd, {timeout:10000}).toString()
     log 'guessit:', guessItRes
     try
       {title, season, type} = JSON.parse guessItRes

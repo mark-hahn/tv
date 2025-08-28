@@ -9,6 +9,8 @@ const allTvdb =
       util.jParse(fs.readFileSync('data/tvdb.json', 'utf8'));
 
 ///////////// get theTvdbToken //////////////
+// this is a duplicate of the client
+// both access tvdb.com independently
 let theTvdbToken = null;
 let gotTokenTime = 0;
 const getTheTvdbToken = async () => {
@@ -16,10 +18,9 @@ const getTheTvdbToken = async () => {
     'https://api4.thetvdb.com/v4/login', 
     { method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: 
-        JSON.stringify({
+      body:    JSON.stringify({
             "apikey": "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df",
-            "pin": "HXEVSDFF"
+            "pin":    "HXEVSDFF"
         })
     }
   );
@@ -35,13 +36,13 @@ const getTheTvdbToken = async () => {
 
 ///////////////////// GET REMOTES ///////////////////////
 
-const getUrlRatings = async (type, url, name) => {
-  // console.log('getUrlRatings', {type, url, name});
+const getUrlAndRatings = async (type, url, name) => {
+  // console.log('getUrlAndRatings', {type, url, name});
 
   let resp = await fetch(url);
   if (!resp.ok) {
     console.error(
-      `getUrlRatings fetch error: ${{type, url, name}}, ${resp.status}`);
+      `getUrlAndRatings fetch error: ${{type, url, name}}, ${resp.status}`);
     return null;
   }
   const html = (await resp.text())
@@ -105,7 +106,7 @@ const getUrlRatings = async (type, url, name) => {
     //   }
     //   return {url:textUrl};
 
-    default: return 'getUrlRatings invalid type: ' + type;
+    default: return 'getUrlAndRatings invalid type: ' + type;
   }
 }
 
@@ -121,7 +122,7 @@ const getRemote = async (id, type, showName) => {
     case 2:  
       name = 'IMDB';
       url  = `https://www.imdb.com/title/${id}`;
-      urlRatings = await getUrlRatings(2, url, name);
+      urlRatings = await getUrlAndRatings(2, url, name);
       ratings = urlRatings?.ratings;
       break;
 
@@ -139,7 +140,7 @@ const getRemote = async (id, type, showName) => {
 
     case 18: 
       name = 'Wikipedia';
-      urlRatings = await getUrlRatings(18, 
+      urlRatings = await getUrlAndRatings(18, 
                     `https://www.wikidata.org/wiki/${id}`, showName);
       url = urlRatings?.url;
       break;
@@ -149,7 +150,7 @@ const getRemote = async (id, type, showName) => {
     // case 99:  
     //   url = `https://www.rottentomatoes.com/search` +
     //                 `?search=${encodeURI(id)}`;
-    //   urlRatings = await getUrlRatings(99, url, showName);
+    //   urlRatings = await getUrlAndRatings(99, url, showName);
     //   name = urlRatings?.name;
     //   url  = urlRatings?.url;
     //   // console.log(`getRemote rotten name url: ${name}, ${url}`);
@@ -167,7 +168,7 @@ const getRemote = async (id, type, showName) => {
 }
 
 ///////////// get remotes  //////////////
-
+// use tvdb remotes data to find complete remote data
 const getRemotes = async (show, tvdbRemotes) => {
   const name   = show.Name;
   const showId = show.Id;
@@ -214,9 +215,13 @@ const getRemotes = async (show, tvdbRemotes) => {
 
 
 //////////// GET TVDB DATA //////////////
+// fetch data from tvdb.com
+// create tvdbData object
+ // update allTvdb & tvdb.json
 const getTvdbData = async (paramObj, resolve, _reject) => {
   const {show, deleted,
          seasonCount, episodeCount, watchedCount} = paramObj;
+  if(deleted) return null;
   const name   = show.Name;
   const showId = show.Id;
   const tvdbId = show.TvdbId;
@@ -254,6 +259,9 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   lastAired = lastAired ?? '';
   let originalNetwork = originalNetworkIn?.name ?? '';
   const status = statusIn.name; // e.g. Ended
+
+  // get remote data, e.g. IMDB for tvdb record
+  // remoteIds come from tvdb
   const remotes = await getRemotes(show, remoteIds);
   const saved = Date.now();
 
@@ -269,11 +277,15 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     tvdbData.deleted = deleted;
 
   // console.log('getTvdbData:', tvdbData);
+  allTvdb[name] = tvdbData;
+  // update allTvdb & tvdb.json
   resolve(tvdbData);
 }
 
 
 /////////  GET/UPDATE TVDB FOR WEB AND LOCAL //////
+// each tvdb request from web waits in queue
+// every result updates json file tvdb.json
 const newTvdbQueue = [];
 let   chkTvdbQueueRunning = false;
 
@@ -305,11 +317,15 @@ const chkTvdbQueue = () => {
 
 
 //////////// UPDATE TVDB LOOP ////////////////
+// get imdb data continuously to update data
+// allTvdb is in memory copy of tvdb.json
+// only one sequential request can be busy at a time
 let tryLocalGetTvdbBusy = false;
 const tryLocalGetTvdb = () => {
   if(tryLocalGetTvdbBusy) return;
   tryLocalGetTvdbBusy = true;
 
+  // find show with oldest save date
   let minSaved = Math.min();
   let minTvdb  = null;
   try {
@@ -362,14 +378,17 @@ const tryLocalGetTvdb = () => {
 
 // calls tryLocalGetTvdb every 6 mins
 const updateTvdbs = () => {
-  if(Date.now() > gotTokenTime + 14*24*60*60*1000) { // 2 weeks
+  // token expires, refresh every 2 weeks
+  if(Date.now() > gotTokenTime + 14*24*60*60*1000) {
     theTvdbToken = null;
     getTheTvdbToken();
   }
+  // wait for token
   if(!theTvdbToken) {
     setTimeout(updateTvdbs, 1000);
     return;
   }
+  // only bother tvdb.com every 6 mins
   if (UPDATE_DATA) tryLocalGetTvdb();
   setTimeout(updateTvdbs, 6*60*1000);  // 6 mins
   console.log(new Date().toTimeString().slice(0,8), 
@@ -381,9 +400,11 @@ updateTvdbs();
 ///////////////////  FUNCTION CALLS FROM CLIENT  ////////////////////
 export const getAllTvdb = (id, _param, resolve, _reject) => {
   console.log('getAllTvdb', id);
+  // return allTvdb object immediatelty
   resolve([id, allTvdb]);
 };
 
+// if tvdb already exists replace it
 export const getNewTvdb = async (ws, id, param) => {
   const paramObj = util.jParse(param, 'getNewTvdb');
   console.log('getNewTvdb:', paramObj.show.Name);
@@ -415,7 +436,7 @@ export const setTvdbFields =
         if(key != 'dontSave' && key != '$delete') 
           tvdb[key] = value;
       }
-      allTvdb[name] = tvdb;
+      // allTvdb[name] = tvdb;
     }
   }
   if(!paramObj.dontSave) 

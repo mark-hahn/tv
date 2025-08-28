@@ -394,11 +394,11 @@ const updateTvdbLocal = () => {
     setTimeout(updateTvdbLocal, 1000);
     return;
   }
-  // only bother tvdb.com every 2 mins
+  // only bother tvdb.com every min
   if (UPDATE_DATA) tryLocalGetTvdb();
-  setTimeout(updateTvdbLocal, 30*1000); 
-  console.log(new Date().toTimeString().slice(0,8), 
-              'tvdb local update finished', );
+  setTimeout(updateTvdbLocal, 60*1000); 
+  // console.log(new Date().toTimeString().slice(0,8), 
+  //             'tvdb local update finished', );
 }
 updateTvdbLocal();
 

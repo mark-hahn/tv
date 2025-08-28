@@ -221,13 +221,16 @@ const getRemotes = async (show, tvdbRemotes) => {
 const getTvdbData = async (paramObj, resolve, _reject) => {
   const {show, deleted,
          seasonCount, episodeCount, watchedCount} = paramObj;
-  if(deleted) return null;
   const name   = show.Name;
+  if(deleted) {
+    resolve(name);
+    return;
+  }
   const showId = show.Id;
   const tvdbId = show.TvdbId;
   if(!tvdbId) {
     console.error('getTvdbData no tvdbId:', show);
-    resolve(null);
+    resolve(name);
     return;
   }
   let extRes, extUrl;
@@ -242,12 +245,14 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     if (!extRes.ok) {
       console.error(`getTvdbData error, extended status:`, 
                         name, {extUrl}, JSON.stringify(extRes, null, 2));
-      return null;
+      resolve(name);
+      return;
     }
   } catch(err) {  
     console.error('getTvdbData extended catch error:', name, 
                       {extUrl, extRes, err});
-    return null;
+    resolve(name);
+    return;
   }
   const extResObj = await extRes.json();
   const {firstAired, lastAired:lastAiredIn, image, score,
@@ -303,12 +308,13 @@ const chkTvdbQueue = () => {
     reject  = rejectIn;
   });
   promise.then((tvdbData) => {
-    const tvdbDataStr = JSON.stringify(tvdbData);
-    if(ws) ws.send(`${id}~~~ok~~~${tvdbDataStr}`);
-
-    allTvdb[tvdbData.name] = tvdbData;
+    if(typeof tvdbData === 'object') {
+      if(ws) ws.send(`${id}~~~ok~~~${JSON.stringify(tvdbData)}`);
+      allTvdb[tvdbData.name] = tvdbData;
+    }
+    else tvdbData = allTvdb[tvdbData]; // tvdbData is name
+    tvdbData.saved = Date.now();
     util.writeFile('./data/tvdb.json', allTvdb);
- 
     chkTvdbQueueRunning == false;
     chkTvdbQueue();
   });
@@ -377,7 +383,7 @@ const tryLocalGetTvdb = () => {
 }
 
 // calls tryLocalGetTvdb every 6 mins
-const updateTvdbs = () => {
+const updateTvdbLocal = () => {
   // token expires, refresh every 2 weeks
   if(Date.now() > gotTokenTime + 14*24*60*60*1000) {
     theTvdbToken = null;
@@ -385,16 +391,16 @@ const updateTvdbs = () => {
   }
   // wait for token
   if(!theTvdbToken) {
-    setTimeout(updateTvdbs, 1000);
+    setTimeout(updateTvdbLocal, 1000);
     return;
   }
-  // only bother tvdb.com every 6 mins
+  // only bother tvdb.com every 2 mins
   if (UPDATE_DATA) tryLocalGetTvdb();
-  setTimeout(updateTvdbs, 6*60*1000);  // 6 mins
+  setTimeout(updateTvdbLocal, 30*1000); 
   console.log(new Date().toTimeString().slice(0,8), 
               'tvdb local update finished', );
 }
-updateTvdbs();
+updateTvdbLocal();
 
 
 ///////////////////  FUNCTION CALLS FROM CLIENT  ////////////////////

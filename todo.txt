@@ -3,10 +3,11 @@ reminder, restore ...
   start gap running
   
 bugs ...
-  the rookie has no emby button
+  rookie next up
   blocked shows appear on boot
   noemby.json has reject field, disagrees with rejects.json
   simpsons undefined
+  local tvdb update unforgivable
 
 todo  ...
   allow putting in collection before show is in emby

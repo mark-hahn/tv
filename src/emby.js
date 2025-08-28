@@ -164,8 +164,8 @@ export async function loadAllShows() {
       }
       const name = show.Name;
       let tvdb = allTvdb[name];
-      if(!tvdb) {
-        console.log(`loadAllShows creating tvdb`, name);
+      if(!tvdb || tvdb.showId !== show.Id) {
+        console.log(`loadAllShows creating/updating tvdb`, name);
         const epicounts = await getEpisodeCounts(show);
         const param = Object.assign({show}, epicounts);
         tvdb = await srvr.getNewTvdb(param);
@@ -175,7 +175,6 @@ export async function loadAllShows() {
         if(remote.ratings) 
             ratings = remote.ratings;
       }
-      tvdb.showId          = show.Id;
       show.TvdbId          = tvdb.tvdbId;
       show.OriginalCountry = tvdb.originalCountry;
       show.Ended           = (tvdb.status == 'Ended');

@@ -3,6 +3,7 @@ reminder, restore ...
   start gap running
   
 bugs ...
+  no ratings for hacks
   blocked shows appear on boot
   noemby.json has reject field, disagrees with rejects.json
   prune skipped first season worked on second try
@@ -16,9 +17,8 @@ todo  ...
   make popups modal with closing by clicking anywhere
   keep deleted date forever
   keep all map info for deleted shows
-  sort by imdb ratings
   show actors
-  files with no emby should be added as pickup if in tvdb
+  shows with no emby should be added as pickup if in tvdb
   add wikipedia remote the hard way
 
 tabled ...

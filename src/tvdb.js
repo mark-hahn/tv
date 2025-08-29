@@ -1,7 +1,8 @@
-import fs        from "fs";
-import * as util from "./util.js";
-import * as urls from "./urls.js";
-import fetch     from 'node-fetch';
+import fs             from "fs";
+import fetch          from 'node-fetch';
+import * as util      from "./util.js";
+import * as urls      from "./urls.js";
+import {rottenSearch} from './rotten.js';
 
 const UPDATE_DATA = true;
 
@@ -37,7 +38,7 @@ const getTheTvdbToken = async () => {
 ///////////////////// GET REMOTES ///////////////////////
 
 const getUrlAndRatings = async (type, url, name) => {
-  // console.log('getUrlAndRatings', {type, url, name});
+  console.log('getUrlAndRatings', {type, url, name});
 
   let resp = await fetch(url);
   if (!resp.ok) {
@@ -48,16 +49,6 @@ const getUrlAndRatings = async (type, url, name) => {
   const html = (await resp.text())
                 .replaceAll(/(\r\n|\n|\r)/gm, "")
                 .replaceAll(/\s+/gm, " ");
-
-  // const rottenStripSfx = (name) => {
-  //   name = name.trim();
-  //   const pfxNameParts = /^(.*?)(\s+\(.*?\))?$/i.exec(name);
-  //   if(!pfxNameParts) {
-  //     console.error('no rotten name pfx match:', {type, url, name});
-  //     return null;
-  //   }
-  //   return pfxNameParts[1];
-  // }
 
   let idFnameParam;
 
@@ -74,38 +65,6 @@ const getUrlAndRatings = async (type, url, name) => {
       if(idFnameParam === null) return {url: null};
       return {url: idFnameParam[1]};
 
-    // case 99:  // rotten tomatoes
-    //   // util.writeFile('samples/rotten-search.html', html);
-    //   const namePfx = rottenStripSfx(name);
-    //   let titleRegx = new RegExp(/search-result-title">TV shows</g);
-    //   titleRegx.lastIndex = 0;
-    //   const titleParts = titleRegx.exec(html);
-    //   if(titleParts === null) {
-    //     console.error('no rotten title match:', {type, url, name});
-    //     return {url:'no match'};
-    //   }
-
-  // need escaping: ] ( ) [ { } * + ? / $ . | ^ \
-
-    //   const urlNameRegx = new RegExp(
-    //      /<a href="([^"]*)" class="unset" data-qa="info-name" slot="title">([^<]*)<\/a>/g
-    // );
-
-    //   urlNameRegx.lastIndex = titleRegx.lastIndex;
-    //   let textUrl;
-    //   for(let i=0; i<3; i++) {
-    //     const nameParts = urlNameRegx.exec(html);
-    //     if(nameParts === null || i == 3) {
-    //       console.log('no rotten url name match:', {type, url, name});
-    //       return {url:'no match'};
-    //     }
-    //     let textName;
-    //     [textUrl, textName] = nameParts.slice(1);
-    //     const textNamePfx = rottenStripSfx(textName);
-    //     if(textNamePfx == namePfx) break;
-    //   }
-    //   return {url:textUrl};
-
     default: return 'getUrlAndRatings invalid type: ' + type;
   }
 }
@@ -116,14 +75,14 @@ const getUrlAndRatings = async (type, url, name) => {
 const getRemote = async (id, type, showName) => {
   let url     = null;  
   let ratings = null;
-  let urlRatings, name;
+  let urlRatings, name, criticsScore, audienceScore;
   
   switch (type) {
     case 2:  
       name = 'IMDB';
       url  = `https://www.imdb.com/title/${id}`;
       urlRatings = await getUrlAndRatings(2, url, name);
-      ratings = urlRatings?.ratings;
+      ratings    = urlRatings?.ratings;
       break;
 
     case 4:  name = 'Official Website'; url = id; break;
@@ -147,36 +106,43 @@ const getRemote = async (id, type, showName) => {
       
     // case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
 
-    // case 99:  
-    //   url = `https://www.rottentomatoes.com/search` +
-    //                 `?search=${encodeURI(id)}`;
-    //   urlRatings = await getUrlAndRatings(99, url, showName);
-    //   name = urlRatings?.name;
-    //   url  = urlRatings?.url;
-    //   // console.log(`getRemote rotten name url: ${name}, ${url}`);
-    //   break;
+    case 99:  // rotten tomatoes
+      name = 'Rotten';
+      urlRatings = await rottenSearch(showName);
+      if(!urlRatings) return null;
+      console.log("getRemote rottenSearch:", urlRatings);
+      url     = urlRatings.url;
+      ratings = urlRatings.criticsScore + '/' + urlRatings.audienceScore;
+      break;
 
     default: return null;
   }
   
   if(!url) {
-    // console.log(`getRemote, no url: ${name}`);
+    console.log(`getRemote, no url: ${name}`);
     return null;
   }
-  // console.log(`getRemote`, {name, url, ratings});
+  console.log(`getRemote`, {name, url, ratings});
   return {name, url, ratings};
 }
 
 ///////////// get remotes  //////////////
 // use tvdb remotes data to find complete remote data
 const getRemotes = async (show, tvdbRemotes) => {
-  const name   = show.Name;
-  const showId = show.Id;
-
-  const remotes = [];
+  const name          = show.Name;
+  const showId        = show.Id;
+  const remotes       = [];
 
   if(showId && !showId.startsWith("noemby-")) 
     remotes.push({name:'Emby', url: urls.embyPageUrl(showId)});
+
+  const rottenRemote = await getRemote(null, 99, name);
+  if(rottenRemote) remotes.push(rottenRemote);
+
+  const encoded = encodeURI(name).replaceAll('&', '%26');
+  const url = `https://www.google.com/search` +
+                       `?q=${encoded}%20tv%20show`;
+  remotes.push({name:'Google', url});
 
   const remotesByName = {};
   for(const tvdbRemote of tvdbRemotes) {
@@ -196,23 +162,12 @@ const getRemotes = async (show, tvdbRemotes) => {
   } 
 
   for(const [name, remote] of Object.entries(remotesByName)) {
-    if(name !== "IMDB" && name !== "Rotten Tomatoes")
+    if(name !== "IMDB" && name !== "Rotten")
       remotes.push(remote);
   }
 
-  // const rottenRemote = await getRemote(name, 99, name);
-  // // if(rottenRemote?.url === 'no match') debugger
-  // if(rottenRemote && rottenRemote.url !== 'no match') 
-  //     remotes.push(rottenRemote);
-
-  const encoded = encodeURI(name).replaceAll('&', '%26');
-  const url = `https://www.google.com/search` +
-                       `?q=${encoded}%20tv%20show`;
-  remotes.push({name:'Google', url});
-
   return remotes;
 }
-
 
 //////////// GET TVDB DATA //////////////
 // fetch data from tvdb.com

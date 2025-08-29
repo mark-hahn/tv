@@ -105,7 +105,7 @@ async function getShows(page, query) {
   );
   return shows;
 }
-export async function getRotten(query) {
+export async function rottenSearch(query) {
   query = query.toLowerCase().trim();
 
   const headless = !process.argv[2];

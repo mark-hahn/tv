@@ -105,11 +105,12 @@ async function getShows(page, query) {
   );
   return shows;
 }
-export async function getRotten(query, headless = true) {
+export async function getRotten(query) {
   query = query.toLowerCase().trim();
 
-  const browser = await chromium.launch({ headless });
-  const page    = await browser.newPage();
+  const headless = !process.argv[2];
+  const browser  = await chromium.launch({ headless });
+  const page     = await browser.newPage();
 
   page.setDefaultTimeout(NAV_TIMEOUT);
   page.setDefaultNavigationTimeout(NAV_TIMEOUT);

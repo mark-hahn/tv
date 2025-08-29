@@ -1,7 +1,13 @@
+// node src/rotten.js "BETH"
+
 import { chromium } from "playwright";
 
 const NAV_TIMEOUT = 15_000;
 const BASE        = "https://www.rottentomatoes.com";
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 async function dismissOverlays(page) {
   const selectors = [
@@ -22,6 +28,23 @@ function mostRecent(shows) {
   });
 }
 
+function overlaps(a, b) {
+  let max = Math.max();
+  for (let i = 0; i < a.length; i++) {
+    for (let j = i + 1; j <= a.length; j++) {
+      const asub = a.substring(i, j);
+      for (let k = 0; k < b.length; k++) {
+        for (let l = k + 1; l <= b.length; l++) {
+          const bsub = b.substring(k, l);
+          if (asub === bsub && asub.length > max) max = asub.length;
+        }
+      }
+    }
+  }
+  const shortest = Math.min(a.length, b.length);
+  return (max >= shortest);
+}
+
 function getShow(shows, query) {
   query = query.toLowerCase().trim();
   shows.forEach(s => s.titleTrimmed = s.title.toLowerCase().trim());
@@ -32,25 +55,35 @@ function getShow(shows, query) {
   // no exact title matches
   matches = [];
   // The Bear (2022) => The Bear
-  const parts = query.match(/^(.*?)[^a-z0-9\s].*$/);
-  const queryTrunc = parts[1].trim(); 
+  const parts = query.match(/^[a-z0-9\s]*/);
+  if(!parts) return null;
+  const queryTrunc = parts[0].trim(); 
   for (const show of shows) {
     const parts = show.titleTrimmed.match(/^(.*?)[^a-z0-9\s].*$/);
+    if(!parts) continue;
     const titleTrunc = parts[1].trim();
     if(titleTrunc === queryTrunc) matches.push(show);
   }
   if(matches.length === 1) return matches[0];
   if(matches.length   > 1) return mostRecent(matches);
   // no prefix matches
+  matches = [];
+  for (const show of shows) {
+    if(overlaps(query, show.titleTrimmed)) matches.push(show);
+  }
+  if(matches.length === 1) return matches[0];
+  if(matches.length   > 1) return mostRecent(matches);
+  // no substring overlap matches
   return null;
 }
 
-async function getShows(page, query) {
-  await page.goto(`${BASE}/search?search=${encodeURIComponent(query)}`, {
-    waitUntil: "domcontentloaded",
-  });
-  await dismissOverlays(page);
+let queryUrl;
 
+async function getShows(page, query) {
+  queryUrl = `${BASE}/search?search=${encodeURIComponent(query)}`;
+  await page.goto(queryUrl, {waitUntil: "domcontentloaded"});
+  await dismissOverlays(page);
+  await page.locator();
   const tv = page.locator('search-page-result[type="tvSeries"]');
   await tv.waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
   const rows = tv.locator("search-page-media-row");
@@ -86,7 +119,7 @@ export async function getRotten(query, headless = true) {
     const shows = await getShows(page, query);
     const show  = getShow(shows, query);
     if (!show) {
-      console.log('No matching show found');
+      console.log(`Rotten: No matching show found for "${query}"`);
       return null;
     }
     const detailLink = show.href;
@@ -95,12 +128,19 @@ export async function getRotten(query, headless = true) {
     await dismissOverlays(page);
     const criticsScore = 
            await page.locator('rt-text[slot="collapsedCriticsScore"]')
-      .evaluate(el => Number((el.textContent || '').match(/\d+/)?.[0] ?? NaN));
+      .evaluate(el => Number((el.textContent || '').match(/\d+/)?.[0] ?? ""));
     const audienceScore = 
            await page.locator('rt-text[slot="collapsedAudienceScore"]')
-      .evaluate(el => Number((el.textContent || '').match(/\d+/)?.[0] ?? NaN));
+      .evaluate(el => Number((el.textContent || '').match(/\d+/)?.[0] ?? ""));
 
-    return { detailLink, criticsScore, audienceScore};
+    console.log(`rotten: "${query }" => "${show.title
+                   }" ${show.startyear
+                   } ${criticsScore
+                   } ${audienceScore
+                   }\n    ${queryUrl
+                   }\n    ${detailLink}`);
+
+    return { url: detailLink, criticsScore, audienceScore};
           // title:     show.title,
           // startyear: show.startyear,
           // endyear:   show.endyear,
@@ -115,6 +155,6 @@ export async function getRotten(query, headless = true) {
   }
 }
 
-(async () => {
-  console.log(await getRotten("The Bear", false));
-})();
+if(process.argv[2]) {
+  (async () => { await getRotten(process.argv[2], false) })();
+}

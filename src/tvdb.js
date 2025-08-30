@@ -181,7 +181,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
          seasonCount, episodeCount, watchedCount} = paramObj;
   const name   = show.Name;
   if(deleted) {
-    console.log('getTvdbData:', name, 'is deleted');
+    // this shouldn't happen, deleteds filter before here
+    console.log('getTvdbData:', name, 'is deleted, skipping tvDb refresh');
     resolve(name);
     return;
   }
@@ -296,10 +297,10 @@ const tryLocalGetTvdb = () => {
   try {
     const tvdbs = Object.values(allTvdb);
     tvdbs.forEach((tvdb) => {
-      if(!tvdb.showId && !tvdb.deleted) {
-        console.error(
-          'tryLocalGetTvdb no showId and not deleted:', 
-          tvdb.name, {tvdb});
+      if(tvdb.deleted) return;
+      if(!tvdb.showId) {
+        console.error('tryLocalGetTvdb no showId and not deleted:', 
+                       tvdb.name, {tvdb});
         return;
       }
       const saved = tvdb.saved;

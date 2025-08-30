@@ -390,7 +390,7 @@ const delNoEmby = async (id, name, resolve, reject) => {
   for(const [idx, show] of noEmbys.entries()) {
     if(!show.Name ||
         show.Name.toLowerCase() === name.toLowerCase()) {
-      console.log('deleting existing:', name);
+      console.log('deleting no-emby because now in emby:', name);
       noEmbys.splice(idx, 1);
       deletedOne = true;
       break;

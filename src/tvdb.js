@@ -323,8 +323,8 @@ const tryLocalGetTvdb = () => {
     tryLocalGetTvdbBusy = false;
     return;
   }
-  console.log('------', new Date().toTimeString().slice(0,8),
-              `updating tvdb locally:`, minTvdb.name); 
+  // console.log('------', new Date().toTimeString().slice(0,8),
+  //             `updating tvdb locally:`, minTvdb.name); 
   const show = {
     Name:   minTvdb.name,
     TvdbId: minTvdb.tvdbId,

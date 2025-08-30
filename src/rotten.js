@@ -155,8 +155,8 @@ export async function rottenSearch(query) {
   } 
   finally {
     await browser.close();
-    const elapsed = Date.now() - rottenStartTime;
-    console.log(`finished rottenSearch, query: "${query}", elapsed: ${elapsed}ms`);
+    const elapsed = ((Date.now() - rottenStartTime)/1000).toFixed(0);
+    console.log(`finished rottenSearch: ${elapsed} secs, "${query}"`);
   }
 }
 

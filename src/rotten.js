@@ -1,12 +1,56 @@
-// node src/rotten.js "BETH"
+// node src/rotten.js "rizzoli-and-isles"
 
 import { chromium } from "playwright";
 
-const NAV_TIMEOUT = 15_000;
-const BASE        = "https://www.rottentomatoes.com";
+const MAX_STR_DIST = 7;
+const NAV_TIMEOUT  = 15_000;
+const BASE         = "https://www.rottentomatoes.com";
+const debug        = !!process.argv[2];
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+const stamp = () => {
+  const now = new Date();
+  const pad = n => n.toString().padStart(2, '0');
+  const MM = pad(now.getMonth() + 1);
+  const DD = pad(now.getDate());
+  const HH = pad(now.getHours());
+  const mm = pad(now.getMinutes());
+  const ss = pad(now.getSeconds());
+  return `${MM}/${DD} ${HH}:${mm}:${ss}`;
+}
+
+// Returns integer edit distance between strings a and b
+function levenshtein(a, b) {
+  if (a === b) return 0;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+
+  // Ensure 'a' is shorter to keep memory O(min(m,n))
+  if (a.length > b.length) [a, b] = [b, a];
+
+  const m = a.length, n = b.length;
+  let prev = new Uint16Array(m + 1);
+  let curr = new Uint16Array(m + 1);
+
+  for (let i = 0; i <= m; i++) prev[i] = i;
+
+  for (let j = 1; j <= n; j++) {
+    curr[0] = j;
+    const bj = b.charCodeAt(j - 1);
+    for (let i = 1; i <= m; i++) {
+      const cost = (a.charCodeAt(i - 1) === bj) ? 0 : 1;
+      const del = prev[i] + 1;        // deletion
+      const ins = curr[i - 1] + 1;    // insertion
+      const sub = prev[i - 1] + cost; // substitution
+      curr[i] = del < ins ? (del < sub ? del : sub) : (ins < sub ? ins : sub);
+    }
+    // swap buffers (no copy)
+    [prev, curr] = [curr, prev];
+  }
+  return prev[m];
 }
 
 async function dismissOverlays(page) {
@@ -28,58 +72,43 @@ function mostRecent(shows) {
   });
 }
 
-function overlaps(a, b) {
-  let max = Math.max();
-  for (let i = 0; i < a.length; i++) {
-    for (let j = i + 1; j <= a.length; j++) {
-      const asub = a.substring(i, j);
-      for (let k = 0; k < b.length; k++) {
-        for (let l = k + 1; l <= b.length; l++) {
-          const bsub = b.substring(k, l);
-          if (asub === bsub && asub.length > max) max = asub.length;
-        }
-      }
+function chooseShow(shows, query) {
+  query           =  query.toLowerCase().trim();
+  const queryYear = (query.match(/[^\d](19|20)\d{2}\)?$/) || [null])[0];
+  query           =  query.replace(/[^\d](19|20)\d{2}\)?$/, '').trim();
+  shows.forEach(s => 
+    s.titleTrimmed = s.title.toLowerCase().trim()
+                      .replace(/[^\d](19|20)\d{2}\)?$/, '').trim());
+  let minDist  = Infinity;
+  let minShows = [];
+  for(const show of shows) {
+    const dist = levenshtein(query, show.titleTrimmed);
+    if(debug) console.log(
+    `dist: "${query}" ~ "${show.titleTrimmed}" => ${dist}`);
+    if(dist > MAX_STR_DIST) continue;
+    if(dist === minDist) {
+      minShows.push(show);
+    }
+    if(dist < minDist) {
+      minDist = dist;
+      minShows = [show];
     }
   }
-  const shortest = Math.min(a.length, b.length);
-  return (max >= shortest);
-}
-
-function getShow(shows, query) {
-  query = query.toLowerCase().trim();
-  shows.forEach(s => s.titleTrimmed = s.title.toLowerCase().trim());
-  let matches = [];
-  for (const show of shows) if(query === show.titleTrimmed) matches.push(show);
-  if(matches.length === 1) return matches[0];
-  if(matches.length   > 1) return mostRecent(matches);
-  // no exact title matches
-  matches = [];
-  // The Bear (2022) => The Bear
-  const parts = query.match(/^[a-z0-9\s]*/);
-  if(!parts) return null;
-  const queryTrunc = parts[0].trim(); 
-  for (const show of shows) {
-    const parts = show.titleTrimmed.match(/^(.*?)[^a-z0-9\s].*$/);
-    if(!parts) continue;
-    const titleTrunc = parts[1].trim();
-    if(titleTrunc === queryTrunc) matches.push(show);
+  if(debug) console.log(`matching shows:`, minShows);
+  if(debug) console.log(`minDist = ${minDist}`);
+  if(minShows.length === 0) return null;
+  if(minShows.length === 1) return minShows[0];
+  if(queryYear) {
+    for(const show of minShows) {
+      if(show.startyear === queryYear) return show;
+    }
   }
-  if(matches.length === 1) return matches[0];
-  if(matches.length   > 1) return mostRecent(matches);
-  // no prefix matches
-  matches = [];
-  for (const show of shows) {
-    if(overlaps(query, show.titleTrimmed)) matches.push(show);
-  }
-  if(matches.length === 1) return matches[0];
-  if(matches.length   > 1) return mostRecent(matches);
-  // no substring overlap matches
-  return null;
+  return mostRecent(minShows);
 }
 
 let queryUrl;
 
-async function getShows(page, query) {
+async function findShows(page, query) {
   queryUrl = `${BASE}/search?search=${encodeURIComponent(query)}`;
   await page.goto(queryUrl, {waitUntil: "domcontentloaded"});
   await dismissOverlays(page);
@@ -110,7 +139,7 @@ export async function rottenSearch(query) {
   // console.log(`starting rottenSearch, query: "${query}"`);
   query = query.toLowerCase().trim();
 
-  const headless = !process.argv[2];
+  const headless = !debug;
   const browser  = await chromium.launch({ headless });
   const page     = await browser.newPage();
 
@@ -119,8 +148,8 @@ export async function rottenSearch(query) {
 
   try {
     // get best show from show rows
-    const shows = await getShows(page, query);
-    const show  = getShow(shows, query);
+    const shows = await findShows(page, query);
+    const show  = chooseShow(shows, query);
     if (!show) {
       console.log(`Rotten: No matching show found for "${query}"`);
       return null;
@@ -136,30 +165,28 @@ export async function rottenSearch(query) {
            await page.locator('rt-text[slot="collapsedAudienceScore"]')
       .evaluate(el => Number((el.textContent || '').match(/\d+/)?.[0] ?? ""));
 
-    // console.log(`rotten: "${query }" => "${show.title
-    //                }" ${show.startyear
-    //                } ${criticsScore
-    //                } ${audienceScore
-    //                }\n    ${queryUrl
-    //                }\n    ${detailLink}`);
+    if(debug) console.log(`rotten: "${query }" => "${show.title
+                                 }" ${show.startyear
+                                  } ${show.endyear
+                                  } ${criticsScore
+                                  }/${audienceScore
+                                  } ${show.sentiment
+                             }\n    ${queryUrl
+                             }\n    ${detailLink}`);
 
     return { url: detailLink, criticsScore, audienceScore};
-          // title:     show.title,
-          // startyear: show.startyear,
-          // endyear:   show.endyear,
-          // sentiment: show.sentiment,
-  } 
+  }
   catch (err) {
-    console.error("getRotten error", query, err.message);
+    console.error("rottenSearch error", query, err.message);
     return null;
   } 
   finally {
     await browser.close();
     const elapsed = ((Date.now() - rottenStartTime)/1000).toFixed(0);
-    console.log(`finished rottenSearch: ${elapsed} secs, "${query}"`);
+    console.log(`${stamp()} finished rottenSearch: ${elapsed} secs, "${query}"`);
   }
 }
 
-if(process.argv[2]) {
-  (async () => { await getRotten(process.argv[2], false) })();
+if(debug) {
+  (async () => { await rottenSearch(process.argv[2], false) })();
 }

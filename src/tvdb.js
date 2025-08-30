@@ -342,7 +342,7 @@ const tryLocalGetTvdb = () => {
   tryLocalGetTvdbBusy = false;
 }
 
-// calls tryLocalGetTvdb every 1 min
+// calls tryLocalGetTvdb every 6 mins
 const updateTvdbLocal = () => {
   // token expires, refresh every 2 weeks
   if(Date.now() > gotTokenTime + 14*24*60*60*1000) {
@@ -356,7 +356,7 @@ const updateTvdbLocal = () => {
   }
   // only bother tvdb.com every min
   if (UPDATE_DATA) tryLocalGetTvdb();
-  setTimeout(updateTvdbLocal, 60*1000); 
+  setTimeout(updateTvdbLocal, 6*60*1000); 
   // console.log(new Date().toTimeString().slice(0,8), 
   //             'tvdb local update finished', );
 }

@@ -9,7 +9,6 @@ bugs ...
   prune skipped first season worked on second try
 
 todo  ...
-  rotten tomatoes
   allow putting in collection before show is in emby
   sort by waiting date
   add unwatched at beginning to watched count

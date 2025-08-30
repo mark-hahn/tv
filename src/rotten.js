@@ -106,7 +106,8 @@ async function getShows(page, query) {
   return shows;
 }
 export async function rottenSearch(query) {
-  console.log(`starting rottenSearch, query: "${query}"`);
+  const rottenStartTime = Date.now();
+  // console.log(`starting rottenSearch, query: "${query}"`);
   query = query.toLowerCase().trim();
 
   const headless = !process.argv[2];
@@ -135,12 +136,12 @@ export async function rottenSearch(query) {
            await page.locator('rt-text[slot="collapsedAudienceScore"]')
       .evaluate(el => Number((el.textContent || '').match(/\d+/)?.[0] ?? ""));
 
-    console.log(`rotten: "${query }" => "${show.title
-                   }" ${show.startyear
-                   } ${criticsScore
-                   } ${audienceScore
-                   }\n    ${queryUrl
-                   }\n    ${detailLink}`);
+    // console.log(`rotten: "${query }" => "${show.title
+    //                }" ${show.startyear
+    //                } ${criticsScore
+    //                } ${audienceScore
+    //                }\n    ${queryUrl
+    //                }\n    ${detailLink}`);
 
     return { url: detailLink, criticsScore, audienceScore};
           // title:     show.title,
@@ -154,6 +155,8 @@ export async function rottenSearch(query) {
   } 
   finally {
     await browser.close();
+    const elapsed = Date.now() - rottenStartTime;
+    console.log(`finished rottenSearch, query: "${query}", elapsed: ${elapsed}ms`);
   }
 }
 

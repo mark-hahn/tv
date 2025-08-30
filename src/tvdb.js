@@ -38,7 +38,7 @@ const getTheTvdbToken = async () => {
 ///////////////////// GET REMOTES ///////////////////////
 
 const getUrlAndRatings = async (type, url, name) => {
-  console.log('getUrlAndRatings', {type, url, name});
+  // console.log('getUrlAndRatings', {type, url, name});
 
   let resp = await fetch(url);
   if (!resp.ok) {
@@ -110,7 +110,7 @@ const getRemote = async (id, type, showName) => {
       name = 'Rotten';
       urlRatings = await rottenSearch(showName);
       if(!urlRatings) return null;
-      console.log("getRemote rottenSearch:", urlRatings);
+      // console.log("getRemote rottenSearch:", urlRatings);
       url     = urlRatings.url;
       ratings = urlRatings.criticsScore + '/' + urlRatings.audienceScore;
       break;
@@ -122,7 +122,7 @@ const getRemote = async (id, type, showName) => {
     console.log(`getRemote, no url: ${name}`);
     return null;
   }
-  console.log(`getRemote`, {name, url, ratings});
+  // console.log(`getRemote`, {name, url, ratings});
   return {name, url, ratings};
 }
 
@@ -181,6 +181,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
          seasonCount, episodeCount, watchedCount} = paramObj;
   const name   = show.Name;
   if(deleted) {
+    console.log('getTvdbData:', name, 'is deleted');
     resolve(name);
     return;
   }
@@ -322,7 +323,7 @@ const tryLocalGetTvdb = () => {
     return;
   }
   console.log('------', new Date().toTimeString().slice(0,8),
-            `updating tvdb locally:`, minTvdb.name); 
+              `updating tvdb locally:`, minTvdb.name); 
   const show = {
     Name:   minTvdb.name,
     TvdbId: minTvdb.tvdbId,
@@ -340,7 +341,7 @@ const tryLocalGetTvdb = () => {
   tryLocalGetTvdbBusy = false;
 }
 
-// calls tryLocalGetTvdb every 6 mins
+// calls tryLocalGetTvdb every 1 min
 const updateTvdbLocal = () => {
   // token expires, refresh every 2 weeks
   if(Date.now() > gotTokenTime + 14*24*60*60*1000) {
@@ -363,7 +364,7 @@ updateTvdbLocal();
 
 ///////////////////  FUNCTION CALLS FROM CLIENT  ////////////////////
 export const getAllTvdb = (id, _param, resolve, _reject) => {
-  console.log('getAllTvdb', id);
+  // console.log('getAllTvdb', id);
   // return allTvdb object immediatelty
   resolve([id, allTvdb]);
 };
@@ -371,7 +372,7 @@ export const getAllTvdb = (id, _param, resolve, _reject) => {
 // if tvdb already exists replace it
 export const getNewTvdb = async (ws, id, param) => {
   const paramObj = util.jParse(param, 'getNewTvdb');
-  console.log('getNewTvdb:', paramObj.show.Name);
+  // console.log('getNewTvdb:', paramObj.show.Name);
   newTvdbQueue.unshift({ws, id, paramObj});
   chkTvdbQueue();
 }

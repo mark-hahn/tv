@@ -56,7 +56,7 @@ const getUrlAndRatings = async (type, url, name) => {
     case 2:  // IMDB
       // console.log('samples/imdb-page.html');
       // await util.writeFile('samples/imdb-page.html', html);
-      idFnameParam = /imUuxf">(\d\.\d)<\/span>/i.exec(html);
+      idFnameParam = /aggregate-rating__score.*?>([\d.]+)</i.exec(html);
       if(idFnameParam === null) return {ratings:null};
       return {ratings: idFnameParam[1]};
 
@@ -137,7 +137,10 @@ const getRemotes = async (show, tvdbRemotes) => {
     remotes.push({name:'Emby', url: urls.embyPageUrl(showId)});
 
   const rottenRemote = await getRemote(null, 99, name);
-  if(rottenRemote) remotes.push(rottenRemote);
+  if(rottenRemote) {
+    if(rottenRemote.ratings) rottenRemote.name += " (" + rottenRemote.ratings + ")";
+    remotes.push(rottenRemote);
+  }
 
   const encoded = encodeURI(name).replaceAll('&', '%26');
   const url = `https://www.google.com/search` +

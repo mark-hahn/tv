@@ -106,6 +106,7 @@ async function getShows(page, query) {
   return shows;
 }
 export async function rottenSearch(query) {
+  console.log(`starting rottenSearch, query: "${query}"`);
   query = query.toLowerCase().trim();
 
   const headless = !process.argv[2];

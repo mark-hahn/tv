@@ -1,15 +1,14 @@
 
 reminder, restore ...
   start gap running
-  
+
 bugs ...
-  Mitchell & Webb Are Not Helping: Next Up: undefined undefined
+  Mitchell & Webb Are Not Helping: Next Up: S03 E04 
   blocked shows appear on boot
-  noemby.json has reject field, disagrees with rejects.json
   prune skipped first season worked on second try
+  old season count data in series (after switching shows?) 
 
 todo  ...
-  allow putting in collection before show is in emby
   sort by waiting date
   add unwatched at beginning to watched count
   map: click on season numbers for whole row

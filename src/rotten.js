@@ -111,7 +111,8 @@ function chooseShow(shows, query) {
 let queryUrl;
 
 async function findShows(page, query) {
-  queryUrl = `${BASE}/search?search=${encodeURIComponent(query)}`;
+  const srchQuery = query.replace(/[^\d](19|20)\d{2}\)?$/, '').trim();
+  queryUrl = `${BASE}/search?search=${encodeURIComponent(srchQuery)}`;
   await page.goto(queryUrl, {waitUntil: "domcontentloaded"});
   await dismissOverlays(page);
   await page.locator();

@@ -5,18 +5,19 @@ reminder, restore ...
 bugs ...
   blocked shows appear on boot
   prune skipped first season worked on second try
+  if 1'st episode file not watched/missing -> S01E01 No File
 
 todo  ...
+  don't show google button if no header
+  get wikipedia from google page
   update map when new show selected
   sort by waiting date
-  add unwatched at beginning to watched count
   map: click on season numbers for whole row
   make popups modal with closing by clicking anywhere
   keep deleted date forever
   keep all map info for deleted shows
   show actors
-  shows with no emby should be added as pickup if in tvdb
-  add wikipedia remote the hard way
+  shows with no emby, in tvdb, and not deleted should have pickup set
 
 tabled ...
   laptop play doesn't start

@@ -206,7 +206,6 @@ export default {
     },
 
     async setNextWatch() {
-      this.nextUpTxt = '';
       const afterWatched = await emby.afterLastWatched(this.show.Id);
       const status       = afterWatched.status;
       const readyToWatch = (status === 'ok');
@@ -222,7 +221,7 @@ export default {
                 &nbsp; Next Up: ${seaEpiTxt} 
                 &nbsp; ${status === 'missing' ? 'No File' : 'Unaired'}`;
       }
-
+      else this.nextUpTxt = '';
       const watchButtonTxtArr = [];
       const devices = await srvr.getDevices();
       for(const device of devices) {
@@ -287,9 +286,6 @@ export default {
       await this.setCntryLangTxt(tvdbData);
       await this.setNextWatch();
       await this.setRemotes();
-      setInterval( () => {
-        this.setNextWatch(true);
-      }, 5000);
     });
 
     setTimeout(() => {

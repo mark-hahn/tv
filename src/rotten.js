@@ -2,7 +2,7 @@
 
 import { chromium } from "playwright";
 
-const MAX_STR_DIST = 7;
+const MAX_STR_DIST = 10;
 const NAV_TIMEOUT  = 15_000;
 const BASE         = "https://www.rottentomatoes.com";
 const debug        = !!process.argv[2];
@@ -73,6 +73,8 @@ function mostRecent(shows) {
 }
 
 function chooseShow(shows, query) {
+  if(shows.length === 0) return null;
+  if(shows.length === 1) return shows[0];
   query           =  query.toLowerCase().trim();
   const queryYear = (query.match(/[^\d](19|20)\d{2}\)?$/) || [null])[0];
   query           =  query.replace(/[^\d](19|20)\d{2}\)?$/, '').trim();

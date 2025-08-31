@@ -3,12 +3,11 @@ reminder, restore ...
   start gap running
 
 bugs ...
-  Mitchell & Webb Are Not Helping: Next Up: S03 E04 
   blocked shows appear on boot
   prune skipped first season worked on second try
-  old season count data in series (after switching shows?) 
 
 todo  ...
+  update map when new show selected
   sort by waiting date
   add unwatched at beginning to watched count
   map: click on season numbers for whole row

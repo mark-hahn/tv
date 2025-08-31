@@ -206,6 +206,7 @@ export default {
     },
 
     async setNextWatch() {
+      this.nextUpTxt = '';
       const afterWatched = await emby.afterLastWatched(this.show.Id);
       const status       = afterWatched.status;
       const readyToWatch = (status === 'ok');
@@ -214,12 +215,12 @@ export default {
         const seaEpiTxt = `S${(''+seasonNumber) .padStart(2, "0")} ` +
                           `E${(''+episodeNumber).padStart(2, "0")}`;
         if (readyToWatch) {
-            this.episodeId = episodeId;
-            this.nextUpTxt = ` &nbsp; Next Up: ${seaEpiTxt}`;
+          this.episodeId = episodeId;
+          this.nextUpTxt = ` &nbsp; Next Up: ${seaEpiTxt}`;
         }
         else this.nextUpTxt = ` 
-            &nbsp; Next Up: ${seaEpiTxt} 
-            &nbsp; ${status === 'missing' ? 'No File' : 'Unaired'}`;
+                &nbsp; Next Up: ${seaEpiTxt} 
+                &nbsp; ${status === 'missing' ? 'No File' : 'Unaired'}`;
       }
 
       const watchButtonTxtArr = [];

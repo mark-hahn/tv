@@ -105,7 +105,7 @@ const getRemote = async (id, type, showName) => {
                     `https://www.googleapis.com/customsearch/v1?`  + 
                     `key=AIzaSyDSdr8Z26vDP4V5J_sEyXCH4s8O56FyfDc&` + 
                     `cx=b59f40d0c17b54ff1&q=${escShow}%20tv%20show`, showName);
-      url     = urlRatings?.url;
+      url = urlRatings?.url;
       break;
 
     // case 19: url = `https://www.tvmaze.com/shows/${id}`; break;

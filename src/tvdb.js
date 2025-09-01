@@ -46,12 +46,11 @@ const getUrlAndRatings = async (type, url, name) => {
       `getUrlAndRatings fetch error: ${{type, url, name}}, ${resp.status}`);
     return null;
   }
-  const html = (await resp.text())
-                .replaceAll(/(\r\n|\n|\r)/gm, "")
-                .replaceAll(/\s+/gm, " ");
-
+  let html, json;
+  if(type == 18) json =  await resp.json();
+  else           html = (await resp.text()).replaceAll(/\r?\n/gm, "")
+                                           .replaceAll(/\s+/gm, " ");
   let idFnameParam;
-
   switch (+type) {
     case 2:  // IMDB
       // console.log('samples/imdb-page.html');
@@ -60,10 +59,12 @@ const getUrlAndRatings = async (type, url, name) => {
       if(idFnameParam === null) return {ratings:null};
       return {ratings: idFnameParam[1]};
 
-    case 18:  // wikidata
-      idFnameParam = /lang="en"><a href="(.*?)"\shreflang="en"/i.exec(html);
-      if(idFnameParam === null) return {url: null};
-      return {url: idFnameParam[1]};
+    case 18:  // wikipedia
+      const items    = Object.values(json.items || {});
+      const wikiItem = items.find(item => item.displayLink == 'en.wikipedia.org');
+      if(!wikiItem) return null;
+      // console.log("wikiItem:", name, wikiItem.formattedUrl);
+      return {url: wikiItem.formattedUrl };
 
     default: return 'getUrlAndRatings invalid type: ' + type;
   }
@@ -75,7 +76,7 @@ const getUrlAndRatings = async (type, url, name) => {
 const getRemote = async (id, type, showName) => {
   let url     = null;  
   let ratings = null;
-  let urlRatings, name, criticsScore, audienceScore;
+  let urlRatings, name, escShow;
   
   switch (type) {
     case 2:  
@@ -99,11 +100,14 @@ const getRemote = async (id, type, showName) => {
 
     case 18: 
       name = 'Wikipedia';
+      escShow    = encodeURIComponent(showName);
       urlRatings = await getUrlAndRatings(18, 
-                    `https://www.wikidata.org/wiki/${id}`, showName);
-      url = urlRatings?.url;
+                    `https://www.googleapis.com/customsearch/v1?`  + 
+                    `key=AIzaSyDSdr8Z26vDP4V5J_sEyXCH4s8O56FyfDc&` + 
+                    `cx=b59f40d0c17b54ff1&q=${escShow}%20tv%20show`, showName);
+      url     = urlRatings?.url;
       break;
-      
+
     // case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
 
     case 99:  // rotten tomatoes
@@ -144,11 +148,15 @@ const getRemotes = async (show, tvdbRemotes) => {
 
   const encoded = encodeURI(name).replaceAll('&', '%26');
   const url = `https://www.google.com/search` +
-                       `?q=${encoded}%20tv%20show`;
+              `?q=${encoded}%20tv%20show`;
   remotes.push({name:'Google', url});
+
+  const wikiRemote = await getRemote(null, 18, name);
+  if(wikiRemote) remotes.push({name:'Wikipedia', url: wikiRemote.url});
 
   const remotesByName = {};
   for(const tvdbRemote of tvdbRemotes) {
+    if(tvdbRemote.type == 18) continue;
     const remote = await getRemote(
             tvdbRemote.id, tvdbRemote.type, tvdbRemote.sourceName);
     if(remote && remote.url != "no match") {

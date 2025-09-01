@@ -63,7 +63,9 @@ startTime = time = Date.now()
 deleteCount = chkCount = recentCount = 0
 existsCount = errCount = downloadCount = blockedCount = 0;
 
-findUsb = "ssh #{usbHost} find files -type f -printf '%CY-%Cm-%Cd-%P-%s\\\\\\n' | grep -Ev .r[0-9]+-[0-9]+$ | grep -Ev .rar-[0-9]+$"
+findUsb = "ssh #{usbHost} find files -type f -printf '%CY-%Cm-%Cd-%P-%s\\\\\\n' " + 
+          "| grep -Ev .r[0-9]+-[0-9]+$ | grep -Ev .rar-[0-9]+$ " + 
+          "| grep -Ev screen[0-9]+.png-[0-9]+$"
 
 if filterRegex
   findUsb += " | grep -i " + filterRegex
@@ -177,7 +179,7 @@ skipPaths = null
 checkFiles = =>
   usbFiles = exec(findUsb, {timeout:300000}).toString().split '\n'
   # fs.writeFileSync 'tv-files.txt', usbFiles.join('\n')
-  
+  # process.exit 0
   skipPaths = []
   for usbLine in usbFiles
     usbLine = usbLine.split('-').slice(0,-1).join('-')

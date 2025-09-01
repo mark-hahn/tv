@@ -1,8 +1,9 @@
 import fs             from "fs";
 import fetch          from 'node-fetch';
-import * as util      from "./util.js";
 import * as urls      from "./urls.js";
 import {rottenSearch} from './rotten.js';
+import * as util      from "./util.js";
+const {log, start, end} = util.getLog('tvdb');
 
 const UPDATE_DATA = true;
 
@@ -26,7 +27,7 @@ const getTheTvdbToken = async () => {
     }
   );
   if (!loginResp.ok) {
-    console.error(`FATAL: TvDbToken Response: ${loginResp.status}`);
+    log('err', `FATAL: TvDbToken Response: ${loginResp.status}`);
     process.exit();
   }
   const loginJSON = await loginResp.json();
@@ -38,12 +39,12 @@ const getTheTvdbToken = async () => {
 ///////////////////// GET REMOTES ///////////////////////
 
 const getUrlAndRatings = async (type, url, name) => {
-  // console.log('getUrlAndRatings', {type, url, name});
+  // log('getUrlAndRatings', {type, url, name});
 
   let resp = await fetch(url);
   if (!resp.ok) {
-    console.error(
-      `getUrlAndRatings fetch error: ${{type, url, name}}, ${resp.status}`);
+    log('err', `getUrlAndRatings fetch error: ${
+                  JSON.stringify({type, url, name})}, ${resp.status}`);
     return null;
   }
   let html, json;
@@ -53,7 +54,7 @@ const getUrlAndRatings = async (type, url, name) => {
   let idFnameParam;
   switch (+type) {
     case 2:  // IMDB
-      // console.log('samples/imdb-page.html');
+      // log('samples/imdb-page.html');
       // await util.writeFile('samples/imdb-page.html', html);
       idFnameParam = /aggregate-rating__score.*?>([\d.]+)</i.exec(html);
       if(idFnameParam === null) return {ratings:null};
@@ -63,7 +64,7 @@ const getUrlAndRatings = async (type, url, name) => {
       const items    = Object.values(json.items || {});
       const wikiItem = items.find(item => item.displayLink == 'en.wikipedia.org');
       if(!wikiItem) return null;
-      // console.log("wikiItem:", name, wikiItem.formattedUrl);
+      // log("wikiItem:", name, wikiItem.formattedUrl);
       return {url: wikiItem.formattedUrl };
 
     default: return 'getUrlAndRatings invalid type: ' + type;
@@ -114,7 +115,7 @@ const getRemote = async (id, type, showName) => {
       name = 'Rotten';
       urlRatings = await rottenSearch(showName);
       if(!urlRatings) return null;
-      // console.log("getRemote rottenSearch:", urlRatings);
+      // log("getRemote rottenSearch:", urlRatings);
       url     = urlRatings.url;
       ratings = urlRatings.criticsScore + '/' + urlRatings.audienceScore;
       break;
@@ -123,10 +124,10 @@ const getRemote = async (id, type, showName) => {
   }
   
   if(!url) {
-    console.log(`getRemote, no url: ${name}`);
+    log(`getRemote, no url: ${name}`);
     return null;
   }
-  // console.log(`getRemote`, {name, url, ratings});
+  // log(`getRemote`, {name, url, ratings});
   return {name, url, ratings};
 }
 
@@ -190,14 +191,14 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   const name   = show.Name;
   if(deleted) {
     // this shouldn't happen, deleteds filter before here
-    console.log('getTvdbData:', name, 'is deleted, skipping tvDb refresh');
+    log('getTvdbData:', name, 'is deleted, skipping tvDb refresh');
     resolve(name);
     return;
   }
   const showId = show.Id;
   const tvdbId = show.TvdbId;
   if(!tvdbId) {
-    console.error('getTvdbData no tvdbId:', show);
+    log('err', 'getTvdbData no tvdbId:', show);
     resolve(name);
     return;
   }
@@ -211,13 +212,13 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
                         Authorization:'Bearer ' + theTvdbToken
                   }});
     if (!extRes.ok) {
-      console.error(`getTvdbData error, extended status:`, 
+      log('err', `getTvdbData error, extended status:`, 
                         name, {extUrl}, JSON.stringify(extRes, null, 2));
       resolve(name);
       return;
     }
   } catch(err) {  
-    console.error('getTvdbData extended catch error:', name, 
+    log('err', 'getTvdbData extended catch error:', name, 
                       {extUrl, extRes, err});
     resolve(name);
     return;
@@ -249,7 +250,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   if(deleted !== undefined)
     tvdbData.deleted = deleted;
 
-  // console.log('getTvdbData:', tvdbData);
+  // log('getTvdbData:', tvdbData);
   allTvdb[name] = tvdbData;
   // update allTvdb & tvdb.json
   resolve(tvdbData);
@@ -307,13 +308,13 @@ const tryLocalGetTvdb = () => {
     tvdbs.forEach((tvdb) => {
       if(tvdb.deleted) return;
       if(!tvdb.showId) {
-        console.error('tryLocalGetTvdb no showId and not deleted:', 
+        log('err', 'tryLocalGetTvdb no showId and not deleted:', 
                        tvdb.name, {tvdb});
         return;
       }
       const saved = tvdb.saved;
       if(saved === undefined) {
-        console.log('tryLocalGetTvdb, saved is undefined:', 
+        log('tryLocalGetTvdb, saved is undefined:', 
                      tvdb.name);
         minTvdb = tvdb;
         throw true;
@@ -326,12 +327,12 @@ const tryLocalGetTvdb = () => {
   }
   catch(e){};
   if(minTvdb === null) {
-    console.error(new Date().toTimeString().slice(0,8),
+    log('err', new Date().toTimeString().slice(0,8),
                    `tryLocalGetTvdbBusy, minTvdb is null`);  
     tryLocalGetTvdbBusy = false;
     return;
   }
-  // console.log('------', new Date().toTimeString().slice(0,8),
+  // log('------', new Date().toTimeString().slice(0,8),
   //             `updating tvdb locally:`, minTvdb.name); 
   const show = {
     Name:   minTvdb.name,
@@ -365,7 +366,7 @@ const updateTvdbLocal = () => {
   // only bother tvdb.com every min
   if (UPDATE_DATA) tryLocalGetTvdb();
   setTimeout(updateTvdbLocal, 6*60*1000); 
-  // console.log(new Date().toTimeString().slice(0,8), 
+  // log(new Date().toTimeString().slice(0,8), 
   //             'tvdb local update finished', );
 }
 updateTvdbLocal();
@@ -373,7 +374,7 @@ updateTvdbLocal();
 
 ///////////////////  FUNCTION CALLS FROM CLIENT  ////////////////////
 export const getAllTvdb = (id, _param, resolve, _reject) => {
-  // console.log('getAllTvdb', id);
+  // log('getAllTvdb', id);
   // return allTvdb object immediatelty
   resolve([id, allTvdb]);
 };
@@ -381,7 +382,7 @@ export const getAllTvdb = (id, _param, resolve, _reject) => {
 // if tvdb already exists replace it
 export const getNewTvdb = async (ws, id, param) => {
   const paramObj = util.jParse(param, 'getNewTvdb');
-  // console.log('getNewTvdb:', paramObj.show.Name);
+  // log('getNewTvdb:', paramObj.show.Name);
   newTvdbQueue.unshift({ws, id, paramObj});
   chkTvdbQueue();
 }
@@ -398,7 +399,7 @@ export const setTvdbFields =
     else {
       tvdb = allTvdb[name];
       if(!tvdb) { 
-        console.error('setTvdbFields no tvdb for', name);
+        log('err', 'setTvdbFields no tvdb for', name);
         resolve([id, 'no tvdb']); 
         return; 
       }

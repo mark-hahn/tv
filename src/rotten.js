@@ -1,6 +1,8 @@
 // node src/rotten.js "rizzoli-and-isles"
 
 import { chromium } from "playwright";
+import * as util    from "./util.js";
+const {log, start, end} = util.getLog('rott');
 
 const MAX_STR_DIST = 10;
 const NAV_TIMEOUT  = 15_000;
@@ -9,17 +11,6 @@ const debug        = !!process.argv[2];
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-const stamp = () => {
-  const now = new Date();
-  const pad = n => n.toString().padStart(2, '0');
-  const MM = pad(now.getMonth() + 1);
-  const DD = pad(now.getDate());
-  const HH = pad(now.getHours());
-  const mm = pad(now.getMinutes());
-  const ss = pad(now.getSeconds());
-  return `${MM}/${DD} ${HH}:${mm}:${ss}`;
 }
 
 // Returns integer edit distance between strings a and b
@@ -85,7 +76,7 @@ function chooseShow(shows, query) {
   let minShows = [];
   for(const show of shows) {
     const dist = levenshtein(query, show.titleTrimmed);
-    if(debug) console.log(
+    if(debug) log(
     `dist: "${query}" ~ "${show.titleTrimmed}" => ${dist}`);
     if(dist > MAX_STR_DIST) continue;
     if(dist === minDist) {
@@ -96,8 +87,8 @@ function chooseShow(shows, query) {
       minShows = [show];
     }
   }
-  if(debug) console.log(`matching shows:`, minShows);
-  if(debug) console.log(`minDist = ${minDist}`);
+  if(debug) log(`matching shows:`, minShows);
+  if(debug) log(`minDist = ${minDist}`);
   if(minShows.length === 0) return null;
   if(minShows.length === 1) return minShows[0];
   if(queryYear) {
@@ -139,7 +130,7 @@ async function findShows(page, query) {
 }
 export async function rottenSearch(query) {
   const rottenStartTime = Date.now();
-  // console.log(`starting rottenSearch, query: "${query}"`);
+  // log(`starting rottenSearch, query: "${query}"`);
   query = query.toLowerCase().trim();
 
   const headless = !debug;
@@ -154,7 +145,7 @@ export async function rottenSearch(query) {
     const shows = await findShows(page, query);
     const show  = chooseShow(shows, query);
     if (!show) {
-      console.log(`Rotten: No matching show found for "${query}"`);
+      log(`Rotten: No matching show found for "${query}"`);
       return null;
     }
     const detailLink = show.href;
@@ -168,7 +159,7 @@ export async function rottenSearch(query) {
            await page.locator('rt-text[slot="collapsedAudienceScore"]')
       .evaluate(el => Number((el.textContent || '').match(/\d+/)?.[0] ?? ""));
 
-    if(debug) console.log(`rotten: "${query }" => "${show.title
+    if(debug) log(`rotten: "${query }" => "${show.title
                                  }" ${show.startyear
                                   } ${show.endyear
                                   } ${criticsScore
@@ -180,13 +171,13 @@ export async function rottenSearch(query) {
     return { url: detailLink, criticsScore, audienceScore};
   }
   catch (err) {
-    console.error("rottenSearch error", query, err.message);
+    log('err', "rottenSearch error", query, err.message);
     return null;
   } 
   finally {
     await browser.close();
     const elapsed = ((Date.now() - rottenStartTime)/1000).toFixed(0);
-    console.log(`${stamp()} finished rottenSearch: ${elapsed} secs, "${query}"`);
+    log(`finished rottenSearch: ${elapsed} secs, "${query}"`);
   }
 }
 

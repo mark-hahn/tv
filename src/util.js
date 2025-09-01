@@ -64,3 +64,75 @@ export const writeFile = (path, data) => {
   chkWriteFile();
   return promise;
 }
+
+export function getLog(module) {
+  const timers = Object.create(null);
+
+  const start = function (name, hide = false, msg = "") {
+    timers[name] = Date.now();
+    if (hide) return;
+    const line = `[${module}]: ${name} started${msg ? ", " + msg : ""}`;
+    console.log(line);
+  };
+
+  const end = function (name, onlySlow = false, msg = "") {
+    if (!timers[name]) {
+      const line = `[${module}]: ${name} ended${msg ? ", " + msg : ""}`;
+      console.log(line);
+      return;
+    }
+    const duration = Date.now() - timers[name];
+    if (onlySlow && duration < 100) return;
+    const line = `[${module}]: ${name} ended, ${duration}ms${msg ? ", " + msg : ""}`;
+    console.log(line);
+  };
+
+  const log = function (...args) {
+    let errFlag = false;
+    let errMsgFlag = false;
+    let nomodFlag = false;
+    let notimeFlag = false;
+    
+    if (typeof args[0] === "string") {
+      errFlag    = args[0].includes("err");
+      nomodFlag  = args[0].includes("nomod");
+      notimeFlag = args[0].includes("notime");
+      errMsgFlag = args[0].includes("errmsg");
+    }
+
+    if (errFlag || nomodFlag || notimeFlag || errMsgFlag) args = args.slice(1);
+
+    let errMsg;
+    if (errMsgFlag) {
+      errMsg = (args[0]?.message) + " -> ";
+      args = args.slice(1);
+      errFlag = true;
+    }
+
+    const par = args.map((a) => {
+      if (typeof a === "object" && a !== null) {
+        try {
+          return JSON.stringify(a, null, 2);
+        } catch (e) {
+          return JSON.stringify(Object.keys(a)) + (e && e.message ? e.message : "");
+        }
+      } else {
+        return a;
+      }
+    });
+
+    const timeHdr = date.format(new Date(), 'MM/DD HH:mm:ss');
+
+    const line =
+      (nomodFlag  ? "" : "[" + module + "] ") +
+      (notimeFlag ? "" : timeHdr  + " ") +
+      (errFlag ? " error, " : "") +
+      (errMsg != null ? errMsg : "") +
+      par.join(" ");
+
+    if (errFlag) console.error(line);
+    else console.log(line);
+  }
+
+  return { log, start, end };
+}

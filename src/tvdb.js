@@ -38,19 +38,33 @@ const getTheTvdbToken = async () => {
 
 ///////////////////// GET REMOTES ///////////////////////
 
+let cacheName = null;
+let cacheJson;
+
 const getUrlAndRatings = async (type, url, name) => {
   // log('getUrlAndRatings', {type, url, name});
 
-  let resp = await fetch(url);
-  if (!resp.ok) {
-    log('err', `getUrlAndRatings fetch error: ${
-                  JSON.stringify({type, url, name})}, ${resp.status}`);
-    return null;
-  }
   let html, json;
-  if(type == 18) json =  await resp.json();
-  else           html = (await resp.text()).replaceAll(/\r?\n/gm, "")
-                                           .replaceAll(/\s+/gm, " ");
+
+  if ((type == 18 || type == 7) && cacheName) json = cacheJson;
+  else {
+    let resp = await fetch(url);
+    if (!resp.ok) {
+      log('err', `getUrlAndRatings fetch error: ${
+                    JSON.stringify({type, url, name})}, ${resp.status}`);
+      return null;
+    }
+    if (type == 18 || type == 7) json = await resp.json();
+    else html = (await resp.text()).replaceAll(/\r?\n/gm, "")
+                                   .replaceAll(/\s+/gm, " ");
+  }
+
+  if (type == 18 || type == 7) {
+    cacheName = name;
+    cacheJson = json;
+  }
+  else cacheName = null;
+
   let idFnameParam;
   switch (+type) {
     case 2:  // IMDB
@@ -60,12 +74,25 @@ const getUrlAndRatings = async (type, url, name) => {
       if(idFnameParam === null) return {ratings:null};
       return {ratings: idFnameParam[1]};
 
+    case 7:  // reddit
+      // fs.writeFileSync(`samples/reddit-${name}.json`, 
+      //                   JSON.stringify(json, null, 2));
+      const redditItems = Object.values(json.items || {});
+      const redditItem = redditItems.find(
+                               item => item.displayLink == 'www.reddit.com');
+      if (!redditItem) return null;
+      // log("redditItem:", name, redditItem.link);
+      return {url: redditItem.link};
+
     case 18:  // wikipedia
-      const items    = Object.values(json.items || {});
-      const wikiItem = items.find(item => item.displayLink == 'en.wikipedia.org');
-      if(!wikiItem) return null;
+      // fs.writeFileSync(`samples/google-${name}.json`, 
+      //                   JSON.stringify(json, null, 2));
+      const items = Object.values(json.items || {});
+      const wikiItem = items.find(
+                             item => item.displayLink == 'en.wikipedia.org');
+      if (!wikiItem) return null;
       // log("wikiItem:", name, wikiItem.formattedUrl);
-      return {url: wikiItem.formattedUrl };
+      return {url: wikiItem.formattedUrl};
 
     default: return 'getUrlAndRatings invalid type: ' + type;
   }
@@ -89,7 +116,16 @@ const getRemote = async (id, type, showName) => {
 
     case 4:  name = 'Official Website'; url = id; break;
 
-    // case 7:   url = `https://www.reddit.com/r/${id}`; break;
+    case 7:
+      name = 'Reddit';
+      escShow = encodeURIComponent(showName);
+      urlRatings = await getUrlAndRatings(7,
+        `https://www.googleapis.com/customsearch/v1?` +
+        `key=AIzaSyDSdr8Z26vDP4V5J_sEyXCH4s8O56FyfDc&` +
+        `cx=b59f40d0c17b54ff1&q=${escShow}%20tv%20show`, showName);
+      url = urlRatings?.url;
+      break;
+      
     // case 8:   url = id; name = 'Instagram'; break;
     // case 9:   url = `https://www.instagram.com/${id}`; break;
     // case 11:  url = `https://www.youtube.com/channel/${id}`; break;
@@ -153,7 +189,10 @@ const getRemotes = async (show, tvdbRemotes) => {
   remotes.push({name:'Google', url});
 
   const wikiRemote = await getRemote(null, 18, name);
-  if(wikiRemote) remotes.push({name:'Wikipedia', url: wikiRemote.url});
+  if (wikiRemote) remotes.push({name: 'Wikipedia', url: wikiRemote.url});
+
+  const redditRemote = await getRemote(null, 7, name);
+  if (redditRemote) remotes.push({name: 'Reddit', url: redditRemote.url});
 
   const remotesByName = {};
   for(const tvdbRemote of tvdbRemotes) {

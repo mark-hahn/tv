@@ -91,8 +91,8 @@ const getUrlAndRatings = async (type, url, name) => {
       const wikiItem = items.find(
                              item => item.displayLink == 'en.wikipedia.org');
       if (!wikiItem) return null;
-      // log("wikiItem:", name, wikiItem.formattedUrl);
-      return {url: wikiItem.formattedUrl};
+      // log("wikiItem:", name, wikiItem.link);
+      return {url: wikiItem.link};
 
     default: return 'getUrlAndRatings invalid type: ' + type;
   }

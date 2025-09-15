@@ -1,4 +1,7 @@
-powershell.exe -File release.ps1
+#!/usr/bin/env bash
+set -euo pipefail
+
+exec npx vite build --base=/shows/
 
 # rsync -av --delete  \
 #    ./shows  hahnca.com:/root/dev/apps/tv-series-client

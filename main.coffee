@@ -17,7 +17,7 @@ debug = false
 log = (...x) => 
   if debug
     console.log '\nLOG:', ...x
-loge = (...x) => console.error '\nLOGE:', ...x  
+console.error = (...x) => console.error '\nconsole.error:', ...x  
 sizeStr = (n, {digits=1, base=1000, suffix=""} = {}) ->
   UNITS = ["", "K", "M", "G", "T", "P", "E", "Z", "Y"]
   sign = if n < 0 then "-" else ""
@@ -154,7 +154,7 @@ delOldFiles = =>
   res = exec("ssh #{usbHost} /home/xobtlu/prune.sh", 
               {timeout:300000}).toString()
   if not res.startsWith('prune ok')
-    loge "Prune error: #{res}"
+    console.error "Prune error: #{res}"
 
 # delete old entries in tv-recent.json
 # tv-recent files limited to 80 days
@@ -234,7 +234,7 @@ checkFile = () =>
       log '------', downloadCount,'/', chkCount, 'SKIPPING *ERROR*:', fname
       process.nextTick checkFile
       return
-    console.log '\n>>>>>>', downloadCount+1,'/', chkCount, errCount, fname, usbFileSize
+    console.log '\n>>>>>>', downloadCount+1, dateStr(Date.now()), '\n' + fname, usbFileSize
     downloadTime = Date.now()
 
     cmd = "guessit -js '#{fname.replace /'|`/g, ''}'"
@@ -247,7 +247,7 @@ checkFile = () =>
         process.nextTick badFile
         return
       if not Number.isInteger season
-        loge '\nno season integer for ' + usbLine + ', defaulting to season 1', {title, season, type}
+        console.error '\nno season integer for ' + usbLine + ', defaulting to season 1', {title, season, type}
         season = 1
     catch
       console.error '\nerror parsing:' + fname
@@ -322,7 +322,7 @@ chkTvDB = =>
         seriesName = body.data[0].name
         log 'tvdb got:', {seriesName, title}
         if map[seriesName]
-          log '+++ Mapping', seriesName, 'to', map[seriesName]
+          console.log 'Mapping', seriesName, 'to', map[seriesName]
           seriesName = map[seriesName]
         tvdbCache[title] = seriesName
         # process.nextTick checkFileExists
@@ -341,13 +341,13 @@ checkFileExists = =>
 
     rsyncCmd = "rsync -av --timeout=20 #{escQuotes usbLongPath} #{escQuotes tvFilePath}"
 
-    log "downloading ... usb path: \n#{usbFilePath}\nlocalPath: #{tvFilePath}\nrsyncCmd: #{rsyncCmd}"
+    console.log "#{usbFilePath}\nlocalPath: #{tvFilePath}"
 
     try
       log(exec(rsyncCmd, fileTimeout).toString().replace('\n\n', '\n'),
                       ((Date.now() - time)/1000).toFixed(0) + ' secs')
     catch e
-      loge "\nvvvvvvvv\nrsync download error: \n#{e.message}^^^^^^^^^"
+      console.error "\nvvvvvvvv\nrsync download error: \n#{e.message}^^^^^^^^^"
       badFile();
       return;
       

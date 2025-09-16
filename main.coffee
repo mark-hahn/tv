@@ -17,7 +17,7 @@ debug = false
 log = (...x) => 
   if debug
     console.log '\nLOG:', ...x
-console.error = (...x) => console.error '\nconsole.error:', ...x  
+err = (...x) => console.error 'error:', ...x  
 sizeStr = (n, {digits=1, base=1000, suffix=""} = {}) ->
   UNITS = ["", "K", "M", "G", "T", "P", "E", "Z", "Y"]
   sign = if n < 0 then "-" else ""
@@ -133,8 +133,8 @@ request.post 'https://api4.thetvdb.com/v4/login',
     "pin": "HXEVSDFF"}},
   (error, response, body) =>
     if error or response.statusCode != 200
-      console.error 'theTvDb login error:', error
-      console.error 'theTvDb statusCode:', response && response.statusCode
+      err 'theTvDb login error:', error
+      err 'theTvDb statusCode:', response && response.statusCode
       process.exit()
     else
       theTvDbToken = body.data.token
@@ -154,7 +154,7 @@ delOldFiles = =>
   res = exec("ssh #{usbHost} /home/xobtlu/prune.sh", 
               {timeout:300000}).toString()
   if not res.startsWith('prune ok')
-    console.error "Prune error: #{res}"
+    err "Prune error: #{res}"
 
 # delete old entries in tv-recent.json
 # tv-recent files limited to 80 days
@@ -234,7 +234,8 @@ checkFile = () =>
       log '------', downloadCount,'/', chkCount, 'SKIPPING *ERROR*:', fname
       process.nextTick checkFile
       return
-    console.log '\n>>>>>>', downloadCount+1, dateStr(Date.now()), '\n' + fname, usbFileSize
+    console.log '\n>>>>>>', downloadCount+1, dateStr(Date.now()), '--', 
+                            usbFileSize, '--\n' + fname
     downloadTime = Date.now()
 
     cmd = "guessit -js '#{fname.replace /'|`/g, ''}'"
@@ -247,10 +248,10 @@ checkFile = () =>
         process.nextTick badFile
         return
       if not Number.isInteger season
-        console.error '\nno season integer for ' + usbLine + ', defaulting to season 1', {title, season, type}
+        err '\nno season integer for ' + usbLine + ', defaulting to season 1', {title, season, type}
         season = 1
     catch
-      console.error '\nerror parsing:' + fname
+      err '\nerror parsing:' + fname
       process.nextTick badFile
       return
     process.nextTick chkTvDB
@@ -306,15 +307,15 @@ chkTvDB = =>
     (error, response, body) =>
       # log 'thetvdb', {tvdburl, error, response, body}
       if error or not body.data?[0] or (response?.statusCode != 200)
-        console.error 'no series name found in theTvDB:', {fname, tvdburl}
-        console.error 'search error:', error
-        console.error 'search statusCode:', response && response.statusCode
-        console.error 'search body:', body
+        err 'no series name found in theTvDB:', {fname, tvdburl}
+        err 'search error:', error
+        err 'search statusCode:', response && response.statusCode
+        err 'search body:', body
         if error
           if ++tvDbErrCount == 15
-            console.error 'giving up, downloaded:', downloadCount
+            err 'giving up, downloaded:', downloadCount
             return
-          console.error "tvdb err retry, waiting one minute"
+          err "tvdb err retry, waiting one minute"
           setTimeout chkTvDB, rsyncDelay
         else
           process.nextTick badFile
@@ -340,14 +341,15 @@ checkFileExists = =>
     mkdirp.sync tvSeasonPath
 
     rsyncCmd = "rsync -av --timeout=20 #{escQuotes usbLongPath} #{escQuotes tvFilePath}"
-
-    console.log "#{usbFilePath}\nlocalPath: #{tvFilePath}"
+    
+    console.log usbFilePath.slice(0,-fname.length)
+    console.log  tvFilePath.slice(0,-fname.length)
 
     try
       log(exec(rsyncCmd, fileTimeout).toString().replace('\n\n', '\n'),
                       ((Date.now() - time)/1000).toFixed(0) + ' secs')
     catch e
-      console.error "\nvvvvvvvv\nrsync download error: \n#{e.message}^^^^^^^^^"
+      err "\nvvvvvvvv\nrsync download error: \n#{e.message}^^^^^^^^^"
       badFile();
       return;
       

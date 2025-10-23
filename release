@@ -1,10 +1,4 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-exec npx vite build --base=/shows/
-
-# rsync -av --delete  \
-#    ./shows  hahnca.com:/root/dev/apps/tv-series-client
+powershell.exe -File release.ps1
 
 rsync -av --delete \
       -e "ssh -i $HOME/.ssh/id_rsa -o IdentitiesOnly=yes" \

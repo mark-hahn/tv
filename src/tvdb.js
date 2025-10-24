@@ -282,7 +282,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   let tvdbData = {tvdbId, name, originalNetwork,
                   seasonCount, episodeCount, watchedCount,
-                  dateCreated: new Date().toISOString().slice(0,10),
                   image, score, overview,
                   firstAired, lastAired, averageRuntime,
                   originalCountry, originalLanguage,

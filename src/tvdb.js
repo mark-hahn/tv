@@ -77,12 +77,14 @@ const getUrlAndRatings = async (type, url, name) => {
     case 7:  // reddit
       // fs.writeFileSync(`samples/reddit-${name}.json`, 
       //                   JSON.stringify(json, null, 2));
-      const redditItems = Object.values(json.items || {});
-      const redditItem = redditItems.find(
+      const allItems    = Object.values(json.items || {});
+      const redditItems = allItems.filter(
                                item => item.displayLink == 'www.reddit.com');
-      if (!redditItem) return null;
-      // log("redditItem:", name, redditItem.link);
-      return {url: redditItem.link};
+      if (!redditItems || redditItems.length === 0) return null;
+      // for(const item of redditItems) {
+      //   log("redditItem:", name, item.link);
+      // }
+      return {url: redditItems[0].link};
 
     case 18:  // wikipedia
       // fs.writeFileSync(`samples/google-${name}.json`, 

@@ -1,0 +1,459 @@
+{
+  "kind": "customsearch#search",
+  "url": {
+    "type": "application/json",
+    "template": "https://www.googleapis.com/customsearch/v1?q={searchTerms}&num={count?}&start={startIndex?}&lr={language?}&safe={safe?}&cx={cx?}&sort={sort?}&filter={filter?}&gl={gl?}&cr={cr?}&googlehost={googleHost?}&c2coff={disableCnTwTranslation?}&hq={hq?}&hl={hl?}&siteSearch={siteSearch?}&siteSearchFilter={siteSearchFilter?}&exactTerms={exactTerms?}&excludeTerms={excludeTerms?}&linkSite={linkSite?}&orTerms={orTerms?}&dateRestrict={dateRestrict?}&lowRange={lowRange?}&highRange={highRange?}&searchType={searchType}&fileType={fileType?}&rights={rights?}&imgSize={imgSize?}&imgType={imgType?}&imgColorType={imgColorType?}&imgDominantColor={imgDominantColor?}&alt=json"
+  },
+  "queries": {
+    "request": [
+      {
+        "title": "Google Custom Search - 3rd Rock from the Sun tv show",
+        "totalResults": "60400000",
+        "searchTerms": "3rd Rock from the Sun tv show",
+        "count": 10,
+        "startIndex": 1,
+        "inputEncoding": "utf8",
+        "outputEncoding": "utf8",
+        "safe": "off",
+        "cx": "b59f40d0c17b54ff1"
+      }
+    ],
+    "nextPage": [
+      {
+        "title": "Google Custom Search - 3rd Rock from the Sun tv show",
+        "totalResults": "60400000",
+        "searchTerms": "3rd Rock from the Sun tv show",
+        "count": 10,
+        "startIndex": 11,
+        "inputEncoding": "utf8",
+        "outputEncoding": "utf8",
+        "safe": "off",
+        "cx": "b59f40d0c17b54ff1"
+      }
+    ]
+  },
+  "context": {
+    "title": "wiki-search"
+  },
+  "searchInformation": {
+    "searchTime": 0.29452,
+    "formattedSearchTime": "0.29",
+    "totalResults": "60400000",
+    "formattedTotalResults": "60,400,000"
+  },
+  "items": [
+    {
+      "kind": "customsearch#result",
+      "title": "3rd Rock from the Sun - Wikipedia",
+      "htmlTitle": "<b>3rd Rock from the Sun</b> - Wikipedia",
+      "link": "https://en.wikipedia.org/wiki/3rd_Rock_from_the_Sun",
+      "displayLink": "en.wikipedia.org",
+      "snippet": "3rd Rock from the Sun ; Sitcom · Science fiction · Satire · Bonnie Turner · Terry Turner · Terry Hughes; Various (seasons 1–2) · John Lithgow · Kristen Johnston ...",
+      "htmlSnippet": "<b>3rd Rock from the Sun</b> ; Sitcom &middot; Science fiction &middot; Satire &middot; Bonnie Turner &middot; Terry Turner &middot; Terry Hughes; Various (seasons 1–2) &middot; John Lithgow &middot; Kristen Johnston&nbsp;...",
+      "formattedUrl": "https://en.wikipedia.org/wiki/3rd_Rock_from_the_Sun",
+      "htmlFormattedUrl": "https://en.wikipedia.org/wiki/<b>3rd</b>_<b>Rock_from_the_Sun</b>",
+      "pagemap": {
+        "metatags": [
+          {
+            "referrer": "origin",
+            "og:image": "https://upload.wikimedia.org/wikipedia/en/thumb/d/de/3rd_Rock_from_the_Sun_%28Carsey-Warner_sitcom%29_logo.svg/1200px-3rd_Rock_from_the_Sun_%28Carsey-Warner_sitcom%29_logo.svg.png",
+            "theme-color": "#eaecf0",
+            "og:image:width": "1200",
+            "og:type": "website",
+            "viewport": "width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=0.25, maximum-scale=5.0",
+            "og:title": "3rd Rock from the Sun - Wikipedia",
+            "og:image:height": "700",
+            "format-detection": "telephone=no"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "3rd Rock from the Sun (TV Series 1996–2001) - IMDb",
+      "htmlTitle": "<b>3rd Rock from the Sun</b> (<b>TV Series</b> 1996–2001) - IMDb",
+      "link": "https://www.imdb.com/title/tt0115082/",
+      "displayLink": "www.imdb.com",
+      "snippet": "A group of aliens is sent to Earth, disguised as a human family, to experience and report life on the third planet from the sun.",
+      "htmlSnippet": "A group of aliens is sent to Earth, disguised as a human family, to experience and report life on the <b>third</b> planet from the <b>sun</b>.",
+      "formattedUrl": "https://www.imdb.com/title/tt0115082/",
+      "htmlFormattedUrl": "https://www.imdb.com/title/tt0115082/",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQUGG1RPHsI2daZ43Lw2ZqBjxtkGYaV7TG9NkmZAdCQeSDivW7UwL7yrban&s",
+            "width": "188",
+            "height": "268"
+          }
+        ],
+        "metatags": [
+          {
+            "og:image": "https://m.media-amazon.com/images/M/MV5BY2UxMzUzNzUtMzA0Ny00MWI1LWEwZjEtMjZhOWYzZGNiMDI3XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+            "og:type": "video.tv_show",
+            "og:image:width": "1000",
+            "twitter:title": "3rd Rock from the Sun (TV Series 1996–2001) ⭐ 7.8 | Comedy, Family, Sci-Fi",
+            "twitter:card": "summary_large_image",
+            "imdb:subpagetype": "main",
+            "og:site_name": "IMDb",
+            "msvalidate.01": "C1DACEF2769068C0B0D2687C9E5105FA",
+            "og:title": "3rd Rock from the Sun (TV Series 1996–2001) ⭐ 7.8 | Comedy, Family, Sci-Fi",
+            "imdb:pageconst": "tt0115082",
+            "og:image:height": "1426",
+            "og:description": "1h | TV-PG",
+            "twitter:image": "https://m.media-amazon.com/images/M/MV5BY2UxMzUzNzUtMzA0Ny00MWI1LWEwZjEtMjZhOWYzZGNiMDI3XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+            "next-head-count": "52",
+            "twitter:image:alt": "3rd Rock from the Sun: Created by Bonnie Turner, Terry Turner. With John Lithgow, Kristen Johnston, French Stewart, Joseph Gordon-Levitt. A group of aliens is sent to Earth, disguised as a human family, to experience and report life on the third planet from the sun.",
+            "twitter:site": "@IMDb",
+            "og:locale:alternate": "es_ES",
+            "viewport": "width=device-width",
+            "twitter:description": "1h | TV-PG",
+            "og:locale": "en_US",
+            "og:url": "https://www.imdb.com/title/tt0115082/",
+            "imdb:pagetype": "title"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://m.media-amazon.com/images/M/MV5BY2UxMzUzNzUtMzA0Ny00MWI1LWEwZjEtMjZhOWYzZGNiMDI3XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "Are there any shows like 3rd rock from the sun?? : r/sciencefiction",
+      "htmlTitle": "Are there any <b>shows</b> like <b>3rd rock from the sun</b>?? : r/sciencefiction",
+      "link": "https://www.reddit.com/r/sciencefiction/comments/14p731g/are_there_any_shows_like_3rd_rock_from_the_sun/",
+      "displayLink": "www.reddit.com",
+      "snippet": "Jul 3, 2023 ... You will like it, it is a wholesome TV show. It's from the same era too, so it will have the same feel and cultural influences as well.",
+      "htmlSnippet": "Jul 3, 2023 <b>...</b> You will like it, it is a wholesome <b>TV show</b>. It&#39;s from the same era too, so it will have the same feel and cultural influences as well.",
+      "formattedUrl": "https://www.reddit.com/.../are_there_any_shows_like_3rd_rock_from_the_...",
+      "htmlFormattedUrl": "https://www.reddit.com/.../are_there_any_<b>show</b>s_like_<b>3rd</b>_<b>rock_from_the_</b>...",
+      "pagemap": {
+        "metatags": [
+          {
+            "og:image": "https://share.redd.it/preview/post/14p731g",
+            "theme-color": "#000000",
+            "og:image:width": "1200",
+            "og:type": "website",
+            "og:image:alt": "An image containing a preview of the post",
+            "twitter:card": "summary_large_image",
+            "twitter:title": "r/sciencefiction on Reddit: Are there any shows like 3rd rock from the sun??",
+            "og:site_name": "Reddit",
+            "og:title": "r/sciencefiction on Reddit: Are there any shows like 3rd rock from the sun??",
+            "og:image:height": "630",
+            "msapplication-navbutton-color": "#000000",
+            "og:description": "Posted by u/Affectionate_Wind560 - 35 votes and 19 comments",
+            "twitter:image": "https://share.redd.it/preview/post/14p731g",
+            "apple-mobile-web-app-status-bar-style": "black",
+            "twitter:site": "@reddit",
+            "viewport": "width=device-width, initial-scale=1, viewport-fit=cover",
+            "apple-mobile-web-app-capable": "yes",
+            "og:ttl": "600",
+            "og:url": "https://www.reddit.com/r/sciencefiction/comments/14p731g/are_there_any_shows_like_3rd_rock_from_the_sun/?seeker-session=true"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "3rd Rock from the Sun (TV Series 1996–2001) - User reviews - IMDb",
+      "htmlTitle": "<b>3rd Rock from the Sun</b> (<b>TV Series</b> 1996–2001) - User reviews - IMDb",
+      "link": "https://www.imdb.com/title/tt0115082/reviews/",
+      "displayLink": "www.imdb.com",
+      "snippet": "3rd Rock from the Sun was a broad comedy about 4 aliens who have come to Earth to explore humanity and what it means to be human.",
+      "htmlSnippet": "<b>3rd Rock from the Sun</b> was a broad comedy about 4 aliens who have come to Earth to explore humanity and what it means to be human.",
+      "formattedUrl": "https://www.imdb.com/title/tt0115082/reviews/",
+      "htmlFormattedUrl": "https://www.imdb.com/title/tt0115082/reviews/",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQUGG1RPHsI2daZ43Lw2ZqBjxtkGYaV7TG9NkmZAdCQeSDivW7UwL7yrban&s",
+            "width": "188",
+            "height": "268"
+          }
+        ],
+        "metatags": [
+          {
+            "og:image": "https://m.media-amazon.com/images/M/MV5BY2UxMzUzNzUtMzA0Ny00MWI1LWEwZjEtMjZhOWYzZGNiMDI3XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+            "og:type": "video.tv_show",
+            "og:image:width": "1000",
+            "twitter:title": "3rd Rock from the Sun (TV Series 1996–2001) - User reviews - IMDb",
+            "twitter:card": "summary_large_image",
+            "imdb:subpagetype": "reviews",
+            "og:site_name": "IMDb",
+            "msvalidate.01": "C1DACEF2769068C0B0D2687C9E5105FA",
+            "og:title": "3rd Rock from the Sun (TV Series 1996–2001) - User reviews - IMDb",
+            "imdb:pageconst": "tt0115082",
+            "og:image:height": "1426",
+            "og:description": "3rd Rock from the Sun (TV Series 1996–2001) - Movies, TV, Celebs, and more...",
+            "twitter:image": "https://m.media-amazon.com/images/M/MV5BY2UxMzUzNzUtMzA0Ny00MWI1LWEwZjEtMjZhOWYzZGNiMDI3XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+            "next-head-count": "51",
+            "twitter:image:alt": "3rd Rock from the Sun (TV Series 1996–2001) - Movies, TV, Celebs, and more...",
+            "twitter:site": "@IMDb",
+            "og:locale:alternate": "es_ES",
+            "viewport": "width=device-width",
+            "twitter:description": "3rd Rock from the Sun (TV Series 1996–2001) - Movies, TV, Celebs, and more...",
+            "og:locale": "en_US",
+            "og:url": "https://www.imdb.com/title/tt0115082/reviews/",
+            "imdb:pagetype": "title"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://m.media-amazon.com/images/M/MV5BY2UxMzUzNzUtMzA0Ny00MWI1LWEwZjEtMjZhOWYzZGNiMDI3XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "3rd Rock from the Sun is the most underrated Sitcom ever... You ...",
+      "htmlTitle": "<b>3rd Rock from the Sun</b> is the most underrated Sitcom ever... You ...",
+      "link": "https://www.reddit.com/r/televisionsuggestions/comments/mw5n48/3rd_rock_from_the_sun_is_the_most_underrated/",
+      "displayLink": "www.reddit.com",
+      "snippet": "Apr 22, 2021 ... I don't like TBBT, but I love 3rd Rock. I watched it back when it was first on television. It was one of my favorite shows back then.",
+      "htmlSnippet": "Apr 22, 2021 <b>...</b> I don&#39;t like TBBT, but I love <b>3rd Rock</b>. I watched it back when it was first on <b>television</b>. It was one of my favorite <b>shows</b> back then.",
+      "formattedUrl": "https://www.reddit.com/.../3rd_rock_from_the_sun_is_the_most_underrate...",
+      "htmlFormattedUrl": "https://www.reddit.com/.../<b>3rd</b>_<b>rock_from_the_sun</b>_is_the_most_underrate...",
+      "pagemap": {
+        "metatags": [
+          {
+            "og:image": "https://share.redd.it/preview/post/mw5n48",
+            "theme-color": "#000000",
+            "og:image:width": "1200",
+            "og:type": "website",
+            "og:image:alt": "An image containing a preview of the post",
+            "twitter:card": "summary_large_image",
+            "twitter:title": "r/televisionsuggestions on Reddit: 3rd Rock from the Sun is the most underrated Sitcom ever... You should watch it!",
+            "og:site_name": "Reddit",
+            "og:title": "r/televisionsuggestions on Reddit: 3rd Rock from the Sun is the most underrated Sitcom ever... You should watch it!",
+            "og:image:height": "630",
+            "msapplication-navbutton-color": "#000000",
+            "og:description": "Posted by u/Kheenamooth - 65 votes and 12 comments",
+            "twitter:image": "https://share.redd.it/preview/post/mw5n48",
+            "apple-mobile-web-app-status-bar-style": "black",
+            "twitter:site": "@reddit",
+            "viewport": "width=device-width, initial-scale=1, viewport-fit=cover",
+            "apple-mobile-web-app-capable": "yes",
+            "og:ttl": "600",
+            "og:url": "https://www.reddit.com/r/televisionsuggestions/comments/mw5n48/3rd_rock_from_the_sun_is_the_most_underrated/?seeker-session=true"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "Classic Sitcom 3rd Rock from the Sun",
+      "htmlTitle": "Classic Sitcom <b>3rd Rock from the Sun</b>",
+      "link": "https://www.facebook.com/groups/classic.television.shows.group/posts/1678795529435103/",
+      "displayLink": "www.facebook.com",
+      "snippet": "Jan 11, 2025 ... Classic Television Shows | Classic Sitcom 3rd Rock from the Sun. Public group. 󰞋. 752K Members · Join group. Jimmy T Ho profile picture. Jimmy T ...",
+      "htmlSnippet": "Jan 11, 2025 <b>...</b> Classic <b>Television Shows</b> | Classic Sitcom <b>3rd Rock from the Sun</b>. Public group. 󰞋. 752K Members &middot; Join group. Jimmy T Ho profile picture. Jimmy T&nbsp;...",
+      "formattedUrl": "https://www.facebook.com/groups/classic...shows.../1678795529435103/",
+      "htmlFormattedUrl": "https://www.facebook.com/groups/classic...<b>show</b>s.../1678795529435103/",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTHfaEwgug1EDjRCwtEVVmL0yoRuuFXgHGgeYE14t2bA3A2-xUsXMNc09Z7&s",
+            "width": "318",
+            "height": "159"
+          }
+        ],
+        "metatags": [
+          {
+            "apple-itunes-app": "app-id=284882215, app-argument=fb://story/?graphqlid=UzpfSTYxNTY2NzM4MjQ0NDgxOlZLOjE2Nzg3OTU1Mjk0MzUxMDM%3D",
+            "og:image": "https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=122132449928557941",
+            "theme-color": "#FFFFFF",
+            "twitter:card": "summary",
+            "al:android:package": "com.facebook.katana",
+            "al:ios:url": "fb://story/?graphqlid=UzpfSTYxNTY2NzM4MjQ0NDgxOlZLOjE2Nzg3OTU1Mjk0MzUxMDM=",
+            "og:description": "3rd Rock from the Sun \nwidely considered an iconic sitcom from the '90s, and it features some extraordinary performances from the likes of John Lithgow and Joseph Gordon-Levitt (still remaining one...",
+            "al:ios:app_store_id": "284882215",
+            "twitter:image": "https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=122132449928557941",
+            "twitter:image:alt": "Classic Sitcom 3rd Rock from the Sun",
+            "twitter:site": "@facebookapp",
+            "application-name": "Facebook Groups",
+            "og:type": "video.other",
+            "og:image:alt": "Classic Sitcom 3rd Rock from the Sun",
+            "twitter:title": "Classic Sitcom 3rd Rock from the Sun",
+            "al:ios:app_name": "Facebook",
+            "application-url": "https://www.facebook.com/groups/",
+            "og:title": "Classic Sitcom 3rd Rock from the Sun",
+            "google": "notranslate",
+            "al:android:url": "fb://native_post/UzpfSTYxNTY2NzM4MjQ0NDgxOlZLOjE2Nzg3OTU1Mjk0MzUxMDM=",
+            "referrer": "origin-when-crossorigin",
+            "viewport": "width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no",
+            "twitter:description": "3rd Rock from the Sun \nwidely considered an iconic sitcom from the '90s, and it features some extraordinary performances from the likes of John Lithgow and Joseph Gordon-Levitt (still remaining one...",
+            "og:locale": "en_US",
+            "og:url": "https://www.facebook.com/groups/classic.television.shows.group/posts/1678795529435103/",
+            "al:android:app_name": "Facebook"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=122132449928557941"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "Movies or TV shows similar to 3rd Rock from the Sun, Coneheads ...",
+      "htmlTitle": "Movies or <b>TV shows</b> similar to <b>3rd Rock from the Sun</b>, Coneheads ...",
+      "link": "https://www.reddit.com/r/MovieSuggestions/comments/148h9o7/movies_or_tv_shows_similar_to_3rd_rock_from_the/",
+      "displayLink": "www.reddit.com",
+      "snippet": "Jun 13, 2023 ... Movies or TV shows similar to 3rd Rock from the Sun, Coneheads, The Neighbors (2012). REQUESTING. Something funny where aliens try to understand ...",
+      "htmlSnippet": "Jun 13, 2023 <b>...</b> Movies or <b>TV shows</b> similar to <b>3rd Rock from the Sun</b>, Coneheads, The Neighbors (2012). REQUESTING. Something funny where aliens try to understand&nbsp;...",
+      "formattedUrl": "https://www.reddit.com/.../movies_or_tv_shows_similar_to_3rd_rock_from...",
+      "htmlFormattedUrl": "https://www.reddit.com/.../movies_or_<b>tv</b>_<b>show</b>s_similar_to_<b>3rd</b>_<b>rock</b>_from...",
+      "pagemap": {
+        "metatags": [
+          {
+            "og:image": "https://share.redd.it/preview/post/148h9o7",
+            "theme-color": "#000000",
+            "og:image:width": "1200",
+            "og:type": "website",
+            "og:image:alt": "An image containing a preview of the post",
+            "twitter:card": "summary_large_image",
+            "twitter:title": "r/MovieSuggestions on Reddit: Movies or TV shows similar to 3rd Rock from the Sun, Coneheads, The Neighbors (2012)",
+            "og:site_name": "Reddit",
+            "og:title": "r/MovieSuggestions on Reddit: Movies or TV shows similar to 3rd Rock from the Sun, Coneheads, The Neighbors (2012)",
+            "og:image:height": "630",
+            "msapplication-navbutton-color": "#000000",
+            "og:description": "Posted by u/Familiar_Ground_162 - 6 votes and 28 comments",
+            "twitter:image": "https://share.redd.it/preview/post/148h9o7",
+            "apple-mobile-web-app-status-bar-style": "black",
+            "twitter:site": "@reddit",
+            "viewport": "width=device-width, initial-scale=1, viewport-fit=cover",
+            "apple-mobile-web-app-capable": "yes",
+            "og:ttl": "600",
+            "og:url": "https://www.reddit.com/r/MovieSuggestions/comments/148h9o7/movies_or_tv_shows_similar_to_3rd_rock_from_the/?seeker-session=true"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "3rd Rock from the Sun: Season 3 : John Lithgow ... - Amazon.com",
+      "htmlTitle": "3rd Rock from the Sun: Season 3 : John Lithgow ... - Amazon.com",
+      "link": "https://www.amazon.com/3rd-Rock-Sun-Season-3/dp/B000CEXF6A",
+      "displayLink": "www.amazon.com",
+      "snippet": "Season three of the cult comedy sitcom 3rd Rock From the Sun has been delivered to Earth in a fancy box set comprising twenty-seven episodes of the TV show ...",
+      "htmlSnippet": "Season three of the cult comedy sitcom <b>3rd Rock From the Sun</b> has been delivered to Earth in a fancy box set comprising twenty-seven <b>episodes</b> of the <b>TV show</b>&nbsp;...",
+      "formattedUrl": "https://www.amazon.com/3rd-Rock-Sun-Season-3/dp/B000CEXF6A",
+      "htmlFormattedUrl": "https://www.amazon.com/<b>3rd</b>-<b>Rock</b>-<b>Sun</b>-Season-3/dp/B000CEXF6A",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTQRolkuo7yW4pCplFEdJvgK6nDMumjh697_eA7gk5IjNfvw4NG2EwHcEiL&s",
+            "width": "310",
+            "height": "162"
+          }
+        ],
+        "metatags": [
+          {
+            "og:image": "https://m.media-amazon.com/images/I/51Y9MD9ZHGL.jpg_BO30,255,255,255_UF900,850_SR1910,1000,0,C_QL100_.jpg",
+            "theme-color": "#131921",
+            "og:type": "video.tv_show",
+            "og:image:width": "1910",
+            "og:title": "3rd Rock from the Sun: Season 3",
+            "og:image:height": "1000",
+            "flow-closure-id": "1757009478",
+            "title": "Amazon.com: 3rd Rock from the Sun: Season 3 : John Lithgow, French Stewart: Movies & TV",
+            "og:description": "Welcome to the most outrageous year of alien lunacy yet! Get ready for out-of-this-world and certified-classic hilarity as Dick Solomon (John Lithgow) and his ‘family’ Sally (Kristen Johnston), Harry (French Stewart), Tommy (Joseph Gordon- Levitt) and Dr. Albright (Jane Curtin) experience the ins...",
+            "encrypted-slate-token": "AnYx2Ju9mnASDGomEdVXz9dTEiU3+sdimfjRxYf2ZlpyoqV+x0zplaQbae2ikUvwdv3Jwdv/n48mEJLE0CDm8O1cn2NWS6q+hyqy4saSbrjXqMYzyOGbweUxfxaQeuyUFks31gPu73sIgZYZcPAIQ2SJ/MW8BxGIxl8B7dmXiJFbZkdChTsrGCycqysVIAuyUrdkBSxKVRlyUrP73nJseKIHqcN9cMEScggQ4c+B3/tfxVIXleO6PDvXqO331zMUnkQxfkpYRk5uaPW/N1Nuyc3bBsWsgWBEAKYiQJ72s8p+wDEi",
+            "viewport": "width=device-width, maximum-scale=2, minimum-scale=1, initial-scale=1, shrink-to-fit=no",
+            "og:sitename": "Amazon.com",
+            "og:url": "https://www.amazon.com/dp/B000CEXF6A"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://m.media-amazon.com/images/I/51Y9MD9ZHGL.jpg_BO30,255,255,255_UF900,850_SR1910,1000,0,C_QL100_.jpg"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "3rd Rock from the Sun (1996-2001) is incredible! : r/television",
+      "htmlTitle": "<b>3rd Rock from the Sun</b> (1996-2001) is incredible! : r/<b>television</b>",
+      "link": "https://www.reddit.com/r/television/comments/1aspm2d/3rd_rock_from_the_sun_19962001_is_incredible/",
+      "displayLink": "www.reddit.com",
+      "snippet": "Feb 17, 2024 ... 401 votes, 185 comments. My husband introduced me to this show and we just finished season 1 together. The physical comedy and ...",
+      "htmlSnippet": "Feb 17, 2024 <b>...</b> 401 votes, 185 comments. My husband introduced me to this <b>show</b> and we just finished season 1 together. The physical comedy and&nbsp;...",
+      "formattedUrl": "https://www.reddit.com/.../3rd_rock_from_the_sun_19962001_is_incredibl...",
+      "htmlFormattedUrl": "https://www.reddit.com/.../<b>3rd</b>_<b>rock_from_the_sun</b>_19962001_is_incredibl...",
+      "pagemap": {
+        "metatags": [
+          {
+            "og:image": "https://share.redd.it/preview/post/1aspm2d",
+            "theme-color": "#000000",
+            "og:image:width": "1200",
+            "og:type": "website",
+            "og:image:alt": "An image containing a preview of the post",
+            "twitter:card": "summary_large_image",
+            "twitter:title": "r/television on Reddit: 3rd Rock from the Sun (1996-2001) is incredible!",
+            "og:site_name": "Reddit",
+            "og:title": "r/television on Reddit: 3rd Rock from the Sun (1996-2001) is incredible!",
+            "og:image:height": "630",
+            "msapplication-navbutton-color": "#000000",
+            "og:description": "Posted by u/ordinarygita - 401 votes and 185 comments",
+            "twitter:image": "https://share.redd.it/preview/post/1aspm2d",
+            "apple-mobile-web-app-status-bar-style": "black",
+            "twitter:site": "@reddit",
+            "viewport": "width=device-width, initial-scale=1, viewport-fit=cover",
+            "apple-mobile-web-app-capable": "yes",
+            "og:ttl": "600",
+            "og:url": "https://www.reddit.com/r/television/comments/1aspm2d/3rd_rock_from_the_sun_19962001_is_incredible/?seeker-session=true"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "3rd Rock from the Sun (TV Series 1996-2001) — The Movie ...",
+      "htmlTitle": "<b>3rd Rock from the Sun</b> (<b>TV Series</b> 1996-2001) — The Movie ...",
+      "link": "https://www.themoviedb.org/tv/155-3rd-rock-from-the-sun?language=en-US",
+      "displayLink": "www.themoviedb.org",
+      "snippet": "The high commander of an alien expedition lands on Earth -- what he considers to be the least-important planet -- in human form as Dick Solomon.",
+      "htmlSnippet": "The high commander of an alien expedition lands on Earth -- what he considers to be the least-important planet -- in human form as Dick Solomon.",
+      "formattedUrl": "https://www.themoviedb.org/tv/155-3rd-rock-from-the-sun?language=en...",
+      "htmlFormattedUrl": "https://www.themoviedb.org/<b>tv</b>/155-<b>3rd</b>-<b>rock-from-the-sun</b>?language=en...",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTOxr1LO54xrr9kGETNZApF5BojTu5811rSbP7uJS6G_hyq97zr-O5bbJ7u&s",
+            "width": "183",
+            "height": "275"
+          }
+        ],
+        "metatags": [
+          {
+            "msapplication-tilecolor": "#032541",
+            "og:image": "https://media.themoviedb.org/t/p/w500/sUB4lZghNnwQywKqgjIfJsyBqI2.jpg",
+            "theme-color": "#032541",
+            "og:type": "video.tv_show",
+            "og:site_name": "The Movie Database",
+            "og:title": "3rd Rock from the Sun",
+            "msapplication-tileimage": "/assets/2/v4/icons/mstile-144x144-30e7905a8315a080978ad6aeb71c69222b72c2f75d26dab1224173a96fecc962.png",
+            "og:description": "The high commander of an alien expedition lands on Earth -- what he considers to be the least-important planet -- in human form as Dick Solomon. Along for the ride are his alien compatriots Harry, Sally and Tommy -- who is the eldest of the group but is now angrily trapped in a teen's body.",
+            "fb:app_id": "141280979243998",
+            "og:locale:alternate": "ar_SA",
+            "viewport": "width=device-width,initial-scale=1",
+            "apple-mobile-web-app-capable": "yes",
+            "mobile-web-app-capable": "yes",
+            "og:locale": "en_US",
+            "og:url": "https://www.themoviedb.org/tv/155-3rd-rock-from-the-sun"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://media.themoviedb.org/t/p/w500/sUB4lZghNnwQywKqgjIfJsyBqI2.jpg"
+          }
+        ]
+      }
+    }
+  ]
+}

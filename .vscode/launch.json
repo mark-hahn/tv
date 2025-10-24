@@ -4,15 +4,29 @@
     {
       "type": "chrome",
       "request": "launch",
-      "name": "Launch Chrome (Vite)",
-      "url": "http://localhost:3000",
+      "name": "Chrome localhost",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}"
+    },
+    {
+      "type": "firefox",
+      "request": "launch",
+      "name": "Firefox localhost",
+      "url": "http://localhost:5173",
       "webRoot": "${workspaceFolder}",
-      "sourceMaps": true,
-      "trace": true,
-      "resolveSourceMapLocations": [
-        "${workspaceFolder}/**",
-        "!**/node_modules/**"
-      ]
+      "reAttach": true,
+      "profile": "dev-edition-default"
+      /* Optional (Windows):
+      "firefoxExecutable": "C:\\Program Files\\Firefox Developer Edition\\firefox.exe"
+      Optional (macOS):
+      "firefoxExecutable": "/Applications/Firefox Developer Edition.app/Contents/MacOS/firefox"
+      */
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Chrome + Firefox",
+      "configurations": ["Chrome localhost", "Firefox localhost"]
     }
   ]
 }

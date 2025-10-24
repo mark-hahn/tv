@@ -6,6 +6,7 @@ bugs ...
   blocked shows appear on boot
   prune skipped first season worked on second try
   if 1'st episode file not watched/missing -> S01E01 No File
+  have to sort added twice
 
 todo  ...
   don't show google button if no header

@@ -1,4 +1,4 @@
-powershell.exe -File release.ps1
+npm run build-vite
 
 rsync -av --delete \
       -e "ssh -i $HOME/.ssh/id_rsa -o IdentitiesOnly=yes" \

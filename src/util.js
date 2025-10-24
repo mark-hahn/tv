@@ -194,27 +194,27 @@ export async function setAllNoEmbyTvdbIds(allShows) {
 }
 
 ////////// temp one-time mass operation (VERY SLOW) //////////
-export async function loadAllRemotes(allShows) {
-  let showIdx = 0;
-  const intvl = setInterval(async () => {
-    while(showIdx < allShows.length) {
-      if(showIdx % 10 == 0) 
-        console.log(new Date().toISOString(), 
-                  showIdx + ' of ' +allShows.length);
-      // if(Math.random() < 0.75) break;
-      const show = allShows[showIdx++];
-      const remotes = await tvdb.getRemotes(show);
-      if(!remotes) continue;
-      const [_remotes, cached] = remotes
-      if(cached) continue;
-      break;
-    }
-    if(showIdx == allShows.length) {
-      clearInterval(intvl);
-      console.log('load remotes done:', showIdx);
-    }
-  }, 45*1000);
-}
+// export async function loadAllRemotes(allShows) {
+//   let showIdx = 0;
+//   const intvl = setInterval(async () => {
+//     while(showIdx < allShows.length) {
+//       if(showIdx % 10 == 0) 
+//         console.log(new Date().toISOString(), 
+//                   showIdx + ' of ' +allShows.length);
+//       // if(Math.random() < 0.75) break;
+//       const show = allShows[showIdx++];
+//       const remotes = await tvdb.getRemotes(show);
+//       if(!remotes) continue;
+//       const [_remotes, cached] = remotes
+//       if(cached) continue;
+//       break;
+//     }
+//     if(showIdx == allShows.length) {
+//       clearInterval(intvl);
+//       console.log('load remotes done:', showIdx);
+//     }
+//   }, 45*1000);
+// }
 
 export function 
           dateWithTZ(date = new Date(), utcOut = false) {

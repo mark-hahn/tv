@@ -56,22 +56,22 @@ export const srchTvdbData = async (searchStr) => {
   return data;
 }
 
-export const markTvdbDeleted = 
-  async (showName, markDelete) => {
-    const tvdbData = allTvdb[showName];
-    if(!tvdbData) return;
-    if(markDelete) tvdbData.deleted = util.dateWithTZ();
-    else    delete tvdbData.deleted;
-    // console.log('markTvdbDeleted:', 
-    //     {showName, markDelete, str: str.substring(-100, 100)});
-    // if(!tvdbData.image) {
-    //   alert('no image in tvdbData');
-    //   return;
-    // }
-    // addTvdb can add or update tvdb.json
-    await srvr.addTvdb(tvdbData);
-    allTvdb[showName] = tvdbData;
-  };
+// export const markTvdbDeleted = 
+//   async (showName, markDelete) => {
+//     const tvdbData = allTvdb[showName];
+//     if(!tvdbData) return;
+//     if(markDelete) tvdbData.deleted = util.dateWithTZ();
+//     else    delete tvdbData.deleted;
+//     // console.log('markTvdbDeleted:', 
+//     //     {showName, markDelete, str: str.substring(-100, 100)});
+//     // if(!tvdbData.image) {
+//     //   alert('no image in tvdbData');
+//     //   return;
+//     // }
+//     // addTvdb can add or update tvdb.json
+//     await srvr.addTvdb(tvdbData);
+//     allTvdb[showName] = tvdbData;
+//   };
 
 //////////// get waitStr //////////////
 

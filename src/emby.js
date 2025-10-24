@@ -96,7 +96,7 @@ export async function loadAllShows() {
       show.Date = date;
       show.Size = size;
     }
-    if(!show.DateCreated) show.DateCreated = show.Date;
+    // if(!show.DateCreated) show.DateCreated = show.Date;
 
     const gapData = gaps[show.Id];
     if(gapData) {
@@ -175,7 +175,7 @@ export async function loadAllShows() {
         if(remote.ratings) 
             ratings = remote.ratings;
       }
-      // show.DateCreated     = tvdb.dateCreated;
+      show.DateCreated     = tvdb.added;
       show.TvdbId          = tvdb.tvdbId;
       show.OriginalCountry = tvdb.originalCountry;
       show.Ended           = (tvdb.status == 'Ended');

@@ -1,8 +1,11 @@
 #!/usr/bin/env node
+
+// node scripts/fix-tvdb-added.cjs
+
 const fs = require('fs');
 const path = require('path');
 
-const INPUT = path.join(__dirname, '..', 'data', 'tvdb-no-created.json');
+const INPUT = path.join(__dirname, '..', 'data', 'tvdb-copy.json');
 const OUTPUT = path.join(__dirname, '..', 'data', 'tvdb.json');
 
 function isoDate(d) {
@@ -29,14 +32,14 @@ function main() {
   const keys = Object.keys(obj);
   let entriesUpdated = 0;
 
-  // Iterate top-level entries in reverse order and add dateCreated to each entry object.
+  // Iterate top-level entries in reverse order and add added to each entry object.
   // Start with 2025-10-26 for the last entry, then decrement one day per entry as we move backward.
   let d = new Date('2025-10-22');
   for (let k = keys.length - 1; k >= 0; k--) {
     const key = keys[k];
     const val = obj[key];
     if (val && typeof val === 'object' && !Array.isArray(val)) {
-      val.dateCreated = isoDate(d);
+      val.added = isoDate(d);
       entriesUpdated++;
     } else if (Array.isArray(val)) {
       // backward-compat: if the value is actually an array of elements, handle that as before
@@ -46,7 +49,7 @@ function main() {
         if (elem === null || typeof elem !== 'object') {
           val[j] = { value: elem };
         }
-        val[j].dateCreated = isoDate(arrDate);
+        val[j].added = isoDate(arrDate);
         arrDate.setDate(arrDate.getDate() - 1);
       }
       entriesUpdated++;

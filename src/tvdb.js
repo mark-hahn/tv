@@ -229,7 +229,8 @@ const getRemotes = async (show, tvdbRemotes) => {
 const getTvdbData = async (paramObj, resolve, _reject) => {
   const {show, deleted,
          seasonCount, episodeCount, watchedCount} = paramObj;
-  const name   = show.Name;
+  const name  = show.Name;
+  const added = allTvdb[name]?.added ?? new Date().toISOString().slice(0,10);
   if(deleted) {
     // this shouldn't happen, deleteds filter before here
     log('getTvdbData:', name, 'is deleted, skipping tvDb refresh');
@@ -285,7 +286,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
                   image, score, overview,
                   firstAired, lastAired, averageRuntime,
                   originalCountry, originalLanguage,
-                  status, remotes, saved};
+                  status, remotes, added, saved};
   if(showId !== undefined) 
     tvdbData.showId = showId;
   if(deleted !== undefined)

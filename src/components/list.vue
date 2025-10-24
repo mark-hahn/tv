@@ -41,11 +41,11 @@
             #sortFltr(style="display:inline-block; display:flex; justify-content:space-between;")
               button(@click='sortClick'
                      :style="{width:'100px', fontSize:'15px', margin:'4px'}") 
-                | {{sortChoice}}
+                | Sort
 
               button(@click='filterClick' 
                      :style="{width:'100px', fontSize:'15px', margin:'4px'}")
-                | {{fltrChoice}}
+                | Filter
           button(@click="allClick" 
                   style="display:inline-block'; width:40px; font-size:15px; margin:4px 10px 4px 10px;backgroundColor:white") All
           #botrgt(style="display:flex; justify-content:space-between; margin: 5px 17px 0 0;")
@@ -56,14 +56,16 @@
                                 :style="{}")
     #sortpop(v-if="sortPopped" 
           style="width:200px; background-color:#eee; border: 1px solid black; position: fixed; display:flex; flex-direction:column; left: 144px; top: 75px;") 
-      div(style="text-align:center; margin:10px; font-weight:bold;") 
-        | Sort
+      div(
+        style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="sortAction('sortClose')") 
+        | Close
       div(v-for="sortChoice in sortChoices"
           style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="sortAction(sortChoice)") 
         | {{sortChoice}}           
     #fltrpop(v-if="fltrPopped" style="width:200px; background-color:#eee; padding:0px; border: 1px solid black; position: fixed; display:flex; flex-direction:column; left: 253px; top: 75px;") 
-      div(style="text-align:center; margin:10px; font-weight:bold;") 
-        | Filter
+      div(
+        style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="fltrAction('fltrClose')") 
+        | Close
       div(v-for="fltrChoice in fltrChoices"
           style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="fltrAction(fltrChoice)") 
         | {{fltrChoice}} 
@@ -701,14 +703,16 @@ export default {
 
     async sortAction(sortChoice) {
       console.log('sortAction', sortChoice);
-      window.localStorage.setItem("sortChoice", sortChoice);
-      this.sortChoice = sortChoice;
+      if (sortChoice != 'sortClose') {
+        window.localStorage.setItem("sortChoice", sortChoice);
+        this.sortChoice = sortChoice;
+        this.sortShows();
+        if(sortChoice != 'Alpha')
+            this.saveVisShow(this.shows[0], true);
+        this.scrollToSavedShow();
+      }
       this.sortPopped = false;
       this.fltrPopped = false;
-      this.sortShows();
-      if(sortChoice != 'Alpha')
-           this.saveVisShow(this.shows[0], true);
-      this.scrollToSavedShow();
     },
 
     async filterClick() {
@@ -718,18 +722,20 @@ export default {
 
     async fltrAction(fltrChoice) {
       console.log('fltrAction', fltrChoice);
-      this.showAll();
-      window.localStorage.setItem("fltrChoice", fltrChoice);
-      this.fltrChoice = fltrChoice;
+      if (fltrChoice != 'fltrClose') {
+        this.showAll();
+        window.localStorage.setItem("fltrChoice", fltrChoice);
+        this.fltrChoice = fltrChoice;
+        this.filterStr = "";
+        for (let cond of this.conds) {
+          util.setCondFltr(cond, this.fltrChoice);
+          //  console.log('cond:', cond.name, cond.filter);
+        }
+        await this.select();
+        this.sortShows();
+      }
       this.sortPopped = false;
       this.fltrPopped = false;
-      this.filterStr = "";
-      for (let cond of this.conds) {
-         util.setCondFltr(cond, this.fltrChoice);
-        //  console.log('cond:', cond.name, cond.filter);
-      }
-      await this.select();
-      this.sortShows();
     },
 
     scrollToSavedShow(saveVis = false) {

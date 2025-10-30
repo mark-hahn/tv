@@ -698,6 +698,7 @@ export default {
 
     async sortClick() {
       this.sortPopped = !this.sortPopped;
+      console.debug("🚀 ~ sortPopped:", sortPopped)
       this.fltrPopped = false;
     },
 

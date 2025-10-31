@@ -1,5 +1,12 @@
 #! /bin/bash
 
+s="$(pgrep -f tv-proc/main.js)"
+if [ ${#s} -gt 1 ] ; then
+  # echo "--  tv-proc not started, main.js already running  --"
+  # echo >> /root/dev/apps/tv-proc/tv.log
+  exit
+fi
+
 echo >> /root/dev/apps/tv-proc/tv.log
 date >> /root/dev/apps/tv-proc/tv.log
 
@@ -14,12 +21,6 @@ if [ -f /mnt/m-bkup/nomount ]; then
          ~/dev/apps/mailit/index.js "tv-proc: m-bkup drive is not mounted"
 fi 
 
-s="$(pgrep -f tv-proc/main.js)"
-if [ ${#s} -gt 1 ] ; then
-  echo "--  tv-proc not started, main.js already running  --"
-  echo >> /root/dev/apps/tv-proc/tv.log
-  exit
-fi
 
 cd /root/dev/apps/tv-proc
 coffee -c main.coffee

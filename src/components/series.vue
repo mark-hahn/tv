@@ -93,12 +93,12 @@ export default {
       evtBus.emit('openMap', show);
     },
 
-    async deleteClick() {
+    deleteClick() {
       console.log('Series, deleteClick:', this.show.Name);
       evtBus.emit('deleteShow', this.show);
     },
 
-    async remoteClick(remote) {
+    remoteClick(remote) {
       console.log('Series: remoteClick:', {remote});
       const url = remote.url;
       if(!url) return
@@ -113,7 +113,7 @@ export default {
       }, 1000);
     },
 
-    async setDeleted(tvdbData) {
+    setDeleted(tvdbData) {
       const deleted = !!tvdbData?.deleted;
       // console.log('series, setDeleted:', deleted)
       if(deleted) this.deletedTxt = 'Deleted ' + tvdbData.deleted;
@@ -121,7 +121,7 @@ export default {
       this.notInEmby = this.show.Id.startsWith('noemby-');
     },
 
-    async setPoster(tvdbData) {
+    setPoster(tvdbData) {
       const img = new Image();
       img.style.maxWidth  = "300px"; 
       img.style.maxHeight = "400px"; 
@@ -140,7 +140,7 @@ export default {
       document.getElementById('poster').replaceChildren(img);
     },
 
-    async setDates(tvdbData) {
+    setDates(tvdbData) {
       const show = this.show;
       const {firstAired, lastAired, status} = tvdbData;
       this.dates = ' &nbsp; ' + firstAired + 
@@ -181,7 +181,7 @@ export default {
       this.seasonsTxt = ' &nbsp; ' + seasonsTxt + watchedTxt;
     },
 
-    async setCntryLangTxt(tvdbData) {
+    setCntryLangTxt(tvdbData) {
       this.cntryLangTxt = ``;
       let {originalCountry, originalLanguage, 
            averageRuntime,  originalNetwork} = tvdbData;
@@ -205,7 +205,7 @@ export default {
                       ? ' ' + avgRuntime + ' Mins' : ''}` 
     },
 
-    async setNextWatch() {
+  async setNextWatch() {
       const afterWatched = await emby.afterLastWatched(this.show.Id);
       const status       = afterWatched.status;
       const readyToWatch = (status === 'ok');
@@ -234,7 +234,7 @@ export default {
       this.watchButtonTxtArr = watchButtonTxtArr.sort();
     },
 
-    async setRemotes() {
+    setRemotes() {
       this.remoteShowName  = this.show.Name;
       this.showSpinner     = false;
       this.showRemotes     = false;

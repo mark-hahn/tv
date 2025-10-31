@@ -109,11 +109,11 @@ export async function adjustDeletedFlags(allShows) {
               {name, $delete:['deleted'], dontSave:true});
     }
   });
-  srvr.setTvdbFields({});
+  await srvr.setTvdbFields({});
 }
 
 ////////// temp one-time mass operation //////////
-export async function listCountries(allShows) {
+export function listCountries(allShows) {
   const countries = new Set();
   allShows.forEach(async (show) => {
     const tvdbData = await allTvdb[show.Name];
@@ -127,7 +127,7 @@ export async function listCountries(allShows) {
 }
 
 ////////// temp one-time mass operation //////////
-export async function setAllFavs(allShows) {
+export function setAllFavs(allShows) {
   allShows.forEach(async (show) => {
     if(show.Id.startsWith("noemby-")) return;
     await emby.saveFav(show.Id, true);

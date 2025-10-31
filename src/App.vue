@@ -135,7 +135,7 @@ export default {
            });
     };
 
-    const toggleFavorite = async (show) => {
+    const toggleFavorite = (show) => {
       this.saveVisShow(show.Name);
       show.IsFavorite = !show.IsFavorite;
       emby.saveFav(show.Id, show.IsFavorite)
@@ -145,7 +145,7 @@ export default {
            });
     };
 
-    const toggleReject = async (show) => {
+    const toggleReject = (show) => {
       this.saveVisShow(show.Name);
       show.Reject = !show.Reject; 
       emby.saveReject(show.Name, show.Reject) 
@@ -172,7 +172,7 @@ export default {
       }
     };
 
-    const togglePickup = async (show) => {
+    const togglePickup = (show) => {
       this.saveVisShow(show.Name);
       show.Pickup = !show.Pickup;
       emby.savePickup(show.Name, show.Pickup)
@@ -198,7 +198,7 @@ export default {
       }
     };
 
-    const toggleToTry = async (show) => {
+    const toggleToTry = (show) => {
       this.saveVisShow(show.Name);
       show.InToTry = !show.InToTry;
       emby.saveToTry(show.Id, show.InToTry)
@@ -208,7 +208,7 @@ export default {
             });
     };
 
-    const toggleContinue = async (show) => {
+    const toggleContinue = (show) => {
       this.saveVisShow(show.Name);
       show.InContinue = !show.InContinue;
       emby.saveContinue(show.Id, show.InContinue)
@@ -218,7 +218,7 @@ export default {
             });
     };
 
-    const toggleMark = async (show) => {
+    const toggleMark = (show) => {
       this.saveVisShow(show.Name);
       show.InMark = !show.InMark;
       emby.saveMark(show.Id, show.InMark)
@@ -228,7 +228,7 @@ export default {
             });
     };
 
-    const toggleLinda = async (show) => {
+    const toggleLinda = (show) => {
       this.saveVisShow(show.Name);
       show.InLinda = !show.InLinda;
       emby.saveLinda(show.Id, show.InLinda)
@@ -296,39 +296,39 @@ export default {
         }, {
           color: "#lime", filter: 0, icon: ["fas", "calendar"],
           cond(show)  { return show.Waiting; },
-          click(show) { toggleWaiting(show); },
+          async click(show) { await toggleWaiting(show); },
         }, {
           color: "lime", filter: 0, icon: ["fas", "question"],
           cond(show)  { return show.InToTry; },
-          click(show) { toggleToTry(show); },
+          async click(show) { await toggleToTry(show); },
         }, {
           color: "lime", filter: 0, icon: ["fas", "arrow-right"],
           cond(show)  { return show.InContinue; },
-          click(show) { toggleContinue(show); },
+          async click(show) { await toggleContinue(show); },
         }, {
           color: "lime", filter: 0, icon: ["fas", "mars"],
           cond(show)  { return show.InMark; },
-          click(show) { toggleMark(show); },
+          async click(show) { await toggleMark(show); },
         }, {
           color: "lime", filter: 0, icon: ["fas", "venus"],
           cond(show)  { return show.InLinda; },
-          click(show) { toggleLinda(show); },
+          async click(show) { await toggleLinda(show); },
         }, {
           color: "red", filter: 0, icon: ["far", "heart"],
           cond(show)  { return show.IsFavorite; },
-          click(show) { toggleFavorite(show); },
+          async click(show) { await toggleFavorite(show); },
         }, {
           color: "red", filter: -1, icon: ["fas", "ban"],
           cond(show)  { return show.Reject; },
-          click(show) { toggleReject(show); },
+          async click(show) { await toggleReject(show); },
         }, {
           color: "#5ff", filter: 0, icon: ["fas", "arrow-down"],
           cond(show)  { return show.Pickup; },
-          click(show) { togglePickup(show); },
+          async click(show) { await togglePickup(show); },
         }, {
           color: "#a66", filter: 0, icon: ["fas", "tv"],
           cond(show)  { return !show.Id.startsWith("noemby-"); },
-          click(show) { deleteShowFromEmby(show); },
+          async click(show) { await deleteShowFromEmby(show); },
         },
       ],
     };
@@ -449,21 +449,21 @@ export default {
       window.localStorage.setItem("lastVisShow", name);
     },
 
-    async sortClickAdded() {
+    sortClickAdded() {
       this.sortByNew      = true;
       this.sortByActivity = false;
       this.sortBySize     = false;
       console.log("sort by Added");
     },
 
-    async sortClickActivity() {
+    sortClickActivity() {
       this.sortByNew      = false;
       this.sortByActivity = true;
       this.sortBySize     = false;
       console.log("sort by Activity");
     },
 
-    async sortClickSize() {
+    sortClickSize() {
       this.sortByNew      = false;
       this.sortByActivity = false;
       this.sortBySize     = true;
@@ -498,9 +498,9 @@ export default {
       });
     },
 
-    copyNameToClipboard(show) {
+    async copyNameToClipboard(show) {
       console.log(`copying ${show.Name} to clipboard`);
-      navigator.clipboard.writeText(show.Name);
+      await navigator.clipboard.writeText(show.Name);
       this.saveVisShow(show.Name);
     },
 
@@ -517,7 +517,7 @@ export default {
       else // toggle watched
         await emby.editEpisode(show.Id, season, episode);
 
-      this.seriesMapAction('', show, deleted);
+        await this.seriesMapAction('', show, deleted);
     },
 
     async seriesMapAction(action, show, wasDeleted) {
@@ -618,7 +618,7 @@ export default {
       this.select();
     },
 
-    async showInExternal(show, event) {
+    showInExternal(show, event) {
       console.log("showInExternal", show);
       this.saveVisShow(show.Name);
       if (!show.Id.startsWith("noemby-")) {
@@ -668,7 +668,7 @@ export default {
 
   /////////////////  MOUNTED  /////////////////
   mounted() {
-    (async () => {
+    await (async () => {
       try {
         showErr = this.showErr;
         await emby.init(showErr);

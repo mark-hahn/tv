@@ -217,11 +217,11 @@ export default {
       this.saveVisShow(show);
       if(show.Waiting) {
         show.Waiting = false;
-        srvr.addBlockedWait(show.Name);
+        await srvr.addBlockedWait(show.Name);
       }
       else if (show.WaitStr?.length > 0) {
         show.Waiting = true;
-        srvr.delBlockedWait(show.Name); 
+        await srvr.delBlockedWait(show.Name); 
       }
     };
 
@@ -230,11 +230,11 @@ export default {
       this.saveVisShow(show);
       if(show.BlockedGap) {
         show.BlockedGap = false;
-        srvr.delBlockedGap(show.Name);
+        await srvr.delBlockedGap(show.Name);
       }
       else {
         show.BlockedGap = true;
-        srvr.addBlockedGap(show.Name); 
+        await srvr.addBlockedGap(show.Name); 
       }
     };
     
@@ -243,14 +243,14 @@ export default {
            !show.InToTry) return;
       this.saveVisShow(show);
       show.InToTry = !show.InToTry;
-      emby.saveToTry(show.Id, show.InToTry)
+      await emby.saveToTry(show.Id, show.InToTry)
           .catch((err) => {
               console.error("late toggleToTry error:", err);
               //- show.InToTry = !show.InToTry;
             });
     };
 
-    const toggleContinue = async (show) => {
+    const toggleContinue = (show) => {
       if(show.Id.startsWith("noemby-") &&
            !show.InContinue) return;
       this.saveVisShow(show);
@@ -262,7 +262,7 @@ export default {
             });
     };
 
-    const toggleMark = async (show) => {
+    const toggleMark = (show) => {
       if(show.Id.startsWith("noemby-") &&
            !show.InMark) return;
       this.saveVisShow(show);
@@ -274,7 +274,7 @@ export default {
             });
     };
 
-    const toggleLinda = async (show) => {
+    const toggleLinda = (show) => {
       if(show.Id.startsWith("noemby-") &&
            !show.InLinda) return;
       this.saveVisShow(show);
@@ -286,7 +286,7 @@ export default {
             });
     };
 
-    const toggleFavorite = async (show) => {
+    const toggleFavorite = (show) => {
       if(show.Id.startsWith("noemby-") &&
            !show.IsFavorite) return
       this.saveVisShow(show);
@@ -323,7 +323,7 @@ export default {
       }
     };
 
-    const togglePickup = async (show) => {
+    const togglePickup = (show) => {
       this.saveVisShow(show);
       show.Pickup = !show.Pickup;
       if(show.Pickup) 
@@ -358,7 +358,7 @@ export default {
 
       if(pruneTvdb) {
         delete allTvdb[name];
-        srvr.setTvdbFields({name, $delTvdb:true});
+        await srvr.setTvdbFields({name, $delTvdb:true});
       }
       else {
         const deleted = tvdbData.deleted = util.fmtDate();
@@ -368,10 +368,10 @@ export default {
       await this.removeRow(show);
     }
 
-    evtBus.on('deleteShow', (show) => {
+    evtBus.on('deleteShow', async (show) => {
       // console.log('evtBus deleteShow', show.Name);
       if(!show) return;
-      deleteShow(show);
+      await deleteShow(show);
     });
 
     return {
@@ -410,7 +410,7 @@ export default {
             return (show.FileGap || show.WatchGap ||
                     show.Id.startsWith("noemby-")) && 
                    !show.BlockedGap},
-          click(show) { toggleBlkGap(show); },
+          async click(show) { await toggleBlkGap(show); },
           name: "gap",
         }, {
           color: "#faa", filter: 0, 
@@ -429,42 +429,42 @@ export default {
         }, {
           color: "lime", filter: 0, icon: ["fas", "question"],
           cond(show)  { return show.InToTry; },
-          click(show) { toggleToTry(show); },
+          async click(show) { await toggleToTry(show); },
            name: "totry",
         }, {
           color: "lime", filter: 0, icon: ["fas", "arrow-right"],
           cond(show)  { return show.InContinue; },
-          click(show) { toggleContinue(show); },
+          async click(show) { await toggleContinue(show); },
            name: "continue",
         }, {
           color: "lime", filter: 0, icon: ["fas", "mars"],
           cond(show)  { return show.InMark; },
-          click(show) { toggleMark(show); },
+          async click(show) { await toggleMark(show); },
            name: "mark",
         }, {
           color: "lime", filter: 0, icon: ["fas", "venus"],
           cond(show)  { return show.InLinda; },
-          click(show) { toggleLinda(show); },
+          async click(show) { await toggleLinda(show); },
           name: "linda",
         }, {
           color: "red", filter: 0, icon: ["far", "heart"],
           cond(show)  { return show.IsFavorite; },
-          click(show) { toggleFavorite(show); },
+          async click(show) { await toggleFavorite(show); },
           name: "favorite",
         }, {
           color: "red", filter: -1, icon: ["fas", "ban"],
           cond(show)  { return show.Reject; },
-          click(show) { toggleReject(show); },
+          async click(show) { await toggleReject(show); },
           name: "ban",
         }, {
           color: "#5ff", filter: 0, icon: ["fas", "arrow-down"],
           cond(show)  { return show.Pickup; },
-          click(show) { togglePickup(show); },
+          async click(show) { await togglePickup(show); },
           name: "pickup",
         }, {
           color: "#a66", filter: 0, icon: ["fas", "tv"],
           cond(show)  { return !show.Id.startsWith("noemby-"); },
-          click(show) { deleteShow(show) },
+          async click(show) { await deleteShow(show); },
           name: "hasemby",
         },
       ],
@@ -643,7 +643,7 @@ export default {
       this.saveVisShow(this.shows[0], true);
     },
 
-    prevNextClick(next) {
+    async prevNextClick(next) {
       if(showHistory.length == 0) return;
       const newPtr = showHistoryPtr + (next ? 1 : -1);
       if(newPtr < 0 || newPtr >= showHistory.length) return;
@@ -652,13 +652,13 @@ export default {
       const showArr = this.shows.filter(
               (showIn) => showIn.Name == show.Name);
       if (showArr.length == 0) {
-        this.fltrAction('All');
+        await this.fltrAction('All');
       }
       this.saveVisShow(show, true);
     },
 
-    allClick() {
-      this.fltrAction('All');
+    async allClick() {
+      await this.fltrAction('All');
     },
 
     nameHash(name) {
@@ -696,13 +696,13 @@ export default {
         evtBus.emit('setUpSeries', show));
     },
 
-    async sortClick() {
+    sortClick() {
       this.sortPopped = !this.sortPopped;
       console.debug("🚀 ~ sortPopped:", sortPopped)
       this.fltrPopped = false;
     },
 
-    async sortAction(sortChoice) {
+    sortAction(sortChoice) {
       console.log('sortAction', sortChoice);
       if (sortChoice != 'sortClose') {
         window.localStorage.setItem("sortChoice", sortChoice);
@@ -716,7 +716,7 @@ export default {
       this.fltrPopped = false;
     },
 
-    async filterClick() {
+    filterClick() {
       this.fltrPopped = !this.fltrPopped
       this.sortPopped = false;
     },
@@ -786,7 +786,7 @@ export default {
       else // toggle watched
         await emby.editEpisode(show.Id, season, episode);
 
-      this.seriesMapAction('', show, deleted);
+      await this.seriesMapAction('', show, deleted);
     },
 
     async waitStrClick(show) {
@@ -794,7 +794,7 @@ export default {
       this.saveVisShow(show);
       if (show.WaitStr?.length > 0) {
         show.Waiting = true;
-        srvr.delBlockedWait(show.Name); 
+        await srvr.delBlockedWait(show.Name);
       }
     },
 
@@ -842,19 +842,19 @@ export default {
       this.saveVisShow(show);
     },
 
-    condFltrClick(cond, event) {
+    async condFltrClick(cond, event) {
       this.fltrChoice = '- - - - -';
       if(cond.name == 'gap' && event.ctrlKey) {
         allShows.forEach((show) =>  {
           if(show.BlockedGap) {
             show.BlockedGap = false;
-            srvr.delBlockedGap(show.Name);
+            await srvr.delBlockedGap(show.Name);
             cond.filter = 1;
           }
         });
       }
       else if (++cond.filter == 2) cond.filter = -1;
-      this.select();
+      await this.select();
     },
 
     condFltrColor(cond) {
@@ -1009,7 +1009,7 @@ export default {
       this.watchingName = showName ?? '---';
     }, 10*1000);
 
-    (async () => {
+    await (async () => {
       document.addEventListener('keydown', (event) => {
         if(event.code == 'Escape') {
           this.remotesAction('close');

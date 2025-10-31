@@ -7,7 +7,7 @@ https://dev.emby.media/reference/RestAPI.html
 https://dev.emby.media/home/sdk/apiclients/index.html
 */
 
-export async function init(credIn) { 
+export function init(credIn) { 
   cred = credIn; 
 }
 

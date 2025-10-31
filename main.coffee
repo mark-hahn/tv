@@ -234,26 +234,37 @@ checkFile = () =>
       log '------', downloadCount,'/', chkCount, 'SKIPPING *ERROR*:', fname
       process.nextTick checkFile
       return
-    console.log '\n>>>>>>', downloadCount+1, dateStr(Date.now()), '--', 
-                            usbFileSize, '--\n' + fname
     downloadTime = Date.now()
 
     cmd = "guessit -js '#{fname.replace /'|`/g, ''}'"
     guessItRes = exec(cmd, {timeout:10000}).toString()
     log 'guessit:', guessItRes
+
+    ###
+    {"title": "Haunted Hotel", "season": 1, "episode": 4, "screen_size": "1080p", "color_depth": "10-bit", "source": "Web", "other": "Rip", "audio_channels": "5.1", "video_codec": "H.265", "video_profile": "High Efficiency Video Coding", "release_group": "PSA", "container": "mkv", "mimetype": "video/x-matroska", "type": "episode"}
+    ###
+
+    season  = 1
+    episode = 1
+
     try
-      {title, season, type} = JSON.parse guessItRes
+      {title, season, episode, type} = JSON.parse guessItRes
       if not type == 'episode'
         log '\nskipping non-episode:', fname
         process.nextTick badFile
         return
       if not Number.isInteger season
-        err '\nno season integer for ' + usbLine + ', defaulting to season 1', {title, season, type}
+        err '\nno season integer for ' + usbLine + ', 
+               defaulting to season 1', {title, season, type}
         season = 1
     catch
       err '\nerror parsing:' + fname
       process.nextTick badFile
       return
+    console.log '\n>>>>>>', downloadCount+1, 
+                  's'+(''+season).padStart(2, '0')+'e'+(''+episode).padStart(2, '0'),
+                   dateStr(Date.now()), '--', 
+                   usbFileSize, '--\n' + fname
     process.nextTick chkTvDB
   else
     log '.... done ....'

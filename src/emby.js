@@ -677,7 +677,7 @@ export const startStop = async (show, episodeId, watchButtonTxt) => {
       const {url, body} = urls.playUrl(sessionId, episodeId);
       await axios({method: 'post', url, data: body});
       console.log(`playing1 ${show.Name} on  ${deviceName}`);
-      setTimeout(() => {
+      setTimeout(async () => {
         await axios({method: 'post', url, data: body});
         console.log(`playing2 ${show.Name} on  ${deviceName}`);
       }, 1000);

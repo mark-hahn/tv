@@ -844,14 +844,14 @@ export default {
 
     async condFltrClick(cond, event) {
       this.fltrChoice = '- - - - -';
-      if(cond.name == 'gap' && event.ctrlKey) {
-        allShows.forEach((show) =>  {
-          if(show.BlockedGap) {
+      if (cond.name == 'gap' && event.ctrlKey) {
+        for (const show of allShows) {
+          if (show.BlockedGap) {
             show.BlockedGap = false;
             await srvr.delBlockedGap(show.Name);
             cond.filter = 1;
           }
-        });
+        }
       }
       else if (++cond.filter == 2) cond.filter = -1;
       await this.select();
@@ -993,7 +993,7 @@ export default {
   },
 
   /////////////////  MOUNTED  /////////////////
-  mounted() {
+  async mounted() {
     evtBus.on('openMap', (show) => {
       this.seriesMapAction('open', show);
     });

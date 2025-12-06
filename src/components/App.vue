@@ -7,7 +7,7 @@
     @show-map="handleShowMap"
     @hide-map="handleHideMap"
   )
-  Series(v-show="!showMap" style="display:inline-block;")
+  Series(v-show="!showMap" style="display:inline-block;" :simpleMode="simpleMode")
   Map(
     v-show="showMap"
     :mapShow="mapShow"

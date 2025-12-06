@@ -12,7 +12,8 @@
     div(v-if="show?.Reject" 
         style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px;") Banned From Download
                 
-    button(@click.stop="deleteClick"
+    button(v-if="!simpleMode"
+            @click.stop="deleteClick"
             style="font-size:15px; cursor:pointer; margin-left:20px; margin-top:3px; max-height:24px; border-radius: 7px;") Delete
   #body(style="display:flex; cursor:pointer;")
     #topLeft(@click="openMap(show)"
@@ -65,6 +66,13 @@ let windowLabel = Math.random();
 export default {
   name: "Series",
 
+  props: {
+    simpleMode: {
+      type: Boolean,
+      default: false
+    }
+  },
+
   data() {
     return {
       show: {Name:''},
@@ -89,10 +97,9 @@ export default {
   methods: {
 
     handleSeriesClick(event) {
-      // Only open map if clicking on series itself, not on child elements
-      if (event.target.id === 'series' || event.target.id === 'bot') {
-        this.openMap(this.show);
-      }
+      // Open map when clicking anywhere in series pane
+      // .stop modifiers on buttons prevent their clicks from reaching here
+      this.openMap(this.show);
     },
 
     openMap(show) {

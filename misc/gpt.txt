@@ -1,10 +1,12 @@
 
-make a new buttons.vue. show it in simple mode. 
+toggling some buttons changes the state of some other buttons.
 
-it should be the same height of the shows pane and it should be in list pane to the left of the shows pane. 
+In each click the clicked button is toggled independent of any other toggle instructions.
 
-it has buttons the full width of the pane.  they stack vertically.
+there are button interactions. the format of each interaction is buttonName:on/off:otherButtons:noChange/on/off
 
-the buttons are:
+for now we will just add one action 
 
-Drama, Comedy, 
+show all:on:filter group:off
+
+

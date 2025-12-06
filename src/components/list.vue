@@ -38,19 +38,26 @@
         @fltr-action="fltrAction"
       )
 
-    Shows(
-      :shows="shows"
-      :conds="conds"
-      :highlightName="highlightName"
-      :getSortDisplayValue="getValBySortChoice"
-      :allShowsLength="allShowsLength"
-      :showConds="!simpleMode"
-      :simpleMode="simpleMode"
-      @copy-name="copyNameToClipboard"
-      @open-map="(show) => seriesMapAction('open', show)"
-      @select-show="saveVisShow"
-      @wait-str-click="waitStrClick"
-    )
+    #showsContainer(style="display:flex; flex-grow:1; overflow:hidden;")
+      Buttons(
+        v-if="simpleMode"
+        style="width:140px; flex-shrink:0;"
+        @button-click="handleButtonClick"
+      )
+      Shows(
+        style="flex-grow:1;"
+        :shows="shows"
+        :conds="conds"
+        :highlightName="highlightName"
+        :getSortDisplayValue="getValBySortChoice"
+        :allShowsLength="allShowsLength"
+        :showConds="!simpleMode"
+        :simpleMode="simpleMode"
+        @copy-name="copyNameToClipboard"
+        @open-map="(show) => seriesMapAction('open', show)"
+        @select-show="saveVisShow"
+        @wait-str-click="waitStrClick"
+      )
 </template>
 
 
@@ -59,10 +66,11 @@ import * as emby from "../emby.js";
 import * as tvdb from "../tvdb.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
-import    evtBus from '../evtBus.js';
-import    Shows  from './shows.vue';
-import    HdrTop from './hdrtop.vue';
-import    HdrBot from './hdrbot.vue';
+import    evtBus  from '../evtBus.js';
+import    Shows   from './shows.vue';
+import    HdrTop  from './hdrtop.vue';
+import    HdrBot  from './hdrbot.vue';
+import    Buttons from './buttons.vue';
 
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library }         from "@fortawesome/fontawesome-svg-core";
@@ -90,7 +98,7 @@ const pruneTvdb = (window.location.href.slice(-5) == 'prune');
 export default {
   name: "List",
 
-  components: { FontAwesomeIcon, Shows, HdrTop, HdrBot },
+  components: { FontAwesomeIcon, Shows, HdrTop, HdrBot, Buttons },
 
   emits: ['show-map', 'hide-map'],
   
@@ -364,6 +372,11 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
+
+    handleButtonClick(label) {
+      console.log('Button clicked:', label);
+      // Actions will be added later
+    },
 
     getValBySortChoice(show, forSort = false) {
       let lastViewed, ratings;

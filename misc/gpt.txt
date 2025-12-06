@@ -9,4 +9,8 @@ for now we will just add one action
 
 show all:on:filter group:off
 
+next interaction is: 
 
+order group:on:other order buttons:off
+
+order button that is on:off:order group:off

@@ -58,8 +58,44 @@ export default {
 
   methods: {
     handleButtonClick(label) {
-      // Toggle the clicked button
+      // Toggle the clicked button first (independent of any other toggle instructions)
       this.activeButtons[label] = !this.activeButtons[label];
+      
+      // Button interactions
+      // show all:on:filter group:off
+      if (label === 'Show All' && this.activeButtons['Show All']) {
+        // Turn off all other buttons in filter group (excluding Show All itself)
+        this.filters.forEach(btn => {
+          if (btn !== 'Show All') {
+            this.activeButtons[btn] = false;
+          }
+        });
+      }
+      
+      // filter group:on:show all:off
+      if (label !== 'Show All' && this.filters.includes(label) && this.activeButtons[label]) {
+        // Turn off Show All when any other filter is turned on
+        this.activeButtons['Show All'] = false;
+      }
+      
+      // order group:on:other order buttons:off
+      if (this.sortOrders.includes(label) && this.activeButtons[label]) {
+        // Turn off all other buttons in sortOrders group (excluding the clicked one)
+        this.sortOrders.forEach(btn => {
+          if (btn !== label) {
+            this.activeButtons[btn] = false;
+          }
+        });
+      }
+      
+      // order button that is on:off:order group:off
+      if (this.sortOrders.includes(label) && !this.activeButtons[label]) {
+        // When turning off an order button, turn off all order buttons
+        this.sortOrders.forEach(btn => {
+          this.activeButtons[btn] = false;
+        });
+      }
+      
       this.$emit('button-click', label, this.activeButtons[label]);
     }
   },

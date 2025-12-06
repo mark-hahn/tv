@@ -1,6 +1,6 @@
 <template lang="pug">
 
-#series(style="height:95dvh; padding:0; margin:0; display:flex; flex-direction:column; padding:5px;")
+#series(@click="handleSeriesClick" style="height:95dvh; padding:0; margin:0; display:flex; flex-direction:column; padding:5px;")
 
   #hdr(v-if="showHdr"
        style="display:flex; justify-content:space-between; font-weight:bold; font-size:25px; margin-bottom:20px; max-width:565px;")
@@ -12,7 +12,7 @@
     div(v-if="show?.Reject" 
         style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px;") Banned From Download
                 
-    button(@click="deleteClick"
+    button(@click.stop="deleteClick"
             style="font-size:15px; cursor:pointer; margin-left:20px; margin-top:3px; max-height:24px; border-radius: 7px;") Delete
   #body(style="display:flex; cursor:pointer;")
     #topLeft(@click="openMap(show)"
@@ -40,12 +40,12 @@
               style="width:100px; height:100px; position:relative; top:20px; left:45px;")
         div(v-if="showRemotes" 
             v-for="remote in remotes"
-            @click="remoteClick(remote)"
+            @click.stop="remoteClick(remote)"
             style="margin:5px 5px; padding:10px; background-color:#eee; border-radius: 7px; text-align:center; border: 1px solid black; font-weight:bold;")
           | {{remote.name}}
       #buttons(style="display:flex; flex-wrap:wrap; margin-top:15px; width:280px; justify-content:space-around;")
         #watchButton(v-for="watchButtonTxt in watchButtonTxtArr"
-            @click="watchButtonClick(show, watchButtonTxt)"
+            @click.stop="watchButtonClick(show, watchButtonTxt)"
             style="margin:5px 10px 10px 7px; border-radius: 10px; padding:3px; max-width:110px; background-color:#eee; text-align:center; border: 1px solid black; font-weight:bold;")
           | {{watchButtonTxt}}
   #bot(style="font-size:20px; padding:10px;") {{show.Overview}}
@@ -87,6 +87,14 @@ export default {
   },
   
   methods: {
+
+    handleSeriesClick(event) {
+      // Only open map if clicking on series itself, not on child elements
+      if (event.target.id === 'series' || event.target.id === 'bot') {
+        this.openMap(this.show);
+      }
+    },
+
     openMap(show) {
       if(show.Id.startsWith('noemby-')) return;
       // console.log('Series: openMap:', show);

@@ -41,7 +41,7 @@
           | {{season}}
 
         td(v-for="episode in seriesMapEpis" key="series+'.'+episode" 
-            @click="$emit('episode-click', $event, mapShow, season, episode)"
+            @click="handleEpisodeClick($event, mapShow, season, episode)"
             :style="{cursor:'default', padding:'0 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor: (seriesMap[season]?.[episode]?.error) ? 'yellow': (seriesMap[season]?.[episode]?.noFile) ? '#faa' : 'white'}")
           span(v-if="seriesMap?.[season]?.[episode]?.played")  w
           span(v-if="seriesMap?.[season]?.[episode]?.avail")   +
@@ -89,6 +89,13 @@ export default {
         event.stopPropagation();
         this.$emit('close');
       }
+    },
+    handleEpisodeClick(event, mapShow, season, episode) {
+      if (this.simpleMode) {
+        // Don't stop propagation - let it bubble up to handleMapClick
+        return;
+      }
+      this.$emit('episode-click', event, mapShow, season, episode);
     }
   }
 };

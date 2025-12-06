@@ -3,7 +3,7 @@
   table(style="width:100%; font-size:18px")
    tbody
     tr(v-for="show in shows" :key="show.Id" 
-          style="outline:thin solid; cursor:default" 
+          style="outline:thin solid; cursor:default; line-height:1.6;" 
          :id="nameHash(show.Name)")
 
       td(v-if="!simpleMode"

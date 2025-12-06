@@ -13,6 +13,7 @@
         :watchingName="watchingName"
         :showingSrchList="showingSrchList"
         :searchList="searchList"
+        :simpleMode="simpleMode"
         @search-click="searchClick"
         @watch-click="watchClick"
         @filter-input="select"

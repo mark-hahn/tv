@@ -1,16 +1,14 @@
 <template lang="pug">
 #map(@click="handleMapClick" style="height:95dvh; padding:5px; margin:0; display:flex; flex-direction:column; background-color:#ffe; overflow-y:auto; flex:1;")
 
-  div(style="margin:0 5px; display:flex; justify-content:space-between;")
-    div(style="font-size:20px; margin:6px 20px 0 0; font-weight:bold; flex-grow:4;")
-      | {{mapShow?.Name}}
-    div(v-if="!simpleMode")
+  div(style="margin:0 5px; display:flex; justify-content:flex-start; align-items:center;")
+    div(v-if="!simpleMode" style="display:flex; gap:5px; margin-right:20px;")
       button(@click="$emit('prune', mapShow)"
               style="margin:5px;")            Prune
       button(@click="$emit('set-date', mapShow)"
               style="margin:5px;")            Set Date
-      button(@click="$emit('close')"
-              style="margin:5px;")            Close
+    div(style="font-size:20px; margin:0 20px 0 0; font-weight:bold;")
+      | {{mapShow?.Name}}
 
   div(v-if="!hideMapBottom")
     div(v-if="mapShow?.WatchGap || mapShow?.FileGap  || mapShow?.WaitStr?.length"

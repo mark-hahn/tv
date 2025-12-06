@@ -18,7 +18,8 @@
           @input="$emit('update:webHistStr', $event.target.value)"
           @keyup.enter="$emit('search-click', 'enter')" 
           placeholder="Search..." style="width:120px;")
-    button(@click="$emit('search-click', 'hist')"
+    button(v-if="!simpleMode"
+          @click="$emit('search-click', 'hist')"
             style="display:inline-block'; font-size:15px; margin:2px 4px 0 0;backgroundColor:white") Hist
     button(@click="$emit('search-click', 'web')" 
             style="display:inline-block'; font-size:15px; margin:2px 4px 0 10px;backgroundColor:white") Web
@@ -86,6 +87,10 @@ export default {
     searchList: {
       type: Array,
       default: null
+    },
+    simpleMode: {
+      type: Boolean,
+      default: false
     }
   },
 

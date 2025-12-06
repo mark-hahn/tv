@@ -8,6 +8,24 @@
     style="width:100%; padding:12px 8px; margin-bottom:8px; font-size:15px; font-weight:bold; border:1px solid #999; border-radius:5px; cursor:pointer; background-color:#eee; text-align:center;"
   ) {{ btn }}
   
+  button(
+    v-for="btn in genres"
+    :key="btn"
+    :class="{ active: activeButtons[btn] }"
+    @click="handleButtonClick(btn)"
+    style="width:100%; padding:12px 8px; margin-bottom:8px; font-size:15px; font-weight:bold; border:1px solid #999; border-radius:5px; cursor:pointer; background-color:#eee; text-align:center;"
+  ) {{ btn }}
+  
+  div(style="height:2px; background-color:#666; margin:10px 0;")
+  
+  button(
+    v-for="btn in collections"
+    :key="btn"
+    :class="{ active: activeButtons[btn] }"
+    @click="handleButtonClick(btn)"
+    style="width:100%; padding:12px 8px; margin-bottom:8px; font-size:15px; font-weight:bold; border:1px solid #999; border-radius:5px; cursor:pointer; background-color:#eee; text-align:center;"
+  ) {{ btn }}
+  
   div(style="height:2px; background-color:#666; margin:10px 0;")
   
   button(
@@ -26,7 +44,6 @@ export default {
   data() {
     return {
       activeButtons: {
-        'Show All': true,
         'Ready To Watch': false,
         'Drama': false,
         'Comedy': false,
@@ -34,23 +51,24 @@ export default {
         'Continue': false,
         'Mark': false,
         'Linda': false,
-        'Alpha Order': true,
         'Added Order': false,
         'Viewed Order': false,
         'Ratings Order': false
       },
       filters: [
-        'Show All',
-        'Ready To Watch',
+        'Ready To Watch'
+      ],
+      genres: [
         'Drama',
-        'Comedy',
+        'Comedy'
+      ],
+      collections: [
         'To Try',
         'Continue',
         'Mark',
         'Linda'
       ],
       sortOrders: [
-        'Alpha Order',
         'Added Order',
         'Viewed Order',
         'Ratings Order'
@@ -60,9 +78,33 @@ export default {
 
   methods: {
     handleButtonClick(label) {
-      // Special handling for order buttons: prevent toggling off when already on
+      // Special handling for order buttons: if clicking an on button, turn all off
       if (this.sortOrders.includes(label) && this.activeButtons[label]) {
-        // Do nothing - button is already on, don't toggle
+        // Turn off all order buttons
+        this.sortOrders.forEach(btn => {
+          this.activeButtons[btn] = false;
+        });
+        this.$emit('button-click', label, false);
+        return;
+      }
+      
+      // Special handling for collections: if clicking an on button, turn all off
+      if (this.collections.includes(label) && this.activeButtons[label]) {
+        // Turn off all collection buttons
+        this.collections.forEach(btn => {
+          this.activeButtons[btn] = false;
+        });
+        this.$emit('button-click', label, false);
+        return;
+      }
+      
+      // Special handling for genres: if clicking an on button, turn all off
+      if (this.genres.includes(label) && this.activeButtons[label]) {
+        // Turn off all genre buttons
+        this.genres.forEach(btn => {
+          this.activeButtons[btn] = false;
+        });
+        this.$emit('button-click', label, false);
         return;
       }
       
@@ -70,20 +112,24 @@ export default {
       this.activeButtons[label] = !this.activeButtons[label];
       
       // Button interactions
-      // show all:on:filter group:off
-      if (label === 'Show All' && this.activeButtons['Show All']) {
-        // Turn off all other buttons in filter group (excluding Show All itself)
-        this.filters.forEach(btn => {
-          if (btn !== 'Show All') {
+      // genres:on:other genres:off (mutually exclusive)
+      if (this.genres.includes(label) && this.activeButtons[label]) {
+        // Turn off all other genre buttons
+        this.genres.forEach(btn => {
+          if (btn !== label) {
             this.activeButtons[btn] = false;
           }
         });
       }
       
-      // filter group:on:show all:off
-      if (label !== 'Show All' && this.filters.includes(label) && this.activeButtons[label]) {
-        // Turn off Show All when any other filter is turned on
-        this.activeButtons['Show All'] = false;
+      // collections:on:other collections:off (mutually exclusive)
+      if (this.collections.includes(label) && this.activeButtons[label]) {
+        // Turn off all other collection buttons
+        this.collections.forEach(btn => {
+          if (btn !== label) {
+            this.activeButtons[btn] = false;
+          }
+        });
       }
       
       // order group:on:other order buttons:off

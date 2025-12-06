@@ -1,24 +1,6 @@
 
-toggling some buttons changes the state of some other buttons.
+now the state of the buttons will control what shows are in the shows list and the sort order.
 
-In each click the clicked button is toggled independent of any other toggle instructions.
+i am still only talking about simpleMode turned on.
 
-there are button interactions. the format of each interaction is buttonName:on/off:otherButtons:noChange/on/off
-
-for now we will just add one action 
-
-show all:on:filter group:off
-
-next interaction is: 
-
-order group:on:other order buttons:off
-
-order button that is on:off:order group:off
-
-add Alpha Order button above Added Button and include in order group with same behavior as other order buttons
---
-
-correction:
-on reload Alpha order button should be on
-
-change order button behavior such that nothing happens when on button is clicked
+the filter buttons filter out shows. They set the state of the cond buttons that are in the conds array in list.vue. the old cond buttons are not shown. The cond button are either on or off and not .

@@ -1,5 +1,5 @@
 <template lang="pug">
-#map(v-if="mapShow !== null" style="background-color:#ffe; padding:10px; display:flex; flex-direction:column; position:fixed; top:70px; left:260px; z-index:2; max-height:85%; max-width:500px; border: 2px solid black; overflow-y:scroll;")
+#map(style="height:95dvh; padding:5px; margin:0; display:flex; flex-direction:column; background-color:#ffe; overflow-y:auto; flex:1;")
 
   div(style="margin:0 5px; display:flex; justify-content:space-between;")
     div(style="font-size:20px; margin:6px 20px 0 0; font-weight:bold; flex-grow:4;")
@@ -81,13 +81,6 @@ export default {
 </script>
 
 <style scoped>
-#map {
-  border: 1px solid black;
-  position: fixed;
-  left: 50px;
-  top: 100px;
-}
-
 tr:nth-child(even) {
   background-color: #f4f4f4;
 }

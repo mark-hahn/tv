@@ -1,9 +1,0 @@
-
-move instance of map component from list.vue to app.vue
-
-change it from a pop-up to a pane with size and position to match series.vue. 
-
-app.vue should show series.vue if variable showMap is false and show map.vue if showMap is true
-
-showMap should be set to true by the same conditions that caused old map popup to show 
-

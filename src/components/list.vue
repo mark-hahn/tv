@@ -49,18 +49,6 @@
       @select-show="saveVisShow"
       @wait-str-click="waitStrClick"
     )
-
-  Map(
-    :mapShow="mapShow"
-    :hideMapBottom="hideMapBottom"
-    :seriesMapSeasons="seriesMapSeasons"
-    :seriesMapEpis="seriesMapEpis"
-    :seriesMap="seriesMap"
-    @prune="(show) => seriesMapAction('prune', show)"
-    @set-date="(show) => seriesMapAction('date', show)"
-    @close="seriesMapAction('close')"
-    @episode-click="episodeClick"
-  )
 </template>
 
 
@@ -73,7 +61,6 @@ import    evtBus from '../evtBus.js';
 import    Shows  from './shows.vue';
 import    HdrTop from './hdrtop.vue';
 import    HdrBot from './hdrbot.vue';
-import    Map    from './map.vue';
 
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library }         from "@fortawesome/fontawesome-svg-core";
@@ -101,7 +88,9 @@ const pruneTvdb = (window.location.href.slice(-5) == 'prune');
 export default {
   name: "List",
 
-  components: { FontAwesomeIcon, Shows, HdrTop, HdrBot, Map },
+  components: { FontAwesomeIcon, Shows, HdrTop, HdrBot },
+
+  emits: ['show-map', 'hide-map'],
   
   props: {
     simpleMode: {
@@ -702,6 +691,7 @@ export default {
       if((action == 'open' && this.mapShow === show) ||
           action == 'close') {
         this.mapShow = null;
+        this.$emit('hide-map');
         return;
       }
       if(action == 'date') {
@@ -740,6 +730,15 @@ export default {
       this.seriesMap = seriesMap;
       this.hideMapBottom = false;
       this.saveVisShow(show);
+      
+      // Emit to App.vue to show map
+      this.$emit('show-map', {
+        mapShow: this.mapShow,
+        hideMapBottom: this.hideMapBottom,
+        seriesMapSeasons: this.seriesMapSeasons,
+        seriesMapEpis: this.seriesMapEpis,
+        seriesMap: this.seriesMap
+      });
     },
 
     async condFltrClick(cond, event) {
@@ -896,6 +895,16 @@ export default {
   async mounted() {
     evtBus.on('openMap', (show) => {
       this.seriesMapAction('open', show);
+    });
+    
+    // Listen for map actions from App.vue
+    evtBus.on('mapAction', async ({ action, show }) => {
+      await this.seriesMapAction(action, show);
+    });
+    
+    // Listen for episode clicks from App.vue
+    evtBus.on('episodeClick', async ({ e, show, season, episode }) => {
+      await this.episodeClick(e, show, season, episode);
     });
 
     setInterval(async () => {

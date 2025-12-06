@@ -4,56 +4,27 @@
   #center(style="height:100%; width:800px; display:flex; flex-direction:column;")             
     #hdr(style="width:100%; background-color:#ccc; display:flex; flex-direction:column;")
 
-      #hdrtop(style="width:100%; height:40px; display:flex; justify-content:space-start; background-color:#ccc;")
-        div(style="display:flex; justify-content:space-between; margin-bottom:10px;")
-          #nums(style="display:flex; justify-content:space-around; width:120px;")
-            #count(style="display:inline-block; margin:4px 5px 4px 15px; width:75px;") 
-              | {{shows.length + '/' + allShowsLength}}
-            #prog(style="display:inline-block; margin:4px 10px 4px 5px; width:75px;") 
-              | {{gapPercent+'%'}}
+      HdrTop(
+        :showsLength="shows.length"
+        :allShowsLength="allShowsLength"
+        :gapPercent="gapPercent"
+        v-model:filterStr="filterStr"
+        v-model:webHistStr="webHistStr"
+        :watchingName="watchingName"
+        @search-click="searchClick"
+        @watch-click="watchClick"
+        @filter-input="select"
+      )
 
-          #srch(style="border:1.5px solid black; width:132px; margin: 3px 10px 0 20px; padding-top:3px; padding-left:5px; background-color:#eee; height:31px;")
-            input(v-model="filterStr" 
-                  @input="select" placeholder="Filter..."
-                  style="width:120px;")
-
-        #webHist(style="border:1.5px solid black; margin: 2px 10px 0 10px; padding-top:3px; padding-left:5px; background-color:#eee; height:31px;")
-          input(v-model="webHistStr"
-                v-on:keyup.enter="searchClick('enter')" 
-                placeholder="Search..." style="width:120px;")
-          button(@click="searchClick('hist')"
-                  style="display:inline-block'; font-size:15px; margin:2px 4px 0 0;backgroundColor:white") Hist
-          button(@click="searchClick('web')" 
-                  style="display:inline-block'; font-size:15px; margin:2px 4px 0 10px;backgroundColor:white") Web
-        button(@click="watchClick"
-                style="height:29px; background-color:white; fontSize:15px; margin:6px 5px 4px 10px;") 
-          | {{ watchingName }}
-
-      #hdrbottom(style="width:100%; background-color:#ccc; display:flex; justify-content:space-between; margin-top:5px; margin-bottom:5px;")
-          #botlft(style="width:400px; overflow:hidden; display:flex; justify-content:space-between;")
-
-            button(@click="topClick" 
-                    style="margin-left:10px; margin-right:5px; fontSize:15px; margin:4px; background-color:white;") Top
-            button(@click="prevNextClick(false)" 
-                    style="margin-left:10px; margin-right:5px; fontSize:15px; margin:4px; background-color:white;") Prev
-            button(@click="prevNextClick(true)" 
-                    style="margin-left:10px; margin-right:5px; fontSize:15px; margin:4px; background-color:white;") Next
-            #sortFltr(style="display:inline-block; display:flex; justify-content:space-between;")
-              button(@click='sortClick'
-                     :style="{width:'100px', fontSize:'15px', margin:'4px'}") 
-                | Sort
-
-              button(@click='filterClick' 
-                     :style="{width:'100px', fontSize:'15px', margin:'4px'}")
-                | Filter
-          button(@click="allClick" 
-                  style="display:inline-block'; width:40px; font-size:15px; margin:4px 10px 4px 10px;backgroundColor:white") All
-          #botrgt(style="display:flex; justify-content:space-between; margin: 5px 17px 0 0;")
-            #fltrs(v-for="cond in conds"
-                @click="condFltrClick(cond, $event)"
-                :style="{width:'1.435em', textAlign:'center', display:'inline-block', color:condFltrColor(cond)}")
-              font-awesome-icon(:icon="cond.icon"
-                                :style="{}")
+      HdrBot(
+        :conds="conds"
+        @top-click="topClick"
+        @prev-next-click="prevNextClick"
+        @sort-click="sortClick"
+        @filter-click="filterClick"
+        @all-click="allClick"
+        @cond-fltr-click="condFltrClick"
+      )
     #sortpop(v-if="sortPopped" 
           style="width:200px; background-color:#eee; border: 1px solid black; position: fixed; display:flex; flex-direction:column; left: 144px; top: 75px;") 
       div(
@@ -98,6 +69,7 @@
       :highlightName="highlightName"
       :getSortDisplayValue="getValBySortChoice"
       :allShowsLength="allShowsLength"
+      :showConds="false"
       @copy-name="copyNameToClipboard"
       @open-map="(show) => seriesMapAction('open', show)"
       @select-show="saveVisShow"
@@ -162,6 +134,8 @@ import * as srvr from "../srvr.js";
 import * as util from "../util.js";
 import    evtBus from '../evtBus.js';
 import    Shows  from './shows.vue';
+import    HdrTop from './hdrtop.vue';
+import    HdrBot from './hdrbot.vue';
 
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library }         from "@fortawesome/fontawesome-svg-core";
@@ -189,7 +163,7 @@ const pruneTvdb = (window.location.href.slice(-5) == 'prune');
 export default {
   name: "List",
 
-  components: { FontAwesomeIcon, Shows },
+  components: { FontAwesomeIcon, Shows, HdrTop, HdrBot },
   data() {
 
     const toggleWaiting = async (show) => {

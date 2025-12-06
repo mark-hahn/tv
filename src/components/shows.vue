@@ -29,7 +29,7 @@
         div(v-if="show.WaitStr?.length" @click="$emit('wait-str-click', show)" style="padding:2px; color: #00f; fontSize:16px;") 
         | {{show.WaitStr}} 
 
-      td(v-for="cond in conds" :key="cond.name" style="width:22px; text-align:center;" @click="cond.click(show)")
+      td(v-if="showConds" v-for="cond in conds" :key="cond.name" style="width:22px; text-align:center;" @click="cond.click(show)")
         font-awesome-icon(:icon="cond.icon" :style="{color:condColor(show, cond)}") 
 </template>
 
@@ -60,6 +60,10 @@ export default {
     allShowsLength: {
       type: Number,
       default: 0
+    },
+    showConds: {
+      type: Boolean,
+      default: true
     }
   },
 

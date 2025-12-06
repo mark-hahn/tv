@@ -1,7 +1,7 @@
 <template lang="pug">
 
 #all(style="width:100%; height:95dvh; box-sizing: border-box; padding:0; margin:0; display:flex;")
-  List(style="display:inline-block;")
+  List(style="display:inline-block;" :simpleMode="true")
   Series(style="display:inline-block;")
 </template>
 

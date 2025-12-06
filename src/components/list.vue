@@ -77,54 +77,17 @@
       @wait-str-click="waitStrClick"
     )
 
-  #map(v-if="mapShow !== null" style="background-color:#ffe; padding:10px; display:flex; flex-direction:column; position:fixed; top:70px; left:260px; z-index:2; max-height:85%; max-width:500px; border: 2px solid black; overflow-y:scroll;")
-
-    div(style="margin:0 5px; display:flex; justify-content:space-between;")
-      div(style="font-size:20px; margin:6px 20px 0 0; font-weight:bold; flex-grow:4;")
-        | {{mapShow?.Name}}
-      button(@click="seriesMapAction('prune', mapShow)"
-              style="margin:5px;")            Prune
-      button(@click="seriesMapAction('date',  mapShow)"
-              style="margin:5px;")            Set Date
-      button(@click="seriesMapAction('close')"
-              style="margin:5px;")            Close
-
-    div(v-if="!hideMapBottom")
-      div(v-if="mapShow?.WatchGap || mapShow?.FileGap  || mapShow?.WaitStr?.length"
-          style="display:flex; justify-content:space-around; color:red; margin: 0 10px; 4px 10px;")
-
-        div(v-if="mapShow?.WatchGap" 
-            style="display:inline-block;")
-          | {{"Watch Gap"}}
-
-        div(v-if="mapShow?.FileGap"
-            style="display:inline-block; margin 3px 10px")
-          | {{"Missing File"}}
-
-        div(v-if="mapShow?.Waiting" 
-            style="display:inline-block; margin 3px 10px")
-          | {{'Waiting ' + mapShow?.WaitStr}}
-
-      table(style="padding:0 5px; font-size:16px" )
-       tbody
-        tr(style="font-weight:bold;")
-          td
-          td(v-for="episode in seriesMapEpis" 
-            style="text-align:center;"
-            key="episode") {{episode}}
-        tr(v-for="season in seriesMapSeasons" key="season"
-                  style="outline:thin solid;")
-          td(style="font-weight:bold; width:10px; text-align:center;")
-            | {{season}}
-
-          td(v-for="episode in seriesMapEpis" key="series+'.'+episode" 
-              @click="episodeClick($event, mapShow, season, episode)"
-              :style="{cursor:'default', padding:'0 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor: (seriesMap[season]?.[episode]?.error) ? 'yellow': (seriesMap[season]?.[episode]?.noFile) ? '#faa' : 'white'}")
-            span(v-if="seriesMap?.[season]?.[episode]?.played")  w
-            span(v-if="seriesMap?.[season]?.[episode]?.avail")   +
-            span(v-if="seriesMap?.[season]?.[episode]?.noFile")  -
-            span(v-if="seriesMap?.[season]?.[episode]?.unaired") u
-            span(v-if="seriesMap?.[season]?.[episode]?.deleted") d
+  Map(
+    :mapShow="mapShow"
+    :hideMapBottom="hideMapBottom"
+    :seriesMapSeasons="seriesMapSeasons"
+    :seriesMapEpis="seriesMapEpis"
+    :seriesMap="seriesMap"
+    @prune="(show) => seriesMapAction('prune', show)"
+    @set-date="(show) => seriesMapAction('date', show)"
+    @close="seriesMapAction('close')"
+    @episode-click="episodeClick"
+  )
 </template>
 
 
@@ -137,6 +100,7 @@ import    evtBus from '../evtBus.js';
 import    Shows  from './shows.vue';
 import    HdrTop from './hdrtop.vue';
 import    HdrBot from './hdrbot.vue';
+import    Map    from './map.vue';
 
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library }         from "@fortawesome/fontawesome-svg-core";
@@ -164,7 +128,7 @@ const pruneTvdb = (window.location.href.slice(-5) == 'prune');
 export default {
   name: "List",
 
-  components: { FontAwesomeIcon, Shows, HdrTop, HdrBot },
+  components: { FontAwesomeIcon, Shows, HdrTop, HdrBot, Map },
   
   props: {
     simpleMode: {

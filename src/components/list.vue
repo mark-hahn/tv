@@ -583,6 +583,11 @@ export default {
       if(scroll) this.scrollToSavedShow();
       this.$nextTick(() =>
         evtBus.emit('setUpSeries', show));
+      
+      // If map is showing, update it to show the newly selected show
+      if(this.mapShow !== null) {
+        this.seriesMapAction('open', show);
+      }
     },
 
     sortClick() {
@@ -688,10 +693,13 @@ export default {
     },
 
     async seriesMapAction(action, show, wasDeleted) {
-      if((action == 'open' && this.mapShow === show) ||
-          action == 'close') {
+      if(action == 'close') {
         this.mapShow = null;
         this.$emit('hide-map');
+        return;
+      }
+      if(action == 'open' && this.mapShow === show) {
+        // If clicking the same show, keep the map open
         return;
       }
       if(action == 'date') {

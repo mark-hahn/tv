@@ -26,7 +26,7 @@ export default {
   data() {
     return {
       activeButtons: {
-        'Show All': false,
+        'Show All': true,
         'Ready To Watch': false,
         'Drama': false,
         'Comedy': false,
@@ -34,6 +34,7 @@ export default {
         'Continue': false,
         'Mark': false,
         'Linda': false,
+        'Alpha Order': true,
         'Added Order': false,
         'Viewed Order': false,
         'Ratings Order': false
@@ -49,6 +50,7 @@ export default {
         'Linda'
       ],
       sortOrders: [
+        'Alpha Order',
         'Added Order',
         'Viewed Order',
         'Ratings Order'
@@ -58,6 +60,12 @@ export default {
 
   methods: {
     handleButtonClick(label) {
+      // Special handling for order buttons: prevent toggling off when already on
+      if (this.sortOrders.includes(label) && this.activeButtons[label]) {
+        // Do nothing - button is already on, don't toggle
+        return;
+      }
+      
       // Toggle the clicked button first (independent of any other toggle instructions)
       this.activeButtons[label] = !this.activeButtons[label];
       
@@ -85,14 +93,6 @@ export default {
           if (btn !== label) {
             this.activeButtons[btn] = false;
           }
-        });
-      }
-      
-      // order button that is on:off:order group:off
-      if (this.sortOrders.includes(label) && !this.activeButtons[label]) {
-        // When turning off an order button, turn off all order buttons
-        this.sortOrders.forEach(btn => {
-          this.activeButtons[btn] = false;
         });
       }
       

@@ -14,3 +14,11 @@ next interaction is:
 order group:on:other order buttons:off
 
 order button that is on:off:order group:off
+
+add Alpha Order button above Added Button and include in order group with same behavior as other order buttons
+--
+
+correction:
+on reload Alpha order button should be on
+
+change order button behavior such that nothing happens when on button is clicked

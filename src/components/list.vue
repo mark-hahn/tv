@@ -11,9 +11,13 @@
         v-model:filterStr="filterStr"
         v-model:webHistStr="webHistStr"
         :watchingName="watchingName"
+        :showingSrchList="showingSrchList"
+        :searchList="searchList"
         @search-click="searchClick"
         @watch-click="watchClick"
         @filter-input="select"
+        @cancel-srch-list="cancelSrchList"
+        @search-action="searchAction"
       )
 
       HdrBot(
@@ -41,28 +45,6 @@
       div(v-for="fltrChoice in fltrChoices"
           style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="fltrAction(fltrChoice)") 
         | {{fltrChoice}} 
-    #searchList( v-if="showingSrchList" style="background-color:#eee; padding:0px; border: 1px solid black; height:85%; position: fixed; display:flex; flex-direction:column; left: 253px; top: 88px; cursor:pointer; min-width:280px;") 
-      div(@click="cancelSrchList()"
-           style="font-weight:bold; text-align:center; margin:10px; padding:10px; height:20px; background-color:white;")
-        | Cancel
-      div(style="overflow-y:scroll")
-        div(v-if="showingSrchList && searchList === null")
-          img(src="../../loading.gif"
-              style="width:100px; height:100px; overflow-y:scroll; position:relative; top:20px; left:80px;")
-        div(v-for="srchChoice in searchList"
-            v-if="searchList !== null"
-            @click="searchAction(srchChoice)"
-            style="margin:3px 10px; padding:10px; width:230px; background-color:white; text-align:center; border: 1px solid black; display:flex;")
-          img(:src="srchChoice.image" 
-              style="max-width:80px; max-height:120px;")
-          #srchTxt(style="max-width:230px; display:flex; margin:5px; flex-direction:column;")
-            #srchName(style="font-weight:bold; font-size:20px;")
-              | {{srchChoice.name}}
-            #srchDtl(style="font-size:18px; margin:10px 0 0 10px;")
-              | {{srchChoice.searchDtlTxt}}
-            #srchDel(v-if="srchChoice.deleted"
-                    style="font-size:18px; margin:10px 0 0 10px; color:red")
-              | Deleted
 
     Shows(
       :shows="shows"

@@ -1,0 +1,15 @@
+it still doesn't show -- the series pane shows when the page is reloaded so it has been built.  try hiding it instead of trashing it:
+13:39:44.625 [vite] connecting... client:733:9
+13:39:44.676 [vite] connected. client:827:12
+13:39:44.726 opened websocket srvr.js:18:11
+13:39:44.740 entering loadAllShows emby.js:50:11
+13:39:44.936 loadAllShows, no tvdbId: Faraway Downs 
+Object { show: {…} }
+emby.js:109:15
+13:39:44.937 loadAllShows, no tvdbId: Men of a Certain Age 
+Object { show: {…} }
+emby.js:109:15
+13:39:45.066 all shows loaded, elapsed ms: 236 emby.js:295:11
+13:39:45.067 gap-worker started, 219 shows gap-worker.js:159:11
+13:40:00.447 handleHideMap called, setting showMap to false 2 App.vue:31:15
+13:40:14.230 gap-worker done, 29 secs gap-worker.js:179:11

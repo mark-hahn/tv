@@ -1,7 +1,7 @@
 <template lang="pug">
-#map(style="height:95dvh; padding:5px; margin:0; display:flex; flex-direction:column; background-color:#ffe; overflow-y:auto; flex:1;")
+#map(@click="handleMapClick" style="height:95dvh; padding:5px; margin:0; display:flex; flex-direction:column; background-color:#ffe; overflow-y:auto; flex:1;")
 
-  div(style="margin:0 5px; display:flex; justify-content:space-between;")
+  div(v-if="!simpleMode" style="margin:0 5px; display:flex; justify-content:space-between;")
     div(style="font-size:20px; margin:6px 20px 0 0; font-weight:bold; flex-grow:4;")
       | {{mapShow?.Name}}
     button(@click="$emit('prune', mapShow)"
@@ -73,10 +73,23 @@ export default {
     seriesMap: {
       type: Object,
       default: () => ({})
+    },
+    simpleMode: {
+      type: Boolean,
+      default: false
     }
   },
 
-  emits: ['prune', 'set-date', 'close', 'episode-click']
+  emits: ['prune', 'set-date', 'close', 'episode-click'],
+
+  methods: {
+    handleMapClick(event) {
+      if (this.simpleMode) {
+        event.stopPropagation();
+        this.$emit('close');
+      }
+    }
+  }
 };
 </script>
 

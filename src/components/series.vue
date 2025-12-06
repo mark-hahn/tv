@@ -137,7 +137,10 @@ export default {
               'image missing from tvdbData', tvdbData.name);
         img.src = './question-mark.png';
       }
-      document.getElementById('poster').replaceChildren(img);
+      const posterEl = document.getElementById('poster');
+      if (posterEl) {
+        posterEl.replaceChildren(img);
+      }
     },
 
     setDates(tvdbData) {

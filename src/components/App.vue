@@ -7,14 +7,15 @@
     @show-map="handleShowMap"
     @hide-map="handleHideMap"
   )
-  Series(v-if="!showMap" style="display:inline-block;")
+  Series(v-show="!showMap" style="display:inline-block;")
   Map(
-    v-if="showMap"
+    v-show="showMap"
     :mapShow="mapShow"
     :hideMapBottom="hideMapBottom"
     :seriesMapSeasons="seriesMapSeasons"
     :seriesMapEpis="seriesMapEpis"
     :seriesMap="seriesMap"
+    :simpleMode="simpleMode"
     @prune="handleMapAction('prune', $event)"
     @set-date="handleMapAction('date', $event)"
     @close="handleMapAction('close')"
@@ -52,10 +53,14 @@ export default {
       this.showMap = data.mapShow !== null;
     },
     handleHideMap() {
+      console.log('handleHideMap called, setting showMap to false');
       this.showMap = false;
       this.mapShow = null;
     },
     handleMapAction(action, show) {
+      if (action === 'close') {
+        this.handleHideMap();
+      }
       evtBus.emit('mapAction', { action, show });
     },
     handleEpisodeClick(e, show, season, episode) {

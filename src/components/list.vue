@@ -17,6 +17,7 @@
       )
 
       HdrBot(
+        v-if="!simpleMode"
         :conds="conds"
         @top-click="topClick"
         @prev-next-click="prevNextClick"
@@ -69,7 +70,7 @@
       :highlightName="highlightName"
       :getSortDisplayValue="getValBySortChoice"
       :allShowsLength="allShowsLength"
-      :showConds="false"
+      :showConds="!simpleMode"
       @copy-name="copyNameToClipboard"
       @open-map="(show) => seriesMapAction('open', show)"
       @select-show="saveVisShow"
@@ -164,6 +165,14 @@ export default {
   name: "List",
 
   components: { FontAwesomeIcon, Shows, HdrTop, HdrBot },
+  
+  props: {
+    simpleMode: {
+      type: Boolean,
+      default: false
+    }
+  },
+
   data() {
 
     const toggleWaiting = async (show) => {

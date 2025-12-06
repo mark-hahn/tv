@@ -1,0 +1,2 @@
+
+add a prop to list.vue called simpleMode which hides hdrbot

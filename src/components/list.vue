@@ -44,6 +44,7 @@
       :getSortDisplayValue="getValBySortChoice"
       :allShowsLength="allShowsLength"
       :showConds="!simpleMode"
+      :simpleMode="simpleMode"
       @copy-name="copyNameToClipboard"
       @open-map="(show) => seriesMapAction('open', show)"
       @select-show="saveVisShow"

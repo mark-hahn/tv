@@ -6,12 +6,14 @@
           style="outline:thin solid; cursor:default" 
          :id="nameHash(show.Name)")
 
-      td(style="width:30px; text-align:center;"
+      td(v-if="!simpleMode"
+        style="width:30px; text-align:center;"
         @click="$emit('copy-name', show, $event)")
         font-awesome-icon(id="cpbrd" icon="copy" 
                           style="color:#ccc")
 
-      td(style="width:30px; text-align:center;" )
+      td(v-if="!simpleMode"
+        style="width:30px; text-align:center;" )
         div(v-show="!show.Id.startsWith('noemby-')" 
               @click="$emit('open-map', show)")
           font-awesome-icon(icon="border-all" style="color:#ccc")
@@ -64,6 +66,10 @@ export default {
     showConds: {
       type: Boolean,
       default: true
+    },
+    simpleMode: {
+      type: Boolean,
+      default: false
     }
   },
 

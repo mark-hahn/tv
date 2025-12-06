@@ -23,28 +23,19 @@
       HdrBot(
         v-if="!simpleMode"
         :conds="conds"
+        :sortPopped="sortPopped"
+        :fltrPopped="fltrPopped"
+        :sortChoices="sortChoices"
+        :fltrChoices="fltrChoices"
         @top-click="topClick"
         @prev-next-click="prevNextClick"
         @sort-click="sortClick"
         @filter-click="filterClick"
         @all-click="allClick"
         @cond-fltr-click="condFltrClick"
+        @sort-action="sortAction"
+        @fltr-action="fltrAction"
       )
-    #sortpop(v-if="sortPopped" 
-          style="width:200px; background-color:#eee; border: 1px solid black; position: fixed; display:flex; flex-direction:column; left: 144px; top: 75px;") 
-      div(
-        style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="sortAction('sortClose')") 
-        | Close
-      div(v-for="sortChoice in sortChoices"
-          style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="sortAction(sortChoice)") 
-        | {{sortChoice}}           
-    #fltrpop(v-if="fltrPopped" style="width:200px; background-color:#eee; padding:0px; border: 1px solid black; position: fixed; display:flex; flex-direction:column; left: 253px; top: 75px;") 
-      div(
-        style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="fltrAction('fltrClose')") 
-        | Close
-      div(v-for="fltrChoice in fltrChoices"
-          style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="fltrAction(fltrChoice)") 
-        | {{fltrChoice}} 
 
     Shows(
       :shows="shows"

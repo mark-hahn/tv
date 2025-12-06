@@ -24,6 +24,22 @@
         :style="{width:'1.435em', textAlign:'center', display:'inline-block', color:condFltrColor(cond)}")
       font-awesome-icon(:icon="cond.icon"
                         :style="{}")
+
+  #sortpop(v-if="sortPopped" 
+        style="width:200px; background-color:#eee; border: 1px solid black; position: fixed; display:flex; flex-direction:column; left: 144px; top: 75px;") 
+    div(
+      style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="$emit('sort-action', 'sortClose')") 
+      | Close
+    div(v-for="sortChoice in sortChoices"
+        style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="$emit('sort-action', sortChoice)") 
+      | {{sortChoice}}           
+  #fltrpop(v-if="fltrPopped" style="width:200px; background-color:#eee; padding:0px; border: 1px solid black; position: fixed; display:flex; flex-direction:column; left: 253px; top: 75px;") 
+    div(
+      style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="$emit('fltr-action', 'fltrClose')") 
+      | Close
+    div(v-for="fltrChoice in fltrChoices"
+        style="margin:3px 10px; padding:10px; background-color:white; text-align:center; border: 1px solid black; font-weight:bold; cursor:default;" @click="$emit('fltr-action', fltrChoice)") 
+      | {{fltrChoice}}
 </template>
 
 <script>
@@ -37,10 +53,26 @@ export default {
     conds: {
       type: Array,
       required: true
+    },
+    sortPopped: {
+      type: Boolean,
+      default: false
+    },
+    fltrPopped: {
+      type: Boolean,
+      default: false
+    },
+    sortChoices: {
+      type: Array,
+      required: true
+    },
+    fltrChoices: {
+      type: Array,
+      required: true
     }
   },
 
-  emits: ['top-click', 'prev-next-click', 'sort-click', 'filter-click', 'all-click', 'cond-fltr-click'],
+  emits: ['top-click', 'prev-next-click', 'sort-click', 'filter-click', 'all-click', 'cond-fltr-click', 'sort-action', 'fltr-action'],
 
   methods: {
     condFltrColor(cond) {

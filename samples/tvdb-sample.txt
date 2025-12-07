@@ -1,0 +1,54 @@
+{
+  "result": {
+    "tvdbId": "447579",
+    "name": "Black Rabbit",
+    "originalNetwork": "Netflix",
+    "seasonCount": 1,
+    "episodeCount": 8,
+    "watchedCount": 6,
+    "image": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68d2d5dd76d43.jpg",
+    "score": 48879,
+    "overview": "A rising-star restaurateur is forced into New York's criminal underworld when his chaotic brother returns to town with loan sharks on his trail.",
+    "firstAired": "2025-09-18",
+    "lastAired": "2025-09-18",
+    "averageRuntime": 56,
+    "originalCountry": "usa",
+    "originalLanguage": "eng",
+    "status": "Ended",
+    "remotes": [
+      {
+        "name": "Emby",
+        "url": "https://hahnca.com:8920/web/index.html#!/item?id=4822638&serverId=ae3349983dbe45d9aa1d317a7753483e"
+      },
+      {
+        "name": "Rotten (67/81)",
+        "url": "https://www.rottentomatoes.com/tv/black_rabbit",
+        "ratings": "67/81"
+      },
+      {
+        "name": "Google",
+        "url": "https://www.google.com/search?q=Black%20Rabbit%20tv%20show"
+      },
+      {
+        "name": "Wikipedia",
+        "url": "https://en.wikipedia.org/wiki/Black_Rabbit"
+      },
+      {
+        "name": "Reddit",
+        "url": "https://www.reddit.com/r/netflix/comments/1nmakbb/black_rabbit_is_not_good/"
+      },
+      {
+        "name": "IMDB (7.3)",
+        "url": "https://www.imdb.com/title/tt23055142",
+        "ratings": "7.3"
+      },
+      {
+        "name": "Official Website",
+        "url": "https://www.netflix.com/title/81630027"
+      }
+    ],
+    "added": "2025-08-17",
+    "saved": 1765148457082,
+    "showId": "4822638"
+  }
+}

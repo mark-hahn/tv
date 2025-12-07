@@ -100,7 +100,8 @@ export default {
         this.sortOrders.forEach(btn => {
           this.activeButtons[btn] = false;
         });
-        this.$emit('button-click', label, false);
+        // Emit all active button states
+        this.$emit('button-click', this.activeButtons);
         return;
       }
       
@@ -110,7 +111,8 @@ export default {
         this.collections.forEach(btn => {
           this.activeButtons[btn] = false;
         });
-        this.$emit('button-click', label, false);
+        // Emit all active button states
+        this.$emit('button-click', this.activeButtons);
         return;
       }
       

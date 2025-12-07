@@ -373,9 +373,12 @@ export default {
   /////////////  METHODS  ////////////
   methods: {
 
-    handleButtonClick(label, isActive) {
-      // In simple mode, button states control conds
+    handleButtonClick(activeButtons) {
+      // In simple mode, button states control conds (pure state-based)
       if (!this.simpleMode) return;
+      
+      // activeButtons is an object with all button states
+      // e.g., { 'Drama': true, 'Mark': true, 'Comedy': false, ... }
       
       // Map button labels to cond names
       const buttonToCondMap = {
@@ -388,28 +391,28 @@ export default {
         'Linda': 'linda'
       };
       
-      // First, turn off all conds except ban (which should be -1 in simple mode)
+      // Pure state-based: Sync conds to match button states
       this.conds.forEach(cond => {
+        // Ban is always -1 in simple mode
         if (cond.name === 'ban') {
           cond.filter = -1;
-        } else {
-          cond.filter = 0;
+          return;
         }
-      });
-      
-      // Then turn on the cond for the active button
-      const condName = buttonToCondMap[label];
-      if (condName && isActive) {
-        const cond = this.conds.find(c => c.name === condName);
-        if (cond) {
-          // Special handling for Comedy button - inverts the drama cond
-          if (label === 'Comedy') {
-            cond.filter = -1; // Set to filter for drama being false (i.e., comedy)
-          } else {
-            cond.filter = 1; // Set to filter for this condition being true
+        
+        // Find if any button controls this cond
+        let condValue = 0; // Default: off
+        
+        for (const [label, isActive] of Object.entries(activeButtons)) {
+          const mappedCondName = buttonToCondMap[label];
+          if (mappedCondName === cond.name && isActive) {
+            // Special handling for Comedy button - inverts the drama cond
+            condValue = (label === 'Comedy') ? -1 : 1;
+            break;
           }
         }
-      }
+        
+        cond.filter = condValue;
+      });
       
       // Trigger re-filtering of shows
       this.select();

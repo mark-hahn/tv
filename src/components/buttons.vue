@@ -142,7 +142,8 @@ export default {
         });
       }
       
-      this.$emit('button-click', label, this.activeButtons[label]);
+      // Emit all active button states, not just the clicked one
+      this.$emit('button-click', this.activeButtons);
     }
   },
 

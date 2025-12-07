@@ -1,9 +1,3 @@
 
 
-i am still only talking about simpleMode turned on.
-
-the state of the filter and collections buttons will control what shows are in the shows list by setting conds on and off.
-the old cond buttons are not shown. 
-
-cond states are off except for when a filter button in buttons.vue is on. each of the fltr and collections buttons sets the cond of the same name. 
-
+the order buttons state should set the 

@@ -32,7 +32,7 @@
       #poster(style="margin-left:20px;")  
     #topRight(style="display:flex; flex-direction:column; width:300px; margin-left:10px;")
       #infoBox(@click.stop="handleBodyClick"
-                :style="{ margin:'0 0 7px 12px', width: sizing.seriesInfoWidth || '250px', fontSize: sizing.seriesInfoFontSize || '17px', display:'flex', flexDirection:'column', border:'2px solid gray', textAlign:'center', fontWeight:'bold' }")
+                :style="{ margin:'0 0 7px 12px', width: sizing.seriesInfoWidth || '250px', fontSize: sizing.seriesInfoFontSize || '17px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column', border:'2px solid gray', textAlign:'center', fontWeight:'bold' }")
         #dates(v-html="dates"
                v-if="dates.length > 0"
                style="min-height:24px; margin-top:10px;")
@@ -41,25 +41,25 @@
                  style="min-height:24px;")
         #cntrylang(v-if="cntryLangTxt.length > 0"
                    v-html="cntryLangTxt"
-                   style="min-height:20px; font-size:16px;")
+                   style="min-height:20px;")
         #nextup(v-if="nextUpTxt.length > 0"
                 v-html="nextUpTxt"
                 style="min-height:32px;")
 
-      #remotes(:style="{ width: sizing.remotesWidth || '260px', margin:'5px 0 0 10px', justifyContent:'space-between', display:'flex', flexWrap:'wrap' }") 
-        div(v-if="showSpinner")
-          img(src="../../loading.gif"
-              style="width:100px; height:100px; position:relative; top:20px; left:45px;")
-        div(v-if="showRemotes" 
-            v-for="remote in remotes"
-            @click.stop="remoteClick(remote)"
-            :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }")
-          | {{remote.name}}
-      #buttons(style="display:flex; flex-wrap:wrap; margin-top:15px; width:280px; justify-content:space-around;")
-        #watchButton(v-for="watchButtonTxt in watchButtonTxtArr"
-            @click.stop="watchButtonClick(show, watchButtonTxt)"
-            :style="{ margin:'5px 10px 10px 7px', borderRadius:'10px', padding: sizing.watchButtonPadding || '3px', maxWidth:'110px', backgroundColor:'#eee', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.watchButtonFontSize || 'inherit' }")
-          | {{watchButtonTxt}}
+  #allButtons(style="display:flex; flex-wrap:wrap; margin-top:15px; padding:0 10px; justify-content:space-around; width:100%;")
+    div(v-if="showSpinner")
+      img(src="../../loading.gif"
+          style="width:100px; height:100px; position:relative; top:20px; left:45px;")
+    div(v-if="showRemotes" 
+        v-for="remote in remotes"
+        @click.stop="remoteClick(remote)"
+        :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }")
+      | {{remote.name}}
+    #watchButton(v-for="watchButtonTxt in watchButtonTxtArr"
+        @click.stop="watchButtonClick(show, watchButtonTxt)"
+        :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }")
+      | {{watchButtonTxt}}
+  
   #bot(:style="{ fontSize: sizing.overviewFontSize || '20px', padding:'10px' }") {{show.Overview}}
 
 </template>
@@ -258,10 +258,10 @@ export default {
       });
       if(originalCountry == 'gbr') originalCountry = 'UK';
       originalNetwork    = originalNetwork.substr(0, 10); 
-      const origCountry  = originalCountry?.toUpperCase()  ?? '';
-      const origLanguage = originalLanguage?.toUpperCase() ?? '';
-      const OrigNetwork  = originalNetwork?.toUpperCase()  ?? '';
-      const avgRuntime   = averageRuntime?.toString().toUpperCase();
+      const origCountry  = originalCountry?.toLowerCase()  ?? '';
+      const origLanguage = originalLanguage?.toLowerCase() ?? '';
+      const OrigNetwork  = originalNetwork?.toLowerCase()  ?? '';
+      const avgRuntime   = averageRuntime?.toString().toLowerCase();
       this.cntryLangTxt = 
                 `${origCountry}`                      +
                 `${origCountry != '' ? '/' : ''}`     +

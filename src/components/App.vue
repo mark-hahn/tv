@@ -49,11 +49,12 @@ export default {
         
         // Series pane  
         seriesWidth: '450px',         // series pane width
-        posterWidth: '140px',         // smaller poster
+        posterWidth: '180px',         // smaller poster
         posterHeight: '210px',
         seriesFontSize: '18px',       // smaller title
         seriesInfoFontSize: '14px',   // smaller info text
-        seriesInfoWidth: '200px',     // narrower info box
+        seriesInfoWidth: '250px',     // narrower info box
+        infoBoxLineHeight: '1.8',     // line spacing in info box (default: 1.2)
         remotesWidth: '210px',        // narrower remotes area
         remoteButtonPadding: '6px',   // smaller remote buttons
         remoteFontSize: '13px',

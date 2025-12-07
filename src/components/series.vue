@@ -6,14 +6,18 @@
        style="display:flex; justify-content:space-between; font-weight:bold; font-size:25px; margin-bottom:20px; max-width:565px;")
     div(style="margin-left:20px; max-width:450px") {{show.Name}}
     
-    textarea(v-if="simpleMode"
-            v-model="emailText"
-            @click.stop
-            rows="2"
-            placeholder="Email note..."
-            style="margin-left:165px; width:200px; padding:5px; font-size:14px; border:1.5px solid black; background-color:#eee; resize:none;")
+    div(v-if="simpleMode" style="display:flex; gap:4px;")
+      textarea(
+              v-model="emailText"
+              @click.stop
+              rows="2"
+              placeholder="Email note..."
+              style="margin-left:165px; width:200px; padding:5px; font-size:14px; border:1.5px solid black; background-color:#eee; resize:none;")
+      
+      div(v-if="notInEmby" 
+          style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; white-space:nowrap;") Not In Emby
     
-    div(v-if="notInEmby" 
+    div(v-if="!simpleMode && notInEmby" 
         style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px;") Not In Emby
                 
     div(v-if="show?.Reject" 

@@ -592,6 +592,15 @@ export default {
       this.addRow(show);
       this.sortShows();
       this.saveVisShow(show, true);
+      
+      // Send email notification for new show added
+      const emailText = show.Name + '~New show added';
+      try {
+        await srvr.sendEmail(emailText);
+        console.log('New show email sent:', emailText);
+      } catch (error) {
+        console.error('Failed to send new show email:', error);
+      }
     },
     
     cancelSrchList() {

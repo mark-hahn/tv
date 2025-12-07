@@ -83,16 +83,15 @@ export default {
 
   methods: {
     handleMapClick(event) {
-      if (this.simpleMode) {
-        event.stopPropagation();
-        this.$emit('close');
-      }
+      event.stopPropagation();
+      this.$emit('close');
     },
     handleEpisodeClick(event, mapShow, season, episode) {
       if (this.simpleMode) {
         // Don't stop propagation - let it bubble up to handleMapClick
         return;
       }
+      event.stopPropagation(); // Prevent map click handler from closing the map
       this.$emit('episode-click', event, mapShow, season, episode);
     }
   }

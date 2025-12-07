@@ -47,7 +47,7 @@
                 style="min-height:32px;")
         #collection(v-if="simpleMode && collectionName"
                     style="min-height:24px; color:#666;")
-          | {{collectionName}}
+          | Collection: {{collectionName}}
 
   #allButtons(style="display:flex; flex-wrap:wrap; margin-top:15px; padding:0 10px; justify-content:space-around; width:100%;")
     div(v-if="showSpinner")

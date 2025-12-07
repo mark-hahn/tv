@@ -1,6 +1,6 @@
 
 in non-simple mode:
+  clicking on map cell works but flashes series pane
 
 in simple mode:
 
-add collection name to infobox

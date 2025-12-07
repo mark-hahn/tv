@@ -4,6 +4,9 @@ reminder, restore ...
 
 todo ...
   add tv guide
+
+non-simple: add feature:
+  click on season number to left of row in map should toggle watched in all cells in row -- if any watched turn them all off otherwise turn all on
   
 simple ...
   mark/linda

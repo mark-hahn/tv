@@ -373,9 +373,46 @@ export default {
   /////////////  METHODS  ////////////
   methods: {
 
-    handleButtonClick(label) {
-      console.log('Button clicked:', label);
-      // Actions will be added later
+    handleButtonClick(label, isActive) {
+      // In simple mode, button states control conds
+      if (!this.simpleMode) return;
+      
+      // Map button labels to cond names
+      const buttonToCondMap = {
+        'Ready To Watch': 'unplayed',
+        'Drama': 'drama',
+        'Comedy': 'drama', // Comedy uses drama cond but inverted
+        'To Try': 'totry',
+        'Continue': 'continue',
+        'Mark': 'mark',
+        'Linda': 'linda'
+      };
+      
+      // First, turn off all conds except ban (which should be -1 in simple mode)
+      this.conds.forEach(cond => {
+        if (cond.name === 'ban') {
+          cond.filter = -1;
+        } else {
+          cond.filter = 0;
+        }
+      });
+      
+      // Then turn on the cond for the active button
+      const condName = buttonToCondMap[label];
+      if (condName && isActive) {
+        const cond = this.conds.find(c => c.name === condName);
+        if (cond) {
+          // Special handling for Comedy button - inverts the drama cond
+          if (label === 'Comedy') {
+            cond.filter = -1; // Set to filter for drama being false (i.e., comedy)
+          } else {
+            cond.filter = 1; // Set to filter for this condition being true
+          }
+        }
+      }
+      
+      // Trigger re-filtering of shows
+      this.select();
     },
 
     getValBySortChoice(show, forSort = false) {

@@ -1,6 +1,6 @@
 <template lang="pug">
 
-#all(style="width:100%; height:100dvh; box-sizing: border-box; padding:0; margin:0; display:flex;")
+#all(style="width:100%; height:97dvh; box-sizing: border-box; padding:0; margin:0; display:flex;")
   List(
     style="display:inline-block;" 
     :simpleMode="simpleMode"
@@ -106,7 +106,7 @@ export default {
 <style>
 html, body {
   width: 100%;
-  height: 100dvh;
+  height: 97dvh;
   margin: 0;
   padding: 0;
 }

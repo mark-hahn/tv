@@ -1,5 +1,7 @@
 <template lang="pug">
-#hdrtop(style="width:100%; height:40px; display:flex; justify-content:space-start; background-color:#ccc;")
+#hdrtop(:style="{ width:'100%', height:'40px', display:'flex', justifyContent: simpleMode ? 'center' : 'space-between', backgroundColor:'#ccc' }")
+  div(v-if="simpleMode" style="flex:1;")
+  
   div(style="display:flex; justify-content:space-between; margin-bottom:10px;")
     #nums(v-if="!simpleMode" style="display:flex; justify-content:space-around; width:120px;")
       #count(style="display:inline-block; margin:4px 5px 4px 15px; width:75px;") 
@@ -10,7 +12,7 @@
     input(:value="filterStr" 
           @input="handleFilterInput" 
           placeholder="Filter..."
-          style="width:132px; height:30px !important; margin: 5px 10px 5px 20px !important; padding:5px; border:1.5px solid black; background-color:#eee; box-sizing:border-box; font-size:16px;")
+          :style="{ width:'132px', height:'30px !important', margin: simpleMode ? '5px 10px' : '5px 10px 5px 20px', padding:'5px', border:'1.5px solid black', backgroundColor:'#eee', boxSizing:'border-box', fontSize:'16px' }")
 
   div(style="display:flex; align-items:center;")
     input(:value="webHistStr"
@@ -26,6 +28,10 @@
   button(@click="$emit('watch-click')"
           style="height:29px; background-color:white; fontSize:15px; margin:6px 5px 4px 10px;") 
     | {{ watchingName }}
+
+  div(style="flex:1; display:flex; align-items:center; justify-content:flex-end; margin-right:15px;")
+    #count(style="font-size:14px; color:#222;") 
+      | {{showsLength}}
 
   #searchList(v-if="showingSrchList" style="background-color:#eee; padding:0px; border: 1px solid black; height:85%; position: fixed; display:flex; flex-direction:column; left: 253px; top: 88px; cursor:pointer; min-width:280px;") 
     div(@click="$emit('cancel-srch-list')"

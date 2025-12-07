@@ -1,9 +1,8 @@
 
 in non-simple mode: add feature:
-add second separate sizing weaking params for non-simple mode
 
 in non-simple mode:
   change finished filter choice in filter drop-down to have same filter but also only show ones that are watched all. 
 
 in simple mode:
-
+show the count of the number of shows listed in small gray font in upper right of hdrtop just like number on left in non-simple mode

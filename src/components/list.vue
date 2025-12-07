@@ -306,7 +306,7 @@ export default {
       fltrChoices:
         ['All', 'Ready', 'Drama', 'To-Try', 
          'Try Drama', 'Continue', 'Download', 
-         'Finished', 'Mark', 'Linda'],
+         'Mark', 'Linda', 'Finished'],
       conds: [ {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],
           cond(show)  { return !show.NotReady },
@@ -895,8 +895,9 @@ export default {
           const tvdbData = allTvdb[show.Name];
           if(!tvdbData) continue;
           const {status, episodeCount, watchedCount} = tvdbData;
+          const watchedAll = episodeCount > 0 && watchedCount == episodeCount;
           const finished = (status == "Ended"            && 
-                            watchedCount == episodeCount &&
+                            watchedAll                   &&
                             !show.Reject);
           if(finished) filteredShows.push(show);
           continue;

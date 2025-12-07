@@ -45,7 +45,7 @@
         #nextup(v-if="nextUpTxt.length > 0"
                 v-html="nextUpTxt"
                 style="min-height:32px;")
-        #collection(v-if="simpleMode && collectionName"
+        #collection(v-if="collectionName"
                     style="min-height:24px; color:#666;")
           | Collection: {{collectionName}}
 
@@ -150,7 +150,6 @@ export default {
     },
 
     openMap(show) {
-      if(show.Id.startsWith('noemby-')) return;
       // console.log('Series: openMap:', show);
       evtBus.emit('openMap', show);
     },

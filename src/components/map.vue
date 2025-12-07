@@ -2,7 +2,7 @@
 #map(@click="handleMapClick" style="height:100%; padding:5px; margin:0; display:flex; flex-direction:column; background-color:#ffe; overflow-y:auto; flex:1;")
 
   div(style="margin:0 5px; display:flex; justify-content:flex-start; align-items:center;")
-    div(v-if="!simpleMode" style="display:flex; gap:5px; margin-right:20px;")
+    div(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" style="display:flex; gap:5px; margin-right:20px;")
       button(@click="$emit('prune', mapShow)"
               style="margin:5px;")            Prune
       button(@click="$emit('set-date', mapShow)"
@@ -11,6 +11,10 @@
       | {{mapShow?.Name}}
 
   div(v-if="!hideMapBottom")
+    div(v-if="mapShow?.Id?.startsWith('noemby-')"
+        style="font-weight:bold; color:red; font-size:18px; text-align:center; margin:20px;")
+      | Not In Emby
+    
     div(v-if="mapShow?.WatchGap || mapShow?.FileGap  || mapShow?.WaitStr?.length"
         style="display:flex; justify-content:space-around; color:red; margin: 0 10px; 4px 10px;")
 

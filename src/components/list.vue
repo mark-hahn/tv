@@ -43,6 +43,7 @@
         v-if="simpleMode"
         style="width:140px; flex-shrink:0;"
         @button-click="handleButtonClick"
+        @top-click="topClick"
       )
       Shows(
         style="flex-grow:1;"
@@ -391,6 +392,13 @@ export default {
         'Linda': 'linda'
       };
       
+      // Map order button labels to sortChoice values
+      const orderToSortMap = {
+        'Added Order': 'Added',
+        'Viewed Order': 'Viewed',
+        'Ratings Order': 'Ratings'
+      };
+      
       // Pure state-based: Sync conds to match button states
       this.conds.forEach(cond => {
         // Ban is always -1 in simple mode
@@ -413,6 +421,18 @@ export default {
         
         cond.filter = condValue;
       });
+      
+      // Pure state-based: Sync sortChoice to match order button states
+      let activeSortOrder = null;
+      for (const [label, isActive] of Object.entries(activeButtons)) {
+        if (isActive && orderToSortMap[label]) {
+          activeSortOrder = orderToSortMap[label];
+          break;
+        }
+      }
+      
+      // If no order button is active, default to 'Alpha'
+      this.sortChoice = activeSortOrder || 'Alpha';
       
       // Trigger re-filtering of shows
       this.select();

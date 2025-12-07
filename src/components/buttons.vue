@@ -1,5 +1,12 @@
 <template lang="pug">
-#buttons(style="display:flex; flex-direction:column; height:100%; overflow-y:auto; padding:5px; background-color:#ddd;")
+#buttons(style="display:flex; flex-direction:column; padding:5px; padding-bottom:0;")
+  button(
+    @click="$emit('top-click')"
+    style="width:100%; padding:12px 8px; margin-top:10px; margin-bottom:8px; font-size:15px; font-weight:bold; border:1px solid #999; border-radius:5px; cursor:pointer; background-color:#eee; text-align:center;"
+  ) Top
+  
+  div(style="height:2px; background-color:#666; margin:10px 0;")
+  
   button(
     v-for="btn in filters"
     :key="btn"
@@ -33,7 +40,7 @@
     :key="btn"
     :class="{ active: activeButtons[btn] }"
     @click="handleButtonClick(btn)"
-    style="width:100%; padding:12px 8px; margin-bottom:8px; font-size:15px; font-weight:bold; border:1px solid #999; border-radius:5px; cursor:pointer; background-color:#eee; text-align:center;"
+    style="width:100%; padding:12px 8px; margin-bottom:10px; font-size:15px; font-weight:bold; border:1px solid #999; border-radius:5px; cursor:pointer; background-color:#eee; text-align:center;"
   ) {{ btn }}
 </template>
 
@@ -75,6 +82,8 @@ export default {
       ]
     };
   },
+
+  emits: ['button-click', 'top-click'],
 
   methods: {
     handleButtonClick(label) {

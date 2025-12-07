@@ -6,6 +6,13 @@
        style="display:flex; justify-content:space-between; font-weight:bold; font-size:25px; margin-bottom:20px; max-width:565px;")
     div(style="margin-left:20px; max-width:450px") {{show.Name}}
     
+    textarea(v-if="simpleMode"
+            v-model="emailText"
+            @click.stop
+            @blur="handleEmailBlur"
+            placeholder="Email note..."
+            style="margin-left:165px; width:200px; height:48px; padding:5px; font-size:14px; border:1.5px solid black; background-color:#eee; resize:none;")
+    
     div(v-if="notInEmby" 
         style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px;") Not In Emby
                 
@@ -16,11 +23,11 @@
             @click.stop="deleteClick"
             style="font-size:15px; cursor:pointer; margin-left:20px; margin-top:3px; max-height:24px; border-radius: 7px;") Delete
   #body(style="display:flex; cursor:pointer;")
-    #topLeft(@click="openMap(show)"
+    #topLeft(@click="handleBodyClick"
               style="display:flex; flex-direction:column; text-align:center;") 
       #poster(style="margin-left:20px;")  
     #topRight(style="display:flex; flex-direction:column; width:300px; margin-left:10px;")
-      #infoBox(@click="openMap(show)"
+      #infoBox(@click="handleBodyClick"
                 style="margin:0 0 7px 12px; width:250px; font-size:17px; display:flex; flex-direction:column; border: 2px solid gray; text-align:center; font-weight:bold;")
         #dates(v-html="dates"
                v-if="dates.length > 0"
@@ -77,6 +84,7 @@ export default {
     return {
       show: {Name:''},
       showHdr: false,
+      emailText: '',
       dates: '',
       remoteShowName: '',
       remotes: [],
@@ -96,7 +104,42 @@ export default {
   
   methods: {
 
-    handleSeriesClick(event) {
+    async sendEmail() {
+      if (!this.emailText.trim() || this.emailText === 'Email Sent') return;
+      
+      const textToSend = this.show.Name + '~' + this.emailText;
+      
+      try {
+        await srvr.sendEmail(textToSend);
+        console.log('Email sent to server:', textToSend);
+        this.emailText = 'Email Sent';
+      } catch (error) {
+        console.error('Failed to send email:', error);
+      }
+    },
+
+    async handleEmailBlur() {
+      await this.sendEmail();
+    },
+
+    async handleBodyClick() {
+      // If there's text in the email box, send it instead of opening map
+      if (this.simpleMode && this.emailText.trim() && this.emailText !== 'Email Sent') {
+        await this.sendEmail();
+        return;
+      }
+      
+      // Otherwise open the map
+      this.openMap(this.show);
+    },
+
+    async handleSeriesClick() {
+      // If there's text in the email box, send it instead of opening map
+      if (this.simpleMode && this.emailText.trim() && this.emailText !== 'Email Sent') {
+        await this.sendEmail();
+        return;
+      }
+      
       // Open map when clicking anywhere in series pane
       // .stop modifiers on buttons prevent their clicks from reaching here
       this.openMap(this.show);
@@ -294,6 +337,7 @@ export default {
   mounted() {
     evtBus.on('setUpSeries', async (show) => { 
       allTvdb        = await tvdb.getAllTvdb();
+      this.emailText = ''; // Clear email text when changing shows
       this.show      = show;
       this.showBody  = true;
       const tvdbData = allTvdb[show.Name];

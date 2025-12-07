@@ -2,6 +2,10 @@
 reminder, restore ...
   start gap running
 
+simple ...
+  tell mark button
+  height
+  
 bugs ...
   blocked shows appear on boot
   prune skipped first season worked on second try

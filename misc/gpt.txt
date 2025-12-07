@@ -1,3 +1,4 @@
+when in simple mode:
 
+in series pane put a text box to the right of show name at the top with left side horizontally aligned to middle of gap to the right of the image. make the box two lines of text tall. when text input is complete send text to server using a new command in srvr.js called sendEmail. Leave text visible in box until series pane is closed, covered with map, or changed to another show.
 
-the order buttons state should set the 

@@ -19,6 +19,7 @@
   "homepage": "https://github.com/mark-hahn/tv-series-srvr#readme",
   "dependencies": {
     "date-and-time": "^3.6.0",
+    "mailtrap": "^4.3.2",
     "moment": "^2.29.4",
     "node-fetch": "^3.3.2",
     "playwright": "^1.55.0",

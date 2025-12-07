@@ -7,6 +7,7 @@ import * as utilNode       from "util";
 import * as emby           from './src/emby.js';
 import * as tvdb           from './src/tvdb.js';
 import * as util           from "./src/util.js";
+import * as email          from './src/email.js';
 
 const dontupload  = false;
 
@@ -440,6 +441,16 @@ const deletePath = async (id, path, resolve, _reject) => {
   resolve([id, 'ok']);
 };
 
+const sendEmailHandler = async (id, bodyText, resolve, reject) => {
+  console.log('sendEmailHandler', id, bodyText);
+  try {
+    await email.sendEmail(bodyText);
+    resolve([id, 'ok']);
+  } catch (error) {
+    reject([id, error.message]);
+  }
+};
+
 //////////////////  CALL FUNCTION SYNCHRONOUSLY  //////////////////
 
 const queue = [];
@@ -514,6 +525,8 @@ const runOne = () => {
     case 'getNewTvdb':    tvdb.getNewTvdb(   id, param, resolve, reject); break;
     case 'setTvdbFields': tvdb.setTvdbFields(id, param, resolve, reject); break;
 
+    case 'sendEmail':     sendEmailHandler(  id, param, resolve, reject); break;
+
     default: reject([id, 'unknownfunction: ' + fname]);
   };
 }
@@ -530,16 +543,19 @@ wss.on('connection', (ws) => {
 
   ws.on('message', (data) => {
     const msg = data.toString();
-    const parts = /^(.*)~~~(.*)~~~(.*)$/.exec(msg);
-    if(!parts) {
+    const firstSep = msg.indexOf('~~~');
+    const secondSep = firstSep >= 0 ? msg.indexOf('~~~', firstSep + 3) : -1;
+    if(firstSep < 0 || secondSep < 0) {
       console.error('ignoring bad message:', msg);
       return;
     }
+    const id = msg.slice(0, firstSep);
+    const fname = msg.slice(firstSep + 3, secondSep);
+    const param = msg.slice(secondSep + 3);
     if(socketName != appSocketName) {
       socketName = appSocketName;
       console.log(socketName + ' connected');
     }
-    const [id, fname, param] = parts.slice(1);
     if(fname == 'getNewTvdb') {
       tvdb.getNewTvdb(ws, id, param) 
     }

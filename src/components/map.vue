@@ -3,9 +3,9 @@
 
   div(style="margin:0 5px; display:flex; justify-content:flex-start; align-items:center;")
     div(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" style="display:flex; gap:5px; margin-right:20px;")
-      button(@click="$emit('prune', mapShow)"
+      button(@click.stop="$emit('prune', mapShow)"
               style="margin:5px;")            Prune
-      button(@click="$emit('set-date', mapShow)"
+      button(@click.stop="$emit('set-date', mapShow)"
               style="margin:5px;")            Set Date
     div(style="font-size:20px; margin:0 20px 0 0; font-weight:bold;")
       | {{mapShow?.Name}}

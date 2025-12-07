@@ -1,6 +1,6 @@
 
 in non-simple mode:
-  center items in hdrtop just they as they are in simple mode but don't change the count displays in either mode
+  clicking the 2 buttons in map switches to series pane
 
 in simple mode:
 

@@ -1,14 +1,6 @@
 
-the panes now scroll ok so everything shows -- but i want to shrink and move all the content to fit on this size of screen 
+in non-simple mode:
 
-i only need to fix it for this one screen size on the tablet 
+in simple mode:
 
-it would be nice if the entire series pane could be shrunk including everything like the image, buttons, text, etc.
-
-the series pane could also be moved left making the list pane narrower
-
-the button heights in buttons.view could be shorter to make buttons fit
-
-this may be bad for my laptop sizing but we can worry about that later
-
-could there be constants for everything that i could tweak?
+add collection name to infobox

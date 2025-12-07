@@ -45,6 +45,9 @@
         #nextup(v-if="nextUpTxt.length > 0"
                 v-html="nextUpTxt"
                 style="min-height:32px;")
+        #collection(v-if="simpleMode && collectionName"
+                    style="min-height:24px; color:#666;")
+          | {{collectionName}}
 
   #allButtons(style="display:flex; flex-wrap:wrap; margin-top:15px; padding:0 10px; justify-content:space-around; width:100%;")
     div(v-if="showSpinner")
@@ -55,11 +58,6 @@
         @click.stop="remoteClick(remote)"
         :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }")
       | {{remote.name}}
-    #watchButton(v-if="!simpleMode"
-        v-for="watchButtonTxt in watchButtonTxtArr"
-        @click.stop="watchButtonClick(show, watchButtonTxt)"
-        :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }")
-      | {{watchButtonTxt}}
   
   #bot(:style="{ fontSize: sizing.overviewFontSize || '20px', padding:'10px' }") {{show.Overview}}
 
@@ -108,6 +106,7 @@ export default {
       episodeId: '',
       deletedTxt: '',
       notInEmby: false,
+      collectionName: ''
     }
   },
   
@@ -345,6 +344,15 @@ export default {
       this.emailText = ''; // Clear email text when changing shows
       this.show      = show;
       this.showBody  = true;
+      
+      // Set collection name(s)
+      const collections = [];
+      if (show.InToTry) collections.push('To Try');
+      if (show.InContinue) collections.push('Continue');
+      if (show.InMark) collections.push('Mark');
+      if (show.InLinda) collections.push('Linda');
+      this.collectionName = collections.join(', ');
+      
       const tvdbData = allTvdb[show.Name];
       await this.setDeleted(tvdbData);
       await this.setPoster(tvdbData);

@@ -2,12 +2,14 @@
 reminder, restore ...
   start gap running
 
+todo ...
+  add tv guide
+  
 simple ...
-  tell mark button
-  height
+  mark/linda
+  collection
   
 bugs ...
-  blocked shows appear on boot
   prune skipped first season worked on second try
   if 1'st episode file not watched/missing -> S01E01 No File
   have to sort added twice

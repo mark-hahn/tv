@@ -45,7 +45,7 @@ export default {
       // TABLET SIZING CONFIGURATION - Tweak these values
       sizing: {
         // List pane
-        listWidth: '500px',           // narrower list pane
+        listWidth: '750px',           // narrower list pane
         
         // Series pane  
         seriesWidth: '450px',         // series pane width
@@ -60,12 +60,14 @@ export default {
         watchButtonPadding: '8px 12px', // smaller watch buttons
         watchButtonFontSize: '13px',
         emailWidth: '150px',          // narrower email box
+        overviewFontSize: '16px',     // overview text at bottom of series pane (default: 20px)
         
         // Buttons pane
-        buttonHeight: '28px',         // shorter buttons
-        buttonFontSize: '13px',
-        buttonPadding: '8px 6px',
-        buttonMarginBottom: '6px'
+        buttonHeight: '32px',         // button height (text will be vertically centered)
+        buttonFontSize: '15px',
+        buttonMarginBottom: '6px',
+        buttonTopMargin: '0px',       // margin above top button
+        buttonContainerPadding: '12px' // padding around entire button container (default: 5px with 0 bottom)
       }
     } 
   },

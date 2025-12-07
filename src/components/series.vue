@@ -60,7 +60,7 @@
             @click.stop="watchButtonClick(show, watchButtonTxt)"
             :style="{ margin:'5px 10px 10px 7px', borderRadius:'10px', padding: sizing.watchButtonPadding || '3px', maxWidth:'110px', backgroundColor:'#eee', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.watchButtonFontSize || 'inherit' }")
           | {{watchButtonTxt}}
-  #bot(style="font-size:20px; padding:10px;") {{show.Overview}}
+  #bot(:style="{ fontSize: sizing.overviewFontSize || '20px', padding:'10px' }") {{show.Overview}}
 
 </template>
 

@@ -388,7 +388,7 @@ export default {
       
       // Map button labels to cond names
       const buttonToCondMap = {
-        'Ready To Watchk': 'unplayed',
+        'Ready To Watch': 'unplayed',
         'Drama': 'drama',
         'Comedy': 'drama', // Comedy uses drama cond but inverted
         'To Try': 'totry',

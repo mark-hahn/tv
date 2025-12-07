@@ -1,8 +1,10 @@
 
-in non-simple mode: add feature:
-
 in non-simple mode:
-  change finished filter choice in filter drop-down to have same filter but also only show ones that are watched all. 
+  center items in hdrtop just they as they are in simple mode but don't change the count displays in either mode
 
 in simple mode:
-show the count of the number of shows listed in small gray font in upper right of hdrtop just like number on left in non-simple mode
+
+in all modes:
+  when starting a web search, show modal dialog with no buttons (is that a toast?) that says Searching web for information about show: <show name>. Please wait ...
+
+  Then remove the dialog when the call to the server returns.

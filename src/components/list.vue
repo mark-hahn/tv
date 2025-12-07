@@ -1,6 +1,11 @@
 <template lang="pug">
 
 #list(style="height:100%; padding:0; margin:0; display:flex; flex-direction:column; align-items:center;")
+  #searchingModal(v-if="showSearching" style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background-color:white; padding:30px 40px; border:2px solid black; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.3); z-index:1000; text-align:center;")
+    div(style="font-size:18px; font-weight:bold; margin-bottom:10px;") Searching web for information about show:
+    div(style="font-size:20px; color:#0066cc; margin-bottom:15px;") {{searchingShowName}}
+    div(style="font-size:16px; color:#666;") Please wait ...
+  
   #center(:style="{ height:'100%', width: sizing.listWidth || '800px', display:'flex', flexDirection:'column' }")             
     #hdr(style="width:100%; background-color:#ccc; display:flex; flex-direction:column;")
 
@@ -300,7 +305,9 @@ export default {
       fltrPopped:        false,
       fltrChoice:        'All',  
       showingSrchList:   false,
-      searchList:         null,        
+      searchList:         null,
+      showSearching:     false,
+      searchingShowName: '',        
       sortChoices:          
         ['Alpha', 'Viewed', 'Added', 'Ratings', 'Size'],
       fltrChoices:
@@ -580,6 +587,11 @@ export default {
           return;
         }
       }
+      
+      // Show searching modal
+      this.searchingShowName = name;
+      this.showSearching = true;
+      
       let show = {
         Name: name,
         TvdbId: tvdbId,
@@ -600,6 +612,10 @@ export default {
               {seasonCount, episodeCount, watchedCount});
       }
       tvdbData = await srvr.getNewTvdb(paramObj);
+      
+      // Hide searching modal
+      this.showSearching = false;
+      
       delete tvdbData.deleted;
       allTvdb[show.Name] = tvdbData;
       await srvr.addBlockedWait(show.Name);

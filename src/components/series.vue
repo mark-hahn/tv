@@ -3,8 +3,8 @@
 #series(@click="handleSeriesClick" :style="{ height:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', maxWidth:'100%', width: sizing.seriesWidth || 'auto' }")
 
   #hdr(v-if="showHdr"
-       :style="{ display:'flex', justifyContent:'space-between', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'20px', maxWidth:'565px' }")
-    div(style="margin-left:20px; max-width:450px") {{show.Name}}
+       :style="{ display:'flex', justifyContent:'space-between', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'20px' }")
+    div(style="margin-left:20px; flex:1;") {{show.Name}}
     
     div(v-if="simpleMode" style="display:flex; gap:4px;")
       textarea(
@@ -12,7 +12,7 @@
               @click.stop
               rows="2"
               placeholder="Email note..."
-              :style="{ marginLeft:'165px', width: sizing.emailWidth || '200px', padding:'5px', fontSize:'14px', border:'1.5px solid black', backgroundColor:'#eee', resize:'none' }")
+              :style="{ width: sizing.emailWidth || '200px', padding:'5px', fontSize:'14px', border:'1.5px solid black', backgroundColor:'#eee', resize:'none' }")
       
       div(v-if="notInEmby" 
           style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; white-space:nowrap;") Not In Emby
@@ -32,7 +32,7 @@
       #poster(style="margin-left:30px;")  
     #topRight(style="display:flex; flex-direction:column; width:300px; margin-left:10px;")
       #infoBox(@click.stop="handleBodyClick"
-                :style="{ margin:'0 0 7px 2px', width: sizing.seriesInfoWidth || '250px', fontSize: sizing.seriesInfoFontSize || '17px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column',textAlign:'center', fontWeight:'bold' }")
+                :style="{ margin:'30px 0 7px 2px', width: sizing.seriesInfoWidth || '250px', fontSize: sizing.seriesInfoFontSize || '17px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column',textAlign:'center', fontWeight:'bold' }")
         #dates(v-html="dates"
                v-if="dates.length > 0"
                style="min-height:24px; margin-top:10px;")

@@ -9,9 +9,9 @@
     textarea(v-if="simpleMode"
             v-model="emailText"
             @click.stop
-            @blur="handleEmailBlur"
+            rows="2"
             placeholder="Email note..."
-            style="margin-left:165px; width:200px; height:48px; padding:5px; font-size:14px; border:1.5px solid black; background-color:#eee; resize:none;")
+            style="margin-left:165px; width:200px; padding:5px; font-size:14px; border:1.5px solid black; background-color:#eee; resize:none;")
     
     div(v-if="notInEmby" 
         style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px;") Not In Emby
@@ -23,11 +23,11 @@
             @click.stop="deleteClick"
             style="font-size:15px; cursor:pointer; margin-left:20px; margin-top:3px; max-height:24px; border-radius: 7px;") Delete
   #body(style="display:flex; cursor:pointer;")
-    #topLeft(@click="handleBodyClick"
+    #topLeft(@click.stop="handleBodyClick"
               style="display:flex; flex-direction:column; text-align:center;") 
       #poster(style="margin-left:20px;")  
     #topRight(style="display:flex; flex-direction:column; width:300px; margin-left:10px;")
-      #infoBox(@click="handleBodyClick"
+      #infoBox(@click.stop="handleBodyClick"
                 style="margin:0 0 7px 12px; width:250px; font-size:17px; display:flex; flex-direction:column; border: 2px solid gray; text-align:center; font-weight:bold;")
         #dates(v-html="dates"
                v-if="dates.length > 0"
@@ -116,10 +116,6 @@ export default {
       } catch (error) {
         console.error('Failed to send email:', error);
       }
-    },
-
-    async handleEmailBlur() {
-      await this.sendEmail();
     },
 
     async handleBodyClick() {

@@ -1,54 +1,1171 @@
 {
-  "result": {
-    "tvdbId": "447579",
-    "name": "Black Rabbit",
-    "originalNetwork": "Netflix",
-    "seasonCount": 1,
-    "episodeCount": 8,
-    "watchedCount": 6,
-    "image": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68d2d5dd76d43.jpg",
-    "score": 48879,
-    "overview": "A rising-star restaurateur is forced into New York's criminal underworld when his chaotic brother returns to town with loan sharks on his trail.",
-    "firstAired": "2025-09-18",
-    "lastAired": "2025-09-18",
-    "averageRuntime": 56,
-    "originalCountry": "usa",
-    "originalLanguage": "eng",
-    "status": "Ended",
-    "remotes": [
-      {
-        "name": "Emby",
-        "url": "https://hahnca.com:8920/web/index.html#!/item?id=4822638&serverId=ae3349983dbe45d9aa1d317a7753483e"
+  "url": "https://api4.thetvdb.com/v4/series/447579/extended",
+  "response": {
+    "status": "success",
+    "data": {
+      "id": 447579,
+      "name": "Black Rabbit",
+      "slug": "black-rabbit",
+      "image": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68d2d5dd76d43.jpg",
+      "nameTranslations": [
+        "eng",
+        "fra",
+        "por",
+        "pt",
+        "rus",
+        "hun",
+        "nld",
+        "tur",
+        "deu",
+        "dan",
+        "spa",
+        "fin"
+      ],
+      "overviewTranslations": [
+        "eng",
+        "fra",
+        "por",
+        "pt",
+        "rus",
+        "hun",
+        "nld",
+        "tur",
+        "deu",
+        "dan",
+        "spa",
+        "pol",
+        "fin"
+      ],
+      "aliases": [],
+      "firstAired": "2025-09-18",
+      "lastAired": "2025-09-18",
+      "nextAired": "",
+      "score": 48879,
+      "status": {
+        "id": 2,
+        "name": "Ended",
+        "recordType": "series",
+        "keepUpdated": false
       },
-      {
-        "name": "Rotten (67/81)",
-        "url": "https://www.rottentomatoes.com/tv/black_rabbit",
-        "ratings": "67/81"
+      "originalCountry": "usa",
+      "originalLanguage": "eng",
+      "defaultSeasonType": 1,
+      "isOrderRandomized": false,
+      "lastUpdated": "2025-12-03 22:47:45",
+      "averageRuntime": 56,
+      "episodes": null,
+      "overview": "A rising-star restaurateur is forced into New York's criminal underworld when his chaotic brother returns to town with loan sharks on his trail.",
+      "year": "2025",
+      "artworks": [
+        {
+          "id": 64473932,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/backgrounds/68ca35a8af81d.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/backgrounds/68ca35a8af81d_t.jpg",
+          "language": "eng",
+          "type": 3,
+          "score": 100000,
+          "width": 1920,
+          "height": 1080,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64474201,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/backgrounds/68ca7e3470fe1.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/backgrounds/68ca7e3470fe1_t.jpg",
+          "language": null,
+          "type": 3,
+          "score": 100000,
+          "width": 1920,
+          "height": 1080,
+          "includesText": false,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64475486,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/backgrounds/68cc046c768ae.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/backgrounds/68cc046c768ae_t.jpg",
+          "language": null,
+          "type": 3,
+          "score": 100000,
+          "width": 1920,
+          "height": 1080,
+          "includesText": false,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64479864,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/backgrounds/68d04b58b7da0.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/backgrounds/68d04b58b7da0_t.jpg",
+          "language": null,
+          "type": 3,
+          "score": 100000,
+          "width": 1920,
+          "height": 1080,
+          "includesText": false,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64476284,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/backgrounds/68ccdc96a5ad6.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/backgrounds/68ccdc96a5ad6_t.jpg",
+          "language": "eng",
+          "type": 3,
+          "score": 100000,
+          "width": 1920,
+          "height": 1080,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64406158,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/backgrounds/687a8b038f656.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/backgrounds/687a8b038f656_t.jpg",
+          "language": null,
+          "type": 3,
+          "score": 100000,
+          "width": 1920,
+          "height": 1080,
+          "includesText": false,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64475335,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/backgrounds/68cbc8a4583af.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/backgrounds/68cbc8a4583af_t.jpg",
+          "language": null,
+          "type": 3,
+          "score": 100000,
+          "width": 1920,
+          "height": 1080,
+          "includesText": false,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64475338,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/backgrounds/68cbc8e68b46e.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/backgrounds/68cbc8e68b46e_t.jpg",
+          "language": null,
+          "type": 3,
+          "score": 100000,
+          "width": 1920,
+          "height": 1080,
+          "includesText": false,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64560657,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/6930be10a95e7.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/6930be10a95e7_t.jpg",
+          "language": "eng",
+          "type": 2,
+          "score": 100000,
+          "width": 680,
+          "height": 1000,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64441617,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68a5d3fa5084e.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68a5d3fa5084e_t.jpg",
+          "language": "eng",
+          "type": 2,
+          "score": 100000,
+          "width": 680,
+          "height": 1000,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64473935,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68ca35cbd2369.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68ca35cbd2369_t.jpg",
+          "language": "eng",
+          "type": 2,
+          "score": 100000,
+          "width": 680,
+          "height": 1000,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64473936,
+          "image": "https://artworks.thetvdb.com/banners/v4/season/2117470/posters/68ca3659b77df.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/season/2117470/posters/68ca3659b77df_t.jpg",
+          "language": "eng",
+          "type": 7,
+          "score": 100000,
+          "width": 680,
+          "height": 1000,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "seasonId": 2117470,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64475478,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68cc0195f26c8.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68cc0195f26c8_t.jpg",
+          "language": "eng",
+          "type": 2,
+          "score": 100000,
+          "width": 680,
+          "height": 1000,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64475480,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68cc026d2a4e6.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68cc026d2a4e6_t.jpg",
+          "language": "eng",
+          "type": 2,
+          "score": 100000,
+          "width": 680,
+          "height": 1000,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64475483,
+          "image": "https://artworks.thetvdb.com/banners/v4/season/2117470/posters/68cc037a07541.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/season/2117470/posters/68cc037a07541_t.jpg",
+          "language": "eng",
+          "type": 7,
+          "score": 100000,
+          "width": 680,
+          "height": 1000,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "seasonId": 2117470,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64475834,
+          "image": "https://artworks.thetvdb.com/banners/v4/season/2117470/posters/68cc67df7707b.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/season/2117470/posters/68cc67df7707b_t.jpg",
+          "language": "eng",
+          "type": 7,
+          "score": 100000,
+          "width": 680,
+          "height": 1000,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "seasonId": 2117470,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64475341,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68cbc9b8c24f2.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68cbc9b8c24f2_t.jpg",
+          "language": "eng",
+          "type": 2,
+          "score": 100000,
+          "width": 680,
+          "height": 1000,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64475342,
+          "image": "https://artworks.thetvdb.com/banners/v4/season/2117469/posters/68cbca16205bf.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/season/2117469/posters/68cbca16205bf_t.jpg",
+          "language": "eng",
+          "type": 7,
+          "score": 100000,
+          "width": 680,
+          "height": 1000,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "seasonId": 2117469,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64475345,
+          "image": "https://artworks.thetvdb.com/banners/v4/season/2117470/posters/68cbcb371e89b.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/season/2117470/posters/68cbcb371e89b_t.jpg",
+          "language": "eng",
+          "type": 7,
+          "score": 100000,
+          "width": 680,
+          "height": 1000,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "seasonId": 2117470,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64515067,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68f95346a22ac.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68f95346a22ac_t.jpg",
+          "language": "eng",
+          "type": 2,
+          "score": 100000,
+          "width": 680,
+          "height": 1000,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64473931,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/clearlogo/68ca3597d1c4f.png",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/clearlogo/68ca3597d1c4f_t.png",
+          "language": "eng",
+          "type": 23,
+          "score": 100000,
+          "width": 800,
+          "height": 310,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64475337,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/clearlogo/68cbc8c66ca5e.png",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/clearlogo/68cbc8c66ca5e_t.png",
+          "language": "eng",
+          "type": 23,
+          "score": 100000,
+          "width": 800,
+          "height": 310,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64473933,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/banners/68ca35b8210df.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/banners/68ca35b8210df_t.jpg",
+          "language": "eng",
+          "type": 1,
+          "score": 100000,
+          "width": 758,
+          "height": 140,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64455323,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/banners/68b530388f0e3.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/banners/68b530388f0e3_t.jpg",
+          "language": "eng",
+          "type": 1,
+          "score": 100000,
+          "width": 758,
+          "height": 140,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64475336,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/banners/68cbc8b5c2231.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/banners/68cbc8b5c2231_t.jpg",
+          "language": "eng",
+          "type": 1,
+          "score": 100000,
+          "width": 758,
+          "height": 140,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 64482052,
+          "image": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68d2d5dd76d43.jpg",
+          "thumbnail": "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68d2d5dd76d43_t.jpg",
+          "language": "rus",
+          "type": 2,
+          "score": 0,
+          "width": 680,
+          "height": 1000,
+          "includesText": true,
+          "thumbnailWidth": 0,
+          "thumbnailHeight": 0,
+          "updatedAt": 0,
+          "status": {
+            "id": 0,
+            "name": null
+          },
+          "tagOptions": null
+        }
+      ],
+      "companies": [
+        {
+          "id": 535,
+          "name": "Netflix",
+          "slug": "netflix",
+          "nameTranslations": [
+            "eng",
+            "fra",
+            "pt",
+            "spa",
+            "tha"
+          ],
+          "overviewTranslations": [
+            "eng",
+            "fra",
+            "pt",
+            "spa",
+            "tha"
+          ],
+          "aliases": [
+            {
+              "language": "eng",
+              "name": "NF"
+            },
+            {
+              "language": "fra",
+              "name": "NF"
+            }
+          ],
+          "country": "usa",
+          "primaryCompanyType": 1,
+          "activeDate": null,
+          "inactiveDate": null,
+          "companyType": {
+            "companyTypeId": 1,
+            "companyTypeName": "Network"
+          },
+          "parentCompany": {
+            "id": null,
+            "name": null,
+            "relation": {
+              "id": null,
+              "typeName": null
+            }
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 3541,
+          "name": "Aggregate Films",
+          "slug": "aggregate-films",
+          "nameTranslations": [
+            "eng"
+          ],
+          "overviewTranslations": [],
+          "aliases": [],
+          "country": null,
+          "primaryCompanyType": 3,
+          "activeDate": null,
+          "inactiveDate": null,
+          "companyType": {
+            "companyTypeId": 3,
+            "companyTypeName": "Production Company"
+          },
+          "parentCompany": {
+            "id": null,
+            "name": null,
+            "relation": {
+              "id": null,
+              "typeName": null
+            }
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 5909,
+          "name": "Automatik Entertainment",
+          "slug": "automatik-entertainment",
+          "nameTranslations": [
+            "eng"
+          ],
+          "overviewTranslations": [],
+          "aliases": [],
+          "country": null,
+          "primaryCompanyType": 3,
+          "activeDate": null,
+          "inactiveDate": null,
+          "companyType": {
+            "companyTypeId": 3,
+            "companyTypeName": "Production Company"
+          },
+          "parentCompany": {
+            "id": null,
+            "name": null,
+            "relation": {
+              "id": null,
+              "typeName": null
+            }
+          },
+          "tagOptions": null
+        },
+        {
+          "id": 30452,
+          "name": "Netflix Studios",
+          "slug": "netflix-studios",
+          "nameTranslations": [
+            "eng"
+          ],
+          "overviewTranslations": [],
+          "aliases": [],
+          "country": "usa",
+          "primaryCompanyType": 3,
+          "activeDate": null,
+          "inactiveDate": null,
+          "companyType": {
+            "companyTypeId": 3,
+            "companyTypeName": "Production Company"
+          },
+          "parentCompany": {
+            "id": null,
+            "name": null,
+            "relation": {
+              "id": null,
+              "typeName": null
+            }
+          },
+          "tagOptions": null
+        }
+      ],
+      "originalNetwork": {
+        "id": 535,
+        "name": "Netflix",
+        "slug": "netflix",
+        "nameTranslations": [
+          "eng",
+          "fra",
+          "pt",
+          "spa",
+          "tha"
+        ],
+        "overviewTranslations": [
+          "eng",
+          "fra",
+          "pt",
+          "spa",
+          "tha"
+        ],
+        "aliases": [
+          {
+            "language": "eng",
+            "name": "NF"
+          },
+          {
+            "language": "fra",
+            "name": "NF"
+          }
+        ],
+        "country": "usa",
+        "primaryCompanyType": 1,
+        "activeDate": null,
+        "inactiveDate": null,
+        "companyType": {
+          "companyTypeId": 1,
+          "companyTypeName": "Network"
+        },
+        "parentCompany": {
+          "id": null,
+          "name": null,
+          "relation": {
+            "id": null,
+            "typeName": null
+          }
+        },
+        "tagOptions": [
+          {
+            "id": 489,
+            "tag": 24,
+            "tagName": "Company Type",
+            "name": "SVOD",
+            "helpText": "Subscription video on demand. Examples: Netflix Amazon Prime Video, Disney+."
+          }
+        ]
       },
-      {
-        "name": "Google",
-        "url": "https://www.google.com/search?q=Black%20Rabbit%20tv%20show"
+      "latestNetwork": {
+        "id": 535,
+        "name": "Netflix",
+        "slug": "netflix",
+        "nameTranslations": [
+          "eng",
+          "fra",
+          "pt",
+          "spa",
+          "tha"
+        ],
+        "overviewTranslations": [
+          "eng",
+          "fra",
+          "pt",
+          "spa",
+          "tha"
+        ],
+        "aliases": [
+          {
+            "language": "eng",
+            "name": "NF"
+          },
+          {
+            "language": "fra",
+            "name": "NF"
+          }
+        ],
+        "country": "usa",
+        "primaryCompanyType": 1,
+        "activeDate": null,
+        "inactiveDate": null,
+        "companyType": {
+          "companyTypeId": 1,
+          "companyTypeName": "Network"
+        },
+        "parentCompany": {
+          "id": null,
+          "name": null,
+          "relation": {
+            "id": null,
+            "typeName": null
+          }
+        },
+        "tagOptions": [
+          {
+            "id": 489,
+            "tag": 24,
+            "tagName": "Company Type",
+            "name": "SVOD",
+            "helpText": "Subscription video on demand. Examples: Netflix Amazon Prime Video, Disney+."
+          }
+        ]
       },
-      {
-        "name": "Wikipedia",
-        "url": "https://en.wikipedia.org/wiki/Black_Rabbit"
+      "genres": [
+        {
+          "id": 5,
+          "name": "Mini-Series",
+          "slug": "mini-series"
+        },
+        {
+          "id": 12,
+          "name": "Drama",
+          "slug": "drama"
+        }
+      ],
+      "trailers": [
+        {
+          "id": 225157,
+          "name": "Trailer",
+          "url": "https://www.youtube.com/watch?v=9j_IFlmFRvU",
+          "language": "eng",
+          "runtime": 0
+        },
+        {
+          "id": 225158,
+          "name": "Trailer",
+          "url": "https://www.youtube.com/watch?v=ueNsPJgWNAg",
+          "language": "eng",
+          "runtime": 0
+        }
+      ],
+      "lists": [
+        {
+          "id": 16528,
+          "name": "_404 posters",
+          "overview": "",
+          "url": "16528",
+          "isOfficial": false,
+          "nameTranslations": [
+            "eng"
+          ],
+          "overviewTranslations": [
+            "eng"
+          ],
+          "aliases": [],
+          "score": 7718141,
+          "image": "",
+          "imageIsFallback": false,
+          "remoteIds": null,
+          "tags": null
+        },
+        {
+          "id": 14608,
+          "name": "¯\\_(ツ) _/¯ Artwork Issue(s)",
+          "overview": "",
+          "url": "14608",
+          "isOfficial": false,
+          "nameTranslations": [
+            "eng"
+          ],
+          "overviewTranslations": [
+            "eng"
+          ],
+          "aliases": [],
+          "score": 3106039,
+          "image": "",
+          "imageIsFallback": false,
+          "remoteIds": null,
+          "tags": null
+        },
+        {
+          "id": 16603,
+          "name": "New TV Shows To Try",
+          "overview": "My list of shows to try for Plex & Kometa",
+          "url": "16603",
+          "isOfficial": false,
+          "nameTranslations": [
+            "eng"
+          ],
+          "overviewTranslations": [
+            "eng"
+          ],
+          "aliases": [],
+          "score": 0,
+          "image": "",
+          "imageIsFallback": false,
+          "remoteIds": null,
+          "tags": null
+        }
+      ],
+      "remoteIds": [
+        {
+          "id": "tt23055142",
+          "type": 2,
+          "sourceName": "IMDB"
+        },
+        {
+          "id": "https://www.netflix.com/title/81630027",
+          "type": 4,
+          "sourceName": "Official Website"
+        },
+        {
+          "id": "249039",
+          "type": 12,
+          "sourceName": "TheMovieDB.com"
+        },
+        {
+          "id": "64835",
+          "type": 19,
+          "sourceName": "TV Maze"
+        },
+        {
+          "id": "Q125620289",
+          "type": 18,
+          "sourceName": "Wikidata"
+        },
+        {
+          "id": "Black_Rabbit",
+          "type": 24,
+          "sourceName": "Wikipedia"
+        }
+      ],
+      "characters": [
+        {
+          "id": 69121389,
+          "name": "Vince Friedken",
+          "peopleId": 253839,
+          "seriesId": 447579,
+          "series": null,
+          "movie": null,
+          "movieId": null,
+          "episodeId": null,
+          "type": 3,
+          "image": "https://artworks.thetvdb.com/banners/v4/actor/253839/photo/685ddaa7adaee.jpg",
+          "sort": 1,
+          "isFeatured": true,
+          "url": "https://thetvdb.com/people/253839-jason-bateman",
+          "nameTranslations": null,
+          "overviewTranslations": null,
+          "aliases": null,
+          "peopleType": "Actor",
+          "personName": "Jason Bateman",
+          "tagOptions": null,
+          "personImgURL": "https://artworks.thetvdb.com/banners/person/253839/primary.jpg"
+        },
+        {
+          "id": 69121390,
+          "name": "Jake Friedken",
+          "peopleId": 255230,
+          "seriesId": 447579,
+          "series": null,
+          "movie": null,
+          "movieId": null,
+          "episodeId": null,
+          "type": 3,
+          "image": "https://artworks.thetvdb.com/banners/v4/actor/255230/photo/685ddab406044.jpg",
+          "sort": 2,
+          "isFeatured": true,
+          "url": "https://thetvdb.com/people/255230-jude-law",
+          "nameTranslations": null,
+          "overviewTranslations": null,
+          "aliases": null,
+          "peopleType": "Actor",
+          "personName": "Jude Law",
+          "tagOptions": null,
+          "personImgURL": "https://artworks.thetvdb.com/banners/v4/actor/255230/photo/64d333e290c7c.jpg"
+        },
+        {
+          "id": 69161801,
+          "name": null,
+          "peopleId": 8926712,
+          "seriesId": 447579,
+          "series": null,
+          "movie": null,
+          "movieId": null,
+          "episodeId": null,
+          "type": 8,
+          "image": null,
+          "sort": 3,
+          "isFeatured": false,
+          "url": "https://thetvdb.com/people/8926712-zachbaylin",
+          "nameTranslations": null,
+          "overviewTranslations": null,
+          "aliases": null,
+          "peopleType": "Showrunner",
+          "personName": "Zach Baylin",
+          "tagOptions": null,
+          "personImgURL": null
+        }
+      ],
+      "airsDays": {
+        "sunday": false,
+        "monday": false,
+        "tuesday": false,
+        "wednesday": false,
+        "thursday": true,
+        "friday": false,
+        "saturday": false
       },
-      {
-        "name": "Reddit",
-        "url": "https://www.reddit.com/r/netflix/comments/1nmakbb/black_rabbit_is_not_good/"
-      },
-      {
-        "name": "IMDB (7.3)",
-        "url": "https://www.imdb.com/title/tt23055142",
-        "ratings": "7.3"
-      },
-      {
-        "name": "Official Website",
-        "url": "https://www.netflix.com/title/81630027"
-      }
-    ],
-    "added": "2025-08-17",
-    "saved": 1765148457082,
-    "showId": "4822638"
+      "airsTime": "03:00",
+      "seasons": [
+        {
+          "id": 2117469,
+          "seriesId": 447579,
+          "type": {
+            "id": 1,
+            "name": "Aired Order",
+            "type": "official",
+            "alternateName": null
+          },
+          "number": 0,
+          "nameTranslations": [],
+          "overviewTranslations": [],
+          "image": "https://artworks.thetvdb.com/banners/v4/season/2117469/posters/68cbca16205bf.jpg",
+          "imageType": 7,
+          "companies": {
+            "studio": null,
+            "network": null,
+            "production": null,
+            "distributor": null,
+            "special_effects": null
+          },
+          "lastUpdated": "2025-09-18 09:00:07"
+        },
+        {
+          "id": 2117470,
+          "seriesId": 447579,
+          "type": {
+            "id": 1,
+            "name": "Aired Order",
+            "type": "official",
+            "alternateName": null
+          },
+          "number": 1,
+          "nameTranslations": [],
+          "overviewTranslations": [],
+          "image": "https://artworks.thetvdb.com/banners/v4/season/2117470/posters/68ca3659b77df.jpg",
+          "imageType": 7,
+          "companies": {
+            "studio": null,
+            "network": null,
+            "production": null,
+            "distributor": null,
+            "special_effects": null
+          },
+          "lastUpdated": "2025-09-30 11:07:25"
+        },
+        {
+          "id": 2117471,
+          "seriesId": 447579,
+          "type": {
+            "id": 3,
+            "name": "Absolute Order",
+            "type": "absolute",
+            "alternateName": null
+          },
+          "number": 1,
+          "nameTranslations": [],
+          "overviewTranslations": [],
+          "companies": {
+            "studio": null,
+            "network": null,
+            "production": null,
+            "distributor": null,
+            "special_effects": null
+          },
+          "lastUpdated": "2024-03-14 18:15:20"
+        }
+      ],
+      "tags": [
+        {
+          "id": 182,
+          "tag": 31,
+          "tagName": "Geographic Location",
+          "name": "America / United States",
+          "helpText": null
+        },
+        {
+          "id": 194,
+          "tag": 31,
+          "tagName": "Geographic Location",
+          "name": "New York City",
+          "helpText": null
+        },
+        {
+          "id": 147,
+          "tag": 9,
+          "tagName": "Relationship Types",
+          "name": "Brother/Brother",
+          "helpText": null
+        },
+        {
+          "id": 191,
+          "tag": 31,
+          "tagName": "Geographic Location",
+          "name": "North America",
+          "helpText": null
+        },
+        {
+          "id": 158,
+          "tag": 9,
+          "tagName": "Relationship Types",
+          "name": "Boss/Employee",
+          "helpText": null
+        },
+        {
+          "id": 160,
+          "tag": 9,
+          "tagName": "Relationship Types",
+          "name": "Co-workers",
+          "helpText": null
+        },
+        {
+          "id": 148,
+          "tag": 9,
+          "tagName": "Relationship Types",
+          "name": "Family",
+          "helpText": null
+        },
+        {
+          "id": 185,
+          "tag": 11,
+          "tagName": "Setting",
+          "name": "Big City",
+          "helpText": null
+        },
+        {
+          "id": 73,
+          "tag": 3,
+          "tagName": "TV Type or Format",
+          "name": "Story-based Miniseries",
+          "helpText": "Ex: Escape at Dannemora, Sharp Objects, Unbelievable"
+        },
+        {
+          "id": 103,
+          "tag": 4,
+          "tagName": "Time Period",
+          "name": "2020s",
+          "helpText": null
+        }
+      ],
+      "contentRatings": [
+        {
+          "id": 77,
+          "name": "16+",
+          "country": "deu",
+          "description": "Restricted to ages 16 and older",
+          "contentType": "",
+          "order": 0,
+          "fullname": null
+        },
+        {
+          "id": 75,
+          "name": "-16",
+          "country": "fra",
+          "description": "Not recommended for persons under 16",
+          "contentType": "",
+          "order": 0,
+          "fullname": null
+        }
+      ],
+      "seasonTypes": [
+        {
+          "id": 1,
+          "name": "Aired Order",
+          "type": "official",
+          "alternateName": null
+        },
+        {
+          "id": 3,
+          "name": "Absolute Order",
+          "type": "absolute",
+          "alternateName": null
+        }
+      ]
+    }
   }
 }

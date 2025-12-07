@@ -19,7 +19,7 @@
           font-awesome-icon(icon="border-all" style="color:#ccc")
 
       td(@click="$emit('select-show', show, false)"
-         :style="{width:'80px', fontSize:'16px', backgroundColor: hilite(show), cursor:'default', textAlign:'center', paddingLeft: simpleMode ? '20px' : '0'}") 
+         :style="{width:'120px', fontSize:'16px', backgroundColor: hilite(show), cursor:'default', textAlign:'center', paddingLeft: simpleMode ? '20px' : '0'}") 
         | {{ getSortDisplayValue(show) }}
         
       td(:style="{display:'flex', padding:'5px', justifyContent:'space-between', backgroundColor: hilite(show)}")

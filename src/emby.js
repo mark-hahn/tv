@@ -366,7 +366,7 @@ const deleteOneFile = async (path) => {
 
 // action from click on episode in map
 export const editEpisode = async (seriesId, 
-              seasonNumIn, episodeNumIn, delFile = false) => {
+              seasonNumIn, episodeNumIn, delFile = false, setWatched = null) => {
   let lastWatchedRec = null;
 
   const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
@@ -398,7 +398,7 @@ export const editEpisode = async (seriesId,
       }
 
       const episodeId = episodeRec.Id;
-      userData.Played = !watched;
+      userData.Played = setWatched !== null ? setWatched : !watched;
       if(!userData.LastPlayedDate)
           userData.LastPlayedDate = util.fmtDate();
       const url = urls.postUserDataUrl(cred, episodeId);

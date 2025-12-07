@@ -1,6 +1,8 @@
 
+in non-simple mode: add feature:
+  click on season number to left of row in map should toggle watched in all cells in row -- if any watched turn them all off otherwise turn all on
+
 in non-simple mode:
-  clicking on map cell works but flashes series pane
 
 in simple mode:
 

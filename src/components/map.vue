@@ -35,7 +35,8 @@
           key="episode") {{episode}}
       tr(v-for="season in seriesMapSeasons" key="season"
                 style="outline:thin solid;")
-        td(style="font-weight:bold; width:10px; text-align:center;")
+        td(@click="handleSeasonClick($event, season)"
+           :style="{ fontWeight:'bold', width:'10px', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer' }")
           | {{season}}
 
         td(v-for="episode in seriesMapEpis" key="series+'.'+episode" 
@@ -79,6 +80,12 @@ export default {
     }
   },
 
+  data() {
+    return {
+      seasonStates: {} // Track original state for each season
+    };
+  },
+
   emits: ['prune', 'set-date', 'close', 'episode-click'],
 
   methods: {
@@ -93,6 +100,56 @@ export default {
       }
       event.stopPropagation(); // Prevent map click handler from closing the map
       this.$emit('episode-click', event, mapShow, season, episode);
+    },
+    handleSeasonClick(event, season) {
+      if (this.simpleMode) return;
+      event.stopPropagation();
+      
+      const seasonEpisodes = this.seriesMap[season];
+      if (!seasonEpisodes) return;
+
+      // Initialize season state tracking if needed (save original state only once)
+      if (!this.seasonStates[season]) {
+        const episodeStates = {};
+        Object.keys(seasonEpisodes).forEach(episodeNum => {
+          const episode = seasonEpisodes[episodeNum];
+          if (episode && !episode.unaired && !episode.deleted) {
+            episodeStates[episodeNum] = episode.played || false;
+          }
+        });
+        
+        this.seasonStates[season] = {
+          original: { ...episodeStates },
+          currentState: 0 // 0=original, 1=all on, 2=all off
+        };
+      }
+
+      const state = this.seasonStates[season];
+
+      // Determine next state based on current state
+      let targetState;
+      if (state.currentState === 0) {
+        targetState = 1; // First click: all watched
+      } else if (state.currentState === 1) {
+        targetState = 2; // Second click: all unwatched
+      } else {
+        targetState = 0; // Third click: restore original
+      }
+
+      state.currentState = targetState;
+
+      // Apply the target state
+      Object.keys(state.original).forEach(episodeNum => {
+        let setWatched;
+        if (targetState === 0) {
+          setWatched = state.original[episodeNum];
+        } else if (targetState === 1) {
+          setWatched = true;
+        } else {
+          setWatched = false;
+        }
+        this.$emit('episode-click', event, this.mapShow, season, parseInt(episodeNum), setWatched);
+      });
     }
   }
 };

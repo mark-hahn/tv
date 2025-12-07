@@ -755,7 +755,7 @@ export default {
       ele.style.color = color
     },
 
-    async episodeClick(e, show, season, episode) {
+    async episodeClick(e, show, season, episode, setWatched = null) {
       let deleted = null;
       if(e.ctrlKey) {
         const ok = 
@@ -763,11 +763,11 @@ export default {
                      `S${season}E${episode} ?`);
         if(!ok) return;
         // delete episode file
-        await emby.editEpisode(show.Id, season, episode, true);
+        await emby.editEpisode(show.Id, season, episode, true, setWatched);
         deleted = {season, episode};
       }
-      else // toggle watched
-        await emby.editEpisode(show.Id, season, episode);
+      else // toggle watched or set to specific value
+        await emby.editEpisode(show.Id, season, episode, false, setWatched);
 
       await this.seriesMapAction('', show, deleted);
     },
@@ -1000,8 +1000,8 @@ export default {
     });
     
     // Listen for episode clicks from App.vue
-    evtBus.on('episodeClick', async ({ e, show, season, episode }) => {
-      await this.episodeClick(e, show, season, episode);
+    evtBus.on('episodeClick', async ({ e, show, season, episode, setWatched }) => {
+      await this.episodeClick(e, show, season, episode, setWatched);
     });
 
     setInterval(async () => {

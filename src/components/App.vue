@@ -92,8 +92,8 @@ export default {
       }
       evtBus.emit('mapAction', { action, show });
     },
-    handleEpisodeClick(e, show, season, episode) {
-      evtBus.emit('episodeClick', { e, show, season, episode });
+    handleEpisodeClick(e, show, season, episode, setWatched = null) {
+      evtBus.emit('episodeClick', {e, show, season, episode, setWatched});
     }
   },
   mounted() {

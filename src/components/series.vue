@@ -29,10 +29,10 @@
   #body(style="display:flex; cursor:pointer;")
     #topLeft(@click.stop="handleBodyClick"
               style="display:flex; flex-direction:column; text-align:center;") 
-      #poster(style="margin-left:20px;")  
+      #poster(style="margin-left:30px;")  
     #topRight(style="display:flex; flex-direction:column; width:300px; margin-left:10px;")
       #infoBox(@click.stop="handleBodyClick"
-                :style="{ margin:'0 0 7px 12px', width: sizing.seriesInfoWidth || '250px', fontSize: sizing.seriesInfoFontSize || '17px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column', border:'2px solid gray', textAlign:'center', fontWeight:'bold' }")
+                :style="{ margin:'0 0 7px 12px', width: sizing.seriesInfoWidth || '250px', fontSize: sizing.seriesInfoFontSize || '17px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column',textAlign:'center', fontWeight:'bold' }")
         #dates(v-html="dates"
                v-if="dates.length > 0"
                style="min-height:24px; margin-top:10px;")

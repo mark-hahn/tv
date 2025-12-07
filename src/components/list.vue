@@ -1043,7 +1043,15 @@ export default {
         this.sortBySize = false;
         this.sortChoice = 
           window.localStorage.getItem("sortChoice") ?? 'Viewed';
+        
+        // Initialize ban condition to -1 to filter out rejected shows BEFORE showAll
+        const banCond = this.conds.find(c => c.name === 'ban');
+        if (banCond) {
+          banCond.filter = -1;
+        }
+        
         this.showAll(true);
+        this.select(); // Apply filters including ban
         this.sortShows();
 
         const name = window.localStorage.getItem("lastVisShow");

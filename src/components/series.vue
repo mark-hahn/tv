@@ -3,14 +3,14 @@
 #series(@click="handleSeriesClick" :style="{ height:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', maxWidth:'100%', width: sizing.seriesWidth || 'auto' }")
 
   #hdr(v-if="showHdr"
-       :style="{ display:'flex', justifyContent:'space-between', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'20px' }")
+       :style="{ display:'flex', justifyContent:'space-between', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'2px' }")
     div(style="margin-left:20px; flex:1;") {{show.Name}}
     
     div(v-if="simpleMode" style="display:flex; gap:4px;")
       textarea(
               v-model="emailText"
               @click.stop
-              rows="2"
+              rows="1"
               placeholder="Email note..."
               :style="{ width: sizing.emailWidth || '200px', padding:'5px', fontSize:'14px', border:'1.5px solid black', backgroundColor:'#eee', resize:'none' }")
       

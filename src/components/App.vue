@@ -60,7 +60,7 @@ export default {
         remoteFontSize: '13px',
         watchButtonPadding: '8px 12px', // smaller watch buttons
         watchButtonFontSize: '13px',
-        emailWidth: '150px',          // narrower email box
+        emailWidth: '170px',          // narrower email box
         overviewFontSize: '16px',     // overview text at bottom of series pane (default: 20px)
         
         // Buttons pane

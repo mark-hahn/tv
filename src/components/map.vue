@@ -1,5 +1,5 @@
 <template lang="pug">
-#map(@click="handleMapClick" style="height:95dvh; padding:5px; margin:0; display:flex; flex-direction:column; background-color:#ffe; overflow-y:auto; flex:1;")
+#map(@click="handleMapClick" style="height:100%; padding:5px; margin:0; display:flex; flex-direction:column; background-color:#ffe; overflow-y:auto; flex:1;")
 
   div(style="margin:0 5px; display:flex; justify-content:flex-start; align-items:center;")
     div(v-if="!simpleMode" style="display:flex; gap:5px; margin-right:20px;")

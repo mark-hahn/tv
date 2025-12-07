@@ -1,7 +1,7 @@
 <template lang="pug">
 
-#list(style="height:95dvh; padding:0; margin:0; display:flex; flex-direction:column; align-items:center;")
-  #center(style="height:100%; width:800px; display:flex; flex-direction:column;")             
+#list(style="height:100%; padding:0; margin:0; display:flex; flex-direction:column; align-items:center;")
+  #center(:style="{ height:'100%', width: sizing.listWidth || '800px', display:'flex', flexDirection:'column' }")             
     #hdr(style="width:100%; background-color:#ccc; display:flex; flex-direction:column;")
 
       HdrTop(
@@ -38,10 +38,11 @@
         @fltr-action="fltrAction"
       )
 
-    #showsContainer(style="display:flex; flex-grow:1; overflow:hidden;")
+    #showsContainer(style="display:flex; flex-grow:1; overflow:hidden; min-height:0;")
       Buttons(
         v-if="simpleMode"
         style="width:140px; flex-shrink:0;"
+        :sizing="sizing"
         @button-click="handleButtonClick"
         @top-click="topClick"
       )
@@ -107,6 +108,10 @@ export default {
     simpleMode: {
       type: Boolean,
       default: false
+    },
+    sizing: {
+      type: Object,
+      default: () => ({})
     }
   },
 
@@ -383,7 +388,7 @@ export default {
       
       // Map button labels to cond names
       const buttonToCondMap = {
-        'Ready To Watch': 'unplayed',
+        'Ready To Watchk': 'unplayed',
         'Drama': 'drama',
         'Comedy': 'drama', // Comedy uses drama cond but inverted
         'To Try': 'totry',

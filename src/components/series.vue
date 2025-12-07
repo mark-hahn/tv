@@ -1,9 +1,9 @@
 <template lang="pug">
 
-#series(@click="handleSeriesClick" style="height:95dvh; padding:0; margin:0; display:flex; flex-direction:column; padding:5px;")
+#series(@click="handleSeriesClick" :style="{ height:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', maxWidth:'100%', width: sizing.seriesWidth || 'auto' }")
 
   #hdr(v-if="showHdr"
-       style="display:flex; justify-content:space-between; font-weight:bold; font-size:25px; margin-bottom:20px; max-width:565px;")
+       :style="{ display:'flex', justifyContent:'space-between', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'20px', maxWidth:'565px' }")
     div(style="margin-left:20px; max-width:450px") {{show.Name}}
     
     div(v-if="simpleMode" style="display:flex; gap:4px;")
@@ -12,7 +12,7 @@
               @click.stop
               rows="2"
               placeholder="Email note..."
-              style="margin-left:165px; width:200px; padding:5px; font-size:14px; border:1.5px solid black; background-color:#eee; resize:none;")
+              :style="{ marginLeft:'165px', width: sizing.emailWidth || '200px', padding:'5px', fontSize:'14px', border:'1.5px solid black', backgroundColor:'#eee', resize:'none' }")
       
       div(v-if="notInEmby" 
           style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; white-space:nowrap;") Not In Emby
@@ -32,7 +32,7 @@
       #poster(style="margin-left:20px;")  
     #topRight(style="display:flex; flex-direction:column; width:300px; margin-left:10px;")
       #infoBox(@click.stop="handleBodyClick"
-                style="margin:0 0 7px 12px; width:250px; font-size:17px; display:flex; flex-direction:column; border: 2px solid gray; text-align:center; font-weight:bold;")
+                :style="{ margin:'0 0 7px 12px', width: sizing.seriesInfoWidth || '250px', fontSize: sizing.seriesInfoFontSize || '17px', display:'flex', flexDirection:'column', border:'2px solid gray', textAlign:'center', fontWeight:'bold' }")
         #dates(v-html="dates"
                v-if="dates.length > 0"
                style="min-height:24px; margin-top:10px;")
@@ -46,19 +46,19 @@
                 v-html="nextUpTxt"
                 style="min-height:32px;")
 
-      #remotes(style="width:260px; margin:5px 0 0 10px; justify-content:space-between; display:flex; flex-wrap:wrap;") 
+      #remotes(:style="{ width: sizing.remotesWidth || '260px', margin:'5px 0 0 10px', justifyContent:'space-between', display:'flex', flexWrap:'wrap' }") 
         div(v-if="showSpinner")
           img(src="../../loading.gif"
               style="width:100px; height:100px; position:relative; top:20px; left:45px;")
         div(v-if="showRemotes" 
             v-for="remote in remotes"
             @click.stop="remoteClick(remote)"
-            style="margin:5px 5px; padding:10px; background-color:#eee; border-radius: 7px; text-align:center; border: 1px solid black; font-weight:bold;")
+            :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }")
           | {{remote.name}}
       #buttons(style="display:flex; flex-wrap:wrap; margin-top:15px; width:280px; justify-content:space-around;")
         #watchButton(v-for="watchButtonTxt in watchButtonTxtArr"
             @click.stop="watchButtonClick(show, watchButtonTxt)"
-            style="margin:5px 10px 10px 7px; border-radius: 10px; padding:3px; max-width:110px; background-color:#eee; text-align:center; border: 1px solid black; font-weight:bold;")
+            :style="{ margin:'5px 10px 10px 7px', borderRadius:'10px', padding: sizing.watchButtonPadding || '3px', maxWidth:'110px', backgroundColor:'#eee', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.watchButtonFontSize || 'inherit' }")
           | {{watchButtonTxt}}
   #bot(style="font-size:20px; padding:10px;") {{show.Overview}}
 
@@ -81,6 +81,10 @@ export default {
     simpleMode: {
       type: Boolean,
       default: false
+    },
+    sizing: {
+      type: Object,
+      default: () => ({})
     }
   },
 
@@ -181,8 +185,8 @@ export default {
 
     setPoster(tvdbData) {
       const img = new Image();
-      img.style.maxWidth  = "300px"; 
-      img.style.maxHeight = "400px"; 
+      img.style.maxWidth  = this.sizing.posterWidth || "300px"; 
+      img.style.maxHeight = this.sizing.posterHeight || "400px"; 
       if(!tvdbData) {
         console.error('setPoster: tvdbData missing');
         img.src = './question-mark.png';

@@ -1,13 +1,14 @@
 <template lang="pug">
 
-#all(style="width:100%; height:95dvh; box-sizing: border-box; padding:0; margin:0; display:flex;")
+#all(style="width:100%; height:100dvh; box-sizing: border-box; padding:0; margin:0; display:flex;")
   List(
     style="display:inline-block;" 
     :simpleMode="simpleMode"
+    :sizing="sizing"
     @show-map="handleShowMap"
     @hide-map="handleHideMap"
   )
-  Series(v-show="!showMap" style="display:inline-block;" :simpleMode="simpleMode")
+  Series(v-show="!showMap" style="display:inline-block;" :simpleMode="simpleMode" :sizing="sizing")
   Map(
     v-show="showMap"
     :mapShow="mapShow"
@@ -40,7 +41,32 @@ export default {
       hideMapBottom: true,
       seriesMapSeasons: [],
       seriesMapEpis: [],
-      seriesMap: {}
+      seriesMap: {},
+      // TABLET SIZING CONFIGURATION - Tweak these values
+      sizing: {
+        // List pane
+        listWidth: '500px',           // narrower list pane
+        
+        // Series pane  
+        seriesWidth: '450px',         // series pane width
+        posterWidth: '140px',         // smaller poster
+        posterHeight: '210px',
+        seriesFontSize: '18px',       // smaller title
+        seriesInfoFontSize: '14px',   // smaller info text
+        seriesInfoWidth: '200px',     // narrower info box
+        remotesWidth: '210px',        // narrower remotes area
+        remoteButtonPadding: '6px',   // smaller remote buttons
+        remoteFontSize: '13px',
+        watchButtonPadding: '8px 12px', // smaller watch buttons
+        watchButtonFontSize: '13px',
+        emailWidth: '150px',          // narrower email box
+        
+        // Buttons pane
+        buttonHeight: '28px',         // shorter buttons
+        buttonFontSize: '13px',
+        buttonPadding: '8px 6px',
+        buttonMarginBottom: '6px'
+      }
     } 
   },
   methods: {
@@ -73,3 +99,12 @@ export default {
   },
 }
 </script>
+
+<style>
+html, body {
+  width: 100%;
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
+}
+</style>

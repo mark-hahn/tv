@@ -1,1 +1,14 @@
-in all modes if a show is clicked in searchList causing search-action which causes a new show to be added, and not an existing show, then send an email with body of show name followed by tilda and message "New show added".  
+
+the panes now scroll ok so everything shows -- but i want to shrink and move all the content to fit on this size of screen 
+
+i only need to fix it for this one screen size on the tablet 
+
+it would be nice if the entire series pane could be shrunk including everything like the image, buttons, text, etc.
+
+the series pane could also be moved left making the list pane narrower
+
+the button heights in buttons.view could be shorter to make buttons fit
+
+this may be bad for my laptop sizing but we can worry about that later
+
+could there be constants for everything that i could tweak?

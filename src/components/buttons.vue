@@ -1,8 +1,8 @@
 <template lang="pug">
-#buttons(style="display:flex; flex-direction:column; padding:5px; padding-bottom:0;")
+#buttons(style="display:flex; flex-direction:column; padding:5px; padding-bottom:0; overflow-y:auto; height:100%;")
   button(
     @click="$emit('top-click')"
-    style="width:100%; padding:12px 8px; margin-top:10px; margin-bottom:8px; font-size:15px; font-weight:bold; border:1px solid #999; border-radius:5px; cursor:pointer; background-color:#eee; text-align:center;"
+    :style="{ width:'100%', height: sizing.buttonHeight || '40px', padding: sizing.buttonPadding || '12px 8px', marginTop:'10px', marginBottom: sizing.buttonMarginBottom || '8px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }"
   ) Top
   
   div(style="height:2px; background-color:#666; margin:10px 0;")
@@ -12,7 +12,7 @@
     :key="btn"
     :class="{ active: activeButtons[btn] }"
     @click="handleButtonClick(btn)"
-    style="width:100%; padding:12px 8px; margin-bottom:8px; font-size:15px; font-weight:bold; border:1px solid #999; border-radius:5px; cursor:pointer; background-color:#eee; text-align:center;"
+    :style="{ width:'100%', height: sizing.buttonHeight || '40px', padding: sizing.buttonPadding || '12px 8px', marginBottom: sizing.buttonMarginBottom || '8px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }"
   ) {{ btn }}
   
   button(
@@ -20,7 +20,7 @@
     :key="btn"
     :class="{ active: activeButtons[btn] }"
     @click="handleButtonClick(btn)"
-    style="width:100%; padding:12px 8px; margin-bottom:8px; font-size:15px; font-weight:bold; border:1px solid #999; border-radius:5px; cursor:pointer; background-color:#eee; text-align:center;"
+    :style="{ width:'100%', height: sizing.buttonHeight || '40px', padding: sizing.buttonPadding || '12px 8px', marginBottom: sizing.buttonMarginBottom || '8px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }"
   ) {{ btn }}
   
   div(style="height:2px; background-color:#666; margin:10px 0;")
@@ -30,7 +30,7 @@
     :key="btn"
     :class="{ active: activeButtons[btn] }"
     @click="handleButtonClick(btn)"
-    style="width:100%; padding:12px 8px; margin-bottom:8px; font-size:15px; font-weight:bold; border:1px solid #999; border-radius:5px; cursor:pointer; background-color:#eee; text-align:center;"
+    :style="{ width:'100%', height: sizing.buttonHeight || '40px', padding: sizing.buttonPadding || '12px 8px', marginBottom: sizing.buttonMarginBottom || '8px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }"
   ) {{ btn }}
   
   div(style="height:2px; background-color:#666; margin:10px 0;")
@@ -40,7 +40,7 @@
     :key="btn"
     :class="{ active: activeButtons[btn] }"
     @click="handleButtonClick(btn)"
-    style="width:100%; padding:12px 8px; margin-bottom:10px; font-size:15px; font-weight:bold; border:1px solid #999; border-radius:5px; cursor:pointer; background-color:#eee; text-align:center;"
+    :style="{ width:'100%', height: sizing.buttonHeight || '40px', padding: sizing.buttonPadding || '12px 8px', marginBottom:'10px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }"
   ) {{ btn }}
 </template>
 
@@ -48,10 +48,17 @@
 export default {
   name: "Buttons",
 
+  props: {
+    sizing: {
+      type: Object,
+      default: () => ({})
+    }
+  },
+
   data() {
     return {
       activeButtons: {
-        'Ready To Watch': false,
+        'Ready To Watchk': false,
         'Drama': false,
         'Comedy': false,
         'To Try': false,
@@ -63,7 +70,7 @@ export default {
         'Ratings Order': false
       },
       filters: [
-        'Ready To Watch'
+        'Ready To Watchk'
       ],
       genres: [
         'Drama',

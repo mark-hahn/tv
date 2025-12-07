@@ -222,6 +222,22 @@ const getRemotes = async (show, tvdbRemotes) => {
   return remotes;
 }
 
+function getTvdbImageUrl(extResObj) {
+  // Try to find first English poster in artworks array
+  const artworks = extResObj?.data?.artworks;
+  if (artworks && Array.isArray(artworks)) {
+    const englishPoster = artworks.find(
+      art => art.language === 'eng' && art.type === 2 && art.image
+    );
+    if (englishPoster) {
+      return englishPoster.image;
+    }
+  }
+  
+  // Fallback to main image
+  return extResObj?.data?.image || '';
+}
+
 //////////// GET TVDB DATA //////////////
 // fetch data from tvdb.com
 // create tvdbData object
@@ -266,11 +282,12 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     return;
   }
   const extResObj = await extRes.json();
-  const {firstAired, lastAired:lastAiredIn, image, score,
+  const {firstAired, lastAired:lastAiredIn, score,
          overview, remoteIds, averageRuntime,
          originalCountry, originalLanguage, 
          originalNetwork:originalNetworkIn,
          status:statusIn}      = extResObj.data;
+  const image = getTvdbImageUrl(extResObj);
   let lastAired = lastAiredIn ?? firstAired;
   lastAired = lastAired ?? '';
   let originalNetwork = originalNetworkIn?.name ?? '';

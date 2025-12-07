@@ -11,11 +11,11 @@
     #sortFltr(style="display:inline-block; display:flex; justify-content:space-between;")
       button(@click='$emit("sort-click")'
              :style="{width:'100px', fontSize:'15px', margin:'4px'}") 
-        | Sort
+        | {{selectedSort}}
 
       button(@click='$emit("filter-click")' 
              :style="{width:'100px', fontSize:'15px', margin:'4px'}")
-        | Filter
+        | {{selectedFilter}}
   button(@click="$emit('all-click')" 
           style="display:inline-block'; width:40px; font-size:15px; margin:4px 10px 4px 10px;backgroundColor:white") All
   #botrgt(style="display:flex; justify-content:space-between; margin: 5px 17px 0 0;")
@@ -68,6 +68,14 @@ export default {
     },
     fltrChoices: {
       type: Array,
+      required: true
+    },
+    selectedSort: {
+      type: String,
+      required: true
+    },
+    selectedFilter: {
+      type: String,
       required: true
     }
   },

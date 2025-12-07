@@ -1,8 +1,9 @@
 
 in non-simple mode: add feature:
-  click on season number to left of row in map should toggle watched in all cells in row -- if any watched turn them all off otherwise turn all on
+add second separate sizing weaking params for non-simple mode
 
 in non-simple mode:
+  change hdrbot sort and filter buttons change button text to show selected sort and selected filter text 
 
 in simple mode:
 

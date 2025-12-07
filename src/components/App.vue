@@ -4,11 +4,11 @@
   List(
     style="display:inline-block;" 
     :simpleMode="simpleMode"
-    :sizing="sizing"
+    :sizing="simpleMode ? sizing : sizingNonSimple"
     @show-map="handleShowMap"
     @hide-map="handleHideMap"
   )
-  Series(v-show="!showMap" style="display:inline-block;" :simpleMode="simpleMode" :sizing="sizing")
+  Series(v-show="!showMap" style="display:inline-block;" :simpleMode="simpleMode" :sizing="simpleMode ? sizing : sizingNonSimple")
   Map(
     v-show="showMap"
     :mapShow="mapShow"
@@ -42,7 +42,7 @@ export default {
       seriesMapSeasons: [],
       seriesMapEpis: [],
       seriesMap: {},
-      // TABLET SIZING CONFIGURATION - Tweak these values
+      // TABLET SIZING CONFIGURATION - SIMPLE MODE - Tweak these values
       sizing: {
         // List pane
         listWidth: '730px',           // narrower list pane
@@ -69,6 +69,34 @@ export default {
         buttonMarginBottom: '6px',
         buttonTopMargin: '0px',       // margin above top button
         buttonContainerPadding: '12px' // padding around entire button container (default: 5px with 0 bottom)
+      },
+      // TABLET SIZING CONFIGURATION - NON-SIMPLE MODE - Tweak these values
+      sizingNonSimple: {
+        // List pane
+        listWidth: '900px',
+        
+        // Series pane  
+        seriesWidth: '450px',
+        posterWidth: '180px',
+        posterHeight: '210px',
+        seriesFontSize: '18px',
+        seriesInfoFontSize: '14px',
+        seriesInfoWidth: '250px',
+        infoBoxLineHeight: '1.8',
+        remotesWidth: '210px',
+        remoteButtonPadding: '6px',
+        remoteFontSize: '13px',
+        watchButtonPadding: '8px 12px',
+        watchButtonFontSize: '13px',
+        emailWidth: '170px',
+        overviewFontSize: '16px',
+        
+        // Buttons pane (not used in non-simple mode)
+        buttonHeight: '32px',
+        buttonFontSize: '15px',
+        buttonMarginBottom: '6px',
+        buttonTopMargin: '0px',
+        buttonContainerPadding: '12px'
       }
     } 
   },

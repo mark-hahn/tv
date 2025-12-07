@@ -28,6 +28,8 @@
         :fltrPopped="fltrPopped"
         :sortChoices="sortChoices"
         :fltrChoices="fltrChoices"
+        :selectedSort="sortChoice"
+        :selectedFilter="fltrChoice"
         @top-click="topClick"
         @prev-next-click="prevNextClick"
         @sort-click="sortClick"

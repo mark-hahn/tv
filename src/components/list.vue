@@ -381,7 +381,7 @@ export default {
   /////////////  METHODS  ////////////
   methods: {
 
-    handleButtonClick(activeButtons) {
+    async handleButtonClick(activeButtons) {
       // In simple mode, button states control conds (pure state-based)
       if (!this.simpleMode) return;
       
@@ -439,10 +439,17 @@ export default {
       }
       
       // If no order button is active, default to 'Alpha'
+      const previousSort = this.sortChoice;
       this.sortChoice = activeSortOrder || 'Alpha';
       
       // Trigger re-filtering of shows
-      this.select();
+      await this.select();
+      
+      // If sort changed, go to top
+      if (previousSort !== this.sortChoice) {
+        this.saveVisShow(this.shows[0], true);
+        this.scrollToSavedShow();
+      }
     },
 
     getValBySortChoice(show, forSort = false) {
@@ -693,8 +700,7 @@ export default {
         window.localStorage.setItem("sortChoice", sortChoice);
         this.sortChoice = sortChoice;
         this.sortShows();
-        if(sortChoice != 'Alpha')
-            this.saveVisShow(this.shows[0], true);
+        this.saveVisShow(this.shows[0], true);
         this.scrollToSavedShow();
       }
       this.sortPopped = false;

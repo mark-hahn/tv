@@ -9,7 +9,6 @@ non-simple:
   
 simple ...
   mark/linda
-  collection
   
 bugs ...
   prune skipped first season worked on second try

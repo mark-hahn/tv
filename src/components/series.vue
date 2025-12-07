@@ -11,7 +11,7 @@
               v-model="emailText"
               @click.stop
               rows="1"
-              placeholder="Email note..."
+              placeholder="Email Mark"
               :style="{ width: sizing.emailWidth || '200px', padding:'5px', fontSize:'14px', border:'1.5px solid black', backgroundColor:'#eee', resize:'none' }")
       
       div(v-if="notInEmby" 

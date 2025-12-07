@@ -55,7 +55,8 @@
         @click.stop="remoteClick(remote)"
         :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }")
       | {{remote.name}}
-    #watchButton(v-for="watchButtonTxt in watchButtonTxtArr"
+    #watchButton(v-if="!simpleMode"
+        v-for="watchButtonTxt in watchButtonTxtArr"
         @click.stop="watchButtonClick(show, watchButtonTxt)"
         :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }")
       | {{watchButtonTxt}}

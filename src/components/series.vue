@@ -1,6 +1,6 @@
 <template lang="pug">
 
-#series(@click="handleSeriesClick" :style="{ height:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', maxWidth:'100%', width: sizing.seriesWidth || 'auto' }")
+#series(@click="handleSeriesClick" :style="{ height:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box' }")
 
   #hdr(v-if="showHdr"
        :style="{ display:'flex', justifyContent:'space-between', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'2px' }")

@@ -45,7 +45,7 @@ export default {
       // TABLET SIZING CONFIGURATION - Tweak these values
       sizing: {
         // List pane
-        listWidth: '750px',           // narrower list pane
+        listWidth: '730px',           // narrower list pane
         
         // Series pane  
         seriesWidth: '450px',         // series pane width

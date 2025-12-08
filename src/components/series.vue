@@ -137,6 +137,7 @@ export default {
     },
 
     async handleSeriesClick() {
+      console.log('handleSeriesClick: simpleMode =', this.simpleMode, 'emailText =', this.emailText, 'show =', this.show?.Name);
       // If there's text in the email box, send it instead of opening map
       if (this.simpleMode && this.emailText.trim() && this.emailText !== 'Email Sent') {
         await this.sendEmail();

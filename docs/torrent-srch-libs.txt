@@ -44,3 +44,7 @@ Most of these libraries work similarly:
 The challenge with all of them is maintenance - torrent sites frequently change their layouts or go offline, so these libraries require constant updates. Many GitHub repos for these tools are abandoned or sporadically maintained.
 
 For production use, you might want to check which ones are actively maintained before choosing.
+
+
+https://github.com/JimmyLaurent/torrent-search-api
+

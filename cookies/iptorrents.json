@@ -1,0 +1,32 @@
+[
+  {
+    "name": "_cfuvid",
+    "value": "ig8YgFtXvQzZoGJzrbkgsatDgwMNIRcbSUwwmOx_qZ8-1765230524731-0.0.1.1-604800000",
+    "domain": ".challenges.cloudflare.com",
+    "path": "/",
+    "expires": -1,
+    "httpOnly": true,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "uid",
+    "value": "1961978",
+    "domain": "iptorrents.com",
+    "path": "/",
+    "expires": 1799790537.566426,
+    "httpOnly": true,
+    "secure": false,
+    "sameSite": "Lax"
+  },
+  {
+    "name": "pass",
+    "value": "HX9iHh25WA4wmZDiUPynh7p1M2OGrJRq",
+    "domain": "iptorrents.com",
+    "path": "/",
+    "expires": 1799790537.566573,
+    "httpOnly": true,
+    "secure": false,
+    "sameSite": "Lax"
+  }
+]

@@ -1,0 +1,94 @@
+[
+  {
+    "name": "_cfuvid",
+    "value": "ig8YgFtXvQzZoGJzrbkgsatDgwMNIRcbSUwwmOx_qZ8-1765230524731-0.0.1.1-604800000",
+    "domain": ".challenges.cloudflare.com",
+    "path": "/",
+    "expires": -1,
+    "httpOnly": true,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "uid",
+    "value": "1961978",
+    "domain": "iptorrents.com",
+    "path": "/",
+    "expires": 1799790537.566426,
+    "httpOnly": true,
+    "secure": false,
+    "sameSite": "Lax"
+  },
+  {
+    "name": "pass",
+    "value": "HX9iHh25WA4wmZDiUPynh7p1M2OGrJRq",
+    "domain": "iptorrents.com",
+    "path": "/",
+    "expires": 1799790537.566573,
+    "httpOnly": true,
+    "secure": false,
+    "sameSite": "Lax"
+  },
+  {
+    "name": "cf_clearance",
+    "value": "myGZMSRkGYpIu0xxmjiZsO3tTJI49STRzu_O6joYhJc-1765230675-1.2.1.1-RJgbIWjBMD27At17Pz7yQF6uHkzCRi2XrQyJP5NJbAM6gVeiWjsK69gcOYrPaS8akLkcmjP8fY0QepLUiSDKPSDoOEmmCgot5PPHb.rbNoEp61AULwn8pWtDf1TkgBea4fTf493VYD0h4eFxSq4L2eSh8H9zb7TmIQA8yLx6Ve4CSkZok1dhgfRq.B4WED5w_VsWko2kbaXsb9paNf8Cn8sTyh7X_M_IM6WAxzf5Vvs",
+    "domain": ".torrentleech.org",
+    "path": "/",
+    "expires": 1796766675.598254,
+    "httpOnly": true,
+    "secure": true,
+    "sameSite": "None",
+    "partitionKey": "https://torrentleech.org",
+    "_crHasCrossSiteAncestor": false
+  },
+  {
+    "name": "tluid",
+    "value": "1781680",
+    "domain": ".torrentleech.org",
+    "path": "/",
+    "expires": 1799790685.770381,
+    "httpOnly": true,
+    "secure": true,
+    "sameSite": "Lax"
+  },
+  {
+    "name": "tlpass",
+    "value": "4b3dced91b1d276cc6da1ceb56e2dc1f96a83ef9",
+    "domain": ".torrentleech.org",
+    "path": "/",
+    "expires": 1799790685.770526,
+    "httpOnly": true,
+    "secure": true,
+    "sameSite": "Lax"
+  },
+  {
+    "name": "PHPSESSID",
+    "value": "81ikb87tcvp3a9lknndub39fgr",
+    "domain": "www.torrentleech.org",
+    "path": "/",
+    "expires": -1,
+    "httpOnly": false,
+    "secure": true,
+    "sameSite": "Lax"
+  },
+  {
+    "name": "lastBrowse1",
+    "value": "1765231845",
+    "domain": ".torrentleech.org",
+    "path": "/",
+    "expires": 1799792147.231183,
+    "httpOnly": false,
+    "secure": true,
+    "sameSite": "Lax"
+  },
+  {
+    "name": "lastBrowse2",
+    "value": "1765232147",
+    "domain": ".torrentleech.org",
+    "path": "/",
+    "expires": 1799792147.231213,
+    "httpOnly": false,
+    "secure": true,
+    "sameSite": "Lax"
+  }
+]

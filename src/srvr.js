@@ -187,6 +187,8 @@ export function getNewTvdb(params)
             {return fCall('getNewTvdb', params)}
 export function setTvdbFields(params) 
               {return fCall('setTvdbFields', params)}
+export function getActorPage(params) 
+              {return fCall('getActorPage', params)}
 
 export function sendEmail(emailData)    
             {return fCall('sendEmail', emailData)}

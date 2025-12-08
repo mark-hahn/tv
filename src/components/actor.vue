@@ -16,6 +16,7 @@
 </template>
 
 <script>
+import * as srvr from '../srvr.js';
 
 export default {
   name: "Actor",
@@ -28,10 +29,11 @@ export default {
   },
   
   methods: {
-    openActorPage() {
+    async openActorPage() {
       if (this.actor.personName) {
-        const actorName = this.actor.personName.replace(/ /g, '_');
-        const url = `https://en.wikipedia.org/wiki/${actorName}`;
+        console.log('openActorPage: requesting URL for', this.actor.personName);
+        const url = await srvr.getActorPage(this.actor.personName);
+        console.log('openActorPage: received URL:', url);
         window.open(url);
       }
     },

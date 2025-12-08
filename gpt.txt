@@ -1,42 +1,7 @@
 
-i'm  back to the latest commit, make the changes again
+i need a function gatActorPage that is called by the client app. It is passed an actor's name.
 
-how do i Enable shell integration to improve command detection
+The function should do an imdb search for that name, then look through the results and find an actor with that exact name.  then it should get the url for that actor's personal imdb page and then return that url to the client.
 
-do not load the sort choice from localStorage, remove that code
-
-
-function getTvdbCharacters(tvdbData) {
-  const characters = tvdbData?.response?.data?.characters;
-  if (!characters || !Array.isArray(characters)) {
-    return [];
-  }
-  return characters
-    .filter(char => char.peopleType === 'Actor')
-    .map(char => ({
-      character:  char.name,
-      actor:      char.personName,
-      image:      char.personImgURL,
-      tvdbUrl:    char.url,
-      sortOrder:  char.sort,
-      isFeatured: char.isFeatured
-    }));
-}
-
-add this function next to getTvdbImageUrl and call it from same place getTvdbImageUrl is called and add the array result to tvdbData as characters.  The function is: function getTvdbCharacters(tvdbData) {
-  const characters = tvdbData?.response?.data?.characters;
-  if (!characters || !Array.isArray(characters)) {
-    return [];
-  }
-  return characters
-    .filter(char => char.peopleType === 'Actor')
-    .map(char => ({
-      character:  char.name,
-      actor:      char.personName,
-      image:      char.personImgURL,
-      tvdbUrl:    char.url,
-      sortOrder:  char.sort,
-      isFeatured: char.isFeatured
-    }));
-}
-
+If no match is found then return the wikipedia url
+  https://en.wikipedia.org/wiki/<actor_name> where <actor_name> is the actor name with spaces replaced with underscores.

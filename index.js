@@ -540,7 +540,7 @@ const runOne = () => {
     case 'getAllTvdb':    tvdb.getAllTvdb(   id, param, resolve, reject); break;
     case 'getNewTvdb':    tvdb.getNewTvdb(   id, param, resolve, reject); break;
     case 'setTvdbFields': tvdb.setTvdbFields(id, param, resolve, reject); break;
-
+    case 'getActorPage':  tvdb.getActorPage( id, param, resolve, reject); break;
     case 'sendEmail':     sendEmailHandler(  id, param, resolve, reject); break;
 
     default: reject([id, 'unknownfunction: ' + fname]);

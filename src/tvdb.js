@@ -469,6 +469,51 @@ export const setAddToPickupsCallback = (callback) => {
   addToPickupsCallback = callback;
 };
 
+export const getActorPage = async (id, param, resolve, _reject) => {
+  const actorName = param;
+  log('getActorPage:', actorName);
+  
+  try {
+    // Search IMDb for the actor
+    const searchUrl = `https://www.imdb.com/find/?q=${encodeURIComponent(actorName)}&s=nm`;
+    const searchResp = await fetch(searchUrl);
+    
+    if (!searchResp.ok) {
+      log('err', 'getActorPage IMDb search failed:', searchResp.status);
+      const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, '_')}`;
+      resolve([id, wikiUrl]);
+      return;
+    }
+    
+    const html = await searchResp.text();
+    
+    // Look for exact name match in search results
+    // IMDb search results have actor links like /name/nm1234567/
+    const nameRegex = new RegExp(
+      `<a[^>]+href="(/name/nm\\d+)/[^"]*"[^>]*>\\s*${actorName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*</a>`,
+      'i'
+    );
+    const match = nameRegex.exec(html);
+    
+    if (match && match[1]) {
+      const actorUrl = `https://www.imdb.com${match[1]}`;
+      log('getActorPage found:', actorUrl);
+      resolve([id, actorUrl]);
+      return;
+    }
+    
+    // No exact match found, return Wikipedia URL
+    log('getActorPage no IMDb match, using Wikipedia');
+    const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, '_')}`;
+    resolve([id, wikiUrl]);
+    
+  } catch(err) {
+    log('err', 'getActorPage error:', err);
+    const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, '_')}`;
+    resolve([id, wikiUrl]);
+  }
+};
+
 export const getAllTvdb = (id, _param, resolve, _reject) => {
   // log('getAllTvdb', id);
   // return allTvdb object immediatelty

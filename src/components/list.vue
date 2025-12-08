@@ -711,13 +711,12 @@ export default {
     },
 
     sortAction(sortChoice) {
-      console.log('sortAction', sortChoice);
       if (sortChoice != 'sortClose') {
-        window.localStorage.setItem("sortChoice", sortChoice);
         this.sortChoice = sortChoice;
         this.sortShows();
-        this.saveVisShow(this.shows[0], true);
-        this.scrollToSavedShow();
+        setTimeout(() => {
+          this.saveVisShow(this.shows[0], true);
+        }, 0);
       }
       this.sortPopped = false;
       this.fltrPopped = false;
@@ -1073,8 +1072,7 @@ export default {
 
         this.sortByNew  = true;
         this.sortBySize = false;
-        this.sortChoice = 
-          window.localStorage.getItem("sortChoice") ?? 'Viewed';
+        this.sortChoice = 'Alpha';
         
         // Initialize ban condition to -1 to filter out rejected shows BEFORE showAll
         const banCond = this.conds.find(c => c.name === 'ban');

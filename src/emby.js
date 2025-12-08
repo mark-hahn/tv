@@ -492,7 +492,6 @@ export const getSeriesMap = async (show, prune = false) => {
   
   // If this is a noemby show (from web search), return empty map
   if (seriesId.startsWith('noemby-')) {
-    console.log('getSeriesMap: noemby show, returning empty map for', show.Name);
     return [];
   }
   

@@ -622,7 +622,6 @@ export default {
       await srvr.addBlockedWait(show.Name);
       this.addRow(show);
       this.sortShows();
-      console.log('searchAction: calling saveVisShow with show:', show);
       this.saveVisShow(show, true);
       
       // Send email notification for new show added

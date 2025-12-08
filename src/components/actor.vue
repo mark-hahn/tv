@@ -31,9 +31,7 @@ export default {
   methods: {
     async openActorPage() {
       if (this.actor.personName) {
-        console.log('openActorPage: requesting URL for', this.actor.personName);
         const url = await srvr.getActorPage(this.actor.personName);
-        console.log('openActorPage: received URL:', url);
         window.open(url);
       }
     },

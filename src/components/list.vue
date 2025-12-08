@@ -293,6 +293,7 @@ export default {
       errMsg:               "",
       highlightName:        "",
       allShowsLength:        0,
+      currentPane:       'series',
       mapShow:            null,
       hideMapBottom:      true,
       seriesMapSeasons:     [],
@@ -698,8 +699,8 @@ export default {
       this.$nextTick(() =>
         evtBus.emit('setUpSeries', show));
       
-      // If map is showing, update it to show the newly selected show
-      if(this.mapShow !== null) {
+      // If map pane is currently showing, update it to show the newly selected show
+      if(this.currentPane === 'map' && this.mapShow !== null) {
         this.seriesMapAction('open', show);
       }
     },
@@ -1018,6 +1019,11 @@ export default {
     evtBus.on('openMap', (show) => {
       console.log('List: openMap event received for show:', show?.Name);
       this.seriesMapAction('open', show);
+    });
+    
+    // Track current pane
+    evtBus.on('paneChanged', (pane) => {
+      this.currentPane = pane;
     });
     
     // Listen for map actions from App.vue

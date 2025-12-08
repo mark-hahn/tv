@@ -119,20 +119,24 @@ export default {
       this.seriesMapEpis = data.seriesMapEpis;
       this.seriesMap = data.seriesMap;
       this.currentPane = data.mapShow !== null ? 'map' : 'series';
+      evtBus.emit('paneChanged', this.currentPane);
     },
     handleHideMap() {
       console.log('handleHideMap called, setting currentPane to series');
       this.currentPane = 'series';
       this.mapShow = null;
+      evtBus.emit('paneChanged', this.currentPane);
     },
     handleShowActors() {
       this.currentPane = 'actors';
+      evtBus.emit('paneChanged', this.currentPane);
       // Emit event to actors component with current tvdbData
       evtBus.emit('showActors', this.currentTvdbData);
     },
     handleActorsClose() {
       this.currentPane = 'series';
       this.mapShow = null;
+      evtBus.emit('paneChanged', this.currentPane);
       // Clear mapShow in list component via event
       evtBus.emit('mapAction', { action: 'close', show: null });
     },

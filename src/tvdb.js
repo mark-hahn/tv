@@ -471,7 +471,6 @@ export const setAddToPickupsCallback = (callback) => {
 
 export const getActorPage = async (id, param, resolve, _reject) => {
   const actorName = param;
-  log('getActorPage:', actorName);
   
   try {
     // Search IMDb for the actor
@@ -488,27 +487,26 @@ export const getActorPage = async (id, param, resolve, _reject) => {
     const html = await searchResp.text();
     
     // Look for exact name match in search results
-    // IMDb search results have actor links like /name/nm1234567/
+    // IMDb uses format: <a href="/name/nm1234567/?ref_=..."><h3 class="ipc-title__text">Actor Name</h3></a>
+    const escapedName = actorName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const nameRegex = new RegExp(
-      `<a[^>]+href="(/name/nm\\d+)/[^"]*"[^>]*>\\s*${actorName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*</a>`,
-      'i'
+      `<a\\s+href="(/name/nm\\d+)/[^"]*"[^>]*>.*?<h3[^>]*>\\s*${escapedName}\\s*</h3>`,
+      'is'
     );
     const match = nameRegex.exec(html);
     
     if (match && match[1]) {
       const actorUrl = `https://www.imdb.com${match[1]}`;
-      log('getActorPage found:', actorUrl);
       resolve([id, actorUrl]);
       return;
     }
     
     // No exact match found, return Wikipedia URL
-    log('getActorPage no IMDb match, using Wikipedia');
     const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, '_')}`;
     resolve([id, wikiUrl]);
     
   } catch(err) {
-    log('err', 'getActorPage error:', err);
+    log('err', 'getActorPage error:', err.message);
     const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, '_')}`;
     resolve([id, wikiUrl]);
   }

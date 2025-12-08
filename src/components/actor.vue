@@ -14,9 +14,6 @@
 </template>
 
 <script>
-import { windowLabel } from '../evtBus.js';
-
-let windowId = null;
 
 export default {
   name: "Actor",
@@ -31,8 +28,7 @@ export default {
   methods: {
     openActorPage() {
       if (this.actor.url) {
-        console.log('Actor opening with windowLabel:', windowLabel, 'url:', this.actor.url);
-        windowId = window.open(this.actor.url, windowLabel);
+        window.open(this.actor.url);
       }
     },
     handleImageError(e) {

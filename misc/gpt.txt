@@ -5,6 +5,8 @@ in non-simple mode:
 in simple mode:
 
 in all modes:
+  when an actor card is clicked go to url
+  https://en.wikipedia.org/wiki/<actor_name> where <actor_name> is the actor name with spaces replaced with underscores
 
 in all modes:
   add new components actors.vue and component actor.vue.

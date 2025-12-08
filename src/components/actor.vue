@@ -29,8 +29,10 @@ export default {
   
   methods: {
     openActorPage() {
-      if (this.actor.url) {
-        window.open(this.actor.url);
+      if (this.actor.personName) {
+        const actorName = this.actor.personName.replace(/ /g, '_');
+        const url = `https://en.wikipedia.org/wiki/${actorName}`;
+        window.open(url);
       }
     },
     handleImageError(e) {

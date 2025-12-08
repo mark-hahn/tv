@@ -1,5 +1,35 @@
 
-in every run of tryLocalGetTvdb
+function getTvdbCharacters(tvdbData) {
+  const characters = tvdbData?.response?.data?.characters;
+  if (!characters || !Array.isArray(characters)) {
+    return [];
+  }
+  return characters
+    .filter(char => char.peopleType === 'Actor')
+    .map(char => ({
+      character:  char.name,
+      actor:      char.personName,
+      image:      char.personImgURL,
+      tvdbUrl:    char.url,
+      sortOrder:  char.sort,
+      isFeatured: char.isFeatured
+    }));
+}
 
-  if show is not in emby, has tvdb data, and not deleted then add to pickup list
-  
+add this function next to getTvdbImageUrl and call it from same place getTvdbImageUrl is called and add the array result to tvdbData as characters.  The function is: function getTvdbCharacters(tvdbData) {
+  const characters = tvdbData?.response?.data?.characters;
+  if (!characters || !Array.isArray(characters)) {
+    return [];
+  }
+  return characters
+    .filter(char => char.peopleType === 'Actor')
+    .map(char => ({
+      character:  char.name,
+      actor:      char.personName,
+      image:      char.personImgURL,
+      tvdbUrl:    char.url,
+      sortOrder:  char.sort,
+      isFeatured: char.isFeatured
+    }));
+}
+

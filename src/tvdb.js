@@ -240,6 +240,23 @@ function getTvdbImageUrl(extResObj) {
   return extResObj?.data?.image || '';
 }
 
+function getTvdbCharacters(extResObj) {
+  const characters = extResObj?.data?.characters;
+  if (!characters || !Array.isArray(characters)) {
+    return [];
+  }
+  return characters
+    .filter(char => char.peopleType === 'Actor')
+    .map(char => ({
+      character:  char.name,
+      actor:      char.personName,
+      image:      char.personImgURL,
+      tvdbUrl:    char.url,
+      sortOrder:  char.sort,
+      isFeatured: char.isFeatured
+    }));
+}
+
 //////////// GET TVDB DATA //////////////
 // fetch data from tvdb.com
 // create tvdbData object
@@ -290,6 +307,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
          originalNetwork:originalNetworkIn,
          status:statusIn}      = extResObj.data;
   const image = getTvdbImageUrl(extResObj);
+  const characters = getTvdbCharacters(extResObj);
   let lastAired = lastAiredIn ?? firstAired;
   lastAired = lastAired ?? '';
   let originalNetwork = originalNetworkIn?.name ?? '';
@@ -305,7 +323,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
                   image, score, overview,
                   firstAired, lastAired, averageRuntime,
                   originalCountry, originalLanguage,
-                  status, remotes, added, saved};
+                  status, remotes, characters, added, saved};
   if(showId !== undefined) 
     tvdbData.showId = showId;
   if(deleted !== undefined)

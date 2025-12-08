@@ -1,4 +1,11 @@
 
+i'm  back to the latest commit, make the changes again
+
+how do i Enable shell integration to improve command detection
+
+do not load the sort choice from localStorage, remove that code
+
+
 function getTvdbCharacters(tvdbData) {
   const characters = tvdbData?.response?.data?.characters;
   if (!characters || !Array.isArray(characters)) {

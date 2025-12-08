@@ -3,7 +3,6 @@ reminder, restore ...
   start gap running
 
 todo ...
-  go to better actor url
   add tv guide
 
 non-simple:
@@ -13,8 +12,6 @@ simple ...
 bugs ...
 
 todo  ...
-  don't show google button if no header
-  get wikipedia from google page
   sort by waiting date
   keep deleted date forever
   keep all map info for deleted shows

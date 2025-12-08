@@ -486,15 +486,8 @@ export const getActorPage = async (id, param, resolve, _reject) => {
     
     const html = await searchResp.text();
     
-    // Look for exact name match in search results
-    // IMDb uses format: <a href="/name/nm1234567/?ref_=..."><h3 class="ipc-title__text">Actor Name</h3></a>
-    const escapedName = actorName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const nameRegex = new RegExp(
-      `<a\\s+href="(/name/nm\\d+)/[^"]*"[^>]*>.*?<h3[^>]*>\\s*${escapedName}\\s*</h3>`,
-      'is'
-    );
-    
     // Find all matches to check for exact name match
+    // IMDb uses format: <a href="/name/nm1234567/?ref_=..."><h3 class="ipc-title__text">Actor Name</h3></a>
     let match;
     const allMatches = [];
     const globalRegex = new RegExp(

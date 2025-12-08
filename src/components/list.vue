@@ -936,7 +936,8 @@ export default {
       this.shows = filteredShows;
       if (this.shows.length === 1) 
         this.saveVisShow(this.shows[0]);
-      else {
+      else if (this.highlightName) {
+        // Only update selection if highlightName is already set
         const showArr = this.shows.filter(
                 (show) => show.Name == this.highlightName);
         if (showArr.length == 0)

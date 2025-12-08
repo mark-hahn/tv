@@ -1,0 +1,46 @@
+
+Yes, there are several libraries across different languages for searching torrents:
+
+Python
+
+    py-torrent-search - Simple interface to multiple torrent sites
+    torrench - CLI tool with library functionality for searching torrents
+    magnetico - Autonomous torrent search engine (DHT crawler)
+    torrent-paradise - Decentralized torrent search
+
+JavaScript/Node.js
+
+    torrent-search-api - Popular library supporting multiple providers
+    torrent-indexer - Search across multiple torrent sites
+    torrents-search - Another multi-site search library
+    kat-cr-search-api - Specific site wrappers (many exist for individual sites)
+
+Go
+
+    go-torrent-search - Multi-provider torrent search
+    magnetico - DHT-based autonomous search engine (Go implementation)
+
+Rust
+
+    torrent-search - Async torrent search library
+    magnetico-rs - Rust port of magnetico
+
+Ruby
+
+    torrent_api - Multi-site torrent search
+
+PHP
+
+    torrent-rpc - Various torrent-related libraries including search
+
+General Approach
+
+Most of these libraries work similarly:
+
+    Scrape torrent site HTML/JSON
+    Parse results into standardized format (name, size, seeds, magnet link)
+    Provide unified API across multiple sites
+
+The challenge with all of them is maintenance - torrent sites frequently change their layouts or go offline, so these libraries require constant updates. Many GitHub repos for these tools are abandoned or sporadically maintained.
+
+For production use, you might want to check which ones are actively maintained before choosing.

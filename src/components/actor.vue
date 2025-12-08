@@ -1,11 +1,10 @@
 <template lang="pug">
-.actor-card(style="display:flex; flex-direction:column; align-items:center; margin:5px; padding:8px; background-color:#f5f5f5; border-radius:6px; border:1px solid #ddd;")
+.actor-card(@click.stop="openActorPage" style="display:flex; flex-direction:column; align-items:center; margin:5px; padding:8px; background-color:#f5f5f5; border-radius:6px; border:1px solid #ddd; cursor:pointer;")
   img(
     v-if="actor.image"
     :src="actor.image"
     :alt="actor.name"
-    style="width:100px; height:130px; object-fit:cover; border-radius:4px; margin-bottom:5px; cursor:pointer;"
-    @click.stop="openActorPage"
+    style="width:100px; height:130px; object-fit:cover; border-radius:4px; margin-bottom:5px;"
     @error="handleImageError"
   )
   .actor-name(style="font-weight:bold; font-size:11px; text-align:center; margin-bottom:3px;")

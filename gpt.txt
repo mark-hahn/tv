@@ -1,28 +1,5 @@
 
-add a file src/email.js and export a function called sendEmail.
+in every run of tryLocalGetTvdb
 
-That function should send an email to mark@hahnca.com with subject "Email from TV Series" and body should be the text in function argument. the email should be sent from mark@hahnca.com. use email utility like the file santa.js does
-
-add function in index.js that is called from client with websocket sendEmail command. 
-
-add sendEmail reception code like this existing command.
-
-case 'addReject':   addReject( id, param, resolve, reject); break;
-
- and a function like existing:
-
-const addReject = (id, name, resolve, reject) => {
-  console.log('addReject', id, name);
-  for(const [idx, rejectNameStr] of rejects.entries()) {
-    if(rejectNameStr.toLowerCase() === name.toLowerCase()) {
-      console.log('-- removing old matching reject:', rejectNameStr);
-      rejects.splice(idx, 1);
-      break;
-    }
-  }
-  console.log('-- adding reject:', name);
-  rejects.push(name);
-  saveConfigYml(id, 'ok', resolve, reject);
-}
-
-in that function  pass the email contents text to  function sendEmail in email.js. 
+  if show is not in emby, has tvdb data, and not deleted then add to pickup list
+  

@@ -7,6 +7,8 @@ const {log, start, end} = util.getLog('tvdb');
 
 const UPDATE_DATA = true;
 
+let addToPickupsCallback = null;
+
 const allTvdb = 
       util.jParse(fs.readFileSync('data/tvdb.json', 'utf8'));
 
@@ -391,6 +393,19 @@ const tryLocalGetTvdb = () => {
     tryLocalGetTvdbBusy = false;
     return;
   }
+  
+  // Check if show should be added to pickup list:
+  // - not in emby (showId starts with 'noemby-' or undefined)
+  // - has tvdb data (minTvdb exists)
+  // - not deleted
+  if(minTvdb && !minTvdb.deleted) {
+    const showId = minTvdb.showId;
+    const notInEmby = !showId || showId.startsWith('noemby-');
+    if(notInEmby && addToPickupsCallback) {
+      addToPickupsCallback(minTvdb.name);
+    }
+  }
+  
   // log('------', new Date().toTimeString().slice(0,8),
   //             `updating tvdb locally:`, minTvdb.name); 
   const show = {
@@ -432,6 +447,10 @@ updateTvdbLocal();
 
 
 ///////////////////  FUNCTION CALLS FROM CLIENT  ////////////////////
+export const setAddToPickupsCallback = (callback) => {
+  addToPickupsCallback = callback;
+};
+
 export const getAllTvdb = (id, _param, resolve, _reject) => {
   // log('getAllTvdb', id);
   // return allTvdb object immediatelty

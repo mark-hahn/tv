@@ -32,6 +32,22 @@ const pickups      = JSON.parse(pickupStr);
 const noEmbys      = JSON.parse(noEmbyStr);
 const gaps         = JSON.parse(gapsStr);
 
+// Set up callback for tvdb to add shows to pickup list
+tvdb.setAddToPickupsCallback((showName) => {
+  // Check if already in pickup list
+  const alreadyInPickups = pickups.some(
+    pickup => pickup.toLowerCase() === showName.toLowerCase()
+  );
+  if (!alreadyInPickups) {
+    console.log('Auto-adding to pickups (not in emby):', showName);
+    pickups.push(showName);
+    // Save and upload config asynchronously without blocking
+    (async () => {
+      await trySaveConfigYml(null, null, () => {}, () => {});
+    })();
+  }
+});
+
 const videoFileExtensions = [
   "mp4", "mkv", "avi", "mov", "wmv", "flv", "mpeg",
   "3gp", "m4v", "ts", "rm", "vob", "ogv", "divx"

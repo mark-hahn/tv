@@ -132,6 +132,9 @@ export default {
     },
     handleActorsClose() {
       this.currentPane = 'series';
+      this.mapShow = null;
+      // Clear mapShow in list component via event
+      evtBus.emit('mapAction', { action: 'close', show: null });
     },
     handleMapAction(action, show) {
       if (action === 'close') {

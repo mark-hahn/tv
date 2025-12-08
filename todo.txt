@@ -3,6 +3,7 @@ reminder, restore ...
   start gap running
 
 todo ...
+  go to better actor url
   add tv guide
 
 non-simple:
@@ -17,7 +18,6 @@ todo  ...
   sort by waiting date
   keep deleted date forever
   keep all map info for deleted shows
-  show actors
 
 tabled ...
   laptop play doesn't start

@@ -1016,6 +1016,7 @@ export default {
   /////////////////  MOUNTED  /////////////////
   async mounted() {
     evtBus.on('openMap', (show) => {
+      console.log('List: openMap event received for show:', show?.Name);
       this.seriesMapAction('open', show);
     });
     

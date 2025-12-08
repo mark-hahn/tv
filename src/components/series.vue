@@ -152,7 +152,11 @@ export default {
     },
 
     openMap(show) {
-      // console.log('Series: openMap:', show);
+      console.log('Series: openMap called with show:', show?.Name);
+      if (!show || !show.Name) {
+        console.log('Series: No show to open map for');
+        return;
+      }
       evtBus.emit('openMap', show);
     },
 

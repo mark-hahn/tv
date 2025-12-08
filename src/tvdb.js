@@ -493,10 +493,26 @@ export const getActorPage = async (id, param, resolve, _reject) => {
       `<a\\s+href="(/name/nm\\d+)/[^"]*"[^>]*>.*?<h3[^>]*>\\s*${escapedName}\\s*</h3>`,
       'is'
     );
-    const match = nameRegex.exec(html);
     
-    if (match && match[1]) {
-      const actorUrl = `https://www.imdb.com${match[1]}`;
+    // Find all matches to check for exact name match
+    let match;
+    const allMatches = [];
+    const globalRegex = new RegExp(
+      `<a\\s+href="(/name/nm\\d+)/[^"]*"[^>]*>.*?<h3[^>]*>([^<]+)</h3>`,
+      'gis'
+    );
+    
+    while ((match = globalRegex.exec(html)) !== null) {
+      allMatches.push({ url: match[1], name: match[2].trim() });
+    }
+    
+    // Find exact match (case-insensitive)
+    const exactMatch = allMatches.find(m => 
+      m.name.toLowerCase() === actorName.toLowerCase()
+    );
+    
+    if (exactMatch) {
+      const actorUrl = `https://www.imdb.com${exactMatch.url}`;
       resolve([id, actorUrl]);
       return;
     }

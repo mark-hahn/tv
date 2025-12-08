@@ -90,12 +90,13 @@ export default {
     };
   },
 
-  emits: ['prune', 'set-date', 'close', 'episode-click'],
+  emits: ['prune', 'set-date', 'close', 'episode-click', 'show-actors'],
 
   methods: {
     handleMapClick(event) {
       event.stopPropagation();
-      this.$emit('close');
+      // Instead of closing, emit show-actors to rotate to actors pane
+      this.$emit('show-actors');
     },
     handleEpisodeClick(event, mapShow, season, episode) {
       if (this.simpleMode) {

@@ -5,10 +5,24 @@ in non-simple mode:
 in simple mode:
 
 in all modes:
-  when starting a web search, show modal dialog with no buttons (is that a toast?) that says Searching web for information about show: <show name>. Please wait ...
 
-  Then remove the dialog when the call to the server returns.
+in all modes:
+  add new components actors.vue and component actor.vue.
 
-there are many image urls in this tvdb.com json data black-rabbit.json with key "Image".  
+  actors.vue should be a pane the same size as series and map panes.
 
-The first one at response/image is: "https://artworks.thetvdb.com/banners/v4/series/447579/posters/68d2d5dd76d43.jpg". it is the main one I have been using for the series pane. it has foreign non-english text in image. Which image has english text and how do you knw which one it is?
+  add actors.vue to the rotation of panes to show when clicking in one of the panes.
+
+  it should use the array characters in tvDbData. call each entry an actor.
+
+  for each actor add the component actor.vue to actors.vue by wrapping. 
+
+  the actor.vue pane should contain the image from the tvDb.image url with the caption of tvDb.actor.
+
+
+give me a function that finds the characters in tvdb json results like black-rabbit.json. It should return an array of character objects that include properties 
+
+name, personName, image, personImgURL, url, sort, isFeatured, 
+
+only include characters with peopleType of Actor
+

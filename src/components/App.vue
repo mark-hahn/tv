@@ -7,10 +7,11 @@
     :sizing="simpleMode ? sizing : sizingNonSimple"
     @show-map="handleShowMap"
     @hide-map="handleHideMap"
+    @show-actors="handleShowActors"
   )
-  Series(v-show="!showMap" style="display:inline-block;" :simpleMode="simpleMode" :sizing="simpleMode ? sizing : sizingNonSimple")
+  Series(v-show="currentPane === 'series'" style="display:inline-block;" :simpleMode="simpleMode" :sizing="simpleMode ? sizing : sizingNonSimple")
   Map(
-    v-show="showMap"
+    v-show="currentPane === 'map'"
     :mapShow="mapShow"
     :hideMapBottom="hideMapBottom"
     :seriesMapSeasons="seriesMapSeasons"
@@ -20,7 +21,14 @@
     @prune="handleMapAction('prune', $event)"
     @set-date="handleMapAction('date', $event)"
     @close="handleMapAction('close')"
+    @show-actors="handleShowActors"
     @episode-click="handleEpisodeClick"
+  )
+  Actors(
+    v-show="currentPane === 'actors'"
+    :simpleMode="simpleMode"
+    :sizing="simpleMode ? sizing : sizingNonSimple"
+    @close="handleActorsClose"
   )
 </template>
 
@@ -28,20 +36,23 @@
 import List    from './list.vue';
 import Series  from './series.vue';
 import Map     from './map.vue';
+import Actors  from './actors.vue';
 import evtBus  from '../evtBus.js';
 
 export default {
   name: "App",
-  components: { List, Series, Map },
+  components: { List, Series, Map, Actors },
   data() { 
     return { 
       simpleMode: false,
-      showMap: false,
+      currentPane: 'series', // 'series', 'map', or 'actors'
+      currentTvdbData: null,
       mapShow: null,
       hideMapBottom: true,
       seriesMapSeasons: [],
       seriesMapEpis: [],
       seriesMap: {},
+      currentTvdbData: null,
       // TABLET SIZING CONFIGURATION - SIMPLE MODE - Tweak these values
       sizing: {
         // List pane
@@ -107,12 +118,20 @@ export default {
       this.seriesMapSeasons = data.seriesMapSeasons;
       this.seriesMapEpis = data.seriesMapEpis;
       this.seriesMap = data.seriesMap;
-      this.showMap = data.mapShow !== null;
+      this.currentPane = data.mapShow !== null ? 'map' : 'series';
     },
     handleHideMap() {
-      console.log('handleHideMap called, setting showMap to false');
-      this.showMap = false;
+      console.log('handleHideMap called, setting currentPane to series');
+      this.currentPane = 'series';
       this.mapShow = null;
+    },
+    handleShowActors() {
+      this.currentPane = 'actors';
+      // Emit event to actors component with current tvdbData
+      evtBus.emit('showActors', this.currentTvdbData);
+    },
+    handleActorsClose() {
+      this.currentPane = 'series';
     },
     handleMapAction(action, show) {
       if (action === 'close') {
@@ -127,6 +146,16 @@ export default {
   mounted() {
     const urlParams = new URLSearchParams(window.location.search);
     this.simpleMode = urlParams.has('simple');
+    
+    // Listen for pane navigation events
+    evtBus.on('showActorsPane', () => {
+      this.currentPane = 'actors';
+    });
+    
+    // Listen for tvdbData updates from series pane
+    evtBus.on('tvdbDataReady', (tvdbData) => {
+      this.currentTvdbData = tvdbData;
+    });
   },
 }
 </script>

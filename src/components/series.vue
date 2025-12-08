@@ -106,7 +106,8 @@ export default {
       episodeId: '',
       deletedTxt: '',
       notInEmby: false,
-      collectionName: ''
+      collectionName: '',
+      currentTvdbData: null
     }
   },
   
@@ -144,8 +145,9 @@ export default {
         return;
       }
       
-      // Open map when clicking anywhere in series pane
-      // .stop modifiers on buttons prevent their clicks from reaching here
+      // Rotate panes: if coming from map, go to actors; otherwise go to map
+      // Check if we should go to actors (this will be after map is shown)
+      // For now, just open map - the map will handle going to actors
       this.openMap(this.show);
     },
 
@@ -354,6 +356,8 @@ export default {
       this.collectionName = collections.join(', ');
       
       const tvdbData = allTvdb[show.Name];
+      this.currentTvdbData = tvdbData; // Store for actors pane
+      evtBus.emit('tvdbDataReady', tvdbData); // Send to App.vue
       await this.setDeleted(tvdbData);
       await this.setPoster(tvdbData);
       await this.setDates(tvdbData);

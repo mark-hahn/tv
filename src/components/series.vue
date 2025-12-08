@@ -64,14 +64,13 @@
 </template>
 
 <script>
-import evtBus    from '../evtBus.js';
+import evtBus, { windowLabel } from '../evtBus.js';
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
 
 let allTvdb = null;
 let windowId = null;
-let windowLabel = Math.random();
 
 export default {
   name: "Series",
@@ -168,16 +167,11 @@ export default {
     remoteClick(remote) {
       console.log('Series: remoteClick:', {remote});
       const url = remote.url;
-      if(!url) return
-      if(windowId !== null) {
-        setTimeout(() => {
-          windowId.close();
-          windowId = null;
-        }, 500);
-      }
-      setTimeout(()=> {
-        windowId = window.open(url, windowLabel);
-      }, 1000);
+      if(!url) return;
+      console.log('Series opening with windowLabel:', windowLabel, 'url:', url);
+      console.log('Before open, windowId is:', windowId);
+      windowId = window.open(url, windowLabel);
+      console.log('After open, windowId is:', windowId);
     },
 
     setDeleted(tvdbData) {

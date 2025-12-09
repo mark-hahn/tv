@@ -1,19 +1,13 @@
-
-Add a torrent search button to the series pane
-
-there should be a new file torrents.vue that matches the other pane sizes that go over series pane.  
-
-The series pane button should open the torrents.vue pane and there is a close button in the torrents.pane that goes back to the series pane. clicks don't do anything in the torrents pane.
-
-show the show name at the top like the other panes.
-for now just find torrent links for the show that is selected and display them as plain text inside torrents pane for testing.
-
-i stashed every change since both trackers first worked.  You can check the files.
-
-Add two input boxes to the top of the torrents pane, one for iptorrents cf_clearance and one for torrentleech cf_clearance.  Then a load button will use those to get the torrents.  For now we'll just show the torrents the current way.
-
-accept this format for clearance inputs: 
-
-cf_clearance:"fUFlDQHu5eTI4nVNeDO15wW5s2C5YoSeBHbeMlk9kMU-1757962029-1.2.1.1-gTTeDX0NHijjjhLv7lQexJGwQECzIkiZvT.ir_oIN6z8dvZNJUbmElu4sKystEK8HowbYA0iU.Ms9k9CexcerfTkCjpTc7EAkJH4J8llmV4YLSR4syBh5vfPxQuFRTI3Pqo4dIFBazPUuQ8Z04s.r7TF9Mk6S02QT5oRL.jNWtTTRs1eBglRf.Cp.smzPbuDpq1eOoJJZnEEwzW_ki2AjkrXWPeXXA2ld4m_ve6ov7w"
-
-cf_clearance:"IHtD4j6EufhyuXiQJIvlumfCaQvGQtnxOhbyEhw2KGE-1765220541-1.2.1.1-UAuc07uCbZlcjX34B1w3mlJ55mIniDK4vW5CkYuOlt8F_uzSXPDjElj5vybZyQ3eaTKcXfdFeZNZiEKvVlgyRUosuWxqTkr8aqi8M300z6fxeafksVpou43R6E8UrieBKl10NJ6yj_34wthC.JPiVznN9_fobdS0f9f8itTY5fcVCmML51Rb67gaZ9_KtI7qkxmne_djsbCvUpvJ.l.ZlK9isHayVQz_.Xc63h8NvH8"
+i loaded web app from server and when i clicked on load torrents i got: Error: NetworkError when attempting to fetch resource. -- console is: 21:06:09.003 opened websocket index-sgw_JwwV.js:2:11680
+21:06:09.071 entering loadAllShows index-sgw_JwwV.js:67:817
+21:06:09.280 loadAllShows, no tvdbId: Faraway Downs
+Object { show: {…} }
+index-sgw_JwwV.js:67:1456
+21:06:09.280 loadAllShows, no tvdbId: Men of a Certain Age 
+Object { show: {…} }
+index-sgw_JwwV.js:67:1456
+21:06:09.429 all shows loaded, elapsed ms: 248 index-sgw_JwwV.js:67:3897
+21:06:09.430 gap-worker started, 213 shows gap-worker-CVkSW1y3.js:8:1558
+21:06:16.440 Series, torrentsClick: Love Me (2021) index-sgw_JwwV.js:519:13490
+21:06:22.156 Cross-Origin Request Blocked: The Same Origin Policy disallows reading the remote resource at http://localhost:3001/api/search?show=Love%20Me%20(2021)&limit=100. (Reason: CORS req21:06:33.726 gap-worker done, 24 secs gap-worker-CVkSW1y3.js:8:2108empting to fetch resource. in
+i: command not found

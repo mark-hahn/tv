@@ -1,4 +1,5 @@
 import express from 'express';
+import https from 'https';
 import dotenv from 'dotenv';
 import fs from 'fs';
 
@@ -9,6 +10,12 @@ dotenv.config();
 
 const app = express();
 const PORT = 3001;
+
+// Load SSL certificate
+const httpsOptions = {
+  key: fs.readFileSync('./localhost-key.pem'),
+  cert: fs.readFileSync('./localhost-cert.pem')
+};
 
 // Enable CORS
 app.use((req, res, next) => {
@@ -118,7 +125,7 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Torrent search server running at http://localhost:${PORT}`);
+https.createServer(httpsOptions, app).listen(PORT, () => {
+  console.log(`Torrent search server running at https://localhost:${PORT}`);
   console.log(`Active providers: ${TorrentSearchApi.getActiveProviders().map(p => p.name).join(', ')}`);
 });

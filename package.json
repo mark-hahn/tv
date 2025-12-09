@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "serve-vite": "vite",
+    "dev": "concurrently \"vite\" \"cd torrents && node server-new.js\"",
     "build-vite": "vite build --base=/shows/ --outDir=shows",
     "preview-vite": "vite preview",
     "torrents": "cd torrents && node server-new.js"
@@ -31,6 +32,7 @@
     "@vue/compiler-sfc": "^3.0.0",
     "@vue/language-plugin-pug": "^3.1.0",
     "babel-eslint": "^10.1.0",
+    "concurrently": "^9.2.1",
     "eslint": "^9.0.0",
     "eslint-plugin-vue": "^9.0.0",
     "pug": "^3.0.2",

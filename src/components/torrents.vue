@@ -170,7 +170,7 @@ export default {
           localStorage.setItem('tlCfClearance', this.tlCfClearance);
         }
 
-        let url = `http://localhost:3001/api/search?show=${encodeURIComponent(this.currentShow.Name)}&limit=${this.maxResults}`;
+        let url = `https://localhost:3001/api/search?show=${encodeURIComponent(this.currentShow.Name)}&limit=${this.maxResults}`;
         
         if (iptCf) {
           url += `&ipt_cf=${encodeURIComponent(iptCf)}`;

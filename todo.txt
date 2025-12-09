@@ -32,3 +32,12 @@ tabled ...
   get drama field from tvdb (as many fields as possible)
   hover hints over cond icons
 
+
+Will auto-start when Windows boots
+Useful pm2 commands:
+
+pm2 status - Check if server is running
+pm2 logs torrents-server - View server logs
+pm2 restart torrents-server - Restart server
+pm2 stop torrents-server - Stop server
+pm2 delete torrents-server - Remove from pm2

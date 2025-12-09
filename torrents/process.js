@@ -1,3 +1,4 @@
+import ptt from 'parse-torrent-title';
 
 /**
  * Handle torrent selection
@@ -5,9 +6,10 @@
  * @returns {Object} Response object with status
  */
 export function selTorrent(torrent) {
-  console.log('selTorrent called with torrent:', torrent);
+  const parsed = ptt.parse(torrent.title);
+  console.log('Parsed torrent:', parsed);
   
-  // TODO: Add torrent  processing 
+  // TODO: Add torrent processing 
   
   return { status: 'ok' };
 }

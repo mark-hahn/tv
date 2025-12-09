@@ -86,7 +86,7 @@ export async function searchTorrents({ showName, limit = 100, iptCf, tlCf }) {
   torrents.forEach(t => {
     providerCounts[t.provider] = (providerCounts[t.provider] || 0) + 1;
   });
-  console.log('Results by provider:', providerCounts);
+  console.log(providerCounts);
   
   // Save one sample torrent from each provider for debugging
   const sampleDir = '../sample-torrents';

@@ -1,30 +1,9 @@
 
-in non-simple mode:
-  clicking the 2 buttons in map switches to series pane
+Add a torrent search button to the series pane
 
-in simple mode:
+there should be a new file torrents.vue that matches the other pane sizes that go over series pane.  
 
-in all modes:
-  when an actor card is clicked go to url
-  https://en.wikipedia.org/wiki/<actor_name> where <actor_name> is the actor name with spaces replaced with underscores
+The series pane button should open the torrents.vue pane and there is a close button in the torrents.pane that goes back to the series pane. clicks don't do anything in the torrents pane.
 
-in all modes:
-  add new components actors.vue and component actor.vue.
-
-  actors.vue should be a pane the same size as series and map panes.
-
-  add actors.vue to the rotation of panes to show when clicking in one of the panes.
-
-  it should use the array characters in tvDbData. call each entry an actor.
-
-  for each actor add the component actor.vue to actors.vue by wrapping. 
-
-  the actor.vue pane should contain the image from the tvDb.image url with the caption of tvDb.actor.
-
-
-give me a function that finds the characters in tvdb json results like black-rabbit.json. It should return an array of character objects that include properties 
-
-name, personName, image, personImgURL, url, sort, isFeatured, 
-
-only include characters with peopleType of Actor
-
+show the show name at the top like the other panes.
+for now just find torrent links for the show that is selected and display them as plain text inside torrents pane for testing.

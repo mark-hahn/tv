@@ -8,6 +8,7 @@
     @show-map="handleShowMap"
     @hide-map="handleHideMap"
     @show-actors="handleShowActors"
+    @show-torrents="handleShowTorrents"
   )
   Series(v-show="currentPane === 'series'" style="display:inline-block;" :simpleMode="simpleMode" :sizing="simpleMode ? sizing : sizingNonSimple")
   Map(
@@ -30,22 +31,29 @@
     :sizing="simpleMode ? sizing : sizingNonSimple"
     @close="handleActorsClose"
   )
+  Torrents(
+    v-show="currentPane === 'torrents'"
+    :simpleMode="simpleMode"
+    :sizing="simpleMode ? sizing : sizingNonSimple"
+    @close="handleTorrentsClose"
+  )
 </template>
 
 <script>
-import List    from './list.vue';
-import Series  from './series.vue';
-import Map     from './map.vue';
-import Actors  from './actors.vue';
-import evtBus  from '../evtBus.js';
+import List     from './list.vue';
+import Series   from './series.vue';
+import Map      from './map.vue';
+import Actors   from './actors.vue';
+import Torrents from './torrents.vue';
+import evtBus   from '../evtBus.js';
 
 export default {
   name: "App",
-  components: { List, Series, Map, Actors },
+  components: { List, Series, Map, Actors, Torrents },
   data() { 
     return { 
       simpleMode: false,
-      currentPane: 'series', // 'series', 'map', or 'actors'
+      currentPane: 'series', // 'series', 'map', 'actors', or 'torrents'
       currentTvdbData: null,
       mapShow: null,
       hideMapBottom: true,
@@ -140,6 +148,19 @@ export default {
       // Clear mapShow in list component via event
       evtBus.emit('mapAction', { action: 'close', show: null });
     },
+    handleShowTorrents(show) {
+      this.currentPane = 'torrents';
+      evtBus.emit('paneChanged', this.currentPane);
+      // Emit event to torrents component with show data
+      evtBus.emit('showTorrents', show);
+    },
+    handleTorrentsClose() {
+      this.currentPane = 'series';
+      this.mapShow = null;
+      evtBus.emit('paneChanged', this.currentPane);
+      // Clear mapShow in list component via event
+      evtBus.emit('mapAction', { action: 'close', show: null });
+    },
     handleMapAction(action, show) {
       if (action === 'close') {
         this.handleHideMap();
@@ -157,6 +178,10 @@ export default {
     // Listen for pane navigation events
     evtBus.on('showActorsPane', () => {
       this.currentPane = 'actors';
+    });
+    
+    evtBus.on('showTorrentsPane', (show) => {
+      this.handleShowTorrents(show);
     });
     
     // Listen for tvdbData updates from series pane

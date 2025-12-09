@@ -24,8 +24,11 @@
         style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px;") Banned From Download
                 
     button(v-if="!simpleMode"
+            @click.stop="torrentsClick"
+            style="font-size:15px; cursor:pointer; margin-left:20px; margin-top:3px; max-height:24px; border-radius: 7px;") Torrents
+    button(v-if="!simpleMode"
             @click.stop="deleteClick"
-            style="font-size:15px; cursor:pointer; margin-left:20px; margin-top:3px; max-height:24px; border-radius: 7px;") Delete
+            style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;") Delete
   #body(style="display:flex; cursor:pointer;")
     #topLeft(@click.stop="handleBodyClick"
               style="display:flex; flex-direction:column; text-align:center;") 
@@ -161,6 +164,11 @@ export default {
     deleteClick() {
       console.log('Series, deleteClick:', this.show.Name);
       evtBus.emit('deleteShow', this.show);
+    },
+
+    torrentsClick() {
+      console.log('Series, torrentsClick:', this.show.Name);
+      evtBus.emit('showTorrentsPane', this.show);
     },
 
     remoteClick(remote) {

@@ -8,8 +8,9 @@
     "test": "node torrents.js"
   },
   "dependencies": {
-    "playwright": "^1.55.0",
     "dotenv": "^17.2.3",
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "playwright": "^1.55.0",
+    "torrent-search-api": "^2.1.4"
   }
 }

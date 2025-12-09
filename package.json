@@ -6,7 +6,7 @@
     "serve-vite": "vite",
     "build-vite": "vite build --base=/shows/ --outDir=shows",
     "preview-vite": "vite preview",
-    "torrents": "cd torrents && node server.js"
+    "torrents": "cd torrents && node server-new.js"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^1.2.36",

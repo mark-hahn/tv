@@ -1,5 +1,3 @@
-// Torrent processing logic
-// All torrent command processing happens here
 
 /**
  * Handle torrent selection
@@ -9,7 +7,7 @@
 export function selTorrent(torrent) {
   console.log('selTorrent called with torrent:', torrent);
   
-  // TODO: Add torrent selection processing logic here
+  // TODO: Add torrent  processing 
   
   return { status: 'ok' };
 }

@@ -66,5 +66,6 @@ app.post('/api/selTorrent', (req, res) => {
 });
 
 https.createServer(httpsOptions, app).listen(PORT, () => {
-  console.log(`Torrent search server running at https://localhost:${PORT}`);
+  console.log('\n\n');
+  console.log(`\n ====> server running on localhost:${PORT}`);
 });

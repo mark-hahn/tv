@@ -30,7 +30,6 @@ export function initializeProviders() {
       const customIptConfig = JSON.parse(fs.readFileSync('./iptorrents-custom.json', 'utf8'));
       TorrentSearchApi.loadProvider(customIptConfig);
       TorrentSearchApi.enableProvider('IpTorrents', iptCookies);
-      console.log('IPTorrents enabled with cookies (custom config)');
     } catch (e) {
       console.error('Failed to enable IPTorrents:', e.message);
     }
@@ -39,7 +38,6 @@ export function initializeProviders() {
   if (tlCookies) {
     try {
       TorrentSearchApi.enableProvider('TorrentLeech', tlCookies);
-      console.log('TorrentLeech enabled with cookies');
     } catch (e) {
       console.error('Failed to enable TorrentLeech:', e.message);
     }

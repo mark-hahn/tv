@@ -80,9 +80,7 @@ export async function searchTorrents({ showName, limit = 100, iptCf, tlCf }) {
   }
   
   const torrents = await TorrentSearchApi.search(showName, 'TV', limit);
-  
-  console.log(`Found ${torrents.length} total results`);
-  
+    
   // Count by provider
   const providerCounts = {};
   torrents.forEach(t => {

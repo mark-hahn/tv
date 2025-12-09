@@ -113,6 +113,21 @@ app.get('/api/search', async (req, res) => {
     });
     console.log('Results by provider:', providerCounts);
     
+    // Save one sample torrent from each provider for debugging
+    const sampleDir = '../sample-torrents';
+    if (!fs.existsSync(sampleDir)) {
+      fs.mkdirSync(sampleDir, { recursive: true });
+    }
+    
+    const savedProviders = new Set();
+    torrents.forEach(torrent => {
+      if (!savedProviders.has(torrent.provider)) {
+        const filename = `${sampleDir}/${torrent.provider.toLowerCase()}-sample.json`;
+        fs.writeFileSync(filename, JSON.stringify(torrent, null, 2));
+        savedProviders.add(torrent.provider);
+      }
+    });
+    
     // Return full torrent objects for now
     res.json({
       show: showName,

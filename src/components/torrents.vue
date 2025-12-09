@@ -111,6 +111,9 @@ export default {
       if (show && show.Name) {
         this.showName = show.Name;
       }
+      
+      // Automatically try to load torrents with saved cookies
+      this.loadTorrents();
     },
 
     extractCfClearance(input) {

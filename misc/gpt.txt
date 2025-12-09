@@ -1,13 +1,16 @@
-i loaded web app from server and when i clicked on load torrents i got: Error: NetworkError when attempting to fetch resource. -- console is: 21:06:09.003 opened websocket index-sgw_JwwV.js:2:11680
-21:06:09.071 entering loadAllShows index-sgw_JwwV.js:67:817
-21:06:09.280 loadAllShows, no tvdbId: Faraway Downs
-Object { show: {…} }
-index-sgw_JwwV.js:67:1456
-21:06:09.280 loadAllShows, no tvdbId: Men of a Certain Age 
-Object { show: {…} }
-index-sgw_JwwV.js:67:1456
-21:06:09.429 all shows loaded, elapsed ms: 248 index-sgw_JwwV.js:67:3897
-21:06:09.430 gap-worker started, 213 shows gap-worker-CVkSW1y3.js:8:1558
-21:06:16.440 Series, torrentsClick: Love Me (2021) index-sgw_JwwV.js:519:13490
-21:06:22.156 Cross-Origin Request Blocked: The Same Origin Policy disallows reading the remote resource at http://localhost:3001/api/search?show=Love%20Me%20(2021)&limit=100. (Reason: CORS req21:06:33.726 gap-worker done, 24 secs gap-worker-CVkSW1y3.js:8:2108empting to fetch resource. in
-i: command not found
+
+add new command to send to server called setTorrents.  
+
+when torrents are loaded don't show them immediately.  send all torrent data to the server with setTorrents command.  
+
+setTorrents will return a new list with a subset of the torrents meant to be displayed in order received.
+
+each torrent received will have a field called torrentId.
+
+add new command to send to server called getTorrent.  
+
+when torrent card is clicked call getTorrent with torrentId.  
+
+if result of either command has json field "error":<message> then show the error message in torrents pane.
+
+both commands will expect and return json data

@@ -1,0 +1,12 @@
+
+pm2 Will auto-start when Windows boots
+Useful pm2 commands:
+
+pm2 status - Check if server is running
+pm2 logs torrents-server - View server logs
+pm2 restart torrents-server - Restart server
+pm2 stop torrents-server - Stop server
+pm2 delete torrents-server - Remove from pm2
+
+https://www.torrentleech.org/torrent/1797203#torrentinfo
+

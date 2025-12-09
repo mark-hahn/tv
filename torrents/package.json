@@ -1,0 +1,15 @@
+{
+  "name": "torrent-search",
+  "version": "1.0.0",
+  "description": "Search IPTorrents and TorrentLeech",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node torrents.js"
+  },
+  "dependencies": {
+    "playwright": "^1.55.0",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2"
+  }
+}

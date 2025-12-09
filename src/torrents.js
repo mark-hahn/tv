@@ -1,4 +1,4 @@
-import { chromium } from 'playwright';
+import { firefox } from 'playwright';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
@@ -60,13 +60,12 @@ async function manualLogin(site) {
   console.log('3. Close the browser when done');
   console.log('Cookies will be saved automatically.\n');
 
-  const browser = await chromium.launch({
-    headless: false, // Must be visible for manual login
-    args: ['--disable-blink-features=AutomationControlled', '--no-sandbox']
+  const browser = await firefox.launch({
+    headless: false // Must be visible for manual login
   });
 
   const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0',
     viewport: { width: 1920, height: 1080 }
   });
 
@@ -74,10 +73,12 @@ async function manualLogin(site) {
 
   // Navigate to login page
   if (site === 'iptorrents') {
-    await page.goto('https://iptorrents.com/login.php');
+    await page.goto('https://iptorrents.com/login.php', { waitUntil: 'networkidle' });
   } else if (site === 'torrentleech') {
-    await page.goto('https://www.torrentleech.org/user/account/login/');
+    await page.goto('https://www.torrentleech.org/user/account/login/', { waitUntil: 'networkidle' });
   }
+
+  console.log('Waiting for you to log in and close the browser...');
 
   // Wait for user to complete login and close browser
   await page.waitForEvent('close').catch(() => {});
@@ -98,13 +99,12 @@ async function manualLogin(site) {
  * @returns {Promise<string[]>} Array of torrent page URLs
  */
 async function searchPrivateTrackers(showName, credentials = {}) {
-  const browser = await chromium.launch({
-    headless: true, // Changed back to true for headless servers
-    args: ['--disable-blink-features=AutomationControlled', '--no-sandbox']
+  const browser = await firefox.launch({
+    headless: true
   });
 
   const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0',
     viewport: { width: 1920, height: 1080 }
   });
 
@@ -132,10 +132,10 @@ async function searchPrivateTrackers(showName, credentials = {}) {
       const iptResults = await searchIPTorrents(context, showName, credentials.iptorrents);
       allResults.push(...iptResults);
       
-      // Save cookies after successful search
-      if (iptResults.length > 0) {
-        await saveCookies(context, 'iptorrents.json');
-      }
+      // Disabled auto-save to prevent overwriting manually added cookies
+      // if (iptResults.length > 0) {
+      //   await saveCookies(context, 'iptorrents.json');
+      // }
     }
 
     // Search TorrentLeech
@@ -144,10 +144,10 @@ async function searchPrivateTrackers(showName, credentials = {}) {
       const tlResults = await searchTorrentLeech(context, showName, credentials.torrentleech);
       allResults.push(...tlResults);
       
-      // Save cookies after successful search
-      if (tlResults.length > 0) {
-        await saveCookies(context, 'torrentleech.json');
-      }
+      // Disabled auto-save to prevent overwriting manually added cookies
+      // if (tlResults.length > 0) {
+      //   await saveCookies(context, 'torrentleech.json');
+      // }
     }
 
   } catch (error) {

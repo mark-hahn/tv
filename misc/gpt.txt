@@ -1,16 +1,43 @@
 
-add new command to send to server called setTorrents.  
+i undid that - i gave bad instructions -- here are new instructions --
 
-when torrents are loaded don't show them immediately.  send all torrent data to the server with setTorrents command.  
+add 2 new commands to srvr.js send to remote server not on laptop. each should look like export function updateTvdb() {return fCall('updateTvdb')}
+
+one is called setTorrents and the other is getTorrent.
+
+when torrents are loaded in torrents.vue don't show them immediately.  send all torrent data to the server with setTorrents command.  
 
 setTorrents will return a new list with a subset of the torrents meant to be displayed in order received.
 
 each torrent received will have a field called torrentId.
-
-add new command to send to server called getTorrent.  
 
 when torrent card is clicked call getTorrent with torrentId.  
 
 if result of either command has json field "error":<message> then show the error message in torrents pane.
 
 both commands will expect and return json data
+
+i got No torrents found when i should have gotten error from srvr.  here is console: 22:45:24.716 [vite] connected from window 5ba443f8-38a6-4ece-a2cf-06a357e521c1:67:11
+22:45:24.717 [vite] new window visibility visible 5ba443f8-38a6-4ece-a2cf-06a357e521c1:63:12
+22:45:28.487 [vite] ping successful 5ba443f8-38a6-4ece-a2cf-06a357e521c1:69:12
+22:45:28.923 [vite] connecting... client:733:9
+22:45:29.000 [vite] connected. client:827:12
+22:45:29.161 opened websocket srvr.js:18:11
+22:45:29.178 entering loadAllShows emby.js:50:11
+22:45:29.495 loadAllShows, no tvdbId: Faraway Downs 
+Object { show: {…} }
+emby.js:109:15
+22:45:29.495 loadAllShows, no tvdbId: Men of a Certain Age 
+Object { show: {…} }
+emby.js:109:15
+22:45:29.633 all shows loaded, elapsed ms: 266 emby.js:295:11
+22:45:29.634 gap-worker started, 213 shows gap-worker.js:159:11
+22:45:34.430 Reject from server: 
+Object { id: "18", fname: "setTorrents", param: (16) […], status: "err", result: '"unknownfunction: setTorrents"' }
+srvr.js:93:13
+22:45:34.430 Torrent search error: unknownfunction: setTorrents torrents.vue:171:17
+22:45:34.432 Uncaught (in promise) TypeError: can't access property "includes", err.message is undefined
+    loadTorrents torrents.vue:220
+torrents.vue:174:13
+22:46:06.531 gap-worker done, 37 secs gap-worker.js:179:11
+

@@ -15,8 +15,7 @@ module.exports = [
         sourceType: "module",
         extraFileExtensions: [".vue"],
         tsconfigRootDir: __dirname,
-        projectService: true,
-        project: [path.join(__dirname, "tsconfig.eslint.json")]
+        projectService: true
       }
     },
 

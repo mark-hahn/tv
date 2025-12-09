@@ -32,7 +32,7 @@
   #torrents-list(v-if="!loading && !error" style="padding:10px; font-size:14px; line-height:1.6;")
     div(v-if="torrents.length === 0" style="text-align:center; color:#999; margin-top:50px;")
       div No torrents found
-    div(v-for="(torrent, index) in torrents" :key="index" style="margin-bottom:15px; padding:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
+    div(v-for="(torrent, index) in torrents" :key="index" @click.stop="handleTorrentClick(torrent)" style="margin-bottom:15px; padding:10px; background:#fff; border-radius:5px; border:1px solid #ddd; cursor:pointer;" @mouseenter="$event.currentTarget.style.background='#f5f5f5'" @mouseleave="$event.currentTarget.style.background='#fff'")
       div(style="font-weight:bold; margin-bottom:5px; color:#333;") {{ torrent.title }}
       div(style="font-size:12px; color:#666; margin-bottom:3px;")
         span(style="margin-right:15px;") 📁 {{ torrent.size }}
@@ -46,6 +46,7 @@
 
 <script>
 import evtBus from '../evtBus.js';
+import { setTorrents, getTorrent } from '../srvr.js';
 
 export default {
   name: "Torrents",
@@ -201,18 +202,56 @@ export default {
           return;
         }
         
-        this.torrents = data.torrents || [];
+        // Send torrents to remote server via WebSocket
+        const result = await setTorrents(data.torrents || []);
+        
+        // Check for error in response
+        if (result.error) {
+          this.error = result.error;
+          this.torrents = [];
+          return;
+        }
+        
+        this.torrents = result.torrents || [];
       } catch (err) {
         console.error('Torrent search error:', err);
         
+        // Handle both Error objects and rejected promise values
+        const errorMessage = err?.message || err?.result || err?.error || (typeof err === 'string' ? err : JSON.stringify(err));
+        
         // Check if it's likely a cookie issue
-        if (err.message.includes('403') || err.message.includes('401') || err.message.includes('Forbidden')) {
+        if (errorMessage.includes('403') || errorMessage.includes('401') || errorMessage.includes('Forbidden')) {
           this.error = 'Access denied. Please provide cf_clearance cookies.';
         } else {
-          this.error = err.message;
+          this.error = errorMessage;
         }
       } finally {
         this.loading = false;
+      }
+    },
+
+    async handleTorrentClick(torrent) {
+      if (!torrent.torrentId) {
+        console.error('Torrent missing torrentId');
+        return;
+      }
+
+      try {
+        const result = await getTorrent(torrent.torrentId);
+        
+        // Check for error in response
+        if (result.error) {
+          this.error = result.error;
+          return;
+        }
+        
+        // Handle the full torrent data
+        console.log('Full torrent data:', result);
+        // TODO: Show torrent details in UI or trigger download
+      } catch (err) {
+        console.error('getTorrent error:', err);
+        const errorMessage = err?.message || err?.result || err?.error || (typeof err === 'string' ? err : JSON.stringify(err));
+        this.error = errorMessage;
       }
     }
   }

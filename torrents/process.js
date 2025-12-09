@@ -1,4 +1,8 @@
 import ptt from 'parse-torrent-title';
+import fs from 'fs';
+import path from 'path';
+
+const DUMP_SAMPLE_TORRENTS = false;
 
 /**
  * Extract release group from title if parser missed it
@@ -104,6 +108,21 @@ export function selTorrent(torrent, showName) {
   };
   
   console.log('Torrent:', JSON.stringify(output, null, 2));
+  
+  // Write sample file based on provider
+  if (DUMP_SAMPLE_TORRENTS) {
+    const provider = torrent.provider;
+    if (provider === 'IpTorrents' || provider === 'TorrentLeech') {
+      const filename = provider === 'IpTorrents' ? 'iptorrents-sample.json' : 'torrentleech-sample.json';
+      const samplePath = path.join(process.cwd(), '..', 'sample-torrents', filename);
+      
+      try {
+        fs.writeFileSync(samplePath, JSON.stringify(output, null, 2));
+      } catch (err) {
+        console.error(`Error writing ${filename}:`, err.message);
+      }
+    }
+  }
   
   // TODO: Add torrent processing 
   

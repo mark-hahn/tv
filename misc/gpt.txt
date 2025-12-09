@@ -8,4 +8,4 @@ from now on when i say server in the context of torrents I mean torrents/server.
 
 create torrents/process.js. forward selTorrent commands to this file to be processed and returned.  more commands will be added later.
 
-create torrents/process.js
+refactor torrent searching to torrents/search.js

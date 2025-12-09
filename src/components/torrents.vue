@@ -3,7 +3,9 @@
 
   #header(style="font-size:20px; font-weight:bold; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;")
     div(style="margin-left:20px;") {{ showName }} Torrents
-    button(@click.stop="$emit('close')" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Close
+    div(style="display:flex; gap:8px;")
+      button(v-if="!loading && torrents.length > 0" @click.stop="restart" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px; background:#ff9800; color:white; border:none;") Restart
+      button(@click.stop="$emit('close')" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Close
 
   #cookie-inputs(v-if="!loading && (error || torrents.length === 0)" style="padding:15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
     div(style="margin-bottom:10px;")
@@ -92,6 +94,13 @@ export default {
   },
 
   methods: {
+    restart() {
+      this.torrents = [];
+      this.error = null;
+      this.iptCfClearance = '';
+      this.tlCfClearance = '';
+    },
+
     searchTorrents(show) {
       // Store the show for later use with Load button
       this.currentShow = show;

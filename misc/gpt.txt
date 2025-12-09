@@ -7,3 +7,13 @@ The series pane button should open the torrents.vue pane and there is a close bu
 
 show the show name at the top like the other panes.
 for now just find torrent links for the show that is selected and display them as plain text inside torrents pane for testing.
+
+i stashed every change since both trackers first worked.  You can check the files.
+
+Add two input boxes to the top of the torrents pane, one for iptorrents cf_clearance and one for torrentleech cf_clearance.  Then a load button will use those to get the torrents.  For now we'll just show the torrents the current way.
+
+accept this format for clearance inputs: 
+
+cf_clearance:"fUFlDQHu5eTI4nVNeDO15wW5s2C5YoSeBHbeMlk9kMU-1757962029-1.2.1.1-gTTeDX0NHijjjhLv7lQexJGwQECzIkiZvT.ir_oIN6z8dvZNJUbmElu4sKystEK8HowbYA0iU.Ms9k9CexcerfTkCjpTc7EAkJH4J8llmV4YLSR4syBh5vfPxQuFRTI3Pqo4dIFBazPUuQ8Z04s.r7TF9Mk6S02QT5oRL.jNWtTTRs1eBglRf.Cp.smzPbuDpq1eOoJJZnEEwzW_ki2AjkrXWPeXXA2ld4m_ve6ov7w"
+
+cf_clearance:"IHtD4j6EufhyuXiQJIvlumfCaQvGQtnxOhbyEhw2KGE-1765220541-1.2.1.1-UAuc07uCbZlcjX34B1w3mlJ55mIniDK4vW5CkYuOlt8F_uzSXPDjElj5vybZyQ3eaTKcXfdFeZNZiEKvVlgyRUosuWxqTkr8aqi8M300z6fxeafksVpou43R6E8UrieBKl10NJ6yj_34wthC.JPiVznN9_fobdS0f9f8itTY5fcVCmML51Rb67gaZ9_KtI7qkxmne_djsbCvUpvJ.l.ZlK9isHayVQz_.Xc63h8NvH8"

@@ -62,6 +62,8 @@ if (tlCookies) {
 app.get('/api/search', async (req, res) => {
   const showName = req.query.show;
   const limit = parseInt(req.query.limit) || 100; // Default to 100 results
+  const iptCf = req.query.ipt_cf; // IPTorrents cf_clearance from query
+  const tlCf = req.query.tl_cf;   // TorrentLeech cf_clearance from query
   
   if (!showName) {
     return res.status(400).json({ error: 'Show name is required' });
@@ -70,6 +72,29 @@ app.get('/api/search', async (req, res) => {
   console.log(`\nSearching for: ${showName} (limit: ${limit})`);
 
   try {
+    // Temporarily override cookies if cf_clearance provided
+    const iptCookiesForSearch = iptCookies ? [...iptCookies] : [];
+    const tlCookiesForSearch = tlCookies ? [...tlCookies] : [];
+    
+    if (iptCf) {
+      // Remove existing cf_clearance and add new one
+      const filtered = iptCookiesForSearch.filter(c => !c.startsWith('cf_clearance='));
+      filtered.push(`cf_clearance=${iptCf}`);
+      TorrentSearchApi.removeProvider('IpTorrents');
+      const customIptConfig = JSON.parse(fs.readFileSync('./iptorrents-custom.json', 'utf8'));
+      TorrentSearchApi.loadProvider(customIptConfig);
+      TorrentSearchApi.enableProvider('IpTorrents', filtered);
+      console.log('Using provided IPTorrents cf_clearance');
+    }
+    
+    if (tlCf) {
+      // Remove existing cf_clearance and add new one
+      const filtered = tlCookiesForSearch.filter(c => !c.startsWith('cf_clearance='));
+      filtered.push(`cf_clearance=${tlCf}`);
+      TorrentSearchApi.enableProvider('TorrentLeech', filtered);
+      console.log('Using provided TorrentLeech cf_clearance');
+    }
+    
     const torrents = await TorrentSearchApi.search(showName, 'TV', limit);
     
     console.log(`Found ${torrents.length} total results`);

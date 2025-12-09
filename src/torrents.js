@@ -13,15 +13,26 @@ let nextTorrentId = 1;
  */
 export function setTorrents(id, param, resolve, reject) {
   try {
-    if (!Array.isArray(param)) {
-      reject([id, 'setTorrents: param must be an array']);
+    // Parse JSON string if needed
+    let data = param;
+    if (typeof param === 'string') {
+      try {
+        data = JSON.parse(param);
+      } catch (e) {
+        reject([id, `setTorrents: failed to parse JSON: ${e.message}`]);
+        return;
+      }
+    }
+    
+    const torrents = data?.torrents;
+    
+    if (!Array.isArray(torrents)) {
+      reject([id, 'setTorrents: torrents must be an array']);
       return;
     }
-
-    console.log(`[torrents] Received ${param.length} torrents from client`);
-
-    // Assign unique torrentId to each torrent and store
-    const torrentsWithIds = param.map(torrent => {
+    
+    console.log(`[torrents] Received ${torrents.length} torrents from client`);    // Assign unique torrentId to each torrent and store
+    const torrentsWithIds = torrents.map(torrent => {
       const torrentId = nextTorrentId++;
       const torrentWithId = {
         ...torrent,
@@ -55,10 +66,21 @@ export function setTorrents(id, param, resolve, reject) {
  */
 export function getTorrent(id, param, resolve, reject) {
   try {
-    const torrentId = param;
+    // Parse JSON string if needed
+    let data = param;
+    if (typeof param === 'string') {
+      try {
+        data = JSON.parse(param);
+      } catch (e) {
+        reject([id, `getTorrent: failed to parse JSON: ${e.message}`]);
+        return;
+      }
+    }
+    
+    const torrentId = data.torrentId;
     
     console.log(`[torrents] getTorrent called with ID: ${torrentId}`);
-    console.log(`[torrents] Request data:`, param);
+    console.log(`[torrents] Request data:`, data);
 
     if (!torrentStore.has(torrentId)) {
       reject([id, `Torrent not found: ${torrentId}`]);

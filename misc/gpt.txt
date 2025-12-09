@@ -1,8 +1,0 @@
-
-refactor torrent processing from process.js to the function normalize in new file normalize.js.  
-
-leave function selTorrent in process.js and use normalize to produce same results and logging as before.
-
-normalize every torrent in found in searchTorrents and return only torrents with matchName true.
-
-Change client app to receive new expanded torrent and use parse field of result to make card and not raw 

@@ -1,23 +1,22 @@
 {
   "provider": "TorrentLeech",
-  "title": "Mom (2013) S01-S08 (1080p AMZN WEB-DL x265 HEVC 10bit mediaNFO 5 1 Silence)",
-  "time": "2024-06-30 13:36:07",
-  "seeds": 40,
-  "peers": 5,
-  "size": "81.8 GiB",
-  "filename": "Mom.(2013).S01-S08.(1080p.AMZN.WEB-DL.x265.HEVC.10bit.mediaNFO.5.1.Silence).torrent",
-  "fid": "241306208",
-  "rating": 8,
+  "title": "Death by Lightning S01 1080p NF WEB-DL DDP5 1 H 264-STC",
+  "time": "2025-11-06 10:22:15",
+  "seeds": 189,
+  "peers": 0,
+  "size": "8.0 GiB",
+  "filename": "Death.by.Lightning.S01.1080p.NF.WEB-DL.DDP5.1.H.264-STC.torrent",
+  "fid": "241637226",
+  "rating": 0,
   "categoryID": 27,
   "new": false,
   "numComments": 0,
   "tags": [
-    "comedy",
     "Drama",
     "FREELEECH",
-    "Romance"
+    "History"
   ],
-  "imdbID": "tt3596102",
+  "imdbID": "",
   "igdbID": "",
-  "tvmazeID": ""
+  "tvmazeID": "s74416"
 }

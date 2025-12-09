@@ -1,20 +1,8 @@
 {
-  "parsed": {
-    "year": 2021,
-    "repack": true,
-    "audio": "flac",
-    "group": "AMOK",
-    "title": "Trevor Something-Love Me and Leave Me-"
-  },
-  "groupSrc": "parse",
-  "nameMatch": false,
-  "clientTitle": "Love Me (2021)",
-  "raw": {
-    "title": "Trevor Something-Love Me and Leave Me-REPACK-Limited Edition-CD-FLAC-2021-AMOK",
-    "seeds": "7",
-    "peers": "0",
-    "size": "268 MB",
-    "desc": "https://iptorrents.com/t/4378816",
-    "provider": "IpTorrents"
-  }
+  "title": "Death by Lightning S01E01 1080p HEVC x265-MeGusta",
+  "seeds": "95",
+  "peers": "1",
+  "size": "566 MB",
+  "desc": "https://iptorrents.com/t/6992662",
+  "provider": "IpTorrents"
 }

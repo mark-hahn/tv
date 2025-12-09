@@ -1,12 +1,16 @@
 
-iptorrents ...
 
-cf_clearance:"fUFlDQHu5eTI4nVNeDO15wW5s2C5YoSeBHbeMlk9kMU-1757962029-1.2.1.1-gTTeDX0NHijjjhLv7lQexJGwQECzIkiZvT.ir_oIN6z8dvZNJUbmElu4sKystEK8HowbYA0iU.Ms9k9CexcerfTkCjpTc7EAkJH4J8llmV4YLSR4syBh5vfPxQuFRTI3Pqo4dIFBazPUuQ8Z04s.r7TF9Mk6S02QT5oRL.jNWtTTRs1eBglRf.Cp.smzPbuDpq1eOoJJZnEEwzW_ki2AjkrXWPeXXA2ld4m_ve6ov7w"
-pass:"HX9iHh25WA4wmZDiUPynh7p1M2OGrJRq"
-uid:"1961978"
+ "title": "3rd Rock from the Sun (1996) S01-S06 (1080p DVD AI UPSACLE x265 HEVC 10bit DD 2 0 EDGE2020)",
 
-torrentleach ...
+  "title": "3rd Rock from the Sun (1996) S01-S06 (1080p AMZN Webrip x265 10bit EAC3 5 1 - TheSickle)[TAoE]",
 
-cf_clearance:"IHtD4j6EufhyuXiQJIvlumfCaQvGQtnxOhbyEhw2KGE-1765220541-1.2.1.1-UAuc07uCbZlcjX34B1w3mlJ55mIniDK4vW5CkYuOlt8F_uzSXPDjElj5vybZyQ3eaTKcXfdFeZNZiEKvVlgyRUosuWxqTkr8aqi8M300z6fxeafksVpou43R6E8UrieBKl10NJ6yj_34wthC.JPiVznN9_fobdS0f9f8itTY5fcVCmML51Rb67gaZ9_KtI7qkxmne_djsbCvUpvJ.l.ZlK9isHayVQz_.Xc63h8NvH8"
-tlpass:"4b3dced91b1d276cc6da1ceb56e2dc1f96a83ef9"
-tluid:"1781680"
+  "title": "3rd Rock From The Sun S01 1080p AMZN WEB-DL DD5 1 H 264-SiGMA",
+
+  "group": "HETeam",
+  "title": "3rd Rock from the Sun S06 720p AMZN WEBRip x265-HETeam",
+
+  "title": "3rd Rock from The Sun Complete MKV",
+
+  "title": "3rd Rock From The Sun Complete Series DVDRip XViD",
+
+  "title": "3rd Rock from the Sun Complete DVDRip x264-hqe",

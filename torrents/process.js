@@ -7,7 +7,11 @@ import ptt from 'parse-torrent-title';
  */
 export function selTorrent(torrent) {
   const parsed = ptt.parse(torrent.title);
-  console.log('Parsed torrent:', parsed);
+  const output = {
+    parsed,
+    raw: torrent
+  };
+  console.log('Torrent:', JSON.stringify(output, null, 2));
   
   // TODO: Add torrent processing 
   

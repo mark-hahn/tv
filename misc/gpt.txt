@@ -1,11 +1,16 @@
-remove torrent commands to remote server in srvr.js
 
-change torrents.vue back to just getting torrents and showing them.  do not send them to remote server. there should be no reference to remote server.
 
-when a torrent card is clicked call a function selTorrent in torrents/server.js with the torrent info. selTorrent should just log the info and return {"status":"ok"}.
+sometimes the parsed torrent will have a group like:   "group": "HETeam",
+-- when it doesn't extract group from raw title like EDGE2020:   "title": "3rd Rock from the Sun (1996) S01-S06 (1080p DVD AI UPSACLE x265 HEVC 10bit DD 2 0 EDGE2020)",
 
-from now on when i say server in the context of torrents I mean torrents/server.js.  We are not using the remote server anymore for torrents. all values sent to server and return values should be json.
+here are more examples:
+TAoE from:   "title": "3rd Rock from the Sun (1996) S01-S06 (1080p AMZN Webrip x265 10bit EAC3 5 1 - TheSickle)[TAoE]",
+SiGMA from:   "title": "3rd Rock From The Sun S01 1080p AMZN WEB-DL DD5 1 H 264-SiGMA",
+MKV from:   "title": "3rd Rock from The Sun Complete MKV",
+XViD from:  "title": "3rd Rock From The Sun Complete Series DVDRip XViD",
+hqe from:  "title": "3rd Rock from the Sun Complete DVDRip x264-hqe",
 
-create torrents/process.js. forward selTorrent commands to this file to be processed and returned.  more commands will be added later.
+-- put that group in parsed section of json
 
-refactor torrent searching to torrents/search.js
+
+

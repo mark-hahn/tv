@@ -167,7 +167,6 @@ export default {
     },
 
     torrentsClick() {
-      console.log('Series, torrentsClick:', this.show.Name);
       evtBus.emit('showTorrentsPane', this.show);
     },
 

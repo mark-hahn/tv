@@ -1,7 +1,7 @@
 module.exports = {
   apps: [{
     name: 'torrents-server',
-    script: 'server-new.js',
+    script: 'server.js',
     cwd: 'C:\\Users\\mark\\apps\\tv-series-client\\torrents',
     watch: false,
     autorestart: true,

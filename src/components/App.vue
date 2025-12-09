@@ -184,6 +184,14 @@ export default {
       this.handleShowTorrents(show);
     });
     
+    // Close torrents pane when a different show is selected
+    evtBus.on('setUpSeries', (show) => {
+      if (this.currentPane === 'torrents') {
+        this.currentPane = 'series';
+        evtBus.emit('paneChanged', this.currentPane);
+      }
+    });
+    
     // Listen for tvdbData updates from series pane
     evtBus.on('tvdbDataReady', (tvdbData) => {
       this.currentTvdbData = tvdbData;

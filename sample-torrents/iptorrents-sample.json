@@ -1,8 +1,20 @@
 {
-  "title": "Trevor Something-Love Me and Leave Me-REPACK-Limited Edition-CD-FLAC-2021-AMOK",
-  "seeds": "7",
-  "peers": "0",
-  "size": "268 MB",
-  "desc": "https://iptorrents.com/t/4378816",
-  "provider": "IpTorrents"
+  "parsed": {
+    "year": 2021,
+    "repack": true,
+    "audio": "flac",
+    "group": "AMOK",
+    "title": "Trevor Something-Love Me and Leave Me-"
+  },
+  "groupSrc": "parse",
+  "nameMatch": false,
+  "clientTitle": "Love Me (2021)",
+  "raw": {
+    "title": "Trevor Something-Love Me and Leave Me-REPACK-Limited Edition-CD-FLAC-2021-AMOK",
+    "seeds": "7",
+    "peers": "0",
+    "size": "268 MB",
+    "desc": "https://iptorrents.com/t/4378816",
+    "provider": "IpTorrents"
+  }
 }

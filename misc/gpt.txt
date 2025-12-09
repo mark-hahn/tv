@@ -1,12 +1,1 @@
 
-i removed everything related to torrents. Now torrents are found by web client and processed here.  I've enclosed instructions about torrents from client project copilot.  they are in misc/srvr-instr.md.  study them.
-
-add setTorrents and getTorrent commands to index.js like     case 'getNewTvdb':    tvdb.getNewTvdb(   id, param, resolve, reject); break;
-
-then create file src/torrents.js. it will handle setTorrents and getTorrent commands
-
-src/torrents.js will have  handler functions that just respond for testing.
-
-for setTorrents  return torrents received from client back to client with id added.
-
-for getTorrent just log data received and return the same data.

@@ -26,7 +26,6 @@
     "playwright": "^1.55.0",
     "public-ip": "^7.0.1",
     "rimraf": "^6.0.1",
-    "torrent-search-api": "^2.1.4",
     "ws": "^8.18.0"
   },
   "nodemonConfig": {

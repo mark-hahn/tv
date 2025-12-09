@@ -38,8 +38,12 @@ const tlCookies = loadCookiesArray('torrentleech.json');
 
 if (iptCookies) {
   try {
+    // Remove default IPTorrents and load custom one
+    TorrentSearchApi.removeProvider('IpTorrents');
+    const customIptConfig = JSON.parse(fs.readFileSync('./iptorrents-custom.json', 'utf8'));
+    TorrentSearchApi.loadProvider(customIptConfig);
     TorrentSearchApi.enableProvider('IpTorrents', iptCookies);
-    console.log('IPTorrents enabled with cookies');
+    console.log('IPTorrents enabled with cookies (custom config)');
   } catch (e) {
     console.error('Failed to enable IPTorrents:', e.message);
   }
@@ -57,19 +61,16 @@ if (tlCookies) {
 // API endpoint
 app.get('/api/search', async (req, res) => {
   const showName = req.query.show;
+  const limit = parseInt(req.query.limit) || 100; // Default to 100 results
   
   if (!showName) {
     return res.status(400).json({ error: 'Show name is required' });
   }
 
-  console.log(`\nSearching for: ${showName}`);
+  console.log(`\nSearching for: ${showName} (limit: ${limit})`);
 
   try {
-    // Search each provider individually to see results
-    const activeProviders = TorrentSearchApi.getActiveProviders();
-    console.log(`Active providers for search: ${activeProviders.map(p => p.name).join(', ')}`);
-    
-    const torrents = await TorrentSearchApi.search(showName, 'TV', 20);
+    const torrents = await TorrentSearchApi.search(showName, 'TV', limit);
     
     console.log(`Found ${torrents.length} total results`);
     
@@ -79,11 +80,6 @@ app.get('/api/search', async (req, res) => {
       providerCounts[t.provider] = (providerCounts[t.provider] || 0) + 1;
     });
     console.log('Results by provider:', providerCounts);
-    
-    // Debug: log first result to see structure
-    if (torrents.length > 0) {
-      console.log('Sample result:', JSON.stringify(torrents[0], null, 2));
-    }
     
     // Return full torrent objects for now
     res.json({

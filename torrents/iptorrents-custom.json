@@ -1,0 +1,28 @@
+{
+    "name": "IpTorrents",
+    "baseUrl": "https://iptorrents.com",
+    "requireAuthentification": true,
+    "supportCookiesAuthentification": true,
+    "supportCredentialsAuthentification": false,
+    "enableCloudFareBypass": true,
+    "searchUrl": "/t?q={query}&o=seeders",
+    "categories": {
+       "All": "",
+       "Movies": "72;77;89;",
+       "TV": "73;",
+       "Games": "74;",
+       "Music": "75;"
+    },
+    "defaultCategory": "All",
+    "resultsPerPageCount": 50,
+    "itemsSelector": "table#torrents tr:not(:first-child)",
+    "itemSelectors": {
+       "title": "td:nth-child(2) a",
+       "seeds": "td:nth-child(8)",
+       "peers": "td:nth-child(9)",
+       "size": "td:nth-child(6)",
+       "desc": "td:nth-child(2) a@href"
+    },
+    "paginateSelector": "a:contains(Next)@href",
+    "torrentDetailsSelector": ".desWrap@html"
+ }

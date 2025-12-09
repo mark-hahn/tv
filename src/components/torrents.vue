@@ -53,7 +53,8 @@ export default {
       torrents: [],
       showName: '',
       loading: false,
-      error: null
+      error: null,
+      maxResults: 100  // Constant for maximum results to fetch
     };
   },
 
@@ -89,7 +90,7 @@ export default {
       this.torrents = [];
 
       try {
-        const response = await fetch(`http://localhost:3001/api/search?show=${encodeURIComponent(show.Name)}`);
+        const response = await fetch(`http://localhost:3001/api/search?show=${encodeURIComponent(show.Name)}&limit=${this.maxResults}`);
         
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);

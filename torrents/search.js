@@ -1,5 +1,6 @@
 // Torrent search logic
 import fs from 'fs';
+import { normalize } from './normalize.js';
 
 // torrent-search-api is CommonJS, need dynamic import
 const TorrentSearchApi = (await import('torrent-search-api')).default;
@@ -81,10 +82,15 @@ export async function searchTorrents({ showName, limit = 100, iptCf, tlCf }) {
   
   const torrents = await TorrentSearchApi.search(showName, 'TV', limit);
     
-  // Count by provider
+  // Normalize and filter torrents
+  const normalized = torrents.map(t => normalize(t, showName));
+  const matches = normalized.filter(t => t.nameMatch);
+  
+  // Count by provider (for matches only)
   const providerCounts = {};
-  torrents.forEach(t => {
-    providerCounts[t.provider] = (providerCounts[t.provider] || 0) + 1;
+  matches.forEach(t => {
+    const provider = t.raw.provider;
+    providerCounts[provider] = (providerCounts[provider] || 0) + 1;
   });
   console.log(providerCounts);
   
@@ -95,17 +101,18 @@ export async function searchTorrents({ showName, limit = 100, iptCf, tlCf }) {
   }
   
   const savedProviders = new Set();
-  torrents.forEach(torrent => {
-    if (!savedProviders.has(torrent.provider)) {
-      const filename = `${sampleDir}/${torrent.provider.toLowerCase()}-sample.json`;
-      fs.writeFileSync(filename, JSON.stringify(torrent, null, 2));
-      savedProviders.add(torrent.provider);
+  matches.forEach(torrent => {
+    const provider = torrent.raw.provider;
+    if (!savedProviders.has(provider)) {
+      const filename = `${sampleDir}/${provider.toLowerCase()}-sample.json`;
+      fs.writeFileSync(filename, JSON.stringify(torrent.raw, null, 2));
+      savedProviders.add(provider);
     }
   });
   
   return {
     show: showName,
-    count: torrents.length,
-    torrents: torrents
+    count: matches.length,
+    torrents: matches
   };
 }

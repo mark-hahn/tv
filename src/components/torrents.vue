@@ -31,14 +31,16 @@
     div(v-if="torrents.length === 0" style="text-align:center; color:#999; margin-top:50px;")
       div No torrents found
     div(v-for="(torrent, index) in torrents" :key="index" @click.stop="handleTorrentClick(torrent)" style="margin-bottom:15px; padding:10px; background:#fff; border-radius:5px; border:1px solid #ddd; cursor:pointer;" @mouseenter="$event.currentTarget.style.background='#f5f5f5'" @mouseleave="$event.currentTarget.style.background='#fff'")
-      div(style="font-weight:bold; margin-bottom:5px; color:#333;") {{ torrent.title }}
+      div(style="font-weight:bold; margin-bottom:5px; color:#333;") {{ torrent.parsed.title }}
       div(style="font-size:12px; color:#666; margin-bottom:3px;")
-        span(style="margin-right:15px;") 📁 {{ torrent.size }}
-        span(style="margin-right:15px;") ⬆️ {{ torrent.seeds }} seeds
-        span(style="margin-right:15px;") ⬇️ {{ torrent.peers }} peers
-        span(v-if="torrent.provider") 🌐 {{ torrent.provider }}
-      div(v-if="torrent.tags && torrent.tags.length" style="font-size:11px; color:#888; margin-top:3px;")
-        span(v-for="tag in torrent.tags" :key="tag" style="background:#e8f4f8; padding:2px 6px; margin-right:5px; border-radius:3px;") {{ tag }}
+        span(style="margin-right:15px;") 📁 {{ torrent.raw.size }}
+        span(style="margin-right:15px;") ⬆️ {{ torrent.raw.seeds }} seeds
+        span(style="margin-right:15px;") ⬇️ {{ torrent.raw.peers }} peers
+        span(v-if="torrent.raw.provider") 🌐 {{ torrent.raw.provider }}
+        span(v-if="torrent.parsed.resolution" style="margin-right:15px;") 🎬 {{ torrent.parsed.resolution }}
+        span(v-if="torrent.parsed.group" style="margin-right:15px;") 👥 {{ torrent.parsed.group }}
+      div(v-if="torrent.raw.tags && torrent.raw.tags.length" style="font-size:11px; color:#888; margin-top:3px;")
+        span(v-for="tag in torrent.raw.tags" :key="tag" style="background:#e8f4f8; padding:2px 6px; margin-right:5px; border-radius:3px;") {{ tag }}
 
 </template>
 
@@ -76,7 +78,7 @@ export default {
     trackerCounts() {
       const counts = {};
       this.torrents.forEach(torrent => {
-        const provider = torrent.provider || 'Unknown';
+        const provider = torrent.raw?.provider || 'Unknown';
         counts[provider] = (counts[provider] || 0) + 1;
       });
       return counts;

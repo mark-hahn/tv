@@ -1,19 +1,8 @@
 
-change the match to be more liberal.  if a match fails try a second match and then if that fails try third.  If any match consider the torrent to have a name match otherwise match fails.  For each match consider these the base actions. 
+refactor torrent processing from process.js to the function normalize in new file normalize.js.  
 
-1) trim it
-2) collapse all white space to a single space
-3) convert to uppercase
+leave function selTorrent in process.js and use normalize to produce same results and logging as before.
 
- each match action listed below will describe modifications to base. apply actions below before base changes. These are the match action changes.
+normalize every torrent in found in searchTorrents and return only torrents with matchName true.
 
-1) just use base changes
-2) remove paren chars at end leaving contents
-3) remove paren chars at end including contents
-4) remove any non alphanum chars
-4) change 2 and remove any non alphanum chars
-5) change 3 and remove any non alphanum chars
-
-add to base rules to remove words "and" and "the"
-
-new base rule to removing diacritics : text.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+Change client app to receive new expanded torrent and use parse field of result to make card and not raw 

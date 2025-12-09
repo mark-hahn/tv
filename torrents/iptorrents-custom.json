@@ -7,13 +7,9 @@
     "enableCloudFareBypass": true,
     "searchUrl": "/t?q={query}&o=seeders",
     "categories": {
-       "All": "",
-       "Movies": "72;77;89;",
-       "TV": "73;",
-       "Games": "74;",
-       "Music": "75;"
+       "TV": "73;"
     },
-    "defaultCategory": "All",
+    "defaultCategory": "TV",
     "resultsPerPageCount": 50,
     "itemsSelector": "table#torrents tr:not(:first-child)",
     "itemSelectors": {

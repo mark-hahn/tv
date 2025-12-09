@@ -3,9 +3,7 @@
 
   #header(style="font-size:20px; font-weight:bold; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;")
     div(style="margin-left:20px;") {{ showName }} Torrents
-    div(style="display:flex; gap:8px;")
-      button(v-if="!loading && torrents.length > 0" @click.stop="restart" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px; background:#ff9800; color:white; border:none;") Restart
-      button(@click.stop="$emit('close')" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Close
+    button(@click.stop="$emit('close')" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Close
 
   #cookie-inputs(v-if="!loading && (error || torrents.length === 0)" style="padding:15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
     div(style="margin-bottom:10px;")
@@ -46,7 +44,6 @@
 
 <script>
 import evtBus from '../evtBus.js';
-import { setTorrents, getTorrent } from '../srvr.js';
 
 export default {
   name: "Torrents",
@@ -95,13 +92,6 @@ export default {
   },
 
   methods: {
-    restart() {
-      this.torrents = [];
-      this.error = null;
-      this.iptCfClearance = '';
-      this.tlCfClearance = '';
-    },
-
     searchTorrents(show) {
       // Reset state when switching shows
       this.torrents = [];
@@ -202,17 +192,7 @@ export default {
           return;
         }
         
-        // Send torrents to remote server via WebSocket
-        const result = await setTorrents(data.torrents || []);
-        
-        // Check for error in response
-        if (result.error) {
-          this.error = result.error;
-          this.torrents = [];
-          return;
-        }
-        
-        this.torrents = result.torrents || [];
+        this.torrents = data.torrents || [];
       } catch (err) {
         console.error('Torrent search error:', err);
         
@@ -231,25 +211,31 @@ export default {
     },
 
     async handleTorrentClick(torrent) {
-      if (!torrent.torrentId) {
-        console.error('Torrent missing torrentId');
-        return;
-      }
-
       try {
-        const result = await getTorrent(torrent.torrentId);
-        
+        const response = await fetch('https://localhost:3001/api/selTorrent', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ torrent })
+        });
+
+        if (!response.ok) {
+          throw new Error(`selTorrent failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+
         // Check for error in response
-        if (result.error) {
-          this.error = result.error;
+        if (data.error) {
+          this.error = data.error;
           return;
         }
-        
-        // Handle the full torrent data
-        console.log('Full torrent data:', result);
+
+        console.log('selTorrent response:', data);
         // TODO: Show torrent details in UI or trigger download
       } catch (err) {
-        console.error('getTorrent error:', err);
+        console.error('selTorrent error:', err);
         const errorMessage = err?.message || err?.result || err?.error || (typeof err === 'string' ? err : JSON.stringify(err));
         this.error = errorMessage;
       }

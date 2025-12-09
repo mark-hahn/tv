@@ -25,7 +25,6 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.static('public'));
 app.use(express.json());
 
 // Load cookies from files
@@ -136,6 +135,20 @@ app.get('/api/search', async (req, res) => {
     });
   } catch (error) {
     console.error('Search error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/selTorrent - Handle torrent selection
+app.post('/api/selTorrent', (req, res) => {
+  try {
+    const { torrent } = req.body;
+    
+    console.log('selTorrent called with torrent:', torrent);
+    
+    res.json({ status: 'ok' });
+  } catch (error) {
+    console.error('selTorrent error:', error);
     res.status(500).json({ error: error.message });
   }
 });

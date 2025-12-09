@@ -25,9 +25,10 @@ function extractGroup(title) {
 /**
  * Handle torrent selection
  * @param {Object} torrent - The selected torrent object
+ * @param {string} showName - The show name passed from the client
  * @returns {Object} Response object with status
  */
-export function selTorrent(torrent) {
+export function selTorrent(torrent, showName) {
   const parsed = ptt.parse(torrent.title);
   let groupSrc = 'parse';
   
@@ -45,11 +46,63 @@ export function selTorrent(torrent) {
     parsed.group = parsed.group.toUpperCase();
   }
   
+  // Clean and compare titles with multiple strategies
+  const applyBase = (title) => {
+    return title
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")  // Remove diacritics
+      .trim()                           // Trim whitespace
+      .replace(/\s+/g, ' ')             // Collapse whitespace to single space
+      .replace(/\b(and|the)\b/gi, '')   // Remove words "and" and "the"
+      .replace(/\s+/g, ' ')             // Collapse whitespace again
+      .trim()                           // Trim again
+      .toUpperCase();                   // Convert to uppercase
+  };
+  
+  const cleanVariations = (title) => {
+    return [
+      // 1) Just base changes
+      applyBase(title),
+      
+      // 2) Remove paren chars at end leaving contents
+      applyBase(title.replace(/\(([^)]+)\)\s*$/, '$1')),
+      
+      // 3) Remove paren chars at end including contents
+      applyBase(title.replace(/\([^)]+\)\s*$/, '')),
+      
+      // 4) Remove any non alphanum chars
+      applyBase(title.replace(/[^a-zA-Z0-9\s]/g, '')),
+      
+      // 5) Change 2 and remove any non alphanum chars
+      applyBase(title.replace(/\(([^)]+)\)\s*$/, '$1').replace(/[^a-zA-Z0-9\s]/g, '')),
+      
+      // 6) Change 3 and remove any non alphanum chars
+      applyBase(title.replace(/\([^)]+\)\s*$/, '').replace(/[^a-zA-Z0-9\s]/g, ''))
+    ];
+  };
+  
+  const parsedVariations = cleanVariations(parsed.title);
+  const showNameVariations = cleanVariations(showName);
+  
+  // Check if any variation matches
+  let nameMatch = false;
+  for (const parsedVar of parsedVariations) {
+    for (const showVar of showNameVariations) {
+      if (parsedVar === showVar) {
+        nameMatch = true;
+        break;
+      }
+    }
+    if (nameMatch) break;
+  }
+  
   const output = {
     parsed,
     groupSrc,
+    nameMatch,
+    clientTitle: showName,
     raw: torrent
   };
+  
   console.log('Torrent:', JSON.stringify(output, null, 2));
   
   // TODO: Add torrent processing 

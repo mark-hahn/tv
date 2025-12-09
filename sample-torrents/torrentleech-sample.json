@@ -1,23 +1,20 @@
 {
   "provider": "TorrentLeech",
-  "title": "3rd Rock from the Sun (1996) S01-S06 (1080p DVD AI UPSACLE x265 HEVC 10bit DD 2 0 EDGE2020)",
-  "time": "2022-10-02 04:28:14",
-  "seeds": 83,
-  "peers": 7,
-  "size": "79.3 GiB",
-  "filename": "3rd.Rock.from.the.Sun.(1996).S01-S06.(1080p.DVD.AI.UPSACLE.x265.HEVC.10bit.DD.2.0.EDGE2020).torrent",
-  "fid": "240907518",
-  "rating": 7.8,
+  "title": "Shōgun (2024) S01 WEBRip EAC3 5 1 1080p x265-iVy",
+  "time": "2024-10-04 04:06:12",
+  "seeds": 26,
+  "peers": 0,
+  "size": "7.8 GiB",
+  "filename": "Shōgun.(2024).S01.WEBRip.EAC3.5.1.1080p.x265-iVy.torrent",
+  "fid": "241359973",
+  "rating": 0,
   "categoryID": 27,
   "new": false,
-  "numComments": 5,
+  "numComments": 0,
   "tags": [
-    "comedy",
-    "Family",
-    "FREELEECH",
-    "Sci-Fi"
+    "FREELEECH"
   ],
-  "imdbID": "tt0115082",
+  "imdbID": "",
   "igdbID": "",
-  "tvmazeID": "s1053"
+  "tvmazeID": ""
 }

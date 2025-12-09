@@ -217,7 +217,10 @@ export default {
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ torrent })
+          body: JSON.stringify({ 
+            torrent,
+            showName: this.showName
+          })
         });
 
         if (!response.ok) {

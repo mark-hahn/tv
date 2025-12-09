@@ -1,16 +1,19 @@
 
+change the match to be more liberal.  if a match fails try a second match and then if that fails try third.  If any match consider the torrent to have a name match otherwise match fails.  For each match consider these the base actions. 
 
-sometimes the parsed torrent will have a group like:   "group": "HETeam",
--- when it doesn't extract group from raw title like EDGE2020:   "title": "3rd Rock from the Sun (1996) S01-S06 (1080p DVD AI UPSACLE x265 HEVC 10bit DD 2 0 EDGE2020)",
+1) trim it
+2) collapse all white space to a single space
+3) convert to uppercase
 
-here are more examples:
-TAoE from:   "title": "3rd Rock from the Sun (1996) S01-S06 (1080p AMZN Webrip x265 10bit EAC3 5 1 - TheSickle)[TAoE]",
-SiGMA from:   "title": "3rd Rock From The Sun S01 1080p AMZN WEB-DL DD5 1 H 264-SiGMA",
-MKV from:   "title": "3rd Rock from The Sun Complete MKV",
-XViD from:  "title": "3rd Rock From The Sun Complete Series DVDRip XViD",
-hqe from:  "title": "3rd Rock from the Sun Complete DVDRip x264-hqe",
+ each match action listed below will describe modifications to base. apply actions below before base changes. These are the match action changes.
 
--- put that group in parsed section of json
+1) just use base changes
+2) remove paren chars at end leaving contents
+3) remove paren chars at end including contents
+4) remove any non alphanum chars
+4) change 2 and remove any non alphanum chars
+5) change 3 and remove any non alphanum chars
 
+add to base rules to remove words "and" and "the"
 
-
+new base rule to removing diacritics : text.normalize("NFD").replace(/[\u0300-\u036f]/g, "")

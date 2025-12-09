@@ -54,9 +54,9 @@ app.get('/api/search', async (req, res) => {
 // POST /api/selTorrent - Handle torrent selection
 app.post('/api/selTorrent', (req, res) => {
   try {
-    const { torrent } = req.body;
+    const { torrent, showName } = req.body;
     
-    const result = process.selTorrent(torrent);
+    const result = process.selTorrent(torrent, showName);
     
     res.json(result);
   } catch (error) {

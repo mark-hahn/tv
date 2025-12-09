@@ -194,6 +194,6 @@ export function sendEmail(emailData)
             {return fCall('sendEmail', emailData)}
 
 export function setTorrents(torrents)    
-            {return fCall('setTorrents', torrents)}
+            {return fCall('setTorrents', {torrents})}
 export function getTorrent(torrentId)    
-            {return fCall('getTorrent', torrentId)}
+            {return fCall('getTorrent', {torrentId})}

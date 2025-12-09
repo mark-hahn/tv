@@ -1,22 +1,23 @@
 {
   "provider": "TorrentLeech",
-  "title": "8 Simple Rules S03 720p x265-ZMNT",
-  "time": "2019-04-06 01:05:06",
-  "seeds": 39,
-  "peers": 1,
-  "size": "4.8 GiB",
-  "filename": "8.Simple.Rules.S03.720p.x265-ZMNT.torrent",
-  "fid": "1307581",
-  "rating": 6.9,
+  "title": "3rd Rock from the Sun (1996) S01-S06 (1080p DVD AI UPSACLE x265 HEVC 10bit DD 2 0 EDGE2020)",
+  "time": "2022-10-02 04:28:14",
+  "seeds": 80,
+  "peers": 6,
+  "size": "79.3 GiB",
+  "filename": "3rd.Rock.from.the.Sun.(1996).S01-S06.(1080p.DVD.AI.UPSACLE.x265.HEVC.10bit.DD.2.0.EDGE2020).torrent",
+  "fid": "240907518",
+  "rating": 7.8,
   "categoryID": 27,
   "new": false,
-  "numComments": 3,
+  "numComments": 5,
   "tags": [
-    "720p",
+    "comedy",
+    "Family",
     "FREELEECH",
-    "ZMNT"
+    "Sci-Fi"
   ],
-  "imdbID": "tt0312081",
+  "imdbID": "tt0115082",
   "igdbID": "",
-  "tvmazeID": ""
+  "tvmazeID": "s1053"
 }

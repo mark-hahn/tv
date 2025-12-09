@@ -102,6 +102,10 @@ export default {
     },
 
     searchTorrents(show) {
+      // Reset state when switching shows
+      this.torrents = [];
+      this.error = null;
+      
       // Store the show for later use with Load button
       this.currentShow = show;
       if (show && show.Name) {

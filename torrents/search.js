@@ -123,6 +123,18 @@ export async function searchTorrents({ showName, limit = 100, iptCf, tlCf, neede
   const normalized = torrents.map(t => normalize(t, showName));
   const matches = normalized.filter(t => t.nameMatch);
   
+  // Add seasonEpisode to all torrents
+  matches.forEach(torrent => {
+    const { season, episode } = torrent.parsed;
+    if (season !== undefined && season !== null) {
+      if (!episode) {
+        torrent.parsed.seasonEpisode = `S${String(season).padStart(2, '0')}`;
+      } else {
+        torrent.parsed.seasonEpisode = `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
+      }
+    }
+  });
+  
   // Filter and sort based on needed array
   let filtered = matches;
   const isNoEmby = needed && needed.includes('noemby');
@@ -149,8 +161,6 @@ export async function searchTorrents({ showName, limit = 100, iptCf, tlCf, neede
         const seasonStr = `S${String(season).padStart(2, '0')}`;
         if (needed.includes(seasonStr)) {
           matchedNeeded.add(seasonStr);
-          // Add seasonEpisode to parsed
-          torrent.parsed.seasonEpisode = seasonStr;
           return true;
         }
       } else {
@@ -158,8 +168,6 @@ export async function searchTorrents({ showName, limit = 100, iptCf, tlCf, neede
         const episodeStr = `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
         if (needed.includes(episodeStr)) {
           matchedNeeded.add(episodeStr);
-          // Add seasonEpisode to parsed
-          torrent.parsed.seasonEpisode = episodeStr;
           return true;
         }
       }

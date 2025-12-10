@@ -1,21 +1,25 @@
 {
   "provider": "TorrentLeech",
-  "title": "Acapulco 2021 S04 1080p WEBRip x265-KONTRAST",
-  "time": "2025-09-25 21:02:54",
-  "seeds": 20,
-  "peers": 0,
-  "size": "7.7 GiB",
-  "filename": "Acapulco.2021.S04.1080p.WEBRip.x265-KONTRAST.torrent",
-  "fid": "241608923",
-  "rating": 7.8,
+  "title": "Clone High 2023 S01 1080p MAX WEB-DL DDP5.1 H.264-NTb",
+  "time": "2023-06-23 08:11:50",
+  "seeds": 57,
+  "peers": 1,
+  "size": "17.4 GiB",
+  "filename": "Clone.High.2023.S01.1080p.MAX.WEB-DL.DDP5.1.H.264-NTb.torrent",
+  "fid": "241077867",
+  "rating": 6.4,
   "categoryID": 27,
   "new": false,
-  "numComments": 0,
+  "numComments": 4,
   "tags": [
+    "Animation",
     "comedy",
-    "FREELEECH"
+    "FREELEECH",
+    "Sci-Fi",
+    "scifi",
+    "tt14028208"
   ],
-  "imdbID": "tt13567344",
+  "imdbID": "tt14028208",
   "igdbID": "",
-  "tvmazeID": "s52193"
+  "tvmazeID": "s53472"
 }

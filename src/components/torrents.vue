@@ -376,8 +376,18 @@ export default {
       
       // Check if torrent has parsed data
       if (!torrent.parsed) {
+        console.log('No parsed data for torrent:', torrent);
         return torrent.title || '';
       }
+      
+      // Log what we're working with
+      console.log('Torrent display data:', {
+        title: torrent.parsed.title,
+        season: torrent.parsed.season,
+        episode: torrent.parsed.episode,
+        seasonEpisode: torrent.parsed.seasonEpisode,
+        rawTitle: torrent.raw?.title
+      });
       
       // If seasonEpisode is already set, use it
       if (torrent.parsed.seasonEpisode) {
@@ -397,6 +407,7 @@ export default {
       }
       
       // Fallback to title if no season info
+      console.log('Falling back to title:', torrent.parsed.title);
       return torrent.parsed.title || '';
     },
 

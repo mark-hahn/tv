@@ -118,7 +118,40 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     console.log('Using provided TorrentLeech cf_clearance');
   }
   
-  const torrents = await TorrentSearchApi.search(showName, 'TV', limit);
+  // Check if show name has parens at end and search both variants
+  let torrents = [];
+  const hasParens = showName.match(/\([^)]+\)\s*$/);
+  
+  if (hasParens) {
+    const nameWithoutParens = showName.replace(/\([^)]+\)\s*$/, '').trim();
+    console.log(`Searching with original name: "${showName}"`);
+    console.log(`Also searching without parens: "${nameWithoutParens}"`);
+    
+    // Search with both names
+    const [results1, results2] = await Promise.all([
+      TorrentSearchApi.search(showName, 'TV', limit),
+      TorrentSearchApi.search(nameWithoutParens, 'TV', limit)
+    ]);
+    
+    // Combine results and remove duplicates
+    const combined = [...results1, ...results2];
+    const seen = new Set();
+    torrents = combined.filter(t => {
+      // Create unique key based on title and provider
+      const key = `${t.provider}|${t.title}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+    
+    console.log(`Results from "${showName}": ${results1.length}`);
+    console.log(`Results from "${nameWithoutParens}": ${results2.length}`);
+    console.log(`Combined after deduplication: ${torrents.length}`);
+  } else {
+    torrents = await TorrentSearchApi.search(showName, 'TV', limit);
+  }
   
   console.log(`Total torrents returned: ${torrents.length}`);
   
@@ -143,8 +176,15 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   const normalized = torrents.map(t => normalize(t, showName));
   const matches = normalized.filter(t => t.nameMatch);
   
+  // Filter out torrents without season information (movies, etc.)
+  const tvOnly = matches.filter(torrent => {
+    return torrent.parsed.season !== undefined && torrent.parsed.season !== null;
+  });
+  
+  console.log(`Filtered: ${matches.length} name matches -> ${tvOnly.length} with season info`);
+  
   // Add seasonEpisode to all torrents
-  matches.forEach(torrent => {
+  tvOnly.forEach(torrent => {
     const { season, episode } = torrent.parsed;
     if (season !== undefined && season !== null) {
       if (!episode) {
@@ -156,7 +196,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   });
   
   // Filter and sort based on needed array
-  let filtered = matches;
+  let filtered = tvOnly;
   const isNoEmby = needed && needed.includes('noemby');
   
   if (needed && needed.length > 0 && !isNoEmby) {
@@ -164,7 +204,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     const matchedNeeded = new Set();
     
     // Filter torrents based on needed array
-    filtered = matches.filter(torrent => {
+    filtered = tvOnly.filter(torrent => {
       const { season, episode } = torrent.parsed;
       
       // Skip if resolution exists but is not 1080 or 720

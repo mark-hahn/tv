@@ -62,7 +62,7 @@ export default {
       showName: '',
       loading: false,
       error: null,
-      maxResults: 100,  // Constant for maximum results to fetch
+      maxResults: 1000,  // Constant for maximum results to fetch
       iptCfClearance: '',
       tlCfClearance: '',
       currentShow: null

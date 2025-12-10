@@ -1,25 +1,20 @@
 {
   "provider": "TorrentLeech",
-  "title": "Clone High 2023 S01 1080p MAX WEB-DL DDP5.1 H.264-NTb",
-  "time": "2023-06-23 08:11:50",
-  "seeds": 57,
-  "peers": 1,
-  "size": "17.4 GiB",
-  "filename": "Clone.High.2023.S01.1080p.MAX.WEB-DL.DDP5.1.H.264-NTb.torrent",
-  "fid": "241077867",
-  "rating": 6.4,
+  "title": "Boss (2011) S01 Bluray EAC3 5 1 1080p x265-iVy",
+  "time": "2024-12-15 19:23:50",
+  "seeds": 13,
+  "peers": 0,
+  "size": "6.0 GiB",
+  "filename": "Boss.(2011).S01.Bluray.EAC3.5.1.1080p.x265-iVy.torrent",
+  "fid": "241408941",
+  "rating": 0,
   "categoryID": 27,
   "new": false,
-  "numComments": 4,
+  "numComments": 0,
   "tags": [
-    "Animation",
-    "comedy",
-    "FREELEECH",
-    "Sci-Fi",
-    "scifi",
-    "tt14028208"
+    "FREELEECH"
   ],
-  "imdbID": "tt14028208",
+  "imdbID": "",
   "igdbID": "",
-  "tvmazeID": "s53472"
+  "tvmazeID": ""
 }

@@ -81,8 +81,9 @@ export function initializeProviders() {
  * @param {Array} params.needed - Optional array of needed episodes (e.g., ["S01", "S02E03"])
  * @returns {Object} Search results with torrents array
  */
-export async function searchTorrents({ showName, limit = 100, iptCf, tlCf, needed = [] }) {
+export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, needed = [] }) {
   console.log(`\nSearching for: ${showName} (limit: ${limit})`);
+  console.log('Enabled providers:', TorrentSearchApi.getActiveProviders().join(', '));
   
   // Write needed array to file (even if empty, for debugging)
   const filename = `needed-${showName.replace(/\s+/g, '-')}.json`;
@@ -118,6 +119,25 @@ export async function searchTorrents({ showName, limit = 100, iptCf, tlCf, neede
   }
   
   const torrents = await TorrentSearchApi.search(showName, 'TV', limit);
+  
+  console.log(`Total torrents returned: ${torrents.length}`);
+  
+  // Count by provider in raw results
+  const rawProviderCounts = {};
+  torrents.forEach(t => {
+    const provider = t.provider || 'Unknown';
+    rawProviderCounts[provider] = (rawProviderCounts[provider] || 0) + 1;
+  });
+  console.log('Raw provider counts:', rawProviderCounts);
+  
+  // Dump all raw torrents for debugging
+  try {
+    const rawDumpPath = path.join(process.cwd(), '..', 'sample-torrents', 'all-raw.json');
+    fs.writeFileSync(rawDumpPath, JSON.stringify(torrents, null, 2));
+    console.log(`Wrote ${torrents.length} raw torrents to all-raw.json`);
+  } catch (err) {
+    console.error('Error writing all-raw.json:', err.message);
+  }
     
   // Normalize and filter torrents
   const normalized = torrents.map(t => normalize(t, showName));

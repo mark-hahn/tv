@@ -2,7 +2,6 @@ import express from 'express';
 import https from 'https';
 import dotenv from 'dotenv';
 import fs from 'fs';
-import * as process from './process.js';
 import * as search from './search.js';
 
 dotenv.config();
@@ -57,20 +56,6 @@ app.get('/api/search', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Search error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// POST /api/selTorrent - Handle torrent selection
-app.post('/api/selTorrent', (req, res) => {
-  try {
-    const { torrent, showName } = req.body;
-    
-    const result = process.selTorrent(torrent, showName);
-    
-    res.json(result);
-  } catch (error) {
-    console.error('selTorrent error:', error);
     res.status(500).json({ error: error.message });
   }
 });

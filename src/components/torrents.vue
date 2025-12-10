@@ -335,38 +335,6 @@ export default {
         window.open(torrent.raw.detailUrl, '_blank');
         return;
       }
-      
-      try {
-        const response = await fetch('https://localhost:3001/api/selTorrent', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ 
-            torrent,
-            showName: this.showName
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`selTorrent failed: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        // Check for error in response
-        if (data.error) {
-          this.error = data.error;
-          return;
-        }
-
-        console.log('selTorrent response:', data);
-        // TODO: Show torrent details in UI or trigger download
-      } catch (err) {
-        console.error('selTorrent error:', err);
-        const errorMessage = err?.message || err?.result || err?.error || (typeof err === 'string' ? err : JSON.stringify(err));
-        this.error = errorMessage;
-      }
     },
 
     formatSeasonEpisode(seasonEpisode) {

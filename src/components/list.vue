@@ -686,6 +686,8 @@ export default {
         return;
       }
       const showName = show.Name;
+      const showChanged = showName !== this.highlightName;
+      
       if(showHistoryPtr == -1 ||
            showName != showHistory[showHistoryPtr].Name) {
         // console.log("adding show to history:", showName);
@@ -696,8 +698,12 @@ export default {
       this.highlightName = showName;
       window.localStorage.setItem("lastVisShow", showName);
       if(scroll) this.scrollToSavedShow();
-      this.$nextTick(() =>
-        evtBus.emit('setUpSeries', show));
+      
+      // Only emit setUpSeries if the show selection changed
+      if(showChanged) {
+        this.$nextTick(() =>
+          evtBus.emit('setUpSeries', show));
+      }
       
       // If map pane is currently showing, update it to show the newly selected show
       if(this.currentPane === 'map' && this.mapShow !== null) {

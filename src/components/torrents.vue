@@ -371,8 +371,18 @@ export default {
 
     formatSeasonEpisode(seasonEpisode) {
       if (!seasonEpisode) return '';
-      // Convert S01E02 to S 01 E 02
-      return seasonEpisode.replace(/S(\d+)/g, 'S $1').replace(/E(\d+)/g, 'E $1');
+      // Convert S01E02 to 01/02, or S01 to 01
+      const match = seasonEpisode.match(/S(\d+)(?:E(\d+))?/);
+      if (!match) return seasonEpisode;
+      
+      const season = match[1];
+      const episode = match[2];
+      
+      if (episode) {
+        return `${season}/${episode}`;
+      } else {
+        return season;
+      }
     },
 
     getDisplaySeasonEpisode(torrent) {

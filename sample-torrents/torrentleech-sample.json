@@ -1,12 +1,12 @@
 {
   "provider": "TorrentLeech",
-  "title": "Boss (2011) S01 Bluray EAC3 5 1 1080p x265-iVy",
-  "time": "2024-12-15 19:23:50",
-  "seeds": 13,
-  "peers": 0,
-  "size": "6.0 GiB",
-  "filename": "Boss.(2011).S01.Bluray.EAC3.5.1.1080p.x265-iVy.torrent",
-  "fid": "241408941",
+  "title": "The Night Of (2016) S01 Bluray EAC3 5 1 1080p x265-iVy",
+  "time": "2024-05-19 22:16:13",
+  "seeds": 73,
+  "peers": 2,
+  "size": "6.9 GiB",
+  "filename": "The.Night.Of.(2016).S01.Bluray.EAC3.5.1.1080p.x265-iVy.torrent",
+  "fid": "241282940",
   "rating": 0,
   "categoryID": 27,
   "new": false,
@@ -16,7 +16,7 @@
   ],
   "imdbID": "",
   "igdbID": "",
-  "tvmazeID": "",
-  "year": 2011,
-  "detailUrl": "https://www.torrentleech.org/torrent/241408941#torrentinfo"
+  "tvmazeID": "s14157",
+  "year": 2016,
+  "detailUrl": "https://www.torrentleech.org/torrent/241282940#torrentinfo"
 }

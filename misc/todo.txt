@@ -4,8 +4,7 @@ reminder, restore ...
 
 todo ...
   add tv guide
-  get torrents for not in emby
-  searching for shows like Dharma & Greg
+  add detail urls and show url if card clicked
 
 non-simple:
   

@@ -32,6 +32,7 @@
       div(v-if="torrents.length === 0" style="text-align:center; color:#999; margin-top:50px;")
         div No torrents found
       div(v-for="(torrent, index) in torrents" :key="index" @click="handleTorrentClick($event, torrent)" @click.stop style="margin-bottom:10px; padding:8px; background:#fff; border-radius:5px; border:1px solid #ddd; cursor:pointer;" @mouseenter="$event.currentTarget.style.background='#f5f5f5'" @mouseleave="$event.currentTarget.style.background='#fff'")
+        div(v-if="SHOW_TITLE" style="font-size:12px; color:#888; margin-bottom:4px;") {{ torrent.raw.title }}
         div(style="font-size:18px; color:#333;") 
           strong {{ getDisplaySeasonEpisode(torrent) }}
           | , {{ torrent.raw.size }}, {{ torrent.raw.seeds }} seeds<span v-if="torrent.raw.provider">, {{ formatProvider(torrent.raw.provider) }}</span><span v-if="torrent.parsed.resolution">, {{ torrent.parsed.resolution }}</span><span v-if="torrent.parsed.group">, {{ formatGroup(torrent.parsed.group) }}</span>
@@ -65,7 +66,8 @@ export default {
       maxResults: 1000,  // Constant for maximum results to fetch
       iptCfClearance: '',
       tlCfClearance: '',
-      currentShow: null
+      currentShow: null,
+      SHOW_TITLE: true  // Show torrent title on card
     };
   },
 
@@ -328,6 +330,11 @@ export default {
     },
 
     async handleTorrentClick(event, torrent) {
+      // If detailUrl exists, open it in a new tab
+      if (torrent.raw && torrent.raw.detailUrl) {
+        window.open(torrent.raw.detailUrl, '_blank');
+        return;
+      }
       
       try {
         const response = await fetch('https://localhost:3001/api/selTorrent', {

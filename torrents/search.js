@@ -176,15 +176,69 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   const normalized = torrents.map(t => normalize(t, showName));
   const matches = normalized.filter(t => t.nameMatch);
   
+  // Add year to raw data
+  matches.forEach(torrent => {
+    if (torrent.raw) {
+      // If parsed.year exists, use it
+      if (torrent.parsed.year) {
+        torrent.raw.year = torrent.parsed.year;
+      } else {
+        // Try to extract year from title - matches (YYYY) or year surrounded by non-alphanumeric
+        const yearMatch = torrent.raw.title.match(/\((\d{4})\)|[^\w](\d{4})[^\w]/);
+        if (yearMatch) {
+          const year = parseInt(yearMatch[1] || yearMatch[2]);
+          if (year > 1950 && year < 2050) {
+            torrent.raw.year = year;
+          }
+        }
+      }
+    }
+  });
+  
+  // Add detailUrl to raw data
+  matches.forEach(torrent => {
+    if (torrent.raw) {
+      const provider = torrent.raw.provider?.toLowerCase();
+      
+      if (provider === 'torrentleech' && torrent.raw.fid) {
+        torrent.raw.detailUrl = `https://www.torrentleech.org/torrent/${torrent.raw.fid}#torrentinfo`;
+      } else if (provider === 'iptorrents' && torrent.raw.desc) {
+        torrent.raw.detailUrl = torrent.raw.desc;
+      }
+    }
+  });
+  
   // Filter out torrents without season information (movies, etc.)
   const tvOnly = matches.filter(torrent => {
     return torrent.parsed.season !== undefined && torrent.parsed.season !== null;
   });
   
-  console.log(`Filtered: ${matches.length} name matches -> ${tvOnly.length} with season info`);
+  // Filter by year if show name contains a year
+  let yearFiltered = tvOnly;
+  const showYearMatch = showName.match(/\((\d{4})\)/);
+  if (showYearMatch) {
+    const showYear = parseInt(showYearMatch[1]);
+    if (showYear > 1950 && showYear < 2050) {
+      yearFiltered = tvOnly.filter(torrent => {
+        // Keep torrents that either don't have a year or match the show year
+        return !torrent.raw.year || torrent.raw.year === showYear;
+      });
+      console.log(`Filtered by year ${showYear}: ${tvOnly.length} -> ${yearFiltered.length} torrents`);
+    }
+  }
+  
+  // Filter out unwanted torrents by excluded strings in title
+  const excludedStrings = ['2160', 'nordic', '480', 'mobile'];
+  const filtered1 = yearFiltered.filter(torrent => {
+    const title = torrent.raw.title.toLowerCase();
+    return !excludedStrings.some(excluded => title.includes(excluded));
+  });
+  
+  const finalCount = showYearMatch ? `${yearFiltered.length} after year filter -> ` : '';
+  console.log(`Filtered: ${matches.length} name matches -> ${tvOnly.length} with season info -> ${finalCount}${filtered1.length} without ${excludedStrings.join('/')}`);
   
   // Add seasonEpisode to all torrents
-  tvOnly.forEach(torrent => {
+  filtered1.forEach(torrent => {
     const { season, episode } = torrent.parsed;
     if (season !== undefined && season !== null) {
       if (!episode) {
@@ -196,7 +250,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   });
   
   // Filter and sort based on needed array
-  let filtered = tvOnly;
+  let filtered = filtered1;
   const isNoEmby = needed && needed.includes('noemby');
   
   if (needed && needed.length > 0 && !isNoEmby) {
@@ -204,7 +258,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     const matchedNeeded = new Set();
     
     // Filter torrents based on needed array
-    filtered = tvOnly.filter(torrent => {
+    filtered = filtered1.filter(torrent => {
       const { season, episode } = torrent.parsed;
       
       // Skip if resolution exists but is not 1080 or 720

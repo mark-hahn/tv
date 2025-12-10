@@ -1,21 +1,20 @@
 {
   "provider": "TorrentLeech",
-  "title": "Blue Lights S03E06 1080p WEBRip X264-SKYFiRE",
-  "time": "2025-11-03 21:40:30",
-  "seeds": 149,
-  "peers": 5,
-  "size": "2.2 GiB",
-  "filename": "Blue.Lights.S03E06.1080p.WEBRip.X264-SKYFiRE.torrent",
-  "fid": "241635443",
+  "title": "Smiling Friends S03E08 1080p WEB h264-EDITH",
+  "time": "2025-12-01 14:01:43",
+  "seeds": 942,
+  "peers": 29,
+  "size": "376.4 MiB",
+  "filename": "Smiling.Friends.S03E08.1080p.WEB.h264-EDITH.torrent",
+  "fid": "241653311",
   "rating": 0,
   "categoryID": 32,
   "new": false,
-  "numComments": 0,
+  "numComments": 1,
   "tags": [
-    "Crime",
-    "Drama"
+    "comedy"
   ],
   "imdbID": "",
   "igdbID": "",
-  "tvmazeID": "e3374901"
+  "tvmazeID": "e3387101"
 }

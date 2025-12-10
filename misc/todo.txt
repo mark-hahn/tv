@@ -4,6 +4,8 @@ reminder, restore ...
 
 todo ...
   add tv guide
+  get torrents for not in emby
+  searching for shows like Dharma & Greg
 
 non-simple:
   

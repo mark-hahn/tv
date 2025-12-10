@@ -1,26 +1,2 @@
 
-in torrents.vue before it sends request to function searchTorrents get season/episode data the same as the data the map uses.
-
-scan the map creating an array with each element a string like "S01' or "S01E01", "S01' represents an entire season and "S01E01" a single episode. The array should be named "needed".
-
-scan the data by seasons and and each episode in each season.  skip episodes until you reach one that is watched (W). then scan until one is not watched and has no file (- in map).
-
-let's call an episode that is not watched and has no file a needed episode.
-
-For every season that has only needed episodes, add "Snn" to the array. for this test include the season that has the first needed episode if it has only needed episodes.
-
-for each needed episode that is not in a seaon with all needed, add "SmmEnn".
-
-Stop scanning if you reach a episode not aired yet (U).
-
-then call function searchTorrents with this array added.
-
-the server function searchTorrents should immediately log this array to a file sample-torrents/needed-<show name with hyphens replacing spaces>.json. write to file not append
-
-function searchTorrents should then proceed as normal
-
-
-
-
-
-
+skip episodes until you reach one that is watched (W). then scan until one is not watched and has no file (- in map).

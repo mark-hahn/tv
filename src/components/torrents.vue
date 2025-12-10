@@ -1,46 +1,47 @@
 <template lang="pug">
-#torrents(@click.stop :style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
+.torrents-container(@click="$emit('close')" :style="{ height:'100%', width:'100%', display:'flex', justifyContent:'flex-start' }")
+  #torrents(@click="$emit('close')" :style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
 
-  #header(style="font-size:20px; font-weight:bold; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;")
-    div(style="margin-left:20px;") {{ showName }} Torrents
-    button(@click.stop="$emit('close')" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Close
+    #header(style="font-size:20px; font-weight:bold; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;")
+      div(style="margin-left:20px;") {{ showName }} Torrents
+      button(@click.stop="$emit('close')" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Close
 
-  #cookie-inputs(v-if="!loading && (error || torrents.length === 0)" style="padding:15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
-    div(style="margin-bottom:10px;")
-      label(style="display:block; font-size:12px; font-weight:bold; margin-bottom:3px; color:#555;") IPTorrents cf_clearance:
-      input(v-model="iptCfClearance" type="text" placeholder="Paste cf_clearance cookie value" style="width:100%; padding:6px; font-size:12px; border:1px solid #ccc; border-radius:3px; box-sizing:border-box;")
-    div(style="margin-bottom:10px;")
-      label(style="display:block; font-size:12px; font-weight:bold; margin-bottom:3px; color:#555;") TorrentLeech cf_clearance:
-      input(v-model="tlCfClearance" type="text" placeholder="Paste cf_clearance cookie value" style="width:100%; padding:6px; font-size:12px; border:1px solid #ccc; border-radius:3px; box-sizing:border-box;")
-    div(style="margin-top:10px;")
-      button(@click.stop="loadTorrents" :disabled="loading" style="padding:8px 20px; font-size:13px; font-weight:bold; cursor:pointer; border-radius:5px; background:#4CAF50; color:white; border:none; width:100%;") 
-        | {{ loading ? 'Loading...' : 'Load Torrents' }}
+    #cookie-inputs(@click.stop v-if="!loading && (error || torrents.length === 0)" style="padding:15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
+      div(style="margin-bottom:10px;")
+        label(style="display:block; font-size:12px; font-weight:bold; margin-bottom:3px; color:#555;") IPTorrents cf_clearance:
+        input(v-model="iptCfClearance" type="text" placeholder="Paste cf_clearance cookie value" style="width:100%; padding:6px; font-size:12px; border:1px solid #ccc; border-radius:3px; box-sizing:border-box;")
+      div(style="margin-bottom:10px;")
+        label(style="display:block; font-size:12px; font-weight:bold; margin-bottom:3px; color:#555;") TorrentLeech cf_clearance:
+        input(v-model="tlCfClearance" type="text" placeholder="Paste cf_clearance cookie value" style="width:100%; padding:6px; font-size:12px; border:1px solid #ccc; border-radius:3px; box-sizing:border-box;")
+      div(style="margin-top:10px;")
+        button(@click.stop="loadTorrents" :disabled="loading" style="padding:8px 20px; font-size:13px; font-weight:bold; cursor:pointer; border-radius:5px; background:#4CAF50; color:white; border:none; width:100%;") 
+          | {{ loading ? 'Loading...' : 'Load Torrents' }}
 
-  #tracker-counts(v-if="!loading && !error && torrents.length > 0" style="padding:5px 20px; margin-bottom:10px; font-size:13px; color:#555; background:#f0f0f0; border-radius:4px;")
-    span(v-for="(count, tracker) in trackerCounts" :key="tracker" style="margin-right:20px;")
-      strong {{ tracker }}:
-      |  {{ count }} result{{ count !== 1 ? 's' : '' }}
+    #tracker-counts(v-if="!loading && !error && torrents.length > 0" style="padding:5px 20px; margin-bottom:10px; font-size:13px; color:#555; background:#f0f0f0; border-radius:4px;")
+      span(v-for="(count, tracker) in trackerCounts" :key="tracker" style="margin-right:20px;")
+        strong {{ tracker }}:
+        |  {{ count }} result{{ count !== 1 ? 's' : '' }}
 
-  #loading(v-if="loading" style="text-align:center; color:#666; margin-top:50px; font-size:16px;")
-    div Searching for torrents...
-    
-  #error(v-if="error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px;")
-    div Error: {{ error }}
-    
-  #torrents-list(v-if="!loading && !error" style="padding:10px; font-size:14px; line-height:1.6;")
-    div(v-if="torrents.length === 0" style="text-align:center; color:#999; margin-top:50px;")
-      div No torrents found
-    div(v-for="(torrent, index) in torrents" :key="index" @click.stop="handleTorrentClick(torrent)" style="margin-bottom:15px; padding:10px; background:#fff; border-radius:5px; border:1px solid #ddd; cursor:pointer;" @mouseenter="$event.currentTarget.style.background='#f5f5f5'" @mouseleave="$event.currentTarget.style.background='#fff'")
-      div(style="font-weight:bold; margin-bottom:5px; color:#333;") {{ torrent.parsed.title }}
-      div(style="font-size:12px; color:#666; margin-bottom:3px;")
-        span(style="margin-right:15px;") 📁 {{ torrent.raw.size }}
-        span(style="margin-right:15px;") ⬆️ {{ torrent.raw.seeds }} seeds
-        span(style="margin-right:15px;") ⬇️ {{ torrent.raw.peers }} peers
-        span(v-if="torrent.raw.provider") 🌐 {{ torrent.raw.provider }}
-        span(v-if="torrent.parsed.resolution" style="margin-right:15px;") 🎬 {{ torrent.parsed.resolution }}
-        span(v-if="torrent.parsed.group" style="margin-right:15px;") 👥 {{ torrent.parsed.group }}
-      div(v-if="torrent.raw.tags && torrent.raw.tags.length" style="font-size:11px; color:#888; margin-top:3px;")
-        span(v-for="tag in torrent.raw.tags" :key="tag" style="background:#e8f4f8; padding:2px 6px; margin-right:5px; border-radius:3px;") {{ tag }}
+    #loading(v-if="loading" style="text-align:center; color:#666; margin-top:50px; font-size:16px;")
+      div Searching for torrents...
+      
+    #error(v-if="error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px;")
+      div Error: {{ error }}
+      
+    #torrents-list(v-if="!loading && !error" style="padding:10px; font-size:14px; line-height:1.6;")
+      div(v-if="torrents.length === 0" style="text-align:center; color:#999; margin-top:50px;")
+        div No torrents found
+      div(v-for="(torrent, index) in torrents" :key="index" @click="handleTorrentClick($event, torrent)" @click.stop style="margin-bottom:15px; padding:10px; background:#fff; border-radius:5px; border:1px solid #ddd; cursor:pointer;" @mouseenter="$event.currentTarget.style.background='#f5f5f5'" @mouseleave="$event.currentTarget.style.background='#fff'")
+        div(style="font-weight:bold; margin-bottom:5px; color:#333;") {{ torrent.parsed.title }}
+        div(style="font-size:12px; color:#666; margin-bottom:3px;")
+          span(style="margin-right:15px;") 📁 {{ torrent.raw.size }}
+          span(style="margin-right:15px;") ⬆️ {{ torrent.raw.seeds }} seeds
+          span(style="margin-right:15px;") ⬇️ {{ torrent.raw.peers }} peers
+          span(v-if="torrent.raw.provider") 🌐 {{ torrent.raw.provider }}
+          span(v-if="torrent.parsed.resolution" style="margin-right:15px;") 🎬 {{ torrent.parsed.resolution }}
+          span(v-if="torrent.parsed.group" style="margin-right:15px;") 👥 {{ torrent.parsed.group }}
+        div(v-if="torrent.raw.tags && torrent.raw.tags.length" style="font-size:11px; color:#888; margin-top:3px;")
+          span(v-for="tag in torrent.raw.tags" :key="tag" style="background:#e8f4f8; padding:2px 6px; margin-right:5px; border-radius:3px;") {{ tag }}
 
 </template>
 
@@ -143,6 +144,16 @@ export default {
         // Scan for needed episodes
         let hasStartedWatching = false;
         
+        // Check if ANY episode in the entire series has been watched
+        const anyEpisodeWatched = Object.values(seriesMap).some(episodes =>
+          Object.values(episodes).some(epiObj => epiObj.played)
+        );
+        
+        // If nothing watched, start collecting from first episode with no file
+        if (!anyEpisodeWatched) {
+          hasStartedWatching = true;
+        }
+        
         for (const [seasonNumStr, episodes] of Object.entries(seriesMap)) {
           const seasonNum = parseInt(seasonNumStr);
           if (isNaN(seasonNum)) continue;
@@ -159,6 +170,7 @@ export default {
           }
           
           const seasonNeeded = [];
+          let allNeeded = true;
           
           for (const [episodeNumStr, epiObj] of Object.entries(episodes)) {
             const episodeNum = parseInt(episodeNumStr);
@@ -170,7 +182,12 @@ export default {
             if (unaired) {
               // Process any accumulated season if any episodes were needed
               if (seasonNeeded.length > 0) {
-                needed.push(`S${seasonNum.toString().padStart(2, '0')}`);
+                if (allNeeded) {
+                  needed.push(`S${seasonNum.toString().padStart(2, '0')}`);
+                } else {
+                  needed.push(`S${seasonNum.toString().padStart(2, '0')}`);
+                  seasonNeeded.forEach(ep => needed.push(ep));
+                }
               }
               return needed; // Stop scanning
             }
@@ -186,12 +203,21 @@ export default {
             if (isNeeded) {
               const epStr = `S${seasonNum.toString().padStart(2, '0')}E${episodeNum.toString().padStart(2, '0')}`;
               seasonNeeded.push(epStr);
+            } else {
+              allNeeded = false;
             }
           }
           
           // Add season if any episodes were needed
           if (seasonNeeded.length > 0 && hasStartedWatching) {
-            needed.push(`S${seasonNum.toString().padStart(2, '0')}`);
+            if (allNeeded) {
+              // All episodes in season are needed - just add season
+              needed.push(`S${seasonNum.toString().padStart(2, '0')}`);
+            } else {
+              // Some episodes needed - add season AND individual episodes
+              needed.push(`S${seasonNum.toString().padStart(2, '0')}`);
+              seasonNeeded.forEach(ep => needed.push(ep));
+            }
           }
         }
         
@@ -308,7 +334,8 @@ export default {
       }
     },
 
-    async handleTorrentClick(torrent) {
+    async handleTorrentClick(event, torrent) {
+      
       try {
         const response = await fetch('https://localhost:3001/api/selTorrent', {
           method: 'POST',

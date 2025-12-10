@@ -61,11 +61,10 @@ export async function searchTorrents({ showName, limit = 100, iptCf, tlCf, neede
   
   // Write needed array to file (even if empty, for debugging)
   const filename = `needed-${showName.replace(/\s+/g, '-')}.json`;
-  const samplePath = path.join(process.cwd(), 'sample-torrents', filename);
+  const samplePath = path.join(process.cwd(), '..', 'sample-torrents', filename);
   
   try {
     fs.writeFileSync(samplePath, JSON.stringify(needed, null, 2));
-    console.log(`Wrote needed episodes to ${filename}: ${needed.length} items`);
   } catch (err) {
     console.error(`Error writing ${filename}:`, err.message);
   }

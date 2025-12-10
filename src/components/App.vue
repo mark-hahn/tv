@@ -71,7 +71,7 @@ export default {
         posterWidth: '180px',         // smaller poster
         posterHeight: '210px',
         seriesFontSize: '18px',       // smaller title
-        seriesInfoFontSize: '14px',   // smaller info text
+        seriesInfoFontSize: '15px',   // smaller info text
         seriesInfoWidth: '250px',     // narrower info box
         infoBoxLineHeight: '1.8',     // line spacing in info box (default: 1.2)
         remotesWidth: '210px',        // narrower remotes area
@@ -99,7 +99,7 @@ export default {
         posterWidth: '180px',
         posterHeight: '210px',
         seriesFontSize: '18px',
-        seriesInfoFontSize: '14px',
+        seriesInfoFontSize: '15px',
         seriesInfoWidth: '250px',
         infoBoxLineHeight: '1.8',
         remotesWidth: '210px',

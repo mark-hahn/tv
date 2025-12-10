@@ -2,21 +2,18 @@
 reminder, restore ...
   start gap running
 
+bugs ...
+
 todo ...
   add tv guide
-  add detail urls and show url if card clicked
+  sort by waiting date
+  keep deleted date forever
+  keep all map info for deleted shows
 
 non-simple:
   
 simple ...
   
-bugs ...
-
-todo  ...
-  sort by waiting date
-  keep deleted date forever
-  keep all map info for deleted shows
-
 tabled ...
   laptop play doesn't start
   show episode being watched (next up line)

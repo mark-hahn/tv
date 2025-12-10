@@ -1,20 +1,21 @@
 {
   "provider": "TorrentLeech",
-  "title": "Clone High (2002) S01 (1080p DVDRip AI Upscale x265 10bit AC3 2 0 - JBENT)[TAoE]",
-  "time": "2022-06-08 21:10:15",
-  "seeds": 69,
+  "title": "Acapulco 2021 S04 1080p WEBRip x265-KONTRAST",
+  "time": "2025-09-25 21:02:54",
+  "seeds": 20,
   "peers": 0,
-  "size": "4.5 GiB",
-  "filename": "Clone.High.(2002).S01.(1080p.DVDRip.AI.Upscale.x265.10bit.AC3.2.0.-.JBENT)[TAoE].torrent",
-  "fid": "10604601",
-  "rating": 0,
+  "size": "7.7 GiB",
+  "filename": "Acapulco.2021.S04.1080p.WEBRip.x265-KONTRAST.torrent",
+  "fid": "241608923",
+  "rating": 7.8,
   "categoryID": 27,
   "new": false,
-  "numComments": 11,
+  "numComments": 0,
   "tags": [
+    "comedy",
     "FREELEECH"
   ],
-  "imdbID": "",
+  "imdbID": "tt13567344",
   "igdbID": "",
-  "tvmazeID": "s1643"
+  "tvmazeID": "s52193"
 }

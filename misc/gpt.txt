@@ -1,3 +1,23 @@
-include torrents button in series view not in emby.
 
-when torrents button not in emby is pressed send array with one entry "noemby"
+
+instructions on what torrents should be reuturned from searchTorrents and in what order follow:
+
+if a torrent has no parsed.episode value then the torrent is a season torrent. 
+
+if torrent has a parsed.episode value then the torrent is an episode torrent.  
+
+ if it is a season torrent then it should only be returned if S<parsed.season value> is in needed array. <parsed.season value> is padded to two digits.
+
+ if it is an episode torrent then it should only be returned if S<parsed.season value>E<parsed.episode value> is in needed array. <parsed.season value> and <parsed.episode value> are padded to two digits.
+
+if parsed.resolution is present and value does not contain "1080" or "720" then don't return.
+
+torrents should be sorted with season torrents first and episode torrents second.
+
+torrents with parsed.resolution that contain "1080" should be sorted before parsed.resolution that contain "720"
+
+torrents that contain parsed.bitdepth value of 10 should be sorted before ones that dont.
+
+if an entry in needed array did not match any torrent then a dummy torrent containing just {"notorrent": <entry>} should be added to results at the end
+
+

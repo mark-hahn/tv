@@ -1,25 +1,24 @@
 {
   "provider": "TorrentLeech",
-  "title": "The Musketeers (2014-2016) Complete S01-S03 1080p BluRay x264",
-  "time": "2021-11-07 16:25:44",
-  "seeds": 12,
-  "peers": 0,
-  "size": "35.6 GiB",
-  "filename": "The.Musketeers.(2014-2016).Complete.S01-S03.1080p.BluRay.x264.torrent",
-  "fid": "2011465",
-  "rating": 7.8,
+  "title": "Murderbot S01 1080p 10bit WEBRip 6CH x265 HEVC-PSA",
+  "time": "2025-07-11 10:31:17",
+  "seeds": 307,
+  "peers": 4,
+  "size": "3.1 GiB",
+  "filename": "Murderbot.S01.1080p.10bit.WEBRip.6CH.x265.HEVC-PSA.torrent",
+  "fid": "241556018",
+  "rating": 0,
   "categoryID": 27,
   "new": false,
-  "numComments": 2,
+  "numComments": 3,
   "tags": [
     "Action",
-    "Adventure",
-    "Drama",
-    "FREELEECH"
+    "comedy",
+    "FREELEECH",
+    "Science-Fiction"
   ],
-  "imdbID": "tt2733252",
+  "imdbID": "",
   "igdbID": "",
-  "tvmazeID": "s377",
-  "year": 2014,
-  "detailUrl": "https://www.torrentleech.org/torrent/2011465#torrentinfo"
+  "tvmazeID": "s73453",
+  "detailUrl": "https://www.torrentleech.org/torrent/241556018#torrentinfo"
 }

@@ -68,6 +68,7 @@ export default {
         
         // Series pane  
         seriesWidth: '450px',         // series pane width
+        mapWidth: '450px',            // map pane width
         posterWidth: '180px',         // smaller poster
         posterHeight: '210px',
         seriesFontSize: '18px',       // smaller title
@@ -96,6 +97,7 @@ export default {
         
         // Series pane  
         seriesWidth: '450px',
+        mapWidth: '450px',
         posterWidth: '180px',
         posterHeight: '210px',
         seriesFontSize: '18px',

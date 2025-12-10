@@ -3,7 +3,7 @@
   #torrents(@click="$emit('close')" :style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
 
     #header(style="font-size:20px; font-weight:bold; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;")
-      div(style="margin-left:20px;") {{ showName }} Torrents
+      div(style="margin-left:20px;") {{ showName }}
       button(@click.stop="$emit('close')" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Close
 
     #cookie-inputs(@click.stop v-if="!loading && (error || torrents.length === 0)" style="padding:15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
@@ -35,7 +35,7 @@
         div(v-if="SHOW_TITLE" style="font-size:12px; color:#888; margin-bottom:4px;") {{ torrent.raw.title }}
         div(style="font-size:18px; color:#333;") 
           strong {{ getDisplaySeasonEpisode(torrent) }}
-          | , {{ torrent.raw.size }}, {{ torrent.raw.seeds }} seeds<span v-if="torrent.raw.provider">, {{ formatProvider(torrent.raw.provider) }}</span><span v-if="torrent.parsed.resolution">, {{ torrent.parsed.resolution }}</span><span v-if="torrent.parsed.group">, {{ formatGroup(torrent.parsed.group) }}</span>
+          | : {{ torrent.raw.size }}, {{ torrent.raw.seeds }} seeds<span v-if="torrent.raw.provider">, {{ formatProvider(torrent.raw.provider) }}</span><span v-if="torrent.parsed.resolution">, {{ torrent.parsed.resolution }}</span><span v-if="torrent.parsed.group">, {{ formatGroup(torrent.parsed.group) }}</span>
 
 </template>
 
@@ -371,17 +371,17 @@ export default {
 
     formatSeasonEpisode(seasonEpisode) {
       if (!seasonEpisode) return '';
-      // Convert S01E02 to 01/02, or S01 to 01
+      // Convert S01E02 to 1/2, or S01 to 1
       const match = seasonEpisode.match(/S(\d+)(?:E(\d+))?/);
       if (!match) return seasonEpisode;
       
-      const season = match[1];
-      const episode = match[2];
+      const season = parseInt(match[1], 10);
+      const episode = match[2] ? parseInt(match[2], 10) : null;
       
-      if (episode) {
+      if (episode !== null) {
         return `${season}/${episode}`;
       } else {
-        return season;
+        return String(season);
       }
     },
 

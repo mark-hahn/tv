@@ -1,16 +1,14 @@
 <template lang="pug">
-#map(@click="handleMapClick" style="height:100%; padding:5px; margin:0; display:flex; flex-direction:column; background-color:#ffe; overflow-y:auto; flex:1;")
-
-  div(style="margin:0 5px; display:flex; justify-content:flex-start; align-items:center;")
-    div(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" style="display:flex; gap:5px; margin-right:20px;")
-      button(@click.stop="$emit('prune', mapShow)"
-              style="margin:5px;")            Prune
-      button(@click.stop="$emit('set-date', mapShow)"
-              style="margin:5px;")            Set Date
-    div(style="font-size:20px; margin:0 20px 0 0; font-weight:bold;")
-      | {{mapShow?.Name}}
+#map(@click="handleMapClick" :style="{ height:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', backgroundColor:'#ffe', overflowY:'auto', overflowX:'auto', maxWidth:'100%', width: sizing.mapWidth || '450px', boxSizing:'border-box' }")
 
   div(v-if="!hideMapBottom")
+    div(style="margin:0 5px; display:flex; justify-content:space-between; align-items:center;")
+      div(style="font-size:20px; font-weight:bold;")
+        | {{mapShow?.Name}}
+      div(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" style="display:flex; gap:5px; flex-shrink:0;")
+        button(@click.stop="$emit('prune', mapShow)" style="margin:5px;") Prune
+        button(@click.stop="$emit('set-date', mapShow)" style="margin:5px;") Set Date
+
     div(v-if="mapShow?.Id?.startsWith('noemby-')"
         style="font-weight:bold; color:red; font-size:18px; text-align:center; margin:20px;")
       | Not In Emby
@@ -30,7 +28,7 @@
           style="display:inline-block; margin 3px 10px")
         | {{'Waiting ' + mapShow?.WaitStr}}
 
-    table(style="padding:0 5px; font-size:16px" )
+    table(style="padding:0 5px; font-size:16px; margin-top:10px;" )
      tbody
       tr(style="font-weight:bold;")
         td
@@ -81,6 +79,10 @@ export default {
     simpleMode: {
       type: Boolean,
       default: false
+    },
+    sizing: {
+      type: Object,
+      default: () => ({})
     }
   },
 

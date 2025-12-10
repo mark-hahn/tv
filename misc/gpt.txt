@@ -1,8 +1,1 @@
-
-immediately after a torrent is parsed and raw torrent was added then if a torrent has parsed.year add property "year" at raw level with value of parsed.year.
-
-if a torrent does not have a parsed.year but the the tile contains "(yyy)" where yyy is a number greater than 1950 and less than 2050 then add property "year" at raw level with value of yyy.
-
-if the show name from app contains "(showyyy)" where showyyy is a number greater than 1950 and less than 2050 then filter out all torrents that have year property at raw level that does not match showyyy
-
-also add year property if a torrent does not have a parsed.year but the title contains "yyy" where yyy is a number greater than 1950 and less than 2050 surrounded by non-alphanumeric chars
+restore torrents\iptorrents-custom.json from git

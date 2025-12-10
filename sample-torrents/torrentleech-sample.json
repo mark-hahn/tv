@@ -1,22 +1,25 @@
 {
   "provider": "TorrentLeech",
-  "title": "The Night Of (2016) S01 Bluray EAC3 5 1 1080p x265-iVy",
-  "time": "2024-05-19 22:16:13",
-  "seeds": 73,
-  "peers": 2,
-  "size": "6.9 GiB",
-  "filename": "The.Night.Of.(2016).S01.Bluray.EAC3.5.1.1080p.x265-iVy.torrent",
-  "fid": "241282940",
-  "rating": 0,
+  "title": "The Musketeers (2014-2016) Complete S01-S03 1080p BluRay x264",
+  "time": "2021-11-07 16:25:44",
+  "seeds": 12,
+  "peers": 0,
+  "size": "35.6 GiB",
+  "filename": "The.Musketeers.(2014-2016).Complete.S01-S03.1080p.BluRay.x264.torrent",
+  "fid": "2011465",
+  "rating": 7.8,
   "categoryID": 27,
   "new": false,
-  "numComments": 0,
+  "numComments": 2,
   "tags": [
+    "Action",
+    "Adventure",
+    "Drama",
     "FREELEECH"
   ],
-  "imdbID": "",
+  "imdbID": "tt2733252",
   "igdbID": "",
-  "tvmazeID": "s14157",
-  "year": 2016,
-  "detailUrl": "https://www.torrentleech.org/torrent/241282940#torrentinfo"
+  "tvmazeID": "s377",
+  "year": 2014,
+  "detailUrl": "https://www.torrentleech.org/torrent/2011465#torrentinfo"
 }

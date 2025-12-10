@@ -184,12 +184,18 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
         torrent.raw.year = torrent.parsed.year;
       } else {
         // Try to extract year from title - matches (YYYY) or year surrounded by non-alphanumeric
-        const yearMatch = torrent.raw.title.match(/\((\d{4})\)|[^\w](\d{4})[^\w]/);
-        if (yearMatch) {
-          const year = parseInt(yearMatch[1] || yearMatch[2]);
+        const yearRegex = /\((\d{4})\)|[^\w](\d{4})[^\w]/g;
+        const years = [];
+        let match;
+        while ((match = yearRegex.exec(torrent.raw.title)) !== null) {
+          const year = parseInt(match[1] || match[2]);
           if (year > 1950 && year < 2050) {
-            torrent.raw.year = year;
+            years.push(year);
           }
+        }
+        // Use the lowest year if any were found
+        if (years.length > 0) {
+          torrent.raw.year = Math.min(...years);
         }
       }
     }
@@ -215,16 +221,23 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   
   // Filter by year if show name contains a year
   let yearFiltered = tvOnly;
-  const showYearMatch = showName.match(/\((\d{4})\)/);
-  if (showYearMatch) {
-    const showYear = parseInt(showYearMatch[1]);
-    if (showYear > 1950 && showYear < 2050) {
-      yearFiltered = tvOnly.filter(torrent => {
-        // Keep torrents that either don't have a year or match the show year
-        return !torrent.raw.year || torrent.raw.year === showYear;
-      });
-      console.log(`Filtered by year ${showYear}: ${tvOnly.length} -> ${yearFiltered.length} torrents`);
+  const showYearRegex = /\((\d{4})\)/g;
+  const showYears = [];
+  let showYearMatch;
+  while ((showYearMatch = showYearRegex.exec(showName)) !== null) {
+    const year = parseInt(showYearMatch[1]);
+    if (year > 1950 && year < 2050) {
+      showYears.push(year);
     }
+  }
+  
+  if (showYears.length > 0) {
+    const showYear = Math.min(...showYears);
+    yearFiltered = tvOnly.filter(torrent => {
+      // Keep torrents that either don't have a year or match the show year
+      return !torrent.raw.year || torrent.raw.year === showYear;
+    });
+    console.log(`Filtered by year ${showYear}: ${tvOnly.length} -> ${yearFiltered.length} torrents`);
   }
   
   // Filter out unwanted torrents by excluded strings in title

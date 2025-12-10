@@ -7,39 +7,88 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
  
+// Index counters for detail page files
+let iptIndex = 0;
+let tlIndex = 0;
+
+/**
+ * Load index counters from disk
+ */
+function loadIndexes() {
+  const detailPagesDir = path.join(__dirname, '..', '..', 'sample-torrents', 'detail-pages');
+  
+  if (!fs.existsSync(detailPagesDir)) {
+    return;
+  }
+  
+  // Find highest existing index for each provider
+  const files = fs.readdirSync(detailPagesDir);
+  
+  for (const file of files) {
+    // Match pattern: (ipt|tl)-{index}-{group}.html
+    const match = file.match(/^(ipt|tl)-(\d+)-(.+)\.html$/);
+    if (match) {
+      const provider = match[1];
+      const index = parseInt(match[2], 10);
+      
+      if (provider === 'ipt' && index > iptIndex) {
+        iptIndex = index;
+      } else if (provider === 'tl' && index > tlIndex) {
+        tlIndex = index;
+      }
+    }
+  }
+}
+
+// Load indexes on module initialization
+loadIndexes();
+console.log(`Initialized indexes - ipt: ${iptIndex}, tl: ${tlIndex}`);
+
 /**
  * Check if a torrent has captions/subtitles by fetching its detail page
- * @param {string} detailUrl - The URL to the torrent detail page
- * @param {string} provider - The torrent provider (iptorrents or torrentleech)
+ * @param {Object} torrent - The torrent object with raw and normalized data
  * @returns {Promise<boolean>} - True if captions are found, false otherwise
  */
-export async function hasCaptions(detailUrl, provider) {
+export async function hasCaptions(torrent) {
   try {
+    const detailUrl = torrent.raw.detailUrl;
+    const provider = torrent.raw.provider;
+    const group = (torrent.group || 'unknown').toLowerCase();
+    
     // Load cookies for authentication
     const cookies = await loadCookies(provider);
     
     // Fetch the detail page using native https/http module with cookies
     const html = await fetchWithRedirects(detailUrl, 5, cookies);
     
-    // Save the HTML to sample-torrents folder
-    const sampleDir = path.join(__dirname, '..', '..', 'sample-torrents');
+    // Save the HTML to detail-pages folder with incrementing index
+    const detailPagesDir = path.join(__dirname, '..', '..', 'sample-torrents', 'detail-pages');
     
     // Create directory if it doesn't exist
-    if (!fs.existsSync(sampleDir)) {
-      fs.mkdirSync(sampleDir, { recursive: true });
+    if (!fs.existsSync(detailPagesDir)) {
+      fs.mkdirSync(detailPagesDir, { recursive: true });
     }
     
-    // Determine filename based on provider
-    let filename;
+    // Determine prefix and increment index based on provider
+    let prefix;
+    let index;
     if (provider.toLowerCase() === 'iptorrents') {
-      filename = 'iptorrents-detail.html';
+      prefix = 'ipt';
+      iptIndex++;
+      index = iptIndex;
+      console.log(`IPT: incremented to ${iptIndex}`);
     } else if (provider.toLowerCase() === 'torrentleech') {
-      filename = 'torrentleech-detail.html';
+      prefix = 'tl';
+      tlIndex++;
+      index = tlIndex;
+      console.log(`TL: incremented to ${tlIndex}`);
     } else {
-      filename = `${provider}-detail.html`;
+      prefix = provider.toLowerCase();
+      index = 1;
     }
     
-    const filePath = path.join(sampleDir, filename);
+    const filename = `${prefix}-${index}-${group}.html`;
+    const filePath = path.join(detailPagesDir, filename);
     
     // Write HTML to file
     fs.writeFileSync(filePath, html, 'utf8');

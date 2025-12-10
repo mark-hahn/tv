@@ -64,13 +64,13 @@ app.get('/api/search', async (req, res) => {
 // POST /api/hasCaptions - Check if torrent has captions
 app.post('/api/hasCaptions', async (req, res) => {
   try {
-    const { detailUrl, provider } = req.body;
+    const { torrent } = req.body;
     
-    if (!detailUrl || !provider) {
-      return res.status(400).json({ error: 'Missing detailUrl or provider' });
+    if (!torrent || !torrent.raw || !torrent.raw.detailUrl || !torrent.raw.provider) {
+      return res.status(400).json({ error: 'Missing torrent data' });
     }
     
-    const hasCaptions = await caption.hasCaptions(detailUrl, provider);
+    const hasCaptions = await caption.hasCaptions(torrent);
     res.json({ hasCaptions });
   } catch (error) {
     console.error('hasCaptions error:', error);

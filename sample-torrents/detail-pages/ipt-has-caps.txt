@@ -1,0 +1,7 @@
+# IPTorrents caption detection training data
+# Format: index::true or index::false
+# true = page shows captions/subtitles present
+# false = page shows no captions/subtitles
+
+1::false
+2::false

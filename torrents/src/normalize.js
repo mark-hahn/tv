@@ -31,19 +31,18 @@ function extractGroup(title) {
 export function normalize(torrent, showName) {
   const parsed = ptt.parse(torrent.title);
   let groupSrc = 'parse';
+  let group = null;
   
-  // Only extract group manually if parser didn't find one
-  if (!parsed.group) {
+  // Get group from parser or extract manually
+  if (parsed.group) {
+    group = parsed.group.toUpperCase();
+    groupSrc = 'parse';
+  } else {
     const manualGroup = extractGroup(torrent.title);
     if (manualGroup) {
-      parsed.group = manualGroup;
+      group = manualGroup.toUpperCase();
       groupSrc = 'calc';
     }
-  }
-  
-  // Convert group to uppercase
-  if (parsed.group) {
-    parsed.group = parsed.group.toUpperCase();
   }
   
   // Clean and compare titles with multiple strategies
@@ -97,6 +96,7 @@ export function normalize(torrent, showName) {
   
   return {
     parsed,
+    group,
     groupSrc,
     nameMatch,
     clientTitle: showName,

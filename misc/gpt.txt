@@ -1,4 +1,6 @@
-the fetch worked.  this is the html for the text block below: <br />
+the fetch worked.  this is the html for the text block below: 
+
+<br />
 Text<br />
 ID &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; : 3<br />
 Format &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; : PGS<br />
@@ -30,4 +32,12 @@ Default                                  : Yes
 Forced                                   : No
 --  
 
-in torrents/src/caption.js we need to scan detail pages to find out if it has captions. this one does.
+in torrents/src/caption.js we need to scan detail pages to find out if they have captions. this one does. but the format for captions in almost every detail page varies.  we are going to have to study many detail pages to create an algorithm that usually works.
+
+create a folder sample-torrents/detail-pages.  it will have many detail html pages. on each card click save a detail html file in that folder with an index number incrementend on every save.
+
+name each file ipt-<index>.html or tl-<index>.html. I will read the visible page to check if it has captions. i will maintain files ipt-has-caps.txt and tl-has-caps.txt.  they will have one line per detail page in format index::true or index::false.
+
+Then we can look for an algorithm to approximately detemine if caption is present based on html. these files can be considered training data for you to look for an algorithm.
+
+

@@ -1,22 +1,23 @@
 {
   "provider": "TorrentLeech",
-  "title": "A Man in Full S01 COMPLETE 1080p NF WEB-DL DDP5 1 H 264-FLUX",
-  "time": "2024-05-02 10:40:38",
-  "seeds": 46,
-  "peers": 0,
-  "size": "9.8 GiB",
-  "filename": "A.Man.in.Full.S01.COMPLETE.1080p.NF.WEB-DL.DDP5.1.H.264-FLUX.torrent",
-  "fid": "241271773",
-  "rating": 0,
+  "title": "30 Rock S02 1080p BluRay DD+ 5 1 x265-edge2020",
+  "time": "2022-12-15 05:30:30",
+  "seeds": 98,
+  "peers": 1,
+  "size": "14.4 GiB",
+  "filename": "30.Rock.S02.1080p.BluRay.DD+.5.1.x265-edge2020.torrent",
+  "fid": "240953144",
+  "rating": 8.3,
   "categoryID": 27,
   "new": false,
-  "numComments": 1,
+  "numComments": 0,
   "tags": [
-    "Drama",
+    "comedy",
     "FREELEECH"
   ],
-  "imdbID": "",
+  "imdbID": "tt0496424",
   "igdbID": "",
-  "tvmazeID": "s60513",
-  "detailUrl": "https://www.torrentleech.org/torrent/241271773#torrentinfo"
+  "tvmazeID": "s537",
+  "year": 2020,
+  "detailUrl": "https://www.torrentleech.org/torrent/240953144#torrentinfo"
 }

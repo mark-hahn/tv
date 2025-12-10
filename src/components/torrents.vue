@@ -339,8 +339,7 @@ export default {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ 
-            detailUrl: torrent.raw.detailUrl,
-            provider: torrent.raw.provider
+            torrent: torrent
           })
         })
           .then(response => response.ok ? response.json() : null)

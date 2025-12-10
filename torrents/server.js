@@ -37,13 +37,23 @@ app.get('/api/search', async (req, res) => {
   const limit = parseInt(req.query.limit) || 100;
   const iptCf = req.query.ipt_cf;
   const tlCf = req.query.tl_cf;
+  let needed = [];
+  
+  // Parse needed array if provided
+  if (req.query.needed) {
+    try {
+      needed = JSON.parse(req.query.needed);
+    } catch (err) {
+      console.error('Error parsing needed array:', err);
+    }
+  }
   
   if (!showName) {
     return res.status(400).json({ error: 'Show name is required' });
   }
 
   try {
-    const result = await search.searchTorrents({ showName, limit, iptCf, tlCf });
+    const result = await search.searchTorrents({ showName, limit, iptCf, tlCf, needed });
     res.json(result);
   } catch (error) {
     console.error('Search error:', error);

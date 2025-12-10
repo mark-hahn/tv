@@ -46,6 +46,7 @@
 
 <script>
 import evtBus from '../evtBus.js';
+import * as emby from '../emby.js';
 
 export default {
   name: "Torrents",
@@ -94,7 +95,7 @@ export default {
   },
 
   methods: {
-    searchTorrents(show) {
+    async searchTorrents(show) {
       // Reset state when switching shows
       this.torrents = [];
       this.error = null;
@@ -105,8 +106,100 @@ export default {
         this.showName = show.Name;
       }
       
+      // Get series map and calculate needed episodes
+      const needed = await this.calculateNeeded(show);
+      
       // Automatically try to load torrents with saved cookies
-      this.loadTorrents();
+      this.loadTorrents(needed);
+    },
+
+    async calculateNeeded(show) {
+      const needed = [];
+      
+      // Skip if no Emby show
+      if (!show || !show.Id || show.Id.startsWith('noemby-')) {
+        return needed;
+      }
+      
+      try {
+        // Get series map (same way as list.vue does)
+        const seriesMapIn = await emby.getSeriesMap(show);
+        if (!seriesMapIn || seriesMapIn.length === 0) {
+          return needed;
+        }
+        
+        // Build seriesMap object from array
+        const seriesMap = {};
+        for (const season of seriesMapIn) {
+          const [seasonNum, episodes] = season;
+          const seasonMap = {};
+          seriesMap[seasonNum] = seasonMap;
+          for (const episode of episodes) {
+            const [episodeNum, epiObj] = episode;
+            seasonMap[episodeNum] = epiObj;
+          }
+        }
+        
+        // Scan for needed episodes
+        let hasStartedWatching = false;
+        
+        for (const [seasonNumStr, episodes] of Object.entries(seriesMap)) {
+          const seasonNum = parseInt(seasonNumStr);
+          if (isNaN(seasonNum)) continue;
+          
+          // Check if season has any episodes with state
+          const seasonHasState = Object.values(episodes).some(epiObj => {
+            const { played, noFile, unaired, avail, deleted, error } = epiObj;
+            return played || noFile || unaired || avail || deleted || error;
+          });
+          
+          // Skip this entire season if no episodes have any state
+          if (!seasonHasState) {
+            continue;
+          }
+          
+          const seasonNeeded = [];
+          
+          for (const [episodeNumStr, epiObj] of Object.entries(episodes)) {
+            const episodeNum = parseInt(episodeNumStr);
+            if (isNaN(episodeNum)) continue;
+            
+            const { played, noFile, unaired } = epiObj;
+            
+            // Stop if we hit an unaired episode
+            if (unaired) {
+              // Process any accumulated season if any episodes were needed
+              if (seasonNeeded.length > 0) {
+                needed.push(`S${seasonNum.toString().padStart(2, '0')}`);
+              }
+              return needed; // Stop scanning
+            }
+            
+            // Track if we've started watching
+            if (played) {
+              hasStartedWatching = true;
+            }
+            
+            // Episode is needed if: started watching AND not played AND no file
+            const isNeeded = hasStartedWatching && !played && noFile;
+            
+            if (isNeeded) {
+              const epStr = `S${seasonNum.toString().padStart(2, '0')}E${episodeNum.toString().padStart(2, '0')}`;
+              seasonNeeded.push(epStr);
+            }
+          }
+          
+          // Add season if any episodes were needed
+          if (seasonNeeded.length > 0 && hasStartedWatching) {
+            needed.push(`S${seasonNum.toString().padStart(2, '0')}`);
+          }
+        }
+        
+      } catch (err) {
+        console.error('Error calculating needed episodes:', err);
+      }
+      
+      return needed;
     },
 
     extractCfClearance(input) {
@@ -134,7 +227,7 @@ export default {
       return trimmed;
     },
 
-    async loadTorrents() {
+    async loadTorrents(needed = []) {
       if (!this.currentShow || !this.currentShow.Name) {
         this.error = 'No show selected';
         return;
@@ -177,6 +270,9 @@ export default {
         }
         if (tlCf) {
           url += `&tl_cf=${encodeURIComponent(tlCf)}`;
+        }
+        if (needed.length > 0) {
+          url += `&needed=${encodeURIComponent(JSON.stringify(needed))}`;
         }
 
         const response = await fetch(url);

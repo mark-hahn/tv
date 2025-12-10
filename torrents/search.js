@@ -1,5 +1,6 @@
 // Torrent search logic
 import fs from 'fs';
+import path from 'path';
 import { normalize } from './normalize.js';
 
 // torrent-search-api is CommonJS, need dynamic import
@@ -52,10 +53,22 @@ export function initializeProviders() {
  * @param {number} params.limit - Maximum number of results
  * @param {string} params.iptCf - Optional IPTorrents cf_clearance override
  * @param {string} params.tlCf - Optional TorrentLeech cf_clearance override
+ * @param {Array} params.needed - Optional array of needed episodes (e.g., ["S01", "S02E03"])
  * @returns {Object} Search results with torrents array
  */
-export async function searchTorrents({ showName, limit = 100, iptCf, tlCf }) {
+export async function searchTorrents({ showName, limit = 100, iptCf, tlCf, needed = [] }) {
   console.log(`\nSearching for: ${showName} (limit: ${limit})`);
+  
+  // Write needed array to file (even if empty, for debugging)
+  const filename = `needed-${showName.replace(/\s+/g, '-')}.json`;
+  const samplePath = path.join(process.cwd(), 'sample-torrents', filename);
+  
+  try {
+    fs.writeFileSync(samplePath, JSON.stringify(needed, null, 2));
+    console.log(`Wrote needed episodes to ${filename}: ${needed.length} items`);
+  } catch (err) {
+    console.error(`Error writing ${filename}:`, err.message);
+  }
 
   // Temporarily override cookies if cf_clearance provided
   const iptCookiesForSearch = iptCookies ? [...iptCookies] : [];

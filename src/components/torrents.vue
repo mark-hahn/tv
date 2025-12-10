@@ -117,9 +117,9 @@ export default {
     async calculateNeeded(show) {
       const needed = [];
       
-      // Skip if no Emby show
+      // If not in Emby, return special marker
       if (!show || !show.Id || show.Id.startsWith('noemby-')) {
-        return needed;
+        return ['noemby'];
       }
       
       try {

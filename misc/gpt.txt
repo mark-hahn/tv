@@ -1,2 +1,3 @@
+include torrents button in series view not in emby.
 
-skip episodes until you reach one that is watched (W). then scan until one is not watched and has no file (- in map).
+when torrents button not in emby is pressed send array with one entry "noemby"

@@ -1,1 +1,10 @@
-restore torrents\iptorrents-custom.json from git
+
+
+
+add torrents/src/caption.js with function hasCaptions. hasCaptions will fetch show detail page and check to see if it has subtitles/captions and return true/false.
+
+for now just fetch the detail page for each of iptorrents and torrentleech and save in sample-torrents/iptorrents-detail.html and sample-torrents/torrentleech-detail.html and return true. detail page url is in torrent data.
+
+call hasCaptions when torrent card is clicked and write one of 
+sample-torrents/iptorrents-detail.html or sample-torrents/torrentleech-detail.html
+

@@ -106,7 +106,7 @@ export default {
       const needed = await this.calculateNeeded(show);
       
       // Automatically try to load torrents with saved cookies
-      this.loadTorrents(needed);
+      await this.loadTorrents(needed);
     },
 
     async calculateNeeded(show) {
@@ -329,9 +329,30 @@ export default {
       }
     },
 
-    async handleTorrentClick(event, torrent) {
-      // If detailUrl exists, open it in a new tab
+    handleTorrentClick(event, torrent) {
+      // If detailUrl exists, check for captions and open it in a new tab
       if (torrent.raw && torrent.raw.detailUrl) {
+        // Call hasCaptions API (fire and forget - don't wait for result)
+        void fetch('https://localhost:3001/api/hasCaptions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ 
+            detailUrl: torrent.raw.detailUrl,
+            provider: torrent.raw.provider
+          })
+        })
+          .then(response => response.ok ? response.json() : null)
+          .then(data => {
+            if (data) {
+              console.log('Has captions:', data.hasCaptions);
+            }
+          })
+          .catch(err => {
+            console.error('Error checking captions:', err);
+          });
+        
         window.open(torrent.raw.detailUrl, '_blank');
         return;
       }

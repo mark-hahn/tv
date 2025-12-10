@@ -1,10 +1,33 @@
+the fetch worked.  this is the html for the text block below: <br />
+Text<br />
+ID &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; : 3<br />
+Format &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; : PGS<br />
+Codec ID &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; : S_HDMV/PGS<br />
+Codec ID/Info &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;: Picture based subtitle format used on BDs/HD-DVDs<br />
+Duration &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; : 40 min 57 s<br />
+Bit rate &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; : 58.0 kb/s<br />
+Frame rate &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; : 0.609 FPS<br />
+Count of elements &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;: 1496<br />
+Stream size &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;: 17.0 MiB (1%)<br />
+Language &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; : English<br />
+Default &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;: Yes<br />
+Forced &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; : No<br />
 
+this is that block of text for captions visible in iptorrents web page.
 
+Text
+ID                                       : 3
+Format                                   : PGS
+Codec ID                                 : S_HDMV/PGS
+Codec ID/Info                            : Picture based subtitle format used on BDs/HD-DVDs
+Duration                                 : 40 min 57 s
+Bit rate                                 : 58.0 kb/s
+Frame rate                               : 0.609 FPS
+Count of elements                        : 1496
+Stream size                              : 17.0 MiB (1%)
+Language                                 : English
+Default                                  : Yes
+Forced                                   : No
+--  
 
-add torrents/src/caption.js with function hasCaptions. hasCaptions will fetch show detail page and check to see if it has subtitles/captions and return true/false.
-
-for now just fetch the detail page for each of iptorrents and torrentleech and save in sample-torrents/iptorrents-detail.html and sample-torrents/torrentleech-detail.html and return true. detail page url is in torrent data.
-
-call hasCaptions when torrent card is clicked and write one of 
-sample-torrents/iptorrents-detail.html or sample-torrents/torrentleech-detail.html
-
+in torrents/src/caption.js we need to scan detail pages to find out if it has captions. this one does.

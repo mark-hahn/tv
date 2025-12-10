@@ -15,8 +15,11 @@ const __dirname = path.dirname(__filename);
  */
 export async function hasCaptions(detailUrl, provider) {
   try {
-    // Fetch the detail page using native https/http module
-    const html = await fetchWithRedirects(detailUrl);
+    // Load cookies for authentication
+    const cookies = await loadCookies(provider);
+    
+    // Fetch the detail page using native https/http module with cookies
+    const html = await fetchWithRedirects(detailUrl, 5, cookies);
     
     // Save the HTML to sample-torrents folder
     const sampleDir = path.join(__dirname, '..', '..', 'sample-torrents');
@@ -53,12 +56,50 @@ export async function hasCaptions(detailUrl, provider) {
 }
 
 /**
+ * Load cookies from the cookies folder
+ * @param {string} provider - The torrent provider (iptorrents or torrentleech)
+ * @returns {Promise<Array>} - Array of cookie objects
+ */
+async function loadCookies(provider) {
+  const cookiesDir = path.join(__dirname, '..', 'cookies');
+  let filename;
+  
+  if (provider.toLowerCase() === 'iptorrents') {
+    filename = 'iptorrents.json';
+  } else if (provider.toLowerCase() === 'torrentleech') {
+    filename = 'torrentleech.json';
+  } else {
+    return [];
+  }
+  
+  const filePath = path.join(cookiesDir, filename);
+  
+  try {
+    const data = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error(`Error loading cookies for ${provider}:`, error);
+    return [];
+  }
+}
+
+/**
+ * Convert cookie array to Cookie header string
+ * @param {Array} cookies - Array of cookie objects
+ * @returns {string} - Cookie header string
+ */
+function cookiesToHeader(cookies) {
+  return cookies.map(cookie => `${cookie.name}=${cookie.value}`).join('; ');
+}
+
+/**
  * Fetch URL with automatic redirect following
  * @param {string} url - URL to fetch
  * @param {number} maxRedirects - Maximum number of redirects to follow
+ * @param {Array} cookies - Array of cookie objects for authentication
  * @returns {Promise<string>} - HTML content
  */
-function fetchWithRedirects(url, maxRedirects = 5) {
+function fetchWithRedirects(url, maxRedirects = 5, cookies = []) {
   return new Promise((resolve, reject) => {
     if (maxRedirects <= 0) {
       reject(new Error('Too many redirects'));
@@ -68,7 +109,16 @@ function fetchWithRedirects(url, maxRedirects = 5) {
     const urlObj = new URL(url);
     const protocol = urlObj.protocol === 'https:' ? https : http;
     
-    protocol.get(url, (res) => {
+    const options = {
+      headers: {}
+    };
+    
+    // Add cookies if provided
+    if (cookies && cookies.length > 0) {
+      options.headers['Cookie'] = cookiesToHeader(cookies);
+    }
+    
+    protocol.get(url, options, (res) => {
       // Handle redirects
       if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 303 || res.statusCode === 307 || res.statusCode === 308) {
         const redirectUrl = res.headers.location;
@@ -82,8 +132,8 @@ function fetchWithRedirects(url, maxRedirects = 5) {
         
         console.log(`Following redirect to: ${nextUrl}`);
         
-        // Follow the redirect
-        fetchWithRedirects(nextUrl, maxRedirects - 1)
+        // Follow the redirect with cookies
+        fetchWithRedirects(nextUrl, maxRedirects - 1, cookies)
           .then(resolve)
           .catch(reject);
         return;

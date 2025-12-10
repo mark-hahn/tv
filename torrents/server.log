@@ -1,5 +1,0 @@
-[dotenv@17.2.3] injecting env (4) from .env -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
-
-(node:135184) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
-(Use `node --trace-deprecation ...` to show where the warning was created)
-Torrent search server running at https://localhost:3001

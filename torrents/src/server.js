@@ -14,8 +14,8 @@ const PORT = 3001;
 
 // Load SSL certificate
 const httpsOptions = {
-  key: fs.readFileSync('./localhost-key.pem'),
-  cert: fs.readFileSync('./localhost-cert.pem')
+  key: fs.readFileSync('./cookies/localhost-key.pem'),
+  cert: fs.readFileSync('./cookies/localhost-cert.pem')
 };
 
 // Enable CORS

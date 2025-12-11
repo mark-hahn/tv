@@ -96,3 +96,46 @@ export async function getWaitStr(show) {
   }
   return waitStr; 
 }
+
+//////////// get episode data //////////////
+
+export const getEpisode = async (showName, seasonNum, episodeNum) => {
+  if (!theTvdbToken) await getToken();
+  
+  // Get series ID from allTvdb
+  if (!allTvdb) await getAllTvdb();
+  const tvdbData = allTvdb[showName];
+  
+  if (!tvdbData || !tvdbData.tvdbId) {
+    console.error('getEpisode: no tvdbId found for show:', showName);
+    return null;
+  }
+  
+  const seriesId = tvdbData.tvdbId;
+  
+  // Fetch episodes for the series with season/episode filter
+  const episodeUrl = `https://api4.thetvdb.com/v4/series/${seriesId}/episodes/default?season=${seasonNum}&episodeNumber=${episodeNum}`;
+  
+  const episodeRes = await fetch(episodeUrl, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + theTvdbToken
+    }
+  });
+  
+  if (!episodeRes.ok) {
+    console.error(`tvdb episode fetch error:`, {showName, seasonNum, episodeNum, status: episodeRes.status});
+    return null;
+  }
+  
+  const episodeResObj = await episodeRes.json();
+  const episodes = episodeResObj.data?.episodes;
+  
+  if (!episodes || episodes.length === 0) {
+    console.error('getEpisode: no episode found for:', {showName, seasonNum, episodeNum});
+    return null;
+  }
+  
+  // Return the first matching episode
+  return episodes[0];
+}

@@ -3,7 +3,7 @@
 
   div(v-if="!hideMapBottom")
     div(style="margin:0 5px; display:flex; justify-content:space-between; align-items:center;")
-      div(style="font-size:20px; font-weight:bold;")
+      div(:style="{ marginLeft:'20px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px' }")
         | {{mapShow?.Name}}
       div(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" style="display:flex; gap:5px; flex-shrink:0;")
         button(@click.stop="$emit('prune', mapShow)" style="margin:5px;") Prune

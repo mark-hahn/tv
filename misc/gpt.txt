@@ -1,5 +1,13 @@
 
 
+add a function to src/tvdb.js called getEpisode that is passed show name, series number, and episode number.  it should return all the episode data from tvdb.com about that episode. 
+
+for testing, add code to app.vue onmounted that calls getEpisode with ("Mom", 1, 1) and logs the result
+
+
 add src/components/episode.vue.  it should be a pane that is the exact same size and position as the Series, Map, Actors, and Torrents panes and positioned in app.vue with the others.
 
-add an Episode button to the series pane remote buttons list at the beginning.  When clicked it should display the episode pane.
+add an Episodes button to the series pane remote buttons list at the beginning.  When clicked it should display the episode pane.
+
+display the show name at top left of pane the same as in the Series, Map, Actors, and Torrents panes
+

@@ -19,6 +19,7 @@
     :seriesMapEpis="seriesMapEpis"
     :seriesMap="seriesMap"
     :simpleMode="simpleMode"
+    :sizing="simpleMode ? sizing : sizingNonSimple"
     @prune="handleMapAction('prune', $event)"
     @set-date="handleMapAction('date', $event)"
     @close="handleMapAction('close')"
@@ -184,6 +185,13 @@ export default {
   mounted() {
     const urlParams = new URLSearchParams(window.location.search);
     this.simpleMode = urlParams.has('simple');
+    
+    // Test getEpisode function
+    import('../tvdb.js').then(tvdb => {
+      tvdb.getEpisode('Mom', 1, 1).then(episodeData => {
+        console.log('Episode data for Mom S01E01:', episodeData);
+      });
+    });
     
     // Listen for pane navigation events
     evtBus.on('showActorsPane', () => {

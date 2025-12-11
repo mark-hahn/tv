@@ -68,15 +68,12 @@ export function normalize(torrent, showName) {
   if (parsed.group) {
     group = parsed.group.toUpperCase();
     groupSrc = 'parse';
-    console.log(`Group from parser: "${group}" for title: ${trimmedTitle}`);
   } else {
     const manualGroup = extractGroup(trimmedTitle);
     if (manualGroup) {
       group = manualGroup.toUpperCase();
       groupSrc = 'calc';
-      console.log(`Group calculated: "${group}" for title: ${trimmedTitle}`);
     } else {
-      console.log(`No group found for title: ${trimmedTitle}`);
       // Log to bad-groups file
       const badGroupsFile = path.join(__dirname, '..', '..', 'sample-torrents', 'bad-groups-live.txt');
       const timestamp = new Date().toISOString();

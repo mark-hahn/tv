@@ -1,10 +1,12 @@
 <template lang="pug">
-.torrents-container(@click="$emit('close')" :style="{ height:'100%', width:'100%', display:'flex', justifyContent:'flex-start' }")
-  #torrents(@click="$emit('close')" :style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
+.torrents-container(@click="handleClose" :style="{ height:'100%', width:'100%', display:'flex', justifyContent:'flex-start' }")
+  #torrents(@click="handleClose" :style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
 
     #header(style="font-size:20px; font-weight:bold; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;")
       div(style="margin-left:20px;") {{ showName }}
-      button(@click.stop="$emit('close')" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Close
+      div(style="display:flex; gap:10px;")
+        button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px; background:#4CAF50; color:white; border:none;") Download
+        button(@click.stop="handleClose" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Close
 
     #cookie-inputs(@click.stop v-if="!loading && (error || torrents.length === 0)" style="padding:15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
       div(style="margin-bottom:10px;")
@@ -31,11 +33,20 @@
     #torrents-list(v-if="!loading && !error" style="padding:10px; font-size:14px; line-height:1.6;")
       div(v-if="torrents.length === 0" style="text-align:center; color:#999; margin-top:50px;")
         div No torrents found
-      div(v-for="(torrent, index) in torrents" :key="index" @click="handleTorrentClick($event, torrent)" @click.stop style="margin-bottom:10px; padding:8px; background:#fff; border-radius:5px; border:1px solid #ddd; cursor:pointer;" @mouseenter="$event.currentTarget.style.background='#f5f5f5'" @mouseleave="$event.currentTarget.style.background='#fff'")
+      div(v-for="(torrent, index) in torrents" :key="index" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
         div(v-if="SHOW_TITLE" style="font-size:12px; color:#888; margin-bottom:4px;") {{ torrent.raw.title }}
         div(style="font-size:18px; color:#333;") 
           strong {{ getDisplaySeasonEpisode(torrent) }}
           | : {{ torrent.raw.size }}, {{ torrent.raw.seeds }} seeds<span v-if="torrent.raw.provider">, {{ formatProvider(torrent.raw.provider) }}</span><span v-if="torrent.parsed.resolution">, {{ torrent.parsed.resolution }}</span><span v-if="torrent.parsed.group">, {{ formatGroup(torrent.parsed.group) }}</span>
+
+  #download-modal(v-if="showModal" @click.stop="showModal = false" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:10000;")
+    #modal-content(@click.stop style="background:white; padding:30px; border-radius:10px; max-width:500px; box-shadow:0 4px 20px rgba(0,0,0,0.3);")
+      div(style="font-size:16px; margin-bottom:20px; line-height:1.5;") Do you want to download the torrent 
+        strong {{ selectedTorrent?.raw?.title || 'Unknown' }}
+        |  and send it to USB for qBittorrent to download?
+      div(style="display:flex; gap:10px; justify-content:flex-end;")
+        button(@click.stop="cancelDownload" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;") Cancel
+        button(@click.stop="continueDownload" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; background:#4CAF50; color:white; border:none;") Continue
 
 </template>
 
@@ -67,7 +78,9 @@ export default {
       iptCfClearance: '',
       tlCfClearance: '',
       currentShow: null,
-      SHOW_TITLE: true  // Show torrent title on card
+      SHOW_TITLE: true,  // Show torrent title on card
+      selectedTorrent: null,  // Currently selected torrent
+      showModal: false  // Show download confirmation modal
     };
   },
 
@@ -91,10 +104,17 @@ export default {
   },
 
   methods: {
+    handleClose() {
+      this.selectedTorrent = null;
+      this.showModal = false;
+      this.$emit('close');
+    },
+
     async searchTorrents(show) {
       // Reset state when switching shows
       this.torrents = [];
       this.error = null;
+      this.selectedTorrent = null;
       
       // Store the show for later use with Load button
       this.currentShow = show;
@@ -330,10 +350,51 @@ export default {
     },
 
     handleTorrentClick(event, torrent) {
+      // Select the card
+      this.selectedTorrent = torrent;
+      
       // Open detail page in new tab
-      if (torrent.raw && torrent.raw.detailUrl) {
-        window.open(torrent.raw.detailUrl, '_blank');
-        return;
+      if (torrent.detailUrl) {
+        window.open(torrent.detailUrl, '_blank');
+      }
+    },
+
+    getCardStyle(torrent) {
+      const isSelected = this.selectedTorrent === torrent;
+      return {
+        marginBottom: '10px',
+        padding: '8px',
+        background: isSelected ? '#fffacd' : '#fff',
+        borderRadius: '5px',
+        border: '1px solid #ddd',
+        cursor: 'pointer',
+        transition: 'all 0.2s'
+      };
+    },
+
+    showDownloadModal() {
+      this.showModal = true;
+    },
+
+    cancelDownload() {
+      this.showModal = false;
+      // Keep card selected
+    },
+
+    async continueDownload() {
+      this.showModal = false;
+      
+      if (!this.selectedTorrent) return;
+      
+      try {
+        const { download } = await import('../../torrents/src/download.js');
+        const success = await download(this.selectedTorrent);
+        
+        if (success) {
+          console.log('Download initiated successfully');
+        }
+      } catch (error) {
+        console.error('Download error:', error);
       }
     },
 

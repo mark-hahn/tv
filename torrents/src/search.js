@@ -201,15 +201,15 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     }
   });
   
-  // Add detailUrl to raw data
+  // Add detailUrl to torrent
   matches.forEach(torrent => {
     if (torrent.raw) {
       const provider = torrent.raw.provider?.toLowerCase();
       
       if (provider === 'torrentleech' && torrent.raw.fid) {
-        torrent.raw.detailUrl = `https://www.torrentleech.org/torrent/${torrent.raw.fid}#torrentinfo`;
+        torrent.detailUrl = `https://www.torrentleech.org/torrent/${torrent.raw.fid}#torrentinfo`;
       } else if (provider === 'iptorrents' && torrent.raw.desc) {
-        torrent.raw.detailUrl = torrent.raw.desc;
+        torrent.detailUrl = torrent.raw.desc;
       }
     }
   });

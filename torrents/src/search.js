@@ -8,6 +8,7 @@ const TorrentSearchApi = (await import('torrent-search-api')).default;
 
 const SAVE_SAMPLE_TORRENTS = false;
 const DUMP_NEEDED          = false;
+const SAVE_ALL_RAW         = false;
 
 // Load cookies from files
 function loadCookiesArray(filename) {
@@ -168,12 +169,14 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   console.log('Raw provider counts:', rawProviderCounts);
   
   // Dump all raw torrents for debugging
-  try {
-    const rawDumpPath = path.join(process.cwd(), '..', 'sample-torrents', 'all-raw.json');
-    fs.writeFileSync(rawDumpPath, JSON.stringify(torrents, null, 2));
-    console.log(`Wrote ${torrents.length} raw torrents to all-raw.json`);
-  } catch (err) {
-    console.error('Error writing all-raw.json:', err.message);
+  if (SAVE_ALL_RAW) {
+    try {
+      const rawDumpPath = path.join(process.cwd(), '..', 'sample-torrents', 'all-raw.json');
+      fs.writeFileSync(rawDumpPath, JSON.stringify(torrents, null, 2));
+      console.log(`Wrote ${torrents.length} raw torrents to all-raw.json`);
+    } catch (err) {
+      console.error('Error writing all-raw.json:', err.message);
+    }
   }
     
   // Normalize and filter torrents

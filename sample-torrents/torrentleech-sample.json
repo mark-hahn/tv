@@ -1,40 +1,39 @@
 {
   "parsed": {
+    "year": 2024,
     "resolution": "1080p",
     "source": "web-dl",
     "codec": "h264",
     "audio": "aac",
     "channels": "2 0",
-    "group": "RAWR",
     "season": 1,
-    "title": "Leonard and Hungry Paul",
+    "title": "Rebus",
     "seasonEpisode": "S01"
   },
-  "group": "RAWR",
+  "group": null,
   "groupSrc": "parse",
   "nameMatch": true,
-  "clientTitle": "Leonard and Hungry Paul",
+  "clientTitle": "Rebus (2024)",
   "raw": {
     "provider": "TorrentLeech",
-    "title": "Leonard and Hungry Paul S01 1080p iP WEB-DL AAC2 0 H 264-RAWR",
-    "time": "2025-10-24 18:41:05",
-    "seeds": 23,
-    "peers": 1,
-    "size": "4.3 GiB",
-    "filename": "Leonard.and.Hungry.Paul.S01.1080p.iP.WEB-DL.AAC2.0.H.264-RAWR.torrent",
-    "fid": "241628674",
+    "title": "Rebus (2024) S01 1080p iP WEB-DL H 264 AAC 2 0",
+    "time": "2024-06-18 03:45:35",
+    "seeds": 13,
+    "peers": 0,
+    "size": "15.3 GiB",
+    "filename": "Rebus.(2024).S01.1080p.iP.WEB-DL.H.264.AAC.2.0.torrent",
+    "fid": "241299847",
     "rating": 0,
     "categoryID": 27,
     "new": false,
     "numComments": 0,
     "tags": [
-      "comedy",
-      "Drama",
       "FREELEECH"
     ],
     "imdbID": "",
     "igdbID": "",
-    "tvmazeID": "s86495"
+    "tvmazeID": "s67534",
+    "year": 2024
   },
-  "detailUrl": "https://www.torrentleech.org/torrent/241628674#torrentinfo"
+  "detailUrl": "https://www.torrentleech.org/torrent/241299847#torrentinfo"
 }

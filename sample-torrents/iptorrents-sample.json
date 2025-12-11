@@ -1,25 +1,23 @@
 {
   "parsed": {
-    "resolution": "1080p",
-    "source": "webrip",
-    "codec": "x264",
-    "group": "DARKFLiX",
+    "source": "dvdrip",
+    "codec": "xvid",
+    "group": "IPT",
     "season": 1,
-    "episode": 1,
-    "title": "Leonard and Hungry Paul",
-    "seasonEpisode": "S01E01"
+    "title": "Rebus",
+    "seasonEpisode": "S01"
   },
-  "group": "DARKFLIX",
+  "group": "IPT",
   "groupSrc": "parse",
   "nameMatch": true,
-  "clientTitle": "Leonard and Hungry Paul",
+  "clientTitle": "Rebus (2024)",
   "raw": {
-    "title": "Leonard and Hungry Paul S01E01 1080p WEBRiP x264-DARKFLiX",
-    "seeds": "7",
-    "peers": "0",
-    "size": "701 MB",
-    "desc": "https://iptorrents.com/t/6972938",
+    "title": "Rebus S01-S04 DVDRip XviD-IPT",
+    "seeds": "9",
+    "peers": "1",
+    "size": "8.65 GB",
+    "desc": "https://iptorrents.com/t/801565",
     "provider": "IpTorrents"
   },
-  "detailUrl": "https://iptorrents.com/t/6972938"
+  "detailUrl": "https://iptorrents.com/t/801565"
 }

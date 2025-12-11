@@ -1,9 +1,12 @@
 
 
 
-in torrents/src/download.js when download called then fetch detail page and save html to sample-torrents/ipt-detail.html or sample-torrents/tl-detail.html
+there is a shared headless server. access is:
 
-then search html for button to download torrent file. explain what you find in srvr log
+Hostname: oracle.usbx.me but you can use xobtlu@oracle.usbx.me
+IP: 46.232.211.70
+Port: 22
+Username: xobtlu
+Password: 90-TYUrtyasd 
 
-
-for torrentleech always use match1
+when a torrent file is downloaded send it to /home/xobtlu/watch/qbittorrent

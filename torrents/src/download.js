@@ -1,11 +1,21 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import Client from 'ssh2-sftp-client';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const SAVE_TORRENT_FILE = true;
+const SAVE_TORRENT_FILE = false;
+
+// SFTP server configuration
+const SFTP_CONFIG = {
+  host: 'oracle.usbx.me',
+  port: 22,
+  username: 'xobtlu',
+  password: '90-TYUrtyasd'
+};
+const REMOTE_WATCH_DIR = '/home/xobtlu/watch/qbittorrent';
 
 /**
  * Download torrent and prepare for qBittorrent
@@ -146,11 +156,35 @@ export async function download(torrent, cfClearance = {}) {
     const torrentData = Buffer.from(torrentBuffer);
     console.log(`Downloaded ${torrentData.length} bytes`);
     
+    // Generate simple hash from random number
+    const hash = Math.random().toString(36).substring(2, 15);
+    const torrentFilename = `${hash}.torrent`;
+    
     // Save .torrent file to sample-torrents directory
     if (SAVE_TORRENT_FILE) {
-      const torrentSavePath = path.join(__dirname, '..', '..', 'sample-torrents', 'download.torrent');
+      const torrentSavePath = path.join(__dirname, '..', '..', 'sample-torrents', torrentFilename);
       fs.writeFileSync(torrentSavePath, torrentData);
       console.log(`Saved torrent to: ${torrentSavePath}`);
+    }
+    
+    // Upload to remote SFTP server
+    const remotePath = `${REMOTE_WATCH_DIR}/${torrentFilename}`;
+    
+    console.log(`\nUploading to SFTP server...`);
+    console.log(`Remote path: ${remotePath}`);
+    
+    const sftp = new Client();
+    try {
+      await sftp.connect(SFTP_CONFIG);
+      console.log('Connected to SFTP server');
+      
+      await sftp.put(torrentData, remotePath);
+      console.log(`Successfully uploaded to ${remotePath}`);
+      
+      await sftp.end();
+    } catch (sftpError) {
+      console.error('SFTP upload failed:', sftpError.message);
+      // Don't fail the whole download if SFTP fails
     }
     
   } catch (error) {

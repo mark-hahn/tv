@@ -22,6 +22,7 @@
     "dotenv": "^17.2.3",
     "mailtrap": "^4.3.2",
     "moment": "^2.29.4",
+    "moviedb-promise": "^4.0.7",
     "node-fetch": "^3.3.2",
     "playwright": "^1.55.0",
     "public-ip": "^7.0.1",

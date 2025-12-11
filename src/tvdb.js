@@ -113,7 +113,7 @@ export const getEpisode = async (showName, seasonNum, episodeNum) => {
   
   const seriesId = tvdbData.tvdbId;
   
-  // Fetch episodes for the series with season/episode filter
+  // Fetch episodes to get episode ID
   const episodeUrl = `https://api4.thetvdb.com/v4/series/${seriesId}/episodes/default?season=${seasonNum}&episodeNumber=${episodeNum}`;
   
   const episodeRes = await fetch(episodeUrl, {
@@ -136,6 +136,23 @@ export const getEpisode = async (showName, seasonNum, episodeNum) => {
     return null;
   }
   
-  // Return the first matching episode
-  return episodes[0];
+  const episodeId = episodes[0].id;
+  
+  // Fetch and return extended episode data
+  const extendedUrl = `https://api4.thetvdb.com/v4/episodes/${episodeId}/extended`;
+  
+  const extendedRes = await fetch(extendedUrl, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + theTvdbToken
+    }
+  });
+  
+  if (!extendedRes.ok) {
+    console.error('getEpisode: failed to fetch extended data:', {episodeId, status: extendedRes.status});
+    return null;
+  }
+  
+  const extendedResObj = await extendedRes.json();
+  return extendedResObj.data;
 }

@@ -1,205 +1,365 @@
 [
   {
     "provider": "TorrentLeech",
-    "title": "Taboo (2017) S01 (1080p BDRip x265 10bit EAC3 5 1 - xtrem3x) [TAoE]",
-    "time": "2020-08-16 15:56:31",
-    "seeds": 96,
-    "peers": 0,
-    "size": "11.1 GiB",
-    "filename": "Taboo.(2017).S01.(1080p.BDRip.x265.10bit.EAC3.5.1.-.xtrem3x).[TAoE].torrent",
-    "fid": "1691258",
+    "title": "All Her Fault S01 1080p 10bit WEBRip 6CH x265 HEVC-PSA",
+    "time": "2025-11-06 19:51:21",
+    "seeds": 418,
+    "peers": 2,
+    "size": "4.4 GiB",
+    "filename": "All.Her.Fault.S01.1080p.10bit.WEBRip.6CH.x265.HEVC-PSA.torrent",
+    "fid": "241637455",
     "rating": 0,
     "categoryID": 27,
     "new": false,
-    "numComments": 2,
+    "numComments": 0,
     "tags": [
-      "FREELEECH",
-      "nonscene"
+      "FREELEECH"
     ],
     "imdbID": "",
     "igdbID": "",
-    "tvmazeID": "s3593"
+    "tvmazeID": "s74670"
   },
   {
-    "title": "Taboo UK S01 720p AMZN WEBRip DD+5 1 x264",
-    "seeds": "8",
-    "peers": "0",
-    "size": "12.4 GB",
-    "desc": "https://iptorrents.com/t/2205045",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo S01 720p BluRay DD5 1 x264-DON",
-    "seeds": "8",
+    "title": "All Her Fault S01E01 1080p WEB H264-SYLiX",
+    "seeds": "79",
     "peers": "1",
-    "size": "21 GB",
-    "desc": "https://iptorrents.com/t/2599249",
+    "size": "2.65 GB",
+    "desc": "https://iptorrents.com/t/6992841",
     "provider": "IpTorrents"
   },
   {
-    "title": "Tehran Taboo 2017 [Persian] 1080p AMZN WEB-DL DDP5 1 H 264-NTG",
-    "seeds": "7",
+    "title": "All Her Fault S01E02 1080p WEB H264-SYLiX",
+    "seeds": "74",
     "peers": "0",
-    "size": "2.29 GB",
-    "desc": "https://iptorrents.com/t/2827936",
+    "size": "2.94 GB",
+    "desc": "https://iptorrents.com/t/6992842",
     "provider": "IpTorrents"
   },
   {
-    "title": "Taboo 2017 S01 1080p BluRay DTS x264-SHORTBREHD [NO RAR]",
+    "title": "All Her Fault S01E04 1080p WEB H264-SYLiX",
+    "seeds": "72",
+    "peers": "0",
+    "size": "3 GB",
+    "desc": "https://iptorrents.com/t/6992845",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01 1080p 10bit WEBRip 6CH x265 HEVC-PSA",
+    "seeds": "71",
+    "peers": "2",
+    "size": "4.41 GB",
+    "desc": "https://iptorrents.com/t/6993184",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E03 1080p WEB H264-SYLiX",
+    "seeds": "70",
+    "peers": "0",
+    "size": "3.05 GB",
+    "desc": "https://iptorrents.com/t/6992850",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E05 720p HEVC x265-MeGusta",
+    "seeds": "68",
+    "peers": "2",
+    "size": "228 MB",
+    "desc": "https://iptorrents.com/t/6993609",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E01 720p HEVC x265-MeGusta",
+    "seeds": "68",
+    "peers": "2",
+    "size": "267 MB",
+    "desc": "https://iptorrents.com/t/6993589",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E04 720p HEVC x265-MeGusta",
+    "seeds": "67",
+    "peers": "2",
+    "size": "266 MB",
+    "desc": "https://iptorrents.com/t/6993598",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E03 720p HEVC x265-MeGusta",
+    "seeds": "67",
+    "peers": "2",
+    "size": "312 MB",
+    "desc": "https://iptorrents.com/t/6993610",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E08 720p HEVC x265-MeGusta",
+    "seeds": "66",
+    "peers": "2",
+    "size": "265 MB",
+    "desc": "https://iptorrents.com/t/6993616",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E06 720p HEVC x265-MeGusta",
+    "seeds": "66",
+    "peers": "2",
+    "size": "249 MB",
+    "desc": "https://iptorrents.com/t/6993615",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01 2160p AMZN WEB-DL DDP5 1 HDR H 265-WADU",
+    "seeds": "66",
+    "peers": "0",
+    "size": "44.5 GB",
+    "desc": "https://iptorrents.com/t/6994544",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E02 720p HEVC x265-MeGusta",
+    "seeds": "64",
+    "peers": "2",
+    "size": "281 MB",
+    "desc": "https://iptorrents.com/t/6993591",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01 2160p PCOK WEB-DL DDP5 1 HDR H 265-Kitsune",
+    "seeds": "64",
+    "peers": "2",
+    "size": "44.8 GB",
+    "desc": "https://iptorrents.com/t/6993941",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E07 720p HEVC x265-MeGusta",
     "seeds": "63",
-    "peers": "0",
-    "size": "34.9 GB",
-    "desc": "https://iptorrents.com/t/2261067",
+    "peers": "2",
+    "size": "302 MB",
+    "desc": "https://iptorrents.com/t/6993624",
     "provider": "IpTorrents"
   },
   {
-    "title": "Taboo UK S01 1080p AMZN WEBRip DD+5 1 x264",
+    "title": "All Her Fault S01 2160p AMZN WEB-DL DDP5 1 HDR H 265-Kitsune",
+    "seeds": "49",
+    "peers": "1",
+    "size": "44.5 GB",
+    "desc": "https://iptorrents.com/t/7014863",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E08 1080p WEB h264-ETHEL",
+    "seeds": "47",
+    "peers": "0",
+    "size": "3.26 GB",
+    "desc": "https://iptorrents.com/t/6992851",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E07 1080p WEB H264-SYLiX",
+    "seeds": "47",
+    "peers": "0",
+    "size": "3.17 GB",
+    "desc": "https://iptorrents.com/t/6992858",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E05 1080p WEB H264-SYLiX",
+    "seeds": "47",
+    "peers": "0",
+    "size": "3.09 GB",
+    "desc": "https://iptorrents.com/t/6992844",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E06 1080p WEB H264-SYLiX",
+    "seeds": "46",
+    "peers": "0",
+    "size": "2.68 GB",
+    "desc": "https://iptorrents.com/t/6992849",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01 1080p x265-AMBER",
+    "seeds": "43",
+    "peers": "0",
+    "size": "4.35 GB",
+    "desc": "https://iptorrents.com/t/7054632",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01 1080p AMZN WEB-DL DD 5 1 H 264-playWEB",
+    "seeds": "38",
+    "peers": "1",
+    "size": "18.7 GB",
+    "desc": "https://iptorrents.com/t/6992889",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01 1080p PCOK WEB-DL DDP5 1 H 264-STC",
     "seeds": "35",
     "peers": "1",
-    "size": "24.3 GB",
-    "desc": "https://iptorrents.com/t/2205252",
+    "size": "23.8 GB",
+    "desc": "https://iptorrents.com/t/7030569",
     "provider": "IpTorrents"
   },
   {
-    "title": "Taboo UK S01E04 1080p HEVC x265-MeGusta",
-    "seeds": "34",
-    "peers": "1",
-    "size": "654 MB",
-    "desc": "https://iptorrents.com/t/2160021",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Taboo 2017 Series 1 Complete WEB 1080p DDPL+ 5 1 - MERRY XMAS - EFPG",
-    "time": "2023-12-24 22:39:37",
-    "seeds": 24,
-    "peers": 1,
-    "size": "8.2 GiB",
-    "filename": "Taboo.2017.Series.1.Complete.WEB.1080p.DDPL+.5.1.-.MERRY.XMAS.-.EFPG.torrent",
-    "fid": "241189878",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 2,
-    "tags": [
-      "Drama",
-      "FREELEECH",
-      "Mystery",
-      "Thriller"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s3593"
-  },
-  {
-    "title": "Taboo 2017 S01E01 720p IP WEBRip AAC2 0 H 264-monkee",
-    "seeds": "3",
+    "title": "All Her Fault S01E08 1080p AMZN WEB-DL DD 5 1 H 264-playWEB",
+    "seeds": "29",
     "peers": "0",
-    "size": "943 MB",
-    "desc": "https://iptorrents.com/t/2133087",
+    "size": "2.32 GB",
+    "desc": "https://iptorrents.com/t/6993324",
     "provider": "IpTorrents"
   },
   {
-    "title": "Taboo UK S01E08 720p HEVC x265-MeGusta",
-    "seeds": "23",
-    "peers": "1",
-    "size": "321 MB",
-    "desc": "https://iptorrents.com/t/2199101",
+    "title": "All Her Fault S01 1080p AMZN WEB-DL DDP5 1 H 264-BLOOM",
+    "seeds": "29",
+    "peers": "0",
+    "size": "18.7 GB",
+    "desc": "https://iptorrents.com/t/6993078",
     "provider": "IpTorrents"
   },
   {
-    "title": "Taboo UK S01E03 1080p HEVC x265-MeGusta",
-    "seeds": "23",
-    "peers": "1",
-    "size": "618 MB",
-    "desc": "https://iptorrents.com/t/2150769",
+    "title": "All Her Fault S01E05 1080p AMZN WEB-DL DD 5 1 H 264-playWEB",
+    "seeds": "28",
+    "peers": "0",
+    "size": "1.95 GB",
+    "desc": "https://iptorrents.com/t/6993268",
     "provider": "IpTorrents"
   },
   {
-    "title": "Taboo UK S01E05 1080p HEVC x265-MeGusta",
-    "seeds": "22",
+    "title": "All Her Fault S01 720p AMZN WEB-DL DDP5 1 H 264-FLUX",
+    "seeds": "27",
     "peers": "1",
-    "size": "656 MB",
-    "desc": "https://iptorrents.com/t/2169438",
+    "size": "8.54 GB",
+    "desc": "https://iptorrents.com/t/6993182",
     "provider": "IpTorrents"
   },
   {
-    "title": "Taboo UK S01E02 1080p HDTV x265 HEVC 6CH-MRN",
-    "seeds": "22",
-    "peers": "1",
-    "size": "646 MB",
-    "desc": "https://iptorrents.com/t/2144832",
+    "title": "All Her Fault S01E04 1080p AMZN WEB-DL DD 5 1 H 264-playWEB",
+    "seeds": "26",
+    "peers": "0",
+    "size": "2.26 GB",
+    "desc": "https://iptorrents.com/t/6993305",
     "provider": "IpTorrents"
   },
   {
-    "title": "Taboo UK S01E07 INTERNAL 1080p HEVC x265-MeGusta",
-    "seeds": "21",
-    "peers": "1",
-    "size": "694 MB",
-    "desc": "https://iptorrents.com/t/2190022",
+    "title": "All Her Fault S01E01 XviD-AFG",
+    "seeds": "26",
+    "peers": "0",
+    "size": "343 MB",
+    "desc": "https://iptorrents.com/t/6993651",
     "provider": "IpTorrents"
   },
   {
-    "title": "Taboo UK S01E06 INTERNAL 1080p HEVC x265-MeGusta",
-    "seeds": "21",
-    "peers": "1",
-    "size": "763 MB",
-    "desc": "https://iptorrents.com/t/2180478",
+    "title": "All Her Fault S01E01 1080p AMZN WEB-DL DD 5 1 H 264-playWEB",
+    "seeds": "26",
+    "peers": "0",
+    "size": "2.1 GB",
+    "desc": "https://iptorrents.com/t/6993303",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E06 1080p HEVC x265-MeGusta",
+    "seeds": "245",
+    "peers": "4",
+    "size": "336 MB",
+    "desc": "https://iptorrents.com/t/6993061",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E07 1080p HEVC x265-MeGusta",
+    "seeds": "243",
+    "peers": "5",
+    "size": "408 MB",
+    "desc": "https://iptorrents.com/t/6993070",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E08 1080p HEVC x265-MeGusta",
+    "seeds": "242",
+    "peers": "3",
+    "size": "343 MB",
+    "desc": "https://iptorrents.com/t/6993054",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E01 1080p HEVC x265-MeGusta",
+    "seeds": "237",
+    "peers": "5",
+    "size": "365 MB",
+    "desc": "https://iptorrents.com/t/6993007",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E02 1080p HEVC x265-MeGusta",
+    "seeds": "230",
+    "peers": "5",
+    "size": "378 MB",
+    "desc": "https://iptorrents.com/t/6993018",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E03 1080p HEVC x265-MeGusta",
+    "seeds": "229",
+    "peers": "4",
+    "size": "424 MB",
+    "desc": "https://iptorrents.com/t/6993046",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E05 1080p HEVC x265-MeGusta",
+    "seeds": "227",
+    "peers": "3",
+    "size": "283 MB",
+    "desc": "https://iptorrents.com/t/6993031",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E04 1080p HEVC x265-MeGusta",
+    "seeds": "226",
+    "peers": "5",
+    "size": "350 MB",
+    "desc": "https://iptorrents.com/t/6993026",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01 1080p AMZN WEB-DL DDP5 1 H 264-Kitsune",
+    "seeds": "225",
+    "peers": "3",
+    "size": "18.7 GB",
+    "desc": "https://iptorrents.com/t/6993958",
     "provider": "IpTorrents"
   },
   {
     "provider": "TorrentLeech",
-    "title": "Taboo 2017 S01 NORDiC 1080p WEB-DL H 264-QUARK",
-    "time": "2022-09-18 09:28:13",
-    "seeds": 19,
+    "title": "All Her Fault (2025) S01 (1080p AMZN Webrip x265 10bit EAC3 5 1 - DNU)[TAoE]",
+    "time": "2025-11-12 00:12:58",
+    "seeds": 216,
     "peers": 2,
-    "size": "11.8 GiB",
-    "filename": "Taboo.2017.S01.NORDiC.1080p.WEB-DL.H.264-QUARK.torrent",
-    "fid": "240899832",
-    "rating": 8.4,
+    "size": "7.1 GiB",
+    "filename": "All.Her.Fault.(2025).S01.(1080p.AMZN.Webrip.x265.10bit.EAC3.5.1.-.DNU)[TAoE].torrent",
+    "fid": "241640633",
+    "rating": 0,
     "categoryID": 27,
     "new": false,
     "numComments": 0,
     "tags": [
       "FREELEECH"
     ],
-    "imdbID": "tt3647998",
+    "imdbID": "",
     "igdbID": "",
-    "tvmazeID": ""
-  },
-  {
-    "title": "Taboo S01 480p BluRay nSD x264-NhaNc3",
-    "seeds": "18",
-    "peers": "1",
-    "size": "4.68 GB",
-    "desc": "https://iptorrents.com/t/3032726",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo UK S01E01 1080p HDTV x265 HEVC 6CH-MRN",
-    "seeds": "17",
-    "peers": "1",
-    "size": "605 MB",
-    "desc": "https://iptorrents.com/t/2133138",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo S01 2017 BluRay 1080i DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "16",
-    "peers": "1",
-    "size": "95.3 GB",
-    "desc": "https://iptorrents.com/t/2387896",
-    "provider": "IpTorrents"
+    "tvmazeID": "s74670"
   },
   {
     "provider": "TorrentLeech",
-    "title": "Taboo 2017 S01 COMPLETE REMUX BluRay 1080p AVC DTS-HD MA 5 1 x264-LEGi0N ",
-    "time": "2023-02-07 16:04:42",
-    "seeds": 16,
+    "title": "All Her Fault 2025 S01 1080p PCOK WEB-DL DD+ 5 1 H 264-KRATOS",
+    "time": "2025-11-06 11:19:20",
+    "seeds": 145,
     "peers": 0,
-    "size": "95.4 GiB",
-    "filename": "Taboo.2017.S01.COMPLETE.REMUX.BluRay.1080p.AVC.DTS-HD.MA.5.1.x264-LEGi0N..torrent",
-    "fid": "240982162",
+    "size": "23.8 GiB",
+    "filename": "All.Her.Fault.2025.S01.1080p.PCOK.WEB-DL.DD+.5.1.H.264-KRATOS.torrent",
+    "fid": "241637252",
     "rating": 0,
     "categoryID": 27,
     "new": false,
@@ -212,249 +372,59 @@
     ],
     "imdbID": "",
     "igdbID": "",
-    "tvmazeID": "s3593"
-  },
-  {
-    "title": "Taboo UK S01E01 1080p BluRay x264-SHORTBREHD",
-    "seeds": "5",
-    "peers": "0",
-    "size": "4.36 GB",
-    "desc": "https://iptorrents.com/t/2260334",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo UK S01E01 PROPER 720p HEVC x265-MeGusta",
-    "seeds": "3",
-    "peers": "0",
-    "size": "274 MB",
-    "desc": "https://iptorrents.com/t/2132887",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo UK S01E02 720p HEVC x265-MeGusta",
-    "seeds": "15",
-    "peers": "0",
-    "size": "280 MB",
-    "desc": "https://iptorrents.com/t/2141024",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo 2017 S01 1080p BluRay REMUX AVC DTS-HD MA 5 1-EPSiLON",
-    "seeds": "15",
-    "peers": "0",
-    "size": "76.6 GB",
-    "desc": "https://iptorrents.com/t/2279954",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo UK S01E03 720p HEVC x265-MeGusta",
-    "seeds": "13",
-    "peers": "0",
-    "size": "275 MB",
-    "desc": "https://iptorrents.com/t/2150707",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo UK S01E07 720p HEVC x265-MeGusta",
-    "seeds": "12",
-    "peers": "0",
-    "size": "275 MB",
-    "desc": "https://iptorrents.com/t/2189633",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo UK S01E01 REAL PROPER 720p HEVC x265-MeGusta",
-    "seeds": "12",
-    "peers": "0",
-    "size": "280 MB",
-    "desc": "https://iptorrents.com/t/2133578",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo 2017 S01 1080p HDTV x264-MIXED[NO RAR]",
-    "seeds": "11",
-    "peers": "0",
-    "size": "19 GB",
-    "desc": "https://iptorrents.com/t/2199957",
-    "provider": "IpTorrents"
+    "tvmazeID": "s74670"
   },
   {
     "provider": "TorrentLeech",
-    "title": "Taboo (2017) S01 (1080p BDRip x265 10bit DTS-HD MA 5 1 - xtrem3x) [TAoE]",
-    "time": "2020-08-16 15:56:23",
-    "seeds": 11,
-    "peers": 0,
-    "size": "19.3 GiB",
-    "filename": "Taboo.(2017).S01.(1080p.BDRip.x265.10bit.DTS-HD.MA.5.1.-.xtrem3x).[TAoE].torrent",
-    "fid": "1691257",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 4,
-    "tags": [
-      "FREELEECH",
-      "nonscene"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s3593"
-  },
-  {
-    "title": "Taboo UK S01E06 720p HEVC x265-MeGusta",
-    "seeds": "10",
-    "peers": "0",
-    "size": "315 MB",
-    "desc": "https://iptorrents.com/t/2178965",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo UK S01E05 720p HEVC x265-MeGusta",
-    "seeds": "10",
-    "peers": "0",
-    "size": "302 MB",
-    "desc": "https://iptorrents.com/t/2169288",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Taboo 2017 1080p WEB-DL HEVC H265 MULTi D DPL 5 1 - EFPG",
-    "time": "2023-01-06 15:56:32",
-    "seeds": 3,
-    "peers": 0,
-    "size": "13.9 GiB",
-    "filename": "Taboo.2017.1080p.WEB-DL.HEVC.H265.MULTi.D.DPL.5.1.-.EFPG.torrent",
-    "fid": "240965106",
-    "rating": 0,
+    "title": "All Her Fault S01 1080p WEBRip 10Bit DDP5 1 HEVC-d3g",
+    "time": "2025-11-07 14:23:12",
+    "seeds": 125,
+    "peers": 2,
+    "size": "9.6 GiB",
+    "filename": "All.Her.Fault.S01.1080p.WEBRip.10Bit.DDP5.1.HEVC-d3g.torrent",
+    "fid": "241637950",
+    "rating": 7.2,
     "categoryID": 27,
     "new": false,
     "numComments": 0,
     "tags": [
       "Drama",
-      "FREELEECH",
-      "Mystery",
-      "Thriller"
+      "FREELEECH"
     ],
-    "imdbID": "",
+    "imdbID": "tt31314751",
     "igdbID": "",
-    "tvmazeID": "s3593"
-  },
-  {
-    "title": "Taboo UK S01E07 720p HDTV x264-ORGANiC",
-    "seeds": "1",
-    "peers": "0",
-    "size": "982 MB",
-    "desc": "https://iptorrents.com/t/2189622",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo UK S01E06 720p HDTV x264-ORGANiC",
-    "seeds": "1",
-    "peers": "0",
-    "size": "1.03 GB",
-    "desc": "https://iptorrents.com/t/2178936",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo UK S01E05 720p HDTV x264-ORGANiC",
-    "seeds": "1",
-    "peers": "0",
-    "size": "0.98 GB",
-    "desc": "https://iptorrents.com/t/2169273",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo UK S01E03 720p HDTV x264-ORGANiC",
-    "seeds": "1",
-    "peers": "0",
-    "size": "953 MB",
-    "desc": "https://iptorrents.com/t/2150694",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo UK S01E02 720p HDTV x264-ORGANiC",
-    "seeds": "1",
-    "peers": "0",
-    "size": "949 MB",
-    "desc": "https://iptorrents.com/t/2141010",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo UK S01E01 REAL PROPER 720p HDTV x264-DEADPOOL",
-    "seeds": "1",
-    "peers": "0",
-    "size": "903 MB",
-    "desc": "https://iptorrents.com/t/2133564",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo UK S01 720p BluRay x264-SHORTBREHD [NO RAR]",
-    "seeds": "1",
-    "peers": "1",
-    "size": "19.7 GB",
-    "desc": "https://iptorrents.com/t/2261161",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo UK 2017 S01 720p WEB DL DD5 1 x264-ITSat",
-    "seeds": "0",
-    "peers": "1",
-    "size": "7.05 GB",
-    "desc": "https://iptorrents.com/t/2205241",
-    "provider": "IpTorrents"
+    "tvmazeID": "s74670"
   },
   {
     "provider": "TorrentLeech",
-    "title": "Taboo UK S01 1080p AMZN WEBRip DD+5.1 x264-CasStudio",
-    "time": "2023-05-31 08:08:01",
-    "seeds": 63,
+    "title": "All Her Fault S01 2160p AMZN WEB-DL DDP5 1 HDR H 265-WADU",
+    "time": "2025-11-07 06:28:45",
+    "seeds": 122,
     "peers": 1,
-    "size": "24.4 GiB",
-    "filename": "Taboo.UK.S01.1080p.AMZN.WEBRip.DD+5.1.x264-CasStudio.torrent",
-    "fid": "241059642",
-    "rating": 0,
+    "size": "44.6 GiB",
+    "filename": "All.Her.Fault.S01.2160p.AMZN.WEB-DL.DDP5.1.HDR.H.265-WADU.torrent",
+    "fid": "241637731",
+    "rating": 7.2,
     "categoryID": 27,
     "new": false,
-    "numComments": 2,
+    "numComments": 0,
     "tags": [
       "Drama",
-      "FREELEECH",
-      "Mystery",
-      "Thriller"
+      "FREELEECH"
     ],
-    "imdbID": "",
+    "imdbID": "tt31314751",
     "igdbID": "",
-    "tvmazeID": "s3593"
+    "tvmazeID": "s74670"
   },
   {
     "provider": "TorrentLeech",
-    "title": "Taboo UK S01E01 SUBPACK HDTV x264-DEADPOOL",
-    "time": "2017-01-08 00:47:14",
-    "seeds": 46,
+    "title": "All Her Fault 2025 S01 2160p PCOK WEB-DL DD+ 5 1 HDR H 265-KRATOS",
+    "time": "2025-11-06 11:59:14",
+    "seeds": 111,
     "peers": 0,
-    "size": "63.7 KiB",
-    "filename": "Taboo.UK.S01E01.SUBPACK.HDTV.x264-DEADPOOL.torrent",
-    "fid": "820801",
-    "rating": 8.7,
-    "categoryID": 26,
-    "new": false,
-    "numComments": 7,
-    "tags": [
-      "Drama",
-      "rar"
-    ],
-    "imdbID": "tt4700596",
-    "igdbID": "",
-    "tvmazeID": "e989920"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Taboo UK S01 COMPLETE 1080p 10bit WEB 6CH x265 HEVC-PSA",
-    "time": "2024-10-31 19:16:26",
-    "seeds": 42,
-    "peers": 2,
-    "size": "6.0 GiB",
-    "filename": "Taboo.UK.S01.COMPLETE.1080p.10bit.WEB.6CH.x265.HEVC-PSA.torrent",
-    "fid": "241377545",
+    "size": "44.8 GiB",
+    "filename": "All.Her.Fault.2025.S01.2160p.PCOK.WEB-DL.DD+.5.1.HDR.H.265-KRATOS.torrent",
+    "fid": "241637269",
     "rating": 0,
     "categoryID": 27,
     "new": false,
@@ -464,1019 +434,1175 @@
     ],
     "imdbID": "",
     "igdbID": "",
-    "tvmazeID": "s3593"
+    "tvmazeID": "s74670"
   },
   {
     "provider": "TorrentLeech",
-    "title": "The Secret Lives of Mormon Wives S02E04 The Book of Taboos 1080p DSNP WEB-DL DDP5 1 H 264-BLOOM",
-    "time": "2025-07-06 16:39:20",
-    "seeds": 26,
-    "peers": 0,
-    "size": "2.2 GiB",
-    "filename": "The.Secret.Lives.of.Mormon.Wives.S02E04.The.Book.of.Taboos.1080p.DSNP.WEB-DL.DDP5.1.H.264-BLOOM.torrent",
-    "fid": "241552132",
-    "rating": 0,
+    "title": "All Her Fault S01E03 1080p WEB H264-SYLiX",
+    "time": "2025-11-06 10:55:21",
+    "seeds": 107,
+    "peers": 1,
+    "size": "3.1 GiB",
+    "filename": "All.Her.Fault.S01E03.1080p.WEB.H264-SYLiX.torrent",
+    "fid": "241637234",
+    "rating": 7.2,
     "categoryID": 32,
     "new": false,
     "numComments": 0,
-    "tags": "",
-    "imdbID": "",
+    "tags": [
+      "Drama"
+    ],
+    "imdbID": "tt31314751",
     "igdbID": "",
-    "tvmazeID": "e3170279"
+    "tvmazeID": "s74670"
   },
   {
-    "title": "Yu Yu Hakusho S03E03 The Power of Taboo 1080p CR WEB-DL DUAL DDP2 0 H 264-Kitsune",
+    "provider": "TorrentLeech",
+    "title": "All Her Fault S01E02 1080p WEB H264-SYLiX",
+    "time": "2025-11-06 10:53:48",
+    "seeds": 99,
+    "peers": 2,
+    "size": "3.0 GiB",
+    "filename": "All.Her.Fault.S01E02.1080p.WEB.H264-SYLiX.torrent",
+    "fid": "241637232",
+    "rating": 7.2,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "Drama"
+    ],
+    "imdbID": "tt31314751",
+    "igdbID": "",
+    "tvmazeID": "s74670"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "All Her Fault S01E06 1080p WEB H264-SYLiX",
+    "time": "2025-11-06 10:58:55",
+    "seeds": 96,
+    "peers": 3,
+    "size": "2.7 GiB",
+    "filename": "All.Her.Fault.S01E06.1080p.WEB.H264-SYLiX.torrent",
+    "fid": "241637237",
+    "rating": 7.2,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "Drama"
+    ],
+    "imdbID": "tt31314751",
+    "igdbID": "",
+    "tvmazeID": "s74670"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "All Her Fault S01E01 1080p WEB H264-SYLiX",
+    "time": "2025-11-06 10:52:14",
+    "seeds": 96,
+    "peers": 2,
+    "size": "2.7 GiB",
+    "filename": "All.Her.Fault.S01E01.1080p.WEB.H264-SYLiX.torrent",
+    "fid": "241637231",
+    "rating": 7.2,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "Drama"
+    ],
+    "imdbID": "tt31314751",
+    "igdbID": "",
+    "tvmazeID": "s74670"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "All Her Fault S01E07 1080p WEB H264-SYLiX",
+    "time": "2025-11-06 11:01:19",
+    "seeds": 90,
+    "peers": 3,
+    "size": "3.2 GiB",
+    "filename": "All.Her.Fault.S01E07.1080p.WEB.H264-SYLiX.torrent",
+    "fid": "241637238",
+    "rating": 7.2,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "Drama"
+    ],
+    "imdbID": "tt31314751",
+    "igdbID": "",
+    "tvmazeID": "s74670"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "All Her Fault S01E08 1080p WEB h264-ETHEL",
+    "time": "2025-11-06 11:02:31",
+    "seeds": 89,
+    "peers": 1,
+    "size": "3.3 GiB",
+    "filename": "All.Her.Fault.S01E08.1080p.WEB.h264-ETHEL.torrent",
+    "fid": "241637239",
+    "rating": 7.2,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "Drama"
+    ],
+    "imdbID": "tt31314751",
+    "igdbID": "",
+    "tvmazeID": "s74670"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "All Her Fault S01E05 1080p WEB H264-SYLiX",
+    "time": "2025-11-06 10:57:53",
+    "seeds": 87,
+    "peers": 1,
+    "size": "3.1 GiB",
+    "filename": "All.Her.Fault.S01E05.1080p.WEB.H264-SYLiX.torrent",
+    "fid": "241637236",
+    "rating": 7.2,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "Drama"
+    ],
+    "imdbID": "tt31314751",
+    "igdbID": "",
+    "tvmazeID": "s74670"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "All Her Fault S01E04 1080p WEB H264-SYLiX",
+    "time": "2025-11-06 10:56:41",
+    "seeds": 84,
+    "peers": 2,
+    "size": "3.1 GiB",
+    "filename": "All.Her.Fault.S01E04.1080p.WEB.H264-SYLiX.torrent",
+    "fid": "241637235",
+    "rating": 7.2,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "Drama"
+    ],
+    "imdbID": "tt31314751",
+    "igdbID": "",
+    "tvmazeID": "s74670"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "All Her Fault S01 720p x264-AMBER",
+    "time": "2025-12-07 19:01:27",
+    "seeds": 60,
+    "peers": 0,
+    "size": "3.9 GiB",
+    "filename": "All.Her.Fault.S01.720p.x264-AMBER.torrent",
+    "fid": "241657212",
+    "rating": 7.2,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "720p",
+      "Amber",
+      "FREELEECH"
+    ],
+    "imdbID": "tt31314751",
+    "igdbID": "",
+    "tvmazeID": "s74670"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "All Her Fault S01 1080p x265-AMBER",
+    "time": "2025-12-07 19:03:56",
+    "seeds": 60,
+    "peers": 0,
+    "size": "4.4 GiB",
+    "filename": "All.Her.Fault.S01.1080p.x265-AMBER.torrent",
+    "fid": "241657216",
+    "rating": 7.2,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "1080p",
+      "Amber",
+      "FREELEECH"
+    ],
+    "imdbID": "tt31314751",
+    "igdbID": "",
+    "tvmazeID": "s74670"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "All Her Fault S01 720p AMZN WEB-DL DD+ 5 1 H 264-FLUX",
+    "time": "2025-11-08 20:28:41",
+    "seeds": 55,
+    "peers": 2,
+    "size": "8.5 GiB",
+    "filename": "All.Her.Fault.S01.720p.AMZN.WEB-DL.DD+.5.1.H.264-FLUX.torrent",
+    "fid": "241638575",
+    "rating": 7.2,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 1,
+    "tags": [
+      "Drama",
+      "FREELEECH"
+    ],
+    "imdbID": "tt31314751",
+    "igdbID": "",
+    "tvmazeID": "s74670"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "All Her Fault S01 1080p PCOK WEB-DL DDP5 1 H 264-STC",
+    "time": "2025-11-25 21:07:33",
+    "seeds": 53,
+    "peers": 0,
+    "size": "23.8 GiB",
+    "filename": "All.Her.Fault.S01.1080p.PCOK.WEB-DL.DDP5.1.H.264-STC.torrent",
+    "fid": "241649614",
+    "rating": 0,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "FREELEECH"
+    ],
+    "imdbID": "",
+    "igdbID": "",
+    "tvmazeID": "s74670"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "All Her Fault S01 2160p PCOK WEB-DL DDP5 1 H 265-STC",
+    "time": "2025-11-25 20:59:55",
+    "seeds": 46,
+    "peers": 1,
+    "size": "44.7 GiB",
+    "filename": "All.Her.Fault.S01.2160p.PCOK.WEB-DL.DDP5.1.H.265-STC.torrent",
+    "fid": "241649609",
+    "rating": 0,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "FREELEECH"
+    ],
+    "imdbID": "",
+    "igdbID": "",
+    "tvmazeID": "s74670"
+  },
+  {
+    "title": "All Her Fault S01E07 AAC MP4-Mobile",
     "seeds": "9",
     "peers": "0",
-    "size": "1.28 GB",
-    "desc": "https://iptorrents.com/t/6583271",
+    "size": "169 MB",
+    "desc": "https://iptorrents.com/t/6993596",
     "provider": "IpTorrents"
   },
   {
-    "title": "Taboo University Book One-I KnoW",
-    "seeds": "15",
+    "title": "All Her Fault S01E06 AAC MP4-Mobile",
+    "seeds": "9",
     "peers": "0",
-    "size": "7.54 GB",
-    "desc": "https://iptorrents.com/t/6174660",
+    "size": "137 MB",
+    "desc": "https://iptorrents.com/t/6993593",
     "provider": "IpTorrents"
   },
   {
-    "title": "Taboo II 1982 BluRay 1080p DDP 1 0 x265-SM737",
-    "seeds": "12",
+    "title": "All Her Fault S01E05 AAC MP4-Mobile",
+    "seeds": "9",
+    "peers": "1",
+    "size": "125 MB",
+    "desc": "https://iptorrents.com/t/6993586",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E04 AAC MP4-Mobile",
+    "seeds": "9",
     "peers": "0",
-    "size": "4.88 GB",
-    "desc": "https://iptorrents.com/t/6914300",
+    "size": "146 MB",
+    "desc": "https://iptorrents.com/t/6993555",
     "provider": "IpTorrents"
   },
   {
-    "title": "Dragon Ball DAIMA S01E14 Taboo REPACK 1080p CR WEB-DL AAC2 0 H 264-VARYG",
-    "seeds": "12",
+    "title": "All Her Fault S01E03 AAC MP4-Mobile",
+    "seeds": "9",
+    "peers": "1",
+    "size": "174 MB",
+    "desc": "https://iptorrents.com/t/6993559",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E02 AAC MP4-Mobile",
+    "seeds": "9",
+    "peers": "1",
+    "size": "156 MB",
+    "desc": "https://iptorrents.com/t/6993548",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E02 2160p AMZN WEB-DL DD 5 1 HDR H 265-playWEB",
+    "seeds": "9",
     "peers": "0",
-    "size": "1.37 GB",
-    "desc": "https://iptorrents.com/t/6398002",
+    "size": "5.5 GB",
+    "desc": "https://iptorrents.com/t/6993419",
     "provider": "IpTorrents"
   },
   {
-    "provider": "TorrentLeech",
-    "title": "Taboo UK S01 1080p BluRay x264-SHORTBREHD",
-    "time": "2017-04-14 06:28:57",
-    "seeds": 11,
-    "peers": 0,
-    "size": "35.5 GiB",
-    "filename": "Taboo.UK.S01.1080p.BluRay.x264-SHORTBREHD.torrent",
-    "fid": "868577",
-    "rating": 8.4,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 4,
-    "tags": [
-      "Drama",
-      "Fantasy",
-      "FREELEECH",
-      "rar",
-      "Thriller"
-    ],
-    "imdbID": "tt3647998",
-    "igdbID": "",
-    "tvmazeID": "s3593"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Taboo Season 1 S01 1080p 10bit BluRay 5 1 x265 HEVC-MZABI ",
-    "time": "2017-06-14 13:19:33",
-    "seeds": 11,
-    "peers": 0,
-    "size": "7.0 GiB",
-    "filename": "Taboo.Season.1.S01.1080p.10bit.BluRay.5.1.x265.HEVC-MZABI..torrent",
-    "fid": "901851",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 3,
-    "tags": [
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": ""
-  },
-  {
-    "title": "Taboo UK S01E08 1080p HEVC x265-MeGusta",
-    "seeds": "10",
-    "peers": "0",
-    "size": "652 MB",
-    "desc": "https://iptorrents.com/t/2201536",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Taboo UK S01 720p HDTV x264 - ORGANiC",
-    "time": "2017-02-26 21:51:11",
-    "seeds": 10,
-    "peers": 0,
-    "size": "7.7 GiB",
-    "filename": "Taboo.UK.S01.720p.HDTV.x264.-.ORGANiC.torrent",
-    "fid": "847310",
-    "rating": 8.4,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 2,
-    "tags": [
-      "Drama",
-      "FREELEECH"
-    ],
-    "imdbID": "tt3647998",
-    "igdbID": "",
-    "tvmazeID": ""
-  },
-  {
-    "title": "Dragon Ball DAIMA S01E14 Taboo 1080p CR WEB-DL DUAL DDP2 0 H 264-Kitsune",
-    "seeds": "10",
-    "peers": "0",
-    "size": "1.43 GB",
-    "desc": "https://iptorrents.com/t/6591086",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Taboo S01 1080i DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "time": "2023-01-18 14:43:05",
-    "seeds": 9,
-    "peers": 0,
-    "size": "95.4 GiB",
-    "filename": "Taboo.S01.1080i.DTS-HD.MA.5.1.AVC.REMUX-FraMeSToR.torrent",
-    "fid": "240970950",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 1,
-    "tags": [
-      "Drama",
-      "FREELEECH",
-      "Mystery",
-      "Thriller"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s3593"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Taboo UK Season One BluRay 1080p HEVC-d3g",
-    "time": "2017-04-15 18:54:07",
-    "seeds": 8,
-    "peers": 0,
-    "size": "9.5 GiB",
-    "filename": "Taboo.UK.Season.One.BluRay.1080p.HEVC-d3g.torrent",
-    "fid": "869242",
-    "rating": 8.4,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 1,
-    "tags": [
-      "Drama",
-      "Fantasy",
-      "FREELEECH",
-      "Thriller"
-    ],
-    "imdbID": "tt3647998",
-    "igdbID": "",
-    "tvmazeID": "s3593"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Taboo UK S01E02 INTERNAL 1080p HDTV x264-FaiLED",
-    "time": "2017-01-15 00:37:09",
-    "seeds": 8,
-    "peers": 0,
-    "size": "3.7 GiB",
-    "filename": "Taboo.UK.S01E02.INTERNAL.1080p.HDTV.x264-FaiLED.torrent",
-    "fid": "824056",
-    "rating": 9.3,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 1,
-    "tags": [
-      "Drama",
-      "rar"
-    ],
-    "imdbID": "tt4700604",
-    "igdbID": "",
-    "tvmazeID": "e991258"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Taboo UK S01 1080p BluRay REMUX AVC DTS-HD MA 5 1-EPSiLON",
-    "time": "2022-04-13 09:34:51",
-    "seeds": 8,
-    "peers": 0,
-    "size": "76.6 GiB",
-    "filename": "Taboo.UK.S01.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-EPSiLON.torrent",
-    "fid": "2116544",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 1,
-    "tags": [
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": ""
-  },
-  {
-    "title": "Archer 2009 S09E05 Strange Doings in the Taboo Groves 1080p AMZN WEB DDP5 1 AV1-DBMS",
+    "title": "All Her Fault S01E07 480p x264-mSD",
     "seeds": "8",
     "peers": "0",
-    "size": "378 MB",
-    "desc": "https://iptorrents.com/t/6130797",
+    "size": "262 MB",
+    "desc": "https://iptorrents.com/t/6993442",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E05 480p x264-mSD",
+    "seeds": "8",
+    "peers": "0",
+    "size": "217 MB",
+    "desc": "https://iptorrents.com/t/6993428",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E07 HDR 2160p WEB H265-SYLiX",
+    "seeds": "7",
+    "peers": "0",
+    "size": "5.95 GB",
+    "desc": "https://iptorrents.com/t/6993013",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E06 HDR 2160p WEB H265-SYLiX",
+    "seeds": "7",
+    "peers": "0",
+    "size": "5.03 GB",
+    "desc": "https://iptorrents.com/t/6993017",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E01 AAC MP4-Mobile",
+    "seeds": "7",
+    "peers": "1",
+    "size": "147 MB",
+    "desc": "https://iptorrents.com/t/6993546",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E01 480p x264-mSD",
+    "seeds": "7",
+    "peers": "0",
+    "size": "225 MB",
+    "desc": "https://iptorrents.com/t/6993393",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E01 2160p AMZN WEB-DL DD 5 1 HDR H 265-playWEB",
+    "seeds": "7",
+    "peers": "0",
+    "size": "4.94 GB",
+    "desc": "https://iptorrents.com/t/6993416",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E01 1080p 10bit WEBRip 6CH x265 HEVC-PSA",
+    "seeds": "7",
+    "peers": "0",
+    "size": "4.41 GB",
+    "desc": "https://iptorrents.com/t/6993120",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E08 HDR 2160p WEB H265-SYLiX",
+    "seeds": "6",
+    "peers": "0",
+    "size": "6.12 GB",
+    "desc": "https://iptorrents.com/t/6993015",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E06 480p x264-mSD",
+    "seeds": "6",
+    "peers": "0",
+    "size": "217 MB",
+    "desc": "https://iptorrents.com/t/6993431",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E04 480p x264-mSD",
+    "seeds": "6",
+    "peers": "0",
+    "size": "235 MB",
+    "desc": "https://iptorrents.com/t/6993401",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E04 2160p AMZN WEB-DL DD 5 1 HDR H 265-playWEB",
+    "seeds": "6",
+    "peers": "0",
+    "size": "5.61 GB",
+    "desc": "https://iptorrents.com/t/6993489",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E03 HDR 2160p WEB H265-SYLiX",
+    "seeds": "6",
+    "peers": "0",
+    "size": "5.73 GB",
+    "desc": "https://iptorrents.com/t/6993009",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E02 480p x264-mSD",
+    "seeds": "6",
+    "peers": "0",
+    "size": "243 MB",
+    "desc": "https://iptorrents.com/t/6993396",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01 2160p AMZN WEB-DL DD 5 1 H 265-playWEB",
+    "seeds": "6",
+    "peers": "0",
+    "size": "44.5 GB",
+    "desc": "https://iptorrents.com/t/6993668",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E08 480p x264-mSD",
+    "seeds": "5",
+    "peers": "0",
+    "size": "239 MB",
+    "desc": "https://iptorrents.com/t/6993423",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E08 2160p AMZN WEB-DL DD 5 1 HDR H 265-playWEB",
+    "seeds": "5",
+    "peers": "0",
+    "size": "6.1 GB",
+    "desc": "https://iptorrents.com/t/6993356",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E05 HDR 2160p WEB H265-SYLiX",
+    "seeds": "5",
+    "peers": "0",
+    "size": "5.79 GB",
+    "desc": "https://iptorrents.com/t/6993010",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E03 2160p WEB H265-SYLiX",
+    "seeds": "5",
+    "peers": "0",
+    "size": "5.7 GB",
+    "desc": "https://iptorrents.com/t/6992985",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault 2025 S01 2160p PCOK WEB-DL DDP5 1 H 265-KRATOS",
+    "seeds": "5",
+    "peers": "1",
+    "size": "44.6 GB",
+    "desc": "https://iptorrents.com/t/6992908",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E06 2160p AMZN WEB-DL DD 5 1 HDR H 265-playWEB",
+    "seeds": "4",
+    "peers": "0",
+    "size": "4.99 GB",
+    "desc": "https://iptorrents.com/t/6993321",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E02 2160p WEB H265-SYLiX",
+    "seeds": "4",
+    "peers": "0",
+    "size": "5.49 GB",
+    "desc": "https://iptorrents.com/t/6992992",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E01 2160p WEB H265-SYLiX",
+    "seeds": "4",
+    "peers": "0",
+    "size": "4.97 GB",
+    "desc": "https://iptorrents.com/t/6992994",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E04 2160p WEB H265-SYLiX",
+    "seeds": "3",
+    "peers": "0",
+    "size": "5.63 GB",
+    "desc": "https://iptorrents.com/t/6992993",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E01 HDR 2160p WEB H265-SYLiX",
+    "seeds": "3",
+    "peers": "0",
+    "size": "4.98 GB",
+    "desc": "https://iptorrents.com/t/6993011",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E07 1080p AMZN WEB-DL DD 5 1 H 264-playWEB",
+    "seeds": "26",
+    "peers": "0",
+    "size": "2.76 GB",
+    "desc": "https://iptorrents.com/t/6993323",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E06 1080p AMZN WEB-DL DD 5 1 H 264-playWEB",
+    "seeds": "26",
+    "peers": "0",
+    "size": "2.24 GB",
+    "desc": "https://iptorrents.com/t/6993307",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01 720p x264-AMBER",
+    "seeds": "24",
+    "peers": "1",
+    "size": "3.87 GB",
+    "desc": "https://iptorrents.com/t/7054633",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E08 XviD-AFG",
+    "seeds": "23",
+    "peers": "0",
+    "size": "306 MB",
+    "desc": "https://iptorrents.com/t/6993673",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E05 XviD-AFG",
+    "seeds": "23",
+    "peers": "0",
+    "size": "265 MB",
+    "desc": "https://iptorrents.com/t/6993675",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E06 XviD-AFG",
+    "seeds": "22",
+    "peers": "0",
+    "size": "307 MB",
+    "desc": "https://iptorrents.com/t/6993677",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E05 1080p 10bit WEBRip 6CH x265 HEVC-PSA",
+    "seeds": "22",
+    "peers": "0",
+    "size": "447 MB",
+    "desc": "https://iptorrents.com/t/6993195",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E03 XviD-AFG",
+    "seeds": "22",
+    "peers": "0",
+    "size": "412 MB",
+    "desc": "https://iptorrents.com/t/6993661",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E02 XviD-AFG",
+    "seeds": "22",
+    "peers": "0",
+    "size": "362 MB",
+    "desc": "https://iptorrents.com/t/6993655",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E07 1080p 10bit WEBRip 6CH x265 HEVC-PSA",
+    "seeds": "21",
+    "peers": "0",
+    "size": "645 MB",
+    "desc": "https://iptorrents.com/t/6993206",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E04 XviD-AFG",
+    "seeds": "21",
+    "peers": "0",
+    "size": "348 MB",
+    "desc": "https://iptorrents.com/t/6993658",
     "provider": "IpTorrents"
   },
   {
     "provider": "TorrentLeech",
-    "title": "Taboo UK S01E01 INTERNAL 1080p HDTV x264-FaiLED",
-    "time": "2017-01-08 00:25:05",
-    "seeds": 7,
-    "peers": 0,
-    "size": "3.7 GiB",
-    "filename": "Taboo.UK.S01E01.INTERNAL.1080p.HDTV.x264-FaiLED.torrent",
-    "fid": "820798",
-    "rating": 8.7,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 1,
-    "tags": [
-      "Drama",
-      "rar"
-    ],
-    "imdbID": "tt4700596",
-    "igdbID": "",
-    "tvmazeID": "e989920"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Archer 2009 S09E05 Strange Doings In The Taboo Groves 1080p AMZN WEB-DL DDP5 1 H 264-NTb",
-    "time": "2018-05-24 11:50:47",
-    "seeds": 7,
-    "peers": 0,
-    "size": "832.8 MiB",
-    "filename": "Archer.2009.S09E05.Strange.Doings.In.The.Taboo.Groves.1080p.AMZN.WEB-DL.DDP5.1.H.264-NTb.torrent",
-    "fid": "1085850",
-    "rating": 8.6,
+    "title": "All Her Fault S01E03 720p WEB H264-SYLiX",
+    "time": "2025-11-06 11:08:53",
+    "seeds": 21,
+    "peers": 1,
+    "size": "2.0 GiB",
+    "filename": "All.Her.Fault.S01E03.720p.WEB.H264-SYLiX.torrent",
+    "fid": "241637246",
+    "rating": 7.2,
     "categoryID": 32,
     "new": false,
     "numComments": 0,
     "tags": [
-      "Action",
-      "Animation",
-      "comedy"
+      "Drama"
     ],
-    "imdbID": "tt1486217",
+    "imdbID": "tt31314751",
     "igdbID": "",
-    "tvmazeID": "s315"
+    "tvmazeID": "s74670"
   },
   {
-    "title": "Parlor Room S01E05 Taboo 1080p DRPO WEB-DL AAC2 0 H 264-NTb",
-    "seeds": "6",
+    "title": "All Her Fault S01E06 1080p 10bit WEBRip 6CH x265 HEVC-PSA",
+    "seeds": "20",
     "peers": "0",
-    "size": "1.73 GB",
-    "desc": "https://iptorrents.com/t/6709673",
+    "size": "517 MB",
+    "desc": "https://iptorrents.com/t/6993197",
     "provider": "IpTorrents"
   },
   {
-    "title": "Criminal Minds S12E03 Taboo 720p DSNP WEB-DL DD 5 1 H 264-playWEB",
-    "seeds": "6",
+    "title": "All Her Fault S01E07 2160p AMZN WEB-DL DD 5 1 HDR H 265-playWEB",
+    "seeds": "2",
     "peers": "0",
-    "size": "890 MB",
-    "desc": "https://iptorrents.com/t/6964638",
+    "size": "5.92 GB",
+    "desc": "https://iptorrents.com/t/6993348",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E05 2160p AMZN WEB-DL DD 5 1 HDR H 265-playWEB",
+    "seeds": "2",
+    "peers": "0",
+    "size": "5.76 GB",
+    "desc": "https://iptorrents.com/t/6993422",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E01 720p PCOK WEB-DL DDP5 1 H 264-RAWR",
+    "seeds": "2",
+    "peers": "0",
+    "size": "1.68 GB",
+    "desc": "https://iptorrents.com/t/6992856",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E08 1080p 10bit WEBRip 6CH x265 HEVC-PSA",
+    "seeds": "19",
+    "peers": "0",
+    "size": "588 MB",
+    "desc": "https://iptorrents.com/t/6993211",
     "provider": "IpTorrents"
   },
   {
     "provider": "TorrentLeech",
-    "title": "Taboo UK S01E08 INTERNAL 1080p HDTV x264-FaiLED",
-    "time": "2017-02-26 00:30:30",
-    "seeds": 5,
-    "peers": 0,
-    "size": "3.7 GiB",
-    "filename": "Taboo.UK.S01E08.INTERNAL.1080p.HDTV.x264-FaiLED.torrent",
-    "fid": "846876",
-    "rating": 8.8,
+    "title": "All Her Fault S01E05 720p WEB H264-SYLiX",
+    "time": "2025-11-06 11:11:08",
+    "seeds": 19,
+    "peers": 1,
+    "size": "2.0 GiB",
+    "filename": "All.Her.Fault.S01E05.720p.WEB.H264-SYLiX.torrent",
+    "fid": "241637248",
+    "rating": 7.2,
     "categoryID": 32,
     "new": false,
-    "numComments": 2,
+    "numComments": 0,
     "tags": [
-      "Drama",
-      "rar"
+      "Drama"
     ],
-    "imdbID": "tt4700598",
+    "imdbID": "tt31314751",
     "igdbID": "",
-    "tvmazeID": "e991264"
+    "tvmazeID": "s74670"
   },
   {
     "provider": "TorrentLeech",
-    "title": "Taboo UK S01E08 720p HDTV x264-ORGANiC",
-    "time": "2017-02-25 22:14:22",
-    "seeds": 5,
+    "title": "All Her Fault S01E04 720p WEB H264-SYLiX",
+    "time": "2025-11-06 11:09:25",
+    "seeds": 19,
     "peers": 0,
-    "size": "1.0 GiB",
-    "filename": "Taboo.UK.S01E08.720p.HDTV.x264-ORGANiC.torrent",
-    "fid": "846855",
-    "rating": 8.8,
+    "size": "1.9 GiB",
+    "filename": "All.Her.Fault.S01E04.720p.WEB.H264-SYLiX.torrent",
+    "fid": "241637247",
+    "rating": 7.2,
     "categoryID": 32,
     "new": false,
-    "numComments": 2,
+    "numComments": 0,
     "tags": [
-      "Drama",
-      "rar"
+      "Drama"
     ],
-    "imdbID": "tt4700598",
+    "imdbID": "tt31314751",
     "igdbID": "",
-    "tvmazeID": "e991264"
+    "tvmazeID": "s74670"
   },
   {
     "provider": "TorrentLeech",
-    "title": "Taboo UK S01E05 INTERNAL 1080p HDTV x264-FaiLED",
-    "time": "2017-02-05 01:32:06",
-    "seeds": 5,
+    "title": "All Her Fault S01E02 720p WEB H264-SYLiX",
+    "time": "2025-11-06 11:07:32",
+    "seeds": 19,
     "peers": 0,
-    "size": "3.9 GiB",
-    "filename": "Taboo.UK.S01E05.INTERNAL.1080p.HDTV.x264-FaiLED.torrent",
-    "fid": "835660",
-    "rating": 8.8,
+    "size": "1.9 GiB",
+    "filename": "All.Her.Fault.S01E02.720p.WEB.H264-SYLiX.torrent",
+    "fid": "241637245",
+    "rating": 7.2,
     "categoryID": 32,
     "new": false,
-    "numComments": 1,
+    "numComments": 0,
     "tags": [
-      "Drama",
-      "rar"
+      "Drama"
     ],
-    "imdbID": "tt4700680",
+    "imdbID": "tt31314751",
     "igdbID": "",
-    "tvmazeID": "e991261"
+    "tvmazeID": "s74670"
   },
   {
     "provider": "TorrentLeech",
-    "title": "Taboo UK S01E03 INTERNAL 1080p HDTV x264-FaiLED",
-    "time": "2017-01-22 01:27:03",
-    "seeds": 5,
-    "peers": 0,
-    "size": "3.9 GiB",
-    "filename": "Taboo.UK.S01E03.INTERNAL.1080p.HDTV.x264-FaiLED.torrent",
-    "fid": "827536",
-    "rating": 9.3,
+    "title": "All Her Fault S01E01 HDR 2160p WEB H265-SYLiX",
+    "time": "2025-11-06 12:33:13",
+    "seeds": 19,
+    "peers": 1,
+    "size": "5.1 GiB",
+    "filename": "All.Her.Fault.S01E01.HDR.2160p.WEB.H265-SYLiX.torrent",
+    "fid": "241637289",
+    "rating": 7.2,
     "categoryID": 32,
     "new": false,
-    "numComments": 1,
+    "numComments": 0,
     "tags": [
-      "Drama",
-      "rar"
+      "Drama"
     ],
-    "imdbID": "tt4701640",
+    "imdbID": "tt31314751",
     "igdbID": "",
-    "tvmazeID": "e991259"
+    "tvmazeID": "s74670"
+  },
+  {
+    "title": "All Her Fault S01 2160p AMZN WEB-DL DD 5 1 HDR H 265-playWEB",
+    "seeds": "19",
+    "peers": "0",
+    "size": "44.5 GB",
+    "desc": "https://iptorrents.com/t/6993019",
+    "provider": "IpTorrents"
   },
   {
     "provider": "TorrentLeech",
-    "title": "Taboo UK S01E01 REAL PROPER 720p HDTV x264-DEADPOOL",
-    "time": "2017-01-08 19:35:18",
-    "seeds": 5,
-    "peers": 0,
-    "size": "928.8 MiB",
-    "filename": "Taboo.UK.S01E01.REAL.PROPER.720p.HDTV.x264-DEADPOOL.torrent",
-    "fid": "821087",
-    "rating": 8.7,
+    "title": "All Her Fault S01E08 HDR 2160p WEB H265-SYLiX",
+    "time": "2025-11-06 12:44:42",
+    "seeds": 18,
+    "peers": 2,
+    "size": "6.2 GiB",
+    "filename": "All.Her.Fault.S01E08.HDR.2160p.WEB.H265-SYLiX.torrent",
+    "fid": "241637303",
+    "rating": 7.2,
     "categoryID": 32,
     "new": false,
-    "numComments": 2,
+    "numComments": 0,
     "tags": [
-      "Drama",
-      "rar"
+      "Drama"
     ],
-    "imdbID": "tt4700596",
+    "imdbID": "tt31314751",
     "igdbID": "",
-    "tvmazeID": "e989920"
+    "tvmazeID": "s74670"
   },
   {
-    "title": "[Moozzi2] Taboo Tattoo - 12 END (BD 1920x1080 x 264 Flac)",
-    "seeds": "4",
-    "peers": "0",
-    "size": "1.12 GB",
-    "desc": "https://iptorrents.com/t/6015491",
-    "provider": "IpTorrents"
+    "provider": "TorrentLeech",
+    "title": "All Her Fault S01E07 HDR 2160p WEB H265-SYLiX",
+    "time": "2025-11-06 12:42:23",
+    "seeds": 18,
+    "peers": 1,
+    "size": "6.1 GiB",
+    "filename": "All.Her.Fault.S01E07.HDR.2160p.WEB.H265-SYLiX.torrent",
+    "fid": "241637299",
+    "rating": 7.2,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "Drama"
+    ],
+    "imdbID": "tt31314751",
+    "igdbID": "",
+    "tvmazeID": "s74670"
   },
   {
-    "title": "[Moozzi2] Taboo Tattoo - 11 (BD 1920x1080 x 264 Flac)",
-    "seeds": "4",
-    "peers": "0",
-    "size": "1.38 GB",
-    "desc": "https://iptorrents.com/t/6015502",
-    "provider": "IpTorrents"
+    "provider": "TorrentLeech",
+    "title": "All Her Fault S01E05 HDR 2160p WEB H265-SYLiX",
+    "time": "2025-11-06 12:39:24",
+    "seeds": 18,
+    "peers": 1,
+    "size": "5.9 GiB",
+    "filename": "All.Her.Fault.S01E05.HDR.2160p.WEB.H265-SYLiX.torrent",
+    "fid": "241637296",
+    "rating": 7.2,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "Drama"
+    ],
+    "imdbID": "tt31314751",
+    "igdbID": "",
+    "tvmazeID": "s74670"
   },
   {
-    "title": "[Moozzi2] Taboo Tattoo - 09 (BD 1920x1080 x 264 Flac)",
-    "seeds": "4",
+    "title": "All Her Fault S01E03 1080p AMZN WEB-DL DD 5 1 H 264-playWEB",
+    "seeds": "18",
     "peers": "0",
-    "size": "1.07 GB",
-    "desc": "https://iptorrents.com/t/6015514",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "[Moozzi2] Taboo Tattoo - 07 (BD 1920x1080 x 264 Flac)",
-    "seeds": "4",
-    "peers": "0",
-    "size": "1.6 GB",
-    "desc": "https://iptorrents.com/t/6015478",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "[Moozzi2] Taboo Tattoo - 06 (BD 1920x1080 x 264 Flac)",
-    "seeds": "4",
-    "peers": "0",
-    "size": "1.07 GB",
-    "desc": "https://iptorrents.com/t/6015589",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "[Moozzi2] Taboo Tattoo - 03 (BD 1920x1080 x 264 Flac)",
-    "seeds": "4",
-    "peers": "0",
-    "size": "1.03 GB",
-    "desc": "https://iptorrents.com/t/6015473",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "[Moozzi2] Taboo Tattoo - 02 (BD 1920x1080 x 264 Flac)",
-    "seeds": "4",
-    "peers": "0",
-    "size": "1.02 GB",
-    "desc": "https://iptorrents.com/t/6015447",
+    "size": "2.73 GB",
+    "desc": "https://iptorrents.com/t/6993265",
     "provider": "IpTorrents"
   },
   {
     "provider": "TorrentLeech",
-    "title": "Taboo with Candace Owens S01 1080p WEB-DL AAC2 0 AVC-SantaJesus",
-    "time": "2024-08-14 13:50:41",
-    "seeds": 4,
+    "title": "All Her Fault S01E06 HDR 2160p WEB H265-SYLiX",
+    "time": "2025-11-06 12:40:36",
+    "seeds": 17,
+    "peers": 1,
+    "size": "5.1 GiB",
+    "filename": "All.Her.Fault.S01E06.HDR.2160p.WEB.H265-SYLiX.torrent",
+    "fid": "241637297",
+    "rating": 7.2,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "Drama"
+    ],
+    "imdbID": "tt31314751",
+    "igdbID": "",
+    "tvmazeID": "s74670"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "All Her Fault S01E01 720p WEB H264-SYLiX",
+    "time": "2025-11-06 11:06:56",
+    "seeds": 17,
     "peers": 0,
-    "size": "7.7 GiB",
-    "filename": "Taboo.with.Candace.Owens.S01.1080p.WEB-DL.AAC2.0.AVC-SantaJesus.torrent",
-    "fid": "241331692",
+    "size": "1.7 GiB",
+    "filename": "All.Her.Fault.S01E01.720p.WEB.H264-SYLiX.torrent",
+    "fid": "241637244",
+    "rating": 7.2,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "Drama"
+    ],
+    "imdbID": "tt31314751",
+    "igdbID": "",
+    "tvmazeID": "s74670"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "All Her Fault S01E06 720p WEB H264-SYLiX",
+    "time": "2025-11-06 11:11:49",
+    "seeds": 16,
+    "peers": 1,
+    "size": "1.7 GiB",
+    "filename": "All.Her.Fault.S01E06.720p.WEB.H264-SYLiX.torrent",
+    "fid": "241637249",
+    "rating": 7.2,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "Drama"
+    ],
+    "imdbID": "tt31314751",
+    "igdbID": "",
+    "tvmazeID": "s74670"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "All Her Fault S01E04 HDR 2160p WEB H265-SYLiX",
+    "time": "2025-11-06 12:37:49",
+    "seeds": 16,
+    "peers": 1,
+    "size": "5.8 GiB",
+    "filename": "All.Her.Fault.S01E04.HDR.2160p.WEB.H265-SYLiX.torrent",
+    "fid": "241637293",
+    "rating": 7.2,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "Drama"
+    ],
+    "imdbID": "tt31314751",
+    "igdbID": "",
+    "tvmazeID": "s74670"
+  },
+  {
+    "title": "All Her Fault S01E02 720p WEB H264-SYLiX",
+    "seeds": "16",
+    "peers": "0",
+    "size": "1.86 GB",
+    "desc": "https://iptorrents.com/t/6992871",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E02 1080p AMZN WEB-DL DD 5 1 H 264-playWEB",
+    "seeds": "16",
+    "peers": "0",
+    "size": "2.37 GB",
+    "desc": "https://iptorrents.com/t/6993264",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01 2160p PCOK WEB-DL DDP5 1 H 265-STC",
+    "seeds": "16",
+    "peers": "0",
+    "size": "44.6 GB",
+    "desc": "https://iptorrents.com/t/7030664",
+    "provider": "IpTorrents"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "All Her Fault 2025 S01 2160p PCOK WEB-DL DD+ 5 1 H 265-KRATOS",
+    "time": "2025-11-06 11:20:53",
+    "seeds": 16,
+    "peers": 0,
+    "size": "44.7 GiB",
+    "filename": "All.Her.Fault.2025.S01.2160p.PCOK.WEB-DL.DD+.5.1.H.265-KRATOS.torrent",
+    "fid": "241637255",
     "rating": 0,
     "categoryID": 27,
     "new": false,
-    "numComments": 2,
+    "numComments": 0,
     "tags": [
       "FREELEECH"
     ],
     "imdbID": "",
     "igdbID": "",
-    "tvmazeID": ""
+    "tvmazeID": "s74670"
   },
   {
     "provider": "TorrentLeech",
-    "title": "Taboo UK S01E06 720p HDTV x264-ORGANiC",
-    "time": "2017-02-11 22:15:01",
-    "seeds": 4,
-    "peers": 0,
-    "size": "1.1 GiB",
-    "filename": "Taboo.UK.S01E06.720p.HDTV.x264-ORGANiC.torrent",
-    "fid": "840027",
-    "rating": 8.8,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 2,
-    "tags": [
-      "Drama",
-      "rar"
-    ],
-    "imdbID": "tt4700682",
-    "igdbID": "",
-    "tvmazeID": "e991262"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Taboo UK S01E02 720p HDTV x264-ORGANiC",
-    "time": "2017-01-14 22:14:53",
-    "seeds": 4,
-    "peers": 0,
-    "size": "965.8 MiB",
-    "filename": "Taboo.UK.S01E02.720p.HDTV.x264-ORGANiC.torrent",
-    "fid": "823998",
-    "rating": 9.3,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 2,
-    "tags": [
-      "Drama",
-      "rar"
-    ],
-    "imdbID": "tt4700604",
-    "igdbID": "",
-    "tvmazeID": "e991258"
-  },
-  {
-    "title": "Taboo (2002) 1080p WEBRip-LAMA",
-    "seeds": "4",
-    "peers": "0",
-    "size": "1.33 GB",
-    "desc": "https://iptorrents.com/t/6926472",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Dragon Ball DAIMA S01E14 Taboo 1080p CR WEB-DL DUAL AAC2 0 H 264 MSubs-ToonsHub",
-    "seeds": "4",
-    "peers": "0",
-    "size": "1.37 GB",
-    "desc": "https://iptorrents.com/t/6590299",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Below the Belt The Last Health Taboo 2023 1080p WEBRip x264-BAE",
-    "seeds": "4",
-    "peers": "0",
-    "size": "2.25 GB",
-    "desc": "https://iptorrents.com/t/5334256",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "[Moozzi2] Taboo Tattoo - 10 (BD 1920x1080 x 264 Flac)",
-    "seeds": "3",
-    "peers": "0",
-    "size": "1.22 GB",
-    "desc": "https://iptorrents.com/t/6015490",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "[Moozzi2] Taboo Tattoo - 08 (BD 1920x1080 x 264 Flac)",
-    "seeds": "3",
-    "peers": "0",
-    "size": "1.75 GB",
-    "desc": "https://iptorrents.com/t/6015479",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "[Moozzi2] Taboo Tattoo - 01 (BD 1920x1080 x 264 Flac)",
-    "seeds": "3",
-    "peers": "0",
-    "size": "1.07 GB",
-    "desc": "https://iptorrents.com/t/6015558",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Taboo UK S01E08 HDTV x264-ORGANiC",
-    "time": "2017-02-25 22:15:23",
-    "seeds": 3,
-    "peers": 0,
-    "size": "331.3 MiB",
-    "filename": "Taboo.UK.S01E08.HDTV.x264-ORGANiC.torrent",
-    "fid": "846856",
-    "rating": 8.8,
-    "categoryID": 26,
-    "new": false,
-    "numComments": 2,
-    "tags": [
-      "Drama",
-      "rar"
-    ],
-    "imdbID": "tt4700598",
-    "igdbID": "",
-    "tvmazeID": "e991264"
-  },
-  {
-    "title": "Taboo UK S01E08 720p HDTV x264-ORGANiC",
-    "seeds": "3",
-    "peers": "0",
-    "size": "1.01 GB",
-    "desc": "https://iptorrents.com/t/2199093",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Taboo UK S01E07 INTERNAL 1080p HDTV x264-FaiLED",
-    "time": "2017-02-19 00:17:32",
-    "seeds": 3,
-    "peers": 0,
-    "size": "3.9 GiB",
-    "filename": "Taboo.UK.S01E07.INTERNAL.1080p.HDTV.x264-FaiLED.torrent",
-    "fid": "843659",
-    "rating": 8.8,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 1,
-    "tags": [
-      "Drama",
-      "rar"
-    ],
-    "imdbID": "tt4700686",
-    "igdbID": "",
-    "tvmazeID": "e991263"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Taboo UK S01E07 720p HDTV x264-ORGANiC",
-    "time": "2017-02-18 22:14:56",
-    "seeds": 3,
-    "peers": 0,
-    "size": "1004.3 MiB",
-    "filename": "Taboo.UK.S01E07.720p.HDTV.x264-ORGANiC.torrent",
-    "fid": "843624",
-    "rating": 8.8,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 1,
-    "tags": [
-      "Drama",
-      "rar"
-    ],
-    "imdbID": "tt4700686",
-    "igdbID": "",
-    "tvmazeID": "e991263"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Taboo UK S01E06 INTERNAL 1080p HDTV x264-FaiLED",
-    "time": "2017-02-12 00:37:23",
-    "seeds": 3,
-    "peers": 0,
-    "size": "3.9 GiB",
-    "filename": "Taboo.UK.S01E06.INTERNAL.1080p.HDTV.x264-FaiLED.torrent",
-    "fid": "840065",
-    "rating": 8.8,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 1,
-    "tags": [
-      "Drama",
-      "rar"
-    ],
-    "imdbID": "tt4700682",
-    "igdbID": "",
-    "tvmazeID": "e991262"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Taboo UK S01E04 INTERNAL 1080p HDTV x264-FaiLED",
-    "time": "2017-01-29 01:03:47",
-    "seeds": 3,
-    "peers": 0,
-    "size": "3.6 GiB",
-    "filename": "Taboo.UK.S01E04.INTERNAL.1080p.HDTV.x264-FaiLED.torrent",
-    "fid": "831337",
-    "rating": 9.2,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 1,
-    "tags": [
-      "Drama",
-      "rar"
-    ],
-    "imdbID": "tt4700678",
-    "igdbID": "",
-    "tvmazeID": "e991260"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Taboo UK S01E04 1080p AMZN WEBRip DD+5 1 x264-CasStudio",
-    "time": "2017-02-02 07:59:00",
-    "seeds": 3,
-    "peers": 0,
-    "size": "3.0 GiB",
-    "filename": "Taboo.UK.S01E04.1080p.AMZN.WEBRip.DD+5.1.x264-CasStudio.torrent",
-    "fid": "833928",
-    "rating": 9.2,
+    "title": "All Her Fault S01E08 720p WEB H264-SYLiX",
+    "time": "2025-11-06 11:13:08",
+    "seeds": 15,
+    "peers": 1,
+    "size": "2.1 GiB",
+    "filename": "All.Her.Fault.S01E08.720p.WEB.H264-SYLiX.torrent",
+    "fid": "241637251",
+    "rating": 7.2,
     "categoryID": 32,
     "new": false,
     "numComments": 0,
     "tags": [
-      "Drama",
-      "nonscene"
+      "Drama"
     ],
-    "imdbID": "tt4700678",
+    "imdbID": "tt31314751",
     "igdbID": "",
-    "tvmazeID": "e991260"
+    "tvmazeID": "s74670"
   },
   {
     "provider": "TorrentLeech",
-    "title": "Taboo UK S01E03 1080p HDTV x264-MORiTZ",
-    "time": "2017-01-21 22:14:34",
-    "seeds": 3,
-    "peers": 0,
-    "size": "2.2 GiB",
-    "filename": "Taboo.UK.S01E03.1080p.HDTV.x264-MORiTZ.torrent",
-    "fid": "827499",
-    "rating": 9.3,
+    "title": "All Her Fault S01E07 720p WEB H264-SYLiX",
+    "time": "2025-11-06 11:12:29",
+    "seeds": 15,
+    "peers": 1,
+    "size": "2.0 GiB",
+    "filename": "All.Her.Fault.S01E07.720p.WEB.H264-SYLiX.torrent",
+    "fid": "241637250",
+    "rating": 7.2,
     "categoryID": 32,
     "new": false,
     "numComments": 0,
     "tags": [
-      "Drama",
-      "rar"
+      "Drama"
     ],
-    "imdbID": "tt4701640",
+    "imdbID": "tt31314751",
     "igdbID": "",
-    "tvmazeID": "e991259"
+    "tvmazeID": "s74670"
+  },
+  {
+    "title": "All Her Fault S01E04 720p WEB H264-SYLiX",
+    "seeds": "15",
+    "peers": "0",
+    "size": "1.9 GB",
+    "desc": "https://iptorrents.com/t/6992869",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E03 720p WEB H264-SYLiX",
+    "seeds": "15",
+    "peers": "0",
+    "size": "1.93 GB",
+    "desc": "https://iptorrents.com/t/6992863",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E03 1080p 10bit WEBRip 6CH x265 HEVC-PSA",
+    "seeds": "15",
+    "peers": "0",
+    "size": "644 MB",
+    "desc": "https://iptorrents.com/t/6993192",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E01 1080p AV1 10bit-MeGusta",
+    "seeds": "15",
+    "peers": "0",
+    "size": "318 MB",
+    "desc": "https://iptorrents.com/t/6993079",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01 720p PCOK WEB-DL DDP5 1 H 264-RAWR",
+    "seeds": "15",
+    "peers": "0",
+    "size": "15.1 GB",
+    "desc": "https://iptorrents.com/t/6993081",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E01 720p WEB H264-SYLiX",
+    "seeds": "14",
+    "peers": "0",
+    "size": "1.68 GB",
+    "desc": "https://iptorrents.com/t/6992862",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E06 720p WEB H264-SYLiX",
+    "seeds": "13",
+    "peers": "0",
+    "size": "1.7 GB",
+    "desc": "https://iptorrents.com/t/6992872",
+    "provider": "IpTorrents"
   },
   {
     "provider": "TorrentLeech",
-    "title": "Taboo UK S01 BDRip X264-HAGGiS [NO RAR]",
-    "time": "2017-04-13 15:32:06",
-    "seeds": 3,
-    "peers": 0,
-    "size": "2.5 GiB",
-    "filename": "Taboo.UK.S01.BDRip.X264-HAGGiS.[NO.RAR].torrent",
-    "fid": "868304",
-    "rating": 8.4,
-    "categoryID": 27,
+    "title": "All Her Fault S01E02 HDR 2160p WEB H265-SYLiX",
+    "time": "2025-11-06 12:34:46",
+    "seeds": 13,
+    "peers": 2,
+    "size": "5.6 GiB",
+    "filename": "All.Her.Fault.S01E02.HDR.2160p.WEB.H265-SYLiX.torrent",
+    "fid": "241637291",
+    "rating": 7.2,
+    "categoryID": 32,
     "new": false,
     "numComments": 0,
     "tags": [
-      "Drama",
-      "Fantasy",
-      "FREELEECH"
+      "Drama"
     ],
-    "imdbID": "tt3647998",
+    "imdbID": "tt31314751",
     "igdbID": "",
-    "tvmazeID": "s3593"
+    "tvmazeID": "s74670"
   },
   {
-    "title": "Taboo Tattoo S01E05 DUBBED 1080p WEB H264-SKYANiME",
-    "seeds": "3",
+    "title": "All Her Fault S01E07 720p WEB H264-SYLiX",
+    "seeds": "12",
     "peers": "0",
-    "size": "1.38 GB",
-    "desc": "https://iptorrents.com/t/5490895",
+    "size": "2.01 GB",
+    "desc": "https://iptorrents.com/t/6992876",
     "provider": "IpTorrents"
   },
   {
-    "title": "Taboo Tattoo S01E04 DUBBED 720p WEB H264-SKYANiME",
-    "seeds": "3",
+    "title": "All Her Fault S01E08 AAC MP4-Mobile",
+    "seeds": "11",
     "peers": "0",
-    "size": "720 MB",
-    "desc": "https://iptorrents.com/t/5490859",
+    "size": "142 MB",
+    "desc": "https://iptorrents.com/t/6993580",
     "provider": "IpTorrents"
   },
   {
-    "title": "Taboo (2002) 720p WEBRip-LAMA",
-    "seeds": "3",
+    "title": "All Her Fault S01E08 720p WEB H264-SYLiX",
+    "seeds": "11",
     "peers": "0",
-    "size": "738 MB",
-    "desc": "https://iptorrents.com/t/6926465",
+    "size": "2.06 GB",
+    "desc": "https://iptorrents.com/t/6992874",
     "provider": "IpTorrents"
   },
   {
-    "title": "Sonic Taboo-Sonic Taboo-16BIT-WEB-FLAC-2020-STONERD",
-    "seeds": "3",
+    "title": "All Her Fault S01E05 720p WEB H264-SYLiX",
+    "seeds": "11",
     "peers": "0",
-    "size": "226 MB",
-    "desc": "https://iptorrents.com/t/6853066",
+    "size": "1.96 GB",
+    "desc": "https://iptorrents.com/t/6992870",
     "provider": "IpTorrents"
   },
   {
-    "title": "Dragon Ball DAIMA S01E14 Taboo 1080p CR WEB-DL AAC2 0 H 264-VARYG",
-    "seeds": "3",
+    "title": "All Her Fault S01E05 1080p AV1 10bit-MeGusta",
+    "seeds": "11",
     "peers": "0",
-    "size": "1.37 GB",
-    "desc": "https://iptorrents.com/t/6397969",
+    "size": "259 MB",
+    "desc": "https://iptorrents.com/t/6993086",
     "provider": "IpTorrents"
   },
   {
-    "title": "Dragon Ball DAIMA - 014 - Taboo (2025) [JP-EN] [CR] [WEB-DL] [1080p] [x264] [V2]",
-    "seeds": "3",
+    "title": "All Her Fault S01E02 1080p 10bit WEBRip 6CH x265 HEVC-PSA",
+    "seeds": "11",
     "peers": "0",
-    "size": "1.37 GB",
-    "desc": "https://iptorrents.com/t/6662201",
+    "size": "576 MB",
+    "desc": "https://iptorrents.com/t/6993191",
     "provider": "IpTorrents"
   },
   {
-    "title": "Below the Belt The Last Health Taboo 2023 720p WEBRip x264-BAE",
-    "seeds": "3",
+    "title": "All Her Fault S01E04 1080p 10bit WEBRip 6CH x265 HEVC-PSA",
+    "seeds": "10",
     "peers": "0",
-    "size": "1.03 GB",
-    "desc": "https://iptorrents.com/t/5334253",
+    "size": "547 MB",
+    "desc": "https://iptorrents.com/t/6993194",
     "provider": "IpTorrents"
   },
   {
-    "title": "[Moozzi2] Taboo Tattoo - 05 (BD 1920x1080 x 264 Flac)",
-    "seeds": "2",
-    "peers": "0",
-    "size": "1.2 GB",
-    "desc": "https://iptorrents.com/t/6015475",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "[Moozzi2] Taboo Tattoo - 04 (BD 1920x1080 x 264 Flac)",
-    "seeds": "2",
-    "peers": "0",
-    "size": "1.08 GB",
-    "desc": "https://iptorrents.com/t/6015474",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "The Misfit of Demon King Academy (2020) - S01E12 - Taboo Magic [Bluray-1080p][10bit][x265][FLAC 2 0][JA]-Asakura",
-    "seeds": "2",
-    "peers": "0",
-    "size": "1.92 GB",
-    "desc": "https://iptorrents.com/t/6370117",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo University Book One Linux-I KnoW",
-    "seeds": "2",
-    "peers": "0",
-    "size": "7.51 GB",
-    "desc": "https://iptorrents.com/t/6174664",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo Trial v5 0-TENOKE",
-    "seeds": "2",
-    "peers": "1",
-    "size": "10 GB",
-    "desc": "https://iptorrents.com/t/5950981",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo Tattoo S01E10 DUBBED 480p x264-mSD",
-    "seeds": "2",
-    "peers": "0",
-    "size": "96 MB",
-    "desc": "https://iptorrents.com/t/5490937",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo Tattoo S01E01 DUBBED 480p x264-mSD",
-    "seeds": "2",
-    "peers": "0",
-    "size": "90.5 MB",
-    "desc": "https://iptorrents.com/t/5490680",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Sonic Taboo-Kind Of Venom-16BIT-WEB-FLAC-2022-STONERD",
-    "seeds": "2",
-    "peers": "0",
-    "size": "303 MB",
-    "desc": "https://iptorrents.com/t/6853071",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Sonic Taboo-Captured Live Vol I-24BIT-WEB-FLAC-2025-STONERD",
-    "seeds": "2",
-    "peers": "0",
-    "size": "432 MB",
-    "desc": "https://iptorrents.com/t/6853064",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Law and Order Special Victims Unit S07E14 Taboo 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "2",
-    "peers": "0",
-    "size": "2.97 GB",
-    "desc": "https://iptorrents.com/t/5975946",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Dragon Ball DAIMA - 014 - Taboo (2025) [JP-EN] [WEB-DL] [2160p] [HEVC 10-Bit] [V2]",
-    "seeds": "2",
-    "peers": "0",
-    "size": "1.23 GB",
-    "desc": "https://iptorrents.com/t/6662345",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Bogus Skill Fruitmaster S01E04 Taboo Skills 1080p CR WEB-DL DUAL AAC2 0 H 264-VARYG",
-    "seeds": "2",
-    "peers": "0",
-    "size": "1.42 GB",
-    "desc": "https://iptorrents.com/t/6996086",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "This Is Us S06E07 Taboo 1080p AMZN WEB-DL DDP5 1 H 264-NTb",
+    "title": "All Her Fault S01E08 2160p WEB H265-SYLiX",
     "seeds": "1",
     "peers": "0",
-    "size": "2.73 GB",
-    "desc": "https://iptorrents.com/t/6469149",
+    "size": "6.11 GB",
+    "desc": "https://iptorrents.com/t/6993001",
     "provider": "IpTorrents"
   },
   {
-    "title": "Taboo Trial Update v20240611-TENOKE",
+    "title": "All Her Fault S01E05 2160p WEB H265-SYLiX",
     "seeds": "1",
     "peers": "0",
-    "size": "147 MB",
-    "desc": "https://iptorrents.com/t/6398171",
+    "size": "5.78 GB",
+    "desc": "https://iptorrents.com/t/6992990",
     "provider": "IpTorrents"
   },
   {
-    "title": "Taboo Trial Update v20240302 incl DLC-TENOKE",
-    "seeds": "1",
-    "peers": "0",
-    "size": "1.31 GB",
-    "desc": "https://iptorrents.com/t/5792282",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo The Unthinkable Act 2016 1080p WEBRip x264-iNTENSO",
-    "seeds": "1",
-    "peers": "0",
-    "size": "5.75 GB",
-    "desc": "https://iptorrents.com/t/3776296",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo 2002 1080p AMZN WEB-DL DDP2 0 H 264-GPRS",
-    "seeds": "1",
-    "peers": "0",
-    "size": "5.54 GB",
-    "desc": "https://iptorrents.com/t/6925924",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Parlor Room S01E05 Taboo 720p DRPO WEB-DL AAC2 0 H 264-NTb",
-    "seeds": "1",
-    "peers": "0",
-    "size": "898 MB",
-    "desc": "https://iptorrents.com/t/6709679",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Dragon Ball DAIMA S01E14 Taboo 1080p DSNP WEB-DL DDP2 0 H 264-VARYG",
-    "seeds": "1",
-    "peers": "0",
-    "size": "965 MB",
-    "desc": "https://iptorrents.com/t/6413247",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Dragon Ball DAIMA S01E14 Taboo 1080p CR WEB-DL JPN AAC2 0 H 264 MSubs-ToonsHub",
-    "seeds": "1",
-    "peers": "0",
-    "size": "1.35 GB",
-    "desc": "https://iptorrents.com/t/6398027",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Bogus Skill Fruitmaster S01E04 Taboo Skills 1080p CR WEB-DL DUAL AAC2 0 H 264 MSubs-ToonsHub",
-    "seeds": "1",
-    "peers": "0",
-    "size": "1.38 GB",
-    "desc": "https://iptorrents.com/t/6995196",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo Trial Update v20240502-TENOKE",
+    "title": "All Her Fault S01E07 2160p WEB H265-SYLiX",
     "seeds": "0",
     "peers": "0",
-    "size": "82.1 MB",
-    "desc": "https://iptorrents.com/t/5907933",
+    "size": "5.93 GB",
+    "desc": "https://iptorrents.com/t/6993003",
     "provider": "IpTorrents"
   },
   {
-    "title": "Taboo Trial Update v20240413-TENOKE",
+    "title": "All Her Fault S01E06 2160p WEB H265-SYLiX",
     "seeds": "0",
     "peers": "0",
-    "size": "76.5 MB",
-    "desc": "https://iptorrents.com/t/5869885",
+    "size": "5.01 GB",
+    "desc": "https://iptorrents.com/t/6993002",
     "provider": "IpTorrents"
   },
   {
-    "title": "Taboo Tattoo S01 [BDRip] [Dual Audio] [1080p] [-ZR-]",
-    "seeds": "0",
-    "peers": "3",
-    "size": "17.6 GB",
-    "desc": "https://iptorrents.com/t/2664568",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Taboo 1988 POLISH 1080p WEBRip x265-WORLD",
-    "seeds": "0",
-    "peers": "2",
-    "size": "1.58 GB",
-    "desc": "https://iptorrents.com/t/5222676",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "National Geographic Taboo Season 2[2003]DVDrip XviD-Kole",
-    "seeds": "0",
-    "peers": "2",
-    "size": "4.44 GB",
-    "desc": "https://iptorrents.com/t/1658544",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "National Geographic Taboo Season 1[2002]DVDrip",
-    "seeds": "0",
-    "peers": "2",
-    "size": "4.44 GB",
-    "desc": "https://iptorrents.com/t/307629",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Dragon Ball DAIMA (2024) - S01E14 - 014 - Taboo [HDTV-1080p][8bit][x264][AAC 2 0][JA]-SubsPlease",
+    "title": "All Her Fault S01E04 HDR 2160p WEB H265-SYLiX",
     "seeds": "0",
     "peers": "0",
-    "size": "1.35 GB",
-    "desc": "https://iptorrents.com/t/6499782",
+    "size": "5.64 GB",
+    "desc": "https://iptorrents.com/t/6993024",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "All Her Fault S01E02 HDR 2160p WEB H265-SYLiX",
+    "seeds": "0",
+    "peers": "0",
+    "size": "5.51 GB",
+    "desc": "https://iptorrents.com/t/6993008",
     "provider": "IpTorrents"
   }
 ]

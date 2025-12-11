@@ -3,7 +3,6 @@ import https from 'https';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import * as search from './search.js';
-import * as caption from './caption.js';
 
 dotenv.config();
 
@@ -57,23 +56,6 @@ app.get('/api/search', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Search error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// POST /api/hasCaptions - Check if torrent has captions
-app.post('/api/hasCaptions', async (req, res) => {
-  try {
-    const { torrent } = req.body;
-    
-    if (!torrent || !torrent.raw || !torrent.raw.detailUrl || !torrent.raw.provider) {
-      return res.status(400).json({ error: 'Missing torrent data' });
-    }
-    
-    const hasCaptions = await caption.hasCaptions(torrent);
-    res.json({ hasCaptions });
-  } catch (error) {
-    console.error('hasCaptions error:', error);
     res.status(500).json({ error: error.message });
   }
 });

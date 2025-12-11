@@ -330,28 +330,8 @@ export default {
     },
 
     handleTorrentClick(event, torrent) {
-      // If detailUrl exists, check for captions and open it in a new tab
+      // Open detail page in new tab
       if (torrent.raw && torrent.raw.detailUrl) {
-        // Call hasCaptions API (fire and forget - don't wait for result)
-        void fetch('https://localhost:3001/api/hasCaptions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ 
-            torrent: torrent
-          })
-        })
-          .then(response => response.ok ? response.json() : null)
-          .then(data => {
-            if (data) {
-              console.log('Has captions:', data.hasCaptions);
-            }
-          })
-          .catch(err => {
-            console.error('Error checking captions:', err);
-          });
-        
         window.open(torrent.raw.detailUrl, '_blank');
         return;
       }

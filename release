@@ -2,7 +2,22 @@
 # Build in PowerShell (not WSL) to avoid rollup issues
 powershell.exe -Command "cd C:\Users\mark\apps\tv-series-client; npm run build-vite"
 
+# Deploy client
 rsync -av --delete \
       -e "ssh -i $HOME/.ssh/id_rsa -o IdentitiesOnly=yes" \
       /mnt/c/Users/mark/apps/tv-series-client/shows/       \
       root@hahnca.com:/root/dev/apps/tv-series-client/shows
+
+# Deploy torrents server
+rsync -av --delete \
+      --exclude 'node_modules' \
+      -e "ssh -i $HOME/.ssh/id_rsa -o IdentitiesOnly=yes" \
+      /mnt/c/Users/mark/apps/tv-series-client/torrents/    \
+      root@hahnca.com:/root/dev/apps/tv-series-client/torrents
+
+echo ""
+echo "=== Deployment complete ==="
+echo "On server, run:"
+echo "  cd /root/dev/apps/tv-series-client/torrents"
+echo "  npm install"
+echo "  pm2 restart torrents-server || pm2 start src/server.js --name torrents-server"

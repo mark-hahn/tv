@@ -4,6 +4,26 @@ import * as srvr from "./srvr.js";
 
 let allTvdb = null;
 
+////////// Build seriesMap object from seriesMapIn array //////////
+export function buildSeriesMap(seriesMapIn) {
+  if (!seriesMapIn || seriesMapIn.length === 0) {
+    return null;
+  }
+  
+  const seriesMap = {};
+  for (const season of seriesMapIn) {
+    const [seasonNum, episodes] = season;
+    const seasonMap = {};
+    seriesMap[seasonNum] = seasonMap;
+    for (const episode of episodes) {
+      const [episodeNum, epiObj] = episode;
+      seasonMap[episodeNum] = epiObj;
+    }
+  }
+  
+  return seriesMap;
+}
+
 ////////// temp one-time mass operation //////////
 export async function removeDeadShows(allShows) {
   allTvdb = await tvdb.getAllTvdb();

@@ -56,12 +56,12 @@ export default {
       simpleMode: false,
       currentPane: 'series', // 'series', 'map', 'actors', or 'torrents'
       currentTvdbData: null,
+      currentShow: null,
       mapShow: null,
       hideMapBottom: true,
       seriesMapSeasons: [],
       seriesMapEpis: [],
       seriesMap: {},
-      currentTvdbData: null,
       // TABLET SIZING CONFIGURATION - SIMPLE MODE - Tweak these values
       sizing: {
         // List pane
@@ -148,8 +148,8 @@ export default {
       } else {
         this.currentPane = 'actors';
         evtBus.emit('paneChanged', this.currentPane);
-        // Emit event to actors component with current tvdbData
-        evtBus.emit('showActors', this.currentTvdbData);
+        // Emit event to actors component with current tvdbData and show
+        evtBus.emit('showActors', { show: this.currentShow, tvdbData: this.currentTvdbData });
       }
     },
     handleActorsClose() {
@@ -186,33 +186,27 @@ export default {
     const urlParams = new URLSearchParams(window.location.search);
     this.simpleMode = urlParams.has('simple');
     
-    // Test getEpisode function
-    import('../tvdb.js').then(tvdb => {
-      tvdb.getEpisode('Mom', 1, 1).then(episodeData => {
-        console.log('Episode data for Mom S01E01:', episodeData);
-      });
-    });
-    
     // Listen for pane navigation events
     evtBus.on('showActorsPane', () => {
-      this.currentPane = 'actors';
+      this.handleShowActors(false);
     });
     
     evtBus.on('showTorrentsPane', (show) => {
       this.handleShowTorrents(show);
     });
     
-    // Close torrents pane when a different show is selected
+    // Close torrents or actors pane when a different show is selected
     evtBus.on('setUpSeries', (show) => {
-      if (this.currentPane === 'torrents') {
+      if (this.currentPane === 'torrents' || this.currentPane === 'actors') {
         this.currentPane = 'series';
         evtBus.emit('paneChanged', this.currentPane);
       }
     });
     
     // Listen for tvdbData updates from series pane
-    evtBus.on('tvdbDataReady', (tvdbData) => {
-      this.currentTvdbData = tvdbData;
+    evtBus.on('tvdbDataReady', (data) => {
+      this.currentShow = data.show;
+      this.currentTvdbData = data.tvdbData;
     });
   },
 }

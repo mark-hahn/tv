@@ -1,2 +1,11 @@
 
-in the actors pane add two input boxes labelled Sea and Epi after the show name. the boxes only need to be big enough to hold two digits each. after the boxes show a button labelled Sel. for now do nothing with those elements but show them
+if a show is currently playing and the selected show is the one currently playing then pre-fill the boxes with the season, episode that is playing. The currently playing show is the one listed on the right side of hdrtop in hdrtop.vue
+
+
+when episode actors are showing add left and right arrow buttons to the left of the close button.
+
+when left arrow button is clicked then use the map to fill boxes with previous episode no matter what the played or avail values are. then do select.
+
+when right arrow button is clicked then use the map to fill boxes with next episode no matter what the played or avail values are. then do select.
+
+show the arrow buttonss whenever the boxes have values even if showing series actors

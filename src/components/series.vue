@@ -56,7 +56,7 @@
     div(v-if="showSpinner")
       img(src="../../loading.gif"
           style="width:100px; height:100px; position:relative; top:20px; left:45px;")
-    div(v-if="!showSpinner"
+    div(v-if="!showSpinner && showRemotes"
         @click.stop="actorsClick"
         :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }")
       | Actors
@@ -364,7 +364,7 @@ export default {
       
       const tvdbData = allTvdb[show.Name];
       this.currentTvdbData = tvdbData; // Store for actors pane
-      evtBus.emit('tvdbDataReady', tvdbData); // Send to App.vue
+      evtBus.emit('tvdbDataReady', { show, tvdbData }); // Send to App.vue
       await this.setDeleted(tvdbData);
       await this.setPoster(tvdbData);
       await this.setDates(tvdbData);

@@ -162,15 +162,9 @@ export default {
         }
         
         // Build seriesMap object from array
-        const seriesMap = {};
-        for (const season of seriesMapIn) {
-          const [seasonNum, episodes] = season;
-          const seasonMap = {};
-          seriesMap[seasonNum] = seasonMap;
-          for (const episode of episodes) {
-            const [episodeNum, epiObj] = episode;
-            seasonMap[episodeNum] = epiObj;
-          }
+        const seriesMap = util.buildSeriesMap(seriesMapIn);
+        if (!seriesMap) {
+          return needed;
         }
 
         console.log('Series map for', show.Name, seriesMap);

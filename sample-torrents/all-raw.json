@@ -1,3626 +1,1482 @@
 [
   {
     "provider": "TorrentLeech",
-    "title": "30 Rock (2005) Season 1-7 S01-S07 (1080p BluRay x265 HEVC 10bit AAC 5 1 Silence)",
-    "time": "2021-02-25 01:19:17",
-    "seeds": 202,
-    "peers": 19,
-    "size": "91.0 GiB",
-    "filename": "30.Rock.(2005).Season.1-7.S01-S07.(1080p.BluRay.x265.HEVC.10bit.AAC.5.1.Silence).torrent",
-    "fid": "1797203",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 8,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S01 1080p BluRay DD+ 5 1 x265-edge2020",
-    "time": "2022-12-15 05:26:13",
-    "seeds": 116,
-    "peers": 1,
-    "size": "20.5 GiB",
-    "filename": "30.Rock.S01.1080p.BluRay.DD+.5.1.x265-edge2020.torrent",
-    "fid": "240953143",
-    "rating": 8.3,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 1,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "tt0496424",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S06 1080p BluRay DD+ 5 1 x265-edge2020",
-    "time": "2022-12-15 06:30:23",
-    "seeds": 102,
-    "peers": 2,
-    "size": "15.8 GiB",
-    "filename": "30.Rock.S06.1080p.BluRay.DD+.5.1.x265-edge2020.torrent",
-    "fid": "240953163",
-    "rating": 8.3,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "tt0496424",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S02 1080p BluRay DD+ 5 1 x265-edge2020",
-    "time": "2022-12-15 05:30:30",
-    "seeds": 98,
-    "peers": 1,
-    "size": "14.4 GiB",
-    "filename": "30.Rock.S02.1080p.BluRay.DD+.5.1.x265-edge2020.torrent",
-    "fid": "240953144",
-    "rating": 8.3,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "tt0496424",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S07 1080p BluRay DD+ 5 1 x265-edge2020",
-    "time": "2022-12-15 06:33:22",
-    "seeds": 95,
-    "peers": 1,
-    "size": "8.9 GiB",
-    "filename": "30.Rock.S07.1080p.BluRay.DD+.5.1.x265-edge2020.torrent",
-    "fid": "240953165",
-    "rating": 8.3,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "tt0496424",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S05 1080p BluRay DD+ 5 1 x265-edge2020",
-    "time": "2022-12-15 06:27:43",
-    "seeds": 89,
-    "peers": 1,
-    "size": "10.5 GiB",
-    "filename": "30.Rock.S05.1080p.BluRay.DD+.5.1.x265-edge2020.torrent",
-    "fid": "240953162",
-    "rating": 8.3,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "tt0496424",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S03 1080p BluRay DD+ 5 1 x265-edge2020",
-    "time": "2022-12-15 05:33:27",
-    "seeds": 87,
-    "peers": 1,
-    "size": "17.2 GiB",
-    "filename": "30.Rock.S03.1080p.BluRay.DD+.5.1.x265-edge2020.torrent",
-    "fid": "240953146",
-    "rating": 8.3,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "tt0496424",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S04 1080p BluRay DD+ 5 1 x265-edge2020",
-    "time": "2022-12-15 06:24:49",
-    "seeds": 85,
-    "peers": 1,
-    "size": "12.8 GiB",
-    "filename": "30.Rock.S04.1080p.BluRay.DD+.5.1.x265-edge2020.torrent",
-    "fid": "240953161",
-    "rating": 8.3,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "tt0496424",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "title": "30 Rock 2006 S01-07 720p BluRay H264 Will1869",
-    "seeds": "80",
-    "peers": "3",
-    "size": "39.5 GB",
-    "desc": "https://iptorrents.com/t/5797588",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S01-S07 1080p Mixed x265-KONTRAST",
-    "time": "2024-02-12 06:16:59",
-    "seeds": 66,
-    "peers": 3,
-    "size": "57.7 GiB",
-    "filename": "30.Rock.S01-S07.1080p.Mixed.x265-KONTRAST.torrent",
-    "fid": "241219682",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S01-S07 COMPLETE 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "time": "2020-03-26 19:38:28",
-    "seeds": 45,
-    "peers": 6,
-    "size": "287.0 GiB",
-    "filename": "30.Rock.S01-S07.COMPLETE.1080p.AMZN.WEBRip.DD5.1.x264-NTb.torrent",
-    "fid": "1591372",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 6,
-    "tags": [
-      "FREELEECH",
-      "nonscene"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": ""
-  },
-  {
-    "title": "30 Rock S04 1080p AMZN WEB-DL DDP5 1 H 264-MZABI",
-    "seeds": "37",
-    "peers": "1",
-    "size": "46.5 GB",
-    "desc": "https://iptorrents.com/t/6853625",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02 1080p AMZN WEB-DL DDP5 1 H 264-MZABI",
-    "seeds": "33",
-    "peers": "2",
-    "size": "32.2 GB",
-    "desc": "https://iptorrents.com/t/6852668",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S06 1080p AMZN WEB-DL DDP5 1 H 264-MZABI",
-    "seeds": "31",
-    "peers": "1",
-    "size": "45.2 GB",
-    "desc": "https://iptorrents.com/t/6846008",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03 1080p AMZN WEB-DL DDP5 1 H 264-MZABI",
-    "seeds": "31",
-    "peers": "1",
-    "size": "47.7 GB",
-    "desc": "https://iptorrents.com/t/6853482",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S01 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "time": "2025-09-06 08:41:42",
-    "seeds": 31,
+    "title": "Taboo (2017) S01 (1080p BDRip x265 10bit EAC3 5 1 - xtrem3x) [TAoE]",
+    "time": "2020-08-16 15:56:31",
+    "seeds": 96,
     "peers": 0,
-    "size": "47.4 GiB",
-    "filename": "30.Rock.S01.1080p.AMZN.WEBRip.DD5.1.x264-NTb.torrent",
-    "fid": "241596233",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "title": "30 Rock S05 1080p AMZN WEB-DL DDP5 1 H 264-MZABI",
-    "seeds": "30",
-    "peers": "2",
-    "size": "39.5 GB",
-    "desc": "https://iptorrents.com/t/6846262",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S07 1080p AMZN WEB-DL DDP5 1 H 264-MZABI",
-    "seeds": "28",
-    "peers": "1",
-    "size": "27.3 GB",
-    "desc": "https://iptorrents.com/t/6846297",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01 1080p BluRay x264-BEDLAM",
-    "seeds": "26",
-    "peers": "0",
-    "size": "32.7 GB",
-    "desc": "https://iptorrents.com/t/6846998",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock 2006 S01-07 720p BluRay H264 Will1869",
-    "time": "2024-03-07 00:25:24",
-    "seeds": 24,
-    "peers": 2,
-    "size": "39.5 GiB",
-    "filename": "30.Rock.2006.S01-07.720p.BluRay.H264.Will1869.torrent",
-    "fid": "241234559",
-    "rating": 8.3,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "tt0496424",
-    "igdbID": "",
-    "tvmazeID": ""
-  },
-  {
-    "title": "30 Rock S01 720p WEB-DL DD5 1 AVC-CtrlHD",
-    "seeds": "22",
-    "peers": "1",
-    "size": "14.5 GB",
-    "desc": "https://iptorrents.com/t/762884",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S05 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "21",
-    "peers": "4",
-    "size": "113 GB",
-    "desc": "https://iptorrents.com/t/4221288",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S02 1080p BluRay DD+ 5 1 x264-BTN",
-    "time": "2021-07-01 07:43:38",
-    "seeds": 21,
-    "peers": 0,
-    "size": "28.1 GiB",
-    "filename": "30.Rock.S02.1080p.BluRay.DD+.5.1.x264-BTN.torrent",
-    "fid": "1909170",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "title": "30 Rock S01-S07 Complete 480p WEB-DL x264-Sticky83",
-    "seeds": "21",
-    "peers": "2",
-    "size": "17.9 GB",
-    "desc": "https://iptorrents.com/t/995582",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S07 1080p BluRay DD+ 5 1 x264-BTN",
-    "time": "2021-07-01 09:16:59",
-    "seeds": 20,
-    "peers": 0,
-    "size": "24.7 GiB",
-    "filename": "30.Rock.S07.1080p.BluRay.DD+.5.1.x264-BTN.torrent",
-    "fid": "1909251",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S05 1080p BluRay DD+ 5.1 x264-BTN",
-    "time": "2021-07-01 10:24:45",
-    "seeds": 20,
-    "peers": 1,
-    "size": "43.5 GiB",
-    "filename": "30.Rock.S05.1080p.BluRay.DD+.5.1.x264-BTN.torrent",
-    "fid": "1909314",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "title": "30 Rock S07 1080p WEB-DL DD5 1 H 264-POD",
-    "seeds": "19",
-    "peers": "0",
-    "size": "10.9 GB",
-    "desc": "https://iptorrents.com/t/771514",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S07 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "19",
-    "peers": "0",
-    "size": "65.7 GB",
-    "desc": "https://iptorrents.com/t/4221540",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S06 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "19",
-    "peers": "1",
-    "size": "109 GB",
-    "desc": "https://iptorrents.com/t/4221441",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "19",
-    "peers": "0",
-    "size": "108 GB",
-    "desc": "https://iptorrents.com/t/4221251",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S01-S07 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "time": "2020-07-29 12:26:06",
-    "seeds": 19,
-    "peers": 3,
-    "size": "688.6 GiB",
-    "filename": "30.Rock.S01-S07.1080p.DTS-HD.MA.5.1.AVC.REMUX-FraMeSToR.torrent",
-    "fid": "1679403",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 8,
-    "tags": [
-      "comedy",
-      "FREELEECH",
-      "nonscene"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock Complete 1080p BluRay Opus 5.1 AV1-GanG",
-    "time": "2025-07-21 05:55:19",
-    "seeds": 19,
-    "peers": 1,
-    "size": "114.7 GiB",
-    "filename": "30.Rock.Complete.1080p.BluRay.Opus.5.1.AV1-GanG.torrent",
-    "fid": "241563797",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "title": "30 Rock S03E15 The Bubble 1080p HEVC x265-MeGusta",
-    "seeds": "9",
-    "peers": "0",
-    "size": "270 MB",
-    "desc": "https://iptorrents.com/t/6601372",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E08 Flu Shot 1080p HEVC x265-MeGusta",
-    "seeds": "9",
-    "peers": "0",
-    "size": "278 MB",
-    "desc": "https://iptorrents.com/t/6601293",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E21 Hiatus 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "9",
-    "peers": "0",
-    "size": "2.28 GB",
-    "desc": "https://iptorrents.com/t/6600491",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E20 Cleveland 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "9",
-    "peers": "0",
-    "size": "2.2 GB",
-    "desc": "https://iptorrents.com/t/6600490",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E16 The Source Awards 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "9",
-    "peers": "0",
-    "size": "2.24 GB",
-    "desc": "https://iptorrents.com/t/6600485",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E14 The C Word 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "9",
-    "peers": "0",
-    "size": "2.25 GB",
-    "desc": "https://iptorrents.com/t/6600482",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E10 The Rural Juror 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "9",
-    "peers": "0",
-    "size": "2.15 GB",
-    "desc": "https://iptorrents.com/t/6600475",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E08 The Break Up 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "9",
-    "peers": "0",
-    "size": "2.21 GB",
-    "desc": "https://iptorrents.com/t/6600470",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E06 Jack Meets Dennis 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "9",
-    "peers": "0",
-    "size": "2.13 GB",
-    "desc": "https://iptorrents.com/t/6600468",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E05 Jack-Tor 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "9",
-    "peers": "0",
-    "size": "2.82 GB",
-    "desc": "https://iptorrents.com/t/6600467",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S00E09 30 Rock A One-Time Special 1080p HULU WEB-DL AAC2 0 H 264-monkee",
-    "seeds": "9",
-    "peers": "0",
-    "size": "1.59 GB",
-    "desc": "https://iptorrents.com/t/6912754",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S07E12-E13 Hogcock-Last Lunch 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "8",
-    "peers": "0",
-    "size": "10.3 GB",
-    "desc": "https://iptorrents.com/t/6391402",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S06 720p BluRay DD5 1 x264-Chotab",
-    "seeds": "8",
-    "peers": "0",
-    "size": "27.5 GB",
-    "desc": "https://iptorrents.com/t/4047949",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E03 The One With The Cast Of Night Court 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "8",
-    "peers": "0",
-    "size": "2.21 GB",
-    "desc": "https://iptorrents.com/t/6601181",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E01 Do-Over 1080p HEVC x265-MeGusta",
-    "seeds": "8",
-    "peers": "0",
-    "size": "359 MB",
-    "desc": "https://iptorrents.com/t/6601231",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E01 Do-Over 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "8",
-    "peers": "0",
-    "size": "2.26 GB",
-    "desc": "https://iptorrents.com/t/6601179",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E13 Succession 1080p HEVC x265-MeGusta",
-    "seeds": "8",
-    "peers": "0",
-    "size": "298 MB",
-    "desc": "https://iptorrents.com/t/6601123",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E18 Fireworks 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "8",
-    "peers": "0",
-    "size": "2.63 GB",
-    "desc": "https://iptorrents.com/t/6600488",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E15 Hard Ball 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "8",
-    "peers": "0",
-    "size": "2.17 GB",
-    "desc": "https://iptorrents.com/t/6600484",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E07 Tracy Does Conan 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "8",
-    "peers": "0",
-    "size": "2.18 GB",
-    "desc": "https://iptorrents.com/t/6600469",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E04 Jack The Writer 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "8",
-    "peers": "0",
-    "size": "2.24 GB",
-    "desc": "https://iptorrents.com/t/6600465",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E03 Blind Date 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "8",
-    "peers": "0",
-    "size": "2.22 GB",
-    "desc": "https://iptorrents.com/t/6600462",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E02 The Aftermath 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "8",
-    "peers": "0",
-    "size": "2.12 GB",
-    "desc": "https://iptorrents.com/t/6600461",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E01 Pilot 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "8",
-    "peers": "0",
-    "size": "2.16 GB",
-    "desc": "https://iptorrents.com/t/6600458",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E14 Sandwich Day 1080p HEVC x265-MeGusta",
-    "seeds": "7",
-    "peers": "0",
-    "size": "298 MB",
-    "desc": "https://iptorrents.com/t/6601107",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E12 Subway Hero 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "7",
-    "peers": "0",
-    "size": "2.2 GB",
-    "desc": "https://iptorrents.com/t/6600827",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E11 MILF Island 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "7",
-    "peers": "0",
-    "size": "2.16 GB",
-    "desc": "https://iptorrents.com/t/6600822",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S07E00 A One-Time Special 720p HEVC x265-MeGusta",
-    "seeds": "6",
-    "peers": "0",
-    "size": "397 MB",
-    "desc": "https://iptorrents.com/t/3982344",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S07 720p HDTV X264-DIMENSION",
-    "seeds": "6",
-    "peers": "0",
-    "size": "7.13 GB",
-    "desc": "https://iptorrents.com/t/797066",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E22 Kidney Now 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "6",
-    "peers": "0",
-    "size": "2.16 GB",
-    "desc": "https://iptorrents.com/t/6601204",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E21 Mamma Mia 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "6",
-    "peers": "0",
-    "size": "2.17 GB",
-    "desc": "https://iptorrents.com/t/6601202",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E20 The Natural Order 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "6",
-    "peers": "0",
-    "size": "2.07 GB",
-    "desc": "https://iptorrents.com/t/6601201",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E07 Senor Macho Solo 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "6",
-    "peers": "0",
-    "size": "2.14 GB",
-    "desc": "https://iptorrents.com/t/6601187",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E03 The One With The Cast Of Night Court 1080p HEVC x265-MeGusta",
-    "seeds": "6",
-    "peers": "0",
-    "size": "302 MB",
-    "desc": "https://iptorrents.com/t/6601241",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E09 Episode 209 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "6",
-    "peers": "0",
-    "size": "2.22 GB",
-    "desc": "https://iptorrents.com/t/6600820",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E03 The Collection 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "6",
-    "peers": "0",
-    "size": "2.04 GB",
-    "desc": "https://iptorrents.com/t/6600809",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E02 Jack Gets In The Game 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "6",
-    "peers": "0",
-    "size": "2.14 GB",
-    "desc": "https://iptorrents.com/t/6600791",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E01 Seinfeld Vision 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "6",
-    "peers": "0",
-    "size": "2.25 GB",
-    "desc": "https://iptorrents.com/t/6600787",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E17 1080p BluRay x264-BEDLAM",
-    "seeds": "6",
-    "peers": "0",
-    "size": "1.45 GB",
-    "desc": "https://iptorrents.com/t/2816224",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E02 The Aftermath 1080p HEVC x265-MeGusta",
-    "seeds": "6",
-    "peers": "0",
-    "size": "376 MB",
-    "desc": "https://iptorrents.com/t/6600533",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock A One-Time Special 2020 1080p HULU WEB-DL AAC2 0 H 264-monkee",
-    "seeds": "6",
-    "peers": "0",
-    "size": "1.6 GB",
-    "desc": "https://iptorrents.com/t/3984224",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Official - Top 40 Rock & Metal Albums Chart 30 08 2024",
-    "seeds": "5",
-    "peers": "0",
-    "size": "4.57 GB",
-    "desc": "https://iptorrents.com/t/6121121",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock Season 3 720p WEB-DL DD 5 1 h 264-TjHD",
-    "seeds": "5",
-    "peers": "0",
-    "size": "14.5 GB",
-    "desc": "https://iptorrents.com/t/763612",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S05E10 720p BluRay x264-BORDURE",
-    "seeds": "5",
-    "peers": "0",
-    "size": "938 MB",
-    "desc": "https://iptorrents.com/t/4115793",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S05E04 Live Show 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "5",
-    "peers": "0",
-    "size": "4.47 GB",
-    "desc": "https://iptorrents.com/t/6390902",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E19 The Ones 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.07 GB",
-    "desc": "https://iptorrents.com/t/6601200",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E17 Cutbacks 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.06 GB",
-    "desc": "https://iptorrents.com/t/6601198",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E16 Apollo Apollo 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.11 GB",
-    "desc": "https://iptorrents.com/t/6601197",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E15 The Bubble 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.14 GB",
-    "desc": "https://iptorrents.com/t/6601195",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E14 The Funcooker 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.08 GB",
-    "desc": "https://iptorrents.com/t/6601194",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E13 Goodbye My Friend 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.11 GB",
-    "desc": "https://iptorrents.com/t/6601193",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E12 Larry King 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "1.96 GB",
-    "desc": "https://iptorrents.com/t/6601192",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E11 St Valentines Day 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.02 GB",
-    "desc": "https://iptorrents.com/t/6601191",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E10 Generalissimo 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.13 GB",
-    "desc": "https://iptorrents.com/t/6601190",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E09 Retreat To Move Forward 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.22 GB",
-    "desc": "https://iptorrents.com/t/6601188",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E08 Flu Shot 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.17 GB",
-    "desc": "https://iptorrents.com/t/6601184",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E06 Christmas Special 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.18 GB",
-    "desc": "https://iptorrents.com/t/6601183",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E05 Reunion 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.15 GB",
-    "desc": "https://iptorrents.com/t/6601182",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E04 Gavin Volure 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.15 GB",
-    "desc": "https://iptorrents.com/t/6601186",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E10 Episode 210 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.15 GB",
-    "desc": "https://iptorrents.com/t/6600825",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E08 Secrets and Lies 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.21 GB",
-    "desc": "https://iptorrents.com/t/6600819",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E07 Cougars 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.08 GB",
-    "desc": "https://iptorrents.com/t/6600817",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E06 Somebody To Love 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.1 GB",
-    "desc": "https://iptorrents.com/t/6600815",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E05 Greenzo 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.17 GB",
-    "desc": "https://iptorrents.com/t/6600810",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E04 Rosemarys Baby 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "2.14 GB",
-    "desc": "https://iptorrents.com/t/6600813",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Elvis - The King Of Rock n Roll 30 Hit Performances And More DVD",
-    "seeds": "4",
-    "peers": "0",
-    "size": "669 MB",
-    "desc": "https://iptorrents.com/t/117742",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S07E11 A Goons Deed in a Weary World 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "4",
-    "peers": "0",
-    "size": "5.05 GB",
-    "desc": "https://iptorrents.com/t/6391401",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S06E19 West Cost Version 720p BluRay x264-BORDURE",
-    "seeds": "4",
-    "peers": "0",
-    "size": "1.21 GB",
-    "desc": "https://iptorrents.com/t/4116987",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S05E23 1080p BluRay x264-BORDURE",
-    "seeds": "4",
-    "peers": "2",
-    "size": "2.95 GB",
-    "desc": "https://iptorrents.com/t/4115736",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S05E02 When It Rains It Pours 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "4",
-    "peers": "0",
-    "size": "4.25 GB",
-    "desc": "https://iptorrents.com/t/6390895",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S05E01 1080p BluRay x264-BORDURE",
-    "seeds": "4",
-    "peers": "2",
-    "size": "2.58 GB",
-    "desc": "https://iptorrents.com/t/4115712",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E16 Floyd 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "4",
-    "peers": "0",
-    "size": "4.97 GB",
-    "desc": "https://iptorrents.com/t/6390990",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E11 Winter Madness 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "4",
-    "peers": "0",
-    "size": "4.95 GB",
-    "desc": "https://iptorrents.com/t/6390982",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E02 Into the Crevasse 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "4",
-    "peers": "0",
-    "size": "4.99 GB",
-    "desc": "https://iptorrents.com/t/6390967",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E18 1080p BluRay x264-BEDLAM",
-    "seeds": "4",
-    "peers": "0",
-    "size": "2.18 GB",
-    "desc": "https://iptorrents.com/t/2816225",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E11 The Head And The Hair 720p HEVC x265-MeGusta",
-    "seeds": "4",
-    "peers": "1",
-    "size": "211 MB",
-    "desc": "https://iptorrents.com/t/6600568",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E10 The Rural Juror 720p HEVC x265-MeGusta",
-    "seeds": "4",
-    "peers": "1",
-    "size": "232 MB",
-    "desc": "https://iptorrents.com/t/6600557",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E09 The Baby Show 720p HEVC x265-MeGusta",
-    "seeds": "4",
-    "peers": "1",
-    "size": "225 MB",
-    "desc": "https://iptorrents.com/t/6600559",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E08 The Break Up 720p HEVC x265-MeGusta",
-    "seeds": "4",
-    "peers": "0",
-    "size": "217 MB",
-    "desc": "https://iptorrents.com/t/6600554",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E07 Tracy Does Conan 720p HEVC x265-MeGusta",
-    "seeds": "4",
-    "peers": "0",
-    "size": "248 MB",
-    "desc": "https://iptorrents.com/t/6600544",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E01 Pilot 1080p BluRay DDP5 1 x264-",
-    "seeds": "4",
-    "peers": "0",
-    "size": "1.89 GB",
-    "desc": "https://iptorrents.com/t/3869726",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "18",
-    "peers": "0",
-    "size": "74.7 GB",
-    "desc": "https://iptorrents.com/t/4221129",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "18",
-    "peers": "0",
-    "size": "107 GB",
-    "desc": "https://iptorrents.com/t/4220147",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S01 1080p BluRay DD+ 5 1 x264-BTN",
-    "time": "2021-07-01 07:41:04",
-    "seeds": 18,
-    "peers": 2,
-    "size": "40.1 GiB",
-    "filename": "30.Rock.S01.1080p.BluRay.DD+.5.1.x264-BTN.torrent",
-    "fid": "1909166",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "title": "30 Rock S04 720p WEB-DL DD5 1 H 264-IPT",
-    "seeds": "17",
-    "peers": "0",
-    "size": "14.7 GB",
-    "desc": "https://iptorrents.com/t/763638",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S04 1080p BluRay DD+ 5 1 x264-BTN",
-    "time": "2021-07-01 09:16:17",
-    "seeds": 16,
-    "peers": 0,
-    "size": "41.6 GiB",
-    "filename": "30.Rock.S04.1080p.BluRay.DD+.5.1.x264-BTN.torrent",
-    "fid": "1909249",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S03 1080p BluRay DD+ 5 1 x264-BTN",
-    "time": "2021-07-01 08:13:24",
-    "seeds": 16,
-    "peers": 1,
-    "size": "40.3 GiB",
-    "filename": "30.Rock.S03.1080p.BluRay.DD+.5.1.x264-BTN.torrent",
-    "fid": "1909201",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S06 1080p BluRay DD+ 5 1 x264-BTN",
-    "time": "2021-07-01 08:11:13",
-    "seeds": 15,
-    "peers": 0,
-    "size": "41.6 GiB",
-    "filename": "30.Rock.S06.1080p.BluRay.DD+.5.1.x264-BTN.torrent",
-    "fid": "1909199",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "title": "30 Rock S03 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "15",
-    "peers": "2",
-    "size": "108 GB",
-    "desc": "https://iptorrents.com/t/4221170",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S05 720p WEB-DL DD5 1 H 264-HoodBag",
-    "seeds": "14",
-    "peers": "1",
-    "size": "16.1 GB",
-    "desc": "https://iptorrents.com/t/763656",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02 720p WEB-DL DD5 1 AVC-CtrlHD",
-    "seeds": "14",
-    "peers": "0",
-    "size": "10 GB",
-    "desc": "https://iptorrents.com/t/762891",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E21 Hiatus 1080p HEVC x265-MeGusta",
-    "seeds": "14",
-    "peers": "0",
-    "size": "334 MB",
-    "desc": "https://iptorrents.com/t/6600753",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "14",
-    "peers": "1",
-    "size": "47.4 GB",
-    "desc": "https://iptorrents.com/t/6872961",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S06 720p WEB-DL DD5 1 H 264-POD",
-    "seeds": "13",
-    "peers": "1",
-    "size": "15.6 GB",
-    "desc": "https://iptorrents.com/t/1591366",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S04 1080p WEB-DL AAC2 0 AVC-TrollHD",
-    "time": "2018-08-18 04:15:49",
-    "seeds": 13,
-    "peers": 0,
-    "size": "33.3 GiB",
-    "filename": "30.Rock.S04.1080p.WEB-DL.AAC2.0.AVC-TrollHD.torrent",
-    "fid": "1132018",
-    "rating": 8.3,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH",
-      "nonscene"
-    ],
-    "imdbID": "tt0496424",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S02 1080p WEB-DL AAC2 0 AVC-TrollHD",
-    "time": "2018-08-17 07:49:43",
-    "seeds": 13,
-    "peers": 0,
-    "size": "22.7 GiB",
-    "filename": "30.Rock.S02.1080p.WEB-DL.AAC2.0.AVC-TrollHD.torrent",
-    "fid": "1131472",
-    "rating": 8.3,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH",
-      "nonscene"
-    ],
-    "imdbID": "tt0496424",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "title": "30 Rock S01E20 Cleveland 1080p HEVC x265-MeGusta",
-    "seeds": "13",
-    "peers": "0",
-    "size": "326 MB",
-    "desc": "https://iptorrents.com/t/6600770",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E16 The Source Awards 1080p HEVC x265-MeGusta",
-    "seeds": "13",
-    "peers": "0",
-    "size": "330 MB",
-    "desc": "https://iptorrents.com/t/6600705",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E14 The C Word 1080p HEVC x265-MeGusta",
-    "seeds": "13",
-    "peers": "0",
-    "size": "351 MB",
-    "desc": "https://iptorrents.com/t/6600692",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E12 Black Tie 1080p HEVC x265-MeGusta",
-    "seeds": "13",
-    "peers": "0",
-    "size": "308 MB",
-    "desc": "https://iptorrents.com/t/6600678",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E04 Jack The Writer 1080p HEVC x265-MeGusta",
-    "seeds": "13",
-    "peers": "0",
-    "size": "350 MB",
-    "desc": "https://iptorrents.com/t/6600581",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E03 Blind Date 1080p HEVC x265-MeGusta",
-    "seeds": "13",
-    "peers": "0",
-    "size": "316 MB",
-    "desc": "https://iptorrents.com/t/6600567",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E18 Jackie Jormp-Jomp 1080p HEVC x265-MeGusta",
-    "seeds": "12",
-    "peers": "0",
-    "size": "257 MB",
-    "desc": "https://iptorrents.com/t/6601422",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E12 Subway Hero 1080p HEVC x265-MeGusta",
-    "seeds": "12",
-    "peers": "0",
-    "size": "336 MB",
-    "desc": "https://iptorrents.com/t/6601117",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E10 Episode 210 1080p HEVC x265-MeGusta",
-    "seeds": "12",
-    "peers": "0",
-    "size": "332 MB",
-    "desc": "https://iptorrents.com/t/6601119",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E09 Episode 209 1080p HEVC x265-MeGusta",
-    "seeds": "12",
-    "peers": "0",
-    "size": "382 MB",
-    "desc": "https://iptorrents.com/t/6601110",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E19 Corporate Crush 1080p HEVC x265-MeGusta",
-    "seeds": "12",
-    "peers": "0",
-    "size": "321 MB",
-    "desc": "https://iptorrents.com/t/6600715",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E18 Fireworks 1080p HEVC x265-MeGusta",
-    "seeds": "12",
-    "peers": "0",
-    "size": "348 MB",
-    "desc": "https://iptorrents.com/t/6600765",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E17 The Fighting Irish 1080p HEVC x265-MeGusta",
-    "seeds": "12",
-    "peers": "0",
-    "size": "316 MB",
-    "desc": "https://iptorrents.com/t/6600696",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E15 Hard Ball 1080p HEVC x265-MeGusta",
-    "seeds": "12",
-    "peers": "0",
-    "size": "349 MB",
-    "desc": "https://iptorrents.com/t/6600726",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E09 The Baby Show 1080p HEVC x265-MeGusta",
-    "seeds": "12",
-    "peers": "0",
-    "size": "335 MB",
-    "desc": "https://iptorrents.com/t/6600632",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E06 Jack Meets Dennis 1080p HEVC x265-MeGusta",
-    "seeds": "12",
-    "peers": "0",
-    "size": "319 MB",
-    "desc": "https://iptorrents.com/t/6600590",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E05 Jack-Tor 1080p HEVC x265-MeGusta",
-    "seeds": "12",
-    "peers": "0",
-    "size": "398 MB",
-    "desc": "https://iptorrents.com/t/6600611",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01 1080p AMZN WEB-DL DDP5 1 H 264-MZABI",
-    "seeds": "12",
-    "peers": "1",
-    "size": "45.8 GB",
-    "desc": "https://iptorrents.com/t/6852646",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock Complete 480p WEB-DL nSD x264-NhaNc3",
-    "seeds": "12",
-    "peers": "0",
-    "size": "33.7 GB",
-    "desc": "https://iptorrents.com/t/2874677",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E22 Kidney Now 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "276 MB",
-    "desc": "https://iptorrents.com/t/6601394",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E20 The Natural Order 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "256 MB",
-    "desc": "https://iptorrents.com/t/6601408",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E17 Cutbacks 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "245 MB",
-    "desc": "https://iptorrents.com/t/6601346",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E16 Apollo Apollo 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "263 MB",
-    "desc": "https://iptorrents.com/t/6601383",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E14 The Funcooker 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "265 MB",
-    "desc": "https://iptorrents.com/t/6601362",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E13 Goodbye My Friend 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "254 MB",
-    "desc": "https://iptorrents.com/t/6601352",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E09 Retreat To Move Forward 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "289 MB",
-    "desc": "https://iptorrents.com/t/6601314",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E06 Christmas Special 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "316 MB",
-    "desc": "https://iptorrents.com/t/6601282",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E04 Gavin Volure 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "290 MB",
-    "desc": "https://iptorrents.com/t/6601259",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E02 Believe In The Stars 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "321 MB",
-    "desc": "https://iptorrents.com/t/6601250",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E08 Secrets and Lies 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "311 MB",
-    "desc": "https://iptorrents.com/t/6601101",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E06 Somebody To Love 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "287 MB",
-    "desc": "https://iptorrents.com/t/6601087",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E05 Greenzo 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "324 MB",
-    "desc": "https://iptorrents.com/t/6601082",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E04 Rosemarys Baby 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "352 MB",
-    "desc": "https://iptorrents.com/t/6601072",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E13 Up All Night 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "319 MB",
-    "desc": "https://iptorrents.com/t/6600686",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E11 The Head And The Hair 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "306 MB",
-    "desc": "https://iptorrents.com/t/6600667",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E10 The Rural Juror 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "350 MB",
-    "desc": "https://iptorrents.com/t/6600650",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E08 The Break Up 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "320 MB",
-    "desc": "https://iptorrents.com/t/6600657",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E07 Tracy Does Conan 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "394 MB",
-    "desc": "https://iptorrents.com/t/6600623",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E01 Pilot 1080p HEVC x265-MeGusta",
-    "seeds": "11",
-    "peers": "0",
-    "size": "394 MB",
-    "desc": "https://iptorrents.com/t/6600555",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock Season 1-5 720p HDTV x264",
-    "seeds": "10",
-    "peers": "0",
-    "size": "59.7 GB",
-    "desc": "https://iptorrents.com/t/552513",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E21 Mamma Mia 1080p HEVC x265-MeGusta",
-    "seeds": "10",
-    "peers": "0",
-    "size": "266 MB",
-    "desc": "https://iptorrents.com/t/6601419",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E19 The Ones 1080p HEVC x265-MeGusta",
-    "seeds": "10",
-    "peers": "0",
-    "size": "242 MB",
-    "desc": "https://iptorrents.com/t/6601400",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E12 Larry King 1080p HEVC x265-MeGusta",
-    "seeds": "10",
-    "peers": "0",
-    "size": "249 MB",
-    "desc": "https://iptorrents.com/t/6601326",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E11 St Valentines Day 1080p HEVC x265-MeGusta",
-    "seeds": "10",
-    "peers": "0",
-    "size": "246 MB",
-    "desc": "https://iptorrents.com/t/6601306",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E07 Senor Macho Solo 1080p HEVC x265-MeGusta",
-    "seeds": "10",
-    "peers": "0",
-    "size": "299 MB",
-    "desc": "https://iptorrents.com/t/6601334",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E05 Reunion 1080p HEVC x265-MeGusta",
-    "seeds": "10",
-    "peers": "0",
-    "size": "304 MB",
-    "desc": "https://iptorrents.com/t/6601269",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E02 1080p HEVC x265-MeGusta",
-    "seeds": "10",
-    "peers": "1",
-    "size": "525 MB",
-    "desc": "https://iptorrents.com/t/2496316",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E15 Cooter 1080p HEVC x265-MeGusta",
-    "seeds": "10",
-    "peers": "0",
-    "size": "299 MB",
-    "desc": "https://iptorrents.com/t/6601122",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E15 Cooter 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "10",
-    "peers": "0",
-    "size": "2.31 GB",
-    "desc": "https://iptorrents.com/t/6600835",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E14 Sandwich Day 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "10",
-    "peers": "0",
-    "size": "2.12 GB",
-    "desc": "https://iptorrents.com/t/6600830",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E13 Succession 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "10",
-    "peers": "0",
-    "size": "2.18 GB",
-    "desc": "https://iptorrents.com/t/6600829",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E11 MILF Island 1080p HEVC x265-MeGusta",
-    "seeds": "10",
-    "peers": "0",
-    "size": "271 MB",
-    "desc": "https://iptorrents.com/t/6601078",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E07 Cougars 1080p HEVC x265-MeGusta",
-    "seeds": "10",
-    "peers": "0",
-    "size": "346 MB",
-    "desc": "https://iptorrents.com/t/6601093",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E03 The Collection 1080p HEVC x265-MeGusta",
-    "seeds": "10",
-    "peers": "0",
-    "size": "338 MB",
-    "desc": "https://iptorrents.com/t/6601064",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E02 Jack Gets In The Game 1080p HEVC x265-MeGusta",
-    "seeds": "10",
-    "peers": "0",
-    "size": "342 MB",
-    "desc": "https://iptorrents.com/t/6601060",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E01 Seinfeld Vision 1080p HEVC x265-MeGusta",
-    "seeds": "10",
-    "peers": "0",
-    "size": "335 MB",
-    "desc": "https://iptorrents.com/t/6601057",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E19 Corporate Crush 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "10",
-    "peers": "0",
-    "size": "2.21 GB",
-    "desc": "https://iptorrents.com/t/6600489",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E13 Up All Night 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "10",
-    "peers": "0",
-    "size": "2.18 GB",
-    "desc": "https://iptorrents.com/t/6600479",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E12 Black Tie 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "10",
-    "peers": "0",
-    "size": "2.25 GB",
-    "desc": "https://iptorrents.com/t/6600478",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E11 The Head And The Hair 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "10",
-    "peers": "0",
-    "size": "2.18 GB",
-    "desc": "https://iptorrents.com/t/6600476",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E09 The Baby Show 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "10",
-    "peers": "0",
-    "size": "2.24 GB",
-    "desc": "https://iptorrents.com/t/6600471",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S03 1080p WEB-DL AAC2 0 AVC-TrollHD",
-    "time": "2018-08-17 09:30:35",
-    "seeds": 9,
-    "peers": 0,
-    "size": "33.1 GiB",
-    "filename": "30.Rock.S03.1080p.WEB-DL.AAC2.0.AVC-TrollHD.torrent",
-    "fid": "1131544",
-    "rating": 8.3,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH",
-      "nonscene"
-    ],
-    "imdbID": "tt0496424",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S01-S07 DVDRip XviD-SCENE",
-    "time": "2019-09-24 13:07:08",
-    "seeds": 9,
-    "peers": 0,
-    "size": "25.7 GiB",
-    "filename": "30.Rock.S01-S07.DVDRip.XviD-SCENE.torrent",
-    "fid": "1452082",
-    "rating": 8.3,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 1,
-    "tags": [
-      "comedy",
-      "FREELEECH",
-      "rar"
-    ],
-    "imdbID": "tt0496424",
-    "igdbID": "",
-    "tvmazeID": ""
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock A One-Time Special 2020 1080p PCOK WEB-DL AAC2 0 H 264-monkee",
-    "time": "2023-02-10 07:50:59",
-    "seeds": 8,
-    "peers": 0,
-    "size": "2.0 GiB",
-    "filename": "30.Rock.A.One-Time.Special.2020.1080p.PCOK.WEB-DL.AAC2.0.H.264-monkee.torrent",
-    "fid": "240983646",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": "",
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "e1886823"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S01 DVDRip XviD-TorrentLeech",
-    "time": "2007-08-28 14:31:03",
-    "seeds": 7,
-    "peers": 0,
-    "size": "3.8 GiB",
-    "filename": "30.Rock.S01.DVDRip.XviD-TorrentLeech.torrent",
-    "fid": "60633",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 60,
-    "tags": [
-      "FREELEECH",
-      "rar"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S03 720p BluRay x264-BORDURE",
-    "time": "2020-11-25 13:45:21",
-    "seeds": 5,
-    "peers": 0,
-    "size": "29.9 GiB",
-    "filename": "30.Rock.S03.720p.BluRay.x264-BORDURE.torrent",
-    "fid": "1739130",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 4,
-    "tags": [
-      "comedy",
-      "FREELEECH",
-      "rar"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S02 DVDRip XviD-ORPHEUS",
-    "time": "2008-09-25 09:36:52",
-    "seeds": 5,
-    "peers": 0,
-    "size": "2.7 GiB",
-    "filename": "30.Rock.S02.DVDRip.XviD-ORPHEUS.torrent",
-    "fid": "112662",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 18,
-    "tags": [
-      "FREELEECH",
-      "rar"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "title": "30 Rock S07E10 Florida 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "4",
-    "peers": "0",
-    "size": "5.01 GB",
-    "desc": "https://iptorrents.com/t/6391403",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S07E09 Game Over 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "4",
-    "peers": "0",
-    "size": "5 GB",
-    "desc": "https://iptorrents.com/t/6391398",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S07E00 A One-Time Special 1080p WEB H264-ALiGN",
-    "time": "2020-07-17 09:03:24",
-    "seeds": 4,
-    "peers": 0,
-    "size": "2.3 GiB",
-    "filename": "30.Rock.S07E00.A.One-Time.Special.1080p.WEB.H264-ALiGN.torrent",
-    "fid": "1671125",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "title": "30 Rock S04E22 I Do Do 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "4",
-    "peers": "0",
-    "size": "4.22 GB",
-    "desc": "https://iptorrents.com/t/6391000",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E21 Emmanuelle Goes to Dinosaur Land 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "4",
-    "peers": "0",
-    "size": "5.02 GB",
-    "desc": "https://iptorrents.com/t/6390998",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E18 Khonani 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "4",
-    "peers": "0",
-    "size": "4.97 GB",
-    "desc": "https://iptorrents.com/t/6390992",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E15 Don Geiss America and Hope 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "4",
-    "peers": "0",
-    "size": "5.09 GB",
-    "desc": "https://iptorrents.com/t/6390985",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E14 Future Husband 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "4",
-    "peers": "0",
-    "size": "4.98 GB",
-    "desc": "https://iptorrents.com/t/6390986",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E13 Anna Howard Shaw Day 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "4",
-    "peers": "0",
-    "size": "5.01 GB",
-    "desc": "https://iptorrents.com/t/6390984",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E12 Verna 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "4",
-    "peers": "0",
-    "size": "4.98 GB",
-    "desc": "https://iptorrents.com/t/6390983",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E10 Black Light Attack 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "4",
-    "peers": "0",
-    "size": "5.07 GB",
-    "desc": "https://iptorrents.com/t/6390979",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E09 Klaus and Greta 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "4",
-    "peers": "0",
-    "size": "5.01 GB",
-    "desc": "https://iptorrents.com/t/6390978",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E07 Dealbreakers Talk Show 0001 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "4",
-    "peers": "0",
-    "size": "5.04 GB",
-    "desc": "https://iptorrents.com/t/6390975",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E02 Believe In The Stars 1080p AMZN WEBRip DD5 1 x264-NTb",
-    "seeds": "4",
-    "peers": "0",
-    "size": "2.2 GB",
-    "desc": "https://iptorrents.com/t/6601180",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S02 720p BluRay x264-BORDURE",
-    "time": "2020-11-26 20:12:56",
-    "seeds": 4,
-    "peers": 0,
-    "size": "21.3 GiB",
-    "filename": "30.Rock.S02.720p.BluRay.x264-BORDURE.torrent",
-    "fid": "1739874",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 3,
-    "tags": [
-      "comedy",
-      "FREELEECH",
-      "rar"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "title": "30 Rock S01E14 The C Word 720p HEVC x265-MeGusta",
-    "seeds": "4",
-    "peers": "0",
-    "size": "236 MB",
-    "desc": "https://iptorrents.com/t/6600569",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S01 720p BluRay X264-REWARD",
-    "time": "2018-05-07 12:57:20",
-    "seeds": 4,
-    "peers": 0,
-    "size": "24.0 GiB",
-    "filename": "30.Rock.S01.720p.BluRay.X264-REWARD.torrent",
-    "fid": "1076898",
-    "rating": 8.3,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH",
-      "rar"
-    ],
-    "imdbID": "tt0496424",
-    "igdbID": "",
-    "tvmazeID": "s537"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "NBA 2025 11 30 Houston Rockets Vs Utah Jazz 1080p WEB H264-GAMETiME",
-    "time": "2025-12-01 17:53:20",
-    "seeds": 3,
-    "peers": 0,
-    "size": "7.0 GiB",
-    "filename": "NBA.2025.11.30.Houston.Rockets.Vs.Utah.Jazz.1080p.WEB.H264-GAMETiME.torrent",
-    "fid": "241653416",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": "",
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s50648"
-  },
-  {
-    "title": "30 Rock S07E08 My Whole Life Is Thunder 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "5.06 GB",
-    "desc": "https://iptorrents.com/t/6391397",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S07E07 Mazel Tov Dummies 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "5.06 GB",
-    "desc": "https://iptorrents.com/t/6391395",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S07E06 Aunt Phatso vs Jack Donaghy 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "5.01 GB",
-    "desc": "https://iptorrents.com/t/6391392",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S07E05 Theres No I in America 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.98 GB",
-    "desc": "https://iptorrents.com/t/6391388",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S07E03 Stride of Pride 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "5.01 GB",
-    "desc": "https://iptorrents.com/t/6391386",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S07E02 Governor Dunston 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "5.11 GB",
-    "desc": "https://iptorrents.com/t/6391384",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S07E01 The Beginning of the End 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "5.02 GB",
-    "desc": "https://iptorrents.com/t/6391391",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "30 Rock S07 DVDRip XviD-DEMAND",
-    "time": "2013-04-24 02:57:27",
-    "seeds": 3,
-    "peers": 0,
-    "size": "2.2 GiB",
-    "filename": "30.Rock.S07.DVDRip.XviD-DEMAND.torrent",
-    "fid": "431447",
+    "size": "11.1 GiB",
+    "filename": "Taboo.(2017).S01.(1080p.BDRip.x265.10bit.EAC3.5.1.-.xtrem3x).[TAoE].torrent",
+    "fid": "1691258",
     "rating": 0,
     "categoryID": 27,
     "new": false,
     "numComments": 2,
     "tags": [
-      "comedy",
       "FREELEECH",
-      "rar"
+      "nonscene"
     ],
     "imdbID": "",
     "igdbID": "",
-    "tvmazeID": "s537"
+    "tvmazeID": "s3593"
   },
   {
-    "title": "30 Rock S05E07 Brooklyn Without Limits 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
+    "title": "Taboo UK S01 720p AMZN WEBRip DD+5 1 x264",
+    "seeds": "8",
     "peers": "0",
-    "size": "4.22 GB",
-    "desc": "https://iptorrents.com/t/6390918",
+    "size": "12.4 GB",
+    "desc": "https://iptorrents.com/t/2205045",
     "provider": "IpTorrents"
   },
   {
-    "title": "30 Rock S05E06 Gentlemans Intermission 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.24 GB",
-    "desc": "https://iptorrents.com/t/6390916",
+    "title": "Taboo S01 720p BluRay DD5 1 x264-DON",
+    "seeds": "8",
+    "peers": "1",
+    "size": "21 GB",
+    "desc": "https://iptorrents.com/t/2599249",
     "provider": "IpTorrents"
   },
   {
-    "title": "30 Rock S05E05 Reaganing 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
+    "title": "Tehran Taboo 2017 [Persian] 1080p AMZN WEB-DL DDP5 1 H 264-NTG",
+    "seeds": "7",
     "peers": "0",
-    "size": "4.33 GB",
-    "desc": "https://iptorrents.com/t/6390903",
+    "size": "2.29 GB",
+    "desc": "https://iptorrents.com/t/2827936",
     "provider": "IpTorrents"
   },
   {
-    "title": "30 Rock S05E03 Lets Stay Together 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
+    "title": "Taboo 2017 S01 1080p BluRay DTS x264-SHORTBREHD [NO RAR]",
+    "seeds": "63",
     "peers": "0",
-    "size": "4.24 GB",
-    "desc": "https://iptorrents.com/t/6390896",
+    "size": "34.9 GB",
+    "desc": "https://iptorrents.com/t/2261067",
     "provider": "IpTorrents"
   },
   {
-    "title": "30 Rock S05E01 The Fabian Strategy 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.25 GB",
-    "desc": "https://iptorrents.com/t/6390894",
+    "title": "Taboo UK S01 1080p AMZN WEBRip DD+5 1 x264",
+    "seeds": "35",
+    "peers": "1",
+    "size": "24.3 GB",
+    "desc": "https://iptorrents.com/t/2205252",
     "provider": "IpTorrents"
   },
   {
-    "title": "30 Rock S04E19 Argus 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "5.01 GB",
-    "desc": "https://iptorrents.com/t/6390993",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E17 Lee Marvin vs Derek Jeter 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.96 GB",
-    "desc": "https://iptorrents.com/t/6390991",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E13 720p BluRay x264-BORDURE",
-    "seeds": "3",
-    "peers": "0",
-    "size": "1.01 GB",
-    "desc": "https://iptorrents.com/t/4113900",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E08 Secret Santa 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.22 GB",
-    "desc": "https://iptorrents.com/t/6390977",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E06 Sun Tea 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "5.02 GB",
-    "desc": "https://iptorrents.com/t/6390974",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E05 The Problem Solvers 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "5.06 GB",
-    "desc": "https://iptorrents.com/t/6390966",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E04 Audition Day 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "5.06 GB",
-    "desc": "https://iptorrents.com/t/6390973",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E03 Stone Mountain 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "5.02 GB",
-    "desc": "https://iptorrents.com/t/6390968",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E01 Season 4 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.98 GB",
-    "desc": "https://iptorrents.com/t/6390965",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E22 Kidney Now 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.92 GB",
-    "desc": "https://iptorrents.com/t/6342081",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E20 The Natural Order 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.86 GB",
-    "desc": "https://iptorrents.com/t/6342077",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E18 Jackie Jormp-Jomp 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.88 GB",
-    "desc": "https://iptorrents.com/t/6342074",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E17 Cutbacks 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.86 GB",
-    "desc": "https://iptorrents.com/t/6342072",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E15 The Bubble 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.92 GB",
-    "desc": "https://iptorrents.com/t/6342067",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E14 The Funcooker 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.87 GB",
-    "desc": "https://iptorrents.com/t/6342069",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E13 Goodbye My Friend 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.87 GB",
-    "desc": "https://iptorrents.com/t/6342071",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E12 Larry King 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.88 GB",
-    "desc": "https://iptorrents.com/t/6342080",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E10 Generalissimo 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.91 GB",
-    "desc": "https://iptorrents.com/t/6342065",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E09 Retreat to Move Forward 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.92 GB",
-    "desc": "https://iptorrents.com/t/6342064",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E08 Flu Shot 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.91 GB",
-    "desc": "https://iptorrents.com/t/6342059",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E07 Senor Macho Solo 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.94 GB",
-    "desc": "https://iptorrents.com/t/6342062",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E06 Christmas Special REPACK 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.95 GB",
-    "desc": "https://iptorrents.com/t/6390638",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E04 Gavin Volure 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.9 GB",
-    "desc": "https://iptorrents.com/t/6342060",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E03 The One with the Cast of Night Court 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.91 GB",
-    "desc": "https://iptorrents.com/t/6342046",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E02 Believe in the Stars 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "4.87 GB",
-    "desc": "https://iptorrents.com/t/6342061",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E01 Do-Over 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "5.01 GB",
-    "desc": "https://iptorrents.com/t/6342041",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E19 Corporate Crush 480p x264-mSD",
-    "seeds": "3",
-    "peers": "0",
-    "size": "175 MB",
-    "desc": "https://iptorrents.com/t/6600565",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E19 Corporate Crush 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
-    "peers": "0",
-    "size": "5 GB",
-    "desc": "https://iptorrents.com/t/6391120",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E17 The Fighting Irish 480p x264-mSD",
-    "seeds": "3",
-    "peers": "0",
-    "size": "177 MB",
-    "desc": "https://iptorrents.com/t/6600562",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E16 The Source Awards 480p x264-mSD",
-    "seeds": "3",
-    "peers": "0",
-    "size": "180 MB",
-    "desc": "https://iptorrents.com/t/6600553",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E12 Black Tie 480p x264-mSD",
-    "seeds": "3",
-    "peers": "0",
-    "size": "179 MB",
-    "desc": "https://iptorrents.com/t/6600539",
+    "title": "Taboo UK S01E04 1080p HEVC x265-MeGusta",
+    "seeds": "34",
+    "peers": "1",
+    "size": "654 MB",
+    "desc": "https://iptorrents.com/t/2160021",
     "provider": "IpTorrents"
   },
   {
     "provider": "TorrentLeech",
-    "title": "30 Rock S01E07 1080p WEB x264-CONVOY",
-    "time": "2017-10-02 06:49:36",
+    "title": "Taboo 2017 Series 1 Complete WEB 1080p DDPL+ 5 1 - MERRY XMAS - EFPG",
+    "time": "2023-12-24 22:39:37",
+    "seeds": 24,
+    "peers": 1,
+    "size": "8.2 GiB",
+    "filename": "Taboo.2017.Series.1.Complete.WEB.1080p.DDPL+.5.1.-.MERRY.XMAS.-.EFPG.torrent",
+    "fid": "241189878",
+    "rating": 0,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 2,
+    "tags": [
+      "Drama",
+      "FREELEECH",
+      "Mystery",
+      "Thriller"
+    ],
+    "imdbID": "",
+    "igdbID": "",
+    "tvmazeID": "s3593"
+  },
+  {
+    "title": "Taboo 2017 S01E01 720p IP WEBRip AAC2 0 H 264-monkee",
+    "seeds": "3",
+    "peers": "0",
+    "size": "943 MB",
+    "desc": "https://iptorrents.com/t/2133087",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E08 720p HEVC x265-MeGusta",
+    "seeds": "23",
+    "peers": "1",
+    "size": "321 MB",
+    "desc": "https://iptorrents.com/t/2199101",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E03 1080p HEVC x265-MeGusta",
+    "seeds": "23",
+    "peers": "1",
+    "size": "618 MB",
+    "desc": "https://iptorrents.com/t/2150769",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E05 1080p HEVC x265-MeGusta",
+    "seeds": "22",
+    "peers": "1",
+    "size": "656 MB",
+    "desc": "https://iptorrents.com/t/2169438",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E02 1080p HDTV x265 HEVC 6CH-MRN",
+    "seeds": "22",
+    "peers": "1",
+    "size": "646 MB",
+    "desc": "https://iptorrents.com/t/2144832",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E07 INTERNAL 1080p HEVC x265-MeGusta",
+    "seeds": "21",
+    "peers": "1",
+    "size": "694 MB",
+    "desc": "https://iptorrents.com/t/2190022",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E06 INTERNAL 1080p HEVC x265-MeGusta",
+    "seeds": "21",
+    "peers": "1",
+    "size": "763 MB",
+    "desc": "https://iptorrents.com/t/2180478",
+    "provider": "IpTorrents"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo 2017 S01 NORDiC 1080p WEB-DL H 264-QUARK",
+    "time": "2022-09-18 09:28:13",
+    "seeds": 19,
+    "peers": 2,
+    "size": "11.8 GiB",
+    "filename": "Taboo.2017.S01.NORDiC.1080p.WEB-DL.H.264-QUARK.torrent",
+    "fid": "240899832",
+    "rating": 8.4,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "FREELEECH"
+    ],
+    "imdbID": "tt3647998",
+    "igdbID": "",
+    "tvmazeID": ""
+  },
+  {
+    "title": "Taboo S01 480p BluRay nSD x264-NhaNc3",
+    "seeds": "18",
+    "peers": "1",
+    "size": "4.68 GB",
+    "desc": "https://iptorrents.com/t/3032726",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E01 1080p HDTV x265 HEVC 6CH-MRN",
+    "seeds": "17",
+    "peers": "1",
+    "size": "605 MB",
+    "desc": "https://iptorrents.com/t/2133138",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo S01 2017 BluRay 1080i DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
+    "seeds": "16",
+    "peers": "1",
+    "size": "95.3 GB",
+    "desc": "https://iptorrents.com/t/2387896",
+    "provider": "IpTorrents"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo 2017 S01 COMPLETE REMUX BluRay 1080p AVC DTS-HD MA 5 1 x264-LEGi0N ",
+    "time": "2023-02-07 16:04:42",
+    "seeds": 16,
+    "peers": 0,
+    "size": "95.4 GiB",
+    "filename": "Taboo.2017.S01.COMPLETE.REMUX.BluRay.1080p.AVC.DTS-HD.MA.5.1.x264-LEGi0N..torrent",
+    "fid": "240982162",
+    "rating": 0,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 1,
+    "tags": [
+      "Drama",
+      "FREELEECH",
+      "Mystery",
+      "Thriller"
+    ],
+    "imdbID": "",
+    "igdbID": "",
+    "tvmazeID": "s3593"
+  },
+  {
+    "title": "Taboo UK S01E01 1080p BluRay x264-SHORTBREHD",
+    "seeds": "5",
+    "peers": "0",
+    "size": "4.36 GB",
+    "desc": "https://iptorrents.com/t/2260334",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E01 PROPER 720p HEVC x265-MeGusta",
+    "seeds": "3",
+    "peers": "0",
+    "size": "274 MB",
+    "desc": "https://iptorrents.com/t/2132887",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E02 720p HEVC x265-MeGusta",
+    "seeds": "15",
+    "peers": "0",
+    "size": "280 MB",
+    "desc": "https://iptorrents.com/t/2141024",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo 2017 S01 1080p BluRay REMUX AVC DTS-HD MA 5 1-EPSiLON",
+    "seeds": "15",
+    "peers": "0",
+    "size": "76.6 GB",
+    "desc": "https://iptorrents.com/t/2279954",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E03 720p HEVC x265-MeGusta",
+    "seeds": "13",
+    "peers": "0",
+    "size": "275 MB",
+    "desc": "https://iptorrents.com/t/2150707",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E07 720p HEVC x265-MeGusta",
+    "seeds": "12",
+    "peers": "0",
+    "size": "275 MB",
+    "desc": "https://iptorrents.com/t/2189633",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E01 REAL PROPER 720p HEVC x265-MeGusta",
+    "seeds": "12",
+    "peers": "0",
+    "size": "280 MB",
+    "desc": "https://iptorrents.com/t/2133578",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo 2017 S01 1080p HDTV x264-MIXED[NO RAR]",
+    "seeds": "11",
+    "peers": "0",
+    "size": "19 GB",
+    "desc": "https://iptorrents.com/t/2199957",
+    "provider": "IpTorrents"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo (2017) S01 (1080p BDRip x265 10bit DTS-HD MA 5 1 - xtrem3x) [TAoE]",
+    "time": "2020-08-16 15:56:23",
+    "seeds": 11,
+    "peers": 0,
+    "size": "19.3 GiB",
+    "filename": "Taboo.(2017).S01.(1080p.BDRip.x265.10bit.DTS-HD.MA.5.1.-.xtrem3x).[TAoE].torrent",
+    "fid": "1691257",
+    "rating": 0,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 4,
+    "tags": [
+      "FREELEECH",
+      "nonscene"
+    ],
+    "imdbID": "",
+    "igdbID": "",
+    "tvmazeID": "s3593"
+  },
+  {
+    "title": "Taboo UK S01E06 720p HEVC x265-MeGusta",
+    "seeds": "10",
+    "peers": "0",
+    "size": "315 MB",
+    "desc": "https://iptorrents.com/t/2178965",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E05 720p HEVC x265-MeGusta",
+    "seeds": "10",
+    "peers": "0",
+    "size": "302 MB",
+    "desc": "https://iptorrents.com/t/2169288",
+    "provider": "IpTorrents"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo 2017 1080p WEB-DL HEVC H265 MULTi D DPL 5 1 - EFPG",
+    "time": "2023-01-06 15:56:32",
     "seeds": 3,
     "peers": 0,
-    "size": "1.2 GiB",
-    "filename": "30.Rock.S01E07.1080p.WEB.x264-CONVOY.torrent",
-    "fid": "957621",
-    "rating": 8.2,
+    "size": "13.9 GiB",
+    "filename": "Taboo.2017.1080p.WEB-DL.HEVC.H265.MULTi.D.DPL.5.1.-.EFPG.torrent",
+    "fid": "240965106",
+    "rating": 0,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "Drama",
+      "FREELEECH",
+      "Mystery",
+      "Thriller"
+    ],
+    "imdbID": "",
+    "igdbID": "",
+    "tvmazeID": "s3593"
+  },
+  {
+    "title": "Taboo UK S01E07 720p HDTV x264-ORGANiC",
+    "seeds": "1",
+    "peers": "0",
+    "size": "982 MB",
+    "desc": "https://iptorrents.com/t/2189622",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E06 720p HDTV x264-ORGANiC",
+    "seeds": "1",
+    "peers": "0",
+    "size": "1.03 GB",
+    "desc": "https://iptorrents.com/t/2178936",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E05 720p HDTV x264-ORGANiC",
+    "seeds": "1",
+    "peers": "0",
+    "size": "0.98 GB",
+    "desc": "https://iptorrents.com/t/2169273",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E03 720p HDTV x264-ORGANiC",
+    "seeds": "1",
+    "peers": "0",
+    "size": "953 MB",
+    "desc": "https://iptorrents.com/t/2150694",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E02 720p HDTV x264-ORGANiC",
+    "seeds": "1",
+    "peers": "0",
+    "size": "949 MB",
+    "desc": "https://iptorrents.com/t/2141010",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01E01 REAL PROPER 720p HDTV x264-DEADPOOL",
+    "seeds": "1",
+    "peers": "0",
+    "size": "903 MB",
+    "desc": "https://iptorrents.com/t/2133564",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK S01 720p BluRay x264-SHORTBREHD [NO RAR]",
+    "seeds": "1",
+    "peers": "1",
+    "size": "19.7 GB",
+    "desc": "https://iptorrents.com/t/2261161",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo UK 2017 S01 720p WEB DL DD5 1 x264-ITSat",
+    "seeds": "0",
+    "peers": "1",
+    "size": "7.05 GB",
+    "desc": "https://iptorrents.com/t/2205241",
+    "provider": "IpTorrents"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01 1080p AMZN WEBRip DD+5.1 x264-CasStudio",
+    "time": "2023-05-31 08:08:01",
+    "seeds": 63,
+    "peers": 1,
+    "size": "24.4 GiB",
+    "filename": "Taboo.UK.S01.1080p.AMZN.WEBRip.DD+5.1.x264-CasStudio.torrent",
+    "fid": "241059642",
+    "rating": 0,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 2,
+    "tags": [
+      "Drama",
+      "FREELEECH",
+      "Mystery",
+      "Thriller"
+    ],
+    "imdbID": "",
+    "igdbID": "",
+    "tvmazeID": "s3593"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01E01 SUBPACK HDTV x264-DEADPOOL",
+    "time": "2017-01-08 00:47:14",
+    "seeds": 46,
+    "peers": 0,
+    "size": "63.7 KiB",
+    "filename": "Taboo.UK.S01E01.SUBPACK.HDTV.x264-DEADPOOL.torrent",
+    "fid": "820801",
+    "rating": 8.7,
+    "categoryID": 26,
+    "new": false,
+    "numComments": 7,
+    "tags": [
+      "Drama",
+      "rar"
+    ],
+    "imdbID": "tt4700596",
+    "igdbID": "",
+    "tvmazeID": "e989920"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01 COMPLETE 1080p 10bit WEB 6CH x265 HEVC-PSA",
+    "time": "2024-10-31 19:16:26",
+    "seeds": 42,
+    "peers": 2,
+    "size": "6.0 GiB",
+    "filename": "Taboo.UK.S01.COMPLETE.1080p.10bit.WEB.6CH.x265.HEVC-PSA.torrent",
+    "fid": "241377545",
+    "rating": 0,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "FREELEECH"
+    ],
+    "imdbID": "",
+    "igdbID": "",
+    "tvmazeID": "s3593"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "The Secret Lives of Mormon Wives S02E04 The Book of Taboos 1080p DSNP WEB-DL DDP5 1 H 264-BLOOM",
+    "time": "2025-07-06 16:39:20",
+    "seeds": 26,
+    "peers": 0,
+    "size": "2.2 GiB",
+    "filename": "The.Secret.Lives.of.Mormon.Wives.S02E04.The.Book.of.Taboos.1080p.DSNP.WEB-DL.DDP5.1.H.264-BLOOM.torrent",
+    "fid": "241552132",
+    "rating": 0,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": "",
+    "imdbID": "",
+    "igdbID": "",
+    "tvmazeID": "e3170279"
+  },
+  {
+    "title": "Yu Yu Hakusho S03E03 The Power of Taboo 1080p CR WEB-DL DUAL DDP2 0 H 264-Kitsune",
+    "seeds": "9",
+    "peers": "0",
+    "size": "1.28 GB",
+    "desc": "https://iptorrents.com/t/6583271",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo University Book One-I KnoW",
+    "seeds": "15",
+    "peers": "0",
+    "size": "7.54 GB",
+    "desc": "https://iptorrents.com/t/6174660",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo II 1982 BluRay 1080p DDP 1 0 x265-SM737",
+    "seeds": "12",
+    "peers": "0",
+    "size": "4.88 GB",
+    "desc": "https://iptorrents.com/t/6914300",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Dragon Ball DAIMA S01E14 Taboo REPACK 1080p CR WEB-DL AAC2 0 H 264-VARYG",
+    "seeds": "12",
+    "peers": "0",
+    "size": "1.37 GB",
+    "desc": "https://iptorrents.com/t/6398002",
+    "provider": "IpTorrents"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01 1080p BluRay x264-SHORTBREHD",
+    "time": "2017-04-14 06:28:57",
+    "seeds": 11,
+    "peers": 0,
+    "size": "35.5 GiB",
+    "filename": "Taboo.UK.S01.1080p.BluRay.x264-SHORTBREHD.torrent",
+    "fid": "868577",
+    "rating": 8.4,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 4,
+    "tags": [
+      "Drama",
+      "Fantasy",
+      "FREELEECH",
+      "rar",
+      "Thriller"
+    ],
+    "imdbID": "tt3647998",
+    "igdbID": "",
+    "tvmazeID": "s3593"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo Season 1 S01 1080p 10bit BluRay 5 1 x265 HEVC-MZABI ",
+    "time": "2017-06-14 13:19:33",
+    "seeds": 11,
+    "peers": 0,
+    "size": "7.0 GiB",
+    "filename": "Taboo.Season.1.S01.1080p.10bit.BluRay.5.1.x265.HEVC-MZABI..torrent",
+    "fid": "901851",
+    "rating": 0,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 3,
+    "tags": [
+      "FREELEECH"
+    ],
+    "imdbID": "",
+    "igdbID": "",
+    "tvmazeID": ""
+  },
+  {
+    "title": "Taboo UK S01E08 1080p HEVC x265-MeGusta",
+    "seeds": "10",
+    "peers": "0",
+    "size": "652 MB",
+    "desc": "https://iptorrents.com/t/2201536",
+    "provider": "IpTorrents"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01 720p HDTV x264 - ORGANiC",
+    "time": "2017-02-26 21:51:11",
+    "seeds": 10,
+    "peers": 0,
+    "size": "7.7 GiB",
+    "filename": "Taboo.UK.S01.720p.HDTV.x264.-.ORGANiC.torrent",
+    "fid": "847310",
+    "rating": 8.4,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 2,
+    "tags": [
+      "Drama",
+      "FREELEECH"
+    ],
+    "imdbID": "tt3647998",
+    "igdbID": "",
+    "tvmazeID": ""
+  },
+  {
+    "title": "Dragon Ball DAIMA S01E14 Taboo 1080p CR WEB-DL DUAL DDP2 0 H 264-Kitsune",
+    "seeds": "10",
+    "peers": "0",
+    "size": "1.43 GB",
+    "desc": "https://iptorrents.com/t/6591086",
+    "provider": "IpTorrents"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo S01 1080i DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
+    "time": "2023-01-18 14:43:05",
+    "seeds": 9,
+    "peers": 0,
+    "size": "95.4 GiB",
+    "filename": "Taboo.S01.1080i.DTS-HD.MA.5.1.AVC.REMUX-FraMeSToR.torrent",
+    "fid": "240970950",
+    "rating": 0,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 1,
+    "tags": [
+      "Drama",
+      "FREELEECH",
+      "Mystery",
+      "Thriller"
+    ],
+    "imdbID": "",
+    "igdbID": "",
+    "tvmazeID": "s3593"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK Season One BluRay 1080p HEVC-d3g",
+    "time": "2017-04-15 18:54:07",
+    "seeds": 8,
+    "peers": 0,
+    "size": "9.5 GiB",
+    "filename": "Taboo.UK.Season.One.BluRay.1080p.HEVC-d3g.torrent",
+    "fid": "869242",
+    "rating": 8.4,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 1,
+    "tags": [
+      "Drama",
+      "Fantasy",
+      "FREELEECH",
+      "Thriller"
+    ],
+    "imdbID": "tt3647998",
+    "igdbID": "",
+    "tvmazeID": "s3593"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01E02 INTERNAL 1080p HDTV x264-FaiLED",
+    "time": "2017-01-15 00:37:09",
+    "seeds": 8,
+    "peers": 0,
+    "size": "3.7 GiB",
+    "filename": "Taboo.UK.S01E02.INTERNAL.1080p.HDTV.x264-FaiLED.torrent",
+    "fid": "824056",
+    "rating": 9.3,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 1,
+    "tags": [
+      "Drama",
+      "rar"
+    ],
+    "imdbID": "tt4700604",
+    "igdbID": "",
+    "tvmazeID": "e991258"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01 1080p BluRay REMUX AVC DTS-HD MA 5 1-EPSiLON",
+    "time": "2022-04-13 09:34:51",
+    "seeds": 8,
+    "peers": 0,
+    "size": "76.6 GiB",
+    "filename": "Taboo.UK.S01.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-EPSiLON.torrent",
+    "fid": "2116544",
+    "rating": 0,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 1,
+    "tags": [
+      "FREELEECH"
+    ],
+    "imdbID": "",
+    "igdbID": "",
+    "tvmazeID": ""
+  },
+  {
+    "title": "Archer 2009 S09E05 Strange Doings in the Taboo Groves 1080p AMZN WEB DDP5 1 AV1-DBMS",
+    "seeds": "8",
+    "peers": "0",
+    "size": "378 MB",
+    "desc": "https://iptorrents.com/t/6130797",
+    "provider": "IpTorrents"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01E01 INTERNAL 1080p HDTV x264-FaiLED",
+    "time": "2017-01-08 00:25:05",
+    "seeds": 7,
+    "peers": 0,
+    "size": "3.7 GiB",
+    "filename": "Taboo.UK.S01E01.INTERNAL.1080p.HDTV.x264-FaiLED.torrent",
+    "fid": "820798",
+    "rating": 8.7,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 1,
+    "tags": [
+      "Drama",
+      "rar"
+    ],
+    "imdbID": "tt4700596",
+    "igdbID": "",
+    "tvmazeID": "e989920"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Archer 2009 S09E05 Strange Doings In The Taboo Groves 1080p AMZN WEB-DL DDP5 1 H 264-NTb",
+    "time": "2018-05-24 11:50:47",
+    "seeds": 7,
+    "peers": 0,
+    "size": "832.8 MiB",
+    "filename": "Archer.2009.S09E05.Strange.Doings.In.The.Taboo.Groves.1080p.AMZN.WEB-DL.DDP5.1.H.264-NTb.torrent",
+    "fid": "1085850",
+    "rating": 8.6,
     "categoryID": 32,
     "new": false,
     "numComments": 0,
     "tags": [
-      "comedy",
+      "Action",
+      "Animation",
+      "comedy"
+    ],
+    "imdbID": "tt1486217",
+    "igdbID": "",
+    "tvmazeID": "s315"
+  },
+  {
+    "title": "Parlor Room S01E05 Taboo 1080p DRPO WEB-DL AAC2 0 H 264-NTb",
+    "seeds": "6",
+    "peers": "0",
+    "size": "1.73 GB",
+    "desc": "https://iptorrents.com/t/6709673",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Criminal Minds S12E03 Taboo 720p DSNP WEB-DL DD 5 1 H 264-playWEB",
+    "seeds": "6",
+    "peers": "0",
+    "size": "890 MB",
+    "desc": "https://iptorrents.com/t/6964638",
+    "provider": "IpTorrents"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01E08 INTERNAL 1080p HDTV x264-FaiLED",
+    "time": "2017-02-26 00:30:30",
+    "seeds": 5,
+    "peers": 0,
+    "size": "3.7 GiB",
+    "filename": "Taboo.UK.S01E08.INTERNAL.1080p.HDTV.x264-FaiLED.torrent",
+    "fid": "846876",
+    "rating": 8.8,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 2,
+    "tags": [
+      "Drama",
       "rar"
     ],
-    "imdbID": "tt0910580",
+    "imdbID": "tt4700598",
     "igdbID": "",
-    "tvmazeID": "e49156"
+    "tvmazeID": "e991264"
   },
   {
-    "title": "30 Rock S01E01 Pilot 720p HEVC x265-MeGusta",
-    "seeds": "3",
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01E08 720p HDTV x264-ORGANiC",
+    "time": "2017-02-25 22:14:22",
+    "seeds": 5,
+    "peers": 0,
+    "size": "1.0 GiB",
+    "filename": "Taboo.UK.S01E08.720p.HDTV.x264-ORGANiC.torrent",
+    "fid": "846855",
+    "rating": 8.8,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 2,
+    "tags": [
+      "Drama",
+      "rar"
+    ],
+    "imdbID": "tt4700598",
+    "igdbID": "",
+    "tvmazeID": "e991264"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01E05 INTERNAL 1080p HDTV x264-FaiLED",
+    "time": "2017-02-05 01:32:06",
+    "seeds": 5,
+    "peers": 0,
+    "size": "3.9 GiB",
+    "filename": "Taboo.UK.S01E05.INTERNAL.1080p.HDTV.x264-FaiLED.torrent",
+    "fid": "835660",
+    "rating": 8.8,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 1,
+    "tags": [
+      "Drama",
+      "rar"
+    ],
+    "imdbID": "tt4700680",
+    "igdbID": "",
+    "tvmazeID": "e991261"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01E03 INTERNAL 1080p HDTV x264-FaiLED",
+    "time": "2017-01-22 01:27:03",
+    "seeds": 5,
+    "peers": 0,
+    "size": "3.9 GiB",
+    "filename": "Taboo.UK.S01E03.INTERNAL.1080p.HDTV.x264-FaiLED.torrent",
+    "fid": "827536",
+    "rating": 9.3,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 1,
+    "tags": [
+      "Drama",
+      "rar"
+    ],
+    "imdbID": "tt4701640",
+    "igdbID": "",
+    "tvmazeID": "e991259"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01E01 REAL PROPER 720p HDTV x264-DEADPOOL",
+    "time": "2017-01-08 19:35:18",
+    "seeds": 5,
+    "peers": 0,
+    "size": "928.8 MiB",
+    "filename": "Taboo.UK.S01E01.REAL.PROPER.720p.HDTV.x264-DEADPOOL.torrent",
+    "fid": "821087",
+    "rating": 8.7,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 2,
+    "tags": [
+      "Drama",
+      "rar"
+    ],
+    "imdbID": "tt4700596",
+    "igdbID": "",
+    "tvmazeID": "e989920"
+  },
+  {
+    "title": "[Moozzi2] Taboo Tattoo - 12 END (BD 1920x1080 x 264 Flac)",
+    "seeds": "4",
     "peers": "0",
-    "size": "261 MB",
-    "desc": "https://iptorrents.com/t/6600516",
+    "size": "1.12 GB",
+    "desc": "https://iptorrents.com/t/6015491",
     "provider": "IpTorrents"
   },
   {
-    "title": "30 Rock S01E01 Pilot 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "3",
+    "title": "[Moozzi2] Taboo Tattoo - 11 (BD 1920x1080 x 264 Flac)",
+    "seeds": "4",
     "peers": "0",
-    "size": "5.1 GB",
-    "desc": "https://iptorrents.com/t/6391092",
+    "size": "1.38 GB",
+    "desc": "https://iptorrents.com/t/6015502",
     "provider": "IpTorrents"
   },
   {
-    "title": "Twisted Sister - 2016 - Metal Meltdown (Live from the Hard Rock Casino, Las Vegas 05-30-2015) 1080p + Album - MKV \\ FLAC \\ MP3",
+    "title": "[Moozzi2] Taboo Tattoo - 09 (BD 1920x1080 x 264 Flac)",
+    "seeds": "4",
+    "peers": "0",
+    "size": "1.07 GB",
+    "desc": "https://iptorrents.com/t/6015514",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "[Moozzi2] Taboo Tattoo - 07 (BD 1920x1080 x 264 Flac)",
+    "seeds": "4",
+    "peers": "0",
+    "size": "1.6 GB",
+    "desc": "https://iptorrents.com/t/6015478",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "[Moozzi2] Taboo Tattoo - 06 (BD 1920x1080 x 264 Flac)",
+    "seeds": "4",
+    "peers": "0",
+    "size": "1.07 GB",
+    "desc": "https://iptorrents.com/t/6015589",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "[Moozzi2] Taboo Tattoo - 03 (BD 1920x1080 x 264 Flac)",
+    "seeds": "4",
+    "peers": "0",
+    "size": "1.03 GB",
+    "desc": "https://iptorrents.com/t/6015473",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "[Moozzi2] Taboo Tattoo - 02 (BD 1920x1080 x 264 Flac)",
+    "seeds": "4",
+    "peers": "0",
+    "size": "1.02 GB",
+    "desc": "https://iptorrents.com/t/6015447",
+    "provider": "IpTorrents"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo with Candace Owens S01 1080p WEB-DL AAC2 0 AVC-SantaJesus",
+    "time": "2024-08-14 13:50:41",
+    "seeds": 4,
+    "peers": 0,
+    "size": "7.7 GiB",
+    "filename": "Taboo.with.Candace.Owens.S01.1080p.WEB-DL.AAC2.0.AVC-SantaJesus.torrent",
+    "fid": "241331692",
+    "rating": 0,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 2,
+    "tags": [
+      "FREELEECH"
+    ],
+    "imdbID": "",
+    "igdbID": "",
+    "tvmazeID": ""
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01E06 720p HDTV x264-ORGANiC",
+    "time": "2017-02-11 22:15:01",
+    "seeds": 4,
+    "peers": 0,
+    "size": "1.1 GiB",
+    "filename": "Taboo.UK.S01E06.720p.HDTV.x264-ORGANiC.torrent",
+    "fid": "840027",
+    "rating": 8.8,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 2,
+    "tags": [
+      "Drama",
+      "rar"
+    ],
+    "imdbID": "tt4700682",
+    "igdbID": "",
+    "tvmazeID": "e991262"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01E02 720p HDTV x264-ORGANiC",
+    "time": "2017-01-14 22:14:53",
+    "seeds": 4,
+    "peers": 0,
+    "size": "965.8 MiB",
+    "filename": "Taboo.UK.S01E02.720p.HDTV.x264-ORGANiC.torrent",
+    "fid": "823998",
+    "rating": 9.3,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 2,
+    "tags": [
+      "Drama",
+      "rar"
+    ],
+    "imdbID": "tt4700604",
+    "igdbID": "",
+    "tvmazeID": "e991258"
+  },
+  {
+    "title": "Taboo (2002) 1080p WEBRip-LAMA",
+    "seeds": "4",
+    "peers": "0",
+    "size": "1.33 GB",
+    "desc": "https://iptorrents.com/t/6926472",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Dragon Ball DAIMA S01E14 Taboo 1080p CR WEB-DL DUAL AAC2 0 H 264 MSubs-ToonsHub",
+    "seeds": "4",
+    "peers": "0",
+    "size": "1.37 GB",
+    "desc": "https://iptorrents.com/t/6590299",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Below the Belt The Last Health Taboo 2023 1080p WEBRip x264-BAE",
+    "seeds": "4",
+    "peers": "0",
+    "size": "2.25 GB",
+    "desc": "https://iptorrents.com/t/5334256",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "[Moozzi2] Taboo Tattoo - 10 (BD 1920x1080 x 264 Flac)",
+    "seeds": "3",
+    "peers": "0",
+    "size": "1.22 GB",
+    "desc": "https://iptorrents.com/t/6015490",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "[Moozzi2] Taboo Tattoo - 08 (BD 1920x1080 x 264 Flac)",
+    "seeds": "3",
+    "peers": "0",
+    "size": "1.75 GB",
+    "desc": "https://iptorrents.com/t/6015479",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "[Moozzi2] Taboo Tattoo - 01 (BD 1920x1080 x 264 Flac)",
+    "seeds": "3",
+    "peers": "0",
+    "size": "1.07 GB",
+    "desc": "https://iptorrents.com/t/6015558",
+    "provider": "IpTorrents"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01E08 HDTV x264-ORGANiC",
+    "time": "2017-02-25 22:15:23",
+    "seeds": 3,
+    "peers": 0,
+    "size": "331.3 MiB",
+    "filename": "Taboo.UK.S01E08.HDTV.x264-ORGANiC.torrent",
+    "fid": "846856",
+    "rating": 8.8,
+    "categoryID": 26,
+    "new": false,
+    "numComments": 2,
+    "tags": [
+      "Drama",
+      "rar"
+    ],
+    "imdbID": "tt4700598",
+    "igdbID": "",
+    "tvmazeID": "e991264"
+  },
+  {
+    "title": "Taboo UK S01E08 720p HDTV x264-ORGANiC",
+    "seeds": "3",
+    "peers": "0",
+    "size": "1.01 GB",
+    "desc": "https://iptorrents.com/t/2199093",
+    "provider": "IpTorrents"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01E07 INTERNAL 1080p HDTV x264-FaiLED",
+    "time": "2017-02-19 00:17:32",
+    "seeds": 3,
+    "peers": 0,
+    "size": "3.9 GiB",
+    "filename": "Taboo.UK.S01E07.INTERNAL.1080p.HDTV.x264-FaiLED.torrent",
+    "fid": "843659",
+    "rating": 8.8,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 1,
+    "tags": [
+      "Drama",
+      "rar"
+    ],
+    "imdbID": "tt4700686",
+    "igdbID": "",
+    "tvmazeID": "e991263"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01E07 720p HDTV x264-ORGANiC",
+    "time": "2017-02-18 22:14:56",
+    "seeds": 3,
+    "peers": 0,
+    "size": "1004.3 MiB",
+    "filename": "Taboo.UK.S01E07.720p.HDTV.x264-ORGANiC.torrent",
+    "fid": "843624",
+    "rating": 8.8,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 1,
+    "tags": [
+      "Drama",
+      "rar"
+    ],
+    "imdbID": "tt4700686",
+    "igdbID": "",
+    "tvmazeID": "e991263"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01E06 INTERNAL 1080p HDTV x264-FaiLED",
+    "time": "2017-02-12 00:37:23",
+    "seeds": 3,
+    "peers": 0,
+    "size": "3.9 GiB",
+    "filename": "Taboo.UK.S01E06.INTERNAL.1080p.HDTV.x264-FaiLED.torrent",
+    "fid": "840065",
+    "rating": 8.8,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 1,
+    "tags": [
+      "Drama",
+      "rar"
+    ],
+    "imdbID": "tt4700682",
+    "igdbID": "",
+    "tvmazeID": "e991262"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01E04 INTERNAL 1080p HDTV x264-FaiLED",
+    "time": "2017-01-29 01:03:47",
+    "seeds": 3,
+    "peers": 0,
+    "size": "3.6 GiB",
+    "filename": "Taboo.UK.S01E04.INTERNAL.1080p.HDTV.x264-FaiLED.torrent",
+    "fid": "831337",
+    "rating": 9.2,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 1,
+    "tags": [
+      "Drama",
+      "rar"
+    ],
+    "imdbID": "tt4700678",
+    "igdbID": "",
+    "tvmazeID": "e991260"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01E04 1080p AMZN WEBRip DD+5 1 x264-CasStudio",
+    "time": "2017-02-02 07:59:00",
+    "seeds": 3,
+    "peers": 0,
+    "size": "3.0 GiB",
+    "filename": "Taboo.UK.S01E04.1080p.AMZN.WEBRip.DD+5.1.x264-CasStudio.torrent",
+    "fid": "833928",
+    "rating": 9.2,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "Drama",
+      "nonscene"
+    ],
+    "imdbID": "tt4700678",
+    "igdbID": "",
+    "tvmazeID": "e991260"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01E03 1080p HDTV x264-MORiTZ",
+    "time": "2017-01-21 22:14:34",
+    "seeds": 3,
+    "peers": 0,
+    "size": "2.2 GiB",
+    "filename": "Taboo.UK.S01E03.1080p.HDTV.x264-MORiTZ.torrent",
+    "fid": "827499",
+    "rating": 9.3,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "Drama",
+      "rar"
+    ],
+    "imdbID": "tt4701640",
+    "igdbID": "",
+    "tvmazeID": "e991259"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Taboo UK S01 BDRip X264-HAGGiS [NO RAR]",
+    "time": "2017-04-13 15:32:06",
+    "seeds": 3,
+    "peers": 0,
+    "size": "2.5 GiB",
+    "filename": "Taboo.UK.S01.BDRip.X264-HAGGiS.[NO.RAR].torrent",
+    "fid": "868304",
+    "rating": 8.4,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "Drama",
+      "Fantasy",
+      "FREELEECH"
+    ],
+    "imdbID": "tt3647998",
+    "igdbID": "",
+    "tvmazeID": "s3593"
+  },
+  {
+    "title": "Taboo Tattoo S01E05 DUBBED 1080p WEB H264-SKYANiME",
+    "seeds": "3",
+    "peers": "0",
+    "size": "1.38 GB",
+    "desc": "https://iptorrents.com/t/5490895",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo Tattoo S01E04 DUBBED 720p WEB H264-SKYANiME",
+    "seeds": "3",
+    "peers": "0",
+    "size": "720 MB",
+    "desc": "https://iptorrents.com/t/5490859",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo (2002) 720p WEBRip-LAMA",
+    "seeds": "3",
+    "peers": "0",
+    "size": "738 MB",
+    "desc": "https://iptorrents.com/t/6926465",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Sonic Taboo-Sonic Taboo-16BIT-WEB-FLAC-2020-STONERD",
+    "seeds": "3",
+    "peers": "0",
+    "size": "226 MB",
+    "desc": "https://iptorrents.com/t/6853066",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Dragon Ball DAIMA S01E14 Taboo 1080p CR WEB-DL AAC2 0 H 264-VARYG",
+    "seeds": "3",
+    "peers": "0",
+    "size": "1.37 GB",
+    "desc": "https://iptorrents.com/t/6397969",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Dragon Ball DAIMA - 014 - Taboo (2025) [JP-EN] [CR] [WEB-DL] [1080p] [x264] [V2]",
+    "seeds": "3",
+    "peers": "0",
+    "size": "1.37 GB",
+    "desc": "https://iptorrents.com/t/6662201",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Below the Belt The Last Health Taboo 2023 720p WEBRip x264-BAE",
+    "seeds": "3",
+    "peers": "0",
+    "size": "1.03 GB",
+    "desc": "https://iptorrents.com/t/5334253",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "[Moozzi2] Taboo Tattoo - 05 (BD 1920x1080 x 264 Flac)",
     "seeds": "2",
     "peers": "0",
-    "size": "41 GB",
-    "desc": "https://iptorrents.com/t/5547038",
+    "size": "1.2 GB",
+    "desc": "https://iptorrents.com/t/6015475",
     "provider": "IpTorrents"
   },
   {
-    "title": "Truefire Andrew Fords 30 Rock Bass Grooves for Beginners You Must Know TUTORiAL-DYNAMiCS",
+    "title": "[Moozzi2] Taboo Tattoo - 04 (BD 1920x1080 x 264 Flac)",
+    "seeds": "2",
+    "peers": "0",
+    "size": "1.08 GB",
+    "desc": "https://iptorrents.com/t/6015474",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "The Misfit of Demon King Academy (2020) - S01E12 - Taboo Magic [Bluray-1080p][10bit][x265][FLAC 2 0][JA]-Asakura",
+    "seeds": "2",
+    "peers": "0",
+    "size": "1.92 GB",
+    "desc": "https://iptorrents.com/t/6370117",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo University Book One Linux-I KnoW",
+    "seeds": "2",
+    "peers": "0",
+    "size": "7.51 GB",
+    "desc": "https://iptorrents.com/t/6174664",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo Trial v5 0-TENOKE",
+    "seeds": "2",
+    "peers": "1",
+    "size": "10 GB",
+    "desc": "https://iptorrents.com/t/5950981",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo Tattoo S01E10 DUBBED 480p x264-mSD",
+    "seeds": "2",
+    "peers": "0",
+    "size": "96 MB",
+    "desc": "https://iptorrents.com/t/5490937",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo Tattoo S01E01 DUBBED 480p x264-mSD",
+    "seeds": "2",
+    "peers": "0",
+    "size": "90.5 MB",
+    "desc": "https://iptorrents.com/t/5490680",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Sonic Taboo-Kind Of Venom-16BIT-WEB-FLAC-2022-STONERD",
+    "seeds": "2",
+    "peers": "0",
+    "size": "303 MB",
+    "desc": "https://iptorrents.com/t/6853071",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Sonic Taboo-Captured Live Vol I-24BIT-WEB-FLAC-2025-STONERD",
+    "seeds": "2",
+    "peers": "0",
+    "size": "432 MB",
+    "desc": "https://iptorrents.com/t/6853064",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Law and Order Special Victims Unit S07E14 Taboo 1080p AMZN WEBRip DD5 1 x264-NTb",
+    "seeds": "2",
+    "peers": "0",
+    "size": "2.97 GB",
+    "desc": "https://iptorrents.com/t/5975946",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Dragon Ball DAIMA - 014 - Taboo (2025) [JP-EN] [WEB-DL] [2160p] [HEVC 10-Bit] [V2]",
+    "seeds": "2",
+    "peers": "0",
+    "size": "1.23 GB",
+    "desc": "https://iptorrents.com/t/6662345",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Bogus Skill Fruitmaster S01E04 Taboo Skills 1080p CR WEB-DL DUAL AAC2 0 H 264-VARYG",
     "seeds": "2",
     "peers": "0",
     "size": "1.42 GB",
-    "desc": "https://iptorrents.com/t/3264876",
+    "desc": "https://iptorrents.com/t/6996086",
     "provider": "IpTorrents"
   },
   {
-    "title": "30 Rock S06 720p [NORAR]",
-    "seeds": "2",
-    "peers": "1",
-    "size": "12.7 GB",
-    "desc": "https://iptorrents.com/t/630347",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S05E09 Chain Reaction of Mental Anguish 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.99 GB",
-    "desc": "https://iptorrents.com/t/6390925",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S05E08 College 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.22 GB",
-    "desc": "https://iptorrents.com/t/6390923",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S04E20 The Moms 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.96 GB",
-    "desc": "https://iptorrents.com/t/6390997",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E21 Mamma Mia 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.91 GB",
-    "desc": "https://iptorrents.com/t/6342079",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E19 The Ones 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.93 GB",
-    "desc": "https://iptorrents.com/t/6342076",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E16 Apollo Apollo 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.93 GB",
-    "desc": "https://iptorrents.com/t/6342070",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E11 St Valentines Day 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.93 GB",
-    "desc": "https://iptorrents.com/t/6342066",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E05 Reunion 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.94 GB",
-    "desc": "https://iptorrents.com/t/6342042",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E14 Sandwich Day 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.89 GB",
-    "desc": "https://iptorrents.com/t/6390951",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E13 Succession 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.98 GB",
-    "desc": "https://iptorrents.com/t/6390948",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E12 Subway Hero 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "5 GB",
-    "desc": "https://iptorrents.com/t/6390947",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E11 MILF Island 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.95 GB",
-    "desc": "https://iptorrents.com/t/6390946",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E10 Episode 210 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.98 GB",
-    "desc": "https://iptorrents.com/t/6390944",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E09 Ludachristmas 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "5.12 GB",
-    "desc": "https://iptorrents.com/t/6390941",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E08 Secrets and Lies 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.93 GB",
-    "desc": "https://iptorrents.com/t/6390940",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E07 Cougars 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.86 GB",
-    "desc": "https://iptorrents.com/t/6390938",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E06 Somebody to Love 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.99 GB",
-    "desc": "https://iptorrents.com/t/6390937",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E05 Greenzo 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.59 GB",
-    "desc": "https://iptorrents.com/t/6390935",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E04 Rosemarys Baby 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.92 GB",
-    "desc": "https://iptorrents.com/t/6390931",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E03 The Collection 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.99 GB",
-    "desc": "https://iptorrents.com/t/6390913",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E02 Jack Gets in the Game 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "5.03 GB",
-    "desc": "https://iptorrents.com/t/6390911",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E01 Seinfeld Vision 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "5.02 GB",
-    "desc": "https://iptorrents.com/t/6390901",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E21 Hiatus 720p HEVC x265-MeGusta",
-    "seeds": "2",
-    "peers": "0",
-    "size": "225 MB",
-    "desc": "https://iptorrents.com/t/6600616",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E21 Hiatus 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "5.19 GB",
-    "desc": "https://iptorrents.com/t/6391139",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E20 Cleveland 480p x264-mSD",
-    "seeds": "2",
-    "peers": "0",
-    "size": "180 MB",
-    "desc": "https://iptorrents.com/t/6600583",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E20 Cleveland 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "5.04 GB",
-    "desc": "https://iptorrents.com/t/6391122",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E19 Corporate Crush 720p HEVC x265-MeGusta",
-    "seeds": "2",
-    "peers": "0",
-    "size": "216 MB",
-    "desc": "https://iptorrents.com/t/6600604",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E18 Fireworks 720p HEVC x265-MeGusta",
-    "seeds": "2",
-    "peers": "0",
-    "size": "247 MB",
-    "desc": "https://iptorrents.com/t/6600619",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E18 Fireworks 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "6.26 GB",
-    "desc": "https://iptorrents.com/t/6391118",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E17 The Fighting Irish 720p HEVC x265-MeGusta",
-    "seeds": "2",
-    "peers": "0",
-    "size": "215 MB",
-    "desc": "https://iptorrents.com/t/6600591",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E17 The Fighting Irish 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "5.03 GB",
-    "desc": "https://iptorrents.com/t/6391117",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E16 The Source Awards 720p HEVC x265-MeGusta",
-    "seeds": "2",
-    "peers": "0",
-    "size": "222 MB",
-    "desc": "https://iptorrents.com/t/6600588",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E16 The Source Awards 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "5.02 GB",
-    "desc": "https://iptorrents.com/t/6391134",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E15 Hard Ball 720p HEVC x265-MeGusta",
-    "seeds": "2",
-    "peers": "0",
-    "size": "238 MB",
-    "desc": "https://iptorrents.com/t/6600602",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E15 Hard Ball 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "5.06 GB",
-    "desc": "https://iptorrents.com/t/6391137",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E14 The C Word 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "5.04 GB",
-    "desc": "https://iptorrents.com/t/6391132",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E13 Up All Night 720p HEVC x265-MeGusta",
-    "seeds": "2",
-    "peers": "0",
-    "size": "220 MB",
-    "desc": "https://iptorrents.com/t/6600580",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E13 Up All Night 480p x264-mSD",
-    "seeds": "2",
-    "peers": "0",
-    "size": "178 MB",
-    "desc": "https://iptorrents.com/t/6600570",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E13 Up All Night 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "5 GB",
-    "desc": "https://iptorrents.com/t/6391133",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E12 Black Tie 720p HEVC x265-MeGusta",
-    "seeds": "2",
-    "peers": "0",
-    "size": "215 MB",
-    "desc": "https://iptorrents.com/t/6600577",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E12 Black Tie 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "5.1 GB",
-    "desc": "https://iptorrents.com/t/6391135",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E11 The Head and the Hair 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.87 GB",
-    "desc": "https://iptorrents.com/t/6391131",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E10 The Rural Juror 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.98 GB",
-    "desc": "https://iptorrents.com/t/6391128",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E09 The Baby Show 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.99 GB",
-    "desc": "https://iptorrents.com/t/6391130",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E08 The Break-Up 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.95 GB",
-    "desc": "https://iptorrents.com/t/6391126",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E07 Tracy Does Conan 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.98 GB",
-    "desc": "https://iptorrents.com/t/6391124",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E06 Jack Meets Dennis 720p HEVC x265-MeGusta",
-    "seeds": "2",
-    "peers": "0",
-    "size": "214 MB",
-    "desc": "https://iptorrents.com/t/6600541",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E06 Jack Meets Dennis 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "5 GB",
-    "desc": "https://iptorrents.com/t/6391123",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E05 Jack-Tor 720p HEVC x265-MeGusta",
-    "seeds": "2",
-    "peers": "0",
-    "size": "273 MB",
-    "desc": "https://iptorrents.com/t/6600532",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E05 Jack-Tor 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "6.35 GB",
-    "desc": "https://iptorrents.com/t/6391102",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E04 Jack the Writer 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.99 GB",
-    "desc": "https://iptorrents.com/t/6391097",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E03 Blind Date 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.99 GB",
-    "desc": "https://iptorrents.com/t/6391096",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E02 The Aftermath 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.88 GB",
-    "desc": "https://iptorrents.com/t/6391093",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01-S07 DVDRip XviD-IPT",
-    "seeds": "2",
-    "peers": "1",
-    "size": "25.7 GB",
-    "desc": "https://iptorrents.com/t/1137968",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "The Baldwins S01E08 Youre My 30 Rock 1080p AMZN WEB-DL DDP2 0 H 264-FLUX",
+    "title": "This Is Us S06E07 Taboo 1080p AMZN WEB-DL DDP5 1 H 264-NTb",
     "seeds": "1",
     "peers": "0",
-    "size": "2.79 GB",
-    "desc": "https://iptorrents.com/t/6595466",
+    "size": "2.73 GB",
+    "desc": "https://iptorrents.com/t/6469149",
     "provider": "IpTorrents"
   },
   {
-    "title": "30 Rock S07E00 A One-Time Special 480p x264-mSD",
+    "title": "Taboo Trial Update v20240611-TENOKE",
     "seeds": "1",
     "peers": "0",
-    "size": "210 MB",
-    "desc": "https://iptorrents.com/t/3982296",
+    "size": "147 MB",
+    "desc": "https://iptorrents.com/t/6398171",
     "provider": "IpTorrents"
   },
   {
-    "title": "30 Rock S03E19 The Ones 480p x264-mSD",
+    "title": "Taboo Trial Update v20240302 incl DLC-TENOKE",
     "seeds": "1",
     "peers": "0",
-    "size": "156 MB",
-    "desc": "https://iptorrents.com/t/6601289",
+    "size": "1.31 GB",
+    "desc": "https://iptorrents.com/t/5792282",
     "provider": "IpTorrents"
   },
   {
-    "title": "30 Rock S03E18 Jackie Jormp-Jomp 480p x264-mSD",
+    "title": "Taboo The Unthinkable Act 2016 1080p WEBRip x264-iNTENSO",
     "seeds": "1",
     "peers": "0",
-    "size": "159 MB",
-    "desc": "https://iptorrents.com/t/6601299",
+    "size": "5.75 GB",
+    "desc": "https://iptorrents.com/t/3776296",
     "provider": "IpTorrents"
   },
   {
-    "title": "30 Rock S03E17 Cutbacks 480p x264-mSD",
+    "title": "Taboo 2002 1080p AMZN WEB-DL DDP2 0 H 264-GPRS",
     "seeds": "1",
     "peers": "0",
-    "size": "154 MB",
-    "desc": "https://iptorrents.com/t/6601279",
+    "size": "5.54 GB",
+    "desc": "https://iptorrents.com/t/6925924",
     "provider": "IpTorrents"
   },
   {
-    "title": "30 Rock S03E16 Apollo Apollo 720p HEVC x265-MeGusta",
+    "title": "Parlor Room S01E05 Taboo 720p DRPO WEB-DL AAC2 0 H 264-NTb",
     "seeds": "1",
     "peers": "0",
-    "size": "188 MB",
-    "desc": "https://iptorrents.com/t/6601287",
+    "size": "898 MB",
+    "desc": "https://iptorrents.com/t/6709679",
     "provider": "IpTorrents"
   },
   {
-    "title": "30 Rock S03E15 The Bubble 720p HEVC x265-MeGusta",
+    "title": "Dragon Ball DAIMA S01E14 Taboo 1080p DSNP WEB-DL DDP2 0 H 264-VARYG",
     "seeds": "1",
     "peers": "0",
-    "size": "191 MB",
-    "desc": "https://iptorrents.com/t/6601296",
+    "size": "965 MB",
+    "desc": "https://iptorrents.com/t/6413247",
     "provider": "IpTorrents"
   },
   {
-    "title": "30 Rock S03E15 The Bubble 480p x264-mSD",
+    "title": "Dragon Ball DAIMA S01E14 Taboo 1080p CR WEB-DL JPN AAC2 0 H 264 MSubs-ToonsHub",
     "seeds": "1",
     "peers": "0",
-    "size": "162 MB",
-    "desc": "https://iptorrents.com/t/6601285",
+    "size": "1.35 GB",
+    "desc": "https://iptorrents.com/t/6398027",
     "provider": "IpTorrents"
   },
   {
-    "title": "30 Rock S03E13 Goodbye My Friend 480p x264-mSD",
+    "title": "Bogus Skill Fruitmaster S01E04 Taboo Skills 1080p CR WEB-DL DUAL AAC2 0 H 264 MSubs-ToonsHub",
     "seeds": "1",
     "peers": "0",
-    "size": "158 MB",
-    "desc": "https://iptorrents.com/t/6601265",
+    "size": "1.38 GB",
+    "desc": "https://iptorrents.com/t/6995196",
     "provider": "IpTorrents"
   },
   {
-    "title": "30 Rock S03E12 Larry King 720p HEVC x265-MeGusta",
-    "seeds": "1",
-    "peers": "0",
-    "size": "182 MB",
-    "desc": "https://iptorrents.com/t/6601271",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E12 Larry King 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "156 MB",
-    "desc": "https://iptorrents.com/t/6601258",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E11 St Valentines Day 720p HEVC x265-MeGusta",
-    "seeds": "1",
-    "peers": "0",
-    "size": "177 MB",
-    "desc": "https://iptorrents.com/t/6601254",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E10 Generalissimo 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "164 MB",
-    "desc": "https://iptorrents.com/t/6601260",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E09 Retreat To Move Forward 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "169 MB",
-    "desc": "https://iptorrents.com/t/6601251",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E07 Senor Macho Solo 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "172 MB",
-    "desc": "https://iptorrents.com/t/6601247",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E04 Gavin Volure 720p HEVC x265-MeGusta",
-    "seeds": "1",
-    "peers": "0",
-    "size": "198 MB",
-    "desc": "https://iptorrents.com/t/6601229",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E03 The One With The Cast Of Night Court 720p HEVC x265-MeGusta",
-    "seeds": "1",
-    "peers": "0",
-    "size": "204 MB",
-    "desc": "https://iptorrents.com/t/6601236",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E02 Believe In The Stars 720p HEVC x265-MeGusta",
-    "seeds": "1",
-    "peers": "0",
-    "size": "214 MB",
-    "desc": "https://iptorrents.com/t/6601226",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E14 Sandwich Day 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "167 MB",
-    "desc": "https://iptorrents.com/t/6600965",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E12 Subway Hero 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "178 MB",
-    "desc": "https://iptorrents.com/t/6600959",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E11 MILF Island 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "160 MB",
-    "desc": "https://iptorrents.com/t/6600925",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E09 Episode 209 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "199 MB",
-    "desc": "https://iptorrents.com/t/6600942",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E08 Secrets and Lies 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "173 MB",
-    "desc": "https://iptorrents.com/t/6600936",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E07 Cougars 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "184 MB",
-    "desc": "https://iptorrents.com/t/6600910",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E06 Somebody To Love 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "168 MB",
-    "desc": "https://iptorrents.com/t/6600918",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E04 Rosemarys Baby 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "180 MB",
-    "desc": "https://iptorrents.com/t/6600884",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E03 The Collection 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "175 MB",
-    "desc": "https://iptorrents.com/t/6600896",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E01 Seinfeld Vision 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "179 MB",
-    "desc": "https://iptorrents.com/t/6600839",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E21 Hiatus 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "180 MB",
-    "desc": "https://iptorrents.com/t/6600586",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E18 Fireworks 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "210 MB",
-    "desc": "https://iptorrents.com/t/6600578",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E15 Hard Ball 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "188 MB",
-    "desc": "https://iptorrents.com/t/6600575",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E10 The Rural Juror 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "183 MB",
-    "desc": "https://iptorrents.com/t/6600537",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E07 Tracy Does Conan 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "192 MB",
-    "desc": "https://iptorrents.com/t/6600535",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E06 Jack Meets Dennis 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "173 MB",
-    "desc": "https://iptorrents.com/t/6600529",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E05 Jack-Tor 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "226 MB",
-    "desc": "https://iptorrents.com/t/6600526",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E04 Jack The Writer 720p HEVC x265-MeGusta",
-    "seeds": "1",
-    "peers": "0",
-    "size": "229 MB",
-    "desc": "https://iptorrents.com/t/6600527",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E04 Jack The Writer 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "180 MB",
-    "desc": "https://iptorrents.com/t/6600514",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E03 Blind Date 720p HEVC x265-MeGusta",
-    "seeds": "1",
-    "peers": "0",
-    "size": "210 MB",
-    "desc": "https://iptorrents.com/t/6600509",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E03 Blind Date 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "172 MB",
-    "desc": "https://iptorrents.com/t/6600505",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E02 The Aftermath 720p HEVC x265-MeGusta",
-    "seeds": "1",
-    "peers": "0",
-    "size": "241 MB",
-    "desc": "https://iptorrents.com/t/6600515",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E02 The Aftermath 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "188 MB",
-    "desc": "https://iptorrents.com/t/6600511",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E01 Pilot 480p x264-mSD",
-    "seeds": "1",
-    "peers": "0",
-    "size": "204 MB",
-    "desc": "https://iptorrents.com/t/6600503",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Deep Rock Galactic Update v1 30 40345 0-CODEX",
+    "title": "Taboo Trial Update v20240502-TENOKE",
     "seeds": "0",
     "peers": "0",
-    "size": "69.6 MB",
-    "desc": "https://iptorrents.com/t/3904486",
+    "size": "82.1 MB",
+    "desc": "https://iptorrents.com/t/5907933",
     "provider": "IpTorrents"
   },
   {
-    "title": "Deep Rock Galactic Update v1 30 40190 0-CODEX",
+    "title": "Taboo Trial Update v20240413-TENOKE",
     "seeds": "0",
     "peers": "0",
-    "size": "42.1 MB",
-    "desc": "https://iptorrents.com/t/3899306",
+    "size": "76.5 MB",
+    "desc": "https://iptorrents.com/t/5869885",
     "provider": "IpTorrents"
   },
   {
-    "title": "30 Rock S03E22 Kidney Now 720p HEVC x265-MeGusta",
+    "title": "Taboo Tattoo S01 [BDRip] [Dual Audio] [1080p] [-ZR-]",
+    "seeds": "0",
+    "peers": "3",
+    "size": "17.6 GB",
+    "desc": "https://iptorrents.com/t/2664568",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Taboo 1988 POLISH 1080p WEBRip x265-WORLD",
+    "seeds": "0",
+    "peers": "2",
+    "size": "1.58 GB",
+    "desc": "https://iptorrents.com/t/5222676",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "National Geographic Taboo Season 2[2003]DVDrip XviD-Kole",
+    "seeds": "0",
+    "peers": "2",
+    "size": "4.44 GB",
+    "desc": "https://iptorrents.com/t/1658544",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "National Geographic Taboo Season 1[2002]DVDrip",
+    "seeds": "0",
+    "peers": "2",
+    "size": "4.44 GB",
+    "desc": "https://iptorrents.com/t/307629",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Dragon Ball DAIMA (2024) - S01E14 - 014 - Taboo [HDTV-1080p][8bit][x264][AAC 2 0][JA]-SubsPlease",
     "seeds": "0",
     "peers": "0",
-    "size": "195 MB",
-    "desc": "https://iptorrents.com/t/6601310",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E22 Kidney Now 480p x264-mSD",
-    "seeds": "0",
-    "peers": "0",
-    "size": "163 MB",
-    "desc": "https://iptorrents.com/t/6601281",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E21 Mamma Mia 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "189 MB",
-    "desc": "https://iptorrents.com/t/6601317",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E21 Mamma Mia 480p x264-mSD",
-    "seeds": "0",
-    "peers": "1",
-    "size": "160 MB",
-    "desc": "https://iptorrents.com/t/6601295",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E20 The Natural Order 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "184 MB",
-    "desc": "https://iptorrents.com/t/6601309",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E20 The Natural Order 480p x264-mSD",
-    "seeds": "0",
-    "peers": "1",
-    "size": "157 MB",
-    "desc": "https://iptorrents.com/t/6601292",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E19 The Ones 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "177 MB",
-    "desc": "https://iptorrents.com/t/6601315",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E18 Jackie Jormp-Jomp 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "185 MB",
-    "desc": "https://iptorrents.com/t/6601324",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E17 Cutbacks 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "178 MB",
-    "desc": "https://iptorrents.com/t/6601297",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E16 Apollo Apollo 480p x264-mSD",
-    "seeds": "0",
-    "peers": "0",
-    "size": "161 MB",
-    "desc": "https://iptorrents.com/t/6601275",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E14 The Funcooker 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "190 MB",
-    "desc": "https://iptorrents.com/t/6601284",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E14 The Funcooker 480p x264-mSD",
-    "seeds": "0",
-    "peers": "1",
-    "size": "160 MB",
-    "desc": "https://iptorrents.com/t/6601268",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E10 Generalissimo 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "195 MB",
-    "desc": "https://iptorrents.com/t/6601263",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E09 Retreat To Move Forward 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "199 MB",
-    "desc": "https://iptorrents.com/t/6601273",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E08 Flu Shot 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "196 MB",
-    "desc": "https://iptorrents.com/t/6601253",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E07 Senor Macho Solo 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "208 MB",
-    "desc": "https://iptorrents.com/t/6601262",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E06 Christmas Special 1080p DTS-HD MA 5 1 AVC REMUX-FraMeSToR",
-    "seeds": "0",
-    "peers": "0",
-    "size": "4.95 GB",
-    "desc": "https://iptorrents.com/t/6342047",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S03E01 Do-Over 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "1",
-    "size": "237 MB",
-    "desc": "https://iptorrents.com/t/6601237",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E15 Cooter 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "210 MB",
-    "desc": "https://iptorrents.com/t/6601019",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E14 Sandwich Day 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "203 MB",
-    "desc": "https://iptorrents.com/t/6600943",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E13 Succession 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "201 MB",
-    "desc": "https://iptorrents.com/t/6601017",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E12 Subway Hero 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "220 MB",
-    "desc": "https://iptorrents.com/t/6600984",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E11 MILF Island 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "188 MB",
-    "desc": "https://iptorrents.com/t/6600923",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E10 Episode 210 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "224 MB",
-    "desc": "https://iptorrents.com/t/6601004",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E09 Episode 209 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "253 MB",
-    "desc": "https://iptorrents.com/t/6600987",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E08 Secrets and Lies 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "209 MB",
-    "desc": "https://iptorrents.com/t/6600963",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E07 Cougars 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "232 MB",
-    "desc": "https://iptorrents.com/t/6600941",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E06 Somebody To Love 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "201 MB",
-    "desc": "https://iptorrents.com/t/6600962",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E05 Greenzo 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "216 MB",
-    "desc": "https://iptorrents.com/t/6600921",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E05 Greenzo 480p x264-mSD",
-    "seeds": "0",
-    "peers": "1",
-    "size": "176 MB",
-    "desc": "https://iptorrents.com/t/6600949",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E02 Jack Gets In The Game 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "229 MB",
-    "desc": "https://iptorrents.com/t/6600847",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E02 Jack Gets In The Game 480p x264-mSD",
-    "seeds": "0",
-    "peers": "1",
-    "size": "183 MB",
-    "desc": "https://iptorrents.com/t/6600844",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S02E01 Seinfeld Vision 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "220 MB",
-    "desc": "https://iptorrents.com/t/6600843",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E20 Cleveland 720p HEVC x265-MeGusta",
-    "seeds": "0",
-    "peers": "0",
-    "size": "223 MB",
-    "desc": "https://iptorrents.com/t/6600626",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "30 Rock S01E11 The Head And The Hair 480p x264-mSD",
-    "seeds": "0",
-    "peers": "1",
-    "size": "173 MB",
-    "desc": "https://iptorrents.com/t/6600542",
+    "size": "1.35 GB",
+    "desc": "https://iptorrents.com/t/6499782",
     "provider": "IpTorrents"
   }
 ]

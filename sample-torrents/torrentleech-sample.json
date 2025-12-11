@@ -1,23 +1,23 @@
 {
   "provider": "TorrentLeech",
-  "title": "30 Rock S02 1080p BluRay DD+ 5 1 x265-edge2020",
-  "time": "2022-12-15 05:30:30",
-  "seeds": 98,
-  "peers": 1,
-  "size": "14.4 GiB",
-  "filename": "30.Rock.S02.1080p.BluRay.DD+.5.1.x265-edge2020.torrent",
-  "fid": "240953144",
-  "rating": 8.3,
+  "title": "Taboo (2017) S01 (1080p BDRip x265 10bit EAC3 5 1 - xtrem3x) [TAoE]",
+  "time": "2020-08-16 15:56:31",
+  "seeds": 96,
+  "peers": 0,
+  "size": "11.1 GiB",
+  "filename": "Taboo.(2017).S01.(1080p.BDRip.x265.10bit.EAC3.5.1.-.xtrem3x).[TAoE].torrent",
+  "fid": "1691258",
+  "rating": 0,
   "categoryID": 27,
   "new": false,
-  "numComments": 0,
+  "numComments": 2,
   "tags": [
-    "comedy",
-    "FREELEECH"
+    "FREELEECH",
+    "nonscene"
   ],
-  "imdbID": "tt0496424",
+  "imdbID": "",
   "igdbID": "",
-  "tvmazeID": "s537",
-  "year": 2020,
-  "detailUrl": "https://www.torrentleech.org/torrent/240953144#torrentinfo"
+  "tvmazeID": "s3593",
+  "year": 2017,
+  "detailUrl": "https://www.torrentleech.org/torrent/1691258#torrentinfo"
 }

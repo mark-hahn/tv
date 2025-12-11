@@ -29,7 +29,9 @@ function extractGroup(title) {
  * @returns {Object} Normalized torrent with parsed data and match status
  */
 export function normalize(torrent, showName) {
-  const parsed = ptt.parse(torrent.title);
+  // Trim the title to handle trailing spaces
+  const trimmedTitle = torrent.title.trim();
+  const parsed = ptt.parse(trimmedTitle);
   let groupSrc = 'parse';
   let group = null;
   
@@ -37,11 +39,15 @@ export function normalize(torrent, showName) {
   if (parsed.group) {
     group = parsed.group.toUpperCase();
     groupSrc = 'parse';
+    console.log(`Group from parser: "${group}" for title: ${trimmedTitle}`);
   } else {
-    const manualGroup = extractGroup(torrent.title);
+    const manualGroup = extractGroup(trimmedTitle);
     if (manualGroup) {
       group = manualGroup.toUpperCase();
       groupSrc = 'calc';
+      console.log(`Group calculated: "${group}" for title: ${trimmedTitle}`);
+    } else {
+      console.log(`No group found for title: ${trimmedTitle}`);
     }
   }
   

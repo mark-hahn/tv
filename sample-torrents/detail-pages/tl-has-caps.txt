@@ -1,7 +1,25 @@
 # TorrentLeech caption detection training data
-# Format: index::true or index::false
-# true = page shows captions/subtitles present
-# false = page shows no captions/subtitles
+# Format: index:t or index:f
+# t = page shows captions/subtitles present
+# f = page shows no captions/subtitles
 
-1::true
-2::true
+1:t
+2:t
+3:f
+4:f
+5:t
+6:t
+7:t
+8:t
+9:t
+10:t
+11:t
+12:t
+13:t
+14:f
+15:t
+16:f
+17:f
+18:t
+19:t
+20:t

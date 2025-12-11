@@ -55,6 +55,9 @@ export async function hasCaptions(torrent) {
     const provider = torrent.raw.provider;
     const group = (torrent.group || 'unknown').toLowerCase();
     
+    console.log(`hasCaptions - Title: "${torrent.raw.title}"`);
+    console.log(`hasCaptions - Group: "${torrent.group}" (will use: "${group}")`);
+    
     // Load cookies for authentication
     const cookies = await loadCookies(provider);
     

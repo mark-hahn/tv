@@ -22,7 +22,7 @@
     @prune="handleMapAction('prune', $event)"
     @set-date="handleMapAction('date', $event)"
     @close="handleMapAction('close')"
-    @show-actors="handleShowActors"
+    @show-actors="() => handleShowActors(true)"
     @episode-click="handleEpisodeClick"
   )
   Actors(
@@ -137,11 +137,19 @@ export default {
       this.mapShow = null;
       evtBus.emit('paneChanged', this.currentPane);
     },
-    handleShowActors() {
-      this.currentPane = 'actors';
-      evtBus.emit('paneChanged', this.currentPane);
-      // Emit event to actors component with current tvdbData
-      evtBus.emit('showActors', this.currentTvdbData);
+    handleShowActors(fromMap = false) {
+      // If called from map click, show series pane instead
+      if (fromMap) {
+        this.currentPane = 'series';
+        this.mapShow = null;
+        evtBus.emit('paneChanged', this.currentPane);
+        evtBus.emit('mapAction', { action: 'close', show: null });
+      } else {
+        this.currentPane = 'actors';
+        evtBus.emit('paneChanged', this.currentPane);
+        // Emit event to actors component with current tvdbData
+        evtBus.emit('showActors', this.currentTvdbData);
+      }
     },
     handleActorsClose() {
       this.currentPane = 'series';

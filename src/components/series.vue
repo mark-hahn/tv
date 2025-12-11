@@ -56,6 +56,10 @@
     div(v-if="showSpinner")
       img(src="../../loading.gif"
           style="width:100px; height:100px; position:relative; top:20px; left:45px;")
+    div(v-if="!showSpinner"
+        @click.stop="actorsClick"
+        :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }")
+      | Actors
     div(v-if="showRemotes" 
         v-for="remote in remotes"
         @click.stop="remoteClick(remote)"
@@ -168,6 +172,10 @@ export default {
 
     torrentsClick() {
       evtBus.emit('showTorrentsPane', this.show);
+    },
+
+    actorsClick() {
+      evtBus.emit('showActorsPane');
     },
 
     remoteClick(remote) {

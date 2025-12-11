@@ -1,7 +1,5 @@
-    
-[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  specify customm .env file path with { path: '/custom/path/.env' }
 
-(node:32536) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
-(Use `node --trace-deprecation ...` to show where the warning was created)
 
- ==== server running on localhost:3001 ====
+add src/components/episode.vue.  it should be a pane that is the exact same size and position as the Series, Map, Actors, and Torrents panes and positioned in app.vue with the others.
+
+add an Episode button to the series pane remote buttons list at the beginning.  When clicked it should display the episode pane.

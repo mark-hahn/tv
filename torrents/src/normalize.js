@@ -1,4 +1,10 @@
 import ptt from 'parse-torrent-title';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Extract release group from title if parser missed it
@@ -6,6 +12,24 @@ import ptt from 'parse-torrent-title';
  * @returns {string|null} Release group name
  */
 function extractGroup(title) {
+  // Remove common suffixes that aren't groups
+  let cleaned = title
+    .replace(/\s*\[no rar\]\s*$/i, '')           // Remove [no rar] suffix
+    .replace(/\s*\[req\]\s*/i, '')               // Remove [req] prefix/suffix
+    .trim();
+  
+  // Common codecs, tags, and scene markers that are NOT release groups
+  const excludedTerms = new Set([
+    // Codecs
+    'X264', 'X265', 'H264', 'H265', 'HEVC', 'AVC', 'XVID', 'DIVX', 'VP9', 'AV1',
+    // Common endings
+    'X0R', 'SCENE', 'NO', 'RAR', 'COMPLETE', 'BLURAY', 'WEBRIP', 'WEBDL',
+    'HDTV', 'BDRIP', 'DVDRIP', 'PROPER', 'REPACK', 'INTERNAL', 'LIMITED',
+    'MKV', 'MP4', 'AVI', 'WEB', 'DL',
+    // Quality indicators
+    '720P', '1080P', '2160P', '480P', '576P', '4K', 'UHD'
+  ]);
+  
   // Match patterns like: -GROUP, [GROUP], (GROUP), or ending with GROUP
   // Order matters - check brackets first as they're most specific
   const patterns = [
@@ -16,8 +40,13 @@ function extractGroup(title) {
   ];
   
   for (const pattern of patterns) {
-    const match = title.match(pattern);
-    if (match) return match[1];
+    const match = cleaned.match(pattern);
+    if (match) {
+      const candidate = match[1].toUpperCase();
+      if (!excludedTerms.has(candidate)) {
+        return match[1];
+      }
+    }
   }
   return null;
 }
@@ -48,6 +77,15 @@ export function normalize(torrent, showName) {
       console.log(`Group calculated: "${group}" for title: ${trimmedTitle}`);
     } else {
       console.log(`No group found for title: ${trimmedTitle}`);
+      // Log to bad-groups file
+      const badGroupsFile = path.join(__dirname, '..', '..', 'sample-torrents', 'bad-groups-live.txt');
+      const timestamp = new Date().toISOString();
+      const entry = `${timestamp}\nTitle: ${trimmedTitle}\n\n`;
+      try {
+        fs.appendFileSync(badGroupsFile, entry, 'utf8');
+      } catch (err) {
+        console.error('Failed to write to bad-groups-live.txt:', err.message);
+      }
     }
   }
   

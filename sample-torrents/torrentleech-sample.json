@@ -1,21 +1,24 @@
 {
   "provider": "TorrentLeech",
-  "title": "All Her Fault S01 1080p 10bit WEBRip 6CH x265 HEVC-PSA",
-  "time": "2025-11-06 19:51:21",
-  "seeds": 418,
-  "peers": 2,
-  "size": "4.4 GiB",
-  "filename": "All.Her.Fault.S01.1080p.10bit.WEBRip.6CH.x265.HEVC-PSA.torrent",
-  "fid": "241637455",
-  "rating": 0,
+  "title": "The Loch S01 BluRay 1080p FLAC 2 0 AVC REMUX-FraMeSToR",
+  "time": "2025-05-03 10:41:11",
+  "seeds": 8,
+  "peers": 0,
+  "size": "55.0 GiB",
+  "filename": "The.Loch.S01.BluRay.1080p.FLAC.2.0.AVC.REMUX-FraMeSToR.torrent",
+  "fid": "241508989",
+  "rating": 6.9,
   "categoryID": 27,
   "new": false,
   "numComments": 0,
   "tags": [
-    "FREELEECH"
+    "Crime",
+    "Drama",
+    "FREELEECH",
+    "Mystery"
   ],
-  "imdbID": "",
+  "imdbID": "tt6734482",
   "igdbID": "",
-  "tvmazeID": "s74670",
-  "detailUrl": "https://www.torrentleech.org/torrent/241637455#torrentinfo"
+  "tvmazeID": "s19063",
+  "detailUrl": "https://www.torrentleech.org/torrent/241508989#torrentinfo"
 }

@@ -1,4 +1,4 @@
-import {MovieDb} from "moviedb-promise ";
+import {MovieDb} from "moviedb-promise";
 const moviedb = new MovieDb('327192a334da700f65b882c7a69cb927');
 
 /**

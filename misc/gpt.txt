@@ -1,46 +1,7 @@
+    
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  specify customm .env file path with { path: '/custom/path/.env' }
 
-# Copy the updated server.conf content to 
+(node:32536) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
 
-/etc/nginx/sites-available/default
-
-# Then test and reload:
-
-sudo nginx -t && sudo systemctl reload nginx
-
-
- Torrent search error: Error: HTTP 404: 
-    loadTorrents https://hahnca.com/shows/assets/index-XYaEfOBo.js:522
-index-XYaEfOBo.js:522:19724
-
-
-wsl(tv-series-client) scp misc/default root@hahnca.com:/etc/ngin
-
-
-
-
-
-
-
-
-
-
-
-
-wsl(tv-series-client) scp misc/default root@hahnca.com:/etc/nginx/sites-available/default
-ssh root@hahnca.com "sudo nginx -t && sudo systemctl reload nginx"
-default                       100% 4852     1.1MB/s   00:00    
-nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
-nginx: configuration file /etc/nginx/nginx.conf test is successful
-
-wsl(tv-series-client) curl -k https://hahnca.com/torrents-api/api/search?show=test&limit=1
-[1] 1186
-
-wsl(tv-series-client) <html>
-<head><title>404 Not Found</title></head>
-<body>
-<center><h1>404 Not Found</h1></center>
-<hr><center>nginx/1.24.0 (Ubuntu)</center>
-</body>
-</html>
-
-ssh root@hahnca.com "cp /etc/nginx/sites-available/default-bkup /etc/nginx/sites-available/default"
+ ==== server running on localhost:3001 ====

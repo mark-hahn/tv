@@ -1,6 +1,7 @@
 {
   "name": "tv-series-client",
   "version": "0.1.0",
+  "type": "module",
   "private": true,
   "scripts": {
     "serve-vite": "vite",

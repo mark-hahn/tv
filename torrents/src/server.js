@@ -1,11 +1,8 @@
 import express from 'express';
 import https from 'https';
-import dotenv from 'dotenv';
 import fs from 'fs';
 import * as search from './search.js';
 import * as download from './download.js';
-
-dotenv.config();
 
 console.log(''); // Blank line on restart
 

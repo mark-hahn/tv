@@ -64,13 +64,13 @@ app.get('/api/search', async (req, res) => {
 // POST /api/download - Download a torrent file
 app.post('/api/download', async (req, res) => {
   try {
-    const { torrent } = req.body;
+    const { torrent, cfClearance } = req.body;
     
     if (!torrent) {
       return res.status(400).json({ error: 'Torrent data is required' });
     }
     
-    const result = await download.download(torrent);
+    const result = await download.download(torrent, cfClearance);
     res.json({ success: result });
   } catch (error) {
     console.error('Download error:', error);

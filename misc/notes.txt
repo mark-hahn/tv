@@ -6,9 +6,5 @@ pm2 Will auto-start when Windows boots
   pm2 stop torrents-server - Stop server
   pm2 delete torrents-server - Remove from pm2
 
-torrentleech detail page format ...
-    https://www.torrentleech.org/torrent/<fid>#torrentinfo
-    https://www.torrentleech.org/torrent/1797203#torrentinfo
-
 test server command ...
     http://localhost:5173/test-ws/index.html

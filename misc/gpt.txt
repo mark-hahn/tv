@@ -1,4 +1,9 @@
 
 
 
+in torrents/src/download.js when download called then fetch detail page and save html to sample-torrents/ipt-detail.html or sample-torrents/tl-detail.html
 
+then search html for button to download torrent file. explain what you find in srvr log
+
+
+for torrentleech always use match1

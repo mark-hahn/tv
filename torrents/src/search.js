@@ -7,7 +7,7 @@ import { normalize } from './normalize.js';
 const TorrentSearchApi = (await import('torrent-search-api')).default;
 
 const SAVE_SAMPLE_TORRENTS = false;
-const DUMP_NEEDED          = true;
+const DUMP_NEEDED          = false;
 
 // Load cookies from files
 function loadCookiesArray(filename) {
@@ -251,11 +251,17 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     return !excludedStrings.some(excluded => title.includes(excluded));
   });
   
+  // Filter out torrents with 0 seeds
+  const filtered2 = filtered1.filter(torrent => {
+    const seeds = parseInt(torrent.raw?.seeds || 0);
+    return seeds > 0;
+  });
+  
   const finalCount = showYearMatch ? `${yearFiltered.length} after year filter -> ` : '';
-  console.log(`Filtered: ${matches.length} name matches -> ${tvOnly.length} with season info -> ${finalCount}${filtered1.length} without ${excludedStrings.join('/')}`);
+  console.log(`Filtered: ${matches.length} name matches -> ${tvOnly.length} with season info -> ${finalCount}${filtered1.length} without ${excludedStrings.join('/')} -> ${filtered2.length} with seeds`);
   
   // Add seasonEpisode to all torrents
-  filtered1.forEach(torrent => {
+  filtered2.forEach(torrent => {
     const { season, episode } = torrent.parsed;
     if (season !== undefined && season !== null) {
       if (!episode) {
@@ -267,7 +273,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   });
   
   // Filter and sort based on needed array
-  let filtered = filtered1;
+  let filtered = filtered2;
   const isLoadAll = needed && needed.includes('loadall');
   
   if (needed && needed.length > 0 && !isLoadAll) {
@@ -275,7 +281,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     const matchedNeeded = new Set();
     
     // Filter torrents based on needed array
-    filtered = filtered1.filter(torrent => {
+    filtered = filtered2.filter(torrent => {
       const { season, episode } = torrent.parsed;
       
       // Skip if resolution exists but is not 1080 or 720

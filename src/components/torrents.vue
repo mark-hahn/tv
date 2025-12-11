@@ -424,12 +424,21 @@ export default {
       console.log('Attempting to download torrent:', this.selectedTorrent);
       
       try {
+        // Get cf_clearance cookies from localStorage
+        const cfClearance = {
+          iptorrents: localStorage.getItem('cf_clearance_iptorrents') || '',
+          torrentleech: localStorage.getItem('cf_clearance_torrentleech') || ''
+        };
+        
         const response = await fetch('https://localhost:3001/api/download', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ torrent: this.selectedTorrent })
+          body: JSON.stringify({ 
+            torrent: this.selectedTorrent,
+            cfClearance: cfClearance
+          })
         });
         
         if (!response.ok) {

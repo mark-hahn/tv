@@ -58,6 +58,7 @@
 <script>
 import evtBus from '../evtBus.js';
 import * as emby from '../emby.js';
+import { config } from '../config.js';
 
 export default {
   name: "Torrents",
@@ -323,7 +324,7 @@ export default {
           localStorage.setItem('tlCfClearance', this.tlCfClearance);
         }
 
-        let url = `https://localhost:3001/api/search?show=${encodeURIComponent(this.currentShow.Name)}&limit=${this.maxResults}`;
+        let url = `${config.torrentsApiUrl}/api/search?show=${encodeURIComponent(this.currentShow.Name)}&limit=${this.maxResults}`;
         
         if (iptCf) {
           url += `&ipt_cf=${encodeURIComponent(iptCf)}`;
@@ -430,7 +431,7 @@ export default {
           torrentleech: localStorage.getItem('cf_clearance_torrentleech') || ''
         };
         
-        const response = await fetch('https://localhost:3001/api/download', {
+        const response = await fetch(`${config.torrentsApiUrl}/api/download`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'

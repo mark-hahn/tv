@@ -1,12 +1,5 @@
+there is already a server for this client that serves a websocket for other non-torrent uses. it is at /mnt/media/archive/dev/apps/tv-series-srvr at hahnca.com.
+
+currently the websocket is accessed through nginx using enclosed server.conf
 
 
-
-there is a shared headless server. access is:
-
-Hostname: oracle.usbx.me but you can use xobtlu@oracle.usbx.me
-IP: 46.232.211.70
-Port: 22
-Username: xobtlu
-Password: 90-TYUrtyasd 
-
-when a torrent file is downloaded send it to /home/xobtlu/watch/qbittorrent

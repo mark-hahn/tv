@@ -1,1 +1,7 @@
 
+
+add src/tmdb.js. provide function getTmdb called with show name and year. return tmdb data for that show.
+
+add getTmdb endpoint from client app in index.js
+
+for now just log the args and return true

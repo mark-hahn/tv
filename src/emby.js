@@ -55,14 +55,18 @@ export const getOnDevices = async () => {
           devicesOn.push({deviceId, deviceName, sessionId});
       continue;
     }
-    const showName  = NowPlayingItem.SeriesName;
+    const showName      = NowPlayingItem.SeriesName;
+    const seasonNumber  = NowPlayingItem.ParentIndexNumber;
+    const episodeNumber = NowPlayingItem.IndexNumber;
+    const episodeName   = NowPlayingItem.Name;
     // (13185330000-12584950000) == (60*1000*1000*10), (tick == 100ns)
     const positionTicks = PlayState.PositionTicks;
     
     // console.log(
     //     `Watching ${showName} on ${deviceName} at ${positionTicks}`);
     devicesOn.push({deviceId, deviceName, sessionId, 
-                    showName, positionTicks});
+                    showName, seasonNumber, episodeNumber, 
+                    episodeName, positionTicks});
   }
   return devicesOn;
 }

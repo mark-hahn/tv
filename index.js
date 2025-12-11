@@ -8,6 +8,7 @@ import * as emby           from './src/emby.js';
 import * as tvdb           from './src/tvdb.js';
 import * as util           from "./src/util.js";
 import * as email          from './src/email.js';
+import * as tmdb           from './src/tmdb.js';
 
 const dontupload  = false;
 
@@ -542,6 +543,8 @@ const runOne = () => {
     case 'setTvdbFields': tvdb.setTvdbFields(id, param, resolve, reject); break;
     case 'getActorPage':  tvdb.getActorPage( id, param, resolve, reject); break;
     case 'sendEmail':     sendEmailHandler(  id, param, resolve, reject); break;
+    
+    case 'getTmdb':       tmdb.getTmdb(      id, param, resolve, reject); break;
 
     default: reject([id, 'unknownfunction: ' + fname]);
   };

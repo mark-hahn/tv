@@ -1,15 +1,4 @@
 
 
-in the torrents pane when a card is clicked then consider it selected.  give selected card a light-yellow background.  then show the detail tab. 
 
-when torrent pane is closed and reset remove card selection.
 
-when card is selected show a button called download to the left of the close button.
-
-create a file torrents/src/download.js that has a function called download. 
-
-When torrents pane download button is clicked bring up a modal dialog that says.  "Do you want to download the torrent <title> and send it to usb for qBittorrent to download?"  show button continue and cancel.  
-
-if button continue is clicked then call download function in download.js with the entire torrent for the selected pane. For now the download function should just log the torrent and return true.
-
-if cancel is clicked then do nothing, leaving the card selected.

@@ -6,8 +6,8 @@ import { normalize } from './normalize.js';
 // torrent-search-api is CommonJS, need dynamic import
 const TorrentSearchApi = (await import('torrent-search-api')).default;
 
-// Debug flag to save sample torrents
 const SAVE_SAMPLE_TORRENTS = false;
+const DUMP_NEEDED          = true;
 
 // Load cookies from files
 function loadCookiesArray(filename) {
@@ -87,6 +87,17 @@ export function initializeProviders() {
 export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, needed = [] }) {
   console.log(`\nSearching for: ${showName} (limit: ${limit})`);
   console.log('Enabled providers:', TorrentSearchApi.getActiveProviders().join(', '));
+  
+  // Dump needed array if debugging enabled
+  if (DUMP_NEEDED) {
+    const neededPath = path.join(process.cwd(), '..', 'sample-torrents', 'needed.json');
+    try {
+      fs.writeFileSync(neededPath, JSON.stringify(needed, null, 2), 'utf8');
+      console.log(`Wrote needed array to needed.json: ${needed.length} entries`);
+    } catch (err) {
+      console.error('Error writing needed.json:', err.message);
+    }
+  }
   
   // Temporarily override cookies if cf_clearance provided
   const iptCookiesForSearch = iptCookies ? [...iptCookies] : [];
@@ -257,9 +268,9 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   
   // Filter and sort based on needed array
   let filtered = filtered1;
-  const isNoEmby = needed && needed.includes('noemby');
+  const isLoadAll = needed && needed.includes('loadall');
   
-  if (needed && needed.length > 0 && !isNoEmby) {
+  if (needed && needed.length > 0 && !isLoadAll) {
     // Track which needed entries were matched
     const matchedNeeded = new Set();
     
@@ -297,13 +308,13 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     
     // Add dummy torrents for unmatched needed entries
     needed.forEach(entry => {
-      if (entry !== 'noemby' && !matchedNeeded.has(entry)) {
+      if (entry !== 'loadall' && !matchedNeeded.has(entry)) {
         filtered.push({ notorrent: entry });
       }
     });
   }
   
-  // Sort torrents (apply to both noemby and regular cases)
+  // Sort torrents (apply to both loadall and regular cases)
   filtered.sort((a, b) => {
     // Skip sorting for dummy torrents (they stay at the end)
     if (a.notorrent || b.notorrent) {

@@ -6,9 +6,10 @@
       div(style="margin-left:20px;") {{ showName }}
       div(style="display:flex; gap:10px;")
         button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px; background:#4CAF50; color:white; border:none;") Download
+        button(v-if="noTorrentsNeeded" @click.stop="forceLoadTorrents" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px; background:#2196F3; color:white; border:none;") Force
         button(@click.stop="handleClose" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Close
 
-    #cookie-inputs(@click.stop v-if="!loading && (error || torrents.length === 0)" style="padding:15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
+    #cookie-inputs(@click.stop v-if="!loading && !noTorrentsNeeded && (error || torrents.length === 0)" style="padding:15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
       div(style="margin-bottom:10px;")
         label(style="display:block; font-size:12px; font-weight:bold; margin-bottom:3px; color:#555;") IPTorrents cf_clearance:
         input(v-model="iptCfClearance" type="text" placeholder="Paste cf_clearance cookie value" style="width:100%; padding:6px; font-size:12px; border:1px solid #ccc; border-radius:3px; box-sizing:border-box;")
@@ -30,7 +31,10 @@
     #error(v-if="error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px;")
       div Error: {{ error }}
       
-    #torrents-list(v-if="!loading && !error" style="padding:10px; font-size:14px; line-height:1.6;")
+    #no-torrents-needed(v-if="noTorrentsNeeded && !loading && !error" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
+      div No torrents needed.
+      
+    #torrents-list(v-if="!loading && !error && !noTorrentsNeeded" style="padding:10px; font-size:14px; line-height:1.6;")
       div(v-if="torrents.length === 0" style="text-align:center; color:#999; margin-top:50px;")
         div No torrents found
       div(v-for="(torrent, index) in torrents" :key="index" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
@@ -82,7 +86,8 @@ export default {
       SHOW_TITLE: true,  // Show torrent title on card
       selectedTorrent: null,  // Currently selected torrent
       showModal: false,  // Show download confirmation modal
-      clickedTorrents: new Set()  // Track which torrents have been clicked
+      clickedTorrents: new Set(),  // Track which torrents have been clicked
+      noTorrentsNeeded: false  // Flag when needed array is empty
     };
   },
 
@@ -119,6 +124,7 @@ export default {
       this.error = null;
       this.selectedTorrent = null;
       this.clickedTorrents.clear();
+      this.noTorrentsNeeded = false;
       
       // Store the show for later use with Load button
       this.currentShow = show;
@@ -129,6 +135,12 @@ export default {
       // Get series map and calculate needed episodes
       const needed = await this.calculateNeeded(show);
       
+      // Check if needed array is truly empty (not 'loadall')
+      if (needed.length === 0) {
+        this.noTorrentsNeeded = true;
+        return;
+      }
+      
       // Automatically try to load torrents with saved cookies
       await this.loadTorrents(needed);
     },
@@ -138,7 +150,7 @@ export default {
       
       // If not in Emby, return special marker
       if (!show || !show.Id || show.Id.startsWith('noemby-')) {
-        return ['noemby'];
+        return ['loadall'];
       }
       
       try {
@@ -159,6 +171,8 @@ export default {
             seasonMap[episodeNum] = epiObj;
           }
         }
+
+        console.log('Series map for', show.Name, seriesMap);
         
         // Scan for needed episodes
         let hasStartedWatching = false;
@@ -243,7 +257,7 @@ export default {
       } catch (err) {
         console.error('Error calculating needed episodes:', err);
       }
-      
+      console.log('Needed episodes for', show.Name, needed);
       return needed;
     },
 
@@ -281,6 +295,7 @@ export default {
       this.loading = true;
       this.error = null;
       this.torrents = [];
+      this.noTorrentsNeeded = false;
 
       try {
         // Extract cf_clearance cookies from input or use saved values
@@ -351,6 +366,11 @@ export default {
       } finally {
         this.loading = false;
       }
+    },
+
+    async forceLoadTorrents() {
+      // Force load all torrents by sending 'loadall' marker
+      await this.loadTorrents(['loadall']);
     },
 
     handleTorrentClick(event, torrent) {

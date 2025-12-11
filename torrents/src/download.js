@@ -7,6 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const SAVE_TORRENT_FILE = false;
+const SAVE_DETAIL_FILE  = false;
 
 // SFTP server configuration
 const SFTP_CONFIG = {
@@ -114,9 +115,11 @@ export async function download(torrent, cfClearance = {}) {
     }
     
     // Save HTML to sample-torrents directory
-    const savePath = path.join(__dirname, '..', '..', 'sample-torrents', filename);
-    fs.writeFileSync(savePath, html, 'utf8');
-    console.log(`Saved detail page to: ${savePath}`);
+    if (SAVE_DETAIL_FILE) {
+      const savePath = path.join(__dirname, '..', '..', 'sample-torrents', filename);
+      fs.writeFileSync(savePath, html, 'utf8');
+      console.log(`Saved detail page to: ${savePath}`);
+    }
     
     // Search for .torrent download link
     const torrentLinkPattern = /<a[^>]*href="([^"]*\.torrent)"[^>]*>/i;

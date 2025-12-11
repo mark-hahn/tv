@@ -6,6 +6,9 @@ import { normalize } from './normalize.js';
 // torrent-search-api is CommonJS, need dynamic import
 const TorrentSearchApi = (await import('torrent-search-api')).default;
 
+// Debug flag to save sample torrents
+const SAVE_SAMPLE_TORRENTS = false;
+
 // Load cookies from files
 function loadCookiesArray(filename) {
   const filepath = `./cookies/${filename}`;
@@ -85,16 +88,6 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   console.log(`\nSearching for: ${showName} (limit: ${limit})`);
   console.log('Enabled providers:', TorrentSearchApi.getActiveProviders().join(', '));
   
-  // Write needed array to file (even if empty, for debugging)
-  const filename = `needed-${showName.replace(/\s+/g, '-')}.json`;
-  const samplePath = path.join(process.cwd(), '..', 'sample-torrents', filename);
-  
-  try {
-    fs.writeFileSync(samplePath, JSON.stringify(needed, null, 2));
-  } catch (err) {
-    console.error(`Error writing ${filename}:`, err.message);
-  }
-
   // Temporarily override cookies if cf_clearance provided
   const iptCookiesForSearch = iptCookies ? [...iptCookies] : [];
   const tlCookiesForSearch = tlCookies ? [...tlCookies] : [];
@@ -392,22 +385,24 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   console.log(providerCounts);
   
   // Save one sample torrent from each provider for debugging
-  const sampleDir = '../sample-torrents';
-  if (!fs.existsSync(sampleDir)) {
-    fs.mkdirSync(sampleDir, { recursive: true });
-  }
-  
-  const savedProviders = new Set();
-  filtered.forEach(torrent => {
-    if (torrent.raw) {
-      const provider = torrent.raw.provider;
-      if (!savedProviders.has(provider)) {
-        const filename = `${sampleDir}/${provider.toLowerCase()}-sample.json`;
-        fs.writeFileSync(filename, JSON.stringify(torrent.raw, null, 2));
-        savedProviders.add(provider);
-      }
+  if (SAVE_SAMPLE_TORRENTS) {
+    const sampleDir = '../sample-torrents';
+    if (!fs.existsSync(sampleDir)) {
+      fs.mkdirSync(sampleDir, { recursive: true });
     }
-  });
+    
+    const savedProviders = new Set();
+    filtered.forEach(torrent => {
+      if (torrent.raw) {
+        const provider = torrent.raw.provider;
+        if (!savedProviders.has(provider)) {
+          const filename = `${sampleDir}/${provider.toLowerCase()}-sample.json`;
+          fs.writeFileSync(filename, JSON.stringify(torrent, null, 2));
+          savedProviders.add(provider);
+        }
+      }
+    });
+  }
   
   return {
     show: showName,

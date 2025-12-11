@@ -1,689 +1,221 @@
 [
   {
-    "title": "Nessy the Loch Ness Monster Flexi Print in Place 3D STL",
-    "seeds": "8",
-    "peers": "0",
-    "size": "32.2 MB",
-    "desc": "https://iptorrents.com/t/5546639",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Incident at Loch Ness 2004 1080p WEBRip x265",
-    "seeds": "8",
-    "peers": "0",
-    "size": "1.46 GB",
-    "desc": "https://iptorrents.com/t/5556167",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Black Mirror S06E02 Loch Henry 2160p NF WEB-DL DDP5 1 HDR HEVC-NTb",
-    "seeds": "8",
-    "peers": "0",
-    "size": "7.27 GB",
-    "desc": "https://iptorrents.com/t/5320041",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "[req] Steve Alten - [Loch 01-02] (epub mobi)",
-    "seeds": "2",
-    "peers": "0",
-    "size": "3.16 MB",
-    "desc": "https://iptorrents.com/t/2398024",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Black Mirror (2011) - S06E02 - Loch Henry [WEBDL-1080p][EAC3 Atmos 5 1][x264]-ETHEL",
-    "seeds": "15",
-    "peers": "0",
-    "size": "2.23 GB",
-    "desc": "https://iptorrents.com/t/6381400",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Black Mirror S06E02 Loch Henry 1080p NF WEB-DL DDP5 1 H 264-NTb",
-    "seeds": "14",
-    "peers": "0",
-    "size": "2.23 GB",
-    "desc": "https://iptorrents.com/t/5318698",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Scooby-Doo and the Loch Ness Monster 2004 1080p BluRay DDP 5 1 x265-EDGE2020",
-    "seeds": "13",
-    "peers": "0",
-    "size": "1.81 GB",
-    "desc": "https://iptorrents.com/t/5967560",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Scooby-Doo and the Loch Ness Monster 2004 1080p BRRip DDP 5 1 H 265 -iVy",
-    "seeds": "13",
-    "peers": "0",
-    "size": "1.53 GB",
-    "desc": "https://iptorrents.com/t/5803156",
-    "provider": "IpTorrents"
-  },
-  {
     "provider": "TorrentLeech",
-    "title": "The Loch S01 BluRay 1080p FLAC 2 0 AVC REMUX-FraMeSToR",
-    "time": "2025-05-03 10:41:11",
-    "seeds": 9,
-    "peers": 0,
-    "size": "55.0 GiB",
-    "filename": "The.Loch.S01.BluRay.1080p.FLAC.2.0.AVC.REMUX-FraMeSToR.torrent",
-    "fid": "241508989",
-    "rating": 6.9,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "Crime",
-      "Drama",
-      "FREELEECH",
-      "Mystery"
-    ],
-    "imdbID": "tt6734482",
-    "igdbID": "",
-    "tvmazeID": "s19063"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "The Loch 2017 S01 720p WEB-DL HEVC x265 BONE",
-    "time": "2025-01-11 04:26:14",
-    "seeds": 8,
-    "peers": 0,
-    "size": "1.9 GiB",
-    "filename": "The.Loch.2017.S01.720p.WEB-DL.HEVC.x265.BONE.torrent",
-    "fid": "241428268",
+    "title": "Leonard and Hungry Paul S01 1080p iP WEB-DL AAC2 0 H 264-RAWR",
+    "time": "2025-10-24 18:41:05",
+    "seeds": 23,
+    "peers": 1,
+    "size": "4.3 GiB",
+    "filename": "Leonard.and.Hungry.Paul.S01.1080p.iP.WEB-DL.AAC2.0.H.264-RAWR.torrent",
+    "fid": "241628674",
     "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s19063"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "A League of Their Own Road Trip Loch Ness to London S01 1080p WEB h264-BETTY",
-    "time": "2025-05-23 10:47:34",
-    "seeds": 8,
-    "peers": 0,
-    "size": "14.8 GiB",
-    "filename": "A.League.of.Their.Own.Road.Trip.Loch.Ness.to.London.S01.1080p.WEB.h264-BETTY.torrent",
-    "fid": "241523988",
-    "rating": 7.1,
     "categoryID": 27,
     "new": false,
     "numComments": 0,
     "tags": [
       "comedy",
-      "FREELEECH",
-      "Reality-TV",
-      "Sports",
-      "travel",
-      "tt14544358"
-    ],
-    "imdbID": "tt14544358",
-    "igdbID": "",
-    "tvmazeID": "s54657"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "The Loch Complete S01 1080p BluRay 10Bit DDP2 0 HEVC-d3g",
-    "time": "2025-05-08 14:06:41",
-    "seeds": 7,
-    "peers": 0,
-    "size": "11.6 GiB",
-    "filename": "The.Loch.Complete.S01.1080p.BluRay.10Bit.DDP2.0.HEVC-d3g.torrent",
-    "fid": "241513085",
-    "rating": 6.9,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "Crime",
       "Drama",
-      "FREELEECH",
-      "Mystery"
+      "FREELEECH"
     ],
-    "imdbID": "tt6734482",
+    "imdbID": "",
     "igdbID": "",
-    "tvmazeID": "s19063"
+    "tvmazeID": "s86495"
   },
   {
-    "title": "Scooby-Doo and the Loch Ness Monster 2004 720p WEB-DL x264-mSD",
+    "title": "Leonard and Hungry Paul S01E02 1080p WEBRiP x264-DARKFLiX",
     "seeds": "7",
     "peers": "0",
-    "size": "885 MB",
-    "desc": "https://iptorrents.com/t/810049",
+    "size": "658 MB",
+    "desc": "https://iptorrents.com/t/6972936",
     "provider": "IpTorrents"
   },
   {
-    "title": "Scooby-Doo And The Loch Ness Monster (2004) 1080p BluRay 5 1-LAMA",
+    "title": "Leonard and Hungry Paul S01E01 1080p WEBRiP x264-DARKFLiX",
     "seeds": "7",
     "peers": "0",
-    "size": "1.37 GB",
-    "desc": "https://iptorrents.com/t/5420986",
+    "size": "701 MB",
+    "desc": "https://iptorrents.com/t/6972938",
     "provider": "IpTorrents"
   },
   {
-    "provider": "TorrentLeech",
-    "title": "Mysteries of the Deep S01E09 The Loch Ness Conspiracy iNTERNAL 1080p WEB h264-ROBOTS",
-    "time": "2020-07-30 02:01:23",
-    "seeds": 7,
-    "peers": 0,
-    "size": "1.5 GiB",
-    "filename": "Mysteries.of.the.Deep.S01E09.The.Loch.Ness.Conspiracy.iNTERNAL.1080p.WEB.h264-ROBOTS.torrent",
-    "fid": "1679747",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "Mystery",
-      "nature"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "e1903154"
-  },
-  {
-    "title": "The Loch Ness Horror 2023 1080p WEB-DL DD+2 0 H264-BobDobbs",
+    "title": "Leonard and Hungry Paul S01E03 1080p iP WEB-DL AAC2 0 H 264-RAWR",
     "seeds": "6",
     "peers": "0",
-    "size": "3.5 GB",
-    "desc": "https://iptorrents.com/t/5671875",
+    "size": "729 MB",
+    "desc": "https://iptorrents.com/t/6950249",
     "provider": "IpTorrents"
   },
   {
-    "title": "Black Mirror S06E02 Loch Henry 1080p WEBRip HDR10 10Bit DDP5 1 Atmos HEVC-d3g",
-    "seeds": "6",
-    "peers": "0",
-    "size": "2.57 GB",
-    "desc": "https://iptorrents.com/t/6600037",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "The Wacky Adventures of Ronald Mc Donald S01E06 The Monster O' McDonaldland Loch 1080p AI upscale x265",
-    "time": "2025-07-26 16:51:41",
-    "seeds": 5,
-    "peers": 0,
-    "size": "2.4 GiB",
-    "filename": "The.Wacky.Adventures.of.Ronald.Mc.Donald.S01E06.The.Monster.O'.McDonaldland.Loch.1080p.AI.upscale.x265.torrent",
-    "fid": "241567189",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 1,
-    "tags": "",
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": ""
-  },
-  {
-    "title": "Loch Ness (1996) WEBRip 1080p-LAMA",
+    "title": "Leonard and Hungry Paul S01E06 1080p iP WEB-DL AAC2 0 H 264-RAWR",
     "seeds": "5",
     "peers": "0",
-    "size": "1.62 GB",
-    "desc": "https://iptorrents.com/t/5801867",
+    "size": "722 MB",
+    "desc": "https://iptorrents.com/t/6950252",
     "provider": "IpTorrents"
   },
   {
-    "provider": "TorrentLeech",
-    "title": "Great British Railway Journeys S15E10 Dundee to Loch of the Lowes 1080p WEBRip x264-CBFM",
-    "time": "2024-04-08 22:38:55",
-    "seeds": 5,
-    "peers": 0,
-    "size": "1019.9 MiB",
-    "filename": "Great.British.Railway.Journeys.S15E10.Dundee.to.Loch.of.the.Lowes.1080p.WEBRip.x264-CBFM.torrent",
-    "fid": "241256438",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "travel"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "e2796578"
-  },
-  {
-    "title": "Great British Railway Journeys S11E05 Elgin to Loch Ness 1080p WEBRip x264-CBFM",
-    "seeds": "5",
-    "peers": "0",
-    "size": "1.4 GB",
-    "desc": "https://iptorrents.com/t/5671516",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Black Mirror S06E02 Loch Henry 2160p NF WEB-DL DDP5 1 DoVi HEVC-NTb",
-    "seeds": "5",
-    "peers": "0",
-    "size": "7.54 GB",
-    "desc": "https://iptorrents.com/t/5319967",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "[REQ]The Loch S01 720p AMZN WEBRip DDP2 0 x264-NTb",
-    "seeds": "4",
-    "peers": "1",
-    "size": "9.27 GB",
-    "desc": "https://iptorrents.com/t/2421491",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "The Loch S01 1080p ITV WEB-DL AAC2 0 H 264-SNAKE",
-    "seeds": "4",
-    "peers": "0",
-    "size": "15.5 GB",
-    "desc": "https://iptorrents.com/t/6543215",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "The Loch S01 1080p FLAC 2 0 AVC REMUX-FraMeSToR ",
-    "time": "2023-01-18 06:03:49",
-    "seeds": 4,
-    "peers": 0,
-    "size": "55.0 GiB",
-    "filename": "The.Loch.S01.1080p.FLAC.2.0.AVC.REMUX-FraMeSToR..torrent",
-    "fid": "240970767",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "Crime",
-      "Drama",
-      "FREELEECH",
-      "Mystery"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s19063"
-  },
-  {
-    "title": "The Loch Ness Horror (2023) 1080p WEBRip-LAMA",
-    "seeds": "4",
-    "peers": "0",
-    "size": "1.3 GB",
-    "desc": "https://iptorrents.com/t/5672029",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Scooby-Doo And The Loch Ness Monster (2004) 720p BluRay-LAMA",
-    "seeds": "4",
+    "title": "Leonard and Hungry Paul S01E02 1080p iP WEB-DL AAC2 0 H 264-RAWR",
+    "seeds": "10",
     "peers": "0",
     "size": "687 MB",
-    "desc": "https://iptorrents.com/t/5420932",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Mysteries of the Deep S01E09 The Loch Ness Conspiracy iNTERNAL 1080p WEB h264-ROBOTS",
-    "seeds": "4",
-    "peers": "0",
-    "size": "1.47 GB",
-    "desc": "https://iptorrents.com/t/3997544",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Escape from Loch Ness Plane Rescue 2021 1080p WEBRip x264-LAMA",
-    "seeds": "4",
-    "peers": "0",
-    "size": "897 MB",
-    "desc": "https://iptorrents.com/t/5263709",
+    "desc": "https://iptorrents.com/t/6950248",
     "provider": "IpTorrents"
   },
   {
     "provider": "TorrentLeech",
-    "title": "A League of Their Own Road Trip Loch Ness to London S01 HLG 2160p WEB h265-BETTY",
-    "time": "2025-05-23 11:14:42",
+    "title": "Leonard and Hungry Paul S01E06 1080p WEBRiP x264-DARKFLiX",
+    "time": "2025-10-27 13:30:51",
+    "seeds": 6,
+    "peers": 0,
+    "size": "714.3 MiB",
+    "filename": "Leonard.and.Hungry.Paul.S01E06.1080p.WEBRiP.x264-DARKFLiX.torrent",
+    "fid": "241630299",
+    "rating": 0,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": "",
+    "imdbID": "",
+    "igdbID": "",
+    "tvmazeID": ""
+  },
+  {
+    "title": "Leonard and Hungry Paul S01E04 1080p iP WEB-DL AAC2 0 H 264-RAWR",
+    "seeds": "6",
+    "peers": "0",
+    "size": "757 MB",
+    "desc": "https://iptorrents.com/t/6950250",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Leonard and Hungry Paul S01E03 1080p WEBRiP x264-DARKFLiX",
+    "seeds": "6",
+    "peers": "0",
+    "size": "624 MB",
+    "desc": "https://iptorrents.com/t/6972937",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Leonard and Hungry Paul S01E06 1080p WEBRiP x264-DARKFLiX",
+    "seeds": "5",
+    "peers": "0",
+    "size": "698 MB",
+    "desc": "https://iptorrents.com/t/6972945",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Leonard and Hungry Paul S01E05 1080p iP WEB-DL AAC2 0 H 264-RAWR",
+    "seeds": "5",
+    "peers": "0",
+    "size": "782 MB",
+    "desc": "https://iptorrents.com/t/6950251",
+    "provider": "IpTorrents"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Leonard and Hungry Paul S01E05 1080p WEBRiP x264-DARKFLiX",
+    "time": "2025-10-27 13:30:06",
+    "seeds": 5,
+    "peers": 0,
+    "size": "753.5 MiB",
+    "filename": "Leonard.and.Hungry.Paul.S01E05.1080p.WEBRiP.x264-DARKFLiX.torrent",
+    "fid": "241630298",
+    "rating": 0,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": "",
+    "imdbID": "",
+    "igdbID": "",
+    "tvmazeID": ""
+  },
+  {
+    "title": "Leonard and Hungry Paul S01E05 1080p WEBRiP x264-DARKFLiX",
+    "seeds": "5",
+    "peers": "0",
+    "size": "737 MB",
+    "desc": "https://iptorrents.com/t/6972942",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Leonard and Hungry Paul S01E04 1080p WEBRiP x264-DARKFLiX",
+    "seeds": "5",
+    "peers": "0",
+    "size": "731 MB",
+    "desc": "https://iptorrents.com/t/6972944",
+    "provider": "IpTorrents"
+  },
+  {
+    "provider": "TorrentLeech",
+    "title": "Leonard and Hungry Paul S01E04 1080p WEBRiP x264-DARKFLiX",
+    "time": "2025-10-27 13:31:42",
     "seeds": 4,
     "peers": 0,
-    "size": "28.9 GiB",
-    "filename": "A.League.of.Their.Own.Road.Trip.Loch.Ness.to.London.S01.HLG.2160p.WEB.h265-BETTY.torrent",
-    "fid": "241524006",
-    "rating": 7.1,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH",
-      "Reality-TV",
-      "Sports",
-      "travel",
-      "tt14544358"
-    ],
-    "imdbID": "tt14544358",
-    "igdbID": "",
-    "tvmazeID": "s54657"
-  },
-  {
-    "title": "The Loch Ness Horror (2023) 720p WEBRip-LAMA",
-    "seeds": "3",
-    "peers": "0",
-    "size": "719 MB",
-    "desc": "https://iptorrents.com/t/5671979",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "The Loch Complete S01 1080p BluRay 10Bit DDP2 0 HEVC-d3g",
-    "seeds": "3",
-    "peers": "0",
-    "size": "11.5 GB",
-    "desc": "https://iptorrents.com/t/6644195",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "The Grand Tour S04E03 The Grand Tour presents Lochdown 2160p HDR10Plus WEBRip 6CH x265 HEVC-PSA",
-    "time": "2024-01-10 13:52:24",
-    "seeds": 3,
-    "peers": 0,
-    "size": "3.0 GiB",
-    "filename": "The.Grand.Tour.S04E03.The.Grand.Tour.presents.Lochdown.2160p.HDR10Plus.WEBRip.6CH.x265.HEVC-PSA.torrent",
-    "fid": "241198436",
+    "size": "755.0 MiB",
+    "filename": "Leonard.and.Hungry.Paul.S01E04.1080p.WEBRiP.x264-DARKFLiX.torrent",
+    "fid": "241630300",
     "rating": 0,
     "categoryID": 32,
     "new": false,
     "numComments": 0,
-    "tags": [
-      "Talk-Show"
-    ],
+    "tags": "",
     "imdbID": "",
     "igdbID": "",
     "tvmazeID": ""
   },
   {
-    "title": "Loch Ness Monster Captured (2024) 1080p WEBRip-LAMA",
-    "seeds": "3",
-    "peers": "0",
-    "size": "746 MB",
-    "desc": "https://iptorrents.com/t/6594172",
-    "provider": "IpTorrents"
-  },
-  {
     "provider": "TorrentLeech",
-    "title": "Limbs in the Loch-Catching a Killer S01 1080p HDTV AAC H264",
-    "time": "2024-12-01 08:50:18",
+    "title": "Leonard and Hungry Paul S01E03 1080p WEBRiP x264-DARKFLiX",
+    "time": "2025-10-27 13:29:19",
     "seeds": 3,
     "peers": 0,
-    "size": "3.3 GiB",
-    "filename": "Limbs.in.the.Loch-Catching.a.Killer.S01.1080p.HDTV.AAC.H264.torrent",
-    "fid": "241398320",
+    "size": "635.4 MiB",
+    "filename": "Leonard.and.Hungry.Paul.S01E03.1080p.WEBRiP.x264-DARKFLiX.torrent",
+    "fid": "241630296",
     "rating": 0,
-    "categoryID": 27,
+    "categoryID": 32,
     "new": false,
     "numComments": 0,
-    "tags": [
-      "1080p",
-      "Crime",
-      "Documentary",
-      "FREELEECH"
-    ],
+    "tags": "",
     "imdbID": "",
     "igdbID": "",
     "tvmazeID": ""
   },
   {
-    "title": "Roaming in the Wild S02E06 Loch Ness Pedalo Dreams 1080p WEBRip x264-CBFM",
-    "seeds": "2",
-    "peers": "0",
-    "size": "1.48 GB",
-    "desc": "https://iptorrents.com/t/6303670",
-    "provider": "IpTorrents"
+    "provider": "TorrentLeech",
+    "title": "Leonard and Hungry Paul S01E02 1080p WEBRiP x264-DARKFLiX",
+    "time": "2025-10-27 13:28:50",
+    "seeds": 3,
+    "peers": 0,
+    "size": "674.9 MiB",
+    "filename": "Leonard.and.Hungry.Paul.S01E02.1080p.WEBRiP.x264-DARKFLiX.torrent",
+    "fid": "241630295",
+    "rating": 0,
+    "categoryID": 32,
+    "new": false,
+    "numComments": 0,
+    "tags": "",
+    "imdbID": "",
+    "igdbID": "",
+    "tvmazeID": ""
   },
   {
-    "title": "Mysteries of the Deep S01E09 The Loch Ness Conspiracy iNTERNAL 1080p HEVC x265-MeGusta",
+    "title": "Ronan Hession Leonard and Hungry Paul 2020 RETAiL ePub eBook-VENTOLiN",
     "seeds": "2",
-    "peers": "0",
-    "size": "635 MB",
-    "desc": "https://iptorrents.com/t/3997554",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Mysteries at the Museum S22E00 The Loch Ness Monster Lives XviD-AFG",
-    "seeds": "2",
-    "peers": "0",
-    "size": "799 MB",
-    "desc": "https://iptorrents.com/t/3225721",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Loch Ness They Created a Monster 2023 1080p WEBRip x264-CBFM",
-    "seeds": "2",
-    "peers": "0",
-    "size": "4.24 GB",
-    "desc": "https://iptorrents.com/t/5765790",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Loch Ness Monster Captured 2024 1080p AMZN WEB-DL DD 2 0 H 264-playWEB",
-    "seeds": "2",
-    "peers": "0",
-    "size": "2.83 GB",
-    "desc": "https://iptorrents.com/t/6594008",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Loch Ness 1996 1080p WEBRip x264",
-    "seeds": "2",
-    "peers": "0",
-    "size": "1.92 GB",
-    "desc": "https://iptorrents.com/t/5516461",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Loch Ness 1996 1080p Blu-ray Remux AVC LPCM 2 0-HDT",
-    "seeds": "2",
-    "peers": "0",
-    "size": "23.9 GB",
-    "desc": "https://iptorrents.com/t/5802575",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Limbs in the Loch Catching a Killer S01E05 1080p WEBRip x264-CBFM",
-    "seeds": "2",
-    "peers": "0",
-    "size": "993 MB",
-    "desc": "https://iptorrents.com/t/6805662",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Limbs in the Loch Catching a Killer S01E04 1080p WEBRip x264-CBFM",
-    "seeds": "2",
-    "peers": "0",
-    "size": "1.16 GB",
-    "desc": "https://iptorrents.com/t/6805656",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Limbs in the Loch Catching a Killer S01E03 1080p WEBRip x264-CBFM",
-    "seeds": "2",
-    "peers": "0",
-    "size": "1.15 GB",
-    "desc": "https://iptorrents.com/t/6805659",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Limbs in the Loch Catching a Killer S01E02 1080p WEBRip x264-CBFM",
-    "seeds": "2",
-    "peers": "0",
-    "size": "1.08 GB",
-    "desc": "https://iptorrents.com/t/6805652",
+    "peers": "1",
+    "size": "2.17 MB",
+    "desc": "https://iptorrents.com/t/5085406",
     "provider": "IpTorrents"
   },
   {
     "provider": "TorrentLeech",
-    "title": "Limbs in the Loch Catching a Killer S01E01 1080p WEBRip x264-CBFM",
-    "time": "2025-08-06 03:41:49",
+    "title": "Leonard and Hungry Paul S01E01 1080p WEBRiP x264-DARKFLiX",
+    "time": "2025-10-27 13:27:51",
     "seeds": 2,
     "peers": 0,
-    "size": "1.3 GiB",
-    "filename": "Limbs.in.the.Loch.Catching.a.Killer.S01E01.1080p.WEBRip.x264-CBFM.torrent",
-    "fid": "241574380",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "Crime"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "e3045998"
-  },
-  {
-    "title": "Limbs in the Loch Catching a Killer S01E01 1080p WEBRip x264-CBFM",
-    "seeds": "2",
-    "peers": "0",
-    "size": "1.26 GB",
-    "desc": "https://iptorrents.com/t/6805653",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Legends End The Loch Ness Monster Story 2021 1080p WEB H264-CBFM",
-    "seeds": "2",
-    "peers": "0",
-    "size": "2.14 GB",
-    "desc": "https://iptorrents.com/t/5379815",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Great British Railway Journeys S15E10 Dundee to Loch of the Lowes 1080p WEBRip x264-CBFM",
-    "seeds": "2",
-    "peers": "0",
-    "size": "0.98 GB",
-    "desc": "https://iptorrents.com/t/5857856",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Great British Railway Journeys S15E06 Loch Lomond to Kelvinbridge 1080p WEBRip x264-CBFM",
-    "seeds": "2",
-    "peers": "0",
-    "size": "1.1 GB",
-    "desc": "https://iptorrents.com/t/5857851",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Gaslamp Cases 10 The Loch Ness Enigma-RAZOR",
-    "seeds": "2",
-    "peers": "0",
-    "size": "137 MB",
-    "desc": "https://iptorrents.com/t/6672674",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Black Mirror S06E02 Loch Henry 720p NF WEB-DL DDP5 1 H 264-NTb",
-    "seeds": "2",
-    "peers": "0",
-    "size": "829 MB",
-    "desc": "https://iptorrents.com/t/5318669",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Beyond the Unknown S02E15 Loch Ness and Edgar Cayce XviD-AFG",
-    "seeds": "2",
-    "peers": "0",
-    "size": "523 MB",
-    "desc": "https://iptorrents.com/t/3826151",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "The Loch S01E01 720p HEVC x265-MeGusta",
-    "seeds": "1",
-    "peers": "0",
-    "size": "250 MB",
-    "desc": "https://iptorrents.com/t/2342849",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "The Alaska Triangle S01E03 The Alaskan Loch Ness Monster 720p HEVC x265-MeGusta",
-    "seeds": "1",
-    "peers": "0",
-    "size": "328 MB",
-    "desc": "https://iptorrents.com/t/3766313",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "The Alaska Triangle S01E03 The Alaskan Loch Ness Monster 1080p WEB h264-B2B",
-    "time": "2021-03-13 19:15:04",
-    "seeds": 1,
-    "peers": 0,
-    "size": "2.0 GiB",
-    "filename": "The.Alaska.Triangle.S01E03.The.Alaskan.Loch.Ness.Monster.1080p.WEB.h264-B2B.torrent",
-    "fid": "1808380",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": "",
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "e1800538"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Roaming in the Wild S01E02 Rock Loch River Coast 1080p WEBRip x264-CBFM",
-    "time": "2024-07-07 09:14:13",
-    "seeds": 1,
-    "peers": 0,
-    "size": "1.4 GiB",
-    "filename": "Roaming.in.the.Wild.S01E02.Rock.Loch.River.Coast.1080p.WEBRip.x264-CBFM.torrent",
-    "fid": "241309823",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "Adventure",
-      "travel"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "e1856981"
-  },
-  {
-    "title": "River Monsters S05E06 Legend of Loch Ness 1080p WEBRip 10Bit DDP2 0 HEVC-d3g",
-    "seeds": "1",
-    "peers": "0",
-    "size": "2.12 GB",
-    "desc": "https://iptorrents.com/t/6147865",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Mysteries of the Deep S01E09 The Loch Ness Conspiracy 720p MAX WEB-DL DD 2 0 H 264-playWEB",
-    "seeds": "1",
-    "peers": "0",
-    "size": "874 MB",
-    "desc": "https://iptorrents.com/t/5941113",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Mysteries of S01E02 Loch Ness 1080p HDTV H264-DARKFLiX",
-    "seeds": "1",
-    "peers": "0",
-    "size": "2.02 GB",
-    "desc": "https://iptorrents.com/t/6417486",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Loch Ness-They Created a Monster 2023 1080p HDTV H264-DEADPOOL",
-    "time": "2023-12-25 11:56:19",
-    "seeds": 1,
-    "peers": 0,
-    "size": "3.0 GiB",
-    "filename": "Loch.Ness-They.Created.a.Monster.2023.1080p.HDTV.H264-DEADPOOL.torrent",
-    "fid": "241190110",
+    "size": "720.4 MiB",
+    "filename": "Leonard.and.Hungry.Paul.S01E01.1080p.WEBRiP.x264-DARKFLiX.torrent",
+    "fid": "241630294",
     "rating": 0,
     "categoryID": 32,
     "new": false,
@@ -694,446 +226,11 @@
     "tvmazeID": ""
   },
   {
-    "title": "Loch Ness S01E01",
-    "seeds": "1",
-    "peers": "0",
-    "size": "527 MB",
-    "desc": "https://iptorrents.com/t/2316895",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Loch Ness Monster Captured 2024 1080p WEB H264-CBFM",
-    "seeds": "1",
-    "peers": "0",
-    "size": "2.83 GB",
-    "desc": "https://iptorrents.com/t/6420768",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Loch Ness Hunting The Monster 2023 1080p WEB H264-CBFM",
-    "seeds": "1",
-    "peers": "0",
-    "size": "3.99 GB",
-    "desc": "https://iptorrents.com/t/5522192",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Loch Ness 1996 720p WEB H264-DiMEPiECE",
-    "seeds": "1",
-    "peers": "0",
-    "size": "4.25 GB",
-    "desc": "https://iptorrents.com/t/5651050",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Loch Ness 1996 1080p BluRay x264-RUSTED",
-    "seeds": "1",
-    "peers": "0",
-    "size": "15.6 GB",
-    "desc": "https://iptorrents.com/t/5801749",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Loch Ness 1996 1080p AMZN WEB-DL H264-GPRS",
-    "seeds": "1",
-    "peers": "0",
-    "size": "6.98 GB",
-    "desc": "https://iptorrents.com/t/6875338",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Loch Ness 1996 1080p AMZN WEB-DL DDP2 0 H 264-GPRS",
-    "seeds": "1",
-    "peers": "0",
-    "size": "6.98 GB",
-    "desc": "https://iptorrents.com/t/6863319",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Limbs in the Loch Catching a Killer S01E06 1080p WEBRip x264-CBFM",
-    "time": "2025-08-06 03:43:28",
-    "seeds": 1,
-    "peers": 0,
-    "size": "762.3 MiB",
-    "filename": "Limbs.in.the.Loch.Catching.a.Killer.S01E06.1080p.WEBRip.x264-CBFM.torrent",
-    "fid": "241574386",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "Crime"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "e3046003"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Limbs in the Loch Catching a Killer S01E05 1080p WEBRip x264-CBFM",
-    "time": "2025-08-06 03:43:09",
-    "seeds": 1,
-    "peers": 0,
-    "size": "1.0 GiB",
-    "filename": "Limbs.in.the.Loch.Catching.a.Killer.S01E05.1080p.WEBRip.x264-CBFM.torrent",
-    "fid": "241574385",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "Crime"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "e3046002"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Limbs in the Loch Catching a Killer S01E04 1080p WEBRip x264-CBFM",
-    "time": "2025-08-06 03:42:52",
-    "seeds": 1,
-    "peers": 0,
-    "size": "1.2 GiB",
-    "filename": "Limbs.in.the.Loch.Catching.a.Killer.S01E04.1080p.WEBRip.x264-CBFM.torrent",
-    "fid": "241574383",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "Crime"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "e3046001"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Limbs in the Loch Catching a Killer S01E03 1080p WEBRip x264-CBFM",
-    "time": "2025-08-06 03:42:28",
-    "seeds": 1,
-    "peers": 0,
-    "size": "1.2 GiB",
-    "filename": "Limbs.in.the.Loch.Catching.a.Killer.S01E03.1080p.WEBRip.x264-CBFM.torrent",
-    "fid": "241574382",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "Crime"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "e3046000"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "Limbs in the Loch Catching a Killer S01E02 1080p WEBRip x264-CBFM",
-    "time": "2025-08-06 03:42:07",
-    "seeds": 1,
-    "peers": 0,
-    "size": "1.1 GiB",
-    "filename": "Limbs.in.the.Loch.Catching.a.Killer.S01E02.1080p.WEBRip.x264-CBFM.torrent",
-    "fid": "241574381",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "Crime"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "e3045999"
-  },
-  {
-    "title": "Great British Railway Journeys S15E10 Dundee to Loch of the Lowes XviD-AFG",
-    "seeds": "1",
-    "peers": "0",
-    "size": "476 MB",
-    "desc": "https://iptorrents.com/t/5858627",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Great British Railway Journeys S15E06 Loch Lomond to Kelvinbridge XviD-AFG",
-    "seeds": "1",
-    "peers": "0",
-    "size": "514 MB",
-    "desc": "https://iptorrents.com/t/5858524",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Great British Railway Journeys S11E05 Elgin to Loch Ness XviD-AFG",
-    "seeds": "1",
-    "peers": "0",
-    "size": "449 MB",
-    "desc": "https://iptorrents.com/t/5671578",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Conspiracy the Missing Evidence S01E04 Loch Ness Monster INTERNAL XviD-AFG",
-    "seeds": "1",
-    "peers": "0",
-    "size": "652 MB",
-    "desc": "https://iptorrents.com/t/3302733",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Black Mirror S06E02 Loch Henry 2160p NF WEB-DL DDP5 1 HEVC-NTb",
-    "seeds": "1",
-    "peers": "0",
-    "size": "4.79 GB",
-    "desc": "https://iptorrents.com/t/5319955",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Beyond the Unknown S01E10 Loch Ness Monster XviD-AFG",
-    "seeds": "1",
-    "peers": "0",
-    "size": "641 MB",
-    "desc": "https://iptorrents.com/t/3279496",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Beyond the Unknown S01E10 Loch Ness Monster 720p HEVC x265-MeGusta",
-    "seeds": "1",
-    "peers": "0",
-    "size": "392 MB",
-    "desc": "https://iptorrents.com/t/3280228",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "A League of Their Own Road Trip Loch Ness to London S01E06 1080p WEB h264-BETTY",
-    "time": "2025-01-01 15:05:30",
-    "seeds": 1,
-    "peers": 0,
-    "size": "2.5 GiB",
-    "filename": "A.League.of.Their.Own.Road.Trip.Loch.Ness.to.London.S01E06.1080p.WEB.h264-BETTY.torrent",
-    "fid": "241422281",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "Sports",
-      "travel"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "e2068009"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "A League of Their Own Road Trip Loch Ness to London S01E05 1080p WEB h264-BETTY",
-    "time": "2025-01-01 15:04:01",
-    "seeds": 1,
-    "peers": 0,
-    "size": "2.5 GiB",
-    "filename": "A.League.of.Their.Own.Road.Trip.Loch.Ness.to.London.S01E05.1080p.WEB.h264-BETTY.torrent",
-    "fid": "241422278",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "Sports",
-      "travel"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "e2068008"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "A League of Their Own Road Trip Loch Ness to London S01E04 1080p WEB h264-BETTY",
-    "time": "2025-01-01 15:03:01",
-    "seeds": 1,
-    "peers": 0,
-    "size": "2.5 GiB",
-    "filename": "A.League.of.Their.Own.Road.Trip.Loch.Ness.to.London.S01E04.1080p.WEB.h264-BETTY.torrent",
-    "fid": "241422275",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "Sports",
-      "travel"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "e2068007"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "A League of Their Own Road Trip Loch Ness to London S01E03 1080p WEB h264-BETTY",
-    "time": "2025-01-01 15:02:04",
-    "seeds": 1,
-    "peers": 0,
-    "size": "2.5 GiB",
-    "filename": "A.League.of.Their.Own.Road.Trip.Loch.Ness.to.London.S01E03.1080p.WEB.h264-BETTY.torrent",
-    "fid": "241422272",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "Sports",
-      "travel"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "e2068006"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "A League of Their Own Road Trip Loch Ness to London S01E02 1080p WEB h264-BETTY",
-    "time": "2025-01-01 15:00:39",
-    "seeds": 1,
-    "peers": 0,
-    "size": "2.5 GiB",
-    "filename": "A.League.of.Their.Own.Road.Trip.Loch.Ness.to.London.S01E02.1080p.WEB.h264-BETTY.torrent",
-    "fid": "241422271",
-    "rating": 0,
-    "categoryID": 32,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "Sports",
-      "travel"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "e2068005"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "A League of Their Own Road Trip Loch Ness to London S01 2160p WEB h265-BETTY",
-    "time": "2025-05-23 10:59:47",
-    "seeds": 1,
-    "peers": 0,
-    "size": "28.7 GiB",
-    "filename": "A.League.of.Their.Own.Road.Trip.Loch.Ness.to.London.S01.2160p.WEB.h265-BETTY.torrent",
-    "fid": "241523999",
-    "rating": 7.1,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "FREELEECH",
-      "Reality-TV",
-      "Sports",
-      "travel",
-      "tt14544358"
-    ],
-    "imdbID": "tt14544358",
-    "igdbID": "",
-    "tvmazeID": "s54657"
-  },
-  {
-    "title": "Roaming in the Wild S01E02 Rock Loch River Coast 1080p WEBRip x264-CBFM",
-    "seeds": "0",
-    "peers": "1",
-    "size": "1.4 GB",
-    "desc": "https://iptorrents.com/t/6024078",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Monster The Mystery Of Loch Ness S01E03 XviD-AFG",
+    "title": "Leonard and Hungry Paul S01E01 720p iP WEB-DL AAC2 0 H 264-RAWR",
     "seeds": "0",
     "peers": "0",
-    "size": "743 MB",
-    "desc": "https://iptorrents.com/t/5214862",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Monster The Mystery Of Loch Ness S01E02 XviD-AFG",
-    "seeds": "0",
-    "peers": "0",
-    "size": "700 MB",
-    "desc": "https://iptorrents.com/t/5214875",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Monster The Mystery Of Loch Ness S01E01 XviD-AFG",
-    "seeds": "0",
-    "peers": "0",
-    "size": "809 MB",
-    "desc": "https://iptorrents.com/t/5214812",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Loch Ness Monster Captured (2024) 720p WEBRip-LAMA",
-    "seeds": "0",
-    "peers": "0",
-    "size": "402 MB",
-    "desc": "https://iptorrents.com/t/6594138",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "Limbs in the Loch Catching a Killer S01E06 1080p iP WEB-DL AAC2 0 HFR H 264-RAWR",
-    "seeds": "0",
-    "peers": "1",
-    "size": "793 MB",
-    "desc": "https://iptorrents.com/t/6419582",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "A League of Their Own Road Trip Loch Ness to London S01E06 1080p WEB h264-BETTY",
-    "seeds": "0",
-    "peers": "0",
-    "size": "2.49 GB",
-    "desc": "https://iptorrents.com/t/6362493",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "A League of Their Own Road Trip Loch Ness to London S01E05 1080p WEB h264-BETTY",
-    "seeds": "0",
-    "peers": "0",
-    "size": "2.46 GB",
-    "desc": "https://iptorrents.com/t/6362494",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "A League of Their Own Road Trip Loch Ness to London S01E04 1080p WEB h264-BETTY",
-    "seeds": "0",
-    "peers": "0",
-    "size": "2.49 GB",
-    "desc": "https://iptorrents.com/t/6362529",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "A League of Their Own Road Trip Loch Ness to London S01E03 1080p WEB h264-BETTY",
-    "seeds": "0",
-    "peers": "0",
-    "size": "2.45 GB",
-    "desc": "https://iptorrents.com/t/6362468",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "A League of Their Own Road Trip Loch Ness to London S01E02 1080p WEB h264-BETTY",
-    "seeds": "0",
-    "peers": "0",
-    "size": "2.46 GB",
-    "desc": "https://iptorrents.com/t/6362466",
-    "provider": "IpTorrents"
-  },
-  {
-    "title": "A League of Their Own Road Trip Loch Ness to London S01E01 1080p WEB h264-BETTY",
-    "seeds": "0",
-    "peers": "0",
-    "size": "2.47 GB",
-    "desc": "https://iptorrents.com/t/6362462",
+    "size": "997 MB",
+    "desc": "https://iptorrents.com/t/6949651",
     "provider": "IpTorrents"
   }
 ]

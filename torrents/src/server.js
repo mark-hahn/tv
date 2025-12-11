@@ -3,6 +3,7 @@ import https from 'https';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import * as search from './search.js';
+import * as download from './download.js';
 
 dotenv.config();
 
@@ -56,6 +57,23 @@ app.get('/api/search', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Search error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/download - Download a torrent file
+app.post('/api/download', async (req, res) => {
+  try {
+    const { torrent } = req.body;
+    
+    if (!torrent) {
+      return res.status(400).json({ error: 'Torrent data is required' });
+    }
+    
+    const result = await download.download(torrent);
+    res.json({ success: result });
+  } catch (error) {
+    console.error('Download error:', error);
     res.status(500).json({ error: error.message });
   }
 });

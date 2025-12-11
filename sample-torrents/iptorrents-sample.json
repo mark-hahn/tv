@@ -1,9 +1,25 @@
 {
-  "title": "The Loch S01 1080p ITV WEB-DL AAC2 0 H 264-SNAKE",
-  "seeds": "4",
-  "peers": "0",
-  "size": "15.5 GB",
-  "desc": "https://iptorrents.com/t/6543215",
-  "provider": "IpTorrents",
-  "detailUrl": "https://iptorrents.com/t/6543215"
+  "parsed": {
+    "resolution": "1080p",
+    "source": "webrip",
+    "codec": "x264",
+    "group": "DARKFLiX",
+    "season": 1,
+    "episode": 1,
+    "title": "Leonard and Hungry Paul",
+    "seasonEpisode": "S01E01"
+  },
+  "group": "DARKFLIX",
+  "groupSrc": "parse",
+  "nameMatch": true,
+  "clientTitle": "Leonard and Hungry Paul",
+  "raw": {
+    "title": "Leonard and Hungry Paul S01E01 1080p WEBRiP x264-DARKFLiX",
+    "seeds": "7",
+    "peers": "0",
+    "size": "701 MB",
+    "desc": "https://iptorrents.com/t/6972938",
+    "provider": "IpTorrents"
+  },
+  "detailUrl": "https://iptorrents.com/t/6972938"
 }

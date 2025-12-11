@@ -34,6 +34,7 @@
       div(v-if="torrents.length === 0" style="text-align:center; color:#999; margin-top:50px;")
         div No torrents found
       div(v-for="(torrent, index) in torrents" :key="index" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
+        div(v-if="isClicked(torrent)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
         div(v-if="SHOW_TITLE" style="font-size:12px; color:#888; margin-bottom:4px;") {{ torrent.raw.title }}
         div(style="font-size:18px; color:#333;") 
           strong {{ getDisplaySeasonEpisode(torrent) }}
@@ -80,7 +81,8 @@ export default {
       currentShow: null,
       SHOW_TITLE: true,  // Show torrent title on card
       selectedTorrent: null,  // Currently selected torrent
-      showModal: false  // Show download confirmation modal
+      showModal: false,  // Show download confirmation modal
+      clickedTorrents: new Set()  // Track which torrents have been clicked
     };
   },
 
@@ -107,6 +109,7 @@ export default {
     handleClose() {
       this.selectedTorrent = null;
       this.showModal = false;
+      this.clickedTorrents.clear();
       this.$emit('close');
     },
 
@@ -115,6 +118,7 @@ export default {
       this.torrents = [];
       this.error = null;
       this.selectedTorrent = null;
+      this.clickedTorrents.clear();
       
       // Store the show for later use with Load button
       this.currentShow = show;
@@ -353,10 +357,17 @@ export default {
       // Select the card
       this.selectedTorrent = torrent;
       
+      // Add to clicked set
+      this.clickedTorrents.add(torrent);
+      
       // Open detail page in new tab
       if (torrent.detailUrl) {
         window.open(torrent.detailUrl, '_blank');
       }
+    },
+
+    isClicked(torrent) {
+      return this.clickedTorrents.has(torrent);
     },
 
     getCardStyle(torrent) {
@@ -368,7 +379,8 @@ export default {
         borderRadius: '5px',
         border: '1px solid #ddd',
         cursor: 'pointer',
-        transition: 'all 0.2s'
+        transition: 'all 0.2s',
+        position: 'relative'
       };
     },
 
@@ -384,15 +396,28 @@ export default {
     async continueDownload() {
       this.showModal = false;
       
-      if (!this.selectedTorrent) return;
+      if (!this.selectedTorrent) {
+        console.log('No torrent selected');
+        return;
+      }
+      
+      console.log('Attempting to download torrent:', this.selectedTorrent);
       
       try {
-        const { download } = await import('../../torrents/src/download.js');
-        const success = await download(this.selectedTorrent);
+        const response = await fetch('https://localhost:3001/api/download', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ torrent: this.selectedTorrent })
+        });
         
-        if (success) {
-          console.log('Download initiated successfully');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
+        
+        const data = await response.json();
+        console.log('Download result:', data);
       } catch (error) {
         console.error('Download error:', error);
       }
@@ -427,13 +452,13 @@ export default {
       }
       
       // Log what we're working with
-      console.log('Torrent display data:', {
-        title: torrent.parsed.title,
-        season: torrent.parsed.season,
-        episode: torrent.parsed.episode,
-        seasonEpisode: torrent.parsed.seasonEpisode,
-        rawTitle: torrent.raw?.title
-      });
+      // console.log('Torrent display data:', {
+      //   title: torrent.parsed.title,
+      //   season: torrent.parsed.season,
+      //   episode: torrent.parsed.episode,
+      //   seasonEpisode: torrent.parsed.seasonEpisode,
+      //   rawTitle: torrent.raw?.title
+      // });
       
       // If seasonEpisode is already set, use it
       if (torrent.parsed.seasonEpisode) {

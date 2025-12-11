@@ -73,16 +73,6 @@ export function normalize(torrent, showName) {
     if (manualGroup) {
       group = manualGroup.toUpperCase();
       groupSrc = 'calc';
-    } else {
-      // Log to bad-groups file
-      const badGroupsFile = path.join(__dirname, '..', '..', 'sample-torrents', 'bad-groups-live.txt');
-      const timestamp = new Date().toISOString();
-      const entry = `${timestamp}\nTitle: ${trimmedTitle}\n\n`;
-      try {
-        fs.appendFileSync(badGroupsFile, entry, 'utf8');
-      } catch (err) {
-        console.error('Failed to write to bad-groups-live.txt:', err.message);
-      }
     }
   }
   

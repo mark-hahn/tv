@@ -1,24 +1,40 @@
 {
-  "provider": "TorrentLeech",
-  "title": "The Loch S01 BluRay 1080p FLAC 2 0 AVC REMUX-FraMeSToR",
-  "time": "2025-05-03 10:41:11",
-  "seeds": 9,
-  "peers": 0,
-  "size": "55.0 GiB",
-  "filename": "The.Loch.S01.BluRay.1080p.FLAC.2.0.AVC.REMUX-FraMeSToR.torrent",
-  "fid": "241508989",
-  "rating": 6.9,
-  "categoryID": 27,
-  "new": false,
-  "numComments": 0,
-  "tags": [
-    "Crime",
-    "Drama",
-    "FREELEECH",
-    "Mystery"
-  ],
-  "imdbID": "tt6734482",
-  "igdbID": "",
-  "tvmazeID": "s19063",
-  "detailUrl": "https://www.torrentleech.org/torrent/241508989#torrentinfo"
+  "parsed": {
+    "resolution": "1080p",
+    "source": "web-dl",
+    "codec": "h264",
+    "audio": "aac",
+    "channels": "2 0",
+    "group": "RAWR",
+    "season": 1,
+    "title": "Leonard and Hungry Paul",
+    "seasonEpisode": "S01"
+  },
+  "group": "RAWR",
+  "groupSrc": "parse",
+  "nameMatch": true,
+  "clientTitle": "Leonard and Hungry Paul",
+  "raw": {
+    "provider": "TorrentLeech",
+    "title": "Leonard and Hungry Paul S01 1080p iP WEB-DL AAC2 0 H 264-RAWR",
+    "time": "2025-10-24 18:41:05",
+    "seeds": 23,
+    "peers": 1,
+    "size": "4.3 GiB",
+    "filename": "Leonard.and.Hungry.Paul.S01.1080p.iP.WEB-DL.AAC2.0.H.264-RAWR.torrent",
+    "fid": "241628674",
+    "rating": 0,
+    "categoryID": 27,
+    "new": false,
+    "numComments": 0,
+    "tags": [
+      "comedy",
+      "Drama",
+      "FREELEECH"
+    ],
+    "imdbID": "",
+    "igdbID": "",
+    "tvmazeID": "s86495"
+  },
+  "detailUrl": "https://www.torrentleech.org/torrent/241628674#torrentinfo"
 }

@@ -1,3 +1,9 @@
 
-if a show is currently playing and the selected show is the one currently playing then pre-fill the boxes with the season, episode that is playing. The currently playing show is the one listed on the right side of hdrtop in hdrtop.vue
 
+
+add link to remote server getTmdb function in srvr.js.  it accepts an object arg { showName, year, season, episode } and returns true for success;
+
+when actors pane is opened call getTmdb with 
+{showName: torrent.parsed.title, year: torrent.parsed.year, season: ss, episode: ee }. where ss and ee are values going into  input boxes. year and ss and ee might be null
+
+ignore results for now

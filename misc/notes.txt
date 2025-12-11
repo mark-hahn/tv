@@ -49,3 +49,6 @@ in samples-emby/showlist.json
                     "Tmdb": "133727"
                 },
 
+
+    https://github.com/grantholle/moviedb-promise
+    

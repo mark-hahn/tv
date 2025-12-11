@@ -301,6 +301,7 @@ export default {
       seriesMap:            {},
       gapPercent:            0,
       watchingName:      '---',
+      currentPlayingDevice: null,
       sortPopped:        false,
       sortChoice:     'Viewed', 
       fltrPopped:        false,
@@ -953,11 +954,24 @@ export default {
       this.sortShows();
     },
 
-    watchClick() {
+    async watchClick() {
       console.log('watchClick');
       if(this.watchingName !== '---') {
         window.localStorage.setItem("lastVisShow", this.watchingName);
         this.scrollToSavedShow(true);
+        
+        // If we have episode info, open actors pane and show episode actors
+        if(this.currentPlayingDevice && 
+           this.currentPlayingDevice.seasonNumber && 
+           this.currentPlayingDevice.episodeNumber) {
+          // Use setTimeout to ensure series pane setup completes first
+          setTimeout(() => {
+            evtBus.emit('showActorsPaneWithEpisode', {
+              seasonNumber: this.currentPlayingDevice.seasonNumber,
+              episodeNumber: this.currentPlayingDevice.episodeNumber
+            });
+          }, 100);
+        }
       }
     },
 
@@ -1044,13 +1058,16 @@ export default {
 
     setInterval(async () => {
       const devices  = await srvr.getDevices();
-      let   showName = null; 
+      let   showName = null;
+      let   playingDevice = null;
       for(const device of devices) {
         if(!device.showName) continue;
         showName = device.showName;
+        playingDevice = device;
         if(device.deviceName == 'chromecast') break;
       }
       this.watchingName = showName ?? '---';
+      this.currentPlayingDevice = playingDevice;
     }, 10*1000);
 
     await (async () => {

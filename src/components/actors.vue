@@ -272,8 +272,27 @@ export default {
       console.log('prefillEpisodeInputs: Starting for show:', this.showName);
       
       // Strategy 1: Check if currently playing show matches selected show
-      // TODO: Need to implement checking currently playing show from hdrtop.vue
-      // For now, skip to strategy 2
+      try {
+        const srvr = await import('../srvr.js');
+        const devices = await srvr.getDevices();
+        console.log('prefillEpisodeInputs: devices:', devices);
+        
+        // Find a device playing the current show (prioritize chromecast)
+        let playingDevice = devices.find(d => d.deviceName === 'chromecast' && d.showName === this.showName);
+        if (!playingDevice) {
+          playingDevice = devices.find(d => d.showName === this.showName);
+        }
+        
+        if (playingDevice && playingDevice.seasonNumber && playingDevice.episodeNumber) {
+          console.log('prefillEpisodeInputs: Found playing show:', playingDevice);
+          this.seasonNum = String(playingDevice.seasonNumber);
+          this.episodeNum = String(playingDevice.episodeNumber);
+          return;
+        }
+      } catch (error) {
+        console.error('prefillEpisodeInputs: Error checking playing show:', error);
+        // Continue to strategy 2
+      }
       
       // Strategy 2: Use seriesMap to find first unwatched episode
       try {
@@ -388,6 +407,17 @@ export default {
       this.$nextTick(() => {
         console.log('actors.vue: $nextTick - calling prefillEpisodeInputs');
         this.prefillEpisodeInputs();
+      });
+    });
+    
+    evtBus.on('fillAndSelectEpisode', (episodeInfo) => {
+      console.log('actors.vue: fillAndSelectEpisode event received:', episodeInfo);
+      // Fill the input boxes
+      this.seasonNum = String(episodeInfo.seasonNumber);
+      this.episodeNum = String(episodeInfo.episodeNumber);
+      // Trigger select to show episode actors
+      this.$nextTick(() => {
+        this.handleSelectClick();
       });
     });
   }

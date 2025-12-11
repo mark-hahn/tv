@@ -191,6 +191,12 @@ export default {
       this.handleShowActors(false);
     });
     
+    evtBus.on('showActorsPaneWithEpisode', (episodeInfo) => {
+      this.handleShowActors(false);
+      // Emit event to actors pane with episode info
+      evtBus.emit('fillAndSelectEpisode', episodeInfo);
+    });
+    
     evtBus.on('showTorrentsPane', (show) => {
       this.handleShowTorrents(show);
     });

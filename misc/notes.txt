@@ -8,3 +8,44 @@ pm2 Will auto-start when Windows boots
 
 test server command ...
     http://localhost:5173/test-ws/index.html
+
+Emby primarily pulls actor images from TMDB (TheMovieDB.org) Emby Community -- 
+
+Emby uses several methods to get TMDB IDs for your media:
+
+1. Automatic Matching by Name and Year
+When you scan media into your library, Emby's primary method is to search TMDB by the movie or TV show name and year. It tries to match your file/folder names against the TMDB database to find the correct entry.
+
+2. Embedding IDs in File/Folder Names
+You can manually specify the TMDB ID directly in your file or folder names using formats like "Name (Year) [tmdbid=xxxx]" or "Name (Year) {tmdb-xxxx}" Emby Community
+
+3. NFO Files
+Emby can read TMDB IDs from NFO metadata files. If you have NFO files with your media (created by tools like Kodi or other media managers), Emby will extract the TMDB ID from those files.
+
+4. Manual Identification
+If an item is misidentified, you can manually identify it using the Identify button in Emby's interface, or directly insert the correct TMDB ID into the database fields and refresh the item Emby Community
+
+The Emby API does provide TMDB IDs through the ProviderIds field.
+How to Access TMDB IDs via API
+When you query items through the Emby API, each item includes a ProviderIds dictionary that contains provider IDs like Tmdb, Tvdb, TvCom, and others Emby Community
+
+{
+  "ProviderIds": {
+    "Imdb": "tt1234567",
+    "Tmdb": "12345",
+    "TmdbCollection": "67890"
+  }
+}
+
+in samples-emby/showlist.json
+
+                "ProviderIds": {
+                    "Tvdb": "393155",
+                    "EIDR": "10.5240/CC4F-E170-4CBD-3BC7-F241-L",
+                    "Official Website": "https://tv.apple.com/show/umc.cmc.8xrkg9zywke7g6a9ahmvpr3l",
+                    "TV Maze": "52193",
+                    "Wikidata": "Q106639092",
+                    "IMDB": "tt13567344",
+                    "Tmdb": "133727"
+                },
+

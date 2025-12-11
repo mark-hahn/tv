@@ -4,7 +4,7 @@
   "description": "Search IPTorrents and TorrentLeech",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
+    "start": "node src/server.js",
     "test": "node torrents.js"
   },
   "dependencies": {

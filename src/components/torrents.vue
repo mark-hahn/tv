@@ -417,6 +417,7 @@ export default {
         return;
       }
       
+      const torrentTitle = this.selectedTorrent.raw?.title || 'Unknown';
       console.log('Attempting to download torrent:', this.selectedTorrent);
       
       try {
@@ -443,8 +444,18 @@ export default {
         
         const data = await response.json();
         console.log('Download result:', data);
+        
+        // Check if download was successful
+        if (data.success || data.result === true) {
+          alert(`Downloaded ${torrentTitle}`);
+        } else {
+          const errorMsg = data.error || data.message || 'Unknown error';
+          alert(`Download failed for ${torrentTitle}, ${errorMsg}`);
+        }
       } catch (error) {
         console.error('Download error:', error);
+        const errorMsg = error.message || String(error);
+        alert(`Download failed for ${torrentTitle}, ${errorMsg}`);
       }
     },
 

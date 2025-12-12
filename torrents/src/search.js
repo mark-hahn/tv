@@ -279,7 +279,41 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   let filtered = filtered2;
   const isLoadAll = needed && needed.includes('loadall');
   
-  if (needed && needed.length > 0 && !isLoadAll) {
+  if (isLoadAll) {
+    // For loadall, return all season torrents and episode torrents for seasons without a season torrent
+    const seasonsByNumber = {};
+    
+    // Group torrents by season
+    filtered2.forEach(torrent => {
+      const season = torrent.parsed.season;
+      if (season === undefined || season === null) return;
+      
+      if (!seasonsByNumber[season]) {
+        seasonsByNumber[season] = { seasonTorrents: [], episodeTorrents: [] };
+      }
+      
+      if (!torrent.parsed.episode) {
+        // This is a season torrent
+        seasonsByNumber[season].seasonTorrents.push(torrent);
+      } else {
+        // This is an episode torrent
+        seasonsByNumber[season].episodeTorrents.push(torrent);
+      }
+    });
+    
+    // Build filtered list: all season torrents, and episode torrents only for seasons without season torrents
+    filtered = [];
+    Object.keys(seasonsByNumber).sort((a, b) => Number(a) - Number(b)).forEach(seasonNum => {
+      const seasonData = seasonsByNumber[seasonNum];
+      if (seasonData.seasonTorrents.length > 0) {
+        // Season torrents exist, include all of them
+        filtered.push(...seasonData.seasonTorrents);
+      } else {
+        // No season torrents, include all episode torrents
+        filtered.push(...seasonData.episodeTorrents);
+      }
+    });
+  } else if (needed && needed.length > 0) {
     // Track which needed entries were matched
     const matchedNeeded = new Set();
     
@@ -322,7 +356,6 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
       }
     });
   }
-  
   // Sort torrents (apply to both loadall and regular cases)
   filtered.sort((a, b) => {
     // Skip sorting for dummy torrents (they stay at the end)

@@ -1,7 +1,2 @@
 
-in torrents.vue
-when using force button send ["force"] for needed instead of ["loadall"] and when no emby send ["noemby"] for needed 
-
-in search.js
-when needed == ["force"] don't use old loadall filtering and
-when needed == ["noemby"] use old loadall filtering
+in torrents pane and actors pane keep everything above the cards stuck to top of pane while scrolling

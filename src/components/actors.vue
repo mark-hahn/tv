@@ -96,48 +96,46 @@ export default {
         return;
       }
       
-      // Import and call getEpisode
+      // Call getTmdb to get guest actor list
       try {
-        const tvdb = await import('../tvdb.js');
-        const episodeData = await tvdb.getEpisode(this.showName, season, episode);
+        const srvr = await import('../srvr.js');
+        const params = {
+          showName: this.showName,
+          year: null,
+          season: season,
+          episode: episode
+        };
         
-        if (!episodeData) {
-          this.errorMessage = 'Episode not found';
-          return;
-        }
+        console.log('Calling getTmdb with:', params);
+        const guestActors = await srvr.getTmdb(params);
         
-        // Log to debug image paths
-        console.log('Episode data:', episodeData);
+        console.log('getTmdb result:', guestActors);
         
-        // Get Guest Star characters
-        const characters = episodeData.characters || [];
-        console.log('All characters:', characters);
-        const guestStars = characters.filter(char => char.peopleType === 'Guest Star');
-        console.log('Guest stars:', guestStars);
-        
-        if (guestStars.length === 0) {
+        if (!guestActors || guestActors.length === 0) {
           this.errorMessage = 'No guest stars found';
           this.actors = [];
           this.showingEpisodeActors = true;
           return;
         }
         
-        // Replace actors list with guest stars
-        this.actors = guestStars
-          .map(char => {
-            // Build full image URL from relative path
-            const imageUrl = char.personImgURL 
-              ? `https://artworks.thetvdb.com${char.personImgURL}`
+        console.log('Guest actors from TMDB:', guestActors);
+        
+        // Replace actors list with guest stars from TMDB
+        this.actors = guestActors
+          .map(actor => {
+            // Build full image URL from profile_path
+            const imageUrl = actor.profile_path 
+              ? `https://image.tmdb.org/t/p/w185${actor.profile_path}`
               : null;
             
             return {
-              name: null, // Don't show character name for episode actors
-              personName: char.personName,
+              name: actor.character, // Character name
+              personName: actor.name, // Actor name
               image: imageUrl,
               personImgURL: imageUrl,
-              url: char.url,
-              sort: char.sortOrder,
-              isFeatured: char.isFeatured,
+              url: null, // No URL from TMDB data
+              sort: actor.order,
+              isFeatured: false,
               hasImage: !!imageUrl
             };
           })
@@ -146,18 +144,15 @@ export default {
             if (a.hasImage !== b.hasImage) {
               return b.hasImage - a.hasImage; // true (1) before false (0)
             }
-            // Minor sort: isFeatured (true before false)
-            if (a.isFeatured !== b.isFeatured) {
-              return b.isFeatured - a.isFeatured; // true (1) before false (0)
-            }
-            return 0;
+            // Minor sort: by order
+            return a.sort - b.sort;
           });
         
         // Mark that we're showing episode actors
         this.showingEpisodeActors = true;
       } catch (error) {
-        console.error('Error fetching episode:', error);
-        this.errorMessage = 'Episode not found';
+        console.error('Error fetching episode actors:', error);
+        this.errorMessage = error.message || 'Episode not found';
       }
     },
 
@@ -407,22 +402,6 @@ export default {
       void this.$nextTick(async () => {
         console.log('actors.vue: $nextTick - calling prefillEpisodeInputs');
         await this.prefillEpisodeInputs();
-        
-        // Call getTmdb with show info and episode numbers
-        const srvr = await import('../srvr.js');
-        const params = {
-          showName: this.showName,
-          year: null, // TODO: extract year from show data if available
-          season: this.seasonNum || null,
-          episode: this.episodeNum || null
-        };
-        console.log('actors.vue: Calling getTmdb with:', params);
-        try {
-          const result = await srvr.getTmdb(params);
-          console.log('actors.vue: getTmdb result:', result);
-        } catch (error) {
-          console.error('actors.vue: getTmdb error:', error);
-        }
       });
     });
     

@@ -1,7 +1,12 @@
 
+sample episodeInfo is in sample-tmdb/episode.txt
 
-add src/tmdb.js. provide function getTmdb called with show name and year. return tmdb data for that show.
+get guestActorList from episodeInfo.guest_stars.  filter by "known_for_department" = "Acting"
 
-add getTmdb endpoint from client app in index.js
+for each actor in guestActorList log their object and call it actorInfo
 
-for now just log the args and return true
+use actorInfo.id as person_id and fetch image object from https://api.themoviedb.org/3/person/{person_id}/images.
+
+log image objects
+
+return episodeInfo as before

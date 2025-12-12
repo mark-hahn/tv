@@ -308,6 +308,12 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
       if (seasonData.seasonTorrents.length > 0) {
         // Season torrents exist, include all of them
         filtered.push(...seasonData.seasonTorrents);
+        
+        // Exception: for season 1, also include episode 1 torrents
+        if (Number(seasonNum) === 1) {
+          const s01e01Torrents = seasonData.episodeTorrents.filter(t => t.parsed.episode === 1);
+          filtered.push(...s01e01Torrents);
+        }
       } else {
         // No season torrents, include all episode torrents
         filtered.push(...seasonData.episodeTorrents);

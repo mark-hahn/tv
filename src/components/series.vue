@@ -29,30 +29,31 @@
     #topRight(style="display:flex; flex-direction:column; width:300px; margin-left:10px;")
       #infoBox(@click.stop="handleBodyClick"
                 :style="{ margin:'30px 0 7px 2px', width: sizing.seriesInfoWidth || '250px', fontSize: sizing.seriesInfoFontSize || '20px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column',textAlign:'center', fontWeight:'bold' }")
-        div(v-if="simpleMode" style="display:flex; gap:4px; justify-content:center; margin-bottom:10px;")
+        div(v-if="simpleMode" style="display:flex; gap:4px; justify-content:center; margin-bottom:5px; align-items:center;")
           textarea(
                   v-model="emailText"
                   @click.stop
                   rows="1"
                   placeholder="Email Mark"
-                  :style="{ width: sizing.emailWidth || '200px', padding:'5px', fontSize:'14px', border:'1.5px solid black', backgroundColor:'#eee', resize:'none' }")
+                  :style="{ width: sizing.emailWidth || '200px', padding:'5px', fontSize:'14px', border:'1.5px solid black', backgroundColor:'#eee', resize:'none', height:'32px', lineHeight:'1.2' }")
           div(v-if="notInEmby" 
-              style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; white-space:nowrap;") Not In Emby
-        #dates(v-html="dates"
-               v-if="dates.length > 0"
-               style="min-height:24px; margin-top:10px;")
-        #seasons(v-html="seasonsTxt"
-                 v-if="seasonsTxt.length > 0"
+              style="font-weight:bold; color:red; font-size:18px; margin-top:0; max-height:24px; white-space:nowrap;") Not In Emby
+        div(style="border:1px solid #ccc; border-radius:5px; padding:5px;")
+          #dates(v-html="dates"
+                 v-if="dates.length > 0"
                  style="min-height:24px;")
-        #cntrylang(v-if="cntryLangTxt.length > 0"
-                   v-html="cntryLangTxt"
-                   style="min-height:20px;")
-        #nextup(v-if="nextUpTxt.length > 0"
-                v-html="nextUpTxt"
-                style="min-height:32px;")
-        #collection(v-if="collectionName"
-                    style="min-height:24px;")
-          | Collection: {{collectionName}}
+          #seasons(v-html="seasonsTxt"
+                   v-if="seasonsTxt.length > 0"
+                   style="min-height:24px;")
+          #cntrylang(v-if="cntryLangTxt.length > 0"
+                     v-html="cntryLangTxt"
+                     style="min-height:20px;")
+          #nextup(v-if="nextUpTxt.length > 0"
+                  v-html="nextUpTxt"
+                  style="min-height:32px;")
+          #collection(v-if="collectionName"
+                      style="min-height:24px;")
+            | Collection: {{collectionName}}
 
   #allButtons(style="display:flex; flex-wrap:wrap; margin-top:15px; padding:0 10px; justify-content:space-around; width:100%;")
     div(v-if="showSpinner")

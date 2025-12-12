@@ -1,2 +1,26 @@
 
-in actors and torrents panes headers make background opaque and have padding on bottom
+in series pane add Map button to right of Delete button and move actors button in remotes list to right of Map button
+
+in map pane remove set date button, add series button and actors button to right of prune button --
+
+in actors button rename close button to Series and to right of series button add Map button
+
+add 10px to space between arrow buttons
+
+
+in series pane,
+ remove Actors button from remotes list and add Actors button to right of new Map button 
+
+ -- in map pane add Torrents button between prune and series
+
+ -- in actors pane,
+  move row 2 of the hdr to the left so that the left side of select button lines up with left side of series button and left side of Clear button lines up with left side of Map button
+
+ -- in torrents pane,
+  rename Close button to Series and add Map button to right of Series button
+
+
+
+
+
+

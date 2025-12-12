@@ -7,7 +7,8 @@
         | {{mapShow?.Name}}
       div(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" style="display:flex; gap:5px; flex-shrink:0;")
         button(@click.stop="$emit('prune', mapShow)" style="margin:5px;") Prune
-        button(@click.stop="$emit('set-date', mapShow)" style="margin:5px;") Set Date
+        button(@click.stop="$emit('series', mapShow)" style="margin:5px;") Series
+        button(@click.stop="$emit('actors', mapShow)" style="margin:5px;") Actors
 
     div(v-if="mapShow?.Id?.startsWith('noemby-')"
         style="font-weight:bold; color:red; font-size:18px; text-align:center; margin:20px;")

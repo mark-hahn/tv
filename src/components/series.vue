@@ -29,6 +29,9 @@
     button(v-if="!simpleMode"
             @click.stop="deleteClick"
             style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;") Delete
+    button(v-if="!simpleMode"
+            @click.stop="mapClick"
+            style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;") Map
   #body(style="display:flex; cursor:pointer;")
     #topLeft(@click.stop="handleBodyClick"
               style="display:flex; flex-direction:column; text-align:center;") 
@@ -56,15 +59,15 @@
     div(v-if="showSpinner")
       img(src="../../loading.gif"
           style="width:100px; height:100px; position:relative; top:20px; left:45px;")
-    div(v-if="!showSpinner && showRemotes"
-        @click.stop="actorsClick"
-        :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }")
-      | Actors
     div(v-if="showRemotes" 
         v-for="remote in remotes"
         @click.stop="remoteClick(remote)"
         :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }")
       | {{remote.name}}
+    div(v-if="!showSpinner && showRemotes"
+        @click.stop="actorsClick"
+        :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }")
+      | Actors
   
   #bot(:style="{ fontSize: sizing.overviewFontSize || '20px', padding:'10px' }") {{show.Overview}}
 
@@ -172,6 +175,10 @@ export default {
 
     torrentsClick() {
       evtBus.emit('showTorrentsPane', this.show);
+    },
+
+    mapClick() {
+      evtBus.emit('showMapPane', this.show);
     },
 
     actorsClick() {

@@ -4,10 +4,11 @@
   #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'15px', display:'flex', flexDirection:'column', gap:'18px' }")
     div(style="display:flex; justify-content:space-between; align-items:center;")
       div(style="margin-left:20px;") {{ showName }}
-      div(style="display:flex; gap:15px; align-items:center; margin-right:20px;")
+      div(style="display:flex; gap:25px; align-items:center; margin-right:20px;")
         button(v-if="seasonNum && episodeNum" @click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ◄
-        button(v-if="seasonNum && episodeNum" @click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:10px;") ►
-        button(@click.stop="$emit('close')" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") Close
+        button(v-if="seasonNum && episodeNum" @click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ►
+        button(@click.stop="$emit('series')" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") Series
+        button(@click.stop="$emit('map')" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") Map
     div(style="display:flex; align-items:center; gap:8px; justify-content:flex-end; font-weight:normal;")
       label(style="font-size:14px; margin-left:auto;") Season
       input(v-model="seasonNum" @click.stop @keyup.enter="handleSelectClick" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")

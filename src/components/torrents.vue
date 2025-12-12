@@ -21,10 +21,7 @@
         button(@click.stop="loadTorrents" :disabled="loading" style="padding:8px 20px; font-size:13px; font-weight:bold; cursor:pointer; border-radius:5px; background:#4CAF50; color:white; border:none; width:100%;") 
           | {{ loading ? 'Loading...' : 'Load Torrents' }}
 
-    #tracker-counts(v-if="!loading && !error && torrents.length > 0" style="position:sticky; top:0; zIndex:50; padding:5px 20px 10px 20px; margin-bottom:10px; font-size:13px; color:#555; background:#f0f0f0; border-radius:4px;")
-      span(v-for="(count, tracker) in trackerCounts" :key="tracker" style="margin-right:20px;")
-        strong {{ tracker }}:
-        |  {{ count }} result{{ count !== 1 ? 's' : '' }}
+    
 
     #loading(v-if="loading" style="text-align:center; color:#666; margin-top:50px; font-size:16px;")
       div Searching for torrents...

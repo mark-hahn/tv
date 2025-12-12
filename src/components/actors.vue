@@ -1,10 +1,10 @@
 <template lang="pug">
 #actors(@click="handleActorsClick" :style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
 
-  #header(:style="{ position:'sticky', top:0, zIndex:10, backgroundColor:'#fafafa', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'15px', display:'flex', flexDirection:'column', gap:'18px' }")
+  #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'15px', display:'flex', flexDirection:'column', gap:'18px' }")
     div(style="display:flex; justify-content:space-between; align-items:center;")
       div(style="margin-left:20px;") {{ showName }}
-      div(style="display:flex; gap:15px; align-items:center;")
+      div(style="display:flex; gap:15px; align-items:center; margin-right:20px;")
         button(v-if="seasonNum && episodeNum" @click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ◄
         button(v-if="seasonNum && episodeNum" @click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:10px;") ►
         button(@click.stop="$emit('close')" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") Close

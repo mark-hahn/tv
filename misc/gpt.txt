@@ -1,2 +1,2 @@
 
-in torrents pane and actors pane keep everything above the cards stuck to top of pane while scrolling
+in actors and torrents panes headers make background opaque and have padding on bottom

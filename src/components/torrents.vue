@@ -2,14 +2,14 @@
 .torrents-container(@click="handleClose" :style="{ height:'100%', width:'100%', display:'flex', justifyContent:'flex-start' }")
   #torrents(@click="handleClose" :style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
 
-    #header(:style="{ position:'sticky', top:0, zIndex:10, backgroundColor:'#fafafa', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'15px', display:'flex', justifyContent:'space-between', alignItems:'center' }")
+    #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'15px', display:'flex', justifyContent:'space-between', alignItems:'center' }")
       div(style="margin-left:20px;") {{ showName }}
-      div(style="display:flex; gap:10px;")
+      div(style="display:flex; gap:10px; margin-right:20px;")
         button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px; background:#4CAF50; color:white; border:none;") Download
         button(v-if="noTorrentsNeeded" @click.stop="forceLoadTorrents" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px; background:#2196F3; color:white; border:none;") Force
         button(@click.stop="handleClose" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Close
 
-    #cookie-inputs(@click.stop v-if="!loading && !noTorrentsNeeded && (error || torrents.length === 0)" style="position:sticky; top:0; zIndex:9; padding:15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
+    #cookie-inputs(@click.stop v-if="!loading && !noTorrentsNeeded && (error || torrents.length === 0)" style="position:sticky; top:0; zIndex:50; padding:15px 20px 15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
       div(style="margin-bottom:10px;")
         label(style="display:block; font-size:12px; font-weight:bold; margin-bottom:3px; color:#555;") IPTorrents cf_clearance:
         input(v-model="iptCfClearance" type="text" placeholder="Paste cf_clearance cookie value" style="width:100%; padding:6px; font-size:12px; border:1px solid #ccc; border-radius:3px; box-sizing:border-box;")
@@ -20,7 +20,7 @@
         button(@click.stop="loadTorrents" :disabled="loading" style="padding:8px 20px; font-size:13px; font-weight:bold; cursor:pointer; border-radius:5px; background:#4CAF50; color:white; border:none; width:100%;") 
           | {{ loading ? 'Loading...' : 'Load Torrents' }}
 
-    #tracker-counts(v-if="!loading && !error && torrents.length > 0" style="position:sticky; top:0; zIndex:9; padding:5px 20px; margin-bottom:10px; font-size:13px; color:#555; background:#f0f0f0; border-radius:4px;")
+    #tracker-counts(v-if="!loading && !error && torrents.length > 0" style="position:sticky; top:0; zIndex:50; padding:5px 20px 10px 20px; margin-bottom:10px; font-size:13px; color:#555; background:#f0f0f0; border-radius:4px;")
       span(v-for="(count, tracker) in trackerCounts" :key="tracker" style="margin-right:20px;")
         strong {{ tracker }}:
         |  {{ count }} result{{ count !== 1 ? 's' : '' }}

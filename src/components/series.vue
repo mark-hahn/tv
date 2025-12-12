@@ -32,6 +32,9 @@
     button(v-if="!simpleMode"
             @click.stop="mapClick"
             style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;") Map
+    button(v-if="!simpleMode"
+            @click.stop="actorsClick"
+            style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;") Actors
   #body(style="display:flex; cursor:pointer;")
     #topLeft(@click.stop="handleBodyClick"
               style="display:flex; flex-direction:column; text-align:center;") 
@@ -64,10 +67,6 @@
         @click.stop="remoteClick(remote)"
         :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }")
       | {{remote.name}}
-    div(v-if="!showSpinner && showRemotes"
-        @click.stop="actorsClick"
-        :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }")
-      | Actors
   
   #bot(:style="{ fontSize: sizing.overviewFontSize || '20px', padding:'10px' }") {{show.Overview}}
 
@@ -178,7 +177,7 @@ export default {
     },
 
     mapClick() {
-      evtBus.emit('showMapPane', this.show);
+      evtBus.emit('mapAction', { action: 'open', show: this.show });
     },
 
     actorsClick() {

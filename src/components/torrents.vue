@@ -7,7 +7,8 @@
       div(style="display:flex; gap:10px; margin-right:20px;")
         button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px; background:#4CAF50; color:white; border:none;") Download
         button(v-if="noTorrentsNeeded" @click.stop="forceLoadTorrents" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px; background:#2196F3; color:white; border:none;") Force
-        button(@click.stop="handleClose" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Close
+        button(@click.stop="$emit('series')" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Series
+        button(@click.stop="handleMapButton" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Map
 
     #cookie-inputs(@click.stop v-if="!loading && !noTorrentsNeeded && (error || torrents.length === 0)" style="position:sticky; top:0; zIndex:50; padding:15px 20px 15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
       div(style="margin-bottom:10px;")
@@ -118,6 +119,14 @@ export default {
       this.showModal = false;
       this.clickedTorrents.clear();
       this.$emit('close');
+    },
+
+    handleMapButton() {
+      const show = this.currentShow;
+      if (show) {
+        const evt = (async () => (await import('../evtBus.js')).default)();
+        evt.then(bus => bus.emit('mapAction', { action: 'open', show }));
+      }
     },
 
     async searchTorrents(show) {

@@ -24,6 +24,9 @@
     @set-date="handleMapAction('date', $event)"
     @close="handleMapAction('close')"
     @show-actors="() => handleShowActors(true)"
+    @series="handleActorsClose"
+    @actors="() => handleShowActors(false)"
+    @torrents="() => handleShowTorrents(mapShow)"
     @episode-click="handleEpisodeClick"
   )
   Actors(
@@ -31,12 +34,16 @@
     :simpleMode="simpleMode"
     :sizing="simpleMode ? sizing : sizingNonSimple"
     @close="handleActorsClose"
+    @series="handleActorsClose"
+    @map="() => { if (currentShow) { evtBus.emit('mapAction', { action: 'open', show: currentShow }); } }"
   )
   Torrents(
     v-show="currentPane === 'torrents'"
     :simpleMode="simpleMode"
     :sizing="simpleMode ? sizing : sizingNonSimple"
     @close="handleTorrentsClose"
+    @series="handleTorrentsClose"
+    @map="() => { if (currentShow) { evtBus.emit('mapAction', { action: 'open', show: currentShow }); } }"
   )
 </template>
 
@@ -200,6 +207,12 @@ export default {
     
     evtBus.on('showTorrentsPane', (show) => {
       this.handleShowTorrents(show);
+    });
+
+    // Map navigation is centralized through list.vue via mapAction('open')
+
+    evtBus.on('showSeriesPane', () => {
+      this.handleActorsClose();
     });
     
     // Close torrents or actors pane when a different show is selected

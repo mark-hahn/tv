@@ -4,18 +4,18 @@
   #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'15px', display:'flex', flexDirection:'column', gap:'18px' }")
     div(style="display:flex; justify-content:space-between; align-items:center;")
       div(style="margin-left:20px;") {{ showName }}
-      div(style="display:flex; gap:25px; align-items:center; margin-right:20px;")
-        button(v-if="seasonNum && episodeNum" @click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ◄
+      div(style="display:flex; gap:12px; align-items:center; margin-right:20px;")
+        button(v-if="seasonNum && episodeNum" @click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:5px;") ◄
         button(v-if="seasonNum && episodeNum" @click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ►
         button(@click.stop="$emit('series')" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") Series
-        button(@click.stop="$emit('map')" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") Map
-    div(style="display:flex; align-items:center; gap:8px; justify-content:flex-end; font-weight:normal;")
-      label(style="font-size:14px; margin-left:auto;") Season
+        button(@click.stop="handleMapButton" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:60px;") Map
+    div(style="display:flex; align-items:center; gap:12px; justify-content:flex-end; margin-right:20px; font-weight:normal;")
+      label(style="font-size:14px;") Season
       input(v-model="seasonNum" @click.stop @keyup.enter="handleSelectClick" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
       label(style="font-size:14px; margin-left:5px;") Episode
       input(v-model="episodeNum" @click.stop @keyup.enter="handleSelectClick" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
       button(@click.stop="handleSelectClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") Select
-      button(@click.stop="handleClearClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") Clear
+      button(@click.stop="handleClearClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:60px;") Clear
   
   #error-message(v-if="errorMessage"
                  style="text-align:center; color:red; margin-top:50px; font-size:16px;")
@@ -73,6 +73,14 @@ export default {
     handleActorsClick() {
       // Click anywhere in actors pane to go back to series pane
       this.$emit('close');
+    },
+
+    handleMapButton() {
+      const show = this.currentShow;
+      if (show) {
+        const evt = (async () => (await import('../evtBus.js')).default)();
+        evt.then(bus => bus.emit('mapAction', { action: 'open', show }));
+      }
     },
 
     async handleSelectClick() {

@@ -52,3 +52,12 @@ in samples-emby/showlist.json
 
     https://github.com/grantholle/moviedb-promise
     
+
+https://api.themoviedb.org/3/movie/550?api_key=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzMjcxOTJhMzM0ZGE3MDBmNjViODgyYzdhNjljYjkyNyIsIm5iZiI6MTc2NTQ5MzI4OC42MDE5OTk4LCJzdWIiOiI2OTNiNGEyODFiYjg2MTU5OWM2ZWMxOGQiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.EiT0uJf1aqDv2RXZnYNAjuywc_4aFLteVPGxZBKfgwI
+
+    curl --request GET \
+     --url 'https://api.themoviedb.org/3/search/tv?query=mom&include_adult=true&language=en-US&page=1&year=2013' \
+     --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzMjcxOTJhMzM0ZGE3MDBmNjViODgyYzdhNjljYjkyNyIsIm5iZiI6MTc2NTQ5MzI4OC42MDE5OTk4LCJzdWIiOiI2OTNiNGEyODFiYjg2MTU5OWM2ZWMxOGQiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzMjcxOTJhMzM0ZGE3MDBmNjViODgyYzdhNjljYjkyNyIsIm5iZiI6MTc2NTQ5MzI4OC42MDE5OTk4LCJzdWIiOiI2OTNiNGEyODFiYjg2MTU5OWM2ZWMxOGQiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.EiT0uJf1aqDv2RXZnYNAjuywc_4aFLteVPGxZBKfgwI' \
+     --header 'accept: application/json'
+
+https://api.themoviedb.org/3/movie/550?api_key=327192a334da700f65b882c7a69cb927

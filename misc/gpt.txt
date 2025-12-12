@@ -1,9 +1,6 @@
 
+getTmdb function now returns Guest actor list with images. see sample-tmdb/actor-list.txt
 
+when episode is selected in actors pane, call getTmdb and use the returned actor list instead of whatever was being used.
 
-add link to remote server getTmdb function in srvr.js.  it accepts an object arg { showName, year, season, episode } and returns true for success;
-
-when actors pane is opened call getTmdb with 
-{showName: torrent.parsed.title, year: torrent.parsed.year, season: ss, episode: ee }. where ss and ee are values going into  input boxes. year and ss and ee might be null
-
-ignore results for now
+for each actor use profile_path to get image to show

@@ -400,13 +400,29 @@ export default {
   mounted() {
     console.log('actors.vue: mounted');
     
-    evtBus.on('showActors', (tvdbData) => {
-      console.log('actors.vue: showActors event received, tvdbData:', tvdbData);
-      this.updateActors(tvdbData);
+    evtBus.on('showActors', (data) => {
+      console.log('actors.vue: showActors event received, tvdbData:', data);
+      this.updateActors(data);
       // Pre-fill episode inputs after actors are loaded
-      this.$nextTick(() => {
+      void this.$nextTick(async () => {
         console.log('actors.vue: $nextTick - calling prefillEpisodeInputs');
-        this.prefillEpisodeInputs();
+        await this.prefillEpisodeInputs();
+        
+        // Call getTmdb with show info and episode numbers
+        const srvr = await import('../srvr.js');
+        const params = {
+          showName: this.showName,
+          year: null, // TODO: extract year from show data if available
+          season: this.seasonNum || null,
+          episode: this.episodeNum || null
+        };
+        console.log('actors.vue: Calling getTmdb with:', params);
+        try {
+          const result = await srvr.getTmdb(params);
+          console.log('actors.vue: getTmdb result:', result);
+        } catch (error) {
+          console.error('actors.vue: getTmdb error:', error);
+        }
       });
     });
     

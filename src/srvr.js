@@ -192,3 +192,6 @@ export function getActorPage(params)
 
 export function sendEmail(emailData)    
             {return fCall('sendEmail', emailData)}
+
+export function getTmdb(params)
+            {return fCall('getTmdb', params)}

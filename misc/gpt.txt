@@ -4,4 +4,5 @@ add images object for each guest actor as the property "images" to their actorIn
 
 only log guestActorList with all actorInfo objects
 
-don't change return results
+ return guestActorList with all actorInfo objects as results
+ 

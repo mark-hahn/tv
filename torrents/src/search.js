@@ -348,13 +348,6 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
       
       return false;
     });
-    
-    // Add dummy torrents for unmatched needed entries
-    needed.forEach(entry => {
-      if (entry !== 'loadall' && !matchedNeeded.has(entry)) {
-        filtered.push({ notorrent: entry });
-      }
-    });
   }
   // Sort torrents (apply to both loadall and regular cases)
   filtered.sort((a, b) => {

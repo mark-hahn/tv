@@ -1,12 +1,7 @@
 
-sample episodeInfo is in sample-tmdb/episode.txt
 
-get guestActorList from episodeInfo.guest_stars.  filter by "known_for_department" = "Acting"
+add images object for each guest actor as the property "images" to their actorInfo object.
 
-for each actor in guestActorList log their object and call it actorInfo
+only log guestActorList with all actorInfo objects
 
-use actorInfo.id as person_id and fetch image object from https://api.themoviedb.org/3/person/{person_id}/images.
-
-log image objects
-
-return episodeInfo as before
+don't change return results

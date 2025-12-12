@@ -58,6 +58,27 @@ export async function getTmdb(id, param, resolve, reject) {
     
     console.log('[tmdb] Episode info:', episodeInfo);
     
+    // Get guest actors (filter by known_for_department === "Acting")
+    const guestActorList = episodeInfo.guest_stars?.filter(
+      actor => actor.known_for_department === "Acting"
+    ) || [];
+    
+    console.log(`[tmdb] Found ${guestActorList.length} guest actors`);
+    
+    // Fetch images for each guest actor
+    for (const actorInfo of guestActorList) {
+      console.log('[tmdb] Actor info:', actorInfo);
+      
+      try {
+        const personImages = await moviedb.personImages({
+          id: actorInfo.id
+        });
+        console.log(`[tmdb] Images for ${actorInfo.name}:`, personImages);
+      } catch (error) {
+        console.error(`[tmdb] Failed to fetch images for ${actorInfo.name}:`, error.message);
+      }
+    }
+    
     resolve([id, episodeInfo]);
     
   } catch (error) {

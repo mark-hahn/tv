@@ -39,10 +39,10 @@
         div No torrents found
       div(v-for="(torrent, index) in torrents" :key="index" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
         div(v-if="isClicked(torrent)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
-        div(v-if="SHOW_TITLE" style="font-size:12px; color:#888; margin-bottom:4px;") {{ torrent.raw.title }}
+        div(v-if="SHOW_TITLE && torrent.raw" style="font-size:12px; color:#888; margin-bottom:4px;") {{ torrent.raw.title }}
         div(style="font-size:18px; color:#333;") 
           strong {{ getDisplaySeasonEpisode(torrent) }}
-          | : {{ torrent.raw.size }}, {{ torrent.raw.seeds }} seeds<span v-if="torrent.raw.provider">, {{ formatProvider(torrent.raw.provider) }}</span><span v-if="torrent.parsed.resolution">, {{ torrent.parsed.resolution }}</span><span v-if="torrent.parsed.group">, {{ formatGroup(torrent.parsed.group) }}</span>
+          | : {{ torrent.raw?.size || 'N/A' }}, {{ torrent.raw?.seeds || 0 }} seeds<span v-if="torrent.raw?.provider">, {{ formatProvider(torrent.raw.provider) }}</span><span v-if="torrent.parsed?.resolution">, {{ torrent.parsed.resolution }}</span><span v-if="torrent.parsed?.group">, {{ formatGroup(torrent.parsed.group) }}</span>
 
   #download-modal(v-if="showModal" @click.stop="showModal = false" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:10000;")
     #modal-content(@click.stop style="background:white; padding:30px; border-radius:10px; max-width:500px; box-shadow:0 4px 20px rgba(0,0,0,0.3);")

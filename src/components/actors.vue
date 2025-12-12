@@ -398,6 +398,11 @@ export default {
     evtBus.on('showActors', (data) => {
       console.log('actors.vue: showActors event received, tvdbData:', data);
       this.updateActors(data);
+      
+      // Reset to series actors view
+      this.showingEpisodeActors = false;
+      this.errorMessage = '';
+      
       // Pre-fill episode inputs after actors are loaded
       void this.$nextTick(async () => {
         console.log('actors.vue: $nextTick - calling prefillEpisodeInputs');

@@ -6,17 +6,6 @@
        :style="{ display:'flex', justifyContent:'space-between', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'2px' }")
     div(style="margin-left:20px; flex:1;") {{show.Name}}
     
-    div(v-if="simpleMode" style="display:flex; gap:4px;")
-      textarea(
-              v-model="emailText"
-              @click.stop
-              rows="1"
-              placeholder="Email Mark"
-              :style="{ width: sizing.emailWidth || '200px', padding:'5px', fontSize:'14px', border:'1.5px solid black', backgroundColor:'#eee', resize:'none' }")
-      
-      div(v-if="notInEmby" 
-          style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; white-space:nowrap;") Not In Emby
-    
     div(v-if="!simpleMode && notInEmby" 
         style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px;") Not In Emby
                 
@@ -29,11 +18,9 @@
     button(v-if="!simpleMode"
             @click.stop="deleteClick"
             style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;") Delete
-    button(v-if="!simpleMode"
-            @click.stop="mapClick"
+    button(@click.stop="mapClick"
             style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;") Map
-    button(v-if="!simpleMode"
-            @click.stop="actorsClick"
+    button(@click.stop="actorsClick"
             style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;") Actors
   #body(style="display:flex; cursor:pointer;")
     #topLeft(@click.stop="handleBodyClick"
@@ -42,6 +29,15 @@
     #topRight(style="display:flex; flex-direction:column; width:300px; margin-left:10px;")
       #infoBox(@click.stop="handleBodyClick"
                 :style="{ margin:'30px 0 7px 2px', width: sizing.seriesInfoWidth || '250px', fontSize: sizing.seriesInfoFontSize || '20px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column',textAlign:'center', fontWeight:'bold' }")
+        div(v-if="simpleMode" style="display:flex; gap:4px; justify-content:center; margin-bottom:10px;")
+          textarea(
+                  v-model="emailText"
+                  @click.stop
+                  rows="1"
+                  placeholder="Email Mark"
+                  :style="{ width: sizing.emailWidth || '200px', padding:'5px', fontSize:'14px', border:'1.5px solid black', backgroundColor:'#eee', resize:'none' }")
+          div(v-if="notInEmby" 
+              style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; white-space:nowrap;") Not In Emby
         #dates(v-html="dates"
                v-if="dates.length > 0"
                style="min-height:24px; margin-top:10px;")

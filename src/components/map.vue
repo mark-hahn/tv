@@ -5,9 +5,9 @@
     div(style="margin:0 5px; display:flex; justify-content:space-between; align-items:center;")
       div(:style="{ marginLeft:'20px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px' }")
         | {{mapShow?.Name}}
-      div(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" style="display:flex; gap:5px; flex-shrink:0;")
-        button(@click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Prune
-        button(@click.stop="$emit('torrents', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Torrents
+      div(v-if="!mapShow?.Id?.startsWith('noemby-')" style="display:flex; gap:5px; flex-shrink:0;")
+        button(v-if="!simpleMode" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Prune
+        button(v-if="!simpleMode" @click.stop="$emit('torrents', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Torrents
         button(@click.stop="$emit('series', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Series
         button(@click.stop="$emit('actors', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Actors
 

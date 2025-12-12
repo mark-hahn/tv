@@ -492,6 +492,15 @@ export default {
         console.log('No parsed data for torrent:', torrent);
         return torrent.title || '';
       }
+
+      // If this torrent represents a season range, show "start-end"
+      if (torrent.seasonRange && torrent.seasonRange.isRange) {
+        const start = Number(torrent.seasonRange.startSeason);
+        const end = Number(torrent.seasonRange.endSeason);
+        if (!Number.isNaN(start) && !Number.isNaN(end) && end >= start) {
+          return `${start}-${end}`;
+        }
+      }
       
       // Log what we're working with
       // console.log('Torrent display data:', {

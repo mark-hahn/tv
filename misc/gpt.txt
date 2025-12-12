@@ -1,2 +1,6 @@
 
 
+torrent objects returned from normalize now have the seasonRange property,  when there are multiple seasons in a torrent like "(S01-S02)", seasonRange is: { startSeason: 1, endSeason: 2, fullMatch: 'S01-S02', isRange: true }
+and a seasonRange of null if there are not multiple seasons
+
+-- in calculateNeeded, if seasonRange is not null then ignore parsed.season and parsed.episode and check torrent against map once for each season between startSeason and endSeason inclusively. include all seasons that pass check

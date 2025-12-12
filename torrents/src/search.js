@@ -222,8 +222,11 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   });
   
   // Filter out torrents without season information (movies, etc.)
+  // Allow season-range torrents through even if parsed.season is missing
   const tvOnly = matches.filter(torrent => {
-    return torrent.parsed.season !== undefined && torrent.parsed.season !== null;
+    const hasSeason = torrent.parsed.season !== undefined && torrent.parsed.season !== null;
+    const hasSeasonRange = !!torrent.seasonRange?.isRange;
+    return hasSeason || hasSeasonRange;
   });
   
   // Filter by year if show name contains a year
@@ -371,6 +374,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     // Filter torrents based on needed array
     filtered = filtered2.filter(torrent => {
       const { season, episode } = torrent.parsed;
+      const range = torrent.seasonRange;
       
       // Skip if resolution exists but is not 1080 or 720
       if (torrent.parsed.resolution) {
@@ -380,7 +384,23 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
         }
       }
       
-      // Check if it's a season or episode torrent
+      // Handle season range torrents: ignore parsed season/episode and match any season in range
+      if (range && range.isRange) {
+        const start = Number(range.startSeason);
+        const end = Number(range.endSeason);
+        if (!Number.isNaN(start) && !Number.isNaN(end) && end >= start) {
+          for (let s = start; s <= end; s++) {
+            const seasonStr = `S${String(s).padStart(2, '0')}`;
+            if (needed.includes(seasonStr)) {
+              matchedNeeded.add(seasonStr);
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      // Non-range: Check if it's a season or episode torrent
       if (!episode) {
         // Season torrent - check if Sxx is in needed
         const seasonStr = `S${String(season).padStart(2, '0')}`;

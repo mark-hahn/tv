@@ -1,10 +1,35 @@
-import ptt from 'parse-torrent-title';
+import parseTorrentTitle from 'parse-torrent-title';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/**
+ * Extract season range from title (e.g., S01-S02, S1-S5)
+ * @param {string} title - Torrent title
+ * @returns {Object|null} Object with startSeason, endSeason, and fullMatch, or null if not found
+ */
+function extractSeasonRange(title) {
+  // Match patterns like S01-S02, S1-S5, s01-s10, etc.
+  const rangePattern = /s(\d{1,2})-s(\d{1,2})/i;
+  const match = title.match(rangePattern);
+  
+  if (match) {
+    const startSeason = parseInt(match[1], 10);
+    const endSeason = parseInt(match[2], 10);
+    
+    return {
+      startSeason,
+      endSeason,
+      fullMatch: match[0],
+      isRange: true
+    };
+  }
+  
+  return null;
+}
 
 /**
  * Extract release group from title if parser missed it
@@ -60,7 +85,12 @@ function extractGroup(title) {
 export function normalize(torrent, showName) {
   // Trim the title to handle trailing spaces
   const trimmedTitle = torrent.title.trim();
-  const parsed = ptt.parse(trimmedTitle);
+  const parsed = parseTorrentTitle.parse(trimmedTitle);
+  
+  // Extract season range if present
+  const seasonRange = extractSeasonRange(trimmedTitle);
+  
+  console.log('parseTorrentTitle:', {trimmedTitle, parsed, seasonRange});
   let groupSrc = 'parse';
   let group = null;
   
@@ -127,6 +157,7 @@ export function normalize(torrent, showName) {
   
   return {
     parsed,
+    seasonRange,
     group,
     groupSrc,
     nameMatch,

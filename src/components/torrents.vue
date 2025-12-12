@@ -121,11 +121,11 @@ export default {
       this.$emit('close');
     },
 
-    handleMapButton() {
+    async handleMapButton() {
       const show = this.currentShow;
       if (show) {
-        const evt = (async () => (await import('../evtBus.js')).default)();
-        evt.then(bus => bus.emit('mapAction', { action: 'open', show }));
+        const bus = await import('../evtBus.js');
+        bus.default.emit('mapAction', { action: 'open', show });
       }
     },
 

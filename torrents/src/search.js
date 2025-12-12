@@ -7,8 +7,8 @@ import { normalize } from './normalize.js';
 const TorrentSearchApi = (await import('torrent-search-api')).default;
 
 const SAVE_SAMPLE_TORRENTS = false;
-const DUMP_NEEDED          = false;
-const SAVE_ALL_RAW         = false;
+const DUMP_NEEDED          = true;
+const SAVE_ALL_RAW         = true;
 
 // Load cookies from files
 function loadCookiesArray(filename) {

@@ -1,3 +1,2 @@
 
 
- in simple mode the map pane is missing the series and actors buttons

@@ -28,14 +28,14 @@
       #poster(style="margin-left:30px;")  
     #topRight(style="display:flex; flex-direction:column; width:300px; margin-left:10px;")
       #infoBox(@click.stop="handleBodyClick"
-                :style="{ margin:'30px 0 7px 2px', width: sizing.seriesInfoWidth || '250px', fontSize: sizing.seriesInfoFontSize || '20px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column',textAlign:'center', fontWeight:'bold' }")
+                :style="{ margin:'5px 0 7px 2px', width: sizing.seriesInfoWidth || '250px', fontSize: sizing.seriesInfoFontSize || '20px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column',textAlign:'center', fontWeight:'bold' }")
         div(v-if="simpleMode" style="display:flex; gap:4px; justify-content:center; margin-bottom:5px; align-items:center;")
           textarea(
                   v-model="emailText"
                   @click.stop
                   rows="1"
                   placeholder="Email Mark"
-                  :style="{ width: sizing.emailWidth || '200px', padding:'5px', fontSize:'14px', border:'1.5px solid black', backgroundColor:'#eee', resize:'none', height:'32px', lineHeight:'1.2' }")
+                  :style="{ width: sizing.emailWidth || '200px', padding:'5px', fontSize:'14px', border:'1.5px solid black', backgroundColor:'#eee', resize:'none', height:'16px', lineHeight:'1.2' }")
           div(v-if="notInEmby" 
               style="font-weight:bold; color:red; font-size:18px; margin-top:0; max-height:24px; white-space:nowrap;") Not In Emby
         div(style="border:1px solid #ccc; border-radius:5px; padding:5px;")

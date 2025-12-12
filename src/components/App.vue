@@ -129,6 +129,7 @@ export default {
       this.seriesMapSeasons = data.seriesMapSeasons;
       this.seriesMapEpis = data.seriesMapEpis;
       this.seriesMap = data.seriesMap;
+      console.log('Map pane opened - seriesMap:', this.seriesMap);
       this.currentPane = data.mapShow !== null ? 'map' : 'series';
       evtBus.emit('paneChanged', this.currentPane);
     },

@@ -1,6 +1,1 @@
 
-getTmdb function now returns Guest actor list with images. see sample-tmdb/actor-list.txt
-
-when episode is selected in actors pane, call getTmdb and use the returned actor list instead of whatever was being used.
-
-for each actor use profile_path to get image to show

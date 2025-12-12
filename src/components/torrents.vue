@@ -58,6 +58,7 @@
 <script>
 import evtBus from '../evtBus.js';
 import * as emby from '../emby.js';
+import * as util from '../util.js';
 import { config } from '../config.js';
 
 export default {

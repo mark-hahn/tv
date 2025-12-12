@@ -106,10 +106,7 @@ export default {
           episode: episode
         };
         
-        console.log('Calling getTmdb with:', params);
         const guestActors = await srvr.getTmdb(params);
-        
-        console.log('getTmdb result:', guestActors);
         
         if (!guestActors || guestActors.length === 0) {
           this.errorMessage = 'No guest stars found';
@@ -117,8 +114,6 @@ export default {
           this.showingEpisodeActors = true;
           return;
         }
-        
-        console.log('Guest actors from TMDB:', guestActors);
         
         // Replace actors list with guest stars from TMDB
         this.actors = guestActors
@@ -151,7 +146,6 @@ export default {
         // Mark that we're showing episode actors
         this.showingEpisodeActors = true;
       } catch (error) {
-        console.error('Error fetching episode actors:', error);
         this.errorMessage = error.message || 'Episode not found';
       }
     },
@@ -210,7 +204,7 @@ export default {
           await this.handleSelectClick();
         }
       } catch (error) {
-        console.error('handleLeftArrow error:', error);
+        // Silently ignore errors
       }
     },
 
@@ -259,18 +253,15 @@ export default {
           await this.handleSelectClick();
         }
       } catch (error) {
-        console.error('handleRightArrow error:', error);
+        // Silently ignore errors
       }
     },
 
     async prefillEpisodeInputs() {
-      console.log('prefillEpisodeInputs: Starting for show:', this.showName);
-      
       // Strategy 1: Check if currently playing show matches selected show
       try {
         const srvr = await import('../srvr.js');
         const devices = await srvr.getDevices();
-        console.log('prefillEpisodeInputs: devices:', devices);
         
         // Find a device playing the current show (prioritize chromecast)
         let playingDevice = devices.find(d => d.deviceName === 'chromecast' && d.showName === this.showName);
@@ -279,58 +270,46 @@ export default {
         }
         
         if (playingDevice && playingDevice.seasonNumber && playingDevice.episodeNumber) {
-          console.log('prefillEpisodeInputs: Found playing show:', playingDevice);
           this.seasonNum = String(playingDevice.seasonNumber);
           this.episodeNum = String(playingDevice.episodeNumber);
           return;
         }
       } catch (error) {
-        console.error('prefillEpisodeInputs: Error checking playing show:', error);
         // Continue to strategy 2
       }
       
       // Strategy 2: Use seriesMap to find first unwatched episode
       try {
         if (!this.currentShow) {
-          console.log('prefillEpisodeInputs: No currentShow object available');
           return;
         }
         
         const emby = await import('../emby.js');
         const util = await import('../util.js');
         
-        console.log('prefillEpisodeInputs: Fetching seriesMap for show:', this.currentShow.Name);
         const seriesMapIn = await emby.getSeriesMap(this.currentShow);
-        console.log('prefillEpisodeInputs: seriesMapIn:', seriesMapIn);
         
         if (!seriesMapIn || seriesMapIn.length === 0) {
-          console.log('prefillEpisodeInputs: No seriesMapIn data, leaving empty');
           return; // Leave empty (strategy 3)
         }
         
         const seriesMap = util.buildSeriesMap(seriesMapIn);
-        console.log('prefillEpisodeInputs: seriesMap:', seriesMap);
         
         if (!seriesMap) {
-          console.log('prefillEpisodeInputs: buildSeriesMap returned null, leaving empty');
           return; // Leave empty (strategy 3)
         }
         
         // Find first episode that is available and not played
         const seasons = Object.keys(seriesMap).sort((a, b) => Number(a) - Number(b));
-        console.log('prefillEpisodeInputs: Seasons:', seasons);
         
         for (const seasonNum of seasons) {
           const episodes = seriesMap[seasonNum];
           const episodeNums = Object.keys(episodes).sort((a, b) => Number(a) - Number(b));
-          console.log(`prefillEpisodeInputs: Season ${seasonNum}, episodes:`, episodeNums);
           
           for (const episodeNum of episodeNums) {
             const epiObj = episodes[episodeNum];
-            console.log(`prefillEpisodeInputs: S${seasonNum}E${episodeNum}:`, { avail: epiObj.avail, played: epiObj.played });
             
             if (epiObj.avail && !epiObj.played) {
-              console.log(`prefillEpisodeInputs: Found unwatched episode S${seasonNum}E${episodeNum}`);
               this.seasonNum = seasonNum;
               this.episodeNum = episodeNum;
               return;
@@ -338,19 +317,14 @@ export default {
           }
         }
         
-        console.log('prefillEpisodeInputs: No unwatched episode found, leaving empty');
         // If no unwatched episode found, leave empty (strategy 3)
       } catch (error) {
-        console.error('prefillEpisodeInputs: Error:', error);
         // Leave empty (strategy 3)
       }
     },
 
     updateActors(data) {
-      console.log('actors.vue: updateActors called with:', data);
-      
       if (!data) {
-        console.log('actors.vue: updateActors - no data');
         this.actors = [];
         this.showName = '';
         this.currentShow = null;
@@ -364,7 +338,6 @@ export default {
       // Handle both formats: direct data or wrapped in response.data
       const actualData = tvdbData.response?.data || tvdbData;
       this.showName = actualData?.name || '';
-      console.log('actors.vue: updateActors - showName set to:', this.showName, 'currentShow:', this.currentShow);
       
       const characters = actualData?.characters;
       
@@ -393,10 +366,7 @@ export default {
   },
 
   mounted() {
-    console.log('actors.vue: mounted');
-    
     evtBus.on('showActors', (data) => {
-      console.log('actors.vue: showActors event received, tvdbData:', data);
       this.updateActors(data);
       
       // Reset to series actors view
@@ -405,13 +375,11 @@ export default {
       
       // Pre-fill episode inputs after actors are loaded
       void this.$nextTick(async () => {
-        console.log('actors.vue: $nextTick - calling prefillEpisodeInputs');
         await this.prefillEpisodeInputs();
       });
     });
     
     evtBus.on('fillAndSelectEpisode', (episodeInfo) => {
-      console.log('actors.vue: fillAndSelectEpisode event received:', episodeInfo);
       // Fill the input boxes
       this.seasonNum = String(episodeInfo.seasonNumber);
       this.episodeNum = String(episodeInfo.episodeNumber);

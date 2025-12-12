@@ -278,8 +278,53 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   // Filter and sort based on needed array
   let filtered = filtered2;
   const isLoadAll = needed && needed.includes('loadall');
+  const isNoEmby = needed && needed.includes('noemby');
+  const isForce = needed && needed.includes('force');
   
-  if (isLoadAll) {
+  if (isNoEmby) {
+    // For noemby, return all season torrents and episode torrents for seasons without a season torrent
+    const seasonsByNumber = {};
+    
+    // Group torrents by season
+    filtered2.forEach(torrent => {
+      const season = torrent.parsed.season;
+      if (season === undefined || season === null) return;
+      
+      if (!seasonsByNumber[season]) {
+        seasonsByNumber[season] = { seasonTorrents: [], episodeTorrents: [] };
+      }
+      
+      if (!torrent.parsed.episode) {
+        // This is a season torrent
+        seasonsByNumber[season].seasonTorrents.push(torrent);
+      } else {
+        // This is an episode torrent
+        seasonsByNumber[season].episodeTorrents.push(torrent);
+      }
+    });
+    
+    // Build filtered list: all season torrents, and episode torrents only for seasons without season torrents
+    filtered = [];
+    Object.keys(seasonsByNumber).sort((a, b) => Number(a) - Number(b)).forEach(seasonNum => {
+      const seasonData = seasonsByNumber[seasonNum];
+      if (seasonData.seasonTorrents.length > 0) {
+        // Season torrents exist, include all of them
+        filtered.push(...seasonData.seasonTorrents);
+        
+        // Exception: for season 1, also include episode 1 torrents
+        if (Number(seasonNum) === 1) {
+          const s01e01Torrents = seasonData.episodeTorrents.filter(t => t.parsed.episode === 1);
+          filtered.push(...s01e01Torrents);
+        }
+      } else {
+        // No season torrents, include all episode torrents
+        filtered.push(...seasonData.episodeTorrents);
+      }
+    });
+  } else if (isForce) {
+    // For force, return all torrents without filtering
+    filtered = filtered2;
+  } else if (isLoadAll) {
     // For loadall, return all season torrents and episode torrents for seasons without a season torrent
     const seasonsByNumber = {};
     

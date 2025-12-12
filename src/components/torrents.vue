@@ -152,7 +152,7 @@ export default {
       
       // If not in Emby, return special marker
       if (!show || !show.Id || show.Id.startsWith('noemby-')) {
-        return ['loadall'];
+        return ['noemby'];
       }
       
       try {
@@ -365,8 +365,8 @@ export default {
     },
 
     async forceLoadTorrents() {
-      // Force load all torrents by sending 'loadall' marker
-      await this.loadTorrents(['loadall']);
+      // Force load all torrents by sending 'force' marker
+      await this.loadTorrents(['force']);
     },
 
     handleTorrentClick(event, torrent) {

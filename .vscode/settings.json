@@ -2,5 +2,33 @@
   "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact", "vue"],
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit"
-  }
+  },
+  "restoreTerminals.runOnStartup": true,
+  "restoreTerminals.terminals": [
+    {
+      "splitTerminals": [
+        {
+          "name": "PS",
+          "commands": [],
+        }
+      ]
+    },
+    {
+       "splitTerminals": [
+         {
+           "name": "client",
+           "commands": ["wsl -d Ubuntu"]
+         }
+       ]
+     },
+     {
+       "splitTerminals": [
+         {
+           "name": "Server",
+           "commands": ["wsl -d Ubuntu"],
+         }
+       ]
+     }
+   ],
+   "terminal.integrated.scrollback": 3000
 }

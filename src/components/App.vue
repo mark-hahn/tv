@@ -54,6 +54,7 @@ import Map      from './map.vue';
 import Actors   from './actors.vue';
 import Torrents from './torrents.vue';
 import evtBus   from '../evtBus.js';
+import * as tvdb from '../tvdb.js';
 
 export default {
   name: "App",
@@ -228,6 +229,18 @@ export default {
       this.currentShow = data.show;
       this.currentTvdbData = data.tvdbData;
     });
+
+    // Optional test has been silenced to avoid console noise
+    // (Leave for manual debugging by uncommenting if needed)
+    // (async () => {
+    //   try {
+    //     const testShow = { Name: 'Ghosts (US)' };
+    //     const seriesMap = await tvdb.getSeriesMap(testShow);
+    //     // console.log('tvdb.getSeriesMap test full for "Ghosts (US)":', seriesMap);
+    //   } catch (err) {
+    //     console.error('tvdb.getSeriesMap test failed:', err);
+    //   }
+    // })();
   },
 }
 </script>

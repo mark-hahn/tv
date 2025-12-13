@@ -1,0 +1,940 @@
+[
+  [
+    1,
+    [
+      [
+        1,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        2,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        3,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        4,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        5,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        6,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        7,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        8,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        9,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        10,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        11,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        12,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        13,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        14,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        15,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        16,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        17,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        18,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ]
+    ]
+  ],
+  [
+    2,
+    [
+      [
+        1,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        2,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        3,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        4,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        5,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        6,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        7,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        8,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        9,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        10,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        11,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        12,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        13,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        14,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        15,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        16,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        17,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        18,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        19,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        20,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        21,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        22,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ]
+    ]
+  ],
+  [
+    3,
+    [
+      [
+        1,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        2,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        3,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        4,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        5,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        6,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        7,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        8,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        9,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        10,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ]
+    ]
+  ],
+  [
+    4,
+    [
+      [
+        1,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        2,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        3,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        4,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        5,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        6,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        7,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        8,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        9,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        10,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        11,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        12,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        13,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        14,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        15,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        16,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        17,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        18,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        19,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        20,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        21,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        22,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ]
+    ]
+  ],
+  [
+    5,
+    [
+      [
+        1,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        2,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        3,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        4,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        5,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        6,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        7,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        8,
+        {
+          "error": false,
+          "played": false,
+          "avail": true,
+          "noFile": true,
+          "unaired": false,
+          "deleted": false
+        }
+      ],
+      [
+        9,
+        {
+          "error": false,
+          "played": false,
+          "avail": false,
+          "noFile": true,
+          "unaired": true,
+          "deleted": false
+        }
+      ],
+      [
+        10,
+        {
+          "error": false,
+          "played": false,
+          "avail": false,
+          "noFile": true,
+          "unaired": true,
+          "deleted": false
+        }
+      ],
+      [
+        11,
+        {
+          "error": false,
+          "played": false,
+          "avail": false,
+          "noFile": true,
+          "unaired": true,
+          "deleted": false
+        }
+      ]
+    ]
+  ]
+]

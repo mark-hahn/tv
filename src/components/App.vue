@@ -18,6 +18,7 @@
     :seriesMapSeasons="seriesMapSeasons"
     :seriesMapEpis="seriesMapEpis"
     :seriesMap="seriesMap"
+    :mapError="mapError"
     :simpleMode="simpleMode"
     :sizing="simpleMode ? sizing : sizingNonSimple"
     @prune="handleMapAction('prune', $event)"
@@ -70,6 +71,7 @@ export default {
       seriesMapSeasons: [],
       seriesMapEpis: [],
       seriesMap: {},
+      mapError: '',
       // TABLET SIZING CONFIGURATION - SIMPLE MODE - Tweak these values
       sizing: {
         // List pane
@@ -137,7 +139,8 @@ export default {
       this.seriesMapSeasons = data.seriesMapSeasons;
       this.seriesMapEpis = data.seriesMapEpis;
       this.seriesMap = data.seriesMap;
-      console.log('Map pane opened - seriesMap:', this.seriesMap);
+      this.mapError = data.mapError || '';
+      console.log('Map pane opened - seriesMap:', this.seriesMap, 'error:', this.mapError);
       this.currentPane = data.mapShow !== null ? 'map' : 'series';
       evtBus.emit('paneChanged', this.currentPane);
     },

@@ -831,8 +831,20 @@ export default {
       const seriesMapSeasons = [];
       const seriesMapEpis    = [];
       const seriesMap        = {};
-      const seriesMapIn = 
+      let errorMessage = '';
+      
+      let seriesMapIn = 
           await emby.getSeriesMap(show, action == 'prune');
+      
+      // If emby has no data, try tvdb as fallback
+      if (!seriesMapIn || seriesMapIn.length === 0) {
+        seriesMapIn = await tvdb.getSeriesMap(show);
+        if (!seriesMapIn || seriesMapIn.length === 0) {
+          errorMessage = 'Not in emby and show not found in TVDB.';
+          seriesMapIn = []; // Keep empty for error display
+        }
+      }
+      
       for(const season of seriesMapIn) {
         const [seasonNum, episodes] = season;
         seriesMapSeasons[seasonNum] = seasonNum;
@@ -865,7 +877,8 @@ export default {
         hideMapBottom: this.hideMapBottom,
         seriesMapSeasons: this.seriesMapSeasons,
         seriesMapEpis: this.seriesMapEpis,
-        seriesMap: this.seriesMap
+        seriesMap: this.seriesMap,
+        mapError: errorMessage
       });
     },
 

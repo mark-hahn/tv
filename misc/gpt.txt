@@ -1,13 +1,3 @@
 
 
-add function getSeriesMap(show) to tvdb.js.  it uses same input and returns same output as emby.getSeriesMap(show) but is accesses tvdb instead of emby.
-
-it should call srchTvdbData with show name as search string.
-
-it should scan the returned data array and find the the first matching show using the same type of logic that normalize uses. 
-
-it should use the show data to make more requests to tvdb until it gets all the season and episode data needed to return seriesMap.
-
-as a test at app.vue onmounted call tvdb.getSeriesMap with input "Mom" and log the results.
-
-it will not be used anywhere else for now.
+when loading map pane if there is no emby use tvdb.getSeriesMap() instead and if there isn't any from there say "Not in emby and show not found in TVDB." in center of pane

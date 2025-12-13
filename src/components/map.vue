@@ -1,7 +1,11 @@
 <template lang="pug">
 #map(@click="handleMapClick" :style="{ height:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', backgroundColor:'#ffe', overflowY:'auto', overflowX:'auto', maxWidth:'100%', width: sizing.mapWidth || '450px', boxSizing:'border-box' }")
 
-  div(v-if="!hideMapBottom")
+  div(v-if="mapError && Object.keys(seriesMap).length === 0"
+      style="display:flex; align-items:center; justify-content:center; height:100%; width:100%; font-size:20px; font-weight:bold; color:red; text-align:center; padding:20px;")
+    | {{mapError}}
+
+  div(v-else-if="!hideMapBottom")
     div(style="margin:0 5px; display:flex; justify-content:space-between; align-items:center;")
       div(:style="{ marginLeft:'20px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px' }")
         | {{mapShow?.Name}}
@@ -77,6 +81,10 @@ export default {
     seriesMap: {
       type: Object,
       default: () => ({})
+    },
+    mapError: {
+      type: String,
+      default: ''
     },
     simpleMode: {
       type: Boolean,

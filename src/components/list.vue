@@ -313,9 +313,7 @@ export default {
       sortChoices:          
         ['Alpha', 'Viewed', 'Added', 'Ratings', 'Size'],
       fltrChoices:
-        ['All', 'Ready', 'Drama', 'To-Try', 
-         'Try Drama', 'Continue', 'Download', 
-         'Mark', 'Linda', 'Finished'],
+        ['All', 'Try Drama', 'Download', 'Finished'],
       conds: [ {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],
           cond(show)  { return !show.NotReady },

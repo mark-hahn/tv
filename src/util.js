@@ -293,55 +293,6 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.hasemby  =  0;
       break;
 
-    case 'Ready': 
-      tmp.unplayed =  1;
-      tmp.gap      =  0;
-      tmp.waiting  =  0;
-      tmp.drama    =  0;
-      tmp.foreign  =  0;
-      tmp.totry    =  0;
-      tmp.continue =  0;
-      tmp.mark     =  0;
-      tmp.linda    =  0;
-      tmp.favorite =  1;
-      tmp.ban      = -1;
-      tmp.pickup   =  0;
-      tmp.hasemby  =  1;
-      break;
-
-    case 'Drama': 
-      tmp.foreign  =  0;
-      tmp.unplayed =  1;
-      tmp.gap      =  0;
-      tmp.waiting  =  0;
-      tmp.drama    =  1;
-      tmp.foreign  =  0;
-      tmp.totry    =  0;
-      tmp.continue =  0;
-      tmp.mark     =  0;
-      tmp.linda    =  0;
-      tmp.favorite =  1;
-      tmp.ban      = -1;
-      tmp.pickup   =  0;
-      tmp.hasemby  =  1;
-      break;
-
-    case 'To-Try': 
-      tmp.unplayed =  1;
-      tmp.gap      =  0;
-      tmp.waiting  =  0;
-      tmp.drama    =  0;
-      tmp.foreign  =  0;
-      tmp.totry    =  1;
-      tmp.continue =  0;
-      tmp.mark     =  0;
-      tmp.linda    =  0;
-      tmp.favorite =  0;
-      tmp.ban      = -1;
-      tmp.pickup   =  0;
-      tmp.hasemby  =  1;
-      break;
-
     case 'Try Drama': 
       tmp.foreign  =  0;
       tmp.unplayed =  1;
@@ -405,38 +356,6 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.ban      = -1;
       tmp.pickup   =  0;
       tmp.hasemby  =  0;
-      break;
-
-    case 'Mark': 
-      tmp.unplayed =  1;
-      tmp.gap      =  0;
-      tmp.waiting  =  0;
-      tmp.drama    =  0;
-      tmp.foreign  =  0;
-      tmp.totry    =  0;
-      tmp.continue =  0;
-      tmp.mark     =  1;
-      tmp.linda    =  0;
-      tmp.favorite = -1;
-      tmp.ban      = -1;
-      tmp.pickup   =  0;
-      tmp.hasemby  =  1;
-      break;
-
-    case 'Linda': 
-      tmp.unplayed =  1;
-      tmp.gap      =  0;
-      tmp.waiting  =  0;
-      tmp.drama    =  0;
-      tmp.foreign  =  0;
-      tmp.totry    =  0;
-      tmp.continue =  0;
-      tmp.mark     =  0;
-      tmp.linda    =  1;
-      tmp.favorite = -1;
-      tmp.ban      = -1;
-      tmp.pickup   =  0;
-      tmp.hasemby  =  1;
       break;
   }
   for(const condName in tmp) {

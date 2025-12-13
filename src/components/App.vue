@@ -233,17 +233,18 @@ export default {
       this.currentTvdbData = data.tvdbData;
     });
 
-    // Optional test has been silenced to avoid console noise
-    // (Leave for manual debugging by uncommenting if needed)
-    // (async () => {
-    //   try {
-    //     const testShow = { Name: 'Ghosts (US)' };
-    //     const seriesMap = await tvdb.getSeriesMap(testShow);
-    //     // console.log('tvdb.getSeriesMap test full for "Ghosts (US)":', seriesMap);
-    //   } catch (err) {
-    //     console.error('tvdb.getSeriesMap test failed:', err);
-    //   }
-    // })();
+    // Test tvdb.getSeriesMap with Clone High (2023) to debug plus/minus contradiction
+    (async () => {
+      try {
+        const testShow = { Name: 'Clone High (2023)' };
+        const seriesMap = await tvdb.getSeriesMap(testShow);
+        const summary = seriesMap.map(([season, eps]) => ({ season, count: eps.length }));
+        console.log('Clone High (2023) tvdb map - summary:', summary);
+        console.log('Clone High (2023) tvdb map - full:', seriesMap);
+      } catch (err) {
+        console.error('Clone High (2023) tvdb.getSeriesMap test failed:', err);
+      }
+    })();
   },
 }
 </script>

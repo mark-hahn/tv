@@ -3,8 +3,10 @@ reminder, restore ...
   start gap running
 
 bugs ...
+  loading from web broken
 
 todo ...
+  show dates in map
   add tv guide
   sort by waiting date
   keep deleted date forever

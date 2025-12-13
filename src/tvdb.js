@@ -51,6 +51,7 @@ export const srchTvdbData = async (searchStr) => {
     return null;
   }
   const srchResObj = await srchRes.json();
+  console.log('srchTvdbData:', {searchStr, srchResObj});
   const data = srchResObj.data;
   if(!data || data.length == 0) return null;
   return data;

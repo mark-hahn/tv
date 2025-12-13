@@ -1,6 +1,13 @@
 
 
-torrent objects returned from normalize now have the seasonRange property,  when there are multiple seasons in a torrent like "(S01-S02)", seasonRange is: { startSeason: 1, endSeason: 2, fullMatch: 'S01-S02', isRange: true }
-and a seasonRange of null if there are not multiple seasons
+add function getSeriesMap(show) to tvdb.js.  it uses same input and returns same output as emby.getSeriesMap(show) but is accesses tvdb instead of emby.
 
--- in calculateNeeded, if seasonRange is not null then ignore parsed.season and parsed.episode and check torrent against map once for each season between startSeason and endSeason inclusively. include all seasons that pass check
+it should call srchTvdbData with show name as search string.
+
+it should scan the returned data array and find the the first matching show using the same type of logic that normalize uses. 
+
+it should use the show data to make more requests to tvdb until it gets all the season and episode data needed to return seriesMap.
+
+as a test at app.vue onmounted call tvdb.getSeriesMap with input "Mom" and log the results.
+
+it will not be used anywhere else for now.

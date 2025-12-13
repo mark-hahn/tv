@@ -945,6 +945,12 @@ export default {
           if(finished) filteredShows.push(show);
           continue;
         }
+        // Special-case Download filter: exclude pure WatchGap entries; allow FileGap or eligible noemby only
+        if (this.fltrChoice === 'Download') {
+          const downloadEligible = (show.FileGap ||
+            (show.Id.startsWith('noemby-') && !show.S1E1Unaired)) && !show.BlockedGap;
+          if (!downloadEligible) continue;
+        }
         if (srchStrLc && 
            !show.Name.toLowerCase().includes(srchStrLc)) continue;
         for (let cond of this.conds) {

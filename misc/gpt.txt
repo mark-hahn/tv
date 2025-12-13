@@ -1,13 +1,2 @@
 
-
-in beginning of addGapToShow after this line:       
-const {showId, progress, notReady, anyWatched,
-             watchGap, watchGapSeason, watchGapEpisode, 
-             fileEndError, seasonWatchedThenNofile,
-             fileGap,  fileGapSeason,  fileGapEpisode}
-                          = event.data;
-then if watchGap or fileGap are true then then call tvdb.getSeriesMap and if season 1 episode 1 in map is unaired then set FileGap and WatchGap to false before continuing
-
-
-"Small Prophets"  is noemby so this gap logic won't  work for it -- 
-
+remove ready, drama, to-try, continue, mark, linda from filter list in list.vue

@@ -8,24 +8,16 @@ todo ...
   add tv guide
   sort by waiting date
   keep deleted date forever
-  keep all map info for deleted shows
+  get drama field from tvdb (as many fields as possible)
 
 non-simple:
   
 simple ...
   
 tabled ...
-  laptop play doesn't start
   show episode being watched (next up line)
-  changing shows doesn't update map
-  remote buttons hop when map opened
   not in emby doesn't show waiting
-  changing map doesn't change gaps
   button: scroll hilighted row to vis 
   refresh filtered rows when new gap loaded
-  thumbnails have wrong language (Wedding Season)
   up/dn arrows
-  show last episode date in map (each season?)
-  emby with no files and has pickup, set to noemby
-  get drama field from tvdb (as many fields as possible)
   hover hints over cond icons

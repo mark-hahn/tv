@@ -12,6 +12,11 @@
         button(@click.stop="handleMapButton" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Map
 
     #cookie-inputs(@click.stop v-if="!loading && !noTorrentsNeeded && (isCookieRelatedError || showCookieInputs)" style="position:sticky; top:0; zIndex:50; padding:15px 20px 15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
+      
+    #unaired(v-if="unaired" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
+      div Show not aired yet
+      
+    #cookie-inputs(@click.stop v-if="!unaired && !loading && !noTorrentsNeeded && (isCookieRelatedError || showCookieInputs)" style="position:sticky; top:0; zIndex:50; padding:15px 20px 15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
       div(style="margin-bottom:10px;")
         label(style="display:block; font-size:12px; font-weight:bold; margin-bottom:3px; color:#555;") IPTorrents cf_clearance:
         input(v-model="iptCfClearance" type="text" placeholder="Paste cf_clearance cookie value" style="width:100%; padding:6px; font-size:12px; border:1px solid #ccc; border-radius:3px; box-sizing:border-box;")
@@ -24,18 +29,18 @@
 
     
 
-    #loading(v-if="loading" style="text-align:center; color:#666; margin-top:50px; font-size:16px;")
+    #loading(v-if="!unaired && loading" style="text-align:center; color:#666; margin-top:50px; font-size:16px;")
       div Searching for torrents...
       
-    #error(v-if="error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px; white-space:pre-line; padding:0 20px;")
+    #error(v-if="!unaired && error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px; white-space:pre-line; padding:0 20px;")
       div Error: {{ error }}
-    #warning(v-if="!error && providerWarning" style="text-align:center; color:#b36b00; margin-top:20px; font-size:14px; white-space:pre-line; padding:0 20px;")
+    #warning(v-if="!unaired && !error && providerWarning" style="text-align:center; color:#b36b00; margin-top:20px; font-size:14px; white-space:pre-line; padding:0 20px;")
       div {{ providerWarning }}
       
-    #no-torrents-needed(v-if="noTorrentsNeeded && !loading && !error" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
+    #no-torrents-needed(v-if="!unaired && noTorrentsNeeded && !loading && !error" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
       div No torrents needed.
       
-    #torrents-list(v-if="!loading && !noTorrentsNeeded" style="padding:10px; font-size:14px; line-height:1.6;")
+    #torrents-list(v-if="!unaired && !loading && !noTorrentsNeeded" style="padding:10px; font-size:14px; line-height:1.6;")
       div(v-if="torrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
         div No torrents found
       div(v-for="(torrent, index) in torrents" :key="index" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
@@ -92,7 +97,8 @@ export default {
       showModal: false,  // Show download confirmation modal
       clickedTorrents: new Set(),  // Track which torrents have been clicked
       noTorrentsNeeded: false,  // Flag when needed array is empty
-      showCookieInputs: false  // Manual toggle for cookie input boxes
+      showCookieInputs: false,  // Manual toggle for cookie input boxes
+      unaired: false
     };
   },
 
@@ -158,6 +164,15 @@ export default {
       this.selectedTorrent = null;
       this.clickedTorrents.clear();
       this.noTorrentsNeeded = false;
+      this.providerWarning = '';
+      this.loading = false;
+      this.unaired = !!(show?.S1E1Unaired || show?.S01E01Unaired);
+      if (this.unaired) {
+        // Short-circuit: show only the unaired message
+        this.currentShow = show;
+        this.showName = show?.Name || '';
+        return;
+      }
       
       // Store the show for later use with Load button
       this.currentShow = show;

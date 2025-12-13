@@ -1,3 +1,13 @@
 
 
-when loading map pane if there is no emby use tvdb.getSeriesMap() instead and if there isn't any from there say "Not in emby and show not found in TVDB." in center of pane
+in beginning of addGapToShow after this line:       
+const {showId, progress, notReady, anyWatched,
+             watchGap, watchGapSeason, watchGapEpisode, 
+             fileEndError, seasonWatchedThenNofile,
+             fileGap,  fileGapSeason,  fileGapEpisode}
+                          = event.data;
+then if watchGap or fileGap are true then then call tvdb.getSeriesMap and if season 1 episode 1 in map is unaired then set FileGap and WatchGap to false before continuing
+
+
+"Small Prophets"  is noemby so this gap logic won't  work for it -- 
+

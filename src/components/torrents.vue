@@ -166,7 +166,7 @@ export default {
       this.noTorrentsNeeded = false;
       this.providerWarning = '';
       this.loading = false;
-      this.unaired = !!(show?.S1E1Unaired || show?.S01E01Unaired);
+      this.unaired = !!show?.S1E1Unaired;
       if (this.unaired) {
         // Short-circuit: show only the unaired message
         this.currentShow = show;

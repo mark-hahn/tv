@@ -1,3 +1,5 @@
+# run this every time tv-series-client/torrents is updated
 
-npm i
-pm2 restart torrents-server || pm2 start src/server.js --name torrents-server
+cd /root/dev/apps/tv-series-client/torrents
+npm install
+pm2 restart torrents-server || pm2 start src/server.js --nametorrents-server

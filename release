@@ -1,23 +1,26 @@
 #!/bin/bash
-# Build in PowerShell (not WSL) to avoid rollup issues
+echo ""
+echo ">>>> Build in PowerShell (not WSL) to avoid rollup issues"
 powershell.exe -Command "cd C:\Users\mark\apps\tv-series-client; npm run build-vite"
 
-# Deploy client
+echo ""
+echo ">>>> Deploy client"
 rsync -av --delete \
       -e "ssh -i $HOME/.ssh/id_rsa -o IdentitiesOnly=yes" \
       /mnt/c/Users/mark/apps/tv-series-client/shows/       \
       root@hahnca.com:/root/dev/apps/tv-series-client/shows
 
-# Deploy torrents server
+echo ""
+echo ">>>> Deploy torrents server"
 rsync -av --delete \
       --exclude 'node_modules' \
       -e "ssh -i $HOME/.ssh/id_rsa -o IdentitiesOnly=yes" \
       /mnt/c/Users/mark/apps/tv-series-client/torrents/    \
       root@hahnca.com:/root/dev/apps/tv-series-client/torrents
 
+
 echo ""
-echo "=== Deployment complete ==="
-echo "On server, run:"
-echo "  cd /root/dev/apps/tv-series-client/torrents"
-echo "  npm install"
-echo "  pm2 restart torrents-server || pm2 start src/server.js --name torrents-server"
+echo ">>>> Run torrents release steps on remote server"
+ssh -i $HOME/.ssh/id_rsa -o IdentitiesOnly=yes root@hahnca.com \
+      'bash -lc "export NVM_DIR=\"\$HOME/.nvm\"; [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\"; nvm use --lts >/dev/null 2>&1 || true; cd /root/dev/apps/tv-series-client/torrents; npm install; pm2 restart torrents-server || pm2 start src/server.js --name torrents-server"'
+

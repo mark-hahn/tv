@@ -39,6 +39,9 @@
 <script>
 import Actor from './actor.vue';
 import evtBus from '../evtBus.js';
+import * as emby from '../emby.js';
+import * as util from '../util.js';
+import * as srvr from '../srvr.js';
 
 export default {
   name: "Actors",
@@ -78,8 +81,7 @@ export default {
     handleMapButton() {
       const show = this.currentShow;
       if (show) {
-        const evt = (async () => (await import('../evtBus.js')).default)();
-        evt.then(bus => bus.emit('mapAction', { action: 'open', show }));
+        evtBus.emit('mapAction', { action: 'open', show });
       }
     },
 
@@ -107,7 +109,6 @@ export default {
       
       // Call getTmdb to get guest actor list
       try {
-        const srvr = await import('../srvr.js');
         const params = {
           showName: this.showName,
           year: null,
@@ -174,9 +175,6 @@ export default {
       }
 
       try {
-        const emby = await import('../emby.js');
-        const util = await import('../util.js');
-        
         const seriesMapIn = await emby.getSeriesMap(this.currentShow);
         if (!seriesMapIn || seriesMapIn.length === 0) {
           return;
@@ -223,9 +221,6 @@ export default {
       }
 
       try {
-        const emby = await import('../emby.js');
-        const util = await import('../util.js');
-        
         const seriesMapIn = await emby.getSeriesMap(this.currentShow);
         if (!seriesMapIn || seriesMapIn.length === 0) {
           return;
@@ -269,7 +264,6 @@ export default {
     async prefillEpisodeInputs() {
       // Strategy 1: Check if currently playing show matches selected show
       try {
-        const srvr = await import('../srvr.js');
         const devices = await srvr.getDevices();
         
         // Find a device playing the current show (prioritize chromecast)
@@ -292,9 +286,6 @@ export default {
         if (!this.currentShow) {
           return;
         }
-        
-        const emby = await import('../emby.js');
-        const util = await import('../util.js');
         
         const seriesMapIn = await emby.getSeriesMap(this.currentShow);
         

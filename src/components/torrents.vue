@@ -149,11 +149,10 @@ export default {
       this.showCookieInputs = !this.showCookieInputs;
     },
 
-    async handleMapButton() {
+    handleMapButton() {
       const show = this.currentShow;
       if (show) {
-        const bus = await import('../evtBus.js');
-        bus.default.emit('mapAction', { action: 'open', show });
+        evtBus.emit('mapAction', { action: 'open', show });
       }
     },
 

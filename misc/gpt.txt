@@ -1,2 +1,3 @@
 
-remove ready, drama, to-try, continue, mark, linda from filter list in list.vue
+at end of release script 
+run /root/dev/apps/tv-series-srvr/release script at hahnca.com server using ssh

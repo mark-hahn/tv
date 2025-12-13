@@ -323,8 +323,9 @@ export const getSeriesMap = async (show) => {
       seasonMap[seasonNum] = [];
     }
     
-    // Compute only unaired using aired date; avail is always false since noFile=true
+    // Compute unaired/avail using aired date if present
     let unaired = true;
+    let avail = false;
     if (epData.aired) {
       try {
         const airedDate = new Date(epData.aired);
@@ -333,17 +334,19 @@ export const getSeriesMap = async (show) => {
         const airedYMD = new Date(airedDate.getFullYear(), airedDate.getMonth(), airedDate.getDate());
         const todayYMD = new Date(today.getFullYear(), today.getMonth(), today.getDate());
         unaired = airedYMD > todayYMD;
+        avail = !unaired;
       } catch(e) {
-        unaired = false; // Default to aired if date parse fails
+        unaired = false;
+        avail = true;
       }
     }
 
     seasonMap[seasonNum].push([episodeNum, {
       error: false,
       played: false,      // tvdb doesn't track watch status
-      avail: false,       // Always false: tvdb provides no file info (noFile=true)
+      avail: avail,
       noFile: true,       // tvdb provides no file info
-      unaired: unaired,   // Only useful flag: based on aired date vs today
+      unaired: unaired,
       deleted: false
     }]);
   }

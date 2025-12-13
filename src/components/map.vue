@@ -34,6 +34,9 @@
           style="display:inline-block; margin 3px 10px")
         | {{'Waiting ' + mapShow?.WaitStr}}
 
+    div(v-if="datesLine" :style="{ fontSize: sizing.seriesInfoFontSize || '20px', fontWeight:'bold', margin:'10px 5px 5px 5px', paddingLeft:'5px' }")
+      | {{datesLine}}
+
     table(style="padding:0 5px; font-size:16px; margin-top:10px;" )
      tbody
       tr(style="font-weight:bold;")
@@ -58,6 +61,8 @@
 </template>
 
 <script>
+import * as tvdb from '../tvdb.js';
+
 export default {
   name: "Map",
 
@@ -98,13 +103,49 @@ export default {
 
   data() {
     return {
-      seasonStates: {} // Track original state for each season
+      seasonStates: {}, // Track original state for each season
+      tvdbData: null,
+      allTvdb: null
     };
+  },
+
+  computed: {
+    datesLine() {
+      if (!this.tvdbData) return '';
+      const { firstAired, lastAired, status } = this.tvdbData;
+      return ` ${firstAired || ''} ${lastAired || ''} ${status || ''}`;
+    }
+  },
+
+  watch: {
+    async mapShow(newShow) {
+      if (newShow && newShow.Name) {
+        await this.loadTvdbData();
+      }
+    }
   },
 
   emits: ['prune', 'set-date', 'close', 'episode-click', 'show-actors'],
 
+  async mounted() {
+    if (this.mapShow && this.mapShow.Name) {
+      await this.loadTvdbData();
+    }
+  },
+
   methods: {
+    async loadTvdbData() {
+      try {
+        if (!this.allTvdb) {
+          this.allTvdb = await tvdb.getAllTvdb();
+        }
+        if (this.mapShow && this.mapShow.Name) {
+          this.tvdbData = this.allTvdb[this.mapShow.Name];
+        }
+      } catch (err) {
+        console.error('loadTvdbData error:', err);
+      }
+    },
     handleMapClick(event) {
       event.stopPropagation();
       // Instead of closing, emit show-actors to rotate to actors pane

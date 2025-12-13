@@ -6,8 +6,7 @@ bugs ...
 
 todo ...
   don't try to load torrents for unaired shows
-  "The Seven Dials Mystery" doesn't match tvdb
-    tvdb has "Agatha Christie’s Seven Dials"
+  
   add tv guide
   sort by waiting date
   keep deleted date forever

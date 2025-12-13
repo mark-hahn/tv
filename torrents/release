@@ -1,4 +1,0 @@
-
- cd /root/dev/apps/tv-series-client/torrents
-  npm install
-  pm2 restart torrents-server || pm2 start src/server.js --name torrents-server

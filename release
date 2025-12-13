@@ -5,6 +5,7 @@ powershell.exe -Command "cd C:\Users\mark\apps\tv-series-client; npm run build-v
 
 echo ""
 echo ">>>> Deploy client"
+echo ""
 rsync -av --delete \
       -e "ssh -i $HOME/.ssh/id_rsa -o IdentitiesOnly=yes" \
       /mnt/c/Users/mark/apps/tv-series-client/shows/       \
@@ -12,6 +13,7 @@ rsync -av --delete \
 
 echo ""
 echo ">>>> Deploy torrents server"
+echo ""
 rsync -av --delete \
       --exclude 'node_modules' \
       -e "ssh -i $HOME/.ssh/id_rsa -o IdentitiesOnly=yes" \

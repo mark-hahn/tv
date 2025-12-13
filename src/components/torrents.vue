@@ -7,10 +7,11 @@
       div(style="display:flex; gap:10px; margin-right:20px;")
         button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px; background:#4CAF50; color:white; border:none;") Download
         button(v-if="noTorrentsNeeded" @click.stop="forceLoadTorrents" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px; background:#2196F3; color:white; border:none;") Force
+        button(@click.stop="toggleCookieInputs" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Cookies
         button(@click.stop="$emit('series')" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Series
         button(@click.stop="handleMapButton" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Map
 
-    #cookie-inputs(@click.stop v-if="!loading && !noTorrentsNeeded && (error || torrents.length === 0)" style="position:sticky; top:0; zIndex:50; padding:15px 20px 15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
+    #cookie-inputs(@click.stop v-if="!loading && !noTorrentsNeeded && (isCookieRelatedError || showCookieInputs)" style="position:sticky; top:0; zIndex:50; padding:15px 20px 15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
       div(style="margin-bottom:10px;")
         label(style="display:block; font-size:12px; font-weight:bold; margin-bottom:3px; color:#555;") IPTorrents cf_clearance:
         input(v-model="iptCfClearance" type="text" placeholder="Paste cf_clearance cookie value" style="width:100%; padding:6px; font-size:12px; border:1px solid #ccc; border-radius:3px; box-sizing:border-box;")
@@ -26,14 +27,16 @@
     #loading(v-if="loading" style="text-align:center; color:#666; margin-top:50px; font-size:16px;")
       div Searching for torrents...
       
-    #error(v-if="error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px;")
+    #error(v-if="error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px; white-space:pre-line; padding:0 20px;")
       div Error: {{ error }}
+    #warning(v-if="!error && providerWarning" style="text-align:center; color:#b36b00; margin-top:20px; font-size:14px; white-space:pre-line; padding:0 20px;")
+      div {{ providerWarning }}
       
     #no-torrents-needed(v-if="noTorrentsNeeded && !loading && !error" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
       div No torrents needed.
       
-    #torrents-list(v-if="!loading && !error && !noTorrentsNeeded" style="padding:10px; font-size:14px; line-height:1.6;")
-      div(v-if="torrents.length === 0" style="text-align:center; color:#999; margin-top:50px;")
+    #torrents-list(v-if="!loading && !noTorrentsNeeded" style="padding:10px; font-size:14px; line-height:1.6;")
+      div(v-if="torrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
         div No torrents found
       div(v-for="(torrent, index) in torrents" :key="index" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
         div(v-if="isClicked(torrent)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
@@ -79,6 +82,7 @@ export default {
       showName: '',
       loading: false,
       error: null,
+      providerWarning: '',
       maxResults: 1000,  // Constant for maximum results to fetch
       iptCfClearance: '',
       tlCfClearance: '',
@@ -87,7 +91,8 @@ export default {
       selectedTorrent: null,  // Currently selected torrent
       showModal: false,  // Show download confirmation modal
       clickedTorrents: new Set(),  // Track which torrents have been clicked
-      noTorrentsNeeded: false  // Flag when needed array is empty
+      noTorrentsNeeded: false,  // Flag when needed array is empty
+      showCookieInputs: false  // Manual toggle for cookie input boxes
     };
   },
 
@@ -99,6 +104,22 @@ export default {
         counts[provider] = (counts[provider] || 0) + 1;
       });
       return counts;
+    },
+    isCookieRelatedError() {
+      // Always show cookie inputs when there are no torrents (likely auth issue)
+      if (this.torrents.length === 0) return true;
+      
+      // Also show for explicit cookie-related errors even if we got some results
+      if (this.error) {
+        const errorLower = this.error.toLowerCase();
+        return errorLower.includes('cf_clearance') || 
+               errorLower.includes('access denied') || 
+               errorLower.includes('403') || 
+               errorLower.includes('401') || 
+               errorLower.includes('forbidden');
+      }
+      
+      return false;
     }
   },
 
@@ -116,6 +137,10 @@ export default {
       this.showModal = false;
       this.clickedTorrents.clear();
       this.$emit('close');
+    },
+
+    toggleCookieInputs() {
+      this.showCookieInputs = !this.showCookieInputs;
     },
 
     async handleMapButton() {
@@ -296,6 +321,7 @@ export default {
 
       this.loading = true;
       this.error = null;
+      this.providerWarning = '';
       this.torrents = [];
       this.noTorrentsNeeded = false;
 
@@ -344,14 +370,35 @@ export default {
         }
 
         const data = await response.json();
-        
-        // Check if we got no results and no cookies were provided
-        if ((!data.torrents || data.torrents.length === 0) && !iptCf && !tlCf) {
-          this.error = 'No results found. cf_clearance cookies may be needed.';
+
+        // Simple number-returned checks
+        const counts = data.rawProviderCounts || {};
+        const iptCount = (counts.IpTorrents ?? counts.iptorrents ?? 0);
+        const tlCount = (counts.TorrentLeech ?? counts.torrentleech ?? 0);
+
+        // If both providers returned 0, treat as no results (show inputs via computed)
+        if ((iptCount === 0 || iptCount === undefined) && (tlCount === 0 || tlCount === undefined)) {
+          console.log('Cookie input shown: Both providers returned 0');
+          this.providerWarning = '';
+          this.error = `No torrents found for "${this.currentShow.Name}"`;
           this.torrents = [];
           return;
         }
-        
+
+        // If exactly one provider returned results and the other returned 0, show a warning
+        const iptZero = iptCount === 0 || iptCount === undefined;
+        const tlZero = tlCount === 0 || tlCount === undefined;
+        const iptHas = !iptZero;
+        const tlHas = !tlZero;
+        // Only warn when we have some torrents overall
+        if (((iptHas && tlZero) || (tlHas && iptZero)) && (data.torrents && data.torrents.length > 0)) {
+          const missing = [];
+          if (iptZero) missing.push('IPTorrents');
+          if (tlZero) missing.push('TorrentLeech');
+          this.providerWarning = `Warning: No results from ${missing.join(' and ')}. Check cookies for that provider.`;
+        }
+
+        // Finally, set torrents
         this.torrents = data.torrents || [];
       } catch (err) {
         console.error('Torrent search error:', err);
@@ -359,12 +406,8 @@ export default {
         // Handle both Error objects and rejected promise values
         const errorMessage = err?.message || err?.result || err?.error || (typeof err === 'string' ? err : JSON.stringify(err));
         
-        // Check if it's likely a cookie issue
-        if (errorMessage.includes('403') || errorMessage.includes('401') || errorMessage.includes('Forbidden')) {
-          this.error = 'Access denied. Please provide cf_clearance cookies.';
-        } else {
-          this.error = errorMessage;
-        }
+        console.log('Cookie input shown: Error occurred -', errorMessage);
+        this.error = errorMessage;
       } finally {
         this.loading = false;
       }

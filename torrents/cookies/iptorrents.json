@@ -1,15 +1,5 @@
 [
   {
-    "name": "cf_clearance",
-    "value": "fUFlDQHu5eTI4nVNeDO15wW5s2C5YoSeBHbeMlk9kMU-1757962029-1.2.1.1-gTTeDX0NHijjjhLv7lQexJGwQECzIkiZvT.ir_oIN6z8dvZNJUbmElu4sKystEK8HowbYA0iU.Ms9k9CexcerfTkCjpTc7EAkJH4J8llmV4YLSR4syBh5vfPxQuFRTI3Pqo4dIFBazPUuQ8Z04s.r7TF9Mk6S02QT5oRL.jNWtTTRs1eBglRf.Cp.smzPbuDpq1eOoJJZnEEwzW_ki2AjkrXWPeXXA2ld4m_ve6ov7w",
-    "domain": ".iptorrents.com",
-    "path": "/",
-    "expires": 1757962029,
-    "httpOnly": true,
-    "secure": true,
-    "sameSite": "None"
-  },
-  {
     "name": "pass",
     "value": "HX9iHh25WA4wmZDiUPynh7p1M2OGrJRq",
     "domain": "iptorrents.com",

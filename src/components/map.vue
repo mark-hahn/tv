@@ -11,7 +11,7 @@
         | {{mapShow?.Name}}
       div(style="display:flex; gap:5px; flex-shrink:0;")
         button(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Prune
-        button(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('torrents', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Torrents
+        button(v-if="!simpleMode" @click.stop="$emit('torrents', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Torrents
         button(@click.stop="$emit('series', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Series
         button(@click.stop="$emit('actors', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Actors
 
@@ -55,9 +55,9 @@
             @click="handleEpisodeClick($event, mapShow, season, episode)"
             :style="{cursor:'default', padding:'0 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor: (seriesMap[season]?.[episode]?.error) ? 'yellow': (seriesMap[season]?.[episode]?.noFile) ? '#faa' : 'white'}")
           span(v-if="seriesMap?.[season]?.[episode]?.played")  w
-          span(v-if="seriesMap?.[season]?.[episode]?.avail && !mapShow?.Id?.startsWith('noemby-')")   +
+          span(v-if="seriesMap?.[season]?.[episode]?.avail && !seriesMap?.[season]?.[episode]?.unaired && !mapShow?.Id?.startsWith('noemby-')")   +
           span(v-if="seriesMap?.[season]?.[episode]?.noFile && !seriesMap?.[season]?.[episode]?.unaired")  -
-          span(v-if="seriesMap?.[season]?.[episode]?.unaired && !(!mapShow?.Id?.startsWith('noemby-') && (seriesMap?.[season]?.[episode]?.played || seriesMap?.[season]?.[episode]?.avail || seriesMap?.[season]?.[episode]?.noFile === false))") u
+          span(v-if="seriesMap?.[season]?.[episode]?.unaired && !seriesMap?.[season]?.[episode]?.played && seriesMap?.[season]?.[episode]?.noFile") u
           span(v-if="seriesMap?.[season]?.[episode]?.deleted") d
 </template>
 
@@ -131,6 +131,7 @@ export default {
     async mapShow(newShow) {
       if (newShow && newShow.Name) {
         await this.loadTvdbData();
+        this.logUnairedInfo();
       }
     }
   },
@@ -140,6 +141,7 @@ export default {
   async mounted() {
     if (this.mapShow && this.mapShow.Name) {
       await this.loadTvdbData();
+      this.logUnairedInfo();
     }
   },
 
@@ -154,6 +156,28 @@ export default {
         }
       } catch (err) {
         console.error('loadTvdbData error:', err);
+      }
+    },
+    logUnairedInfo() {
+      try {
+        const showName = this.mapShow?.Name || '(unknown)';
+        const unaired = [];
+        Object.keys(this.seriesMap || {}).forEach(season => {
+          const epis = this.seriesMap[season] || {};
+          Object.keys(epis).forEach(ep => {
+            const e = epis[ep];
+            if (!e) return;
+            if (e.unaired) {
+              unaired.push({ season: Number(season), episode: Number(ep), played: !!e.played, avail: !!e.avail, noFile: e.noFile, deleted: !!e.deleted });
+            }
+          });
+        });
+        console.group(`Map unaired debug for ${showName}`);
+        console.log('Unaired count:', unaired.length);
+        console.table(unaired);
+        console.groupEnd();
+      } catch (err) {
+        console.error('logUnairedInfo error:', err);
       }
     },
     handleMapClick(event) {

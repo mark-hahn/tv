@@ -1,15 +1,5 @@
 [
   {
-    "name": "cf_clearance",
-    "value": "IHtD4j6EufhyuXiQJIvlumfCaQvGQtnxOhbyEhw2KGE-1765220541-1.2.1.1-UAuc07uCbZlcjX34B1w3mlJ55mIniDK4vW5CkYuOlt8F_uzSXPDjElj5vybZyQ3eaTKcXfdFeZNZiEKvVlgyRUosuWxqTkr8aqi8M300z6fxeafksVpou43R6E8UrieBKl10NJ6yj_34wthC.JPiVznN9_fobdS0f9f8itTY5fcVCmML51Rb67gaZ9_KtI7qkxmne_djsbCvUpvJ.l.ZlK9isHayVQz_.Xc63h8NvH8",
-    "domain": ".torrentleech.org",
-    "path": "/",
-    "expires": 1765220541,
-    "httpOnly": true,
-    "secure": true,
-    "sameSite": "None"
-  },
-  {
     "name": "tlpass",
     "value": "4b3dced91b1d276cc6da1ceb56e2dc1f96a83ef9",
     "domain": "torrentleech.org",

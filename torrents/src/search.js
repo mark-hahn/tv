@@ -167,6 +167,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     rawProviderCounts[provider] = (rawProviderCounts[provider] || 0) + 1;
   });
   console.log('Raw provider counts:', rawProviderCounts);
+
   
   // Dump all raw torrents for debugging
   if (SAVE_ALL_RAW) {
@@ -524,6 +525,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   return {
     show: showName,
     count: filtered.length,
-    torrents: filtered
+    torrents: filtered,
+    rawProviderCounts
   };
 }

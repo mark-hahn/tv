@@ -547,8 +547,13 @@ export const getSeriesMap = async (show, prune = false) => {
            episodeNumber == show.FileGapEpisode &&
               show.FileGap);
 
+      const noFileVal = !path;  // noFile is true when there's no path
+      if (show.Name === 'Pluribus' && unaired) {
+        console.log(`Pluribus S${seasonNumber}E${episodeNumber}: path=${path}, unaired=${unaired}, noFile=${noFileVal}, played=${played}, avail=${avail}`);
+      }
+
       episodes.push([episodeNumber, 
-          {error, played, avail, noFile:!path && !unaired, 
+          {error, played, avail, noFile: noFileVal, 
             unaired, deleted}]); 
     }
     seriesMap.push([seasonNumber, episodes]);

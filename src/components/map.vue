@@ -9,33 +9,34 @@
     div(style="margin:0 5px; display:flex; justify-content:space-between; align-items:center;")
       div(:style="{ marginLeft:'20px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px' }")
         | {{mapShow?.Name}}
-      div(v-if="!mapShow?.Id?.startsWith('noemby-')" style="display:flex; gap:5px; flex-shrink:0;")
-        button(v-if="!simpleMode" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Prune
-        button(v-if="!simpleMode" @click.stop="$emit('torrents', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Torrents
+      div(style="display:flex; gap:5px; flex-shrink:0;")
+        button(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Prune
+        button(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('torrents', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Torrents
         button(@click.stop="$emit('series', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Series
         button(@click.stop="$emit('actors', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Actors
 
-    div(v-if="mapShow?.Id?.startsWith('noemby-')"
-        style="font-weight:bold; color:red; font-size:18px; text-align:center; margin:20px;")
-      | Not In Emby
-    
-    div(v-if="mapShow?.WatchGap || mapShow?.FileGap  || mapShow?.WaitStr?.length"
-        style="display:flex; justify-content:space-around; color:red; margin: 0 10px; 4px 10px;")
+    div(v-if="mapShow?.WatchGap || mapShow?.FileGap  || mapShow?.WaitStr?.length || mapShow?.Id?.startsWith('noemby-')"
+        style="display:flex; justify-content:space-between; align-items:center; color:red; margin:0 10px; padding:0 10px; min-height:26px;")
 
-      div(v-if="mapShow?.WatchGap" 
-          style="display:inline-block;")
-        | {{"Watch Gap"}}
+      div(v-if="mapShow?.WatchGap || mapShow?.FileGap  || mapShow?.WaitStr?.length"
+          style="display:flex; gap:15px;")
+        div(v-if="mapShow?.WatchGap")
+          | {{"Watch Gap"}}
 
-      div(v-if="mapShow?.FileGap"
-          style="display:inline-block; margin 3px 10px")
-        | {{"Missing File"}}
+        div(v-if="mapShow?.FileGap")
+          | {{"Missing File"}}
 
-      div(v-if="mapShow?.Waiting" 
-          style="display:inline-block; margin 3px 10px")
-        | {{'Waiting ' + mapShow?.WaitStr}}
+        div(v-if="mapShow?.Waiting")
+          | {{'Waiting ' + mapShow?.WaitStr}}
 
-    div(v-if="datesLine" :style="{ fontSize: sizing.seriesInfoFontSize || '20px', fontWeight:'bold', margin:'10px 5px 5px 5px', paddingLeft:'5px' }")
-      | {{datesLine}}
+      div(v-if="mapShow?.Id?.startsWith('noemby-')"
+          style="font-weight:bold; font-size:18px; white-space:nowrap; padding-left:10px;")
+        | Not In Emby
+
+    div(v-if="datesLine" :style="{ fontSize: sizing.seriesInfoFontSize || '20px', fontWeight:'bold', margin:'10px 5px 5px 5px', paddingLeft:'5px', display:'flex', gap:'10px' }")
+      span {{firstAiredVal}}
+      span {{lastAiredVal}}
+      span {{statusVal}}
 
     table(style="padding:0 5px; font-size:16px; margin-top:10px;" )
      tbody
@@ -54,9 +55,9 @@
             @click="handleEpisodeClick($event, mapShow, season, episode)"
             :style="{cursor:'default', padding:'0 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor: (seriesMap[season]?.[episode]?.error) ? 'yellow': (seriesMap[season]?.[episode]?.noFile) ? '#faa' : 'white'}")
           span(v-if="seriesMap?.[season]?.[episode]?.played")  w
-          span(v-if="seriesMap?.[season]?.[episode]?.avail")   +
-          span(v-if="seriesMap?.[season]?.[episode]?.noFile")  -
-          span(v-if="seriesMap?.[season]?.[episode]?.unaired") u
+          span(v-if="seriesMap?.[season]?.[episode]?.avail && !mapShow?.Id?.startsWith('noemby-')")   +
+          span(v-if="seriesMap?.[season]?.[episode]?.noFile && !seriesMap?.[season]?.[episode]?.unaired")  -
+          span(v-if="seriesMap?.[season]?.[episode]?.unaired && !(!mapShow?.Id?.startsWith('noemby-') && (seriesMap?.[season]?.[episode]?.played || seriesMap?.[season]?.[episode]?.avail || seriesMap?.[season]?.[episode]?.noFile === false))") u
           span(v-if="seriesMap?.[season]?.[episode]?.deleted") d
 </template>
 
@@ -114,6 +115,15 @@ export default {
       if (!this.tvdbData) return '';
       const { firstAired, lastAired, status } = this.tvdbData;
       return ` ${firstAired || ''} ${lastAired || ''} ${status || ''}`;
+    },
+    firstAiredVal() {
+      return this.tvdbData?.firstAired || '';
+    },
+    lastAiredVal() {
+      return this.tvdbData?.lastAired || '';
+    },
+    statusVal() {
+      return this.tvdbData?.status || '';
     }
   },
 

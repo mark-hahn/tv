@@ -1,288 +1,178 @@
 [
   {
-    "provider": "TorrentLeech",
-    "title": "8 Simple Rules S03 720p x265-ZMNT",
-    "time": "2019-04-06 01:05:06",
-    "seeds": 34,
-    "peers": 1,
-    "size": "4.8 GiB",
-    "filename": "8.Simple.Rules.S03.720p.x265-ZMNT.torrent",
-    "fid": "1307581",
-    "rating": 6.9,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 3,
-    "tags": [
-      "720p",
-      "FREELEECH",
-      "ZMNT"
-    ],
-    "imdbID": "tt0312081",
-    "igdbID": "",
-    "tvmazeID": ""
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "8 Simple Rules S01-S02 1080p Web DDP5 1 HEVC x265-JoeBee",
-    "time": "2023-01-31 06:35:33",
-    "seeds": 17,
-    "peers": 1,
-    "size": "16.8 GiB",
-    "filename": "8.Simple.Rules.S01-S02.1080p.Web.DDP5.1.HEVC.x265-JoeBee.torrent",
-    "fid": "240977797",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 3,
-    "tags": [
-      "comedy",
-      "FREELEECH",
-      "hevc",
-      "x265"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s984"
-  },
-  {
-    "title": "8 Simple Rules S01-S03 720p HDTV DD5 1 x264",
-    "seeds": "16",
-    "peers": "2",
-    "size": "65.1 GB",
-    "desc": "https://iptorrents.com/t/2390460",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "8 Simple Rules S02 1080p WEBRip x265-KONTRAST",
-    "time": "2025-03-31 17:04:24",
-    "seeds": 11,
-    "peers": 0,
-    "size": "13.8 GiB",
-    "filename": "8.Simple.Rules.S02.1080p.WEBRip.x265-KONTRAST.torrent",
-    "fid": "241481577",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "Family",
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s984"
-  },
-  {
-    "title": "8 Simple Rules S01-S03 Complete XViD-BARTI",
-    "seeds": "11",
-    "peers": "1",
-    "size": "13.2 GB",
-    "desc": "https://iptorrents.com/t/1089053",
-    "provider": "IpTorrents"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "8 Simple Rules (2002) S02 1080p WEBRip 10bit EAC3 5 1 x265-iVy",
-    "time": "2024-10-12 21:05:13",
-    "seeds": 11,
-    "peers": 1,
-    "size": "9.0 GiB",
-    "filename": "8.Simple.Rules.(2002).S02.1080p.WEBRip.10bit.EAC3.5.1.x265-iVy.torrent",
-    "fid": "241365329",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": ""
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "8 Simple Rules (2002) S01 1080p WEBRip 10bit EAC3 5 1 x265-iVy",
-    "time": "2024-10-12 21:02:37",
-    "seeds": 11,
-    "peers": 1,
-    "size": "10.9 GiB",
-    "filename": "8.Simple.Rules.(2002).S01.1080p.WEBRip.10bit.EAC3.5.1.x265-iVy.torrent",
-    "fid": "241365328",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": ""
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "8 Simple Rules S01 1080p WEBRip x265-KONTRAST",
-    "time": "2025-03-31 17:02:53",
-    "seeds": 9,
-    "peers": 0,
-    "size": "16.2 GiB",
-    "filename": "8.Simple.Rules.S01.1080p.WEBRip.x265-KONTRAST.torrent",
-    "fid": "241481576",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "Family",
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s984"
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "8 Simple Rules S02 720p x265-ZMNT",
-    "time": "2019-04-03 00:31:40",
-    "seeds": 8,
-    "peers": 0,
-    "size": "4.6 GiB",
-    "filename": "8.Simple.Rules.S02.720p.x265-ZMNT.torrent",
-    "fid": "1304364",
-    "rating": 6.9,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 2,
-    "tags": [
-      "720p",
-      "FREELEECH",
-      "ZMNT"
-    ],
-    "imdbID": "tt0312081",
-    "igdbID": "",
-    "tvmazeID": ""
-  },
-  {
-    "provider": "TorrentLeech",
-    "title": "8 Simple Rules S01 720p x265-ZMNT",
-    "time": "2019-04-01 00:25:09",
-    "seeds": 8,
-    "peers": 0,
-    "size": "5.4 GiB",
-    "filename": "8.Simple.Rules.S01.720p.x265-ZMNT.torrent",
-    "fid": "1302675",
-    "rating": 6.9,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 3,
-    "tags": [
-      "720p",
-      "FREELEECH",
-      "nonscene",
-      "ZMNT"
-    ],
-    "imdbID": "tt0312081",
-    "igdbID": "",
-    "tvmazeID": ""
-  },
-  {
-    "title": "8 Simple Rules 2002 S01 1080p WEBRip 10bit EAC3 5 1 x265-iVy",
+    "title": "Pulp-His N Hers-(0600753278543)-REMASTERED DELUXE EDITION-2CD-FLAC-2012-WRE",
     "seeds": "8",
-    "peers": "1",
-    "size": "10.8 GB",
-    "desc": "https://iptorrents.com/t/6317522",
+    "peers": "0",
+    "size": "770 MB",
+    "desc": "https://iptorrents.com/t/3647680",
     "provider": "IpTorrents"
   },
   {
-    "title": "8 Simple Rules 2002 S02 1080p WEBRip 10bit EAC3 5 1 x265-iVy",
-    "seeds": "7",
-    "peers": "1",
-    "size": "8.98 GB",
-    "desc": "https://iptorrents.com/t/6317523",
+    "title": "His and Hers 2024 720p WEB-DL x264 BONE",
+    "seeds": "6",
+    "peers": "0",
+    "size": "850 MB",
+    "desc": "https://iptorrents.com/t/6136657",
     "provider": "IpTorrents"
   },
   {
-    "provider": "TorrentLeech",
-    "title": "8 Simple Rules S01 1080p AMZN WEBRip DDP5 1 x264-TEPES",
-    "time": "2023-01-28 18:41:44",
-    "seeds": 3,
-    "peers": 0,
-    "size": "59.2 GiB",
-    "filename": "8.Simple.Rules.S01.1080p.AMZN.WEBRip.DDP5.1.x264-TEPES.torrent",
-    "fid": "240976398",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "Family",
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s984"
+    "title": "Terry McMillan Presents His Hers and Ours 2025 720p WEB h264-NoRBiT",
+    "seeds": "5",
+    "peers": "0",
+    "size": "3.67 GB",
+    "desc": "https://iptorrents.com/t/6988325",
+    "provider": "IpTorrents"
   },
   {
-    "title": "8 Simple Rules S02E14 720p WEB x264-QCF",
+    "title": "His Hers (2024) 1080p WEBRip x265 10bit 5 1-LAMA",
+    "seeds": "5",
+    "peers": "0",
+    "size": "1.4 GB",
+    "desc": "https://iptorrents.com/t/6145027",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "His And Hers 1961 1080p BluRay x264-GeneMige",
+    "seeds": "5",
+    "peers": "0",
+    "size": "7.58 GB",
+    "desc": "https://iptorrents.com/t/7043280",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Debra Macleod Lip Service A His And Hers Guide To The Art Of Oral Sex And Seduction 2009 RETAiL ePub eBook-LiBRiCiDE",
+    "seeds": "5",
+    "peers": "0",
+    "size": "481 KB",
+    "desc": "https://iptorrents.com/t/3875746",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Alice Feeney - His And Hers A Novel 2020 RETAIL EPUB eBook-CTO",
+    "seeds": "5",
+    "peers": "0",
+    "size": "4.25 MB",
+    "desc": "https://iptorrents.com/t/5587077",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Terry McMillan Presents His Hers and Ours 2025 1080p WEB h264-NoRBiT",
+    "seeds": "4",
+    "peers": "0",
+    "size": "7.3 GB",
+    "desc": "https://iptorrents.com/t/6988328",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Mini Reni S01E08 His and Hers Offices to Love 1080p DISC WEB-DL AAC2 0 H 264-RAWR",
+    "seeds": "3",
+    "peers": "0",
+    "size": "904 MB",
+    "desc": "https://iptorrents.com/t/6750269",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "His and Hers 1961 1080p BluRay REMUX AVC FLAC 2 0-EPSiLON",
+    "seeds": "3",
+    "peers": "0",
+    "size": "12.2 GB",
+    "desc": "https://iptorrents.com/t/6957349",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "His And Hers 2024 1080p AMZN WEBRip DDP5 1 x265 10bit-LAMA",
+    "seeds": "3",
+    "peers": "0",
+    "size": "1.34 GB",
+    "desc": "https://iptorrents.com/t/6142611",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "His And Hers 2024 1080p AMZN WEBRip DD5 1 x264-LAMA",
+    "seeds": "3",
+    "peers": "0",
+    "size": "1.4 GB",
+    "desc": "https://iptorrents.com/t/6141755",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "[REQ] Joey and Rory - His and Hers [2012/MP3/320]",
     "seeds": "2",
     "peers": "0",
-    "size": "533 MB",
-    "desc": "https://iptorrents.com/t/2301270",
+    "size": "68 MB",
+    "desc": "https://iptorrents.com/t/675323",
     "provider": "IpTorrents"
   },
   {
-    "provider": "TorrentLeech",
-    "title": "8 Simple Rules S02 1080p AMZN WEBRip DDP5 1 x264-TEPES",
-    "time": "2023-01-29 08:44:41",
-    "seeds": 1,
-    "peers": 0,
-    "size": "50.2 GiB",
-    "filename": "8.Simple.Rules.S02.1080p.AMZN.WEBRip.DDP5.1.x264-TEPES.torrent",
-    "fid": "240976731",
-    "rating": 0,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 0,
-    "tags": [
-      "comedy",
-      "Family",
-      "FREELEECH"
-    ],
-    "imdbID": "",
-    "igdbID": "",
-    "tvmazeID": "s984"
+    "title": "His And Hers 2024 1080p AMZN WEB-DL DDP5 1 H 264-FLUX",
+    "seeds": "2",
+    "peers": "0",
+    "size": "4.63 GB",
+    "desc": "https://iptorrents.com/t/6141659",
+    "provider": "IpTorrents"
   },
   {
-    "provider": "TorrentLeech",
-    "title": "8 Simple Rules Complete [DVDrip - Xvid - NoRAR]",
-    "time": "2015-06-22 20:24:58",
-    "seeds": 0,
-    "peers": 3,
-    "size": "13.2 GiB",
-    "filename": "8.Simple.Rules.Complete.[DVDrip.-.Xvid.-.NoRAR].torrent",
-    "fid": "622921",
-    "rating": 6.9,
-    "categoryID": 27,
-    "new": false,
-    "numComments": 3,
-    "tags": [
-      "comedy",
-      "Drama",
-      "Family",
-      "FREELEECH",
-      "James Garner",
-      "John Ritter",
-      "Katey Sagal",
-      "retro",
-      "Sitcom"
-    ],
-    "imdbID": "tt0312081",
-    "igdbID": "",
-    "tvmazeID": ""
+    "title": "His And Hers (2024) 720p WEBRip-LAMA",
+    "seeds": "2",
+    "peers": "0",
+    "size": "776 MB",
+    "desc": "https://iptorrents.com/t/6150858",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "His Hers (2024) 720p WEBRip-LAMA",
+    "seeds": "1",
+    "peers": "0",
+    "size": "776 MB",
+    "desc": "https://iptorrents.com/t/6141990",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "His And Hers 2024 1080p WEB H264-SKYFiRE",
+    "seeds": "1",
+    "peers": "0",
+    "size": "1.83 GB",
+    "desc": "https://iptorrents.com/t/6155517",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Building Outside the Lines S02E10 His and Hers Adventure Bus 720p AMZN WEB-DL DDP2 0 H 264-RAWR",
+    "seeds": "1",
+    "peers": "0",
+    "size": "1.7 GB",
+    "desc": "https://iptorrents.com/t/6477051",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "Building Outside the Lines S02E10 His and Hers Adventure Bus 1080p AMZN WEB-DL DDP2 0 H 264-RAWR",
+    "seeds": "1",
+    "peers": "0",
+    "size": "2.92 GB",
+    "desc": "https://iptorrents.com/t/6476993",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "[Req] His And Hers 1961 - DD",
+    "seeds": "0",
+    "peers": "0",
+    "size": "1.59 GB",
+    "desc": "https://iptorrents.com/t/6359845",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "His&Hers 2024 1080p WEBRip DDP 5 1 10bit H 265-iVy",
+    "seeds": "0",
+    "peers": "0",
+    "size": "1.04 GB",
+    "desc": "https://iptorrents.com/t/6478669",
+    "provider": "IpTorrents"
+  },
+  {
+    "title": "His And Hers 2024 720p AMZN WEB-DL DDP5 1 H 264-FLUX",
+    "seeds": "0",
+    "peers": "0",
+    "size": "2.17 GB",
+    "desc": "https://iptorrents.com/t/6141992",
+    "provider": "IpTorrents"
   }
 ]

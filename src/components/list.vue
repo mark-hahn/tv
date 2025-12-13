@@ -818,8 +818,8 @@ export default {
         this.$emit('hide-map');
         return;
       }
-      if(action == 'open' && this.mapShow === show) {
-        // If clicking the same show, keep the map open
+      if(action == 'open' && this.mapShow === show && this.currentPane === 'map') {
+        // If clicking the same show while already on map, keep it as-is
         return;
       }
       if(action == 'date') {

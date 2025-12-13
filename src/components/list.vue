@@ -324,8 +324,9 @@ export default {
           color: "#f88", filter: 0, icon: ["fas", "minus"],
           cond(show)  { 
             return (show.FileGap || show.WatchGap ||
-                    show.Id.startsWith("noemby-")) && 
-                   !show.BlockedGap},
+                    (show.Id.startsWith("noemby-") && !show.S1E1Unaired)) && 
+                   !show.BlockedGap;
+          },
           async click(show) { await toggleBlkGap(show); },
           name: "gap",
         }, {
@@ -1008,32 +1009,6 @@ export default {
              fileEndError, seasonWatchedThenNofile,
              fileGap,  fileGapSeason,  fileGapEpisode}
                           = event.data;
-      
-      // Override gaps if S01E01 is unaired in TVDB
-      let _watchGap = watchGap;
-      let _fileGap  = fileGap;
-      let s01e01Unaired = false;
-      try {
-        if (_watchGap || _fileGap) {
-          const showForMap = allShows.find((s) => s.Id == showId);
-          if (showForMap) {
-            const seriesMap = await tvdb.getSeriesMap(showForMap);
-            const s1 = seriesMap.find(([seasonNumber]) => seasonNumber === 1);
-            if (s1) {
-              const e1 = s1[1].find(([episodeNumber]) => episodeNumber === 1);
-              const unaired = e1?.[1]?.unaired === true;
-              if (unaired) {
-                _watchGap = false;
-                _fileGap  = false;
-                s01e01Unaired = true;
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.error('addGapToShow: tvdb.getSeriesMap override error', e);
-      }
-      
       this.gapPercent = progress;
       const save = progress == 100;
       
@@ -1061,29 +1036,13 @@ export default {
       gap.FileGapEpisode  = fileGapEpisode;
       gap.WatchGapSeason  = watchGapSeason;
       gap.WatchGapEpisode = watchGapEpisode;
-      gap.WatchGap        = s01e01Unaired ? false : _watchGap; 
+      gap.WatchGap        = watchGap; 
       gap.NotReady        = notReady;
       gap.BlockedGap      = blockedGap;
       gap.Waiting         = !blockedWait;
       gap.WaitStr         = await tvdb.getWaitStr(show);
-      // If S01E01 unaired, force FileGap false regardless of other flags
-      gap.FileGap = s01e01Unaired ? false :
-                    (!(!notReady && show.InToTry) &&
-                     (_fileGap || fileEndError || seasonWatchedThenNofile));
-      
-      if (show.Name === 'Small Prophets') {
-        console.log('Small Prophets gap processing', {
-          originalWatchGap: watchGap,
-          originalFileGap: fileGap,
-          s01e01Unaired,
-          finalWatchGap: gap.WatchGap,
-          finalFileGap: gap.FileGap,
-          NotReady: gap.NotReady,
-          BlockedGap: gap.BlockedGap,
-          InToTry: show.InToTry,
-        });
-      }
-      
+      gap.FileGap = !(!notReady && show.InToTry) &&
+                     (fileGap || fileEndError || seasonWatchedThenNofile);
       Object.assign(show, gap);
       await srvr.addGap([show.Id, gap, save]);
     }

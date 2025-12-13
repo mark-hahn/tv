@@ -125,6 +125,22 @@ export async function loadAllShows() {
       prunedNoEmbyIds.push(noEmbyShow.Id);
       continue;
     }
+    
+    // Check if S01E01 is unaired in TVDB
+    try {
+      const seriesMap = await tvdb.getSeriesMap(noEmbyShow);
+      const s1 = seriesMap.find(([seasonNumber]) => seasonNumber === 1);
+      if (s1) {
+        const e1 = s1[1].find(([episodeNumber]) => episodeNumber === 1);
+        const unaired = e1?.[1]?.unaired === true;
+        if (unaired) {
+          noEmbyShow.S1E1Unaired = true;
+        }
+      }
+    } catch (e) {
+      console.error('loadAllShows: tvdb.getSeriesMap error for noemby', noEmbyShow.Name, e);
+    }
+    
     shows.push(noEmbyShow);
   }
   for(const prunedNoEmbyId of prunedNoEmbyIds) {

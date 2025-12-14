@@ -6,7 +6,12 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import * as search from './search.js';
 import * as download from './download.js';
-import fetchTorrentsInfo from './qb-info.js';
+import fetchTorrentsInfo from './qbt-torrents.js';
+import { loadCreds } from './qb-cred.js';
+import { tvdbProxyGet } from './tvdb-proxy.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 console.log(''); // Blank line on restart
 
@@ -17,15 +22,19 @@ const TEST_QBT      = false
 
 // Load SSL certificate
 const httpsOptions = {
-  key: fs.readFileSync('./cookies/localhost-key.pem'),
-  cert: fs.readFileSync('./cookies/localhost-cert.pem')
+  key: fs.readFileSync(path.resolve(__dirname, '..', 'cookies', 'localhost-key.pem')),
+  cert: fs.readFileSync(path.resolve(__dirname, '..', 'cookies', 'localhost-cert.pem'))
 };
 
 // Enable CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
   next();
 });
 
@@ -39,71 +48,27 @@ if (TEST_QBT) (async () => {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
 
-  const parseKeyValueFile = (text) => {
-    const out = {};
-    for (const rawLine of String(text).split(/\r?\n/)) {
-      const line = rawLine.trim();
-      if (!line || line.startsWith('#')) continue;
-      const eq = line.indexOf('=');
-      if (eq === -1) continue;
-      const key = line.slice(0, eq).trim();
-      let value = line.slice(eq + 1).trimStart();
+  const credPath = path.resolve(__dirname, '..', 'qb-cred.txt');
 
-      // Allow common shell-style quoting in the cred file:
-      //   QB_PASS='secret'
-      //   QB_PASS="secret"
-      // Strip surrounding quotes only when they match.
-      const trimmedEnd = value.trimEnd();
-      if (trimmedEnd.length >= 2) {
-        const first = trimmedEnd[0];
-        const last = trimmedEnd[trimmedEnd.length - 1];
-        if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
-          value = trimmedEnd.slice(1, -1);
-        } else {
-          value = trimmedEnd;
-        }
-      } else {
-        value = trimmedEnd;
-      }
-      if (key) out[key] = value;
-    }
-    return out;
-  };
+  const { creds: fileCreds, loaded: fileCredsLoaded } = await loadCreds(credPath);
 
-  const credPath = process.env.QB_CRED_PATH
-    ? path.resolve(process.env.QB_CRED_PATH)
-    : path.resolve(__dirname, '..', 'qb-cred.txt');
-  let fileCreds = {};
-  let fileCredsLoaded = false;
-  try {
-    const text = await fs.promises.readFile(credPath, 'utf8');
-    fileCreds = parseKeyValueFile(text);
-    fileCredsLoaded = true;
-  } catch {
-    // no file / unreadable
-  }
+  const qbUser = fileCreds.QB_USER;
+  const qbPass = fileCreds.QB_PASS;
 
-  const qbUser = process.env.QB_USER || fileCreds.QB_USER;
-  const qbPass = process.env.QB_PASS || fileCreds.QB_PASS;
-
-  const sshTarget = process.env.SSH_TARGET || fileCreds.SSH_TARGET;
-  const qbPort = process.env.QB_PORT
-    ? Number(process.env.QB_PORT)
-    : (fileCreds.QB_PORT ? Number(fileCreds.QB_PORT) : undefined);
-  const localPort = process.env.LOCAL_PORT
-    ? Number(process.env.LOCAL_PORT)
-    : (fileCreds.LOCAL_PORT ? Number(fileCreds.LOCAL_PORT) : undefined);
+  const sshTarget = fileCreds.SSH_TARGET;
+  const qbPort = fileCreds.QB_PORT ? Number(fileCreds.QB_PORT) : undefined;
+  const localPort = fileCreds.LOCAL_PORT ? Number(fileCreds.LOCAL_PORT) : undefined;
 
   console.log(
     'qb-info probe: creds source=' +
-      (process.env.QB_USER || process.env.QB_PASS ? 'env' : (fileCredsLoaded ? `file(${credPath})` : 'none')) +
+      (fileCredsLoaded ? `file(${credPath})` : 'none') +
       `, user=${qbUser || '(missing)'}` +
       `, passLen=${qbPass ? String(qbPass).length : 0}` +
-      `, sshTarget=${sshTarget || '(default)'}` +
+        `, sshTarget=${sshTarget || '(missing)'}` +
       `, qbPort=${Number.isFinite(qbPort) ? qbPort : '(default)'}`
   );
   if (!qbUser || !qbPass) {
-    console.log('qb-info probe: skipped (QB_USER/QB_PASS not set)');
+    console.log('qb-info probe: skipped (QB_USER/QB_PASS missing in qb-cred.txt)');
     return;
   }
 
@@ -135,6 +100,8 @@ if (TEST_QBT) (async () => {
 })();
 
 // API endpoint
+app.get('/api/tvdb/*', tvdbProxyGet);
+
 app.get('/api/search', async (req, res) => {
   const showName = req.query.show;
   const limit = parseInt(req.query.limit) || 100;

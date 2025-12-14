@@ -1,7 +1,19 @@
 import * as srvr from "./srvr.js";
 import * as util from "./util.js";
 
-let theTvdbToken = null;
+// Route TVDB calls through the local torrents server proxy.
+// This avoids browser-to-TVDB CORS issues (Authorization header).
+const TVDB_PROXY_BASE = 'https://localhost:3001/api/tvdb';
+
+async function tvdbFetch(path, init) {
+  const url = `${TVDB_PROXY_BASE}/${String(path).replace(/^\/+/, '')}`;
+  const res = await fetch(url, init);
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`tvdb proxy error: ${res.status} ${text}`.trim());
+  }
+  return res;
+}
 
 let allTvdb = null;
 export const getAllTvdb = async () => {
@@ -11,45 +23,11 @@ export const getAllTvdb = async () => {
   return allTvdb;
 }
 
-///////////// get theTvdbToken //////////////
-// this is a duplicate of the server
-// both access tvdb.com independently
-const getToken = async () => {
-  const loginResp = await fetch(
-    'https://api4.thetvdb.com/v4/login', 
-    { method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: 
-        JSON.stringify({
-            "apikey": "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df",
-            "pin": "HXEVSDFF"
-        })
-    }
-  );
-  if (!loginResp.ok) {
-    console.error(`FATAL: TvDbToken Response: ${loginResp.status}`);
-    process.exit();
-  }
-  const loginJSON = await loginResp.json();
-  theTvdbToken = loginJSON.data.token;
-}
-
 //////////// search for TvDb Data //////////////
 
 export const srchTvdbData = async (searchStr) => {
-  if(!theTvdbToken) await getToken();
-  const srchUrl = 'https://api4.thetvdb.com/v4/' +
-                  'search?type=series&query='    + 
-                   encodeURIComponent(searchStr);
-  const srchRes = await fetch(srchUrl,
-                    {headers: {
-                      'Content-Type': 'application/json',
-                      Authorization:'Bearer ' + theTvdbToken}
-                    });
-  if (!srchRes.ok) {
-    console.error(`tvdb search error:`, {searchStr}, srchRes.status);
-    return null;
-  }
+  const srchUrl = 'search?type=series&query=' + encodeURIComponent(searchStr);
+  const srchRes = await tvdbFetch(srchUrl);
   const srchResObj = await srchRes.json();
   const data = srchResObj.data;
   if(!data || data.length == 0) return null;
@@ -100,8 +78,6 @@ export async function getWaitStr(show) {
 //////////// get episode data //////////////
 
 export const getEpisode = async (showName, seasonNum, episodeNum) => {
-  if (!theTvdbToken) await getToken();
-  
   // Get series ID from allTvdb
   if (!allTvdb) await getAllTvdb();
   const tvdbData = allTvdb[showName];
@@ -114,20 +90,9 @@ export const getEpisode = async (showName, seasonNum, episodeNum) => {
   const seriesId = tvdbData.tvdbId;
   
   // Fetch episodes to get episode ID
-  const episodeUrl = `https://api4.thetvdb.com/v4/series/${seriesId}/episodes/default?season=${seasonNum}&episodeNumber=${episodeNum}`;
+  const episodeUrl = `series/${seriesId}/episodes/default?season=${seasonNum}&episodeNumber=${episodeNum}`;
   
-  const episodeRes = await fetch(episodeUrl, {
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + theTvdbToken
-    }
-  });
-  
-  if (!episodeRes.ok) {
-    console.error(`tvdb episode fetch error:`, {showName, seasonNum, episodeNum, status: episodeRes.status});
-    return null;
-  }
-  
+  const episodeRes = await tvdbFetch(episodeUrl);
   const episodeResObj = await episodeRes.json();
   const episodes = episodeResObj.data?.episodes;
   
@@ -139,20 +104,9 @@ export const getEpisode = async (showName, seasonNum, episodeNum) => {
   const episodeId = episodes[0].id;
   
   // Fetch and return extended episode data
-  const extendedUrl = `https://api4.thetvdb.com/v4/episodes/${episodeId}/extended`;
+  const extendedUrl = `episodes/${episodeId}/extended`;
   
-  const extendedRes = await fetch(extendedUrl, {
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + theTvdbToken
-    }
-  });
-  
-  if (!extendedRes.ok) {
-    console.error('getEpisode: failed to fetch extended data:', {episodeId, status: extendedRes.status});
-    return null;
-  }
-  
+  const extendedRes = await tvdbFetch(extendedUrl);
   const extendedResObj = await extendedRes.json();
   return extendedResObj.data;
 }
@@ -214,8 +168,6 @@ function showNamesMatch(tvdbShowName, searchShowName) {
 }
 
 export const getSeriesMap = async (show) => {
-  if (!theTvdbToken) await getToken();
-  
   // Search for the show on tvdb
   const searchResults = await srchTvdbData(show.Name);
   if (!searchResults || searchResults.length === 0) {
@@ -263,20 +215,15 @@ export const getSeriesMap = async (show) => {
   while (true) {
     seenPages.add(page);
 
-    const episodesUrl = `https://api4.thetvdb.com/v4/series/${tvdbId}/episodes/default?page=${page}&seasonType=official&perPage=100`;
+    const episodesUrl = `series/${tvdbId}/episodes/default?page=${page}&seasonType=official&perPage=100`;
     
-    const episodesRes = await fetch(episodesUrl, {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + theTvdbToken
-      }
-    });
-    
-    if (!episodesRes.ok) {
-      console.error('getSeriesMap: failed to fetch episodes:', {tvdbId, page, status: episodesRes.status});
+    let episodesRes;
+    try {
+      episodesRes = await tvdbFetch(episodesUrl);
+    } catch (e) {
+      console.error('getSeriesMap: failed to fetch episodes:', {tvdbId, page, err: e?.message || e});
       break;
     }
-    
     const episodesObj = await episodesRes.json();
     const episodes = episodesObj.data?.episodes || [];
     const links = episodesObj.links || {};

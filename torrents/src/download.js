@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import Client from 'ssh2-sftp-client';
+import { loadCreds } from './qb-cred.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -9,14 +10,52 @@ const __dirname = path.dirname(__filename);
 const SAVE_TORRENT_FILE = false;
 const SAVE_DETAIL_FILE  = false;
 
-// SFTP server configuration
-const SFTP_CONFIG = {
-  host: 'oracle.usbx.me',
-  port: 22,
-  username: 'xobtlu',
-  password: '90-TYUrtyasd'
-};
-const REMOTE_WATCH_DIR = '/home/xobtlu/watch/qbittorrent';
+let _cachedCreds;
+async function getCreds() {
+  if (_cachedCreds) return _cachedCreds;
+  const { creds } = await loadCreds();
+  _cachedCreds = creds;
+  return creds;
+}
+
+function parseSshTarget(sshTarget) {
+  // Basic parse for user@host (ignore ports/options)
+  if (!sshTarget) return undefined;
+  const at = sshTarget.lastIndexOf('@');
+  if (at === -1) return { host: sshTarget };
+  const user = sshTarget.slice(0, at);
+  const host = sshTarget.slice(at + 1);
+  return { user: user || undefined, host: host || undefined };
+}
+
+async function getSftpSettings() {
+  const creds = await getCreds();
+
+  const sshParts = parseSshTarget(creds.SSH_TARGET);
+
+  const host = creds.SFTP_HOST || sshParts?.host;
+  const port = Number(creds.SFTP_PORT || 22);
+  const username = creds.SFTP_USER || creds.SFTP_USERNAME || sshParts?.user;
+  const password = creds.SFTP_PASS || creds.SFTP_PASSWORD;
+
+  const remoteWatchDir =
+    creds.REMOTE_WATCH_DIR ||
+    (username ? `/home/${username}/watch/qbittorrent` : undefined);
+
+  if (!host || !username || !password) {
+    throw new Error(
+      'Missing SFTP config. Put SFTP_PASS and either (SFTP_HOST + SFTP_USER) or SSH_TARGET in torrents/qb-cred.txt.'
+    );
+  }
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    throw new Error(`Invalid SFTP_PORT: ${port}`);
+  }
+
+  return {
+    sftpConfig: { host, port, username, password },
+    remoteWatchDir,
+  };
+}
 
 /**
  * Download torrent and prepare for qBittorrent
@@ -171,14 +210,15 @@ export async function download(torrent, cfClearance = {}) {
     }
     
     // Upload to remote SFTP server
-    const remotePath = `${REMOTE_WATCH_DIR}/${torrentFilename}`;
+    const { sftpConfig, remoteWatchDir } = await getSftpSettings();
+    const remotePath = `${remoteWatchDir}/${torrentFilename}`;
     
     console.log(`\nUploading to SFTP server...`);
     console.log(`Remote path: ${remotePath}`);
     
     const sftp = new Client();
     try {
-      await sftp.connect(SFTP_CONFIG);
+      await sftp.connect(sftpConfig);
       console.log('Connected to SFTP server');
       
       await sftp.put(torrentData, remotePath);

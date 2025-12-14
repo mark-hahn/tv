@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { loadCreds } from './qb-cred.js';
 
 function parseArgValue(args, name) {
   const idx = args.indexOf(name);
@@ -16,14 +17,11 @@ function parseArgValue(args, name) {
 function usageAndExit(code) {
   const msg = [
     'Usage:',
-    '  QB_USER=... QB_PASS=... node qb-info.js [--ssh xobtlu@oracle.usbx.me] [--qb-port 12041]',
+    '  node qbt-torrents.js [--ssh user@host] [--qb-port 12041]',
     '',
-    'Env vars:',
-    '  QB_USER     qBittorrent WebUI username (required)',
-    '  QB_PASS     qBittorrent WebUI password (required)',
-    '  SSH_TARGET  SSH target (default: xobtlu@oracle.usbx.me)',
-    '  QB_PORT     qBittorrent WebUI port on the remote host (default: 12041)',
-    '  LOCAL_PORT  Local forwarded port (default: auto)',
+    'Config:',
+    '  Reads defaults from torrents/qb-cred.txt:',
+    '    QB_USER, QB_PASS, SSH_TARGET, optional QB_PORT',
     '',
     'Notes:',
     '  This script runs curl on the remote host via SSH against http://127.0.0.1:<QB_PORT>.',
@@ -100,24 +98,36 @@ function runSshScript({ sshTarget, script, timeoutMs = 30_000 }) {
 }
 
 export async function fetchTorrentsInfo({
-  sshTarget = 'xobtlu@oracle.usbx.me',
-  qbPort = 12041,
+  sshTarget,
+  qbPort,
   qbUser,
   qbPass,
 } = {}) {
-  if (!qbUser || !qbPass) {
-    throw new Error('Missing qbUser/qbPass');
+  const { creds: fileCreds } = await loadCreds();
+
+  const resolvedQbUser = qbUser || fileCreds.QB_USER;
+  const resolvedQbPass = qbPass || fileCreds.QB_PASS;
+  const resolvedSshTarget = sshTarget || fileCreds.SSH_TARGET;
+  const resolvedQbPortRaw =
+    qbPort ??
+    (fileCreds.QB_PORT ? Number(fileCreds.QB_PORT) : 12041);
+
+  if (!resolvedQbUser || !resolvedQbPass) {
+    throw new Error('Missing QB_USER/QB_PASS in torrents/qb-cred.txt');
   }
-  if (!Number.isInteger(qbPort) || qbPort <= 0 || qbPort > 65535) {
-    throw new Error(`Invalid qbPort: ${qbPort}`);
+  if (!resolvedSshTarget) {
+    throw new Error('Missing SSH_TARGET in torrents/qb-cred.txt');
+  }
+  if (!Number.isInteger(resolvedQbPortRaw) || resolvedQbPortRaw <= 0 || resolvedQbPortRaw > 65535) {
+    throw new Error(`Invalid qbPort: ${resolvedQbPortRaw}`);
   }
 
   // Run curl on the remote host against its localhost WebUI.
   const remoteScript = `set -euo pipefail
-QB_USER=${bashEscape(qbUser)}
-QB_PASS=${bashEscape(qbPass)}
+QB_USER=${bashEscape(resolvedQbUser)}
+QB_PASS=${bashEscape(resolvedQbPass)}
 
-BASE="http://127.0.0.1:${qbPort}"
+BASE="http://127.0.0.1:${resolvedQbPortRaw}"
 COOK="$(mktemp)"
 trap 'rm -f "$COOK"' EXIT
 
@@ -135,12 +145,12 @@ curl -sS \
   "$BASE/api/v2/torrents/info"
 `;
 
-  const { stdout } = await runSshScript({ sshTarget, script: remoteScript });
+  const { stdout } = await runSshScript({ sshTarget: resolvedSshTarget, script: remoteScript });
   return stdout;
 }
 
 // Convenience default export so callers can do:
-//   import fetchTorrentsInfo from './qb-info.js'
+//   import fetchTorrentsInfo from './qbt-torrents.js'
 export default fetchTorrentsInfo;
 
 async function main() {
@@ -149,20 +159,11 @@ async function main() {
     usageAndExit(0);
   }
 
-  const qbUser = process.env.QB_USER;
-  const qbPass = process.env.QB_PASS;
-  if (!qbUser || !qbPass) {
-    process.stderr.write('Missing QB_USER and/or QB_PASS.\n');
-    usageAndExit(2);
-  }
+  const sshTarget = parseArgValue(argv, '--ssh');
+  const qbPortRaw = parseArgValue(argv, '--qb-port');
+  const qbPort = qbPortRaw ? Number(qbPortRaw) : undefined;
 
-  const sshTarget = parseArgValue(argv, '--ssh') || process.env.SSH_TARGET || 'xobtlu@oracle.usbx.me';
-  const qbPortRaw = parseArgValue(argv, '--qb-port') || process.env.QB_PORT;
-  const qbPort = qbPortRaw ? Number(qbPortRaw) : 12041;
-  const localPortRaw = parseArgValue(argv, '--local-port') || process.env.LOCAL_PORT;
-  const localPort = localPortRaw ? Number(localPortRaw) : undefined;
-
-  const json = await fetchTorrentsInfo({ sshTarget, qbPort, qbUser, qbPass, localPort });
+  const json = await fetchTorrentsInfo({ sshTarget, qbPort });
   process.stdout.write(json);
 }
 

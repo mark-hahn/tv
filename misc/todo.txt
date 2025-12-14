@@ -5,10 +5,18 @@ reminder, restore ...
 bugs ...
 
 todo ...
+  use minimum from emby
+    shows
+    watched
+    collections
+    favorite?
+  compare & merge tvdd, tmdb, actors
+  episode arrivals (fgh, qBittorrent, tv-proc)
   add tv guide
   sort by waiting date
   keep deleted date forever
   get drama field from tvdb (as many fields as possible)
+  show waiting for not in emby
 
 non-simple:
   
@@ -16,7 +24,6 @@ simple ...
   
 tabled ...
   show episode being watched (next up line)
-  not in emby doesn't show waiting
   button: scroll hilighted row to vis 
   refresh filtered rows when new gap loaded
   up/dn arrows

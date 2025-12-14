@@ -264,7 +264,12 @@ export default {
         if (!window.confirm(
             `Do you really want to delete series ${name}?`)) 
           return;
+        // Optimistically remove from UI before slow deletes
+        this.removeRow(show);
         await emby.deleteShowFromEmby(show);
+      } else {
+        // Non-emby: still remove immediately
+        this.removeRow(show);
       }
       const tvdbData = allTvdb[name];
 

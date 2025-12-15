@@ -49,12 +49,10 @@ export default {
 
   mounted() {
     evtBus.on('paneChanged', this.onPaneChanged);
-    evtBus.on('resetDlStatusPane', this.resetPane);
   },
 
   unmounted() {
     evtBus.off('paneChanged', this.onPaneChanged);
-    evtBus.off('resetDlStatusPane', this.resetPane);
     this.stopPolling();
     this.cards = [];
   },
@@ -80,10 +78,6 @@ export default {
       this._polling = false;
     },
 
-    resetPane() {
-      this.stopPolling();
-      this.cards = [];
-    },
 
     sleep(ms) {
       return new Promise(resolve => setTimeout(resolve, ms));

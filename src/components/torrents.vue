@@ -186,15 +186,8 @@ export default {
     },
 
     handleClose() {
-      this.selectedTorrent = null;
-      this.showModal = false;
-      this.clickedTorrents.clear();
+      // Do not reset pane state on close; only stop background polling.
       this.stopQbtPolling();
-      this.qbtPollText = '';
-      this._qbtSawTorrent = false;
-      this._qbtLastTorrent = null;
-      this.spaceAvailText = 'Space Used, Seed Box: --%, Server: --%';
-      this.spaceAvailGbText = 'Available, Seed Box: -- GB, Server: -- GB';
       this.$emit('close');
     },
 

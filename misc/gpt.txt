@@ -1,4 +1,8 @@
 
 Torrents, Status, History, Series, and Map
 
-change name of Load Torrents button below cf_clearance inputs to Save Cookies.  When that button is clicked and cookies are saved then hide cf_clearance inputs and do not start any torrent loading.
+do not reset torrents or status panes except when show selection changes.
+
+the torrent search in torrent pane restarts when switching panes.  it should only restart when a show selection changes
+
+the status pane should never reset

@@ -78,6 +78,7 @@ export default {
       currentTvdbData: null,
       currentShow: null,
       _torrentsInitialized: false,
+      _torrentsShowKey: null,
       mapShow: null,
       hideMapBottom: true,
       seriesMapSeasons: [],
@@ -184,11 +185,21 @@ export default {
       evtBus.emit('mapAction', { action: 'close', show: null });
     },
     handleShowTorrents(show) {
+      const showKey = show?.Id || show?.Name || null;
+
+      // Switching panes should not restart searching; only restart when show selection changes.
+      if (this._torrentsInitialized && this._torrentsShowKey && showKey && this._torrentsShowKey === showKey) {
+        this.currentPane = 'torrents';
+        evtBus.emit('paneChanged', this.currentPane);
+        return;
+      }
+
       this.currentPane = 'torrents';
       evtBus.emit('paneChanged', this.currentPane);
       // Emit event to torrents component with show data
       evtBus.emit('showTorrents', show);
       this._torrentsInitialized = true;
+      this._torrentsShowKey = showKey;
     },
 
     handleShowStatus() {
@@ -270,10 +281,15 @@ export default {
     // Close torrents or actors pane when a different show is selected
     evtBus.on('setUpSeries', (show) => {
       if (this.currentPane === 'torrents' || this.currentPane === 'dlstatus') {
+        const prevPane = this.currentPane;
         this.currentPane = 'series';
         evtBus.emit('paneChanged', this.currentPane);
-        evtBus.emit('resetTorrentsPane');
-        evtBus.emit('resetDlStatusPane');
+        // Only reset torrents; status pane should never reset.
+        if (prevPane === 'torrents') {
+          evtBus.emit('resetTorrentsPane');
+        }
+        this._torrentsInitialized = false;
+        this._torrentsShowKey = null;
         return;
       }
 

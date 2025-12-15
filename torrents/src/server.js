@@ -6,9 +6,8 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import * as search from './search.js';
 import * as download from './download.js';
-import fetchTorrentsInfo from './qbt-torrents.js';
-import { loadCreds } from './qb-cred.js';
 import { tvdbProxyGet } from './tvdb-proxy.js';
+import { getQbtInfo } from './usb.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,7 +17,7 @@ console.log(''); // Blank line on restart
 const app = express();
 
 const QBT_TEST_PORT = 3001;
-const TEST_QBT      = false
+const DUMP_INFO = true;
 
 // Load SSL certificate
 const httpsOptions = {
@@ -43,64 +42,29 @@ app.use(express.json());
 // Initialize torrent search providers
 search.initializeProviders();
 
-// One-time startup probe for qb-info (runs only when TEST_QBT is enabled)
-if (TEST_QBT) (async () => {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-
-  const credPath = path.resolve(__dirname, '..', 'qb-cred.txt');
-
-  const { creds: fileCreds, loaded: fileCredsLoaded } = await loadCreds(credPath);
-
-  const qbUser = fileCreds.QB_USER;
-  const qbPass = fileCreds.QB_PASS;
-
-  const sshTarget = fileCreds.SSH_TARGET;
-  const qbPort = fileCreds.QB_PORT ? Number(fileCreds.QB_PORT) : undefined;
-  const localPort = fileCreds.LOCAL_PORT ? Number(fileCreds.LOCAL_PORT) : undefined;
-
-  console.log(
-    'qb-info probe: creds source=' +
-      (fileCredsLoaded ? `file(${credPath})` : 'none') +
-      `, user=${qbUser || '(missing)'}` +
-      `, passLen=${qbPass ? String(qbPass).length : 0}` +
-        `, sshTarget=${sshTarget || '(missing)'}` +
-      `, qbPort=${Number.isFinite(qbPort) ? qbPort : '(default)'}`
-  );
-  if (!qbUser || !qbPass) {
-    console.log('qb-info probe: skipped (QB_USER/QB_PASS missing in qb-cred.txt)');
-    return;
-  }
-
-  try {
-    const jsonText = await fetchTorrentsInfo({
-      qbUser,
-      qbPass,
-      sshTarget,
-      qbPort,
-      localPort,
-    });
-
-    let torrentsCount = undefined;
-    try {
-      const parsed = JSON.parse(jsonText);
-      if (Array.isArray(parsed)) torrentsCount = parsed.length;
-    } catch {
-      // ignore parse errors; still log raw length
-    }
-
-    console.log(
-      `qb-info probe: ok (bytes=${jsonText.length}` +
-      (typeof torrentsCount === 'number' ? `, torrents=${torrentsCount}` : '') +
-      ')'
-    );
-  } catch (e) {
-    console.error(`qb-info probe: failed: ${e?.message || e}`);
-  }
-})();
-
 // API endpoint
 app.get('/api/tvdb/*', tvdbProxyGet);
+
+app.get('/api/qbt/info', async (req, res) => {
+  try {
+    const info = await getQbtInfo();
+
+    if (DUMP_INFO) {
+      try {
+        const outPath = path.resolve(__dirname, '..', '..', 'sample-qbt', 'qbt-info.json');
+        fs.mkdirSync(path.dirname(outPath), { recursive: true });
+        fs.writeFileSync(outPath, JSON.stringify(info, null, 2), 'utf8');
+      } catch (e) {
+        console.error('qbt info dump error:', e);
+      }
+    }
+
+    res.json(info);
+  } catch (error) {
+    console.error('qbt info error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 app.get('/api/search', async (req, res) => {
   const showName = req.query.show;

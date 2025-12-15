@@ -1,1 +1,12 @@
 
+create module torrents/src/usb.js
+
+it should implement the logic in the bash script get-qbt-info to query the qbittorrent api to return info. it should use the credential file torrents/cookies/qbt-cred.txt.
+
+usb.js should export function getQbtInfo with no args and return an object from the returned json.
+
+it should not use any env var or npm run script.  it should only be used by calls from the client to server.js.
+
+add an endpoint from the client in server.js to run getQbtInfo and return the info to the client.
+
+explain how you plan to do this and whether you need more information from me.  don't change anything yet.

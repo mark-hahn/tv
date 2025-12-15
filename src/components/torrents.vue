@@ -109,7 +109,8 @@ export default {
       _qbtPolling: false,
       _qbtStopPolling: false,
       _qbtSawTorrent: false,
-      _qbtLastTorrent: null
+      _qbtLastTorrent: null,
+      _qbtSpeedHistory: []
     };
   },
 
@@ -200,6 +201,20 @@ export default {
       return `${v.toFixed(1)} ${units[i]}`;
     },
 
+    fmtSizeParts(bytes) {
+      const n = Number(bytes);
+      if (!Number.isFinite(n)) return null;
+      const b = Math.max(0, n);
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      let v = b;
+      let i = 0;
+      while (v >= 1000 && i < units.length - 1) {
+        v /= 1000;
+        i += 1;
+      }
+      return { value: v, unit: units[i] };
+    },
+
     fmtSpeedMbits(bytesPerSec) {
       const n = Number(bytesPerSec);
       if (!Number.isFinite(n)) return String(bytesPerSec);
@@ -229,21 +244,46 @@ export default {
       return this.pacificHms(base + etaSec);
     },
 
+    getAvgSpeedBytesPerSec() {
+      const xs = Array.isArray(this._qbtSpeedHistory) ? this._qbtSpeedHistory : [];
+      if (xs.length === 0) return undefined;
+      const sum = xs.reduce((acc, v) => acc + v, 0);
+      return sum / xs.length;
+    },
+
+    fmtDownloadedOfSize(downloadedBytes, sizeBytes) {
+      const size = this.fmtSizeParts(sizeBytes);
+      if (!size) return String(downloadedBytes);
+      const nDownloaded = Number(downloadedBytes);
+      if (!Number.isFinite(nDownloaded)) return String(downloadedBytes);
+
+      const divisorByUnit = {
+        B: 1,
+        KB: 1_000,
+        MB: 1_000_000,
+        GB: 1_000_000_000,
+        TB: 1_000_000_000_000
+      };
+      const div = divisorByUnit[size.unit] || 1;
+      const downloadedInUnit = Math.max(0, nDownloaded) / div;
+
+      if (size.unit === 'B') {
+        return `${Math.round(downloadedInUnit)} of ${Math.round(size.value)} ${size.unit}`;
+      }
+      return `${downloadedInUnit.toFixed(1)} of ${size.value.toFixed(1)} ${size.unit}`;
+    },
+
     formatQbtTorrentState(t) {
       const props = [
         ['name', 'string'],
-        ['size', 'size'],
-        ['downloaded', 'size'],
         ['state', 'string'],
-        ['trackers_count', 'integer'],
-        ['num_seeds', 'integer'],
-        ['dlspeed', 'speed'],
-        ['amount_left', 'size'],
+        ['downloaded', 'downloaded_of_size'],
         ['progress', 'percent'],
+        ['seeds', 'integer'],
+        ['speed', 'speed'],
         ['time_active', 'duration'],
-        ['time_remaining', 'duration'],
         ['added_on', 'date'],
-        ['seen_complete', 'date'],
+        ['time_remaining', 'duration_padded'],
         ['eta', 'date']
       ];
 
@@ -254,8 +294,14 @@ export default {
         let value;
         if (key === 'time_remaining') {
           value = t?.eta;
+        } else if (key === 'speed') {
+          value = this.getAvgSpeedBytesPerSec();
+        } else if (key === 'seeds') {
+          value = t?.num_seeds;
         } else if (key === 'eta') {
           value = this.computeEtaTime(t);
+        } else if (key === 'downloaded') {
+          value = this.fmtDownloadedOfSize(t?.downloaded, t?.size);
         } else {
           value = t?.[key];
         }
@@ -271,11 +317,19 @@ export default {
           case 'duration':
             shown = this.fmtDurationMmSs(value);
             break;
+          case 'duration_padded': {
+            const mmss = this.fmtDurationMmSs(value);
+            shown = `   ${mmss}`;
+            break;
+          }
           case 'percent':
             shown = this.fmtPercent(value);
             break;
           case 'date':
             shown = this.pacificHms(value);
+            break;
+          case 'downloaded_of_size':
+            shown = value;
             break;
           default:
             shown = value;
@@ -307,6 +361,7 @@ export default {
       this._qbtStopPolling = false;
       this._qbtSawTorrent = false;
       this._qbtLastTorrent = null;
+      this._qbtSpeedHistory = [];
       this._qbtPolling = true;
       this.qbtPollText = 'Waiting for download to start ...';
 
@@ -326,7 +381,7 @@ export default {
           if (this._qbtSawTorrent) {
             // After we have shown a torrent, an empty result means downloading has stopped.
             if (this._qbtLastTorrent) {
-              const doneTorrent = { ...this._qbtLastTorrent, amount_left: 0 };
+              const doneTorrent = { ...this._qbtLastTorrent, amount_left: 0, state: 'finished', eta: 0 };
               this.qbtPollText = this.formatQbtTorrentState(doneTorrent);
               this._qbtLastTorrent = doneTorrent;
             }
@@ -338,6 +393,15 @@ export default {
         } else {
           this._qbtSawTorrent = true;
           this._qbtLastTorrent = first;
+
+          const s = Number(first?.dlspeed);
+          if (Number.isFinite(s) && s >= 0) {
+            this._qbtSpeedHistory.push(s);
+            if (this._qbtSpeedHistory.length > 5) {
+              this._qbtSpeedHistory.splice(0, this._qbtSpeedHistory.length - 5);
+            }
+          }
+
           this.qbtPollText = this.formatQbtTorrentState(first);
         }
 

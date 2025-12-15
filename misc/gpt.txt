@@ -48,5 +48,10 @@ added_on (date),
 seen_complete (date),
 eta (date)
 
+remove speed and rename avg_speed to speed
+--
+combine trackers_count and num_seeds to name trackers/seeds and value <trackers_count/<num_seeds>
 
-change 
+replace trackers/seeds with just seeds and no trackers
+--
+add cur_time with value of the current now time in date format at end of list

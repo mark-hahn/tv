@@ -5,10 +5,14 @@ reminder, restore ...
 bugs ...
 
 todo ...
-  add (Sxx-yy) format
+  add downloadStatus pane w multiple downloads
+  chg dload confirm msg
+  show tv-proc status
+  add (Sxx-yy) format to title parsing
   show torrent card badges for previously downloaded
   add added and downloaded history pane
-  add time-now
+    from qbt-info
+
   use minimum from emby
     shows
     watched

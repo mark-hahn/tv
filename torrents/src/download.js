@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 
 const SAVE_TORRENT_FILE = false;
 const SAVE_DETAIL_FILE  = false;
-const DOWNLOAD_DEBUG    = true;
+const DOWNLOAD_DEBUG    = false;
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });

@@ -7,6 +7,4 @@ app-bad.vue
 emby-bad.js
 .vscode/bookmarks.json
 temp.txt
-
-# Secrets
-torrents/qb-cred.txt
+torrents/cookies/qbt-cred.txt

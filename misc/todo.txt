@@ -5,6 +5,10 @@ reminder, restore ...
 bugs ...
 
 todo ...
+  add (Sxx-yy) format
+  show torrent card badges for previously downloaded
+  add added and downloaded history pane
+  add time-now
   use minimum from emby
     shows
     watched

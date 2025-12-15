@@ -2,14 +2,17 @@
 .torrents-container(@click="handleClose" :style="{ height:'100%', width:'100%', display:'flex', justifyContent:'flex-start' }")
   #torrents(@click="handleClose" :style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
 
-    #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'15px', display:'flex', justifyContent:'space-between', alignItems:'center' }")
-      div(style="margin-left:20px;") {{ showName }}
-      div(style="display:flex; gap:10px; margin-right:20px;")
-        button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px; background:#4CAF50; color:white; border:none;") Download
-        button(v-if="noTorrentsNeeded" @click.stop="forceLoadTorrents" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px; background:#2196F3; color:white; border:none;") Force
-        button(@click.stop="toggleCookieInputs" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Cookies
-        button(@click.stop="$emit('series')" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Series
-        button(@click.stop="handleMapButton" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Map
+    #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'15px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
+      div(style="display:flex; justify-content:space-between; align-items:center;")
+        div(style="margin-left:20px;") {{ showName }}
+        div(style="display:flex; gap:10px; margin-right:20px;")
+          button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px; background:#4CAF50; color:white; border:none;") Download
+          button(v-if="noTorrentsNeeded" @click.stop="forceLoadTorrents" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px; background:#2196F3; color:white; border:none;") Force
+          button(@click.stop="toggleCookieInputs" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Cookies
+          button(@click.stop="$emit('series')" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Series
+          button(@click.stop="handleMapButton" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Map
+
+      div(v-if="_qbtPolling && !_qbtSawTorrent" style="margin-left:20px; margin-right:20px; margin-top:6px; font-weight:normal; font-size:14px; color:#666;") Waiting for download to start ...
 
     #cookie-inputs(@click.stop v-if="!loading && !noTorrentsNeeded && (isCookieRelatedError || showCookieInputs)" style="position:sticky; top:0; zIndex:50; padding:15px 20px 15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
       
@@ -41,14 +44,16 @@
       div No torrents needed.
       
     #torrents-list(v-if="!unaired && !loading && !noTorrentsNeeded" style="padding:10px; font-size:14px; line-height:1.6;")
-      div(v-if="torrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
-        div No torrents found
-      div(v-for="(torrent, index) in torrents" :key="index" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
-        div(v-if="isClicked(torrent)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
-        div(v-if="SHOW_TITLE && torrent.raw" style="font-size:12px; color:#888; margin-bottom:4px;") {{ torrent.raw.title }}
-        div(style="font-size:18px; color:#333;") 
-          strong {{ getDisplaySeasonEpisode(torrent) }}
-          | : {{ torrent.raw?.size || 'N/A' }}, {{ torrent.raw?.seeds || 0 }} seeds<span v-if="torrent.raw?.provider">, {{ formatProvider(torrent.raw.provider) }}</span><span v-if="torrent.parsed?.resolution">, {{ torrent.parsed.resolution }}</span><span v-if="torrent.parsed?.group">, {{ formatGroup(torrent.parsed.group) }}</span>
+      pre(v-if="qbtPollText && !(_qbtPolling && !_qbtSawTorrent)" style="margin:0 0 10px 0; padding:10px; background:#fff; border:1px solid #ddd; border-radius:5px; white-space:pre; overflow-x:auto;") {{ qbtPollText }}
+      template(v-if="!_qbtSawTorrent")
+        div(v-if="torrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
+          div No torrents found
+        div(v-for="(torrent, index) in torrents" :key="index" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
+          div(v-if="isClicked(torrent)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
+          div(v-if="SHOW_TITLE && torrent.raw" style="font-size:12px; color:#888; margin-bottom:4px;") {{ torrent.raw.title }}
+          div(style="font-size:18px; color:#333;") 
+            strong {{ getDisplaySeasonEpisode(torrent) }}
+            | : {{ torrent.raw?.size || 'N/A' }}, {{ torrent.raw?.seeds || 0 }} seeds<span v-if="torrent.raw?.provider">, {{ formatProvider(torrent.raw.provider) }}</span><span v-if="torrent.parsed?.resolution">, {{ torrent.parsed.resolution }}</span><span v-if="torrent.parsed?.group">, {{ formatGroup(torrent.parsed.group) }}</span>
 
   #download-modal(v-if="showModal" @click.stop="showModal = false" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:10000;")
     #modal-content(@click.stop style="background:white; padding:30px; border-radius:10px; max-width:500px; box-shadow:0 4px 20px rgba(0,0,0,0.3);")
@@ -98,7 +103,13 @@ export default {
       clickedTorrents: new Set(),  // Track which torrents have been clicked
       noTorrentsNeeded: false,  // Flag when needed array is empty
       showCookieInputs: false,  // Manual toggle for cookie input boxes
-      unaired: false
+      unaired: false,
+
+      qbtPollText: '',
+      _qbtPolling: false,
+      _qbtStopPolling: false,
+      _qbtSawTorrent: false,
+      _qbtLastTorrent: null
     };
   },
 
@@ -135,6 +146,7 @@ export default {
 
   unmounted() {
     evtBus.off('showTorrents', this.searchTorrents);
+    this.stopQbtPolling();
   },
 
   methods: {
@@ -142,7 +154,195 @@ export default {
       this.selectedTorrent = null;
       this.showModal = false;
       this.clickedTorrents.clear();
+      this.stopQbtPolling();
+      this.qbtPollText = '';
+      this._qbtSawTorrent = false;
+      this._qbtLastTorrent = null;
       this.$emit('close');
+    },
+
+    stopQbtPolling() {
+      this._qbtStopPolling = true;
+      this._qbtPolling = false;
+    },
+
+    sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    },
+
+    pacificHms(epochSeconds) {
+      const n = Number(epochSeconds);
+      if (!Number.isFinite(n) || n <= 0) return epochSeconds;
+      const d = new Date(n * 1000);
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }).formatToParts(d);
+      const get = (t) => parts.find(p => p.type === t)?.value;
+      return `${get('hour')}:${get('minute')}:${get('second')}`;
+    },
+
+    fmtSize(bytes) {
+      const n = Number(bytes);
+      if (!Number.isFinite(n)) return String(bytes);
+      const b = Math.max(0, n);
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      let v = b;
+      let i = 0;
+      while (v >= 1000 && i < units.length - 1) {
+        v /= 1000;
+        i += 1;
+      }
+      if (i === 0) return `${Math.round(v)} B`;
+      return `${v.toFixed(1)} ${units[i]}`;
+    },
+
+    fmtSpeedMbits(bytesPerSec) {
+      const n = Number(bytesPerSec);
+      if (!Number.isFinite(n)) return String(bytesPerSec);
+      const gbitPerSec = (Math.max(0, n) * 8) / 1_000_000_000;
+      return `${gbitPerSec.toFixed(3)} gb/sec`;
+    },
+
+    fmtDurationMmSs(seconds) {
+      const n = Number(seconds);
+      if (!Number.isFinite(n) || n < 0) return String(seconds);
+      const s = Math.floor(n);
+      const mm = Math.floor(s / 60);
+      const ss = s % 60;
+      return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+    },
+
+    fmtPercent(progress) {
+      const n = Number(progress);
+      if (!Number.isFinite(n)) return String(progress);
+      return `${Math.round(n * 100)}%`;
+    },
+
+    computeEtaTime(t) {
+      const etaSec = Number(t?.eta);
+      if (!Number.isFinite(etaSec) || etaSec < 0) return String(t?.eta);
+      const base = Math.floor(Date.now() / 1000);
+      return this.pacificHms(base + etaSec);
+    },
+
+    formatQbtTorrentState(t) {
+      const props = [
+        ['name', 'string'],
+        ['size', 'size'],
+        ['downloaded', 'size'],
+        ['state', 'string'],
+        ['trackers_count', 'integer'],
+        ['num_seeds', 'integer'],
+        ['dlspeed', 'speed'],
+        ['amount_left', 'size'],
+        ['progress', 'percent'],
+        ['time_active', 'duration'],
+        ['time_remaining', 'duration'],
+        ['added_on', 'date'],
+        ['seen_complete', 'date'],
+        ['eta', 'date']
+      ];
+
+      const maxKeyLen = Math.max(...props.map(([k]) => k.length));
+      const lines = [];
+
+      for (const [key, kind] of props) {
+        let value;
+        if (key === 'time_remaining') {
+          value = t?.eta;
+        } else if (key === 'eta') {
+          value = this.computeEtaTime(t);
+        } else {
+          value = t?.[key];
+        }
+
+        let shown;
+        switch (kind) {
+          case 'size':
+            shown = this.fmtSize(value);
+            break;
+          case 'speed':
+            shown = this.fmtSpeedMbits(value);
+            break;
+          case 'duration':
+            shown = this.fmtDurationMmSs(value);
+            break;
+          case 'percent':
+            shown = this.fmtPercent(value);
+            break;
+          case 'date':
+            shown = this.pacificHms(value);
+            break;
+          default:
+            shown = value;
+        }
+
+        const shownText = (shown === undefined || shown === null) ? '' : String(shown);
+        const pad = ' '.repeat((maxKeyLen - key.length) + 2);
+        lines.push(`${key}:${pad}${shownText}`);
+      }
+
+      return lines.join('\n');
+    },
+
+    async getQbtInfo(filterObj) {
+      const url = new URL(`${config.torrentsApiUrl}/api/qbt/info`);
+      if (filterObj && typeof filterObj === 'object') {
+        if (filterObj.hash) url.searchParams.set('hash', filterObj.hash);
+        if (filterObj.category) url.searchParams.set('category', filterObj.category);
+        if (filterObj.tag) url.searchParams.set('tag', filterObj.tag);
+        if (filterObj.filter) url.searchParams.set('filter', filterObj.filter);
+      }
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      return res.json();
+    },
+
+    async startQbtPollingAfterDownloadApproved() {
+      this.stopQbtPolling();
+      this._qbtStopPolling = false;
+      this._qbtSawTorrent = false;
+      this._qbtLastTorrent = null;
+      this._qbtPolling = true;
+      this.qbtPollText = 'Waiting for download to start ...';
+
+      while (!this._qbtStopPolling) {
+        let torrents;
+        try {
+          torrents = await this.getQbtInfo({ filter: 'downloading' });
+        } catch (e) {
+          // Keep showing last good state; do not stop polling on transient fetch errors.
+          console.error('getQbtInfo polling error:', e);
+          await this.sleep(1000);
+          continue;
+        }
+
+        const first = Array.isArray(torrents) ? torrents[0] : undefined;
+        if (!first) {
+          if (this._qbtSawTorrent) {
+            // After we have shown a torrent, an empty result means downloading has stopped.
+            if (this._qbtLastTorrent) {
+              const doneTorrent = { ...this._qbtLastTorrent, amount_left: 0 };
+              this.qbtPollText = this.formatQbtTorrentState(doneTorrent);
+              this._qbtLastTorrent = doneTorrent;
+            }
+            this._qbtStopPolling = true;
+            this._qbtPolling = false;
+            break;
+          }
+          this.qbtPollText = 'Waiting for download to start ...';
+        } else {
+          this._qbtSawTorrent = true;
+          this._qbtLastTorrent = first;
+          this.qbtPollText = this.formatQbtTorrentState(first);
+        }
+
+        await this.sleep(1000);
+      }
     },
 
     toggleCookieInputs() {
@@ -165,6 +365,10 @@ export default {
       this.noTorrentsNeeded = false;
       this.providerWarning = '';
       this.loading = false;
+      this.stopQbtPolling();
+      this.qbtPollText = '';
+      this._qbtSawTorrent = false;
+      this._qbtLastTorrent = null;
       this.unaired = !!show?.S1E1Unaired;
       if (this.unaired) {
         // Short-circuit: show only the unaired message
@@ -510,7 +714,7 @@ export default {
         
         // Check if download was successful
         if (data.success || data.result === true) {
-          alert(`Downloaded ${torrentTitle}`);
+          this.startQbtPollingAfterDownloadApproved();
         } else {
           const errorMsg = data.error || data.message || 'Unknown error';
           alert(`Download failed for ${torrentTitle}, ${errorMsg}`);

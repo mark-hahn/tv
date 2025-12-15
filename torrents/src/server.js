@@ -64,7 +64,15 @@ app.get('/api/tvdb/*', tvdbProxyGet);
 
 app.get('/api/qbt/info', async (req, res) => {
   try {
-    const info = await getQbtInfo();
+    const q = req.query || {};
+    const filterObj = {};
+    if (typeof q.hash === 'string' && q.hash) filterObj.hash = q.hash;
+    if (typeof q.category === 'string' && q.category) filterObj.category = q.category;
+    if (typeof q.tag === 'string' && q.tag) filterObj.tag = q.tag;
+    if (typeof q.filter === 'string' && q.filter) filterObj.filter = q.filter;
+
+    const useFilter = Object.keys(filterObj).length > 0 ? filterObj : undefined;
+    const info = await getQbtInfo(useFilter);
 
     if (DUMP_INFO) {
       try {

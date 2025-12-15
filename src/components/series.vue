@@ -10,8 +10,9 @@
         div(v-if="show?.Reject"
             style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; margin-right:10px;") Banned From Download
         button(v-if="!simpleMode"
-                @click.stop="torrentsClick"
-                style="font-size:15px; cursor:pointer; margin-left:20px; margin-top:3px; max-height:24px; border-radius: 7px;") Torrents
+          @click.stop="torrentsClick"
+          style="font-size:15px; cursor:pointer; margin-left:20px; margin-top:3px; max-height:24px; border-radius: 7px;") Download
+        
         button(v-if="!simpleMode"
                 @click.stop="deleteClick"
                 style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;") Delete

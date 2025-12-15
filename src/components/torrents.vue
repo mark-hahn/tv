@@ -6,11 +6,17 @@
       div(style="display:flex; justify-content:space-between; align-items:center;")
         div(style="margin-left:20px;") {{ showName }}
         div(style="display:flex; gap:10px; margin-right:20px;")
-          button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px; background:#4CAF50; color:white; border:none;") Download
-          button(v-if="noTorrentsNeeded" @click.stop="forceLoadTorrents" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px; background:#2196F3; color:white; border:none;") Force
-          button(@click.stop="toggleCookieInputs" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Cookies
-          button(@click.stop="$emit('series')" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Series
-          button(@click.stop="handleMapButton" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Map
+          button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px; background:#4CAF50; color:white; border:none;") Download
+          button(@click.stop="toggleCookieInputs" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Cookies
+          button(@click.stop="$emit('series')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Series
+          button(@click.stop="handleMapButton" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Map
+
+      div(style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;")
+        div
+        div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
+          button(v-if="noTorrentsNeeded" @click.stop="forceLoadTorrents" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Force
+          button(@click.stop="$emit('status')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Status
+          button(@click.stop="$emit('history')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") History
 
       div(v-if="_qbtPolling && !_qbtSawTorrent" style="margin-left:20px; margin-right:20px; margin-top:6px; font-weight:normal; font-size:14px; color:#666; display:block; line-height:1.2;") Waiting for download to start ...
       div(style="margin-left:20px; margin-right:20px; margin-top:14px; font-weight:normal; font-size:16px; color:#666; display:block; visibility:visible; opacity:1; line-height:1.1; white-space:nowrap; overflow:visible;") {{ spaceAvailText }}
@@ -413,7 +419,7 @@ export default {
         const srvrGb = this.fmtAvailGb(s?.mediaSpaceTotal, s?.mediaSpaceUsed);
         this.spaceAvailGbText = `Available, Seed Box: ${usbGb} GB, Server: ${srvrGb} GB`;
       } catch (e) {
-        console.error('spaceAvail fetch error:', e);
+        // ignore
       }
     },
 
@@ -432,7 +438,6 @@ export default {
           torrents = await this.getQbtInfo({ filter: 'downloading' });
         } catch (e) {
           // Keep showing last good state; do not stop polling on transient fetch errors.
-          console.error('getQbtInfo polling error:', e);
           await this.sleep(1000);
           continue;
         }
@@ -551,7 +556,7 @@ export default {
           return needed;
         }
 
-        console.log('Series map for', show.Name, seriesMap);
+
         
         // Scan for needed episodes
         let hasStartedWatching = false;
@@ -634,9 +639,8 @@ export default {
         }
         
       } catch (err) {
-        console.error('Error calculating needed episodes:', err);
+        // ignore
       }
-      console.log('Needed episodes for', show.Name, needed);
       return needed;
     },
 
@@ -730,7 +734,6 @@ export default {
 
         // If both providers returned 0, treat as no results (show inputs via computed)
         if ((iptCount === 0 || iptCount === undefined) && (tlCount === 0 || tlCount === undefined)) {
-          console.log('Cookie input shown: Both providers returned 0');
           this.providerWarning = '';
           this.error = `No torrents found for "${this.currentShow.Name}"`;
           this.torrents = [];
@@ -753,12 +756,8 @@ export default {
         // Finally, set torrents
         this.torrents = data.torrents || [];
       } catch (err) {
-        console.error('Torrent search error:', err);
-        
         // Handle both Error objects and rejected promise values
         const errorMessage = err?.message || err?.result || err?.error || (typeof err === 'string' ? err : JSON.stringify(err));
-        
-        console.log('Cookie input shown: Error occurred -', errorMessage);
         this.error = errorMessage;
       } finally {
         this.loading = false;
@@ -814,12 +813,10 @@ export default {
       this.showModal = false;
       
       if (!this.selectedTorrent) {
-        console.log('No torrent selected');
         return;
       }
       
       const torrentTitle = this.selectedTorrent.raw?.title || 'Unknown';
-      console.log('Attempting to download torrent:', this.selectedTorrent);
       
       try {
         // Get cf_clearance cookies from localStorage
@@ -844,7 +841,6 @@ export default {
         }
         
         const data = await response.json();
-        console.log('Download result:', data);
         
         // Check if download was successful
         if (data.success || data.result === true) {
@@ -854,7 +850,6 @@ export default {
           alert(`Download failed for ${torrentTitle}, ${errorMsg}`);
         }
       } catch (error) {
-        console.error('Download error:', error);
         const errorMsg = error.message || String(error);
         alert(`Download failed for ${torrentTitle}, ${errorMsg}`);
       }
@@ -884,7 +879,6 @@ export default {
       
       // Check if torrent has parsed data
       if (!torrent.parsed) {
-        console.log('No parsed data for torrent:', torrent);
         return torrent.title || '';
       }
 
@@ -924,7 +918,6 @@ export default {
       }
       
       // Fallback to title if no season info
-      console.log('Falling back to title:', torrent.parsed.title);
       return torrent.parsed.title || '';
     },
 

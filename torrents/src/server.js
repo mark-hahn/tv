@@ -12,7 +12,12 @@ import { getQbtInfo, spaceAvail } from './usb.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-console.log(''); // Blank line on restart
+const TORRENTS_DEBUG = process.env.TORRENTS_DEBUG === '1';
+if (!TORRENTS_DEBUG) {
+  // Remove debug noise in production.
+  console.log = () => {};
+  console.warn = () => {};
+}
 
 const app = express();
 

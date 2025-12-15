@@ -1,37 +1,22 @@
 
-rename the Torrents buttons in series.vue and map.view to Download
+Torrents, Status, History, Series, and Map
 
-create a new file src/components/dlstatus.vue. it is a pane component the same size and position as series.vue, map.vue, torrents.vue, etc. 
+create a new file src/components/dlstatus.vue. it is a pane component the same size and position as series.vue, map.vue, torrents.vue, etc. i will call it the status pane.
 
-like the torrents pane it is only used in the app's non-simple mode.
+use a sticky non-scrolling header that has a row of buttons aligned to the right the same size and style of series pane.  The buttons are Torrents, History, Series, and Map
 
-there is a sticky non-scrolling header that has a row of buttons aligned to the right.  The buttons are Torrents, History, Series, and Map
+refactor code from torrents pane to status pane. The code moved should include at least repeatedly calling the qbittorrent api for info torrents and displaying the torrent info in a list.
 
+the repeated calling of the api should start when status pane is loaded and continue until the pane is closed.  
 
-export a function spaceAvail() in torrents/src/usb.js with no args that returns four integers:
-total size of usb server storage (usbSpaceTotal),
-used size of usb server storage (usbSpaceUsed),
-total size of local mounted /mnt/media disk (mediaSpaceTotal),
-used size of local mounted /mnt/media disk (mediaSpaceUsed).
+There may be more than one info torrent returned from api. There should be a card for each returned info torrent. every time an info torrent is received match it to any existing card using the hash and update the card.
 
-add an endpoint to torrents/src/server.js to call spaceAvail() from the client app.
+when an info torrent is received that doesn't match any existing card then create a new card and add it to the top of the card list.
 
-for now return usbSpaceTotal as 2e9.
+when no cards are showing display the message "No files are downloading."
 
-usbSpaceUsed will be determined by using ssh to the QB_HOST specified in torrents/src/qb-cred.js.  use the command: ssh <QB_HOST> "cd; du -s"
- and return the integer in the last line of the result.
+do not remove any cards until the pane is closed.
 
-mediaSpaceTotal and mediaSpaceUsed should be gotten from the df command on local mnt/media disk.
+clicking the status button in the torrents pane should open the status pane.
 
-----
-
-in torrents.vue add a second status line to the torrents pane sticky header. it will show "Space Available, Seed Box: <usbPercent>, Server: <srvrPercent>". The line will be generated when torrents pane is first shown and updated when any download finishes.
-
-usbPercent is (usbSpaceTotal - usbSpaceUsed) / usbSpaceTotal shown as integer percentage.
-
-srvrPercent is (mediaSpaceTotal - mediaSpaceUsed) / mediaSpaceTotal shown as integer percentage.
-
-
-add new line below space line "Available, Seed Box: <usb> GB, Server: <srvr> GB" where usb is integer (usbSpaceTotal - usbSpaceUsed)/1e9 and srvr is integer (mediaSpaceTotal - mediaSpaceUsed)/1e9 
-
-switch server space reporting to use /mnt/m-bkup, not /mnt/media
+clicking the torrents button in the status pane should open the torrents pane.

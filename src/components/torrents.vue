@@ -22,12 +22,10 @@
       div(style="margin-left:20px; margin-right:20px; margin-top:14px; font-weight:normal; font-size:16px; color:#666; display:block; visibility:visible; opacity:1; line-height:1.1; white-space:nowrap; overflow:visible;") {{ spaceAvailText }}
       div(style="margin-left:20px; margin-right:20px; margin-top:2px; font-weight:normal; font-size:16px; color:#666; display:block; visibility:visible; opacity:1; line-height:1.1; white-space:nowrap; overflow:visible;") {{ spaceAvailGbText }}
 
-    #cookie-inputs(@click.stop v-if="!loading && !noTorrentsNeeded && (isCookieRelatedError || showCookieInputs)" style="position:sticky; top:0; zIndex:50; padding:15px 20px 15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
-      
     #unaired(v-if="unaired" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
       div Show not aired yet
       
-    #cookie-inputs(@click.stop v-if="!unaired && !loading && !noTorrentsNeeded && (isCookieRelatedError || showCookieInputs)" style="position:sticky; top:0; zIndex:50; padding:15px 20px 15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
+    #cookie-inputs(@click.stop v-if="!loading && ((isCookieRelatedError && !dismissCookieInputs) || showCookieInputs)" style="position:sticky; top:0; zIndex:50; padding:15px 20px 15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
       div(style="margin-bottom:10px;")
         label(style="display:block; font-size:12px; font-weight:bold; margin-bottom:3px; color:#555;") IPTorrents cf_clearance:
         input(v-model="iptCfClearance" type="text" placeholder="Paste cf_clearance cookie value" style="width:100%; padding:6px; font-size:12px; border:1px solid #ccc; border-radius:3px; box-sizing:border-box;")
@@ -35,8 +33,8 @@
         label(style="display:block; font-size:12px; font-weight:bold; margin-bottom:3px; color:#555;") TorrentLeech cf_clearance:
         input(v-model="tlCfClearance" type="text" placeholder="Paste cf_clearance cookie value" style="width:100%; padding:6px; font-size:12px; border:1px solid #ccc; border-radius:3px; box-sizing:border-box;")
       div(style="margin-top:10px;")
-        button(@click.stop="loadTorrents" :disabled="loading" style="padding:8px 20px; font-size:13px; font-weight:bold; cursor:pointer; border-radius:5px; background:#4CAF50; color:white; border:none; width:100%;") 
-          | {{ loading ? 'Loading...' : 'Load Torrents' }}
+        button(@click.stop="saveCookies" :disabled="loading" style="padding:8px 20px; font-size:13px; font-weight:bold; cursor:pointer; border-radius:5px; background:#4CAF50; color:white; border:none; width:100%;") 
+          | Save Cookies
 
     
 
@@ -111,6 +109,7 @@ export default {
       clickedTorrents: new Set(),  // Track which torrents have been clicked
       noTorrentsNeeded: false,  // Flag when needed array is empty
       showCookieInputs: false,  // Manual toggle for cookie input boxes
+      dismissCookieInputs: false,
       unaired: false,
 
       qbtPollText: '',
@@ -135,9 +134,6 @@ export default {
       return counts;
     },
     isCookieRelatedError() {
-      // Always show cookie inputs when there are no torrents (likely auth issue)
-      if (this.torrents.length === 0) return true;
-      
       // Also show for explicit cookie-related errors even if we got some results
       if (this.error) {
         const errorLower = this.error.toLowerCase();
@@ -183,6 +179,7 @@ export default {
       this.currentShow = null;
       this.noTorrentsNeeded = false;
       this.showCookieInputs = false;
+      this.dismissCookieInputs = false;
       this.unaired = false;
       this.iptCfClearance = '';
       this.tlCfClearance = '';
@@ -502,7 +499,25 @@ export default {
       }
     },
 
+    saveCookies() {
+      // Save only; do not start any torrent loading.
+      const iptCf = this.extractCfClearance(this.iptCfClearance);
+      const tlCf = this.extractCfClearance(this.tlCfClearance);
+
+      if (iptCf) {
+        localStorage.setItem('iptCfClearance', this.iptCfClearance);
+      }
+      if (tlCf) {
+        localStorage.setItem('tlCfClearance', this.tlCfClearance);
+      }
+
+      // Always close the inputs when clicked, even if empty.
+      this.showCookieInputs = false;
+      this.dismissCookieInputs = true;
+    },
+
     toggleCookieInputs() {
+      this.dismissCookieInputs = false;
       this.showCookieInputs = !this.showCookieInputs;
     },
 
@@ -522,6 +537,7 @@ export default {
       this.noTorrentsNeeded = false;
       this.providerWarning = '';
       this.loading = false;
+      this.dismissCookieInputs = false;
       this.stopQbtPolling();
       this.qbtPollText = '';
       this._qbtSawTorrent = false;

@@ -1,6 +1,4 @@
 
 Torrents, Status, History, Series, and Map
 
-use v-show for Torrents and Status panes.  Do not change dom or component code vars state when switching panes except when the show selection changes. when Torrents or Status panes are showing and the show selection changes switch to the series pane and reset the Torrents and Status panes.
-
-find and remove any current logic that changes anything in the Torrents or Status panes when a pane is loaded.
+change name of Load Torrents button below cf_clearance inputs to Save Cookies.  When that button is clicked and cookies are saved then hide cf_clearance inputs and do not start any torrent loading.

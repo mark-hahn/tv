@@ -77,6 +77,7 @@ export default {
       currentPane: 'series', // 'series', 'map', 'actors', 'torrents', or 'dlstatus'
       currentTvdbData: null,
       currentShow: null,
+      _torrentsInitialized: false,
       mapShow: null,
       hideMapBottom: true,
       seriesMapSeasons: [],
@@ -187,6 +188,7 @@ export default {
       evtBus.emit('paneChanged', this.currentPane);
       // Emit event to torrents component with show data
       evtBus.emit('showTorrents', show);
+      this._torrentsInitialized = true;
     },
 
     handleShowStatus() {
@@ -195,6 +197,14 @@ export default {
     },
 
     handleStatusToTorrents() {
+      // Do not reload/emit showTorrents when just switching panes.
+      if (this._torrentsInitialized) {
+        this.currentPane = 'torrents';
+        evtBus.emit('paneChanged', this.currentPane);
+        return;
+      }
+
+      // Fallback: if torrents was never initialized, open it with current show.
       if (this.currentShow) {
         this.handleShowTorrents(this.currentShow);
       } else {
@@ -259,7 +269,15 @@ export default {
     
     // Close torrents or actors pane when a different show is selected
     evtBus.on('setUpSeries', (show) => {
-      if (this.currentPane === 'torrents' || this.currentPane === 'actors') {
+      if (this.currentPane === 'torrents' || this.currentPane === 'dlstatus') {
+        this.currentPane = 'series';
+        evtBus.emit('paneChanged', this.currentPane);
+        evtBus.emit('resetTorrentsPane');
+        evtBus.emit('resetDlStatusPane');
+        return;
+      }
+
+      if (this.currentPane === 'actors') {
         this.currentPane = 'series';
         evtBus.emit('paneChanged', this.currentPane);
       }

@@ -49,33 +49,39 @@ export default {
 
   mounted() {
     evtBus.on('paneChanged', this.onPaneChanged);
+    evtBus.on('resetDlStatusPane', this.resetPane);
   },
 
   unmounted() {
     evtBus.off('paneChanged', this.onPaneChanged);
-    this.stopPollingAndReset();
+    evtBus.off('resetDlStatusPane', this.resetPane);
+    this.stopPolling();
+    this.cards = [];
   },
 
   methods: {
     onPaneChanged(pane) {
       if (pane === 'dlstatus') {
-        this.startPollingFresh();
+        this.startPolling();
       } else {
-        this.stopPollingAndReset();
+        this.stopPolling();
       }
     },
 
-    startPollingFresh() {
+    startPolling() {
       if (this._polling) return;
-      this.cards = [];
       this._stopPolling = false;
       this._polling = true;
       void this.pollLoop();
     },
 
-    stopPollingAndReset() {
+    stopPolling() {
       this._stopPolling = true;
       this._polling = false;
+    },
+
+    resetPane() {
+      this.stopPolling();
       this.cards = [];
     },
 

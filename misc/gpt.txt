@@ -1,22 +1,6 @@
 
 Torrents, Status, History, Series, and Map
 
-create a new file src/components/dlstatus.vue. it is a pane component the same size and position as series.vue, map.vue, torrents.vue, etc. i will call it the status pane.
+use v-show for Torrents and Status panes.  Do not change dom or component code vars state when switching panes except when the show selection changes. when Torrents or Status panes are showing and the show selection changes switch to the series pane and reset the Torrents and Status panes.
 
-use a sticky non-scrolling header that has a row of buttons aligned to the right the same size and style of series pane.  The buttons are Torrents, History, Series, and Map
-
-refactor code from torrents pane to status pane. The code moved should include at least repeatedly calling the qbittorrent api for info torrents and displaying the torrent info in a list.
-
-the repeated calling of the api should start when status pane is loaded and continue until the pane is closed.  
-
-There may be more than one info torrent returned from api. There should be a card for each returned info torrent. every time an info torrent is received match it to any existing card using the hash and update the card.
-
-when an info torrent is received that doesn't match any existing card then create a new card and add it to the top of the card list.
-
-when no cards are showing display the message "No files are downloading."
-
-do not remove any cards until the pane is closed.
-
-clicking the status button in the torrents pane should open the status pane.
-
-clicking the torrents button in the status pane should open the torrents pane.
+find and remove any current logic that changes anything in the Torrents or Status panes when a pane is loaded.

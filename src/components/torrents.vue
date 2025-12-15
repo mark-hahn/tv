@@ -14,7 +14,7 @@
       div(style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;")
         div
         div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
-          button(v-if="noTorrentsNeeded" @click.stop="forceLoadTorrents" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Force
+          button(@click.stop="forceLoadTorrents" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Force
           button(@click.stop="$emit('status')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Status
           button(@click.stop="$emit('history')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") History
 
@@ -154,14 +154,40 @@ export default {
 
   mounted() {
     evtBus.on('showTorrents', this.searchTorrents);
+    evtBus.on('resetTorrentsPane', this.resetPane);
   },
 
   unmounted() {
     evtBus.off('showTorrents', this.searchTorrents);
+    evtBus.off('resetTorrentsPane', this.resetPane);
     this.stopQbtPolling();
   },
 
   methods: {
+    resetPane() {
+      this.selectedTorrent = null;
+      this.showModal = false;
+      this.clickedTorrents.clear();
+      this.stopQbtPolling();
+      this.qbtPollText = '';
+      this._qbtSawTorrent = false;
+      this._qbtLastTorrent = null;
+      this._qbtSpeedHistory = [];
+      this.spaceAvailText = 'Space Used, Seed Box: --%, Server: --%';
+      this.spaceAvailGbText = 'Available, Seed Box: -- GB, Server: -- GB';
+      this.torrents = [];
+      this.showName = '';
+      this.loading = false;
+      this.error = null;
+      this.providerWarning = '';
+      this.currentShow = null;
+      this.noTorrentsNeeded = false;
+      this.showCookieInputs = false;
+      this.unaired = false;
+      this.iptCfClearance = '';
+      this.tlCfClearance = '';
+    },
+
     handleClose() {
       this.selectedTorrent = null;
       this.showModal = false;

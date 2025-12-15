@@ -1,3 +1,12 @@
 
-at end of release script 
-run /root/dev/apps/tv-series-srvr/release script at hahnca.com server using ssh
+write a bash script called get-qbt-info at the project root. it should implement the functionality of misc/qb-info.js of accessing the qbttorrent api info.  it should write the result to misc/qb-info.json.
+
+i will run this script from wsl and nothing should run in the windows enviornment.
+
+it should use QB_HOST, QB_USER, and QB_PASS from torrents/cookies/qbt-cred.txt for host and credentials.
+
+it should not use npm run and not use node.
+
+if you want to add files then stop and ask me
+
+exlain what you are going to do. make no changes for now.

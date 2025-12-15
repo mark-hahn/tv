@@ -1,10 +1,14 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { parseKeyValueFile } from './qb-cred.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const execFileAsync = promisify(execFile);
 
 function resolveCredPath() {
   return path.resolve(__dirname, '..', 'cookies', 'qbt-cred.txt');
@@ -39,6 +43,175 @@ async function loadQbtCreds() {
   }
 
   return { qbHost, qbPort, qbUser, qbPass };
+}
+
+async function loadQbHostForSsh() {
+  const credPath = resolveCredPath();
+  const text = await fs.readFile(credPath, 'utf8');
+  const creds = parseKeyValueFile(text);
+  const qbHost = creds.QB_HOST;
+  if (!qbHost) throw new Error(`Missing QB_HOST in ${credPath}`);
+  return String(qbHost).trim();
+}
+
+function lastNonEmptyLine(text) {
+  const lines = String(text ?? '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  return lines.length ? lines[lines.length - 1] : '';
+}
+
+function lastLineStartingWithInt(text) {
+  const lines = String(text ?? '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    if (/^\d+/.test(lines[i])) return lines[i];
+  }
+  return '';
+}
+
+function parseLeadingInt(text) {
+  const line = String(text ?? '').trim();
+  const m = line.match(/^(\d+)/);
+  if (!m) return undefined;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? Math.trunc(n) : undefined;
+}
+
+function parseDfForMount(dfText, mountPoint) {
+  const text = String(dfText ?? '');
+  const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  if (lines.length < 2) return undefined;
+
+  // Skip header; find the row whose mountpoint matches.
+  const rows = lines.slice(1);
+
+  const parseRow = (row) => {
+    const parts = String(row).split(/\s+/);
+    if (parts.length < 6) return undefined;
+    const target = parts[parts.length - 1];
+    const total = Number(parts[1]);
+    const used = Number(parts[2]);
+    const avail = Number(parts[3]);
+    if (!Number.isFinite(total) || !Number.isFinite(used) || !Number.isFinite(avail)) return undefined;
+    return { target, total: Math.trunc(total), used: Math.trunc(used), avail: Math.trunc(avail) };
+  };
+
+  for (const row of rows) {
+    const parsed = parseRow(row);
+    if (parsed && parsed.target === mountPoint) return { total: parsed.total, used: parsed.used, avail: parsed.avail };
+  }
+
+  // If df only printed a single filesystem line, accept it.
+  if (rows.length === 1) {
+    const parsed = parseRow(rows[0]);
+    if (parsed) return { total: parsed.total, used: parsed.used, avail: parsed.avail };
+  }
+
+  return undefined;
+}
+
+/**
+ * Returns four integers describing free space.
+ *
+ * Units:
+ * - usbSpaceTotal/usbSpaceUsed are bytes derived from `du -s` output (1K blocks)
+ * - mediaSpaceTotal/mediaSpaceUsed are bytes (from `df -B1`)
+ */
+export async function spaceAvail() {
+  const usbSpaceTotalK = 2e9;
+  let usbSpaceUsedK = 0;
+  try {
+    const qbHost = await loadQbHostForSsh();
+
+    // du may exit non-zero if it hits unreadable directories; still emits a usable summary line.
+    // Keep command exactly as requested (cd; du -s) and parse stdout even on non-zero exit.
+    const args = [
+      '-o',
+      'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=10',
+      '-o',
+      'LogLevel=ERROR',
+      '-o',
+      'StrictHostKeyChecking=no',
+      '-o',
+      'UserKnownHostsFile=/dev/null',
+      qbHost,
+      'cd; du -s'
+    ];
+
+    let stdout = '';
+    let duErr = null;
+    try {
+      const du = await execFileAsync('ssh', args, {
+        timeout: 20000,
+        maxBuffer: 1024 * 1024,
+        windowsHide: true
+      });
+      stdout = du.stdout;
+    } catch (e) {
+      stdout = (e && typeof e === 'object' && 'stdout' in e) ? String(e.stdout ?? '') : '';
+      duErr = e;
+    }
+
+    // The last non-empty line is sometimes an error message; take the last numeric-leading line instead.
+    const duLine = lastLineStartingWithInt(stdout) || lastNonEmptyLine(stdout);
+    const duK = parseLeadingInt(duLine);
+    if (Number.isInteger(duK) && duK >= 0) {
+      usbSpaceUsedK = duK;
+      if (duErr && !stdout) {
+        console.error('spaceAvail: ssh du failed (no stdout):', duErr);
+      }
+    } else {
+      if (duErr) {
+        console.error('spaceAvail: ssh du failed (unparsable stdout):', duErr);
+      }
+      console.error('spaceAvail: unexpected ssh du output:', stdout);
+    }
+  } catch (e) {
+    console.error('spaceAvail: ssh du failed (returning usbSpaceUsed=0):', e);
+  }
+
+  let mediaSpaceTotal = 0;
+  let mediaSpaceUsed = 0;
+  try {
+    const mediaMount = '/mnt/m-bkup';
+
+    // In Windows/dev environments, the mount may not exist.
+    try {
+      await fs.access(mediaMount);
+    } catch {
+      return {
+        usbSpaceTotal: Math.trunc(usbSpaceTotalK * 1024),
+        usbSpaceUsed: Math.trunc(usbSpaceUsedK * 1024),
+        mediaSpaceTotal: 0,
+        mediaSpaceUsed: 0
+      };
+    }
+
+    const df = await execFileAsync('df', ['-B1', '-P', mediaMount], {
+      timeout: 15000,
+      maxBuffer: 1024 * 1024,
+      windowsHide: true
+    });
+    const dfText = String(df.stdout ?? '');
+    const parsed = parseDfForMount(dfText, mediaMount);
+    if (parsed && parsed.used >= 0 && parsed.avail >= 0) {
+      // Match `df` semantics: Available excludes reserved blocks.
+      // Use (used + avail) so client pctUsed and (total-used) match df Use%/Available.
+      mediaSpaceUsed = parsed.used;
+      mediaSpaceTotal = parsed.used + parsed.avail;
+    } else {
+      console.error('spaceAvail: unexpected df output:', dfText);
+    }
+  } catch (e) {
+    console.error('spaceAvail: df failed (returning mediaSpaceTotal/mediaSpaceUsed=0):', e);
+  }
+
+  return {
+    usbSpaceTotal: Math.trunc(usbSpaceTotalK * 1024),
+    usbSpaceUsed: Math.trunc(usbSpaceUsedK * 1024),
+    mediaSpaceTotal: Math.trunc(mediaSpaceTotal),
+    mediaSpaceUsed: Math.trunc(mediaSpaceUsed)
+  };
 }
 
 function getSetCookieHeader(headers) {

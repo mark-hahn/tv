@@ -1,57 +1,37 @@
 
+rename the Torrents buttons in series.vue and map.view to Download
 
-in torrents.vue after downloading is approved call getQbtInfo({filter: 'downloading'}) repeatedly with 1 sec between the result of one call and the start of the next. 
+create a new file src/components/dlstatus.vue. it is a pane component the same size and position as series.vue, map.vue, torrents.vue, etc. 
 
-the state of the call results should be shown live above the top torrent card until the torrents pane is closed.
+like the torrents pane it is only used in the app's non-simple mode.
 
-there will be no torrent in the results until downloading is started. before the first torrent arrives the state should just be a msg "Waiting for download to start ..."
+there is a sticky non-scrolling header that has a row of buttons aligned to the right.  The buttons are Torrents, History, Series, and Map
 
-when a torrent is received start displaying the state as a list of torrent properties and their values with the property names lined up in the left of each line and the values lined up with the first char of each value starting 2 char positions after the longest prop name like:
-foo:       "a result"
-foobarbaz: 27
-foobar:    -1
 
-when a result with no torrent is received after showing a list of torrent properties then stop calling getQbtInfo and leave the last list of torrent properties showing.
+export a function spaceAvail() in torrents/src/usb.js with no args that returns four integers:
+total size of usb server storage (usbSpaceTotal),
+used size of usb server storage (usbSpaceUsed),
+total size of local mounted /mnt/media disk (mediaSpaceTotal),
+used size of local mounted /mnt/media disk (mediaSpaceUsed).
 
-the properties to show are in this list.  
+add an endpoint to torrents/src/server.js to call spaceAvail() from the client app.
 
-properties labelled as date should be converted to time hh:mm:ss in pacific time zone.
+for now return usbSpaceTotal as 2e9.
 
-properties labelled as size should be converted to human size like 11.1 GB.
+usbSpaceUsed will be determined by using ssh to the QB_HOST specified in torrents/src/qb-cred.js.  use the command: ssh <QB_HOST> "cd; du -s"
+ and return the integer in the last line of the result.
 
-properties labelled as speed should be converted to integer mbits/sec like 782 mbits/sec.
+mediaSpaceTotal and mediaSpaceUsed should be gotten from the df command on local mnt/media disk.
 
-properties labelled as duration should be converted from secs to mm:ss mins
+----
 
-properties labelled as string or integer should be shown as is.
+in torrents.vue add a second status line to the torrents pane sticky header. it will show "Space Available, Seed Box: <usbPercent>, Server: <srvrPercent>". The line will be generated when torrents pane is first shown and updated when any download finishes.
 
-properties labelled as percent should be shown as integer xx%
+usbPercent is (usbSpaceTotal - usbSpaceUsed) / usbSpaceTotal shown as integer percentage.
 
-the value shown for eta should be computed as (base time (epoc) + property eta (secs)) and formatted in Pacific time hh:mm:ss where Base time is last_activity when present (fallbacks: seen_complete, added_on, completion_on).
+srvrPercent is (mediaSpaceTotal - mediaSpaceUsed) / mediaSpaceTotal shown as integer percentage.
 
-properties are ...
-name (string),
 
-size (size), 
-downloaded (size), 
+add new line below space line "Available, Seed Box: <usb> GB, Server: <srvr> GB" where usb is integer (usbSpaceTotal - usbSpaceUsed)/1e9 and srvr is integer (mediaSpaceTotal - mediaSpaceUsed)/1e9 
 
-state  (string),
-trackers_count (integer),
-num_seeds (integer),
-dlspeed (speed),
-
-amount_left (size), 
-progress (percent),
-time_active (duration),
-
-added_on (date),
-seen_complete (date),
-eta (date)
-
-remove speed and rename avg_speed to speed
---
-combine trackers_count and num_seeds to name trackers/seeds and value <trackers_count/<num_seeds>
-
-replace trackers/seeds with just seeds and no trackers
---
-add cur_time with value of the current now time in date format at end of list
+switch server space reporting to use /mnt/m-bkup, not /mnt/media

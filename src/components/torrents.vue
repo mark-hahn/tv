@@ -12,7 +12,9 @@
           button(@click.stop="$emit('series')" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Series
           button(@click.stop="handleMapButton" style="font-size:15px; cursor:pointer; border-radius:7px; padding:4px 12px;") Map
 
-      div(v-if="_qbtPolling && !_qbtSawTorrent" style="margin-left:20px; margin-right:20px; margin-top:6px; font-weight:normal; font-size:14px; color:#666;") Waiting for download to start ...
+      div(v-if="_qbtPolling && !_qbtSawTorrent" style="margin-left:20px; margin-right:20px; margin-top:6px; font-weight:normal; font-size:14px; color:#666; display:block; line-height:1.2;") Waiting for download to start ...
+      div(style="margin-left:20px; margin-right:20px; margin-top:14px; font-weight:normal; font-size:16px; color:#666; display:block; visibility:visible; opacity:1; line-height:1.1; white-space:nowrap; overflow:visible;") {{ spaceAvailText }}
+      div(style="margin-left:20px; margin-right:20px; margin-top:2px; font-weight:normal; font-size:16px; color:#666; display:block; visibility:visible; opacity:1; line-height:1.1; white-space:nowrap; overflow:visible;") {{ spaceAvailGbText }}
 
     #cookie-inputs(@click.stop v-if="!loading && !noTorrentsNeeded && (isCookieRelatedError || showCookieInputs)" style="position:sticky; top:0; zIndex:50; padding:15px 20px 15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
       
@@ -110,7 +112,10 @@ export default {
       _qbtStopPolling: false,
       _qbtSawTorrent: false,
       _qbtLastTorrent: null,
-      _qbtSpeedHistory: []
+      _qbtSpeedHistory: [],
+
+      spaceAvailText: 'Space Used, Seed Box: --%, Server: --%',
+      spaceAvailGbText: 'Available, Seed Box: -- GB, Server: -- GB'
     };
   },
 
@@ -159,6 +164,8 @@ export default {
       this.qbtPollText = '';
       this._qbtSawTorrent = false;
       this._qbtLastTorrent = null;
+      this.spaceAvailText = 'Space Used, Seed Box: --%, Server: --%';
+      this.spaceAvailGbText = 'Available, Seed Box: -- GB, Server: -- GB';
       this.$emit('close');
     },
 
@@ -356,6 +363,60 @@ export default {
       return res.json();
     },
 
+    async getSpaceAvail() {
+      const url = new URL(`${config.torrentsApiUrl}/api/space/avail`);
+      const res = await fetch(url.toString());
+      if (!res.ok) {
+        let detail = '';
+        try {
+          const ct = res.headers.get('content-type') || '';
+          if (ct.includes('application/json')) {
+            const j = await res.json();
+            detail = j?.error ? String(j.error) : JSON.stringify(j);
+          } else {
+            detail = await res.text();
+          }
+        } catch {
+          // ignore parse errors
+        }
+        throw new Error(`HTTP ${res.status}: ${detail || res.statusText}`);
+      }
+      return res.json();
+    },
+
+    pctUsed(total, used) {
+      const t = Number(total);
+      const u = Number(used);
+      if (!Number.isFinite(t) || !Number.isFinite(u) || t <= 0) return '--%';
+      const pct = Math.ceil((u / t) * 100);
+      return `${Math.max(0, Math.min(100, pct))}%`;
+    },
+
+    fmtAvailGb(total, used) {
+      const t = Number(total);
+      const u = Number(used);
+      if (!Number.isFinite(t) || !Number.isFinite(u) || t <= 0) return '--';
+      const avail = Math.max(0, t - u);
+      // df-style GB: df reports 1K-blocks; dividing by 1e6 yields “GB”.
+      // Our API returns bytes, so bytes / 1_024_000_000 matches that convention.
+      return String(Math.round(avail / 1_024_000_000));
+    },
+
+    async updateSpaceAvail() {
+      try {
+        const s = await this.getSpaceAvail();
+        const usbPercent = this.pctUsed(s?.usbSpaceTotal, s?.usbSpaceUsed);
+        const srvrPercent = this.pctUsed(s?.mediaSpaceTotal, s?.mediaSpaceUsed);
+        this.spaceAvailText = `Space Used, Seed Box: ${usbPercent}, Server: ${srvrPercent}`;
+
+        const usbGb = this.fmtAvailGb(s?.usbSpaceTotal, s?.usbSpaceUsed);
+        const srvrGb = this.fmtAvailGb(s?.mediaSpaceTotal, s?.mediaSpaceUsed);
+        this.spaceAvailGbText = `Available, Seed Box: ${usbGb} GB, Server: ${srvrGb} GB`;
+      } catch (e) {
+        console.error('spaceAvail fetch error:', e);
+      }
+    },
+
     async startQbtPollingAfterDownloadApproved() {
       this.stopQbtPolling();
       this._qbtStopPolling = false;
@@ -385,6 +446,7 @@ export default {
               this.qbtPollText = this.formatQbtTorrentState(doneTorrent);
               this._qbtLastTorrent = doneTorrent;
             }
+            this.updateSpaceAvail();
             this._qbtStopPolling = true;
             this._qbtPolling = false;
             break;
@@ -433,6 +495,12 @@ export default {
       this.qbtPollText = '';
       this._qbtSawTorrent = false;
       this._qbtLastTorrent = null;
+      this.spaceAvailText = 'Space Used, Seed Box: --%, Server: --%';
+      this.spaceAvailGbText = 'Available, Seed Box: -- GB, Server: -- GB';
+
+      // Kick off space fetch ASAP; don't wait for torrent searching.
+      this.updateSpaceAvail();
+
       this.unaired = !!show?.S1E1Unaired;
       if (this.unaired) {
         // Short-circuit: show only the unaired message
@@ -440,6 +508,8 @@ export default {
         this.showName = show?.Name || '';
         return;
       }
+
+      // (space fetch already started above)
       
       // Store the show for later use with Load button
       this.currentShow = show;

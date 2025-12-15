@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import * as search from './search.js';
 import * as download from './download.js';
 import { tvdbProxyGet } from './tvdb-proxy.js';
-import { getQbtInfo } from './usb.js';
+import { getQbtInfo, spaceAvail } from './usb.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -87,6 +87,16 @@ app.get('/api/qbt/info', async (req, res) => {
     res.json(info);
   } catch (error) {
     console.error('qbt info error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/space/avail', async (req, res) => {
+  try {
+    const info = await spaceAvail();
+    res.json(info);
+  } catch (error) {
+    console.error('spaceAvail error:', error);
     res.status(500).json({ error: error.message });
   }
 });

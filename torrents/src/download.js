@@ -9,11 +9,46 @@ const __dirname = path.dirname(__filename);
 
 const SAVE_TORRENT_FILE = false;
 const SAVE_DETAIL_FILE  = false;
+const DOWNLOAD_DEBUG    = true;
+
+function ensureDir(dirPath) {
+  fs.mkdirSync(dirPath, { recursive: true });
+}
+
+function safeCookieNames(cookiePairs) {
+  return (cookiePairs || [])
+    .map(c => String(c).split('=')[0].trim())
+    .filter(Boolean);
+}
+
+function nowStamp() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
+function fail(stage, reason, extra = {}) {
+  return { success: false, error: reason, message: reason, stage, reason, ...extra };
+}
+
+function ok(extra = {}) {
+  return { success: true, ...extra };
+}
+
+function normalizeProvider(rawProvider, detailUrl) {
+  const p = String(rawProvider || '').toLowerCase().trim();
+  const url = String(detailUrl || '').toLowerCase();
+
+  if (p === 'iptorrents' || p.includes('iptorrents') || url.includes('iptorrents')) return 'iptorrents';
+  if (p === 'torrentleech' || p.includes('torrentleech') || url.includes('torrentleech')) return 'torrentleech';
+  return p || 'unknown';
+}
 
 let _cachedCreds;
 async function getCreds() {
   if (_cachedCreds) return _cachedCreds;
-  const { creds } = await loadCreds();
+  const credPath = path.join(__dirname, '..', 'cookies', 'download-cred.txt');
+  const { creds } = await loadCreds(credPath);
   _cachedCreds = creds;
   return creds;
 }
@@ -44,7 +79,7 @@ async function getSftpSettings() {
 
   if (!host || !username || !password) {
     throw new Error(
-      'Missing SFTP config. Put SFTP_PASS and either (SFTP_HOST + SFTP_USER) or SSH_TARGET in torrents/qb-cred.txt.'
+      'Missing SFTP config. Put SFTP_PASS and either (SFTP_HOST + SFTP_USER) or SSH_TARGET in torrents/cookies/download-cred.txt.'
     );
   }
   if (!Number.isInteger(port) || port <= 0 || port > 65535) {
@@ -61,19 +96,21 @@ async function getSftpSettings() {
  * Download torrent and prepare for qBittorrent
  * @param {Object} torrent - The complete torrent object
  * @param {Object} cfClearance - cf_clearance cookies by provider
- * @returns {Promise<boolean>} - True if successful
+ * @returns {Promise<{success:boolean, stage?:string, reason?:string, provider?:string, httpStatus?:number, httpStatusText?:string, savedFile?:string, cookiesSent?:string[], hasCfClearance?:boolean, downloadUrl?:string, detailUrl?:string, warning?:string}>}
  */
 export async function download(torrent, cfClearance = {}) {
   console.log('Download function called with torrent:', torrent);
+
+  let warning;
   
   if (!torrent.detailUrl) {
     console.log('No detailUrl available for torrent');
-    return false;
+    return fail('validate', 'No detailUrl available for torrent');
   }
   
   try {
     // Determine provider from detailUrl
-    const provider = torrent.raw?.provider?.toLowerCase() || 'unknown';
+    const provider = normalizeProvider(torrent.raw?.provider, torrent.detailUrl);
     const filename = provider === 'iptorrents' ? 'ipt-detail.html' : 
                      provider === 'torrentleech' ? 'tl-detail.html' : 
                      `${provider}-detail.html`;
@@ -112,11 +149,20 @@ export async function download(torrent, cfClearance = {}) {
     }
     
     // Fetch the detail page with all cookies
+    const detailUrl = torrent.detailUrl;
+    const detailOrigin = new URL(detailUrl).origin;
+    const referer =
+      provider === 'iptorrents'
+        ? 'https://iptorrents.com/'
+        : provider === 'torrentleech'
+          ? 'https://www.torrentleech.org/'
+          : `${detailOrigin}/`;
+
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
       'Accept-Language': 'en-US,en;q=0.5',
-      'Referer': torrent.detailUrl.includes('iptorrents') ? 'https://iptorrents.com/' : 'https://www.torrentleech.org/'
+      'Referer': referer
     };
     
     if (allCookies.length > 0) {
@@ -126,14 +172,32 @@ export async function download(torrent, cfClearance = {}) {
     
     console.log('Request headers:', JSON.stringify(headers, null, 2));
     
-    const response = await fetch(torrent.detailUrl, { headers });
+    const response = await fetch(detailUrl, { headers });
     if (!response.ok) {
       console.log(`Failed to fetch detail page: ${response.status} ${response.statusText}`);
-      return false;
+      const snippet = await response.text().catch(() => '');
+      return fail('fetch-detail', 'Failed to fetch detail page', {
+        provider,
+        detailUrl,
+        httpStatus: response.status,
+        httpStatusText: response.statusText,
+        cookiesSent: safeCookieNames(allCookies),
+        hasCfClearance: Boolean(cfCookie),
+        bodySnippet: snippet ? snippet.substring(0, 500) : undefined,
+      });
     }
     
     const html = await response.text();
     console.log(`Fetched ${html.length} bytes of HTML`);
+
+    const sampleDir = path.join(__dirname, '..', '..', 'sample-torrents');
+    let savedDetailPath;
+    if (SAVE_DETAIL_FILE || DOWNLOAD_DEBUG) {
+      ensureDir(sampleDir);
+      savedDetailPath = path.join(sampleDir, filename.replace('.html', `-${nowStamp()}.html`));
+      fs.writeFileSync(savedDetailPath, html, 'utf8');
+      console.log(`Saved detail page to: ${savedDetailPath}`);
+    }
     
     // Check if we got a sign-in page
     const isSignInPage = html.toLowerCase().includes('sign in') || 
@@ -145,19 +209,21 @@ export async function download(torrent, cfClearance = {}) {
       console.log('ERROR: Got sign-in page instead of detail page!');
       console.log('First 500 chars of HTML:');
       console.log(html.substring(0, 500));
-      
-      // Save it anyway for inspection
-      const savePath = path.join(__dirname, '..', '..', 'sample-torrents', filename);
-      fs.writeFileSync(savePath, html, 'utf8');
-      console.log(`Saved sign-in page to: ${savePath} for inspection`);
-      return false;
-    }
-    
-    // Save HTML to sample-torrents directory
-    if (SAVE_DETAIL_FILE) {
-      const savePath = path.join(__dirname, '..', '..', 'sample-torrents', filename);
-      fs.writeFileSync(savePath, html, 'utf8');
-      console.log(`Saved detail page to: ${savePath}`);
+
+      if (!savedDetailPath) {
+        ensureDir(sampleDir);
+        savedDetailPath = path.join(sampleDir, filename.replace('.html', `-signin-${nowStamp()}.html`));
+        fs.writeFileSync(savedDetailPath, html, 'utf8');
+        console.log(`Saved sign-in page to: ${savedDetailPath} for inspection`);
+      }
+
+      return fail('parse-detail', 'Got sign-in/login page instead of detail page', {
+        provider,
+        detailUrl,
+        cookiesSent: safeCookieNames(allCookies),
+        hasCfClearance: Boolean(cfCookie),
+        savedFile: savedDetailPath,
+      });
     }
     
     // Search for .torrent download link
@@ -166,7 +232,11 @@ export async function download(torrent, cfClearance = {}) {
     
     if (!match) {
       console.log('ERROR: No .torrent download link found!');
-      return false;
+      return fail('parse-detail', 'No .torrent download link found in HTML', {
+        provider,
+        detailUrl,
+        savedFile: savedDetailPath,
+      });
     }
     
     const downloadUrl = match[1];
@@ -190,13 +260,36 @@ export async function download(torrent, cfClearance = {}) {
     
     if (!torrentResponse.ok) {
       console.log(`Failed to download torrent: ${torrentResponse.status} ${torrentResponse.statusText}`);
-      return false;
+      const snippet = await torrentResponse.text().catch(() => '');
+      return fail('fetch-torrent', 'Failed to download torrent', {
+        provider,
+        downloadUrl: absoluteDownloadUrl,
+        httpStatus: torrentResponse.status,
+        httpStatusText: torrentResponse.statusText,
+        cookiesSent: safeCookieNames(allCookies),
+        hasCfClearance: Boolean(cfCookie),
+        bodySnippet: snippet ? snippet.substring(0, 500) : undefined,
+      });
     }
     
     // Get the file content as buffer
     const torrentBuffer = await torrentResponse.arrayBuffer();
     const torrentData = Buffer.from(torrentBuffer);
     console.log(`Downloaded ${torrentData.length} bytes`);
+
+    const contentType = torrentResponse.headers?.get?.('content-type') || '';
+    if (DOWNLOAD_DEBUG && contentType.toLowerCase().includes('text/html')) {
+      ensureDir(sampleDir);
+      const savePath = path.join(sampleDir, `${provider}-torrent-html-${nowStamp()}.html`);
+      fs.writeFileSync(savePath, torrentData.toString('utf8'), 'utf8');
+      console.log(`WARNING: Torrent download returned HTML. Saved to: ${savePath}`);
+      return fail('fetch-torrent', 'Torrent download returned HTML (likely blocked/login)', {
+        provider,
+        downloadUrl: absoluteDownloadUrl,
+        contentType,
+        savedFile: savePath,
+      });
+    }
     
     // Generate simple hash from random number
     const hash = Math.random().toString(36).substring(2, 15);
@@ -204,13 +297,20 @@ export async function download(torrent, cfClearance = {}) {
     
     // Save .torrent file to sample-torrents directory
     if (SAVE_TORRENT_FILE) {
+      ensureDir(sampleDir);
       const torrentSavePath = path.join(__dirname, '..', '..', 'sample-torrents', torrentFilename);
       fs.writeFileSync(torrentSavePath, torrentData);
       console.log(`Saved torrent to: ${torrentSavePath}`);
     }
     
     // Upload to remote SFTP server
-    const { sftpConfig, remoteWatchDir } = await getSftpSettings();
+    let sftpConfig;
+    let remoteWatchDir;
+    try {
+      ({ sftpConfig, remoteWatchDir } = await getSftpSettings());
+    } catch (e) {
+      return fail('sftp-config', e?.message || String(e), { provider });
+    }
     const remotePath = `${remoteWatchDir}/${torrentFilename}`;
     
     console.log(`\nUploading to SFTP server...`);
@@ -228,13 +328,14 @@ export async function download(torrent, cfClearance = {}) {
     } catch (sftpError) {
       console.error('SFTP upload failed:', sftpError.message);
       // Don't fail the whole download if SFTP fails
+      warning = `SFTP upload failed: ${sftpError.message}`;
     }
     
   } catch (error) {
     console.error('Error in download function:', error);
-    return false;
+    return fail('exception', error?.message || String(error));
   }
-  
-  return true;
+
+  return ok(typeof warning === 'string' ? { warning } : undefined);
 }
 

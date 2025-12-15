@@ -96,15 +96,43 @@ async function qbLogin({ baseUrl, qbUser, qbPass }) {
 /**
  * Query qBittorrent WebUI /api/v2/torrents/info using creds from torrents/cookies/qbt-cred.txt.
  *
+ * Optional filtering is forwarded to qBittorrent as query params.  see misc/notes.txt for details of input
+ *
+ * @typedef {{
+ *   hash?: string | string[],
+ *   category?: string,
+ *   tag?: string,
+ *   filter?: string,
+ * }} QbtInfoFilter
+ *
+ * Notes:
+ * - qBittorrent expects hashes to be provided as a single string joined by '|'.
+ * - qBittorrent's 'filter' values are WebUI state filters (e.g. downloading, seeding, completed, etc.).
+ *
+ * @param {QbtInfoFilter | undefined} [filter]
  * @returns {Promise<any>} Parsed JSON returned by qBittorrent (typically an array of torrent objects)
  */
-export async function getQbtInfo() {
+export async function getQbtInfo(filter) {
   const { qbHost, qbPort, qbUser, qbPass } = await loadQbtCreds();
   const baseUrl = `http://${qbHost}:${qbPort}`;
 
   const cookie = await qbLogin({ baseUrl, qbUser, qbPass });
 
-  const res = await fetch(new URL('/api/v2/torrents/info', baseUrl), {
+  const url = new URL('/api/v2/torrents/info', baseUrl);
+
+  if (filter && typeof filter === 'object' && !Array.isArray(filter)) {
+    const { hash, category, tag, filter: state } = filter;
+
+    if (hash) {
+      const hashes = Array.isArray(hash) ? hash.join('|') : String(hash);
+      if (hashes.trim()) url.searchParams.set('hashes', hashes);
+    }
+    if (category) url.searchParams.set('category', String(category));
+    if (tag) url.searchParams.set('tag', String(tag));
+    if (state) url.searchParams.set('filter', String(state));
+  }
+
+  const res = await fetch(url, {
     method: 'GET',
     headers: {
       Accept: 'application/json',

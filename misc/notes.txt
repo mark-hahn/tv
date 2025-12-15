@@ -137,3 +137,43 @@ Sentinel values used by qB:
   -1 usually means "no limit" for a per-torrent setting.
   -2 usually means "use the global/app setting".
 
+
+----------------------------------------------------------
+FILTER_TORRENTS startup test object (torrents/src/server.js)
+----------------------------------------------------------
+
+Purpose:
+  When FILTER_TORRENTS is an object, torrents/src/server.js will, at startup,
+  call getQbtInfo(FILTER_TORRENTS) once and write the returned JSON to:
+    sample-qbt/qbt-info.json
+
+Disable:
+  Set FILTER_TORRENTS = false
+
+Shape (all keys optional):
+  {
+    hash: <string | string[]>,   // forwarded to qB as query param 'hashes'
+    category: <string>,         // forwarded to qB as query param 'category'
+    tag: <string>,              // forwarded to qB as query param 'tag'
+    filter: <string>,           // forwarded to qB as query param 'filter' (state)
+  }
+
+Notes:
+  - qBittorrent expects multiple hashes as a single string separated by '|'.
+    Passing hash as an array will be joined with '|'.
+  - The 'filter' value is qBittorrent's state filter (examples include:
+      downloading, seeding, completed, paused, active, inactive, resumed,
+      stalled, stalled_uploading, stalled_downloading, errored
+    )
+
+Examples:
+  1) Single torrent by hash:
+     FILTER_TORRENTS = { hash: 'e4cd137cc02d4c04ec1660435ffa29db4c0aa179' }
+
+  2) By category + tag:
+     FILTER_TORRENTS = { category: 'tv', tag: 'autograb' }
+
+  3) Only downloading torrents:
+     FILTER_TORRENTS = { filter: 'downloading' }
+
+

@@ -1,5 +1,13 @@
 
 
-if any of these are unused then delete them: torrents/src/qb-cred.js, get-qbt-info, torrents/src/tvdb-proxy.js, 
 
-add an exported function 
+add input arg object "filter" to getQbtInfo() to allow optional filtering of results. the filter options should be based on these.  the input arg should be optional and each one of these is optional.  if no filter options then just get all torrents
+
+hash=<hash>
+category=<name>
+tag=<name>
+filter=<state> (e.g. downloading, seeding, completed, etc.)
+
+add test code to torrents/src/server.js such that when torrents/src/server.js loads it uses a const FILTER_TORRENTS to test run getQbtInfo with FILTER_TORRENTS as input object and writes results to sample-qbt/qbt-info.json. do not test run getQbtInfo if FILTER_TORRENTS is false, not an object.
+
+add explanation of input FILTER_TORRENTS object to end of misc/notes.txt

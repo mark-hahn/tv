@@ -16,8 +16,11 @@ console.log(''); // Blank line on restart
 
 const app = express();
 
-const QBT_TEST_PORT = 3001;
-const DUMP_INFO = true;
+const QBT_TEST_PORT   = 3001;
+const DUMP_INFO       = false;
+const FILTER_TORRENTS = false;
+// const FILTER_TORRENTS = {hash:   "629746091b23ec0617405e8cc6f1eee486447629"};
+// const FILTER_TORRENTS = {filter: 'downloading'}
 
 // Load SSL certificate
 const httpsOptions = {
@@ -41,6 +44,20 @@ app.use(express.json());
 
 // Initialize torrent search providers
 search.initializeProviders();
+
+if (FILTER_TORRENTS && typeof FILTER_TORRENTS === 'object' && !Array.isArray(FILTER_TORRENTS)) {
+  (async () => {
+    try {
+      const info = await getQbtInfo(FILTER_TORRENTS);
+      const outPath = path.resolve(__dirname, '..', '..', 'sample-qbt', 'qbt-info.json');
+      fs.mkdirSync(path.dirname(outPath), { recursive: true });
+      fs.writeFileSync(outPath, JSON.stringify(info, null, 2), 'utf8');
+      console.log(`qbt startup dump wrote ${Array.isArray(info) ? info.length : 0} torrents -> ${outPath}`);
+    } catch (e) {
+      console.error('qbt startup dump error:', e);
+    }
+  })();
+}
 
 // API endpoint
 app.get('/api/tvdb/*', tvdbProxyGet);
@@ -105,7 +122,13 @@ app.post('/api/download', async (req, res) => {
     }
     
     const result = await download.download(torrent, cfClearance);
-    res.json({ success: result });
+
+    // Keep 200 OK for expected download failures; client treats non-2xx as exception.
+    if (result && typeof result === 'object' && !Array.isArray(result)) {
+      res.json(result);
+      return;
+    }
+    res.json({ success: Boolean(result) });
   } catch (error) {
     console.error('Download error:', error);
     res.status(500).json({ error: error.message });

@@ -1,0 +1,24 @@
+# torrents/cookies/download-cred.txt
+#
+# SFTP settings used by torrents/src/download.js to upload a .torrent file
+# to your remote qBittorrent "watch" folder.
+#
+# Create torrents/cookies/download-cred.txt based on this template.
+# Lines are KEY=VALUE. Quotes are optional.
+
+# Option A (recommended):
+# Provide SSH_TARGET and SFTP_PASS (user and host derived from SSH_TARGET).
+#SSH_TARGET=user@host
+#SFTP_PASS=your_password
+
+# Option B:
+# Provide SFTP_HOST + SFTP_USER + SFTP_PASS.
+#SFTP_HOST=host
+#SFTP_USER=user
+#SFTP_PASS=your_password
+
+# Optional (defaults to 22):
+#SFTP_PORT=22
+
+# Optional. If omitted, defaults to /home/<user>/watch/qbittorrent
+#REMOTE_WATCH_DIR=/home/user/watch/qbittorrent

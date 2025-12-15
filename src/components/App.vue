@@ -45,6 +45,16 @@
     @close="handleTorrentsClose"
     @series="handleTorrentsClose"
     @map="() => { if (currentShow) { evtBus.emit('mapAction', { action: 'open', show: currentShow }); } }"
+    @status="handleShowStatus"
+  )
+
+  DlStatus(
+    v-show="currentPane === 'dlstatus'"
+    :simpleMode="simpleMode"
+    :sizing="simpleMode ? sizing : sizingNonSimple"
+    @torrents="handleStatusToTorrents"
+    @series="handleStatusToSeries"
+    @map="handleStatusToMap"
   )
 </template>
 
@@ -54,16 +64,17 @@ import Series   from './series.vue';
 import Map      from './map.vue';
 import Actors   from './actors.vue';
 import Torrents from './torrents.vue';
+import DlStatus from './dlstatus.vue';
 import evtBus   from '../evtBus.js';
 import * as tvdb from '../tvdb.js';
 
 export default {
   name: "App",
-  components: { List, Series, Map, Actors, Torrents },
+  components: { List, Series, Map, Actors, Torrents, DlStatus },
   data() { 
     return { 
       simpleMode: false,
-      currentPane: 'series', // 'series', 'map', 'actors', or 'torrents'
+      currentPane: 'series', // 'series', 'map', 'actors', 'torrents', or 'dlstatus'
       currentTvdbData: null,
       currentShow: null,
       mapShow: null,
@@ -176,6 +187,33 @@ export default {
       evtBus.emit('paneChanged', this.currentPane);
       // Emit event to torrents component with show data
       evtBus.emit('showTorrents', show);
+    },
+
+    handleShowStatus() {
+      this.currentPane = 'dlstatus';
+      evtBus.emit('paneChanged', this.currentPane);
+    },
+
+    handleStatusToTorrents() {
+      if (this.currentShow) {
+        this.handleShowTorrents(this.currentShow);
+      } else {
+        this.currentPane = 'torrents';
+        evtBus.emit('paneChanged', this.currentPane);
+      }
+    },
+
+    handleStatusToSeries() {
+      this.currentPane = 'series';
+      this.mapShow = null;
+      evtBus.emit('paneChanged', this.currentPane);
+      evtBus.emit('mapAction', { action: 'close', show: null });
+    },
+
+    handleStatusToMap() {
+      if (this.currentShow) {
+        evtBus.emit('mapAction', { action: 'open', show: this.currentShow });
+      }
     },
     handleTorrentsClose() {
       this.currentPane = 'series';

@@ -138,33 +138,52 @@ export async function spaceAvail() {
       'cd; du -s'
     ];
 
-    let stdout = '';
-    let duErr = null;
-    try {
-      const du = await execFileAsync('ssh', args, {
-        timeout: 20000,
-        maxBuffer: 1024 * 1024,
-        windowsHide: true
-      });
-      stdout = du.stdout;
-    } catch (e) {
-      stdout = (e && typeof e === 'object' && 'stdout' in e) ? String(e.stdout ?? '') : '';
-      duErr = e;
+    const runDuOnce = async () => {
+      try {
+        const du = await execFileAsync('ssh', args, {
+          timeout: 30000,
+          maxBuffer: 1024 * 1024,
+          windowsHide: true
+        });
+        return { stdout: String(du.stdout ?? ''), stderr: String(du.stderr ?? ''), err: null };
+      } catch (e) {
+        const stdout = (e && typeof e === 'object' && 'stdout' in e) ? String(e.stdout ?? '') : '';
+        const stderr = (e && typeof e === 'object' && 'stderr' in e) ? String(e.stderr ?? '') : '';
+        return { stdout, stderr, err: e };
+      }
+    };
+
+    const parseDuK = (stdout, stderr) => {
+      const duLine =
+        lastLineStartingWithInt(stdout) ||
+        lastLineStartingWithInt(stderr) ||
+        lastNonEmptyLine(stdout) ||
+        lastNonEmptyLine(stderr);
+      const duK = parseLeadingInt(duLine);
+      return Number.isInteger(duK) && duK >= 0 ? duK : undefined;
+    };
+
+    // First attempt.
+    let attempt = await runDuOnce();
+    let duK = parseDuK(attempt.stdout, attempt.stderr);
+
+    // Retry once if we couldn't parse a usable summary.
+    if (!Number.isInteger(duK)) {
+      attempt = await runDuOnce();
+      duK = parseDuK(attempt.stdout, attempt.stderr);
     }
 
-    // The last non-empty line is sometimes an error message; take the last numeric-leading line instead.
-    const duLine = lastLineStartingWithInt(stdout) || lastNonEmptyLine(stdout);
-    const duK = parseLeadingInt(duLine);
-    if (Number.isInteger(duK) && duK >= 0) {
+    if (Number.isInteger(duK)) {
       usbSpaceUsedK = duK;
-      if (duErr && !stdout) {
-        console.error('spaceAvail: ssh du failed (no stdout):', duErr);
+      if (attempt.err && !attempt.stdout && !attempt.stderr) {
+        console.error('spaceAvail: ssh du failed (no output):', attempt.err);
       }
     } else {
-      if (duErr) {
-        console.error('spaceAvail: ssh du failed (unparsable stdout):', duErr);
+      if (attempt.err) {
+        console.error('spaceAvail: ssh du failed (unparsable output):', attempt.err);
       }
-      console.error('spaceAvail: unexpected ssh du output:', stdout);
+      // Preserve old log shape (stdout-focused) but include stderr for diagnosis.
+      console.error('spaceAvail: unexpected ssh du output:', attempt.stdout || attempt.stderr);
     }
   } catch (e) {
     console.error('spaceAvail: ssh du failed (returning usbSpaceUsed=0):', e);

@@ -61,9 +61,9 @@
 
   #download-modal(v-if="showModal" @click.stop="showModal = false" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:10000;")
     #modal-content(@click.stop style="background:white; padding:30px; border-radius:10px; max-width:500px; box-shadow:0 4px 20px rgba(0,0,0,0.3);")
-      div(style="font-size:16px; margin-bottom:20px; line-height:1.5;") Do you want to download the torrent 
+      div(style="font-size:16px; margin-bottom:20px; line-height:1.5;") Is it OK to download file 
         strong {{ selectedTorrent?.raw?.title || 'Unknown' }}
-        |  and send it to USB for qBittorrent to download?
+        | ?
       div(style="display:flex; gap:10px; justify-content:flex-end;")
         button(@click.stop="cancelDownload" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;") Cancel
         button(@click.stop="continueDownload" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; background:#4CAF50; color:white; border:none;") Continue
@@ -200,15 +200,14 @@ export default {
     pruneDownloadedHistory() {
       const now = Date.now();
       const cutoff = now - this.downloadHistoryWindowMs();
-      let changed = false;
-      const map = this.downloadedByHash || {};
-      for (const [hash, ts] of Object.entries(map)) {
+      const map = (this.downloadedByHash && typeof this.downloadedByHash === 'object') ? this.downloadedByHash : {};
+      const next = {};
+      for (const [k, ts] of Object.entries(map)) {
         const t = Number(ts);
-        if (!Number.isFinite(t) || t < cutoff) {
-          delete map[hash];
-          changed = true;
-        }
+        if (Number.isFinite(t) && t >= cutoff) next[k] = t;
       }
+      const changed = Object.keys(next).length !== Object.keys(map).length;
+      if (changed) this.downloadedByHash = next;
       if (changed) this.saveDownloadedHistory();
     },
 
@@ -231,19 +230,30 @@ export default {
       return '';
     },
 
-    rememberDownloadedTorrent(torrent) {
+    getTorrentHistoryKey(torrent) {
+      // Prefer hash; fall back to the title (as-is).
       const hash = this.getTorrentHash(torrent);
-      if (!hash) return;
-      if (!this.downloadedByHash || typeof this.downloadedByHash !== 'object') this.downloadedByHash = {};
-      this.downloadedByHash[hash] = Date.now();
+      if (hash) return hash;
+
+      const title = torrent?.raw?.title || torrent?.title || '';
+      return typeof title === 'string' ? title : String(title || '');
+    },
+
+    rememberDownloadedTorrent(torrent) {
+      const key = this.getTorrentHistoryKey(torrent);
+      if (!key) return;
+      const now = Date.now();
+      const map = (this.downloadedByHash && typeof this.downloadedByHash === 'object') ? this.downloadedByHash : {};
+      // Reassign for reliable reactivity.
+      this.downloadedByHash = { ...map, [key]: now };
       this.pruneDownloadedHistory();
       this.saveDownloadedHistory();
     },
 
     isDownloadedBefore(torrent) {
-      const hash = this.getTorrentHash(torrent);
-      if (!hash) return false;
-      const ts = Number(this.downloadedByHash?.[hash]);
+      const key = this.getTorrentHistoryKey(torrent);
+      if (!key) return false;
+      const ts = Number(this.downloadedByHash?.[key]);
       if (!Number.isFinite(ts)) return false;
       return ts >= (Date.now() - this.downloadHistoryWindowMs());
     },

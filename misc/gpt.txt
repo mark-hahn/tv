@@ -8,27 +8,5 @@ do not change current check mark icon or its meaning
 add a new file history.vue -- it should show a pane like the series pane, map pane, etc.
 
 
-past download clock icon isn't showing. the localstorage has no entry for this.
---
-show download clock icon in search card immediately when download finishes
---
-change download confirmation msg in dialog to "Is it OK to download file <torrent title>?"
---
-remove mins label string from info pane
--- 
-when using ssh to run du on seed box, i'm sometimes getting: spaceAvail: unexpected ssh du output:
-spaceAvail: ssh du failed (unparsable stdout): Error: Command failed: ssh -o BatchMode=yes -o ConnectTimeout=10 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null xobtlu@oracle.usbx.me cd; du -s
-    at genericNodeError (node:internal/errors:983:15)
-    at wrappedFn (node:internal/errors:537:14)
-    at ChildProcess.exithandler (node:child_process:414:12)
-    at ChildProcess.emit (node:events:524:28)
-    at maybeClose (node:internal/child_process:1101:16)
-    at ChildProcess._handle.onexit (node:internal/child_process:304:5) {
-  code: null,
-  killed: true,
-  signal: 'SIGTERM',
-  cmd: 'ssh -o BatchMode=yes -o ConnectTimeout=10 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null xobtlu@oracle.usbx.me cd; du -s',
-  stdout: '',
-  stderr: ''
-}
- -- it says sigterm, doesn't that mean someone told it to stop
+add console msg (not a debug line) that tells server started and show port
+

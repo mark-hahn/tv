@@ -183,7 +183,7 @@ export default {
 
     fmtEtaMins(etaSeconds) {
       const mmss = this.fmtDurationMmSs(etaSeconds);
-      return `${mmss} mins`;
+      return `${mmss}`;
     },
 
     formatAlignedBox(pairs) {

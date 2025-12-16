@@ -3,6 +3,6 @@ const isDevelopment = window.location.hostname === 'localhost' || window.locatio
 
 export const config = {
   torrentsApiUrl: isDevelopment 
-    ? 'https://localhost:3001'
+    ? window.location.origin
     : 'https://hahnca.com/torrents-api'
 };

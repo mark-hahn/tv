@@ -1,9 +1,10 @@
 import * as srvr from "./srvr.js";
 import * as util from "./util.js";
+import { config } from "./config.js";
 
 // Route TVDB calls through the local torrents server proxy.
 // This avoids browser-to-TVDB CORS issues (Authorization header).
-const TVDB_PROXY_BASE = 'https://localhost:3001/api/tvdb';
+const TVDB_PROXY_BASE = `${config.torrentsApiUrl}/api/tvdb`;
 
 async function tvdbFetch(path, init) {
   const url = `${TVDB_PROXY_BASE}/${String(path).replace(/^\/+/, '')}`;

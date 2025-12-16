@@ -4,7 +4,7 @@
 
     #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'15px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
       div(style="display:flex; justify-content:space-between; align-items:center;")
-        div(style="margin-left:20px;") {{ showName }}
+        div(style="margin-left:20px;") {{ headerShowName }}
         div(style="display:flex; gap:10px; margin-right:20px;")
           button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px; background:#4CAF50; color:white; border:none;") Download
           button(@click.stop="toggleCookieInputs" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Cookies
@@ -83,6 +83,10 @@ export default {
       type: Boolean,
       default: false
     },
+    activeShow: {
+      type: Object,
+      default: null
+    },
     sizing: {
       type: Object,
       default: () => ({})
@@ -115,6 +119,14 @@ export default {
   },
 
   computed: {
+    headerShowName() {
+      return (
+        this.showName ||
+        this.currentShow?.Name ||
+        this.activeShow?.Name ||
+        ''
+      );
+    },
     trackerCounts() {
       const counts = {};
       this.torrents.forEach(torrent => {
@@ -612,7 +624,7 @@ export default {
         
         // Check if download was successful
         if (data.success || data.result === true) {
-          this.$emit('status');
+          // Success: do not switch panes automatically.
         } else {
           const errorMsg = data.error || data.message || 'Unknown error';
           alert(`Download failed for ${torrentTitle}, ${errorMsg}`);

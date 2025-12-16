@@ -1,49 +1,9 @@
 
 Torrents, Status, History, Series, and Map
 
-rearrange info card contents in status pane so the title is still at the top but two div boxes are below the title side-by-side. the div boxes should have no styling. there should be 10px of margin between the boxes.
-
-each div box has three lines of status.  each line should have <prop name>: <value> as before.
-
-align the property names to the left of the box and align the values vertically so the first char of each value is at the same char position. That char position should be one character after the end position of the  widest property name.
-
-most values are computed the same as before but the dl size and downloaded properties have been combined so the name is "downloaded" and the value is "<dl> of <sz> GB" where dl is completed property of torrent  (gigabytes with one decimal place) and sz is size property  (gigabytes with one decimal place).
-
-the property orders have changed. here is an example showing the final appearance of the left box. 
-
-state:      downloading
-downloaded: 8.4 of 27.7 GB
-speed:      165.6 MB/s
-
-here is an example showing the final appearance of the right box. 
-
-seeds:    10
-progress: 31%
-eta:      02:02 mins
-
-as a test show this data in the new layout as static without any downloading needed.
-
-add margin-right of 10px to left div box 
+add log line when torrent server starts with port number
 --
-remove margin-bottom from title div
----
-change "downloaded" name to "down"
----
-capitalize each prop name
-
--- remove layout testing and resume live data
-
-change margin-left of left div box to 20px
-change margin-right of left div box to 30px
-
-change speed from megabytes/sec to gigabite/sec with 2 decimal places
-
-while downloading i switched to torrents pane and clicked on cookies -- it showed Save Cookies button but the input boxes were missing -- i went back to status pane and it was frozen at 86% without updating. apparently the cookies button disturbed the state of the status pane
-
-remove the action where the status pane is opened when downloading starts. the status pane should now be independent of all other panes except it is opened by status buttons. 
-
+rem mins from info torrent display
 --
-verify that i can input cookes, start searches, etc, after going to status pane and back to torrents pane
+change speed display units from megabytes/sec to gigabits/sec and display with 3 decimal places and change MB/s string to Gb/s 
 --
-
-

@@ -42,6 +42,7 @@
     v-show="currentPane === 'torrents'"
     :simpleMode="simpleMode"
     :sizing="simpleMode ? sizing : sizingNonSimple"
+    :activeShow="currentShow"
     @close="handleTorrentsClose"
     @series="handleTorrentsClose"
     @map="() => { if (currentShow) { evtBus.emit('mapAction', { action: 'open', show: currentShow }); } }"

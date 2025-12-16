@@ -1,12 +1,6 @@
 
 Torrents, Status, History, Series, and Map
 
-keep a history in the torrent of every torrent downloaded in past 60 days.  use the hash to identify the torrent. show a clock icon in card when downloaded before
---
-do not change current check mark icon or its meaning
-
 add a new file history.vue -- it should show a pane like the series pane, map pane, etc.
 
-
-add console msg (not a debug line) that tells server started and show port
 

@@ -159,6 +159,8 @@ app.post('/api/download', async (req, res) => {
 });
 
 https.createServer(httpsOptions, app).listen(QBT_TEST_PORT, () => {
-  console.log('\n\n');
-  console.log(`\n ==== server running on localhost:${QBT_TEST_PORT} ====`);
+  // Always print a startup line, even when TORRENTS_DEBUG disables console.log.
+  process.stderr.write(`=\n`);
+  process.stderr.write(`========== torrents server started on port ${QBT_TEST_PORT} ==========\n`);
+  process.stderr.write(`=\n`);
 });

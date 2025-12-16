@@ -54,7 +54,7 @@ if (FILTER_TORRENTS && typeof FILTER_TORRENTS === 'object' && !Array.isArray(FIL
   (async () => {
     try {
       const info = await getQbtInfo(FILTER_TORRENTS);
-      const outPath = path.resolve(__dirname, '..', '..', 'sample-qbt', 'qbt-info.json');
+      const outPath = path.resolve(__dirname, '..', '..', 'samples','sample-qbt', 'qbt-info.json');
       fs.mkdirSync(path.dirname(outPath), { recursive: true });
       fs.writeFileSync(outPath, JSON.stringify(info, null, 2), 'utf8');
       console.log(`qbt startup dump wrote ${Array.isArray(info) ? info.length : 0} torrents -> ${outPath}`);
@@ -81,7 +81,7 @@ app.get('/api/qbt/info', async (req, res) => {
 
     if (DUMP_INFO) {
       try {
-        const outPath = path.resolve(__dirname, '..', '..', 'sample-qbt', 'qbt-info.json');
+        const outPath = path.resolve(__dirname, '..', '..', 'samples', 'sample-qbt', 'qbt-info.json');
         fs.mkdirSync(path.dirname(outPath), { recursive: true });
         fs.writeFileSync(outPath, JSON.stringify(info, null, 2), 'utf8');
       } catch (e) {

@@ -1,2 +1,10 @@
 
-Torrents, Status, History, Series, and Map
+Torrents, Status, History, Tvproc, Series, and Map
+
+add a new file tvproc.vue -- it should show a pane like the series pane, map pane, etc.
+
+it should have a sticky hdr with "TV Proc" on top left and buttons on the right.  buttons should be Torrents, Status, History, Series, and Map
+
+when the app 
+
+moved sample files to samples folder

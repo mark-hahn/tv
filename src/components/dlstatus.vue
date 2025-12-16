@@ -161,10 +161,11 @@ export default {
       return (Math.max(0, n) / 1_000_000_000).toFixed(1);
     },
 
-    fmtSpeedMBps(bytesPerSec) {
+    fmtSpeedGbps(bytesPerSec) {
       const n = Number(bytesPerSec);
       if (!Number.isFinite(n)) return String(bytesPerSec);
-      return `${(Math.max(0, n) / 1_000_000).toFixed(1)} MB/s`;
+      // qBittorrent reports bytes/sec. Convert to gigabits/sec.
+      return `${((Math.max(0, n) * 8) / 1_000_000_000).toFixed(3)} Gb/s`;
     },
 
     fmtDownloadedOfSizeGb(completedBytes, sizeBytes) {
@@ -195,7 +196,7 @@ export default {
       return this.formatAlignedBox([
         ['State', t?.state],
         ['Down', this.fmtDownloadedOfSizeGb(t?.completed, t?.size)],
-        ['Speed', this.fmtSpeedMBps(t?.dlspeed)]
+        ['Speed', this.fmtSpeedGbps(t?.dlspeed)]
       ]);
     },
 

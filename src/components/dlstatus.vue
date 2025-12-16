@@ -16,6 +16,7 @@
 
   div(v-else style="padding:10px; font-size:14px; line-height:1.6;")
     div(v-for="card in cards" :key="card.hash" style="position:relative; background:#fff; border:1px solid #ddd; border-radius:5px; padding:10px; margin:0 0 10px 0;")
+      button(@click.stop="closeCard(card.hash)" title="Close" aria-label="Close" style="position:absolute; top:6px; right:6px; padding:0 6px; line-height:16px; height:16px; font-size:12px; border:none; background:transparent; cursor:pointer; color:#666;") X
       div(style="font-size:16px; font-weight:bold; color:#333; margin-bottom:0; word-break:break-word;") {{ card.name || card.hash }}
       div(style="display:flex;")
         div(style="margin-left:20px; margin-right:30px;")
@@ -61,6 +62,12 @@ export default {
   },
 
   methods: {
+    closeCard(hash) {
+      const h = String(hash || '');
+      if (!h) return;
+      const idx = this.cards.findIndex(c => c.hash === h);
+      if (idx >= 0) this.cards.splice(idx, 1);
+    },
     onPaneChanged(pane) {
       if (pane === 'dlstatus') {
         this.startPolling();

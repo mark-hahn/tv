@@ -1,22 +1,3 @@
 
 Torrents, Status, History, Series, and Map
 
-add log line when torrent server starts with port number
---
-remove mins string from info torrent display
---
-change speed display units from megabytes/sec to gigabits/sec and display with 3 decimal places and change MB/s string to Gb/s 
---
-
-add log line when torrent server starts with port number
---
-info display speed and eta were broken in last change. 
-Speed: shows 0.0 MB/s and Eta: shows 144000:00 mins
---
-
-add a small close button to upper right of info pane
--
-have it remove that pane from the display
---
-if it is still downloading it will reappear but that is ok
-

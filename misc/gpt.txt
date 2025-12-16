@@ -34,3 +34,20 @@ switch to live, show all cards with updating
 remove any leading 0 from mins:secs
 instead of commas separate values with " | "
 
+change word finished to prop state.
+
+replace space before and after | to &nbsp&nbsp
+
+don't poll every 5 seconds, call getQbtInfo 5 secs after last call completed. 
+make first call immediately on history pane load.
+
+make all text in history panes bold
+
+remove all padding from history pane div
+give history pane div 16px margin-left
+make all text in history card 14px
+
+change status pane timing to call getQbtInfo 1 sec after last call completed. 
+make first call immediately on statuspane load.
+
+make title in status pane card 14px

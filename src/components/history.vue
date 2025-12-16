@@ -1,8 +1,8 @@
 <template lang="pug">
 
-#history(:style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
+#history(:style="{ height:'100%', padding:'0px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa', fontWeight:'bold' }")
 
-  #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'15px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
+  #header(:style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'0px', paddingLeft:'0px', paddingRight:'0px', paddingBottom:'0px', marginLeft:'0px', marginRight:'0px', marginTop:'0px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
     div(style="display:flex; justify-content:space-between; align-items:center;")
       div(style="margin-left:20px;") History
       div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
@@ -14,7 +14,7 @@
   div(v-if="sortedTorrents.length === 0" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
     | No history.
 
-  div(v-else style="padding:10px; font-size:14px; line-height:1.6;")
+  div(v-else style="padding:0px; font-size:14px; line-height:1.6;")
     div(v-for="t in sortedTorrents" :key="String(t.hash || t.name || t.added_on)" style="position:relative; background:#fff; border:1px solid #ddd; border-radius:5px; padding:10px; margin:0 0 10px 0;")
       div(style="font-size:16px; font-weight:bold; color:#333; word-break:break-word;") {{ t.name || t.hash }}
       div(style="font-size:14px; color:#333;") {{ infoLine(t) }}
@@ -43,6 +43,7 @@ export default {
     return {
       torrents: [],
       _pollTimer: null,
+      _polling: false,
       useStaticSamples: false
     };
   },
@@ -77,18 +78,32 @@ export default {
     },
 
     startPolling() {
-      if (this._pollTimer) return;
-      this._pollTimer = setInterval(() => {
-        void this.pollOnce();
-      }, 5000);
-      void this.pollOnce();
+      if (this._polling) return;
+      this._polling = true;
+      // First call immediately on history pane load.
+      this.scheduleNextPoll(0);
     },
 
     stopPolling() {
+      this._polling = false;
       if (this._pollTimer) {
-        clearInterval(this._pollTimer);
+        clearTimeout(this._pollTimer);
         this._pollTimer = null;
       }
+    },
+
+    scheduleNextPoll(delayMs) {
+      if (!this._polling) return;
+      if (this._pollTimer) {
+        clearTimeout(this._pollTimer);
+        this._pollTimer = null;
+      }
+      this._pollTimer = setTimeout(async () => {
+        if (!this._polling) return;
+        await this.pollOnce();
+        // Poll again 5 seconds after the last call completed.
+        this.scheduleNextPoll(5000);
+      }, Math.max(0, Number(delayMs) || 0));
     },
 
     async getQbtInfo(filterObj) {
@@ -113,6 +128,11 @@ export default {
       } catch {
         // ignore transient errors
       }
+    },
+
+    sep() {
+      // Replace spaces around '|' with two non-breaking spaces.
+      return '\u00A0\u00A0|\u00A0\u00A0';
     },
 
     pad2(n) {
@@ -165,15 +185,17 @@ export default {
     infoLine(t) {
       const added = this.fmtMmDd_HhMm(t?.added_on);
       const size = this.fmtGbOneDecimal(t?.size);
+      const sep = this.sep();
 
       if (t?.state === 'downloading') {
         const prog = this.fmtProgPc(t?.completed, t?.size);
         const eta = this.fmtEtaMmSs(t?.eta);
-        return `${added} | ${size} | downloading | ${prog}% | ${eta}`;
+        return `${added}${sep}${size}${sep}downloading${sep}${prog}%${sep}${eta}`;
       }
 
       const finished = this.fmtHhMm(t?.completion_on);
-      return `${added} | ${finished} | ${size} | finished`;
+      const state = (t?.state === undefined || t?.state === null) ? '' : String(t.state);
+      return `${added}${sep}${finished}${sep}${size}${sep}${state}`;
     }
   }
 };

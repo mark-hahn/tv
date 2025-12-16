@@ -8,6 +8,7 @@
       div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
         button(@click.stop="$emit('torrents')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Torrents
         button(@click.stop="$emit('status')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Status
+        button(@click.stop="$emit('tvproc')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Tvproc
         button(@click.stop="$emit('series')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Series
         button(@click.stop="$emit('map')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Map
 

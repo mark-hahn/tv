@@ -48,6 +48,7 @@
     @map="() => { if (currentShow) { evtBus.emit('mapAction', { action: 'open', show: currentShow }); } }"
     @status="handleShowStatus"
     @history="handleShowHistory"
+    @tvproc="handleShowTvproc"
   )
 
   DlStatus(
@@ -58,6 +59,7 @@
     @series="handleStatusToSeries"
     @map="handleStatusToMap"
     @history="handleShowHistory"
+    @tvproc="handleShowTvproc"
   )
 
   History(
@@ -66,8 +68,20 @@
     :sizing="simpleMode ? sizing : sizingNonSimple"
     @torrents="handleHistoryToTorrents"
     @status="handleHistoryToStatus"
+    @tvproc="handleShowTvproc"
     @series="handleHistoryToSeries"
     @map="handleHistoryToMap"
+  )
+
+  TvProc(
+    v-show="currentPane === 'tvproc'"
+    :simpleMode="simpleMode"
+    :sizing="simpleMode ? sizing : sizingNonSimple"
+    @torrents="handleTvprocToTorrents"
+    @status="handleTvprocToStatus"
+    @history="handleTvprocToHistory"
+    @series="handleTvprocToSeries"
+    @map="handleTvprocToMap"
   )
 </template>
 
@@ -79,16 +93,17 @@ import Actors   from './actors.vue';
 import Torrents from './torrents.vue';
 import DlStatus from './dlstatus.vue';
 import History  from './history.vue';
+import TvProc   from './tvproc.vue';
 import evtBus   from '../evtBus.js';
 import * as tvdb from '../tvdb.js';
 
 export default {
   name: "App",
-  components: { List, Series, Map, Actors, Torrents, DlStatus, History },
+  components: { List, Series, Map, Actors, Torrents, DlStatus, History, TvProc },
   data() { 
     return { 
       simpleMode: false,
-      currentPane: 'series', // 'series', 'map', 'actors', 'torrents', 'dlstatus', or 'history'
+      currentPane: 'series', // 'series', 'map', 'actors', 'torrents', 'dlstatus', 'history', or 'tvproc'
       currentTvdbData: null,
       currentShow: null,
       _torrentsInitialized: false,
@@ -226,6 +241,11 @@ export default {
       evtBus.emit('paneChanged', this.currentPane);
     },
 
+    handleShowTvproc() {
+      this.currentPane = 'tvproc';
+      evtBus.emit('paneChanged', this.currentPane);
+    },
+
     handleStatusToTorrents() {
       // Do not reload/emit showTorrents when just switching panes.
       if (this._torrentsInitialized) {
@@ -286,6 +306,44 @@ export default {
     },
 
     handleHistoryToMap() {
+      if (this.currentShow) {
+        evtBus.emit('mapAction', { action: 'open', show: this.currentShow });
+      }
+    },
+
+    handleTvprocToTorrents() {
+      if (this._torrentsInitialized) {
+        this.currentPane = 'torrents';
+        evtBus.emit('paneChanged', this.currentPane);
+        return;
+      }
+
+      if (this.currentShow) {
+        this.handleShowTorrents(this.currentShow);
+      } else {
+        this.currentPane = 'torrents';
+        evtBus.emit('paneChanged', this.currentPane);
+      }
+    },
+
+    handleTvprocToStatus() {
+      this.currentPane = 'dlstatus';
+      evtBus.emit('paneChanged', this.currentPane);
+    },
+
+    handleTvprocToHistory() {
+      this.currentPane = 'history';
+      evtBus.emit('paneChanged', this.currentPane);
+    },
+
+    handleTvprocToSeries() {
+      this.currentPane = 'series';
+      this.mapShow = null;
+      evtBus.emit('paneChanged', this.currentPane);
+      evtBus.emit('mapAction', { action: 'close', show: null });
+    },
+
+    handleTvprocToMap() {
       if (this.currentShow) {
         evtBus.emit('mapAction', { action: 'open', show: this.currentShow });
       }
@@ -388,7 +446,8 @@ html, body {
 #actors, #actors *,
 #torrents, #torrents *,
 #dlstatus, #dlstatus *,
-#history, #history * {
+#history, #history *,
+#tvproc, #tvproc * {
   color: #000 !important;
 }
 
@@ -399,7 +458,8 @@ html, body {
 #torrents button,
 .torrents-container button,
 #dlstatus button,
-#history button {
+#history button,
+#tvproc button {
   background-color: whitesmoke !important;
 }
 </style>

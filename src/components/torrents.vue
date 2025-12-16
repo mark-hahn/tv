@@ -6,8 +6,6 @@
       div(style="display:flex; justify-content:space-between; align-items:center;")
         div(style="margin-left:20px;") {{ headerShowName }}
         div(style="display:flex; gap:10px; margin-right:20px;")
-          button(@click.stop="$emit('status')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Status
-          button(@click.stop="$emit('history')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") History
           button(@click.stop="$emit('series')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Series
           button(@click.stop="handleMapButton" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Map
 
@@ -15,7 +13,10 @@
         div
         div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
           button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Download
-          button(@click.stop="forceLoadTorrents" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Force
+          button(@click.stop="$emit('status')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Status
+          button(@click.stop="$emit('history')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") History
+          button(@click.stop="$emit('tvproc')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Tvproc
+          button(@click.stop="searchClick" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Search
           button(@click.stop="toggleCookieInputs" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Cookies
 
       div(style="margin-left:20px; margin-right:20px; margin-top:14px; font-weight:normal; font-size:16px; color:#666; display:block; visibility:visible; opacity:1; line-height:1.1; white-space:nowrap; overflow:visible;") {{ spaceAvailText }}
@@ -114,6 +115,8 @@ export default {
       showCookieInputs: false,  // Manual toggle for cookie input boxes
       dismissCookieInputs: false,
       unaired: false,
+
+      lastNeeded: null,
 
       downloadedByHash: {},
 
@@ -390,6 +393,7 @@ export default {
       this.dismissCookieInputs = false;
       this.spaceAvailText = 'Space Used, Seed Box: --%, Server: --%';
       this.spaceAvailGbText = 'Available, Seed Box: -- GB, Server: -- GB';
+      this.lastNeeded = null;
 
       // Kick off space fetch ASAP; don't wait for torrent searching.
       this.updateSpaceAvail();
@@ -412,15 +416,44 @@ export default {
       
       // Get series map and calculate needed episodes
       const needed = await this.calculateNeeded(show);
+      this.lastNeeded = needed;
       
       // Check if needed array is truly empty (not 'loadall')
       if (needed.length === 0) {
         this.noTorrentsNeeded = true;
         return;
       }
-      
-      // Automatically try to load torrents with saved cookies
-      await this.loadTorrents(needed);
+
+      // Do not search automatically; wait for Search button.
+    },
+
+    async searchClick() {
+      if (!this.currentShow || !this.currentShow.Name) {
+        this.error = 'No show selected';
+        return;
+      }
+
+      if (this.unaired) {
+        return;
+      }
+
+      this.noTorrentsNeeded = false;
+      this.providerWarning = '';
+
+      if (!Array.isArray(this.lastNeeded)) {
+        try {
+          this.lastNeeded = await this.calculateNeeded(this.currentShow);
+        } catch {
+          this.lastNeeded = [];
+        }
+      }
+
+      if (Array.isArray(this.lastNeeded) && this.lastNeeded.length === 0) {
+        this.noTorrentsNeeded = true;
+        return;
+      }
+
+      await this.loadTorrents(this.lastNeeded || []);
     },
 
     async calculateNeeded(show) {

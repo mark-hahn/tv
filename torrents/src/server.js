@@ -27,6 +27,18 @@ const FILTER_TORRENTS = false;
 // const FILTER_TORRENTS = {hash:   "629746091b23ec0617405e8cc6f1eee486447629"};
 // const FILTER_TORRENTS = {filter: 'downloading'}
 
+const TVPROC_LOG_WIN = 'C:\\Users\\mark\\apps\\tv-series-client\\samples\\sample-tvproc\\tv.log';
+const TVPROC_LOG_WSL = '/mnt/c/Users/mark/apps/tv-series-client/samples/sample-tvproc/tv.log';
+const TVPROC_LOG_LINUX = '/mnt/media/archive/dev/apps/tv-proc/tv.log';
+
+function getTvprocLogPath() {
+  const override = process.env.TVPROC_LOG_PATH;
+  if (typeof override === 'string' && override.trim()) return override.trim();
+  if (process.platform === 'win32') return TVPROC_LOG_WIN;
+  if (process.env.WSL_DISTRO_NAME) return TVPROC_LOG_WSL;
+  return TVPROC_LOG_LINUX;
+}
+
 // Load SSL certificate
 const httpsOptions = {
   key: fs.readFileSync(path.resolve(__dirname, '..', 'cookies', 'localhost-key.pem')),
@@ -66,6 +78,22 @@ if (FILTER_TORRENTS && typeof FILTER_TORRENTS === 'object' && !Array.isArray(FIL
 
 // API endpoint
 app.get('/api/tvdb/*', tvdbProxyGet);
+
+app.get('/api/tvproc', async (req, res) => {
+  const logPath = getTvprocLogPath();
+  try {
+    const txt = await fs.promises.readFile(logPath, 'utf8');
+    res.type('text/plain').send(txt);
+  } catch (error) {
+    const code = error?.code;
+    if (code === 'ENOENT') {
+      res.status(404).json({ error: 'tvproc log file not found', path: logPath });
+      return;
+    }
+    console.error('tvproc error:', error);
+    res.status(500).json({ error: error?.message || String(error), path: logPath });
+  }
+});
 
 app.get('/api/qbt/info', async (req, res) => {
   try {

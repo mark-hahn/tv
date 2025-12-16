@@ -1,10 +1,47 @@
 
 Torrents, Status, History, Tvproc, Series, and Map
 
-add a new file tvproc.vue -- it should show a pane like the series pane, map pane, etc.
 
-it should have a sticky hdr with "TV Proc" on top left and buttons on the right.  buttons should be Torrents, Status, History, Series, and Map
+add an endpoint tvproc() to torrents/src/server.js that reads a log file and returns it. 
 
-when the app 
+when running torrents/src/server.js on laptop read the file C:\Users\mark\apps\tv-series-client\samples\sample-tvproc\tv.log.
 
-moved sample files to samples folder
+when running server.js in server read the file /mnt/media/archive/dev/apps/tv-proc/tv.log.
+
+add a new file torrents/src/tvproc.vue -- it should show a pane like the series pane, map pane, etc.
+
+it should have a sticky hdr with "TV Proc" on top left and buttons on the right.  buttons should be Torrents, Status, History, Series, and Map.
+
+it should call tvproc() to get file contents. It should display the log as raw text in a scrollable pane below the hdr.  It should use monospaced font.
+
+in the torrents pane change name of Force button to Search. Do not start a torrent search when the torrents pane loads.  only start a search when search button is clicked.
+
+add a button to torrents pane called Tvproc that loads the tvproc pane. it should be to the left of the Search Button. then move the Status and History buttons from the top row to the second row and place them to the left of the search button.
+
+add a tvproc button to the status pane between the history and series buttons.  it should load the tvproc pane.
+
+add a tvproc button to the history pane between the status and series buttons.  it should load the tvproc pane.
+
+
+
+when the pane first loads scroll the pane to the bottom.
+have tvproc.vue read the log every 5 seconds and update the scrolling pane.  
+
+move the search and cookies buttons in the torrents pane to the immediate left of the status button.
+
+in the tvproc pane move the torrents, status, and history buttons to a new second row in the header. add a button to the header called Trim to the left of the torrents button.
+
+in the tvproc pane add a button to the header called Trim to the immediate left of the other buttons. that trims the beginning of the log file such that only the bottom 1000 lines remain and then update the scrolling pane. 
+
+in the scroll pane if the bottom of the log text is within 20px of the bottom when an update occurs then scroll the pane up so the new end of the log is at the bottom. if the scroll pane is not at the bottom don't scroll the pane.
+
+when loading the text of the file remove every four line section that has this format:
+
+Tue Dec 16 03:45:01 AM PST 2025
+skipped recent:   1202
+elapsed(mins):    0.1
+
+ the numbers may vary of course. do not remove these sections from the log file.
+
+if no file text remains after removing the suppressed sections so the scrolling pane appears blank, show a msg "The log is empty."
+

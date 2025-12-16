@@ -70,3 +70,5 @@ change completion_on date format to "<month>/<day <hour>:<min>".
 change second line in history card text color to 75% gray
 
 change second line in torrents search card font size to 16px
+
+change continue button in download confirmation dialog to say OK

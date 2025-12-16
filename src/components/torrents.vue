@@ -66,7 +66,8 @@
         | ?
       div(style="display:flex; gap:10px; justify-content:flex-end;")
         button(@click.stop="cancelDownload" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;") Cancel
-        button(@click.stop="continueDownload" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; background:#4CAF50; color:white; border:none;") Continue
+        button(@click.stop="continueDownload" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; background:#4CAF50; color:white; border:none;") OK
+
 
 </template>
 

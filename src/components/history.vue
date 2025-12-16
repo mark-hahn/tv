@@ -17,7 +17,7 @@
   div(v-else style="padding:5px; font-size:16px; line-height:1.6;")
     div(v-for="t in sortedTorrents" :key="String(t.hash || t.name || t.added_on)" style="position:relative; background:#fff; border:1px solid #ddd; border-radius:5px; padding:10px; margin:0 0 10px 0;")
       div(style="font-size:16px; font-weight:bold; color:#333; word-break:break-word;") {{ t.name || t.hash }}
-      div(style="font-size:16px; color:#333;") {{ infoLine(t) }}
+      div(style="font-size:16px; color:rgba(0,0,0,0.50) !important;") {{ infoLine(t) }}
 
 </template>
 
@@ -154,16 +154,29 @@ export default {
       const dd = this.pad2(d.getDate());
       const hh = this.pad2(d.getHours());
       const mi = this.pad2(d.getMinutes());
-      return `${mm}/${dd}.${hh}:${mi}`;
+      return `${mm}/${dd} ${hh}:${mi}`;
     },
 
-    fmtHhMm(epochSeconds) {
+    fmtCompletionMmDd_HhMm(epochSeconds) {
       const n = Number(epochSeconds);
-      if (!Number.isFinite(n) || n <= 0) return '??:??';
+      if (!Number.isFinite(n) || n <= 0) return '??/?? ??:??';
       const d = new Date(Math.floor(n) * 1000);
+      const mm = this.pad2(d.getMonth() + 1);
+      const dd = this.pad2(d.getDate());
       const hh = this.pad2(d.getHours());
       const mi = this.pad2(d.getMinutes());
-      return `${hh}:${mi}`;
+      return `${mm}/${dd} ${hh}:${mi}`;
+    },
+
+    fmtState(state) {
+      const raw = (state === undefined || state === null) ? '' : String(state);
+      if (!raw) return '';
+
+      // Special-case qBittorrent's stalledUP to match requested wording.
+      if (raw === 'stalledUP') return 'Finished';
+
+      const lower = raw.toLowerCase();
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
     },
 
     fmtEtaMmSs(seconds) {
@@ -197,11 +210,11 @@ export default {
       if (t?.state === 'downloading') {
         const prog = this.fmtProgPc(t?.completed, t?.size);
         const eta = this.fmtEtaMmSs(t?.eta);
-        return `${added}${sep}${size}${sep}downloading${sep}${prog}%${sep}${eta}`;
+        return `${added}${sep}${size}${sep}Downloading${sep}${prog}%${sep}${eta}`;
       }
 
-      const finished = this.fmtHhMm(t?.completion_on);
-      const state = (t?.state === undefined || t?.state === null) ? '' : String(t.state);
+      const finished = this.fmtCompletionMmDd_HhMm(t?.completion_on);
+      const state = this.fmtState(t?.state);
       return `${added}${sep}${finished}${sep}${size}${sep}${state}`;
     }
   }

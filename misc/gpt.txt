@@ -61,3 +61,12 @@ make all text color in all panes black
 in torrents pane move buttons in second row to first row between cookies and series -- remove second row
 
 add second row back and move cookies button to far right of second row and the force button to the left of the cookies button
+
+if history card state is stalledUP then replace it with Finished.
+capitalize history card state value.
+change added_on date format "<month>/<day.<hour>:<min>" to "<month>/<day <hour>:<min>".
+change completion_on date format to "<month>/<day <hour>:<min>".
+
+change second line in history card text color to 75% gray
+
+change second line in torrents search card font size to 16px

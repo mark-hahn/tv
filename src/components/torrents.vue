@@ -55,7 +55,7 @@
         div(v-if="isClicked(torrent)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
         div(v-if="isDownloadedBefore(torrent)" :style="getDownloadedBeforeIconStyle(torrent)" title="Downloaded before") 🕘
         div(v-if="SHOW_TITLE && torrent.raw" style="font-size:14px; color:#888; margin-bottom:4px;") {{ torrent.raw.title }}
-        div(style="font-size:18px; color:#333;") 
+        div(style="font-size:16px; color:#333;") 
           strong {{ getDisplaySeasonEpisode(torrent) }}
           | : {{ torrent.raw?.size || 'N/A' }}, {{ torrent.raw?.seeds || 0 }} seeds<span v-if="torrent.raw?.provider">, {{ formatProvider(torrent.raw.provider) }}</span><span v-if="torrent.parsed?.resolution">, {{ torrent.parsed.resolution }}</span><span v-if="torrent.parsed?.group">, {{ formatGroup(torrent.parsed.group) }}</span>
 

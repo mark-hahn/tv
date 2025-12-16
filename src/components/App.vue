@@ -47,6 +47,7 @@
     @series="handleTorrentsClose"
     @map="() => { if (currentShow) { evtBus.emit('mapAction', { action: 'open', show: currentShow }); } }"
     @status="handleShowStatus"
+    @history="handleShowHistory"
   )
 
   DlStatus(
@@ -56,6 +57,17 @@
     @torrents="handleStatusToTorrents"
     @series="handleStatusToSeries"
     @map="handleStatusToMap"
+    @history="handleShowHistory"
+  )
+
+  History(
+    v-show="currentPane === 'history'"
+    :simpleMode="simpleMode"
+    :sizing="simpleMode ? sizing : sizingNonSimple"
+    @torrents="handleHistoryToTorrents"
+    @status="handleHistoryToStatus"
+    @series="handleHistoryToSeries"
+    @map="handleHistoryToMap"
   )
 </template>
 
@@ -66,16 +78,17 @@ import Map      from './map.vue';
 import Actors   from './actors.vue';
 import Torrents from './torrents.vue';
 import DlStatus from './dlstatus.vue';
+import History  from './history.vue';
 import evtBus   from '../evtBus.js';
 import * as tvdb from '../tvdb.js';
 
 export default {
   name: "App",
-  components: { List, Series, Map, Actors, Torrents, DlStatus },
+  components: { List, Series, Map, Actors, Torrents, DlStatus, History },
   data() { 
     return { 
       simpleMode: false,
-      currentPane: 'series', // 'series', 'map', 'actors', 'torrents', or 'dlstatus'
+      currentPane: 'series', // 'series', 'map', 'actors', 'torrents', 'dlstatus', or 'history'
       currentTvdbData: null,
       currentShow: null,
       _torrentsInitialized: false,
@@ -208,6 +221,11 @@ export default {
       evtBus.emit('paneChanged', this.currentPane);
     },
 
+    handleShowHistory() {
+      this.currentPane = 'history';
+      evtBus.emit('paneChanged', this.currentPane);
+    },
+
     handleStatusToTorrents() {
       // Do not reload/emit showTorrents when just switching panes.
       if (this._torrentsInitialized) {
@@ -233,6 +251,41 @@ export default {
     },
 
     handleStatusToMap() {
+      if (this.currentShow) {
+        evtBus.emit('mapAction', { action: 'open', show: this.currentShow });
+      }
+    },
+
+    handleHistoryToTorrents() {
+      // Do not reload/emit showTorrents when just switching panes.
+      if (this._torrentsInitialized) {
+        this.currentPane = 'torrents';
+        evtBus.emit('paneChanged', this.currentPane);
+        return;
+      }
+
+      // Fallback: if torrents was never initialized, open it with current show.
+      if (this.currentShow) {
+        this.handleShowTorrents(this.currentShow);
+      } else {
+        this.currentPane = 'torrents';
+        evtBus.emit('paneChanged', this.currentPane);
+      }
+    },
+
+    handleHistoryToStatus() {
+      this.currentPane = 'dlstatus';
+      evtBus.emit('paneChanged', this.currentPane);
+    },
+
+    handleHistoryToSeries() {
+      this.currentPane = 'series';
+      this.mapShow = null;
+      evtBus.emit('paneChanged', this.currentPane);
+      evtBus.emit('mapAction', { action: 'close', show: null });
+    },
+
+    handleHistoryToMap() {
       if (this.currentShow) {
         evtBus.emit('mapAction', { action: 'open', show: this.currentShow });
       }

@@ -3,4 +3,34 @@ Torrents, Status, History, Series, and Map
 
 add a new file history.vue -- it should show a pane like the series pane, map pane, etc.
 
+it should have a sticky hdr with "History" on top left and buttons on the right.  buttons should be Torrents, Status, Series, and Map.
+
+it should call getQbtInfo({}) (no filters) repeatedly like the status page does but it should update with 5 seconds between calls not one sec.
+
+getQbtInfo({}) will return a large number of torrents. Show a card for every torrent like the status page. sort them by added_on with newest at top.
+
+the cards will have only two lines, the title line, and below that the info line.
+
+the info line will have values separated by commas with no names or suffixes.  
+
+if prop state is "downloading" then the line template is:
+
+ "<month>/<day>.<hour>:<min>, <size>, downloading, <progpc>%, <eta>",
+
+<month>,<day>, <hour>, <min> are 2 digits each from prop added_on;
+<size> is prop size in gigabytes with 1 decimal place;
+<progpc> is (prop completed)/(prop size) as integer percent;
+<eta> is prop eta in mins:secs
+--
+if prop state is not "downloading" then the line template is:
+
+ "<month>/<day.<hour>:<min>, <hour2>:<min2>, <size>, finished"
+
+<month>,<day>, <hour>, <min> are 2 digits each from prop added_on;
+<hour2>, <min2> are 2 digits each from prop completion_on;
+<size> is prop size in gigabytes with 1 decimal place;
+
+switch to live, show all cards with updating
+remove any leading 0 from mins:secs
+instead of commas separate values with " | "
 

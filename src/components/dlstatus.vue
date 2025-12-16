@@ -16,8 +16,12 @@
 
   div(v-else style="padding:10px; font-size:14px; line-height:1.6;")
     div(v-for="card in cards" :key="card.hash" style="position:relative; background:#fff; border:1px solid #ddd; border-radius:5px; padding:10px; margin:0 0 10px 0;")
-      div(style="font-size:16px; font-weight:bold; color:#333; margin-bottom:6px; word-break:break-word;") {{ card.name || card.hash }}
-      pre(style="margin:0; white-space:pre; overflow-x:auto;") {{ formatCard(card) }}
+      div(style="font-size:16px; font-weight:bold; color:#333; margin-bottom:0; word-break:break-word;") {{ card.name || card.hash }}
+      div(style="display:flex;")
+        div(style="margin-left:20px; margin-right:30px;")
+          pre(style="margin:0;") {{ leftBoxText(card) }}
+        div
+          pre(style="margin:0;") {{ rightBoxText(card) }}
 
 </template>
 
@@ -42,8 +46,7 @@ export default {
   data() {
     return {
       cards: [],
-      _polling: false,
-      _stopPolling: false
+      _pollTimer: null
     };
   },
 
@@ -67,20 +70,18 @@ export default {
     },
 
     startPolling() {
-      if (this._polling) return;
-      this._stopPolling = false;
-      this._polling = true;
-      void this.pollLoop();
+      if (this._pollTimer) return;
+      this._pollTimer = setInterval(() => {
+        void this.pollOnce();
+      }, 1000);
+      void this.pollOnce();
     },
 
     stopPolling() {
-      this._stopPolling = true;
-      this._polling = false;
-    },
-
-
-    sleep(ms) {
-      return new Promise(resolve => setTimeout(resolve, ms));
+      if (this._pollTimer) {
+        clearInterval(this._pollTimer);
+        this._pollTimer = null;
+      }
     },
 
     async getQbtInfo(filterObj) {
@@ -114,34 +115,29 @@ export default {
       }
     },
 
-    async pollLoop() {
-      while (!this._stopPolling) {
-        try {
-          const torrents = await this.getQbtInfo({ filter: 'downloading' });
-          if (Array.isArray(torrents)) {
-            for (const t of torrents) this.upsertTorrent(t);
-          }
-        } catch {
-          // ignore transient errors
-        }
+    shouldShowTorrent(t) {
+      const amountLeft = Number(t?.amount_left);
+      if (Number.isFinite(amountLeft) && amountLeft > 0) return true;
 
-        await this.sleep(1000);
-      }
+      const progress = Number(t?.progress);
+      if (Number.isFinite(progress) && progress >= 0 && progress < 1) return true;
+
+      return false;
     },
 
-    fmtSize(bytes) {
-      const n = Number(bytes);
-      if (!Number.isFinite(n)) return String(bytes);
-      const b = Math.max(0, n);
-      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-      let v = b;
-      let i = 0;
-      while (v >= 1000 && i < units.length - 1) {
-        v /= 1000;
-        i += 1;
+    async pollOnce() {
+      try {
+        // No filter: qB state can flip between downloading/stalled/etc.
+        // Client-side filter keeps cards updating while data is still relevant.
+        const torrents = await this.getQbtInfo(null);
+        if (Array.isArray(torrents)) {
+          for (const t of torrents) {
+            if (this.shouldShowTorrent(t)) this.upsertTorrent(t);
+          }
+        }
+      } catch {
+        // ignore transient errors
       }
-      if (i === 0) return `${Math.round(v)} B`;
-      return `${v.toFixed(1)} ${units[i]}`;
     },
 
     fmtPercent(progress) {
@@ -159,24 +155,57 @@ export default {
       return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
     },
 
-    formatCard(card) {
+    fmtGbOneDecimal(bytes) {
+      const n = Number(bytes);
+      if (!Number.isFinite(n)) return String(bytes);
+      return (Math.max(0, n) / 1_000_000_000).toFixed(1);
+    },
+
+    fmtSpeedMBps(bytesPerSec) {
+      const n = Number(bytesPerSec);
+      if (!Number.isFinite(n)) return String(bytesPerSec);
+      return `${(Math.max(0, n) / 1_000_000).toFixed(1)} MB/s`;
+    },
+
+    fmtDownloadedOfSizeGb(completedBytes, sizeBytes) {
+      const dl = this.fmtGbOneDecimal(completedBytes);
+      const sz = this.fmtGbOneDecimal(sizeBytes);
+      return `${dl} of ${sz} GB`;
+    },
+
+    fmtEtaMins(etaSeconds) {
+      const mmss = this.fmtDurationMmSs(etaSeconds);
+      return `${mmss} mins`;
+    },
+
+    formatAlignedBox(pairs) {
+      const maxKeyLen = Math.max(...pairs.map(([k]) => String(k).length));
+      return pairs
+        .map(([k, v]) => {
+          const key = String(k);
+          const val = (v === undefined || v === null) ? '' : String(v);
+          const pad = ' '.repeat(Math.max(0, maxKeyLen - key.length));
+          return `${key}: ${pad}${val}`;
+        })
+        .join('\n');
+    },
+
+    leftBoxText(card) {
       const t = card?.torrent || {};
+      return this.formatAlignedBox([
+        ['State', t?.state],
+        ['Down', this.fmtDownloadedOfSizeGb(t?.completed, t?.size)],
+        ['Speed', this.fmtSpeedMBps(t?.dlspeed)]
+      ]);
+    },
 
-      const lines = [];
-      const push = (k, v) => {
-        const shown = (v === undefined || v === null) ? '' : String(v);
-        lines.push(`${k}: ${shown}`);
-      };
-
-      push('state', t?.state);
-      push('progress', this.fmtPercent(t?.progress));
-      push('downloaded', this.fmtSize(t?.downloaded));
-      push('size', this.fmtSize(t?.size));
-      push('dl speed', this.fmtSize(t?.dlspeed) + '/s');
-      push('eta', this.fmtDurationMmSs(t?.eta));
-      push('seeds', t?.num_seeds);
-
-      return lines.join('\n');
+    rightBoxText(card) {
+      const t = card?.torrent || {};
+      return this.formatAlignedBox([
+        ['Seeds', t?.num_seeds],
+        ['Progress', this.fmtPercent(t?.progress)],
+        ['Eta', this.fmtEtaMins(t?.eta)]
+      ]);
     }
   }
 };

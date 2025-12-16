@@ -22,3 +22,28 @@ progress: 31%
 eta:      02:02 mins
 
 as a test show this data in the new layout as static without any downloading needed.
+
+add margin-right of 10px to left div box 
+--
+remove margin-bottom from title div
+---
+change "downloaded" name to "down"
+---
+capitalize each prop name
+
+-- remove layout testing and resume live data
+
+change margin-left of left div box to 20px
+change margin-right of left div box to 30px
+
+change speed from megabytes/sec to gigabite/sec with 2 decimal places
+
+while downloading i switched to torrents pane and clicked on cookies -- it showed Save Cookies button but the input boxes were missing -- i went back to status pane and it was frozen at 86% without updating. apparently the cookies button disturbed the state of the status pane
+
+remove the action where the status pane is opened when downloading starts. the status pane should now be independent of all other panes except it is opened by status buttons. 
+
+--
+verify that i can input cookes, start searches, etc, after going to status pane and back to torrents pane
+--
+
+

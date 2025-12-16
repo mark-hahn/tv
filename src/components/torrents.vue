@@ -24,7 +24,7 @@
     #unaired(v-if="unaired" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
       div Show not aired yet
       
-    #cookie-inputs(@click.stop v-if="!loading && ((isCookieRelatedError && !dismissCookieInputs) || showCookieInputs)" style="position:sticky; top:0; zIndex:50; padding:15px 20px 15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
+    #cookie-inputs(@click.stop v-if="!loading && ((isCookieRelatedError && !dismissCookieInputs) || showCookieInputs)" style="position:sticky; top:120px; zIndex:120; padding:15px 20px 15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
       div(style="margin-bottom:10px;")
         label(style="display:block; font-size:12px; font-weight:bold; margin-bottom:3px; color:#555;") IPTorrents cf_clearance:
         input(v-model="iptCfClearance" type="text" placeholder="Paste cf_clearance cookie value" style="width:100%; padding:6px; font-size:12px; border:1px solid #ccc; border-radius:3px; box-sizing:border-box;")

@@ -391,4 +391,15 @@ html, body {
 #history, #history * {
   color: #000 !important;
 }
+
+/* Force light-gray button backgrounds only in the right-side panes */
+#series button,
+#map button,
+#actors button,
+#torrents button,
+.torrents-container button,
+#dlstatus button,
+#history button {
+  background-color: whitesmoke !important;
+}
 </style>

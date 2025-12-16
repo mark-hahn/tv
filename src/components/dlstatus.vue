@@ -174,7 +174,10 @@ export default {
       const s = Math.floor(n);
       const mm = Math.floor(s / 60);
       const ss = s % 60;
-      return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+      const ss2 = String(ss).padStart(2, '0');
+      // If minutes would render as "00", drop just one leading zero.
+      if (mm === 0) return `0:${ss2}`;
+      return `${String(mm).padStart(2, '0')}:${ss2}`;
     },
 
     fmtGbOneDecimal(bytes) {

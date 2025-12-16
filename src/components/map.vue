@@ -11,7 +11,7 @@
         | {{mapShow?.Name}}
       div(style="display:flex; gap:5px; flex-shrink:0;")
         button(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Prune
-        button(v-if="!simpleMode" @click.stop="$emit('torrents', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Download
+        button(v-if="!simpleMode" @click.stop="$emit('torrents', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Torrents
         button(@click.stop="$emit('series', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Series
         button(@click.stop="$emit('actors', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Actors
 

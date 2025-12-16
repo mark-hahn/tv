@@ -427,20 +427,42 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     if (a.notorrent || b.notorrent) {
       return a.notorrent ? 1 : -1;
     }
-    
-    // Season torrents before episode torrents
-    const aIsSeason = !a.parsed.episode;
-    const bIsSeason = !b.parsed.episode;
-    if (aIsSeason !== bIsSeason) {
-      return aIsSeason ? -1 : 1;
-    }
-    
-    // Sort by seasonEpisode value (S01 before S02, S01E01 before S01E02)
-    const aSeasonEp = a.parsed.seasonEpisode || '';
-    const bSeasonEp = b.parsed.seasonEpisode || '';
-    if (aSeasonEp && bSeasonEp && aSeasonEp !== bSeasonEp) {
-      return aSeasonEp.localeCompare(bSeasonEp);
-    }
+
+    // Highest-priority: sort by the same label shown in the UI (season/episode at left).
+    // Ordering: season packs first, then season-range packs, then individual episodes.
+    const key = (t) => {
+      const range = t.seasonRange;
+      if (range && range.isRange) {
+        const startSeason = Number(range.startSeason);
+        const endSeason = Number(range.endSeason);
+        return {
+          season: Number.isFinite(startSeason) ? startSeason : 9999,
+          kind: 1, // range
+          episode: 0,
+          endSeason: Number.isFinite(endSeason) ? endSeason : 9999
+        };
+      }
+
+      const season = Number(t?.parsed?.season);
+      const episode = Number(t?.parsed?.episode);
+      const hasSeason = Number.isFinite(season);
+      const hasEpisode = Number.isFinite(episode) && episode > 0;
+
+      return {
+        season: hasSeason ? season : 9999,
+        kind: hasEpisode ? 2 : 0, // 0 season pack, 2 episode
+        episode: hasEpisode ? episode : 0,
+        endSeason: 0
+      };
+    };
+
+    const ak = key(a);
+    const bk = key(b);
+
+    if (ak.season !== bk.season) return ak.season - bk.season;
+    if (ak.kind !== bk.kind) return ak.kind - bk.kind;
+    if (ak.kind === 1 && ak.endSeason !== bk.endSeason) return ak.endSeason - bk.endSeason;
+    if (ak.kind === 2 && ak.episode !== bk.episode) return ak.episode - bk.episode;
     
     // 1080 before 720
     const aHas1080 = a.parsed.resolution?.includes('1080') || false;

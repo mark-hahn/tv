@@ -5,9 +5,6 @@ reminder, restore ...
 bugs ...
 
 todo ...
-  show tv-proc status
-  add (Sxx-yy) format to title parsing
-
   use minimum from emby
     shows
     watched

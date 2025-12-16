@@ -7,13 +7,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * Extract season range from title (e.g., S01-S02, S1-S5)
+ * Extract season range from title (e.g., S01-S02, S1-S5, S1-2)
  * @param {string} title - Torrent title
  * @returns {Object|null} Object with startSeason, endSeason, and fullMatch, or null if not found
  */
 function extractSeasonRange(title) {
-  // Match patterns like S01-S02, S1-S5, s01-s10, etc.
-  const rangePattern = /s(\d{1,2})-s(\d{1,2})/i;
+  // Match patterns like:
+  // - S01-S02
+  // - (S1-S5)
+  // - (S1-2)
+  // with optional whitespace and case-insensitive "S".
+  const rangePattern = /s(\d{1,2})\s*-\s*(?:s\s*)?(\d{1,2})/i;
   const match = title.match(rangePattern);
   
   if (match) {

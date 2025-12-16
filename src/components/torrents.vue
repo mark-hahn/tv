@@ -53,6 +53,7 @@
         div No torrents found
       div(v-for="(torrent, index) in torrents" :key="index" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
         div(v-if="isClicked(torrent)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
+        div(v-if="isDownloadedBefore(torrent)" :style="getDownloadedBeforeIconStyle(torrent)" title="Downloaded before") 🕘
         div(v-if="SHOW_TITLE && torrent.raw" style="font-size:12px; color:#888; margin-bottom:4px;") {{ torrent.raw.title }}
         div(style="font-size:18px; color:#333;") 
           strong {{ getDisplaySeasonEpisode(torrent) }}
@@ -113,6 +114,8 @@ export default {
       dismissCookieInputs: false,
       unaired: false,
 
+      downloadedByHash: {},
+
       spaceAvailText: 'Space Used, Seed Box: --%, Server: --%',
       spaceAvailGbText: 'Available, Seed Box: -- GB, Server: -- GB'
     };
@@ -153,6 +156,8 @@ export default {
   mounted() {
     evtBus.on('showTorrents', this.searchTorrents);
     evtBus.on('resetTorrentsPane', this.resetPane);
+
+    this.loadDownloadedHistory();
   },
 
   unmounted() {
@@ -161,6 +166,98 @@ export default {
   },
 
   methods: {
+    downloadHistoryKey() {
+      return 'downloadedTorrentHashes';
+    },
+
+    downloadHistoryWindowMs() {
+      return 60 * 24 * 60 * 60 * 1000;
+    },
+
+    loadDownloadedHistory() {
+      let parsed = {};
+      try {
+        const raw = localStorage.getItem(this.downloadHistoryKey());
+        if (raw) {
+          const j = JSON.parse(raw);
+          if (j && typeof j === 'object' && !Array.isArray(j)) parsed = j;
+        }
+      } catch {
+        // ignore
+      }
+      this.downloadedByHash = parsed;
+      this.pruneDownloadedHistory();
+    },
+
+    saveDownloadedHistory() {
+      try {
+        localStorage.setItem(this.downloadHistoryKey(), JSON.stringify(this.downloadedByHash || {}));
+      } catch {
+        // ignore
+      }
+    },
+
+    pruneDownloadedHistory() {
+      const now = Date.now();
+      const cutoff = now - this.downloadHistoryWindowMs();
+      let changed = false;
+      const map = this.downloadedByHash || {};
+      for (const [hash, ts] of Object.entries(map)) {
+        const t = Number(ts);
+        if (!Number.isFinite(t) || t < cutoff) {
+          delete map[hash];
+          changed = true;
+        }
+      }
+      if (changed) this.saveDownloadedHistory();
+    },
+
+    extractBtih(str) {
+      const s = String(str || '');
+      if (!s) return '';
+      const m = /xt=urn:btih:([a-zA-Z0-9]+)/.exec(s) || /btih:([a-zA-Z0-9]+)/.exec(s);
+      return m?.[1] ? String(m[1]).toLowerCase() : '';
+    },
+
+    getTorrentHash(torrent) {
+      const direct = torrent?.raw?.infoHash || torrent?.raw?.info_hash || torrent?.raw?.hash || torrent?.hash;
+      if (typeof direct === 'string' && direct) return direct.toLowerCase();
+
+      const magnet = torrent?.raw?.magnet || torrent?.raw?.magnetLink || torrent?.raw?.link;
+      if (typeof magnet === 'string' && magnet) {
+        const h = this.extractBtih(magnet);
+        if (h) return h;
+      }
+      return '';
+    },
+
+    rememberDownloadedTorrent(torrent) {
+      const hash = this.getTorrentHash(torrent);
+      if (!hash) return;
+      if (!this.downloadedByHash || typeof this.downloadedByHash !== 'object') this.downloadedByHash = {};
+      this.downloadedByHash[hash] = Date.now();
+      this.pruneDownloadedHistory();
+      this.saveDownloadedHistory();
+    },
+
+    isDownloadedBefore(torrent) {
+      const hash = this.getTorrentHash(torrent);
+      if (!hash) return false;
+      const ts = Number(this.downloadedByHash?.[hash]);
+      if (!Number.isFinite(ts)) return false;
+      return ts >= (Date.now() - this.downloadHistoryWindowMs());
+    },
+
+    getDownloadedBeforeIconStyle(torrent) {
+      const right = this.isClicked(torrent) ? 32 : 8;
+      return {
+        position: 'absolute',
+        top: '10px',
+        right: `${right}px`,
+        color: '#888',
+        fontSize: '16px'
+      };
+    },
     resetPane() {
       this.selectedTorrent = null;
       this.showModal = false;
@@ -625,6 +722,7 @@ export default {
         // Check if download was successful
         if (data.success || data.result === true) {
           // Success: do not switch panes automatically.
+          this.rememberDownloadedTorrent(this.selectedTorrent);
         } else {
           const errorMsg = data.error || data.message || 'Unknown error';
           alert(`Download failed for ${torrentTitle}, ${errorMsg}`);

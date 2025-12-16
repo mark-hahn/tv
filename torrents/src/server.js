@@ -95,6 +95,30 @@ app.get('/api/tvproc', async (req, res) => {
   }
 });
 
+app.post('/api/tvproc/trim', async (req, res) => {
+  const logPath = getTvprocLogPath();
+  const keepLines = Number(req?.body?.keepLines);
+  const n = Number.isFinite(keepLines) && keepLines > 0 ? Math.floor(keepLines) : 1000;
+
+  try {
+    const txt = await fs.promises.readFile(logPath, 'utf8');
+    const lines = String(txt).split(/\r?\n/);
+    const originalLines = lines.length;
+    const kept = lines.slice(Math.max(0, originalLines - n));
+    const out = kept.join('\n') + (kept.length ? '\n' : '');
+    await fs.promises.writeFile(logPath, out, 'utf8');
+    res.json({ ok: true, path: logPath, originalLines, keptLines: kept.length });
+  } catch (error) {
+    const code = error?.code;
+    if (code === 'ENOENT') {
+      res.status(404).json({ error: 'tvproc log file not found', path: logPath });
+      return;
+    }
+    console.error('tvproc trim error:', error);
+    res.status(500).json({ error: error?.message || String(error), path: logPath });
+  }
+});
+
 app.get('/api/qbt/info', async (req, res) => {
   try {
     const q = req.query || {};

@@ -45,3 +45,5 @@ elapsed(mins):    0.1
 
 if no file text remains after removing the suppressed sections so the scrolling pane appears blank, show a msg "The log is empty."
 
+
+in torrents pane move the tvproc button to the far right.

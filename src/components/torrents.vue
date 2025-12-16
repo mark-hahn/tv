@@ -13,11 +13,11 @@
         div
         div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
           button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Download
+          button(@click.stop="searchClick" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Search
+          button(@click.stop="toggleCookieInputs" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Cookies
           button(@click.stop="$emit('status')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Status
           button(@click.stop="$emit('history')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") History
           button(@click.stop="$emit('tvproc')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Tvproc
-          button(@click.stop="searchClick" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Search
-          button(@click.stop="toggleCookieInputs" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Cookies
 
       div(style="margin-left:20px; margin-right:20px; margin-top:14px; font-weight:normal; font-size:16px; color:#666; display:block; visibility:visible; opacity:1; line-height:1.1; white-space:nowrap; overflow:visible;") {{ spaceAvailText }}
       div(style="margin-left:20px; margin-right:20px; margin-top:2px; font-weight:normal; font-size:16px; color:#666; display:block; visibility:visible; opacity:1; line-height:1.1; white-space:nowrap; overflow:visible;") {{ spaceAvailGbText }}

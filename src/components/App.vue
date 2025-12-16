@@ -381,4 +381,14 @@ html, body {
   margin: 0;
   padding: 0;
 }
+
+/* Force black text only in the right-side panes */
+#series, #series *,
+#map, #map *,
+#actors, #actors *,
+#torrents, #torrents *,
+#dlstatus, #dlstatus *,
+#history, #history * {
+  color: #000 !important;
+}
 </style>

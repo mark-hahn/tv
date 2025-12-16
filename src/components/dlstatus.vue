@@ -47,7 +47,8 @@ export default {
   data() {
     return {
       cards: [],
-      _pollTimer: null
+      _pollTimer: null,
+      _polling: false
     };
   },
 
@@ -77,18 +78,32 @@ export default {
     },
 
     startPolling() {
-      if (this._pollTimer) return;
-      this._pollTimer = setInterval(() => {
-        void this.pollOnce();
-      }, 1000);
-      void this.pollOnce();
+      if (this._polling) return;
+      this._polling = true;
+      // First call immediately on status pane load.
+      this.scheduleNextPoll(0);
     },
 
     stopPolling() {
+      this._polling = false;
       if (this._pollTimer) {
-        clearInterval(this._pollTimer);
+        clearTimeout(this._pollTimer);
         this._pollTimer = null;
       }
+    },
+
+    scheduleNextPoll(delayMs) {
+      if (!this._polling) return;
+      if (this._pollTimer) {
+        clearTimeout(this._pollTimer);
+        this._pollTimer = null;
+      }
+      this._pollTimer = setTimeout(async () => {
+        if (!this._polling) return;
+        await this.pollOnce();
+        // Poll again 1 second after the last call completed.
+        this.scheduleNextPoll(1000);
+      }, Math.max(0, Number(delayMs) || 0));
     },
 
     async getQbtInfo(filterObj) {
@@ -136,7 +151,7 @@ export default {
       try {
         // No filter: qB state can flip between downloading/stalled/etc.
         // Client-side filter keeps cards updating while data is still relevant.
-        const torrents = await this.getQbtInfo(null);
+        const torrents = await this.getQbtInfo({});
         if (Array.isArray(torrents)) {
           for (const t of torrents) {
             if (this.shouldShowTorrent(t)) this.upsertTorrent(t);

@@ -1,8 +1,8 @@
 <template lang="pug">
 
-#history(:style="{ height:'100%', padding:'0px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa', fontWeight:'bold' }")
+#history(:style="{ height:'100%', padding:'5px', margin:0, marginLeft:'16px', display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa', fontWeight:'bold' }")
 
-  #header(:style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'0px', paddingLeft:'0px', paddingRight:'0px', paddingBottom:'0px', marginLeft:'0px', marginRight:'0px', marginTop:'0px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
+  #header(:style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', marginLeft:'0px', marginRight:'0px', marginTop:'0px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
     div(style="display:flex; justify-content:space-between; align-items:center;")
       div(style="margin-left:20px;") History
       div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
@@ -14,10 +14,10 @@
   div(v-if="sortedTorrents.length === 0" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
     | No history.
 
-  div(v-else style="padding:0px; font-size:14px; line-height:1.6;")
+  div(v-else style="padding:5px; font-size:16px; line-height:1.6;")
     div(v-for="t in sortedTorrents" :key="String(t.hash || t.name || t.added_on)" style="position:relative; background:#fff; border:1px solid #ddd; border-radius:5px; padding:10px; margin:0 0 10px 0;")
       div(style="font-size:16px; font-weight:bold; color:#333; word-break:break-word;") {{ t.name || t.hash }}
-      div(style="font-size:14px; color:#333;") {{ infoLine(t) }}
+      div(style="font-size:16px; color:#333;") {{ infoLine(t) }}
 
 </template>
 
@@ -50,11 +50,18 @@ export default {
 
   computed: {
     sortedTorrents() {
-      return [...(this.torrents || [])].sort((a, b) => {
-        const aa = Number(a?.added_on) || 0;
-        const bb = Number(b?.added_on) || 0;
-        return bb - aa;
-      });
+      const nowSec = Math.floor(Date.now() / 1000);
+      const cutoff = nowSec - (60 * 24 * 60 * 60);
+      return [...(this.torrents || [])]
+        .filter(t => {
+          const added = Number(t?.added_on) || 0;
+          return added >= cutoff;
+        })
+        .sort((a, b) => {
+          const aa = Number(a?.added_on) || 0;
+          const bb = Number(b?.added_on) || 0;
+          return bb - aa;
+        });
     }
   },
 

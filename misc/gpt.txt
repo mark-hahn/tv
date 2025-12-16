@@ -45,9 +45,19 @@ make all text in history panes bold
 
 remove all padding from history pane div
 give history pane div 16px margin-left
-make all text in history card 14px
+make all text in history card 16px
 
-change status pane timing to call getQbtInfo 1 sec after last call completed. 
+change history pane timing to call getQbtInfo 5 secs after last getQbtInfo call completed.  
+
+change status pane timing to call getQbtInfo 1 sec after last getQbtInfo call completed. 
 make first call immediately on statuspane load.
+only show last 2 months of history cards
+make title in search pane card 14px
 
-make title in status pane card 14px
+make padding in history header and history panes 5px
+
+make all text color in all panes black
+
+in torrents pane move buttons in second row to first row between cookies and series -- remove second row
+
+add second row back and move cookies button to far right of second row and the force button to the left of the cookies button

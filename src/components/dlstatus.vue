@@ -73,6 +73,32 @@ export default {
       const idx = this.cards.findIndex(c => c.hash === h);
       if (idx >= 0) this.cards.splice(idx, 1);
     },
+
+    applyEarlyFinish(card) {
+      const t = card?.torrent;
+      if (!t || typeof t !== 'object') return;
+
+      const progress = Number(t.progress);
+      const eta = Number(t.eta);
+
+      // Only apply if the card isn't already finished.
+      const needsFinish = (Number.isFinite(progress) && progress < 1) || (Number.isFinite(eta) && eta !== 0);
+      if (!needsFinish) return;
+
+      const size = Number(t.size);
+      const next = {
+        ...t,
+        state: 'Early Finish',
+        progress: 1,
+        eta: 0
+      };
+      if (Number.isFinite(size) && size >= 0) {
+        next.size = size;
+        next.completed = size;
+      }
+
+      card.torrent = next;
+    },
     onPaneChanged(pane) {
       this._isVisible = pane === 'dlstatus';
       if (this._isVisible) this._everVisible = true;
@@ -176,8 +202,21 @@ export default {
         // Client-side filter keeps cards updating while data is still relevant.
         const torrents = await this.getQbtInfo({});
         if (Array.isArray(torrents)) {
+          const seen = new Set();
           for (const t of torrents) {
-            if (this.shouldShowTorrent(t)) this.upsertTorrent(t);
+            if (this.shouldShowTorrent(t)) {
+              const hash = String(t?.hash || '');
+              if (hash) seen.add(hash);
+              this.upsertTorrent(t);
+            }
+          }
+
+          // If a previously shown torrent is no longer in the active set, mark it as finished.
+          for (const card of this.cards) {
+            if (!card?.hash) continue;
+            if (!seen.has(card.hash)) {
+              this.applyEarlyFinish(card);
+            }
           }
         }
       } catch {

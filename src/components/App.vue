@@ -43,6 +43,7 @@
         :sizing="simpleMode ? sizing : sizingNonSimple"
       )
       Torrents(
+        v-if="!simpleMode"
         v-show="currentPane === 'torrents'"
         :simpleMode="simpleMode"
         :sizing="simpleMode ? sizing : sizingNonSimple"
@@ -50,18 +51,21 @@
       )
 
       DlStatus(
+        v-if="!simpleMode"
         v-show="currentPane === 'dlstatus'"
         :simpleMode="simpleMode"
         :sizing="simpleMode ? sizing : sizingNonSimple"
       )
 
       History(
+        v-if="!simpleMode"
         v-show="currentPane === 'history'"
         :simpleMode="simpleMode"
         :sizing="simpleMode ? sizing : sizingNonSimple"
       )
 
       TvProc(
+        v-if="!simpleMode"
         v-show="currentPane === 'tvproc'"
         :simpleMode="simpleMode"
         :sizing="simpleMode ? sizing : sizingNonSimple"
@@ -85,7 +89,8 @@ export default {
   components: { List, Series, Map, Actors, Torrents, DlStatus, History, TvProc },
   data() { 
     return { 
-      simpleMode: false,
+      // Must be known before first render so non-simple panes never mount in simple mode.
+      simpleMode: new URLSearchParams(window.location.search).has('simple'),
       currentPane: 'series', // 'series', 'map', 'actors', 'torrents', 'dlstatus', 'history', or 'tvproc'
       currentTvdbData: null,
       currentShow: null,
@@ -161,7 +166,7 @@ export default {
   },
   computed: {
     tabs() {
-      return [
+      const allTabs = [
         { label: 'Series', key: 'series' },
         { label: 'Map', key: 'map' },
         { label: 'Actors', key: 'actors' },
@@ -170,12 +175,21 @@ export default {
         { label: 'Qbt', key: 'history' },
         { label: 'Proc', key: 'tvproc' }
       ];
+
+      if (!this.simpleMode) return allTabs;
+      const allowed = new Set(['series', 'map', 'actors']);
+      return allTabs.filter(t => allowed.has(t.key));
     }
   },
   methods: {
     selectTab(key) {
       const k = String(key || '');
       if (!k) return;
+
+      // In simple mode, only Series/Map/Actors exist.
+      if (this.simpleMode && !['series', 'map', 'actors'].includes(k)) {
+        return;
+      }
 
       if (k === 'series') {
         this.handleActorsClose();
@@ -272,6 +286,7 @@ export default {
       evtBus.emit('mapAction', { action: 'close', show: null });
     },
     handleShowTorrents(show) {
+      if (this.simpleMode) return;
       const showKey = show?.Id || show?.Name || null;
 
       // Switching panes should not restart searching; only restart when show selection changes.
@@ -290,16 +305,19 @@ export default {
     },
 
     handleShowStatus() {
+      if (this.simpleMode) return;
       this.currentPane = 'dlstatus';
       evtBus.emit('paneChanged', this.currentPane);
     },
 
     handleShowHistory() {
+      if (this.simpleMode) return;
       this.currentPane = 'history';
       evtBus.emit('paneChanged', this.currentPane);
     },
 
     handleShowTvproc() {
+      if (this.simpleMode) return;
       this.currentPane = 'tvproc';
       evtBus.emit('paneChanged', this.currentPane);
     },
@@ -424,9 +442,10 @@ export default {
     }
   },
   mounted() {
-    const urlParams = new URLSearchParams(window.location.search);
-    this.simpleMode = urlParams.has('simple');
-    
+    if (this.simpleMode && !['series', 'map', 'actors'].includes(this.currentPane)) {
+      this.currentPane = 'series';
+    }
+
     // Listen for pane navigation events
     evtBus.on('showActorsPane', () => {
       this.handleShowActors(false);

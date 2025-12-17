@@ -49,7 +49,10 @@ export default {
     return {
       cards: [],
       _pollTimer: null,
-      _polling: false
+      _polling: false,
+      _inFlight: false,
+      _isVisible: false,
+      _everVisible: false
     };
   },
 
@@ -71,26 +74,39 @@ export default {
       if (idx >= 0) this.cards.splice(idx, 1);
     },
     onPaneChanged(pane) {
-      if (pane === 'dlstatus') {
+      this._isVisible = pane === 'dlstatus';
+      if (this._isVisible) this._everVisible = true;
+
+      // Start polling only once the pane has been shown at least once.
+      if (this._everVisible) {
         this.startPolling();
-      } else {
-        this.stopPolling();
+      }
+
+      // If we already have a scheduled next poll and we're not mid-request,
+      // reschedule to match the visible/hidden interval.
+      if (this._polling && !this._inFlight) {
+        this.scheduleNextPoll(this.getPollDelayMs());
       }
     },
 
     startPolling() {
       if (this._polling) return;
       this._polling = true;
-      // First call immediately on status pane load.
+      // First call immediately the first time we start.
       this.scheduleNextPoll(0);
     },
 
     stopPolling() {
       this._polling = false;
+      this._inFlight = false;
       if (this._pollTimer) {
         clearTimeout(this._pollTimer);
         this._pollTimer = null;
       }
+    },
+
+    getPollDelayMs() {
+      return this._isVisible ? 1000 : 10000;
     },
 
     scheduleNextPoll(delayMs) {
@@ -101,9 +117,15 @@ export default {
       }
       this._pollTimer = setTimeout(async () => {
         if (!this._polling) return;
-        await this.pollOnce();
-        // Poll again 1 second after the last call completed.
-        this.scheduleNextPoll(1000);
+        if (this._inFlight) return;
+        this._inFlight = true;
+        try {
+          await this.pollOnce();
+        } finally {
+          this._inFlight = false;
+        }
+        // Poll again after the last call completed; interval depends on visibility.
+        this.scheduleNextPoll(this.getPollDelayMs());
       }, Math.max(0, Number(delayMs) || 0));
     },
 

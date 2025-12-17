@@ -1,8 +1,4 @@
 
-in the status pane start calling the qbt api the first time the pane is visible. Then keep calling all the time, even when the pane is not visible.
+when the torrent isn't received any more we want the displayed torrent to show it is finished downloading. to do this we need to check the torrent. if the torrent has progress that is not 100%, or eta that is not zero, then we know the torrent needs to be updated to show it is finished. 
 
-When the status pane is hidden the gap between the calls should be 10 secs. When the status pane is visible use a gap between the calls of 1 sec. 
-
-Since the pane is displayed with v-show, the pane display should keep updating even when the pane is not visible. 
-
-This way while the pane is not visible, torrents that were received and then not received will show when the pane is later visible.
+the updated torrent should have a State of "Early Finish", a progress of 100%, and an eta of zero. The Down display should have the completed value set to the size value.

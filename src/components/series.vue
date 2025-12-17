@@ -31,15 +31,15 @@
               style="display:flex; flex-direction:column; text-align:center;") 
       #poster(style="margin-left:30px;")  
     #topRight(style="display:flex; flex-direction:column; width:300px; margin-left:10px;")
-      #infoBox(@click.stop="handleBodyClick"
-            :style="{ margin:'0px 0 7px 2px', width: sizing.seriesInfoWidth || '250px', fontSize: sizing.seriesInfoFontSize || '20px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column',textAlign:'center', fontWeight:'bold' }")
-        div(v-if="simpleMode && showHdr" style="display:flex; gap:4px; justify-content:center; margin-bottom:5px; align-items:center;")
+      #infoBox(v-if="seriesReady" @click.stop="handleBodyClick"
+              :style="{ margin:'0px 0 7px 2px', width: sizing.seriesInfoWidth || '250px', fontSize: sizing.seriesInfoFontSize || '20px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column',textAlign:'center', fontWeight:'bold' }")
+        div(v-if="simpleMode" style="display:flex; gap:4px; justify-content:center; margin-bottom:5px; align-items:center;")
           textarea(
                   v-model="emailText"
                   @click.stop
                   rows="1"
                   placeholder="Email Mark"
-            :style="{ width: sizing.emailWidth || '200px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2' }")
+                  :style="{ width: sizing.emailWidth || '200px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2' }")
           div(v-if="notInEmby" 
               style="font-weight:bold; color:red; font-size:18px; margin-top:0; max-height:24px; white-space:nowrap;") Not In Emby
         div(style="border:1px solid #ccc; border-radius:5px; padding:5px;")
@@ -99,6 +99,7 @@ export default {
     return {
       show: {Name:''},
       showHdr: false,
+      seriesReady: false,
       emailText: '',
       dates: '',
       remoteShowName: '',
@@ -358,7 +359,17 @@ export default {
       allTvdb        = await tvdb.getAllTvdb();
       this.emailText = ''; // Clear email text when changing shows
       this.show      = show;
-      this.showBody  = true;
+      this.showHdr   = true;
+      this.seriesReady = false;
+
+      // Clear info fields so nothing renders until ready
+      this.dates = '';
+      this.seasonsTxt = '';
+      this.cntryLangTxt = '';
+      this.nextUpTxt = '';
+      this.remotes = [];
+      this.showRemotes = false;
+      this.showSpinner = false;
       
       // Set collection name(s)
       const collections = [];
@@ -379,11 +390,10 @@ export default {
       await this.setCntryLangTxt(tvdbData);
       await this.setNextWatch();
       await this.setRemotes();
-    });
 
-    setTimeout(() => {
-      this.showHdr = true;
-    }, 1000);
+      // Only show the info box (and email input) once everything is populated.
+      this.seriesReady = true;
+    });
   },
 }
 </script>

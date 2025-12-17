@@ -1,6 +1,6 @@
 <template lang="pug">
-.torrents-container(@click="handleClose" :style="{ height:'100%', width:'100%', display:'flex', justifyContent:'flex-start' }")
-  #torrents(@click="handleClose" :style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
+.torrents-container(:style="{ height:'100%', width:'100%', display:'flex', justifyContent:'flex-start' }")
+  #torrents(:style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
 
     #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
       div(style="display:flex; justify-content:space-between; align-items:center;")

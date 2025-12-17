@@ -27,3 +27,6 @@ in the actors pane the show name is still cut off in the right. word-wrap it.
 
 in the actors pane and the torrents pane when i click in the white space outside of buttons it goes to the series pane.  ignore those clicks.
 
+ in simple mode when the app is loading, the email input box and an empty infobox are still showing. it works corrently in non-simple mode.
+
+ in simple mode in the actors pane clicking outside the buttons still goes to the series pane. it works corrently in non-simple mode.

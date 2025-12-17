@@ -5,14 +5,24 @@
     div(style="display:flex; justify-content:space-between; align-items:center;")
       div(style="margin-left:20px;") {{ showName }}
       div(style="display:flex; gap:12px; align-items:center; margin-right:20px;")
-        button(v-if="isGuestMode && seasonNum && episodeNum" @click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:5px;") ◄
-        button(v-if="isGuestMode && seasonNum && episodeNum" @click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ►
-        div(style="font-size:14px; font-weight:normal;") {{ modeLabel }}
         button(@click.stop="$emit('series')" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") Series
         button(@click.stop="handleMapButton" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:60px;") Map
+
+    div(v-if="!simpleMode" style="display:grid; grid-template-columns:auto 1fr auto; align-items:center; margin-right:20px; margin-left:20px; font-weight:normal;")
+      div(style="font-size:18px; font-weight:bold; justify-self:start;") {{ modeLabel }}
+      div(style="display:flex; gap:12px; align-items:center; justify-self:center;")
+        button(@click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:5px;") ◄
+        button(@click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ►
+      button(@click.stop="$emit('torrents')" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; justify-self:end;") Torrents
+
+    div(v-else style="display:flex; justify-content:space-between; align-items:center; margin-right:20px; margin-left:20px; font-weight:normal;")
+      div(style="font-size:18px; font-weight:bold;") {{ modeLabel }}
+      div(style="display:flex; gap:12px; align-items:center;")
+        button(@click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:5px;") ◄
+        button(@click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ►
     div(style="display:flex; align-items:center; gap:12px; justify-content:flex-end; margin-right:20px; font-weight:normal;")
-      button(@click.stop="handleRegularClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:70px;") Regular
-      button(@click.stop="handleGuestClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:70px;") Guest
+      button(@click.stop="handleRegularClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:80px;") Regulars
+      button(@click.stop="handleGuestClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:80px;") Guests
       label(style="font-size:14px; margin-left:10px;") Season
       input(v-model="seasonNum" @click.stop type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
       label(style="font-size:14px; margin-left:5px;") Episode
@@ -178,9 +188,15 @@ export default {
     },
 
     async handleLeftArrow() {
-      if (!this.isGuestMode || !this.currentShow || !this.seasonNum || !this.episodeNum) {
-        return;
+      if (!this.currentShow) return;
+
+      // Arrow navigation always moves through episodes; if in regular mode, switch to guest mode.
+      if (!this.isGuestMode) this.isGuestMode = true;
+
+      if (!this.seasonNum || !this.episodeNum) {
+        await this.prefillEpisodeInputs();
       }
+      if (!this.seasonNum || !this.episodeNum) return;
 
       try {
         const seriesMapIn = await emby.getSeriesMap(this.currentShow);
@@ -224,9 +240,15 @@ export default {
     },
 
     async handleRightArrow() {
-      if (!this.isGuestMode || !this.currentShow || !this.seasonNum || !this.episodeNum) {
-        return;
+      if (!this.currentShow) return;
+
+      // Arrow navigation always moves through episodes; if in regular mode, switch to guest mode.
+      if (!this.isGuestMode) this.isGuestMode = true;
+
+      if (!this.seasonNum || !this.episodeNum) {
+        await this.prefillEpisodeInputs();
       }
+      if (!this.seasonNum || !this.episodeNum) return;
 
       try {
         const seriesMapIn = await emby.getSeriesMap(this.currentShow);

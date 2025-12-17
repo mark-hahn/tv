@@ -37,6 +37,7 @@
     @close="handleActorsClose"
     @series="handleActorsClose"
     @map="() => { if (currentShow) { evtBus.emit('mapAction', { action: 'open', show: currentShow }); } }"
+    @torrents="() => { if (currentShow) { handleShowTorrents(currentShow); } }"
   )
   Torrents(
     v-show="currentPane === 'torrents'"

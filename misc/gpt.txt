@@ -8,3 +8,10 @@ When the pane first opens put it in regular mode and only show guest actors when
 
 increase the Regular/Guest message font-size to 16px.
 Create a new middle line in the hdr. move the Regular/Guest messages to the far left of that middle line. move the arrow buttons to the far right of the middle line. Put a Torrents button to the left of the series button and wire it to the torrents pane.
+
+Change button Regular to Regulars and button Guest to Guests. Always show the arrow buttons and if they are clicked in regular mode switch to guest and change the episode as they always do. the Regular/Guest messages should be centered in the space to the left of the arrows. the Regular/Guest messages should be 18px and in bold.
+
+move the Regular/Guest messages to the far left of the middle line but line up the left side with the left side of the show name above.  Move the arrow keys to the center of the middle line.  move the torrents button to the far right of the middle line.
+
+in simple mode when there is no torrents button show the arrows at the far right. 
+

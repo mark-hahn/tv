@@ -1,6 +1,1 @@
 
-when the torrent isn't received any more we want the displayed torrent to show it is finished downloading. to do this we need to check the torrent. if the torrent has progress that is not 100%, or eta that is not zero, then we know the torrent needs to be updated to show it is finished. 
-
-the updated torrent should have a State of "Early Finish", a progress of 100%, and an eta of zero. The Down display should have the completed value set to the size value.
-
-in status pane when eta value is less than a minute show only one leading zero.  Capitalize the state value.

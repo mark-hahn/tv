@@ -392,22 +392,21 @@ export default {
     
     // Close torrents or actors pane when a different show is selected
     evtBus.on('setUpSeries', (show) => {
-      if (this.currentPane === 'torrents' || this.currentPane === 'dlstatus') {
+      // If map is not currently showing, always return to the Series pane.
+      if (this.currentPane !== 'map') {
         const prevPane = this.currentPane;
         this.currentPane = 'series';
+        this.mapShow = null;
         evtBus.emit('paneChanged', this.currentPane);
+
         // Only reset torrents; status pane should never reset.
         if (prevPane === 'torrents') {
           evtBus.emit('resetTorrentsPane');
         }
+
+        // New show selection should allow torrents pane to reinitialize.
         this._torrentsInitialized = false;
         this._torrentsShowKey = null;
-        return;
-      }
-
-      if (this.currentPane === 'actors') {
-        this.currentPane = 'series';
-        evtBus.emit('paneChanged', this.currentPane);
       }
     });
     

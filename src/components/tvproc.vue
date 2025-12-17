@@ -13,6 +13,7 @@
       div
       div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
         button(@click.stop="trimLog" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Trim
+        button(@click.stop="clearLog" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Clear
         button(@click.stop="$emit('torrents')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Torrents
         button(@click.stop="$emit('status')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Status
         button(@click.stop="$emit('history')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") History
@@ -147,6 +148,33 @@ export default {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ keepLines: 1000 })
+        });
+        if (!res.ok) {
+          let detail = '';
+          try {
+            const ct = res.headers.get('content-type') || '';
+            if (ct.includes('application/json')) {
+              const j = await res.json();
+              detail = j?.error ? String(j.error) : JSON.stringify(j);
+            } else {
+              detail = await res.text();
+            }
+          } catch {
+            // ignore
+          }
+          throw new Error(`HTTP ${res.status}: ${detail || res.statusText}`);
+        }
+        await this.loadLog({ forceScrollToBottom: true });
+      } catch (e) {
+        this.error = e?.message || String(e);
+      }
+    },
+
+    async clearLog() {
+      this.error = null;
+      try {
+        const res = await fetch(`${config.torrentsApiUrl}/api/tvproc/clear`, {
+          method: 'POST'
         });
         if (!res.ok) {
           let detail = '';

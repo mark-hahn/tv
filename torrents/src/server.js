@@ -119,6 +119,23 @@ app.post('/api/tvproc/trim', async (req, res) => {
   }
 });
 
+app.post('/api/tvproc/clear', async (req, res) => {
+  const logPath = getTvprocLogPath();
+  try {
+    // Truncate to zero bytes.
+    await fs.promises.writeFile(logPath, '', 'utf8');
+    res.json({ ok: true, path: logPath, cleared: true });
+  } catch (error) {
+    const code = error?.code;
+    if (code === 'ENOENT') {
+      res.status(404).json({ error: 'tvproc log file not found', path: logPath });
+      return;
+    }
+    console.error('tvproc clear error:', error);
+    res.status(500).json({ error: error?.message || String(error), path: logPath });
+  }
+});
+
 app.get('/api/qbt/info', async (req, res) => {
   try {
     const q = req.query || {};

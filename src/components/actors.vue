@@ -24,9 +24,9 @@
       button(@click.stop="handleRegularClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:80px;") Regulars
       button(@click.stop="handleGuestClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:80px;") Guests
       label(style="font-size:14px; margin-left:10px;") Season
-      input(v-model="seasonNum" @click.stop type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
+      input(v-model="seasonNum" @click.stop @keydown.enter.prevent="handleGuestClick" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
       label(style="font-size:14px; margin-left:5px;") Episode
-      input(v-model="episodeNum" @click.stop type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
+      input(v-model="episodeNum" @click.stop @keydown.enter.prevent="handleGuestClick" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
   
   #error-message(v-if="errorMessage"
                  style="text-align:center; color:red; margin-top:50px; font-size:16px;")

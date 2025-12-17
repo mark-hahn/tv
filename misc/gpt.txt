@@ -25,7 +25,7 @@ in the actors pane the show name is still cut off in the right. word-wrap it.
 
  when the app is loading, the email input box and an empty infobox are showing.  don't show them until everything else in the series pane shows.
 
-in the actors pane and the torrents pane when i click in the white space outside of buttons it goes to the series pane.  ignore those clicks.
+in the actors pane when entering a number in an input box, pressing enter does nothing.  it should do the same thing as clicking on the guest button
 
  in simple mode when the app is loading, the email input box and an empty infobox are still showing. it works correctly in non-simple mode.
 

@@ -1,6 +1,4 @@
 .
 
 flex vue
-move history header to top
 
-in the qbt tab move the header to the top and change the msg in the header to qBittorent History

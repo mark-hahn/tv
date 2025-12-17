@@ -1,19 +1,21 @@
 <template lang="pug">
 
-#history(ref="scroller" :style="{ height:'100%', padding:'5px', margin:0, marginLeft:'16px', display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa', fontWeight:'bold' }")
+#history(:style="{ height:'100%', padding:'5px', margin:0, marginLeft:'16px', display:'flex', flexDirection:'column', overflow:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa', fontWeight:'bold' }")
 
-  #header(:style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', marginLeft:'0px', marginRight:'0px', marginTop:'0px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
+  #header(:style="{ flex:'0 0 auto', backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', marginLeft:'0px', marginRight:'0px', marginTop:'0px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
     div(style="display:flex; justify-content:space-between; align-items:center;")
-      div(style="margin-left:20px;") History
+      div(style="margin-left:20px;") qBittorent History
       div(style="margin-right:20px;")
 
-  div(v-if="sortedTorrents.length === 0" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
-    | No history.
+  #scroller(ref="scroller" :style="{ flex:'1 1 auto', minHeight:'0px', overflowY:'auto', overflowX:'hidden' }")
 
-  div(v-else style="padding:5px; font-size:16px; line-height:1.6;")
-    div(v-for="t in sortedTorrents" :key="String(t.hash || t.name || t.added_on)" style="position:relative; background:#fff; border:1px solid #ddd; border-radius:5px; padding:10px; margin:0 0 10px 0;")
-      div(style="font-size:16px; font-weight:bold; color:#333; word-break:break-word;") {{ t.name || t.hash }}
-      div(style="font-size:16px; color:rgba(0,0,0,0.50) !important;") {{ infoLine(t) }}
+    div(v-if="sortedTorrents.length === 0" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
+      | No history.
+
+    div(v-else style="padding:5px; font-size:16px; line-height:1.6;")
+      div(v-for="t in sortedTorrents" :key="String(t.hash || t.name || t.added_on)" style="position:relative; background:#fff; border:1px solid #ddd; border-radius:5px; padding:10px; margin:0 0 10px 0;")
+        div(style="font-size:16px; font-weight:bold; color:#333; word-break:break-word;") {{ t.name || t.hash }}
+        div(style="font-size:16px; color:rgba(0,0,0,0.50) !important;") {{ infoLine(t) }}
 
 </template>
 

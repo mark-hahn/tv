@@ -6,13 +6,13 @@
       div(style="display:flex; justify-content:space-between; align-items:center;")
         div(style="margin-left:20px;") {{ headerShowName }}
         div(style="display:flex; gap:10px; margin-right:20px;")
+          button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Download
           button(@click.stop="$emit('series')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Series
           button(@click.stop="handleMapButton" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Map
 
       div(style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;")
         div
         div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
-          button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Download
           button(@click.stop="searchClick" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Search
           button(@click.stop="forceClick" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Force
           button(@click.stop="toggleCookieInputs" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Cookies

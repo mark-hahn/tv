@@ -199,26 +199,28 @@ export default {
       this.notInEmby = this.show.Id.startsWith('noemby-');
     },
 
-    setPoster(tvdbData) {
-      const img = new Image();
-      img.style.maxWidth  = this.sizing.posterWidth || "300px"; 
-      img.style.maxHeight = this.sizing.posterHeight || "400px"; 
-      if(!tvdbData) {
-        console.error('setPoster: tvdbData missing');
-        img.src = './question-mark.png';
-        return;
-      }
-      if(tvdbData.image) {
-        img.src = tvdbData.image;
-      } else {
-        console.error(
-              'image missing from tvdbData', tvdbData.name);
-        img.src = './question-mark.png';
-      }
+    async setPoster(tvdbData) {
       const posterEl = document.getElementById('poster');
-      if (posterEl) {
-        posterEl.replaceChildren(img);
+      if (!posterEl) return;
+
+      const img = new Image();
+      img.style.maxWidth = this.sizing.posterWidth || '300px';
+      img.style.maxHeight = this.sizing.posterHeight || '400px';
+
+      const src = tvdbData?.image || './question-mark.png';
+      if (!tvdbData) {
+        console.error('setPoster: tvdbData missing');
+      } else if (!tvdbData.image) {
+        console.error('image missing from tvdbData', tvdbData.name);
       }
+
+      await new Promise((resolve) => {
+        img.onload = () => resolve();
+        img.onerror = () => resolve();
+        img.src = src;
+      });
+
+      posterEl.replaceChildren(img);
     },
 
     setDates(tvdbData) {

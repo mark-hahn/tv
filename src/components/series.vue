@@ -3,7 +3,7 @@
 #series(@click="handleSeriesClick" :style="{ height:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box' }")
 
   #hdr(v-if="showHdr"
-       :style="{ display:'flex', flexDirection:'column', gap:'2px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'2px' }")
+       :style="{ display:'flex', flexDirection:'column', gap:'10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', margin:'0px', marginBottom:'0px' }")
     div(style="display:flex; justify-content:space-between; align-items:center; width:100%;")
       div(style="margin-left:20px; flex:1;") {{show.Name}}
       div(style="display:flex; align-items:center; flex-shrink:0;")
@@ -32,14 +32,14 @@
       #poster(style="margin-left:30px;")  
     #topRight(style="display:flex; flex-direction:column; width:300px; margin-left:10px;")
       #infoBox(@click.stop="handleBodyClick"
-                :style="{ margin:'10px 0 7px 2px', width: sizing.seriesInfoWidth || '250px', fontSize: sizing.seriesInfoFontSize || '20px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column',textAlign:'center', fontWeight:'bold' }")
-        div(v-if="simpleMode" style="display:flex; gap:4px; justify-content:center; margin-bottom:5px; align-items:center;")
+            :style="{ margin:'0px 0 7px 2px', width: sizing.seriesInfoWidth || '250px', fontSize: sizing.seriesInfoFontSize || '20px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column',textAlign:'center', fontWeight:'bold' }")
+        div(v-if="simpleMode && showHdr" style="display:flex; gap:4px; justify-content:center; margin-bottom:5px; align-items:center;")
           textarea(
                   v-model="emailText"
                   @click.stop
                   rows="1"
                   placeholder="Email Mark"
-                  :style="{ width: sizing.emailWidth || '200px', padding:'5px', fontSize:'14px', border:'1.5px solid black', backgroundColor:'#eee', resize:'none', height:'16px', lineHeight:'1.2' }")
+            :style="{ width: sizing.emailWidth || '200px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2' }")
           div(v-if="notInEmby" 
               style="font-weight:bold; color:red; font-size:18px; margin-top:0; max-height:24px; white-space:nowrap;") Not In Emby
         div(style="border:1px solid #ccc; border-radius:5px; padding:5px;")

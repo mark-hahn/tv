@@ -109,6 +109,8 @@ export default {
       currentShow: null,
       _torrentsInitialized: false,
       _torrentsShowKey: null,
+      _actorsInitialized: false,
+      _actorsShowKey: null,
       mapShow: null,
       hideMapBottom: true,
       seriesMapSeasons: [],
@@ -201,10 +203,20 @@ export default {
         evtBus.emit('paneChanged', this.currentPane);
         evtBus.emit('mapAction', { action: 'close', show: null });
       } else {
+        const showKey = this.currentShow?.Id || this.currentShow?.Name || null;
+        // Switching panes should not reset actors; only reset when show selection changes.
+        if (this._actorsInitialized && this._actorsShowKey && showKey && this._actorsShowKey === showKey) {
+          this.currentPane = 'actors';
+          evtBus.emit('paneChanged', this.currentPane);
+          return;
+        }
+
         this.currentPane = 'actors';
         evtBus.emit('paneChanged', this.currentPane);
         // Emit event to actors component with current tvdbData and show
         evtBus.emit('showActors', { show: this.currentShow, tvdbData: this.currentTvdbData });
+        this._actorsInitialized = true;
+        this._actorsShowKey = showKey;
       }
     },
     handleActorsClose() {
@@ -399,6 +411,11 @@ export default {
         this.currentPane = 'series';
         this.mapShow = null;
         evtBus.emit('paneChanged', this.currentPane);
+
+        // Reset actors pane only when show selection changes.
+        evtBus.emit('resetActorsPane');
+        this._actorsInitialized = false;
+        this._actorsShowKey = null;
 
         // Only reset torrents; status pane should never reset.
         if (prevPane === 'torrents') {

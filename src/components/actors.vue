@@ -1,10 +1,10 @@
 <template lang="pug">
 #actors(@click="handleActorsClick" :style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
 
-  #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'15px', display:'flex', flexDirection:'column', gap:'18px' }")
+  #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'15px', display:'flex', flexDirection:'column', gap:'8px' }")
     div(style="display:flex; justify-content:space-between; align-items:center;")
-      div(style="margin-left:20px;") {{ showName }}
-      div(style="display:flex; gap:12px; align-items:center; margin-right:20px;")
+      div(style="margin-left:20px; margin-right:10px; flex:1; min-width:0; white-space:normal; overflow-wrap:anywhere; word-break:break-word;") {{ showName }}
+      div(style="display:flex; gap:12px; align-items:center; margin-right:20px; flex-shrink:0;")
         button(@click.stop="$emit('series')" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") Series
         button(@click.stop="handleMapButton" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:60px;") Map
 
@@ -91,6 +91,17 @@ export default {
   },
 
   methods: {
+    resetPane() {
+      this.actors = [];
+      this.seriesActors = [];
+      this.showName = '';
+      this.currentShow = null;
+      this.seasonNum = '';
+      this.episodeNum = '';
+      this.errorMessage = '';
+      this.isGuestMode = false;
+      this.showingEpisodeActors = false;
+    },
     handleActorsClick() {
       // Click anywhere in actors pane to go back to series pane
       this.$emit('close');
@@ -417,6 +428,12 @@ export default {
       this.episodeNum = String(episodeInfo.episodeNumber);
       // Do not auto-load guest actors; guest mode only when Guest is clicked.
     });
+
+    evtBus.on('resetActorsPane', this.resetPane);
+  },
+
+  unmounted() {
+    evtBus.off('resetActorsPane', this.resetPane);
   }
 }
 </script>

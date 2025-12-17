@@ -15,3 +15,15 @@ move the Regular/Guest messages to the far left of the middle line but line up t
 
 in simple mode when there is no torrents button show the arrows at the far right. 
 
+in actors pane put the show name in a div with a margin-right of 10pix so it is 10px from the series button.  right now it runs into the series button.
+use v-show on the actors pane and don't change it when going to series or map panes and back.  reset it only when show selection changes.
+
+in the series pane set the email input box to 14px tall, set the email input box padding to 2px, remove the the margin-top from #infobox, and change the gap in #header to 10px and remove the margin from #header;
+
+in the actors pane the show name is still cut off in the right. word-wrap it.
+
+
+ when the app is loading, the email input box and an empty infobox are showing.  don't show them until everything else in the series pane shows.
+
+in the actors pane and the torrents pane when i click in the white space outside of buttons it goes to the series pane.  ignore those clicks.
+

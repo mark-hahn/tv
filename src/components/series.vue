@@ -3,7 +3,7 @@
 #series(@click="handleSeriesClick" :style="{ height:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box' }")
 
   #hdr(v-if="showHdr"
-       :style="{ display:'flex', flexDirection:'column', gap:'10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', margin:'0px', marginBottom:'0px' }")
+       :style="{ display:'flex', flexDirection:'column', gap:'10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', margin:'0px', marginBottom:'10px' }")
     div(style="display:flex; justify-content:space-between; align-items:center; width:100%;")
       div(style="margin-left:20px; flex:1;") {{show.Name}}
       div(style="display:flex; align-items:center; flex-shrink:0;")
@@ -12,11 +12,6 @@
         button(v-if="!simpleMode"
                 @click.stop="deleteClick"
                 style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;") Delete
-
-    div(style="display:flex; justify-content:space-between; align-items:center; width:100%; min-height:24px; padding-right:10px;")
-      div
-      div(v-if="!simpleMode && notInEmby"
-          style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; white-space:nowrap;") Not In Emby
 
   #body(style="display:flex; cursor:pointer;")
     #topLeft(@click.stop="handleBodyClick"

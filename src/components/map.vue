@@ -178,20 +178,23 @@ export default {
       }
     },
     handleMapClick(event) {
-      event.stopPropagation();
-      // Instead of closing, emit show-actors to rotate to actors pane
-      this.$emit('show-actors');
+      // Background click returns to Series.
+      // (In non-simple mode, clicks inside the table stop propagation.)
+      this.$emit('close');
     },
     handleEpisodeClick(event, mapShow, season, episode) {
       if (this.simpleMode) {
-        // Don't stop propagation - let it bubble up to handleMapClick
+        // Let it bubble to handleMapClick (which returns to Series).
         return;
       }
-      event.stopPropagation(); // Prevent map click handler from closing the map
+      event.stopPropagation(); // Prevent map click handler from switching tabs
       this.$emit('episode-click', event, mapShow, season, episode);
     },
     handleSeasonClick(event, season) {
-      if (this.simpleMode) return;
+      if (this.simpleMode) {
+        // Let it bubble to handleMapClick (which returns to Series).
+        return;
+      }
       event.stopPropagation();
       
       const seasonEpisodes = this.seriesMap[season];

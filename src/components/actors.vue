@@ -1,29 +1,24 @@
 <template lang="pug">
 #actors(@click.stop :style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
 
-  #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'15px', display:'flex', flexDirection:'column', gap:'8px' }")
-    div(style="display:flex; justify-content:space-between; align-items:center;")
-      div(style="margin-left:20px; margin-right:10px; flex:1; min-width:0; white-space:normal; overflow-wrap:anywhere; word-break:break-word;") {{ showName }}
-      div(style="margin-right:20px; flex-shrink:0;")
+  #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', display:'flex', flexDirection:'column', gap:'8px' }")
+    div(style="width:100%; display:flex; flex-direction:column; gap:8px;")
+      //- Top row: show name (fills), mode label, arrows.
+      div(style="width:100%; display:flex; align-items:center; justify-content:space-between;")
+        div(style="margin-left:20px; margin-right:10px; flex:1 1 auto; min-width:0; white-space:normal; overflow-wrap:anywhere; word-break:break-word;") {{ showName }}
+        div(style="flex:0 0 auto; width:75px; text-align:right; font-size:18px; font-weight:bold; white-space:nowrap;") {{ modeLabel }}
+        div(style="margin-left:20px; margin-right:15px; flex:0 0 auto; display:flex; align-items:center; gap:12px; font-weight:normal;")
+          button(@click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:5px;") ◄
+          button(@click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ►
 
-    div(v-if="!simpleMode" style="display:grid; grid-template-columns:auto 1fr; align-items:center; margin-right:20px; margin-left:20px; font-weight:normal;")
-      div(style="font-size:18px; font-weight:bold; justify-self:start;") {{ modeLabel }}
-      div(style="display:flex; gap:12px; align-items:center; justify-self:end;")
-        button(@click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:5px;") ◄
-        button(@click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ►
-
-    div(v-else style="display:flex; justify-content:space-between; align-items:center; margin-right:20px; margin-left:20px; font-weight:normal;")
-      div(style="font-size:18px; font-weight:bold;") {{ modeLabel }}
-      div(style="display:flex; gap:12px; align-items:center;")
-        button(@click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:5px;") ◄
-        button(@click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ►
-    div(style="display:flex; align-items:center; gap:12px; justify-content:flex-end; margin-right:20px; font-weight:normal;")
-      button(@click.stop="handleRegularClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:80px;") Regulars
-      button(@click.stop="handleGuestClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:80px;") Guests
-      label(style="font-size:14px; margin-left:10px;") Season
-      input(v-model="seasonNum" @click.stop @keydown.enter.prevent="handleGuestClick" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
-      label(style="font-size:14px; margin-left:5px;") Episode
-      input(v-model="episodeNum" @click.stop @keydown.enter.prevent="handleGuestClick" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
+      //- Bottom row: buttons and inputs only.
+      div(style="width:100%; display:flex; align-items:center; justify-content:flex-start; gap:12px; margin-right:20px; margin-left:20px; font-weight:normal;")
+        button(@click.stop="handleRegularClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:80px;") Regulars
+        button(@click.stop="handleGuestClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:80px;") Guests
+        label(style="font-size:14px; margin-left:10px;") Season
+        input(v-model="seasonNum" @click.stop @keydown.enter.prevent="handleGuestClick" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
+        label(style="font-size:14px; margin-left:5px;") Episode
+        input(v-model="episodeNum" @click.stop @keydown.enter.prevent="handleGuestClick" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
   
   #error-message(v-if="errorMessage"
                  style="text-align:center; color:red; margin-top:50px; font-size:16px;")
@@ -83,7 +78,7 @@ export default {
 
   computed: {
     modeLabel() {
-      return this.isGuestMode ? 'Guest Stars' : 'Series Regulars';
+      return this.isGuestMode ? 'Guests' : 'Regulars';
     }
   },
 

@@ -1,6 +1,6 @@
 <template lang="pug">
 
-#history(:style="{ height:'100%', padding:'5px', margin:0, marginLeft:'16px', display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa', fontWeight:'bold' }")
+#history(ref="scroller" :style="{ height:'100%', padding:'5px', margin:0, marginLeft:'16px', display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa', fontWeight:'bold' }")
 
   #header(:style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', marginLeft:'0px', marginRight:'0px', marginTop:'0px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
     div(style="display:flex; justify-content:space-between; align-items:center;")
@@ -40,7 +40,8 @@ export default {
       torrents: [],
       _pollTimer: null,
       _polling: false,
-      useStaticSamples: false
+      useStaticSamples: false,
+      _didInitialScroll: false
     };
   },
 
@@ -56,7 +57,7 @@ export default {
         .sort((a, b) => {
           const aa = Number(a?.added_on) || 0;
           const bb = Number(b?.added_on) || 0;
-          return bb - aa;
+          return aa - bb;
         });
     }
   },
@@ -72,8 +73,25 @@ export default {
   },
 
   methods: {
+    getScroller() {
+      return this.$refs.scroller || null;
+    },
+
+    isAtBottom(el) {
+      if (!el) return false;
+      const tolerance = 2;
+      return (el.scrollTop + el.clientHeight) >= (el.scrollHeight - tolerance);
+    },
+
+    scrollToBottom() {
+      const el = this.getScroller();
+      if (!el) return;
+      el.scrollTop = el.scrollHeight;
+    },
+
     onPaneChanged(pane) {
       if (pane === 'history') {
+        this._didInitialScroll = false;
         if (!this.useStaticSamples) this.startPolling();
       } else {
         this.stopPolling();
@@ -124,9 +142,20 @@ export default {
 
     async pollOnce() {
       try {
+        const scroller = this.getScroller();
+        const wasAtBottom = this.isAtBottom(scroller);
+
         const torrents = await this.getQbtInfo({});
         if (Array.isArray(torrents)) {
           this.torrents = torrents;
+
+          await this.$nextTick();
+          if (!this._didInitialScroll) {
+            this.scrollToBottom();
+            this._didInitialScroll = true;
+          } else if (wasAtBottom) {
+            this.scrollToBottom();
+          }
         }
       } catch {
         // ignore transient errors

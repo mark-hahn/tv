@@ -14,6 +14,7 @@
         div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
           button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Download
           button(@click.stop="searchClick" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Search
+          button(@click.stop="forceClick" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Force
           button(@click.stop="toggleCookieInputs" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Cookies
           button(@click.stop="$emit('status')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Status
           button(@click.stop="$emit('history')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") History
@@ -50,8 +51,10 @@
       div No torrents needed.
       
     #torrents-list(v-if="!unaired && !loading && !noTorrentsNeeded" style="padding:10px; font-size:14px; line-height:1.6;")
-      div(v-if="torrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
-        div No torrents found
+      div(v-if="!hasSearched && torrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
+        div Click on Search to find torrents for {{ headerShowName }}.
+      div(v-else-if="hasSearched && torrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
+        div No torrents found.
       div(v-for="(torrent, index) in torrents" :key="index" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
         div(v-if="isClicked(torrent)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
         div(v-if="isDownloadedBefore(torrent)" :style="getDownloadedBeforeIconStyle(torrent)" title="Downloaded before") 🕘
@@ -102,6 +105,7 @@ export default {
       showName: '',
       loading: false,
       error: null,
+      hasSearched: false,
       providerWarning: '',
       maxResults: 1000,  // Constant for maximum results to fetch
       iptCfClearance: '',
@@ -385,6 +389,7 @@ export default {
       // Reset state when switching shows
       this.torrents = [];
       this.error = null;
+      this.hasSearched = false;
       this.selectedTorrent = null;
       this.clickedTorrents.clear();
       this.noTorrentsNeeded = false;
@@ -453,7 +458,21 @@ export default {
         return;
       }
 
+      this.hasSearched = true;
       await this.loadTorrents(this.lastNeeded || []);
+    },
+
+    async forceClick() {
+      if (!this.currentShow || !this.currentShow.Name) {
+        this.error = 'No show selected';
+        return;
+      }
+      if (this.unaired) return;
+
+      this.noTorrentsNeeded = false;
+      this.providerWarning = '';
+      this.hasSearched = true;
+      await this.loadTorrents(['force']);
     },
 
     async calculateNeeded(show) {
@@ -653,10 +672,10 @@ export default {
         const iptCount = (counts.IpTorrents ?? counts.iptorrents ?? 0);
         const tlCount = (counts.TorrentLeech ?? counts.torrentleech ?? 0);
 
-        // If both providers returned 0, treat as no results (show inputs via computed)
+        // If both providers returned 0, treat as no results
         if ((iptCount === 0 || iptCount === undefined) && (tlCount === 0 || tlCount === undefined)) {
           this.providerWarning = '';
-          this.error = `No torrents found for "${this.currentShow.Name}"`;
+          this.error = null;
           this.torrents = [];
           return;
         }

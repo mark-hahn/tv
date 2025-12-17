@@ -1,13 +1,8 @@
 
-in the torrents pane, torrent titles that contained text like (S1-S2) were shown as a range of seasons like 1-2: at the left of the second line. 
+in the status pane start calling the qbt api the first time the pane is visible. Then keep calling all the time, even when the pane is not visible.
 
-now include these text formats to detect as season ranges: (S1-S2) (S1-2) where the numbers can be 1 or 2 digits and they may have leading zeros. the S should be case-insensitive.
+When the status pane is hidden the gap between the calls should be 10 secs. When the status pane is visible use a gap between the calls of 1 sec. 
 
-when sorting the torrents the highest priority sorting should be the season/episode label at the left of the second line, like 1:
+Since the pane is displayed with v-show, the pane display should keep updating even when the pane is not visible. 
 
-
-Add a button called Force between search and cookies in the torrents pane. The force button should do no filtering of torrents.
-
-When the search button is pressed it should use all the filters that were used in the past like the needed list. 
-
-before any search is done display the message: "Click on Search to find torrents for <show name>." instead of "No torrents found." show "No torrents found." after a search found no torrents.
+This way while the pane is not visible, torrents that were received and then not received will show when the pane is later visible.

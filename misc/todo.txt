@@ -5,6 +5,10 @@ reminder, restore ...
 bugs ...
 
 todo ...
+  change guest actor Select button to Guest
+    and Clear button to Regular.
+    show "Guest Stars" to left of series button
+    or "Series Regulars" otherwise.
   use minimum from emby
     shows
     watched

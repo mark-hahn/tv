@@ -1,1 +1,10 @@
 
+in the actors pane rename the clear button to "Regular" and move that button to the far left. then rename the Select button to "Guest" and move it to the immediate right of the Regular button.  Place the input boxes to the right of the buttons.
+
+To the left of the Series button show the message "Series Regulars" when in regular mode and show "Guest Stars" when in guest mode.
+
+When the pane first opens put it in regular mode and only show guest actors when Guest is clicked and it is in guest mode.
+
+
+increase the Regular/Guest message font-size to 16px.
+Create a new middle line in the hdr. move the Regular/Guest messages to the far left of that middle line. move the arrow buttons to the far right of the middle line. Put a Torrents button to the left of the series button and wire it to the torrents pane.

@@ -5,17 +5,18 @@
     div(style="display:flex; justify-content:space-between; align-items:center;")
       div(style="margin-left:20px;") {{ showName }}
       div(style="display:flex; gap:12px; align-items:center; margin-right:20px;")
-        button(v-if="seasonNum && episodeNum" @click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:5px;") ◄
-        button(v-if="seasonNum && episodeNum" @click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ►
+        button(v-if="isGuestMode && seasonNum && episodeNum" @click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:5px;") ◄
+        button(v-if="isGuestMode && seasonNum && episodeNum" @click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ►
+        div(style="font-size:14px; font-weight:normal;") {{ modeLabel }}
         button(@click.stop="$emit('series')" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") Series
         button(@click.stop="handleMapButton" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:60px;") Map
     div(style="display:flex; align-items:center; gap:12px; justify-content:flex-end; margin-right:20px; font-weight:normal;")
-      label(style="font-size:14px;") Season
-      input(v-model="seasonNum" @click.stop @keyup.enter="handleSelectClick" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
+      button(@click.stop="handleRegularClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:70px;") Regular
+      button(@click.stop="handleGuestClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:70px;") Guest
+      label(style="font-size:14px; margin-left:10px;") Season
+      input(v-model="seasonNum" @click.stop type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
       label(style="font-size:14px; margin-left:5px;") Episode
-      input(v-model="episodeNum" @click.stop @keyup.enter="handleSelectClick" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
-      button(@click.stop="handleSelectClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") Select
-      button(@click.stop="handleClearClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:60px;") Clear
+      input(v-model="episodeNum" @click.stop type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
   
   #error-message(v-if="errorMessage"
                  style="text-align:center; color:red; margin-top:50px; font-size:16px;")
@@ -28,7 +29,7 @@
       :actor="actor"
     )
 
-  #no-actors(v-if="!errorMessage && !showingEpisodeActors && showName && actors.length === 0"
+  #no-actors(v-if="!errorMessage && !isGuestMode && showName && actors.length === 0"
              style="text-align:center; color:#999; margin-top:50px; font-size:16px;")
     div(style="margin-bottom:20px;") No cast information available
     div(style="font-size:14px; color:#666;") 
@@ -68,8 +69,15 @@ export default {
       seasonNum: '',
       episodeNum: '',
       errorMessage: '',
+      isGuestMode: false,
       showingEpisodeActors: false // Track if we're showing episode actors
     };
+  },
+
+  computed: {
+    modeLabel() {
+      return this.isGuestMode ? 'Guest Stars' : 'Series Regulars';
+    }
   },
 
   methods: {
@@ -85,8 +93,9 @@ export default {
       }
     },
 
-    async handleSelectClick() {
+    async handleGuestClick() {
       this.errorMessage = '';
+      this.isGuestMode = true;
       
       // If input boxes are empty, auto-fill from map first
       if (!this.seasonNum || !this.episodeNum) {
@@ -160,17 +169,16 @@ export default {
       }
     },
 
-    handleClearClick() {
-      this.seasonNum = '';
-      this.episodeNum = '';
+    handleRegularClick() {
       this.errorMessage = '';
+      this.isGuestMode = false;
       this.showingEpisodeActors = false;
       // Restore series actors
       this.actors = [...this.seriesActors];
     },
 
     async handleLeftArrow() {
-      if (!this.currentShow || !this.seasonNum || !this.episodeNum) {
+      if (!this.isGuestMode || !this.currentShow || !this.seasonNum || !this.episodeNum) {
         return;
       }
 
@@ -208,7 +216,7 @@ export default {
           const prevEpisode = allEpisodes[currentIndex - 1];
           this.seasonNum = prevEpisode.season;
           this.episodeNum = prevEpisode.episode;
-          await this.handleSelectClick();
+          await this.handleGuestClick();
         }
       } catch (error) {
         // Silently ignore errors
@@ -216,7 +224,7 @@ export default {
     },
 
     async handleRightArrow() {
-      if (!this.currentShow || !this.seasonNum || !this.episodeNum) {
+      if (!this.isGuestMode || !this.currentShow || !this.seasonNum || !this.episodeNum) {
         return;
       }
 
@@ -254,7 +262,7 @@ export default {
           const nextEpisode = allEpisodes[currentIndex + 1];
           this.seasonNum = nextEpisode.season;
           this.episodeNum = nextEpisode.episode;
-          await this.handleSelectClick();
+          await this.handleGuestClick();
         }
       } catch (error) {
         // Silently ignore errors
@@ -361,6 +369,7 @@ export default {
       
       // Cache series actors for restore
       this.seriesActors = [...this.actors];
+      this.isGuestMode = false;
       this.showingEpisodeActors = false;
     }
   },
@@ -370,6 +379,7 @@ export default {
       this.updateActors(data);
       
       // Reset to series actors view
+      this.isGuestMode = false;
       this.showingEpisodeActors = false;
       this.errorMessage = '';
       
@@ -383,10 +393,7 @@ export default {
       // Fill the input boxes
       this.seasonNum = String(episodeInfo.seasonNumber);
       this.episodeNum = String(episodeInfo.episodeNumber);
-      // Trigger select to show episode actors
-      this.$nextTick(() => {
-        this.handleSelectClick();
-      });
+      // Do not auto-load guest actors; guest mode only when Guest is clicked.
     });
   }
 }

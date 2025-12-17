@@ -266,6 +266,17 @@ export default {
       return `${mmss}`;
     },
 
+    fmtState(state) {
+      const s = (state === undefined || state === null) ? '' : String(state);
+      if (!s) return '';
+      // Simple capitalization: "downloading" -> "Downloading", "Early Finish" stays.
+      return s
+        .split(' ')
+        .filter(Boolean)
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+    },
+
     formatAlignedBox(pairs) {
       const maxKeyLen = Math.max(...pairs.map(([k]) => String(k).length));
       return pairs
@@ -281,7 +292,7 @@ export default {
     leftBoxText(card) {
       const t = card?.torrent || {};
       return this.formatAlignedBox([
-        ['State', t?.state],
+        ['State', this.fmtState(t?.state)],
         ['Down', this.fmtDownloadedOfSizeGb(t?.completed, t?.size)],
         ['Speed', this.fmtSpeedGbps(t?.dlspeed)]
       ]);

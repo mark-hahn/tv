@@ -10,16 +10,8 @@
         div(v-if="show?.Reject"
             style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; margin-right:10px;") Banned From Download
         button(v-if="!simpleMode"
-          @click.stop="torrentsClick"
-          style="font-size:15px; cursor:pointer; margin-left:20px; margin-top:3px; max-height:24px; border-radius: 7px;") Torrents
-        
-        button(v-if="!simpleMode"
                 @click.stop="deleteClick"
                 style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;") Delete
-        button(@click.stop="mapClick"
-                style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;") Map
-        button(@click.stop="actorsClick"
-                style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;") Actors
 
     div(style="display:flex; justify-content:space-between; align-items:center; width:100%; min-height:24px; padding-right:10px;")
       div

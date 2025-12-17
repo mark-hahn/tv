@@ -1,2 +1,32 @@
 
-in the tvproc pane add a button called Clear between trim and torrents. when clicked empty the log file on the disk so it is zero bytes long.
+Put a tabbed pane div to the right of the list div, in the location where there is currently the series pane, map pane, etc. 
+
+refactor the series pane, map pane, etc. into the contents of the tabs.
+
+This is a list of the tabs and which current pane should become the contents. The format is a list of <tab name>:<old pane name>.
+
+Series:series, 
+Map:map, 
+Actors:actors,
+Tor:torrents,
+Down:status,
+Qbt:history,
+Proc:tvproc
+
+Remove all buttons that switched the old panes. The pane switching should be replaced by the tab switching. 
+
+Pane/tab contents other than those buttons should be unchanged from the old pane.
+
+Any automatic pane switching should stay the same.  an example is switching to the series tab when a show selection changes.
+
+
+
+add a new file flex.vue -- it should show a pane like the series pane, map pane, etc.
+
+it should have a sticky hdr with 2 lines.
+
+The top line should have "Flexget" on top left and buttons on the right.  buttons should be Torrents, Status, History, TvProc, Series, and Map
+
+when the app 
+
+moved sample files to samples folder

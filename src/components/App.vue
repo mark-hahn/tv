@@ -10,80 +10,62 @@
     @show-actors="handleShowActors"
     @show-torrents="handleShowTorrents"
   )
-  Series(v-show="currentPane === 'series'" style="display:inline-block;" :simpleMode="simpleMode" :sizing="simpleMode ? sizing : sizingNonSimple")
-  Map(
-    v-show="currentPane === 'map'"
-    :mapShow="mapShow"
-    :hideMapBottom="hideMapBottom"
-    :seriesMapSeasons="seriesMapSeasons"
-    :seriesMapEpis="seriesMapEpis"
-    :seriesMap="seriesMap"
-    :mapError="mapError"
-    :simpleMode="simpleMode"
-    :sizing="simpleMode ? sizing : sizingNonSimple"
-    @prune="handleMapAction('prune', $event)"
-    @set-date="handleMapAction('date', $event)"
-    @close="handleMapAction('close')"
-    @show-actors="() => handleShowActors(true)"
-    @series="handleActorsClose"
-    @actors="() => handleShowActors(false)"
-    @torrents="() => handleShowTorrents(mapShow)"
-    @episode-click="handleEpisodeClick"
-  )
-  Actors(
-    v-show="currentPane === 'actors'"
-    :simpleMode="simpleMode"
-    :sizing="simpleMode ? sizing : sizingNonSimple"
-    @close="handleActorsClose"
-    @series="handleActorsClose"
-    @map="() => { if (currentShow) { evtBus.emit('mapAction', { action: 'open', show: currentShow }); } }"
-    @torrents="() => { if (currentShow) { handleShowTorrents(currentShow); } }"
-  )
-  Torrents(
-    v-show="currentPane === 'torrents'"
-    :simpleMode="simpleMode"
-    :sizing="simpleMode ? sizing : sizingNonSimple"
-    :activeShow="currentShow"
-    @close="handleTorrentsClose"
-    @series="handleTorrentsClose"
-    @map="() => { if (currentShow) { evtBus.emit('mapAction', { action: 'open', show: currentShow }); } }"
-    @status="handleShowStatus"
-    @history="handleShowHistory"
-    @tvproc="handleShowTvproc"
-  )
+  #tabArea(:style="{ flex:'1 1 auto', minWidth:'0px', display:'flex', flexDirection:'column', height:'100%' }")
+    #tabBar(:style="{ display:'flex', gap:'6px', padding:'6px 8px', alignItems:'center', borderBottom:'1px solid #ddd', backgroundColor:'#fafafa', flex:'0 0 auto', flexWrap:'wrap' }")
+      button(
+        v-for="t in tabs"
+        :key="t.key"
+        @click.stop="selectTab(t.key)"
+        :style="{ fontSize:'13px', cursor:'pointer', borderRadius:'7px', padding:'4px 10px', border:'1px solid #bbb', backgroundColor: (currentPane === t.key ? '#ddd' : 'whitesmoke') }"
+      ) {{ t.label }}
 
-  DlStatus(
-    v-show="currentPane === 'dlstatus'"
-    :simpleMode="simpleMode"
-    :sizing="simpleMode ? sizing : sizingNonSimple"
-    @torrents="handleStatusToTorrents"
-    @series="handleStatusToSeries"
-    @map="handleStatusToMap"
-    @history="handleShowHistory"
-    @tvproc="handleShowTvproc"
-  )
+    #tabBody(:style="{ flex:'1 1 auto', minHeight:'0px', position:'relative' }")
+      Series(v-show="currentPane === 'series'" style="display:inline-block;" :simpleMode="simpleMode" :sizing="simpleMode ? sizing : sizingNonSimple")
+      Map(
+        v-show="currentPane === 'map'"
+        :mapShow="mapShow"
+        :hideMapBottom="hideMapBottom"
+        :seriesMapSeasons="seriesMapSeasons"
+        :seriesMapEpis="seriesMapEpis"
+        :seriesMap="seriesMap"
+        :mapError="mapError"
+        :simpleMode="simpleMode"
+        :sizing="simpleMode ? sizing : sizingNonSimple"
+        @prune="handleMapAction('prune', $event)"
+        @set-date="handleMapAction('date', $event)"
+        @close="handleMapAction('close')"
+        @show-actors="() => handleShowActors(false)"
+        @episode-click="handleEpisodeClick"
+      )
+      Actors(
+        v-show="currentPane === 'actors'"
+        :simpleMode="simpleMode"
+        :sizing="simpleMode ? sizing : sizingNonSimple"
+      )
+      Torrents(
+        v-show="currentPane === 'torrents'"
+        :simpleMode="simpleMode"
+        :sizing="simpleMode ? sizing : sizingNonSimple"
+        :activeShow="currentShow"
+      )
 
-  History(
-    v-show="currentPane === 'history'"
-    :simpleMode="simpleMode"
-    :sizing="simpleMode ? sizing : sizingNonSimple"
-    @torrents="handleHistoryToTorrents"
-    @status="handleHistoryToStatus"
-    @tvproc="handleShowTvproc"
-    @series="handleHistoryToSeries"
-    @map="handleHistoryToMap"
-  )
+      DlStatus(
+        v-show="currentPane === 'dlstatus'"
+        :simpleMode="simpleMode"
+        :sizing="simpleMode ? sizing : sizingNonSimple"
+      )
 
-  TvProc(
-    v-show="currentPane === 'tvproc'"
-    :simpleMode="simpleMode"
-    :sizing="simpleMode ? sizing : sizingNonSimple"
-    @torrents="handleTvprocToTorrents"
-    @status="handleTvprocToStatus"
-    @history="handleTvprocToHistory"
-    @series="handleTvprocToSeries"
-    @map="handleTvprocToMap"
-  )
+      History(
+        v-show="currentPane === 'history'"
+        :simpleMode="simpleMode"
+        :sizing="simpleMode ? sizing : sizingNonSimple"
+      )
+
+      TvProc(
+        v-show="currentPane === 'tvproc'"
+        :simpleMode="simpleMode"
+        :sizing="simpleMode ? sizing : sizingNonSimple"
+      )
 </template>
 
 <script>
@@ -177,7 +159,70 @@ export default {
       }
     } 
   },
+  computed: {
+    tabs() {
+      return [
+        { label: 'Series', key: 'series' },
+        { label: 'Map', key: 'map' },
+        { label: 'Actors', key: 'actors' },
+        { label: 'Tor', key: 'torrents' },
+        { label: 'Down', key: 'dlstatus' },
+        { label: 'Qbt', key: 'history' },
+        { label: 'Proc', key: 'tvproc' }
+      ];
+    }
+  },
   methods: {
+    selectTab(key) {
+      const k = String(key || '');
+      if (!k) return;
+
+      if (k === 'series') {
+        this.handleActorsClose();
+        return;
+      }
+
+      if (k === 'map') {
+        if (this.currentShow) {
+          this.currentPane = 'map';
+          evtBus.emit('paneChanged', this.currentPane);
+          evtBus.emit('mapAction', { action: 'open', show: this.currentShow });
+        } else {
+          this.currentPane = 'map';
+          evtBus.emit('paneChanged', this.currentPane);
+        }
+        return;
+      }
+
+      if (k === 'actors') {
+        this.handleShowActors(false);
+        return;
+      }
+
+      if (k === 'torrents') {
+        if (this.currentShow) this.handleShowTorrents(this.currentShow);
+        else {
+          this.currentPane = 'torrents';
+          evtBus.emit('paneChanged', this.currentPane);
+        }
+        return;
+      }
+
+      if (k === 'dlstatus') {
+        this.handleShowStatus();
+        return;
+      }
+
+      if (k === 'history') {
+        this.handleShowHistory();
+        return;
+      }
+
+      if (k === 'tvproc') {
+        this.handleShowTvproc();
+        return;
+      }
+    },
     handleShowMap(data) {
       this.mapShow = data.mapShow;
       this.hideMapBottom = data.hideMapBottom;

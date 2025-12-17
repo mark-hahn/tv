@@ -5,18 +5,13 @@
   #header(:style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', marginLeft:'0px', marginRight:'0px', marginTop:'0px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
     div(style="display:flex; justify-content:space-between; align-items:center;")
       div(style="margin-left:20px;") TV Proc
-      div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
-        button(@click.stop="$emit('series')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Series
-        button(@click.stop="$emit('map')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Map
+      div(style="margin-right:20px;")
 
     div(style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;")
       div
       div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
         button(@click.stop="trimLog" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Trim
         button(@click.stop="clearLog" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Clear
-        button(@click.stop="$emit('torrents')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Torrents
-        button(@click.stop="$emit('status')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Status
-        button(@click.stop="$emit('history')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") History
 
   div(v-if="error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px; white-space:pre-line; padding:0 20px;")
     div Error: {{ error }}

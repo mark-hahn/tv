@@ -4,16 +4,13 @@
   #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'15px', display:'flex', flexDirection:'column', gap:'8px' }")
     div(style="display:flex; justify-content:space-between; align-items:center;")
       div(style="margin-left:20px; margin-right:10px; flex:1; min-width:0; white-space:normal; overflow-wrap:anywhere; word-break:break-word;") {{ showName }}
-      div(style="display:flex; gap:12px; align-items:center; margin-right:20px; flex-shrink:0;")
-        button(@click.stop="$emit('series')" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") Series
-        button(@click.stop="handleMapButton" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:60px;") Map
+      div(style="margin-right:20px; flex-shrink:0;")
 
-    div(v-if="!simpleMode" style="display:grid; grid-template-columns:auto 1fr auto; align-items:center; margin-right:20px; margin-left:20px; font-weight:normal;")
+    div(v-if="!simpleMode" style="display:grid; grid-template-columns:auto 1fr; align-items:center; margin-right:20px; margin-left:20px; font-weight:normal;")
       div(style="font-size:18px; font-weight:bold; justify-self:start;") {{ modeLabel }}
-      div(style="display:flex; gap:12px; align-items:center; justify-self:center;")
+      div(style="display:flex; gap:12px; align-items:center; justify-self:end;")
         button(@click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:5px;") ◄
         button(@click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ►
-      button(@click.stop="$emit('torrents')" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; justify-self:end;") Torrents
 
     div(v-else style="display:flex; justify-content:space-between; align-items:center; margin-right:20px; margin-left:20px; font-weight:normal;")
       div(style="font-size:18px; font-weight:bold;") {{ modeLabel }}

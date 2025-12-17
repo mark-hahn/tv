@@ -5,12 +5,7 @@
   #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'15px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
     div(style="display:flex; justify-content:space-between; align-items:center;")
       div(style="margin-left:20px;") Status
-      div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
-        button(@click.stop="$emit('torrents')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Torrents
-        button(@click.stop="$emit('history')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") History
-        button(@click.stop="$emit('tvproc')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Tvproc
-        button(@click.stop="$emit('series')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Series
-        button(@click.stop="$emit('map')" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Map
+      div(style="margin-right:20px;")
 
   div(v-if="cards.length === 0" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
     | No files are downloading.

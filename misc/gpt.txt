@@ -1,30 +1,6 @@
 
+sometimes when i load the app, then go to torrents tab, then click on force, and then click on actors tab, the season and episode inputs are blank and the center of the pane has the msg "No unwatched episodes found"
 
-add a new file flex.vue -- it should show a pane like the series pane, map pane, etc.
+guard against this by checking for this condition after pane loads and restarting load if there is this problem.
 
-it should have a sticky hdr with 2 lines.
-
-The top line should have "Flexget" on top left and buttons on the right.  buttons should be Torrents, Status, History, TvProc, Series, and Map
-
-in both simple and non-simple modes, a click anywhere in map pane should switch to series tab
-
-in series tab remove second child div from #hdr and add margin-bottom of 10px to #hdr
-in actors tab move buttons to top row
-In actors tab chg Series Regulars msg to "Regulars".
-In actors tab change Guest Stars msg to "Guests".
-In actors tab move Regulars and Guests messages to top row to the immediate left of arrows.
-In actors tab remove middle row.
-in torrents tab move buttons to top row and remove second row.
-in qbt tab reverse orde of cards.  on load set scrolling to bottom. if cards are added and it is scrolled to bottom the keep it scrolled to bottom.  if not at bottom do not scroll.
-
-in the actors pane the regulars/guests messages and the arrows are in the second row.  they should be in the top line to the right.
-
-you are  having a problem with the header. forget the existing header you were working on. create a new header that is a div the width of the actors pane that contains two child divs. those two should be full width with the second div below the first.
-the top div should have the show name on the left in a div.  then to the right of that should be a div with the regulars/guests message. a third div in that top div should contain the arrows and be at the far right.  The show name div should expand to fill all the remaining space in the top div.
-the bottom div should contain the Regulars button, the guests button, the series/episodes input boxes, and that's all.
-
-align the left side of the regulars button to match the left side of the show name div. remove the margin-right from the arrows div and add a 10px margin-left to the arrows div
-
-change the margin-right of the arrows div to 15px. remove the margin-bottom for #header
-
-to the arrows div and increase the margin-left to 20 px, change the width of the regulars/guests message div to 75px.
+ if there is no “first available + not played” episode when the pane is loaded then set the season to 1 and the episode to 1

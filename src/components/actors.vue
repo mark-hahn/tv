@@ -72,7 +72,10 @@ export default {
       episodeNum: '',
       errorMessage: '',
       isGuestMode: false,
-      showingEpisodeActors: false // Track if we're showing episode actors
+      showingEpisodeActors: false, // Track if we're showing episode actors
+      _onShowActors: null,
+      _onFillAndSelectEpisode: null,
+      _onResetActorsPane: null
     };
   },
 
@@ -344,10 +347,17 @@ export default {
             }
           }
         }
-        
-        // If no unwatched episode found, leave empty (strategy 3)
+        // If no "first available + not played" episode exists, default to S1E1.
+        if (!String(this.seasonNum || '').trim() && !String(this.episodeNum || '').trim()) {
+          this.seasonNum = '1';
+          this.episodeNum = '1';
+        }
       } catch (error) {
-        // Leave empty (strategy 3)
+        // Fall back to S1E1 if we couldn't compute a better default.
+        if (this.currentShow && !String(this.seasonNum || '').trim() && !String(this.episodeNum || '').trim()) {
+          this.seasonNum = '1';
+          this.episodeNum = '1';
+        }
       }
     },
 
@@ -395,32 +405,37 @@ export default {
   },
 
   mounted() {
-    evtBus.on('showActors', (data) => {
+    this._onShowActors = (data) => {
       this.updateActors(data);
-      
+
       // Reset to series actors view
       this.isGuestMode = false;
       this.showingEpisodeActors = false;
       this.errorMessage = '';
-      
+
       // Pre-fill episode inputs after actors are loaded
       void this.$nextTick(async () => {
         await this.prefillEpisodeInputs();
       });
-    });
-    
-    evtBus.on('fillAndSelectEpisode', (episodeInfo) => {
+    };
+    evtBus.on('showActors', this._onShowActors);
+
+    this._onFillAndSelectEpisode = (episodeInfo) => {
       // Fill the input boxes
       this.seasonNum = String(episodeInfo.seasonNumber);
       this.episodeNum = String(episodeInfo.episodeNumber);
       // Do not auto-load guest actors; guest mode only when Guest is clicked.
-    });
+    };
+    evtBus.on('fillAndSelectEpisode', this._onFillAndSelectEpisode);
 
-    evtBus.on('resetActorsPane', this.resetPane);
+    this._onResetActorsPane = this.resetPane;
+    evtBus.on('resetActorsPane', this._onResetActorsPane);
   },
 
   unmounted() {
-    evtBus.off('resetActorsPane', this.resetPane);
+    if (this._onShowActors) evtBus.off('showActors', this._onShowActors);
+    if (this._onFillAndSelectEpisode) evtBus.off('fillAndSelectEpisode', this._onFillAndSelectEpisode);
+    if (this._onResetActorsPane) evtBus.off('resetActorsPane', this._onResetActorsPane);
   }
 }
 </script>

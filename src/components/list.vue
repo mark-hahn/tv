@@ -611,13 +611,10 @@ export default {
         episodeCount: 0, 
         watchedCount: 0, 
       };
-      let tvdbData = allTvdb[show.Name];
-      if(tvdbData) {
-        const {seasonCount, episodeCount, watchedCount} = tvdbData;
-        Object.assign(paramObj, 
-              {seasonCount, episodeCount, watchedCount});
-      }
-      tvdbData = await srvr.getNewTvdb(paramObj);
+      // For no-Emby shows, never inherit episode/watched counts from any existing
+      // tvdb.json entry keyed by the same name. Name-collisions (or stale tvdb data)
+      // can otherwise leak watchedCount into a show that cannot be watched in Emby.
+      const tvdbData = await srvr.getNewTvdb(paramObj);
       
       // Hide searching modal
       this.showSearching = false;

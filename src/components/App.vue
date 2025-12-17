@@ -245,6 +245,12 @@ export default {
       this.seriesMap = data.seriesMap;
       this.mapError = data.mapError || '';
       console.log('Map pane opened - seriesMap:', this.seriesMap, 'error:', this.mapError);
+
+      // Let Series pane derive counts from the same map it shows.
+      if (this.mapShow) {
+        evtBus.emit('seriesMapUpdated', { show: this.mapShow, seriesMap: this.seriesMap });
+      }
+
       this.currentPane = data.mapShow !== null ? 'map' : 'series';
       evtBus.emit('paneChanged', this.currentPane);
     },

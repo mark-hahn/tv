@@ -109,6 +109,21 @@ export default {
   
   methods: {
 
+    getMapCounts(seriesMap) {
+      try {
+        const seasonKeys = Object.keys(seriesMap || {})
+          .filter((s) => seriesMap?.[s] && Object.keys(seriesMap[s]).length > 0);
+        const seasonCount = seasonKeys.length;
+        const episodeCount = seasonKeys.reduce((sum, s) => {
+          const epis = seriesMap?.[s] || {};
+          return sum + Object.keys(epis).length;
+        }, 0);
+        return { seasonCount, episodeCount };
+      } catch (e) {
+        return { seasonCount: 0, episodeCount: 0 };
+      }
+    },
+
     async sendEmail() {
       if (!this.emailText.trim() || this.emailText === 'Email Sent') return;
       
@@ -233,9 +248,22 @@ export default {
         const fields = Object.assign({name}, epiCounts);
         tvdbData = await srvr.setTvdbFields(fields);
       }
+      else {
+        // noemby shows cannot have real watched state from Emby; prevent stale
+        // tvdb.json values (name collisions / prior cached data) from showing up.
+        if ((tvdbData.watchedCount ?? 0) !== 0) {
+          tvdbData.watchedCount = 0;
+          try {
+            await srvr.setTvdbFields({ name, watchedCount: 0 });
+          } catch (e) {
+            // Non-fatal: UI will still display the corrected value.
+          }
+        }
+      }
       allTvdb[name] = tvdbData;
       let seasonsTxt;
-      const {episodeCount, seasonCount, watchedCount} = tvdbData;
+      const {episodeCount, seasonCount} = tvdbData;
+      const watchedCount = this.show.Id.startsWith('noemby-') ? 0 : (tvdbData.watchedCount ?? 0);
       switch (seasonCount) {
         case 0:  
           console.error('setSeasonsTxt, no seasonCount:', name);
@@ -382,6 +410,27 @@ export default {
 
       // Only show the info box (and email input) once everything is populated.
       this.seriesReady = true;
+    });
+
+    // Keep the Series infobox totals in sync with the actual Map grid.
+    // This matters for noemby shows where tvdb.json counts can be stale / mismatched.
+    evtBus.on('seriesMapUpdated', async ({ show, seriesMap }) => {
+      if (!show || !seriesMap) return;
+      if (!this.show || this.show.Name !== show.Name) return;
+      if (!this.show.Id?.startsWith('noemby-')) return;
+
+      const { seasonCount, episodeCount } = this.getMapCounts(seriesMap);
+      if (!episodeCount || !seasonCount) return;
+
+      const seasonsTxt = seasonCount === 1 ? '1 Season' : `${seasonCount} Seasons`;
+      const watchedTxt = `  &nbsp  Watched 0 of ${episodeCount}`;
+      this.seasonsTxt = ' &nbsp; ' + seasonsTxt + watchedTxt;
+
+      try {
+        await srvr.setTvdbFields({ name: show.Name, seasonCount, episodeCount, watchedCount: 0 });
+      } catch (e) {
+        // Non-fatal: UI already corrected.
+      }
     });
   },
 }

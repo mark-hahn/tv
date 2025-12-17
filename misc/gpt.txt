@@ -1,6 +1,6 @@
+.
 
-sometimes when i load the app, then go to torrents tab, then click on force, and then click on actors tab, the season and episode inputs are blank and the center of the pane has the msg "No unwatched episodes found"
+flex vue
+move history header to top
 
-guard against this by checking for this condition after pane loads and restarting load if there is this problem.
-
- if there is no “first available + not played” episode when the pane is loaded then set the season to 1 and the episode to 1
+in the qbt tab move the header to the top and change the msg in the header to qBittorent History

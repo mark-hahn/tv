@@ -86,6 +86,11 @@ export default {
   },
 
   methods: {
+    ensureEpisodeInputs() {
+      if (!String(this.seasonNum || '').trim()) this.seasonNum = '1';
+      if (!String(this.episodeNum || '').trim()) this.episodeNum = '1';
+    },
+
     resetPane() {
       this.actors = [];
       this.seriesActors = [];
@@ -416,6 +421,9 @@ export default {
       // Pre-fill episode inputs after actors are loaded
       void this.$nextTick(async () => {
         await this.prefillEpisodeInputs();
+
+        // Guard: if inputs are still empty after pane load, force S1/E1.
+        this.ensureEpisodeInputs();
       });
     };
     evtBus.on('showActors', this._onShowActors);

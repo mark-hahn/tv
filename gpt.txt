@@ -22,8 +22,6 @@ tv.log is read and tailed and trimmed by another app.  so no maintenance of tv.l
 --
 change name of pm2 process to tv-proc 
 -- 
-only run prune.sh once an hour 
--- 
 switch from using guessit to using npm module parse-torrent-title. 
 -- 
 delay starting processing until 5 mins (or 30 secs) have elapsed from finishing last processing
@@ -39,4 +37,10 @@ use port 3003
 --
 write sample code to a file client.js to run in the browser to call the function with fetch.
 
+
+
 i removed an entry form tv-recent and it was not processed.  refresh memory contente of tv-recent.json, and any other in-memory copies of files.
+--
+only run prune.sh once an hour 
+
+would you recommend switching to use main.js and not use coffeescript any more?

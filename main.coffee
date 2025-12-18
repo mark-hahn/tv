@@ -120,6 +120,7 @@ deleteCount = chkCount = recentCount = 0
 existsCount = errCount = downloadCount = blockedCount = 0
 
 cycleRunning = no
+lastPruneAt = 0
 
 resetCycleState = ->
   startTime = time = Date.now()
@@ -136,6 +137,7 @@ scheduleNextCycle = ->
 runCycle = ->
   return if cycleRunning
   cycleRunning = yes
+  reloadState()
   resetCycleState()
   process.nextTick delOldFiles
 
@@ -164,23 +166,32 @@ readMap = (fname) =>
   map
 
 writeMap = (fname, map) =>
+  out = {}
   for entry, timex of map
-    map[entry] = dateStr timex
-  fs.writeFileSync fname, JSON.stringify map
+    out[entry] = dateStr timex
+  fs.writeFileSync fname, JSON.stringify out
 
-recent  = readMap 'tv-recent.json'
-errors  = readMap 'tv-errors'
-blocked = JSON.parse fs.readFileSync 'tv-blocked.json', 'utf8'
+recent  = null
+errors  = null
+blocked = null
 
 ###########
 # constants
 
 map = {}
-mapStr = fs.readFileSync 'tv-map', 'utf8'
-mapLines = mapStr.split '\n'
-for line in mapLines
-  [f,t] = line.split ','
-  if line.length then map[f.trim()] = t.trim()
+reloadState = ->
+  recent  = readMap 'tv-recent.json'
+  errors  = readMap 'tv-errors'
+  blocked = JSON.parse fs.readFileSync 'tv-blocked.json', 'utf8'
+
+  map = {}
+  mapStr = fs.readFileSync 'tv-map', 'utf8'
+  mapLines = mapStr.split '\n'
+  for line in mapLines
+    [f,t] = line.split ','
+    if line.length then map[f.trim()] = t.trim()
+
+reloadState()
 
 tvPath    = '/mnt/media/tv/'
 
@@ -224,16 +235,16 @@ request.post 'https://api4.thetvdb.com/v4/login',
 # delete old files in usb/files and entries in tv-recent.json
 
 delOldFiles = =>
-  if FAST_TEST
-    process.nextTick checkFiles
-    return
+  PRUNE_INTERVAL_MS = 60*60*1000
 
-  # prune script deletes files older than 60 days
-  log ".... deleting old files in usb ~/files ...."
-  res = exec("ssh #{usbHost} /home/xobtlu/prune.sh", 
-              {timeout:300000}).toString()
-  if not res.startsWith('prune ok')
-    err "Prune error: #{res}"
+  if (Date.now() - lastPruneAt) >= PRUNE_INTERVAL_MS
+    # prune script deletes files older than 60 days
+    log ".... deleting old files in usb ~/files ...."
+    res = exec("ssh #{usbHost} /home/xobtlu/prune.sh", 
+                {timeout:300000}).toString()
+    lastPruneAt = Date.now()
+    if not res.startsWith('prune ok')
+      err "Prune error: #{res}"
 
 # delete old entries in tv-recent.json
 # tv-recent files limited to 80 days

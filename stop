@@ -2,11 +2,13 @@
 
 set -euo pipefail
 
-APP_NAME="main"
+APP_NAME="tv-proc"
 BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$BASEDIR"
 
 # Remove the pm2 process so `./run` can start it again cleanly.
+# Also delete the legacy name ("main") if present.
+pm2 delete "main" >/dev/null 2>&1 || true
 pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
 
 echo "stopped: pm2 process '$APP_NAME' (if it was running)"

@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-APP_NAME="main"
+APP_NAME="tv-proc"
 APP_SCRIPT="main.js"
 APP_ARGS=()
 if [ "${1-}" != "" ]; then
@@ -31,14 +31,14 @@ cd "$BASEDIR"
 echo "---- (re)starting under pm2 ----"
 
 # Restart under pm2. Use delete+start so updated JS and optional args are applied.
-if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
-  pm2 delete "$APP_NAME" >/dev/null
-fi
+# Also delete the old legacy process name ("main") if it exists.
+pm2 delete "main" >/dev/null 2>&1 || true
+pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
 
 if [ ${#APP_ARGS[@]} -gt 0 ]; then
-  pm2 start "$APP_SCRIPT" -- "${APP_ARGS[@]}"
+  pm2 start "$APP_SCRIPT" --name "$APP_NAME" -- "${APP_ARGS[@]}"
 else
-  pm2 start "$APP_SCRIPT"
+  pm2 start "$APP_SCRIPT" --name "$APP_NAME"
 fi
 
 # Clear old pm2 logs for this process so the log stream starts fresh.

@@ -30,12 +30,13 @@ change name of pm2 process to tv-proc
 -- 
 switch from using guessit to using npm module parse-torrent-title. 
 -- 
-delay starting processing until 5 mins (or 30 secs) have elapsed from finishing last processing
+delay starting processing until 5 mins (or 30 secs) have elapsed since finishing last processing
 --
 sort files by title before processing
 --
 add server functionality to app to provide an endpoint for a request to a function startProc(title) which takes a title arg and returns {"status":"ok"} for success or {"status":<error msg>} for error.
--- startProc() should stop processing while waiting for any single file processing to finish, and then it should trigger a new processing cycle where title is processed first before other files.
+-- 
+startProc() should stop processing while waiting for any single file processing to finish, and then it should trigger a new processing cycle where title is processed first before other files.
 --
 if there is no title arg or there is no matching file then just restart the cycle
 --
@@ -44,3 +45,8 @@ use port 3003
  the request will come from a browser so handle cors properly 
 --
 write sample code to a file client.js to run in the browser to call the function with fetch.
+
+==========================================
+
+Sort files by title before processing
+In main.js, checkFiles now sorts by parsed title, then season, then episode.

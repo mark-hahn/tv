@@ -1,43 +1,17 @@
 
-add to the app a new component file src/components/flex.vue. it should show a pane in a tab like the series tab, map tab, etc.
 
-The tab should be named "Flex" and it should be between Tor and Down.
+the tvproc pane says the log is empty but this is the beginning of the log:
 
-the pane should be layed out like the qbt history pane and behave like it. The header should just say Flexget History. The scrolling pane should have cards.
+Tue Dec 16 11:20:01 PM PST 2025
 
-there should be a new endpoint in torrents/src/server.js called flexget(). when called it should execute an ssh command to the usb server with the bash command "flexget history". 
+>>>>>> 1 s08e14 2025/12/16-23:20:08 -- 2.17GB --
+Cheers.S08E14.1080p.BluRay.x264-BORDURE.mkv
+Cheers.S08E14.1080p.BluRay.x264-BORDURE/
+/mnt/media/tv/Cheers/Season 8/
+download finished: elapsed(mins): 3.2
+***********************************************************
+skipped recent:   1279
+blocked:          1
+downloaded:       1
+elapsed(mins):    3.3
 
-the usb server details are in torrents/cookies/qbt-cred.txt.
-
-the flex tab pane should call flexget() every 10 seconds only when the pane is visible.
-
-the returned text will have groups of 5 lines separated by lines that only contain spaces and vertical bars |.  each group provides the data for one card. 
-
-the group format, ignoring white space, is:
-│Task│<provider>│
-│Title│<title>│
-│URL│<url>│
-│Time|<time>|
-│Details│Accepted by series (reason: <reason>)|
-
-Put <title> in the first row of the card.  In the second row list these values separated by commas in this format:
-<provider>, <time>, <reason>
-
-convert the <time> value from format "Tue Dec 16 05:25:08 2025" to "<month>/<day> <hour>:<mins>" with no leading zero on month or day.  hour and mins should be two digits.
-
-
-you said "That output means the USB box really doesn’t have any runnable flexget executable for user xobtlu (not in PATH, not in ~/.local/bin, not in /usr/local/bin or /usr/bin, and no Python “scripts” install that pr" but that is impossible -- 
-
-when i use ssh in a termin and type in the "flexget history" bash command  in the server it works
-
-usb(~) flexget history
-There is a FlexGet process already running for this config, sending execution there.
-
-┌Showing 50 entries from History──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ Task    │ ipt                                                                                                                   │
-│ Title   │ Down Cemetery Road S01E06 720p HEVC x265-MeGusta                                                                      │
-│ URL     │ https://iptorrents.com/download.php/7031056/Down.Cemetery.Road.S01E06.720p.HEVC.x265-MeGusta.torrent?torrent_pass=444 │
-│         │ 62d6cdc795cb9204c454f38785dcd                                                                                         │
-│ Time    │ Wed Nov 26 03:25:09 2025                                                                                              │
-│ Details │ Accepted by series (reason: target quality)                                                                           │
-│         │                                                 

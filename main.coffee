@@ -14,6 +14,10 @@ convert to js:
 
 debug = false
 
+# Set true to process every 30s instead of 5 minutes.
+FAST_TEST = false
+PROCESS_INTERVAL_MS = if FAST_TEST then 30*1000 else 5*60*1000
+
 log = (...x) => 
   if debug
     console.log '\nLOG:', ...x
@@ -49,7 +53,7 @@ util = require 'util'
 
 # --- tv.log buffering -------------------------------------------------------
 # Goal:
-# - Start LIVE (no buffering)
+# - Start each processing cycle BUFFERING
 # - After the separator log("***********************************************************") runs,
 #   clear the buffer and start BUFFERING
 # - When we reach "# file passed all block tests, process it": flush buffer and go LIVE
@@ -107,9 +111,26 @@ if process.argv.length == 3
   filterRegexTxt = 'filter:' + filterRegex
 
 log ".... starting tv.coffee v4 #{filterRegexTxt} ...."
-startTime = time = Date.now()
-deleteCount = chkCount = recentCount = 0
-existsCount = errCount = downloadCount = blockedCount = 0;
+
+cycleRunning = no
+
+resetCycleState = ->
+  startTime = time = Date.now()
+  downloadTime = Date.now()
+  deleteCount = chkCount = recentCount = 0
+  existsCount = errCount = downloadCount = blockedCount = 0
+  # Per requirements: when processing starts, begin in buffer mode.
+  clearBuffer()
+  startBuffering()
+
+scheduleNextCycle = ->
+  setTimeout runCycle, PROCESS_INTERVAL_MS
+
+runCycle = ->
+  return if cycleRunning
+  cycleRunning = yes
+  resetCycleState()
+  process.nextTick delOldFiles
 
 findUsb = "ssh #{usbHost} find files -type f -printf '%CY-%Cm-%Cd-%P-%s\\\\\\n' " + 
           "| grep -Ev .r[0-9]+-[0-9]+$ | grep -Ev .rar-[0-9]+$ " + 
@@ -191,7 +212,7 @@ request.post 'https://api4.thetvdb.com/v4/login',
       # log 'tvdb login', {error, response, body}
       #   process.exit()
 
-      process.nextTick delOldFiles
+      process.nextTick runCycle
 
 ######################################################
 # delete old files in usb/files and entries in tv-recent.json
@@ -347,6 +368,9 @@ checkFile = () =>
 
     if (deleteCount + existsCount + errCount + downloadCount + blockedCount) > 0
       log "***********************************************************"
+
+    cycleRunning = no
+    scheduleNextCycle()
 
 tvdbCache = {}
 tvdburl = ''

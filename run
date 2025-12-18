@@ -1,14 +1,18 @@
 #! /bin/bash
 
-s="$(pgrep -f tv-proc/main.js)"
-if [ ${#s} -gt 1 ] ; then
-  # echo "--  tv-proc not started, main.js already running  --"
-  # echo >> /root/dev/apps/tv-proc/tv.log
-  exit
+set -euo pipefail
+
+APP_NAME="main"
+APP_SCRIPT="main.js"
+APP_ARGS=()
+if [ "${1-}" != "" ]; then
+  APP_ARGS=("$1")
 fi
 
-echo >> /root/dev/apps/tv-proc/tv.log
-date >> /root/dev/apps/tv-proc/tv.log
+BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo >> "$BASEDIR/tv.log"
+date >> "$BASEDIR/tv.log"
 
 if [ -f /mnt/media/nomount ]; then
   printf "\n---- tv-proc: media drive is not mounted\n"
@@ -22,13 +26,22 @@ if [ -f /mnt/m-bkup/nomount ]; then
 fi 
 
 
-cd /root/dev/apps/tv-proc
+cd "$BASEDIR"
 coffee -c main.coffee
 
-/root/.nvm/versions/node/v22.18.0/bin/node  \
-        --no-deprecation                    \
-         /root/dev/apps/tv-proc/main.js $1  \
-    2>&1 >> /root/dev/apps/tv-proc/tv.log
+# Restart under pm2. Use delete+start so updated JS and optional args are applied.
+if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
+  pm2 delete "$APP_NAME" >/dev/null
+fi
+
+if [ ${#APP_ARGS[@]} -gt 0 ]; then
+  pm2 start "$APP_SCRIPT" -- "${APP_ARGS[@]}"
+else
+  pm2 start "$APP_SCRIPT"
+fi
+
+# Stream logs continuously (Ctrl+C to detach).
+pm2 logs "$APP_NAME"
 
 chmod -R 774  /mnt/media/tv
 chown -R emby /mnt/media/tv

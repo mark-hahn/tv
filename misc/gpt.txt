@@ -1,2 +1,23 @@
 
-given a torrent file can you determine the list of file names to download?
+changes to the dlStatus card:
+  rename state value downloading to Getting,
+  when a file/card is finished:
+    replace Eta with Finished: "<month>/<day> <hours>:<mins>", and
+    replace Progress with Elapsed "<mins>:<secs>",
+--
+  torrent scrolling should start at bottom
+
+======================================================
+
+in flex card find and convert date/time from utc to local date/time
+
+======================================================
+
+changes to the torrent pane:
+  when card selected don't open details tab if card already has checkmark.
+  --
+  add Details button between download and search buttons.
+  Details button should open details tab.
+  make all hdr buttons in torrent and tvproc panes the same size as tab buttons
+--
+  when download button is clicked and torrent file downloaded, get file title list using parse-torrent module, and for each file name use parse-torrent-tile to parse file name into season and episode numbers, and if season or episode number is missing bring up modal dialog with msg: "Torrent file name is missing a season or episode number." and then abort sending torrent to usb. for testing log the results of the parse-torrent-tile results

@@ -1,6 +1,6 @@
 <template lang="pug">
 .torrents-container(:style="{ height:'100%', width:'100%', display:'flex', justifyContent:'flex-start' }")
-  #torrents(:style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
+  #torrents(ref="scroller" :style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
 
     #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
       div(style="display:flex; justify-content:space-between; align-items:center;")
@@ -116,7 +116,9 @@ export default {
       downloadedByHash: {},
 
       spaceAvailText: 'Space Used, Seed Box: --%, Server: --%',
-      spaceAvailGbText: 'Available, Seed Box: -- GB, Server: -- GB'
+      spaceAvailGbText: 'Available, Seed Box: -- GB, Server: -- GB',
+
+      _didInitialScroll: false
     };
   },
 
@@ -165,6 +167,15 @@ export default {
   },
 
   methods: {
+    getScroller() {
+      return this.$refs.scroller || null;
+    },
+
+    scrollToBottom() {
+      const el = this.getScroller();
+      if (!el) return;
+      el.scrollTop = el.scrollHeight;
+    },
     downloadHistoryKey() {
       return 'downloadedTorrentHashes';
     },
@@ -285,6 +296,8 @@ export default {
       this.unaired = false;
       this.iptCfClearance = '';
       this.tlCfClearance = '';
+
+      this._didInitialScroll = false;
     },
 
     handleClose() {
@@ -390,6 +403,7 @@ export default {
       this.spaceAvailText = 'Space Used, Seed Box: --%, Server: --%';
       this.spaceAvailGbText = 'Available, Seed Box: -- GB, Server: -- GB';
       this.lastNeeded = null;
+      this._didInitialScroll = false;
 
       // Kick off space fetch ASAP; don't wait for torrent searching.
       this.updateSpaceAvail();
@@ -424,6 +438,11 @@ export default {
     },
 
     async searchClick() {
+      if ((!this.currentShow || !this.currentShow.Name) && this.activeShow?.Name) {
+        this.currentShow = this.activeShow;
+        this.showName = this.activeShow?.Name || this.showName;
+      }
+
       if (!this.currentShow || !this.currentShow.Name) {
         this.error = 'No show selected';
         return;
@@ -454,6 +473,11 @@ export default {
     },
 
     async forceClick() {
+      if ((!this.currentShow || !this.currentShow.Name) && this.activeShow?.Name) {
+        this.currentShow = this.activeShow;
+        this.showName = this.activeShow?.Name || this.showName;
+      }
+
       if (!this.currentShow || !this.currentShow.Name) {
         this.error = 'No show selected';
         return;
@@ -611,6 +635,7 @@ export default {
       this.providerWarning = '';
       this.torrents = [];
       this.noTorrentsNeeded = false;
+      this._didInitialScroll = false;
 
       try {
         // Extract cf_clearance cookies from input or use saved values
@@ -686,6 +711,12 @@ export default {
 
         // Finally, set torrents
         this.torrents = data.torrents || [];
+
+        await this.$nextTick();
+        if (!this._didInitialScroll && Array.isArray(this.torrents) && this.torrents.length > 0) {
+          this.scrollToBottom();
+          this._didInitialScroll = true;
+        }
       } catch (err) {
         // Handle both Error objects and rejected promise values
         const errorMessage = err?.message || err?.result || err?.error || (typeof err === 'string' ? err : JSON.stringify(err));

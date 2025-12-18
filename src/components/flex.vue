@@ -26,25 +26,59 @@ function splitCells(line) {
 
 function fmtFlexgetTime(raw) {
   const txt = String(raw || '').trim();
-  // Expected: "Tue Dec 16 05:25:08 2025"
+  if (!txt) return '';
+
+  // 1) If the string already includes TZ info (Z or +/-HH:MM), let Date.parse handle it.
+  // Example: 2025-12-16T05:25:08Z
+  if (/[zZ]$/.test(txt) || /[+-]\d{2}:?\d{2}$/.test(txt)) {
+    const d = new Date(txt);
+    if (!Number.isNaN(d.getTime())) {
+      const m = d.getMonth() + 1;
+      const day = d.getDate();
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      return `${m}/${day} ${hh}:${mm}`;
+    }
+  }
+
+  // 2) Legacy format from flexget: "Tue Dec 16 05:25:08 2025" (assume UTC)
   const parts = txt.split(/\s+/);
-  if (parts.length < 5) return txt;
+  if (parts.length >= 5) {
+    const monStr = parts[1];
+    const day = Number(parts[2]);
+    const hhmmss = parts[3] || '';
+    const year = Number(parts[4]);
 
-  const monStr = parts[1];
-  const day = Number(parts[2]);
-  const hhmmss = parts[3] || '';
+    const monthMap = {
+      Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+      Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11
+    };
+    const monthIdx = monthMap[monStr];
+    const [hhRaw, mmRaw, ssRaw] = hhmmss.split(':');
+    const hh = Number(hhRaw);
+    const mm = Number(mmRaw);
+    const ss = Number(ssRaw);
 
-  const monthMap = {
-    Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
-    Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12
-  };
-  const month = monthMap[monStr] || undefined;
-  const [hhRaw, mmRaw] = hhmmss.split(':');
-  const hh = String(hhRaw || '').padStart(2, '0');
-  const mm = String(mmRaw || '').padStart(2, '0');
+    if (
+      monthIdx !== undefined &&
+      Number.isFinite(day) &&
+      Number.isFinite(year) &&
+      Number.isFinite(hh) &&
+      Number.isFinite(mm)
+    ) {
+      // Interpret the input as UTC, then render as local.
+      const utcMs = Date.UTC(year, monthIdx, day, hh, mm, Number.isFinite(ss) ? ss : 0);
+      const d = new Date(utcMs);
+      const mOut = d.getMonth() + 1;
+      const dayOut = d.getDate();
+      const hhOut = String(d.getHours()).padStart(2, '0');
+      const mmOut = String(d.getMinutes()).padStart(2, '0');
+      return `${mOut}/${dayOut} ${hhOut}:${mmOut}`;
+    }
+  }
 
-  if (!month || !Number.isFinite(day)) return txt;
-  return `${month}/${day} ${hh}:${mm}`;
+  // 3) Fallback: return as-is if we can't parse
+  return txt;
 }
 
 function parseFlexgetHistoryText(text) {

@@ -5,18 +5,17 @@ reminder, restore ...
 bugs ...
 
 todo ...
-  rename down?  Usb ToUsb Get  
-  check torrent files validity before downloading
-    parse-torrent module - missing season or episode
-  history of progress for a torrent title
-  tvproc cards
-  add end date and elapsed to down
-  reload when just visible
-    browser or app tab switch
-  trigger emby library scan auto and/or button
   don't force detail torrent tab
     check for checkmark
     add Details button
+  check torrent files validity before downloading
+    parse-torrent module - missing season or episode
+
+  history of progress for a torrent title
+  tvproc cards
+  reload when just visible
+    browser or app tab switch
+  trigger emby library scan auto and/or button
   tvproc control
   use minimum from emby
     more from tvdb

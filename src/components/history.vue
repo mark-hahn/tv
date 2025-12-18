@@ -241,6 +241,9 @@ export default {
       // Special-case qBittorrent's stalledUP to match requested wording.
       if (raw === 'stalledUP') return 'Finished';
 
+      // Match DlStatus wording.
+      if (raw === 'downloading') return 'Getting';
+
       const lower = raw.toLowerCase();
       return lower.charAt(0).toUpperCase() + lower.slice(1);
     },
@@ -276,7 +279,7 @@ export default {
       if (t?.state === 'downloading') {
         const prog = this.fmtProgPc(t?.completed, t?.size);
         const eta = this.fmtEtaMmSs(t?.eta);
-        return `${added}${sep}${size}${sep}Downloading${sep}${prog}%${sep}${eta}`;
+        return `${added}${sep}${size}${sep}Getting${sep}${prog}%${sep}${eta}`;
       }
 
       const finished = this.fmtCompletionMmDd_HhMm(t?.completion_on);

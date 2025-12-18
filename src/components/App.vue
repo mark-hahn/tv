@@ -180,7 +180,7 @@ export default {
         { label: 'Actors', key: 'actors' },
         { label: 'Tor', key: 'torrents' },
         { label: 'Flex', key: 'flex' },
-        { label: 'GET', key: 'dlstatus' },
+        { label: 'Get', key: 'dlstatus' },
         { label: 'Qbt', key: 'history' },
         { label: 'Down', key: 'tvproc' }
       ];
@@ -491,6 +491,10 @@ export default {
     
     // Close torrents or actors pane when a different show is selected
     evtBus.on('setUpSeries', (show) => {
+      // Keep currentShow synced to the list selection immediately.
+      // tvdbDataReady may arrive later; that's fine.
+      this.currentShow = show;
+
       // If map is not currently showing, always return to the Series pane.
       if (this.currentPane !== 'map') {
         const prevPane = this.currentPane;

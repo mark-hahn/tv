@@ -76,11 +76,15 @@ export default {
       if (!needsFinish) return;
 
       const size = Number(t.size);
+      const nowSec = Math.floor(Date.now() / 1000);
       const next = {
         ...t,
         state: 'Early Finish',
         progress: 1,
-        eta: 0
+        eta: 0,
+        completion_on: Number.isFinite(Number(t.completion_on)) && Number(t.completion_on) > 0
+          ? Number(t.completion_on)
+          : nowSec
       };
       if (Number.isFinite(size) && size >= 0) {
         next.size = size;
@@ -232,6 +236,26 @@ export default {
       return `${String(mm).padStart(2, '0')}:${ss2}`;
     },
 
+    fmtElapsedMmSs(seconds) {
+      const n = Number(seconds);
+      if (!Number.isFinite(n) || n < 0) return String(seconds);
+      const s = Math.floor(n);
+      const mm = Math.floor(s / 60);
+      const ss = s % 60;
+      return `${mm}:${String(ss).padStart(2, '0')}`;
+    },
+
+    fmtFinishedMmDd_HhMm(epochSeconds) {
+      const n = Number(epochSeconds);
+      if (!Number.isFinite(n) || n <= 0) return '';
+      const d = new Date(Math.floor(n) * 1000);
+      const m = d.getMonth() + 1;
+      const day = d.getDate();
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mi = String(d.getMinutes()).padStart(2, '0');
+      return `${m}/${day} ${hh}:${mi}`;
+    },
+
     fmtGbOneDecimal(bytes) {
       const n = Number(bytes);
       if (!Number.isFinite(n)) return String(bytes);
@@ -259,12 +283,34 @@ export default {
     fmtState(state) {
       const s = (state === undefined || state === null) ? '' : String(state);
       if (!s) return '';
+      if (s === 'downloading') return 'Getting';
       // Simple capitalization: "downloading" -> "Downloading", "Early Finish" stays.
       return s
         .split(' ')
         .filter(Boolean)
         .map(w => w.charAt(0).toUpperCase() + w.slice(1))
         .join(' ');
+    },
+
+    isFinishedTorrent(t) {
+      const progress = Number(t?.progress);
+      const amountLeft = Number(t?.amount_left);
+      const eta = Number(t?.eta);
+      if (Number.isFinite(amountLeft) && amountLeft === 0) return true;
+      if (Number.isFinite(progress) && progress >= 1 && Number.isFinite(eta) && eta === 0) return true;
+      if (String(t?.state || '') === 'Early Finish') return true;
+      return false;
+    },
+
+    elapsedSeconds(t) {
+      const completion = Number(t?.completion_on);
+      const added = Number(t?.added_on);
+      if (Number.isFinite(completion) && completion > 0 && Number.isFinite(added) && added > 0) {
+        return Math.max(0, completion - added);
+      }
+      const active = Number(t?.time_active);
+      if (Number.isFinite(active) && active >= 0) return active;
+      return NaN;
     },
 
     formatAlignedBox(pairs) {
@@ -290,6 +336,16 @@ export default {
 
     rightBoxText(card) {
       const t = card?.torrent || {};
+      if (this.isFinishedTorrent(t)) {
+        const finished = this.fmtFinishedMmDd_HhMm(t?.completion_on);
+        const elapsed = this.fmtElapsedMmSs(this.elapsedSeconds(t));
+        return this.formatAlignedBox([
+          ['Seeds', t?.num_seeds],
+          ['Finished', finished],
+          ['Elapsed', elapsed]
+        ]);
+      }
+
       return this.formatAlignedBox([
         ['Seeds', t?.num_seeds],
         ['Progress', this.fmtPercent(t?.progress)],

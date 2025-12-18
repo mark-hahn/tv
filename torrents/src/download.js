@@ -3,6 +3,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import Client from 'ssh2-sftp-client';
 import { loadCreds } from './qb-cred.js';
+import parseTorrent from 'parse-torrent';
+import parseTorrentTitle from 'parse-torrent-title';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,6 +35,12 @@ function fail(stage, reason, extra = {}) {
 
 function ok(extra = {}) {
   return { success: true, ...extra };
+}
+
+function isVideoFile(filePath) {
+  const p = String(filePath || '');
+  const ext = p.toLowerCase().split('.').pop() || '';
+  return ['mkv', 'mp4', 'avi', 'm4v', 'mov', 'ts'].includes(ext);
 }
 
 function normalizeProvider(rawProvider, detailUrl) {
@@ -276,6 +284,43 @@ export async function download(torrent, cfClearance = {}) {
     const torrentBuffer = await torrentResponse.arrayBuffer();
     const torrentData = Buffer.from(torrentBuffer);
     console.log(`Downloaded ${torrentData.length} bytes`);
+
+    // Validate torrent content: each relevant file name must contain season & episode.
+    // If missing, abort BEFORE sending to the watch folder.
+    try {
+      const parsedTorrent = parseTorrent(torrentData);
+      const files = Array.isArray(parsedTorrent?.files) ? parsedTorrent.files : [];
+      const allPaths = files.map(f => String(f?.path || f?.name || '')).filter(Boolean);
+
+      // Prefer video files for validation (avoid NFO/SRT triggering false failures).
+      const pathsToCheck = allPaths.filter(isVideoFile);
+      const checkList = pathsToCheck.length > 0 ? pathsToCheck : allPaths;
+
+      const parsedByFile = [];
+      let missing = false;
+
+      for (const p of checkList) {
+        const base = path.basename(p);
+        const noExt = base.replace(/\.[^.]+$/, '');
+        const info = parseTorrentTitle.parse(noExt);
+        parsedByFile.push({ file: p, parsed: info });
+        if (!info?.season || !info?.episode) missing = true;
+      }
+
+      // For testing: log parse results.
+      console.error('parse-torrent files:', checkList);
+      console.error('parse-torrent-title results:', parsedByFile.map(x => ({ file: x.file, season: x.parsed?.season, episode: x.parsed?.episode })));
+
+      if (missing) {
+        return fail('validate-torrent-files', 'Torrent file name is missing a season or episode number.', {
+          fileCount: allPaths.length,
+          checkedCount: checkList.length,
+          checkedFiles: parsedByFile.map(x => ({ file: x.file, parsed: x.parsed }))
+        });
+      }
+    } catch (e) {
+      return fail('parse-torrent', e?.message || String(e));
+    }
 
     const contentType = torrentResponse.headers?.get?.('content-type') || '';
     if (DOWNLOAD_DEBUG && contentType.toLowerCase().includes('text/html')) {

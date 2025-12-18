@@ -21,3 +21,6 @@ changes to the torrent pane:
   make all hdr buttons in torrent and tvproc panes the same size as tab buttons
 --
   when download button is clicked and torrent file downloaded, get file title list using parse-torrent module, and for each file name use parse-torrent-tile to parse file name into season and episode numbers, and if season or episode number is missing bring up modal dialog with msg: "Torrent file name is missing a season or episode number." and then abort sending torrent to usb. for testing log the results of the parse-torrent-tile results
+
+======================================================
+

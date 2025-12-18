@@ -6,10 +6,11 @@
       div(style="display:flex; justify-content:space-between; align-items:center;")
         div(style="margin-left:20px;") {{ headerShowName }}
         div(style="display:flex; gap:10px; margin-right:20px;")
-          button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Download
-          button(@click.stop="searchClick" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Search
-          button(@click.stop="forceClick" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Force
-          button(@click.stop="toggleCookieInputs" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Cookies
+          button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Get
+          button(v-if="selectedTorrent" @click.stop="openDetails" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Tab
+          button(@click.stop="searchClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Search
+          button(@click.stop="forceClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Force
+          button(@click.stop="toggleCookieInputs" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Cookies
 
       div(style="margin-left:20px; margin-right:20px; margin-top:14px; font-weight:normal; font-size:16px; color:#666; display:block; visibility:visible; opacity:1; line-height:1.1; white-space:nowrap; overflow:visible;") {{ spaceAvailText }}
       div(style="margin-left:20px; margin-right:20px; margin-top:2px; font-weight:normal; font-size:16px; color:#666; display:block; visibility:visible; opacity:1; line-height:1.1; white-space:nowrap; overflow:visible;") {{ spaceAvailGbText }}
@@ -63,6 +64,12 @@
         button(@click.stop="cancelDownload" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;") Cancel
         button(@click.stop="continueDownload" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;") OK
 
+  #error-modal(v-if="showErrorModal" @click.stop="closeErrorModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:10000;")
+    #modal-content(@click.stop style="background:white; padding:30px; border-radius:10px; max-width:520px; box-shadow:0 4px 20px rgba(0,0,0,0.3);")
+      div(style="font-size:16px; margin-bottom:20px; line-height:1.5;") {{ errorModalMsg }}
+      div(style="display:flex; gap:10px; justify-content:flex-end;")
+        button(@click.stop="closeErrorModal" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;") OK
+
 
 </template>
 
@@ -105,6 +112,8 @@ export default {
       SHOW_TITLE: true,  // Show torrent title on card
       selectedTorrent: null,  // Currently selected torrent
       showModal: false,  // Show download confirmation modal
+      showErrorModal: false,
+      errorModalMsg: '',
       clickedTorrents: new Set(),  // Track which torrents have been clicked
       noTorrentsNeeded: false,  // Flag when needed array is empty
       showCookieInputs: false,  // Manual toggle for cookie input boxes
@@ -167,6 +176,20 @@ export default {
   },
 
   methods: {
+    openDetails() {
+      const url = this.selectedTorrent?.detailUrl;
+      if (url) window.open(url, '_blank');
+    },
+
+    showError(msg) {
+      this.errorModalMsg = String(msg || '');
+      this.showErrorModal = true;
+    },
+
+    closeErrorModal() {
+      this.showErrorModal = false;
+      this.errorModalMsg = '';
+    },
     getScroller() {
       return this.$refs.scroller || null;
     },
@@ -734,12 +757,13 @@ export default {
     handleTorrentClick(event, torrent) {
       // Select the card
       this.selectedTorrent = torrent;
-      
+
+      const alreadyClicked = this.isClicked(torrent);
       // Add to clicked set
       this.clickedTorrents.add(torrent);
-      
-      // Open detail page in new tab
-      if (torrent.detailUrl) {
+
+      // Only open the detail tab the first time (no auto-open if it already has a checkmark).
+      if (!alreadyClicked && torrent.detailUrl) {
         window.open(torrent.detailUrl, '_blank');
       }
     },
@@ -799,7 +823,19 @@ export default {
         });
         
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          let detail = '';
+          try {
+            const ct = response.headers.get('content-type') || '';
+            if (ct.includes('application/json')) {
+              const j = await response.json();
+              detail = j?.error ? String(j.error) : JSON.stringify(j);
+            } else {
+              detail = await response.text();
+            }
+          } catch {
+            // ignore
+          }
+          throw new Error(detail || `HTTP ${response.status}: ${response.statusText}`);
         }
         
         const data = await response.json();
@@ -810,11 +846,11 @@ export default {
           this.rememberDownloadedTorrent(this.selectedTorrent);
         } else {
           const errorMsg = data.error || data.message || 'Unknown error';
-          alert(`Download failed for ${torrentTitle}, ${errorMsg}`);
+          this.showError(errorMsg);
         }
       } catch (error) {
         const errorMsg = error.message || String(error);
-        alert(`Download failed for ${torrentTitle}, ${errorMsg}`);
+        this.showError(errorMsg);
       }
     },
 

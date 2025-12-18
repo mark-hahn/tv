@@ -4,13 +4,11 @@ reminder, restore ...
 
 bugs ...
 
-todo ...
-  don't force detail torrent tab
-    check for checkmark
-    add Details button
+untested ...
   check torrent files validity before downloading
-    parse-torrent module - missing season or episode
 
+
+todo ...
   history of progress for a torrent title
   tvproc cards
   reload when just visible

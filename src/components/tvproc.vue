@@ -6,8 +6,8 @@
     div(style="display:flex; justify-content:space-between; align-items:center;")
       div(style="margin-left:20px;") TV Proc
       div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
-        button(@click.stop="trimLog" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Trim
-        button(@click.stop="clearLog" style="font-size:15px; cursor:pointer; margin-top:3px; max-height:24px; border-radius:7px;") Clear
+        button(@click.stop="trimLog" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Trim
+        button(@click.stop="clearLog" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Clear
 
   div(v-if="error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px; white-space:pre-line; padding:0 20px;")
     div Error: {{ error }}

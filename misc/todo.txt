@@ -5,6 +5,9 @@ reminder, restore ...
 bugs ...
 
 todo ...
+  trigger emby library scan
+  don't force detail torrent page
+  show elapsed time for finished downloads
   show subtitle files
   tvproc control
   emby library

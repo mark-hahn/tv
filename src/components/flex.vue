@@ -9,7 +9,7 @@
 
   #scroller(ref="scroller" :style="{ flex:'1 1 auto', minHeight:'0px', overflowY:'auto', overflowX:'hidden' }")
     div(v-if="cards.length === 0" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
-      | No history.
+      span(v-if="emptyStateText") {{ emptyStateText }}
 
     div(v-else style="padding:5px; font-size:16px; line-height:1.6;")
       div(v-for="c in cards" :key="c.key" style="position:relative; background:#fff; border:1px solid #ddd; border-radius:5px; padding:10px; margin:0 0 10px 0;")
@@ -119,8 +119,21 @@ export default {
       cards: [],
       _pollTimer: null,
       _polling: false,
-      _didInitialScroll: false
+      _didInitialScroll: false,
+      _didLoadOnce: false,
+      _inFlight: false,
+      _loadingTimer: null,
+      _showLoading: false
     };
+  },
+
+  computed: {
+    emptyStateText() {
+      if (this.cards.length > 0) return '';
+      if (this._didLoadOnce) return 'No results.';
+      if (this._showLoading) return 'Loading ...';
+      return '';
+    }
   },
 
   mounted() {
@@ -176,6 +189,35 @@ export default {
         clearTimeout(this._pollTimer);
         this._pollTimer = null;
       }
+      this._inFlight = false;
+      this._showLoading = false;
+      if (this._loadingTimer) {
+        clearTimeout(this._loadingTimer);
+        this._loadingTimer = null;
+      }
+    },
+
+    startLoadingDelay() {
+      this._inFlight = true;
+      this._showLoading = false;
+      if (this._loadingTimer) {
+        clearTimeout(this._loadingTimer);
+        this._loadingTimer = null;
+      }
+      this._loadingTimer = setTimeout(() => {
+        if (this._inFlight && this.cards.length === 0 && !this._didLoadOnce) {
+          this._showLoading = true;
+        }
+      }, 2000);
+    },
+
+    finishLoadingDelay() {
+      this._inFlight = false;
+      this._showLoading = false;
+      if (this._loadingTimer) {
+        clearTimeout(this._loadingTimer);
+        this._loadingTimer = null;
+      }
     },
 
     scheduleNextPoll(delayMs) {
@@ -192,6 +234,7 @@ export default {
     },
 
     async pollOnce() {
+      this.startLoadingDelay();
       try {
         const scroller = this.getScroller();
         const wasAtBottom = this.isAtBottom(scroller);
@@ -202,6 +245,7 @@ export default {
         const text = await res.text();
 
         this.cards = parseFlexgetHistoryText(text);
+        this._didLoadOnce = true;
 
         await this.$nextTick();
         if (!this._didInitialScroll) {
@@ -212,6 +256,8 @@ export default {
         }
       } catch {
         // ignore transient errors
+      } finally {
+        this.finishLoadingDelay();
       }
     }
   }

@@ -12,8 +12,8 @@
   div(v-if="error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px; white-space:pre-line; padding:0 20px;")
     div Error: {{ error }}
 
-  div(v-else-if="isEmpty" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
-    div The log is empty.
+  div(v-else-if="!hasContent" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
+    div(v-if="emptyStateText") {{ emptyStateText }}
 
   pre(v-else ref="logPane" :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'auto', background:'#fff', border:'1px solid #ddd', borderRadius:'5px', fontFamily:'monospace', fontSize:'14px', fontWeight:'normal', whiteSpace:'pre' }") {{ logText }}
 
@@ -43,13 +43,24 @@ export default {
       error: null,
       _pollTimer: null,
       _active: false,
-      _firstLoad: false
+      _firstLoad: false,
+      _didLoadOnce: false,
+      _inFlight: false,
+      _loadingTimer: null,
+      _showLoading: false
     };
   },
 
   computed: {
-    isEmpty() {
-      return !this.error && String(this.logText || '').trim().length === 0;
+    hasContent() {
+      return !this.error && String(this.logText || '').trim().length > 0;
+    },
+
+    emptyStateText() {
+      if (this.hasContent) return '';
+      if (this._didLoadOnce) return 'No results.';
+      if (this._showLoading) return 'Loading ...';
+      return '';
     }
   },
 
@@ -81,6 +92,35 @@ export default {
       if (this._pollTimer) {
         clearTimeout(this._pollTimer);
         this._pollTimer = null;
+      }
+      this._inFlight = false;
+      this._showLoading = false;
+      if (this._loadingTimer) {
+        clearTimeout(this._loadingTimer);
+        this._loadingTimer = null;
+      }
+    },
+
+    startLoadingDelay() {
+      this._inFlight = true;
+      this._showLoading = false;
+      if (this._loadingTimer) {
+        clearTimeout(this._loadingTimer);
+        this._loadingTimer = null;
+      }
+      this._loadingTimer = setTimeout(() => {
+        if (this._inFlight && !this._didLoadOnce && !this.hasContent) {
+          this._showLoading = true;
+        }
+      }, 2000);
+    },
+
+    finishLoadingDelay() {
+      this._inFlight = false;
+      this._showLoading = false;
+      if (this._loadingTimer) {
+        clearTimeout(this._loadingTimer);
+        this._loadingTimer = null;
       }
     },
 
@@ -190,6 +230,7 @@ export default {
 
     async loadLog(opts = {}) {
       this.error = null;
+      this.startLoadingDelay();
       try {
         const el = this.$refs.logPane;
         const shouldStick = Boolean(opts.forceScrollToBottom) || this._firstLoad || this.isNearBottom(el);
@@ -212,6 +253,7 @@ export default {
         }
         const raw = await res.text();
         this.logText = this.suppressSections(raw);
+        this._didLoadOnce = true;
 
         await this.$nextTick();
         const el2 = this.$refs.logPane;
@@ -219,6 +261,8 @@ export default {
         this._firstLoad = false;
       } catch (e) {
         this.error = e?.message || String(e);
+      } finally {
+        this.finishLoadingDelay();
       }
     }
   }

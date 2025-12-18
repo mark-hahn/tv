@@ -1,17 +1,10 @@
 
+in flex, qbt, and proc tabs show "Loading ..." instead of No History before cards are loaded.
 
-the tvproc pane says the log is empty but this is the beginning of the log:
+in qbt tab show "Loading ..." instead of No History before cards are loaded.
 
-Tue Dec 16 11:20:01 PM PST 2025
 
->>>>>> 1 s08e14 2025/12/16-23:20:08 -- 2.17GB --
-Cheers.S08E14.1080p.BluRay.x264-BORDURE.mkv
-Cheers.S08E14.1080p.BluRay.x264-BORDURE/
-/mnt/media/tv/Cheers/Season 8/
-download finished: elapsed(mins): 3.2
-***********************************************************
-skipped recent:   1279
-blocked:          1
-downloaded:       1
-elapsed(mins):    3.3
 
+
+in flex, qbt, and proc tabs, after the first request for data is sent wait 2 secs and then show "Loading ...". When response is received at any time then show results immediately. 
+if results are empty after any request then switch msg to "No results."

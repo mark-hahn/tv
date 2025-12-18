@@ -180,9 +180,9 @@ export default {
         { label: 'Actors', key: 'actors' },
         { label: 'Tor', key: 'torrents' },
         { label: 'Flex', key: 'flex' },
-        { label: 'Down', key: 'dlstatus' },
+        { label: 'GET', key: 'dlstatus' },
         { label: 'Qbt', key: 'history' },
-        { label: 'Proc', key: 'tvproc' }
+        { label: 'Down', key: 'tvproc' }
       ];
 
       if (!this.simpleMode) return allTabs;

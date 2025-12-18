@@ -5,33 +5,29 @@ reminder, restore ...
 bugs ...
 
 todo ...
-  rename down?
-  check torrent validity before downloading
-  duplicate files on disk
+  rename down?  Usb ToUsb Get  
+  check torrent files validity before downloading
+    parse-torrent module - missing season or episode
   history of progress for a torrent title
   tvproc cards
   add end date and elapsed to down
-  tvproc errors
   reload when just visible
+    browser or app tab switch
   trigger emby library scan auto and/or button
-  don't force detail torrent page
-  show elapsed time for finished downloads
-  show subtitle files
+  don't force detail torrent tab
+    check for checkmark
+    add Details button
   tvproc control
-  tvdb actors
-
   use minimum from emby
-    shows
-    watched
-    collections
-    favorite?
-  compare & merge tvdd, tmdb, actors
-  episode arrivals (fgh, qBittorrent, tv-proc)
-  add tv guide
-  sort by waiting date
-  keep deleted date forever
-  get drama field from tvdb (as many fields as possible)
-  show waiting for not in emby
+    more from tvdb
+    is tmdb needed
+    compare & merge tvdb, tmdb, actors
+    get drama field from tvdb
+  keep deleted date and watched info forever
+  waiting enhancements
+    sort by waiting date
+    filter waiting
+    add no-emby waiting
 
 non-simple:
   

@@ -176,4 +176,39 @@ Examples:
   3) Only downloading torrents:
      FILTER_TORRENTS = { filter: 'downloading' }
 
+parse-torrent-title fields
+  mandatory ...
+    title (must be truthy/non-empty)
+    season (must be an integer)
+    episode (must be an integer)
+    
+  used ...
+    title (string)
+    year (number)
+    resolution (string)
+    group (string)
+    season (number)
+    episode (number)
+
+  not used ...
+    extended (boolean)
+    unrated (boolean)
+    openmatte (boolean)
+    proper (boolean)
+    repack (boolean)
+    convert (boolean)
+    hardcoded (boolean)
+    remux (boolean)
+    retail (boolean)
+    remastered (boolean)
+    region (string)
+    container (string)
+    source (string)
+    service (string)
+    codec (string)
+    audio (string)
+    channels (number)
+    bitdepth (number)
+    tracker (string)
+    language (string)
 

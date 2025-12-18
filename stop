@@ -1,0 +1,12 @@
+#! /bin/bash
+
+set -euo pipefail
+
+APP_NAME="main"
+BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$BASEDIR"
+
+# Remove the pm2 process so `./run` can start it again cleanly.
+pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
+
+echo "stopped: pm2 process '$APP_NAME' (if it was running)"

@@ -13,9 +13,7 @@ convert to js:
 #  move episode dupes code to this file
 
 debug = false
-
-# Set true to process every 30s instead of 5 minutes.
-FAST_TEST = false
+FAST_TEST = true
 PROCESS_INTERVAL_MS = if FAST_TEST then 30*1000 else 5*60*1000
 
 log = (...x) => 
@@ -51,15 +49,19 @@ fileTimeout = {timeout: 2*60*60*1000} # 2 hours
 fs   = require 'fs-plus'
 util = require 'util'
 
+appendTvLog = (line) ->
+  try
+    fs.appendFileSync 'tv.log', line
+  catch
+    # If logging fails, don't crash processing.
+    return
+
 # --- tv.log buffering -------------------------------------------------------
 # Goal:
 # - Start each processing cycle BUFFERING
 # - After the separator log("***********************************************************") runs,
 #   clear the buffer and start BUFFERING
 # - When we reach "# file passed all block tests, process it": flush buffer and go LIVE
-
-rawStdoutWrite = process.stdout.write.bind(process.stdout)
-rawStderrWrite = process.stderr.write.bind(process.stderr)
 
 buffering = no
 logBuffer = []
@@ -69,7 +71,7 @@ writeLine = (streamName, args) ->
   if buffering
     logBuffer.push [streamName, line]
   else
-    if streamName is 'stdout' then rawStdoutWrite(line) else rawStderrWrite(line)
+    appendTvLog line
 
 startBuffering = ->
   buffering = yes
@@ -82,7 +84,7 @@ clearBuffer = ->
 
 flushBuffer = ->
   for [streamName, line] in logBuffer
-    if streamName is 'stdout' then rawStdoutWrite(line) else rawStderrWrite(line)
+    appendTvLog line
   logBuffer = []
 
 flushAndGoLive = ->
@@ -112,6 +114,11 @@ if process.argv.length == 3
 
 log ".... starting tv.coffee v4 #{filterRegexTxt} ...."
 
+# Declare per-cycle state in outer scope (CoffeeScript scoping is per-function).
+startTime = time = Date.now()
+deleteCount = chkCount = recentCount = 0
+existsCount = errCount = downloadCount = blockedCount = 0
+
 cycleRunning = no
 
 resetCycleState = ->
@@ -132,10 +139,9 @@ runCycle = ->
   resetCycleState()
   process.nextTick delOldFiles
 
-findUsb = "ssh #{usbHost} find files -type f -printf '%CY-%Cm-%Cd-%P-%s\\\\\\n' " + 
-          "| grep -Ev .r[0-9]+-[0-9]+$ | grep -Ev .rar-[0-9]+$ " + 
+findUsb = "ssh #{usbHost} \"find files -ignore_readdir_race -type f -printf '%CY-%Cm-%Cd-%P-%s\\\\n' 2>/dev/null\" " +
+         "| grep -Ev .r[0-9]+-[0-9]+$ | grep -Ev .rar-[0-9]+$ " +
           "| grep -Ev screen[0-9]+.png-[0-9]+$"
-
 if filterRegex
   findUsb += " | grep -i " + filterRegex
 
@@ -218,6 +224,10 @@ request.post 'https://api4.thetvdb.com/v4/login',
 # delete old files in usb/files and entries in tv-recent.json
 
 delOldFiles = =>
+  if FAST_TEST
+    process.nextTick checkFiles
+    return
+
   # prune script deletes files older than 60 days
   log ".... deleting old files in usb ~/files ...."
   res = exec("ssh #{usbHost} /home/xobtlu/prune.sh", 
@@ -263,6 +273,11 @@ checkFiles = =>
 checkFile = () =>
   tvDbErrCount = 0
   if usbLine = usbFiles.shift()
+    # Buffering must suppress output for files that never reach the flush point.
+    # So when we're in buffering mode, keep only the current file's buffered lines.
+    if buffering
+      clearBuffer()
+
     usbLineParts = usbLine.split('-')
     usbFileSize  = usbLineParts.pop()
     usbLine      = usbLineParts.join('-')

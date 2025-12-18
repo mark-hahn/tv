@@ -27,7 +27,11 @@ fi
 
 
 cd "$BASEDIR"
+
+echo "---- compiling CoffeeScript ----"
 coffee -c main.coffee
+
+echo "---- (re)starting under pm2 ----"
 
 # Restart under pm2. Use delete+start so updated JS and optional args are applied.
 if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
@@ -40,8 +44,12 @@ else
   pm2 start "$APP_SCRIPT"
 fi
 
-# Stream logs continuously (Ctrl+C to detach).
-pm2 logs "$APP_NAME"
+# Clear old pm2 logs for this process so the log stream starts fresh.
+echo "---- flushing pm2 logs for $APP_NAME ----"
+pm2 flush "$APP_NAME" || true
+
+echo "---- tailing tv.log (Ctrl+C to detach) ----"
+tail -n 0 -F "$BASEDIR/tv.log"
 
 chmod -R 774  /mnt/media/tv
 chown -R emby /mnt/media/tv

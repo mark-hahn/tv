@@ -15,3 +15,28 @@ this is not correct. do not pay attention to any behavior other thsn the request
 currently is retrieves a list of files from the usb server, processes them and then quits.  change it so it doesn't quit but retrieves and processes the files every five minutes. run it in pm2.  whenever it starts processing keep it in buffer mode and ndo ot start live like it does when the app starts.
 
 create a FAST_TEST constant that when true has it process once every 30 secs instead of 5 mins, for testing
+
+we don't need  extra “file passed all block tests…” log line because when that happens the normal log lines will be logged
+--
+tv.log is read and tailed and trimmed by another app.  so no maintenance of tv.log is needed.
+--
+change name of pm2 process to tv-proc 
+-- 
+only run prune.sh once an hour 
+-- 
+switch from using guessit to using npm module parse-torrent-title. 
+-- 
+delay starting processing until 5 mins (or 30 secs) have elapsed from finishing last processing
+--
+
+add server functionality to app to provide an endpoint for a request to a function startProc(title) which takes a title arg and returns {"status":"ok"} for succes or .   {"status":<error msg>} 
+
+-- startProc() should trigger a new processing cycle. i it is called while already processing then remember the reuest and process it after current one finishes.
+--
+use port 3003
+--
+ the request will come from a browser so handle cors properly 
+--
+write sample code to a file client.js to run in the browser to call the function with fetch.
+
+i removed an entry form tv-recent and it was not processed.  refresh memory contente of tv-recent.json, and any other in-memory copies of files.

@@ -2,11 +2,6 @@
 
 #flex(:style="{ height:'100%', padding:'5px', margin:0, marginLeft:'16px', display:'flex', flexDirection:'column', overflow:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa', fontWeight:'bold' }")
 
-  #header(:style="{ flex:'0 0 auto', backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', marginLeft:'0px', marginRight:'0px', marginTop:'0px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
-    div(style="display:flex; justify-content:space-between; align-items:center;")
-      div(style="margin-left:20px;") Flexget History
-      div(style="margin-right:20px;")
-
   #scroller(ref="scroller" :style="{ flex:'1 1 auto', minHeight:'0px', overflowY:'auto', overflowX:'hidden' }")
     div(v-if="cards.length === 0" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
       span(v-if="emptyStateText") {{ emptyStateText }}

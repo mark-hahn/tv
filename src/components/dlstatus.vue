@@ -2,11 +2,6 @@
 
 #dlstatus(:style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
 
-  #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'15px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
-    div(style="display:flex; justify-content:space-between; align-items:center;")
-      div(style="margin-left:20px;") Downloading
-      div(style="margin-right:20px;")
-
   div(v-if="cards.length === 0" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
     | No files are downloading.
 
@@ -288,7 +283,7 @@ export default {
       const t = card?.torrent || {};
       return this.formatAlignedBox([
         ['State', this.fmtState(t?.state)],
-        ['Down', this.fmtDownloadedOfSizeGb(t?.completed, t?.size)],
+        ['Up', this.fmtDownloadedOfSizeGb(t?.completed, t?.size)],
         ['Speed', this.fmtSpeedGbps(t?.dlspeed)]
       ]);
     },

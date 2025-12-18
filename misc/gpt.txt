@@ -1,5 +1,2 @@
 
-in flex, qbt, and proc tabs, after the first request for data is sent wait 2 secs and then show "Loading ...". When response is received at any time then show results immediately. 
-if results are empty after any request then switch msg to "No results."
-
-in download pane order the cards so new cards are added to the bottom. use the usual scrolling logic such that it starts scrolled to the bottom and only scrolls when starting at the bottom.
+given a torrent file can you determine the list of file names to download?

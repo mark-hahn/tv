@@ -5,12 +5,19 @@ reminder, restore ...
 bugs ...
 
 todo ...
-  trigger emby library scan
+  rename down?
+  check torrent validity before downloading
+  duplicate files on disk
+  history of progress for a torrent title
+  tvproc cards
+  add end date and elapsed to down
+  tvproc errors
+  reload when just visible
+  trigger emby library scan auto and/or button
   don't force detail torrent page
   show elapsed time for finished downloads
   show subtitle files
   tvproc control
-  emby library
   tvdb actors
 
   use minimum from emby

@@ -48,5 +48,3 @@ write sample code to a file client.js to run in the browser to call the function
 
 ==========================================
 
-Sort files by title before processing
-In main.js, checkFiles now sorts by parsed title, then season, then episode.

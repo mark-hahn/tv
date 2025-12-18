@@ -1,0 +1,17 @@
+i undid that because spec changed...
+
+instead of logging lines to tv.log immediately, buffer them and wait until line 238: # file passed all block tests, process it, is reached. then dump buffer to log and start logging live.
+
+after line 299:      log "***********************************************************", is executed clear the buffer and then start buffering again until line 238 is reached.
+
+when app starts don't buffer until line 299 is executed.
+
+
+you said "While buffering:
+if a file gets skipped/blocked/recent/error before passing block tests, its buffered lines are discarded (so they don’t leak into the next flush)."
+
+this is not correct. do not pay attention to any behavior other thsn the requested buffer actions at line 238 and line 299. at 238 you output the buffer to the log and go live. you stay live until line 299 is reached and you start the buffering over again.
+
+currently is retrieves a list of files from the usb server, processes them and then quits.  change it so it doesn't quit but retrieves and processes the files every five minutes. run it in pm2.  whenever it starts processing keep it in buffer mode and ndo ot start live like it does when the app starts.
+
+create a FAST_TEST constant that when true has it process once every 30 secs instead of 5 mins, for testing

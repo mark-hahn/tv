@@ -17,6 +17,11 @@ debug = false
 log = (...x) => 
   if debug
     console.log '\nLOG:', ...x
+  # After the separator line is reached, clear any prior buffered output and
+  # begin buffering until the next file passes block tests.
+  if x?[0] is "***********************************************************"
+    clearBuffer?()
+    startBuffering?()
 err = (...x) => console.error 'error:', ...x  
 sizeStr = (n, {digits=1, base=1000, suffix=""} = {}) ->
   UNITS = ["", "K", "M", "G", "T", "P", "E", "Z", "Y"]
@@ -41,6 +46,49 @@ fileTimeout = {timeout: 2*60*60*1000} # 2 hours
 
 fs   = require 'fs-plus'
 util = require 'util'
+
+# --- tv.log buffering -------------------------------------------------------
+# Goal:
+# - Start LIVE (no buffering)
+# - After the separator log("***********************************************************") runs,
+#   clear the buffer and start BUFFERING
+# - When we reach "# file passed all block tests, process it": flush buffer and go LIVE
+
+rawStdoutWrite = process.stdout.write.bind(process.stdout)
+rawStderrWrite = process.stderr.write.bind(process.stderr)
+
+buffering = no
+logBuffer = []
+
+writeLine = (streamName, args) ->
+  line = util.format(...args) + "\n"
+  if buffering
+    logBuffer.push [streamName, line]
+  else
+    if streamName is 'stdout' then rawStdoutWrite(line) else rawStderrWrite(line)
+
+startBuffering = ->
+  buffering = yes
+
+stopBuffering = ->
+  buffering = no
+
+clearBuffer = ->
+  logBuffer = []
+
+flushBuffer = ->
+  for [streamName, line] in logBuffer
+    if streamName is 'stdout' then rawStdoutWrite(line) else rawStderrWrite(line)
+  logBuffer = []
+
+flushAndGoLive = ->
+  flushBuffer()
+  stopBuffering()
+
+console.log = (...args) -> writeLine 'stdout', args
+console.error = (...args) -> writeLine 'stderr', args
+
+# ---------------------------------------------------------------------------
 exec = require('child_process').execSync
 mkdirp  = require 'mkdirp'
 request = require 'request'
@@ -234,6 +282,11 @@ checkFile = () =>
       log '------', downloadCount,'/', chkCount, 'SKIPPING *ERROR*:', fname
       process.nextTick checkFile
       return
+
+    # file passed all block tests, process it
+
+    flushAndGoLive()
+
     downloadTime = Date.now()
 
     cmd = "guessit -js '#{fname.replace /'|`/g, ''}'"

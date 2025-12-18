@@ -16,8 +16,14 @@ currently is retrieves a list of files from the usb server, processes them and t
 
 create a FAST_TEST constant that when true has it process once every 30 secs instead of 5 mins, for testing
 
-we don't need  extra “file passed all block tests…” log line because when that happens the normal log lines will be logged
+i removed an entry form tv-recent and it was not processed.  refresh memory contente of tv-recent.json, and any other in-memory copies of files.
 --
+only run prune.sh once an hour 
+
+would you recommend switching to use main.js and not use coffeescript any more?
+
+==========================================
+
 tv.log is read and tailed and trimmed by another app.  so no maintenance of tv.log is needed.
 --
 change name of pm2 process to tv-proc 
@@ -26,21 +32,15 @@ switch from using guessit to using npm module parse-torrent-title.
 -- 
 delay starting processing until 5 mins (or 30 secs) have elapsed from finishing last processing
 --
-
-add server functionality to app to provide an endpoint for a request to a function startProc(title) which takes a title arg and returns {"status":"ok"} for succes or .   {"status":<error msg>} 
-
--- startProc() should trigger a new processing cycle. i it is called while already processing then remember the reuest and process it after current one finishes.
+sort files by title before processing
+--
+add server functionality to app to provide an endpoint for a request to a function startProc(title) which takes a title arg and returns {"status":"ok"} for success or {"status":<error msg>} for error.
+-- startProc() should stop processing while waiting for any single file processing to finish, and then it should trigger a new processing cycle where title is processed first before other files.
+--
+if there is no title arg or there is no matching file then just restart the cycle
 --
 use port 3003
 --
  the request will come from a browser so handle cors properly 
 --
 write sample code to a file client.js to run in the browser to call the function with fetch.
-
-
-
-i removed an entry form tv-recent and it was not processed.  refresh memory contente of tv-recent.json, and any other in-memory copies of files.
---
-only run prune.sh once an hour 
-
-would you recommend switching to use main.js and not use coffeescript any more?

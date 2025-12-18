@@ -28,9 +28,6 @@ fi
 
 cd "$BASEDIR"
 
-echo "---- compiling CoffeeScript ----"
-coffee -c main.coffee
-
 echo "---- (re)starting under pm2 ----"
 
 # Restart under pm2. Use delete+start so updated JS and optional args are applied.

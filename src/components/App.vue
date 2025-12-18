@@ -50,6 +50,13 @@
         :activeShow="currentShow"
       )
 
+      Flex(
+        v-if="!simpleMode"
+        v-show="currentPane === 'flex'"
+        :simpleMode="simpleMode"
+        :sizing="simpleMode ? sizing : sizingNonSimple"
+      )
+
       DlStatus(
         v-if="!simpleMode"
         v-show="currentPane === 'dlstatus'"
@@ -78,6 +85,7 @@ import Series   from './series.vue';
 import Map      from './map.vue';
 import Actors   from './actors.vue';
 import Torrents from './torrents.vue';
+import Flex     from './flex.vue';
 import DlStatus from './dlstatus.vue';
 import History  from './history.vue';
 import TvProc   from './tvproc.vue';
@@ -86,12 +94,12 @@ import * as tvdb from '../tvdb.js';
 
 export default {
   name: "App",
-  components: { List, Series, Map, Actors, Torrents, DlStatus, History, TvProc },
+  components: { List, Series, Map, Actors, Torrents, Flex, DlStatus, History, TvProc },
   data() { 
     return { 
       // Must be known before first render so non-simple panes never mount in simple mode.
       simpleMode: new URLSearchParams(window.location.search).has('simple'),
-      currentPane: 'series', // 'series', 'map', 'actors', 'torrents', 'dlstatus', 'history', or 'tvproc'
+      currentPane: 'series', // 'series', 'map', 'actors', 'torrents', 'flex', 'dlstatus', 'history', or 'tvproc'
       currentTvdbData: null,
       currentShow: null,
       _torrentsInitialized: false,
@@ -171,6 +179,7 @@ export default {
         { label: 'Map', key: 'map' },
         { label: 'Actors', key: 'actors' },
         { label: 'Tor', key: 'torrents' },
+        { label: 'Flex', key: 'flex' },
         { label: 'Down', key: 'dlstatus' },
         { label: 'Qbt', key: 'history' },
         { label: 'Proc', key: 'tvproc' }
@@ -219,6 +228,13 @@ export default {
           this.currentPane = 'torrents';
           evtBus.emit('paneChanged', this.currentPane);
         }
+        return;
+      }
+
+      if (k === 'flex') {
+        if (this.simpleMode) return;
+        this.currentPane = 'flex';
+        evtBus.emit('paneChanged', this.currentPane);
         return;
       }
 

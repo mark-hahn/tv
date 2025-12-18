@@ -54,6 +54,19 @@ async function loadQbHostForSsh() {
   return String(qbHost).trim();
 }
 
+async function loadFlexgetOverridesForSsh() {
+  const credPath = resolveCredPath();
+  const text = await fs.readFile(credPath, 'utf8');
+  const creds = parseKeyValueFile(text);
+  const flexgetCmd = (creds.FLEXGET_CMD ?? '').toString().trim();
+  const flexgetBin = (creds.FLEXGET_BIN ?? '').toString().trim();
+  return {
+    flexgetCmd: flexgetCmd || null,
+    flexgetBin: flexgetBin || null,
+    credPath
+  };
+}
+
 function lastNonEmptyLine(text) {
   const lines = String(text ?? '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
   return lines.length ? lines[lines.length - 1] : '';
@@ -231,6 +244,231 @@ export async function spaceAvail() {
     mediaSpaceTotal: Math.trunc(mediaSpaceTotal),
     mediaSpaceUsed: Math.trunc(mediaSpaceUsed)
   };
+}
+
+/**
+ * Runs `flexget history` on the USB server via ssh.
+ * Uses torrents/cookies/qbt-cred.txt QB_HOST (user@host) as the SSH target.
+ * Returns raw stdout (text table).
+ */
+export async function flexgetHistory() {
+  const qbHost = await loadQbHostForSsh();
+
+  const { flexgetCmd, flexgetBin } = await loadFlexgetOverridesForSsh();
+
+  const sshBaseArgs = [
+    '-o',
+    'BatchMode=yes',
+    '-o',
+    'ConnectTimeout=10',
+    '-o',
+    'LogLevel=ERROR',
+    '-o',
+    'StrictHostKeyChecking=no',
+    '-o',
+    'UserKnownHostsFile=/dev/null',
+  ];
+
+  const extractHistoryTable = (text) => {
+    const s = String(text ?? '');
+    if (!s) return { text: '', ok: false };
+
+    // FlexGet renders a table using box drawing chars; when we run via an interactive shell
+    // we may get MOTD/prompt noise. Strip everything before the header.
+    const lines = s.split(/\r?\n/);
+    const isHeaderLine = (line) => {
+      const l = String(line ?? '');
+      if (l.includes('│Task│') || l.includes('|Task|')) return true;
+      // Some installs output without box chars or leading pipes, e.g. "Task   |ipt".
+      return /^\s*Task\s*\|/.test(l);
+    };
+
+    const headerIdx = lines.findIndex(isHeaderLine);
+    if (headerIdx >= 0) return { text: lines.slice(headerIdx).join('\n'), ok: true };
+    return { text: s, ok: false };
+  };
+
+  const runSsh = async (args) => {
+    try {
+      const out = await execFileAsync('ssh', args, {
+        timeout: 30000,
+        maxBuffer: 10 * 1024 * 1024,
+        windowsHide: true
+      });
+      return { stdout: String(out.stdout ?? ''), stderr: String(out.stderr ?? ''), err: null };
+    } catch (e) {
+      const stdout = (e && typeof e === 'object' && 'stdout' in e) ? String(e.stdout ?? '') : '';
+      const stderr = (e && typeof e === 'object' && 'stderr' in e) ? String(e.stderr ?? '') : '';
+      return { stdout, stderr, err: e };
+    }
+  };
+
+  const formatRemoteTail = (stdout, stderr) => {
+    const s = String(stdout ?? '').trim();
+    const e = String(stderr ?? '').trim();
+    const pickTail = (t) => {
+      const lines = String(t ?? '').split(/\r?\n/).filter(Boolean);
+      return lines.slice(Math.max(0, lines.length - 8)).join('\n');
+    };
+    const parts = [];
+    if (s) parts.push(`stdout tail:\n${pickTail(s)}`);
+    if (e) parts.push(`stderr tail:\n${pickTail(e)}`);
+    return parts.join('\n\n');
+  };
+
+  const looksLikeFlexgetNotFound = (stdout, stderr) => {
+    const combined = `${stdout || ''}\n${stderr || ''}`.toLowerCase();
+    return combined.includes('command not found') || combined.includes('flexget not found');
+  };
+
+  // If configured, prefer explicit command or binary path.
+  // - FLEXGET_CMD should be a full command that prints history (e.g. "flexget history").
+  // - FLEXGET_BIN should be an absolute path to the flexget executable (we append "history").
+  if (flexgetCmd || flexgetBin) {
+    const cmdLine = flexgetCmd
+      ? flexgetCmd
+      : `"${flexgetBin.replace(/\"/g, '\\"')}" history`;
+
+    const args = [
+      ...sshBaseArgs,
+      qbHost,
+      'bash',
+      '-lc',
+      `cd "$HOME" || exit 1\n${cmdLine}`
+    ];
+
+    const r = await runSsh(args);
+    if (r.stdout) {
+      const extracted = extractHistoryTable(r.stdout);
+      if (extracted.ok) return extracted.text;
+    }
+    if (r.err) throw r.err;
+    throw new Error(`flexget history did not return expected table header.\n${formatRemoteTail(r.stdout, r.stderr)}`);
+  }
+
+  // Try to find flexget in typical locations; fall back to python module.
+  // Run in a login shell so user PATH/profile is loaded.
+  const remoteScript = [
+    'cd "$HOME" || exit 1',
+    // Common local install used on this box (often exposed via an alias in interactive shells).
+    'if [ -x "$HOME/flexget/bin/flexget" ]; then',
+    '  "$HOME/flexget/bin/flexget" history',
+    '  exit $?',
+    'fi',
+    'FLEXGET_BIN="$(command -v flexget 2>/dev/null || true)"',
+    'if [ -n "$FLEXGET_BIN" ] && [ -x "$FLEXGET_BIN" ]; then',
+    '  "$FLEXGET_BIN" history',
+    '  exit $?',
+    'fi',
+    'if [ -x "$HOME/.local/bin/flexget" ]; then',
+    '  "$HOME/.local/bin/flexget" history',
+    '  exit $?',
+    'fi',
+    'if [ -x "/usr/local/bin/flexget" ]; then',
+    '  "/usr/local/bin/flexget" history',
+    '  exit $?',
+    'fi',
+    'if [ -x "/usr/bin/flexget" ]; then',
+    '  "/usr/bin/flexget" history',
+    '  exit $?',
+    'fi',
+    'if command -v python3 >/dev/null 2>&1; then',
+    '  PY_SCRIPTS="$(python3 -c \'import sysconfig; print(sysconfig.get_path("scripts") or "")\' 2>/dev/null || true)"',
+    '  if [ -n "$PY_SCRIPTS" ] && [ -x "$PY_SCRIPTS/flexget" ]; then',
+    '    "$PY_SCRIPTS/flexget" history',
+    '    exit $?',
+    '  fi',
+    '  PY_USERBASE="$(python3 -c \'import site; print(site.getuserbase() or "")\' 2>/dev/null || true)"',
+    '  if [ -n "$PY_USERBASE" ] && [ -x "$PY_USERBASE/bin/flexget" ]; then',
+    '    "$PY_USERBASE/bin/flexget" history',
+    '    exit $?',
+    '  fi',
+    'fi',
+    'echo "flexget not found (no flexget executable found)" 1>&2',
+    'exit 127'
+  ].join('\n');
+
+  // First, try a non-interactive login shell (clean output).
+  // This will NOT pick up aliases/functions defined only in ~/.bashrc.
+  const argsLogin = [
+    ...sshBaseArgs,
+    qbHost,
+    'bash',
+    '-lc',
+    remoteScript
+  ];
+  const r1 = await runSsh(argsLogin);
+  if (r1.stdout) {
+    const extracted = extractHistoryTable(r1.stdout);
+    if (extracted.ok) return extracted.text;
+  }
+
+  // If that failed due to "flexget not found", fall back to an interactive shell.
+  // This matches the "ssh, then run flexget" behavior you described (loads ~/.bashrc).
+  if (looksLikeFlexgetNotFound(r1.stdout, r1.stderr)) {
+    // Figure out the remote account's login shell; many setups use zsh and only
+    // configure PATH/aliases in interactive rc files.
+    const shellQuery = [
+      'u="$(id -un 2>/dev/null || echo "$USER")"',
+      // Prefer getent, but fall back to /etc/passwd to avoid dependency on getent.
+      'sh="$(getent passwd "$u" 2>/dev/null | cut -d: -f7)"',
+      'if [ -z "$sh" ] && [ -r /etc/passwd ]; then',
+      '  sh="$(awk -F: -v u="$u" \"$1==u{print $7}\" /etc/passwd 2>/dev/null | head -n 1)"',
+      'fi',
+      'printf "%s" "$sh"'
+    ].join('\n');
+
+    const shellQueryArgs = [
+      ...sshBaseArgs,
+      qbHost,
+      'sh',
+      '-lc',
+      shellQuery
+    ];
+
+    const shellRes = await runSsh(shellQueryArgs);
+    const shellPath = String(shellRes.stdout ?? '').trim();
+    const shellName = shellPath ? path.posix.basename(shellPath) : 'bash';
+
+    const interactiveScript = [
+      // Suppress prompt/noise as much as possible.
+      'export PS1=""',
+      'export PROMPT_COMMAND=""',
+      'export PROMPT=""',
+      'cd "$HOME" || exit 1',
+      'if [ -x "$HOME/flexget/bin/flexget" ]; then "$HOME/flexget/bin/flexget" history; else flexget history; fi'
+    ].join('\n');
+
+    // Prefer the user's actual shell if it supports login+interactive modes.
+    // For bash/zsh, use -ilc to approximate an actual interactive login session.
+    const shellToRun = shellName || 'bash';
+    const shellArgs = (shellToRun === 'zsh' || shellToRun === 'bash')
+      ? ['-ilc', interactiveScript]
+      : ['-ic', interactiveScript];
+
+    const argsInteractive = [
+      ...sshBaseArgs,
+      // Force a pseudo-tty so interactive rc files are loaded and job control warnings are avoided.
+      '-tt',
+      qbHost,
+      shellToRun,
+      ...shellArgs
+    ];
+
+    const r2 = await runSsh(argsInteractive);
+    if (r2.stdout) {
+      const extracted = extractHistoryTable(r2.stdout);
+      if (extracted.ok) return extracted.text;
+    }
+    if (r2.err) {
+      throw new Error(`flexget history ssh (interactive) failed.\n${formatRemoteTail(r2.stdout, r2.stderr)}`);
+    }
+  }
+
+  if (r1.err) {
+    throw new Error(`flexget history ssh (login) failed.\n${formatRemoteTail(r1.stdout, r1.stderr)}`);
+  }
+  throw new Error(`flexget history did not return expected table header.\n${formatRemoteTail(r1.stdout, r1.stderr)}`);
 }
 
 function getSetCookieHeader(headers) {

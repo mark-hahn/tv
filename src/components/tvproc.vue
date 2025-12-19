@@ -16,9 +16,16 @@
     div(v-if="emptyStateText") {{ emptyStateText }}
 
   div(v-else ref="scroller" :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'hidden', background:'#fff', border:'1px solid #ddd', borderRadius:'5px', fontFamily:'sans-serif', fontSize:'14px', fontWeight:'normal' }")
-    div(v-for="(it, idx) in orderedItems" :key="it?.path || it?.title || idx" style="border:1px solid #ddd; border-radius:8px; padding:10px; margin-bottom:10px; background:#fff;")
-      div(style="font-weight:bold; font-size:16px;") {{ it.title || '(no title)' }}
-      div(style="margin-top:4px; color:#333; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;") {{ fmtLine2(it) }}
+    div(v-for="(it, idx) in orderedItems" :key="(it?.sequence ?? it?.path ?? it?.title ?? idx)" style="border:1px solid #ddd; border-radius:8px; padding:10px; margin-bottom:10px; background:#fff;")
+      div(style="font-weight:bold; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;")
+        span(v-if="it?.sequence !== undefined && it?.sequence !== null" style="color:blue !important;") {{ it.sequence }})
+        span(v-if="it?.sequence !== undefined && it?.sequence !== null") &nbsp;
+        span {{ it.title || '(no title)' }}
+      div(style="margin-top:4px; color:#333; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;")
+        span(v-if="line2(it).seasonEpisode" style="color:blue !important;") {{ line2(it).seasonEpisode }}
+        span(v-if="line2(it).rest")
+          span(v-if="line2(it).seasonEpisode") ,&nbsp;
+          span {{ line2(it).rest }}
 
 </template>
 
@@ -188,7 +195,22 @@ export default {
       return `${gb.toFixed(3)} GB`;
     },
 
-    fmtLine2(it) {
+    fmtElapsedMmSs(seconds) {
+      const n = Number(seconds);
+      if (!Number.isFinite(n) || n < 0) return '';
+      const mins = Math.floor(n / 60);
+      const secs = Math.floor(n % 60);
+      return `${mins}:${String(secs).padStart(2, '0')}`;
+    },
+
+    elapsedSeconds(it) {
+      const started = Number(it?.dateStarted);
+      const ended = Number(it?.dateEnded);
+      if (!Number.isFinite(started) || !Number.isFinite(ended)) return null;
+      return Math.max(0, ended - started);
+    },
+
+    line2(it) {
       const s = Number(it?.season);
       const e = Number(it?.episode);
       const seasonEpisode = Number.isFinite(s) && Number.isFinite(e) ? `S${s}:E${e}` : '';
@@ -199,24 +221,25 @@ export default {
       const status = String(it?.status || '').trim();
 
       const parts = [];
-      if (seasonEpisode) parts.push(seasonEpisode);
       if (size) parts.push(size);
       if (started) parts.push(started);
 
       if (status === 'finished') {
         if (ended) parts.push(ended);
+        const elapsed = this.fmtElapsedMmSs(this.elapsedSeconds(it));
+        if (elapsed) parts.push(elapsed);
         parts.push('Finished');
-        return parts.join(', ');
+        return { seasonEpisode, rest: parts.join(', ') };
       }
 
       if (status === 'downloading') {
         parts.push('Downloading');
-        return parts.join(', ');
+        return { seasonEpisode, rest: parts.join(', ') };
       }
 
       if (ended) parts.push(ended);
       if (status) parts.push(status);
-      return parts.join(', ');
+      return { seasonEpisode, rest: parts.join(', ') };
     },
 
     async trimLog() {

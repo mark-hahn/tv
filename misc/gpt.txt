@@ -46,10 +46,19 @@ When ended the second line should be "S<season>:E<episode>, <size in format 0.12
 
 ======================================================
 
+in tvproc:
 reduce title font-size to 14px.
 when Finished add elapsed download time <mins:secs> to info line before "Finished".
 the json object now has a "sequence" property in file object. it should appear before title in first line as <seq> <title>.
 <seq> and "S<season>:E<episode> should be color blue.
 
+======================================================
 
+<seq> and "S<season>:E<episode> should be color blue.
+
+======================================================
+
+add paren after sequence number, also blue
+
+======================================================
 

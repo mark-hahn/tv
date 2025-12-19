@@ -8,12 +8,13 @@ untested ...
   check torrent files validity before downloading
 
 todo ...
+  tvproc control - force get
+  abort qbt downloading
   history of progress for a torrent title
   tvproc cards
   reload when just visible
     browser or app tab switch
   trigger emby library scan auto and/or button
-  tvproc control
   use minimum from emby
     more from tvdb
     is tmdb needed
@@ -24,7 +25,6 @@ todo ...
     sort by waiting date
     filter waiting
     add no-emby waiting
-  abort qbt downloading
 
 non-simple:
   

@@ -16,7 +16,7 @@
     div(v-if="emptyStateText") {{ emptyStateText }}
 
   div(v-else ref="scroller" :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'hidden', background:'#fff', border:'1px solid #ddd', borderRadius:'5px', fontFamily:'sans-serif', fontSize:'14px', fontWeight:'normal' }")
-    div(v-for="(it, idx) in orderedItems" :key="(it?.sequence ?? it?.path ?? it?.title ?? idx)" style="border:1px solid #ddd; border-radius:8px; padding:10px; margin-bottom:10px; background:#fff;")
+    div(v-for="(it, idx) in orderedItems" :key="idx" style="border:1px solid #ddd; border-radius:8px; padding:10px; margin-bottom:10px; background:#fff;")
       div(style="font-weight:bold; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;")
         span(v-if="it?.sequence !== undefined && it?.sequence !== null" style="color:blue !important;") {{ it.sequence }})
         span(v-if="it?.sequence !== undefined && it?.sequence !== null") &nbsp;
@@ -74,21 +74,8 @@ export default {
     },
 
     orderedItems() {
-      const arr = Array.isArray(this.items) ? this.items.slice() : [];
-      arr.sort((a, b) => {
-        const aStart = Number(a?.dateStarted) || 0;
-        const bStart = Number(b?.dateStarted) || 0;
-        if (aStart !== bStart) return aStart - bStart;
-
-        const aEnd = Number(a?.dateEnded) || 0;
-        const bEnd = Number(b?.dateEnded) || 0;
-        if (aEnd !== bEnd) return aEnd - bEnd;
-
-        const at = String(a?.title || '');
-        const bt = String(b?.title || '');
-        return at.localeCompare(bt);
-      });
-      return arr;
+      // Render in the exact array order returned by /api/tvproc.
+      return Array.isArray(this.items) ? this.items : [];
     }
   },
 

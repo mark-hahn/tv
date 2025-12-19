@@ -119,3 +119,6 @@ divider did not appear -- also make sure divider has no margins
 
 ======================================================
 
+arrow buttons broken in actors pane
+--
+  tvproc control - force get

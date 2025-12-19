@@ -4,7 +4,7 @@
 
   #header(:style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', marginLeft:'0px', marginRight:'0px', marginTop:'0px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
     div(style="display:flex; justify-content:space-between; align-items:center;")
-      div(style="margin-left:20px;") TV Proc
+      div(style="margin-left:20px;") Downloading
       div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
         button(@click.stop="trimLog" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Trim
         button(@click.stop="clearLog" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Clear
@@ -18,7 +18,7 @@
   div(v-else ref="scroller" :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'hidden', background:'#fff', border:'1px solid #ddd', borderRadius:'5px', fontFamily:'sans-serif', fontSize:'14px', fontWeight:'normal' }")
     template(v-for="(it, idx) in orderedItems" :key="idx")
       div(v-if="idx > 0 && Number(it?.sequence) === 1" style="margin:0; padding:0; line-height:14px; white-space:nowrap; overflow:hidden; font-family:monospace;") ====================================================================================================
-      div(style="border:1px solid #ddd; border-radius:8px; padding:10px; margin-bottom:10px; background:#fff;")
+      div(style="border:1px solid #ddd; border-radius:8px; padding:10px; background:#fff;")
         div(style="font-weight:bold; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;")
           span(v-if="it?.sequence !== undefined && it?.sequence !== null" style="color:blue !important;") {{ it.sequence }})
           span(v-if="it?.sequence !== undefined && it?.sequence !== null") &nbsp;

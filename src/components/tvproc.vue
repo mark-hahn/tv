@@ -186,7 +186,8 @@ export default {
       this._libBusy = false;
       this._libTaskId = null;
       if (res?.status === 'refreshdone') {
-        this.libraryProgressText = '';
+        // Always keep a completion indicator; only clear on a fresh pane load.
+        this.libraryProgressText = '100%';
       } else if (res?.status) {
         this.libraryProgressText = String(res.status);
       }

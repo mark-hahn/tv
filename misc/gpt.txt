@@ -160,3 +160,9 @@ while taskStatus(<task id>) is being called the button "Library" should do nothi
 
 when showing progress to the left of the Library button do not remove 100% msg when finished. remove it on fresh pane load.
 
+======================================================
+
+progress to the left of the Library button still disappears when finished
+
+======================================================
+

@@ -4,12 +4,17 @@ reminder, restore ...
 
 bugs ...
   a noemby map episode cell sometimes shows + which is impossible since plus means file is avaialbe in emby (Chuck)
+  get cards wrong order
 
 untested ...
   check torrent files validity before downloading
 
 todo ...
-  
+  after lib refresh reload all emby data like map
+  in tvproc change Downloading to Downloads
+  tvproc download progress
+  add elapsed to qbt card
+  1/5 looks too much like 1-5
   tvproc control - force get
   add secs to qbt card
   abort qbt downloading

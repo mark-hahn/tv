@@ -3,5 +3,5 @@ todo ...
   lazy-login to thetvdb
   title parsed dupes
   restart cycle no delay
-  encrypt
   
+  smart check duplicate files on disk - parse title

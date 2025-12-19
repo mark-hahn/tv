@@ -1,1 +1,13 @@
-[{"localPath":"/mnt/media/tv/Cheers/Season 1/","title":"Cheers.S01E07.Friends,.Romans.and.Accountants.1080p.WEB-DL.AAC2.0.H.264-NTb.mkv","status":"finished","dateEnded":1766104656,"fileSize":928751564},{"localPath":"/mnt/media/tv/Cheers/Season 1/","title":"Cheers.S01E08.Truce.or.Consequences.1080p.WEB-DL.AAC2.0.H.264-NTb.mkv","status":"finished","fileSize":910426640,"season":1,"episode":8,"dateStarted":1766104659,"dateEnded":1766104739},{"localPath":"/mnt/media/tv/Cheers/Season 1/","title":"Cheers.S01E09.Coach.Returns.to.Action.1080p.WEB-DL.AAC2.0.H.264-NTb.mkv","status":"finished","fileSize":946937120,"season":1,"episode":9,"dateStarted":1766104742,"dateEnded":1766104826},{"localPath":"/mnt/media/tv/Cheers/Season 1/","title":"Cheers.S01E10.Endless.Slumper.1080p.WEB-DL.AAC2.0.H.264-NTb.mkv","status":"finished","fileSize":933137600,"season":1,"episode":10,"dateStarted":1766104829,"dateEnded":1766104913},{"localPath":"/mnt/media/tv/Cheers/Season 1/","title":"Cheers.S01E11.One.for.the.Book.1080p.WEB-DL.AAC2.0.H.264-NTb.mkv","status":"downloading","fileSize":870028949,"season":1,"episode":11,"dateStarted":1766104916}]
+[
+  {
+    "localPath": "/mnt/media/tv/Cheers/Season 11/",
+    "title": "Cheers.S11E04.1080p.HEVC.x265-MeGusta.mkv",
+    "status": "finished",
+    "sequence": 1,
+    "fileSize": 220969134,
+    "season": 11,
+    "episode": 4,
+    "dateStarted": 1766108798,
+    "dateEnded": 1766108821
+  }
+]

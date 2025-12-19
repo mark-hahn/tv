@@ -89,3 +89,9 @@ when a cycle that included a download finishes restart a new cycle immediately. 
 --
 Change delay from 5 mins to 2 mins.
 
+==========================================
+
+add "sequence" number property to object.  it should start with 1 and increment every file. it should reset to 1 on cycle start
+
+==========================================
+

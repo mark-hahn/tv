@@ -8,13 +8,13 @@ untested ...
   check torrent files validity before downloading
 
 todo ...
-  add secs to qbt card
   tvproc control - force get
+
+  add secs to qbt card
   abort qbt downloading
   history of progress for a torrent title
   reload when just visible
     browser or app tab switch
-  trigger emby library scan auto and/or button
   use minimum from emby
     more from tvdb
     is tmdb needed

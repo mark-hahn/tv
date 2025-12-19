@@ -120,5 +120,24 @@ divider did not appear -- also make sure divider has no margins
 ======================================================
 
 arrow buttons broken in actors pane
---
-  tvproc control - force get
+
+======================================================
+
+it is no-emby but they should still work -- 
+when i click on arrow the hdr msg changes from Regulars to Guests, the input boxes don't change, and the actors list doesn't change. T 
+when i click on guest button the actors do change.
+when i change an number in the input box and press enter it does work.
+
+======================================================
+
+for noemby shows you can build an Emby episode map -- the map pane does it for noemby
+
+======================================================
+
+in tvproc pane add button Library to left of Trim.
+button shoukd tell emby to reload it's library using 
+
+
+
+   trigger emby library scan auto and/or button
+

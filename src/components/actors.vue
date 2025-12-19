@@ -43,6 +43,7 @@
 import Actor from './actor.vue';
 import evtBus from '../evtBus.js';
 import * as emby from '../emby.js';
+import * as tvdb from '../tvdb.js';
 import * as util from '../util.js';
 import * as srvr from '../srvr.js';
 
@@ -73,6 +74,9 @@ export default {
       errorMessage: '',
       isGuestMode: false,
       showingEpisodeActors: false, // Track if we're showing episode actors
+      _seriesMapInForArrows: null,
+      _seriesMapInForArrowsShowKey: null,
+      _seriesMapInForArrowsPromise: null,
       _onShowActors: null,
       _onFillAndSelectEpisode: null,
       _onResetActorsPane: null
@@ -86,6 +90,12 @@ export default {
   },
 
   methods: {
+    normPosIntStr(v) {
+      const n = parseInt(String(v ?? '').trim(), 10);
+      if (!Number.isFinite(n) || n <= 0) return '';
+      return String(n);
+    },
+
     ensureEpisodeInputs() {
       if (!String(this.seasonNum || '').trim()) this.seasonNum = '1';
       if (!String(this.episodeNum || '').trim()) this.episodeNum = '1';
@@ -101,6 +111,43 @@ export default {
       this.errorMessage = '';
       this.isGuestMode = false;
       this.showingEpisodeActors = false;
+
+      this._seriesMapInForArrows = null;
+      this._seriesMapInForArrowsShowKey = null;
+      this._seriesMapInForArrowsPromise = null;
+    },
+
+    prefetchSeriesMapForArrows() {
+      const show = this.currentShow;
+      if (!show) return;
+      const showKey = show?.Id || show?.Name || null;
+      if (!showKey) return;
+
+      // Only prefetch for noemby shows to avoid extra load.
+      if (!String(show?.Id || '').startsWith('noemby-')) return;
+
+      if (this._seriesMapInForArrowsShowKey === showKey && (this._seriesMapInForArrows || this._seriesMapInForArrowsPromise)) {
+        return;
+      }
+
+      this._seriesMapInForArrowsShowKey = showKey;
+      this._seriesMapInForArrows = null;
+      this._seriesMapInForArrowsPromise = (async () => {
+        try {
+          const in2 = await tvdb.getSeriesMap(show);
+          if (this._seriesMapInForArrowsShowKey === showKey) {
+            this._seriesMapInForArrows = Array.isArray(in2) ? in2 : [];
+          }
+        } catch {
+          if (this._seriesMapInForArrowsShowKey === showKey) {
+            this._seriesMapInForArrows = [];
+          }
+        } finally {
+          if (this._seriesMapInForArrowsShowKey === showKey) {
+            this._seriesMapInForArrowsPromise = null;
+          }
+        }
+      })();
     },
     handleMapButton() {
       const show = this.currentShow;
@@ -193,6 +240,39 @@ export default {
       this.actors = [...this.seriesActors];
     },
 
+    async getSeriesMapInForArrows(show) {
+      if (!show) return [];
+      const showKey = show?.Id || show?.Name || null;
+
+      // Use cached/prefetched TVDB map for noemby.
+      if (String(show?.Id || '').startsWith('noemby-') && showKey && this._seriesMapInForArrowsShowKey === showKey) {
+        if (Array.isArray(this._seriesMapInForArrows) && this._seriesMapInForArrows.length) {
+          return this._seriesMapInForArrows;
+        }
+        if (this._seriesMapInForArrowsPromise) {
+          await this._seriesMapInForArrowsPromise;
+          if (Array.isArray(this._seriesMapInForArrows) && this._seriesMapInForArrows.length) {
+            return this._seriesMapInForArrows;
+          }
+        }
+      }
+      // Prefer Emby when available, but for noemby (and other failures),
+      // fall back to TVDB (same strategy as map pane).
+      try {
+        const in1 = await emby.getSeriesMap(show);
+        if (in1 && in1.length) return in1;
+      } catch {
+        // ignore
+      }
+      try {
+        const in2 = await tvdb.getSeriesMap(show);
+        if (in2 && in2.length) return in2;
+      } catch {
+        // ignore
+      }
+      return [];
+    },
+
     async handleLeftArrow() {
       if (!this.currentShow) return;
 
@@ -202,11 +282,25 @@ export default {
       if (!this.seasonNum || !this.episodeNum) {
         await this.prefillEpisodeInputs();
       }
+      this.ensureEpisodeInputs();
+      this.seasonNum = this.normPosIntStr(this.seasonNum);
+      this.episodeNum = this.normPosIntStr(this.episodeNum);
       if (!this.seasonNum || !this.episodeNum) return;
 
       try {
-        const seriesMapIn = await emby.getSeriesMap(this.currentShow);
+        const seriesMapIn = await this.getSeriesMapInForArrows(this.currentShow);
         if (!seriesMapIn || seriesMapIn.length === 0) {
+          // Last-resort fallback: decrement episode.
+          const curS = Number(this.seasonNum);
+          const curE = Number(this.episodeNum);
+          if (!Number.isFinite(curS) || !Number.isFinite(curE)) return;
+          if (curS <= 1 && curE <= 1) return;
+          if (curE > 1) this.episodeNum = String(curE - 1);
+          else {
+            this.seasonNum = String(Math.max(1, curS - 1));
+            this.episodeNum = '1';
+          }
+          await this.handleGuestClick();
           return;
         }
         
@@ -229,15 +323,17 @@ export default {
         }
         
         // Find current episode index
+        const curS = Number(this.seasonNum);
+        const curE = Number(this.episodeNum);
         const currentIndex = allEpisodes.findIndex(
-          ep => ep.season === this.seasonNum && ep.episode === this.episodeNum
+          (ep) => Number(ep.season) === curS && Number(ep.episode) === curE
         );
         
         if (currentIndex > 0) {
           // Go to previous episode
           const prevEpisode = allEpisodes[currentIndex - 1];
-          this.seasonNum = prevEpisode.season;
-          this.episodeNum = prevEpisode.episode;
+          this.seasonNum = this.normPosIntStr(prevEpisode.season);
+          this.episodeNum = this.normPosIntStr(prevEpisode.episode);
           await this.handleGuestClick();
         }
       } catch (error) {
@@ -254,11 +350,21 @@ export default {
       if (!this.seasonNum || !this.episodeNum) {
         await this.prefillEpisodeInputs();
       }
+      this.ensureEpisodeInputs();
+      this.seasonNum = this.normPosIntStr(this.seasonNum);
+      this.episodeNum = this.normPosIntStr(this.episodeNum);
       if (!this.seasonNum || !this.episodeNum) return;
 
       try {
-        const seriesMapIn = await emby.getSeriesMap(this.currentShow);
+        const seriesMapIn = await this.getSeriesMapInForArrows(this.currentShow);
         if (!seriesMapIn || seriesMapIn.length === 0) {
+          // Last-resort fallback: increment episode.
+          const curS = Number(this.seasonNum);
+          const curE = Number(this.episodeNum);
+          if (!Number.isFinite(curS) || !Number.isFinite(curE)) return;
+          this.seasonNum = String(curS);
+          this.episodeNum = String(Math.min(99, curE + 1));
+          await this.handleGuestClick();
           return;
         }
         
@@ -281,15 +387,17 @@ export default {
         }
         
         // Find current episode index
+        const curS = Number(this.seasonNum);
+        const curE = Number(this.episodeNum);
         const currentIndex = allEpisodes.findIndex(
-          ep => ep.season === this.seasonNum && ep.episode === this.episodeNum
+          (ep) => Number(ep.season) === curS && Number(ep.episode) === curE
         );
         
         if (currentIndex >= 0 && currentIndex < allEpisodes.length - 1) {
           // Go to next episode
           const nextEpisode = allEpisodes[currentIndex + 1];
-          this.seasonNum = nextEpisode.season;
-          this.episodeNum = nextEpisode.episode;
+          this.seasonNum = this.normPosIntStr(nextEpisode.season);
+          this.episodeNum = this.normPosIntStr(nextEpisode.episode);
           await this.handleGuestClick();
         }
       } catch (error) {
@@ -412,6 +520,10 @@ export default {
   mounted() {
     this._onShowActors = (data) => {
       this.updateActors(data);
+
+      // For noemby shows, start loading the series map immediately so
+      // arrow navigation doesn't wait on TVDB later.
+      this.prefetchSeriesMapForArrows();
 
       // Reset to series actors view
       this.isGuestMode = false;

@@ -112,3 +112,10 @@ S11:E4, 0.221 GB, 12/18 17:46, 12/18 17:47, 0:23, Finished
 ======================================================
 
 put a row of = between cards when second card has sequence 1
+
+======================================================
+
+divider did not appear -- also make sure divider has no margins
+
+======================================================
+

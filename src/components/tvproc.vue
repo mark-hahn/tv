@@ -16,16 +16,18 @@
     div(v-if="emptyStateText") {{ emptyStateText }}
 
   div(v-else ref="scroller" :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'hidden', background:'#fff', border:'1px solid #ddd', borderRadius:'5px', fontFamily:'sans-serif', fontSize:'14px', fontWeight:'normal' }")
-    div(v-for="(it, idx) in orderedItems" :key="idx" style="border:1px solid #ddd; border-radius:8px; padding:10px; margin-bottom:10px; background:#fff;")
-      div(style="font-weight:bold; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;")
-        span(v-if="it?.sequence !== undefined && it?.sequence !== null" style="color:blue !important;") {{ it.sequence }})
-        span(v-if="it?.sequence !== undefined && it?.sequence !== null") &nbsp;
-        span {{ it.title || '(no title)' }}
-      div(style="margin-top:4px; color:#333; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;")
-        span(v-if="line2(it).seasonEpisode" style="color:blue !important;") {{ line2(it).seasonEpisode }}
-        span(v-if="line2(it).rest")
-          span(v-if="line2(it).seasonEpisode") ,&nbsp;
-          span {{ line2(it).rest }}
+    template(v-for="(it, idx) in orderedItems" :key="idx")
+      div(v-if="idx > 0 && Number(it?.sequence) === 1" style="margin:0; padding:0; line-height:14px; white-space:nowrap; overflow:hidden; font-family:monospace;") ====================================================================================================
+      div(style="border:1px solid #ddd; border-radius:8px; padding:10px; margin-bottom:10px; background:#fff;")
+        div(style="font-weight:bold; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;")
+          span(v-if="it?.sequence !== undefined && it?.sequence !== null" style="color:blue !important;") {{ it.sequence }})
+          span(v-if="it?.sequence !== undefined && it?.sequence !== null") &nbsp;
+          span {{ it.title || '(no title)' }}
+        div(style="margin-top:4px; color:#333; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;")
+          span(v-if="line2(it).seasonEpisode" style="color:blue !important;") {{ line2(it).seasonEpisode }}
+          span(v-if="line2(it).rest")
+            span(v-if="line2(it).seasonEpisode") ,&nbsp;
+            span {{ line2(it).rest }}
 
 </template>
 

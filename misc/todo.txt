@@ -3,13 +3,14 @@ reminder, restore ...
   start gap running
 
 bugs ...
+  a noemby map episode cell sometimes shows + which is impossible since plus means file is avaialbe in emby (Chuck)
 
 untested ...
   check torrent files validity before downloading
 
 todo ...
+  
   tvproc control - force get
-
   add secs to qbt card
   abort qbt downloading
   history of progress for a torrent title

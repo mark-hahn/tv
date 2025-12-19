@@ -134,10 +134,29 @@ for noemby shows you can build an Emby episode map -- the map pane does it for n
 
 ======================================================
 
-in tvproc pane add button Library to left of Trim.
-button shoukd tell emby to reload it's library using 
+in src/emby.js add a function refreshLib() that takes no args and starts refreshing emby's library using the api POST "/emby/Library/Refresh".
+--
+then if available, use the emby api endpoint: GET "/emby/ScheduledTasks?api_key=<key>" to get a task list. if it finds a task in the list like “Scan Media Library” or “Refresh Media Library”, refreshLib() should return the id, key, hash, etc, as {"status":"hasTask", "taskId":<task id>}. if not then return {"status":"notask"}.
+--
+add a second function to src/emby.js, taskStatus(<task id>), that takes <task id> arg and returns status.
+--
+taskStatus() works by refreshing task list and returning the status from status list entry <task id> if available, using {"status":"refreshing", "taskStatus":<scheduled-task status>}. if there is a progress value like CurrentProgressPercentage return {"status":"refreshing", "progress":<progress>}. 
+--
+if the task list doesn't have a <task id> entry any more, or the state/progress has flipped back to idle, or progress is finished, then taskStatus() returns {"status":"refreshdone"}.
+--
+if there is an error in any call return {"status":"<error>"} 
+--
+in tvproc pane add button "Library" to left of Trim.
+--
+Library button should call refreshLib() and if it gets {"status":"notask"} or {"status":"<error>"} then the library refresh logic is done.
+--
+if it returns {"status":"hasTask", "taskId":<task id>} then taskStatus(<task id>) is repeatedly called with a delay of 2 secs between each call and the previous return result. It keeps calling and showing progress to the left of the Library button until {"status":"refreshdone"} or {status":"<error>"} is returned.
+-
+if the pane is reloaded the progress display should be cleared
+--
+while taskStatus(<task id>) is being called the button "Library" should do nothing.
 
+======================================================
 
-
-   trigger emby library scan auto and/or button
+when showing progress to the left of the Library button do not remove 100% msg when finished. remove it on fresh pane load.
 

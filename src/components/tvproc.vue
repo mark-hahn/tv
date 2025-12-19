@@ -6,6 +6,8 @@
     div(style="display:flex; justify-content:space-between; align-items:center;")
       div(style="margin-left:20px;") Downloading
       div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
+        div(v-if="libraryProgressText" style="align-self:center; font-size:13px; color:#555; white-space:nowrap;") {{ libraryProgressText }}
+        button(@click.stop="startLibraryRefresh" :disabled="_libBusy" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Library
         button(@click.stop="trimLog" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Trim
         button(@click.stop="clearLog" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Clear
 
@@ -34,6 +36,7 @@
 <script>
 import evtBus from '../evtBus.js';
 import { config } from '../config.js';
+import * as emby from '../emby.js';
 
 export default {
   name: 'TvProc',
@@ -54,6 +57,10 @@ export default {
       items: [],
       error: null,
       _pollTimer: null,
+      _libPollTimer: null,
+      _libBusy: false,
+      _libTaskId: null,
+      libraryProgressText: '',
       _active: false,
       _firstLoad: false,
       _didLoadOnce: false,
@@ -88,6 +95,7 @@ export default {
   unmounted() {
     evtBus.off('paneChanged', this.onPaneChanged);
     this.stopPolling();
+    this.stopLibraryPolling();
     this.items = [];
     this.error = null;
   },
@@ -97,11 +105,16 @@ export default {
       const active = pane === 'tvproc';
       this._active = active;
       if (active) {
+        this.stopLibraryPolling();
+        this.libraryProgressText = '';
+        this._libTaskId = null;
+        this._libBusy = false;
         this._firstLoad = true;
         void this.loadTvproc();
         this.scheduleNextPoll(5000);
       } else {
         this.stopPolling();
+        this.stopLibraryPolling();
       }
     },
 
@@ -115,6 +128,67 @@ export default {
       if (this._loadingTimer) {
         clearTimeout(this._loadingTimer);
         this._loadingTimer = null;
+      }
+    },
+
+    stopLibraryPolling() {
+      if (this._libPollTimer) {
+        clearTimeout(this._libPollTimer);
+        this._libPollTimer = null;
+      }
+    },
+
+    async startLibraryRefresh() {
+      if (this._libBusy) return;
+
+      this.stopLibraryPolling();
+      this.libraryProgressText = '';
+      this._libTaskId = null;
+      this._libBusy = true;
+
+      const res = await emby.refreshLib();
+      if (res?.status === 'hasTask') {
+        this._libTaskId = res.taskId;
+        this.libraryProgressText = 'Refreshing...';
+        void this.pollLibraryStatus();
+        return;
+      }
+
+      this._libBusy = false;
+      if (res?.status && res.status !== 'notask') {
+        this.libraryProgressText = String(res.status);
+      }
+    },
+
+    async pollLibraryStatus() {
+      if (!this._libTaskId) {
+        this._libBusy = false;
+        return;
+      }
+
+      const res = await emby.taskStatus(this._libTaskId);
+      if (res?.status === 'refreshing') {
+        if (Number.isFinite(Number(res?.progress))) {
+          this.libraryProgressText = `${Number(res.progress).toFixed(0)}%`;
+        } else if (res?.taskStatus) {
+          this.libraryProgressText = String(res.taskStatus);
+        } else {
+          this.libraryProgressText = 'Refreshing...';
+        }
+
+        this._libPollTimer = setTimeout(() => {
+          if (!this._active) return;
+          void this.pollLibraryStatus();
+        }, 2000);
+        return;
+      }
+
+      this._libBusy = false;
+      this._libTaskId = null;
+      if (res?.status === 'refreshdone') {
+        this.libraryProgressText = '';
+      } else if (res?.status) {
+        this.libraryProgressText = String(res.status);
       }
     },
 

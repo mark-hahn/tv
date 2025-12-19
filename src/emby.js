@@ -750,3 +750,63 @@ export const afterLastWatched = async (showId) => {
   }
   return {status: 'allWatched'};
 }
+
+export const refreshLib = async () => {
+  try {
+    await axios({
+      method: 'post',
+      url: `https://hahnca.com:8920/emby/Library/Refresh?api_key=${apiKey}`
+    });
+
+    const tasksRes = await axios({
+      method: 'get',
+      url: `https://hahnca.com:8920/emby/ScheduledTasks?api_key=${apiKey}`
+    });
+
+    const tasks = Array.isArray(tasksRes?.data) ? tasksRes.data : [];
+    const isLibraryRefreshTask = (t) => {
+      const n = String(t?.Name || '').toLowerCase();
+      // Emby task names vary a bit across versions/translations.
+      // Keep this intentionally broad but scoped to "library" + (scan|refresh).
+      if (!n.includes('library')) return false;
+      if (n.includes('scan') || n.includes('refresh')) return true;
+      // Common variants seen in some builds.
+      return /scan\s+media\s+library|refresh\s+media\s+library|scan\s+library|refresh\s+library/.test(n);
+    };
+
+    const task = tasks.find(isLibraryRefreshTask);
+    if (!task?.Id) return { status: 'notask' };
+    return { status: 'hasTask', taskId: task.Id };
+  } catch (e) {
+    return { status: e?.message || String(e) };
+  }
+};
+
+export const taskStatus = async (taskId) => {
+  try {
+    const tasksRes = await axios({
+      method: 'get',
+      url: `https://hahnca.com:8920/emby/ScheduledTasks?api_key=${apiKey}`
+    });
+
+    const tasks = Array.isArray(tasksRes?.data) ? tasksRes.data : [];
+    const task = tasks.find((t) => String(t?.Id) === String(taskId));
+    if (!task) return { status: 'refreshdone' };
+
+    const stateRaw = String(task?.State || task?.Status || '').trim();
+    const state = stateRaw.toLowerCase();
+    const progressNum = Number(task?.CurrentProgressPercentage);
+    const hasProgress = Number.isFinite(progressNum);
+
+    if (hasProgress && progressNum >= 100) return { status: 'refreshdone' };
+    if (state && state !== 'running') return { status: 'refreshdone' };
+
+    return {
+      status: 'refreshing',
+      taskStatus: stateRaw,
+      progress: hasProgress ? progressNum : undefined
+    };
+  } catch (e) {
+    return { status: e?.message || String(e) };
+  }
+};

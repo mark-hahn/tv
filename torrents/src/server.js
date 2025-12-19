@@ -27,16 +27,51 @@ const FILTER_TORRENTS = false;
 // const FILTER_TORRENTS = {hash:   "629746091b23ec0617405e8cc6f1eee486447629"};
 // const FILTER_TORRENTS = {filter: 'downloading'}
 
-const TVPROC_LOG_WIN = 'C:\\Users\\mark\\apps\\tv-series-client\\samples\\sample-tvproc\\tv.log';
-const TVPROC_LOG_WSL = '/mnt/c/Users/mark/apps/tv-series-client/samples/sample-tvproc/tv.log';
-const TVPROC_LOG_LINUX = '/mnt/media/archive/dev/apps/tv-proc/tv.log';
+const TVPROC_JSON_WIN = 'C:\\Users\\mark\\apps\\tv-series-client\\samples\\sample-tvproc\\tv.json';
+const TVPROC_JSON_WSL = '/mnt/c/Users/mark/apps/tv-series-client/samples/sample-tvproc/tv.json';
+const TVPROC_JSON_LINUX = '/mnt/media/archive/dev/apps/tv-proc/tv.json';
 
-function getTvprocLogPath() {
-  const override = process.env.TVPROC_LOG_PATH;
+function getTvprocJsonPath() {
+  const override = process.env.TVPROC_JSON_PATH;
   if (typeof override === 'string' && override.trim()) return override.trim();
-  if (process.platform === 'win32') return TVPROC_LOG_WIN;
-  if (process.env.WSL_DISTRO_NAME) return TVPROC_LOG_WSL;
-  return TVPROC_LOG_LINUX;
+  if (process.platform === 'win32') return TVPROC_JSON_WIN;
+  if (process.env.WSL_DISTRO_NAME) return TVPROC_JSON_WSL;
+  return TVPROC_JSON_LINUX;
+}
+
+function parseJsonArrayWithContext(txt, filePath) {
+  try {
+    const arr = JSON.parse(String(txt || '[]'));
+    if (!Array.isArray(arr)) {
+      const err = new Error('tvproc json must be an array');
+      err.code = 'TVPROC_NOT_ARRAY';
+      err.path = filePath;
+      throw err;
+    }
+    return arr;
+  } catch (e) {
+    // Add best-effort line/column for JSON.parse errors like:
+    // "Expected double-quoted property name in JSON at position 123 (line 4 column 2)"
+    const msg = e?.message || String(e);
+    const m = /position\s+(\d+)/i.exec(msg);
+    const pos = m ? Number(m[1]) : null;
+    let line = null;
+    let column = null;
+    if (Number.isFinite(pos) && pos >= 0) {
+      const s = String(txt || '');
+      const upto = s.slice(0, pos);
+      line = upto.split(/\n/).length;
+      const lastNl = upto.lastIndexOf('\n');
+      column = (lastNl >= 0 ? upto.length - lastNl : upto.length + 1);
+    }
+    const err = new Error(msg);
+    err.code = e?.code || 'TVPROC_JSON_PARSE_ERROR';
+    err.path = filePath;
+    err.pos = Number.isFinite(pos) ? pos : null;
+    err.line = line;
+    err.column = column;
+    throw err;
+  }
 }
 
 // Load SSL certificate
@@ -84,59 +119,74 @@ if (FILTER_TORRENTS && typeof FILTER_TORRENTS === 'object' && !Array.isArray(FIL
 app.get('/api/tvdb/*', tvdbProxyGet);
 
 app.get('/api/tvproc', async (req, res) => {
-  const logPath = getTvprocLogPath();
+  const jsonPath = getTvprocJsonPath();
   try {
-    const txt = await fs.promises.readFile(logPath, 'utf8');
-    res.type('text/plain').send(txt);
+    const txt = await fs.promises.readFile(jsonPath, 'utf8');
+    const arr = parseJsonArrayWithContext(txt, jsonPath);
+    res.json(arr);
   } catch (error) {
     const code = error?.code;
     if (code === 'ENOENT') {
-      res.status(404).json({ error: 'tvproc log file not found', path: logPath });
+      // Treat missing as empty.
+      res.json([]);
       return;
     }
-    console.error('tvproc error:', error);
-    res.status(500).json({ error: error?.message || String(error), path: logPath });
+    const isParse = code === 'TVPROC_JSON_PARSE_ERROR' || error?.name === 'SyntaxError';
+    if (isParse) {
+      console.error(`tvproc invalid json: ${jsonPath}: ${error?.message || String(error)}`);
+    } else {
+      console.error('tvproc error:', error);
+    }
+    res.status(500).json({
+      error: error?.message || String(error),
+      path: jsonPath,
+      line: error?.line ?? null,
+      column: error?.column ?? null
+    });
   }
 });
 
 app.post('/api/tvproc/trim', async (req, res) => {
-  const logPath = getTvprocLogPath();
+  const jsonPath = getTvprocJsonPath();
   const keepLines = Number(req?.body?.keepLines);
   const n = Number.isFinite(keepLines) && keepLines > 0 ? Math.floor(keepLines) : 1000;
 
   try {
-    const txt = await fs.promises.readFile(logPath, 'utf8');
-    const lines = String(txt).split(/\r?\n/);
-    const originalLines = lines.length;
-    const kept = lines.slice(Math.max(0, originalLines - n));
-    const out = kept.join('\n') + (kept.length ? '\n' : '');
-    await fs.promises.writeFile(logPath, out, 'utf8');
-    res.json({ ok: true, path: logPath, originalLines, keptLines: kept.length });
+    const txt = await fs.promises.readFile(jsonPath, 'utf8');
+    const arr = parseJsonArrayWithContext(txt, jsonPath);
+    const originalCount = arr.length;
+    const kept = arr.slice(Math.max(0, originalCount - n));
+    await fs.promises.writeFile(jsonPath, JSON.stringify(kept, null, 2) + '\n', 'utf8');
+    res.json({ ok: true, path: jsonPath, originalCount, keptCount: kept.length });
   } catch (error) {
     const code = error?.code;
     if (code === 'ENOENT') {
-      res.status(404).json({ error: 'tvproc log file not found', path: logPath });
+      res.json({ ok: true, path: jsonPath, originalCount: 0, keptCount: 0 });
       return;
     }
     console.error('tvproc trim error:', error);
-    res.status(500).json({ error: error?.message || String(error), path: logPath });
+    res.status(500).json({
+      error: error?.message || String(error),
+      path: jsonPath,
+      line: error?.line ?? null,
+      column: error?.column ?? null
+    });
   }
 });
 
 app.post('/api/tvproc/clear', async (req, res) => {
-  const logPath = getTvprocLogPath();
+  const jsonPath = getTvprocJsonPath();
   try {
-    // Truncate to zero bytes.
-    await fs.promises.writeFile(logPath, '', 'utf8');
-    res.json({ ok: true, path: logPath, cleared: true });
+    await fs.promises.writeFile(jsonPath, '[]\n', 'utf8');
+    res.json({ ok: true, path: jsonPath, cleared: true });
   } catch (error) {
     const code = error?.code;
     if (code === 'ENOENT') {
-      res.status(404).json({ error: 'tvproc log file not found', path: logPath });
+      res.json({ ok: true, path: jsonPath, cleared: true });
       return;
     }
     console.error('tvproc clear error:', error);
-    res.status(500).json({ error: error?.message || String(error), path: logPath });
+    res.status(500).json({ error: error?.message || String(error), path: jsonPath });
   }
 });
 

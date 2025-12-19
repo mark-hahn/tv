@@ -15,7 +15,10 @@
   div(v-else-if="!hasContent" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
     div(v-if="emptyStateText") {{ emptyStateText }}
 
-  pre(v-else ref="logPane" :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'auto', background:'#fff', border:'1px solid #ddd', borderRadius:'5px', fontFamily:'monospace', fontSize:'14px', fontWeight:'normal', whiteSpace:'pre' }") {{ logText }}
+  div(v-else ref="scroller" :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'hidden', background:'#fff', border:'1px solid #ddd', borderRadius:'5px', fontFamily:'sans-serif', fontSize:'14px', fontWeight:'normal' }")
+    div(v-for="(it, idx) in orderedItems" :key="it?.path || it?.title || idx" style="border:1px solid #ddd; border-radius:8px; padding:10px; margin-bottom:10px; background:#fff;")
+      div(style="font-weight:bold; font-size:16px;") {{ it.title || '(no title)' }}
+      div(style="margin-top:4px; color:#333; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;") {{ fmtLine2(it) }}
 
 </template>
 
@@ -39,7 +42,7 @@ export default {
 
   data() {
     return {
-      logText: '',
+      items: [],
       error: null,
       _pollTimer: null,
       _active: false,
@@ -53,7 +56,7 @@ export default {
 
   computed: {
     hasContent() {
-      return !this.error && String(this.logText || '').trim().length > 0;
+      return !this.error && Array.isArray(this.items) && this.items.length > 0;
     },
 
     emptyStateText() {
@@ -61,6 +64,24 @@ export default {
       if (this._didLoadOnce) return 'No results.';
       if (this._showLoading) return 'Loading ...';
       return '';
+    },
+
+    orderedItems() {
+      const arr = Array.isArray(this.items) ? this.items.slice() : [];
+      arr.sort((a, b) => {
+        const aStart = Number(a?.dateStarted) || 0;
+        const bStart = Number(b?.dateStarted) || 0;
+        if (aStart !== bStart) return aStart - bStart;
+
+        const aEnd = Number(a?.dateEnded) || 0;
+        const bEnd = Number(b?.dateEnded) || 0;
+        if (aEnd !== bEnd) return aEnd - bEnd;
+
+        const at = String(a?.title || '');
+        const bt = String(b?.title || '');
+        return at.localeCompare(bt);
+      });
+      return arr;
     }
   },
 
@@ -71,7 +92,7 @@ export default {
   unmounted() {
     evtBus.off('paneChanged', this.onPaneChanged);
     this.stopPolling();
-    this.logText = '';
+    this.items = [];
     this.error = null;
   },
 
@@ -81,7 +102,7 @@ export default {
       this._active = active;
       if (active) {
         this._firstLoad = true;
-        void this.loadLog();
+        void this.loadTvproc();
         this.scheduleNextPoll(5000);
       } else {
         this.stopPolling();
@@ -128,7 +149,7 @@ export default {
       this.stopPolling();
       this._pollTimer = setTimeout(() => {
         if (!this._active) return;
-        void this.loadLog();
+        void this.loadTvproc();
         this.scheduleNextPoll(5000);
       }, ms);
     },
@@ -144,32 +165,58 @@ export default {
       el.scrollTop = el.scrollHeight;
     },
 
-    suppressSections(txt) {
-      const lines = String(txt || '').split(/\r?\n/);
-      const out = [];
+    fmtMdhm(ts) {
+      const n = Number(ts);
+      if (!Number.isFinite(n) || n <= 0) return '';
 
-      const isDateLine = (s) => {
-        // Example: Tue Dec 16 03:45:01 AM PST 2025
-        return /^\w{3} \w{3} \d{1,2} \d{2}:\d{2}:\d{2} [AP]M [A-Z]{3} \d{4}$/.test(String(s || '').trim());
-      };
-      const isSkippedLine = (s) => /^skipped recent:\s+\d+\s*$/.test(String(s || ''));
-      const isElapsedLine = (s) => /^elapsed\(mins\):\s+[0-9.]+\s*$/.test(String(s || ''));
-      const isBlankLine = (s) => String(s || '').trim().length === 0;
+      // Accept seconds or milliseconds.
+      const ms = n > 1e12 ? n : n * 1000;
+      const d = new Date(ms);
+      if (Number.isNaN(d.getTime())) return '';
 
-      for (let i = 0; i < lines.length; i++) {
-        const l0 = lines[i];
-        const l1 = lines[i + 1];
-        const l2 = lines[i + 2];
-        const l3 = lines[i + 3];
+      const m = d.getMonth() + 1;
+      const day = d.getDate();
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      return `${m}/${day} ${hh}:${mm}`;
+    },
 
-        if (isDateLine(l0) && isSkippedLine(l1) && isElapsedLine(l2) && (isBlankLine(l3) || typeof l3 === 'undefined')) {
-          i += (typeof l3 === 'undefined' ? 2 : 3);
-          continue;
-        }
-        out.push(l0);
+    fmtGb(bytes) {
+      const n = Number(bytes);
+      if (!Number.isFinite(n) || n <= 0) return '';
+      const gb = n / 1e9;
+      return `${gb.toFixed(3)} GB`;
+    },
+
+    fmtLine2(it) {
+      const s = Number(it?.season);
+      const e = Number(it?.episode);
+      const seasonEpisode = Number.isFinite(s) && Number.isFinite(e) ? `S${s}:E${e}` : '';
+
+      const size = this.fmtGb(it?.fileSize);
+      const started = this.fmtMdhm(it?.dateStarted);
+      const ended = this.fmtMdhm(it?.dateEnded);
+      const status = String(it?.status || '').trim();
+
+      const parts = [];
+      if (seasonEpisode) parts.push(seasonEpisode);
+      if (size) parts.push(size);
+      if (started) parts.push(started);
+
+      if (status === 'finished') {
+        if (ended) parts.push(ended);
+        parts.push('Finished');
+        return parts.join(', ');
       }
 
-      return out.join('\n');
+      if (status === 'downloading') {
+        parts.push('Downloading');
+        return parts.join(', ');
+      }
+
+      if (ended) parts.push(ended);
+      if (status) parts.push(status);
+      return parts.join(', ');
     },
 
     async trimLog() {
@@ -195,7 +242,7 @@ export default {
           }
           throw new Error(`HTTP ${res.status}: ${detail || res.statusText}`);
         }
-        await this.loadLog({ forceScrollToBottom: true });
+        await this.loadTvproc({ forceScrollToBottom: true });
       } catch (e) {
         this.error = e?.message || String(e);
       }
@@ -222,17 +269,17 @@ export default {
           }
           throw new Error(`HTTP ${res.status}: ${detail || res.statusText}`);
         }
-        await this.loadLog({ forceScrollToBottom: true });
+        await this.loadTvproc({ forceScrollToBottom: true });
       } catch (e) {
         this.error = e?.message || String(e);
       }
     },
 
-    async loadLog(opts = {}) {
+    async loadTvproc(opts = {}) {
       this.error = null;
       this.startLoadingDelay();
       try {
-        const el = this.$refs.logPane;
+        const el = this.$refs.scroller;
         const shouldStick = Boolean(opts.forceScrollToBottom) || this._firstLoad || this.isNearBottom(el);
 
         const res = await fetch(`${config.torrentsApiUrl}/api/tvproc`);
@@ -251,12 +298,12 @@ export default {
           }
           throw new Error(`HTTP ${res.status}: ${detail || res.statusText}`);
         }
-        const raw = await res.text();
-        this.logText = this.suppressSections(raw);
+        const arr = await res.json();
+        this.items = Array.isArray(arr) ? arr : [];
         this._didLoadOnce = true;
 
         await this.$nextTick();
-        const el2 = this.$refs.logPane;
+        const el2 = this.$refs.scroller;
         if (shouldStick) this.scrollToBottom(el2);
         this._firstLoad = false;
       } catch (e) {

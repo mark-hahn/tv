@@ -24,3 +24,32 @@ changes to the torrent pane:
 
 ======================================================
 
+read data from tv.json, not tv.log, it will be a json file with an array of file objects, one per file. each file object will have these properties when the download is started:
+status, title, fileSize, season, episode, dateStarted, and the local file path.
+fileSize is an integer number of bytes. dates are integer linux timestamps.
+---
+the status will be "downloading" when the download is started.
+---
+when finished the object will also have the property dateEnded and the status changed to "finished". 
+---
+when there is an error the status will have the string error message. 
+--
+change the scroll display from plain text to cards, one card per file object. The card list should be updated every 5 secs.
+The cards should be ordered from oldest to newest.
+Like the other card lists the scroll pane should be scrolled to the bottom when loaded.  if it is at the bottom when more panes added it should scroll to bottom.  if not at the the bottom it should not scroll.
+---
+the first line of the card should be the title in bold font. the second line is info with fields separate by commas. 
+--
+When started the second line should be "S<season>:E<episode>, <size in format 0.123 GB>, <dateStarted in format "month/day hour:mins">, Downloading"
+--
+When ended the second line should be "S<season>:E<episode>, <size in format 0.123 GB>, <dateStarted in format "month/day hour:mins">, <dateEnded in format "month/day hour:mins">, Finished"
+
+======================================================
+
+reduce title font-size to 14px.
+when Finished add elapsed download time <mins:secs> to info line before "Finished".
+the json object now has a "sequence" property in file object. it should appear before title in first line as <seq> <title>.
+<seq> and "S<season>:E<episode> should be color blue.
+
+
+

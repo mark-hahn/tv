@@ -7,7 +7,6 @@ bugs ...
 untested ...
   check torrent files validity before downloading
 
-
 todo ...
   history of progress for a torrent title
   tvproc cards
@@ -25,6 +24,7 @@ todo ...
     sort by waiting date
     filter waiting
     add no-emby waiting
+  abort qbt downloading
 
 non-simple:
   

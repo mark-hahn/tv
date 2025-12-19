@@ -1,7 +1,6 @@
 
 todo ...
   lazy-login to thetvdb
-  title parsed dupes
   restart cycle no delay
   
   smart check duplicate files on disk - parse title

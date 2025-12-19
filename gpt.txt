@@ -83,3 +83,9 @@ change dates to integer linux timestamps.
 ---
 encrypt the downloading of the actual file.
 
+==========================================
+
+when a cycle that included a download finishes restart a new cycle immediately.  if no download then delay to next cycle.
+--
+Change delay from 5 mins to 2 mins.
+

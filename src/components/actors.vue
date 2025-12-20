@@ -90,6 +90,96 @@ export default {
   },
 
   methods: {
+    normPersonName(v) {
+      return String(v || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
+    },
+
+    hasAnyImage(actor) {
+      return Boolean(actor?.image || actor?.personImgURL);
+    },
+
+    mergeTmdbTvdbActors(tmdbIn, tvdbIn) {
+      const tmdb = Array.isArray(tmdbIn) ? [...tmdbIn] : [];
+      const tvdb = Array.isArray(tvdbIn) ? [...tvdbIn] : [];
+      const output = [];
+
+      console.log('tmdb list size:', tmdb.length);
+      console.log('tvdb list size:', tvdb.length);
+
+      // Sort both lists by normalized person name so duplicates align
+      tmdb.sort((a, b) => {
+        const nameA = this.normPersonName(a?.personName || a?.name);
+        const nameB = this.normPersonName(b?.personName || b?.name);
+        return nameA.localeCompare(nameB);
+      });
+      tvdb.sort((a, b) => {
+        const nameA = this.normPersonName(a?.personName || a?.name);
+        const nameB = this.normPersonName(b?.personName || b?.name);
+        return nameA.localeCompare(nameB);
+      });
+
+      while (true) {
+        console.log('----- beginning of loop -----');
+
+        if (tmdb.length === 0) {
+          console.log('tmdb list is empty: append entire tvdb list to output and exit loop');
+          output.push(...tvdb);
+          break;
+        }
+        if (tvdb.length === 0) {
+          console.log('tvdb list is empty: append entire tmdb list to output and exit loop');
+          output.push(...tmdb);
+          break;
+        }
+
+        const t0 = tmdb[0];
+        const v0 = tvdb[0];
+        const tName = this.normPersonName(t0?.personName || t0?.name);
+        const vName = this.normPersonName(v0?.personName || v0?.name);
+        
+        console.log('compare first tmdb actor to first tvdb actor:', { tmdb: t0?.personName || t0?.name, tvdb: v0?.personName || v0?.name });
+
+        const duplicate = tName && vName && tName === vName;
+        if (duplicate) {
+          const tHasImage = this.hasAnyImage(t0);
+          const vHasImage = this.hasAnyImage(v0);
+
+          if (tHasImage !== vHasImage) {
+            if (tHasImage) {
+              console.log('duplicate names and tmdb has image and tvdb doesn\'t: remove tvdb from its list and move tmdb to output');
+              tvdb.shift();
+              output.push(tmdb.shift());
+            } else {
+              console.log('duplicate names and tvdb has image and tmdb doesn\'t: remove tmdb from its list and move tvdb to output');
+              tmdb.shift();
+              output.push(tvdb.shift());
+            }
+          } else {
+            // Both have image or both don't have image
+            console.log('duplicate names and both have image: remove tmdb from list and move tvdb to output');
+            tmdb.shift();
+            output.push(tvdb.shift());
+          }
+        } else {
+          // Not duplicate - names don't match, move the one that comes first alphabetically
+          if (tName < vName) {
+            console.log('not duplicate: tmdb name comes first alphabetically, move tmdb to output');
+            output.push(tmdb.shift());
+          } else {
+            console.log('not duplicate: tvdb name comes first alphabetically, move tvdb to output');
+            output.push(tvdb.shift());
+          }
+        }
+      }
+
+      console.log('tmdb list should be empty:', tmdb.length);
+      console.log('output list size:', output.length);
+      return output;
+    },
+
     normPosIntStr(v) {
       const n = parseInt(String(v ?? '').trim(), 10);
       if (!Number.isFinite(n) || n <= 0) return '';
@@ -179,7 +269,8 @@ export default {
         return;
       }
       
-      // Call getTmdb to get guest actor list
+      // Load guests from TMDB
+      let tmdbList = [];
       try {
         const params = {
           showName: this.showName,
@@ -190,46 +281,47 @@ export default {
         
         const guestActors = await srvr.getTmdb(params);
         
-        if (!guestActors || guestActors.length === 0) {
-          this.errorMessage = 'No guest stars found';
-          this.actors = [];
-          this.showingEpisodeActors = true;
-          return;
-        }
-        
-        // Replace actors list with guest stars from TMDB
-        this.actors = guestActors
-          .map(actor => {
-            // Build full image URL from profile_path
+        if (Array.isArray(guestActors) && guestActors.length) {
+          tmdbList = guestActors.map(actor => {
             const imageUrl = actor.profile_path 
               ? `https://image.tmdb.org/t/p/w185${actor.profile_path}`
               : null;
             
             return {
-              name: actor.character, // Character name
-              personName: actor.name, // Actor name
+              name: actor.character,
+              personName: actor.name,
               image: imageUrl,
               personImgURL: imageUrl,
-              url: null, // No URL from TMDB data
+              url: null,
               sort: actor.order,
-              isFeatured: false,
-              hasImage: !!imageUrl
+              isFeatured: false
             };
-          })
-          .sort((a, b) => {
-            // Major sort: has image (true before false)
-            if (a.hasImage !== b.hasImage) {
-              return b.hasImage - a.hasImage; // true (1) before false (0)
-            }
-            // Minor sort: by order
-            return a.sort - b.sort;
           });
-        
-        // Mark that we're showing episode actors
-        this.showingEpisodeActors = true;
+        }
       } catch (error) {
-        this.errorMessage = error.message || 'Episode not found';
+        console.log('TMDB guests fetch error:', error.message || String(error));
       }
+      
+      // Load guests from TVDB
+      let tvdbList = [];
+      try {
+        const tvdbGuests = await tvdb.getEpisodeGuests(this.showName, season, episode);
+        if (Array.isArray(tvdbGuests) && tvdbGuests.length) {
+          tvdbList = tvdbGuests;
+        }
+      } catch (error) {
+        console.log('TVDB guests fetch error:', error.message || String(error));
+      }
+      
+      // Merge TMDB and TVDB guest lists
+      this.actors = this.mergeTmdbTvdbActors(tmdbList, tvdbList);
+      
+      if (this.actors.length === 0) {
+        this.errorMessage = 'No guest stars found';
+      }
+      
+      // Mark that we're showing episode actors
+      this.showingEpisodeActors = true;
     },
 
     handleRegularClick() {
@@ -474,7 +566,7 @@ export default {
       }
     },
 
-    updateActors(data) {
+    async updateActors(data) {
       if (!data) {
         this.actors = [];
         this.showName = '';
@@ -488,27 +580,127 @@ export default {
       
       // Handle both formats: direct data or wrapped in response.data
       const actualData = tvdbData.response?.data || tvdbData;
-      this.showName = actualData?.name || '';
+      this.showName = actualData?.name || this.currentShow?.Name || '';
       
       const characters = actualData?.characters;
-      
-      if (!characters || !Array.isArray(characters)) {
-        this.actors = [];
-        return;
-      }
 
-      // Extract relevant properties from simplified character data
-      this.actors = characters
-        .sort((a, b) => (a.sortOrder || 999) - (b.sortOrder || 999))
-        .map(char => ({
+      // Load actors from TVDB into a tvdb list
+      let tvdbList = [];
+      if (Array.isArray(characters) && characters.length) {
+        tvdbList = characters.map(char => ({
           name: char.character,
           personName: char.actor,
           image: char.image,
-          personImgURL: char.image, // Use same image for both
+          personImgURL: char.image,
           url: char.tvdbUrl,
           sort: char.sortOrder,
           isFeatured: char.isFeatured
         }));
+      }
+
+      // Load actors from TMDB into a tmdb list
+      let tmdbList = [];
+      console.log('Attempting to fetch TMDB series cast for:', this.showName);
+      try {
+        // First, get series metadata to extract the series ID
+        const seriesParams = {
+          showName: this.showName,
+          year: null
+        };
+        
+        console.log('TMDB series metadata request:', JSON.stringify(seriesParams));
+        const seriesData = await srvr.getTmdb(seriesParams);
+        console.log('TMDB series response type:', typeof seriesData);
+        console.log('TMDB series response:', seriesData);
+        
+        // Check if we got series metadata with an ID
+        if (seriesData && typeof seriesData === 'object' && seriesData.id) {
+          const seriesId = seriesData.id;
+          console.log('Got TMDB series ID:', seriesId, '- attempting to fetch credits');
+          
+          // Try to get credits using the series ID
+          const creditsParams = {
+            seriesId: seriesId,
+            type: 'credits'
+          };
+          
+          console.log('TMDB credits request:', JSON.stringify(creditsParams));
+          const creditsData = await srvr.getTmdb(creditsParams);
+          console.log('TMDB credits response type:', typeof creditsData);
+          console.log('TMDB credits response:', creditsData);
+          
+          // Check if we got cast array
+          let castArray = null;
+          if (Array.isArray(creditsData)) {
+            castArray = creditsData;
+          } else if (creditsData && Array.isArray(creditsData.cast)) {
+            castArray = creditsData.cast;
+          }
+          
+          if (castArray && castArray.length) {
+            console.log('Successfully got', castArray.length, 'cast members from credits');
+            tmdbList = castArray.map(actor => {
+              const imageUrl = actor.profile_path 
+                ? `https://image.tmdb.org/t/p/w185${actor.profile_path}`
+                : null;
+              
+              return {
+                name: actor.character,
+                personName: actor.name,
+                image: imageUrl,
+                personImgURL: imageUrl,
+                url: null,
+                sort: actor.order,
+                isFeatured: false
+              };
+            });
+          } else {
+            console.log('Credits request did not return cast array');
+          }
+        } else {
+          console.log('Did not get series metadata with ID');
+        }
+        
+        // If credits approach didn't work, fall back to S1E1 as proxy for series cast
+        if (tmdbList.length === 0) {
+          console.log('Falling back to S1E1 episode cast as proxy for series regulars');
+          const episodeParams = {
+            showName: this.showName,
+            year: null,
+            season: 1,
+            episode: 1
+          };
+          
+          const episodeCast = await srvr.getTmdb(episodeParams);
+          
+          if (Array.isArray(episodeCast) && episodeCast.length) {
+            console.log('Got', episodeCast.length, 'actors from S1E1 fallback');
+            tmdbList = episodeCast.map(actor => {
+              const imageUrl = actor.profile_path 
+                ? `https://image.tmdb.org/t/p/w185${actor.profile_path}`
+                : null;
+              
+              return {
+                name: actor.character,
+                personName: actor.name,
+                image: imageUrl,
+                personImgURL: imageUrl,
+                url: null,
+                sort: actor.order,
+                isFeatured: false
+              };
+            });
+          } else {
+            console.log('S1E1 fallback also returned no cast');
+          }
+        }
+      } catch (error) {
+        console.log('TMDB fetch error:', error.message || String(error));
+      }
+      console.log('Final TMDB list size for merge:', tmdbList.length);
+
+      // Merge TMDB and TVDB lists
+      this.actors = this.mergeTmdbTvdbActors(tmdbList, tvdbList);
       
       // Cache series actors for restore
       this.seriesActors = [...this.actors];
@@ -518,8 +710,8 @@ export default {
   },
 
   mounted() {
-    this._onShowActors = (data) => {
-      this.updateActors(data);
+    this._onShowActors = async (data) => {
+      await this.updateActors(data);
 
       // For noemby shows, start loading the series map immediately so
       // arrow navigation doesn't wait on TVDB later.

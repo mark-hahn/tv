@@ -166,3 +166,295 @@ progress to the left of the Library button still disappears when finished
 
 ======================================================
 
+the tmdb list had no entries at initial load.  this is the same problem the other model had and could not fix.  please fix it.  this is the console output from this run:
+ tmdb list size: 0 actors.vue:109:15
+tvdb list size: 24 actors.vue:110:15
+----- beginning of loop ----- actors.vue:125:17
+tmdb list is empty: append entire tvdb list to output and exit loop actors.vue:128:19
+tmdb list should be empty: 0 actors.vue:178:15
+output list size: 24 actors.vue:179:15
+---
+feel free to add logging statements.
+
+======================================================
+
+i never tested the guests loading, only the series actors -- never do the { showName, year: null, season: 1, episode: 1 } -fallback. -- this is the console from this run:
+15:19:57.188 Fetching TMDB actors for show: 30 Rock actors.vue:560:15
+15:19:57.189 TMDB request attempt 1: {"showName":"30 Rock","year":null} actors.vue:573:19
+15:19:57.290 TMDB response attempt 1: undefined actors object actors.vue:577:21
+15:19:57.290 TMDB request attempt 2: {"showName":"30 Rock"} actors.vue:573:19
+15:19:57.316 TMDB response attempt 2: undefined actors object actors.vue:577:21
+15:19:57.316 TMDB request attempt 3: {"showName":"30 Rock","year":null,"season":1,"episode":1} actors.vue:573:19
+15:19:59.181 TMDB response attempt 3: 16 actors object actors.vue:577:21
+15:19:59.182 TMDB success with params: {"showName":"30 Rock","year":null,"season":1,"episode":1} actors.vue:581:23
+15:19:59.182 Processing TMDB actors, count: 16 actors.vue:590:19
+15:19:59.182 TMDB list built successfully, count: 16 actors.vue:606:19
+15:19:59.182 tmdb list size: 16 actors.vue:68:15
+15:19:59.182 tvdb list size: 24 actors.vue:69:15
+15:19:59.183 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.183 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Alison White", tvdb: "Alec Baldwin" }
+actors.vue:102:17
+15:19:59.185 not duplicate: tvdb name comes first alphabetically, move tvdb to output actors.vue:131:21
+15:19:59.185 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.185 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Alison White", tvdb: "Cheyenne Jackson" }
+actors.vue:102:17
+15:19:59.185 not duplicate: tmdb name comes first alphabetically, move tmdb to output actors.vue:128:21
+15:19:59.185 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.185 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Anita Durst", tvdb: "Cheyenne Jackson" }
+actors.vue:102:17
+15:19:59.185 not duplicate: tmdb name comes first alphabetically, move tmdb to output actors.vue:128:21
+15:19:59.185 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.185 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Ciaran Tyrrell", tvdb: "Cheyenne Jackson" }
+actors.vue:102:17
+15:19:59.186 not duplicate: tvdb name comes first alphabetically, move tvdb to output actors.vue:131:21
+15:19:59.186 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.186 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Ciaran Tyrrell", tvdb: "Chris Parnell" }
+actors.vue:102:17
+15:19:59.186 not duplicate: tvdb name comes first alphabetically, move tvdb to output actors.vue:131:21
+15:19:59.186 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.186 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Ciaran Tyrrell", tvdb: "Dean Winters" }
+actors.vue:102:17
+15:19:59.186 not duplicate: tmdb name comes first alphabetically, move tmdb to output actors.vue:128:21
+15:19:59.186 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.186 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Emana Rachelle", tvdb: "Dean Winters" }
+actors.vue:102:17
+15:19:59.186 not duplicate: tvdb name comes first alphabetically, move tvdb to output actors.vue:131:21
+15:19:59.186 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.186 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Emana Rachelle", tvdb: "Elaine Stritch" }
+actors.vue:102:17
+15:19:59.186 not duplicate: tvdb name comes first alphabetically, move tvdb to output actors.vue:131:21
+15:19:59.186 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.186 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Emana Rachelle", tvdb: "Elizabeth Banks" }
+actors.vue:102:17
+15:19:59.186 not duplicate: tvdb name comes first alphabetically, move tvdb to output actors.vue:131:21
+15:19:59.186 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.186 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Emana Rachelle", tvdb: "Grizz Chapman" }
+actors.vue:102:17
+15:19:59.186 not duplicate: tmdb name comes first alphabetically, move tmdb to output actors.vue:128:21
+15:19:59.186 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.186 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Gary Cowling", tvdb: "Grizz Chapman" }
+actors.vue:102:17
+15:19:59.187 not duplicate: tmdb name comes first alphabetically, move tmdb to output actors.vue:128:21
+15:19:59.187 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.187 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Grizz Chapman", tvdb: "Grizz Chapman" }
+actors.vue:102:17
+15:19:59.187 duplicate names and tmdb has image and tvdb doesn't: remove tvdb from its list and move tmdb to output actors.vue:111:23
+15:19:59.187 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.187 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "John Lutz", tvdb: "Jack McBrayer" }
+actors.vue:102:17
+15:19:59.187 not duplicate: tvdb name comes first alphabetically, move tvdb to output actors.vue:131:21
+15:19:59.187 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.187 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "John Lutz", tvdb: "James Marsden" }
+actors.vue:102:17
+15:19:59.187 not duplicate: tvdb name comes first alphabetically, move tvdb to output actors.vue:131:21
+15:19:59.187 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.187 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "John Lutz", tvdb: "Jane Krakowski" }
+actors.vue:102:17
+15:19:59.187 not duplicate: tvdb name comes first alphabetically, move tvdb to output actors.vue:131:21
+15:19:59.187 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.187 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "John Lutz", tvdb: "Jason Sudeikis" }
+actors.vue:102:17
+15:19:59.187 not duplicate: tvdb name comes first alphabetically, move tvdb to output actors.vue:131:21
+15:19:59.187 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.187 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "John Lutz", tvdb: "John Lutz" }
+actors.vue:102:17
+15:19:59.187 duplicate names and tmdb has image and tvdb doesn't: remove tvdb from its list and move tmdb to output actors.vue:111:23
+15:19:59.188 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.188 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Katrina Bowden", tvdb: "Judah Friedlander" }
+actors.vue:102:17
+15:19:59.188 not duplicate: tvdb name comes first alphabetically, move tvdb to output actors.vue:131:21
+15:19:59.188 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.188 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Katrina Bowden", tvdb: "Katrina Bowden" }
+actors.vue:102:17
+15:19:59.188 duplicate names and both have image: remove tmdb from list and move tvdb to output actors.vue:121:21
+15:19:59.188 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.188 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Keith Powell", tvdb: "Keith Powell" }
+actors.vue:102:17
+15:19:59.188 duplicate names and both have image: remove tmdb from list and move tvdb to output actors.vue:121:21
+15:19:59.188 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.188 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Kevin Dorff", tvdb: "Kevin Brown" }
+actors.vue:102:17
+15:19:59.188 not duplicate: tvdb name comes first alphabetically, move tvdb to output actors.vue:131:21
+15:19:59.188 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.188 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Kevin Dorff", tvdb: "Kristen Schaal" }
+actors.vue:102:17
+15:19:59.188 not duplicate: tmdb name comes first alphabetically, move tmdb to output actors.vue:128:21
+15:19:59.188 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.188 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Kevin Dotcom Brown", tvdb: "Kristen Schaal" }
+actors.vue:102:17
+15:19:59.188 not duplicate: tmdb name comes first alphabetically, move tmdb to output actors.vue:128:21
+15:19:59.188 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.188 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Lonny Ross", tvdb: "Kristen Schaal" }
+actors.vue:102:17
+15:19:59.188 not duplicate: tvdb name comes first alphabetically, move tvdb to output actors.vue:131:21
+15:19:59.188 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.188 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Lonny Ross", tvdb: "Lonny Ross" }
+actors.vue:102:17
+15:19:59.188 duplicate names and both have image: remove tmdb from list and move tvdb to output actors.vue:121:21
+15:19:59.188 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.188 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Maulik Pancholy", tvdb: "Maulik Pancholy" }
+actors.vue:102:17
+15:19:59.188 duplicate names and both have image: remove tmdb from list and move tvdb to output actors.vue:121:21
+15:19:59.188 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.188 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Rachel Dratch", tvdb: "Scott Adsit" }
+actors.vue:102:17
+15:19:59.188 not duplicate: tmdb name comes first alphabetically, move tmdb to output actors.vue:128:21
+15:19:59.188 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.188 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Tabbie Conrad", tvdb: "Scott Adsit" }
+actors.vue:102:17
+15:19:59.189 not duplicate: tvdb name comes first alphabetically, move tvdb to output actors.vue:131:21
+15:19:59.189 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.189 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Tabbie Conrad", tvdb: "Sherri Shepherd" }
+actors.vue:102:17
+15:19:59.189 not duplicate: tvdb name comes first alphabetically, move tvdb to output actors.vue:131:21
+15:19:59.189 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.189 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Tabbie Conrad", tvdb: "Tina Fey" }
+actors.vue:102:17
+15:19:59.189 not duplicate: tmdb name comes first alphabetically, move tmdb to output actors.vue:128:21
+15:19:59.189 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.189 compare first tmdb actor to first tvdb actor: 
+Object { tmdb: "Teddy Coluca", tvdb: "Tina Fey" }
+actors.vue:102:17
+15:19:59.189 not duplicate: tmdb name comes first alphabetically, move tmdb to output actors.vue:128:21
+15:19:59.189 ----- beginning of loop ----- actors.vue:84:17
+15:19:59.189 tmdb list is empty: append entire tvdb list to output and exit loop actors.vue:87:19
+15:19:59.189 tmdb list should be empty: 0 actors.vue:137:15
+15:19:59.189 output list size: 34 actors.vue:138:15
+-- 
+may i suggest that you isolate the code that loads the tmdb list and fix it while ignoring other code like the sort/merge.
+
+================================================
+
+the tmdb list in the wroking version did load the regulars and not the guests.-- since the workspace is at the working version add logging necessary to prove that the working version used only the tmdb list and that it worked.
+
+================================================
+
+you can undo your latest changes --  i was wrong and the series regulars came from tvdb and guests came from tmdb.  
+--
+now when either of series regulars or guests are processed,  get lists from both tvdb and tmdb and merge them.
+-- 
+you should be able to get tmdb list of regulars using the data already retrieved from tmdb
+---
+the current code doesn't show how to get the tvdb guests.  these are the instructions to get tvdb guests: # TVDB API - Get Guest Actors for Episode
+
+## Authentication
+
+First, you need to authenticate and get a token:
+
+```
+POST https://api4.thetvdb.com/v4/login
+Content-Type: application/json
+
+{
+  "apikey": "YOUR_API_KEY"
+}
+```
+
+Response will include a `token` that you'll use in subsequent requests.
+
+## Get Episode Details with Cast
+
+### Method 1: Get Episode by ID
+
+```
+GET https://api4.thetvdb.com/v4/episodes/{episodeId}/extended
+Authorization: Bearer {token}
+```
+
+### Method 2: Search for Episode
+
+First, get the series ID, then query episodes:
+
+```
+GET https://api4.thetvdb.com/v4/series/{seriesId}/episodes/default?season={seasonNumber}&page=0
+Authorization: Bearer {token}
+```
+
+Then use the episode ID from the results to get extended details.
+
+## Response Structure
+
+The extended episode response includes a `characters` array:
+
+```json
+{
+  "data": {
+    "id": 123456,
+    "name": "Episode Title",
+    "seasonNumber": 1,
+    "number": 5,
+    "characters": [
+      {
+        "id": 789,
+        "name": "Character Name",
+        "peopleId": 456,
+        "personName": "Actor Name",
+        "type": 3,
+        "isFeatured": false
+      }
+    ]
+  }
+}
+```
+
+## Character Types
+
+- `type: 3` = Guest Star
+- `type: 1` = Main Cast
+- `type: 2` = Recurring
+
+## Filter for Guest Stars
+
+Filter the `characters` array where `type === 3` or where `isFeatured === false` to get guest actors.
+
+## Example with cURL
+
+```bash
+# Login
+curl -X POST https://api4.thetvdb.com/v4/login \
+  -H "Content-Type: application/json" \
+  -d '{"apikey":"YOUR_API_KEY"}'
+
+# Get episode with guest stars
+curl -X GET https://api4.thetvdb.com/v4/episodes/123456/extended \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+## Notes
+
+- TVDB API v4 requires authentication for all requests
+- Guest actor data may not be available for all episodes
+- The `isFeatured` flag can also help identify guest stars (typically `false` for guests)
+
+
+

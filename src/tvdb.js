@@ -112,6 +112,37 @@ export const getEpisode = async (showName, seasonNum, episodeNum) => {
   return extendedResObj.data;
 }
 
+//////////// get episode guest actors //////////////
+
+export const getEpisodeGuests = async (showName, seasonNum, episodeNum) => {
+  try {
+    const episodeData = await getEpisode(showName, seasonNum, episodeNum);
+    
+    if (!episodeData || !episodeData.characters) {
+      console.log('getEpisodeGuests: no character data for episode:', {showName, seasonNum, episodeNum});
+      return [];
+    }
+    
+    // Filter for guest stars (type 3 or isFeatured false)
+    const guests = episodeData.characters
+      .filter(char => char.type === 3 || char.isFeatured === false)
+      .map(char => ({
+        name: char.name,
+        personName: char.personName,
+        image: char.image || null,
+        personImgURL: char.image || null,
+        url: null,
+        type: char.type,
+        isFeatured: char.isFeatured
+      }));
+    
+    return guests;
+  } catch (error) {
+    console.error('getEpisodeGuests error:', error);
+    return [];
+  }
+}
+
 //////////// get series map from tvdb //////////////
 
 /**

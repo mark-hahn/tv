@@ -856,7 +856,7 @@ export default {
 
     formatSeasonEpisode(seasonEpisode) {
       if (!seasonEpisode) return '';
-      // Convert S01E02 to 1/2, or S01 to 1
+      // Convert S01E02 to 1/2 without leading zeros
       const match = seasonEpisode.match(/S(\d+)(?:E(\d+))?/);
       if (!match) return seasonEpisode;
       
@@ -881,12 +881,12 @@ export default {
         return torrent.title || '';
       }
 
-      // If this torrent represents a season range, show "start-end"
+      // If this torrent represents a season range, show "start...end"
       if (torrent.seasonRange && torrent.seasonRange.isRange) {
         const start = Number(torrent.seasonRange.startSeason);
         const end = Number(torrent.seasonRange.endSeason);
         if (!Number.isNaN(start) && !Number.isNaN(end) && end >= start) {
-          return `${start}-${end}`;
+          return `${start}...${end}`;
         }
       }
       

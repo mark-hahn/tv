@@ -4,7 +4,7 @@
 
   #header(:style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', marginLeft:'0px', marginRight:'0px', marginTop:'0px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
     div(style="display:flex; justify-content:space-between; align-items:center;")
-      div(style="margin-left:20px;") Downloading
+      div(style="margin-left:20px;") Downloads
       div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
         div(v-if="libraryProgressText" style="align-self:center; font-size:13px; color:#555; white-space:nowrap;") {{ libraryProgressText }}
         button(@click.stop="startLibraryRefresh" :disabled="_libBusy" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Library
@@ -299,7 +299,7 @@ export default {
       }
 
       if (status === 'downloading') {
-        parts.push('Downloading');
+        parts.push('Downloads');
         return { seasonEpisode, rest: parts.join(', ') };
       }
 

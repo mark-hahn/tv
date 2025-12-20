@@ -1,3 +1,7 @@
 
 
-if startGapWorker is blocked by !isInitialLoad then run startGapWorker when current gapworker is finished
+in torrents pane cards, 
+change <season>/<episode> to S<season>/E<episode> with 2 digits for <season> and <episode>
+
+change <season>|<episode> to <season>/<episode> 
+change <season1>-<season2> to <season1>...<season2> 

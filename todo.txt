@@ -1,6 +1,5 @@
 
 todo ...
+  remove tv.log and buffering ???
   lazy-login to thetvdb
-  restart cycle no delay
-  
   smart check duplicate files on disk - parse title

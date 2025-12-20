@@ -87,3 +87,11 @@ Fallout S01E01 - TVDB: 4, TMDB: 26 actors.vue:346:15
 
 ================
 i want to revert code added to cache episode ids in server and client. i have already reverted the server. revert the client to remove these latest cache optimizations and go back to always making 2 api calls for guests.
+================
+
+when loading regulars and before merging actor lists the tmdb list is supposed to be narrowed down to 10 or less actors by using a binary search to find threshold of appearances.
+this is not working. i see a show where there are 93 actors. the console is:
+Before merge - TMDB: 93, TVDB: 14 actors.vue:68:15
+Another Period - TVDB: 9, TMDB: 84 actors.vue:730:15
+--
+what is wrong?

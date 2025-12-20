@@ -710,29 +710,34 @@ export default {
             
             // Find the max episode count in the data
             const maxEpisodeCount = Math.max(...castArray.map(a => a.total_episode_count || 0));
+            console.log(`TMDB cast: ${castArray.length}, max episodes: ${maxEpisodeCount}`);
             
             let low = 1;
             let high = maxEpisodeCount;
-            let bestThreshold = 1;
+            let bestThreshold = maxEpisodeCount; // Default to max if we can't get < 10
             
             while (low <= high) {
               const mid = Math.floor((low + high) / 2);
               const count = castArray.filter(a => (a.total_episode_count || 0) >= mid).length;
               
               if (count < TARGET_MAX_REGULARS) {
-                // Too few, need to lower threshold
+                // Few enough actors, save this threshold and try lower to get more
                 bestThreshold = mid;
                 high = mid - 1;
               } else {
-                // Too many or exact, need to raise threshold
+                // Too many actors, need higher threshold
                 low = mid + 1;
               }
             }
+            
+            console.log(`Binary search result: threshold=${bestThreshold}`);
             
             const regularsOnly = castArray.filter(actor => {
               const episodeCount = actor.total_episode_count || 0;
               return episodeCount >= bestThreshold;
             });
+            
+            console.log(`Filtered to ${regularsOnly.length} regulars`);
             
             tmdbList = regularsOnly.map(actor => {
               const imageUrl = actor.profile_path 

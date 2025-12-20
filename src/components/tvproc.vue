@@ -188,6 +188,8 @@ export default {
       if (res?.status === 'refreshdone') {
         // Always keep a completion indicator; only clear on a fresh pane load.
         this.libraryProgressText = '100%';
+        // Emit event to trigger show list refresh
+        evtBus.emit('library-refresh-complete');
       } else if (res?.status) {
         this.libraryProgressText = String(res.status);
       }

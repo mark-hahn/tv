@@ -24,6 +24,7 @@
         @filter-input="select"
         @cancel-srch-list="cancelSrchList"
         @search-action="searchAction"
+        @test-click="newShows"
       )
 
       HdrBot(
@@ -102,6 +103,7 @@ let showHistoryPtr   = -1;
 let blockedWaitShows = null;
 let blockedGapShows  = null;
 let srchListWeb      = null;
+let gapWorkerRunning = false;
 const pruneTvdb = (window.location.href.slice(-5) == 'prune');
 
 export default {
@@ -709,7 +711,7 @@ export default {
       
       // If map pane is currently showing, update it to show the newly selected show
       if(this.currentPane === 'map' && this.mapShow !== null) {
-        this.seriesMapAction('open', show);
+        void this.seriesMapAction('open', show);
       }
     },
 
@@ -819,7 +821,7 @@ export default {
         this.$emit('hide-map');
         return;
       }
-      if(action == 'open' && this.mapShow === show && this.currentPane === 'map') {
+      if(action == 'open' && this.mapShow?.Name === show?.Name && this.currentPane === 'map') {
         // If clicking the same show while already on map, keep it as-is
         return;
       }
@@ -974,7 +976,7 @@ export default {
       this.sortShows();
     },
 
-    async watchClick() {
+    watchClick() {
       console.log('watchClick');
       if(this.watchingName !== '---') {
         window.localStorage.setItem("lastVisShow", this.watchingName);
@@ -1051,11 +1053,91 @@ export default {
                      (fileGap || fileEndError || seasonWatchedThenNofile);
       Object.assign(show, gap);
       await srvr.addGap([show.Id, gap, save]);
+
+      // When worker finishes (progress == 100), mark it as not running
+      if(progress == 100) {
+        gapWorkerRunning = false;
+      }
+    },
+
+    async newShows(isInitialLoad = false) {
+      await emby.init();
+
+      allShows = await emby.loadAllShows();
+      if(!allShows) {
+        console.error("No shows from loadAllShows");
+        return;
+      }
+      this.shows = [...allShows];
+
+      // must be set before startWorker
+      blockedWaitShows = [];
+      blockedGapShows  = [];
+
+      // Handle gap worker restart logic
+      if(!pruneTvdb) {
+        if(isInitialLoad) {
+          // Initial load: start worker immediately
+          gapWorkerRunning = true;
+          emby.startGapWorker(allShows, this.addGapToShow);
+        } else if(gapWorkerRunning) {
+          // Worker is running, wait for it to finish then restart
+          const checkAndRestart = setInterval(() => {
+            if(!gapWorkerRunning) {
+              clearInterval(checkAndRestart);
+              gapWorkerRunning = true;
+              emby.startGapWorker(allShows, this.addGapToShow);
+            }
+          }, 100);
+        } else {
+          // Worker not running, start immediately
+          gapWorkerRunning = true;
+          emby.startGapWorker(allShows, this.addGapToShow);
+        }
+      }
+
+      // Only set sort properties on initial load
+      if(isInitialLoad) {
+        this.sortByNew  = true;
+        this.sortBySize = false;
+        this.sortChoice = 'Alpha';
+      }
+      
+      // Initialize ban condition to -1 to filter out rejected shows BEFORE showAll
+      const banCond = this.conds.find(c => c.name === 'ban');
+      if (banCond) {
+        banCond.filter = -1;
+      }
+      
+      this.showAll(true);
+      await this.select(); // Apply filters including ban
+      this.sortShows();
+
+      const name = window.localStorage.getItem("lastVisShow");
+      if (!name)   window.localStorage.setItem("lastVisShow",
+                                     allShows[0].Name);
+      this.scrollToSavedShow(true);
+
+      // ... temp one-time mass operations ...
+      // await util.fixShowidInTvdbs(allShows);
+      // await util.clrEndedContinues(allShows);
+      // await util.adjustDeletedFlags(allShows);
+      // await util.delPickups(allShows);
+      // await util.setPickups(allShows);
+      // await util.setTvdbDeleted(allShows);
+      // await util.removeDeadShows(allShows);
+      // await util.listCountries(allShows);
+      // await util.setAllFavs(allShows);
+      // await util.setAllTvdbShowIds(allShows);
+      // await util.setAllNoEmbyTvdbIds(allShows);
+      // await util.removeNoMatchsFromTvdbJson()
+      // await util.removeDontSavesFromTvdbJson()
+      // await util.loadAllRemotes(allShows); // takes many hours
     }
   },
 
   /////////////////  MOUNTED  /////////////////
-  async mounted() {
+  mounted() {
     evtBus.on('openMap', (show) => {
       console.log('List: openMap event received for show:', show?.Name);
       this.seriesMapAction('open', show);
@@ -1075,6 +1157,11 @@ export default {
     evtBus.on('episodeClick', async ({ e, show, season, episode, setWatched }) => {
       await this.episodeClick(e, show, season, episode, setWatched);
     });
+    
+    // Listen for library refresh completion to refresh show list
+    evtBus.on('library-refresh-complete', () => {
+      void this.newShows();
+    });
 
     setInterval(async () => {
       const devices  = await srvr.getDevices();
@@ -1090,7 +1177,7 @@ export default {
       this.currentPlayingDevice = playingDevice;
     }, 10*1000);
 
-    await (async () => {
+    void (async () => {
       document.addEventListener('keydown', (event) => {
         if(event.code == 'Escape') {
           this.remotesAction('close');
@@ -1099,59 +1186,7 @@ export default {
       }); 
 
       try {
-        await emby.init();
-
-        allShows = await emby.loadAllShows();
-        if(!allShows) {
-          console.error("No shows from loadAllShows");
-          return;
-        }
-        this.shows = [...allShows];
-
-        // must be set before startWorker
-        blockedWaitShows = [];
-        blockedGapShows  = [];
-
-        let showList = allShows;
-        // showList = [allShows.find((show) => // for testing
-        //                 show.Name == 'Splitting Up Together (US)')]; 
-        if(!pruneTvdb) 
-          emby.startGapWorker(showList, this.addGapToShow);
-
-        this.sortByNew  = true;
-        this.sortBySize = false;
-        this.sortChoice = 'Alpha';
-        
-        // Initialize ban condition to -1 to filter out rejected shows BEFORE showAll
-        const banCond = this.conds.find(c => c.name === 'ban');
-        if (banCond) {
-          banCond.filter = -1;
-        }
-        
-        this.showAll(true);
-        this.select(); // Apply filters including ban
-        this.sortShows();
-
-        const name = window.localStorage.getItem("lastVisShow");
-        if (!name)   window.localStorage.setItem("lastVisShow",
-                                       allShows[0].Name);
-        this.scrollToSavedShow(true);
-
-        // ... temp one-time mass operations ...
-        // await util.fixShowidInTvdbs(allShows);
-        // await util.clrEndedContinues(allShows);
-        // await util.adjustDeletedFlags(allShows);
-        // await util.delPickups(allShows);
-        // await util.setPickups(allShows);
-        // await util.setTvdbDeleted(allShows);
-        // await util.removeDeadShows(allShows);
-        // await util.listCountries(allShows);
-        // await util.setAllFavs(allShows);
-        // await util.setAllTvdbShowIds(allShows);
-        // await util.setAllNoEmbyTvdbIds(allShows);
-        // await util.removeNoMatchsFromTvdbJson()
-        // await util.removeDontSavesFromTvdbJson()
-        // await util.loadAllRemotes(allShows); // takes many hours
+        await this.newShows(true);
       }
       catch (err) {
         console.error("Mounted:", err);

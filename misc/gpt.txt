@@ -1,4 +1,3 @@
 
-i want to be able reload data from emby while the app is running.
 
-
+if startGapWorker is blocked by !isInitialLoad then run startGapWorker when current gapworker is finished

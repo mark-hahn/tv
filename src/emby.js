@@ -61,7 +61,7 @@ export async function loadAllShows() {
   const noEmbyPromise = srvr.getNoEmbys();
   const gapPromise    = srvr.getGaps();
 
-  const [embyShows, srvrShows, 
+  const [embyShows, diskShows, 
          rejectsIn, pickups, noEmbys, gaps] = 
     await Promise.all([embyPromise, diskPromise, 
                        rejPromise, pkupPromise,
@@ -81,7 +81,7 @@ export async function loadAllShows() {
       if(show[date]) show[date] = show[date].substring(0, 10);
     }
     const embyPath     = show.Path.split('/').pop();
-    const showDateSize = srvrShows[embyPath];
+    const showDateSize = diskShows[embyPath];
     if(!showDateSize) {
       show.NoFiles = true;
       show.Date = '2017-12-05';
@@ -276,8 +276,6 @@ export async function loadAllShows() {
 //////////  finished loadAllShows ////////////
   const elapsed = new Date().getTime() - loadAllShowsStartTime;
   console.log('all shows loaded, elapsed ms:', elapsed);
-
-  // console.log('shows:', shows);
   return shows;
 }
 

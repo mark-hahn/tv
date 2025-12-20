@@ -95,3 +95,5 @@ Before merge - TMDB: 93, TVDB: 14 actors.vue:68:15
 Another Period - TVDB: 9, TMDB: 84 actors.vue:730:15
 --
 what is wrong?
+---
+in the show Bob's Burgers the regulars list has the same actor name twice. the character name is different but only the actor name should be used in the logic.

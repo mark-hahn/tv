@@ -712,7 +712,6 @@ export default {
             
             // Find the max episode count in the data
             const maxEpisodeCount = Math.max(...castArray.map(a => a.total_episode_count || 0));
-            console.log(`TMDB cast: ${castArray.length}, max episodes: ${maxEpisodeCount}`);
             
             let low = 1;
             let high = maxEpisodeCount;
@@ -732,14 +731,10 @@ export default {
               }
             }
             
-            console.log(`Binary search result: threshold=${bestThreshold}`);
-            
             const regularsOnly = castArray.filter(actor => {
               const episodeCount = actor.total_episode_count || 0;
               return episodeCount >= bestThreshold;
             });
-            
-            console.log(`Filtered to ${regularsOnly.length} regulars`);
             
             tmdbList = regularsOnly.map(actor => {
               const imageUrl = actor.profile_path 

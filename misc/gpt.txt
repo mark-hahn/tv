@@ -52,6 +52,7 @@
     "showId": "4759942"
   }
 }
+
 ---
 
 there is a function in the server that makes the api call for this show object data and updates the tvdb.json cache. add the necessary api calls to this function to also add episode ids to this show object. make the code changes to the local copy of misc/tv-series-srvr.copy and i will copy the changes to the real server.
@@ -61,3 +62,25 @@ this function is called for every show every 30 hours so this new code would eve
 ---
 
 the client app loads this tvdb data from the server when the app loads. extract the episode id data if available from the tvdb show object and store it in a separate cache called episodeIds of episode ids by show/season/episode.  when episode ids are needed to get guest actors from tvdb use episodeIds cache.  if the episode isn't in the cache look it up using the api call and save the ids in episodeIds cache.  there is no need to send this new data to the server because it will eventually get that data by itself.
+
+=============================
+
+here are two shows i tested. one got the episode id data from the server and the other didn't. for each show it took 3 to 4 seconds from clicking the guests button for the guest images to appear. the one with the ids from the server was no faster even though ids were cached.  
+
+--------
+the show without the episode data from server had this console:
+
+Before merge - TMDB: 9, TVDB: 10 actors.vue:68:15
+Cheers - TVDB: 10, TMDB: 0 actors.vue:730:15
+Guest data fetch: 2462ms (episode ID API lookup) tvdb.js:146:11
+Before merge - TMDB: 13, TVDB: 9 actors.vue:68:15
+Cheers S01E03 - TVDB: 6, TMDB: 10 actors.vue:346:15
+
+--------
+the show with the episode data from server had this console:
+
+Before merge - TMDB: 7, TVDB: 10 actors.vue:68:15
+Fallout - TVDB: 10, TMDB: 4 actors.vue:730:15
+Guest data fetch: 2226ms (episode ID cached) tvdb.js:146:11
+Before merge - TMDB: 27, TVDB: 27 actors.vue:68:15
+Fallout S01E01 - TVDB: 4, TMDB: 26 actors.vue:346:15

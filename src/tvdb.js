@@ -21,8 +21,24 @@ export const getAllTvdb = async () => {
   // all data in tvdb.json
   // cached in allTvdb
   allTvdb ??= await srvr.getAllTvdb();
+  
+  // Extract episode IDs from allTvdb into episodeIds cache
+  if (allTvdb && !episodeIdsExtracted) {
+    for (const showName in allTvdb) {
+      const showData = allTvdb[showName];
+      if (showData.episodeIds) {
+        episodeIds[showName] = showData.episodeIds;
+      }
+    }
+    episodeIdsExtracted = true;
+  }
+  
   return allTvdb;
 }
+
+// Cache of episode IDs by show/season/episode
+let episodeIds = {};
+let episodeIdsExtracted = false;
 
 //////////// search for TvDb Data //////////////
 
@@ -79,6 +95,8 @@ export async function getWaitStr(show) {
 //////////// get episode data //////////////
 
 export const getEpisode = async (showName, seasonNum, episodeNum) => {
+  const startTime = performance.now();
+  
   // Get series ID from allTvdb
   if (!allTvdb) await getAllTvdb();
   const tvdbData = allTvdb[showName];
@@ -89,26 +107,44 @@ export const getEpisode = async (showName, seasonNum, episodeNum) => {
   }
   
   const seriesId = tvdbData.tvdbId;
+  let episodeId = null;
+  let usedCache = false;
   
-  // Fetch episodes to get episode ID
-  const episodeUrl = `series/${seriesId}/episodes/default?season=${seasonNum}&episodeNumber=${episodeNum}`;
-  
-  const episodeRes = await tvdbFetch(episodeUrl);
-  const episodeResObj = await episodeRes.json();
-  const episodes = episodeResObj.data?.episodes;
-  
-  if (!episodes || episodes.length === 0) {
-    console.error('getEpisode: no episode found for:', {showName, seasonNum, episodeNum});
-    return null;
+  // Try to get episode ID from cache first
+  if (episodeIds[showName]?.[seasonNum]?.[episodeNum]) {
+    episodeId = episodeIds[showName][seasonNum][episodeNum];
+    usedCache = true;
+  } else {
+    // Episode ID not in cache, fetch it via API
+    const episodeUrl = `series/${seriesId}/episodes/default?season=${seasonNum}&episodeNumber=${episodeNum}`;
+    
+    const episodeRes = await tvdbFetch(episodeUrl);
+    const episodeResObj = await episodeRes.json();
+    const episodes = episodeResObj.data?.episodes;
+    
+    if (!episodes || episodes.length === 0) {
+      console.error('getEpisode: no episode found for:', {showName, seasonNum, episodeNum});
+      return null;
+    }
+    
+    episodeId = episodes[0].id;
+    
+    // Cache the episode ID for future use
+    if (!episodeIds[showName]) episodeIds[showName] = {};
+    if (!episodeIds[showName][seasonNum]) episodeIds[showName][seasonNum] = {};
+    episodeIds[showName][seasonNum][episodeNum] = episodeId;
   }
   
-  const episodeId = episodes[0].id;
-  
-  // Fetch and return extended episode data
+  // Fetch and return extended episode data using the episode ID
   const extendedUrl = `episodes/${episodeId}/extended`;
   
   const extendedRes = await tvdbFetch(extendedUrl);
   const extendedResObj = await extendedRes.json();
+  
+  const elapsed = (performance.now() - startTime).toFixed(0);
+  const cacheStatus = usedCache ? 'cached' : 'API lookup';
+  console.log(`Guest data fetch: ${elapsed}ms (episode ID ${cacheStatus})`);
+  
   return extendedResObj.data;
 }
 

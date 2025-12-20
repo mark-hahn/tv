@@ -53,9 +53,9 @@ export async function loadAllShows() {
 
   const loadAllShowsStartTime = new Date().getTime();
 
-  const listPromise   = axios.get(
+  const embyPromise   = axios.get(
                         urls.showListUrl(cred, 0, 10000));
-  const seriesPromise = srvr.getAllShows(); 
+  const diskPromise   = srvr.getShowsFromDisk(); 
   const waitPromise   = srvr.getBlockedWaits();
   const blkGapPromise = srvr.getBlockedGaps();
   const rejPromise    = srvr.getRejects();
@@ -66,7 +66,7 @@ export async function loadAllShows() {
   const [embyShows, srvrShows, 
          blockedWaitShows, blockedGapShows,
          rejectsIn, pickups, noEmbys, gaps] = 
-    await Promise.all([listPromise, seriesPromise, 
+    await Promise.all([embyPromise, diskPromise, 
                        waitPromise, blkGapPromise, 
                        rejPromise, pkupPromise,
                        noEmbyPromise, gapPromise]);

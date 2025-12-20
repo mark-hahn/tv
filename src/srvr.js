@@ -127,8 +127,8 @@ const updateLastViewedCache = async () => {
 setTimeout(updateLastViewedCache, 0); 
 setInterval(updateLastViewedCache, 10*1000); // every 10 secs
 
-export function getAllShows()      
-            {return fCall('getAllShows')}
+export function getShowsFromDisk()      
+            {return fCall('getShowsFromDisk')}
 export function deletePath(path)   
             {return fCall('deletePath', path)}
 export function updateTvdb()      

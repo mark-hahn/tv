@@ -257,6 +257,74 @@ function getTvdbCharacters(extResObj) {
     }));
 }
 
+async function getTvdbEpisodeIds(tvdbId, name) {
+  // Fetch all episode IDs organized by season/episode
+  const episodeIds = {};
+  let page = 0;
+  let safety = 0;
+  const seenPages = new Set();
+  
+  try {
+    while (true) {
+      seenPages.add(page);
+      
+      const episodesUrl = `https://api4.thetvdb.com/v4/series/${tvdbId}/episodes/default?page=${page}&seasonType=official&perPage=100`;
+      
+      const episodesRes = await fetch(episodesUrl, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + theTvdbToken
+        }
+      });
+      
+      if (!episodesRes.ok) {
+        log('err', `getTvdbEpisodeIds error for ${name}, page ${page}:`, episodesRes.status);
+        break;
+      }
+      
+      const episodesObj = await episodesRes.json();
+      const episodes = episodesObj.data?.episodes || [];
+      const links = episodesObj.links || {};
+      
+      // Process episodes
+      for (const epData of episodes) {
+        const seasonNum = epData.seasonNumber ?? epData.airedSeason ?? epData.airedSeasonNumber ?? epData.season;
+        const episodeNum = epData.number ?? epData.airedEpisodeNumber ?? epData.episodeNumber;
+        const episodeId = epData.id;
+        
+        if (seasonNum > 0 && episodeNum && episodeId) {
+          if (!episodeIds[seasonNum]) {
+            episodeIds[seasonNum] = {};
+          }
+          episodeIds[seasonNum][episodeNum] = episodeId;
+        }
+      }
+      
+      // Determine next page
+      let nextPage = null;
+      if (links.next !== undefined && links.next !== null) {
+        if (Number.isFinite(links.next)) {
+          nextPage = links.next;
+        } else if (typeof links.next === 'string') {
+          const match = links.next.match(/page=(\d+)/);
+          if (match) nextPage = Number(match[1]);
+        } else if (links.next) {
+          nextPage = page + 1;
+        }
+      }
+      
+      if (nextPage === null) break;
+      if (seenPages.has(nextPage)) break;
+      if (safety++ > 50) break;
+      page = nextPage;
+    }
+  } catch (error) {
+    log('err', `getTvdbEpisodeIds exception for ${name}:`, error);
+  }
+  
+  return episodeIds;
+}
+
 //////////// GET TVDB DATA //////////////
 // fetch data from tvdb.com
 // create tvdbData object
@@ -313,6 +381,9 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   let originalNetwork = originalNetworkIn?.name ?? '';
   const status = statusIn.name; // e.g. Ended
 
+  // Fetch episode IDs organized by season/episode
+  const episodeIds = await getTvdbEpisodeIds(tvdbId, name);
+
   // get remote data, e.g. IMDB for tvdb record
   // remoteIds come from tvdb
   const remotes = await getRemotes(show, remoteIds);
@@ -323,7 +394,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
                   image, score, overview,
                   firstAired, lastAired, averageRuntime,
                   originalCountry, originalLanguage,
-                  status, remotes, characters, added, saved};
+                  status, remotes, characters, episodeIds, added, saved};
   if(showId !== undefined) 
     tvdbData.showId = showId;
   if(deleted !== undefined)

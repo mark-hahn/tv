@@ -1,0 +1,665 @@
+{
+  "kind": "customsearch#search",
+  "url": {
+    "type": "application/json",
+    "template": "https://www.googleapis.com/customsearch/v1?q={searchTerms}&num={count?}&start={startIndex?}&lr={language?}&safe={safe?}&cx={cx?}&sort={sort?}&filter={filter?}&gl={gl?}&cr={cr?}&googlehost={googleHost?}&c2coff={disableCnTwTranslation?}&hq={hq?}&hl={hl?}&siteSearch={siteSearch?}&siteSearchFilter={siteSearchFilter?}&exactTerms={exactTerms?}&excludeTerms={excludeTerms?}&linkSite={linkSite?}&orTerms={orTerms?}&dateRestrict={dateRestrict?}&lowRange={lowRange?}&highRange={highRange?}&searchType={searchType}&fileType={fileType?}&rights={rights?}&imgSize={imgSize?}&imgType={imgType?}&imgColorType={imgColorType?}&imgDominantColor={imgDominantColor?}&alt=json"
+  },
+  "queries": {
+    "request": [
+      {
+        "title": "Google Custom Search - A Thousand Blows tv show",
+        "totalResults": "3950000",
+        "searchTerms": "A Thousand Blows tv show",
+        "count": 10,
+        "startIndex": 1,
+        "inputEncoding": "utf8",
+        "outputEncoding": "utf8",
+        "safe": "off",
+        "cx": "b59f40d0c17b54ff1"
+      }
+    ],
+    "nextPage": [
+      {
+        "title": "Google Custom Search - A Thousand Blows tv show",
+        "totalResults": "3950000",
+        "searchTerms": "A Thousand Blows tv show",
+        "count": 10,
+        "startIndex": 11,
+        "inputEncoding": "utf8",
+        "outputEncoding": "utf8",
+        "safe": "off",
+        "cx": "b59f40d0c17b54ff1"
+      }
+    ]
+  },
+  "context": {
+    "title": "wiki-search"
+  },
+  "searchInformation": {
+    "searchTime": 0.377245,
+    "formattedSearchTime": "0.38",
+    "totalResults": "3950000",
+    "formattedTotalResults": "3,950,000"
+  },
+  "items": [
+    {
+      "kind": "customsearch#result",
+      "title": "A Thousand Blows - Wikipedia",
+      "htmlTitle": "<b>A Thousand Blows</b> - Wikipedia",
+      "link": "https://en.wikipedia.org/wiki/A_Thousand_Blows",
+      "displayLink": "en.wikipedia.org",
+      "snippet": "A Thousand Blows is a British historical drama series created by Steven Knight about the Forty Elephants, an all-female crime syndicate, clashing with the ...",
+      "htmlSnippet": "<b>A Thousand Blows</b> is a British historical drama <b>series</b> created by Steven Knight about the Forty Elephants, an all-female crime syndicate, clashing with the&nbsp;...",
+      "formattedUrl": "https://en.wikipedia.org/wiki/A_Thousand_Blows",
+      "htmlFormattedUrl": "https://en.wikipedia.org/wiki/<b>A_Thousand</b>_<b>Blows</b>",
+      "pagemap": {
+        "metatags": [
+          {
+            "referrer": "origin",
+            "og:image": "https://upload.wikimedia.org/wikipedia/en/b/b4/A_Thousand_Blows_Disney%2B_UK.jpg",
+            "theme-color": "#eaecf0",
+            "og:image:width": "959",
+            "og:type": "website",
+            "viewport": "width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=0.25, maximum-scale=5.0",
+            "og:title": "A Thousand Blows - Wikipedia",
+            "og:image:height": "1200",
+            "format-detection": "telephone=no"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "A Thousand Blows (TV Series 2024– ) - IMDb",
+      "htmlTitle": "<b>A Thousand Blows</b> (<b>TV Series</b> 2024– ) - IMDb",
+      "link": "https://www.imdb.com/title/tt21874900/",
+      "displayLink": "www.imdb.com",
+      "snippet": "The fortunes of Hezekiah and Alec, two best friends newly arrived from Jamaica. Fighting for survival in the violent melting pot of Victorian London's East End.",
+      "htmlSnippet": "The fortunes of Hezekiah and Alec, two best friends newly arrived from Jamaica. Fighting for survival in the violent melting pot of Victorian London&#39;s East End.",
+      "formattedUrl": "https://www.imdb.com/title/tt21874900/",
+      "htmlFormattedUrl": "https://www.imdb.com/title/tt21874900/",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTCnwR8-v2IfPY1UFT57pYkK5yk4PyeWAf1oBJmeQFbG4sRuIcozEw_ijmk&s",
+            "width": "168",
+            "height": "300"
+          }
+        ],
+        "metatags": [
+          {
+            "og:image": "https://m.media-amazon.com/images/M/MV5BY2E1OTM1YmItMDQ0Ni00YmY3LTgyNTEtMDk2NTA3MmY1NjI3XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+            "og:type": "video.tv_show",
+            "og:image:width": "1000",
+            "twitter:title": "A Thousand Blows (TV Series 2024– ) ⭐ 7.4 | Drama, History, Sport",
+            "twitter:card": "summary_large_image",
+            "imdb:subpagetype": "main",
+            "og:site_name": "IMDb",
+            "msvalidate.01": "C1DACEF2769068C0B0D2687C9E5105FA",
+            "og:title": "A Thousand Blows (TV Series 2024– ) ⭐ 7.4 | Drama, History, Sport",
+            "imdb:pageconst": "tt21874900",
+            "og:image:height": "1777.7777777777776",
+            "og:description": "1h | TV-MA",
+            "twitter:image": "https://m.media-amazon.com/images/M/MV5BY2E1OTM1YmItMDQ0Ni00YmY3LTgyNTEtMDk2NTA3MmY1NjI3XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+            "next-head-count": "52",
+            "twitter:image:alt": "A Thousand Blows: Created by Steven Knight. With Malachi Kirby, Erin Doherty, Francis Lovehall, Morgan Hilaire. The fortunes of Hezekiah and Alec, two best friends newly arrived from Jamaica. Fighting for survival in the violent melting pot of Victorian London's East End, they come up against Sugar Goodson, a dangerous, veteran boxer.",
+            "twitter:site": "@IMDb",
+            "og:locale:alternate": "es_ES",
+            "viewport": "width=device-width",
+            "twitter:description": "1h | TV-MA",
+            "og:locale": "en_US",
+            "og:url": "https://www.imdb.com/title/tt21874900/",
+            "imdb:pagetype": "title"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://m.media-amazon.com/images/M/MV5BY2E1OTM1YmItMDQ0Ni00YmY3LTgyNTEtMDk2NTA3MmY1NjI3XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "Watch A Thousand Blows | Full Episodes | Disney+",
+      "htmlTitle": "Watch <b>A Thousand Blows</b> | Full Episodes | Disney+",
+      "link": "https://www.disneyplus.com/browse/entity-865a666b-4759-46b2-91a2-bb217d3e8164",
+      "displayLink": "www.disneyplus.com",
+      "snippet": "This series is inspired by the true life stories of a group of characters battling for survival in the brutal East End of London in the 1880s.",
+      "htmlSnippet": "This <b>series</b> is <b>inspired by the true life stories of a group of characters battling for survival</b> in the brutal East End of London in the 1880s.",
+      "formattedUrl": "https://www.disneyplus.com/.../entity-865a666b-4759-46b2-91a2-bb217d3...",
+      "htmlFormattedUrl": "https://www.disneyplus.com/.../entity-865a666b-4759-46b2-91a2-bb217d3...",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTSHtqMIJcc3sjnhsMu1JpG0D6aXYav708TXfYk5L1vqn81caaEzkTdmmA&s",
+            "width": "300",
+            "height": "168"
+          }
+        ],
+        "metatags": [
+          {
+            "og:image": "https://disney.images.edge.bamgrid.com/ripcut-delivery/v2/variant/disney/a572c368-5e21-44ca-98ad-b976d68177b7/compose?aspectRatio=1.78&format=webp&width=1200",
+            "msapplication-config": "https://static-assets.bamgrid.com/product/disneyplus/favicons/browserconfig.8d3376270ef0e2abbb8bcb806162ae6d.xml",
+            "twitter:card": "summary_large_image",
+            "theme-color": "#ffffff",
+            "twitter:url": "https://www.disneyplus.com/browse/entity-865a666b-4759-46b2-91a2-bb217d3e8164",
+            "apple-mobile-web-app-title": "Disney+",
+            "apporigin": "bix-caleen",
+            "locale": "en-us",
+            "title": "Watch A Thousand Blows | Full Episodes | Disney+",
+            "og:description": "Two Jamaican friends arrive in London and become caught up in the East End's criminal underworld.",
+            "twitter:image": "https://disney.images.edge.bamgrid.com/ripcut-delivery/v2/variant/disney/840d5514-09e9-43a8-84a8-ccc1fc59f57d/compose?aspectRatio=2.00&format=webp&width=506",
+            "next-head-count": "31",
+            "sitename": "Disney+",
+            "server_url": "https://www.disneyplus.com",
+            "app": "marketing-unified",
+            "msapplication-tilecolor": "#ffffff",
+            "jenkinscommit": "8c700dd1b9da89e2dfc2c8a15f2d62502c42618e",
+            "twitter:title": "Watch A Thousand Blows | Full Episodes | Disney+",
+            "og:type": "website",
+            "og:title": "Watch A Thousand Blows | Full Episodes | Disney+",
+            "staticroot": "https://prod-static.disney-plus.net/us-east-1/disneyPlus/marketing-unified",
+            "env": "production",
+            "referrer": "strict-origin-when-cross-origin",
+            "aws_region": "us-east-1",
+            "viewport": "width=device-width, initial-scale=1.0",
+            "build": "8c700dd1",
+            "twitter:description": "Two Jamaican friends arrive in London and become caught up in the East End's criminal underworld.",
+            "og:url": "https://www.disneyplus.com/browse/entity-865a666b-4759-46b2-91a2-bb217d3e8164",
+            "config": "prod-2025-9-2_12_11_28_PM_EST"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://disney.images.edge.bamgrid.com/ripcut-delivery/v2/variant/disney/a572c368-5e21-44ca-98ad-b976d68177b7/compose?aspectRatio=1.78&format=webp&width=1200"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "A Thousand Blows | Teaser Trailer | Hulu - YouTube",
+      "htmlTitle": "<b>A Thousand Blows</b> | Teaser Trailer | Hulu - YouTube",
+      "link": "https://www.youtube.com/watch?v=ojZ922ohMIc",
+      "displayLink": "www.youtube.com",
+      "snippet": "Oct 11, 2024 ... ... TV Series/Films and award-winning Hulu Originals like Only Murders In The Building, The Handmaid's Tale, The Kardashians, and more! Visit ...",
+      "htmlSnippet": "Oct 11, 2024 <b>...</b> ... <b>TV Series</b>/Films and award-winning Hulu Originals like Only Murders In The Building, The Handmaid&#39;s Tale, The Kardashians, and more! Visit&nbsp;...",
+      "formattedUrl": "https://www.youtube.com/watch?v=ojZ922ohMIc",
+      "htmlFormattedUrl": "https://www.youtube.com/watch?v=ojZ922ohMIc",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQBxbxLMtfniRMZHMYlDgQyujCAjYIEItqWhiyYQLkm0pFW_9m_fbwlb1Gz&s",
+            "width": "300",
+            "height": "168"
+          }
+        ],
+        "imageobject": [
+          {
+            "width": "1280",
+            "url": "https://i.ytimg.com/vi/ojZ922ohMIc/maxresdefault.jpg",
+            "height": "720"
+          }
+        ],
+        "person": [
+          {
+            "name": "Hulu",
+            "url": "http://www.youtube.com/@hulu"
+          }
+        ],
+        "interactioncounter": [
+          {
+            "userinteractioncount": "504",
+            "interactiontype": "https://schema.org/LikeAction"
+          },
+          {
+            "userinteractioncount": "49081",
+            "interactiontype": "https://schema.org/WatchAction"
+          }
+        ],
+        "metatags": [
+          {
+            "apple-itunes-app": "app-id=544007664, app-argument=https://m.youtube.com/watch?v=ojZ922ohMIc&referring_app=com.apple.mobilesafari-smartbanner, affiliate-data=ct=smart_app_banner_polymer&pt=9008",
+            "og:image": "https://i.ytimg.com/vi/ojZ922ohMIc/maxresdefault.jpg",
+            "theme-color": "rgba(0, 0, 0, 0)",
+            "og:image:width": "1280",
+            "og:site_name": "YouTube",
+            "twitter:url": "https://www.youtube.com/watch?v=ojZ922ohMIc",
+            "al:android:package": "com.google.android.youtube",
+            "title": "A Thousand Blows | Teaser Trailer | Hulu",
+            "al:ios:url": "vnd.youtube://m.youtube.com/watch?v=ojZ922ohMIc&feature=applinks",
+            "og:description": "A Thousand Blows is inspired by the true-life stories of a group of characters battling for survival in the brutal East End of London in the 1880’s. Hezekiah (Malachi Kirby) and Alec (Francis Lovehall), two friends from Jamaica, find themselves thrust into the criminal underbelly of London's East End. It's there they meet Mary Carr (Erin Doherty), Queen of an all-female criminal gang known as The Forty Elephants, and run afoul of Sugar Goodson (Stephen Graham), criminal kingpin and notorious boxer. What ensues is a battle of the old world against the new.\n\nComing soon on Hulu. \n\nSUBSCRIBE TO HULU’S YOUTUBE CHANNEL\nClick the link to subscribe to our channel for the latest shows & updates: http://www.youtube.com/hulu?sub_confirmation=1\n\nSTART YOUR FREE TRIAL \nhttp://hulu.com/start \n\nFOLLOW US ON SOCIAL\nInstagram: https://www.instagram.com/hulu/ \nHulu on Twitter: https://twitter.com/hulu\nFacebook: https://www.facebook.com/hulu\n\nABOUT HULU\nHulu is the leading all-in-one premium streaming service that offers a",
+            "al:ios:app_store_id": "544007664",
+            "og:video:type": "text/html",
+            "og:video:height": "720",
+            "og:video:url": "https://www.youtube.com/embed/ojZ922ohMIc",
+            "og:type": "video.other",
+            "al:ios:app_name": "YouTube",
+            "og:title": "A Thousand Blows | Teaser Trailer | Hulu",
+            "og:image:height": "720",
+            "al:web:url": "http://m.youtube.com/watch?v=ojZ922ohMIc&feature=applinks",
+            "og:video:secure_url": "https://www.youtube.com/embed/ojZ922ohMIc",
+            "og:video:tag": "hulu",
+            "og:video:width": "1280",
+            "al:android:url": "vnd.youtube://m.youtube.com/watch?v=ojZ922ohMIc&feature=applinks",
+            "viewport": "width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no,",
+            "og:url": "https://www.youtube.com/watch?v=ojZ922ohMIc",
+            "al:android:app_name": "YouTube"
+          }
+        ],
+        "videoobject": [
+          {
+            "identifier": "ojZ922ohMIc",
+            "embedurl": "https://www.youtube.com/embed/ojZ922ohMIc",
+            "playertype": "HTML5 Flash",
+            "isfamilyfriendly": "true",
+            "keywords": "hulu,disney,hulu movies,hulu shows,hulu tv,hulu tv shows,disney streaming,disney hulu,tv on hulu,movies on hulu,shows on hulu,hulu youtube,a thousand blows trailer,A Thousand Blows Teaser,A...",
+            "uploaddate": "2024-10-11T05:59:58-07:00",
+            "requiressubscription": "False",
+            "description": "A Thousand Blows is inspired by the true-life stories of a group of characters battling for survival in the brutal East End of London in the 1880’s. Hezekiah (Malachi Kirby) and Alec (Francis...",
+            "url": "https://www.youtube.com/watch?v=ojZ922ohMIc",
+            "duration": "PT0M49S",
+            "name": "A Thousand Blows | Teaser Trailer | Hulu",
+            "width": "1280",
+            "regionsallowed": "AD,AE,AF,AG,AI,AL,AM,AO,AQ,AR,AS,AT,AU,AW,AX,AZ,BA,BB,BD,BE,BF,BG,BH,BI,BJ,BL,BM,BN,BO,BQ,BR,BS,BT,BV,BW,BY,BZ,CA,CC,CD,CF,CG,CH,CI,CK,CL,CM,CN,CO,CR,CU,CV,CW,CX,CY,CZ,DE,DJ,DK,DM,DO,DZ,EC,EE,EG,EH...",
+            "genre": "Entertainment",
+            "datepublished": "2024-10-11T05:59:58-07:00",
+            "thumbnailurl": "https://i.ytimg.com/vi/ojZ922ohMIc/maxresdefault.jpg",
+            "height": "720"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://i.ytimg.com/vi/ojZ922ohMIc/maxresdefault.jpg"
+          }
+        ],
+        "thing": [
+          {
+            "name": "Hulu"
+          }
+        ],
+        "listitem": [
+          {
+            "position": "1"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "A Thousand Blows | Rotten Tomatoes",
+      "htmlTitle": "<b>A Thousand Blows</b> | Rotten Tomatoes",
+      "link": "https://www.rottentomatoes.com/tv/a_thousand_blows",
+      "displayLink": "www.rottentomatoes.com",
+      "snippet": "Inspired by the true life stories of a group of characters battling for survival in the brutal East End of London in the 1880s. Hezekiah Moscow and Alec ...",
+      "htmlSnippet": "Inspired by the true life stories of a group of characters battling for survival in the brutal East End of London in the 1880s. Hezekiah Moscow and Alec&nbsp;...",
+      "formattedUrl": "https://www.rottentomatoes.com/tv/a_thousand_blows",
+      "htmlFormattedUrl": "https://www.rottentomatoes.com/<b>tv</b>/<b>a_thousand</b>_<b>blows</b>",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQxjG9Tv1C51jGfsckFfzLIq7BhdNo9ppfon-DNfFIVKe5fKT7jLniG0DZW&s",
+            "width": "184",
+            "height": "273"
+          }
+        ],
+        "metatags": [
+          {
+            "og:image": "https://resizing.flixster.com/ybkhFD4UxPG2pJHpv2lZgx1waYI=/206x305/v2/https://resizing.flixster.com/1anASP_OE_hD1qh32eUAymCCPlQ=/ems.cHJkLWVtcy1hc3NldHMvdHZzZXJpZXMvYTNiMDZjNTYtYzlhNC00ODljLWE4OWEtZmVkNDIzMWRhNTEwLmpwZw==",
+            "apple-itunes-app": "app-id=6673916573, app-argument=https://www.rottentomatoes.com/",
+            "twitter:card": "summary",
+            "twitter:title": "A Thousand Blows | Rotten Tomatoes",
+            "og:type": "video.tv_show",
+            "theme-color": "#FA320A",
+            "og:site_name": "Rotten Tomatoes",
+            "msvalidate.01": "034F16304017CA7DCF45D43850915323",
+            "og:title": "A Thousand Blows | Rotten Tomatoes",
+            "og:description": "Discover reviews, ratings, and trailers for A Thousand Blows on Rotten Tomatoes. Stay updated with critic and audience scores today!",
+            "twitter:image": "https://resizing.flixster.com/ybkhFD4UxPG2pJHpv2lZgx1waYI=/206x305/v2/https://resizing.flixster.com/1anASP_OE_hD1qh32eUAymCCPlQ=/ems.cHJkLWVtcy1hc3NldHMvdHZzZXJpZXMvYTNiMDZjNTYtYzlhNC00ODljLWE4OWEtZmVkNDIzMWRhNTEwLmpwZw==",
+            "twitter:text:title": "A Thousand Blows | Rotten Tomatoes",
+            "viewport": "width=device-width, initial-scale=1",
+            "twitter:description": "Discover reviews, ratings, and trailers for A Thousand Blows on Rotten Tomatoes. Stay updated with critic and audience scores today!",
+            "og:locale": "en_US",
+            "og:url": "https://www.rottentomatoes.com/tv/a_thousand_blows"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://resizing.flixster.com/ybkhFD4UxPG2pJHpv2lZgx1waYI=/206x305/v2/https://resizing.flixster.com/1anASP_OE_hD1qh32eUAymCCPlQ=/ems.cHJkLWVtcy1hc3NldHMvdHZzZXJpZXMvYTNiMDZjNTYtYzlhNC00ODljLWE4OWEtZmVkNDIzMWRhNTEwLmpwZw=="
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "Watch A Thousand Blows Streaming Online | Hulu",
+      "htmlTitle": "Watch <b>A Thousand Blows</b> Streaming Online | Hulu",
+      "link": "https://www.hulu.com/series/a-thousand-blows-865a666b-4759-46b2-91a2-bb217d3e8164",
+      "displayLink": "www.hulu.com",
+      "snippet": "Watch A Thousand Blows and other popular TV shows and movies including new releases, classics, Hulu Originals, and more. It's all on Hulu.",
+      "htmlSnippet": "Watch <b>A Thousand Blows</b> and other popular <b>TV shows</b> and movies including new releases, classics, Hulu Originals, and more. It&#39;s all on Hulu.",
+      "formattedUrl": "https://www.hulu.com/.../a-thousand-blows-865a666b-4759-46b2-91a2-bb...",
+      "htmlFormattedUrl": "https://www.hulu.com/.../<b>a-thousand</b>-<b>blows</b>-865a666b-4759-46b2-91a2-bb...",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ55LPPbhK0ghplu4TtXPUYV46EFxoaAcDYdoqnfjr4TdrUhRVQAMMIVza2&s",
+            "width": "310",
+            "height": "163"
+          }
+        ],
+        "tvepisode": [
+          {
+            "image": "https://img3.hulu.com/user/v3/artwork/5d289be9-4a50-492d-ad84-535e474fd75a?base_image_bucket_name=image_manager&base_image=cd081436-f14e-4da7-a72a-949d6b7e3c89&size=600x338&format=webp",
+            "partofseason": "1",
+            "partofseries": "A Thousand Blows",
+            "name": "Episode 1",
+            "description": "Hezekiah and Alec, best friends from Jamaica, arrive in London to make their fortunes; they meet Mary Carr, leader of the Forty Elephants, who is planning a major heist."
+          },
+          {
+            "image": "https://img2.hulu.com/user/v3/artwork/683d7c7b-8396-4160-ae4c-b49313eb16b9?base_image_bucket_name=image_manager&base_image=36dc9983-4a4d-4efe-8948-f4a365506542&size=600x338&format=webp",
+            "partofseason": "1",
+            "partofseries": "A Thousand Blows",
+            "name": "Episode 2",
+            "description": "Hezekiah becomes Sugar's target as Mary accelerates her heist plans with him and Lao; the Forty Elephants raid Harrods while Alec meets a new acquaintance."
+          },
+          {
+            "image": "https://img2.hulu.com/user/v3/artwork/62df7648-c43f-44e1-a0e4-f9144f6aaa3d?base_image_bucket_name=image_manager&base_image=1f1c1f8f-2df4-45fa-917f-d63109d4c34b&size=600x338&format=webp",
+            "partofseason": "1",
+            "partofseries": "A Thousand Blows",
+            "name": "Episode 3",
+            "description": "A bombing threatens Mary's plans as she takes Hezekiah out to meet a key West End boxing figure; Hezekiah seizes this opportunity and asks Alec to help train him."
+          },
+          {
+            "image": "https://img.hulu.com/user/v3/artwork/515ec8bd-948e-4af1-aac9-b3dc91ab4e82?base_image_bucket_name=image_manager&base_image=c8edf16e-5994-4f1a-a4e7-53fe445235eb&size=600x338&format=webp",
+            "partofseason": "1",
+            "partofseries": "A Thousand Blows",
+            "name": "Episode 4",
+            "description": "Hezekiah debuts at West London Boxing Club, but Sugar's appearance after his fight disrupts plans; Mary Carr's heist night arrives with preparations complete, while Alec and Treacle strike a deal."
+          },
+          {
+            "image": "https://img4.hulu.com/user/v3/artwork/82392062-653f-4c64-8224-92a80d1d9b96?base_image_bucket_name=image_manager&base_image=b03b7e85-b57d-4e7c-ac09-08972d149c13&size=600x338&format=webp",
+            "partofseason": "1",
+            "partofseries": "A Thousand Blows",
+            "name": "Episode 5",
+            "description": "Mary finds herself under threat from figures both new and old; having caught the Earl of Lonsdale's attention, Hezekiah finds himself rising in the West London boxing circuit."
+          },
+          {
+            "image": "https://img2.hulu.com/user/v3/artwork/ef765c05-64c2-4ecf-80ae-9c484426c89e?base_image_bucket_name=image_manager&base_image=753f0da5-be82-4c3c-aa4f-781c755c7a03&size=600x338&format=webp",
+            "partofseason": "1",
+            "partofseries": "A Thousand Blows",
+            "name": "Episode 6",
+            "description": "Hezekiah is in shock but his title fight against Buster Williams is fast approaching and many key parties, including Peggy and Lonsdale, are relying on his victory."
+          }
+        ],
+        "TVSeries": [
+          {}
+        ],
+        "metatags": [
+          {
+            "og:image": "https://img3.hulu.com/user/v3/artwork/865a666b-4759-46b2-91a2-bb217d3e8164?base_image_bucket_name=image_manager&base_image=1b5862d2-c665-4248-8198-150df03a5688&size=1200x630&format=webp&operations=%5B%7B%22gradient_vector%22%3A%22(0%2C0%2C0%2C0.5)%7C(0%2C0%2C0%2C0)%7C(0%2C600)%7C(0%2C240)%22%7D%2C%7B%22overlay%22%3A%7B%22position%22%3A%22SouthEast%7C(30%2C30)%22%2C%22operations%22%3A%5B%7B%22image%22%3A%22image_manager%7Cfe4f02cd-31fd-4b04-9381-55593cc97e3b%22%7D%2C%7B%22resize%22%3A%22204x204%7Cmax%22%7D%2C%7B%22extent%22%3A%22204x204%22%7D%5D%7D%7D%2C%5D",
+            "twitter:card": "summary_large_image",
+            "og:site_name": "Hulu",
+            "twitter:url": "https://www.hulu.com/series/a-thousand-blows-865a666b-4759-46b2-91a2-bb217d3e8164",
+            "msapplication-tooltip": "Start Hulu with Internet Explorer enhancements.",
+            "cmsversion": "3",
+            "title": "Watch A Thousand Blows Streaming Online | Hulu",
+            "msapplication-tileimage": "/icon-win8-tile.png",
+            "og:description": "Hezekiah and Alec, two best friends from Jamaica, fight for survival in the violent melting pot of Victorian London's East End; they come up against Sugar Goodson, a dangerous, veteran boxer.",
+            "twitter:image": "https://img3.hulu.com/user/v3/artwork/865a666b-4759-46b2-91a2-bb217d3e8164?base_image_bucket_name=image_manager&base_image=1b5862d2-c665-4248-8198-150df03a5688&size=1200x630&format=webp&operations=%5B%7B%22gradient_vector%22%3A%22(0%2C0%2C0%2C0.5)%7C(0%2C0%2C0%2C0)%7C(0%2C600)%7C(0%2C240)%22%7D%2C%7B%22overlay%22%3A%7B%22position%22%3A%22SouthEast%7C(30%2C30)%22%2C%22operations%22%3A%5B%7B%22image%22%3A%22image_manager%7Cfe4f02cd-31fd-4b04-9381-55593cc97e3b%22%7D%2C%7B%22resize%22%3A%22204x204%7Cmax%22%7D%2C%7B%22extent%22%3A%22204x204%22%7D%5D%7D%7D%2C%5D",
+            "msapplication-packagefamilyname": "HuluLLC.HuluPlus_fphbd361v8tya",
+            "next-head-count": "4",
+            "twitter:site": "@Hulu",
+            "cu_app": "web-nonsub",
+            "twitter:account_id": "15033883",
+            "application-name": "Hulu",
+            "msapplication-starturl": "/",
+            "msapplication-tilecolor": "#ffffff",
+            "twitter:title": "A Thousand Blows",
+            "og:type": "tv_show",
+            "handheldfriendly": "true",
+            "og:title": "A Thousand Blows",
+            "msapplication-id": "App",
+            "referrer": "no-referrer-when-downgrade",
+            "fb:app_id": "40582213222",
+            "viewport": "width=device-width, initial-scale=1.0",
+            "twitter:description": "Hezekiah and Alec, two best friends from Jamaica, fight for survival in the violent melting pot of Victorian London's East End; they come up against Sugar Goodson, a dangerous, veteran boxer.",
+            "mobileoptimized": "width",
+            "og:url": "https://www.hulu.com/series/a-thousand-blows-865a666b-4759-46b2-91a2-bb217d3e8164"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://img3.hulu.com/user/v3/artwork/865a666b-4759-46b2-91a2-bb217d3e8164?base_image_bucket_name=image_manager&base_image=1b5862d2-c665-4248-8198-150df03a5688&size=1200x630&format=webp&operations=%5B%7B%22gradient_vector%22%3A%22(0%2C0%2C0%2C0.5)%7C(0%2C0%2C0%2C0)%7C(0%2C600)%7C(0%2C240)%22%7D%2C%7B%22overlay%22%3A%7B%22position%22%3A%22SouthEast%7C(30%2C30)%22%2C%22operations%22%3A%5B%7B%22image%22%3A%22image_manager%7Cfe4f02cd-31fd-4b04-9381-55593cc97e3b%22%7D%2C%7B%22resize%22%3A%22204x204%7Cmax%22%7D%2C%7B%22extent%22%3A%22204x204%22%7D%5D%7D%7D%2C%5D"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "'A Thousand Blows' Is a Knuckle Sandwich of a Series - The New ...",
+      "htmlTitle": "&#39;<b>A Thousand Blows</b>&#39; Is a Knuckle Sandwich of a <b>Series</b> - The New ...",
+      "link": "https://www.nytimes.com/2025/02/25/arts/television/a-thousand-blows-hulu.html",
+      "displayLink": "www.nytimes.com",
+      "snippet": "Feb 25, 2025 ... 'A Thousand Blows' Is a Knuckle Sandwich of a Series · “Peaky Blinders” is on Netflix. · If you want a different, slower British period drama ...",
+      "htmlSnippet": "Feb 25, 2025 <b>...</b> &#39;<b>A Thousand Blows</b>&#39; Is a Knuckle Sandwich of a <b>Series</b> &middot; “Peaky Blinders” is on Netflix. &middot; If you want a different, slower British period drama&nbsp;...",
+      "formattedUrl": "https://www.nytimes.com/2025/02/25/arts/.../a-thousand-blows-hulu.html",
+      "htmlFormattedUrl": "https://www.nytimes.com/2025/02/25/arts/.../<b>a-thousand</b>-<b>blows</b>-hulu.html",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSeIPSe096SRm6fraYA2SQntUBHWi9d8cRHuBKjuarN6RPDVpfZ_syuDSY&s",
+            "width": "310",
+            "height": "162"
+          }
+        ],
+        "metatags": [
+          {
+            "og:image": "https://static01.nyt.com/images/2025/02/24/arts/24Watching-Blows/24Watching-Blows-facebookJumbo.jpg",
+            "twitter:card": "summary_large_image",
+            "article:published_time": "2025-02-25T16:38:43.000Z",
+            "pt": "article",
+            "twitter:url": "https://www.nytimes.com/2025/02/25/arts/television/a-thousand-blows-hulu.html",
+            "al:ipad:app_store_id": "357066198",
+            "og:description": "From the creator of “Peaky Blinders” comes another brutal and dingy underworld drama, this one set among the boxers and criminals of 1880s London.",
+            "twitter:image:alt": "Stephen Graham and Malachi Kirby in a scene from “A Thousand Blows.”",
+            "article:modified_time": "2025-02-25T17:30:01.000Z",
+            "scg": "television",
+            "image": "https://static01.nyt.com/images/2025/02/24/arts/24Watching-Blows/24Watching-Blows-facebookJumbo.jpg",
+            "og:image:alt": "Stephen Graham and Malachi Kirby in a scene from “A Thousand Blows.”",
+            "pubp_event_id": "pubp://event/17daf6559e3b4dc7a66ada12f3583206",
+            "article:author": "https://www.nytimes.com/by/margaret-lyons",
+            "article:tag": "Television",
+            "al:ipad:url": "nytimes://www.nytimes.com/2025/02/25/arts/television/a-thousand-blows-hulu.html",
+            "al:ipad:app_name": "NYTimes",
+            "al:android:app_name": "NYTimes",
+            "nyt_uri": "nyt://article/5293f526-f53e-58bb-9f8c-2e3e2cbe17a6",
+            "twitter:app:id:googleplay": "com.nytimes.android",
+            "pdate": "20250225",
+            "articleid": "100000010011337",
+            "al:android:package": "com.nytimes.android",
+            "twitter:app:name:googleplay": "NYTimes",
+            "twitter:image": "https://static01.nyt.com/images/2025/02/24/arts/24Watching-Blows/24Watching-Blows-videoSixteenByNine3000.jpg",
+            "pst": "News",
+            "al:iphone:app_name": "NYTimes",
+            "twitter:site": "@nytimes",
+            "news_keywords": "TV,A Thousand Blows",
+            "article:content_tier": "metered",
+            "msapplication-starturl": "https://www.nytimes.com",
+            "twitter:title": "‘A Thousand Blows’ Is a Knuckle Sandwich of a Series",
+            "og:type": "article",
+            "article:section": "Arts",
+            "cg": "arts",
+            "og:title": "‘A Thousand Blows’ Is a Knuckle Sandwich of a Series",
+            "cn": "pop-culture",
+            "url": "https://www.nytimes.com/2025/02/25/arts/television/a-thousand-blows-hulu.html",
+            "al:iphone:url": "nytimes://www.nytimes.com/2025/02/25/arts/television/a-thousand-blows-hulu.html",
+            "al:android:url": "nyt://article/5293f526-f53e-58bb-9f8c-2e3e2cbe17a6",
+            "ct": "spotlight",
+            "twitter:app:url:googleplay": "nyt://article/5293f526-f53e-58bb-9f8c-2e3e2cbe17a6",
+            "fb:app_id": "9869919170",
+            "byl": "By Margaret Lyons",
+            "viewport": "width=device-width, initial-scale=1",
+            "twitter:description": "From the creator of “Peaky Blinders” comes another brutal and dingy underworld drama, this one set among the boxers and criminals of 1880s London.",
+            "al:iphone:app_store_id": "284862083",
+            "og:url": "https://www.nytimes.com/2025/02/25/arts/television/a-thousand-blows-hulu.html",
+            "article:opinion": "false"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://static01.nyt.com/images/2025/02/24/arts/24Watching-Blows/24Watching-Blows-facebookJumbo.jpg"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "If you liked Warrior, check out A Thousand Blows. It also stars Jason ...",
+      "htmlTitle": "If you liked Warrior, check out <b>A Thousand Blows</b>. It also stars Jason ...",
+      "link": "https://www.reddit.com/r/WarriorTV/comments/1ivxcxv/if_you_liked_warrior_check_out_a_thousand_blows/",
+      "displayLink": "www.reddit.com",
+      "snippet": "Feb 23, 2025 ... There's a new TV series called A Thousand Blows, and it features none other than Jason Tobin (our beloved Young Jun from Warrior).",
+      "htmlSnippet": "Feb 23, 2025 <b>...</b> There&#39;s a new <b>TV series</b> called <b>A Thousand Blows</b>, and it features none other than Jason Tobin (our beloved Young Jun from Warrior).",
+      "formattedUrl": "https://www.reddit.com/.../if_you_liked_warrior_check_out_a_thousand_bl...",
+      "htmlFormattedUrl": "https://www.reddit.com/.../if_you_liked_warrior_check_out_<b>a_thousand</b>_<b>bl</b>...",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR1N9q02y_29WOsDzKGcGiXMGrTmxbI5ZrbqD4LkHAyXpSRG9XYMoaeznF7&s",
+            "width": "201",
+            "height": "251"
+          }
+        ],
+        "metatags": [
+          {
+            "og:image": "https://share.redd.it/preview/post/1ivxcxv",
+            "theme-color": "#000000",
+            "og:image:width": "1200",
+            "og:type": "website",
+            "og:image:alt": "An image containing a preview of the post",
+            "twitter:card": "summary_large_image",
+            "twitter:title": "r/WarriorTV on Reddit: If you liked Warrior, check out A Thousand Blows. It also stars Jason Tobin!",
+            "og:site_name": "Reddit",
+            "og:title": "r/WarriorTV on Reddit: If you liked Warrior, check out A Thousand Blows. It also stars Jason Tobin!",
+            "og:image:height": "630",
+            "msapplication-navbutton-color": "#000000",
+            "og:description": "Posted by u/[Deleted Account] - 195 votes and 24 comments",
+            "twitter:image": "https://share.redd.it/preview/post/1ivxcxv",
+            "apple-mobile-web-app-status-bar-style": "black",
+            "twitter:site": "@reddit",
+            "viewport": "width=device-width, initial-scale=1, viewport-fit=cover",
+            "apple-mobile-web-app-capable": "yes",
+            "og:ttl": "600",
+            "og:url": "https://www.reddit.com/r/WarriorTV/comments/1ivxcxv/if_you_liked_warrior_check_out_a_thousand_blows/?seeker-session=true"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://preview.redd.it/if-you-liked-warrior-check-out-a-thousand-blows-it-also-v0-wyr4zb4d9ske1.jpg?width=1080&format=pjpg&auto=webp&s=b1c969ebf32f4e9c1d052bdb16077a86b66faf0a"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "A Thousand Blows review – the irresistible new boxing drama from ...",
+      "htmlTitle": "<b>A Thousand Blows</b> review – the irresistible new boxing drama from ...",
+      "link": "https://www.theguardian.com/tv-and-radio/2025/feb/21/a-thousand-blows-review-the-irresistible-new-boxing-drama-from-the-peaky-blinders-creator",
+      "displayLink": "www.theguardian.com",
+      "snippet": "Feb 21, 2025 ... The new series is called A Thousand Blows, and this is an understatement. Some will stay away because of the boxing. This would be a mistake, ...",
+      "htmlSnippet": "Feb 21, 2025 <b>...</b> The new <b>series</b> is called <b>A Thousand Blows</b>, and this is an understatement. Some will stay away because of the boxing. This would be a mistake,&nbsp;...",
+      "formattedUrl": "https://www.theguardian.com/tv.../a-thousand-blows-review-the-irresistible-...",
+      "htmlFormattedUrl": "https://www.theguardian.com/<b>tv</b>.../<b>a-thousand</b>-<b>blows</b>-review-the-irresistible-...",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSP7RIIMeWQBYY85oX2hTiRMKeBdRmD43OZumr0cFb9sxI9sHS-07THh8k&s",
+            "width": "310",
+            "height": "163"
+          }
+        ],
+        "metatags": [
+          {
+            "og:image": "https://i.guim.co.uk/img/media/b6a70f1a5840e9635362519f686003106c647905/0_520_8346_5008/master/8346.jpg?width=1200&height=630&quality=85&auto=format&fit=crop&precrop=40:21,offset-x50,offset-y0&overlay-align=bottom%2Cleft&overlay-width=100p&overlay-base64=L2ltZy9zdGF0aWMvb3ZlcmxheXMvdGctcmV2aWV3LTUucG5n&enable=upscale&s=4e1b18de9e214fd86862c0d8ae82aad5",
+            "twitter:app:id:googleplay": "com.guardian",
+            "twitter:app:url:iphone": "gnmguardian://tv-and-radio/2025/feb/21/a-thousand-blows-review-the-irresistible-new-boxing-drama-from-the-peaky-blinders-creator?contenttype=Article&source=twitter",
+            "theme-color": "#052962",
+            "og:image:width": "1200",
+            "article:published_time": "2025-02-21T05:00:29.000Z",
+            "twitter:card": "summary_large_image",
+            "og:site_name": "the Guardian",
+            "twitter:app:url:ipad": "gnmguardian://tv-and-radio/2025/feb/21/a-thousand-blows-review-the-irresistible-new-boxing-drama-from-the-peaky-blinders-creator?contenttype=Article&source=twitter",
+            "twitter:app:name:googleplay": "The Guardian",
+            "al:ios:url": "gnmguardian://tv-and-radio/2025/feb/21/a-thousand-blows-review-the-irresistible-new-boxing-drama-from-the-peaky-blinders-creator?contenttype=Article&source=applinks",
+            "twitter:app:id:iphone": "409128287",
+            "og:description": "Steven Knight’s latest series is a hugely fun journey into the murky world of Victorian bare-knuckle fighting. It’s a ripping yarn full of audacious dialogue",
+            "twitter:creator": "@LucyMangan",
+            "article:publisher": "https://www.facebook.com/theguardian",
+            "al:ios:app_store_id": "409128287",
+            "twitter:dnt": "on",
+            "twitter:image": "https://i.guim.co.uk/img/media/b6a70f1a5840e9635362519f686003106c647905/0_520_8346_5008/master/8346.jpg?width=1200&height=630&quality=85&auto=format&fit=crop&precrop=40:21,offset-x50,offset-y0&overlay-align=bottom%2Cleft&overlay-width=100p&overlay-base64=L2ltZy9zdGF0aWMvb3ZlcmxheXMvdGctcmV2aWV3LTUucG5n&s=59388ff0d91862738a006b11a01eb689",
+            "twitter:site": "@guardian",
+            "article:modified_time": "2025-02-21T05:00:29.000Z",
+            "og:type": "article",
+            "article:section": "Television & radio",
+            "al:ios:app_name": "The Guardian",
+            "og:title": "A Thousand Blows review – the irresistible new boxing drama from the Peaky Blinders creator",
+            "og:image:height": "720",
+            "twitter:app:id:ipad": "409128287",
+            "article:author": "https://www.theguardian.com/profile/lucymangan",
+            "article:tag": "Television,Television & radio,Culture,Stephen Graham",
+            "fb:app_id": "180444840287",
+            "twitter:app:url:googleplay": "guardian://www.theguardian.com/tv-and-radio/2025/feb/21/a-thousand-blows-review-the-irresistible-new-boxing-drama-from-the-peaky-blinders-creator",
+            "twitter:app:name:ipad": "The Guardian",
+            "viewport": "width=device-width,minimum-scale=1,initial-scale=1",
+            "og:url": "https://www.theguardian.com/tv-and-radio/2025/feb/21/a-thousand-blows-review-the-irresistible-new-boxing-drama-from-the-peaky-blinders-creator",
+            "twitter:app:name:iphone": "The Guardian"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://i.guim.co.uk/img/media/b6a70f1a5840e9635362519f686003106c647905/0_520_8346_5008/master/8346.jpg?width=1200&height=630&quality=85&auto=format&fit=crop&precrop=40:21,offset-x50,offset-y0&overlay-align=bottom%2Cleft&overlay-width=100p&overlay-base64=L2ltZy9zdGF0aWMvb3ZlcmxheXMvdGctcmV2aWV3LTUucG5n&enable=upscale&s=4e1b18de9e214fd86862c0d8ae82aad5"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "A Thousand Blows - Series Premiere Discussion : r/television",
+      "htmlTitle": "<b>A Thousand Blows</b> - <b>Series</b> Premiere Discussion : r/<b>television</b>",
+      "link": "https://www.reddit.com/r/television/comments/1iwf8tn/a_thousand_blows_series_premiere_discussion/",
+      "displayLink": "www.reddit.com",
+      "snippet": "Feb 24, 2025 ... Premise: The latest series from Peaky Blinders creator Steven Knight is set in 1880s London where Hezekiah (Malachi Kirby) meets the all-female ...",
+      "htmlSnippet": "Feb 24, 2025 <b>...</b> Premise: The latest <b>series</b> from Peaky Blinders creator Steven Knight is set in 1880s London where Hezekiah (Malachi Kirby) meets the all-female&nbsp;...",
+      "formattedUrl": "https://www.reddit.com/r/.../a_thousand_blows_series_premiere_discussion/",
+      "htmlFormattedUrl": "https://www.reddit.com/r/.../<b>a_thousand</b>_<b>blows</b>_series_premiere_discussion/",
+      "pagemap": {
+        "metatags": [
+          {
+            "og:image": "https://share.redd.it/preview/post/1iwf8tn",
+            "theme-color": "#000000",
+            "og:image:width": "1200",
+            "og:type": "website",
+            "og:image:alt": "An image containing a preview of the post",
+            "twitter:card": "summary_large_image",
+            "twitter:title": "r/television on Reddit: A Thousand Blows - Series Premiere Discussion",
+            "og:site_name": "Reddit",
+            "og:title": "r/television on Reddit: A Thousand Blows - Series Premiere Discussion",
+            "og:image:height": "630",
+            "msapplication-navbutton-color": "#000000",
+            "og:description": "Posted by u/NicholasCajun - 43 votes and 92 comments",
+            "twitter:image": "https://share.redd.it/preview/post/1iwf8tn",
+            "apple-mobile-web-app-status-bar-style": "black",
+            "twitter:site": "@reddit",
+            "viewport": "width=device-width, initial-scale=1, viewport-fit=cover",
+            "apple-mobile-web-app-capable": "yes",
+            "og:ttl": "600",
+            "og:url": "https://www.reddit.com/r/television/comments/1iwf8tn/a_thousand_blows_series_premiere_discussion/?seeker-session=true"
+          }
+        ]
+      }
+    }
+  ]
+}

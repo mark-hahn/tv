@@ -265,7 +265,8 @@ export default {
 
       const hh = String(d.getHours()).padStart(2, '0');
       const mm = String(d.getMinutes()).padStart(2, '0');
-      return `${hh}:${mm}`;
+      const ss = String(d.getSeconds()).padStart(2, '0');
+      return `${hh}:${mm}:${ss}`;
     },
 
     fmtGb(bytes) {
@@ -315,11 +316,11 @@ export default {
 
       if (status === 'downloading') {
         if (ended) parts.push(ended);
+        const eta = this.fmtHhmm(it?.eta);
+        if (eta) parts.push(eta);
         if (Number.isFinite(progress) && progress >= 0 && progress <= 100) {
           parts.push(`${progress}%`);
         }
-        const eta = this.fmtHhmm(it?.eta);
-        if (eta) parts.push(eta);
         parts.push('Downloading');
         return { seasonEpisode, rest: parts.join(' | ') };
       }

@@ -10,9 +10,7 @@ untested ...
   check torrent files validity before downloading
 
 todo ...
-  add eta to tvrpoc cardss
   card order in dlstatus.vue
-  tvproc download progress
   add elapsed to qbt card
   tvproc control - force get
   add secs to qbt card

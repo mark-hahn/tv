@@ -3,7 +3,7 @@
 #dlstatus(:style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
 
   div(v-if="cards.length === 0" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
-    | Usb is not getting any files from swarm.
+    | USB is not getting any files from swarm.
 
   div(v-else style="padding:10px; font-size:14px; line-height:1.6;")
     div(v-for="card in cards" :key="card.hash" style="position:relative; background:#fff; border:1px solid #ddd; border-radius:5px; padding:10px; margin:0 0 10px 0;")

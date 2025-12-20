@@ -117,7 +117,7 @@ function parseFlexgetHistoryText(text) {
     }
 
     const timeFmt = fmtFlexgetTime(time);
-    const subline = [provider, timeFmt, reason].filter(Boolean).join(', ');
+    const subline = [provider, timeFmt, reason].filter(Boolean).join(' | ');
 
     cards.push({
       key: `${title}::${provider}::${time}::${reason}::${i}`,

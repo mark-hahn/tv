@@ -285,6 +285,7 @@ export default {
       const started = this.fmtMdhm(it?.dateStarted);
       const ended = this.fmtMdhm(it?.dateEnded);
       const status = String(it?.status || '').trim();
+      const progress = Number(it?.progress);
 
       const parts = [];
       if (size) parts.push(size);
@@ -295,17 +296,21 @@ export default {
         const elapsed = this.fmtElapsedMmSs(this.elapsedSeconds(it));
         if (elapsed) parts.push(elapsed);
         parts.push('Finished');
-        return { seasonEpisode, rest: parts.join(', ') };
+        return { seasonEpisode, rest: parts.join(' | ') };
       }
 
       if (status === 'downloading') {
-        parts.push('Downloads');
-        return { seasonEpisode, rest: parts.join(', ') };
+        if (ended) parts.push(ended);
+        if (Number.isFinite(progress) && progress >= 0 && progress <= 100) {
+          parts.push(`${progress}%`);
+        }
+        parts.push('Downloading');
+        return { seasonEpisode, rest: parts.join(' | ') };
       }
 
       if (ended) parts.push(ended);
       if (status) parts.push(status);
-      return { seasonEpisode, rest: parts.join(', ') };
+      return { seasonEpisode, rest: parts.join(' | ') };
     },
 
     async trimLog() {

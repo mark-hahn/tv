@@ -267,8 +267,11 @@ export default {
         evtBus.emit('seriesMapUpdated', { show: this.mapShow, seriesMap: this.seriesMap });
       }
 
-      this.currentPane = data.mapShow !== null ? 'map' : 'series';
-      evtBus.emit('paneChanged', this.currentPane);
+      // Only switch to map pane if noSwitch flag is not set
+      if (!data.noSwitch) {
+        this.currentPane = data.mapShow !== null ? 'map' : 'series';
+        evtBus.emit('paneChanged', this.currentPane);
+      }
     },
     handleHideMap() {
       console.log('handleHideMap called, setting currentPane to series');

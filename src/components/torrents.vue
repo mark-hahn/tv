@@ -53,7 +53,7 @@
         div(v-if="SHOW_TITLE && torrent.raw" style="font-size:14px; color:#888; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;") {{ torrent.raw.title }}
         div(style="font-size:16px; color:#333;") 
           strong {{ getDisplaySeasonEpisode(torrent) }}
-          | : {{ torrent.raw?.size || 'N/A' }}, {{ torrent.raw?.seeds || 0 }} seeds<span v-if="torrent.raw?.provider">, {{ formatProvider(torrent.raw.provider) }}</span><span v-if="torrent.parsed?.resolution">, {{ torrent.parsed.resolution }}</span><span v-if="torrent.parsed?.group">, {{ formatGroup(torrent.parsed.group) }}</span>
+          | : {{ torrent.raw?.size || 'N/A' }} | {{ torrent.raw?.seeds || 0 }} seeds<span v-if="torrent.raw?.provider"> | {{ formatProvider(torrent.raw.provider) }}</span><span v-if="torrent.parsed?.resolution"> | {{ torrent.parsed.resolution }}</span><span v-if="torrent.parsed?.group"> | {{ formatGroup(torrent.parsed.group) }}</span>
 
   #download-modal(v-if="showModal" @click.stop="showModal = false" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:10000;")
     #modal-content(@click.stop style="background:white; padding:30px; border-radius:10px; max-width:500px; box-shadow:0 4px 20px rgba(0,0,0,0.3);")

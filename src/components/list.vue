@@ -828,6 +828,9 @@ export default {
         console.log('setting last watched to cur date');
         await emby.setLastWatched(show.Id);
       }
+      
+      const isRefresh = action === 'refresh';
+      
       this.hideMapBottom     = true;
       this.mapShow           = show;
       const seriesMapSeasons = [];
@@ -880,7 +883,8 @@ export default {
         seriesMapSeasons: this.seriesMapSeasons,
         seriesMapEpis: this.seriesMapEpis,
         seriesMap: this.seriesMap,
-        mapError: errorMessage
+        mapError: errorMessage,
+        noSwitch: isRefresh
       });
     },
 
@@ -1124,6 +1128,14 @@ export default {
           this.$nextTick(() => {
             evtBus.emit('setUpSeries', currentShow);
           });
+          
+          // Reload map pane with updated data (regardless of whether it's currently visible)
+          // Use 'refresh' action to avoid switching panes
+          if(this.mapShow) {
+            this.$nextTick(() => {
+              void this.seriesMapAction('refresh', currentShow);
+            });
+          }
         }
       }
 

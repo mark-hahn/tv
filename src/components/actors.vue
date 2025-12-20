@@ -109,37 +109,51 @@ export default {
       const tmdbBefore = tmdb.length;
       const tvdbBefore = tvdb.length;
 
+      // Deduplicate each list by actor name (keep first occurrence)
+      const deduplicateByActor = (list) => {
+        const seen = new Set();
+        return list.filter(actor => {
+          const name = this.normPersonName(actor?.personName || actor?.name);
+          if (seen.has(name)) return false;
+          seen.add(name);
+          return true;
+        });
+      };
+      
+      const tmdbUnique = deduplicateByActor(tmdb);
+      const tvdbUnique = deduplicateByActor(tvdb);
+
       // Sort both lists by normalized person name so duplicates align
-      tmdb.sort((a, b) => {
+      tmdbUnique.sort((a, b) => {
         const nameA = this.normPersonName(a?.personName || a?.name);
         const nameB = this.normPersonName(b?.personName || b?.name);
         return nameA.localeCompare(nameB);
       });
-      tvdb.sort((a, b) => {
+      tvdbUnique.sort((a, b) => {
         const nameA = this.normPersonName(a?.personName || a?.name);
         const nameB = this.normPersonName(b?.personName || b?.name);
         return nameA.localeCompare(nameB);
       });
 
       while (true) {
-        if (tmdb.length === 0) {
-          tvdb.forEach(actor => {
+        if (tmdbUnique.length === 0) {
+          tvdbUnique.forEach(actor => {
             actor.source = actor.source || 'tvdb';
             actor.actorSort = actor.sort;
           });
-          output.push(...tvdb);
+          output.push(...tvdbUnique);
           break;
         }
-        if (tvdb.length === 0) {
-          tmdb.forEach(actor => {
+        if (tvdbUnique.length === 0) {
+          tmdbUnique.forEach(actor => {
             actor.source = actor.source || 'tmdb';
           });
-          output.push(...tmdb);
+          output.push(...tmdbUnique);
           break;
         }
 
-        const t0 = tmdb[0];
-        const v0 = tvdb[0];
+        const t0 = tmdbUnique[0];
+        const v0 = tvdbUnique[0];
         const tName = this.normPersonName(t0?.personName || t0?.name);
         const vName = this.normPersonName(v0?.personName || v0?.name);
 
@@ -150,31 +164,31 @@ export default {
 
           if (tHasImage !== vHasImage) {
             if (tHasImage) {
-              tvdb.shift();
-              const actor = tmdb.shift();
+              tvdbUnique.shift();
+              const actor = tmdbUnique.shift();
               actor.source = actor.source || 'tmdb';
               output.push(actor);
             } else {
-              tmdb.shift();
-              const actor = tvdb.shift();
+              tmdbUnique.shift();
+              const actor = tvdbUnique.shift();
               actor.source = actor.source || 'tvdb';
               actor.actorSort = actor.sort;
               output.push(actor);
             }
           } else {
-            tmdb.shift();
-            const actor = tvdb.shift();
+            tmdbUnique.shift();
+            const actor = tvdbUnique.shift();
             actor.source = actor.source || 'tvdb';
             actor.actorSort = actor.sort;
             output.push(actor);
           }
         } else {
           if (tName < vName) {
-            const actor = tmdb.shift();
+            const actor = tmdbUnique.shift();
             actor.source = actor.source || 'tmdb';
             output.push(actor);
           } else {
-            const actor = tvdb.shift();
+            const actor = tvdbUnique.shift();
             actor.source = actor.source || 'tvdb';
             actor.actorSort = actor.sort;
             output.push(actor);

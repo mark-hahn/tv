@@ -105,8 +105,9 @@ export default {
       const tmdb = Array.isArray(tmdbIn) ? [...tmdbIn] : [];
       const tvdb = Array.isArray(tvdbIn) ? [...tvdbIn] : [];
       const output = [];
-
-      console.log(`Before merge - TMDB: ${tmdb.length}, TVDB: ${tvdb.length}`);
+      
+      const tmdbBefore = tmdb.length;
+      const tvdbBefore = tvdb.length;
 
       // Sort both lists by normalized person name so duplicates align
       tmdb.sort((a, b) => {
@@ -216,7 +217,7 @@ export default {
         return 0;
       });
       
-      return output;
+      return { output, tmdbBefore, tvdbBefore };
     },
 
     normPosIntStr(v) {
@@ -370,7 +371,8 @@ export default {
       }
       
       // Merge TMDB and TVDB guest lists
-      this.actors = this.mergeTmdbTvdbActors(tmdbList, tvdbList);
+      const mergeResult = this.mergeTmdbTvdbActors(tmdbList, tvdbList);
+      this.actors = mergeResult.output;
       
       if (this.actors.length === 0) {
         this.errorMessage = 'No guest stars found';
@@ -379,12 +381,12 @@ export default {
       // Mark that we're showing episode actors
       this.showingEpisodeActors = true;
       
-      // Log summary
-      const tvdbCount = this.actors.filter(a => a.source === 'tvdb').length;
-      const tmdbCount = this.actors.filter(a => a.source === 'tmdb').length;
+      // Log summary with before/after counts
+      const tvdbAfter = this.actors.filter(a => a.source === 'tvdb').length;
+      const tmdbAfter = this.actors.filter(a => a.source === 'tmdb').length;
       const seasonStr = String(season).padStart(2, '0');
       const episodeStr = String(episode).padStart(2, '0');
-      console.log(`${this.showName} S${seasonStr}E${episodeStr} - TVDB: ${tvdbCount}, TMDB: ${tmdbCount}`);
+      console.log(`${this.showName} S${seasonStr}E${episodeStr} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`);
     },
 
     handleRegularClick() {
@@ -763,17 +765,18 @@ export default {
       }
 
       // Merge TMDB and TVDB lists
-      this.actors = this.mergeTmdbTvdbActors(tmdbList, tvdbList);
+      const mergeResult = this.mergeTmdbTvdbActors(tmdbList, tvdbList);
+      this.actors = mergeResult.output;
       
       // Cache series actors for restore
       this.seriesActors = [...this.actors];
       this.isGuestMode = false;
       this.showingEpisodeActors = false;
       
-      // Log summary
-      const tvdbCount = this.actors.filter(a => a.source === 'tvdb').length;
-      const tmdbCount = this.actors.filter(a => a.source === 'tmdb').length;
-      console.log(`${this.showName} - TVDB: ${tvdbCount}, TMDB: ${tmdbCount}`);
+      // Log summary with before/after counts
+      const tvdbAfter = this.actors.filter(a => a.source === 'tvdb').length;
+      const tmdbAfter = this.actors.filter(a => a.source === 'tmdb').length;
+      console.log(`${this.showName} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`);
     }
   },
 

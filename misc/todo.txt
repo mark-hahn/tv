@@ -10,7 +10,6 @@ untested ...
   check torrent files validity before downloading
 
 todo ...
-  use new episodeIds from server to speed up map generation
   after lib refresh reload all emby data like map
   in tvproc change Downloading to Downloads
   tvproc download progress

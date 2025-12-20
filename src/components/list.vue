@@ -24,7 +24,6 @@
         @filter-input="select"
         @cancel-srch-list="cancelSrchList"
         @search-action="searchAction"
-        @test-click="newShows"
       )
 
       HdrBot(

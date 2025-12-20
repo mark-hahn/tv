@@ -32,9 +32,6 @@
   div(style="flex:1; display:flex; align-items:center; justify-content:flex-end; margin-right:15px;")
     #count(v-if="simpleMode" style="font-size:14px; color:black;") 
       | {{showsLength}} Shows
-    button(@click="$emit('test-click')"
-            style="height:29px; background-color:yellow; fontSize:15px; margin:6px 10px 4px 10px;") 
-      | Test
 
   #searchList(v-if="showingSrchList" style="background-color:#eee; padding:0px; border: 1px solid black; height:85%; position: fixed; display:flex; flex-direction:column; left: 253px; top: 88px; cursor:pointer; min-width:280px;") 
     div(@click="$emit('cancel-srch-list')"

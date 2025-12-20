@@ -95,3 +95,19 @@ add "sequence" number property to object.  it should start with 1 and increment 
 
 ==========================================
 
+in file download encrcypt data.  also add progress from 0 to 100 to tv.json object for download
+
+==========================================
+
+add an eta to tv.json object
+
+add endpoint function forceFile(<file title>) that gives <file title> higher priority that any other file when sorting for downloading.  If forceFile is called in the middle of downloading then wait until downloading is finished and then start a new cycle so that <file title> can be downloaded next. if forceFile(<file title>) is called again while old <file title> is downloading then change priority to new <file title>  and restart cycle when current download is finished.
+
+
+# Force "Chuck" files to be downloaded next
+curl "http://localhost:3003/forceFile?title=Chuck"
+
+# POST version
+curl -X POST http://localhost:3003/forceFile \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Chuck"}'

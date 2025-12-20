@@ -254,6 +254,20 @@ export default {
       return `${m}/${day} ${hh}:${mm}`;
     },
 
+    fmtHhmm(ts) {
+      const n = Number(ts);
+      if (!Number.isFinite(n) || n <= 0) return '';
+
+      // Accept seconds or milliseconds.
+      const ms = n > 1e12 ? n : n * 1000;
+      const d = new Date(ms);
+      if (Number.isNaN(d.getTime())) return '';
+
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      return `${hh}:${mm}`;
+    },
+
     fmtGb(bytes) {
       const n = Number(bytes);
       if (!Number.isFinite(n) || n <= 0) return '';
@@ -304,6 +318,8 @@ export default {
         if (Number.isFinite(progress) && progress >= 0 && progress <= 100) {
           parts.push(`${progress}%`);
         }
+        const eta = this.fmtHhmm(it?.eta);
+        if (eta) parts.push(eta);
         parts.push('Downloading');
         return { seasonEpisode, rest: parts.join(' | ') };
       }

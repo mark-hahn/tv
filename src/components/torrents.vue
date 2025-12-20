@@ -42,7 +42,7 @@
     #no-torrents-needed(v-if="!unaired && noTorrentsNeeded && !loading && !error" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
       div No torrents needed.
       
-    #torrents-list(v-if="!unaired && !loading && !noTorrentsNeeded" style="padding:10px; font-size:14px; line-height:1.6;")
+    #torrents-list(v-if="!unaired && !loading && !noTorrentsNeeded" style="padding:10px; font-size:14px; line-height:1.2;")
       div(v-if="!hasSearched && torrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
         div Click on Search to find torrents for {{ headerShowName }}.
       div(v-else-if="hasSearched && torrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
@@ -50,7 +50,7 @@
       div(v-for="(torrent, index) in torrents" :key="index" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
         div(v-if="isClicked(torrent)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
         div(v-if="isDownloadedBefore(torrent)" :style="getDownloadedBeforeIconStyle(torrent)" title="Downloaded before") 🕘
-        div(v-if="SHOW_TITLE && torrent.raw" style="font-size:14px; color:#888; margin-bottom:4px;") {{ torrent.raw.title }}
+        div(v-if="SHOW_TITLE && torrent.raw" style="font-size:14px; color:#888; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;") {{ torrent.raw.title }}
         div(style="font-size:16px; color:#333;") 
           strong {{ getDisplaySeasonEpisode(torrent) }}
           | : {{ torrent.raw?.size || 'N/A' }}, {{ torrent.raw?.seeds || 0 }} seeds<span v-if="torrent.raw?.provider">, {{ formatProvider(torrent.raw.provider) }}</span><span v-if="torrent.parsed?.resolution">, {{ torrent.parsed.resolution }}</span><span v-if="torrent.parsed?.group">, {{ formatGroup(torrent.parsed.group) }}</span>

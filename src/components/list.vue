@@ -1101,17 +1101,16 @@ export default {
       try {
         await emby.init();
 
-        const showsBlocks = await emby.loadAllShows();
-        if(!showsBlocks) {
+        allShows = await emby.loadAllShows();
+        if(!allShows) {
           console.error("No shows from loadAllShows");
           return;
         }
-        allShows = showsBlocks.shows;
         this.shows = [...allShows];
 
         // must be set before startWorker
-        blockedWaitShows = showsBlocks.blockedWaitShows;
-        blockedGapShows  = showsBlocks.blockedGapShows;
+        blockedWaitShows = [];
+        blockedGapShows  = [];
 
         let showList = allShows;
         // showList = [allShows.find((show) => // for testing

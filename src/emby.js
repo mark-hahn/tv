@@ -56,18 +56,14 @@ export async function loadAllShows() {
   const embyPromise   = axios.get(
                         urls.showListUrl(cred, 0, 10000));
   const diskPromise   = srvr.getShowsFromDisk(); 
-  const waitPromise   = srvr.getBlockedWaits();
-  const blkGapPromise = srvr.getBlockedGaps();
   const rejPromise    = srvr.getRejects();
   const pkupPromise   = srvr.getPickups();
   const noEmbyPromise = srvr.getNoEmbys();
   const gapPromise    = srvr.getGaps();
 
   const [embyShows, srvrShows, 
-         blockedWaitShows, blockedGapShows,
          rejectsIn, pickups, noEmbys, gaps] = 
     await Promise.all([embyPromise, diskPromise, 
-                       waitPromise, blkGapPromise, 
                        rejPromise, pkupPromise,
                        noEmbyPromise, gapPromise]);
   rejects = rejectsIn
@@ -228,35 +224,6 @@ export async function loadAllShows() {
   }
   if(deletedGap) await srvr.delGap([null, true]);
 
-//////////  process blockedWaitShows from srvr ////////////
-  for(let blockedWaitName of blockedWaitShows) {
-    const i = shows.findIndex(
-                (show) => show.Name == blockedWaitName);
-    if(i > -1) {
-      const show = shows[i];
-      show.WaitStr = await tvdb.getWaitStr(show);
-    }
-    else {
-      console.log('no show, deleting blockedWaitShows:',   
-                   blockedWaitName);
-      await srvr.delBlockedWait(blockedWaitName);
-    }
-  }
-
-//////////  process blockedGapShows from srvr ////////////
-  for(let blockedGapName of blockedGapShows) {
-    const i = shows.findIndex(
-                (show) => show.Name == blockedGapName);
-    if(i > -1) {
-      shows[i].BlockedGap = true;
-    }
-    else {
-      console.log('deleting from blockedGapShows list:',   
-                   blockedGapName);
-      await srvr.delBlockedGap(blockedGapName);
-    }
-  }
-
 //////////  process toTry collection  ////////////
   const toTryRes = await axios.get(
         urls.collectionListUrl(cred, toTryCollId));
@@ -311,7 +278,7 @@ export async function loadAllShows() {
   console.log('all shows loaded, elapsed ms:', elapsed);
 
   // console.log('shows:', shows);
-  return {shows, blockedWaitShows, blockedGapShows};
+  return shows;
 }
 
 //////////// misc functions //////////////

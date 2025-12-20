@@ -106,8 +106,6 @@ handleMsg = async (msg) => {
 }
 
 export async function deleteShowFromSrvr(show) {
-  await delBlockedWait(show.Name);
-  await delBlockedGap(show.Name);
   await delGap([show.Id, true]);
   if(show.Pickup)  await delPickup(show.Name);
   await delNoEmby(show.Name);
@@ -139,19 +137,6 @@ export function getDevices()
 export function getLastViewed()      
             {return fCall('getLastViewed')}
 
-export function getBlockedWaits()        
-            {return fCall('getBlockedWaits')}
-export function addBlockedWait(name)        
-            {return fCall('addBlockedWait', name)}
-export function delBlockedWait(name)  
-            {return fCall('delBlockedWait', name)}
-
-export function getBlockedGaps()        
-            {return fCall('getBlockedGaps')}
-export function addBlockedGap(name)        
-            {return fCall('addBlockedGap', name)}
-export function delBlockedGap(name)  
-            {return fCall('delBlockedGap', name)}
 
 export function getRejects()       
             {return fCall('getRejects')}

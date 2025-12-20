@@ -1,21 +1,63 @@
 
-remove all logging except:
- 
- name of show loading.
- if guests show season num and episode num
- lengths of both lists before merge.
- number of duplicates removed.
- total count of output.
- how many output are from tvdb and how many from tmdb.
 
-============================================================
+ series tvdb data comes from cached data in tv-series-srvr/data/tvdb.json in the tv-series-srvr. there is a local copy of that project in misc/tv-series-srvr.copy. that project accesses the tvdb api to maintain that cache file. an example of a tvdb show object in the file is:
+ {
+  "Acapulco (2021)": {
+    "tvdbId": "393155",
+    "name": "Acapulco (2021)",
+    "originalNetwork": "Apple TV",
+    "seasonCount": 4,
+    "episodeCount": 40,
+    "watchedCount": 30,
+    "image": "https://artworks.thetvdb.com/banners/v4/series/393155/posters/63467793dd0e9.jpg",
+    "score": 21922,
+    "overview": "A young Mexican man's dream comes true when he gets the job of a lifetime at the hottest resort in Acapulco. But he soon realizes the job is far more complicated than he ever imagined as all of his beliefs and morals start to be questioned.",
+    "firstAired": "2021-10-08",
+    "lastAired": "2025-09-17",
+    "averageRuntime": 32,
+    "originalCountry": "usa",
+    "originalLanguage": "eng",
+    "status": "Ended",
+    "remotes": [
+      {
+        "name": "Emby",
+        "url": "https://hahnca.com:8920/web/index.html#!/item?id=4759942&serverId=ae3349983dbe45d9aa1d317a7753483e"
+      },
+      {
+        "name": "Rotten (0/85)",
+        "url": "https://www.rottentomatoes.com/tv/acapulco",
+        "ratings": "0/85"
+      }
+    ],
+    "characters": [
+      {
+        "character": "Máximo Gallardo (Young)",
+        "actor": "Enrique Arrizon",
+        "image": "https://artworks.thetvdb.com/banners/v4/actor/7890985/photo/6168e0f35ad70.jpg",
+        "tvdbUrl": "https://thetvdb.com/people/7890985-enrique-arrizon",
+        "sortOrder": 2,
+        "isFeatured": true
+      },
+      {
+        "character": "Máximo Gallardo",
+        "actor": "Eugenio Derbez",
+        "image": "https://artworks.thetvdb.com/banners/v4/actor/360750/photo/66a7fe88e0b20.jpg",
+        "tvdbUrl": "https://thetvdb.com/people/360750-eugenio-derbez",
+        "sortOrder": 1,
+        "isFeatured": true
+      }
+    ],
+    "added": "2024-04-17",
+    "saved": 1766113152565,
+    "showId": "4759942"
+  }
+}
+---
 
-Actors without images should be sorted last in output no mattter what group they are in.  it is higher priority than tvdb vs. tmdb
+there is a function in the server that makes the api call for this show object data and updates the tvdb.json cache. add the necessary api calls to this function to also add episode ids to this show object. make the code changes to the local copy of misc/tv-series-srvr.copy and i will copy the changes to the real server.
 
-============================================================
+this function is called for every show every 30 hours so this new code would eventually update all shows in the cache.
 
-regulars for a show are always loaded before guests.  remember regulars and when guests are loaded remove regulars from both initial guest lists before merge -- clear everythin when a show selection changes
+---
 
-============================================================
-
-remove logging except for one line containing show name, season/episode (S01E01) if episode, how many output are from tvdb, and how many from tmdb.
+the client app loads this tvdb data from the server when the app loads. extract the episode id data if available from the tvdb show object and store it in a separate cache called episodeIds of episode ids by show/season/episode.  when episode ids are needed to get guest actors from tvdb use episodeIds cache.  if the episode isn't in the cache look it up using the api call and save the ids in episodeIds cache.  there is no need to send this new data to the server because it will eventually get that data by itself.

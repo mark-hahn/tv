@@ -106,6 +106,8 @@ export default {
       const tvdb = Array.isArray(tvdbIn) ? [...tvdbIn] : [];
       const output = [];
 
+      console.log(`Before merge - TMDB: ${tmdb.length}, TVDB: ${tvdb.length}`);
+
       // Sort both lists by normalized person name so duplicates align
       tmdb.sort((a, b) => {
         const nameA = this.normPersonName(a?.personName || a?.name);

@@ -116,6 +116,28 @@ export const getEpisode = async (showName, seasonNum, episodeNum) => {
 
 export const getEpisodeGuests = async (showName, seasonNum, episodeNum) => {
   try {
+    // First check if we have episode data in allTvdb cache
+    if (!allTvdb) await getAllTvdb();
+    const tvdbData = allTvdb[showName];
+    
+    if (tvdbData?.seasons?.[seasonNum]?.episodes?.[episodeNum]?.characters) {
+      // Episode guest data exists in cache
+      const characters = tvdbData.seasons[seasonNum].episodes[episodeNum].characters;
+      const guests = characters
+        .filter(char => char.type === 3 || char.isFeatured === false)
+        .map(char => ({
+          name: char.name,
+          personName: char.personName,
+          image: char.image || null,
+          personImgURL: char.image || null,
+          url: null,
+          type: char.type,
+          isFeatured: char.isFeatured
+        }));
+      return guests;
+    }
+    
+    // Fall back to API call if not in cache
     const episodeData = await getEpisode(showName, seasonNum, episodeNum);
     
     if (!episodeData || !episodeData.characters) {

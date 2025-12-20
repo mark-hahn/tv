@@ -1118,6 +1118,16 @@ export default {
                                      allShows[0].Name);
       this.scrollToSavedShow(true);
 
+      // Update series pane infobox with refreshed data
+      if(this.highlightName) {
+        const currentShow = allShows.find(s => s.Name === this.highlightName);
+        if(currentShow) {
+          this.$nextTick(() => {
+            evtBus.emit('setUpSeries', currentShow);
+          });
+        }
+      }
+
       // ... temp one-time mass operations ...
       // await util.fixShowidInTvdbs(allShows);
       // await util.clrEndedContinues(allShows);

@@ -21,7 +21,36 @@ export async function getTmdb(id, param, resolve, reject) {
       }
     }
     
-    const { showName, year, season, episode } = data;
+    const { showName, year, season, episode, credits, seriesId, imdbId } = data;
+    
+    // If requesting series-level cast/credits data
+    if (credits === true && seriesId) {
+      console.log(`[tmdb] Fetching aggregate_credits for series ID: ${seriesId}`);
+      try {
+        // Try the moviedb-promise method first
+        let creditsData;
+        try {
+          creditsData = await moviedb.tvAggregateCredits({ id: seriesId });
+        } catch (methodError) {
+          // If method doesn't exist, use direct fetch to TMDB API
+          console.log('[tmdb] tvAggregateCredits method not found, using direct API call');
+          const response = await fetch(
+            `https://api.themoviedb.org/3/tv/${seriesId}/aggregate_credits?api_key=327192a334da700f65b882c7a69cb927`
+          );
+          if (!response.ok) {
+            throw new Error(`TMDB API returned ${response.status}: ${response.statusText}`);
+          }
+          creditsData = await response.json();
+        }
+        console.log(`[tmdb] Got ${creditsData.cast?.length || 0} cast members from aggregate_credits`);
+        resolve([id, creditsData]);
+        return;
+      } catch (error) {
+        console.error('[tmdb] aggregate_credits error:', error.message);
+        reject([id, `aggregate_credits error: ${error.message}`]);
+        return;
+      }
+    }
     
     const res = await moviedb.searchTv({ query: showName });
     

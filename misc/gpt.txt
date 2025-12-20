@@ -84,3 +84,6 @@ Fallout - TVDB: 10, TMDB: 4 actors.vue:730:15
 Guest data fetch: 2226ms (episode ID cached) tvdb.js:146:11
 Before merge - TMDB: 27, TVDB: 27 actors.vue:68:15
 Fallout S01E01 - TVDB: 4, TMDB: 26 actors.vue:346:15
+
+================
+i want to revert code added to cache episode ids in server and client. i have already reverted the server. revert the client to remove these latest cache optimizations and go back to always making 2 api calls for guests.

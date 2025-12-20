@@ -68,7 +68,7 @@ function fmtDateWithTZ(date, utcOut = false) {
   return `${year}-${month}-${day}`;
 }
 
-const getAllShows = async (id, _param, resolve, reject) => {
+const getShowsFromDisk = async (id, _param, resolve, reject) => {
   let   errFlg = null;
   const shows = {};
 
@@ -111,7 +111,7 @@ const getAllShows = async (id, _param, resolve, reject) => {
     }
   }
   if(errFlg) {
-    reject([id, `getAllShows: ${dirent}, ${err.message}`]);
+    reject([id, `getShowsFromDisk: ${dirent}, ${err.message}`]);
     return;
   }
   else {
@@ -508,7 +508,7 @@ const runOne = () => {
 
   // call function fname
   switch (fname) {
-    case 'getAllShows':   getAllShows(       id,    '', resolve, reject); break;
+    case 'getShowsFromDisk':   getShowsFromDisk(       id,    '', resolve, reject); break;
     case 'deletePath':    deletePath(        id, param, resolve, reject); break;
 
     case 'getDevices':    emby.getDevices(   id,    '', resolve, reject); break;

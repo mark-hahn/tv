@@ -106,9 +106,6 @@ export default {
       const tvdb = Array.isArray(tvdbIn) ? [...tvdbIn] : [];
       const output = [];
 
-      console.log('tmdb list size:', tmdb.length);
-      console.log('tvdb list size:', tvdb.length);
-
       // Sort both lists by normalized person name so duplicates align
       tmdb.sort((a, b) => {
         const nameA = this.normPersonName(a?.personName || a?.name);
@@ -122,10 +119,7 @@ export default {
       });
 
       while (true) {
-        console.log('----- beginning of loop -----');
-
         if (tmdb.length === 0) {
-          console.log('tmdb list is empty: append entire tvdb list to output and exit loop');
           tvdb.forEach(actor => {
             actor.source = actor.source || 'tvdb';
             actor.actorSort = actor.sort;
@@ -134,7 +128,6 @@ export default {
           break;
         }
         if (tvdb.length === 0) {
-          console.log('tvdb list is empty: append entire tmdb list to output and exit loop');
           tmdb.forEach(actor => {
             actor.source = actor.source || 'tmdb';
           });
@@ -146,8 +139,6 @@ export default {
         const v0 = tvdb[0];
         const tName = this.normPersonName(t0?.personName || t0?.name);
         const vName = this.normPersonName(v0?.personName || v0?.name);
-        
-        console.log('compare first tmdb actor to first tvdb actor:', { tmdb: t0?.personName || t0?.name, tvdb: v0?.personName || v0?.name });
 
         const duplicate = tName && vName && tName === vName;
         if (duplicate) {
@@ -156,13 +147,11 @@ export default {
 
           if (tHasImage !== vHasImage) {
             if (tHasImage) {
-              console.log('duplicate names and tmdb has image and tvdb doesn\'t: remove tvdb from its list and move tmdb to output');
               tvdb.shift();
               const actor = tmdb.shift();
               actor.source = actor.source || 'tmdb';
               output.push(actor);
             } else {
-              console.log('duplicate names and tvdb has image and tmdb doesn\'t: remove tmdb from its list and move tvdb to output');
               tmdb.shift();
               const actor = tvdb.shift();
               actor.source = actor.source || 'tvdb';
@@ -170,8 +159,6 @@ export default {
               output.push(actor);
             }
           } else {
-            // Both have image or both don't have image
-            console.log('duplicate names and both have image: remove tmdb from list and move tvdb to output');
             tmdb.shift();
             const actor = tvdb.shift();
             actor.source = actor.source || 'tvdb';
@@ -179,14 +166,11 @@ export default {
             output.push(actor);
           }
         } else {
-          // Not duplicate - names don't match, move the one that comes first alphabetically
           if (tName < vName) {
-            console.log('not duplicate: tmdb name comes first alphabetically, move tmdb to output');
             const actor = tmdb.shift();
             actor.source = actor.source || 'tmdb';
             output.push(actor);
           } else {
-            console.log('not duplicate: tvdb name comes first alphabetically, move tvdb to output');
             const actor = tvdb.shift();
             actor.source = actor.source || 'tvdb';
             actor.actorSort = actor.sort;
@@ -195,14 +179,19 @@ export default {
         }
       }
 
-      console.log('tmdb list should be empty:', tmdb.length);
-      console.log('output list size:', output.length);
-      
-      // Final sort: TVDB actors first (sorted by actorSort ascending), then TMDB actors (sorted by actorEpiCount descending)
+      // Final sort: Actors with images first (highest priority), then actors without images
+      // Within each image group: TVDB first (sorted by actorSort), then TMDB (sorted by actorEpiCount descending)
       output.sort((a, b) => {
         const aSource = a.source || 'unknown';
         const bSource = b.source || 'unknown';
+        const aHasImage = this.hasAnyImage(a);
+        const bHasImage = this.hasAnyImage(b);
         
+        // Image presence is highest priority: actors with images come before actors without
+        if (aHasImage && !bHasImage) return -1;
+        if (!aHasImage && bHasImage) return 1;
+        
+        // Both have images or both don't have images - sort by source
         // TVDB comes before TMDB
         if (aSource === 'tvdb' && bSource === 'tmdb') return -1;
         if (aSource === 'tmdb' && bSource === 'tvdb') return 1;
@@ -224,8 +213,6 @@ export default {
         
         return 0;
       });
-      
-      console.log('Final sorted output:', output.map(a => ({ name: a.personName, source: a.source, sort: a.actorSort || a.sort, epiCount: a.actorEpiCount })));
       
       return output;
     },
@@ -349,7 +336,7 @@ export default {
           });
         }
       } catch (error) {
-        console.log('TMDB guests fetch error:', error.message || String(error));
+        // Silent error handling
       }
       
       // Load guests from TVDB
@@ -360,7 +347,24 @@ export default {
           tvdbList = tvdbGuests;
         }
       } catch (error) {
-        console.log('TVDB guests fetch error:', error.message || String(error));
+        // Silent error handling
+      }
+      
+      // Remove regulars from both guest lists before merging
+      if (this.seriesActors && this.seriesActors.length > 0) {
+        const regularNames = new Set(
+          this.seriesActors.map(actor => this.normPersonName(actor?.personName || actor?.name))
+        );
+        
+        tmdbList = tmdbList.filter(actor => {
+          const actorName = this.normPersonName(actor?.personName || actor?.name);
+          return !regularNames.has(actorName);
+        });
+        
+        tvdbList = tvdbList.filter(actor => {
+          const actorName = this.normPersonName(actor?.personName || actor?.name);
+          return !regularNames.has(actorName);
+        });
       }
       
       // Merge TMDB and TVDB guest lists
@@ -372,6 +376,13 @@ export default {
       
       // Mark that we're showing episode actors
       this.showingEpisodeActors = true;
+      
+      // Log summary
+      const tvdbCount = this.actors.filter(a => a.source === 'tvdb').length;
+      const tmdbCount = this.actors.filter(a => a.source === 'tmdb').length;
+      const seasonStr = String(season).padStart(2, '0');
+      const episodeStr = String(episode).padStart(2, '0');
+      console.log(`${this.showName} S${seasonStr}E${episodeStr} - TVDB: ${tvdbCount}, TMDB: ${tmdbCount}`);
     },
 
     handleRegularClick() {
@@ -632,10 +643,6 @@ export default {
       const actualData = tvdbData.response?.data || tvdbData;
       this.showName = actualData?.name || this.currentShow?.Name || '';
       
-      console.log('Current show object:', this.currentShow);
-      console.log('Show ProviderIds:', this.currentShow?.ProviderIds);
-      console.log('Show IMDB ID:', this.currentShow?.ProviderIds?.IMDB);
-      
       const characters = actualData?.characters;
 
       // Load actors from TVDB into a tvdb list
@@ -654,7 +661,6 @@ export default {
 
       // Load actors from TMDB into a tmdb list
       let tmdbList = [];
-      console.log('Attempting to fetch TMDB series cast for:', this.showName);
       try {
         // First, get series metadata to extract the series ID
         const seriesParams = {
@@ -665,18 +671,13 @@ export default {
         // If we have IMDB ID, add it to the request
         if (this.currentShow?.ProviderIds?.IMDB) {
           seriesParams.imdbId = this.currentShow.ProviderIds.IMDB;
-          console.log('Using IMDB ID:', seriesParams.imdbId);
         }
         
-        console.log('TMDB series metadata request:', JSON.stringify(seriesParams));
         const seriesData = await srvr.getTmdb(seriesParams);
-        console.log('TMDB series response type:', typeof seriesData);
-        console.log('TMDB series response:', seriesData);
         
         // Check if we got series metadata with an ID
         if (seriesData && typeof seriesData === 'object' && seriesData.id) {
           const seriesId = seriesData.id;
-          console.log('Got TMDB series ID:', seriesId, '- attempting to fetch aggregate_credits');
           
           // Try to get aggregate_credits using the series ID
           // TMDB API: /tv/{series_id}/aggregate_credits returns all cast across all seasons
@@ -690,10 +691,7 @@ export default {
             creditsParams.imdbId = this.currentShow.ProviderIds.IMDB;
           }
           
-          console.log('TMDB aggregate_credits request:', JSON.stringify(creditsParams));
           const creditsData = await srvr.getTmdb(creditsParams);
-          console.log('TMDB credits response type:', typeof creditsData);
-          console.log('TMDB credits response:', creditsData);
           
           // Check if we got cast array
           let castArray = null;
@@ -704,15 +702,12 @@ export default {
           }
           
           if (castArray && castArray.length) {
-            console.log('Successfully got', castArray.length, 'cast members from aggregate_credits');
-            
             // Filter to only include series regulars (actors who appeared in multiple episodes)
             // Use binary search to find the minimum episode threshold that gives us < 10 regulars
             const TARGET_MAX_REGULARS = 10;
             
             // Find the max episode count in the data
             const maxEpisodeCount = Math.max(...castArray.map(a => a.total_episode_count || 0));
-            console.log('Max episode count in cast:', maxEpisodeCount);
             
             let low = 1;
             let high = maxEpisodeCount;
@@ -721,8 +716,6 @@ export default {
             while (low <= high) {
               const mid = Math.floor((low + high) / 2);
               const count = castArray.filter(a => (a.total_episode_count || 0) >= mid).length;
-              
-              console.log(`Testing threshold ${mid}: ${count} regulars`);
               
               if (count < TARGET_MAX_REGULARS) {
                 // Too few, need to lower threshold
@@ -734,14 +727,10 @@ export default {
               }
             }
             
-            console.log('Binary search complete. Using threshold:', bestThreshold);
-            
             const regularsOnly = castArray.filter(actor => {
               const episodeCount = actor.total_episode_count || 0;
               return episodeCount >= bestThreshold;
             });
-            
-            console.log('Filtered to', regularsOnly.length, 'series regulars (appeared in', bestThreshold, '+ episodes)');
             
             tmdbList = regularsOnly.map(actor => {
               const imageUrl = actor.profile_path 
@@ -760,18 +749,11 @@ export default {
                 actorEpiCount: actor.total_episode_count || 0
               };
             });
-          } else {
-            console.log('aggregate_credits request did not return cast array');
-            console.log('ERROR: Websocket server getTmdb does not support series-level cast requests');
-            console.log('The server needs to implement: /tv/{series_id}/aggregate_credits endpoint');
           }
-        } else {
-          console.log('Did not get series metadata with ID');
         }
       } catch (error) {
-        console.log('TMDB fetch error:', error.message || String(error));
+        // Silent error handling
       }
-      console.log('Final TMDB list size for merge:', tmdbList.length);
 
       // Merge TMDB and TVDB lists
       this.actors = this.mergeTmdbTvdbActors(tmdbList, tvdbList);
@@ -780,6 +762,11 @@ export default {
       this.seriesActors = [...this.actors];
       this.isGuestMode = false;
       this.showingEpisodeActors = false;
+      
+      // Log summary
+      const tvdbCount = this.actors.filter(a => a.source === 'tvdb').length;
+      const tmdbCount = this.actors.filter(a => a.source === 'tmdb').length;
+      console.log(`${this.showName} - TVDB: ${tvdbCount}, TMDB: ${tmdbCount}`);
     }
   },
 

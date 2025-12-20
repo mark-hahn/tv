@@ -1,9 +1,21 @@
 
-the tvdb results have a field called "sort" for each actor. lets call that the actorSort.
-then tmdb has the number of episode appearances for each actor. lets call that the actorEpiCount.
-when running the merge/sort record whether the actor came from tvdb or tmdb in the output.
+remove all logging except:
+ 
+ name of show loading.
+ if guests show season num and episode num
+ lengths of both lists before merge.
+ number of duplicates removed.
+ total count of output.
+ how many output are from tvdb and how many from tmdb.
 
-run the sort/merge and then sort the output list such that the tvdb actors appear before the tmdb actors. 
-sort the tvdb actors by actorSort ascending.
-sort the tmdb actors by actorEpiCount descending.
-then display the output list
+============================================================
+
+Actors without images should be sorted last in output no mattter what group they are in.  it is higher priority than tvdb vs. tmdb
+
+============================================================
+
+regulars for a show are always loaded before guests.  remember regulars and when guests are loaded remove regulars from both initial guest lists before merge -- clear everythin when a show selection changes
+
+============================================================
+
+remove logging except for one line containing show name, season/episode (S01E01) if episode, how many output are from tvdb, and how many from tmdb.

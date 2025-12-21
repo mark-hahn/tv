@@ -10,7 +10,9 @@
     div(v-else style="padding:5px; font-size:16px; line-height:1.6;")
       div(v-for="t in sortedTorrents" :key="String(t.hash || t.name || t.added_on)" style="position:relative; background:#fff; border:1px solid #ddd; border-radius:5px; padding:10px; margin:0 0 10px 0;")
         div(style="font-size:16px; font-weight:bold; color:#333; word-break:break-word;") {{ t.name || t.hash }}
-        div(style="font-size:16px; color:rgba(0,0,0,0.50) !important;") {{ infoLine(t) }}
+        div(style="display:flex; justify-content:space-between; align-items:center;")
+          div(style="font-size:16px; color:rgba(0,0,0,0.50) !important;") {{ infoLine(t) }}
+          button(@click.stop="forceFile(t.name)" style="font-size:12px; padding:2px 6px; cursor:pointer; border:none; background:transparent; color:#666;") F
 
 </template>
 
@@ -285,6 +287,13 @@ export default {
       const finished = this.fmtCompletionMmDd_HhMm(t?.completion_on);
       const state = this.fmtState(t?.state);
       return `${added}${sep}${finished}${sep}${size}${sep}${state}`;
+    },
+
+    forceFile(title) {
+      console.log('history: forceFile button clicked, title:', title);
+      if (!title) return;
+      console.log('history: emitting forceFile event');
+      evtBus.emit('forceFile', title);
     }
   }
 };

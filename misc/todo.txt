@@ -5,11 +5,13 @@ reminder, restore ...
 bugs ...
   a noemby map episode cell sometimes shows + which is impossible since plus means file is avaialbe in emby (Chuck)
   get cards wrong order
+  F button sends season file title but tvproc list is episode file titles
 
 untested ...
   check torrent files validity before downloading
 
 todo ...
+  change eta in tvproc to mm:ss remaining
   card order in dlstatus.vue
   add elapsed to qbt card
   tvproc control - force get

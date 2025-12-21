@@ -90,10 +90,12 @@ export default {
 
   mounted() {
     evtBus.on('paneChanged', this.onPaneChanged);
+    evtBus.on('forceFile', this.handleForceFile);
   },
 
   unmounted() {
     evtBus.off('paneChanged', this.onPaneChanged);
+    evtBus.off('forceFile', this.handleForceFile);
     this.stopPolling();
     this.stopLibraryPolling();
     this.items = [];
@@ -328,6 +330,30 @@ export default {
       if (ended) parts.push(ended);
       if (status) parts.push(status);
       return { seasonEpisode, rest: parts.join(' | ') };
+    },
+
+    async handleForceFile(title) {
+      console.log('tvproc: handleForceFile called with title:', title);
+      if (!title) return;
+      try {
+        const encodedTitle = encodeURIComponent(title);
+        const url = `${config.torrentsApiUrl}/api/tvproc/forceFile?title=${encodedTitle}`;
+        console.log('forceFile URL:', url);
+        const res = await fetch(url, {
+          method: 'GET',
+          mode: 'cors'
+        });
+        console.log('forceFile response:', res.status, res.statusText);
+        if (!res.ok) {
+          const text = await res.text();
+          console.error(`forceFile failed: HTTP ${res.status}`, text);
+        } else {
+          const result = await res.json();
+          console.log('forceFile success:', result);
+        }
+      } catch (e) {
+        console.error('forceFile error:', e);
+      }
     },
 
     async trimLog() {

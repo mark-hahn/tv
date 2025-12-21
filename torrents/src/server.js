@@ -190,6 +190,22 @@ app.post('/api/tvproc/clear', async (req, res) => {
   }
 });
 
+app.get('/api/tvproc/forceFile', async (req, res) => {
+  try {
+    const title = req.query.title;
+    if (!title) {
+      return res.status(400).json({ error: 'title parameter required' });
+    }
+    const url = `https://hahnca.com/tvproc/forceFile?title=${encodeURIComponent(title)}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('forceFile proxy error:', error);
+    res.status(500).json({ error: error?.message || String(error) });
+  }
+});
+
 app.get('/api/qbt/info', async (req, res) => {
   try {
     const q = req.query || {};

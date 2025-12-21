@@ -20,7 +20,7 @@
   div(v-else ref="scroller" :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'hidden', background:'#fff', border:'1px solid #ddd', borderRadius:'5px', fontFamily:'sans-serif', fontSize:'14px', fontWeight:'normal' }")
     template(v-for="(it, idx) in orderedItems" :key="idx")
       div(v-if="idx > 0 && Number(it?.sequence) === 1" style="margin:0; padding:0; line-height:14px; white-space:nowrap; overflow:hidden; font-family:monospace;") ====================================================================================================
-      div(style="border:1px solid #ddd; border-radius:8px; padding:10px; background:#fff;")
+      div(:style="getCardStyle(it)" @click="handleCardClick(it)" @mouseenter="handleMouseEnter($event, it)" @mouseleave="handleMouseLeave($event)")
         div(style="font-weight:bold; font-size:13px; word-wrap:break-word; overflow-wrap:break-word;")
           span(v-if="it?.sequence !== undefined && it?.sequence !== null" style="color:blue !important;") {{ it.sequence }})
           span(v-if="it?.sequence !== undefined && it?.sequence !== null") &nbsp;
@@ -304,6 +304,13 @@ export default {
       const status = String(it?.status || '').trim();
       const progress = Number(it?.progress);
 
+      // For future status, only show size
+      if (status === 'future') {
+        const parts = [];
+        if (size) parts.push(size);
+        return { seasonEpisode, rest: parts.join(' | ') };
+      }
+
       const parts = [];
       if (size) parts.push(size);
       if (started) parts.push(started);
@@ -353,6 +360,39 @@ export default {
         }
       } catch (e) {
         console.error('forceFile error:', e);
+      }
+    },
+
+    getCardStyle(it) {
+      const status = String(it?.status || '').trim();
+      const isFuture = status === 'future';
+      return {
+        border: '1px solid #ddd',
+        borderRadius: '8px',
+        padding: '10px',
+        background: '#fff',
+        cursor: isFuture ? 'pointer' : 'default'
+      };
+    },
+
+    handleMouseEnter(event, it) {
+      const status = String(it?.status || '').trim();
+      if (status === 'future') {
+        event.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+      }
+    },
+
+    handleMouseLeave(event) {
+      event.currentTarget.style.boxShadow = 'none';
+    },
+
+    handleCardClick(it) {
+      const status = String(it?.status || '').trim();
+      if (status === 'future') {
+        const title = it?.title;
+        if (title) {
+          this.handleForceFile(title);
+        }
       }
     },
 

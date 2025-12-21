@@ -43,11 +43,11 @@
       div No torrents needed.
       
     #torrents-list(v-if="!unaired && !loading && !noTorrentsNeeded" style="padding:10px; font-size:14px; line-height:1.2;")
-      div(v-if="!hasSearched && torrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
+      div(v-if="!hasSearched && filteredTorrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
         div Click on Search to find torrents for {{ headerShowName }}.
-      div(v-else-if="hasSearched && torrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
+      div(v-else-if="hasSearched && filteredTorrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
         div No torrents found.
-      div(v-for="(torrent, index) in torrents" :key="index" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
+      div(v-for="(torrent, index) in filteredTorrents" :key="index" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
         div(v-if="isClicked(torrent)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
         div(v-if="isDownloadedBefore(torrent)" :style="getDownloadedBeforeIconStyle(torrent)" title="Downloaded before") 🕘
         div(v-if="SHOW_TITLE && torrent.raw" style="font-size:13px; font-weight:bold; color:#888; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;") {{ torrent.raw.title }}
@@ -139,6 +139,12 @@ export default {
         this.activeShow?.Name ||
         ''
       );
+    },
+    filteredTorrents() {
+      return this.torrents.filter(torrent => {
+        const seeds = Number(torrent.raw?.seeds);
+        return seeds > 0;
+      });
     },
     trackerCounts() {
       const counts = {};

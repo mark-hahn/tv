@@ -3,14 +3,15 @@ reminder, restore ...
   start gap running
 
 bugs ...
-  a noemby map episode cell sometimes shows + which is impossible since plus means file is avaialbe in emby (Chuck)
   get cards wrong order
-  F button sends season file title but tvproc list is episode file titles
+  when library finishes it goes to series
 
 untested ...
   check torrent files validity before downloading
 
 todo ...
+  mark get tab card as aborted when file deleted from qBittorrent
+  delete file from qBittorrent when card deleted from get tab
   change eta in tvproc to mm:ss remaining
   card order in dlstatus.vue
   add elapsed to qbt card

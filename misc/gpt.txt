@@ -1,15 +1,1 @@
 
-from browser: forceFile failed: HTTP 404 but https://hahnca.com/tvproc/forceFile?title=test was tested in browser and it worked
-
-F button in history pane did not attempt a network request
-
-nothing appears in console from production code but vite code gives:
-Cross-Origin Request Blocked: The Same Origin Policy disallows reading the remote resource at https://hahnca.com/tvproc/forceFile?title=Ghosts.US.S05E10.Its.a.Wonderful.Christmas.Carol.Part.Two.1080p.AMZN.WEB-DL.DDP5.1.H.264-NTb.mkv. (Reason: CORS header ‘Access-Control-Allow-Origin’ does not match ‘*, *’).
-
-forceFile error: TypeError: NetworkError when attempting to fetch resource. tvproc.vue:355:17
-
-switch tvproc cards from truncating titles to word wrapping. 
-
-change font-size for both lines in tvproc, history, flex, and torrent cards to 13px
-
-set title line 1, not info line 2 in torrent card to bold

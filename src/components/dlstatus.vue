@@ -253,7 +253,8 @@ export default {
       const day = d.getDate();
       const hh = String(d.getHours()).padStart(2, '0');
       const mi = String(d.getMinutes()).padStart(2, '0');
-      return `${m}/${day} ${hh}:${mi}`;
+      const ss = String(d.getSeconds()).padStart(2, '0');
+      return `${m}/${day} ${hh}:${mi}:${ss}`;
     },
 
     fmtGbOneDecimal(bytes) {
@@ -328,9 +329,9 @@ export default {
     leftBoxText(card) {
       const t = card?.torrent || {};
       return this.formatAlignedBox([
-        ['State', this.fmtState(t?.state)],
         ['Up', this.fmtDownloadedOfSizeGb(t?.completed, t?.size)],
-        ['Speed', this.fmtSpeedGbps(t?.dlspeed)]
+        ['Speed', this.fmtSpeedGbps(t?.dlspeed)],
+        ['Eta', this.fmtEtaMins(t?.eta)]
       ]);
     },
 
@@ -342,14 +343,15 @@ export default {
         return this.formatAlignedBox([
           ['Seeds', t?.num_seeds],
           ['Finished', finished],
-          ['Elapsed', elapsed]
+          ['Elapsed', elapsed],
+          ['State', this.fmtState(t?.state)]
         ]);
       }
 
       return this.formatAlignedBox([
         ['Seeds', t?.num_seeds],
         ['Progress', this.fmtPercent(t?.progress)],
-        ['Eta', this.fmtEtaMins(t?.eta)]
+        ['State', this.fmtState(t?.state)]
       ]);
     }
   }

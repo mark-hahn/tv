@@ -11,6 +11,7 @@ untested ...
   check torrent files validity before downloading
 
 todo ...
+  add X del button to tvproc cards
   change eta in tvproc to mm:ss remaining
   card order in dlstatus.vue
   add elapsed to qbt card

@@ -5,12 +5,12 @@
     #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'0px', marginRight:'0px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
       div(style="display:flex; justify-content:space-between; align-items:center;")
         div(style="margin-left:20px;") {{ headerShowName }}
-        div(style="display:flex; gap:4px; margin-left:auto;")
-          button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:13px; cursor:pointer; border-radius:7px; padding:2px; border:1px solid #bbb; background-color:whitesmoke;") Get
-          button(v-if="selectedTorrent" @click.stop="openDetails" style="font-size:13px; cursor:pointer; border-radius:7px; padding:2px; border:1px solid #bbb; background-color:whitesmoke;") Tab
-          button(@click.stop="searchClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:2px; border:1px solid #bbb; background-color:whitesmoke;") Search
-          button(@click.stop="forceClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:2px; border:1px solid #bbb; background-color:whitesmoke;") Force
-          button(@click.stop="toggleCookieInputs" style="font-size:13px; cursor:pointer; border-radius:7px; padding:2px; border:1px solid #bbb; background-color:whitesmoke;") Cookies
+        div(style="display:flex; gap:8px; margin-left:auto;")
+          button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Get
+          button(v-if="selectedTorrent" @click.stop="openDetails" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Tab
+          button(@click.stop="searchClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Search
+          button(@click.stop="forceClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Force
+          button(@click.stop="toggleCookieInputs" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Cookies
 
       div(style="margin-left:20px; margin-right:20px; margin-top:14px; font-weight:normal; font-size:16px; color:#666; display:block; visibility:visible; opacity:1; line-height:1.1; white-space:nowrap; overflow:visible;") {{ spaceAvailText }}
       div(style="margin-left:20px; margin-right:20px; margin-top:2px; font-weight:normal; font-size:16px; color:#666; display:block; visibility:visible; opacity:1; line-height:1.1; white-space:nowrap; overflow:visible;") {{ spaceAvailGbText }}

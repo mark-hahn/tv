@@ -122,7 +122,7 @@ export async function loadAllShows() {
       continue;
     }
     
-    // Check if S01E01 is unaired in TVDB
+    // Check if S01E01 is unaired in TVDB and set WaitStr
     try {
       const seriesMap = await tvdb.getSeriesMap(noEmbyShow);
       const s1 = seriesMap.find(([seasonNumber]) => seasonNumber === 1);
@@ -131,6 +131,10 @@ export async function loadAllShows() {
         const unaired = e1?.[1]?.unaired === true;
         if (unaired) {
           noEmbyShow.S1E1Unaired = true;
+          const airDate = e1?.[1]?.aired;
+          if (airDate) {
+            noEmbyShow.WaitStr = `Waiting ${airDate}`;
+          }
         }
       }
     } catch (e) {

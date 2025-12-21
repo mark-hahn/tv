@@ -214,24 +214,26 @@ export default {
 
     fmtMmDd_HhMm(epochSeconds) {
       const n = Number(epochSeconds);
-      if (!Number.isFinite(n) || n <= 0) return '??/??.??:??';
+      if (!Number.isFinite(n) || n <= 0) return '??/??.??:??:??';
       const d = new Date(Math.floor(n) * 1000);
       const mm = this.pad2(d.getMonth() + 1);
       const dd = this.pad2(d.getDate());
       const hh = this.pad2(d.getHours());
       const mi = this.pad2(d.getMinutes());
-      return `${mm}/${dd} ${hh}:${mi}`;
+      const ss = this.pad2(d.getSeconds());
+      return `${mm}/${dd} ${hh}:${mi}:${ss}`;
     },
 
     fmtCompletionMmDd_HhMm(epochSeconds) {
       const n = Number(epochSeconds);
-      if (!Number.isFinite(n) || n <= 0) return '??/?? ??:??';
+      if (!Number.isFinite(n) || n <= 0) return '??/?? ??:??:??';
       const d = new Date(Math.floor(n) * 1000);
       const mm = this.pad2(d.getMonth() + 1);
       const dd = this.pad2(d.getDate());
       const hh = this.pad2(d.getHours());
       const mi = this.pad2(d.getMinutes());
-      return `${mm}/${dd} ${hh}:${mi}`;
+      const ss = this.pad2(d.getSeconds());
+      return `${mm}/${dd} ${hh}:${mi}:${ss}`;
     },
 
     fmtState(state) {
@@ -279,7 +281,7 @@ export default {
       if (t?.state === 'downloading') {
         const prog = this.fmtProgPc(t?.completed, t?.size);
         const eta = this.fmtEtaMmSs(t?.eta);
-        return `${added}${sep}${size}${sep}Getting${sep}${prog}%${sep}${eta}`;
+        return `${added}${sep}${size}${sep}${prog}%${sep}${eta}${sep}Getting`;
       }
 
       const finished = this.fmtCompletionMmDd_HhMm(t?.completion_on);

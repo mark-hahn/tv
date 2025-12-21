@@ -112,10 +112,6 @@ export default {
       const active = pane === 'tvproc';
       this._active = active;
       if (active) {
-        this.stopLibraryPolling();
-        this.libraryProgressText = '';
-        this._libTaskId = null;
-        this._libBusy = false;
         void this.loadTvproc({ isInitialPaneSwitch: true });
         this.scheduleNextPoll(5000);
       } else {
@@ -176,6 +172,8 @@ export default {
         this._libBusy = false;
         return;
       }
+
+      if (!this._active) return;
 
       const res = await emby.taskStatus(this._libTaskId);
       if (res?.status === 'refreshing') {
@@ -334,8 +332,8 @@ export default {
 
       if (status === 'downloading') {
         if (ended) parts.push(ended);
-        const eta = this.fmtHhmm(it?.eta);
-        if (eta) parts.push(eta);
+        const eta = this.fmtElapsedMmSs(it?.eta);
+        if (eta) parts.push(`${eta} remaining`);
         if (Number.isFinite(progress) && progress >= 0 && progress <= 100) {
           parts.push(`${progress}%`);
         }

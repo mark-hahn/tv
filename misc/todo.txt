@@ -3,7 +3,6 @@ reminder, restore ...
   start gap running
 
 bugs ...
-  get cards wrong order
   when library finishes it goes to series
   delete broken (Orville)
   in tvproc pane library % lost when pane switched
@@ -12,10 +11,6 @@ untested ...
   check torrent files validity before downloading
 
 todo ...
-  push torrents buttons to right
-  add show button to tvproc to scroll downloading card into view
-  mark get tab card as aborted when file deleted from qBittorrent
-  delete file from qBittorrent when card deleted from get tab
   change eta in tvproc to mm:ss remaining
   card order in dlstatus.vue
   add elapsed to qbt card
@@ -41,6 +36,9 @@ non-simple:
 simple ...
   
 tabled ...
+  delete file from qBittorrent when card deleted from get tab
+  mark get tab card as aborted when file deleted from qBittorrent
+  get cards wrong order
   show episode being watched (next up line)
   button: scroll hilighted row to vis 
   refresh filtered rows when new gap loaded

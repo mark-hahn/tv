@@ -1,6 +1,7 @@
 <template lang="pug">
 #shows(style="width:100%; flex-grow: 1; overflow-y:scroll;")
-  table(style="width:100%; font-size:18px")
+  div(v-if="shows.length === 0" style="display:flex; justify-content:center; align-items:center; height:100%; font-size:18px; color:#666;") No shows.
+  table(v-else style="width:100%; font-size:18px")
    tbody
     tr(v-for="show in shows" :key="show.Id" 
           :style="{ outline:'thin solid', cursor:'default', lineHeight: simpleMode ? '1.6' : '1' }" 

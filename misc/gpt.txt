@@ -1,2 +1,3 @@
 
 
+in tvproc remove completed time from card 

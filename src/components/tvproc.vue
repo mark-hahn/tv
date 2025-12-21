@@ -8,6 +8,7 @@
       div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
         div(v-if="libraryProgressText" style="align-self:center; font-size:13px; color:#555; white-space:nowrap;") {{ libraryProgressText }}
         button(@click.stop="startLibraryRefresh" :disabled="_libBusy" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Library
+        button(@click.stop="showFirstDownloading" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Show
         button(@click.stop="trimLog" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Trim
         button(@click.stop="clearLog" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Clear
 
@@ -411,6 +412,27 @@ export default {
       if (status !== 'future') return false;
       const title = it?.title;
       return title && this.clickedFutures.has(title);
+    },
+
+    showFirstDownloading() {
+      const downloading = this.items.find(it => String(it?.status || '').trim() === 'downloading');
+      if (!downloading) return;
+      
+      const scroller = this.$refs.scroller;
+      if (!scroller) return;
+      
+      // Find the index of the downloading item in orderedItems
+      const idx = this.orderedItems.findIndex(it => it === downloading);
+      if (idx === -1) return;
+      
+      // Get all card divs (direct children of the template v-for)
+      const allChildren = Array.from(scroller.children);
+      // Filter out separator divs (which have === in text)
+      const cards = allChildren.filter(el => !el.textContent.includes('===='));
+      
+      if (cards[idx]) {
+        cards[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     },
 
     async trimLog() {

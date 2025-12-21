@@ -21,6 +21,7 @@
     template(v-for="(it, idx) in orderedItems" :key="idx")
       div(v-if="idx > 0 && Number(it?.sequence) === 1" style="margin:0; padding:0; line-height:14px; white-space:nowrap; overflow:hidden; font-family:monospace;") ====================================================================================================
       div(:style="getCardStyle(it)" @click="handleCardClick(it)" @mouseenter="handleMouseEnter($event, it)" @mouseleave="handleMouseLeave($event)")
+        div(v-if="isFutureClicked(it)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
         div(style="font-weight:bold; font-size:13px; word-wrap:break-word; overflow-wrap:break-word;")
           span(v-if="it?.sequence !== undefined && it?.sequence !== null" style="color:blue !important;") {{ it.sequence }})
           span(v-if="it?.sequence !== undefined && it?.sequence !== null") &nbsp;
@@ -66,7 +67,10 @@ export default {
       _didLoadOnce: false,
       _inFlight: false,
       _loadingTimer: null,
-      _showLoading: false
+      _showLoading: false,
+      clickedFutures: new Set(),
+      _lastScrollTop: null,
+      _hasEverMounted: false
     };
   },
 
@@ -111,10 +115,14 @@ export default {
         this.libraryProgressText = '';
         this._libTaskId = null;
         this._libBusy = false;
-        this._firstLoad = true;
-        void this.loadTvproc();
+        void this.loadTvproc({ isInitialPaneSwitch: true });
         this.scheduleNextPoll(5000);
       } else {
+        // Store scroll position when leaving
+        const el = this.$refs.scroller;
+        if (el) {
+          this._lastScrollTop = el.scrollTop;
+        }
         this.stopPolling();
         this.stopLibraryPolling();
       }
@@ -367,6 +375,7 @@ export default {
       const status = String(it?.status || '').trim();
       const isFuture = status === 'future';
       return {
+        position: 'relative',
         border: '1px solid #ddd',
         borderRadius: '8px',
         padding: '10px',
@@ -391,9 +400,17 @@ export default {
       if (status === 'future') {
         const title = it?.title;
         if (title) {
+          this.clickedFutures.add(title);
           this.handleForceFile(title);
         }
       }
+    },
+
+    isFutureClicked(it) {
+      const status = String(it?.status || '').trim();
+      if (status !== 'future') return false;
+      const title = it?.title;
+      return title && this.clickedFutures.has(title);
     },
 
     async trimLog() {
@@ -457,7 +474,9 @@ export default {
       this.startLoadingDelay();
       try {
         const el = this.$refs.scroller;
-        const shouldStick = Boolean(opts.forceScrollToBottom) || this._firstLoad || this.isNearBottom(el);
+        // Only auto-scroll if: 1) explicitly requested, or 2) not initial switch AND near bottom
+        const wasNearBottom = !opts.isInitialPaneSwitch && el && this.isNearBottom(el);
+        const shouldStick = Boolean(opts.forceScrollToBottom) || wasNearBottom;
 
         const res = await fetch(`${config.torrentsApiUrl}/api/tvproc`);
         if (!res.ok) {
@@ -477,11 +496,20 @@ export default {
         }
         const arr = await res.json();
         this.items = Array.isArray(arr) ? arr : [];
+        const isFirstLoad = !this._didLoadOnce;
         this._didLoadOnce = true;
 
         await this.$nextTick();
         const el2 = this.$refs.scroller;
-        if (shouldStick) this.scrollToBottom(el2);
+        
+        // Scroll to bottom on very first load ever
+        if (isFirstLoad && !this._hasEverMounted) {
+          this._hasEverMounted = true;
+          this.scrollToBottom(el2);
+        } else if (shouldStick) {
+          this.scrollToBottom(el2);
+        }
+        // Don't touch scroll position otherwise - v-show preserves it naturally
         this._firstLoad = false;
       } catch (e) {
         this.error = e?.message || String(e);

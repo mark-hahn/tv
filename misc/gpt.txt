@@ -1,18 +1,2 @@
 
 
-in tvproc show all files in list as cards, including future downloads. The future cards should only have season/episode and size.  When a future starts downloading it should show complete info line.
-
-remove the F buttons from the history cards. if a future card is clicked then it should call forceFile with the file name in the first line.
-
-future download cards in list are not showing in tvproc pane.
-
-when a tvproc future card is clicked add a checkmark to show it is priority
-
-the checkmark was not in card
-
-when switching to tvproc pane the cards scroll to bottom. don't ever scroll unless it is already at bottom and a card is added
-
-forceScrollToBottom
-
-when tvproc pane is first mounted it doesn't scroll to bottom
-

@@ -8,4 +8,6 @@ Cross-Origin Request Blocked: The Same Origin Policy disallows reading the remot
 
 forceFile error: TypeError: NetworkError when attempting to fetch resource. tvproc.vue:355:17
 
-switch tvproc cards from truncating titles to word wrapping. change font-size for both ines in tvproc cards to 12px
+switch tvproc cards from truncating titles to word wrapping. 
+
+change font-size for both lines in tvproc, history, flex, and torrent cards to 12px

@@ -21,11 +21,11 @@
     template(v-for="(it, idx) in orderedItems" :key="idx")
       div(v-if="idx > 0 && Number(it?.sequence) === 1" style="margin:0; padding:0; line-height:14px; white-space:nowrap; overflow:hidden; font-family:monospace;") ====================================================================================================
       div(style="border:1px solid #ddd; border-radius:8px; padding:10px; background:#fff;")
-        div(style="font-weight:bold; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;")
+        div(style="font-weight:bold; font-size:12px; word-wrap:break-word; overflow-wrap:break-word;")
           span(v-if="it?.sequence !== undefined && it?.sequence !== null" style="color:blue !important;") {{ it.sequence }})
           span(v-if="it?.sequence !== undefined && it?.sequence !== null") &nbsp;
           span {{ it.title || '(no title)' }}
-        div(style="margin-top:4px; color:#333; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;")
+        div(style="margin-top:4px; color:#333; font-size:12px; word-wrap:break-word; overflow-wrap:break-word;")
           span(v-if="line2(it).seasonEpisode" style="color:blue !important;") {{ line2(it).seasonEpisode }}
           span(v-if="line2(it).rest")
             span(v-if="line2(it).seasonEpisode") ,&nbsp;

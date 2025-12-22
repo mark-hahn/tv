@@ -339,11 +339,9 @@ export default {
       const t = card?.torrent || {};
       if (this.isFinishedTorrent(t)) {
         const finished = this.fmtFinishedMmDd_HhMm(t?.completion_on);
-        const elapsed = this.fmtElapsedMmSs(this.elapsedSeconds(t));
         return this.formatAlignedBox([
           ['Seeds', t?.num_seeds],
           ['Finished', finished],
-          ['Elapsed', elapsed],
           ['State', this.fmtState(t?.state)]
         ]);
       }

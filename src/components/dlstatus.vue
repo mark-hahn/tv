@@ -53,8 +53,8 @@ export default {
   },
 
   unmounted() {
-    evtBustopCycleTimer();
-    this.s.off('paneChanged', this.onPaneChanged);
+    this.stopCycleTimer();
+    evtBus.off('paneChanged', this.onPaneChanged);
     this.stopPolling();
     this.cards = [];
   },
@@ -115,6 +115,7 @@ export default {
     startPolling() {
       if (this._polling) return;
       this._polling = true;
+      console.log('GET TAB: Scheduling first poll immediately');
       // First call immediately the first time we start.
       this.scheduleNextPoll(0);
     },
@@ -206,13 +207,10 @@ export default {
         // No filter: qB state can flip between downloading/stalled/etc.
         // Client-side filter keeps cards updating while data is still relevant.
         const torrents = await this.getQbtInfo({});
-        console.log('GET TAB: pollOnce - fetched', torrents?.length || 0, 'torrents from qBittorrent');
         
         if (Array.isArray(torrents)) {
           const seen = new Set();
           let hasAnyFinished = false;
-          
-          console.log('GET TAB: Currently have', this.cards.length, 'cards displayed');
           
           for (const t of torrents) {
             if (this.shouldShowTorrent(t)) {
@@ -226,9 +224,7 @@ export default {
           for (const card of this.cards) {
             if (!card?.hash) continue;
             const stillActive = seen.has(card.hash);
-            console.log('GET TAB: Card', card.name, '- still active:', stillActive);
             if (!stillActive) {
-              console.log('GET TAB: Download finished:', card.name);
               this.applyEarlyFinish(card);
               hasAnyFinished = true;
             }
@@ -236,45 +232,32 @@ export default {
           
           // If something finished, check tvproc and start new cycle if nothing is downloading
           if (hasAnyFinished) {
-            console.log('GET TAB: Download(s) finished, checking if we should start new cycle...');
             await this.checkAndStartNewCycle();
-          } else {
-            console.log('GET TAB: No downloads finished this cycle');
           }
         }
       } catch (e) {
-        console.error('GET TAB: pollOnce error:', e);
+        // Silently ignore polling errors
       }
     },
 
     async checkAndStartNewCycle() {
       try {
-        console.log('GET TAB: checkAndStartNewCycle called');
+        // Wait 2 seconds for tvproc to refresh and see the finished download
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
         // Check tvproc status
         const res = await fetch(`${config.torrentsApiUrl}/api/tvproc`);
-        if (!res.ok) {
-          console.log('GET TAB: Failed to fetch tvproc status:', res.status);
-          return;
-        }
+        if (!res.ok) return;
         
         const items = await res.json();
-        if (!Array.isArray(items)) {
-          console.log('GET TAB: tvproc returned non-array:', typeof items);
-          return;
-        }
-        
-        console.log('GET TAB: tvproc has', items.length, 'items');
+        if (!Array.isArray(items)) return;
         
         // Check if anything is downloading
         const downloadingItems = items.filter(it => String(it?.status || '').trim() === 'downloading');
         const hasDownloading = downloadingItems.length > 0;
         
-        console.log('GET TAB: Found', downloadingItems.length, 'downloading items');
-        
         // If something is downloading, stop the aggressive cycling
         if (hasDownloading) {
-          console.log('GET TAB: Download already in progress, stopping aggressive cycle');
           this.stopCycleTimer();
           evtBus.emit('cycle-started');
           return;
@@ -283,29 +266,23 @@ export default {
         // Start aggressive cycling if not already started
         if (!this._cycleStartTime) {
           this._cycleStartTime = Date.now();
-          console.log('GET TAB: Starting aggressive cycling at', new Date(this._cycleStartTime).toLocaleTimeString());
         }
         
         // Check if we've been cycling for more than 1 minute
         const elapsed = Date.now() - this._cycleStartTime;
-        console.log('GET TAB: Elapsed time:', Math.round(elapsed / 1000) + 's / 60s');
         
         if (elapsed > 60000) {
-          console.log('GET TAB: 1 minute elapsed, stopping aggressive cycle');
           this.stopCycleTimer();
           return;
         }
         
         // Start a new cycle
-        console.log('GET TAB: Starting new cycle (attempt at +' + Math.round(elapsed / 1000) + 's)...');
         const cycleRes = await fetch(`${config.torrentsApiUrl}/api/tvproc/cycle`, {
           method: 'POST'
         });
         
         if (cycleRes.ok) {
           const result = await cycleRes.text();
-          console.log('GET TAB: Cycle API responded:', result);
-          console.log('GET TAB: Scheduling next check in 2 seconds...');
           // Check again in 2 seconds
           this._cycleTimer = setTimeout(() => {
             void this.checkAndStartNewCycle();

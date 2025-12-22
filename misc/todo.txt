@@ -7,6 +7,8 @@ bugs ...
   delete broken (Orville)
   in tvproc pane library % lost when pane switched
 
+  are there 2 timestamps in down when downloading
+
 untested ...
   check torrent files validity before downloading
 

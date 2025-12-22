@@ -6,8 +6,6 @@ bugs ...
 
 todo ...
   how to see why qbt or down don't start
-  in qbt pane card change completion date to elapsed mm:ss
-    use data from qbt not card timings
 
 non-simple:
   

@@ -260,10 +260,22 @@ export default {
       return `${mm}:${this.pad2(ss)}`;
     },
 
+    fmtElapsedMmSs(startEpoch, endEpoch) {
+      const start = Number(startEpoch);
+      const end = Number(endEpoch);
+      if (!Number.isFinite(start) || start <= 0 || !Number.isFinite(end) || end <= 0) {
+        return '??:??';
+      }
+      const elapsedSeconds = Math.max(0, end - start);
+      const mm = Math.floor(elapsedSeconds / 60);
+      const ss = Math.floor(elapsedSeconds % 60);
+      return `${mm}:${this.pad2(ss)}`;
+    },
+
     fmtGbOneDecimal(bytes) {
       const n = Number(bytes);
       if (!Number.isFinite(n)) return String(bytes);
-      return `${(Math.max(0, n) / 1_000_000_000).toFixed(1)} GB`;
+      return `${(Math.max(0, n) / 1_000_000_000).toFixed(3)} GB`;
     },
 
     fmtProgPc(completedBytes, sizeBytes) {
@@ -281,12 +293,12 @@ export default {
       if (t?.state === 'downloading') {
         const prog = this.fmtProgPc(t?.completed, t?.size);
         const eta = this.fmtEtaMmSs(t?.eta);
-        return `${added}${sep}${size}${sep}${prog}%${sep}${eta}${sep}Getting`;
+        return `${size}${sep}${added}${sep}${prog}%${sep}${eta}${sep}Getting`;
       }
 
-      const finished = this.fmtCompletionMmDd_HhMm(t?.completion_on);
+      const elapsed = this.fmtElapsedMmSs(t?.added_on, t?.completion_on);
       const state = this.fmtState(t?.state);
-      return `${added}${sep}${finished}${sep}${size}${sep}${state}`;
+      return `${size}${sep}${added}${sep}${elapsed}${sep}${state}`;
     },
 
     forceFile(title) {

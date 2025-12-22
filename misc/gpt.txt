@@ -1,3 +1,4 @@
 
 
 
+in qbt pane card show size with 3 decimal places

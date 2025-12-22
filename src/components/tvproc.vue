@@ -256,11 +256,9 @@ export default {
       const d = new Date(ms);
       if (Number.isNaN(d.getTime())) return '';
 
-      const m = d.getMonth() + 1;
-      const day = d.getDate();
       const hh = String(d.getHours()).padStart(2, '0');
       const mm = String(d.getMinutes()).padStart(2, '0');
-      return `${m}/${day} ${hh}:${mm}`;
+      return `${hh}:${mm}`;
     },
 
     fmtHhmm(ts) {
@@ -306,6 +304,21 @@ export default {
       return `${mins}:${String(secs).padStart(2, '0')}`;
     },
 
+    fmtEtaTimestamp(eta) {
+      const n = Number(eta);
+      if (!Number.isFinite(n) || n <= 0) return '';
+      
+      // If it's a large number (Unix timestamp), format as time only
+      if (n > 10000000) {
+        const d = new Date(n * 1000);
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        const ss = String(d.getSeconds()).padStart(2, '0');
+        return `${hh}:${mm}:${ss}`;
+      }
+      return '';
+    },
+
     elapsedSeconds(it) {
       const started = Number(it?.dateStarted);
       const ended = Number(it?.dateEnded);
@@ -336,7 +349,6 @@ export default {
       if (started) parts.push(started);
 
       if (status === 'finished') {
-        if (ended) parts.push(ended);
         const elapsed = this.fmtElapsedMmSs(this.elapsedSeconds(it));
         if (elapsed) parts.push(elapsed);
         parts.push('Finished');
@@ -347,6 +359,8 @@ export default {
         if (ended) parts.push(ended);
         const eta = this.fmtEtaRemaining(it?.eta);
         if (eta) parts.push(eta);
+        const etaTimestamp = this.fmtEtaTimestamp(it?.eta);
+        if (etaTimestamp) parts.push(etaTimestamp);
         if (Number.isFinite(progress) && progress >= 0 && progress <= 100) {
           parts.push(`${progress}%`);
         }

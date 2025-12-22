@@ -1,12 +1,5 @@
 
 
-in tvproc remove completed time from card 
-
-========================
-
-
-in get: remove date from finished timestamp
-
 not fixed
 =========
 
@@ -14,10 +7,4 @@ in Show list (emby.js):
 Added WaitStr (waiting dates) for no-emby shows
 
 
-new
-===
-in tvproc, while downloading the info line looked like this:
-S1:E6, 1.634 GB | 12/21 16:08 | 29439371:14 remaining | 85% | 
---
-fix 29439371:14 number, remove word remaining, remove trailing |
-
+in get, when a download finished -- if in down pane nothing is doenloading start a new cycle

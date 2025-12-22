@@ -197,6 +197,8 @@ export default {
         const torrents = await this.getQbtInfo({});
         if (Array.isArray(torrents)) {
           const seen = new Set();
+          let hasAnyFinished = false;
+          
           for (const t of torrents) {
             if (this.shouldShowTorrent(t)) {
               const hash = String(t?.hash || '');
@@ -210,11 +212,43 @@ export default {
             if (!card?.hash) continue;
             if (!seen.has(card.hash)) {
               this.applyEarlyFinish(card);
+              hasAnyFinished = true;
             }
+          }
+          
+          // If something finished, check tvproc and start new cycle if nothing is downloading
+          if (hasAnyFinished) {
+            await this.checkAndStartNewCycle();
           }
         }
       } catch {
         // ignore transient errors
+      }
+    },
+
+    async checkAndStartNewCycle() {
+      try {
+        // Check tvproc status
+        const res = await fetch(`${config.torrentsApiUrl}/api/tvproc`);
+        if (!res.ok) return;
+        
+        const items = await res.json();
+        if (!Array.isArray(items)) return;
+        
+        // Check if anything is downloading
+        const hasDownloading = items.some(it => String(it?.status || '').trim() === 'downloading');
+        
+        // If nothing is downloading, start a new cycle
+        if (!hasDownloading) {
+          const cycleRes = await fetch(`${config.torrentsApiUrl}/api/tvproc/cycle`, {
+            method: 'POST'
+          });
+          if (cycleRes.ok) {
+            console.log('Started new download cycle');
+          }
+        }
+      } catch (e) {
+        console.error('checkAndStartNewCycle error:', e);
       }
     },
 
@@ -249,12 +283,10 @@ export default {
       const n = Number(epochSeconds);
       if (!Number.isFinite(n) || n <= 0) return '';
       const d = new Date(Math.floor(n) * 1000);
-      const m = d.getMonth() + 1;
-      const day = d.getDate();
       const hh = String(d.getHours()).padStart(2, '0');
       const mi = String(d.getMinutes()).padStart(2, '0');
       const ss = String(d.getSeconds()).padStart(2, '0');
-      return `${m}/${day} ${hh}:${mi}:${ss}`;
+      return `${hh}:${mi}:${ss}`;
     },
 
     fmtGbOneDecimal(bytes) {

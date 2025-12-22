@@ -1,1 +1,2 @@
 
+don't read tv.json file, cache in memory

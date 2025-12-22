@@ -6,7 +6,7 @@
       div(style="display:flex; justify-content:space-between; align-items:center;")
         div(style="margin-left:20px;") {{ headerShowName }}
         div(style="display:flex; gap:8px; margin-left:auto;")
-          button(v-if="selectedTorrent" @click.stop="showDownloadModal" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Get
+          button(v-if="selectedTorrent" @click.stop="continueDownload" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Get
           button(v-if="selectedTorrent" @click.stop="openDetails" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Tab
           button(@click.stop="searchClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Search
           button(@click.stop="forceClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Force

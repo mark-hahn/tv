@@ -82,7 +82,7 @@ export default {
       const nowSec = Math.floor(Date.now() / 1000);
       const next = {
         ...t,
-        state: 'Early Finish',
+        state: 'Finished',
         progress: 1,
         eta: 0,
         completion_on: Number.isFinite(Number(t.completion_on)) && Number(t.completion_on) > 0
@@ -115,7 +115,6 @@ export default {
     startPolling() {
       if (this._polling) return;
       this._polling = true;
-      console.log('GET TAB: Scheduling first poll immediately');
       // First call immediately the first time we start.
       this.scheduleNextPoll(0);
     },
@@ -230,11 +229,8 @@ export default {
             const alreadyFinished = t && Number(t.progress) === 1 && Number(t.eta) === 0;
             
             if (!stillActive && !alreadyFinished) {
-              const now = new Date();
-              const timestamp = `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}.${String(now.getMilliseconds()).padStart(3,'0')}`;
-              console.log(`[${timestamp}] GET: Download finished - ${card.name}`);
               // Store finish time for delay calculation
-              evtBus.emit('get-download-finished', { time: Date.now(), timestamp });
+              evtBus.emit('get-download-finished', { time: Date.now() });
               this.applyEarlyFinish(card);
               hasAnyFinished = true;
             }
@@ -268,23 +264,8 @@ export default {
         // Only downloading if status='downloading' AND no dateEnded
         const hasDownloading = status === 'downloading' && (!Number.isFinite(ended) || ended === 0);
         
-        const now2 = new Date();
-        const ts2 = `${now2.getHours()}:${String(now2.getMinutes()).padStart(2,'0')}:${String(now2.getSeconds()).padStart(2,'0')}.${String(now2.getMilliseconds()).padStart(3,'0')}`;
-        console.log(`[${ts2}] GET: tvproc check - ${hasDownloading ? 1 : 0} downloading items (total: ${items.length})`);
-        
-        // Log the last item details
-        if (hasDownloading) {
-          const started = Number(lastItem?.dateStarted);
-          const ageMinutes = Number.isFinite(started) ? Math.floor((nowSec - started) / 60) : 'unknown';
-          console.log(`[${ts2}] GET: - downloading: ${lastItem.title || '(no title)'} (status: ${lastItem.status}, started ${ageMinutes}m ago, not ended)`);
-        } else {
-          const ageMinutes = Number.isFinite(ended) ? Math.floor((nowSec - ended) / 60) : 'unknown';
-          console.log(`[${ts2}] GET: - last download ended ${ageMinutes}m ago: ${lastItem.title || '(no title)'}`);
-        }
-        
         // If something is downloading, stop the aggressive cycling
         if (hasDownloading) {
-          console.log(`[${ts2}] GET: Down pane already downloading, stopping cycle`);
           this.stopCycleTimer();
           evtBus.emit('cycle-started');
           return;
@@ -293,9 +274,6 @@ export default {
         // Start aggressive cycling if not already started
         if (!this._cycleStartTime) {
           this._cycleStartTime = Date.now();
-          const now3 = new Date();
-          const ts3 = `${now3.getHours()}:${String(now3.getMinutes()).padStart(2,'0')}:${String(now3.getSeconds()).padStart(2,'0')}.${String(now3.getMilliseconds()).padStart(3,'0')}`;
-          console.log(`[${ts3}] GET: Starting aggressive cycle (2s intervals, 60s max)`);
         }
         
         // Check if we've been cycling for more than 1 minute
@@ -307,23 +285,16 @@ export default {
         }
         
         // Start a new cycle
-        const now4 = new Date();
-        const ts4 = `${now4.getHours()}:${String(now4.getMinutes()).padStart(2,'0')}:${String(now4.getSeconds()).padStart(2,'0')}.${String(now4.getMilliseconds()).padStart(3,'0')}`;
-        console.log(`[${ts4}] GET: Calling tvproc/startProc (elapsed: ${Math.round(elapsed/1000)}s)`);
-        
         const cycleRes = await fetch('https://hahnca.com/tvproc/startProc', {
           method: 'POST'
         });
         
         if (cycleRes.ok) {
-          const result = await cycleRes.text();
-          console.log(`[${ts4}] GET: Cycle API response: ${result}`);
           // Check again in 2 seconds
           this._cycleTimer = setTimeout(() => {
             void this.checkAndStartNewCycle();
           }, 2000);
         } else {
-          console.log('GET TAB: Cycle API failed:', cycleRes.status);
           this.stopCycleTimer();
         }
       } catch (e) {

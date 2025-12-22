@@ -120,7 +120,6 @@ export default {
     },
 
     handleCycleStarted() {
-      console.log('tvproc: cycle-started event received, starting fast polling (1s for 30s)');
       // Start fast polling when a cycle starts
       this._fastPollStartTime = Date.now();
       this._oldDownloadingCount = this.items.filter(it => it.status === 'downloading' && (!it.dateEnded || it.dateEnded === 0)).length;
@@ -260,7 +259,6 @@ export default {
           pollInterval = 1000;
         } else {
           // Timeout reached, go back to normal polling
-          console.log('tvproc: fast polling timeout (30s), returning to 5s interval');
           this._fastPollStartTime = null;
           pollInterval = 5000;
         }
@@ -293,9 +291,12 @@ export default {
       const d = new Date(ms);
       if (Number.isNaN(d.getTime())) return '';
 
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
       const hh = String(d.getHours()).padStart(2, '0');
       const mm = String(d.getMinutes()).padStart(2, '0');
-      return `${hh}:${mm}`;
+      const ss = String(d.getSeconds()).padStart(2, '0');
+      return `${month}/${day} ${hh}:${mm}:${ss}`;
     },
 
     fmtHhmm(ts) {
@@ -411,23 +412,17 @@ export default {
     },
 
     async handleForceFile(title) {
-      console.log('tvproc: handleForceFile called with title:', title);
       if (!title) return;
       try {
         const encodedTitle = encodeURIComponent(title);
         const url = `${config.torrentsApiUrl}/api/tvproc/forceFile?title=${encodedTitle}`;
-        console.log('forceFile URL:', url);
         const res = await fetch(url, {
           method: 'GET',
           mode: 'cors'
         });
-        console.log('forceFile response:', res.status, res.statusText);
         if (!res.ok) {
           const text = await res.text();
           console.error(`forceFile failed: HTTP ${res.status}`, text);
-        } else {
-          const result = await res.json();
-          console.log('forceFile success:', result);
         }
       } catch (e) {
         console.error('forceFile error:', e);
@@ -464,7 +459,7 @@ export default {
         const title = it?.title;
         if (title) {
           this.clickedFutures.add(title);
-          this.handleForceFile(title);
+          void this.handleForceFile(title);
         }
       }
     },
@@ -606,29 +601,18 @@ export default {
         
         // Check if download started during fast polling
         if (this._fastPollStartTime && newDownloading.length > this._oldDownloadingCount) {
-          console.log('tvproc: download started, ending fast polling, returning to 5s interval');
           this._fastPollStartTime = null;
         }
         
         // If a download finished and nothing is downloading, trigger cycle
         if (oldDownloading.length > 0 && newDownloading.length === 0) {
-          const now = new Date();
-          const timestamp = `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}.${String(now.getMilliseconds()).padStart(3,'0')}`;
-          console.log(`[${timestamp}] DOWN: Download finished, calling tvproc/startProc`);
-          
           // Call cycle endpoint to start next download
           try {
-            const cycleRes = await fetch('https://hahnca.com/tvproc/startProc', {
+            await fetch('https://hahnca.com/tvproc/startProc', {
               method: 'POST'
             });
-            if (cycleRes.ok) {
-              const result = await cycleRes.text();
-              console.log(`[${timestamp}] DOWN: Cycle API response: ${result}`);
-            } else {
-              console.log(`[${timestamp}] DOWN: Cycle API failed: ${cycleRes.status}`);
-            }
           } catch (e) {
-            console.error(`[${timestamp}] DOWN: Cycle API error:`, e);
+            // Silently ignore
           }
           
           evtBus.emit('cycle-started');

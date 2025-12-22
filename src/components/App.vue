@@ -330,10 +330,8 @@ export default {
     },
 
     handleShowStatus() {
-      console.log('APP: handleShowStatus called, simpleMode:', this.simpleMode);
       if (this.simpleMode) return;
       this.currentPane = 'dlstatus';
-      console.log('APP: Setting currentPane to dlstatus and emitting paneChanged event');
       evtBus.emit('paneChanged', this.currentPane);
     },
 

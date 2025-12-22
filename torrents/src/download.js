@@ -179,11 +179,16 @@ export async function download(torrent, cfClearance = {}) {
     }
     
     console.log('Request headers:', JSON.stringify(headers, null, 2));
+    console.log('Fetching detail page URL:', detailUrl);
     
     const response = await fetch(detailUrl, { headers });
+    console.log('Detail page fetch response status:', response.status, response.statusText);
+    console.log('Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
+    
     if (!response.ok) {
       console.log(`Failed to fetch detail page: ${response.status} ${response.statusText}`);
       const snippet = await response.text().catch(() => '');
+      console.log('Response body snippet:', snippet.substring(0, 1000));
       return fail('fetch-detail', 'Failed to fetch detail page', {
         provider,
         detailUrl,

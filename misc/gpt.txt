@@ -1,30 +1,4 @@
 
 
 
-[23:38:32.940] GET: Download finished - The.Orville.S02E07.iNTERNAL.1080p.HEVC.x265-MeGusta index-DgaXX4fA.js:522:57725
-
-[23:38:32.952] GET: tvproc check - 0 downloading items (total: 4) index-DgaXX4fA.js:522:58409
-[23:38:32.952] GET: - last download ended 3m ago: The.Orville.S02E09.XviD-AFG.avi index-DgaXX4fA.js:522:58767
-[23:38:32.953] GET: Starting aggressive cycle (2s intervals, 60s max) index-DgaXX4fA.js:522:59210
-[23:38:32.953] GET: Calling tvproc/startProc (elapsed: 0s) index-DgaXX4fA.js:522:59534
-[23:38:32.953] GET: Cycle API response: {"status":"ok"} index-DgaXX4fA.js:522:59726
-
-[23:38:35.030] GET: tvproc check - 0 downloading items (total: 4) index-DgaXX4fA.js:522:58409
-[23:38:35.030] GET: - last download ended 3m ago: The.Orville.S02E09.XviD-AFG.avi index-DgaXX4fA.js:522:58767
-[23:38:35.031] GET: Calling tvproc/startProc (elapsed: 2s) index-DgaXX4fA.js:522:59534
-[23:38:35.031] GET: Cycle API response: {"status":"ok"} index-DgaXX4fA.js:522:59726
-
-[23:38:37.974] GET: tvproc check - 0 downloading items (total: 5) index-DgaXX4fA.js:522:58409
-
-[23:38:37.974] GET: - last download ended unknownm ago: The.Orville.S02E07.iNTERNAL.1080p.HEVC.x265-MeGusta.mkv index-DgaXX4fA.js:522:58767
-
-[23:38:37.974] GET: Calling tvproc/startProc (elapsed: 5s) index-DgaXX4fA.js:522:59534
-[23:38:37.974] GET: Cycle API response: {"status":"ok"} index-DgaXX4fA.js:522:59726
-
-[23:38:40.001] GET: tvproc check - 1 downloading items (total: 5) index-DgaXX4fA.js:522:58409
-
-[23:38:40.001] GET: - downloading: The.Orville.S02E07.iNTERNAL.1080p.HEVC.x265-MeGusta.mkv (status: downloading, started 0m ago, not ended) index-DgaXX4fA.js:522:58585
-
-[23:38:40.001] GET: Down pane already downloading, stopping cycle index-DgaXX4fA.js:522:58858
-tvproc: cycle-started event received, starting fast polling (1s for 30s) index-DgaXX4fA.js:523:11926
-tvproc: fast polling timeout (30s), returning to 5s interval index-DgaXX4fA.js:523:14273
+all the download monitoring and starting should not be affected by what pane is showing.  they are shown with v-show so they should execute all the time.  ignore which pane is showing.

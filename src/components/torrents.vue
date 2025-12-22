@@ -115,6 +115,7 @@ export default {
       showErrorModal: false,
       errorModalMsg: '',
       clickedTorrents: new Set(),  // Track which torrents have been clicked
+      downloadedTorrents: new Set(),  // Track which torrents have been downloaded via Get button
       noTorrentsNeeded: false,  // Flag when needed array is empty
       showCookieInputs: false,  // Manual toggle for cookie input boxes
       dismissCookieInputs: false,
@@ -780,16 +781,28 @@ export default {
 
     getCardStyle(torrent) {
       const isSelected = this.selectedTorrent === torrent;
+      const isDownloaded = this.isDownloadedNow(torrent);
+      let bgColor = '#fff';
+      if (isDownloaded) {
+        bgColor = '#ffcccb';  // Light red for downloaded
+      } else if (isSelected) {
+        bgColor = '#fffacd';  // Light yellow for selected
+      }
       return {
         marginBottom: '10px',
         padding: '8px',
-        background: isSelected ? '#fffacd' : '#fff',
+        background: bgColor,
         borderRadius: '5px',
         border: '1px solid #ddd',
         cursor: 'pointer',
         transition: 'all 0.2s',
         position: 'relative'
       };
+    },
+
+    isDownloadedNow(torrent) {
+      if (!torrent?.raw?.title) return false;
+      return this.downloadedTorrents.has(torrent.raw.title);
     },
 
     showDownloadModal() {
@@ -806,6 +819,11 @@ export default {
       
       if (!this.selectedTorrent) {
         return;
+      }
+      
+      // Mark as downloaded immediately to change card color
+      if (this.selectedTorrent?.raw?.title) {
+        this.downloadedTorrents.add(this.selectedTorrent.raw.title);
       }
       
       const torrentTitle = this.selectedTorrent.raw?.title || 'Unknown';
@@ -848,7 +866,7 @@ export default {
         
         // Check if download was successful
         if (data.success || data.result === true) {
-          // Success: do not switch panes automatically.
+          // Success
           this.rememberDownloadedTorrent(this.selectedTorrent);
         } else {
           const errorMsg = data.error || data.message || 'Unknown error';

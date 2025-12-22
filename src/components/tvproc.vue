@@ -123,25 +123,28 @@ export default {
       // Start fast polling when a cycle starts
       this._fastPollStartTime = Date.now();
       this._oldDownloadingCount = this.items.filter(it => it.status === 'downloading' && (!it.dateEnded || it.dateEnded === 0)).length;
-      if (this._active) {
-        void this.loadTvproc();
-      }
+      // Start polling immediately, even if pane is not active
+      void this.loadTvproc();
+      this.scheduleNextPoll(1000);
     },
 
     onPaneChanged(pane) {
       const active = pane === 'tvproc';
       this._active = active;
       if (active) {
+        // Load data when switching to this pane
         void this.loadTvproc({ isInitialPaneSwitch: true });
-        this.scheduleNextPoll(5000);
+        // Start polling if not already running
+        if (!this._pollTimer) {
+          this.scheduleNextPoll(5000);
+        }
       } else {
         // Store scroll position when leaving
         const el = this.$refs.scroller;
         if (el) {
           this._lastScrollTop = el.scrollTop;
         }
-        this.stopPolling();
-        this.stopLibraryPolling();
+        // Don't stop polling - let it continue in background
       }
     },
 
@@ -193,8 +196,6 @@ export default {
         return;
       }
 
-      if (!this._active) return;
-
       const res = await emby.taskStatus(this._libTaskId);
       if (res?.status === 'refreshing') {
         if (Number.isFinite(Number(res?.progress))) {
@@ -206,7 +207,6 @@ export default {
         }
 
         this._libPollTimer = setTimeout(() => {
-          if (!this._active) return;
           void this.pollLibraryStatus();
         }, 2000);
         return;
@@ -265,7 +265,6 @@ export default {
       }
       
       this._pollTimer = setTimeout(() => {
-        if (!this._active) return;
         void this.loadTvproc();
         this.scheduleNextPoll(5000);
       }, pollInterval);
@@ -592,10 +591,12 @@ export default {
             return Number.isFinite(started) && (nowSec - started) < 30;
           });
           newItems.forEach(item => {
-            const delayInfo = this._getFinishTime ? ` (delay: ${((Date.now() - this._getFinishTime) / 1000).toFixed(1)}s from GET finish)` : '';
-            console.log(`[${timestamp}] DOWN: Download started - ${item.title || '(no title)'}${delayInfo}`);
-            // Clear the finish time after logging
-            this._getFinishTime = null;
+            if (this._getFinishTime) {
+              const delayInfo = ` (delay: ${((Date.now() - this._getFinishTime) / 1000).toFixed(1)}s from GET finish)`;
+              console.log(`[${timestamp}] DOWN: Download started - ${item.title || '(no title)'}${delayInfo}`);
+              // Clear the finish time after logging
+              this._getFinishTime = null;
+            }
           });
         }
         

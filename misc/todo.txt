@@ -6,32 +6,23 @@ bugs ...
   delete broken (Orville)
 
 todo ...
-  add X del button to tvproc cards
-  change eta in tvproc to mm:ss remaining
-  card order in dlstatus.vue
-  add elapsed to qbt card
-  tvproc control - force get
-  add secs to qbt card
-  abort qbt downloading
-  history of progress for a torrent title
-  reload when just visible
-    browser or app tab switch
-  use minimum from emby
-    more from tvdb
-    is tmdb needed
-    compare & merge tvdb, tmdb, actors
-    get drama field from tvdb
-  keep deleted date and watched info forever
-  waiting enhancements
-    sort by waiting date
-    filter waiting
-    add no-emby waiting
-
+  remove vert mgns of card
+  in qbt pane card change completion date to elapsed mm:ss
+  in tor pane when get clicked chg card color to light red
+  
 non-simple:
   
 simple ...
   
 tabled ...
+  waiting enhancements
+    sort by waiting date
+    filter waiting
+  keep deleted date and watched info forever
+  history of progress for a torrent title
+  abort qbt downloading
+  add X del button to tvproc cards
+  card order in get pane
   when library finishes it goes to series
   delete file from qBittorrent when card deleted from get tab
   mark get tab card as aborted when file deleted from qBittorrent

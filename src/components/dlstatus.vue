@@ -100,15 +100,9 @@ export default {
       this._isVisible = pane === 'dlstatus';
       if (this._isVisible) this._everVisible = true;
 
-      // Start polling only once the pane has been shown at least once.
-      if (this._everVisible) {
+      // Start polling once we've been shown at least once
+      if (this._everVisible && !this._polling) {
         this.startPolling();
-      }
-
-      // If we already have a scheduled next poll and we're not mid-request,
-      // reschedule to match the visible/hidden interval.
-      if (this._polling && !this._inFlight) {
-        this.scheduleNextPoll(this.getPollDelayMs());
       }
     },
 
@@ -137,7 +131,7 @@ export default {
     },
 
     getPollDelayMs() {
-      return this._isVisible ? 1000 : 10000;
+      return 1000;
     },
 
     scheduleNextPoll(delayMs) {
@@ -178,10 +172,12 @@ export default {
       if (!hash) return;
 
       const idx = this.cards.findIndex(c => c.hash === hash);
+      const existingCard = idx >= 0 ? this.cards[idx] : null;
       const next = {
         hash,
         name: t?.name || '',
-        torrent: t
+        torrent: t,
+        startTime: existingCard?.startTime || Date.now()
       };
 
       if (idx >= 0) {
@@ -340,6 +336,15 @@ export default {
       return `${hh}:${mi}:${ss}`;
     },
 
+    fmtElapsedMmSs(startTime) {
+      if (!startTime) return '';
+      const elapsedMs = Date.now() - startTime;
+      const elapsedSec = Math.floor(elapsedMs / 1000);
+      const mm = Math.floor(elapsedSec / 60);
+      const ss = elapsedSec % 60;
+      return `${mm}:${String(ss).padStart(2, '0')}`;
+    },
+
     fmtGbOneDecimal(bytes) {
       const n = Number(bytes);
       if (!Number.isFinite(n)) return String(bytes);
@@ -421,10 +426,10 @@ export default {
     rightBoxText(card) {
       const t = card?.torrent || {};
       if (this.isFinishedTorrent(t)) {
-        const finished = this.fmtFinishedMmDd_HhMm(t?.completion_on);
+        const elapsed = this.fmtElapsedMmSs(card?.startTime);
         return this.formatAlignedBox([
           ['Seeds', t?.num_seeds],
-          ['Finished', finished],
+          ['Finished', elapsed],
           ['State', this.fmtState(t?.state)]
         ]);
       }

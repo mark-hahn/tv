@@ -263,10 +263,13 @@ export default {
           return;
         // Optimistically remove from UI before slow deletes
         this.removeRow(show);
+        // Delete files from server first, then from Emby
+        await srvr.deleteShowFromSrvr(show);
         await emby.deleteShowFromEmby(show);
       } else {
         // Non-emby: still remove immediately
         this.removeRow(show);
+        await srvr.deleteShowFromSrvr(show);
       }
       const tvdbData = allTvdb[name];
 
@@ -278,7 +281,6 @@ export default {
         const deleted = tvdbData.deleted = util.fmtDate();
         allTvdb[name] = await srvr.setTvdbFields({name, deleted});
       }
-      await srvr.deleteShowFromSrvr(show);
       await this.removeRow(show);
     }
 

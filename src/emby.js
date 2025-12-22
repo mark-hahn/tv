@@ -327,16 +327,34 @@ const markCollId     = '4697672';
 const lindaCollId    = '4706186';
 
 export async function deleteShowFromEmby(show) {
-  const delRes = await axios.delete(
-           urls.deleteShowUrl(cred, show.Id));
-  const res = delRes.status;
-  if(res != 204) {
-    const err = 
-      `unable to delete ${show.Name} from emby: ${delRes.data}`;
-    console.error(err);
-    return;
+  try {
+    const url = urls.deleteShowUrl(cred, show.Id);
+    const delRes = await axios.delete(url, {
+      headers: {
+        'X-Emby-Authorization': authHdr,
+        'X-Emby-Token': cred.token
+      }
+    });
+    const res = delRes.status;
+    if(res != 204) {
+      const err = 
+        `unable to delete ${show.Name} from emby: ${delRes.data}`;
+      console.error(err);
+      return;
+    }
+    console.log("deleted show from emby:", show.Name);
+  } catch (error) {
+    const errData = error.response?.data || '';
+    if (errData.includes('Directory not empty')) {
+      const msg = `Cannot delete "${show.Name}" - directory still has files. Delete files from disk first.`;
+      console.error(msg);
+      alert(msg);
+    } else {
+      console.error('deleteShowFromEmby error:', error);
+      console.error('Response data:', errData);
+    }
+    throw error;
   }
-  console.log("deleted show from emby:", show.Name);
 }
 
 const deleteOneFile = async (path) => {

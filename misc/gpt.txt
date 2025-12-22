@@ -1,5 +1,3 @@
 
 
-
-the clear button in the down pane works but the display doesn't change -- update after clear 
--- also remove trim button from down pane
+the delete button is broken in series pane -- the dialog confirmation is shown and the show dissapears from the show list but the show wasn't deleted from emby.

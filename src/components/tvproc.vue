@@ -293,6 +293,19 @@ export default {
       return `${mins}:${String(secs).padStart(2, '0')}`;
     },
 
+    fmtEtaRemaining(eta) {
+      const n = Number(eta);
+      if (!Number.isFinite(n) || n <= 0) return '';
+      
+      // If it's a large number (Unix timestamp), calculate remaining time from now
+      const now = Math.floor(Date.now() / 1000);
+      const remaining = n > 10000000 ? Math.max(0, n - now) : n;
+      
+      const mins = Math.floor(remaining / 60);
+      const secs = Math.floor(remaining % 60);
+      return `${mins}:${String(secs).padStart(2, '0')}`;
+    },
+
     elapsedSeconds(it) {
       const started = Number(it?.dateStarted);
       const ended = Number(it?.dateEnded);
@@ -332,8 +345,8 @@ export default {
 
       if (status === 'downloading') {
         if (ended) parts.push(ended);
-        const eta = this.fmtElapsedMmSs(it?.eta);
-        if (eta) parts.push(`${eta} remaining`);
+        const eta = this.fmtEtaRemaining(it?.eta);
+        if (eta) parts.push(eta);
         if (Number.isFinite(progress) && progress >= 0 && progress <= 100) {
           parts.push(`${progress}%`);
         }

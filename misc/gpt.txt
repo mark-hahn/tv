@@ -4,20 +4,42 @@ in tvproc remove completed time from card
 
 in tvproc pane (Get tab):
 Changed ETA format from "hh:mm" to "mm:ss remaining"
-Fixed library percentage staying visible when switching panes (no longer clears it)
-Fixed library percentage continuing to update when switching back to tvproc
+
 ===
+
+
 in qBittorrent cards (dlstatus.vue):
+
 Added seconds to timestamps (now shows hh:mm:ss instead of hh:mm)
 Moved "State" from leftBoxText to end of rightBoxText
 Moved "Eta" from rightBoxText to leftBoxText
+
 ===
+
+
 in History pane:
+
 Added seconds to all timestamps (now shows hh:mm:ss)
 Changed info line order - moved "Getting" to the end
 ===
+
+
 in Torrents pane:
 Changed button styling: gap increased from 4px to 8px, padding from 2px to 4px
-===
+
+
+not fixed
+=========
+
+
 in Show list (emby.js):
 Added WaitStr (waiting dates) for no-emby shows
+
+
+new
+===
+in tvproc, while downloading the info line looked like this:
+S1:E6, 1.634 GB | 12/21 16:08 | 29439371:14 remaining | 85% | 
+--
+fix 29439371:14 number, remove word remaining, remove trailing |
+

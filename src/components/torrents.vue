@@ -789,7 +789,6 @@ export default {
         bgColor = '#fffacd';  // Light yellow for selected
       }
       return {
-        marginBottom: '10px',
         padding: '8px',
         background: bgColor,
         borderRadius: '5px',

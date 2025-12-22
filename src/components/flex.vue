@@ -7,7 +7,7 @@
       span(v-if="emptyStateText") {{ emptyStateText }}
 
     div(v-else style="padding:5px; font-size:13px; line-height:1.6;")
-      div(v-for="c in cards" :key="c.key" style="position:relative; background:#fff; border:1px solid #ddd; border-radius:5px; padding:10px; margin:0 0 10px 0;")
+      div(v-for="c in cards" :key="c.key" style="position:relative; background:#fff; border:1px solid #ddd; border-radius:5px; padding:10px;")
         div(style="font-size:13px; font-weight:bold; color:#333; word-break:break-word;") {{ c.title }}
         div(style="font-size:13px; color:rgba(0,0,0,0.50) !important; word-break:break-word;") {{ c.subline }}
 

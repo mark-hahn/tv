@@ -224,7 +224,17 @@ export default {
           for (const card of this.cards) {
             if (!card?.hash) continue;
             const stillActive = seen.has(card.hash);
-            if (!stillActive) {
+            
+            // Check if card is already finished (progress=1 AND eta=0)
+            const t = card?.torrent;
+            const alreadyFinished = t && Number(t.progress) === 1 && Number(t.eta) === 0;
+            
+            if (!stillActive && !alreadyFinished) {
+              const now = new Date();
+              const timestamp = `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}.${String(now.getMilliseconds()).padStart(3,'0')}`;
+              console.log(`[${timestamp}] GET: Download finished - ${card.name}`);
+              // Store finish time for delay calculation
+              evtBus.emit('get-download-finished', { time: Date.now(), timestamp });
               this.applyEarlyFinish(card);
               hasAnyFinished = true;
             }
@@ -242,22 +252,39 @@ export default {
 
     async checkAndStartNewCycle() {
       try {
-        // Wait 2 seconds for tvproc to refresh and see the finished download
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
         // Check tvproc status
         const res = await fetch(`${config.torrentsApiUrl}/api/tvproc`);
         if (!res.ok) return;
         
         const items = await res.json();
-        if (!Array.isArray(items)) return;
+        if (!Array.isArray(items) || items.length === 0) return;
         
-        // Check if anything is downloading
-        const downloadingItems = items.filter(it => String(it?.status || '').trim() === 'downloading');
-        const hasDownloading = downloadingItems.length > 0;
+        const nowSec = Math.floor(Date.now() / 1000);
+        
+        // Only one download at a time, check last item (most recent)
+        const lastItem = items[items.length - 1];
+        const ended = Number(lastItem?.dateEnded);
+        const status = String(lastItem?.status || '').trim();
+        // Only downloading if status='downloading' AND no dateEnded
+        const hasDownloading = status === 'downloading' && (!Number.isFinite(ended) || ended === 0);
+        
+        const now2 = new Date();
+        const ts2 = `${now2.getHours()}:${String(now2.getMinutes()).padStart(2,'0')}:${String(now2.getSeconds()).padStart(2,'0')}.${String(now2.getMilliseconds()).padStart(3,'0')}`;
+        console.log(`[${ts2}] GET: tvproc check - ${hasDownloading ? 1 : 0} downloading items (total: ${items.length})`);
+        
+        // Log the last item details
+        if (hasDownloading) {
+          const started = Number(lastItem?.dateStarted);
+          const ageMinutes = Number.isFinite(started) ? Math.floor((nowSec - started) / 60) : 'unknown';
+          console.log(`[${ts2}] GET: - downloading: ${lastItem.title || '(no title)'} (status: ${lastItem.status}, started ${ageMinutes}m ago, not ended)`);
+        } else {
+          const ageMinutes = Number.isFinite(ended) ? Math.floor((nowSec - ended) / 60) : 'unknown';
+          console.log(`[${ts2}] GET: - last download ended ${ageMinutes}m ago: ${lastItem.title || '(no title)'}`);
+        }
         
         // If something is downloading, stop the aggressive cycling
         if (hasDownloading) {
+          console.log(`[${ts2}] GET: Down pane already downloading, stopping cycle`);
           this.stopCycleTimer();
           evtBus.emit('cycle-started');
           return;
@@ -266,6 +293,9 @@ export default {
         // Start aggressive cycling if not already started
         if (!this._cycleStartTime) {
           this._cycleStartTime = Date.now();
+          const now3 = new Date();
+          const ts3 = `${now3.getHours()}:${String(now3.getMinutes()).padStart(2,'0')}:${String(now3.getSeconds()).padStart(2,'0')}.${String(now3.getMilliseconds()).padStart(3,'0')}`;
+          console.log(`[${ts3}] GET: Starting aggressive cycle (2s intervals, 60s max)`);
         }
         
         // Check if we've been cycling for more than 1 minute
@@ -277,12 +307,17 @@ export default {
         }
         
         // Start a new cycle
-        const cycleRes = await fetch(`${config.torrentsApiUrl}/api/tvproc/cycle`, {
+        const now4 = new Date();
+        const ts4 = `${now4.getHours()}:${String(now4.getMinutes()).padStart(2,'0')}:${String(now4.getSeconds()).padStart(2,'0')}.${String(now4.getMilliseconds()).padStart(3,'0')}`;
+        console.log(`[${ts4}] GET: Calling tvproc/startProc (elapsed: ${Math.round(elapsed/1000)}s)`);
+        
+        const cycleRes = await fetch('https://hahnca.com/tvproc/startProc', {
           method: 'POST'
         });
         
         if (cycleRes.ok) {
           const result = await cycleRes.text();
+          console.log(`[${ts4}] GET: Cycle API response: ${result}`);
           // Check again in 2 seconds
           this._cycleTimer = setTimeout(() => {
             void this.checkAndStartNewCycle();

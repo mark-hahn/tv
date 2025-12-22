@@ -71,7 +71,10 @@ export default {
       _showLoading: false,
       clickedFutures: new Set(),
       _lastScrollTop: null,
-      _hasEverMounted: false
+      _hasEverMounted: false,
+      _fastPollStartTime: null,
+      _oldDownloadingCount: 0,
+      _getFinishTime: null
     };
   },
 
@@ -97,12 +100,14 @@ export default {
     evtBus.on('paneChanged', this.onPaneChanged);
     evtBus.on('forceFile', this.handleForceFile);
     evtBus.on('cycle-started', this.handleCycleStarted);
+    evtBus.on('get-download-finished', this.handleGetFinished);
   },
 
   unmounted() {
     evtBus.off('paneChanged', this.onPaneChanged);
     evtBus.off('forceFile', this.handleForceFile);
     evtBus.off('cycle-started', this.handleCycleStarted);
+    evtBus.off('get-download-finished', this.handleGetFinished);
     this.stopPolling();
     this.stopLibraryPolling();
     this.items = [];
@@ -110,9 +115,15 @@ export default {
   },
 
   methods: {
+    handleGetFinished(data) {
+      this._getFinishTime = data?.time || null;
+    },
+
     handleCycleStarted() {
-      console.log('tvproc: cycle-started event received, reloading immediately');
-      // Reload immediately when a new cycle starts
+      console.log('tvproc: cycle-started event received, starting fast polling (1s for 30s)');
+      // Start fast polling when a cycle starts
+      this._fastPollStartTime = Date.now();
+      this._oldDownloadingCount = this.items.filter(it => it.status === 'downloading' && (!it.dateEnded || it.dateEnded === 0)).length;
       if (this._active) {
         void this.loadTvproc();
       }
@@ -239,11 +250,27 @@ export default {
 
     scheduleNextPoll(ms) {
       this.stopPolling();
+      
+      // Determine if we should use fast polling
+      let pollInterval = ms;
+      if (this._fastPollStartTime) {
+        const elapsed = Date.now() - this._fastPollStartTime;
+        if (elapsed < 30000) {
+          // Still within 30-second fast polling window
+          pollInterval = 1000;
+        } else {
+          // Timeout reached, go back to normal polling
+          console.log('tvproc: fast polling timeout (30s), returning to 5s interval');
+          this._fastPollStartTime = null;
+          pollInterval = 5000;
+        }
+      }
+      
       this._pollTimer = setTimeout(() => {
         if (!this._active) return;
         void this.loadTvproc();
         this.scheduleNextPoll(5000);
-      }, ms);
+      }, pollInterval);
     },
 
     isNearBottom(el) {
@@ -552,7 +579,62 @@ export default {
           throw new Error(`HTTP ${res.status}: ${detail || res.statusText}`);
         }
         const arr = await res.json();
-        this.items = Array.isArray(arr) ? arr : [];
+        
+        // Track status changes for downloading items
+        const oldDownloading = Array.isArray(this.items) ? this.items.filter(it => String(it?.status || '').trim() === 'downloading') : [];
+        const newDownloading = Array.isArray(arr) ? arr.filter(it => String(it?.status || '').trim() === 'downloading') : [];
+        
+        // Log if a new download started (check timestamp to avoid false positives from reordering)
+        if (newDownloading.length > oldDownloading.length) {
+          const now = new Date();
+          const timestamp = `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}.${String(now.getMilliseconds()).padStart(3,'0')}`;
+          const nowSec = Math.floor(Date.now() / 1000);
+          const newItems = newDownloading.filter(nd => {
+            // Not in old list
+            if (oldDownloading.some(od => od.title === nd.title)) return false;
+            // Started within last 30 seconds (truly new)
+            const started = Number(nd?.dateStarted);
+            return Number.isFinite(started) && (nowSec - started) < 30;
+          });
+          newItems.forEach(item => {
+            const delayInfo = this._getFinishTime ? ` (delay: ${((Date.now() - this._getFinishTime) / 1000).toFixed(1)}s from GET finish)` : '';
+            console.log(`[${timestamp}] DOWN: Download started - ${item.title || '(no title)'}${delayInfo}`);
+            // Clear the finish time after logging
+            this._getFinishTime = null;
+          });
+        }
+        
+        // Check if download started during fast polling
+        if (this._fastPollStartTime && newDownloading.length > this._oldDownloadingCount) {
+          console.log('tvproc: download started, ending fast polling, returning to 5s interval');
+          this._fastPollStartTime = null;
+        }
+        
+        // If a download finished and nothing is downloading, trigger cycle
+        if (oldDownloading.length > 0 && newDownloading.length === 0) {
+          const now = new Date();
+          const timestamp = `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}.${String(now.getMilliseconds()).padStart(3,'0')}`;
+          console.log(`[${timestamp}] DOWN: Download finished, calling tvproc/startProc`);
+          
+          // Call cycle endpoint to start next download
+          try {
+            const cycleRes = await fetch('https://hahnca.com/tvproc/startProc', {
+              method: 'POST'
+            });
+            if (cycleRes.ok) {
+              const result = await cycleRes.text();
+              console.log(`[${timestamp}] DOWN: Cycle API response: ${result}`);
+            } else {
+              console.log(`[${timestamp}] DOWN: Cycle API failed: ${cycleRes.status}`);
+            }
+          } catch (e) {
+            console.error(`[${timestamp}] DOWN: Cycle API error:`, e);
+          }
+          
+          evtBus.emit('cycle-started');
+        }
+        
+        this.items = arr;
         const isFirstLoad = !this._didLoadOnce;
         this._didLoadOnce = true;
 

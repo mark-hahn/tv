@@ -9,9 +9,6 @@ bugs ...
 
   are there 2 timestamps in down when downloading
 
-untested ...
-  check torrent files validity before downloading
-
 todo ...
   add X del button to tvproc cards
   change eta in tvproc to mm:ss remaining

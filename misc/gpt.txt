@@ -1,4 +1,5 @@
 
 
 
-all the download monitoring and starting should not be affected by what pane is showing.  they are shown with v-show so they should execute all the time.  ignore which pane is showing.
+the clear button in the down pane works but the display doesn't change -- update after clear 
+-- also remove trim button from down pane

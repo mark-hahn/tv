@@ -6,6 +6,7 @@ bugs ...
   delete broken (Orville)
 
 todo ...
+  how to see why qbt or down don't start
   remove vert mgns of card
   in qbt pane card change completion date to elapsed mm:ss
     use data from qbt not card timings

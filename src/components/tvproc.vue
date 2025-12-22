@@ -522,7 +522,7 @@ export default {
     async clearLog() {
       this.error = null;
       try {
-        const res = await fetch(`${config.torrentsApiUrl}/api/tvproc/clear`, {
+        const res = await fetch('https://hahnca.com/tvproc/clearCache', {
           method: 'POST'
         });
         if (!res.ok) {

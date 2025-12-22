@@ -35,6 +35,8 @@
       span {{lastAiredVal}}
       span {{statusVal}}
 
+    div(v-if="nextUpTxt.length > 0" v-html="nextUpTxt" style="min-height:32px; font-size:16px; font-weight:bold; margin:5px 10px; padding-left:5px;")
+
     table(style="padding:0 5px; font-size:16px; margin-top:10px;" )
      tbody
       tr(style="font-weight:bold;")
@@ -60,6 +62,7 @@
 
 <script>
 import * as tvdb from '../tvdb.js';
+import * as emby from '../emby.js';
 
 export default {
   name: "Map",
@@ -103,7 +106,8 @@ export default {
     return {
       seasonStates: {}, // Track original state for each season
       tvdbData: null,
-      allTvdb: null
+      allTvdb: null,
+      nextUpTxt: ''
     };
   },
 
@@ -129,6 +133,7 @@ export default {
       if (newShow && newShow.Name) {
         await this.loadTvdbData();
         this.logUnairedInfo();
+        await this.setNextWatch();
       }
     }
   },
@@ -139,6 +144,7 @@ export default {
     if (this.mapShow && this.mapShow.Name) {
       await this.loadTvdbData();
       this.logUnairedInfo();
+      await this.setNextWatch();
     }
   },
 
@@ -242,6 +248,32 @@ export default {
         }
         this.$emit('episode-click', event, this.mapShow, season, parseInt(episodeNum), setWatched);
       });
+    },
+
+    async setNextWatch() {
+      if (!this.mapShow || !this.mapShow.Id) {
+        this.nextUpTxt = '';
+        return;
+      }
+      
+      const afterWatched = await emby.afterLastWatched(this.mapShow.Id);
+      const status = afterWatched.status;
+      const readyToWatch = (status === 'ok');
+      
+      if (!this.mapShow.Id.startsWith('noemby') && status !== 'allWatched') {
+        const {seasonNumber, episodeNumber} = afterWatched;
+        const seaEpiTxt = `S${(''+seasonNumber).padStart(2, "0")} ` +
+                          `E${(''+episodeNumber).padStart(2, "0")}`;
+        if (readyToWatch) {
+          this.nextUpTxt = ` &nbsp; Next Up: ${seaEpiTxt}`;
+        } else {
+          this.nextUpTxt = ` 
+                &nbsp; Next Up: ${seaEpiTxt} 
+                &nbsp; ${status === 'missing' ? 'No File' : 'Unaired'}`;
+        }
+      } else {
+        this.nextUpTxt = '';
+      }
     }
   }
 };

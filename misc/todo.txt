@@ -8,8 +8,8 @@ bugs ...
 todo ...
   remove vert mgns of card
   in qbt pane card change completion date to elapsed mm:ss
-  in tor pane when get clicked chg card color to light red
-  
+    use data from qbt not card timings
+
 non-simple:
   
 simple ...

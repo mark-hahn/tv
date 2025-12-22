@@ -96,11 +96,13 @@ export default {
   mounted() {
     evtBus.on('paneChanged', this.onPaneChanged);
     evtBus.on('forceFile', this.handleForceFile);
+    evtBus.on('cycle-started', this.handleCycleStarted);
   },
 
   unmounted() {
     evtBus.off('paneChanged', this.onPaneChanged);
     evtBus.off('forceFile', this.handleForceFile);
+    evtBus.off('cycle-started', this.handleCycleStarted);
     this.stopPolling();
     this.stopLibraryPolling();
     this.items = [];
@@ -108,6 +110,14 @@ export default {
   },
 
   methods: {
+    handleCycleStarted() {
+      console.log('tvproc: cycle-started event received, reloading immediately');
+      // Reload immediately when a new cycle starts
+      if (this._active) {
+        void this.loadTvproc();
+      }
+    },
+
     onPaneChanged(pane) {
       const active = pane === 'tvproc';
       this._active = active;

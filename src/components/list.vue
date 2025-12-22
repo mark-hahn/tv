@@ -130,11 +130,9 @@ export default {
       this.saveVisShow(show);
       if(show.Waiting) {
         show.Waiting = false;
-        await srvr.addBlockedWait(show.Name);
       }
       else if (show.WaitStr?.length > 0) {
         show.Waiting = true;
-        await srvr.delBlockedWait(show.Name); 
       }
     };
 
@@ -143,11 +141,9 @@ export default {
       this.saveVisShow(show);
       if(show.BlockedGap) {
         show.BlockedGap = false;
-        await srvr.delBlockedGap(show.Name);
       }
       else {
         show.BlockedGap = true;
-        await srvr.addBlockedGap(show.Name); 
       }
     };
     
@@ -622,7 +618,6 @@ export default {
       
       delete tvdbData.deleted;
       allTvdb[show.Name] = tvdbData;
-      await srvr.addBlockedWait(show.Name);
       this.addRow(show);
       this.sortShows();
       this.saveVisShow(show, true);
@@ -810,7 +805,6 @@ export default {
       this.saveVisShow(show);
       if (show.WaitStr?.length > 0) {
         show.Waiting = true;
-        await srvr.delBlockedWait(show.Name);
       }
     },
 
@@ -894,7 +888,6 @@ export default {
         for (const show of allShows) {
           if (show.BlockedGap) {
             show.BlockedGap = false;
-            await srvr.delBlockedGap(show.Name);
             cond.filter = 1;
           }
         }

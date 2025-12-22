@@ -1,10 +1,5 @@
+this didn't work: in get, when a download finishes -- if in down pane nothing is downloading, then start a new cycle -- it took a minute for downloading to start in down tab
 
+in git pane card change Early Finish msg to Finished 
 
-not fixed
-=========
-
-in Show list (emby.js):
-Added WaitStr (waiting dates) for no-emby shows
-
-
-in get, when a download finished -- if in down pane nothing is doenloading start a new cycle
+still no logs in browser console -- i should be lookin in browser, right?

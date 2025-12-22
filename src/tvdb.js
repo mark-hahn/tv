@@ -348,7 +348,8 @@ export const getSeriesMap = async (show) => {
       avail: avail,
       noFile: true,       // tvdb provides no file info
       unaired: unaired,
-      deleted: false
+      deleted: false,
+      aired: epData.aired || null  // Include aired date for WaitStr
     }]);
   }
   

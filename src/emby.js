@@ -133,7 +133,9 @@ export async function loadAllShows() {
           noEmbyShow.S1E1Unaired = true;
           const airDate = e1?.[1]?.aired;
           if (airDate) {
-            noEmbyShow.WaitStr = `Waiting ${airDate}`;
+            // Format as {M/DD} matching getWaitStr format
+            const dateStr = airDate.slice(5).replace(/^0/, ' ');
+            noEmbyShow.WaitStr = `{${dateStr}}`;
           }
         }
       }

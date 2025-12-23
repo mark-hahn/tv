@@ -8,6 +8,7 @@ import * as search from './search.js';
 import * as download from './download.js';
 import { tvdbProxyGet } from './tvdb-proxy.js';
 import { getQbtInfo, spaceAvail, flexgetHistory } from './usb.js';
+import { startReel, getReel } from './reelgood.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -200,6 +201,26 @@ app.post('/api/download', async (req, res) => {
     res.json({ success: Boolean(result) });
   } catch (error) {
     console.error('Download error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/startreel', async (req, res) => {
+  try {
+    const result = await startReel();
+    res.json(result);
+  } catch (error) {
+    console.error('startReel error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/getreel', async (req, res) => {
+  try {
+    const result = await getReel();
+    res.json(result);
+  } catch (error) {
+    console.error('getReel error:', error);
     res.status(500).json({ error: error.message });
   }
 });

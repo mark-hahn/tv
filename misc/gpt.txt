@@ -1,5 +1,13 @@
 
- log each show rejected to torrents/reelgood.log with the genre that caused its rejection
+i restored the seen shows list back to where i know there are unseen shows rejected and accepted 
+--
+i'm getting
+{
+  "status": "no show",
+  "rejects": []
+}
+so there is a bug -- put in logging to find the bug
 
- log each show accepted to torrents/reelgood.log 
+there are 
 
+show:.*?:@global

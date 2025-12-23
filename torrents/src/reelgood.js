@@ -19,6 +19,7 @@ const rx_genre = new RegExp('href="/tv/genre/([^"]*)"', 'sg');
 const homeUrl = "https://reelgood.com/new/tv";
 const reelShowsPath = path.resolve(__dirname, '..', 'reel-shows.json');
 const logPath = path.resolve(__dirname, '..', 'reelgood.log');
+const homePagePath = path.resolve(__dirname, '..', '..', 'samples', 'sample-reelgood', 'homepage.html');
 
 // Global cache
 let homeHtml = null;
@@ -87,6 +88,20 @@ export async function startReel() {
     const homeData = await fetch(homeUrl);
     homeHtml = await homeData.text();
     console.log('Home page loaded into memory');
+    
+    // Save to samples directory
+    try {
+      const sampleDir = path.dirname(homePagePath);
+      if (!fs.existsSync(sampleDir)) {
+        fs.mkdirSync(sampleDir, { recursive: true });
+      }
+      fs.writeFileSync(homePagePath, homeHtml, 'utf8');
+      console.log('Saved home page to', homePagePath);
+    } catch (err) {
+      console.error('Error saving home page:', err);
+      logToFile(`ERROR saving homepage.html: ${err.message}`);
+    }
+    
     return { status: 'ok' };
   } catch (err) {
     const errmsg = err.message || String(err);
@@ -96,20 +111,33 @@ export async function startReel() {
 }
 
 export async function getReel() {
+  const rejects = [];
   try {
+    logToFile('getReel() called');
     if (!homeHtml) {
+      logToFile('ERROR: homeHtml is null');
       return { status: 'error', errmsg: 'Home page not loaded. Call startReel first.' };
     }
+    logToFile(`homeHtml length: ${homeHtml.length}`);
 
     let show;
     rx_show.lastIndex = 0;
+    let matchCount = 0;
     
     while ((show = rx_show.exec(homeHtml)) !== null) {
+      matchCount++;
       const titleMatches = rx_title.exec(show[0]);
-      if (!titleMatches?.length) continue;
+      if (!titleMatches?.length) {
+        logToFile(`Match ${matchCount}: No title found`);
+        continue;
+      }
 
       const title = titleMatches[1];
-      if (title in oldShows) continue;
+      logToFile(`Match ${matchCount}: "${title}"`);
+      if (title in oldShows) {
+        logToFile(`  -> Already in oldShows, skipping`);
+        continue;
+      }
       
       oldShows[title] = true;
 
@@ -119,10 +147,12 @@ export async function getReel() {
       const slugMatches = rx_slug.exec(show[0]);
       if (!slugMatches?.length) {
         console.log('No slug found');
+        logToFile(`  -> No slug found`);
         continue;
       }
 
       const slug = slugMatches[1];
+      logToFile(`  -> Slug: ${slug}`);
       const showUrl = `https://reelgood.com/show/${encodeURIComponent(slug)}`;
 
       let reelData;
@@ -130,9 +160,11 @@ export async function getReel() {
         reelData = await fetch(showUrl);
       } catch (e) {
         console.log('Error fetching show page:', e);
+        logToFile(`  -> ERROR fetching show page: ${e.message || String(e)}`);
         logToFile(`ERROR fetching show page "${title}": ${e.message || String(e)}`);
         continue;
       }
+      logToFile(`  -> Fetched show page successfully`);
       const reelHtml = await reelData.text();
 
       const chk = (slug, label) => {
@@ -161,26 +193,30 @@ export async function getReel() {
       }
 
       if (shouldSkip) {
+        rejects.push({ title, genre: rejectedGenre });
+        logToFile(`  -> REJECTED: genre ${rejectedGenre}`);
         logToFile(`REJECT: "${title}" (${rejectedGenre})`);
         continue;
       }
 
       // Log accepted show
+      logToFile(`  -> ACCEPTED!`);
       logToFile(`>>>  "${title}", ${showUrl}`);
 
       // Save oldShows at end before returning
       saveReelShows(oldShows);
 
-      return { status: 'ok', title, showUrl};
+      return { status: 'ok', title, showUrl, rejects };
     }
 
     // Save oldShows even when no show found
+    logToFile(`No more shows found. Total matches processed: ${matchCount}`);
     saveReelShows(oldShows);
 
-    return { status: 'no show' };
+    return { status: 'no show', rejects };
   } catch (err) {
     const errmsg = err.message || String(err);
     logToFile(`ERROR in getReel: ${errmsg}`);
-    return { status: 'error', errmsg };
+    return { status: 'error', errmsg, rejects };
   }
 }

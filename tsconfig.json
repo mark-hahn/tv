@@ -12,6 +12,6 @@
     "types": ["vue"],
     "plugins": [{ "name": "@vue/typescript-plugin" }]
   },
-  "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.vue"],
+  "include": ["src/*.js", "src/components/*.vue", "torrents/src/*.js"],
   "exclude": ["node_modules", "dist"]
 }

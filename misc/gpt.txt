@@ -1,1 +1,14 @@
 
+change torrents/src/reelgood.js to just export functions getReel() and startReel(). server.js will call them from the endpoints getreel and startreel. neither has input args.
+
+change oldShows.json to torrents/reelhows.json in code.
+
+when startReel is called it should load the home page and save it and nothing else.
+
+getReel() will scrape the saved home page for shows it has not seen in the cached file torrents/reelhows.json. It will load the page for that show and check for genre filters.  when it finds one that passes then it will get imbdUrl, wikiUrl, googleUrl, and tomatoUrl.  then it returns the title and these urls from the getReel() call.
+
+torrents/src/reelgood.js will not exit.
+
+put the endpoint for the two functions in torrents/src/server.js.
+
+in src/main.js put debug test code that calls startReel() and then getReel() and logs the results.

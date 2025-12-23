@@ -110,7 +110,7 @@ export default {
 
   components: { FontAwesomeIcon, Shows, HdrTop, HdrBot, Buttons },
 
-  emits: ['show-map', 'hide-map'],
+  emits: ['show-map', 'hide-map', 'all-shows'],
   
   props: {
     simpleMode: {
@@ -1067,6 +1067,7 @@ export default {
         return;
       }
       this.shows = [...allShows];
+      this.$emit('all-shows', allShows);
 
       // must be set before startWorker
       blockedWaitShows = [];

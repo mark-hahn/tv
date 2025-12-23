@@ -207,7 +207,30 @@ app.post('/api/download', async (req, res) => {
 
 app.get('/api/startreel', async (req, res) => {
   try {
-    const result = await startReel();
+    const q = req.query || {};
+    let showTitles = [];
+    if (typeof q.showTitles === 'string' && q.showTitles) {
+      try {
+        const parsed = JSON.parse(q.showTitles);
+        if (Array.isArray(parsed)) showTitles = parsed;
+      } catch {
+        showTitles = q.showTitles.split(',').map(s => s.trim()).filter(Boolean);
+      }
+    }
+
+    const result = await startReel(showTitles);
+    res.json(result);
+  } catch (error) {
+    console.error('startReel error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/startreel', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const showTitles = Array.isArray(body.showTitles) ? body.showTitles : [];
+    const result = await startReel(showTitles);
     res.json(result);
   } catch (error) {
     console.error('startReel error:', error);

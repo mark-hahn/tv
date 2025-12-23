@@ -1,46 +1,9 @@
 
-the reel pane goes all the way to the right of the window.  it is supposed to be the size of series.vue
+when the reel pane mounted  reelTitles was not populated.  
 
-there is one card in the reelGallery and it has the caption but no image
+torrents/reelgood.log showed this:
 
-set width of the reelGallery component to be 150px wide
+12/23 15:37 REJECT: "Man vs Baby" (family)
+12/23 15:37 >>>  "Little Disasters", https://reelgood.com/show/little-disasters
 
-reelRight should have a width that fills the rest of the reelPane to the right
 
-the buttons should have a height of 18px and a margin of 0
-
-the labels for the button are not in the border -- and reduce padding of buttons to 2px
-
-set margin-top of #reelButtons to 0
-
-even though all margins are 0 there is a gap between #reelDescr and #reelButtons - remove it
-
-set width of the reelGallery component to be 100px wide
-
-set font-size of reelGallery caption to 12px
-
-set padding of reelGallery caption to 2px
-
-- for testing the reelGallery component should have a srchStr property of "friends".
-
-- the cards in reelGallery component appear to have zero height. make the height such that  the image and caption are visible - the reelGallery component pane should be scrollable
-
-the cards in reelGallery component should not a height set so they can naturally cover image and caption
-
-the cards are overlapping vertically
-
-remove averageRuntime and set reelInfo text to uppercase
-
-set reelInfo font-size to 14px
-
-the reelTitles cards have no text content - log rejectStatus  and titleString
-
-reduce rejectStatus box width to 80px and make titleString truncate instead of wrapping
-
-put 1px 50% gray border around reelTitles cards -- and set vertical gap to 0
-
-set font-size of reelTitles cards to 14px
-
-when reelTitles card clicked set reelGallery srchStr to title in card 
-
-set reelGallery width to 125px

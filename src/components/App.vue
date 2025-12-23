@@ -9,6 +9,7 @@
     @hide-map="handleHideMap"
     @show-actors="handleShowActors"
     @show-torrents="handleShowTorrents"
+    @all-shows="handleAllShows"
   )
   #tabArea(:style="{ flex:'1 1 auto', minWidth:'0px', display:'flex', flexDirection:'column', height:'100%' }")
     #tabBar(:style="{ display:'flex', gap:'6px', padding:'6px 8px', alignItems:'center', borderBottom:'1px solid #ddd', backgroundColor:'#fafafa', flex:'0 0 auto', flexWrap:'wrap' }")
@@ -47,6 +48,7 @@
         v-show="currentPane === 'reel'"
         :simpleMode="simpleMode"
         :sizing="simpleMode ? sizing : sizingNonSimple"
+        :allShows="allShows"
       )
       Torrents(
         v-if="!simpleMode"
@@ -119,6 +121,7 @@ export default {
       seriesMapEpis: [],
       seriesMap: {},
       mapError: '',
+      allShows: [],
       // TABLET SIZING CONFIGURATION - SIMPLE MODE - Tweak these values
       sizing: {
         // List pane
@@ -199,6 +202,9 @@ export default {
     }
   },
   methods: {
+    handleAllShows(shows) {
+      this.allShows = Array.isArray(shows) ? shows : [];
+    },
     selectTab(key) {
       const k = String(key || '');
       if (!k) return;

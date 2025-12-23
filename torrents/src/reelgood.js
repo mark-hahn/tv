@@ -18,12 +18,43 @@ const rx_genre = new RegExp('href="/tv/genre/([^"]*)"', 'sg');
 
 const homeUrl = "https://reelgood.com/new/tv";
 const reelShowsPath = path.resolve(__dirname, '..', 'reel-shows.json');
+const reelTitlesPath = path.resolve(__dirname, '..', 'reelgood-titles.json');
 const logPath = path.resolve(__dirname, '..', 'reelgood.log');
 const homePagePath = path.resolve(__dirname, '..', '..', 'samples', 'sample-reelgood', 'homepage.html');
 
 // Global cache
 let homeHtml = null;
 let oldShows = null;
+let showTitles = [];
+let resultTitles = [];
+
+function loadResultTitles() {
+  try {
+    if (fs.existsSync(reelTitlesPath)) {
+      const parsed = JSON.parse(fs.readFileSync(reelTitlesPath, 'utf8'));
+      if (Array.isArray(parsed)) return parsed.map(String);
+    }
+  } catch (err) {
+    console.error('Error loading reelgood-titles.json:', err);
+    logToFile(`ERROR loading reelgood-titles.json: ${err.message}`);
+  }
+  return [];
+}
+
+function saveResultTitles(titlesArr) {
+  try {
+    fs.writeFileSync(reelTitlesPath, JSON.stringify(titlesArr, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error saving reelgood-titles.json:', err);
+    logToFile(`ERROR saving reelgood-titles.json: ${err.message}`);
+  }
+}
+
+function appendResultTitle(entry) {
+  resultTitles.push(String(entry));
+  while (resultTitles.length > 100) resultTitles.shift();
+  saveResultTitles(resultTitles);
+}
 
 function logToFile(message) {
   try {
@@ -70,6 +101,7 @@ function saveReelShows(shows) {
 
 // Load oldShows once at module load time
 oldShows = loadReelShows();
+resultTitles = loadResultTitles();
 
 // Log startup - wrapped in try/catch to prevent module load failure
 (function logStartup() {
@@ -82,8 +114,10 @@ oldShows = loadReelShows();
   }
 })();
 
-export async function startReel() {
+export async function startReel(showTitlesArg) {
   try {
+    showTitles = Array.isArray(showTitlesArg) ? showTitlesArg : [];
+
     console.log('Fetching fresh reelgood home page');
     const homeData = await fetch(homeUrl);
     homeHtml = await homeData.text();
@@ -102,20 +136,30 @@ export async function startReel() {
       logToFile(`ERROR saving homepage.html: ${err.message}`);
     }
     
-    return { status: 'ok' };
+    return resultTitles;
   } catch (err) {
     const errmsg = err.message || String(err);
     logToFile(`ERROR in startReel: ${errmsg}`);
-    return { status: 'error', errmsg };
+    appendResultTitle(`error|${errmsg}`);
+    return resultTitles;
   }
 }
 
 export async function getReel() {
-  const rejects = [];
   try {
     if (!homeHtml) {
-      return { status: 'error', errmsg: 'Home page not loaded. Call startReel first.' };
+      const msg = 'Home page not loaded. Call startReel first.';
+      appendResultTitle(`error|${msg}`);
+      return [`error|${msg}`];
     }
+
+    const addedThisCall = [];
+    const add = (entry) => {
+      appendResultTitle(entry);
+      addedThisCall.push(entry);
+    };
+
+    const haveItSet = new Set((Array.isArray(showTitles) ? showTitles : []).map(String));
 
     let show;
     rx_show.lastIndex = 0;
@@ -140,6 +184,12 @@ export async function getReel() {
 
       const slug = slugMatches[1];
       const showUrl = `https://reelgood.com/show/${encodeURIComponent(slug)}`;
+
+      if (haveItSet.has(title)) {
+        add(`Have It|${title}`);
+        logToFile(`REJECT: "${title}" (Have It)`);
+        continue;
+      }
 
       let reelData;
       try {
@@ -177,7 +227,7 @@ export async function getReel() {
       }
 
       if (shouldSkip) {
-        rejects.push({ title, genre: rejectedGenre });
+        add(`${rejectedGenre}|${title}`);
         logToFile(`REJECT: "${title}" (${rejectedGenre})`);
         continue;
       }
@@ -185,19 +235,22 @@ export async function getReel() {
       // Log accepted show
       logToFile(`>>>  "${title}", ${showUrl}`);
 
+      add(`ok|${title}`);
+
       // Save oldShows at end before returning
       saveReelShows(oldShows);
 
-      return { status: 'ok', title, showUrl, rejects };
+      return addedThisCall;
     }
 
     // Save oldShows even when no show found
     saveReelShows(oldShows);
 
-    return { status: 'no show', rejects };
+    return addedThisCall;
   } catch (err) {
     const errmsg = err.message || String(err);
     logToFile(`ERROR in getReel: ${errmsg}`);
-    return { status: 'error', errmsg, rejects };
+    appendResultTitle(`error|${errmsg}`);
+    return [`error|${errmsg}`];
   }
 }

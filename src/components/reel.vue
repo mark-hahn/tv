@@ -29,7 +29,9 @@
         button(:style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Google
         button(:style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Imdb
         button(:style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Prev
-        button(:style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Next
+        button(
+          @click="handleNext"
+          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Next
     
     #reelTitles(
       ref="titlesPane"
@@ -51,6 +53,7 @@
 <script>
 import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import ReelGallery from './reel-gallery.vue';
+import { config } from '../config.js';
 
 export default {
   name: 'ReelPane',
@@ -58,6 +61,10 @@ export default {
     ReelGallery
   },
   props: {
+    allShows: {
+      type: Array,
+      default: () => ([])
+    },
     sizing: {
       type: Object,
       default: () => ({})
@@ -70,6 +77,45 @@ export default {
     const titleStrings = ref([]);
     const selectedTitleIdx = ref(-1);
     const titlesPane = ref(null);
+
+    const getAllShowNames = () => {
+      const src = Array.isArray(props.allShows) ? props.allShows : [];
+      const names = src
+        .map((s) => {
+          if (!s) return '';
+          if (typeof s === 'string') return s;
+          return String(s.Name || s.name || s.title || s.showName || s.seriesName || '');
+        })
+        .map((s) => s.trim())
+        .filter(Boolean);
+      return Array.from(new Set(names));
+    };
+
+    const startReelAndLoadTitles = async () => {
+      try {
+        const showTitles = getAllShowNames();
+        const res = await fetch(`${config.torrentsApiUrl}/api/startreel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ showTitles })
+        });
+        const data = await res.json();
+        titleStrings.value = Array.isArray(data) ? data : [];
+      } catch (e) {
+        console.log('startReel failed:', e);
+      }
+    };
+
+    const handleNext = async () => {
+      try {
+        const res = await fetch(`${config.torrentsApiUrl}/api/getreel`);
+        const data = await res.json();
+        const added = Array.isArray(data) ? data : [];
+        titleStrings.value = [...titleStrings.value, ...added];
+      } catch (e) {
+        console.log('getReel failed:', e);
+      }
+    };
 
     // Parse titleStrings into objects
     const parsedTitles = computed(() => {
@@ -164,26 +210,7 @@ export default {
 
     // Initialize with test data
     onMounted(() => {
-      // Test data
-      titleStrings.value = [
-        'documentary|Taylor Swift: The End of an Era',
-        'documentary|Vantara: Sanctuary Stories',
-        'ok|Castle Rock'
-      ];
-
-      // Load test tvdb object
-      curTvdb.value = {
-        "id": 385730,
-        "name": "Somebody Somewhere",
-        "slug": "somebody-somewhere",
-        "image": "https://artworks.thetvdb.com/banners/v4/series/385730/posters/670a459298ada.jpg",
-        "year": "2022",
-        "originalCountry": "usa",
-        "originalLanguage": "eng",
-        "overview": "Sam is a true Kansan on the surface but beneath it all struggles to fit the hometown mold. As she grapples with loss and acceptance, singing is Sam's saving grace and leads her on a journey to discover herself and a community of outsiders that don't fit in but don't give up, showing that finding your people, and finding your voice, is possible. Anywhere. Somewhere.",
-        "network": "HBO Max",
-        "averageRuntime": 30
-      };
+      void startReelAndLoadTitles();
     });
 
     return {
@@ -198,7 +225,8 @@ export default {
       titlesPane,
       getTitleCardStyle,
       handleGallerySelect,
-      selectTitle
+      selectTitle,
+      handleNext
     };
   }
 };

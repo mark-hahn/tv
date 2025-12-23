@@ -42,6 +42,12 @@
         :simpleMode="simpleMode"
         :sizing="simpleMode ? sizing : sizingNonSimple"
       )
+      Reel(
+        v-if="!simpleMode"
+        v-show="currentPane === 'reel'"
+        :simpleMode="simpleMode"
+        :sizing="simpleMode ? sizing : sizingNonSimple"
+      )
       Torrents(
         v-if="!simpleMode"
         v-show="currentPane === 'torrents'"
@@ -84,6 +90,7 @@ import List     from './list.vue';
 import Series   from './series.vue';
 import Map      from './map.vue';
 import Actors   from './actors.vue';
+import Reel     from './reel.vue';
 import Torrents from './torrents.vue';
 import Flex     from './flex.vue';
 import DlStatus from './dlstatus.vue';
@@ -94,7 +101,7 @@ import * as tvdb from '../tvdb.js';
 
 export default {
   name: "App",
-  components: { List, Series, Map, Actors, Torrents, Flex, DlStatus, History, TvProc },
+  components: { List, Series, Map, Actors, Reel, Torrents, Flex, DlStatus, History, TvProc },
   data() { 
     return { 
       // Must be known before first render so non-simple panes never mount in simple mode.
@@ -178,6 +185,7 @@ export default {
         { label: 'Series', key: 'series' },
         { label: 'Map', key: 'map' },
         { label: 'Actors', key: 'actors' },
+        { label: 'Reel', key: 'reel' },
         { label: 'Tor', key: 'torrents' },
         { label: 'Flex', key: 'flex' },
         { label: 'Get', key: 'dlstatus' },

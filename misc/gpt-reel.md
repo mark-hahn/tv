@@ -21,11 +21,11 @@
 
 ## gallery card
 
-- the file samples/sample-tvdbs/somebody-series-base.json has an example of a tvdb record. that record has a property image that is the url of the image for the card. the caption of the card is text with fields in the format "<year> - <name>" where each field name is a property in the tvdb record for that card.
+- the file samples/sample-tvdbs/somebody-series-base.json has an example of a tvdb record. that record has a property "image" that is the url of the image for the card. the caption of the card is text with fields in the format "<year> - <name>" where each field name is a property in the tvdb record for that card.
 
-- when a gallery card is clicked and selected and curTvdb is set to the tvdb object for that card.
+- when a gallery card is clicked it is selected and curTvdb is set to the tvdb object for that card. There is always just one card selected.
 
-- if the reelGallery card is selected the background should be light-yellow. 
+- if the reelGallery card is selected the background should be light-yellow otherwise white.
 
 ## reelRight box
 
@@ -37,7 +37,7 @@
 
 ## reelDescr box
 
-- reelDescr is a text box containing the property overview  in curTvdb.
+- reelDescr is a text box containing the property "overview"  in curTvdb.
 
 ## reelButtons box
 
@@ -47,9 +47,9 @@
 
 - reelTitles is a scrolling pane of title cards based on the array titleStrings.
 
-- each entry in titleStrings is a string of the format <rejectStatus>|<titleString>".
+- each entry in titleStrings is a string of the format "<rejectStatus>|<titleString>".
 
-- each card in reelTitles in one text line tall. if the entry has a rejectStatus of "ok" then the card is just the string titleString, otherwise it has a box on the left 120px wide with the text rejectStatus and a box on the right containing titleString.
+- each card in reelTitles is one text line tall. if the entry has a rejectStatus of "ok" then the card is just the string titleString, otherwise it has a box on the left 120px wide with the text rejectStatus and a box on the right containing titleString.
 
 - when a card in reelTitles is clicked it becomes the selected card and curTitle is set to the titleString for that card. There is always just one card selected.
 

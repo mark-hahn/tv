@@ -160,26 +160,13 @@ export async function getReel() {
         continue;
       }
 
-      const imbdUrl = `https://www.imdb.com/find/?q=${escape(title)}`;
-      const wikiUrl = `https://en.wikipedia.org/wiki/${title.replace(/ /g, '_')}%20(TV%20Series)`;
-      const googleUrl = `https://www.google.com/search?q=%22${title.replace(/ /g, '+')}%22+wiki+tv+show`;
-      const tomatoUrl = `https://www.rottentomatoes.com/search/?search=${escape(title)}`;
-
       // Log accepted show
       logToFile(`ACCEPTED: "${title}"`);
 
       // Save oldShows at end before returning
       saveReelShows(oldShows);
 
-      return {
-        status: 'ok',
-        title,
-        imbdUrl,
-        wikiUrl,
-        googleUrl,
-        tomatoUrl,
-        showUrl
-      };
+      return { status: 'ok', title};
     }
 
     // Save oldShows even when no show found

@@ -6,7 +6,7 @@ module.exports = {
     out_file: 'C:\\Users\\mark\\.pm2\\logs\\torrents-server-out.log',
     error_file: 'C:\\Users\\mark\\.pm2\\logs\\torrents-server-error.log',
     watch: true,
-    ignore_watch: ['node_modules', 'cookies/*.json'],
+    ignore_watch: ['node_modules', 'cookies/*.json', 'reelgood.log', 'reel-shows.json'],
     autorestart: true,
     max_restarts: 10,
     env: {

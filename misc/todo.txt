@@ -5,7 +5,9 @@ reminder, restore ...
 bugs ...
 
 todo ...
-  takes notes
+  save filter settings for simple custom button
+  half-hour filter
+  take notes
   reelgood
   how to see why qbt or down don't start
 

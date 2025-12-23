@@ -1,13 +1,30 @@
 
-i restored the seen shows list back to where i know there are unseen shows rejected and accepted 
---
-i'm getting
-{
-  "status": "no show",
-  "rejects": []
-}
-so there is a bug -- put in logging to find the bug
 
-there are 
+i want a new tab with a pane connected. 
 
-show:.*?:@global
+the tab should be "Reel" and placed between Actors and Tor.  
+
+the pane should be the same size and position as series.vue. the pane should be the component src/components/reel.vue.
+
+the pane should have to boxes side-by-side the full height called reelLeft on left and reelRight on right.
+
+reelLeft contains a component called gallery in src/components/reel-gallery.vue. 
+
+gallery is a scrolling pane of cards with each card showing an image and caption. each card matches an entry in an array of tvdb records returned from srchTvdbData(title) in src/tvdb.js. 
+
+when the pane is loaded or whenever a property called srchStr changes, srchTvdbData() should be called with that property srchStr to get the list of tvdb records and show the cards. 
+
+the file samples/sample-tvdbs/srchTvdbData.json has an example of a tvdb record. that record has a property image_url that is the url of the image for the card. the caption of the card is "<year> - <name>" where <year> is the property year in the record and <name> is the property name in the record.
+
+reelRight has 4 panes stacked vertically.  They are the reelInfo, reelDescr, reelButtons, and reelTitles panes.
+
+
+
+
+
+
+
+
+
+
+

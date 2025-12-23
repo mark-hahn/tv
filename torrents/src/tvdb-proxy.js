@@ -57,6 +57,8 @@ export async function tvdbProxyGet(req, res) {
     const tvdbPath = req.params[0] || '';
     const url = buildTvdbUrl(tvdbPath, req.query);
 
+    console.log('TVDB proxy request:', url.toString());
+
     let token = await getToken();
     let upstream = await fetch(url, {
       method: 'GET',
@@ -66,8 +68,11 @@ export async function tvdbProxyGet(req, res) {
       },
     });
 
+    console.log('TVDB upstream status:', upstream.status);
+
     // Retry once on auth failure
     if (upstream.status === 401) {
+      console.log('TVDB auth failed, refreshing token');
       cachedToken = null;
       token = await getToken();
       upstream = await fetch(url, {
@@ -77,6 +82,7 @@ export async function tvdbProxyGet(req, res) {
           Authorization: `Bearer ${token}`,
         },
       });
+      console.log('TVDB retry status:', upstream.status);
     }
 
     const body = await upstream.text();
@@ -84,6 +90,7 @@ export async function tvdbProxyGet(req, res) {
     res.set('Content-Type', upstream.headers.get('content-type') || 'application/json');
     res.send(body);
   } catch (e) {
+    console.error('TVDB proxy error:', e);
     res.status(500).json({ error: String(e?.message || e) });
   }
 }

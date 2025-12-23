@@ -1,5 +1,4 @@
 import fs from 'fs';
-import fetch from 'node-fetch';
 import { escape } from 'querystring';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

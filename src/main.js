@@ -7,8 +7,8 @@ const app = createApp(App);
 app.mount('#app')
 
 // Debug test code for reelgood API
-if (false) {
-  (async () => {
+if (true) {
+  void (async () => {
     try {
       console.log('Testing Reelgood API...');
       

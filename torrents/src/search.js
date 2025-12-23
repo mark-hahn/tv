@@ -7,8 +7,8 @@ import { normalize } from './normalize.js';
 const TorrentSearchApi = (await import('torrent-search-api')).default;
 
 const SAVE_SAMPLE_TORRENTS = false;
-const DUMP_NEEDED          = false;
-const SAVE_ALL_RAW         = false;
+const DUMP_NEEDED          = true;
+const SAVE_ALL_RAW         = true;
 
 // Load cookies from files
 function loadCookiesArray(filename) {
@@ -91,7 +91,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   
   // Dump needed array if debugging enabled
   if (DUMP_NEEDED) {
-    const neededPath = path.join(process.cwd(), '..', 'sample-torrents', 'needed.json');
+    const neededPath = path.join(process.cwd(), '..', 'samples', 'sample-torrents', 'needed.json');
     try {
       fs.writeFileSync(neededPath, JSON.stringify(needed, null, 2), 'utf8');
       console.log(`Wrote needed array to needed.json: ${needed.length} entries`);
@@ -172,7 +172,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   // Dump all raw torrents for debugging
   if (SAVE_ALL_RAW) {
     try {
-      const rawDumpPath = path.join(process.cwd(), '..', 'sample-torrents', 'all-raw.json');
+      const rawDumpPath = path.join(process.cwd(), '..', 'samples', 'sample-torrents', 'all-raw.json');
       fs.writeFileSync(rawDumpPath, JSON.stringify(torrents, null, 2));
       console.log(`Wrote ${torrents.length} raw torrents to all-raw.json`);
     } catch (err) {
@@ -526,7 +526,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   
   // Save one sample torrent from each provider for debugging
   if (SAVE_SAMPLE_TORRENTS) {
-    const sampleDir = '../sample-torrents';
+    const sampleDir = '../samples/sample-torrents';
     if (!fs.existsSync(sampleDir)) {
       fs.mkdirSync(sampleDir, { recursive: true });
     }

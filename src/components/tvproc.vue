@@ -430,12 +430,13 @@ export default {
     getCardStyle(it) {
       const status = String(it?.status || '').trim();
       const isFuture = status === 'future';
+      const isDownloading = status === 'downloading';
       return {
         position: 'relative',
         border: '1px solid #ddd',
         borderRadius: '8px',
         padding: '10px',
-        background: '#fff',
+        background: isDownloading ? '#fffacd' : '#fff',
         cursor: isFuture ? 'pointer' : 'default'
       };
     },

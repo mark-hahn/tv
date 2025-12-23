@@ -573,6 +573,21 @@ export default {
           
           const seasonNeeded = [];
           let allNeeded = true;
+          let hasUnaired = false;
+          let hasNoFile = false;
+          
+          // First pass: check if season has both unaired AND no file episodes
+          for (const [episodeNumStr, epiObj] of Object.entries(episodes)) {
+            const episodeNum = parseInt(episodeNumStr);
+            if (isNaN(episodeNum)) continue;
+            
+            const { noFile, unaired } = epiObj;
+            if (unaired) hasUnaired = true;
+            if (noFile) hasNoFile = true;
+          }
+          
+          // Determine if we should include individual episodes for this season
+          const includeIndividualEpisodes = hasUnaired && hasNoFile;
           
           for (const [episodeNumStr, epiObj] of Object.entries(episodes)) {
             const episodeNum = parseInt(episodeNumStr);
@@ -580,11 +595,14 @@ export default {
             
             const { played, noFile, unaired } = epiObj;
             
-            // Stop if we hit an unaired episode
+            // Stop if we hit an unaired episode (unless this season needs individual episodes)
             if (unaired) {
               // Process any accumulated season if any episodes were needed
               if (seasonNeeded.length > 0) {
-                if (allNeeded) {
+                if (includeIndividualEpisodes) {
+                  // Include all individual episodes for this season
+                  seasonNeeded.forEach(ep => needed.push(ep));
+                } else if (allNeeded) {
                   needed.push(`S${seasonNum.toString().padStart(2, '0')}`);
                 } else {
                   needed.push(`S${seasonNum.toString().padStart(2, '0')}`);
@@ -612,7 +630,10 @@ export default {
           
           // Add season if any episodes were needed
           if (seasonNeeded.length > 0 && hasStartedWatching) {
-            if (allNeeded) {
+            if (includeIndividualEpisodes) {
+              // Include all individual episodes (no season marker)
+              seasonNeeded.forEach(ep => needed.push(ep));
+            } else if (allNeeded) {
               // All episodes in season are needed - just add season
               needed.push(`S${seasonNum.toString().padStart(2, '0')}`);
             } else {

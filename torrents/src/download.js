@@ -203,7 +203,7 @@ export async function download(torrent, cfClearance = {}) {
     const html = await response.text();
     console.log(`Fetched ${html.length} bytes of HTML`);
 
-    const sampleDir = path.join(__dirname, '..', '..', 'sample-torrents');
+    const sampleDir = path.join(__dirname, '..', '..', 'samples', 'sample-torrents');
     let savedDetailPath;
     if (SAVE_DETAIL_FILE || DOWNLOAD_DEBUG) {
       ensureDir(sampleDir);
@@ -348,7 +348,7 @@ export async function download(torrent, cfClearance = {}) {
     // Save .torrent file to sample-torrents directory
     if (SAVE_TORRENT_FILE) {
       ensureDir(sampleDir);
-      const torrentSavePath = path.join(__dirname, '..', '..', 'sample-torrents', torrentFilename);
+      const torrentSavePath = path.join(__dirname, '..', '..', 'samples', 'sample-torrents', torrentFilename);
       fs.writeFileSync(torrentSavePath, torrentData);
       console.log(`Saved torrent to: ${torrentSavePath}`);
     }

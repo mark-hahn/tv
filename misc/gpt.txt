@@ -1,1 +1,14 @@
 
+
+undo that 
+-- 
+that map produced  this result for needed: [
+  "S16"
+]
+so that fix won't do anything -- 
+you just added code to include all episodes in any season that has an unaired episode and a no file episode, season 16 meets this condition but no individual episodes were inclued
+
+
+when calculating the needed array include all episodes in any season that has an unaired episode and a no file episode
+
+when calculating the needed array, in any season that has an unaired episode and a no file episode, include all individual episodes, not just a season.

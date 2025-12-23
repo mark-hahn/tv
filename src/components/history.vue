@@ -8,7 +8,7 @@
       span(v-if="emptyStateText") {{ emptyStateText }}
 
     div(v-else style="padding:5px; font-size:13px; line-height:1.6;")
-      div(v-for="t in sortedTorrents" :key="String(t.hash || t.name || t.added_on)" style="position:relative; background:#fff; border:1px solid #ddd; border-radius:5px; padding:10px;")
+      div(v-for="t in sortedTorrents" :key="String(t.hash || t.name || t.added_on)" :style="getCardStyle(t)")
         div(style="font-size:13px; font-weight:bold; color:#333; word-break:break-word;") {{ t.name || t.hash }}
         div(style="font-size:13px; color:rgba(0,0,0,0.50) !important;") {{ infoLine(t) }}
 
@@ -283,6 +283,17 @@ export default {
       const s = Number(sizeBytes);
       if (!Number.isFinite(c) || !Number.isFinite(s) || s <= 0) return 0;
       return Math.max(0, Math.min(100, Math.round((c / s) * 100)));
+    },
+
+    getCardStyle(t) {
+      const isDownloading = t?.state === 'downloading';
+      return {
+        position: 'relative',
+        background: isDownloading ? '#fffacd' : '#fff',
+        border: '1px solid #ddd',
+        borderRadius: '5px',
+        padding: '10px'
+      };
     },
 
     infoLine(t) {

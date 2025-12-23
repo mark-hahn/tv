@@ -53,6 +53,7 @@ function loadReelShows() {
     }
   } catch (err) {
     console.error('Error loading reel-shows.json:', err);
+    logToFile(`ERROR loading reel-shows.json: ${err.message}`);
   }
   return {};
 }
@@ -62,6 +63,7 @@ function saveReelShows(shows) {
     fs.writeFileSync(reelShowsPath, JSON.stringify(shows, null, 2));
   } catch (err) {
     console.error('Error saving reel-shows.json:', err);
+    logToFile(`ERROR saving reel-shows.json: ${err.message}`);
   }
 }
 
@@ -87,7 +89,9 @@ export async function startReel() {
     console.log('Home page loaded into memory');
     return { status: 'ok' };
   } catch (err) {
-    return { status: 'error', errmsg: err.message || String(err) };
+    const errmsg = err.message || String(err);
+    logToFile(`ERROR in startReel: ${errmsg}`);
+    return { status: 'error', errmsg };
   }
 }
 
@@ -126,6 +130,7 @@ export async function getReel() {
         reelData = await fetch(showUrl);
       } catch (e) {
         console.log('Error fetching show page:', e);
+        logToFile(`ERROR fetching show page "${title}": ${e.message || String(e)}`);
         continue;
       }
       const reelHtml = await reelData.text();
@@ -156,17 +161,17 @@ export async function getReel() {
       }
 
       if (shouldSkip) {
-        logToFile(`REJECTED: "${title}" - genre: ${rejectedGenre}`);
+        logToFile(`REJECT: "${title}" (${rejectedGenre})`);
         continue;
       }
 
       // Log accepted show
-      logToFile(`ACCEPTED: "${title}"`);
+      logToFile(`>>>  "${title}", ${showUrl}`);
 
       // Save oldShows at end before returning
       saveReelShows(oldShows);
 
-      return { status: 'ok', title};
+      return { status: 'ok', title, showUrl};
     }
 
     // Save oldShows even when no show found
@@ -174,6 +179,8 @@ export async function getReel() {
 
     return { status: 'no show' };
   } catch (err) {
-    return { status: 'error', errmsg: err.message || String(err) };
+    const errmsg = err.message || String(err);
+    logToFile(`ERROR in getReel: ${errmsg}`);
+    return { status: 'error', errmsg };
   }
 }

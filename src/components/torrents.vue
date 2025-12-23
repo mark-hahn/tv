@@ -436,7 +436,7 @@ export default {
       this._didInitialScroll = false;
 
       // Kick off space fetch ASAP; don't wait for torrent searching.
-      this.updateSpaceAvail();
+      void this.updateSpaceAvail();
 
       this.unaired = !!show?.S1E1Unaired;
       if (this.unaired) {

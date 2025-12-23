@@ -1,0 +1,3 @@
+#!/bin/bash
+# Restart the torrents server via PM2 and show logs
+powershell.exe -Command "cd C:\Users\mark\apps\tv-series-client; pm2 delete torrents-server 2>\$null; Remove-Item C:\Users\mark\.pm2\logs\torrents-server-*.log -ErrorAction SilentlyContinue"

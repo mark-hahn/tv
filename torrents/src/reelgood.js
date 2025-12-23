@@ -18,10 +18,33 @@ const rx_genre = new RegExp('href="/tv/genre/([^"]*)"', 'sg');
 
 const homeUrl = "https://reelgood.com/new/tv";
 const reelShowsPath = path.resolve(__dirname, '..', 'reel-shows.json');
+const logPath = path.resolve(__dirname, '..', 'reelgood.log');
 
 // Global cache
 let homeHtml = null;
 let oldShows = null;
+
+function logToFile(message) {
+  try {
+    const now = new Date();
+    // Simple UTC offset calculation for PST/PDT (-8/-7 hours)
+    // Detect DST by checking if we're in March-November
+    const month = now.getUTCMonth();
+    const isDST = month >= 2 && month <= 10; // Approximate DST period
+    const offsetHours = isDST ? -7 : -8;
+    const pstTime = new Date(now.getTime() + offsetHours * 60 * 60 * 1000);
+    
+    const mm = String(pstTime.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(pstTime.getUTCDate()).padStart(2, '0');
+    const hh = String(pstTime.getUTCHours()).padStart(2, '0');
+    const min = String(pstTime.getUTCMinutes()).padStart(2, '0');
+    const timestamp = `${mm}/${dd} ${hh}:${min}`;
+    
+    fs.appendFileSync(logPath, `${timestamp} ${message}\n`, 'utf8');
+  } catch (err) {
+    console.error('Error writing to log:', err);
+  }
+}
 
 function loadReelShows() {
   try {
@@ -44,6 +67,17 @@ function saveReelShows(shows) {
 
 // Load oldShows once at module load time
 oldShows = loadReelShows();
+
+// Log startup - wrapped in try/catch to prevent module load failure
+(function logStartup() {
+  try {
+    fs.appendFileSync(logPath, '\n', 'utf8');
+    logToFile('Reelgood started.');
+  } catch (err) {
+    // Silently fail - don't crash the module
+    console.error('Could not write startup log:', err.message);
+  }
+})();
 
 export async function startReel() {
   try {
@@ -101,29 +135,38 @@ export async function getReel() {
         for (const avoid of avoidGenres) {
           if (slug == avoid) {
             console.log('---- skipping', label, avoid);
-            return true;
+            return avoid;
           }
         }
-        return false;
+        return null;
       }
 
       let shouldSkip = false;
+      let rejectedGenre = null;
       let genreMatches;
       rx_genre.lastIndex = 0;
       while ((genreMatches = rx_genre.exec(reelHtml)) !== null) {
         const genre = genreMatches[1];
-        if (chk(genre, 'genre')) {
+        const matched = chk(genre, 'genre');
+        if (matched) {
           shouldSkip = true;
+          rejectedGenre = matched;
           break;
         }
       }
 
-      if (shouldSkip) continue;
+      if (shouldSkip) {
+        logToFile(`REJECTED: "${title}" - genre: ${rejectedGenre}`);
+        continue;
+      }
 
       const imbdUrl = `https://www.imdb.com/find/?q=${escape(title)}`;
       const wikiUrl = `https://en.wikipedia.org/wiki/${title.replace(/ /g, '_')}%20(TV%20Series)`;
       const googleUrl = `https://www.google.com/search?q=%22${title.replace(/ /g, '+')}%22+wiki+tv+show`;
       const tomatoUrl = `https://www.rottentomatoes.com/search/?search=${escape(title)}`;
+
+      // Log accepted show
+      logToFile(`ACCEPTED: "${title}"`);
 
       // Save oldShows at end before returning
       saveReelShows(oldShows);

@@ -1,8 +1,5 @@
 
-do not save homeHtml to disk. keep it globally available to getReel.
+ log each show rejected to torrents/reelgood.log with the genre that caused its rejection
 
-getReel should just use the saved homeHtml.
+ log each show accepted to torrents/reelgood.log 
 
-oldShows = loadReelShows() should only be called once at module loading.  oldShows should be cached and written back to disk only at end of getReel.
-
-if any error return { status: 'error', errmsg: '<error msg>' };

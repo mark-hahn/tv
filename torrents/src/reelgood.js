@@ -113,31 +113,19 @@ export async function startReel() {
 export async function getReel() {
   const rejects = [];
   try {
-    logToFile('getReel() called');
     if (!homeHtml) {
-      logToFile('ERROR: homeHtml is null');
       return { status: 'error', errmsg: 'Home page not loaded. Call startReel first.' };
     }
-    logToFile(`homeHtml length: ${homeHtml.length}`);
 
     let show;
     rx_show.lastIndex = 0;
-    let matchCount = 0;
     
     while ((show = rx_show.exec(homeHtml)) !== null) {
-      matchCount++;
       const titleMatches = rx_title.exec(show[0]);
-      if (!titleMatches?.length) {
-        logToFile(`Match ${matchCount}: No title found`);
-        continue;
-      }
+      if (!titleMatches?.length) continue;
 
       const title = titleMatches[1];
-      logToFile(`Match ${matchCount}: "${title}"`);
-      if (title in oldShows) {
-        logToFile(`  -> Already in oldShows, skipping`);
-        continue;
-      }
+      if (title in oldShows) continue;
       
       oldShows[title] = true;
 
@@ -147,12 +135,10 @@ export async function getReel() {
       const slugMatches = rx_slug.exec(show[0]);
       if (!slugMatches?.length) {
         console.log('No slug found');
-        logToFile(`  -> No slug found`);
         continue;
       }
 
       const slug = slugMatches[1];
-      logToFile(`  -> Slug: ${slug}`);
       const showUrl = `https://reelgood.com/show/${encodeURIComponent(slug)}`;
 
       let reelData;
@@ -160,11 +146,9 @@ export async function getReel() {
         reelData = await fetch(showUrl);
       } catch (e) {
         console.log('Error fetching show page:', e);
-        logToFile(`  -> ERROR fetching show page: ${e.message || String(e)}`);
         logToFile(`ERROR fetching show page "${title}": ${e.message || String(e)}`);
         continue;
       }
-      logToFile(`  -> Fetched show page successfully`);
       const reelHtml = await reelData.text();
 
       const chk = (slug, label) => {
@@ -194,13 +178,11 @@ export async function getReel() {
 
       if (shouldSkip) {
         rejects.push({ title, genre: rejectedGenre });
-        logToFile(`  -> REJECTED: genre ${rejectedGenre}`);
         logToFile(`REJECT: "${title}" (${rejectedGenre})`);
         continue;
       }
 
       // Log accepted show
-      logToFile(`  -> ACCEPTED!`);
       logToFile(`>>>  "${title}", ${showUrl}`);
 
       // Save oldShows at end before returning
@@ -210,7 +192,6 @@ export async function getReel() {
     }
 
     // Save oldShows even when no show found
-    logToFile(`No more shows found. Total matches processed: ${matchCount}`);
     saveReelShows(oldShows);
 
     return { status: 'no show', rejects };

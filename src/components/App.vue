@@ -230,6 +230,13 @@ export default {
         return;
       }
 
+      if (k === 'reel') {
+        if (this.simpleMode) return;
+        this.currentPane = 'reel';
+        evtBus.emit('paneChanged', this.currentPane);
+        return;
+      }
+
       if (k === 'torrents') {
         if (this.currentShow) this.handleShowTorrents(this.currentShow);
         else {

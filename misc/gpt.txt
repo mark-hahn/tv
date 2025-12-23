@@ -1,30 +1,46 @@
 
+the reel pane goes all the way to the right of the window.  it is supposed to be the size of series.vue
 
-i want a new tab with a pane connected. 
+there is one card in the reelGallery and it has the caption but no image
 
-the tab should be "Reel" and placed between Actors and Tor.  
+set width of the reelGallery component to be 150px wide
 
-the pane should be the same size and position as series.vue. the pane should be the component src/components/reel.vue.
+reelRight should have a width that fills the rest of the reelPane to the right
 
-the pane should have to boxes side-by-side the full height called reelLeft on left and reelRight on right.
+the buttons should have a height of 18px and a margin of 0
 
-reelLeft contains a component called gallery in src/components/reel-gallery.vue. 
+the labels for the button are not in the border -- and reduce padding of buttons to 2px
 
-gallery is a scrolling pane of cards with each card showing an image and caption. each card matches an entry in an array of tvdb records returned from srchTvdbData(title) in src/tvdb.js. 
+set margin-top of #reelButtons to 0
 
-when the pane is loaded or whenever a property called srchStr changes, srchTvdbData() should be called with that property srchStr to get the list of tvdb records and show the cards. 
+even though all margins are 0 there is a gap between #reelDescr and #reelButtons - remove it
 
-the file samples/sample-tvdbs/srchTvdbData.json has an example of a tvdb record. that record has a property image_url that is the url of the image for the card. the caption of the card is "<year> - <name>" where <year> is the property year in the record and <name> is the property name in the record.
+set width of the reelGallery component to be 100px wide
 
-reelRight has 4 panes stacked vertically.  They are the reelInfo, reelDescr, reelButtons, and reelTitles panes.
+set font-size of reelGallery caption to 12px
 
+set padding of reelGallery caption to 2px
 
+- for testing the reelGallery component should have a srchStr property of "friends".
 
+- the cards in reelGallery component appear to have zero height. make the height such that  the image and caption are visible - the reelGallery component pane should be scrollable
 
+the cards in reelGallery component should not a height set so they can naturally cover image and caption
 
+the cards are overlapping vertically
 
+remove averageRuntime and set reelInfo text to uppercase
 
+set reelInfo font-size to 14px
 
+the reelTitles cards have no text content - log rejectStatus  and titleString
 
+reduce rejectStatus box width to 80px and make titleString truncate instead of wrapping
 
+put 1px 50% gray border around reelTitles cards -- and set vertical gap to 0
 
+set font-size of reelTitles cards to 14px
+
+when reelTitles card clicked set reelGallery srchStr to title in card 
+
+set reelGallery width to 125px

@@ -1,38 +1,41 @@
 <template lang="pug">
 
 #reelPane(
-  :style="{ height:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'row', overflowY:'hidden', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', gap: '10px' }")
+  :style="{ height:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'row', overflowY:'hidden', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', gap: '10px' }")
 
   #reelLeft(
-    :style="{ flex: '0 0 400px', height: '100%', display: 'flex', flexDirection: 'column' }")
+    :style="{ flex: '0 0 125px', height: '100%', display: 'flex', flexDirection: 'column' }")
     reel-gallery(
+      :style="{ flex: '1', minHeight: 0 }"
       :srchStr="srchStr"
       @select="handleGallerySelect")
 
   #reelRight(
-    :style="{ flex: '1', height: '100%', display: 'flex', flexDirection: 'column', gap: '10px' }")
+    :style="{ flex: '1 1 0', minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column', gap: '10px' }")
     
     #reelInfo(
-      :style="{ padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', fontSize: '16px' }")
+      :style="{ padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', fontSize: '14px', textTransform: 'uppercase' }")
       div(v-if="curTvdb") {{ infoLine }}
-    
-    #reelDescr(
-      :style="{ flex: '1', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', overflowY: 'auto', fontSize: '14px', lineHeight: '1.5' }")
-      div(v-if="curTvdb") {{ curTvdb.overview }}
-    
-    #reelButtons(
-      :style="{ display: 'flex', gap: '10px', padding: '10px' }")
-      button Load
-      button Google
-      button Imdb
-      button Prev
-      button Next
+
+    // keep zero gap between description and buttons
+    #reelDescrButtons(:style="{ flex: '1', minHeight: 0, display: 'flex', flexDirection: 'column', gap: '0' }")
+      #reelDescr(
+        :style="{ flex: '1', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', overflowY: 'auto', fontSize: '14px', lineHeight: '1.5' }")
+        div(v-if="curTvdb") {{ curTvdb.overview }}
+      
+      #reelButtons(
+        :style="{ display: 'flex', gap: '10px', padding: '10px', marginTop: '0' }")
+        button(:style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Load
+        button(:style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Google
+        button(:style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Imdb
+        button(:style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Prev
+        button(:style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Next
     
     #reelTitles(
       ref="titlesPane"
-      :style="{ flex: '1', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }")
+      :style="{ flex: '1', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0' }")
       div(
-        v-for="(item, idx) in titleStrings"
+        v-for="(item, idx) in parsedTitles"
         :key="idx"
         @click="selectTitle(idx)"
         :style="getTitleCardStyle(idx)")
@@ -40,8 +43,8 @@
           div {{ item.titleString }}
         template(v-else)
           div(:style="{ display: 'flex' }")
-            div(:style="{ width: '120px', flexShrink: 0, backgroundColor: '#ffcccc', padding: '5px' }") {{ item.rejectStatus }}
-            div(:style="{ flex: 1, padding: '5px' }") {{ item.titleString }}
+            div(:style="{ width: '80px', flexShrink: 0, backgroundColor: '#ffcccc', padding: '5px' }") {{ item.rejectStatus }}
+            div(:style="{ flex: 1, padding: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }") {{ item.titleString }}
 
 </template>
 
@@ -54,8 +57,14 @@ export default {
   components: {
     ReelGallery
   },
-  setup() {
-    const srchStr = ref('Castle Rock');
+  props: {
+    sizing: {
+      type: Object,
+      default: () => ({})
+    }
+  },
+  setup(props) {
+    const srchStr = ref('friends');
     const curTitle = ref('');
     const curTvdb = ref(null);
     const titleStrings = ref([]);
@@ -77,7 +86,7 @@ export default {
     const infoLine = computed(() => {
       if (!curTvdb.value) return '';
       const t = curTvdb.value;
-      return `${t.year || ''} | ${t.originalCountry || ''} | ${t.originalLanguage || ''} | ${t.network || ''} | ${t.averageRuntime || ''}`;
+      return `${t.year || ''} | ${t.country || ''} | ${t.primary_language || ''} | ${t.network || ''}`;
     });
 
     // Get style for title card
@@ -94,7 +103,9 @@ export default {
       return {
         padding: '5px',
         cursor: 'pointer',
+        fontSize: '14px',
         backgroundColor,
+        border: '1px solid #808080',
         borderRadius: '3px',
         minHeight: '30px',
         display: 'flex',
@@ -112,6 +123,7 @@ export default {
     const selectTitle = (idx) => {
       selectedTitleIdx.value = idx;
       curTitle.value = parsedTitles.value[idx].titleString;
+      srchStr.value = curTitle.value;
       console.log('curTitle set to:', curTitle.value);
     };
 
@@ -121,6 +133,16 @@ export default {
       if (titlesPane.value) {
         titlesPane.value.scrollTop = titlesPane.value.scrollHeight;
       }
+
+      // Log parsed title cards for debugging
+      try {
+        parsedTitles.value.forEach((it, i) => {
+          console.log('reelTitles item:', i, it.rejectStatus, it.titleString);
+        });
+      } catch (e) {
+        console.log('reelTitles parse/log failed:', e);
+      }
+
       // Select last item
       if (titleStrings.value.length > 0) {
         selectTitle(titleStrings.value.length - 1);
@@ -165,6 +187,7 @@ export default {
     });
 
     return {
+      sizing: props.sizing,
       srchStr,
       curTitle,
       curTvdb,

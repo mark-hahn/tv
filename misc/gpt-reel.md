@@ -63,6 +63,6 @@
 
 - for testing curTvdb should be the object in samples/sample-tvdbs/somebody-series-base.json.
 
-- for testing the reelGallery component should have a srchStr property of "Castle Rock".
+- for testing the reelGallery component should have a srchStr property of "friends".
 
 - when curTitle, curTvdb, or titleStrings is set then that value should be logged.

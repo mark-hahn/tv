@@ -10,9 +10,11 @@
       div(:style="{ marginLeft:'20px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px' }")
         | {{mapShow?.Name}}
       div(style="display:flex; gap:5px; flex-shrink:0;")
+        div(v-if="mapShow?.Id?.startsWith('noemby-')"
+            style="font-weight:bold; color:red; font-size:18px; white-space:nowrap; margin:5px; max-height:24px;") Not In Emby
         button(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Prune
 
-    div(v-if="mapShow?.WatchGap || mapShow?.FileGap  || mapShow?.WaitStr?.length || mapShow?.Id?.startsWith('noemby-')"
+    div(v-if="mapShow?.WatchGap || mapShow?.FileGap  || mapShow?.WaitStr?.length"
         style="display:flex; justify-content:space-between; align-items:center; color:red; margin:0 10px; padding:0 10px; min-height:26px;")
 
       div(v-if="mapShow?.WatchGap || mapShow?.FileGap  || mapShow?.WaitStr?.length"
@@ -25,10 +27,6 @@
 
         div(v-if="mapShow?.Waiting")
           | {{'Waiting ' + mapShow?.WaitStr}}
-
-      div(v-if="mapShow?.Id?.startsWith('noemby-')"
-          style="font-weight:bold; font-size:18px; white-space:nowrap; padding-left:10px;")
-        | Not In Emby
 
     div(v-if="datesLine" :style="{ fontSize: sizing.seriesInfoFontSize || '20px', fontWeight:'bold', margin:'10px 5px 5px 5px', paddingLeft:'5px', display:'flex', gap:'10px' }")
       span {{firstAiredVal}}

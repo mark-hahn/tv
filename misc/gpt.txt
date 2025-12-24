@@ -1,34 +1,6 @@
 
+add Not In Emby  msg to series pane where it used to be. In map pane move Not In Emby msg to right side of the top of the pane.
 
-in reel pane move the Load button to the bottom right of the info pane in the second line.
+in simple mode move email mark input box to below the infobox and move them up so that the top of the infobox is in line with the top of the image
 
-in the reel pane add two new buttons Wiki and Official to #buttons.
-arrange the buttons from left to right to be 
-Next, Imdb, Google, Wiki, Official. Add " | " between the Next and Imdb buttons.
-
-There may be "Wikipedia" or "Official Website" objects in the getRemotesCmd results. 
-
-Just like the Google object 
-
-    {
-      "name": "Google",
-      "url": "<url>"
-    },
-
-these objects will be 
-
-    {
-      "name": "Wikipedia",
-      "url": "<url>"
-    },
-
-or 
-    {
-      "name": "Official Website",
-      "url": "<url>"
-    },
-
-in each case they will be handled like the google object.  If the object isn't present then the button should be hidden.  The click action of the button should be to load a browser tab with the url.
-
-
-set Load button margin-right to 20px
+add margin-left of 10px to email mark textarea

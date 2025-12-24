@@ -57,8 +57,6 @@ import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import ReelGallery from './reel-gallery.vue';
 import { config } from '../config.js';
 import evtBus from '../evtBus.js';
-import * as emby from '../emby.js';
-import * as srvr from '../srvr.js';
 
 export default {
   name: 'ReelPane',
@@ -87,6 +85,18 @@ export default {
     const selectedTitleIdx = ref(-1);
     const titlesPane = ref(null);
     const _titlesPopulated = ref(false);
+    const _didStartReel = ref(false);
+    const _didInitialVisibleScroll = ref(false);
+
+    const toTitleArray = (data) => {
+      if (Array.isArray(data)) return data.map(String);
+      if (data && typeof data === 'object') {
+        const msg = data.errmsg || data.error || data.message || data.status;
+        if (msg) return [`error|${String(msg)}`];
+      }
+      if (typeof data === 'string' && data.trim()) return [`error|${data.trim()}`];
+      return [];
+    };
 
     const scrollTitlesToBottom = async () => {
       await nextTick();
@@ -115,32 +125,61 @@ export default {
     const startReelAndLoadTitles = async () => {
       try {
         const showTitles = getAllShowNames();
-        const res = await fetch(`${config.torrentsApiUrl}/api/startreel`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ showTitles })
-        });
-        const data = await res.json();
-        titleStrings.value = Array.isArray(data) ? data : [];
+        let data;
+        try {
+          const res = await fetch(`${config.torrentsApiUrl}/api/startreel`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ showTitles })
+          });
+          if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(`HTTP ${res.status}: ${txt}`);
+          }
+          data = await res.json();
+        } catch (e) {
+          // Fallback for older server versions that only support GET /api/startreel
+          const url = new URL(`${config.torrentsApiUrl}/api/startreel`);
+          url.searchParams.set('showTitles', JSON.stringify(showTitles));
+          const res2 = await fetch(url.toString());
+          if (!res2.ok) {
+            const txt2 = await res2.text();
+            throw new Error(`HTTP ${res2.status}: ${txt2}`);
+          }
+          data = await res2.json();
+        }
+
+        titleStrings.value = toTitleArray(data);
         _titlesPopulated.value = true;
+        _didStartReel.value = true;
         if (props.active) {
           await scrollTitlesToBottom();
         }
       } catch (e) {
-        console.log('startReel failed:', e);
+        const msg = e?.message || String(e);
+        console.log('startReel failed:', msg);
+        titleStrings.value = [...titleStrings.value, `error|${msg}`];
+        _titlesPopulated.value = true;
       }
     };
 
     const handleNext = async () => {
       try {
         const res = await fetch(`${config.torrentsApiUrl}/api/getreel`);
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(`HTTP ${res.status}: ${txt}`);
+        }
         const data = await res.json();
-        const added = Array.isArray(data) ? data : [];
+        const added = toTitleArray(data);
         titleStrings.value = [...titleStrings.value, ...added];
 
         await scrollTitlesToBottom();
       } catch (e) {
-        console.log('getReel failed:', e);
+        const msg = e?.message || String(e);
+        console.log('getReel failed:', msg);
+        titleStrings.value = [...titleStrings.value, `error|${msg}`];
+        await scrollTitlesToBottom();
       }
     };
 
@@ -151,54 +190,24 @@ export default {
       const name = String(t.name || t.Name || '').trim();
       if (!name) return;
 
-      // Mirror list.vue searchAction(): if show already exists, select it.
-      const matchShow = (Array.isArray(props.allShows) ? props.allShows : []).find((s) => s?.Name === name);
-      if (matchShow) {
-        evtBus.emit('setUpSeries', matchShow);
-        return;
-      }
-
-      // Otherwise create a no-Emby show and select it.
-      const tvdbIdRaw = t.tvdbId || t.tvdb_id || '';
-      const tvdbId = String(tvdbIdRaw).trim();
-      const overview = t.overview || t.overviewText || t.overview_txt || t.Overview || '';
-
-      try {
-        let show = {
-          Name: name,
-          TvdbId: tvdbId,
-          Overview: overview,
-          Reject: emby.isReject(name),
-        };
-        show = await emby.createNoemby(show);
-
-        const paramObj = {
-          show,
-          seasonCount: 0,
-          episodeCount: 0,
-          watchedCount: 0,
-        };
-        // Ensure tvdb data exists for this new show (mirrors list.vue)
-        await srvr.getNewTvdb(paramObj);
-
-        // Refresh the List pane's show cache, then select in series.
-        evtBus.emit('library-refresh-complete');
-        evtBus.emit('setUpSeries', show);
-
-        // Send email notification (mirrors list.vue)
-        try {
-          await srvr.sendEmail(`${name}~New show added`);
-        } catch (e) {
-          console.error('Reel Load: sendEmail failed:', e);
-        }
-      } catch (e) {
-        console.error('Reel Load failed:', e);
-      }
+      // Route through the exact same flow used by clicking a card in #searchList.
+      const srchChoice = {
+        name,
+        tvdbId: String(t.tvdbId || t.tvdb_id || '').trim(),
+        overview: t.overview || t.overviewText || t.overview_txt || t.Overview || '',
+        image: t.image || t.image_url || t.thumbnail || '',
+        year: t.year || '',
+        originalCountry: t.originalCountry || t.country || '',
+        searchDtlTxt: t.searchDtlTxt || ''
+      };
+      evtBus.emit('reelSearchAction', srchChoice);
     };
 
     watch(() => props.active, async (isActive) => {
       if (!isActive) return;
+      if (_didInitialVisibleScroll.value) return;
       if (!_titlesPopulated.value) return;
+      _didInitialVisibleScroll.value = true;
       await scrollTitlesToBottom();
     });
 
@@ -259,8 +268,13 @@ export default {
     // Handle title selection
     const selectTitle = (idx) => {
       selectedTitleIdx.value = idx;
-      curTitle.value = parsedTitles.value[idx].titleString;
-      srchStr.value = curTitle.value;
+      const nextTitle = String(parsedTitles.value[idx]?.titleString || '').trim();
+      curTitle.value = nextTitle;
+
+      const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+      if (norm(nextTitle) !== norm(srchStr.value)) {
+        srchStr.value = nextTitle;
+      }
       console.log('curTitle set to:', curTitle.value);
     };
 
@@ -301,8 +315,17 @@ export default {
 
     // Initialize with test data
     onMounted(() => {
-      void startReelAndLoadTitles();
+      // Wait until allShows is available so startReel gets the full library.
+      if (Array.isArray(props.allShows) && props.allShows.length > 0) {
+        void startReelAndLoadTitles();
+      }
     });
+
+    watch(() => props.allShows, (val) => {
+      if (_didStartReel.value) return;
+      if (!Array.isArray(val) || val.length === 0) return;
+      void startReelAndLoadTitles();
+    }, { deep: true });
 
     return {
       sizing: props.sizing,

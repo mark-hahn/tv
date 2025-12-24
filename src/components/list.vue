@@ -1155,6 +1155,10 @@ export default {
 
   /////////////////  MOUNTED  /////////////////
   mounted() {
+    evtBus.on('reelSearchAction', (srchChoice) => {
+      void this.searchAction(srchChoice);
+    });
+
     evtBus.on('openMap', (show) => {
       console.log('List: openMap event received for show:', show?.Name);
       this.seriesMapAction('open', show);

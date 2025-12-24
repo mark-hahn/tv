@@ -24,3 +24,9 @@ the Load button action does not match clicking a card in #searchList.
 when clicking in card in the #searchList a dialog appears saying web data is being loaded and then the show appears in the list view and the series pane shows with all the data visible.  
 
 the Load button just brought up an empty series pane. nothing was loaded from the web.
+
+when next is clicked and titles are appended to the titles pane and the bottom pane of the title pane is automatically selected -- then that selection should set srchStr just like clicking on a titles pane.  if srchStr in gallery already matches the title in the titles card the gallery should ignore it.
+
+the titles pane is not populated by mounting or by click of next button
+
+when i go from reel pane to series pane and back the reel pane changes.  it should do nothing and stay the same because it is using v-show and the only automatic change is when mounted

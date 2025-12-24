@@ -1,10 +1,6 @@
 
 
-when i say qbt tab then that means the history.vue pane.
-when i say down tab then that means the tvproc.vue pane.
+when i say qbt tab or pane that means the history.vue pane.
+when i say down tab or pane then that means the tvproc.vue pane.
 
-whenever the qpt pane has loaded any cards set an array called activeDownLoads to contain the titles of all cards in downloading state.
-
-on every poll check to see if any entry of activeDownLoads is not downloading. if so then send a startProc command to https://hahnca.com/tvproc/startProc.
-
-after that check set activeDownLoads to have the titles of all cards downloading.
+whenever the usb windows notification is issued include the title of the last card that finished downloading. the msg is "All files have been downloaded from USB, the last is <title>."

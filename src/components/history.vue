@@ -35,6 +35,7 @@ export default {
   data() {
     return {
       torrents: [],
+      activeDownLoads: [],
       _pollTimer: null,
       _polling: false,
       useStaticSamples: false,
@@ -185,6 +186,32 @@ export default {
 
         const torrents = await this.getQbtInfo({});
         if (Array.isArray(torrents)) {
+          const hashOf = (t) => String(t?.hash || '').trim();
+          const curDownloading = torrents
+            .filter(t => String(t?.state || '').trim() === 'downloading')
+            .map(hashOf)
+            .filter(Boolean);
+
+          // Once the Qbt pane has loaded any cards, track currently-downloading titles.
+          if (!this._didLoadOnce && torrents.length > 0) {
+            this.activeDownLoads = curDownloading;
+          } else {
+            // On each poll: if any previously-downloading title is no longer downloading,
+            // kick tvproc to start the next cycle.
+            const prev = Array.isArray(this.activeDownLoads) ? this.activeDownLoads : [];
+            const missing = prev.filter(h => h && !curDownloading.includes(h));
+            if (missing.length > 0) {
+              console.log('History: download finished, starting tvproc cycle', { finishedHashes: missing });
+              try {
+                await fetch('https://hahnca.com/tvproc/startProc', { method: 'POST' });
+              } catch {
+                // ignore
+              }
+            }
+            // Always refresh activeDownLoads after the check.
+            this.activeDownLoads = curDownloading;
+          }
+
           this.torrents = torrents;
           this._didLoadOnce = true;
 

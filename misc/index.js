@@ -21,13 +21,9 @@ const rejectStr  = fs.readFileSync('config/config2-rejects.json', 'utf8');
 const middleStr  = fs.readFileSync('config/config3-middle.txt',   'utf8');
 const pickupStr  = fs.readFileSync('config/config4-pickups.json', 'utf8');
 const footerStr  = fs.readFileSync('config/config5-footer.txt',   'utf8');
-const waitingStr = fs.readFileSync('data/blockedWaits.json',      'utf8');
-const blkGapsStr = fs.readFileSync('data/blockedGaps.json',       'utf8');
 const noEmbyStr  = fs.readFileSync('data/noemby.json',            'utf8');
 const gapsStr    = fs.readFileSync('data/gaps.json',              'utf8');
 
-const blockedWaits = JSON.parse(waitingStr);
-const blockedGaps  = JSON.parse(blkGapsStr);
 const rejects      = JSON.parse(rejectStr);
 const pickups      = JSON.parse(pickupStr);
 const noEmbys      = JSON.parse(noEmbyStr);
@@ -68,7 +64,7 @@ function fmtDateWithTZ(date, utcOut = false) {
   return `${year}-${month}-${day}`;
 }
 
-const getAllShows = async (id, _param, resolve, reject) => {
+const getShowsFromDisk = async (id, _param, resolve, reject) => {
   let   errFlg = null;
   const shows = {};
 
@@ -111,7 +107,7 @@ const getAllShows = async (id, _param, resolve, reject) => {
     }
   }
   if(errFlg) {
-    reject([id, `getAllShows: ${dirent}, ${err.message}`]);
+    reject([id, `getShowsFromDisk: ${dirent}, ${err.message}`]);
     return;
   }
   else {
@@ -224,86 +220,6 @@ const saveConfigYml = async (idIn, resultIn, resolveIn, rejectIn) => {
     case 'ok':  resolve([id, result]); break;
     case 'err': reject( [id, tryRes]); break;
   }
-}
-
-const getBlockedWaits = (id, _param, resolve) => {
-  resolve([id, blockedWaits]);
-};
-
-const addBlockedWait = async (id, name, resolve, _reject) => {
-  console.log('addBlockedWait', id, name);
-  for(const [idx, blockedWaitStr] of blockedWaits.entries()) {
-    if(blockedWaitStr.toLowerCase() === name.toLowerCase()) {
-      console.log(
-          '-- removing matching blockedWaits:', blockedWaitStr);
-      blockedWaits.splice(idx, 1);
-      break;
-    }
-  }
-  console.log('-- adding blockedWait:', name);
-  blockedWaits.push(name);
-  await util.writeFile('data/blockedWaits.json', blockedWaits);
-  resolve([id, 'ok']);
-}
-
-const delBlockedWait = async (id, name, resolve, _reject) => {
-  console.log('delBlockedWait', id, name);
-  let deletedOne = false;
-  for(const [idx, blockedWaitStr] of blockedWaits.entries()) {
-    if(blockedWaitStr.toLowerCase() === name.toLowerCase()) {
-      console.log('-- deleting blockedWait:', blockedWaitStr);
-      blockedWaits.splice(idx, 1);
-      deletedOne = true;
-      break;
-    }
-  }
-  if(!deletedOne) {
-    console.log('blockedWait not deleted -- no match:', name);
-    resolve([id, 'ok']);
-    return
-  }
-  await util.writeFile('data/blockedWaits.json', blockedWaits);
-  resolve([id, 'ok']);
-}
-
-const getBlockedGaps = (id, _param, resolve) => {
-  resolve([id, blockedGaps]);
-};
-
-const addBlockedGap = async (id, name, resolve, _reject) => {
-  console.log('addBlockedGap', id, name);
-  for(const [idx, blockedGapStr] of blockedGaps.entries()) {
-    if(blockedGapStr.toLowerCase() === name.toLowerCase()) {
-      console.log(
-          '-- removing matching blockedGap:', blockedGapStr);
-      blockedGaps.splice(idx, 1);
-      break;
-    }
-  }
-  console.log('-- adding blockedGap:', name);
-  blockedGaps.push(name);
-  await util.writeFile('data/blockedGaps.json', blockedGaps);
-  resolve([id, 'ok']);
-}
-
-const delBlockedGap = async (id, name, resolve, _reject) => {
-  console.log('delBlockedGap', id, name);
-  let deletedOne = false;
-  for(const [idx, blockedGapStr] of blockedGaps.entries()) {
-    if(blockedGapStr.toLowerCase() === name.toLowerCase()) {
-      console.log('-- deleting blockedGap:', blockedGapStr);
-      blockedGaps.splice(idx, 1);
-      deletedOne = true;
-      break;
-    }
-  }
-  if(!deletedOne) {
-    console.log('blockedGap not deleted -- no match:', name);
-    resolve([id, 'ok']);
-    return
-  }
-   await util.writeFile('data/blockedGaps.json', blockedGaps);
-  resolve([id, 'ok']);
 }
 
 const getRejects = (id, _param, resolve, _reject) => {
@@ -508,19 +424,11 @@ const runOne = () => {
 
   // call function fname
   switch (fname) {
-    case 'getAllShows':   getAllShows(       id,    '', resolve, reject); break;
+    case 'getShowsFromDisk':   getShowsFromDisk(       id,    '', resolve, reject); break;
     case 'deletePath':    deletePath(        id, param, resolve, reject); break;
 
     case 'getDevices':    emby.getDevices(   id,    '', resolve, reject); break;
     case 'getLastViewed': view.getLastViewed(id,    '', resolve, reject); break;
-
-    case 'getBlockedWaits': getBlockedWaits( id, '',    resolve, reject); break;
-    case 'addBlockedWait':  addBlockedWait(  id, param, resolve, reject); break;
-    case 'delBlockedWait':  delBlockedWait(  id, param, resolve, reject); break;
-
-    case 'getBlockedGaps': getBlockedGaps(id, '',    resolve, reject); break;
-    case 'addBlockedGap':  addBlockedGap( id, param, resolve, reject); break;
-    case 'delBlockedGap':  delBlockedGap( id, param, resolve, reject); break;
 
     case 'getRejects':  getRejects(id, '',    resolve, reject); break;
     case 'addReject':   addReject( id, param, resolve, reject); break;
@@ -541,6 +449,7 @@ const runOne = () => {
     case 'getAllTvdb':    tvdb.getAllTvdb(   id, param, resolve, reject); break;
     case 'getNewTvdb':    tvdb.getNewTvdb(   id, param, resolve, reject); break;
     case 'setTvdbFields': tvdb.setTvdbFields(id, param, resolve, reject); break;
+    case 'getRemotes':    tvdb.getRemotesCmd(id, param, resolve, reject); break;
     case 'getActorPage':  tvdb.getActorPage( id, param, resolve, reject); break;
     case 'sendEmail':     sendEmailHandler(  id, param, resolve, reject); break;
     

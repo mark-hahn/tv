@@ -12,7 +12,7 @@
     @all-shows="handleAllShows"
   )
   #tabArea(:style="{ flex:'1 1 auto', minWidth:'0px', display:'flex', flexDirection:'column', height:'100%' }")
-    #tabBar(:style="{ display:'flex', gap:'6px', padding:'6px 8px', alignItems:'center', borderBottom:'1px solid #ddd', backgroundColor:'#fafafa', flex:'0 0 auto', flexWrap:'wrap' }")
+    #tabBar(:style="{ display:'flex', gap:(simpleMode ? '30px' : '0px'), padding:(simpleMode ? '6px 8px' : '6px 0px'), alignItems:'center', borderBottom:'1px solid #ddd', backgroundColor:'#fafafa', flex:'0 0 auto', flexWrap:'wrap' }")
       button(
         v-for="t in tabs"
         :key="t.key"

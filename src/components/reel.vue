@@ -185,6 +185,13 @@ export default {
 
     const handleNext = async () => {
       try {
+        // If the "-- no more titles --" message is showing, restart Reel (same as initial mount).
+        // This refreshes the reelgood home page and reloads cached result titles.
+        if (titleStrings.value.some((s) => String(s) === NO_MORE_ENTRY)) {
+          await startReelAndLoadTitles();
+          return;
+        }
+
         const res = await fetch(`${config.torrentsApiUrl}/api/getreel`);
         if (!res.ok) {
           const txt = await res.text();

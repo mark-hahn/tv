@@ -125,6 +125,8 @@ export async function startReel(showTitlesArg) {
   try {
     showTitles = Array.isArray(showTitlesArg) ? showTitlesArg : [];
 
+    logToFile(`startReel called (showTitles: ${showTitles.length})`);
+
     console.log('Fetching fresh reelgood home page');
     const homeData = await fetch(homeUrl);
     homeHtml = await homeData.text();

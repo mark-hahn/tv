@@ -1,6 +1,7 @@
 // Torrent search logic
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { normalize } from './normalize.js';
 
 // torrent-search-api is CommonJS, need dynamic import
@@ -10,9 +11,26 @@ const SAVE_SAMPLE_TORRENTS = false;
 const DUMP_NEEDED          = true;
 const SAVE_ALL_RAW         = true;
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const TORRENTS_DIR = path.resolve(__dirname, '..');
+const ROOT_DIR = path.resolve(TORRENTS_DIR, '..');
+const SAMPLE_TORRENTS_DIR = path.join(ROOT_DIR, 'samples', 'sample-torrents');
+const COOKIES_DIR = path.join(TORRENTS_DIR, 'cookies');
+const IPTORRENTS_CUSTOM_PATH = path.join(TORRENTS_DIR, 'iptorrents-custom.json');
+
+function ensureDir(dirPath) {
+  try {
+    fs.mkdirSync(dirPath, { recursive: true });
+  } catch (e) {
+    // ignore
+  }
+}
+
 // Load cookies from files
 function loadCookiesArray(filename) {
-  const filepath = `./cookies/${filename}`;
+  const filepath = path.join(COOKIES_DIR, filename);
   if (fs.existsSync(filepath)) {
     const cookiesJson = JSON.parse(fs.readFileSync(filepath, 'utf8'));
     // Convert Playwright cookie format to cookie string array
@@ -56,10 +74,14 @@ export function initializeProviders() {
 
   if (iptCookies) {
     try {
-      // Remove default IPTorrents and load custom one
-      TorrentSearchApi.removeProvider('IpTorrents');
-      const customIptConfig = JSON.parse(fs.readFileSync('./iptorrents-custom.json', 'utf8'));
-      TorrentSearchApi.loadProvider(customIptConfig);
+      // Prefer custom provider config when present; otherwise fall back to built-in.
+      if (fs.existsSync(IPTORRENTS_CUSTOM_PATH)) {
+        TorrentSearchApi.removeProvider('IpTorrents');
+        const customIptConfig = JSON.parse(fs.readFileSync(IPTORRENTS_CUSTOM_PATH, 'utf8'));
+        TorrentSearchApi.loadProvider(customIptConfig);
+      } else {
+        console.error(`IPTorrents custom config missing: ${IPTORRENTS_CUSTOM_PATH} (using default provider config)`);
+      }
       TorrentSearchApi.enableProvider('IpTorrents', iptCookies);
     } catch (e) {
       console.error('Failed to enable IPTorrents:', e.message);
@@ -91,8 +113,9 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   
   // Dump needed array if debugging enabled
   if (DUMP_NEEDED) {
-    const neededPath = path.join(process.cwd(), '..', 'samples', 'sample-torrents', 'needed.json');
+    const neededPath = path.join(SAMPLE_TORRENTS_DIR, 'needed.json');
     try {
+      ensureDir(SAMPLE_TORRENTS_DIR);
       fs.writeFileSync(neededPath, JSON.stringify(needed, null, 2), 'utf8');
       console.log(`Wrote needed array to needed.json: ${needed.length} entries`);
     } catch (err) {
@@ -108,11 +131,19 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     // Remove existing cf_clearance and add new one
     const filtered = iptCookiesForSearch.filter(c => !c.startsWith('cf_clearance='));
     filtered.push(`cf_clearance=${iptCf}`);
-    TorrentSearchApi.removeProvider('IpTorrents');
-    const customIptConfig = JSON.parse(fs.readFileSync('./iptorrents-custom.json', 'utf8'));
-    TorrentSearchApi.loadProvider(customIptConfig);
-    TorrentSearchApi.enableProvider('IpTorrents', filtered);
-    console.log('Using provided IPTorrents cf_clearance');
+    try {
+      if (fs.existsSync(IPTORRENTS_CUSTOM_PATH)) {
+        TorrentSearchApi.removeProvider('IpTorrents');
+        const customIptConfig = JSON.parse(fs.readFileSync(IPTORRENTS_CUSTOM_PATH, 'utf8'));
+        TorrentSearchApi.loadProvider(customIptConfig);
+      } else {
+        console.error(`IPTorrents custom config missing: ${IPTORRENTS_CUSTOM_PATH} (cf_clearance override will use default provider config)`);
+      }
+      TorrentSearchApi.enableProvider('IpTorrents', filtered);
+      console.log('Using provided IPTorrents cf_clearance');
+    } catch (e) {
+      console.error('Failed to apply IPTorrents cf_clearance override:', e.message);
+    }
   }
   
   if (tlCf) {
@@ -172,7 +203,8 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   // Dump all raw torrents for debugging
   if (SAVE_ALL_RAW) {
     try {
-      const rawDumpPath = path.join(process.cwd(), '..', 'samples', 'sample-torrents', 'all-raw.json');
+      const rawDumpPath = path.join(SAMPLE_TORRENTS_DIR, 'all-raw.json');
+      ensureDir(SAMPLE_TORRENTS_DIR);
       fs.writeFileSync(rawDumpPath, JSON.stringify(torrents, null, 2));
       console.log(`Wrote ${torrents.length} raw torrents to all-raw.json`);
     } catch (err) {
@@ -526,17 +558,15 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   
   // Save one sample torrent from each provider for debugging
   if (SAVE_SAMPLE_TORRENTS) {
-    const sampleDir = '../samples/sample-torrents';
-    if (!fs.existsSync(sampleDir)) {
-      fs.mkdirSync(sampleDir, { recursive: true });
-    }
+    const sampleDir = SAMPLE_TORRENTS_DIR;
+    ensureDir(sampleDir);
     
     const savedProviders = new Set();
     filtered.forEach(torrent => {
       if (torrent.raw) {
         const provider = torrent.raw.provider;
         if (!savedProviders.has(provider)) {
-          const filename = `${sampleDir}/${provider.toLowerCase()}-sample.json`;
+          const filename = path.join(sampleDir, `${provider.toLowerCase()}-sample.json`);
           fs.writeFileSync(filename, JSON.stringify(torrent, null, 2));
           savedProviders.add(provider);
         }

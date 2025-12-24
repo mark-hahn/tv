@@ -3,20 +3,20 @@ reminder, restore ...
   start gap running
 
 bugs ...
+  fast down start failed
 
-todo ...
-  handle changes to Allshow in reel pane
+todo both ...
+
+todo non-simple:
   save filter settings for simple custom button
-  half-hour filter
   take notes
-  reelgood
   how to see why qbt or down don't start
-
-non-simple:
   
-simple ...
+todo simple ...
+  add custom button
   
 tabled ...
+  half-hour filter
   waiting enhancements
     sort by waiting date
     filter waiting

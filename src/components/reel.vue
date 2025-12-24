@@ -29,8 +29,14 @@
         button(
           @click="handleLoad"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Load
-        button(:style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Google
-        button(:style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Imdb
+        button(
+          v-if="googleResult"
+          @click="handleGoogle"
+          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Google
+        button(
+          v-if="imdbResult"
+          @click="handleImdb"
+          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") {{ imdbButtonLabel }}
         button(
           @click="handleNext"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Next
@@ -59,6 +65,7 @@ import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import ReelGallery from './reel-gallery.vue';
 import { config } from '../config.js';
 import evtBus from '../evtBus.js';
+import * as srvr from '../srvr.js';
 
 export default {
   name: 'ReelPane',
@@ -83,6 +90,8 @@ export default {
     const srchStr = ref('friends');
     const curTitle = ref('');
     const curTvdb = ref(null);
+    const getRemotesResults = ref([]);
+    const _lastRemotesKey = ref('');
     const titleStrings = ref([]);
     const selectedTitleIdx = ref(-1);
     const titlesPane = ref(null);
@@ -211,7 +220,76 @@ export default {
       }
     };
 
-    const handleLoad = async () => {
+    const googleResult = computed(() => {
+      const arr = Array.isArray(getRemotesResults.value) ? getRemotesResults.value : [];
+      return arr.find((r) => r && r.name === 'Google' && r.url) || null;
+    });
+
+    const imdbResult = computed(() => {
+      const arr = Array.isArray(getRemotesResults.value) ? getRemotesResults.value : [];
+      return arr.find((r) => r && typeof r.name === 'string' && r.name.toUpperCase().startsWith('IMDB') && r.url) || null;
+    });
+
+    const imdbButtonLabel = computed(() => {
+      return imdbResult.value?.name || 'Imdb';
+    });
+
+    const openUrl = (url) => {
+      const u = String(url || '').trim();
+      if (!u) return;
+      try {
+        window.open(u, '_blank');
+      } catch (e) {
+        console.log('openUrl failed:', e?.message || String(e));
+      }
+    };
+
+    const handleGoogle = () => {
+      openUrl(googleResult.value?.url);
+    };
+
+    const handleImdb = () => {
+      openUrl(imdbResult.value?.url);
+    };
+
+    const loadRemotesForTvdb = async (tvdb) => {
+      if (!tvdb) {
+        getRemotesResults.value = [];
+        _lastRemotesKey.value = '';
+        return;
+      }
+
+      const name = String(tvdb.name || '').trim();
+      const tvdbId = String(tvdb.tvdb_id || '').trim();
+      const key = tvdbId || name;
+      if (!key) {
+        getRemotesResults.value = [];
+        _lastRemotesKey.value = '';
+        return;
+      }
+
+      if (_lastRemotesKey.value === key) return;
+      _lastRemotesKey.value = key;
+
+      getRemotesResults.value = [];
+      try {
+        const params = {
+          show: {
+            Name: name,
+            TvdbId: tvdbId
+          },
+          tvdbRemotes: tvdb.remote_ids,
+          fast: true
+        };
+        const res = await srvr.getRemotesCmd(params);
+        getRemotesResults.value = Array.isArray(res) ? res : [];
+      } catch (e) {
+        console.log('getRemotesCmd failed:', e?.message || String(e));
+        getRemotesResults.value = [];
+      }
+    };
+
+    const handleLoad = () => {
       const t = curTvdb.value;
       if (!t) return;
 
@@ -297,6 +375,10 @@ export default {
       console.log('curTvdb set to:', tvdb);
     };
 
+    watch(curTvdb, (val) => {
+      void loadRemotesForTvdb(val);
+    }, { deep: true });
+
     // Handle title selection
     const selectTitle = (idx) => {
       const item = parsedTitles.value[idx];
@@ -366,6 +448,10 @@ export default {
       srchStr,
       curTitle,
       curTvdb,
+      getRemotesResults,
+      googleResult,
+      imdbResult,
+      imdbButtonLabel,
       titleStrings,
       selectedTitleIdx,
       parsedTitles,
@@ -376,7 +462,9 @@ export default {
       handleGallerySelect,
       selectTitle,
       handleNext,
-      handleLoad
+      handleLoad,
+      handleGoogle,
+      handleImdb
     };
   }
 };

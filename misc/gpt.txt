@@ -1,43 +1,44 @@
 
 
-add a line at the top of the reelInfo box with the selected card title in reelGallery
+in the reel pane whenever curTvdb gets set at loading, or later, call srvr.getRemotesCmd(params) where params is an object with the properties show,  tvdbRemotes, and fast.
 
-change the font-size of that title to 12px and truncate the title instead of wrapping
+- show property value  is:  
+{
+  "Name": "<name>",
+  "TvdbId": "<tvdb_id>",   
+}
+where <name> is curTvdb.name and <tvdb_id> is curTvdb.tvdb_id
 
-set #reelDescr height to 120
+- tvdbRemotes property value is curTvdb.remote_ids
 
-adjust top of reelTitles pane to bottom of buttons pane
+- fast property value is true
 
-after reelTitles pane mounted scroll to bottom
+when srvr.getRemotesCmd() returns results the results should be stored in reel.vue var getRemotesResults.
 
-i meant after it was populated
+getRemotesResults looks like:
+[
+  {
+    "name": "Google",
+    "url": "<googleUrl>"
+  },
+  {
+    "name": "<imdbName>",
+    "url": "<imdbUrl>"
+  }
+]
+the object with the name "Google" we will call the googleResult.
 
-change image width in gallery to 101px centered horizontally in card
+the object with a name that starts with "IMDB" we will call the imdbResult. a sample of <imdbName> in imdbResult is "IMDB (7.5)".
 
-remove margin-bottom from #reelInfo
+either googleResult or imdbResult could be missing. there may be other objects and properties that can be ignored. 
 
-remove Prev button -- 
-when the Load button is clicked perform the same action that happens when a card in the #searchList is clicked using the selected card in the gallery
+if srvr.getRemotesCmd() returns and we have no googleResult then hide the google button in #reelButtons. 
 
-the Load button action does not match clicking a card in #searchList.  
+the google button should have the action of creating a browser tab with the url <googleUrl>.
 
-when clicking in card in the #searchList a dialog appears saying web data is being loaded and then the show appears in the list view and the series pane shows with all the data visible.  
+if srvr.getRemotesCmd() returns and we have no imdbResult then hide the imdb button in #reelButtons.
 
-the Load button just brought up an empty series pane. nothing was loaded from the web.
+if we do have an imdbResult then change the name of the Imdb button to <imdbName>.
 
-when next is clicked and titles are appended to the titles pane and the bottom pane of the title pane is automatically selected -- then that selection should set srchStr just like clicking on a titles pane.  if srchStr in gallery already matches the title in the titles card the gallery should ignore it.
+the imdb button should have the action of creating a browser tab with the url <imdbUrl>.
 
-the titles pane is not populated by mounting or by click of next button
-
-when i go from reel pane to series pane and back the reel pane changes.  it should do nothing and stay the same because it is using v-show and the only automatic change is when mounted
-
-in reelgood.js ignore titles that are already in resultTitles just like ones in oldShows. you will need to parse the resultTitles string to get the real title after |
-
-why do you need to build a set of titles already present in resultTitles
-
-when getReel returns and empty array add a msg titles card that says "-- no more titles --.
-later, if something is appended to the list remove that msg titles card 
-
-when srch title changes and the gallery loads new cards it should scroll to the top and select the top card
-
-when getReel returns and empty array scroll titles list to bottom whether a msg titles card alreay exists or not. if adding a msg titles card scroll to bottom after it was added.

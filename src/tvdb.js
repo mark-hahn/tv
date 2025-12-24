@@ -173,7 +173,8 @@ const getRemote = async (id, type, showName) => {
 
 ///////////// get remotes  //////////////
 // use tvdb remotes data to find complete remote data
-const getRemotes = async (show, tvdbRemotes) => {
+
+const getRemotes = async (show, tvdbRemotes, fast = false) => {
   const name          = show.Name;
   const showId        = show.Id;
   const remotes       = [];
@@ -181,12 +182,13 @@ const getRemotes = async (show, tvdbRemotes) => {
   if(showId && !showId.startsWith("noemby-")) 
     remotes.push({name:'Emby', url: urls.embyPageUrl(showId)});
 
-  const rottenRemote = await getRemote(null, 99, name);
-  if(rottenRemote) {
-    if(rottenRemote.ratings) rottenRemote.name += " (" + rottenRemote.ratings + ")";
-    remotes.push(rottenRemote);
+  if(!fast) {
+    const rottenRemote = await getRemote(null, 99, name);
+    if(rottenRemote) {
+      if(rottenRemote.ratings) rottenRemote.name += " (" + rottenRemote.ratings + ")";
+      remotes.push(rottenRemote);
+    }
   }
-
   const encoded = encodeURI(name).replaceAll('&', '%26');
   const url = `https://www.google.com/search` +
               `?q=${encoded}%20tv%20show`;

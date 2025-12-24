@@ -74,7 +74,8 @@ export default {
       _fastPollStartTime: null,
       _oldDownloadingCount: 0,
       _getFinishTime: null,
-      _lastFinishedEnded: 0
+      _lastFinishedEnded: 0,
+      _tvprocInitialized: false
     };
   },
 
@@ -574,6 +575,7 @@ export default {
       this.error = null;
       this.startLoadingDelay();
       try {
+        const initializing = !this._tvprocInitialized;
         const el = this.$refs.scroller;
         // Only auto-scroll if: 1) explicitly requested, or 2) not initial switch AND near bottom
         const wasNearBottom = !opts.isInitialPaneSwitch && el && this.isNearBottom(el);
@@ -613,7 +615,20 @@ export default {
               .filter(it => String(it?.status || '').trim() === 'finished')
               .reduce((mx, it) => Math.max(mx, toSeconds(it?.dateEnded)), 0)
           : 0;
-        const didFinishSomething = finishedEndedMax > Number(this._lastFinishedEnded || 0);
+        let didFinishSomething = finishedEndedMax > Number(this._lastFinishedEnded || 0);
+
+        // On the first successful load, establish a baseline so we don't
+        // notify for historical "finished" items already present.
+        if (initializing) {
+          this._tvprocInitialized = true;
+          this._lastFinishedEnded = finishedEndedMax;
+          didFinishSomething = false;
+          console.log('TVProc initialized baseline', {
+            finishedEndedMax,
+            downloading: newDownloading.length,
+            permission: (typeof window !== 'undefined' && 'Notification' in window) ? Notification.permission : 'n/a'
+          });
+        }
         
         // Log if a new download started (check timestamp to avoid false positives from reordering)
         if (newDownloading.length > oldDownloading.length) {
@@ -643,9 +658,10 @@ export default {
         }
         
         // If a download finished and nothing is downloading, trigger cycle.
-        // Notify when we observe a new finished item and nothing is downloading.
-        if (newDownloading.length === 0 && (oldDownloading.length > 0 || didFinishSomething)) {
+        // Notify when we observe a new finished item (since baseline) and nothing is downloading.
+        if (!initializing && newDownloading.length === 0 && (oldDownloading.length > 0 || didFinishSomething)) {
           console.log('TVProc download->done transition', {
+            initializing,
             oldDownloading: oldDownloading.length,
             newDownloading: newDownloading.length,
             didFinishSomething,

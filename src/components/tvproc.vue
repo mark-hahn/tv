@@ -73,7 +73,6 @@ export default {
       _hasEverMounted: false,
       _fastPollStartTime: null,
       _oldDownloadingCount: 0,
-      _getFinishTime: null,
       _lastFinishedEnded: 0,
       _tvprocInitialized: false
     };
@@ -101,14 +100,12 @@ export default {
     evtBus.on('paneChanged', this.onPaneChanged);
     evtBus.on('forceFile', this.handleForceFile);
     evtBus.on('cycle-started', this.handleCycleStarted);
-    evtBus.on('get-download-finished', this.handleGetFinished);
   },
 
   unmounted() {
     evtBus.off('paneChanged', this.onPaneChanged);
     evtBus.off('forceFile', this.handleForceFile);
     evtBus.off('cycle-started', this.handleCycleStarted);
-    evtBus.off('get-download-finished', this.handleGetFinished);
     this.stopPolling();
     this.stopLibraryPolling();
     this.items = [];
@@ -135,9 +132,6 @@ export default {
       } catch (e) {
         console.log('notifyAllUsbFinished failed:', e?.message || String(e));
       }
-    },
-    handleGetFinished(data) {
-      this._getFinishTime = data?.time || null;
     },
 
     handleCycleStarted() {
@@ -643,12 +637,7 @@ export default {
             return Number.isFinite(started) && (nowSec - started) < 30;
           });
           newItems.forEach(item => {
-            if (this._getFinishTime) {
-              const delayInfo = ` (delay: ${((Date.now() - this._getFinishTime) / 1000).toFixed(1)}s from GET finish)`;
-              console.log(`[${timestamp}] DOWN: Download started - ${item.title || '(no title)'}${delayInfo}`);
-              // Clear the finish time after logging
-              this._getFinishTime = null;
-            }
+            console.log(`[${timestamp}] DOWN: Download started - ${item.title || '(no title)'}`);
           });
         }
         

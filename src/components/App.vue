@@ -66,13 +66,6 @@
         :sizing="simpleMode ? sizing : sizingNonSimple"
       )
 
-      DlStatus(
-        v-if="!simpleMode"
-        v-show="currentPane === 'dlstatus'"
-        :simpleMode="simpleMode"
-        :sizing="simpleMode ? sizing : sizingNonSimple"
-      )
-
       History(
         v-if="!simpleMode"
         v-show="currentPane === 'history'"
@@ -96,7 +89,6 @@ import Actors   from './actors.vue';
 import Reel     from './reel.vue';
 import Torrents from './torrents.vue';
 import Flex     from './flex.vue';
-import DlStatus from './dlstatus.vue';
 import History  from './history.vue';
 import TvProc   from './tvproc.vue';
 import evtBus   from '../evtBus.js';
@@ -104,12 +96,12 @@ import * as tvdb from '../tvdb.js';
 
 export default {
   name: "App",
-  components: { List, Series, Map, Actors, Reel, Torrents, Flex, DlStatus, History, TvProc },
+  components: { List, Series, Map, Actors, Reel, Torrents, Flex, History, TvProc },
   data() { 
     return { 
       // Must be known before first render so non-simple panes never mount in simple mode.
       simpleMode: new URLSearchParams(window.location.search).has('simple'),
-      currentPane: 'series', // 'series', 'map', 'actors', 'torrents', 'flex', 'dlstatus', 'history', or 'tvproc'
+      currentPane: 'series', // 'series', 'map', 'actors', 'torrents', 'flex', 'history', or 'tvproc'
       currentTvdbData: null,
       currentShow: null,
       _torrentsInitialized: false,
@@ -193,7 +185,6 @@ export default {
         { label: 'Reel', key: 'reel' },
         { label: 'Tor', key: 'torrents' },
         { label: 'Flex', key: 'flex' },
-        { label: 'Get', key: 'dlstatus' },
         { label: 'Qbt', key: 'history' },
         { label: 'Down', key: 'tvproc' }
       ];
@@ -271,11 +262,6 @@ export default {
         if (this.simpleMode) return;
         this.currentPane = 'flex';
         evtBus.emit('paneChanged', this.currentPane);
-        return;
-      }
-
-      if (k === 'dlstatus') {
-        this.handleShowStatus();
         return;
       }
 
@@ -367,12 +353,6 @@ export default {
       this._torrentsShowKey = showKey;
     },
 
-    handleShowStatus() {
-      if (this.simpleMode) return;
-      this.currentPane = 'dlstatus';
-      evtBus.emit('paneChanged', this.currentPane);
-    },
-
     handleShowHistory() {
       if (this.simpleMode) return;
       this.currentPane = 'history';
@@ -383,36 +363,6 @@ export default {
       if (this.simpleMode) return;
       this.currentPane = 'tvproc';
       evtBus.emit('paneChanged', this.currentPane);
-    },
-
-    handleStatusToTorrents() {
-      // Do not reload/emit showTorrents when just switching panes.
-      if (this._torrentsInitialized) {
-        this.currentPane = 'torrents';
-        evtBus.emit('paneChanged', this.currentPane);
-        return;
-      }
-
-      // Fallback: if torrents was never initialized, open it with current show.
-      if (this.currentShow) {
-        this.handleShowTorrents(this.currentShow);
-      } else {
-        this.currentPane = 'torrents';
-        evtBus.emit('paneChanged', this.currentPane);
-      }
-    },
-
-    handleStatusToSeries() {
-      this.currentPane = 'series';
-      this.mapShow = null;
-      evtBus.emit('paneChanged', this.currentPane);
-      evtBus.emit('mapAction', { action: 'close', show: null });
-    },
-
-    handleStatusToMap() {
-      if (this.currentShow) {
-        evtBus.emit('mapAction', { action: 'open', show: this.currentShow });
-      }
     },
 
     handleHistoryToTorrents() {
@@ -430,11 +380,6 @@ export default {
         this.currentPane = 'torrents';
         evtBus.emit('paneChanged', this.currentPane);
       }
-    },
-
-    handleHistoryToStatus() {
-      this.currentPane = 'dlstatus';
-      evtBus.emit('paneChanged', this.currentPane);
     },
 
     handleHistoryToSeries() {
@@ -463,11 +408,6 @@ export default {
         this.currentPane = 'torrents';
         evtBus.emit('paneChanged', this.currentPane);
       }
-    },
-
-    handleTvprocToStatus() {
-      this.currentPane = 'dlstatus';
-      evtBus.emit('paneChanged', this.currentPane);
     },
 
     handleTvprocToHistory() {
@@ -593,7 +533,6 @@ html, body {
 #map, #map *,
 #actors, #actors *,
 #torrents, #torrents *,
-#dlstatus, #dlstatus *,
 #history, #history *,
 #tvproc, #tvproc * {
   color: #000 !important;
@@ -605,7 +544,6 @@ html, body {
 #actors button,
 #torrents button,
 .torrents-container button,
-#dlstatus button,
 #history button,
 #tvproc button {
   background-color: whitesmoke !important;

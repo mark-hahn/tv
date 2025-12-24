@@ -9,6 +9,7 @@ bugs ...
 todo both ...
 
 todo non-simple:
+  ad 2px margin-left to all tab buttons
   include show name in usb finished
   abort qbt downloading
   select show on card clicks

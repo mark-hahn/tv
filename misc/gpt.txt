@@ -1,29 +1,10 @@
 
-if in map.vue and there is a ctrl-click on season number of the map, show confirmation dialog with message "Is it ok to delete all episodes in season <season> of show <showName>." where season is the number clicked on and showName is the selected show.Name.
 
-if dialog is confirmed then delete all files in season folder in the disk using the call to delSeasonFiles(showPath, season) where showPath is show.Path and season is the season number clicked on.  Then mark each episode in the season as deleted so the letter d will appear in the table cell. log the call.
+when i say qbt tab then that means the history.vue pane.
+when i say down tab then that means the tvproc.vue pane.
 
-add function delSeasonFiles(showName, season) to srvr.js.
+whenever the qpt pane has loaded any cards set an array called activeDownLoads to contain the titles of all cards in downloading state.
 
-delSeasonFiles will return {status: "ok"} or {"err":"<error msg>"}
+on every poll check to see if any entry of activeDownLoads is not downloading. if so then send a startProc command to https://hahnca.com/tvproc/startProc.
 
-i got {
-  "err": "delSeasonFiles: requires showName, showPath, season"
-}
-
-and
-
-{
-  "id": "119",
-  "fname": "delSeasonFiles",
-  "param": [
-    "/mnt/media/tv/Trial & Error",
-    1
-  ],
-  "status": "err",
-  "result": "{\"err\":\"delSeasonFiles: requires showName, showPath, season\"}"
-}
-
-{
-  "err": "delSeasonFiles: requires showName, showPath, season"
-}
+after that check set activeDownLoads to have the titles of all cards downloading.

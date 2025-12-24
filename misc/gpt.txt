@@ -1,8 +1,11 @@
 
+add delSeasonFiles(params) endpoint to index.js that calls function delSeasonFiles. 
+params is object like:
+{
+  "showName": "Trial & Error",
+  "showPath": "/mnt/media/tv/Trial & Error",
+  "season": 1
+}
+then go to the directory "<params.showPath>/Season <params.season>" and delete contntents of that directory. log the deletion with params.showName and  "<params.showPath>/Season <params.season>".
 
-add images object for each guest actor as the property "images" to their actorInfo object.
-
-only log guestActorList with all actorInfo objects
-
- return guestActorList with all actorInfo objects as results
- 
+for testing do not do the actual deleting.

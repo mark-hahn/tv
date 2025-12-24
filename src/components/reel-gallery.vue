@@ -1,6 +1,7 @@
 <template lang="pug">
 
 #reelGallery(
+  ref="galleryPane"
   :style="{ flex: '1', minHeight: 0, height: '100%', overflowY: 'auto', overflowX: 'hidden', display: 'block', padding: '2px' }")
   
   div(
@@ -24,7 +25,7 @@
 </template>
 
 <script>
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch, onMounted, nextTick } from 'vue';
 import { srchTvdbData } from '../tvdb.js';
 
 export default {
@@ -39,6 +40,7 @@ export default {
   setup(props, { emit }) {
     const tvdbList = ref([]);
     const selectedIdx = ref(0);
+    const galleryPane = ref(null);
 
     const getImageUrl = (tvdb) => {
       if (!tvdb) return null;
@@ -74,6 +76,10 @@ export default {
         console.log('TVDB search results:', data);
         if (data && data.length > 0) {
           tvdbList.value = data;
+          await nextTick();
+          if (galleryPane.value) {
+            galleryPane.value.scrollTop = 0;
+          }
           // Auto-select first card
           selectedIdx.value = 0;
           emit('select', data[0]);
@@ -103,6 +109,7 @@ export default {
     return {
       tvdbList,
       selectedIdx,
+      galleryPane,
       getImageUrl,
       getCardStyle,
       selectCard,

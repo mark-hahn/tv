@@ -113,6 +113,13 @@ export default {
       }
     };
 
+    const scrollTitlesPaneToBottom = async () => {
+      await nextTick();
+      if (titlesPane.value) {
+        titlesPane.value.scrollTop = titlesPane.value.scrollHeight;
+      }
+    };
+
     const getAllShowNames = () => {
       const src = Array.isArray(props.allShows) ? props.allShows : [];
       const names = src
@@ -181,6 +188,7 @@ export default {
         if (added.length > 0) {
           titleStrings.value = titleStrings.value.filter((s) => String(s) !== NO_MORE_ENTRY);
           titleStrings.value = [...titleStrings.value, ...added];
+          await scrollTitlesToBottom();
         } else {
           // If none returned, ensure the sentinel exists (once).
           const hasNoMore = titleStrings.value.some((s) => String(s) === NO_MORE_ENTRY);
@@ -190,9 +198,11 @@ export default {
             // Force a new array assignment so the UI updates consistently.
             titleStrings.value = [...titleStrings.value];
           }
-        }
 
-        await scrollTitlesToBottom();
+          // Always scroll to the bottom even if the msg card already exists;
+          // if we just added it, wait for it to render first.
+          await scrollTitlesPaneToBottom();
+        }
       } catch (e) {
         const msg = e?.message || String(e);
         console.log('getReel failed:', msg);

@@ -39,3 +39,5 @@ when getReel returns and empty array add a msg titles card that says "-- no more
 later, if something is appended to the list remove that msg titles card 
 
 when srch title changes and the gallery loads new cards it should scroll to the top and select the top card
+
+when getReel returns and empty array scroll titles list to bottom whether a msg titles card alreay exists or not. if adding a msg titles card scroll to bottom after it was added.

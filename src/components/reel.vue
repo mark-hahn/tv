@@ -16,7 +16,11 @@
     #reelInfo(
       :style="{ padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', fontSize: '14px', textTransform: 'uppercase' }")
       div(v-if="curTvdb" :style="{ fontWeight: 'bold', fontSize: '12px', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }") {{ galleryTitleLine }}
-      div(v-if="curTvdb") {{ infoLine }}
+      div(v-if="curTvdb" :style="{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '10px' }")
+        div(:style="{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }") {{ infoLine }}
+        button(
+          @click="handleLoad"
+          :style="{ height: '18px', margin: '0', marginLeft: '10px', marginRight: '20px', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto' }") Get
 
     // keep zero gap between description and buttons
     #reelDescrButtons(:style="{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: '0' }")
@@ -27,19 +31,27 @@
       #reelButtons(
         :style="{ display: 'flex', gap: '10px', padding: '10px', marginTop: '0' }")
         button(
-          @click="handleLoad"
-          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Load
-        button(
-          v-if="googleResult"
-          @click="handleGoogle"
-          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Google
+          @click="handleNext"
+          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Next
+
+        span(v-if="hasAnyRemoteButton" :style="{ lineHeight: '18px', fontSize: '12px' }")  |
+
         button(
           v-if="imdbResult"
           @click="handleImdb"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") {{ imdbButtonLabel }}
         button(
-          @click="handleNext"
-          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Next
+          v-if="googleResult"
+          @click="handleGoogle"
+          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Google
+        button(
+          v-if="wikiResult"
+          @click="handleWiki"
+          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Wiki
+        button(
+          v-if="officialResult"
+          @click="handleOfficial"
+          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Official
     
     #reelTitles(
       ref="titlesPane"
@@ -237,6 +249,16 @@ export default {
       return arr.find((r) => r && typeof r.name === 'string' && r.name.toUpperCase().startsWith('IMDB') && r.url) || null;
     });
 
+    const wikiResult = computed(() => {
+      const arr = Array.isArray(getRemotesResults.value) ? getRemotesResults.value : [];
+      return arr.find((r) => r && r.name === 'Wikipedia' && r.url) || null;
+    });
+
+    const officialResult = computed(() => {
+      const arr = Array.isArray(getRemotesResults.value) ? getRemotesResults.value : [];
+      return arr.find((r) => r && r.name === 'Official Website' && r.url) || null;
+    });
+
     const imdbButtonLabel = computed(() => {
       return imdbResult.value?.name || 'Imdb';
     });
@@ -258,6 +280,18 @@ export default {
     const handleImdb = () => {
       openUrl(imdbResult.value?.url);
     };
+
+    const handleWiki = () => {
+      openUrl(wikiResult.value?.url);
+    };
+
+    const handleOfficial = () => {
+      openUrl(officialResult.value?.url);
+    };
+
+    const hasAnyRemoteButton = computed(() => {
+      return !!(imdbResult.value || googleResult.value || wikiResult.value || officialResult.value);
+    });
 
     const loadRemotesForTvdb = async (tvdb) => {
       if (!tvdb) {
@@ -458,7 +492,10 @@ export default {
       getRemotesResults,
       googleResult,
       imdbResult,
+      wikiResult,
+      officialResult,
       imdbButtonLabel,
+      hasAnyRemoteButton,
       titleStrings,
       selectedTitleIdx,
       parsedTitles,
@@ -471,7 +508,9 @@ export default {
       handleNext,
       handleLoad,
       handleGoogle,
-      handleImdb
+      handleImdb,
+      handleWiki,
+      handleOfficial
     };
   }
 };

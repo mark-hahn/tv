@@ -1,6 +1,34 @@
 
 
-when i say qbt tab or pane that means the history.vue pane.
-when i say down tab or pane then that means the tvproc.vue pane.
+in reel pane move the Load button to the bottom right of the info pane in the second line.
 
-whenever the usb windows notification is issued include the title of the last card that finished downloading. the msg is "All files have been downloaded from USB, the last is <title>."
+in the reel pane add two new buttons Wiki and Official to #buttons.
+arrange the buttons from left to right to be 
+Next, Imdb, Google, Wiki, Official. Add " | " between the Next and Imdb buttons.
+
+There may be "Wikipedia" or "Official Website" objects in the getRemotesCmd results. 
+
+Just like the Google object 
+
+    {
+      "name": "Google",
+      "url": "<url>"
+    },
+
+these objects will be 
+
+    {
+      "name": "Wikipedia",
+      "url": "<url>"
+    },
+
+or 
+    {
+      "name": "Official Website",
+      "url": "<url>"
+    },
+
+in each case they will be handled like the google object.  If the object isn't present then the button should be hidden.  The click action of the button should be to load a browser tab with the url.
+
+
+set Load button margin-right to 20px

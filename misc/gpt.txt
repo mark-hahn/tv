@@ -1,9 +1,13 @@
 
-when the reel pane mounted  reelTitles was not populated.  
 
-torrents/reelgood.log showed this:
+add a line at the top of the reelInfo box with the selected card title in reelGallery
 
-12/23 15:37 REJECT: "Man vs Baby" (family)
-12/23 15:37 >>>  "Little Disasters", https://reelgood.com/show/little-disasters
+change the font-size of that title to 12px and truncate the title instead of wrapping
 
+set #reelDescr height to 120
 
+adjust top of reelTitles pane to bottom of buttons pane
+
+after reelTitles pane mounted scroll to bottom
+
+i meant after it was populated

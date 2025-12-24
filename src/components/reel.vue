@@ -11,16 +11,17 @@
       @select="handleGallerySelect")
 
   #reelRight(
-    :style="{ flex: '1 1 0', minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column', gap: '10px' }")
+    :style="{ flex: '1 1 0', minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column', gap: '0' }")
     
     #reelInfo(
-      :style="{ padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', fontSize: '14px', textTransform: 'uppercase' }")
+      :style="{ padding: '10px', marginBottom: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', fontSize: '14px', textTransform: 'uppercase' }")
+      div(v-if="curTvdb" :style="{ fontWeight: 'bold', fontSize: '12px', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }") {{ galleryTitleLine }}
       div(v-if="curTvdb") {{ infoLine }}
 
     // keep zero gap between description and buttons
-    #reelDescrButtons(:style="{ flex: '1', minHeight: 0, display: 'flex', flexDirection: 'column', gap: '0' }")
+    #reelDescrButtons(:style="{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: '0' }")
       #reelDescr(
-        :style="{ flex: '1', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', overflowY: 'auto', fontSize: '14px', lineHeight: '1.5' }")
+        :style="{ flex: '0 0 auto', height: '120px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', overflowY: 'auto', fontSize: '14px', lineHeight: '1.5' }")
         div(v-if="curTvdb") {{ curTvdb.overview }}
       
       #reelButtons(
@@ -61,6 +62,10 @@ export default {
     ReelGallery
   },
   props: {
+    active: {
+      type: Boolean,
+      default: false
+    },
     allShows: {
       type: Array,
       default: () => ([])
@@ -77,6 +82,18 @@ export default {
     const titleStrings = ref([]);
     const selectedTitleIdx = ref(-1);
     const titlesPane = ref(null);
+    const _titlesPopulated = ref(false);
+
+    const scrollTitlesToBottom = async () => {
+      await nextTick();
+      if (titleStrings.value.length > 0) {
+        selectTitle(titleStrings.value.length - 1);
+      }
+      await nextTick();
+      if (titlesPane.value) {
+        titlesPane.value.scrollTop = titlesPane.value.scrollHeight;
+      }
+    };
 
     const getAllShowNames = () => {
       const src = Array.isArray(props.allShows) ? props.allShows : [];
@@ -101,6 +118,10 @@ export default {
         });
         const data = await res.json();
         titleStrings.value = Array.isArray(data) ? data : [];
+        _titlesPopulated.value = true;
+        if (props.active) {
+          await scrollTitlesToBottom();
+        }
       } catch (e) {
         console.log('startReel failed:', e);
       }
@@ -112,10 +133,18 @@ export default {
         const data = await res.json();
         const added = Array.isArray(data) ? data : [];
         titleStrings.value = [...titleStrings.value, ...added];
+
+        await scrollTitlesToBottom();
       } catch (e) {
         console.log('getReel failed:', e);
       }
     };
+
+    watch(() => props.active, async (isActive) => {
+      if (!isActive) return;
+      if (!_titlesPopulated.value) return;
+      await scrollTitlesToBottom();
+    });
 
     // Parse titleStrings into objects
     const parsedTitles = computed(() => {
@@ -133,6 +162,12 @@ export default {
       if (!curTvdb.value) return '';
       const t = curTvdb.value;
       return `${t.year || ''} | ${t.country || ''} | ${t.primary_language || ''} | ${t.network || ''}`;
+    });
+
+    const galleryTitleLine = computed(() => {
+      const t = curTvdb.value;
+      if (!t) return '';
+      return String(t.name || t.Name || t.seriesName || t.title || '').trim();
     });
 
     // Get style for title card
@@ -222,6 +257,7 @@ export default {
       selectedTitleIdx,
       parsedTitles,
       infoLine,
+      galleryTitleLine,
       titlesPane,
       getTitleCardStyle,
       handleGallerySelect,

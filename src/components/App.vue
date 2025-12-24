@@ -49,6 +49,7 @@
         :simpleMode="simpleMode"
         :sizing="simpleMode ? sizing : sizingNonSimple"
         :allShows="allShows"
+        :active="currentPane === 'reel'"
       )
       Torrents(
         v-if="!simpleMode"

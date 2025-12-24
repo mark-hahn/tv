@@ -125,7 +125,7 @@ export default {
 
   data() {
 
-    const toggleWaiting = async (show) => {
+    const toggleWaiting = (show) => {
       // console.log("toggleWaiting", show.Name);
       this.saveVisShow(show);
       if(show.Waiting) {
@@ -136,7 +136,7 @@ export default {
       }
     };
 
-    const toggleBlkGap = async (show) => {
+    const toggleBlkGap = (show) => {
       // console.log("toggleBlkGap", show.Name);
       this.saveVisShow(show);
       if(show.BlockedGap) {
@@ -806,7 +806,7 @@ export default {
       await this.seriesMapAction('', show, deleted);
     },
 
-    async waitStrClick(show) {
+    waitStrClick(show) {
       console.log("waitStrClick", show.Name);
       this.saveVisShow(show);
       if (show.WaitStr?.length > 0) {

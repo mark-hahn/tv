@@ -129,6 +129,8 @@ export function getShowsFromDisk()
             {return fCall('getShowsFromDisk')}
 export function deletePath(path)   
             {return fCall('deletePath', path)}
+export function delSeasonFiles(showName, showPath, season)
+            {return fCall('delSeasonFiles', { showName, showPath, season })}
 export function updateTvdb()      
             {return fCall('updateTvdb')}
 

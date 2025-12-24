@@ -63,6 +63,7 @@
 <script>
 import * as tvdb from '../tvdb.js';
 import * as emby from '../emby.js';
+import * as srvr from '../srvr.js';
 
 export default {
   name: "Map",
@@ -202,6 +203,58 @@ export default {
         return;
       }
       event.stopPropagation();
+
+      // Ctrl-click: delete all episodes in this season from disk.
+      if (event?.ctrlKey) {
+        const showName = this.mapShow?.Name || '';
+        const showPath = this.mapShow?.Path || '';
+        const ok = window.confirm(
+          `Is it ok to delete all episodes in season ${season} of show ${showName}.`
+        );
+        if (!ok) return;
+
+        if (!showPath) {
+          console.error('Map: delSeasonFiles missing showPath', { showName, season, mapShow: this.mapShow });
+          return;
+        }
+
+        const fmtErr = (val) => {
+          if (val == null) return 'Unknown error';
+          if (typeof val === 'string') return val;
+          try {
+            const s = JSON.stringify(val);
+            return s && s !== '{}' ? s : 'Unknown error';
+          } catch (_) {
+            return String(val);
+          }
+        };
+
+        console.log('Map: delSeasonFiles', { showName, showPath, season });
+        srvr.delSeasonFiles(showName, showPath, season)
+          .then((res) => {
+            if (res?.err || res?.status !== 'ok') {
+              const msg = res?.err ? fmtErr(res.err) : fmtErr(res);
+              console.error('Map: delSeasonFiles error', { res, msg });
+              window.alert(msg);
+              return;
+            }
+            console.log('Map: delSeasonFiles ok', res);
+
+            // Only mark episodes as deleted after success.
+            const seasonEpisodes = this.seriesMap?.[season];
+            if (seasonEpisodes) {
+              Object.keys(seasonEpisodes).forEach((episodeNum) => {
+                if (seasonEpisodes[episodeNum]) seasonEpisodes[episodeNum].deleted = true;
+              });
+            }
+          })
+          .catch((err) => {
+            const msg = fmtErr(err?.message || err);
+            console.error('Map: delSeasonFiles error', { err, msg });
+            window.alert(msg);
+          });
+        return;
+      }
       
       const seasonEpisodes = this.seriesMap[season];
       if (!seasonEpisodes) return;

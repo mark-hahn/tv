@@ -5,3 +5,25 @@ if dialog is confirmed then delete all files in season folder in the disk using 
 
 add function delSeasonFiles(showName, season) to srvr.js.
 
+delSeasonFiles will return {status: "ok"} or {"err":"<error msg>"}
+
+i got {
+  "err": "delSeasonFiles: requires showName, showPath, season"
+}
+
+and
+
+{
+  "id": "119",
+  "fname": "delSeasonFiles",
+  "param": [
+    "/mnt/media/tv/Trial & Error",
+    1
+  ],
+  "status": "err",
+  "result": "{\"err\":\"delSeasonFiles: requires showName, showPath, season\"}"
+}
+
+{
+  "err": "delSeasonFiles: requires showName, showPath, season"
+}

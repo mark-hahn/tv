@@ -1,13 +1,8 @@
 {
-  "id": "263",
-  "fname": "getRemotes",
-  "param": {
-    "show": {
-      "Name": "The Hairy Bikers: Home for Christmas",
-      "TvdbId": "338712"
-    },
-    "fast": true
-  },
-  "status": "err",
-  "result": "\"getRemotes: missing show or tvdbRemotes\""
+  "showName": "Trial & Error",
+  "showPath": "/mnt/media/tv/Trial & Error",
+  "season": 1
+}
+{
+  "status": "ok"
 }

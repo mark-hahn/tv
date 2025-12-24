@@ -1,3 +1,7 @@
-in firefox i downloaded a file in down pane and i got no notification questions and in settings notification permissions this app wasn't listed
 
-i'm on http://localhost:5173 and use Down tab click
+if in map.vue and there is a ctrl-click on season number of the map, show confirmation dialog with message "Is it ok to delete all episodes in season <season> of show <showName>." where season is the number clicked on and showName is the selected show.Name.
+
+if dialog is confirmed then delete all files in season folder in the disk using the call to delSeasonFiles(showPath, season) where showPath is show.Path and season is the season number clicked on.  Then mark each episode in the season as deleted so the letter d will appear in the table cell. log the call.
+
+add function delSeasonFiles(showName, season) to srvr.js.
+

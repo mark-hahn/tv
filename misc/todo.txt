@@ -9,6 +9,10 @@ bugs ...
 todo both ...
 
 todo non-simple:
+  select show on card clicks
+  ctrl-click on map
+  move next button
+  set notify for prod
   save filter settings for simple custom button
   take notes
   how to see why qbt or down don't start

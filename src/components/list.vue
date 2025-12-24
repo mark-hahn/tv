@@ -64,7 +64,7 @@
         :simpleMode="simpleMode"
         @copy-name="copyNameToClipboard"
         @open-map="(show) => seriesMapAction('open', show)"
-        @select-show="saveVisShow"
+        @select-show="onSelectShow"
         @wait-str-click="waitStrClick"
       )
 </template>
@@ -663,6 +663,10 @@ export default {
 
     async allClick() {
       await this.fltrAction('All');
+    },
+    onSelectShow(show, scroll = false) {
+      console.log('List: selected show:', show);
+      this.saveVisShow(show, scroll);
     },
 
     nameHash(name) {

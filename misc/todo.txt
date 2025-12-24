@@ -4,15 +4,15 @@ reminder, restore ...
 
 bugs ...
   fast down start failed
-  extra windows notifications
+  two usb finished msgs
 
 todo both ...
 
 todo non-simple:
+  include show name in usb finished
+  abort qbt downloading
   select show on card clicks
-  ctrl-click on map
   move next button
-  set notify for prod
   save filter settings for simple custom button
   take notes
   how to see why qbt or down don't start
@@ -27,7 +27,6 @@ tabled ...
     filter waiting
   keep deleted date and watched info forever
   history of progress for a torrent title
-  abort qbt downloading
   add X del button to tvproc cards
   card order in get pane
   when library finishes it goes to series

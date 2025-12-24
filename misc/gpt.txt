@@ -9,3 +9,5 @@ params is object like:
 then go to the directory "<params.showPath>/Season <params.season>" and delete contntents of that directory. log the deletion with params.showName and  "<params.showPath>/Season <params.season>".
 
 for testing do not do the actual deleting.
+
+return {status: "ok"} or {"err":"<error msg>"}

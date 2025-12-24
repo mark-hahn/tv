@@ -1,5 +1,6 @@
 import fs                  from "fs";
 import * as cp             from 'child_process';
+import * as path           from 'node:path';
 import { WebSocketServer } from 'ws';
 import {rimraf}            from 'rimraf'
 import * as view           from './src/lastViewed.js';
@@ -361,6 +362,47 @@ const delGap = async (id, gapIdSave, resolve, _reject) => {
   resolve([id, 'ok']);
 }
 
+const delSeasonFiles = async (id, param, resolve, reject) => {
+  const params = util.jParse(param, 'delSeasonFiles');
+  const showName = params?.showName;
+  const showPath = params?.showPath;
+  const season = params?.season;
+
+  if (!showName || !showPath || season === undefined || season === null) {
+    reject([id, {err: 'delSeasonFiles: requires showName, showPath, season'}]);
+    return;
+  }
+
+  const seasonDir = path.join(showPath, `Season ${season}`);
+  console.log(`[delSeasonFiles] ${showName}: ${seasonDir}`);
+
+  if (!fs.existsSync(seasonDir)) {
+    reject([id, {err: `no such dir: ${seasonDir}`}]);
+    return;
+  }
+
+  let entries = [];
+  try {
+    entries = fs.readdirSync(seasonDir);
+  } catch (e) {
+    reject([id, {err: `delSeasonFiles: readdir failed: ${e.message}`}]);
+    return;
+  }
+
+  for (const entry of entries) {
+    const entryPath = path.join(seasonDir, entry);
+    console.log(`[delSeasonFiles] deleting: ${entryPath}`);
+    try {
+      await rimraf(entryPath);
+    } catch (e) {
+      reject([id, {err: `delSeasonFiles: delete failed: ${e.message}`}]);
+      return;
+    }
+  }
+
+  resolve([id, {status: 'ok'}]);
+}
+
 const deletePath = async (id, path, resolve, _reject) => {
   // console.log('deletePath', id, path);
   try {
@@ -445,6 +487,8 @@ const runOne = () => {
     case 'getGaps':     getGaps(   id, '',    resolve, reject); break;
     case 'addGap':      addGap(    id, param, resolve, reject); break;
     case 'delGap':      delGap(    id, param, resolve, reject); break;
+
+    case 'delSeasonFiles': delSeasonFiles(id, param, resolve, reject); break;
     
     case 'getAllTvdb':    tvdb.getAllTvdb(   id, param, resolve, reject); break;
     case 'getNewTvdb':    tvdb.getNewTvdb(   id, param, resolve, reject); break;

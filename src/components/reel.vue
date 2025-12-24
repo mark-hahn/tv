@@ -14,7 +14,7 @@
     :style="{ flex: '1 1 0', minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column', gap: '0' }")
     
     #reelInfo(
-      :style="{ padding: '10px', marginBottom: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', fontSize: '14px', textTransform: 'uppercase' }")
+      :style="{ padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', fontSize: '14px', textTransform: 'uppercase' }")
       div(v-if="curTvdb" :style="{ fontWeight: 'bold', fontSize: '12px', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }") {{ galleryTitleLine }}
       div(v-if="curTvdb") {{ infoLine }}
 
@@ -26,10 +26,11 @@
       
       #reelButtons(
         :style="{ display: 'flex', gap: '10px', padding: '10px', marginTop: '0' }")
-        button(:style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Load
+        button(
+          @click="handleLoad"
+          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Load
         button(:style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Google
         button(:style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Imdb
-        button(:style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Prev
         button(
           @click="handleNext"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Next
@@ -55,6 +56,9 @@
 import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import ReelGallery from './reel-gallery.vue';
 import { config } from '../config.js';
+import evtBus from '../evtBus.js';
+import * as emby from '../emby.js';
+import * as srvr from '../srvr.js';
 
 export default {
   name: 'ReelPane',
@@ -137,6 +141,58 @@ export default {
         await scrollTitlesToBottom();
       } catch (e) {
         console.log('getReel failed:', e);
+      }
+    };
+
+    const handleLoad = async () => {
+      const t = curTvdb.value;
+      if (!t) return;
+
+      const name = String(t.name || t.Name || '').trim();
+      if (!name) return;
+
+      // Mirror list.vue searchAction(): if show already exists, select it.
+      const matchShow = (Array.isArray(props.allShows) ? props.allShows : []).find((s) => s?.Name === name);
+      if (matchShow) {
+        evtBus.emit('setUpSeries', matchShow);
+        return;
+      }
+
+      // Otherwise create a no-Emby show and select it.
+      const tvdbIdRaw = t.tvdbId || t.tvdb_id || '';
+      const tvdbId = String(tvdbIdRaw).trim();
+      const overview = t.overview || t.overviewText || t.overview_txt || t.Overview || '';
+
+      try {
+        let show = {
+          Name: name,
+          TvdbId: tvdbId,
+          Overview: overview,
+          Reject: emby.isReject(name),
+        };
+        show = await emby.createNoemby(show);
+
+        const paramObj = {
+          show,
+          seasonCount: 0,
+          episodeCount: 0,
+          watchedCount: 0,
+        };
+        // Ensure tvdb data exists for this new show (mirrors list.vue)
+        await srvr.getNewTvdb(paramObj);
+
+        // Refresh the List pane's show cache, then select in series.
+        evtBus.emit('library-refresh-complete');
+        evtBus.emit('setUpSeries', show);
+
+        // Send email notification (mirrors list.vue)
+        try {
+          await srvr.sendEmail(`${name}~New show added`);
+        } catch (e) {
+          console.error('Reel Load: sendEmail failed:', e);
+        }
+      } catch (e) {
+        console.error('Reel Load failed:', e);
       }
     };
 
@@ -262,7 +318,8 @@ export default {
       getTitleCardStyle,
       handleGallerySelect,
       selectTitle,
-      handleNext
+      handleNext,
+      handleLoad
     };
   }
 };

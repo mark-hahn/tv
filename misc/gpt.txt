@@ -11,3 +11,16 @@ adjust top of reelTitles pane to bottom of buttons pane
 after reelTitles pane mounted scroll to bottom
 
 i meant after it was populated
+
+change image width in gallery to 101px centered horizontally in card
+
+remove margin-bottom from #reelInfo
+
+remove Prev button -- 
+when the Load button is clicked perform the same action that happens when a card in the #searchList is clicked using the selected card in the gallery
+
+the Load button action does not match clicking a card in #searchList.  
+
+when clicking in card in the #searchList a dialog appears saying web data is being loaded and then the show appears in the list view and the series pane shows with all the data visible.  
+
+the Load button just brought up an empty series pane. nothing was loaded from the web.

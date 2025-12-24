@@ -9,13 +9,13 @@
     @click="selectCard(idx)"
     :style="getCardStyle(idx)")
 
-    div(v-if="!getImageUrl(tvdb)" :style="{ width: '100%', backgroundColor: '#e0e0e0', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: '#666', padding: '10px' }")
+    div(v-if="!getImageUrl(tvdb)" :style="{ width: '101px', margin: '0 auto', backgroundColor: '#e0e0e0', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: '#666', padding: '10px' }")
       | No Image
     
     img(
       v-else
       :src="getImageUrl(tvdb)"
-      :style="{ width: '100%', height: 'auto', borderRadius: '5px', display: 'block' }"
+      :style="{ width: '101px', margin: '0 auto', height: 'auto', borderRadius: '5px', display: 'block' }"
       @error="handleImageError($event)")
     
     div(:style="{ padding: '2px', fontSize: '12px', textAlign: 'center', fontWeight: 'bold' }")

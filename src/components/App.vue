@@ -123,6 +123,7 @@ export default {
       seriesMap: {},
       mapError: '',
       allShows: [],
+      _didRequestNotifications: false,
       // TABLET SIZING CONFIGURATION - SIMPLE MODE - Tweak these values
       sizing: {
         // List pane
@@ -203,6 +204,19 @@ export default {
     }
   },
   methods: {
+    requestNotificationsOnce() {
+      try {
+        if (this._didRequestNotifications) return;
+        this._didRequestNotifications = true;
+        if (typeof window === 'undefined') return;
+        if (!('Notification' in window)) return;
+        if (Notification.permission !== 'default') return;
+        // Must be triggered by a user gesture (e.g., this tab click) to prompt in Firefox.
+        void Notification.requestPermission();
+      } catch {
+        // ignore
+      }
+    },
     handleAllShows(shows) {
       this.allShows = Array.isArray(shows) ? shows : [];
     },
@@ -271,6 +285,8 @@ export default {
       }
 
       if (k === 'tvproc') {
+        // Prompt for desktop notification permission (Firefox requires user gesture).
+        this.requestNotificationsOnce();
         this.handleShowTvproc();
         return;
       }

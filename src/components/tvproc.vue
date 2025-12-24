@@ -73,7 +73,8 @@ export default {
       _hasEverMounted: false,
       _fastPollStartTime: null,
       _oldDownloadingCount: 0,
-      _getFinishTime: null
+      _getFinishTime: null,
+      _lastFinishedEnded: 0
     };
   },
 
@@ -114,6 +115,26 @@ export default {
   },
 
   methods: {
+    notifyAllUsbFinished() {
+      try {
+        if (typeof window === 'undefined') return;
+        if (!('Notification' in window)) return;
+
+        const msg = 'All USB downloads finished.';
+
+        if (Notification.permission === 'granted') {
+          console.log('TVProc notify:', msg);
+          new Notification(msg);
+          return;
+        }
+
+        // Do not request permission automatically (may require user gesture).
+        // If user wants notifications, they can grant it in browser/site settings.
+        console.log('Desktop notification not shown (permission:', Notification.permission + ')');
+      } catch (e) {
+        console.log('notifyAllUsbFinished failed:', e?.message || String(e));
+      }
+    },
     handleGetFinished(data) {
       this._getFinishTime = data?.time || null;
     },
@@ -579,6 +600,20 @@ export default {
         // Track status changes for downloading items
         const oldDownloading = Array.isArray(this.items) ? this.items.filter(it => String(it?.status || '').trim() === 'downloading') : [];
         const newDownloading = Array.isArray(arr) ? arr.filter(it => String(it?.status || '').trim() === 'downloading') : [];
+
+        // Detect newly-finished items since last poll.
+        // dateEnded is expected to be epoch seconds (or ms); treat both.
+        const toSeconds = (n) => {
+          const x = Number(n);
+          if (!Number.isFinite(x) || x <= 0) return 0;
+          return x > 1e12 ? Math.floor(x / 1000) : Math.floor(x);
+        };
+        const finishedEndedMax = Array.isArray(arr)
+          ? arr
+              .filter(it => String(it?.status || '').trim() === 'finished')
+              .reduce((mx, it) => Math.max(mx, toSeconds(it?.dateEnded)), 0)
+          : 0;
+        const didFinishSomething = finishedEndedMax > Number(this._lastFinishedEnded || 0);
         
         // Log if a new download started (check timestamp to avoid false positives from reordering)
         if (newDownloading.length > oldDownloading.length) {
@@ -607,8 +642,18 @@ export default {
           this._fastPollStartTime = null;
         }
         
-        // If a download finished and nothing is downloading, trigger cycle
-        if (oldDownloading.length > 0 && newDownloading.length === 0) {
+        // If a download finished and nothing is downloading, trigger cycle.
+        // Notify when we observe a new finished item and nothing is downloading.
+        if (newDownloading.length === 0 && (oldDownloading.length > 0 || didFinishSomething)) {
+          console.log('TVProc download->done transition', {
+            oldDownloading: oldDownloading.length,
+            newDownloading: newDownloading.length,
+            didFinishSomething,
+            finishedEndedMax,
+            lastFinishedEnded: this._lastFinishedEnded
+          });
+          this.notifyAllUsbFinished();
+
           // Call cycle endpoint to start next download
           try {
             await fetch('https://hahnca.com/tvproc/startProc', {
@@ -619,6 +664,11 @@ export default {
           }
           
           evtBus.emit('cycle-started');
+        }
+
+        // Update last-finished timestamp after processing.
+        if (finishedEndedMax > Number(this._lastFinishedEnded || 0)) {
+          this._lastFinishedEnded = finishedEndedMax;
         }
         
         this.items = arr;

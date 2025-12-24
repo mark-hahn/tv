@@ -471,6 +471,27 @@ export const setAddToPickupsCallback = (callback) => {
   addToPickupsCallback = callback;
 };
 
+// WebSocket endpoint handler: returns remotes for a show.
+// Expects param JSON: { show: { Name, Id? }, tvdbRemotes: [...], fast?: boolean }
+export const getRemotesCmd = async (id, param, resolve, reject) => {
+  const paramObj = util.jParse(param, 'getRemotes');
+  const show = paramObj?.show;
+  const tvdbRemotes = paramObj?.tvdbRemotes;
+  const fast = !!paramObj?.fast;
+
+  if (!show || !tvdbRemotes) {
+    reject([id, 'getRemotes: missing show or tvdbRemotes']);
+    return;
+  }
+
+  try {
+    const remotes = await getRemotes(show, tvdbRemotes, fast);
+    resolve([id, remotes]);
+  } catch (err) {
+    reject([id, `getRemotes error: ${err.message}`]);
+  }
+};
+
 export const getActorPage = async (id, param, resolve, _reject) => {
   const actorName = param;
   

@@ -56,6 +56,13 @@ function appendResultTitle(entry) {
   saveResultTitles(resultTitles);
 }
 
+function parseResultTitle(entry) {
+  const s = String(entry || '');
+  const bar = s.indexOf('|');
+  if (bar < 0) return '';
+  return s.slice(bar + 1).trim();
+}
+
 function logToFile(message) {
   try {
     const now = new Date();
@@ -160,6 +167,7 @@ export async function getReel() {
     };
 
     const haveItSet = new Set((Array.isArray(showTitles) ? showTitles : []).map(String));
+    const seenInResultTitles = new Set(resultTitles.map(parseResultTitle).filter(Boolean));
 
     let show;
     rx_show.lastIndex = 0;
@@ -170,6 +178,11 @@ export async function getReel() {
 
       const title = titleMatches[1];
       if (title in oldShows) continue;
+      if (seenInResultTitles.has(title)) {
+        // Treat as already processed, same behavior as oldShows.
+        oldShows[title] = true;
+        continue;
+      }
       
       oldShows[title] = true;
 

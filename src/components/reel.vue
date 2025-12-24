@@ -43,7 +43,9 @@
         :key="idx"
         @click="selectTitle(idx)"
         :style="getTitleCardStyle(idx)")
-        template(v-if="item.rejectStatus === 'ok'")
+        template(v-if="item.rejectStatus === 'msg'")
+          div(:style="{ width: '100%', textAlign: 'center', color: 'rgba(0,0,0,0.6)' }") {{ item.titleString }}
+        template(v-else-if="item.rejectStatus === 'ok'")
           div {{ item.titleString }}
         template(v-else)
           div(:style="{ display: 'flex' }")
@@ -87,6 +89,8 @@ export default {
     const _titlesPopulated = ref(false);
     const _didStartReel = ref(false);
     const _didInitialVisibleScroll = ref(false);
+
+    const NO_MORE_ENTRY = 'msg|-- no more titles --';
 
     const toTitleArray = (data) => {
       if (Array.isArray(data)) return data.map(String);
@@ -172,7 +176,21 @@ export default {
         }
         const data = await res.json();
         const added = toTitleArray(data);
-        titleStrings.value = [...titleStrings.value, ...added];
+
+        // If we get new entries, remove the "no more" sentinel.
+        if (added.length > 0) {
+          titleStrings.value = titleStrings.value.filter((s) => String(s) !== NO_MORE_ENTRY);
+          titleStrings.value = [...titleStrings.value, ...added];
+        } else {
+          // If none returned, ensure the sentinel exists (once).
+          const hasNoMore = titleStrings.value.some((s) => String(s) === NO_MORE_ENTRY);
+          if (!hasNoMore) {
+            titleStrings.value = [...titleStrings.value, NO_MORE_ENTRY];
+          } else {
+            // Force a new array assignment so the UI updates consistently.
+            titleStrings.value = [...titleStrings.value];
+          }
+        }
 
         await scrollTitlesToBottom();
       } catch (e) {
@@ -239,16 +257,20 @@ export default {
     const getTitleCardStyle = (idx) => {
       const item = parsedTitles.value[idx];
       let backgroundColor = 'white';
+      let cursor = 'pointer';
       
       if (idx === selectedTitleIdx.value) {
         backgroundColor = '#fffacd'; // light-yellow
+      } else if (item.rejectStatus === 'msg') {
+        backgroundColor = '#f5f5f5';
+        cursor = 'default';
       } else if (item.rejectStatus === 'ok') {
         backgroundColor = '#90ee90'; // light-green
       }
       
       return {
         padding: '5px',
-        cursor: 'pointer',
+        cursor,
         fontSize: '14px',
         backgroundColor,
         border: '1px solid #808080',
@@ -267,8 +289,10 @@ export default {
 
     // Handle title selection
     const selectTitle = (idx) => {
+      const item = parsedTitles.value[idx];
+      if (item?.rejectStatus === 'msg') return;
       selectedTitleIdx.value = idx;
-      const nextTitle = String(parsedTitles.value[idx]?.titleString || '').trim();
+      const nextTitle = String(item?.titleString || '').trim();
       curTitle.value = nextTitle;
 
       const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();

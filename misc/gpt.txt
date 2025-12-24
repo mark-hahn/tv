@@ -30,3 +30,10 @@ when next is clicked and titles are appended to the titles pane and the bottom p
 the titles pane is not populated by mounting or by click of next button
 
 when i go from reel pane to series pane and back the reel pane changes.  it should do nothing and stay the same because it is using v-show and the only automatic change is when mounted
+
+in reelgood.js ignore titles that are already in resultTitles just like ones in oldShows. you will need to parse the resultTitles string to get the real title after |
+
+why do you need to build a set of titles already present in resultTitles
+
+when getReel returns and empty array add a msg titles card that says "-- no more titles --.
+later, if something is appended to the list remove that msg titles card 

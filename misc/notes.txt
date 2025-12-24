@@ -1,36 +1,13 @@
 {
-  "objectID": "series-84460",
-  "country": "usa",
-  "id": "series-84460",
-  "image_url": "https://artworks.thetvdb.com/banners/posters/84460-2.jpg",
-  "name": "True Beauty",
-  "first_air_time": "2009-01-05",
-  "overview": "What makes a person truly beautiful? Hosted and judged by Vanessa Minnillo (former host of TRL and ET), along with judges Cheryl Tiegs (America's first supermodel, currently designer and author) and Nolé Marin (America's Next Top Model and fashion expert for E!, TV Guide, The Tyra Banks Show), the series will determine the True Beauty of six stunning females and four handsome males who will live together in a spectacular Los Angeles mansion as they undergo a series of challenges to determine who is truly the most beautiful.",
-  "primary_language": "eng",
-  "primary_type": "series",
-  "status": "Ended",
-  "type": "series",
-  "tvdb_id": "84460",
-  "year": "2009",
-  "slug": "true-beauty",
-  "overviews": {
-    "eng": "What makes a person truly beautiful? Hosted and judged by Vanessa Minnillo (former host of TRL and ET), along with judges Cheryl Tiegs (America's first supermodel, currently designer and author) and Nolé Marin (America's Next Top Model and fashion expert for E!, TV Guide, The Tyra Banks Show), the series will determine the True Beauty of six stunning females and four handsome males who will live together in a spectacular Los Angeles mansion as they undergo a series of challenges to determine who is truly the most beautiful."
-  },
-  "translations": {
-    "eng": "True Beauty"
-  },
-  "network": "ABC (US)",
-  "remote_ids": [
-    {
-      "id": "tt1232714",
-      "type": 2,
-      "sourceName": "IMDB"
+  "id": "263",
+  "fname": "getRemotes",
+  "param": {
+    "show": {
+      "Name": "The Hairy Bikers: Home for Christmas",
+      "TvdbId": "338712"
     },
-    {
-      "id": "32945",
-      "type": 12,
-      "sourceName": "TheMovieDB.com"
-    }
-  ],
-  "thumbnail": "https://artworks.thetvdb.com/banners/posters/84460-2_t.jpg"
+    "fast": true
+  },
+  "status": "err",
+  "result": "\"getRemotes: missing show or tvdbRemotes\""
 }

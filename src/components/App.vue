@@ -17,7 +17,7 @@
         v-for="t in tabs"
         :key="t.key"
         @click.stop="selectTab(t.key)"
-        :style="{ fontSize:'13px', cursor:'pointer', borderRadius:'7px', padding:'4px 10px', border:'1px solid #bbb', backgroundColor: (currentPane === t.key ? '#ddd' : 'whitesmoke') }"
+        :style="{ fontSize:'13px', cursor:'pointer', borderRadius:'7px', padding:'4px 10px', marginLeft:'4px', border:'1px solid #bbb', backgroundColor: (currentPane === t.key ? '#ddd' : 'whitesmoke') }"
       ) {{ t.label }}
 
     #tabBody(:style="{ flex:'1 1 auto', minHeight:'0px', position:'relative' }")

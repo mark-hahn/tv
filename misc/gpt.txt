@@ -37,3 +37,5 @@ why do you need to build a set of titles already present in resultTitles
 
 when getReel returns and empty array add a msg titles card that says "-- no more titles --.
 later, if something is appended to the list remove that msg titles card 
+
+when srch title changes and the gallery loads new cards it should scroll to the top and select the top card

@@ -32,59 +32,27 @@ async function getGRatedImpl(actorName) {
     
     const searchUrl = `https://www.${getTheMan()}.com`;
     console.log('Navigating to:',  getTheMan(), searchUrl);
+
     await page.goto(searchUrl);
-    
     await page.click('#age-gate-agree a');
 
+    await page.waitForTimeout(2000);
+    // await page.waitForLoadState('networkidle')
     const html = await page.content();
+
     fs.writeFileSync('misc/grated.html', html, 'utf8');
     console.log('Wrote page HTML to misc/grated.html');
     
-    
-    // Handle age gate if present
-    try {
-      await page.waitForTimeout(2000);
-      
-      const ageSelectors = [
-        'button:has-text("I\'m more than")',
-        'button:has-text("Enter")',
-        'button:has-text("Yes")',
-        '.age-gate-modal button',
-        '[data-testid="age-gate-confirm"]',
-        '.confirm-age'
-      ];
-      
-      for (const selector of ageSelectors) {
-        try {
-          await page.click(selector, { timeout: 2000 });
-          console.log('Clicked age gate with:', selector);
-          break;
-        } catch (e) {
-          // Try next selector
-        }
-      }
-      
-      await page.waitForTimeout(1000);
-      
-    } catch (e) {
-      console.log('Age gate handling completed or not present');
-    }
-
     // Take a screenshot for debugging
     await page.screenshot({ path: 'grated-debug.png' });
     
-    await sleep(2000);
-
     // Get page title and some content
     const title = await page.title();
     console.log('Page title:', title);
-    
-    await sleep(2000);
 
     const bodyText = await page.textContent('body');
     console.log('Page contains "Lake Bell":', bodyText.includes('Lake Bell'));
     
-    await sleep(2000);
 
     // Look for actor links in search results
     const links = await page.$$('a');

@@ -9,8 +9,13 @@ function log(str) {
 }
 
 function writeFile(file, str) {
-  fs.writeFileSync(`misc/${file}`, 
-      str.replaceAll(theMan, 'plplpl'), 'utf8');
+  fs.writeFileSync(file, str.replaceAll(theMan, 'plplpl'), 'utf8');
+}
+
+async function dump(page, name) {
+  const html = await page.content();
+  writeFile(`misc/${name}.html`, html);
+  await page.screenshot({ path: `misc/${name}.png` });
 }
 
 function sleep(ms) {
@@ -33,18 +38,27 @@ async function getGRatedImpl(actorName) {
     const page = await browser.newPage();
 
 ////////////  home page and age gate ///////////
+
     const searchUrl = `https://www.${theMan}.com`;
     log('Navigating to:',  theMan, searchUrl);
     await page.goto(searchUrl);
     await page.click('#age-gate-agree a');
-    await page.waitForTimeout(2000);
-    const htmlAge = await page.content();
-    writeFile('age', htmlAge);
-    await page.screenshot({ path: 'misc/img-age.png' });
-    
-    // Get page title and some content
-    const title = await page.title();
-    log('Page title:', title);
+    await sleep(2000);
+    await dump(page, 'age');
+
+////////////  login ///////////
+
+    const loginLink = page.locator(
+      'a.login.trackable-link[data-trackable-name="Login"][href="/account/login"]:visible'
+    );
+    await loginLink.waitFor({ state: 'visible', timeout: 15000 });
+    await loginLink.click();
+
+    // This site opens a login modal (often without navigating).
+    const loginForm = page.locator('form#new_customer, form[action*="/account/login"]').first();
+    await loginForm.waitFor({ state: 'attached', timeout: 15000 });
+    await sleep(1000);
+    await dump(page, 'login');
 
     const bodyText = await page.textContent('body');
     log('Page contains actorName:', bodyText.includes(actorName));
@@ -76,17 +90,13 @@ async function getGRatedImpl(actorName) {
         }
       }
     }
-    
-    // No match found
     return { url: 'not found' };
-    
+
   } catch (error) {
     console.error('getGRated error:', error);
     return { err: error.message };
   } finally {
-    if (browser) {
-      await browser.close();
-    }
+    if (browser) await browser.close();
   }
 }
 

@@ -1,17 +1,17 @@
 
-how would i use playwright to find this and click on it
-
-<div id="age-gate-agree">
-            <a href="#" class="grated" title="I'm more than 18 years old!">Enter</a>
-          </div>
-
 explain with no changes
 
-will this get page html resulting from click into grated.html:
-    await page.goto(searchUrl);
-    await page.click('#age-gate-agree a');
-    const html = await page.content();
+this:
 
-explain with no changes
+    const loginLink = page.locator('a.login.trackable-link[' +
+        'data-trackable-name="Login"][href="/account/login"]');
+    await loginLink.first().waitFor({ state: 'visible', timeout: 5000 });
 
-is it possible for you to forget all context, prompts, answeres, code, conversatins, etc.
+is not locating this
+
+<a class="login trackable-link" data-trackable-name="Login" href="/account/login">Login</a>
+
+would it work to use this for a delay until page is loaded?
+loop every 100ms and do 
+  const html = await page.content();
+until the html includes some expected string in the page?

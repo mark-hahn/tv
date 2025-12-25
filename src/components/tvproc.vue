@@ -113,15 +113,17 @@ export default {
   },
 
   methods: {
-    notifyAllUsbFinished() {
+    notifyAllUsbFinished(lastTitle) {
       try {
         if (typeof window === 'undefined') return;
         if (!('Notification' in window)) return;
 
-        const msg = 'All USB downloads finished.';
+        const title = String(lastTitle || '').trim();
+        const msg = title
+          ? `All files have been downloaded from USB, the last is ${title}.`
+          : 'All USB downloads finished.';
 
         if (Notification.permission === 'granted') {
-          console.log('TVProc notify:', msg);
           new Notification(msg);
           return;
         }
@@ -617,29 +619,9 @@ export default {
           this._tvprocInitialized = true;
           this._lastFinishedEnded = finishedEndedMax;
           didFinishSomething = false;
-          console.log('TVProc initialized baseline', {
-            finishedEndedMax,
-            downloading: newDownloading.length,
-            permission: (typeof window !== 'undefined' && 'Notification' in window) ? Notification.permission : 'n/a'
-          });
         }
         
-        // Log if a new download started (check timestamp to avoid false positives from reordering)
-        if (newDownloading.length > oldDownloading.length) {
-          const now = new Date();
-          const timestamp = `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}.${String(now.getMilliseconds()).padStart(3,'0')}`;
-          const nowSec = Math.floor(Date.now() / 1000);
-          const newItems = newDownloading.filter(nd => {
-            // Not in old list
-            if (oldDownloading.some(od => od.title === nd.title)) return false;
-            // Started within last 30 seconds (truly new)
-            const started = Number(nd?.dateStarted);
-            return Number.isFinite(started) && (nowSec - started) < 30;
-          });
-          newItems.forEach(item => {
-            console.log(`[${timestamp}] DOWN: Download started - ${item.title || '(no title)'}`);
-          });
-        }
+        // (debug logging removed)
         
         // Check if download started during fast polling
         if (this._fastPollStartTime && newDownloading.length > this._oldDownloadingCount) {
@@ -649,15 +631,8 @@ export default {
         // If a download finished and nothing is downloading, trigger cycle.
         // Notify when we observe a new finished item (since baseline) and nothing is downloading.
         if (!initializing && newDownloading.length === 0 && (oldDownloading.length > 0 || didFinishSomething)) {
-          console.log('TVProc download->done transition', {
-            initializing,
-            oldDownloading: oldDownloading.length,
-            newDownloading: newDownloading.length,
-            didFinishSomething,
-            finishedEndedMax,
-            lastFinishedEnded: this._lastFinishedEnded
-          });
-          this.notifyAllUsbFinished();
+          const lastTitle = String(oldDownloading?.[oldDownloading.length - 1]?.title || '').trim();
+          this.notifyAllUsbFinished(lastTitle);
 
           // Call cycle endpoint to start next download
           try {
@@ -667,7 +642,7 @@ export default {
           } catch (e) {
             // Silently ignore
           }
-          
+
           evtBus.emit('cycle-started');
         }
 

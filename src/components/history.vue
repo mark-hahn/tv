@@ -330,8 +330,9 @@ export default {
 
       if (t?.state === 'downloading') {
         const prog = this.fmtProgPc(t?.completed, t?.size);
+        const seeds = Number.isFinite(Number(t?.num_seeds)) ? Number(t?.num_seeds) : 0;
         const eta = this.fmtEtaMmSs(t?.eta);
-        return `${size}${sep}${added}${sep}${prog}%${sep}${eta}${sep}Getting`;
+        return `${size}${sep}${added}${sep}${seeds}${sep}${prog}%${sep}${eta}${sep}Getting`;
       }
 
       const elapsed = this.fmtElapsedMmSs(t?.added_on, t?.completion_on);

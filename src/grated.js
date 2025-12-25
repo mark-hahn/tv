@@ -3,9 +3,7 @@ import base64 from 'base64-js';
 import fs from 'fs';
 
 function getTheMan() {
-  const theMan = Buffer.from('bXJza2lu', 'base64').toString();
-  console.log('Decoded theMan:', theMan);
-  return theMan;
+  return Buffer.from('bXJza2lu', 'base64').toString();
 }
 
 function sleep(ms) {
@@ -26,29 +24,23 @@ async function getGRatedImpl(actorName) {
   try {
     browser = await chromium.launch();
     const page = await browser.newPage();
-    
+
+////////////  home page and age gate ///////////
     const searchUrl = `https://www.${getTheMan()}.com`;
     console.log('Navigating to:',  getTheMan(), searchUrl);
-
     await page.goto(searchUrl);
     await page.click('#age-gate-agree a');
-
     await page.waitForTimeout(2000);
-    // await page.waitForLoadState('networkidle')
-    const html = await page.content();
-
-    fs.writeFileSync('misc/grated.html', html, 'utf8');
-    console.log('Wrote page HTML to misc/grated.html');
-    
-    // Take a screenshot for debugging
-    await page.screenshot({ path: 'misc/grated-debug.png' });
+    const htmlAge = await page.content();
+    fs.writeFileSync('misc/age.html', htmlAge, 'utf8');
+    await page.screenshot({ path: 'misc/img-age.png' });
     
     // Get page title and some content
     const title = await page.title();
     console.log('Page title:', title);
 
     const bodyText = await page.textContent('body');
-    console.log('Page contains "Lake Bell":', bodyText.includes('Lake Bell'));
+    console.log('Page contains actorName:', bodyText.includes(actorName));
     
 
     // Look for actor links in search results

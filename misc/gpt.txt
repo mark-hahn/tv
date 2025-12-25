@@ -1,13 +1,16 @@
 
-add delSeasonFiles(params) endpoint to index.js that calls function delSeasonFiles. 
-params is object like:
-{
-  "showName": "Trial & Error",
-  "showPath": "/mnt/media/tv/Trial & Error",
-  "season": 1
-}
-then go to the directory "<params.showPath>/Season <params.season>" and delete contntents of that directory. log the deletion with params.showName and  "<params.showPath>/Season <params.season>".
+add and endpoint for function getMrskin(actorName).  it should call getMrskin function in src/mrskin.js.
 
-for testing do not do the actual deleting.
+it should use playwright to load https://www.imdb.com/ and click on the search button at:
+<a class="search trackable-link" title="Search" data-trackable-name="Search Icon" href="/browse"><i class="fa fa-search fa-2x navbar-icon"></i>
+</a>
+which loads page with search input box.  load input box with actorName and a list at:
 
-return {status: "ok"} or {"err":"<error msg>"}
+<div class="sk-search-modal-results"><ul class="list-unstyled"><li tabindex="1" class="selected"><a href="/lake-bell-nude-c8993">Lake Bell</a></li></ul></div>
+
+will populate. find normalized match of actorName to names in list. find a link like:
+<a href="/lake-bell-nude-c8993">Lake Bell</a> 
+convert it absolute url and return that url as {url:"<url>"} or {url:"not found"} or {err:"<err msg>"} from getMrskin().
+
+for testing when module starts call  getMrskin("lake bell") and log results.
+

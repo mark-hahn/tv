@@ -3,10 +3,14 @@ reminder, restore ...
   start gap running
 
 bugs ...
+  qbt and down leave eta when finished
+  tor forgets space when leaving tab
+    -- update every 10 downloads
 
 todo both ...
 
 todo non-simple:
+  show episode and file details
   abort qbt downloading
   select show on card clicks
   move next button

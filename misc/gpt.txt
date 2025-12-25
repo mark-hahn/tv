@@ -1,16 +1,15 @@
 
-add and endpoint for function getMrskin(actorName).  it should call getMrskin function in src/mrskin.js.
+how would i use playwright to find this and click on it
 
-it should use playwright to load https://www.mrskin.com/ and click on the search button at:
-<a class="search trackable-link" title="Search" data-trackable-name="Search Icon" href="/browse"><i class="fa fa-search fa-2x navbar-icon"></i>
-</a>
-which loads page with search input box.  load input box with actorName and a list at:
+<div id="age-gate-agree">
+            <a href="#" class="grated" title="I'm more than 18 years old!">Enter</a>
+          </div>
 
-<div class="sk-search-modal-results"><ul class="list-unstyled"><li tabindex="1" class="selected"><a href="/lake-bell-nude-c8993">Lake Bell</a></li></ul></div>
+explain with no changes
 
-will populate. find normalized match of actorName to names in list. find a link like:
-<a href="/lake-bell-nude-c8993">Lake Bell</a> 
-convert it absolute url and return that url as {url:"<url>"} or {url:"not found"} or {err:"<err msg>"} from getMrskin().
+will this get page html resulting from click into grated.html:
+    await page.goto(searchUrl);
+    await page.click('#age-gate-agree a');
+    const html = await page.content();
 
-for testing when module starts call  getMrskin("lake bell") and log results.
-
+explain with no changes

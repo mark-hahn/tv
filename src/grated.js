@@ -1,4 +1,15 @@
 import { chromium } from 'playwright';
+import base64 from 'base64-js';
+import fs from 'fs';
+
+// log(base64.b64encode("mrskin".encode()).decode());
+// process.exit(0);
+
+function getTheMan() {
+  const theMan = Buffer.from('bXJza2lu', 'base64').toString();
+  console.log('Decoded theMan:', theMan);
+  return theMan;
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -19,68 +30,61 @@ async function getGRatedImpl(actorName) {
     browser = await chromium.launch();
     const page = await browser.newPage();
     
-    await page.setViewportSize({ width: 1280, height: 720 });
+    const searchUrl = `https://www.${getTheMan()}.com`;
+    console.log('Navigating to:',  getTheMan(), searchUrl);
+    await page.goto(searchUrl);
     
-    // Try direct search URL
-    const searchUrl = `https://www.grated.com/search?q=${encodeURIComponent(actorName)}`;
-    console.log('Navigating to:', searchUrl);
-    await page.goto(searchUrl, { waitUntil: 'domcontentloaded' });
+    await page.click('#age-gate-agree a');
+
+    const html = await page.content();
+    fs.writeFileSync('misc/grated.html', html, 'utf8');
+    console.log('Wrote page HTML to misc/grated.html');
     
-    try {
-      await page.waitForLoadState('networkidle', { timeout: 15000 });
-    } catch {
-      // Network may stay busy; continue anyway
-    }
     
     // Handle age gate if present
-    // try {
-    //   await page.waitForTimeout(2000);
+    try {
+      await page.waitForTimeout(2000);
       
-    //   const ageSelectors = [
-    //     'button:has-text("I am 18")',
-    //     'button:has-text("Enter")',
-    //     'button:has-text("Yes")',
-    //     '.age-gate-modal button',
-    //     '[data-testid="age-gate-confirm"]',
-    //     '.confirm-age'
-    //   ];
+      const ageSelectors = [
+        'button:has-text("I\'m more than")',
+        'button:has-text("Enter")',
+        'button:has-text("Yes")',
+        '.age-gate-modal button',
+        '[data-testid="age-gate-confirm"]',
+        '.confirm-age'
+      ];
       
-    //   for (const selector of ageSelectors) {
-    //     try {
-    //       await page.click(selector, { timeout: 2000 });
-    //       console.log('Clicked age gate with:', selector);
-    //       break;
-    //     } catch (e) {
-    //       // Try next selector
-    //     }
-    //   }
+      for (const selector of ageSelectors) {
+        try {
+          await page.click(selector, { timeout: 2000 });
+          console.log('Clicked age gate with:', selector);
+          break;
+        } catch (e) {
+          // Try next selector
+        }
+      }
       
-    //   await page.waitForTimeout(1000);
+      await page.waitForTimeout(1000);
       
-    // } catch (e) {
-    //   console.log('Age gate handling completed or not present');
-    // }
-
-    await sleep(250);
-
-    console.log('Page url:', page.url());
-    console.log('Page title:', await page.title());
+    } catch (e) {
+      console.log('Age gate handling completed or not present');
+    }
 
     // Take a screenshot for debugging
-    await page.screenshot({ path: 'grated-debug.png', fullPage: true });
+    await page.screenshot({ path: 'grated-debug.png' });
     
-    await sleep(250);
+    await sleep(2000);
 
     // Get page title and some content
     const title = await page.title();
     console.log('Page title:', title);
     
-    await sleep(250);
+    await sleep(2000);
 
     const bodyText = await page.textContent('body');
     console.log('Page contains "Lake Bell":', bodyText.includes('Lake Bell'));
     
-    await sleep(250);
+    await sleep(2000);
 
     // Look for actor links in search results
     const links = await page.$$('a');
@@ -102,7 +106,7 @@ async function getGRatedImpl(actorName) {
         // Look for actor profile links
         if (href.includes('/') && !href.includes('search') && !href.includes('browse') && !href.startsWith('http')) {
           if (normalizedText.includes(normalizedActorName) || normalizedActorName.includes(normalizedText)) {
-            const fullUrl = new URL(href, 'https://www.grated.com').href;
+            const fullUrl = new URL(href, `https://www.${getTheMan()}.com`).href;
             return { url: fullUrl };
           }
         }

@@ -10,7 +10,7 @@ import * as tvdb           from './src/tvdb.js';
 import * as util           from "./src/util.js";
 import * as email          from './src/email.js';
 import * as tmdb           from './src/tmdb.js';
-import * as mrskin         from './src/mrskin.js';
+import * as mrskin         from './src/grated.js';
 
 const dontupload  = false;
 

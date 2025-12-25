@@ -111,36 +111,45 @@ async function getGRatedImpl(actorName) {
     await sleep(1000);
     await dump(page, 'login');
 
-    const bodyText = await page.textContent('body');
-    log('Page contains actorName:', bodyText.includes(actorName));
+////////////  search ///////////
+
+    const searchLink = page.locator('a.search.trackable-link[href="/browse"]:visible');
+    await searchLink.waitFor({ state: 'visible', timeout: 15000 });
+    await Promise.all([
+      page.waitForURL('**/browse**', { timeout: 15000 }).catch(() => null),
+      searchLink.click(),
+    ]);
+    await sleep(1000);
+    await dump(page, 'browse');
+
     
 
-    // Look for actor links in search results
-    const links = await page.$$('a');
-    log('Found', links.length, 'links on page');
+    // // Look for actor links in search results
+    // const links = await page.$$('a');
+    // log('Found', links.length, 'links on page');
     
-    // Normalize the actor name for comparison
-    const normalizedActorName = actorName.toLowerCase().trim();
+    // // Normalize the actor name for comparison
+    // const normalizedActorName = actorName.toLowerCase().trim();
     
-    // Find a matching link
-    for (const link of links) {
-      const text = await link.textContent();
-      const href = await link.getAttribute('href');
+    // // Find a matching link
+    // for (const link of links) {
+    //   const text = await link.textContent();
+    //   const href = await link.getAttribute('href');
       
-      if (href && text) {
-        log('Link:', text.trim(), '->', href);
+    //   if (href && text) {
+    //     log('Link:', text.trim(), '->', href);
         
-        const normalizedText = text.toLowerCase().trim();
+    //     const normalizedText = text.toLowerCase().trim();
         
-        // Look for actor profile links
-        if (href.includes('/') && !href.includes('search') && !href.includes('browse') && !href.startsWith('http')) {
-          if (normalizedText.includes(normalizedActorName) || normalizedActorName.includes(normalizedText)) {
-            const fullUrl = new URL(href, `https://www.${theMan}.com`).href;
-            return { url: fullUrl };
-          }
-        }
-      }
-    }
+    //     // Look for actor profile links
+    //     if (href.includes('/') && !href.includes('search') && !href.includes('browse') && !href.startsWith('http')) {
+    //       if (normalizedText.includes(normalizedActorName) || normalizedActorName.includes(normalizedText)) {
+    //         const fullUrl = new URL(href, `https://www.${theMan}.com`).href;
+    //         return { url: fullUrl };
+    //       }
+    //     }
+    //   }
+    // }
     return { url: 'not found' };
 
   } catch (error) {

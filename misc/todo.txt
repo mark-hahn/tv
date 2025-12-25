@@ -1,7 +1,4 @@
 
-reminder, restore ...
-  start gap running
-
 bugs ...
   qbt and down leave eta when finished
   tor forgets space when leaving tab
@@ -12,8 +9,6 @@ todo both ...
 todo non-simple:
   show episode and file details
   abort qbt downloading
-  select show on card clicks
-  move next button
   save filter settings for simple custom button
   take notes
   how to see why qbt or down don't start

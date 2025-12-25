@@ -471,6 +471,9 @@ export default {
     },
 
     handleCardClick(it) {
+      const clickedTitle = it?.title;
+      if (clickedTitle) evtBus.emit('selectShowFromCardTitle', clickedTitle);
+
       const status = String(it?.status || '').trim();
       if (status === 'future') {
         const title = it?.title;

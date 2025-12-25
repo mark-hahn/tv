@@ -8,7 +8,7 @@
       span(v-if="emptyStateText") {{ emptyStateText }}
 
     div(v-else style="padding:5px; font-size:13px; line-height:1.6;")
-      div(v-for="t in sortedTorrents" :key="String(t.hash || t.name || t.added_on)" :style="getCardStyle(t)")
+      div(v-for="t in sortedTorrents" :key="String(t.hash || t.name || t.added_on)" :style="getCardStyle(t)" @click="handleCardClick(t)")
         div(style="font-size:13px; font-weight:bold; color:#333; word-break:break-word;") {{ t.name || t.hash }}
         div(style="font-size:13px; color:rgba(0,0,0,0.50) !important;") {{ infoLine(t) }}
 
@@ -319,8 +319,14 @@ export default {
         background: isDownloading ? '#fffacd' : '#fff',
         border: '1px solid #ddd',
         borderRadius: '5px',
-        padding: '10px'
+        padding: '10px',
+        cursor: 'pointer'
       };
+    },
+
+    handleCardClick(t) {
+      const title = t?.name;
+      if (title) evtBus.emit('selectShowFromCardTitle', title);
     },
 
     infoLine(t) {

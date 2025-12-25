@@ -75,6 +75,7 @@ import * as emby from "../emby.js";
 import * as tvdb from "../tvdb.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
+import parseTorrentTitle from 'parse-torrent-title';
 import    evtBus  from '../evtBus.js';
 import    Shows   from './shows.vue';
 import    HdrTop  from './hdrtop.vue';
@@ -669,6 +670,97 @@ export default {
       this.saveVisShow(show, scroll);
     },
 
+    normalizeForShowMatch(name) {
+      return String(name || '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/\b(and|the)\b/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/[^a-zA-Z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toUpperCase();
+    },
+
+    stripTitleNoise(raw) {
+      let s = String(raw || '').trim();
+      if (!s) return '';
+
+      // Remove path prefix if present (Windows or Unix paths)
+      s = s.replace(/^.*[\\/]/, '');
+
+      // Remove common media extensions
+      s = s.replace(/\.(mkv|mp4|avi|m4v|ts|m2ts|wmv|mov|mpg|mpeg|srt|sub|rar|zip|7z)$/i, '');
+
+      return s.trim();
+    },
+
+    async selectShowFromCardTitle(rawTitle) {
+      const raw = String(rawTitle || '').trim();
+      if (!raw) return;
+      if (!Array.isArray(allShows) || allShows.length === 0) return;
+
+      const stripped = this.stripTitleNoise(raw);
+
+      let parsed = null;
+      try {
+        const parser = parseTorrentTitle?.parse
+          ? parseTorrentTitle.parse
+          : (typeof parseTorrentTitle === 'function' ? parseTorrentTitle : null);
+        parsed = parser ? parser(stripped) : null;
+      } catch {
+        parsed = null;
+      }
+
+      const candidates = [];
+      const parsedTitle = String(parsed?.title || '').trim();
+      if (parsedTitle) candidates.push(parsedTitle);
+      if (stripped) candidates.push(stripped);
+      candidates.push(raw);
+
+      const candidateKeys = candidates
+        .map(c => this.normalizeForShowMatch(c))
+        .filter(Boolean);
+
+      const showKeyOf = (show) => this.normalizeForShowMatch(show?.Name);
+
+      // 1) Exact normalized match
+      for (const key of candidateKeys) {
+        const match = allShows.find(s => showKeyOf(s) === key);
+        if (match) {
+          if (!this.shows.some(sh => sh?.Name === match.Name)) {
+            await this.fltrAction('All');
+          }
+          this.onSelectShow(match, true);
+          return;
+        }
+      }
+
+      // 2) Prefix/contains heuristic (pick strongest)
+      let best = null;
+      let bestScore = 0;
+      for (const show of allShows) {
+        const sk = showKeyOf(show);
+        if (!sk) continue;
+        for (const ck of candidateKeys) {
+          if (!ck) continue;
+          const isRelated = sk.startsWith(ck) || ck.startsWith(sk) || sk.includes(ck) || ck.includes(sk);
+          if (!isRelated) continue;
+          const score = Math.min(sk.length, ck.length);
+          if (score > bestScore) {
+            bestScore = score;
+            best = show;
+          }
+        }
+      }
+
+      if (best) {
+        if (!this.shows.some(sh => sh?.Name === best.Name)) {
+          await this.fltrAction('All');
+        }
+        this.onSelectShow(best, true);
+      }
+    },
+
     nameHash(name) {
       this.allShowsLength = allShows.length;
       if(!name) {
@@ -1186,6 +1278,11 @@ export default {
     // Listen for library refresh completion to refresh show list
     evtBus.on('library-refresh-complete', () => {
       void this.newShows();
+    });
+
+    // Cross-pane: click a card in Flex/Qbt/Down to select show in list
+    evtBus.on('selectShowFromCardTitle', (rawTitle) => {
+      void this.selectShowFromCardTitle(rawTitle);
     });
 
     setInterval(async () => {

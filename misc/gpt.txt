@@ -1,7 +1,7 @@
 
 add and endpoint for function getMrskin(actorName).  it should call getMrskin function in src/mrskin.js.
 
-it should use playwright to load https://www.imdb.com/ and click on the search button at:
+it should use playwright to load https://www.mrskin.com/ and click on the search button at:
 <a class="search trackable-link" title="Search" data-trackable-name="Search Icon" href="/browse"><i class="fa fa-search fa-2x navbar-icon"></i>
 </a>
 which loads page with search input box.  load input box with actorName and a list at:

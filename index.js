@@ -10,6 +10,7 @@ import * as tvdb           from './src/tvdb.js';
 import * as util           from "./src/util.js";
 import * as email          from './src/email.js';
 import * as tmdb           from './src/tmdb.js';
+import * as mrskin         from './src/mrskin.js';
 
 const dontupload  = false;
 
@@ -498,6 +499,7 @@ const runOne = () => {
     case 'sendEmail':     sendEmailHandler(  id, param, resolve, reject); break;
     
     case 'getTmdb':       tmdb.getTmdb(      id, param, resolve, reject); break;
+    case 'getMrskin':     mrskin.getMrskin(  id, param, resolve, reject); break;
 
     default: reject([id, 'unknownfunction: ' + fname]);
   };

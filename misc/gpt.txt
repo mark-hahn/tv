@@ -1,0 +1,2 @@
+
+in map pane add left and right arrow buttons to the left of the prune button.  when right is clicked scroll pane horizontally to the far right.  when left is clicked scroll pane horizontally to the far left. 

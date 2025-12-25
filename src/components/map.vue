@@ -1,5 +1,5 @@
 <template lang="pug">
-#map(@click="handleMapClick" :style="{ height:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', backgroundColor:'#ffe', overflowY:'auto', overflowX:'auto', maxWidth:'100%', width: sizing.mapWidth || '450px', boxSizing:'border-box' }")
+#map(ref="mapScroller" @click="handleMapClick" :style="{ height:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', backgroundColor:'#ffe', overflowY:'auto', overflowX:'auto', maxWidth:'100%', width: sizing.mapWidth || '450px', boxSizing:'border-box' }")
 
   div(v-if="mapError && Object.keys(seriesMap).length === 0"
       style="display:flex; align-items:center; justify-content:center; height:100%; width:100%; font-size:20px; font-weight:bold; color:red; text-align:center; padding:20px;")
@@ -12,6 +12,8 @@
       div(style="display:flex; gap:5px; flex-shrink:0;")
         div(v-if="mapShow?.Id?.startsWith('noemby-')"
             style="font-weight:bold; color:red; font-size:18px; white-space:nowrap; margin:5px; max-height:24px;") Not In Emby
+        button(@click.stop="scrollMapToLeft" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") ←
+        button(@click.stop="scrollMapToRight" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") →
         button(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Prune
 
     div(v-if="mapShow?.WatchGap || mapShow?.FileGap  || mapShow?.WaitStr?.length"
@@ -148,6 +150,18 @@ export default {
   },
 
   methods: {
+    scrollMapToLeft() {
+      const el = this.$refs.mapScroller;
+      if (!el) return;
+      el.scrollLeft = 0;
+    },
+
+    scrollMapToRight() {
+      const el = this.$refs.mapScroller;
+      if (!el) return;
+      el.scrollLeft = Math.max(0, (el.scrollWidth || 0) - (el.clientWidth || 0));
+    },
+
     async loadTvdbData() {
       try {
         if (!this.allTvdb) {

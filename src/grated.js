@@ -2,9 +2,6 @@ import { chromium } from 'playwright';
 import base64 from 'base64-js';
 import fs from 'fs';
 
-// log(base64.b64encode("mrskin".encode()).decode());
-// process.exit(0);
-
 function getTheMan() {
   const theMan = Buffer.from('bXJza2lu', 'base64').toString();
   console.log('Decoded theMan:', theMan);
@@ -44,7 +41,7 @@ async function getGRatedImpl(actorName) {
     console.log('Wrote page HTML to misc/grated.html');
     
     // Take a screenshot for debugging
-    await page.screenshot({ path: 'grated-debug.png' });
+    await page.screenshot({ path: 'misc/grated-debug.png' });
     
     // Get page title and some content
     const title = await page.title();

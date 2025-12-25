@@ -12,6 +12,28 @@ function writeFile(file, str) {
   fs.writeFileSync(file, str.replaceAll(theMan, 'plplpl'), 'utf8');
 }
 
+function loadThemanLogin() {
+  const secretsPath = '.secrets.txt';
+  if (!fs.existsSync(secretsPath)) {
+    throw new Error(`Missing ${secretsPath} (expected JSON with themanLogin.email and themanLogin.pwd)`);
+  }
+
+  let secrets;
+  try {
+    secrets = JSON.parse(fs.readFileSync(secretsPath, 'utf8'));
+  } catch (e) {
+    throw new Error(`Invalid JSON in ${secretsPath}: ${e.message}`);
+  }
+
+  const email = secrets?.themanLogin?.email;
+  const pwd = secrets?.themanLogin?.pwd;
+  if (!email || !pwd) {
+    throw new Error(`Missing themanLogin.email or themanLogin.pwd in ${secretsPath}`);
+  }
+
+  return { email, pwd };
+}
+
 async function dump(page, name) {
   const html = await page.content();
   writeFile(`misc/${name}.html`, html);
@@ -57,6 +79,35 @@ async function getGRatedImpl(actorName) {
     // This site opens a login modal (often without navigating).
     const loginForm = page.locator('form#new_customer, form[action*="/account/login"]').first();
     await loginForm.waitFor({ state: 'attached', timeout: 15000 });
+
+    const { email, pwd } = loadThemanLogin();
+    await loginForm.locator('input[name="customer[username]"]').fill(email);
+    await loginForm.locator('input[name="customer[password]"]').fill(pwd);
+
+    const submit = loginForm.locator('input[type="submit"], button[type="submit"]').first();
+    await Promise.all([
+      page
+        .waitForResponse(
+          (resp) =>
+            resp.request().method() === 'POST' &&
+            resp.url().includes('/account/login') &&
+            resp.status() < 500,
+          { timeout: 15000 }
+        )
+        .catch(() => null),
+      submit.click(),
+    ]);
+
+    const loginModal = page.locator('#login_modal');
+    const loginError = loginModal.locator('.alert:visible').first();
+
+    await Promise.race([
+      loginModal.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => null),
+      loginForm.waitFor({ state: 'detached', timeout: 15000 }).catch(() => null),
+      page.locator('a:has-text("Logout"), a[href*="logout"]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => null),
+      loginError.waitFor({ state: 'visible', timeout: 15000 }).catch(() => null),
+    ]);
+
     await sleep(1000);
     await dump(page, 'login');
 

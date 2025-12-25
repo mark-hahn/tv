@@ -3,5 +3,6 @@ package-lock.json
 .vscode
 config
 secrets
+.secrets.txt
 .env
 misc

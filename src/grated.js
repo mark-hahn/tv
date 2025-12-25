@@ -2,8 +2,15 @@ import { chromium } from 'playwright';
 import base64 from 'base64-js';
 import fs from 'fs';
 
-function getTheMan() {
-  return Buffer.from('bXJza2lu', 'base64').toString();
+const theMan = Buffer.from('bXJza2lu', 'base64').toString();
+
+function log(str) {
+  console.log(str.replaceAll(theMan, 'theman'));
+}
+
+function writeFile(file, str) {
+  fs.writeFileSync(`misc/${file}`, 
+      str.replaceAll(theMan, 'plplpl'), 'utf8');
 }
 
 function sleep(ms) {
@@ -26,26 +33,26 @@ async function getGRatedImpl(actorName) {
     const page = await browser.newPage();
 
 ////////////  home page and age gate ///////////
-    const searchUrl = `https://www.${getTheMan()}.com`;
-    console.log('Navigating to:',  getTheMan(), searchUrl);
+    const searchUrl = `https://www.${theMan}.com`;
+    log('Navigating to:',  theMan, searchUrl);
     await page.goto(searchUrl);
     await page.click('#age-gate-agree a');
     await page.waitForTimeout(2000);
     const htmlAge = await page.content();
-    fs.writeFileSync('misc/age.html', htmlAge, 'utf8');
+    writeFile('age', htmlAge);
     await page.screenshot({ path: 'misc/img-age.png' });
     
     // Get page title and some content
     const title = await page.title();
-    console.log('Page title:', title);
+    log('Page title:', title);
 
     const bodyText = await page.textContent('body');
-    console.log('Page contains actorName:', bodyText.includes(actorName));
+    log('Page contains actorName:', bodyText.includes(actorName));
     
 
     // Look for actor links in search results
     const links = await page.$$('a');
-    console.log('Found', links.length, 'links on page');
+    log('Found', links.length, 'links on page');
     
     // Normalize the actor name for comparison
     const normalizedActorName = actorName.toLowerCase().trim();
@@ -56,14 +63,14 @@ async function getGRatedImpl(actorName) {
       const href = await link.getAttribute('href');
       
       if (href && text) {
-        console.log('Link:', text.trim(), '->', href);
+        log('Link:', text.trim(), '->', href);
         
         const normalizedText = text.toLowerCase().trim();
         
         // Look for actor profile links
         if (href.includes('/') && !href.includes('search') && !href.includes('browse') && !href.startsWith('http')) {
           if (normalizedText.includes(normalizedActorName) || normalizedActorName.includes(normalizedText)) {
-            const fullUrl = new URL(href, `https://www.${getTheMan()}.com`).href;
+            const fullUrl = new URL(href, `https://www.${theMan}.com`).href;
             return { url: fullUrl };
           }
         }
@@ -86,5 +93,5 @@ async function getGRatedImpl(actorName) {
 // Testing call
 (async () => {
   const result = await getGRatedImpl('lake bell');
-  console.log('Testing getGRated("lake bell"):', result);
+  log('Testing getGRated("lake bell"):', result);
 })();

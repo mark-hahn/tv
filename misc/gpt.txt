@@ -13,3 +13,5 @@ will this get page html resulting from click into grated.html:
     const html = await page.content();
 
 explain with no changes
+
+is it possible for you to forget all context, prompts, answeres, code, conversatins, etc.

@@ -238,8 +238,11 @@ export async function spaceAvail() {
   let mediaSpaceTotal = 0;
   let mediaSpaceUsed = 0;
   try {
-    // Host server mounts: try /media first, then /m-bkup.
-    const candidateMounts = ['/media', '/m-bkup'];
+    // Host server mounts.
+    // Prefer the actual mounted paths under /mnt (common on Linux servers) to avoid
+    // accidentally measuring the root filesystem when /media exists as a plain directory.
+    // Fallback to legacy paths if present.
+    const candidateMounts = ['/mnt/media', '/mnt/m-bkup', '/media', '/m-bkup'];
 
     // In Windows/dev environments, none of these mounts may exist.
     let mediaMount = '';
@@ -255,8 +258,8 @@ export async function spaceAvail() {
 
     if (!mediaMount) {
       return {
-        usbSpaceTotal: Math.trunc(usbSpaceTotalK * 1024),
-        usbSpaceUsed: Math.trunc(usbSpaceUsedK * 1024),
+        usbSpaceTotal: Math.trunc(usbSpaceTotal),
+        usbSpaceUsed: Math.trunc(usbSpaceUsed),
         mediaSpaceTotal: 0,
         mediaSpaceUsed: 0
       };

@@ -2,7 +2,7 @@
 .torrents-container(:style="{ height:'100%', width:'100%', display:'flex', justifyContent:'flex-start' }")
   #torrents(ref="scroller" :style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
 
-    #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'0px', marginRight:'0px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
+    #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'10px', marginLeft:'0px', marginRight:'0px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
       div(style="display:flex; justify-content:space-between; align-items:center;")
         div(style="margin-left:20px;") {{ headerShowName }}
         div(style="display:flex; gap:8px; margin-left:auto;")
@@ -12,8 +12,28 @@
           button(@click.stop="forceClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Force
           button(@click.stop="toggleCookieInputs" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Cookies
 
-      div(style="margin-left:20px; margin-right:20px; margin-top:14px; font-weight:normal; font-size:16px; color:#666; display:block; visibility:visible; opacity:1; line-height:1.1; white-space:nowrap; overflow:visible;") {{ spaceAvailText }}
-      div(style="margin-left:20px; margin-right:20px; margin-top:2px; font-weight:normal; font-size:16px; color:#666; display:block; visibility:visible; opacity:1; line-height:1.1; white-space:nowrap; overflow:visible;") {{ spaceAvailGbText }}
+      div(style="height:1px; width:100%; background-color:#ddd; margin-top:6px;")
+
+      div(style="margin-left:20px; margin-right:20px; margin-top:6px; font-weight:normal; font-size:15px; color:#666; display:block; line-height:1.1; overflow:visible;")
+        div(style="display:flex; align-items:center; justify-content:flex-start; gap:25px; white-space:nowrap;")
+          div(style="display:flex; align-items:center; gap:10px;")
+            div(style="font-weight:bold;") USB
+            table(style="border-collapse:separate; border-spacing:15px 0;")
+              tbody
+                tr
+                  td(style="text-align:right; padding:0;")
+                    span {{ spaceUsbGb }} GB
+                  td(style="text-align:right; padding:0;")
+                    span {{ spaceUsbPct }}
+          div(style="display:flex; align-items:center; gap:10px;")
+            div(style="font-weight:bold;") SRVR
+            table(style="border-collapse:separate; border-spacing:15px 0;")
+              tbody
+                tr
+                  td(style="text-align:right; padding:0;")
+                    span {{ spaceSrvrGb }} GB
+                  td(style="text-align:right; padding:0;")
+                    span {{ spaceSrvrPct }}
 
     #unaired(v-if="unaired" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
       div Show not aired yet
@@ -125,8 +145,11 @@ export default {
 
       downloadedByHash: {},
 
-      spaceAvailText: 'Space Used, Seed Box: --%, Server: --%',
-      spaceAvailGbText: 'Available, Seed Box: -- GB, Server: -- GB',
+      // Space display cells (2x2): rows USB/SRVR, cols GB/%.
+      spaceUsbGb: '--',
+      spaceUsbPct: '--%',
+      spaceSrvrGb: '--',
+      spaceSrvrPct: '--%',
 
       _didInitialScroll: false
     };
@@ -379,6 +402,15 @@ export default {
       return `${Math.max(0, Math.min(100, pct))}%`;
     },
 
+    pctAvail(total, used) {
+      const t = Number(total);
+      const u = Number(used);
+      if (!Number.isFinite(t) || !Number.isFinite(u) || t <= 0) return '--%';
+      const avail = Math.max(0, t - u);
+      const pct = Math.floor((avail / t) * 100);
+      return `${Math.max(0, Math.min(100, pct))}%`;
+    },
+
     fmtAvailGb(total, used) {
       const t = Number(total);
       const u = Number(used);
@@ -397,22 +429,21 @@ export default {
         const hasSrvr = Number.isFinite(Number(s?.mediaSpaceTotal)) && Number.isFinite(Number(s?.mediaSpaceUsed));
         if (!hasUsb && !hasSrvr) return;
 
-        const usbPercent = hasUsb ? this.pctUsed(s?.usbSpaceTotal, s?.usbSpaceUsed) : '--%';
-        const srvrPercent = hasSrvr ? this.pctUsed(s?.mediaSpaceTotal, s?.mediaSpaceUsed) : '--%';
-        this.spaceAvailText = `Space Used, Seed Box: ${usbPercent}, Server: ${srvrPercent}`;
-
-        const usbGb = hasUsb ? this.fmtAvailGb(s?.usbSpaceTotal, s?.usbSpaceUsed) : '--';
-        const srvrGb = hasSrvr ? this.fmtAvailGb(s?.mediaSpaceTotal, s?.mediaSpaceUsed) : '--';
-        this.spaceAvailGbText = `Available, Seed Box: ${usbGb} GB, Server: ${srvrGb} GB`;
+        if (hasUsb) {
+          this.spaceUsbPct = this.pctAvail(s?.usbSpaceTotal, s?.usbSpaceUsed);
+          this.spaceUsbGb = this.fmtAvailGb(s?.usbSpaceTotal, s?.usbSpaceUsed);
+        }
+        if (hasSrvr) {
+          this.spaceSrvrPct = this.pctAvail(s?.mediaSpaceTotal, s?.mediaSpaceUsed);
+          this.spaceSrvrGb = this.fmtAvailGb(s?.mediaSpaceTotal, s?.mediaSpaceUsed);
+        }
       } catch (e) {
         // On failure, show unknown placeholders, but don't clobber last-known-good values.
         const hasAnyDigits = (txt) => /\d/.test(String(txt || ''));
-        if (!hasAnyDigits(this.spaceAvailText)) {
-          this.spaceAvailText = 'Space Used, Seed Box: ???, Server: ???';
-        }
-        if (!hasAnyDigits(this.spaceAvailGbText)) {
-          this.spaceAvailGbText = 'Available, Seed Box: ??? GB, Server: ??? GB';
-        }
+        if (!hasAnyDigits(this.spaceUsbGb)) this.spaceUsbGb = '???';
+        if (!hasAnyDigits(this.spaceUsbPct)) this.spaceUsbPct = '???%';
+        if (!hasAnyDigits(this.spaceSrvrGb)) this.spaceSrvrGb = '???';
+        if (!hasAnyDigits(this.spaceSrvrPct)) this.spaceSrvrPct = '???%';
       }
     },
 

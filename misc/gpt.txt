@@ -1,6 +1,23 @@
 
-that works
---
-i want a new format for the space avail display.  I want a 2X2 table with top row labeled USB andthe second row labeled SRVR.  the left column should be labeled GB and the right %
---
-the data should be in four cells 
+df on the host server says:
+
+srvr(~) df
+Filesystem                         1K-blocks       Used  Available Use% Mounted on
+/dev/sda1                         9689313060 7398198696 2291097980  77% /mnt/m-bkup
+/dev/sdb1                         9688268580 7368362056 1831570040  81% /mnt/media
+
+but the second row in the table says:
+SRVR 34 GB 65%
+
+
+- reformat the table into two tables with one row and two columns each.
+- put the tables in one line with USB on left and SRVR on right with 50px space between them
+- shrink the space between the show title line and this line
+ - make the sticky hdr just tall enough so there is 10px between the tables line and the botton of the hdr
+
+ put the two tables in one div that spans the full width of the pane. put the div below the show name and buttons
+
+ - undo that
+ - the problem i was trying to fix is that the vertical position of the two tables don't align. the USB table is higher than the SRVR.   fix that.
+ - set the space between the tables to 25px
+ 

@@ -1,9 +1,5 @@
 
 
-nothing was working so i reverted it back to where right and bottom overlapped scrollbars.
+that works
 --
-try putting a div inside the pane with width and height small enough to fit inside scrollbars and then scrolling the table inside that div
-
-i reverted again to the original version with the table under the scrollbars problem. 
--- 
-remove the scrollbars and i'll move the table hoizontally with the arrows on top and vertically with the scroll wheel
+change the arrow behavior such that instead of clicking them you press and hold and it scrolls smoothly. the max amount of scrolling should match the amount it used to scroll with a click on the right arrow. make the speed of the scroll adjustable with a const

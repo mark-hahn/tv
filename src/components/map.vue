@@ -14,8 +14,22 @@
         #mapnoemby(v-if="mapShow?.Id?.startsWith('noemby-')"
             style="font-weight:bold; color:red; font-size:14px; white-space:nowrap; margin:8px; max-height:24px;") Not In Emby
         #mapbuttons(v-if="!simpleMode" style="display:flex; gap:5px; flex-shrink:0;")
-          button(@click.stop="scrollMapToLeft" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") ←
-          button(@click.stop="scrollMapToRight" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") →
+          button(
+            @click.stop.prevent="noop"
+            @pointerdown.stop.prevent="startArrowPan($event, -1)"
+            @pointerup.stop.prevent="stopArrowPan"
+            @pointercancel.stop.prevent="stopArrowPan"
+            @pointerleave.stop.prevent="stopArrowPan"
+            style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;"
+          ) ←
+          button(
+            @click.stop.prevent="noop"
+            @pointerdown.stop.prevent="startArrowPan($event, 1)"
+            @pointerup.stop.prevent="stopArrowPan"
+            @pointercancel.stop.prevent="stopArrowPan"
+            @pointerleave.stop.prevent="stopArrowPan"
+            style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;"
+          ) →
           button(v-if="!mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px 0 5px 5px; max-height:24px; border-radius:7px;") Prune
 
     #maphdr2(style="display:flex; justify-content:space-between; align-items:center; color:red; margin:0 10px 5px 10px; padding-left:5px; ")
@@ -64,6 +78,8 @@ import * as tvdb from '../tvdb.js';
 import * as emby from '../emby.js';
 import * as srvr from '../srvr.js';
 
+const MAP_ARROW_PAN_PX_PER_SEC = 400;
+
 export default {
   name: "Map",
 
@@ -111,7 +127,12 @@ export default {
       mapScrollLeft: 0,
       mapScrollTop: 0,
       mapMaxScrollLeft: 0,
-      mapMaxScrollTop: 0
+      mapMaxScrollTop: 0,
+      arrowPanActive: false,
+      arrowPanRafId: 0,
+      arrowPanLastTs: 0,
+      arrowPanTargetLeft: 0,
+      arrowPanDir: 0
     };
   },
 
@@ -163,11 +184,20 @@ export default {
 
   beforeUnmount() {
     window.removeEventListener('resize', this.updateMapPanBounds);
+    this.stopArrowPan();
   },
 
   methods: {
+    noop() {},
+
     clamp(val, min, max) {
       return Math.min(max, Math.max(min, val));
+    },
+
+    getArrowStepPx() {
+      const viewport = this.$refs.mapViewport;
+      const vw = viewport?.clientWidth || 0;
+      return Math.max(50, Math.floor(vw * 0.8));
     },
 
     updateMapPanBounds() {
@@ -194,12 +224,78 @@ export default {
       this.mapScrollTop = this.clamp(this.mapScrollTop + (event.deltaY || 0), 0, this.mapMaxScrollTop);
     },
 
+    startArrowPan(event, dir) {
+      if (this.simpleMode) return;
+      if (dir !== -1 && dir !== 1) return;
+
+      this.updateMapPanBounds();
+
+      const step = this.getArrowStepPx();
+      const target = this.clamp(this.mapScrollLeft + dir * step, 0, this.mapMaxScrollLeft);
+
+      this.arrowPanActive = true;
+      this.arrowPanDir = dir;
+      this.arrowPanTargetLeft = target;
+      this.arrowPanLastTs = 0;
+
+      try {
+        if (event?.currentTarget && typeof event.currentTarget.setPointerCapture === 'function' && event.pointerId != null) {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        }
+      } catch (_) {
+        // ignore
+      }
+
+      if (this.arrowPanRafId) {
+        cancelAnimationFrame(this.arrowPanRafId);
+        this.arrowPanRafId = 0;
+      }
+
+      const tick = (ts) => {
+        if (!this.arrowPanActive) return;
+        if (!this.arrowPanLastTs) this.arrowPanLastTs = ts;
+        const dt = Math.max(0, (ts - this.arrowPanLastTs) / 1000);
+        this.arrowPanLastTs = ts;
+
+        const delta = MAP_ARROW_PAN_PX_PER_SEC * dt * this.arrowPanDir;
+        const nextLeft = this.mapScrollLeft + delta;
+
+        if (this.arrowPanDir > 0) {
+          this.mapScrollLeft = Math.min(nextLeft, this.arrowPanTargetLeft);
+          if (this.mapScrollLeft >= this.arrowPanTargetLeft) {
+            this.stopArrowPan();
+            return;
+          }
+        } else {
+          this.mapScrollLeft = Math.max(nextLeft, this.arrowPanTargetLeft);
+          if (this.mapScrollLeft <= this.arrowPanTargetLeft) {
+            this.stopArrowPan();
+            return;
+          }
+        }
+
+        this.arrowPanRafId = requestAnimationFrame(tick);
+      };
+
+      this.arrowPanRafId = requestAnimationFrame(tick);
+    },
+
+    stopArrowPan() {
+      this.arrowPanActive = false;
+      this.arrowPanDir = 0;
+      this.arrowPanLastTs = 0;
+      if (this.arrowPanRafId) {
+        cancelAnimationFrame(this.arrowPanRafId);
+        this.arrowPanRafId = 0;
+      }
+    },
+
     scrollMapToLeft() {
-      this.mapScrollLeft = 0;
+      // Legacy: click-jump behavior removed in favor of press-and-hold.
     },
 
     scrollMapToRight() {
-      this.mapScrollLeft = this.mapMaxScrollLeft;
+      // Legacy: click-jump behavior removed in favor of press-and-hold.
     },
 
     async loadTvdbData() {

@@ -79,6 +79,7 @@ import * as emby from '../emby.js';
 import * as srvr from '../srvr.js';
 
 const MAP_ARROW_PAN_PX_PER_SEC = 400;
+const MAP_PAN_SMOOTH_TAU_SEC = 0.10;
 
 export default {
   name: "Map",
@@ -126,11 +127,12 @@ export default {
       nextUpTxt: '',
       mapScrollLeft: 0,
       mapScrollTop: 0,
+      mapDesiredLeft: 0,
       mapMaxScrollLeft: 0,
       mapMaxScrollTop: 0,
       arrowPanActive: false,
-      arrowPanRafId: 0,
-      arrowPanLastTs: 0,
+      mapPanRafId: 0,
+      mapPanLastTs: 0,
       arrowPanTargetLeft: 0,
       arrowPanDir: 0
     };
@@ -185,6 +187,7 @@ export default {
   beforeUnmount() {
     window.removeEventListener('resize', this.updateMapPanBounds);
     this.stopArrowPan();
+    this.stopMapPanLoop();
   },
 
   methods: {
@@ -215,12 +218,62 @@ export default {
 
       this.mapScrollLeft = this.clamp(this.mapScrollLeft, 0, this.mapMaxScrollLeft);
       this.mapScrollTop = this.clamp(this.mapScrollTop, 0, this.mapMaxScrollTop);
+
+      this.mapDesiredLeft = this.clamp(this.mapDesiredLeft, 0, this.mapMaxScrollLeft);
+    },
+
+    stopMapPanLoop() {
+      this.mapPanLastTs = 0;
+      if (this.mapPanRafId) {
+        cancelAnimationFrame(this.mapPanRafId);
+        this.mapPanRafId = 0;
+      }
+    },
+
+    ensureMapPanLoop() {
+      if (this.mapPanRafId) return;
+
+      const tick = (ts) => {
+        if (!this.mapPanLastTs) this.mapPanLastTs = ts;
+        let dt = Math.max(0, (ts - this.mapPanLastTs) / 1000);
+        this.mapPanLastTs = ts;
+        dt = Math.min(dt, 0.05);
+
+        // If holding an arrow, move the desired X smoothly toward the target.
+        if (this.arrowPanActive && this.arrowPanDir !== 0) {
+          const delta = MAP_ARROW_PAN_PX_PER_SEC * dt * this.arrowPanDir;
+          const next = this.mapDesiredLeft + delta;
+          if (this.arrowPanDir > 0) {
+            this.mapDesiredLeft = Math.min(next, this.arrowPanTargetLeft);
+            if (this.mapDesiredLeft >= this.arrowPanTargetLeft) this.stopArrowPan();
+          } else {
+            this.mapDesiredLeft = Math.max(next, this.arrowPanTargetLeft);
+            if (this.mapDesiredLeft <= this.arrowPanTargetLeft) this.stopArrowPan();
+          }
+        }
+
+        // Ease current toward desired.
+        const alpha = 1 - Math.exp(-dt / MAP_PAN_SMOOTH_TAU_SEC);
+        this.mapScrollLeft = this.mapScrollLeft + (this.mapDesiredLeft - this.mapScrollLeft) * alpha;
+
+        const doneX = Math.abs(this.mapDesiredLeft - this.mapScrollLeft) < 0.25;
+        if (!this.arrowPanActive && doneX) {
+          this.mapScrollLeft = this.mapDesiredLeft;
+          this.stopMapPanLoop();
+          return;
+        }
+
+        this.mapPanRafId = requestAnimationFrame(tick);
+      };
+
+      this.mapPanRafId = requestAnimationFrame(tick);
     },
 
     handleMapWheel(event) {
       if (this.simpleMode) return;
       if (!event) return;
       // Vertical pan only.
+      this.updateMapPanBounds();
       this.mapScrollTop = this.clamp(this.mapScrollTop + (event.deltaY || 0), 0, this.mapMaxScrollTop);
     },
 
@@ -230,13 +283,16 @@ export default {
 
       this.updateMapPanBounds();
 
+      // Sync desired with current before starting a new pan.
+      this.mapDesiredLeft = this.clamp(this.mapDesiredLeft || this.mapScrollLeft, 0, this.mapMaxScrollLeft);
+
       const step = this.getArrowStepPx();
-      const target = this.clamp(this.mapScrollLeft + dir * step, 0, this.mapMaxScrollLeft);
+      const target = this.clamp(this.mapDesiredLeft + dir * step, 0, this.mapMaxScrollLeft);
 
       this.arrowPanActive = true;
       this.arrowPanDir = dir;
       this.arrowPanTargetLeft = target;
-      this.arrowPanLastTs = 0;
+      this.ensureMapPanLoop();
 
       try {
         if (event?.currentTarget && typeof event.currentTarget.setPointerCapture === 'function' && event.pointerId != null) {
@@ -246,48 +302,12 @@ export default {
         // ignore
       }
 
-      if (this.arrowPanRafId) {
-        cancelAnimationFrame(this.arrowPanRafId);
-        this.arrowPanRafId = 0;
-      }
-
-      const tick = (ts) => {
-        if (!this.arrowPanActive) return;
-        if (!this.arrowPanLastTs) this.arrowPanLastTs = ts;
-        const dt = Math.max(0, (ts - this.arrowPanLastTs) / 1000);
-        this.arrowPanLastTs = ts;
-
-        const delta = MAP_ARROW_PAN_PX_PER_SEC * dt * this.arrowPanDir;
-        const nextLeft = this.mapScrollLeft + delta;
-
-        if (this.arrowPanDir > 0) {
-          this.mapScrollLeft = Math.min(nextLeft, this.arrowPanTargetLeft);
-          if (this.mapScrollLeft >= this.arrowPanTargetLeft) {
-            this.stopArrowPan();
-            return;
-          }
-        } else {
-          this.mapScrollLeft = Math.max(nextLeft, this.arrowPanTargetLeft);
-          if (this.mapScrollLeft <= this.arrowPanTargetLeft) {
-            this.stopArrowPan();
-            return;
-          }
-        }
-
-        this.arrowPanRafId = requestAnimationFrame(tick);
-      };
-
-      this.arrowPanRafId = requestAnimationFrame(tick);
+      // Movement happens inside the shared map pan loop.
     },
 
     stopArrowPan() {
       this.arrowPanActive = false;
       this.arrowPanDir = 0;
-      this.arrowPanLastTs = 0;
-      if (this.arrowPanRafId) {
-        cancelAnimationFrame(this.arrowPanRafId);
-        this.arrowPanRafId = 0;
-      }
     },
 
     scrollMapToLeft() {

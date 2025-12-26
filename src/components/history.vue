@@ -7,10 +7,10 @@
     div(v-if="sortedTorrents.length === 0" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
       span(v-if="emptyStateText") {{ emptyStateText }}
 
-    div(v-else style="padding:5px; font-size:13px; line-height:1.6;")
+    div(v-else style="padding:10px; font-size:14px; font-family:sans-serif; font-weight:normal;")
       div(v-for="t in sortedTorrents" :key="String(t.hash || t.name || t.added_on)" :style="getCardStyle(t)" @click="handleCardClick(t)")
-        div(style="font-size:13px; font-weight:bold; color:#333; word-break:break-word;") {{ t.name || t.hash }}
-        div(style="font-size:13px; color:rgba(0,0,0,0.50) !important;") {{ infoLine(t) }}
+        div(style="font-size:14px; font-weight:bold; color:#333; word-break:break-word;") {{ t.name || t.hash }}
+        div(style="margin-top:8px; font-size:14px; font-weight:normal; color:rgba(0,0,0,0.50) !important;") {{ infoLine(t) }}
 
 </template>
 

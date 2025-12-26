@@ -1,23 +1,9 @@
 
-df on the host server says:
+in the down pane card,  remove the sequence number and paren from title line, the title should be on the far left
 
-srvr(~) df
-Filesystem                         1K-blocks       Used  Available Use% Mounted on
-/dev/sda1                         9689313060 7398198696 2291097980  77% /mnt/m-bkup
-/dev/sdb1                         9688268580 7368362056 1831570040  81% /mnt/media
+make the qbt pane card font size the same as the down pane card size
 
-but the second row in the table says:
-SRVR 34 GB 65%
+make the card width in down pane the same as in the qbt pane
 
 
-- reformat the table into two tables with one row and two columns each.
-- put the tables in one line with USB on left and SRVR on right with 50px space between them
-- shrink the space between the show title line and this line
- - make the sticky hdr just tall enough so there is 10px between the tables line and the botton of the hdr
-
- put the two tables in one div that spans the full width of the pane. put the div below the show name and buttons
-
- - undo that
- - the problem i was trying to fix is that the vertical position of the two tables don't align. the USB table is higher than the SRVR.   fix that.
- - set the space between the tables to 25px
- 
+in the down pane card and the qbt pane card give the second line a margin-top of 8px

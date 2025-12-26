@@ -171,18 +171,35 @@ export default {
   },
 
   mounted() {
+    evtBus.on('paneChanged', this.onPaneChanged);
     evtBus.on('showTorrents', this.searchTorrents);
     evtBus.on('resetTorrentsPane', this.resetPane);
+    evtBus.on('refreshSpaceAvail', this.onRefreshSpaceAvail);
 
     this.loadDownloadedHistory();
+
+    // App-load refresh: populate space strings as soon as the component mounts.
+    void this.updateSpaceAvail();
   },
 
   unmounted() {
+    evtBus.off('paneChanged', this.onPaneChanged);
     evtBus.off('showTorrents', this.searchTorrents);
     evtBus.off('resetTorrentsPane', this.resetPane);
+    evtBus.off('refreshSpaceAvail', this.onRefreshSpaceAvail);
   },
 
   methods: {
+    onPaneChanged(pane) {
+      if (pane === 'torrents') {
+        // Keep space info fresh whenever Tor pane is shown.
+        void this.updateSpaceAvail();
+      }
+    },
+
+    onRefreshSpaceAvail() {
+      void this.updateSpaceAvail();
+    },
     openDetails() {
       const url = this.selectedTorrent?.detailUrl;
       if (url) window.open(url, '_blank');
@@ -312,8 +329,6 @@ export default {
       this.selectedTorrent = null;
       this.showModal = false;
       this.clickedTorrents.clear();
-      this.spaceAvailText = 'Space Used, Seed Box: --%, Server: --%';
-      this.spaceAvailGbText = 'Available, Seed Box: -- GB, Server: -- GB';
       this.torrents = [];
       this.showName = '';
       this.loading = false;
@@ -377,15 +392,27 @@ export default {
     async updateSpaceAvail() {
       try {
         const s = await this.getSpaceAvail();
-        const usbPercent = this.pctUsed(s?.usbSpaceTotal, s?.usbSpaceUsed);
-        const srvrPercent = this.pctUsed(s?.mediaSpaceTotal, s?.mediaSpaceUsed);
+
+        const hasUsb = Number.isFinite(Number(s?.usbSpaceTotal)) && Number.isFinite(Number(s?.usbSpaceUsed));
+        const hasSrvr = Number.isFinite(Number(s?.mediaSpaceTotal)) && Number.isFinite(Number(s?.mediaSpaceUsed));
+        if (!hasUsb && !hasSrvr) return;
+
+        const usbPercent = hasUsb ? this.pctUsed(s?.usbSpaceTotal, s?.usbSpaceUsed) : '--%';
+        const srvrPercent = hasSrvr ? this.pctUsed(s?.mediaSpaceTotal, s?.mediaSpaceUsed) : '--%';
         this.spaceAvailText = `Space Used, Seed Box: ${usbPercent}, Server: ${srvrPercent}`;
 
-        const usbGb = this.fmtAvailGb(s?.usbSpaceTotal, s?.usbSpaceUsed);
-        const srvrGb = this.fmtAvailGb(s?.mediaSpaceTotal, s?.mediaSpaceUsed);
+        const usbGb = hasUsb ? this.fmtAvailGb(s?.usbSpaceTotal, s?.usbSpaceUsed) : '--';
+        const srvrGb = hasSrvr ? this.fmtAvailGb(s?.mediaSpaceTotal, s?.mediaSpaceUsed) : '--';
         this.spaceAvailGbText = `Available, Seed Box: ${usbGb} GB, Server: ${srvrGb} GB`;
       } catch (e) {
-        // ignore
+        // On failure, show unknown placeholders, but don't clobber last-known-good values.
+        const hasAnyDigits = (txt) => /\d/.test(String(txt || ''));
+        if (!hasAnyDigits(this.spaceAvailText)) {
+          this.spaceAvailText = 'Space Used, Seed Box: ???, Server: ???';
+        }
+        if (!hasAnyDigits(this.spaceAvailGbText)) {
+          this.spaceAvailGbText = 'Available, Seed Box: ??? GB, Server: ??? GB';
+        }
       }
     },
 
@@ -430,8 +457,6 @@ export default {
       this.providerWarning = '';
       this.loading = false;
       this.dismissCookieInputs = false;
-      this.spaceAvailText = 'Space Used, Seed Box: --%, Server: --%';
-      this.spaceAvailGbText = 'Available, Seed Box: -- GB, Server: -- GB';
       this.lastNeeded = null;
       this._didInitialScroll = false;
 

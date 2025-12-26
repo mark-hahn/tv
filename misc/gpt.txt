@@ -1,7 +1,6 @@
 
-some oldcards in down are showing just season:episode and size like:
-
-1) mom.s01e01.multi.1080p.web.h264-ukdtv.mkv
-S1:E1, 2.561 GB
-
-what causes this?
+that works
+--
+i want a new format for the space avail display.  I want a 2X2 table with top row labeled USB andthe second row labeled SRVR.  the left column should be labeled GB and the right %
+--
+the data should be in four cells 

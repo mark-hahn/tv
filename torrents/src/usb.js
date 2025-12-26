@@ -129,14 +129,41 @@ function parseDfForMount(dfText, mountPoint) {
  * - mediaSpaceTotal/mediaSpaceUsed are bytes (from `df -B1`)
  */
 export async function spaceAvail() {
-  const usbSpaceTotalK = 2e9;
-  let usbSpaceUsedK = 0;
+  // Seed box (USB server): use ssh `du -s` as requested.
+  // Total is a fixed-size assumption used for percent calculations.
+  const usbSpaceTotalKFallback = 2e9;
+  const usbSpaceTotal = Math.trunc(usbSpaceTotalKFallback * 1024);
+  let usbSpaceUsed = 0;
+
+  const parseDfFirstDataRow = (dfText) => {
+    const text = String(dfText ?? '');
+    const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    if (lines.length < 2) return undefined;
+    const row = lines[1];
+    const parts = String(row).split(/\s+/);
+    if (parts.length < 6) return undefined;
+    const total = Number(parts[1]);
+    const used = Number(parts[2]);
+    const avail = Number(parts[3]);
+    if (!Number.isFinite(total) || !Number.isFinite(used) || !Number.isFinite(avail)) return undefined;
+    return { total: Math.trunc(total), used: Math.trunc(used), avail: Math.trunc(avail) };
+  };
+
+  const dfToTotalUsed = (parsed) => {
+    if (!parsed) return undefined;
+    if (parsed.used < 0 || parsed.avail < 0) return undefined;
+    return {
+      // Match `df` semantics: Available excludes reserved blocks.
+      // Use (used + avail) so client pctUsed and (total-used) match df Use%/Available.
+      total: Math.trunc(parsed.used + parsed.avail),
+      used: Math.trunc(parsed.used)
+    };
+  };
+
   try {
     const qbHost = await loadQbHostForSsh();
 
-    // du may exit non-zero if it hits unreadable directories; still emits a usable summary line.
-    // Keep command exactly as requested (cd; du -s) and parse stdout even on non-zero exit.
-    const args = [
+    const sshBaseArgs = [
       '-o',
       'BatchMode=yes',
       '-o',
@@ -147,6 +174,12 @@ export async function spaceAvail() {
       'StrictHostKeyChecking=no',
       '-o',
       'UserKnownHostsFile=/dev/null',
+    ];
+
+    // du may exit non-zero if it hits unreadable directories; still emits a usable summary line.
+    // Keep command exactly as requested (cd; du -s) and parse stdout even on non-zero exit.
+    const args = [
+      ...sshBaseArgs,
       qbHost,
       'cd; du -s'
     ];
@@ -187,7 +220,7 @@ export async function spaceAvail() {
     }
 
     if (Number.isInteger(duK)) {
-      usbSpaceUsedK = duK;
+      usbSpaceUsed = Math.trunc(duK * 1024);
       if (attempt.err && !attempt.stdout && !attempt.stderr) {
         console.error('spaceAvail: ssh du failed (no output):', attempt.err);
       }
@@ -199,18 +232,28 @@ export async function spaceAvail() {
       console.error('spaceAvail: unexpected ssh du output:', attempt.stdout || attempt.stderr);
     }
   } catch (e) {
-    console.error('spaceAvail: ssh du failed (returning usbSpaceUsed=0):', e);
+    console.error('spaceAvail: ssh space probing failed (returning usbSpaceUsed=0):', e);
   }
 
   let mediaSpaceTotal = 0;
   let mediaSpaceUsed = 0;
   try {
-    const mediaMount = '/mnt/m-bkup';
+    // Host server mounts: try /media first, then /m-bkup.
+    const candidateMounts = ['/media', '/m-bkup'];
 
-    // In Windows/dev environments, the mount may not exist.
-    try {
-      await fs.access(mediaMount);
-    } catch {
+    // In Windows/dev environments, none of these mounts may exist.
+    let mediaMount = '';
+    for (const m of candidateMounts) {
+      try {
+        await fs.access(m);
+        mediaMount = m;
+        break;
+      } catch {
+        // keep trying
+      }
+    }
+
+    if (!mediaMount) {
       return {
         usbSpaceTotal: Math.trunc(usbSpaceTotalK * 1024),
         usbSpaceUsed: Math.trunc(usbSpaceUsedK * 1024),
@@ -226,11 +269,10 @@ export async function spaceAvail() {
     });
     const dfText = String(df.stdout ?? '');
     const parsed = parseDfForMount(dfText, mediaMount);
-    if (parsed && parsed.used >= 0 && parsed.avail >= 0) {
-      // Match `df` semantics: Available excludes reserved blocks.
-      // Use (used + avail) so client pctUsed and (total-used) match df Use%/Available.
-      mediaSpaceUsed = parsed.used;
-      mediaSpaceTotal = parsed.used + parsed.avail;
+    const tu = dfToTotalUsed(parsed);
+    if (tu) {
+      mediaSpaceUsed = tu.used;
+      mediaSpaceTotal = tu.total;
     } else {
       console.error('spaceAvail: unexpected df output:', dfText);
     }
@@ -239,8 +281,8 @@ export async function spaceAvail() {
   }
 
   return {
-    usbSpaceTotal: Math.trunc(usbSpaceTotalK * 1024),
-    usbSpaceUsed: Math.trunc(usbSpaceUsedK * 1024),
+    usbSpaceTotal: Math.trunc(usbSpaceTotal),
+    usbSpaceUsed: Math.trunc(usbSpaceUsed),
     mediaSpaceTotal: Math.trunc(mediaSpaceTotal),
     mediaSpaceUsed: Math.trunc(mediaSpaceUsed)
   };

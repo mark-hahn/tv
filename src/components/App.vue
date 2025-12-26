@@ -93,6 +93,7 @@ import History  from './history.vue';
 import TvProc   from './tvproc.vue';
 import evtBus   from '../evtBus.js';
 import * as tvdb from '../tvdb.js';
+import { config } from '../config.js';
 
 export default {
   name: "App",
@@ -116,6 +117,13 @@ export default {
       mapError: '',
       allShows: [],
       _didRequestNotifications: false,
+
+      _downActiveQbt: false,
+      _downActiveDown: false,
+      _downActive: false,
+      _downInactiveTimer: null,
+      _qbtPollTimer: null,
+      _qbtPolling: false,
       // TABLET SIZING CONFIGURATION - SIMPLE MODE - Tweak these values
       sizing: {
         // List pane
@@ -194,7 +202,102 @@ export default {
       return allTabs.filter(t => allowed.has(t.key));
     }
   },
+  unmounted() {
+    evtBus.off('downActivePart', this.handleDownActivePart);
+    this.stopQbtPolling();
+    this.cancelDownInactiveTimer();
+  },
   methods: {
+    cancelDownInactiveTimer() {
+      if (this._downInactiveTimer) {
+        clearTimeout(this._downInactiveTimer);
+        this._downInactiveTimer = null;
+      }
+    },
+
+    requestSpaceAvailRefresh(reason = '') {
+      if (this.simpleMode) return;
+      evtBus.emit('refreshSpaceAvail', { reason: String(reason || '') });
+    },
+
+    recomputeDownActive() {
+      const prev = !!this._downActive;
+      const next = !!(this._downActiveQbt || this._downActiveDown);
+      if (prev === next) return;
+      this._downActive = next;
+
+      if (next) {
+        // Downloads became active again; cancel any pending restart.
+        this.cancelDownInactiveTimer();
+        return;
+      }
+
+      // Falling edge: true -> false. Restart only after 60s of sustained inactivity.
+      this.cancelDownInactiveTimer();
+      this._downInactiveTimer = setTimeout(() => {
+        this._downInactiveTimer = null;
+        if (this._downActiveQbt || this._downActiveDown) return;
+        this.requestSpaceAvailRefresh('downActive idle 60s');
+      }, 60000);
+    },
+
+    handleDownActivePart(payload) {
+      const src = payload?.source;
+      const active = !!payload?.active;
+      if (src === 'tvproc') {
+        this._downActiveDown = active;
+        this.recomputeDownActive();
+      }
+    },
+
+    async pollQbtActiveOnce() {
+      try {
+        const url = new URL(`${config.torrentsApiUrl}/api/qbt/info`);
+        const res = await fetch(url.toString());
+        if (!res.ok) return;
+        const torrents = await res.json();
+        if (!Array.isArray(torrents)) return;
+
+        const active = torrents.some(t => {
+          const st = String(t?.state || '').trim().toLowerCase();
+          return st === 'downloading';
+        });
+
+        if (active !== this._downActiveQbt) {
+          this._downActiveQbt = active;
+          this.recomputeDownActive();
+        }
+      } catch {
+        // ignore
+      }
+    },
+
+    scheduleNextQbtPoll(delayMs) {
+      if (!this._qbtPolling) return;
+      if (this._qbtPollTimer) {
+        clearTimeout(this._qbtPollTimer);
+        this._qbtPollTimer = null;
+      }
+      this._qbtPollTimer = setTimeout(async () => {
+        if (!this._qbtPolling) return;
+        await this.pollQbtActiveOnce();
+        this.scheduleNextQbtPoll(5000);
+      }, Math.max(0, Number(delayMs) || 0));
+    },
+
+    startQbtPolling() {
+      if (this._qbtPolling || this.simpleMode) return;
+      this._qbtPolling = true;
+      this.scheduleNextQbtPoll(0);
+    },
+
+    stopQbtPolling() {
+      this._qbtPolling = false;
+      if (this._qbtPollTimer) {
+        clearTimeout(this._qbtPollTimer);
+        this._qbtPollTimer = null;
+      }
+    },
     requestNotificationsOnce() {
       try {
         if (this._didRequestNotifications) return;
@@ -445,6 +548,13 @@ export default {
     }
   },
   mounted() {
+    // Derive downActive and schedule deferred Tor restarts.
+    evtBus.on('downActivePart', this.handleDownActivePart);
+    this.startQbtPolling();
+
+    // Refresh space display once on app load.
+    this.requestSpaceAvailRefresh('app load');
+
     if (this.simpleMode && !['series', 'map', 'actors'].includes(this.currentPane)) {
       this.currentPane = 'series';
     }

@@ -599,6 +599,19 @@ export default {
           throw new Error(`HTTP ${res.status}: ${detail || res.statusText}`);
         }
         const arr = await res.json();
+
+        // downActive: true when any item is downloading or future.
+        try {
+          const active = Array.isArray(arr)
+            ? arr.some(it => {
+                const st = String(it?.status || '').trim().toLowerCase();
+                return st === 'downloading' || st === 'future';
+              })
+            : false;
+          evtBus.emit('downActivePart', { source: 'tvproc', active });
+        } catch {
+          // ignore
+        }
         
         // Track status changes for downloading items
         const oldDownloading = Array.isArray(this.items) ? this.items.filter(it => String(it?.status || '').trim() === 'downloading') : [];

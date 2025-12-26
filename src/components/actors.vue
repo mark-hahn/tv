@@ -29,6 +29,7 @@
       v-for="actor in actors"
       :key="actor.url"
       :actor="actor"
+      @actor-click="handleActorClick"
     )
 
   #no-actors(v-if="!errorMessage && !isGuestMode && showName && actors.length === 0"
@@ -90,6 +91,18 @@ export default {
   },
 
   methods: {
+    async handleActorClick({ event, actor }) {
+      const a = actor;
+
+      const name = String(a?.personName || a?.name || '').trim();
+      if (!name) return;
+
+      if (a?.personName) {
+        const url = await srvr.getActorPage(a.personName);
+        if (url) window.open(url);
+      }
+    },
+
     normPersonName(v) {
       return String(v || '')
         .trim()

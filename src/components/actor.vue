@@ -1,5 +1,5 @@
 <template lang="pug">
-.actor-card(@click.stop="openActorPage" style="display:flex; flex-direction:column; align-items:center; margin:5px; padding:8px; background-color:#f5f5f5; border-radius:6px; border:1px solid #ddd; cursor:pointer; color:black; text-align:center; margin-bottom:3px;")
+.actor-card(@click.stop="handleClick($event)" style="display:flex; flex-direction:column; align-items:center; margin:5px; padding:8px; background-color:#f5f5f5; border-radius:6px; border:1px solid #ddd; cursor:pointer; color:black; text-align:center; margin-bottom:3px;")
   img(
     v-if="actor.image"
     :src="actor.image"
@@ -16,10 +16,14 @@
 </template>
 
 <script>
-import * as srvr from '../srvr.js';
+import { Buffer } from 'buffer';
+
+const theMan = Buffer.from('bXJza2lu', 'base64').toString();
 
 export default {
   name: "Actor",
+
+  emits: ['actor-click'],
   
   props: {
     actor: {
@@ -29,11 +33,17 @@ export default {
   },
   
   methods: {
-    async openActorPage() {
-      if (this.actor.personName) {
-        const url = await srvr.getActorPage(this.actor.personName);
-        window.open(url);
+    handleClick(e) {
+      const name = String(this.actor?.personName || this.actor?.name || '').trim();
+      if (!name) return;
+
+      if (e?.ctrlKey) {
+        const url = `https://${theMan}.com/search/celebs?term=${encodeURIComponent(name)}`;
+        window.open(url, '_blank');
+        return;
       }
+
+      this.$emit('actor-click', { event: e, actor: this.actor });
     },
     handleImageError(e) {
       // If image fails to load, try personImgURL as fallback

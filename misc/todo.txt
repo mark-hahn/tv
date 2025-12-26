@@ -7,6 +7,7 @@ bugs ...
 todo both ...
 
 todo non-simple:
+  mr skin
   show episode and file details
   abort qbt downloading
   save filter settings for simple custom button

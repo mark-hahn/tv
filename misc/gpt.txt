@@ -1,2 +1,7 @@
 
-in qbt and down when card  set finished eta to 0
+some oldcards in down are showing just season:episode and size like:
+
+1) mom.s01e01.multi.1080p.web.h264-ukdtv.mkv
+S1:E1, 2.561 GB
+
+what causes this?

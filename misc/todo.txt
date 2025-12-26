@@ -4,12 +4,12 @@ bugs ...
   tor forgets space when leaving tab
     -- update every 10 downloads
   clear down broken
+  double windows notifications
 
 todo both ...
   make map top row sticky
 
 todo non-simple:
-  mr skin
   show episode and file details
   abort qbt downloading
   save filter settings for simple custom button

@@ -395,6 +395,7 @@ export default {
       if (status === 'future') {
         const parts = [];
         if (size) parts.push(size);
+        parts.push('Future');
         return { seasonEpisode, rest: parts.join(' | ') };
       }
 
@@ -424,6 +425,7 @@ export default {
 
       if (ended) parts.push(ended);
       if (status) parts.push(status);
+      else parts.push('Unknown');
       return { seasonEpisode, rest: parts.join(' | ') };
     },
 

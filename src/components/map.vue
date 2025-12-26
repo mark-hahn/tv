@@ -1,11 +1,11 @@
 <template lang="pug">
-#map(ref="mapScroller" @click="handleMapClick" :style="{ height:'100%',margin:0, display:'flex', flexDirection:'column', backgroundColor:'#ffe', overflowY:'auto', overflowX:'auto', maxWidth:'100%', width: sizing.mapWidth || '450px', boxSizing:'border-box' }")
+#map(ref="mapScroller" @click="handleMapClick" :style="{ height:'100%',margin:0, display:'flex', flexDirection:'column', backgroundColor:'#ffe', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.mapWidth || '450px', boxSizing:'border-box' }")
 
   #maperr(v-if="mapError && Object.keys(seriesMap).length === 0"
       style="display:flex; align-items:center; justify-content:center; height:100%; width:100%; font-size:20px; font-weight:bold; color:red; text-align:center; padding:20px;")
     | {{mapError}}
 
-  #maphdr(v-else style="position:sticky; top:0px; z-index:50; background-color:#ffe;")
+  #maphdr(v-else style="position:sticky; top:0px; z-index:50; background-color:#ffe; padding-bottom:5px;")
     #maphdr1(style="margin:0 5px; display:flex; justify-content:space-between; align-items:center;")
       #mapshow(:style="{ marginLeft:'15px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px' }")
         | {{mapShow?.Name}} 
@@ -18,7 +18,7 @@
           button(@click.stop="scrollMapToRight" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") →
           button(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px 0 5px 5px; max-height:24px; border-radius:7px;") Prune
 
-    #maphdr2(style="display:flex; justify-content:space-between; align-items:center; color:red; margin:0 10px; padding:0 5px; min-height:26px;")
+    #maphdr2(style="display:flex; justify-content:space-between; align-items:center; color:red; margin:0 10px 5px 10px; padding-left:5px; ")
       #dates(v-if="datesLine" :style="{ fontSize: sizing.seriesInfoFontSize || '20px', paddingLeft:'5px', display:'flex', gap:'10px' }")
         span {{firstAiredVal}}
         span {{lastAiredVal}}
@@ -33,9 +33,9 @@
 
           div(v-if="mapShow?.Waiting")
             | {{'Waiting ' + mapShow?.WaitStr}}
-  #maptable(v-if="!hideMapBottom")
-    table(style="font-size:16px; margin-top:10px;" )
-     tbody
+  #maptable(v-if="!hideMapBottom" ref="tableScroller" style="overflow-x:auto; overflow-y:visible;")
+    table(style="font-size:16px;" )
+    tbody
       tr(style="font-weight:bold;")
         td
         td(v-for="episode in seriesMapEpis" 
@@ -148,13 +148,13 @@ export default {
 
   methods: {
     scrollMapToLeft() {
-      const el = this.$refs.mapScroller;
+      const el = this.$refs.tableScroller;
       if (!el) return;
       el.scrollLeft = 0;
     },
 
     scrollMapToRight() {
-      const el = this.$refs.mapScroller;
+      const el = this.$refs.tableScroller;
       if (!el) return;
       el.scrollLeft = Math.max(0, (el.scrollWidth || 0) - (el.clientWidth || 0));
     },

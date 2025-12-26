@@ -1,5 +1,5 @@
 <template lang="pug">
-#map(ref="mapScroller" @click="handleMapClick" :style="{ height:'100%',margin:0, display:'flex', flexDirection:'column', backgroundColor:'#ffe', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.mapWidth || '450px', boxSizing:'border-box' }")
+#map(ref="mapScroller" @click="handleMapClick" :style="{ height:'100%',margin:0, display:'flex', flexDirection:'column', backgroundColor:'#ffe', overflow:'hidden', maxWidth:'100%', width: sizing.mapWidth || '450px', boxSizing:'border-box' }")
 
   #maperr(v-if="mapError && Object.keys(seriesMap).length === 0"
       style="display:flex; align-items:center; justify-content:center; height:100%; width:100%; font-size:20px; font-weight:bold; color:red; text-align:center; padding:20px;")
@@ -33,28 +33,30 @@
 
           div(v-if="mapShow?.Waiting")
             | {{'Waiting ' + mapShow?.WaitStr}}
-  #maptable(v-if="!hideMapBottom" ref="tableScroller" style="overflow-x:auto; overflow-y:visible; margin-left:15px")
-    table(style="font-size:16px;" )
-    tbody
-      tr(style="font-weight:bold;")
-        td
-        td(v-for="episode in seriesMapEpis" 
-          style="text-align:center;"
-          key="episode") {{episode}}
-      tr(v-for="season in seriesMapSeasons" key="season"
-                style="outline:thin solid;")
-        td(@click="handleSeasonClick($event, season)"
-           :style="{ fontWeight:'bold', width:'10px', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer', paddingRight:'4px' }")
-          | {{season}}
+  #maptable(v-if="!hideMapBottom" style="flex:1 1 auto; min-height:0px; margin-left:15px; margin-right:15px; box-sizing:border-box; position:relative; overflow:hidden;")
+    //- No scrollbars: pan the table with arrows (horizontal) and mouse wheel (vertical).
+    #maptblpane(ref="mapViewport" @wheel.stop.prevent="handleMapWheel" style="position:absolute; inset:0; overflow:hidden; box-sizing:border-box;")
+      table(ref="mapTable" :style="{ fontSize:'16px', transform: 'translate(' + (-mapScrollLeft) + 'px,' + (-mapScrollTop) + 'px)' }")
+        tbody
+          tr(style="font-weight:bold;")
+            td
+            td(v-for="episode in seriesMapEpis" 
+              style="text-align:center;"
+              key="episode") {{episode}}
+          tr(v-for="season in seriesMapSeasons" key="season"
+                    style="outline:thin solid;")
+            td(@click="handleSeasonClick($event, season)"
+               :style="{ fontWeight:'bold', width:'10px', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer', paddingRight:'4px' }")
+              | {{season}}
 
-        td(v-for="episode in seriesMapEpis" key="series+'.'+episode" 
-            @click="handleEpisodeClick($event, mapShow, season, episode)"
-            :style="{cursor:'default', padding:'0 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor: (seriesMap[season]?.[episode]?.error) ? 'yellow': (seriesMap[season]?.[episode]?.noFile) ? '#faa' : 'white'}")
-          span(v-if="seriesMap?.[season]?.[episode]?.played")  w
-          span(v-if="seriesMap?.[season]?.[episode]?.avail && !seriesMap?.[season]?.[episode]?.unaired && !mapShow?.Id?.startsWith('noemby-')")   +
-          span(v-if="seriesMap?.[season]?.[episode]?.noFile && !seriesMap?.[season]?.[episode]?.unaired")  -
-          span(v-if="seriesMap?.[season]?.[episode]?.unaired && !seriesMap?.[season]?.[episode]?.played && seriesMap?.[season]?.[episode]?.noFile") u
-          span(v-if="seriesMap?.[season]?.[episode]?.deleted") d
+            td(v-for="episode in seriesMapEpis" key="series+'.'+episode" 
+                @click="handleEpisodeClick($event, mapShow, season, episode)"
+                :style="{cursor:'default', padding:'0 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor: (seriesMap[season]?.[episode]?.error) ? 'yellow': (seriesMap[season]?.[episode]?.noFile) ? '#faa' : 'white'}")
+              span(v-if="seriesMap?.[season]?.[episode]?.played")  w
+              span(v-if="seriesMap?.[season]?.[episode]?.avail && !seriesMap?.[season]?.[episode]?.unaired && !mapShow?.Id?.startsWith('noemby-')")   +
+              span(v-if="seriesMap?.[season]?.[episode]?.noFile && !seriesMap?.[season]?.[episode]?.unaired")  -
+              span(v-if="seriesMap?.[season]?.[episode]?.unaired && !seriesMap?.[season]?.[episode]?.played && seriesMap?.[season]?.[episode]?.noFile") u
+              span(v-if="seriesMap?.[season]?.[episode]?.deleted") d
 </template>
 
 <script>
@@ -105,7 +107,11 @@ export default {
       seasonStates: {}, // Track original state for each season
       tvdbData: null,
       allTvdb: null,
-      nextUpTxt: ''
+      nextUpTxt: '',
+      mapScrollLeft: 0,
+      mapScrollTop: 0,
+      mapMaxScrollLeft: 0,
+      mapMaxScrollTop: 0
     };
   },
 
@@ -132,7 +138,14 @@ export default {
         await this.loadTvdbData();
         this.logUnairedInfo();
         await this.setNextWatch();
+        this.$nextTick(() => this.updateMapPanBounds());
       }
+    },
+    seriesMapSeasons() {
+      this.$nextTick(() => this.updateMapPanBounds());
+    },
+    seriesMapEpis() {
+      this.$nextTick(() => this.updateMapPanBounds());
     }
   },
 
@@ -144,19 +157,49 @@ export default {
       this.logUnairedInfo();
       await this.setNextWatch();
     }
+    this.$nextTick(() => this.updateMapPanBounds());
+    window.addEventListener('resize', this.updateMapPanBounds);
+  },
+
+  beforeUnmount() {
+    window.removeEventListener('resize', this.updateMapPanBounds);
   },
 
   methods: {
+    clamp(val, min, max) {
+      return Math.min(max, Math.max(min, val));
+    },
+
+    updateMapPanBounds() {
+      const viewport = this.$refs.mapViewport;
+      const table = this.$refs.mapTable;
+      if (!viewport || !table) return;
+
+      const vw = viewport.clientWidth || 0;
+      const vh = viewport.clientHeight || 0;
+      const tw = table.offsetWidth || 0;
+      const th = table.offsetHeight || 0;
+
+      this.mapMaxScrollLeft = Math.max(0, tw - vw);
+      this.mapMaxScrollTop = Math.max(0, th - vh);
+
+      this.mapScrollLeft = this.clamp(this.mapScrollLeft, 0, this.mapMaxScrollLeft);
+      this.mapScrollTop = this.clamp(this.mapScrollTop, 0, this.mapMaxScrollTop);
+    },
+
+    handleMapWheel(event) {
+      if (this.simpleMode) return;
+      if (!event) return;
+      // Vertical pan only.
+      this.mapScrollTop = this.clamp(this.mapScrollTop + (event.deltaY || 0), 0, this.mapMaxScrollTop);
+    },
+
     scrollMapToLeft() {
-      const el = this.$refs.tableScroller;
-      if (!el) return;
-      el.scrollLeft = 0;
+      this.mapScrollLeft = 0;
     },
 
     scrollMapToRight() {
-      const el = this.$refs.tableScroller;
-      if (!el) return;
-      el.scrollLeft = Math.max(0, (el.scrollWidth || 0) - (el.clientWidth || 0));
+      this.mapScrollLeft = this.mapMaxScrollLeft;
     },
 
     async loadTvdbData() {

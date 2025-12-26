@@ -1,3 +1,9 @@
 
 
-in map pane the arrow buttons should only move #maptable left and right and #maphdr should not move
+nothing was working so i reverted it back to where right and bottom overlapped scrollbars.
+--
+try putting a div inside the pane with width and height small enough to fit inside scrollbars and then scrolling the table inside that div
+
+i reverted again to the original version with the table under the scrollbars problem. 
+-- 
+remove the scrollbars and i'll move the table hoizontally with the arrows on top and vertically with the scroll wheel

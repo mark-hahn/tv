@@ -1,9 +1,3 @@
 
-in the down pane card,  remove the sequence number and paren from title line, the title should be on the far left
 
-make the qbt pane card font size the same as the down pane card size
-
-make the card width in down pane the same as in the qbt pane
-
-
-in the down pane card and the qbt pane card give the second line a margin-top of 8px
+in map pane the arrow buttons should only move #maptable left and right and #maphdr should not move

@@ -1,43 +1,40 @@
 <template lang="pug">
-#map(ref="mapScroller" @click="handleMapClick" :style="{ height:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', backgroundColor:'#ffe', overflowY:'auto', overflowX:'auto', maxWidth:'100%', width: sizing.mapWidth || '450px', boxSizing:'border-box' }")
+#map(ref="mapScroller" @click="handleMapClick" :style="{ height:'100%',margin:0, display:'flex', flexDirection:'column', backgroundColor:'#ffe', overflowY:'auto', overflowX:'auto', maxWidth:'100%', width: sizing.mapWidth || '450px', boxSizing:'border-box' }")
 
-  div(v-if="mapError && Object.keys(seriesMap).length === 0"
+  #maperr(v-if="mapError && Object.keys(seriesMap).length === 0"
       style="display:flex; align-items:center; justify-content:center; height:100%; width:100%; font-size:20px; font-weight:bold; color:red; text-align:center; padding:20px;")
     | {{mapError}}
 
-  div(v-else-if="!hideMapBottom")
-    div(style="margin:0 5px; display:flex; justify-content:space-between; align-items:center;")
-      div(:style="{ marginLeft:'20px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px' }")
-        | {{mapShow?.Name}}
-      div(style="display:flex; gap:5px; flex-shrink:0;")
-        div(v-if="mapShow?.Id?.startsWith('noemby-')"
-            style="font-weight:bold; color:red; font-size:18px; white-space:nowrap; margin:5px; max-height:24px;") Not In Emby
-        button(@click.stop="scrollMapToLeft" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") ←
-        button(@click.stop="scrollMapToRight" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") →
-        button(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") Prune
+  #maphdr(v-else style="position:sticky; top:0px; z-index:50; background-color:#ffe;")
+    #maphdr1(style="margin:0 5px; display:flex; justify-content:space-between; align-items:center;")
+      #mapshow(:style="{ marginLeft:'15px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px' }")
+        | {{mapShow?.Name}} 
+      div(style="display:flex; ")
+        #mapstatus(style="margin:6px;") {{statusVal}}
+        #mapnoemby(v-if="mapShow?.Id?.startsWith('noemby-')"
+            style="font-weight:bold; color:red; font-size:14px; white-space:nowrap; margin-top:0px; max-height:24px;") Not In Emby
+        #mapbuttons(style="display:flex; gap:5px; flex-shrink:0;")
+          button(@click.stop="scrollMapToLeft" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") ←
+          button(@click.stop="scrollMapToRight" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") →
+          button(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px 0 5px 5px; max-height:24px; border-radius:7px;") Prune
 
-    div(v-if="mapShow?.WatchGap || mapShow?.FileGap  || mapShow?.WaitStr?.length"
-        style="display:flex; justify-content:space-between; align-items:center; color:red; margin:0 10px; padding:0 10px; min-height:26px;")
+    #maphdr2(style="display:flex; justify-content:space-between; align-items:center; color:red; margin:0 10px; padding:0 5px; min-height:26px;")
+      #dates(v-if="datesLine" :style="{ fontSize: sizing.seriesInfoFontSize || '20px', paddingLeft:'5px', display:'flex', gap:'10px' }")
+        span {{firstAiredVal}}
+        span {{lastAiredVal}}
 
-      div(v-if="mapShow?.WatchGap || mapShow?.FileGap  || mapShow?.WaitStr?.length"
-          style="display:flex; gap:15px;")
-        div(v-if="mapShow?.WatchGap")
-          | {{"Watch Gap"}}
+      #gaps(v-if="mapShow?.WatchGap || mapShow?.FileGap  || mapShow?.WaitStr?.length"
+            style="display:flex; gap:15px;")
+          div(v-if="mapShow?.WatchGap")
+            | {{"Watch Gap"}}
 
-        div(v-if="mapShow?.FileGap")
-          | {{"Missing File"}}
+          div(v-if="mapShow?.FileGap")
+            | {{"Missing File"}}
 
-        div(v-if="mapShow?.Waiting")
-          | {{'Waiting ' + mapShow?.WaitStr}}
-
-    div(v-if="datesLine" :style="{ fontSize: sizing.seriesInfoFontSize || '20px', fontWeight:'bold', margin:'10px 5px 5px 5px', paddingLeft:'5px', display:'flex', gap:'10px' }")
-      span {{firstAiredVal}}
-      span {{lastAiredVal}}
-      span {{statusVal}}
-
-    div(v-if="nextUpTxt.length > 0" v-html="nextUpTxt" style="min-height:32px; font-size:16px; font-weight:bold; margin:5px 10px; padding-left:5px;")
-
-    table(style="padding:0 5px; font-size:16px; margin-top:10px;" )
+          div(v-if="mapShow?.Waiting")
+            | {{'Waiting ' + mapShow?.WaitStr}}
+  #maptable(v-if="!hideMapBottom")
+    table(style="font-size:16px; margin-top:10px;" )
      tbody
       tr(style="font-weight:bold;")
         td

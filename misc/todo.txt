@@ -1,13 +1,12 @@
 
 bugs ...
-  tor forgets space when leaving tab
-  clear down broken
   double windows notifications
 
 todo both ...
   make map top row sticky
 
 todo non-simple:
+  shows hidden from simple
   show episode and file details
   abort qbt downloading
   save filter settings for simple custom button

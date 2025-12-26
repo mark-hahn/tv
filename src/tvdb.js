@@ -62,7 +62,7 @@ export async function getWaitStr(show) {
       const lastAired = tvdbData.lastAired;
       if(!lastAired) return '';
       const lastAiredDay  = lastAired;
-      const lastAiredNoYr = lastAired.slice(5).replace(/^0/, ' ');  
+      const lastAiredNoYr = lastAired.slice(5).replace(/^0/, ' ').trim();  
       const today = util.fmtDate();
       if(lastAiredDay >= today) waitStr = `{${lastAiredNoYr}}`;
       // console.log('getWaitStr:', show.Name, 

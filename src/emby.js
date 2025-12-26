@@ -134,7 +134,7 @@ export async function loadAllShows() {
           const airDate = e1?.[1]?.aired;
           if (airDate) {
             // Format as {M/DD} matching getWaitStr format
-            const dateStr = airDate.slice(5).replace(/^0/, ' ');
+            const dateStr = airDate.slice(5).replace(/^0/, ' ').trim();
             noEmbyShow.WaitStr = `{${dateStr}}`;
           }
         }

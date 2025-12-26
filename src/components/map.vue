@@ -12,11 +12,11 @@
       div(style="display:flex; ")
         #mapstatus(style="margin:6px;") {{statusVal}}
         #mapnoemby(v-if="mapShow?.Id?.startsWith('noemby-')"
-            style="font-weight:bold; color:red; font-size:14px; white-space:nowrap; margin-top:0px; max-height:24px;") Not In Emby
-        #mapbuttons(style="display:flex; gap:5px; flex-shrink:0;")
+            style="font-weight:bold; color:red; font-size:14px; white-space:nowrap; margin:8px; max-height:24px;") Not In Emby
+        #mapbuttons(v-if="!simpleMode" style="display:flex; gap:5px; flex-shrink:0;")
           button(@click.stop="scrollMapToLeft" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") ←
           button(@click.stop="scrollMapToRight" style="font-size:15px; cursor:pointer; margin:5px; max-height:24px; border-radius:7px;") →
-          button(v-if="!simpleMode && !mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px 0 5px 5px; max-height:24px; border-radius:7px;") Prune
+          button(v-if="!mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px 0 5px 5px; max-height:24px; border-radius:7px;") Prune
 
     #maphdr2(style="display:flex; justify-content:space-between; align-items:center; color:red; margin:0 10px 5px 10px; padding-left:5px; ")
       #dates(v-if="datesLine" :style="{ fontSize: sizing.seriesInfoFontSize || '20px', paddingLeft:'5px', display:'flex', gap:'10px' }")
@@ -33,7 +33,7 @@
 
           div(v-if="mapShow?.Waiting")
             | {{'Waiting ' + mapShow?.WaitStr}}
-  #maptable(v-if="!hideMapBottom" ref="tableScroller" style="overflow-x:auto; overflow-y:visible;")
+  #maptable(v-if="!hideMapBottom" ref="tableScroller" style="overflow-x:auto; overflow-y:visible; margin-left:15px")
     table(style="font-size:16px;" )
     tbody
       tr(style="font-weight:bold;")
@@ -44,7 +44,7 @@
       tr(v-for="season in seriesMapSeasons" key="season"
                 style="outline:thin solid;")
         td(@click="handleSeasonClick($event, season)"
-           :style="{ fontWeight:'bold', width:'10px', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer' }")
+           :style="{ fontWeight:'bold', width:'10px', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer', paddingRight:'4px' }")
           | {{season}}
 
         td(v-for="episode in seriesMapEpis" key="series+'.'+episode" 
@@ -342,7 +342,4 @@ export default {
 </script>
 
 <style scoped>
-tr:nth-child(even) {
-  background-color: #f4f4f4;
-}
 </style>

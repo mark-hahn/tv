@@ -1,1 +1,2 @@
 
+in qbt and down when card  set finished eta to 0

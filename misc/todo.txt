@@ -3,8 +3,10 @@ bugs ...
   qbt and down leave eta when finished
   tor forgets space when leaving tab
     -- update every 10 downloads
+  clear down broken
 
 todo both ...
+  make map top row sticky
 
 todo non-simple:
   mr skin

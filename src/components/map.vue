@@ -65,9 +65,9 @@
         table(:style="{ fontSize:'16px', borderCollapse:'collapse', transform: 'translate(' + (-mapScrollLeft) + 'px,0px)' }")
           tbody
             tr(style="font-weight:bold;")
-              td(:style="{ width:'28px', minWidth:'28px', maxWidth:'28px', textAlign:'center', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'#ffe' }") &nbsp;
+              td(:style="{ width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', textAlign:'center', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'#ffe' }") &nbsp;
               td(v-for="episode in seriesMapEpis"
-                :style="{ width:'28px', minWidth:'28px', maxWidth:'28px', padding:'1px 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor:'#ffe' }"
+                :style="{ width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', padding:'1px 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor:'#ffe' }"
                 :key="episode") {{episode}}
 
       //- Sticky top-left corner cell (covers the moving blank header cell when panning horizontally).
@@ -75,7 +75,7 @@
         table(:style="{ fontSize:'16px', borderCollapse:'collapse' }")
           tbody
             tr(style="font-weight:bold;")
-              td(:style="{ width:'28px', minWidth:'28px', maxWidth:'28px', textAlign:'center', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'#ffe' }") &nbsp;
+              td(:style="{ width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', textAlign:'center', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'#ffe' }") &nbsp;
 
       //- Body viewport starts below the sticky header.
       div(ref="mapBodyViewport" :style="{ position:'absolute', left:'0', right:'0', top: mapHeaderH + 'px', bottom:'0', overflow:'hidden', boxSizing:'border-box' }")
@@ -84,12 +84,12 @@
             tr(v-for="season in seriesMapSeasons" :key="season"
                       style="outline:thin solid;")
               td(@click="handleSeasonClick($event, season)"
-                  :style="{ fontWeight:'bold', width:'28px', minWidth:'28px', maxWidth:'28px', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'#ffe' }")
+                  :style="{ fontWeight:'bold', width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'#ffe' }")
                 | {{season}}
 
               td(v-for="episode in seriesMapEpis" :key="season + '.' + episode"
                   @click="handleEpisodeClick($event, mapShow, season, episode)"
-                  :style="{cursor:'default', width:'28px', minWidth:'28px', maxWidth:'28px', padding:'1px 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor: (seriesMap[season]?.[episode]?.error) ? 'yellow': (seriesMap[season]?.[episode]?.noFile) ? '#faa' : 'white'}")
+                  :style="{cursor:'default', width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', padding:'1px 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor: (seriesMap[season]?.[episode]?.error) ? 'yellow': (seriesMap[season]?.[episode]?.noFile) ? '#faa' : 'white'}")
                 span(v-if="seriesMap?.[season]?.[episode]?.played")  w
                 span(v-if="seriesMap?.[season]?.[episode]?.avail && !seriesMap?.[season]?.[episode]?.unaired && !mapShow?.Id?.startsWith('noemby-')")   +
                 span(v-if="seriesMap?.[season]?.[episode]?.noFile && !seriesMap?.[season]?.[episode]?.unaired")  -
@@ -102,12 +102,12 @@
         @pointermove="handleMapPointerMove"
         @pointerup="handleMapPointerUp"
         @pointercancel="handleMapPointerUp"
-        :style="{ position:'absolute', left:'0', top: mapHeaderH + 'px', bottom:'0', width:'28px', overflow:'hidden', zIndex:5, backgroundColor:'#ffe', pointerEvents:'auto', touchAction:'none' }")
+        :style="{ position:'absolute', left:'0', top: mapHeaderH + 'px', bottom:'0', width:'30px', overflow:'hidden', zIndex:5, backgroundColor:'#ffe', pointerEvents:'auto', touchAction:'none' }")
         table(:style="{ fontSize:'16px', borderCollapse:'collapse', transform: 'translate(0px,' + (-mapScrollTop) + 'px)' }")
           tbody
             tr(v-for="season in seriesMapSeasons" :key="'sticky-' + season" style="outline:thin solid;")
               td(@click="handleSeasonClick($event, season)"
-                 :style="{ fontWeight:'bold', width:'28px', minWidth:'28px', maxWidth:'28px', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'#ffe' }")
+                 :style="{ fontWeight:'bold', width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'#ffe' }")
                 | {{season}}
 </template>
 

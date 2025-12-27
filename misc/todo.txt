@@ -3,7 +3,6 @@ bugs ...
   double windows notifications
 
 todo both ...
-  make map top row sticky
 
 todo non-simple:
   shows hidden from simple

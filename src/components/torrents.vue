@@ -907,16 +907,17 @@ export default {
     async continueDownload() {
       this.showModal = false;
       
-      if (!this.selectedTorrent) {
+      const torrent = this.selectedTorrent;
+      if (!torrent) {
         return;
       }
       
       // Mark as downloaded immediately to change card color
-      if (this.selectedTorrent?.raw?.title) {
-        this.downloadedTorrents.add(this.selectedTorrent.raw.title);
+      if (torrent?.raw?.title) {
+        this.downloadedTorrents.add(torrent.raw.title);
       }
       
-      const torrentTitle = this.selectedTorrent.raw?.title || 'Unknown';
+      const torrentTitle = torrent.raw?.title || 'Unknown';
       
       try {
         // Get cf_clearance cookies from localStorage
@@ -931,7 +932,7 @@ export default {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ 
-            torrent: this.selectedTorrent,
+            torrent,
             cfClearance: cfClearance
           })
         });
@@ -957,7 +958,7 @@ export default {
         // Check if download was successful
         if (data.success || data.result === true) {
           // Success
-          this.rememberDownloadedTorrent(this.selectedTorrent);
+          this.rememberDownloadedTorrent(torrent);
         } else {
           const errorMsg = data.error || data.message || 'Unknown error';
           this.showError(errorMsg);

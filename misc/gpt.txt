@@ -1,4 +1,6 @@
 
 the width of the series pane changed -- it should stay constant at the previous width -- contents like the infobox width are running off the right side
 
-adjust width of list.vue automatically so right side of panes like series, map, etc. line up with right side of browser window.  keep those pane widths constant
+adjust width of list.vue automatically so right side of #tabArea pane line up with right side of browser window.  keep #tabArea pane is 10 px to the left of the browser window right side. pane width constant
+
+reduce width of list pane so right side #tabArea pane is 10 px to the left of the browser window right side. 

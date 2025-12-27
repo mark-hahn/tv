@@ -2,7 +2,7 @@
 
 #all(style="width:100%; height:97dvh; box-sizing: border-box; padding:0; margin:0; display:flex;")
   List(
-    style="display:inline-block;" 
+    style="flex:1 1 auto; min-width:0px;" 
     :simpleMode="simpleMode"
     :sizing="activeSizing"
     @show-map="handleShowMap"
@@ -11,7 +11,7 @@
     @show-torrents="handleShowTorrents"
     @all-shows="handleAllShows"
   )
-  #tabArea(:style="{ flex:'1 1 auto', minWidth:'0px', display:'flex', flexDirection:'column', height:'100%' }")
+  #tabArea(:style="{ width: tabAreaWidth, flex:'0 0 auto', minWidth:'0px', display:'flex', flexDirection:'column', height:'100%' }")
     #tabBar(:style="{ display:'flex', gap:(simpleMode ? '30px' : '0px'), padding:(simpleMode ? '6px 8px' : '6px 0px'), alignItems:'center', borderBottom:'1px solid #ddd', backgroundColor:'#fafafa', flex:'0 0 auto', flexWrap:'wrap' }")
       button(
         v-for="t in tabs"
@@ -181,15 +181,19 @@ export default {
         buttonMarginBottom: '6px',
         buttonTopMargin: '0px',
         buttonContainerPadding: '12px'
-      },
-
-      windowW: (document.documentElement?.clientWidth || window.innerWidth || 0)
+      }
     } 
   },
   computed: {
     activeSizing() {
       const base = this.simpleMode ? this.sizing : this.sizingNonSimple;
 
+      // List pane should flex; keep internal list content at 100% of its container.
+      return { ...base, listWidth: '100%' };
+    },
+
+    tabAreaWidth() {
+      const base = this.simpleMode ? this.sizing : this.sizingNonSimple;
       const toPx = (val) => {
         if (typeof val === 'number' && Number.isFinite(val)) return val;
         if (typeof val !== 'string') return null;
@@ -197,19 +201,10 @@ export default {
         return m ? Number(m[1]) : null;
       };
 
-      const tabW = Math.max(
-        toPx(base?.seriesWidth) ?? 0,
-        toPx(base?.mapWidth) ?? 0
-      ) || 450;
-
-      const ww = this.windowW || (document.documentElement?.clientWidth || window.innerWidth || 0);
-      const listW = Math.max(0, Math.floor(ww - tabW));
-
-      // Keep right pane widths constant; adjust listWidth to make the tab area end at the window edge.
-      return {
-        ...base,
-        listWidth: `${listW}px`
-      };
+      const seriesW = toPx(base?.seriesWidth) ?? 0;
+      const mapW = toPx(base?.mapWidth) ?? 0;
+      const tabW = Math.max(seriesW, mapW) || 450;
+      return `${tabW}px`;
     },
     tabs() {
       const allTabs = [
@@ -230,14 +225,10 @@ export default {
   },
   unmounted() {
     evtBus.off('downActivePart', this.handleDownActivePart);
-    window.removeEventListener('resize', this.handleWindowResize);
     this.stopQbtPolling();
     this.cancelDownInactiveTimer();
   },
   methods: {
-    handleWindowResize() {
-      this.windowW = (document.documentElement?.clientWidth || window.innerWidth || 0);
-    },
     cancelDownInactiveTimer() {
       if (this._downInactiveTimer) {
         clearTimeout(this._downInactiveTimer);
@@ -581,10 +572,6 @@ export default {
     // Derive downActive and schedule deferred Tor restarts.
     evtBus.on('downActivePart', this.handleDownActivePart);
     this.startQbtPolling();
-
-    // Keep list width in sync with the browser window so right panes stay constant-width.
-    this.handleWindowResize();
-    window.addEventListener('resize', this.handleWindowResize);
 
     // Refresh space display once on app load.
     this.requestSpaceAvailRefresh('app load');

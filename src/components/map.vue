@@ -55,10 +55,10 @@
     //- No scrollbars: pan the table with arrows (horizontal) and mouse wheel (vertical).
     #maptblpane(ref="mapViewport"
       @wheel.stop.prevent="handleMapWheel"
-      @pointerdown.stop.prevent="handleMapPointerDown"
-      @pointermove.stop.prevent="handleMapPointerMove"
-      @pointerup.stop.prevent="handleMapPointerUp"
-      @pointercancel.stop.prevent="handleMapPointerUp"
+      @pointerdown="handleMapPointerDown"
+      @pointermove="handleMapPointerMove"
+      @pointerup="handleMapPointerUp"
+      @pointercancel="handleMapPointerUp"
       style="position:absolute; inset:0; overflow:hidden; box-sizing:border-box; touch-action:none;")
       //- Sticky header row: moves horizontally with pan but stays fixed vertically.
       div(ref="mapHeader" style="position:absolute; left:0; right:0; top:0; overflow:hidden; box-sizing:border-box; background-color:#ffe; pointer-events:none;")
@@ -98,15 +98,15 @@
 
       //- Sticky season column (covers the moving season cells when panning horizontally).
       div(
-        @pointerdown.stop.prevent="handleMapPointerDown"
-        @pointermove.stop.prevent="handleMapPointerMove"
-        @pointerup.stop.prevent="handleMapPointerUp"
-        @pointercancel.stop.prevent="handleMapPointerUp"
-        :style="{ position:'absolute', left:'0', top: mapHeaderH + 'px', bottom:'0', width:'28px', overflow:'hidden', zIndex:5, backgroundColor:'#ffe', pointerEvents: simpleMode ? 'none' : 'auto', touchAction:'none' }")
+        @pointerdown="handleMapPointerDown"
+        @pointermove="handleMapPointerMove"
+        @pointerup="handleMapPointerUp"
+        @pointercancel="handleMapPointerUp"
+        :style="{ position:'absolute', left:'0', top: mapHeaderH + 'px', bottom:'0', width:'28px', overflow:'hidden', zIndex:5, backgroundColor:'#ffe', pointerEvents:'auto', touchAction:'none' }")
         table(:style="{ fontSize:'16px', borderCollapse:'collapse', transform: 'translate(0px,' + (-mapScrollTop) + 'px)' }")
           tbody
             tr(v-for="season in seriesMapSeasons" :key="'sticky-' + season" style="outline:thin solid;")
-              td(@click.stop="handleSeasonClick($event, season)"
+              td(@click="handleSeasonClick($event, season)"
                  :style="{ fontWeight:'bold', width:'28px', minWidth:'28px', maxWidth:'28px', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'#ffe' }")
                 | {{season}}
 </template>
@@ -177,7 +177,10 @@ export default {
       mapTouchActive: false,
       mapTouchPointerId: -1,
       mapTouchLastX: 0,
-      mapTouchLastY: 0
+      mapTouchLastY: 0,
+      mapTouchMoved: false,
+      mapTouchMovedDist: 0,
+      mapTouchSuppressClickUntil: 0
     };
   },
 
@@ -253,7 +256,6 @@ export default {
     noop() {},
 
     handleMapPointerDown(event) {
-      if (this.simpleMode) return;
       if (!event) return;
       // Only handle touch/pen drag as "scroll". Mouse drag isn't expected UX here.
       const pt = event.pointerType || '';
@@ -267,6 +269,8 @@ export default {
       this.mapTouchPointerId = (event.pointerId != null) ? event.pointerId : -1;
       this.mapTouchLastX = event.clientX || 0;
       this.mapTouchLastY = event.clientY || 0;
+      this.mapTouchMoved = false;
+      this.mapTouchMovedDist = 0;
 
       try {
         if (event.currentTarget && typeof event.currentTarget.setPointerCapture === 'function' && event.pointerId != null) {
@@ -278,10 +282,12 @@ export default {
     },
 
     handleMapPointerMove(event) {
-      if (this.simpleMode) return;
       if (!this.mapTouchActive) return;
       if (!event) return;
       if (this.mapTouchPointerId !== -1 && event.pointerId != null && event.pointerId !== this.mapTouchPointerId) return;
+
+      // Prevent the browser from doing page scroll/gesture handling.
+      try { event.preventDefault(); } catch (_) { /* ignore */ }
 
       this.updateMapPanBounds();
 
@@ -291,6 +297,10 @@ export default {
       const dy = y - this.mapTouchLastY;
       this.mapTouchLastX = x;
       this.mapTouchLastY = y;
+
+      const movedThis = Math.abs(dx) + Math.abs(dy);
+      this.mapTouchMovedDist += movedThis;
+      if (!this.mapTouchMoved && this.mapTouchMovedDist >= 4) this.mapTouchMoved = true;
 
       // Native-scroll semantics: finger left => reveal right (scrollLeft increases).
       this.mapScrollLeft = this.clamp((this.mapScrollLeft || 0) - dx, 0, this.mapMaxScrollLeft || 0);
@@ -303,6 +313,11 @@ export default {
     handleMapPointerUp(event) {
       if (!this.mapTouchActive) return;
       if (event?.pointerId != null && this.mapTouchPointerId !== -1 && event.pointerId !== this.mapTouchPointerId) return;
+
+      if (this.mapTouchMoved) {
+        // A click can fire after touch drag; suppress the close action briefly.
+        this.mapTouchSuppressClickUntil = Date.now() + 300;
+      }
       this.mapTouchActive = false;
       this.mapTouchPointerId = -1;
     },
@@ -448,6 +463,7 @@ export default {
       }
     },
     handleMapClick(event) {
+      if (Date.now() < (this.mapTouchSuppressClickUntil || 0)) return;
       // Background click returns to Series.
       // (In non-simple mode, clicks inside the table stop propagation.)
       this.$emit('close');

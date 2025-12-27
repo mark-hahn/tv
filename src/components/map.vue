@@ -19,7 +19,7 @@
             @pointerdown.stop.prevent="startArrowPan($event, -1)"
             @pointerup.stop.prevent="stopArrowPan"
             @pointercancel.stop.prevent="stopArrowPan"
-            @pointerleave.stop.prevent="stopArrowPan"
+            @lostpointercapture.stop.prevent="stopArrowPan"
             :disabled="!canPanLeft"
             :style="{ opacity: canPanLeft ? 1 : 0.35, cursor: canPanLeft ? 'pointer' : 'default' }"
             style="font-size:15px; margin:5px; max-height:24px; border-radius:7px;"
@@ -29,7 +29,7 @@
             @pointerdown.stop.prevent="startArrowPan($event, 1)"
             @pointerup.stop.prevent="stopArrowPan"
             @pointercancel.stop.prevent="stopArrowPan"
-            @pointerleave.stop.prevent="stopArrowPan"
+            @lostpointercapture.stop.prevent="stopArrowPan"
             :disabled="!canPanRight"
             :style="{ opacity: canPanRight ? 1 : 0.35, cursor: canPanRight ? 'pointer' : 'default' }"
             style="font-size:15px; margin:5px; max-height:24px; border-radius:7px;"
@@ -56,27 +56,27 @@
     #maptblpane(ref="mapViewport" @wheel.stop.prevent="handleMapWheel" style="position:absolute; inset:0; overflow:hidden; box-sizing:border-box;")
       //- Sticky header row: moves horizontally with pan but stays fixed vertically.
       div(ref="mapHeader" style="position:absolute; left:0; right:0; top:0; overflow:hidden; box-sizing:border-box; background-color:#ffe; pointer-events:none;")
-        table(:style="{ fontSize:'16px', transform: 'translate(' + (-mapScrollLeft) + 'px,0px)' }")
+        table(:style="{ fontSize:'16px', borderCollapse:'collapse', transform: 'translate(' + (-mapScrollLeft) + 'px,0px)' }")
           tbody
             tr(style="font-weight:bold;")
-              td(:style="{ width:'10px', textAlign:'center', paddingRight:'4px', border:'1px solid #ccc', backgroundColor:'#ffe' }")
+              td(:style="{ width:'28px', minWidth:'28px', maxWidth:'28px', textAlign:'center', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'#ffe' }") &nbsp;
               td(v-for="episode in seriesMapEpis"
-                :style="{ padding:'0 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor:'#ffe' }"
-                key="episode") {{episode}}
+                :style="{ width:'28px', minWidth:'28px', maxWidth:'28px', padding:'1px 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor:'#ffe' }"
+                :key="episode") {{episode}}
 
       //- Body viewport starts below the sticky header.
       div(ref="mapBodyViewport" :style="{ position:'absolute', left:'0', right:'0', top: mapHeaderH + 'px', bottom:'0', overflow:'hidden', boxSizing:'border-box' }")
-        table(ref="mapBodyTable" :style="{ fontSize:'16px', transform: 'translate(' + (-mapScrollLeft) + 'px,' + (-mapScrollTop) + 'px)' }")
+        table(ref="mapBodyTable" :style="{ fontSize:'16px', borderCollapse:'collapse', transform: 'translate(' + (-mapScrollLeft) + 'px,' + (-mapScrollTop) + 'px)' }")
           tbody
-            tr(v-for="season in seriesMapSeasons" key="season"
+            tr(v-for="season in seriesMapSeasons" :key="season"
                       style="outline:thin solid;")
               td(@click="handleSeasonClick($event, season)"
-                 :style="{ fontWeight:'bold', width:'10px', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer', paddingRight:'4px' }")
+                  :style="{ fontWeight:'bold', width:'28px', minWidth:'28px', maxWidth:'28px', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'#ffe' }")
                 | {{season}}
 
-              td(v-for="episode in seriesMapEpis" key="series+'.'+episode"
+              td(v-for="episode in seriesMapEpis" :key="season + '.' + episode"
                   @click="handleEpisodeClick($event, mapShow, season, episode)"
-                  :style="{cursor:'default', padding:'0 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor: (seriesMap[season]?.[episode]?.error) ? 'yellow': (seriesMap[season]?.[episode]?.noFile) ? '#faa' : 'white'}")
+                  :style="{cursor:'default', width:'28px', minWidth:'28px', maxWidth:'28px', padding:'1px 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor: (seriesMap[season]?.[episode]?.error) ? 'yellow': (seriesMap[season]?.[episode]?.noFile) ? '#faa' : 'white'}")
                 span(v-if="seriesMap?.[season]?.[episode]?.played")  w
                 span(v-if="seriesMap?.[season]?.[episode]?.avail && !seriesMap?.[season]?.[episode]?.unaired && !mapShow?.Id?.startsWith('noemby-')")   +
                 span(v-if="seriesMap?.[season]?.[episode]?.noFile && !seriesMap?.[season]?.[episode]?.unaired")  -
@@ -181,16 +181,21 @@ export default {
     async mapShow(newShow) {
       if (newShow && newShow.Name) {
         await this.loadTvdbData();
-        this.logUnairedInfo();
         await this.setNextWatch();
-        this.$nextTick(() => this.updateMapPanBounds());
+        this.$nextTick(() => {
+          this.updateMapPanBounds();
+        });
       }
     },
     seriesMapSeasons() {
-      this.$nextTick(() => this.updateMapPanBounds());
+      this.$nextTick(() => {
+        this.updateMapPanBounds();
+      });
     },
     seriesMapEpis() {
-      this.$nextTick(() => this.updateMapPanBounds());
+      this.$nextTick(() => {
+        this.updateMapPanBounds();
+      });
     }
   },
 
@@ -199,10 +204,11 @@ export default {
   async mounted() {
     if (this.mapShow && this.mapShow.Name) {
       await this.loadTvdbData();
-      this.logUnairedInfo();
       await this.setNextWatch();
     }
-    this.$nextTick(() => this.updateMapPanBounds());
+    this.$nextTick(() => {
+      this.updateMapPanBounds();
+    });
     window.addEventListener('resize', this.updateMapPanBounds);
   },
 
@@ -217,12 +223,6 @@ export default {
 
     clamp(val, min, max) {
       return Math.min(max, Math.max(min, val));
-    },
-
-    getArrowStepPx() {
-      const viewport = this.$refs.mapViewport;
-      const vw = viewport?.clientWidth || 0;
-      return Math.max(50, Math.floor(vw * 0.8));
     },
 
     updateMapPanBounds() {
@@ -317,8 +317,8 @@ export default {
       // Sync desired with current before starting a new pan.
       this.mapDesiredLeft = this.clamp(this.mapDesiredLeft || this.mapScrollLeft, 0, this.mapMaxScrollLeft);
 
-      const step = this.getArrowStepPx();
-      const target = this.clamp(this.mapDesiredLeft + dir * step, 0, this.mapMaxScrollLeft);
+      // Press-and-hold should pan continuously to the edge.
+      const target = (dir > 0) ? (this.mapMaxScrollLeft || 0) : 0;
 
       this.arrowPanActive = true;
       this.arrowPanDir = dir;
@@ -359,28 +359,6 @@ export default {
         }
       } catch (err) {
         console.error('loadTvdbData error:', err);
-      }
-    },
-    logUnairedInfo() {
-      try {
-        const showName = this.mapShow?.Name || '(unknown)';
-        const unaired = [];
-        Object.keys(this.seriesMap || {}).forEach(season => {
-          const epis = this.seriesMap[season] || {};
-          Object.keys(epis).forEach(ep => {
-            const e = epis[ep];
-            if (!e) return;
-            if (e.unaired) {
-              unaired.push({ season: Number(season), episode: Number(ep), played: !!e.played, avail: !!e.avail, noFile: e.noFile, deleted: !!e.deleted });
-            }
-          });
-        });
-        console.group(`Map unaired debug for ${showName}`);
-        console.log('Unaired count:', unaired.length);
-        console.table(unaired);
-        console.groupEnd();
-      } catch (err) {
-        console.error('logUnairedInfo error:', err);
       }
     },
     handleMapClick(event) {

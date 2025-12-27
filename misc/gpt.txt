@@ -1,5 +1,6 @@
 
-
-that works
---
-change the arrow behavior such that instead of clicking them you press and hold and it scrolls smoothly. the max amount of scrolling should match the amount it used to scroll with a click on the right arrow. make the speed of the scroll adjustable with a const
+the hdr numbers now line up and the count of data cells in each row are correct 
+-- 
+remove the debugging for the cell data 
+-- 
+there is a new problem. as i hold down the arrow button it scrolls less that the width.  if i quit pressing and then press again it moves some more.  so i have to press it multiple times to get all the way to the end

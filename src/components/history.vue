@@ -42,6 +42,7 @@ export default {
       activeDownLoads: [],
       _pollTimer: null,
       _polling: false,
+      _active: false,
       useStaticSamples: false,
       _didInitialScroll: false,
       _didLoadOnce: false,
@@ -77,6 +78,11 @@ export default {
 
   mounted() {
     evtBus.on('paneChanged', this.onPaneChanged);
+
+    // This component is mounted (v-show) even when not visible.
+    // Keep polling in the background so qBittorrent completion can trigger tvproc/startProc
+    // regardless of which pane is currently shown.
+    if (!this.useStaticSamples) this.startPolling();
   },
 
   unmounted() {
@@ -113,11 +119,12 @@ export default {
     },
 
     onPaneChanged(pane) {
-      if (pane === 'history') {
+      this._active = pane === 'history';
+      if (this._active) {
         this._didInitialScroll = false;
         if (!this.useStaticSamples) this.startPolling();
-      } else {
-        this.stopPolling();
+        // Refresh immediately when user switches here.
+        this.scheduleNextPoll(0);
       }
     },
 
@@ -230,11 +237,14 @@ export default {
           this._didLoadOnce = true;
 
           await this.$nextTick();
-          if (!this._didInitialScroll) {
-            this.scrollToBottom();
-            this._didInitialScroll = true;
-          } else if (wasAtBottom) {
-            this.scrollToBottom();
+          // Only auto-scroll when this pane is actually visible.
+          if (this._active) {
+            if (!this._didInitialScroll) {
+              this.scrollToBottom();
+              this._didInitialScroll = true;
+            } else if (wasAtBottom) {
+              this.scrollToBottom();
+            }
           }
         }
       } catch {

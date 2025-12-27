@@ -77,6 +77,7 @@ export default {
       _fastPollStartTime: null,
       _oldDownloadingCount: 0,
       _lastFinishedEnded: 0,
+      _lastNotifiedEnded: 0,
       _tvprocInitialized: false
     };
   },
@@ -103,6 +104,12 @@ export default {
     evtBus.on('paneChanged', this.onPaneChanged);
     evtBus.on('forceFile', this.handleForceFile);
     evtBus.on('cycle-started', this.handleCycleStarted);
+
+    // This component is mounted (v-show) even when not visible.
+    // Keep polling in the background so it can react to download completion and kick cycles.
+    if (!this._pollTimer) {
+      this.scheduleNextPoll(0);
+    }
   },
 
   unmounted() {
@@ -153,8 +160,9 @@ export default {
       // Start fast polling when a cycle starts
       this._fastPollStartTime = Date.now();
       this._oldDownloadingCount = this.items.filter(it => it.status === 'downloading' && (!it.dateEnded || it.dateEnded === 0)).length;
-      // Start polling immediately, even if pane is not active
-      void this.loadTvproc();
+      // Start polling immediately, even if pane is not active.
+      // Do not call loadTvproc() synchronously here; cycle-started can be emitted
+      // from inside loadTvproc(), which would cause re-entrant loops.
       this.scheduleNextPoll(1000);
     },
 
@@ -188,6 +196,13 @@ export default {
       if (this._loadingTimer) {
         clearTimeout(this._loadingTimer);
         this._loadingTimer = null;
+      }
+    },
+
+    clearPollTimer() {
+      if (this._pollTimer) {
+        clearTimeout(this._pollTimer);
+        this._pollTimer = null;
       }
     },
 
@@ -278,26 +293,30 @@ export default {
     },
 
     scheduleNextPoll(ms) {
-      this.stopPolling();
-      
+      // Only clear the poll timer; do not reset loading state here.
+      // Poll cadence is defined as: wait N ms AFTER the previous poll completes.
+      this.clearPollTimer();
+
       // Determine if we should use fast polling
-      let pollInterval = ms;
+      let pollDelay = ms;
       if (this._fastPollStartTime) {
         const elapsed = Date.now() - this._fastPollStartTime;
         if (elapsed < 30000) {
           // Still within 30-second fast polling window
-          pollInterval = 1000;
+          pollDelay = 1000;
         } else {
           // Timeout reached, go back to normal polling
           this._fastPollStartTime = null;
-          pollInterval = 5000;
+          pollDelay = 5000;
         }
       }
-      
-      this._pollTimer = setTimeout(() => {
-        void this.loadTvproc();
+
+      this._pollTimer = setTimeout(async () => {
+        await this.loadTvproc();
+        // Default to a 5-second delay after completion; scheduleNextPoll will
+        // override to 1s if the fast window is still active.
         this.scheduleNextPoll(5000);
-      }, pollInterval);
+      }, Math.max(0, Number(pollDelay) || 0));
     },
 
     isNearBottom(el) {
@@ -649,6 +668,7 @@ export default {
         if (initializing) {
           this._tvprocInitialized = true;
           this._lastFinishedEnded = finishedEndedMax;
+          this._lastNotifiedEnded = finishedEndedMax;
           didFinishSomething = false;
         }
         
@@ -660,10 +680,19 @@ export default {
         }
         
         // If a download finished and nothing is downloading, trigger cycle.
-        // Notify when we observe a new finished item (since baseline) and nothing is downloading.
+        // Notify only once per newly observed finished timestamp.
         if (!initializing && newDownloading.length === 0 && (oldDownloading.length > 0 || didFinishSomething)) {
-          const lastTitle = String(oldDownloading?.[oldDownloading.length - 1]?.title || '').trim();
-          this.notifyAllUsbFinished(lastTitle);
+          // Mark the finished item as processed BEFORE emitting cycle-started
+          // to avoid re-entrant loadTvproc() calls re-detecting it.
+          if (finishedEndedMax > Number(this._lastFinishedEnded || 0)) {
+            this._lastFinishedEnded = finishedEndedMax;
+          }
+
+          if (finishedEndedMax > Number(this._lastNotifiedEnded || 0)) {
+            this._lastNotifiedEnded = finishedEndedMax;
+            const lastTitle = String(oldDownloading?.[oldDownloading.length - 1]?.title || '').trim();
+            this.notifyAllUsbFinished(lastTitle);
+          }
 
           // Call cycle endpoint to start next download
           try {
@@ -674,7 +703,8 @@ export default {
             // Silently ignore
           }
 
-          evtBus.emit('cycle-started');
+          // Defer to avoid synchronous re-entrancy into loadTvproc().
+          setTimeout(() => evtBus.emit('cycle-started'), 0);
         }
 
         // Update last-finished timestamp after processing.

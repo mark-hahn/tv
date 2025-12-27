@@ -1,2 +1,8 @@
 
 when in actors pane don't switch to series pane when a new show is selected.
+
+i reverted changes since the windows notification problem. all your changes did not relate to the fact that tvproc didn't send a start proc after qbt finished.
+
+i reverted changes since the windows notification problem. fix the windows notification problem but this time make sure that a tvproc startproc is still issued when a qbt download is finished.
+
+as an exception to rule that pane visibilty should not affect logic have polling slow down to every 

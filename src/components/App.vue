@@ -11,7 +11,7 @@
     @show-torrents="handleShowTorrents"
     @all-shows="handleAllShows"
   )
-  #tabArea(:style="{ width: tabAreaWidth, flex:'0 0 auto', minWidth:'0px', display:'flex', flexDirection:'column', height:'100%' }")
+  #tabArea(:style="{ width: tabAreaWidth, flex:'0 0 auto', minWidth:'0px', display:'flex', flexDirection:'column', height:'100%', marginRight:'10px' }")
     #tabBar(:style="{ display:'flex', gap:(simpleMode ? '30px' : '0px'), padding:(simpleMode ? '6px 8px' : '6px 0px'), alignItems:'center', borderBottom:'1px solid #ddd', backgroundColor:'#fafafa', flex:'0 0 auto', flexWrap:'wrap' }")
       button(
         v-for="t in tabs"

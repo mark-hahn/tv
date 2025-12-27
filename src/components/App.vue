@@ -4,7 +4,7 @@
   List(
     style="display:inline-block;" 
     :simpleMode="simpleMode"
-    :sizing="simpleMode ? sizing : sizingNonSimple"
+    :sizing="activeSizing"
     @show-map="handleShowMap"
     @hide-map="handleHideMap"
     @show-actors="handleShowActors"
@@ -21,7 +21,7 @@
       ) {{ t.label }}
 
     #tabBody(:style="{ flex:'1 1 auto', minHeight:'0px', position:'relative' }")
-      Series(v-show="currentPane === 'series'" style="display:inline-block;" :simpleMode="simpleMode" :sizing="simpleMode ? sizing : sizingNonSimple")
+      Series(v-show="currentPane === 'series'" style="display:inline-block;" :simpleMode="simpleMode" :sizing="activeSizing")
       Map(
         v-show="currentPane === 'map'"
         :mapShow="mapShow"
@@ -31,7 +31,7 @@
         :seriesMap="seriesMap"
         :mapError="mapError"
         :simpleMode="simpleMode"
-        :sizing="simpleMode ? sizing : sizingNonSimple"
+        :sizing="activeSizing"
         @prune="handleMapAction('prune', $event)"
         @set-date="handleMapAction('date', $event)"
         @close="handleMapAction('close')"
@@ -41,13 +41,13 @@
       Actors(
         v-show="currentPane === 'actors'"
         :simpleMode="simpleMode"
-        :sizing="simpleMode ? sizing : sizingNonSimple"
+        :sizing="activeSizing"
       )
       Reel(
         v-if="!simpleMode"
         v-show="currentPane === 'reel'"
         :simpleMode="simpleMode"
-        :sizing="simpleMode ? sizing : sizingNonSimple"
+        :sizing="activeSizing"
         :allShows="allShows"
         :active="currentPane === 'reel'"
       )
@@ -55,7 +55,7 @@
         v-if="!simpleMode"
         v-show="currentPane === 'torrents'"
         :simpleMode="simpleMode"
-        :sizing="simpleMode ? sizing : sizingNonSimple"
+        :sizing="activeSizing"
         :activeShow="currentShow"
       )
 
@@ -63,21 +63,21 @@
         v-if="!simpleMode"
         v-show="currentPane === 'flex'"
         :simpleMode="simpleMode"
-        :sizing="simpleMode ? sizing : sizingNonSimple"
+        :sizing="activeSizing"
       )
 
       History(
         v-if="!simpleMode"
         v-show="currentPane === 'history'"
         :simpleMode="simpleMode"
-        :sizing="simpleMode ? sizing : sizingNonSimple"
+        :sizing="activeSizing"
       )
 
       TvProc(
         v-if="!simpleMode"
         v-show="currentPane === 'tvproc'"
         :simpleMode="simpleMode"
-        :sizing="simpleMode ? sizing : sizingNonSimple"
+        :sizing="activeSizing"
       )
 </template>
 
@@ -181,10 +181,36 @@ export default {
         buttonMarginBottom: '6px',
         buttonTopMargin: '0px',
         buttonContainerPadding: '12px'
-      }
+      },
+
+      windowW: (document.documentElement?.clientWidth || window.innerWidth || 0)
     } 
   },
   computed: {
+    activeSizing() {
+      const base = this.simpleMode ? this.sizing : this.sizingNonSimple;
+
+      const toPx = (val) => {
+        if (typeof val === 'number' && Number.isFinite(val)) return val;
+        if (typeof val !== 'string') return null;
+        const m = val.trim().match(/^([0-9]+(?:\.[0-9]+)?)px$/);
+        return m ? Number(m[1]) : null;
+      };
+
+      const tabW = Math.max(
+        toPx(base?.seriesWidth) ?? 0,
+        toPx(base?.mapWidth) ?? 0
+      ) || 450;
+
+      const ww = this.windowW || (document.documentElement?.clientWidth || window.innerWidth || 0);
+      const listW = Math.max(0, Math.floor(ww - tabW));
+
+      // Keep right pane widths constant; adjust listWidth to make the tab area end at the window edge.
+      return {
+        ...base,
+        listWidth: `${listW}px`
+      };
+    },
     tabs() {
       const allTabs = [
         { label: 'Series', key: 'series' },
@@ -204,10 +230,14 @@ export default {
   },
   unmounted() {
     evtBus.off('downActivePart', this.handleDownActivePart);
+    window.removeEventListener('resize', this.handleWindowResize);
     this.stopQbtPolling();
     this.cancelDownInactiveTimer();
   },
   methods: {
+    handleWindowResize() {
+      this.windowW = (document.documentElement?.clientWidth || window.innerWidth || 0);
+    },
     cancelDownInactiveTimer() {
       if (this._downInactiveTimer) {
         clearTimeout(this._downInactiveTimer);
@@ -551,6 +581,10 @@ export default {
     // Derive downActive and schedule deferred Tor restarts.
     evtBus.on('downActivePart', this.handleDownActivePart);
     this.startQbtPolling();
+
+    // Keep list width in sync with the browser window so right panes stay constant-width.
+    this.handleWindowResize();
+    window.addEventListener('resize', this.handleWindowResize);
 
     // Refresh space display once on app load.
     this.requestSpaceAvailRefresh('app load');

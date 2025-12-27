@@ -438,6 +438,17 @@ export default {
 </script>
 
 <style>
+  #series {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  #series::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+
   button {
     cursor:pointer;
   }

@@ -1,5 +1,5 @@
 <template lang="pug">
-#hdrbottom(style="width:100%; background-color:#ccc; display:flex; justify-content:space-between; margin-top:5px; margin-bottom:5px;")
+#hdrbottom(style="width:100%; background-color:#ccc; display:flex; justify-content:space-between; margin-top:5px; margin-bottom:5px; padding-right:5px; box-sizing:border-box;")
   #botlft(style="width:400px; overflow:hidden; display:flex; justify-content:space-between;")
 
     button(@click="$emit('top-click')" 
@@ -18,10 +18,10 @@
         | {{selectedFilter}}
   button(@click="$emit('all-click')" 
           style="display:inline-block'; width:40px; font-size:15px; margin:4px 10px 4px 10px;backgroundColor:white") All
-  #botrgt(style="display:flex; justify-content:space-between; margin: 5px 17px 0 0;")
+  #botrgt(:style="{ display:'flex', justifyContent:'flex-start', margin:'5px 0 0 0', width: (conds.length * 22) + 'px' }")
     #fltrs(v-for="cond in conds" :key="cond.name"
         @click="$emit('cond-fltr-click', cond, $event)"
-        :style="{width:'1.435em', textAlign:'center', display:'inline-block', color:condFltrColor(cond)}")
+        :style="{width:'22px', padding:'0', margin:'0', textAlign:'center', display:'inline-block', color:condFltrColor(cond)}")
       font-awesome-icon(:icon="cond.icon"
                         :style="{}")
 

@@ -1323,6 +1323,17 @@ export default {
 tr:nth-child(even) {
   background-color: #f4f4f4;
 }
+
+#showsContainer {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+#showsContainer::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
 #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;

@@ -844,3 +844,16 @@ export default {
   }
 }
 </script>
+
+<style>
+  #actors {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  #actors::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+</style>

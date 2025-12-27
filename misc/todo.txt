@@ -5,17 +5,17 @@ bugs ...
 todo both ...
 
 todo non-simple:
-  shows hidden from simple
   show episode and file details
   abort qbt downloading
-  save filter settings for simple custom button
-  take notes
   how to see why qbt or down don't start
+  save filter settings for simple custom button
   
 todo simple ...
   add custom button
   
 tabled ...
+  take notes
+  shows hidden from simple
   half-hour filter
   waiting enhancements
     sort by waiting date

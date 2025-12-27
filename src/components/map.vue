@@ -10,7 +10,6 @@
       #mapshow(:style="{ marginLeft:'15px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px' }")
         | {{mapShow?.Name}} 
       div(style="display:flex; ")
-        #mapstatus(style="margin:6px;") {{statusVal}}
         #mapnoemby(v-if="mapShow?.Id?.startsWith('noemby-')"
             style="font-weight:bold; color:red; font-size:14px; white-space:nowrap; margin:8px; max-height:24px;") Not In Emby
         #mapbuttons(v-if="!simpleMode" style="display:flex; gap:5px; flex-shrink:0;")
@@ -36,11 +35,10 @@
           ) →
           button(v-if="!mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px 0 5px 5px; max-height:24px; border-radius:7px;") Prune
 
-    #maphdr2(style="display:flex; justify-content:space-between; align-items:center; color:red; margin:0 10px 5px 10px; padding-left:5px; ")
-      #dates(v-if="datesLine" :style="{ fontSize: sizing.seriesInfoFontSize || '20px', paddingLeft:'5px', display:'flex', gap:'10px' }")
-        span {{firstAiredVal}}
-        span {{lastAiredVal}}
-
+    #maphdr2(style="display:flex; justify-content:space-between; align-items:center; color:red; margin:0 10px 5px 10px; padding-left:5px; font-size:15px;")
+      #dates(v-if="datesLine" :style="{  paddingLeft:'5px'}")
+        span {{firstAiredVal}} {{lastAiredVal}}
+      #mapstatus(style="margin:6px;") {{statusVal}}
       #gaps(v-if="mapShow?.WatchGap || mapShow?.FileGap  || mapShow?.WaitStr?.length"
             style="display:flex; gap:15px;")
           div(v-if="mapShow?.WatchGap")

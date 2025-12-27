@@ -1,19 +1,2 @@
 
 
-remove all scrollbars in series and actors panes
---
-i added id="showlineicons" to show.vue
---
-adjust the offset and spacing of icons in #botrgt in #hdrbottom  to line up with the icons in #showlineicons
-
-spacing in #botrgt doesn't match spacing in #showlineicons.  feel free to make #botrgt and #showlineicons fixed-width.
-
-the spacing in #botrgt doesn't match spacing in #showlineicons so the alignment drifts
-
-#botrgt and #showlineicons now align perfectly but they need some space on the right -- add 5px margin-right to #botrgt and #showlineicons
-
-#botrgt moved left but #showlineicons didn't
---
-remove scrollbars from #showsContainer
-
-there is a 1px line on the right side of #shows and table in #shows.  is it a border?

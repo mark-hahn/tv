@@ -1,5 +1,2 @@
 
-
-in map one click of mouse wheel causes 8 rows of vertical scroll
-
-do the same thing for show list, reel pane, tor, flex, qbt and down panes
+when in actors pane don't switch to series pane when a new show is selected.

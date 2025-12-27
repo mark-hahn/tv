@@ -607,26 +607,41 @@ export default {
       // tvdbDataReady may arrive later; that's fine.
       this.currentShow = show;
 
-      // If map is not currently showing, always return to the Series pane.
-      if (this.currentPane !== 'map') {
-        const prevPane = this.currentPane;
-        this.currentPane = 'series';
-        this.mapShow = null;
-        evtBus.emit('paneChanged', this.currentPane);
+      // If currently on Map, do not force-switch panes.
+      // list.vue will separately update the map content.
+      if (this.currentPane === 'map') {
+        return;
+      }
 
-        // Reset actors pane only when show selection changes.
-        evtBus.emit('resetActorsPane');
-        this._actorsInitialized = false;
-        this._actorsShowKey = null;
+      const prevPane = this.currentPane;
 
-        // Only reset torrents; status pane should never reset.
-        if (prevPane === 'torrents') {
-          evtBus.emit('resetTorrentsPane');
-        }
+      // New show selection should reset Actors state.
+      evtBus.emit('resetActorsPane');
+      this._actorsInitialized = false;
+      this._actorsShowKey = null;
 
-        // New show selection should allow torrents pane to reinitialize.
-        this._torrentsInitialized = false;
-        this._torrentsShowKey = null;
+      // Clear stale TVDB data until the series pane publishes the new show data.
+      this.currentTvdbData = null;
+
+      // New show selection should allow torrents pane to reinitialize.
+      this._torrentsInitialized = false;
+      this._torrentsShowKey = null;
+
+      // When currently viewing Actors, stay on Actors (do not bounce to Series).
+      if (prevPane === 'actors') {
+        // Trigger a refresh; tvdbData may be null initially and will be resent on tvdbDataReady.
+        evtBus.emit('showActors', { show: this.currentShow, tvdbData: this.currentTvdbData });
+        return;
+      }
+
+      // Otherwise, return to the Series pane.
+      this.currentPane = 'series';
+      this.mapShow = null;
+      evtBus.emit('paneChanged', this.currentPane);
+
+      // Only reset torrents UI when torrents pane was open.
+      if (prevPane === 'torrents') {
+        evtBus.emit('resetTorrentsPane');
       }
     });
     
@@ -634,6 +649,14 @@ export default {
     evtBus.on('tvdbDataReady', (data) => {
       this.currentShow = data.show;
       this.currentTvdbData = data.tvdbData;
+
+      // If Actors pane is currently showing, refresh it with the newly loaded tvdbData.
+      if (this.currentPane === 'actors') {
+        const showKey = this.currentShow?.Id || this.currentShow?.Name || null;
+        evtBus.emit('showActors', { show: this.currentShow, tvdbData: this.currentTvdbData });
+        this._actorsInitialized = true;
+        this._actorsShowKey = showKey;
+      }
     });
 
     // Optional test has been silenced to avoid console noise

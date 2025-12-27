@@ -20,8 +20,8 @@
 
       div(style="margin-left:20px; margin-right:20px; margin-top:6px; font-weight:normal; font-size:15px; color:#666; display:block; line-height:1.1; overflow:visible;")
         div(style="display:flex; align-items:center; justify-content:flex-start; gap:25px; white-space:nowrap;")
-          div(style="display:flex; align-items:center; gap:10px;")
-            div(style="font-weight:bold;") USB
+          div(style="display:flex")
+            div() USB:
             table(style="border-collapse:separate; border-spacing:15px 0;")
               tbody
                 tr
@@ -29,8 +29,8 @@
                     span {{ spaceUsbGb }} GB
                   td(style="text-align:right; padding:0;")
                     span {{ spaceUsbPct }}
-          div(style="display:flex; align-items:center; gap:10px;")
-            div(style="font-weight:bold;") SRVR
+          div(style="display:flex;")
+            div() SRVR:
             table(style="border-collapse:separate; border-spacing:15px 0;")
               tbody
                 tr

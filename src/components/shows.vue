@@ -23,7 +23,7 @@
          :style="{maxWidth:'110px', fontSize:'16px', backgroundColor: hilite(show), cursor:'default', textAlign:'center', paddingLeft: simpleMode ? '20px' : '0'}") 
         | {{ getSortDisplayValue(show) }}
         
-      td(:style="{display:'flex', padding:'5px', justifyContent:'space-between', backgroundColor: hilite(show)}")
+      td(id="showlineicons" :style="{display:'flex', padding:'5px', justifyContent:'space-between', backgroundColor: hilite(show)}")
 
         div(style="padding:2px; fontSize:16px; font-weight:bold;" @click="$emit('select-show', show, false, true)") {{show.Name}} 
 

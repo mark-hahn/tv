@@ -1,8 +1,7 @@
 
-the width of the series pane changed -- it should stay constant at the previous width -- contents like the infobox width are running off the right side
-
-adjust width of list.vue automatically so right side of #tabArea pane line up with right side of browser window.  keep #tabArea pane is 10 px to the left of the browser window right side. pane width constant
-
-reduce width of list pane so right side #tabArea pane is 10 px to the left of the browser window right side. 
 
 remove all scrollbars in series and actors panes
+--
+i added id="showlineicons" to show.vue
+--
+adjust the offset and spacing of icons in #botrgt in #hdrbottom  to line up with the icons in #showlineicons

@@ -53,7 +53,13 @@
             | {{'Waiting ' + mapShow?.WaitStr}}
   #maptable(v-if="!hideMapBottom" style="flex:1 1 auto; min-height:0px; margin-left:15px; margin-right:15px; box-sizing:border-box; position:relative; overflow:hidden;")
     //- No scrollbars: pan the table with arrows (horizontal) and mouse wheel (vertical).
-    #maptblpane(ref="mapViewport" @wheel.stop.prevent="handleMapWheel" style="position:absolute; inset:0; overflow:hidden; box-sizing:border-box;")
+    #maptblpane(ref="mapViewport"
+      @wheel.stop.prevent="handleMapWheel"
+      @pointerdown.stop.prevent="handleMapPointerDown"
+      @pointermove.stop.prevent="handleMapPointerMove"
+      @pointerup.stop.prevent="handleMapPointerUp"
+      @pointercancel.stop.prevent="handleMapPointerUp"
+      style="position:absolute; inset:0; overflow:hidden; box-sizing:border-box; touch-action:none;")
       //- Sticky header row: moves horizontally with pan but stays fixed vertically.
       div(ref="mapHeader" style="position:absolute; left:0; right:0; top:0; overflow:hidden; box-sizing:border-box; background-color:#ffe; pointer-events:none;")
         table(:style="{ fontSize:'16px', borderCollapse:'collapse', transform: 'translate(' + (-mapScrollLeft) + 'px,0px)' }")
@@ -91,7 +97,12 @@
                 span(v-if="seriesMap?.[season]?.[episode]?.deleted") d
 
       //- Sticky season column (covers the moving season cells when panning horizontally).
-      div(:style="{ position:'absolute', left:'0', top: mapHeaderH + 'px', bottom:'0', width:'28px', overflow:'hidden', zIndex:5, backgroundColor:'#ffe', pointerEvents: simpleMode ? 'none' : 'auto' }")
+      div(
+        @pointerdown.stop.prevent="handleMapPointerDown"
+        @pointermove.stop.prevent="handleMapPointerMove"
+        @pointerup.stop.prevent="handleMapPointerUp"
+        @pointercancel.stop.prevent="handleMapPointerUp"
+        :style="{ position:'absolute', left:'0', top: mapHeaderH + 'px', bottom:'0', width:'28px', overflow:'hidden', zIndex:5, backgroundColor:'#ffe', pointerEvents: simpleMode ? 'none' : 'auto', touchAction:'none' }")
         table(:style="{ fontSize:'16px', borderCollapse:'collapse', transform: 'translate(0px,' + (-mapScrollTop) + 'px)' }")
           tbody
             tr(v-for="season in seriesMapSeasons" :key="'sticky-' + season" style="outline:thin solid;")
@@ -162,7 +173,11 @@ export default {
       mapPanRafId: 0,
       mapPanLastTs: 0,
       arrowPanTargetLeft: 0,
-      arrowPanDir: 0
+      arrowPanDir: 0,
+      mapTouchActive: false,
+      mapTouchPointerId: -1,
+      mapTouchLastX: 0,
+      mapTouchLastY: 0
     };
   },
 
@@ -236,6 +251,61 @@ export default {
 
   methods: {
     noop() {},
+
+    handleMapPointerDown(event) {
+      if (this.simpleMode) return;
+      if (!event) return;
+      // Only handle touch/pen drag as "scroll". Mouse drag isn't expected UX here.
+      const pt = event.pointerType || '';
+      if (pt !== 'touch' && pt !== 'pen') return;
+
+      this.stopArrowPan();
+      this.stopMapPanLoop();
+      this.updateMapPanBounds();
+
+      this.mapTouchActive = true;
+      this.mapTouchPointerId = (event.pointerId != null) ? event.pointerId : -1;
+      this.mapTouchLastX = event.clientX || 0;
+      this.mapTouchLastY = event.clientY || 0;
+
+      try {
+        if (event.currentTarget && typeof event.currentTarget.setPointerCapture === 'function' && event.pointerId != null) {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        }
+      } catch (_) {
+        // ignore
+      }
+    },
+
+    handleMapPointerMove(event) {
+      if (this.simpleMode) return;
+      if (!this.mapTouchActive) return;
+      if (!event) return;
+      if (this.mapTouchPointerId !== -1 && event.pointerId != null && event.pointerId !== this.mapTouchPointerId) return;
+
+      this.updateMapPanBounds();
+
+      const x = event.clientX || 0;
+      const y = event.clientY || 0;
+      const dx = x - this.mapTouchLastX;
+      const dy = y - this.mapTouchLastY;
+      this.mapTouchLastX = x;
+      this.mapTouchLastY = y;
+
+      // Native-scroll semantics: finger left => reveal right (scrollLeft increases).
+      this.mapScrollLeft = this.clamp((this.mapScrollLeft || 0) - dx, 0, this.mapMaxScrollLeft || 0);
+      this.mapDesiredLeft = this.mapScrollLeft;
+
+      // Finger up => reveal lower rows (scrollTop increases).
+      this.mapScrollTop = this.clamp((this.mapScrollTop || 0) - dy, 0, this.mapMaxScrollTop || 0);
+    },
+
+    handleMapPointerUp(event) {
+      if (!this.mapTouchActive) return;
+      if (event?.pointerId != null && this.mapTouchPointerId !== -1 && event.pointerId !== this.mapTouchPointerId) return;
+      this.mapTouchActive = false;
+      this.mapTouchPointerId = -1;
+    },
 
     clamp(val, min, max) {
       return Math.min(max, Math.max(min, val));

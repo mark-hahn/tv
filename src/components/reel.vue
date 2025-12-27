@@ -25,7 +25,9 @@
     // keep zero gap between description and buttons
     #reelDescrButtons(:style="{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: '0' }")
       #reelDescr(
-        :style="{ flex: '0 0 auto', height: '120px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', overflowY: 'auto', fontSize: '14px', lineHeight: '1.5' }")
+        :style="{ flex: '0 0 auto', height: '120px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', overflowY: 'auto', fontSize: '14px', lineHeight: '1.5' }"
+        @wheel.stop.prevent="handleScaledWheel"
+      )
         div(v-if="curTvdb") {{ curTvdb.overview }}
       
       #reelButtons(
@@ -55,7 +57,9 @@
     
     #reelTitles(
       ref="titlesPane"
-      :style="{ flex: '1', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0' }")
+      :style="{ flex: '1', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0' }"
+      @wheel.stop.prevent="handleScaledWheel"
+    )
       div(
         v-for="(item, idx) in parsedTitles"
         :key="idx"
@@ -110,6 +114,16 @@ export default {
     const _titlesPopulated = ref(false);
     const _didStartReel = ref(false);
     const _didInitialVisibleScroll = ref(false);
+
+    const handleScaledWheel = (event) => {
+      if (!event) return;
+      const el = event.currentTarget;
+      if (!el) return;
+      const dy = (event.deltaY || 0);
+      const scaledDy = dy * 0.125;
+      const max = Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0));
+      el.scrollTop = Math.max(0, Math.min(max, (el.scrollTop || 0) + scaledDy));
+    };
 
     const NO_MORE_ENTRY = 'msg|-- no more titles --';
 
@@ -502,6 +516,7 @@ export default {
       infoLine,
       galleryTitleLine,
       titlesPane,
+      handleScaledWheel,
       getTitleCardStyle,
       handleGallerySelect,
       selectTitle,

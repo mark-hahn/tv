@@ -2,7 +2,9 @@
 
 #reelGallery(
   ref="galleryPane"
-  :style="{ flex: '1', minHeight: 0, height: '100%', overflowY: 'auto', overflowX: 'hidden', display: 'block', padding: '2px' }")
+  :style="{ flex: '1', minHeight: 0, height: '100%', overflowY: 'auto', overflowX: 'hidden', display: 'block', padding: '2px' }"
+  @wheel.stop.prevent="handleScaledWheel"
+)
   
   div(
     v-for="(tvdb, idx) in tvdbList"
@@ -41,6 +43,16 @@ export default {
     const tvdbList = ref([]);
     const selectedIdx = ref(0);
     const galleryPane = ref(null);
+
+    const handleScaledWheel = (event) => {
+      if (!event) return;
+      const el = event.currentTarget;
+      if (!el) return;
+      const dy = (event.deltaY || 0);
+      const scaledDy = dy * 0.125;
+      const max = Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0));
+      el.scrollTop = Math.max(0, Math.min(max, (el.scrollTop || 0) + scaledDy));
+    };
 
     const getImageUrl = (tvdb) => {
       if (!tvdb) return null;
@@ -113,7 +125,8 @@ export default {
       getImageUrl,
       getCardStyle,
       selectCard,
-      handleImageError
+      handleImageError,
+      handleScaledWheel
     };
   }
 };

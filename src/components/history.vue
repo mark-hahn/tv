@@ -2,7 +2,11 @@
 
 #history(:style="{ height:'100%', padding:'5px', margin:0, marginLeft:'16px', display:'flex', flexDirection:'column', overflow:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa', fontWeight:'bold' }")
 
-  #scroller(ref="scroller" :style="{ flex:'1 1 auto', minHeight:'0px', overflowY:'auto', overflowX:'hidden' }")
+  #scroller(
+    ref="scroller"
+    :style="{ flex:'1 1 auto', minHeight:'0px', overflowY:'auto', overflowX:'hidden' }"
+    @wheel.stop.prevent="handleScaledWheel"
+  )
 
     div(v-if="sortedTorrents.length === 0" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
       span(v-if="emptyStateText") {{ emptyStateText }}
@@ -82,6 +86,16 @@ export default {
   },
 
   methods: {
+    handleScaledWheel(event) {
+      if (!event) return;
+      const el = event.currentTarget;
+      if (!el) return;
+      const dy = (event.deltaY || 0);
+      const scaledDy = dy * 0.125;
+      const max = Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0));
+      el.scrollTop = Math.max(0, Math.min(max, (el.scrollTop || 0) + scaledDy));
+    },
+
     getScroller() {
       return this.$refs.scroller || null;
     },

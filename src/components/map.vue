@@ -400,7 +400,11 @@ export default {
       if (!event) return;
       // Vertical pan only.
       this.updateMapPanBounds();
-      this.mapScrollTop = this.clamp(this.mapScrollTop + (event.deltaY || 0), 0, this.mapMaxScrollTop);
+      // On Windows mouse wheels, one notch often produces a fairly large deltaY.
+      // Scale it down so one wheel "click" pans roughly one row.
+      const dy = (event.deltaY || 0);
+      const scaledDy = dy * 0.125;
+      this.mapScrollTop = this.clamp(this.mapScrollTop + scaledDy, 0, this.mapMaxScrollTop);
     },
 
     startArrowPan(event, dir) {

@@ -1,2 +1,5 @@
 
 
+in map one click of mouse wheel causes 8 rows of vertical scroll
+
+do the same thing for show list, reel pane, tor, flex, qbt and down panes

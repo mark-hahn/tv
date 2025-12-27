@@ -1,6 +1,10 @@
 <template lang="pug">
 .torrents-container(:style="{ height:'100%', width:'100%', display:'flex', justifyContent:'flex-start' }")
-  #torrents(ref="scroller" :style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }")
+  #torrents(
+    ref="scroller"
+    :style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }"
+    @wheel.stop.prevent="handleScaledWheel"
+  )
 
     #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'10px', marginLeft:'0px', marginRight:'0px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
       div(style="display:flex; justify-content:space-between; align-items:center;")
@@ -213,6 +217,16 @@ export default {
   },
 
   methods: {
+    handleScaledWheel(event) {
+      if (!event) return;
+      const el = event.currentTarget;
+      if (!el) return;
+      const dy = (event.deltaY || 0);
+      const scaledDy = dy * 0.125;
+      const max = Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0));
+      el.scrollTop = Math.max(0, Math.min(max, (el.scrollTop || 0) + scaledDy));
+    },
+
     onPaneChanged(pane) {
       if (pane === 'torrents') {
         // Keep space info fresh whenever Tor pane is shown.

@@ -17,7 +17,12 @@
   div(v-else-if="!hasContent" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
     div(v-if="emptyStateText") {{ emptyStateText }}
 
-  div(v-else ref="scroller" :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'hidden', background:'#fff', fontFamily:'sans-serif', fontSize:'14px', fontWeight:'normal' }")
+  div(
+    v-else
+    ref="scroller"
+    :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'hidden', background:'#fff', fontFamily:'sans-serif', fontSize:'14px', fontWeight:'normal' }"
+    @wheel.stop.prevent="handleScaledWheel"
+  )
     template(v-for="(it, idx) in orderedItems" :key="idx")
       div(v-if="idx > 0 && Number(it?.sequence) === 1" style="margin:0; padding:0; line-height:14px; white-space:nowrap; overflow:hidden; font-family:monospace;") ====================================================================================================
       div(:style="getCardStyle(it)" @click="handleCardClick(it)" @mouseenter="handleMouseEnter($event, it)" @mouseleave="handleMouseLeave($event)")
@@ -111,6 +116,16 @@ export default {
   },
 
   methods: {
+    handleScaledWheel(event) {
+      if (!event) return;
+      const el = event.currentTarget;
+      if (!el) return;
+      const dy = (event.deltaY || 0);
+      const scaledDy = dy * 0.125;
+      const max = Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0));
+      el.scrollTop = Math.max(0, Math.min(max, (el.scrollTop || 0) + scaledDy));
+    },
+
     notifyAllUsbFinished(lastTitle) {
       try {
         if (typeof window === 'undefined') return;

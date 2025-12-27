@@ -1,5 +1,8 @@
 <template lang="pug">
-#shows(style="width:100%; flex-grow: 1; overflow-y:scroll; padding-right:5px; box-sizing:border-box;")
+#shows(
+  style="width:100%; flex-grow: 1; overflow-y:scroll; padding-right:5px; box-sizing:border-box;"
+  @wheel.stop.prevent="handleScaledWheel"
+)
   div(v-if="shows.length === 0" style="display:flex; justify-content:center; align-items:center; height:100%; font-size:18px; color:#666;") No shows.
   table(v-else style="width:100%; font-size:18px; border-collapse:collapse; border-spacing:0;")
     tbody
@@ -75,6 +78,16 @@ export default {
   },
 
   methods: {
+    handleScaledWheel(event) {
+      if (!event) return;
+      const el = event.currentTarget;
+      if (!el) return;
+      const dy = (event.deltaY || 0);
+      const scaledDy = dy * 0.125;
+      const max = Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0));
+      el.scrollTop = Math.max(0, Math.min(max, (el.scrollTop || 0) + scaledDy));
+    },
+
     hilite(show) {
       return (this.highlightName == show.Name) ? "yellow" : "white";
     },

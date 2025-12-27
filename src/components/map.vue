@@ -64,6 +64,13 @@
                 :style="{ width:'28px', minWidth:'28px', maxWidth:'28px', padding:'1px 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor:'#ffe' }"
                 :key="episode") {{episode}}
 
+      //- Sticky top-left corner cell (covers the moving blank header cell when panning horizontally).
+      div(style="position:absolute; left:0; top:0; z-index:6; overflow:hidden; background-color:#ffe; pointer-events:none;")
+        table(:style="{ fontSize:'16px', borderCollapse:'collapse' }")
+          tbody
+            tr(style="font-weight:bold;")
+              td(:style="{ width:'28px', minWidth:'28px', maxWidth:'28px', textAlign:'center', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'#ffe' }") &nbsp;
+
       //- Body viewport starts below the sticky header.
       div(ref="mapBodyViewport" :style="{ position:'absolute', left:'0', right:'0', top: mapHeaderH + 'px', bottom:'0', overflow:'hidden', boxSizing:'border-box' }")
         table(ref="mapBodyTable" :style="{ fontSize:'16px', borderCollapse:'collapse', transform: 'translate(' + (-mapScrollLeft) + 'px,' + (-mapScrollTop) + 'px)' }")
@@ -82,6 +89,15 @@
                 span(v-if="seriesMap?.[season]?.[episode]?.noFile && !seriesMap?.[season]?.[episode]?.unaired")  -
                 span(v-if="seriesMap?.[season]?.[episode]?.unaired && !seriesMap?.[season]?.[episode]?.played && seriesMap?.[season]?.[episode]?.noFile") u
                 span(v-if="seriesMap?.[season]?.[episode]?.deleted") d
+
+      //- Sticky season column (covers the moving season cells when panning horizontally).
+      div(:style="{ position:'absolute', left:'0', top: mapHeaderH + 'px', bottom:'0', width:'28px', overflow:'hidden', zIndex:5, backgroundColor:'#ffe', pointerEvents: simpleMode ? 'none' : 'auto' }")
+        table(:style="{ fontSize:'16px', borderCollapse:'collapse', transform: 'translate(0px,' + (-mapScrollTop) + 'px)' }")
+          tbody
+            tr(v-for="season in seriesMapSeasons" :key="'sticky-' + season" style="outline:thin solid;")
+              td(@click.stop="handleSeasonClick($event, season)"
+                 :style="{ fontWeight:'bold', width:'28px', minWidth:'28px', maxWidth:'28px', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'#ffe' }")
+                | {{season}}
 </template>
 
 <script>

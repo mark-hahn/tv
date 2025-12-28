@@ -964,6 +964,16 @@ export default {
       const torrentTitle = torrent.raw?.title || 'Unknown';
       
       try {
+        const providerRaw = String(torrent?.raw?.provider || '').toLowerCase();
+        const detailUrl = String(torrent?.detailUrl || '');
+        const detailUrlLower = detailUrl.toLowerCase();
+        const provider =
+          providerRaw.includes('torrentleech') || detailUrlLower.includes('torrentleech')
+            ? 'torrentleech'
+            : providerRaw.includes('iptorrents') || detailUrlLower.includes('iptorrents')
+              ? 'iptorrents'
+              : providerRaw || 'unknown';
+
         // Get cf_clearance cookies from localStorage.
         // Note: the UI stores these under iptCfClearance/tlCfClearance.
         // Keep backward-compatible fallbacks for older keys.
@@ -982,13 +992,101 @@ export default {
           iptorrents: this.extractCfClearance(iptCfRaw),
           torrentleech: this.extractCfClearance(tlCfRaw)
         };
-        
+
+        // TL: Use the new direct-binary endpoint (no detail page), then push bytes to USB watch folder.
+        if (provider === 'torrentleech') {
+          const resp = await fetch(`${config.torrentsApiUrl}/api/torrentFile`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ torrent })
+          });
+
+          const ct = (resp.headers.get('content-type') || '').toLowerCase();
+          if (ct.includes('application/json')) {
+            const j = await resp.json().catch(() => null);
+            const errorMsg = j?.error || j?.message || 'Unknown error';
+            const isCloudflare = Boolean(j && typeof j === 'object' && (j.isCloudflare || j.stage === 'cloudflare')) ||
+              /cloudflare|just a moment|checking your browser/i.test(String(errorMsg || ''));
+
+            if (isCloudflare) {
+              let popupBlocked = false;
+              if (detailUrl) {
+                try {
+                  const w = window.open(detailUrl, '_blank');
+                  popupBlocked = !w;
+                } catch {
+                  popupBlocked = true;
+                }
+              }
+
+              this.showError(
+                'TorrentLeech blocked the server request with a Cloudflare challenge page ("Just a moment...").\n\n' +
+                (detailUrl
+                  ? (popupBlocked
+                    ? 'Note: Browser blocked the popup tab.\n\n'
+                    : 'Opened the detail page in a new tab.\n\n')
+                  : '') +
+                'Try:\n' +
+                '- Complete any “verify you are human” step in the detail tab.\n' +
+                '- Re-copy DevTools “Copy as cURL (bash)” into misc/req-browser.txt and retry.\n\n' +
+                (detailUrl ? `Detail URL:\n${detailUrl}` : '')
+              );
+              return;
+            }
+
+            this.showError(errorMsg);
+            return;
+          }
+
+          if (!resp.ok) {
+            const t = await resp.text().catch(() => '');
+            throw new Error(t || `HTTP ${resp.status}: ${resp.statusText}`);
+          }
+
+          const bytes = await resp.arrayBuffer();
+          const upload = await fetch(`${config.torrentsApiUrl}/api/usb/addTorrent`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-bittorrent',
+              'x-torrent-filename': String(torrent?.raw?.filename || torrentTitle || 'download.torrent')
+            },
+            body: bytes
+          });
+
+          if (!upload.ok) {
+            let detail = '';
+            try {
+              const uct = upload.headers.get('content-type') || '';
+              if (uct.includes('application/json')) {
+                const uj = await upload.json();
+                detail = uj?.error ? String(uj.error) : JSON.stringify(uj);
+              } else {
+                detail = await upload.text();
+              }
+            } catch {
+              // ignore
+            }
+            throw new Error(detail || `USB upload failed: HTTP ${upload.status}: ${upload.statusText}`);
+          }
+
+          const uploadRes = await upload.json().catch(() => null);
+          if (uploadRes && typeof uploadRes === 'object' && (uploadRes.success || uploadRes.result === true)) {
+            this.rememberDownloadedTorrent(torrent);
+            return;
+          }
+
+          const uploadErr = uploadRes?.error || uploadRes?.message || 'USB upload failed';
+          this.showError(uploadErr);
+          return;
+        }
+
+        // Non-TL providers: keep the existing server-side pipeline.
         const response = await fetch(`${config.torrentsApiUrl}/api/download`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             torrent,
             cfClearance: cfClearance
           })
@@ -1020,16 +1118,6 @@ export default {
           const errorMsg = data.error || data.message || 'Unknown error';
           const isCloudflare = Boolean(data && typeof data === 'object' && (data.isCloudflare || data.stage === 'cloudflare')) ||
             /cloudflare|just a moment|checking your browser/i.test(String(errorMsg || ''));
-
-          const providerRaw = String(torrent?.raw?.provider || '').toLowerCase();
-          const detailUrl = String(torrent?.detailUrl || '');
-          const detailUrlLower = detailUrl.toLowerCase();
-          const provider =
-            providerRaw.includes('torrentleech') || detailUrlLower.includes('torrentleech')
-              ? 'torrentleech'
-              : providerRaw.includes('iptorrents') || detailUrlLower.includes('iptorrents')
-                ? 'iptorrents'
-                : providerRaw || 'unknown';
 
           if (isCloudflare && (provider === 'torrentleech' || provider === 'iptorrents')) {
             const label = provider === 'torrentleech' ? 'TorrentLeech' : 'IPTorrents';

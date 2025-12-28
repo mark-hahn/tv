@@ -45,7 +45,7 @@ const httpsOptions = {
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Torrent-Filename');
   if (req.method === 'OPTIONS') {
     res.sendStatus(204);
     return;
@@ -266,6 +266,70 @@ app.post('/api/download', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// POST /api/torrentFile - Fetch the raw .torrent bytes directly (no detail-page scraping)
+// Body: { torrent }
+// Success: application/x-bittorrent
+// Failure: JSON (200 OK) with { success:false, stage, error, isCloudflare?, ... }
+app.post('/api/torrentFile', async (req, res) => {
+  try {
+    const { torrent } = req.body || {};
+    if (!torrent) {
+      res.status(400).json({ success: false, error: 'Torrent data is required' });
+      return;
+    }
+
+    const result = await download.fetchTorrentFileFromSearchResult(torrent);
+    if (!result || typeof result !== 'object' || Array.isArray(result)) {
+      res.status(500).json({ success: false, error: 'Unexpected torrentFile result' });
+      return;
+    }
+
+    if (!result.success) {
+      res.json(result);
+      return;
+    }
+
+    const torrentData = result.torrentData;
+    if (!Buffer.isBuffer(torrentData) || torrentData.length === 0) {
+      res.json({ success: false, stage: 'validate', error: 'No torrent bytes returned' });
+      return;
+    }
+
+    const rawName = torrent?.raw?.filename || 'download.torrent';
+    const safeName = String(rawName || 'download.torrent').replace(/[\\/]+/g, '_');
+
+    res.setHeader('Content-Type', 'application/x-bittorrent');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
+    res.status(200).send(torrentData);
+  } catch (error) {
+    console.error('torrentFile error:', error);
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+// POST /api/usb/addTorrent - Upload a .torrent buffer to the remote watch folder
+// Content-Type: application/x-bittorrent
+// Optional header: x-torrent-filename
+app.post(
+  '/api/usb/addTorrent',
+  express.raw({ type: 'application/x-bittorrent', limit: '10mb' }),
+  async (req, res) => {
+    try {
+      const buf = req.body;
+      if (!Buffer.isBuffer(buf) || buf.length === 0) {
+        res.status(400).json({ success: false, error: 'Torrent bytes are required' });
+        return;
+      }
+      const hint = String(req.headers['x-torrent-filename'] || '').trim();
+      const result = await download.uploadTorrentToWatchFolder(buf, hint);
+      res.json(result);
+    } catch (error) {
+      console.error('usb addTorrent error:', error);
+      res.status(500).json({ success: false, error: error?.message || String(error) });
+    }
+  }
+);
 
 app.get('/api/startreel', async (req, res) => {
   try {

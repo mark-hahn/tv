@@ -195,6 +195,120 @@ async function getSftpSettings() {
   };
 }
 
+function sanitizeFilenameForWatch(name) {
+  const s = String(name || '').trim();
+  if (!s) return '';
+  // Keep it simple: drop path separators and weird chars.
+  return s
+    .replace(/[\\/]+/g, '_')
+    .replace(/[\x00-\x1F\x7F]+/g, '')
+    .replace(/[^a-zA-Z0-9._\-()\[\] ]+/g, '_')
+    .trim();
+}
+
+function buildTorrentLeechDirectUrlFromSearchResult(torrent) {
+  const fid = torrent?.raw?.fid;
+  const filename = torrent?.raw?.filename;
+  if (!fid || !filename) return '';
+  const f = String(filename);
+  if (!f.toLowerCase().endsWith('.torrent')) return '';
+  return `https://www.torrentleech.org/download/${encodeURIComponent(String(fid))}/${encodeURIComponent(f)}`;
+}
+
+/**
+ * Fetch a .torrent directly from a provider using only the search-result fields.
+ * NOTE: This intentionally avoids detail-page scraping.
+ */
+export async function fetchTorrentFileFromSearchResult(torrent) {
+  const provider = normalizeProvider(torrent?.raw?.provider, torrent?.detailUrl);
+
+  if (provider !== 'torrentleech') {
+    return fail('validate', `Direct torrent download not supported for provider: ${provider}`, { provider });
+  }
+
+  const downloadUrl = buildTorrentLeechDirectUrlFromSearchResult(torrent);
+  if (!downloadUrl) {
+    return fail('validate', 'Missing TorrentLeech fid/filename (or filename not .torrent).', {
+      provider,
+      fid: torrent?.raw?.fid,
+      filename: torrent?.raw?.filename,
+    });
+  }
+
+  const profile = tryLoadBrowserCurlProfile();
+  const headers = profile?.headers || {};
+  const cookieHeader = profile?.cookieHeader || '';
+
+  console.error('[torrentFile] TL curl direct download', {
+    downloadUrl,
+    hasProfile: Boolean(profile),
+    hasCookies: Boolean(cookieHeader),
+    headerKeys: Object.keys(headers || {}),
+  });
+
+  const r = await curlFetchBinary(downloadUrl, { headers, cookieHeader });
+  const headText = r.stdout.slice(0, 600).toString('utf8');
+  const looksHtml = /^\s*</.test(headText) || looksLikeCloudflareChallenge(headText);
+
+  if (!r.ok || looksHtml) {
+    const isCloudflare = looksLikeCloudflareChallenge(headText);
+    return fail('fetch-torrent', r.error || 'Failed to fetch torrent via curl', {
+      provider,
+      downloadUrl,
+      code: r.code,
+      isCloudflare,
+      bodyHead: headText.slice(0, 300),
+      profilePath: profile?.path,
+      hasProfile: Boolean(profile),
+      hasCookies: Boolean(cookieHeader),
+    });
+  }
+
+  return ok({
+    provider,
+    downloadUrl,
+    bytes: r.stdout.length,
+    torrentData: r.stdout,
+    method: 'curl',
+  });
+}
+
+/**
+ * Upload a .torrent buffer to the configured remote watch folder via SFTP.
+ */
+export async function uploadTorrentToWatchFolder(torrentData, filenameHint = '') {
+  if (!Buffer.isBuffer(torrentData) || torrentData.length === 0) {
+    return fail('validate', 'No torrent data provided');
+  }
+
+  const hash = Math.random().toString(36).substring(2, 15);
+  const hint = sanitizeFilenameForWatch(filenameHint);
+  const base = hint ? hint.replace(/\.torrent$/i, '') : hash;
+  const safeBase = String(base || hash).slice(0, 120).trim() || hash;
+  const torrentFilename = `${safeBase}-${hash}.torrent`;
+
+  let sftpConfig;
+  let remoteWatchDir;
+  try {
+    ({ sftpConfig, remoteWatchDir } = await getSftpSettings());
+  } catch (e) {
+    return fail('sftp-config', e?.message || String(e));
+  }
+
+  const remotePath = `${remoteWatchDir}/${torrentFilename}`;
+  const sftp = new Client();
+  try {
+    await sftp.connect(sftpConfig);
+    await sftp.put(torrentData, remotePath);
+    await sftp.end();
+  } catch (e) {
+    try { await sftp.end(); } catch { /* ignore */ }
+    return fail('sftp-put', e?.message || String(e), { remotePath });
+  }
+
+  return ok({ remotePath, bytes: torrentData.length, filename: torrentFilename });
+}
+
 /**
  * Download torrent and prepare for qBittorrent
  * @param {Object} torrent - The complete torrent object

@@ -37,6 +37,19 @@ function ok(extra = {}) {
   return { success: true, ...extra };
 }
 
+function looksLikeCloudflareChallenge(html) {
+  const s = String(html || '').toLowerCase();
+  return (
+    s.includes('<title>just a moment') ||
+    s.includes('checking your browser') ||
+    s.includes('cf-chl') ||
+    s.includes('cf-ray') ||
+    s.includes('attention required') ||
+    s.includes('enable javascript and cookies') ||
+    s.includes('verify you are human')
+  );
+}
+
 function isVideoFile(filePath) {
   const p = String(filePath || '');
   const ext = p.toLowerCase().split('.').pop() || '';
@@ -188,20 +201,60 @@ export async function download(torrent, cfClearance = {}) {
     if (!response.ok) {
       console.log(`Failed to fetch detail page: ${response.status} ${response.statusText}`);
       const snippet = await response.text().catch(() => '');
+      const isCloudflare = looksLikeCloudflareChallenge(snippet);
+      if (provider === 'torrentleech') {
+        const s = String(snippet || '').toLowerCase();
+        const tags = [];
+        if (
+          s.includes('cloudflare') ||
+          s.includes('cf-chl') ||
+          s.includes('cf-ray') ||
+          s.includes('attention required') ||
+          s.includes('just a moment') ||
+          s.includes('checking your browser') ||
+          s.includes('verify you are human') ||
+          s.includes('enable javascript and cookies')
+        ) tags.push('cloudflare');
+        if (s.includes('sign in') || s.includes('login') || s.includes('loginform') || s.includes('type="password"')) tags.push('login');
+        if (s.includes('forbidden') || s.includes('access denied') || s.includes('not authorized')) tags.push('forbidden');
+        console.error('[TL] Detail fetch failed summary:', {
+          httpStatus: response.status,
+          httpStatusText: response.statusText,
+          hasCfClearance: Boolean(cfCookie),
+          cfLen: cfCookie ? String(cfCookie).length : 0,
+          cookiesSent: safeCookieNames(allCookies),
+          tags,
+          bodyHead: snippet ? String(snippet).slice(0, 200) : '',
+        });
+      }
       console.log('Response body snippet:', snippet.substring(0, 1000));
-      return fail('fetch-detail', 'Failed to fetch detail page', {
+      return fail('fetch-detail', isCloudflare ? 'Cloudflare challenge page (Just a moment...)' : 'Failed to fetch detail page', {
         provider,
         detailUrl,
         httpStatus: response.status,
         httpStatusText: response.statusText,
         cookiesSent: safeCookieNames(allCookies),
         hasCfClearance: Boolean(cfCookie),
+        isCloudflare,
         bodySnippet: snippet ? snippet.substring(0, 500) : undefined,
       });
     }
     
     const html = await response.text();
     console.log(`Fetched ${html.length} bytes of HTML`);
+
+    if (looksLikeCloudflareChallenge(html)) {
+      return fail('fetch-detail', 'Cloudflare challenge page (Just a moment...)', {
+        provider,
+        detailUrl,
+        httpStatus: response.status,
+        httpStatusText: response.statusText,
+        cookiesSent: safeCookieNames(allCookies),
+        hasCfClearance: Boolean(cfCookie),
+        isCloudflare: true,
+        bodySnippet: html ? String(html).slice(0, 500) : undefined,
+      });
+    }
 
     const sampleDir = path.join(__dirname, '..', '..', 'samples', 'sample-torrents');
     let savedDetailPath;

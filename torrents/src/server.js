@@ -20,6 +20,13 @@ if (!TORRENTS_DEBUG) {
   console.warn = () => {};
 }
 
+console.error('[torrents-server] module loaded', {
+  ts: new Date().toISOString(),
+  cwd: process.cwd(),
+  node: process.version,
+  TORRENTS_DEBUG,
+});
+
 const app = express();
 
 const QBT_TEST_PORT   = 3001;
@@ -189,6 +196,25 @@ app.post('/api/download', async (req, res) => {
     
     if (!torrent) {
       return res.status(400).json({ error: 'Torrent data is required' });
+    }
+
+    try {
+      const detailUrl = torrent?.detailUrl;
+      const provider = String(torrent?.raw?.provider || '').toLowerCase().includes('torrentleech') || String(detailUrl || '').toLowerCase().includes('torrentleech')
+        ? 'torrentleech'
+        : String(torrent?.raw?.provider || '').toLowerCase().includes('iptorrents') || String(detailUrl || '').toLowerCase().includes('iptorrents')
+          ? 'iptorrents'
+          : (torrent?.raw?.provider || 'unknown');
+      const cf = cfClearance && typeof cfClearance === 'object' ? cfClearance : {};
+      if (provider === 'torrentleech') {
+        console.error('[TL] /api/download request:', {
+          hasCfClearance: Boolean(cf.torrentleech),
+          cfLen: cf.torrentleech ? String(cf.torrentleech).length : 0,
+          detailUrl,
+        });
+      }
+    } catch {
+      // ignore debug logging errors
     }
     
     const result = await download.download(torrent, cfClearance);

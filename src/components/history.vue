@@ -6,6 +6,7 @@
     ref="scroller"
     :style="{ flex:'1 1 auto', minHeight:'0px', overflowY:'auto', overflowX:'hidden' }"
     @wheel.stop.prevent="handleScaledWheel"
+    @scroll.passive="handleScroll"
   )
 
     div(v-if="sortedTorrents.length === 0" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
@@ -46,6 +47,7 @@ export default {
       useStaticSamples: false,
       _didInitialScroll: false,
       _didInitialVisibleScroll: false,
+      _stickToBottom: true,
       _didLoadOnce: false,
       _inFlight: false,
       _loadingTimer: null,
@@ -93,6 +95,14 @@ export default {
   },
 
   methods: {
+        handleScroll(event) {
+          const el = event?.currentTarget;
+          if (!el) return;
+          // When user scrolls up, stop auto-scrolling on future polls.
+          // When user scrolls back to bottom, re-enable it.
+          this._stickToBottom = this.isAtBottom(el);
+        },
+
     handleScaledWheel(event) {
       if (!event) return;
       const el = event.currentTarget;
@@ -131,6 +141,7 @@ export default {
           void this.$nextTick(() => {
             this.scrollToBottom();
             this._didInitialScroll = true;
+            this._stickToBottom = true;
           });
         }
 
@@ -214,7 +225,8 @@ export default {
       this.startLoadingDelay();
       try {
         const scroller = this.getScroller();
-        const wasAtBottom = this.isAtBottom(scroller);
+        // Update stickiness based on current scroll position at the start of the poll.
+        if (scroller) this._stickToBottom = this.isAtBottom(scroller);
 
         const torrents = await this.getQbtInfo({});
         if (Array.isArray(torrents)) {
@@ -253,7 +265,8 @@ export default {
           if (!this._didInitialScroll) {
             this.scrollToBottom();
             this._didInitialScroll = true;
-          } else if (this._active && wasAtBottom) {
+            this._stickToBottom = true;
+          } else if (this._active && this._stickToBottom) {
             this.scrollToBottom();
           }
         }

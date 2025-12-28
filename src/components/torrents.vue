@@ -90,7 +90,7 @@
 
   #error-modal(v-if="showErrorModal" @click.stop="closeErrorModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:10000;")
     #modal-content(@click.stop style="background:white; padding:30px; border-radius:10px; max-width:520px; box-shadow:0 4px 20px rgba(0,0,0,0.3);")
-      div(style="font-size:16px; margin-bottom:20px; line-height:1.5;") {{ errorModalMsg }}
+      div(style="font-size:16px; margin-bottom:20px; line-height:1.5; white-space:pre-line;") {{ errorModalMsg }}
       div(style="display:flex; gap:10px; justify-content:flex-end;")
         button(@click.stop="closeErrorModal" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;") OK
 
@@ -949,10 +949,23 @@ export default {
       const torrentTitle = torrent.raw?.title || 'Unknown';
       
       try {
-        // Get cf_clearance cookies from localStorage
+        // Get cf_clearance cookies from localStorage.
+        // Note: the UI stores these under iptCfClearance/tlCfClearance.
+        // Keep backward-compatible fallbacks for older keys.
+        const iptCfRaw =
+          this.iptCfClearance ||
+          localStorage.getItem('iptCfClearance') ||
+          localStorage.getItem('cf_clearance_iptorrents') ||
+          '';
+        const tlCfRaw =
+          this.tlCfClearance ||
+          localStorage.getItem('tlCfClearance') ||
+          localStorage.getItem('cf_clearance_torrentleech') ||
+          '';
+
         const cfClearance = {
-          iptorrents: localStorage.getItem('cf_clearance_iptorrents') || '',
-          torrentleech: localStorage.getItem('cf_clearance_torrentleech') || ''
+          iptorrents: this.extractCfClearance(iptCfRaw),
+          torrentleech: this.extractCfClearance(tlCfRaw)
         };
         
         const response = await fetch(`${config.torrentsApiUrl}/api/download`, {
@@ -990,7 +1003,49 @@ export default {
           this.rememberDownloadedTorrent(torrent);
         } else {
           const errorMsg = data.error || data.message || 'Unknown error';
-          this.showError(errorMsg);
+          const isCloudflare = Boolean(data && typeof data === 'object' && (data.isCloudflare || data.stage === 'cloudflare')) ||
+            /cloudflare|just a moment|checking your browser/i.test(String(errorMsg || ''));
+
+          const providerRaw = String(torrent?.raw?.provider || '').toLowerCase();
+          const detailUrl = String(torrent?.detailUrl || '');
+          const detailUrlLower = detailUrl.toLowerCase();
+          const provider =
+            providerRaw.includes('torrentleech') || detailUrlLower.includes('torrentleech')
+              ? 'torrentleech'
+              : providerRaw.includes('iptorrents') || detailUrlLower.includes('iptorrents')
+                ? 'iptorrents'
+                : providerRaw || 'unknown';
+
+          if (isCloudflare && (provider === 'torrentleech' || provider === 'iptorrents')) {
+            const label = provider === 'torrentleech' ? 'TorrentLeech' : 'IPTorrents';
+            const cookieBox = provider === 'torrentleech' ? 'TL' : 'IPT';
+
+            let popupBlocked = false;
+            if (detailUrl) {
+              try {
+                const w = window.open(detailUrl, '_blank');
+                popupBlocked = !w;
+              } catch {
+                popupBlocked = true;
+              }
+            }
+
+            this.showError(
+              `${label} blocked the server request with a Cloudflare challenge page ("Just a moment...").\n\n` +
+              (detailUrl
+                ? (popupBlocked
+                  ? 'Note: Browser blocked the popup tab.\n\n'
+                  : 'Opened the detail page in a new tab.\n\n')
+                : '') +
+              'Try:\n' +
+              `- Complete any “verify you are human” step in the detail tab.\n` +
+              `- Copy the latest cf_clearance cookie into the ${cookieBox} box and Save, then retry.\n` +
+              '- If it still fails, Cloudflare is likely fingerprinting requests from this network/IP.\n\n' +
+              (detailUrl ? `Detail URL:\n${detailUrl}` : '')
+            );
+          } else {
+            this.showError(errorMsg);
+          }
         }
       } catch (error) {
         const errorMsg = error.message || String(error);

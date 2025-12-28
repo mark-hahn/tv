@@ -1,19 +1,4 @@
 
-node torrents/test/curl-test.js "https://www.torrentleech.org/download/241560289/Its.Always.Sunny.in.Philadelphia.S17E03.1080p.WEB.H264-SuccessfulCrab.torrent"
 
-- the test script worked with a new direct url- the get button in tor pane did not work.
-
-- in download.js make an endpoint that is given a search result from a provider, gets the torrent file, and returns it. only use direct url computed from search result fid and file. -- use same logic used in curl-test.js to get torrent file-- do not use any detail page
-
-- change the tor pane get button to just call that endpoint with search result, and send the torrent file returned to the usb server 
-
-- do nothing with detail file except show it in a tab when old logic says to.
-
-
-
-- i moved req-browser.txt to torrents/req-browser.txt for you to use as the template
-
--- that worked 
-- what changes will you have to make to the curl command req-browser.txt to use it? Will you need anything more than the cf_clearance cookie and the url?
-- just asking
-
+- everything works
+- i've done a backup commit

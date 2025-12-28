@@ -55,8 +55,13 @@ function tryLoadBrowserCurlProfile() {
   // Optional best-match replay: if misc/req-browser.txt exists (DevTools Copy as cURL (bash)),
   // we can reuse its cookie/header set when invoking curl.
   try {
-    const p = path.join(__dirname, '..', '..', 'misc', 'req-browser.txt');
-    if (!fs.existsSync(p)) return null;
+    // Prefer torrents/req-browser.txt (user-provided template), fall back to misc/req-browser.txt.
+    const candidates = [
+      path.join(__dirname, '..', 'req-browser.txt'),
+      path.join(__dirname, '..', '..', 'misc', 'req-browser.txt'),
+    ];
+    const p = candidates.find((x) => fs.existsSync(x));
+    if (!p) return null;
     const raw = fs.readFileSync(p, 'utf8');
 
     const headers = {};
@@ -87,6 +92,12 @@ function tryLoadBrowserCurlProfile() {
     while ((mh = reH1.exec(raw))) pushHeader(mh[1]);
     while ((mh = reH2.exec(raw))) pushHeader(mh[1]);
 
+    // Some exports (notably Firefox) may include cookies as a header instead of -b.
+    if (!cookieHeader && headers.cookie) {
+      cookieHeader = String(headers.cookie || '').trim();
+      delete headers.cookie;
+    }
+
     return {
       path: p,
       url: capturedUrl,
@@ -95,6 +106,44 @@ function tryLoadBrowserCurlProfile() {
     };
   } catch {
     return null;
+  }
+}
+
+function upsertCookieValue(cookieHeader, cookieName, cookieValue) {
+  const name = String(cookieName || '').trim();
+  const value = String(cookieValue || '').trim();
+  if (!name || !value) return String(cookieHeader || '').trim();
+
+  const parts = String(cookieHeader || '')
+    .split(';')
+    .map(s => String(s || '').trim())
+    .filter(Boolean);
+
+  let replaced = false;
+  const out = parts.map(p => {
+    const idx = p.indexOf('=');
+    if (idx <= 0) return p;
+    const k = p.slice(0, idx).trim();
+    if (k !== name) return p;
+    replaced = true;
+    return `${name}=${value}`;
+  });
+
+  if (!replaced) out.push(`${name}=${value}`);
+  return out.join('; ');
+}
+
+async function loadLocalCfClearance(provider) {
+  try {
+    const p = String(provider || '').trim();
+    if (!p) return '';
+    const inPath = path.join(__dirname, '..', 'cookies', 'cf-clearance.local.json');
+    const raw = await fs.promises.readFile(inPath, 'utf8');
+    const j = JSON.parse(raw);
+    const v = j && typeof j === 'object' && !Array.isArray(j) ? j[p] : '';
+    return typeof v === 'string' ? v.trim() : '';
+  } catch {
+    return '';
   }
 }
 
@@ -237,13 +286,21 @@ export async function fetchTorrentFileFromSearchResult(torrent) {
 
   const profile = tryLoadBrowserCurlProfile();
   const headers = profile?.headers || {};
-  const cookieHeader = profile?.cookieHeader || '';
+  let cookieHeader = profile?.cookieHeader || '';
+
+  // Source of truth: cf-clearance.local.json (written by client Save Cookies).
+  // req-browser.txt is treated as an immutable template; we only patch an in-memory copy.
+  const localCf = await loadLocalCfClearance(provider);
+  if (localCf) {
+    cookieHeader = upsertCookieValue(cookieHeader, 'cf_clearance', localCf);
+  }
 
   console.error('[torrentFile] TL curl direct download', {
     downloadUrl,
     hasProfile: Boolean(profile),
     hasCookies: Boolean(cookieHeader),
     headerKeys: Object.keys(headers || {}),
+    hasLocalCf: Boolean(localCf),
   });
 
   const r = await curlFetchBinary(downloadUrl, { headers, cookieHeader });

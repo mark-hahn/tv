@@ -9,7 +9,10 @@ import { spawn } from 'child_process';
 // Writes: torrents/test/curl-test.torrent
 
 const WORKSPACE_ROOT = path.resolve(process.cwd());
-const REQ_BROWSER_PATH = path.join(WORKSPACE_ROOT, 'misc', 'req-browser.txt');
+const REQ_BROWSER_CANDIDATES = [
+  path.join(WORKSPACE_ROOT, 'torrents', 'req-browser.txt'),
+  path.join(WORKSPACE_ROOT, 'misc', 'req-browser.txt'),
+];
 const OUTPUT_PATH = path.join(WORKSPACE_ROOT, 'torrents', 'test', 'curl-test.torrent');
 
 function fail(msg) {
@@ -42,9 +45,42 @@ function parseReqBrowserTxt(text) {
 
   const b1 = text.match(/\s-b\s+'([^']*)'/i);
   const b2 = text.match(/\s-b\s+"([^\"]*)"/i);
-  const cookieHeader = (b1?.[1] || b2?.[1] || '').trim();
+  let cookieHeader = (b1?.[1] || b2?.[1] || '').trim();
+
+  // Firefox often emits cookies as a header instead of -b.
+  if (!cookieHeader) {
+    const cookieKey = Object.keys(headers).find(k => String(k).toLowerCase() === 'cookie');
+    if (cookieKey) {
+      cookieHeader = String(headers[cookieKey] || '').trim();
+      delete headers[cookieKey];
+    }
+  }
 
   return { url, headers, cookieHeader };
+}
+
+function upsertCookieValue(cookieHeader, cookieName, cookieValue) {
+  const name = String(cookieName || '').trim();
+  const value = String(cookieValue || '').trim();
+  if (!name || !value) return String(cookieHeader || '').trim();
+
+  const parts = String(cookieHeader || '')
+    .split(';')
+    .map(s => String(s || '').trim())
+    .filter(Boolean);
+
+  let replaced = false;
+  const out = parts.map(p => {
+    const idx = p.indexOf('=');
+    if (idx <= 0) return p;
+    const k = p.slice(0, idx).trim();
+    if (k !== name) return p;
+    replaced = true;
+    return `${name}=${value}`;
+  });
+
+  if (!replaced) out.push(`${name}=${value}`);
+  return out.join('; ');
 }
 
 function buildCurlArgs(targetUrl, { headers, cookieHeader, outputPath }) {
@@ -92,13 +128,32 @@ async function main() {
     return;
   }
 
-  if (!fs.existsSync(REQ_BROWSER_PATH)) {
-    fail(`Missing curl profile file: ${REQ_BROWSER_PATH}`);
+  const reqBrowserPath = REQ_BROWSER_CANDIDATES.find((p) => fs.existsSync(p));
+  if (!reqBrowserPath) {
+    fail(`Missing curl profile file. Tried:\n- ${REQ_BROWSER_CANDIDATES.join('\n- ')}`);
     return;
   }
 
-  const raw = fs.readFileSync(REQ_BROWSER_PATH, 'utf8');
+  const raw = fs.readFileSync(reqBrowserPath, 'utf8');
   const profile = parseReqBrowserTxt(raw);
+
+  // req-browser.txt is an immutable template; patch cf_clearance in-memory from local file.
+  let localTlCf = '';
+  try {
+    const cfPath = path.join(WORKSPACE_ROOT, 'torrents', 'cookies', 'cf-clearance.local.json');
+    if (fs.existsSync(cfPath)) {
+      const j = JSON.parse(fs.readFileSync(cfPath, 'utf8'));
+      if (j && typeof j === 'object' && !Array.isArray(j) && typeof j.torrentleech === 'string') {
+        localTlCf = j.torrentleech.trim();
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  const patchedCookieHeader = localTlCf
+    ? upsertCookieValue(profile.cookieHeader, 'cf_clearance', localTlCf)
+    : profile.cookieHeader;
 
   // Use the profile’s headers/cookies, but replace the URL with the CLI arg.
   // (We do NOT edit req-browser.txt.)
@@ -107,15 +162,16 @@ async function main() {
 
   const args = buildCurlArgs(targetUrl, {
     headers: profile.headers,
-    cookieHeader: profile.cookieHeader,
+    cookieHeader: patchedCookieHeader,
     outputPath: OUTPUT_PATH,
   });
 
   console.log('[curl-test] profile', {
-    reqBrowserPath: REQ_BROWSER_PATH,
+    reqBrowserPath,
     profileUrl: profile.url || null,
     headerNames: Object.keys(profile.headers || {}).sort(),
-    hasCookies: Boolean(profile.cookieHeader),
+    hasCookies: Boolean(patchedCookieHeader),
+    hasLocalCf: Boolean(localTlCf),
     output: OUTPUT_PATH,
     targetUrl,
   });

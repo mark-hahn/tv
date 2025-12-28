@@ -1,15 +1,2 @@
 
-cache the tv.json file in memory. only write back to the file when a new object is added to the array or when a file download is finished. add a server endpoint called downloads that returns the contents of the cache.
-
-
-There are tvproc results being sent to client that are marked as future but they are not being processed. An example:
-
-the client is still receiving this:
-
-{"localPath":"/mnt/media/tv/Ghosts US/Season 1/",
-"title":"Ghosts US 2021 S01E01 Pilot 1080p AMZN WEB-DL 10bit DDP5 1 x265-YELLO.mkv",
-"status":"future",
-"sequence":1,
-"fileSize":627613687,
-"season":1,
-"episode":1}
+if startProc is called while downloading then start a new cycle when that download finishes even if no title

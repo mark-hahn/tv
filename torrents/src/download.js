@@ -10,24 +10,13 @@ import parseTorrentTitle from 'parse-torrent-title';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const SAVE_TORRENT_FILE = false;
-const SAVE_DETAIL_FILE  = false;
-const DOWNLOAD_DEBUG    = false;
-
-function ensureDir(dirPath) {
-  fs.mkdirSync(dirPath, { recursive: true });
-}
+const DOWNLOAD_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 function safeCookieNames(cookiePairs) {
   return (cookiePairs || [])
     .map(c => String(c).split('=')[0].trim())
     .filter(Boolean);
-}
-
-function nowStamp() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
 function fail(stage, reason, extra = {}) {
@@ -187,6 +176,41 @@ function isVideoFile(filePath) {
   return ['mkv', 'mp4', 'avi', 'm4v', 'mov', 'ts'].includes(ext);
 }
 
+function validateTorrentData(torrentData) {
+  try {
+    const parsedTorrent = parseTorrent(torrentData);
+    const files = Array.isArray(parsedTorrent?.files) ? parsedTorrent.files : [];
+    const allPaths = files.map(f => String(f?.path || f?.name || '')).filter(Boolean);
+
+    // Prefer video files for validation (avoid NFO/SRT triggering false failures).
+    const pathsToCheck = allPaths.filter(isVideoFile);
+    const checkList = pathsToCheck.length > 0 ? pathsToCheck : allPaths;
+
+    let missing = false;
+    const checkedFiles = [];
+
+    for (const p of checkList) {
+      const base = path.basename(p);
+      const noExt = base.replace(/\.[^.]+$/, '');
+      const info = parseTorrentTitle.parse(noExt);
+      checkedFiles.push({ file: p, parsed: info });
+      if (!info?.season || !info?.episode) missing = true;
+    }
+
+    if (missing) {
+      return fail('validate-torrent-files', 'Torrent file name is missing a season or episode number.', {
+        fileCount: allPaths.length,
+        checkedCount: checkList.length,
+        checkedFiles,
+      });
+    }
+
+    return ok();
+  } catch (e) {
+    return fail('parse-torrent', e?.message || String(e));
+  }
+}
+
 function normalizeProvider(rawProvider, detailUrl) {
   const p = String(rawProvider || '').toLowerCase().trim();
   const url = String(detailUrl || '').toLowerCase();
@@ -295,14 +319,6 @@ export async function fetchTorrentFileFromSearchResult(torrent) {
     cookieHeader = upsertCookieValue(cookieHeader, 'cf_clearance', localCf);
   }
 
-  console.error('[torrentFile] TL curl direct download', {
-    downloadUrl,
-    hasProfile: Boolean(profile),
-    hasCookies: Boolean(cookieHeader),
-    headerKeys: Object.keys(headers || {}),
-    hasLocalCf: Boolean(localCf),
-  });
-
   const r = await curlFetchBinary(downloadUrl, { headers, cookieHeader });
   const headText = r.stdout.slice(0, 600).toString('utf8');
   const looksHtml = /^\s*</.test(headText) || looksLikeCloudflareChallenge(headText);
@@ -373,556 +389,161 @@ export async function uploadTorrentToWatchFolder(torrentData, filenameHint = '')
  * @returns {Promise<{success:boolean, stage?:string, reason?:string, provider?:string, httpStatus?:number, httpStatusText?:string, savedFile?:string, cookiesSent?:string[], hasCfClearance?:boolean, downloadUrl?:string, detailUrl?:string, warning?:string}>}
  */
 export async function download(torrent, cfClearance = {}) {
-  console.log('Download function called with torrent:', torrent);
-
-  let warning;
-  
-  if (!torrent.detailUrl) {
-    console.log('No detailUrl available for torrent');
-    return fail('validate', 'No detailUrl available for torrent');
+  if (!torrent || typeof torrent !== 'object') {
+    return fail('validate', 'Torrent data is required');
   }
-  
-  try {
-    // Determine provider from detailUrl
-    const provider = normalizeProvider(torrent.raw?.provider, torrent.detailUrl);
-    const filename = provider === 'iptorrents' ? 'ipt-detail.html' : 
-                     provider === 'torrentleech' ? 'tl-detail.html' : 
-                     `${provider}-detail.html`;
-    
-    console.log(`Fetching detail page from: ${torrent.detailUrl}`);
-    console.log('Provider:', provider);
-    console.log('Available cf_clearance keys:', Object.keys(cfClearance));
 
-    console.error('[download] start', {
+  const detailUrl = String(torrent?.detailUrl || '').trim();
+  const provider = normalizeProvider(torrent?.raw?.provider, detailUrl);
+
+  // TorrentLeech: direct .torrent only (no detail-page scraping).
+  if (provider === 'torrentleech') {
+    const fetched = await fetchTorrentFileFromSearchResult(torrent);
+    if (!fetched.success) return fetched;
+
+    const valid = validateTorrentData(fetched.torrentData);
+    if (!valid.success) return valid;
+
+    const hint = torrent?.raw?.filename || torrent?.raw?.title || 'download.torrent';
+    const uploaded = await uploadTorrentToWatchFolder(fetched.torrentData, hint);
+    if (!uploaded.success) return uploaded;
+
+    return ok({
       provider,
-      detailUrl: torrent?.detailUrl,
-      fid: torrent?.raw?.fid,
-      filename: torrent?.raw?.filename,
-      hasCfClearance: Boolean(cfClearance && typeof cfClearance === 'object' && cfClearance[provider]),
+      method: fetched.method,
+      downloadUrl: fetched.downloadUrl,
+      remotePath: uploaded.remotePath,
+      filename: uploaded.filename,
+      bytes: fetched.bytes,
     });
-    
-    // Load all cookies from the cookie file for this provider
-    let allCookies = [];
-    const cookieFile = provider === 'iptorrents' ? 'iptorrents.json' : 
-                       provider === 'torrentleech' ? 'torrentleech.json' : null;
-    
-    if (cookieFile) {
-      const cookiePath = path.join(__dirname, '..', 'cookies', cookieFile);
-      try {
-        const cookieData = JSON.parse(fs.readFileSync(cookiePath, 'utf8'));
-        // Get all cookies EXCEPT cf_clearance (that comes from localStorage)
-        allCookies = cookieData
-          .filter(c => c.name !== 'cf_clearance')
-          .map(c => `${c.name}=${c.value}`);
-        console.log(`Loaded ${allCookies.length} cookies from ${cookieFile}:`, allCookies.map(c => c.split('=')[0]));
-      } catch (err) {
-        console.log(`Could not load cookie file ${cookieFile}:`, err.message);
-      }
+  }
+
+  // Non-TL providers: use the legacy detail-page scrape pipeline.
+  if (!detailUrl) {
+    return fail('validate', 'No detailUrl available for torrent', { provider });
+  }
+
+  // Load cookies from provider cookie jar (excluding cf_clearance)
+  let allCookies = [];
+  const cookieFile = provider === 'iptorrents' ? 'iptorrents.json' : null;
+  if (cookieFile) {
+    const cookiePath = path.join(__dirname, '..', 'cookies', cookieFile);
+    try {
+      const cookieData = JSON.parse(fs.readFileSync(cookiePath, 'utf8'));
+      allCookies = cookieData
+        .filter(c => c && c.name && c.value && c.name !== 'cf_clearance')
+        .map(c => `${c.name}=${c.value}`);
+    } catch {
+      // ignore
     }
-    
-    // Get cf_clearance cookie for this provider from localStorage
-    const cfCookie = cfClearance[provider] || '';
-    if (cfCookie) {
-      console.log(`Using cf_clearance for ${provider}: ${cfCookie.substring(0, 30)}...`);
-      allCookies.push(`cf_clearance=${cfCookie}`);
+  }
+
+  // Prefer local persisted cf_clearance (written by the client Save Cookies)
+  const localCf = await loadLocalCfClearance(provider);
+  const fallbackCf =
+    cfClearance && typeof cfClearance === 'object' && typeof cfClearance[provider] === 'string'
+      ? String(cfClearance[provider]).trim()
+      : '';
+  const cfCookie = localCf || fallbackCf;
+  if (cfCookie) allCookies.push(`cf_clearance=${cfCookie}`);
+
+  const detailOrigin = new URL(detailUrl).origin;
+  const referer = provider === 'iptorrents' ? 'https://iptorrents.com/' : `${detailOrigin}/`;
+
+  const headers = {
+    'User-Agent': DOWNLOAD_USER_AGENT,
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5',
+    'Referer': referer,
+  };
+  if (allCookies.length > 0) headers['Cookie'] = allCookies.join('; ');
+
+  const torrentHeaders = {
+    ...headers,
+    'Accept': 'application/x-bittorrent,application/octet-stream,*/*;q=0.8',
+  };
+
+  const response = await fetch(detailUrl, { headers });
+  if (!response.ok) {
+    const snippet = await response.text().catch(() => '');
+    const isCloudflare = looksLikeCloudflareChallenge(snippet);
+    return fail('fetch-detail', isCloudflare ? 'Cloudflare challenge page (Just a moment...)' : 'Failed to fetch detail page', {
+      provider,
+      detailUrl,
+      httpStatus: response.status,
+      httpStatusText: response.statusText,
+      cookiesSent: safeCookieNames(allCookies),
+      hasCfClearance: Boolean(cfCookie),
+      isCloudflare,
+      bodySnippet: snippet ? snippet.substring(0, 500) : undefined,
+    });
+  }
+
+  const html = await response.text();
+  if (looksLikeCloudflareChallenge(html)) {
+    return fail('fetch-detail', 'Cloudflare challenge page (Just a moment...)', {
+      provider,
+      detailUrl,
+      httpStatus: response.status,
+      httpStatusText: response.statusText,
+      cookiesSent: safeCookieNames(allCookies),
+      hasCfClearance: Boolean(cfCookie),
+      isCloudflare: true,
+      bodySnippet: html ? String(html).slice(0, 500) : undefined,
+    });
+  }
+
+  // Search for .torrent download link
+  const torrentLinkPattern = /<a[^>]*href="([^"]*\.torrent)"[^>]*>/i;
+  const match = html.match(torrentLinkPattern);
+  if (!match) {
+    return fail('parse-detail', 'No .torrent download link found in HTML', { provider, detailUrl });
+  }
+
+  // Convert relative URL to absolute
+  let absoluteDownloadUrl = match[1];
+  if (!absoluteDownloadUrl.startsWith('http://') && !absoluteDownloadUrl.startsWith('https://')) {
+    const baseUrl = new URL(detailUrl);
+    if (absoluteDownloadUrl.startsWith('/')) {
+      absoluteDownloadUrl = `${baseUrl.protocol}//${baseUrl.host}${absoluteDownloadUrl}`;
     } else {
-      console.log('WARNING: No cf_clearance cookie found for provider:', provider);
-      console.log('Available providers in cfClearance:', Object.keys(cfClearance));
+      absoluteDownloadUrl = `${baseUrl.protocol}//${baseUrl.host}/${absoluteDownloadUrl}`;
     }
-    
-    // Fetch the detail page with all cookies
-    const detailUrl = torrent.detailUrl;
-    const detailOrigin = new URL(detailUrl).origin;
-    const referer =
-      provider === 'iptorrents'
-        ? 'https://iptorrents.com/'
-        : provider === 'torrentleech'
-          ? 'https://www.torrentleech.org/'
-          : `${detailOrigin}/`;
+  }
 
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-      'Referer': referer
-    };
-
-    const torrentHeaders = {
-      ...headers,
-      // Prefer binary content-types for direct .torrent downloads.
-      'Accept': 'application/x-bittorrent,application/octet-stream,*/*;q=0.8',
-    };
-    
-    if (allCookies.length > 0) {
-      headers['Cookie'] = allCookies.join('; ');
-      console.log('Sending cookies:', allCookies.join('; ').substring(0, 200) + '...');
-    }
-    
-    console.log('Request headers:', JSON.stringify(headers, null, 2));
-
-    let absoluteDownloadUrl;
-    let torrentResponse;
-
-    // Safe improvement: for TL, attempt the direct download URL first using fid + filename.
-    // If it doesn't yield a torrent, fall back to the detail-page scrape.
-    if (provider === 'torrentleech') {
-      const fid = torrent?.raw?.fid;
-      const rawFilename = torrent?.raw?.filename;
-      if (fid && rawFilename && String(rawFilename).toLowerCase().endsWith('.torrent')) {
-        const directUrl = `https://www.torrentleech.org/download/${encodeURIComponent(String(fid))}/${encodeURIComponent(String(rawFilename))}`;
-        try {
-          console.error('[TL] direct .torrent attempt', { directUrl });
-          const r = await fetch(directUrl, { headers: torrentHeaders });
-          const ct = (r.headers?.get?.('content-type') || '').toLowerCase();
-
-          console.error('[TL] direct .torrent response', {
-            httpStatus: r.status,
-            httpStatusText: r.statusText,
-            contentType: ct,
-          });
-
-          if (r.ok && !ct.includes('text/html')) {
-            absoluteDownloadUrl = directUrl;
-            torrentResponse = r;
-            console.error('[TL] direct .torrent accepted', { downloadUrl: absoluteDownloadUrl });
-          } else {
-            // If we got HTML or a failure, fall back to fetching the detail page.
-            try {
-              const body = await r.text();
-              console.error('[TL] direct .torrent rejected; falling back to detail page', {
-                httpStatus: r.status,
-                httpStatusText: r.statusText,
-                contentType: ct,
-                isCloudflare: looksLikeCloudflareChallenge(body),
-                bodyHead: String(body || '').slice(0, 200),
-              });
-            } catch {
-              // ignore
-            }
-          }
-        } catch {
-          // ignore and fall back
-        }
-      }
-    }
-
-    const sampleDir = path.join(__dirname, '..', '..', 'samples', 'sample-torrents');
-    let savedDetailPath;
-
-    // Some providers (notably TL) may hand us a direct .torrent URL as detailUrl.
-    // In that case, skip detail-page scraping and go straight to downloading.
-    if (!torrentResponse && typeof detailUrl === 'string' && detailUrl.toLowerCase().endsWith('.torrent')) {
-      absoluteDownloadUrl = detailUrl;
-      console.error('[download] detailUrl looks like a direct .torrent; downloading directly', {
-        provider,
-        downloadUrl: absoluteDownloadUrl,
-      });
-      torrentResponse = await fetch(absoluteDownloadUrl, { headers: torrentHeaders });
-    }
-
-    let html;
-    if (!torrentResponse) {
-      console.log('Fetching detail page URL:', detailUrl);
-
-      const response = await fetch(detailUrl, { headers });
-      console.log('Detail page fetch response status:', response.status, response.statusText);
-      console.log('Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
-
-      if (!response.ok) {
-        console.log(`Failed to fetch detail page: ${response.status} ${response.statusText}`);
-        const snippet = await response.text().catch(() => '');
-        const isCloudflare = looksLikeCloudflareChallenge(snippet);
-        if (provider === 'torrentleech') {
-          const s = String(snippet || '').toLowerCase();
-          const tags = [];
-          if (
-            s.includes('cloudflare') ||
-            s.includes('cf-chl') ||
-            s.includes('cf-ray') ||
-            s.includes('attention required') ||
-            s.includes('just a moment') ||
-            s.includes('checking your browser') ||
-            s.includes('verify you are human') ||
-            s.includes('enable javascript and cookies')
-          ) tags.push('cloudflare');
-          if (s.includes('sign in') || s.includes('login') || s.includes('loginform') || s.includes('type="password"')) tags.push('login');
-          if (s.includes('forbidden') || s.includes('access denied') || s.includes('not authorized')) tags.push('forbidden');
-          console.error('[TL] Detail fetch failed summary:', {
-            httpStatus: response.status,
-            httpStatusText: response.statusText,
-            hasCfClearance: Boolean(cfCookie),
-            cfLen: cfCookie ? String(cfCookie).length : 0,
-            cookiesSent: safeCookieNames(allCookies),
-            tags,
-            bodyHead: snippet ? String(snippet).slice(0, 200) : '',
-          });
-        }
-        console.log('Response body snippet:', snippet.substring(0, 1000));
-        return fail('fetch-detail', isCloudflare ? 'Cloudflare challenge page (Just a moment...)' : 'Failed to fetch detail page', {
-          provider,
-          detailUrl,
-          httpStatus: response.status,
-          httpStatusText: response.statusText,
-          cookiesSent: safeCookieNames(allCookies),
-          hasCfClearance: Boolean(cfCookie),
-          isCloudflare,
-          bodySnippet: snippet ? snippet.substring(0, 500) : undefined,
-        });
-      }
-
-      html = await response.text();
-      console.log(`Fetched ${html.length} bytes of HTML`);
-
-      if (looksLikeCloudflareChallenge(html)) {
-        return fail('fetch-detail', 'Cloudflare challenge page (Just a moment...)', {
-          provider,
-          detailUrl,
-          httpStatus: response.status,
-          httpStatusText: response.statusText,
-          cookiesSent: safeCookieNames(allCookies),
-          hasCfClearance: Boolean(cfCookie),
-          isCloudflare: true,
-          bodySnippet: html ? String(html).slice(0, 500) : undefined,
-        });
-      }
-      if (SAVE_DETAIL_FILE || DOWNLOAD_DEBUG) {
-        ensureDir(sampleDir);
-        savedDetailPath = path.join(sampleDir, filename.replace('.html', `-${nowStamp()}.html`));
-        fs.writeFileSync(savedDetailPath, html, 'utf8');
-        console.log(`Saved detail page to: ${savedDetailPath}`);
-      }
-
-      // Check if we got a sign-in page
-      const isSignInPage = html.toLowerCase().includes('sign in') ||
-        html.toLowerCase().includes('login') ||
-        html.toLowerCase().includes('loginform') ||
-        html.includes('type="password"');
-
-      if (isSignInPage) {
-        console.log('ERROR: Got sign-in page instead of detail page!');
-        console.log('First 500 chars of HTML:');
-        console.log(html.substring(0, 500));
-
-        if (!savedDetailPath) {
-          ensureDir(sampleDir);
-          savedDetailPath = path.join(sampleDir, filename.replace('.html', `-signin-${nowStamp()}.html`));
-          fs.writeFileSync(savedDetailPath, html, 'utf8');
-          console.log(`Saved sign-in page to: ${savedDetailPath} for inspection`);
-        }
-
-        return fail('parse-detail', 'Got sign-in/login page instead of detail page', {
-          provider,
-          detailUrl,
-          cookiesSent: safeCookieNames(allCookies),
-          hasCfClearance: Boolean(cfCookie),
-          savedFile: savedDetailPath,
-        });
-      }
-
-      // Search for .torrent download link
-      const torrentLinkPattern = /<a[^>]*href="([^"]*\.torrent)"[^>]*>/i;
-      const match = html.match(torrentLinkPattern);
-
-      if (!match) {
-        console.log('ERROR: No .torrent download link found!');
-        return fail('parse-detail', 'No .torrent download link found in HTML', {
-          provider,
-          detailUrl,
-          savedFile: savedDetailPath,
-        });
-      }
-
-      const downloadUrl = match[1];
-      console.log(`Found download link: ${downloadUrl}`);
-
-      // Convert relative URL to absolute
-      absoluteDownloadUrl = downloadUrl;
-      if (!downloadUrl.startsWith('http://') && !downloadUrl.startsWith('https://')) {
-        const baseUrl = new URL(torrent.detailUrl);
-        if (downloadUrl.startsWith('/')) {
-          absoluteDownloadUrl = `${baseUrl.protocol}//${baseUrl.host}${downloadUrl}`;
-        } else {
-          absoluteDownloadUrl = `${baseUrl.protocol}//${baseUrl.host}/${downloadUrl}`;
-        }
-      }
-
-      console.log(`Downloading from: ${absoluteDownloadUrl}`);
-
-      console.error('[download] using scraped .torrent URL', {
-        provider,
-        downloadUrl: absoluteDownloadUrl,
-      });
-
-      // Fetch the .torrent file with same cookies
-      torrentResponse = await fetch(absoluteDownloadUrl, { headers: torrentHeaders });
-    }
-    
-    if (!torrentResponse.ok) {
-      console.log(`Failed to download torrent: ${torrentResponse.status} ${torrentResponse.statusText}`);
-      const snippet = await torrentResponse.text().catch(() => '');
-      const isCloudflare = looksLikeCloudflareChallenge(snippet);
-      console.error('[download] .torrent fetch failed', {
-        provider,
-        downloadUrl: absoluteDownloadUrl,
-        httpStatus: torrentResponse.status,
-        httpStatusText: torrentResponse.statusText,
-        isCloudflare,
-        bodyHead: String(snippet || '').slice(0, 200),
-      });
-
-      // TL-specific fallback: if fetch is blocked by Cloudflare, try invoking curl.
-      if (provider === 'torrentleech' && isCloudflare && absoluteDownloadUrl) {
-        try {
-          const profile = tryLoadBrowserCurlProfile();
-          const cookieHeader =
-            (profile?.cookieHeader && profile.cookieHeader.includes('cf_clearance='))
-              ? profile.cookieHeader
-              : (allCookies.length > 0 ? allCookies.join('; ') : '');
-
-          // Use the more browser-like header set when available.
-          const curlHeaders = profile?.headers && Object.keys(profile.headers).length > 0
-            ? profile.headers
-            : {
-                accept: torrentHeaders['Accept'],
-                'accept-language': headers['Accept-Language'],
-                'cache-control': 'no-cache',
-                pragma: 'no-cache',
-                'user-agent': headers['User-Agent'],
-              };
-
-          console.error('[TL] Cloudflare via fetch; trying curl', {
-            downloadUrl: absoluteDownloadUrl,
-            usingProfile: Boolean(profile),
-            profilePath: profile?.path,
-            cookieNames: safeCookieNames(cookieHeader.split(';').map(s => s.trim()).filter(Boolean)),
-          });
-
-          const r = await curlFetchBinary(absoluteDownloadUrl, { headers: curlHeaders, cookieHeader });
-          if (r.ok) {
-            const head = r.stdout.slice(0, 256).toString('utf8');
-            const looksHtml = head.trim().startsWith('<') || looksLikeCloudflareChallenge(head);
-            if (!looksHtml) {
-              console.error('[TL] curl download ok', { bytes: r.stdout.length });
-              // Continue with normal pipeline using the curl result.
-              const torrentData = r.stdout;
-              console.log(`Downloaded ${torrentData.length} bytes (curl)`);
-
-              // Validate torrent content (same as normal path)
-              try {
-                const parsedTorrent = parseTorrent(torrentData);
-                const files = Array.isArray(parsedTorrent?.files) ? parsedTorrent.files : [];
-                const allPaths = files.map(f => String(f?.path || f?.name || '')).filter(Boolean);
-
-                const pathsToCheck = allPaths.filter(isVideoFile);
-                const checkList = pathsToCheck.length > 0 ? pathsToCheck : allPaths;
-
-                const parsedByFile = [];
-                let missing = false;
-
-                for (const p of checkList) {
-                  const base = path.basename(p);
-                  const noExt = base.replace(/\.[^.]+$/, '');
-                  const info = parseTorrentTitle.parse(noExt);
-                  parsedByFile.push({ file: p, parsed: info });
-                  if (!info?.season || !info?.episode) missing = true;
-                }
-
-                console.error('parse-torrent files:', checkList);
-                console.error('parse-torrent-title results:', parsedByFile.map(x => ({ file: x.file, season: x.parsed?.season, episode: x.parsed?.episode })));
-
-                if (missing) {
-                  return fail('validate-torrent-files', 'Torrent file name is missing a season or episode number.', {
-                    fileCount: allPaths.length,
-                    checkedCount: checkList.length,
-                    checkedFiles: parsedByFile.map(x => ({ file: x.file, parsed: x.parsed }))
-                  });
-                }
-              } catch (e) {
-                return fail('parse-torrent', e?.message || String(e));
-              }
-
-              // From here, reuse the existing upload pipeline: fall through by emulating torrentResponse buffer.
-              // We do this by stashing torrentData and skipping the fetch-returned failure.
-              torrentResponse = null;
-
-              // Generate simple hash from random number
-              const hash = Math.random().toString(36).substring(2, 15);
-              const torrentFilename = `${hash}.torrent`;
-
-              // Save .torrent file to sample-torrents directory
-              if (SAVE_TORRENT_FILE) {
-                const sampleDir = path.join(__dirname, '..', '..', 'samples', 'sample-torrents');
-                ensureDir(sampleDir);
-                const torrentSavePath = path.join(sampleDir, torrentFilename);
-                fs.writeFileSync(torrentSavePath, torrentData);
-                console.log(`Saved torrent to: ${torrentSavePath}`);
-              }
-
-              // Upload to remote SFTP server
-              let sftpConfig;
-              let remoteWatchDir;
-              try {
-                ({ sftpConfig, remoteWatchDir } = await getSftpSettings());
-              } catch (e) {
-                return fail('sftp-config', e?.message || String(e), { provider });
-              }
-              const remotePath = `${remoteWatchDir}/${torrentFilename}`;
-
-              console.log(`\nUploading to SFTP server...`);
-              console.log(`Remote path: ${remotePath}`);
-
-              const sftp = new Client();
-              try {
-                await sftp.connect(sftpConfig);
-                console.log('Connected to SFTP server');
-
-                await sftp.put(torrentData, remotePath);
-                console.log(`Successfully uploaded to ${remotePath}`);
-
-                await sftp.end();
-              } catch (sftpError) {
-                console.error('SFTP upload failed:', sftpError.message);
-                warning = `SFTP upload failed: ${sftpError.message}`;
-              }
-
-              return ok({
-                provider,
-                downloadUrl: absoluteDownloadUrl,
-                detailUrl,
-                cookiesSent: safeCookieNames(cookieHeader.split(';').map(s => s.trim()).filter(Boolean)),
-                hasCfClearance: Boolean(cookieHeader && cookieHeader.includes('cf_clearance=')),
-                method: 'curl',
-                warning,
-              });
-            }
-            console.error('[TL] curl returned HTML/challenge', { bytes: r.stdout.length, head: head.slice(0, 200) });
-          } else {
-            console.error('[TL] curl failed', { code: r.code, error: r.error, stderr: r.stderr.toString('utf8').slice(0, 400) });
-          }
-        } catch (e) {
-          console.error('[TL] curl fallback exception', e?.message || String(e));
-        }
-      }
-
-      return fail('fetch-torrent', 'Failed to download torrent', {
-        provider,
-        downloadUrl: absoluteDownloadUrl,
-        httpStatus: torrentResponse.status,
-        httpStatusText: torrentResponse.statusText,
-        cookiesSent: safeCookieNames(allCookies),
-        hasCfClearance: Boolean(cfCookie),
-        bodySnippet: snippet ? snippet.substring(0, 500) : undefined,
-      });
-    }
-    
-    // Get the file content as buffer
-    const torrentBuffer = await torrentResponse.arrayBuffer();
-    const torrentData = Buffer.from(torrentBuffer);
-    console.log(`Downloaded ${torrentData.length} bytes`);
-
-    console.error('[download] .torrent downloaded', {
+  const torrentResponse = await fetch(absoluteDownloadUrl, { headers: torrentHeaders });
+  if (!torrentResponse.ok) {
+    const snippet = await torrentResponse.text().catch(() => '');
+    const isCloudflare = looksLikeCloudflareChallenge(snippet);
+    return fail('fetch-torrent', 'Failed to download torrent', {
       provider,
       downloadUrl: absoluteDownloadUrl,
-      bytes: torrentData.length,
-      contentType: (torrentResponse.headers?.get?.('content-type') || ''),
+      httpStatus: torrentResponse.status,
+      httpStatusText: torrentResponse.statusText,
+      cookiesSent: safeCookieNames(allCookies),
+      hasCfClearance: Boolean(cfCookie),
+      isCloudflare,
+      bodySnippet: snippet ? snippet.substring(0, 500) : undefined,
     });
-
-    // Validate torrent content: each relevant file name must contain season & episode.
-    // If missing, abort BEFORE sending to the watch folder.
-    try {
-      const parsedTorrent = parseTorrent(torrentData);
-      const files = Array.isArray(parsedTorrent?.files) ? parsedTorrent.files : [];
-      const allPaths = files.map(f => String(f?.path || f?.name || '')).filter(Boolean);
-
-      // Prefer video files for validation (avoid NFO/SRT triggering false failures).
-      const pathsToCheck = allPaths.filter(isVideoFile);
-      const checkList = pathsToCheck.length > 0 ? pathsToCheck : allPaths;
-
-      const parsedByFile = [];
-      let missing = false;
-
-      for (const p of checkList) {
-        const base = path.basename(p);
-        const noExt = base.replace(/\.[^.]+$/, '');
-        const info = parseTorrentTitle.parse(noExt);
-        parsedByFile.push({ file: p, parsed: info });
-        if (!info?.season || !info?.episode) missing = true;
-      }
-
-      // For testing: log parse results.
-      console.error('parse-torrent files:', checkList);
-      console.error('parse-torrent-title results:', parsedByFile.map(x => ({ file: x.file, season: x.parsed?.season, episode: x.parsed?.episode })));
-
-      if (missing) {
-        return fail('validate-torrent-files', 'Torrent file name is missing a season or episode number.', {
-          fileCount: allPaths.length,
-          checkedCount: checkList.length,
-          checkedFiles: parsedByFile.map(x => ({ file: x.file, parsed: x.parsed }))
-        });
-      }
-    } catch (e) {
-      return fail('parse-torrent', e?.message || String(e));
-    }
-
-    const contentType = torrentResponse.headers?.get?.('content-type') || '';
-    if (DOWNLOAD_DEBUG && contentType.toLowerCase().includes('text/html')) {
-      ensureDir(sampleDir);
-      const savePath = path.join(sampleDir, `${provider}-torrent-html-${nowStamp()}.html`);
-      fs.writeFileSync(savePath, torrentData.toString('utf8'), 'utf8');
-      console.log(`WARNING: Torrent download returned HTML. Saved to: ${savePath}`);
-      return fail('fetch-torrent', 'Torrent download returned HTML (likely blocked/login)', {
-        provider,
-        downloadUrl: absoluteDownloadUrl,
-        contentType,
-        savedFile: savePath,
-      });
-    }
-    
-    // Generate simple hash from random number
-    const hash = Math.random().toString(36).substring(2, 15);
-    const torrentFilename = `${hash}.torrent`;
-    
-    // Save .torrent file to sample-torrents directory
-    if (SAVE_TORRENT_FILE) {
-      ensureDir(sampleDir);
-      const torrentSavePath = path.join(__dirname, '..', '..', 'samples', 'sample-torrents', torrentFilename);
-      fs.writeFileSync(torrentSavePath, torrentData);
-      console.log(`Saved torrent to: ${torrentSavePath}`);
-    }
-    
-    // Upload to remote SFTP server
-    let sftpConfig;
-    let remoteWatchDir;
-    try {
-      ({ sftpConfig, remoteWatchDir } = await getSftpSettings());
-    } catch (e) {
-      return fail('sftp-config', e?.message || String(e), { provider });
-    }
-    const remotePath = `${remoteWatchDir}/${torrentFilename}`;
-    
-    console.log(`\nUploading to SFTP server...`);
-    console.log(`Remote path: ${remotePath}`);
-    
-    const sftp = new Client();
-    try {
-      await sftp.connect(sftpConfig);
-      console.log('Connected to SFTP server');
-      
-      await sftp.put(torrentData, remotePath);
-      console.log(`Successfully uploaded to ${remotePath}`);
-      
-      await sftp.end();
-    } catch (sftpError) {
-      console.error('SFTP upload failed:', sftpError.message);
-      // Don't fail the whole download if SFTP fails
-      warning = `SFTP upload failed: ${sftpError.message}`;
-    }
-    
-  } catch (error) {
-    console.error('Error in download function:', error);
-    return fail('exception', error?.message || String(error));
   }
 
-  return ok(typeof warning === 'string' ? { warning } : undefined);
+  const torrentBuffer = await torrentResponse.arrayBuffer();
+  const torrentData = Buffer.from(torrentBuffer);
+
+  const valid = validateTorrentData(torrentData);
+  if (!valid.success) return valid;
+
+  const hint = torrent?.raw?.filename || torrent?.raw?.title || 'download.torrent';
+  const uploaded = await uploadTorrentToWatchFolder(torrentData, hint);
+  if (!uploaded.success) return uploaded;
+
+  return ok({
+    provider,
+    method: 'fetch',
+    downloadUrl: absoluteDownloadUrl,
+    remotePath: uploaded.remotePath,
+    filename: uploaded.filename,
+    bytes: torrentData.length,
+  });
 }
 

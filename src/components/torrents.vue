@@ -974,25 +974,6 @@ export default {
               ? 'iptorrents'
               : providerRaw || 'unknown';
 
-        // Get cf_clearance cookies from localStorage.
-        // Note: the UI stores these under iptCfClearance/tlCfClearance.
-        // Keep backward-compatible fallbacks for older keys.
-        const iptCfRaw =
-          this.iptCfClearance ||
-          localStorage.getItem('iptCfClearance') ||
-          localStorage.getItem('cf_clearance_iptorrents') ||
-          '';
-        const tlCfRaw =
-          this.tlCfClearance ||
-          localStorage.getItem('tlCfClearance') ||
-          localStorage.getItem('cf_clearance_torrentleech') ||
-          '';
-
-        const cfClearance = {
-          iptorrents: this.extractCfClearance(iptCfRaw),
-          torrentleech: this.extractCfClearance(tlCfRaw)
-        };
-
         // TL: Use the new direct-binary endpoint (no detail page), then push bytes to USB watch folder.
         if (provider === 'torrentleech') {
           const resp = await fetch(`${config.torrentsApiUrl}/api/torrentFile`, {
@@ -1028,7 +1009,8 @@ export default {
                   : '') +
                 'Try:\n' +
                 '- Complete any “verify you are human” step in the detail tab.\n' +
-                '- Re-copy DevTools “Copy as cURL (bash)” into misc/req-browser.txt and retry.\n\n' +
+                '- Click Cookies → paste TL cf_clearance → Save Cookies.\n' +
+                '- Ensure torrents/req-browser.txt matches the browser you’re using (DevTools “Copy as cURL (bash)”).\n\n' +
                 (detailUrl ? `Detail URL:\n${detailUrl}` : '')
               );
               return;
@@ -1081,6 +1063,16 @@ export default {
         }
 
         // Non-TL providers: keep the existing server-side pipeline.
+        // For backward compatibility, still send IPT cf_clearance if present.
+        const iptCfRaw =
+          this.iptCfClearance ||
+          localStorage.getItem('iptCfClearance') ||
+          localStorage.getItem('cf_clearance_iptorrents') ||
+          '';
+        const cfClearance = {
+          iptorrents: this.extractCfClearance(iptCfRaw)
+        };
+
         const response = await fetch(`${config.torrentsApiUrl}/api/download`, {
           method: 'POST',
           headers: {
@@ -1088,7 +1080,7 @@ export default {
           },
           body: JSON.stringify({
             torrent,
-            cfClearance: cfClearance
+            cfClearance
           })
         });
         
@@ -1119,9 +1111,9 @@ export default {
           const isCloudflare = Boolean(data && typeof data === 'object' && (data.isCloudflare || data.stage === 'cloudflare')) ||
             /cloudflare|just a moment|checking your browser/i.test(String(errorMsg || ''));
 
-          if (isCloudflare && (provider === 'torrentleech' || provider === 'iptorrents')) {
-            const label = provider === 'torrentleech' ? 'TorrentLeech' : 'IPTorrents';
-            const cookieBox = provider === 'torrentleech' ? 'TL' : 'IPT';
+          if (isCloudflare && provider === 'iptorrents') {
+            const label = 'IPTorrents';
+            const cookieBox = 'IPT';
 
             let popupBlocked = false;
             if (detailUrl) {

@@ -2,3 +2,4 @@
 
 - everything works
 - i've done a backup commit
+- clean up torrents/src/download.js and vue file for tor pane by removing debugging and removing all old logic not used for new flow.  remove anything having to do with using a tl detail page except for browser tabs.

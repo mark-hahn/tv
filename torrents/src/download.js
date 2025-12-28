@@ -139,6 +139,14 @@ export async function download(torrent, cfClearance = {}) {
     console.log(`Fetching detail page from: ${torrent.detailUrl}`);
     console.log('Provider:', provider);
     console.log('Available cf_clearance keys:', Object.keys(cfClearance));
+
+    console.error('[download] start', {
+      provider,
+      detailUrl: torrent?.detailUrl,
+      fid: torrent?.raw?.fid,
+      filename: torrent?.raw?.filename,
+      hasCfClearance: Boolean(cfClearance && typeof cfClearance === 'object' && cfClearance[provider]),
+    });
     
     // Load all cookies from the cookie file for this provider
     let allCookies = [];
@@ -185,6 +193,12 @@ export async function download(torrent, cfClearance = {}) {
       'Accept-Language': 'en-US,en;q=0.5',
       'Referer': referer
     };
+
+    const torrentHeaders = {
+      ...headers,
+      // Prefer binary content-types for direct .torrent downloads.
+      'Accept': 'application/x-bittorrent,application/octet-stream,*/*;q=0.8',
+    };
     
     if (allCookies.length > 0) {
       headers['Cookie'] = allCookies.join('; ');
@@ -192,68 +206,118 @@ export async function download(torrent, cfClearance = {}) {
     }
     
     console.log('Request headers:', JSON.stringify(headers, null, 2));
-    console.log('Fetching detail page URL:', detailUrl);
-    
-    const response = await fetch(detailUrl, { headers });
-    console.log('Detail page fetch response status:', response.status, response.statusText);
-    console.log('Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
-    
-    if (!response.ok) {
-      console.log(`Failed to fetch detail page: ${response.status} ${response.statusText}`);
-      const snippet = await response.text().catch(() => '');
-      const isCloudflare = looksLikeCloudflareChallenge(snippet);
-      if (provider === 'torrentleech') {
-        const s = String(snippet || '').toLowerCase();
-        const tags = [];
-        if (
-          s.includes('cloudflare') ||
-          s.includes('cf-chl') ||
-          s.includes('cf-ray') ||
-          s.includes('attention required') ||
-          s.includes('just a moment') ||
-          s.includes('checking your browser') ||
-          s.includes('verify you are human') ||
-          s.includes('enable javascript and cookies')
-        ) tags.push('cloudflare');
-        if (s.includes('sign in') || s.includes('login') || s.includes('loginform') || s.includes('type="password"')) tags.push('login');
-        if (s.includes('forbidden') || s.includes('access denied') || s.includes('not authorized')) tags.push('forbidden');
-        console.error('[TL] Detail fetch failed summary:', {
+
+    let absoluteDownloadUrl;
+    let torrentResponse;
+
+    // Safe improvement: for TL, attempt the direct download URL first using fid + filename.
+    // If it doesn't yield a torrent, fall back to the detail-page scrape.
+    if (provider === 'torrentleech') {
+      const fid = torrent?.raw?.fid;
+      const rawFilename = torrent?.raw?.filename;
+      if (fid && rawFilename && String(rawFilename).toLowerCase().endsWith('.torrent')) {
+        const directUrl = `https://www.torrentleech.org/download/${encodeURIComponent(String(fid))}/${encodeURIComponent(String(rawFilename))}`;
+        try {
+          console.error('[TL] direct .torrent attempt', { directUrl });
+          const r = await fetch(directUrl, { headers: torrentHeaders });
+          const ct = (r.headers?.get?.('content-type') || '').toLowerCase();
+
+          console.error('[TL] direct .torrent response', {
+            httpStatus: r.status,
+            httpStatusText: r.statusText,
+            contentType: ct,
+          });
+
+          if (r.ok && !ct.includes('text/html')) {
+            absoluteDownloadUrl = directUrl;
+            torrentResponse = r;
+            console.error('[TL] direct .torrent accepted', { downloadUrl: absoluteDownloadUrl });
+          } else {
+            // If we got HTML or a failure, fall back to fetching the detail page.
+            try {
+              const body = await r.text();
+              console.error('[TL] direct .torrent rejected; falling back to detail page', {
+                httpStatus: r.status,
+                httpStatusText: r.statusText,
+                contentType: ct,
+                isCloudflare: looksLikeCloudflareChallenge(body),
+                bodyHead: String(body || '').slice(0, 200),
+              });
+            } catch {
+              // ignore
+            }
+          }
+        } catch {
+          // ignore and fall back
+        }
+      }
+    }
+
+    let html;
+    if (!torrentResponse) {
+      console.log('Fetching detail page URL:', detailUrl);
+
+      const response = await fetch(detailUrl, { headers });
+      console.log('Detail page fetch response status:', response.status, response.statusText);
+      console.log('Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
+
+      if (!response.ok) {
+        console.log(`Failed to fetch detail page: ${response.status} ${response.statusText}`);
+        const snippet = await response.text().catch(() => '');
+        const isCloudflare = looksLikeCloudflareChallenge(snippet);
+        if (provider === 'torrentleech') {
+          const s = String(snippet || '').toLowerCase();
+          const tags = [];
+          if (
+            s.includes('cloudflare') ||
+            s.includes('cf-chl') ||
+            s.includes('cf-ray') ||
+            s.includes('attention required') ||
+            s.includes('just a moment') ||
+            s.includes('checking your browser') ||
+            s.includes('verify you are human') ||
+            s.includes('enable javascript and cookies')
+          ) tags.push('cloudflare');
+          if (s.includes('sign in') || s.includes('login') || s.includes('loginform') || s.includes('type="password"')) tags.push('login');
+          if (s.includes('forbidden') || s.includes('access denied') || s.includes('not authorized')) tags.push('forbidden');
+          console.error('[TL] Detail fetch failed summary:', {
+            httpStatus: response.status,
+            httpStatusText: response.statusText,
+            hasCfClearance: Boolean(cfCookie),
+            cfLen: cfCookie ? String(cfCookie).length : 0,
+            cookiesSent: safeCookieNames(allCookies),
+            tags,
+            bodyHead: snippet ? String(snippet).slice(0, 200) : '',
+          });
+        }
+        console.log('Response body snippet:', snippet.substring(0, 1000));
+        return fail('fetch-detail', isCloudflare ? 'Cloudflare challenge page (Just a moment...)' : 'Failed to fetch detail page', {
+          provider,
+          detailUrl,
           httpStatus: response.status,
           httpStatusText: response.statusText,
-          hasCfClearance: Boolean(cfCookie),
-          cfLen: cfCookie ? String(cfCookie).length : 0,
           cookiesSent: safeCookieNames(allCookies),
-          tags,
-          bodyHead: snippet ? String(snippet).slice(0, 200) : '',
+          hasCfClearance: Boolean(cfCookie),
+          isCloudflare,
+          bodySnippet: snippet ? snippet.substring(0, 500) : undefined,
         });
       }
-      console.log('Response body snippet:', snippet.substring(0, 1000));
-      return fail('fetch-detail', isCloudflare ? 'Cloudflare challenge page (Just a moment...)' : 'Failed to fetch detail page', {
-        provider,
-        detailUrl,
-        httpStatus: response.status,
-        httpStatusText: response.statusText,
-        cookiesSent: safeCookieNames(allCookies),
-        hasCfClearance: Boolean(cfCookie),
-        isCloudflare,
-        bodySnippet: snippet ? snippet.substring(0, 500) : undefined,
-      });
-    }
-    
-    const html = await response.text();
-    console.log(`Fetched ${html.length} bytes of HTML`);
 
-    if (looksLikeCloudflareChallenge(html)) {
-      return fail('fetch-detail', 'Cloudflare challenge page (Just a moment...)', {
-        provider,
-        detailUrl,
-        httpStatus: response.status,
-        httpStatusText: response.statusText,
-        cookiesSent: safeCookieNames(allCookies),
-        hasCfClearance: Boolean(cfCookie),
-        isCloudflare: true,
-        bodySnippet: html ? String(html).slice(0, 500) : undefined,
-      });
+      html = await response.text();
+      console.log(`Fetched ${html.length} bytes of HTML`);
+
+      if (looksLikeCloudflareChallenge(html)) {
+        return fail('fetch-detail', 'Cloudflare challenge page (Just a moment...)', {
+          provider,
+          detailUrl,
+          httpStatus: response.status,
+          httpStatusText: response.statusText,
+          cookiesSent: safeCookieNames(allCookies),
+          hasCfClearance: Boolean(cfCookie),
+          isCloudflare: true,
+          bodySnippet: html ? String(html).slice(0, 500) : undefined,
+        });
+      }
     }
 
     const sampleDir = path.join(__dirname, '..', '..', 'samples', 'sample-torrents');
@@ -305,28 +369,43 @@ export async function download(torrent, cfClearance = {}) {
       });
     }
     
-    const downloadUrl = match[1];
-    console.log(`Found download link: ${downloadUrl}`);
-    
-    // Convert relative URL to absolute
-    let absoluteDownloadUrl = downloadUrl;
-    if (!downloadUrl.startsWith('http://') && !downloadUrl.startsWith('https://')) {
-      const baseUrl = new URL(torrent.detailUrl);
-      if (downloadUrl.startsWith('/')) {
-        absoluteDownloadUrl = `${baseUrl.protocol}//${baseUrl.host}${downloadUrl}`;
-      } else {
-        absoluteDownloadUrl = `${baseUrl.protocol}//${baseUrl.host}/${downloadUrl}`;
+    if (!torrentResponse) {
+      const downloadUrl = match[1];
+      console.log(`Found download link: ${downloadUrl}`);
+
+      // Convert relative URL to absolute
+      absoluteDownloadUrl = downloadUrl;
+      if (!downloadUrl.startsWith('http://') && !downloadUrl.startsWith('https://')) {
+        const baseUrl = new URL(torrent.detailUrl);
+        if (downloadUrl.startsWith('/')) {
+          absoluteDownloadUrl = `${baseUrl.protocol}//${baseUrl.host}${downloadUrl}`;
+        } else {
+          absoluteDownloadUrl = `${baseUrl.protocol}//${baseUrl.host}/${downloadUrl}`;
+        }
       }
+
+      console.log(`Downloading from: ${absoluteDownloadUrl}`);
+
+      console.error('[download] using scraped .torrent URL', {
+        provider,
+        downloadUrl: absoluteDownloadUrl,
+      });
+
+      // Fetch the .torrent file with same cookies
+      torrentResponse = await fetch(absoluteDownloadUrl, { headers: torrentHeaders });
     }
-    
-    console.log(`Downloading from: ${absoluteDownloadUrl}`);
-    
-    // Fetch the .torrent file with same cookies
-    const torrentResponse = await fetch(absoluteDownloadUrl, { headers });
     
     if (!torrentResponse.ok) {
       console.log(`Failed to download torrent: ${torrentResponse.status} ${torrentResponse.statusText}`);
       const snippet = await torrentResponse.text().catch(() => '');
+      console.error('[download] .torrent fetch failed', {
+        provider,
+        downloadUrl: absoluteDownloadUrl,
+        httpStatus: torrentResponse.status,
+        httpStatusText: torrentResponse.statusText,
+        isCloudflare: looksLikeCloudflareChallenge(snippet),
+        bodyHead: String(snippet || '').slice(0, 200),
+      });
       return fail('fetch-torrent', 'Failed to download torrent', {
         provider,
         downloadUrl: absoluteDownloadUrl,
@@ -342,6 +421,13 @@ export async function download(torrent, cfClearance = {}) {
     const torrentBuffer = await torrentResponse.arrayBuffer();
     const torrentData = Buffer.from(torrentBuffer);
     console.log(`Downloaded ${torrentData.length} bytes`);
+
+    console.error('[download] .torrent downloaded', {
+      provider,
+      downloadUrl: absoluteDownloadUrl,
+      bytes: torrentData.length,
+      contentType: (torrentResponse.headers?.get?.('content-type') || ''),
+    });
 
     // Validate torrent content: each relevant file name must contain season & episode.
     // If missing, abort BEFORE sending to the watch folder.

@@ -55,6 +55,42 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+// POST /api/cf_clearance - Persist provider cf_clearance values for local tooling
+// Body: { ipt_cf?: string, tl_cf?: string }
+app.post('/api/cf_clearance', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const ipt = typeof body.ipt_cf === 'string' ? body.ipt_cf.trim() : '';
+    const tl = typeof body.tl_cf === 'string' ? body.tl_cf.trim() : '';
+
+    const outPath = path.resolve(__dirname, '..', 'cookies', 'cf-clearance.local.json');
+    let current = {};
+    try {
+      const raw = await fs.promises.readFile(outPath, 'utf8');
+      const j = JSON.parse(raw);
+      if (j && typeof j === 'object' && !Array.isArray(j)) current = j;
+    } catch {
+      // ignore
+    }
+
+    if (ipt) current.iptorrents = ipt;
+    if (tl) current.torrentleech = tl;
+
+    await fs.promises.writeFile(outPath, JSON.stringify(current, null, 2) + '\n', 'utf8');
+    console.error('[cf_clearance] saved', {
+      path: outPath,
+      keys: Object.keys(current),
+      iptLen: current.iptorrents ? String(current.iptorrents).length : 0,
+      tlLen: current.torrentleech ? String(current.torrentleech).length : 0,
+    });
+
+    res.json({ ok: true, path: outPath, keys: Object.keys(current) });
+  } catch (error) {
+    console.error('[cf_clearance] error', error);
+    res.status(500).json({ ok: false, error: error?.message || String(error) });
+  }
+});
+
 async function flexget() {
   return flexgetHistory();
 }

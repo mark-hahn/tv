@@ -501,6 +501,21 @@ export default {
         localStorage.setItem('tlCfClearance', this.tlCfClearance);
       }
 
+      // Also persist to local torrents server so Node/Playwright tools can use it.
+      // Best-effort; ignore errors.
+      try {
+        void fetch(`${config.torrentsApiUrl}/api/cf_clearance`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ipt_cf: iptCf || '',
+            tl_cf: tlCf || '',
+          }),
+        });
+      } catch {
+        // ignore
+      }
+
       // Always close the inputs when clicked, even if empty.
       this.showCookieInputs = false;
       this.dismissCookieInputs = true;

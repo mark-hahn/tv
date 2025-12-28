@@ -1,17 +1,4 @@
 
-0|torrents-server  | ========== torrents server started on port 3001 ==========
-0|torrents-server  | =
-0|torrents-server  | [TL] /api/download request: {
-0|torrents-server  |   hasCfClearance: true,
-0|torrents-server  |   cfLen: 298,
-0|torrents-server  |   detailUrl: 'https://www.torrentleech.org/torrent/241463012#torrentinfo'
-0|torrents-server  | }
-0|torrents-server  | [TL] Detail fetch failed summary: {
-0|torrents-server  |   httpStatus: 403,
-0|torrents-server  |   httpStatusText: 'Forbidden',        
-0|torrents-server  |   hasCfClearance: true,
-0|torrents-server  |   cfLen: 298,
-0|torrents-server  |   cookiesSent: [ 'tlpass', 'tluid', 'cf_clearance' ],
-0|torrents-server  |   tags: [ 'cloudflare' ],
-0|torrents-server  |   bodyHead: '<!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta nam' 
-0|torrents-server  | }
+
+this worked in the browser: https://www.torrentleech.org/download/241575376/Its.Always.Sunny.in.Philadelphia.S17E06.1080p.WEB.H264-SuccessfulCrab.torrent
+try this with playwright in a smoke test

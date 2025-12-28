@@ -385,10 +385,9 @@ export async function uploadTorrentToWatchFolder(torrentData, filenameHint = '')
 /**
  * Download torrent and prepare for qBittorrent
  * @param {Object} torrent - The complete torrent object
- * @param {Object} cfClearance - cf_clearance cookies by provider
  * @returns {Promise<{success:boolean, stage?:string, reason?:string, provider?:string, httpStatus?:number, httpStatusText?:string, savedFile?:string, cookiesSent?:string[], hasCfClearance?:boolean, downloadUrl?:string, detailUrl?:string, warning?:string}>}
  */
-export async function download(torrent, cfClearance = {}) {
+export async function download(torrent) {
   if (!torrent || typeof torrent !== 'object') {
     return fail('validate', 'Torrent data is required');
   }
@@ -438,13 +437,9 @@ export async function download(torrent, cfClearance = {}) {
     }
   }
 
-  // Prefer local persisted cf_clearance (written by the client Save Cookies)
-  const localCf = await loadLocalCfClearance(provider);
-  const fallbackCf =
-    cfClearance && typeof cfClearance === 'object' && typeof cfClearance[provider] === 'string'
-      ? String(cfClearance[provider]).trim()
-      : '';
-  const cfCookie = localCf || fallbackCf;
+  // Source of truth for cf_clearance is the local file written by the client Save Cookies.
+  // We intentionally do not rely on any client-sent cfClearance.
+  const cfCookie = await loadLocalCfClearance(provider);
   if (cfCookie) allCookies.push(`cf_clearance=${cfCookie}`);
 
   const detailOrigin = new URL(detailUrl).origin;

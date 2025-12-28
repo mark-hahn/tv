@@ -47,6 +47,20 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+async function loadLocalCfClearance(provider) {
+  try {
+    const p = String(provider || '').trim();
+    if (!p) return '';
+    const inPath = path.resolve(__dirname, '..', 'cookies', 'cf-clearance.local.json');
+    const raw = await fs.promises.readFile(inPath, 'utf8');
+    const j = JSON.parse(raw);
+    const v = j && typeof j === 'object' && !Array.isArray(j) ? j[p] : '';
+    return typeof v === 'string' ? v.trim() : '';
+  } catch {
+    return '';
+  }
+}
+
 // POST /api/cf_clearance - Persist provider cf_clearance values for local tooling
 // Body: { ipt_cf?: string, tl_cf?: string }
 app.post('/api/cf_clearance', async (req, res) => {
@@ -191,8 +205,8 @@ app.get('/api/flexget', async (req, res) => {
 app.get('/api/search', async (req, res) => {
   const showName = req.query.show;
   const limit = parseInt(req.query.limit) || 100;
-  const iptCf = req.query.ipt_cf;
-  const tlCf = req.query.tl_cf;
+  const iptCfRaw = req.query.ipt_cf;
+  const tlCfRaw = req.query.tl_cf;
   let needed = [];
   
   // Parse needed array if provided
@@ -209,6 +223,10 @@ app.get('/api/search', async (req, res) => {
   }
 
   try {
+    // If the client doesn't pass cf_clearance values, fall back to the local persisted file.
+    // This allows the UI to avoid localStorage for cookies.
+    const iptCf = (typeof iptCfRaw === 'string' && iptCfRaw.trim()) ? iptCfRaw.trim() : await loadLocalCfClearance('iptorrents');
+    const tlCf = (typeof tlCfRaw === 'string' && tlCfRaw.trim()) ? tlCfRaw.trim() : await loadLocalCfClearance('torrentleech');
     const result = await search.searchTorrents({ showName, limit, iptCf, tlCf, needed });
     res.json(result);
   } catch (error) {
@@ -220,13 +238,13 @@ app.get('/api/search', async (req, res) => {
 // POST /api/download - Download a torrent file
 app.post('/api/download', async (req, res) => {
   try {
-    const { torrent, cfClearance } = req.body;
+    const { torrent } = req.body;
     
     if (!torrent) {
       return res.status(400).json({ error: 'Torrent data is required' });
     }
     
-    const result = await download.download(torrent, cfClearance);
+    const result = await download.download(torrent);
 
     // Keep 200 OK for expected download failures; client treats non-2xx as exception.
     if (result && typeof result === 'object' && !Array.isArray(result)) {

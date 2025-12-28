@@ -494,13 +494,6 @@ export default {
       const iptCf = this.extractCfClearance(this.iptCfClearance);
       const tlCf = this.extractCfClearance(this.tlCfClearance);
 
-      if (iptCf) {
-        localStorage.setItem('iptCfClearance', this.iptCfClearance);
-      }
-      if (tlCf) {
-        localStorage.setItem('tlCfClearance', this.tlCfClearance);
-      }
-
       // Also persist to local torrents server so Node/Playwright tools can use it.
       // Best-effort; ignore errors.
       try {
@@ -519,6 +512,10 @@ export default {
       // Always close the inputs when clicked, even if empty.
       this.showCookieInputs = false;
       this.dismissCookieInputs = true;
+
+      // Don't retain potentially-stale values in UI state.
+      this.iptCfClearance = '';
+      this.tlCfClearance = '';
     },
 
     toggleCookieInputs() {
@@ -801,39 +798,7 @@ export default {
       this._didInitialScroll = false;
 
       try {
-        // Extract cf_clearance cookies from input or use saved values
-        let iptCf = this.extractCfClearance(this.iptCfClearance);
-        let tlCf = this.extractCfClearance(this.tlCfClearance);
-        
-        // If input fields are empty, try to use saved values
-        if (!iptCf) {
-          const saved = localStorage.getItem('iptCfClearance');
-          if (saved) {
-            iptCf = this.extractCfClearance(saved);
-          }
-        } else {
-          // Save new value
-          localStorage.setItem('iptCfClearance', this.iptCfClearance);
-        }
-        
-        if (!tlCf) {
-          const saved = localStorage.getItem('tlCfClearance');
-          if (saved) {
-            tlCf = this.extractCfClearance(saved);
-          }
-        } else {
-          // Save new value
-          localStorage.setItem('tlCfClearance', this.tlCfClearance);
-        }
-
         let url = `${config.torrentsApiUrl}/api/search?show=${encodeURIComponent(this.currentShow.Name)}&limit=${this.maxResults}`;
-        
-        if (iptCf) {
-          url += `&ipt_cf=${encodeURIComponent(iptCf)}`;
-        }
-        if (tlCf) {
-          url += `&tl_cf=${encodeURIComponent(tlCf)}`;
-        }
         if (needed.length > 0) {
           url += `&needed=${encodeURIComponent(JSON.stringify(needed))}`;
         }
@@ -1063,24 +1028,13 @@ export default {
         }
 
         // Non-TL providers: keep the existing server-side pipeline.
-        // For backward compatibility, still send IPT cf_clearance if present.
-        const iptCfRaw =
-          this.iptCfClearance ||
-          localStorage.getItem('iptCfClearance') ||
-          localStorage.getItem('cf_clearance_iptorrents') ||
-          '';
-        const cfClearance = {
-          iptorrents: this.extractCfClearance(iptCfRaw)
-        };
-
         const response = await fetch(`${config.torrentsApiUrl}/api/download`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            torrent,
-            cfClearance
+            torrent
           })
         });
         

@@ -1,0 +1,50 @@
+
+[pw-smoke] start {
+  url: 'https://www.torrentleech.org/download/241575376/Its.Always.Sunny.in.Philadelphia.S17E06.1080p.WEB.H264-SuccessfulCrab.torrent',
+  headless: false,
+  host: 'www.torrentleech.org',
+  cookiesDir: 'C:\\Users\\mark\\apps\\tv-series-client\\torrents\\cookies',
+  appliedCookieNames: [ 'cf_clearance', 'tlpass', 'tluid' ]   
+}
+[pw-smoke] nav request {
+  method: 'GET',
+  url: 'https://www.torrentleech.org/download/241575376/Its.Always.Sunny.in.Philadelphia.S17E06.1080p.WEB.H264-SuccessfulCrab.torrent',
+  resourceType: 'document',
+  hasCookieHeader: false,
+  headerNames: [
+    'sec-ch-ua',
+    'sec-ch-ua-mobile',
+    'sec-ch-ua-platform',
+    'upgrade-insecure-requests',
+    'user-agent'
+  ]
+}
+[pw-smoke] nav request headers {
+  'upgrade-insecure-requests': '1',
+  'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  'sec-ch-ua': '"Chromium";v="143", "Not A(Brand";v="24"',    
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"Windows"'
+}
+[pw-smoke] nav request curl (bash) curl 'https://www.torrentleech.org/download/241575376/Its.Always.Sunny.in.Philadelphia.S17E06.1080p.WEB.H264-SuccessfulCrab.torrent' \
+  -H 'sec-ch-ua: "Chromium";v="143", "Not A(Brand";v="24"' \  
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "Windows"' \
+  -H 'upgrade-insecure-requests: 1' \
+  -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36' \
+  --compressed
+[pw-smoke] nav response {
+  status: 307,
+  url: 'https://www.torrentleech.org/download/241575376/Its.Always.Sunny.in.Philadelphia.S17E06.1080p.WEB.H264-SuccessfulCrab.torrent',
+  headerNames: [ 'location' ]
+}
+[pw-smoke] nav response headers {
+  location: 'https://www.torrentleech.org/download/241575376/Its.Always.Sunny.in.Philadelphia.S17E06.1080p.WEB.H264-SuccessfulCrab.torrent'
+}
+[pw-smoke] result {
+  title: 'Just a moment...',
+  looksLikeChallenge: true,
+  htmlHead: '<!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta nam'
+}
+[pw-smoke] screenshot saved { path: 'www.torrentleech.org-challenge.png' }
+PS C:\Users\mark\apps\tv-series-client\torrents> 

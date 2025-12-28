@@ -1,0 +1,22 @@
+curl 'https://www.torrentleech.org/download/241575376/Its.Always.Sunny.in.Philadelphia.S17E06.1080p.WEB.H264-SuccessfulCrab.torrent' \
+  -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cache-control: no-cache' \
+  -b 'cf_clearance=r5ON4pi54PU_Pha4vhIDxykde8p3oI8tMxMFc_N84mc-1766903283-1.2.1.1-uhAtVLGeIUfzcGMKr2GmGDpJDuXK10oH78HU1PTDOmkQ9GEAZJ5hQb084scSF_DbqQrXSAuFp862SZhqyDEyLwirsYC9Q8Xu5CKmtcC_1dAN0LggeG6GMbuShPm2q4tyO2Z9Jr7YZYAcvs7F3iK31WU8UiyJ3XzvcPWVDtut_UMszFnXwfJc0moApDtCRDIPdbTUPqDhUMpKp.EDGNRIrRB7tALKmwom4600CgNtyt0; tluid=1781680; tlpass=4b3dced91b1d276cc6da1ceb56e2dc1f96a83ef9; PHPSESSID=bbfjf8fprkmqlhbeu0021gbare; lastBrowse1=1766903417; lastBrowse2=1766903417' \
+  -H 'pragma: no-cache' \
+  -H 'priority: u=0, i' \
+  -H 'sec-ch-ua: "Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"' \
+  -H 'sec-ch-ua-arch: "x86"' \
+  -H 'sec-ch-ua-bitness: "64"' \
+  -H 'sec-ch-ua-full-version: "143.0.7499.170"' \
+  -H 'sec-ch-ua-full-version-list: "Google Chrome";v="143.0.7499.170", "Chromium";v="143.0.7499.170", "Not A(Brand";v="24.0.0.0"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-model: ""' \
+  -H 'sec-ch-ua-platform: "Windows"' \
+  -H 'sec-ch-ua-platform-version: "19.0.0"' \
+  -H 'sec-fetch-dest: document' \
+  -H 'sec-fetch-mode: navigate' \
+  -H 'sec-fetch-site: none' \
+  -H 'sec-fetch-user: ?1' \
+  -H 'upgrade-insecure-requests: 1' \
+  -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36' --output req/x.torrent

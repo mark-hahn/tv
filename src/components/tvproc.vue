@@ -474,17 +474,17 @@ export default {
       if (!title) return;
       try {
         const encodedTitle = encodeURIComponent(title);
-        const url = `${config.torrentsApiUrl}/api/tvproc/forceFile?title=${encodedTitle}`;
+        const url = `${config.torrentsApiUrl}/api/tvproc/startProc?title=${encodedTitle}`;
         const res = await fetch(url, {
           method: 'GET',
           mode: 'cors'
         });
         if (!res.ok) {
           const text = await res.text();
-          console.error(`forceFile failed: HTTP ${res.status}`, text);
+          console.error(`startProc failed: HTTP ${res.status}`, text);
         }
       } catch (e) {
-        console.error('forceFile error:', e);
+        console.error('startProc error:', e);
       }
     },
 

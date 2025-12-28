@@ -121,7 +121,7 @@ if (FILTER_TORRENTS && typeof FILTER_TORRENTS === 'object' && !Array.isArray(FIL
 // API endpoint
 app.get('/api/tvdb/*', tvdbProxyGet);
 
-app.post('/api/tvproc/forceFile', async (req, res) => {
+app.post('/api/tvproc/startProc', async (req, res) => {
   const jsonPath = getTvprocJsonPath();
   try {
     await fs.promises.writeFile(jsonPath, '[]\n', 'utf8');
@@ -137,18 +137,18 @@ app.post('/api/tvproc/forceFile', async (req, res) => {
   }
 });
 
-app.get('/api/tvproc/forceFile', async (req, res) => {
+app.get('/api/tvproc/startProc', async (req, res) => {
   try {
     const title = req.query.title;
     if (!title) {
       return res.status(400).json({ error: 'title parameter required' });
     }
-    const url = `https://hahnca.com/tvproc/forceFile?title=${encodeURIComponent(title)}`;
+    const url = `https://hahnca.com/tvproc/startProc?title=${encodeURIComponent(title)}`;
     const response = await fetch(url);
     const data = await response.json();
     res.json(data);
   } catch (error) {
-    console.error('forceFile proxy error:', error);
+    console.error('startProc proxy error:', error);
     res.status(500).json({ error: error?.message || String(error) });
   }
 });

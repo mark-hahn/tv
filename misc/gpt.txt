@@ -1,1 +1,4 @@
 
+2 cards in tor pane sometimes have the same titles when the 2 come from different providers. when looking for specific cards use the title with the provider appended. I don't know when this new id would be used.  the symptom i noticed is that when i select one card in the tor pane and it turns light-red another card will also turn light-red.
+
+when the app first loads make sure scrolling panes tor, flex, qbt, and down are scrolled to the bottom

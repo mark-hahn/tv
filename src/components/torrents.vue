@@ -71,10 +71,10 @@
         div Click on Search to find torrents for {{ headerShowName }}.
       div(v-else-if="hasSearched && filteredTorrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
         div No torrents found.
-      div(v-for="(torrent, index) in filteredTorrents" :key="index" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
+      div(v-for="(torrent, index) in filteredTorrents" :key="getTorrentCardKey(torrent, index)" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
         div(v-if="isClicked(torrent)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
         div(v-if="isDownloadedBefore(torrent)" :style="getDownloadedBeforeIconStyle(torrent)" title="Downloaded before") 🕘
-        div(v-if="SHOW_TITLE && torrent.raw" style="font-size:13px; font-weight:bold; color:#888; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;") {{ torrent.raw.title }}
+        div(v-if="SHOW_TITLE && torrent.raw" style="font-size:13px; font-weight:bold; color:#888; margin-bottom:4px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;") {{ getDisplayTitleWithProvider(torrent) }}
         div(style="font-size:12px; color:#333;") 
           strong {{ getDisplaySeasonEpisode(torrent) }}
           | : {{ torrent.raw?.size || 'N/A' }} | {{ torrent.raw?.seeds || 0 }} seeds<span v-if="torrent.raw?.provider"> | {{ formatProvider(torrent.raw.provider) }}</span><span v-if="torrent.parsed?.resolution"> | {{ torrent.parsed.resolution }}</span><span v-if="torrent.parsed?.group"> | {{ formatGroup(torrent.parsed.group) }}</span>
@@ -330,7 +330,28 @@ export default {
       if (hash) return hash;
 
       const title = torrent?.raw?.title || torrent?.title || '';
-      return typeof title === 'string' ? title : String(title || '');
+      const titleStr = typeof title === 'string' ? title : String(title || '');
+      const provider = String(torrent?.raw?.provider || '').trim().toLowerCase();
+
+      // Titles can collide across providers (IPT/TL). Include provider in the identity.
+      return provider ? `${titleStr}::${provider}` : titleStr;
+    },
+
+    getTorrentNowKey(torrent) {
+      // Key used for "downloaded now" highlighting. Must disambiguate identical titles across providers.
+      return this.getTorrentHistoryKey(torrent);
+    },
+
+    getTorrentCardKey(torrent, index) {
+      // Stable key to prevent DOM reuse glitches when multiple providers return the same title.
+      return String(torrent?.detailUrl || this.getTorrentNowKey(torrent) || index);
+    },
+
+    getDisplayTitleWithProvider(torrent) {
+      const title = String(torrent?.raw?.title || torrent?.title || '').trim();
+      const provider = String(torrent?.raw?.provider || '').trim();
+      if (!provider) return title;
+      return `${title} | ${this.formatProvider(provider)}`;
     },
 
     rememberDownloadedTorrent(torrent) {
@@ -891,8 +912,9 @@ export default {
     },
 
     isDownloadedNow(torrent) {
-      if (!torrent?.raw?.title) return false;
-      return this.downloadedTorrents.has(torrent.raw.title);
+      const key = this.getTorrentNowKey(torrent);
+      if (!key) return false;
+      return this.downloadedTorrents.has(key);
     },
 
     showDownloadModal() {
@@ -913,8 +935,9 @@ export default {
       }
       
       // Mark as downloaded immediately to change card color
-      if (torrent?.raw?.title) {
-        this.downloadedTorrents.add(torrent.raw.title);
+      const nowKey = this.getTorrentNowKey(torrent);
+      if (nowKey) {
+        this.downloadedTorrents.add(nowKey);
       }
       
       const torrentTitle = torrent.raw?.title || 'Unknown';

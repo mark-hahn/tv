@@ -207,6 +207,12 @@ export default {
 
     // App-load refresh: populate space strings as soon as the component mounts.
     void this.updateSpaceAvail();
+
+    // Establish an initial "bottom" baseline on app load.
+    // v-show preserves scroll position even when hidden.
+    void this.$nextTick(() => {
+      this.scrollToBottom();
+    });
   },
 
   unmounted() {

@@ -74,6 +74,7 @@ export default {
       clickedFutures: new Set(),
       _lastScrollTop: null,
       _hasEverMounted: false,
+      _didInitialVisibleScroll: false,
       _fastPollStartTime: null,
       _oldDownloadingCount: 0,
       _lastFinishedEnded: 0,
@@ -170,8 +171,16 @@ export default {
       const active = pane === 'tvproc';
       this._active = active;
       if (active) {
-        // Load data when switching to this pane
-        void this.loadTvproc({ isInitialPaneSwitch: true });
+        // Load data when switching to this pane.
+        // On app load, tvproc is mounted under v-show and may have been polling while hidden
+        // (display:none). Scroll-to-bottom can't reliably take effect while hidden, so force a
+        // one-time bottom scroll the first time the pane becomes visible.
+        if (!this._didInitialVisibleScroll) {
+          void this.loadTvproc({ isInitialPaneSwitch: true, forceScrollToBottom: true });
+          this._didInitialVisibleScroll = true;
+        } else {
+          void this.loadTvproc({ isInitialPaneSwitch: true });
+        }
         // Start polling if not already running
         if (!this._pollTimer) {
           this.scheduleNextPoll(5000);

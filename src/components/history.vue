@@ -45,6 +45,7 @@ export default {
       _active: false,
       useStaticSamples: false,
       _didInitialScroll: false,
+      _didInitialVisibleScroll: false,
       _didLoadOnce: false,
       _inFlight: false,
       _loadingTimer: null,
@@ -121,8 +122,18 @@ export default {
     onPaneChanged(pane) {
       this._active = pane === 'history';
       if (this._active) {
-        this._didInitialScroll = false;
         if (!this.useStaticSamples) this.startPolling();
+
+        // On first view, force a one-time scroll-to-bottom after the pane becomes visible.
+        // This avoids the top->bottom flash that would otherwise wait for the next poll.
+        if (!this._didInitialVisibleScroll) {
+          this._didInitialVisibleScroll = true;
+          void this.$nextTick(() => {
+            this.scrollToBottom();
+            this._didInitialScroll = true;
+          });
+        }
+
         // Refresh immediately when user switches here.
         this.scheduleNextPoll(0);
       }
@@ -237,14 +248,13 @@ export default {
           this._didLoadOnce = true;
 
           await this.$nextTick();
-          // Only auto-scroll when this pane is actually visible.
-          if (this._active) {
-            if (!this._didInitialScroll) {
-              this.scrollToBottom();
-              this._didInitialScroll = true;
-            } else if (wasAtBottom) {
-              this.scrollToBottom();
-            }
+          // On app load, establish an initial "bottom" baseline even if the pane
+          // is not currently visible (v-show preserves scroll position).
+          if (!this._didInitialScroll) {
+            this.scrollToBottom();
+            this._didInitialScroll = true;
+          } else if (this._active && wasAtBottom) {
+            this.scrollToBottom();
           }
         }
       } catch {

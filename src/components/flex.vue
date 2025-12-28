@@ -171,6 +171,12 @@ export default {
 
   mounted() {
     evtBus.on('paneChanged', this.onPaneChanged);
+
+    // Establish an initial "bottom" baseline on app load.
+    // v-show preserves scroll position even when hidden.
+    void this.$nextTick(() => {
+      this.scrollToBottom();
+    });
   },
 
   unmounted() {

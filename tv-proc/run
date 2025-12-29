@@ -1,0 +1,52 @@
+#! /bin/bash
+
+set -euo pipefail
+
+APP_NAME="tv-proc"
+APP_SCRIPT="src/main.js"
+APP_ARGS=()
+if [ "${1-}" != "" ]; then
+  APP_ARGS=("$1")
+fi
+
+BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo >> "$BASEDIR/data/tv.log"
+date >> "$BASEDIR/data/tv.log"
+
+if [ -f /mnt/media/nomount ]; then
+  printf "\n---- tv-proc: media drive is not mounted\n"
+  /root/.nvm/versions/node/v22.18.0/bin/node \
+         ~/dev/apps/mailit/index.js "tv-proc: media drive is not mounted"
+fi 
+if [ -f /mnt/m-bkup/nomount ]; then
+  printf "\n---- tv-proc: m-bkup drive is not mounted\n"
+  /root/.nvm/versions/node/v22.18.0/bin/node \
+         ~/dev/apps/mailit/index.js "tv-proc: m-bkup drive is not mounted"
+fi 
+
+
+cd "$BASEDIR"
+
+echo "---- (re)starting under pm2 ----"
+
+# Restart under pm2. Use delete+start so updated JS and optional args are applied.
+# Also delete the old legacy process name ("main") if it exists.
+pm2 delete "main" >/dev/null 2>&1 || true
+pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
+
+if [ ${#APP_ARGS[@]} -gt 0 ]; then
+  pm2 start "$APP_SCRIPT" --name "$APP_NAME" -- "${APP_ARGS[@]}"
+else
+  pm2 start "$APP_SCRIPT" --name "$APP_NAME"
+fi
+
+# Clear old pm2 logs for this process so the log stream starts fresh.
+echo "---- flushing pm2 logs for $APP_NAME ----"
+pm2 flush "$APP_NAME" || true
+
+echo "---- tailing data/tv.log (Ctrl+C to detach) ----"
+tail -n 0 -F "$BASEDIR/data/tv.log"
+
+chmod -R 774  /mnt/media/tv
+chown -R emby /mnt/media/tv

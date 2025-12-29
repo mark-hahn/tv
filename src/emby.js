@@ -47,8 +47,6 @@ export const isReject = (name) => rejects.includes(name);
 
 // load all shows from emby and server //////////
 export async function loadAllShows() {
-  console.log('entering loadAllShows');
-
   allTvdb = await tvdb.getAllTvdb();
 
   const loadAllShowsStartTime = new Date().getTime();

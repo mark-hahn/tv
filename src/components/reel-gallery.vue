@@ -85,7 +85,6 @@ export default {
       
       try {
         const data = await srchTvdbData(props.srchStr);
-        console.log('TVDB search results:', data);
         if (data && data.length > 0) {
           tvdbList.value = data;
           await nextTick();

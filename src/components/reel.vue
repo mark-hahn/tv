@@ -427,7 +427,6 @@ export default {
     // Handle gallery card selection
     const handleGallerySelect = (tvdb) => {
       curTvdb.value = tvdb;
-      console.log('curTvdb set to:', tvdb);
     };
 
     watch(curTvdb, (val) => {
@@ -446,7 +445,6 @@ export default {
       if (norm(nextTitle) !== norm(srchStr.value)) {
         srchStr.value = nextTitle;
       }
-      console.log('curTitle set to:', curTitle.value);
     };
 
     // Scroll to bottom when titleStrings changes
@@ -459,29 +457,17 @@ export default {
       // Log parsed title cards for debugging
       try {
         parsedTitles.value.forEach((it, i) => {
-          console.log('reelTitles item:', i, it.rejectStatus, it.titleString);
+          void i;
+          void it;
         });
       } catch (e) {
-        console.log('reelTitles parse/log failed:', e);
+        void e;
       }
 
       // Select last item
       if (titleStrings.value.length > 0) {
         selectTitle(titleStrings.value.length - 1);
       }
-    }, { deep: true });
-
-    // Watch for logging
-    watch(curTitle, (val) => {
-      console.log('curTitle changed to:', val);
-    });
-
-    watch(curTvdb, (val) => {
-      console.log('curTvdb changed to:', val);
-    }, { deep: true });
-
-    watch(titleStrings, (val) => {
-      console.log('titleStrings changed to:', val);
     }, { deep: true });
 
     // Initialize with test data

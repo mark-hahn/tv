@@ -2,6 +2,7 @@
 bugs ...
 
 todo both ...
+  widen series pane
 
 todo non-simple:
   show episode and file details

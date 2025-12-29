@@ -871,6 +871,14 @@ export default {
       this.clickedTorrents.add(torrent);
 
       // Only open the detail tab the first time (no auto-open if it already has a checkmark).
+      const isCtrlClick = Boolean(event?.ctrlKey || event?.metaKey);
+
+      // Ctrl-click should behave like clicking the Get button.
+      if (isCtrlClick) {
+        void this.continueDownload();
+        return;
+      }
+
       if (!alreadyClicked && torrent.detailUrl) {
         window.open(torrent.detailUrl, '_blank');
       }

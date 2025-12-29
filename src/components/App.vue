@@ -408,7 +408,6 @@ export default {
       this.seriesMapEpis = data.seriesMapEpis;
       this.seriesMap = data.seriesMap;
       this.mapError = data.mapError || '';
-      console.log('Map pane opened - seriesMap:', this.seriesMap, 'error:', this.mapError);
 
       // Let Series pane derive counts from the same map it shows.
       if (this.mapShow) {
@@ -422,7 +421,6 @@ export default {
       }
     },
     handleHideMap() {
-      console.log('handleHideMap called, setting currentPane to series');
       this.currentPane = 'series';
       this.mapShow = null;
       evtBus.emit('paneChanged', this.currentPane);

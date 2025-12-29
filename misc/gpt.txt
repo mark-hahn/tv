@@ -1,18 +1,35 @@
 
-{
-  "localPath": "/mnt/media/tv/It's Always Sunny in Philadelphia/Season 17/",
-  "title": "its.always.sunny.in.philadelphia.s17e02.1080p.web.h264-successfulcrab.mkv",
-  "status": "finished",
-  "progress": 100,
-  "eta": null,
-  "sequence": 2,
-  "fileSize": 1181367768,
-  "season": 17,
-  "episode": 2,
-  "dateStarted": 1766961646,
-  "dateEnded": 1766961749
-}
+this is from tv.log. what can cause this to download twice:
 
-add field to tv.json entry called speed that is gigabytes/sec. calculate instant speed every update while downloading and put the average of the last five updates in the speed field.  Keep the last value when download finishes.
+>>>>>> 1 s01e10 2025/12/29-00:20:56 -- 1.76GB --
+common.side.effects.s01e10.1080p.web.h264-successfulcrab.mkv
+Common.Side.Effects.S01E10.1080p.WEB.H264-SuccessfulCrab/
+/mnt/media/tv/Common Side Effects/Season 1/
+download finished: elapsed(mins): 3.2
 
-everything should be bytes/sec not gigabytes/sec
+>>>>>> 1 s01e10 2025/12/29-00:22:45 -- 1.76GB --
+common.side.effects.s01e10.1080p.web.h264-successfulcrab.mkv
+Common.Side.Effects.S01E10.1080p.WEB.H264-SuccessfulCrab/
+/mnt/media/tv/Common Side Effects/Season 1/
+download finished: elapsed(mins): 3.1
+download finished: elapsed(mins): 2.6
+
+also note that the start time of the first (2025/12/29-00:20:56) plus its elapsed time (elapsed(mins): 3.2) is after the start time of the second (2025/12/29-00:22:45).  this should not be possible.
+
+also, why does the finished line appear twice at the end:
+
+download finished: elapsed(mins): 3.1
+download finished: elapsed(mins): 2.6
+
+in this logging:
+
+>>>>>> 1 s01e10 2025/12/29-00:20:56 -- 1.76GB --
+common.side.effects.s01e10.1080p.web.h264-successfulcrab.mkv
+Common.Side.Effects.S01E10.1080p.WEB.H264-SuccessfulCrab/
+/mnt/media/tv/Common Side Effects/Season 1/
+download finished: elapsed(mins): 3.2
+--
+remove the log line: Common.Side.Effects.S01E10.1080p.WEB.H264-SuccessfulCrab/
+
+
+would it be possible and safe to run multiple rsync downloads at the same time? -- make no changes

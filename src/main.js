@@ -89,6 +89,10 @@
   // We keep the smoothed value in tv.json as `speed` and clean up transient
   // state when a download finishes/errors.
   var speedStateByKey = new Map();
+
+  // Guard against accidentally starting the same download twice.
+  // Keyed by (localPath + title).
+  var inFlightDownloads = new Set();
   var bytesPerSec = function(localPath, title1, fileSizeBytes, progress) {
     if (!(typeof fileSizeBytes === 'number' && Number.isFinite(fileSizeBytes) && fileSizeBytes > 0)) {
       return null;
@@ -1318,6 +1322,17 @@
 
       var tvLocalDir = `${tvSeasonPath}/`;
 
+      // If this exact (dir+file) is already in-flight, don't start a second rsync.
+      var inFlightKey = tvLocalDir + '\u0000' + fname;
+      if (inFlightDownloads.has(inFlightKey)) {
+        appendTvLog(`[skip] already downloading: ${fname} @ ${tvLocalDir}\n`);
+        return process.nextTick(checkFile);
+      }
+
+      // Capture per-download start time so elapsed isn't affected by other files.
+      var downloadStartedAtMs = Date.now();
+      inFlightDownloads.add(inFlightKey);
+
       // Update status from 'future' to 'downloading' (entry already exists from pre-population)
       upsertTvJson(tvLocalDir, fname, {
         status: 'downloading',
@@ -1434,6 +1449,7 @@
 
             // Clean up transient speed tracking state.
             speedStateByKey.delete(tvLocalDir + '\u0000' + fname);
+            inFlightDownloads.delete(inFlightKey);
 
             badFile(`rsync download error: ${errMsg}`);
             return;
@@ -1447,7 +1463,7 @@
         // Success: mark finished.
         downloadCount++;
         time = Date.now();
-        appendTvLog('download finished: elapsed(mins): ' + ((Date.now() - downloadTime) / (60 * 1000)).toFixed(1) + '\n');
+        appendTvLog('download finished: ' + fname + ' elapsed(mins): ' + ((Date.now() - downloadStartedAtMs) / (60 * 1000)).toFixed(1) + '\n');
 
         // Record finished download with progress=100, clear ETA.
         upsertTvJson(tvLocalDir, fname, {
@@ -1460,6 +1476,7 @@
 
         // Clean up transient speed tracking state.
         speedStateByKey.delete(tvLocalDir + '\u0000' + fname);
+        inFlightDownloads.delete(inFlightKey);
 
         // Continue to next file.
         recent[fname] = Date.now();
@@ -1481,6 +1498,7 @@
 
         // Clean up transient speed tracking state.
         speedStateByKey.delete(tvLocalDir + '\u0000' + fname);
+        inFlightDownloads.delete(inFlightKey);
 
         badFile(`rsync spawn error: ${errMsg}`);
       });

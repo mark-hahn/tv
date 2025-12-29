@@ -51,6 +51,31 @@ const videoFileExtensions = [
   "3gp", "m4v", "ts", "rm", "vob", "ogv", "divx"
 ];
 
+function safeShowFolderName(rawName) {
+  if (typeof rawName !== 'string') return null;
+
+  let name = rawName.trim();
+  if (!name) return null;
+
+  // Prevent traversal / invalid names: remove path separators and trailing dots/spaces.
+  name = name.replaceAll('/', ' ').replaceAll('\\', ' ');
+  name = name.replace(/[\x00-\x1F\x7F]/g, ' ');
+  name = name.replace(/[\.\s]+$/g, '');
+  name = name.replace(/\s{2,}/g, ' ').trim();
+  if (!name) return null;
+
+  return name;
+}
+
+function seasonFolderName(season) {
+  // Keep consistent with existing convention used elsewhere: `Season ${season}`.
+  // If season is a number, keep it unpadded (Season 1). If it's a string like "01", preserve it.
+  if (season === null || season === undefined) return null;
+  const s = typeof season === 'number' ? String(season) : String(season).trim();
+  if (!s) return null;
+  return `Season ${s}`;
+}
+
 function fmtDateWithTZ(date, utcOut = false) {
   let year, month, day;
   if(utcOut) {
@@ -403,6 +428,58 @@ const delSeasonFiles = async (id, param, resolve, reject) => {
   resolve([id, {status: 'ok'}]);
 }
 
+const createShowFolder = async (id, param, resolve, reject) => {
+  const params = util.jParse(param, 'createShowFolder');
+  const showNameRaw = params?.showName;
+  const seriesMapSeasons = params?.seriesMapSeasons;
+
+  console.log('[createShowFolder] request', {
+    id,
+    showName: showNameRaw,
+    tvdbId: params?.tvdbId,
+    seriesMapSeasons,
+  });
+
+  const showName = safeShowFolderName(showNameRaw);
+  if (!showName) {
+    console.log('[createShowFolder] invalid showName', { showNameRaw });
+    reject([id, { err: 'createShowFolder: invalid showName' }]);
+    return;
+  }
+
+  const showPath = path.join(tvDir, showName);
+  const existed = fs.existsSync(showPath);
+
+  try {
+    fs.mkdirSync(showPath, { recursive: true });
+    console.log('[createShowFolder] show dir', { showPath, existed });
+  } catch (e) {
+    reject([id, { err: `createShowFolder: mkdir failed: ${e.message}` }]);
+    return;
+  }
+
+  if (Array.isArray(seriesMapSeasons)) {
+    for (const season of seriesMapSeasons) {
+      const seasonDirName = seasonFolderName(season);
+      if (!seasonDirName) continue;
+      const seasonPath = path.join(showPath, seasonDirName);
+      try {
+        fs.mkdirSync(seasonPath, { recursive: true });
+        console.log('[createShowFolder] season dir', { season, seasonPath });
+      } catch (e) {
+        reject([id, { err: `createShowFolder: mkdir season failed: ${e.message}` }]);
+        return;
+      }
+    }
+  } else if (seriesMapSeasons !== undefined) {
+    console.log('[createShowFolder] seriesMapSeasons not an array; skipping season dirs', {
+      seriesMapSeasonsType: typeof seriesMapSeasons,
+    });
+  }
+
+  resolve([id, { ok: true, created: !existed, path: showPath }]);
+}
+
 const deletePath = async (id, path, resolve, _reject) => {
   // console.log('deletePath', id, path);
   try {
@@ -498,6 +575,8 @@ const runOne = () => {
     case 'sendEmail':     sendEmailHandler(  id, param, resolve, reject); break;
     
     case 'getTmdb':       tmdb.getTmdb(      id, param, resolve, reject); break;
+
+    case 'createShowFolder': createShowFolder(id, param, resolve, reject); break;
 
     default: reject([id, 'unknownfunction: ' + fname]);
   };

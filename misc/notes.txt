@@ -1,113 +1,55 @@
-wsl(tv-series-client) srvr
-[PM2] Applying action deleteProcessId on app [torrents
 
+Server changes needed (Web add -> put series in Emby)
 
+Client changes were made so that when adding a new series from the web-search list it will:
+- call a websocket RPC: createShowFolder({ showName, tvdbId, seriesMapSeasons, tvdbData })
+- request an Emby library refresh and poll task status
+- reload shows and use the real Emby show record if it appears
 
+IMPORTANT: the client only calls createShowFolder when it has map data (tvdbData is present and non-empty).
+If tvdbData is missing/empty, it shows an alert and skips folder creation.
 
+What the server must implement
 
+1) Add a websocket RPC handler named: createShowFolder
 
+Signature / behavior (recommended)
+- Input: an object (JSON) like:
+	{ showName: string, tvdbId?: number|string, seriesMapSeasons?: number[], tvdbData?: object }
+- Action:
+	1) Create the show folder under the TV root (e.g. /mnt/media/tv/<showName>)
+	2) If seriesMapSeasons is provided, also create empty season folders inside it
+	   (e.g. Season 01, Season 02, ...)
+- Idempotent: if the folder already exists, return ok
+- Return: something JSON-serializable like:
+	{ ok: true, created: true|false, path: "..." }
+	or just "ok" (client only cares that it resolves)
 
+Implementation notes
+- Sanitize showName to a safe folder name. Minimum: reject empty string, strip trailing dots/spaces, and remove path separators (/ and \\) to prevent traversal.
+- Season folder naming should match your existing on-disk conventions (common patterns: "Season 01" or "Season 1").
+- Use mkdir with recursive/parents enabled.
+- Do NOT delete/overwrite existing data.
 
+Where to add it
 
+The client websocket wrapper was added in src/srvr.js:
+	export function createShowFolder(params) { return fCall('createShowFolder', params) }
 
-                                                     s-server](ids: [ 0 ])
-[PM2] [torrents-server](0) ✓
-┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
-│ id │ name               │ mode     │ ↺    │ status  
-  │ cpu      │ memory   │
-└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
-[PM2][WARN] Applications torrents-server not running, starting...
-[PM2] App [torrents-server] launched (1 instances)
-┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
-│ id │ name               │ mode     │ ↺    │ status  
-  │ cpu      │ memory   │
-├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
-│ 0  │ torrents-server    │ fork     │ 0    │ online  
-  │ 0%       │ 0b       │
-└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
-[TAILING] Tailing last 15 lines for [torrents-server] process (change the value with --lines option)        
-C:\Users\mark\.pm2\logs\torrents-server-out.log last 15 lines:
-C:\Users\mark\.pm2\logs\torrents-server-error.log last 15 lines:
-[torrents-server] module loaded {
-  ts: '2025-12-28T07:06:38.747Z',
-  cwd: 'C:\\Users\\mark\\apps\\tv-series-client\\torrents',
-  node: 'v22.12.0',
-  TORRENTS_DEBUG: false
-}
-(node:49960) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
-(Use `node --trace-deprecation ...` to show where the warning was created)
-=
-========== torrents server started on port 3001 ==========
-=
-[TL] /api/download request: {
-  hasCfClearance: true,
-  cfLen: 298,
-  detailUrl: 'https://www.torrentleech.org/torrent/241560289#torrentinfo'
-}
-[download] start {
-  provider: 'torrentleech',
-  detailUrl: 'https://www.torrentleech.org/torrent/241560289#torrentinfo',
-  fid: '241560289',
-  filename: 'Its.Always.Sunny.in.Philadelphia.S17E03.1080p.WEB.H264-SuccessfulCrab.torrent',
-  hasCfClearance: true
-}
-[TL] direct .torrent attempt {
-  directUrl: 'https://www.torrentleech.org/download/241560289/Its.Always.Sunny.in.Philadelphia.S17E03.1080p.WEB.H264-SuccessfulCrab.torrent'
-}
-[TL] direct .torrent response {
-  httpStatus: 403,
-  httpStatusText: 'Forbidden',
-  contentType: 'text/html; charset=utf-8'
-}
-[TL] direct .torrent rejected; falling back to detail page {
-  httpStatus: 403,
-  httpStatusText: 'Forbidden',
-  contentType: 'text/html; charset=utf-8',
-  isCloudflare: true,
-  bodyHead: '<!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta nam'  
-}
-[TL] Detail fetch failed summary: {
-  httpStatus: 403,
-  httpStatusText: 'Forbidden',
-  hasCfClearance: true,
-  cfLen: 298,
-  cookiesSent: [ 'tlpass', 'tluid', 'cf_clearance' ], 
-  tags: [ 'cloudflare' ],
-  bodyHead: '<!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta nam'  
-}
-[TL] /api/download request: {
-  hasCfClearance: true,
-  cfLen: 298,
-  detailUrl: 'https://www.torrentleech.org/torrent/241560289#torrentinfo'
-}
-[download] start {
-  provider: 'torrentleech',
-  detailUrl: 'https://www.torrentleech.org/torrent/241560289#torrentinfo',
-  fid: '241560289',
-  filename: 'Its.Always.Sunny.in.Philadelphia.S17E03.1080p.WEB.H264-SuccessfulCrab.torrent',
-  hasCfClearance: true
-}
-[TL] direct .torrent attempt {
-  directUrl: 'https://www.torrentleech.org/download/241560289/Its.Always.Sunny.in.Philadelphia.S17E03.1080p.WEB.H264-SuccessfulCrab.torrent'
-}
-[TL] direct .torrent response {
-  httpStatus: 403,
-  httpStatusText: 'Forbidden',
-  contentType: 'text/html; charset=utf-8'
-}
-[TL] direct .torrent rejected; falling back to detail page {
-  httpStatus: 403,
-  httpStatusText: 'Forbidden',
-  contentType: 'text/html; charset=utf-8',
-  isCloudflare: true,
-  bodyHead: '<!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta nam'  
-}
-[TL] Detail fetch failed summary: {
-  httpStatus: 403,
-  httpStatusText: 'Forbidden',
-  hasCfClearance: true,
-  cfLen: 298,
-  cookiesSent: [ 'tlpass', 'tluid', 'cf_clearance' ], 
-  tags: [ 'cloudflare' ],
-  bodyHead: '<!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta nam'  
-}
+So the websocket server behind wss://hahnca.com/tv-series-srvr must route incoming fname === 'createShowFolder'
+to the implementation described above.
+
+If you use a dispatcher like the one in misc/index.js (switch(fname) { ... }), add:
+	case 'createShowFolder': createShowFolder(id, param, resolve, reject); break;
+
+and implement createShowFolder similar to:
+	- parse param as JSON object
+	- compute path = tvDir + '/' + safeName
+	- fs.mkdir(path, { recursive: true })
+	- for each season in seriesMapSeasons: fs.mkdir(path + '/' + seasonFolderName(season), { recursive:true })
+	- resolve([id, { ok:true, created:true|false, path }])
+
+2) Emby side
+
+Nothing special is required server-side for Emby if Emby is already configured to monitor that TV root.
+After the folder exists, the client triggers a library refresh and waits for it to finish.

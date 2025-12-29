@@ -1,2 +1,10 @@
 
-what is the down pane card line2 item to the left of the progress item
+when  web button to add new series and it was not put in emby
+
+Searching web for information never finishes.
+
+server never got create folder command
+
+client console log is empty
+
+add progress messages to Searching web for information about show like waiting for tvdb data and refreshing emby.

@@ -255,22 +255,27 @@ export const getSeriesMap = async (show) => {
     console.error('getSeriesMap: no tvdb_id in best match for:', show.Name);
     return [];
   }
-  
-  // matched show found; proceed to fetch episodes
-  
+
+  return await getSeriesMapByTvdbId(tvdbId);
+}
+
+export const getSeriesMapByTvdbId = async (tvdbId) => {
+  if (!tvdbId) return [];
+
+  // Fetch episodes directly by TVDB id (avoids name-search mismatch).
   const seriesMap = [];
   let allEpisodes = [];
   let page = 0;
   let safety = 0;
   const seenPages = new Set();
   // fetch all episodes across pages
-  
+
   // Fetch all episodes with pagination using /episodes/default endpoint
   while (true) {
     seenPages.add(page);
 
     const episodesUrl = `series/${tvdbId}/episodes/default?page=${page}&seasonType=official&perPage=100`;
-    
+
     let episodesRes;
     try {
       episodesRes = await tvdbFetch(episodesUrl);
@@ -281,9 +286,9 @@ export const getSeriesMap = async (show) => {
     const episodesObj = await episodesRes.json();
     const episodes = episodesObj.data?.episodes || [];
     const links = episodesObj.links || {};
-    
+
     allEpisodes = allEpisodes.concat(episodes);
-    
+
     // Derive the next page from the link value (could be number or URL string)
     let nextPage = null;
     if (links.next !== undefined && links.next !== null) {
@@ -303,9 +308,9 @@ export const getSeriesMap = async (show) => {
     if (safety++ > 50) break; // hard cap
     page = nextPage;
   }
-  
+
   // finished fetching all episodes
-  
+
   // Group episodes by season
   const seasonMap = {};
   for (const epData of allEpisodes) {
@@ -317,13 +322,13 @@ export const getSeriesMap = async (show) => {
       (typeof epData.seasonName === 'string' && epData.seasonName.match(/\d+/) ? Number(epData.seasonName.match(/\d+/)[0]) : undefined);
 
     const episodeNum = epData.number ?? epData.airedEpisodeNumber ?? epData.episodeNumber;
-    
+
     if (seasonNum === undefined || seasonNum === null || seasonNum === 0) continue; // Skip specials (season 0)
-    
+
     if (!seasonMap[seasonNum]) {
       seasonMap[seasonNum] = [];
     }
-    
+
     // Compute unaired/avail using aired date if present
     let unaired = true;
     let avail = false;
@@ -352,7 +357,7 @@ export const getSeriesMap = async (show) => {
       aired: epData.aired || null  // Include aired date for WaitStr
     }]);
   }
-  
+
   // Convert to seriesMap format (season number sorted)
   const seasonNums = Object.keys(seasonMap).map(Number).sort((a, b) => a - b);
   for (const seasonNum of seasonNums) {

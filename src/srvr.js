@@ -127,6 +127,8 @@ setInterval(updateLastViewedCache, 10*1000); // every 10 secs
 
 export function getShowsFromDisk()      
             {return fCall('getShowsFromDisk')}
+export function createShowFolder(params)
+            {return fCall('createShowFolder', params)}
 export function deletePath(path)   
             {return fCall('deletePath', path)}
 export function delSeasonFiles(showName, showPath, season)

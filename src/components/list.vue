@@ -4,7 +4,7 @@
   #searchingModal(v-if="showSearching" style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background-color:white; padding:30px 40px; border:2px solid black; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.3); z-index:1000; text-align:center;")
     div(style="font-size:18px; font-weight:bold; margin-bottom:10px;") Searching web for information about show:
     div(style="font-size:20px; color:#0066cc; margin-bottom:15px;") {{searchingShowName}}
-    div(style="font-size:16px; color:#666;") Please wait ...
+    div(style="font-size:16px; color:#666; margin-bottom:6px;") {{ searchingStatus || 'Please wait ...' }}
   
   #center(:style="{ height:'100%', width: sizing.listWidth || '800px', display:'flex', flexDirection:'column' }")             
     #hdr(style="width:100%; background-color:#ccc; display:flex; flex-direction:column;")
@@ -315,6 +315,7 @@ export default {
       searchList:         null,
       showSearching:     false,
       searchingShowName: '',        
+      searchingStatus:   '',
       sortChoices:          
         ['Alpha', 'Viewed', 'Added', 'Ratings', 'Size'],
       fltrChoices:
@@ -500,6 +501,16 @@ export default {
     },
 
     addRow(show) {
+      if (!show) return;
+      const existsById = (arr) => Array.isArray(arr) && arr.some((s) => s?.Id && s.Id === show.Id);
+      const existsByName = (arr) => Array.isArray(arr) && arr.some((s) => s?.Name && s.Name === show.Name);
+      const alreadyExists = existsById(allShows) || existsByName(allShows) || existsById(this.shows) || existsByName(this.shows);
+      if (alreadyExists) {
+        // Don't insert duplicates; just select/highlight.
+        this.saveVisShow(show, true);
+        return;
+      }
+
       console.log("addRow", show.Name);
       this.shows.unshift(show);
       if(allShows !== this.shows)
@@ -597,41 +608,167 @@ export default {
       // Show searching modal
       this.searchingShowName = name;
       this.showSearching = true;
-      
-      let show = {
+      this.searchingStatus = 'Starting...';
+
+      const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+      const withTimeout = async (promise, ms, label) => {
+        const timeoutMs = Math.max(0, Number(ms) || 0);
+        let t;
+        const timeout = new Promise((_, reject) => {
+          t = setTimeout(() => reject(new Error(`timeout waiting for ${label}`)), timeoutMs);
+        });
+        try {
+          return await Promise.race([promise, timeout]);
+        } finally {
+          clearTimeout(t);
+        }
+      };
+
+      let show = null;
+      const reject = emby.isReject(name);
+
+      const showSeed = {
         Name: name,
         TvdbId: tvdbId,
         Overview: overview,
-        Reject: emby.isReject(name),
+        Reject: reject,
       };
-      show = await emby.createNoemby(show);
+
       const paramObj = {
-        show,
-        seasonCount:  0, 
-        episodeCount: 0, 
-        watchedCount: 0, 
+        show: showSeed,
+        seasonCount:  0,
+        episodeCount: 0,
+        watchedCount: 0,
       };
       // For no-Emby shows, never inherit episode/watched counts from any existing
       // tvdb.json entry keyed by the same name. Name-collisions (or stale tvdb data)
       // can otherwise leak watchedCount into a show that cannot be watched in Emby.
-      const tvdbData = await srvr.getNewTvdb(paramObj);
-      
-      // Hide searching modal
-      this.showSearching = false;
-      
-      delete tvdbData.deleted;
-      allTvdb[show.Name] = tvdbData;
-      this.addRow(show);
-      this.sortShows();
-      this.saveVisShow(show, true);
-      
-      // Send email notification for new show added
-      const emailText = show.Name + '~New show added';
+      let tvdbData = null;
+
       try {
-        await srvr.sendEmail(emailText);
-        console.log('New show email sent:', emailText);
-      } catch (error) {
-        console.error('Failed to send new show email:', error);
+        this.searchingStatus = 'Waiting for TVDB data...';
+        console.log('web add progress:', name, this.searchingStatus);
+        tvdbData = await withTimeout(srvr.getNewTvdb(paramObj), 60000, 'tvdb data');
+
+        // Derive the season list from the actual series map (episodes), not from seasonCount.
+        let seriesMapSeasons = [];
+        try {
+          this.searchingStatus = 'Fetching season map...';
+          console.log('web add progress:', name, this.searchingStatus);
+          const seriesMapIn = await withTimeout(
+            tvdb.getSeriesMapByTvdbId(tvdbId),
+            60000,
+            'tvdb series map'
+          );
+          if (Array.isArray(seriesMapIn) && seriesMapIn.length > 0) {
+            seriesMapSeasons = seriesMapIn
+              .map((season) => Number(Array.isArray(season) ? season[0] : undefined))
+              .filter((n) => Number.isFinite(n) && n > 0)
+              .sort((a, b) => a - b);
+          }
+        } catch (e) {
+          seriesMapSeasons = [];
+          console.error('web add: failed to fetch series map', { name, tvdbId, err: e?.message || e });
+        }
+
+        const hasMapData = !!tvdbData && typeof tvdbData === 'object' && Object.keys(tvdbData).length > 0;
+
+        // Prefer putting the show into Emby by creating the show folder and refreshing
+        // the Emby library so it receives a real Emby Id.
+        let createdFolder = false;
+        if (!hasMapData) {
+          createdFolder = false;
+          console.error('web add: missing map data; skipping createShowFolder', {
+            name,
+            tvdbId,
+            seriesMapSeasons,
+            tvdbData,
+          });
+          alert(`No map data for new show ${name}`);
+        } else {
+          try {
+            this.searchingStatus = 'Creating folder...';
+            console.log('web add progress:', name, this.searchingStatus);
+            await withTimeout(
+              srvr.createShowFolder({ showName: name, tvdbId, seriesMapSeasons, tvdbData }),
+              15000,
+              'createShowFolder'
+            );
+            createdFolder = true;
+          } catch (e) {
+            createdFolder = false;
+            console.error('web add: createShowFolder failed', { name, tvdbId, err: e?.message || e });
+          }
+        }
+
+        if (createdFolder) {
+          try {
+            this.searchingStatus = 'Refreshing Emby...';
+            console.log('web add progress:', name, this.searchingStatus);
+            const refreshRes = await emby.refreshLib();
+            if (refreshRes?.status === 'hasTask' && refreshRes?.taskId) {
+              const startMs = Date.now();
+              while (Date.now() - startMs < 120000) {
+                const st = await withTimeout(emby.taskStatus(refreshRes.taskId), 15000, 'emby task status');
+                if (st?.status !== 'refreshing') break;
+                await sleep(2000);
+              }
+            }
+          } catch {
+            // ignore refresh errors; we'll still try to reload and fall back.
+          }
+
+          try {
+            this.searchingStatus = 'Reloading shows...';
+            console.log('web add progress:', name, this.searchingStatus);
+            await this.newShows(false);
+          } catch {
+            // ignore
+          }
+
+          show = Array.isArray(allShows) ? allShows.find((s) => s?.Name === name) : null;
+          if (show) {
+            show.TvdbId = tvdbId;
+            show.Overview = overview;
+            show.Reject = reject;
+          }
+        }
+
+        // Fallback: old behavior, track as a no-Emby placeholder.
+        if (!show) {
+          show = await emby.createNoemby(showSeed);
+        }
+
+        if (tvdbData) {
+          delete tvdbData.deleted;
+          allTvdb[show.Name] = tvdbData;
+        }
+        // If the show came from Emby via refresh + reload, it's already in allShows.
+        // Only insert a new row for the no-Emby placeholder case.
+        const alreadyInAllShows = Array.isArray(allShows) && (allShows.some((s) => s?.Id === show?.Id) || allShows.some((s) => s?.Name === show?.Name));
+        if (!alreadyInAllShows) {
+          this.addRow(show);
+        } else {
+          // Ensure it's selected even if current filters hide it.
+          this.saveVisShow(show, true);
+        }
+        this.sortShows();
+        this.saveVisShow(show, true);
+
+        // Send email notification for new show added
+        const emailText = show.Name + '~New show added';
+        try {
+          await srvr.sendEmail(emailText);
+          console.log('New show email sent:', emailText);
+        } catch (error) {
+          console.error('Failed to send new show email:', error);
+        }
+      } catch (e) {
+        console.error('web add: failed', { name, tvdbId, err: e?.message || e });
+        alert(`Web add failed for ${name}`);
+      } finally {
+        this.showSearching = false;
+        this.searchingStatus = '';
       }
     },
     

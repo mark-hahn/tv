@@ -94,6 +94,52 @@
     }
   })();
 
+  // Startup marker (tv.log only)
+  (function writeStartupMarker() {
+    try {
+      var fmt = function() {
+        try {
+          var dtf = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Los_Angeles',
+            year: '2-digit',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+          });
+          var parts = dtf.formatToParts(new Date());
+          var m = {};
+          for (var i = 0; i < parts.length; i++) {
+            var p = parts[i];
+            if (p && p.type && p.value) m[p.type] = p.value;
+          }
+          return `${m.year}/${m.month}/${m.day} ${m.hour}:${m.minute}:${m.second}`;
+        } catch (e) {
+          var d = new Date();
+          var yy = String(d.getFullYear() % 100).padStart(2, '0');
+          var mm = String(d.getMonth() + 1).padStart(2, '0');
+          var dd = String(d.getDate()).padStart(2, '0');
+          var hh = String(d.getHours()).padStart(2, '0');
+          var mi = String(d.getMinutes()).padStart(2, '0');
+          var ss = String(d.getSeconds()).padStart(2, '0');
+          return `${yy}/${mm}/${dd} ${hh}:${mi}:${ss}`;
+        }
+      };
+
+      var prefix = '';
+      try {
+        if (fs.existsSync(TV_LOG_PATH)) {
+          var st = fs.statSync(TV_LOG_PATH);
+          if (st && st.size > 0) prefix = '\n';
+        }
+      } catch (e) {}
+
+      appendTvLog(`${prefix}==== tv-proc started ${fmt()} ====\n`);
+    } catch (e) {}
+  })();
+
   // --- tv.json status tracking ----------------------------------------------
   // tv.json is an array of file objects.
   // Each update rewrites the entire file and prunes entries older than 1 month.

@@ -1,5 +1,25 @@
 
-- are there any files in src or data that are not referenced in code?
-- are there any files in old that are referenced in code?
+add provider ipt or tl to object stored in tv.json
+when comparing and referencing objects stored in tv.json use <title>|<provider>
 
-rename data/tv-errors to data/tv-errors.json and update code to match
+i have a qbttorrent server running in the usb server.  torrents are added to it by flexget and torrents dropped in a drop folder.  the torrents have 
+
+how do you get the tracker url for a torrent from the qbttorrent server api 
+
+how does the code get the title for this tv.json object when the object is created: 
+{
+  "localPath": "/mnt/media/tv/It's Always Sunny in Philadelphia/Season 17/",
+  "title": "its.always.sunny.in.philadelphia.s17e02.1080p.web.h264-successfulcrab.mkv",
+  "status": "finished",
+  "progress": 100,
+  "eta": null,
+  "sequence": 2,
+  "fileSize": 1181367768,
+  "season": 17,
+  "episode": 2,
+  "dateStarted": 1766961646,
+  "dateEnded": 1766961749
+}
+
+write an explanation of tv.json in misc/tv-json-doc.md.  explain the flow of data in and out of the tv.json cache, the meaning of the fields, how duplicates are handled, how progress is updated, and when it is flushed. 
+

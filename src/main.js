@@ -79,64 +79,6 @@
   // Each update rewrites the entire file and prunes entries older than 1 month.
   var tvJsonCache = null; // In-memory cache
 
-  // Debug: stop processing after the first /downloads response that is served
-  // while a download is in progress.
-  var debugStopAfterDownloadsArmed = false;
-  var debugStopAfterDownloadsExecuted = false;
-  var stopProcessingAfterCurrentDownload = false;
-  var activeRsyncProc = null;
-
-  var debugStopNow = function() {
-    if (debugStopAfterDownloadsExecuted) {
-      return;
-    }
-    debugStopAfterDownloadsExecuted = true;
-    stopProcessingAfterCurrentDownload = true;
-    appendTvLog('[debug] stopping immediately (after progress>0 and eta set)\n');
-
-    // Flush the in-memory tv.json cache to disk so the last progress/eta update is persisted.
-    try {
-      writeTvJson(readTvJson());
-      appendTvLog('[debug] flushed tv.json cache to disk\n');
-    } catch (e) {}
-
-    // Stop immediately: kill the active rsync if present.
-    try {
-      if (activeRsyncProc && typeof activeRsyncProc.kill === 'function') {
-        activeRsyncProc.kill('SIGTERM');
-        setTimeout(() => {
-          try {
-            if (activeRsyncProc) {
-              activeRsyncProc.kill('SIGKILL');
-            }
-          } catch (e) {}
-        }, 2000);
-      }
-    } catch (e) {}
-
-    // Also stop the cycle from starting more work.
-    try {
-      if (nextCycleTimer) {
-        clearTimeout(nextCycleTimer);
-        nextCycleTimer = null;
-      }
-    } catch (e) {}
-    cycleRunning = false;
-  };
-
-  var hasActiveDownload = function() {
-    try {
-      var arr = readTvJson();
-      for (var i = 0; i < arr.length; i++) {
-        var o = arr[i];
-        if (o && o.status === 'downloading') {
-          return true;
-        }
-      }
-    } catch (e) {}
-    return false;
-  };
-
   var unixNow = function() {
     return Math.floor(Date.now() / 1000);
   };
@@ -721,11 +663,6 @@
         if (req.method === 'GET') {
           try {
             var downloads = readTvJson();
-
-            if (!debugStopAfterDownloadsArmed && hasActiveDownload()) {
-              debugStopAfterDownloadsArmed = true;
-              appendTvLog('[debug] /downloads served during download; armed stop (waiting for progress>0 and eta)\n');
-            }
             return json(res, 200, downloads);
           } catch (e) {
             return json(res, 500, {status: String(e && e.message ? e.message : e)});
@@ -739,9 +676,14 @@
       if (pathname === '/clearCache') {
         if (req.method === 'POST' || req.method === 'GET') {
           try {
-            tvJsonCache = null;
-            var downloads = readTvJson();
-            return json(res, 200, {status: 'ok', count: downloads.length});
+            // Hard reset: empty in-memory cache and overwrite tv.json on disk.
+            var clearedCount = 0;
+            try {
+              clearedCount = readTvJson().length;
+            } catch (e) {}
+            tvJsonCache = [];
+            writeTvJson([]);
+            return json(res, 200, {status: 'ok', count: clearedCount});
           } catch (e) {
             return json(res, 500, {status: String(e && e.message ? e.message : e)});
           }
@@ -1066,12 +1008,6 @@
     var blkName, cmd, fext, guessItRes, j, len, parts, skipPath, usbLine, usbLineParts;
     tvDbErrCount = 0;
 
-    // Debug stop: once triggered, stop before starting the next file.
-    if (stopProcessingAfterCurrentDownload) {
-      cycleRunning = false;
-      return;
-    }
-
     // If a startProc request came in while processing, finish the current file,
     // then restart the cycle immediately (and optionally prioritize a title).
     if (abortBetweenFiles) {
@@ -1339,8 +1275,6 @@
         stdio: ['ignore', 'pipe', 'pipe']
       });
 
-      activeRsyncProc = rsyncProc;
-
       var rsyncOutput = '';
       var lastProgress = 0;
       var progressUpdateInterval = 500; // ms
@@ -1384,17 +1318,6 @@
             }
             
             upsertTvJson(tvLocalDir, fname, updateData);
-
-            // Debug stop: only stop once we've written a downloading entry that has
-            // progress > 0 and a non-null eta.
-            if (
-              debugStopAfterDownloadsArmed &&
-              !debugStopAfterDownloadsExecuted &&
-              updateData.progress > 0 &&
-              updateData.eta != null
-            ) {
-              debugStopNow();
-            }
           }
         }
       });
@@ -1404,23 +1327,6 @@
       });
 
       rsyncProc.on('close', (code, signal) => {
-        if (activeRsyncProc === rsyncProc) {
-          activeRsyncProc = null;
-        }
-
-        // Debug stop: if we intentionally stopped rsync, record a clean stop and exit.
-        if (stopProcessingAfterCurrentDownload && (signal || code == null)) {
-          upsertTvJson(tvLocalDir, fname, {
-            status: 'stopped',
-            progress: lastProgress,
-            eta: null,
-            sequence: currentSeq,
-            dateEnded: unixNow()
-          });
-          cycleRunning = false;
-          return;
-        }
-
         if (code !== 0) {
           // Check if the file was actually created despite the error code.
           // Exit code 23 = "Partial transfer due to error" - may still have the file.
@@ -1472,12 +1378,6 @@
           dateEnded: unixNow()
         });
 
-        // Debug stop: don't continue to the next file.
-        if (stopProcessingAfterCurrentDownload) {
-          cycleRunning = false;
-          return;
-        }
-
         // Continue to next file.
         recent[fname] = Date.now();
         writeMap(TV_RECENT_PATH, recent);
@@ -1485,9 +1385,6 @@
       });
 
       rsyncProc.on('error', (err) => {
-        if (activeRsyncProc === rsyncProc) {
-          activeRsyncProc = null;
-        }
         var errMsg = err && err.message ? err.message : 'rsync spawn error';
         console.error(`\nvvvvvvvv\nrsync spawn error: \n${errMsg}^^^^^^^^^`);
 

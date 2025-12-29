@@ -49,9 +49,26 @@
 
   path = require('path');
 
+  // Project layout:
+  // - Source code in ./src
+  // - Runtime state/logs in ./data
+  var BASEDIR = path.join(__dirname, '..');
+  var DATA_DIR = path.join(BASEDIR, 'data');
+  var dataPath = function(p) {
+    return path.join(DATA_DIR, p);
+  };
+
+  var TV_LOG_PATH = dataPath('tv.log');
+  var TV_JSON_PATH = dataPath('tv.json');
+  var TV_RECENT_PATH = dataPath('tv-recent.json');
+  var TV_ERRORS_PATH = dataPath('tv-errors.json');
+  var TV_BLOCKED_PATH = dataPath('tv-blocked.json');
+  var TV_MAP_PATH = dataPath('tv-map');
+  var SCAN_LIBRARY_FLAG_PATH = dataPath('scanLibraryFlag');
+
   appendTvLog = function(line) {
     try {
-      return fs.appendFileSync('tv.log', line);
+      return fs.appendFileSync(TV_LOG_PATH, line);
     } catch (error1) {
 
     }
@@ -60,7 +77,6 @@
   // --- tv.json status tracking ----------------------------------------------
   // tv.json is an array of file objects.
   // Each update rewrites the entire file and prunes entries older than 1 month.
-  var TV_JSON_PATH = 'tv.json';
   var tvJsonCache = null; // In-memory cache
 
   // Debug: stop processing after the first /downloads response that is served
@@ -534,7 +550,7 @@
 
   await emby.init();
 
-  fs.writeFileSync('scanLibraryFlag', 'noscan');
+  fs.writeFileSync(SCAN_LIBRARY_FLAG_PATH, 'noscan');
 
   downloadTime = Date.now();
 
@@ -791,11 +807,11 @@
 
   reloadState = function() {
     var f, j, len, line, mapLines, mapStr, results, t;
-    recent = readMap('tv-recent.json');
-    errors = readMap('tv-errors');
-    blocked = JSON.parse(fs.readFileSync('tv-blocked.json', 'utf8'));
+    recent = readMap(TV_RECENT_PATH);
+    errors = readMap(TV_ERRORS_PATH);
+    blocked = JSON.parse(fs.readFileSync(TV_BLOCKED_PATH, 'utf8'));
     map = {};
-    mapStr = fs.readFileSync('tv-map', 'utf8');
+    mapStr = fs.readFileSync(TV_MAP_PATH, 'utf8');
     mapLines = mapStr.split('\n');
     results = [];
     for (j = 0, len = mapLines.length; j < len; j++) {
@@ -886,7 +902,7 @@
       recentChgd = true;
     }
     if (recentChgd) {
-      writeMap('tv-recent.json', recent);
+      writeMap(TV_RECENT_PATH, recent);
     }
     return process.nextTick(checkFiles);
   };
@@ -1105,7 +1121,7 @@
       for (blkName in blocked) {
         if (fname.indexOf(blkName) > -1) {
           recent[fname] = Date.now();
-          writeMap('tv-recent.json', recent);
+          writeMap(TV_RECENT_PATH, recent);
           // fs.writeFileSync 'tv-recent.json', JSON.stringify recent
           blockedCount++;
           log('-- BLOCKED:', {blkName, fname});
@@ -1173,11 +1189,11 @@
       log('.... done ....');
       
       // if downloadCount > 0 
-      //   fs.writeFileSync('scanLibraryFlag', 'scan')
-      // else if fs.readFileSync('scanLibraryFlag','utf8') is 'scan'
+      //   fs.writeFileSync(SCAN_LIBRARY_FLAG_PATH, 'scan')
+      // else if fs.readFileSync(SCAN_LIBRARY_FLAG_PATH,'utf8') is 'scan'
       //   log 'scanning library'
       //   await emby.scanLibrary()
-      //   fs.writeFileSync('scanLibraryFlag', 'noscan')
+      //   fs.writeFileSync(SCAN_LIBRARY_FLAG_PATH, 'noscan')
       if ((deleteCount + existsCount + errCount + downloadCount + blockedCount) > 0) {
         log("***********************************************************");
       }
@@ -1273,7 +1289,7 @@
       
       downloadCount++;
       recent[fname] = Date.now();
-      writeMap('tv-recent.json', recent);
+      writeMap(TV_RECENT_PATH, recent);
       return process.nextTick(checkFile);
     }
     
@@ -1464,7 +1480,7 @@
 
         // Continue to next file.
         recent[fname] = Date.now();
-        writeMap('tv-recent.json', recent);
+        writeMap(TV_RECENT_PATH, recent);
         return process.nextTick(checkFile);
       });
 
@@ -1492,7 +1508,7 @@
     
     // File already exists; continue to next file.
     recent[fname] = Date.now();
-    writeMap('tv-recent.json', recent);
+    writeMap(TV_RECENT_PATH, recent);
     return process.nextTick(checkFile);
   };
 
@@ -1507,7 +1523,7 @@
       usbFilePath
     });
     errors[fname] = Date.now();
-    writeMap('tv-errors', errors);
+    writeMap(TV_ERRORS_PATH, errors);
     return process.nextTick(checkFile);
   };
 

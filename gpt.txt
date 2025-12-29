@@ -1,2 +1,0 @@
-
-if startProc is called while downloading then start a new cycle when that download finishes even if no title

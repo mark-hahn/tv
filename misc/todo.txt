@@ -1,6 +1,5 @@
 
 todo ...
-  interrupt between downloads
   remove tv.log and buffering ???
   lazy-login to thetvdb
   smart check duplicate files on disk - parse title

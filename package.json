@@ -2,7 +2,7 @@
   "name": "tv-proc",
   "version": "1.0.0",
   "description": "Download from USB and insert files into structured tv folder",
-  "main": "main.js",
+  "main": "src/main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

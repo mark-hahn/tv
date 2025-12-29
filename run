@@ -3,7 +3,7 @@
 set -euo pipefail
 
 APP_NAME="tv-proc"
-APP_SCRIPT="main.js"
+APP_SCRIPT="src/main.js"
 APP_ARGS=()
 if [ "${1-}" != "" ]; then
   APP_ARGS=("$1")
@@ -11,8 +11,8 @@ fi
 
 BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo >> "$BASEDIR/tv.log"
-date >> "$BASEDIR/tv.log"
+echo >> "$BASEDIR/data/tv.log"
+date >> "$BASEDIR/data/tv.log"
 
 if [ -f /mnt/media/nomount ]; then
   printf "\n---- tv-proc: media drive is not mounted\n"
@@ -45,8 +45,8 @@ fi
 echo "---- flushing pm2 logs for $APP_NAME ----"
 pm2 flush "$APP_NAME" || true
 
-echo "---- tailing tv.log (Ctrl+C to detach) ----"
-tail -n 0 -F "$BASEDIR/tv.log"
+echo "---- tailing data/tv.log (Ctrl+C to detach) ----"
+tail -n 0 -F "$BASEDIR/data/tv.log"
 
 chmod -R 774  /mnt/media/tv
 chown -R emby /mnt/media/tv

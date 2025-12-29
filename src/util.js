@@ -274,6 +274,57 @@ export function fmtSize(show) {
                   return Math.round(size / 1e9) + "G";
 }
 
+export function parseHumanSizeToBytes(value) {
+  if (value === undefined || value === null) return NaN;
+  if (typeof value === 'number') return value;
+
+  const s = String(value).trim();
+  if (!s) return NaN;
+
+  // Support formats like: "1.23 GB", "690 MB", "123 KB", "999 B", plus IEC variants.
+  const m = s.match(/^([\d.]+)\s*(B|KB|MB|GB|TB|KIB|MIB|GIB|TIB)?$/i);
+  if (!m) return NaN;
+
+  const n = Number(m[1]);
+  if (!Number.isFinite(n)) return NaN;
+
+  const unit = String(m[2] || 'B').toUpperCase();
+  const mul = {
+    B: 1,
+    KB: 1e3,
+    MB: 1e6,
+    GB: 1e9,
+    TB: 1e12,
+    KIB: 1024,
+    MIB: 1024 ** 2,
+    GIB: 1024 ** 3,
+    TIB: 1024 ** 4,
+  };
+
+  const factor = mul[unit] || 1;
+  return n * factor;
+}
+
+export function fmtBytesSize(value) {
+  if (value === undefined || value === null) return '';
+
+  const bytes = (typeof value === 'string') ? parseHumanSizeToBytes(value) : Number(value);
+  if (!Number.isFinite(bytes) || bytes < 0) {
+    // If it was a string but didn't match our parser, keep it as-is.
+    return (typeof value === 'string') ? value : '';
+  }
+
+  // Requested formatting rules:
+  // - 1.234 GB when size >= 1e9
+  // - else 123 MB when size >= 1e7
+  // - else 123 KB when size >= 1e4
+  // - else 123 B
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(3)} GB`;
+  if (bytes >= 1e7) return `${Math.round(bytes / 1e6)} MB`;
+  if (bytes >= 1e4) return `${Math.round(bytes / 1e3)} KB`;
+  return `${Math.round(bytes)} B`;
+}
+
 export function setCondFltr(cond, fltrChoice) {
   let tmp = {};
   switch (fltrChoice) {

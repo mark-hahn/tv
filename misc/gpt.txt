@@ -1,13 +1,20 @@
 
-i added a speed field to down pane download data entry:
-- `speed` (number|null): Download speed in bytes/sec, updated while downloading.
-	- Computed as the average of the last five instantaneous samples.
-	- Preserved when the entry becomes `finished`.
+remove debug log lines like these:
 
-  report the speed in down pane card info line. replace dateEnded with speed in GB/sec where GB/sec is shown with three decimal places and no label.
-
-  
-new sample down card info line...
-
-S1:E6 | 2.308 GB | 12/28 17:14:12 | <speed> | <status>
-
+[client] boot 
+Object { ts: "2025-12-29T07:57:02.047Z", href: "http://localhost:5173/", origin: "http://localhost:5173" }
+main.js:5:9
+entering loadAllShows emby.js:50:11
+TVDB search results: 
+Array(50) [ {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, … ]
+reel-gallery.vue:60:17
+curTvdb set to: 
+Object { objectID: "series-79168", aliases: (5) […], country: "usa", id: "series-79168", image_url: "https://artworks.thetvdb.com/banners/posters/79168-27.jpg", name: "Friends", first_air_time: "1994-09-22", overview: "Rachel Green, Ross Geller, Monica Geller, Joey Tribbiani, Chandler Bing and Phoebe Buffay are six 20 something year-olds, living off one another in the heart of New York City. Over the course of ten years, this average group of buddies goes through massive mayhem, family trouble, past and future romances, fights, laughs, tears and surprises as they learn what it really means to be a friend.\r\n", primary_language: "eng", primary_type: "series", … }
+reel.vue:352:15
+curTvdb changed to: 
+Proxy { <target>: {…}, <handler>: {…} }
+reel.vue:402:15
+titleStrings changed to: 
+Proxy { <target>: (35) […], <handler>: {…} }
+reel.vue:406:15
+reelTitles item: 0 bad show Simon Cowell: The Next Act reel.vue:384:19

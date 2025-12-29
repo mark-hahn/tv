@@ -37,7 +37,9 @@
 
     #maphdr2(style="display:flex; justify-content:space-between; align-items:center; color:red; margin:0 10px 5px 10px; padding-left:5px; font-size:15px;")
       #dates(v-if="datesLine" :style="{  paddingLeft:'5px'}")
-        span {{firstAiredVal}} {{lastAiredVal}}
+        span {{firstAiredVal}}
+        span(v-if="firstAiredVal && lastAiredVal" style="font-weight:bold;") &nbsp;/&nbsp;
+        span {{lastAiredVal}}
       #mapstatus(style="margin:6px;") {{statusVal}}
       #gaps(v-if="mapShow?.WatchGap || mapShow?.FileGap  || mapShow?.WaitStr?.length"
             style="display:flex; gap:15px;")

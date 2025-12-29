@@ -41,6 +41,7 @@
 import evtBus from '../evtBus.js';
 import { config } from '../config.js';
 import * as emby from '../emby.js';
+import * as util from '../util.js';
 
 export default {
   name: 'TvProc',
@@ -371,11 +372,8 @@ export default {
       return `${hh}:${mm}:${ss}`;
     },
 
-    fmtGb(bytes) {
-      const n = Number(bytes);
-      if (!Number.isFinite(n) || n <= 0) return '';
-      const gb = n / 1e9;
-      return `${gb.toFixed(3)} GB`;
+    fmtSize(bytesOrHumanString) {
+      return util.fmtBytesSize(bytesOrHumanString);
     },
 
     fmtGbPerSec(bytesPerSec) {
@@ -433,7 +431,7 @@ export default {
       const e = Number(it?.episode);
       const seasonEpisode = Number.isFinite(s) && Number.isFinite(e) ? `S${s}:E${e}` : '';
 
-      const size = this.fmtGb(it?.fileSize);
+      const size = this.fmtSize(it?.fileSize);
       const started = this.fmtMdhm(it?.dateStarted);
       const speed = this.fmtGbPerSec(it?.speed);
       const status = String(it?.status || '').trim();

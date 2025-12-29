@@ -22,6 +22,7 @@
 <script>
 import evtBus from '../evtBus.js';
 import { config } from '../config.js';
+import * as util from '../util.js';
 
 export default {
   name: 'History',
@@ -346,10 +347,8 @@ export default {
       return `${mm}:${this.pad2(ss)}`;
     },
 
-    fmtGbOneDecimal(bytes) {
-      const n = Number(bytes);
-      if (!Number.isFinite(n)) return String(bytes);
-      return `${(Math.max(0, n) / 1_000_000_000).toFixed(3)} GB`;
+    fmtSize(bytesOrHumanString) {
+      return util.fmtBytesSize(bytesOrHumanString);
     },
 
     fmtProgPc(completedBytes, sizeBytes) {
@@ -378,7 +377,8 @@ export default {
 
     infoLine(t) {
       const added = this.fmtMmDd_HhMm(t?.added_on);
-      const size = this.fmtGbOneDecimal(t?.size);
+      const bytes = (t && (t.size_bytes ?? t.total_size_bytes ?? t.size)) ?? undefined;
+      const size = this.fmtSize(bytes) || this.fmtSize(t?.size) || String(t?.size ?? '');
       const sep = this.sep();
 
       if (t?.state === 'downloading') {

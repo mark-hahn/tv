@@ -3,13 +3,16 @@
 
 `tv.json` is the runtime “download status” database for tv-proc. It is stored on disk at `data/tv.json` and served over HTTP via `GET /downloads`.
 
-It is intentionally small and append/update-only: the code keeps an in-memory cache (`tvJsonCache`) and only writes to disk at specific moments.
+It is intentionally small and append/update-only. In multi-worker mode, both the main process and worker processes write `tv.json`, so reads use an mtime-aware cache.
 
 ## File location and API
 
 - Disk path: `data/tv.json`
 - Endpoint: `GET /downloads` returns the current cached array (loaded via `readTvJson()`)
-- Cache reset: `GET|POST /clearCache` **hard-resets** by writing `[]` to `data/tv.json` and setting `tvJsonCache = []`
+
+Finished authority:
+
+- `data/tv-finished.json` is the authority for what is already finished; tv-proc does not infer “finished” from disk state.
 
 ## Object schema
 
@@ -36,6 +39,14 @@ Common fields:
 - `season` / `episode` (number): Parsed from the filename.
 - `dateStarted` / `dateEnded` (number): Unix timestamps in seconds.
 
+Multi-download fields:
+
+- `worker` (number|null): Worker id (1–9) currently assigned to download this file.
+	- `null` at app load and when not actively owned by a worker.
+- `priority` (number): Sort key for scheduling.
+	- Defaults to `0`.
+	- When `/startProc?title=...` is used, the newest matching title gets `priority = unixNow()`.
+
 ### Important note: `title` vs TV series title
 
 The stored `title` field is derived from the filename (`fname`). The TV series name (from TVDB/cache/mapping) influences the destination directory (`localPath`), not the `title` field.
@@ -46,7 +57,7 @@ The stored `title` field is derived from the filename (`fname`). The TV series n
 
 `readTvJson()` is the single source of truth for reads:
 
-1. If `tvJsonCache` is non-null, it returns the cached array immediately.
+1. If the on-disk `mtime` matches the cached version, it returns the cached array immediately.
 2. Otherwise it reads `data/tv.json` from disk, parses it as an array, then performs a one-time normalization + de-dupe + prune.
 3. If normalization/de-dupe changed anything, it writes the cleaned array back to disk and stores it in `tvJsonCache`.
 
@@ -54,9 +65,13 @@ Normalization performed on read:
 
 - Ensures `localPath` is a directory path ending in `/`.
 - Ensures `title` is a plain filename (not a full path).
-- Ensures `fileSize` is numeric bytes (tries to stat the on-disk file when possible).
+- Ensures `fileSize` is numeric bytes (does not stat the on-disk file).
 - Converts `dateStarted`/`dateEnded` into unix seconds.
 - Backfills `progress` if missing (`100` when `finished`, `0` when `downloading`).
+
+Worker normalization performed on boot:
+
+- Clears `worker` back to `null`.
 
 Pruning performed on read:
 
@@ -71,7 +86,7 @@ Pruning performed on read:
 - Disk writes are intentionally limited:
 	- It writes to disk only when a new item is added, or when a download is marked `finished`.
 
-This is why mid-download progress/ETA changes can be visible via `GET /downloads` (cache) without constantly rewriting `data/tv.json`.
+In multi-worker mode, workers update `tv.json` progress/ETA/speed while downloading.
 
 ## How entries are created and updated
 
@@ -87,34 +102,32 @@ This provides visibility before any download actually starts.
 
 ### 2) Download start: `downloading`
 
-When a file is selected and tv-proc decides it needs downloading, it transitions the entry:
+When a file is selected and tv-proc decides it needs downloading, it queues the entry for a worker:
 
-- `status: 'future' → 'downloading'`
-- sets `progress: 0`
-- sets `dateStarted: unixNow()`
+- main sets `worker: <id>` when a worker is assigned
+- worker sets `status: 'downloading'`, `progress: 0`, and `dateStarted: unixNow()`
 
 ### 3) Progress + ETA updates during rsync
 
-While `rsync` runs, tv-proc parses `--info=progress2` output:
+While `rsync` runs, the worker parses `--info=progress2` output:
 
 - `progress` is derived from the `%` seen in rsync output.
 - `eta` is computed when rsync prints a time remaining:
 	- Accepts either `MM:SS` or `HH:MM:SS`.
 	- Stored as an absolute unix timestamp: `eta = unixNow() + remainingSeconds`.
 
-These updates call `upsertTvJson(..., { status: 'downloading', progress, eta })`.
-Because `upsertTvJson` normally avoids disk writes for mid-download updates, these are typically **cache-only** until the file finishes.
+These updates patch `tv.json` directly from the worker process.
 
 ### 4) Completion: `finished`
 
-When rsync completes successfully, tv-proc marks:
+When rsync completes successfully, the worker marks:
 
 - `status: 'finished'`
 - `progress: 100`
 - `eta: null`
 - `dateEnded: unixNow()`
 
-Because `status === 'finished'`, `upsertTvJson` writes the updated array back to `data/tv.json`.
+The worker clears `worker: null` so the entry is no longer owned.
 
 ## Duplicate handling
 

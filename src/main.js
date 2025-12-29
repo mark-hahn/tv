@@ -38,7 +38,7 @@
   usbHost = "xobtlu@oracle.usbx.me";
 
   // prune script deletes files older than 30 days
-  // tv-recent files limited to 35 days
+  // tv-finished.json is authority for which torrents are finished
   fileTimeout = {
     timeout: 2 * 60 * 60 * 1000 // 2 hours
   };
@@ -61,7 +61,7 @@
   // tv.log lives under misc/ (BASEDIR/misc/tv.log)
   var TV_LOG_PATH = path.join(BASEDIR, 'misc', 'tv.log');
   var TV_JSON_PATH = dataPath('tv.json');
-  var TV_RECENT_PATH = dataPath('tv-recent.json');
+  var TV_FINISHED_PATH = dataPath('tv-finished.json');
   var TV_ERRORS_PATH = dataPath('tv-errors.json');
   var TV_BLOCKED_PATH = dataPath('tv-blocked.json');
   var TV_MAP_PATH = dataPath('tv-map');
@@ -79,130 +79,33 @@
     }
   };
 
-  // Startup marker (tv.log only): a simple date header like "==== Mon Dec 29 01:08:21 AM PST 2025 ====".
-  (function writeStartupDateHeader() {
+  // One-time migration: rename legacy tv-recent.json to tv-finished.json.
+  (function migrateRecentToFinished() {
     try {
-      var fmt = function() {
-        try {
-          var dtf = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/Los_Angeles',
-            year: '2-digit',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-          });
-          var parts = dtf.formatToParts(new Date());
-          var m = {};
-          for (var i = 0; i < parts.length; i++) {
-            var p = parts[i];
-            if (p && p.type && p.value) {
-              m[p.type] = p.value;
-            }
-          }
-          // yy/mm/dd hh:mm:ss
-          return `${m.year}/${m.month}/${m.day} ${m.hour}:${m.minute}:${m.second}`;
-        } catch (e) {
-          // Fallback: local time.
-          var d = new Date();
-          var yy = String(d.getFullYear() % 100).padStart(2, '0');
-          var mm = String(d.getMonth() + 1).padStart(2, '0');
-          var dd = String(d.getDate()).padStart(2, '0');
-          var hh = String(d.getHours()).padStart(2, '0');
-          var mi = String(d.getMinutes()).padStart(2, '0');
-          var ss = String(d.getSeconds()).padStart(2, '0');
-          return `${yy}/${mm}/${dd} ${hh}:${mi}:${ss}`;
-        }
-      };
-
-      var prefix = '';
-      try {
-        if (fs.existsSync(TV_LOG_PATH)) {
-          var st = fs.statSync(TV_LOG_PATH);
-          if (st && st.size > 0) {
-            prefix = '\n';
-          }
-        }
-      } catch (e) {}
-
-      appendTvLog(`${prefix}==== tv-proc started ${fmt()} ====\n`);
-    } catch (e) {}
+      var oldPath = dataPath('tv-recent.json');
+      if (fs.existsSync(oldPath) && !fs.existsSync(TV_FINISHED_PATH)) {
+        fs.renameSync(oldPath, TV_FINISHED_PATH);
+      }
+      if (!fs.existsSync(TV_FINISHED_PATH)) {
+        fs.writeFileSync(TV_FINISHED_PATH, '{}');
+      }
+    } catch (e) {
+      // Non-fatal.
+    }
   })();
 
   // --- tv.json status tracking ----------------------------------------------
   // tv.json is an array of file objects.
   // Each update rewrites the entire file and prunes entries older than 1 month.
-  var tvJsonCache = null; // In-memory cache
+  var tvJsonCache = {mtimeMs: null, arr: null}; // mtime-aware cache (workers may write)
+  var clearedDownloadingOnBoot = false;
 
   var unixNow = function() {
     return Math.floor(Date.now() / 1000);
   };
 
-  // --- download speed tracking (bytes/sec) ---------------------------------
-  // Speed is computed as an average of the last 5 instantaneous samples.
-  // Instantaneous sample = (delta transferred bytes / delta time seconds).
-  // We keep the smoothed value in tv.json as `speed` and clean up transient
-  // state when a download finishes/errors.
-  var speedStateByKey = new Map();
-
-  // Guard against accidentally starting the same download twice.
-  // Keyed by (localPath + title).
-  var inFlightDownloads = new Set();
-  var bytesPerSec = function(localPath, title1, fileSizeBytes, progress) {
-    if (!(typeof fileSizeBytes === 'number' && Number.isFinite(fileSizeBytes) && fileSizeBytes > 0)) {
-      return null;
-    }
-    if (!(typeof progress === 'number' && Number.isFinite(progress))) {
-      return null;
-    }
-    // Clamp progress to [0, 100]
-    if (progress < 0) progress = 0;
-    if (progress > 100) progress = 100;
-
-    var key = localPath + '\u0000' + title1;
-    var nowMs = Date.now();
-    var bytesDone = fileSizeBytes * (progress / 100);
-    var st = speedStateByKey.get(key);
-    if (!st) {
-      st = {
-        lastBytes: bytesDone,
-        lastAtMs: nowMs,
-        samples: [],
-        lastSpeed: null
-      };
-      speedStateByKey.set(key, st);
-      return null;
-    }
-
-    var dt = (nowMs - st.lastAtMs) / 1000;
-    var dBytes = bytesDone - st.lastBytes;
-    if (dt > 0 && dBytes >= 0) {
-      var inst = (dBytes / dt); // bytes/sec
-      if (Number.isFinite(inst)) {
-        st.samples.push(inst);
-        if (st.samples.length > 5) {
-          st.samples = st.samples.slice(-5);
-        }
-        var sum = 0;
-        for (var i = 0; i < st.samples.length; i++) {
-          sum += st.samples[i];
-        }
-        st.lastSpeed = st.samples.length ? (sum / st.samples.length) : null;
-      }
-    }
-
-    st.lastBytes = bytesDone;
-    st.lastAtMs = nowMs;
-    speedStateByKey.set(key, st);
-
-    if (st.lastSpeed == null) {
-      return null;
-    }
-    // Store as integer bytes/sec.
-    return Math.round(st.lastSpeed);
-  };
+  // --- worker pool ---------------------------------------------------------
+  const MAX_WORKERS = 2;
 
   var toUnixSeconds = function(v) {
     if (v == null) {
@@ -225,20 +128,24 @@
   };
 
   var readTvJson = function() {
-    // Return cached version if available
-    if (tvJsonCache !== null) {
-      return tvJsonCache;
-    }
-    
+    // mtime-aware cache: workers may update tv.json in other processes.
     try {
       if (!fs.existsSync(TV_JSON_PATH)) {
-        tvJsonCache = [];
+        tvJsonCache = {mtimeMs: null, arr: []};
         return [];
       }
+
+      try {
+        var st0 = fs.statSync(TV_JSON_PATH);
+        if (tvJsonCache && tvJsonCache.arr && tvJsonCache.mtimeMs != null && st0 && st0.mtimeMs === tvJsonCache.mtimeMs) {
+          return tvJsonCache.arr;
+        }
+      } catch (e) {}
+
       var raw = fs.readFileSync(TV_JSON_PATH, 'utf8');
       var arr = JSON.parse(raw);
       if (!Array.isArray(arr)) {
-        tvJsonCache = [];
+        tvJsonCache = {mtimeMs: null, arr: []};
         return [];
       }
 
@@ -282,24 +189,12 @@
           title1 = baseName;
         }
 
-        // fileSize must be integer bytes; compute via stat when possible.
+        // fileSize must be integer bytes (do not infer from disk; tv.json is authority).
         var fileSizeBytes = null;
         if (typeof prevFileSize === 'number' && Number.isFinite(prevFileSize)) {
           fileSizeBytes = prevFileSize;
         } else if (typeof prevFileSize === 'string' && /^\d+$/.test(prevFileSize)) {
           fileSizeBytes = parseInt(prevFileSize, 10);
-        } else {
-          var statPath = '';
-          if (filePath) {
-            statPath = filePath;
-          } else if (dirPath && title1) {
-            statPath = dirPath + title1;
-          }
-          try {
-            if (statPath && fs.existsSync(statPath)) {
-              fileSizeBytes = fs.statSync(statPath).size;
-            }
-          } catch (e) {}
         }
 
         var dateStarted1 = toUnixSeconds(prevDateStarted);
@@ -319,6 +214,22 @@
           } else if (o.status === 'downloading') {
             n.progress = 0;
           }
+          changed = true;
+        }
+
+        // Multi-worker fields.
+        if (n.worker != null) {
+          n.worker = null;
+          changed = true;
+        }
+        if (!(typeof n.priority === 'number' && Number.isFinite(n.priority))) {
+          n.priority = 0;
+          changed = true;
+        }
+
+        // If we crashed mid-download, clear downloading state once on boot.
+        if (!clearedDownloadingOnBoot && n.status === 'downloading') {
+          n.status = 'future';
           changed = true;
         }
 
@@ -401,9 +312,6 @@
 
         if (changed) {
           out = out.filter((_, i) => keep[i]);
-          if (removedTotal > 0) {
-            appendTvLog(`[dedupe] readTvJson removed ${removedTotal} duplicate entries\n`);
-          }
         }
       })();
 
@@ -411,18 +319,27 @@
       if (changed) {
         writeTvJson(out);
       }
-      tvJsonCache = out;
+      clearedDownloadingOnBoot = true;
+      var st1 = null;
+      try { st1 = fs.statSync(TV_JSON_PATH); } catch (e) {}
+      tvJsonCache = {mtimeMs: st1 && st1.mtimeMs != null ? st1.mtimeMs : null, arr: out};
       return out;
     } catch (e) {
-      tvJsonCache = [];
+      tvJsonCache = {mtimeMs: null, arr: []};
+      clearedDownloadingOnBoot = true;
       return [];
     }
   };
 
   var writeTvJson = function(arr) {
     try {
-      tvJsonCache = arr;
-      fs.writeFileSync(TV_JSON_PATH, JSON.stringify(arr));
+      var dir = path.dirname(TV_JSON_PATH);
+      var tmp = path.join(dir, '.' + path.basename(TV_JSON_PATH) + '.tmp.' + process.pid + '.' + Date.now());
+      fs.writeFileSync(tmp, JSON.stringify(arr));
+      fs.renameSync(tmp, TV_JSON_PATH);
+      var st = null;
+      try { st = fs.statSync(TV_JSON_PATH); } catch (e) {}
+      tvJsonCache = {mtimeMs: st && st.mtimeMs != null ? st.mtimeMs : null, arr: arr};
     } catch (e) {
       // don't crash processing if status file can't be written
     }
@@ -442,138 +359,145 @@
 
   // A file is uniquely identified by (localPath directory + title filename).
   var upsertTvJson = function(localPath, title1, patch) {
-    var arr = pruneOldTvJson(readTvJson());
-    var idx = arr.findIndex((o) => o && o.localPath === localPath && o.title === title1);
-    var isNewItem = idx < 0;
-    var isFinished = patch && patch.status === 'finished';
-    var isDownloading = patch && patch.status === 'downloading';
-    
-    if (isNewItem) {
-      arr.push(Object.assign({localPath, title: title1}, patch));
-    } else {
-      arr[idx] = Object.assign({}, arr[idx], patch);
-    }
-
-    // If duplicates exist for the same filename (typically due to pre-population
-    // guessing a different seriesName/localPath), keep the most recent one.
-    // "Most recent" is determined by dateEnded/dateStarted; ties break by status/progress.
-    var dupIdxs = [];
-    for (var di = 0; di < arr.length; di++) {
-      var d = arr[di];
-      if (d && d.title === title1) {
-        dupIdxs.push(di);
-      }
-    }
-
-    if (dupIdxs.length > 1) {
-      var statusRank = function(s) {
-        if (s === 'finished') return 3;
-        if (s === 'downloading') return 2;
-        if (s === 'future') return 1;
-        return 0;
-      };
-
-      var bestIdx = dupIdxs[0];
-      var bestScore = null;
-      var bestObj = null;
-
-      for (var dk = 0; dk < dupIdxs.length; dk++) {
-        var k = dupIdxs[dk];
-        var o = arr[k] || {};
-        var ended = toUnixSeconds(o.dateEnded) || 0;
-        var started = toUnixSeconds(o.dateStarted) || 0;
-        var recency = Math.max(ended, started);
-        var st = statusRank(o.status);
-        var prog = (typeof o.progress === 'number' && Number.isFinite(o.progress)) ? o.progress : -1;
-
-        // Prefer the entry we just updated if everything else is equal.
-        var isCurrent = (o.localPath === localPath);
-
-        var score = [recency, st, prog, isCurrent ? 1 : 0];
-        if (!bestScore) {
-          bestScore = score;
-          bestIdx = k;
-          bestObj = o;
-          continue;
+    var tries = 0;
+    while (tries++ < 12) {
+      var baseRaw = '[]';
+      try {
+        if (fs.existsSync(TV_JSON_PATH)) {
+          baseRaw = fs.readFileSync(TV_JSON_PATH, 'utf8');
         }
-        // Lexicographic compare
-        var better = false;
-        for (var si = 0; si < score.length; si++) {
-          if (score[si] > bestScore[si]) {
-            better = true;
-            break;
+      } catch (e) {
+        baseRaw = '[]';
+      }
+
+      var arr = [];
+      try {
+        arr = JSON.parse(baseRaw);
+        if (!Array.isArray(arr)) {
+          arr = [];
+        }
+      } catch (e) {
+        arr = [];
+      }
+
+      arr = pruneOldTvJson(arr);
+
+      var idx = arr.findIndex((o) => o && o.localPath === localPath && o.title === title1);
+      var isNewItem = idx < 0;
+      var isFinished = patch && patch.status === 'finished';
+
+      if (isNewItem) {
+        arr.push(Object.assign({localPath, title: title1}, patch));
+      } else {
+        arr[idx] = Object.assign({}, arr[idx], patch);
+      }
+
+      // If duplicates exist for the same filename (typically due to pre-population
+      // guessing a different seriesName/localPath), keep the most recent one.
+      // "Most recent" is determined by dateEnded/dateStarted; ties break by status/progress.
+      var dupIdxs = [];
+      for (var di = 0; di < arr.length; di++) {
+        var d = arr[di];
+        if (d && d.title === title1) {
+          dupIdxs.push(di);
+        }
+      }
+
+      if (dupIdxs.length > 1) {
+        var statusRank = function(s) {
+          if (s === 'finished') return 3;
+          if (s === 'downloading') return 2;
+          if (s === 'future') return 1;
+          return 0;
+        };
+
+        var bestIdx = dupIdxs[0];
+        var bestScore = null;
+        var bestObj = null;
+
+        for (var dk = 0; dk < dupIdxs.length; dk++) {
+          var k = dupIdxs[dk];
+          var o = arr[k] || {};
+          var ended = toUnixSeconds(o.dateEnded) || 0;
+          var started = toUnixSeconds(o.dateStarted) || 0;
+          var recency = Math.max(ended, started);
+          var st = statusRank(o.status);
+          var prog = (typeof o.progress === 'number' && Number.isFinite(o.progress)) ? o.progress : -1;
+
+          // Prefer the entry we just updated if everything else is equal.
+          var isCurrent = (o.localPath === localPath);
+
+          var score = [recency, st, prog, isCurrent ? 1 : 0];
+          if (!bestScore) {
+            bestScore = score;
+            bestIdx = k;
+            bestObj = o;
+            continue;
           }
-          if (score[si] < bestScore[si]) {
-            break;
+          // Lexicographic compare
+          var better = false;
+          for (var si = 0; si < score.length; si++) {
+            if (score[si] > bestScore[si]) {
+              better = true;
+              break;
+            }
+            if (score[si] < bestScore[si]) {
+              break;
+            }
+          }
+          if (better) {
+            bestScore = score;
+            bestIdx = k;
+            bestObj = o;
           }
         }
-        if (better) {
-          bestScore = score;
-          bestIdx = k;
-          bestObj = o;
-        }
+
+        var removedCount = dupIdxs.length - 1;
+        arr = arr.filter((o, i) => {
+          if (!o) return false;
+          if (o.title === title1) {
+            return i === bestIdx;
+          }
+          return true;
+        });
+
+        // no logging
       }
 
-      var removedCount = dupIdxs.length - 1;
-      arr = arr.filter((o, i) => {
-        if (!o) return false;
-        if (o.title === title1) {
-          return i === bestIdx;
-        }
-        return true;
-      });
+      // Update cache immediately (mtime unknown until next stat).
+      tvJsonCache = {mtimeMs: null, arr: arr};
 
-      if (removedCount > 0) {
-        var keptPath = bestObj && bestObj.localPath ? bestObj.localPath : localPath;
-        var keptStatus = bestObj && bestObj.status ? bestObj.status : (patch && patch.status ? patch.status : '');
-        appendTvLog(`[dedupe] removed ${removedCount} duplicate(s) for "${title1}", kept: ${keptStatus} @ ${keptPath}\n`);
+      // Persist changes that matter to scheduling/ownership.
+      var needsWrite = isNewItem || isFinished || (patch && (patch.worker != null || patch.priority != null));
+      if (!needsWrite) {
+        return;
       }
-    }
-    
-    // Update cache immediately
-    tvJsonCache = arr;
-    
-    // Only write to disk when adding new item or download finished
-    if (isNewItem || isFinished) {
+
+      // Best-effort CAS: if someone else wrote tv.json since our read, retry.
+      var nowRaw = '[]';
+      try {
+        if (fs.existsSync(TV_JSON_PATH)) {
+          nowRaw = fs.readFileSync(TV_JSON_PATH, 'utf8');
+        }
+      } catch (e) {
+        nowRaw = '[]';
+      }
+      if (nowRaw !== baseRaw) {
+        continue;
+      }
+
       writeTvJson(arr);
+      return;
     }
+
+    // Give up silently; keep service alive.
+    try {
+      writeTvJson(tvJsonCache && tvJsonCache.arr ? tvJsonCache.arr : []);
+    } catch (e) {}
   };
 
   // Trigger one-time normalization/migration at startup.
   readTvJson();
-
-  // Always show crashes in tv.log (pm2 may otherwise capture them separately).
-  var appendFatalToTvLog = function(kind, value) {
-    try {
-      var msg = value;
-      if (value && typeof value === 'object') {
-        msg = value.stack || value.message || JSON.stringify(value);
-      }
-      appendTvLog(`\n[${new Date().toISOString()}] ${kind}: ${String(msg)}\n`);
-    } catch (e) {
-      try {
-        appendTvLog(`\n[${new Date().toISOString()}] ${kind}: (failed to stringify error)\n`);
-      } catch (_) {}
-    }
-  };
-
-  process.on('uncaughtException', (e) => {
-    appendFatalToTvLog('uncaughtException', e);
-  });
-
-  process.on('unhandledRejection', (reason) => {
-    appendFatalToTvLog('unhandledRejection', reason);
-  });
-
-  // --- tv.log direct writing (buffering disabled) ----------------------------
-  // Write all logs directly to tv.log without buffering.
-  // If logging fails, don't crash processing.
-  
-  writeLine = function(streamName, args) {
-    var line;
-    line = util.format(...args) + "\n";
-    return appendTvLog(line);
-  };
 
   // Keep these functions as no-ops for compatibility
   startBuffering = function() {};
@@ -582,18 +506,10 @@
   flushBuffer = function() {};
   flushAndGoLive = function() {};
 
-  console.log = function(...args) {
-    return writeLine('stdout', args);
-  };
-
-  console.error = function(...args) {
-    return writeLine('stderr', args);
-  };
-
   // ---------------------------------------------------------------------------
-  exec = require('child_process').execSync;
-
-  var spawn = require('child_process').spawn;
+  var childProcess = require('child_process');
+  exec = childProcess.execSync;
+  var fork = childProcess.fork;
 
   mkdirp = require('mkdirp');
 
@@ -603,6 +519,163 @@
 
   // Replace guessit with npm module parse-torrent-title
   var parseTorrentTitle = require('parse-torrent-title').parse;
+
+  // --- worker pool ---------------------------------------------------------
+  var WORKER_SCRIPT = path.join(__dirname, 'worker.js');
+  var workers = []; // [{id, proc, busy}]
+  var pendingJobs = []; // [{key, job}]
+
+  var jobKey = function(localDir, fname) {
+    return localDir + '\u0000' + fname;
+  };
+
+  var enqueueJob = function(job) {
+    // Avoid duplicate concurrent downloads: use tv.json worker/status as the authority.
+    try {
+      var arr = readTvJson();
+      for (var ai = 0; ai < arr.length; ai++) {
+        var o = arr[ai];
+        if (!o || o.title !== job.fname) continue;
+        if (o.worker != null || o.status === 'downloading') {
+          return;
+        }
+      }
+    } catch (e) {}
+
+    var key = jobKey(job.tvLocalDir, job.fname);
+    for (var i = 0; i < pendingJobs.length; i++) {
+      if (pendingJobs[i] && pendingJobs[i].key === key) {
+        return;
+      }
+    }
+    pendingJobs.push({key: key, job: job});
+  };
+
+  var getPriorityForJob = function(job) {
+    try {
+      var arr = readTvJson();
+      var best = 0;
+      for (var i = 0; i < arr.length; i++) {
+        var o = arr[i];
+        if (!o || o.title !== job.fname) continue;
+        var pri = (typeof o.priority === 'number' && Number.isFinite(o.priority)) ? o.priority : 0;
+        if (o.localPath === job.tvLocalDir) {
+          return pri;
+        }
+        if (pri > best) {
+          best = pri;
+        }
+      }
+      return best;
+    } catch (e) {}
+    return 0;
+  };
+
+  var pickNextJobIndex = function() {
+    if (!pendingJobs.length) return -1;
+    var bestIdx = 0;
+    var bestPri = -Infinity;
+    for (var i = 0; i < pendingJobs.length; i++) {
+      var pj = pendingJobs[i];
+      if (!pj || !pj.job) continue;
+      var pri = getPriorityForJob(pj.job);
+      if (pri > bestPri) {
+        bestPri = pri;
+        bestIdx = i;
+      }
+    }
+    return bestIdx;
+  };
+
+  var assignWork = function() {
+    // Fill any available worker slots.
+    for (var wi = 0; wi < workers.length; wi++) {
+      var w = workers[wi];
+      if (!w || w.busy) continue;
+      if (!pendingJobs.length) return;
+
+      var idx = pickNextJobIndex();
+      if (idx < 0) return;
+      var item = pendingJobs.splice(idx, 1)[0];
+      if (!item || !item.job) continue;
+
+      // Reserve the entry for this worker in tv.json.
+      try {
+        upsertTvJson(item.job.tvLocalDir, item.job.fname, {
+          worker: w.id
+        });
+      } catch (e) {}
+
+      try {
+        w.busy = true;
+        w.proc.send({type: 'start', worker: w.id, job: item.job});
+      } catch (e) {
+        w.busy = false;
+        // Put job back and keep going.
+        pendingJobs.unshift(item);
+      }
+    }
+  };
+
+  var startWorkers = function() {
+    var hasId = function(id) {
+      for (var j = 0; j < workers.length; j++) {
+        if (workers[j] && workers[j].id === id) return true;
+      }
+      return false;
+    };
+    for (var i = 1; i <= MAX_WORKERS; i++) {
+      if (hasId(i)) {
+        continue;
+      }
+      try {
+        var p = fork(WORKER_SCRIPT, [], {stdio: ['inherit', 'inherit', 'inherit', 'ipc']});
+        var w = {id: i, proc: p, busy: false};
+        workers.push(w);
+
+        p.on('message', (function(wref) {
+          return function(msg) {
+            try {
+              if (!msg || typeof msg !== 'object') return;
+              if (msg.type === 'ready') {
+                // worker is idle/online
+                wref.busy = false;
+                assignWork();
+                return;
+              }
+              if (msg.type === 'done') {
+                wref.busy = false;
+                // If worker finished successfully, record in tv-finished.json (authority).
+                if (msg.kind === 'finished' && msg.title) {
+                  try {
+                    recent[msg.title] = Date.now();
+                    writeMap(TV_FINISHED_PATH, recent);
+                  } catch (e) {}
+                }
+                assignWork();
+                return;
+              }
+            } catch (e) {}
+          };
+        })(w));
+
+        p.on('exit', (function(wref) {
+          return function() {
+            wref.busy = false;
+            // Best-effort respawn on crash.
+            try {
+              workers = workers.filter((x) => x && x.id !== wref.id);
+            } catch (e) {}
+            try {
+              setTimeout(startWorkers, 2000);
+            } catch (e) {}
+          };
+        })(w));
+      } catch (e) {
+        // If a worker can't start, keep service alive.
+      }
+    }
+  };
 
   // --- startProc server state ------------------------------------------------
   var pendingStartProcTitle = null;
@@ -793,27 +866,6 @@
         return json(res, 405, {status: 'method not allowed'});
       }
 
-      // Handle /clearCache endpoint - invalidates cache and reloads from disk
-      if (pathname === '/clearCache') {
-        if (req.method === 'POST' || req.method === 'GET') {
-          try {
-            // Hard reset: empty in-memory cache and overwrite tv.json on disk.
-            var clearedCount = 0;
-            try {
-              clearedCount = readTvJson().length;
-            } catch (e) {}
-            tvJsonCache = [];
-            speedStateByKey.clear();
-            writeTvJson([]);
-            return json(res, 200, {status: 'ok', count: clearedCount});
-          } catch (e) {
-            return json(res, 500, {status: String(e && e.message ? e.message : e)});
-          }
-        }
-
-        return json(res, 405, {status: 'method not allowed'});
-      }
-
       // No matching endpoint
       return json(res, 404, {status: 'not found'});
     }).listen(3003, '0.0.0.0');
@@ -871,7 +923,7 @@
 
   reloadState = function() {
     var f, j, len, line, mapLines, mapStr, results, t;
-    recent = readMap(TV_RECENT_PATH);
+    recent = readMap(TV_FINISHED_PATH);
     errors = readMap(TV_ERRORS_PATH);
     blocked = JSON.parse(fs.readFileSync(TV_BLOCKED_PATH, 'utf8'));
     map = {};
@@ -891,6 +943,9 @@
   };
 
   reloadState();
+
+  // Start rsync worker pool.
+  startWorkers();
 
   tvPath = '/mnt/media/tv/';
 
@@ -934,9 +989,9 @@
   });
 
   //#####################################################
-  // delete old files in usb/files and entries in tv-recent.json
+  // delete old files in usb/files
   delOldFiles = () => {
-    var PRUNE_DAYS, PRUNE_INTERVAL_MS, recentChgd, recentFname, recentLimit, recentTime, res;
+    var PRUNE_DAYS, PRUNE_INTERVAL_MS, res;
     PRUNE_INTERVAL_MS = 60 * 60 * 1000;
     if ((Date.now() - lastPruneAt) >= PRUNE_INTERVAL_MS) {
       // Inline prune.sh behavior: delete files older than 60 days on the USB host.
@@ -952,21 +1007,6 @@
       if (!res.startsWith('prune ok')) {
         err(`Prune error: ${res}`);
       }
-    }
-    // delete old entries in tv-recent.json
-    // tv-recent files limited to 80 days
-    recentLimit = new Date(Date.now() - 80 * 24 * 60 * 60 * 1000); // 80 days ago
-    recentChgd = false;
-    for (recentFname in recent) {
-      recentTime = recent[recentFname];
-      if (!(new Date(recentTime) < recentLimit)) {
-        continue;
-      }
-      delete recent[recentFname];
-      recentChgd = true;
-    }
-    if (recentChgd) {
-      writeMap(TV_RECENT_PATH, recent);
     }
     return process.nextTick(checkFiles);
   };
@@ -1006,15 +1046,17 @@
       return {line, key, base};
     }).sort((a, b) => a.key.localeCompare(b.key));
 
-    // If startProc requested a title, process a matching file first (if any).
+    // If startProc requested a title, process a matching file first (if any)
+    // and boost its tv.json priority.
+    var wantedNeedle = null;
+    var wantedApplied = false;
     if (pendingStartProcTitle) {
-      var wanted = pendingStartProcTitle.toLowerCase();
-      var idx = usbFiles.findIndex((x) => x.base.toLowerCase().includes(wanted));
+      wantedNeedle = pendingStartProcTitle.toLowerCase();
+      var idx = usbFiles.findIndex((x) => x.base.toLowerCase().includes(wantedNeedle));
       if (idx >= 0) {
         var match = usbFiles.splice(idx, 1)[0];
         usbFiles.unshift(match);
       }
-      pendingStartProcTitle = null;
     }
 
     usbFiles = usbFiles.map((x) => x.line);
@@ -1112,15 +1154,25 @@
       var futTvLocalDir = `${futTvSeasonPath}/`;
       
       // Create "future" entry in tv.json
+      var futPriority = 0;
+      if (wantedNeedle && !wantedApplied && futFname.toLowerCase().includes(wantedNeedle)) {
+        futPriority = unixNow();
+        wantedApplied = true;
+      }
       upsertTvJson(futTvLocalDir, futFname, {
         status: 'future',
         sequence: futureSeq,
         fileSize: futFileBytes,
         season: futSeason,
         episode: futEpisode,
-        speed: null
+        speed: null,
+        worker: null,
+        priority: futPriority
       });
     }
+
+    // Clear pending title now that we've applied priority in this cycle.
+    pendingStartProcTitle = null;
 
     // if filterRegex
     //   log usbFiles.join('\n')
@@ -1180,8 +1232,8 @@
       for (blkName in blocked) {
         if (fname.indexOf(blkName) > -1) {
           recent[fname] = Date.now();
-          writeMap(TV_RECENT_PATH, recent);
-          // fs.writeFileSync 'tv-recent.json', JSON.stringify recent
+          writeMap(TV_FINISHED_PATH, recent);
+          // fs.writeFileSync 'tv-finished.json', JSON.stringify recent
           blockedCount++;
           log('-- BLOCKED:', {blkName, fname});
           process.nextTick(checkFile);
@@ -1242,7 +1294,7 @@
         badFile(`parse-torrent-title threw: ${error1 && error1.message ? error1.message : 'unknown'}`);
         return;
       }
-      appendTvLog('\n>>>>>> ' + (downloadCount + 1) + ' s' + ('' + season).padStart(2, '0') + 'e' + ('' + episode).padStart(2, '0') + ' ' + dateStr(Date.now()) + ' -- ' + usbFileSize + ' --\n' + fname + '\n');
+      // (logging moved to workers)
       return process.nextTick(chkTvDB);
     } else {
       log('.... done ....');
@@ -1258,11 +1310,9 @@
       }
       cycleRunning = false;
 
-      // If we downloaded anything this cycle, start a new cycle immediately.
-      // Otherwise, wait until the next scheduled interval.
-      if (downloadCount > 0) {
-        return runCycle();
-      }
+      // In multi-worker mode, the cycle only enqueues work; workers run concurrently.
+      // Kick assignment once more and wait until the next scheduled interval.
+      try { assignWork(); } catch (e) {}
       return scheduleNextCycle();
     }
   };
@@ -1323,16 +1373,17 @@
   };
 
   checkFileExists = () => {
-    var e, rsyncCmd, tvFilePath, tvSeasonPath, usbLongPath, videoPath;
+    var e, tvFilePath, tvSeasonPath, usbLongPath, videoPath;
     tvSeasonPath = `${tvPath}${seriesName}/Season ${season}`;
     tvFilePath = `${tvSeasonPath}/${fname}`;
     videoPath = `files/${usbFilePath}`;
     usbLongPath = `${usbHost}:${videoPath}`;
+
+    var tvLocalDir = `${tvSeasonPath}/`;
     
     if (SKIP_DOWNLOAD) {
       // Skip download mode: just mark as finished and add to recent list
       console.log(`[SKIP_DOWNLOAD] Marking as finished without downloading: ${fname}`);
-      var tvLocalDir = `${tvSeasonPath}/`;
       
       upsertTvJson(tvLocalDir, fname, {
         status: 'finished',
@@ -1342,23 +1393,20 @@
         fileSize: usbFileBytes,
         season,
         episode,
+        worker: null,
         dateStarted: unixNow(),
         dateEnded: unixNow()
       });
       
       downloadCount++;
       recent[fname] = Date.now();
-      writeMap(TV_RECENT_PATH, recent);
+      writeMap(TV_FINISHED_PATH, recent);
       return process.nextTick(checkFile);
     }
-    
-    if (fs.existsSync(tvFilePath)) {
-      existsCount++;
-      log(`-- EXISTING: ${tvPath}${seriesName}/Season ${season}`);
 
-      // If this file was pre-populated as "future", mark it as finished so it
-      // doesn't remain stuck forever.
-      var tvLocalDir = `${tvSeasonPath}/`;
+    // Finished authority: tv-finished.json (do not infer from disk).
+    if (recent && recent[fname]) {
+      existsCount++;
       upsertTvJson(tvLocalDir, fname, {
         status: 'finished',
         progress: 100,
@@ -1367,205 +1415,38 @@
         fileSize: usbFileBytes,
         season,
         episode,
-        dateStarted: unixNow(),
+        worker: null,
         dateEnded: unixNow()
       });
-    } else {
-      mkdirp.sync(tvSeasonPath);
-      // Ensure download is encrypted: force rsync remote shell to SSH.
-      rsyncCmd = `rsync -av -e ssh --timeout=20 ${escQuotes(usbLongPath)} ${escQuotes(tvFilePath)}`;
-      appendTvLog(tvFilePath.slice(0, -fname.length) + '\n');
-
-      var tvLocalDir = `${tvSeasonPath}/`;
-
-      // If this exact (dir+file) is already in-flight, don't start a second rsync.
-      var inFlightKey = tvLocalDir + '\u0000' + fname;
-      if (inFlightDownloads.has(inFlightKey)) {
-        appendTvLog(`[skip] already downloading: ${fname} @ ${tvLocalDir}\n`);
-        return process.nextTick(checkFile);
-      }
-
-      // Capture per-download start time so elapsed isn't affected by other files.
-      var downloadStartedAtMs = Date.now();
-      inFlightDownloads.add(inFlightKey);
-
-      // Update status from 'future' to 'downloading' (entry already exists from pre-population)
-      upsertTvJson(tvLocalDir, fname, {
-        status: 'downloading',
-        progress: 0,
-        speed: 0,
-        eta: null,
-        sequence: currentSeq,
-        fileSize: usbFileBytes,
-        season,
-        episode,
-        dateStarted: unixNow()
-      });
-
-      // Initialize speed tracking state for this download.
-      speedStateByKey.set(tvLocalDir + '\u0000' + fname, {
-        lastBytes: 0,
-        lastAtMs: Date.now(),
-        samples: [],
-        lastSpeed: 0
-      });
-
-      // Use spawn to stream rsync progress and update tv.json in real-time.
-      var rsyncArgs = ['-av', '-e', 'ssh', '--timeout=20', '--info=progress2', usbLongPath, tvFilePath];
-      var rsyncProc = spawn('rsync', rsyncArgs, {
-        timeout: fileTimeout.timeout,
-        stdio: ['ignore', 'pipe', 'pipe']
-      });
-
-      var rsyncOutput = '';
-      var lastProgress = 0;
-      var progressUpdateInterval = 500; // ms
-      var lastProgressUpdateTime = 0;
-
-      rsyncProc.stdout.on('data', (data) => {
-        var chunk = data.toString();
-        rsyncOutput += chunk;
-        
-        // Parse progress and ETA from rsync output (format: "1.23M  45%  123.45kB/s    0:00:12" or "2:30")
-        var progressMatch = chunk.match(/(\d+)%/);
-        var etaMatch = chunk.match(/(\d+):(\d+)(?::(\d+))?/);
-        
-        if (progressMatch) {
-          var progress = parseInt(progressMatch[1], 10);
-          if (progress > lastProgress && (Date.now() - lastProgressUpdateTime) >= progressUpdateInterval) {
-            lastProgress = progress;
-            lastProgressUpdateTime = Date.now();
-            
-            var updateData = {
-              status: 'downloading',
-              progress: progress
-            };
-
-            // Add speed (bytes/sec): average of last five instantaneous samples.
-            var spd = bytesPerSec(tvLocalDir, fname, usbFileBytes, progress);
-            if (spd != null) {
-              updateData.speed = spd;
-            }
-            
-            // Add ETA if available (rsync shows remaining time as MM:SS or HH:MM:SS)
-            if (etaMatch) {
-              var etaSeconds = 0;
-              if (etaMatch[3] !== undefined) {
-                // HH:MM:SS format
-                var hours = parseInt(etaMatch[1], 10);
-                var minutes = parseInt(etaMatch[2], 10);
-                var seconds = parseInt(etaMatch[3], 10);
-                etaSeconds = hours * 3600 + minutes * 60 + seconds;
-              } else {
-                // MM:SS format
-                var minutes = parseInt(etaMatch[1], 10);
-                var seconds = parseInt(etaMatch[2], 10);
-                etaSeconds = minutes * 60 + seconds;
-              }
-              updateData.eta = unixNow() + etaSeconds;
-            }
-            
-            upsertTvJson(tvLocalDir, fname, updateData);
-          }
-        }
-      });
-
-      rsyncProc.stderr.on('data', (data) => {
-        rsyncOutput += data.toString();
-      });
-
-      rsyncProc.on('close', (code, signal) => {
-        if (code !== 0) {
-          // Check if the file was actually created despite the error code.
-          // Exit code 23 = "Partial transfer due to error" - may still have the file.
-          var fileExists = false;
-          var actualSize = 0;
-          try {
-            if (fs.existsSync(tvFilePath)) {
-              var stats = fs.statSync(tvFilePath);
-              actualSize = stats.size;
-              // Consider it a success if file exists and has reasonable size (> 1MB).
-              if (actualSize > 1024 * 1024) {
-                fileExists = true;
-              }
-            }
-          } catch (e) {}
-
-          if (!fileExists) {
-            var errMsg = code === 23 ? 'Missing' : `rsync exit code ${code}`;
-            err(`\nvvvvvvvv\nrsync download error: \n${errMsg} (exit code ${code})\nOutput: ${rsyncOutput.slice(-500)}^^^^^^^^^`);
-
-            // Record error status for this file.
-            upsertTvJson(tvLocalDir, fname, {
-              status: errMsg,
-              progress: lastProgress,
-              sequence: currentSeq,
-              dateEnded: unixNow()
-            });
-
-            // Clean up transient speed tracking state.
-            speedStateByKey.delete(tvLocalDir + '\u0000' + fname);
-            inFlightDownloads.delete(inFlightKey);
-
-            badFile(`rsync download error: ${errMsg}`);
-            return;
-          }
-          
-          // File exists despite error code - treat as success with warning.
-          log(`rsync exit ${code} but file exists (${sizeStr(actualSize, {digits:2, suffix:'B'})}), treating as success`);
-          code = 0; // Fall through to success handling below.
-        }
-
-        // Success: mark finished.
-        downloadCount++;
-        time = Date.now();
-        appendTvLog('download finished: ' + fname + ' elapsed(mins): ' + ((Date.now() - downloadStartedAtMs) / (60 * 1000)).toFixed(1) + '\n');
-
-        // Record finished download with progress=100, clear ETA.
-        upsertTvJson(tvLocalDir, fname, {
-          status: 'finished',
-          progress: 100,
-          eta: null,
-          sequence: currentSeq,
-          dateEnded: unixNow()
-        });
-
-        // Clean up transient speed tracking state.
-        speedStateByKey.delete(tvLocalDir + '\u0000' + fname);
-        inFlightDownloads.delete(inFlightKey);
-
-        // Continue to next file.
-        recent[fname] = Date.now();
-        writeMap(TV_RECENT_PATH, recent);
-        return process.nextTick(checkFile);
-      });
-
-      rsyncProc.on('error', (err) => {
-        var errMsg = err && err.message ? err.message : 'rsync spawn error';
-        console.error(`\nvvvvvvvv\nrsync spawn error: \n${errMsg}^^^^^^^^^`);
-
-        // Record error status for this file.
-        upsertTvJson(tvLocalDir, fname, {
-          status: errMsg,
-          progress: lastProgress,
-          sequence: currentSeq,
-          dateEnded: unixNow()
-        });
-
-        // Clean up transient speed tracking state.
-        speedStateByKey.delete(tvLocalDir + '\u0000' + fname);
-        inFlightDownloads.delete(inFlightKey);
-
-        badFile(`rsync spawn error: ${errMsg}`);
-      });
-
-      // Exit early: the rsync 'close' handler will continue processing.
-      return;
+      return process.nextTick(checkFile);
     }
-    
-    // File already exists; continue to next file.
-    recent[fname] = Date.now();
-    writeMap(TV_RECENT_PATH, recent);
+
+    mkdirp.sync(tvSeasonPath);
+    // (logging moved to workers)
+
+    // Ensure a tv.json entry exists (future) and queue work for a worker.
+    upsertTvJson(tvLocalDir, fname, {
+      status: 'future',
+      sequence: currentSeq,
+      fileSize: usbFileBytes,
+      season,
+      episode,
+      worker: null
+    });
+
+    enqueueJob({
+      usbLongPath: usbLongPath,
+      tvFilePath: tvFilePath,
+      tvLocalDir: tvLocalDir,
+      fname: fname,
+      seriesName: seriesName,
+      fileSizeBytes: usbFileBytes,
+      season: season,
+      episode: episode,
+      sequence: currentSeq
+    });
+
+    assignWork();
     return process.nextTick(checkFile);
   };
 

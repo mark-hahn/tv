@@ -17,3 +17,15 @@ support multiple downloads
 - priority field is persistant across boots
 
 - don't use downloaded data directory information from disk except for filtering out torrents. a disk directory might be deleted by other processes but that torrent is still considered finished because tv-finished.json is authority on which torrents are finished
+
+change logging in tv.log. only log:
+- log starting worker and worker finished
+- each log entry should be two-line groups with blank line and first line like:
+"[<worker>] yy/mm/dd hh:mm:ss S01E01 <series name>
+second line 
+"<4 spaces> <size 0.123 GB> <duration mm:ss> <error?>"
+
+what info is in job object that isn't in tv.json entry
+
+when cycle is finished with no jobs waiting, log stats on tv.json for that cycle:
+number of jobs. speed(size/seconds) for each worker. speed(size/seconds) for all jobs combined

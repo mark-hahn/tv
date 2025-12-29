@@ -378,6 +378,13 @@ export default {
       return `${gb.toFixed(3)} GB`;
     },
 
+    fmtGbPerSec(bytesPerSec) {
+      const n = Number(bytesPerSec);
+      if (!Number.isFinite(n) || n < 0) return '';
+      const gbps = n / 1e9;
+      return `${gbps.toFixed(3)}`;
+    },
+
     fmtElapsedMmSs(seconds) {
       const n = Number(seconds);
       if (!Number.isFinite(n) || n < 0) return '';
@@ -428,7 +435,7 @@ export default {
 
       const size = this.fmtGb(it?.fileSize);
       const started = this.fmtMdhm(it?.dateStarted);
-      const ended = this.fmtMdhm(it?.dateEnded);
+      const speed = this.fmtGbPerSec(it?.speed);
       const status = String(it?.status || '').trim();
       const progress = Number(it?.progress);
 
@@ -447,12 +454,13 @@ export default {
       if (status === 'finished') {
         const elapsed = this.fmtElapsedMmSs(this.elapsedSeconds(it));
         if (elapsed) parts.push(elapsed);
+        if (speed) parts.push(speed);
         parts.push('Finished');
         return { seasonEpisode, rest: parts.join(' | ') };
       }
 
       if (status === 'downloading') {
-        if (ended) parts.push(ended);
+        if (speed) parts.push(speed);
         const eta = this.fmtEtaRemaining(it?.eta);
         if (eta) parts.push(eta);
         const etaTimestamp = this.fmtEtaTimestamp(it?.eta);
@@ -464,7 +472,7 @@ export default {
         return { seasonEpisode, rest: parts.join(' | ') };
       }
 
-      if (ended) parts.push(ended);
+      if (speed) parts.push(speed);
       if (status) parts.push(status);
       else parts.push('Unknown');
       return { seasonEpisode, rest: parts.join(' | ') };

@@ -1,4 +1,15 @@
 
 
-will release script copy torrents/cookies/cf-clearance.local.json to production?  if so production cookies might be overwritten by stale cookies. -- make no changes
+- when i refer to server i mean hahnca.com. you can ssh into hahnca.com without credentials
 
+- i moved the project tv-proc from the server /root/dev/apps/tv-proc to tv-proc here
+
+- adjust code references to tv-proc endpoints
+
+- tv-proc should mirror how torrents is used.  there should be a tv-proc-server in pm2 in localhost and on server. 
+
+- the release script should Deploy tv-proc server and Run tv-proc release steps on remote server just as it does for torrents server
+
+- misc/server.conf is a copy of /etc/nginx/conf.d/server.conf on server. configure proxy endpoints for tv-proc as they are for torrents
+
+- rename script srvr to srvt and create new script srvp that runs tv-proc-server like how srvt runs torrents-server

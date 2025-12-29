@@ -1,12 +1,4 @@
 
-add provider ipt or tl to object stored in tv.json
-when comparing and referencing objects stored in tv.json use <title>|<provider>
-
-i have a qbttorrent server running in the usb server.  torrents are added to it by flexget and torrents dropped in a drop folder.  the torrents have 
-
-how do you get the tracker url for a torrent from the qbttorrent server api 
-
-how does the code get the title for this tv.json object when the object is created: 
 {
   "localPath": "/mnt/media/tv/It's Always Sunny in Philadelphia/Season 17/",
   "title": "its.always.sunny.in.philadelphia.s17e02.1080p.web.h264-successfulcrab.mkv",
@@ -21,5 +13,6 @@ how does the code get the title for this tv.json object when the object is creat
   "dateEnded": 1766961749
 }
 
-write an explanation of tv.json in misc/tv-json-doc.md.  explain the flow of data in and out of the tv.json cache, the meaning of the fields, how duplicates are handled, how progress is updated, and when it is flushed. 
+add field to tv.json entry called speed that is gigabytes/sec. calculate instant speed every update while downloading and put the average of the last five updates in the speed field.  Keep the last value when download finishes.
 
+everything should be bytes/sec not gigabytes/sec

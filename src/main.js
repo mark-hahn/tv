@@ -83,6 +83,66 @@
     return Math.floor(Date.now() / 1000);
   };
 
+  // --- download speed tracking (bytes/sec) ---------------------------------
+  // Speed is computed as an average of the last 5 instantaneous samples.
+  // Instantaneous sample = (delta transferred bytes / delta time seconds).
+  // We keep the smoothed value in tv.json as `speed` and clean up transient
+  // state when a download finishes/errors.
+  var speedStateByKey = new Map();
+  var bytesPerSec = function(localPath, title1, fileSizeBytes, progress) {
+    if (!(typeof fileSizeBytes === 'number' && Number.isFinite(fileSizeBytes) && fileSizeBytes > 0)) {
+      return null;
+    }
+    if (!(typeof progress === 'number' && Number.isFinite(progress))) {
+      return null;
+    }
+    // Clamp progress to [0, 100]
+    if (progress < 0) progress = 0;
+    if (progress > 100) progress = 100;
+
+    var key = localPath + '\u0000' + title1;
+    var nowMs = Date.now();
+    var bytesDone = fileSizeBytes * (progress / 100);
+    var st = speedStateByKey.get(key);
+    if (!st) {
+      st = {
+        lastBytes: bytesDone,
+        lastAtMs: nowMs,
+        samples: [],
+        lastSpeed: null
+      };
+      speedStateByKey.set(key, st);
+      return null;
+    }
+
+    var dt = (nowMs - st.lastAtMs) / 1000;
+    var dBytes = bytesDone - st.lastBytes;
+    if (dt > 0 && dBytes >= 0) {
+      var inst = (dBytes / dt); // bytes/sec
+      if (Number.isFinite(inst)) {
+        st.samples.push(inst);
+        if (st.samples.length > 5) {
+          st.samples = st.samples.slice(-5);
+        }
+        var sum = 0;
+        for (var i = 0; i < st.samples.length; i++) {
+          sum += st.samples[i];
+        }
+        st.lastSpeed = st.samples.length ? (sum / st.samples.length) : null;
+      }
+    }
+
+    st.lastBytes = bytesDone;
+    st.lastAtMs = nowMs;
+    speedStateByKey.set(key, st);
+
+    if (st.lastSpeed == null) {
+      return null;
+    }
+    // Store as integer bytes/sec.
+    return Math.round(st.lastSpeed);
+  };
+
   var toUnixSeconds = function(v) {
     if (v == null) {
       return null;
@@ -682,6 +742,7 @@
               clearedCount = readTvJson().length;
             } catch (e) {}
             tvJsonCache = [];
+            speedStateByKey.clear();
             writeTvJson([]);
             return json(res, 200, {status: 'ok', count: clearedCount});
           } catch (e) {
@@ -995,7 +1056,8 @@
         sequence: futureSeq,
         fileSize: futFileBytes,
         season: futSeason,
-        episode: futEpisode
+        episode: futEpisode,
+        speed: null
       });
     }
 
@@ -1260,12 +1322,21 @@
       upsertTvJson(tvLocalDir, fname, {
         status: 'downloading',
         progress: 0,
+        speed: 0,
         eta: null,
         sequence: currentSeq,
         fileSize: usbFileBytes,
         season,
         episode,
         dateStarted: unixNow()
+      });
+
+      // Initialize speed tracking state for this download.
+      speedStateByKey.set(tvLocalDir + '\u0000' + fname, {
+        lastBytes: 0,
+        lastAtMs: Date.now(),
+        samples: [],
+        lastSpeed: 0
       });
 
       // Use spawn to stream rsync progress and update tv.json in real-time.
@@ -1298,6 +1369,12 @@
               status: 'downloading',
               progress: progress
             };
+
+            // Add speed (bytes/sec): average of last five instantaneous samples.
+            var spd = bytesPerSec(tvLocalDir, fname, usbFileBytes, progress);
+            if (spd != null) {
+              updateData.speed = spd;
+            }
             
             // Add ETA if available (rsync shows remaining time as MM:SS or HH:MM:SS)
             if (etaMatch) {
@@ -1355,6 +1432,9 @@
               dateEnded: unixNow()
             });
 
+            // Clean up transient speed tracking state.
+            speedStateByKey.delete(tvLocalDir + '\u0000' + fname);
+
             badFile(`rsync download error: ${errMsg}`);
             return;
           }
@@ -1378,6 +1458,9 @@
           dateEnded: unixNow()
         });
 
+        // Clean up transient speed tracking state.
+        speedStateByKey.delete(tvLocalDir + '\u0000' + fname);
+
         // Continue to next file.
         recent[fname] = Date.now();
         writeMap(TV_RECENT_PATH, recent);
@@ -1395,6 +1478,9 @@
           sequence: currentSeq,
           dateEnded: unixNow()
         });
+
+        // Clean up transient speed tracking state.
+        speedStateByKey.delete(tvLocalDir + '\u0000' + fname);
 
         badFile(`rsync spawn error: ${errMsg}`);
       });

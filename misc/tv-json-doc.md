@@ -25,6 +25,9 @@ Common fields:
 	- Typical values: `future`, `downloading`, `finished`
 	- Also used for exceptional states: `stopped`, `Missing`, `rsync exit code 23`, etc.
 - `progress` (number): Percent complete, usually an integer 0–100.
+- `speed` (number|null): Download speed in bytes/sec, updated while downloading.
+	- Computed as the average of the last five instantaneous samples.
+	- Preserved when the entry becomes `finished`.
 - `eta` (number|null): Unix timestamp (seconds) for estimated completion time.
 	- Set only while downloading when rsync reports time remaining.
 	- Cleared (`null`) when a file is marked `finished`.

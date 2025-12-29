@@ -9,7 +9,6 @@
         div(v-if="libraryProgressText" style="align-self:center; font-size:13px; color:#555; white-space:nowrap;") {{ libraryProgressText }}
         button(@click.stop="startLibraryRefresh" :disabled="_libBusy" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Library
         button(@click.stop="showFirstDownloading" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Show
-        button(@click.stop="clearLog" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Clear
 
   div(v-if="error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px; white-space:pre-line; padding:0 20px;")
     div Error: {{ error }}
@@ -584,35 +583,6 @@ export default {
           }
           throw new Error(`HTTP ${res.status}: ${detail || res.statusText}`);
         }
-        await this.loadTvproc({ forceScrollToBottom: true });
-      } catch (e) {
-        this.error = e?.message || String(e);
-      }
-    },
-
-    async clearLog() {
-      this.error = null;
-      try {
-        const res = await fetch('https://hahnca.com/tvproc/clearCache', {
-          method: 'POST'
-        });
-        if (!res.ok) {
-          let detail = '';
-          try {
-            const ct = res.headers.get('content-type') || '';
-            if (ct.includes('application/json')) {
-              const j = await res.json();
-              detail = j?.error ? String(j.error) : JSON.stringify(j);
-            } else {
-              detail = await res.text();
-            }
-          } catch {
-            // ignore
-          }
-          throw new Error(`HTTP ${res.status}: ${detail || res.statusText}`);
-        }
-        // Immediately reload to show cleared data
-        this.items = [];
         await this.loadTvproc({ forceScrollToBottom: true });
       } catch (e) {
         this.error = e?.message || String(e);

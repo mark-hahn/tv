@@ -3,6 +3,7 @@ bugs ...
 
 todo both ...
   widen series pane
+  allow setting watched on non-emby
 
 todo non-simple:
   show episode and file details

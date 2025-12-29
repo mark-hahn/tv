@@ -79,7 +79,10 @@ export default {
       _oldDownloadingCount: 0,
       _lastFinishedEnded: 0,
       _lastNotifiedEnded: 0,
-      _tvprocInitialized: false
+      _tvprocInitialized: false,
+      _lastStartProcAt: 0,
+      _startProcInFlight: false,
+      _startProcPending: false
     };
   },
 
@@ -160,7 +163,12 @@ export default {
     handleCycleStarted() {
       // Start fast polling when a cycle starts
       this._fastPollStartTime = Date.now();
-      this._oldDownloadingCount = this.items.filter(it => it.status === 'downloading' && (!it.dateEnded || it.dateEnded === 0)).length;
+      this._oldDownloadingCount = this.items.filter(it => {
+        const st = String(it?.status || '').trim().toLowerCase();
+        if (st !== 'downloading') return false;
+        const ended = Number(it?.dateEnded);
+        return !Number.isFinite(ended) || ended === 0;
+      }).length;
       // Start polling immediately, even if pane is not active.
       // Do not call loadTvproc() synchronously here; cycle-started can be emitted
       // from inside loadTvproc(), which would cause re-entrant loops.
@@ -630,9 +638,21 @@ export default {
           // ignore
         }
         
+        const isActiveDownloading = (it) => {
+          const st = String(it?.status || '').trim().toLowerCase();
+          if (st !== 'downloading') return false;
+          const ended = Number(it?.dateEnded);
+          // Old behavior: treat downloads with no/zero end time as active.
+          return !Number.isFinite(ended) || ended === 0;
+        };
+
+        const isFuture = (it) => String(it?.status || '').trim().toLowerCase() === 'future';
+
         // Track status changes for downloading items
-        const oldDownloading = Array.isArray(this.items) ? this.items.filter(it => String(it?.status || '').trim() === 'downloading') : [];
-        const newDownloading = Array.isArray(arr) ? arr.filter(it => String(it?.status || '').trim() === 'downloading') : [];
+        const oldDownloading = Array.isArray(this.items) ? this.items.filter(isActiveDownloading) : [];
+        const oldFutures = Array.isArray(this.items) ? this.items.filter(isFuture) : [];
+        const newDownloading = Array.isArray(arr) ? arr.filter(isActiveDownloading) : [];
+        const newFutures = Array.isArray(arr) ? arr.filter(isFuture) : [];
 
         // Detect newly-finished items since last poll.
         // dateEnded is expected to be epoch seconds (or ms); treat both.
@@ -658,15 +678,53 @@ export default {
         }
         
         // (debug logging removed)
-        
-        // Check if download started during fast polling
-        if (this._fastPollStartTime && newDownloading.length > this._oldDownloadingCount) {
-          this._fastPollStartTime = null;
+
+        // If we've already asked the server to start downloads, wait until we see the
+        // queue actually advance before sending another startProc.
+        if (this._startProcPending) {
+          const didAdvance =
+            newFutures.length === 0 ||
+            newFutures.length < oldFutures.length ||
+            newDownloading.length > oldDownloading.length;
+          if (didAdvance) this._startProcPending = false;
+        }
+
+        // Keep starting downloads while there is a queue.
+        // With concurrent downloads, do not wait for newDownloading.length === 0.
+        // Only send one startProc per observed queue advance.
+        if (!initializing && newFutures.length > 0) {
+          const nowMs = Date.now();
+          const cooldownMs = 1500;
+          const canStart =
+            !this._startProcInFlight &&
+            !this._startProcPending &&
+            (nowMs - Number(this._lastStartProcAt || 0) >= cooldownMs);
+
+          if (canStart) {
+            this._lastStartProcAt = nowMs;
+            this._startProcInFlight = true;
+            // Ensure we observe the newly-started downloads quickly.
+            this._fastPollStartTime = nowMs;
+
+            let ok = false;
+            try {
+              const resp = await fetch('https://hahnca.com/tvproc/startProc', { method: 'POST' });
+              ok = Boolean(resp && resp.ok);
+            } catch {
+              ok = false;
+            } finally {
+              this._startProcInFlight = false;
+            }
+
+            if (ok) {
+              this._startProcPending = true;
+            }
+          }
         }
         
-        // If a download finished and nothing is downloading, trigger cycle.
-        // Notify only once per newly observed finished timestamp.
-        if (!initializing && newDownloading.length === 0 && (oldDownloading.length > 0 || didFinishSomething)) {
+        // Notify only once per newly observed finished timestamp, and only when everything is done.
+        // With concurrent downloads, this means: no active downloads and no future queue.
+        if (!initializing && newDownloading.length === 0 && newFutures.length === 0 && (oldDownloading.length > 0 || didFinishSomething)) {
           // Mark the finished item as processed BEFORE emitting cycle-started
           // to avoid re-entrant loadTvproc() calls re-detecting it.
           if (finishedEndedMax > Number(this._lastFinishedEnded || 0)) {
@@ -679,17 +737,7 @@ export default {
             this.notifyAllUsbFinished(lastTitle);
           }
 
-          // Call cycle endpoint to start next download
-          try {
-            await fetch('https://hahnca.com/tvproc/startProc', {
-              method: 'POST'
-            });
-          } catch (e) {
-            // Silently ignore
-          }
-
-          // Defer to avoid synchronous re-entrancy into loadTvproc().
-          setTimeout(() => evtBus.emit('cycle-started'), 0);
+          // No further action needed here; the queue is empty.
         }
 
         // Update last-finished timestamp after processing.

@@ -11,9 +11,6 @@ fi
 
 BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo >> "$BASEDIR/data/tv.log"
-date >> "$BASEDIR/data/tv.log"
-
 if [ -f /mnt/media/nomount ]; then
   printf "\n---- tv-proc: media drive is not mounted\n"
   /root/.nvm/versions/node/v22.18.0/bin/node \
@@ -45,8 +42,8 @@ fi
 echo "---- flushing pm2 logs for $APP_NAME ----"
 pm2 flush "$APP_NAME" || true
 
-echo "---- tailing data/tv.log (Ctrl+C to detach) ----"
-tail -n 0 -F "$BASEDIR/data/tv.log"
-
 chmod -R 774  /mnt/media/tv
 chown -R emby /mnt/media/tv
+
+echo "---- tailing pm2 logs for $APP_NAME (Ctrl+C to detach) ----"
+pm2 logs "$APP_NAME" --lines 200

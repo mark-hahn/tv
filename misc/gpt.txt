@@ -1,35 +1,19 @@
 
-this is from tv.log. what can cause this to download twice:
+how to have multiple copilot chats at once
 
->>>>>> 1 s01e10 2025/12/29-00:20:56 -- 1.76GB --
-common.side.effects.s01e10.1080p.web.h264-successfulcrab.mkv
-Common.Side.Effects.S01E10.1080p.WEB.H264-SuccessfulCrab/
-/mnt/media/tv/Common Side Effects/Season 1/
-download finished: elapsed(mins): 3.2
+support multiple downloads
+- rename data/tv-recent.json to data/tv-finished.json
+- create src/worker.js for worker code
+- add const MAX_WORKERS = 2
+- add field named worker to tv.json entry which is integer 1-9. worker fields are null at app load and when not being used by worker.
+- no globals in workers
+- tv.json is atomically shared by main and workers and is only shared data. inFlightDownloads is replaced by worker fields in tv.json entries. if you think other shared data is needed ask me first
+- main.js is responsible for getting files from usb, running cycles, adding entries to tv.json, assigning entries to workers, and supporting endpoints.
+- a worker is responsible for running rsync and updating tv.json progress
 
->>>>>> 1 s01e10 2025/12/29-00:22:45 -- 1.76GB --
-common.side.effects.s01e10.1080p.web.h264-successfulcrab.mkv
-Common.Side.Effects.S01E10.1080p.WEB.H264-SuccessfulCrab/
-/mnt/media/tv/Common Side Effects/Season 1/
-download finished: elapsed(mins): 3.1
-download finished: elapsed(mins): 2.6
+- add integer field named priority to tv.json entry that defaults to 0
+- when setProc has a title put unixnow in priority
+- each cycle main looks at entries with priority first and uses newest one
+- priority field is persistant across boots
 
-also note that the start time of the first (2025/12/29-00:20:56) plus its elapsed time (elapsed(mins): 3.2) is after the start time of the second (2025/12/29-00:22:45).  this should not be possible.
-
-also, why does the finished line appear twice at the end:
-
-download finished: elapsed(mins): 3.1
-download finished: elapsed(mins): 2.6
-
-in this logging:
-
->>>>>> 1 s01e10 2025/12/29-00:20:56 -- 1.76GB --
-common.side.effects.s01e10.1080p.web.h264-successfulcrab.mkv
-Common.Side.Effects.S01E10.1080p.WEB.H264-SuccessfulCrab/
-/mnt/media/tv/Common Side Effects/Season 1/
-download finished: elapsed(mins): 3.2
---
-remove the log line: Common.Side.Effects.S01E10.1080p.WEB.H264-SuccessfulCrab/
-
-
-would it be possible and safe to run multiple rsync downloads at the same time? -- make no changes
+- don't use downloaded data directory information from disk except for filtering out torrents. a disk directory might be deleted by other processes but that torrent is still considered finished because tv-finished.json is authority on which torrents are finished

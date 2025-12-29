@@ -264,7 +264,11 @@
         }
 
         // Multi-worker fields.
-        if (n.worker != null) {
+        // worker should always exist (null when idle) and should be cleared on boot.
+        if (!Object.prototype.hasOwnProperty.call(n, 'worker')) {
+          n.worker = null;
+          changed = true;
+        } else if (n.worker != null) {
           n.worker = null;
           changed = true;
         }
@@ -537,9 +541,19 @@
     }
 
     // Give up silently; keep service alive.
+    // IMPORTANT: do NOT write anything here.
+    // Under high write contention (workers updating progress), CAS retries can fail.
+    // Writing an empty/stale cache would clobber the authoritative on-disk tv.json.
     try {
-      writeTvJson(tvJsonCache && tvJsonCache.arr ? tvJsonCache.arr : []);
+      if (fs.existsSync(TV_JSON_PATH)) {
+        var raw = fs.readFileSync(TV_JSON_PATH, 'utf8');
+        var latest = JSON.parse(raw);
+        if (Array.isArray(latest)) {
+          tvJsonCache = {mtimeMs: null, arr: latest};
+        }
+      }
     } catch (e) {}
+    return;
   };
 
   // Trigger one-time normalization/migration at startup.
@@ -570,6 +584,11 @@
   var WORKER_SCRIPT = path.join(__dirname, 'worker.js');
   var workers = []; // [{id, proc, busy}]
   var pendingJobs = []; // [{key, job}]
+
+  // If /startProc?title=... is received but the matching job isn't runnable yet,
+  // keep it around until we successfully apply its priority to a tv.json entry.
+  // (Priority is persisted in tv.json; this is only for "remember until available".)
+  var pendingStartProcPriority = 0;
 
   var jobKey = function(localDir, fname) {
     return localDir + '\u0000' + fname;
@@ -728,6 +747,54 @@
   var abortBetweenFiles = false;
   var nextCycleTimer = null;
 
+  var boostPriorityForNeedle = function(needleLower, priorityValue) {
+    try {
+      if (!needleLower || !priorityValue) return false;
+      var arr = readTvJson();
+      var best = null;
+      var bestScore = null;
+      for (var i = 0; i < arr.length; i++) {
+        var o = arr[i];
+        if (!o || typeof o !== 'object') continue;
+        var t = (typeof o.title === 'string') ? o.title : '';
+        if (!t) continue;
+        if (!t.toLowerCase().includes(needleLower)) continue;
+        if (o.status === 'finished') continue;
+        if (o.worker != null || o.status === 'downloading') continue;
+        var seq = (typeof o.sequence === 'number' && Number.isFinite(o.sequence)) ? o.sequence : 0;
+        var ended = toUnixSeconds(o.dateEnded) || 0;
+        var started = toUnixSeconds(o.dateStarted) || 0;
+        var recency = Math.max(ended, started);
+        var score = [seq, recency];
+        if (!bestScore) {
+          bestScore = score;
+          best = o;
+          continue;
+        }
+        var better = false;
+        for (var si = 0; si < score.length; si++) {
+          if (score[si] > bestScore[si]) {
+            better = true;
+            break;
+          }
+          if (score[si] < bestScore[si]) {
+            break;
+          }
+        }
+        if (better) {
+          bestScore = score;
+          best = o;
+        }
+      }
+
+      if (best && best.localPath && best.title) {
+        upsertTvJson(best.localPath, best.title, {priority: priorityValue});
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  };
+
   emby = require('./emby.js');
 
   await emby.init();
@@ -815,6 +882,24 @@
 
     var requestStartProc = function(reqTitle) {
       pendingStartProcTitle = (typeof reqTitle === 'string' ? reqTitle : '').trim();
+
+      // Capture request-time priority (persisted to tv.json when applied).
+      pendingStartProcPriority = pendingStartProcTitle ? unixNow() : 0;
+
+      // If jobs already exist in tv.json (e.g. pending queue while all workers are busy),
+      // boost priority immediately so the next available worker picks it.
+      if (pendingStartProcTitle) {
+        try {
+          var needleLower = pendingStartProcTitle.toLowerCase();
+          var appliedNow = boostPriorityForNeedle(needleLower, pendingStartProcPriority);
+          if (appliedNow) {
+            // Priority is now persisted; keep the title for this cycle ordering only.
+          }
+        } catch (e) {}
+        try {
+          assignWork();
+        } catch (e) {}
+      }
       
       // If title is blank:
       // - if a cycle is running, restart after the current file finishes
@@ -1095,9 +1180,11 @@
     // If startProc requested a title, process a matching file first (if any)
     // and boost its tv.json priority.
     var wantedNeedle = null;
+    var wantedPriority = 0;
     var wantedApplied = false;
     if (pendingStartProcTitle) {
       wantedNeedle = pendingStartProcTitle.toLowerCase();
+      wantedPriority = pendingStartProcPriority || 0;
       var idx = usbFiles.findIndex((x) => x.base.toLowerCase().includes(wantedNeedle));
       if (idx >= 0) {
         var match = usbFiles.splice(idx, 1)[0];
@@ -1199,26 +1286,30 @@
       var futTvSeasonPath = `${tvPath}${futSeriesName}/Season ${futSeason}`;
       var futTvLocalDir = `${futTvSeasonPath}/`;
       
-      // Create "future" entry in tv.json
-      var futPriority = 0;
-      if (wantedNeedle && !wantedApplied && futFname.toLowerCase().includes(wantedNeedle)) {
-        futPriority = unixNow();
-        wantedApplied = true;
-      }
-      upsertTvJson(futTvLocalDir, futFname, {
+      // Create "future" entry in tv.json.
+      // IMPORTANT: do not overwrite an existing priority with 0; priority is persistent.
+      var futPatch = {
         status: 'future',
         sequence: futureSeq,
         fileSize: futFileBytes,
         season: futSeason,
         episode: futEpisode,
         speed: null,
-        worker: null,
-        priority: futPriority
-      });
+        worker: null
+      };
+      if (wantedNeedle && !wantedApplied && futFname.toLowerCase().includes(wantedNeedle)) {
+        futPatch.priority = wantedPriority || unixNow();
+        wantedApplied = true;
+      }
+      upsertTvJson(futTvLocalDir, futFname, futPatch);
     }
 
-    // Clear pending title now that we've applied priority in this cycle.
-    pendingStartProcTitle = null;
+    // Only clear the pending title when we actually applied its priority.
+    // Otherwise keep it around for a later cycle / when the matching file appears.
+    if (wantedApplied) {
+      pendingStartProcTitle = null;
+      pendingStartProcPriority = 0;
+    }
 
     // if filterRegex
     //   log usbFiles.join('\n')

@@ -29,3 +29,5 @@ what info is in job object that isn't in tv.json entry
 
 when cycle is finished with no jobs waiting, log stats on tv.json for that cycle:
 number of jobs. speed(size/seconds) for each worker. speed(size/seconds) for all jobs combined
+
+when a worker is finished make sure to start another job if available. when a startproc is received make sure it is remembered until a worker is available.

@@ -1,15 +1,13 @@
 
+i added a speed field to down pane download data entry:
+- `speed` (number|null): Download speed in bytes/sec, updated while downloading.
+	- Computed as the average of the last five instantaneous samples.
+	- Preserved when the entry becomes `finished`.
 
-- when i refer to server i mean hahnca.com. you can ssh into hahnca.com without credentials
+  report the speed in down pane card info line. replace dateEnded with speed in GB/sec where GB/sec is shown with three decimal places and no label.
 
-- i moved the project tv-proc from the server /root/dev/apps/tv-proc to tv-proc here
+  
+new sample down card info line...
 
-- adjust code references to tv-proc endpoints
+S1:E6 | 2.308 GB | 12/28 17:14:12 | <speed> | <status>
 
-- tv-proc should mirror how torrents is used.  there should be a tv-proc-server in pm2 in localhost and on server. 
-
-- the release script should Deploy tv-proc server and Run tv-proc release steps on remote server just as it does for torrents server
-
-- misc/server.conf is a copy of /etc/nginx/conf.d/server.conf on server. configure proxy endpoints for tv-proc as they are for torrents
-
-- rename script srvr to srvt and create new script srvp that runs tv-proc-server like how srvt runs torrents-server

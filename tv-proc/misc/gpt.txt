@@ -1,5 +1,0 @@
-
-- are there any files in src or data that are not referenced in code?
-- are there any files in old that are referenced in code?
-
-rename data/tv-errors to data/tv-errors.json and update code to match

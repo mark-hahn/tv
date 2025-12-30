@@ -1,17 +1,4 @@
 
-in the shows pane list row for noemby shows, when icons toTry, continue, mark, or linda, are clicked toggle the InToTry InContinue, InMark, or InLinda property in the noemby show object. then call the addNoEmby endpoint in the server with the show object to save it. when toggling if property does not exist add it as true.
 
-toggling InToTry correctly highlights it in show list and works for filtering. and when toggling InToTry to true and saving it with addNoEmby() the noemby show storage in the server is correctly updated. when app is reloaded getNoEmbys() should return the show with InToTry set.  but the InToTry icon is not highlighted when app is reloaded
-
-in loadAllSows() when a show is in shows (emby shows) and in noEmbys, noemby show is deleted here. before deleting, copy the properties InToTry InContinue, InMark, and InLinda from noemby show to emby show:
-  for(const noEmbyShow of noEmbys) {
-    const idx = shows.findIndex(
-                  (show) => show.Name == noEmbyShow.Name);
-    if(idx != -1) {
-      console.log('upgrading noEmby by deleting it:', 
-                    noEmbyShow.Name);
-      await srvr.delNoEmby(noEmbyShow.Name);
-      prunedNoEmbyIds.push(noEmbyShow.Id);
-      continue;
-    }
-- and update emby show in emby by calling all four of these: saveToTry(id, inToTry), saveContinue(id, inContinue), saveMark(id, inMark), and saveLinda(id, inLinda) 
+when a show is added with the web button in hdrtop and 
+noemby show is created, create it with InToTry true.

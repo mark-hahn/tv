@@ -697,6 +697,7 @@ export const createNoemby = async (show) => {
     Date: dateStr,
     NotReady: true,
     Seasons: [],
+    InToTry: true,
   });
   await srvr.addNoEmby(show);
   return show;

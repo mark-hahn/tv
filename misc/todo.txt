@@ -2,10 +2,11 @@
 bugs ...
 
 todo both ...
-  widen series pane
 
 todo non-simple:
-  show episode and file details
+  show episode
+    file details
+    being watched (next up line)
   abort qbt downloading
   how to see why qbt or down won't start
   
@@ -21,12 +22,9 @@ tabled ...
   keep deleted date and watched info forever
   history of progress for a torrent title
   add X del button to tvproc cards
-  card order in get pane
   when library finishes it goes to series
   delete file from qBittorrent when card deleted from get tab
   mark get tab card as aborted when file deleted from qBittorrent
-  get cards wrong order
-  show episode being watched (next up line)
   button: scroll hilighted row to vis 
   refresh filtered rows when new gap loaded
   up/dn arrows

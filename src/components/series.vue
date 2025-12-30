@@ -101,7 +101,7 @@
         :key="remote.name"
         data-remote-btn="1"
         @click.stop="remoteClick(remote)"
-        :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }"
+        :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit', flex:'0 0 auto' }"
       )
         | {{remote.name}}
   
@@ -163,9 +163,9 @@ export default {
 
   computed: {
     remoteButtonsStyle() {
-      // Default: flex-wrap behaves like "single row until it wraps".
-      // When wrapping is needed, switch to a 2-row layout that alternates items
-      // between rows (equal count when even; top row has +1 when odd).
+      // Default: single row (no wrapping). If buttons don't fit, switch to a
+      // 2-row layout that alternates items between rows (equal count when even;
+      // top row has +1 when odd).
       if (this.remoteButtonsTwoRows) {
         return {
           display: 'grid',
@@ -178,33 +178,27 @@ export default {
       }
       return {
         display: 'flex',
-        flexWrap: 'wrap',
+        flexWrap: 'nowrap',
         justifyContent: 'space-around',
+        alignItems: 'center',
+        overflow: 'hidden',
         width: '100%'
       };
     }
   },
-
-  mounted() {
-    this._onSeriesResize = () => {
-      // Force a re-measure in flex mode so we can both enable and disable
-      // the 2-row layout as the available width changes.
-      this.remoteButtonsTwoRows = false;
-      this.$nextTick(() => {
-        requestAnimationFrame(() => this.measureRemoteButtonsWrap());
-      });
-    };
-    window.addEventListener('resize', this._onSeriesResize);
-    this.$nextTick(() => {
-      requestAnimationFrame(() => this.measureRemoteButtonsWrap());
-    });
-  },
-
-  beforeUnmount() {
-    if (this._onSeriesResize) window.removeEventListener('resize', this._onSeriesResize);
-  },
   
   methods: {
+
+    requestMeasureRemoteButtonsWrap() {
+      // Always start in 1-row mode, then enable 2-row only if measurement
+      // shows overflow. Double-rAF helps when tabs/visibility change.
+      this.remoteButtonsTwoRows = false;
+      this.$nextTick(() => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => this.measureRemoteButtonsWrap());
+        });
+      });
+    },
 
     measureRemoteButtonsWrap() {
       const el = this.$refs.remoteButtonsEl;
@@ -212,13 +206,29 @@ export default {
         this.remoteButtonsTwoRows = false;
         return;
       }
+
+      // If hidden (e.g. inactive tab) we can't measure; stay in 1-row mode.
+      const containerWidth = el.clientWidth;
+      if (!containerWidth || containerWidth < 5 || el.offsetParent === null) {
+        this.remoteButtonsTwoRows = false;
+        return;
+      }
+
       const btns = Array.from(el.querySelectorAll('[data-remote-btn="1"]'));
       if (btns.length <= 1) {
         this.remoteButtonsTwoRows = false;
         return;
       }
-      const tops = new Set(btns.map((b) => b.offsetTop));
-      this.remoteButtonsTwoRows = tops.size > 1;
+      // In single-row mode we prevent wrapping and shrinking. Decide if we need
+      // 2 rows by comparing total button width (including margins) to container.
+      let neededWidth = 0;
+      btns.forEach((b) => {
+        const cs = window.getComputedStyle(b);
+        const ml = parseFloat(cs.marginLeft || '0') || 0;
+        const mr = parseFloat(cs.marginRight || '0') || 0;
+        neededWidth += b.offsetWidth + ml + mr;
+      });
+      this.remoteButtonsTwoRows = neededWidth > (containerWidth + 1);
     },
 
     getMapCounts(seriesMap) {
@@ -503,6 +513,17 @@ export default {
   // series vue component at mounted phase
   // set everything in html
   mounted() {
+    this._onSeriesResize = () => this.requestMeasureRemoteButtonsWrap();
+    window.addEventListener('resize', this._onSeriesResize);
+
+    if (typeof ResizeObserver !== 'undefined') {
+      this._seriesResizeObserver = new ResizeObserver(() => {
+        this.requestMeasureRemoteButtonsWrap();
+      });
+      // Observe the component root so we re-measure when the tab/pane becomes visible.
+      this._seriesResizeObserver.observe(this.$el);
+    }
+
     evtBus.on('setUpSeries', async (show) => { 
       allTvdb        = await tvdb.getAllTvdb();
       this.emailText = ''; // Clear email text when changing shows
@@ -545,10 +566,7 @@ export default {
       await this.setNextWatch();
       await this.setRemotes();
 
-      this.remoteButtonsTwoRows = false;
-      this.$nextTick(() => {
-        requestAnimationFrame(() => this.measureRemoteButtonsWrap());
-      });
+      this.requestMeasureRemoteButtonsWrap();
 
       // Only show the info box (and email input) once everything is populated.
       this.seriesReady = true;
@@ -574,6 +592,13 @@ export default {
         // Non-fatal: UI already corrected.
       }
     });
+
+    this.requestMeasureRemoteButtonsWrap();
+  },
+
+  beforeUnmount() {
+    if (this._onSeriesResize) window.removeEventListener('resize', this._onSeriesResize);
+    if (this._seriesResizeObserver) this._seriesResizeObserver.disconnect();
   },
 }
 </script>

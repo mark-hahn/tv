@@ -42,3 +42,7 @@ in infobox...
 change Collection: to Collections: when more than one collection follows
 
 when buttons need to wrap,  wrap them so that the two rows have the same number of buttons if even number of buttons or top row has one more than bottom when odd number
+
+the buttons are always in two rows.  there should be only one row when they fit
+
+they worked correctly one time and now are stuck on two rows

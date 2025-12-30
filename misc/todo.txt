@@ -5,6 +5,7 @@ todo both ...
   widen series pane
 
 todo non-simple:
+  allow marking no-emby as to-try, continue, etc.
   show episode and file details
   abort qbt downloading
   how to see why qbt or down won't start

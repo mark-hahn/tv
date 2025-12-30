@@ -11,6 +11,18 @@
     @show-torrents="handleShowTorrents"
     @all-shows="handleAllShows"
   )
+
+  //- Draggable divider between List and right-side panes
+  #paneDivider(
+    @pointerdown.stop.prevent="startPaneResize"
+    @pointermove.stop.prevent="onPaneResizeMove"
+    @pointerup.stop.prevent="stopPaneResize"
+    @pointercancel.stop.prevent="stopPaneResize"
+    @lostpointercapture.stop.prevent="stopPaneResize"
+    :style="{ width: '6px', cursor: 'col-resize', backgroundColor: '#ddd', flex: '0 0 auto' }"
+    title="Drag to resize panes"
+  )
+
   #tabArea(:style="{ width: tabAreaWidth, flex:'0 0 auto', minWidth:'0px', display:'flex', flexDirection:'column', height:'100%', marginRight:'10px' }")
     #tabBar(:style="{ display:'flex', gap:(simpleMode ? '30px' : '0px'), padding:(simpleMode ? '6px 8px' : '6px 0px'), alignItems:'center', borderBottom:'1px solid #ddd', backgroundColor:'#fafafa', flex:'0 0 auto', flexWrap:'wrap' }")
       button(
@@ -20,8 +32,8 @@
         :style="{ fontSize:'13px', cursor:'pointer', borderRadius:'7px', padding:'4px 10px', marginLeft:'4px', border:'1px solid #bbb', backgroundColor: (currentPane === t.key ? '#ddd' : 'whitesmoke') }"
       ) {{ t.label }}
 
-    #tabBody(:style="{ flex:'1 1 auto', minHeight:'0px', position:'relative' }")
-      Series(v-show="currentPane === 'series'" style="display:inline-block;" :simpleMode="simpleMode" :sizing="activeSizing")
+    #tabBody(:style="{ flex:'1 1 auto', minHeight:'0px', position:'relative', width:'100%' }")
+      Series(v-show="currentPane === 'series'" style="display:block; width:100%; height:100%;" :simpleMode="simpleMode" :sizing="activeSizing")
       Map(
         v-show="currentPane === 'map'"
         :mapShow="mapShow"
@@ -40,12 +52,14 @@
       )
       Actors(
         v-show="currentPane === 'actors'"
+        style="width:100%; height:100%;"
         :simpleMode="simpleMode"
         :sizing="activeSizing"
       )
       Reel(
         v-if="!simpleMode"
         v-show="currentPane === 'reel'"
+        style="width:100%; height:100%;"
         :simpleMode="simpleMode"
         :sizing="activeSizing"
         :allShows="allShows"
@@ -54,6 +68,7 @@
       Torrents(
         v-if="!simpleMode"
         v-show="currentPane === 'torrents'"
+        style="width:100%; height:100%;"
         :simpleMode="simpleMode"
         :sizing="activeSizing"
         :activeShow="currentShow"
@@ -62,6 +77,7 @@
       Flex(
         v-if="!simpleMode"
         v-show="currentPane === 'flex'"
+        style="width:100%; height:100%;"
         :simpleMode="simpleMode"
         :sizing="activeSizing"
       )
@@ -69,6 +85,7 @@
       History(
         v-if="!simpleMode"
         v-show="currentPane === 'history'"
+        style="width:100%; height:100%;"
         :simpleMode="simpleMode"
         :sizing="activeSizing"
       )
@@ -76,6 +93,7 @@
       TvProc(
         v-if="!simpleMode"
         v-show="currentPane === 'tvproc'"
+        style="width:100%; height:100%;"
         :simpleMode="simpleMode"
         :sizing="activeSizing"
       )
@@ -181,7 +199,13 @@ export default {
         buttonMarginBottom: '6px',
         buttonTopMargin: '0px',
         buttonContainerPadding: '12px'
-      }
+      },
+
+      // Drag-resize state for List vs right-side panes
+      tabAreaWidthOverridePx: null,
+      paneResizeActive: false,
+      paneResizeStartX: 0,
+      paneResizeStartTabW: 0,
     } 
   },
   computed: {
@@ -193,6 +217,9 @@ export default {
     },
 
     tabAreaWidth() {
+      if (typeof this.tabAreaWidthOverridePx === 'number' && Number.isFinite(this.tabAreaWidthOverridePx)) {
+        return `${Math.max(0, this.tabAreaWidthOverridePx)}px`;
+      }
       const base = this.simpleMode ? this.sizing : this.sizingNonSimple;
       const toPx = (val) => {
         if (typeof val === 'number' && Number.isFinite(val)) return val;
@@ -201,10 +228,19 @@ export default {
         return m ? Number(m[1]) : null;
       };
 
-      const seriesW = toPx(base?.seriesWidth) ?? 0;
-      const mapW = toPx(base?.mapWidth) ?? 0;
-      const tabW = Math.max(seriesW, mapW) || 450;
-      return `${tabW}px`;
+      const seriesPx = toPx(base?.seriesWidth);
+      const mapPx = toPx(base?.mapWidth);
+
+      // If both are explicit px values, keep the old behavior: use the larger,
+      // so switching tabs doesn't change the outer width.
+      if (seriesPx != null && mapPx != null) {
+        const tabW = Math.max(seriesPx, mapPx) || 450;
+        return `${tabW}px`;
+      }
+
+      // Otherwise allow "variable" CSS widths (vw, %, auto, calc, etc.).
+      // Prefer an explicit series width first, then map.
+      return base?.seriesWidth || base?.mapWidth || '450px';
     },
     tabs() {
       const allTabs = [
@@ -229,6 +265,48 @@ export default {
     this.cancelDownInactiveTimer();
   },
   methods: {
+    startPaneResize(e) {
+      if (!e) return;
+      const divider = e.currentTarget;
+      const tab = this.$el?.querySelector?.('#tabArea');
+      if (!divider || !tab) return;
+
+      // Measure current rendered width so drag works even if the width is vw/%.
+      const rect = tab.getBoundingClientRect?.();
+      const w = rect && Number.isFinite(rect.width) ? rect.width : null;
+      if (!w) return;
+
+      this.paneResizeActive = true;
+      this.paneResizeStartX = Number(e.clientX) || 0;
+      this.paneResizeStartTabW = w;
+
+      try {
+        if (typeof divider.setPointerCapture === 'function' && e.pointerId != null) {
+          divider.setPointerCapture(e.pointerId);
+        }
+      } catch {
+        // ignore
+      }
+    },
+
+    onPaneResizeMove(e) {
+      if (!this.paneResizeActive) return;
+      if (!e) return;
+
+      const dx = (Number(e.clientX) || 0) - (Number(this.paneResizeStartX) || 0);
+      // Drag right => divider right => tab area smaller.
+      const next = (Number(this.paneResizeStartTabW) || 0) - dx;
+
+      const minTabW = 320;
+      const maxTabW = Math.max(minTabW, Math.floor(window.innerWidth * 0.9));
+      const clamped = Math.max(minTabW, Math.min(maxTabW, next));
+      this.tabAreaWidthOverridePx = Math.round(clamped);
+    },
+
+    stopPaneResize() {
+      this.paneResizeActive = false;
+    },
+
     cancelDownInactiveTimer() {
       if (this._downInactiveTimer) {
         clearTimeout(this._downInactiveTimer);

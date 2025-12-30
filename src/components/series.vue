@@ -1,6 +1,6 @@
 <template lang="pug">
 
-#series(@click="handleSeriesClick" :style="{ height:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box' }")
+#series(@click="handleSeriesClick" :style="{ height:'100%', width:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box' }")
 
   #hdr(v-if="showHdr"
        :style="{ display:'flex', flexDirection:'column', gap:'10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', margin:'0px', marginBottom:'10px' }")
@@ -21,41 +21,89 @@
                 @click.stop="deleteClick"
                 style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;") Delete
 
-  #body(style="display:flex; cursor:pointer;")
-    #topLeft(@click.stop="handleBodyClick"
-              style="display:flex; flex-direction:column; text-align:center;") 
-      #poster(style="margin-left:30px;")  
-    #topRight(style="display:flex; flex-direction:column; width:300px; margin-left:10px;")
-      #infoBox(v-if="seriesReady" @click.stop="handleBodyClick"
-              :style="{ margin:'0px 0 7px 2px', width: sizing.seriesInfoWidth || '250px', fontSize: sizing.seriesInfoFontSize || '20px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column',textAlign:'center', fontWeight:'bold' }")
-        div(style="border:1px solid #ccc; border-radius:5px; padding:5px;")
-          #dates(v-html="dates"
-                 v-if="dates.length > 0"
-                 style="min-height:24px;")
-          #seasons(v-html="seasonsTxt"
-                   v-if="seasonsTxt.length > 0"
-                   style="min-height:24px;")
-          #cntrylang(v-if="cntryLangTxt.length > 0"
-                     v-html="cntryLangTxt"
-                     style="min-height:20px;")
-          #nextup(v-if="nextUpTxt.length > 0"
-                  v-html="nextUpTxt"
-                  style="min-height:32px;")
-          #collection(v-if="collectionName"
-                      style="min-height:24px;")
-            | Collection: {{collectionName}}
+  //- Layout: 1/9 whitespace, 1/3 poster, 1/9 whitespace, 1/3 infobox, 1/9 whitespace
+  #body(
+    :style="{ display:'grid', cursor:'pointer', width:'100%', gridTemplateColumns:'1fr 3fr 1fr 3fr 1fr', alignItems:'start' }"
+  )
+    //- Column 2: poster (1/3)
+    #topLeft(
+      @click.stop="handleBodyClick"
+      :style="{ gridColumn:'2', minWidth:'0px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-start', textAlign:'center' }"
+    )
+      #poster(:style="{ width:'100%', display:'flex', justifyContent:'center', alignItems:'flex-start' }")
+
+    //- Column 4: info box (1/3)
+    #topRight(:style="{ gridColumn:'4', minWidth:'0px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-start' }")
+      #infoBox(
+        v-if="seriesReady"
+        @click.stop="handleBodyClick"
+        :style="{ margin:'0px 0 7px 0px', width:'100%', boxSizing:'border-box', overflow:'hidden', fontSize: sizing.seriesInfoFontSize || '20px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column', textAlign:'center', fontWeight:'bold' }"
+      )
+        div(style="border:1px solid #ccc; border-radius:5px; padding:5px; width:100%; box-sizing:border-box;")
+          //- Dates in one div; allow wrapping up to 2 lines
+          #dates(
+            v-if="dates && String(dates).length > 0"
+            style="min-height:24px; white-space:normal; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2;"
+          ) {{ dates }}
+          #status(
+            v-if="statusTxt.length > 0"
+            v-html="statusTxt"
+            style="min-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+          )
+          #seasons(
+            v-if="seasonsTxt.length > 0"
+            v-html="seasonsTxt"
+            style="min-height:24px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+          )
+          //- Split only between "Watched" and the value; allow wrapping between them
+          #watched(
+            v-if="watchedValTxt && String(watchedValTxt).length > 0"
+            style="min-height:24px; display:flex; flex-wrap:wrap; justify-content:center; column-gap:8px; row-gap:0px;"
+          )
+            div(style="white-space:nowrap;") Watched
+            div(style="white-space:normal; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2;") {{ watchedValTxt }}
+          #cntrylang(
+            v-if="cntryLangTxt.length > 0"
+            v-html="cntryLangTxt"
+            style="min-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+          )
+          #mins(
+            v-if="runtimeTxt.length > 0"
+            v-html="runtimeTxt"
+            style="min-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+          )
+          //- Split only between "Next Up" and the value; allow wrapping between them
+          #nextup(
+            v-if="nextUpValTxt && String(nextUpValTxt).length > 0"
+            style="min-height:32px; display:flex; flex-wrap:wrap; justify-content:center; column-gap:8px; row-gap:0px;"
+          )
+            div(style="white-space:nowrap;") Next Up
+            div(style="white-space:normal; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2;") {{ nextUpValTxt }}
+          #collection(
+            v-if="collectionName"
+            style="min-height:24px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;"
+          )
+            | {{ (collectionCount > 1) ? 'Collections' : 'Collection' }}: {{collectionName}}
 
 
 
-  #allButtons(style="display:flex; flex-wrap:wrap; margin-top:15px; padding:0 10px; justify-content:space-around; width:100%;")
+  #allButtons(style="display:flex; flex-direction:column; margin-top:15px; padding:0 10px; width:100%;")
     div(v-if="showSpinner")
       img(src="../../loading.gif"
           style="width:100px; height:100px; position:relative; top:20px; left:45px;")
-    div(v-if="showRemotes" 
+    #remoteButtons(
+      v-if="showRemotes"
+      ref="remoteButtonsEl"
+      :style="remoteButtonsStyle"
+    )
+      div(
         v-for="remote in remotes"
+        :key="remote.name"
+        data-remote-btn="1"
         @click.stop="remoteClick(remote)"
-        :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }")
-      | {{remote.name}}
+        :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }"
+      )
+        | {{remote.name}}
   
   #bot(:style="{ fontSize: sizing.overviewFontSize || '20px', padding:'10px' }") {{show.Overview}}
 
@@ -90,25 +138,88 @@ export default {
       seriesReady: false,
       emailText: '',
       dates: '',
+      statusTxt: '',
       remoteShowName: '',
       remotes: [],
       seasonsTxt: '',
+      watchedValTxt: '',
       cntryLangTxt: '',
+      runtimeTxt: '',
       subs: '',
       subsActive:  false,
       showSpinner: false,
       showRemotes: false,
-      nextUpTxt: '',
+      nextUpValTxt: '',
       watchButtonTxtArr: [],
       episodeId: '',
       deletedTxt: '',
       notInEmby: false,
       collectionName: '',
+      collectionCount: 0,
+      remoteButtonsTwoRows: false,
       currentTvdbData: null
     }
   },
+
+  computed: {
+    remoteButtonsStyle() {
+      // Default: flex-wrap behaves like "single row until it wraps".
+      // When wrapping is needed, switch to a 2-row layout that alternates items
+      // between rows (equal count when even; top row has +1 when odd).
+      if (this.remoteButtonsTwoRows) {
+        return {
+          display: 'grid',
+          gridAutoFlow: 'column',
+          gridTemplateRows: 'auto auto',
+          justifyContent: 'space-around',
+          alignContent: 'start',
+          width: '100%'
+        };
+      }
+      return {
+        display: 'flex',
+        flexWrap: 'wrap',
+        justifyContent: 'space-around',
+        width: '100%'
+      };
+    }
+  },
+
+  mounted() {
+    this._onSeriesResize = () => {
+      // Force a re-measure in flex mode so we can both enable and disable
+      // the 2-row layout as the available width changes.
+      this.remoteButtonsTwoRows = false;
+      this.$nextTick(() => {
+        requestAnimationFrame(() => this.measureRemoteButtonsWrap());
+      });
+    };
+    window.addEventListener('resize', this._onSeriesResize);
+    this.$nextTick(() => {
+      requestAnimationFrame(() => this.measureRemoteButtonsWrap());
+    });
+  },
+
+  beforeUnmount() {
+    if (this._onSeriesResize) window.removeEventListener('resize', this._onSeriesResize);
+  },
   
   methods: {
+
+    measureRemoteButtonsWrap() {
+      const el = this.$refs.remoteButtonsEl;
+      if (!el) {
+        this.remoteButtonsTwoRows = false;
+        return;
+      }
+      const btns = Array.from(el.querySelectorAll('[data-remote-btn="1"]'));
+      if (btns.length <= 1) {
+        this.remoteButtonsTwoRows = false;
+        return;
+      }
+      const tops = new Set(btns.map((b) => b.offsetTop));
+      this.remoteButtonsTwoRows = tops.size > 1;
+    },
 
     getMapCounts(seriesMap) {
       try {
@@ -207,8 +318,12 @@ export default {
       if (!posterEl) return;
 
       const img = new Image();
-      img.style.maxWidth = this.sizing.posterWidth || '300px';
-      img.style.maxHeight = this.sizing.posterHeight || '400px';
+      // Poster column is 25% of pane; fill that column.
+      img.style.width = '100%';
+      img.style.maxWidth = '100%';
+      img.style.height = 'auto';
+      img.style.objectFit = 'contain';
+      img.style.display = 'block';
 
       const src = tvdbData?.image || './question-mark.png';
       if (!tvdbData) {
@@ -229,9 +344,15 @@ export default {
     setDates(tvdbData) {
       const show = this.show;
       const {firstAired, lastAired, status} = tvdbData;
-      this.dates = ' &nbsp; ' + firstAired + 
-                    '&nbsp; ' + lastAired +
-                   ' &nbsp; ' + status;
+      const fa = firstAired || '';
+      const la = lastAired || '';
+      const st = status || '';
+      // Dates (start/end) should be on one line and separate from status.
+      if (fa && la) this.dates = `${fa} - ${la}`;
+      else if (fa) this.dates = `${fa}`;
+      else if (la) this.dates = `${la}`;
+      else this.dates = '';
+      this.statusTxt = st ? ` &nbsp; ${st}` : '';
     },
 
     async setSeasonsTxt(tvdbData) {
@@ -272,36 +393,42 @@ export default {
         case 1:  seasonsTxt = "1 Season"; break;
         default: seasonsTxt = `${seasonCount} Seasons`;
       }
-      const watchedTxt = (episodeCount > 0  &&
-                          watchedCount == episodeCount) 
-              ? ` &nbsp; &nbsp; Watched All ${episodeCount}` 
-              :`  &nbsp  
-                  Watched ${watchedCount} of ${episodeCount}`;
-      this.seasonsTxt = ' &nbsp; ' + seasonsTxt + watchedTxt;
+      this.seasonsTxt = ` &nbsp; ${seasonsTxt}`;
+
+      if (episodeCount > 0) {
+        this.watchedValTxt = (watchedCount === episodeCount)
+          ? `All ${episodeCount}`
+          : `${watchedCount} of ${episodeCount}`;
+      } else {
+        this.watchedValTxt = '';
+      }
     },
 
     setCntryLangTxt(tvdbData) {
-      this.cntryLangTxt = ``;
-      let {originalCountry, originalLanguage, 
-           averageRuntime,  originalNetwork} = tvdbData;
+      this.cntryLangTxt = '';
+      this.runtimeTxt = '';
 
+      let { originalCountry, originalLanguage, averageRuntime, originalNetwork } = tvdbData;
+
+      originalNetwork = String(originalNetwork || '');
       const longNets = ['Amazon', 'Paramount+'];
       longNets.forEach((net) => {
-        if(originalNetwork.includes(net))
-          originalNetwork = net;
+        if (originalNetwork.includes(net)) originalNetwork = net;
       });
-      if(originalCountry == 'gbr') originalCountry = 'UK';
-      originalNetwork    = originalNetwork.substr(0, 10); 
-      const origCountry  = originalCountry?.toLowerCase()  ?? '';
-      const origLanguage = originalLanguage?.toLowerCase() ?? '';
-      const OrigNetwork  = originalNetwork?.toLowerCase()  ?? '';
-      const avgRuntime   = averageRuntime?.toString().toLowerCase();
-      this.cntryLangTxt = 
-                `${origCountry}`                      +
-                `${origCountry != '' ? '/' : ''}`     +
-                `${origLanguage} ${OrigNetwork}&nbsp;`+
-                `${avgRuntime !== undefined
-                      ? ' ' + avgRuntime + ' Mins' : ''}` 
+
+      if (originalCountry === 'gbr') originalCountry = 'UK';
+      originalCountry = String(originalCountry || '');
+      originalLanguage = String(originalLanguage || '');
+      originalNetwork = String(originalNetwork || '').substr(0, 10);
+
+      const origCountry = originalCountry.toLowerCase();
+      const origLanguage = originalLanguage.toLowerCase();
+      const origNetwork = originalNetwork.toLowerCase();
+      const left = `${origCountry}${origCountry ? '/' : ''}${origLanguage}${origLanguage ? ' ' : ''}${origNetwork}`.trim();
+      if (left) this.cntryLangTxt = left;
+
+      const rt = (averageRuntime !== undefined && averageRuntime !== null) ? String(averageRuntime) : '';
+      if (rt) this.runtimeTxt = `${rt} Mins`;
     },
 
   async setNextWatch() {
@@ -314,13 +441,16 @@ export default {
                           `E${(''+episodeNumber).padStart(2, "0")}`;
         if (readyToWatch) {
           this.episodeId = episodeId;
-          this.nextUpTxt = ` &nbsp; Next Up: ${seaEpiTxt}`;
+          this.nextUpValTxt = seaEpiTxt;
         }
-        else this.nextUpTxt = ` 
-                &nbsp; Next Up: ${seaEpiTxt} 
-                &nbsp; ${status === 'missing' ? 'No File' : 'Unaired'}`;
+        else {
+          const suffix = (status === 'missing') ? 'No File' : 'Unaired';
+          this.nextUpValTxt = `${seaEpiTxt} ${suffix}`;
+        }
       }
-      else this.nextUpTxt = '';
+      else {
+        this.nextUpValTxt = '';
+      }
       const watchButtonTxtArr = [];
       const devices = await srvr.getDevices();
       for(const device of devices) {
@@ -382,12 +512,17 @@ export default {
 
       // Clear info fields so nothing renders until ready
       this.dates = '';
+      this.statusTxt = '';
       this.seasonsTxt = '';
+      this.watchedValTxt = '';
       this.cntryLangTxt = '';
-      this.nextUpTxt = '';
+      this.runtimeTxt = '';
+      this.nextUpValTxt = '';
       this.remotes = [];
       this.showRemotes = false;
       this.showSpinner = false;
+      this.collectionName = '';
+      this.collectionCount = 0;
       
       // Set collection name(s)
       const collections = [];
@@ -397,6 +532,7 @@ export default {
       if (show.InLinda) collections.push('Linda');
       if (show.IsFavorite) collections.push('Favorite');
       this.collectionName = collections.join(', ');
+      this.collectionCount = collections.length;
       
       const tvdbData = allTvdb[show.Name];
       this.currentTvdbData = tvdbData; // Store for actors pane
@@ -408,6 +544,11 @@ export default {
       await this.setCntryLangTxt(tvdbData);
       await this.setNextWatch();
       await this.setRemotes();
+
+      this.remoteButtonsTwoRows = false;
+      this.$nextTick(() => {
+        requestAnimationFrame(() => this.measureRemoteButtonsWrap());
+      });
 
       // Only show the info box (and email input) once everything is populated.
       this.seriesReady = true;
@@ -424,8 +565,8 @@ export default {
       if (!episodeCount || !seasonCount) return;
 
       const seasonsTxt = seasonCount === 1 ? '1 Season' : `${seasonCount} Seasons`;
-      const watchedTxt = `  &nbsp  Watched 0 of ${episodeCount}`;
-      this.seasonsTxt = ' &nbsp; ' + seasonsTxt + watchedTxt;
+      this.seasonsTxt = ' &nbsp; ' + seasonsTxt;
+      this.watchedValTxt = `0 of ${episodeCount}`;
 
       try {
         await srvr.setTvdbFields({ name: show.Name, seasonCount, episodeCount, watchedCount: 0 });

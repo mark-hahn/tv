@@ -2,7 +2,7 @@
 .torrents-container(:style="{ height:'100%', width:'100%', display:'flex', justifyContent:'flex-start' }")
   #torrents(
     ref="scroller"
-    :style="{ height:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', backgroundColor:'#fafafa' }"
+    :style="{ height:'100%', width:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa' }"
     @wheel.stop.prevent="handleScaledWheel"
   )
 

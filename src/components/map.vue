@@ -1,5 +1,5 @@
 <template lang="pug">
-#map(ref="mapScroller" @click="handleMapClick" :style="{ height:'100%',margin:0, display:'flex', flexDirection:'column', backgroundColor:'#ffe', overflow:'hidden', maxWidth:'100%', width: sizing.mapWidth || '450px', boxSizing:'border-box' }")
+#map(ref="mapScroller" @click="handleMapClick" :style="{ height:'100%', width:'100%', margin:0, display:'flex', flexDirection:'column', backgroundColor:'#ffe', overflow:'hidden', maxWidth:'100%', boxSizing:'border-box' }")
 
   //- Progress modal (similar to web-add in list.vue)
   #mapWorkingModal(

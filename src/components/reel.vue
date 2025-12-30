@@ -1,7 +1,7 @@
 <template lang="pug">
 
 #reelPane(
-  :style="{ height:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'row', overflowY:'hidden', overflowX:'hidden', maxWidth:'100%', width: sizing.seriesWidth || 'auto', boxSizing:'border-box', gap: '10px' }")
+  :style="{ height:'100%', width:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'row', overflowY:'hidden', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', gap: '10px' }")
 
   #reelLeft(
     :style="{ flex: '0 0 125px', height: '100%', display: 'flex', flexDirection: 'column' }")

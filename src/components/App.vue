@@ -1,29 +1,10 @@
 <template lang="pug">
 
-#all(style="width:100%; height:97dvh; box-sizing: border-box; padding:0; margin:0; display:flex;")
-  List(
-    style="flex:1 1 auto; min-width:0px;" 
-    :simpleMode="simpleMode"
-    :sizing="activeSizing"
-    @show-map="handleShowMap"
-    @hide-map="handleHideMap"
-    @show-actors="handleShowActors"
-    @show-torrents="handleShowTorrents"
-    @all-shows="handleAllShows"
-  )
-
-  //- Draggable divider between List and right-side panes
-  #paneDivider(
-    @pointerdown.stop.prevent="startPaneResize"
-    @pointermove.stop.prevent="onPaneResizeMove"
-    @pointerup.stop.prevent="stopPaneResize"
-    @pointercancel.stop.prevent="stopPaneResize"
-    @lostpointercapture.stop.prevent="stopPaneResize"
-    :style="{ width: '6px', cursor: 'col-resize', backgroundColor: '#ddd', flex: '0 0 auto' }"
-    title="Drag to resize panes"
-  )
-
-  #tabArea(:style="{ width: tabAreaWidth, flex:'0 0 auto', minWidth:'0px', display:'flex', flexDirection:'column', height:'100%', marginRight:'10px' }")
+#all(
+  :style="{ width:'100%', height:'97dvh', boxSizing:'border-box', padding:0, margin:0, display:'flex', flexDirection: isPortrait ? 'column' : 'row' }"
+)
+  //- In portrait, put the right-side pane (Series/Map/etc) above the List.
+  #tabArea(:style="tabAreaStyle")
     #tabBar(:style="{ display:'flex', gap:(simpleMode ? '30px' : '0px'), padding:(simpleMode ? '6px 8px' : '6px 0px'), alignItems:'center', borderBottom:'1px solid #ddd', backgroundColor:'#fafafa', flex:'0 0 auto', flexWrap:'wrap' }")
       button(
         v-for="t in tabs"
@@ -97,6 +78,28 @@
         :simpleMode="simpleMode"
         :sizing="activeSizing"
       )
+
+  //- Draggable divider between panes: vertical in landscape, horizontal in portrait.
+  #paneDivider(
+    @pointerdown.stop.prevent="startPaneResize"
+    @pointermove.stop.prevent="onPaneResizeMove"
+    @pointerup.stop.prevent="stopPaneResize"
+    @pointercancel.stop.prevent="stopPaneResize"
+    @lostpointercapture.stop.prevent="stopPaneResize"
+    :style="paneDividerStyle"
+    title="Drag to resize panes"
+  )
+
+  List(
+    :style="listStyle"
+    :simpleMode="simpleMode"
+    :sizing="activeSizing"
+    @show-map="handleShowMap"
+    @hide-map="handleHideMap"
+    @show-actors="handleShowActors"
+    @show-torrents="handleShowTorrents"
+    @all-shows="handleAllShows"
+  )
 </template>
 
 <script>
@@ -202,13 +205,23 @@ export default {
       },
 
       // Drag-resize state for List vs right-side panes
+      windowW: window.innerWidth,
+      windowH: window.innerHeight,
       tabAreaWidthOverridePx: null,
+      tabAreaHeightOverridePx: null,
       paneResizeActive: false,
+      paneResizeAxis: 'x',
       paneResizeStartX: 0,
+      paneResizeStartY: 0,
       paneResizeStartTabW: 0,
+      paneResizeStartTabH: 0,
     } 
   },
   computed: {
+    isPortrait() {
+      return Number(this.windowH) > Number(this.windowW);
+    },
+
     activeSizing() {
       const base = this.simpleMode ? this.sizing : this.sizingNonSimple;
 
@@ -242,6 +255,36 @@ export default {
       // Prefer an explicit series width first, then map.
       return base?.seriesWidth || base?.mapWidth || '450px';
     },
+
+    tabAreaHeight() {
+      if (typeof this.tabAreaHeightOverridePx === 'number' && Number.isFinite(this.tabAreaHeightOverridePx)) {
+        return `${Math.max(0, this.tabAreaHeightOverridePx)}px`;
+      }
+      // Default portrait split if no override: half the available height.
+      return '50%';
+    },
+
+    tabAreaStyle() {
+      if (this.isPortrait) {
+        return { width: '100%', height: this.tabAreaHeight, flex: '0 0 auto', minWidth: '0px', minHeight: '0px', display: 'flex', flexDirection: 'column', marginRight: '0px', order: 0 };
+      }
+      return { width: this.tabAreaWidth, height: '100%', flex: '0 0 auto', minWidth: '0px', display: 'flex', flexDirection: 'column', marginRight: '10px', order: 2 };
+    },
+
+    listStyle() {
+      if (this.isPortrait) {
+        return { flex: '1 1 auto', minHeight: '0px', width: '100%', order: 2 };
+      }
+      return { flex: '1 1 auto', minWidth: '0px', order: 0 };
+    },
+
+    paneDividerStyle() {
+      if (this.isPortrait) {
+        return { height: '6px', width: '100%', cursor: 'row-resize', backgroundColor: '#ddd', flex: '0 0 auto', order: 1 };
+      }
+      return { width: '6px', cursor: 'col-resize', backgroundColor: '#ddd', flex: '0 0 auto', order: 1 };
+    },
+
     tabs() {
       const allTabs = [
         { label: 'Series', key: 'series' },
@@ -261,6 +304,7 @@ export default {
   },
   unmounted() {
     evtBus.off('downActivePart', this.handleDownActivePart);
+    if (this._onAppWindowResize) window.removeEventListener('resize', this._onAppWindowResize);
     this.stopQbtPolling();
     this.cancelDownInactiveTimer();
   },
@@ -271,14 +315,30 @@ export default {
       const tab = this.$el?.querySelector?.('#tabArea');
       if (!divider || !tab) return;
 
-      // Measure current rendered width so drag works even if the width is vw/%.
-      const rect = tab.getBoundingClientRect?.();
-      const w = rect && Number.isFinite(rect.width) ? rect.width : null;
-      if (!w) return;
-
       this.paneResizeActive = true;
-      this.paneResizeStartX = Number(e.clientX) || 0;
-      this.paneResizeStartTabW = w;
+
+      const rect = tab.getBoundingClientRect?.();
+      if (this.isPortrait) {
+        // Measure current rendered height so drag works even if height is %.
+        const h = rect && Number.isFinite(rect.height) ? rect.height : null;
+        if (!h) {
+          this.paneResizeActive = false;
+          return;
+        }
+        this.paneResizeAxis = 'y';
+        this.paneResizeStartY = Number(e.clientY) || 0;
+        this.paneResizeStartTabH = h;
+      } else {
+        // Measure current rendered width so drag works even if width is vw/%.
+        const w = rect && Number.isFinite(rect.width) ? rect.width : null;
+        if (!w) {
+          this.paneResizeActive = false;
+          return;
+        }
+        this.paneResizeAxis = 'x';
+        this.paneResizeStartX = Number(e.clientX) || 0;
+        this.paneResizeStartTabW = w;
+      }
 
       try {
         if (typeof divider.setPointerCapture === 'function' && e.pointerId != null) {
@@ -292,6 +352,17 @@ export default {
     onPaneResizeMove(e) {
       if (!this.paneResizeActive) return;
       if (!e) return;
+
+      if (this.paneResizeAxis === 'y') {
+        const dy = (Number(e.clientY) || 0) - (Number(this.paneResizeStartY) || 0);
+        // Drag down => divider down => tab area taller.
+        const next = (Number(this.paneResizeStartTabH) || 0) + dy;
+        const minTabH = 220;
+        const maxTabH = Math.max(minTabH, Math.floor(window.innerHeight * 0.9));
+        const clamped = Math.max(minTabH, Math.min(maxTabH, next));
+        this.tabAreaHeightOverridePx = Math.round(clamped);
+        return;
+      }
 
       const dx = (Number(e.clientX) || 0) - (Number(this.paneResizeStartX) || 0);
       // Drag right => divider right => tab area smaller.
@@ -645,6 +716,13 @@ export default {
     }
   },
   mounted() {
+    this._onAppWindowResize = () => {
+      this.windowW = window.innerWidth;
+      this.windowH = window.innerHeight;
+    };
+    window.addEventListener('resize', this._onAppWindowResize);
+    this._onAppWindowResize();
+
     // Derive downActive and schedule deferred Tor restarts.
     evtBus.on('downActivePart', this.handleDownActivePart);
     this.startQbtPolling();

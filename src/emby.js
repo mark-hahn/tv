@@ -113,6 +113,36 @@ export async function loadAllShows() {
     const idx = shows.findIndex(
                   (show) => show.Name == noEmbyShow.Name);
     if(idx != -1) {
+      // If the show now exists in Emby, preserve any collection flags
+      // we tracked while it was a noemby show by copying them over and
+      // writing them into the real Emby collections before deleting.
+      try {
+        const embyShow = shows[idx];
+        const wantToTry    = !!noEmbyShow.InToTry;
+        const wantContinue = !!noEmbyShow.InContinue;
+        const wantMark     = !!noEmbyShow.InMark;
+        const wantLinda    = !!noEmbyShow.InLinda;
+
+        if (wantToTry) {
+          embyShow.InToTry = true;
+          await saveToTry(embyShow.Id, true);
+        }
+        if (wantContinue) {
+          embyShow.InContinue = true;
+          await saveContinue(embyShow.Id, true);
+        }
+        if (wantMark) {
+          embyShow.InMark = true;
+          await saveMark(embyShow.Id, true);
+        }
+        if (wantLinda) {
+          embyShow.InLinda = true;
+          await saveLinda(embyShow.Id, true);
+        }
+      } catch (e) {
+        console.error('loadAllShows: upgrade noEmby -> Emby flag copy failed', noEmbyShow?.Name, e);
+      }
+
       console.log('upgrading noEmby by deleting it:', 
                     noEmbyShow.Name);
       await srvr.delNoEmby(noEmbyShow.Name);
@@ -234,8 +264,11 @@ export async function loadAllShows() {
   const toTryIds = [];
   for(let tryEntry of toTryRes.data.Items)
        toTryIds.push(tryEntry.Id);
-  for(let show of shows)
-       show.InToTry = toTryIds.includes(show.Id);
+  for(let show of shows) {
+    // noemby shows are not in Emby collections; keep server-stored flags.
+    if (String(show?.Id || '').startsWith('noemby-')) continue;
+    show.InToTry = toTryIds.includes(show.Id);
+  }
 
 //////////  process continue collection  ////////////
   const continueRes = await axios.get(
@@ -243,8 +276,10 @@ export async function loadAllShows() {
   const continueIds = [];
   for(let tryEntry of continueRes.data.Items)
        continueIds.push(tryEntry.Id);
-  for(let show of shows)
-       show.InContinue = continueIds.includes(show.Id);
+  for(let show of shows) {
+    if (String(show?.Id || '').startsWith('noemby-')) continue;
+    show.InContinue = continueIds.includes(show.Id);
+  }
 
 //////////  process mark collection  ////////////
   const markRes = await axios.get(
@@ -252,8 +287,10 @@ export async function loadAllShows() {
   const markIds = [];
   for(let tryEntry of markRes.data.Items)
        markIds.push(tryEntry.Id);
-  for(let show of shows)
-       show.InMark = markIds.includes(show.Id);
+  for(let show of shows) {
+    if (String(show?.Id || '').startsWith('noemby-')) continue;
+    show.InMark = markIds.includes(show.Id);
+  }
 
 //////////  process linda collection  ////////////
   const lindaRes = await axios.get(
@@ -261,8 +298,10 @@ export async function loadAllShows() {
   const lindaIds = [];
   for(let tryEntry of lindaRes.data.Items)
        lindaIds.push(tryEntry.Id);
-  for(let show of shows)
-       show.InLinda = lindaIds.includes(show.Id);
+  for(let show of shows) {
+    if (String(show?.Id || '').startsWith('noemby-')) continue;
+    show.InLinda = lindaIds.includes(show.Id);
+  }
 
 //////////  process rejects for usb ////////////
   for(let rejectName of rejects) {

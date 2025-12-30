@@ -1,4 +1,2 @@
 
 
-when a show is added with the web button in hdrtop and 
-noemby show is created, create it with InToTry true.

@@ -480,6 +480,36 @@ const createShowFolder = async (id, param, resolve, reject) => {
   resolve([id, { ok: true, created: !existed, path: showPath }]);
 }
 
+let sharedFilters = null;
+
+const setSharedFilters = (id, param, resolve, reject) => {
+  // Client sends JSON.stringify(object) or "null".
+  if (param === '' || param === undefined || param === null) {
+    sharedFilters = null;
+    resolve([id, { ok: true }]);
+    return;
+  }
+
+  const parsed = util.jParse(param, 'setSharedFilters');
+  if (parsed === null) {
+    sharedFilters = null;
+    resolve([id, { ok: true }]);
+    return;
+  }
+
+  if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+    reject([id, { err: 'setSharedFilters: expected object or null' }]);
+    return;
+  }
+
+  sharedFilters = parsed;
+  resolve([id, { ok: true }]);
+};
+
+const getSharedFilters = (id, _param, resolve, _reject) => {
+  resolve([id, sharedFilters]);
+};
+
 const deletePath = async (id, path, resolve, _reject) => {
   // console.log('deletePath', id, path);
   try {
@@ -575,6 +605,9 @@ const runOne = () => {
     case 'sendEmail':     sendEmailHandler(  id, param, resolve, reject); break;
     
     case 'getTmdb':       tmdb.getTmdb(      id, param, resolve, reject); break;
+
+    case 'setSharedFilters': setSharedFilters(id, param, resolve, reject); break;
+    case 'getSharedFilters': getSharedFilters(id, param, resolve, reject); break;
 
     case 'createShowFolder': createShowFolder(id, param, resolve, reject); break;
 

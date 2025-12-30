@@ -24,6 +24,7 @@
         @filter-input="select"
         @cancel-srch-list="cancelSrchList"
         @search-action="searchAction"
+        @send-filters="sendSharedFilters"
       )
 
       HdrBot(
@@ -395,9 +396,112 @@ export default {
   /////////////  METHODS  ////////////
   methods: {
 
+    async sendSharedFilters() {
+      // Save current filter settings (for simple-mode Custom button).
+      // If we're effectively in "All" mode, clear sharedFilters instead.
+      try {
+        const condFilters = {};
+        (this.conds || []).forEach((c) => {
+          if (!c?.name) return;
+          condFilters[c.name] = c.filter;
+        });
+
+        // Always keep ban enabled for shared filters.
+        condFilters.ban = -1;
+
+        const payload = {
+          fltrChoice: this.fltrChoice,
+          filterStr: this.filterStr,
+          condFilters,
+        };
+
+        const isAllMode =
+          (this.fltrChoice === 'All') &&
+          (!this.filterStr || String(this.filterStr).length === 0) &&
+          (this.conds || []).every((c) => {
+            if (!c?.name) return true;
+            if (c.name === 'ban') return c.filter === -1; // default ban behavior
+            return c.filter === 0;
+          });
+
+        if (isAllMode) {
+          await srvr.setSharedFilters(null);
+        } else {
+          await srvr.setSharedFilters(payload);
+        }
+      } catch (e) {
+        console.error('sendSharedFilters failed:', e);
+      }
+    },
+
     async handleButtonClick(activeButtons) {
       // In simple mode, button states control conds (pure state-based)
       if (!this.simpleMode) return;
+
+      // Custom: apply previously-shared filter state (saved by non-simple Send).
+      if (activeButtons && activeButtons['Custom']) {
+        try {
+          const shared = await srvr.getSharedFilters();
+          if (shared && typeof shared === 'object') {
+            if (shared.filterStr !== undefined) this.filterStr = String(shared.filterStr || '');
+            if (shared.fltrChoice !== undefined) this.fltrChoice = String(shared.fltrChoice || 'All');
+            const condFilters = shared.condFilters && typeof shared.condFilters === 'object' ? shared.condFilters : null;
+            if (condFilters) {
+              this.conds.forEach((cond) => {
+                if (!cond?.name) return;
+                if (condFilters[cond.name] !== undefined) {
+                  cond.filter = condFilters[cond.name];
+                }
+              });
+            }
+          }
+        } catch (e) {
+          console.error('Custom sharedFilters parse/apply failed:', e);
+        }
+
+        // Always keep ban enabled.
+        const banCond = this.conds.find(c => c?.name === 'ban');
+        if (banCond) banCond.filter = -1;
+
+        // Preserve current sort unless an order button is active.
+        const orderToSortMap = {
+          'Added Order': 'Added',
+          'Viewed Order': 'Viewed',
+          'Ratings Order': 'Ratings'
+        };
+        let activeSortOrder = null;
+        for (const [label, isActive] of Object.entries(activeButtons || {})) {
+          if (isActive && orderToSortMap[label]) {
+            activeSortOrder = orderToSortMap[label];
+            break;
+          }
+        }
+        if (activeSortOrder) {
+          this.sortChoice = activeSortOrder;
+        }
+
+        await this.select();
+        this.sortShows();
+
+        // When clicking Custom, scroll to top and select first show.
+        this.$nextTick(() => {
+          const container = document.querySelector('#shows');
+          if (container) container.scrollTop = 0;
+          if (Array.isArray(this.shows) && this.shows.length > 0) {
+            this.saveVisShow(this.shows[0], false);
+          }
+        });
+        return;
+      }
+
+      // Not in Custom: ensure any previously-applied sharedFilters state does not
+      // linger (but do NOT delete localStorage.sharedFilters; Custom can be used again).
+      this.filterStr = '';
+      this.fltrChoice = 'All';
+
+      // Always keep ban enabled.
+      const banCond = this.conds.find(c => c?.name === 'ban');
+      if (banCond) banCond.filter = -1;
       
       // activeButtons is an object with all button states
       // e.g., { 'Drama': true, 'Mark': true, 'Comedy': false, ... }

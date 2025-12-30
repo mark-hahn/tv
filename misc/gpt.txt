@@ -1,10 +1,17 @@
 
-when  web button to add new series and it was not put in emby
+in non-simple mode:
+- add "Send" button to top row of hdrtop in list vue to the far right.
 
-Searching web for information never finishes.
+- when clicked and current filters are not in "all" mode collect all show filter information and save to localhost called sharedFilters
 
-server never got create folder command
+- when clicked and current filters are in "all" mode clear  sharedFilters
 
-client console log is empty
+in simple mode:
+- if sharedFilters exists add "Custom" button to left buttons under Linda button
+- when clicked highlight it and remove highlights from all buttons above it.
+- set show filters information from sharedFilters even though not visible
+- don't change order buttons highlight or function
 
-add progress messages to Searching web for information about show like waiting for tvdb data and refreshing emby.
+in simple mode the sharedFilters should only be applied when custom button is clicked. clicking on any button above the custom button should remove sharedFilters and restore the filters based on those buttons
+
+when clicking on custom scroll to top

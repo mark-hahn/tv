@@ -32,6 +32,13 @@
     @click="handleButtonClick(btn)"
     :style="{ width:'100%', lineHeight: sizing.buttonHeight || '40px', padding:'0 8px', marginBottom: sizing.buttonMarginBottom || '8px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }"
   ) {{ btn }}
+
+  button(
+    v-if="hasSharedFilters"
+    :class="{ active: activeButtons['Custom'] }"
+    @click="handleButtonClick('Custom')"
+    :style="{ width:'100%', lineHeight: sizing.buttonHeight || '40px', padding:'0 8px', marginBottom: sizing.buttonMarginBottom || '8px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }"
+  ) Custom
   
   div(style="height:2px; background-color:#666; margin:10px 0;")
   
@@ -45,6 +52,8 @@
 </template>
 
 <script>
+import * as srvr from '../srvr.js';
+
 export default {
   name: "Buttons",
 
@@ -57,6 +66,7 @@ export default {
 
   data() {
     return {
+      hasSharedFilters: false,
       activeButtons: {
         'Ready To Watch': false,
         'Drama': false,
@@ -65,6 +75,7 @@ export default {
         'Continue': false,
         'Mark': false,
         'Linda': false,
+        'Custom': false,
         'Added Order': false,
         'Viewed Order': false,
         'Ratings Order': false
@@ -92,8 +103,84 @@ export default {
 
   emits: ['button-click', 'top-click'],
 
+  mounted() {
+    void this.refreshHasSharedFilters();
+    this.startSharedFiltersPolling();
+  },
+
+  beforeUnmount() {
+    if (this._sharedFiltersPoll) {
+      clearInterval(this._sharedFiltersPoll);
+      this._sharedFiltersPoll = null;
+    }
+  },
+
   methods: {
+    startSharedFiltersPolling() {
+      // Poll tv-series-srvr sharedFilters so Custom button appears/disappears across computers.
+      // When it changes, reset internal filters by emitting current button state
+      // (with Custom turned off) so List recomputes from visible buttons.
+      this._lastSharedFiltersRaw = '';
+
+      if (this._sharedFiltersPoll) return;
+      this._sharedFiltersPoll = setInterval(() => {
+        void (async () => {
+          let shared = null;
+          try {
+            shared = await srvr.getSharedFilters();
+          } catch {
+            shared = null;
+          }
+
+          const raw = shared ? JSON.stringify(shared) : '';
+          if (raw === this._lastSharedFiltersRaw) return;
+          this._lastSharedFiltersRaw = raw;
+
+          await this.refreshHasSharedFilters(shared);
+          this.activeButtons['Custom'] = false;
+          this.$emit('button-click', this.activeButtons);
+        })();
+      }, 3000);
+    },
+
+    async refreshHasSharedFilters(sharedFiltersIn = undefined) {
+      let shared = sharedFiltersIn;
+      if (shared === undefined) {
+        try {
+          shared = await srvr.getSharedFilters();
+        } catch {
+          shared = null;
+        }
+      }
+
+      const has = !!shared && typeof shared === 'object' && Object.keys(shared).length > 0;
+      this.hasSharedFilters = has;
+      if (!has) this.activeButtons['Custom'] = false;
+    },
+
     handleButtonClick(label) {
+      void this.refreshHasSharedFilters();
+
+      // Custom: turn off highlights above it (filters/genres/collections), keep order buttons unchanged.
+      if (label === 'Custom') {
+        const nextVal = !this.activeButtons['Custom'];
+        this.activeButtons['Custom'] = nextVal;
+
+        if (nextVal) {
+          // Clear highlights from all buttons above Custom
+          [...this.filters, ...this.genres, ...this.collections].forEach((btn) => {
+            this.activeButtons[btn] = false;
+          });
+        }
+        this.$emit('button-click', this.activeButtons);
+        return;
+      }
+
+      // Any non-order button click should clear Custom highlight.
+      if (!this.sortOrders.includes(label)) {
+        this.activeButtons['Custom'] = false;
+      }
+
       // Special handling for order buttons: if clicking an on button, turn all off
       if (this.sortOrders.includes(label) && this.activeButtons[label]) {
         // Turn off all order buttons
@@ -164,8 +251,6 @@ export default {
       this.$emit('button-click', this.activeButtons);
     }
   },
-
-  emits: ['button-click']
 };
 </script>
 

@@ -129,6 +129,13 @@ export function getShowsFromDisk()
             {return fCall('getShowsFromDisk')}
 export function createShowFolder(params)
             {return fCall('createShowFolder', params)}
+
+// Shared filters (cross-computer) 
+export function getSharedFilters()
+            {return fCall('getSharedFilters')}
+export function setSharedFilters(sharedFilters)
+            {return fCall('setSharedFilters', sharedFilters)}
+
 export function deletePath(path)   
             {return fCall('deletePath', path)}
 export function delSeasonFiles(showName, showPath, season)

@@ -3,12 +3,11 @@ bugs ...
 
 todo both ...
   widen series pane
-  allow setting watched on non-emby
 
 todo non-simple:
   show episode and file details
   abort qbt downloading
-  how to see why qbt or down don't start
+  how to see why qbt or down won't start
   save filter settings for simple custom button
   
 todo simple ...

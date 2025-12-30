@@ -32,6 +32,10 @@
   div(style="flex:1; display:flex; align-items:center; justify-content:flex-end; margin-right:15px;")
     #count(v-if="simpleMode" style="font-size:14px; color:black;") 
       | {{showsLength}} Shows
+    button(v-if="!simpleMode"
+          @click="$emit('send-filters')"
+          style="height:29px; background-color:white; fontSize:15px; margin:6px 0 4px 10px;")
+      | Send
 
   #searchList(v-if="showingSrchList" style="background-color:#eee; padding:0px; border: 1px solid black; height:85%; position: fixed; display:flex; flex-direction:column; left: 253px; top: 88px; cursor:pointer; min-width:280px;") 
     div(@click="$emit('cancel-srch-list')"
@@ -100,7 +104,7 @@ export default {
     }
   },
 
-  emits: ['update:filterStr', 'update:webHistStr', 'search-click', 'watch-click', 'filter-input', 'cancel-srch-list', 'search-action'],
+  emits: ['update:filterStr', 'update:webHistStr', 'search-click', 'watch-click', 'filter-input', 'cancel-srch-list', 'search-action', 'send-filters'],
 
   methods: {
     handleFilterInput(event) {

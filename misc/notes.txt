@@ -1,55 +1,90 @@
 
-Server changes needed (Web add -> put series in Emby)
+tv-series-srvr (server) notes
+===========================
 
-Client changes were made so that when adding a new series from the web-search list it will:
-- call a websocket RPC: createShowFolder({ showName, tvdbId, seriesMapSeasons, tvdbData })
-- request an Emby library refresh and poll task status
-- reload shows and use the real Emby show record if it appears
+This client (tv-series-client) talks to tv-series-srvr over WebSocket using a very small RPC protocol.
 
-IMPORTANT: the client only calls createShowFolder when it has map data (tvdbData is present and non-empty).
-If tvdbData is missing/empty, it shows an alert and skips folder creation.
+WebSocket RPC protocol
+----------------------
 
-What the server must implement
+- URL: wss://hahnca.com/tv-series-srvr
+- Client implementation: src/srvr.js
 
-1) Add a websocket RPC handler named: createShowFolder
+Request format (string message)
+- "<id>~~~<fname>~~~<param>"
+	- id: incrementing integer string from the client
+	- fname: RPC function name (examples below)
+	- param:
+		- if param is an object on the client, it is JSON.stringify(param)
+		- if param is a string/number/etc, it is sent as-is
 
-Signature / behavior (recommended)
-- Input: an object (JSON) like:
-	{ showName: string, tvdbId?: number|string, seriesMapSeasons?: number[], tvdbData?: object }
-- Action:
-	1) Create the show folder under the TV root (e.g. /mnt/media/tv/<showName>)
-	2) If seriesMapSeasons is provided, also create empty season folders inside it
-	   (e.g. Season 01, Season 02, ...)
-- Idempotent: if the folder already exists, return ok
-- Return: something JSON-serializable like:
-	{ ok: true, created: true|false, path: "..." }
-	or just "ok" (client only cares that it resolves)
+Response format (string message)
+- "<id>~~~<status>~~~<result>"
+	- status: "ok" for success, anything else means error
+	- result: JSON string (the client always JSON.parse(result))
+
+Important: because the client always JSON.parse(result), the server must always JSON.stringify the result,
+including when returning strings (return "\"some string\"").
+
+Required RPC endpoints
+----------------------
+
+1) setSharedFilters
+
+Purpose
+- Stores the current shared filter state in the server so that simple-mode on another computer can use it.
+
+Client usage
+- Called when the non-simple mode "Send" button is clicked.
+- If UI is in effective "All" mode, the client clears shared filters by calling setSharedFilters(null).
+
+Signature
+- fname: setSharedFilters
+- param: object OR null
+
+Param payload (object)
+- {
+		fltrChoice: string,
+		filterStr: string,
+		condFilters: {
+			[condName: string]: number
+		}
+	}
+
+Rules
+- Server should store the object as-is (no transformation required).
+- The client forces condFilters.ban = -1; server does not need to enforce it.
+- When param is null: clear stored shared filters.
+
+Return
+- { ok: true }
+
+2) getSharedFilters
+
+Purpose
+- Returns the server-stored shared filter object so simple-mode can show/hide the Custom button and apply it.
+
+Client usage
+- Simple-mode polls this every 3 seconds (Buttons component).
+- Simple-mode also calls it when Custom is clicked (List.handleButtonClick).
+
+Signature
+- fname: getSharedFilters
+- param: (ignored / empty)
+
+Return
+- If shared filters exist: the stored object (same shape as setSharedFilters payload)
+- If none: null
+
+Notes
+- The client treats "no shared filters" as null or empty object.
 
 Implementation notes
-- Sanitize showName to a safe folder name. Minimum: reject empty string, strip trailing dots/spaces, and remove path separators (/ and \\) to prevent traversal.
-- Season folder naming should match your existing on-disk conventions (common patterns: "Season 01" or "Season 1").
-- Use mkdir with recursive/parents enabled.
-- Do NOT delete/overwrite existing data.
+--------------------
 
-Where to add it
+- Keep sharedFilters in memory or persist to disk.
+	- Memory-only is simplest but will reset on server restart.
+- There are multiple clients (tabs/computers). The simple-mode UI expects:
+	- Custom button visible only when getSharedFilters() returns a non-empty object.
+	- When sharedFilters changes/clears, the client will turn Custom off and revert to visible button filters.
 
-The client websocket wrapper was added in src/srvr.js:
-	export function createShowFolder(params) { return fCall('createShowFolder', params) }
-
-So the websocket server behind wss://hahnca.com/tv-series-srvr must route incoming fname === 'createShowFolder'
-to the implementation described above.
-
-If you use a dispatcher like the one in misc/index.js (switch(fname) { ... }), add:
-	case 'createShowFolder': createShowFolder(id, param, resolve, reject); break;
-
-and implement createShowFolder similar to:
-	- parse param as JSON object
-	- compute path = tvDir + '/' + safeName
-	- fs.mkdir(path, { recursive: true })
-	- for each season in seriesMapSeasons: fs.mkdir(path + '/' + seasonFolderName(season), { recursive:true })
-	- resolve([id, { ok:true, created:true|false, path }])
-
-2) Emby side
-
-Nothing special is required server-side for Emby if Emby is already configured to monitor that TV root.
-After the folder exists, the client triggers a library refresh and waits for it to finish.

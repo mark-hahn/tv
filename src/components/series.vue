@@ -63,10 +63,17 @@
             div(style="white-space:nowrap;") Watched
             div(style="white-space:normal; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2;") {{ watchedValTxt }}
           #cntrylang(
-            v-if="cntryLangTxt.length > 0"
-            v-html="cntryLangTxt"
-            style="min-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+            v-if="(cntryLangLeftTxt && cntryLangLeftTxt.length > 0) || (cntryLangRightTxt && cntryLangRightTxt.length > 0)"
+            style="min-height:20px; display:flex; flex-wrap:wrap; justify-content:center; column-gap:8px; row-gap:0px;"
           )
+            div(
+              v-if="cntryLangLeftTxt && cntryLangLeftTxt.length > 0"
+              style="white-space:nowrap;"
+            ) {{ cntryLangLeftTxt }}
+            div(
+              v-if="cntryLangRightTxt && cntryLangRightTxt.length > 0"
+              style="white-space:normal; overflow-wrap:anywhere; word-break:break-word;"
+            ) {{ cntryLangRightTxt }}
           #mins(
             v-if="runtimeTxt.length > 0"
             v-html="runtimeTxt"
@@ -93,15 +100,13 @@
           style="width:100px; height:100px; position:relative; top:20px; left:45px;")
     #remoteButtons(
       v-if="showRemotes"
-      ref="remoteButtonsEl"
-      :style="remoteButtonsStyle"
+      style="display:flex; flex-wrap:wrap; justify-content:space-around; width:100%;"
     )
       div(
         v-for="remote in remotes"
         :key="remote.name"
-        data-remote-btn="1"
         @click.stop="remoteClick(remote)"
-        :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit', flex:'0 0 auto' }"
+        :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }"
       )
         | {{remote.name}}
   
@@ -143,7 +148,8 @@ export default {
       remotes: [],
       seasonsTxt: '',
       watchedValTxt: '',
-      cntryLangTxt: '',
+      cntryLangLeftTxt: '',
+      cntryLangRightTxt: '',
       runtimeTxt: '',
       subs: '',
       subsActive:  false,
@@ -156,80 +162,11 @@ export default {
       notInEmby: false,
       collectionName: '',
       collectionCount: 0,
-      remoteButtonsTwoRows: false,
       currentTvdbData: null
-    }
-  },
-
-  computed: {
-    remoteButtonsStyle() {
-      // Default: single row (no wrapping). If buttons don't fit, switch to a
-      // 2-row layout that alternates items between rows (equal count when even;
-      // top row has +1 when odd).
-      if (this.remoteButtonsTwoRows) {
-        return {
-          display: 'grid',
-          gridAutoFlow: 'column',
-          gridTemplateRows: 'auto auto',
-          justifyContent: 'space-around',
-          alignContent: 'start',
-          width: '100%'
-        };
-      }
-      return {
-        display: 'flex',
-        flexWrap: 'nowrap',
-        justifyContent: 'space-around',
-        alignItems: 'center',
-        overflow: 'hidden',
-        width: '100%'
-      };
     }
   },
   
   methods: {
-
-    requestMeasureRemoteButtonsWrap() {
-      // Always start in 1-row mode, then enable 2-row only if measurement
-      // shows overflow. Double-rAF helps when tabs/visibility change.
-      this.remoteButtonsTwoRows = false;
-      this.$nextTick(() => {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => this.measureRemoteButtonsWrap());
-        });
-      });
-    },
-
-    measureRemoteButtonsWrap() {
-      const el = this.$refs.remoteButtonsEl;
-      if (!el) {
-        this.remoteButtonsTwoRows = false;
-        return;
-      }
-
-      // If hidden (e.g. inactive tab) we can't measure; stay in 1-row mode.
-      const containerWidth = el.clientWidth;
-      if (!containerWidth || containerWidth < 5 || el.offsetParent === null) {
-        this.remoteButtonsTwoRows = false;
-        return;
-      }
-
-      const btns = Array.from(el.querySelectorAll('[data-remote-btn="1"]'));
-      if (btns.length <= 1) {
-        this.remoteButtonsTwoRows = false;
-        return;
-      }
-      // In single-row mode we prevent wrapping and shrinking. Decide if we need
-      // 2 rows by comparing total button width (including margins) to container.
-      let neededWidth = 0;
-      btns.forEach((b) => {
-        const cs = window.getComputedStyle(b);
-        const ml = parseFloat(cs.marginLeft || '0') || 0;
-        const mr = parseFloat(cs.marginRight || '0') || 0;
-        neededWidth += b.offsetWidth + ml + mr;
-      });
-      this.remoteButtonsTwoRows = neededWidth > (containerWidth + 1);
-    },
 
     getMapCounts(seriesMap) {
       try {
@@ -415,7 +352,8 @@ export default {
     },
 
     setCntryLangTxt(tvdbData) {
-      this.cntryLangTxt = '';
+      this.cntryLangLeftTxt = '';
+      this.cntryLangRightTxt = '';
       this.runtimeTxt = '';
 
       let { originalCountry, originalLanguage, averageRuntime, originalNetwork } = tvdbData;
@@ -429,13 +367,15 @@ export default {
       if (originalCountry === 'gbr') originalCountry = 'UK';
       originalCountry = String(originalCountry || '');
       originalLanguage = String(originalLanguage || '');
-      originalNetwork = String(originalNetwork || '').substr(0, 10);
+      originalNetwork = String(originalNetwork || '');
 
       const origCountry = originalCountry.toLowerCase();
       const origLanguage = originalLanguage.toLowerCase();
       const origNetwork = originalNetwork.toLowerCase();
-      const left = `${origCountry}${origCountry ? '/' : ''}${origLanguage}${origLanguage ? ' ' : ''}${origNetwork}`.trim();
-      if (left) this.cntryLangTxt = left;
+      const left = `${origCountry}${origCountry ? '/' : ''}${origLanguage}`.trim();
+      const right = `${origNetwork}`.trim();
+      if (left) this.cntryLangLeftTxt = left;
+      if (right) this.cntryLangRightTxt = right;
 
       const rt = (averageRuntime !== undefined && averageRuntime !== null) ? String(averageRuntime) : '';
       if (rt) this.runtimeTxt = `${rt} Mins`;
@@ -513,17 +453,6 @@ export default {
   // series vue component at mounted phase
   // set everything in html
   mounted() {
-    this._onSeriesResize = () => this.requestMeasureRemoteButtonsWrap();
-    window.addEventListener('resize', this._onSeriesResize);
-
-    if (typeof ResizeObserver !== 'undefined') {
-      this._seriesResizeObserver = new ResizeObserver(() => {
-        this.requestMeasureRemoteButtonsWrap();
-      });
-      // Observe the component root so we re-measure when the tab/pane becomes visible.
-      this._seriesResizeObserver.observe(this.$el);
-    }
-
     evtBus.on('setUpSeries', async (show) => { 
       allTvdb        = await tvdb.getAllTvdb();
       this.emailText = ''; // Clear email text when changing shows
@@ -536,7 +465,8 @@ export default {
       this.statusTxt = '';
       this.seasonsTxt = '';
       this.watchedValTxt = '';
-      this.cntryLangTxt = '';
+      this.cntryLangLeftTxt = '';
+      this.cntryLangRightTxt = '';
       this.runtimeTxt = '';
       this.nextUpValTxt = '';
       this.remotes = [];
@@ -566,8 +496,6 @@ export default {
       await this.setNextWatch();
       await this.setRemotes();
 
-      this.requestMeasureRemoteButtonsWrap();
-
       // Only show the info box (and email input) once everything is populated.
       this.seriesReady = true;
     });
@@ -593,12 +521,6 @@ export default {
       }
     });
 
-    this.requestMeasureRemoteButtonsWrap();
-  },
-
-  beforeUnmount() {
-    if (this._onSeriesResize) window.removeEventListener('resize', this._onSeriesResize);
-    if (this._seriesResizeObserver) this._seriesResizeObserver.disconnect();
   },
 }
 </script>

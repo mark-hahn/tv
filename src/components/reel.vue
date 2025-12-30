@@ -17,7 +17,7 @@
       :style="{ padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', fontSize: '14px', textTransform: 'uppercase' }")
       div(v-if="curTvdb" :style="{ fontWeight: 'bold', fontSize: '12px', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }") {{ galleryTitleLine }}
       div(v-if="curTvdb" :style="{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '10px' }")
-        div(:style="{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }") {{ infoLine }}
+        div(:style="{ flex: '1 1 auto', minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word' }") {{ infoLine }}
         button(
           @click="handleLoad"
           :style="{ height: '18px', margin: '0', marginLeft: '10px', marginRight: '20px', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto' }") Get
@@ -31,7 +31,7 @@
         div(v-if="curTvdb") {{ curTvdb.overview }}
       
       #reelButtons(
-        :style="{ display: 'flex', gap: '10px', padding: '10px', marginTop: '0' }")
+        :style="{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '10px', marginTop: '0' }")
         button(
           @click="handleNext"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '12px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Next

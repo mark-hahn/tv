@@ -3,46 +3,11 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-set image width to 1/3 pane width and the infobox to 1/3 and split the whitespace equally in the three whitespaces
+in series pane  
+- country, language, channel div is truncated on right no matter how wide pane is
 
-align the top of info box to the top of the image
+- let country, language, channel div wrap keeping country and language in one div with no wrap
 
-in infobox...
-- keep start and end dates in one div with no wrapping
-- keep "watched x of y"  in one div with no wrapping
-- keep "x mins"  in one div with no wrapping
-- keep "next up Sxx Eyy"  in one div with no wrapping
-- keep "collection list"  in one div with no wrapping
+let the buttons row wrap
 
-- allow wrapping in "collection list"
-- automatically widen infobox so divs don't extend outside it
-
-- keep "xx seasons" in one div with no wrapping
-- dates and ended should not be in same div
-- seasons and watched should not be in same div
-- country, language, channel and "xx mins" should not be in same div
- and ended should not be in same div
-- dates and ended should not be in same div
-
-- let dates wrap into two rows
-- let "watched" and "xx of yy"  wrap into two rows
-- let "next up" and "Sxx Eyy"  wrap into two rows
-
--  dates should be one div and only wrap into two lines when needed
--  "watched" and "xx of yy" should be one div and only wrap into two lines when needed
--  "next up" and "Sxx Eyy"  should be one div and only wrap into two lines when needed
-
-- remove Start: and end: labels
-
-- i'll give that prompt again.  keep things in quotes together in their own div without splitting. splitting should be limited to splitting between the two quoted items
-
--  "watched" and "xx of yy" should each be one div and only wrap into two lines when needed between those divs
--  "next up" and "Sxx Eyy" should each be one div and only wrap into two lines when needed between those divs
-
-change Collection: to Collections: when more than one collection follows
-
-when buttons need to wrap,  wrap them so that the two rows have the same number of buttons if even number of buttons or top row has one more than bottom when odd number
-
-the buttons are always in two rows.  there should be only one row when they fit
-
-they worked correctly one time and now are stuck on two rows
+remove complicated button row wrap logic to control how many buttons are in each row and chnge to simple wrap

@@ -215,6 +215,10 @@ export default {
       paneResizeStartY: 0,
       paneResizeStartTabW: 0,
       paneResizeStartTabH: 0,
+
+      // Persisted split percentages (0..1). Stored separately for landscape vs portrait.
+      splitTabWidthPct: null,
+      splitTabHeightPct: null,
     } 
   },
   computed: {
@@ -309,6 +313,91 @@ export default {
     this.cancelDownInactiveTimer();
   },
   methods: {
+    loadSplitPrefs() {
+      const readNum = (key) => {
+        try {
+          const raw = window.localStorage.getItem(key);
+          if (raw == null) return null;
+          const n = Number(raw);
+          return Number.isFinite(n) ? n : null;
+        } catch {
+          return null;
+        }
+      };
+
+      const w = readNum('tv.split.tabWidthPct');
+      const h = readNum('tv.split.tabHeightPct');
+      this.splitTabWidthPct = (w != null && w > 0 && w < 1) ? w : null;
+      this.splitTabHeightPct = (h != null && h > 0 && h < 1) ? h : null;
+    },
+
+    persistSplitPrefs() {
+      const writeNum = (key, val) => {
+        try {
+          if (typeof val !== 'number' || !Number.isFinite(val)) return;
+          window.localStorage.setItem(key, String(val));
+        } catch {
+          // ignore
+        }
+      };
+
+      writeNum('tv.split.tabWidthPct', this.splitTabWidthPct);
+      writeNum('tv.split.tabHeightPct', this.splitTabHeightPct);
+    },
+
+    applySplitPrefsToOverrides() {
+      // Convert stored percentages into px overrides for the current container size.
+      const root = this.$el;
+      if (!root) return;
+
+      const baseW = root.clientWidth || window.innerWidth;
+      const baseH = root.clientHeight || window.innerHeight;
+
+      if (this.isPortrait) {
+        if (typeof this.splitTabHeightPct === 'number' && Number.isFinite(this.splitTabHeightPct)) {
+          const desired = Math.round(this.splitTabHeightPct * baseH);
+          const minTabH = 220;
+          const maxTabH = Math.max(minTabH, Math.floor(baseH * 0.9));
+          this.tabAreaHeightOverridePx = Math.max(minTabH, Math.min(maxTabH, desired));
+        }
+        return;
+      }
+
+      if (typeof this.splitTabWidthPct === 'number' && Number.isFinite(this.splitTabWidthPct)) {
+        const desired = Math.round(this.splitTabWidthPct * baseW);
+        const minTabW = 320;
+        const maxTabW = Math.max(minTabW, Math.floor(baseW * 0.9));
+        this.tabAreaWidthOverridePx = Math.max(minTabW, Math.min(maxTabW, desired));
+      }
+    },
+
+    updateSplitPrefsFromDom() {
+      const root = this.$el;
+      const tab = root?.querySelector?.('#tabArea');
+      if (!root || !tab) return;
+
+      const baseW = root.clientWidth || window.innerWidth;
+      const baseH = root.clientHeight || window.innerHeight;
+      const rect = tab.getBoundingClientRect?.();
+      if (!rect) return;
+
+      if (this.isPortrait) {
+        if (!baseH) return;
+        const pct = rect.height / baseH;
+        if (Number.isFinite(pct) && pct > 0 && pct < 1) {
+          this.splitTabHeightPct = pct;
+        }
+      } else {
+        if (!baseW) return;
+        const pct = rect.width / baseW;
+        if (Number.isFinite(pct) && pct > 0 && pct < 1) {
+          this.splitTabWidthPct = pct;
+        }
+      }
+
+      this.persistSplitPrefs();
+    },
+
     startPaneResize(e) {
       if (!e) return;
       const divider = e.currentTarget;
@@ -376,6 +465,8 @@ export default {
 
     stopPaneResize() {
       this.paneResizeActive = false;
+      // Save final split as a percentage for future sessions.
+      this.updateSplitPrefsFromDom();
     },
 
     cancelDownInactiveTimer() {
@@ -719,9 +810,18 @@ export default {
     this._onAppWindowResize = () => {
       this.windowW = window.innerWidth;
       this.windowH = window.innerHeight;
+      // Keep px overrides in sync with stored percentages.
+      if (!this.paneResizeActive) {
+        this.applySplitPrefsToOverrides();
+      }
     };
     window.addEventListener('resize', this._onAppWindowResize);
     this._onAppWindowResize();
+
+    this.loadSplitPrefs();
+    this.$nextTick(() => {
+      this.applySplitPrefsToOverrides();
+    });
 
     // Derive downActive and schedule deferred Tor restarts.
     evtBus.on('downActivePart', this.handleDownActivePart);

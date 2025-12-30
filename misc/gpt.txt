@@ -3,7 +3,4 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-if window width is greater than window height (landscape) then keep the list and series panes side by side.  
-if window height is greater than window width (portrait) then put series pane above the list pane with both the full width of the window.  Put a line the width of the pane between them that can be dragged.
-
-in landscape mode the series pane is on left instead of right and dragging the vertical bar changes dimensions in wrong direction
+save the percentage of widths of the sections in localstorage and save the percentage of heights of the sections in localstorage

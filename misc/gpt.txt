@@ -1,17 +1,17 @@
 
-in non-simple mode:
-- add "Send" button to top row of hdrtop in list vue to the far right.
+in the shows pane list row for noemby shows, when icons toTry, continue, mark, or linda, are clicked toggle the InToTry InContinue, InMark, or InLinda property in the noemby show object. then call the addNoEmby endpoint in the server with the show object to save it. when toggling if property does not exist add it as true.
 
-- when clicked and current filters are not in "all" mode collect all show filter information and save to localhost called sharedFilters
+toggling InToTry correctly highlights it in show list and works for filtering. and when toggling InToTry to true and saving it with addNoEmby() the noemby show storage in the server is correctly updated. when app is reloaded getNoEmbys() should return the show with InToTry set.  but the InToTry icon is not highlighted when app is reloaded
 
-- when clicked and current filters are in "all" mode clear  sharedFilters
-
-in simple mode:
-- if sharedFilters exists add "Custom" button to left buttons under Linda button
-- when clicked highlight it and remove highlights from all buttons above it.
-- set show filters information from sharedFilters even though not visible
-- don't change order buttons highlight or function
-
-in simple mode the sharedFilters should only be applied when custom button is clicked. clicking on any button above the custom button should remove sharedFilters and restore the filters based on those buttons
-
-when clicking on custom scroll to top
+in loadAllSows() when a show is in shows (emby shows) and in noEmbys, noemby show is deleted here. before deleting, copy the properties InToTry InContinue, InMark, and InLinda from noemby show to emby show:
+  for(const noEmbyShow of noEmbys) {
+    const idx = shows.findIndex(
+                  (show) => show.Name == noEmbyShow.Name);
+    if(idx != -1) {
+      console.log('upgrading noEmby by deleting it:', 
+                    noEmbyShow.Name);
+      await srvr.delNoEmby(noEmbyShow.Name);
+      prunedNoEmbyIds.push(noEmbyShow.Id);
+      continue;
+    }
+- and update emby show in emby by calling all four of these: saveToTry(id, inToTry), saveContinue(id, inContinue), saveMark(id, inMark), and saveLinda(id, inLinda) 

@@ -148,53 +148,71 @@ export default {
         show.BlockedGap = true;
       }
     };
+
+    const toggleNoEmbyFlag = async (show, flagName) => {
+      this.saveVisShow(show);
+      // If the flag doesn't exist yet, treat it as false and set to true.
+      show[flagName] = !show[flagName];
+      await srvr.addNoEmby(show)
+        .catch((err) => {
+          console.error(`late addNoEmby error (${flagName}):`, err);
+        });
+    };
     
     const toggleToTry = async (show) => {
-      if(show.Id.startsWith("noemby-") &&
-           !show.InToTry) return;
+      if (show.Id.startsWith("noemby-")) {
+        await toggleNoEmbyFlag(show, 'InToTry');
+        return;
+      }
       this.saveVisShow(show);
       show.InToTry = !show.InToTry;
       await emby.saveToTry(show.Id, show.InToTry)
-          .catch((err) => {
-              console.error("late toggleToTry error:", err);
-              //- show.InToTry = !show.InToTry;
-            });
+        .catch((err) => {
+          console.error("late toggleToTry error:", err);
+          //- show.InToTry = !show.InToTry;
+        });
     };
 
-    const toggleContinue = (show) => {
-      if(show.Id.startsWith("noemby-") &&
-           !show.InContinue) return;
+    const toggleContinue = async (show) => {
+      if (show.Id.startsWith("noemby-")) {
+        await toggleNoEmbyFlag(show, 'InContinue');
+        return;
+      }
       this.saveVisShow(show);
       show.InContinue = !show.InContinue;
       emby.saveContinue(show.Id, show.InContinue)
-          .catch((err) => {
-              console.error("late saveContinue error:", err);
-              //- show.InContinue = !show.InContinue;
-            });
+        .catch((err) => {
+          console.error("late saveContinue error:", err);
+          //- show.InContinue = !show.InContinue;
+        });
     };
 
-    const toggleMark = (show) => {
-      if(show.Id.startsWith("noemby-") &&
-           !show.InMark) return;
+    const toggleMark = async (show) => {
+      if (show.Id.startsWith("noemby-")) {
+        await toggleNoEmbyFlag(show, 'InMark');
+        return;
+      }
       this.saveVisShow(show);
       show.InMark = !show.InMark;
       emby.saveMark(show.Id, show.InMark)
-          .catch((err) => {
-              console.error("late toggleMark error:", err);
-              //- show.InMark = !show.InMark;
-            });
+        .catch((err) => {
+          console.error("late toggleMark error:", err);
+          //- show.InMark = !show.InMark;
+        });
     };
 
-    const toggleLinda = (show) => {
-      if(show.Id.startsWith("noemby-") &&
-           !show.InLinda) return;
+    const toggleLinda = async (show) => {
+      if (show.Id.startsWith("noemby-")) {
+        await toggleNoEmbyFlag(show, 'InLinda');
+        return;
+      }
       this.saveVisShow(show);
       show.InLinda = !show.InLinda;
       emby.saveLinda(show.Id, show.InLinda)
-          .catch((err) => {
-              console.error("late toggleLinda error:", err);
-              //- show.InLinda = !show.InLinda;
-            });
+        .catch((err) => {
+          console.error("late toggleLinda error:", err);
+          //- show.InLinda = !show.InLinda;
+        });
     };
 
     const toggleFavorite = (show) => {

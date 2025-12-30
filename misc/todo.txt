@@ -8,10 +8,8 @@ todo non-simple:
   show episode and file details
   abort qbt downloading
   how to see why qbt or down won't start
-  save filter settings for simple custom button
   
 todo simple ...
-  add custom button
   
 tabled ...
   take notes

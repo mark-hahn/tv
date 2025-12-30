@@ -396,10 +396,52 @@ export default {
   /////////////  METHODS  ////////////
   methods: {
 
-    async sendSharedFilters() {
+    async sendSharedFilters(e) {
       // Save current filter settings (for simple-mode Custom button).
       // If we're effectively in "All" mode, clear sharedFilters instead.
       try {
+        // Ctrl-click: load sharedFilters into internal state (like simple-mode Custom).
+        if (e && e.ctrlKey) {
+          let shared = null;
+          try {
+            shared = await srvr.getSharedFilters();
+          } catch (err) {
+            console.error('ctrl-send: getSharedFilters failed', err);
+            shared = null;
+          }
+
+          if (shared && typeof shared === 'object') {
+            if (shared.filterStr !== undefined) this.filterStr = String(shared.filterStr || '');
+            if (shared.fltrChoice !== undefined) this.fltrChoice = String(shared.fltrChoice || 'All');
+
+            const condFilters = shared.condFilters && typeof shared.condFilters === 'object' ? shared.condFilters : null;
+            if (condFilters) {
+              this.conds.forEach((cond) => {
+                if (!cond?.name) return;
+                if (condFilters[cond.name] !== undefined) {
+                  cond.filter = condFilters[cond.name];
+                }
+              });
+            }
+          }
+
+          // Always keep ban enabled.
+          const banCond = this.conds.find(c => c?.name === 'ban');
+          if (banCond) banCond.filter = -1;
+
+          await this.select();
+          this.sortShows();
+
+          this.$nextTick(() => {
+            const container = document.querySelector('#shows');
+            if (container) container.scrollTop = 0;
+            if (Array.isArray(this.shows) && this.shows.length > 0) {
+              this.saveVisShow(this.shows[0], false);
+            }
+          });
+          return;
+        }
+
         const condFilters = {};
         (this.conds || []).forEach((c) => {
           if (!c?.name) return;

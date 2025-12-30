@@ -33,7 +33,7 @@
     #count(v-if="simpleMode" style="font-size:14px; color:black;") 
       | {{showsLength}} Shows
     button(v-if="!simpleMode"
-          @click="$emit('send-filters')"
+          @click="$emit('send-filters', $event)"
           style="height:29px; background-color:white; fontSize:15px; margin:6px 0 4px 10px;")
       | Send
 

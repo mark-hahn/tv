@@ -1,6 +1,16 @@
 <template lang="pug">
 #map(ref="mapScroller" @click="handleMapClick" :style="{ height:'100%',margin:0, display:'flex', flexDirection:'column', backgroundColor:'#ffe', overflow:'hidden', maxWidth:'100%', width: sizing.mapWidth || '450px', boxSizing:'border-box' }")
 
+  //- Progress modal (similar to web-add in list.vue)
+  #mapWorkingModal(
+    v-if="mapWorking"
+    @click.stop
+    style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background-color:white; padding:30px 40px; border:2px solid black; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.3); z-index:1000; text-align:center;"
+  )
+    div(style="font-size:18px; font-weight:bold; margin-bottom:10px;") {{ mapWorkingTitle }}
+    div(style="font-size:20px; color:#0066cc; margin-bottom:15px;") {{ mapWorkingShowName }}
+    div(style="font-size:16px; color:#666; margin-bottom:6px;") {{ mapWorkingStatus || 'Please wait ...' }}
+
   #maperr(v-if="mapError && Object.keys(seriesMap).length === 0"
       style="display:flex; align-items:center; justify-content:center; height:100%; width:100%; font-size:20px; font-weight:bold; color:red; text-align:center; padding:20px;")
     | {{mapError}}
@@ -11,7 +21,8 @@
         | {{mapShow?.Name}} 
       div(style="display:flex; ")
         #mapnoemby(v-if="mapShow?.Id?.startsWith('noemby-')"
-            style="font-weight:bold; color:red; font-size:14px; white-space:nowrap; margin:8px; max-height:24px;") Not In Emby
+            @click.stop.prevent="handleNotInEmbyClick($event)"
+            style="font-weight:bold; color:red; font-size:14px; white-space:nowrap; margin:8px; max-height:24px; cursor:pointer;") Not In Emby
         #mapbuttons(v-if="!simpleMode" style="display:flex; gap:5px; flex-shrink:0;")
           button(
             @click.stop.prevent="noop"
@@ -115,6 +126,7 @@
 import * as tvdb from '../tvdb.js';
 import * as emby from '../emby.js';
 import * as srvr from '../srvr.js';
+import    evtBus  from '../evtBus.js';
 
 const MAP_ARROW_PAN_PX_PER_SEC = 400;
 const MAP_PAN_SMOOTH_TAU_SEC = 0.10;
@@ -163,6 +175,12 @@ export default {
       tvdbData: null,
       allTvdb: null,
       nextUpTxt: '',
+
+      mapWorking: false,
+      mapWorkingTitle: '',
+      mapWorkingShowName: '',
+      mapWorkingStatus: '',
+
       mapScrollLeft: 0,
       mapScrollTop: 0,
       mapDesiredLeft: 0,
@@ -254,6 +272,98 @@ export default {
 
   methods: {
     noop() {},
+
+    async handleNotInEmbyClick(event) {
+      // Ctrl-click on "Not In Emby": create the server folder and refresh Emby.
+      if (!event?.ctrlKey) return;
+
+      const showName = String(this.mapShow?.Name || '').trim();
+      const tvdbId = String(this.mapShow?.TvdbId || this.tvdbData?.tvdbId || this.tvdbData?.tvdb_id || '').trim();
+      const seasons = Array.isArray(this.seriesMapSeasons)
+        ? this.seriesMapSeasons
+            .map((n) => Number(n))
+            .filter((n) => Number.isFinite(n) && n > 0)
+            .sort((a, b) => a - b)
+        : [];
+
+      if (!showName) return;
+      if (!tvdbId) {
+        console.error('Map: Not In Emby ctrl-click missing tvdbId', { mapShow: this.mapShow, tvdbData: this.tvdbData });
+        window.alert('Missing TvdbId; cannot create show folder.');
+        return;
+      }
+      if (!this.tvdbData || typeof this.tvdbData !== 'object' || Object.keys(this.tvdbData).length === 0) {
+        await this.loadTvdbData();
+      }
+      const hasTvdbData = !!this.tvdbData && typeof this.tvdbData === 'object' && Object.keys(this.tvdbData).length > 0;
+      if (!hasTvdbData) {
+        console.error('Map: Not In Emby ctrl-click missing tvdbData', { showName, tvdbId, tvdbData: this.tvdbData });
+        window.alert('Missing TVDB data; cannot create show folder.');
+        return;
+      }
+
+      const ok = window.confirm(`Create Emby folder + refresh library for "${showName}"?`);
+      if (!ok) return;
+
+      console.log('Map: Not In Emby ctrl-click', { showName, tvdbId, seasons });
+      this.mapWorking = true;
+      this.mapWorkingTitle = 'Creating show folder and refreshing Emby:';
+      this.mapWorkingShowName = showName;
+      this.mapWorkingStatus = 'Starting...';
+
+      const setStatus = (txt) => {
+        this.mapWorkingStatus = String(txt || '');
+        console.log('Map: Not In Emby progress:', showName, this.mapWorkingStatus);
+      };
+
+      try {
+        const res = await emby.createShowFolderAndRefreshEmby({
+          showName,
+          tvdbId,
+          seriesMapSeasons: seasons,
+          tvdbData: this.tvdbData,
+          onStatus: setStatus,
+          createTimeoutMs: 15000,
+          refreshTimeoutMs: 120000,
+        });
+
+        if (!res?.createdFolder) {
+          console.error('Map: createShowFolderAndRefreshEmby failed', { showName, tvdbId, res });
+          window.alert(res?.err || 'Failed to create show folder.');
+          return;
+        }
+
+        setStatus('Reloading shows...');
+        // Trigger list reload so the show becomes a real Emby item.
+        // Wait for List.newShows() to finish (web-add does this inline).
+        await new Promise((resolve) => {
+          let done = false;
+          const finish = () => {
+            if (done) return;
+            done = true;
+            resolve();
+          };
+
+          const timeoutMs = 60000;
+          const t = setTimeout(() => {
+            console.warn('Map: timed out waiting for show reload after library-refresh-complete');
+            finish();
+          }, timeoutMs);
+
+          evtBus.emit('library-refresh-complete', {
+            onDone: () => {
+              clearTimeout(t);
+              finish();
+            },
+          });
+        });
+      } finally {
+        this.mapWorking = false;
+        this.mapWorkingTitle = '';
+        this.mapWorkingShowName = '';
+        this.mapWorkingStatus = '';
+      }
+    },
 
     handleMapPointerDown(event) {
       if (!event) return;

@@ -774,7 +774,10 @@ export default {
       this.showSearching = true;
       this.searchingStatus = 'Starting...';
 
-      const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+      const setWebAddStatus = (txt) => {
+        this.searchingStatus = txt;
+        console.log('web add progress:', name, txt);
+      };
       const withTimeout = async (promise, ms, label) => {
         const timeoutMs = Math.max(0, Number(ms) || 0);
         let t;
@@ -810,15 +813,13 @@ export default {
       let tvdbData = null;
 
       try {
-        this.searchingStatus = 'Waiting for TVDB data...';
-        console.log('web add progress:', name, this.searchingStatus);
+        setWebAddStatus('Waiting for TVDB data...');
         tvdbData = await withTimeout(srvr.getNewTvdb(paramObj), 60000, 'tvdb data');
 
         // Derive the season list from the actual series map (episodes), not from seasonCount.
         let seriesMapSeasons = [];
         try {
-          this.searchingStatus = 'Fetching season map...';
-          console.log('web add progress:', name, this.searchingStatus);
+          setWebAddStatus('Fetching season map...');
           const seriesMapIn = await withTimeout(
             tvdb.getSeriesMapByTvdbId(tvdbId),
             60000,
@@ -850,41 +851,24 @@ export default {
           });
           alert(`No map data for new show ${name}`);
         } else {
-          try {
-            this.searchingStatus = 'Creating folder...';
-            console.log('web add progress:', name, this.searchingStatus);
-            await withTimeout(
-              srvr.createShowFolder({ showName: name, tvdbId, seriesMapSeasons, tvdbData }),
-              15000,
-              'createShowFolder'
-            );
-            createdFolder = true;
-          } catch (e) {
-            createdFolder = false;
-            console.error('web add: createShowFolder failed', { name, tvdbId, err: e?.message || e });
+          const res = await emby.createShowFolderAndRefreshEmby({
+            showName: name,
+            tvdbId,
+            seriesMapSeasons,
+            tvdbData,
+            onStatus: setWebAddStatus,
+            createTimeoutMs: 15000,
+            refreshTimeoutMs: 120000,
+          });
+          createdFolder = !!res?.createdFolder;
+          if (!createdFolder) {
+            console.error('web add: createShowFolderAndRefreshEmby failed', { name, tvdbId, res });
           }
         }
 
         if (createdFolder) {
           try {
-            this.searchingStatus = 'Refreshing Emby...';
-            console.log('web add progress:', name, this.searchingStatus);
-            const refreshRes = await emby.refreshLib();
-            if (refreshRes?.status === 'hasTask' && refreshRes?.taskId) {
-              const startMs = Date.now();
-              while (Date.now() - startMs < 120000) {
-                const st = await withTimeout(emby.taskStatus(refreshRes.taskId), 15000, 'emby task status');
-                if (st?.status !== 'refreshing') break;
-                await sleep(2000);
-              }
-            }
-          } catch {
-            // ignore refresh errors; we'll still try to reload and fall back.
-          }
-
-          try {
-            this.searchingStatus = 'Reloading shows...';
-            console.log('web add progress:', name, this.searchingStatus);
+            setWebAddStatus('Reloading shows...');
             await this.newShows(false);
           } catch {
             // ignore
@@ -1577,8 +1561,17 @@ export default {
     });
     
     // Listen for library refresh completion to refresh show list
-    evtBus.on('library-refresh-complete', () => {
-      void this.newShows();
+    evtBus.on('library-refresh-complete', (payload) => {
+      const onDone = payload && typeof payload === 'object' ? payload.onDone : null;
+      Promise.resolve(this.newShows())
+        .catch((err) => {
+          console.error('library-refresh-complete: newShows failed', err);
+        })
+        .finally(() => {
+          if (typeof onDone === 'function') {
+            try { onDone(); } catch { /* ignore */ }
+          }
+        });
     });
 
     // Cross-pane: click a card in Flex/Qbt/Down to select show in list

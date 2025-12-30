@@ -809,6 +809,82 @@ export const refreshLib = async () => {
   }
 };
 
+export const createShowFolderAndRefreshEmby = async ({
+  showName,
+  tvdbId,
+  seriesMapSeasons,
+  tvdbData,
+  onStatus,
+  createTimeoutMs = 15000,
+  refreshTimeoutMs = 120000,
+} = {}) => {
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+  const withTimeout = async (promise, ms, label) => {
+    const timeoutMs = Math.max(0, Number(ms) || 0);
+    let t;
+    const timeout = new Promise((_, reject) => {
+      t = setTimeout(() => reject(new Error(`timeout waiting for ${label}`)), timeoutMs);
+    });
+    try {
+      return await Promise.race([promise, timeout]);
+    } finally {
+      clearTimeout(t);
+    }
+  };
+
+  const nameStr = String(showName || '').trim();
+  const tvdbIdStr = String(tvdbId || '').trim();
+  const hasTvdbData = !!tvdbData && typeof tvdbData === 'object' && Object.keys(tvdbData).length > 0;
+  const seasons = Array.isArray(seriesMapSeasons)
+    ? seriesMapSeasons
+        .map((n) => Number(n))
+        .filter((n) => Number.isFinite(n) && n > 0)
+        .sort((a, b) => a - b)
+    : [];
+
+  if (!nameStr) return { createdFolder: false, status: 'badargs', err: 'missing showName' };
+  if (!tvdbIdStr) return { createdFolder: false, status: 'badargs', err: 'missing tvdbId' };
+  if (!hasTvdbData) return { createdFolder: false, status: 'badargs', err: 'missing tvdbData' };
+
+  let createdFolder = false;
+
+  try {
+    if (typeof onStatus === 'function') onStatus('Creating folder...');
+    await withTimeout(
+      srvr.createShowFolder({ showName: nameStr, tvdbId: tvdbIdStr, seriesMapSeasons: seasons, tvdbData }),
+      createTimeoutMs,
+      'createShowFolder'
+    );
+    createdFolder = true;
+  } catch (e) {
+    return { createdFolder: false, status: 'createfailed', err: e?.message || String(e) };
+  }
+
+  // Refresh Emby so the new folder gets scanned. Ignore refresh errors, but report them.
+  let refreshRes = null;
+  try {
+    if (typeof onStatus === 'function') onStatus('Refreshing Emby...');
+    refreshRes = await refreshLib();
+    if (refreshRes?.status === 'hasTask' && refreshRes?.taskId) {
+      const startMs = Date.now();
+      while (Date.now() - startMs < refreshTimeoutMs) {
+        const st = await withTimeout(taskStatus(refreshRes.taskId), 15000, 'emby task status');
+        if (st?.status !== 'refreshing') break;
+        await sleep(2000);
+      }
+    }
+  } catch (e) {
+    return {
+      createdFolder: true,
+      status: 'refreshfailed',
+      err: e?.message || String(e),
+      refreshRes,
+    };
+  }
+
+  return { createdFolder: true, status: 'ok', refreshRes };
+};
+
 export const taskStatus = async (taskId) => {
   try {
     const tasksRes = await axios({

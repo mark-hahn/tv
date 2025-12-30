@@ -1,2 +1,8 @@
 
+=== copilot should ignore this file 
+=== do not use this file for prompts
+=== it is just a scratchpad for editing copilot prompts.
 
+in map pane ctrl-clicking on msg "Not In Emby" should create a folder on server by getting seasons from map and calling createShowFolder. then refresh emby to load it.
+
+refactor this code from the last part of the web button action in hdrtop.

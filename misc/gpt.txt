@@ -1,39 +1,12 @@
 
-how to have multiple copilot chats at once
+=== copilot should ignore this file 
+=== do not use this file for prompts
+=== it is just a scratchpad for editing copilot prompts.
 
-support multiple downloads
-- rename data/tv-recent.json to data/tv-finished.json
-- create src/worker.js for worker code
-- add const MAX_WORKERS = 2
-- add field named worker to tv.json entry which is integer 1-9. worker fields are null at app load and when not being used by worker.
-- no globals in workers
-- tv.json is atomically shared by main and workers and is only shared data. inFlightDownloads is replaced by worker fields in tv.json entries. if you think other shared data is needed ask me first
-- main.js is responsible for getting files from usb, running cycles, adding entries to tv.json, assigning entries to workers, and supporting endpoints.
-- a worker is responsible for running rsync and updating tv.json progress
+- add the line
+"======================================================" 
+to tv.log, with a blank line before, every time a cycle starts its first download.  it should appear before other log lines for that download. the groups have a blank line before alo so there won't be two blank lines together.
 
-- add integer field named priority to tv.json entry that defaults to 0
-- when setProc has a title put unixnow in priority
-- each cycle main looks at entries with priority first and uses newest one
-- priority field is persistant across boots
+- assign a sequence number to each download when starting and change beginning of first line of a group from "[<worker num>]" to [<seq num>.<worker num>]". this means the start group and finish group of each download will have the same sequence number. the sequence number starts at 1 on startup and never resets.
 
-- don't use downloaded data directory information from disk except for filtering out torrents. a disk directory might be deleted by other processes but that torrent is still considered finished because tv-finished.json is authority on which torrents are finished
-
-change logging in tv.log. only log:
-- log starting worker and worker finished
-- each log entry should be two-line groups with blank line and first line like:
-"[<worker>] yy/mm/dd hh:mm:ss S01E01 <series name>
-second line 
-"<4 spaces> <size 0.123 GB> <duration mm:ss> <error?>"
-
-what info is in job object that isn't in tv.json entry
-
-when cycle is finished with no jobs waiting, log stats on tv.json for that cycle:
-number of jobs. speed(size/seconds) for each worker. speed(size/seconds) for all jobs combined
-
-when a worker is finished make sure to start another job if available. when a startproc is received make sure it is remembered until a worker is available.
-
-- i'm calling a group the two lines of tv.log next to each other with a blank line before.
-
-- on the tv.log group type written when starting, remove duration on the second line.
-
-- on both types of tv.log group, at the end of the second line put "Starting" on the download start group and "Finished" on the download finished group.
+-change number of leading spaces in second line of groups so the left side of date on the first line aligns with left side of size on second line

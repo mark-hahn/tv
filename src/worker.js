@@ -66,16 +66,19 @@
     return (bytes / 1e9).toFixed(3) + ' GB';
   };
 
-  var logWorkerGroup = function(workerId, whenDate, season, episode, seriesName, fileSizeBytes, durationSeconds, errorText, phase) {
+  var logWorkerGroup = function(seqNo, workerId, whenDate, season, episode, seriesName, fileSizeBytes, durationSeconds, errorText, phase) {
     try {
       var wid = String(workerId);
+      var seq = (seqNo == null) ? '?' : String(seqNo);
       var ts = formatLaTimestamp(whenDate);
       var se = 'S' + pad2(season) + 'E' + pad2(episode);
       var name = (seriesName || '').trim();
-      var line1 = '[' + wid + '] ' + ts + ' ' + se + (name ? (' ' + name) : '');
+      var prefixTag = '[' + seq + '.' + wid + '] ';
+      var line1 = prefixTag + ts + ' ' + se + (name ? (' ' + name) : '');
 
       var sizeStr = formatGb(fileSizeBytes);
-      var line2 = '    ' + sizeStr;
+      // Indent so that size aligns under the left edge of the timestamp.
+      var line2 = ' '.repeat(prefixTag.length) + sizeStr;
 
       // Starting groups omit duration.
       if (phase === 'finished') {
@@ -219,7 +222,8 @@
     var startedAtMs = Date.now();
 
     // Worker start log group.
-    logWorkerGroup(workerId, new Date(), season, episode, seriesName, fileSizeBytes, null, null, 'starting');
+    var seqNo = job && job.logSeq != null ? job.logSeq : null;
+    logWorkerGroup(seqNo, workerId, new Date(), season, episode, seriesName, fileSizeBytes, null, null, 'starting');
 
     // Local per-job speed state (no module-level mutable globals).
     var lastBytes = 0;
@@ -300,7 +304,7 @@
         if (kind !== 'finished') {
           errText = patch && patch.status ? String(patch.status) : String(kind);
         }
-        logWorkerGroup(workerId, new Date(), season, episode, seriesName, fileSizeBytes, durSec, errText, 'finished');
+        logWorkerGroup(seqNo, workerId, new Date(), season, episode, seriesName, fileSizeBytes, durSec, errText, 'finished');
       } catch (e) {}
 
       try {

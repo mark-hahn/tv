@@ -585,6 +585,30 @@
   var workers = []; // [{id, proc, busy}]
   var pendingJobs = []; // [{key, job}]
 
+  // Log sequencing (monotonic since startup) and per-cycle start separator.
+  var nextDownloadLogSeq = 1;
+  var currentCycleId = 0;
+  var cycleSeparatorLogged = {}; // { [cycleId:number]: true }
+
+  var appendCycleSeparatorIfNeeded = function(cycleId) {
+    try {
+      if (!cycleId) return;
+      if (cycleSeparatorLogged[cycleId]) return;
+      cycleSeparatorLogged[cycleId] = true;
+
+      // Blank line before separator.
+      var prefix = '';
+      try {
+        if (fs.existsSync(TV_LOG_PATH)) {
+          var st = fs.statSync(TV_LOG_PATH);
+          if (st && st.size > 0) prefix = '\n';
+        }
+      } catch (e) {}
+
+      appendTvLog(prefix + '======================================================\n');
+    } catch (e) {}
+  };
+
   // If /startProc?title=... is received but the matching job isn't runnable yet,
   // keep it around until we successfully apply its priority to a tv.json entry.
   // (Priority is persisted in tv.json; this is only for "remember until available".)
@@ -669,6 +693,19 @@
         upsertTvJson(item.job.tvLocalDir, item.job.fname, {
           worker: w.id
         });
+      } catch (e) {}
+
+      // Assign a monotonic per-download log sequence at the moment the download starts.
+      try {
+        if (item.job && item.job.logSeq == null) {
+          item.job.logSeq = nextDownloadLogSeq++;
+        }
+      } catch (e) {}
+
+      // When a cycle starts its first download, write the separator before any
+      // worker log lines for that download.
+      try {
+        appendCycleSeparatorIfNeeded(item.job && item.job.cycleId);
       } catch (e) {}
 
       try {
@@ -856,6 +893,14 @@
       nextCycleTimer = null;
     }
     cycleRunning = true;
+
+    // New cycle id (monotonic since startup). Used only for logging separator.
+    try {
+      currentCycleId++;
+    } catch (e) {
+      currentCycleId = (currentCycleId || 0) + 1;
+    }
+
     reloadState();
     resetCycleState();
     return process.nextTick(delOldFiles);
@@ -1580,7 +1625,8 @@
       fileSizeBytes: usbFileBytes,
       season: season,
       episode: episode,
-      sequence: currentSeq
+      sequence: currentSeq,
+      cycleId: currentCycleId
     });
 
     assignWork();

@@ -66,7 +66,7 @@
     return (bytes / 1e9).toFixed(3) + ' GB';
   };
 
-  var logWorkerGroup = function(workerId, whenDate, season, episode, seriesName, fileSizeBytes, durationSeconds, errorText) {
+  var logWorkerGroup = function(workerId, whenDate, season, episode, seriesName, fileSizeBytes, durationSeconds, errorText, phase) {
     try {
       var wid = String(workerId);
       var ts = formatLaTimestamp(whenDate);
@@ -75,13 +75,35 @@
       var line1 = '[' + wid + '] ' + ts + ' ' + se + (name ? (' ' + name) : '');
 
       var sizeStr = formatGb(fileSizeBytes);
-      var durStr = formatDurationMmSs(durationSeconds);
-      var line2 = '    ' + sizeStr + ' ' + durStr;
+      var line2 = '    ' + sizeStr;
+
+      // Starting groups omit duration.
+      if (phase === 'finished') {
+        var durStr = formatDurationMmSs(durationSeconds);
+        line2 += ' ' + durStr;
+      }
+
       if (errorText) {
         line2 += ' ' + String(errorText).trim();
       }
 
-      appendTvLog(line1 + '\n' + line2 + '\n\n');
+      // Status word must be the final token on line 2.
+      if (phase === 'starting') {
+        line2 += ' Starting';
+      } else if (phase === 'finished') {
+        line2 += ' Finished';
+      }
+
+      // "Group" = two lines with a blank line before.
+      var prefix = '';
+      try {
+        if (fs.existsSync(TV_LOG_PATH)) {
+          var st = fs.statSync(TV_LOG_PATH);
+          if (st && st.size > 0) prefix = '\n';
+        }
+      } catch (e) {}
+
+      appendTvLog(prefix + line1 + '\n' + line2 + '\n');
     } catch (e) {
       // best-effort only
     }
@@ -183,7 +205,7 @@
     return mm2 * 60 + ss2;
   };
 
-  var runJob = function(job, workerId) {
+  var runJob = function(job, workerId, onBeforeDoneSend) {
     var localDir = job.tvLocalDir;
     var fname = job.fname;
     var tvFilePath = job.tvFilePath;
@@ -197,7 +219,7 @@
     var startedAtMs = Date.now();
 
     // Worker start log group.
-    logWorkerGroup(workerId, new Date(), season, episode, seriesName, fileSizeBytes, null, null);
+    logWorkerGroup(workerId, new Date(), season, episode, seriesName, fileSizeBytes, null, null, 'starting');
 
     // Local per-job speed state (no module-level mutable globals).
     var lastBytes = 0;
@@ -253,12 +275,23 @@
     var progressUpdateInterval = 500;
     var lastProgressUpdateTime = 0;
 
+    var finishedOnce = false;
     var finish = function(kind, patch) {
+      if (finishedOnce) return;
+      finishedOnce = true;
       patch = patch || {};
       patch.worker = null;
       patch.eta = patch.eta === undefined ? null : patch.eta;
       patch.dateEnded = patch.dateEnded === undefined ? unixNow() : patch.dateEnded;
       patchTvJson(localDir, fname, patch, {createIfMissing: true});
+
+      // Clear worker's current job BEFORE notifying parent, so we can accept
+      // an immediate next 'start' message without race conditions.
+      try {
+        if (typeof onBeforeDoneSend === 'function') {
+          onBeforeDoneSend();
+        }
+      } catch (e) {}
 
       // Worker finished log group.
       try {
@@ -267,7 +300,7 @@
         if (kind !== 'finished') {
           errText = patch && patch.status ? String(patch.status) : String(kind);
         }
-        logWorkerGroup(workerId, new Date(), season, episode, seriesName, fileSizeBytes, durSec, errText);
+        logWorkerGroup(workerId, new Date(), season, episode, seriesName, fileSizeBytes, durSec, errText, 'finished');
       } catch (e) {}
 
       try {
@@ -369,7 +402,9 @@
           }
           var workerId = msg.worker;
           var job = msg.job;
-          current = runJob(job, workerId);
+          current = runJob(job, workerId, function() {
+            current = null;
+          });
           return;
         }
         if (msg.type === 'ping') {

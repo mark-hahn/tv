@@ -31,3 +31,9 @@ when cycle is finished with no jobs waiting, log stats on tv.json for that cycle
 number of jobs. speed(size/seconds) for each worker. speed(size/seconds) for all jobs combined
 
 when a worker is finished make sure to start another job if available. when a startproc is received make sure it is remembered until a worker is available.
+
+- i'm calling a group the two lines of tv.log next to each other with a blank line before.
+
+- on the tv.log group type written when starting, remove duration on the second line.
+
+- on both types of tv.log group, at the end of the second line put "Starting" on the download start group and "Finished" on the download finished group.

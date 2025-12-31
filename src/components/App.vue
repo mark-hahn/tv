@@ -91,6 +91,14 @@
             :sizing="activeSizing"
           )
 
+          FilePane(
+            v-if="!simpleMode"
+            v-show="currentPane === 'file'"
+            style="width:100%; height:100%;"
+            :simpleMode="simpleMode"
+            :sizing="activeSizing"
+          )
+
       //- Draggable divider between panes: vertical in landscape, horizontal in portrait.
       #paneDivider(
         @pointerdown.stop.prevent="startPaneResize"
@@ -191,6 +199,14 @@
           :sizing="activeSizing"
         )
 
+        FilePane(
+          v-if="!simpleMode"
+          v-show="currentPane === 'file'"
+          style="width:100%; height:100%;"
+          :simpleMode="simpleMode"
+          :sizing="activeSizing"
+        )
+
     //- Draggable divider between panes: vertical in landscape, horizontal in portrait.
     #paneDivider(
       @pointerdown.stop.prevent="startPaneResize"
@@ -225,18 +241,19 @@ import Torrents from './torrents.vue';
 import Flex     from './flex.vue';
 import History  from './history.vue';
 import TvProc   from './tvproc.vue';
+import FilePane from './file.vue';
 import evtBus   from '../evtBus.js';
 import * as tvdb from '../tvdb.js';
 import { config } from '../config.js';
 
 export default {
   name: "App",
-  components: { List, Series, Map, Actors, Buttons, Reel, Torrents, Flex, History, TvProc },
+  components: { List, Series, Map, Actors, Buttons, Reel, Torrents, Flex, History, TvProc, FilePane },
   data() { 
     return { 
       // Must be known before first render so non-simple panes never mount in simple mode.
       simpleMode: new URLSearchParams(window.location.search).has('simple'),
-      currentPane: 'series', // 'series', 'map', 'actors', 'torrents', 'flex', 'history', or 'tvproc'
+      currentPane: 'series', // 'series', 'map', 'actors', 'torrents', 'flex', 'history', 'tvproc', or 'file'
       currentTvdbData: null,
       currentShow: null,
       _torrentsInitialized: false,
@@ -436,7 +453,8 @@ export default {
         { label: 'Tor', key: 'torrents' },
         { label: 'Flex', key: 'flex' },
         { label: 'Qbt', key: 'history' },
-        { label: 'Down', key: 'tvproc' }
+        { label: 'Down', key: 'tvproc' },
+        { label: 'File', key: 'file' }
       ];
 
       if (!this.simpleMode) return allTabs;
@@ -783,6 +801,13 @@ export default {
         // Prompt for desktop notification permission (Firefox requires user gesture).
         this.requestNotificationsOnce();
         this.handleShowTvproc();
+        return;
+      }
+
+      if (k === 'file') {
+        if (this.simpleMode) return;
+        this.currentPane = 'file';
+        evtBus.emit('paneChanged', this.currentPane);
         return;
       }
     },

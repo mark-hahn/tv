@@ -193,3 +193,17 @@ export function sendEmail(emailData)
 
 export function getTmdb(params)
             {return fCall('getTmdb', params)}
+
+// File browser
+export async function getFile(path) {
+  console.log('RPC getFile call:', path);
+  try {
+    const res = await fCall('getFile', path);
+    console.log('RPC getFile result:', res);
+    return res;
+  }
+  catch (err) {
+    console.log('RPC getFile error:', err);
+    throw err;
+  }
+}

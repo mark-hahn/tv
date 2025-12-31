@@ -3,6 +3,27 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-in down pane card change speed display from "0.123" (gigabits/sec) to "123" (mbits/sec) -- no label just the integer with no leading zeros
+- create new pane in #tabbody with tab named File.
 
-that didn't work. remove padding from #sortfltr children buttons
+- it should call a server endpoint getFile(<path>) to get file listings from server disk. The return value should have this object format: 
+{
+  [
+    "<child1 file name>",
+    "<child2 dir name>": [
+      "<child21 file name>",
+      "<child22 file name>"
+    ]
+  ]
+where the outer array is the children of <path> arg.
+
+- It should have a sticky hdr with an input box and Open button on the right. the input box width should span the whole pane except for the width of the button. a return keypress inside the input or Open button click should call getFile(<input box>).  
+
+- The return object should be displayed in a scroll pane where the the dirs and file are shown in tree with each dir node collapsable.
+
+- the pane should open with the selected show file path in the input box. when a show selection changes the input box path and tree should change to match the new file.
+
+- clicking anywhere on a dir name should toggle the node.
+
+- clicking on a file name should put the file path including file name in the clipboard.
+
+- the text in the input box should be aligned to the right when a value is inserted.

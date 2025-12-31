@@ -510,6 +510,94 @@ const getSharedFilters = (id, _param, resolve, _reject) => {
   resolve([id, sharedFilters]);
 };
 
+const getFile = (id, param, resolve, reject) => {
+  // Param is usually a raw string path (per RPC protocol). Allow "" => tvDir.
+  let requestedPath = param;
+  if (requestedPath === undefined || requestedPath === null) requestedPath = '';
+
+  // If someone accidentally JSON.stringified a string, tolerate it.
+  if (typeof requestedPath === 'string') {
+    const trimmed = requestedPath.trim();
+    if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || trimmed === 'null') {
+      try {
+        requestedPath = JSON.parse(trimmed);
+      } catch {
+        // keep as-is
+        requestedPath = param;
+      }
+    }
+  }
+
+  if (typeof requestedPath !== 'string') {
+    reject([id, { err: 'getFile: param must be a string path' }]);
+    return;
+  }
+
+  const rawPath = requestedPath.trim();
+  const basePath = tvDir;
+  const targetPath = rawPath ? path.resolve(rawPath) : path.resolve(basePath);
+
+  // Safety: only allow listings within tvDir.
+  const allowedRoot = path.resolve(basePath) + path.sep;
+  if (!(targetPath + path.sep).startsWith(allowedRoot) && targetPath !== path.resolve(basePath)) {
+    reject([id, { err: `getFile: path not allowed: ${rawPath}` }]);
+    return;
+  }
+
+  let stat;
+  try {
+    stat = fs.statSync(targetPath);
+  } catch (e) {
+    reject([id, { err: `getFile: stat failed: ${e.message}` }]);
+    return;
+  }
+
+  if (!stat.isDirectory()) {
+    reject([id, { err: 'getFile: path is not a directory' }]);
+    return;
+  }
+
+  let dirents;
+  try {
+    dirents = fs.readdirSync(targetPath, { withFileTypes: true });
+  } catch (e) {
+    reject([id, { err: `getFile: readdir failed: ${e.message}` }]);
+    return;
+  }
+
+  const collator = new Intl.Collator(undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  });
+
+  dirents.sort((a, b) => collator.compare(a.name, b.name));
+
+  const out = [];
+  for (const d of dirents) {
+    const name = d.name;
+    if (!name) continue;
+
+    if (d.isDirectory()) {
+      const childPath = path.join(targetPath, name);
+      try {
+        const childDirents = fs.readdirSync(childPath, { withFileTypes: true });
+        const childNames = childDirents
+          .map((cd) => cd.name)
+          .filter(Boolean)
+          .sort((a, b) => collator.compare(a, b));
+        out.push({ [name]: childNames });
+      } catch {
+        // If we can't read the directory, still return it with empty children.
+        out.push({ [name]: [] });
+      }
+    } else {
+      out.push(name);
+    }
+  }
+
+  resolve([id, out]);
+};
+
 const deletePath = async (id, path, resolve, _reject) => {
   // console.log('deletePath', id, path);
   try {
@@ -608,6 +696,8 @@ const runOne = () => {
 
     case 'setSharedFilters': setSharedFilters(id, param, resolve, reject); break;
     case 'getSharedFilters': getSharedFilters(id, param, resolve, reject); break;
+
+    case 'getFile': getFile(id, param, resolve, reject); break;
 
     case 'createShowFolder': createShowFolder(id, param, resolve, reject); break;
 

@@ -2,3 +2,7 @@
 === copilot should ignore this file 
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
+
+in down pane card change speed display from "0.123" (gigabits/sec) to "123" (mbits/sec) -- no label just the integer with no leading zeros
+
+that didn't work. remove padding from #sortfltr children buttons

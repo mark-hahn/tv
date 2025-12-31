@@ -383,11 +383,12 @@ export default {
       return util.fmtBytesSize(bytesOrHumanString);
     },
 
-    fmtGbPerSec(bytesPerSec) {
-      const n = Number(bytesPerSec);
+    fmtGbPerSec(bitsPerSec) {
+      // Server reports bits/sec. Display as integer megabits/sec with no units.
+      const n = Number(bitsPerSec);
       if (!Number.isFinite(n) || n < 0) return '';
-      const gbps = n / 1e9;
-      return `${gbps.toFixed(3)}`;
+      const mbps = n / 1e6;
+      return `${Math.round(mbps)}`;
     },
 
     fmtElapsedMmSs(seconds) {

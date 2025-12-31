@@ -102,7 +102,7 @@
           style="width:100px; height:100px; position:relative; top:20px; left:45px;")
     #remoteButtons(
       v-if="showRemotes"
-      style="display:flex; flex-wrap:wrap; justify-content:space-around; width:100%; cursor:default;"
+        style="display:flex; flex-wrap:wrap; justify-content:flex-start; width:100%; cursor:default;"
     )
       div(
         v-for="remote in remotes"
@@ -389,7 +389,7 @@ export default {
 
       const countryDisp = String(originalCountry || '').trim().toUpperCase();
       const languageDisp = capWords(originalLanguage);
-      const networkDisp = capWords(originalNetwork);
+      const networkDisp = String(originalNetwork || '').trim().toUpperCase();
 
       const left = `${countryDisp}${countryDisp ? '/' : ''}${languageDisp}`.trim();
       const right = `${networkDisp}`.trim();

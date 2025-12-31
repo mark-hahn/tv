@@ -2,14 +2,14 @@
 bugs ...
 
 todo both ...
-
-todo non-simple:
   show episode
     file details
     being watched (next up line)
+
+todo non-simple:
   abort qbt downloading
   how to see why qbt or down won't start
-  
+
 todo simple ...
   
 tabled ...

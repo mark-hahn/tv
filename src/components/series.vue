@@ -23,7 +23,7 @@
 
   //- Layout: 1/9 whitespace, 1/3 poster, 1/9 whitespace, 1/3 infobox, 1/9 whitespace
   #body(
-    :style="{ display:'grid', cursor:'pointer', width:'100%', gridTemplateColumns:'1fr 3fr 1fr 3fr 1fr', alignItems:'start' }"
+    :style="{ display:'grid', cursor:'default', width:'100%', gridTemplateColumns:'1fr 3fr 1fr 3fr 1fr', alignItems:'start' }"
   )
     //- Column 2: poster (1/3)
     #topLeft(
@@ -100,13 +100,13 @@
           style="width:100px; height:100px; position:relative; top:20px; left:45px;")
     #remoteButtons(
       v-if="showRemotes"
-      style="display:flex; flex-wrap:wrap; justify-content:space-around; width:100%;"
+      style="display:flex; flex-wrap:wrap; justify-content:space-around; width:100%; cursor:default;"
     )
       div(
         v-for="remote in remotes"
         :key="remote.name"
         @click.stop="remoteClick(remote)"
-        :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit' }"
+        :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit', cursor:'pointer', userSelect:'none' }"
       )
         | {{remote.name}}
   

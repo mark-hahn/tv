@@ -100,7 +100,7 @@
 
               td(v-for="episode in seriesMapEpis" :key="season + '.' + episode"
                   @click="handleEpisodeClick($event, mapShow, season, episode)"
-                  :style="{cursor:'default', width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', padding:'1px 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor: (seriesMap[season]?.[episode]?.error) ? 'yellow': (seriesMap[season]?.[episode]?.noFile) ? '#faa' : 'white'}")
+                  :style="{ cursor: simpleMode ? 'default' : 'pointer', width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', padding:'1px 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor: (seriesMap[season]?.[episode]?.error) ? 'yellow': (seriesMap[season]?.[episode]?.noFile) ? '#faa' : 'white'}")
                 span(v-if="seriesMap?.[season]?.[episode]?.played")  w
                 span(v-if="seriesMap?.[season]?.[episode]?.avail && !seriesMap?.[season]?.[episode]?.unaired && !mapShow?.Id?.startsWith('noemby-')")   +
                 span(v-if="seriesMap?.[season]?.[episode]?.noFile && !seriesMap?.[season]?.[episode]?.unaired")  -

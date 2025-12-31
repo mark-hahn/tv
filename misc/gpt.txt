@@ -2,13 +2,3 @@
 === copilot should ignore this file 
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
-
-- the dir tree shows correctly. 
-
-- indent children by 8 spaces.
-
-- increase line height by 25%
-
-- clicking on file name does not populate input box.
-
-- 

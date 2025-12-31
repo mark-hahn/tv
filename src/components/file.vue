@@ -5,15 +5,33 @@
   #header(:style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', margin:0, display:'flex', gap:'8px', alignItems:'center' }")
     input(
       v-model="pathInput"
-      @keydown.enter.stop.prevent="openFromInput"
+      @keydown.enter.stop.prevent="loadFromInput"
       placeholder="Path"
       :style="{ flex:'1 1 auto', minWidth:'0px', fontSize:'13px', padding:'4px 6px', border:'1px solid #bbb', borderRadius:'7px', textAlign:'right' }"
     )
     button(
-      @click.stop="openFromInput"
+      @click.stop="loadFromInput"
       :disabled="busy"
       style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;"
+    ) Load
+
+    button(
+      @click.stop="openAll"
+      :disabled="busy || !Array.isArray(tree)"
+      style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;"
     ) Open
+
+    button(
+      @click.stop="closeAll"
+      :disabled="busy || expanded.size === 0"
+      style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;"
+    ) Close
+
+    button(
+      @click.stop="selClick"
+      :disabled="busy || selectedFiles.size === 0"
+      :style="{ fontSize:'13px', cursor:(busy || selectedFiles.size === 0 ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', border:'1px solid #bbb', backgroundColor:'whitesmoke', opacity:(selectedFiles.size === 0 ? 0.4 : 1) }"
+    ) Sel
 
   div(v-if="error" style="text-align:left; color:#c00; margin-top:10px; font-size:14px; white-space:pre-line; padding:0 10px;")
     div Error: {{ error }}
@@ -21,6 +39,7 @@
   div(
     v-else
     ref="scroller"
+    @click="clearSelections"
     :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'auto', background:'#fff', fontFamily:'sans-serif', fontSize:'13px', fontWeight:'normal', lineHeight:'1.56' }"
   )
     div(v-if="busy" style="color:#666; padding:10px;") Loading...
@@ -31,8 +50,10 @@
       :parentPath="rootPath"
       :depth="0"
       :expanded="expanded"
-      @toggle-dir="toggleDir"
-      @copy-file="copyFile"
+      :selectedFiles="selectedFiles"
+      @dir-click="onDirClick"
+      @file-click="onFileClick"
+      @clear-selections="clearSelections"
     )
 
     div(v-else style="color:#666; padding:10px;") No data.
@@ -40,29 +61,54 @@
 </template>
 
 <script>
-import { h } from 'vue';
+import { h, nextTick } from 'vue';
 import evtBus from '../evtBus.js';
 import * as srvr from '../srvr.js';
+import parseTorrentTitle from 'parse-torrent-title';
+
+const BASE = '/mnt/media/tv';
 
 const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
 
-const detectSep = (p) => {
-  const s = String(p || '');
-  // Prefer Windows-style if it's clearly Windows.
-  if (s.includes('\\') && !s.includes('/')) return '\\';
-  return '/';
+const sanitizeRelPath = (input) => {
+  let s = String(input || '').trim();
+  if (!s) return '';
+  // Normalize slashes.
+  s = s.replace(/\\/g, '/');
+    s = s.replace(/\/+/g, '/');
+
+  // Strip base prefix if present.
+  if (s === BASE) s = '';
+  else if (s.startsWith(BASE + '/')) s = s.slice((BASE + '/').length);
+
+  // Keep relative.
+  s = s.replace(/^\/+/, '');
+
+  // Collapse '.', '..' segments.
+  const parts = s.split('/').filter(Boolean);
+  const out = [];
+  for (const part of parts) {
+    if (!part || part === '.') continue;
+    if (part === '..') {
+      if (out.length) out.pop();
+      continue;
+    }
+    out.push(part);
+  }
+  return out.join('/');
 };
 
-const trimTrailingSeps = (p) => String(p || '').replace(/[\\/]+$/, '');
-const trimLeadingSeps = (p) => String(p || '').replace(/^[\\/]+/, '');
+const joinRel = (baseRel, childName) => {
+  const b = sanitizeRelPath(baseRel);
+  const c = String(childName || '').replace(/^\/+/, '').replace(/\/+$/, '');
+  if (!b) return sanitizeRelPath(c);
+  if (!c) return b;
+  return sanitizeRelPath(`${b}/${c}`);
+};
 
-const joinPath = (base, child) => {
-  const b = String(base || '');
-  const c = String(child || '');
-  if (!b) return trimLeadingSeps(c);
-  if (!c) return trimTrailingSeps(b);
-  const sep = detectSep(b);
-  return `${trimTrailingSeps(b)}${sep}${trimLeadingSeps(c)}`;
+const fullFromRel = (rel) => {
+  const r = sanitizeRelPath(rel);
+  return r ? `${BASE}/${r}` : BASE;
 };
 
 const nodeKey = (node, idx) => {
@@ -89,9 +135,10 @@ const TreeNodes = {
     nodes: { type: Array, required: true },
     parentPath: { type: String, required: true },
     depth: { type: Number, required: true },
-    expanded: { type: Object, required: true }
+    expanded: { type: Object, required: true },
+    selectedFiles: { type: Object, required: true }
   },
-  emits: ['toggle-dir', 'copy-file'],
+  emits: ['dir-click', 'file-click', 'clear-selections'],
   methods: {
     nodeKey,
     isDir(node) {
@@ -105,7 +152,7 @@ const TreeNodes = {
     },
     dirPath(node) {
       const name = this.dirName(node);
-      return joinPath(this.parentPath, name);
+      return joinRel(this.parentPath, name);
     },
     isExpandedDir(node) {
       const p = this.dirPath(node);
@@ -115,13 +162,15 @@ const TreeNodes = {
       const spaces = Math.max(0, Number(this.depth) || 0) * 2;
       return { paddingLeft: `${spaces}ch` };
     },
-    onToggle(node) {
+    onDirNameClick(e, node) {
+      e?.stopPropagation?.();
       const p = this.dirPath(node);
-      this.$emit('toggle-dir', p);
+      this.$emit('dir-click', { path: p, ctrl: !!(e?.ctrlKey || e?.metaKey), shift: !!e?.shiftKey, area: 'name' });
     },
-    onCopyFile(name) {
-      const p = joinPath(this.parentPath, name);
-      this.$emit('copy-file', p);
+    onFileNameClick(e, name) {
+      e?.stopPropagation?.();
+      const p = joinRel(this.parentPath, name);
+      this.$emit('file-click', { path: p, ctrl: !!(e?.ctrlKey || e?.metaKey), shift: !!e?.shiftKey, area: 'name' });
     }
   },
   render() {
@@ -149,23 +198,39 @@ const TreeNodes = {
       };
 
       if (typeof node === 'string') {
+        const filePath = joinRel(this.parentPath, node);
+        const isSelected = !!this.selectedFiles?.has?.(filePath);
         return h(
           'div',
           {
             key,
-            title: 'Click to copy full path',
+            'data-type': 'file',
+            'data-nodepath': filePath,
             onClick: (e) => {
-              e?.stopPropagation?.();
-              this.onCopyFile(node);
+              // Plain whitespace click: allow bubble to scroller, which clears selections.
+              // Ctrl-click on whitespace: treat as selection toggle (multi-select support).
+              if (e?.ctrlKey || e?.metaKey) {
+                e?.stopPropagation?.();
+                this.$emit('file-click', { path: filePath, ctrl: true, shift: false, area: 'whitespace' });
+              }
             },
             style: {
-              cursor: 'pointer',
-              ...rowStyleBase
+              cursor: 'default',
+              ...rowStyleBase,
+              backgroundColor: isSelected ? 'yellow' : ''
             }
           },
           [
             h('span', { style: twistyStyle }, ''),
-            h('span', { style: textStyle }, node)
+            h(
+              'span',
+              {
+                'data-click': 'name',
+                style: { ...textStyle, cursor: 'pointer' },
+                onClick: (e) => this.onFileNameClick(e, node)
+              },
+              node
+            )
           ]
         );
       }
@@ -182,17 +247,35 @@ const TreeNodes = {
             title: 'Click to expand/collapse',
             onClick: (e) => {
               e?.stopPropagation?.();
-              this.onToggle(node);
+              this.$emit('clear-selections');
             },
             style: {
-              cursor: 'pointer',
+              cursor: 'default',
               ...rowStyleBase,
               fontWeight: 'bold'
-            }
+            },
+            'data-type': 'dir',
+            'data-nodepath': dirPathVal
           },
           [
-            h('span', { style: twistyStyle }, isOpen ? '▾' : '▸'),
-            h('span', { style: textStyle }, name)
+            h(
+              'span',
+              {
+                'data-click': 'name',
+                style: { ...twistyStyle, cursor: 'pointer' },
+                onClick: (e) => this.onDirNameClick(e, node)
+              },
+              isOpen ? '▾' : '▸'
+            ),
+            h(
+              'span',
+              {
+                'data-click': 'name',
+                style: { ...textStyle, cursor: 'pointer' },
+                onClick: (e) => this.onDirNameClick(e, node)
+              },
+              name
+            )
           ]
         );
 
@@ -203,8 +286,10 @@ const TreeNodes = {
               parentPath: dirPathVal,
               depth: (Number(this.depth) || 0) + 1,
               expanded: this.expanded,
-              onToggleDir: (p) => this.$emit('toggle-dir', p),
-              onCopyFile: (p) => this.$emit('copy-file', p)
+              selectedFiles: this.selectedFiles,
+              onDirClick: (payload) => this.$emit('dir-click', payload),
+              onFileClick: (payload) => this.$emit('file-click', payload),
+              onClearSelections: () => this.$emit('clear-selections')
             })
           : null;
 
@@ -235,7 +320,9 @@ export default {
       tree: null,
       error: null,
       busy: false,
-      expanded: new Set()
+      expanded: new Set(),
+      selectedFiles: new Set(),
+      selectionAnchor: null
     };
   },
 
@@ -249,26 +336,66 @@ export default {
 
   methods: {
     onSetUpSeries(show) {
-      const p = String(show?.Path || '').trim();
-      if (!p) return;
-      this.pathInput = p;
-      // Auto-load to keep in sync with show selection.
-      void this.openPath(p);
+      const rel = sanitizeRelPath(show?.Path);
+      this.pathInput = rel;
+      void this.openRel(rel);
     },
 
-    async openFromInput() {
-      const p = String(this.pathInput || '').trim();
-      if (!p) return;
-      await this.openPath(p);
+    clearSelections() {
+      if (this.selectedFiles.size === 0 && !this.selectionAnchor) return;
+      this.selectedFiles = new Set();
+      this.selectionAnchor = null;
     },
 
-    async openPath(path) {
+    getVisibleFilePaths() {
+      const out = [];
+      const walk = (nodes, parentRel) => {
+        const arr = Array.isArray(nodes) ? nodes : [];
+        for (const node of arr) {
+          if (typeof node === 'string') {
+            out.push(joinRel(parentRel, node));
+            continue;
+          }
+          const entry = dirEntry(node);
+          if (!entry) continue;
+          const dPath = joinRel(parentRel, entry.name);
+          if (this.expanded.has(dPath)) {
+            walk(entry.children, dPath);
+          }
+        }
+      };
+      walk(this.tree, this.rootPath);
+      return out;
+    },
+
+    pruneSelectionsToVisible() {
+      if (this.selectedFiles.size === 0) return;
+      const visible = new Set(this.getVisibleFilePaths());
+      const next = new Set();
+      for (const p of this.selectedFiles) {
+        if (visible.has(p)) next.add(p);
+      }
+      this.selectedFiles = next;
+      if (this.selectionAnchor && !visible.has(this.selectionAnchor)) {
+        this.selectionAnchor = null;
+      }
+    },
+
+    async loadFromInput() {
+      const rel = sanitizeRelPath(this.pathInput);
+      this.pathInput = rel;
+      await this.openRel(rel);
+    },
+
+    async openRel(relPath) {
       this.error = null;
       this.busy = true;
       this.tree = null;
       this.expanded = new Set();
-      this.rootPath = String(path || '').trim();
+      this.clearSelections();
+      this.rootPath = sanitizeRelPath(relPath);
       try {
+        // Call getFile() with path relative to BASE.
         const res = await srvr.getFile(this.rootPath);
         if (Array.isArray(res)) {
           this.tree = res;
@@ -285,24 +412,165 @@ export default {
       }
     },
 
-    toggleDir(dirPath) {
-      const p = String(dirPath || '').trim();
-      if (!p) return;
-      if (this.expanded.has(p)) this.expanded.delete(p);
-      else this.expanded.add(p);
-      // Force update since Set is not deeply reactive.
-      this.expanded = new Set(this.expanded);
+    async confirmAndDeletePaths(fullPaths) {
+      const paths = Array.isArray(fullPaths) ? fullPaths.filter(Boolean) : [];
+      if (paths.length === 0) return;
+
+      const msg = (paths.length === 1)
+        ? `Is it OK to delete ${paths[0]}.`
+        : `Is it OK to delete ${paths.length} files.`;
+      const ok = window.confirm(msg);
+      if (!ok) return;
+
+      try {
+        for (const p of paths) {
+          await srvr.deletePath(p);
+        }
+      } catch (e) {
+        this.error = e?.message || String(e);
+      }
+
+      await this.openRel(this.rootPath);
     },
 
-    async copyFile(fullPath) {
-      const p = String(fullPath || '').trim();
-      if (!p) return;
-      this.pathInput = p;
-      try {
-        await navigator.clipboard.writeText(p);
-      } catch (e) {
-        this.error = `Clipboard copy failed: ${e?.message || String(e)}`;
+    async onDirClick(payload) {
+      const rel = sanitizeRelPath(payload?.path);
+      if (!rel) return;
+      if (payload?.ctrl) {
+        await this.confirmAndDeletePaths([fullFromRel(rel)]);
+        return;
       }
+
+      const wasOpen = this.expanded.has(rel);
+      if (wasOpen) {
+        this.expanded.delete(rel);
+        this.expanded = new Set(this.expanded);
+        this.pruneSelectionsToVisible();
+        return;
+      }
+
+      this.expanded.add(rel);
+      this.expanded = new Set(this.expanded);
+      await nextTick();
+      this.ensureExpandedDirVisible(rel);
+    },
+
+    async onFileClick(payload) {
+      const rel = sanitizeRelPath(payload?.path);
+      if (!rel) return;
+
+      const isCtrl = !!payload?.ctrl;
+      const isShift = !!payload?.shift;
+      const area = String(payload?.area || 'name');
+      const isSelected = this.selectedFiles.has(rel);
+
+      // Ctrl-click on a selected file => delete confirmation.
+      if (isCtrl && isSelected) {
+        const sel = Array.from(this.selectedFiles);
+        const full = sel.map(p => fullFromRel(p));
+        await this.confirmAndDeletePaths(full);
+        return;
+      }
+
+      // Ctrl-click on an UNSELECTED file name => delete that file.
+      if (isCtrl && !isSelected && area === 'name') {
+        await this.confirmAndDeletePaths([fullFromRel(rel)]);
+        return;
+      }
+
+      const visible = this.getVisibleFilePaths();
+      const idx = visible.indexOf(rel);
+      const anchor = this.selectionAnchor && visible.includes(this.selectionAnchor)
+        ? this.selectionAnchor
+        : null;
+
+      if (isShift && anchor && idx >= 0) {
+        const aIdx = visible.indexOf(anchor);
+        const lo = Math.min(aIdx, idx);
+        const hi = Math.max(aIdx, idx);
+        const range = visible.slice(lo, hi + 1);
+        const next = isCtrl ? new Set(this.selectedFiles) : new Set();
+        for (const p of range) next.add(p);
+        this.selectedFiles = next;
+        return;
+      }
+
+      if (isCtrl) {
+        const next = new Set(this.selectedFiles);
+        if (next.has(rel)) next.delete(rel);
+        else next.add(rel);
+        this.selectedFiles = next;
+        this.selectionAnchor = rel;
+        return;
+      }
+
+      // Plain click selects only this file.
+      this.selectedFiles = new Set([rel]);
+      this.selectionAnchor = rel;
+    },
+
+    ensureExpandedDirVisible(dirRel) {
+      const sc = this.$refs.scroller;
+      if (!sc) return;
+      const esc = (s) => (window?.CSS?.escape ? CSS.escape(String(s || '')) : String(s || '').replace(/"/g, '\\"'));
+
+      const headerSel = `[data-type="dir"][data-nodepath="${esc(dirRel)}"]`;
+      const headerEl = sc.querySelector(headerSel);
+      if (!headerEl) return;
+
+      const prefix = dirRel.endsWith('/') ? dirRel : `${dirRel}/`;
+      const childSel = `[data-nodepath^="${esc(prefix)}"]`;
+      const childEls = sc.querySelectorAll(childSel);
+      if (!childEls || childEls.length === 0) return;
+      const lastEl = childEls[childEls.length - 1];
+
+      const target = Math.max(0, (lastEl.offsetTop + lastEl.offsetHeight) - sc.clientHeight);
+      const maxScroll = Math.max(0, headerEl.offsetTop);
+      const nextScroll = Math.min(target, maxScroll);
+      if (nextScroll > sc.scrollTop) sc.scrollTop = nextScroll;
+    },
+
+    openAll() {
+      if (!Array.isArray(this.tree)) return;
+      const dirs = [];
+      const walk = (nodes, parentRel) => {
+        const arr = Array.isArray(nodes) ? nodes : [];
+        for (const node of arr) {
+          const entry = dirEntry(node);
+          if (!entry) continue;
+          const dPath = joinRel(parentRel, entry.name);
+          dirs.push(dPath);
+          walk(entry.children, dPath);
+        }
+      };
+      walk(this.tree, this.rootPath);
+      this.expanded = new Set(dirs);
+    },
+
+    closeAll() {
+      this.expanded = new Set();
+      this.pruneSelectionsToVisible();
+    },
+
+    selClick() {
+      if (this.selectedFiles.size !== 1) return;
+      const only = Array.from(this.selectedFiles)[0];
+      const baseName = String(only || '').replace(/^.*\//, '');
+      const noExt = baseName.replace(/\.[a-z0-9]{1,5}$/i, '');
+
+      let parsed = null;
+      try {
+        const parser = parseTorrentTitle?.parse
+          ? parseTorrentTitle.parse
+          : (typeof parseTorrentTitle === 'function' ? parseTorrentTitle : null);
+        parsed = parser ? parser(noExt) : null;
+      } catch {
+        parsed = null;
+      }
+
+      const title = String(parsed?.title || noExt || '').trim();
+      if (!title) return;
+      evtBus.emit('selectShowFromCardTitle', title);
     }
   }
 };

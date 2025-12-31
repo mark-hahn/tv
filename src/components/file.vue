@@ -21,7 +21,7 @@
   div(
     v-else
     ref="scroller"
-    :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'auto', background:'#fff', fontFamily:'sans-serif', fontSize:'13px', fontWeight:'normal' }"
+    :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'auto', background:'#fff', fontFamily:'sans-serif', fontSize:'13px', fontWeight:'normal', lineHeight:'1.56' }"
   )
     div(v-if="busy" style="color:#666; padding:10px;") Loading...
 
@@ -112,8 +112,8 @@ const TreeNodes = {
       return this.expanded?.has?.(p);
     },
     indentStyle() {
-      const px = Math.max(0, Number(this.depth) || 0) * 16;
-      return { paddingLeft: `${px}px` };
+      const spaces = Math.max(0, Number(this.depth) || 0) * 2;
+      return { paddingLeft: `${spaces}ch` };
     },
     onToggle(node) {
       const p = this.dirPath(node);
@@ -129,6 +129,25 @@ const TreeNodes = {
     const children = nodes.map((node, idx) => {
       const key = this.nodeKey(node, idx);
 
+      const rowStyleBase = {
+        ...this.indentStyle(),
+        display: 'flex',
+        alignItems: 'baseline',
+        gap: '0ch',
+        whiteSpace: 'nowrap',
+        userSelect: 'none'
+      };
+
+      const twistyStyle = {
+        flex: '0 0 2ch',
+        width: '2ch',
+        textAlign: 'left'
+      };
+
+      const textStyle = {
+        flex: '0 0 auto'
+      };
+
       if (typeof node === 'string') {
         return h(
           'div',
@@ -140,13 +159,14 @@ const TreeNodes = {
               this.onCopyFile(node);
             },
             style: {
-              ...this.indentStyle(),
               cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              userSelect: 'none'
+              ...rowStyleBase
             }
           },
-          node
+          [
+            h('span', { style: twistyStyle }, ''),
+            h('span', { style: textStyle }, node)
+          ]
         );
       }
 
@@ -165,14 +185,15 @@ const TreeNodes = {
               this.onToggle(node);
             },
             style: {
-              ...this.indentStyle(),
               cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              userSelect: 'none',
+              ...rowStyleBase,
               fontWeight: 'bold'
             }
           },
-          `${isOpen ? '▾' : '▸'} ${name}`
+          [
+            h('span', { style: twistyStyle }, isOpen ? '▾' : '▸'),
+            h('span', { style: textStyle }, name)
+          ]
         );
 
         const body = isOpen
@@ -276,6 +297,7 @@ export default {
     async copyFile(fullPath) {
       const p = String(fullPath || '').trim();
       if (!p) return;
+      this.pathInput = p;
       try {
         await navigator.clipboard.writeText(p);
       } catch (e) {

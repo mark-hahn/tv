@@ -1058,6 +1058,12 @@ export default {
         return;
       }
 
+      // When currently viewing File, stay on File.
+      // The File pane listens to setUpSeries and will refresh itself.
+      if (prevPane === 'file') {
+        return;
+      }
+
       // Otherwise, return to the Series pane.
       this.currentPane = 'series';
       this.mapShow = null;

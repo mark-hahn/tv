@@ -79,13 +79,15 @@
             v-html="runtimeTxt"
             style="min-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
           )
-          //- Split only between "Next Up" and the value; allow wrapping between them
+          //- Next Up: keep episode and suffix on separate lines
           #nextup(
             v-if="nextUpValTxt && String(nextUpValTxt).length > 0"
-            style="min-height:32px; display:flex; flex-wrap:wrap; justify-content:center; column-gap:8px; row-gap:0px;"
+            style="min-height:32px; display:flex; flex-direction:column; align-items:center; justify-content:center;"
           )
-            div(style="white-space:nowrap;") Next Up
-            div(style="white-space:normal; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2;") {{ nextUpValTxt }}
+            div(style="display:flex; column-gap:8px; justify-content:center;")
+              div(style="white-space:nowrap;") Next Up
+              div(style="white-space:nowrap;") {{ nextUpValTxt }}
+            div(v-if="nextUpSuffixTxt && String(nextUpSuffixTxt).length > 0" style="white-space:nowrap;") {{ nextUpSuffixTxt }}
           #collection(
             v-if="collectionName"
             style="min-height:24px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;"
@@ -156,6 +158,7 @@ export default {
       showSpinner: false,
       showRemotes: false,
       nextUpValTxt: '',
+      nextUpSuffixTxt: '',
       watchButtonTxtArr: [],
       episodeId: '',
       deletedTxt: '',
@@ -360,6 +363,19 @@ export default {
 
       let { originalCountry, originalLanguage, averageRuntime, originalNetwork } = tvdbData;
 
+      const capWords = (raw) => {
+        const s = String(raw || '').trim();
+        if (!s) return '';
+        // Keep exact-cased tokens like "UK".
+        if (s === 'UK') return 'UK';
+        // Capitalize each whitespace-separated word; preserve punctuation like "/" and "+".
+        return s
+          .toLowerCase()
+          .split(/\s+/)
+          .map((w) => (w ? (w[0].toUpperCase() + w.slice(1)) : ''))
+          .join(' ');
+      };
+
       originalNetwork = String(originalNetwork || '');
       const longNets = ['Amazon', 'Paramount+'];
       longNets.forEach((net) => {
@@ -371,11 +387,12 @@ export default {
       originalLanguage = String(originalLanguage || '');
       originalNetwork = String(originalNetwork || '');
 
-      const origCountry = originalCountry.toLowerCase();
-      const origLanguage = originalLanguage.toLowerCase();
-      const origNetwork = originalNetwork.toLowerCase();
-      const left = `${origCountry}${origCountry ? '/' : ''}${origLanguage}`.trim();
-      const right = `${origNetwork}`.trim();
+      const countryDisp = String(originalCountry || '').trim().toUpperCase();
+      const languageDisp = capWords(originalLanguage);
+      const networkDisp = capWords(originalNetwork);
+
+      const left = `${countryDisp}${countryDisp ? '/' : ''}${languageDisp}`.trim();
+      const right = `${networkDisp}`.trim();
       if (left) this.cntryLangLeftTxt = left;
       if (right) this.cntryLangRightTxt = right;
 
@@ -394,14 +411,17 @@ export default {
         if (readyToWatch) {
           this.episodeId = episodeId;
           this.nextUpValTxt = seaEpiTxt;
+          this.nextUpSuffixTxt = '';
         }
         else {
           const suffix = (status === 'missing') ? 'No File' : 'Unaired';
-          this.nextUpValTxt = `${seaEpiTxt} ${suffix}`;
+          this.nextUpValTxt = seaEpiTxt;
+          this.nextUpSuffixTxt = suffix;
         }
       }
       else {
         this.nextUpValTxt = '';
+        this.nextUpSuffixTxt = '';
       }
       const watchButtonTxtArr = [];
       const devices = await srvr.getDevices();
@@ -471,6 +491,7 @@ export default {
       this.cntryLangRightTxt = '';
       this.runtimeTxt = '';
       this.nextUpValTxt = '';
+      this.nextUpSuffixTxt = '';
       this.remotes = [];
       this.showRemotes = false;
       this.showSpinner = false;

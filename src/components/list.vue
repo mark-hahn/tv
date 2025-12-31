@@ -48,7 +48,7 @@
 
     #showsContainer(style="display:flex; flex-grow:1; overflow:hidden; min-height:0;")
       Buttons(
-        v-if="simpleMode"
+        v-if="simpleMode && !hideButtonsPane"
         style="width:140px; flex-shrink:0;"
         :sizing="sizing"
         @button-click="handleButtonClick"
@@ -116,6 +116,10 @@ export default {
   
   props: {
     simpleMode: {
+      type: Boolean,
+      default: false
+    },
+    hideButtonsPane: {
       type: Boolean,
       default: false
     },
@@ -1536,6 +1540,15 @@ export default {
 
   /////////////////  MOUNTED  /////////////////
   mounted() {
+    // Simple + portrait: Buttons are rendered in App.vue and forward events via evtBus.
+    evtBus.on('simpleModeButtonsClick', (activeButtons) => {
+      void this.handleButtonClick(activeButtons);
+    });
+
+    evtBus.on('simpleModeButtonsTop', () => {
+      this.topClick();
+    });
+
     evtBus.on('reelSearchAction', (srchChoice) => {
       void this.searchAction(srchChoice);
     });

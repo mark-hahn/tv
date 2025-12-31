@@ -269,6 +269,8 @@ export default {
       img.style.width = '100%';
       img.style.maxWidth = '100%';
       img.style.height = 'auto';
+      // Cap poster height to keep the header compact.
+      img.style.maxHeight = '220px';
       img.style.objectFit = 'contain';
       img.style.display = 'block';
 

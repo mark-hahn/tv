@@ -1,105 +1,217 @@
 <template lang="pug">
 
 #all(
-  :style="{ width:'100%', height:'97dvh', boxSizing:'border-box', padding:0, margin:0, display:'flex', flexDirection: isPortrait ? 'column' : 'row' }"
+  :style="{ width:'100%', height:'97dvh', boxSizing:'border-box', padding:0, margin:0, display:'flex', flexDirection: showSideButtons ? 'row' : (isPortrait ? 'column' : 'row'), alignItems:'stretch' }"
 )
-  //- In portrait, put the right-side pane (Series/Map/etc) above the List.
-  #tabArea(:style="tabAreaStyle")
-    #tabBar(:style="{ display:'flex', gap:(simpleMode ? '30px' : '0px'), padding:(simpleMode ? '6px 8px' : '6px 0px'), alignItems:'center', borderBottom:'1px solid #ddd', backgroundColor:'#fafafa', flex:'0 0 auto', flexWrap:'wrap' }")
-      button(
-        v-for="t in tabs"
-        :key="t.key"
-        @click.stop="selectTab(t.key)"
-        :style="{ fontSize:'13px', cursor:'pointer', borderRadius:'7px', padding:'4px 10px', marginLeft:'4px', border:'1px solid #bbb', backgroundColor: (currentPane === t.key ? '#ddd' : 'whitesmoke') }"
-      ) {{ t.label }}
-
-    #tabBody(:style="{ flex:'1 1 auto', minHeight:'0px', position:'relative', width:'100%' }")
-      Series(v-show="currentPane === 'series'" style="display:block; width:100%; height:100%;" :simpleMode="simpleMode" :sizing="activeSizing")
-      Map(
-        v-show="currentPane === 'map'"
-        :mapShow="mapShow"
-        :hideMapBottom="hideMapBottom"
-        :seriesMapSeasons="seriesMapSeasons"
-        :seriesMapEpis="seriesMapEpis"
-        :seriesMap="seriesMap"
-        :mapError="mapError"
-        :simpleMode="simpleMode"
-        :sizing="activeSizing"
-        @prune="handleMapAction('prune', $event)"
-        @set-date="handleMapAction('date', $event)"
-        @close="handleMapAction('close')"
-        @show-actors="() => handleShowActors(false)"
-        @episode-click="handleEpisodeClick"
-      )
-      Actors(
-        v-show="currentPane === 'actors'"
-        style="width:100%; height:100%;"
-        :simpleMode="simpleMode"
-        :sizing="activeSizing"
-      )
-      Reel(
-        v-if="!simpleMode"
-        v-show="currentPane === 'reel'"
-        style="width:100%; height:100%;"
-        :simpleMode="simpleMode"
-        :sizing="activeSizing"
-        :allShows="allShows"
-        :active="currentPane === 'reel'"
-      )
-      Torrents(
-        v-if="!simpleMode"
-        v-show="currentPane === 'torrents'"
-        style="width:100%; height:100%;"
-        :simpleMode="simpleMode"
-        :sizing="activeSizing"
-        :activeShow="currentShow"
+  template(v-if="showSideButtons")
+    //- Simple + portrait: full-height Buttons pane on the left.
+    #simpleButtonsPane(:style="{ flex:'0 0 auto', height:'100%', overflow:'hidden', display:'flex', flexDirection:'column', backgroundColor:'#ccc' }")
+      Buttons(
+        style="width:105px; flex:1 1 auto;"
+        :sizing="sideButtonsSizing"
+        @button-click="onSideButtonsClick"
+        @top-click="onSideButtonsTop"
       )
 
-      Flex(
-        v-if="!simpleMode"
-        v-show="currentPane === 'flex'"
-        style="width:100%; height:100%;"
-        :simpleMode="simpleMode"
-        :sizing="activeSizing"
+    //- Simple + portrait: Series/Map/etc above List to the right.
+    #mainStack(:style="{ flex:'1 1 auto', minWidth:'0px', height:'100%', display:'flex', flexDirection:'column' }")
+      //- In portrait, put the right-side pane (Series/Map/etc) above the List.
+      #tabArea(:style="tabAreaStyle")
+        #tabBar(:style="{ display:'flex', gap:(simpleMode ? '30px' : '0px'), padding:(simpleMode ? '6px 8px' : '6px 0px'), alignItems:'center', borderBottom:'1px solid #ddd', backgroundColor:'#fafafa', flex:'0 0 auto', flexWrap:'wrap' }")
+          button(
+            v-for="t in tabs"
+            :key="t.key"
+            @click.stop="selectTab(t.key)"
+            :style="{ fontSize:'13px', cursor:'pointer', borderRadius:'7px', padding:'4px 10px', marginLeft:'4px', border:'1px solid #bbb', backgroundColor: (currentPane === t.key ? '#ddd' : 'whitesmoke') }"
+          ) {{ t.label }}
+
+        #tabBody(:style="{ flex:'1 1 auto', minHeight:'0px', position:'relative', width:'100%' }")
+          Series(v-show="currentPane === 'series'" style="display:block; width:100%; height:100%;" :simpleMode="simpleMode" :sizing="activeSizing")
+          Map(
+            v-show="currentPane === 'map'"
+            :mapShow="mapShow"
+            :hideMapBottom="hideMapBottom"
+            :seriesMapSeasons="seriesMapSeasons"
+            :seriesMapEpis="seriesMapEpis"
+            :seriesMap="seriesMap"
+            :mapError="mapError"
+            :simpleMode="simpleMode"
+            :sizing="activeSizing"
+            @prune="handleMapAction('prune', $event)"
+            @set-date="handleMapAction('date', $event)"
+            @close="handleMapAction('close')"
+            @show-actors="() => handleShowActors(false)"
+            @episode-click="handleEpisodeClick"
+          )
+          Actors(
+            v-show="currentPane === 'actors'"
+            style="width:100%; height:100%;"
+            :simpleMode="simpleMode"
+            :sizing="activeSizing"
+          )
+          Reel(
+            v-if="!simpleMode"
+            v-show="currentPane === 'reel'"
+            style="width:100%; height:100%;"
+            :simpleMode="simpleMode"
+            :sizing="activeSizing"
+            :allShows="allShows"
+            :active="currentPane === 'reel'"
+          )
+          Torrents(
+            v-if="!simpleMode"
+            v-show="currentPane === 'torrents'"
+            style="width:100%; height:100%;"
+            :simpleMode="simpleMode"
+            :sizing="activeSizing"
+            :activeShow="currentShow"
+          )
+
+          Flex(
+            v-if="!simpleMode"
+            v-show="currentPane === 'flex'"
+            style="width:100%; height:100%;"
+            :simpleMode="simpleMode"
+            :sizing="activeSizing"
+          )
+
+          History(
+            v-if="!simpleMode"
+            v-show="currentPane === 'history'"
+            style="width:100%; height:100%;"
+            :simpleMode="simpleMode"
+            :sizing="activeSizing"
+          )
+
+          TvProc(
+            v-if="!simpleMode"
+            v-show="currentPane === 'tvproc'"
+            style="width:100%; height:100%;"
+            :simpleMode="simpleMode"
+            :sizing="activeSizing"
+          )
+
+      //- Draggable divider between panes: vertical in landscape, horizontal in portrait.
+      #paneDivider(
+        @pointerdown.stop.prevent="startPaneResize"
+        @pointermove.stop.prevent="onPaneResizeMove"
+        @pointerup.stop.prevent="stopPaneResize"
+        @pointercancel.stop.prevent="stopPaneResize"
+        @lostpointercapture.stop.prevent="stopPaneResize"
+        :style="paneDividerStyle"
+        title="Drag to resize panes"
       )
 
-      History(
-        v-if="!simpleMode"
-        v-show="currentPane === 'history'"
-        style="width:100%; height:100%;"
+      List(
+        :style="listStyle"
         :simpleMode="simpleMode"
         :sizing="activeSizing"
+        :hideButtonsPane="true"
+        @show-map="handleShowMap"
+        @hide-map="handleHideMap"
+        @show-actors="handleShowActors"
+        @show-torrents="handleShowTorrents"
+        @all-shows="handleAllShows"
       )
 
-      TvProc(
-        v-if="!simpleMode"
-        v-show="currentPane === 'tvproc'"
-        style="width:100%; height:100%;"
-        :simpleMode="simpleMode"
-        :sizing="activeSizing"
-      )
+  template(v-else)
+    //- In portrait, put the right-side pane (Series/Map/etc) above the List.
+    #tabArea(:style="tabAreaStyle")
+      #tabBar(:style="{ display:'flex', gap:(simpleMode ? '30px' : '0px'), padding:(simpleMode ? '6px 8px' : '6px 0px'), alignItems:'center', borderBottom:'1px solid #ddd', backgroundColor:'#fafafa', flex:'0 0 auto', flexWrap:'wrap' }")
+        button(
+          v-for="t in tabs"
+          :key="t.key"
+          @click.stop="selectTab(t.key)"
+          :style="{ fontSize:'13px', cursor:'pointer', borderRadius:'7px', padding:'4px 10px', marginLeft:'4px', border:'1px solid #bbb', backgroundColor: (currentPane === t.key ? '#ddd' : 'whitesmoke') }"
+        ) {{ t.label }}
 
-  //- Draggable divider between panes: vertical in landscape, horizontal in portrait.
-  #paneDivider(
-    @pointerdown.stop.prevent="startPaneResize"
-    @pointermove.stop.prevent="onPaneResizeMove"
-    @pointerup.stop.prevent="stopPaneResize"
-    @pointercancel.stop.prevent="stopPaneResize"
-    @lostpointercapture.stop.prevent="stopPaneResize"
-    :style="paneDividerStyle"
-    title="Drag to resize panes"
-  )
+      #tabBody(:style="{ flex:'1 1 auto', minHeight:'0px', position:'relative', width:'100%' }")
+        Series(v-show="currentPane === 'series'" style="display:block; width:100%; height:100%;" :simpleMode="simpleMode" :sizing="activeSizing")
+        Map(
+          v-show="currentPane === 'map'"
+          :mapShow="mapShow"
+          :hideMapBottom="hideMapBottom"
+          :seriesMapSeasons="seriesMapSeasons"
+          :seriesMapEpis="seriesMapEpis"
+          :seriesMap="seriesMap"
+          :mapError="mapError"
+          :simpleMode="simpleMode"
+          :sizing="activeSizing"
+          @prune="handleMapAction('prune', $event)"
+          @set-date="handleMapAction('date', $event)"
+          @close="handleMapAction('close')"
+          @show-actors="() => handleShowActors(false)"
+          @episode-click="handleEpisodeClick"
+        )
+        Actors(
+          v-show="currentPane === 'actors'"
+          style="width:100%; height:100%;"
+          :simpleMode="simpleMode"
+          :sizing="activeSizing"
+        )
+        Reel(
+          v-if="!simpleMode"
+          v-show="currentPane === 'reel'"
+          style="width:100%; height:100%;"
+          :simpleMode="simpleMode"
+          :sizing="activeSizing"
+          :allShows="allShows"
+          :active="currentPane === 'reel'"
+        )
+        Torrents(
+          v-if="!simpleMode"
+          v-show="currentPane === 'torrents'"
+          style="width:100%; height:100%;"
+          :simpleMode="simpleMode"
+          :sizing="activeSizing"
+          :activeShow="currentShow"
+        )
 
-  List(
-    :style="listStyle"
-    :simpleMode="simpleMode"
-    :sizing="activeSizing"
-    @show-map="handleShowMap"
-    @hide-map="handleHideMap"
-    @show-actors="handleShowActors"
-    @show-torrents="handleShowTorrents"
-    @all-shows="handleAllShows"
-  )
+        Flex(
+          v-if="!simpleMode"
+          v-show="currentPane === 'flex'"
+          style="width:100%; height:100%;"
+          :simpleMode="simpleMode"
+          :sizing="activeSizing"
+        )
+
+        History(
+          v-if="!simpleMode"
+          v-show="currentPane === 'history'"
+          style="width:100%; height:100%;"
+          :simpleMode="simpleMode"
+          :sizing="activeSizing"
+        )
+
+        TvProc(
+          v-if="!simpleMode"
+          v-show="currentPane === 'tvproc'"
+          style="width:100%; height:100%;"
+          :simpleMode="simpleMode"
+          :sizing="activeSizing"
+        )
+
+    //- Draggable divider between panes: vertical in landscape, horizontal in portrait.
+    #paneDivider(
+      @pointerdown.stop.prevent="startPaneResize"
+      @pointermove.stop.prevent="onPaneResizeMove"
+      @pointerup.stop.prevent="stopPaneResize"
+      @pointercancel.stop.prevent="stopPaneResize"
+      @lostpointercapture.stop.prevent="stopPaneResize"
+      :style="paneDividerStyle"
+      title="Drag to resize panes"
+    )
+
+    List(
+      :style="listStyle"
+      :simpleMode="simpleMode"
+      :sizing="activeSizing"
+      @show-map="handleShowMap"
+      @hide-map="handleHideMap"
+      @show-actors="handleShowActors"
+      @show-torrents="handleShowTorrents"
+      @all-shows="handleAllShows"
+    )
 </template>
 
 <script>
@@ -107,6 +219,7 @@ import List     from './list.vue';
 import Series   from './series.vue';
 import Map      from './map.vue';
 import Actors   from './actors.vue';
+import Buttons  from './buttons.vue';
 import Reel     from './reel.vue';
 import Torrents from './torrents.vue';
 import Flex     from './flex.vue';
@@ -118,7 +231,7 @@ import { config } from '../config.js';
 
 export default {
   name: "App",
-  components: { List, Series, Map, Actors, Reel, Torrents, Flex, History, TvProc },
+  components: { List, Series, Map, Actors, Buttons, Reel, Torrents, Flex, History, TvProc },
   data() { 
     return { 
       // Must be known before first render so non-simple panes never mount in simple mode.
@@ -226,6 +339,31 @@ export default {
       return Number(this.windowH) > Number(this.windowW);
     },
 
+    showSideButtons() {
+      return !!(this.simpleMode && this.isPortrait);
+    },
+
+    sideButtonsSizing() {
+      const scalePx = (val, scale) => {
+        if (typeof val !== 'string') return val;
+        const m = val.trim().match(/^([0-9]+(?:\.[0-9]+)?)px$/);
+        if (!m) return val;
+        const n = Math.round(Number(m[1]) * scale);
+        return `${n}px`;
+      };
+
+      const scale = 0.75;
+      const base = this.activeSizing || {};
+      return {
+        ...base,
+        buttonHeight: scalePx(base.buttonHeight || '40px', scale),
+        buttonFontSize: scalePx(base.buttonFontSize || '15px', scale),
+        buttonMarginBottom: scalePx(base.buttonMarginBottom || '8px', scale),
+        buttonTopMargin: scalePx(base.buttonTopMargin || '10px', scale),
+        buttonContainerPadding: scalePx(base.buttonContainerPadding || '5px', scale),
+      };
+    },
+
     activeSizing() {
       const base = this.simpleMode ? this.sizing : this.sizingNonSimple;
 
@@ -284,9 +422,9 @@ export default {
 
     paneDividerStyle() {
       if (this.isPortrait) {
-        return { height: '6px', width: '100%', cursor: 'row-resize', backgroundColor: '#ddd', flex: '0 0 auto', order: 1 };
+        return { height: '12px', width: '100%', cursor: 'row-resize', backgroundColor: '#ddd', flex: '0 0 auto', order: 1 };
       }
-      return { width: '6px', cursor: 'col-resize', backgroundColor: '#ddd', flex: '0 0 auto', order: 1 };
+      return { width: '12px', cursor: 'col-resize', backgroundColor: '#ddd', flex: '0 0 auto', order: 1 };
     },
 
     tabs() {
@@ -313,6 +451,13 @@ export default {
     this.cancelDownInactiveTimer();
   },
   methods: {
+    onSideButtonsClick(activeButtons) {
+      evtBus.emit('simpleModeButtonsClick', activeButtons);
+    },
+
+    onSideButtonsTop() {
+      evtBus.emit('simpleModeButtonsTop');
+    },
     loadSplitPrefs() {
       const readNum = (key) => {
         try {

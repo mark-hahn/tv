@@ -2,5 +2,3 @@
 === copilot should ignore this file 
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
-
-save the percentage of widths of the sections in localstorage and save the percentage of heights of the sections in localstorage

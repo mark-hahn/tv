@@ -44,6 +44,7 @@
             :style="{ opacity: canPanRight ? 1 : 0.35, cursor: canPanRight ? 'pointer' : 'default' }"
             style="font-size:15px; margin:5px; max-height:24px; border-radius:7px;"
           ) →
+          button(v-if="!mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('reload-shows')" style="font-size:15px; cursor:pointer; margin:5px 0 5px 5px; max-height:24px; border-radius:7px;") Refresh
           button(v-if="!mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px 0 5px 5px; max-height:24px; border-radius:7px;") Prune
 
     #maphdr2(style="display:flex; justify-content:space-between; align-items:center; color:red; margin:0 10px 5px 10px; padding-left:5px; font-size:15px;")
@@ -251,7 +252,7 @@ export default {
     }
   },
 
-  emits: ['prune', 'set-date', 'close', 'episode-click', 'show-actors'],
+  emits: ['reload-shows', 'prune', 'set-date', 'close', 'episode-click', 'show-actors'],
 
   async mounted() {
     if (this.mapShow && this.mapShow.Name) {

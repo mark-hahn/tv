@@ -596,7 +596,7 @@ export const getSeriesMap = async (show, prune = false) => {
 
       episodes.push([episodeNumber, 
           {error, played, avail, noFile: noFileVal, 
-            unaired, deleted}]); 
+            unaired, deleted, path}]); 
     }
     seriesMap.push([seasonNumber, episodes]);
   }

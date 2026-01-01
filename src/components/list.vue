@@ -5,6 +5,12 @@
     div(style="font-size:18px; font-weight:bold; margin-bottom:10px;") Searching web for information about show:
     div(style="font-size:20px; color:#0066cc; margin-bottom:15px;") {{searchingShowName}}
     div(style="font-size:16px; color:#666; margin-bottom:6px;") {{ searchingStatus || 'Please wait ...' }}
+
+  #reloadingShowsModal(v-if="showReloadingShows" @click.stop style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background-color:white; padding:30px 40px; border:2px solid black; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.3); z-index:10000; text-align:center;")
+    div(style="font-size:18px; font-weight:bold;") Reloading Shows
+
+  #embyRefreshingModal(v-if="showEmbyRefreshing" @click.stop style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background-color:white; padding:30px 40px; border:2px solid black; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.3); z-index:10000; text-align:center;")
+    div(style="font-size:18px; font-weight:bold;") Emby is being refreshed.
   
   #center(:style="{ height:'100%', width: sizing.listWidth || '800px', display:'flex', flexDirection:'column' }")             
     #hdr(style="width:100%; background-color:#ccc; display:flex; flex-direction:column;")
@@ -339,6 +345,8 @@ export default {
       showSearching:     false,
       searchingShowName: '',        
       searchingStatus:   '',
+      showReloadingShows: false,
+      showEmbyRefreshing: false,
       sortChoices:          
         ['Alpha', 'Viewed', 'Added', 'Ratings', 'Size'],
       fltrChoices:
@@ -1171,20 +1179,61 @@ export default {
     },
 
     async episodeClick(e, show, season, episode, setWatched = null) {
-      let deleted = null;
-      if(e.ctrlKey) {
-        const ok = 
-          confirm(`OK to delete file for ${show.Name} ` +
-                     `S${season}E${episode} ?`);
-        if(!ok) return;
-        // delete episode file
-        await emby.editEpisode(show.Id, season, episode, true, setWatched);
-        deleted = {season, episode};
-      }
-      else // toggle watched or set to specific value
-        await emby.editEpisode(show.Id, season, episode, false, setWatched);
+      if (e?.ctrlKey) {
+        const cell = this.seriesMap?.[season]?.[episode];
+        const path = cell?.path;
+        const noFile = !!cell?.noFile;
 
-      await this.seriesMapAction('', show, deleted);
+        if (!path || noFile) return;
+
+        const ok = confirm(
+          `OK to delete file for ${show.Name} S${season}E${episode} ?`
+        );
+        if (!ok) return;
+
+        try {
+          await srvr.deletePath(path);
+        } catch (err) {
+          console.error('episodeClick: deletePath failed', { path, err });
+          window.alert(err?.message || String(err));
+          return;
+        }
+
+        // Emby won't reflect the deletion until the library is refreshed.
+        await this.refreshEmbyLibraryWithDialog();
+
+        // Refresh the Map grid now that Emby has refreshed.
+        await this.seriesMapAction('refresh', show, null);
+
+        // Reload show list (shows the Reloading Shows dialog).
+        evtBus.emit('library-refresh-complete');
+        return;
+      }
+
+      // toggle watched or set to specific value
+      await emby.editEpisode(show.Id, season, episode, false, setWatched);
+      await this.seriesMapAction('', show, null);
+    },
+
+    async refreshEmbyLibraryWithDialog(timeoutMs = 120000) {
+      const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+
+      this.showEmbyRefreshing = true;
+      try {
+        const res = await emby.refreshLib();
+        if (res?.status === 'hasTask' && res?.taskId) {
+          const startMs = Date.now();
+          while (Date.now() - startMs < timeoutMs) {
+            const st = await emby.taskStatus(res.taskId);
+            if (st?.status !== 'refreshing') break;
+            await sleep(2000);
+          }
+        }
+      } catch (e) {
+        console.error('refreshEmbyLibraryWithDialog failed', e);
+      } finally {
+        this.showEmbyRefreshing = false;
+      }
     },
 
     waitStrClick(show) {
@@ -1239,14 +1288,14 @@ export default {
         for(const episode of episodes) {
           let [episodeNum, epiObj] = episode;
           const {error, played, avail, noFile, 
-                 unaired, deleted:epiDeleted} = epiObj;
+             unaired, deleted:epiDeleted, path} = epiObj;
           seriesMapEpis[episodeNum] = episodeNum;
           const deleted = epiDeleted ||
               (wasDeleted?.season  == seasonNum && 
                wasDeleted?.episode == episodeNum);
           seasonMap[episodeNum] = 
               {error, played, avail,
-               noFile, unaired, deleted};
+           noFile, unaired, deleted, path};
         }
       }
       this.seriesMapSeasons = 
@@ -1576,11 +1625,13 @@ export default {
     // Listen for library refresh completion to refresh show list
     evtBus.on('library-refresh-complete', (payload) => {
       const onDone = payload && typeof payload === 'object' ? payload.onDone : null;
+      this.showReloadingShows = true;
       Promise.resolve(this.newShows())
         .catch((err) => {
           console.error('library-refresh-complete: newShows failed', err);
         })
         .finally(() => {
+          this.showReloadingShows = false;
           if (typeof onDone === 'function') {
             try { onDone(); } catch { /* ignore */ }
           }

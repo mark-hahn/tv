@@ -37,6 +37,7 @@
             :mapError="mapError"
             :simpleMode="simpleMode"
             :sizing="activeSizing"
+            @reload-shows="triggerShowReload"
             @prune="handleMapAction('prune', $event)"
             @set-date="handleMapAction('date', $event)"
             @close="handleMapAction('close')"
@@ -145,6 +146,7 @@
           :mapError="mapError"
           :simpleMode="simpleMode"
           :sizing="activeSizing"
+          @reload-shows="triggerShowReload"
           @prune="handleMapAction('prune', $event)"
           @set-date="handleMapAction('date', $event)"
           @close="handleMapAction('close')"
@@ -469,6 +471,9 @@ export default {
     this.cancelDownInactiveTimer();
   },
   methods: {
+    triggerShowReload() {
+      evtBus.emit('library-refresh-complete', { showReloadDialog: true });
+    },
     onSideButtonsClick(activeButtons) {
       evtBus.emit('simpleModeButtonsClick', activeButtons);
     },

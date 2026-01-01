@@ -11,6 +11,11 @@
       style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; background-color:whitesmoke; margin-right:20px;"
     ) {{ expanded.size === 0 ? 'Expand' : 'Collapse' }}
 
+    button(
+      @click.stop="refreshShows"
+      style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; background-color:whitesmoke; margin-right:20px;"
+    ) Refresh
+
   div(v-if="error" style="text-align:left; color:#c00; margin-top:10px; font-size:14px; white-space:pre-line; padding:0 10px;")
     div Error: {{ error }}
 
@@ -152,15 +157,15 @@ const TreeNodes = {
   },
   render() {
     const nodes = Array.isArray(this.nodes) ? this.nodes : [];
+    const softWrap = (s) => String(s ?? '').replace(/([^A-Za-z0-9\s])/g, '$1\u200B');
     const children = nodes.map((node, idx) => {
       const key = this.nodeKey(node, idx);
 
       const rowStyleBase = {
         ...this.indentStyle(),
         display: 'flex',
-        alignItems: 'baseline',
+        alignItems: 'flex-start',
         gap: '0ch',
-        whiteSpace: 'nowrap',
         userSelect: 'none'
       };
 
@@ -170,8 +175,16 @@ const TreeNodes = {
         textAlign: 'left'
       };
 
-      const textStyle = {
-        flex: '0 0 auto'
+      const nameTextStyle = {
+        flex: '1 1 auto',
+        minWidth: '0px',
+        display: 'block',
+        whiteSpace: 'normal',
+        overflowWrap: 'break-word',
+        wordBreak: 'break-word',
+        // Hanging indent: wrapped lines start 4ch to the right.
+        paddingLeft: '4ch',
+        textIndent: '-4ch'
       };
 
       if (typeof node === 'string') {
@@ -203,10 +216,10 @@ const TreeNodes = {
               'span',
               {
                 'data-click': 'name',
-                style: { ...textStyle, cursor: 'pointer' },
+                style: { ...nameTextStyle, cursor: 'pointer' },
                 onClick: (e) => this.onFileNameClick(e, node)
               },
-              node
+              softWrap(node)
             )
           ]
         );
@@ -248,10 +261,10 @@ const TreeNodes = {
               'span',
               {
                 'data-click': 'name',
-                style: { ...textStyle, cursor: 'pointer' },
+                style: { ...nameTextStyle, cursor: 'pointer', fontWeight: 'bold' },
                 onClick: (e) => this.onDirNameClick(e, node)
               },
-              name
+              softWrap(name)
             )
           ]
         );
@@ -364,6 +377,10 @@ export default {
       else this.openAll();
     },
 
+    refreshShows() {
+      evtBus.emit('library-refresh-complete', { showReloadDialog: true });
+    },
+
     async openRel(relPath) {
       this.error = null;
       this.busy = true;
@@ -399,15 +416,19 @@ export default {
       const ok = window.confirm(msg);
       if (!ok) return;
 
+      let didDelete = false;
       try {
         for (const p of paths) {
           await srvr.deletePath(p);
+          didDelete = true;
         }
       } catch (e) {
         this.error = e?.message || String(e);
       }
 
       await this.openRel(this.rootPath);
+
+      if (didDelete) evtBus.emit('library-refresh-complete', { showReloadDialog: true });
     },
 
     async onDirClick(payload) {

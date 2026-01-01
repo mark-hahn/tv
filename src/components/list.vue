@@ -1621,6 +1621,36 @@ export default {
     evtBus.on('episodeClick', async ({ e, show, season, episode, setWatched }) => {
       await this.episodeClick(e, show, season, episode, setWatched);
     });
+
+    // Listen for season folder deletes from App.vue (ctrl-click season number in Map)
+    evtBus.on('seasonDelete', async ({ e, show, season }) => {
+      if (this.simpleMode) return;
+      if (!e?.ctrlKey) return;
+
+      const showName = show?.Name || '';
+      const showPath = show?.Path || '';
+      if (!showPath) return;
+
+      const ok = window.confirm(
+        `OK to delete folder Season ${season} for show ${showName} ?`
+      );
+      if (!ok) return;
+
+      const sep = showPath.includes('\\') ? '\\' : '/';
+      const seasonPath = `${showPath.replace(/[\\/]+$/, '')}${sep}Season ${season}`;
+
+      try {
+        await srvr.deletePath(seasonPath);
+      } catch (err) {
+        console.error('seasonDelete: deletePath failed', { seasonPath, err });
+        window.alert(err?.message || String(err));
+        return;
+      }
+
+      await this.refreshEmbyLibraryWithDialog();
+      await this.seriesMapAction('refresh', show, null);
+      evtBus.emit('library-refresh-complete');
+    });
     
     // Listen for library refresh completion to refresh show list
     evtBus.on('library-refresh-complete', (payload) => {

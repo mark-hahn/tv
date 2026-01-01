@@ -3,3 +3,5 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
+when ctrl-clicking on season numer in table in map pane, delete entire season folder, not just the episode files. do deletePath(<dir path>) where <dir path> is like "<showPath>/Season <x>". where <showPath> is from show record and <x> is season number of the row. then there is no need to do deletePath on all episode files.
+

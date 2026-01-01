@@ -43,6 +43,7 @@
             @close="handleMapAction('close')"
             @show-actors="() => handleShowActors(false)"
             @episode-click="handleEpisodeClick"
+            @season-delete="handleSeasonDelete"
           )
           Actors(
             v-show="currentPane === 'actors'"
@@ -152,6 +153,7 @@
           @close="handleMapAction('close')"
           @show-actors="() => handleShowActors(false)"
           @episode-click="handleEpisodeClick"
+          @season-delete="handleSeasonDelete"
         )
         Actors(
           v-show="currentPane === 'actors'"
@@ -979,6 +981,10 @@ export default {
     },
     handleEpisodeClick(e, show, season, episode, setWatched = null) {
       evtBus.emit('episodeClick', {e, show, season, episode, setWatched});
+    }
+    ,
+    handleSeasonDelete(e, show, season) {
+      evtBus.emit('seasonDelete', { e, show, season });
     }
   },
   mounted() {

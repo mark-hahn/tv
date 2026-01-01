@@ -165,12 +165,12 @@ const TreeNodes = {
     onDirNameClick(e, node) {
       e?.stopPropagation?.();
       const p = this.dirPath(node);
-      this.$emit('dir-click', { path: p, ctrl: !!(e?.ctrlKey || e?.metaKey), shift: !!e?.shiftKey, area: 'name' });
+      this.$emit('dir-click', { path: p, alt: !!e?.altKey, ctrl: !!(e?.ctrlKey || e?.metaKey), shift: !!e?.shiftKey, area: 'name' });
     },
     onFileNameClick(e, name) {
       e?.stopPropagation?.();
       const p = joinRel(this.parentPath, name);
-      this.$emit('file-click', { path: p, ctrl: !!(e?.ctrlKey || e?.metaKey), shift: !!e?.shiftKey, area: 'name' });
+      this.$emit('file-click', { path: p, alt: !!e?.altKey, ctrl: !!(e?.ctrlKey || e?.metaKey), shift: !!e?.shiftKey, area: 'name' });
     }
   },
   render() {
@@ -211,7 +211,7 @@ const TreeNodes = {
               // Ctrl-click on whitespace: treat as selection toggle (multi-select support).
               if (e?.ctrlKey || e?.metaKey) {
                 e?.stopPropagation?.();
-                this.$emit('file-click', { path: filePath, ctrl: true, shift: false, area: 'whitespace' });
+                this.$emit('file-click', { path: filePath, alt: false, ctrl: true, shift: false, area: 'whitespace' });
               }
             },
             style: {
@@ -395,8 +395,8 @@ export default {
       this.clearSelections();
       this.rootPath = sanitizeRelPath(relPath);
       try {
-        // Call getFile() with path relative to BASE.
-        const res = await srvr.getFile(this.rootPath);
+        // Always call getFile() with a full BASE-prefixed path.
+        const res = await srvr.getFile(fullFromRel(this.rootPath));
         if (Array.isArray(res)) {
           this.tree = res;
         } else if (res && Array.isArray(res.children)) {
@@ -406,7 +406,7 @@ export default {
           this.error = 'Unexpected response from getFile.';
         }
       } catch (e) {
-        this.error = e?.message || String(e);
+        this.error = e?.err || e?.message || String(e);
       } finally {
         this.busy = false;
       }
@@ -436,7 +436,7 @@ export default {
     async onDirClick(payload) {
       const rel = sanitizeRelPath(payload?.path);
       if (!rel) return;
-      if (payload?.ctrl) {
+      if (payload?.alt) {
         await this.confirmAndDeletePaths([fullFromRel(rel)]);
         return;
       }
@@ -459,21 +459,22 @@ export default {
       const rel = sanitizeRelPath(payload?.path);
       if (!rel) return;
 
+      const isAlt = !!payload?.alt;
       const isCtrl = !!payload?.ctrl;
       const isShift = !!payload?.shift;
       const area = String(payload?.area || 'name');
       const isSelected = this.selectedFiles.has(rel);
 
-      // Ctrl-click on a selected file => delete confirmation.
-      if (isCtrl && isSelected) {
+      // Alt-click on a selected file name => delete confirmation for selection.
+      if (isAlt && isSelected && area === 'name') {
         const sel = Array.from(this.selectedFiles);
         const full = sel.map(p => fullFromRel(p));
         await this.confirmAndDeletePaths(full);
         return;
       }
 
-      // Ctrl-click on an UNSELECTED file name => delete that file.
-      if (isCtrl && !isSelected && area === 'name') {
+      // Alt-click on an unselected file name => delete just that file.
+      if (isAlt && !isSelected && area === 'name') {
         await this.confirmAndDeletePaths([fullFromRel(rel)]);
         return;
       }
@@ -485,13 +486,33 @@ export default {
         : null;
 
       if (isShift && anchor && idx >= 0) {
-        const aIdx = visible.indexOf(anchor);
-        const lo = Math.min(aIdx, idx);
-        const hi = Math.max(aIdx, idx);
-        const range = visible.slice(lo, hi + 1);
-        const next = isCtrl ? new Set(this.selectedFiles) : new Set();
+        const dirOf = (p) => {
+          const s = String(p || '');
+          const i = s.lastIndexOf('/');
+          return i >= 0 ? s.slice(0, i) : '';
+        };
+
+        // Shift-click only extends a range within the same directory as the
+        // last-selected file. If there's no selection anchor in this directory,
+        // do nothing and do not clear any existing selections.
+        const targetDir = dirOf(rel);
+        const anchorDir = dirOf(anchor);
+        if (targetDir !== anchorDir) return;
+        if (!this.selectedFiles.has(anchor)) return;
+
+        const visibleInDir = visible.filter(p => dirOf(p) === targetDir);
+        const aIdx = visibleInDir.indexOf(anchor);
+        const tIdx = visibleInDir.indexOf(rel);
+        if (aIdx < 0 || tIdx < 0) return;
+
+        const lo = Math.min(aIdx, tIdx);
+        const hi = Math.max(aIdx, tIdx);
+        const range = visibleInDir.slice(lo, hi + 1);
+
+        const next = new Set(this.selectedFiles);
         for (const p of range) next.add(p);
         this.selectedFiles = next;
+        this.selectionAnchor = rel;
         return;
       }
 
@@ -524,10 +545,25 @@ export default {
       if (!childEls || childEls.length === 0) return;
       const lastEl = childEls[childEls.length - 1];
 
-      const target = Math.max(0, (lastEl.offsetTop + lastEl.offsetHeight) - sc.clientHeight);
-      const maxScroll = Math.max(0, headerEl.offsetTop);
-      const nextScroll = Math.min(target, maxScroll);
-      if (nextScroll > sc.scrollTop) sc.scrollTop = nextScroll;
+      // Use client rects instead of offsetTop because offsetTop is relative to the
+      // element's offsetParent (which may not be the scroll container).
+      const scRect = sc.getBoundingClientRect();
+      const headerRect = headerEl.getBoundingClientRect();
+      const lastRect = lastEl.getBoundingClientRect();
+
+      // How much we need to scroll DOWN so the last child becomes visible at the bottom.
+      // Positive means it's below the viewport.
+      const needDown = Math.max(0, lastRect.bottom - scRect.bottom);
+      const desired = sc.scrollTop + needDown;
+
+      // Constraint: after scrolling, the header must still be visible (not above top).
+      // Scrolling down by delta moves the header up by delta.
+      const headerTopNow = headerRect.top - scRect.top;
+      const maxDeltaDown = Math.max(0, headerTopNow);
+      const maxScrollForHeaderVisible = sc.scrollTop + maxDeltaDown;
+
+      const nextScroll = Math.min(desired, maxScrollForHeaderVisible);
+      if (Number.isFinite(nextScroll) && nextScroll !== sc.scrollTop) sc.scrollTop = nextScroll;
     },
 
     openAll() {

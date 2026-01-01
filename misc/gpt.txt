@@ -2,3 +2,12 @@
 === copilot should ignore this file 
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
+
+my instructions were contradictoy when ctrl-clicking on file name - i said to add to selection and i also said to delete the file. ctrl-clicking on file name should add to selection.
+
+for deletion of dir or file use alt-click, not ctrl-click
+
+
+expanding selection with shift-click should expand to last file selected if in same dir, do nothing if no selection in dir and not clear any other selections
+
+clicking on file name should toggle selection

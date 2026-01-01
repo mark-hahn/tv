@@ -115,7 +115,8 @@ const filterNodesForVideos = (nodes, videosOnly) => {
     const entry = dirEntry(node);
     if (!entry) continue;
     const kids = filterNodesForVideos(entry.children, true);
-    if (kids.length > 0) out.push({ [entry.name]: kids });
+    // Never hide directories in Videos mode; just filter files.
+    out.push({ [entry.name]: kids });
   }
   return out;
 };

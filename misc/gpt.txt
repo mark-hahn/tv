@@ -3,5 +3,3 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-- in file pane add button Videos between collapse and copy. It is a toggle that when enabled shows a gray background and only files with video extensions are shown in tree.
-- append " (<file count>)" to end of dir names where <file count> is number of files in dir

@@ -456,7 +456,7 @@ export default {
         { label: 'Flex', key: 'flex' },
         { label: 'Qbt', key: 'history' },
         { label: 'Down', key: 'tvproc' },
-        { label: 'File', key: 'file' }
+        { label: 'Files', key: 'file' }
       ];
 
       if (!this.simpleMode) return allTabs;

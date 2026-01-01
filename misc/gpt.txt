@@ -3,10 +3,19 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
+in this:
+  your.friends.and.neighbors.s01e04.1080p.web.h264-successfulcrab.mkv
+  Your Friends and Neighbors S01E06 The Things You Lost Along the Way 1080p ATVP WEB-DL DDP5 1 Atmos H 264-FLUX-thumb.jpg
+  Your Friends and Neighbors S01E06 The Things You Lost Along the Way 1080p ATVP WEB-DL DDP5 1 Atmos H 264-FLUX.nfo
+  your.friends.and.neighbors.s01e04.1080p.web.h264-successfulcrab-thumb.jpg
+  your.friends.and.neighbors.s01e05.1080p.web.h264-successfulcrab-thumb.jpg
 
-in file pane sort files for a dir in this order:
+the lines:
+  Your Friends and Neighbors S01E06 The Things You Lost Along the Way 1080p ATVP WEB-DL DDP5 1 Atmos H 264-FLUX-thumb.jpg
+  Your Friends and Neighbors S01E06 The Things You Lost Along the Way 1080p ATVP WEB-DL DDP5 1 Atmos H 264-FLUX.nfo
+should be after lines:
+  your.friends.and.neighbors.s01e04.1080p.web.h264-successfulcrab-thumb.jpg
+  your.friends.and.neighbors.s01e05.1080p.web.h264-successfulcrab-thumb.jpg
+because s01e06 should sort after s01e05
 
-- show video files first with extensions like .mkv, .avi, etc. first before others.
-
-- in video file list and in "others" list get season and episode values by parsing name with parse-torrent-title. then sort by season episode numbers
-
+-- use the season/episode numbers from parse-torrent-title

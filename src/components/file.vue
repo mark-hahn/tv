@@ -12,6 +12,12 @@
     ) {{ expanded.size === 0 ? 'Expand' : 'Collapse' }}
 
     button(
+      @click.stop="copyPaneToClipboard"
+      :disabled="busy || !Array.isArray(tree)"
+      style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; background-color:whitesmoke; margin-right:20px;"
+    ) Copy
+
+    button(
       @click.stop="refreshShows"
       style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; background-color:whitesmoke; margin-right:20px;"
     ) Refresh
@@ -45,10 +51,88 @@
 
 <script>
 import { h, nextTick } from 'vue';
+import parseTorrentTitle from 'parse-torrent-title';
 import evtBus from '../evtBus.js';
 import * as srvr from '../srvr.js';
 
 const BASE = '/mnt/media/tv';
+
+const VIDEO_EXTS = new Set([
+  'mkv', 'avi', 'mp4', 'm4v', 'mov', 'wmv', 'webm',
+  'mpg', 'mpeg', 'ts', 'm2ts'
+]);
+
+const getExt = (name) => {
+  const s = String(name || '');
+  const i = s.lastIndexOf('.');
+  if (i < 0) return '';
+  return s.slice(i + 1).toLowerCase();
+};
+
+const isVideoFileName = (name) => VIDEO_EXTS.has(getExt(name));
+
+const toNum = (v) => {
+  if (v == null) return null;
+  if (Array.isArray(v)) return toNum(v[0]);
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+const parseSeasonEpisode = (name) => {
+  try {
+    const parsed = parseTorrentTitle(String(name || ''));
+    const season = toNum(parsed?.season ?? parsed?.seasonNumber ?? parsed?.seasons);
+    const episode = toNum(parsed?.episode ?? parsed?.episodeNumber ?? parsed?.episodes);
+    return { season, episode };
+  } catch (_) {
+    return { season: null, episode: null };
+  }
+};
+
+const sortDirNodes = (nodes) => {
+  const arr = Array.isArray(nodes) ? nodes.slice() : [];
+
+  // Stable sort.
+  const withIdx = arr.map((node, idx) => ({ node, idx }));
+  withIdx.sort((a, b) => {
+    const aNode = a.node;
+    const bNode = b.node;
+
+    const aDir = !!dirEntry(aNode);
+    const bDir = !!dirEntry(bNode);
+    if (aDir !== bDir) return aDir ? -1 : 1;
+
+    // Directories: alpha by name.
+    if (aDir && bDir) {
+      const an = (dirEntry(aNode)?.name || '').toLowerCase();
+      const bn = (dirEntry(bNode)?.name || '').toLowerCase();
+      const c = an.localeCompare(bn);
+      return c || (a.idx - b.idx);
+    }
+
+    // Files.
+    const aName = String(aNode || '');
+    const bName = String(bNode || '');
+    const aVideo = isVideoFileName(aName);
+    const bVideo = isVideoFileName(bName);
+    if (aVideo !== bVideo) return aVideo ? -1 : 1;
+
+    const aSe = parseSeasonEpisode(aName);
+    const bSe = parseSeasonEpisode(bName);
+    const aHas = aSe.season != null && aSe.episode != null;
+    const bHas = bSe.season != null && bSe.episode != null;
+    if (aHas !== bHas) return aHas ? -1 : 1;
+    if (aHas && bHas) {
+      if (aSe.season !== bSe.season) return aSe.season - bSe.season;
+      if (aSe.episode !== bSe.episode) return aSe.episode - bSe.episode;
+    }
+
+    const c = aName.toLowerCase().localeCompare(bName.toLowerCase());
+    return c || (a.idx - b.idx);
+  });
+
+  return withIdx.map((x) => x.node);
+};
 
 const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
 
@@ -156,7 +240,7 @@ const TreeNodes = {
     }
   },
   render() {
-    const nodes = Array.isArray(this.nodes) ? this.nodes : [];
+    const nodes = sortDirNodes(this.nodes);
     const softWrap = (s) => String(s ?? '').replace(/([^A-Za-z0-9\s])/g, '$1\u200B');
     const children = nodes.map((node, idx) => {
       const key = this.nodeKey(node, idx);
@@ -196,14 +280,6 @@ const TreeNodes = {
             key,
             'data-type': 'file',
             'data-nodepath': filePath,
-            onClick: (e) => {
-              // Plain whitespace click: allow bubble to scroller, which clears selections.
-              // Ctrl-click on whitespace: treat as selection toggle (multi-select support).
-              if (e?.ctrlKey || e?.metaKey) {
-                e?.stopPropagation?.();
-                this.$emit('file-click', { path: filePath, alt: false, ctrl: true, shift: false, area: 'whitespace' });
-              }
-            },
             style: {
               cursor: 'default',
               ...rowStyleBase,
@@ -216,10 +292,18 @@ const TreeNodes = {
               'span',
               {
                 'data-click': 'name',
-                style: { ...nameTextStyle, cursor: 'pointer' },
-                onClick: (e) => this.onFileNameClick(e, node)
+                style: { ...nameTextStyle }
               },
-              softWrap(node)
+              [
+                h(
+                  'span',
+                  {
+                    style: { cursor: 'pointer' },
+                    onClick: (e) => this.onFileNameClick(e, node)
+                  },
+                  softWrap(node)
+                )
+              ]
             )
           ]
         );
@@ -261,10 +345,18 @@ const TreeNodes = {
               'span',
               {
                 'data-click': 'name',
-                style: { ...nameTextStyle, cursor: 'pointer', fontWeight: 'bold' },
-                onClick: (e) => this.onDirNameClick(e, node)
+                style: { ...nameTextStyle, fontWeight: 'bold' }
               },
-              softWrap(name)
+              [
+                h(
+                  'span',
+                  {
+                    style: { cursor: 'pointer', fontWeight: 'bold' },
+                    onClick: (e) => this.onDirNameClick(e, node)
+                  },
+                  softWrap(name)
+                )
+              ]
             )
           ]
         );
@@ -272,7 +364,7 @@ const TreeNodes = {
         const body = isOpen
           ? h(TreeNodes, {
               key: `${key}:c`,
-              nodes: this.dirChildren(node),
+              nodes: sortDirNodes(this.dirChildren(node)),
               parentPath: dirPathVal,
               depth: (Number(this.depth) || 0) + 1,
               expanded: this.expanded,
@@ -379,6 +471,33 @@ export default {
 
     refreshShows() {
       evtBus.emit('library-refresh-complete', { showReloadDialog: true });
+    },
+
+    async copyPaneToClipboard() {
+      if (!Array.isArray(this.tree)) return;
+
+      const lines = [];
+      const walk = (nodes, depth) => {
+        const arr = sortDirNodes(nodes);
+        for (const node of arr) {
+          if (typeof node === 'string') {
+            lines.push(`${'  '.repeat(depth)}${node}`);
+            continue;
+          }
+          const entry = dirEntry(node);
+          if (!entry) continue;
+          lines.push(`${'  '.repeat(depth)}${entry.name}`);
+          walk(entry.children, depth + 1);
+        }
+      };
+
+      walk(this.tree, 0);
+
+      try {
+        await navigator.clipboard.writeText(lines.join('\n'));
+      } catch (e) {
+        this.error = e?.message || String(e);
+      }
     },
 
     async openRel(relPath) {

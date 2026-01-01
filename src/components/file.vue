@@ -80,7 +80,12 @@ const toNum = (v) => {
 
 const parseSeasonEpisode = (name) => {
   try {
-    const parsed = parseTorrentTitle(String(name || ''));
+    const s = String(name || '');
+    const parsed = (typeof parseTorrentTitle === 'function')
+      ? parseTorrentTitle(s)
+      : (typeof parseTorrentTitle?.parse === 'function')
+          ? parseTorrentTitle.parse(s)
+          : null;
     const season = toNum(parsed?.season ?? parsed?.seasonNumber ?? parsed?.seasons);
     const episode = toNum(parsed?.episode ?? parsed?.episodeNumber ?? parsed?.episodes);
     return { season, episode };

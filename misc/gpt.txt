@@ -3,19 +3,5 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-in this:
-  your.friends.and.neighbors.s01e04.1080p.web.h264-successfulcrab.mkv
-  Your Friends and Neighbors S01E06 The Things You Lost Along the Way 1080p ATVP WEB-DL DDP5 1 Atmos H 264-FLUX-thumb.jpg
-  Your Friends and Neighbors S01E06 The Things You Lost Along the Way 1080p ATVP WEB-DL DDP5 1 Atmos H 264-FLUX.nfo
-  your.friends.and.neighbors.s01e04.1080p.web.h264-successfulcrab-thumb.jpg
-  your.friends.and.neighbors.s01e05.1080p.web.h264-successfulcrab-thumb.jpg
-
-the lines:
-  Your Friends and Neighbors S01E06 The Things You Lost Along the Way 1080p ATVP WEB-DL DDP5 1 Atmos H 264-FLUX-thumb.jpg
-  Your Friends and Neighbors S01E06 The Things You Lost Along the Way 1080p ATVP WEB-DL DDP5 1 Atmos H 264-FLUX.nfo
-should be after lines:
-  your.friends.and.neighbors.s01e04.1080p.web.h264-successfulcrab-thumb.jpg
-  your.friends.and.neighbors.s01e05.1080p.web.h264-successfulcrab-thumb.jpg
-because s01e06 should sort after s01e05
-
--- use the season/episode numbers from parse-torrent-title
+- in file pane add button Videos between collapse and copy. It is a toggle that when enabled shows a gray background and only files with video extensions are shown in tree.
+- append " (<file count>)" to end of dir names where <file count> is number of files in dir

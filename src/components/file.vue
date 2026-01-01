@@ -12,6 +12,13 @@
     ) {{ expanded.size === 0 ? 'Expand' : 'Collapse' }}
 
     button(
+      @click.stop="toggleVideosOnly"
+      :disabled="busy || !Array.isArray(tree)"
+      :style="{ backgroundColor: videosOnly ? '#ddd' : 'whitesmoke' }"
+      style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; margin-right:20px;"
+    ) Videos
+
+    button(
       @click.stop="copyPaneToClipboard"
       :disabled="busy || !Array.isArray(tree)"
       style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; background-color:whitesmoke; margin-right:20px;"
@@ -40,6 +47,7 @@
       :depth="0"
       :expanded="expanded"
       :selectedFiles="selectedFiles"
+      :videosOnly="videosOnly"
       @dir-click="onDirClick"
       @file-click="onFileClick"
       @clear-selections="clearSelections"
@@ -92,6 +100,24 @@ const parseSeasonEpisode = (name) => {
   } catch (_) {
     return { season: null, episode: null };
   }
+};
+
+const filterNodesForVideos = (nodes, videosOnly) => {
+  const arr = Array.isArray(nodes) ? nodes : [];
+  if (!videosOnly) return arr;
+
+  const out = [];
+  for (const node of arr) {
+    if (typeof node === 'string') {
+      if (isVideoFileName(node)) out.push(node);
+      continue;
+    }
+    const entry = dirEntry(node);
+    if (!entry) continue;
+    const kids = filterNodesForVideos(entry.children, true);
+    if (kids.length > 0) out.push({ [entry.name]: kids });
+  }
+  return out;
 };
 
 const sortDirNodes = (nodes) => {
@@ -207,7 +233,8 @@ const TreeNodes = {
     parentPath: { type: String, required: true },
     depth: { type: Number, required: true },
     expanded: { type: Object, required: true },
-    selectedFiles: { type: Object, required: true }
+    selectedFiles: { type: Object, required: true },
+    videosOnly: { type: Boolean, default: false }
   },
   emits: ['dir-click', 'file-click', 'clear-selections'],
   methods: {
@@ -220,6 +247,14 @@ const TreeNodes = {
     },
     dirChildren(node) {
       return dirEntry(node)?.children || [];
+    },
+    dirFileCount(node) {
+      const kids = filterNodesForVideos(this.dirChildren(node), this.videosOnly);
+      let n = 0;
+      for (const child of kids) {
+        if (typeof child === 'string') n++;
+      }
+      return n;
     },
     dirPath(node) {
       const name = this.dirName(node);
@@ -245,7 +280,7 @@ const TreeNodes = {
     }
   },
   render() {
-    const nodes = sortDirNodes(this.nodes);
+    const nodes = sortDirNodes(filterNodesForVideos(this.nodes, this.videosOnly));
     const softWrap = (s) => String(s ?? '').replace(/([^A-Za-z0-9\s])/g, '$1\u200B');
     const children = nodes.map((node, idx) => {
       const key = this.nodeKey(node, idx);
@@ -318,6 +353,7 @@ const TreeNodes = {
         const isOpen = this.isExpandedDir(node);
         const name = this.dirName(node);
         const dirPathVal = this.dirPath(node);
+        const fileCount = this.dirFileCount(node);
 
         const header = h(
           'div',
@@ -360,6 +396,13 @@ const TreeNodes = {
                     onClick: (e) => this.onDirNameClick(e, node)
                   },
                   softWrap(name)
+                ),
+                h(
+                  'span',
+                  {
+                    style: { fontWeight: 'normal' }
+                  },
+                  ` (${fileCount})`
                 )
               ]
             )
@@ -369,11 +412,12 @@ const TreeNodes = {
         const body = isOpen
           ? h(TreeNodes, {
               key: `${key}:c`,
-              nodes: sortDirNodes(this.dirChildren(node)),
+              nodes: this.dirChildren(node),
               parentPath: dirPathVal,
               depth: (Number(this.depth) || 0) + 1,
               expanded: this.expanded,
               selectedFiles: this.selectedFiles,
+              videosOnly: this.videosOnly,
               onDirClick: (payload) => this.$emit('dir-click', payload),
               onFileClick: (payload) => this.$emit('file-click', payload),
               onClearSelections: () => this.$emit('clear-selections')
@@ -408,6 +452,7 @@ export default {
       error: null,
       busy: false,
       expanded: new Set(),
+      videosOnly: false,
       selectedFiles: new Set(),
       selectionAnchor: null
     };
@@ -434,10 +479,15 @@ export default {
       this.selectionAnchor = null;
     },
 
+    toggleVideosOnly() {
+      this.videosOnly = !this.videosOnly;
+      this.pruneSelectionsToVisible();
+    },
+
     getVisibleFilePaths() {
       const out = [];
       const walk = (nodes, parentRel) => {
-        const arr = Array.isArray(nodes) ? nodes : [];
+        const arr = filterNodesForVideos(nodes, this.videosOnly);
         for (const node of arr) {
           if (typeof node === 'string') {
             out.push(joinRel(parentRel, node));
@@ -483,7 +533,7 @@ export default {
 
       const lines = [];
       const walk = (nodes, depth) => {
-        const arr = sortDirNodes(nodes);
+        const arr = sortDirNodes(filterNodesForVideos(nodes, this.videosOnly));
         for (const node of arr) {
           if (typeof node === 'string') {
             lines.push(`${'  '.repeat(depth)}${node}`);
@@ -491,7 +541,9 @@ export default {
           }
           const entry = dirEntry(node);
           if (!entry) continue;
-          lines.push(`${'  '.repeat(depth)}${entry.name}`);
+          const kids = filterNodesForVideos(entry.children, this.videosOnly);
+          const fileCount = kids.filter((k) => typeof k === 'string').length;
+          lines.push(`${'  '.repeat(depth)}${entry.name} (${fileCount})`);
           walk(entry.children, depth + 1);
         }
       };

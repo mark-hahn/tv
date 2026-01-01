@@ -2,36 +2,14 @@
 
 #filepane(:style="{ height:'100%', width:'100%', padding:'5px', margin:0, marginLeft:'16px', display:'flex', flexDirection:'column', overflow:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa' }")
 
-  #header(:style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', margin:0, display:'flex', gap:'8px', alignItems:'center' }")
-    input(
-      v-model="pathInput"
-      @keydown.enter.stop.prevent="loadFromInput"
-      placeholder="Path"
-      :style="{ flex:'1 1 auto', minWidth:'0px', fontSize:'13px', padding:'4px 6px', border:'1px solid #bbb', borderRadius:'7px', textAlign:'right' }"
-    )
-    button(
-      @click.stop="loadFromInput"
-      :disabled="busy"
-      style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;"
-    ) Load
+  #header(:style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', margin:0, display:'flex', alignItems:'center' }")
+    div(:style="{ flex:'1 1 auto', minWidth:'0px', fontWeight:'bold', fontSize:'18px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }") {{ showName }}
 
     button(
-      @click.stop="openAll"
+      @click.stop="collapseToggle"
       :disabled="busy || !Array.isArray(tree)"
-      style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;"
-    ) Open
-
-    button(
-      @click.stop="closeAll"
-      :disabled="busy || expanded.size === 0"
-      style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;"
-    ) Close
-
-    button(
-      @click.stop="selClick"
-      :disabled="busy || selectedFiles.size === 0"
-      :style="{ fontSize:'13px', cursor:(busy || selectedFiles.size === 0 ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', border:'1px solid #bbb', backgroundColor:'whitesmoke', opacity:(selectedFiles.size === 0 ? 0.4 : 1) }"
-    ) Sel
+      style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; background-color:whitesmoke; margin-right:20px;"
+    ) {{ expanded.size === 0 ? 'Expand' : 'Collapse' }}
 
   div(v-if="error" style="text-align:left; color:#c00; margin-top:10px; font-size:14px; white-space:pre-line; padding:0 10px;")
     div Error: {{ error }}
@@ -64,7 +42,6 @@
 import { h, nextTick } from 'vue';
 import evtBus from '../evtBus.js';
 import * as srvr from '../srvr.js';
-import parseTorrentTitle from 'parse-torrent-title';
 
 const BASE = '/mnt/media/tv';
 
@@ -315,7 +292,7 @@ export default {
 
   data() {
     return {
-      pathInput: '',
+      showName: '',
       rootPath: '',
       tree: null,
       error: null,
@@ -336,8 +313,8 @@ export default {
 
   methods: {
     onSetUpSeries(show) {
+      this.showName = String(show?.Name || '').trim();
       const rel = sanitizeRelPath(show?.Path);
-      this.pathInput = rel;
       void this.openRel(rel);
     },
 
@@ -381,10 +358,10 @@ export default {
       }
     },
 
-    async loadFromInput() {
-      const rel = sanitizeRelPath(this.pathInput);
-      this.pathInput = rel;
-      await this.openRel(rel);
+    collapseToggle() {
+      if (!Array.isArray(this.tree)) return;
+      if (this.expanded.size > 0) this.closeAll();
+      else this.openAll();
     },
 
     async openRel(relPath) {
@@ -588,26 +565,7 @@ export default {
       this.pruneSelectionsToVisible();
     },
 
-    selClick() {
-      if (this.selectedFiles.size !== 1) return;
-      const only = Array.from(this.selectedFiles)[0];
-      const baseName = String(only || '').replace(/^.*\//, '');
-      const noExt = baseName.replace(/\.[a-z0-9]{1,5}$/i, '');
-
-      let parsed = null;
-      try {
-        const parser = parseTorrentTitle?.parse
-          ? parseTorrentTitle.parse
-          : (typeof parseTorrentTitle === 'function' ? parseTorrentTitle : null);
-        parsed = parser ? parser(noExt) : null;
-      } catch {
-        parsed = null;
-      }
-
-      const title = String(parsed?.title || noExt || '').trim();
-      if (!title) return;
-      evtBus.emit('selectShowFromCardTitle', title);
-    }
+    // Sel button removed.
   }
 };
 </script>

@@ -25,10 +25,24 @@ const footerStr  = fs.readFileSync('config/config5-footer.txt',   'utf8');
 const noEmbyStr  = fs.readFileSync('data/noemby.json',            'utf8');
 const gapsStr    = fs.readFileSync('data/gaps.json',              'utf8');
 
+const notesPath = 'data/notes.json';
+let notesCache = {};
+try {
+  const notesStr = fs.readFileSync(notesPath, 'utf8');
+  notesCache = JSON.parse(notesStr || '{}') || {};
+} catch (e) {
+  // First run or corrupt JSON: create/reset to empty.
+  try {
+    fs.writeFileSync(notesPath, '{}', 'utf8');
+  } catch {}
+  notesCache = {};
+}
+
 const rejects      = JSON.parse(rejectStr);
 const pickups      = JSON.parse(pickupStr);
 const noEmbys      = JSON.parse(noEmbyStr);
 const gaps         = JSON.parse(gapsStr);
+const notes        = notesCache;
 
 // Set up callback for tvdb to add shows to pickup list
 tvdb.setAddToPickupsCallback((showName) => {
@@ -74,6 +88,24 @@ function seasonFolderName(season) {
   const s = typeof season === 'number' ? String(season) : String(season).trim();
   if (!s) return null;
   return `Season ${s}`;
+}
+
+function rpcParamToString(param) {
+  // Param is usually a raw string, but tolerate JSON-stringified strings.
+  if (param === undefined || param === null) return '';
+  if (typeof param !== 'string') return String(param);
+  const trimmed = param.trim();
+  if (trimmed === '') return '';
+  if (trimmed === 'null') return '';
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      return typeof parsed === 'string' ? parsed : String(parsed);
+    } catch {
+      return param;
+    }
+  }
+  return param;
 }
 
 function fmtDateWithTZ(date, utcOut = false) {
@@ -510,6 +542,59 @@ const getSharedFilters = (id, _param, resolve, _reject) => {
   resolve([id, sharedFilters]);
 };
 
+const getNote = (id, param, resolve, reject) => {
+  const showName = rpcParamToString(param).trim();
+  if (!showName) {
+    reject([id, { err: 'getNote: missing showName' }]);
+    return;
+  }
+  resolve([id, notesCache[showName] ?? '' ]);
+};
+
+const saveNote = async (id, param, resolve, reject) => {
+  if (param === undefined || param === null || param === '') {
+    reject([id, { err: 'saveNote: missing params' }]);
+    return;
+  }
+
+  const parsed = util.jParse(param, 'saveNote');
+  let showName;
+  let noteText;
+
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    showName = parsed.showName;
+    noteText = parsed.noteText;
+  } else {
+    reject([id, { err: 'saveNote: expected { showName, noteText }' }]);
+    return;
+  }
+
+  if (typeof showName !== 'string' || showName.trim() === '') {
+    reject([id, { err: 'saveNote: invalid showName' }]);
+    return;
+  }
+  if (noteText === undefined || noteText === null) noteText = '';
+  if (typeof noteText !== 'string') noteText = String(noteText);
+
+  const key = showName.trim();
+  const prev = notesCache[key];
+  if (prev === noteText) {
+    resolve([id, 'ok']);
+    return;
+  }
+
+  notesCache[key] = noteText;
+  try {
+    // Flush to disk on every change.
+    await util.writeFile(notesPath, notesCache);
+  } catch (e) {
+    reject([id, { err: `saveNote: write failed: ${e.message}` }]);
+    return;
+  }
+
+  resolve([id, 'ok']);
+};
+
 const getFile = (id, param, resolve, reject) => {
   // Param is usually a raw string path (per RPC protocol). Allow "" => tvDir.
   let requestedPath = param;
@@ -696,6 +781,9 @@ const runOne = () => {
 
     case 'setSharedFilters': setSharedFilters(id, param, resolve, reject); break;
     case 'getSharedFilters': getSharedFilters(id, param, resolve, reject); break;
+
+    case 'getNote':  getNote( id, param, resolve, reject); break;
+    case 'saveNote': saveNote(id, param, resolve, reject); break;
 
     case 'getFile': getFile(id, param, resolve, reject); break;
 

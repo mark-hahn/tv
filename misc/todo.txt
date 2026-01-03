@@ -9,6 +9,7 @@ todo both ...
     being watched (next up line)
 
 todo non-simple:
+  use multiple rsyncs for single file
   delete row in map should delete dir
   abort qbt downloading
   remove downloaded qbt

@@ -24,7 +24,7 @@
   )
     template(v-for="(it, idx) in orderedItems" :key="idx")
       div(v-if="idx > 0 && Number(it?.sequence) === 1" style="margin:0; padding:0; line-height:14px; white-space:nowrap; overflow:hidden; font-family:monospace;") ====================================================================================================
-      div(:style="getCardStyle(it)" @click="handleCardClick(it)" @mouseenter="handleMouseEnter($event, it)" @mouseleave="handleMouseLeave($event)")
+      div(:style="getCardStyle(it)" @click="handleCardClick($event, it)" @mouseenter="handleMouseEnter($event, it)" @mouseleave="handleMouseLeave($event)")
         div(v-if="isFutureClicked(it)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
         div(style="font-weight:bold; font-size:13px; word-wrap:break-word; overflow-wrap:break-word;")
           span {{ it.title || '(no title)' }}
@@ -527,8 +527,16 @@ export default {
       event.currentTarget.style.boxShadow = 'none';
     },
 
-    handleCardClick(it) {
+    handleCardClick(event, it) {
       const clickedTitle = it?.title;
+
+      // Alt-click: if not in development and procId exists, call startProc("hyper.<procId>")
+      const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      if (event?.altKey && !isDev && it?.procId && clickedTitle) {
+        void this.startProcWithId(it.procId);
+        return;
+      }
+
       if (clickedTitle) evtBus.emit('selectShowFromCardTitle', clickedTitle);
 
       const status = String(it?.status || '').trim();
@@ -538,6 +546,28 @@ export default {
           this.clickedFutures.add(title);
           void this.handleForceFile(title);
         }
+      }
+    },
+
+    async startProcWithId(procId) {
+      const payload = `hyper.${procId}`;
+      try {
+        const url = `${config.torrentsApiUrl}/api/tvproc/startProc?title=${encodeURIComponent(payload)}`;
+        const res = await fetch(url, { method: 'GET', mode: 'cors' });
+        let body = null;
+        try {
+          body = await res.json();
+        } catch (_) {
+          body = null;
+        }
+        if (!res.ok || (body && body.error)) {
+          const msg = body?.error || `HTTP ${res.status}`;
+          console.error('startProcWithId failed', { payload, msg, body });
+          return;
+        }
+        // Success: no further action needed.
+      } catch (e) {
+        console.error('startProcWithId error', e);
       }
     },
 

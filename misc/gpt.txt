@@ -4,3 +4,12 @@
 === it is just a scratchpad for editing copilot prompts.
 
 how is speed calculated and displayed in qbt pane card
+
+
+- if there is an alt-click on down pane card and  isDevelopment is false and down card tv.json object contains the property procId 
+then call startproc(<title>:<procId>)  
+- call will return {"ok":true} or {"error":"<error msg>"}.
+
+change startproc(<title>~~<procId>) to startproc("hyper.<procId>")
+
+

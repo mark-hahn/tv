@@ -1,5 +1,7 @@
 (async function() {
 
+  const MAX_WORKERS = 4;
+
   var FAST_TEST, PROCESS_INTERVAL_MS, appendTvLog, badFile, blocked, blockedCount, buffering, checkFile, checkFileExists, checkFiles, chkCount, chkTvDB, clearBuffer, currentSeq, cycleRunning, cycleSeq, dateStr, debug, delOldFiles, deleteCount, downloadCount, downloadTime, emby, episode, err, errCount, errors, escQuotes, exec, existsCount, fileTimeout, filterRegex, filterRegexTxt, findUsb, flushAndGoLive, flushBuffer, fname, fs, getUsbFiles, lastPruneAt, log, logBuffer, map, mkdirp, path, readMap, recent, recentCount, reloadState, request, resetCycleState, rimraf, rsyncDelay, runCycle, scheduleNextCycle, season, seriesName, sizeStr, skipPaths, startBuffering, startTime, stopBuffering, theTvDbToken, time, title, tvDbErrCount, tvPath, tvdbCache, tvdburl, type, usbFilePath, usbFileSize, usbFiles, usbHost, util, writeLine, writeMap;
 
   debug = false;
@@ -151,7 +153,6 @@
   };
 
   // --- worker pool ---------------------------------------------------------
-  const MAX_WORKERS = 2;
 
   var toUnixSeconds = function(v) {
     if (v == null) {

@@ -106,7 +106,6 @@ let allTvdb          = null;
 let allShows         = [];
 let showHistory      = [];
 let showHistoryPtr   = -1;
-let blockedGapShows  = null;
 let srchListWeb      = null;
 let gapWorkerRunning = false;
 const pruneTvdb = (window.location.href.slice(-5) == 'prune');
@@ -134,17 +133,6 @@ export default {
   },
 
   data() {
-
-    const toggleBlkGap = (show) => {
-      // console.log("toggleBlkGap", show.Name);
-      this.saveVisShow(show);
-      if(show.BlockedGap) {
-        show.BlockedGap = false;
-      }
-      else {
-        show.BlockedGap = true;
-      }
-    };
 
     const toggleNoEmbyFlag = async (show, flagName) => {
       this.saveVisShow(show);
@@ -350,10 +338,9 @@ export default {
           color: "#f88", filter: 0, icon: ["fas", "minus"],
           cond(show)  { 
             return (show.FileGap || show.WatchGap ||
-                    (show.Id.startsWith("noemby-") && !show.S1E1Unaired)) && 
-                   !show.BlockedGap;
+                    (show.Id.startsWith("noemby-") && !show.S1E1Unaired));
           },
-          async click(show) { await toggleBlkGap(show); },
+          click() { },
           name: "gap",
         }, {
           color: "#faa", filter: 0, 
@@ -1332,15 +1319,7 @@ export default {
 
     async condFltrClick(cond, event) {
       this.fltrChoice = '- - - - -';
-      if (cond.name == 'gap' && event.ctrlKey) {
-        for (const show of allShows) {
-          if (show.BlockedGap) {
-            show.BlockedGap = false;
-            cond.filter = 1;
-          }
-        }
-      }
-      else if (++cond.filter == 2) cond.filter = -1;
+      if (++cond.filter == 2) cond.filter = -1;
       await this.select();
     },
 
@@ -1418,7 +1397,7 @@ export default {
         // Special-case Download filter: exclude pure WatchGap entries; allow FileGap or eligible noemby only
         if (this.fltrChoice === 'Download') {
           const downloadEligible = (show.FileGap ||
-            (show.Id.startsWith('noemby-') && !show.S1E1Unaired)) && !show.BlockedGap;
+            (show.Id.startsWith('noemby-') && !show.S1E1Unaired));
           if (!downloadEligible) continue;
         }
         if (srchStrLc && !show.Name.toLowerCase().includes(srchStrLc)) {
@@ -1512,8 +1491,6 @@ export default {
           });
       }
 
-      const blockedGap  = blockedGapShows .includes(show.Name);
-
       const gap = {};
       gap.ShowId          = showId;
       gap.FileGapSeason   = fileGapSeason;
@@ -1522,7 +1499,6 @@ export default {
       gap.WatchGapEpisode = watchGapEpisode;
       gap.WatchGap        = watchGap; 
       gap.NotReady        = notReady;
-      gap.BlockedGap      = blockedGap;
       gap.FileGap = !(!notReady && show.InToTry) &&
                      (fileGap || fileEndError || seasonWatchedThenNofile);
 
@@ -1552,7 +1528,6 @@ export default {
       this.$emit('all-shows', allShows);
 
       // must be set before startWorker
-      blockedGapShows  = [];
 
       // Handle gap worker restart logic
       if(!pruneTvdb) {

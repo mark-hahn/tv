@@ -80,7 +80,6 @@ function gapEntryHasGap(gap) {
   // Boolean flags that indicate a gap condition.
   if (gap.FileGap === true) return true;
   if (gap.WatchGap === true) return true;
-  if (gap.BlockedGap === true) return true;
   if (gap.NotReady === true) return true;
 
   // Explicit season/episode markers (allow 0).
@@ -96,10 +95,22 @@ function gapEntryHasGap(gap) {
 }
 
 function stripGapTransientFields(gap) {
-  if (!gap || typeof gap !== 'object') return gap;
+  if (!gap || typeof gap !== 'object') return false;
+  let changed = false;
+
   // `Waiting` is transient client state; never persist it.
-  if (Object.prototype.hasOwnProperty.call(gap, 'Waiting')) delete gap.Waiting;
-  return gap;
+  if (Object.prototype.hasOwnProperty.call(gap, 'Waiting')) {
+    delete gap.Waiting;
+    changed = true;
+  }
+
+    // Legacy field removed from the data model; never persist it.
+  if (Object.prototype.hasOwnProperty.call(gap, 'BlockedGap')) {
+    delete gap.BlockedGap;
+    changed = true;
+  }
+
+  return changed;
 }
 
 // Prune gaps on load: only keep shows that currently have gaps.
@@ -107,11 +118,8 @@ try {
   if (gaps && typeof gaps === 'object' && !Array.isArray(gaps)) {
     let changed = false;
     for (const [gapId, gap] of Object.entries(gaps)) {
-      // Never persist transient fields.
-      if (gap && typeof gap === 'object' && Object.prototype.hasOwnProperty.call(gap, 'Waiting')) {
-        delete gap.Waiting;
-        changed = true;
-      }
+      // Never persist transient/removed fields.
+      if (stripGapTransientFields(gap)) changed = true;
       if (!gapEntryHasGap(gap)) {
         delete gaps[gapId];
         changed = true;

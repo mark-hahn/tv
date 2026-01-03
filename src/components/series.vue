@@ -4,22 +4,61 @@
 
   #hdr(v-if="showHdr"
        :style="{ display:'flex', flexDirection:'column', gap:'10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', margin:'0px', marginBottom:'10px' }")
-    div(style="display:flex; justify-content:space-between; align-items:center; width:100%;")
-      div(style="margin-left:20px; flex:1;") {{show.Name}}
-      div(style="display:flex; align-items:center; flex-shrink:0;")
-        textarea(v-if="simpleMode"
+    div(
+      :style="{ display:'grid', gridTemplateColumns:'1fr 3fr 1fr 3fr 1fr', alignItems:'center', width:'100%' }"
+    )
+      div(:style="{ gridColumn:'1 / span 2', marginLeft:'20px', marginRight:'20px', whiteSpace:'normal', overflowWrap:'anywhere', wordBreak:'break-word' }") {{show.Name}}
+
+      //- Simple mode: align left edge of Notes with right edge of image (end of poster column)
+      div(v-if="simpleMode" :style="{ gridColumn:'3 / span 3', display:'flex', alignItems:'center' }")
+        textarea(
+          v-model="noteText"
+          @click.stop
+          @keydown.stop
+          @keydown.enter.prevent.stop="onEnterBlur"
+          @input="onNoteInput"
+          @focus="onNoteFocus"
+          @blur="onNoteBlur"
+          rows="1"
+          placeholder="Notes"
+          :style="{ width: sizing.emailWidth || '200px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
+        )
+        textarea(
           v-model="emailText"
           @click.stop
+          @keydown.stop
+          @keydown.enter.prevent.stop="onEnterBlur"
           rows="1"
           placeholder="Email Mark"
-          :style="{ width: sizing.emailWidth || '200px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'10px' }")
+          :style="{ width: sizing.emailWidth || '200px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
+        )
         div(v-if="show?.Reject"
             style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; margin-right:10px;") Banned From Download
         div(v-if="notInEmby"
             style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; margin-right:10px; white-space:nowrap;") Not In Emby
-        button(v-if="!simpleMode"
-                @click.stop="deleteClick"
-                style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;") Delete
+
+      //- Non-simple mode: align left edge of Notes with left edge of infobox (start of infobox column)
+      div(v-else :style="{ gridColumn:'4 / span 2', display:'flex', alignItems:'center' }")
+        div(v-if="show?.Reject"
+            style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; margin-right:10px;") Banned From Download
+        div(v-if="notInEmby"
+            style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; margin-right:10px; white-space:nowrap;") Not In Emby
+        textarea(
+          v-model="noteText"
+          @click.stop
+          @keydown.stop
+          @keydown.enter.prevent.stop="onEnterBlur"
+          @input="onNoteInput"
+          @focus="onNoteFocus"
+          @blur="onNoteBlur"
+          rows="1"
+          placeholder="Notes"
+          :style="{ width: sizing.emailWidth || '200px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
+        )
+        button(
+          @click.stop="deleteClick"
+          style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;"
+        ) Delete
 
   //- Layout: 1/9 whitespace, 1/3 poster, 1/9 whitespace, 1/3 infobox, 1/9 whitespace
   #body(
@@ -37,7 +76,7 @@
       #infoBox(
         v-if="seriesReady"
         @click.stop="handleBodyClick"
-        :style="{ margin:'0px 0 7px 0px', width:'100%', boxSizing:'border-box', overflow:'hidden', fontSize: sizing.seriesInfoFontSize || '20px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column', textAlign:'center', fontWeight:'bold' }"
+        :style="{ margin:'0px 0 0px 0px', width:'100%', boxSizing:'border-box', overflow:'hidden', fontSize: sizing.seriesInfoFontSize || '20px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column', textAlign:'center', fontWeight:'bold' }"
       )
         div(style="border:1px solid #ccc; border-radius:5px; padding:5px; width:100%; box-sizing:border-box;")
           //- Dates in one div; allow wrapping up to 2 lines
@@ -94,6 +133,8 @@
           )
             | {{ (collectionCount > 1) ? 'Collections' : 'Collection' }}: {{collectionName}}
 
+      //- Notes input moved to header (simple + non-simple)
+
 
 
   #allButtons(style="display:flex; flex-direction:column; margin-top:15px; padding:0 10px; width:100%;")
@@ -144,6 +185,13 @@ export default {
       showHdr: false,
       seriesReady: false,
       emailText: '',
+      noteText: '',
+      lastSavedNoteText: '',
+      noteCacheByShowName: {},
+      noteSaveTimer: null,
+      noteFocused: false,
+      notePollTimer: null,
+      notePollInFlight: false,
       dates: '',
       statusTxt: '',
       remoteShowName: '',
@@ -170,6 +218,109 @@ export default {
   },
   
   methods: {
+
+    onEnterBlur(e) {
+      try { e?.target?.blur?.(); } catch { /* ignore */ }
+    },
+
+    onNoteFocus() {
+      this.noteFocused = true;
+    },
+
+    async onNoteBlur() {
+      this.noteFocused = false;
+      await this.commitNote();
+    },
+
+    onNoteInput() {
+      // Auto-save while typing (debounced).
+      const showName = this.show?.Name;
+      if (!showName) return;
+
+      this.noteCacheByShowName[showName] = this.noteText;
+
+      if (this.noteSaveTimer) {
+        clearTimeout(this.noteSaveTimer);
+        this.noteSaveTimer = null;
+      }
+      this.noteSaveTimer = setTimeout(() => {
+        this.noteSaveTimer = null;
+        void this.saveNoteNow(false);
+      }, 600);
+    },
+
+    async saveNoteNow(showAlertOnError) {
+      const showName = this.show?.Name;
+      if (!showName) return;
+
+      if (this.noteText === this.lastSavedNoteText) return;
+
+      try {
+        await srvr.saveNote(showName, this.noteText);
+        this.lastSavedNoteText = this.noteText;
+        this.noteCacheByShowName[showName] = this.noteText;
+      } catch (err) {
+        console.error('Series: saveNote failed', { showName, err });
+        if (showAlertOnError) window.alert(err?.message || String(err));
+      }
+    },
+
+    async refreshNoteFromServer() {
+      const showName = this.show?.Name;
+      if (!showName) return;
+      if (this.noteFocused) return;
+      if (this.notePollInFlight) return;
+      this.notePollInFlight = true;
+      try {
+        const res = await srvr.getNote(showName);
+        const text = (typeof res === 'string') ? res : (res?.noteText ?? res?.text ?? '');
+        const next = String(text ?? '');
+        if (this.noteFocused) return;
+        if (next === this.noteText) return;
+        this.noteText = next;
+        this.lastSavedNoteText = next;
+        this.noteCacheByShowName[showName] = next;
+      } catch (err) {
+        console.error('Series: refreshNoteFromServer failed', { showName, err });
+      } finally {
+        this.notePollInFlight = false;
+      }
+    },
+
+    async loadNote(showName) {
+      if (!showName) return;
+
+      // Immediately show cached note (if any) so the input is never blanked
+      // just because the server is slow or temporarily failing.
+      if (Object.prototype.hasOwnProperty.call(this.noteCacheByShowName, showName)) {
+        const cached = this.noteCacheByShowName[showName];
+        this.noteText = String(cached ?? '');
+        this.lastSavedNoteText = this.noteText;
+      }
+
+      try {
+        const res = await srvr.getNote(showName);
+        const text = (typeof res === 'string') ? res : (res?.noteText ?? res?.text ?? '');
+        this.noteText = String(text ?? '');
+        this.lastSavedNoteText = this.noteText;
+        this.noteCacheByShowName[showName] = this.noteText;
+      } catch (err) {
+        console.error('Series: getNote failed', { showName, err });
+        // Keep whatever is currently displayed (cached or user-entered).
+      }
+    },
+
+    async commitNote() {
+      const showName = this.show?.Name;
+      if (!showName) return;
+
+      if (this.noteSaveTimer) {
+        clearTimeout(this.noteSaveTimer);
+        this.noteSaveTimer = null;
+      }
+
+      await this.saveNoteNow(true);
+    },
 
     getMapCounts(seriesMap) {
       try {
@@ -482,6 +633,9 @@ export default {
       this.showHdr   = true;
       this.seriesReady = false;
 
+      // Load persistent note for this show.
+      await this.loadNote(show?.Name);
+
       // Clear info fields so nothing renders until ready
       this.dates = '';
       this.statusTxt = '';
@@ -523,6 +677,14 @@ export default {
       this.seriesReady = true;
     });
 
+    // While notes input is NOT focused, refresh note text from server once/sec.
+    // (Keeps the notes display in sync with external edits.)
+    this.notePollTimer = setInterval(() => {
+      if (this.noteFocused) return;
+      if (!this.show?.Name) return;
+      void this.refreshNoteFromServer();
+    }, 1000);
+
     // Keep the Series infobox totals in sync with the actual Map grid.
     // This matters for noemby shows where tvdb.json counts can be stale / mismatched.
     evtBus.on('seriesMapUpdated', async ({ show, seriesMap }) => {
@@ -544,6 +706,17 @@ export default {
       }
     });
 
+  },
+
+  beforeUnmount() {
+    if (this.notePollTimer) {
+      clearInterval(this.notePollTimer);
+      this.notePollTimer = null;
+    }
+    if (this.noteSaveTimer) {
+      clearTimeout(this.noteSaveTimer);
+      this.noteSaveTimer = null;
+    }
   },
 }
 </script>

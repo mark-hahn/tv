@@ -194,6 +194,12 @@ export function sendEmail(emailData)
 export function getTmdb(params)
             {return fCall('getTmdb', params)}
 
+// Persistent per-show notes
+export function saveNote(showName, noteText)
+            {return fCall('saveNote', { showName, noteText })}
+export function getNote(showName)
+            {return fCall('getNote', showName)}
+
 // File browser
 export async function getFile(path) {
   console.log('RPC getFile call:', path);

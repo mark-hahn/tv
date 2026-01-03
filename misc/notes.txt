@@ -1,90 +1,20 @@
 
-tv-series-srvr (server) notes
-===========================
+Client requirements: per-show Notes persistence
 
-This client (tv-series-client) talks to tv-series-srvr over WebSocket using a very small RPC protocol.
+- UI: In the Series pane (both simple and non-simple modes), show a multiline notes input box directly below the existing Series infobox, with the same width as the infobox.
 
-WebSocket RPC protocol
-----------------------
+- RPC functions (tv-series-srvr):
+	- `getNote(showName)`
+		- Input: `showName` string
+		- Output: note text (string) OR an object containing a string field like `{ noteText: "..." }`.
+	- `saveNote(showName, noteText)`
+		- Input: `showName` string and `noteText` string
+		- Output: `ok` or an error (same pattern as other RPC calls).
 
-- URL: wss://hahnca.com/tv-series-srvr
-- Client implementation: src/srvr.js
+- Persistence behavior:
+	- When the Series pane loads a show, client calls `getNote(showName)` and populates the notes box.
+	- When the notes value is committed (client uses blur), client calls `saveNote(showName, noteText)`.
 
-Request format (string message)
-- "<id>~~~<fname>~~~<param>"
-	- id: incrementing integer string from the client
-	- fname: RPC function name (examples below)
-	- param:
-		- if param is an object on the client, it is JSON.stringify(param)
-		- if param is a string/number/etc, it is sent as-is
-
-Response format (string message)
-- "<id>~~~<status>~~~<result>"
-	- status: "ok" for success, anything else means error
-	- result: JSON string (the client always JSON.parse(result))
-
-Important: because the client always JSON.parse(result), the server must always JSON.stringify the result,
-including when returning strings (return "\"some string\"").
-
-Required RPC endpoints
-----------------------
-
-1) setSharedFilters
-
-Purpose
-- Stores the current shared filter state in the server so that simple-mode on another computer can use it.
-
-Client usage
-- Called when the non-simple mode "Send" button is clicked.
-- If UI is in effective "All" mode, the client clears shared filters by calling setSharedFilters(null).
-
-Signature
-- fname: setSharedFilters
-- param: object OR null
-
-Param payload (object)
-- {
-		fltrChoice: string,
-		filterStr: string,
-		condFilters: {
-			[condName: string]: number
-		}
-	}
-
-Rules
-- Server should store the object as-is (no transformation required).
-- The client forces condFilters.ban = -1; server does not need to enforce it.
-- When param is null: clear stored shared filters.
-
-Return
-- { ok: true }
-
-2) getSharedFilters
-
-Purpose
-- Returns the server-stored shared filter object so simple-mode can show/hide the Custom button and apply it.
-
-Client usage
-- Simple-mode polls this every 3 seconds (Buttons component).
-- Simple-mode also calls it when Custom is clicked (List.handleButtonClick).
-
-Signature
-- fname: getSharedFilters
-- param: (ignored / empty)
-
-Return
-- If shared filters exist: the stored object (same shape as setSharedFilters payload)
-- If none: null
-
-Notes
-- The client treats "no shared filters" as null or empty object.
-
-Implementation notes
---------------------
-
-- Keep sharedFilters in memory or persist to disk.
-	- Memory-only is simplest but will reset on server restart.
-- There are multiple clients (tabs/computers). The simple-mode UI expects:
-	- Custom button visible only when getSharedFilters() returns a non-empty object.
-	- When sharedFilters changes/clears, the client will turn Custom off and revert to visible button filters.
-
+- Server storage:
+	- The tv-series-srvr should persist notes to disk so they survive app restarts.
+	- One note per show name.

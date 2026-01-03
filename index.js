@@ -23,7 +23,8 @@ const middleStr  = fs.readFileSync('config/config3-middle.txt',   'utf8');
 const pickupStr  = fs.readFileSync('config/config4-pickups.json', 'utf8');
 const footerStr  = fs.readFileSync('config/config5-footer.txt',   'utf8');
 const noEmbyStr  = fs.readFileSync('data/noemby.json',            'utf8');
-const gapsStr    = fs.readFileSync('data/gaps.json',              'utf8');
+const gapsPath   = 'data/gaps.json';
+const gapsStr    = fs.readFileSync(gapsPath,                      'utf8');
 
 const notesPath = 'data/notes.json';
 let notesCache = {};
@@ -72,6 +73,57 @@ const pickups      = JSON.parse(pickupStr);
 const noEmbys      = JSON.parse(noEmbyStr);
 const gaps         = JSON.parse(gapsStr);
 const notes        = notesCache;
+
+function gapEntryHasGap(gap) {
+  if (!gap || typeof gap !== 'object') return false;
+
+  // Boolean flags that indicate a gap condition.
+  if (gap.FileGap === true) return true;
+  if (gap.WatchGap === true) return true;
+  if (gap.BlockedGap === true) return true;
+  if (gap.NotReady === true) return true;
+
+  // Explicit season/episode markers (allow 0).
+  if (gap.FileGapSeason !== null && gap.FileGapSeason !== undefined) return true;
+  if (gap.FileGapEpisode !== null && gap.FileGapEpisode !== undefined) return true;
+  if (gap.WatchGapSeason !== null && gap.WatchGapSeason !== undefined) return true;
+  if (gap.WatchGapEpisode !== null && gap.WatchGapEpisode !== undefined) return true;
+
+  // Non-empty wait string can also indicate a gap state.
+  if (typeof gap.WaitStr === 'string' && gap.WaitStr.trim() !== '') return true;
+
+  return false;
+}
+
+function stripGapTransientFields(gap) {
+  if (!gap || typeof gap !== 'object') return gap;
+  // `Waiting` is transient client state; never persist it.
+  if (Object.prototype.hasOwnProperty.call(gap, 'Waiting')) delete gap.Waiting;
+  return gap;
+}
+
+// Prune gaps on load: only keep shows that currently have gaps.
+try {
+  if (gaps && typeof gaps === 'object' && !Array.isArray(gaps)) {
+    let changed = false;
+    for (const [gapId, gap] of Object.entries(gaps)) {
+      // Never persist transient fields.
+      if (gap && typeof gap === 'object' && Object.prototype.hasOwnProperty.call(gap, 'Waiting')) {
+        delete gap.Waiting;
+        changed = true;
+      }
+      if (!gapEntryHasGap(gap)) {
+        delete gaps[gapId];
+        changed = true;
+      }
+    }
+    if (changed) {
+      try {
+        fs.writeFileSync(gapsPath, JSON.stringify(gaps), 'utf8');
+      } catch {}
+    }
+  }
+} catch {}
 
 // Set up callback for tvdb to add shows to pickup list
 tvdb.setAddToPickupsCallback((showName) => {
@@ -433,8 +485,12 @@ const getGaps = (id, _param, resolve, _reject) => {
 const addGap = async (id, gapIdGapSave, resolve, _reject) => {
   const [gapId, gap, save] = JSON.parse(gapIdGapSave);
   // console.logapIdGapSaveg('addGap', id, {gapIdGapSave});
-  gaps[gapId] = gap;
-  if(save) await util.writeFile('data/gaps.json', gaps); 
+  if (gapId !== null && gapId !== undefined) {
+    stripGapTransientFields(gap);
+    if (gapEntryHasGap(gap)) gaps[gapId] = gap;
+    else delete gaps[gapId];
+  }
+  if(save) await util.writeFile(gapsPath, gaps); 
   resolve([id, 'ok']);
 }
 
@@ -443,7 +499,7 @@ const delGap = async (id, gapIdSave, resolve, _reject) => {
   const [gapId, save] = JSON.parse(gapIdSave);
   if(gapId !== null) delete gaps[gapId];
   if(save) {
-    await util.writeFile('data/gaps.json', gaps); 
+    await util.writeFile(gapsPath, gaps); 
   }
   resolve([id, 'ok']);
 }

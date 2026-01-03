@@ -347,6 +347,10 @@ export default {
       searchingStatus:   '',
       showReloadingShows: false,
       showEmbyRefreshing: false,
+      allNotesCache: {},
+      allNotesCacheAt: 0,
+      allNotesCacheInFlight: null,
+      wasFilterEmpty: true,
       sortChoices:          
         ['Alpha', 'Viewed', 'Added', 'Ratings', 'Size'],
       fltrChoices:
@@ -425,6 +429,35 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
+
+    async getAllNotesCached(ttlMs = 3000) {
+      const now = Date.now();
+      if (this.allNotesCache && (now - (this.allNotesCacheAt || 0)) < ttlMs) {
+        return this.allNotesCache;
+      }
+
+      if (this.allNotesCacheInFlight) {
+        return await this.allNotesCacheInFlight;
+      }
+
+      this.allNotesCacheInFlight = (async () => {
+        try {
+          const res = await srvr.getAllNotes();
+          this.allNotesCache = (res && typeof res === 'object') ? res : {};
+          this.allNotesCacheAt = Date.now();
+          return this.allNotesCache;
+        } catch (err) {
+          console.error('List: getAllNotes failed', err);
+          this.allNotesCache = this.allNotesCache || {};
+          this.allNotesCacheAt = Date.now();
+          return this.allNotesCache;
+        } finally {
+          this.allNotesCacheInFlight = null;
+        }
+      })();
+
+      return await this.allNotesCacheInFlight;
+    },
 
     async sendSharedFilters(e) {
       // Save current filter settings (for simple-mode Custom button).
@@ -1357,23 +1390,47 @@ export default {
     },
 
     async select(scroll = true) {
+      // Preserve original behavior: always refresh TVDB data here.
       allTvdb = await tvdb.getAllTvdb();
-      let srchStrLc;
-      if(this.fltrChoice !== 'Finished') {
-        if(this.filterStr.length > 0) 
-              this.fltrChoice = '- - - - -';
-        srchStrLc = this.filterStr == "" 
-                    ? null : this.filterStr.toLowerCase();
+      await this.refilter(scroll);
+    },
+
+    async refilter(scroll = true) {
+      // Lightweight version of select(): avoids a full TVDB refresh unless
+      // the "Finished" filter needs it.
+      let localAllTvdb = null;
+      if(this.fltrChoice === 'Finished') {
+        if(!allTvdb) allTvdb = await tvdb.getAllTvdb();
+        localAllTvdb = allTvdb;
       }
+
+      let srchStrLc;
+      let allNotes = null;
+      if(this.fltrChoice !== 'Finished') {
+        if(this.filterStr.length > 0)
+              this.fltrChoice = '- - - - -';
+        const filterEmpty = (this.filterStr == null) || (String(this.filterStr).length === 0);
+        srchStrLc = filterEmpty ? null : String(this.filterStr).toLowerCase();
+
+        if (filterEmpty) {
+          this.wasFilterEmpty = true;
+        } else {
+          // First keystroke into the filter box: force a fresh notes fetch.
+          const forceFresh = !!this.wasFilterEmpty;
+          this.wasFilterEmpty = false;
+          allNotes = await this.getAllNotesCached(forceFresh ? 0 : 3000);
+        }
+      }
+
       const filteredShows = [];
       fltrLoop:
       for(const show of allShows) {
         if(this.fltrChoice === 'Finished') {
-          const tvdbData = allTvdb[show.Name];
+          const tvdbData = localAllTvdb?.[show.Name];
           if(!tvdbData) continue;
           const {status, episodeCount, watchedCount} = tvdbData;
           const watchedAll = episodeCount > 0 && watchedCount == episodeCount;
-          const finished = (status == "Ended"            && 
+          const finished = (status == "Ended"            &&
                             watchedAll                   &&
                             !show.Reject);
           if(finished) filteredShows.push(show);
@@ -1385,17 +1442,21 @@ export default {
             (show.Id.startsWith('noemby-') && !show.S1E1Unaired)) && !show.BlockedGap;
           if (!downloadEligible) continue;
         }
-        if (srchStrLc && 
-           !show.Name.toLowerCase().includes(srchStrLc)) continue;
+        if (srchStrLc && !show.Name.toLowerCase().includes(srchStrLc)) {
+          const note = allNotes?.[show.Name];
+          const noteLc = (note == null) ? '' : String(note).toLowerCase();
+          if (!noteLc.includes(srchStrLc)) continue;
+        }
         for (let cond of this.conds) {
           if ( cond.filter ===  0) continue;
-          if ((cond.filter === +1) != (!!cond.cond(show))) 
+          if ((cond.filter === +1) != (!!cond.cond(show)))
             continue fltrLoop;
         }
         filteredShows.push(show);
       }
+
       this.shows = filteredShows;
-      if (this.shows.length === 1) 
+      if (this.shows.length === 1)
         this.saveVisShow(this.shows[0]);
       else if (this.highlightName) {
         // Only update selection if highlightName is already set
@@ -1452,14 +1513,19 @@ export default {
       this.gapPercent = progress;
       const save = progress == 100;
       
-      const show = allShows.find((show) => show.Id == showId);
+      // Prefer updating the reactive object (this.shows) so the UI repaints.
+      // Keep the backing allShows entry in sync if it differs by reference.
+      const reactiveShow = this.shows.find((s) => s.Id == showId);
+      const allShowsShow = allShows.find((s) => s.Id == showId);
+      const show = reactiveShow || allShowsShow;
       if(!show) return;
 
       // if(fileEndError)
       //   console.log('fileEndError', show.Name);
 
       if(anyWatched && show.InToTry) {
-        show.InToTry = false;
+        if(reactiveShow) reactiveShow.InToTry = false;
+        if(allShowsShow) allShowsShow.InToTry = false;
         emby.saveToTry(show.Id, false)
           .catch((err) => {
               console.error(
@@ -1483,12 +1549,18 @@ export default {
       gap.WaitStr         = await tvdb.getWaitStr(show);
       gap.FileGap = !(!notReady && show.InToTry) &&
                      (fileGap || fileEndError || seasonWatchedThenNofile);
-      Object.assign(show, gap);
+
+      // Apply to reactive show first, but always keep the backing store synced.
+      if(reactiveShow) Object.assign(reactiveShow, gap);
+      if(allShowsShow && allShowsShow !== reactiveShow) Object.assign(allShowsShow, gap);
       await srvr.addGap([show.Id, gap, save]);
 
       // When worker finishes (progress == 100), mark it as not running
       if(progress == 100) {
         gapWorkerRunning = false;
+        // Re-run filters/sort once at completion so any gap-driven UI changes
+        // (e.g. Download filter) are reflected immediately.
+        await this.refilter(false);
       }
     },
 

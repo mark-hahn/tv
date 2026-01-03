@@ -1,20 +1,21 @@
 
-Client requirements: per-show Notes persistence
+Where the worker “updates a show”
 
-- UI: In the Series pane (both simple and non-simple modes), show a multiline notes input box directly below the existing Series infobox, with the same width as the infobox.
+Worker computes fileGap/etc, then sends a message: gap-worker.js:170-205 (self.postMessage({ showId, ... })).
+The UI-side mutation happens in addGapToShow(event): list.vue:1492-1542
+Finds the show: const show = allShows.find((show) => show.Id == showId);
+Applies fields onto it: Object.assign(show, gap);
+Persists to server: await srvr.addGap([show.Id, gap, save]);
+Where addGap is called
 
-- RPC functions (tv-series-srvr):
-	- `getNote(showName)`
-		- Input: `showName` string
-		- Output: note text (string) OR an object containing a string field like `{ noteText: "..." }`.
-	- `saveNote(showName, noteText)`
-		- Input: `showName` string and `noteText` string
-		- Output: `ok` or an error (same pattern as other RPC calls).
+Only here: list.vue:1533 (srvr.addGap(...))
+Where delGap is called
 
-- Persistence behavior:
-	- When the Series pane loads a show, client calls `getNote(showName)` and populates the notes box.
-	- When the notes value is committed (client uses blur), client calls `saveNote(showName, noteText)`.
+When deleting a show from the server side of the client workflow: srvr.js:104-116 (deleteShowFromSrvr calls delGap([show.Id, true]))
+During Emby load, cleaning gaps with no matching show: emby.js:256-260
+Where the worker is started / callback wired
 
-- Server storage:
-	- The tv-series-srvr should persist notes to disk so they survive app restarts.
-	- One note per show name.
+Worker creation: emby.js:7-10
+Wiring onmessage + postMessage: emby.js:327-342
+Start call (and restart logic): list.vue:1549-1580
+If you’re asking because the UI isn’t repainting when gaps change: the mutation currently targets the allShows object found outside Vue’s reactive state, which can bypass reactivity depending on how those objects are proxied. If you want, I can adjust addGapToShow to assign onto the reactive object in this.shows (or make allShows reactive) so the list always updates immediately.

@@ -3,6 +3,7 @@ bugs ...
   multiple downloads - second late
 
 todo both ...
+  show last-watched even for non-emby
   show episode
     file details
     being watched (next up line)

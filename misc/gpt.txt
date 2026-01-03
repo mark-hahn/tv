@@ -3,28 +3,9 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-in simple and non-simple modes:
+in map gap check consider any show with no files at all to have the "Missing File" condition/error
 
-add a notes input box to series pane below infobox the width of the infobox.  when value is committed send it to tv-series server function saveNote(<showName>, <noteText>); use existing rpc call structure in srvr.js. return is either ok or error.
+when gap worker detects a problem like fileGap it updates a show. where is that in the codebase?
 
-the tv-series-srvr will save notes from the saveNote call in a file.
+where is addGap and delGap called
 
-when a series pane is loaded call getNote(<showName>) and load the resulting text note in the notes input box.  thus the input box text is persistent across app loads etc.
-
-put a description of the saveNote and getNote requirements in notes.txt so that the requirements can be read by tv-series-srvr copilot
-
-in non-simple mode move notes input box to left of delete button.
-
-in both modes make input box same width as simple mode email box
-
-
-
-in simple mode keep note input box width and email input box width the same and to what is required that the left side of the notes box is aligned with the right side of image.
-
-
-in non-simple mode keep note input box width such that the left side of the notes box is aligned with the left side of infobox.
-
-
-
-
-in both modes keep input box width to what is required 

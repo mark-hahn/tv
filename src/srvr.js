@@ -199,6 +199,8 @@ export function saveNote(showName, noteText)
             {return fCall('saveNote', { showName, noteText })}
 export function getNote(showName)
             {return fCall('getNote', showName)}
+export function getAllNotes()
+            {return fCall('getAllNotes')}
 
 // File browser
 export async function getFile(path) {

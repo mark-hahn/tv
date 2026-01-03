@@ -1493,6 +1493,7 @@ export default {
 
       const gap = {};
       gap.ShowId          = showId;
+      gap.showName        = show.Name;
       gap.FileGapSeason   = fileGapSeason;
       gap.FileGapEpisode  = fileGapEpisode;
       gap.WatchGapSeason  = watchGapSeason;

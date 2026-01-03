@@ -47,22 +47,10 @@
           button(v-if="!mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('reload-shows')" style="font-size:15px; cursor:pointer; margin:5px 0 5px 5px; max-height:24px; border-radius:7px;") Refresh
           button(v-if="!mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px 0 5px 5px; max-height:24px; border-radius:7px;") Prune
 
-    #maphdr2(style="display:flex; justify-content:space-between; align-items:center; color:red; margin:0 10px 5px 10px; padding-left:5px; font-size:15px;")
-      #dates(v-if="datesLine" :style="{  paddingLeft:'5px'}")
-        span {{firstAiredVal}}
-        span(v-if="firstAiredVal && lastAiredVal" style="font-weight:bold;") &nbsp;/&nbsp;
-        span {{lastAiredVal}}
-      #mapstatus(style="margin:6px;") {{statusVal}}
-      #gaps(v-if="mapShow?.WatchGap || mapShow?.FileGap  || mapShow?.WaitStr?.length"
-            style="display:flex; gap:15px;")
-          div(v-if="mapShow?.WatchGap")
-            | {{"Watch Gap"}}
-
-          div(v-if="mapShow?.FileGap")
-            | {{"Missing File"}}
-
-          div(v-if="mapShow?.WaitStr?.length")
-            | {{'Waiting ' + mapShow?.WaitStr}}
+    #maphdr2(style="display:flex; justify-content:flex-start; align-items:center; color:red; margin:0 10px 5px 10px; padding-left:5px; font-size:15px; flex-wrap:wrap;")
+      span(v-for="(part, idx) in hdr2Parts" :key="idx" style="white-space:nowrap;")
+        span(v-if="idx > 0" style="padding:0 6px; font-weight:bold;") |
+        span {{part}}
   #maptable(v-if="!hideMapBottom" style="flex:1 1 auto; min-height:0px; margin-left:15px; margin-right:15px; box-sizing:border-box; position:relative; overflow:hidden;")
     //- No scrollbars: pan the table with arrows (horizontal) and mouse wheel (vertical).
     #maptblpane(ref="mapViewport"
@@ -217,6 +205,25 @@ export default {
     },
     statusVal() {
       return this.tvdbData?.status || '';
+    },
+
+    hdr2Parts() {
+      const parts = [];
+
+      const firstAired = this.firstAiredVal;
+      const lastAired = this.lastAiredVal;
+      if (firstAired || lastAired) {
+        parts.push(firstAired && lastAired ? `${firstAired} / ${lastAired}` : (firstAired || lastAired));
+      }
+
+      const status = this.statusVal;
+      if (status) parts.push(status);
+
+      if (this.mapShow?.WatchGap) parts.push('Watch Gap');
+      if (this.mapShow?.FileGap) parts.push('Missing File');
+      if (this.mapShow?.WaitStr?.length) parts.push('Waiting ' + this.mapShow.WaitStr);
+
+      return parts;
     },
 
     canPanLeft() {

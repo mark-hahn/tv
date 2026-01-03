@@ -65,6 +65,7 @@ export async function loadAllShows() {
                        rejPromise, pkupPromise,
                        noEmbyPromise, gapPromise]);
   rejects = rejectsIn
+  const gapsById = gaps || {};
   
   let shows = [];
 
@@ -92,10 +93,10 @@ export async function loadAllShows() {
     }
     // if(!show.DateCreated) show.DateCreated = show.Date;
 
-    const gapData = gaps[show.Id];
+    const gapData = gapsById[show.Id];
     if(gapData) {
       Object.assign(show, gapData);
-      delete gaps[show.Id];
+      delete gapsById[show.Id];
     }
 
     const tvdbId = show?.ProviderIds?.Tvdb || show?.TvdbId;
@@ -177,6 +178,35 @@ export async function loadAllShows() {
     const idx = noEmbys.findIndex(
         (noEmbyShow) => noEmbyShow.Id == prunedNoEmbyId);
     if(idx != -1) noEmbys.splice(idx, 1);
+  }
+
+//////////  one-time migrate gaps: add showName for debugging ////////////
+  try {
+    const migratedKey = 'gapShowNameMigrated_v1';
+    const alreadyMigrated = window?.localStorage?.getItem(migratedKey) === '1';
+    if (!alreadyMigrated) {
+      const entries = Object.entries(gaps || {});
+      let pending = [];
+      for (const [gapId, gapObj] of entries) {
+        if (!gapId || !gapObj || typeof gapObj !== 'object') continue;
+        const match = shows.find((s) => String(s?.Id) === String(gapId));
+        if (!match) continue;
+        if (gapObj.showName === match.Name) continue;
+        pending.push([gapId, Object.assign({}, gapObj, { showName: match.Name })]);
+      }
+
+      if (pending.length > 0) {
+        for (let i = 0; i < pending.length; i++) {
+          const [gapId, gapObj] = pending[i];
+          const save = (i === pending.length - 1);
+          await srvr.addGap([gapId, gapObj, save]);
+        }
+      }
+
+      window?.localStorage?.setItem(migratedKey, '1');
+    }
+  } catch (e) {
+    console.error('loadAllShows: gap showName migration failed', e);
   }
 
 //////////  mark tvdbs with no show as deleted ////////////

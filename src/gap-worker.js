@@ -27,6 +27,8 @@ const getShowState = async (showId, _showName) => {
   let seasonWatchedThenNofile = false;
   let firstNoFileSeason        = null;
   let firstNoFileEpisode       = null;
+  let anyUnaired              = false;
+  let sawAnyEpisode           = false;
 
   try {
     let seasonsRes;
@@ -76,12 +78,14 @@ const getShowState = async (showId, _showName) => {
         const episode       = episodes[episodeIdx];
         const episodeNumber = episode.IndexNumber;
         if(episodeNumber === undefined) continue;
+        sawAnyEpisode = true;
         const userData      = episode?.UserData;
         const watched       = !!userData?.Played;
         const haveFile      = (episode.LocationType != "Virtual");
         let unaired = unairedFromHere || !!unairedObj[episodeNumber];
         if(watched) unaired = false;
         else if(unaired) unairedFromHere = true;
+        if(unaired) anyUnaired = true;
 
         // Track the first aired episode that has no file.
         if(!unaired && !haveFile && firstNoFileSeason === null) {
@@ -146,6 +150,16 @@ const getShowState = async (showId, _showName) => {
            seasonNotWatchedNoFiles)
         seasonWatchedThenNofile = true;
       lastSeasonWatched = allSeasonWatched;
+    }
+
+    // If a show has no files at all AND nothing watched AND nothing unaired,
+    // treat it as Missing File (FileGap).
+    if(!fileGap && sawAnyEpisode && !haveFileShow && !anyWatched && !anyUnaired) {
+      if(fileGapSeason === null && firstNoFileSeason !== null) {
+        fileGapSeason = firstNoFileSeason;
+        fileGapEpisode = firstNoFileEpisode;
+      }
+      fileGap = true;
     }
 
   }

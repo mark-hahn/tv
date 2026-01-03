@@ -3,6 +3,4 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-- gap behavior in server has changed -- see misc/notes.txt.
-- remove blockedWait and waiting property from all gap objects and gap processing and display logic.  waitStr is now the only property related to waiting.
-- remove gap.WaitStr = await tvdb.getWaitStr(show); in addGapToShow and insert WaitStr into show object using tvdb.getWaitStr in loadallshows when merging tvdb data into shows. 
+in gap calculations in gap worker mark any show that has no files and nothing unaired and nothing watched as File Missing

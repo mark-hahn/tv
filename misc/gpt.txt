@@ -3,9 +3,7 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
+revert the changes made because of this prompt:
 in map gap check consider any show with no files at all to have the "Missing File" condition/error
 
-when gap worker detects a problem like fileGap it updates a show. where is that in the codebase?
-
-where is addGap and delGap called
-
+in gap logic consider all episodes after an unaired episode to also be unaired

@@ -388,7 +388,7 @@ export default {
       const n = Number(bitsPerSec);
       if (!Number.isFinite(n) || n < 0) return '';
       const mbps = n / 1e6;
-      return `${Math.round(mbps)}`;
+      return `${Math.round(mbps)} mb`;
     },
 
     fmtElapsedMmSs(seconds) {

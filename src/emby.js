@@ -3,6 +3,7 @@ import * as tvdb from "./tvdb.js";
 import * as srvr from "./srvr.js";
 import * as urls from "./urls.js";
 import * as util from "./util.js";
+import    evtBus from "./evtBus.js";
 
 const gapWorker = 
   new Worker(new URL('gap-worker.js', import.meta.url), 
@@ -241,7 +242,25 @@ export async function loadAllShows() {
       const name = show.Name;
       let tvdb = allTvdb[name];
       if(!tvdb || tvdb.showId !== show.Id) {
-        console.log(`loadAllShows creating/updating tvdb`, name);
+        const reason = !tvdb
+          ? 'no existing tvdb entry for show name'
+          : `showId mismatch (tvdb.showId=${tvdb.showId || 'n/a'} != show.Id=${show.Id})`;
+        const details = {
+          name,
+          showId: show.Id,
+          tvdbId: show.TvdbId,
+          existing: tvdb ? { tvdbId: tvdb.tvdbId, showId: tvdb.showId, deleted: tvdb.deleted } : null
+        };
+        console.log(
+          `loadAllShows tvdb: creating/updating via getNewTvdb (${reason})`,
+          details
+        );
+
+        // Pop a modal only for true mismatches (a preexisting entry that conflicts)
+        // so the user can see the details immediately.
+        if (tvdb && (tvdb.showId !== show.Id || (tvdb.tvdbId && show.TvdbId && String(tvdb.tvdbId) !== String(show.TvdbId)))) {
+          evtBus.emit('tvdb-mismatch', details);
+        }
         const epicounts = await getEpisodeCounts(show);
         const param = Object.assign({show}, epicounts);
         tvdb = await srvr.getNewTvdb(param);

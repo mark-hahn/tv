@@ -11,6 +11,7 @@ todo both ...
 todo non-simple:
   delete row in map should delete dir
   abort qbt downloading
+  remove downloaded qbt
   how to see why qbt or down won't start
 
 todo simple ...

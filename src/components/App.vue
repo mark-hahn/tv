@@ -232,6 +232,27 @@
       @show-torrents="handleShowTorrents"
       @all-shows="handleAllShows"
     )
+
+  //- TVDB mismatch detail modal (OK-only)
+  #tvdbMismatchModal(
+    v-if="tvdbMismatchOpen"
+    @click.stop.prevent
+    @pointerdown.stop.prevent
+    style="position:fixed; inset:0; background-color:rgba(0,0,0,0.35); z-index:2000; display:flex; align-items:center; justify-content:center;"
+  )
+    #tvdbMismatchBox(
+      @click.stop.prevent
+      @pointerdown.stop.prevent
+      style="background-color:white; border:2px solid black; border-radius:10px; padding:18px 22px; max-width:900px; width:calc(100% - 40px); max-height:85vh; overflow:auto;"
+    )
+      div(style="font-size:16px; font-weight:bold; margin-bottom:10px;") TVDB cache mismatch detected
+      pre(style="margin:0; font-size:12px; white-space:pre-wrap; word-break:break-word;") {{ tvdbMismatchText }}
+      div(style="display:flex; justify-content:flex-end; margin-top:12px;")
+        button(
+          @click.stop.prevent="closeTvdbMismatch"
+          @pointerdown.stop.prevent
+          style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 12px; border:1px solid #bbb; background-color:whitesmoke;"
+        ) OK
 </template>
 
 <script>
@@ -272,6 +293,9 @@ export default {
       mapError: '',
       allShows: [],
       _didRequestNotifications: false,
+
+      tvdbMismatchOpen: false,
+      tvdbMismatchText: '',
 
       _downActiveQbt: false,
       _downActiveDown: false,
@@ -468,11 +492,56 @@ export default {
   },
   unmounted() {
     evtBus.off('downActivePart', this.handleDownActivePart);
+    evtBus.off('tvdb-mismatch', this.handleTvdbMismatch);
     if (this._onAppWindowResize) window.removeEventListener('resize', this._onAppWindowResize);
     this.stopQbtPolling();
     this.cancelDownInactiveTimer();
   },
   methods: {
+    handleTvdbMismatch(payload) {
+      if (this.simpleMode) return;
+
+      if (payload && typeof payload === 'object') {
+        const name = payload?.name != null ? String(payload.name) : '';
+        const showId = payload?.showId != null ? String(payload.showId) : '';
+        const tvdbId = payload?.tvdbId != null ? String(payload.tvdbId) : '';
+        const existingShowId = payload?.existing?.showId != null ? String(payload.existing.showId) : '';
+        const existingTvdbId = payload?.existing?.tvdbId != null ? String(payload.existing.tvdbId) : '';
+        const existingDeleted = payload?.existing?.deleted != null ? String(payload.existing.deleted) : '';
+
+        const lines = [];
+        lines.push('What happened');
+        lines.push('- A cached TVDB entry exists for this show name, but it does not match the currently loaded Emby show.');
+        lines.push('- The client will rebuild/update the cache entry via getNewTvdb().');
+        lines.push('');
+        lines.push('Current show (from Emby)');
+        lines.push(`- Show name key (show.Name): ${name}`);
+        lines.push(`- Emby show Id (show.Id): ${showId}`);
+        lines.push(`- TVDB series Id on show (show.TvdbId): ${tvdbId}`);
+        lines.push('');
+        lines.push('Existing cached entry (from server TVDB cache: allTvdb[show.Name])');
+        lines.push(`- Cached showId (tvdb.showId): ${existingShowId}`);
+        lines.push(`- Cached tvdbId (tvdb.tvdbId): ${existingTvdbId}`);
+        if (existingDeleted) lines.push(`- Cached deleted flag/date (tvdb.deleted): ${existingDeleted}`);
+        lines.push('');
+        lines.push('Raw details');
+        try {
+          lines.push(JSON.stringify(payload, null, 2));
+        } catch {
+          lines.push(String(payload));
+        }
+
+        this.tvdbMismatchText = lines.join('\n');
+      } else {
+        this.tvdbMismatchText = String(payload);
+      }
+      this.tvdbMismatchOpen = true;
+    },
+
+    closeTvdbMismatch() {
+      this.tvdbMismatchOpen = false;
+    },
+
     triggerShowReload() {
       evtBus.emit('library-refresh-complete', { showReloadDialog: true });
     },
@@ -1006,6 +1075,7 @@ export default {
 
     // Derive downActive and schedule deferred Tor restarts.
     evtBus.on('downActivePart', this.handleDownActivePart);
+    evtBus.on('tvdb-mismatch', this.handleTvdbMismatch);
     this.startQbtPolling();
 
     // Refresh space display once on app load.

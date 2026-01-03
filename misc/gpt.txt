@@ -3,4 +3,4 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-in map pane rename refresh button to Library and have it perform exact same action as library button in down pane include % progress before button
+how is speed calculated and displayed in qbt pane card

@@ -25,7 +25,8 @@
     ) Copy
 
     button(
-      @click.stop="refreshShows"
+      @click.stop="refreshContents"
+      :disabled="busy || !rootPath"
       style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; background-color:whitesmoke; margin-right:20px;"
     ) Refresh
 
@@ -525,8 +526,28 @@ export default {
       else this.openAll();
     },
 
-    refreshShows() {
-      evtBus.emit('library-refresh-complete', { showReloadDialog: true });
+    async refreshContents() {
+      if (!this.rootPath) return;
+
+      this.error = null;
+      this.busy = true;
+      try {
+        const res = await srvr.getFile(fullFromRel(this.rootPath));
+        if (Array.isArray(res)) {
+          this.tree = res;
+        } else if (res && Array.isArray(res.children)) {
+          this.tree = res.children;
+        } else {
+          this.tree = null;
+          this.error = 'Unexpected response from getFile.';
+        }
+      } catch (e) {
+        this.error = e?.err || e?.message || String(e);
+      } finally {
+        this.busy = false;
+      }
+
+      this.pruneSelectionsToVisible();
     },
 
     async copyPaneToClipboard() {

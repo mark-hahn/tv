@@ -38,6 +38,35 @@ try {
   notesCache = {};
 }
 
+// Ensure we never keep/persist empty notes.
+try {
+  let changed = false;
+  const cleaned = {};
+  for (const [rawKey, rawVal] of Object.entries(notesCache ?? {})) {
+    const key = typeof rawKey === 'string' ? rawKey.trim() : '';
+    if (!key) {
+      changed = true;
+      continue;
+    }
+
+    const val = rawVal === undefined || rawVal === null ? '' : String(rawVal);
+    if (val.trim() === '') {
+      changed = true;
+      continue;
+    }
+
+    if (key !== rawKey || val !== rawVal) changed = true;
+    cleaned[key] = val;
+  }
+
+  if (changed) {
+    notesCache = cleaned;
+    try {
+      fs.writeFileSync(notesPath, JSON.stringify(notesCache), 'utf8');
+    } catch {}
+  }
+} catch {}
+
 const rejects      = JSON.parse(rejectStr);
 const pickups      = JSON.parse(pickupStr);
 const noEmbys      = JSON.parse(noEmbyStr);
@@ -551,6 +580,16 @@ const getNote = (id, param, resolve, reject) => {
   resolve([id, notesCache[showName] ?? '' ]);
 };
 
+const getAllNotes = (id, _param, resolve, _reject) => {
+  // Return a shallow copy so callers can't mutate server cache by reference.
+  // Also defensively filter empty notes.
+  const out = {};
+  for (const [key, val] of Object.entries(notesCache)) {
+    if (typeof val === 'string' && val.trim() !== '') out[key] = val;
+  }
+  resolve([id, out]);
+};
+
 const saveNote = async (id, param, resolve, reject) => {
   if (param === undefined || param === null || param === '') {
     reject([id, { err: 'saveNote: missing params' }]);
@@ -577,6 +616,24 @@ const saveNote = async (id, param, resolve, reject) => {
   if (typeof noteText !== 'string') noteText = String(noteText);
 
   const key = showName.trim();
+
+  // Never store empty notes: treat as delete.
+  if (noteText.trim() === '') {
+    if (notesCache[key] === undefined) {
+      resolve([id, 'ok']);
+      return;
+    }
+    delete notesCache[key];
+    try {
+      await util.writeFile(notesPath, notesCache);
+    } catch (e) {
+      reject([id, { err: `saveNote: write failed: ${e.message}` }]);
+      return;
+    }
+    resolve([id, 'ok']);
+    return;
+  }
+
   const prev = notesCache[key];
   if (prev === noteText) {
     resolve([id, 'ok']);
@@ -784,6 +841,7 @@ const runOne = () => {
 
     case 'getNote':  getNote( id, param, resolve, reject); break;
     case 'saveNote': saveNote(id, param, resolve, reject); break;
+    case 'getAllNotes': getAllNotes(id, param, resolve, reject); break;
 
     case 'getFile': getFile(id, param, resolve, reject); break;
 

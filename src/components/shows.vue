@@ -32,7 +32,7 @@
         td(id="showlineicons" :style="{display:'flex', padding:'5px', justifyContent:'space-between', backgroundColor: hilite(show)}")
           div(style="padding:2px; fontSize:16px; font-weight:bold;" @click="$emit('select-show', show, false, true)") {{show.Name}}
           div(style="padding:2px; flex-grow:1; fontSize:16px; font-weight:bold;" @click="$emit('select-show', show, false, true)" )
-          div(v-if="show.WaitStr?.length" @click="$emit('wait-str-click', show)" style="padding:2px; color: #00f; fontSize:16px;")
+          div(v-if="show.WaitStr?.length" style="padding:2px; color: #00f; fontSize:16px;")
             | {{show.WaitStr}}
 
         td(v-if="showConds" v-for="cond in conds" :key="cond.name" style="width:22px; padding:0; text-align:center;" @click="cond.click(show)")

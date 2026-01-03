@@ -1,21 +1,60 @@
 
-Where the worker “updates a show”
+GAPS LOGIC CHANGES (server)
+==========================
 
-Worker computes fileGap/etc, then sends a message: gap-worker.js:170-205 (self.postMessage({ showId, ... })).
-The UI-side mutation happens in addGapToShow(event): list.vue:1492-1542
-Finds the show: const show = allShows.find((show) => show.Id == showId);
-Applies fields onto it: Object.assign(show, gap);
-Persists to server: await srvr.addGap([show.Id, gap, save]);
-Where addGap is called
+Summary
+-------
+- `data/gaps.json` is treated as a persisted cache of only “shows that currently have gaps”.
+- The server prunes entries on load and maintains that invariant on updates.
+- The `Waiting` property is considered transient client state and is never persisted or returned.
 
-Only here: list.vue:1533 (srvr.addGap(...))
-Where delGap is called
+Files/locations
+--------------
+- Main implementation is in [index.js](../index.js):
+	- `gapEntryHasGap(gap)` predicate
+	- startup prune + rewrite of `data/gaps.json`
+	- updated `addGap` / `delGap`
 
-When deleting a show from the server side of the client workflow: srvr.js:104-116 (deleteShowFromSrvr calls delGap([show.Id, true]))
-During Emby load, cleaning gaps with no matching show: emby.js:256-260
-Where the worker is started / callback wired
+What counts as “has a gap”
+--------------------------
+An entry is kept if ANY of these are true:
+- `FileGap === true`
+- `WatchGap === true`
+- `BlockedGap === true`
+- `NotReady === true`
+- Any of these are non-null/defined: `FileGapSeason`, `FileGapEpisode`, `WatchGapSeason`, `WatchGapEpisode`
+- `WaitStr` is a non-blank string (e.g. `"{3-01}"`)
 
-Worker creation: emby.js:7-10
-Wiring onmessage + postMessage: emby.js:327-342
-Start call (and restart logic): list.vue:1549-1580
-If you’re asking because the UI isn’t repainting when gaps change: the mutation currently targets the allShows object found outside Vue’s reactive state, which can bypass reactivity depending on how those objects are proxied. If you want, I can adjust addGapToShow to assign onto the reactive object in this.shows (or make allShows reactive) so the list always updates immediately.
+Note: `Waiting` is NOT used for “has gap” and is removed entirely.
+
+Startup behavior (load + prune)
+-------------------------------
+- The server loads `data/gaps.json` once at startup into an in-memory map `gaps`.
+- During startup it:
+	1) Deletes `Waiting` from every gap object (whether true/false).
+	2) Deletes any gap entry that does not satisfy `gapEntryHasGap()`.
+	3) If anything changed, rewrites `data/gaps.json` with the pruned result.
+
+RPC behavior
+------------
+- `getGaps`:
+	- Returns the in-memory `gaps` object (does NOT reread `data/gaps.json` per call).
+	- Returned gap objects do not include `Waiting`.
+
+- `addGap`:
+	- Param format: JSON string of `[gapId, gapObj, save]`.
+	- Before storing, the server deletes `gapObj.Waiting` (if present).
+	- If `gapObj` satisfies `gapEntryHasGap()`, it stores the full object at `gaps[gapId]`.
+	- Otherwise it deletes `gaps[gapId]` (so non-gap shows are not persisted).
+	- If `save === true`, it writes the entire `gaps` map to `data/gaps.json`.
+
+- `delGap`:
+	- Param format: JSON string of `[gapId, save]`.
+	- Deletes `gaps[gapId]` (if `gapId !== null`).
+	- If `save === true`, writes the entire `gaps` map to `data/gaps.json`.
+
+Persistence
+-----------
+- The code now uses a shared `gapsPath = 'data/gaps.json'`.
+- Writes use `util.writeFile(gapsPath, gaps)` (queued async writer).
+

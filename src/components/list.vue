@@ -72,7 +72,6 @@
         @copy-name="copyNameToClipboard"
         @open-map="(show) => seriesMapAction('open', show)"
         @select-show="onSelectShow"
-        @wait-str-click="waitStrClick"
       )
 </template>
 
@@ -107,7 +106,6 @@ let allTvdb          = null;
 let allShows         = [];
 let showHistory      = [];
 let showHistoryPtr   = -1;
-let blockedWaitShows = null;
 let blockedGapShows  = null;
 let srchListWeb      = null;
 let gapWorkerRunning = false;
@@ -136,17 +134,6 @@ export default {
   },
 
   data() {
-
-    const toggleWaiting = (show) => {
-      // console.log("toggleWaiting", show.Name);
-      this.saveVisShow(show);
-      if(show.Waiting) {
-        show.Waiting = false;
-      }
-      else if (show.WaitStr?.length > 0) {
-        show.Waiting = true;
-      }
-    };
 
     const toggleBlkGap = (show) => {
       // console.log("toggleBlkGap", show.Name);
@@ -1269,14 +1256,6 @@ export default {
       }
     },
 
-    waitStrClick(show) {
-      console.log("waitStrClick", show.Name);
-      this.saveVisShow(show);
-      if (show.WaitStr?.length > 0) {
-        show.Waiting = true;
-      }
-    },
-
     async seriesMapAction(action, show, wasDeleted) {
       if(action == 'close') {
         this.mapShow = null;
@@ -1534,7 +1513,6 @@ export default {
       }
 
       const blockedGap  = blockedGapShows .includes(show.Name);
-      const blockedWait = blockedWaitShows.includes(show.Name);
 
       const gap = {};
       gap.ShowId          = showId;
@@ -1545,8 +1523,6 @@ export default {
       gap.WatchGap        = watchGap; 
       gap.NotReady        = notReady;
       gap.BlockedGap      = blockedGap;
-      gap.Waiting         = !blockedWait;
-      gap.WaitStr         = await tvdb.getWaitStr(show);
       gap.FileGap = !(!notReady && show.InToTry) &&
                      (fileGap || fileEndError || seasonWatchedThenNofile);
 
@@ -1576,7 +1552,6 @@ export default {
       this.$emit('all-shows', allShows);
 
       // must be set before startWorker
-      blockedWaitShows = [];
       blockedGapShows  = [];
 
       // Handle gap worker restart logic

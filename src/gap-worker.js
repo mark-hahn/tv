@@ -13,7 +13,6 @@ const getShowState = async (showId, _showName) => {
   let lastWatched             = false;
   let watchedShow             = false;
   let watchedLastEpiLastSea   = true; 
-  let waiting                 = false;
   let unwatchedAfterWatched   = false;
   let watchGap                = false;
   let haveFileShow            = false;
@@ -108,8 +107,6 @@ const getShowState = async (showId, _showName) => {
         }
         if(episodeIdx == episodes.length-1) {
           // last epi in season
-          if(unaired && (watchedLastEpiLastSea || watchedSeason))
-            waiting = true;
           watchedLastEpiLastSea = watched;
         }
 
@@ -156,7 +153,7 @@ const getShowState = async (showId, _showName) => {
     console.error('getShowState error:', error.message);
     return null;
   }
-  return {notReady:!ready, waiting, anyWatched, 
+  return {notReady:!ready, anyWatched, 
          fileEndError, seasonWatchedThenNofile,
           watchGap, watchGapSeason, watchGapEpisode, 
           fileGap,  fileGapSeason,  fileGapEpisode};
@@ -170,7 +167,7 @@ self.onmessage = async (event) => {
       `gap-worker started, ${allShowsIdName.length} shows`);
   for (let i = 0; i < allShowsIdName.length; i++) {
     const [showId, showName] = allShowsIdName[i];
-    const {notReady, waiting, anyWatched, fileEndError,
+    const {notReady, anyWatched, fileEndError,
            watchGap, watchGapSeason, watchGapEpisode, 
            fileGap,  fileGapSeason,  fileGapEpisode,
            seasonWatchedThenNofile} = 
@@ -178,8 +175,8 @@ self.onmessage = async (event) => {
     const progress = Math.ceil( 
                       (i+1) * 100 / allShowsIdName.length );
 
-    self.postMessage(
-          {showId, progress, notReady, waiting, anyWatched,
+        self.postMessage(
+          {showId, progress, notReady, anyWatched,
           watchGap, watchGapSeason, watchGapEpisode, 
           fileGap,  fileGapSeason,  fileGapEpisode, 
           fileEndError, seasonWatchedThenNofile }

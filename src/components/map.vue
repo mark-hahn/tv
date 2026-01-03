@@ -61,7 +61,7 @@
           div(v-if="mapShow?.FileGap")
             | {{"Missing File"}}
 
-          div(v-if="mapShow?.Waiting")
+          div(v-if="mapShow?.WaitStr?.length")
             | {{'Waiting ' + mapShow?.WaitStr}}
   #maptable(v-if="!hideMapBottom" style="flex:1 1 auto; min-height:0px; margin-left:15px; margin-right:15px; box-sizing:border-box; position:relative; overflow:hidden;")
     //- No scrollbars: pan the table with arrows (horizontal) and mouse wheel (vertical).

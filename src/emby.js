@@ -316,6 +316,16 @@ export async function loadAllShows() {
     if(show) show.Pickup = true;
   }
 
+//////////  set WaitStr (waiting indicator) ////////////
+  for (const show of shows) {
+    try {
+      const waitStr = await tvdb.getWaitStr(show);
+      if (waitStr) show.WaitStr = waitStr;
+    } catch (e) {
+      // Ignore WaitStr errors; gap/TVDB errors are non-fatal for load.
+    }
+  }
+
 //////////  finished loadAllShows ////////////
   const elapsed = new Date().getTime() - loadAllShowsStartTime;
   console.log('all shows loaded, elapsed ms:', elapsed);

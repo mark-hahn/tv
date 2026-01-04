@@ -81,6 +81,7 @@ const main = () => {
   entry.status = 'downloading';
   entry.progress = 0;
   entry.eta = null;
+  entry.speed = 0;
   entry.dateEnded = null;
   postUpdate('update');
 
@@ -90,6 +91,21 @@ const main = () => {
   let lastProgress = 0;
   let lastProgressUpdateTime = 0;
   const progressUpdateInterval = 500;
+
+  // Speed estimate based on rsync progress2 byte counter deltas.
+  let lastBytes = null;
+  let lastBytesTimeMs = null;
+  const speedSamples = [];
+
+  const parseTransferredBytes = (chunk) => {
+    // Typical progress2 lines contain: "   123,456,789  12% ..."
+    const m = chunk.match(/\s*([\d,]+)\s+(\d+)%/);
+    if (!m) return null;
+    const s = m[1].replace(/,/g, '');
+    if (!/^\d+$/.test(s)) return null;
+    const n = parseInt(s, 10);
+    return Number.isFinite(n) ? n : null;
+  };
 
   p.stdout.on('data', (data) => {
     const chunk = data.toString();
@@ -103,6 +119,26 @@ const main = () => {
       lastProgress = pct;
       lastProgressUpdateTime = Date.now();
       entry.progress = pct;
+
+      const nowMs = Date.now();
+      const bytes = parseTransferredBytes(chunk);
+      if (bytes != null) {
+        if (lastBytes != null && lastBytesTimeMs != null && bytes >= lastBytes) {
+          const dt = (nowMs - lastBytesTimeMs) / 1000;
+          if (dt > 0) {
+            const dBytes = bytes - lastBytes;
+            const instBitsPerSec = Math.round((dBytes * 8) / dt);
+            const inst = Number.isFinite(instBitsPerSec) && instBitsPerSec >= 0 ? instBitsPerSec : 0;
+
+            speedSamples.push(inst);
+            while (speedSamples.length > 3) speedSamples.shift();
+            const sum = speedSamples.reduce((a, b) => a + b, 0);
+            entry.speed = speedSamples.length ? Math.round(sum / speedSamples.length) : 0;
+          }
+        }
+        lastBytes = bytes;
+        lastBytesTimeMs = nowMs;
+      }
 
       const etaSec = parseEtaSeconds(chunk);
       if (etaSec != null) {

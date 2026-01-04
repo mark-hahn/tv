@@ -246,7 +246,7 @@
       usbPath: readFixedString(tvShared.usbPathBytes, procId, USB_PATH_BYTES),
       localPath: readFixedString(tvShared.localPathBytes, procId, LOCAL_PATH_BYTES),
       title: readFixedString(tvShared.titleBytes, procId, TITLE_BYTES),
-      status: getStatus(procId) || 'future',
+      status: getStatus(procId) || 'waiting',
       progress: tvShared.progress[procId] || 0,
       eta: etaVal ? etaVal : null,
       sequence: tvShared.sequence[procId] || 0,
@@ -312,7 +312,7 @@
       writeFixedString(tvShared.usbPathBytes, pid, USB_PATH_BYTES, o.usbPath || '');
       writeFixedString(tvShared.localPathBytes, pid, LOCAL_PATH_BYTES, o.localPath || '');
       writeFixedString(tvShared.titleBytes, pid, TITLE_BYTES, o.title || '');
-      setStatus(pid, o.status || 'future');
+      setStatus(pid, (o.status === 'future' ? 'waiting' : (o.status || 'waiting')));
 
       tvShared.progress[pid] = (typeof o.progress === 'number' && Number.isFinite(o.progress)) ? Math.floor(o.progress) : 0;
       tvShared.eta[pid] = (typeof o.eta === 'number' && Number.isFinite(o.eta)) ? Math.floor(o.eta) : 0;
@@ -324,11 +324,11 @@
       tvShared.fileSize[pid] = (typeof o.fileSize === 'number' && Number.isFinite(o.fileSize)) ? BigInt(Math.floor(o.fileSize)) : 0n;
     }
 
-    // Per spec: reset any downloading entries to future on load.
+    // Per spec: reset any downloading entries to waiting on load.
     for (var pid = 0; pid < nextProcId; pid++) {
       var st = getStatus(pid);
       if (st === 'downloading') {
-        setStatus(pid, 'future');
+        setStatus(pid, 'waiting');
         tvShared.progress[pid] = 0;
         tvShared.eta[pid] = 0;
       }
@@ -467,7 +467,7 @@
 
         // If we crashed mid-download, clear downloading state once on boot.
         if (!clearedDownloadingOnBoot && n.status === 'downloading') {
-          n.status = 'future';
+          n.status = 'waiting';
           changed = true;
         }
 
@@ -498,7 +498,7 @@
         var statusRank = function(s) {
           if (s === 'finished') return 3;
           if (s === 'downloading') return 2;
-          if (s === 'future') return 1;
+          if (s === 'waiting') return 1;
           return 0;
         };
 
@@ -645,7 +645,7 @@
         var statusRank = function(s) {
           if (s === 'finished') return 3;
           if (s === 'downloading') return 2;
-          if (s === 'future') return 1;
+          if (s === 'waiting') return 1;
           return 0;
         };
 
@@ -777,7 +777,7 @@
 
   var findOldestFutureProcId = function() {
     for (var pid = 0; pid < nextProcId; pid++) {
-      if (getStatus(pid) === 'future') {
+      if (getStatus(pid) === 'waiting') {
         return pid;
       }
     }
@@ -837,7 +837,7 @@
         }
 
         // Any non-finished terminal status is treated as an error message.
-        if (status1 && status1 !== 'downloading' && status1 !== 'future') {
+        if (status1 && status1 !== 'downloading' && status1 !== 'waiting') {
           try {
             appendTvLog(`${dateStr(ts)} ERROR ${title1}: ${status1}\n`);
           } catch (e) {}
@@ -858,7 +858,7 @@
       // Update tv-finished.json / tv-errors.json for this procId.
       handleFinish(finishedProcId != null ? finishedProcId : procId);
 
-      // On finished, if there is capacity start the oldest future entry.
+      // On finished, if there is capacity start the oldest waiting entry.
       if (workerCount < MAX_WORKERS) {
         var nextPid = findOldestFutureProcId();
         if (nextPid != null) {
@@ -1255,7 +1255,7 @@
 
   reloadState();
 
-  // On load, start the first MAX_WORKERS future entries.
+  // On load, start the first MAX_WORKERS waiting entries.
   // (disabled) Workers are started by tvJson.js on module load.
 
   tvPath = '/mnt/media/tv/';
@@ -1365,7 +1365,7 @@
 
     // Load tv.json once per cycle and block any file already present there.
     // This prevents duplicates after restarts where tv-inProgress.json may be cleared
-    // but tv.json still contains queued/future entries.
+    // but tv.json still contains queued/waiting entries.
     tvJsonTitles = {};
     try {
       var tvArr = JSON.parse(fs.readFileSync(TV_JSON_PATH, 'utf8'));
@@ -1694,9 +1694,10 @@
         usbPath: usbPath,
         localPath: tvLocalDir,
         title: fname,
-        status: 'future',
+        status: 'waiting',
         progress: 0,
         eta: null,
+        speed: 0,
         sequence: currentSeq || 0,
         fileSize: usbFileBytes || 0,
         season: season || 0,

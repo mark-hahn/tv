@@ -154,24 +154,31 @@ const loadOnStart = () => {
   const arr = readJson(TV_JSON_PATH, []);
   tvJsonCache = Array.isArray(arr) ? arr : [];
 
-  // Reset any in-progress or downloading entries to future on start.
-  // Spec: if entry has inProgress:true at reload, set inProgress:false and status:"future".
+  // Reset any in-progress or downloading entries to waiting on start.
+  // Spec: if entry has inProgress:true at reload, set inProgress:false and status:"waiting".
   for (const e of tvJsonCache) {
     if (!e || typeof e !== 'object') continue;
 
+    // Migrate legacy queued status.
+    if (e.status === 'future') {
+      e.status = 'waiting';
+    }
+
     if (e.inProgress === true) {
       e.inProgress = false;
-      e.status = 'future';
+      e.status = 'waiting';
       e.progress = 0;
       e.eta = null;
+      e.speed = 0;
       e.dateEnded = null;
       continue;
     }
 
     if (e.status === 'downloading') {
-      e.status = 'future';
+      e.status = 'waiting';
       e.progress = 0;
       e.eta = null;
+      e.speed = 0;
       e.dateEnded = null;
     }
   }
@@ -190,23 +197,23 @@ const loadOnStart = () => {
   finishedMap = readMap(TV_FINISHED_PATH);
   errorsMap = readMap(TV_ERRORS_PATH);
   // On restart/reload, treat all prior in-progress markers as stale.
-  // We already reset any persisted entry.inProgress=true back to future above.
+  // We already reset any persisted entry.inProgress=true back to waiting above.
   // Clearing the map prevents duplicate suppression from getting stuck.
   inProgressCache = {};
   flushInProgress();
 
-  // Start up to MAX_WORKERS oldest future entries.
+  // Start up to MAX_WORKERS oldest waiting entries.
   tryStartNextWorkers();
   flushTvJsonToDisk();
 };
 
-const findOldestFutureIndex = () => {
-  return tvJsonCache.findIndex((e) => e && typeof e === 'object' && e.status === 'future');
+const findOldestWaitingIndex = () => {
+  return tvJsonCache.findIndex((e) => e && typeof e === 'object' && e.status === 'waiting');
 };
 
 const tryStartNextWorkers = () => {
   while (workerCount < MAX_WORKERS) {
-    const idx = findOldestFutureIndex();
+    const idx = findOldestWaitingIndex();
     if (idx < 0) return;
     startWorkerForIndex(idx);
   }
@@ -241,7 +248,7 @@ const handleFinish = (entry) => {
       return;
     }
 
-    if (status && status !== 'downloading' && status !== 'future') {
+    if (status && status !== 'downloading' && status !== 'waiting') {
       appendTvLog(`${tsStr} ERROR ${title}: ${status}\n`);
       errorsMap[title] = tsStr;
       writeMap(TV_ERRORS_PATH, errorsMap);
@@ -267,6 +274,7 @@ const startWorkerForIndex = (idx) => {
   entry.status = 'downloading';
   entry.progress = 0;
   entry.eta = null;
+  entry.speed = 0;
   entry.dateStarted = unixNow();
   entry.dateEnded = null;
 
@@ -299,8 +307,8 @@ const startWorkerForIndex = (idx) => {
       handleFinish(doneEntry);
       flushTvJsonToDisk();
 
-      // Start exactly one oldest future (spec: keep the pipeline full).
-      const nextIdx = findOldestFutureIndex();
+      // Start exactly one oldest waiting (spec: keep the pipeline full).
+      const nextIdx = findOldestWaitingIndex();
       if (nextIdx >= 0) {
         startWorkerForIndex(nextIdx);
       }
@@ -316,7 +324,7 @@ const startWorkerForIndex = (idx) => {
     handleFinish(errEntry);
     flushTvJsonToDisk();
 
-    const nextIdx = findOldestFutureIndex();
+    const nextIdx = findOldestWaitingIndex();
     if (nextIdx >= 0) {
       startWorkerForIndex(nextIdx);
     }
@@ -338,9 +346,11 @@ const addEntry = (entry) => {
   const e = { ...entry };
 
   // Ensure minimal fields exist.
-  if (!e.status) e.status = 'future';
+  // Queue status is "waiting" (formerly "future").
+  if (!e.status || e.status === 'future') e.status = 'waiting';
   if (typeof e.progress !== 'number') e.progress = 0;
   if (e.eta === undefined) e.eta = null;
+  if (typeof e.speed !== 'number') e.speed = 0;
   if (!e.dateStarted) e.dateStarted = 0;
   if (!e.dateEnded) e.dateEnded = null;
 

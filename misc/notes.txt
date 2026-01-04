@@ -1,6 +1,5 @@
 
-i stopped the app in the middle of downloading and then restarted it.  The entries that were downloading correctly started over.  But there was one future entry and it was added a second time by the cycle even though it was already in tv.json.
 
-after usb file list is downloaded also read tv.json and block any files where the title is already in tv.json. tv.json should not be cached.
+- change the "status":"future" used in tv.json to "status":"waiting" and change all code that looks for "status":"future" to look for "status":"waiting"
 
-so now the list of files read after usb file list is downloaded is data/tv-errors.json, data/tv-finished.json, data/tv-inProgress.json, and data/tv.json. any file in any of the files should be blocked.  none should be cached.
+- a worker should calculate download speed in bits/sec and update its tv.json entry to have a speed field with that number every time it updates progress and eta.  use the old method of calculating speed and if you don't remember it I will revert the commits to find it.

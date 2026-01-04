@@ -2,7 +2,7 @@
 
   const MAX_WORKERS = 8;
 
-  var FAST_TEST, PROCESS_INTERVAL_MS, appendTvLog, badFile, blocked, blockedCount, buffering, checkFile, checkFileExists, checkFiles, chkCount, chkTvDB, clearBuffer, currentSeq, cycleRunning, cycleSeq, dateStr, debug, delOldFiles, deleteCount, downloadCount, downloadTime, emby, episode, err, errCount, errors, escQuotes, exec, existsCount, fileTimeout, filterRegex, filterRegexTxt, findUsb, flushAndGoLive, flushBuffer, fname, fs, getUsbFiles, lastPruneAt, log, logBuffer, map, mkdirp, path, readMap, recent, recentCount, reloadState, request, resetCycleState, rimraf, rsyncDelay, runCycle, scheduleNextCycle, season, seriesName, sizeStr, skipPaths, startBuffering, startTime, stopBuffering, theTvDbToken, time, title, tvDbErrCount, tvPath, tvdbCache, tvdburl, type, usbFilePath, usbFileSize, usbFiles, usbHost, util, writeLine, writeMap;
+  var FAST_TEST, PROCESS_INTERVAL_MS, appendTvLog, badFile, blocked, blockedCount, buffering, checkFile, checkFileExists, checkFiles, chkCount, chkTvDB, clearBuffer, currentSeq, cycleRunning, cycleSeq, dateStr, debug, delOldFiles, deleteCount, downloadCount, downloadTime, emby, episode, err, errCount, errors, escQuotes, exec, existsCount, fileTimeout, filterRegex, filterRegexTxt, findUsb, flushAndGoLive, flushBuffer, fname, fs, getUsbFiles, inProgress, lastPruneAt, log, logBuffer, map, mkdirp, path, readMap, recent, recentCount, reloadState, request, resetCycleState, rimraf, rsyncDelay, runCycle, scheduleNextCycle, season, seriesName, sizeStr, skipPaths, startBuffering, startTime, stopBuffering, theTvDbToken, time, title, tvDbErrCount, tvPath, tvdbCache, tvdburl, type, usbFilePath, usbFileSize, usbFiles, usbHost, util, writeLine, writeMap;
 
   debug = false;
   FAST_TEST = false;
@@ -65,6 +65,7 @@
   var TV_JSON_PATH = dataPath('tv.json');
   var TV_FINISHED_PATH = dataPath('tv-finished.json');
   var TV_ERRORS_PATH = dataPath('tv-errors.json');
+  var TV_INPROGRESS_PATH = dataPath('tv-inProgress.json');
   var TV_BLOCKED_PATH = dataPath('tv-blocked.json');
   var TV_MAP_PATH = dataPath('tv-map');
   var SCAN_LIBRARY_FLAG_PATH = dataPath('scanLibraryFlag');
@@ -90,6 +91,12 @@
       }
       if (!fs.existsSync(TV_FINISHED_PATH)) {
         fs.writeFileSync(TV_FINISHED_PATH, '{}');
+      }
+      if (!fs.existsSync(TV_ERRORS_PATH)) {
+        fs.writeFileSync(TV_ERRORS_PATH, '{}');
+      }
+      if (!fs.existsSync(TV_INPROGRESS_PATH)) {
+        fs.writeFileSync(TV_INPROGRESS_PATH, '{}');
       }
     } catch (e) {
       // Non-fatal.
@@ -825,7 +832,6 @@
         if (status1 === 'finished') {
           if (recent) {
             recent[title1] = ts;
-            writeMap(TV_FINISHED_PATH, recent);
           }
           return;
         }
@@ -837,7 +843,6 @@
           } catch (e) {}
           if (errors) {
             errors[title1] = ts;
-            writeMap(TV_ERRORS_PATH, errors);
           }
         }
       } catch (e) {
@@ -1216,6 +1221,8 @@
 
   errors = null;
 
+  inProgress = null;
+
   blocked = null;
 
   //##########
@@ -1224,8 +1231,8 @@
 
   reloadState = function() {
     var f, j, len, line, mapLines, mapStr, results, t;
-    recent = readMap(TV_FINISHED_PATH);
-    errors = readMap(TV_ERRORS_PATH);
+    // Do not cache tv-finished.json / tv-errors.json / tv-inProgress.json here.
+    // Those are loaded once per cycle immediately after the USB file list is fetched.
     blocked = JSON.parse(fs.readFileSync(TV_BLOCKED_PATH, 'utf8'));
     map = {};
     mapStr = fs.readFileSync(TV_MAP_PATH, 'utf8');
@@ -1335,6 +1342,24 @@
       timeout: 300000
     }).toString().split('\n');
 
+    // Load finished/errors/inProgress maps once per cycle, immediately after
+    // the USB file list is available.
+    try {
+      recent = readMap(TV_FINISHED_PATH);
+    } catch (e) {
+      recent = {};
+    }
+    try {
+      errors = readMap(TV_ERRORS_PATH);
+    } catch (e) {
+      errors = {};
+    }
+    try {
+      inProgress = readMap(TV_INPROGRESS_PATH);
+    } catch (e) {
+      inProgress = {};
+    }
+
     // Sort files by parsed title before processing.
     usbFiles = usbFiles.filter((l) => l && l.trim().length);
     usbFiles = usbFiles.map((line) => {
@@ -1436,18 +1461,22 @@
         process.nextTick(checkFile);
         return;
       }
-      if (recent[fname]) {
+      if (recent && recent[fname]) {
         recentCount++;
         log('------', downloadCount, '/', chkCount, 'SKIPPING RECENT:', fname);
+        process.nextTick(checkFile);
+        return;
+      }
+
+      if (inProgress && inProgress[fname]) {
+        recentCount++;
+        log('------', downloadCount, '/', chkCount, 'SKIPPING IN-PROGRESS:', fname);
         process.nextTick(checkFile);
         return;
       }
       log('not recent', usbLine);
       for (blkName in blocked) {
         if (fname.indexOf(blkName) > -1) {
-          recent[fname] = Date.now();
-          writeMap(TV_FINISHED_PATH, recent);
-          // fs.writeFileSync 'tv-finished.json', JSON.stringify recent
           blockedCount++;
           log('-- BLOCKED:', {blkName, fname});
           process.nextTick(checkFile);
@@ -1455,7 +1484,7 @@
         }
       }
       log('not blocked', usbLine);
-      if (errors[fname]) {
+      if (errors && errors[fname]) {
         log('------', downloadCount, '/', chkCount, 'SKIPPING *ERROR*:', fname);
         process.nextTick(checkFile);
         return;
@@ -1617,6 +1646,13 @@
       return process.nextTick(checkFile);
     }
 
+    // In-progress authority: tv-inProgress.json (do not create duplicate tv.json entries
+    // for files already queued/downloading).
+    if (inProgress && inProgress[fname]) {
+      existsCount++;
+      return process.nextTick(checkFile);
+    }
+
     mkdirp.sync(tvSeasonPath);
     // Create a new tv.json entry (tvJson.js will assign procId when a worker starts).
     try {
@@ -1651,8 +1687,9 @@
       episode,
       usbFilePath
     });
-    errors[fname] = Date.now();
-    writeMap(TV_ERRORS_PATH, errors);
+    try {
+      tvJson.markError(fname, reason || 'unknown');
+    } catch (e) {}
     return process.nextTick(checkFile);
   };
 

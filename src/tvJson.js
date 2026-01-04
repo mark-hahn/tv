@@ -15,6 +15,7 @@ const DATA_DIR = path.join(BASEDIR, 'data');
 const TV_JSON_PATH = path.join(DATA_DIR, 'tv.json');
 const TV_FINISHED_PATH = path.join(DATA_DIR, 'tv-finished.json');
 const TV_ERRORS_PATH = path.join(DATA_DIR, 'tv-errors.json');
+const TV_INPROGRESS_PATH = path.join(DATA_DIR, 'tv-inProgress.json');
 const TV_LOG_PATH = path.join(BASEDIR, 'misc', 'tv.log');
 
 const WORKER_SCRIPT = path.join(__dirname, 'worker.js');
@@ -102,6 +103,7 @@ let nextProcId = 0;
 
 let finishedMap = null;
 let errorsMap = null;
+let inProgressCache = null;
 
 const unixNow = () => Math.floor(Date.now() / 1000);
 
@@ -109,16 +111,68 @@ const flushTvJsonToDisk = () => {
   writeJsonAtomic(TV_JSON_PATH, tvJsonCache);
 };
 
+const ensureMapFileExists = (filePath, defaultObj) => {
+  try {
+    if (!fs.existsSync(filePath)) {
+      writeJsonAtomic(filePath, defaultObj);
+    }
+  } catch {}
+};
+
+const ensureMapsLoaded = () => {
+  if (!finishedMap) finishedMap = readMap(TV_FINISHED_PATH);
+  if (!errorsMap) errorsMap = readMap(TV_ERRORS_PATH);
+  if (!inProgressCache) inProgressCache = readMap(TV_INPROGRESS_PATH);
+};
+
+const flushInProgress = () => {
+  if (!inProgressCache) return;
+  writeMap(TV_INPROGRESS_PATH, inProgressCache);
+};
+
+const addInProgress = (title) => {
+  if (!title) return;
+  ensureMapsLoaded();
+  inProgressCache[String(title)] = dateStr(Date.now());
+  flushInProgress();
+};
+
+const removeInProgress = (title) => {
+  if (!title) return;
+  ensureMapsLoaded();
+  if (Object.prototype.hasOwnProperty.call(inProgressCache, String(title))) {
+    delete inProgressCache[String(title)];
+    flushInProgress();
+  }
+};
+
 const loadOnStart = () => {
+  ensureMapFileExists(TV_FINISHED_PATH, {});
+  ensureMapFileExists(TV_ERRORS_PATH, {});
+  ensureMapFileExists(TV_INPROGRESS_PATH, {});
+
   const arr = readJson(TV_JSON_PATH, []);
   tvJsonCache = Array.isArray(arr) ? arr : [];
 
-  // Reset any downloading entries to future on start (no shared state).
+  // Reset any in-progress or downloading entries to future on start.
+  // Spec: if entry has inProgress:true at reload, set inProgress:false and status:"future".
   for (const e of tvJsonCache) {
-    if (e && typeof e === 'object' && e.status === 'downloading') {
+    if (!e || typeof e !== 'object') continue;
+
+    if (e.inProgress === true) {
+      e.inProgress = false;
       e.status = 'future';
       e.progress = 0;
       e.eta = null;
+      e.dateEnded = null;
+      continue;
+    }
+
+    if (e.status === 'downloading') {
+      e.status = 'future';
+      e.progress = 0;
+      e.eta = null;
+      e.dateEnded = null;
     }
   }
 
@@ -132,9 +186,14 @@ const loadOnStart = () => {
   }
   nextProcId = maxId + 1;
 
-  // Load finished/errors maps for immediate skip updates on worker finish.
+  // Load finished/errors/inProgress maps for immediate updates.
   finishedMap = readMap(TV_FINISHED_PATH);
   errorsMap = readMap(TV_ERRORS_PATH);
+  // On restart/reload, treat all prior in-progress markers as stale.
+  // We already reset any persisted entry.inProgress=true back to future above.
+  // Clearing the map prevents duplicate suppression from getting stuck.
+  inProgressCache = {};
+  flushInProgress();
 
   // Start up to MAX_WORKERS oldest future entries.
   tryStartNextWorkers();
@@ -163,11 +222,6 @@ const replaceByProcId = (entry) => {
   }
 };
 
-const ensureTerminalMapsLoaded = () => {
-  if (!finishedMap) finishedMap = readMap(TV_FINISHED_PATH);
-  if (!errorsMap) errorsMap = readMap(TV_ERRORS_PATH);
-};
-
 const handleFinish = (entry) => {
   try {
     if (!entry || typeof entry !== 'object') return;
@@ -175,7 +229,7 @@ const handleFinish = (entry) => {
     const status = entry.status ? String(entry.status) : '';
     if (!title) return;
 
-    ensureTerminalMapsLoaded();
+    ensureMapsLoaded();
 
     const ts = Date.now();
     const tsStr = dateStr(ts);
@@ -183,6 +237,7 @@ const handleFinish = (entry) => {
     if (status === 'finished') {
       finishedMap[title] = tsStr;
       writeMap(TV_FINISHED_PATH, finishedMap);
+      removeInProgress(title);
       return;
     }
 
@@ -190,6 +245,7 @@ const handleFinish = (entry) => {
       appendTvLog(`${tsStr} ERROR ${title}: ${status}\n`);
       errorsMap[title] = tsStr;
       writeMap(TV_ERRORS_PATH, errorsMap);
+      removeInProgress(title);
     }
   } catch {}
 };
@@ -203,6 +259,10 @@ const startWorkerForIndex = (idx) => {
   if (!(typeof entry.procId === 'number' && Number.isInteger(entry.procId))) {
     entry.procId = nextProcId++;
   }
+
+  // Mark inProgress before downloading.
+  entry.inProgress = true;
+  addInProgress(entry.title);
 
   entry.status = 'downloading';
   entry.progress = 0;
@@ -232,10 +292,11 @@ const startWorkerForIndex = (idx) => {
     }
 
     if (msg.type === 'finished' && msg.entry) {
-      replaceByProcId(msg.entry);
+      const doneEntry = { ...msg.entry, inProgress: false };
+      replaceByProcId(doneEntry);
       workerCount = Math.max(0, workerCount - 1);
 
-      handleFinish(msg.entry);
+      handleFinish(doneEntry);
       flushTvJsonToDisk();
 
       // Start exactly one oldest future (spec: keep the pipeline full).
@@ -249,7 +310,7 @@ const startWorkerForIndex = (idx) => {
   w.on('message', onMessage);
   w.on('error', (e) => {
     // Treat worker error as a finish with an error status.
-    const errEntry = { ...entry, status: (e && e.message) ? String(e.message) : 'worker error', dateEnded: unixNow(), eta: null };
+    const errEntry = { ...entry, status: (e && e.message) ? String(e.message) : 'worker error', dateEnded: unixNow(), eta: null, inProgress: false };
     replaceByProcId(errEntry);
     workerCount = Math.max(0, workerCount - 1);
     handleFinish(errEntry);
@@ -283,6 +344,10 @@ const addEntry = (entry) => {
   if (!e.dateStarted) e.dateStarted = 0;
   if (!e.dateEnded) e.dateEnded = null;
 
+  // Mark inProgress immediately and record it before any download starts.
+  e.inProgress = true;
+  addInProgress(e.title);
+
   tvJsonCache.push(e);
   flushTvJsonToDisk();
 
@@ -290,6 +355,24 @@ const addEntry = (entry) => {
     // Start worker for this newly added entry.
     startWorkerForIndex(tvJsonCache.length - 1);
   }
+};
+
+// Record a non-download (cycle) error so main.js never writes tv-errors.json.
+const markError = (title, reason) => {
+  try {
+    const t = title ? String(title) : '';
+    if (!t) return;
+    ensureMapsLoaded();
+
+    const tsStr = dateStr(Date.now());
+    const msg = reason ? String(reason) : 'error';
+    appendTvLog(`${tsStr} ERROR ${t}: ${msg}\n`);
+    errorsMap[t] = tsStr;
+    writeMap(TV_ERRORS_PATH, errorsMap);
+
+    // If it was ever marked inProgress, clear it.
+    removeInProgress(t);
+  } catch {}
 };
 
 const getDownloads = () => {
@@ -303,4 +386,5 @@ const getDownloads = () => {
 module.exports = {
   addEntry,
   getDownloads,
+  markError,
 };

@@ -801,10 +801,52 @@
       }
     });
 
-    var onFinished = function() {
+    var handleFinish = function(finishedProcId) {
+      try {
+        if (!(finishedProcId >= 0 && finishedProcId < nextProcId)) {
+          return;
+        }
+
+        var entry = materializeEntry(finishedProcId);
+        var title1 = (entry && entry.title) ? String(entry.title) : '';
+        var status1 = (entry && entry.status) ? String(entry.status) : '';
+        if (!title1) {
+          return;
+        }
+
+        // Timestamp value is stored as ms; writeMap() will convert to YYYY/MM/DD-HH:MM:SS.
+        var ts = Date.now();
+
+        if (status1 === 'finished') {
+          if (recent) {
+            recent[title1] = ts;
+            writeMap(TV_FINISHED_PATH, recent);
+          }
+          return;
+        }
+
+        // Any non-finished terminal status is treated as an error message.
+        if (status1 && status1 !== 'downloading' && status1 !== 'future') {
+          try {
+            appendTvLog(`${dateStr(ts)} ERROR ${title1}: ${status1}\n`);
+          } catch (e) {}
+          if (errors) {
+            errors[title1] = ts;
+            writeMap(TV_ERRORS_PATH, errors);
+          }
+        }
+      } catch (e) {
+        // non-fatal
+      }
+    };
+
+    var onFinished = function(finishedProcId) {
       if (finished) return;
       finished = true;
       workerCount = Math.max(0, workerCount - 1);
+
+      // Update tv-finished.json / tv-errors.json for this procId.
+      handleFinish(finishedProcId != null ? finishedProcId : procId);
 
       // On finished, if there is capacity start the oldest future entry.
       if (workerCount < MAX_WORKERS) {
@@ -820,15 +862,20 @@
 
     w.on('message', function(msg) {
       if (msg === 'finished') {
-        onFinished();
+        // Legacy form
+        onFinished(procId);
+        return;
+      }
+      if (msg && typeof msg === 'object' && msg.type === 'finished') {
+        onFinished(typeof msg.procId === 'number' ? msg.procId : procId);
       }
     });
     w.on('error', function() {
-      onFinished();
+      onFinished(procId);
     });
     w.on('exit', function() {
       // If worker exited without sending "finished", still clean up.
-      onFinished();
+      onFinished(procId);
     });
   };
 
@@ -1036,16 +1083,105 @@
 
   log({findUsb});
 
+  // Timestamps in tv-finished.json and tv-errors.json must be PST timezone.
+  // Use America/Los_Angeles so DST is handled correctly.
+  var PST_TZ = 'America/Los_Angeles';
+
   dateStr = (date) => {
-    var day, hours, minutes, month, seconds, year;
-    date = new Date(date);
-    year = date.getFullYear();
-    month = (date.getMonth() + 1).toString().padStart(2, '0');
-    day = date.getDate().toString().padStart(2, '0');
-    hours = date.getHours().toString().padStart(2, '0');
-    minutes = date.getMinutes().toString().padStart(2, '0');
-    seconds = date.getSeconds().toString().padStart(2, '0');
-    return `${year}/${month}/${day}-${hours}:${minutes}:${seconds}`;
+    try {
+      var d = new Date(date);
+      var dtf = new Intl.DateTimeFormat('en-US', {
+        timeZone: PST_TZ,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      var parts = dtf.formatToParts(d);
+      var m = {};
+      for (var i = 0; i < parts.length; i++) {
+        var p = parts[i];
+        if (p && p.type && p.value) m[p.type] = p.value;
+      }
+      return `${m.year}/${m.month}/${m.day}-${m.hour}:${m.minute}:${m.second}`;
+    } catch (e) {
+      // Fallback to local time if Intl is unavailable.
+      var day, hours, minutes, month, seconds, year;
+      date = new Date(date);
+      year = date.getFullYear();
+      month = (date.getMonth() + 1).toString().padStart(2, '0');
+      day = date.getDate().toString().padStart(2, '0');
+      hours = date.getHours().toString().padStart(2, '0');
+      minutes = date.getMinutes().toString().padStart(2, '0');
+      seconds = date.getSeconds().toString().padStart(2, '0');
+      return `${year}/${month}/${day}-${hours}:${minutes}:${seconds}`;
+    }
+  };
+
+  // Convert a local date/time (YYYY/MM/DD-HH:MM:SS) in PST_TZ to epoch ms.
+  var epochMsFromZonedParts = function(y, mo, d, hh, mi, ss) {
+    // Initial guess: treat provided components as UTC.
+    var t = Date.UTC(y, mo - 1, d, hh, mi, ss);
+    // Iteratively adjust to account for timezone offset/DST.
+    for (var iter = 0; iter < 3; iter++) {
+      var dtf = new Intl.DateTimeFormat('en-US', {
+        timeZone: PST_TZ,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      var parts = dtf.formatToParts(new Date(t));
+      var m = {};
+      for (var i = 0; i < parts.length; i++) {
+        var p = parts[i];
+        if (p && p.type && p.value) m[p.type] = p.value;
+      }
+      var yy = parseInt(m.year, 10);
+      var mm = parseInt(m.month, 10);
+      var dd = parseInt(m.day, 10);
+      var h2 = parseInt(m.hour, 10);
+      var m2 = parseInt(m.minute, 10);
+      var s2 = parseInt(m.second, 10);
+      var want = Date.UTC(y, mo - 1, d, hh, mi, ss);
+      var got = Date.UTC(yy, mm - 1, dd, h2, m2, s2);
+      var delta = want - got;
+      if (delta === 0) {
+        break;
+      }
+      t += delta;
+    }
+    return t;
+  };
+
+  var parseMapTimestampMs = function(timex) {
+    if (typeof timex !== 'string') {
+      return null;
+    }
+    var m = timex.match(/^(\d{4})\/(\d{2})\/(\d{2})-(\d{2}):(\d{2}):(\d{2})$/);
+    if (m) {
+      var y = parseInt(m[1], 10);
+      var mo = parseInt(m[2], 10);
+      var d = parseInt(m[3], 10);
+      var hh = parseInt(m[4], 10);
+      var mi = parseInt(m[5], 10);
+      var ss = parseInt(m[6], 10);
+      if ([y, mo, d, hh, mi, ss].every(Number.isFinite)) {
+        try {
+          return epochMsFromZonedParts(y, mo, d, hh, mi, ss);
+        } catch (e) {
+          return null;
+        }
+      }
+    }
+    var t = new Date(timex).getTime();
+    return Number.isNaN(t) ? null : t;
   };
 
   readMap = (fname) => {
@@ -1053,7 +1189,7 @@
     map = JSON.parse(fs.readFileSync(fname, 'utf8'));
     for (entry in map) {
       timex = map[entry];
-      map[entry] = new Date(timex).getTime();
+      map[entry] = parseMapTimestampMs(timex);
     }
     return map;
   };

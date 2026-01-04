@@ -81,7 +81,7 @@ const finish = (statusText) => {
     dateEnded[procId] = unixNow();
   } catch {}
   try {
-    parentPort.postMessage('finished');
+    parentPort.postMessage({ type: 'finished', procId });
   } catch {}
   try {
     process.exit(0);

@@ -1,55 +1,17 @@
 
-- make these major changes to tv.json entries and the operation of download workers. the new logic is much simpler with fewer state variables and less interaction between the main thread and the workers.
+my new worker logic has problems with finishing. it didn't correctly add downloaded files to data/tv-finished.json.  also errors would not be added to data/tv-errors.json.
 
-## new entries
+i think the finished message should include the procId of the finished entry. then there should be a handleFinish(procId) function that processes every finish message by looking at the tv.json entry with that procId. it should create a string "<title>":"<timestamp>" and add it to tv-finished.json or tv-errors.json.
 
-- when cycle creates a new entry for tv.json the entry should look like it did before this change except it should also have the additional properties "procId" and "usbPath".  here is an example:
-{
-  "procId": 1234,
-  "usbPath": "~/files/Its.Always.Sunny.in.Philadelphia.S17E02.1080p.WEB.H264-SuccessfulCrab/",
-  "localPath": "/mnt/media/tv/It's Always Sunny in Philadelphia/Season 17/",
-  "title": "its.always.sunny.in.philadelphia.s17e02.1080p.web.h264-successfulcrab.mkv",
-  "status": "future",
-  "progress": 0,
-  "eta": null,
-  "sequence": 2,
-  "fileSize": 1181367768,
-  "season": 17,
-  "episode": 2,
-  "dateStarted": 1766961646,
-  "dateEnded": null
-}
+an example "<title>":"<timestamp>" string is: 
+"The.Amazing.Mrs.Pritchard.S01E03.Hourglass.WEB-DL.DDP2.0.H.264-squalor.mkv": "2025/12/30-21:31:07",
+use that timestamp format.
 
-- "procId" is a number that is an index unique to every tv.json entry for all time.  When the app loads, the global var nextProcId is set to the last procId in the tv.json file plus one. If the file is an empty array set nextProcId to zero. Increment nextProcId after each tv.json entry is created.
+if the status is "finished" it should add the string "<title>":"<timestamp>" to data/tv-finished.json with a flush every time. 
 
-- "usbPath" is the path in the usb server to the folder containing the file to be downloaded.
+if the status is an error message the error should be logged to tv.log and the "<title>":"<timestamp>" string should be added to data/tv-errors.json with a flush every time.
 
-## workers
+the cycle should then skip titles matching ones in tv-finished.json or tv-errors.json. this is old logic that might still be in the code.
 
-- use the npm module worker_threads to create workers, not forking. pass a procId to each new worker and use tvJsonCache as shared memory. workers are not reused. they destroy themselves with process.exit() when finished.
 
-- workers are autonomous. they are created as fire-and-forget except the procId arg passed when created and when a worker is finished it should send the message "finished".  there is no other communication either way.
 
-- there should be a global var workerCount that starts at zero. 
-
-- whenever a new worker is created, workerCount should be incremented and whenever a message "finished" is received the workerCount should be decremented. 
-
-- there is no array of workers in memory nor any other state information about the workers other than workerCount. all state information is kept in tvJsonCache.
-
-- when the main thread cycle creates a new entry and the counter is less than MAX_WORKERS the main thread should add the entry with status of "downloading" to the tvJsonCache and create a new worker with the procId of the entry so the worker can access the shared memory tvJsonCache using that procId.
-
-- when the main thread cycle creates a new entry and the counter is equal to MAX_WORKERS the main thread should add the entry to tvJsonCache with status "future" and do nothing else.
-
-- when the main thread receives a final message and the counter is less than MAX_WORKERS the main thread should look for the oldest future entry. if there is a future entry it should be changed to have a status of "downloading" and a new worker  should be created with that procId.  the main thread should do nothing else.
-
-- when a worker is created it should start downloading the file. the rsync command should have a source path of "<usbPath><title>" and a destination path of "<localPath><title>".
-
-- as the download continues the worker should update the tvJsonCache entry with properties "progress" and "eta".
-
-- if there is an error the worker should change the entry "status" property to the error message and send the finished message with only the text "finished".
-
-- if the download finishes with no error the worker should change the entry "status" property to "finished" and send the finished message with only the text "finished".
-
-- when the app loads and tv.json is read into tvJsonCache all entries with state "downloading" should be reset to state "future" with progress of zero and eta of null. then the first MAX_WORKERS entries with status future should be changed to status "downloading" and their procId passed to a newly created worker.
-
-- tvJsonCache should be flushed back to tv.json file after a new entry is added and after a finished message is received and at no other time.

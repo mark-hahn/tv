@@ -1,17 +1,40 @@
 
-my new worker logic has problems with finishing. it didn't correctly add downloaded files to data/tv-finished.json.  also errors would not be added to data/tv-errors.json.
+this is a major change to how tvJsonCache is stored and shared.  it also refactors the code that manipulates tvJsonCache.  the new overall logic is much simpler than before.
 
-i think the finished message should include the procId of the finished entry. then there should be a handleFinish(procId) function that processes every finish message by looking at the tv.json entry with that procId. it should create a string "<title>":"<timestamp>" and add it to tv-finished.json or tv-errors.json.
+## tvJson.js source file
 
-an example "<title>":"<timestamp>" string is: 
-"The.Amazing.Mrs.Pritchard.S01E03.Hourglass.WEB-DL.DDP2.0.H.264-squalor.mkv": "2025/12/30-21:31:07",
-use that timestamp format.
+- create a new source file src/tvJson.js. it will hold refactoring of tvJsonCache management. it is also a middleman between the main thread and the workers. 
 
-if the status is "finished" it should add the string "<title>":"<timestamp>" to data/tv-finished.json with a flush every time. 
+- tvJsonCache is stored in tvJson.js.  it is an array of entry objects, not buffers. there is no copy of it anywhere else.
 
-if the status is an error message the error should be logged to tv.log and the "<title>":"<timestamp>" string should be added to data/tv-errors.json with a flush every time.
+## main.js interaction with tvJson.js
 
-the cycle should then skip titles matching ones in tv-finished.json or tv-errors.json. this is old logic that might still be in the code.
+- tvJson.js creates the workers with new entries and processes messages from the workers.  it never sends messages to the workers.
 
+- tvJson.js has a counter of of workers called workerCount that starts at zero, is updated when a worker is created, and decremented when a worker finishes.
+
+- tvJson.js exports two functions, addEntry and getDownloads, that are called by main thread in main.js. The functions are the only way that main thread can read or write tvJsonCache entries. tvJsonCache data is not shared. here are those functions:
+
+- addEntry(<entry>) adds, not upserts, new entries to tvJsonCache. The main thread cycle calls this as fire-and-forget and can call it anytime and it is not throttled by MAX_WORKERS.
+
+- after adding the new entry to tvJsonCache, tvJson.js will create a new worker with the new entry if workerCount is less than MAX_WORKERS.
+
+- if workerCount is equal to MAX_WORKERS then tvJson.js does nothing after adding the new entry to tvJsonCache.
+
+- when a worker finishes, tvJson.js looks through tvJsonCache to find the oldest future entry and creates a worker with that entry. it doesn't use MAX_WORKERS since workerCount doesn't change. if there is no future entry then tvJson.js does nothing after adding the new entry to tvJsonCache.
+
+- getDownloads() returns a json text encoded copy of tvJsonCache ready to be returned to the client.
+
+## workers
+
+- the worker is passed a new entry when created and there is no shared buffer.
+
+- tvJson.js keeps the var procId index and increments it on every worker creation. procId is set in the new entry before passing the entry to a new worker.
+
+- A newly created worker starts with a new entry as the arg. The worker keeps its own copy of the entry. 
+
+- the worker starts a download from usb server to the local disk. it monitors progress of the download and updates its local entry copy with properties progress and eta. whenever the entry is updated it sends a message {type:"update", <entry>} to tvJson.js. tvJson.js then updates tvJsonCache by replacing the entry matching the procId. tvJson.js does nothing else.
+
+- when a download is finished, with or without an error, the worker changes the status to "finished" or to the error message, and it sends {type:"finished", <entry>} to tvJson.js. tvJson.js then updates tvJsonCache by replacing the entry matching the procId. tvJson.js decrements the workerCount and maybe creates a new worker. tvJson.js does nothing else. the worker then calls process.exit() to destroy itself.
 
 

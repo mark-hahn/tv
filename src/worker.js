@@ -1,57 +1,19 @@
 'use strict';
 
-// worker_threads entrypoint
-// - reads shared tvJsonCache by procId
+// worker_threads entrypoint (no shared buffers)
+// - receives a copy of the entry object
 // - runs rsync: <usbHost>:<usbPath><title> -> <localPath><title>
-// - updates shared progress/eta during transfer
-// - on finish/error sets status/dateEnded and posts only: "finished"
+// - updates local entry.progress/entry.eta during transfer
+// - sends {type:"update", entry} to tvJson.js on updates
+// - sends {type:"finished", entry} on completion/error, then exits
 
 const { parentPort, workerData } = require('worker_threads');
 const { spawn } = require('child_process');
 
 const unixNow = () => Math.floor(Date.now() / 1000);
 
-const { procId, usbHost, sab, sizes } = workerData || {};
-
-const USB_PATH_BYTES = sizes && sizes.USB_PATH_BYTES;
-const LOCAL_PATH_BYTES = sizes && sizes.LOCAL_PATH_BYTES;
-const TITLE_BYTES = sizes && sizes.TITLE_BYTES;
-const STATUS_BYTES = sizes && sizes.STATUS_BYTES;
-
-const encoder = new (global.TextEncoder || require('util').TextEncoder)();
-const decoder = new (global.TextDecoder || require('util').TextDecoder)('utf-8');
-
-const usbPathBytes = new Uint8Array(sab.usbPath);
-const localPathBytes = new Uint8Array(sab.localPath);
-const titleBytes = new Uint8Array(sab.title);
-const statusBytes = new Uint8Array(sab.status);
-
-const progress = new Int32Array(sab.progress);
-const eta = new Int32Array(sab.eta);
-const dateEnded = new Int32Array(sab.dateEnded);
-
-const readFixedString = (bytesView, idx, stride) => {
-  const off = idx * stride;
-  let end = off;
-  const max = off + stride;
-  while (end < max && bytesView[end] !== 0) end++;
-  if (end === off) return '';
-  return decoder.decode(bytesView.subarray(off, end));
-};
-
-const writeFixedString = (bytesView, idx, stride, s) => {
-  const off = idx * stride;
-  bytesView.fill(0, off, off + stride);
-  if (!s) return;
-  const b = encoder.encode(String(s));
-  const n = Math.min(b.length, stride - 1);
-  for (let i = 0; i < n; i++) bytesView[off + i] = b[i];
-  bytesView[off + n] = 0;
-};
-
-const setStatus = (s) => {
-  writeFixedString(statusBytes, procId, STATUS_BYTES, s);
-};
+const { entry: entry0, usbHost } = workerData || {};
+let entry = entry0 && typeof entry0 === 'object' ? { ...entry0 } : null;
 
 const parseEtaSeconds = (chunk) => {
   // rsync progress2 shows remaining time as MM:SS or HH:MM:SS
@@ -70,33 +32,41 @@ const parseEtaSeconds = (chunk) => {
   return mm2 * 60 + ss2;
 };
 
+const postUpdate = (type) => {
+  try {
+    parentPort.postMessage({ type, entry });
+  } catch {}
+};
+
 const finish = (statusText) => {
-  try {
-    setStatus(statusText);
-  } catch {}
-  try {
-    eta[procId] = 0;
-  } catch {}
-  try {
-    dateEnded[procId] = unixNow();
-  } catch {}
-  try {
-    parentPort.postMessage({ type: 'finished', procId });
-  } catch {}
+  if (!entry) {
+    try {
+      parentPort.postMessage({ type: 'finished', entry: { procId: null, status: statusText || 'error', dateEnded: unixNow() } });
+    } catch {}
+    try {
+      process.exit(0);
+    } catch {}
+    return;
+  }
+
+  entry.status = statusText;
+  entry.eta = null;
+  entry.dateEnded = unixNow();
+  postUpdate('finished');
   try {
     process.exit(0);
   } catch {}
 };
 
 const main = () => {
-  if (procId == null || procId < 0) {
+  if (!entry || entry.procId == null) {
     finish('bad procId');
     return;
   }
 
-  const usbPath = readFixedString(usbPathBytes, procId, USB_PATH_BYTES);
-  const localPath = readFixedString(localPathBytes, procId, LOCAL_PATH_BYTES);
-  const title = readFixedString(titleBytes, procId, TITLE_BYTES);
+  const usbPath = entry.usbPath;
+  const localPath = entry.localPath;
+  const title = entry.title;
 
   if (!usbHost || !usbPath || !localPath || !title) {
     finish('missing fields');
@@ -108,14 +78,11 @@ const main = () => {
   const dst = `${localPath}${title}`;
 
   // Ensure our status starts as downloading
-  try {
-    setStatus('downloading');
-  } catch {}
-  try {
-    progress[procId] = 0;
-    eta[procId] = 0;
-    dateEnded[procId] = 0;
-  } catch {}
+  entry.status = 'downloading';
+  entry.progress = 0;
+  entry.eta = null;
+  entry.dateEnded = null;
+  postUpdate('update');
 
   const rsyncArgs = ['-av', '-e', 'ssh', '--timeout=20', '--info=progress2', src, dst];
   const p = spawn('rsync', rsyncArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -135,16 +102,14 @@ const main = () => {
     if (pct > lastProgress && (Date.now() - lastProgressUpdateTime) >= progressUpdateInterval) {
       lastProgress = pct;
       lastProgressUpdateTime = Date.now();
-      try {
-        progress[procId] = pct;
-      } catch {}
+      entry.progress = pct;
 
       const etaSec = parseEtaSeconds(chunk);
       if (etaSec != null) {
-        try {
-          eta[procId] = unixNow() + etaSec;
-        } catch {}
+        entry.eta = unixNow() + etaSec;
       }
+
+      postUpdate('update');
     }
   });
 
@@ -158,9 +123,7 @@ const main = () => {
       finish(msg);
       return;
     }
-    try {
-      progress[procId] = 100;
-    } catch {}
+    entry.progress = 100;
     finish('finished');
   });
 

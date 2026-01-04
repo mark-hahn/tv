@@ -1,0 +1,306 @@
+'use strict';
+
+// tvJson.js
+// - Owns tvJsonCache (array of entry objects)
+// - Creates workers and processes messages from workers
+// - Exports ONLY: addEntry(entry), getDownloads()
+
+const fs = require('fs');
+const path = require('path');
+const { Worker } = require('worker_threads');
+
+const BASEDIR = path.join(__dirname, '..');
+const DATA_DIR = path.join(BASEDIR, 'data');
+
+const TV_JSON_PATH = path.join(DATA_DIR, 'tv.json');
+const TV_FINISHED_PATH = path.join(DATA_DIR, 'tv-finished.json');
+const TV_ERRORS_PATH = path.join(DATA_DIR, 'tv-errors.json');
+const TV_LOG_PATH = path.join(BASEDIR, 'misc', 'tv.log');
+
+const WORKER_SCRIPT = path.join(__dirname, 'worker.js');
+
+const MAX_WORKERS = 8;
+const usbHost = 'xobtlu@oracle.usbx.me';
+
+// PST/PDT formatting
+const PST_TZ = 'America/Los_Angeles';
+
+const appendTvLog = (line) => {
+  try {
+    fs.mkdirSync(path.dirname(TV_LOG_PATH), { recursive: true });
+  } catch {}
+  try {
+    fs.appendFileSync(TV_LOG_PATH, line);
+  } catch {}
+};
+
+const dateStr = (ms) => {
+  try {
+    const dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: PST_TZ,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+    const parts = dtf.formatToParts(new Date(ms));
+    const m = {};
+    for (const p of parts) {
+      if (p && p.type && p.value) m[p.type] = p.value;
+    }
+    return `${m.year}/${m.month}/${m.day}-${m.hour}:${m.minute}:${m.second}`;
+  } catch {
+    const d = new Date(ms);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const seconds = String(d.getSeconds()).padStart(2, '0');
+    return `${year}/${month}/${day}-${hours}:${minutes}:${seconds}`;
+  }
+};
+
+const readJson = (filePath, fallback) => {
+  try {
+    if (!fs.existsSync(filePath)) return fallback;
+    const raw = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+};
+
+const writeJsonAtomic = (filePath, obj) => {
+  try {
+    const dir = path.dirname(filePath);
+    const tmp = path.join(dir, '.' + path.basename(filePath) + '.tmp.' + process.pid + '.' + Date.now());
+    fs.writeFileSync(tmp, JSON.stringify(obj));
+    fs.renameSync(tmp, filePath);
+  } catch {}
+};
+
+const readMap = (filePath) => {
+  const obj = readJson(filePath, {});
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {};
+  return obj;
+};
+
+const writeMap = (filePath, mapObj) => {
+  // mapObj values are already formatted strings
+  writeJsonAtomic(filePath, mapObj);
+};
+
+// ---- in-memory state (single authority) ------------------------------------
+
+let tvJsonCache = [];
+let workerCount = 0;
+let nextProcId = 0;
+
+let finishedMap = null;
+let errorsMap = null;
+
+const unixNow = () => Math.floor(Date.now() / 1000);
+
+const flushTvJsonToDisk = () => {
+  writeJsonAtomic(TV_JSON_PATH, tvJsonCache);
+};
+
+const loadOnStart = () => {
+  const arr = readJson(TV_JSON_PATH, []);
+  tvJsonCache = Array.isArray(arr) ? arr : [];
+
+  // Reset any downloading entries to future on start (no shared state).
+  for (const e of tvJsonCache) {
+    if (e && typeof e === 'object' && e.status === 'downloading') {
+      e.status = 'future';
+      e.progress = 0;
+      e.eta = null;
+    }
+  }
+
+  // Determine nextProcId from existing entries (max+1) so procId stays unique.
+  let maxId = -1;
+  for (const e of tvJsonCache) {
+    if (!e || typeof e !== 'object') continue;
+    if (typeof e.procId === 'number' && Number.isInteger(e.procId) && e.procId > maxId) {
+      maxId = e.procId;
+    }
+  }
+  nextProcId = maxId + 1;
+
+  // Load finished/errors maps for immediate skip updates on worker finish.
+  finishedMap = readMap(TV_FINISHED_PATH);
+  errorsMap = readMap(TV_ERRORS_PATH);
+
+  // Start up to MAX_WORKERS oldest future entries.
+  tryStartNextWorkers();
+  flushTvJsonToDisk();
+};
+
+const findOldestFutureIndex = () => {
+  return tvJsonCache.findIndex((e) => e && typeof e === 'object' && e.status === 'future');
+};
+
+const tryStartNextWorkers = () => {
+  while (workerCount < MAX_WORKERS) {
+    const idx = findOldestFutureIndex();
+    if (idx < 0) return;
+    startWorkerForIndex(idx);
+  }
+};
+
+const replaceByProcId = (entry) => {
+  if (!entry || typeof entry !== 'object') return;
+  const pid = entry.procId;
+  if (typeof pid !== 'number') return;
+  const idx = tvJsonCache.findIndex((e) => e && typeof e === 'object' && e.procId === pid);
+  if (idx >= 0) {
+    tvJsonCache[idx] = entry;
+  }
+};
+
+const ensureTerminalMapsLoaded = () => {
+  if (!finishedMap) finishedMap = readMap(TV_FINISHED_PATH);
+  if (!errorsMap) errorsMap = readMap(TV_ERRORS_PATH);
+};
+
+const handleFinish = (entry) => {
+  try {
+    if (!entry || typeof entry !== 'object') return;
+    const title = entry.title ? String(entry.title) : '';
+    const status = entry.status ? String(entry.status) : '';
+    if (!title) return;
+
+    ensureTerminalMapsLoaded();
+
+    const ts = Date.now();
+    const tsStr = dateStr(ts);
+
+    if (status === 'finished') {
+      finishedMap[title] = tsStr;
+      writeMap(TV_FINISHED_PATH, finishedMap);
+      return;
+    }
+
+    if (status && status !== 'downloading' && status !== 'future') {
+      appendTvLog(`${tsStr} ERROR ${title}: ${status}\n`);
+      errorsMap[title] = tsStr;
+      writeMap(TV_ERRORS_PATH, errorsMap);
+    }
+  } catch {}
+};
+
+const startWorkerForIndex = (idx) => {
+  const entry0 = tvJsonCache[idx];
+  if (!entry0 || typeof entry0 !== 'object') return;
+
+  // Assign procId on worker creation (spec) if missing.
+  const entry = { ...entry0 };
+  if (!(typeof entry.procId === 'number' && Number.isInteger(entry.procId))) {
+    entry.procId = nextProcId++;
+  }
+
+  entry.status = 'downloading';
+  entry.progress = 0;
+  entry.eta = null;
+  entry.dateStarted = unixNow();
+  entry.dateEnded = null;
+
+  // Replace cache immediately so /downloads reflects the procId.
+  tvJsonCache[idx] = entry;
+  flushTvJsonToDisk();
+
+  workerCount++;
+
+  const w = new Worker(WORKER_SCRIPT, {
+    workerData: {
+      entry,
+      usbHost,
+    },
+  });
+
+  const onMessage = (msg) => {
+    if (!msg || typeof msg !== 'object') return;
+
+    if (msg.type === 'update' && msg.entry) {
+      replaceByProcId(msg.entry);
+      return;
+    }
+
+    if (msg.type === 'finished' && msg.entry) {
+      replaceByProcId(msg.entry);
+      workerCount = Math.max(0, workerCount - 1);
+
+      handleFinish(msg.entry);
+      flushTvJsonToDisk();
+
+      // Start exactly one oldest future (spec: keep the pipeline full).
+      const nextIdx = findOldestFutureIndex();
+      if (nextIdx >= 0) {
+        startWorkerForIndex(nextIdx);
+      }
+    }
+  };
+
+  w.on('message', onMessage);
+  w.on('error', (e) => {
+    // Treat worker error as a finish with an error status.
+    const errEntry = { ...entry, status: (e && e.message) ? String(e.message) : 'worker error', dateEnded: unixNow(), eta: null };
+    replaceByProcId(errEntry);
+    workerCount = Math.max(0, workerCount - 1);
+    handleFinish(errEntry);
+    flushTvJsonToDisk();
+
+    const nextIdx = findOldestFutureIndex();
+    if (nextIdx >= 0) {
+      startWorkerForIndex(nextIdx);
+    }
+  });
+  w.on('exit', () => {
+    // No-op: worker should have sent finished.
+  });
+};
+
+// Initialize on module load.
+loadOnStart();
+
+// ---- exports ---------------------------------------------------------------
+
+const addEntry = (entry) => {
+  if (!entry || typeof entry !== 'object') return;
+
+  // Store entry as a plain object. procId is assigned when/if a worker starts.
+  const e = { ...entry };
+
+  // Ensure minimal fields exist.
+  if (!e.status) e.status = 'future';
+  if (typeof e.progress !== 'number') e.progress = 0;
+  if (e.eta === undefined) e.eta = null;
+  if (!e.dateStarted) e.dateStarted = 0;
+  if (!e.dateEnded) e.dateEnded = null;
+
+  tvJsonCache.push(e);
+  flushTvJsonToDisk();
+
+  if (workerCount < MAX_WORKERS) {
+    // Start worker for this newly added entry.
+    startWorkerForIndex(tvJsonCache.length - 1);
+  }
+};
+
+const getDownloads = () => {
+  try {
+    return JSON.stringify(tvJsonCache);
+  } catch {
+    return '[]';
+  }
+};
+
+module.exports = {
+  addEntry,
+  getDownloads,
+};

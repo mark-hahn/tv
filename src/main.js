@@ -96,6 +96,9 @@
     }
   })();
 
+  // tvJson.js owns tv.json cache and all worker lifecycle.
+  var tvJson = require('./tvJson.js');
+
   // Startup marker (tv.log only)
   (function writeStartupMarker() {
     try {
@@ -735,7 +738,9 @@
   };
 
   // Initialize shared tvJsonCache from disk (tv.json may be empty).
-  initTvJsonCache();
+  // (disabled) SharedArrayBuffer tv.json cache is no longer used.
+  // tvJson.js owns tv.json state and worker lifecycle.
+  // initTvJsonCache();
 
   // Keep these functions as no-ops for compatibility
   startBuffering = function() {};
@@ -1061,7 +1066,10 @@
       if (pathname === '/downloads') {
         if (req.method === 'GET') {
           try {
-            return json(res, 200, snapshotTvJson());
+            setCors(res);
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            return res.end(tvJson.getDownloads());
           } catch (e) {
             return json(res, 500, {status: String(e && e.message ? e.message : e)});
           }
@@ -1238,13 +1246,7 @@
   reloadState();
 
   // On load, start the first MAX_WORKERS future entries.
-  try {
-    while (workerCount < MAX_WORKERS) {
-      var pid = findOldestFutureProcId();
-      if (pid == null) break;
-      startWorkerForProcId(pid);
-    }
-  } catch (e) {}
+  // (disabled) Workers are started by tvJson.js on module load.
 
   tvPath = '/mnt/media/tv/';
 
@@ -1616,43 +1618,22 @@
     }
 
     mkdirp.sync(tvSeasonPath);
-    // Create a new tv.json entry with procId + usbPath.
+    // Create a new tv.json entry (tvJson.js will assign procId when a worker starts).
     try {
-      var procId = nextProcId;
-      if (procId >= tvShared.capacity) {
-        err('tv.json capacity exceeded', {procId, capacity: tvShared.capacity});
-        return process.nextTick(checkFile);
-      }
-
-      // Fill shared entry fields.
-      writeFixedString(tvShared.usbPathBytes, procId, USB_PATH_BYTES, usbPath);
-      writeFixedString(tvShared.localPathBytes, procId, LOCAL_PATH_BYTES, tvLocalDir);
-      writeFixedString(tvShared.titleBytes, procId, TITLE_BYTES, fname);
-      tvShared.progress[procId] = 0;
-      tvShared.eta[procId] = 0;
-      tvShared.sequence[procId] = currentSeq || 0;
-      tvShared.fileSize[procId] = BigInt(usbFileBytes || 0);
-      tvShared.season[procId] = season || 0;
-      tvShared.episode[procId] = episode || 0;
-      tvShared.dateStarted[procId] = unixNow();
-      tvShared.dateEnded[procId] = 0;
-
-      // Decide whether to start downloading now.
-      if (workerCount < MAX_WORKERS) {
-        setStatus(procId, 'downloading');
-      } else {
-        setStatus(procId, 'future');
-      }
-
-      nextProcId++;
-
-      // If capacity allows, start a new worker.
-      if (getStatus(procId) === 'downloading') {
-        startWorkerForProcId(procId);
-      }
-
-      // Flush tv.json after new entry is added.
-      flushTvJsonToDisk();
+      tvJson.addEntry({
+        usbPath: usbPath,
+        localPath: tvLocalDir,
+        title: fname,
+        status: 'future',
+        progress: 0,
+        eta: null,
+        sequence: currentSeq || 0,
+        fileSize: usbFileBytes || 0,
+        season: season || 0,
+        episode: episode || 0,
+        dateStarted: 0,
+        dateEnded: null
+      });
     } catch (e) {
       // keep going
     }

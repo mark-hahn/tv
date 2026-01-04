@@ -1223,6 +1223,9 @@
 
   inProgress = null;
 
+  // Per-cycle view of current tv.json titles (do not cache across cycles)
+  var tvJsonTitles = null;
+
   blocked = null;
 
   //##########
@@ -1360,6 +1363,24 @@
       inProgress = {};
     }
 
+    // Load tv.json once per cycle and block any file already present there.
+    // This prevents duplicates after restarts where tv-inProgress.json may be cleared
+    // but tv.json still contains queued/future entries.
+    tvJsonTitles = {};
+    try {
+      var tvArr = JSON.parse(fs.readFileSync(TV_JSON_PATH, 'utf8'));
+      if (Array.isArray(tvArr)) {
+        for (var i = 0; i < tvArr.length; i++) {
+          var e = tvArr[i];
+          if (e && typeof e === 'object' && e.title) {
+            tvJsonTitles[String(e.title)] = true;
+          }
+        }
+      }
+    } catch (e) {
+      tvJsonTitles = {};
+    }
+
     // Sort files by parsed title before processing.
     usbFiles = usbFiles.filter((l) => l && l.trim().length);
     usbFiles = usbFiles.map((line) => {
@@ -1464,6 +1485,13 @@
       if (recent && recent[fname]) {
         recentCount++;
         log('------', downloadCount, '/', chkCount, 'SKIPPING RECENT:', fname);
+        process.nextTick(checkFile);
+        return;
+      }
+
+      if (tvJsonTitles && tvJsonTitles[fname]) {
+        recentCount++;
+        log('------', downloadCount, '/', chkCount, 'SKIPPING ALREADY QUEUED:', fname);
         process.nextTick(checkFile);
         return;
       }
@@ -1653,6 +1681,12 @@
       return process.nextTick(checkFile);
     }
 
+    // tv.json authority: do not create duplicates for titles already queued.
+    if (tvJsonTitles && tvJsonTitles[fname]) {
+      existsCount++;
+      return process.nextTick(checkFile);
+    }
+
     mkdirp.sync(tvSeasonPath);
     // Create a new tv.json entry (tvJson.js will assign procId when a worker starts).
     try {
@@ -1670,6 +1704,11 @@
         dateStarted: 0,
         dateEnded: null
       });
+
+      // Update per-cycle view so later files in the same cycle don't re-queue.
+      if (tvJsonTitles) {
+        tvJsonTitles[fname] = true;
+      }
     } catch (e) {
       // keep going
     }

@@ -143,10 +143,187 @@
   })();
 
   // --- tv.json status tracking ----------------------------------------------
-  // tv.json is an array of file objects.
-  // Each update rewrites the entire file and prunes entries older than 1 month.
-  var tvJsonCache = {mtimeMs: null, arr: null}; // mtime-aware cache (workers may write)
-  var clearedDownloadingOnBoot = false;
+  // tv.json is backed by SharedArrayBuffer storage (tvJsonCache) and only
+  // flushed to disk when:
+  // - a new entry is added
+  // - a worker posts "finished"
+  // (No other writes.)
+  var tvJsonCache = null;
+  var tvShared = null;
+  var nextProcId = 0;
+  var workerCount = 0;
+
+  // Shared storage sizing. procId is the index.
+  var TV_CAPACITY = 10000;
+  var USB_PATH_BYTES = 512;
+  var LOCAL_PATH_BYTES = 512;
+  var TITLE_BYTES = 256;
+  var STATUS_BYTES = 256;
+
+  var TextEncoder_ = global.TextEncoder || require('util').TextEncoder;
+  var TextDecoder_ = global.TextDecoder || require('util').TextDecoder;
+  var encoder = new TextEncoder_();
+  var decoder = new TextDecoder_('utf-8');
+
+  var allocShared = function(capacity) {
+    var sab = {
+      usbPath: new SharedArrayBuffer(capacity * USB_PATH_BYTES),
+      localPath: new SharedArrayBuffer(capacity * LOCAL_PATH_BYTES),
+      title: new SharedArrayBuffer(capacity * TITLE_BYTES),
+      status: new SharedArrayBuffer(capacity * STATUS_BYTES),
+      progress: new SharedArrayBuffer(capacity * Int32Array.BYTES_PER_ELEMENT),
+      eta: new SharedArrayBuffer(capacity * Int32Array.BYTES_PER_ELEMENT),
+      sequence: new SharedArrayBuffer(capacity * Int32Array.BYTES_PER_ELEMENT),
+      season: new SharedArrayBuffer(capacity * Int32Array.BYTES_PER_ELEMENT),
+      episode: new SharedArrayBuffer(capacity * Int32Array.BYTES_PER_ELEMENT),
+      dateStarted: new SharedArrayBuffer(capacity * Int32Array.BYTES_PER_ELEMENT),
+      dateEnded: new SharedArrayBuffer(capacity * Int32Array.BYTES_PER_ELEMENT),
+      fileSize: new SharedArrayBuffer(capacity * BigInt64Array.BYTES_PER_ELEMENT)
+    };
+
+    return {
+      capacity: capacity,
+      sab: sab,
+      usbPathBytes: new Uint8Array(sab.usbPath),
+      localPathBytes: new Uint8Array(sab.localPath),
+      titleBytes: new Uint8Array(sab.title),
+      statusBytes: new Uint8Array(sab.status),
+      progress: new Int32Array(sab.progress),
+      eta: new Int32Array(sab.eta),
+      sequence: new Int32Array(sab.sequence),
+      season: new Int32Array(sab.season),
+      episode: new Int32Array(sab.episode),
+      dateStarted: new Int32Array(sab.dateStarted),
+      dateEnded: new Int32Array(sab.dateEnded),
+      fileSize: new BigInt64Array(sab.fileSize)
+    };
+  };
+
+  var writeFixedString = function(bytesView, idx, stride, s) {
+    var off = idx * stride;
+    bytesView.fill(0, off, off + stride);
+    if (!s) return;
+    var b = encoder.encode(String(s));
+    var n = Math.min(b.length, stride - 1);
+    for (var i = 0; i < n; i++) {
+      bytesView[off + i] = b[i];
+    }
+    bytesView[off + n] = 0;
+  };
+
+  var readFixedString = function(bytesView, idx, stride) {
+    var off = idx * stride;
+    var end = off;
+    var max = off + stride;
+    while (end < max && bytesView[end] !== 0) end++;
+    if (end === off) return '';
+    return decoder.decode(bytesView.subarray(off, end));
+  };
+
+  var getStatus = function(procId) {
+    return readFixedString(tvShared.statusBytes, procId, STATUS_BYTES);
+  };
+
+  var setStatus = function(procId, s) {
+    writeFixedString(tvShared.statusBytes, procId, STATUS_BYTES, s);
+  };
+
+  var materializeEntry = function(procId) {
+    var etaVal = tvShared.eta[procId] || 0;
+    var endedVal = tvShared.dateEnded[procId] || 0;
+    return {
+      procId: procId,
+      usbPath: readFixedString(tvShared.usbPathBytes, procId, USB_PATH_BYTES),
+      localPath: readFixedString(tvShared.localPathBytes, procId, LOCAL_PATH_BYTES),
+      title: readFixedString(tvShared.titleBytes, procId, TITLE_BYTES),
+      status: getStatus(procId) || 'future',
+      progress: tvShared.progress[procId] || 0,
+      eta: etaVal ? etaVal : null,
+      sequence: tvShared.sequence[procId] || 0,
+      fileSize: Number(tvShared.fileSize[procId] || 0n),
+      season: tvShared.season[procId] || 0,
+      episode: tvShared.episode[procId] || 0,
+      dateStarted: tvShared.dateStarted[procId] || 0,
+      dateEnded: endedVal ? endedVal : null
+    };
+  };
+
+  var snapshotTvJson = function() {
+    var out = [];
+    for (var i = 0; i < nextProcId; i++) {
+      out.push(materializeEntry(i));
+    }
+    return out;
+  };
+
+  var flushTvJsonToDisk = function() {
+    try {
+      var arr = snapshotTvJson();
+      var dir = path.dirname(TV_JSON_PATH);
+      var tmp = path.join(dir, '.' + path.basename(TV_JSON_PATH) + '.tmp.' + process.pid + '.' + Date.now());
+      fs.writeFileSync(tmp, JSON.stringify(arr));
+      fs.renameSync(tmp, TV_JSON_PATH);
+    } catch (e) {}
+  };
+
+  var initTvJsonCache = function() {
+    var arr = [];
+    try {
+      if (fs.existsSync(TV_JSON_PATH)) {
+        var raw = fs.readFileSync(TV_JSON_PATH, 'utf8');
+        var v = JSON.parse(raw);
+        if (Array.isArray(v)) arr = v;
+      }
+    } catch (e) {
+      arr = [];
+    }
+
+    // nextProcId is last procId + 1; if empty array, start at 0.
+    var maxId = -1;
+    for (var i = 0; i < arr.length; i++) {
+      var o = arr[i];
+      if (!o || typeof o !== 'object') continue;
+      var pid = (typeof o.procId === 'number' && Number.isInteger(o.procId)) ? o.procId : null;
+      if (pid != null && pid > maxId) maxId = pid;
+    }
+    nextProcId = maxId >= 0 ? (maxId + 1) : 0;
+
+    var cap = Math.max(TV_CAPACITY, nextProcId + 16);
+    tvShared = allocShared(cap);
+    tvJsonCache = {shared: tvShared};
+
+    // Load existing entries if present.
+    for (var i = 0; i < arr.length; i++) {
+      var o = arr[i];
+      if (!o || typeof o !== 'object') continue;
+      var pid = (typeof o.procId === 'number' && Number.isInteger(o.procId)) ? o.procId : null;
+      if (pid == null || pid < 0 || pid >= tvShared.capacity) continue;
+
+      writeFixedString(tvShared.usbPathBytes, pid, USB_PATH_BYTES, o.usbPath || '');
+      writeFixedString(tvShared.localPathBytes, pid, LOCAL_PATH_BYTES, o.localPath || '');
+      writeFixedString(tvShared.titleBytes, pid, TITLE_BYTES, o.title || '');
+      setStatus(pid, o.status || 'future');
+
+      tvShared.progress[pid] = (typeof o.progress === 'number' && Number.isFinite(o.progress)) ? Math.floor(o.progress) : 0;
+      tvShared.eta[pid] = (typeof o.eta === 'number' && Number.isFinite(o.eta)) ? Math.floor(o.eta) : 0;
+      tvShared.sequence[pid] = (typeof o.sequence === 'number' && Number.isFinite(o.sequence)) ? Math.floor(o.sequence) : 0;
+      tvShared.season[pid] = (typeof o.season === 'number' && Number.isFinite(o.season)) ? Math.floor(o.season) : 0;
+      tvShared.episode[pid] = (typeof o.episode === 'number' && Number.isFinite(o.episode)) ? Math.floor(o.episode) : 0;
+      tvShared.dateStarted[pid] = (typeof o.dateStarted === 'number' && Number.isFinite(o.dateStarted)) ? Math.floor(o.dateStarted) : 0;
+      tvShared.dateEnded[pid] = (typeof o.dateEnded === 'number' && Number.isFinite(o.dateEnded)) ? Math.floor(o.dateEnded) : 0;
+      tvShared.fileSize[pid] = (typeof o.fileSize === 'number' && Number.isFinite(o.fileSize)) ? BigInt(Math.floor(o.fileSize)) : 0n;
+    }
+
+    // Per spec: reset any downloading entries to future on load.
+    for (var pid = 0; pid < nextProcId; pid++) {
+      var st = getStatus(pid);
+      if (st === 'downloading') {
+        setStatus(pid, 'future');
+        tvShared.progress[pid] = 0;
+        tvShared.eta[pid] = 0;
+      }
+    }
+  };
 
   var unixNow = function() {
     return Math.floor(Date.now() / 1000);
@@ -557,8 +734,8 @@
     return;
   };
 
-  // Trigger one-time normalization/migration at startup.
-  readTvJson();
+  // Initialize shared tvJsonCache from disk (tv.json may be empty).
+  initTvJsonCache();
 
   // Keep these functions as no-ops for compatibility
   startBuffering = function() {};
@@ -570,7 +747,9 @@
   // ---------------------------------------------------------------------------
   var childProcess = require('child_process');
   exec = childProcess.execSync;
-  var fork = childProcess.fork;
+
+  var workerThreads = require('worker_threads');
+  var Worker = workerThreads.Worker;
 
   mkdirp = require('mkdirp');
 
@@ -581,203 +760,76 @@
   // Replace guessit with npm module parse-torrent-title
   var parseTorrentTitle = require('parse-torrent-title').parse;
 
-  // --- worker pool ---------------------------------------------------------
+  // --- worker_threads model -------------------------------------------------
   var WORKER_SCRIPT = path.join(__dirname, 'worker.js');
-  var workers = []; // [{id, proc, busy}]
-  var pendingJobs = []; // [{key, job}]
 
-  // Log sequencing (monotonic since startup) and per-cycle start separator.
-  var nextDownloadLogSeq = 1;
-  var currentCycleId = 0;
-  var cycleSeparatorLogged = {}; // { [cycleId:number]: true }
-
-  var appendCycleSeparatorIfNeeded = function(cycleId) {
-    try {
-      if (!cycleId) return;
-      if (cycleSeparatorLogged[cycleId]) return;
-      cycleSeparatorLogged[cycleId] = true;
-
-      // Blank line before separator.
-      var prefix = '';
-      try {
-        if (fs.existsSync(TV_LOG_PATH)) {
-          var st = fs.statSync(TV_LOG_PATH);
-          if (st && st.size > 0) prefix = '\n';
-        }
-      } catch (e) {}
-
-      appendTvLog(prefix + '======================================================\n');
-    } catch (e) {}
-  };
-
-  // If /startProc?title=... is received but the matching job isn't runnable yet,
-  // keep it around until we successfully apply its priority to a tv.json entry.
-  // (Priority is persisted in tv.json; this is only for "remember until available".)
-  var pendingStartProcPriority = 0;
-
-  var jobKey = function(localDir, fname) {
-    return localDir + '\u0000' + fname;
-  };
-
-  var enqueueJob = function(job) {
-    // Avoid duplicate concurrent downloads: use tv.json worker/status as the authority.
-    try {
-      var arr = readTvJson();
-      for (var ai = 0; ai < arr.length; ai++) {
-        var o = arr[ai];
-        if (!o || o.title !== job.fname) continue;
-        if (o.worker != null || o.status === 'downloading') {
-          return;
-        }
-      }
-    } catch (e) {}
-
-    var key = jobKey(job.tvLocalDir, job.fname);
-    for (var i = 0; i < pendingJobs.length; i++) {
-      if (pendingJobs[i] && pendingJobs[i].key === key) {
-        return;
+  var findOldestFutureProcId = function() {
+    for (var pid = 0; pid < nextProcId; pid++) {
+      if (getStatus(pid) === 'future') {
+        return pid;
       }
     }
-    pendingJobs.push({key: key, job: job});
+    return null;
   };
 
-  var getPriorityForJob = function(job) {
-    try {
-      var arr = readTvJson();
-      var best = 0;
-      for (var i = 0; i < arr.length; i++) {
-        var o = arr[i];
-        if (!o || o.title !== job.fname) continue;
-        var pri = (typeof o.priority === 'number' && Number.isFinite(o.priority)) ? o.priority : 0;
-        if (o.localPath === job.tvLocalDir) {
-          return pri;
+  var startWorkerForProcId = function(procId) {
+    if (procId == null) return;
+    if (workerCount >= MAX_WORKERS) return;
+    if (!(procId >= 0 && procId < nextProcId)) return;
+
+    // Mark downloading in shared memory.
+    setStatus(procId, 'downloading');
+    tvShared.progress[procId] = 0;
+    tvShared.eta[procId] = 0;
+    tvShared.dateEnded[procId] = 0;
+
+    workerCount++;
+    var finished = false;
+
+    var w = new Worker(WORKER_SCRIPT, {
+      workerData: {
+        procId: procId,
+        usbHost: usbHost,
+        capacity: tvShared.capacity,
+        sizes: {
+          USB_PATH_BYTES: USB_PATH_BYTES,
+          LOCAL_PATH_BYTES: LOCAL_PATH_BYTES,
+          TITLE_BYTES: TITLE_BYTES,
+          STATUS_BYTES: STATUS_BYTES
+        },
+        sab: tvShared.sab
+      }
+    });
+
+    var onFinished = function() {
+      if (finished) return;
+      finished = true;
+      workerCount = Math.max(0, workerCount - 1);
+
+      // On finished, if there is capacity start the oldest future entry.
+      if (workerCount < MAX_WORKERS) {
+        var nextPid = findOldestFutureProcId();
+        if (nextPid != null) {
+          startWorkerForProcId(nextPid);
         }
-        if (pri > best) {
-          best = pri;
-        }
       }
-      return best;
-    } catch (e) {}
-    return 0;
-  };
 
-  var pickNextJobIndex = function() {
-    if (!pendingJobs.length) return -1;
-    var bestIdx = 0;
-    var bestPri = -Infinity;
-    for (var i = 0; i < pendingJobs.length; i++) {
-      var pj = pendingJobs[i];
-      if (!pj || !pj.job) continue;
-      var pri = getPriorityForJob(pj.job);
-      if (pri > bestPri) {
-        bestPri = pri;
-        bestIdx = i;
-      }
-    }
-    return bestIdx;
-  };
-
-  var assignWork = function() {
-    // Fill any available worker slots.
-    for (var wi = 0; wi < workers.length; wi++) {
-      var w = workers[wi];
-      if (!w || w.busy) continue;
-      if (!pendingJobs.length) return;
-
-      var idx = pickNextJobIndex();
-      if (idx < 0) return;
-      var item = pendingJobs.splice(idx, 1)[0];
-      if (!item || !item.job) continue;
-
-      // Reserve the entry for this worker in tv.json.
-      try {
-        upsertTvJson(item.job.tvLocalDir, item.job.fname, {
-          worker: w.id
-        });
-      } catch (e) {}
-
-      // Assign a monotonic per-download log sequence at the moment the download starts.
-      try {
-        if (item.job && item.job.logSeq == null) {
-          item.job.logSeq = nextDownloadLogSeq++;
-        }
-      } catch (e) {}
-
-      // When a cycle starts its first download, write the separator before any
-      // worker log lines for that download.
-      try {
-        appendCycleSeparatorIfNeeded(item.job && item.job.cycleId);
-      } catch (e) {}
-
-      try {
-        w.busy = true;
-        w.proc.send({type: 'start', worker: w.id, job: item.job});
-      } catch (e) {
-        w.busy = false;
-        // Put job back and keep going.
-        pendingJobs.unshift(item);
-      }
-    }
-  };
-
-  var startWorkers = function() {
-    var hasId = function(id) {
-      for (var j = 0; j < workers.length; j++) {
-        if (workers[j] && workers[j].id === id) return true;
-      }
-      return false;
+      // Flush tv.json after finished message received.
+      flushTvJsonToDisk();
     };
-    for (var i = 1; i <= MAX_WORKERS; i++) {
-      if (hasId(i)) {
-        continue;
-      }
-      try {
-        var p = fork(WORKER_SCRIPT, [], {stdio: ['inherit', 'inherit', 'inherit', 'ipc']});
-        var w = {id: i, proc: p, busy: false};
-        workers.push(w);
 
-        p.on('message', (function(wref) {
-          return function(msg) {
-            try {
-              if (!msg || typeof msg !== 'object') return;
-              if (msg.type === 'ready') {
-                // worker is idle/online
-                wref.busy = false;
-                assignWork();
-                return;
-              }
-              if (msg.type === 'done') {
-                wref.busy = false;
-                // If worker finished successfully, record in tv-finished.json (authority).
-                if (msg.kind === 'finished' && msg.title) {
-                  try {
-                    recent[msg.title] = Date.now();
-                    writeMap(TV_FINISHED_PATH, recent);
-                  } catch (e) {}
-                }
-                assignWork();
-                return;
-              }
-            } catch (e) {}
-          };
-        })(w));
-
-        p.on('exit', (function(wref) {
-          return function() {
-            wref.busy = false;
-            // Best-effort respawn on crash.
-            try {
-              workers = workers.filter((x) => x && x.id !== wref.id);
-            } catch (e) {}
-            try {
-              setTimeout(startWorkers, 2000);
-            } catch (e) {}
-          };
-        })(w));
-      } catch (e) {
-        // If a worker can't start, keep service alive.
+    w.on('message', function(msg) {
+      if (msg === 'finished') {
+        onFinished();
       }
-    }
+    });
+    w.on('error', function() {
+      onFinished();
+    });
+    w.on('exit', function() {
+      // If worker exited without sending "finished", still clean up.
+      onFinished();
+    });
   };
 
   // --- startProc server state ------------------------------------------------
@@ -785,53 +837,7 @@
   var abortBetweenFiles = false;
   var nextCycleTimer = null;
 
-  var boostPriorityForNeedle = function(needleLower, priorityValue) {
-    try {
-      if (!needleLower || !priorityValue) return false;
-      var arr = readTvJson();
-      var best = null;
-      var bestScore = null;
-      for (var i = 0; i < arr.length; i++) {
-        var o = arr[i];
-        if (!o || typeof o !== 'object') continue;
-        var t = (typeof o.title === 'string') ? o.title : '';
-        if (!t) continue;
-        if (!t.toLowerCase().includes(needleLower)) continue;
-        if (o.status === 'finished') continue;
-        if (o.worker != null || o.status === 'downloading') continue;
-        var seq = (typeof o.sequence === 'number' && Number.isFinite(o.sequence)) ? o.sequence : 0;
-        var ended = toUnixSeconds(o.dateEnded) || 0;
-        var started = toUnixSeconds(o.dateStarted) || 0;
-        var recency = Math.max(ended, started);
-        var score = [seq, recency];
-        if (!bestScore) {
-          bestScore = score;
-          best = o;
-          continue;
-        }
-        var better = false;
-        for (var si = 0; si < score.length; si++) {
-          if (score[si] > bestScore[si]) {
-            better = true;
-            break;
-          }
-          if (score[si] < bestScore[si]) {
-            break;
-          }
-        }
-        if (better) {
-          bestScore = score;
-          best = o;
-        }
-      }
-
-      if (best && best.localPath && best.title) {
-        upsertTvJson(best.localPath, best.title, {priority: priorityValue});
-        return true;
-      }
-    } catch (e) {}
-    return false;
-  };
+  // (priority scheduling removed in the new worker_threads + procId model)
 
   emby = require('./emby.js');
 
@@ -895,13 +901,6 @@
     }
     cycleRunning = true;
 
-    // New cycle id (monotonic since startup). Used only for logging separator.
-    try {
-      currentCycleId++;
-    } catch (e) {
-      currentCycleId = (currentCycleId || 0) + 1;
-    }
-
     reloadState();
     resetCycleState();
     return process.nextTick(delOldFiles);
@@ -928,24 +927,6 @@
 
     var requestStartProc = function(reqTitle) {
       pendingStartProcTitle = (typeof reqTitle === 'string' ? reqTitle : '').trim();
-
-      // Capture request-time priority (persisted to tv.json when applied).
-      pendingStartProcPriority = pendingStartProcTitle ? unixNow() : 0;
-
-      // If jobs already exist in tv.json (e.g. pending queue while all workers are busy),
-      // boost priority immediately so the next available worker picks it.
-      if (pendingStartProcTitle) {
-        try {
-          var needleLower = pendingStartProcTitle.toLowerCase();
-          var appliedNow = boostPriorityForNeedle(needleLower, pendingStartProcPriority);
-          if (appliedNow) {
-            // Priority is now persisted; keep the title for this cycle ordering only.
-          }
-        } catch (e) {}
-        try {
-          assignWork();
-        } catch (e) {}
-      }
       
       // If title is blank:
       // - if a cycle is running, restart after the current file finishes
@@ -964,7 +945,7 @@
         return;
       }
       
-      // Title is not blank - set priority and abort if needed
+      // Title is not blank - optionally prioritize that filename in the next cycle.
       if (cycleRunning) {
         // Finish the current file, then restart the cycle.
         abortBetweenFiles = true;
@@ -1029,12 +1010,11 @@
         return json(res, 405, {status: 'method not allowed'});
       }
 
-      // Handle /downloads endpoint - returns cached tv.json data
+      // Handle /downloads endpoint
       if (pathname === '/downloads') {
         if (req.method === 'GET') {
           try {
-            var downloads = readTvJson();
-            return json(res, 200, downloads);
+            return json(res, 200, snapshotTvJson());
           } catch (e) {
             return json(res, 500, {status: String(e && e.message ? e.message : e)});
           }
@@ -1121,8 +1101,14 @@
 
   reloadState();
 
-  // Start rsync worker pool.
-  startWorkers();
+  // On load, start the first MAX_WORKERS future entries.
+  try {
+    while (workerCount < MAX_WORKERS) {
+      var pid = findOldestFutureProcId();
+      if (pid == null) break;
+      startWorkerForProcId(pid);
+    }
+  } catch (e) {}
 
   tvPath = '/mnt/media/tv/';
 
@@ -1174,12 +1160,20 @@
       // Inline prune.sh behavior: delete files older than 60 days on the USB host.
       log(".... deleting old files in usb ~/files ....");
       PRUNE_DAYS = 60;
-      res = exec(
-        `ssh ${usbHost} "find ~/files -mtime +${PRUNE_DAYS} -exec rm -rf {} \\\; ; echo prune ok"`,
-        {
-        timeout: 300000
-        }
-      ).toString();
+      try {
+        // Do not block the cycle on pruning: run remotely in background.
+        // Suppress all output to keep pm2 logs clean.
+        exec(
+          `ssh ${usbHost} "nohup find ~/files -mtime +${PRUNE_DAYS} -exec rm -rf {} \\; >/dev/null 2>&1 &"`,
+          {
+            timeout: 30000
+          }
+        );
+        res = 'prune ok';
+      } catch (e) {
+        // Non-fatal; continue cycle even if prune fails.
+        res = 'prune ok';
+      }
       lastPruneAt = Date.now();
       if (!res.startsWith('prune ok')) {
         err(`Prune error: ${res}`);
@@ -1226,11 +1220,8 @@
     // If startProc requested a title, process a matching file first (if any)
     // and boost its tv.json priority.
     var wantedNeedle = null;
-    var wantedPriority = 0;
-    var wantedApplied = false;
     if (pendingStartProcTitle) {
       wantedNeedle = pendingStartProcTitle.toLowerCase();
-      wantedPriority = pendingStartProcPriority || 0;
       var idx = usbFiles.findIndex((x) => x.base.toLowerCase().includes(wantedNeedle));
       if (idx >= 0) {
         var match = usbFiles.splice(idx, 1)[0];
@@ -1253,109 +1244,11 @@
       log("skipping locked paths", skipPaths);
     }
 
-    // Pre-populate tv.json with all files that will be processed this cycle
-    var futureSeq = 0;
-    for (j = 0; j < usbFiles.length; j++) {
-      var futLine = usbFiles[j];
-      var futLineParts = futLine.split('-');
-      var futFileBytes = parseInt(futLineParts.pop(), 10);
-      futLine = futLineParts.join('-');
-      var futFilePath = futLine.slice(11);
-      var futParts = futFilePath.split('/');
-      var futFname = futParts[futParts.length - 1];
-      var futExt = futFname.split('.').pop();
-      
-      // Skip non-video files
-      if (futExt.length === 6 || ['nfo', 'idx', 'sub', 'txt', 'jpg', 'gif', 'jpeg', 'part'].includes(futExt)) {
-        continue;
-      }
-      
-      // Skip if in recent list
-      if (recent[futFname]) {
-        continue;
-      }
-      
-      // Skip if blocked
-      var isBlocked = false;
-      for (var blk in blocked) {
-        if (futFname.indexOf(blk) > -1) {
-          isBlocked = true;
-          break;
-        }
-      }
-      if (isBlocked) {
-        continue;
-      }
-      
-      // Skip if in errors
-      if (errors[futFname]) {
-        continue;
-      }
-      
-      // Skip locked paths
-      var isLocked = false;
-      for (var sp = 0; sp < skipPaths.length; sp++) {
-        if (futFilePath.startsWith(skipPaths[sp])) {
-          isLocked = true;
-          break;
-        }
-      }
-      if (isLocked) {
-        continue;
-      }
-      
-      // Parse title, season, episode
-      var futParsed = {};
-      var futTitle = null;
-      var futSeason = null;
-      var futEpisode = null;
-      try {
-        futParsed = parseTorrentTitle(futFname) || {};
-        futTitle = futParsed.title;
-        futSeason = futParsed.season;
-        futEpisode = futParsed.episode;
-        
-        if (!futTitle || !Number.isInteger(futSeason) || !Number.isInteger(futEpisode)) {
-          continue; // Skip non-episodes
-        }
-      } catch (e) {
-        continue; // Skip parse errors
-      }
-      
-      // Get series name from cache or mark for lookup
-      var futSeriesName = tvdbCache[futTitle] || map[futTitle] || futTitle;
-      if (map[futSeriesName]) {
-        futSeriesName = map[futSeriesName];
-      }
-      
-      futureSeq++;
-      var futTvSeasonPath = `${tvPath}${futSeriesName}/Season ${futSeason}`;
-      var futTvLocalDir = `${futTvSeasonPath}/`;
-      
-      // Create "future" entry in tv.json.
-      // IMPORTANT: do not overwrite an existing priority with 0; priority is persistent.
-      var futPatch = {
-        status: 'future',
-        sequence: futureSeq,
-        fileSize: futFileBytes,
-        season: futSeason,
-        episode: futEpisode,
-        speed: null,
-        worker: null
-      };
-      if (wantedNeedle && !wantedApplied && futFname.toLowerCase().includes(wantedNeedle)) {
-        futPatch.priority = wantedPriority || unixNow();
-        wantedApplied = true;
-      }
-      upsertTvJson(futTvLocalDir, futFname, futPatch);
-    }
+    // Clear the pending title once we have applied ordering for this cycle.
+    pendingStartProcTitle = null;
 
-    // Only clear the pending title when we actually applied its priority.
-    // Otherwise keep it around for a later cycle / when the matching file appears.
-    if (wantedApplied) {
-      pendingStartProcTitle = null;
-      pendingStartProcPriority = 0;
-    }
+    // No tv.json pre-population in the new model.
+    // Entries are created only when a file is ready to be queued/downloaded.
 
     // if filterRegex
     //   log usbFiles.join('\n')
@@ -1493,9 +1386,8 @@
       }
       cycleRunning = false;
 
-      // In multi-worker mode, the cycle only enqueues work; workers run concurrently.
-      // Kick assignment once more and wait until the next scheduled interval.
-      try { assignWork(); } catch (e) {}
+      // In the new model, workers are started only when entries are added
+      // and when a worker posts "finished".
       return scheduleNextCycle();
     }
   };
@@ -1519,6 +1411,7 @@
     tvdburl = 'https://api4.thetvdb.com/v4/search?type=series&q=' + encodeURIComponent(title);
     return request(tvdburl, {
       json: true,
+      timeout: 15000,
       headers: {
         Authorization: 'Bearer ' + theTvDbToken
       }
@@ -1560,77 +1453,74 @@
     tvSeasonPath = `${tvPath}${seriesName}/Season ${season}`;
     tvFilePath = `${tvSeasonPath}/${fname}`;
     videoPath = `files/${usbFilePath}`;
-    usbLongPath = `${usbHost}:${videoPath}`;
-
     var tvLocalDir = `${tvSeasonPath}/`;
+
+    // usbPath is the folder containing the file on the USB host.
+    // Example: "~/files/<torrent-folder>/"
+    var usbDir = '';
+    try {
+      usbDir = path.dirname(usbFilePath);
+    } catch (e) {
+      usbDir = '';
+    }
+    if (usbDir === '.' || usbDir === '/') {
+      usbDir = '';
+    }
+    var usbPath = usbDir ? (`~/files/${usbDir}/`) : '~/files/';
     
     if (SKIP_DOWNLOAD) {
-      // Skip download mode: just mark as finished and add to recent list
-      console.log(`[SKIP_DOWNLOAD] Marking as finished without downloading: ${fname}`);
-      
-      upsertTvJson(tvLocalDir, fname, {
-        status: 'finished',
-        progress: 100,
-        eta: null,
-        sequence: currentSeq,
-        fileSize: usbFileBytes,
-        season,
-        episode,
-        worker: null,
-        dateStarted: unixNow(),
-        dateEnded: unixNow()
-      });
-      
-      downloadCount++;
-      recent[fname] = Date.now();
-      writeMap(TV_FINISHED_PATH, recent);
+      // Skip download mode: no-op in the new model.
       return process.nextTick(checkFile);
     }
 
-    // Finished authority: tv-finished.json (do not infer from disk).
+    // Finished authority: tv-finished.json (do not create tv.json entries for already-finished).
     if (recent && recent[fname]) {
       existsCount++;
-      upsertTvJson(tvLocalDir, fname, {
-        status: 'finished',
-        progress: 100,
-        eta: null,
-        sequence: currentSeq,
-        fileSize: usbFileBytes,
-        season,
-        episode,
-        worker: null,
-        dateEnded: unixNow()
-      });
       return process.nextTick(checkFile);
     }
 
     mkdirp.sync(tvSeasonPath);
-    // (logging moved to workers)
+    // Create a new tv.json entry with procId + usbPath.
+    try {
+      var procId = nextProcId;
+      if (procId >= tvShared.capacity) {
+        err('tv.json capacity exceeded', {procId, capacity: tvShared.capacity});
+        return process.nextTick(checkFile);
+      }
 
-    // Ensure a tv.json entry exists (future) and queue work for a worker.
-    upsertTvJson(tvLocalDir, fname, {
-      status: 'future',
-      sequence: currentSeq,
-      fileSize: usbFileBytes,
-      season,
-      episode,
-      worker: null
-    });
+      // Fill shared entry fields.
+      writeFixedString(tvShared.usbPathBytes, procId, USB_PATH_BYTES, usbPath);
+      writeFixedString(tvShared.localPathBytes, procId, LOCAL_PATH_BYTES, tvLocalDir);
+      writeFixedString(tvShared.titleBytes, procId, TITLE_BYTES, fname);
+      tvShared.progress[procId] = 0;
+      tvShared.eta[procId] = 0;
+      tvShared.sequence[procId] = currentSeq || 0;
+      tvShared.fileSize[procId] = BigInt(usbFileBytes || 0);
+      tvShared.season[procId] = season || 0;
+      tvShared.episode[procId] = episode || 0;
+      tvShared.dateStarted[procId] = unixNow();
+      tvShared.dateEnded[procId] = 0;
 
-    enqueueJob({
-      usbLongPath: usbLongPath,
-      tvFilePath: tvFilePath,
-      tvLocalDir: tvLocalDir,
-      fname: fname,
-      seriesName: seriesName,
-      fileSizeBytes: usbFileBytes,
-      season: season,
-      episode: episode,
-      sequence: currentSeq,
-      cycleId: currentCycleId
-    });
+      // Decide whether to start downloading now.
+      if (workerCount < MAX_WORKERS) {
+        setStatus(procId, 'downloading');
+      } else {
+        setStatus(procId, 'future');
+      }
 
-    assignWork();
+      nextProcId++;
+
+      // If capacity allows, start a new worker.
+      if (getStatus(procId) === 'downloading') {
+        startWorkerForProcId(procId);
+      }
+
+      // Flush tv.json after new entry is added.
+      flushTvJsonToDisk();
+    } catch (e) {
+      // keep going
+    }
+
     return process.nextTick(checkFile);
   };
 

@@ -3,10 +3,33 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-- add the line
-"======================================================" 
-to tv.log, with a blank line before, every time a cycle starts its first download.  it should appear before other log lines for that download. the groups have a blank line before alo so there won't be two blank lines together.
 
-- assign a sequence number to each download when starting and change beginning of first line of a group from "[<worker num>]" to [<seq num>.<worker num>]". this means the start group and finish group of each download will have the same sequence number. the sequence number starts at 1 on startup and never resets.
+- add a new feature called hyper transfer that downloads files with multiple rsyncs per file in parallel for fast transfer. every rsync from usb server runs at a fixed 10 mbits/sec so this will make a big difference.
 
--change number of leading spaces in second line of groups so the left side of date on the first line aligns with left side of size on second line
+- each of the parallel rsyncs will have their own tv.json hyper entry that has identical properties of a non-hyper entry. each hyper entry will be managed by a standard download worker. The download worker will not know there is anything special about a hyper entry.
+
+- create global vars hyperProcId and hyperTransferBusy that are null when app loads.
+
+- when you receive the command startproc("hyper.<procId>") then the procId should be stored in hyperProcId. hyperProcId will be set back to null when hyper transfer is finished. while hyperProcId is non-null we are considered to be in hyper mode.
+
+- the tv.json entry with procId of hyperProcId will be known as the original entry.
+
+- If another startproc("hyper.<procId>") is received while we are in hyper mode it should be ignored.  there can only be one hyper transfer at a time.  
+
+- if hyper mode starts and we are downloading the original entry, the original entry download should be aborted. 
+
+- when hyper mode starts the original entry should be marked as "status": "finished", "progress": 100, "eta": null. Add the property "hyperSpeed":"original". the original entry should never be assigned to a worker to be downloaded. 
+
+-no new non-hyper download workers should be started while in hyper mode.
+
+- immediately after startproc("hyper.<procId>") is received ssh into the usb server and split the file at <usb path> into MAX_WORKERS number of chunks of approximately the same size and each chunk should be written to a file at the usb path "~/fileChunks/<hyper index>" where <hyper index> is a number from 0 to MAX_WORKERS-1.
+
+- After the splitting is complete set hyperTransferMode to true. in hyperTransferMode the chunk files will be downloaded with multiple rsyncs in parallel. 
+
+- add MAX_WORKERS number of hyper entries to tv.json 
+
+- each hyper entry should start with every property the same as the original entry except "status":"future", "localPath":"/mnt/media/tvFileChunks/" and "hyperSpeed":"<hyper index>" where <hyper index> is a number from 0 to MAX_WORKERS-1.
+
+- when hyper entries are added to tv.json then a standard worker download should be started immediately for each hyper entry. any workers already running should keep running.  the hyper entry worker will operate exactly the same as it does for non-hyper entries.
+
+

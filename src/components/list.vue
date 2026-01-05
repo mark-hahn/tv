@@ -322,14 +322,10 @@ export default {
       searchingStatus:   '',
       showReloadingShows: false,
       showEmbyRefreshing: false,
-      allNotesCache: {},
-      allNotesCacheAt: 0,
-      allNotesCacheInFlight: null,
-      wasFilterEmpty: true,
       sortChoices:          
         ['Alpha', 'Viewed', 'Added', 'Ratings', 'Notes', 'Size'],
       fltrChoices:
-        ['All', 'Try Drama', 'Download', 'Notes', 'Finished'],
+        ['All', 'Try Drama', 'Finished'],
       conds: [ {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],
           cond(show)  { return !show.NotReady },
@@ -403,35 +399,6 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
-
-    async getAllNotesCached(ttlMs = 3000) {
-      const now = Date.now();
-      if (this.allNotesCache && (now - (this.allNotesCacheAt || 0)) < ttlMs) {
-        return this.allNotesCache;
-      }
-
-      if (this.allNotesCacheInFlight) {
-        return await this.allNotesCacheInFlight;
-      }
-
-      this.allNotesCacheInFlight = (async () => {
-        try {
-          const res = await srvr.getAllNotes();
-          this.allNotesCache = (res && typeof res === 'object') ? res : {};
-          this.allNotesCacheAt = Date.now();
-          return this.allNotesCache;
-        } catch (err) {
-          console.error('List: getAllNotes failed', err);
-          this.allNotesCache = this.allNotesCache || {};
-          this.allNotesCacheAt = Date.now();
-          return this.allNotesCache;
-        } finally {
-          this.allNotesCacheInFlight = null;
-        }
-      })();
-
-      return await this.allNotesCacheInFlight;
-    },
 
     async sendSharedFilters(e) {
       // Save current filter settings (for simple-mode Custom button).
@@ -1388,21 +1355,11 @@ export default {
       }
 
       let srchStrLc;
-      let allNotes = null;
       if(this.fltrChoice !== 'Finished') {
         if(this.filterStr.length > 0)
               this.fltrChoice = '- - - - -';
         const filterEmpty = (this.filterStr == null) || (String(this.filterStr).length === 0);
         srchStrLc = filterEmpty ? null : String(this.filterStr).toLowerCase();
-
-        if (filterEmpty) {
-          this.wasFilterEmpty = true;
-        } else {
-          // First keystroke into the filter box: force a fresh notes fetch.
-          const forceFresh = !!this.wasFilterEmpty;
-          this.wasFilterEmpty = false;
-          allNotes = await this.getAllNotesCached(forceFresh ? 0 : 3000);
-        }
       }
 
       const filteredShows = [];
@@ -1419,21 +1376,7 @@ export default {
           if(finished) filteredShows.push(show);
           continue;
         }
-        // Special-case Download filter: exclude pure WatchGap entries; allow FileGap or eligible noemby only
-        if (this.fltrChoice === 'Download') {
-          const downloadEligible = (show.FileGap ||
-            (show.Id.startsWith('noemby-') && !show.S1E1Unaired));
-          if (!downloadEligible) continue;
-        }
-        if (this.fltrChoice === 'Notes') {
-          const note = show?.Notes;
-          if (note == null || String(note).trim().length === 0) continue;
-        }
-        if (srchStrLc && !show.Name.toLowerCase().includes(srchStrLc)) {
-          const note = allNotes?.[show.Name];
-          const noteLc = (note == null) ? '' : String(note).toLowerCase();
-          if (!noteLc.includes(srchStrLc)) continue;
-        }
+        if (srchStrLc && !show.Name.toLowerCase().includes(srchStrLc)) continue;
         for (let cond of this.conds) {
           if ( cond.filter ===  0) continue;
           if ((cond.filter === +1) != (!!cond.cond(show)))

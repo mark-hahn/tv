@@ -327,7 +327,7 @@ export default {
       allNotesCacheInFlight: null,
       wasFilterEmpty: true,
       sortChoices:          
-        ['Alpha', 'Viewed', 'Added', 'Ratings', 'Size'],
+        ['Alpha', 'Viewed', 'Added', 'Ratings', 'Notes', 'Size'],
       fltrChoices:
         ['All', 'Try Drama', 'Download', 'Notes', 'Finished'],
       conds: [ {
@@ -546,7 +546,8 @@ export default {
         const orderToSortMap = {
           'Added Order': 'Added',
           'Viewed Order': 'Viewed',
-          'Ratings Order': 'Ratings'
+          'Ratings Order': 'Ratings',
+          'Notes Order': 'Notes'
         };
         let activeSortOrder = null;
         for (const [label, isActive] of Object.entries(activeButtons || {})) {
@@ -600,7 +601,8 @@ export default {
       const orderToSortMap = {
         'Added Order': 'Added',
         'Viewed Order': 'Viewed',
-        'Ratings Order': 'Ratings'
+        'Ratings Order': 'Ratings',
+        'Notes Order': 'Notes'
       };
       
       // Pure state-based: Sync conds to match button states
@@ -662,6 +664,9 @@ export default {
         case 'Ratings':  
           ratings = show?.Ratings;
           return ((ratings !== undefined) ? +ratings : 0);
+        case 'Notes':
+          if (!forSort) return '';
+          return String(show?.Notes ?? '').trim().toLowerCase();
         case 'Viewed': 
           lastViewed = srvr.lastViewedCache[show.Name];
           if(forSort) return lastViewed || 0;
@@ -1332,6 +1337,26 @@ export default {
     },
 
     sortShows() {
+      if (this.sortChoice === 'Notes') {
+        this.shows.sort((a, b) => {
+          const aNoteRaw = String(a?.Notes ?? '').trim();
+          const bNoteRaw = String(b?.Notes ?? '').trim();
+          const aHas = aNoteRaw.length > 0;
+          const bHas = bNoteRaw.length > 0;
+          if (aHas !== bHas) return aHas ? -1 : 1; // notes first
+
+          const aKey = aNoteRaw.toLowerCase();
+          const bKey = bNoteRaw.toLowerCase();
+          if (aKey !== bKey) return aKey > bKey ? 1 : -1; // alphabetical
+
+          const aName = String(a?.Name ?? '').replace(/^the\s*/i, '').toLowerCase();
+          const bName = String(b?.Name ?? '').replace(/^the\s*/i, '').toLowerCase();
+          if (aName === bName) return 0;
+          return aName > bName ? 1 : -1;
+        });
+        return;
+      }
+
       this.shows.sort((a, b) => {
         a = this.getValBySortChoice(a, true);
         b = this.getValBySortChoice(b, true);

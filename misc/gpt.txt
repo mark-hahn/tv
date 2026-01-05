@@ -3,5 +3,6 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-add a new choice "Notes" to #sortpop after "Ratings". it should sort the list in notes alphabetical order.
+add a new choice "Notes" to #sortpop after "Ratings". it should sort the show list in  alphabetical order of show.Notes. shows with notes should be listed first
 
+in simple mode add a button at bottom of the left-side list called "Notes Order".  is should sort the list in notes order just like the Notes sort option in non-simple mode.

@@ -78,7 +78,8 @@ export default {
         'Custom': false,
         'Added Order': false,
         'Viewed Order': false,
-        'Ratings Order': false
+        'Ratings Order': false,
+        'Notes Order': false
       },
       filters: [
         'Ready To Watch'
@@ -96,7 +97,8 @@ export default {
       sortOrders: [
         'Added Order',
         'Viewed Order',
-        'Ratings Order'
+        'Ratings Order',
+        'Notes Order'
       ]
     };
   },

@@ -3,4 +3,5 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-add a new choice "Notes" to #fltrpop after "Download". it should set a filter that lists only shows with notes
+add a new choice "Notes" to #sortpop after "Ratings". it should sort the list in notes alphabetical order.
+

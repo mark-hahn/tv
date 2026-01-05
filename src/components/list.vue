@@ -329,7 +329,7 @@ export default {
       sortChoices:          
         ['Alpha', 'Viewed', 'Added', 'Ratings', 'Size'],
       fltrChoices:
-        ['All', 'Try Drama', 'Download', 'Finished'],
+        ['All', 'Try Drama', 'Download', 'Notes', 'Finished'],
       conds: [ {
           color: "#0cf", filter: 0, icon: ["fas", "plus"],
           cond(show)  { return !show.NotReady },
@@ -1399,6 +1399,10 @@ export default {
           const downloadEligible = (show.FileGap ||
             (show.Id.startsWith('noemby-') && !show.S1E1Unaired));
           if (!downloadEligible) continue;
+        }
+        if (this.fltrChoice === 'Notes') {
+          const note = show?.Notes;
+          if (note == null || String(note).trim().length === 0) continue;
         }
         if (srchStrLc && !show.Name.toLowerCase().includes(srchStrLc)) {
           const note = allNotes?.[show.Name];

@@ -1,6 +1,7 @@
 
 bugs ...
-
+  fast-start download problem?
+  
 todo both ...
   show last-watched even for non-emby
   show episode

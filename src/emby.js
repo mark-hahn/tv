@@ -567,18 +567,54 @@ export const getEpisodeCounts = async (show) => {
   try {
     const seasonsRes = 
           await axios.get(urls.childrenUrl(cred, showId));
+    let skippedEpisodeCount = 0;
+    const skippedEpisodes = [];
     for(let key in seasonsRes.data.Items) {
-      seasonCount++;
       const seasonRec   =  seasonsRes.data.Items[key];
+      const seasonNumber = Number(seasonRec?.IndexNumber);
+
+      // Ignore non-numbered / special seasons for aggregate counts (matches map behavior).
+      if (!Number.isFinite(seasonNumber) || seasonNumber <= 0) {
+        continue;
+      }
+
+      seasonCount++;
       const seasonId    =  seasonRec.Id;
       const episodesRes = 
               await axios.get(urls.childrenUrl(cred, seasonId));
       for(let key in episodesRes.data.Items) {
-        episodeCount++;
         const episodeRec = episodesRes.data.Items[key];
+        const episodeNumber = Number(episodeRec?.IndexNumber);
+
+        // Emby will sometimes return items that don't have a parsable episode number
+        // (e.g. filenames like "S04.EXTRA..."). Don't count these, otherwise
+        // Series pane totals can disagree with the Map (which effectively ignores them).
+        if (!Number.isFinite(episodeNumber) || episodeNumber <= 0) {
+          skippedEpisodeCount++;
+          if (skippedEpisodes.length < 10) {
+            skippedEpisodes.push({
+              seasonNumber,
+              indexNumber: episodeRec?.IndexNumber,
+              name: episodeRec?.Name,
+              path: episodeRec?.Path
+            });
+          }
+          continue;
+        }
+
+        episodeCount++;
         const userData   = episodeRec?.UserData;
         if(userData?.Played) watchedCount++;
       }
+    }
+
+    if (skippedEpisodeCount > 0) {
+      const showName = show?.Name || showId;
+      console.log('getEpisodeCounts: skipped episodes with missing/invalid IndexNumber', {
+        show: showName,
+        skippedEpisodeCount,
+        sample: skippedEpisodes
+      });
     }
   }
   catch(e) { 

@@ -646,6 +646,38 @@ export default {
         if (!seriesMapIn || seriesMapIn.length === 0) {
           return needed;
         }
+
+        // Debug: help diagnose season/episode parsing issues (e.g. "S04.EXTRA")
+        // by logging any non-numeric season/episode indices returned by Emby.
+        try {
+          const nm = String(show?.Name || '');
+          if (/\bcoupling\b/i.test(nm)) {
+            const bad = [];
+            for (const seasonEntry of seriesMapIn) {
+              const seasonNum = Number(seasonEntry?.[0]);
+              const eps = seasonEntry?.[1];
+              if (!Number.isFinite(seasonNum) || seasonNum <= 0) {
+                bad.push({ kind: 'season', season: seasonEntry?.[0] });
+                continue;
+              }
+              if (Array.isArray(eps)) {
+                for (const epEntry of eps) {
+                  const epNum = Number(epEntry?.[0]);
+                  if (!Number.isFinite(epNum) || epNum <= 0) {
+                    bad.push({ kind: 'episode', season: seasonNum, episode: epEntry?.[0], title: epEntry?.[1]?.title });
+                    if (bad.length >= 12) break;
+                  }
+                }
+              }
+              if (bad.length >= 12) break;
+            }
+            if (bad.length) {
+              console.log('calculateNeeded debug: invalid season/episode indices in seriesMapIn', { show: nm, bad });
+            }
+          }
+        } catch {
+          // ignore
+        }
         
         // Build seriesMap object from array
         const seriesMap = util.buildSeriesMap(seriesMapIn);

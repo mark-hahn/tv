@@ -3,4 +3,20 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-add a number display in the top row of the down pane header to the right of the "Downloads" label. it should be the sum of all the speed fields in the cards that are downloading. it should look like "123 mb". it should have a margin-left of 20px
+the show Coupling has a map pane table that shows a total of 28 episodes. all 28 have files and all 28 are watched, but the series pane infobox says "Watched 29 of 30".
+
+the problem is that two of the files in the local disk have the name (title): 
+"Coupling.S04.EXTRA.From.Screen.to.Script.PAL.DVD.AC3.x264-SDB.mkv"
+and
+"Coupling.S04.EXTRA.Outtakes.PAL.DVD.AC3.x264-SDB.mkv"
+
+S04.EXTRA is obviously a parsing problem but the map and infobox should at least match.  
+
+ideally S04.EXTRA would parse as Season 4, Episode 0, but let's concentrate on the mismatch for now
+
+in needed add logging.
+
+
+- log what parse-torrent-title returns for the file titles with EXTRA
+
+- watched counts in infobox are now correct, but the next up line has "Next Up S04 Eundefined".  the next up line should not be there since there are no un-watched shows.  so watched line was fixed but not next up

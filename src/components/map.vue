@@ -20,9 +20,6 @@
       #mapshow(:style="{ marginLeft:'15px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px' }")
         | {{mapShow?.Name}} 
       div(style="display:flex; ")
-        #mapnoemby(v-if="mapShow?.Id?.startsWith('noemby-')"
-            @click.stop.prevent="handleNotInEmbyClick($event)"
-            style="font-weight:bold; color:red; font-size:14px; white-space:nowrap; margin:8px; max-height:24px; cursor:pointer;") Not In Emby
         #mapbuttons(v-if="!simpleMode" style="display:flex; gap:5px; flex-shrink:0;")
           button(
             @click.stop.prevent="noop"
@@ -52,6 +49,9 @@
       span(v-for="(part, idx) in hdr2Parts" :key="idx" style="white-space:nowrap;")
         span(v-if="idx > 0" style="padding:0 6px; font-weight:bold;") |
         span {{part}}
+      span(v-if="mapShow?.Id?.startsWith('noemby-')" style="white-space:nowrap;")
+        span(v-if="hdr2Parts && hdr2Parts.length > 0" style="padding:0 6px; font-weight:bold;") |
+        span(@click.stop.prevent="handleNotInEmbyClick($event)" style="font-weight:bold; cursor:pointer; white-space:nowrap;") Not In Emby
   #maptable(v-if="!hideMapBottom" style="flex:1 1 auto; min-height:0px; margin-left:15px; margin-right:15px; box-sizing:border-box; position:relative; overflow:hidden;")
     //- No scrollbars: pan the table with arrows (horizontal) and mouse wheel (vertical).
     #maptblpane(ref="mapViewport"

@@ -12,67 +12,133 @@
   #embyRefreshingModal(v-if="showEmbyRefreshing" @click.stop style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background-color:white; padding:30px 40px; border:2px solid black; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.3); z-index:10000; text-align:center;")
     div(style="font-size:18px; font-weight:bold;") Emby is being refreshed.
   
-  #center(:style="{ height:'100%', width: sizing.listWidth || '800px', display:'flex', flexDirection:'column' }")             
-    #hdr(style="width:100%; background-color:#ccc; display:flex; flex-direction:column;")
-
-      HdrTop(
-        :showsLength="shows.length"
-        :allShowsLength="allShowsLength"
-        :gapPercent="gapPercent"
-        v-model:filterStr="filterStr"
-        v-model:webHistStr="webHistStr"
-        :watchingName="watchingName"
-        :showingSrchList="showingSrchList"
-        :searchList="searchList"
-        :simpleMode="simpleMode"
-        @search-click="searchClick"
-        @watch-click="watchClick"
-        @filter-input="select"
-        @cancel-srch-list="cancelSrchList"
-        @search-action="searchAction"
-        @send-filters="sendSharedFilters"
-      )
-
-      HdrBot(
-        v-if="!simpleMode"
-        :conds="conds"
-        :sortPopped="sortPopped"
-        :fltrPopped="fltrPopped"
-        :sortChoices="sortChoices"
-        :fltrChoices="fltrChoices"
-        :selectedSort="sortChoice"
-        :selectedFilter="fltrChoice"
-        @top-click="topClick"
-        @prev-next-click="prevNextClick"
-        @sort-click="sortClick"
-        @filter-click="filterClick"
-        @all-click="allClick"
-        @cond-fltr-click="condFltrClick"
-        @sort-action="sortAction"
-        @fltr-action="fltrAction"
-      )
-
-    #showsContainer(style="display:flex; flex-grow:1; overflow:hidden; min-height:0;")
+  #center(:style="{ height:'100%', width: sizing.listWidth || '800px', display:'flex', flexDirection: (simpleMode && isWideLandscape) ? 'row' : 'column' }")
+    // Wide/landscape simple mode: buttons left column full height; header+shows stacked right.
+    template(v-if="simpleMode && isWideLandscape")
       Buttons(
-        v-if="simpleMode && !hideButtonsPane"
-        style="width:140px; flex-shrink:0;"
+        v-if="!hideButtonsPane"
+        style="width:140px; flex-shrink:0; height:100%;"
         :sizing="sizing"
         @button-click="handleButtonClick"
         @top-click="topClick"
       )
-      Shows(
-        style="flex-grow:1;"
-        :shows="shows"
-        :conds="conds"
-        :highlightName="highlightName"
-        :getSortDisplayValue="getValBySortChoice"
-        :allShowsLength="allShowsLength"
-        :showConds="!simpleMode"
-        :simpleMode="simpleMode"
-        @copy-name="copyNameToClipboard"
-        @open-map="(show) => seriesMapAction('open', show)"
-        @select-show="onSelectShow"
-      )
+
+      #rightCol(style="display:flex; flex-direction:column; flex-grow:1; min-width:0;")
+        #hdr(style="width:100%; background-color:#ccc; display:flex; flex-direction:column;")
+          HdrTop(
+            :showsLength="shows.length"
+            :allShowsLength="allShowsLength"
+            :gapPercent="gapPercent"
+            v-model:filterStr="filterStr"
+            v-model:webHistStr="webHistStr"
+            :watchingName="watchingName"
+            :showingSrchList="showingSrchList"
+            :searchList="searchList"
+            :simpleMode="simpleMode"
+            @search-click="searchClick"
+            @watch-click="watchClick"
+            @filter-input="select"
+            @cancel-srch-list="cancelSrchList"
+            @search-action="searchAction"
+            @send-filters="sendSharedFilters"
+          )
+
+          HdrBot(
+            v-if="!simpleMode"
+            :conds="conds"
+            :sortPopped="sortPopped"
+            :fltrPopped="fltrPopped"
+            :sortChoices="sortChoices"
+            :fltrChoices="fltrChoices"
+            :selectedSort="sortChoice"
+            :selectedFilter="fltrChoice"
+            @top-click="topClick"
+            @prev-next-click="prevNextClick"
+            @sort-click="sortClick"
+            @filter-click="filterClick"
+            @all-click="allClick"
+            @cond-fltr-click="condFltrClick"
+            @sort-action="sortAction"
+            @fltr-action="fltrAction"
+          )
+
+        #showsLandscape(style="display:flex; flex-grow:1; overflow:hidden; min-height:0;")
+          Shows(
+            style="flex-grow:1;"
+            :shows="shows"
+            :conds="conds"
+            :highlightName="highlightName"
+            :getSortDisplayValue="getValBySortChoice"
+            :allShowsLength="allShowsLength"
+            :showConds="!simpleMode"
+            :simpleMode="simpleMode"
+            @copy-name="copyNameToClipboard"
+            @open-map="(show) => seriesMapAction('open', show)"
+            @select-show="onSelectShow"
+          )
+
+    // Default layout
+    template(v-else)
+      #hdr(style="width:100%; background-color:#ccc; display:flex; flex-direction:column;")
+
+        HdrTop(
+          :showsLength="shows.length"
+          :allShowsLength="allShowsLength"
+          :gapPercent="gapPercent"
+          v-model:filterStr="filterStr"
+          v-model:webHistStr="webHistStr"
+          :watchingName="watchingName"
+          :showingSrchList="showingSrchList"
+          :searchList="searchList"
+          :simpleMode="simpleMode"
+          @search-click="searchClick"
+          @watch-click="watchClick"
+          @filter-input="select"
+          @cancel-srch-list="cancelSrchList"
+          @search-action="searchAction"
+          @send-filters="sendSharedFilters"
+        )
+
+        HdrBot(
+          v-if="!simpleMode"
+          :conds="conds"
+          :sortPopped="sortPopped"
+          :fltrPopped="fltrPopped"
+          :sortChoices="sortChoices"
+          :fltrChoices="fltrChoices"
+          :selectedSort="sortChoice"
+          :selectedFilter="fltrChoice"
+          @top-click="topClick"
+          @prev-next-click="prevNextClick"
+          @sort-click="sortClick"
+          @filter-click="filterClick"
+          @all-click="allClick"
+          @cond-fltr-click="condFltrClick"
+          @sort-action="sortAction"
+          @fltr-action="fltrAction"
+        )
+
+      #showsContainer(style="display:flex; flex-grow:1; overflow:hidden; min-height:0;")
+        Buttons(
+          v-if="simpleMode && !hideButtonsPane"
+          style="width:140px; flex-shrink:0;"
+          :sizing="sizing"
+          @button-click="handleButtonClick"
+          @top-click="topClick"
+        )
+        Shows(
+          style="flex-grow:1;"
+          :shows="shows"
+          :conds="conds"
+          :highlightName="highlightName"
+          :getSortDisplayValue="getValBySortChoice"
+          :allShowsLength="allShowsLength"
+          :showConds="!simpleMode"
+          :simpleMode="simpleMode"
+          @copy-name="copyNameToClipboard"
+          @open-map="(show) => seriesMapAction('open', show)"
+          @select-show="onSelectShow"
+        )
 </template>
 
 
@@ -322,6 +388,7 @@ export default {
       searchingStatus:   '',
       showReloadingShows: false,
       showEmbyRefreshing: false,
+      isWideLandscape: false,
       sortChoices:          
         ['Alpha', 'Viewed', 'Added', 'Ratings', 'Notes', 'Size'],
       fltrChoices:
@@ -399,6 +466,19 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
+
+    updateWideLandscape() {
+      // Simple heuristic: treat landscape as "wide".
+      // (On desktops, simpleMode is typically off, so this won't affect normal layout.)
+      try {
+        const isLandscape = !!(window.matchMedia && window.matchMedia('(orientation: landscape)').matches);
+        const w = Number(window.innerWidth || 0);
+        const h = Number(window.innerHeight || 0);
+        this.isWideLandscape = isLandscape && w > h;
+      } catch {
+        this.isWideLandscape = false;
+      }
+    },
 
     async sendSharedFilters(e) {
       // Save current filter settings (for simple-mode Custom button).
@@ -1584,6 +1664,11 @@ export default {
 
   /////////////////  MOUNTED  /////////////////
   mounted() {
+    this.updateWideLandscape();
+    this._onResizeWideLandscape = () => this.updateWideLandscape();
+    window.addEventListener('resize', this._onResizeWideLandscape);
+    window.addEventListener('orientationchange', this._onResizeWideLandscape);
+
     // Simple + portrait: Buttons are rendered in App.vue and forward events via evtBus.
     evtBus.on('simpleModeButtonsClick', (activeButtons) => {
       void this.handleButtonClick(activeButtons);
@@ -1697,6 +1782,14 @@ export default {
         console.error("Mounted:", err);
       }
     })();
+  },
+
+  beforeUnmount() {
+    if (this._onResizeWideLandscape) {
+      window.removeEventListener('resize', this._onResizeWideLandscape);
+      window.removeEventListener('orientationchange', this._onResizeWideLandscape);
+      this._onResizeWideLandscape = null;
+    }
   },
 };
 </script>

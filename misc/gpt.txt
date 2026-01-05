@@ -3,4 +3,10 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-remove "Download" and "Notes" buttons from #fltrpop and revert code used to implement them. 
+in simple mode when the screen is wide (landscape mode) the #hdr inside #tabBody has the Not In Emby message overflowing #hdr to the right and outside the window.  the left side of the message starts at the right of #hdr.  the message should be insde #hdr at the far right.
+
+also change the width of the textareas to 125px
+
+move the Not In Emby message to below the infobox and change font-size to 16px
+
+in the map pane move the Not In Emby message to the end of the list of messages in #maphdr2. separate it with a | to the left like all the others

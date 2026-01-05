@@ -10,7 +10,7 @@
       div(:style="{ gridColumn:'1 / span 2', marginLeft:'20px', marginRight:'20px', whiteSpace:'normal', overflowWrap:'anywhere', wordBreak:'break-word' }") {{show.Name}}
 
       //- Simple mode: align left edge of Notes with right edge of image (end of poster column)
-      div(v-if="simpleMode" :style="{ gridColumn:'3 / span 3', display:'flex', alignItems:'center' }")
+      div(v-if="simpleMode" :style="{ gridColumn:'3 / span 3', display:'flex', alignItems:'center', minWidth:'0px', width:'100%' }")
         textarea(
           v-model="noteText"
           @click.stop
@@ -21,7 +21,7 @@
           @blur="onNoteBlur"
           rows="1"
           placeholder="Notes"
-          :style="{ width: sizing.emailWidth || '200px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
+          :style="{ width:'125px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
         )
         textarea(
           v-model="emailText"
@@ -30,19 +30,16 @@
           @keydown.enter.prevent.stop="onEnterBlur"
           rows="1"
           placeholder="Email Mark"
-          :style="{ width: sizing.emailWidth || '200px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
+          :style="{ width:'125px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
         )
-        div(v-if="show?.Reject"
-            style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; margin-right:10px;") Banned From Download
-        div(v-if="notInEmby"
-            style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; margin-right:10px; white-space:nowrap;") Not In Emby
+        div(:style="{ display:'flex', alignItems:'center', marginLeft:'auto', minWidth:'0px' }")
+          div(v-if="show?.Reject"
+            style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; margin-right:10px; white-space:nowrap;") Banned From Download
 
       //- Non-simple mode: align left edge of Notes with left edge of infobox (start of infobox column)
       div(v-else :style="{ gridColumn:'4 / span 2', display:'flex', alignItems:'center' }")
         div(v-if="show?.Reject"
             style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; margin-right:10px;") Banned From Download
-        div(v-if="notInEmby"
-            style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; margin-right:10px; white-space:nowrap;") Not In Emby
         textarea(
           v-model="noteText"
           @click.stop
@@ -53,7 +50,7 @@
           @blur="onNoteBlur"
           rows="1"
           placeholder="Notes"
-          :style="{ width: sizing.emailWidth || '200px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
+          :style="{ width:'125px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
         )
         button(
           @click.stop="deleteClick"
@@ -132,6 +129,8 @@
             style="min-height:24px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;"
           )
             | {{ (collectionCount > 1) ? 'Collections' : 'Collection' }}: {{collectionName}}
+
+          div(v-if="notInEmby" style="font-weight:bold; color:red; font-size:16px; margin-top:8px; white-space:nowrap;") Not In Emby
 
       //- Notes input moved to header (simple + non-simple)
 

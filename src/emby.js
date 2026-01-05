@@ -608,14 +608,7 @@ export const getEpisodeCounts = async (show) => {
       }
     }
 
-    if (skippedEpisodeCount > 0) {
-      const showName = show?.Name || showId;
-      console.log('getEpisodeCounts: skipped episodes with missing/invalid IndexNumber', {
-        show: showName,
-        skippedEpisodeCount,
-        sample: skippedEpisodes
-      });
-    }
+    // Intentionally no logging here; we just skip malformed items.
   }
   catch(e) { 
     console.error('getEpisodeCounts error:', e);
@@ -843,14 +836,18 @@ export const afterLastWatched = async (showId) => {
   const seasonItems = seasonsRes.data.Items;
   for(let key in seasonItems) {
     let   seasonRec    = seasonItems[key];
-    const seasonNumber = seasonRec.IndexNumber;
+    const seasonNumber = Number(seasonRec.IndexNumber);
+
+    // Skip non-numbered / special seasons.
+    if (!Number.isFinite(seasonNumber) || seasonNumber <= 0) continue;
     const seasonId     = seasonRec.Id;
     const unairedObj = {};
     const unairedRes = await axios.get(
               urls.childrenUrl(cred, seasonId, true));
     for(let key in unairedRes.data.Items) {
       const episode       = unairedRes.data.Items[key];
-      const episodeNumber = +episode.IndexNumber;
+      const episodeNumber = Number(episode.IndexNumber);
+      if (!Number.isFinite(episodeNumber) || episodeNumber <= 0) continue;
       unairedObj[episodeNumber] = true;
     }
     const episodesRes  = 
@@ -861,7 +858,10 @@ export const afterLastWatched = async (showId) => {
       const userData   = episodeRec.UserData;
       const watched    = userData.Played;
       if(watched) continue;
-      const episodeNumber = episodeRec.IndexNumber;
+
+      // Ignore "episode" items without a numeric index (e.g. S04.EXTRA...)
+      const episodeNumber = Number(episodeRec.IndexNumber);
+      if (!Number.isFinite(episodeNumber) || episodeNumber <= 0) continue;
       const episodeId     = episodeRec.Id;
       const haveFile      = (episodeRec.LocationType != "Virtual");
       const unaired       = !!unairedObj[episodeNumber];

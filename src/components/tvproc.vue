@@ -683,28 +683,6 @@ export default {
         }
         const arr = await res.json();
 
-        // Debug: log a compact view of the raw data received from the server.
-        // This endpoint is polled, so rate-limit logs to avoid console spam.
-        try {
-          const nowMs = Date.now();
-          if (!this._lastTvprocDataLogAt || nowMs - this._lastTvprocDataLogAt > 30000) {
-            this._lastTvprocDataLogAt = nowMs;
-            const sample = Array.isArray(arr)
-              ? arr.slice(0, 6).map(it => ({
-                  title: it?.title,
-                  status: it?.status,
-                  progress: it?.progress,
-                  speed: it?.speed,
-                  eta: it?.eta,
-                  procId: it?.procId
-                }))
-              : arr;
-            console.log('tvproc/downloads raw sample', sample);
-          }
-        } catch {
-          // ignore
-        }
-
         // downActive: true when any item is downloading or waiting (formerly "future").
         try {
           const active = Array.isArray(arr)

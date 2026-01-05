@@ -93,8 +93,8 @@ export function normalize(torrent, showName) {
   
   // Extract season range if present
   const seasonRange = extractSeasonRange(trimmedTitle);
-  
-  console.log('parseTorrentTitle:', {trimmedTitle, parsed, seasonRange});
+
+  // (debug logging removed)
   let groupSrc = 'parse';
   let group = null;
   

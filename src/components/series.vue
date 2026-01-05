@@ -557,6 +557,14 @@ export default {
       const readyToWatch = (status === 'ok');
       if(!this.show.Id.startsWith('noemby') && status !== 'allWatched') {
         const {seasonNumber, episodeNumber, episodeId} = afterWatched;
+
+        // Defensive: never render "Eundefined" for malformed Emby items (e.g. Sxx.EXTRA).
+        if (!Number.isFinite(+seasonNumber) || !Number.isFinite(+episodeNumber)) {
+          this.nextUpValTxt = '';
+          this.nextUpSuffixTxt = '';
+          this.episodeId = '';
+          return;
+        }
         const seaEpiTxt = `S${(''+seasonNumber) .padStart(2, "0")} ` +
                           `E${(''+episodeNumber).padStart(2, "0")}`;
         if (readyToWatch) {

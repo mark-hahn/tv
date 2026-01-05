@@ -1,5 +1,4 @@
 
+i undid that change.  i want bits/sec for speed property. 
 
-- change the "status":"future" used in tv.json to "status":"waiting" and change all code that looks for "status":"future" to look for "status":"waiting"
-
-- a worker should calculate download speed in bits/sec and update its tv.json entry to have a speed field with that number every time it updates progress and eta.  use the old method of calculating speed and if you don't remember it I will revert the commits to find it.
+- for the first ten progress calculations log the raw numbers used for the calculation including logging the progress text from rsync. include times for each progress update.

@@ -25,11 +25,12 @@ Common fields:
 - `title` (string): The **filename** (not the TVDB show title).
 	- Example: `its.always.sunny.in.philadelphia.s17e02.1080p.web.h264-successfulcrab.mkv`
 - `status` (string): State of this file.
-	- Typical values: `future`, `downloading`, `finished`
+	- Typical values: `waiting`, `downloading`, `finished`
 	- Also used for exceptional states: `stopped`, `Missing`, `rsync exit code 23`, etc.
 - `progress` (number): Percent complete, usually an integer 0–100.
-- `speed` (number|null): Download speed in bytes/sec, updated while downloading.
-	- Computed as the average of the last five instantaneous samples.
+
+- `speed` (number|null): Download speed in bits/sec, updated while downloading.
+	- Computed as the moving average of the last three instantaneous samples.
 	- Preserved when the entry becomes `finished`.
 - `eta` (number|null): Unix timestamp (seconds) for estimated completion time.
 	- Set only while downloading when rsync reports time remaining.
@@ -90,13 +91,13 @@ In multi-worker mode, workers update `tv.json` progress/ETA/speed while download
 
 ## How entries are created and updated
 
-### 1) Pre-population: `future`
+### 1) Pre-population: `waiting`
 
 At the start of a cycle, tv-proc iterates through eligible remote files and pre-populates `tv.json` with entries that will likely be processed.
 
 For each eligible episode file, it calls:
 
-- `upsertTvJson(<season dir>, <fname>, { status: 'future', sequence, fileSize, season, episode })`
+- `upsertTvJson(<season dir>, <fname>, { status: 'waiting', sequence, fileSize, season, episode })`
 
 This provides visibility before any download actually starts.
 

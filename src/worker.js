@@ -122,12 +122,14 @@ const main = () => {
 
       const nowMs = Date.now();
       const bytes = parseTransferredBytes(chunk);
+      let etaSec = null;
+
       if (bytes != null) {
         if (lastBytes != null && lastBytesTimeMs != null && bytes >= lastBytes) {
-          const dt = (nowMs - lastBytesTimeMs) / 1000;
-          if (dt > 0) {
+          const dtSec = (nowMs - lastBytesTimeMs) / 1000;
+          if (dtSec > 0) {
             const dBytes = bytes - lastBytes;
-            const instBitsPerSec = Math.round((dBytes * 8) / dt);
+            const instBitsPerSec = Math.round((dBytes * 8) / dtSec);
             const inst = Number.isFinite(instBitsPerSec) && instBitsPerSec >= 0 ? instBitsPerSec : 0;
 
             speedSamples.push(inst);
@@ -140,7 +142,7 @@ const main = () => {
         lastBytesTimeMs = nowMs;
       }
 
-      const etaSec = parseEtaSeconds(chunk);
+      etaSec = parseEtaSeconds(chunk);
       if (etaSec != null) {
         entry.eta = unixNow() + etaSec;
       }

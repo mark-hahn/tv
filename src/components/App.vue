@@ -453,9 +453,9 @@ export default {
 
     tabAreaStyle() {
       if (this.isPortrait) {
-        return { width: '100%', height: this.tabAreaHeight, flex: '0 0 auto', minWidth: '0px', minHeight: '0px', display: 'flex', flexDirection: 'column', marginRight: '0px', order: 0 };
+        return { width: '100%', height: this.tabAreaHeight, flex: '0 0 auto', minWidth: '0px', minHeight: '0px', display: 'flex', flexDirection: 'column', marginRight: '0px', order: 0, boxSizing: 'border-box', paddingLeft: this.simpleMode ? '0px' : '10px' };
       }
-      return { width: this.tabAreaWidth, height: '100%', flex: '0 0 auto', minWidth: '0px', display: 'flex', flexDirection: 'column', marginRight: '10px', order: 2 };
+      return { width: this.tabAreaWidth, height: '100%', flex: '0 0 auto', minWidth: '0px', display: 'flex', flexDirection: 'column', marginRight: '10px', order: 2, boxSizing: 'border-box', paddingLeft: this.simpleMode ? '0px' : '10px' };
     },
 
     listStyle() {

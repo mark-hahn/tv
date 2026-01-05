@@ -4,7 +4,10 @@
 
   #header(:style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', marginLeft:'0px', marginRight:'0px', marginTop:'0px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
     div(style="display:flex; justify-content:space-between; align-items:center;")
-      div(style="margin-left:20px;") Downloads
+      div(style="margin-left:20px; display:flex; align-items:center;")
+        span Downloads
+        span(v-if="totalDownloadingSpeedText" style="margin-left:20px; align-self:center; font-size:13px; color:#555; white-space:nowrap; font-weight:normal;") {{ totalDownloadingSpeedText }}
+        span(v-if="avgDownloadingSpeedText" style="margin-left:20px; align-self:center; font-size:13px; color:#555; white-space:nowrap; font-weight:normal;") {{ avgDownloadingSpeedText }}
       div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
         div(v-if="libraryProgressText" style="align-self:center; font-size:13px; color:#555; white-space:nowrap;") {{ libraryProgressText }}
         button(@click.stop="startLibraryRefresh" :disabled="_libBusy" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Library
@@ -89,6 +92,29 @@ export default {
   computed: {
     hasContent() {
       return !this.error && Array.isArray(this.items) && this.items.length > 0;
+    },
+
+    totalDownloadingSpeedText() {
+      const items = Array.isArray(this.items) ? this.items : [];
+      const downloading = items.filter(it => String(it?.status || '').trim().toLowerCase() === 'downloading');
+      if (downloading.length === 0) return '';
+      const totalBitsPerSec = downloading.reduce((sum, it) => {
+        const n = Number(it?.speed);
+        return sum + (Number.isFinite(n) ? n : 0);
+      }, 0);
+      return this.fmtGbPerSec(totalBitsPerSec);
+    },
+
+    avgDownloadingSpeedText() {
+      const items = Array.isArray(this.items) ? this.items : [];
+      const downloading = items.filter(it => String(it?.status || '').trim().toLowerCase() === 'downloading');
+      if (downloading.length === 0) return '';
+      const totalBitsPerSec = downloading.reduce((sum, it) => {
+        const n = Number(it?.speed);
+        return sum + (Number.isFinite(n) ? n : 0);
+      }, 0);
+      const avgBitsPerSec = totalBitsPerSec / downloading.length;
+      return this.fmtGbPerSec(avgBitsPerSec);
     },
 
     emptyStateText() {
@@ -443,13 +469,14 @@ export default {
       const started = this.fmtMdhm(it?.dateStarted);
       const speed = this.fmtGbPerSec(it?.speed);
       const status = String(it?.status || '').trim();
+      const statusLower = status.toLowerCase();
       const progress = Number(it?.progress);
 
-      // For future status, only show size
-      if (status === 'future') {
+      // For waiting status (formerly "future"), only show size
+      if (statusLower === 'waiting' || statusLower === 'future') {
         const parts = [];
         if (size) parts.push(size);
-        parts.push('Future');
+        parts.push('Waiting');
         return { seasonEpisode, rest: parts.join(' | ') };
       }
 
@@ -457,7 +484,7 @@ export default {
       if (size) parts.push(size);
       if (started) parts.push(started);
 
-      if (status === 'finished') {
+      if (statusLower === 'finished') {
         const elapsed = this.fmtElapsedMmSs(this.elapsedSeconds(it));
         if (elapsed) parts.push(elapsed);
         if (speed) parts.push(speed);
@@ -465,7 +492,7 @@ export default {
         return { seasonEpisode, rest: parts.join(' | ') };
       }
 
-      if (status === 'downloading') {
+      if (statusLower === 'downloading') {
         if (speed) parts.push(speed);
         const eta = this.fmtEtaRemaining(it?.eta);
         if (eta) parts.push(eta);
@@ -503,8 +530,8 @@ export default {
     },
 
     getCardStyle(it) {
-      const status = String(it?.status || '').trim();
-      const isFuture = status === 'future';
+      const status = String(it?.status || '').trim().toLowerCase();
+      const isFuture = status === 'future' || status === 'waiting';
       const isDownloading = status === 'downloading';
       return {
         position: 'relative',
@@ -517,8 +544,8 @@ export default {
     },
 
     handleMouseEnter(event, it) {
-      const status = String(it?.status || '').trim();
-      if (status === 'future') {
+      const status = String(it?.status || '').trim().toLowerCase();
+      if (status === 'future' || status === 'waiting') {
         event.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
       }
     },
@@ -539,8 +566,8 @@ export default {
 
       if (clickedTitle) evtBus.emit('selectShowFromCardTitle', clickedTitle);
 
-      const status = String(it?.status || '').trim();
-      if (status === 'future') {
+      const status = String(it?.status || '').trim().toLowerCase();
+      if (status === 'future' || status === 'waiting') {
         const title = it?.title;
         if (title) {
           this.clickedFutures.add(title);
@@ -572,8 +599,8 @@ export default {
     },
 
     isFutureClicked(it) {
-      const status = String(it?.status || '').trim();
-      if (status !== 'future') return false;
+      const status = String(it?.status || '').trim().toLowerCase();
+      if (status !== 'future' && status !== 'waiting') return false;
       const title = it?.title;
       return title && this.clickedFutures.has(title);
     },
@@ -656,12 +683,34 @@ export default {
         }
         const arr = await res.json();
 
-        // downActive: true when any item is downloading or future.
+        // Debug: log a compact view of the raw data received from the server.
+        // This endpoint is polled, so rate-limit logs to avoid console spam.
+        try {
+          const nowMs = Date.now();
+          if (!this._lastTvprocDataLogAt || nowMs - this._lastTvprocDataLogAt > 30000) {
+            this._lastTvprocDataLogAt = nowMs;
+            const sample = Array.isArray(arr)
+              ? arr.slice(0, 6).map(it => ({
+                  title: it?.title,
+                  status: it?.status,
+                  progress: it?.progress,
+                  speed: it?.speed,
+                  eta: it?.eta,
+                  procId: it?.procId
+                }))
+              : arr;
+            console.log('tvproc/downloads raw sample', sample);
+          }
+        } catch {
+          // ignore
+        }
+
+        // downActive: true when any item is downloading or waiting (formerly "future").
         try {
           const active = Array.isArray(arr)
             ? arr.some(it => {
                 const st = String(it?.status || '').trim().toLowerCase();
-                return st === 'downloading' || st === 'future';
+                return st === 'downloading' || st === 'waiting' || st === 'future';
               })
             : false;
           evtBus.emit('downActivePart', { source: 'tvproc', active });
@@ -677,7 +726,10 @@ export default {
           return !Number.isFinite(ended) || ended === 0;
         };
 
-        const isFuture = (it) => String(it?.status || '').trim().toLowerCase() === 'future';
+        const isFuture = (it) => {
+          const st = String(it?.status || '').trim().toLowerCase();
+          return st === 'waiting' || st === 'future';
+        };
 
         // Track status changes for downloading items
         const oldDownloading = Array.isArray(this.items) ? this.items.filter(isActiveDownloading) : [];

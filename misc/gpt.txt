@@ -3,13 +3,4 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-how is speed calculated and displayed in qbt pane card
-
-
-- if there is an alt-click on down pane card and  isDevelopment is false and down card tv.json object contains the property procId 
-then call startproc(<title>:<procId>)  
-- call will return {"ok":true} or {"error":"<error msg>"}.
-
-change startproc(<title>~~<procId>) to startproc("hyper.<procId>")
-
-
+add a number display in the top row of the down pane header to the right of the "Downloads" label. it should be the sum of all the speed fields in the cards that are downloading. it should look like "123 mb". it should have a margin-left of 20px

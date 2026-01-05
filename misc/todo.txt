@@ -1,6 +1,5 @@
 
 bugs ...
-  multiple downloads - second late
 
 todo both ...
   show last-watched even for non-emby
@@ -9,8 +8,6 @@ todo both ...
     being watched (next up line)
 
 todo non-simple:
-  use multiple rsyncs for single file
-  delete row in map should delete dir
   abort qbt downloading
   remove downloaded qbt
   how to see why qbt or down won't start

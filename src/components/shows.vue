@@ -29,9 +29,13 @@
         )
           | {{ getSortDisplayValue(show) }}
 
-        td(id="showlineicons" :style="{display:'flex', padding:'5px', justifyContent:'space-between', backgroundColor: hilite(show)}")
+        td(id="showLineText" :style="{display:'flex', padding:'5px', justifyContent:'space-between', backgroundColor: hilite(show)}")
           div(style="padding:2px; fontSize:16px; font-weight:bold;" @click="$emit('select-show', show, false, true)") {{show.Name}}
           div(style="padding:2px; flex-grow:1; fontSize:16px; font-weight:bold;" @click="$emit('select-show', show, false, true)" )
+          div(
+            v-if="show.Notes && String(show.Notes).length"
+            :style="{ padding:'2px', fontSize:'14px', color:'rgba(0,0,0,0.5)', marginRight:'15px' }"
+          ) {{ String(show.Notes) }}
           div(v-if="show.WaitStr?.length" style="padding:2px; color: #00f; fontSize:16px;")
             | {{show.WaitStr}}
 

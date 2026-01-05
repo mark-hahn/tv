@@ -59,14 +59,16 @@ export async function loadAllShows() {
   const pkupPromise   = srvr.getPickups();
   const noEmbyPromise = srvr.getNoEmbys();
   const gapPromise    = srvr.getGaps();
+    const notesPromise  = srvr.getAllNotes();
 
-  const [embyShows, diskShows, 
-         rejectsIn, pickups, noEmbys, gaps] = 
+    const [embyShows, diskShows, 
+      rejectsIn, pickups, noEmbys, gaps, notesIn] = 
     await Promise.all([embyPromise, diskPromise, 
                        rejPromise, pkupPromise,
-                       noEmbyPromise, gapPromise]);
+          noEmbyPromise, gapPromise, notesPromise]);
   rejects = rejectsIn
   const gapsById = gaps || {};
+    const notesByShowName = (notesIn && typeof notesIn === 'object') ? notesIn : {};
   
   let shows = [];
 
@@ -306,6 +308,13 @@ export async function loadAllShows() {
     deletedGap = true;
   }
   if(deletedGap) await srvr.delGap([null, true]);
+
+//////////  attach Notes to show objects ////////////
+  for (const show of shows) {
+    const nm = show?.Name;
+    const note = nm ? notesByShowName?.[nm] : '';
+    show.Notes = (note == null) ? '' : String(note);
+  }
 
 //////////  process toTry collection  ////////////
   const toTryRes = await axios.get(

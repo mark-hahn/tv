@@ -238,6 +238,7 @@ export default {
       if (!showName) return;
 
       this.noteCacheByShowName[showName] = this.noteText;
+      this.show.Notes = this.noteText;
 
       if (this.noteSaveTimer) {
         clearTimeout(this.noteSaveTimer);
@@ -259,6 +260,7 @@ export default {
         await srvr.saveNote(showName, this.noteText);
         this.lastSavedNoteText = this.noteText;
         this.noteCacheByShowName[showName] = this.noteText;
+        this.show.Notes = this.noteText;
       } catch (err) {
         console.error('Series: saveNote failed', { showName, err });
         if (showAlertOnError) window.alert(err?.message || String(err));
@@ -280,6 +282,7 @@ export default {
         this.noteText = next;
         this.lastSavedNoteText = next;
         this.noteCacheByShowName[showName] = next;
+        this.show.Notes = next;
       } catch (err) {
         console.error('Series: refreshNoteFromServer failed', { showName, err });
       } finally {
@@ -297,6 +300,11 @@ export default {
         this.noteText = String(cached ?? '');
         this.lastSavedNoteText = this.noteText;
       }
+      else if (this.show && this.show.Notes != null) {
+        // Seed from show.Notes (populated by loadAllShows) before polling refresh.
+        this.noteText = String(this.show.Notes ?? '');
+        this.lastSavedNoteText = this.noteText;
+      }
 
       try {
         const res = await srvr.getNote(showName);
@@ -304,6 +312,7 @@ export default {
         this.noteText = String(text ?? '');
         this.lastSavedNoteText = this.noteText;
         this.noteCacheByShowName[showName] = this.noteText;
+        this.show.Notes = this.noteText;
       } catch (err) {
         console.error('Series: getNote failed', { showName, err });
         // Keep whatever is currently displayed (cached or user-entered).

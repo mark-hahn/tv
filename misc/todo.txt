@@ -1,7 +1,7 @@
 
 bugs ...
   fast-start download problem?
-  
+
 todo both ...
   show last-watched even for non-emby
   show episode
@@ -9,6 +9,7 @@ todo both ...
     being watched (next up line)
 
 todo non-simple:
+  subs for custom srt script
   abort qbt downloading
   remove downloaded qbt
   how to see why qbt or down won't start

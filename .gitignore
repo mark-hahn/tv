@@ -8,5 +8,7 @@ emby-bad.js
 .vscode/bookmarks.json
 temp.txt
 torrents/cookies/qbt-cred.txt
+torrents/cookies/subs-login.txt
+torrents/cookies/subs-token.txt
 samples/**
 torrents/reelgood.log

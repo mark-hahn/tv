@@ -1,0 +1,2332 @@
+{
+  "total_pages": 1,
+  "total_count": 47,
+  "per_page": 50,
+  "page": 1,
+  "data": [
+    {
+      "id": "8985403",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8985403",
+        "language": "en",
+        "download_count": 29,
+        "new_download_count": 319,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 23.976,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-09-05T17:35:03Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s00e28-gag-reel-bloopers-from-season-2",
+        "machine_translated": false,
+        "release": "Cheers - S00E28 - Gag Reel - Bloopers from Season 2",
+        "comments": "",
+        "legacy_subtitle_id": 12710982,
+        "legacy_uploader_id": 10166212,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/en/subtitles/cheers-s00e28-gag-reel-bloopers-from-season-2",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9904218,
+            "cd_number": 1,
+            "file_name": "Cheers - S00E28 - Gag Reel - Bloopers from Season 2.eng"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167728",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167728",
+        "language": "ar",
+        "download_count": 20,
+        "new_download_count": 8,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:59:23Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "273-11x28-cheers-arabic",
+        "machine_translated": false,
+        "release": "273-11x28 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167719,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/273-11x28-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093177,
+            "cd_number": 1,
+            "file_name": "273-11x28 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167727",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167727",
+        "language": "ar",
+        "download_count": 0,
+        "new_download_count": 8,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:59:23Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "272-11x27-cheers-arabic",
+        "machine_translated": false,
+        "release": "272-11x27 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167717,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/272-11x27-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093176,
+            "cd_number": 1,
+            "file_name": "272-11x27 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167726",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167726",
+        "language": "ar",
+        "download_count": 20,
+        "new_download_count": 7,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:59:22Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "271-11x26-cheers-arabic",
+        "machine_translated": false,
+        "release": "271-11x26 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167716,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/271-11x26-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093175,
+            "cd_number": 1,
+            "file_name": "271-11x26 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167725",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167725",
+        "language": "ar",
+        "download_count": 0,
+        "new_download_count": 6,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:58:53Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "245-10x26-cheers-arabic",
+        "machine_translated": false,
+        "release": "245-10x26 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167683,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/245-10x26-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093174,
+            "cd_number": 1,
+            "file_name": "245-10x26 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167723",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167723",
+        "language": "ar",
+        "download_count": 11,
+        "new_download_count": 6,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:58:25Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "208-09x14-cheers-arabic",
+        "machine_translated": false,
+        "release": "208-09x14 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167634,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/208-09x14-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093172,
+            "cd_number": 1,
+            "file_name": "208-09x14 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167724",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167724",
+        "language": "ar",
+        "download_count": 19,
+        "new_download_count": 6,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:58:25Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "209-09x15-cheers-arabic",
+        "machine_translated": false,
+        "release": "209-09x15 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167636,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/209-09x15-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093173,
+            "cd_number": 1,
+            "file_name": "209-09x15 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167722",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167722",
+        "language": "ar",
+        "download_count": 0,
+        "new_download_count": 4,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:58:21Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "207-09x13-cheers-arabic",
+        "machine_translated": false,
+        "release": "207-09x13 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167632,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/207-09x13-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093171,
+            "cd_number": 1,
+            "file_name": "207-09x13 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167721",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167721",
+        "language": "ar",
+        "download_count": 0,
+        "new_download_count": 6,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:58:20Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "206-09x12-cheers-arabic",
+        "machine_translated": false,
+        "release": "206-09x12 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167630,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/206-09x12-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093170,
+            "cd_number": 1,
+            "file_name": "206-09x12 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167719",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167719",
+        "language": "ar",
+        "download_count": 14,
+        "new_download_count": 7,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:58:16Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "204-09x10-cheers-arabic",
+        "machine_translated": false,
+        "release": "204-09x10 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167620,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/204-09x10-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093168,
+            "cd_number": 1,
+            "file_name": "204-09x10 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167720",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167720",
+        "language": "ar",
+        "download_count": 20,
+        "new_download_count": 3,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:58:16Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "205-09x11-cheers-arabic",
+        "machine_translated": false,
+        "release": "205-09x11 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167623,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/205-09x11-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093169,
+            "cd_number": 1,
+            "file_name": "205-09x11 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167718",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167718",
+        "language": "ar",
+        "download_count": 21,
+        "new_download_count": 6,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:58:15Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "203-09x09-cheers-arabic",
+        "machine_translated": false,
+        "release": "203-09x09 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167617,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/203-09x09-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093167,
+            "cd_number": 1,
+            "file_name": "203-09x09 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167717",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167717",
+        "language": "ar",
+        "download_count": 0,
+        "new_download_count": 5,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:56:48Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "105-05x10-cheers-arabic",
+        "machine_translated": false,
+        "release": "105-05x10 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167379,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/105-05x10-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093166,
+            "cd_number": 1,
+            "file_name": "105-05x10 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167715",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167715",
+        "language": "ar",
+        "download_count": 3,
+        "new_download_count": 3,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:56:47Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "103-05x08-cheers-arabic",
+        "machine_translated": false,
+        "release": "103-05x08 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167373,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/103-05x08-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093164,
+            "cd_number": 1,
+            "file_name": "103-05x08 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167716",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167716",
+        "language": "ar",
+        "download_count": 0,
+        "new_download_count": 4,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:56:47Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "104-05x09-cheers-arabic",
+        "machine_translated": false,
+        "release": "104-05x09 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167376,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/104-05x09-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093165,
+            "cd_number": 1,
+            "file_name": "104-05x09 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167714",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167714",
+        "language": "ar",
+        "download_count": 21,
+        "new_download_count": 4,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:56:46Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "102-05x07-cheers-arabic",
+        "machine_translated": false,
+        "release": "102-05x07 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167370,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/102-05x07-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093163,
+            "cd_number": 1,
+            "file_name": "102-05x07 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167713",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167713",
+        "language": "ar",
+        "download_count": 0,
+        "new_download_count": 5,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:56:46Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "101-05x06-cheers-arabic",
+        "machine_translated": false,
+        "release": "101-05x06 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167368,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/101-05x06-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093162,
+            "cd_number": 1,
+            "file_name": "101-05x06 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167712",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167712",
+        "language": "ar",
+        "download_count": 0,
+        "new_download_count": 2,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:56:45Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "100-05x05-cheers-arabic",
+        "machine_translated": false,
+        "release": "100-05x05 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167367,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/100-05x05-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093161,
+            "cd_number": 1,
+            "file_name": "100-05x05 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167711",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167711",
+        "language": "ar",
+        "download_count": 0,
+        "new_download_count": 5,
+        "hearing_impaired": true,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-09T00:55:37Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "001-01x01-cheers-arabic",
+        "machine_translated": false,
+        "release": "001-01x01 - Cheers - Arabic",
+        "comments": "جميع المواسم - ترجمة آلية عربي و عربي / انجليزي مزدوجة ملونة. متوافقة مع االنسخة\r\nhttps://ibit.to/torrent/Cheers-1982-Season-1-11-S1-S11-1080p-AMZN-WEB-DL-x265-HEVC-10bit-EAC3-2-0-ImE--2gTdeZe/\nImported from subscene.com/subtitles/cheers-complete-series/arabic/2929246", 
+        "legacy_subtitle_id": 11167227,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ar/subtitles/001-01x01-cheers-arabic",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093160,
+            "cd_number": 1,
+            "file_name": "001-01x01 - Cheers - Arabic-English"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167695",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167695",
+        "language": "da",
+        "download_count": 4,
+        "new_download_count": 5,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-08T12:54:36Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s11e28-web",
+        "machine_translated": false,
+        "release": "Cheers - S11E28 WEB",
+        "comments": "Tak til TWASERiES\nImported from subscene.com/subtitles/cheers-eleventh-season/danish/2945129",  
+        "legacy_subtitle_id": 11127696,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/da/subtitles/cheers-s11e28-web",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093146,
+            "cd_number": 1,
+            "file_name": "Cheers - S11E28 WEB.dan"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167709",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167709",
+        "language": "da",
+        "download_count": 2,
+        "new_download_count": 5,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-08T12:54:35Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s11e26-web",
+        "machine_translated": false,
+        "release": "Cheers - S11E26 WEB",
+        "comments": "Tak til TWASERiES\nImported from subscene.com/subtitles/cheers-eleventh-season/danish/2945129",  
+        "legacy_subtitle_id": 11127694,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/da/subtitles/cheers-s11e26-web",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093158,
+            "cd_number": 1,
+            "file_name": "Cheers - S11E26 WEB.dan"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167710",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167710",
+        "language": "da",
+        "download_count": 0,
+        "new_download_count": 1,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-08T12:54:35Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s11e27-web",
+        "machine_translated": false,
+        "release": "Cheers - S11E27 WEB",
+        "comments": "Tak til TWASERiES\nImported from subscene.com/subtitles/cheers-eleventh-season/danish/2945129",  
+        "legacy_subtitle_id": 11127695,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/da/subtitles/cheers-s11e27-web",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093159,
+            "cd_number": 1,
+            "file_name": "Cheers - S11E27 WEB.dan"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167708",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167708",
+        "language": "da",
+        "download_count": 0,
+        "new_download_count": 3,
+        "hearing_impaired": false,
+        "hd": true,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-08T12:51:31Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s00e08-web",
+        "machine_translated": false,
+        "release": "Cheers - S00E08 WEB",
+        "comments": "Tak til TWASERiES\nImported from subscene.com/subtitles/cheers-specials/danish/2945117",
+        "legacy_subtitle_id": 11127496,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/da/subtitles/cheers-s00e08-web",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093157,
+            "cd_number": 1,
+            "file_name": "Cheers - S00E08 WEB.dan"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167707",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167707",
+        "language": "da",
+        "download_count": 0,
+        "new_download_count": 1,
+        "hearing_impaired": false,
+        "hd": true,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-08T12:51:31Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s00e02-web",
+        "machine_translated": false,
+        "release": "Cheers - S00E02 WEB",
+        "comments": "Tak til TWASERiES\nImported from subscene.com/subtitles/cheers-specials/danish/2945117",
+        "legacy_subtitle_id": 11127495,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/da/subtitles/cheers-s00e02-web",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093156,
+            "cd_number": 1,
+            "file_name": "Cheers - S00E02 WEB.dan"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167705",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167705",
+        "language": "da",
+        "download_count": 5,
+        "new_download_count": 5,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-07-08T12:51:23Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s10e26-web",
+        "machine_translated": false,
+        "release": "Cheers - S10E26 WEB",
+        "comments": "Tak til TWASERiES\nImported from subscene.com/subtitles/cheers-tenth-season/danish/2945128",     
+        "legacy_subtitle_id": 11127484,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/da/subtitles/cheers-s10e26-web",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093155,
+            "cd_number": 1,
+            "file_name": "Cheers - S10E26 WEB.dan"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167702",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167702",
+        "language": "no",
+        "download_count": 0,
+        "new_download_count": 8,
+        "hearing_impaired": false,
+        "hd": true,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-06-24T01:49:12Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s00e08e01-nordic-1080p-web-dl-h-264-dd2-0-twaseries",
+        "machine_translated": false,
+        "release": "Cheers.S00E08E01.NORDiC.1080p.WEB-DL.H.264.DD2.0-TWASERiES",
+        "comments": "Cheers 200th Anniversary Special\nImported from subscene.com/subtitles/cheers-specials/norwegian/3210393",
+        "legacy_subtitle_id": 10502805,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/no/subtitles/cheers-s00e08e01-nordic-1080p-web-dl-h-264-dd2-0-twaseries",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093152,
+            "cd_number": 1,
+            "file_name": "Cheers.S00E08E01.NORDiC.1080p.WEB-DL.H.264.DD2.0-TWASERiES.no"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167703",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167703",
+        "language": "no",
+        "download_count": 0,
+        "new_download_count": 5,
+        "hearing_impaired": false,
+        "hd": true,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-06-24T01:49:12Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s00e08e02-nordic-1080p-web-dl-h-264-dd2-0-twaseries",
+        "machine_translated": false,
+        "release": "Cheers.S00E08E02.NORDiC.1080p.WEB-DL.H.264.DD2.0-TWASERiES",
+        "comments": "Cheers 200th Anniversary Special\nImported from subscene.com/subtitles/cheers-specials/norwegian/3210393",
+        "legacy_subtitle_id": 10502806,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/no/subtitles/cheers-s00e08e02-nordic-1080p-web-dl-h-264-dd2-0-twaseries",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093153,
+            "cd_number": 1,
+            "file_name": "Cheers.S00E08E02.NORDiC.1080p.WEB-DL.H.264.DD2.0-TWASERiES.no"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167700",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167700",
+        "language": "no",
+        "download_count": 0,
+        "new_download_count": 2,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-06-24T01:47:37Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s11e28-nordic-540p-web-dl-h-264-dd2-0-twaseries",
+        "machine_translated": false,
+        "release": "Cheers.S11E28.NORDiC.540p.WEB-DL.H.264.DD2.0-TWASERiES",
+        "comments": "Imported from subscene.com/subtitles/cheers-eleventh-season/norwegian/3210408",
+        "legacy_subtitle_id": 10502687,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/no/subtitles/cheers-s11e28-nordic-540p-web-dl-h-264-dd2-0-twaseries",   
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093151,
+            "cd_number": 1,
+            "file_name": "Cheers.S11E28.NORDiC.540p.WEB-DL.H.264.DD2.0-TWASERiES.no"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167698",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167698",
+        "language": "no",
+        "download_count": 1,
+        "new_download_count": 2,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-06-24T01:47:36Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s11e26-nordic-540p-web-dl-h-264-dd2-0-twaseries",
+        "machine_translated": false,
+        "release": "Cheers.S11E26.NORDiC.540p.WEB-DL.H.264.DD2.0-TWASERiES",
+        "comments": "Imported from subscene.com/subtitles/cheers-eleventh-season/norwegian/3210408",
+        "legacy_subtitle_id": 10502685,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/no/subtitles/cheers-s11e26-nordic-540p-web-dl-h-264-dd2-0-twaseries",   
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093149,
+            "cd_number": 1,
+            "file_name": "Cheers.S11E26.NORDiC.540p.WEB-DL.H.264.DD2.0-TWASERiES.no"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167699",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167699",
+        "language": "no",
+        "download_count": 3,
+        "new_download_count": 5,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-06-24T01:47:36Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s11e27-nordic-540p-web-dl-h-264-dd2-0-twaseries",
+        "machine_translated": false,
+        "release": "Cheers.S11E27.NORDiC.540p.WEB-DL.H.264.DD2.0-TWASERiES",
+        "comments": "Imported from subscene.com/subtitles/cheers-eleventh-season/norwegian/3210408",
+        "legacy_subtitle_id": 10502686,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/no/subtitles/cheers-s11e27-nordic-540p-web-dl-h-264-dd2-0-twaseries",   
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093150,
+            "cd_number": 1,
+            "file_name": "Cheers.S11E27.NORDiC.540p.WEB-DL.H.264.DD2.0-TWASERiES.no"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8167697",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "8167697",
+        "language": "no",
+        "download_count": 1,
+        "new_download_count": 2,
+        "hearing_impaired": false,
+        "hd": true,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2024-06-24T01:45:48Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s10e26-nordic-1080p-web-dl-h-264-dd2-0-twaseries",
+        "machine_translated": false,
+        "release": "Cheers.S10E26.NORDiC.1080p.WEB-DL.H.264.DD2.0-TWASERiES",
+        "comments": "Imported from subscene.com/subtitles/cheers-tenth-season/norwegian/3210406",
+        "legacy_subtitle_id": 10502569,
+        "legacy_uploader_id": 10030650,
+        "uploader": {
+          "uploader_id": null,
+          "name": "Anonymous",
+          "rank": "anonymous"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/no/subtitles/cheers-s10e26-nordic-1080p-web-dl-h-264-dd2-0-twaseries",  
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 9093148,
+            "cd_number": 1,
+            "file_name": "Cheers.S10E26.NORDiC.1080p.WEB-DL.H.264.DD2.0-TWASERiES.no"
+          }
+        ]
+      }
+    },
+    {
+      "id": "7529651",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "7529651",
+        "language": "fr",
+        "download_count": 34,
+        "new_download_count": 6,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 24,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2023-12-07T09:50:43Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers_s09e27-1990-vff-web-dl",
+        "machine_translated": false,
+        "release": "Cheers_S09E27.1990.VFF.WEB-DL",        
+        "comments": "",
+        "legacy_subtitle_id": 9812536,
+        "legacy_uploader_id": 177296,
+        "uploader": {
+          "uploader_id": 37111,
+          "name": "fafa2706",
+          "rank": "Bronze Member"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/fr/subtitles/cheers_s09e27-1990-vff-web-dl",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 8459292,
+            "cd_number": 1,
+            "file_name": "Cheers_S09E27.1990.VFF.WEB-DL"   
+          }
+        ]
+      }
+    },
+    {
+      "id": "7224827",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "7224827",
+        "language": "pt-PT",
+        "download_count": 48,
+        "new_download_count": 9,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": true,
+        "foreign_parts_only": false,
+        "upload_date": "2023-06-14T01:52:55Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s11e28-one-for-the-road-part-3",   
+        "machine_translated": false,
+        "release": "Cheers.S11E28.One.For.The.Road.Part.3",
+        "comments": "",
+        "legacy_subtitle_id": 9601679,
+        "legacy_uploader_id": 4625227,
+        "uploader": {
+          "uploader_id": 77461,
+          "name": "nunocobain4",
+          "rank": "Trusted member"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/pt-PT/subtitles/cheers-s11e28-one-for-the-road-part-3",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 8159907,
+            "cd_number": 1,
+            "file_name": "Cheers.S11E28.One.For.The.Road.Part.3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "7224820",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "7224820",
+        "language": "pt-PT",
+        "download_count": 39,
+        "new_download_count": 8,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": true,
+        "foreign_parts_only": false,
+        "upload_date": "2023-06-14T01:25:22Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s11e27-one-for-the-road-part-2",   
+        "machine_translated": false,
+        "release": "Cheers.S11E27.One.For.The.Road.Part.2",
+        "comments": "",
+        "legacy_subtitle_id": 9601672,
+        "legacy_uploader_id": 4625227,
+        "uploader": {
+          "uploader_id": 77461,
+          "name": "nunocobain4",
+          "rank": "Trusted member"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/pt-PT/subtitles/cheers-s11e27-one-for-the-road-part-2",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 8159900,
+            "cd_number": 1,
+            "file_name": "Cheers.S11E27.One.For.The.Road.Part.2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "7219311",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "7219311",
+        "language": "pt-PT",
+        "download_count": 30,
+        "new_download_count": 5,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": true,
+        "foreign_parts_only": false,
+        "upload_date": "2023-06-09T17:40:41Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "9596473-cheers-s10e26-an-old-fashioned-wedding-part-2",
+        "machine_translated": false,
+        "release": "Cheers.S10E26.An.Old.Fashioned.Wedding.Part.2",
+        "comments": "",
+        "legacy_subtitle_id": 9596473,
+        "legacy_uploader_id": 4625227,
+        "uploader": {
+          "uploader_id": 77461,
+          "name": "nunocobain4",
+          "rank": "Trusted member"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/pt-PT/subtitles/9596473-cheers-s10e26-an-old-fashioned-wedding-part-2", 
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 8154384,
+            "cd_number": 1,
+            "file_name": "Cheers.S10E26.An.Old.Fashioned.Wedding.Part.2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "7219267",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "7219267",
+        "language": "pt-PT",
+        "download_count": 37,
+        "new_download_count": 7,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": true,
+        "foreign_parts_only": false,
+        "upload_date": "2023-06-09T17:24:52Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s10e26-an-old-fashioned-wedding-part-2",
+        "machine_translated": false,
+        "release": "Cheers.S10E26.An.Old.Fashioned.Wedding.Part.2",
+        "comments": "",
+        "legacy_subtitle_id": 9596451,
+        "legacy_uploader_id": 4625227,
+        "uploader": {
+          "uploader_id": 77461,
+          "name": "nunocobain4",
+          "rank": "Trusted member"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/pt-PT/subtitles/cheers-s10e26-an-old-fashioned-wedding-part-2",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 8154339,
+            "cd_number": 1,
+            "file_name": "Cheers.S10E26.An.Old.Fashioned.Wedding.Part.2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "7211737",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "7211737",
+        "language": "pt-PT",
+        "download_count": 23,
+        "new_download_count": 5,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": true,
+        "foreign_parts_only": false,
+        "upload_date": "2023-06-04T23:41:21Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s09e27-uncle-sam-wants-you",       
+        "machine_translated": false,
+        "release": "Cheers.S09E27.Uncle.Sam.Wants.You",    
+        "comments": "",
+        "legacy_subtitle_id": 9589383,
+        "legacy_uploader_id": 4625227,
+        "uploader": {
+          "uploader_id": 77461,
+          "name": "nunocobain4",
+          "rank": "Trusted member"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/pt-PT/subtitles/cheers-s09e27-uncle-sam-wants-you",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 8146908,
+            "cd_number": 1,
+            "file_name": "Cheers.S09E27.Uncle.Sam.Wants.You"
+          }
+        ]
+      }
+    },
+    {
+      "id": "7256429",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "7256429",
+        "language": "ro",
+        "download_count": 52,
+        "new_download_count": 10,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 23.976,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2022-06-11T15:37:43Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s10e26",
+        "machine_translated": false,
+        "release": "Cheers s10e26",
+        "comments": "",
+        "legacy_subtitle_id": 9132899,
+        "legacy_uploader_id": 1413146,
+        "uploader": {
+          "uploader_id": 58888,
+          "name": "coate_goale",
+          "rank": "Gold member"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/ro/subtitles/cheers-s10e26",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 8191252,
+            "cd_number": 1,
+            "file_name": "1026 An Old Fashioned Wedding Pt 2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "7256425",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "7256425",
+        "language": "nl",
+        "download_count": 95,
+        "new_download_count": 8,
+        "hearing_impaired": false,
+        "hd": true,
+        "fps": 23.98,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2022-02-06T11:23:41Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-1982-s09e27-uncle-sam-wants-you-1080p-amzn-web-dl-x265-ime-1",
+        "machine_translated": false,
+        "release": "Cheers (1982) - S09E27 - Uncle Sam Wants You (1080p AMZN WEB-DL x265 ImE)-1",
+        "comments": "",
+        "legacy_subtitle_id": 8970769,
+        "legacy_uploader_id": 0,
+        "uploader": {
+          "uploader_id": 3282,
+          "name": "os-auto",
+          "rank": "Application Developers"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/nl/subtitles/cheers-1982-s09e27-uncle-sam-wants-you-1080p-amzn-web-dl-x265-ime-1",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 8191250,
+            "cd_number": 1,
+            "file_name": "Cheers (1982) - S09E27 - Uncle Sam Wants You (1080p AMZN WEB-DL x265 ImE)-1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "5657814",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "5657814",
+        "language": "nl",
+        "download_count": 80,
+        "new_download_count": 15,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2020-11-02T11:31:45Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "season9-ep-28",
+        "machine_translated": false,
+        "release": "Season9 Ep 28",
+        "comments": "",
+        "legacy_subtitle_id": 8406971,
+        "legacy_uploader_id": 0,
+        "uploader": {
+          "uploader_id": 3282,
+          "name": "os-auto",
+          "rank": "Application Developers"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/nl/subtitles/season9-ep-28",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 6691173,
+            "cd_number": 1,
+            "file_name": "Cheers S11E28 One for the Road Pt 3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "7256346",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "7256346",
+        "language": "nl",
+        "download_count": 59,
+        "new_download_count": 7,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2020-11-02T11:30:26Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "season9-ep-27",
+        "machine_translated": false,
+        "release": "Season9 Ep 27",
+        "comments": "",
+        "legacy_subtitle_id": 8406970,
+        "legacy_uploader_id": 0,
+        "uploader": {
+          "uploader_id": 3282,
+          "name": "os-auto",
+          "rank": "Application Developers"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/nl/subtitles/season9-ep-27",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 8191234,
+            "cd_number": 1,
+            "file_name": "Cheers S11E27 One for the Road Pt 2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "7256400",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "7256400",
+        "language": "nl",
+        "download_count": 134,
+        "new_download_count": 13,
+        "hearing_impaired": false,
+        "hd": true,
+        "fps": 0,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2020-10-01T19:23:30Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s10e26-an-old-fashioned-wedding-pt-2-1080p-web-dl-aac2-0-h-264-ntb",
+        "machine_translated": false,
+        "release": "Cheers.S10E26.An.Old.Fashioned.Wedding.Pt.2.1080p.WEB-DL.AAC2.0.H.264-NTb",
+        "comments": "1080p.WEB-DL.AAC2.0.H.264-NTb",       
+        "legacy_subtitle_id": 8371986,
+        "legacy_uploader_id": 0,
+        "uploader": {
+          "uploader_id": 3282,
+          "name": "os-auto",
+          "rank": "Application Developers"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/nl/subtitles/cheers-s10e26-an-old-fashioned-wedding-pt-2-1080p-web-dl-aac2-0-h-264-ntb",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 8191249,
+            "cd_number": 1,
+            "file_name": "Cheers.S10E26.An.Old.Fashioned.Wedding.Pt.2.1080p.WEB-DL.AAC2.0.H.264-NTb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "7256394",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "7256394",
+        "language": "pt-BR",
+        "download_count": 122,
+        "new_download_count": 9,
+        "hearing_impaired": false,
+        "hd": true,
+        "fps": 23.976,
+        "votes": 1,
+        "ratings": 10,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2019-05-17T23:38:26Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s11e27-720p-web-x264-galaxytv",    
+        "machine_translated": false,
+        "release": "Cheers.S11E27.720p.WEB.x264-GalaxyTV", 
+        "comments": "Legendas ressincronizadas e renomeadas para este release.",
+        "legacy_subtitle_id": 7767161,
+        "legacy_uploader_id": 7152636,
+        "uploader": {
+          "uploader_id": 228210,
+          "name": "vini_cinema",
+          "rank": "Gold member"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/pt-BR/subtitles/cheers-s11e27-720p-web-x264-galaxytv",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 8191248,
+            "cd_number": 1,
+            "file_name": "Cheers.S11E27.720p.WEB.x264-GalaxyTV"
+          }
+        ]
+      }
+    },
+    {
+      "id": "5018793",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "5018793",
+        "language": "pt-BR",
+        "download_count": 133,
+        "new_download_count": 11,
+        "hearing_impaired": false,
+        "hd": true,
+        "fps": 23.976,
+        "votes": 1,
+        "ratings": 10,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2019-05-17T23:38:26Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-s11e28-720p-web-x264-galaxytv",    
+        "machine_translated": false,
+        "release": "Cheers.S11E28.720p.WEB.x264-GalaxyTV", 
+        "comments": "Legendas ressincronizadas e renomeadas para este release.",
+        "legacy_subtitle_id": 7767162,
+        "legacy_uploader_id": 7152636,
+        "uploader": {
+          "uploader_id": 228210,
+          "name": "vini_cinema",
+          "rank": "Gold member"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/pt-BR/subtitles/cheers-s11e28-720p-web-x264-galaxytv",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 5141350,
+            "cd_number": 1,
+            "file_name": "Cheers.S11E28.720p.WEB.x264-GalaxyTV"
+          }
+        ]
+      }
+    },
+    {
+      "id": "4296434",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "4296434",
+        "language": "hr",
+        "download_count": 65,
+        "new_download_count": 6,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 23.976,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2016-07-10T00:13:49Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "6680236-cheers-21",
+        "machine_translated": false,
+        "release": "Cheers 21",
+        "comments": "",
+        "legacy_subtitle_id": 6680236,
+        "legacy_uploader_id": 0,
+        "uploader": {
+          "uploader_id": 3282,
+          "name": "os-auto",
+          "rank": "Application Developers"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/hr/subtitles/6680236-cheers-21",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 4385379,
+            "cd_number": 1,
+            "file_name": "Cheers 21"
+          }
+        ]
+      }
+    },
+    {
+      "id": "4296446",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "4296446",
+        "language": "hr",
+        "download_count": 52,
+        "new_download_count": 5,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 23.976,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": false,
+        "foreign_parts_only": false,
+        "upload_date": "2016-07-10T00:13:49Z",
+        "ai_translated": false,
+        "nb_cd": 1,
+        "slug": "cheers-22",
+        "machine_translated": false,
+        "release": "Cheers 22",
+        "comments": "",
+        "legacy_subtitle_id": 6680237,
+        "legacy_uploader_id": 0,
+        "uploader": {
+          "uploader_id": 3282,
+          "name": "os-auto",
+          "rank": "Application Developers"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/hr/subtitles/cheers-22",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 4385391,
+            "cd_number": 1,
+            "file_name": "Cheers 22"
+          }
+        ]
+      }
+    },
+    {
+      "id": "4296026",
+      "type": "subtitle",
+      "attributes": {
+        "subtitle_id": "4296026",
+        "language": "en",
+        "download_count": 428,
+        "new_download_count": 74,
+        "hearing_impaired": false,
+        "hd": false,
+        "fps": 25,
+        "votes": 0,
+        "ratings": 0,
+        "from_trusted": true,
+        "foreign_parts_only": false,
+        "upload_date": "2009-11-21T11:36:10Z",
+        "ai_translated": false,
+        "nb_cd": 5,
+        "slug": "cheers-s02-bonus",
+        "machine_translated": false,
+        "release": "Cheers.S02.Bonus.",
+        "comments": "",
+        "legacy_subtitle_id": 3596173,
+        "legacy_uploader_id": 510761,
+        "uploader": {
+          "uploader_id": 42455,
+          "name": "MrLifestyles",
+          "rank": "Trusted member"
+        },
+        "feature_details": {
+          "feature_id": 644054,
+          "feature_type": "Tvshow",
+          "year": 1982,
+          "title": "Cheers",
+          "movie_name": "1982 - Cheers",
+          "imdb_id": 83399,
+          "tmdb_id": 141
+        },
+        "url": "https://www.opensubtitles.com/en/subtitles/cheers-s02-bonus",
+        "related_links": null,
+        "files": [
+          {
+            "file_id": 4385017,
+            "cd_number": 1,
+            "file_name": "Cheers.S02.Bonus.1.-.The.Guys.Behind.The.Bar.DVDRip.XviD-FPM"
+          },
+          {
+            "file_id": 4385021,
+            "cd_number": 2,
+            "file_name": "Cheers.S02.Bonus.2.-.The.Wisdom.Of.Cliff.Claven.DVDRip.XviD-FPM"
+          },
+          {
+            "file_id": 4385024,
+            "cd_number": 3,
+            "file_name": "Cheers.S02.Bonus.3.-.Carla.The.Comeback.Queen.DVDRip.XviD-FPM"
+          },
+          {
+            "file_id": 4385026,
+            "cd_number": 4,
+            "file_name": "Cheers.S02.Bonus.4.-.Diane.Chambers.From.A.To.Z.DVDRip.XviD-FPM"
+          },
+          {
+            "file_id": 4385027,
+            "cd_number": 5,
+            "file_name": "Cheers.S02.Bonus.5.-.Gag.Reel.DVDRip.XviD-FPM"
+          }
+        ]
+      }
+    }
+  ]
+}
+PS C:\Users\mark\apps\tv-series-client> 

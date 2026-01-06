@@ -3,6 +3,11 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-add a tab Subs with a pane over series pane. put it in src/components/subs.vue.  the tab should be between Tor and Flex.  
+i will be using the opensubtitles api. describe the api and the different access commands.  store the description in misc/notes.txt
 
-- to start with copy the Tor pane complete with header and cards pane except remove the Force and Cookies buttons and remove the second line in the header.  the search button shouldn't be wired to anything for now
+- move subs tab to between Down and Files
+
+- when the subs pane search button is presses do a search using an imdb id from the selected show.  the command looks like "node misc/subs-curl.js search --imdb-id <imdb id> download" if you get a not logged in error then login using ""
+
+tt0083399
+when the subs pane is loaded get the token

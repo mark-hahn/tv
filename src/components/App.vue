@@ -69,6 +69,15 @@
             :activeShow="currentShow"
           )
 
+          Subs(
+            v-if="!simpleMode"
+            v-show="currentPane === 'subs'"
+            style="width:100%; height:100%;"
+            :simpleMode="simpleMode"
+            :sizing="activeSizing"
+            :activeShow="currentShow"
+          )
+
           Flex(
             v-if="!simpleMode"
             v-show="currentPane === 'flex'"
@@ -179,6 +188,15 @@
           :activeShow="currentShow"
         )
 
+        Subs(
+          v-if="!simpleMode"
+          v-show="currentPane === 'subs'"
+          style="width:100%; height:100%;"
+          :simpleMode="simpleMode"
+          :sizing="activeSizing"
+          :activeShow="currentShow"
+        )
+
         Flex(
           v-if="!simpleMode"
           v-show="currentPane === 'flex'"
@@ -263,6 +281,7 @@ import Actors   from './actors.vue';
 import Buttons  from './buttons.vue';
 import Reel     from './reel.vue';
 import Torrents from './torrents.vue';
+import Subs     from './subs.vue';
 import Flex     from './flex.vue';
 import History  from './history.vue';
 import TvProc   from './tvproc.vue';
@@ -273,12 +292,12 @@ import { config } from '../config.js';
 
 export default {
   name: "App",
-  components: { List, Series, Map, Actors, Buttons, Reel, Torrents, Flex, History, TvProc, FilePane },
+  components: { List, Series, Map, Actors, Buttons, Reel, Torrents, Subs, Flex, History, TvProc, FilePane },
   data() { 
     return { 
       // Must be known before first render so non-simple panes never mount in simple mode.
       simpleMode: new URLSearchParams(window.location.search).has('simple'),
-      currentPane: 'series', // 'series', 'map', 'actors', 'torrents', 'flex', 'history', 'tvproc', or 'file'
+      currentPane: 'series', // 'series', 'map', 'actors', 'torrents', 'subs', 'flex', 'history', 'tvproc', or 'file'
       currentTvdbData: null,
       currentShow: null,
       _torrentsInitialized: false,
@@ -479,6 +498,7 @@ export default {
         { label: 'Actors', key: 'actors' },
         { label: 'Reel', key: 'reel' },
         { label: 'Tor', key: 'torrents' },
+        { label: 'Subs', key: 'subs' },
         { label: 'Flex', key: 'flex' },
         { label: 'Qbt', key: 'history' },
         { label: 'Down', key: 'tvproc' },
@@ -858,6 +878,13 @@ export default {
           this.currentPane = 'torrents';
           evtBus.emit('paneChanged', this.currentPane);
         }
+        return;
+      }
+
+      if (k === 'subs') {
+        if (this.simpleMode) return;
+        this.currentPane = 'subs';
+        evtBus.emit('paneChanged', this.currentPane);
         return;
       }
 

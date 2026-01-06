@@ -3,3 +3,6 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
+add a tab Subs with a pane over series pane. put it in src/components/subs.vue.  the tab should be between Tor and Flex.  
+
+- to start with copy the Tor pane complete with header and cards pane except remove the Force and Cookies buttons and remove the second line in the header.  the search button shouldn't be wired to anything for now

@@ -1456,7 +1456,10 @@ export default {
           if(finished) filteredShows.push(show);
           continue;
         }
-        if (srchStrLc && !show.Name.toLowerCase().includes(srchStrLc)) continue;
+        if (srchStrLc && !show.Name.toLowerCase().includes(srchStrLc)) {
+          const noteLc = String(show?.Notes ?? '').toLowerCase();
+          if (!noteLc.includes(srchStrLc)) continue;
+        }
         for (let cond of this.conds) {
           if ( cond.filter ===  0) continue;
           if ((cond.filter === +1) != (!!cond.cond(show)))

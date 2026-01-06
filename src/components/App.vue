@@ -498,10 +498,10 @@ export default {
         { label: 'Actors', key: 'actors' },
         { label: 'Reel', key: 'reel' },
         { label: 'Tor', key: 'torrents' },
-        { label: 'Subs', key: 'subs' },
         { label: 'Flex', key: 'flex' },
         { label: 'Qbt', key: 'history' },
         { label: 'Down', key: 'tvproc' },
+        { label: 'Subs', key: 'subs' },
         { label: 'Files', key: 'file' }
       ];
 

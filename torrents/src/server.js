@@ -47,6 +47,119 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+const OPENSUBTITLES_BASE_URL = 'https://api.opensubtitles.com/api/v1';
+
+function getRootSecretsDir() {
+  // torrents/src -> torrents -> repo root -> secrets
+  return path.resolve(__dirname, '..', '..', 'secrets');
+}
+
+function getSubsLoginPath() {
+  return path.join(getRootSecretsDir(), 'subs-login.txt');
+}
+
+function getSubsTokenPath() {
+  return path.join(getRootSecretsDir(), 'subs-token.txt');
+}
+
+async function readTextIfExists(filePath) {
+  try {
+    const txt = await fs.promises.readFile(filePath, 'utf8');
+    return String(txt || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+async function readJsonIfExists(filePath) {
+  try {
+    const txt = await fs.promises.readFile(filePath, 'utf8');
+    return JSON.parse(txt);
+  } catch {
+    return null;
+  }
+}
+
+async function writeTextFile(filePath, text) {
+  await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.promises.writeFile(filePath, String(text || '') + '\n', 'utf8');
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function osFetchJson(url, { apiKey, token, method = 'GET', jsonBody } = {}) {
+  const headers = {
+    Accept: 'application/json',
+    // Some edge/CDN configurations behave better when a UA is present.
+    'User-Agent': 'tv-series-client/1.0 (torrents-proxy)',
+    'X-User-Agent': 'tv-series-client/1.0 (torrents-proxy)',
+  };
+  if (apiKey) headers['Api-Key'] = apiKey;
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  let body;
+  if (jsonBody !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    body = JSON.stringify(jsonBody);
+  }
+
+  const resp = await fetch(url, { method, headers, body });
+  const text = await resp.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+
+  return {
+    ok: resp.ok,
+    status: resp.status,
+    statusText: resp.statusText,
+    data,
+    text,
+  };
+}
+
+async function osLoginAndPersistToken() {
+  const loginPath = getSubsLoginPath();
+  const login = await readJsonIfExists(loginPath);
+  const apiKey = String(login?.apiKey || '').trim();
+  const username = String(login?.username || '').trim();
+  const password = String(login?.password || '').trim();
+  if (!apiKey || !username || !password) {
+    throw new Error(`Missing apiKey/username/password in ${loginPath}`);
+  }
+
+  const resp = await osFetchJson(`${OPENSUBTITLES_BASE_URL}/login`, {
+    apiKey,
+    method: 'POST',
+    jsonBody: { username, password },
+  });
+
+  if (!resp.ok) {
+    const detail = resp.data ? JSON.stringify(resp.data) : resp.text;
+    throw new Error(`OpenSubtitles login failed: HTTP ${resp.status} ${resp.statusText} ${detail}`);
+  }
+
+  const token = String(resp.data?.token || '').trim();
+  if (!token) {
+    throw new Error('OpenSubtitles login response missing token');
+  }
+  await writeTextFile(getSubsTokenPath(), token);
+  return { apiKey, token };
+}
+
+function normalizeImdbIdToDigits(imdbId) {
+  const raw = String(imdbId || '').trim();
+  if (!raw) return '';
+  const s = raw.toLowerCase().startsWith('tt') ? raw.slice(2) : raw;
+  const digits = s.replace(/\D/g, '');
+  return digits;
+}
+
 async function loadLocalCfClearance(provider) {
   try {
     const p = String(provider || '').trim();
@@ -232,6 +345,88 @@ app.get('/api/search', async (req, res) => {
   } catch (error) {
     console.error('Search error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/subs/search?imdb_id=1234567&page=1
+// GET /api/subs/search?q=tt0083399&page=1
+// GET /api/subs/search?q=osdb:18563&page=1
+// - Reads secrets/subs-login.txt (JSON: {apiKey, username, password})
+// - Uses secrets/subs-token.txt (token string)
+// - If not logged in, auto-logins and retries once
+app.get('/api/subs/search', async (req, res) => {
+  try {
+    const qRaw = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const imdbIdDigits = normalizeImdbIdToDigits(req.query.imdb_id);
+    if (!qRaw && !imdbIdDigits) {
+      return res.status(400).json({ error: 'imdb_id or q query parameter required' });
+    }
+
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+
+    const loginPath = getSubsLoginPath();
+    const login = await readJsonIfExists(loginPath);
+    const apiKey = String(login?.apiKey || '').trim();
+    if (!apiKey) {
+      return res.status(500).json({ error: `Missing apiKey in ${loginPath}` });
+    }
+
+    let token = await readTextIfExists(getSubsTokenPath());
+
+    const url = new URL(`${OPENSUBTITLES_BASE_URL}/subtitles`);
+    if (qRaw) {
+      url.searchParams.set('query', qRaw);
+    } else {
+      // For TV shows, OpenSubtitles stores most episode subtitles under the *parent* (series) imdb id.
+      // Using imdb_id here often returns only a tiny subset.
+      url.searchParams.set('parent_imdb_id', imdbIdDigits);
+    }
+    url.searchParams.set('page', String(page));
+
+    // Hint to reduce payload; client still filters.
+    url.searchParams.set('languages', 'en');
+
+    const transientStatuses = new Set([429, 500, 502, 503, 504, 520, 522, 524]);
+
+    const fetchWithRetry = async () => {
+      let last = null;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        last = await osFetchJson(url.toString(), { apiKey, token });
+        if (last.ok) return last;
+        if (!transientStatuses.has(last.status)) return last;
+        await sleep(300 * (attempt + 1) * (attempt + 1));
+      }
+      return last;
+    };
+
+    let resp = await fetchWithRetry();
+
+    // OpenSubtitles auth errors are typically 401/403.
+    if (!resp.ok && (resp.status === 401 || resp.status === 403)) {
+      const fresh = await osLoginAndPersistToken();
+      token = fresh.token;
+      resp = await fetchWithRetry();
+    }
+
+    if (!resp.ok) {
+      let detail = resp.data || resp.text;
+      if (typeof detail === 'string') {
+        const s = detail.trim();
+        if (s.toLowerCase().includes('<!doctype html') || s.toLowerCase().includes('<html')) {
+          detail = s.slice(0, 1200);
+        }
+      }
+      res.status(resp.status || 500).json({
+        error: `OpenSubtitles subtitles request failed: HTTP ${resp.status} ${resp.statusText}`,
+        detail,
+      });
+      return;
+    }
+
+    res.json(resp.data);
+  } catch (error) {
+    console.error('[subs] search error:', error);
+    res.status(500).json({ error: error?.message || String(error) });
   }
 });
 

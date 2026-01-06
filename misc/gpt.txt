@@ -3,11 +3,71 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-i will be using the opensubtitles api. describe the api and the different access commands.  store the description in misc/notes.txt
-
 - move subs tab to between Down and Files
 
-- when the subs pane search button is presses do a search using an imdb id from the selected show.  the command looks like "node misc/subs-curl.js search --imdb-id <imdb id> download" if you get a not logged in error then login using ""
+- when the pane is loaded before search button is pressed show "Press search to load subtitles." in center of pane.
 
-tt0083399
-when the subs pane is loaded get the token
+- when the subs pane search button is pressed do a search using an imdb id from the selected show. use secrets/subs-token.txt. if you get a not logged in error then login using using secrets/subs-login.txt, write secrets/subs-token.txt, and try again.
+
+- if the search results are empty (total_pages == 0) show "No subtitles found." in the center of the pane and do nothing else.
+
+- load the entries from "data" property array into the array var "searchResults" that meet this citeria:
+    data.type "subtitle",
+    data.attributes.language "en",
+    and data.attributes.feature_details.feature_type "Tvshow".
+
+for each entry:
+  if total_count is greater than per_page then load the rest of the pages.
+
+- log the first entry of searchResults.
+
+- populate the cards with data from searchResults. the format should be:
+
+line 1: "S<season>E<episode> <data.attributes.release>"
+line 2: "<5 spaces><data.attributes.uploader.name> <data.attributes.ai_translated> <data.attributes.machine_translated>"
+
+where <season> and <episode> are from running parse-torrent-title on data.attributes.release.
+
+skip any false valued field data.attributes.machine_translated or data.attributes.machine_translated.
+
+
+
+
+
+remove proxy for secrets/subs-login.txt and secrets/subs-token.txt.  i will store them in tv-series-srvr in the hahnca.com server.
+
+
+
+to get them call use  "export function getSubsSecrets() {return fCall('getDevices')} in srvr.js to call getSubsSecrets.
+
+when i searched Cheers show before i got the json in misc/subs-cheers.json. but using the new search button I got only these two:
+
+S02E28 Cheers - S00E28 - Gag Reel - Bloopers from Season 2 Anonymous
+S02E?? Cheers.S02.Bonus. MrLifestyles
+
+what is blocking the others?
+
+the home page opensubtitles.com Cheers search gave an imdb id tt0083399 which worked -- do we have that?
+
+the samples/sample-shows/show.json has:
+  "ExternalUrls": [
+    {
+      "Name": "IMDb",
+      "Url": "https://www.imdb.com/title/tt5511512"
+    },
+
+log the first entry that has episode S?? or E??
+
+
+if that parse fails try using data.attributes.url.  if parse-torrent-title fails they looking for SxxEyy yourself.  
+
+here is an example: "url": "https://www.opensubtitles.com/da/subtitles/cheers-s11e28-web", 
+
+-- and if that fails try the same things on every entry in the array data.attributes.files with property file_name. an example of files is:         "files": [
+          {
+            "file_id": 9093146,
+            "cd_number": 1,
+            "file_name": "Cheers - S11E28 WEB.dan"
+          }
+        ]
+

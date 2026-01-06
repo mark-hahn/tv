@@ -3,4 +3,3 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-using filter input box in #hdrtop is not including notes field in shows

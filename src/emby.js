@@ -403,7 +403,13 @@ export function startGapWorker(allShows, cb) {
       show.NotReady = true;
       continue;
     }
-    allShowsIdName.push([id, show.Name]);
+    const tvdbData = allTvdb?.[show.Name] || {};
+    allShowsIdName.push({
+      showId: id,
+      showName: show.Name,
+      firstAired: tvdbData.firstAired,
+      tvdbStatus: tvdbData.status,
+    });
   }
   gapWorker.onmessage = cb;
   gapWorker.postMessage({cred, allShowsIdName});
@@ -420,7 +426,13 @@ export function startUpdateWorker(allShows, cb) {
       show.NotReady = true;
       continue;
     }
-    allShowsIdName.push([id, show.Name]);
+    const tvdbData = allTvdb?.[show.Name] || {};
+    allShowsIdName.push({
+      showId: id,
+      showName: show.Name,
+      firstAired: tvdbData.firstAired,
+      tvdbStatus: tvdbData.status,
+    });
   }
   gapWorker.onmessage = cb;
   gapWorker.postMessage({cred, allShowsIdName});

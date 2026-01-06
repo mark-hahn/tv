@@ -3,7 +3,14 @@ import * as urls from "./urls.js";
 
 let cred;
 
-const getShowState = async (showId, _showName) => {
+const toYyyyMmDd = (d) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getShowState = async (showId, _showName, showMeta) => {
   // active rows have watched with no watched at end
   // or last epi in last row watched
   let firstEpisode            = true;
@@ -29,6 +36,7 @@ const getShowState = async (showId, _showName) => {
   let firstNoFileEpisode       = null;
   let anyUnaired              = false;
   let sawAnyEpisode           = false;
+  let anyAiredEpisode         = false;
 
   try {
     let seasonsRes;
@@ -86,6 +94,7 @@ const getShowState = async (showId, _showName) => {
         if(watched) unaired = false;
         else if(unaired) unairedFromHere = true;
         if(unaired) anyUnaired = true;
+        if(!unaired) anyAiredEpisode = true;
 
         // Track the first aired episode that has no file.
         if(!unaired && !haveFile && firstNoFileSeason === null) {
@@ -152,14 +161,31 @@ const getShowState = async (showId, _showName) => {
       lastSeasonWatched = allSeasonWatched;
     }
 
+    const allEpisodesUnaired = sawAnyEpisode && anyUnaired && !anyAiredEpisode;
+    const showStatus = String(showMeta?.tvdbStatus || '').trim();
+    const firstAired = String(showMeta?.firstAired || '').trim();
+    const today = toYyyyMmDd(new Date());
+    const startDateInFuture = !!firstAired && firstAired > today;
+    const skipMissingFileGap = allEpisodesUnaired || startDateInFuture || showStatus.toLowerCase() === 'upcoming';
+
     // If a show has no files at all AND nothing watched AND nothing unaired,
     // treat it as Missing File (FileGap).
-    if(!fileGap && sawAnyEpisode && !haveFileShow && !anyWatched && !anyUnaired) {
+    if(!skipMissingFileGap && !fileGap && sawAnyEpisode && !haveFileShow && !anyWatched && !anyUnaired) {
       if(fileGapSeason === null && firstNoFileSeason !== null) {
         fileGapSeason = firstNoFileSeason;
         fileGapEpisode = firstNoFileEpisode;
       }
       fileGap = true;
+    }
+
+    // List/Map treat any of these as "Missing File". If user said skip it,
+    // suppress all file-missing related signals.
+    if (skipMissingFileGap) {
+      fileGap = false;
+      fileGapSeason = null;
+      fileGapEpisode = null;
+      fileEndError = false;
+      seasonWatchedThenNofile = false;
     }
 
   }
@@ -180,12 +206,14 @@ self.onmessage = async (event) => {
   console.log(
       `gap-worker started, ${allShowsIdName.length} shows`);
   for (let i = 0; i < allShowsIdName.length; i++) {
-    const [showId, showName] = allShowsIdName[i];
+    const entry = allShowsIdName[i];
+    const showId = Array.isArray(entry) ? entry[0] : (entry?.showId ?? entry?.Id);
+    const showName = Array.isArray(entry) ? entry[1] : (entry?.showName ?? entry?.Name);
     const {notReady, anyWatched, fileEndError,
            watchGap, watchGapSeason, watchGapEpisode, 
            fileGap,  fileGapSeason,  fileGapEpisode,
            seasonWatchedThenNofile} = 
-              await getShowState(showId, showName);
+              await getShowState(showId, showName, entry);
     const progress = Math.ceil( 
                       (i+1) * 100 / allShowsIdName.length );
 

@@ -92,7 +92,7 @@ const notes        = notesCache;
 
 function encodeFileIdBase5(fileId) {
   // "base 5" here means base-32 using alphabet: A-P then a-p.
-  // Output is *at least* 5 chars (for stable filenames), but can be longer.
+  // Output is minimal-length (no left padding).
   const alphabet = 'ABCDEFGHIJKLMNOPabcdefghijklmnop';
   let n = Number(fileId);
   if (!Number.isFinite(n) || n < 0) n = 0;
@@ -104,8 +104,6 @@ function encodeFileIdBase5(fileId) {
     out = alphabet[digit] + out;
     n = Math.floor(n / 32);
   } while (n > 0);
-
-  while (out.length < 5) out = 'A' + out;
   return out;
 }
 

@@ -3,18 +3,20 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-in the season list and the episode list make sure seasons listed match those in map and make sure episodes listed match those in map
+add button Apply to right of files. when clicked send a list of applyData objects to tv-series-srvr endpoint applySubs();
 
-- make sure season list has a card for every season in series map and for missing ones show: "Season <season number> missing", in light-red.
+- an applyData object has properties: file_id, 
 
-- make sure season list has a card for every season in series map and for missing ones show: "Season <season number> subs missing", in light-red.
 
-- make sure episode list has a card for every episode in map and for missing ones show: "SxxYxx subs missing", in  light-red.
+in search mode the list should include every file_id in every result of search.
 
-the show Toast of London has 50 subs according to website search 
-- count at top of search page shows 580/776
-- the total number of episodes in season list is 19
+in season mode it should include every file_id in all files in selected season
 
-i found the numbers problem - the subs pane was showing an old show selection.  i switched shows by using filtering down to one show.  subs was still using the show from before filtering.
+in episode mode it should include every sub/file entry with selected season and episode
 
-that worked -- 
+in files mode it should just send the one selected sub/file.
+
+the endpoint will add subtitle files to the video files stored in server.
+
+what data is needed in this sub entry to download a .srt file using the api:
+

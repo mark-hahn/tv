@@ -650,13 +650,21 @@ export default {
           const episodeCount = mapEps.length ? mapEps.length : Array.from((bySeason.get(s) || new Map()).keys()).length;
           const hasAnySubs = bySeason.has(s);
           const missing = !hasAnySubs;
+          const seasonMap = bySeason.get(s) || null;
+          let fileCount = 0;
+          if (seasonMap && typeof seasonMap === 'object') {
+            for (const arr of seasonMap.values()) {
+              if (Array.isArray(arr)) fileCount += arr.length;
+            }
+          }
           return {
             key: `season-${s}`,
             season: s,
             episodeCount,
+            fileCount,
             line1: missing
               ? `Season ${s} subs missing`
-              : `Season ${s} | ${episodeCount} episodes`,
+              : `Season ${s} | ${episodeCount} Episodes | ${fileCount} Files`,
             missing,
             lineColor: missing ? '#a00' : '#333',
             uploader: ''

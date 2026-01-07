@@ -115,10 +115,19 @@ const deleteSubFiles = async (id, param, resolve, reject) => {
   }
 
   const fileIdObjs = util.jParse(param, 'deleteSubFiles');
-  if (!Array.isArray(fileIdObjs) || fileIdObjs.length === 0) {
-    reject([id, { error: 'deleteSubFiles: expected non-empty array' }]);
+  if (fileIdObjs === null || fileIdObjs === undefined) {
+    reject([id, { error: 'deleteSubFiles: JSON parse failed' }]);
     return;
   }
+
+  // Debug only: dump payload
+  try {
+    fs.writeFileSync('misc/temp.txt', JSON.stringify(fileIdObjs, null, 2), 'utf8');
+  } catch {}
+
+  // Debug only: do nothing else.
+  resolve([id, { ok: true }]);
+  return;
 
   const showName = typeof fileIdObjs[0]?.showName === 'string' ? fileIdObjs[0].showName : '';
   if (!showName || showName.trim() === '') {
@@ -1193,10 +1202,19 @@ const applySubFiles = async (id, param, resolve, reject) => {
   }
 
   const fileIdObjs = util.jParse(param, 'applySubFiles');
-  if (!Array.isArray(fileIdObjs) || fileIdObjs.length === 0) {
-    reject([id, { error: 'applySubFiles: expected non-empty array' }]);
+  if (fileIdObjs === null || fileIdObjs === undefined) {
+    reject([id, { error: 'applySubFiles: JSON parse failed' }]);
     return;
   }
+
+  // Debug only: dump payload
+  try {
+    fs.writeFileSync('misc/temp.txt', JSON.stringify(fileIdObjs, null, 2), 'utf8');
+  } catch {}
+
+  // Debug only: do nothing else.
+  resolve([id, { ok: true }]);
+  return;
 
   const showName = typeof fileIdObjs[0]?.showName === 'string' ? fileIdObjs[0].showName : '';
   if (!showName || showName.trim() === '') {

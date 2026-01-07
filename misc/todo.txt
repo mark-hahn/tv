@@ -9,6 +9,7 @@ todo both ...
     being watched (next up line)
 
 todo non-simple:
+  adjust timing of subs
   subs for custom srt script
   abort qbt downloading
   remove downloaded torrent with data from qbt

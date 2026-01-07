@@ -3,4 +3,6 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-in files tab pane sort all .srt files after video files and before rest of files
+move buttons search, season, episode, and files to second row of header to the far right.  restore gap between buttons
+
+move arrows to second row to the right of files button

@@ -7,18 +7,25 @@
   )
 
     #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'10px', marginLeft:'0px', marginRight:'0px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
+      //- Row 1
       div(style="display:flex; justify-content:space-between; align-items:center;")
         div(style="margin-left:20px; display:flex; gap:10px; align-items:baseline;")
           div {{ headerShowName }}
           div(v-if="hasSearched && !loading && totalSubsCount > 0" style="font-size:12px; color:#666; font-weight:normal;") {{ validSubsCount }}/{{ totalSubsCount }}
-        div(style="display:flex; gap:8px; margin-left:auto;")
+        div(style="display:flex; gap:8px; margin-left:auto; align-items:center;")
+          div(v-if="libraryProgressText" style="align-self:center; font-size:12px; color:#555; white-space:nowrap; font-weight:normal; padding-right:8px;") {{ libraryProgressText }}
+          button(@click.stop="startLibraryRefresh" :disabled="_libBusy" :style="getLibraryButtonStyle()") Library
+          button(@click.stop="applyClick" :disabled="!applyEnabled" :style="getApplyButtonStyle()") Apply
+
+      //- Row 2 (mode buttons)
+      div(style="display:flex; justify-content:flex-end; align-items:center; margin-top:6px;")
+        div(style="display:flex; gap:8px; align-items:center;")
           button(@click.stop="selectMode('search')" :style="getModeButtonStyle('search')") Search
           button(@click.stop="selectMode('season')" :style="getModeButtonStyle('season')") Season
           button(@click.stop="selectMode('episode')" :style="getModeButtonStyle('episode')") Episode
           button(@click.stop="selectMode('files')" :style="getModeButtonStyle('files')") Files
-          button(@click.stop="applyClick" :disabled="!applyEnabled" :style="getApplyButtonStyle()") Apply
-          button(v-if="viewMode === 'search'" @click.stop="scrollGroup(-1)" :disabled="!items || items.length === 0" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;") ▲
-          button(v-if="viewMode === 'search'" @click.stop="scrollGroup(1)" :disabled="!items || items.length === 0" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;") ▼
+          button(v-if="viewMode === 'search'" @click.stop="scrollGroup(-1)" :disabled="!items || items.length === 0" style="font-size:12px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;") ▲
+          button(v-if="viewMode === 'search'" @click.stop="scrollGroup(1)" :disabled="!items || items.length === 0" style="font-size:12px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;") ▼
 
       div(style="height:1px; width:100%; background-color:#ddd; margin-top:6px;")
 
@@ -45,6 +52,7 @@
 <script>
 import parseTorrentTitle from 'parse-torrent-title';
 import { subsSearch, applySubFiles } from '../srvr.js';
+import evtBus from '../evtBus.js';
 import * as emby from '../emby.js';
 import * as util from '../util.js';
 
@@ -84,6 +92,11 @@ export default {
       validSubsCount: 0,
 
       applyInProgress: false,
+
+      _libBusy: false,
+      _libTaskId: null,
+      _libPollTimer: null,
+      libraryProgressText: '',
 
       _lastSearchShowKey: '',
       _validEntries: [],
@@ -238,7 +251,7 @@ export default {
     getModeButtonStyle(mode) {
       const active = this.viewMode === mode;
       return {
-        fontSize: '13px',
+        fontSize: '12px',
         cursor: 'pointer',
         borderRadius: '7px',
         padding: '4px 8px',
@@ -247,11 +260,24 @@ export default {
       };
     },
 
+    getLibraryButtonStyle() {
+      const enabled = !this._libBusy;
+      return {
+        fontSize: '12px',
+        cursor: enabled ? 'pointer' : 'not-allowed',
+        borderRadius: '7px',
+        padding: '4px 8px',
+        border: '1px solid #bbb',
+        backgroundColor: 'whitesmoke',
+        color: '#000'
+      };
+    },
+
     getApplyButtonStyle() {
       const enabled = this.applyEnabled;
       const applying = !!this.applyInProgress;
       return {
-        fontSize: '13px',
+        fontSize: '12px',
         cursor: enabled ? 'pointer' : 'not-allowed',
         borderRadius: '7px',
         padding: '4px 8px',
@@ -259,6 +285,83 @@ export default {
         backgroundColor: applying ? '#ffd6d6' : (enabled ? 'whitesmoke' : '#eee'),
         color: applying ? '#a00' : (enabled ? '#000' : '#777')
       };
+    },
+
+    async startLibraryRefresh() {
+      if (this._libBusy) return;
+
+      this.stopLibraryPolling();
+      this.libraryProgressText = '';
+      this._libTaskId = null;
+      this._libBusy = true;
+
+      let res = null;
+      try {
+        res = await emby.refreshLib();
+      } catch (e) {
+        this._libBusy = false;
+        this.libraryProgressText = 'error';
+        return;
+      }
+
+      if (res?.status === 'hasTask') {
+        this._libTaskId = res.taskId;
+        this.libraryProgressText = 'Refreshing...';
+        void this.pollLibraryStatus();
+        return;
+      }
+
+      this._libBusy = false;
+      if (res?.status && res.status !== 'notask') {
+        this.libraryProgressText = String(res.status);
+      }
+    },
+
+    stopLibraryPolling() {
+      if (this._libPollTimer) {
+        clearTimeout(this._libPollTimer);
+        this._libPollTimer = null;
+      }
+    },
+
+    async pollLibraryStatus() {
+      if (!this._libTaskId) {
+        this._libBusy = false;
+        return;
+      }
+
+      let res = null;
+      try {
+        res = await emby.taskStatus(this._libTaskId);
+      } catch (e) {
+        this._libBusy = false;
+        this._libTaskId = null;
+        this.libraryProgressText = 'error';
+        return;
+      }
+      if (res?.status === 'refreshing') {
+        if (Number.isFinite(Number(res?.progress))) {
+          this.libraryProgressText = `${Number(res.progress).toFixed(0)}%`;
+        } else if (res?.taskStatus) {
+          this.libraryProgressText = String(res.taskStatus);
+        } else {
+          this.libraryProgressText = 'Refreshing...';
+        }
+
+        this._libPollTimer = setTimeout(() => {
+          void this.pollLibraryStatus();
+        }, 2000);
+        return;
+      }
+
+      this._libBusy = false;
+      this._libTaskId = null;
+      if (res?.status === 'refreshdone') {
+        this.libraryProgressText = '100%';
+        evtBus.emit('library-refresh-complete');
+      } else if (res?.status) {
+        this.libraryProgressText = String(res.status);
+      }
     },
 
     async selectMode(mode) {

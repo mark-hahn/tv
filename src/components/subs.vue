@@ -97,6 +97,13 @@ export default {
       hasSearched: false,
       viewMode: 'search',
       selectedCardKey: '',
+
+      // Multi-select (Season/Episode/Files)
+      selectedSeasonKeys: [],
+      selectedEpisodeKeys: [],
+      selectedFileKeys: [],
+      _lastClickedKeyByMode: {},
+
       selectedSeason: null,
       selectedEpisode: null,
       clickedItemKeys: new Set(),
@@ -204,6 +211,12 @@ export default {
       this.showApplyFailuresModal = false;
       this.applyFailures = [];
       this.selectedCardKey = '';
+
+      this.selectedSeasonKeys = [];
+      this.selectedEpisodeKeys = [];
+      this.selectedFileKeys = [];
+      this._lastClickedKeyByMode = {};
+
       this.selectedSeason = null;
       this.selectedEpisode = null;
       this.clickedItemKeys = new Set();
@@ -407,13 +420,22 @@ export default {
     },
 
     handleItemClick(_event, item) {
+      const event = _event || {};
       const key = this.getItemCardKey(item);
       this.clickedItemKeys.add(key);
 
       // Search mode: show all subs like before with no selection.
-      if (this.viewMode !== 'search') {
-        this.selectedCardKey = key;
+      if (this.viewMode === 'search') {
+        if (item?.season != null) this.selectedSeason = Number(item.season);
+        if (item?.episode != null) this.selectedEpisode = Number(item.episode);
+        return;
       }
+
+      const isCtrl = !!(event.ctrlKey || event.metaKey);
+      const isShift = !!event.shiftKey;
+
+      // Maintain "primary" selection for existing navigation/memory logic.
+      this.selectedCardKey = key;
 
       if (this.viewMode === 'season') {
         this.selectedSeason = item?.season != null ? Number(item.season) : null;
@@ -428,9 +450,49 @@ export default {
         }
       }
 
-      if (this.viewMode === 'search' || this.viewMode === 'files') {
+      if (this.viewMode === 'files') {
         if (item?.season != null) this.selectedSeason = Number(item.season);
         if (item?.episode != null) this.selectedEpisode = Number(item.episode);
+      }
+
+      // Multi-select handling (Season/Episode/Files).
+      const mode = this.viewMode;
+      const sel = this.getSelectionKeys(mode);
+
+      if (isShift) {
+        const anchorKey = this.getRangeAnchorKey(mode, key, sel);
+        const rangeKeys = this.getRangeKeysBetween(anchorKey, key);
+        // Shift-click extends selection; it should never remove existing selections.
+        const newSel = Array.from(new Set([...(sel || []), ...rangeKeys]));
+        this.setSelectionKeys(mode, newSel);
+      } else if (isCtrl) {
+        const idx = sel.indexOf(key);
+        if (idx >= 0) {
+          const next = sel.slice();
+          next.splice(idx, 1);
+          this.setSelectionKeys(mode, next);
+        } else {
+          this.setSelectionKeys(mode, [...sel, key]);
+        }
+      } else {
+        this.setSelectionKeys(mode, [key]);
+      }
+
+      this._lastClickedKeyByMode[mode] = key;
+
+      // Prevent shift-click text selection in the UI.
+      if (isShift) {
+        try {
+          const selection = window.getSelection ? window.getSelection() : null;
+          if (selection && typeof selection.removeAllRanges === 'function') selection.removeAllRanges();
+        } catch {
+          // ignore
+        }
+        try {
+          if (typeof event.preventDefault === 'function') event.preventDefault();
+        } catch {
+          // ignore
+        }
       }
 
       if (this.viewMode === 'files') {
@@ -440,6 +502,39 @@ export default {
           this._selectedFileKeyBySeasonEpisode[`${s}-${e}`] = key;
         }
       }
+    },
+
+    getSelectionKeys(mode) {
+      if (mode === 'season') return Array.isArray(this.selectedSeasonKeys) ? this.selectedSeasonKeys : [];
+      if (mode === 'episode') return Array.isArray(this.selectedEpisodeKeys) ? this.selectedEpisodeKeys : [];
+      if (mode === 'files') return Array.isArray(this.selectedFileKeys) ? this.selectedFileKeys : [];
+      return [];
+    },
+
+    setSelectionKeys(mode, keys) {
+      const next = Array.isArray(keys) ? keys.filter(Boolean) : [];
+      if (mode === 'season') this.selectedSeasonKeys = next;
+      if (mode === 'episode') this.selectedEpisodeKeys = next;
+      if (mode === 'files') this.selectedFileKeys = next;
+    },
+
+    getRangeAnchorKey(mode, clickedKey, selectedKeys) {
+      const last = this._lastClickedKeyByMode?.[mode];
+      if (last) return last;
+      const sel = Array.isArray(selectedKeys) ? selectedKeys : [];
+      if (sel.length === 1) return sel[0];
+      return clickedKey;
+    },
+
+    getRangeKeysBetween(anchorKey, clickedKey) {
+      const list = Array.isArray(this.items) ? this.items : [];
+      const keys = list.map(it => this.getItemCardKey(it)).filter(Boolean);
+      const a = keys.indexOf(String(anchorKey || ''));
+      const b = keys.indexOf(String(clickedKey || ''));
+      if (a < 0 || b < 0) return [String(clickedKey || '')].filter(Boolean);
+      const start = Math.min(a, b);
+      const end = Math.max(a, b);
+      return keys.slice(start, end + 1);
     },
 
     isClicked(item) {
@@ -459,7 +554,9 @@ export default {
         };
       }
 
-      const isSelected = this.selectedCardKey && this.selectedCardKey === this.getItemCardKey(item);
+      const key = this.getItemCardKey(item);
+      const selectedKeys = new Set(this.getSelectionKeys(this.viewMode));
+      const isSelected = key && selectedKeys.has(key);
       let bgColor = item?.missing ? '#ffd6d6' : '#fff';
       if (isSelected) {
         bgColor = '#fffacd';
@@ -471,7 +568,8 @@ export default {
         border: '1px solid #ddd',
         cursor: 'pointer',
         transition: 'all 0.2s',
-        position: 'relative'
+        position: 'relative',
+        userSelect: 'none'
       };
     },
 
@@ -527,25 +625,50 @@ export default {
       }
 
       if (this.viewMode === 'season') {
-        const s = this.selectedSeason;
-        return this.buildFileIdObjsFromValidEntries(validEntries.filter(v => v?.season === s));
+        const selected = new Set(this.selectedSeasonKeys || []);
+        const seasons = new Set(
+          (Array.isArray(this.items) ? this.items : [])
+            .filter(it => selected.has(this.getItemCardKey(it)))
+            .map(it => (it?.season != null ? Number(it.season) : null))
+            .filter(n => Number.isFinite(n))
+        );
+        return this.buildFileIdObjsFromValidEntries(validEntries.filter(v => seasons.has(v?.season)));
       }
 
       if (this.viewMode === 'episode') {
-        const s = this.selectedSeason;
-        const e = this.selectedEpisode;
-        return this.buildFileIdObjsFromValidEntries(validEntries.filter(v => v?.season === s && v?.episode === e));
+        const selected = new Set(this.selectedEpisodeKeys || []);
+        const pairs = new Set(
+          (Array.isArray(this.items) ? this.items : [])
+            .filter(it => selected.has(this.getItemCardKey(it)))
+            .map(it => {
+              const s = it?.season != null ? Number(it.season) : null;
+              const e = it?.episode != null ? Number(it.episode) : null;
+              if (!Number.isFinite(s) || !Number.isFinite(e)) return '';
+              return `${s}-${e}`;
+            })
+            .filter(Boolean)
+        );
+        return this.buildFileIdObjsFromValidEntries(validEntries.filter(v => pairs.has(`${v?.season}-${v?.episode}`)));
       }
 
       if (this.viewMode === 'files') {
-        const sel = Array.isArray(this.items) ? this.items.find(it => this.getItemCardKey(it) === this.selectedCardKey) : null;
         const showName = this.getCurrentShowName();
-        if (!sel || !showName) return [];
-        const fileId = sel?.file_id;
-        const season = sel?.season;
-        const episode = sel?.episode;
-        if (fileId == null || season == null || episode == null) return [];
-        return [{ file_id: Number(fileId), showName, season: Number(season), episode: Number(episode) }];
+        if (!showName) return [];
+        const selected = new Set(this.selectedFileKeys || []);
+        const out = [];
+        const seen = new Set();
+        for (const it of (Array.isArray(this.items) ? this.items : [])) {
+          if (!selected.has(this.getItemCardKey(it))) continue;
+          const fileId = it?.file_id;
+          const season = it?.season;
+          const episode = it?.episode;
+          if (fileId == null || season == null || episode == null) continue;
+          const key = `${fileId}-${season}-${episode}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          out.push({ file_id: Number(fileId), showName, season: Number(season), episode: Number(episode) });
+        }
+        return out;
       }
 
       return [];

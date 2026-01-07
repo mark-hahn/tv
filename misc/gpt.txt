@@ -3,10 +3,27 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-- move library and apply to the second row to the left of search.
+in the subs pane for season, episode, and files lists allow multiple card selections. ctrl-click should toggle a selection  and shift-click should extend a selection from the last clicked card or from the selected card when only one card selected.
 
-- add button Del between apply and search.  have it call a new rpc deleteSubFiles(fileIdObjs). fileIdObjs should be computed exactly the same way as applySubFiles(fileIdObjs) so that computation can be shared.
+the apply and del buttons should build fileIdObjs using all selections.
 
-- put 20px gap between del and search
+- normal click should clear selections for all other cards in same list
 
-- put all buttons in div and center it on second line
+episode, season, and files list should allow multiple selections.  
+
+- when apply or del are clicked and the current list showing is season list then episode and files lists should be ignored and all subs with one of the selected seasons should be included in fileIdObjs.
+
+- when apply or del are clicked and the current list showing is episode list then files lists should be ignored and all subs with one of the selected season/episodes should be included in fileIdObjs.
+
+- when apply or del are clicked and the current list showing is files list then only selected files should be included in fileIdObjs.
+
+when i shift click other selections are removed - the only clicks that should ever remove a click is a ctrl toggle or a normal click.
+
+- when I shift click the cards are selected but also the text in the cards is selected.  block that text selection or remove it afterwards
+
+
+- the episode list should include all episodes for all season list selections. the files list should include all files for all episode list selections.
+ 
+- when a selection is changed in season list then selections in episode list should be pruned to just episodes in seasons selected in season list.  if that prunes all episode selections then select the top card.
+
+- when a selection is changed in episode list then selections in files list should be pruned to just files in episodes selected. if that prunes all files selections then select the top card.

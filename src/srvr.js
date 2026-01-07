@@ -1,41 +1,61 @@
 const URL = 'wss://hahnca.com/tv-series-srvr';
 
 let ws;
-const openWs = () => {ws = new WebSocket(URL)};
-openWs();
+const openWs = () => {
+  ws = new WebSocket(URL);
+  attachWsHandlers();
+};
 
 let handleMsg  = null;
 let haveSocket = false;
 
 const waitingSends = [];
 
-ws.onmessage = (event) => {
-  // console.log("onmessage:" + event.data);
-  handleMsg(event.data);
-}
-
-ws.onopen = () => {
-  console.log("opened websocket");
-  haveSocket = true;
-  for(const msg of waitingSends) ws.send(msg);
-  waitingSends.length = 0;
-};
-
-ws.onclose = () => {() =>
-  console.log("websocket closed, trying open in 2 secs");
-  haveSocket = false;
-  setTimeout(openWs, 2000);
-};
-
-ws.onerror = (err) => {
-  console.error(("websocket error:", err));
-  haveSocket = false;
-};
-
 const calls      = [];
 const fCallQueue = [];
 let   nextId     = 0;
 let   clint      = null;
+
+const rejectAllPending = (reason) => {
+  const err = reason || { error: 'websocket disconnected' };
+  while (calls.length) {
+    const call = calls.shift();
+    try {
+      call.reject(err);
+    } catch {
+      // ignore
+    }
+  }
+}
+
+const attachWsHandlers = () => {
+  ws.onmessage = (event) => {
+    // console.log("onmessage:" + event.data);
+    handleMsg(event.data);
+  };
+
+  ws.onopen = () => {
+    console.log("opened websocket");
+    haveSocket = true;
+    for (const msg of waitingSends) ws.send(msg);
+    waitingSends.length = 0;
+  };
+
+  ws.onclose = () => {
+    console.log("websocket closed, trying open in 2 secs");
+    haveSocket = false;
+    rejectAllPending({ error: 'websocket closed' });
+    setTimeout(openWs, 2000);
+  };
+
+  ws.onerror = (err) => {
+    console.error(("websocket error:", err));
+    haveSocket = false;
+    rejectAllPending({ error: 'websocket error', details: err });
+  };
+};
+
+openWs();
 
 // if(!clint) {
 //   clint = setInterval(() => {
@@ -68,8 +88,7 @@ const fCall = (fname, param) => {
 handleMsg = async (msg) => { 
   if(msg instanceof Blob) {
     const text = await msg.text();
-    console.log("blob msg length:", text.length);
-    return;
+    msg = text;
   }
   msg = msg.toString();
   const parts = /^(.*)~~~(.*)~~~(.*)$/.exec(msg);

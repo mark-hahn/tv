@@ -35,6 +35,17 @@
     #error(v-if="error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px; white-space:pre-line; padding:0 20px;")
       div Error: {{ error }}
 
+    //- Apply failures modal
+    div(v-if="showApplyFailuresModal" @click.self.stop="closeApplyFailuresModal" style="position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.35); display:flex; align-items:flex-start; justify-content:center; padding-top:60px;")
+      div(@click.stop style="background:#fff; border:1px solid #bbb; border-radius:8px; padding:12px; width:min(900px, 92vw); max-height:75vh; overflow:auto; box-sizing:border-box;")
+        div(style="display:flex; justify-content:space-between; align-items:center; gap:12px;")
+          div(style="font-weight:bold; font-size:14px;") Apply failures
+          button(@click.stop="closeApplyFailuresModal" style="font-size:12px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;") Close
+        div(style="height:1px; width:100%; background-color:#ddd; margin:8px 0;")
+        div(v-if="!applyFailures || applyFailures.length === 0" style="font-size:12px; color:#666;") No failures.
+        div(v-else style="font-size:12px; color:#333; white-space:pre-wrap; font-family:monospace;")
+          div(v-for="(f, idx) in applyFailures" :key="idx" style="padding:4px 0; border-bottom:1px solid #eee;") {{ formatApplyFailure(f) }}
+
     #subs-list(v-if="!loading" style="padding:10px; font-size:14px; line-height:1.2;")
       div(v-if="!hasSearched && items.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
         div Press search to load subtitles.
@@ -93,6 +104,9 @@ export default {
 
       applyInProgress: false,
 
+      showApplyFailuresModal: false,
+      applyFailures: [],
+
       _libBusy: false,
       _libTaskId: null,
       _libPollTimer: null,
@@ -131,6 +145,7 @@ export default {
       if (!show) return false;
       if (!this.hasSearched) return false;
       if (this.loading) return false;
+      if (this.applyInProgress) return false;
 
       const validEntries = Array.isArray(this._validEntries) ? this._validEntries : [];
       if (this.viewMode === 'search') return validEntries.length > 0;
@@ -195,6 +210,9 @@ export default {
       this.error = null;
       this.loading = false;
       this.hasSearched = false;
+      this.applyInProgress = false;
+      this.showApplyFailuresModal = false;
+      this.applyFailures = [];
       this.selectedCardKey = '';
       this.selectedSeason = null;
       this.selectedEpisode = null;
@@ -531,14 +549,25 @@ export default {
     },
 
     async applyClick() {
+      if (this.applyInProgress) return;
       await this.ensureSearched();
       const payload = this.buildApplyPayload();
       if (!payload.length) return;
       this.error = null;
       this.applyInProgress = true;
       try {
-        const res = await applySubFiles(payload);
-        if (res && typeof res === 'object' && typeof res.error === 'string') {
+        const timeoutMs = 120000;
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error(`applySubFiles: timed out after ${timeoutMs / 1000}s`)), timeoutMs);
+        });
+
+        const res = await Promise.race([applySubFiles(payload), timeoutPromise]);
+
+        // If server returns a partial-success object, show failures in a modal.
+        if (res && typeof res === 'object' && res.ok && Array.isArray(res.failures)) {
+          this.applyFailures = res.failures;
+          this.showApplyFailuresModal = res.failures.length > 0;
+        } else if (res && typeof res === 'object' && typeof res.error === 'string') {
           this.error = res.error;
         }
       } catch (e) {
@@ -557,6 +586,26 @@ export default {
       } finally {
         this.applyInProgress = false;
       }
+    },
+
+    closeApplyFailuresModal() {
+      this.showApplyFailuresModal = false;
+    },
+
+    formatApplyFailure(f) {
+      if (f == null) return '';
+      if (typeof f === 'string') return f;
+      if (typeof f === 'object') {
+        const fileId = f.file_id != null ? `file_id=${f.file_id}` : '';
+        const showName = f.showName != null ? `show=${f.showName}` : '';
+        const season = f.season != null ? `S${String(f.season).padStart(2, '0')}` : '';
+        const episode = f.episode != null ? `E${String(f.episode).padStart(2, '0')}` : '';
+        const se = season || episode ? `${season}${episode}` : '';
+        const err = f.error != null ? String(f.error) : (f.message != null ? String(f.message) : '');
+        const head = [fileId, showName, se].filter(Boolean).join(' ');
+        return head && err ? `${head} - ${err}` : (head || err || JSON.stringify(f));
+      }
+      return String(f);
     },
 
     parseSeasonEpisodeFromText(text) {

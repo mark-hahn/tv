@@ -10,6 +10,7 @@ import * as tvdb           from './src/tvdb.js';
 import * as util           from "./src/util.js";
 import * as email          from './src/email.js';
 import * as tmdb           from './src/tmdb.js';
+import fetch               from 'node-fetch';
 
 const dontupload  = false;
 
@@ -25,6 +26,17 @@ const footerStr  = fs.readFileSync('config/config5-footer.txt',   'utf8');
 const noEmbyStr  = fs.readFileSync('data/noemby.json',            'utf8');
 const gapsPath   = 'data/gaps.json';
 const gapsStr    = fs.readFileSync(gapsPath,                      'utf8');
+
+const subsLoginPath = 'secrets/subs-login.txt';
+const subsTokenPath = 'secrets/subs-token.txt';
+
+let subsTokenCache = null;
+try {
+  const token = fs.readFileSync(subsTokenPath, 'utf8');
+  subsTokenCache = typeof token === 'string' && token.trim() ? token.trim() : null;
+} catch {
+  subsTokenCache = null;
+}
 
 const notesPath = 'data/notes.json';
 let notesCache = {};
@@ -73,6 +85,169 @@ const pickups      = JSON.parse(pickupStr);
 const noEmbys      = JSON.parse(noEmbyStr);
 const gaps         = JSON.parse(gapsStr);
 const notes        = notesCache;
+
+function normalizeImdbId(imdbId) {
+  if (imdbId === undefined || imdbId === null) return '';
+  const s = String(imdbId).trim();
+  if (!s) return '';
+  // remove leading tt and any non-digits
+  return s.replace(/^tt/i, '').replace(/\D/g, '');
+}
+
+function loadSubsLogin() {
+  let loginStr;
+  try {
+    loginStr = fs.readFileSync(subsLoginPath, 'utf8');
+  } catch (e) {
+    throw new Error(`subsSearch: missing ${subsLoginPath}`);
+  }
+
+  let login;
+  try {
+    login = JSON.parse(loginStr);
+  } catch (e) {
+    throw new Error(`subsSearch: invalid JSON in ${subsLoginPath}`);
+  }
+
+  const apiKey = typeof login?.apiKey === 'string' ? login.apiKey.trim() : '';
+  const username = typeof login?.username === 'string' ? login.username.trim() : '';
+  const password = typeof login?.password === 'string' ? login.password.trim() : '';
+
+  if (!apiKey) throw new Error('subsSearch: missing apiKey');
+  // username/password only required for login refresh path
+
+  return { apiKey, username, password };
+}
+
+async function persistSubsToken(token) {
+  const t = typeof token === 'string' ? token.trim() : '';
+  if (!t) throw new Error('subsSearch: empty token');
+  subsTokenCache = t;
+  await util.writeFile(subsTokenPath, t);
+}
+
+async function openSubtitlesLogin({ apiKey, username, password }) {
+  if (!username || !password) {
+    throw new Error('subsSearch: cannot login (missing username/password)');
+  }
+
+  const url = 'https://api.opensubtitles.com/api/v1/login';
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Api-Key': apiKey,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({ username, password }),
+  });
+
+  let body;
+  try {
+    body = await resp.json();
+  } catch {
+    body = null;
+  }
+
+  if (!resp.ok) {
+    const msg = body?.message || body?.error || `OpenSubtitles login failed (${resp.status})`;
+    throw new Error(`subsSearch: ${msg}`);
+  }
+
+  const token = typeof body?.token === 'string' ? body.token.trim() : '';
+  if (!token) throw new Error('subsSearch: login succeeded but no token returned');
+  return token;
+}
+
+async function openSubtitlesSubtitles({ apiKey, token, imdbDigits, page }) {
+  const url = new URL('https://api.opensubtitles.com/api/v1/subtitles');
+  url.search = new URLSearchParams({
+    parent_imdb_id: imdbDigits,
+    page: String(page),
+    languages: 'en',
+  }).toString();
+
+  const headers = {
+    'Api-Key': apiKey,
+    'Accept': 'application/json',
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const resp = await fetch(url.toString(), { headers });
+
+  let body;
+  try {
+    body = await resp.json();
+  } catch {
+    const text = await resp.text().catch(() => '');
+    body = { error: text || `OpenSubtitles non-JSON response (${resp.status})` };
+  }
+
+  return { resp, body };
+}
+
+const subsSearch = async (id, param, resolve, reject) => {
+  const parsed = util.jParse(param, 'subsSearch');
+  const imdbDigits = normalizeImdbId(parsed?.imdb_id);
+  let page = parsed?.page;
+
+  if (!imdbDigits) {
+    reject([id, { error: 'subsSearch: missing imdb_id' }]);
+    return;
+  }
+
+  if (page === undefined || page === null || page === '') page = 1;
+  page = Number(page);
+  if (!Number.isFinite(page) || page < 1) page = 1;
+
+  let login;
+  try {
+    login = loadSubsLogin();
+  } catch (e) {
+    reject([id, { error: e.message }]);
+    return;
+  }
+
+  // First attempt with existing token (if any)
+  try {
+    const { resp, body } = await openSubtitlesSubtitles({
+      apiKey: login.apiKey,
+      token: subsTokenCache,
+      imdbDigits,
+      page,
+    });
+
+    if (resp.ok) {
+      resolve([id, body]);
+      return;
+    }
+
+    // Refresh token on auth failure and retry once.
+    if (resp.status === 401 || resp.status === 403) {
+      const newToken = await openSubtitlesLogin(login);
+      await persistSubsToken(newToken);
+
+      const retry = await openSubtitlesSubtitles({
+        apiKey: login.apiKey,
+        token: subsTokenCache,
+        imdbDigits,
+        page,
+      });
+
+      if (retry.resp.ok) {
+        resolve([id, retry.body]);
+        return;
+      }
+
+      reject([id, { error: `subsSearch: OpenSubtitles HTTP ${retry.resp.status}`, details: retry.body }]);
+      return;
+    }
+
+    reject([id, { error: `subsSearch: OpenSubtitles HTTP ${resp.status}`, details: body }]);
+  } catch (e) {
+    reject([id, { error: `subsSearch: ${e.message}` }]);
+  }
+};
 
 function gapEntryHasGap(gap) {
   if (!gap || typeof gap !== 'object') return false;
@@ -908,6 +1083,8 @@ const runOne = () => {
     case 'getAllNotes': getAllNotes(id, param, resolve, reject); break;
 
     case 'getFile': getFile(id, param, resolve, reject); break;
+
+    case 'subsSearch': subsSearch(id, param, resolve, reject); break;
 
     case 'createShowFolder': createShowFolder(id, param, resolve, reject); break;
 

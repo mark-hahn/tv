@@ -30,6 +30,9 @@ const gapsStr    = fs.readFileSync(gapsPath,                      'utf8');
 const subsLoginPath = 'secrets/subs-login.txt';
 const subsTokenPath = 'secrets/subs-token.txt';
 
+// OpenSubtitles requires a real app User-Agent; it will 403 on generic ones (e.g. node-fetch).
+const openSubtitlesUserAgent = 'tv-series-srvr v1.0.0';
+
 let subsTokenCache = null;
 try {
   const token = fs.readFileSync(subsTokenPath, 'utf8');
@@ -136,6 +139,7 @@ async function openSubtitlesLogin({ apiKey, username, password }) {
     method: 'POST',
     headers: {
       'Api-Key': apiKey,
+      'User-Agent': openSubtitlesUserAgent,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     },
@@ -146,7 +150,8 @@ async function openSubtitlesLogin({ apiKey, username, password }) {
   try {
     body = await resp.json();
   } catch {
-    body = null;
+    const text = await resp.text().catch(() => '');
+    body = { error: (text || '').slice(0, 500) };
   }
 
   if (!resp.ok) {
@@ -169,6 +174,7 @@ async function openSubtitlesSubtitles({ apiKey, token, imdbDigits, page }) {
 
   const headers = {
     'Api-Key': apiKey,
+    'User-Agent': openSubtitlesUserAgent,
     'Accept': 'application/json',
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;

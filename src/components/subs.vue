@@ -13,6 +13,8 @@
           div(v-if="hasSearched && !loading && totalSubsCount > 0" style="font-size:12px; color:#666; font-weight:normal;") {{ validSubsCount }}/{{ totalSubsCount }}
         div(style="display:flex; gap:8px; margin-left:auto;")
           button(@click.stop="searchClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Search
+          button(@click.stop="scrollGroup(-1)" :disabled="!items || items.length === 0" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;") ▲
+          button(@click.stop="scrollGroup(1)" :disabled="!items || items.length === 0" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;") ▼
 
       div(style="height:1px; width:100%; background-color:#ddd; margin-top:6px;")
 
@@ -27,12 +29,13 @@
         div Press search to load subtitles.
       div(v-else-if="hasSearched && totalSubsCount === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
         div No subtitles found.
-      div(v-for="(item, index) in items" :key="getItemCardKey(item, index)" @click="handleItemClick($event, item)" @click.stop :style="getCardStyle(item)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
-        div(v-if="isClicked(item)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
-        div(style="font-size:12px; color:#333;")
-          div
-            strong {{ item?.line1 || '' }}
-          div(v-if="item?.line2" style="white-space:pre;") {{ item.line2 }}
+      template(v-for="(item, index) in items" :key="getItemCardKey(item, index)")
+        div.se-divider(v-if="shouldShowSeDivider(index)" style="text-align:center; color:#888; font-family:monospace; margin:4px 0;") {{ getSeDividerText(index) }}
+        div(@click="handleItemClick($event, item)" @click.stop :style="getCardStyle(item)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
+          div(v-if="isClicked(item)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
+          div(style="display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:12px; color:#333;")
+            div(style="font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;") {{ item?.line1 || '' }}
+            div(style="color:#666; white-space:nowrap;") {{ item?.uploader || '' }}
 </template>
 
 <script>
@@ -290,7 +293,8 @@ export default {
     buildCardItemFromResult(entry) {
       const id = entry?.id != null ? String(entry.id) : '';
       const release = entry?.attributes?.release != null ? String(entry.attributes.release) : '';
-      const uploader = entry?.attributes?.uploader?.name != null ? String(entry.attributes.uploader.name) : '';
+      let uploader = entry?.attributes?.uploader?.name != null ? String(entry.attributes.uploader.name) : '';
+      if (uploader && uploader.trim().toLowerCase() === 'anonymous') uploader = '';
       const aiTranslated = entry?.attributes?.ai_translated;
       const machineTranslated = entry?.attributes?.machine_translated;
 
@@ -302,7 +306,6 @@ export default {
       const line1 = `S${sStr}E${eStr} ${release}`.trim();
 
       const parts = [];
-      if (uploader) parts.push(uploader);
       if (aiTranslated) parts.push(String(aiTranslated));
       if (machineTranslated) parts.push(String(machineTranslated));
       const line2 = parts.length ? `     ${parts.join(' ')}` : '';
@@ -311,8 +314,87 @@ export default {
         key: id || release,
         line1,
         line2,
+        uploader,
+        season,
+        episode,
         raw: entry,
       };
+    },
+
+    shouldShowSeDivider(index) {
+      if (index === 0) return true;
+      if (index < 0) return false;
+      const prev = this.items[index - 1];
+      const cur = this.items[index];
+      if (!prev || !cur) return false;
+      return prev.season !== cur.season || prev.episode !== cur.episode;
+    },
+
+    getSeDividerText(index) {
+      const item = this.items[index];
+      if (!item) return '================';
+      const sStr = item.season != null ? String(item.season).padStart(2, '0') : '??';
+      const eStr = item.episode != null ? String(item.episode).padStart(2, '0') : '??';
+      return `======== S${sStr}E${eStr} ========`;
+    },
+
+    scrollGroup(direction) {
+      const scroller = this.$refs?.scroller;
+      if (!scroller) return;
+
+      const dividers = Array.from(scroller.querySelectorAll('.se-divider'));
+      if (!dividers.length) return;
+
+      const header = scroller.querySelector('#header');
+      const headerOffset = header ? (header.offsetHeight || 0) : 0;
+
+      // "Anchor" is the y-position just under the sticky header.
+      // Use this and each divider's offsetTop to find the next/previous group.
+      const eps = 2;
+      const nearThreshold = 30;
+      const anchor = (scroller.scrollTop || 0) + headerOffset + 4;
+      const tops = dividers.map(el => el.offsetTop || 0);
+
+      // Find the divider currently aligned under the header (if any).
+      let alignedIndex = -1;
+      let alignedDist = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < tops.length; i++) {
+        const dist = Math.abs(tops[i] - anchor);
+        if (dist <= nearThreshold && dist < alignedDist) {
+          alignedDist = dist;
+          alignedIndex = i;
+        }
+      }
+
+      // Find the last divider above the anchor (for aligning on Up).
+      let aboveIndex = -1;
+      for (let i = 0; i < tops.length; i++) {
+        if (tops[i] <= anchor + eps) aboveIndex = i;
+        else break;
+      }
+
+      let targetIndex = 0;
+      if (direction > 0) {
+        // Down: if a divider is already aligned, move to the next group; otherwise go to the next divider below.
+        if (alignedIndex >= 0) {
+          targetIndex = Math.min(dividers.length - 1, alignedIndex + 1);
+        } else {
+          const nextIndex = tops.findIndex(t => t > anchor + eps);
+          targetIndex = nextIndex >= 0 ? nextIndex : (dividers.length - 1);
+        }
+      } else {
+        // Up: if a divider is aligned, move to previous group; otherwise align the current group (don't skip).
+        if (alignedIndex >= 0) {
+          targetIndex = Math.max(0, alignedIndex - 1);
+        } else {
+          targetIndex = aboveIndex >= 0 ? aboveIndex : 0;
+        }
+      }
+
+      const target = dividers[targetIndex];
+      if (!target) return;
+      const targetTop = Math.max(0, (target.offsetTop || 0) - headerOffset - 4);
+      scroller.scrollTo({ top: targetTop, behavior: 'smooth' });
     },
 
     async fetchSubsPage(imdbIdDigits, page) {
@@ -393,7 +475,8 @@ export default {
 
         const sortable = filtered.map(entry => {
           const release = entry?.attributes?.release != null ? String(entry.attributes.release) : '';
-          const uploader = entry?.attributes?.uploader?.name != null ? String(entry.attributes.uploader.name) : '';
+          let uploader = entry?.attributes?.uploader?.name != null ? String(entry.attributes.uploader.name) : '';
+          if (uploader && uploader.trim().toLowerCase() === 'anonymous') uploader = '';
           const { season, episode } = this.parseSeasonEpisodeFromEntry(entry);
           return { entry, release, uploader, season, episode };
         });
@@ -409,6 +492,9 @@ export default {
 
           const uA = (a.uploader || '').trim();
           const uB = (b.uploader || '').trim();
+          const uAEmpty = !uA;
+          const uBEmpty = !uB;
+          if (uAEmpty !== uBEmpty) return uAEmpty ? 1 : -1;
           const uCmp = uA.localeCompare(uB, undefined, { sensitivity: 'base' });
           if (uCmp !== 0) return uCmp;
 

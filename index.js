@@ -129,6 +129,10 @@ function parseSeasonEpisodeFromFilename(fileName) {
   return { season, episode };
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function normalizeImdbId(imdbId) {
   if (imdbId === undefined || imdbId === null) return '';
   const s = String(imdbId).trim();
@@ -257,6 +261,35 @@ async function openSubtitlesDownload({ apiKey, token, fileId }) {
   }
 
   return { resp, body };
+}
+
+async function openSubtitlesDownloadWithRetry({ apiKey, token, fileId, maxAttempts = 3 }) {
+  // Retry transient upstream errors.
+  const retryStatus = new Set([502, 503, 504]);
+  let last;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      last = await openSubtitlesDownload({ apiKey, token, fileId });
+      if (last?.resp?.ok) return last;
+      const status = last?.resp?.status;
+      if (retryStatus.has(status)) {
+        console.log(`[subs] OpenSubtitles /download HTTP ${status} (file_id=${fileId}, attempt=${attempt}/${maxAttempts})`);
+      }
+      if (retryStatus.has(status) && attempt < maxAttempts) {
+        await sleep(400 * attempt);
+        continue;
+      }
+      return last;
+    } catch (e) {
+      // Network error / fetch throw: retry.
+      if (attempt < maxAttempts) {
+        await sleep(400 * attempt);
+        continue;
+      }
+      throw e;
+    }
+  }
+  return last;
 }
 
 const subsSearch = async (id, param, resolve, reject) => {
@@ -1100,7 +1133,11 @@ const applySubFiles = async (id, param, resolve, reject) => {
     return;
   }
 
-  // Step 1-4: update entries with local paths, validate, fetch download link, compute fileIdBase5.
+  const failures = [];
+
+  // Step 1-4: update entries with local paths, validate, compute fileIdBase5.
+  // Note: we fetch OpenSubtitles /download links lazily per video file so one bad
+  // file_id (e.g. transient 502) doesn't fail the entire batch.
   for (const entry of fileIdObjs) {
     const file_id = entry?.file_id;
     const season = entry?.season;
@@ -1144,24 +1181,6 @@ const applySubFiles = async (id, param, resolve, reject) => {
       return;
     }
 
-    // Get /download link.
-    let dl = await openSubtitlesDownload({ apiKey: login.apiKey, token: subsTokenCache, fileId: Number(file_id) });
-    if (!dl.resp.ok && (dl.resp.status === 401 || dl.resp.status === 403)) {
-      const newToken = await openSubtitlesLogin(login);
-      await persistSubsToken(newToken);
-      dl = await openSubtitlesDownload({ apiKey: login.apiKey, token: subsTokenCache, fileId: Number(file_id) });
-    }
-    if (!dl.resp.ok) {
-      reject([id, { error: `applySubFiles: OpenSubtitles /download HTTP ${dl.resp.status} (${file_id})`, details: dl.body }]);
-      return;
-    }
-
-    const link = typeof dl.body?.link === 'string' ? dl.body.link.trim() : '';
-    if (!link) {
-      reject([id, { error: `applySubFiles: missing srt link (${file_id})`, details: dl.body }]);
-      return;
-    }
-    entry.srtFileUrl = link;
     entry.fileIdBase5 = encodeFileIdBase5(Number(file_id));
   }
 
@@ -1182,6 +1201,8 @@ const applySubFiles = async (id, param, resolve, reject) => {
   }
 
   const srtCacheByFileId = new Map();
+  const srtUrlCacheByFileId = new Map();
+  const failedByFileId = new Map();
 
   // For each video file in all season dirs under localShowPath, write a matching srt.
   let seasonDirents;
@@ -1218,46 +1239,97 @@ const applySubFiles = async (id, param, resolve, reject) => {
 
       const fileBase = fileName.slice(0, -(ext.length + 1));
 
-      // Find first candidate that doesn't already exist on disk.
-      let chosen = null;
-      let outPath = null;
+      // Find the first candidate that (a) doesn't already exist on disk and
+      // (b) successfully downloads. Only write one new srt per video per call.
+      let wroteOneForThisVideo = false;
       for (const cand of candidates) {
         const srtName = `${fileBase}.${cand.fileIdBase5}.srt`;
-        const p = path.join(cand.localSeasonPath, srtName);
-        if (fs.existsSync(p)) continue;
-        chosen = cand;
-        outPath = p;
-        break;
-      }
-      if (!chosen || !outPath) continue;
+        const outPath = path.join(cand.localSeasonPath, srtName);
+        if (fs.existsSync(outPath)) continue;
 
-      const fid = Number(chosen.file_id);
-      let srtText = srtCacheByFileId.get(fid);
-      if (srtText === undefined) {
-        try {
-          const resp = await fetch(chosen.srtFileUrl, { headers: { 'Accept': '*/*' } });
-          if (!resp.ok) {
-            reject([id, { error: `applySubFiles: srt download failed HTTP ${resp.status} (${fid})` }]);
-            return;
+        const fid = Number(cand.file_id);
+
+        // If this file_id already failed earlier in this call, skip it.
+        if (failedByFileId.has(fid)) continue;
+
+        let srtText = srtCacheByFileId.get(fid);
+        if (srtText === undefined) {
+          // Resolve (and cache) /download link for this file_id.
+          let url = srtUrlCacheByFileId.get(fid) || null;
+          if (!url) {
+            try {
+              let dl = await openSubtitlesDownloadWithRetry({ apiKey: login.apiKey, token: subsTokenCache, fileId: fid });
+              if (!dl?.resp?.ok && (dl?.resp?.status === 401 || dl?.resp?.status === 403)) {
+                const newToken = await openSubtitlesLogin(login);
+                await persistSubsToken(newToken);
+                dl = await openSubtitlesDownloadWithRetry({ apiKey: login.apiKey, token: subsTokenCache, fileId: fid });
+              }
+
+              if (!dl?.resp?.ok) {
+                const status = dl?.resp?.status;
+                if (status === 502 || status === 503 || status === 504) {
+                  console.log(`[subs] OpenSubtitles /download HTTP ${status} (file_id=${fid})`);
+                }
+                failures.push({ file_id: fid, stage: 'download', status, details: dl?.body });
+                failedByFileId.set(fid, { stage: 'download', status });
+                continue;
+              }
+
+              url = typeof dl.body?.link === 'string' ? dl.body.link.trim() : '';
+              if (!url) {
+                failures.push({ file_id: fid, stage: 'download', status: dl?.resp?.status, details: dl?.body });
+                failedByFileId.set(fid, { stage: 'download', status: dl?.resp?.status });
+                continue;
+              }
+              srtUrlCacheByFileId.set(fid, url);
+              cand.srtFileUrl = url;
+            } catch {
+              failures.push({ file_id: fid, stage: 'download', status: null, error: e?.message || String(e) });
+              failedByFileId.set(fid, { stage: 'download', status: null });
+              continue;
+            }
+          } else {
+            cand.srtFileUrl = url;
           }
-          srtText = await resp.text();
-        } catch (e) {
-          reject([id, { error: `applySubFiles: srt download failed (${fid}): ${e.message}` }]);
-          return;
+
+          try {
+            const resp = await fetch(url, { headers: { 'Accept': '*/*' } });
+            if (!resp.ok) {
+              const status = resp.status;
+              if (status === 502 || status === 503 || status === 504) {
+                console.log(`[subs] OpenSubtitles .srt GET HTTP ${status} (file_id=${fid})`);
+              }
+              failures.push({ file_id: fid, stage: 'srt', status });
+              failedByFileId.set(fid, { stage: 'srt', status });
+              continue;
+            }
+            srtText = await resp.text();
+            srtCacheByFileId.set(fid, srtText);
+          } catch {
+            failures.push({ file_id: fid, stage: 'srt', status: null, error: e?.message || String(e) });
+            failedByFileId.set(fid, { stage: 'srt', status: null });
+            continue;
+          }
         }
-        srtCacheByFileId.set(fid, srtText);
+
+        try {
+          await fs.promises.writeFile(outPath, srtText, 'utf8');
+          wroteOneForThisVideo = true;
+          break;
+        } catch {
+          // If write fails, try next candidate (maybe different season path or name).
+          continue;
+        }
       }
 
-      try {
-        await fs.promises.writeFile(outPath, srtText, 'utf8');
-      } catch (e) {
-        reject([id, { error: `applySubFiles: write srt failed: ${e.message}` }]);
-        return;
+      if (wroteOneForThisVideo) {
+        // Ensure only one new srt per video per call.
+        continue;
       }
     }
   }
 
-  resolve([id, 'ok']);
+  resolve([id, { ok: true, failures }]);
 };
 
 const deletePath = async (id, path, resolve, _reject) => {

@@ -1135,6 +1135,22 @@ const applySubFiles = async (id, param, resolve, reject) => {
 
   const failures = [];
 
+  const addFailure = (cand, stage, status, details, error) => {
+    const fid = Number(cand?.file_id);
+    const showName = typeof cand?.showName === 'string' ? cand.showName : undefined;
+    const season = cand?.season;
+    const episode = cand?.episode;
+
+    let reason = '';
+    if (status !== undefined && status !== null) reason = `${stage} HTTP ${status}`;
+    else if (error) reason = `${stage}: ${error}`;
+    else reason = stage;
+
+    const rec = { file_id: fid, showName, season, episode, reason, stage, status };
+    if (details !== undefined) rec.details = details;
+    failures.push(rec);
+  };
+
   // Step 1-4: update entries with local paths, validate, compute fileIdBase5.
   // Note: we fetch OpenSubtitles /download links lazily per video file so one bad
   // file_id (e.g. transient 502) doesn't fail the entire batch.
@@ -1270,21 +1286,21 @@ const applySubFiles = async (id, param, resolve, reject) => {
                 if (status === 502 || status === 503 || status === 504) {
                   console.log(`[subs] OpenSubtitles /download HTTP ${status} (file_id=${fid})`);
                 }
-                failures.push({ file_id: fid, stage: 'download', status, details: dl?.body });
+                addFailure(cand, 'download', status, dl?.body);
                 failedByFileId.set(fid, { stage: 'download', status });
                 continue;
               }
 
               url = typeof dl.body?.link === 'string' ? dl.body.link.trim() : '';
               if (!url) {
-                failures.push({ file_id: fid, stage: 'download', status: dl?.resp?.status, details: dl?.body });
+                addFailure(cand, 'download', dl?.resp?.status, dl?.body, 'missing link');
                 failedByFileId.set(fid, { stage: 'download', status: dl?.resp?.status });
                 continue;
               }
               srtUrlCacheByFileId.set(fid, url);
               cand.srtFileUrl = url;
-            } catch {
-              failures.push({ file_id: fid, stage: 'download', status: null, error: e?.message || String(e) });
+            } catch (e) {
+              addFailure(cand, 'download', null, undefined, e?.message || String(e));
               failedByFileId.set(fid, { stage: 'download', status: null });
               continue;
             }
@@ -1299,14 +1315,14 @@ const applySubFiles = async (id, param, resolve, reject) => {
               if (status === 502 || status === 503 || status === 504) {
                 console.log(`[subs] OpenSubtitles .srt GET HTTP ${status} (file_id=${fid})`);
               }
-              failures.push({ file_id: fid, stage: 'srt', status });
+              addFailure(cand, 'srt', status);
               failedByFileId.set(fid, { stage: 'srt', status });
               continue;
             }
             srtText = await resp.text();
             srtCacheByFileId.set(fid, srtText);
-          } catch {
-            failures.push({ file_id: fid, stage: 'srt', status: null, error: e?.message || String(e) });
+          } catch (e) {
+            addFailure(cand, 'srt', null, undefined, e?.message || String(e));
             failedByFileId.set(fid, { stage: 'srt', status: null });
             continue;
           }

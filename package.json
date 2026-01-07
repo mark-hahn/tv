@@ -25,6 +25,7 @@
     "moment": "^2.29.4",
     "moviedb-promise": "^4.0.7",
     "node-fetch": "^3.3.2",
+    "parse-torrent-title": "^2.1.0",
     "playwright": "^1.57.0",
     "public-ip": "^7.0.1",
     "rimraf": "^6.0.1",

@@ -11,6 +11,7 @@ import * as util           from "./src/util.js";
 import * as email          from './src/email.js';
 import * as tmdb           from './src/tmdb.js';
 import fetch               from 'node-fetch';
+import { parse as parseTorrentTitle } from 'parse-torrent-title';
 
 const dontupload  = false;
 
@@ -88,6 +89,47 @@ const pickups      = JSON.parse(pickupStr);
 const noEmbys      = JSON.parse(noEmbyStr);
 const gaps         = JSON.parse(gapsStr);
 const notes        = notesCache;
+
+function encodeFileIdBase5(fileId) {
+  // "base 5" here means base-32 using alphabet: A-P then a-p.
+  // Output is *at least* 5 chars (for stable filenames), but can be longer.
+  const alphabet = 'ABCDEFGHIJKLMNOPabcdefghijklmnop';
+  let n = Number(fileId);
+  if (!Number.isFinite(n) || n < 0) n = 0;
+  n = Math.floor(n);
+
+  let out = '';
+  do {
+    const digit = n % 32;
+    out = alphabet[digit] + out;
+    n = Math.floor(n / 32);
+  } while (n > 0);
+
+  while (out.length < 5) out = 'A' + out;
+  return out;
+}
+
+function parseSeasonEpisodeFromFilename(fileName) {
+  // Uses parse-torrent-title. Returns { season, episode } or null.
+  if (!fileName) return null;
+  const base = String(fileName);
+
+  let parsed;
+  try {
+    parsed = parseTorrentTitle(base);
+  } catch {
+    parsed = null;
+  }
+  if (!parsed || typeof parsed !== 'object') return null;
+
+  const season = Number.isFinite(Number(parsed.season)) ? Number(parsed.season) :
+    (Array.isArray(parsed.seasons) && parsed.seasons.length ? Number(parsed.seasons[0]) : NaN);
+  const episode = Number.isFinite(Number(parsed.episode)) ? Number(parsed.episode) :
+    (Array.isArray(parsed.episodes) && parsed.episodes.length ? Number(parsed.episodes[0]) : NaN);
+
+  if (!Number.isFinite(season) || !Number.isFinite(episode)) return null;
+  return { season, episode };
+}
 
 function normalizeImdbId(imdbId) {
   if (imdbId === undefined || imdbId === null) return '';
@@ -187,6 +229,33 @@ async function openSubtitlesSubtitles({ apiKey, token, imdbDigits, page }) {
   } catch {
     const text = await resp.text().catch(() => '');
     body = { error: text || `OpenSubtitles non-JSON response (${resp.status})` };
+  }
+
+  return { resp, body };
+}
+
+async function openSubtitlesDownload({ apiKey, token, fileId }) {
+  const url = 'https://api.opensubtitles.com/api/v1/download';
+  const headers = {
+    'Api-Key': apiKey,
+    'User-Agent': openSubtitlesUserAgent,
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ file_id: fileId }),
+  });
+
+  let body;
+  try {
+    body = await resp.json();
+  } catch {
+    const text = await resp.text().catch(() => '');
+    body = { error: (text || '').slice(0, 500) };
   }
 
   return { resp, body };
@@ -991,19 +1060,206 @@ const applySubFiles = async (id, param, resolve, reject) => {
     return;
   }
 
-  const parsed = util.jParse(param, 'applySubFiles');
-  if (parsed === null) {
-    reject([id, { error: 'applySubFiles: invalid JSON params' }]);
+  const fileIdObjs = util.jParse(param, 'applySubFiles');
+  if (!Array.isArray(fileIdObjs) || fileIdObjs.length === 0) {
+    reject([id, { error: 'applySubFiles: expected non-empty array' }]);
     return;
   }
 
+  const showName = typeof fileIdObjs[0]?.showName === 'string' ? fileIdObjs[0].showName : '';
+  if (!showName || showName.trim() === '') {
+    reject([id, { error: 'applySubFiles: missing showName' }]);
+    return;
+  }
+  if (showName.includes('/') || showName.includes('\\')) {
+    reject([id, { error: 'applySubFiles: invalid showName' }]);
+    return;
+  }
+  for (const entry of fileIdObjs) {
+    if (typeof entry?.showName !== 'string' || entry.showName !== showName) {
+      reject([id, { error: 'applySubFiles: all entries must have same showName' }]);
+      return;
+    }
+  }
+
+  const localShowPath = path.join(tvDir, showName);
   try {
-    // For now: just persist request for inspection.
-    await util.writeFile('samples/fileIdObjs.json', parsed);
-    resolve([id, 'ok']);
+    const st = fs.statSync(localShowPath);
+    if (!st.isDirectory()) {
+      reject([id, { error: `Show directory missing: ${localShowPath} (n/a)` }]);
+      return;
+    }
+  } catch {
+    reject([id, { error: `Show directory missing: ${localShowPath} (n/a)` }]);
+    return;
+  }
+
+  let login;
+  try {
+    login = loadSubsLogin();
+  } catch (e) {
+    reject([id, { error: e.message }]);
+    return;
+  }
+
+  // Step 1-4: update entries with local paths, validate, fetch download link, compute fileIdBase5.
+  for (const entry of fileIdObjs) {
+    const file_id = entry?.file_id;
+    const season = entry?.season;
+    const episode = entry?.episode;
+
+    if (!Number.isFinite(Number(file_id))) {
+      reject([id, { error: 'applySubFiles: invalid file_id' }]);
+      return;
+    }
+    if (!Number.isFinite(Number(season))) {
+      reject([id, { error: `applySubFiles: invalid season (${file_id})` }]);
+      return;
+    }
+    if (!Number.isFinite(Number(episode))) {
+      reject([id, { error: `applySubFiles: invalid episode (${file_id})` }]);
+      return;
+    }
+
+    entry.localShowPath = localShowPath + '/';
+    entry.localSeasonPath = path.join(localShowPath, `Season ${Number(season)}`);
+
+    // Verify local show/season paths exist.
+    try {
+      const stShow = fs.statSync(localShowPath);
+      if (!stShow.isDirectory()) {
+        reject([id, { error: `Show directory missing: ${entry.localShowPath} (${file_id})` }]);
+        return;
+      }
+    } catch {
+      reject([id, { error: `Show directory missing: ${entry.localShowPath} (${file_id})` }]);
+      return;
+    }
+    try {
+      const stSeason = fs.statSync(entry.localSeasonPath);
+      if (!stSeason.isDirectory()) {
+        reject([id, { error: `Season directory missing: ${entry.localSeasonPath} (${file_id})` }]);
+        return;
+      }
+    } catch {
+      reject([id, { error: `Season directory missing: ${entry.localSeasonPath} (${file_id})` }]);
+      return;
+    }
+
+    // Get /download link.
+    let dl = await openSubtitlesDownload({ apiKey: login.apiKey, token: subsTokenCache, fileId: Number(file_id) });
+    if (!dl.resp.ok && (dl.resp.status === 401 || dl.resp.status === 403)) {
+      const newToken = await openSubtitlesLogin(login);
+      await persistSubsToken(newToken);
+      dl = await openSubtitlesDownload({ apiKey: login.apiKey, token: subsTokenCache, fileId: Number(file_id) });
+    }
+    if (!dl.resp.ok) {
+      reject([id, { error: `applySubFiles: OpenSubtitles /download HTTP ${dl.resp.status} (${file_id})`, details: dl.body }]);
+      return;
+    }
+
+    const link = typeof dl.body?.link === 'string' ? dl.body.link.trim() : '';
+    if (!link) {
+      reject([id, { error: `applySubFiles: missing srt link (${file_id})`, details: dl.body }]);
+      return;
+    }
+    entry.srtFileUrl = link;
+    entry.fileIdBase5 = encodeFileIdBase5(Number(file_id));
+  }
+
+  // Persist the augmented request for inspection.
+  try {
+    await util.writeFile('samples/fileIdObjs.json', fileIdObjs);
   } catch (e) {
     reject([id, { error: `applySubFiles: write failed: ${e.message}` }]);
+    return;
   }
+
+  // Build lookup by season/episode.
+  const byKey = new Map();
+  for (const entry of fileIdObjs) {
+    const key = `${Number(entry.season)}-${Number(entry.episode)}`;
+    if (!byKey.has(key)) byKey.set(key, []);
+    byKey.get(key).push(entry);
+  }
+
+  const srtCacheByFileId = new Map();
+
+  // For each video file in all season dirs under localShowPath, write a matching srt.
+  let seasonDirents;
+  try {
+    seasonDirents = fs.readdirSync(localShowPath, { withFileTypes: true });
+  } catch (e) {
+    reject([id, { error: `applySubFiles: readdir failed: ${e.message}` }]);
+    return;
+  }
+
+  for (const dirent of seasonDirents) {
+    if (!dirent.isDirectory()) continue;
+    const seasonPath = path.join(localShowPath, dirent.name);
+
+    let fileDirents;
+    try {
+      fileDirents = fs.readdirSync(seasonPath, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const fd of fileDirents) {
+      if (!fd.isFile()) continue;
+      const fileName = fd.name;
+      const ext = fileName.includes('.') ? fileName.split('.').pop().toLowerCase() : '';
+      if (!videoFileExtensions.includes(ext)) continue;
+
+      const parsed = parseSeasonEpisodeFromFilename(fileName);
+      if (!parsed) continue;
+
+      const key = `${parsed.season}-${parsed.episode}`;
+      const candidates = byKey.get(key);
+      if (!candidates || candidates.length === 0) continue;
+
+      const fileBase = fileName.slice(0, -(ext.length + 1));
+
+      // Find first candidate that doesn't already exist on disk.
+      let chosen = null;
+      let outPath = null;
+      for (const cand of candidates) {
+        const srtName = `${fileBase}.${cand.fileIdBase5}.srt`;
+        const p = path.join(cand.localSeasonPath, srtName);
+        if (fs.existsSync(p)) continue;
+        chosen = cand;
+        outPath = p;
+        break;
+      }
+      if (!chosen || !outPath) continue;
+
+      const fid = Number(chosen.file_id);
+      let srtText = srtCacheByFileId.get(fid);
+      if (srtText === undefined) {
+        try {
+          const resp = await fetch(chosen.srtFileUrl, { headers: { 'Accept': '*/*' } });
+          if (!resp.ok) {
+            reject([id, { error: `applySubFiles: srt download failed HTTP ${resp.status} (${fid})` }]);
+            return;
+          }
+          srtText = await resp.text();
+        } catch (e) {
+          reject([id, { error: `applySubFiles: srt download failed (${fid}): ${e.message}` }]);
+          return;
+        }
+        srtCacheByFileId.set(fid, srtText);
+      }
+
+      try {
+        await fs.promises.writeFile(outPath, srtText, 'utf8');
+      } catch (e) {
+        reject([id, { error: `applySubFiles: write srt failed: ${e.message}` }]);
+        return;
+      }
+    }
+  }
+
+  resolve([id, 'ok']);
 };
 
 const deletePath = async (id, path, resolve, _reject) => {

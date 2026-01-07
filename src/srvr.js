@@ -179,6 +179,12 @@ export function subsSearch(params)
 export function applySubFiles(fileIdObjs)
             {return fCall('applySubFiles', fileIdObjs)}
 
+// Delete previously applied subtitle files on the server.
+// fileIdObjs: [{ file_id:number, showName:string, season:number, episode:number }, ...]
+// Returns: "ok" or { error: string }
+export function deleteSubFiles(fileIdObjs)
+            {return fCall('deleteSubFiles', fileIdObjs)}
+
 
 export function getRejects()       
             {return fCall('getRejects')}

@@ -3,3 +3,10 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
+- move library and apply to the second row to the left of search.
+
+- add button Del between apply and search.  have it call a new rpc deleteSubFiles(fileIdObjs). fileIdObjs should be computed exactly the same way as applySubFiles(fileIdObjs) so that computation can be shared.
+
+- put 20px gap between del and search
+
+- put all buttons in div and center it on second line

@@ -12,14 +12,16 @@
         div(style="margin-left:20px; display:flex; gap:10px; align-items:baseline;")
           div {{ headerShowName }}
           div(v-if="hasSearched && !loading && totalSubsCount > 0" style="font-size:12px; color:#666; font-weight:normal;") {{ validSubsCount }}/{{ totalSubsCount }}
-        div(style="display:flex; gap:8px; margin-left:auto; align-items:center;")
+        div(style="margin-left:auto;")
+
+      //- Row 2 (all buttons centered)
+      div(style="display:flex; justify-content:center; align-items:center; margin-top:6px;")
+        div(style="display:flex; gap:8px; align-items:center;")
           div(v-if="libraryProgressText" style="align-self:center; font-size:12px; color:#555; white-space:nowrap; font-weight:normal; padding-right:8px;") {{ libraryProgressText }}
           button(@click.stop="startLibraryRefresh" :disabled="_libBusy" :style="getLibraryButtonStyle()") Library
           button(@click.stop="applyClick" :disabled="!applyEnabled" :style="getApplyButtonStyle()") Apply
-
-      //- Row 2 (mode buttons)
-      div(style="display:flex; justify-content:flex-end; align-items:center; margin-top:6px;")
-        div(style="display:flex; gap:8px; align-items:center;")
+          button(@click.stop="deleteClick" :disabled="!deleteEnabled" :style="getDelButtonStyle()") Del
+          div(style="width:20px;")
           button(@click.stop="selectMode('search')" :style="getModeButtonStyle('search')") Search
           button(@click.stop="selectMode('season')" :style="getModeButtonStyle('season')") Season
           button(@click.stop="selectMode('episode')" :style="getModeButtonStyle('episode')") Episode
@@ -62,7 +64,7 @@
 
 <script>
 import parseTorrentTitle from 'parse-torrent-title';
-import { subsSearch, applySubFiles } from '../srvr.js';
+import { subsSearch, applySubFiles, deleteSubFiles } from '../srvr.js';
 import evtBus from '../evtBus.js';
 import * as emby from '../emby.js';
 import * as util from '../util.js';
@@ -103,6 +105,7 @@ export default {
       validSubsCount: 0,
 
       applyInProgress: false,
+      delInProgress: false,
 
       showApplyFailuresModal: false,
       applyFailures: [],
@@ -141,34 +144,20 @@ export default {
     },
 
     applyEnabled() {
+      return this.actionEnabled;
+    },
+
+    deleteEnabled() {
+      return this.actionEnabled;
+    },
+
+    actionEnabled() {
       const show = this.currentShow || this.activeShow;
       if (!show) return false;
       if (!this.hasSearched) return false;
       if (this.loading) return false;
-      if (this.applyInProgress) return false;
-
-      const validEntries = Array.isArray(this._validEntries) ? this._validEntries : [];
-      if (this.viewMode === 'search') return validEntries.length > 0;
-
-      if (this.viewMode === 'season') {
-        const s = this.selectedSeason;
-        if (s == null) return false;
-        return validEntries.some(v => v?.season === s);
-      }
-
-      if (this.viewMode === 'episode') {
-        const s = this.selectedSeason;
-        const e = this.selectedEpisode;
-        if (s == null || e == null) return false;
-        return validEntries.some(v => v?.season === s && v?.episode === e);
-      }
-
-      if (this.viewMode === 'files') {
-        if (!this.selectedCardKey) return false;
-        return Array.isArray(this.items) && this.items.some(it => this.getItemCardKey(it) === this.selectedCardKey && it?.file_id != null);
-      }
-
-      return false;
+      if (this.applyInProgress || this.delInProgress) return false;
+      return this.buildFileIdObjsPayload().length > 0;
     }
   },
 
@@ -211,6 +200,7 @@ export default {
       this.loading = false;
       this.hasSearched = false;
       this.applyInProgress = false;
+      this.delInProgress = false;
       this.showApplyFailuresModal = false;
       this.applyFailures = [];
       this.selectedCardKey = '';
@@ -302,6 +292,19 @@ export default {
         border: '1px solid #bbb',
         backgroundColor: applying ? '#ffd6d6' : (enabled ? 'whitesmoke' : '#eee'),
         color: applying ? '#a00' : (enabled ? '#000' : '#777')
+      };
+    },
+
+    getDelButtonStyle() {
+      const enabled = this.deleteEnabled;
+      return {
+        fontSize: '12px',
+        cursor: enabled ? 'pointer' : 'not-allowed',
+        borderRadius: '7px',
+        padding: '4px 8px',
+        border: '1px solid #bbb',
+        backgroundColor: enabled ? 'whitesmoke' : '#eee',
+        color: enabled ? '#000' : '#777'
       };
     },
 
@@ -517,7 +520,7 @@ export default {
       return out;
     },
 
-    buildApplyPayload() {
+    buildFileIdObjsPayload() {
       const validEntries = Array.isArray(this._validEntries) ? this._validEntries : [];
       if (this.viewMode === 'search') {
         return this.buildFileIdObjsFromValidEntries(validEntries);
@@ -551,7 +554,7 @@ export default {
     async applyClick() {
       if (this.applyInProgress) return;
       await this.ensureSearched();
-      const payload = this.buildApplyPayload();
+      const payload = this.buildFileIdObjsPayload();
       if (!payload.length) return;
       this.error = null;
       this.applyInProgress = true;
@@ -588,6 +591,40 @@ export default {
       }
     },
 
+    async deleteClick() {
+      if (this.delInProgress) return;
+      await this.ensureSearched();
+      const payload = this.buildFileIdObjsPayload();
+      if (!payload.length) return;
+      this.error = null;
+      this.delInProgress = true;
+      try {
+        const timeoutMs = 120000;
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error(`deleteSubFiles: timed out after ${timeoutMs / 1000}s`)), timeoutMs);
+        });
+        const res = await Promise.race([deleteSubFiles(payload), timeoutPromise]);
+        if (res && typeof res === 'object' && typeof res.error === 'string') {
+          this.error = res.error;
+        }
+      } catch (e) {
+        const msg = (() => {
+          if (!e) return '';
+          if (typeof e === 'string') return e;
+          if (typeof e === 'object' && typeof e.error === 'string') return e.error;
+          if (typeof e.message === 'string') return e.message;
+          try {
+            return JSON.stringify(e);
+          } catch {
+            return String(e);
+          }
+        })();
+        this.error = msg;
+      } finally {
+        this.delInProgress = false;
+      }
+    },
+
     closeApplyFailuresModal() {
       this.showApplyFailuresModal = false;
     },
@@ -596,14 +633,22 @@ export default {
       if (f == null) return '';
       if (typeof f === 'string') return f;
       if (typeof f === 'object') {
-        const fileId = f.file_id != null ? `file_id=${f.file_id}` : '';
-        const showName = f.showName != null ? `show=${f.showName}` : '';
-        const season = f.season != null ? `S${String(f.season).padStart(2, '0')}` : '';
-        const episode = f.episode != null ? `E${String(f.episode).padStart(2, '0')}` : '';
-        const se = season || episode ? `${season}${episode}` : '';
-        const err = f.error != null ? String(f.error) : (f.message != null ? String(f.message) : '');
-        const head = [fileId, showName, se].filter(Boolean).join(' ');
-        return head && err ? `${head} - ${err}` : (head || err || JSON.stringify(f));
+        const fileId = f.file_id != null ? String(f.file_id) : '';
+        const showName = f.showName != null ? String(f.showName) : '';
+        const season = f.season != null ? String(f.season) : '';
+        const episode = f.episode != null ? String(f.episode) : '';
+        const reason = f.reason != null
+          ? String(f.reason)
+          : (f.error != null ? String(f.error) : (f.message != null ? String(f.message) : ''));
+
+        const parts = [
+          `file_id=${fileId || '?'}`,
+          `showName=${showName || '?'}`,
+          `season=${season || '?'}`,
+          `episode=${episode || '?'}`,
+          `reason=${reason || '?'}`,
+        ];
+        return parts.join(' | ');
       }
       return String(f);
     },

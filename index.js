@@ -104,8 +104,109 @@ function encodeFileIdBase5(fileId) {
     out = alphabet[digit] + out;
     n = Math.floor(n / 32);
   } while (n > 0);
-  return out;
+  // Prefix with '#' so these can be uniquely identified for later deletion.
+  return '#' + out;
 }
+
+const deleteSubFiles = async (id, param, resolve, reject) => {
+  if (param === undefined || param === null || param === '') {
+    reject([id, { error: 'deleteSubFiles: missing params' }]);
+    return;
+  }
+
+  const fileIdObjs = util.jParse(param, 'deleteSubFiles');
+  if (!Array.isArray(fileIdObjs) || fileIdObjs.length === 0) {
+    reject([id, { error: 'deleteSubFiles: expected non-empty array' }]);
+    return;
+  }
+
+  const showName = typeof fileIdObjs[0]?.showName === 'string' ? fileIdObjs[0].showName : '';
+  if (!showName || showName.trim() === '') {
+    reject([id, { error: 'deleteSubFiles: missing showName' }]);
+    return;
+  }
+  if (showName.includes('/') || showName.includes('\\')) {
+    reject([id, { error: 'deleteSubFiles: invalid showName' }]);
+    return;
+  }
+  for (const entry of fileIdObjs) {
+    if (typeof entry?.showName !== 'string' || entry.showName !== showName) {
+      reject([id, { error: 'deleteSubFiles: all entries must have same showName' }]);
+      return;
+    }
+  }
+
+  const localShowPath = path.join(tvDir, showName);
+  try {
+    const st = fs.statSync(localShowPath);
+    if (!st.isDirectory()) {
+      reject([id, { error: `Show directory missing: ${localShowPath} (n/a)` }]);
+      return;
+    }
+  } catch {
+    reject([id, { error: `Show directory missing: ${localShowPath} (n/a)` }]);
+    return;
+  }
+
+  const tags = new Set();
+  for (const entry of fileIdObjs) {
+    const file_id = entry?.file_id;
+    if (!Number.isFinite(Number(file_id))) {
+      reject([id, { error: 'deleteSubFiles: invalid file_id' }]);
+      return;
+    }
+    tags.add(encodeFileIdBase5(Number(file_id)));
+  }
+
+  const foundTags = new Set();
+  const deleted = [];
+  const failures = [];
+
+  const recurs = async (dirPath) => {
+    if (dirPath === tvDir + '/.stfolder') return;
+    let dirents;
+    try {
+      dirents = fs.readdirSync(dirPath, { withFileTypes: true });
+    } catch (e) {
+      failures.push({ path: dirPath, error: `readdir failed: ${e.message}` });
+      return;
+    }
+
+    for (const d of dirents) {
+      if (d.isSymbolicLink && d.isSymbolicLink()) continue;
+      const p = path.join(dirPath, d.name);
+      if (d.isDirectory()) {
+        await recurs(p);
+        continue;
+      }
+      if (!d.isFile()) continue;
+      if (!d.name || !d.name.toLowerCase().endsWith('.srt')) continue;
+
+      const noExt = d.name.slice(0, -4); // remove .srt
+      const lastDot = noExt.lastIndexOf('.');
+      if (lastDot < 0) continue;
+      const tag = noExt.slice(lastDot + 1);
+      if (!tags.has(tag)) continue;
+
+      try {
+        fs.unlinkSync(p);
+        foundTags.add(tag);
+        deleted.push(p);
+      } catch (e) {
+        failures.push({ path: p, tag, error: `unlink failed: ${e.message}` });
+      }
+    }
+  };
+
+  await recurs(localShowPath);
+
+  const notFound = [];
+  for (const t of tags) {
+    if (!foundTags.has(t)) notFound.push(t);
+  }
+
+  resolve([id, { ok: true, deletedCount: deleted.length, notFoundCount: notFound.length, notFound, failures }]);
+};
 
 function parseSeasonEpisodeFromFilename(fileName) {
   // Uses parse-torrent-title. Returns { season, episode } or null.
@@ -1456,6 +1557,8 @@ const runOne = () => {
     case 'subsSearch': subsSearch(id, param, resolve, reject); break;
 
     case 'applySubFiles': applySubFiles(id, param, resolve, reject); break;
+
+    case 'deleteSubFiles': deleteSubFiles(id, param, resolve, reject); break;
 
     case 'createShowFolder': createShowFolder(id, param, resolve, reject); break;
 

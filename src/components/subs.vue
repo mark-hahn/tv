@@ -12,9 +12,12 @@
           div {{ headerShowName }}
           div(v-if="hasSearched && !loading && totalSubsCount > 0" style="font-size:12px; color:#666; font-weight:normal;") {{ validSubsCount }}/{{ totalSubsCount }}
         div(style="display:flex; gap:8px; margin-left:auto;")
-          button(@click.stop="searchClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Search
-          button(@click.stop="scrollGroup(-1)" :disabled="!items || items.length === 0" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;") ▲
-          button(@click.stop="scrollGroup(1)" :disabled="!items || items.length === 0" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;") ▼
+          button(@click.stop="selectMode('search')" :style="getModeButtonStyle('search')") Search
+          button(@click.stop="selectMode('season')" :style="getModeButtonStyle('season')") Season
+          button(@click.stop="selectMode('episode')" :style="getModeButtonStyle('episode')") Episode
+          button(@click.stop="selectMode('files')" :style="getModeButtonStyle('files')") Files
+          button(v-if="viewMode === 'search'" @click.stop="scrollGroup(-1)" :disabled="!items || items.length === 0" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;") ▲
+          button(v-if="viewMode === 'search'" @click.stop="scrollGroup(1)" :disabled="!items || items.length === 0" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;") ▼
 
       div(style="height:1px; width:100%; background-color:#ddd; margin-top:6px;")
 
@@ -29,18 +32,20 @@
         div Press search to load subtitles.
       div(v-else-if="hasSearched && totalSubsCount === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
         div No subtitles found.
-      template(v-for="(item, index) in items" :key="getItemCardKey(item, index)")
+      template(v-for="(item, index) in items" :key="getItemCardKey(item)")
         div.se-divider(v-if="shouldShowSeDivider(index)" style="text-align:center; color:#888; font-family:monospace; margin:4px 0;") {{ getSeDividerText(index) }}
         div(@click="handleItemClick($event, item)" @click.stop :style="getCardStyle(item)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
-          div(v-if="isClicked(item)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
+          div(v-if="shouldShowClickedCheckmark && isClicked(item)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
           div(style="display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:12px; color:#333;")
-            div(style="font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;") {{ item?.line1 || '' }}
+            div(:style="{ fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, color: item?.lineColor || '#333' }") {{ item?.line1 || '' }}
             div(style="color:#666; white-space:nowrap;") {{ item?.uploader || '' }}
 </template>
 
 <script>
 import parseTorrentTitle from 'parse-torrent-title';
 import { subsSearch } from '../srvr.js';
+import * as emby from '../emby.js';
+import * as util from '../util.js';
 
 export default {
   name: 'Subs',
@@ -68,11 +73,22 @@ export default {
       loading: false,
       error: null,
       hasSearched: false,
-      selectedItem: null,
-      clickedItems: new Set(),
+      viewMode: 'search',
+      selectedCardKey: '',
+      selectedSeason: null,
+      selectedEpisode: null,
+      clickedItemKeys: new Set(),
       currentShow: null,
       totalSubsCount: 0,
-      validSubsCount: 0
+      validSubsCount: 0,
+
+      _lastSearchShowKey: '',
+      _validEntries: [],
+      _selectedEpisodeBySeason: {},
+      _selectedFileKeyBySeasonEpisode: {},
+
+      _seriesMapObj: null,
+      _seriesMapLoading: false
     };
   },
 
@@ -84,6 +100,10 @@ export default {
         this.activeShow?.Name ||
         ''
       );
+    },
+
+    shouldShowClickedCheckmark() {
+      return this.viewMode === 'files';
     }
   },
 
@@ -91,14 +111,21 @@ export default {
     activeShow: {
       immediate: true,
       handler(newShow, oldShow) {
-        const newName = newShow?.Name || '';
-        const oldName = oldShow?.Name || '';
+        const newKey = this.getShowKey(newShow);
+        const oldKey = this.getShowKey(oldShow);
         this.currentShow = newShow || null;
-        if (newName && newName !== oldName) {
+        if (newKey && newKey !== oldKey) {
           this.resetSearchState();
+          void this.ensureSeriesMapLoaded();
+          void this.ensureSearched();
         }
       }
     }
+  },
+
+  mounted() {
+    void this.ensureSeriesMapLoaded();
+    void this.ensureSearched();
   },
 
   methods: {
@@ -111,10 +138,71 @@ export default {
       this.error = null;
       this.loading = false;
       this.hasSearched = false;
-      this.selectedItem = null;
-      this.clickedItems = new Set();
+      this.selectedCardKey = '';
+      this.selectedSeason = null;
+      this.selectedEpisode = null;
+      this.clickedItemKeys = new Set();
       this.totalSubsCount = 0;
       this.validSubsCount = 0;
+      this._validEntries = [];
+      this._selectedEpisodeBySeason = {};
+      this._selectedFileKeyBySeasonEpisode = {};
+
+      this._seriesMapObj = null;
+      this._seriesMapLoading = false;
+    },
+
+    async ensureSeriesMapLoaded() {
+      const show = this.currentShow || this.activeShow;
+      if (!show) return;
+      if (this._seriesMapObj) return;
+      if (this._seriesMapLoading) return;
+      this._seriesMapLoading = true;
+      try {
+        const seriesMapIn = await emby.getSeriesMap(show);
+        const seriesMapObj = util.buildSeriesMap(seriesMapIn);
+        this._seriesMapObj = seriesMapObj || null;
+      } catch {
+        this._seriesMapObj = null;
+      } finally {
+        this._seriesMapLoading = false;
+        // If user is in Season/Episode modes, rebuild using map now.
+        if (this.hasSearched) this.rebuildVisibleItems();
+      }
+    },
+
+    getShowKey(show) {
+      if (!show) return '';
+      const id = show?.Id != null ? String(show.Id) : '';
+      const name = show?.Name != null ? String(show.Name) : '';
+      const imdbDigits = (() => {
+        const imdb = show?.ProviderIds?.Imdb || show?.ProviderIds?.imdb || show?.ProviderIds?.IMDb || show?.ProviderIds?.IMDB;
+        if (!imdb) return '';
+        const raw = String(imdb).trim();
+        const digits = raw.toLowerCase().startsWith('tt') ? raw.slice(2) : raw;
+        const digitsOnly = digits.replace(/\D/g, '');
+        const normalized = digitsOnly.replace(/^0+/, '');
+        return normalized || digitsOnly;
+      })();
+      return id || imdbDigits || name;
+    },
+
+    getModeButtonStyle(mode) {
+      const active = this.viewMode === mode;
+      return {
+        fontSize: '13px',
+        cursor: 'pointer',
+        borderRadius: '7px',
+        padding: '4px 8px',
+        border: '1px solid #bbb',
+        backgroundColor: active ? '#ddd' : 'whitesmoke'
+      };
+    },
+
+    async selectMode(mode) {
+      this.viewMode = mode;
+      await this.ensureSearched();
+      this.rebuildVisibleItems();
     },
 
     handleScaledWheel(event) {
@@ -127,22 +215,66 @@ export default {
       el.scrollTop = Math.max(0, Math.min(max, (el.scrollTop || 0) + scaledDy));
     },
 
-    getItemCardKey(item, index) {
-      return String(item?.key || item?.id || index);
+    getItemCardKey(item) {
+      // All cards should have a stable non-empty key.
+      return String(item?.key || item?.id || '');
     },
 
     handleItemClick(_event, item) {
-      this.selectedItem = item;
-      this.clickedItems.add(item);
+      const key = this.getItemCardKey(item);
+      this.clickedItemKeys.add(key);
+
+      // Search mode: show all subs like before with no selection.
+      if (this.viewMode !== 'search') {
+        this.selectedCardKey = key;
+      }
+
+      if (this.viewMode === 'season') {
+        this.selectedSeason = item?.season != null ? Number(item.season) : null;
+        this.selectedEpisode = null;
+      }
+
+      if (this.viewMode === 'episode') {
+        this.selectedSeason = item?.season != null ? Number(item.season) : (this.selectedSeason != null ? this.selectedSeason : null);
+        this.selectedEpisode = item?.episode != null ? Number(item.episode) : null;
+        if (this.selectedSeason != null && this.selectedEpisode != null) {
+          this._selectedEpisodeBySeason[String(this.selectedSeason)] = this.selectedEpisode;
+        }
+      }
+
+      if (this.viewMode === 'search' || this.viewMode === 'files') {
+        if (item?.season != null) this.selectedSeason = Number(item.season);
+        if (item?.episode != null) this.selectedEpisode = Number(item.episode);
+      }
+
+      if (this.viewMode === 'files') {
+        const s = this.selectedSeason;
+        const e = this.selectedEpisode;
+        if (s != null && e != null && key) {
+          this._selectedFileKeyBySeasonEpisode[`${s}-${e}`] = key;
+        }
+      }
     },
 
     isClicked(item) {
-      return this.clickedItems.has(item);
+      return this.clickedItemKeys.has(this.getItemCardKey(item));
     },
 
     getCardStyle(item) {
-      const isSelected = this.selectedItem === item;
-      let bgColor = '#fff';
+      if (this.viewMode === 'search') {
+        return {
+          padding: '8px',
+          background: '#fff',
+          borderRadius: '5px',
+          border: '1px solid #ddd',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+          position: 'relative'
+        };
+      }
+
+      const isSelected = this.selectedCardKey && this.selectedCardKey === this.getItemCardKey(item);
+      let bgColor = item?.missing ? '#ffd6d6' : '#fff';
       if (isSelected) {
         bgColor = '#fffacd';
       }
@@ -311,7 +443,7 @@ export default {
       const line2 = parts.length ? `     ${parts.join(' ')}` : '';
 
       return {
-        key: id || release,
+        key: id ? `sub-${id}` : (release ? `sub-${release}` : ''),
         line1,
         line2,
         uploader,
@@ -322,6 +454,7 @@ export default {
     },
 
     shouldShowSeDivider(index) {
+      if (this.viewMode !== 'search') return false;
       if (index === 0) return true;
       if (index < 0) return false;
       const prev = this.items[index - 1];
@@ -402,7 +535,17 @@ export default {
         // WebSocket RPC to tv-series-srvr (no local proxy)
         return await subsSearch({ imdb_id: imdbIdDigits, page });
       } catch (e) {
-        const msg = e?.message || (typeof e === 'string' ? e : JSON.stringify(e));
+        const msg = (() => {
+          if (!e) return '';
+          if (typeof e === 'string') return e;
+          if (typeof e === 'object' && typeof e.error === 'string') return e.error;
+          if (typeof e.message === 'string') return e.message;
+          try {
+            return JSON.stringify(e);
+          } catch {
+            return String(e);
+          }
+        })();
         throw new Error(msg);
       }
     },
@@ -420,18 +563,253 @@ export default {
       throw lastErr;
     },
 
+    rebuildVisibleItems() {
+      const validEntries = Array.isArray(this._validEntries) ? this._validEntries : [];
+
+      const containsKey = (arr, key) => {
+        if (!key) return false;
+        if (!Array.isArray(arr) || !arr.length) return false;
+        for (let i = 0; i < arr.length; i++) {
+          if (this.getItemCardKey(arr[i]) === key) return true;
+        }
+        return false;
+      };
+
+      const bySeason = new Map();
+      for (const it of validEntries) {
+        const s = it.season;
+        const e = it.episode;
+        if (s == null || e == null) continue;
+        if (!bySeason.has(s)) bySeason.set(s, new Map());
+        const seasonMap = bySeason.get(s);
+        if (!seasonMap.has(e)) seasonMap.set(e, []);
+        seasonMap.get(e).push(it);
+      }
+
+      const seasonNums = Array.from(bySeason.keys()).sort((a, b) => a - b);
+
+      // Prefer series map seasons/episodes when available.
+      const mapObj = this._seriesMapObj && typeof this._seriesMapObj === 'object' ? this._seriesMapObj : null;
+      const mapSeasonNums = mapObj
+        ? Object.keys(mapObj)
+            .map(k => Number(k))
+            .filter(n => Number.isFinite(n))
+            .sort((a, b) => a - b)
+        : [];
+
+      const getMapEpisodeNums = (season) => {
+        if (!mapObj || season == null) return [];
+        const seasonObj = mapObj[String(season)];
+        if (!seasonObj || typeof seasonObj !== 'object') return [];
+        return Object.keys(seasonObj)
+          .map(k => Number(k))
+          .filter(n => Number.isFinite(n))
+          .sort((a, b) => a - b);
+      };
+
+      const pickFirstSeason = () => {
+        const list = mapSeasonNums.length ? mapSeasonNums : seasonNums;
+        if (this.selectedSeason != null) {
+          if (mapSeasonNums.length && list.includes(this.selectedSeason)) return this.selectedSeason;
+          if (!mapSeasonNums.length && bySeason.has(this.selectedSeason)) return this.selectedSeason;
+        }
+        return list.length ? list[0] : null;
+      };
+      const pickFirstEpisode = (season) => {
+        if (season == null) return null;
+        const mapEps = getMapEpisodeNums(season);
+        if (mapEps.length) {
+          if (this.selectedEpisode != null && mapEps.includes(this.selectedEpisode)) return this.selectedEpisode;
+          return mapEps[0];
+        }
+        const seasonMap = bySeason.get(season);
+        const eps = seasonMap ? Array.from(seasonMap.keys()).sort((a, b) => a - b) : [];
+        if (this.selectedEpisode != null && seasonMap && seasonMap.has(this.selectedEpisode)) return this.selectedEpisode;
+        return eps.length ? eps[0] : null;
+      };
+
+      if (this.viewMode === 'season') {
+        const seasons = mapSeasonNums.length ? mapSeasonNums : seasonNums;
+        const seasonCards = seasons.map((s) => {
+          const mapEps = getMapEpisodeNums(s);
+          const episodeCount = mapEps.length ? mapEps.length : Array.from((bySeason.get(s) || new Map()).keys()).length;
+          const hasAnySubs = bySeason.has(s);
+          const missing = !hasAnySubs;
+          return {
+            key: `season-${s}`,
+            season: s,
+            episodeCount,
+            line1: missing
+              ? `Season ${s} subs missing`
+              : `Season ${s} | ${episodeCount} episodes`,
+            missing,
+            lineColor: missing ? '#a00' : '#333',
+            uploader: ''
+          };
+        });
+        this.items = seasonCards;
+
+        const s0 = pickFirstSeason();
+        if (s0 != null) this.selectedSeason = s0;
+        const defaultKey = s0 != null ? `season-${s0}` : '';
+        if (!this.selectedCardKey || !containsKey(seasonCards, this.selectedCardKey)) {
+          this.selectedCardKey = defaultKey;
+        }
+        return;
+      }
+
+      if (this.viewMode === 'episode') {
+        const s = pickFirstSeason();
+        this.selectedSeason = s;
+        const seasonMap = s != null ? bySeason.get(s) : null;
+        const eps = (() => {
+          const mapEps = getMapEpisodeNums(s);
+          if (mapEps.length) return mapEps;
+          return seasonMap ? Array.from(seasonMap.keys()).sort((a, b) => a - b) : [];
+        })();
+
+        const remembered = s != null ? this._selectedEpisodeBySeason[String(s)] : null;
+        const rememberedNum = remembered != null ? Number(remembered) : null;
+        const rememberedEpisode = (Number.isFinite(rememberedNum) && eps.includes(rememberedNum)) ? rememberedNum : null;
+        if (rememberedEpisode != null) this.selectedEpisode = rememberedEpisode;
+
+        const episodeCards = eps.map((e) => {
+          const fileCount = (seasonMap && Array.isArray(seasonMap.get(e))) ? seasonMap.get(e).length : 0;
+          const sStr = s != null ? String(s).padStart(2, '0') : '??';
+          const eStr = e != null ? String(e).padStart(2, '0') : '??';
+          const missing = fileCount === 0;
+          return {
+            key: `episode-${s}-${e}`,
+            season: s,
+            episode: e,
+            fileCount,
+            line1: missing
+              ? `S${sStr}E${eStr} subs missing`
+              : `S${sStr}E${eStr} | ${fileCount} files`,
+            missing,
+            lineColor: missing ? '#a00' : '#333',
+            uploader: ''
+          };
+        });
+        this.items = episodeCards;
+
+        const e0 = rememberedEpisode != null ? rememberedEpisode : pickFirstEpisode(s);
+        if (e0 != null) this.selectedEpisode = e0;
+        const defaultKey = (s != null && e0 != null) ? `episode-${s}-${e0}` : '';
+        if (!this.selectedCardKey || !containsKey(episodeCards, this.selectedCardKey)) {
+          this.selectedCardKey = defaultKey;
+        }
+        return;
+      }
+
+      if (this.viewMode === 'files') {
+        const s = pickFirstSeason();
+        const rememberedEpisode = s != null ? this._selectedEpisodeBySeason[String(s)] : null;
+        const seasonMap0 = s != null ? bySeason.get(s) : null;
+        this.selectedSeason = s;
+
+        const eps = (() => {
+          const mapEps = getMapEpisodeNums(s);
+          if (mapEps.length) return mapEps;
+          return seasonMap0 ? Array.from(seasonMap0.keys()).sort((a, b) => a - b) : [];
+        })();
+
+        const rememberedNum = rememberedEpisode != null ? Number(rememberedEpisode) : null;
+        const rememberedOk = Number.isFinite(rememberedNum) && eps.includes(rememberedNum);
+        if (rememberedOk) this.selectedEpisode = rememberedNum;
+
+        const e = rememberedOk ? rememberedNum : pickFirstEpisode(s);
+        this.selectedEpisode = e;
+        const seasonMap = s != null ? bySeason.get(s) : null;
+        const files = (seasonMap && e != null && Array.isArray(seasonMap.get(e))) ? [...seasonMap.get(e)] : [];
+
+        files.sort((a, b) => {
+          const pA = (a.uploader || '').trim();
+          const pB = (b.uploader || '').trim();
+          const pAEmpty = !pA;
+          const pBEmpty = !pB;
+          if (pAEmpty !== pBEmpty) return pAEmpty ? 1 : -1;
+          const pCmp = pA.localeCompare(pB, undefined, { sensitivity: 'base' });
+          if (pCmp !== 0) return pCmp;
+          const rA = (a.release || '').trim();
+          const rB = (b.release || '').trim();
+          return rA.localeCompare(rB, undefined, { sensitivity: 'base' });
+        });
+
+        this.items = files.map(x => this.buildCardItemFromResult(x.entry));
+        const seKey = (s != null && e != null) ? `${s}-${e}` : '';
+        const rememberedFileKey = seKey ? this._selectedFileKeyBySeasonEpisode[seKey] : '';
+        if (rememberedFileKey && containsKey(this.items, rememberedFileKey)) {
+          this.selectedCardKey = rememberedFileKey;
+        } else if (!this.selectedCardKey || !containsKey(this.items, this.selectedCardKey)) {
+          this.selectedCardKey = this.items.length ? this.getItemCardKey(this.items[0]) : '';
+        }
+        return;
+      }
+
+      // search (default)
+      const allFileItems = validEntries
+        .slice()
+        .sort((a, b) => {
+          const sA = a.season != null ? a.season : Number.POSITIVE_INFINITY;
+          const sB = b.season != null ? b.season : Number.POSITIVE_INFINITY;
+          if (sA !== sB) return sA - sB;
+          const eA = a.episode != null ? a.episode : Number.POSITIVE_INFINITY;
+          const eB = b.episode != null ? b.episode : Number.POSITIVE_INFINITY;
+          if (eA !== eB) return eA - eB;
+          const uA = (a.uploader || '').trim();
+          const uB = (b.uploader || '').trim();
+          const uAEmpty = !uA;
+          const uBEmpty = !uB;
+          if (uAEmpty !== uBEmpty) return uAEmpty ? 1 : -1;
+          const uCmp = uA.localeCompare(uB, undefined, { sensitivity: 'base' });
+          if (uCmp !== 0) return uCmp;
+          const rA = (a.release || '').trim();
+          const rB = (b.release || '').trim();
+          return rA.localeCompare(rB, undefined, { sensitivity: 'base' });
+        })
+        .map(x => this.buildCardItemFromResult(x.entry));
+
+      this.items = allFileItems;
+      // Search mode shows no selection.
+      this.selectedCardKey = '';
+    },
+
+    async ensureSearched() {
+      const showKey = this.getShowKey(this.currentShow || this.activeShow);
+      if (!showKey) return;
+      if (this.hasSearched && this._lastSearchShowKey === showKey) {
+        this.rebuildVisibleItems();
+        return;
+      }
+      await this.searchClick();
+    },
+
     async searchClick() {
+      // Whenever a search is done, switch mode to Search.
+      this.viewMode = 'search';
+
       this.loading = true;
       this.error = null;
       this.hasSearched = true;
       this.items = [];
       this.searchResults = [];
-      this.selectedItem = null;
-      this.clickedItems = new Set();
+      this.selectedCardKey = '';
+      this.clickedItemKeys = new Set();
       this.totalSubsCount = 0;
       this.validSubsCount = 0;
+      this._validEntries = [];
+
+      // Reset selection memory on any new search.
+      this.selectedSeason = null;
+      this.selectedEpisode = null;
+      this._selectedEpisodeBySeason = {};
+      this._selectedFileKeyBySeasonEpisode = {};
 
       try {
+        const showKey = this.getShowKey(this.currentShow || this.activeShow);
+        this._lastSearchShowKey = showKey;
+
         const imdbIdDigits = this.getShowImdbId();
         if (!imdbIdDigits) {
           this.error = 'No imdb id found for selected show';
@@ -479,41 +857,58 @@ export default {
           return { entry, release, uploader, season, episode };
         });
 
-        sortable.sort((a, b) => {
-          const sA = a.season != null ? a.season : Number.POSITIVE_INFINITY;
-          const sB = b.season != null ? b.season : Number.POSITIVE_INFINITY;
-          if (sA !== sB) return sA - sB;
-
-          const eA = a.episode != null ? a.episode : Number.POSITIVE_INFINITY;
-          const eB = b.episode != null ? b.episode : Number.POSITIVE_INFINITY;
-          if (eA !== eB) return eA - eB;
-
-          const uA = (a.uploader || '').trim();
-          const uB = (b.uploader || '').trim();
-          const uAEmpty = !uA;
-          const uBEmpty = !uB;
-          if (uAEmpty !== uBEmpty) return uAEmpty ? 1 : -1;
-          const uCmp = uA.localeCompare(uB, undefined, { sensitivity: 'base' });
-          if (uCmp !== 0) return uCmp;
-
-          const rA = (a.release || '').trim();
-          const rB = (b.release || '').trim();
-          return rA.localeCompare(rB, undefined, { sensitivity: 'base' });
-        });
-
         this.totalSubsCount = sortable.length;
         const validOnly = sortable.filter(x => x.season != null && x.episode != null);
         this.validSubsCount = validOnly.length;
 
         this.searchResults = validOnly.map(x => x.entry);
 
-        this.items = validOnly.map(x => this.buildCardItemFromResult(x.entry));
+        this._validEntries = validOnly;
+        // Default selected season/episode for Season/Episode/Files views: choose earliest S/E.
+        if (validOnly.length) {
+          let minSeason = null;
+          let minEpisode = null;
+          for (const it of validOnly) {
+            const s = it?.season != null ? Number(it.season) : null;
+            const e = it?.episode != null ? Number(it.episode) : null;
+            if (!Number.isFinite(s) || !Number.isFinite(e)) continue;
+            if (minSeason == null || s < minSeason || (s === minSeason && e < minEpisode)) {
+              minSeason = s;
+              minEpisode = e;
+            }
+          }
+          if (minSeason != null) this.selectedSeason = minSeason;
+          if (minEpisode != null) this.selectedEpisode = minEpisode;
+          if (minSeason != null && minEpisode != null) {
+            this._selectedEpisodeBySeason[String(minSeason)] = minEpisode;
+          }
+        }
+
+        this.rebuildVisibleItems();
 
         if (failedPages.length) {
           this.error = `Warning: some pages failed to load (${failedPages.join(', ')}). Showing partial results.`;
         }
       } catch (err) {
-        const msg = err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
+        const raw = err?.message || (typeof err === 'string' ? err : (() => {
+          try {
+            return JSON.stringify(err);
+          } catch {
+            return String(err);
+          }
+        })());
+
+        // If server returned a JSON string like {"error":"..."}, show the nested error.
+        let msg = raw;
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object' && typeof parsed.error === 'string') {
+            msg = parsed.error;
+          }
+        } catch {
+          // ignore
+        }
+
         this.error = msg;
       } finally {
         this.loading = false;

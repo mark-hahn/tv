@@ -10,3 +10,11 @@ in the season list and the episode list make sure seasons listed match those in 
 - make sure season list has a card for every season in series map and for missing ones show: "Season <season number> subs missing", in light-red.
 
 - make sure episode list has a card for every episode in map and for missing ones show: "SxxYxx subs missing", in  light-red.
+
+the show Toast of London has 50 subs according to website search 
+- count at top of search page shows 580/776
+- the total number of episodes in season list is 19
+
+i found the numbers problem - the subs pane was showing an old show selection.  i switched shows by using filtering down to one show.  subs was still using the show from before filtering.
+
+that worked -- 

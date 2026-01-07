@@ -88,7 +88,11 @@ export default {
       _selectedFileKeyBySeasonEpisode: {},
 
       _seriesMapObj: null,
-      _seriesMapLoading: false
+      _seriesMapLoading: false,
+
+      // Monotonic tokens to prevent stale async updates when switching shows quickly.
+      _searchToken: 0,
+      _seriesMapToken: 0
     };
   },
 
@@ -114,7 +118,14 @@ export default {
         const newKey = this.getShowKey(newShow);
         const oldKey = this.getShowKey(oldShow);
         this.currentShow = newShow || null;
-        if (newKey && newKey !== oldKey) {
+        // Cancel any in-flight async work from the previous show.
+        this._searchToken++;
+        this._seriesMapToken++;
+
+        // Treat any actual show change as requiring a state reset.
+        // Keys can be missing/empty during rapid filtering, but we still must not
+        // keep displaying previous results.
+        if (newShow !== oldShow && (newKey !== oldKey || newKey || oldKey)) {
           this.resetSearchState();
           void this.ensureSeriesMapLoaded();
           void this.ensureSearched();
@@ -157,14 +168,18 @@ export default {
       if (!show) return;
       if (this._seriesMapObj) return;
       if (this._seriesMapLoading) return;
+      const token = ++this._seriesMapToken;
       this._seriesMapLoading = true;
       try {
         const seriesMapIn = await emby.getSeriesMap(show);
+        if (token !== this._seriesMapToken) return;
         const seriesMapObj = util.buildSeriesMap(seriesMapIn);
+        if (token !== this._seriesMapToken) return;
         this._seriesMapObj = seriesMapObj || null;
       } catch {
         this._seriesMapObj = null;
       } finally {
+        if (token !== this._seriesMapToken) return;
         this._seriesMapLoading = false;
         // If user is in Season/Episode modes, rebuild using map now.
         if (this.hasSearched) this.rebuildVisibleItems();
@@ -789,6 +804,8 @@ export default {
       // Whenever a search is done, switch mode to Search.
       this.viewMode = 'search';
 
+      const token = ++this._searchToken;
+
       this.loading = true;
       this.error = null;
       this.hasSearched = true;
@@ -810,6 +827,9 @@ export default {
         const showKey = this.getShowKey(this.currentShow || this.activeShow);
         this._lastSearchShowKey = showKey;
 
+        // If user switched shows right as we started, abort.
+        if (token !== this._searchToken) return;
+
         const imdbIdDigits = this.getShowImdbId();
         if (!imdbIdDigits) {
           this.error = 'No imdb id found for selected show';
@@ -819,6 +839,7 @@ export default {
         const failedPages = [];
 
         const first = await this.fetchSubsPageWithRetry(imdbIdDigits, 1);
+        if (token !== this._searchToken) return;
         const totalPages = Number(first?.total_pages ?? 0);
         const totalCount = Number(first?.total_count ?? 0);
         const perPage = Number(first?.per_page ?? 0);
@@ -834,6 +855,7 @@ export default {
         for (let p = 2; p <= pagesToLoad; p++) {
           try {
             const next = await this.fetchSubsPageWithRetry(imdbIdDigits, p);
+            if (token !== this._searchToken) return;
             if (Array.isArray(next?.data)) allData.push(...next.data);
           } catch (e) {
             failedPages.push(p);
@@ -890,6 +912,7 @@ export default {
           this.error = `Warning: some pages failed to load (${failedPages.join(', ')}). Showing partial results.`;
         }
       } catch (err) {
+        if (token !== this._searchToken) return;
         const raw = err?.message || (typeof err === 'string' ? err : (() => {
           try {
             return JSON.stringify(err);
@@ -911,6 +934,7 @@ export default {
 
         this.error = msg;
       } finally {
+        if (token !== this._searchToken) return;
         this.loading = false;
       }
     }

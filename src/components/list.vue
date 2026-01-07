@@ -367,6 +367,7 @@ export default {
       webHistStr:           "",
       errMsg:               "",
       highlightName:        "",
+      _pendingSetUpSeriesToken: 0,
       allShowsLength:        0,
       currentPane:       'series',
       mapShow:            null,
@@ -1145,8 +1146,13 @@ export default {
       
       // Only emit setUpSeries if the show selection changed
       if(showChanged) {
-        this.$nextTick(() =>
-          evtBus.emit('setUpSeries', show));
+        const token = (this._pendingSetUpSeriesToken || 0) + 1;
+        this._pendingSetUpSeriesToken = token;
+        this.$nextTick(() => {
+          // If another selection happened since scheduling, ignore this one.
+          if (token !== this._pendingSetUpSeriesToken) return;
+          evtBus.emit('setUpSeries', show);
+        });
       }
       
       // If map pane is currently showing, update it to show the newly selected show

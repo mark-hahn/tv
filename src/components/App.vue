@@ -1185,8 +1185,23 @@ export default {
     
     // Listen for tvdbData updates from series pane
     evtBus.on('tvdbDataReady', (data) => {
-      this.currentShow = data.show;
-      this.currentTvdbData = data.tvdbData;
+      const incomingShow = data?.show || null;
+      const incomingId = incomingShow?.Id != null ? String(incomingShow.Id) : '';
+      const incomingName = incomingShow?.Name != null ? String(incomingShow.Name) : '';
+
+      const currentId = this.currentShow?.Id != null ? String(this.currentShow.Id) : '';
+      const currentName = this.currentShow?.Name != null ? String(this.currentShow.Name) : '';
+
+      // Ignore late/stale tvdbDataReady events for a previously selected show.
+      // setUpSeries is the source of truth for current selection.
+      if (this.currentShow && incomingShow) {
+        const sameId = incomingId && currentId && incomingId === currentId;
+        const sameName = !incomingId && !currentId && incomingName && currentName && incomingName === currentName;
+        if (!sameId && !sameName) return;
+      }
+
+      // Keep currentShow as-is (already set by setUpSeries). Only update TVDB data.
+      this.currentTvdbData = data?.tvdbData ?? null;
 
       // If Actors pane is currently showing, refresh it with the newly loaded tvdbData.
       if (this.currentPane === 'actors') {

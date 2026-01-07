@@ -40,7 +40,7 @@
 
 <script>
 import parseTorrentTitle from 'parse-torrent-title';
-import { config } from '../config.js';
+import { subsSearch } from '../srvr.js';
 
 export default {
   name: 'Subs',
@@ -398,13 +398,13 @@ export default {
     },
 
     async fetchSubsPage(imdbIdDigits, page) {
-      const url = `${config.torrentsApiUrl}/api/subs/search?imdb_id=${encodeURIComponent(imdbIdDigits)}&page=${encodeURIComponent(String(page))}`;
-      const resp = await fetch(url);
-      if (!resp.ok) {
-        const txt = await resp.text();
-        throw new Error(`HTTP ${resp.status}: ${resp.statusText}${txt ? `\n${txt}` : ''}`);
+      try {
+        // WebSocket RPC to tv-series-srvr (no local proxy)
+        return await subsSearch({ imdb_id: imdbIdDigits, page });
+      } catch (e) {
+        const msg = e?.message || (typeof e === 'string' ? e : JSON.stringify(e));
+        throw new Error(msg);
       }
-      return await resp.json();
     },
 
     async fetchSubsPageWithRetry(imdbIdDigits, page) {

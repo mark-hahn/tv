@@ -148,6 +148,12 @@ export function getDevices()
 export function getLastViewed()      
             {return fCall('getLastViewed')}
 
+// OpenSubtitles (server-side search)
+// tv-series-srvr should implement this endpoint.
+// params: { imdb_id?: string, q?: string, page?: number }
+export function subsSearch(params)
+            {return fCall('subsSearch', params)}
+
 
 export function getRejects()       
             {return fCall('getRejects')}

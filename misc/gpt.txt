@@ -34,7 +34,8 @@ skip any false valued field data.attributes.machine_translated or data.attribute
 
 
 
-remove proxy for secrets/subs-login.txt and secrets/subs-token.txt.  i will store them in tv-series-srvr in the hahnca.com server.
+remove proxy server for getSubsLoginPath and getSubsTokenPath in torrents/src/server.js. instead add them to the websocket calls to tv-series-srvr.
+-- document everything copilot needs in tv-series-srvr to provide the endpoint for them.  i'll move secrets/subs-login.txt and secrets/subs-token.txt to tv-series-srvr.
 
 
 

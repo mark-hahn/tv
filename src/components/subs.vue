@@ -433,7 +433,6 @@ export default {
 
       try {
         const imdbIdDigits = this.getShowImdbId();
-        console.log('[subs] show ProviderIds + imdb', (this.currentShow || this.activeShow)?.ProviderIds, 'digits', imdbIdDigits);
         if (!imdbIdDigits) {
           this.error = 'No imdb id found for selected show';
           return;
@@ -460,7 +459,6 @@ export default {
             if (Array.isArray(next?.data)) allData.push(...next.data);
           } catch (e) {
             failedPages.push(p);
-            console.warn('[subs] page fetch failed', { page: p, error: e?.message || String(e) });
           }
         }
 
@@ -507,27 +505,7 @@ export default {
         const validOnly = sortable.filter(x => x.season != null && x.episode != null);
         this.validSubsCount = validOnly.length;
 
-        const unknownSeEp = sortable.filter(x => x.season == null || x.episode == null).slice(0, 10);
-        if (unknownSeEp.length) {
-          console.log(
-            '[subs] first 10 with unknown S/E',
-            unknownSeEp.map(x => ({
-              season: x.season,
-              episode: x.episode,
-              release: x.release,
-              uploader: x.uploader,
-              url: x.entry?.attributes?.url,
-              files: Array.isArray(x.entry?.attributes?.files)
-                ? x.entry.attributes.files.map(f => f?.file_name).filter(Boolean).slice(0, 3)
-                : []
-            }))
-          );
-        }
-
         this.searchResults = validOnly.map(x => x.entry);
-        if (this.searchResults.length > 0) {
-          console.log('[subs] first searchResult', this.searchResults[0]);
-        }
 
         this.items = validOnly.map(x => this.buildCardItemFromResult(x.entry));
 

@@ -985,6 +985,27 @@ const getFile = (id, param, resolve, reject) => {
   resolve([id, out]);
 };
 
+const applySubFiles = async (id, param, resolve, reject) => {
+  if (param === undefined || param === null || param === '') {
+    reject([id, { error: 'applySubFiles: missing params' }]);
+    return;
+  }
+
+  const parsed = util.jParse(param, 'applySubFiles');
+  if (parsed === null) {
+    reject([id, { error: 'applySubFiles: invalid JSON params' }]);
+    return;
+  }
+
+  try {
+    // For now: just persist request for inspection.
+    await util.writeFile('samples/fileIdObjs.json', parsed);
+    resolve([id, 'ok']);
+  } catch (e) {
+    reject([id, { error: `applySubFiles: write failed: ${e.message}` }]);
+  }
+};
+
 const deletePath = async (id, path, resolve, _reject) => {
   // console.log('deletePath', id, path);
   try {
@@ -1091,6 +1112,8 @@ const runOne = () => {
     case 'getFile': getFile(id, param, resolve, reject); break;
 
     case 'subsSearch': subsSearch(id, param, resolve, reject); break;
+
+    case 'applySubFiles': applySubFiles(id, param, resolve, reject); break;
 
     case 'createShowFolder': createShowFolder(id, param, resolve, reject); break;
 

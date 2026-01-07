@@ -16,6 +16,7 @@
           button(@click.stop="selectMode('season')" :style="getModeButtonStyle('season')") Season
           button(@click.stop="selectMode('episode')" :style="getModeButtonStyle('episode')") Episode
           button(@click.stop="selectMode('files')" :style="getModeButtonStyle('files')") Files
+          button(@click.stop="applyClick" :disabled="!applyEnabled" :style="getApplyButtonStyle()") Apply
           button(v-if="viewMode === 'search'" @click.stop="scrollGroup(-1)" :disabled="!items || items.length === 0" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;") ▲
           button(v-if="viewMode === 'search'" @click.stop="scrollGroup(1)" :disabled="!items || items.length === 0" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;") ▼
 
@@ -43,7 +44,7 @@
 
 <script>
 import parseTorrentTitle from 'parse-torrent-title';
-import { subsSearch } from '../srvr.js';
+import { subsSearch, applySubFiles } from '../srvr.js';
 import * as emby from '../emby.js';
 import * as util from '../util.js';
 
@@ -82,6 +83,8 @@ export default {
       totalSubsCount: 0,
       validSubsCount: 0,
 
+      applyInProgress: false,
+
       _lastSearchShowKey: '',
       _validEntries: [],
       _selectedEpisodeBySeason: {},
@@ -108,6 +111,36 @@ export default {
 
     shouldShowClickedCheckmark() {
       return this.viewMode === 'files';
+    },
+
+    applyEnabled() {
+      const show = this.currentShow || this.activeShow;
+      if (!show) return false;
+      if (!this.hasSearched) return false;
+      if (this.loading) return false;
+
+      const validEntries = Array.isArray(this._validEntries) ? this._validEntries : [];
+      if (this.viewMode === 'search') return validEntries.length > 0;
+
+      if (this.viewMode === 'season') {
+        const s = this.selectedSeason;
+        if (s == null) return false;
+        return validEntries.some(v => v?.season === s);
+      }
+
+      if (this.viewMode === 'episode') {
+        const s = this.selectedSeason;
+        const e = this.selectedEpisode;
+        if (s == null || e == null) return false;
+        return validEntries.some(v => v?.season === s && v?.episode === e);
+      }
+
+      if (this.viewMode === 'files') {
+        if (!this.selectedCardKey) return false;
+        return Array.isArray(this.items) && this.items.some(it => this.getItemCardKey(it) === this.selectedCardKey && it?.file_id != null);
+      }
+
+      return false;
     }
   },
 
@@ -214,6 +247,20 @@ export default {
       };
     },
 
+    getApplyButtonStyle() {
+      const enabled = this.applyEnabled;
+      const applying = !!this.applyInProgress;
+      return {
+        fontSize: '13px',
+        cursor: enabled ? 'pointer' : 'not-allowed',
+        borderRadius: '7px',
+        padding: '4px 8px',
+        border: '1px solid #bbb',
+        backgroundColor: applying ? '#ffd6d6' : (enabled ? 'whitesmoke' : '#eee'),
+        color: applying ? '#a00' : (enabled ? '#000' : '#777')
+      };
+    },
+
     async selectMode(mode) {
       this.viewMode = mode;
       await this.ensureSearched();
@@ -313,6 +360,100 @@ export default {
       const digitsOnly = digits.replace(/\D/g, '');
       const normalized = digitsOnly.replace(/^0+/, '');
       return normalized || digitsOnly;
+    },
+
+    getCurrentShowName() {
+      const show = this.currentShow || this.activeShow;
+      const name = show?.Name != null ? String(show.Name) : '';
+      return name || '';
+    },
+
+    buildFileIdObjsFromValidEntries(validEntries) {
+      const showName = this.getCurrentShowName();
+      if (!showName) return [];
+      const out = [];
+      const seen = new Set();
+      for (const v of (Array.isArray(validEntries) ? validEntries : [])) {
+        const season = v?.season != null ? Number(v.season) : null;
+        const episode = v?.episode != null ? Number(v.episode) : null;
+        if (!Number.isFinite(season) || !Number.isFinite(episode)) continue;
+        const files = v?.entry?.attributes?.files;
+        if (!Array.isArray(files) || !files.length) continue;
+        for (const f of files) {
+          const fileId = f?.file_id;
+          if (fileId == null) continue;
+          const key = `${fileId}-${season}-${episode}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          out.push({
+            file_id: Number(fileId),
+            showName,
+            season,
+            episode,
+          });
+        }
+      }
+      return out;
+    },
+
+    buildApplyPayload() {
+      const validEntries = Array.isArray(this._validEntries) ? this._validEntries : [];
+      if (this.viewMode === 'search') {
+        return this.buildFileIdObjsFromValidEntries(validEntries);
+      }
+
+      if (this.viewMode === 'season') {
+        const s = this.selectedSeason;
+        return this.buildFileIdObjsFromValidEntries(validEntries.filter(v => v?.season === s));
+      }
+
+      if (this.viewMode === 'episode') {
+        const s = this.selectedSeason;
+        const e = this.selectedEpisode;
+        return this.buildFileIdObjsFromValidEntries(validEntries.filter(v => v?.season === s && v?.episode === e));
+      }
+
+      if (this.viewMode === 'files') {
+        const sel = Array.isArray(this.items) ? this.items.find(it => this.getItemCardKey(it) === this.selectedCardKey) : null;
+        const showName = this.getCurrentShowName();
+        if (!sel || !showName) return [];
+        const fileId = sel?.file_id;
+        const season = sel?.season;
+        const episode = sel?.episode;
+        if (fileId == null || season == null || episode == null) return [];
+        return [{ file_id: Number(fileId), showName, season: Number(season), episode: Number(episode) }];
+      }
+
+      return [];
+    },
+
+    async applyClick() {
+      await this.ensureSearched();
+      const payload = this.buildApplyPayload();
+      if (!payload.length) return;
+      this.error = null;
+      this.applyInProgress = true;
+      try {
+        const res = await applySubFiles(payload);
+        if (res && typeof res === 'object' && typeof res.error === 'string') {
+          this.error = res.error;
+        }
+      } catch (e) {
+        const msg = (() => {
+          if (!e) return '';
+          if (typeof e === 'string') return e;
+          if (typeof e === 'object' && typeof e.error === 'string') return e.error;
+          if (typeof e.message === 'string') return e.message;
+          try {
+            return JSON.stringify(e);
+          } catch {
+            return String(e);
+          }
+        })();
+        this.error = msg;
+      } finally {
+        this.applyInProgress = false;
+      }
     },
 
     parseSeasonEpisodeFromText(text) {
@@ -464,6 +605,33 @@ export default {
         uploader,
         season,
         episode,
+        raw: entry,
+      };
+    },
+
+    buildFileCardItem(validEntry, fileObj) {
+      const fileId = fileObj?.file_id;
+      const season = validEntry?.season;
+      const episode = validEntry?.episode;
+      const entry = validEntry?.entry;
+      if (fileId == null || season == null || episode == null || !entry) return null;
+
+      const release = entry?.attributes?.release != null ? String(entry.attributes.release) : '';
+      let uploader = entry?.attributes?.uploader?.name != null ? String(entry.attributes.uploader.name) : '';
+      if (uploader && uploader.trim().toLowerCase() === 'anonymous') uploader = '';
+
+      const sStr = String(Number(season)).padStart(2, '0');
+      const eStr = String(Number(episode)).padStart(2, '0');
+      const line1 = `S${sStr}E${eStr} ${release}`.trim();
+
+      return {
+        key: `file-${fileId}`,
+        file_id: Number(fileId),
+        season: Number(season),
+        episode: Number(episode),
+        uploader,
+        line1,
+        line2: '',
         raw: entry,
       };
     },
@@ -744,9 +912,20 @@ export default {
         const e = rememberedOk ? rememberedNum : pickFirstEpisode(s);
         this.selectedEpisode = e;
         const seasonMap = s != null ? bySeason.get(s) : null;
-        const files = (seasonMap && e != null && Array.isArray(seasonMap.get(e))) ? [...seasonMap.get(e)] : [];
+        const entries = (seasonMap && e != null && Array.isArray(seasonMap.get(e))) ? [...seasonMap.get(e)] : [];
 
-        files.sort((a, b) => {
+        // Flatten into per-file cards (OpenSubtitles attributes.files[]).
+        const fileCards = [];
+        for (const v of entries) {
+          const files = v?.entry?.attributes?.files;
+          if (!Array.isArray(files) || !files.length) continue;
+          for (const f of files) {
+            const card = this.buildFileCardItem(v, f);
+            if (card) fileCards.push(card);
+          }
+        }
+
+        fileCards.sort((a, b) => {
           const pA = (a.uploader || '').trim();
           const pB = (b.uploader || '').trim();
           const pAEmpty = !pA;
@@ -754,12 +933,12 @@ export default {
           if (pAEmpty !== pBEmpty) return pAEmpty ? 1 : -1;
           const pCmp = pA.localeCompare(pB, undefined, { sensitivity: 'base' });
           if (pCmp !== 0) return pCmp;
-          const rA = (a.release || '').trim();
-          const rB = (b.release || '').trim();
-          return rA.localeCompare(rB, undefined, { sensitivity: 'base' });
+          const lA = (a.line1 || '').trim();
+          const lB = (b.line1 || '').trim();
+          return lA.localeCompare(lB, undefined, { sensitivity: 'base' });
         });
 
-        this.items = files.map(x => this.buildCardItemFromResult(x.entry));
+        this.items = fileCards;
         const seKey = (s != null && e != null) ? `${s}-${e}` : '';
         const rememberedFileKey = seKey ? this._selectedFileKeyBySeasonEpisode[seKey] : '';
         if (rememberedFileKey && containsKey(this.items, rememberedFileKey)) {

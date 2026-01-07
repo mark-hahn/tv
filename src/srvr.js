@@ -154,6 +154,12 @@ export function getLastViewed()
 export function subsSearch(params)
             {return fCall('subsSearch', params)}
 
+// Apply subtitle files to media files on the server.
+// fileIdObjs: [{ file_id:number, showName:string, season:number, episode:number }, ...]
+// Returns: "ok" or { error: string }
+export function applySubFiles(fileIdObjs)
+            {return fCall('applySubFiles', fileIdObjs)}
+
 
 export function getRejects()       
             {return fCall('getRejects')}

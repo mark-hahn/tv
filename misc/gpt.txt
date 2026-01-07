@@ -2,21 +2,3 @@
 === copilot should ignore this file 
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
-
-add button Apply to right of files. when clicked send a list of applyData objects to tv-series-srvr endpoint applySubs();
-
-- an applyData object has properties: file_id, 
-
-
-in search mode the list should include every file_id in every result of search.
-
-in season mode it should include every file_id in all files in selected season
-
-in episode mode it should include every sub/file entry with selected season and episode
-
-in files mode it should just send the one selected sub/file.
-
-the endpoint will add subtitle files to the video files stored in server.
-
-what data is needed in this sub entry to download a .srt file using the api:
-

@@ -1,0 +1,16 @@
+
+Client calls this via WebSocket RPC:
+- method: applySubFiles(fileIdObjs)
+- return: "ok" on success, or { error: string } on failure
+
+fileIdObj shape (per subtitle file to apply):
+- file_id: number   (OpenSubtitles attributes.files[].file_id)
+- showName: string  (selected show.Name)
+- season: number
+- episode: number
+
+Server action in the future:
+- Downloads the subtitle via OpenSubtitles (POST /api/v1/download with file_id, then GET the returned link)
+- Writes the .srt next to the matching video file in the show folder
+
+ -- but for now just write the arg fileIdObjs to samples/fileIdObjs.json

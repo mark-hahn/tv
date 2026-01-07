@@ -80,6 +80,8 @@ const getExt = (name) => {
 
 const isVideoFileName = (name) => VIDEO_EXTS.has(getExt(name));
 
+const isSrtFileName = (name) => getExt(name) === 'srt';
+
 const toNum = (v) => {
   if (v == null) return null;
   if (Array.isArray(v)) return toNum(v[0]);
@@ -148,7 +150,14 @@ const sortDirNodes = (nodes) => {
     const bName = String(bNode || '');
     const aVideo = isVideoFileName(aName);
     const bVideo = isVideoFileName(bName);
-    if (aVideo !== bVideo) return aVideo ? -1 : 1;
+    const aSrt = isSrtFileName(aName);
+    const bSrt = isSrtFileName(bName);
+
+    // Ordering: video files first, then .srt files, then everything else.
+    const rank = (isVideo, isSrt) => (isVideo ? 0 : (isSrt ? 1 : 2));
+    const aRank = rank(aVideo, aSrt);
+    const bRank = rank(bVideo, bSrt);
+    if (aRank !== bRank) return aRank - bRank;
 
     const aSe = parseSeasonEpisode(aName);
     const bSe = parseSeasonEpisode(bName);
@@ -284,7 +293,18 @@ const TreeNodes = {
   render() {
     const nodes = sortDirNodes(filterNodesForVideos(this.nodes, this.videosOnly));
     const softWrap = (s) => String(s ?? '').replace(/([^A-Za-z0-9\s])/g, '$1\u200B');
-    const children = nodes.map((node, idx) => {
+    const fileRank = (name) => {
+      const n = String(name || '');
+      if (isVideoFileName(n)) return 0;
+      if (isSrtFileName(n)) return 1;
+      return 2;
+    };
+
+    const children = [];
+    let lastFileRank = null;
+
+    for (let idx = 0; idx < nodes.length; idx++) {
+      const node = nodes[idx];
       const key = this.nodeKey(node, idx);
 
       const rowStyleBase = {
@@ -314,9 +334,26 @@ const TreeNodes = {
       };
 
       if (typeof node === 'string') {
+        const r = fileRank(node);
+        if (lastFileRank != null && r !== lastFileRank) {
+          children.push(
+            h('div', {
+              key: `${key}:divider`,
+              style: {
+                ...this.indentStyle(),
+                height: '1px',
+                backgroundColor: '#ddd',
+                margin: '4px 0',
+                pointerEvents: 'none'
+              }
+            })
+          );
+        }
+        lastFileRank = r;
+
         const filePath = joinRel(this.parentPath, node);
         const isSelected = !!this.selectedFiles?.has?.(filePath);
-        return h(
+        children.push(h(
           'div',
           {
             key,
@@ -348,10 +385,13 @@ const TreeNodes = {
               ]
             )
           ]
-        );
+        ));
+        continue;
       }
 
       if (this.isDir(node)) {
+        // Reset file grouping for directory rows.
+        lastFileRank = null;
         const isOpen = this.isExpandedDir(node);
         const name = this.dirName(node);
         const dirPathVal = this.dirPath(node);
@@ -426,12 +466,13 @@ const TreeNodes = {
             })
           : null;
 
-        return h('div', { key }, [header, body]);
+        children.push(h('div', { key }, [header, body]));
+        continue;
       }
 
       // Unknown node type; skip.
-      return null;
-    });
+      continue;
+    }
 
     return h('div', {}, children);
   }

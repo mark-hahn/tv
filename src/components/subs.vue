@@ -397,9 +397,15 @@ export default {
         if (res && typeof res === 'object' && res.ok && Array.isArray(res.failures)) {
           this.applyFailures = res.failures;
           this.showApplyFailuresModal = res.failures.length > 0;
+          if (!res.failures.length) {
+            this.setHeaderStatusText('Offset finished', 2000);
+          }
         } else if (res && typeof res === 'object' && typeof res.error === 'string') {
           this.error = null;
           this.setHeaderStatusText(this.normalizeHeaderErrorText(res.error), 2000);
+        } else {
+          // String "ok" or object without failures/error.
+          this.setHeaderStatusText('Offset finished', 2000);
         }
       } catch (e) {
         const msg = (() => {

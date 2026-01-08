@@ -1,1 +1,10 @@
-[{"file_id":9252052,"showName":"Plebs","season":1,"episode":6,"localShowPath":"/mnt/media/tv/Plebs/","fileIdBase32":"#I0LGU"},{"file_id":8800132,"showName":"Plebs","season":1,"episode":6,"localShowPath":"/mnt/media/tv/Plebs/","fileIdBase32":"#IMR2E"},{"file_id":8800110,"showName":"Plebs","season":1,"episode":5,"localShowPath":"/mnt/media/tv/Plebs/","fileIdBase32":"#IMR1O"},{"file_id":8800057,"showName":"Plebs","season":1,"episode":3,"localShowPath":"/mnt/media/tv/Plebs/","fileIdBase32":"#IMRZZ"},{"file_id":8800188,"showName":"Plebs","season":1,"episode":4,"localShowPath":"/mnt/media/tv/Plebs/","fileIdBase32":"#IMR32"},{"file_id":8800114,"showName":"Plebs","season":1,"episode":2,"localShowPath":"/mnt/media/tv/Plebs/","fileIdBase32":"#IMR1S"},{"file_id":8800058,"showName":"Plebs","season":1,"episode":1,"localShowPath":"/mnt/media/tv/Plebs/","fileIdBase32":"#IMRZ0"},{"file_id":4013234,"showName":"Plebs","season":1,"episode":4,"localShowPath":"/mnt/media/tv/Plebs/","fileIdBase32":"#D0PFS"},{"file_id":4011811,"showName":"Plebs","season":1,"episode":6,"localShowPath":"/mnt/media/tv/Plebs/","fileIdBase32":"#D0NZD"},{"file_id":4012967,"showName":"Plebs","season":1,"episode":4,"localShowPath":"/mnt/media/tv/Plebs/","fileIdBase32":"#D0O3H"},{"file_id":4013244,"showName":"Plebs","season":1,"episode":5,"localShowPath":"/mnt/media/tv/Plebs/","fileIdBase32":"#D0PF2"},{"file_id":4008859,"showName":"Plebs","season":1,"episode":3,"localShowPath":"/mnt/media/tv/Plebs/","fileIdBase32":"#D0K21"},{"file_id":4008780,"showName":"Plebs","season":1,"episode":3,"localShowPath":"/mnt/media/tv/Plebs/","fileIdBase32":"#D0K0M"},{"file_id":4013274,"showName":"Plebs","season":1,"episode":2,"localShowPath":"/mnt/media/tv/Plebs/","fileIdBase32":"#D0PG0"},{"file_id":4013631,"showName":"Plebs","season":1,"episode":1,"localShowPath":"/mnt/media/tv/Plebs/","fileIdBase32":"#D0PR5"}]
+[
+  {
+    "file_id": 4013274,
+    "showName": "Plebs",
+    "season": 1,
+    "episode": 2,
+    "localShowPath": "/mnt/media/tv/Plebs/",
+    "fileIdBase32": "#D2PG2"
+  }
+]

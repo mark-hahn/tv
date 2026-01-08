@@ -264,6 +264,65 @@ const deleteSubFiles = async (id, param, resolve, reject) => {
   resolve([id, { ok: true, applied: Array.from(appliedSet), deletedCount: deleted.length, notFoundCount: notFound.length, notFound, failures }]);
 };
 
+const getSubFileIds = async (id, param, resolve, reject) => {
+  const showName = rpcParamToString(param).trim();
+  if (!showName) {
+    reject([id, { error: 'getSubFileIds: missing showName' }]);
+    return;
+  }
+  if (showName.includes('/') || showName.includes('\\')) {
+    reject([id, { error: 'getSubFileIds: invalid showName' }]);
+    return;
+  }
+
+  const localShowPath = path.join(tvDir, showName);
+  try {
+    const st = fs.statSync(localShowPath);
+    if (!st.isDirectory()) {
+      reject([id, { error: `Show directory missing: ${localShowPath} (n/a)` }]);
+      return;
+    }
+  } catch {
+    reject([id, { error: `Show directory missing: ${localShowPath} (n/a)` }]);
+    return;
+  }
+
+  // Match current Base32 tag style: .#<A-Z2-7>.srt
+  const tagRe = /\.\#([A-Z2-7]+)\.srt$/;
+  const foundSet = new Set();
+  const found = [];
+
+  const recurs = (dirPath) => {
+    if (dirPath === tvDir + '/.stfolder') return;
+    let dirents;
+    try {
+      dirents = fs.readdirSync(dirPath, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const d of dirents) {
+      if (d.isSymbolicLink && d.isSymbolicLink()) continue;
+      const p = path.join(dirPath, d.name);
+      if (d.isDirectory()) {
+        recurs(p);
+        continue;
+      }
+      if (!d.isFile()) continue;
+      const name = d.name;
+      if (!name || !name.toLowerCase().endsWith('.srt')) continue;
+      const m = tagRe.exec(name);
+      if (!m) continue;
+      const tag = m[1];
+      if (foundSet.has(tag)) continue;
+      foundSet.add(tag);
+      found.push(tag);
+    }
+  };
+
+  recurs(localShowPath);
+  resolve([id, found]);
+};
+
 function srtTimeToMs(timeStr) {
   // "hh:mm:ss,mmm" -> ms
   const m = /^([0-9]{2}):([0-9]{2}):([0-9]{2}),([0-9]{3})$/.exec(String(timeStr || '').trim());
@@ -1869,6 +1928,8 @@ const runOne = () => {
     case 'applySubFiles': applySubFiles(id, param, resolve, reject); break;
 
     case 'deleteSubFiles': deleteSubFiles(id, param, resolve, reject); break;
+
+    case 'getSubFileIds': getSubFileIds(id, param, resolve, reject); break;
 
     case 'offsetSubFiles': offsetSubFiles(id, param, resolve, reject); break;
 

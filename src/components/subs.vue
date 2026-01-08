@@ -56,11 +56,18 @@
       template(v-for="(item, index) in items" :key="getItemCardKey(item)")
         div.se-divider(v-if="shouldShowSeDivider(index)" style="text-align:center; color:#888; font-family:monospace; margin:4px 0;") {{ getSeDividerText(index) }}
         div(@click="handleItemClick($event, item)" @click.stop :style="getCardStyle(item)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
-          div(v-if="viewMode === 'files' && isAppliedFile(item)" style="position:absolute; top:8px; left:8px; color:#4CAF50; font-size:14px; font-weight:bold;") ✓
           div(v-if="shouldShowClickedCheckmark && isClicked(item)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
           div(style="display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:12px; color:#333;")
             div(:style="{ fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, color: item?.lineColor || '#333' }") {{ item?.line1 || '' }}
-            div(style="color:#666; white-space:nowrap;") {{ item?.uploader || '' }}
+            div(style="color:#666; white-space:nowrap; display:flex; align-items:center; gap:6px; justify-content:flex-end; min-width:0;")
+              template(v-if="viewMode === 'files'")
+                //- Fixed-width provider column so base32 aligns across rows
+                div(style="width:100px; min-width:100px; max-width:100px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;") {{ item?.uploader || '' }}
+                div(style="min-width:10ch; text-align:left; font-family:monospace;") {{ encodeFileIdBase32(item?.file_id) }}
+                div(:style="{ color:'#4CAF50', fontSize:'14px', fontWeight:'bold', visibility: (isAppliedFile(item) ? 'visible' : 'hidden') }") ✓
+              template(v-else)
+                div {{ item?.uploader || '' }}
+                div(v-if="hasAppliedMark(item)" style="color:#4CAF50; font-size:14px; font-weight:bold;") ✓
 </template>
 
 <script>
@@ -151,7 +158,54 @@ export default {
     },
 
     shouldShowClickedCheckmark() {
-      return this.viewMode === 'files';
+      return false;
+    },
+
+    appliedFileIdSet() {
+      const out = new Set();
+      const arr = Array.isArray(this._appliedFileIds) ? this._appliedFileIds : [];
+      for (const v of arr) {
+        const n = Number(v);
+        if (Number.isFinite(n)) out.add(n);
+      }
+      return out;
+    },
+
+    appliedEpisodeKeySet() {
+      const fileSet = this.appliedFileIdSet;
+      const out = new Set();
+      const validEntries = Array.isArray(this._validEntries) ? this._validEntries : [];
+      for (const v of validEntries) {
+        const s = v?.season;
+        const e = v?.episode;
+        if (!Number.isFinite(s) || !Number.isFinite(e)) continue;
+        const files = v?.entry?.attributes?.files;
+        if (!Array.isArray(files) || !files.length) continue;
+        let hit = false;
+        for (const f of files) {
+          const fileId = f?.file_id;
+          if (fileId == null) continue;
+          const n = Number(fileId);
+          if (!Number.isFinite(n)) continue;
+          if (fileSet.has(n)) {
+            hit = true;
+            break;
+          }
+        }
+        if (hit) out.add(`${s}-${e}`);
+      }
+      return out;
+    },
+
+    appliedSeasonSet() {
+      const out = new Set();
+      for (const k of this.appliedEpisodeKeySet) {
+        const m = /^(\d+)-(\d+)$/.exec(String(k));
+        if (!m) continue;
+        const s = Number(m[1]);
+        if (Number.isFinite(s)) out.add(s);
+      }
+      return out;
     },
 
     applyEnabled() {
@@ -202,6 +256,20 @@ export default {
   },
 
   methods: {
+    encodeFileIdBase32(fileId) {
+    const alphabet = 'ABCDEFGHIJKLMNOPabcdefghijklmnop';
+    let n = Number(fileId);
+    if (!Number.isFinite(n) || n < 0) n = 0;
+    n = Math.floor(n);
+
+    let base32 = '';
+    do {
+      base32 = alphabet[n % 32] + base32;
+      n = Math.floor(n / 32);
+    } while (n > 0);
+
+    return base32;
+    },
     sleep(ms) {
       return new Promise(resolve => setTimeout(resolve, ms));
     },
@@ -1015,9 +1083,23 @@ export default {
       if (fileId == null) return false;
       const n = Number(fileId);
       if (!Number.isFinite(n)) return false;
-      const arr = Array.isArray(this._appliedFileIds) ? this._appliedFileIds : [];
-      // Keep array for ordered storage; check membership via linear scan (max 1000).
-      return arr.includes(n);
+      return this.appliedFileIdSet.has(n);
+    },
+
+    hasAppliedMark(item) {
+      if (this.viewMode === 'files') return this.isAppliedFile(item);
+      if (this.viewMode === 'episode') {
+        const s = item?.season;
+        const e = item?.episode;
+        if (!Number.isFinite(Number(s)) || !Number.isFinite(Number(e))) return false;
+        return this.appliedEpisodeKeySet.has(`${Number(s)}-${Number(e)}`);
+      }
+      if (this.viewMode === 'season') {
+        const s = item?.season;
+        if (!Number.isFinite(Number(s))) return false;
+        return this.appliedSeasonSet.has(Number(s));
+      }
+      return false;
     },
 
     formatApplyFailure(f) {

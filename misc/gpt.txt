@@ -4,10 +4,4 @@
 === it is just a scratchpad for editing copilot prompts.
 
 
-the rpc calls now return an array property called "applied" that is a list of every file_id that was used to succesfully add a srt file or delete a srt file.
-
-keep a running list of every file_id ever returned in localstorage. store the file_id as a number in the json string like [1,2], not a string.
-
-in files cards show a small checkmark on every card with the file_id in that list.
- 
-keep the list in order of addition and whenever the list exceeds 1000 items prune oldest items to get it down to 1000.
+on cards in files list put provider in a div 100px wide and center provider text in div and place div to the left of the base32 text

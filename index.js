@@ -93,7 +93,7 @@ const notes        = notesCache;
 function encodeFileIdBase32(fileId) {
   // base-32 using alphabet: A-Z then 0-5.
   // Output is minimal-length (no left padding).
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ012345';
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   let n = Number(fileId);
   if (!Number.isFinite(n) || n < 0) n = 0;
   n = Math.floor(n);

@@ -91,7 +91,7 @@ const gaps         = JSON.parse(gapsStr);
 const notes        = notesCache;
 
 function encodeFileIdBase32(fileId) {
-  // base-32 using alphabet: A-Z then 0-5.
+  // base-32 using RFC4648 alphabet: A-Z then 2-7.
   // Output is minimal-length (no left padding).
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   let n = Number(fileId);
@@ -113,6 +113,24 @@ function encodeFileIdBase32Legacy(fileId) {
   // alphabet: A-P then a-p.
   // Output is minimal-length (no left padding).
   const alphabet = 'ABCDEFGHIJKLMNOPabcdefghijklmnop';
+  let n = Number(fileId);
+  if (!Number.isFinite(n) || n < 0) n = 0;
+  n = Math.floor(n);
+
+  let out = '';
+  do {
+    const digit = n % 32;
+    out = alphabet[digit] + out;
+    n = Math.floor(n / 32);
+  } while (n > 0);
+  return '#' + out;
+}
+
+function encodeFileIdBase32LegacyAZ05(fileId) {
+  // Legacy base-32 encoding used briefly:
+  // alphabet: A-Z then 0-5.
+  // Output is minimal-length (no left padding).
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ012345';
   let n = Number(fileId);
   if (!Number.isFinite(n) || n < 0) n = 0;
   n = Math.floor(n);
@@ -178,9 +196,10 @@ const deleteSubFiles = async (id, param, resolve, reject) => {
     const fid = Number(file_id);
     const tagNew = encodeFileIdBase32(fid);
     const tagLegacy = encodeFileIdBase32Legacy(fid);
+    const tagLegacy2 = encodeFileIdBase32LegacyAZ05(fid);
     fidToNewTag.set(fid, tagNew);
 
-    for (const tag of [tagNew, tagLegacy]) {
+    for (const tag of [tagNew, tagLegacy, tagLegacy2]) {
       searchTags.add(tag);
       if (!fileIdsByTag.has(tag)) fileIdsByTag.set(tag, new Set());
       fileIdsByTag.get(tag).add(fid);
@@ -243,6 +262,229 @@ const deleteSubFiles = async (id, param, resolve, reject) => {
   }
 
   resolve([id, { ok: true, applied: Array.from(appliedSet), deletedCount: deleted.length, notFoundCount: notFound.length, notFound, failures }]);
+};
+
+function srtTimeToMs(timeStr) {
+  // "hh:mm:ss,mmm" -> ms
+  const m = /^([0-9]{2}):([0-9]{2}):([0-9]{2}),([0-9]{3})$/.exec(String(timeStr || '').trim());
+  if (!m) return null;
+  const hh = Number(m[1]);
+  const mm = Number(m[2]);
+  const ss = Number(m[3]);
+  const ms = Number(m[4]);
+  if (![hh, mm, ss, ms].every((n) => Number.isFinite(n))) return null;
+  return (((hh * 60 + mm) * 60 + ss) * 1000 + ms);
+}
+
+function msToSrtTime(msTotal) {
+  let ms = Number(msTotal);
+  if (!Number.isFinite(ms) || ms < 0) ms = 0;
+  ms = Math.floor(ms);
+  const hh = Math.floor(ms / 3600000);
+  ms -= hh * 3600000;
+  const mm = Math.floor(ms / 60000);
+  ms -= mm * 60000;
+  const ss = Math.floor(ms / 1000);
+  ms -= ss * 1000;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
+}
+
+const offsetSubFiles = async (id, param, resolve, reject) => {
+  if (param === undefined || param === null || param === '') {
+    reject([id, { error: 'offsetSubFiles: missing params' }]);
+    return;
+  }
+
+  const fileIdObjs = util.jParse(param, 'offsetSubFiles');
+  if (!Array.isArray(fileIdObjs) || fileIdObjs.length === 0) {
+    reject([id, { error: 'offsetSubFiles: expected non-empty array' }]);
+    return;
+  }
+
+  const showName = typeof fileIdObjs[0]?.showName === 'string' ? fileIdObjs[0].showName : '';
+  if (!showName || showName.trim() === '') {
+    reject([id, { error: 'offsetSubFiles: missing showName' }]);
+    return;
+  }
+  if (showName.includes('/') || showName.includes('\\')) {
+    reject([id, { error: 'offsetSubFiles: invalid showName' }]);
+    return;
+  }
+  for (const entry of fileIdObjs) {
+    if (typeof entry?.showName !== 'string' || entry.showName !== showName) {
+      reject([id, { error: 'offsetSubFiles: all entries must have same showName' }]);
+      return;
+    }
+  }
+
+  const localShowPath = path.join(tvDir, showName);
+  try {
+    const st = fs.statSync(localShowPath);
+    if (!st.isDirectory()) {
+      reject([id, { error: `Show directory missing: ${localShowPath} (n/a)` }]);
+      return;
+    }
+  } catch {
+    reject([id, { error: `Show directory missing: ${localShowPath} (n/a)` }]);
+    return;
+  }
+
+  // Validate offset is present on every entry and identical.
+  const offsetRaw = fileIdObjs[0]?.offset;
+  const offsetMs = Math.trunc(Number(offsetRaw));
+  if (!Number.isFinite(offsetMs)) {
+    reject([id, { error: 'offsetSubFiles: invalid offset' }]);
+    return;
+  }
+  for (const entry of fileIdObjs) {
+    const o = Math.trunc(Number(entry?.offset));
+    if (!Number.isFinite(o) || o !== offsetMs) {
+      reject([id, { error: 'offsetSubFiles: offset must be the same on every entry' }]);
+      return;
+    }
+  }
+
+  const failures = [];
+  const appliedSet = new Set();
+
+  const addFailure = (cand, stage, status, details, error) => {
+    const fid = Number(cand?.file_id);
+    const showName = typeof cand?.showName === 'string' ? cand.showName : undefined;
+    const season = cand?.season;
+    const episode = cand?.episode;
+
+    let reason = '';
+    if (status !== undefined && status !== null) reason = `${stage} HTTP ${status}`;
+    else if (error) reason = `${stage}: ${error}`;
+    else reason = stage;
+
+    const rec = { file_id: fid, showName, season, episode, reason, stage, status };
+    if (details !== undefined) rec.details = details;
+    failures.push(rec);
+  };
+
+  // Build tag set and scan show folder once for all matching SRTs.
+  const searchTags = new Set();
+  for (const entry of fileIdObjs) {
+    const fid = Number(entry?.file_id);
+    if (!Number.isFinite(fid)) {
+      addFailure(entry, 'input', undefined, undefined, 'invalid file_id');
+      continue;
+    }
+    searchTags.add(encodeFileIdBase32(fid));
+    searchTags.add(encodeFileIdBase32Legacy(fid));
+    searchTags.add(encodeFileIdBase32LegacyAZ05(fid));
+  }
+
+  const pathsByTag = new Map();
+  const recurs = (dirPath) => {
+    if (dirPath === tvDir + '/.stfolder') return;
+    let dirents;
+    try {
+      dirents = fs.readdirSync(dirPath, { withFileTypes: true });
+    } catch (e) {
+      failures.push({ path: dirPath, error: `readdir failed: ${e.message}` });
+      return;
+    }
+    for (const d of dirents) {
+      if (d.isSymbolicLink && d.isSymbolicLink()) continue;
+      const p = path.join(dirPath, d.name);
+      if (d.isDirectory()) {
+        recurs(p);
+        continue;
+      }
+      if (!d.isFile()) continue;
+      if (!d.name || !d.name.toLowerCase().endsWith('.srt')) continue;
+      const noExt = d.name.slice(0, -4);
+      const lastDot = noExt.lastIndexOf('.');
+      if (lastDot < 0) continue;
+      const tag = noExt.slice(lastDot + 1);
+      if (!searchTags.has(tag)) continue;
+      if (!pathsByTag.has(tag)) pathsByTag.set(tag, []);
+      pathsByTag.get(tag).push(p);
+    }
+  };
+
+  recurs(localShowPath);
+
+  const timeLineRe = /^([0-9]{2}:[0-9]{2}:[0-9]{2},[0-9]{3})(\s*-->\s*)([0-9]{2}:[0-9]{2}:[0-9]{2},[0-9]{3})(.*)$/;
+
+  for (const entry of fileIdObjs) {
+    const fid = Number(entry?.file_id);
+    if (!Number.isFinite(fid)) {
+      addFailure(entry, 'input', undefined, undefined, 'invalid file_id');
+      continue;
+    }
+
+    const tags = [encodeFileIdBase32(fid), encodeFileIdBase32Legacy(fid), encodeFileIdBase32LegacyAZ05(fid)];
+    const srtPaths = [];
+    const seen = new Set();
+    for (const t of tags) {
+      const arr = pathsByTag.get(t);
+      if (!arr) continue;
+      for (const p of arr) {
+        if (seen.has(p)) continue;
+        seen.add(p);
+        srtPaths.push(p);
+      }
+    }
+
+    if (srtPaths.length === 0) {
+      addFailure(entry, 'find', undefined, { tags }, 'subtitle .srt not found');
+      continue;
+    }
+
+    let anyUpdated = false;
+    for (const srtPath of srtPaths) {
+      let text;
+      try {
+        text = fs.readFileSync(srtPath, 'utf8');
+      } catch (e) {
+        addFailure(entry, 'read', undefined, { path: srtPath }, e.message);
+        continue;
+      }
+
+      const lines = String(text).split(/\r?\n/);
+      let changed = false;
+      let matched = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const m = timeLineRe.exec(line);
+        if (!m) continue;
+        const startMs = srtTimeToMs(m[1]);
+        const endMs = srtTimeToMs(m[3]);
+        if (startMs === null || endMs === null) continue;
+        matched++;
+        const newStart = Math.max(0, startMs + offsetMs);
+        const newEnd = Math.max(0, endMs + offsetMs);
+        lines[i] = `${msToSrtTime(newStart)}${m[2]}${msToSrtTime(newEnd)}${m[4] || ''}`;
+        changed = true;
+      }
+
+      if (matched === 0) {
+        addFailure(entry, 'parse', undefined, { path: srtPath }, 'no timing lines found');
+        continue;
+      }
+      if (!changed) {
+        // Shouldn't happen if matched>0, but keep it safe.
+        addFailure(entry, 'parse', undefined, { path: srtPath }, 'no changes applied');
+        continue;
+      }
+
+      try {
+        fs.writeFileSync(srtPath, lines.join('\n'), 'utf8');
+        anyUpdated = true;
+      } catch (e) {
+        addFailure(entry, 'write', undefined, { path: srtPath }, e.message);
+      }
+    }
+
+    if (anyUpdated) {
+      appliedSet.add(fid);
+    }
+  }
+
+  resolve([id, { ok: true, applied: Array.from(appliedSet), failures }]);
 };
 
 function parseSeasonEpisodeFromFilename(fileName) {
@@ -1416,9 +1658,13 @@ const applySubFiles = async (id, param, resolve, reject) => {
         const fid = Number(cand.file_id);
 
         // Don't create a duplicate if the legacy-tagged subtitle already exists.
-        const legacyTag = encodeFileIdBase32Legacy(fid);
-        const legacyPath = path.join(seasonPath, `${fileBase}.${legacyTag}.srt`);
-        if (fs.existsSync(legacyPath)) continue;
+        const legacyTag1 = encodeFileIdBase32Legacy(fid);
+        const legacyPath1 = path.join(seasonPath, `${fileBase}.${legacyTag1}.srt`);
+        if (fs.existsSync(legacyPath1)) continue;
+
+        const legacyTag2 = encodeFileIdBase32LegacyAZ05(fid);
+        const legacyPath2 = path.join(seasonPath, `${fileBase}.${legacyTag2}.srt`);
+        if (fs.existsSync(legacyPath2)) continue;
 
         // If this file_id already failed earlier in this call, skip it.
         if (failedByFileId.has(fid)) continue;
@@ -1623,6 +1869,8 @@ const runOne = () => {
     case 'applySubFiles': applySubFiles(id, param, resolve, reject); break;
 
     case 'deleteSubFiles': deleteSubFiles(id, param, resolve, reject); break;
+
+    case 'offsetSubFiles': offsetSubFiles(id, param, resolve, reject); break;
 
     case 'createShowFolder': createShowFolder(id, param, resolve, reject); break;
 

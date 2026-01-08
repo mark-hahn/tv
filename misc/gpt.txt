@@ -3,19 +3,14 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
+- add tv-series-srvr rpc offsetSubfiles(fileIdObjs) with a return of ok or error object including failure list and applied list like applySubFiles.
 
-on cards in files list move provider and base32 text to the right so right side of base32 text is 10px to left of checkmark. 
+- fileIdObjs is calculated the same as in applySubFiles(fileIdObjs) with the exception that each entry of fileIdObjs has an extra property "offset" which is a signed number. offset is the same in every entry.
 
-remove any whitespace between provider div and base32 text
+there should be an input box labeled Trim to the left of the FileId input box the same width as the FileId input box.  The value in the Trim input box must be a signed integer.
 
-shrink base32 div to 45px and 
+when a value is accepted from the Trim input box bring up a confirmation that says "Is it ok to adjust timing by <ms> ms?" where <ms> is the number from the Trim input box.
 
-in encodeFileIdBase32 change alphabet to  'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+if confirmed then call offsetSubfiles(fileIdObjs) with the property "offset" in every fileIdObjs entry with the number from the Trim input box.
 
-add an input box labeled FileId 50px wide to the right side of top row of files header.  when value is accepted convert to uppercase and look for sub a file with that base32 version of file_id.  if found then set the season selection to the one card that includes the file with that base32 value. do the same for the episode and files list. show the files list scrolled such that the selected card is visible in the pane.
-
-- scroll works now
-
-- change msg "Error: FileId not found: " to "ID not found", show in center of top row of hdr,  and only show for 1 sec
-
-- show input box at all times
+show errors like "Error: unknownfunction: offsetSubfiles" in the middle of the top row for 2 secs.

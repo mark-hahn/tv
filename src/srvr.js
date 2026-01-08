@@ -185,6 +185,12 @@ export function applySubFiles(fileIdObjs)
 export function deleteSubFiles(fileIdObjs)
             {return fCall('deleteSubFiles', fileIdObjs)}
 
+// Offset (trim) existing subtitle files on the server.
+// fileIdObjs: [{ file_id:number, showName:string, season:number, episode:number, offset:number }, ...]
+// Returns: "ok" or { error: string } or { ok:true, failures:[...], applied:[...] }
+export function offsetSubFiles(fileIdObjs)
+            {return fCall('offsetSubFiles', fileIdObjs)}
+
 
 export function getRejects()       
             {return fCall('getRejects')}

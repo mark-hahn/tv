@@ -15,6 +15,12 @@
         div(v-if="fileIdStatusText" style="position:absolute; left:50%; transform:translateX(-50%); font-size:12px; font-weight:normal; color:#c00; text-align:center; pointer-events:none;") {{ fileIdStatusText }}
         div(style="margin-left:auto; display:flex; align-items:center;")
           div(style="display:flex; align-items:center; gap:6px;")
+            div(style="font-size:12px; font-weight:normal; color:#555;") Trim
+            input(
+              v-model="trimMsText"
+              @keyup.enter.stop.prevent="acceptTrimMs"
+              style="width:50px; font-size:12px; padding:2px 4px; border:1px solid #bbb; border-radius:4px;"
+            )
             div(style="font-size:12px; font-weight:normal; color:#555;") FileId
             input(
               v-model="fileIdSearch"
@@ -89,7 +95,7 @@
 
 <script>
 import parseTorrentTitle from 'parse-torrent-title';
-import { subsSearch, applySubFiles, deleteSubFiles } from '../srvr.js';
+import { subsSearch, applySubFiles, deleteSubFiles, offsetSubFiles } from '../srvr.js';
 import evtBus from '../evtBus.js';
 import * as emby from '../emby.js';
 import * as util from '../util.js';
@@ -142,6 +148,8 @@ export default {
       // Tracks file_ids successfully applied/deleted (server-reported) across sessions.
       _appliedFileIds: [],
 
+      trimMsText: '',
+      _trimBusy: false,
       fileIdSearch: '',
       fileIdStatusText: '',
       _fileIdStatusTimer: null,
@@ -292,6 +300,29 @@ export default {
     return base32;
     },
 
+    setHeaderStatusText(text, durationMs) {
+      const t = String(text || '').trim();
+      this.fileIdStatusText = t;
+      if (this._fileIdStatusTimer) {
+        clearTimeout(this._fileIdStatusTimer);
+        this._fileIdStatusTimer = null;
+      }
+      if (!t) return;
+      const ms = Number(durationMs);
+      const useMs = Number.isFinite(ms) && ms > 0 ? ms : 1000;
+      this._fileIdStatusTimer = setTimeout(() => {
+        this.fileIdStatusText = '';
+        this._fileIdStatusTimer = null;
+      }, useMs);
+    },
+
+    normalizeHeaderErrorText(msg) {
+      const s = String(msg || '').trim();
+      if (!s) return 'Error';
+      if (/^error\s*:/i.test(s)) return `Error: ${s.replace(/^error\s*:/i, '').trim()}`;
+      return `Error: ${s}`;
+    },
+
     async acceptFileIdSearch() {
       await this.ensureSearched();
       const raw = String(this.fileIdSearch || '').trim();
@@ -307,15 +338,7 @@ export default {
       const hit = this.findFileByBase32(code);
       if (!hit) {
         this.error = null;
-        this.fileIdStatusText = 'ID not found';
-        if (this._fileIdStatusTimer) {
-          clearTimeout(this._fileIdStatusTimer);
-          this._fileIdStatusTimer = null;
-        }
-        this._fileIdStatusTimer = setTimeout(() => {
-          this.fileIdStatusText = '';
-          this._fileIdStatusTimer = null;
-        }, 1000);
+        this.setHeaderStatusText('ID not found', 1000);
         return;
       }
 
@@ -325,11 +348,7 @@ export default {
       const fileKey = `file-${file_id}`;
 
       this.error = null;
-      this.fileIdStatusText = '';
-      if (this._fileIdStatusTimer) {
-        clearTimeout(this._fileIdStatusTimer);
-        this._fileIdStatusTimer = null;
-      }
+      this.setHeaderStatusText('', 0);
       this.selectedSeasonKeys = [seasonKey];
       this.selectedEpisodeKeys = [episodeKey];
       this.selectedFileKeys = [fileKey];
@@ -344,6 +363,61 @@ export default {
       this.rebuildVisibleItems();
       await this.$nextTick();
       this.scrollCardIntoView(fileKey);
+    },
+
+    async acceptTrimMs() {
+      if (this._trimBusy) return;
+      this._trimBusy = true;
+      try {
+        await this.ensureSearched();
+        const raw = String(this.trimMsText || '').trim();
+        if (!raw) return;
+        if (!/^[+-]?\d+$/.test(raw)) return;
+        const offset = Number.parseInt(raw, 10);
+        if (!Number.isFinite(offset)) return;
+
+        const ok = window.confirm(`Is it ok to adjust timing by ${offset} ms?`);
+        if (!ok) return;
+
+        const payload = this.buildFileIdObjsPayload();
+        if (!payload.length) return;
+        const payloadWithOffset = payload.map(o => ({ ...o, offset }));
+
+        this.error = null;
+        const timeoutMs = 120000;
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error(`offsetSubFiles: timed out after ${timeoutMs / 1000}s`)), timeoutMs);
+        });
+        const res = await Promise.race([offsetSubFiles(payloadWithOffset), timeoutPromise]);
+
+        if (res && typeof res === 'object' && Array.isArray(res.applied)) {
+          this.recordAppliedFileIds(res.applied);
+        }
+
+        if (res && typeof res === 'object' && res.ok && Array.isArray(res.failures)) {
+          this.applyFailures = res.failures;
+          this.showApplyFailuresModal = res.failures.length > 0;
+        } else if (res && typeof res === 'object' && typeof res.error === 'string') {
+          this.error = null;
+          this.setHeaderStatusText(this.normalizeHeaderErrorText(res.error), 2000);
+        }
+      } catch (e) {
+        const msg = (() => {
+          if (!e) return '';
+          if (typeof e === 'string') return e;
+          if (typeof e === 'object' && typeof e.error === 'string') return e.error;
+          if (typeof e.message === 'string') return e.message;
+          try {
+            return JSON.stringify(e);
+          } catch {
+            return String(e);
+          }
+        })();
+        this.error = null;
+        this.setHeaderStatusText(this.normalizeHeaderErrorText(msg), 2000);
+      } finally {
+        this._trimBusy = false;
+      }
     },
 
     findFileByBase32(base32Upper) {

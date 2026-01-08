@@ -115,19 +115,10 @@ const deleteSubFiles = async (id, param, resolve, reject) => {
   }
 
   const fileIdObjs = util.jParse(param, 'deleteSubFiles');
-  if (fileIdObjs === null || fileIdObjs === undefined) {
-    reject([id, { error: 'deleteSubFiles: JSON parse failed' }]);
+  if (!Array.isArray(fileIdObjs) || fileIdObjs.length === 0) {
+    reject([id, { error: 'deleteSubFiles: expected non-empty array' }]);
     return;
   }
-
-  // Debug only: dump payload
-  try {
-    fs.writeFileSync('misc/temp.txt', JSON.stringify(fileIdObjs, null, 2), 'utf8');
-  } catch {}
-
-  // Debug only: do nothing else.
-  resolve([id, { ok: true }]);
-  return;
 
   const showName = typeof fileIdObjs[0]?.showName === 'string' ? fileIdObjs[0].showName : '';
   if (!showName || showName.trim() === '') {
@@ -1202,19 +1193,10 @@ const applySubFiles = async (id, param, resolve, reject) => {
   }
 
   const fileIdObjs = util.jParse(param, 'applySubFiles');
-  if (fileIdObjs === null || fileIdObjs === undefined) {
-    reject([id, { error: 'applySubFiles: JSON parse failed' }]);
+  if (!Array.isArray(fileIdObjs) || fileIdObjs.length === 0) {
+    reject([id, { error: 'applySubFiles: expected non-empty array' }]);
     return;
   }
-
-  // Debug only: dump payload
-  try {
-    fs.writeFileSync('misc/temp.txt', JSON.stringify(fileIdObjs, null, 2), 'utf8');
-  } catch {}
-
-  // Debug only: do nothing else.
-  resolve([id, { ok: true }]);
-  return;
 
   const showName = typeof fileIdObjs[0]?.showName === 'string' ? fileIdObjs[0].showName : '';
   if (!showName || showName.trim() === '') {
@@ -1273,6 +1255,7 @@ const applySubFiles = async (id, param, resolve, reject) => {
   // Step 1-4: update entries with local paths, validate, compute fileIdBase5.
   // Note: we fetch OpenSubtitles /download links lazily per video file so one bad
   // file_id (e.g. transient 502) doesn't fail the entire batch.
+  const seasonExistsCache = new Map();
   for (const entry of fileIdObjs) {
     const file_id = entry?.file_id;
     const season = entry?.season;
@@ -1292,9 +1275,8 @@ const applySubFiles = async (id, param, resolve, reject) => {
     }
 
     entry.localShowPath = localShowPath + '/';
-    entry.localSeasonPath = path.join(localShowPath, `Season ${Number(season)}`);
 
-    // Verify local show/season paths exist.
+    // Verify local show path exists.
     try {
       const stShow = fs.statSync(localShowPath);
       if (!stShow.isDirectory()) {
@@ -1305,15 +1287,22 @@ const applySubFiles = async (id, param, resolve, reject) => {
       reject([id, { error: `Show directory missing: ${entry.localShowPath} (${file_id})` }]);
       return;
     }
-    try {
-      const stSeason = fs.statSync(entry.localSeasonPath);
-      if (!stSeason.isDirectory()) {
-        reject([id, { error: `Season directory missing: ${entry.localSeasonPath} (${file_id})` }]);
-        return;
+
+    // If the requested season folder doesn't exist, record a failure but keep going.
+    const seasonNum = Number(season);
+    const expectedSeasonPath = path.join(localShowPath, `Season ${seasonNum}`);
+    let seasonExists = seasonExistsCache.get(seasonNum);
+    if (seasonExists === undefined) {
+      try {
+        seasonExists = fs.statSync(expectedSeasonPath).isDirectory();
+      } catch {
+        seasonExists = false;
       }
-    } catch {
-      reject([id, { error: `Season directory missing: ${entry.localSeasonPath} (${file_id})` }]);
-      return;
+      seasonExistsCache.set(seasonNum, seasonExists);
+    }
+    if (!seasonExists) {
+      entry._missingSeasonDir = true;
+      addFailure(entry, 'localSeason', undefined, { path: expectedSeasonPath }, 'Season directory missing');
     }
 
     entry.fileIdBase5 = encodeFileIdBase5(Number(file_id));
@@ -1348,6 +1337,8 @@ const applySubFiles = async (id, param, resolve, reject) => {
     return;
   }
 
+  const foundKeys = new Set();
+
   for (const dirent of seasonDirents) {
     if (!dirent.isDirectory()) continue;
     const seasonPath = path.join(localShowPath, dirent.name);
@@ -1372,6 +1363,8 @@ const applySubFiles = async (id, param, resolve, reject) => {
       const candidates = byKey.get(key);
       if (!candidates || candidates.length === 0) continue;
 
+      foundKeys.add(key);
+
       const fileBase = fileName.slice(0, -(ext.length + 1));
 
       // Find the first candidate that (a) doesn't already exist on disk and
@@ -1379,7 +1372,7 @@ const applySubFiles = async (id, param, resolve, reject) => {
       let wroteOneForThisVideo = false;
       for (const cand of candidates) {
         const srtName = `${fileBase}.${cand.fileIdBase5}.srt`;
-        const outPath = path.join(cand.localSeasonPath, srtName);
+        const outPath = path.join(seasonPath, srtName);
         if (fs.existsSync(outPath)) continue;
 
         const fid = Number(cand.file_id);
@@ -1461,6 +1454,15 @@ const applySubFiles = async (id, param, resolve, reject) => {
         // Ensure only one new srt per video per call.
         continue;
       }
+    }
+  }
+
+  // Any requested season/episode with no matching video file should be reported.
+  for (const [key, entries] of byKey.entries()) {
+    if (foundKeys.has(key)) continue;
+    for (const entry of entries) {
+      if (entry?._missingSeasonDir) continue; // already reported a more specific failure
+      addFailure(entry, 'match', undefined, { key }, 'No matching video file');
     }
   }
 

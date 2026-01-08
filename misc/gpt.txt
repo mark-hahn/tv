@@ -4,4 +4,18 @@
 === it is just a scratchpad for editing copilot prompts.
 
 
-on cards in files list put provider in a div 100px wide and center provider text in div and place div to the left of the base32 text
+on cards in files list move provider and base32 text to the right so right side of base32 text is 10px to left of checkmark. 
+
+remove any whitespace between provider div and base32 text
+
+shrink base32 div to 45px and 
+
+in encodeFileIdBase32 change alphabet to  'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+
+add an input box labeled FileId 50px wide to the right side of top row of files header.  when value is accepted convert to uppercase and look for sub a file with that base32 version of file_id.  if found then set the season selection to the one card that includes the file with that base32 value. do the same for the episode and files list. show the files list scrolled such that the selected card is visible in the pane.
+
+- scroll works now
+
+- change msg "Error: FileId not found: " to "ID not found", show in center of top row of hdr,  and only show for 1 sec
+
+- show input box at all times

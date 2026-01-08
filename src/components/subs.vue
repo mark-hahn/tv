@@ -8,11 +8,20 @@
 
     #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'10px', marginLeft:'0px', marginRight:'0px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
       //- Row 1
-      div(style="display:flex; justify-content:space-between; align-items:center;")
+      div(style="display:flex; justify-content:space-between; align-items:center; position:relative;")
         div(style="margin-left:20px; display:flex; gap:10px; align-items:baseline;")
           div {{ headerShowName }}
           div(v-if="hasSearched && !loading && totalSubsCount > 0" style="font-size:12px; color:#666; font-weight:normal;") {{ validSubsCount }}/{{ totalSubsCount }}
-        div(style="margin-left:auto;")
+        div(v-if="fileIdStatusText" style="position:absolute; left:50%; transform:translateX(-50%); font-size:12px; font-weight:normal; color:#c00; text-align:center; pointer-events:none;") {{ fileIdStatusText }}
+        div(style="margin-left:auto; display:flex; align-items:center;")
+          div(style="display:flex; align-items:center; gap:6px;")
+            div(style="font-size:12px; font-weight:normal; color:#555;") FileId
+            input(
+              v-model="fileIdSearch"
+              @keyup.enter.stop.prevent="acceptFileIdSearch"
+              @blur.stop="acceptFileIdSearch"
+              style="width:50px; font-size:12px; padding:2px 4px; border:1px solid #bbb; border-radius:4px;"
+            )
 
       //- Row 2 (all buttons centered)
       div(style="display:flex; justify-content:center; align-items:center; margin-top:6px;")
@@ -55,16 +64,24 @@
         div No subtitles found.
       template(v-for="(item, index) in items" :key="getItemCardKey(item)")
         div.se-divider(v-if="shouldShowSeDivider(index)" style="text-align:center; color:#888; font-family:monospace; margin:4px 0;") {{ getSeDividerText(index) }}
-        div(@click="handleItemClick($event, item)" @click.stop :style="getCardStyle(item)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
+        div(
+          @click="handleItemClick($event, item)"
+          @click.stop
+          :data-card-key="getItemCardKey(item)"
+          :style="getCardStyle(item)"
+          @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'"
+          @mouseleave="$event.currentTarget.style.boxShadow='none'"
+        )
           div(v-if="shouldShowClickedCheckmark && isClicked(item)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
           div(style="display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:12px; color:#333;")
             div(:style="{ fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, color: item?.lineColor || '#333' }") {{ item?.line1 || '' }}
             div(style="color:#666; white-space:nowrap; display:flex; align-items:center; gap:6px; justify-content:flex-end; min-width:0;")
               template(v-if="viewMode === 'files'")
                 //- Fixed-width provider column so base32 aligns across rows
-                div(style="width:100px; min-width:100px; max-width:100px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;") {{ item?.uploader || '' }}
-                div(style="min-width:10ch; text-align:left; font-family:monospace;") {{ encodeFileIdBase32(item?.file_id) }}
-                div(:style="{ color:'#4CAF50', fontSize:'14px', fontWeight:'bold', visibility: (isAppliedFile(item) ? 'visible' : 'hidden') }") ✓
+                div(style="display:flex; align-items:center; gap:0;")
+                  div(style="width:100px; min-width:100px; max-width:100px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;") {{ item?.uploader || '' }}
+                  div(style="width:45px; min-width:45px; max-width:45px; text-align:right; font-family:monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;") {{ encodeFileIdBase32(item?.file_id) }}
+                div(:style="{ color:'#4CAF50', fontSize:'14px', fontWeight:'bold', marginLeft:'4px', visibility: (isAppliedFile(item) ? 'visible' : 'hidden') }") ✓
               template(v-else)
                 div {{ item?.uploader || '' }}
                 div(v-if="hasAppliedMark(item)" style="color:#4CAF50; font-size:14px; font-weight:bold;") ✓
@@ -124,6 +141,10 @@ export default {
 
       // Tracks file_ids successfully applied/deleted (server-reported) across sessions.
       _appliedFileIds: [],
+
+      fileIdSearch: '',
+      fileIdStatusText: '',
+      _fileIdStatusTimer: null,
 
       showApplyFailuresModal: false,
       applyFailures: [],
@@ -257,7 +278,7 @@ export default {
 
   methods: {
     encodeFileIdBase32(fileId) {
-    const alphabet = 'ABCDEFGHIJKLMNOPabcdefghijklmnop';
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
     let n = Number(fileId);
     if (!Number.isFinite(n) || n < 0) n = 0;
     n = Math.floor(n);
@@ -269,6 +290,115 @@ export default {
     } while (n > 0);
 
     return base32;
+    },
+
+    async acceptFileIdSearch() {
+      await this.ensureSearched();
+      const raw = String(this.fileIdSearch || '').trim();
+      if (!raw) return;
+      const code = raw.toUpperCase();
+      this.fileIdSearch = code;
+
+      // If the box is always visible, make it work from any mode.
+      if (this.viewMode !== 'files') {
+        this.viewMode = 'files';
+      }
+
+      const hit = this.findFileByBase32(code);
+      if (!hit) {
+        this.error = null;
+        this.fileIdStatusText = 'ID not found';
+        if (this._fileIdStatusTimer) {
+          clearTimeout(this._fileIdStatusTimer);
+          this._fileIdStatusTimer = null;
+        }
+        this._fileIdStatusTimer = setTimeout(() => {
+          this.fileIdStatusText = '';
+          this._fileIdStatusTimer = null;
+        }, 1000);
+        return;
+      }
+
+      const { season, episode, file_id } = hit;
+      const seasonKey = `season-${season}`;
+      const episodeKey = `episode-${season}-${episode}`;
+      const fileKey = `file-${file_id}`;
+
+      this.error = null;
+      this.fileIdStatusText = '';
+      if (this._fileIdStatusTimer) {
+        clearTimeout(this._fileIdStatusTimer);
+        this._fileIdStatusTimer = null;
+      }
+      this.selectedSeasonKeys = [seasonKey];
+      this.selectedEpisodeKeys = [episodeKey];
+      this.selectedFileKeys = [fileKey];
+      this._lastClickedKeyByMode = {
+        ...(this._lastClickedKeyByMode || {}),
+        season: seasonKey,
+        episode: episodeKey,
+        files: fileKey,
+      };
+      this.selectedCardKey = fileKey;
+
+      this.rebuildVisibleItems();
+      await this.$nextTick();
+      this.scrollCardIntoView(fileKey);
+    },
+
+    findFileByBase32(base32Upper) {
+      const target = String(base32Upper || '').trim().toUpperCase();
+      if (!target) return null;
+      const validEntries = Array.isArray(this._validEntries) ? this._validEntries : [];
+      for (const v of validEntries) {
+        const season = v?.season;
+        const episode = v?.episode;
+        if (!Number.isFinite(season) || !Number.isFinite(episode)) continue;
+        const files = v?.entry?.attributes?.files;
+        if (!Array.isArray(files) || !files.length) continue;
+        for (const f of files) {
+          const fileId = f?.file_id;
+          if (fileId == null) continue;
+          const enc = this.encodeFileIdBase32(fileId);
+          if (String(enc || '').toUpperCase() === target) {
+            return { season: Number(season), episode: Number(episode), file_id: Number(fileId) };
+          }
+        }
+      }
+      return null;
+    },
+
+    scrollCardIntoView(cardKey) {
+      const key = String(cardKey || '');
+      if (!key) return;
+      const scroller = this.$refs?.scroller;
+      if (!scroller || typeof scroller.querySelector !== 'function') return;
+      // Keys are simple (season-#, episode-#-#, file-#) but escape anyway.
+      const safe = key.replace(/\"/g, '\\\"');
+      const el = scroller.querySelector(`[data-card-key="${safe}"]`);
+      if (!el) return;
+
+      const header = scroller.querySelector('#header');
+      const headerOffset = header ? (header.offsetHeight || 0) : 0;
+      const padding = 8;
+
+      const elTop = el.offsetTop || 0;
+      const elHeight = el.offsetHeight || 0;
+      const elBottom = elTop + elHeight;
+
+      const curTop = scroller.scrollTop || 0;
+      const visibleTop = curTop + headerOffset + padding;
+      const visibleBottom = curTop + (scroller.clientHeight || 0) - padding;
+
+      let nextTop = null;
+      if (elTop < visibleTop) {
+        nextTop = Math.max(0, elTop - headerOffset - padding);
+      } else if (elBottom > visibleBottom) {
+        nextTop = Math.max(0, elBottom - (scroller.clientHeight || 0) + padding);
+      }
+      if (nextTop != null) {
+        scroller.scrollTo({ top: nextTop, behavior: 'auto' });
+      }
     },
     sleep(ms) {
       return new Promise(resolve => setTimeout(resolve, ms));

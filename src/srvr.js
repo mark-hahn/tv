@@ -191,6 +191,12 @@ export function deleteSubFiles(fileIdObjs)
 export function offsetSubFiles(fileIdObjs)
             {return fCall('offsetSubFiles', fileIdObjs)}
 
+// Scan the show folder for existing subtitle files and return their file-id base32 strings.
+// showName: string
+// Returns: string[] (e.g. ["ASD2H", "IF8JH"])
+export function getSubFileIds(showName)
+            {return fCall('getSubFileIds', showName)}
+
 
 export function getRejects()       
             {return fCall('getRejects')}

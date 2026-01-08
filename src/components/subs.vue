@@ -37,7 +37,7 @@
           button(@click.stop="applyClick" :disabled="!applyEnabled" :style="getApplyButtonStyle()") Apply
           button(@click.stop="deleteClick" :disabled="!deleteEnabled" :style="getDelButtonStyle()") Del
           div(style="width:20px;")
-          button(@click.stop="selectMode('search')" :style="getModeButtonStyle('search')") Search
+          button(@click.stop="searchClick" :style="getModeButtonStyle('search')") Search
           button(@click.stop="selectMode('season')" :style="getModeButtonStyle('season')") Season
           button(@click.stop="selectMode('episode')" :style="getModeButtonStyle('episode')") Episode
           button(@click.stop="selectMode('files')" :style="getModeButtonStyle('files')") Files
@@ -95,7 +95,7 @@
 
 <script>
 import parseTorrentTitle from 'parse-torrent-title';
-import { subsSearch, applySubFiles, deleteSubFiles, offsetSubFiles } from '../srvr.js';
+import { subsSearch, applySubFiles, deleteSubFiles, offsetSubFiles, getSubFileIds } from '../srvr.js';
 import evtBus from '../evtBus.js';
 import * as emby from '../emby.js';
 import * as util from '../util.js';
@@ -145,8 +145,8 @@ export default {
       applyInProgress: false,
       delInProgress: false,
 
-      // Tracks file_ids successfully applied/deleted (server-reported) across sessions.
-      _appliedFileIds: [],
+      // Server-provided list of base32 file-id strings for subtitle files present on disk.
+      _subFileIdsBase32: [],
 
       trimMsText: '',
       _trimBusy: false,
@@ -190,18 +190,19 @@ export default {
       return false;
     },
 
-    appliedFileIdSet() {
+    appliedFileIdBase32Set() {
       const out = new Set();
-      const arr = Array.isArray(this._appliedFileIds) ? this._appliedFileIds : [];
+      const arr = Array.isArray(this._subFileIdsBase32) ? this._subFileIdsBase32 : [];
       for (const v of arr) {
-        const n = Number(v);
-        if (Number.isFinite(n)) out.add(n);
+        if (typeof v !== 'string') continue;
+        const s = v.trim().toUpperCase();
+        if (s) out.add(s);
       }
       return out;
     },
 
     appliedEpisodeKeySet() {
-      const fileSet = this.appliedFileIdSet;
+      const fileSet = this.appliedFileIdBase32Set;
       const out = new Set();
       const validEntries = Array.isArray(this._validEntries) ? this._validEntries : [];
       for (const v of validEntries) {
@@ -214,9 +215,8 @@ export default {
         for (const f of files) {
           const fileId = f?.file_id;
           if (fileId == null) continue;
-          const n = Number(fileId);
-          if (!Number.isFinite(n)) continue;
-          if (fileSet.has(n)) {
+          const enc = this.encodeFileIdBase32(fileId);
+          if (fileSet.has(String(enc || '').toUpperCase())) {
             hit = true;
             break;
           }
@@ -272,16 +272,13 @@ export default {
         if (newShow !== oldShow && (newKey !== oldKey || newKey || oldKey)) {
           this.resetSearchState();
           void this.ensureSeriesMapLoaded();
-          void this.ensureSearched();
         }
       }
     }
   },
 
   mounted() {
-    this.loadAppliedFileIdsFromStorage();
     void this.ensureSeriesMapLoaded();
-    void this.ensureSearched();
   },
 
   methods: {
@@ -324,7 +321,11 @@ export default {
     },
 
     async acceptFileIdSearch() {
-      await this.ensureSearched();
+      const showKey = this.getShowKey(this.currentShow || this.activeShow);
+      const needSearch = !this.hasSearched || this._lastSearchShowKey !== showKey || !(Array.isArray(this._validEntries) && this._validEntries.length);
+      if (needSearch) {
+        await this.searchClick();
+      }
       const raw = String(this.fileIdSearch || '').trim();
       if (!raw) return;
       const code = raw.toUpperCase();
@@ -369,7 +370,7 @@ export default {
       if (this._trimBusy) return;
       this._trimBusy = true;
       try {
-        await this.ensureSearched();
+        if (!this.hasSearched) return;
         const raw = String(this.trimMsText || '').trim();
         if (!raw) return;
         if (!/^[+-]?\d+$/.test(raw)) return;
@@ -389,10 +390,6 @@ export default {
           setTimeout(() => reject(new Error(`offsetSubFiles: timed out after ${timeoutMs / 1000}s`)), timeoutMs);
         });
         const res = await Promise.race([offsetSubFiles(payloadWithOffset), timeoutPromise]);
-
-        if (res && typeof res === 'object' && Array.isArray(res.applied)) {
-          this.recordAppliedFileIds(res.applied);
-        }
 
         if (res && typeof res === 'object' && res.ok && Array.isArray(res.failures)) {
           this.applyFailures = res.failures;
@@ -681,10 +678,9 @@ export default {
       }
     },
 
-    async selectMode(mode) {
+    selectMode(mode) {
       this.viewMode = mode;
-      await this.ensureSearched();
-      this.rebuildVisibleItems();
+      if (this.hasSearched) this.rebuildVisibleItems();
     },
 
     handleScaledWheel(event) {
@@ -1149,7 +1145,7 @@ export default {
 
     async applyClick() {
       if (this.applyInProgress) return;
-      await this.ensureSearched();
+      if (!this.hasSearched) return;
       const payload = this.buildFileIdObjsPayload();
       if (!payload.length) return;
       this.error = null;
@@ -1161,10 +1157,6 @@ export default {
         });
 
         const res = await Promise.race([applySubFiles(payload), timeoutPromise]);
-
-        if (res && typeof res === 'object' && Array.isArray(res.applied)) {
-          this.recordAppliedFileIds(res.applied);
-        }
 
         // If server returns a partial-success object, show failures in a modal.
         if (res && typeof res === 'object' && res.ok && Array.isArray(res.failures)) {
@@ -1188,12 +1180,13 @@ export default {
         this.error = msg;
       } finally {
         this.applyInProgress = false;
+        await this.refreshSubFileIds();
       }
     },
 
     async deleteClick() {
       if (this.delInProgress) return;
-      await this.ensureSearched();
+      if (!this.hasSearched) return;
       const payload = this.buildFileIdObjsPayload();
       if (!payload.length) return;
       this.error = null;
@@ -1204,9 +1197,6 @@ export default {
           setTimeout(() => reject(new Error(`deleteSubFiles: timed out after ${timeoutMs / 1000}s`)), timeoutMs);
         });
         const res = await Promise.race([deleteSubFiles(payload), timeoutPromise]);
-        if (res && typeof res === 'object' && Array.isArray(res.applied)) {
-          this.recordAppliedFileIds(res.applied);
-        }
         if (res && typeof res === 'object' && typeof res.error === 'string') {
           this.error = res.error;
         }
@@ -1225,6 +1215,7 @@ export default {
         this.error = msg;
       } finally {
         this.delInProgress = false;
+        await this.refreshSubFileIds();
       }
     },
 
@@ -1232,68 +1223,31 @@ export default {
       this.showApplyFailuresModal = false;
     },
 
-    getAppliedFileIdsStorageKey() {
-      return 'tv-series-subs-applied-file-ids';
-    },
-
-    loadAppliedFileIdsFromStorage() {
+    async refreshSubFileIds() {
+      const showName = this.getCurrentShowName();
+      if (!showName) {
+        this._subFileIdsBase32 = [];
+        return;
+      }
       try {
-        const raw = localStorage.getItem(this.getAppliedFileIdsStorageKey());
-        if (!raw) {
-          this._appliedFileIds = [];
-          return;
+        const res = await getSubFileIds(showName);
+        if (Array.isArray(res)) {
+          this._subFileIdsBase32 = res;
+        } else if (res && typeof res === 'object' && Array.isArray(res.ids)) {
+          this._subFileIdsBase32 = res.ids;
+        } else {
+          this._subFileIdsBase32 = [];
         }
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) {
-          this._appliedFileIds = [];
-          return;
-        }
-        const out = [];
-        const seen = new Set();
-        for (const v of parsed) {
-          const n = Number(v);
-          if (!Number.isFinite(n)) continue;
-          if (seen.has(n)) continue;
-          seen.add(n);
-          out.push(n);
-        }
-        if (out.length > 1000) out.splice(0, out.length - 1000);
-        this._appliedFileIds = out;
-      } catch {
-        this._appliedFileIds = [];
+      } catch (e) {
+        console.error('getSubFileIds error:', e);
       }
-    },
-
-    saveAppliedFileIdsToStorage() {
-      try {
-        const arr = Array.isArray(this._appliedFileIds) ? this._appliedFileIds : [];
-        localStorage.setItem(this.getAppliedFileIdsStorageKey(), JSON.stringify(arr));
-      } catch {
-        // ignore
-      }
-    },
-
-    recordAppliedFileIds(fileIds) {
-      const current = Array.isArray(this._appliedFileIds) ? this._appliedFileIds.slice() : [];
-      const seen = new Set(current);
-      for (const v of (Array.isArray(fileIds) ? fileIds : [])) {
-        const n = Number(v);
-        if (!Number.isFinite(n)) continue;
-        if (seen.has(n)) continue;
-        seen.add(n);
-        current.push(n);
-      }
-      if (current.length > 1000) current.splice(0, current.length - 1000);
-      this._appliedFileIds = current;
-      this.saveAppliedFileIdsToStorage();
     },
 
     isAppliedFile(item) {
       const fileId = item?.file_id;
       if (fileId == null) return false;
-      const n = Number(fileId);
-      if (!Number.isFinite(n)) return false;
-      return this.appliedFileIdSet.has(n);
+      const enc = this.encodeFileIdBase32(fileId);
+      return this.appliedFileIdBase32Set.has(String(enc || '').toUpperCase());
     },
 
     hasAppliedMark(item) {
@@ -1471,7 +1425,7 @@ export default {
       const sStr = season != null ? String(season).padStart(2, '0') : '??';
       const eStr = episode != null ? String(episode).padStart(2, '0') : '??';
 
-      const line1 = `S${sStr}E${eStr} ${release}`.trim();
+      const line1 = release ? `S${sStr}E${eStr} | ${release}` : `S${sStr}E${eStr}`;
 
       const parts = [];
       if (aiTranslated) parts.push(String(aiTranslated));
@@ -1502,7 +1456,7 @@ export default {
 
       const sStr = String(Number(season)).padStart(2, '0');
       const eStr = String(Number(episode)).padStart(2, '0');
-      const line1 = `S${sStr}E${eStr} ${release}`.trim();
+      const line1 = release ? `S${sStr}E${eStr} | ${release}` : `S${sStr}E${eStr}`;
 
       return {
         key: `file-${fileId}`,
@@ -1800,16 +1754,6 @@ export default {
       this.selectedCardKey = '';
     },
 
-    async ensureSearched() {
-      const showKey = this.getShowKey(this.currentShow || this.activeShow);
-      if (!showKey) return;
-      if (this.hasSearched && this._lastSearchShowKey === showKey) {
-        this.rebuildVisibleItems();
-        return;
-      }
-      await this.searchClick();
-    },
-
     async searchClick() {
       // Whenever a search is done, switch mode to Search.
       this.viewMode = 'search';
@@ -1946,6 +1890,7 @@ export default {
       } finally {
         if (token !== this._searchToken) return;
         this.loading = false;
+        await this.refreshSubFileIds();
       }
     }
   }

@@ -56,6 +56,7 @@
       template(v-for="(item, index) in items" :key="getItemCardKey(item)")
         div.se-divider(v-if="shouldShowSeDivider(index)" style="text-align:center; color:#888; font-family:monospace; margin:4px 0;") {{ getSeDividerText(index) }}
         div(@click="handleItemClick($event, item)" @click.stop :style="getCardStyle(item)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
+          div(v-if="viewMode === 'files' && isAppliedFile(item)" style="position:absolute; top:8px; left:8px; color:#4CAF50; font-size:14px; font-weight:bold;") ✓
           div(v-if="shouldShowClickedCheckmark && isClicked(item)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
           div(style="display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:12px; color:#333;")
             div(:style="{ fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, color: item?.lineColor || '#333' }") {{ item?.line1 || '' }}
@@ -113,6 +114,9 @@ export default {
 
       applyInProgress: false,
       delInProgress: false,
+
+      // Tracks file_ids successfully applied/deleted (server-reported) across sessions.
+      _appliedFileIds: [],
 
       showApplyFailuresModal: false,
       applyFailures: [],
@@ -192,6 +196,7 @@ export default {
   },
 
   mounted() {
+    this.loadAppliedFileIdsFromStorage();
     void this.ensureSeriesMapLoaded();
     void this.ensureSearched();
   },
@@ -502,6 +507,196 @@ export default {
           this._selectedFileKeyBySeasonEpisode[`${s}-${e}`] = key;
         }
       }
+
+      // Prune dependent selections.
+      if (mode === 'season') {
+        this.pruneEpisodeSelectionsToSelectedSeasons();
+        this.pruneFileSelectionsToSelectedEpisodes();
+      }
+      if (mode === 'episode') {
+        this.pruneFileSelectionsToSelectedEpisodes();
+      }
+    },
+
+    parseSeasonKey(key) {
+      const m = /^season-(\d+)$/.exec(String(key || ''));
+      return m ? Number(m[1]) : null;
+    },
+
+    parseEpisodeKey(key) {
+      const m = /^episode-(\d+)-(\d+)$/.exec(String(key || ''));
+      if (!m) return { season: null, episode: null };
+      return { season: Number(m[1]), episode: Number(m[2]) };
+    },
+
+    getSelectedSeasonNums() {
+      const out = [];
+      for (const k of (Array.isArray(this.selectedSeasonKeys) ? this.selectedSeasonKeys : [])) {
+        const s = this.parseSeasonKey(k);
+        if (Number.isFinite(s)) out.push(s);
+      }
+      out.sort((a, b) => a - b);
+      return out;
+    },
+
+    getSelectedEpisodePairs() {
+      const out = [];
+      for (const k of (Array.isArray(this.selectedEpisodeKeys) ? this.selectedEpisodeKeys : [])) {
+        const { season, episode } = this.parseEpisodeKey(k);
+        if (Number.isFinite(season) && Number.isFinite(episode)) out.push({ season, episode });
+      }
+      out.sort((a, b) => (a.season - b.season) || (a.episode - b.episode));
+      return out;
+    },
+
+    buildBySeasonIndex(validEntries) {
+      const bySeason = new Map();
+      for (const it of (Array.isArray(validEntries) ? validEntries : [])) {
+        const s = it?.season;
+        const e = it?.episode;
+        if (s == null || e == null) continue;
+        if (!bySeason.has(s)) bySeason.set(s, new Map());
+        const seasonMap = bySeason.get(s);
+        if (!seasonMap.has(e)) seasonMap.set(e, []);
+        seasonMap.get(e).push(it);
+      }
+      return bySeason;
+    },
+
+    getMapSeasonNums(mapObj) {
+      if (!mapObj || typeof mapObj !== 'object') return [];
+      return Object.keys(mapObj)
+        .map(k => Number(k))
+        .filter(n => Number.isFinite(n))
+        .sort((a, b) => a - b);
+    },
+
+    getMapEpisodeNums(mapObj, season) {
+      if (!mapObj || typeof mapObj !== 'object' || season == null) return [];
+      const seasonObj = mapObj[String(season)];
+      if (!seasonObj || typeof seasonObj !== 'object') return [];
+      return Object.keys(seasonObj)
+        .map(k => Number(k))
+        .filter(n => Number.isFinite(n))
+        .sort((a, b) => a - b);
+    },
+
+    computeEpisodeCardsForSelectedSeasons(selectedSeasons, bySeason, mapObj) {
+      const seasons = Array.isArray(selectedSeasons) ? selectedSeasons.filter(n => Number.isFinite(n)) : [];
+      const out = [];
+      for (const s of seasons) {
+        const mapEps = this.getMapEpisodeNums(mapObj, s);
+        const seasonMap = bySeason?.get(s) || null;
+        const eps = mapEps.length ? mapEps : (seasonMap ? Array.from(seasonMap.keys()).sort((a, b) => a - b) : []);
+        for (const e of eps) {
+          const fileCount = (seasonMap && Array.isArray(seasonMap.get(e))) ? seasonMap.get(e).length : 0;
+          const sStr = String(s).padStart(2, '0');
+          const eStr = String(e).padStart(2, '0');
+          const missing = fileCount === 0;
+          out.push({
+            key: `episode-${s}-${e}`,
+            season: s,
+            episode: e,
+            fileCount,
+            line1: missing
+              ? `S${sStr}E${eStr} subs missing`
+              : `S${sStr}E${eStr} | ${fileCount} files`,
+            missing,
+            lineColor: missing ? '#a00' : '#333',
+            uploader: ''
+          });
+        }
+      }
+      return out;
+    },
+
+    computeFileCardsForSelectedEpisodes(selectedPairs, bySeason) {
+      const pairs = Array.isArray(selectedPairs) ? selectedPairs : [];
+      const fileCards = [];
+      for (const p of pairs) {
+        const s = p?.season;
+        const e = p?.episode;
+        if (!Number.isFinite(s) || !Number.isFinite(e)) continue;
+        const seasonMap = bySeason?.get(s) || null;
+        const entries = (seasonMap && Array.isArray(seasonMap.get(e))) ? [...seasonMap.get(e)] : [];
+        for (const v of entries) {
+          const files = v?.entry?.attributes?.files;
+          if (!Array.isArray(files) || !files.length) continue;
+          for (const f of files) {
+            const card = this.buildFileCardItem(v, f);
+            if (card) fileCards.push(card);
+          }
+        }
+      }
+
+      fileCards.sort((a, b) => {
+        const sA = a?.season != null ? Number(a.season) : Number.POSITIVE_INFINITY;
+        const sB = b?.season != null ? Number(b.season) : Number.POSITIVE_INFINITY;
+        if (sA !== sB) return sA - sB;
+        const eA = a?.episode != null ? Number(a.episode) : Number.POSITIVE_INFINITY;
+        const eB = b?.episode != null ? Number(b.episode) : Number.POSITIVE_INFINITY;
+        if (eA !== eB) return eA - eB;
+
+        const pA = (a.uploader || '').trim();
+        const pB = (b.uploader || '').trim();
+        const pAEmpty = !pA;
+        const pBEmpty = !pB;
+        if (pAEmpty !== pBEmpty) return pAEmpty ? 1 : -1;
+        const pCmp = pA.localeCompare(pB, undefined, { sensitivity: 'base' });
+        if (pCmp !== 0) return pCmp;
+
+        const lA = (a.line1 || '').trim();
+        const lB = (b.line1 || '').trim();
+        return lA.localeCompare(lB, undefined, { sensitivity: 'base' });
+      });
+
+      return fileCards;
+    },
+
+    pruneEpisodeSelectionsToSelectedSeasons() {
+      const selectedSeasons = new Set(this.getSelectedSeasonNums());
+      if (!selectedSeasons.size) {
+        this.selectedEpisodeKeys = [];
+        return;
+      }
+      const keep = [];
+      for (const k of (Array.isArray(this.selectedEpisodeKeys) ? this.selectedEpisodeKeys : [])) {
+        const { season } = this.parseEpisodeKey(k);
+        if (Number.isFinite(season) && selectedSeasons.has(season)) keep.push(k);
+      }
+
+      const validEntries = Array.isArray(this._validEntries) ? this._validEntries : [];
+      const bySeason = this.buildBySeasonIndex(validEntries);
+      const mapObj = this._seriesMapObj && typeof this._seriesMapObj === 'object' ? this._seriesMapObj : null;
+      const episodeCards = this.computeEpisodeCardsForSelectedSeasons(Array.from(selectedSeasons).sort((a, b) => a - b), bySeason, mapObj);
+      const allowedKeys = new Set(episodeCards.map(c => c.key));
+      const pruned = keep.filter(k => allowedKeys.has(k));
+      if (pruned.length) {
+        this.selectedEpisodeKeys = pruned;
+        return;
+      }
+      // If prune removes all selections, select the top card.
+      this.selectedEpisodeKeys = episodeCards.length ? [episodeCards[0].key] : [];
+    },
+
+    pruneFileSelectionsToSelectedEpisodes() {
+      const pairs = this.getSelectedEpisodePairs();
+      if (!pairs.length) {
+        this.selectedFileKeys = [];
+        return;
+      }
+      const validEntries = Array.isArray(this._validEntries) ? this._validEntries : [];
+      const bySeason = this.buildBySeasonIndex(validEntries);
+      const fileCards = this.computeFileCardsForSelectedEpisodes(pairs, bySeason);
+      const allowedKeys = new Set(fileCards.map(c => c.key));
+      const existing = Array.isArray(this.selectedFileKeys) ? this.selectedFileKeys : [];
+      const pruned = existing.filter(k => allowedKeys.has(k));
+      if (pruned.length) {
+        this.selectedFileKeys = pruned;
+        return;
+      }
+      // If prune removes all selections, select the top card.
+      this.selectedFileKeys = fileCards.length ? [fileCards[0].key] : [];
     },
 
     getSelectionKeys(mode) {
@@ -689,6 +884,10 @@ export default {
 
         const res = await Promise.race([applySubFiles(payload), timeoutPromise]);
 
+        if (res && typeof res === 'object' && Array.isArray(res.applied)) {
+          this.recordAppliedFileIds(res.applied);
+        }
+
         // If server returns a partial-success object, show failures in a modal.
         if (res && typeof res === 'object' && res.ok && Array.isArray(res.failures)) {
           this.applyFailures = res.failures;
@@ -727,6 +926,9 @@ export default {
           setTimeout(() => reject(new Error(`deleteSubFiles: timed out after ${timeoutMs / 1000}s`)), timeoutMs);
         });
         const res = await Promise.race([deleteSubFiles(payload), timeoutPromise]);
+        if (res && typeof res === 'object' && Array.isArray(res.applied)) {
+          this.recordAppliedFileIds(res.applied);
+        }
         if (res && typeof res === 'object' && typeof res.error === 'string') {
           this.error = res.error;
         }
@@ -750,6 +952,72 @@ export default {
 
     closeApplyFailuresModal() {
       this.showApplyFailuresModal = false;
+    },
+
+    getAppliedFileIdsStorageKey() {
+      return 'tv-series-subs-applied-file-ids';
+    },
+
+    loadAppliedFileIdsFromStorage() {
+      try {
+        const raw = localStorage.getItem(this.getAppliedFileIdsStorageKey());
+        if (!raw) {
+          this._appliedFileIds = [];
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+          this._appliedFileIds = [];
+          return;
+        }
+        const out = [];
+        const seen = new Set();
+        for (const v of parsed) {
+          const n = Number(v);
+          if (!Number.isFinite(n)) continue;
+          if (seen.has(n)) continue;
+          seen.add(n);
+          out.push(n);
+        }
+        if (out.length > 1000) out.splice(0, out.length - 1000);
+        this._appliedFileIds = out;
+      } catch {
+        this._appliedFileIds = [];
+      }
+    },
+
+    saveAppliedFileIdsToStorage() {
+      try {
+        const arr = Array.isArray(this._appliedFileIds) ? this._appliedFileIds : [];
+        localStorage.setItem(this.getAppliedFileIdsStorageKey(), JSON.stringify(arr));
+      } catch {
+        // ignore
+      }
+    },
+
+    recordAppliedFileIds(fileIds) {
+      const current = Array.isArray(this._appliedFileIds) ? this._appliedFileIds.slice() : [];
+      const seen = new Set(current);
+      for (const v of (Array.isArray(fileIds) ? fileIds : [])) {
+        const n = Number(v);
+        if (!Number.isFinite(n)) continue;
+        if (seen.has(n)) continue;
+        seen.add(n);
+        current.push(n);
+      }
+      if (current.length > 1000) current.splice(0, current.length - 1000);
+      this._appliedFileIds = current;
+      this.saveAppliedFileIdsToStorage();
+    },
+
+    isAppliedFile(item) {
+      const fileId = item?.file_id;
+      if (fileId == null) return false;
+      const n = Number(fileId);
+      if (!Number.isFinite(n)) return false;
+      const arr = Array.isArray(this._appliedFileIds) ? this._appliedFileIds : [];
+      // Keep array for ordered storage; check membership via linear scan (max 1000).
+      return arr.includes(n);
     },
 
     formatApplyFailure(f) {
@@ -1078,37 +1346,13 @@ export default {
         return false;
       };
 
-      const bySeason = new Map();
-      for (const it of validEntries) {
-        const s = it.season;
-        const e = it.episode;
-        if (s == null || e == null) continue;
-        if (!bySeason.has(s)) bySeason.set(s, new Map());
-        const seasonMap = bySeason.get(s);
-        if (!seasonMap.has(e)) seasonMap.set(e, []);
-        seasonMap.get(e).push(it);
-      }
+      const bySeason = this.buildBySeasonIndex(validEntries);
 
       const seasonNums = Array.from(bySeason.keys()).sort((a, b) => a - b);
 
       // Prefer series map seasons/episodes when available.
       const mapObj = this._seriesMapObj && typeof this._seriesMapObj === 'object' ? this._seriesMapObj : null;
-      const mapSeasonNums = mapObj
-        ? Object.keys(mapObj)
-            .map(k => Number(k))
-            .filter(n => Number.isFinite(n))
-            .sort((a, b) => a - b)
-        : [];
-
-      const getMapEpisodeNums = (season) => {
-        if (!mapObj || season == null) return [];
-        const seasonObj = mapObj[String(season)];
-        if (!seasonObj || typeof seasonObj !== 'object') return [];
-        return Object.keys(seasonObj)
-          .map(k => Number(k))
-          .filter(n => Number.isFinite(n))
-          .sort((a, b) => a - b);
-      };
+      const mapSeasonNums = this.getMapSeasonNums(mapObj);
 
       const pickFirstSeason = () => {
         const list = mapSeasonNums.length ? mapSeasonNums : seasonNums;
@@ -1120,7 +1364,7 @@ export default {
       };
       const pickFirstEpisode = (season) => {
         if (season == null) return null;
-        const mapEps = getMapEpisodeNums(season);
+        const mapEps = this.getMapEpisodeNums(mapObj, season);
         if (mapEps.length) {
           if (this.selectedEpisode != null && mapEps.includes(this.selectedEpisode)) return this.selectedEpisode;
           return mapEps[0];
@@ -1134,7 +1378,7 @@ export default {
       if (this.viewMode === 'season') {
         const seasons = mapSeasonNums.length ? mapSeasonNums : seasonNums;
         const seasonCards = seasons.map((s) => {
-          const mapEps = getMapEpisodeNums(s);
+          const mapEps = this.getMapEpisodeNums(mapObj, s);
           const episodeCount = mapEps.length ? mapEps.length : Array.from((bySeason.get(s) || new Map()).keys()).length;
           const hasAnySubs = bySeason.has(s);
           const missing = !hasAnySubs;
@@ -1160,112 +1404,79 @@ export default {
         });
         this.items = seasonCards;
 
-        const s0 = pickFirstSeason();
-        if (s0 != null) this.selectedSeason = s0;
-        const defaultKey = s0 != null ? `season-${s0}` : '';
-        if (!this.selectedCardKey || !containsKey(seasonCards, this.selectedCardKey)) {
-          this.selectedCardKey = defaultKey;
+        // Keep multi-selection if possible; otherwise pick top card.
+        const allowed = new Set(seasonCards.map(c => c.key));
+        const existing = Array.isArray(this.selectedSeasonKeys) ? this.selectedSeasonKeys : [];
+        const pruned = existing.filter(k => allowed.has(k));
+        if (pruned.length) {
+          this.selectedSeasonKeys = pruned;
+        } else {
+          const s0 = pickFirstSeason();
+          this.selectedSeasonKeys = (s0 != null) ? [`season-${s0}`] : [];
         }
+        const primaryKey = this._lastClickedKeyByMode?.season && allowed.has(this._lastClickedKeyByMode.season)
+          ? this._lastClickedKeyByMode.season
+          : (this.selectedSeasonKeys[0] || '');
+        this.selectedCardKey = primaryKey;
+        const primarySeason = this.parseSeasonKey(primaryKey);
+        if (primarySeason != null) this.selectedSeason = primarySeason;
         return;
       }
 
       if (this.viewMode === 'episode') {
-        const s = pickFirstSeason();
-        this.selectedSeason = s;
-        const seasonMap = s != null ? bySeason.get(s) : null;
-        const eps = (() => {
-          const mapEps = getMapEpisodeNums(s);
-          if (mapEps.length) return mapEps;
-          return seasonMap ? Array.from(seasonMap.keys()).sort((a, b) => a - b) : [];
-        })();
-
-        const remembered = s != null ? this._selectedEpisodeBySeason[String(s)] : null;
-        const rememberedNum = remembered != null ? Number(remembered) : null;
-        const rememberedEpisode = (Number.isFinite(rememberedNum) && eps.includes(rememberedNum)) ? rememberedNum : null;
-        if (rememberedEpisode != null) this.selectedEpisode = rememberedEpisode;
-
-        const episodeCards = eps.map((e) => {
-          const fileCount = (seasonMap && Array.isArray(seasonMap.get(e))) ? seasonMap.get(e).length : 0;
-          const sStr = s != null ? String(s).padStart(2, '0') : '??';
-          const eStr = e != null ? String(e).padStart(2, '0') : '??';
-          const missing = fileCount === 0;
-          return {
-            key: `episode-${s}-${e}`,
-            season: s,
-            episode: e,
-            fileCount,
-            line1: missing
-              ? `S${sStr}E${eStr} subs missing`
-              : `S${sStr}E${eStr} | ${fileCount} files`,
-            missing,
-            lineColor: missing ? '#a00' : '#333',
-            uploader: ''
-          };
-        });
+        const selectedSeasons = this.getSelectedSeasonNums();
+        const seasonsToShow = selectedSeasons.length ? selectedSeasons : [pickFirstSeason()].filter(v => v != null);
+        const episodeCards = this.computeEpisodeCardsForSelectedSeasons(seasonsToShow, bySeason, mapObj);
         this.items = episodeCards;
 
-        const e0 = rememberedEpisode != null ? rememberedEpisode : pickFirstEpisode(s);
-        if (e0 != null) this.selectedEpisode = e0;
-        const defaultKey = (s != null && e0 != null) ? `episode-${s}-${e0}` : '';
-        if (!this.selectedCardKey || !containsKey(episodeCards, this.selectedCardKey)) {
-          this.selectedCardKey = defaultKey;
+        const allowed = new Set(episodeCards.map(c => c.key));
+        const existing = Array.isArray(this.selectedEpisodeKeys) ? this.selectedEpisodeKeys : [];
+        const pruned = existing.filter(k => allowed.has(k));
+        if (pruned.length) {
+          this.selectedEpisodeKeys = pruned;
+        } else {
+          this.selectedEpisodeKeys = episodeCards.length ? [episodeCards[0].key] : [];
         }
+
+        const primaryKey = this._lastClickedKeyByMode?.episode && allowed.has(this._lastClickedKeyByMode.episode)
+          ? this._lastClickedKeyByMode.episode
+          : (this.selectedEpisodeKeys[0] || '');
+        this.selectedCardKey = primaryKey;
+        const { season: ps, episode: pe } = this.parseEpisodeKey(primaryKey);
+        if (ps != null) this.selectedSeason = ps;
+        if (pe != null) this.selectedEpisode = pe;
         return;
       }
 
       if (this.viewMode === 'files') {
-        const s = pickFirstSeason();
-        const rememberedEpisode = s != null ? this._selectedEpisodeBySeason[String(s)] : null;
-        const seasonMap0 = s != null ? bySeason.get(s) : null;
-        this.selectedSeason = s;
-
-        const eps = (() => {
-          const mapEps = getMapEpisodeNums(s);
-          if (mapEps.length) return mapEps;
-          return seasonMap0 ? Array.from(seasonMap0.keys()).sort((a, b) => a - b) : [];
-        })();
-
-        const rememberedNum = rememberedEpisode != null ? Number(rememberedEpisode) : null;
-        const rememberedOk = Number.isFinite(rememberedNum) && eps.includes(rememberedNum);
-        if (rememberedOk) this.selectedEpisode = rememberedNum;
-
-        const e = rememberedOk ? rememberedNum : pickFirstEpisode(s);
-        this.selectedEpisode = e;
-        const seasonMap = s != null ? bySeason.get(s) : null;
-        const entries = (seasonMap && e != null && Array.isArray(seasonMap.get(e))) ? [...seasonMap.get(e)] : [];
-
-        // Flatten into per-file cards (OpenSubtitles attributes.files[]).
-        const fileCards = [];
-        for (const v of entries) {
-          const files = v?.entry?.attributes?.files;
-          if (!Array.isArray(files) || !files.length) continue;
-          for (const f of files) {
-            const card = this.buildFileCardItem(v, f);
-            if (card) fileCards.push(card);
-          }
+        let pairs = this.getSelectedEpisodePairs();
+        if (!pairs.length) {
+          const selectedSeasons = this.getSelectedSeasonNums();
+          const s0 = selectedSeasons.length ? selectedSeasons[0] : pickFirstSeason();
+          const e0 = s0 != null ? pickFirstEpisode(s0) : null;
+          if (s0 != null && e0 != null) pairs = [{ season: s0, episode: e0 }];
+          this.selectedEpisodeKeys = (s0 != null && e0 != null) ? [`episode-${s0}-${e0}`] : [];
         }
 
-        fileCards.sort((a, b) => {
-          const pA = (a.uploader || '').trim();
-          const pB = (b.uploader || '').trim();
-          const pAEmpty = !pA;
-          const pBEmpty = !pB;
-          if (pAEmpty !== pBEmpty) return pAEmpty ? 1 : -1;
-          const pCmp = pA.localeCompare(pB, undefined, { sensitivity: 'base' });
-          if (pCmp !== 0) return pCmp;
-          const lA = (a.line1 || '').trim();
-          const lB = (b.line1 || '').trim();
-          return lA.localeCompare(lB, undefined, { sensitivity: 'base' });
-        });
-
+        const fileCards = this.computeFileCardsForSelectedEpisodes(pairs, bySeason);
         this.items = fileCards;
-        const seKey = (s != null && e != null) ? `${s}-${e}` : '';
-        const rememberedFileKey = seKey ? this._selectedFileKeyBySeasonEpisode[seKey] : '';
-        if (rememberedFileKey && containsKey(this.items, rememberedFileKey)) {
-          this.selectedCardKey = rememberedFileKey;
-        } else if (!this.selectedCardKey || !containsKey(this.items, this.selectedCardKey)) {
-          this.selectedCardKey = this.items.length ? this.getItemCardKey(this.items[0]) : '';
+
+        const allowed = new Set(fileCards.map(c => c.key));
+        const existing = Array.isArray(this.selectedFileKeys) ? this.selectedFileKeys : [];
+        const pruned = existing.filter(k => allowed.has(k));
+        if (pruned.length) {
+          this.selectedFileKeys = pruned;
+        } else {
+          this.selectedFileKeys = fileCards.length ? [fileCards[0].key] : [];
         }
+
+        const primaryKey = this._lastClickedKeyByMode?.files && allowed.has(this._lastClickedKeyByMode.files)
+          ? this._lastClickedKeyByMode.files
+          : (this.selectedFileKeys[0] || '');
+        this.selectedCardKey = primaryKey;
+        const primaryItem = Array.isArray(fileCards) ? fileCards.find(it => it.key === primaryKey) : null;
+        if (primaryItem?.season != null) this.selectedSeason = Number(primaryItem.season);
+        if (primaryItem?.episode != null) this.selectedEpisode = Number(primaryItem.episode);
         return;
       }
 

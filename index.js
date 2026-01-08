@@ -91,7 +91,26 @@ const gaps         = JSON.parse(gapsStr);
 const notes        = notesCache;
 
 function encodeFileIdBase32(fileId) {
-  // base-32 using alphabet: A-P then a-p.
+  // base-32 using alphabet: A-Z then 0-5.
+  // Output is minimal-length (no left padding).
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ012345';
+  let n = Number(fileId);
+  if (!Number.isFinite(n) || n < 0) n = 0;
+  n = Math.floor(n);
+
+  let out = '';
+  do {
+    const digit = n % 32;
+    out = alphabet[digit] + out;
+    n = Math.floor(n / 32);
+  } while (n > 0);
+  // Prefix with '#' so these can be uniquely identified for later deletion.
+  return '#' + out;
+}
+
+function encodeFileIdBase32Legacy(fileId) {
+  // Legacy base-32 encoding used by older subtitle filenames:
+  // alphabet: A-P then a-p.
   // Output is minimal-length (no left padding).
   const alphabet = 'ABCDEFGHIJKLMNOPabcdefghijklmnop';
   let n = Number(fileId);
@@ -104,7 +123,6 @@ function encodeFileIdBase32(fileId) {
     out = alphabet[digit] + out;
     n = Math.floor(n / 32);
   } while (n > 0);
-  // Prefix with '#' so these can be uniquely identified for later deletion.
   return '#' + out;
 }
 
@@ -148,8 +166,9 @@ const deleteSubFiles = async (id, param, resolve, reject) => {
     return;
   }
 
-  const tags = new Set();
+  const searchTags = new Set();
   const fileIdsByTag = new Map();
+  const fidToNewTag = new Map();
   for (const entry of fileIdObjs) {
     const file_id = entry?.file_id;
     if (!Number.isFinite(Number(file_id))) {
@@ -157,13 +176,18 @@ const deleteSubFiles = async (id, param, resolve, reject) => {
       return;
     }
     const fid = Number(file_id);
-    const tag = encodeFileIdBase32(fid);
-    tags.add(tag);
-    if (!fileIdsByTag.has(tag)) fileIdsByTag.set(tag, new Set());
-    fileIdsByTag.get(tag).add(fid);
+    const tagNew = encodeFileIdBase32(fid);
+    const tagLegacy = encodeFileIdBase32Legacy(fid);
+    fidToNewTag.set(fid, tagNew);
+
+    for (const tag of [tagNew, tagLegacy]) {
+      searchTags.add(tag);
+      if (!fileIdsByTag.has(tag)) fileIdsByTag.set(tag, new Set());
+      fileIdsByTag.get(tag).add(fid);
+    }
   }
 
-  const foundTags = new Set();
+  const deletedFids = new Set();
   const deleted = [];
   const appliedSet = new Set();
   const failures = [];
@@ -192,15 +216,17 @@ const deleteSubFiles = async (id, param, resolve, reject) => {
       const lastDot = noExt.lastIndexOf('.');
       if (lastDot < 0) continue;
       const tag = noExt.slice(lastDot + 1);
-      if (!tags.has(tag)) continue;
+      if (!searchTags.has(tag)) continue;
 
       try {
         fs.unlinkSync(p);
-        foundTags.add(tag);
         deleted.push(p);
         const fids = fileIdsByTag.get(tag);
         if (fids) {
-          for (const fid of fids) appliedSet.add(fid);
+          for (const fid of fids) {
+            appliedSet.add(fid);
+            deletedFids.add(fid);
+          }
         }
       } catch (e) {
         failures.push({ path: p, tag, error: `unlink failed: ${e.message}` });
@@ -210,9 +236,10 @@ const deleteSubFiles = async (id, param, resolve, reject) => {
 
   await recurs(localShowPath);
 
+  // Report notFound in terms of the *new* tag, but consider legacy deletions as found.
   const notFound = [];
-  for (const t of tags) {
-    if (!foundTags.has(t)) notFound.push(t);
+  for (const fid of fidToNewTag.keys()) {
+    if (!deletedFids.has(fid)) notFound.push(fidToNewTag.get(fid));
   }
 
   resolve([id, { ok: true, applied: Array.from(appliedSet), deletedCount: deleted.length, notFoundCount: notFound.length, notFound, failures }]);
@@ -1387,6 +1414,11 @@ const applySubFiles = async (id, param, resolve, reject) => {
         if (fs.existsSync(outPath)) continue;
 
         const fid = Number(cand.file_id);
+
+        // Don't create a duplicate if the legacy-tagged subtitle already exists.
+        const legacyTag = encodeFileIdBase32Legacy(fid);
+        const legacyPath = path.join(seasonPath, `${fileBase}.${legacyTag}.srt`);
+        if (fs.existsSync(legacyPath)) continue;
 
         // If this file_id already failed earlier in this call, skip it.
         if (failedByFileId.has(fid)) continue;

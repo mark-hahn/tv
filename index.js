@@ -90,8 +90,8 @@ const noEmbys      = JSON.parse(noEmbyStr);
 const gaps         = JSON.parse(gapsStr);
 const notes        = notesCache;
 
-function encodeFileIdBase5(fileId) {
-  // "base 5" here means base-32 using alphabet: A-P then a-p.
+function encodeFileIdBase32(fileId) {
+  // base-32 using alphabet: A-P then a-p.
   // Output is minimal-length (no left padding).
   const alphabet = 'ABCDEFGHIJKLMNOPabcdefghijklmnop';
   let n = Number(fileId);
@@ -157,7 +157,7 @@ const deleteSubFiles = async (id, param, resolve, reject) => {
       return;
     }
     const fid = Number(file_id);
-    const tag = encodeFileIdBase5(fid);
+    const tag = encodeFileIdBase32(fid);
     tags.add(tag);
     if (!fileIdsByTag.has(tag)) fileIdsByTag.set(tag, new Set());
     fileIdsByTag.get(tag).add(fid);
@@ -1263,7 +1263,7 @@ const applySubFiles = async (id, param, resolve, reject) => {
     failures.push(rec);
   };
 
-  // Step 1-4: update entries with local paths, validate, compute fileIdBase5.
+  // Step 1-4: update entries with local paths, validate, compute fileIdBase32.
   // Note: we fetch OpenSubtitles /download links lazily per video file so one bad
   // file_id (e.g. transient 502) doesn't fail the entire batch.
   const seasonExistsCache = new Map();
@@ -1316,7 +1316,7 @@ const applySubFiles = async (id, param, resolve, reject) => {
       addFailure(entry, 'localSeason', undefined, { path: expectedSeasonPath }, 'Season directory missing');
     }
 
-    entry.fileIdBase5 = encodeFileIdBase5(Number(file_id));
+    entry.fileIdBase32 = encodeFileIdBase32(Number(file_id));
   }
 
   // Persist the augmented request for inspection.
@@ -1382,7 +1382,7 @@ const applySubFiles = async (id, param, resolve, reject) => {
       // (b) successfully downloads. Only write one new srt per video per call.
       let wroteOneForThisVideo = false;
       for (const cand of candidates) {
-        const srtName = `${fileBase}.${cand.fileIdBase5}.srt`;
+        const srtName = `${fileBase}.${cand.fileIdBase32}.srt`;
         const outPath = path.join(seasonPath, srtName);
         if (fs.existsSync(outPath)) continue;
 

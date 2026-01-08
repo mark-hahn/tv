@@ -1253,6 +1253,6 @@ html, body {
 .torrents-container button,
 #history button,
 #tvproc button {
-  background-color: whitesmoke !important;
+  background-color: var(--btn-bg, whitesmoke) !important;
 }
 </style>

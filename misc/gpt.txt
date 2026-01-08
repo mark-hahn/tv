@@ -3,16 +3,12 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-- do not search for sub files at load or when a show selection changes. instead only search when the Search button in subs pane is clicked.
+in actors pane ..
 
-- series-tv-srvr has a new endpoint getSubFileIds(<showName>). 
+- when season or episode input box is blurred then the guest actors for that season/episode should be refreshed
 
-- getSubFileIds scans the show folder at "/mnt/media/tv/<showName>/" and finds every subtitle file. it returns a list of the file base32 values like ["ASD2H", "IF8JH"].
+- remove Regulars/guests msg in top row of hdr.  in regular mode hilight the regular button in light-gray and  in guests mode hilight the guests button in light-gray 
 
-- remove the localstorage list of base32 values. instead call getSubFileIds and use that returned list. call getSubFileIds to refresh that list every time the Search, Apply or Del buttons are clicked and their rpc calls are finished. 
+- in Plebs show season 0 has only episode 1 (S00E01).  season 1 has 6 episodes"  when season input box is 0 and episode box is 1 then guests button works correctly but clicking on either arrow leaves season input box blank and episode still 1.
 
-- show the checkmarks in the lists using base32 values from getSubFileIds just like they were used with the localstorage list.
-
-- when the fileId input box accepts a value and there is no subs search data then do a subs search before using the value
-
-in the search list cards and the files list cards put a | between the SxxEyy and the file name
+the regulars/guests buttons are not hilighted

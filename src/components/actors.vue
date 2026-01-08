@@ -6,19 +6,18 @@
       //- Top row: show name (fills), mode label, arrows.
       div(style="width:100%; display:flex; align-items:center; justify-content:space-between;")
         div(style="margin-left:20px; margin-right:10px; flex:1 1 auto; min-width:0; white-space:normal; overflow-wrap:anywhere; word-break:break-word;") {{ showName }}
-        div(style="flex:0 0 auto; width:75px; text-align:right; font-size:18px; font-weight:bold; white-space:nowrap;") {{ modeLabel }}
         div(style="margin-left:20px; margin-right:15px; flex:0 0 auto; display:flex; align-items:center; gap:12px; font-weight:normal;")
           button(@click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:5px;") ◄
           button(@click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ►
 
       //- Bottom row: buttons and inputs only.
       div(style="width:100%; display:flex; align-items:center; justify-content:flex-start; gap:12px; margin-right:20px; margin-left:20px; font-weight:normal;")
-        button(@click.stop="handleRegularClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:80px;") Regulars
-        button(@click.stop="handleGuestClick" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; min-width:80px;") Guests
+        button(@click.stop="handleRegularClick" :style="getRegularButtonStyle()") Regulars
+        button(@click.stop="handleGuestClick" :style="getGuestsButtonStyle()") Guests
         label(style="font-size:14px; margin-left:10px;") Season
-        input(v-model="seasonNum" @click.stop @keydown.enter.prevent="handleGuestClick" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
+        input(v-model="seasonNum" @click.stop @keydown.enter.prevent="handleGuestClick" @blur.stop="handleSeasonEpisodeBlur" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
         label(style="font-size:14px; margin-left:5px;") Episode
-        input(v-model="episodeNum" @click.stop @keydown.enter.prevent="handleGuestClick" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
+        input(v-model="episodeNum" @click.stop @keydown.enter.prevent="handleGuestClick" @blur.stop="handleSeasonEpisodeBlur" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
   
   #error-message(v-if="errorMessage"
                  style="text-align:center; color:red; margin-top:50px; font-size:16px;")
@@ -85,12 +84,37 @@ export default {
   },
 
   computed: {
-    modeLabel() {
-      return this.isGuestMode ? 'Guests' : 'Regulars';
-    }
+    
   },
 
   methods: {
+    getActorsModeButtonStyle(isActive) {
+      return {
+        fontSize: '13px',
+        cursor: 'pointer',
+        borderRadius: '5px',
+        padding: '2px 8px',
+        minWidth: '80px',
+        border: '1px solid #bbb',
+        '--btn-bg': isActive ? 'lightgray' : 'whitesmoke',
+      };
+    },
+
+    getRegularButtonStyle() {
+      return this.getActorsModeButtonStyle(!this.isGuestMode);
+    },
+
+    getGuestsButtonStyle() {
+      return this.getActorsModeButtonStyle(!!this.isGuestMode);
+    },
+
+    async handleSeasonEpisodeBlur() {
+      if (!this.isGuestMode) return;
+      const s = String(this.seasonNum || '').trim();
+      const e = String(this.episodeNum || '').trim();
+      if (!s || !e) return;
+      await this.handleGuestClick();
+    },
     async handleActorClick({ event, actor }) {
       const a = actor;
 
@@ -250,6 +274,12 @@ export default {
     normPosIntStr(v) {
       const n = parseInt(String(v ?? '').trim(), 10);
       if (!Number.isFinite(n) || n <= 0) return '';
+      return String(n);
+    },
+
+    normNonNegIntStr(v) {
+      const n = parseInt(String(v ?? '').trim(), 10);
+      if (!Number.isFinite(n) || n < 0) return '';
       return String(n);
     },
 
@@ -467,7 +497,7 @@ export default {
         await this.prefillEpisodeInputs();
       }
       this.ensureEpisodeInputs();
-      this.seasonNum = this.normPosIntStr(this.seasonNum);
+      this.seasonNum = this.normNonNegIntStr(this.seasonNum);
       this.episodeNum = this.normPosIntStr(this.episodeNum);
       if (!this.seasonNum || !this.episodeNum) return;
 
@@ -478,10 +508,11 @@ export default {
           const curS = Number(this.seasonNum);
           const curE = Number(this.episodeNum);
           if (!Number.isFinite(curS) || !Number.isFinite(curE)) return;
+          if (curS <= 0 && curE <= 1) return;
           if (curS <= 1 && curE <= 1) return;
           if (curE > 1) this.episodeNum = String(curE - 1);
           else {
-            this.seasonNum = String(Math.max(1, curS - 1));
+            this.seasonNum = String(Math.max(0, curS - 1));
             this.episodeNum = '1';
           }
           await this.handleGuestClick();
@@ -516,7 +547,7 @@ export default {
         if (currentIndex > 0) {
           // Go to previous episode
           const prevEpisode = allEpisodes[currentIndex - 1];
-          this.seasonNum = this.normPosIntStr(prevEpisode.season);
+          this.seasonNum = this.normNonNegIntStr(prevEpisode.season);
           this.episodeNum = this.normPosIntStr(prevEpisode.episode);
           await this.handleGuestClick();
         }
@@ -535,7 +566,7 @@ export default {
         await this.prefillEpisodeInputs();
       }
       this.ensureEpisodeInputs();
-      this.seasonNum = this.normPosIntStr(this.seasonNum);
+      this.seasonNum = this.normNonNegIntStr(this.seasonNum);
       this.episodeNum = this.normPosIntStr(this.episodeNum);
       if (!this.seasonNum || !this.episodeNum) return;
 
@@ -580,7 +611,7 @@ export default {
         if (currentIndex >= 0 && currentIndex < allEpisodes.length - 1) {
           // Go to next episode
           const nextEpisode = allEpisodes[currentIndex + 1];
-          this.seasonNum = this.normPosIntStr(nextEpisode.season);
+          this.seasonNum = this.normNonNegIntStr(nextEpisode.season);
           this.episodeNum = this.normPosIntStr(nextEpisode.episode);
           await this.handleGuestClick();
         }

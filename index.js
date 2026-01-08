@@ -149,17 +149,23 @@ const deleteSubFiles = async (id, param, resolve, reject) => {
   }
 
   const tags = new Set();
+  const fileIdsByTag = new Map();
   for (const entry of fileIdObjs) {
     const file_id = entry?.file_id;
     if (!Number.isFinite(Number(file_id))) {
       reject([id, { error: 'deleteSubFiles: invalid file_id' }]);
       return;
     }
-    tags.add(encodeFileIdBase5(Number(file_id)));
+    const fid = Number(file_id);
+    const tag = encodeFileIdBase5(fid);
+    tags.add(tag);
+    if (!fileIdsByTag.has(tag)) fileIdsByTag.set(tag, new Set());
+    fileIdsByTag.get(tag).add(fid);
   }
 
   const foundTags = new Set();
   const deleted = [];
+  const appliedSet = new Set();
   const failures = [];
 
   const recurs = async (dirPath) => {
@@ -192,6 +198,10 @@ const deleteSubFiles = async (id, param, resolve, reject) => {
         fs.unlinkSync(p);
         foundTags.add(tag);
         deleted.push(p);
+        const fids = fileIdsByTag.get(tag);
+        if (fids) {
+          for (const fid of fids) appliedSet.add(fid);
+        }
       } catch (e) {
         failures.push({ path: p, tag, error: `unlink failed: ${e.message}` });
       }
@@ -205,7 +215,7 @@ const deleteSubFiles = async (id, param, resolve, reject) => {
     if (!foundTags.has(t)) notFound.push(t);
   }
 
-  resolve([id, { ok: true, deletedCount: deleted.length, notFoundCount: notFound.length, notFound, failures }]);
+  resolve([id, { ok: true, applied: Array.from(appliedSet), deletedCount: deleted.length, notFoundCount: notFound.length, notFound, failures }]);
 };
 
 function parseSeasonEpisodeFromFilename(fileName) {
@@ -1235,6 +1245,7 @@ const applySubFiles = async (id, param, resolve, reject) => {
   }
 
   const failures = [];
+  const appliedSet = new Set();
 
   const addFailure = (cand, stage, status, details, error) => {
     const fid = Number(cand?.file_id);
@@ -1442,6 +1453,7 @@ const applySubFiles = async (id, param, resolve, reject) => {
 
         try {
           await fs.promises.writeFile(outPath, srtText, 'utf8');
+          appliedSet.add(fid);
           wroteOneForThisVideo = true;
           break;
         } catch {
@@ -1466,7 +1478,7 @@ const applySubFiles = async (id, param, resolve, reject) => {
     }
   }
 
-  resolve([id, { ok: true, failures }]);
+  resolve([id, { ok: true, applied: Array.from(appliedSet), failures }]);
 };
 
 const deletePath = async (id, path, resolve, _reject) => {

@@ -1172,15 +1172,29 @@ export default {
         return;
       }
 
+      // When currently viewing Torrents, stay on Torrents.
+      // A new show selection should restart torrent search for the new show.
+      if (prevPane === 'torrents') {
+        this.currentPane = 'torrents';
+        evtBus.emit('paneChanged', this.currentPane);
+        evtBus.emit('showTorrents', this.currentShow);
+        this._torrentsInitialized = true;
+        this._torrentsShowKey = this.currentShow?.Id || this.currentShow?.Name || null;
+        return;
+      }
+
+      // When currently viewing Subs, stay on Subs.
+      // Subs pane is driven by :activeShow and will update for the new show.
+      if (prevPane === 'subs') {
+        this.currentPane = 'subs';
+        evtBus.emit('paneChanged', this.currentPane);
+        return;
+      }
+
       // Otherwise, return to the Series pane.
       this.currentPane = 'series';
       this.mapShow = null;
       evtBus.emit('paneChanged', this.currentPane);
-
-      // Only reset torrents UI when torrents pane was open.
-      if (prevPane === 'torrents') {
-        evtBus.emit('resetTorrentsPane');
-      }
     });
     
     // Listen for tvdbData updates from series pane

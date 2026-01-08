@@ -34,8 +34,7 @@
   #no-actors(v-if="!errorMessage && !isGuestMode && showName && actors.length === 0"
              style="text-align:center; color:#999; margin-top:50px; font-size:16px;")
     div(style="margin-bottom:20px;") No cast information available
-    div(style="font-size:14px; color:#666;") 
-      | Server needs to fetch extended TVDB data with character information
+
 
 </template>
 

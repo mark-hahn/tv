@@ -1017,6 +1017,13 @@ export default {
     onSelectShow(show, scroll = false) {
       console.log('List: selected show:', show);
       this.saveVisShow(show, scroll);
+
+      // Clicking a show should generally return to the Series pane.
+      // Exception: when the user is actively in Map/Actors/Torrents/Subs/Files, do not switch panes.
+      const keepPane = new Set(['map', 'actors', 'torrents', 'subs', 'file']);
+      if (!keepPane.has(this.currentPane)) {
+        evtBus.emit('showSeriesPane');
+      }
     },
 
     normalizeForShowMatch(name) {

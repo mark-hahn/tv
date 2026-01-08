@@ -3,12 +3,3 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-in actors pane ..
-
-- when season or episode input box is blurred then the guest actors for that season/episode should be refreshed
-
-- remove Regulars/guests msg in top row of hdr.  in regular mode hilight the regular button in light-gray and  in guests mode hilight the guests button in light-gray 
-
-- in Plebs show season 0 has only episode 1 (S00E01).  season 1 has 6 episodes"  when season input box is 0 and episode box is 1 then guests button works correctly but clicking on either arrow leaves season input box blank and episode still 1.
-
-the regulars/guests buttons are not hilighted

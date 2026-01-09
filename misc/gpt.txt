@@ -5,25 +5,8 @@
 
 cd /root/dev/apps/tv-series-client/torrents
 
-is it better to run this msys2 than a wsl-based rsync because it doesn't require file system emulation?
+i have been running one long chat session as i work on my project because i thought having all the old context was good. is it just as good to open new sessions for the same project?
 
-convert this bash script to a windows script and save it in misc, do not use wsl use native windows sw:
+how do i adjust font-size in chat window
 
-nohup rsync -avx \
-            --exclude Downloads     --exclude "arduino ide"    \
-            --exclude assem         --exclude node_modules     \
-            --exclude AppData                                  \
-            --exclude *.img         --exclude temp             \
-            --exclude .vscode       --exclude Documents        \
-            --exclude='*cache*'     --exclude '*Cache*'        \
-            --exclude='*google*'    --exclude '*Google*'       \
-            --exclude='*Microsoft*' --exclude '*microsoft*'    \
-            --exclude='*Packages*'  --exclude '*packages*'     \
-            --exclude='*Temp*'      --exclude '*temp*'         \
-            --exclude .vscode       --exclude .cache           \
-      /mnt/c/Users/mark/  hahnca.com:/mnt/media/backup/mark    \
-                        >> /mnt/c/Users/mark/bkup.log &
-
-nohup rsync -av   /mnt/c/Users/mark/Appdata/Roaming/DeskSoft   \
-  hahnca.com:/mnt/media/backup/mark/AppData/Roaming/           \
-          >> /mnt/c/Users/mark/bkup.log &
+is there a way to Keep a small “project brief” in a file that new sessions read automatically without cutting and pasting each new session

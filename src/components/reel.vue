@@ -1,6 +1,7 @@
 <template lang="pug">
 
 #reelPane(
+  @click="handleBackgroundClick"
   :style="{ height:'100%', width:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'row', overflowY:'hidden', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', gap: '10px' }")
 
   #reelLeft(
@@ -396,6 +397,24 @@ export default {
       return String(t.name || t.Name || t.seriesName || t.title || '').trim();
     });
 
+    const handleBackgroundClick = (event) => {
+      const target = event?.target;
+      if (!(target instanceof Element)) return;
+
+      // Ignore clicks on buttons/interactive controls.
+      if (target.closest('button')) return;
+
+      // Ignore clicks in the title card list.
+      if (target.closest('#reelTitles')) return;
+
+      // Ignore clicks in the left gallery (it has its own selection behavior).
+      if (target.closest('#reelLeft')) return;
+
+      const name = String(galleryTitleLine.value || curTitle.value || '').trim();
+      if (!name) return;
+      evtBus.emit('selectShowFromCardTitle', name);
+    };
+
     // Get style for title card
     const getTitleCardStyle = (idx) => {
       const item = parsedTitles.value[idx];
@@ -502,6 +521,7 @@ export default {
       infoLine,
       galleryTitleLine,
       titlesPane,
+      handleBackgroundClick,
       handleScaledWheel,
       getTitleCardStyle,
       handleGallerySelect,

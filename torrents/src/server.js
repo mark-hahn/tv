@@ -13,6 +13,43 @@ import { startReel, getReel } from './reelgood.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function formatPstTimestamp(date = new Date()) {
+  // Match the reelgood logger behavior: approximate PST/PDT using month.
+  const now = date instanceof Date ? date : new Date();
+  const month = now.getUTCMonth();
+  const isDST = month >= 2 && month <= 10; // Approximate DST period (Mar-Nov)
+  const offsetHours = isDST ? -7 : -8;
+  const pstTime = new Date(now.getTime() + offsetHours * 60 * 60 * 1000);
+
+  const mm = String(pstTime.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(pstTime.getUTCDate()).padStart(2, '0');
+  const hh = String(pstTime.getUTCHours()).padStart(2, '0');
+  const min = String(pstTime.getUTCMinutes()).padStart(2, '0');
+  const ss = String(pstTime.getUTCSeconds()).padStart(2, '0');
+  return `${mm}-${dd} ${hh}:${min}:${ss}`;
+}
+
+function appendCallsLog({ endpoint, method, ok, result, error }) {
+  try {
+    const outPath = path.resolve(__dirname, '..', 'calls.log');
+    const asArray = Array.isArray(result) ? result.map(String) : [];
+    const last5 = asArray.length > 5 ? asArray.slice(-5) : asArray;
+    const payload = {
+      ts: formatPstTimestamp(new Date()),
+      endpoint,
+      method,
+      ok: Boolean(ok),
+      last5,
+      count: Array.isArray(result) ? result.length : null,
+      error: error ? { message: error?.message || String(error), stack: error?.stack || null } : null,
+    };
+    const txt = `==========\n${JSON.stringify(payload, null, 2)}\n`;
+    fs.appendFileSync(outPath, txt, 'utf8');
+  } catch {
+    // ignore logging failures
+  }
+}
+
 console.error('[torrents-server] module loaded', {
   ts: new Date().toISOString(),
   cwd: process.cwd(),
@@ -531,9 +568,11 @@ app.get('/api/startreel', async (req, res) => {
     }
 
     const result = await startReel(showTitles);
+    appendCallsLog({ endpoint: '/api/startreel', method: 'GET', ok: true, result });
     res.json(result);
   } catch (error) {
     console.error('startReel error:', error);
+    appendCallsLog({ endpoint: '/api/startreel', method: 'GET', ok: false, result: null, error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -543,9 +582,11 @@ app.post('/api/startreel', async (req, res) => {
     const body = req.body || {};
     const showTitles = Array.isArray(body.showTitles) ? body.showTitles : [];
     const result = await startReel(showTitles);
+    appendCallsLog({ endpoint: '/api/startreel', method: 'POST', ok: true, result });
     res.json(result);
   } catch (error) {
     console.error('startReel error:', error);
+    appendCallsLog({ endpoint: '/api/startreel', method: 'POST', ok: false, result: null, error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -553,9 +594,11 @@ app.post('/api/startreel', async (req, res) => {
 app.get('/api/getreel', async (req, res) => {
   try {
     const result = await getReel();
+    appendCallsLog({ endpoint: '/api/getreel', method: 'GET', ok: true, result });
     res.json(result);
   } catch (error) {
     console.error('getReel error:', error);
+    appendCallsLog({ endpoint: '/api/getreel', method: 'GET', ok: false, result: null, error });
     res.status(500).json({ error: error.message });
   }
 });

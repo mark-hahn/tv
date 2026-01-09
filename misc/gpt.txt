@@ -3,29 +3,27 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-there is a show "Can You Keep a Secret?" that has listings in the ipTorrents website and in the flexget history but tor api can't find it.  dump all data from torrent search in tor pane into misc/temp.txt for debugging
-.
+cd /root/dev/apps/tv-series-client/torrents
 
-for debugging change request in tor to remove ? . in /api/search?show=Can%20You%20Keep%20a%20Secret&limit=1000&needed=%5B%22force%22%5D instead of /api/search?show=Can%20You%20Keep%20a%20Secret%3F&limit=1000&needed=%5B%22force%22%5D
+is it better to run this msys2 than a wsl-based rsync because it doesn't require file system emulation?
 
-in the IpTorrents website search for "Can You Keep a Secret" i get:
-	
-Can You Keep A Secret S01E01 720p WEB H 264-JFF
-Can You Keep A Secret S01E01 1080p HDTV H264-ORGANiC
-Can You Keep a Secret S01E06 HLG 2160p WEB H265-iNSiDiOUS
-Can You Keep a Secret S01E02 HLG 2160p WEB H265-iNSiDiOUS
-Can You Keep a Secret S01E05 HLG 2160p WEB H265-iNSiDiOUS
-Can You Keep a Secret S01E04 HLG 2160p WEB H265-iNSiDiOUS
-Can You Keep a Secret S01E03 HLG 2160p WEB H265-iNSiDiOUS
-Can You Keep a Secret S01E01 HLG 2160p WEB H265-iNSiDiOUS
-Can You Keep A Secret S01E01 720p WEB H264-JFF
-Can You Keep a Secret S01E01 2160p iP WEB-DL AAC2 0 HLG H 265-RAWR
-Can You Keep a Secret S01E01 1080p iP WEB-DL AAC2 0 H 264-RAWR
+convert this bash script to a windows script and save it in misc, do not use wsl use native windows sw:
 
-the temp.txt debug dump doesn't have RAWR in the text.  what happened to "Can You Keep a Secret S01E01 1080p iP WEB-DL AAC2 0 H 264-RAWR"? is there something in the query to block it?
+nohup rsync -avx \
+            --exclude Downloads     --exclude "arduino ide"    \
+            --exclude assem         --exclude node_modules     \
+            --exclude AppData                                  \
+            --exclude *.img         --exclude temp             \
+            --exclude .vscode       --exclude Documents        \
+            --exclude='*cache*'     --exclude '*Cache*'        \
+            --exclude='*google*'    --exclude '*Google*'       \
+            --exclude='*Microsoft*' --exclude '*microsoft*'    \
+            --exclude='*Packages*'  --exclude '*packages*'     \
+            --exclude='*Temp*'      --exclude '*temp*'         \
+            --exclude .vscode       --exclude .cache           \
+      /mnt/c/Users/mark/  hahnca.com:/mnt/media/backup/mark    \
+                        >> /mnt/c/Users/mark/bkup.log &
 
-the original search with the ? returned only one result and removing the ? gave many more results.  we should remove any non-alphanumeric characters before search.
-
-query IPT with category “All” and any other changes you can think of to make the query more lenient. don't remove any filtering after the query like excludedStrings.
-
-make these changes now and we'll remove debugging later
+nohup rsync -av   /mnt/c/Users/mark/Appdata/Roaming/DeskSoft   \
+  hahnca.com:/mnt/media/backup/mark/AppData/Roaming/           \
+          >> /mnt/c/Users/mark/bkup.log &

@@ -5,3 +5,21 @@
 
 there is a show "Can You Keep a Secret?" that has listings in the ipTorrents website and in the flexget history but tor api can't find it.  dump all data from torrent search in tor pane into misc/temp.txt for debugging
 .
+
+for debugging change request in tor to remove ? . in /api/search?show=Can%20You%20Keep%20a%20Secret&limit=1000&needed=%5B%22force%22%5D instead of /api/search?show=Can%20You%20Keep%20a%20Secret%3F&limit=1000&needed=%5B%22force%22%5D
+
+in the IpTorrents website search for "Can You Keep a Secret" i get:
+	
+Can You Keep A Secret S01E01 720p WEB H 264-JFF
+Can You Keep A Secret S01E01 1080p HDTV H264-ORGANiC
+Can You Keep a Secret S01E06 HLG 2160p WEB H265-iNSiDiOUS
+Can You Keep a Secret S01E02 HLG 2160p WEB H265-iNSiDiOUS
+Can You Keep a Secret S01E05 HLG 2160p WEB H265-iNSiDiOUS
+Can You Keep a Secret S01E04 HLG 2160p WEB H265-iNSiDiOUS
+Can You Keep a Secret S01E03 HLG 2160p WEB H265-iNSiDiOUS
+Can You Keep a Secret S01E01 HLG 2160p WEB H265-iNSiDiOUS
+Can You Keep A Secret S01E01 720p WEB H264-JFF
+Can You Keep a Secret S01E01 2160p iP WEB-DL AAC2 0 HLG H 265-RAWR
+Can You Keep a Secret S01E01 1080p iP WEB-DL AAC2 0 H 264-RAWR
+
+the temp.txt debug dump doesn't have RAWR in the text.  what happened to "Can You Keep a Secret S01E01 1080p iP WEB-DL AAC2 0 H 264-RAWR"? is there something in the query to block it?

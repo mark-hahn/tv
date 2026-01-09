@@ -321,6 +321,17 @@ app.get('/api/search', async (req, res) => {
   const iptCfRaw = req.query.ipt_cf;
   const tlCfRaw = req.query.tl_cf;
   let needed = [];
+
+  const dumpTorrentSearch = async (payload) => {
+    try {
+      const outPath = path.resolve(__dirname, '..', '..', 'misc', 'temp.txt');
+      fs.mkdirSync(path.dirname(outPath), { recursive: true });
+      const txt = JSON.stringify(payload, null, 2);
+      fs.writeFileSync(outPath, txt, 'utf8');
+    } catch (e) {
+      console.error('torrent search dump failed:', e?.message || String(e));
+    }
+  };
   
   // Parse needed array if provided
   if (req.query.needed) {
@@ -341,9 +352,38 @@ app.get('/api/search', async (req, res) => {
     const iptCf = (typeof iptCfRaw === 'string' && iptCfRaw.trim()) ? iptCfRaw.trim() : await loadLocalCfClearance('iptorrents');
     const tlCf = (typeof tlCfRaw === 'string' && tlCfRaw.trim()) ? tlCfRaw.trim() : await loadLocalCfClearance('torrentleech');
     const result = await search.searchTorrents({ showName, limit, iptCf, tlCf, needed });
+
+    await dumpTorrentSearch({
+      ts: new Date().toISOString(),
+      endpoint: '/api/search',
+      req: {
+        url: req.originalUrl,
+        query: req.query,
+        showName,
+        limit,
+        needed
+      },
+      res: result
+    });
+
     res.json(result);
   } catch (error) {
     console.error('Search error:', error);
+    await dumpTorrentSearch({
+      ts: new Date().toISOString(),
+      endpoint: '/api/search',
+      req: {
+        url: req.originalUrl,
+        query: req.query,
+        showName,
+        limit,
+        needed
+      },
+      error: {
+        message: error?.message || String(error),
+        stack: error?.stack || null
+      }
+    });
     res.status(500).json({ error: error.message });
   }
 });

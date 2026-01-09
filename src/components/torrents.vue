@@ -803,7 +803,12 @@ export default {
       this._didInitialScroll = false;
 
       try {
-        let url = `${config.torrentsApiUrl}/api/search?show=${encodeURIComponent(this.currentShow.Name)}&limit=${this.maxResults}`;
+        // Some shows include trailing punctuation (e.g. "Can You Keep a Secret?")
+        // that can hurt provider matching. For torrent searching, strip trailing ?/.
+        const rawShowName = String(this.currentShow.Name || '').trim();
+        const showNameForSearch = rawShowName.replace(/[?.]+\s*$/g, '').trim();
+
+        let url = `${config.torrentsApiUrl}/api/search?show=${encodeURIComponent(showNameForSearch)}&limit=${this.maxResults}`;
         if (needed.length > 0) {
           url += `&needed=${encodeURIComponent(JSON.stringify(needed))}`;
         }

@@ -110,6 +110,17 @@ export function initializeProviders() {
 export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, needed = [] }) {
   console.log(`\nSearching for: ${showName} (limit: ${limit})`);
   console.log('Enabled providers:', TorrentSearchApi.getActiveProviders().join(', '));
+
+  const debug = {
+    ts: new Date().toISOString(),
+    showName,
+    limit,
+    neededCount: Array.isArray(needed) ? needed.length : 0,
+    neededSample: Array.isArray(needed) ? needed.slice(0, 80) : [],
+    iptCfProvided: !!iptCf,
+    tlCfProvided: !!tlCf,
+    phases: {}
+  };
   
   // Dump needed array if debugging enabled
   if (DUMP_NEEDED) {
@@ -157,9 +168,11 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   // Check if show name has parens at end and search both variants
   let torrents = [];
   const hasParens = showName.match(/\([^)]+\)\s*$/);
+  debug.hasParens = !!hasParens;
   
   if (hasParens) {
     const nameWithoutParens = showName.replace(/\([^)]+\)\s*$/, '').trim();
+    debug.nameWithoutParens = nameWithoutParens;
     console.log(`Searching with original name: "${showName}"`);
     console.log(`Also searching without parens: "${nameWithoutParens}"`);
     
@@ -185,8 +198,19 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     console.log(`Results from "${showName}": ${results1.length}`);
     console.log(`Results from "${nameWithoutParens}": ${results2.length}`);
     console.log(`Combined after deduplication: ${torrents.length}`);
+
+    debug.phases.providerSearch = {
+      resultsWithParens: results1.length,
+      resultsWithoutParens: results2.length,
+      combinedDeduped: torrents.length
+    };
   } else {
     torrents = await TorrentSearchApi.search(showName, 'TV', limit);
+    debug.phases.providerSearch = {
+      resultsWithParens: torrents.length,
+      resultsWithoutParens: 0,
+      combinedDeduped: torrents.length
+    };
   }
   
   console.log(`Total torrents returned: ${torrents.length}`);
@@ -198,6 +222,8 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     rawProviderCounts[provider] = (rawProviderCounts[provider] || 0) + 1;
   });
   console.log('Raw provider counts:', rawProviderCounts);
+  debug.rawProviderCounts = rawProviderCounts;
+  debug.phases.rawCount = torrents.length;
 
   
   // Dump all raw torrents for debugging
@@ -215,6 +241,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   // Normalize and filter torrents
   const normalized = torrents.map(t => normalize(t, showName));
   const matches = normalized.filter(t => t.nameMatch);
+  debug.phases.nameMatchCount = matches.length;
   
   // Add year to raw data
   matches.forEach(torrent => {
@@ -261,6 +288,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     const hasSeasonRange = !!torrent.seasonRange?.isRange;
     return hasSeason || hasSeasonRange;
   });
+  debug.phases.tvOnlyCount = tvOnly.length;
   
   // Filter by year if show name contains a year
   let yearFiltered = tvOnly;
@@ -281,6 +309,9 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
       return !torrent.raw.year || torrent.raw.year === showYear;
     });
     console.log(`Filtered by year ${showYear}: ${tvOnly.length} -> ${yearFiltered.length} torrents`);
+    debug.phases.yearFilter = { showYears, appliedYear: showYear, before: tvOnly.length, after: yearFiltered.length };
+  } else {
+    debug.phases.yearFilter = { showYears, appliedYear: null, before: tvOnly.length, after: yearFiltered.length };
   }
   
   // Filter out unwanted torrents by excluded strings in title
@@ -289,12 +320,15 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     const title = torrent.raw.title.toLowerCase();
     return !excludedStrings.some(excluded => title.includes(excluded));
   });
+  debug.phases.excludedStrings = excludedStrings;
+  debug.phases.afterExcludedStringsCount = filtered1.length;
   
   // Filter out torrents with 0 seeds
   const filtered2 = filtered1.filter(torrent => {
     const seeds = parseInt(torrent.raw?.seeds || 0);
     return seeds > 0;
   });
+  debug.phases.afterSeedsCount = filtered2.length;
   
   const finalCount = showYearMatch ? `${yearFiltered.length} after year filter -> ` : '';
   console.log(`Filtered: ${matches.length} name matches -> ${tvOnly.length} with season info -> ${finalCount}${filtered1.length} without ${excludedStrings.join('/')} -> ${filtered2.length} with seeds`);
@@ -316,6 +350,9 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   const isLoadAll = needed && needed.includes('loadall');
   const isNoEmby = needed && needed.includes('noemby');
   const isForce = needed && needed.includes('force');
+  debug.isLoadAll = !!isLoadAll;
+  debug.isNoEmby = !!isNoEmby;
+  debug.isForce = !!isForce;
   
   if (isNoEmby) {
     // For noemby, return all season torrents and episode torrents for seasons without a season torrent
@@ -555,6 +592,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     }
   });
   console.log(providerCounts);
+  debug.providerCounts = providerCounts;
   
   // Save one sample torrent from each provider for debugging
   if (SAVE_SAMPLE_TORRENTS) {
@@ -578,6 +616,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     show: showName,
     count: filtered.length,
     torrents: filtered,
-    rawProviderCounts
+    rawProviderCounts,
+    _debug: debug
   };
 }

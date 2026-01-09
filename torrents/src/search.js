@@ -8,25 +8,13 @@ import { normalize } from './normalize.js';
 const TorrentSearchApi = (await import('torrent-search-api')).default;
 
 const SAVE_SAMPLE_TORRENTS = false;
-const DUMP_NEEDED          = true;
-const SAVE_ALL_RAW         = true;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const TORRENTS_DIR = path.resolve(__dirname, '..');
-const ROOT_DIR = path.resolve(TORRENTS_DIR, '..');
-const SAMPLE_TORRENTS_DIR = path.join(ROOT_DIR, 'samples', 'sample-torrents');
 const COOKIES_DIR = path.join(TORRENTS_DIR, 'cookies');
 const IPTORRENTS_CUSTOM_PATH = path.join(TORRENTS_DIR, 'iptorrents-custom.json');
-
-function ensureDir(dirPath) {
-  try {
-    fs.mkdirSync(dirPath, { recursive: true });
-  } catch (e) {
-    // ignore
-  }
-}
 
 // Load cookies from files
 function loadCookiesArray(filename) {
@@ -111,29 +99,13 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   console.log(`\nSearching for: ${showName} (limit: ${limit})`);
   console.log('Enabled providers:', TorrentSearchApi.getActiveProviders().join(', '));
 
-  const debug = {
-    ts: new Date().toISOString(),
-    showName,
-    limit,
-    neededCount: Array.isArray(needed) ? needed.length : 0,
-    neededSample: Array.isArray(needed) ? needed.slice(0, 80) : [],
-    iptCfProvided: !!iptCf,
-    tlCfProvided: !!tlCf,
-    phases: {}
+  const sanitizeForProviderSearch = (name) => {
+    return String(name || '')
+      .replace(/[^a-zA-Z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   };
-  
-  // Dump needed array if debugging enabled
-  if (DUMP_NEEDED) {
-    const neededPath = path.join(SAMPLE_TORRENTS_DIR, 'needed.json');
-    try {
-      ensureDir(SAMPLE_TORRENTS_DIR);
-      fs.writeFileSync(neededPath, JSON.stringify(needed, null, 2), 'utf8');
-      console.log(`Wrote needed array to needed.json: ${needed.length} entries`);
-    } catch (err) {
-      console.error('Error writing needed.json:', err.message);
-    }
-  }
-  
+
   // Temporarily override cookies if cf_clearance provided
   const iptCookiesForSearch = iptCookies ? [...iptCookies] : [];
   const tlCookiesForSearch = tlCookies ? [...tlCookies] : [];
@@ -165,83 +137,61 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     console.log('Using provided TorrentLeech cf_clearance');
   }
   
-  // Check if show name has parens at end and search both variants
+  // Provider search:
+  // - Sanitize the show name for provider searching (strip punctuation, collapse whitespace)
+  // - Also try a parens-stripped variant
+  // - Keep provider category as "TV" (existing behavior)
   let torrents = [];
-  const hasParens = showName.match(/\([^)]+\)\s*$/);
-  debug.hasParens = !!hasParens;
-  
-  if (hasParens) {
-    const nameWithoutParens = showName.replace(/\([^)]+\)\s*$/, '').trim();
-    debug.nameWithoutParens = nameWithoutParens;
-    console.log(`Searching with original name: "${showName}"`);
-    console.log(`Also searching without parens: "${nameWithoutParens}"`);
-    
-    // Search with both names
-    const [results1, results2] = await Promise.all([
-      TorrentSearchApi.search(showName, 'TV', limit),
-      TorrentSearchApi.search(nameWithoutParens, 'TV', limit)
-    ]);
-    
-    // Combine results and remove duplicates
-    const combined = [...results1, ...results2];
-    const seen = new Set();
-    torrents = combined.filter(t => {
-      // Create unique key based on title and provider
-      const key = `${t.provider}|${t.title}`;
-      if (seen.has(key)) {
-        return false;
-      }
-      seen.add(key);
-      return true;
-    });
-    
-    console.log(`Results from "${showName}": ${results1.length}`);
-    console.log(`Results from "${nameWithoutParens}": ${results2.length}`);
-    console.log(`Combined after deduplication: ${torrents.length}`);
+  const baseName = String(showName || '').trim();
+  const hasParens = baseName.match(/\([^)]+\)\s*$/);
+  const nameWithoutParens = hasParens ? baseName.replace(/\([^)]+\)\s*$/, '').trim() : '';
 
-    debug.phases.providerSearch = {
-      resultsWithParens: results1.length,
-      resultsWithoutParens: results2.length,
-      combinedDeduped: torrents.length
-    };
-  } else {
-    torrents = await TorrentSearchApi.search(showName, 'TV', limit);
-    debug.phases.providerSearch = {
-      resultsWithParens: torrents.length,
-      resultsWithoutParens: 0,
-      combinedDeduped: torrents.length
-    };
+  const sanitized = sanitizeForProviderSearch(baseName);
+  const sanitizedWithoutParens = nameWithoutParens ? sanitizeForProviderSearch(nameWithoutParens) : '';
+
+  const queries = [sanitized, sanitizedWithoutParens].filter(Boolean);
+  const seenQuery = new Set();
+  const uniqueQueries = [];
+  for (const q of queries) {
+    const key = q.toUpperCase();
+    if (seenQuery.has(key)) continue;
+    seenQuery.add(key);
+    uniqueQueries.push(q);
   }
+
+  const resultsArrays = await Promise.all(
+    uniqueQueries.map(async (q) => {
+      try {
+        const r = await TorrentSearchApi.search(q, 'TV', limit);
+        return Array.isArray(r) ? r : [];
+      } catch {
+        return [];
+      }
+    })
+  );
+
+  const combined = resultsArrays.flat();
+  const seen = new Set();
+  torrents = combined.filter(t => {
+    const key = `${t.provider}|${t.title}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   
   console.log(`Total torrents returned: ${torrents.length}`);
-  
-  // Count by provider in raw results
+
+  // Count by provider in raw results (before normalization/filtering).
+  // The UI uses this to decide whether to show "missing provider" cookie warnings.
   const rawProviderCounts = {};
   torrents.forEach(t => {
     const provider = t.provider || 'Unknown';
     rawProviderCounts[provider] = (rawProviderCounts[provider] || 0) + 1;
   });
-  console.log('Raw provider counts:', rawProviderCounts);
-  debug.rawProviderCounts = rawProviderCounts;
-  debug.phases.rawCount = torrents.length;
-
   
-  // Dump all raw torrents for debugging
-  if (SAVE_ALL_RAW) {
-    try {
-      const rawDumpPath = path.join(SAMPLE_TORRENTS_DIR, 'all-raw.json');
-      ensureDir(SAMPLE_TORRENTS_DIR);
-      fs.writeFileSync(rawDumpPath, JSON.stringify(torrents, null, 2));
-      console.log(`Wrote ${torrents.length} raw torrents to all-raw.json`);
-    } catch (err) {
-      console.error('Error writing all-raw.json:', err.message);
-    }
-  }
-    
   // Normalize and filter torrents
   const normalized = torrents.map(t => normalize(t, showName));
   const matches = normalized.filter(t => t.nameMatch);
-  debug.phases.nameMatchCount = matches.length;
   
   // Add year to raw data
   matches.forEach(torrent => {
@@ -288,7 +238,6 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     const hasSeasonRange = !!torrent.seasonRange?.isRange;
     return hasSeason || hasSeasonRange;
   });
-  debug.phases.tvOnlyCount = tvOnly.length;
   
   // Filter by year if show name contains a year
   let yearFiltered = tvOnly;
@@ -309,9 +258,9 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
       return !torrent.raw.year || torrent.raw.year === showYear;
     });
     console.log(`Filtered by year ${showYear}: ${tvOnly.length} -> ${yearFiltered.length} torrents`);
-    debug.phases.yearFilter = { showYears, appliedYear: showYear, before: tvOnly.length, after: yearFiltered.length };
+    // (debug removed)
   } else {
-    debug.phases.yearFilter = { showYears, appliedYear: null, before: tvOnly.length, after: yearFiltered.length };
+    // (debug removed)
   }
   
   // Filter out unwanted torrents by excluded strings in title
@@ -320,15 +269,12 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     const title = torrent.raw.title.toLowerCase();
     return !excludedStrings.some(excluded => title.includes(excluded));
   });
-  debug.phases.excludedStrings = excludedStrings;
-  debug.phases.afterExcludedStringsCount = filtered1.length;
   
   // Filter out torrents with 0 seeds
   const filtered2 = filtered1.filter(torrent => {
     const seeds = parseInt(torrent.raw?.seeds || 0);
     return seeds > 0;
   });
-  debug.phases.afterSeedsCount = filtered2.length;
   
   const finalCount = showYearMatch ? `${yearFiltered.length} after year filter -> ` : '';
   console.log(`Filtered: ${matches.length} name matches -> ${tvOnly.length} with season info -> ${finalCount}${filtered1.length} without ${excludedStrings.join('/')} -> ${filtered2.length} with seeds`);
@@ -350,9 +296,6 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   const isLoadAll = needed && needed.includes('loadall');
   const isNoEmby = needed && needed.includes('noemby');
   const isForce = needed && needed.includes('force');
-  debug.isLoadAll = !!isLoadAll;
-  debug.isNoEmby = !!isNoEmby;
-  debug.isForce = !!isForce;
   
   if (isNoEmby) {
     // For noemby, return all season torrents and episode torrents for seasons without a season torrent
@@ -592,31 +535,13 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     }
   });
   console.log(providerCounts);
-  debug.providerCounts = providerCounts;
   
-  // Save one sample torrent from each provider for debugging
-  if (SAVE_SAMPLE_TORRENTS) {
-    const sampleDir = SAMPLE_TORRENTS_DIR;
-    ensureDir(sampleDir);
-    
-    const savedProviders = new Set();
-    filtered.forEach(torrent => {
-      if (torrent.raw) {
-        const provider = torrent.raw.provider;
-        if (!savedProviders.has(provider)) {
-          const filename = path.join(sampleDir, `${provider.toLowerCase()}-sample.json`);
-          fs.writeFileSync(filename, JSON.stringify(torrent, null, 2));
-          savedProviders.add(provider);
-        }
-      }
-    });
-  }
+  // (debug sample saving removed)
   
   return {
     show: showName,
     count: filtered.length,
     torrents: filtered,
-    rawProviderCounts,
-    _debug: debug
+    rawProviderCounts
   };
 }

@@ -23,3 +23,9 @@ Can You Keep a Secret S01E01 2160p iP WEB-DL AAC2 0 HLG H 265-RAWR
 Can You Keep a Secret S01E01 1080p iP WEB-DL AAC2 0 H 264-RAWR
 
 the temp.txt debug dump doesn't have RAWR in the text.  what happened to "Can You Keep a Secret S01E01 1080p iP WEB-DL AAC2 0 H 264-RAWR"? is there something in the query to block it?
+
+the original search with the ? returned only one result and removing the ? gave many more results.  we should remove any non-alphanumeric characters before search.
+
+query IPT with category “All” and any other changes you can think of to make the query more lenient. don't remove any filtering after the query like excludedStrings.
+
+make these changes now and we'll remove debugging later

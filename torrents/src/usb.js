@@ -292,7 +292,7 @@ export async function spaceAvail() {
 }
 
 /**
- * Runs `flexget history` on the USB server via ssh.
+ * Runs `flexget history --limit 1000` on the USB server via ssh.
  * Uses torrents/cookies/qbt-cred.txt QB_HOST (user@host) as the SSH target.
  * Returns raw stdout (text table).
  */
@@ -367,12 +367,12 @@ export async function flexgetHistory() {
   };
 
   // If configured, prefer explicit command or binary path.
-  // - FLEXGET_CMD should be a full command that prints history (e.g. "flexget history").
-  // - FLEXGET_BIN should be an absolute path to the flexget executable (we append "history").
+  // - FLEXGET_CMD should be a full command that prints history (e.g. "flexget history --limit 1000").
+  // - FLEXGET_BIN should be an absolute path to the flexget executable (we append "history --limit 1000").
   if (flexgetCmd || flexgetBin) {
     const cmdLine = flexgetCmd
       ? flexgetCmd
-      : `"${flexgetBin.replace(/\"/g, '\\"')}" history`;
+      : `"${flexgetBin.replace(/\"/g, '\\"')}" history --limit 1000`;
 
     const args = [
       ...sshBaseArgs,
@@ -397,35 +397,35 @@ export async function flexgetHistory() {
     'cd "$HOME" || exit 1',
     // Common local install used on this box (often exposed via an alias in interactive shells).
     'if [ -x "$HOME/flexget/bin/flexget" ]; then',
-    '  "$HOME/flexget/bin/flexget" history',
+    '  "$HOME/flexget/bin/flexget" history --limit 1000',
     '  exit $?',
     'fi',
     'FLEXGET_BIN="$(command -v flexget 2>/dev/null || true)"',
     'if [ -n "$FLEXGET_BIN" ] && [ -x "$FLEXGET_BIN" ]; then',
-    '  "$FLEXGET_BIN" history',
+    '  "$FLEXGET_BIN" history --limit 1000',
     '  exit $?',
     'fi',
     'if [ -x "$HOME/.local/bin/flexget" ]; then',
-    '  "$HOME/.local/bin/flexget" history',
+    '  "$HOME/.local/bin/flexget" history --limit 1000',
     '  exit $?',
     'fi',
     'if [ -x "/usr/local/bin/flexget" ]; then',
-    '  "/usr/local/bin/flexget" history',
+    '  "/usr/local/bin/flexget" history --limit 1000',
     '  exit $?',
     'fi',
     'if [ -x "/usr/bin/flexget" ]; then',
-    '  "/usr/bin/flexget" history',
+    '  "/usr/bin/flexget" history --limit 1000',
     '  exit $?',
     'fi',
     'if command -v python3 >/dev/null 2>&1; then',
     '  PY_SCRIPTS="$(python3 -c \'import sysconfig; print(sysconfig.get_path("scripts") or "")\' 2>/dev/null || true)"',
     '  if [ -n "$PY_SCRIPTS" ] && [ -x "$PY_SCRIPTS/flexget" ]; then',
-    '    "$PY_SCRIPTS/flexget" history',
+    '    "$PY_SCRIPTS/flexget" history --limit 1000',
     '    exit $?',
     '  fi',
     '  PY_USERBASE="$(python3 -c \'import site; print(site.getuserbase() or "")\' 2>/dev/null || true)"',
     '  if [ -n "$PY_USERBASE" ] && [ -x "$PY_USERBASE/bin/flexget" ]; then',
-    '    "$PY_USERBASE/bin/flexget" history',
+    '    "$PY_USERBASE/bin/flexget" history --limit 1000',
     '    exit $?',
     '  fi',
     'fi',
@@ -481,7 +481,7 @@ export async function flexgetHistory() {
       'export PROMPT_COMMAND=""',
       'export PROMPT=""',
       'cd "$HOME" || exit 1',
-      'if [ -x "$HOME/flexget/bin/flexget" ]; then "$HOME/flexget/bin/flexget" history; else flexget history; fi'
+      'if [ -x "$HOME/flexget/bin/flexget" ]; then "$HOME/flexget/bin/flexget" history --limit 1000; else flexget history --limit 1000; fi'
     ].join('\n');
 
     // Prefer the user's actual shell if it supports login+interactive modes.

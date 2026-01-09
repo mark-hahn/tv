@@ -2,3 +2,6 @@
 === copilot should ignore this file 
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
+
+there is a show "Can You Keep a Secret?" that has listings in the ipTorrents website and in the flexget history but tor api can't find it.  dump all data from torrent search in tor pane into misc/temp.txt for debugging
+.

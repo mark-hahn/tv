@@ -3,11 +3,3 @@
 === do not use this file for prompts or edit it
 === it is just a scratchpad for editing copilot prompts.
 
-add README for all of this project
-
-when reel pane has "no more shows" message and you click get button it clears list.  it should just do nothing but refresh list
-
-
-i undid the "no more shows" fix.  the problem was in the client
-
-i moved the script to run -- 

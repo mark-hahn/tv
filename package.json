@@ -1,0 +1,20 @@
+{
+  "name": "torrent-search",
+  "version": "1.0.0",
+  "description": "Search IPTorrents and TorrentLeech",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node torrents.js",
+    "tl-smoke": "node torrents/src/playwright-smoke.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "parse-torrent": "^9.1.5",
+    "parse-torrent-title": "^2.1.0",
+    "playwright": "^1.55.0",
+    "ssh2-sftp-client": "^12.0.1",
+    "torrent-search-api": "^2.1.4"
+  }
+}

@@ -3,10 +3,22 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-cd /root/dev/apps/tv-series-client/torrents
+decisions ...
 
-i have been running one long chat session as i work on my project because i thought having all the old context was good. is it just as good to open new sessions for the same project?
+Store format should be json file with minimum flushes.
 
-how do i adjust font-size in chat window
+for detailUrlFromHash and hashFromFilePath include all suggested properties
 
-is there a way to Keep a small “project brief” in a file that new sessions read automatically without cutting and pasting each new session
+use **exact containment** (usb absolute path == qbt root + relative file path), not fuzzy name matching.
+
+don't need stronger identity
+
+no debug fields for now
+
+new requirement: 
+
+when tv-proc gets filepath it should check the season folder for multiple video files that match parse-torrent-title on the one file provided by rpc call filepath. then map.vue should open all detail pages.
+
+this means we will need to use multiple rpc results `{ ok:true, results:[…] }` 
+
+put complete logic for all this with no more options in notes.txt.  if any decision is missing use your best suggestion.

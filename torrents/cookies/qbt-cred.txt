@@ -1,3 +1,0 @@
-QB_HOST=xobtlu@oracle.usbx.me
-QB_PORT=12041
-QB_PASS=90-TYUrtyasd

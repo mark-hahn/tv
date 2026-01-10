@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { escape } from 'querystring';
 import path from 'node:path';
+import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -41,9 +42,33 @@ function loadResultTitles() {
   return [];
 }
 
+function atomicWriteTextFile(outPath, content) {
+  const dir = path.dirname(outPath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const tmpPath = `${outPath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  fs.writeFileSync(tmpPath, content, 'utf8');
+  try {
+    fs.renameSync(tmpPath, outPath);
+  } catch (err) {
+    // Cross-platform fallback: if destination exists and rename failed, try unlink+rename.
+    try {
+      fs.unlinkSync(outPath);
+      fs.renameSync(tmpPath, outPath);
+    } catch {
+      try { fs.unlinkSync(tmpPath); } catch {}
+      throw err;
+    }
+  }
+}
+
+function atomicWriteJson(outPath, data) {
+  const txt = JSON.stringify(data, null, 2) + '\n';
+  atomicWriteTextFile(outPath, txt);
+}
+
 function saveResultTitles(titlesArr) {
   try {
-    fs.writeFileSync(reelTitlesPath, JSON.stringify(titlesArr, null, 2), 'utf8');
+    atomicWriteJson(reelTitlesPath, titlesArr);
   } catch (err) {
     console.error('Error saving reelgood-titles.json:', err);
     logToFile(`ERROR saving reelgood-titles.json: ${err.message}`);
@@ -88,7 +113,34 @@ function logToFile(message) {
 function loadReelShows() {
   try {
     if (fs.existsSync(reelShowsPath)) {
-      return JSON.parse(fs.readFileSync(reelShowsPath, 'utf8'));
+      const raw = fs.readFileSync(reelShowsPath, 'utf8');
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+        return {};
+      } catch (e) {
+        // Best-effort recovery for truncated/partial JSON.
+        // Extract keys of the form "Title": true
+        const repaired = {};
+        const rx = /"([^"\\]*(?:\\.[^"\\]*)*)"\s*:\s*true/g;
+        let m;
+        while ((m = rx.exec(raw)) !== null) {
+          const k = String(m[1] || '').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+          if (k) repaired[k] = true;
+        }
+        const count = Object.keys(repaired).length;
+        if (count > 0) {
+          console.error('Recovered truncated reel-shows.json; rewriting repaired file', { count });
+          logToFile(`WARN recovered truncated reel-shows.json (count: ${count}); rewriting repaired file`);
+          try {
+            atomicWriteJson(reelShowsPath, repaired);
+          } catch {
+            // ignore rewrite failures; still return repaired in-memory
+          }
+          return repaired;
+        }
+        throw e;
+      }
     }
   } catch (err) {
     console.error('Error loading reel-shows.json:', err);
@@ -99,7 +151,15 @@ function loadReelShows() {
 
 function saveReelShows(shows) {
   try {
-    fs.writeFileSync(reelShowsPath, JSON.stringify(shows, null, 2));
+    // Merge with on-disk state to reduce lost updates if multiple processes write.
+    let disk = {};
+    try {
+      disk = loadReelShows();
+    } catch {
+      disk = {};
+    }
+    const merged = { ...(disk || {}), ...(shows || {}) };
+    atomicWriteJson(reelShowsPath, merged);
   } catch (err) {
     console.error('Error saving reel-shows.json:', err);
     logToFile(`ERROR saving reel-shows.json: ${err.message}`);
@@ -124,6 +184,11 @@ resultTitles = loadResultTitles();
 export async function startReel(showTitlesArg) {
   try {
     showTitles = Array.isArray(showTitlesArg) ? showTitlesArg : [];
+
+    // New reel run: clear any persisted/in-memory previous results so callers
+    // don't see stale titles from earlier sessions.
+    resultTitles = [];
+    saveResultTitles(resultTitles);
 
     logToFile(`startReel called (showTitles: ${showTitles.length})`);
 

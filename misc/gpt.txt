@@ -1,0 +1,5 @@
+
+=== copilot should ignore this file 
+=== do not use this file for prompts or edit it
+=== it is just a scratchpad for editing copilot prompts.
+

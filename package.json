@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
+    "restart": "bash scripts/restart.sh",
     "test": "node torrents.js",
     "tl-smoke": "node torrents/src/playwright-smoke.js"
   },

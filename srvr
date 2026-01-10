@@ -1,5 +1,0 @@
-#!/bin/bash
-# Torrents server has moved out of this repo.
-# Use Remote SSH and manage it on the server instead.
-echo "Torrents server is now maintained separately on hahnca.com."
-echo "Try: ssh hahnca.com 'pm2 restart torrents-server; pm2 logs torrents-server --lines 100'"

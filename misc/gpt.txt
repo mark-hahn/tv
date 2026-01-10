@@ -3,14 +3,3 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-- you have ssh remote access to hahnca.com with no login.
-
-- remove torrents/node_modules
-
-- move torrents folder to hahnca.com:/mnt/media/archive/dev/apps/torrents.
-
-- change /etc/nginx/conf.d/server.conf so it proxies to /mnt/media/archive/dev/apps/torrents.
-
-- do npm install in /mnt/media/archive/dev/apps/torrents
-
-- init git in /mnt/media/archive/dev/apps/torrents

@@ -5,10 +5,10 @@
   "private": true,
   "scripts": {
     "serve-vite": "vite",
-    "dev": "concurrently \"vite\" \"cd torrents && node src/server.js\"",
+    "dev": "vite",
     "build-vite": "vite build --base=/shows/ --outDir=shows",
     "preview-vite": "vite preview",
-    "torrents": "cd torrents && node src/server.js"
+    "torrents": "node -e \"console.error('This repo no longer includes the torrents server. Run it from its own project.'); process.exit(1)\""
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^1.2.36",
@@ -35,14 +35,12 @@
     "@vue/compiler-sfc": "^3.0.0",
     "@vue/language-plugin-pug": "^3.1.0",
     "babel-eslint": "^10.1.0",
-    "concurrently": "^9.2.1",
     "eslint": "^9.0.0",
     "eslint-plugin-vue": "^9.0.0",
     "pug": "^3.0.2",
     "pug-plain-loader": "^1.1.0",
     "typescript": "^5.0.0",
     "vite": "^7.1.10",
-    "vite-plugin-env-compatible": "^1.1.1",
     "vite-plugin-html": "3.2.2"
   },
   "eslintConfig": {

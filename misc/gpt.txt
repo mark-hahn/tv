@@ -3,22 +3,14 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-decisions ...
+- you have ssh remote access to hahnca.com with no login.
 
-Store format should be json file with minimum flushes.
+- remove torrents/node_modules
 
-for detailUrlFromHash and hashFromFilePath include all suggested properties
+- move torrents folder to hahnca.com:/mnt/media/archive/dev/apps/torrents.
 
-use **exact containment** (usb absolute path == qbt root + relative file path), not fuzzy name matching.
+- change /etc/nginx/conf.d/server.conf so it proxies to /mnt/media/archive/dev/apps/torrents.
 
-don't need stronger identity
+- do npm install in /mnt/media/archive/dev/apps/torrents
 
-no debug fields for now
-
-new requirement: 
-
-when tv-proc gets filepath it should check the season folder for multiple video files that match parse-torrent-title on the one file provided by rpc call filepath. then map.vue should open all detail pages.
-
-this means we will need to use multiple rpc results `{ ok:true, results:[…] }` 
-
-put complete logic for all this with no more options in notes.txt.  if any decision is missing use your best suggestion.
+- init git in /mnt/media/archive/dev/apps/torrents

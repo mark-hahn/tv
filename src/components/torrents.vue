@@ -993,7 +993,7 @@ export default {
                 'Try:\n' +
                 '- Complete any “verify you are human” step in the detail tab.\n' +
                 '- Click Cookies → paste TL cf_clearance → Save Cookies.\n' +
-                '- Ensure torrents/req-browser.txt matches the browser you’re using (DevTools “Copy as cURL (bash)”).\n\n' +
+                '- Ensure req-browser.txt in the torrents server project matches the browser you’re using (DevTools “Copy as cURL (bash)”).\n\n' +
                 (detailUrl ? `Detail URL:\n${detailUrl}` : '')
               );
               return;

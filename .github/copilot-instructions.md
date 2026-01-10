@@ -1,17 +1,14 @@
 # Copilot project brief (tv-series-client)
 
 ## What this repo is
-A Vue 3 + Vite client for browsing TV series metadata and working with torrents. There is a separate Node-based torrents server under `torrents/`.
+A Vue 3 + Vite client for browsing TV series metadata and working with torrents. The torrents API server is a separate project (not in this repo).
 
 ## How to run
-- Client + torrents server together: `npm run dev`
-- Client only (Vite): `npm run serve-vite`
-- Torrents server only: `npm run torrents`
+- Client (Vite): `npm run dev` or `npm run serve-vite`
 - Build static output to `shows/`: `npm run build-vite`
 
 ## Key folders
 - `src/`: main client app code (Vue components in `src/assets/components/`)
-- `torrents/`: Node service used by the client
 - `shows/`: built output directory (generated)
 - `samples/`: sample API payloads and fixtures
 

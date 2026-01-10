@@ -12,17 +12,6 @@ rsync -av --delete \
       root@hahnca.com:/root/dev/apps/tv-series-client/shows
 
 echo ""
-echo ">>>> Deploy torrents server"
-echo ""
-rsync -av --delete \
-      --exclude 'node_modules' \
-      -e "ssh -i $HOME/.ssh/id_rsa -o IdentitiesOnly=yes" \
-      /mnt/c/Users/mark/apps/tv-series-client/torrents/    \
-      root@hahnca.com:/root/dev/apps/tv-series-client/torrents
-
-
-echo ""
-echo ">>>> Run torrents release steps on remote server"
-ssh -i $HOME/.ssh/id_rsa -o IdentitiesOnly=yes root@hahnca.com \
-      'bash -lc "export NVM_DIR=\"\$HOME/.nvm\"; [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\"; nvm use --lts >/dev/null 2>&1 || true; cd /root/dev/apps/tv-series-client/torrents; npm install; pm2 restart torrents-server || pm2 start src/server.js --name torrents-server"'
+echo ">>>> Torrents server"
+echo "Torrents is deployed/managed separately on hahnca.com (/mnt/media/archive/dev/apps/torrents)."
 

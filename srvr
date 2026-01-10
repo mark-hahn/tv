@@ -1,3 +1,5 @@
 #!/bin/bash
-# Restart the torrents server via PM2 and show logs
-powershell.exe -Command "cd C:\Users\mark\apps\tv-series-client; pm2 delete torrents-server 2>\$null; Remove-Item C:\Users\mark\.pm2\logs\torrents-server-*.log -ErrorAction SilentlyContinue; pm2 start torrents/ecosystem.config.cjs; pm2 logs torrents-server --raw"
+# Torrents server has moved out of this repo.
+# Use Remote SSH and manage it on the server instead.
+echo "Torrents server is now maintained separately on hahnca.com."
+echo "Try: ssh hahnca.com 'pm2 restart torrents-server; pm2 logs torrents-server --lines 100'"

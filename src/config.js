@@ -1,8 +1,6 @@
 // Configuration for different environments
-const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const TORRENTS_API_URL = 'https://hahnca.com/torrents-api';
 
 export const config = {
-  torrentsApiUrl: isDevelopment 
-    ? window.location.origin
-    : 'https://hahnca.com/torrents-api'
+  torrentsApiUrl: TORRENTS_API_URL
 };

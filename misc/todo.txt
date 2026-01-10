@@ -1,6 +1,5 @@
 
 bugs ...
-  fast-start download problem?
 
 todo both ...
   show last-watched even for non-emby
@@ -9,7 +8,7 @@ todo both ...
     being watched (next up line)
 
 todo non-simple:
-  open torrent detail page from map or files pane
+  usb file system clone of local files pane
   subs for custom srt script
   abort qbt downloading
   remove downloaded torrent with data from qbt
@@ -18,8 +17,8 @@ todo non-simple:
 todo simple ...
   
 tabled ...
-  take notes
-  shows hidden from simple
+  open torrent detail page from map or files pane
+  shows can be hidden from simple
   half-hour filter
   waiting enhancements
     sort by waiting date

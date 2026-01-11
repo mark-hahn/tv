@@ -77,6 +77,9 @@
         div(v-if="lastRawProviderCounts")
           span(style="font-weight:bold;") rawProviderCounts:
           |  {{ formatJsonInline(lastRawProviderCounts) }}
+        div(v-if="lastWarningSummary")
+          span(style="font-weight:bold;") warningSummary:
+          |  {{ formatJsonInline(lastWarningSummary) }}
 
     
 
@@ -100,6 +103,8 @@
         div(v-if="isClicked(torrent)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
         div(v-if="isDownloadedBefore(torrent)" :style="getDownloadedBeforeIconStyle(torrent)" title="Downloaded before") 🕘
         div(v-if="SHOW_TITLE && torrent.raw" style="font-size:13px; font-weight:bold; color:#888; margin-bottom:4px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;") {{ getDisplayTitleWithProvider(torrent) }}
+        div(v-if="getTorrentWarnings(torrent).length > 0" style="font-size:11px; color:#a33; margin-bottom:4px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;")
+          | Warnings: {{ formatTorrentWarnings(torrent) }}
         div(style="font-size:12px; color:#333;") 
           strong {{ getDisplaySeasonEpisode(torrent) }}
           | : {{ fmtSize(torrent.raw?.size) || torrent.raw?.size || 'N/A' }} | {{ torrent.raw?.seeds || 0 }} seeds<span v-if="torrent.raw?.provider"> | {{ formatProvider(torrent.raw.provider) }}</span><span v-if="torrent.parsed?.resolution"> | {{ torrent.parsed.resolution }}</span><span v-if="torrent.parsed?.group"> | {{ formatGroup(torrent.parsed.group) }}</span>
@@ -189,6 +194,7 @@ export default {
       lastSearchNeeded: '',
       lastRawProviderCounts: null,
       lastApiCount: null,
+      lastWarningSummary: null,
       debugCopyMsg: ''
     };
   },
@@ -204,15 +210,28 @@ export default {
     },
     filteredTorrents() {
       // Show all results (including 0-seed) so “dead” torrents are still visible.
-      // Sort seeded torrents to the top.
+      // Sort seeded torrents to the top, but push warning torrents to the bottom.
       const asNumber = (v) => {
         const n = Number(v);
         return Number.isFinite(n) ? n : 0;
       };
 
+      const hasWarn = (t) => this.getTorrentWarnings(t).length > 0;
+
       return (Array.isArray(this.torrents) ? this.torrents : [])
         .slice()
-        .sort((a, b) => asNumber(b?.raw?.seeds) - asNumber(a?.raw?.seeds));
+        .sort((a, b) => {
+          const wa = hasWarn(a) ? 1 : 0;
+          const wb = hasWarn(b) ? 1 : 0;
+          if (wa !== wb) return wa - wb;
+
+          const sd = asNumber(b?.raw?.seeds) - asNumber(a?.raw?.seeds);
+          if (sd !== 0) return sd;
+
+          const ta = String(a?.raw?.title || a?.title || '');
+          const tb = String(b?.raw?.title || b?.title || '');
+          return ta.localeCompare(tb);
+        });
     },
     trackerCounts() {
       const counts = {};
@@ -300,6 +319,24 @@ export default {
       } catch {
         return String(obj);
       }
+    },
+    getTorrentWarnings(torrent) {
+      const w = torrent?.warnings ?? torrent?.raw?.warnings;
+      return Array.isArray(w) ? w : [];
+    },
+    formatTorrentWarnings(torrent) {
+      const warnings = this.getTorrentWarnings(torrent);
+      if (!warnings.length) return '';
+
+      return warnings
+        .map(w => {
+          const code = String(w?.code || '').trim();
+          const msg = String(w?.message || '').trim();
+          if (code && msg && msg.toLowerCase() !== code.toLowerCase()) return `${code} (${msg})`;
+          return code || msg || '';
+        })
+        .filter(Boolean)
+        .join(', ');
     },
     fmtSize(bytesOrHumanString) {
       return util.fmtBytesSize(bytesOrHumanString);
@@ -409,6 +446,31 @@ export default {
         if (h) return h;
       }
       return '';
+    },
+
+    buildTorrentUploadFilename(torrent, fallbackTitle) {
+      // qBittorrent's "watched folder" can miss modified/overwritten files.
+      // Ensure each upload writes a *new* file by suffixing a stable unique token.
+      const baseIn = String(torrent?.raw?.filename || fallbackTitle || torrent?.raw?.title || torrent?.title || 'download').trim();
+      const hash = this.getTorrentHash(torrent);
+      const suffix = hash ? hash.slice(0, 10) : `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+
+      // Windows-safe filename (server may run on Windows and write to disk).
+      let base = baseIn
+        .replace(/[\\/:*?"<>|]/g, '_')
+        .replace(/[\u0000-\u001f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      // Remove extension so we can control it.
+      base = base.replace(/\.torrent$/i, '');
+      if (!base) base = 'download';
+
+      // Keep filenames reasonably short to avoid filesystem/path limits.
+      const maxBaseLen = 150;
+      if (base.length > maxBaseLen) base = base.slice(0, maxBaseLen).trim();
+
+      return `${base}-${suffix}.torrent`;
     },
 
     getTorrentHistoryKey(torrent) {
@@ -883,6 +945,7 @@ export default {
       // Reset debug metadata for this request
       this.lastRawProviderCounts = null;
       this.lastApiCount = null;
+      this.lastWarningSummary = null;
 
       try {
         // Some shows include trailing punctuation (e.g. "Can You Keep a Secret?")
@@ -910,9 +973,35 @@ export default {
 
         // Debug info from response
         this.lastApiCount = (typeof data?.count === 'number') ? data.count : null;
+        this.lastWarningSummary = (data && typeof data.warningSummary === 'object') ? data.warningSummary : null;
 
         // Set torrents first; some server versions may omit rawProviderCounts.
         this.torrents = data.torrents || [];
+
+        // Debug logging: helps confirm whether warnings are being returned by the API.
+        try {
+          // Full response first (expandable in DevTools).
+          console.log('torrentSearch full response', data);
+
+          const sample = (Array.isArray(this.torrents) ? this.torrents : []).slice(0, 5).map(t => ({
+            title: String(t?.raw?.title || t?.title || ''),
+            provider: String(t?.raw?.provider || ''),
+            seeds: t?.raw?.seeds,
+            warnings: this.getTorrentWarnings(t)
+          }));
+          console.log('torrentSearch result', {
+            show: showNameForSearch,
+            needed,
+            url,
+            apiCount: data?.count,
+            torrentsReturned: Array.isArray(this.torrents) ? this.torrents.length : 0,
+            rawProviderCounts: data?.rawProviderCounts,
+            warningSummary: data?.warningSummary,
+            sample
+          });
+        } catch {
+          // ignore logging failures
+        }
 
         // Simple number-returned checks
         const counts = data.rawProviderCounts || {};
@@ -991,11 +1080,14 @@ export default {
     getCardStyle(torrent) {
       const isSelected = this.selectedTorrent === torrent;
       const isDownloaded = this.isDownloadedNow(torrent);
+      const hasWarnings = this.getTorrentWarnings(torrent).length > 0;
       let bgColor = '#fff';
       if (isDownloaded) {
         bgColor = '#ffcccb';  // Light red for downloaded
       } else if (isSelected) {
         bgColor = '#fffacd';  // Light yellow for selected
+      } else if (hasWarnings) {
+        bgColor = '#fff0f0';  // Light red/pink for warnings
       }
       return {
         padding: '8px',
@@ -1102,11 +1194,17 @@ export default {
           }
 
           const bytes = await resp.arrayBuffer();
-          const upload = await fetch(`${config.torrentsApiUrl}/api/usb/addTorrent`, {
+          const filename = this.buildTorrentUploadFilename(torrent, torrentTitle);
+          // NOTE: Avoid custom headers here. Browsers will preflight and block if the
+          // torrents API CORS config doesn't allow them (e.g. x-torrent-filename).
+          // If the server cares about filename, pass it as a query param.
+          const uploadUrl = new URL(`${config.torrentsApiUrl}/api/usb/addTorrent`);
+          uploadUrl.searchParams.set('filename', filename);
+
+          const upload = await fetch(uploadUrl.toString(), {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/x-bittorrent',
-              'x-torrent-filename': String(torrent?.raw?.filename || torrentTitle || 'download.torrent')
+              'Content-Type': 'application/x-bittorrent'
             },
             body: bytes
           });
@@ -1127,14 +1225,21 @@ export default {
             throw new Error(detail || `USB upload failed: HTTP ${upload.status}: ${upload.statusText}`);
           }
 
-          const uploadRes = await upload.json().catch(() => null);
-          if (uploadRes && typeof uploadRes === 'object' && (uploadRes.success || uploadRes.result === true)) {
-            this.rememberDownloadedTorrent(torrent);
-            return;
+          const uploadRes = await upload.json().catch(() => ({}));
+          if (uploadRes && typeof uploadRes === 'object') {
+            if (uploadRes.success || uploadRes.result === true) {
+              this.rememberDownloadedTorrent(torrent);
+              return;
+            }
+            const uploadErr = uploadRes?.error || uploadRes?.message;
+            if (uploadErr) {
+              this.showError(uploadErr);
+              return;
+            }
           }
 
-          const uploadErr = uploadRes?.error || uploadRes?.message || 'USB upload failed';
-          this.showError(uploadErr);
+          // If the server returned 2xx but no JSON body, assume the file was written.
+          this.rememberDownloadedTorrent(torrent);
           return;
         }
 

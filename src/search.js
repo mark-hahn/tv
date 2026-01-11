@@ -126,6 +126,28 @@ function torrentProviderName(torrent) {
   return String(torrent?.raw?.provider || torrent?.provider || 'Unknown');
 }
 
+function addTorrentWarning(torrent, code, message) {
+  if (!torrent || typeof torrent !== 'object') return;
+  if (!Array.isArray(torrent.warnings)) torrent.warnings = [];
+  const c = String(code || '').trim();
+  if (!c) return;
+  if (torrent.warnings.some(w => w && w.code === c)) return;
+  torrent.warnings.push({ code: c, message: String(message || '').trim() });
+}
+
+function computeWarningSummary(torrents) {
+  const summary = {};
+  for (const t of torrents || []) {
+    const ws = Array.isArray(t?.warnings) ? t.warnings : [];
+    for (const w of ws) {
+      const code = String(w?.code || '').trim();
+      if (!code) continue;
+      summary[code] = (summary[code] || 0) + 1;
+    }
+  }
+  return summary;
+}
+
 function logFilterStage(stage, beforeCount, keptCount, removed, meta) {
   const filteredCount = Math.max(0, beforeCount - keptCount);
   torLog(`[search] ${stage}: ${beforeCount} -> ${keptCount} (filtered ${filteredCount})`);
@@ -459,7 +481,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   }
   
   // Filter out unwanted torrents by excluded strings in title
-  const excludedStrings = ['2160', 'nordic', '480', 'mobile'];
+  const excludedStrings = ['2160', 'nordic', 'mobile'];
   const excludedStage = filterWithReasons(
     yearFiltered,
     (torrent) => {
@@ -475,17 +497,29 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   const filtered1 = excludedStage.kept;
   logFilterStage('excluded strings', yearFiltered.length, filtered1.length, excludedStage.removed, { excludedStrings });
   
-  // Filter out torrents with 0 seeds
-  const seedsStage = filterWithReasons(
-    filtered1,
-    (torrent) => {
-      const seeds = parseInt(torrent?.raw?.seeds || 0);
-      return seeds > 0;
-    },
-    (torrent) => `seeds<=0 (seeds=${parseInt(torrent?.raw?.seeds || 0)})`
-  );
-  const filtered2 = seedsStage.kept;
-  logFilterStage('seeds', filtered1.length, filtered2.length, seedsStage.removed);
+  // Do NOT filter on 0 seeds or 480p; attach warnings for the client to filter.
+  const filtered2 = filtered1;
+  let warnedZeroSeeds = 0;
+  let warned480 = 0;
+  filtered2.forEach((torrent) => {
+    const titleLower = String(torrent?.raw?.title || '').toLowerCase();
+    const res = String(torrent?.parsed?.resolution || '').toLowerCase();
+
+    if (res.includes('480') || titleLower.includes('480p') || titleLower.includes(' 480 ')) {
+      warned480 += 1;
+      addTorrentWarning(torrent, 'low_res_480', 'Low resolution (480p)');
+    }
+
+    const seeds = parseInt(torrent?.raw?.seeds || 0);
+    if (Number.isFinite(seeds) && seeds <= 0) {
+      warnedZeroSeeds += 1;
+      addTorrentWarning(torrent, 'zero_seeds', `No seeds (seeds=${seeds})`);
+    }
+  });
+  logFilterStage('warnings (no filtering)', filtered1.length, filtered2.length, [], {
+    warned480,
+    warnedZeroSeeds,
+  });
   
   torLog(
     `[search] summary counts: ` +
@@ -494,7 +528,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
       `${tvOnly.length} tv-only -> ` +
       `${showYears.length ? yearFiltered.length + ' year-match -> ' : ''}` +
       `${filtered1.length} exclude-filter -> ` +
-      `${filtered2.length} seeds>0`
+      `${filtered2.length} warnings-attached`
   );
   
   // Add seasonEpisode to all torrents
@@ -636,13 +670,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
       const { season, episode } = torrent.parsed;
       const range = torrent.seasonRange;
       
-      // Skip if resolution exists but is not 1080 or 720
-      if (torrent.parsed.resolution) {
-        const res = torrent.parsed.resolution;
-        if (!res.includes('1080') && !res.includes('720')) {
-          return false;
-        }
-      }
+      // Do not hard-filter by resolution; client can use warnings.
       
       // Handle season range torrents: ignore parsed season/episode and match any season in range
       if (range && range.isRange) {
@@ -680,11 +708,6 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
       return false;
       },
       (torrent) => {
-        const res = torrent?.parsed?.resolution;
-        if (res && !String(res).includes('1080') && !String(res).includes('720')) {
-          return `needed: resolution not 720/1080 (${res})`;
-        }
-
         const range = torrent?.seasonRange;
         if (range?.isRange) {
           return `needed: range ${String(range.startSeason)}-${String(range.endSeason)} didn't match needed`;
@@ -809,6 +832,9 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     }
   });
   torLog(`[search] providerCounts(filtered) ${JSON.stringify(providerCounts)}`);
+
+  const warningSummary = computeWarningSummary(filtered);
+  torLog(`[search] warningSummary(returned) ${JSON.stringify(warningSummary)}`);
   
   // (debug sample saving removed)
 
@@ -817,6 +843,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     count: filtered.length,
     rawProviderCounts,
     providerCounts,
+    warningSummary,
   })}`);
 
   const returnMax = parseInt(process.env.TOR_RETURN_MAX || '0');
@@ -841,6 +868,7 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     show: showName,
     count: filtered.length,
     torrents: filtered,
-    rawProviderCounts
+    rawProviderCounts,
+    warningSummary,
   };
 }

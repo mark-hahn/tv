@@ -3,11 +3,29 @@
 === do not use this file for prompts or edit it
 === it is just a scratchpad for editing copilot prompts.
 
-log tor search result counts and filtered counts.  for each result filtered out log it and the reason.
+the client claims this is all it got:
+{
+  "show": "Due South",
+  "count": 0,
+  "torrents": [],
+  "rawProviderCounts": {
+    "TorrentLeech": 1
+  }
+}
+the 480 filter did not show in those results:
 
 
-according to the website iptorrents has:
+{
+  "show": "Due South",
+  "needed": [
+    "force"
+  ],
+  "url": "https://hahnca.com/torrents-api/api/search?show=Due%20South&limit=1000&needed=%5B%22force%22%5D",
+  "apiCount": 0,
+  "torrentsReturned": 0,
+  "rawProviderCounts": {
+    "TorrentLeech": 1
+  },
+  "sample": []
+}
 
-Due South - Complete S01-04 DVDRiP FS XviD [BamBoo]
-
-why is that filterd. check tor-results.txt

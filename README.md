@@ -143,6 +143,33 @@ Example:
 curl -k "https://localhost:3001/api/search?show=Stranger%20Things&limit=50"
 ```
 
+#### Search filtering & warnings
+
+The server normalizes provider results, then applies a few **hard filters** to keep the list TV-focused and relevant:
+
+- **Name match**: keeps only results whose parsed title matches `show` (with several normalization variants).
+- **TV-only**: drops items with no season/episode info (movies, etc). Season-range torrents (e.g. `S01-S04`) are allowed.
+- **Year match** (optional): if `show` contains a year like `"Foo (2011)"`, keeps torrents that either have no year or match that year.
+- **Title excludes**: drops obvious unwanted variants by substring (currently `2160`, `nordic`, `mobile`).
+
+The server no longer hard-filters on:
+
+- **480p / low-res**
+- **0 seeds**
+
+Instead, it annotates returned torrents so the client can decide what to hide.
+
+Response fields:
+
+- Each torrent may include `warnings: [{ code, message }, ...]`.
+  - `code=low_res_480` for likely 480p/low-res releases
+  - `code=zero_seeds` for `seeds <= 0`
+- The top-level response includes `warningSummary` (a count map of warning codes across returned torrents).
+
+#### Search logging
+
+Search stages/counts and filter reasons are appended to `tor-results.txt` in the project root.
+
 ### Download helpers
 
 - `POST /api/download` – Higher-level download flow (JSON body `{ torrent }`)

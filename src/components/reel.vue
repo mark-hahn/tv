@@ -196,11 +196,25 @@ export default {
           data = await res2.json();
         }
 
-        titleStrings.value = toTitleArray(data);
+        const nextTitles = toTitleArray(data);
+
+        // Always append: starting/restarting the reel should not wipe what the user already has.
+        // If we get new entries, remove the "no more" sentinel and append the new titles.
+        if (nextTitles.length > 0) {
+          const withoutNoMore = titleStrings.value.filter((s) => String(s) !== NO_MORE_ENTRY);
+          titleStrings.value = [...withoutNoMore, ...nextTitles];
+        } else if (titleStrings.value.length === 0) {
+          titleStrings.value = [NO_MORE_ENTRY];
+        } else {
+          // Force a new array assignment so the UI updates consistently.
+          titleStrings.value = [...titleStrings.value];
+        }
+
         _titlesPopulated.value = true;
         _didStartReel.value = true;
         if (props.active) {
-          await scrollTitlesToBottom();
+          if (nextTitles.length > 0) await scrollTitlesToBottom();
+          else await scrollTitlesPaneToBottom();
         }
       } catch (e) {
         const msg = e?.message || String(e);
@@ -212,12 +226,8 @@ export default {
 
     const handleNext = async () => {
       try {
-        // If the "-- no more titles --" message is showing, restart Reel (same as initial mount).
-        // This refreshes the reelgood home page and reloads cached result titles.
-        if (titleStrings.value.some((s) => String(s) === NO_MORE_ENTRY)) {
-          await startReelAndLoadTitles();
-          return;
-        }
+        // If the "-- no more titles --" message is showing, do not restart the reel.
+        // Just refresh via /api/getreel; this should be a no-op that preserves the current list.
 
         const res = await fetch(`${config.torrentsApiUrl}/api/getreel`);
         if (!res.ok) {

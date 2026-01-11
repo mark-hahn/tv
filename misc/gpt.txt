@@ -3,3 +3,4 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
+a tor search for  "Due South", "Getting Personal",, or "Yes, Dear" shows gives no results but both ipt and tl have it available on their websites.  debug why this is happening

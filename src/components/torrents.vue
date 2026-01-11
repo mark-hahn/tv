@@ -15,6 +15,7 @@
           button(@click.stop="searchClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Search
           button(@click.stop="forceClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Force
           button(@click.stop="toggleCookieInputs" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Cookies
+          button(@click.stop="toggleDebug" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Debug
 
       div(style="height:1px; width:100%; background-color:#ddd; margin-top:6px;")
 
@@ -52,6 +53,30 @@
       div(style="margin-top:10px;")
         button(@click.stop="saveCookies" :disabled="loading" style="padding:8px 20px; font-size:13px; font-weight:bold; cursor:pointer; border-radius:5px; background:#4CAF50; color:white; border:none; width:100%;") 
           | Save Cookies
+
+    #debug-panel(@click.stop v-if="!loading && showDebug" style="position:sticky; top:120px; zIndex:119; padding:12px 16px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd; font-weight:normal;")
+      div(style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;")
+        div(style="font-weight:bold; color:#444; font-size:12px;") Debug
+        div(style="display:flex; gap:8px; align-items:center;")
+          button(v-if="lastSearchUrl" @click.stop="copyDebugUrl" style="font-size:12px; cursor:pointer; border-radius:6px; padding:2px 8px; border:1px solid #bbb; background-color:whitesmoke;") Copy URL
+          button(@click.stop="showDebug=false" style="font-size:12px; cursor:pointer; border-radius:6px; padding:2px 8px; border:1px solid #bbb; background-color:whitesmoke;") Close
+      div(style="font-size:12px; color:#555; line-height:1.35; white-space:pre-wrap; overflow-wrap:anywhere;")
+        div(v-if="debugCopyMsg" style="color:#2b6; margin-bottom:6px;") {{ debugCopyMsg }}
+        div(v-if="lastSearchShow")
+          span(style="font-weight:bold;") show:
+          |  {{ lastSearchShow }}
+        div(v-if="lastSearchNeeded")
+          span(style="font-weight:bold;") needed:
+          |  {{ lastSearchNeeded }}
+        div(v-if="lastSearchUrl")
+          span(style="font-weight:bold;") url:
+          |  {{ lastSearchUrl }}
+        div(v-if="lastApiCount !== null")
+          span(style="font-weight:bold;") api count:
+          |  {{ lastApiCount }}
+        div(v-if="lastRawProviderCounts")
+          span(style="font-weight:bold;") rawProviderCounts:
+          |  {{ formatJsonInline(lastRawProviderCounts) }}
 
     
 
@@ -155,7 +180,16 @@ export default {
       spaceSrvrGb: '--',
       spaceSrvrPct: '--%',
 
-      _didInitialScroll: false
+      _didInitialScroll: false,
+
+      // Debug: last search request/response metadata
+      showDebug: false,
+      lastSearchUrl: '',
+      lastSearchShow: '',
+      lastSearchNeeded: '',
+      lastRawProviderCounts: null,
+      lastApiCount: null,
+      debugCopyMsg: ''
     };
   },
 
@@ -169,10 +203,16 @@ export default {
       );
     },
     filteredTorrents() {
-      return this.torrents.filter(torrent => {
-        const seeds = Number(torrent.raw?.seeds);
-        return seeds > 0;
-      });
+      // Show all results (including 0-seed) so “dead” torrents are still visible.
+      // Sort seeded torrents to the top.
+      const asNumber = (v) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : 0;
+      };
+
+      return (Array.isArray(this.torrents) ? this.torrents : [])
+        .slice()
+        .sort((a, b) => asNumber(b?.raw?.seeds) - asNumber(a?.raw?.seeds));
     },
     trackerCounts() {
       const counts = {};
@@ -223,6 +263,44 @@ export default {
   },
 
   methods: {
+    toggleDebug() {
+      this.showDebug = !this.showDebug;
+    },
+    async copyDebugUrl() {
+      const text = String(this.lastSearchUrl || '').trim();
+      if (!text) return;
+
+      try {
+        if (navigator?.clipboard?.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        this.debugCopyMsg = 'Copied URL to clipboard';
+      } catch {
+        this.debugCopyMsg = 'Copy failed (clipboard blocked)';
+      }
+
+      window.clearTimeout(this._debugCopyTimer);
+      this._debugCopyTimer = window.setTimeout(() => {
+        this.debugCopyMsg = '';
+      }, 1500);
+    },
+    formatJsonInline(obj) {
+      try {
+        return JSON.stringify(obj);
+      } catch {
+        return String(obj);
+      }
+    },
     fmtSize(bytesOrHumanString) {
       return util.fmtBytesSize(bytesOrHumanString);
     },
@@ -802,6 +880,10 @@ export default {
       this.noTorrentsNeeded = false;
       this._didInitialScroll = false;
 
+      // Reset debug metadata for this request
+      this.lastRawProviderCounts = null;
+      this.lastApiCount = null;
+
       try {
         // Some shows include trailing punctuation (e.g. "Can You Keep a Secret?")
         // that can hurt provider matching. For torrent searching, strip trailing ?/.
@@ -813,6 +895,11 @@ export default {
           url += `&needed=${encodeURIComponent(JSON.stringify(needed))}`;
         }
 
+        // Debug info
+        this.lastSearchUrl = url;
+        this.lastSearchShow = showNameForSearch;
+        this.lastSearchNeeded = Array.isArray(needed) ? JSON.stringify(needed) : String(needed);
+
         const response = await fetch(url);
         
         if (!response.ok) {
@@ -821,34 +908,40 @@ export default {
 
         const data = await response.json();
 
+        // Debug info from response
+        this.lastApiCount = (typeof data?.count === 'number') ? data.count : null;
+
+        // Set torrents first; some server versions may omit rawProviderCounts.
+        this.torrents = data.torrents || [];
+
         // Simple number-returned checks
         const counts = data.rawProviderCounts || {};
-        const iptCount = (counts.IpTorrents ?? counts.iptorrents ?? 0);
-        const tlCount = (counts.TorrentLeech ?? counts.torrentleech ?? 0);
+        this.lastRawProviderCounts = counts;
+        const iptCount = Number(counts.IpTorrents ?? counts.iptorrents ?? 0) || 0;
+        const tlCount = Number(counts.TorrentLeech ?? counts.torrentleech ?? 0) || 0;
 
-        // If both providers returned 0, treat as no results
-        if ((iptCount === 0 || iptCount === undefined) && (tlCount === 0 || tlCount === undefined)) {
-          this.providerWarning = '';
-          this.error = null;
-          this.torrents = [];
-          return;
+        // If the backend reports raw provider hits but returns none, call it out explicitly.
+        // This typically means results exist on IPT/TL but were filtered out server-side
+        // (commonly because all hits have 0 seeds, or title parsing/matching rejected them).
+        if (Array.isArray(this.torrents) && this.torrents.length === 0 && (iptCount > 0 || tlCount > 0)) {
+          const parts = [];
+          if (iptCount > 0) parts.push(`IPTorrents: ${iptCount}`);
+          if (tlCount > 0) parts.push(`TorrentLeech: ${tlCount}`);
+          this.providerWarning = `Providers reported hits (${parts.join(', ')}), but none were returned. This is usually because all hits were filtered out (often 0 seeds) or title matching failed. Try Force, or check the provider site directly.`;
         }
 
         // If exactly one provider returned results and the other returned 0, show a warning
-        const iptZero = iptCount === 0 || iptCount === undefined;
-        const tlZero = tlCount === 0 || tlCount === undefined;
+        const iptZero = iptCount === 0;
+        const tlZero = tlCount === 0;
         const iptHas = !iptZero;
         const tlHas = !tlZero;
         // Only warn when we have some torrents overall
-        if (((iptHas && tlZero) || (tlHas && iptZero)) && (data.torrents && data.torrents.length > 0)) {
+        if (((iptHas && tlZero) || (tlHas && iptZero)) && (Array.isArray(this.torrents) && this.torrents.length > 0)) {
           const missing = [];
           if (iptZero) missing.push('IPTorrents');
           if (tlZero) missing.push('TorrentLeech');
           this.providerWarning = `Warning: No results from ${missing.join(' and ')}. Check cookies for that provider.`;
         }
-
-        // Finally, set torrents
-        this.torrents = data.torrents || [];
 
         await this.$nextTick();
         if (!this._didInitialScroll && Array.isArray(this.torrents) && this.torrents.length > 0) {

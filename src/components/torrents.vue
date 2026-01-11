@@ -77,6 +77,9 @@
         div(v-if="lastRawProviderCounts")
           span(style="font-weight:bold;") rawProviderCounts:
           |  {{ formatJsonInline(lastRawProviderCounts) }}
+        div(v-if="lastReturnedProviderCounts")
+          span(style="font-weight:bold;") returnedProviderCounts:
+          |  {{ formatJsonInline(lastReturnedProviderCounts) }}
         div(v-if="lastWarningSummary")
           span(style="font-weight:bold;") warningSummary:
           |  {{ formatJsonInline(lastWarningSummary) }}
@@ -102,6 +105,7 @@
       div(v-for="(torrent, index) in filteredTorrents" :key="getTorrentCardKey(torrent, index)" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
         div(v-if="isClicked(torrent)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
         div(v-if="isDownloadedBefore(torrent)" :style="getDownloadedBeforeIconStyle(torrent)" title="Downloaded before") 🕘
+        div(v-if="getDownloadStatus(torrent)" :title="getDownloadStatusTooltip(torrent)" style="position:absolute; bottom:8px; right:8px; font-size:11px; color:#666; max-width:70%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;") {{ getDownloadStatusLabel(torrent) }}
         div(v-if="SHOW_TITLE && torrent.raw" style="font-size:13px; font-weight:bold; color:#888; margin-bottom:4px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;") {{ getDisplayTitleWithProvider(torrent) }}
         div(v-if="getTorrentWarnings(torrent).length > 0" style="font-size:11px; color:#a33; margin-bottom:4px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;")
           | Warnings: {{ formatTorrentWarnings(torrent) }}
@@ -193,9 +197,15 @@ export default {
       lastSearchShow: '',
       lastSearchNeeded: '',
       lastRawProviderCounts: null,
+      lastReturnedProviderCounts: null,
       lastApiCount: null,
       lastWarningSummary: null,
-      debugCopyMsg: ''
+      debugCopyMsg: '',
+
+      // Download queue/state (avoid dropped requests + show per-torrent results)
+      downloadQueue: [],
+      downloadQueueRunning: false,
+      downloadStatus: {}
     };
   },
 
@@ -944,6 +954,7 @@ export default {
 
       // Reset debug metadata for this request
       this.lastRawProviderCounts = null;
+      this.lastReturnedProviderCounts = null;
       this.lastApiCount = null;
       this.lastWarningSummary = null;
 
@@ -1003,11 +1014,46 @@ export default {
           // ignore logging failures
         }
 
-        // Simple number-returned checks
-        const counts = data.rawProviderCounts || {};
-        this.lastRawProviderCounts = counts;
-        const iptCount = Number(counts.IpTorrents ?? counts.iptorrents ?? 0) || 0;
-        const tlCount = Number(counts.TorrentLeech ?? counts.torrentleech ?? 0) || 0;
+        // Provider hit counts.
+        // Prefer backend-reported rawProviderCounts when present, but fall back to deriving counts from
+        // returned torrents because some server versions omit rawProviderCounts.
+        const counts = (data && typeof data.rawProviderCounts === 'object') ? (data.rawProviderCounts || {}) : {};
+        this.lastRawProviderCounts = Object.keys(counts).length > 0 ? counts : null;
+
+        const toCount = (v) => {
+          const n = Number(v);
+          return Number.isFinite(n) ? n : 0;
+        };
+
+        const iptCountFromApi = toCount(
+          counts.IpTorrents ?? counts.IPTorrents ?? counts.iptorrents ?? counts.ipt ?? counts.IPT ?? counts.Iptorrents ?? 0
+        );
+        const tlCountFromApi = toCount(
+          counts.TorrentLeech ?? counts.torrentleech ?? counts.TL ?? counts.tl ?? counts.TorrentLeach ?? 0
+        );
+
+        let iptCount = iptCountFromApi;
+        let tlCount = tlCountFromApi;
+
+        // Fallback: infer from returned torrents if counts were not provided.
+        if ((iptCount + tlCount) === 0 && Array.isArray(this.torrents) && this.torrents.length > 0) {
+          for (const t of this.torrents) {
+            const providerRaw = String(t?.raw?.provider || t?.provider || '').toLowerCase();
+            if (!providerRaw) continue;
+            if (providerRaw.includes('torrentleech') || providerRaw === 'tl') {
+              tlCount += 1;
+            } else if (providerRaw.includes('iptorrents') || providerRaw === 'ipt' || providerRaw.includes('ipt')) {
+              iptCount += 1;
+            }
+          }
+
+          // When we infer counts, populate the debug display so it's obvious what happened.
+          this.lastRawProviderCounts = {
+            inferred: true,
+            IpTorrents: iptCount,
+            TorrentLeech: tlCount,
+          };
+        }
 
         // If the backend reports raw provider hits but returns none, call it out explicitly.
         // This typically means results exist on IPT/TL but were filtered out server-side
@@ -1019,17 +1065,43 @@ export default {
           this.providerWarning = `Providers reported hits (${parts.join(', ')}), but none were returned. This is usually because all hits were filtered out (often 0 seeds) or title matching failed. Try Force, or check the provider site directly.`;
         }
 
-        // If exactly one provider returned results and the other returned 0, show a warning
-        const iptZero = iptCount === 0;
-        const tlZero = tlCount === 0;
-        const iptHas = !iptZero;
-        const tlHas = !tlZero;
-        // Only warn when we have some torrents overall
-        if (((iptHas && tlZero) || (tlHas && iptZero)) && (Array.isArray(this.torrents) && this.torrents.length > 0)) {
+        // Returned-per-provider counts (what the user actually sees in the list).
+        const inferProvider = (torrent) => {
+          const providerRaw = String(torrent?.raw?.provider || torrent?.provider || '').toLowerCase();
+          const detailUrlLower = String(torrent?.detailUrl || torrent?.raw?.desc || '').toLowerCase();
+          if (providerRaw.includes('torrentleech') || detailUrlLower.includes('torrentleech') || providerRaw === 'tl') return 'torrentleech';
+          if (providerRaw.includes('iptorrents') || detailUrlLower.includes('iptorrents') || providerRaw === 'ipt') return 'iptorrents';
+          return providerRaw || 'unknown';
+        };
+
+        const returnedCounts = { iptorrents: 0, torrentleech: 0, unknown: 0 };
+        if (Array.isArray(this.torrents)) {
+          for (const t of this.torrents) {
+            const p = inferProvider(t);
+            if (p === 'iptorrents') returnedCounts.iptorrents += 1;
+            else if (p === 'torrentleech') returnedCounts.torrentleech += 1;
+            else returnedCounts.unknown += 1;
+          }
+        }
+        this.lastReturnedProviderCounts = returnedCounts;
+
+        // If exactly one provider returned results and the other returned none, show a cookie warning.
+        const iptReturned = returnedCounts.iptorrents;
+        const tlReturned = returnedCounts.torrentleech;
+        const iptZero = iptReturned === 0;
+        const tlZero = tlReturned === 0;
+        const iptHas = iptReturned > 0;
+        const tlHas = tlReturned > 0;
+
+        if ((Array.isArray(this.torrents) && this.torrents.length > 0) && ((iptHas && tlZero) || (tlHas && iptZero))) {
           const missing = [];
           if (iptZero) missing.push('IPTorrents');
           if (tlZero) missing.push('TorrentLeech');
-          this.providerWarning = `Warning: No results from ${missing.join(' and ')}. Check cookies for that provider.`;
+          const cookieWarning = `Warning: No results from ${missing.join(' and ')}. Check cookies for that provider.`;
+
+          this.providerWarning = this.providerWarning
+            ? `${this.providerWarning}\n\n${cookieWarning}`
+            : cookieWarning;
         }
 
         await this.$nextTick();
@@ -1064,7 +1136,7 @@ export default {
 
       // Ctrl-click should behave like clicking the Get button.
       if (isCtrlClick) {
-        void this.continueDownload();
+        void this.enqueueDownload(torrent);
         return;
       }
 
@@ -1115,22 +1187,159 @@ export default {
       // Keep card selected
     },
 
-    async continueDownload() {
+    continueDownload() {
+      // Keep the existing template bindings, but route through the queue.
       this.showModal = false;
-      
-      const torrent = this.selectedTorrent;
-      if (!torrent) {
-        return;
+      void this.enqueueDownload(this.selectedTorrent);
+    },
+
+    statusKeyForTorrent(torrent) {
+      return this.getTorrentHistoryKey(torrent) || this.getTorrentCardKey(torrent, 0) || '';
+    },
+
+    getDownloadStatus(torrent) {
+      const key = this.statusKeyForTorrent(torrent);
+      if (!key) return null;
+      return this.downloadStatus?.[key] || null;
+    },
+
+    getDownloadStatusLabel(torrent) {
+      const st = this.getDownloadStatus(torrent);
+      if (!st) return '';
+      const s = String(st.status || '');
+      if (s === 'queued') return 'Queued';
+      if (s === 'sending') return 'Sending…';
+      if (s === 'ok') return 'OK';
+      if (s === 'warn') return 'Sent (verify pending)';
+      if (s === 'error') return 'Error';
+      return s;
+    },
+
+    getDownloadStatusTooltip(torrent) {
+      const st = this.getDownloadStatus(torrent);
+      if (!st) return '';
+      const msg = String(st.message || '').trim();
+      return msg ? `${this.getDownloadStatusLabel(torrent)}: ${msg}` : this.getDownloadStatusLabel(torrent);
+    },
+
+    setDownloadStatus(torrent, status, message) {
+      const key = this.statusKeyForTorrent(torrent);
+      if (!key) return;
+      const next = {
+        ...(this.downloadStatus && typeof this.downloadStatus === 'object' ? this.downloadStatus : {}),
+        [key]: {
+          status,
+          message: message ? String(message) : '',
+          ts: Date.now()
+        }
+      };
+      this.downloadStatus = next;
+    },
+
+    async fetchWithTimeout(url, options = {}, timeoutMs = 60000) {
+      const ms = Math.max(0, Number(timeoutMs) || 0);
+      if (!ms) return fetch(url, options);
+
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), ms);
+      try {
+        return await fetch(url, { ...options, signal: controller.signal });
+      } finally {
+        clearTimeout(t);
       }
-      
-      // Mark as downloaded immediately to change card color
+    },
+
+    enqueueDownload(torrent) {
+      if (!torrent) return;
+
+      const key = this.statusKeyForTorrent(torrent);
+      if (!key) return;
+
+      const existing = this.downloadStatus?.[key]?.status;
+      if (existing === 'queued' || existing === 'sending') return;
+
+      this.downloadQueue.push({ torrent, key });
+      this.setDownloadStatus(torrent, 'queued', '');
+      void this.processDownloadQueue();
+    },
+
+    async waitForQbtHash(hash, timeoutMs = 15000) {
+      const h = String(hash || '').trim().toLowerCase();
+      if (!h) return false;
+      const end = Date.now() + Math.max(0, Number(timeoutMs) || 0);
+      const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+      while (Date.now() < end) {
+        try {
+          const url = new URL(`${config.torrentsApiUrl}/api/qbt/info`);
+          url.searchParams.set('hash', h);
+          const res = await fetch(url.toString());
+          if (res.ok) {
+            const j = await res.json().catch(() => null);
+            if (Array.isArray(j) && j.length > 0) return true;
+          }
+        } catch {
+          // ignore transient errors
+        }
+        await sleep(1000);
+      }
+      return false;
+    },
+
+    async processDownloadQueue() {
+      if (this.downloadQueueRunning) return;
+      this.downloadQueueRunning = true;
+
+      try {
+        while (this.downloadQueue.length > 0) {
+          const item = this.downloadQueue.shift();
+          const torrent = item?.torrent;
+          if (!torrent) continue;
+
+          this.setDownloadStatus(torrent, 'sending', '');
+          const torrentTitle = String(torrent?.raw?.title || torrent?.title || 'Unknown');
+
+          try {
+            const result = await this.downloadTorrentInternal(torrent);
+            if (result?.ok) {
+              const hash = this.getTorrentHash(torrent);
+              if (hash) {
+                const seen = await this.waitForQbtHash(hash, 15000);
+                if (!seen) {
+                  this.setDownloadStatus(torrent, 'warn', 'Server reported success, but qBittorrent has not listed this hash yet');
+                } else {
+                  this.setDownloadStatus(torrent, 'ok', result?.message || '');
+                }
+              } else {
+                this.setDownloadStatus(torrent, 'ok', result?.message || '');
+              }
+
+              // Only mark "downloaded" after the server indicates success.
+              this.rememberDownloadedTorrent(torrent);
+            } else {
+              const msg = result?.message || `Failed to add: ${torrentTitle}`;
+              this.setDownloadStatus(torrent, 'error', msg);
+            }
+          } catch (err) {
+            const msg = err?.message || String(err);
+            this.setDownloadStatus(torrent, 'error', msg);
+          }
+        }
+      } finally {
+        this.downloadQueueRunning = false;
+      }
+    },
+
+    async downloadTorrentInternal(torrent) {
+      // Mark as downloaded immediately to change card color ("now" highlighting)
       const nowKey = this.getTorrentNowKey(torrent);
       if (nowKey) {
         this.downloadedTorrents.add(nowKey);
       }
+
+      const torrentTitle = torrent?.raw?.title || 'Unknown';
       
-      const torrentTitle = torrent.raw?.title || 'Unknown';
-      
+      // Mark as downloaded immediately to change card color
       try {
         const providerRaw = String(torrent?.raw?.provider || '').toLowerCase();
         const detailUrl = String(torrent?.detailUrl || '');
@@ -1144,11 +1353,11 @@ export default {
 
         // TL: Use the new direct-binary endpoint (no detail page), then push bytes to USB watch folder.
         if (provider === 'torrentleech') {
-          const resp = await fetch(`${config.torrentsApiUrl}/api/torrentFile`, {
+          const resp = await this.fetchWithTimeout(`${config.torrentsApiUrl}/api/torrentFile`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ torrent })
-          });
+          }, 60000);
 
           const ct = (resp.headers.get('content-type') || '').toLowerCase();
           if (ct.includes('application/json')) {
@@ -1181,11 +1390,11 @@ export default {
                 '- Ensure req-browser.txt in the torrents server project matches the browser you’re using (DevTools “Copy as cURL (bash)”).\n\n' +
                 (detailUrl ? `Detail URL:\n${detailUrl}` : '')
               );
-              return;
+              return { ok: false, message: 'Cloudflare challenge blocked server request' };
             }
 
             this.showError(errorMsg);
-            return;
+            return { ok: false, message: errorMsg };
           }
 
           if (!resp.ok) {
@@ -1201,13 +1410,13 @@ export default {
           const uploadUrl = new URL(`${config.torrentsApiUrl}/api/usb/addTorrent`);
           uploadUrl.searchParams.set('filename', filename);
 
-          const upload = await fetch(uploadUrl.toString(), {
+          const upload = await this.fetchWithTimeout(uploadUrl.toString(), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/x-bittorrent'
             },
             body: bytes
-          });
+          }, 60000);
 
           if (!upload.ok) {
             let detail = '';
@@ -1228,23 +1437,21 @@ export default {
           const uploadRes = await upload.json().catch(() => ({}));
           if (uploadRes && typeof uploadRes === 'object') {
             if (uploadRes.success || uploadRes.result === true) {
-              this.rememberDownloadedTorrent(torrent);
-              return;
+              return { ok: true, message: '' };
             }
             const uploadErr = uploadRes?.error || uploadRes?.message;
             if (uploadErr) {
               this.showError(uploadErr);
-              return;
+              return { ok: false, message: String(uploadErr) };
             }
           }
 
           // If the server returned 2xx but no JSON body, assume the file was written.
-          this.rememberDownloadedTorrent(torrent);
-          return;
+          return { ok: true, message: '' };
         }
 
         // Non-TL providers: keep the existing server-side pipeline.
-        const response = await fetch(`${config.torrentsApiUrl}/api/download`, {
+        const response = await this.fetchWithTimeout(`${config.torrentsApiUrl}/api/download`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -1252,7 +1459,7 @@ export default {
           body: JSON.stringify({
             torrent
           })
-        });
+        }, 60000);
         
         if (!response.ok) {
           let detail = '';
@@ -1274,8 +1481,7 @@ export default {
         
         // Check if download was successful
         if (data.success || data.result === true) {
-          // Success
-          this.rememberDownloadedTorrent(torrent);
+          return { ok: true, message: '' };
         } else {
           const errorMsg = data.error || data.message || 'Unknown error';
           const isCloudflare = Boolean(data && typeof data === 'object' && (data.isCloudflare || data.stage === 'cloudflare')) ||
@@ -1308,13 +1514,16 @@ export default {
               '- If it still fails, Cloudflare is likely fingerprinting requests from this network/IP.\n\n' +
               (detailUrl ? `Detail URL:\n${detailUrl}` : '')
             );
+            return { ok: false, message: 'Cloudflare challenge blocked server request' };
           } else {
             this.showError(errorMsg);
+            return { ok: false, message: String(errorMsg) };
           }
         }
       } catch (error) {
         const errorMsg = error.message || String(error);
         this.showError(errorMsg);
+        return { ok: false, message: String(errorMsg) };
       }
     },
 

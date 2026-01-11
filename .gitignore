@@ -3,6 +3,8 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+tor-results.txt
+misc
 
 # local cookies/credentials
 cookies/*.json

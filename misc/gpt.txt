@@ -3,3 +3,11 @@
 === do not use this file for prompts or edit it
 === it is just a scratchpad for editing copilot prompts.
 
+log tor search result counts and filtered counts.  for each result filtered out log it and the reason.
+
+
+according to the website iptorrents has:
+
+Due South - Complete S01-04 DVDRiP FS XviD [BamBoo]
+
+why is that filterd. check tor-results.txt

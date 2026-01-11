@@ -15,6 +15,163 @@ const __dirname = path.dirname(__filename);
 const TORRENTS_DIR = path.resolve(__dirname, '..');
 const COOKIES_DIR = path.join(TORRENTS_DIR, 'cookies');
 const IPTORRENTS_CUSTOM_PATH = path.join(TORRENTS_DIR, 'iptorrents-custom.json');
+const TOR_RESULTS_LOG_PATH = path.join(TORRENTS_DIR, 'tor-results.txt');
+
+function appendTorResultsLog(lines) {
+  try {
+    const arr = Array.isArray(lines) ? lines : [String(lines || '')];
+    const txt = arr.filter(Boolean).map((l) => String(l).replace(/\s+$/g, '')).join('\n') + '\n';
+    fs.appendFileSync(TOR_RESULTS_LOG_PATH, txt, 'utf8');
+  } catch {
+    // ignore logging failures
+  }
+}
+
+function torLog(line) {
+  const ts = new Date().toISOString();
+  appendTorResultsLog(`[${ts}] ${String(line || '')}`);
+  if (process.env.TOR_LOG_STDOUT === '1') {
+    console.log(String(line || ''));
+  }
+}
+
+function formatActiveProviders(activeProviders) {
+  const arr = Array.isArray(activeProviders) ? activeProviders : [];
+  return arr
+    .map((p) => {
+      if (typeof p === 'string') return p;
+      if (p && typeof p === 'object') {
+        if (typeof p.name === 'string' && p.name.trim()) return p.name.trim();
+        if (typeof p.provider === 'string' && p.provider.trim()) return p.provider.trim();
+      }
+      return String(p);
+    })
+    .filter(Boolean);
+}
+
+function logProviderSearchResults(items, { stage = 'provider-search results', expectedProviders } = {}) {
+  const arr = Array.isArray(items) ? items : [];
+  const groups = new Map();
+  for (const t of arr) {
+    const provider = torrentProviderName(t);
+    if (!groups.has(provider)) groups.set(provider, []);
+    groups.get(provider).push(t);
+  }
+
+  const expected = Array.isArray(expectedProviders) ? expectedProviders : [];
+  for (const p of expected) {
+    const name = String(p || '').trim();
+    if (!name) continue;
+    if (!groups.has(name)) groups.set(name, []);
+  }
+
+  const maxPerProvider = parseInt(process.env.TOR_PROVIDER_SEARCH_MAX || '100');
+  const max = Number.isFinite(maxPerProvider) ? maxPerProvider : 100;
+
+  torLog(`[search] ${stage}: total=${arr.length} providers=${groups.size}`);
+
+  const orderedProviders = [];
+  for (const p of expected) {
+    const name = String(p || '').trim();
+    if (name && groups.has(name)) orderedProviders.push(name);
+  }
+  for (const name of groups.keys()) {
+    if (!orderedProviders.includes(name)) orderedProviders.push(name);
+  }
+
+  for (const provider of orderedProviders) {
+    const list = groups.get(provider) || [];
+    torLog(`========= ${provider} =========`);
+    if (!list.length) {
+      torLog(`[search] ${provider}: 0 results`);
+      continue;
+    }
+    const slice = max > 0 ? list.slice(0, max) : list;
+    slice.forEach((t, i) => {
+      const title = t?.title || t?.raw?.title || '';
+      const seeds = t?.seeds;
+      const size = t?.size;
+      const parts = [];
+      if (Number.isFinite(Number(seeds))) parts.push(`seeds=${seeds}`);
+      if (size) parts.push(`size=${size}`);
+      const meta = parts.length ? ` [${parts.join(' ')}]` : '';
+      torLog(`[search] ${provider} item ${String(i + 1).padStart(3, '0')}/${list.length}${meta}: ${title}`);
+    });
+    if (slice.length !== list.length) {
+      torLog(`[search] ${provider} items truncated: logged ${slice.length}/${list.length} (set TOR_PROVIDER_SEARCH_MAX=0 to log all)`);
+    }
+  }
+}
+
+function torrentLogLabel(torrent) {
+  if (!torrent) return '(null)';
+  const provider = torrent?.raw?.provider || torrent?.provider || 'Unknown';
+  const title = torrent?.raw?.title || torrent?.title || '';
+  const seasonEpisode = torrent?.parsed?.seasonEpisode;
+  const range = torrent?.seasonRange?.isRange
+    ? `S${String(torrent.seasonRange.startSeason).padStart(2, '0')}-S${String(torrent.seasonRange.endSeason).padStart(2, '0')}`
+    : '';
+  const left = seasonEpisode || range || '';
+  const seeds = torrent?.raw?.seeds;
+  const size = torrent?.raw?.size;
+  const bits = [];
+  if (left) bits.push(left);
+  if (Number.isFinite(Number(seeds))) bits.push(`seeds=${seeds}`);
+  if (size) bits.push(`size=${size}`);
+  const meta = bits.length ? ` [${bits.join(' ')}]` : '';
+  return `${provider}${meta} | ${title}`.trim();
+}
+
+function torrentProviderName(torrent) {
+  return String(torrent?.raw?.provider || torrent?.provider || 'Unknown');
+}
+
+function logFilterStage(stage, beforeCount, keptCount, removed, meta) {
+  const filteredCount = Math.max(0, beforeCount - keptCount);
+  torLog(`[search] ${stage}: ${beforeCount} -> ${keptCount} (filtered ${filteredCount})`);
+  if (meta && typeof meta === 'object') {
+    const keys = Object.keys(meta);
+    if (keys.length) torLog(`[search] meta ${JSON.stringify({ stage, ...meta })}`);
+  }
+
+  const groups = new Map();
+  for (const r of removed || []) {
+    const provider = torrentProviderName(r?.item);
+    if (!groups.has(provider)) groups.set(provider, []);
+    groups.get(provider).push(r);
+  }
+  for (const [provider, list] of groups.entries()) {
+    torLog(`========= ${provider} =========`);
+    list.forEach(({ item, reason }) => {
+      torLog(`[search] filtered(${stage}): ${torrentLogLabel(item)} :: ${reason || 'filtered'}`);
+    });
+  }
+}
+
+function filterWithReasons(items, keepFn, reasonFn) {
+  const kept = [];
+  const removed = [];
+  for (const item of items || []) {
+    let keep = false;
+    try {
+      keep = Boolean(keepFn(item));
+    } catch {
+      keep = false;
+    }
+    if (keep) {
+      kept.push(item);
+    } else {
+      let reason = 'filtered';
+      try {
+        reason = reasonFn ? String(reasonFn(item) || 'filtered') : 'filtered';
+      } catch {
+        reason = 'filtered';
+      }
+      removed.push({ item, reason });
+    }
+  }
+  return { kept, removed };
+}
 
 // Load cookies from files
 function loadCookiesArray(filename) {
@@ -97,7 +254,11 @@ export function initializeProviders() {
  */
 export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, needed = [] }) {
   console.log(`\nSearching for: ${showName} (limit: ${limit})`);
-  console.log('Enabled providers:', TorrentSearchApi.getActiveProviders().join(', '));
+  const activeProvidersRaw = TorrentSearchApi.getActiveProviders();
+  const activeProviders = formatActiveProviders(activeProvidersRaw);
+  console.log('Enabled providers:', activeProviders.join(', '));
+
+  torLog(`========== search: ${showName} (limit=${limit}) ==========`);
 
   const sanitizeForProviderSearch = (name) => {
     return String(name || '')
@@ -172,14 +333,25 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
 
   const combined = resultsArrays.flat();
   const seen = new Set();
-  torrents = combined.filter(t => {
-    const key = `${t.provider}|${t.title}`;
-    if (seen.has(key)) return false;
+  const deduped = [];
+  const dedupeRemoved = [];
+  for (const t of combined) {
+    const key = `${t?.provider}|${t?.title}`;
+    if (seen.has(key)) {
+      dedupeRemoved.push({ item: t, reason: `duplicate key: ${key}` });
+      continue;
+    }
     seen.add(key);
-    return true;
+    deduped.push(t);
+  }
+  torrents = deduped;
+  logFilterStage('provider-search dedupe', combined.length, torrents.length, dedupeRemoved, {
+    queries: uniqueQueries,
   });
-  
-  console.log(`Total torrents returned: ${torrents.length}`);
+  logProviderSearchResults(torrents, {
+    stage: 'provider-search results (deduped)',
+    expectedProviders: activeProviders,
+  });
 
   // Count by provider in raw results (before normalization/filtering).
   // The UI uses this to decide whether to show "missing provider" cookie warnings.
@@ -188,10 +360,22 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
     const provider = t.provider || 'Unknown';
     rawProviderCounts[provider] = (rawProviderCounts[provider] || 0) + 1;
   });
+  torLog(`[search] rawProviderCounts(provider-search) ${JSON.stringify(rawProviderCounts)}`);
   
   // Normalize and filter torrents
   const normalized = torrents.map(t => normalize(t, showName));
-  const matches = normalized.filter(t => t.nameMatch);
+  logFilterStage('normalize', torrents.length, normalized.length, []);
+
+  const nameMatchStage = filterWithReasons(
+    normalized,
+    (t) => t && t.nameMatch,
+    (t) => {
+      const rawTitle = t?.raw?.title || t?.title || '';
+      return `nameMatch=false (${rawTitle.slice(0, 120)})`;
+    }
+  );
+  const matches = nameMatchStage.kept;
+  logFilterStage('name match', normalized.length, matches.length, nameMatchStage.removed);
   
   // Add year to raw data
   matches.forEach(torrent => {
@@ -233,11 +417,17 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   
   // Filter out torrents without season information (movies, etc.)
   // Allow season-range torrents through even if parsed.season is missing
-  const tvOnly = matches.filter(torrent => {
-    const hasSeason = torrent.parsed.season !== undefined && torrent.parsed.season !== null;
-    const hasSeasonRange = !!torrent.seasonRange?.isRange;
-    return hasSeason || hasSeasonRange;
-  });
+  const tvOnlyStage = filterWithReasons(
+    matches,
+    (torrent) => {
+      const hasSeason = torrent?.parsed?.season !== undefined && torrent?.parsed?.season !== null;
+      const hasSeasonRange = !!torrent?.seasonRange?.isRange;
+      return hasSeason || hasSeasonRange;
+    },
+    () => 'missing season info (and not a season-range torrent)'
+  );
+  const tvOnly = tvOnlyStage.kept;
+  logFilterStage('tv-only', matches.length, tvOnly.length, tvOnlyStage.removed);
   
   // Filter by year if show name contains a year
   let yearFiltered = tvOnly;
@@ -253,11 +443,16 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   
   if (showYears.length > 0) {
     const showYear = Math.min(...showYears);
-    yearFiltered = tvOnly.filter(torrent => {
-      // Keep torrents that either don't have a year or match the show year
-      return !torrent.raw.year || torrent.raw.year === showYear;
-    });
-    console.log(`Filtered by year ${showYear}: ${tvOnly.length} -> ${yearFiltered.length} torrents`);
+    const yearStage = filterWithReasons(
+      tvOnly,
+      (torrent) => !torrent?.raw?.year || torrent.raw.year === showYear,
+      (torrent) => {
+        const y = torrent?.raw?.year;
+        return `year mismatch (show=${showYear} torrent=${y})`;
+      }
+    );
+    yearFiltered = yearStage.kept;
+    logFilterStage('year match', tvOnly.length, yearFiltered.length, yearStage.removed, { showYear });
     // (debug removed)
   } else {
     // (debug removed)
@@ -265,19 +460,42 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
   
   // Filter out unwanted torrents by excluded strings in title
   const excludedStrings = ['2160', 'nordic', '480', 'mobile'];
-  const filtered1 = yearFiltered.filter(torrent => {
-    const title = torrent.raw.title.toLowerCase();
-    return !excludedStrings.some(excluded => title.includes(excluded));
-  });
+  const excludedStage = filterWithReasons(
+    yearFiltered,
+    (torrent) => {
+      const title = String(torrent?.raw?.title || '').toLowerCase();
+      return !excludedStrings.some((excluded) => title.includes(excluded));
+    },
+    (torrent) => {
+      const title = String(torrent?.raw?.title || '').toLowerCase();
+      const hit = excludedStrings.find((excluded) => title.includes(excluded));
+      return `excluded title token: ${hit || 'unknown'}`;
+    }
+  );
+  const filtered1 = excludedStage.kept;
+  logFilterStage('excluded strings', yearFiltered.length, filtered1.length, excludedStage.removed, { excludedStrings });
   
   // Filter out torrents with 0 seeds
-  const filtered2 = filtered1.filter(torrent => {
-    const seeds = parseInt(torrent.raw?.seeds || 0);
-    return seeds > 0;
-  });
+  const seedsStage = filterWithReasons(
+    filtered1,
+    (torrent) => {
+      const seeds = parseInt(torrent?.raw?.seeds || 0);
+      return seeds > 0;
+    },
+    (torrent) => `seeds<=0 (seeds=${parseInt(torrent?.raw?.seeds || 0)})`
+  );
+  const filtered2 = seedsStage.kept;
+  logFilterStage('seeds', filtered1.length, filtered2.length, seedsStage.removed);
   
-  const finalCount = showYearMatch ? `${yearFiltered.length} after year filter -> ` : '';
-  console.log(`Filtered: ${matches.length} name matches -> ${tvOnly.length} with season info -> ${finalCount}${filtered1.length} without ${excludedStrings.join('/')} -> ${filtered2.length} with seeds`);
+  torLog(
+    `[search] summary counts: ` +
+      `${torrents.length} provider results -> ` +
+      `${matches.length} name matches -> ` +
+      `${tvOnly.length} tv-only -> ` +
+      `${showYears.length ? yearFiltered.length + ' year-match -> ' : ''}` +
+      `${filtered1.length} exclude-filter -> ` +
+      `${filtered2.length} seeds>0`
+  );
   
   // Add seasonEpisode to all torrents
   filtered2.forEach(torrent => {
@@ -337,9 +555,23 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
         filtered.push(...seasonData.episodeTorrents);
       }
     });
+    const include = new Set(filtered.map(t => torrentLogLabel(t)));
+    const removed = filtered2
+      .filter(t => !include.has(torrentLogLabel(t)))
+      .map((t) => {
+        const season = t?.parsed?.season;
+        const hasSeasonPack = seasonsByNumber[season]?.seasonTorrents?.length > 0;
+        const isS01E01 = Number(season) === 1 && Number(t?.parsed?.episode) === 1;
+        const reason = hasSeasonPack && !isS01E01
+          ? 'noemby: season pack exists (drop episodes except S01E01)'
+          : 'noemby: excluded by selection';
+        return { item: t, reason };
+      });
+    logFilterStage('noemby selection', filtered2.length, filtered.length, removed);
   } else if (isForce) {
     // For force, return all torrents without filtering
     filtered = filtered2;
+    logFilterStage('force (no filtering)', filtered2.length, filtered.length, []);
   } else if (isLoadAll) {
     // For loadall, return all season torrents and episode torrents for seasons without a season torrent
     const seasonsByNumber = {};
@@ -380,12 +612,27 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
         filtered.push(...seasonData.episodeTorrents);
       }
     });
+    const include = new Set(filtered.map(t => torrentLogLabel(t)));
+    const removed = filtered2
+      .filter(t => !include.has(torrentLogLabel(t)))
+      .map((t) => {
+        const season = t?.parsed?.season;
+        const hasSeasonPack = seasonsByNumber[season]?.seasonTorrents?.length > 0;
+        const isS01E01 = Number(season) === 1 && Number(t?.parsed?.episode) === 1;
+        const reason = hasSeasonPack && !isS01E01
+          ? 'loadall: season pack exists (drop episodes except S01E01)'
+          : 'loadall: excluded by selection';
+        return { item: t, reason };
+      });
+    logFilterStage('loadall selection', filtered2.length, filtered.length, removed);
   } else if (needed && needed.length > 0) {
     // Track which needed entries were matched
     const matchedNeeded = new Set();
     
     // Filter torrents based on needed array
-    filtered = filtered2.filter(torrent => {
+    const neededStage = filterWithReasons(
+      filtered2,
+      (torrent) => {
       const { season, episode } = torrent.parsed;
       const range = torrent.seasonRange;
       
@@ -431,7 +678,34 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
       }
       
       return false;
-    });
+      },
+      (torrent) => {
+        const res = torrent?.parsed?.resolution;
+        if (res && !String(res).includes('1080') && !String(res).includes('720')) {
+          return `needed: resolution not 720/1080 (${res})`;
+        }
+
+        const range = torrent?.seasonRange;
+        if (range?.isRange) {
+          return `needed: range ${String(range.startSeason)}-${String(range.endSeason)} didn't match needed`;
+        }
+
+        const season = torrent?.parsed?.season;
+        const episode = torrent?.parsed?.episode;
+        if (!episode) {
+          const seasonStr = `S${String(season).padStart(2, '0')}`;
+          return `needed: missing ${seasonStr}`;
+        }
+        const episodeStr = `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
+        return `needed: missing ${episodeStr}`;
+      }
+    );
+    filtered = neededStage.kept;
+    logFilterStage('needed filter', filtered2.length, filtered.length, neededStage.removed, { needed });
+  }
+
+  if (!isNoEmby && !isForce && !isLoadAll && !(needed && needed.length > 0)) {
+    logFilterStage('default (no additional filtering)', filtered2.length, filtered.length, []);
   }
   // Sort torrents (apply to both loadall and regular cases)
   filtered.sort((a, b) => {
@@ -534,9 +808,34 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
       providerCounts[provider] = (providerCounts[provider] || 0) + 1;
     }
   });
-  console.log(providerCounts);
+  torLog(`[search] providerCounts(filtered) ${JSON.stringify(providerCounts)}`);
   
   // (debug sample saving removed)
+
+  torLog(`[search] return payload summary ${JSON.stringify({
+    show: showName,
+    count: filtered.length,
+    rawProviderCounts,
+    providerCounts,
+  })}`);
+
+  const returnMax = parseInt(process.env.TOR_RETURN_MAX || '0');
+  const toLog = Number.isFinite(returnMax) && returnMax > 0 ? filtered.slice(0, returnMax) : filtered;
+  const returnGroups = new Map();
+  toLog.forEach((t, i) => {
+    const provider = torrentProviderName(t);
+    if (!returnGroups.has(provider)) returnGroups.set(provider, []);
+    returnGroups.get(provider).push({ t, i });
+  });
+  for (const [provider, list] of returnGroups.entries()) {
+    torLog(`========= ${provider} =========`);
+    list.forEach(({ t, i }) => {
+      torLog(`[search] return item ${String(i + 1).padStart(3, '0')}/${filtered.length}: ${torrentLogLabel(t)}`);
+    });
+  }
+  if (toLog.length !== filtered.length) {
+    torLog(`[search] return items truncated: logged ${toLog.length}/${filtered.length} (set TOR_RETURN_MAX=0 to log all)`);
+  }
   
   return {
     show: showName,

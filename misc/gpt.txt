@@ -3,13 +3,27 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-the show "I Hate You" is not in emby and not in the local disk.  i ctrl-clicked on each of 5 cards about 1 sec between each clcik. each card went through the states queued, sending, and ok, one at a time.
+these files are in the local server file system:
+-rw-r--r-- 1 1020 1020 824M 2026/01/11 13:32 i.hate.you.s01e01.1080p.web.h264-glhf.mkv
+-rw-r--r-- 1 1020 1020 2.6K 2026/01/11 13:31 i.hate.you.s01e01.1080p.web.h264-glhf.srr
+-rw-r--r-- 1 1020 1020 837M 2026/01/11 14:40 i.hate.you.s01e02.1080p.web.h264-glhf.mkv
+-rw-r--r-- 1 1020 1020 2.6K 2026/01/11 14:38 i.hate.you.s01e02.1080p.web.h264-glhf.srr
+-rw-r--r-- 1 1020 1020 802M 2026/01/11 14:40 i.hate.you.s01e03.1080p.web.h264-glhf.mkv
+-rw-r--r-- 1 1020 1020 2.6K 2026/01/11 14:39 i.hate.you.s01e03.1080p.web.h264-glhf.srr
+-rw-r--r-- 1 1020 1020 802M 2026/01/11 14:39 i.hate.you.s01e04.1080p.web.h264-glhf.mkv
+-rw-r--r-- 1 1020 1020 2.6K 2026/01/11 14:37 i.hate.you.s01e04.1080p.web.h264-glhf.srr
+-rw-r--r-- 1 1020 1020 772M 2026/01/11 14:40 i.hate.you.s01e05.1080p.web.h264-glhf.mkv
+-rw-r--r-- 1 1020 1020 2.6K 2026/01/11 14:40 i.hate.you.s01e05.1080p.web.h264-glhf.srr
+-rw-r--r-- 1 1020 1020 835M 2026/01/11 14:40 i.hate.you.s01e06.1080p.web.h264-glhf.mkv
+-rw-r--r-- 1 1020 1020 2.6K 2026/01/11 14:34 i.hate.you.s01e06.1080p.web.h264-glhf.srr
 
-then only one showed 
+after the library button was clicked in the down pane there was the library refresh and then the shows were reloaded.
 
-when qbt pane card has a status of stalleddl change the spelling to stalled
+the series pane was correct except that it said Not In Emby.
 
-changed stalleddl stalled
+the actors pane was correct.
+
+showing the map pane would show +- in each cell then quickly switch to all - which is wrong.
 
 
 

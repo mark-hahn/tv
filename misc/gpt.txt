@@ -3,8 +3,13 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-the tor pane did gets for many torrent files and all but one was started in qbt. the last one didn't get to qbt until another unrelated torrent was added much later.
+the show "I Hate You" is not in emby and not in the local disk.  i ctrl-clicked on each of 5 cards about 1 sec between each clcik. each card went through the states queued, sending, and ok, one at a time.
 
-i did not ask for a message.  fix or debug the problem
+then only one showed 
 
-qbt watch folder got 
+when qbt pane card has a status of stalleddl change the spelling to stalled
+
+changed stalleddl stalled
+
+
+

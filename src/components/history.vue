@@ -318,6 +318,9 @@ export default {
       // Special-case qBittorrent's stalledUP to match requested wording.
       if (raw === 'stalledUP') return 'Finished';
 
+      // Special-case qBittorrent's stalledDL to match requested wording.
+      if (raw.toLowerCase() === 'stalleddl') return 'Stalled';
+
       // Match TvProc wording.
       if (raw === 'downloading') return 'Getting';
 

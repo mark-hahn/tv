@@ -369,12 +369,24 @@ export async function uploadTorrentToWatchFolder(torrentData, filenameHint = '')
   }
 
   const remotePath = `${remoteWatchDir}/${torrentFilename}`;
+  const tmpRemotePath = `${remoteWatchDir}/.${torrentFilename}.${hash}.tmp`;
   const sftp = new Client();
   try {
     await sftp.connect(sftpConfig);
-    await sftp.put(torrentData, remotePath);
+
+    // Atomic-ish write for qBittorrent watch folders:
+    // upload to a temp filename (non-.torrent) so qBittorrent doesn't attempt
+    // to parse it while it's still being written, then rename into place.
+    await sftp.put(torrentData, tmpRemotePath);
+    await sftp.rename(tmpRemotePath, remotePath);
     await sftp.end();
   } catch (e) {
+    try {
+      // Best-effort cleanup of temp file.
+      await sftp.delete(tmpRemotePath);
+    } catch {
+      /* ignore */
+    }
     try { await sftp.end(); } catch { /* ignore */ }
     return fail('sftp-put', e?.message || String(e), { remotePath });
   }

@@ -3,29 +3,5 @@
 === do not use this file for prompts or edit it
 === it is just a scratchpad for editing copilot prompts.
 
-the client claims this is all it got:
-{
-  "show": "Due South",
-  "count": 0,
-  "torrents": [],
-  "rawProviderCounts": {
-    "TorrentLeech": 1
-  }
-}
-the 480 filter did not show in those results:
 
-
-{
-  "show": "Due South",
-  "needed": [
-    "force"
-  ],
-  "url": "https://hahnca.com/torrents-api/api/search?show=Due%20South&limit=1000&needed=%5B%22force%22%5D",
-  "apiCount": 0,
-  "torrentsReturned": 0,
-  "rawProviderCounts": {
-    "TorrentLeech": 1
-  },
-  "sample": []
-}
-
+the torrent Cheers.S02.1080p.BluRay.x264-OFT.torrent showed just the title Cheers.S02 when it appeared in qbt.  parse it to find the problem.

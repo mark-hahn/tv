@@ -29,6 +29,11 @@ let oldShows = null;
 let showTitles = [];
 let resultTitles = [];
 
+function shouldPersistResultEntry(entry) {
+  const s = String(entry || '');
+  return !s.toLowerCase().startsWith('error|');
+}
+
 function loadResultTitles() {
   try {
     if (fs.existsSync(reelTitlesPath)) {
@@ -185,11 +190,6 @@ export async function startReel(showTitlesArg) {
   try {
     showTitles = Array.isArray(showTitlesArg) ? showTitlesArg : [];
 
-    // New reel run: clear any persisted/in-memory previous results so callers
-    // don't see stale titles from earlier sessions.
-    resultTitles = [];
-    saveResultTitles(resultTitles);
-
     logToFile(`startReel called (showTitles: ${showTitles.length})`);
 
     console.log('Fetching fresh reelgood home page');
@@ -209,13 +209,14 @@ export async function startReel(showTitlesArg) {
       console.error('Error saving home page:', err);
       logToFile(`ERROR saving homepage.html: ${err.message}`);
     }
-    
+
+    // Return full persisted/in-memory history (rolling window) so the caller
+    // can render prior results immediately.
     return resultTitles;
   } catch (err) {
     const errmsg = err.message || String(err);
     logToFile(`ERROR in startReel: ${errmsg}`);
-    appendResultTitle(`error|${errmsg}`);
-    return resultTitles;
+    return [`error|${errmsg}`];
   }
 }
 
@@ -223,13 +224,12 @@ export async function getReel() {
   try {
     if (!homeHtml) {
       const msg = 'Home page not loaded. Call startReel first.';
-      appendResultTitle(`error|${msg}`);
       return [`error|${msg}`];
     }
 
     const addedThisCall = [];
     const add = (entry) => {
-      appendResultTitle(entry);
+      if (shouldPersistResultEntry(entry)) appendResultTitle(entry);
       addedThisCall.push(entry);
     };
 
@@ -330,7 +330,6 @@ export async function getReel() {
   } catch (err) {
     const errmsg = err.message || String(err);
     logToFile(`ERROR in getReel: ${errmsg}`);
-    appendResultTitle(`error|${errmsg}`);
     return [`error|${errmsg}`];
   }
 }

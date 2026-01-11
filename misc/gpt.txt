@@ -3,3 +3,39 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
+remove the prioritizing of a show/title and all related code
+
+startProc
+downloads
+
+if the normalized first search result from TheTVDB doesn't match the normalized parse-torrent-title title then we  send the first 5 results to tvJson.js so the client can choose one.
+
+those
+
+the downloads rpc results array should have the choices appended, each choice object should props procid, title, and a status of "choice".
+
+these choice objects are only appended to the results.  choices should not be added to anything internally.
+
+
+
+change that. when you get the search results from TheTVDB don't just use the first one.  
+
+scan all results looking for a match to the normalized parse-torrent-title title. if there is a match use that.
+
+if there is no match then scan again with a more aggressive normalization.  if there is a match use that.
+
+if there is still no match use the first result. 
+
+first normalization is:
+1) convert to lowercase
+2) trim beginning and ending whitespace
+3) convert multiple whitespace chars to single space
+
+aggresive normalization is:
+1) if it contains a left paren "(" remove the paren and everything that follows.
+2) convert to lowercase
+3) replace periods with a space
+4) remove all non-alphanumeric chars except whitespace
+5) trim beginning and ending whitespace
+6) convert multiple whitespace chars to single space
+

@@ -1592,6 +1592,33 @@
   tvdburl = '';
 
   chkTvDB = () => {
+    // Normalization helpers for matching TheTVDB search results to parse-torrent-title output.
+    // Basic normalization:
+    // 1) lowercase 2) trim 3) collapse whitespace
+    var normalizeBasic = function(s) {
+      return String(s || '').toLowerCase().trim().replace(/\s+/g, ' ');
+    };
+
+    // Aggressive normalization:
+    // 1) drop "(" and everything after
+    // 2) lowercase
+    // 3) replace periods with spaces
+    // 4) remove non-alphanumeric except whitespace
+    // 5) trim
+    // 6) collapse whitespace
+    var normalizeAggressive = function(s) {
+      s = String(s || '');
+      var idx = s.indexOf('(');
+      if (idx >= 0) {
+        s = s.slice(0, idx);
+      }
+      s = s.toLowerCase();
+      s = s.replace(/\./g, ' ');
+      s = s.replace(/[^a-z0-9\s]/g, ' ');
+      s = s.trim().replace(/\s+/g, ' ');
+      return s;
+    };
+
     // if title.includes('Faraway')
     //   seriesName = 'Faraway Downs'
     //   setTimeout checkFileExists, rsyncDelay
@@ -1630,7 +1657,35 @@
           return;
         }
       } else {
-        seriesName = body.data[0].name;
+        // Prefer a title match across all results (basic normalization first, then aggressive).
+        var results = Array.isArray(body && body.data) ? body.data : [];
+        var chosenName = null;
+        var normTitleBasic = normalizeBasic(title);
+        for (var i = 0; i < results.length; i++) {
+          var r = results[i];
+          var nm = r && r.name;
+          if (!nm) continue;
+          if (normalizeBasic(nm) === normTitleBasic) {
+            chosenName = nm;
+            break;
+          }
+        }
+        if (!chosenName) {
+          var normTitleAgg = normalizeAggressive(title);
+          for (var j = 0; j < results.length; j++) {
+            var r2 = results[j];
+            var nm2 = r2 && r2.name;
+            if (!nm2) continue;
+            if (normalizeAggressive(nm2) === normTitleAgg) {
+              chosenName = nm2;
+              break;
+            }
+          }
+        }
+        if (!chosenName && results[0] && results[0].name) {
+          chosenName = results[0].name;
+        }
+        seriesName = chosenName;
         log('tvdb got:', {seriesName, title});
         if (map[seriesName]) {
           console.log('Mapping', seriesName, 'to', map[seriesName]);

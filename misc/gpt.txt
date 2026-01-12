@@ -3,5 +3,4 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-the imdb button in the series and reel panes are not showing the imdb rating
-
+in reel pane the get button caused the web search and reloading shows. the show then appeared in the show list but a different show was selected.

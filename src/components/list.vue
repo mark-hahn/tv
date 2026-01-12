@@ -1632,7 +1632,10 @@ export default {
       const name = window.localStorage.getItem("lastVisShow");
       if (!name)   window.localStorage.setItem("lastVisShow",
                                      allShows[0].Name);
-      this.scrollToSavedShow(true);
+      // On initial load, restore selection from lastVisShow.
+      // On subsequent reloads, do not change selection (avoids races where a reload
+      // can override an explicit selection made immediately after the reload).
+      this.scrollToSavedShow(!!isInitialLoad);
 
       // Update series pane infobox with refreshed data
       if(this.highlightName) {

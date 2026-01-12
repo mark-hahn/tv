@@ -10,10 +10,10 @@
     div(v-if="cards.length === 0" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
       span(v-if="emptyStateText") {{ emptyStateText }}
 
-    div(v-else style="padding:5px; font-size:13px; line-height:1.6;")
+    div(v-else style="padding:5px; font-size:14px; line-height:1.2; font-family:sans-serif; font-weight:normal;")
       div(v-for="c in cards" :key="c.key" @click="handleCardClick(c)" style="position:relative; background:#fff; border:1px solid #ddd; border-radius:5px; padding:10px; cursor:pointer;")
-        div(style="font-size:13px; font-weight:bold; color:#333; word-break:break-word;") {{ c.title }}
-        div(style="font-size:13px; color:rgba(0,0,0,0.50) !important; word-break:break-word;") {{ c.subline }}
+        div(style="font-size:14px; font-weight:bold; color:#333; word-break:break-word;") {{ c.title }}
+        div(style="font-size:14px; font-weight:normal; color:rgba(0,0,0,0.50) !important; word-break:break-word;") {{ c.subline }}
 
 </template>
 

@@ -7,8 +7,7 @@
     "serve-vite": "vite",
     "dev": "vite",
     "build-vite": "vite build --base=/shows/ --outDir=shows",
-    "preview-vite": "vite preview",
-    "torrents": "node -e \"console.error('This repo no longer includes the torrents server. Run it from its own project.'); process.exit(1)\""
+    "preview-vite": "vite preview"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^1.2.36",

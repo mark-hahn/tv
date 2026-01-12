@@ -14,21 +14,13 @@
       ]
     },
     {
-       "splitTerminals": [
-         {
+      "splitTerminals": [
+        {
            "name": "client",
            "commands": ["wsl -d Ubuntu"]
-         }
-       ]
-     },
-     {
-       "splitTerminals": [
-         {
-           "name": "Server",
-           "commands": ["wsl -d Ubuntu"],
-         }
-       ]
-     }
-   ],
-   "terminal.integrated.scrollback": 3000
+        }
+      ]
+    }
+  ],
+  "terminal.integrated.scrollback": 3000
 }

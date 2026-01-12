@@ -43,6 +43,33 @@ const getTheTvdbToken = async () => {
 let cacheName = null;
 let cacheJson;
 
+const imdbFetchHeaders = {
+  // IMDb commonly returns HTTP 202 with an empty body to non-browser requests.
+  // A realistic UA + accept headers consistently yields normal HTML.
+  'user-agent':
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'accept-language': 'en-US,en;q=0.9',
+};
+
+const extractImdbRating = (html) => {
+  if (!html) return null;
+
+  // Primary (current site): still present on many pages.
+  let m = /aggregate-rating__score.*?>([\d.]+)</i.exec(html);
+  if (m?.[1]) return m[1];
+
+  // Fallback: JSON data embedded in the page.
+  m = /"aggregateRating"\s*:\s*\{[^}]*?"ratingValue"\s*:\s*"?([\d.]+)"?/i.exec(html);
+  if (m?.[1]) return m[1];
+
+  // Last resort: any ratingValue (can be less specific).
+  m = /"ratingValue"\s*:\s*"?([\d.]+)"?/i.exec(html);
+  if (m?.[1]) return m[1];
+
+  return null;
+};
+
 const getUrlAndRatings = async (type, url, name) => {
   // log('getUrlAndRatings', {type, url, name});
 
@@ -50,15 +77,29 @@ const getUrlAndRatings = async (type, url, name) => {
 
   if ((type == 18 || type == 7) && cacheName) json = cacheJson;
   else {
-    let resp = await fetch(url);
+    const fetchOpts = (+type === 2)
+      ? { headers: imdbFetchHeaders, redirect: 'follow' }
+      : undefined;
+
+    let resp = await fetch(url, fetchOpts);
     if (!resp.ok) {
       log('err', `getUrlAndRatings fetch error: ${
                     JSON.stringify({type, url, name})}, ${resp.status}`);
       return null;
     }
     if (type == 18 || type == 7) json = await resp.json();
-    else html = (await resp.text()).replaceAll(/\r?\n/gm, "")
-                                   .replaceAll(/\s+/gm, " ");
+    else {
+      html = await resp.text();
+
+      // IMDb bot mitigation can manifest as 202 + empty body.
+      if (+type === 2 && (!html || html.length === 0 || resp.status === 202)) {
+        resp = await fetch(url, fetchOpts);
+        html = await resp.text();
+      }
+
+      html = (html || '').replaceAll(/\r?\n/gm, "")
+                         .replaceAll(/\s+/gm, " ");
+    }
   }
 
   if (type == 18 || type == 7) {
@@ -71,10 +112,12 @@ const getUrlAndRatings = async (type, url, name) => {
   switch (+type) {
     case 2:  // IMDB
       // log('samples/imdb-page.html');
-      // await util.writeFile('samples/imdb-page.html', html);
-      idFnameParam = /aggregate-rating__score.*?>([\d.]+)</i.exec(html);
-      if(idFnameParam === null) return {ratings:null};
-      return {ratings: idFnameParam[1]};
+      await util.writeFile('samples/imdb-page.html', html);
+      {
+        const rating = extractImdbRating(html);
+        if (!rating) return { ratings: null };
+        return { ratings: rating };
+      }
 
     case 7:  // reddit
       // fs.writeFileSync(`samples/reddit-${name}.json`, 

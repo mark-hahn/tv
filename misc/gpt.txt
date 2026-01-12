@@ -3,53 +3,16 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-remove the prioritizing of a show/title and all related code
+## in main.js:
 
-misc/qbt-conf/qBittorrent.conf is a copy of qbt config on the usb server. it says to run qbt-unrar.sh when download is finished:
+- remove requestStartProc, only startProc will be used.
 
-[AutoRun]
-enabled=true
-program=/bin/bash /home/xobtlu/qbt-unrar.sh \"%R\" \"%N\"
+- remove show title as arg of startProc. there will be no args.
 
-a copy of qbt-unrar.sh is at misc/qbt-conf/qbt-unrar.sh.
+- remove the prioritizing of a show title feature and remove all related code. 
 
-qbt-unrar.sh is supposed to lock rsync access until unrar is finished.
+## when startProc is called do the same as before when arg was blank:
 
-evaluate this scheme.  make no changes.
+- if a cycle is running, restart after the current file finishes
+- if nothing is running, start a new cycle immediately
 
-tv.json has:
-,
-  {
-    "usbPath": "~/files/The.Following.Events.Are.Based.On.A.Pack.Of.Lies.S01.DVDRip.x264-TABULARiA/The.Following.Events.Are.Based.On.A.Pack.Of.Lies.S01E01.DVDRip.x264-TABULARiA/",
-    "localPath": "/mnt/media/tv/The Following Events Are Based on a Pack of Lies/Season 1/",
-    "title": "The.Following.Events.Are.Based.On.A.Pack.Of.Lies.S01E01.DVDRip.x264-TABULARiA.mkv",
-    "status": "Missing",
-    "progress": 0,
-    "eta": null,
-    "speed": 0,
-    "sequence": 6,
-    "fileSize": 368001389,
-    "season": 1,
-    "episode": 1,
-    "dateStarted": 1768178012,
-    "dateEnded": 1768178015,
-    "inProgress": false,
-    "procId": 434
-  }
-
-i manually ran unrar on tab-tfeaboapackoflies101.rar after the problem happened as a test.  this was the result:
--rw-r--r-- 1 xobtlu xobtlu 351M 2024/06/04 12:25 The.Following.Events.Are.Based.On.A.Pack.Of.Lies.S01E01.DVDRip.x264-TABULARiA.mkv
- 
- a copy of the torrent file is at misc/qbt-conf/1da83387f54bc275a9e6eb16b4358e60a6da1484.torrent so you can see exactly what files were contained
-
- i did not delete -rw-r--r-- 1 xobtlu xobtlu 351M 2024/06/04 12:25 The.Following.Events.Are.Based.On.A.Pack.Of.Lies.S01E01.DVDRip.x264-TABULARiA.mkv but it is gone now.
-
- the directory that is from is /home/xobtlu/files/The.Following.Events.Are.Based.On.A.Pack.Of.Lies.S01.DVDRip.x264-TABULARiA/The.Following.Events.Are.Based.On.A.Pack.Of.Lies.S01E01.DVDRip.x264-TABULARiA
-
- is that directory nesting the same as for other shows?
-
-this seems important and may be the source of the problem: Nesting pattern: counting “top-level dir has *S??E??* subdirs at depth 2” showed only 2 matches
-
--- can you see anything in the processing that could choke on that?
-
-since this is rare i'm ignoring this problem for now. i do want to make error reporting to tv.log more complete.  maybe better rsync error reporting. maybe show rsync stderr in tv.log. are there any other errors not reported?

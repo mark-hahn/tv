@@ -890,7 +890,6 @@
   };
 
   // --- startProc server state ------------------------------------------------
-  var pendingStartProcTitle = null;
   var abortBetweenFiles = false;
   var nextCycleTimer = null;
 
@@ -982,33 +981,14 @@
       res.end(JSON.stringify(obj));
     };
 
-    var requestStartProc = function(reqTitle) {
-      pendingStartProcTitle = (typeof reqTitle === 'string' ? reqTitle : '').trim();
-      
-      // If title is blank:
+    var startProc = function() {
+      // When startProc is called do the same as before when arg was blank:
       // - if a cycle is running, restart after the current file finishes
       // - if nothing is running, start a new cycle immediately
-      if (!pendingStartProcTitle) {
-        if (cycleRunning) {
-          abortBetweenFiles = true;
-          return;
-        }
-        // Not currently processing: start new cycle.
-        if (nextCycleTimer) {
-          clearTimeout(nextCycleTimer);
-          nextCycleTimer = null;
-        }
-        runCycle();
-        return;
-      }
-      
-      // Title is not blank - optionally prioritize that filename in the next cycle.
       if (cycleRunning) {
-        // Finish the current file, then restart the cycle.
         abortBetweenFiles = true;
         return;
       }
-      // Not currently processing: restart cycle immediately.
       if (nextCycleTimer) {
         clearTimeout(nextCycleTimer);
         nextCycleTimer = null;
@@ -1037,7 +1017,7 @@
       if (pathname === '/startProc') {
         if (req.method === 'GET') {
           try {
-            requestStartProc(parsed.query && parsed.query.title);
+            startProc();
             return json(res, 200, {status: 'ok'});
           } catch (e) {
             return json(res, 500, {status: String(e && e.message ? e.message : e)});
@@ -1054,8 +1034,11 @@
           });
           req.on('end', () => {
             try {
-              var obj = body ? JSON.parse(body) : {};
-              requestStartProc(obj && obj.title);
+              // Accept body for backwards compatibility, but ignore any args.
+              if (body) {
+                JSON.parse(body);
+              }
+              startProc();
               return json(res, 200, {status: 'ok'});
             } catch (e) {
               return json(res, 400, {status: String(e && e.message ? e.message : e)});
@@ -1401,18 +1384,6 @@
       return {line, key, base};
     }).sort((a, b) => a.key.localeCompare(b.key));
 
-    // If startProc requested a title, process a matching file first (if any)
-    // and boost its tv.json priority.
-    var wantedNeedle = null;
-    if (pendingStartProcTitle) {
-      wantedNeedle = pendingStartProcTitle.toLowerCase();
-      var idx = usbFiles.findIndex((x) => x.base.toLowerCase().includes(wantedNeedle));
-      if (idx >= 0) {
-        var match = usbFiles.splice(idx, 1)[0];
-        usbFiles.unshift(match);
-      }
-    }
-
     usbFiles = usbFiles.map((x) => x.line);
     // fs.writeFileSync 'tv-files.txt', usbFiles.join('\n')
     // process.exit 0
@@ -1428,9 +1399,6 @@
       log("skipping locked paths", skipPaths);
     }
 
-    // Clear the pending title once we have applied ordering for this cycle.
-    pendingStartProcTitle = null;
-
     // No tv.json pre-population in the new model.
     // Entries are created only when a file is ready to be queued/downloaded.
 
@@ -1444,7 +1412,7 @@
     tvDbErrCount = 0;
 
     // If a startProc request came in while processing, finish the current file,
-    // then restart the cycle immediately (and optionally prioritize a title).
+    // then restart the cycle immediately.
     if (abortBetweenFiles) {
       abortBetweenFiles = false;
       cycleRunning = false;

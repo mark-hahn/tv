@@ -46,7 +46,7 @@ Multi-download fields:
 	- `null` at app load and when not actively owned by a worker.
 - `priority` (number): Sort key for scheduling.
 	- Defaults to `0`.
-	- When `/startProc?title=...` is used, the newest matching title gets `priority = unixNow()`.
+	- `/startProc` starts/restarts a processing cycle. (No title argument.)
 
 ### Important note: `title` vs TV series title
 

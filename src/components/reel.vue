@@ -15,18 +15,15 @@
     :style="{ flex: '1 1 0', minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column', gap: '0' }")
     
     #reelInfo(
-      :style="{ padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', fontSize: '14px', textTransform: 'uppercase' }")
-      div(v-if="curTvdb" :style="{ fontWeight: 'bold', fontSize: '12px', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }") {{ galleryTitleLine }}
+      :style="{ padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', fontSize: '14px', textTransform: 'none' }")
+      div(v-if="curTvdb" :style="{ fontWeight: 'bold', fontSize: '18px', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }") {{ galleryTitleLine }}
       div(v-if="curTvdb" :style="{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '10px' }")
-        div(:style="{ flex: '1 1 auto', minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word' }") {{ infoLine }}
-        button(
-          @click="handleLoad"
-          :style="{ height: '18px', margin: '0', marginLeft: '10px', marginRight: '20px', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto' }") Get
+        div(:style="{ flex: '1 1 auto', minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: '15px' }") {{ infoLine }}
 
     // keep zero gap between description and buttons
     #reelDescrButtons(:style="{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: '0' }")
       #reelDescr(
-        :style="{ flex: '0 0 auto', height: '120px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', overflowY: 'auto', fontSize: '14px', lineHeight: '1.5' }"
+        :style="{ flex: '0 0 auto', height: '120px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', overflowY: 'auto', fontSize: '16px', lineHeight: '1.5' }"
         @wheel.stop.prevent="handleScaledWheel"
       )
         div(v-if="curTvdb") {{ curTvdb.overview }}
@@ -55,6 +52,11 @@
           v-if="officialResult"
           @click="handleOfficial"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Official
+
+        button(
+          v-if="curTvdb"
+          @click="handleLoad"
+          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Get
     
     #reelTitles(
       ref="titlesPane"
@@ -441,9 +443,9 @@ export default {
       }
       
       return {
-        padding: '5px',
+        padding: '2px',
         cursor,
-        fontSize: '14px',
+        fontSize: '16px',
         backgroundColor,
         border: '1px solid #808080',
         borderRadius: '3px',

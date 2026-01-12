@@ -28,7 +28,6 @@
     template(v-for="(it, idx) in orderedItems" :key="idx")
       div(v-if="idx > 0 && Number(it?.sequence) === 1" style="margin:0; padding:0; line-height:14px; white-space:nowrap; overflow:hidden; font-family:monospace;") ====================================================================================================
       div(:style="getCardStyle(it)" @click="handleCardClick($event, it)" @mouseenter="handleMouseEnter($event, it)" @mouseleave="handleMouseLeave($event)")
-        div(v-if="isFutureClicked(it)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
         div(style="font-weight:bold; font-size:13px; word-wrap:break-word; overflow-wrap:break-word;")
           span {{ it.title || '(no title)' }}
         div(style="margin-top:8px; color:#333; font-size:13px; word-wrap:break-word; overflow-wrap:break-word;")
@@ -74,7 +73,6 @@ export default {
       _inFlight: false,
       _loadingTimer: null,
       _showLoading: false,
-      clickedFutures: new Set(),
       _lastScrollTop: null,
       _hasEverMounted: false,
       _didInitialVisibleScroll: false,
@@ -132,7 +130,6 @@ export default {
 
   mounted() {
     evtBus.on('paneChanged', this.onPaneChanged);
-    evtBus.on('forceFile', this.handleForceFile);
     evtBus.on('cycle-started', this.handleCycleStarted);
 
     // This component is mounted (v-show) even when not visible.
@@ -144,7 +141,6 @@ export default {
 
   unmounted() {
     evtBus.off('paneChanged', this.onPaneChanged);
-    evtBus.off('forceFile', this.handleForceFile);
     evtBus.off('cycle-started', this.handleCycleStarted);
     this.stopPolling();
     this.stopLibraryPolling();
@@ -511,27 +507,9 @@ export default {
       return { seasonEpisode, rest: parts.join(' | ') };
     },
 
-    async handleForceFile(title) {
-      if (!title) return;
-      try {
-        const encodedTitle = encodeURIComponent(title);
-        const url = `${config.torrentsApiUrl}/api/tvproc/startProc?title=${encodedTitle}`;
-        const res = await fetch(url, {
-          method: 'GET',
-          mode: 'cors'
-        });
-        if (!res.ok) {
-          const text = await res.text();
-          console.error(`startProc failed: HTTP ${res.status}`, text);
-        }
-      } catch (e) {
-        console.error('startProc error:', e);
-      }
-    },
 
     getCardStyle(it) {
       const status = String(it?.status || '').trim().toLowerCase();
-      const isFuture = status === 'future' || status === 'waiting';
       const isDownloading = status === 'downloading';
       return {
         position: 'relative',
@@ -539,15 +517,13 @@ export default {
         borderRadius: '8px',
         padding: '10px',
         background: isDownloading ? '#fffacd' : '#fff',
-        cursor: isFuture ? 'pointer' : 'default'
+        cursor: 'pointer'
       };
     },
 
     handleMouseEnter(event, it) {
-      const status = String(it?.status || '').trim().toLowerCase();
-      if (status === 'future' || status === 'waiting') {
-        event.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-      }
+      void it;
+      event.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
     },
 
     handleMouseLeave(event) {
@@ -555,55 +531,12 @@ export default {
     },
 
     handleCardClick(event, it) {
+      void event;
       const clickedTitle = it?.title;
-
-      // Alt-click: if not in development and procId exists, call startProc("hyper.<procId>")
-      const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      if (event?.altKey && !isDev && it?.procId && clickedTitle) {
-        void this.startProcWithId(it.procId);
-        return;
-      }
-
       if (clickedTitle) evtBus.emit('selectShowFromCardTitle', clickedTitle);
-
-      const status = String(it?.status || '').trim().toLowerCase();
-      if (status === 'future' || status === 'waiting') {
-        const title = it?.title;
-        if (title) {
-          this.clickedFutures.add(title);
-          void this.handleForceFile(title);
-        }
-      }
     },
 
-    async startProcWithId(procId) {
-      const payload = `hyper.${procId}`;
-      try {
-        const url = `${config.torrentsApiUrl}/api/tvproc/startProc?title=${encodeURIComponent(payload)}`;
-        const res = await fetch(url, { method: 'GET', mode: 'cors' });
-        let body = null;
-        try {
-          body = await res.json();
-        } catch (_) {
-          body = null;
-        }
-        if (!res.ok || (body && body.error)) {
-          const msg = body?.error || `HTTP ${res.status}`;
-          console.error('startProcWithId failed', { payload, msg, body });
-          return;
-        }
-        // Success: no further action needed.
-      } catch (e) {
-        console.error('startProcWithId error', e);
-      }
-    },
 
-    isFutureClicked(it) {
-      const status = String(it?.status || '').trim().toLowerCase();
-      if (status !== 'future' && status !== 'waiting') return false;
-      const title = it?.title;
-      return title && this.clickedFutures.has(title);
-    },
 
     showFirstDownloading() {
       const downloading = this.items.find(it => String(it?.status || '').trim() === 'downloading');

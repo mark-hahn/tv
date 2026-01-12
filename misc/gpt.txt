@@ -3,4 +3,8 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-in reel pane the get button caused the web search and reloading shows. the show then appeared in the show list but a different show was selected.
+remove the detection and action from Clicking a “future/waiting” download card
+
+remove the detection and action from Alt-clicking a card that has a procId (and not on localhost)
+
+startProc is now only used to trigger processing in tvproc. it never has an argument.

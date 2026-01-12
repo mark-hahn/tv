@@ -38,6 +38,15 @@ const postUpdate = (type) => {
   } catch {}
 };
 
+const summarizeStderr = (stderrText) => {
+  const s = String(stderrText || '').trim();
+  if (!s) return '';
+  // Keep it single-line and reasonably short for tv.log.
+  const oneLine = s.replace(/[\r\n]+/g, ' | ').replace(/\s+/g, ' ').trim();
+  if (oneLine.length <= 280) return oneLine;
+  return oneLine.slice(0, 277) + '...';
+};
+
 const finish = (statusText) => {
   if (!entry) {
     try {
@@ -87,6 +96,11 @@ const main = () => {
 
   const rsyncArgs = ['-av', '-e', 'ssh', '--timeout=20', '--info=progress2', src, dst];
   const p = spawn('rsync', rsyncArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
+
+  // Capture rsync stderr so failures can be diagnosed (tv.log currently only sees entry.status).
+  // Keep last N bytes to avoid unbounded memory use.
+  const STDERR_MAX = 8192;
+  let stderrBuf = '';
 
   let lastProgress = 0;
   let lastProgressUpdateTime = 0;
@@ -151,13 +165,26 @@ const main = () => {
     }
   });
 
-  p.stderr.on('data', () => {
-    // ignore; status will be set on exit code
+  p.stderr.on('data', (data) => {
+    try {
+      stderrBuf += data.toString();
+      if (stderrBuf.length > STDERR_MAX) {
+        stderrBuf = stderrBuf.slice(stderrBuf.length - STDERR_MAX);
+      }
+    } catch {
+      // ignore
+    }
   });
 
   p.on('close', (code) => {
     if (code !== 0) {
-      const msg = code === 23 ? 'Missing' : `rsync exit code ${code}`;
+      const stderrSummary = summarizeStderr(stderrBuf);
+      let msg;
+      if (code === 23) {
+        msg = stderrSummary ? `Missing: ${stderrSummary}` : 'Missing';
+      } else {
+        msg = stderrSummary ? `rsync exit code ${code}: ${stderrSummary}` : `rsync exit code ${code}`;
+      }
       finish(msg);
       return;
     }

@@ -291,6 +291,8 @@ const startWorkerForIndex = (idx) => {
     },
   });
 
+  let finishedReceived = false;
+
   const onMessage = (msg) => {
     if (!msg || typeof msg !== 'object') return;
 
@@ -300,6 +302,7 @@ const startWorkerForIndex = (idx) => {
     }
 
     if (msg.type === 'finished' && msg.entry) {
+      finishedReceived = true;
       const doneEntry = { ...msg.entry, inProgress: false };
       replaceByProcId(doneEntry);
       workerCount = Math.max(0, workerCount - 1);
@@ -330,7 +333,18 @@ const startWorkerForIndex = (idx) => {
     }
   });
   w.on('exit', () => {
-    // No-op: worker should have sent finished.
+    // If the worker exits without sending finished, record something actionable.
+    if (finishedReceived) return;
+    const errEntry = { ...entry, status: 'worker exited without finished', dateEnded: unixNow(), eta: null, inProgress: false };
+    replaceByProcId(errEntry);
+    workerCount = Math.max(0, workerCount - 1);
+    handleFinish(errEntry);
+    flushTvJsonToDisk();
+
+    const nextIdx = findOldestWaitingIndex();
+    if (nextIdx >= 0) {
+      startWorkerForIndex(nextIdx);
+    }
   });
 };
 

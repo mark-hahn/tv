@@ -5,37 +5,51 @@
 
 remove the prioritizing of a show/title and all related code
 
-startProc
-downloads
+misc/qbt-conf/qBittorrent.conf is a copy of qbt config on the usb server. it says to run qbt-unrar.sh when download is finished:
 
-if the normalized first search result from TheTVDB doesn't match the normalized parse-torrent-title title then we  send the first 5 results to tvJson.js so the client can choose one.
+[AutoRun]
+enabled=true
+program=/bin/bash /home/xobtlu/qbt-unrar.sh \"%R\" \"%N\"
 
-those
+a copy of qbt-unrar.sh is at misc/qbt-conf/qbt-unrar.sh.
 
-the downloads rpc results array should have the choices appended, each choice object should props procid, title, and a status of "choice".
+qbt-unrar.sh is supposed to lock rsync access until unrar is finished.
 
-these choice objects are only appended to the results.  choices should not be added to anything internally.
+evaluate this scheme.  make no changes.
 
+tv.json has:
+,
+  {
+    "usbPath": "~/files/The.Following.Events.Are.Based.On.A.Pack.Of.Lies.S01.DVDRip.x264-TABULARiA/The.Following.Events.Are.Based.On.A.Pack.Of.Lies.S01E01.DVDRip.x264-TABULARiA/",
+    "localPath": "/mnt/media/tv/The Following Events Are Based on a Pack of Lies/Season 1/",
+    "title": "The.Following.Events.Are.Based.On.A.Pack.Of.Lies.S01E01.DVDRip.x264-TABULARiA.mkv",
+    "status": "Missing",
+    "progress": 0,
+    "eta": null,
+    "speed": 0,
+    "sequence": 6,
+    "fileSize": 368001389,
+    "season": 1,
+    "episode": 1,
+    "dateStarted": 1768178012,
+    "dateEnded": 1768178015,
+    "inProgress": false,
+    "procId": 434
+  }
 
+i manually ran unrar on tab-tfeaboapackoflies101.rar after the problem happened as a test.  this was the result:
+-rw-r--r-- 1 xobtlu xobtlu 351M 2024/06/04 12:25 The.Following.Events.Are.Based.On.A.Pack.Of.Lies.S01E01.DVDRip.x264-TABULARiA.mkv
+ 
+ a copy of the torrent file is at misc/qbt-conf/1da83387f54bc275a9e6eb16b4358e60a6da1484.torrent so you can see exactly what files were contained
 
-change that. when you get the search results from TheTVDB don't just use the first one.  
+ i did not delete -rw-r--r-- 1 xobtlu xobtlu 351M 2024/06/04 12:25 The.Following.Events.Are.Based.On.A.Pack.Of.Lies.S01E01.DVDRip.x264-TABULARiA.mkv but it is gone now.
 
-scan all results looking for a match to the normalized parse-torrent-title title. if there is a match use that.
+ the directory that is from is /home/xobtlu/files/The.Following.Events.Are.Based.On.A.Pack.Of.Lies.S01.DVDRip.x264-TABULARiA/The.Following.Events.Are.Based.On.A.Pack.Of.Lies.S01E01.DVDRip.x264-TABULARiA
 
-if there is no match then scan again with a more aggressive normalization.  if there is a match use that.
+ is that directory nesting the same as for other shows?
 
-if there is still no match use the first result. 
+this seems important and may be the source of the problem: Nesting pattern: counting “top-level dir has *S??E??* subdirs at depth 2” showed only 2 matches
 
-first normalization is:
-1) convert to lowercase
-2) trim beginning and ending whitespace
-3) convert multiple whitespace chars to single space
+-- can you see anything in the processing that could choke on that?
 
-aggresive normalization is:
-1) if it contains a left paren "(" remove the paren and everything that follows.
-2) convert to lowercase
-3) replace periods with a space
-4) remove all non-alphanumeric chars except whitespace
-5) trim beginning and ending whitespace
-6) convert multiple whitespace chars to single space
-
+since this is rare i'm ignoring this problem for now. i do want to make error reporting to tv.log more complete.  maybe better rsync error reporting. maybe show rsync stderr in tv.log. are there any other errors not reported?

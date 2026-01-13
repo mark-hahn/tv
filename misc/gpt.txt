@@ -3,10 +3,4 @@
 === do not use this file for prompts or edit it
 === it is just a scratchpad for editing copilot prompts.
 
-the reelgood-titles.json and its memory cache should never be Cleared. it should always be appended to with the only deletion being pruning.
-
-load reelgood-titles into a memory cache at startup.  append as before and flush it every time it is appended to. before flushing prune the end to keep it less than 100 entries.
-
-every time getreel is called the returned entries should be appended to the reelgood-titles cache except for errors or none-found entries.
-
-startReel() should return all of reelgood-titles cache after it fetches the page.
+add endpoint for client delTorrent(<hash>). when called delete the qbittorent torrent at usb host including deleting the files.

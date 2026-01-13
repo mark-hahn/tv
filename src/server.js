@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import * as search from './search.js';
 import * as download from './download.js';
 import { tvdbProxyGet } from './tvdb-proxy.js';
-import { getQbtInfo, spaceAvail, flexgetHistory } from './usb.js';
+import { getQbtInfo, delQbtTorrent, spaceAvail, flexgetHistory } from './usb.js';
 import { startReel, getReel } from './reelgood.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -333,6 +333,31 @@ app.get('/api/qbt/info', async (req, res) => {
   } catch (error) {
     console.error('qbt info error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Client helper: delTorrent(<hash>)
+// Deletes torrent in qBittorrent, including files by default.
+app.post('/api/qbt/delTorrent', async (req, res) => {
+  try {
+    const q = req.query || {};
+    const b = req.body || {};
+
+    const hash = (typeof b.hash === 'string' && b.hash)
+      ? b.hash
+      : (typeof q.hash === 'string' && q.hash) ? q.hash : '';
+
+    if (!hash) {
+      res.status(400).json({ error: 'hash required' });
+      return;
+    }
+
+    const deleteFiles = (typeof b.deleteFiles === 'boolean') ? b.deleteFiles : true;
+    const result = await delQbtTorrent({ hash, deleteFiles });
+    res.json(result);
+  } catch (error) {
+    console.error('qbt delTorrent error:', error);
+    res.status(500).json({ error: error?.message || String(error) });
   }
 });
 

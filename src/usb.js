@@ -624,3 +624,51 @@ export async function getQbtInfo(filter) {
 
   return res.json();
 }
+
+/**
+ * Delete one or more torrents in qBittorrent.
+ *
+ * Uses qBittorrent WebUI endpoint `/api/v2/torrents/delete`.
+ *
+ * @param {{ hash: string | string[], deleteFiles?: boolean }} input
+ * @returns {Promise<{ ok: true, hashes: string[] }>} basic success payload
+ */
+export async function delQbtTorrent(input) {
+  const { qbHost, qbPort, qbUser, qbPass } = await loadQbtCreds();
+  const baseUrl = `http://${qbHost}:${qbPort}`;
+
+  const hashValue = input?.hash;
+  const hashesArr = Array.isArray(hashValue)
+    ? hashValue.map(String).map(s => s.trim()).filter(Boolean)
+    : [String(hashValue ?? '').trim()].filter(Boolean);
+
+  if (!hashesArr.length) {
+    throw new Error('delQbtTorrent requires hash');
+  }
+
+  const cookie = await qbLogin({ baseUrl, qbUser, qbPass });
+
+  const body = new URLSearchParams({
+    hashes: hashesArr.join('|'),
+    deleteFiles: input?.deleteFiles === false ? 'false' : 'true',
+  });
+
+  const res = await fetch(new URL('/api/v2/torrents/delete', baseUrl), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Cookie: cookie,
+      Origin: baseUrl,
+      Referer: `${baseUrl}/`,
+    },
+    body,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`qBittorrent delete failed: HTTP ${res.status}${text ? `: ${text}` : ''}`);
+  }
+
+  // qB often returns empty body or "Ok."; ignore content.
+  return { ok: true, hashes: hashesArr };
+}

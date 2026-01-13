@@ -211,6 +211,22 @@ function validateTorrentData(torrentData) {
   }
 }
 
+export function validateTorrentBytes(torrentData) {
+  return validateTorrentData(torrentData);
+}
+
+export function extractTorrentFileTitles(torrentData) {
+  const parsed = parseTorrent(torrentData);
+  const files = Array.isArray(parsed?.files) ? parsed.files : [];
+
+  const titles = files
+    .map((f) => String(f?.path || f?.name || ''))
+    .filter(Boolean)
+    .map((p) => path.basename(p));
+
+  return Array.from(new Set(titles)).filter(Boolean);
+}
+
 function normalizeProvider(rawProvider, detailUrl) {
   const p = String(rawProvider || '').toLowerCase().trim();
   const url = String(detailUrl || '').toLowerCase();
@@ -347,59 +363,10 @@ export async function fetchTorrentFileFromSearchResult(torrent) {
 }
 
 /**
- * Upload a .torrent buffer to the configured remote watch folder via SFTP.
+ * Fetch a .torrent for any provider, without uploading it anywhere.
+ * Returns { success, torrentData, bytes, provider, method, downloadUrl, ... }
  */
-export async function uploadTorrentToWatchFolder(torrentData, filenameHint = '') {
-  if (!Buffer.isBuffer(torrentData) || torrentData.length === 0) {
-    return fail('validate', 'No torrent data provided');
-  }
-
-  const hash = Math.random().toString(36).substring(2, 15);
-  const hint = sanitizeFilenameForWatch(filenameHint);
-  const base = hint ? hint.replace(/\.torrent$/i, '') : hash;
-  const safeBase = String(base || hash).slice(0, 120).trim() || hash;
-  const torrentFilename = `${safeBase}-${hash}.torrent`;
-
-  let sftpConfig;
-  let remoteWatchDir;
-  try {
-    ({ sftpConfig, remoteWatchDir } = await getSftpSettings());
-  } catch (e) {
-    return fail('sftp-config', e?.message || String(e));
-  }
-
-  const remotePath = `${remoteWatchDir}/${torrentFilename}`;
-  const tmpRemotePath = `${remoteWatchDir}/.${torrentFilename}.${hash}.tmp`;
-  const sftp = new Client();
-  try {
-    await sftp.connect(sftpConfig);
-
-    // Atomic-ish write for qBittorrent watch folders:
-    // upload to a temp filename (non-.torrent) so qBittorrent doesn't attempt
-    // to parse it while it's still being written, then rename into place.
-    await sftp.put(torrentData, tmpRemotePath);
-    await sftp.rename(tmpRemotePath, remotePath);
-    await sftp.end();
-  } catch (e) {
-    try {
-      // Best-effort cleanup of temp file.
-      await sftp.delete(tmpRemotePath);
-    } catch {
-      /* ignore */
-    }
-    try { await sftp.end(); } catch { /* ignore */ }
-    return fail('sftp-put', e?.message || String(e), { remotePath });
-  }
-
-  return ok({ remotePath, bytes: torrentData.length, filename: torrentFilename });
-}
-
-/**
- * Download torrent and prepare for qBittorrent
- * @param {Object} torrent - The complete torrent object
- * @returns {Promise<{success:boolean, stage?:string, reason?:string, provider?:string, httpStatus?:number, httpStatusText?:string, savedFile?:string, cookiesSent?:string[], hasCfClearance?:boolean, downloadUrl?:string, detailUrl?:string, warning?:string}>}
- */
-export async function download(torrent) {
+export async function fetchTorrentFile(torrent) {
   if (!torrent || typeof torrent !== 'object') {
     return fail('validate', 'Torrent data is required');
   }
@@ -407,29 +374,10 @@ export async function download(torrent) {
   const detailUrl = String(torrent?.detailUrl || '').trim();
   const provider = normalizeProvider(torrent?.raw?.provider, detailUrl);
 
-  // TorrentLeech: direct .torrent only (no detail-page scraping).
   if (provider === 'torrentleech') {
-    const fetched = await fetchTorrentFileFromSearchResult(torrent);
-    if (!fetched.success) return fetched;
-
-    const valid = validateTorrentData(fetched.torrentData);
-    if (!valid.success) return valid;
-
-    const hint = torrent?.raw?.filename || torrent?.raw?.title || 'download.torrent';
-    const uploaded = await uploadTorrentToWatchFolder(fetched.torrentData, hint);
-    if (!uploaded.success) return uploaded;
-
-    return ok({
-      provider,
-      method: fetched.method,
-      downloadUrl: fetched.downloadUrl,
-      remotePath: uploaded.remotePath,
-      filename: uploaded.filename,
-      bytes: fetched.bytes,
-    });
+    return await fetchTorrentFileFromSearchResult(torrent);
   }
 
-  // Non-TL providers: use the legacy detail-page scrape pipeline.
   if (!detailUrl) {
     return fail('validate', 'No detailUrl available for torrent', { provider });
   }
@@ -537,20 +485,90 @@ export async function download(torrent) {
   const torrentBuffer = await torrentResponse.arrayBuffer();
   const torrentData = Buffer.from(torrentBuffer);
 
-  const valid = validateTorrentData(torrentData);
-  if (!valid.success) return valid;
-
-  const hint = torrent?.raw?.filename || torrent?.raw?.title || 'download.torrent';
-  const uploaded = await uploadTorrentToWatchFolder(torrentData, hint);
-  if (!uploaded.success) return uploaded;
-
   return ok({
     provider,
     method: 'fetch',
     downloadUrl: absoluteDownloadUrl,
+    bytes: torrentData.length,
+    torrentData,
+  });
+}
+
+/**
+ * Upload a .torrent buffer to the configured remote watch folder via SFTP.
+ */
+export async function uploadTorrentToWatchFolder(torrentData, filenameHint = '') {
+  if (!Buffer.isBuffer(torrentData) || torrentData.length === 0) {
+    return fail('validate', 'No torrent data provided');
+  }
+
+  const hash = Math.random().toString(36).substring(2, 15);
+  const hint = sanitizeFilenameForWatch(filenameHint);
+  const base = hint ? hint.replace(/\.torrent$/i, '') : hash;
+  const safeBase = String(base || hash).slice(0, 120).trim() || hash;
+  const torrentFilename = `${safeBase}-${hash}.torrent`;
+
+  let sftpConfig;
+  let remoteWatchDir;
+  try {
+    ({ sftpConfig, remoteWatchDir } = await getSftpSettings());
+  } catch (e) {
+    return fail('sftp-config', e?.message || String(e));
+  }
+
+  const remotePath = `${remoteWatchDir}/${torrentFilename}`;
+  const tmpRemotePath = `${remoteWatchDir}/.${torrentFilename}.${hash}.tmp`;
+  const sftp = new Client();
+  try {
+    await sftp.connect(sftpConfig);
+
+    // Atomic-ish write for qBittorrent watch folders:
+    // upload to a temp filename (non-.torrent) so qBittorrent doesn't attempt
+    // to parse it while it's still being written, then rename into place.
+    await sftp.put(torrentData, tmpRemotePath);
+    await sftp.rename(tmpRemotePath, remotePath);
+    await sftp.end();
+  } catch (e) {
+    try {
+      // Best-effort cleanup of temp file.
+      await sftp.delete(tmpRemotePath);
+    } catch {
+      /* ignore */
+    }
+    try { await sftp.end(); } catch { /* ignore */ }
+    return fail('sftp-put', e?.message || String(e), { remotePath });
+  }
+
+  return ok({ remotePath, bytes: torrentData.length, filename: torrentFilename });
+}
+
+/**
+ * Download torrent and prepare for qBittorrent
+ * @param {Object} torrent - The complete torrent object
+ * @returns {Promise<{success:boolean, stage?:string, reason?:string, provider?:string, httpStatus?:number, httpStatusText?:string, savedFile?:string, cookiesSent?:string[], hasCfClearance?:boolean, downloadUrl?:string, detailUrl?:string, warning?:string}>}
+ */
+export async function download(torrent) {
+  if (!torrent || typeof torrent !== 'object') {
+    return fail('validate', 'Torrent data is required');
+  }
+
+  const fetched = await fetchTorrentFile(torrent);
+  if (!fetched.success) return fetched;
+
+  const valid = validateTorrentData(fetched.torrentData);
+  if (!valid.success) return valid;
+
+  const hint = torrent?.raw?.filename || torrent?.raw?.title || 'download.torrent';
+  const uploaded = await uploadTorrentToWatchFolder(fetched.torrentData, hint);
+  if (!uploaded.success) return uploaded;
+
+  return ok({
+    provider: fetched.provider,
+    method: fetched.method,
+    downloadUrl: fetched.downloadUrl,
     remotePath: uploaded.remotePath,
     filename: uploaded.filename,
-    bytes: torrentData.length,
+    bytes: fetched.bytes,
   });
 }
 

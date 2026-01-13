@@ -9,6 +9,7 @@ import * as download from './download.js';
 import { tvdbProxyGet } from './tvdb-proxy.js';
 import { getQbtInfo, delQbtTorrent, spaceAvail, flexgetHistory } from './usb.js';
 import { startReel, getReel } from './reelgood.js';
+import { checkFiles as tvProcCheckFiles } from './tv-proc.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -496,15 +497,70 @@ app.get('/api/subs/search', async (req, res) => {
   }
 });
 
-// POST /api/download - Download a torrent file
-app.post('/api/download', async (req, res) => {
+async function handleDownloadRequest(req, res) {
   try {
-    const { torrent } = req.body;
-    
+    const body = req.body || {};
+    const torrent = body.torrent;
+    const forceDownload = body.forceDownload === true;
+
     if (!torrent) {
-      return res.status(400).json({ error: 'Torrent data is required' });
+      res.status(400).json({ error: 'Torrent data is required' });
+      return;
     }
-    
+
+    // New behavior: if forceDownload is NOT true, consult tv-proc before uploading.
+    if (!forceDownload) {
+      const fetched = await download.fetchTorrentFile(torrent);
+      if (!fetched || typeof fetched !== 'object') {
+        res.json({ success: false, stage: 'fetch-torrent', error: 'Unexpected fetchTorrentFile result' });
+        return;
+      }
+      if (!fetched.success) {
+        res.json(fetched);
+        return;
+      }
+
+      const valid = download.validateTorrentBytes(fetched.torrentData);
+      if (!valid.success) {
+        res.json(valid);
+        return;
+      }
+
+      let titles = [];
+      try {
+        titles = download.extractTorrentFileTitles(fetched.torrentData);
+      } catch (e) {
+        res.json({ success: false, stage: 'parse-torrent', error: e?.message || String(e) });
+        return;
+      }
+
+      let alreadyDownloaded = [];
+      try {
+        alreadyDownloaded = await tvProcCheckFiles(titles);
+      } catch (e) {
+        res.json({ success: false, stage: 'tv-proc', error: e?.message || String(e) });
+        return;
+      }
+
+      // If any file titles are already present, do NOT send to qBittorrent.
+      if (Array.isArray(alreadyDownloaded) && alreadyDownloaded.length > 0) {
+        res.json(alreadyDownloaded);
+        return;
+      }
+
+      const hint = torrent?.raw?.filename || torrent?.raw?.title || 'download.torrent';
+      const uploaded = await download.uploadTorrentToWatchFolder(fetched.torrentData, hint);
+      if (!uploaded.success) {
+        res.json(uploaded);
+        return;
+      }
+
+      // In this mode, always return the tv-proc list (empty).
+      res.json([]);
+      return;
+    }
+
+    // Legacy behavior: always download+upload, return detailed result object.
     const result = await download.download(torrent);
 
     // Keep 200 OK for expected download failures; client treats non-2xx as exception.
@@ -515,9 +571,15 @@ app.post('/api/download', async (req, res) => {
     res.json({ success: Boolean(result) });
   } catch (error) {
     console.error('Download error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error?.message || String(error) });
   }
-});
+}
+
+// POST /api/download - Download a torrent file
+app.post('/api/download', handleDownloadRequest);
+
+// Back-compat alias for older clients/nginx rewrites.
+app.post('/downloads', handleDownloadRequest);
 
 // POST /api/torrentFile - Fetch the raw .torrent bytes directly (no detail-page scraping)
 // Body: { torrent }

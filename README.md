@@ -172,7 +172,8 @@ Search stages/counts and filter reasons are appended to `tor-results.txt` in the
 
 ### Download helpers
 
-- `POST /api/download` – Higher-level download flow (JSON body `{ torrent }`)
+- `POST /api/download` – Higher-level download flow (JSON body `{ torrent, forceDownload?: true }`)
+  - If `forceDownload:true` is **not** provided, the server fetches the `.torrent`, extracts file titles, calls `POST http://localhost:3003/checkFiles`, and **skips** the qBittorrent upload when any titles were already downloaded. In this mode it returns the tv-proc response array.
 - `POST /api/torrentFile` – Fetch raw `.torrent` bytes (no detail-page scraping)
 
 ### Upload `.torrent` to remote watch folder

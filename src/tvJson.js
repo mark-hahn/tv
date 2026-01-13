@@ -234,7 +234,11 @@ const openDb = () => {
     "SELECT title FROM tv_entries WHERE status='waiting' ORDER BY procId ASC LIMIT 1"
   );
   stmtGetMaxProcId = db.prepare('SELECT MAX(procId) AS maxProcId FROM tv_entries');
-  stmtGetDownloads = db.prepare('SELECT * FROM tv_entries ORDER BY procId DESC LIMIT 200');
+  // Return the newest 200 rows (by procId) but in ascending procId order
+  // so callers can display consistently without extra sorting.
+  stmtGetDownloads = db.prepare(
+    'SELECT * FROM (SELECT * FROM tv_entries ORDER BY procId DESC LIMIT 200) ORDER BY procId ASC'
+  );
   stmtGetTitles = db.prepare('SELECT title, error FROM tv_entries');
 };
 
@@ -712,10 +716,9 @@ const getDownloads = () => {
   try {
     openDb();
     const rows = stmtGetDownloads.all();
-    // Query returns DESC; reverse so clients keep ascending order.
     const out = [];
-    for (let i = rows.length - 1; i >= 0; i--) {
-      const e = rowToEntry(rows[i]);
+    for (const r of rows) {
+      const e = rowToEntry(r);
       if (e) out.push(e);
     }
     return out;

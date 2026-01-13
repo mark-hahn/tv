@@ -3,3 +3,12 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
+- do not read or write or revert misc/gpt.txt
+
+- replace data/tv.json file and the cached version of it in memory with a sqlite db.
+
+- you said "I’m going to inspect how tv.json is loaded/updated today (likely via tvJson.js), then replace that module".  do not replace any module.  
+
+can't sql return the 200 sorted entries directly for /download  instead of loading all into memory?
+
+what data is passed to pruneMissingUsbDirs?

@@ -28,6 +28,35 @@ function splitCells(line) {
     .filter(Boolean);
 }
 
+function fmtPacificMmDd_HhMm(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(date);
+
+    const get = (type) => parts.find(p => p.type === type)?.value || '';
+    const m = get('month');
+    const d = get('day');
+    const hh = get('hour');
+    const mm = get('minute');
+    if (!m || !d || !hh || !mm) return '';
+    return `${m}/${d} ${hh}:${mm}`;
+  } catch {
+    // Fallback: local time formatting.
+    const m = date.getMonth() + 1;
+    const d = date.getDate();
+    const hh = String(date.getHours()).padStart(2, '0');
+    const mm = String(date.getMinutes()).padStart(2, '0');
+    return `${m}/${d} ${hh}:${mm}`;
+  }
+}
+
 function fmtFlexgetTime(raw) {
   const txt = String(raw || '').trim();
   if (!txt) return '';
@@ -37,15 +66,13 @@ function fmtFlexgetTime(raw) {
   if (/[zZ]$/.test(txt) || /[+-]\d{2}:?\d{2}$/.test(txt)) {
     const d = new Date(txt);
     if (!Number.isNaN(d.getTime())) {
-      const m = d.getMonth() + 1;
-      const day = d.getDate();
-      const hh = String(d.getHours()).padStart(2, '0');
-      const mm = String(d.getMinutes()).padStart(2, '0');
-      return `${m}/${day} ${hh}:${mm}`;
+      return fmtPacificMmDd_HhMm(d);
     }
   }
 
-  // 2) Legacy format from flexget: "Tue Dec 16 05:25:08 2025" (assume UTC)
+  // 2) Legacy format from flexget: "Tue Dec 16 05:25:08 2025" (UTC)
+  // Flexget's legacy format doesn't include TZ, but the server emits it as UTC.
+  // Convert UTC -> Pacific (PST/PDT) for display.
   const parts = txt.split(/\s+/);
   if (parts.length >= 5) {
     const monStr = parts[1];
@@ -70,14 +97,8 @@ function fmtFlexgetTime(raw) {
       Number.isFinite(hh) &&
       Number.isFinite(mm)
     ) {
-      // Interpret the input as UTC, then render as local.
       const utcMs = Date.UTC(year, monthIdx, day, hh, mm, Number.isFinite(ss) ? ss : 0);
-      const d = new Date(utcMs);
-      const mOut = d.getMonth() + 1;
-      const dayOut = d.getDate();
-      const hhOut = String(d.getHours()).padStart(2, '0');
-      const mmOut = String(d.getMinutes()).padStart(2, '0');
-      return `${mOut}/${dayOut} ${hhOut}:${mmOut}`;
+      return fmtPacificMmDd_HhMm(new Date(utcMs));
     }
   }
 

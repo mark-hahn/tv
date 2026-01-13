@@ -1285,44 +1285,6 @@ export default {
       void this.processDownloadQueue();
     },
 
-    async waitForQbtHash(hash, timeoutMs = 15000) {
-      const h = String(hash || '').trim().toLowerCase();
-      if (!h) return false;
-      const end = Date.now() + Math.max(0, Number(timeoutMs) || 0);
-      const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-      while (Date.now() < end) {
-        try {
-          const url = new URL(`${config.torrentsApiUrl}/api/qbt/info`);
-          url.searchParams.set('hash', h);
-          const res = await fetch(url.toString());
-          if (res.ok) {
-            const j = await res.json().catch(() => null);
-            if (Array.isArray(j) && j.length > 0) return true;
-          }
-        } catch {
-          // ignore transient errors
-        }
-        await sleep(1000);
-      }
-      return false;
-    },
-
-    async isAlreadyInQbt(hash) {
-      const h = String(hash || '').trim().toLowerCase();
-      if (!h) return false;
-      try {
-        const url = new URL(`${config.torrentsApiUrl}/api/qbt/info`);
-        url.searchParams.set('hash', h);
-        const res = await fetch(url.toString());
-        if (!res.ok) return false;
-        const j = await res.json().catch(() => null);
-        return Array.isArray(j) && j.length > 0;
-      } catch {
-        return false;
-      }
-    },
-
     normalizeQbtNameForMatch(name) {
       let s = String(name || '').toLowerCase();
       if (!s) return '';
@@ -1335,27 +1297,6 @@ export default {
       // Collapse whitespace.
       s = s.replace(/\s+/g, ' ').trim();
       return s;
-    },
-
-    async isAlreadyInQbtByName(titleOrName) {
-      const wanted = this.normalizeQbtNameForMatch(titleOrName);
-      if (!wanted) return false;
-      try {
-        const url = new URL(`${config.torrentsApiUrl}/api/qbt/info`);
-        const res = await fetch(url.toString());
-        if (!res.ok) return false;
-        const list = await res.json().catch(() => null);
-        if (!Array.isArray(list) || list.length === 0) return false;
-
-        for (const t of list) {
-          const n = this.normalizeQbtNameForMatch(t?.name || '');
-          if (!n) continue;
-          if (n === wanted) return true;
-        }
-        return false;
-      } catch {
-        return false;
-      }
     },
 
     
@@ -1371,57 +1312,13 @@ export default {
           const forceDownload = Boolean(item?.forceDownload);
           if (!torrent) continue;
 
-          // If qBittorrent already has this torrent, don't silently no-op.
-          // Pre-check by infohash (most reliable).
-          const existingHash = this.getTorrentHash(torrent);
-          if (existingHash) {
-            const already = await this.isAlreadyInQbt(existingHash);
-            if (already) {
-              const torrentTitle = String(torrent?.raw?.title || torrent?.title || 'Unknown');
-              this.showError(`QbitTorrent already downloaded the torrent ${torrentTitle}`);
-
-              const nowKey = this.getTorrentNowKey(torrent);
-              if (nowKey) this.downloadedTorrents.add(nowKey);
-              this.setDownloadStatus(torrent, 'ok', 'Already in qBittorrent');
-              this.rememberDownloadedTorrent(torrent);
-              continue;
-            }
-          } else {
-            // Fallback: some providers (notably TL) don't provide magnet/infohash.
-            // In that case, attempt an exact normalized name match against the qBittorrent list.
-            const titleForMatch = String(torrent?.raw?.title || torrent?.title || '').trim();
-            if (titleForMatch) {
-              const alreadyByName = await this.isAlreadyInQbtByName(titleForMatch);
-              if (alreadyByName) {
-                const torrentTitle = String(torrent?.raw?.title || torrent?.title || 'Unknown');
-                this.showError(`QbitTorrent already downloaded the torrent ${torrentTitle}`);
-
-                const nowKey = this.getTorrentNowKey(torrent);
-                if (nowKey) this.downloadedTorrents.add(nowKey);
-                this.setDownloadStatus(torrent, 'ok', 'Already in qBittorrent');
-                this.rememberDownloadedTorrent(torrent);
-                continue;
-              }
-            }
-          }
-
           this.setDownloadStatus(torrent, 'sending', '');
           const torrentTitle = String(torrent?.raw?.title || torrent?.title || 'Unknown');
 
           try {
             const result = await this.downloadTorrentInternal(torrent, { forceDownload });
             if (result?.ok) {
-              const hash = this.getTorrentHash(torrent);
-              if (hash) {
-                const seen = await this.waitForQbtHash(hash, 15000);
-                if (!seen) {
-                  this.setDownloadStatus(torrent, 'warn', 'Server reported success, but qBittorrent has not listed this hash yet');
-                } else {
-                  this.setDownloadStatus(torrent, 'ok', result?.message || '');
-                }
-              } else {
-                this.setDownloadStatus(torrent, 'ok', result?.message || '');
-              }
+              this.setDownloadStatus(torrent, 'ok', result?.message || '');
 
               // Only mark "downloaded" after the server indicates success.
               this.rememberDownloadedTorrent(torrent);
@@ -1450,6 +1347,7 @@ export default {
       const forceDownload = Boolean(opts.forceDownload);
 
       const torrentTitle = torrent?.raw?.title || 'Unknown';
+      const isAlreadyInQbtMessage = (msg) => /qbit\s*torrent\s+already\s+downloaded/i.test(String(msg || ''));
       
       // Mark as downloaded immediately to change card color
       try {
@@ -1540,6 +1438,11 @@ export default {
 
             const errorMsg = payload.error || payload.message;
             if (errorMsg) {
+              if (isAlreadyInQbtMessage(errorMsg)) {
+                this.showError(`QbitTorrent already downloaded the torrent ${torrentTitle}`);
+                return { ok: true, message: 'Already in qBittorrent' };
+              }
+
               const isCloudflare = Boolean(payload && typeof payload === 'object' && (payload.isCloudflare || payload.stage === 'cloudflare')) ||
                 /cloudflare|just a moment|checking your browser/i.test(String(errorMsg || ''));
 
@@ -1591,6 +1494,12 @@ export default {
           } catch {
             // ignore
           }
+
+          if (isAlreadyInQbtMessage(detail)) {
+            this.showError(`QbitTorrent already downloaded the torrent ${torrentTitle}`);
+            return { ok: true, message: 'Already in qBittorrent' };
+          }
+
           throw new Error(detail || `HTTP ${downloadsRes.status}: ${downloadsRes.statusText}`);
         }
 

@@ -1290,6 +1290,151 @@ export default {
       return false;
     },
 
+    async isAlreadyInQbt(hash) {
+      const h = String(hash || '').trim().toLowerCase();
+      if (!h) return false;
+      try {
+        const url = new URL(`${config.torrentsApiUrl}/api/qbt/info`);
+        url.searchParams.set('hash', h);
+        const res = await fetch(url.toString());
+        if (!res.ok) return false;
+        const j = await res.json().catch(() => null);
+        return Array.isArray(j) && j.length > 0;
+      } catch {
+        return false;
+      }
+    },
+
+    normalizeQbtNameForMatch(name) {
+      let s = String(name || '').toLowerCase();
+      if (!s) return '';
+      // Drop the provider suffix we add in display titles.
+      s = s.replace(/\s*\|\s*(tl|ipt)\s*$/i, '');
+      // Normalize common separators.
+      s = s.replace(/[\._\-]+/g, ' ');
+      // Remove brackets/parentheses but keep the content.
+      s = s.replace(/[\[\]\(\){}]/g, ' ');
+      // Collapse whitespace.
+      s = s.replace(/\s+/g, ' ').trim();
+      return s;
+    },
+
+    async isAlreadyInQbtByName(titleOrName) {
+      const wanted = this.normalizeQbtNameForMatch(titleOrName);
+      if (!wanted) return false;
+      try {
+        const url = new URL(`${config.torrentsApiUrl}/api/qbt/info`);
+        const res = await fetch(url.toString());
+        if (!res.ok) return false;
+        const list = await res.json().catch(() => null);
+        if (!Array.isArray(list) || list.length === 0) return false;
+
+        for (const t of list) {
+          const n = this.normalizeQbtNameForMatch(t?.name || '');
+          if (!n) continue;
+          if (n === wanted) return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    },
+
+    async sha1Hex(arrayBuffer) {
+      const buf = arrayBuffer instanceof ArrayBuffer ? arrayBuffer : arrayBuffer?.buffer;
+      if (!buf || !(buf instanceof ArrayBuffer)) return '';
+      try {
+        const digest = await crypto.subtle.digest('SHA-1', buf);
+        const bytes = new Uint8Array(digest);
+        return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+      } catch {
+        return '';
+      }
+    },
+
+    async computeInfoHashFromTorrentBytes(arrayBuffer) {
+      // Compute infohash = SHA1(bencode(info-dict)) from a .torrent file.
+      // We avoid re-encoding by hashing the original byte slice that represents the info dict.
+      const u8 = new Uint8Array(arrayBuffer);
+      const ascii = (start, end) => {
+        let out = '';
+        for (let i = start; i < end; i++) out += String.fromCharCode(u8[i]);
+        return out;
+      };
+
+      const readInt = (i) => {
+        let j = i;
+        while (j < u8.length && u8[j] !== 0x65 /* 'e' */) j++;
+        if (j >= u8.length) throw new Error('bad int');
+        const n = parseInt(ascii(i, j), 10);
+        if (!Number.isFinite(n)) throw new Error('bad int');
+        return { n, next: j + 1 };
+      };
+
+      const readBytes = (i) => {
+        let j = i;
+        while (j < u8.length && u8[j] >= 0x30 && u8[j] <= 0x39) j++;
+        if (j >= u8.length || u8[j] !== 0x3a /* ':' */) throw new Error('bad bytes');
+        const len = parseInt(ascii(i, j), 10);
+        if (!Number.isFinite(len) || len < 0) throw new Error('bad bytes len');
+        const start = j + 1;
+        const end = start + len;
+        if (end > u8.length) throw new Error('bad bytes range');
+        return { start, end, next: end };
+      };
+
+      const parse = (i) => {
+        const b = u8[i];
+        if (b === 0x69 /* 'i' */) return readInt(i + 1);
+        if (b === 0x6c /* 'l' */) {
+          i++;
+          while (u8[i] !== 0x65 /* 'e' */) {
+            const r = parse(i);
+            i = r.next;
+          }
+          return { next: i + 1 };
+        }
+        if (b === 0x64 /* 'd' */) {
+          i++;
+          while (u8[i] !== 0x65 /* 'e' */) {
+            const k = readBytes(i);
+            i = k.next;
+            const v = parse(i);
+            i = v.next;
+          }
+          return { next: i + 1 };
+        }
+        if (b >= 0x30 && b <= 0x39) return readBytes(i);
+        throw new Error('bad bencode');
+      };
+
+      // Top-level must be a dict.
+      if (u8[0] !== 0x64 /* 'd' */) return '';
+      let i = 1;
+      let infoStart = -1;
+      let infoEnd = -1;
+
+      while (i < u8.length && u8[i] !== 0x65 /* 'e' */) {
+        const keyBytes = readBytes(i);
+        const key = ascii(keyBytes.start, keyBytes.end);
+        i = keyBytes.next;
+
+        if (key === 'info') {
+          infoStart = i;
+          const v = parse(i);
+          infoEnd = v.next;
+          i = v.next;
+        } else {
+          const v = parse(i);
+          i = v.next;
+        }
+      }
+
+      if (infoStart < 0 || infoEnd <= infoStart) return '';
+      const slice = u8.slice(infoStart, infoEnd);
+      return await this.sha1Hex(slice.buffer);
+    },
+
     async processDownloadQueue() {
       if (this.downloadQueueRunning) return;
       this.downloadQueueRunning = true;
@@ -1299,6 +1444,48 @@ export default {
           const item = this.downloadQueue.shift();
           const torrent = item?.torrent;
           if (!torrent) continue;
+
+          // If qBittorrent already has this torrent, don't silently no-op.
+          // Pre-check by infohash (most reliable).
+          const existingHash = this.getTorrentHash(torrent);
+          if (existingHash) {
+            const already = await this.isAlreadyInQbt(existingHash);
+            if (already) {
+              const torrentTitle = String(torrent?.raw?.title || torrent?.title || 'Unknown');
+              try {
+                window.alert(`QbitTorrent already downloaded the torrent ${torrentTitle}`);
+              } catch {
+                // ignore
+              }
+
+              const nowKey = this.getTorrentNowKey(torrent);
+              if (nowKey) this.downloadedTorrents.add(nowKey);
+              this.setDownloadStatus(torrent, 'ok', 'Already in qBittorrent');
+              this.rememberDownloadedTorrent(torrent);
+              continue;
+            }
+          } else {
+            // Fallback: some providers (notably TL) don't provide magnet/infohash.
+            // In that case, attempt an exact normalized name match against the qBittorrent list.
+            const titleForMatch = String(torrent?.raw?.title || torrent?.title || '').trim();
+            if (titleForMatch) {
+              const alreadyByName = await this.isAlreadyInQbtByName(titleForMatch);
+              if (alreadyByName) {
+                const torrentTitle = String(torrent?.raw?.title || torrent?.title || 'Unknown');
+                try {
+                  window.alert(`QbitTorrent already downloaded the torrent ${torrentTitle}`);
+                } catch {
+                  // ignore
+                }
+
+                const nowKey = this.getTorrentNowKey(torrent);
+                if (nowKey) this.downloadedTorrents.add(nowKey);
+                this.setDownloadStatus(torrent, 'ok', 'Already in qBittorrent');
+                this.rememberDownloadedTorrent(torrent);
+                continue;
+              }
+            }
+          }
 
           this.setDownloadStatus(torrent, 'sending', '');
           const torrentTitle = String(torrent?.raw?.title || torrent?.title || 'Unknown');
@@ -1407,6 +1594,27 @@ export default {
           }
 
           const bytes = await resp.arrayBuffer();
+
+          // TorrentLeech results often don't include magnet/infohash. Compute the infohash from
+          // the .torrent bytes and short-circuit if qBittorrent already has it.
+          try {
+            const infoHash = await this.computeInfoHashFromTorrentBytes(bytes);
+            if (infoHash) {
+              const already = await this.isAlreadyInQbt(infoHash);
+              if (already) {
+                const torrentTitle = String(torrent?.raw?.title || torrent?.title || 'Unknown');
+                try {
+                  window.alert(`QbitTorrent already downloaded the torrent ${torrentTitle}`);
+                } catch {
+                  // ignore
+                }
+                return { ok: true, message: 'Already in qBittorrent' };
+              }
+            }
+          } catch {
+            // ignore; proceed with upload
+          }
+
           const filename = this.buildTorrentUploadFilename(torrent, torrentTitle);
           // NOTE: Avoid custom headers here. Browsers will preflight and block if the
           // torrents API CORS config doesn't allow them (e.g. x-torrent-filename).

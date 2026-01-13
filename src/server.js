@@ -513,7 +513,7 @@ async function handleDownloadRequest(req, res) {
       return;
     }
 
-    // New behavior: if forceDownload is NOT true, consult tv-proc before uploading.
+    // Default behavior: consult tv-proc before uploading.
     if (!forceDownload) {
       const fetched = await download.fetchTorrentFile(torrent);
       if (!fetched || typeof fetched !== 'object') {
@@ -568,15 +568,39 @@ async function handleDownloadRequest(req, res) {
       return;
     }
 
-    // Legacy behavior: always download+upload, return detailed result object.
-    const result = await download.download(torrent);
-
-    // Keep 200 OK for expected download failures; client treats non-2xx as exception.
-    if (result && typeof result === 'object' && !Array.isArray(result)) {
-      res.json(result);
+    // Force mode: skip tv-proc only; still validate torrent file naming.
+    const fetched = await download.fetchTorrentFile(torrent);
+    if (!fetched || typeof fetched !== 'object') {
+      res.json({ success: false, stage: 'fetch-torrent', error: 'Unexpected fetchTorrentFile result' });
       return;
     }
-    res.json({ success: Boolean(result) });
+    if (!fetched.success) {
+      res.json(fetched);
+      return;
+    }
+
+    const valid = download.validateTorrentBytes(fetched.torrentData);
+    if (!valid.success) {
+      res.json(valid);
+      return;
+    }
+
+    const hint = torrent?.raw?.filename || torrent?.raw?.title || 'download.torrent';
+    const uploaded = await download.uploadTorrentToWatchFolder(fetched.torrentData, hint);
+    if (!uploaded.success) {
+      res.json(uploaded);
+      return;
+    }
+
+    res.json({
+      success: true,
+      provider: fetched.provider,
+      method: fetched.method,
+      downloadUrl: fetched.downloadUrl,
+      remotePath: uploaded.remotePath,
+      filename: uploaded.filename,
+      bytes: fetched.bytes,
+    });
   } catch (error) {
     console.error('Download error:', error);
     res.status(500).json({ error: error?.message || String(error) });

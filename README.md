@@ -175,7 +175,8 @@ Search stages/counts and filter reasons are appended to `tor-results.txt` in the
 - `POST /api/download` (or `/downloads`) – Higher-level download flow.
   - IPT-style: JSON body `{ torrent, forceDownload?: true }`
   - TorrentLeech-style: JSON body `{ tl: { torrent: ... } }` (or `{ tl: <torrent> }`)
-  - If `forceDownload:true` is **not** provided, the server fetches the `.torrent`, extracts file titles, calls `POST http://localhost:3003/checkFiles`, and **skips** the qBittorrent upload when any titles were already downloaded. In this mode it returns the tv-proc response array.
+  - If `forceDownload:true` is **not** provided, the server fetches the `.torrent`, validates it, extracts file titles, calls `POST http://localhost:3003/checkFiles`, and **skips** the qBittorrent upload when any titles were already downloaded. In this mode it returns the tv-proc response array.
+  - If `forceDownload:true` is provided, it skips tv-proc and uploads immediately (still validates torrent naming).
 
 ### Upload `.torrent` to remote watch folder
 

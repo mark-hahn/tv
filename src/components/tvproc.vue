@@ -28,13 +28,13 @@
     template(v-for="(it, idx) in orderedItems" :key="idx")
       div(v-if="idx > 0 && Number(it?.sequence) === 1" style="margin:0; padding:0; line-height:14px; white-space:nowrap; overflow:hidden; font-family:monospace;") ====================================================================================================
       div(:style="getCardStyle(it)" @click="handleCardClick($event, it)" @mouseenter="handleMouseEnter($event, it)" @mouseleave="handleMouseLeave($event)")
-        div(style="font-weight:bold; font-size:13px; word-wrap:break-word; overflow-wrap:break-word;")
+        div(style="font-weight:bold; font-size:14px; word-wrap:break-word; overflow-wrap:break-word; font-family:sans-serif;")
           span {{ it.title || '(no title)' }}
-        div(style="margin-top:8px; color:#333; font-size:13px; word-wrap:break-word; overflow-wrap:break-word;")
+        div(style="margin-top:8px; color:#333; font-size:13px; word-wrap:break-word; overflow-wrap:break-word; font-family:sans-serif;")
           span(v-if="line2(it).seasonEpisode" style="color:blue !important;") {{ line2(it).seasonEpisode }}
-          span(v-if="line2(it).rest")
+          span(v-if="line2(it).rest" style="color:rgba(0,0,0,0.50) !important;")
             span(v-if="line2(it).seasonEpisode") &nbsp;|&nbsp;
-            span {{ line2(it).rest }}
+            span(style="color:rgba(0,0,0,0.50) !important;") {{ line2(it).rest }}
 
 </template>
 

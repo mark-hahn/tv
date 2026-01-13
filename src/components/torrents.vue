@@ -97,7 +97,7 @@
     #no-torrents-needed(v-if="!unaired && noTorrentsNeeded && !loading && !error" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
       div No torrents needed.
       
-    #torrents-list(v-if="!unaired && !loading && !noTorrentsNeeded" style="padding:10px; font-size:14px; line-height:1.2;")
+    #torrents-list(v-if="!unaired && !loading && !noTorrentsNeeded" style="padding:10px; font-size:14px; font-family:sans-serif; font-weight:normal;")
       div(v-if="!hasSearched && filteredTorrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
         div Click on Search to find torrents for {{ headerShowName }}.
       div(v-else-if="hasSearched && filteredTorrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
@@ -106,17 +106,21 @@
         div(v-if="isClicked(torrent)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
         div(v-if="isDownloadedBefore(torrent)" :style="getDownloadedBeforeIconStyle(torrent)" title="Downloaded before") 🕘
         div(v-if="getDownloadStatus(torrent)" :title="getDownloadStatusTooltip(torrent)" style="position:absolute; bottom:8px; right:8px; font-size:11px; color:#666; max-width:70%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;") {{ getDownloadStatusLabel(torrent) }}
-        div(v-if="SHOW_TITLE && torrent.raw" style="font-size:13px; font-weight:bold; color:#888; margin-bottom:4px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;") {{ getDisplayTitleWithProvider(torrent) }}
+        div(v-if="SHOW_TITLE && torrent.raw" style="font-size:14px; font-weight:bold; color:#888; margin-bottom:4px; white-space:normal; overflow-wrap:anywhere; word-break:break-word; font-family:sans-serif;") {{ getDisplayTitleWithProvider(torrent) }}
         div(v-if="getTorrentWarnings(torrent).length > 0" style="font-size:11px; color:#a33; margin-bottom:4px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;")
           | Warnings: {{ formatTorrentWarnings(torrent) }}
-        div(style="font-size:12px; color:#333;") 
-          strong {{ getDisplaySeasonEpisode(torrent) }}
-          | : {{ fmtSize(torrent.raw?.size) || torrent.raw?.size || 'N/A' }} | {{ torrent.raw?.seeds || 0 }} seeds<span v-if="torrent.raw?.provider"> | {{ formatProvider(torrent.raw.provider) }}</span><span v-if="torrent.parsed?.resolution"> | {{ torrent.parsed.resolution }}</span><span v-if="torrent.parsed?.group"> | {{ formatGroup(torrent.parsed.group) }}</span>
+        div(style="margin-top:8px; font-size:13px; font-family:sans-serif; color:#333;") 
+          span(style="color:blue !important;") {{ getDisplaySeasonEpisode(torrent) }}
+          span(style="color:rgba(0,0,0,0.50) !important;")
+            | : {{ fmtSize(torrent.raw?.size) || torrent.raw?.size || 'N/A' }} | {{ torrent.raw?.seeds || 0 }} seeds
+            span(v-if="torrent.raw?.provider" style="color:rgba(0,0,0,0.50) !important;") &nbsp;|&nbsp;{{ formatProvider(torrent.raw.provider) }}
+            span(v-if="torrent.parsed?.resolution" style="color:rgba(0,0,0,0.50) !important;") &nbsp;|&nbsp;{{ torrent.parsed.resolution }}
+            span(v-if="torrent.parsed?.group" style="color:rgba(0,0,0,0.50) !important;") &nbsp;|&nbsp;{{ formatGroup(torrent.parsed.group) }}
 
   #download-modal(v-if="showModal" @click.stop="showModal = false" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:10000;")
     #modal-content(@click.stop style="background:white; padding:30px; border-radius:10px; max-width:500px; box-shadow:0 4px 20px rgba(0,0,0,0.3);")
       div(style="font-size:16px; margin-bottom:20px; line-height:1.5;") Is it OK to download file 
-        strong {{ selectedTorrent?.raw?.title || 'Unknown' }}
+        span(style="font-weight:bold;") {{ selectedTorrent?.raw?.title || 'Unknown' }}
         | ?
       div(style="display:flex; gap:10px; justify-content:flex-end;")
         button(@click.stop="cancelDownload" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;") Cancel
@@ -1162,7 +1166,7 @@ export default {
         bgColor = '#fff0f0';  // Light red/pink for warnings
       }
       return {
-        padding: '8px',
+        padding: '10px',
         background: bgColor,
         borderRadius: '5px',
         border: '1px solid #ddd',

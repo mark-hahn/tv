@@ -20,3 +20,7 @@ A Vue 3 + Vite client for browsing TV series metadata and working with torrents.
 ## When debugging
 - First reproduce from scripts/logs, then identify the smallest fix.
 - When proposing fixes, include the exact file paths and minimal diffs.
+
+## tabbed pane card tabs
+
+when a pane is referenced by tab name it means the file for that tab.  For example, the down tab refers to tvproc.vue

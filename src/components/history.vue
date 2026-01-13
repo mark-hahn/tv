@@ -13,7 +13,7 @@
       span(v-if="emptyStateText") {{ emptyStateText }}
 
     div(v-else style="padding:10px; font-size:14px; font-family:sans-serif; font-weight:normal;")
-      div(v-for="t in sortedTorrents" :key="String(t.hash || t.name || t.added_on)" :style="getCardStyle(t)" @click="handleCardClick(t)")
+      div(v-for="t in sortedTorrents" :key="String(t.hash || t.name || t.added_on)" :style="getCardStyle(t)" @click="handleCardClick($event, t)")
         div(style="font-size:14px; font-weight:bold; color:#333; word-break:break-word;") {{ t.name || t.hash }}
         div(style="margin-top:8px; font-size:14px; font-weight:normal; color:rgba(0,0,0,0.50) !important;") {{ infoLine(t) }}
 
@@ -373,7 +373,61 @@ export default {
       };
     },
 
-    handleCardClick(t) {
+    async deleteTorrentAndFiles(t) {
+      const hash = String(t?.hash || '').trim();
+      if (!hash) throw new Error('Missing torrent hash; cannot delete.');
+
+      const url = new URL(`${config.torrentsApiUrl}/api/qbt/delTorrent`);
+      const res = await fetch(url.toString(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hash, deleteFiles: true })
+      });
+
+      if (!res.ok) {
+        let details = '';
+        try {
+          details = await res.text();
+        } catch {
+          // ignore
+        }
+        const suffix = details ? `\n${details}` : '';
+        throw new Error(`qbt delete failed: HTTP ${res.status}: ${res.statusText}${suffix}`);
+      }
+
+      // Endpoint may return JSON or empty/ok text. Treat both as success.
+      const contentType = String(res.headers.get('content-type') || '').toLowerCase();
+      if (contentType.includes('application/json')) {
+        const data = await res.json().catch(() => null);
+        if (data?.error) throw new Error(String(data.error));
+        return data;
+      }
+      return 'ok';
+    },
+
+    async handleCardClick(event, t) {
+      // Ctrl+Click (Cmd+Click on mac) deletes torrent and its files.
+      if (event && (event.ctrlKey || event.metaKey)) {
+        try {
+          event.preventDefault();
+          event.stopPropagation();
+        } catch {
+          // ignore
+        }
+
+        const title = (t?.name || t?.hash || 'Unknown').toString();
+        const ok = window.confirm(`Is it ok to delete the torrent ${title} from qbittorrent and its files?`);
+        if (!ok) return;
+
+        try {
+          await this.deleteTorrentAndFiles(t);
+          await this.pollOnce();
+        } catch (err) {
+          window.alert(err?.message || String(err));
+        }
+        return;
+      }
+
       const title = t?.name;
       if (title) evtBus.emit('selectShowFromCardTitle', title);
     },

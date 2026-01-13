@@ -3,16 +3,21 @@
 === do not use this file for prompts
 === it is just a scratchpad for editing copilot prompts.
 
-## in main.js:
 
-- remove requestStartProc, only startProc will be used.
+- why did you change gpt.txt? there is a clear instruction that copilot should ignore this file
 
-- remove show title as arg of startProc. there will be no args.
+- i hit an undo button in gpt.txt and other files were undone.  so i reverted all files. make the changes again and don't touch gpt.txt.
 
-- remove the prioritizing of a show title feature and remove all related code. 
+- are we still using the old find command to prune old files/folders in usb file system? that needs to be done hourly before the tv.json pruning
 
-## when startProc is called do the same as before when arg was blank:
+- don't add  /download  api call, i meant /downloads
 
-- if a cycle is running, restart after the current file finishes
-- if nothing is running, start a new cycle immediately
+- don't Add an hourly, separate prune timer. just add to the old one.
 
+- summarize changes in temp.txt again
+
+you said "/downloads is the only endpoint". did you remove any endpoints?  they are all needed.
+
+are you pruning tv.json from main.js?  tvJson.js is the only module allowed to change tv.json.
+
+explain pruneMissingUsbDirs. where is it located and how is it called.

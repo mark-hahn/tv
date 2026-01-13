@@ -1,1 +1,11 @@
 
+tv-proc changes (re-applied; misc/gpt.txt untouched)
+
+- tv.json cache in src/tvJson.js is now a Map keyed by title; disk format remains a JSON array.
+- data/tv-errors.json is removed; errors are stored as `error: true` on tv.json entries.
+- One-time migration on startup: if data/tv-errors.json exists, matching tv.json titles are marked `error:true` and the file is deleted (mismatches ignored).
+- /downloads now returns the most recent 200 tv.json entries as a JSON list sorted by procId (ascending).
+- tv.json flush happens on: addEntry, worker finished/error, and after pruneMissingUsbDirs removes entries.
+- Pruning of deleted USB folders is run hourly inside the existing delOldFiles hourly prune block (old USB prune first, then tv.json prune). No separate timer was added.
+- Removed legacy time-based tv.json pruning (30-day cutoff).
+

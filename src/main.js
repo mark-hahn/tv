@@ -64,7 +64,6 @@
   var TV_LOG_PATH = path.join(BASEDIR, 'misc', 'tv.log');
   var TV_JSON_PATH = dataPath('tv.json');
   var TV_FINISHED_PATH = dataPath('tv-finished.json');
-  var TV_ERRORS_PATH = dataPath('tv-errors.json');
   var TV_INPROGRESS_PATH = dataPath('tv-inProgress.json');
   var TV_BLOCKED_PATH = dataPath('tv-blocked.json');
   var TV_MAP_PATH = dataPath('tv-map');
@@ -91,9 +90,6 @@
       }
       if (!fs.existsSync(TV_FINISHED_PATH)) {
         fs.writeFileSync(TV_FINISHED_PATH, '{}');
-      }
-      if (!fs.existsSync(TV_ERRORS_PATH)) {
-        fs.writeFileSync(TV_ERRORS_PATH, '{}');
       }
       if (!fs.existsSync(TV_INPROGRESS_PATH)) {
         fs.writeFileSync(TV_INPROGRESS_PATH, '{}');
@@ -553,7 +549,6 @@
         }
       })();
 
-      out = pruneOldTvJson(out);
       if (changed) {
         writeTvJson(out);
       }
@@ -583,18 +578,6 @@
     }
   };
 
-  var pruneOldTvJson = function(arr) {
-    var cutoff = unixNow() - 30 * 24 * 60 * 60; // ~1 month
-    return arr.filter((o) => {
-      if (!o) return false;
-      var d = o.dateEnded != null ? o.dateEnded : o.dateStarted;
-      if (d == null) return true;
-      var t = toUnixSeconds(d);
-      if (t == null) return true;
-      return t >= cutoff;
-    });
-  };
-
   // A file is uniquely identified by (localPath directory + title filename).
   var upsertTvJson = function(localPath, title1, patch) {
     var tries = 0;
@@ -617,8 +600,6 @@
       } catch (e) {
         arr = [];
       }
-
-      arr = pruneOldTvJson(arr);
 
       var idx = arr.findIndex((o) => o && o.localPath === localPath && o.title === title1);
       var isNewItem = idx < 0;
@@ -855,7 +836,7 @@
       finished = true;
       workerCount = Math.max(0, workerCount - 1);
 
-      // Update tv-finished.json / tv-errors.json for this procId.
+      // Update tv-finished.json for this procId.
       handleFinish(finishedProcId != null ? finishedProcId : procId);
 
       // On finished, if there is capacity start the oldest waiting entry.
@@ -1057,7 +1038,7 @@
             setCors(res);
             res.statusCode = 200;
             res.setHeader('Content-Type', 'application/json');
-            return res.end(tvJson.getDownloads());
+            return res.end(JSON.stringify(tvJson.getDownloads()));
           } catch (e) {
             return json(res, 500, {status: String(e && e.message ? e.message : e)});
           }
@@ -1079,7 +1060,7 @@
 
   log({findUsb});
 
-  // Timestamps in tv-finished.json and tv-errors.json must be PST timezone.
+  // Timestamps in tv-finished.json must be PST timezone.
   // Use America/Los_Angeles so DST is handled correctly.
   var PST_TZ = 'America/Los_Angeles';
 
@@ -1217,7 +1198,7 @@
 
   reloadState = function() {
     var f, j, len, line, mapLines, mapStr, results, t;
-    // Do not cache tv-finished.json / tv-errors.json / tv-inProgress.json here.
+    // Do not cache tv-finished.json / tv-inProgress.json here.
     // Those are loaded once per cycle immediately after the USB file list is fetched.
     blocked = JSON.parse(fs.readFileSync(TV_BLOCKED_PATH, 'utf8'));
     map = {};
@@ -1305,6 +1286,23 @@
         // Non-fatal; continue cycle even if prune fails.
         res = 'prune ok';
       }
+
+      // After the hourly USB prune command is kicked off, prune tv.json entries whose USB folder no longer exists.
+      // Keep SSH calls small: this is one additional SSH call.
+      try {
+        var dirsOut = exec(
+          `ssh ${usbHost} "find files -ignore_readdir_race -type d -printf '%P\\n' 2>/dev/null"`,
+          {
+            timeout: 300000
+          }
+        ).toString();
+        var dirs = dirsOut.split('\n').map((s) => String(s || '').trim()).filter((s) => s.length);
+        var set = new Set(dirs);
+        tvJson.pruneMissingUsbDirs(set);
+      } catch (e) {
+        // Non-fatal.
+      }
+
       lastPruneAt = Date.now();
       if (!res.startsWith('prune ok')) {
         err(`Prune error: ${res}`);
@@ -1328,17 +1326,12 @@
       timeout: 300000
     }).toString().split('\n');
 
-    // Load finished/errors/inProgress maps once per cycle, immediately after
+    // Load finished/inProgress maps once per cycle, immediately after
     // the USB file list is available.
     try {
       recent = readMap(TV_FINISHED_PATH);
     } catch (e) {
       recent = {};
-    }
-    try {
-      errors = readMap(TV_ERRORS_PATH);
-    } catch (e) {
-      errors = {};
     }
     try {
       inProgress = readMap(TV_INPROGRESS_PATH);
@@ -1356,7 +1349,7 @@
         for (var i = 0; i < tvArr.length; i++) {
           var e = tvArr[i];
           if (e && typeof e === 'object' && e.title) {
-            tvJsonTitles[String(e.title)] = true;
+            tvJsonTitles[String(e.title)] = {error: !!e.error};
           }
         }
       }
@@ -1457,6 +1450,13 @@
         return;
       }
 
+      if (tvJsonTitles && tvJsonTitles[fname] && tvJsonTitles[fname].error) {
+        recentCount++;
+        log('------', downloadCount, '/', chkCount, 'SKIPPING *ERROR*:', fname);
+        process.nextTick(checkFile);
+        return;
+      }
+
       if (tvJsonTitles && tvJsonTitles[fname]) {
         recentCount++;
         log('------', downloadCount, '/', chkCount, 'SKIPPING ALREADY QUEUED:', fname);
@@ -1480,11 +1480,6 @@
         }
       }
       log('not blocked', usbLine);
-      if (errors && errors[fname]) {
-        log('------', downloadCount, '/', chkCount, 'SKIPPING *ERROR*:', fname);
-        process.nextTick(checkFile);
-        return;
-      }
       // file passed all block tests, process it
       flushAndGoLive();
       currentSeq = ++cycleSeq;
@@ -1731,7 +1726,7 @@
 
       // Update per-cycle view so later files in the same cycle don't re-queue.
       if (tvJsonTitles) {
-        tvJsonTitles[fname] = true;
+        tvJsonTitles[fname] = {error: false};
       }
     } catch (e) {
       // keep going
@@ -1742,7 +1737,7 @@
 
   badFile = (reason) => {
     errCount++;
-    err('writing tv-errors:', {
+    err('marking tv.json error:', {
       reason: reason || 'unknown',
       fname,
       title,
@@ -1751,7 +1746,19 @@
       usbFilePath
     });
     try {
-      tvJson.markError(fname, reason || 'unknown');
+      var usbDir = '';
+      try {
+        usbDir = path.dirname(usbFilePath);
+      } catch (e) {
+        usbDir = '';
+      }
+      if (usbDir === '.' || usbDir === '/') usbDir = '';
+      var usbPath = usbDir ? (`~/files/${usbDir}/`) : '~/files/';
+      tvJson.markError({
+        title: fname,
+        usbPath: usbPath,
+        reason: reason || 'unknown'
+      });
     } catch (e) {}
     return process.nextTick(checkFile);
   };

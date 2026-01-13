@@ -1,7 +1,7 @@
 'use strict';
 
 // tvJson.js
-// - Owns tvJsonCache (array of entry objects)
+// - Owns tvJsonCache (Map keyed by title)
 // - Creates workers and processes messages from workers
 // - Exports ONLY: addEntry(entry), getDownloads()
 
@@ -14,7 +14,6 @@ const DATA_DIR = path.join(BASEDIR, 'data');
 
 const TV_JSON_PATH = path.join(DATA_DIR, 'tv.json');
 const TV_FINISHED_PATH = path.join(DATA_DIR, 'tv-finished.json');
-const TV_ERRORS_PATH = path.join(DATA_DIR, 'tv-errors.json');
 const TV_INPROGRESS_PATH = path.join(DATA_DIR, 'tv-inProgress.json');
 const TV_LOG_PATH = path.join(BASEDIR, 'misc', 'tv.log');
 
@@ -97,18 +96,23 @@ const writeMap = (filePath, mapObj) => {
 
 // ---- in-memory state (single authority) ------------------------------------
 
-let tvJsonCache = [];
+let tvJsonCache = new Map();
 let workerCount = 0;
 let nextProcId = 0;
 
 let finishedMap = null;
-let errorsMap = null;
 let inProgressCache = null;
 
 const unixNow = () => Math.floor(Date.now() / 1000);
 
 const flushTvJsonToDisk = () => {
-  writeJsonAtomic(TV_JSON_PATH, tvJsonCache);
+  const arr = Array.from(tvJsonCache.values());
+  arr.sort((a, b) => {
+    const ap = (a && typeof a.procId === 'number') ? a.procId : Number.POSITIVE_INFINITY;
+    const bp = (b && typeof b.procId === 'number') ? b.procId : Number.POSITIVE_INFINITY;
+    return ap - bp;
+  });
+  writeJsonAtomic(TV_JSON_PATH, arr);
 };
 
 const ensureMapFileExists = (filePath, defaultObj) => {
@@ -121,7 +125,6 @@ const ensureMapFileExists = (filePath, defaultObj) => {
 
 const ensureMapsLoaded = () => {
   if (!finishedMap) finishedMap = readMap(TV_FINISHED_PATH);
-  if (!errorsMap) errorsMap = readMap(TV_ERRORS_PATH);
   if (!inProgressCache) inProgressCache = readMap(TV_INPROGRESS_PATH);
 };
 
@@ -148,16 +151,24 @@ const removeInProgress = (title) => {
 
 const loadOnStart = () => {
   ensureMapFileExists(TV_FINISHED_PATH, {});
-  ensureMapFileExists(TV_ERRORS_PATH, {});
   ensureMapFileExists(TV_INPROGRESS_PATH, {});
 
   const arr = readJson(TV_JSON_PATH, []);
-  tvJsonCache = Array.isArray(arr) ? arr : [];
+  tvJsonCache = new Map();
+  if (Array.isArray(arr)) {
+    for (const e of arr) {
+      if (!e || typeof e !== 'object') continue;
+      const t = e.title ? String(e.title) : '';
+      if (!t) continue;
+      tvJsonCache.set(t, e);
+    }
+  }
 
   // Reset any in-progress or downloading entries to waiting on start.
   // Spec: if entry has inProgress:true at reload, set inProgress:false and status:"waiting".
-  for (const e of tvJsonCache) {
-    if (!e || typeof e !== 'object') continue;
+  for (const [t, e0] of tvJsonCache.entries()) {
+    const e = e0 && typeof e0 === 'object' ? e0 : null;
+    if (!e) continue;
 
     // Migrate legacy queued status.
     if (e.status === 'future') {
@@ -181,11 +192,18 @@ const loadOnStart = () => {
       e.speed = 0;
       e.dateEnded = null;
     }
+
+    // Keep Map key in sync with entry.title.
+    if (t !== String(e.title || '')) {
+      tvJsonCache.delete(t);
+      const nt = e.title ? String(e.title) : '';
+      if (nt) tvJsonCache.set(nt, e);
+    }
   }
 
   // Determine nextProcId from existing entries (max+1) so procId stays unique.
   let maxId = -1;
-  for (const e of tvJsonCache) {
+  for (const e of tvJsonCache.values()) {
     if (!e || typeof e !== 'object') continue;
     if (typeof e.procId === 'number' && Number.isInteger(e.procId) && e.procId > maxId) {
       maxId = e.procId;
@@ -193,9 +211,34 @@ const loadOnStart = () => {
   }
   nextProcId = maxId + 1;
 
+  // Assign procId to any entries missing it.
+  for (const e of tvJsonCache.values()) {
+    if (!e || typeof e !== 'object') continue;
+    if (!(typeof e.procId === 'number' && Number.isInteger(e.procId))) {
+      e.procId = nextProcId++;
+    }
+  }
+
   // Load finished/errors/inProgress maps for immediate updates.
   finishedMap = readMap(TV_FINISHED_PATH);
-  errorsMap = readMap(TV_ERRORS_PATH);
+
+  // One-time migration: if legacy tv-errors.json exists, mark matching tv.json entries as error:true then delete it.
+  // Any mismatches are ignored.
+  try {
+    const legacyErrorsPath = path.join(DATA_DIR, 'tv-errors.json');
+    if (fs.existsSync(legacyErrorsPath)) {
+      const legacy = readMap(legacyErrorsPath);
+      for (const k of Object.keys(legacy || {})) {
+        const title = String(k || '');
+        if (!title) continue;
+        const existing = tvJsonCache.get(title);
+        if (existing && typeof existing === 'object') {
+          existing.error = true;
+        }
+      }
+      try { fs.unlinkSync(legacyErrorsPath); } catch {}
+    }
+  } catch {}
   // On restart/reload, treat all prior in-progress markers as stale.
   // We already reset any persisted entry.inProgress=true back to waiting above.
   // Clearing the map prevents duplicate suppression from getting stuck.
@@ -208,24 +251,49 @@ const loadOnStart = () => {
 };
 
 const findOldestWaitingIndex = () => {
-  return tvJsonCache.findIndex((e) => e && typeof e === 'object' && e.status === 'waiting');
+  let bestTitle = null;
+  let bestProcId = null;
+  for (const [t, e] of tvJsonCache.entries()) {
+    if (!e || typeof e !== 'object') continue;
+    if (e.status !== 'waiting') continue;
+    const pid = (typeof e.procId === 'number' && Number.isInteger(e.procId)) ? e.procId : null;
+    if (bestTitle == null) {
+      bestTitle = t;
+      bestProcId = pid;
+      continue;
+    }
+    if (pid == null && bestProcId == null) continue;
+    if (pid == null) continue;
+    if (bestProcId == null || pid < bestProcId) {
+      bestTitle = t;
+      bestProcId = pid;
+    }
+  }
+  return bestTitle;
 };
 
 const tryStartNextWorkers = () => {
   while (workerCount < MAX_WORKERS) {
-    const idx = findOldestWaitingIndex();
-    if (idx < 0) return;
-    startWorkerForIndex(idx);
+    const title = findOldestWaitingIndex();
+    if (!title) return;
+    startWorkerForTitle(title);
   }
 };
 
 const replaceByProcId = (entry) => {
   if (!entry || typeof entry !== 'object') return;
+  const title = entry.title ? String(entry.title) : '';
+  if (title) {
+    tvJsonCache.set(title, entry);
+    return;
+  }
   const pid = entry.procId;
   if (typeof pid !== 'number') return;
-  const idx = tvJsonCache.findIndex((e) => e && typeof e === 'object' && e.procId === pid);
-  if (idx >= 0) {
-    tvJsonCache[idx] = entry;
+  for (const [t, e] of tvJsonCache.entries()) {
+    if (e && typeof e === 'object' && e.procId === pid) {
+      tvJsonCache.set(t, entry);
+      return;
+    }
   }
 };
 
@@ -250,15 +318,18 @@ const handleFinish = (entry) => {
 
     if (status && status !== 'downloading' && status !== 'waiting') {
       appendTvLog(`${tsStr} ERROR ${title}: ${status}\n`);
-      errorsMap[title] = tsStr;
-      writeMap(TV_ERRORS_PATH, errorsMap);
+
+      const existing = tvJsonCache.get(title);
+      if (existing && typeof existing === 'object') {
+        existing.error = true;
+      }
       removeInProgress(title);
     }
   } catch {}
 };
 
-const startWorkerForIndex = (idx) => {
-  const entry0 = tvJsonCache[idx];
+const startWorkerForTitle = (title) => {
+  const entry0 = tvJsonCache.get(title);
   if (!entry0 || typeof entry0 !== 'object') return;
 
   // Assign procId on worker creation (spec) if missing.
@@ -279,7 +350,7 @@ const startWorkerForIndex = (idx) => {
   entry.dateEnded = null;
 
   // Replace cache immediately so /downloads reflects the procId.
-  tvJsonCache[idx] = entry;
+  tvJsonCache.set(String(entry.title || title), entry);
   flushTvJsonToDisk();
 
   workerCount++;
@@ -311,10 +382,8 @@ const startWorkerForIndex = (idx) => {
       flushTvJsonToDisk();
 
       // Start exactly one oldest waiting (spec: keep the pipeline full).
-      const nextIdx = findOldestWaitingIndex();
-      if (nextIdx >= 0) {
-        startWorkerForIndex(nextIdx);
-      }
+      const nextTitle = findOldestWaitingIndex();
+      if (nextTitle) startWorkerForTitle(nextTitle);
     }
   };
 
@@ -327,10 +396,8 @@ const startWorkerForIndex = (idx) => {
     handleFinish(errEntry);
     flushTvJsonToDisk();
 
-    const nextIdx = findOldestWaitingIndex();
-    if (nextIdx >= 0) {
-      startWorkerForIndex(nextIdx);
-    }
+    const nextTitle = findOldestWaitingIndex();
+    if (nextTitle) startWorkerForTitle(nextTitle);
   });
   w.on('exit', () => {
     // If the worker exits without sending finished, record something actionable.
@@ -341,10 +408,8 @@ const startWorkerForIndex = (idx) => {
     handleFinish(errEntry);
     flushTvJsonToDisk();
 
-    const nextIdx = findOldestWaitingIndex();
-    if (nextIdx >= 0) {
-      startWorkerForIndex(nextIdx);
-    }
+    const nextTitle = findOldestWaitingIndex();
+    if (nextTitle) startWorkerForTitle(nextTitle);
   });
 };
 
@@ -359,6 +424,11 @@ const addEntry = (entry) => {
   // Store entry as a plain object. procId is assigned when/if a worker starts.
   const e = { ...entry };
 
+  // Assign procId on add so /downloads sorting/capping is deterministic.
+  if (!(typeof e.procId === 'number' && Number.isInteger(e.procId))) {
+    e.procId = nextProcId++;
+  }
+
   // Ensure minimal fields exist.
   // Queue status is "waiting" (formerly "future").
   if (!e.status || e.status === 'future') e.status = 'waiting';
@@ -368,31 +438,51 @@ const addEntry = (entry) => {
   if (!e.dateStarted) e.dateStarted = 0;
   if (!e.dateEnded) e.dateEnded = null;
 
-  // Mark inProgress immediately and record it before any download starts.
-  e.inProgress = true;
+  // Record inProgress in the de-dupe map, but only set entry.inProgress=true when worker starts.
+  e.inProgress = false;
   addInProgress(e.title);
 
-  tvJsonCache.push(e);
+  const title = e.title ? String(e.title) : '';
+  if (!title) return;
+  tvJsonCache.set(title, e);
   flushTvJsonToDisk();
 
   if (workerCount < MAX_WORKERS) {
     // Start worker for this newly added entry.
-    startWorkerForIndex(tvJsonCache.length - 1);
+    startWorkerForTitle(title);
   }
 };
 
-// Record a non-download (cycle) error so main.js never writes tv-errors.json.
-const markError = (title, reason) => {
+// Record a non-download (cycle) error directly on tv.json entries.
+const markError = (titleOrEntry, reason) => {
   try {
-    const t = title ? String(title) : '';
+    const entry = (titleOrEntry && typeof titleOrEntry === 'object') ? titleOrEntry : null;
+    const t = entry ? String(entry.title || '') : (titleOrEntry ? String(titleOrEntry) : '');
     if (!t) return;
     ensureMapsLoaded();
 
     const tsStr = dateStr(Date.now());
-    const msg = reason ? String(reason) : 'error';
+    const msg = entry && entry.reason ? String(entry.reason) : (reason ? String(reason) : 'error');
     appendTvLog(`${tsStr} ERROR ${t}: ${msg}\n`);
-    errorsMap[t] = tsStr;
-    writeMap(TV_ERRORS_PATH, errorsMap);
+
+    const existing = tvJsonCache.get(t);
+    const patch = {
+      title: t,
+      usbPath: entry && entry.usbPath ? String(entry.usbPath) : (existing && existing.usbPath ? existing.usbPath : ''),
+      localPath: entry && entry.localPath ? String(entry.localPath) : (existing && existing.localPath ? existing.localPath : ''),
+      procId: (existing && typeof existing.procId === 'number') ? existing.procId : nextProcId++,
+      status: msg,
+      error: true,
+      inProgress: false,
+      progress: 0,
+      eta: null,
+      speed: 0,
+      dateStarted: (existing && existing.dateStarted) ? existing.dateStarted : 0,
+      dateEnded: unixNow(),
+    };
+
+    tvJsonCache.set(t, Object.assign({}, existing || {}, patch));
+    flushTvJsonToDisk();
 
     // If it was ever marked inProgress, clear it.
     removeInProgress(t);
@@ -401,14 +491,54 @@ const markError = (title, reason) => {
 
 const getDownloads = () => {
   try {
-    return JSON.stringify(tvJsonCache);
+    const arr = Array.from(tvJsonCache.values());
+    arr.sort((a, b) => {
+      const ap = (a && typeof a.procId === 'number') ? a.procId : Number.POSITIVE_INFINITY;
+      const bp = (b && typeof b.procId === 'number') ? b.procId : Number.POSITIVE_INFINITY;
+      return ap - bp;
+    });
+    return arr.length > 200 ? arr.slice(arr.length - 200) : arr;
   } catch {
-    return '[]';
+    return [];
   }
+};
+
+// Prune tv.json entries when their corresponding USB folder has been deleted.
+// existingUsbDirs: Set of relative directory paths under "files/" on the usbHost.
+const pruneMissingUsbDirs = (existingUsbDirs) => {
+  try {
+    if (!existingUsbDirs || typeof existingUsbDirs.has !== 'function') return;
+
+    const normalizeUsbDir = (usbPath) => {
+      let p = String(usbPath || '');
+      p = p.replace(/^~\//, '');
+      p = p.replace(/^\/+/g, '');
+      if (p.startsWith('files/')) p = p.slice('files/'.length);
+      if (p.startsWith('~/files/')) p = p.slice('~/files/'.length);
+      p = p.replace(/^files\//, '');
+      p = p.replace(/^\.\/?/, '');
+      p = p.replace(/\/+$/g, '');
+      return p;
+    };
+
+    let changed = false;
+    for (const [title, e] of tvJsonCache.entries()) {
+      if (!e || typeof e !== 'object') continue;
+      const usbDir = normalizeUsbDir(e.usbPath);
+      if (!usbDir) continue;
+      if (!existingUsbDirs.has(usbDir)) {
+        tvJsonCache.delete(title);
+        removeInProgress(title);
+        changed = true;
+      }
+    }
+    if (changed) flushTvJsonToDisk();
+  } catch {}
 };
 
 module.exports = {
   addEntry,
   getDownloads,
   markError,
+  pruneMissingUsbDirs,
 };

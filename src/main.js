@@ -1339,20 +1339,11 @@
       inProgress = {};
     }
 
-    // Load tv.json once per cycle and block any file already present there.
-    // This prevents duplicates after restarts where tv-inProgress.json may be cleared
-    // but tv.json still contains queued/waiting entries.
-    tvJsonTitles = {};
+    // Load queued titles once per cycle and block any file already present there.
+    // This prevents duplicates after restarts where tv-inProgress.json may be cleared.
+    // Backed by SQLite (tvJson.js); do not read data/tv.json.
     try {
-      var tvArr = JSON.parse(fs.readFileSync(TV_JSON_PATH, 'utf8'));
-      if (Array.isArray(tvArr)) {
-        for (var i = 0; i < tvArr.length; i++) {
-          var e = tvArr[i];
-          if (e && typeof e === 'object' && e.title) {
-            tvJsonTitles[String(e.title)] = {error: !!e.error};
-          }
-        }
-      }
+      tvJsonTitles = tvJson.getTitlesMap ? tvJson.getTitlesMap() : {};
     } catch (e) {
       tvJsonTitles = {};
     }

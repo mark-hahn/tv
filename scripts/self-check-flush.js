@@ -1,19 +1,21 @@
 #!/usr/bin/env node
 'use strict';
 
-// Self-check: verify data/tv.json is flushed ONLY on:
-// - entry added (new procId appears)
-// - worker finished (status transitions from downloading -> non-downloading)
+// Self-check: observe persistence activity during downloads.
+//
+// tv-proc now persists downloads in SQLite (data/tv.sqlite). SQLite writes are
+// implemented via a database file plus WAL/SHM sidecars, and multiple logical
+// updates may coalesce into fewer filesystem events.
 //
 // This script polls:
 // - http://127.0.0.1:3003/downloads
-// - data/tv.json mtime
-// and reports unexpected/missing flushes.
+// - data/tv.sqlite (+ -wal/-shm) fs events/mtime
+// and reports (best-effort) activity aligned with add/finish events.
 
 const fs = require('fs');
 const path = require('path');
 
-const TV_JSON_PATH = path.join(__dirname, '..', 'data', 'tv.json');
+const TV_DB_PATH = path.join(__dirname, '..', 'data', 'tv.sqlite');
 const BASE_URL = process.env.TVPROC_URL || 'http://127.0.0.1:3003';
 
 const args = process.argv.slice(2);
@@ -33,7 +35,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const statMtimeMs = () => {
   try {
-    const st = fs.statSync(TV_JSON_PATH);
+    const st = fs.statSync(TV_DB_PATH);
     return st.mtimeMs;
   } catch {
     return null;
@@ -95,16 +97,21 @@ const isDownloading = (status) => status === 'downloading';
   // Expected events that should cause a flush.
   const expected = []; // {type, at, details, matched}
 
-  // Observe actual flush events via fs.watch (flush is implemented as write tmp + rename to tv.json).
+  // Observe persistence activity via fs.watch.
+  // Note: SQLite may write tv.sqlite, tv.sqlite-wal, and tv.sqlite-shm.
   const flushEvents = []; // {at, eventType}
   const unexpectedFlushes = []; // {at, eventType}
   const matchedFlushes = []; // {at, eventType, matchedTo}
 
   let watcher;
   try {
-    watcher = fs.watch(path.dirname(TV_JSON_PATH), { persistent: true }, (eventType, filename) => {
+    const base = path.basename(TV_DB_PATH);
+    const wal = base + '-wal';
+    const shm = base + '-shm';
+    watcher = fs.watch(path.dirname(TV_DB_PATH), { persistent: true }, (eventType, filename) => {
       if (!filename) return;
-      if (String(filename) !== path.basename(TV_JSON_PATH)) return;
+      const fn = String(filename);
+      if (fn !== base && fn !== wal && fn !== shm) return;
       flushEvents.push({ at: Date.now(), eventType: String(eventType || '') });
     });
   } catch (e) {
@@ -201,7 +208,7 @@ const isDownloading = (status) => status === 'downloading';
 
   if (unexpectedFlushes.length) {
     console.log('');
-    console.log('[self-check] unexpected tv.json writes (first 5)');
+    console.log('[self-check] unexpected sqlite file events (first 5)');
     for (const u of unexpectedFlushes.slice(0, 5)) {
       console.log(JSON.stringify(u, null, 2));
     }

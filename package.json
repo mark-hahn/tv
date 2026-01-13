@@ -22,6 +22,7 @@
     "fs-plus": "^3.0.1",
     "mkdirp": "^0.5.1",
     "request": "^2.83.0",
-    "rimraf": "^2.6.2"
+    "rimraf": "^2.6.2",
+    "better-sqlite3": "^11.8.1"
   }
 }

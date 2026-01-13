@@ -1,17 +1,21 @@
 'use strict';
 
 // tvJson.js
-// - Owns tvJsonCache (Map keyed by title)
-// - Creates workers and processes messages from workers
-// - Exports ONLY: addEntry(entry), getDownloads()
+// - Owns download state and worker lifecycle
+// - Persists state in SQLite (replaces data/tv.json and in-memory tvJsonCache)
+// - Exports: addEntry(entry), getDownloads(), markError(), pruneMissingUsbDirs()
 
 const fs = require('fs');
 const path = require('path');
 const { Worker } = require('worker_threads');
+const Database = require('better-sqlite3');
 
 const BASEDIR = path.join(__dirname, '..');
 const DATA_DIR = path.join(BASEDIR, 'data');
 
+// SQLite backing store (replaces data/tv.json)
+const TV_DB_PATH = path.join(DATA_DIR, 'tv.sqlite');
+// Legacy JSON path (migration-only)
 const TV_JSON_PATH = path.join(DATA_DIR, 'tv.json');
 const TV_FINISHED_PATH = path.join(DATA_DIR, 'tv-finished.json');
 const TV_INPROGRESS_PATH = path.join(DATA_DIR, 'tv-inProgress.json');
@@ -107,25 +111,225 @@ const writeMap = (filePath, mapObj) => {
   writeJsonAtomic(filePath, mapObj);
 };
 
-// ---- in-memory state (single authority) ------------------------------------
+// ---- SQLite-backed state (single authority) --------------------------------
 
-let tvJsonCache = new Map();
+let db = null;
 let workerCount = 0;
 let nextProcId = 0;
 
 let finishedMap = null;
 let inProgressCache = null;
 
+let stmtUpsertByTitle = null;
+let stmtGetByTitle = null;
+let stmtGetByProcId = null;
+let stmtUpdateByProcId = null;
+let stmtDeleteByTitle = null;
+let stmtFindOldestWaitingTitle = null;
+let stmtGetMaxProcId = null;
+let stmtGetDownloads = null;
+let stmtGetTitles = null;
+
 const unixNow = () => Math.floor(Date.now() / 1000);
 
-const flushTvJsonToDisk = () => {
-  const arr = Array.from(tvJsonCache.values());
-  arr.sort((a, b) => {
-    const ap = (a && typeof a.procId === 'number') ? a.procId : Number.POSITIVE_INFINITY;
-    const bp = (b && typeof b.procId === 'number') ? b.procId : Number.POSITIVE_INFINITY;
-    return ap - bp;
-  });
-  writeJsonAtomic(TV_JSON_PATH, arr);
+const ensureDataDir = () => {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  } catch {}
+};
+
+const openDb = () => {
+  if (db) return;
+  ensureDataDir();
+  db = new Database(TV_DB_PATH);
+
+  try {
+    db.pragma('journal_mode = WAL');
+  } catch {}
+  try {
+    db.pragma('synchronous = NORMAL');
+  } catch {}
+  try {
+    db.pragma('busy_timeout = 5000');
+  } catch {}
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tv_entries (
+      title TEXT PRIMARY KEY,
+      procId INTEGER,
+      usbPath TEXT,
+      localPath TEXT,
+      status TEXT,
+      progress INTEGER,
+      eta INTEGER,
+      speed INTEGER,
+      sequence INTEGER,
+      fileSize INTEGER,
+      season INTEGER,
+      episode INTEGER,
+      dateStarted INTEGER,
+      dateEnded INTEGER,
+      inProgress INTEGER,
+      error INTEGER,
+      reason TEXT
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_tv_entries_procId_unique ON tv_entries(procId);
+    CREATE INDEX IF NOT EXISTS idx_tv_entries_status_procId ON tv_entries(status, procId);
+  `);
+
+  stmtUpsertByTitle = db.prepare(`
+    INSERT INTO tv_entries (
+      title, procId, usbPath, localPath, status, progress, eta, speed,
+      sequence, fileSize, season, episode, dateStarted, dateEnded,
+      inProgress, error, reason
+    ) VALUES (
+      @title, @procId, @usbPath, @localPath, @status, @progress, @eta, @speed,
+      @sequence, @fileSize, @season, @episode, @dateStarted, @dateEnded,
+      @inProgress, @error, @reason
+    )
+    ON CONFLICT(title) DO UPDATE SET
+      procId=excluded.procId,
+      usbPath=excluded.usbPath,
+      localPath=excluded.localPath,
+      status=excluded.status,
+      progress=excluded.progress,
+      eta=excluded.eta,
+      speed=excluded.speed,
+      sequence=excluded.sequence,
+      fileSize=excluded.fileSize,
+      season=excluded.season,
+      episode=excluded.episode,
+      dateStarted=excluded.dateStarted,
+      dateEnded=excluded.dateEnded,
+      inProgress=excluded.inProgress,
+      error=excluded.error,
+      reason=excluded.reason
+  `);
+
+  stmtGetByTitle = db.prepare('SELECT * FROM tv_entries WHERE title = ?');
+  stmtGetByProcId = db.prepare('SELECT * FROM tv_entries WHERE procId = ?');
+  stmtUpdateByProcId = db.prepare(`
+    UPDATE tv_entries SET
+      usbPath=@usbPath,
+      localPath=@localPath,
+      status=@status,
+      progress=@progress,
+      eta=@eta,
+      speed=@speed,
+      sequence=@sequence,
+      fileSize=@fileSize,
+      season=@season,
+      episode=@episode,
+      dateStarted=@dateStarted,
+      dateEnded=@dateEnded,
+      inProgress=@inProgress,
+      error=@error,
+      reason=@reason
+    WHERE procId=@procId
+  `);
+  stmtDeleteByTitle = db.prepare('DELETE FROM tv_entries WHERE title = ?');
+
+  stmtFindOldestWaitingTitle = db.prepare(
+    "SELECT title FROM tv_entries WHERE status='waiting' ORDER BY procId ASC LIMIT 1"
+  );
+  stmtGetMaxProcId = db.prepare('SELECT MAX(procId) AS maxProcId FROM tv_entries');
+  stmtGetDownloads = db.prepare('SELECT * FROM tv_entries ORDER BY procId DESC LIMIT 200');
+  stmtGetTitles = db.prepare('SELECT title, error FROM tv_entries');
+};
+
+const rowToEntry = (row) => {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    procId: (typeof row.procId === 'number') ? row.procId : (row.procId == null ? null : Number(row.procId)),
+    usbPath: row.usbPath || '',
+    localPath: row.localPath || '',
+    title: row.title || '',
+    status: row.status || 'waiting',
+    progress: (typeof row.progress === 'number') ? row.progress : (row.progress == null ? 0 : Number(row.progress)),
+    eta: row.eta == null ? null : Number(row.eta),
+    speed: (typeof row.speed === 'number') ? row.speed : (row.speed == null ? 0 : Number(row.speed)),
+    sequence: (typeof row.sequence === 'number') ? row.sequence : (row.sequence == null ? 0 : Number(row.sequence)),
+    fileSize: (typeof row.fileSize === 'number') ? row.fileSize : (row.fileSize == null ? 0 : Number(row.fileSize)),
+    season: (typeof row.season === 'number') ? row.season : (row.season == null ? 0 : Number(row.season)),
+    episode: (typeof row.episode === 'number') ? row.episode : (row.episode == null ? 0 : Number(row.episode)),
+    dateStarted: (typeof row.dateStarted === 'number') ? row.dateStarted : (row.dateStarted == null ? 0 : Number(row.dateStarted)),
+    dateEnded: row.dateEnded == null ? null : Number(row.dateEnded),
+    inProgress: !!row.inProgress,
+    error: !!row.error,
+    reason: row.reason || undefined,
+  };
+};
+
+const normalizeEntryForDb = (entry) => {
+  const e = entry && typeof entry === 'object' ? entry : {};
+  const title = e.title ? String(e.title) : '';
+
+  // Defaults match prior tv.json behavior.
+  const status0 = e.status ? String(e.status) : 'waiting';
+  const status = status0 === 'future' ? 'waiting' : status0;
+
+  let procId = (typeof e.procId === 'number' && Number.isInteger(e.procId)) ? e.procId : null;
+  if (procId == null) procId = nextProcId++;
+
+  const progress = (typeof e.progress === 'number' && Number.isFinite(e.progress)) ? Math.trunc(e.progress) : 0;
+  const eta = (e.eta == null) ? null : Math.trunc(Number(e.eta));
+  const speed = (typeof e.speed === 'number' && Number.isFinite(e.speed)) ? Math.trunc(e.speed) : 0;
+  const sequence = (typeof e.sequence === 'number' && Number.isFinite(e.sequence)) ? Math.trunc(e.sequence) : 0;
+  const fileSize = (typeof e.fileSize === 'number' && Number.isFinite(e.fileSize)) ? Math.trunc(e.fileSize) : 0;
+  const season = (typeof e.season === 'number' && Number.isFinite(e.season)) ? Math.trunc(e.season) : 0;
+  const episode = (typeof e.episode === 'number' && Number.isFinite(e.episode)) ? Math.trunc(e.episode) : 0;
+  const dateStarted = (typeof e.dateStarted === 'number' && Number.isFinite(e.dateStarted)) ? Math.trunc(e.dateStarted) : 0;
+  const dateEnded = (e.dateEnded == null) ? null : Math.trunc(Number(e.dateEnded));
+
+  return {
+    title,
+    procId,
+    usbPath: e.usbPath ? String(e.usbPath) : '',
+    localPath: e.localPath ? String(e.localPath) : '',
+    status,
+    progress,
+    eta,
+    speed,
+    sequence,
+    fileSize,
+    season,
+    episode,
+    dateStarted,
+    dateEnded,
+    inProgress: e.inProgress ? 1 : 0,
+    error: e.error ? 1 : 0,
+    reason: e.reason ? String(e.reason) : (e.status && e.status !== status ? String(e.status) : null),
+  };
+};
+
+const upsertEntry = (entry) => {
+  openDb();
+  const v = normalizeEntryForDb(entry);
+  if (!v.title) return;
+  try {
+    stmtUpsertByTitle.run(v);
+  } catch {
+    // Best effort; avoid crashing download pipeline.
+  }
+};
+
+const updateEntryByProcId = (entry) => {
+  openDb();
+  const v = normalizeEntryForDb(entry);
+  if (!v.title || v.procId == null) {
+    upsertEntry(entry);
+    return;
+  }
+  try {
+    const info = stmtUpdateByProcId.run(v);
+    if (!info || info.changes === 0) {
+      // If procId not found, fall back to title upsert.
+      upsertEntry(entry);
+    }
+  } catch {
+    upsertEntry(entry);
+  }
 };
 
 const ensureMapFileExists = (filePath, defaultObj) => {
@@ -166,88 +370,88 @@ const loadOnStart = () => {
   ensureMapFileExists(TV_FINISHED_PATH, {});
   ensureMapFileExists(TV_INPROGRESS_PATH, {});
 
-  const arr = readJson(TV_JSON_PATH, []);
-  tvJsonCache = new Map();
-  if (Array.isArray(arr)) {
-    for (const e of arr) {
-      if (!e || typeof e !== 'object') continue;
-      const t = e.title ? String(e.title) : '';
-      if (!t) continue;
-      tvJsonCache.set(t, e);
+  openDb();
+
+  // One-time migration: import data/tv.json into SQLite if DB is empty.
+  try {
+    const cnt = db.prepare('SELECT COUNT(1) AS n FROM tv_entries').get();
+    const n = cnt && typeof cnt.n === 'number' ? cnt.n : 0;
+    if (n === 0 && fs.existsSync(TV_JSON_PATH)) {
+      const arr = readJson(TV_JSON_PATH, []);
+      if (Array.isArray(arr)) {
+        const insertMany = db.transaction((rows) => {
+          for (const e of rows) {
+            if (!e || typeof e !== 'object') continue;
+            const t = e.title ? String(e.title) : '';
+            if (!t) continue;
+            // Preserve existing procId when present.
+            const clone = { ...e };
+            if (!(typeof clone.procId === 'number' && Number.isInteger(clone.procId))) {
+              clone.procId = nextProcId++;
+            }
+            upsertEntry(clone);
+          }
+        });
+        insertMany(arr);
+      }
     }
+  } catch {}
+
+  // Normalize persisted statuses on restart.
+  try {
+    db.prepare("UPDATE tv_entries SET status='waiting' WHERE status='future'").run();
+  } catch {}
+  try {
+    db.prepare("UPDATE tv_entries SET inProgress=0, status='waiting', progress=0, eta=NULL, speed=0, dateEnded=NULL WHERE inProgress=1 OR status='downloading'").run();
+  } catch {}
+
+  // Establish nextProcId from existing entries.
+  try {
+    const row = stmtGetMaxProcId.get();
+    const maxId = row && row.maxProcId != null ? Number(row.maxProcId) : -1;
+    nextProcId = (Number.isFinite(maxId) ? maxId : -1) + 1;
+  } catch {
+    nextProcId = 0;
   }
 
-  // Reset any in-progress or downloading entries to waiting on start.
-  // Spec: if entry has inProgress:true at reload, set inProgress:false and status:"waiting".
-  for (const [t, e0] of tvJsonCache.entries()) {
-    const e = e0 && typeof e0 === 'object' ? e0 : null;
-    if (!e) continue;
-
-    // Migrate legacy queued status.
-    if (e.status === 'future') {
-      e.status = 'waiting';
+  // Assign procId to any rows missing it.
+  try {
+    const rows = db.prepare('SELECT title FROM tv_entries WHERE procId IS NULL ORDER BY rowid ASC').all();
+    if (Array.isArray(rows) && rows.length) {
+      const tx = db.transaction((rs) => {
+        for (const r of rs) {
+          const t = r && r.title ? String(r.title) : '';
+          if (!t) continue;
+          try {
+            db.prepare('UPDATE tv_entries SET procId = ? WHERE title = ? AND procId IS NULL').run(nextProcId++, t);
+          } catch {}
+        }
+      });
+      tx(rows);
     }
-
-    if (e.inProgress === true) {
-      e.inProgress = false;
-      e.status = 'waiting';
-      e.progress = 0;
-      e.eta = null;
-      e.speed = 0;
-      e.dateEnded = null;
-      continue;
-    }
-
-    if (e.status === 'downloading') {
-      e.status = 'waiting';
-      e.progress = 0;
-      e.eta = null;
-      e.speed = 0;
-      e.dateEnded = null;
-    }
-
-    // Keep Map key in sync with entry.title.
-    if (t !== String(e.title || '')) {
-      tvJsonCache.delete(t);
-      const nt = e.title ? String(e.title) : '';
-      if (nt) tvJsonCache.set(nt, e);
-    }
-  }
-
-  // Determine nextProcId from existing entries (max+1) so procId stays unique.
-  let maxId = -1;
-  for (const e of tvJsonCache.values()) {
-    if (!e || typeof e !== 'object') continue;
-    if (typeof e.procId === 'number' && Number.isInteger(e.procId) && e.procId > maxId) {
-      maxId = e.procId;
-    }
-  }
-  nextProcId = maxId + 1;
-
-  // Assign procId to any entries missing it.
-  for (const e of tvJsonCache.values()) {
-    if (!e || typeof e !== 'object') continue;
-    if (!(typeof e.procId === 'number' && Number.isInteger(e.procId))) {
-      e.procId = nextProcId++;
-    }
-  }
+  } catch {}
 
   // Load finished/errors/inProgress maps for immediate updates.
   finishedMap = readMap(TV_FINISHED_PATH);
 
-  // One-time migration: if legacy tv-errors.json exists, mark matching tv.json entries as error:true then delete it.
+  // One-time migration: if legacy tv-errors.json exists, mark matching entries as error:true then delete it.
   // Any mismatches are ignored.
   try {
     const legacyErrorsPath = path.join(DATA_DIR, 'tv-errors.json');
     if (fs.existsSync(legacyErrorsPath)) {
       const legacy = readMap(legacyErrorsPath);
-      for (const k of Object.keys(legacy || {})) {
-        const title = String(k || '');
-        if (!title) continue;
-        const existing = tvJsonCache.get(title);
-        if (existing && typeof existing === 'object') {
-          existing.error = true;
-        }
+      const keys = Object.keys(legacy || {});
+      if (keys.length) {
+        const tx = db.transaction((titles) => {
+          for (const k of titles) {
+            const t = String(k || '');
+            if (!t) continue;
+            try {
+              db.prepare('UPDATE tv_entries SET error=1 WHERE title=?').run(t);
+            } catch {}
+          }
+        });
+        tx(keys);
       }
       try { fs.unlinkSync(legacyErrorsPath); } catch {}
     }
@@ -260,29 +464,16 @@ const loadOnStart = () => {
 
   // Start up to MAX_WORKERS oldest waiting entries.
   tryStartNextWorkers();
-  flushTvJsonToDisk();
 };
 
 const findOldestWaitingIndex = () => {
-  let bestTitle = null;
-  let bestProcId = null;
-  for (const [t, e] of tvJsonCache.entries()) {
-    if (!e || typeof e !== 'object') continue;
-    if (e.status !== 'waiting') continue;
-    const pid = (typeof e.procId === 'number' && Number.isInteger(e.procId)) ? e.procId : null;
-    if (bestTitle == null) {
-      bestTitle = t;
-      bestProcId = pid;
-      continue;
-    }
-    if (pid == null && bestProcId == null) continue;
-    if (pid == null) continue;
-    if (bestProcId == null || pid < bestProcId) {
-      bestTitle = t;
-      bestProcId = pid;
-    }
+  try {
+    openDb();
+    const r = stmtFindOldestWaitingTitle.get();
+    return r && r.title ? String(r.title) : null;
+  } catch {
+    return null;
   }
-  return bestTitle;
 };
 
 const tryStartNextWorkers = () => {
@@ -295,19 +486,7 @@ const tryStartNextWorkers = () => {
 
 const replaceByProcId = (entry) => {
   if (!entry || typeof entry !== 'object') return;
-  const title = entry.title ? String(entry.title) : '';
-  if (title) {
-    tvJsonCache.set(title, entry);
-    return;
-  }
-  const pid = entry.procId;
-  if (typeof pid !== 'number') return;
-  for (const [t, e] of tvJsonCache.entries()) {
-    if (e && typeof e === 'object' && e.procId === pid) {
-      tvJsonCache.set(t, entry);
-      return;
-    }
-  }
+  updateEntryByProcId(entry);
 };
 
 const handleFinish = (entry) => {
@@ -332,17 +511,20 @@ const handleFinish = (entry) => {
     if (status && status !== 'downloading' && status !== 'waiting') {
       appendTvLog(`${tsStr} ERROR ${title}: ${status}\n`);
 
-      const existing = tvJsonCache.get(title);
-      if (existing && typeof existing === 'object') {
-        existing.error = true;
-      }
+      // Mark the entry as error in SQLite.
+      try {
+        openDb();
+        db.prepare('UPDATE tv_entries SET error=1 WHERE title=?').run(title);
+      } catch {}
       removeInProgress(title);
     }
   } catch {}
 };
 
 const startWorkerForTitle = (title) => {
-  const entry0 = tvJsonCache.get(title);
+  openDb();
+  const row = stmtGetByTitle.get(title);
+  const entry0 = rowToEntry(row);
   if (!entry0 || typeof entry0 !== 'object') return;
 
   // Assign procId on worker creation (spec) if missing.
@@ -362,9 +544,8 @@ const startWorkerForTitle = (title) => {
   entry.dateStarted = unixNow();
   entry.dateEnded = null;
 
-  // Replace cache immediately so /downloads reflects the procId.
-  tvJsonCache.set(String(entry.title || title), entry);
-  flushTvJsonToDisk();
+  // Persist immediately so /downloads reflects the procId.
+  upsertEntry(entry);
 
   workerCount++;
 
@@ -392,7 +573,6 @@ const startWorkerForTitle = (title) => {
       workerCount = Math.max(0, workerCount - 1);
 
       handleFinish(doneEntry);
-      flushTvJsonToDisk();
 
       // Start exactly one oldest waiting (spec: keep the pipeline full).
       const nextTitle = findOldestWaitingIndex();
@@ -407,7 +587,6 @@ const startWorkerForTitle = (title) => {
     replaceByProcId(errEntry);
     workerCount = Math.max(0, workerCount - 1);
     handleFinish(errEntry);
-    flushTvJsonToDisk();
 
     const nextTitle = findOldestWaitingIndex();
     if (nextTitle) startWorkerForTitle(nextTitle);
@@ -419,7 +598,6 @@ const startWorkerForTitle = (title) => {
     replaceByProcId(errEntry);
     workerCount = Math.max(0, workerCount - 1);
     handleFinish(errEntry);
-    flushTvJsonToDisk();
 
     const nextTitle = findOldestWaitingIndex();
     if (nextTitle) startWorkerForTitle(nextTitle);
@@ -433,6 +611,8 @@ loadOnStart();
 
 const addEntry = (entry) => {
   if (!entry || typeof entry !== 'object') return;
+
+  openDb();
 
   // Store entry as a plain object. procId is assigned when/if a worker starts.
   const e = { ...entry };
@@ -458,8 +638,26 @@ const addEntry = (entry) => {
   const title = e.title ? String(e.title) : '';
   if (!title) return;
 
-  const wasExisting = tvJsonCache.has(title);
-  tvJsonCache.set(title, e);
+  let wasExisting = false;
+  let existingEntry = null;
+  try {
+    const r0 = stmtGetByTitle.get(title);
+    wasExisting = !!r0;
+    existingEntry = rowToEntry(r0);
+  } catch {
+    wasExisting = false;
+    existingEntry = null;
+  }
+
+  // If this title already exists and caller didn't provide procId,
+  // preserve the existing procId so ordering stays stable.
+  if (wasExisting && existingEntry && typeof existingEntry.procId === 'number' && Number.isInteger(existingEntry.procId)) {
+    if (!(typeof e.procId === 'number' && Number.isInteger(e.procId))) {
+      e.procId = existingEntry.procId;
+    }
+  }
+
+  upsertEntry(e);
 
   // Add a tv.log line for every newly-added tv.json entry.
   if (!wasExisting) {
@@ -467,7 +665,6 @@ const addEntry = (entry) => {
     const errorMsg = isError ? (e.reason || e.status || 'error') : null;
     logTvEntryAdded(title, errorMsg);
   }
-  flushTvJsonToDisk();
 
   if (workerCount < MAX_WORKERS) {
     // Start worker for this newly added entry.
@@ -487,7 +684,8 @@ const markError = (titleOrEntry, reason) => {
     const msg = entry && entry.reason ? String(entry.reason) : (reason ? String(reason) : 'error');
     appendTvLog(`${tsStr} ERROR ${t}: ${msg}\n`);
 
-    const existing = tvJsonCache.get(t);
+    openDb();
+    const existing = rowToEntry(stmtGetByTitle.get(t));
     const patch = {
       title: t,
       usbPath: entry && entry.usbPath ? String(entry.usbPath) : (existing && existing.usbPath ? existing.usbPath : ''),
@@ -503,8 +701,7 @@ const markError = (titleOrEntry, reason) => {
       dateEnded: unixNow(),
     };
 
-    tvJsonCache.set(t, Object.assign({}, existing || {}, patch));
-    flushTvJsonToDisk();
+    upsertEntry(Object.assign({}, existing || {}, patch));
 
     // If it was ever marked inProgress, clear it.
     removeInProgress(t);
@@ -513,15 +710,33 @@ const markError = (titleOrEntry, reason) => {
 
 const getDownloads = () => {
   try {
-    const arr = Array.from(tvJsonCache.values());
-    arr.sort((a, b) => {
-      const ap = (a && typeof a.procId === 'number') ? a.procId : Number.POSITIVE_INFINITY;
-      const bp = (b && typeof b.procId === 'number') ? b.procId : Number.POSITIVE_INFINITY;
-      return ap - bp;
-    });
-    return arr.length > 200 ? arr.slice(arr.length - 200) : arr;
+    openDb();
+    const rows = stmtGetDownloads.all();
+    // Query returns DESC; reverse so clients keep ascending order.
+    const out = [];
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const e = rowToEntry(rows[i]);
+      if (e) out.push(e);
+    }
+    return out;
   } catch {
     return [];
+  }
+};
+
+// For per-cycle de-dupe in main.js (replaces reading data/tv.json).
+const getTitlesMap = () => {
+  try {
+    openDb();
+    const rows = stmtGetTitles.all();
+    const out = {};
+    for (const r of rows) {
+      if (!r || !r.title) continue;
+      out[String(r.title)] = { error: !!r.error };
+    }
+    return out;
+  } catch {
+    return {};
   }
 };
 
@@ -543,18 +758,30 @@ const pruneMissingUsbDirs = (existingUsbDirs) => {
       return p;
     };
 
-    let changed = false;
-    for (const [title, e] of tvJsonCache.entries()) {
-      if (!e || typeof e !== 'object') continue;
-      const usbDir = normalizeUsbDir(e.usbPath);
+    openDb();
+    const rows = db.prepare('SELECT title, usbPath FROM tv_entries').all();
+    if (!Array.isArray(rows) || !rows.length) return;
+
+    const toDelete = [];
+    for (const r of rows) {
+      if (!r || !r.title) continue;
+      const usbDir = normalizeUsbDir(r.usbPath);
       if (!usbDir) continue;
       if (!existingUsbDirs.has(usbDir)) {
-        tvJsonCache.delete(title);
-        removeInProgress(title);
-        changed = true;
+        toDelete.push(String(r.title));
       }
     }
-    if (changed) flushTvJsonToDisk();
+
+    if (!toDelete.length) return;
+
+    const tx = db.transaction((titles) => {
+      for (const t of titles) {
+        try { stmtDeleteByTitle.run(t); } catch {}
+      }
+    });
+    tx(toDelete);
+
+    for (const t of toDelete) removeInProgress(t);
   } catch {}
 };
 
@@ -563,4 +790,5 @@ module.exports = {
   getDownloads,
   markError,
   pruneMissingUsbDirs,
+  getTitlesMap,
 };

@@ -1029,30 +1029,7 @@ export default {
         // Set torrents first; some server versions may omit rawProviderCounts.
         this.torrents = data.torrents || [];
 
-        // Debug logging: helps confirm whether warnings are being returned by the API.
-        try {
-          // Full response first (expandable in DevTools).
-          console.log('torrentSearch full response', data);
-
-          const sample = (Array.isArray(this.torrents) ? this.torrents : []).slice(0, 5).map(t => ({
-            title: String(t?.raw?.title || t?.title || ''),
-            provider: String(t?.raw?.provider || ''),
-            seeds: t?.raw?.seeds,
-            warnings: this.getTorrentWarnings(t)
-          }));
-          console.log('torrentSearch result', {
-            show: showNameForSearch,
-            needed,
-            url,
-            apiCount: data?.count,
-            torrentsReturned: Array.isArray(this.torrents) ? this.torrents.length : 0,
-            rawProviderCounts: data?.rawProviderCounts,
-            warningSummary: data?.warningSummary,
-            sample
-          });
-        } catch {
-          // ignore logging failures
-        }
+        // (debug logging removed)
 
         // Provider hit counts.
         // Prefer backend-reported rawProviderCounts when present, but fall back to deriving counts from
@@ -1176,10 +1153,6 @@ export default {
 
       // Ctrl-click should behave like clicking the Get button.
       if (isCtrlClick) {
-        console.log('torrent ctrl-click → enqueueDownload', {
-          title: torrent?.raw?.title || torrent?.title || 'Unknown',
-          provider: torrent?.raw?.provider || 'unknown'
-        });
         void this.enqueueDownload(torrent);
         return;
       }
@@ -1508,7 +1481,6 @@ export default {
         let downloadsRes = null;
         try {
           const downloadsUrl = `${config.torrentsApiUrl}/downloads`;
-          console.log('downloads request (about to send)', { url: downloadsUrl });
 
           const downloadsPayload = provider === 'torrentleech'
             ? { tl: { torrent } }
@@ -1523,8 +1495,6 @@ export default {
             });
             throw e;
           }
-
-          console.log('downloads request body', downloadsBody);
 
           downloadsRes = await this.fetchWithTimeout(downloadsUrl, {
             method: 'POST',

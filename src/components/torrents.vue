@@ -1149,11 +1149,13 @@ export default {
       this.clickedTorrents.add(torrent);
 
       // Only open the detail tab the first time (no auto-open if it already has a checkmark).
+      const isAltClick = Boolean(event?.altKey);
       const isCtrlClick = Boolean(event?.ctrlKey || event?.metaKey);
 
       // Ctrl-click should behave like clicking the Get button.
-      if (isCtrlClick) {
-        void this.enqueueDownload(torrent);
+      // Alt-click behaves like ctrl-click but forces download (bypass server-side "already downloaded" checks).
+      if (isAltClick || isCtrlClick) {
+        void this.enqueueDownload(torrent, { forceDownload: isAltClick });
         return;
       }
 
@@ -1266,8 +1268,11 @@ export default {
       }
     },
 
-    enqueueDownload(torrent) {
+    enqueueDownload(torrent, options = {}) {
       if (!torrent) return;
+
+      const opts = (options && typeof options === 'object') ? options : {};
+      const forceDownload = Boolean(opts.forceDownload);
 
       const key = this.statusKeyForTorrent(torrent);
       if (!key) return;
@@ -1275,7 +1280,7 @@ export default {
       const existing = this.downloadStatus?.[key]?.status;
       if (existing === 'queued' || existing === 'sending') return;
 
-      this.downloadQueue.push({ torrent, key });
+      this.downloadQueue.push({ torrent, key, forceDownload });
       this.setDownloadStatus(torrent, 'queued', '');
       void this.processDownloadQueue();
     },
@@ -1363,6 +1368,7 @@ export default {
         while (this.downloadQueue.length > 0) {
           const item = this.downloadQueue.shift();
           const torrent = item?.torrent;
+          const forceDownload = Boolean(item?.forceDownload);
           if (!torrent) continue;
 
           // If qBittorrent already has this torrent, don't silently no-op.
@@ -1403,7 +1409,7 @@ export default {
           const torrentTitle = String(torrent?.raw?.title || torrent?.title || 'Unknown');
 
           try {
-            const result = await this.downloadTorrentInternal(torrent);
+            const result = await this.downloadTorrentInternal(torrent, { forceDownload });
             if (result?.ok) {
               const hash = this.getTorrentHash(torrent);
               if (hash) {
@@ -1433,12 +1439,15 @@ export default {
       }
     },
 
-    async downloadTorrentInternal(torrent) {
+    async downloadTorrentInternal(torrent, options = {}) {
       // Mark as downloaded immediately to change card color ("now" highlighting)
       const nowKey = this.getTorrentNowKey(torrent);
       if (nowKey) {
         this.downloadedTorrents.add(nowKey);
       }
+
+      const opts = (options && typeof options === 'object') ? options : {};
+      const forceDownload = Boolean(opts.forceDownload);
 
       const torrentTitle = torrent?.raw?.title || 'Unknown';
       
@@ -1483,8 +1492,8 @@ export default {
           const downloadsUrl = `${config.torrentsApiUrl}/downloads`;
 
           const downloadsPayload = provider === 'torrentleech'
-            ? { tl: { torrent } }
-            : { torrent };
+            ? { tl: { torrent }, ...(forceDownload ? { forceDownload: true } : {}) }
+            : { torrent, ...(forceDownload ? { forceDownload: true } : {}) };
 
           let downloadsBody = '';
           try {

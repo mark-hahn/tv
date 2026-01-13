@@ -500,8 +500,13 @@ app.get('/api/subs/search', async (req, res) => {
 async function handleDownloadRequest(req, res) {
   try {
     const body = req.body || {};
-    const torrent = body.torrent;
+    const hasTl = body.tl != null;
+    const tlBody = hasTl ? body.tl : null;
+    const torrent = hasTl
+      ? (tlBody && typeof tlBody === 'object' && 'torrent' in tlBody ? tlBody.torrent : tlBody)
+      : body.torrent;
     const forceDownload = body.forceDownload === true;
+    const debug = body.debug === true;
 
     if (!torrent) {
       res.status(400).json({ error: 'Torrent data is required' });
@@ -536,15 +541,18 @@ async function handleDownloadRequest(req, res) {
 
       let alreadyDownloaded = [];
       try {
+        appendCallsLog({ endpoint: 'tv-proc:/checkFiles request', method: 'POST', ok: true, result: titles });
         alreadyDownloaded = await tvProcCheckFiles(titles);
+        appendCallsLog({ endpoint: 'tv-proc:/checkFiles response', method: 'POST', ok: true, result: alreadyDownloaded });
       } catch (e) {
+        appendCallsLog({ endpoint: 'tv-proc:/checkFiles', method: 'POST', ok: false, result: null, error: e });
         res.json({ success: false, stage: 'tv-proc', error: e?.message || String(e) });
         return;
       }
 
       // If any file titles are already present, do NOT send to qBittorrent.
       if (Array.isArray(alreadyDownloaded) && alreadyDownloaded.length > 0) {
-        res.json(alreadyDownloaded);
+        res.json(debug ? { titles, alreadyDownloaded } : alreadyDownloaded);
         return;
       }
 
@@ -556,7 +564,7 @@ async function handleDownloadRequest(req, res) {
       }
 
       // In this mode, always return the tv-proc list (empty).
-      res.json([]);
+      res.json(debug ? { titles, alreadyDownloaded: [] } : []);
       return;
     }
 
@@ -580,70 +588,6 @@ app.post('/api/download', handleDownloadRequest);
 
 // Back-compat alias for older clients/nginx rewrites.
 app.post('/downloads', handleDownloadRequest);
-
-// POST /api/torrentFile - Fetch the raw .torrent bytes directly (no detail-page scraping)
-// Body: { torrent }
-// Success: application/x-bittorrent
-// Failure: JSON (200 OK) with { success:false, stage, error, isCloudflare?, ... }
-app.post('/api/torrentFile', async (req, res) => {
-  try {
-    const { torrent } = req.body || {};
-    if (!torrent) {
-      res.status(400).json({ success: false, error: 'Torrent data is required' });
-      return;
-    }
-
-    const result = await download.fetchTorrentFileFromSearchResult(torrent);
-    if (!result || typeof result !== 'object' || Array.isArray(result)) {
-      res.status(500).json({ success: false, error: 'Unexpected torrentFile result' });
-      return;
-    }
-
-    if (!result.success) {
-      res.json(result);
-      return;
-    }
-
-    const torrentData = result.torrentData;
-    if (!Buffer.isBuffer(torrentData) || torrentData.length === 0) {
-      res.json({ success: false, stage: 'validate', error: 'No torrent bytes returned' });
-      return;
-    }
-
-    const rawName = torrent?.raw?.filename || 'download.torrent';
-    const safeName = String(rawName || 'download.torrent').replace(/[\\/]+/g, '_');
-
-    res.setHeader('Content-Type', 'application/x-bittorrent');
-    res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
-    res.status(200).send(torrentData);
-  } catch (error) {
-    console.error('torrentFile error:', error);
-    res.status(500).json({ success: false, error: error?.message || String(error) });
-  }
-});
-
-// POST /api/usb/addTorrent - Upload a .torrent buffer to the remote watch folder
-// Content-Type: application/x-bittorrent
-// Optional header: x-torrent-filename
-app.post(
-  '/api/usb/addTorrent',
-  express.raw({ type: 'application/x-bittorrent', limit: '10mb' }),
-  async (req, res) => {
-    try {
-      const buf = req.body;
-      if (!Buffer.isBuffer(buf) || buf.length === 0) {
-        res.status(400).json({ success: false, error: 'Torrent bytes are required' });
-        return;
-      }
-      const hint = String(req.headers['x-torrent-filename'] || '').trim();
-      const result = await download.uploadTorrentToWatchFolder(buf, hint);
-      res.json(result);
-    } catch (error) {
-      console.error('usb addTorrent error:', error);
-      res.status(500).json({ success: false, error: error?.message || String(error) });
-    }
-  }
-);
 
 app.get('/api/startreel', async (req, res) => {
   try {

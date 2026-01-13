@@ -67,7 +67,7 @@ Optional Cloudflare bypass values (written by the `/api/cf_clearance` endpoint):
 
 ### Remote watch folder / SFTP upload
 
-`/api/usb/addTorrent` and related helpers use:
+`/downloads` and related helpers use:
 
 - `cookies/download-cred.txt`
 
@@ -172,16 +172,14 @@ Search stages/counts and filter reasons are appended to `tor-results.txt` in the
 
 ### Download helpers
 
-- `POST /api/download` – Higher-level download flow (JSON body `{ torrent, forceDownload?: true }`)
+- `POST /api/download` (or `/downloads`) – Higher-level download flow.
+  - IPT-style: JSON body `{ torrent, forceDownload?: true }`
+  - TorrentLeech-style: JSON body `{ tl: { torrent: ... } }` (or `{ tl: <torrent> }`)
   - If `forceDownload:true` is **not** provided, the server fetches the `.torrent`, extracts file titles, calls `POST http://localhost:3003/checkFiles`, and **skips** the qBittorrent upload when any titles were already downloaded. In this mode it returns the tv-proc response array.
-- `POST /api/torrentFile` – Fetch raw `.torrent` bytes (no detail-page scraping)
 
 ### Upload `.torrent` to remote watch folder
 
-`POST /api/usb/addTorrent`
-
-- Content-Type: `application/x-bittorrent`
-- Optional header: `x-torrent-filename`
+Uploads are now triggered server-side via `POST /downloads` (or `/api/download`).
 
 ### qBittorrent / system info
 

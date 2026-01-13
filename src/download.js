@@ -219,10 +219,15 @@ export function extractTorrentFileTitles(torrentData) {
   const parsed = parseTorrent(torrentData);
   const files = Array.isArray(parsed?.files) ? parsed.files : [];
 
-  const titles = files
+  const allPaths = files
     .map((f) => String(f?.path || f?.name || ''))
-    .filter(Boolean)
-    .map((p) => path.basename(p));
+    .filter(Boolean);
+
+  // Prefer video files so tv-proc matching is closer to what's actually downloaded.
+  const videoPaths = allPaths.filter(isVideoFile);
+  const picked = videoPaths.length > 0 ? videoPaths : allPaths;
+
+  const titles = picked.map((p) => path.basename(p));
 
   return Array.from(new Set(titles)).filter(Boolean);
 }

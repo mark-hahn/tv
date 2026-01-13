@@ -34,6 +34,19 @@ const appendTvLog = (line) => {
   } catch {}
 };
 
+const logTvEntryAdded = (title, errorMsg) => {
+  try {
+    const t = title ? String(title) : '';
+    if (!t) return;
+    const tsStr = dateStr(Date.now());
+    if (errorMsg) {
+      appendTvLog(`${tsStr} ===> ERROR: ${t} ${String(errorMsg)}\n`);
+    } else {
+      appendTvLog(`${tsStr} ${t}\n`);
+    }
+  } catch {}
+};
+
 const dateStr = (ms) => {
   try {
     const dtf = new Intl.DateTimeFormat('en-US', {
@@ -444,7 +457,16 @@ const addEntry = (entry) => {
 
   const title = e.title ? String(e.title) : '';
   if (!title) return;
+
+  const wasExisting = tvJsonCache.has(title);
   tvJsonCache.set(title, e);
+
+  // Add a tv.log line for every newly-added tv.json entry.
+  if (!wasExisting) {
+    const isError = !!e.error;
+    const errorMsg = isError ? (e.reason || e.status || 'error') : null;
+    logTvEntryAdded(title, errorMsg);
+  }
   flushTvJsonToDisk();
 
   if (workerCount < MAX_WORKERS) {

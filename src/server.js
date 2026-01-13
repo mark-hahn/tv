@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import parseTorrent from 'parse-torrent';
 import * as search from './search.js';
 import * as download from './download.js';
 import { tvdbProxyGet } from './tvdb-proxy.js';
@@ -529,6 +530,34 @@ async function handleDownloadRequest(req, res) {
       if (!valid.success) {
         res.json(valid);
         return;
+      }
+
+      // New pre-check: if the torrent hash is already present in qBittorrent, stop early.
+      let infoHash = '';
+      try {
+        const parsed = parseTorrent(fetched.torrentData);
+        infoHash = String(parsed?.infoHash || '').trim().toLowerCase();
+      } catch (e) {
+        res.json({ success: false, stage: 'parse-torrent-hash', error: e?.message || String(e) });
+        return;
+      }
+
+      if (infoHash) {
+        try {
+          const qbtInfo = await getQbtInfo({ hash: infoHash });
+          const list = Array.isArray(qbtInfo) ? qbtInfo : [];
+          if (list.length > 0) {
+            const existing = list[0] || {};
+            const existingName = String(existing?.name || '').trim();
+            const fallbackTitle = String(torrent?.raw?.title || torrent?.title || torrent?.clientTitle || '').trim();
+            const title = existingName || fallbackTitle || infoHash;
+            res.json({ success: false, stage: 'qbt', error: `QbitTorrent already downloaded ${title}`, hash: infoHash });
+            return;
+          }
+        } catch (e) {
+          res.json({ success: false, stage: 'qbt', error: e?.message || String(e), hash: infoHash });
+          return;
+        }
       }
 
       let titles = [];

@@ -1,0 +1,7 @@
+
+add a new check before the tv-proc check but only when forceDownload:true is not set.
+
+call qBittorrent info api with the torrent hash like you used to do for the call  GET …/api/qbt/info?hash=<hash>
+
+if qBittorrent info shows already in qb condition then return error QbitTorrent already downloaded <title> to the /downloads call and don't do tv-proc check and don't send the torrent.
+

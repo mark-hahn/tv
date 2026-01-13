@@ -500,6 +500,37 @@ export default {
       return provider ? `${titleStr}::${provider}` : titleStr;
     },
 
+    getTorrentHistoryKeys(torrent) {
+      const keys = [];
+      const add = (k) => {
+        const s = String(k || '');
+        if (!s) return;
+        if (!keys.includes(s)) keys.push(s);
+      };
+
+      const hash = this.getTorrentHash(torrent);
+      if (hash) add(hash);
+
+      const titleRaw = torrent?.raw?.title || torrent?.title || '';
+      const titleStr = typeof titleRaw === 'string' ? titleRaw : String(titleRaw || '');
+      const titleTrim = titleStr.trim();
+      const provider = String(torrent?.raw?.provider || '').trim().toLowerCase();
+
+      // Legacy keys (historically stored as-is).
+      if (provider) add(`${titleStr}::${provider}`);
+      add(titleStr);
+
+      // Normalized variants (fixes missing history icons when titles differ only by
+      // punctuation/separators/case/whitespace or when provider field is missing).
+      const norm = this.normalizeQbtNameForMatch(titleTrim);
+      if (provider && norm) add(`${norm}::${provider}`);
+      if (provider && titleTrim) add(`${titleTrim}::${provider}`);
+      if (titleTrim) add(titleTrim);
+      if (norm) add(norm);
+
+      return keys;
+    },
+
     getTorrentNowKey(torrent) {
       // Key used for "downloaded now" highlighting. Must disambiguate identical titles across providers.
       return this.getTorrentHistoryKey(torrent);
@@ -518,22 +549,27 @@ export default {
     },
 
     rememberDownloadedTorrent(torrent) {
-      const key = this.getTorrentHistoryKey(torrent);
-      if (!key) return;
+      const keys = this.getTorrentHistoryKeys(torrent);
+      if (!keys.length) return;
       const now = Date.now();
       const map = (this.downloadedByHash && typeof this.downloadedByHash === 'object') ? this.downloadedByHash : {};
       // Reassign for reliable reactivity.
-      this.downloadedByHash = { ...map, [key]: now };
+      const next = { ...map };
+      for (const k of keys) next[k] = now;
+      this.downloadedByHash = next;
       this.pruneDownloadedHistory();
       this.saveDownloadedHistory();
     },
 
     isDownloadedBefore(torrent) {
-      const key = this.getTorrentHistoryKey(torrent);
-      if (!key) return false;
-      const ts = Number(this.downloadedByHash?.[key]);
-      if (!Number.isFinite(ts)) return false;
-      return ts >= (Date.now() - this.downloadHistoryWindowMs());
+      const keys = this.getTorrentHistoryKeys(torrent);
+      if (!keys.length) return false;
+      const cutoff = Date.now() - this.downloadHistoryWindowMs();
+      for (const k of keys) {
+        const ts = Number(this.downloadedByHash?.[k]);
+        if (Number.isFinite(ts) && ts >= cutoff) return true;
+      }
+      return false;
     },
 
     getDownloadedBeforeIconStyle(torrent) {
@@ -1140,6 +1176,10 @@ export default {
 
       // Ctrl-click should behave like clicking the Get button.
       if (isCtrlClick) {
+        console.log('torrent ctrl-click → enqueueDownload', {
+          title: torrent?.raw?.title || torrent?.title || 'Unknown',
+          provider: torrent?.raw?.provider || 'unknown'
+        });
         void this.enqueueDownload(torrent);
         return;
       }
@@ -1340,100 +1380,7 @@ export default {
       }
     },
 
-    async sha1Hex(arrayBuffer) {
-      const buf = arrayBuffer instanceof ArrayBuffer ? arrayBuffer : arrayBuffer?.buffer;
-      if (!buf || !(buf instanceof ArrayBuffer)) return '';
-      try {
-        const digest = await crypto.subtle.digest('SHA-1', buf);
-        const bytes = new Uint8Array(digest);
-        return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-      } catch {
-        return '';
-      }
-    },
-
-    async computeInfoHashFromTorrentBytes(arrayBuffer) {
-      // Compute infohash = SHA1(bencode(info-dict)) from a .torrent file.
-      // We avoid re-encoding by hashing the original byte slice that represents the info dict.
-      const u8 = new Uint8Array(arrayBuffer);
-      const ascii = (start, end) => {
-        let out = '';
-        for (let i = start; i < end; i++) out += String.fromCharCode(u8[i]);
-        return out;
-      };
-
-      const readInt = (i) => {
-        let j = i;
-        while (j < u8.length && u8[j] !== 0x65 /* 'e' */) j++;
-        if (j >= u8.length) throw new Error('bad int');
-        const n = parseInt(ascii(i, j), 10);
-        if (!Number.isFinite(n)) throw new Error('bad int');
-        return { n, next: j + 1 };
-      };
-
-      const readBytes = (i) => {
-        let j = i;
-        while (j < u8.length && u8[j] >= 0x30 && u8[j] <= 0x39) j++;
-        if (j >= u8.length || u8[j] !== 0x3a /* ':' */) throw new Error('bad bytes');
-        const len = parseInt(ascii(i, j), 10);
-        if (!Number.isFinite(len) || len < 0) throw new Error('bad bytes len');
-        const start = j + 1;
-        const end = start + len;
-        if (end > u8.length) throw new Error('bad bytes range');
-        return { start, end, next: end };
-      };
-
-      const parse = (i) => {
-        const b = u8[i];
-        if (b === 0x69 /* 'i' */) return readInt(i + 1);
-        if (b === 0x6c /* 'l' */) {
-          i++;
-          while (u8[i] !== 0x65 /* 'e' */) {
-            const r = parse(i);
-            i = r.next;
-          }
-          return { next: i + 1 };
-        }
-        if (b === 0x64 /* 'd' */) {
-          i++;
-          while (u8[i] !== 0x65 /* 'e' */) {
-            const k = readBytes(i);
-            i = k.next;
-            const v = parse(i);
-            i = v.next;
-          }
-          return { next: i + 1 };
-        }
-        if (b >= 0x30 && b <= 0x39) return readBytes(i);
-        throw new Error('bad bencode');
-      };
-
-      // Top-level must be a dict.
-      if (u8[0] !== 0x64 /* 'd' */) return '';
-      let i = 1;
-      let infoStart = -1;
-      let infoEnd = -1;
-
-      while (i < u8.length && u8[i] !== 0x65 /* 'e' */) {
-        const keyBytes = readBytes(i);
-        const key = ascii(keyBytes.start, keyBytes.end);
-        i = keyBytes.next;
-
-        if (key === 'info') {
-          infoStart = i;
-          const v = parse(i);
-          infoEnd = v.next;
-          i = v.next;
-        } else {
-          const v = parse(i);
-          i = v.next;
-        }
-      }
-
-      if (infoStart < 0 || infoEnd <= infoStart) return '';
-      const slice = u8.slice(infoStart, infoEnd);
-      return await this.sha1Hex(slice.buffer);
-    },
+    
 
     async processDownloadQueue() {
       if (this.downloadQueueRunning) return;
@@ -1452,11 +1399,7 @@ export default {
             const already = await this.isAlreadyInQbt(existingHash);
             if (already) {
               const torrentTitle = String(torrent?.raw?.title || torrent?.title || 'Unknown');
-              try {
-                window.alert(`QbitTorrent already downloaded the torrent ${torrentTitle}`);
-              } catch {
-                // ignore
-              }
+              this.showError(`QbitTorrent already downloaded the torrent ${torrentTitle}`);
 
               const nowKey = this.getTorrentNowKey(torrent);
               if (nowKey) this.downloadedTorrents.add(nowKey);
@@ -1472,11 +1415,7 @@ export default {
               const alreadyByName = await this.isAlreadyInQbtByName(titleForMatch);
               if (alreadyByName) {
                 const torrentTitle = String(torrent?.raw?.title || torrent?.title || 'Unknown');
-                try {
-                  window.alert(`QbitTorrent already downloaded the torrent ${torrentTitle}`);
-                } catch {
-                  // ignore
-                }
+                this.showError(`QbitTorrent already downloaded the torrent ${torrentTitle}`);
 
                 const nowKey = this.getTorrentNowKey(torrent);
                 if (nowKey) this.downloadedTorrents.add(nowKey);
@@ -1542,127 +1481,141 @@ export default {
               ? 'iptorrents'
               : providerRaw || 'unknown';
 
-        // TL: Use the new direct-binary endpoint (no detail page), then push bytes to USB watch folder.
-        if (provider === 'torrentleech') {
-          const resp = await this.fetchWithTimeout(`${config.torrentsApiUrl}/api/torrentFile`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ torrent })
-          }, 60000);
+        // Prefer /downloads if available.
+        // If it returns a non-empty list, those titles were already downloaded and nothing was sent to qBittorrent.
+        const extractAlreadyDownloadedTitles = (payload) => {
+          if (Array.isArray(payload)) return payload.map(v => String(v)).filter(Boolean);
+          if (!payload || typeof payload !== 'object') return [];
+          const candidates =
+            payload.alreadyDownloaded ||
+            payload.alreadyDownloadedTitles ||
+            payload.downloads ||
+            payload.titles ||
+            payload.already;
+          return Array.isArray(candidates) ? candidates.map(v => String(v)).filter(Boolean) : [];
+        };
 
-          const ct = (resp.headers.get('content-type') || '').toLowerCase();
-          if (ct.includes('application/json')) {
-            const j = await resp.json().catch(() => null);
-            const errorMsg = j?.error || j?.message || 'Unknown error';
-            const isCloudflare = Boolean(j && typeof j === 'object' && (j.isCloudflare || j.stage === 'cloudflare')) ||
-              /cloudflare|just a moment|checking your browser/i.test(String(errorMsg || ''));
+        const formatAlreadyDownloadedDialog = (titles) => {
+          const unique = Array.from(
+            new Set((Array.isArray(titles) ? titles : []).map(t => String(t || '').trim()).filter(Boolean))
+          );
+          return (
+            'No torrents sent to qbitTorrent.  these files have already been downloaded\n\n' +
+            unique.join('\n')
+          );
+        };
 
-            if (isCloudflare) {
-              let popupBlocked = false;
-              if (detailUrl) {
-                try {
-                  const w = window.open(detailUrl, '_blank');
-                  popupBlocked = !w;
-                } catch {
-                  popupBlocked = true;
-                }
-              }
+        let downloadsRes = null;
+        try {
+          const downloadsUrl = `${config.torrentsApiUrl}/downloads`;
+          console.log('downloads request (about to send)', { url: downloadsUrl });
 
-              this.showError(
-                'TorrentLeech blocked the server request with a Cloudflare challenge page ("Just a moment...").\n\n' +
-                (detailUrl
-                  ? (popupBlocked
-                    ? 'Note: Browser blocked the popup tab.\n\n'
-                    : 'Opened the detail page in a new tab.\n\n')
-                  : '') +
-                'Try:\n' +
-                '- Complete any “verify you are human” step in the detail tab.\n' +
-                '- Click Cookies → paste TL cf_clearance → Save Cookies.\n' +
-                '- Ensure req-browser.txt in the torrents server project matches the browser you’re using (DevTools “Copy as cURL (bash)”).\n\n' +
-                (detailUrl ? `Detail URL:\n${detailUrl}` : '')
-              );
-              return { ok: false, message: 'Cloudflare challenge blocked server request' };
-            }
+          const downloadsPayload = provider === 'torrentleech'
+            ? { tl: { torrent } }
+            : { torrent };
 
-            this.showError(errorMsg);
-            return { ok: false, message: errorMsg };
-          }
-
-          if (!resp.ok) {
-            const t = await resp.text().catch(() => '');
-            throw new Error(t || `HTTP ${resp.status}: ${resp.statusText}`);
-          }
-
-          const bytes = await resp.arrayBuffer();
-
-          // TorrentLeech results often don't include magnet/infohash. Compute the infohash from
-          // the .torrent bytes and short-circuit if qBittorrent already has it.
+          let downloadsBody = '';
           try {
-            const infoHash = await this.computeInfoHashFromTorrentBytes(bytes);
-            if (infoHash) {
-              const already = await this.isAlreadyInQbt(infoHash);
-              if (already) {
-                const torrentTitle = String(torrent?.raw?.title || torrent?.title || 'Unknown');
-                try {
-                  window.alert(`QbitTorrent already downloaded the torrent ${torrentTitle}`);
-                } catch {
-                  // ignore
-                }
-                return { ok: true, message: 'Already in qBittorrent' };
-              }
-            }
-          } catch {
-            // ignore; proceed with upload
+            downloadsBody = JSON.stringify(downloadsPayload);
+          } catch (e) {
+            console.log('downloads request JSON stringify failed', {
+              error: e?.message || String(e)
+            });
+            throw e;
           }
 
-          const filename = this.buildTorrentUploadFilename(torrent, torrentTitle);
-          // NOTE: Avoid custom headers here. Browsers will preflight and block if the
-          // torrents API CORS config doesn't allow them (e.g. x-torrent-filename).
-          // If the server cares about filename, pass it as a query param.
-          const uploadUrl = new URL(`${config.torrentsApiUrl}/api/usb/addTorrent`);
-          uploadUrl.searchParams.set('filename', filename);
+          console.log('downloads request body', downloadsBody);
 
-          const upload = await this.fetchWithTimeout(uploadUrl.toString(), {
+          downloadsRes = await this.fetchWithTimeout(downloadsUrl, {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/x-bittorrent'
+              'Content-Type': 'application/json'
             },
-            body: bytes
+            body: downloadsBody
           }, 60000);
-
-          if (!upload.ok) {
-            let detail = '';
-            try {
-              const uct = upload.headers.get('content-type') || '';
-              if (uct.includes('application/json')) {
-                const uj = await upload.json();
-                detail = uj?.error ? String(uj.error) : JSON.stringify(uj);
-              } else {
-                detail = await upload.text();
-              }
-            } catch {
-              // ignore
-            }
-            throw new Error(detail || `USB upload failed: HTTP ${upload.status}: ${upload.statusText}`);
-          }
-
-          const uploadRes = await upload.json().catch(() => ({}));
-          if (uploadRes && typeof uploadRes === 'object') {
-            if (uploadRes.success || uploadRes.result === true) {
-              return { ok: true, message: '' };
-            }
-            const uploadErr = uploadRes?.error || uploadRes?.message;
-            if (uploadErr) {
-              this.showError(uploadErr);
-              return { ok: false, message: String(uploadErr) };
-            }
-          }
-
-          // If the server returned 2xx but no JSON body, assume the file was written.
-          return { ok: true, message: '' };
+        } catch {
+          downloadsRes = null;
         }
 
-        // Non-TL providers: keep the existing server-side pipeline.
+        if (downloadsRes && downloadsRes.ok) {
+          const ct = (downloadsRes.headers.get('content-type') || '').toLowerCase();
+          const payload = ct.includes('application/json')
+            ? await downloadsRes.json().catch(() => null)
+            : await downloadsRes.text().catch(() => '');
+
+          const alreadyTitles = extractAlreadyDownloadedTitles(payload);
+          if (alreadyTitles.length > 0) {
+            this.showError(formatAlreadyDownloadedDialog(alreadyTitles));
+            return { ok: true, message: 'Already downloaded' };
+          }
+
+          // If the endpoint returned an empty array, treat as “no already-downloaded titles”.
+          if (Array.isArray(payload)) {
+            return { ok: true, message: '' };
+          }
+
+          if (payload && typeof payload === 'object') {
+            if (payload.success || payload.result === true) {
+              return { ok: true, message: '' };
+            }
+
+            const errorMsg = payload.error || payload.message;
+            if (errorMsg) {
+              const isCloudflare = Boolean(payload && typeof payload === 'object' && (payload.isCloudflare || payload.stage === 'cloudflare')) ||
+                /cloudflare|just a moment|checking your browser/i.test(String(errorMsg || ''));
+
+              if (isCloudflare && provider === 'iptorrents') {
+                const label = 'IPTorrents';
+                const cookieBox = 'IPT';
+
+                let popupBlocked = false;
+                if (detailUrl) {
+                  try {
+                    const w = window.open(detailUrl, '_blank');
+                    popupBlocked = !w;
+                  } catch {
+                    popupBlocked = true;
+                  }
+                }
+
+                this.showError(
+                  `${label} blocked the server request with a Cloudflare challenge page ("Just a moment...").\n\n` +
+                  (detailUrl
+                    ? (popupBlocked
+                      ? 'Note: Browser blocked the popup tab.\n\n'
+                      : 'Opened the detail page in a new tab.\n\n')
+                    : '') +
+                  'Try:\n' +
+                  `- Complete any “verify you are human” step in the detail tab.\n` +
+                  `- Copy the latest cf_clearance cookie into the ${cookieBox} box and Save, then retry.\n` +
+                  '- If it still fails, Cloudflare is likely fingerprinting requests from this network/IP.\n\n' +
+                  (detailUrl ? `Detail URL:\n${detailUrl}` : '')
+                );
+                return { ok: false, message: 'Cloudflare challenge blocked server request' };
+              }
+
+              this.showError(errorMsg);
+              return { ok: false, message: String(errorMsg) };
+            }
+          }
+          // Unknown successful payload shape; fall back to legacy endpoint.
+        } else if (downloadsRes && downloadsRes.status !== 404) {
+          let detail = '';
+          try {
+            const ct = downloadsRes.headers.get('content-type') || '';
+            if (ct.includes('application/json')) {
+              const j = await downloadsRes.json();
+              detail = j?.error ? String(j.error) : (j?.message ? String(j.message) : JSON.stringify(j));
+            } else {
+              detail = await downloadsRes.text();
+            }
+          } catch {
+            // ignore
+          }
+          throw new Error(detail || `HTTP ${downloadsRes.status}: ${downloadsRes.statusText}`);
+        }
+
+        // Legacy server-side pipeline.
         const response = await this.fetchWithTimeout(`${config.torrentsApiUrl}/api/download`, {
           method: 'POST',
           headers: {

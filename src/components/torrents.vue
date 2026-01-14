@@ -1580,7 +1580,8 @@ export default {
 
           // After checking already-downloaded titles (regardless of deletion), offer to delete any error titles.
           const errorItems = normalizeErrorTitleItems(errorTitlesRaw);
-          if (errorItems.length > 0) {
+          const hadErrorTitles = errorItems.length > 0;
+          if (hadErrorTitles) {
             const titlesForDialog = errorItems.map(x => x.title).filter(Boolean);
             const confirmed = await this.confirmExistingDownloads(
               formatErrorDownloadsDialog(titlesForDialog),
@@ -1600,6 +1601,12 @@ export default {
             if (!ok) {
               // deleteProcids already surfaced the error
             }
+          }
+
+          // If the server returned errorTitles, we've already surfaced them via the dialog.
+          // Avoid also showing a generic error modal like "Download Error" from wrapper.error/message.
+          if (hadErrorTitles) {
+            return { ok: false, message: String(wrapper?.error || wrapper?.message || 'Download Error') };
           }
 
           if (hadAlreadyTitles) {

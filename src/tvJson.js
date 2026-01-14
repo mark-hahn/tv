@@ -148,10 +148,6 @@ const dirWatchers = new Map(); // dirPath -> FSWatcher
 let tvResyncInFlight = false;
 let tvResyncQueued = false;
 
-// Heuristic: unlink followed shortly by add implies rename/move.
-let lastUnlinkAtMs = 0;
-let lastUnlinkDir = '';
-
 const safeExists = (p) => {
   try {
     return fs.existsSync(p);
@@ -218,15 +214,13 @@ const deleteDbEntryForLocalFilePath = (filePath) => {
 
     openDb();
 
-    // NOTE: requested behavior: only delete tv.sqlite row; do not touch other stores.
+    // NOTE: requested behavior: delete only finished non-errored rows in tv.sqlite;
+    // do not touch any other datastore.
     try {
       db.prepare(
-        'DELETE FROM tv_entries WHERE title=? AND (localPath=? OR localPath=? OR localPath=?)'
+        "DELETE FROM tv_entries WHERE title=? AND status='finished' AND (error IS NULL OR error=0) AND (localPath=? OR localPath=? OR localPath=?)"
       ).run(title, localPath1, localPath2, localPath3);
-    } catch {
-      // Fall back to primary-key delete if localPath doesn't match due to legacy formatting.
-      try { stmtDeleteByTitle.run(title); } catch {}
-    }
+    } catch {}
   } catch {}
 };
 
@@ -289,29 +283,30 @@ const ensureWatcherForDir = (dir) => {
     w.on('unlink', (p) => {
       try {
         const fp = String(p || '');
-        lastUnlinkAtMs = Date.now();
-        lastUnlinkDir = '';
-        try { lastUnlinkDir = path.dirname(fp); } catch { lastUnlinkDir = ''; }
         deleteDbEntryForLocalFilePath(fp);
       } catch {}
     });
 
-    w.on('add', (p) => {
+    // Move/rename events: chokidar doesn't emit a high-level rename event, but it
+    // does surface underlying rename/move notifications via `raw`.
+    // We do NOT listen to add/addDir.
+    w.on('raw', (eventName, eventPath, details) => {
       try {
-        const fp = String(p || '');
-        const now = Date.now();
-        let dir2 = '';
-        try { dir2 = path.dirname(fp); } catch { dir2 = ''; }
+        const ev = String(eventName || '').toLowerCase();
+        const det = details && typeof details === 'object' ? details : {};
+        const detEvent = det && det.event != null ? String(det.event).toLowerCase() : '';
+        const p = String(eventPath || '');
 
-        // Heuristic rename/move detection.
-        if (lastUnlinkAtMs && (now - lastUnlinkAtMs) < 2000 && dir2 && dir2 === lastUnlinkDir) {
-          tvResync();
+        // Only handle move/rename.
+        // inotify commonly reports moves/renames as eventName='rename'.
+        if (ev === 'rename' || detEvent.includes('moved') || detEvent.includes('rename')) {
+          // Best-effort: only resync when it pertains to the watched dir.
+          if (!p || p.startsWith(d)) tvResync();
         }
       } catch {}
     });
 
-    // Directory structure changes should resync watchers.
-    w.on('addDir', () => tvResync());
+    // Directory deletes can manifest as unlinkDir; treat as unlink => resync.
     w.on('unlinkDir', () => tvResync());
     w.on('error', () => {});
 
@@ -365,11 +360,10 @@ const tvResync = () => {
       try {
         openDb();
 
-        // Only rows that *should* exist locally are candidates for orphan cleanup.
-        // Avoid deleting queued/waiting rows where the file may not exist yet.
+        // Only delete finished rows (never delete errored entries).
         let rows = [];
         try {
-          rows = db.prepare("SELECT title, localPath, status FROM tv_entries").all();
+          rows = db.prepare("SELECT title, localPath, status, error FROM tv_entries").all();
         } catch {
           rows = [];
         }
@@ -380,10 +374,12 @@ const tvResync = () => {
           const title = r.title != null ? String(r.title) : '';
           const localPath = r.localPath != null ? String(r.localPath) : '';
           const status = r.status != null ? String(r.status) : '';
+          const error = r.error == null ? 0 : Number(r.error);
           if (!title) continue;
 
           // Orphan definition for this resync: finished but missing local file.
           if (status !== 'finished') continue;
+          if (Number.isFinite(error) && error !== 0) continue;
 
           if (!localPath || !path.isAbsolute(localPath)) {
             toDelete.push(title);
@@ -450,7 +446,7 @@ const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
     openDb();
     let rows = [];
     try {
-      rows = db.prepare('SELECT title, usbPath, localPath, status FROM tv_entries').all();
+      rows = db.prepare('SELECT title, usbPath, localPath, status, error FROM tv_entries').all();
     } catch {
       rows = [];
     }
@@ -467,6 +463,12 @@ const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
       const title = r.title != null ? String(r.title) : '';
       if (!title) continue;
 
+      // Only delete finished and non-errored entries.
+      const status = r.status != null ? String(r.status) : '';
+      const error = r.error == null ? 0 : Number(r.error);
+      if (status !== 'finished') continue;
+      if (Number.isFinite(error) && error !== 0) continue;
+
       // USB-dir pruning (existing behavior)
       try {
         const usbDir = normalizeUsbDir(r.usbPath);
@@ -475,10 +477,7 @@ const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
         }
       } catch {}
 
-      // Orphan pruning (new resync behavior): finished but missing local file.
-      const status = r.status != null ? String(r.status) : '';
-      if (status !== 'finished') continue;
-
+      // Orphan pruning: finished but missing local file.
       const localPath = r.localPath != null ? String(r.localPath) : '';
       if (!localPath || !path.isAbsolute(localPath)) {
         orphanFinishedTitles.push(title);
@@ -502,11 +501,6 @@ const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
         }
       });
       tx(toDelete);
-    }
-
-    // Preserve existing prune behavior: missing USB dirs remove inProgress markers.
-    for (const t of missingUsbTitles) {
-      try { removeInProgress(t); } catch {}
     }
 
     // Finish with watcher resync (pass 2).

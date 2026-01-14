@@ -56,6 +56,54 @@ function appendCallsLog({ endpoint, method, ok, result, error }) {
   }
 }
 
+function appendDownloadsRequestLog(reqBody) {
+  try {
+    const outPath = path.resolve(__dirname, '..', 'misc', 'temp.txt');
+    const body = reqBody && typeof reqBody === 'object' ? reqBody : {};
+
+    const hasTl = body.tl != null;
+    const tlBody = hasTl ? body.tl : null;
+    const torrent = hasTl
+      ? (tlBody && typeof tlBody === 'object' && 'torrent' in tlBody ? tlBody.torrent : tlBody)
+      : body.torrent;
+
+    const torrentObj = torrent && typeof torrent === 'object' ? torrent : null;
+    const raw = torrentObj && typeof torrentObj.raw === 'object' ? torrentObj.raw : null;
+
+    const safeStr = (v, max = 240) => {
+      const s = v == null ? '' : String(v);
+      if (s.length <= max) return s;
+      return s.slice(0, max) + `…(+${s.length - max})`;
+    };
+
+    const payload = {
+      ts: new Date().toISOString(),
+      endpoint: '/downloads',
+      hasTl,
+      forceDownload: body.forceDownload === true,
+      topKeys: Object.keys(body || {}).slice(0, 50),
+      tlKeys: tlBody && typeof tlBody === 'object' ? Object.keys(tlBody).slice(0, 50) : null,
+      torrentKeys: torrentObj ? Object.keys(torrentObj).slice(0, 50) : null,
+      torrent: torrentObj
+        ? {
+            provider: torrentObj?.provider || raw?.provider || undefined,
+            rawYear: raw?.year ?? undefined,
+            id: raw?.id ?? torrentObj?.id ?? undefined,
+            fid: raw?.fid ?? undefined,
+            title: safeStr(raw?.title ?? torrentObj?.title ?? torrentObj?.clientTitle ?? ''),
+            filename: safeStr(raw?.filename ?? ''),
+            detailUrl: safeStr(torrentObj?.detailUrl ?? ''),
+            rawKeys: raw ? Object.keys(raw).slice(0, 50) : null,
+          }
+        : null,
+    };
+
+    fs.appendFileSync(outPath, JSON.stringify(payload) + '\n', 'utf8');
+  } catch {
+    // ignore logging failures
+  }
+}
+
 function tvEntryHasError(entry) {
   if (!entry || typeof entry !== 'object') return false;
   if (!('error' in entry)) return false;
@@ -72,6 +120,16 @@ function tvEntryHasError(entry) {
 function tvEntriesErrorTitles(tvEntries) {
   const list = Array.isArray(tvEntries) ? tvEntries : [];
   return list.filter(tvEntryHasError);
+}
+
+function extractYearFromString(s) {
+  const text = String(s || '');
+  const m = text.match(/\b(19\d{2}|20\d{2})\b/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n)) return null;
+  if (n < 1950 || n > 2050) return null;
+  return n;
 }
 
 console.error('[torrents-server] module loaded', {
@@ -532,6 +590,8 @@ async function handleDownloadRequest(req, res) {
     // Temporary: hardwire debug on so we always return/emit extra diagnostics.
     const debug = true;
 
+    appendDownloadsRequestLog(body);
+
     if (debug) {
       console.error('[downloads] request', {
         forceDownload,
@@ -565,6 +625,38 @@ async function handleDownloadRequest(req, res) {
       if (!valid.success) {
         res.json({ ...baseWrapper, ...valid });
         return;
+      }
+
+      // Guardrail: if the request implies a specific year, and the torrent's internal name
+      // includes a conflicting year, refuse to upload (prevents "wrong show" mismatches).
+      try {
+        const expectedYear =
+          (Number.isFinite(Number(torrent?.raw?.year)) ? Number(torrent?.raw?.year) : null) ||
+          extractYearFromString(torrent?.raw?.title || torrent?.title || torrent?.clientTitle);
+
+        if (expectedYear && expectedYear >= 1950 && expectedYear <= 2050) {
+          const parsed = parseTorrent(fetched.torrentData);
+          const parsedName = String(parsed?.name || '').trim();
+          const actualYear = extractYearFromString(parsedName);
+          if (actualYear && actualYear !== expectedYear) {
+            const requestedTitle = String(torrent?.raw?.title || torrent?.title || torrent?.clientTitle || '').trim();
+            res.json({
+              ...baseWrapper,
+              success: false,
+              stage: 'validate-torrent-metadata',
+              error: `Torrent year mismatch (requested ${expectedYear}, torrent says ${actualYear})`,
+              yearError: `${actualYear}|${expectedYear}|${requestedTitle}`,
+              expectedYear,
+              actualYear,
+              torrentName: parsedName || undefined,
+              downloadUrl: fetched?.downloadUrl || undefined,
+              provider: fetched?.provider || undefined,
+            });
+            return;
+          }
+        }
+      } catch {
+        // ignore metadata validation failures
       }
 
       let titles = [];
@@ -694,6 +786,38 @@ async function handleDownloadRequest(req, res) {
     if (!valid.success) {
       res.json({ ...baseWrapper, ...valid });
       return;
+    }
+
+    // Same guardrail in force mode.
+    try {
+      const expectedYear =
+        (Number.isFinite(Number(torrent?.raw?.year)) ? Number(torrent?.raw?.year) : null) ||
+        extractYearFromString(torrent?.raw?.title || torrent?.title || torrent?.clientTitle);
+
+      if (expectedYear && expectedYear >= 1950 && expectedYear <= 2050) {
+        const parsed = parseTorrent(fetched.torrentData);
+        const parsedName = String(parsed?.name || '').trim();
+        const actualYear = extractYearFromString(parsedName);
+        if (actualYear && actualYear !== expectedYear) {
+          const requestedTitle = String(torrent?.raw?.title || torrent?.title || torrent?.clientTitle || '').trim();
+          res.json({
+            ...baseWrapper,
+            success: false,
+            stage: 'validate-torrent-metadata',
+            error: `Torrent year mismatch (requested ${expectedYear}, torrent says ${actualYear})`,
+            yearError: `${actualYear}|${expectedYear}|${requestedTitle}`,
+            expectedYear,
+            actualYear,
+            torrentName: parsedName || undefined,
+            downloadUrl: fetched?.downloadUrl || undefined,
+            provider: fetched?.provider || undefined,
+            debug,
+          });
+          return;
+        }
+      }
+    } catch {
+      // ignore metadata validation failures
     }
 
     let titles = [];

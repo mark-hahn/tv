@@ -13,6 +13,47 @@ const __dirname = path.dirname(__filename);
 const DOWNLOAD_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
+function appendTorrentBytesLog({ provider, method, downloadUrl, torrentData }) {
+  try {
+    const outPath = path.join(__dirname, '..', 'misc', 'temp.txt');
+    const buf = Buffer.isBuffer(torrentData) ? torrentData : Buffer.from(torrentData || []);
+
+    let parsed = null;
+    try {
+      parsed = parseTorrent(buf);
+    } catch {
+      parsed = null;
+    }
+
+    const maxBytes = (() => {
+      const raw = String(process.env.TOR_LOG_TORRENT_MAX_BYTES || '').trim();
+      const n = raw ? Number(raw) : 200_000;
+      return Number.isFinite(n) && n > 0 ? Math.floor(n) : 200_000;
+    })();
+
+    const truncated = buf.length > maxBytes;
+    const slice = truncated ? buf.subarray(0, maxBytes) : buf;
+
+    const payload = {
+      ts: new Date().toISOString(),
+      event: 'torrent-bytes',
+      provider: provider || undefined,
+      method: method || undefined,
+      downloadUrl: downloadUrl || undefined,
+      bytes: buf.length,
+      truncated,
+      loggedBytes: slice.length,
+      infoHash: parsed?.infoHash || undefined,
+      name: parsed?.name || undefined,
+      torrentBase64: slice.toString('base64'),
+    };
+
+    fs.appendFileSync(outPath, JSON.stringify(payload) + '\n', 'utf8');
+  } catch {
+    // ignore logging failures
+  }
+}
+
 function safeCookieNames(cookiePairs) {
   return (cookiePairs || [])
     .map(c => String(c).split('=')[0].trim())
@@ -357,6 +398,9 @@ export async function fetchTorrentFileFromSearchResult(torrent) {
       hasCookies: Boolean(cookieHeader),
     });
   }
+
+  // Debug support: persist the fetched torrent bytes (base64; truncated by TOR_LOG_TORRENT_MAX_BYTES).
+  appendTorrentBytesLog({ provider, method: 'curl', downloadUrl, torrentData: r.stdout });
 
   return ok({
     provider,

@@ -1,0 +1,4 @@
+
+
+If it’s a clear mismatch (like 2023 vs 2012), return new field yearError:"<actual year>|<requested year>|requested title>" and do not send it to qBittorrent.
+

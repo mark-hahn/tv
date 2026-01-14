@@ -1100,7 +1100,7 @@
       }
 
       // Handle /deleteProcids endpoint
-      // POST body: { existingTitles: [...], existingProcids: [...] }
+      // POST body: { procIds: [...] } (legacy alias: existingProcids)
       // Returns: { status: 'ok' } OR { status: 'error', error: '...' }
       if (pathname === '/deleteProcids') {
         if (req.method === 'POST') {
@@ -1110,9 +1110,9 @@
             }
             try {
               var payload = body ? JSON.parse(body) : {};
-              var procids = payload && payload.existingProcids ? payload.existingProcids : [];
+              var procids = payload && payload.procIds ? payload.procIds : (payload && payload.existingProcids ? payload.existingProcids : []);
               if (!Array.isArray(procids)) {
-                return json(res, 400, {status: 'error', error: 'existingProcids must be an array'});
+                return json(res, 400, {status: 'error', error: 'procIds must be an array'});
               }
               if (!tvJson.deleteProcids) {
                 return json(res, 500, {status: 'error', error: 'deleteProcids not supported'});

@@ -1389,7 +1389,13 @@
         ).toString();
         var dirs = dirsOut.split('\n').map((s) => String(s || '').trim()).filter((s) => s.length);
         var set = new Set(dirs);
-        tvJson.pruneMissingUsbDirs(set);
+        // Hourly prune: also run tvResync (and combine DB scans when available).
+        if (tvJson.hourlyUsbPruneAndTvResync) {
+          tvJson.hourlyUsbPruneAndTvResync(set);
+        } else {
+          tvJson.pruneMissingUsbDirs(set);
+          if (tvJson.tvResync) tvJson.tvResync();
+        }
       } catch (e) {
         // Non-fatal.
       }

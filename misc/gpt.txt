@@ -1,1 +1,8 @@
 
+don't monitor addDir or add file events.  only handle unlink, move, or rename events. tvResync should only  delete entries.
+
+we should only delete finished or errored tv.sqlite entries.
+
+whenever an entry changes to finished or errored then check the local file path and delete the entry if file is missing - in other words let progress complete before checking for deletion.
+
+

@@ -8,7 +8,9 @@
 const fs = require('fs');
 const path = require('path');
 const { Worker } = require('worker_threads');
+const { execFile } = require('child_process');
 const Database = require('better-sqlite3');
+const chokidar = require('chokidar');
 
 const BASEDIR = path.join(__dirname, '..');
 const DATA_DIR = path.join(BASEDIR, 'data');
@@ -20,6 +22,11 @@ const TV_JSON_PATH = path.join(DATA_DIR, 'tv.json');
 const TV_FINISHED_PATH = path.join(DATA_DIR, 'tv-finished.json');
 const TV_INPROGRESS_PATH = path.join(DATA_DIR, 'tv-inProgress.json');
 const TV_LOG_PATH = path.join(BASEDIR, 'misc', 'tv.log');
+
+const TV_DB_BACKUP_PATH = path.join(DATA_DIR, 'tv.sqlite.backup');
+
+// Local TV library root for watcher assignment.
+const TV_ROOT = '/mnt/media/tv';
 
 const WORKER_SCRIPT = path.join(__dirname, 'worker.js');
 
@@ -132,6 +139,416 @@ let stmtGetDownloads = null;
 let stmtGetTitles = null;
 
 const unixNow = () => Math.floor(Date.now() / 1000);
+
+// ---- tvResync + chokidar watchers -----------------------------------------
+
+// One chokidar watcher per directory under TV_ROOT.
+const dirWatchers = new Map(); // dirPath -> FSWatcher
+
+let tvResyncInFlight = false;
+let tvResyncQueued = false;
+
+// Heuristic: unlink followed shortly by add implies rename/move.
+let lastUnlinkAtMs = 0;
+let lastUnlinkDir = '';
+
+const safeExists = (p) => {
+  try {
+    return fs.existsSync(p);
+  } catch {
+    return false;
+  }
+};
+
+const safeIsDir = (p) => {
+  try {
+    const st = fs.statSync(p);
+    return !!(st && st.isDirectory());
+  } catch {
+    return false;
+  }
+};
+
+const toPstParts = (ms) => {
+  try {
+    const dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: PST_TZ,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+    const parts = dtf.formatToParts(new Date(ms));
+    const m = {};
+    for (const p of parts) {
+      if (p && p.type && p.value) m[p.type] = p.value;
+    }
+    return {
+      ymd: `${m.year}-${m.month}-${m.day}`,
+      hm: `${m.hour}:${m.minute}`,
+    };
+  } catch {
+    const d = new Date(ms);
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const da = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return { ymd: `${y}-${mo}-${da}`, hm: `${hh}:${mm}` };
+  }
+};
+
+const deleteDbEntryForLocalFilePath = (filePath) => {
+  try {
+    const fp = String(filePath || '');
+    if (!fp || !path.isAbsolute(fp)) return;
+
+    // Derive (localPath, title) from the filesystem event.
+    const title = path.basename(fp);
+    const dir = path.dirname(fp);
+    if (!title || !dir) return;
+
+    const localPath1 = dir;
+    const localPath2 = dir.endsWith(path.sep) ? dir : (dir + path.sep);
+    const localPath3 = localPath2.replace(/\/+$/g, '/')
+      .replace(/\\+$/g, path.sep);
+
+    openDb();
+
+    // NOTE: requested behavior: only delete tv.sqlite row; do not touch other stores.
+    try {
+      db.prepare(
+        'DELETE FROM tv_entries WHERE title=? AND (localPath=? OR localPath=? OR localPath=?)'
+      ).run(title, localPath1, localPath2, localPath3);
+    } catch {
+      // Fall back to primary-key delete if localPath doesn't match due to legacy formatting.
+      try { stmtDeleteByTitle.run(title); } catch {}
+    }
+  } catch {}
+};
+
+const walkDirectories = (rootDir) => {
+  const out = [];
+  try {
+    const root = String(rootDir || '');
+    if (!root) return out;
+    if (!safeIsDir(root)) return out;
+
+    const stack = [root];
+    const seen = new Set();
+    const MAX_DIRS = 200000;
+
+    while (stack.length) {
+      const dir = stack.pop();
+      if (!dir || seen.has(dir)) continue;
+      seen.add(dir);
+      out.push(dir);
+      if (out.length >= MAX_DIRS) break;
+
+      let ents;
+      try {
+        ents = fs.readdirSync(dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+
+      for (const ent of ents) {
+        if (!ent || !ent.isDirectory()) continue;
+        const name = ent.name != null ? String(ent.name) : '';
+        if (!name) continue;
+        // Avoid pathological recursion; keep it simple.
+        if (name === '.' || name === '..') continue;
+        const child = path.join(dir, name);
+        stack.push(child);
+      }
+    }
+
+    return out;
+  } catch {
+    return out;
+  }
+};
+
+const ensureWatcherForDir = (dir) => {
+  const d = String(dir || '');
+  if (!d) return false;
+  if (dirWatchers.has(d)) return false;
+  if (!safeIsDir(d)) return false;
+
+  try {
+    const w = chokidar.watch(d, {
+      persistent: true,
+      ignoreInitial: true,
+      depth: 0,
+      awaitWriteFinish: false,
+    });
+
+    w.on('unlink', (p) => {
+      try {
+        const fp = String(p || '');
+        lastUnlinkAtMs = Date.now();
+        lastUnlinkDir = '';
+        try { lastUnlinkDir = path.dirname(fp); } catch { lastUnlinkDir = ''; }
+        deleteDbEntryForLocalFilePath(fp);
+      } catch {}
+    });
+
+    w.on('add', (p) => {
+      try {
+        const fp = String(p || '');
+        const now = Date.now();
+        let dir2 = '';
+        try { dir2 = path.dirname(fp); } catch { dir2 = ''; }
+
+        // Heuristic rename/move detection.
+        if (lastUnlinkAtMs && (now - lastUnlinkAtMs) < 2000 && dir2 && dir2 === lastUnlinkDir) {
+          tvResync();
+        }
+      } catch {}
+    });
+
+    // Directory structure changes should resync watchers.
+    w.on('addDir', () => tvResync());
+    w.on('unlinkDir', () => tvResync());
+    w.on('error', () => {});
+
+    dirWatchers.set(d, w);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const ensureTvRootWatchers = () => {
+  const result = { ok: true, watched: 0, added: 0, removed: 0 };
+  try {
+    const dirs = walkDirectories(TV_ROOT);
+    const set = new Set(dirs);
+
+    for (const d of dirs) {
+      if (!dirWatchers.has(d)) {
+        const added = ensureWatcherForDir(d);
+        if (added) result.added++;
+      }
+    }
+
+    // Drop watchers for directories that no longer exist.
+    for (const [d, w] of dirWatchers.entries()) {
+      if (set.has(d)) continue;
+      try { w.close(); } catch {}
+      dirWatchers.delete(d);
+      result.removed++;
+    }
+
+    result.watched = dirWatchers.size;
+    return result;
+  } catch (e) {
+    result.ok = false;
+    return result;
+  }
+};
+
+// First pass: delete orphaned finished rows whose localPath/title file is missing.
+// Second pass: ensure all directories under TV_ROOT have watchers.
+const tvResync = () => {
+  try {
+    if (tvResyncInFlight) {
+      tvResyncQueued = true;
+      return;
+    }
+    tvResyncInFlight = true;
+
+    setImmediate(() => {
+      try {
+        openDb();
+
+        // Only rows that *should* exist locally are candidates for orphan cleanup.
+        // Avoid deleting queued/waiting rows where the file may not exist yet.
+        let rows = [];
+        try {
+          rows = db.prepare("SELECT title, localPath, status FROM tv_entries").all();
+        } catch {
+          rows = [];
+        }
+
+        const toDelete = [];
+        for (const r of rows) {
+          if (!r) continue;
+          const title = r.title != null ? String(r.title) : '';
+          const localPath = r.localPath != null ? String(r.localPath) : '';
+          const status = r.status != null ? String(r.status) : '';
+          if (!title) continue;
+
+          // Orphan definition for this resync: finished but missing local file.
+          if (status !== 'finished') continue;
+
+          if (!localPath || !path.isAbsolute(localPath)) {
+            toDelete.push(title);
+            continue;
+          }
+          if (path.isAbsolute(title) || title.includes('\0') || title.includes('..')) {
+            toDelete.push(title);
+            continue;
+          }
+
+          const filePath = path.resolve(localPath, title);
+          if (!safeExists(filePath)) {
+            toDelete.push(title);
+          }
+        }
+
+        if (toDelete.length) {
+          const tx = db.transaction((titles) => {
+            for (const t of titles) {
+              try { stmtDeleteByTitle.run(t); } catch {}
+            }
+          });
+          tx(toDelete);
+        }
+
+        // Pass 2: ensure watchers for all TV_ROOT directories.
+        try {
+          ensureTvRootWatchers();
+        } catch {}
+      } finally {
+        tvResyncInFlight = false;
+        if (tvResyncQueued) {
+          tvResyncQueued = false;
+          tvResync();
+        }
+      }
+    });
+  } catch {
+    tvResyncInFlight = false;
+  }
+};
+
+// Hourly prune hook: combine missing USB-dir pruning with orphan local-file pruning.
+// existingUsbDirs: Set of relative directory paths under "files/" on the usbHost.
+const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
+  try {
+    if (!existingUsbDirs || typeof existingUsbDirs.has !== 'function') {
+      tvResync();
+      return;
+    }
+
+    const normalizeUsbDir = (usbPath) => {
+      let p = String(usbPath || '');
+      p = p.replace(/^~\//, '');
+      p = p.replace(/^\/+/, '');
+      if (p.startsWith('files/')) p = p.slice('files/'.length);
+      if (p.startsWith('~/files/')) p = p.slice('~/files/'.length);
+      p = p.replace(/^files\//, '');
+      p = p.replace(/^\.\/?/, '');
+      p = p.replace(/\/+$/g, '');
+      return p;
+    };
+
+    openDb();
+    let rows = [];
+    try {
+      rows = db.prepare('SELECT title, usbPath, localPath, status FROM tv_entries').all();
+    } catch {
+      rows = [];
+    }
+    if (!Array.isArray(rows) || !rows.length) {
+      tvResync();
+      return;
+    }
+
+    const missingUsbTitles = [];
+    const orphanFinishedTitles = [];
+
+    for (const r of rows) {
+      if (!r) continue;
+      const title = r.title != null ? String(r.title) : '';
+      if (!title) continue;
+
+      // USB-dir pruning (existing behavior)
+      try {
+        const usbDir = normalizeUsbDir(r.usbPath);
+        if (usbDir && !existingUsbDirs.has(usbDir)) {
+          missingUsbTitles.push(title);
+        }
+      } catch {}
+
+      // Orphan pruning (new resync behavior): finished but missing local file.
+      const status = r.status != null ? String(r.status) : '';
+      if (status !== 'finished') continue;
+
+      const localPath = r.localPath != null ? String(r.localPath) : '';
+      if (!localPath || !path.isAbsolute(localPath)) {
+        orphanFinishedTitles.push(title);
+        continue;
+      }
+      if (path.isAbsolute(title) || title.includes('\0') || title.includes('..')) {
+        orphanFinishedTitles.push(title);
+        continue;
+      }
+      const filePath = path.resolve(localPath, title);
+      if (!safeExists(filePath)) {
+        orphanFinishedTitles.push(title);
+      }
+    }
+
+    const toDelete = Array.from(new Set([...missingUsbTitles, ...orphanFinishedTitles]));
+    if (toDelete.length) {
+      const tx = db.transaction((titles) => {
+        for (const t of titles) {
+          try { stmtDeleteByTitle.run(t); } catch {}
+        }
+      });
+      tx(toDelete);
+    }
+
+    // Preserve existing prune behavior: missing USB dirs remove inProgress markers.
+    for (const t of missingUsbTitles) {
+      try { removeInProgress(t); } catch {}
+    }
+
+    // Finish with watcher resync (pass 2).
+    try {
+      ensureTvRootWatchers();
+    } catch {}
+  } catch {
+    tvResync();
+  }
+};
+
+// Scheduled SQLite backup at 05:30, 11:30, 17:30, 23:30 PST.
+let lastBackupKey = '';
+const backupTimes = new Set(['05:30', '11:30', '17:30', '23:30']);
+
+const runSqliteBackup = () => {
+  try {
+    ensureDataDir();
+    // Use sqlite3 CLI so backup is consistent even with WAL.
+    execFile(
+      'sqlite3',
+      [TV_DB_PATH, `.backup '${TV_DB_BACKUP_PATH}'`],
+      { timeout: 5 * 60 * 1000 },
+      () => {}
+    );
+  } catch {}
+};
+
+const startBackupScheduler = () => {
+  try {
+    setInterval(() => {
+      try {
+        const { ymd, hm } = toPstParts(Date.now());
+        if (!backupTimes.has(hm)) return;
+        const key = `${ymd} ${hm}`;
+        if (key === lastBackupKey) return;
+        lastBackupKey = key;
+        runSqliteBackup();
+      } catch {}
+    }, 20 * 1000);
+  } catch {}
+};
 
 const ensureDataDir = () => {
   try {
@@ -618,6 +1035,14 @@ const startWorkerForTitle = (title) => {
 // Initialize on module load.
 loadOnStart();
 
+// On module load, run a resync (DB orphan cleanup + watcher assignment) and start backup schedule.
+try {
+  tvResync();
+} catch {}
+try {
+  startBackupScheduler();
+} catch {}
+
 // ---- exports ---------------------------------------------------------------
 
 const addEntry = (entry) => {
@@ -942,6 +1367,8 @@ module.exports = {
   getDownloads,
   markError,
   pruneMissingUsbDirs,
+  tvResync,
+  hourlyUsbPruneAndTvResync,
   getTitlesMap,
   checkFiles,
   deleteProcids,

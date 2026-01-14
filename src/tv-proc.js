@@ -12,7 +12,8 @@ function normalizeTitles(titles) {
  *
  * POST {baseUrl}/checkFiles
  * Body: JSON array of strings
- * Response: JSON array of strings (the already-downloaded subset)
+ * Response (legacy): JSON array of strings (the already-downloaded subset)
+ * Response (current): { existingTitles: string[], existingProcids: any[], tvEntries?: any[] }
  */
 export async function checkFiles(titles, { baseUrl, timeoutMs = 5000 } = {}) {
   const list = normalizeTitles(titles);
@@ -48,7 +49,7 @@ export async function checkFiles(titles, { baseUrl, timeoutMs = 5000 } = {}) {
 
     // Back-compat: old tv-proc returned a raw array of titles.
     if (Array.isArray(data)) {
-      return { existingTitles: data.map((t) => String(t)), existingProcids: [] };
+      return { existingTitles: data.map((t) => String(t)), existingProcids: [], tvEntries: [] };
     }
 
     // New shape: { existingTitles: string[], existingProcids: any[] }
@@ -58,7 +59,8 @@ export async function checkFiles(titles, { baseUrl, timeoutMs = 5000 } = {}) {
 
     const existingTitles = Array.isArray(data.existingTitles) ? data.existingTitles.map((t) => String(t)) : [];
     const existingProcids = Array.isArray(data.existingProcids) ? data.existingProcids : [];
-    return { existingTitles, existingProcids };
+    const tvEntries = Array.isArray(data.tvEntries) ? data.tvEntries : [];
+    return { existingTitles, existingProcids, tvEntries };
   } finally {
     clearTimeout(timer);
   }

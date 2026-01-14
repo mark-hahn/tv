@@ -56,6 +56,46 @@ function appendCallsLog({ endpoint, method, ok, result, error }) {
   }
 }
 
+function tvEntryHasError(entry) {
+  if (!entry || typeof entry !== 'object') return false;
+  if (!('error' in entry)) return false;
+  const v = entry.error;
+  if (v === null || v === undefined) return false;
+  if (typeof v === 'number') return v !== 0;
+  if (typeof v === 'string') {
+    const s = v.trim();
+    return Boolean(s) && s !== '0';
+  }
+  return v !== 0 && v !== false;
+}
+
+function tvEntryTitle(entry) {
+  if (!entry || typeof entry !== 'object') return '';
+  const candidates = [entry.title, entry.name, entry.filename, entry.file, entry.path];
+  for (const c of candidates) {
+    if (typeof c === 'string') {
+      const s = c.trim();
+      if (s) return s;
+    }
+  }
+  return '';
+}
+
+function tvEntriesErrorTitles(tvEntries) {
+  const list = Array.isArray(tvEntries) ? tvEntries : [];
+  const out = [];
+  const seen = new Set();
+  for (const entry of list) {
+    if (!tvEntryHasError(entry)) continue;
+    const t = tvEntryTitle(entry);
+    if (!t) continue;
+    if (seen.has(t)) continue;
+    seen.add(t);
+    out.push(t);
+  }
+  return out;
+}
+
 console.error('[torrents-server] module loaded', {
   ts: new Date().toISOString(),
   cwd: process.cwd(),
@@ -524,7 +564,7 @@ async function handleDownloadRequest(req, res) {
     }
 
     // Standard wrapper shape returned to the client.
-    const baseWrapper = { existingTitles: [], existingProcids: [] };
+    const baseWrapper = { existingTitles: [], existingProcids: [], tvEntries: [], errorTitles: [] };
 
     if (!torrent) {
       res.status(400).json({ ...baseWrapper, success: false, stage: 'validate', error: 'Torrent data is required' });
@@ -570,8 +610,9 @@ async function handleDownloadRequest(req, res) {
 
       // If any file titles are already present, do NOT send to qBittorrent.
       const existingTitles = Array.isArray(tvProcResult?.existingTitles) ? tvProcResult.existingTitles : [];
-      if (existingTitles.length > 0) {
-        res.json(tvProcResult);
+      const errorTitles = tvEntriesErrorTitles(tvProcResult?.tvEntries);
+      if (existingTitles.length > 0 || errorTitles.length > 0) {
+        res.json(errorTitles.length > 0 ? { ...tvProcResult, errorTitles } : tvProcResult);
         return;
       }
 
@@ -699,8 +740,9 @@ async function handleDownloadRequest(req, res) {
 
     // If any file titles are already present, do NOT send to qBittorrent.
     const existingTitles = Array.isArray(tvProcResult?.existingTitles) ? tvProcResult.existingTitles : [];
-    if (existingTitles.length > 0) {
-      res.json(tvProcResult);
+    const errorTitles = tvEntriesErrorTitles(tvProcResult?.tvEntries);
+    if (existingTitles.length > 0 || errorTitles.length > 0) {
+      res.json(errorTitles.length > 0 ? { ...tvProcResult, errorTitles } : tvProcResult);
       return;
     }
 

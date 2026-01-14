@@ -330,8 +330,13 @@ const updateEntryByProcId = (entry) => {
   try {
     const info = stmtUpdateByProcId.run(v);
     if (!info || info.changes === 0) {
-      // If procId not found, fall back to title upsert.
-      upsertEntry(entry);
+      // If procId not found, only fall back to title upsert when the title
+      // already exists (procId mismatch). Do NOT insert a new row here; that
+      // can resurrect rows intentionally deleted via /deleteProcids.
+      try {
+        const existing = stmtGetByTitle.get(v.title);
+        if (existing) upsertEntry(entry);
+      } catch {}
     }
   } catch {
     upsertEntry(entry);
@@ -857,7 +862,8 @@ const deleteProcids = (procIds) => {
 
       // Remove DB row.
       try {
-        stmtDeleteByProcId.run(pid);
+        // title is the primary key; delete by title to avoid procId races.
+        stmtDeleteByTitle.run(title);
       } catch (e) {
         result.ok = false;
         result.errors.push({ procId: pid, title, error: (e && e.message) ? String(e.message) : 'db delete failed' });

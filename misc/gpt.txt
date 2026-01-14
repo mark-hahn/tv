@@ -1,6 +1,1 @@
 
-- change the return value from /checkFiles to a wrapper object with the prop existingTitles:<array returned before> and a prop existingProcids:<existing procids>
-
-- add an endpoint deleteProcids(<same wrapper object>) that deletes all local files referenced in the tv.sqlite entries for the existingProcids:<existing procids>.  then delete the matching tv.sqlite entries.
-
-- return ok or error object

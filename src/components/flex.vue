@@ -21,6 +21,52 @@
 import evtBus from '../evtBus.js';
 import { config } from '../config.js';
 
+const FLEX_DISPLAY_TIME_ZONE = 'America/Los_Angeles';
+// USB server is in the Netherlands and emits legacy timestamps without TZ info.
+// Treat those naive timestamps as Europe/Amsterdam so we don't drift by +1 hour.
+const FLEX_SERVER_TIME_ZONE = 'Europe/Amsterdam';
+
+function getTimeZoneOffsetMs(timeZone, date) {
+  // Returns: (wall-clock time in `timeZone` interpreted as UTC) - (actual epoch).
+  // Example: if `timeZone` is UTC+1 at that instant, this returns +3600000.
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    hourCycle: 'h23'
+  }).formatToParts(date);
+
+  const get = (type) => parts.find(p => p.type === type)?.value || '';
+  const y = Number(get('year'));
+  const m = Number(get('month'));
+  const d = Number(get('day'));
+  const hh = Number(get('hour'));
+  const mm = Number(get('minute'));
+  const ss = Number(get('second'));
+
+  if (![y, m, d, hh, mm, ss].every(Number.isFinite)) return 0;
+  const asUTC = Date.UTC(y, m - 1, d, hh, mm, ss);
+  return asUTC - date.getTime();
+}
+
+function zonedTimeToUtcMs(timeZone, year, monthIdx, day, hh, mm, ss) {
+  // Converts a wall-clock time in `timeZone` into a UTC epoch ms.
+  // Iterates to account for DST.
+  let utcGuess = Date.UTC(year, monthIdx, day, hh, mm, ss);
+  for (let i = 0; i < 3; i++) {
+    const offset = getTimeZoneOffsetMs(timeZone, new Date(utcGuess));
+    const next = Date.UTC(year, monthIdx, day, hh, mm, ss) - offset;
+    if (Math.abs(next - utcGuess) < 1000) return next;
+    utcGuess = next;
+  }
+  return utcGuess;
+}
+
 function splitCells(line) {
   return String(line || '')
     .split(/[│|]/)
@@ -32,12 +78,13 @@ function fmtPacificMmDd_HhMm(date) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
   try {
     const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/Los_Angeles',
+      timeZone: FLEX_DISPLAY_TIME_ZONE,
       month: 'numeric',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      hour12: false
+      hour12: false,
+      hourCycle: 'h23'
     }).formatToParts(date);
 
     const get = (type) => parts.find(p => p.type === type)?.value || '';
@@ -70,9 +117,8 @@ function fmtFlexgetTime(raw) {
     }
   }
 
-  // 2) Legacy format from flexget: "Tue Dec 16 05:25:08 2025" (UTC)
-  // Flexget's legacy format doesn't include TZ, but the server emits it as UTC.
-  // Convert UTC -> Pacific (PST/PDT) for display.
+  // 2) Legacy format from flexget: "Tue Dec 16 05:25:08 2025" (no TZ)
+  // Server emits this without TZ info; interpret it as Netherlands local time.
   const parts = txt.split(/\s+/);
   if (parts.length >= 5) {
     const monStr = parts[1];
@@ -97,7 +143,15 @@ function fmtFlexgetTime(raw) {
       Number.isFinite(hh) &&
       Number.isFinite(mm)
     ) {
-      const utcMs = Date.UTC(year, monthIdx, day, hh, mm, Number.isFinite(ss) ? ss : 0);
+      const utcMs = zonedTimeToUtcMs(
+        FLEX_SERVER_TIME_ZONE,
+        year,
+        monthIdx,
+        day,
+        hh,
+        mm,
+        Number.isFinite(ss) ? ss : 0
+      );
       return fmtPacificMmDd_HhMm(new Date(utcMs));
     }
   }

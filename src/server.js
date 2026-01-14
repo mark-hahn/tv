@@ -605,7 +605,7 @@ async function handleDownloadRequest(req, res) {
       return;
     }
 
-    // Force mode: skip tv-proc; still validate torrent file naming.
+    // Force mode: still run tv-proc; skip only the qBittorrent hash pre-check.
     const fetched = await download.fetchTorrentFile(torrent);
     if (!fetched || typeof fetched !== 'object') {
       res.json({ ...baseWrapper, success: false, stage: 'fetch-torrent', error: 'Unexpected fetchTorrentFile result' });
@@ -622,15 +622,42 @@ async function handleDownloadRequest(req, res) {
       return;
     }
 
+    let titles = [];
+    try {
+      titles = download.extractTorrentFileTitles(fetched.torrentData);
+    } catch (e) {
+      res.json({ ...baseWrapper, success: false, stage: 'parse-torrent', error: e?.message || String(e) });
+      return;
+    }
+
+    let tvProcResult = baseWrapper;
+    try {
+      appendCallsLog({ endpoint: 'tv-proc:/checkFiles request', method: 'POST', ok: true, result: titles });
+      tvProcResult = await tvProcCheckFiles(titles);
+      appendCallsLog({ endpoint: 'tv-proc:/checkFiles response', method: 'POST', ok: true, result: tvProcResult });
+    } catch (e) {
+      appendCallsLog({ endpoint: 'tv-proc:/checkFiles', method: 'POST', ok: false, result: null, error: e });
+      // Don't upload if tv-proc fails.
+      res.json({ ...baseWrapper, success: false, stage: 'tv-proc', error: e?.message || String(e) });
+      return;
+    }
+
+    // If any file titles are already present, do NOT send to qBittorrent.
+    const existingTitles = Array.isArray(tvProcResult?.existingTitles) ? tvProcResult.existingTitles : [];
+    if (existingTitles.length > 0) {
+      res.json(tvProcResult);
+      return;
+    }
+
     const hint = torrent?.raw?.filename || torrent?.raw?.title || 'download.torrent';
     const uploaded = await download.uploadTorrentToWatchFolder(fetched.torrentData, hint);
     if (!uploaded.success) {
-      res.json({ ...baseWrapper, ...uploaded });
+      res.json({ ...tvProcResult, ...uploaded });
       return;
     }
 
     res.json({
-      ...baseWrapper,
+      ...tvProcResult,
       success: true,
       provider: fetched.provider,
       method: fetched.method,

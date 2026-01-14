@@ -3,7 +3,7 @@
 Small HTTPS JSON API for:
 
 - Searching private torrent sites (IPTorrents, TorrentLeech)
-- Fetching/downloading `.torrent` files and optionally uploading them to a remote qBittorrent watch folder
+- Fetching/downloading `.torrent` files and adding them to qBittorrent
 - A few helper/proxy endpoints used by the TV UI (TVDB proxy, OpenSubtitles search, “reel”/Reelgood workflow)
 
 This repo is intended to run locally behind nginx (nginx sets the CORS headers).
@@ -12,7 +12,7 @@ This repo is intended to run locally behind nginx (nginx sets the CORS headers).
 
 - Node.js 18+ (uses built-in `fetch`)
 - `curl` available on the host (used to fetch `.torrent` files)
-- If you use the remote-watch-folder feature: SSH/SFTP access to the remote box
+- qBittorrent Web UI reachable from this server (uses `cookies/qbt-cred.txt`)
 
 ## Install
 
@@ -64,24 +64,6 @@ These are Playwright-style cookie JSON arrays (each cookie has `{name,value,...}
 Optional Cloudflare bypass values (written by the `/api/cf_clearance` endpoint):
 
 - `cookies/cf-clearance.local.json`
-
-### Remote watch folder / SFTP upload
-
-`/downloads` and related helpers use:
-
-- `cookies/download-cred.txt`
-
-Format is `KEY=VALUE` lines. Required keys:
-
-- `SFTP_PASS`
-- Either (`SFTP_HOST` + `SFTP_USER`) **or** `SSH_TARGET` (as `user@host`)
-
-Optional keys:
-
-- `SFTP_PORT` (default 22)
-- `REMOTE_WATCH_DIR` (default `/home/<user>/watch/qbittorrent`)
-
-See `cookies/download-cred.template.txt` for a starter template.
 
 ### qBittorrent Web UI creds (and SSH target)
 
@@ -175,9 +157,9 @@ Search stages/counts and filter reasons are appended to `tor-results.txt` in the
 - `POST /api/download` (or `/downloads`) – Higher-level download flow.
   - IPT-style: JSON body `{ torrent, forceDownload?: true }`
   - TorrentLeech-style: JSON body `{ tl: { torrent: ... } }` (or `{ tl: <torrent> }`)
-  - If `forceDownload:true` is **not** provided, the server fetches the `.torrent`, validates it, extracts file titles, calls `POST http://localhost:3003/checkFiles`, and **skips** the qBittorrent upload when any titles were already downloaded. In this mode it returns the tv-proc response array.
-  - Before calling tv-proc, it also checks qBittorrent for an existing torrent with the same infohash and returns an error if found.
-  - If `forceDownload:true` is provided, it skips the qBittorrent hash pre-check but still calls tv-proc (still validates torrent naming).
+  - The server fetches the `.torrent`, validates it, extracts file titles, calls `POST http://localhost:3003/checkFiles`, and **skips** the qBittorrent add when any titles were already downloaded.
+  - If tv-proc says nothing exists, the server adds the torrent via qBittorrent WebUI `torrents/add` (duplicates are rejected by qBittorrent).
+  - `forceDownload:true` does not bypass tv-proc; it still blocks upload if tv-proc reports existing titles (and it returns additional metadata on success).
 
 #### `/downloads` response shape
 
@@ -190,9 +172,9 @@ Search stages/counts and filter reasons are appended to `tor-results.txt` in the
 - `existingTitles.length > 0` means "already downloaded" and upload is skipped.
 - On force mode or error responses, the same wrapper object is returned with extra fields like `success`, `stage`, `error`, etc.
 
-### Upload `.torrent` to remote watch folder
+### Upload `.torrent` to qBittorrent
 
-Uploads are now triggered server-side via `POST /downloads` (or `/api/download`).
+Uploads are triggered server-side via `POST /downloads` (or `/api/download`).
 
 ### qBittorrent / system info
 

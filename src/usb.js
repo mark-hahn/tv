@@ -672,3 +672,57 @@ export async function delQbtTorrent(input) {
   // qB often returns empty body or "Ok."; ignore content.
   return { ok: true, hashes: hashesArr };
 }
+
+/**
+ * Add a .torrent to qBittorrent via WebUI API `/api/v2/torrents/add`.
+ *
+ * This is deterministic with respect to duplicates: qBittorrent will refuse
+ * duplicate torrents (same infohash).
+ *
+ * @param {{ torrentData: Buffer, filename?: string, tags?: string | string[] }} input
+ * @returns {Promise<{ ok: boolean, status: number, text: string }>} result
+ */
+export async function addQbtTorrent(input) {
+  const torrentData = input?.torrentData;
+  if (!Buffer.isBuffer(torrentData) || torrentData.length === 0) {
+    throw new Error('addQbtTorrent requires torrentData Buffer');
+  }
+
+  const filenameRaw = String(input?.filename || 'download.torrent').trim() || 'download.torrent';
+  const filename = filenameRaw.replace(/[\\/]+/g, '_');
+
+  const tagsValue = input?.tags;
+  const tags = Array.isArray(tagsValue)
+    ? tagsValue.map(String).map(s => s.trim()).filter(Boolean).join(',')
+    : String(tagsValue ?? '').trim();
+
+  const { qbHost, qbPort, qbUser, qbPass } = await loadQbtCreds();
+  const baseUrl = `http://${qbHost}:${qbPort}`;
+
+  const cookie = await qbLogin({ baseUrl, qbUser, qbPass });
+
+  const form = new FormData();
+  const blob = new Blob([torrentData], { type: 'application/x-bittorrent' });
+  form.append('torrents', blob, filename);
+  if (tags) form.append('tags', tags);
+
+  const res = await fetch(new URL('/api/v2/torrents/add', baseUrl), {
+    method: 'POST',
+    headers: {
+      Cookie: cookie,
+      Origin: baseUrl,
+      Referer: `${baseUrl}/`,
+    },
+    body: form,
+  });
+
+  const text = await res.text().catch(() => '');
+  if (!res.ok) {
+    throw new Error(`qBittorrent add failed: HTTP ${res.status}${text ? `: ${text}` : ''}`);
+  }
+
+  const t = String(text || '').trim();
+  // qBittorrent often returns "Ok.", but some versions/configs return an empty body on success.
+  const ok = t.length === 0 || t.toLowerCase().startsWith('ok');
+  return { ok, status: res.status, text: t };
+}

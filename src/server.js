@@ -8,7 +8,7 @@ import parseTorrent from 'parse-torrent';
 import * as search from './search.js';
 import * as download from './download.js';
 import { tvdbProxyGet } from './tvdb-proxy.js';
-import { getQbtInfo, delQbtTorrent, spaceAvail, flexgetHistory } from './usb.js';
+import { getQbtInfo, delQbtTorrent, spaceAvail, flexgetHistory, addQbtTorrent } from './usb.js';
 import { startReel, getReel } from './reelgood.js';
 import { checkFiles as tvProcCheckFiles } from './tv-proc.js';
 
@@ -511,7 +511,17 @@ async function handleDownloadRequest(req, res) {
       ? (tlBody && typeof tlBody === 'object' && 'torrent' in tlBody ? tlBody.torrent : tlBody)
       : body.torrent;
     const forceDownload = body.forceDownload === true;
-    const debug = body.debug === true;
+    // Temporary: hardwire debug on so we always return/emit extra diagnostics.
+    const debug = true;
+
+    if (debug) {
+      console.error('[downloads] request', {
+        forceDownload,
+        provider: torrent?.provider || torrent?.raw?.provider || undefined,
+        id: torrent?.raw?.id || torrent?.id || undefined,
+        title: torrent?.raw?.title || torrent?.title || undefined,
+      });
+    }
 
     // Standard wrapper shape returned to the client.
     const baseWrapper = { existingTitles: [], existingProcids: [] };
@@ -537,34 +547,6 @@ async function handleDownloadRequest(req, res) {
       if (!valid.success) {
         res.json({ ...baseWrapper, ...valid });
         return;
-      }
-
-      // New pre-check: if the torrent hash is already present in qBittorrent, stop early.
-      let infoHash = '';
-      try {
-        const parsed = parseTorrent(fetched.torrentData);
-        infoHash = String(parsed?.infoHash || '').trim().toLowerCase();
-      } catch (e) {
-        res.json({ ...baseWrapper, success: false, stage: 'parse-torrent-hash', error: e?.message || String(e) });
-        return;
-      }
-
-      if (infoHash) {
-        try {
-          const qbtInfo = await getQbtInfo({ hash: infoHash });
-          const list = Array.isArray(qbtInfo) ? qbtInfo : [];
-          if (list.length > 0) {
-            const existing = list[0] || {};
-            const existingName = String(existing?.name || '').trim();
-            const fallbackTitle = String(torrent?.raw?.title || torrent?.title || torrent?.clientTitle || '').trim();
-            const title = existingName || fallbackTitle || infoHash;
-            res.json({ ...baseWrapper, success: false, stage: 'qbt', error: `QbitTorrent already downloaded ${title}`, hash: infoHash });
-            return;
-          }
-        } catch (e) {
-          res.json({ ...baseWrapper, success: false, stage: 'qbt', error: e?.message || String(e), hash: infoHash });
-          return;
-        }
       }
 
       let titles = [];
@@ -594,13 +576,86 @@ async function handleDownloadRequest(req, res) {
       }
 
       const hint = torrent?.raw?.filename || torrent?.raw?.title || 'download.torrent';
-      const uploaded = await download.uploadTorrentToWatchFolder(fetched.torrentData, hint);
-      if (!uploaded.success) {
-        res.json({ ...tvProcResult, ...uploaded });
+      let addRes;
+      const addTag = `tapi_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+      try {
+        addRes = await addQbtTorrent({ torrentData: fetched.torrentData, filename: hint, tags: addTag });
+      } catch (e) {
+        if (debug) console.error('[downloads] qbt add threw', { addTag, error: e?.message || String(e) });
+        res.json({ ...tvProcResult, success: false, stage: 'qbt-add', error: e?.message || String(e) });
+        return;
+      }
+
+      if (debug) console.error('[downloads] qbt add response', { addTag, ok: addRes.ok, status: addRes.status, text: addRes.text });
+
+      if (!addRes.ok) {
+        // qB sometimes returns "Fails." but still adds the torrent. If we can find a torrent
+        // with the unique tag we used for this request, treat it as success.
+        try {
+          const tagged = await getQbtInfo({ tag: addTag });
+          const list = Array.isArray(tagged) ? tagged : [];
+          if (list.length > 0) {
+            if (debug) console.error('[downloads] qbt add disambiguated as success via tag', { addTag, count: list.length });
+            if (debug) {
+              res.json({ ...tvProcResult, success: true, stage: 'qbt-add', qbAdd: addRes, qbtTag: addTag });
+              return;
+            }
+            res.json(tvProcResult);
+            return;
+          }
+        } catch {
+          // ignore
+        }
+
+        // qB uses 200 OK with body "Fails." for duplicates and other add failures.
+        // Disambiguate by checking whether the torrent exists after the add attempt.
+        let infoHash = '';
+        try {
+          const parsed = parseTorrent(fetched.torrentData);
+          infoHash = String(parsed?.infoHash || '').trim().toLowerCase();
+        } catch {
+          // ignore
+        }
+
+        if (infoHash) {
+          try {
+            const qbtInfo = await getQbtInfo({ hash: infoHash });
+            const list = Array.isArray(qbtInfo) ? qbtInfo : [];
+            if (list.length > 0) {
+              const existing = list[0] || {};
+              const existingName = String(existing?.name || '').trim();
+              const fallbackTitle = String(torrent?.raw?.title || torrent?.title || torrent?.clientTitle || '').trim();
+              const title = existingName || fallbackTitle || infoHash;
+              if (debug) console.error('[downloads] qbt add disambiguated as duplicate via hash', { addTag, infoHash, title });
+              res.json({
+                ...tvProcResult,
+                success: false,
+                stage: 'qbt',
+                error: `QbitTorrent already has torrent ${title}`,
+                hash: infoHash,
+                qbt: {
+                  name: existingName || undefined,
+                  state: existing?.state || undefined,
+                  progress: typeof existing?.progress === 'number' ? existing.progress : undefined,
+                },
+              });
+              return;
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        res.json({ ...tvProcResult, success: false, stage: 'qbt-add', error: `qBittorrent add failed: ${addRes.text || 'Fails.'}`, qbAdd: addRes });
         return;
       }
 
       // In this mode, always return the tv-proc wrapper unchanged.
+      if (debug) {
+        console.error('[downloads] qbt add success', { addTag });
+        res.json({ ...tvProcResult, success: true, stage: 'qbt-add', qbAdd: addRes, qbtTag: addTag });
+        return;
+      }
       res.json(tvProcResult);
       return;
     }
@@ -650,10 +705,99 @@ async function handleDownloadRequest(req, res) {
     }
 
     const hint = torrent?.raw?.filename || torrent?.raw?.title || 'download.torrent';
-    const uploaded = await download.uploadTorrentToWatchFolder(fetched.torrentData, hint);
-    if (!uploaded.success) {
-      res.json({ ...tvProcResult, ...uploaded });
+    let addRes;
+    const addTag = `tapi_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    try {
+      addRes = await addQbtTorrent({ torrentData: fetched.torrentData, filename: hint, tags: addTag });
+    } catch (e) {
+      if (debug) console.error('[downloads] qbt add threw (force)', { addTag, error: e?.message || String(e) });
+      res.json({ ...tvProcResult, success: false, stage: 'qbt-add', error: e?.message || String(e) });
       return;
+    }
+
+    if (debug) console.error('[downloads] qbt add response (force)', { addTag, ok: addRes.ok, status: addRes.status, text: addRes.text });
+
+    if (!addRes.ok) {
+      // Same as non-force mode: if the torrent shows up with our unique tag, the add succeeded.
+      try {
+        const tagged = await getQbtInfo({ tag: addTag });
+        const list = Array.isArray(tagged) ? tagged : [];
+        if (list.length > 0) {
+          if (debug) console.error('[downloads] qbt add disambiguated as success via tag (force)', { addTag, count: list.length });
+          let infoHash = '';
+          try {
+            const parsed = parseTorrent(fetched.torrentData);
+            infoHash = String(parsed?.infoHash || '').trim().toLowerCase();
+          } catch {
+            // ignore
+          }
+
+          res.json({
+            ...tvProcResult,
+            success: true,
+            provider: fetched.provider,
+            method: fetched.method,
+            downloadUrl: fetched.downloadUrl,
+            qbAdd: addRes,
+            bytes: fetched.bytes,
+            hash: infoHash || undefined,
+            qbtTag: addTag,
+            debug,
+          });
+          return;
+        }
+      } catch {
+        // ignore
+      }
+
+      let infoHash = '';
+      try {
+        const parsed = parseTorrent(fetched.torrentData);
+        infoHash = String(parsed?.infoHash || '').trim().toLowerCase();
+      } catch {
+        // ignore
+      }
+
+      if (infoHash) {
+        try {
+          const qbtInfo = await getQbtInfo({ hash: infoHash });
+          const list = Array.isArray(qbtInfo) ? qbtInfo : [];
+          if (list.length > 0) {
+            const existing = list[0] || {};
+            const existingName = String(existing?.name || '').trim();
+            const fallbackTitle = String(torrent?.raw?.title || torrent?.title || torrent?.clientTitle || '').trim();
+            const title = existingName || fallbackTitle || infoHash;
+            res.json({
+              ...tvProcResult,
+              success: false,
+              stage: 'qbt',
+              error: `QbitTorrent already has torrent ${title}`,
+              hash: infoHash,
+              qbt: {
+                name: existingName || undefined,
+                state: existing?.state || undefined,
+                progress: typeof existing?.progress === 'number' ? existing.progress : undefined,
+              },
+            });
+            return;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      res.json({ ...tvProcResult, success: false, stage: 'qbt-add', error: `qBittorrent add failed: ${addRes.text || 'Fails.'}`,
+        qbAdd: addRes,
+      });
+      return;
+    }
+
+    let infoHash = '';
+    try {
+      const parsed = parseTorrent(fetched.torrentData);
+      infoHash = String(parsed?.infoHash || '').trim().toLowerCase();
+    } catch {
+      // ignore
     }
 
     res.json({
@@ -662,9 +806,9 @@ async function handleDownloadRequest(req, res) {
       provider: fetched.provider,
       method: fetched.method,
       downloadUrl: fetched.downloadUrl,
-      remotePath: uploaded.remotePath,
-      filename: uploaded.filename,
+      qbAdd: addRes,
       bytes: fetched.bytes,
+      hash: infoHash || undefined,
       debug,
     });
   } catch (error) {

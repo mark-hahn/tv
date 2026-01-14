@@ -2,7 +2,7 @@
 
   const MAX_WORKERS = 8;
 
-  var FAST_TEST, PROCESS_INTERVAL_MS, appendTvLog, badFile, blocked, blockedCount, buffering, checkFile, checkFileExists, checkFiles, chkCount, chkTvDB, clearBuffer, currentSeq, cycleRunning, cycleSeq, dateStr, debug, delOldFiles, deleteCount, downloadCount, downloadTime, emby, episode, err, errCount, errors, escQuotes, exec, existsCount, fileTimeout, filterRegex, filterRegexTxt, findUsb, flushAndGoLive, flushBuffer, fname, fs, getUsbFiles, inProgress, lastPruneAt, log, logBuffer, map, mkdirp, path, readMap, recent, recentCount, reloadState, request, resetCycleState, rimraf, rsyncDelay, runCycle, scheduleNextCycle, season, seriesName, sizeStr, skipPaths, startBuffering, startTime, stopBuffering, theTvDbToken, time, title, tvDbErrCount, tvPath, tvdbCache, tvdburl, type, usbFilePath, usbFileSize, usbFiles, usbHost, util, writeLine, writeMap;
+  var FAST_TEST, PROCESS_INTERVAL_MS, appendTvLog, badFile, blocked, blockedCount, buffering, checkFile, checkFileExists, checkFiles, chkCount, chkTvDB, clearBuffer, currentSeq, cycleRunning, cycleSeq, dateStr, debug, delOldFiles, deleteCount, downloadCount, downloadTime, episode, err, errCount, errors, escQuotes, exec, existsCount, fileTimeout, filterRegex, filterRegexTxt, findUsb, flushAndGoLive, flushBuffer, fname, fs, getUsbFiles, inProgress, lastPruneAt, log, logBuffer, map, mkdirp, path, readMap, recent, recentCount, reloadState, request, resetCycleState, rimraf, rsyncDelay, runCycle, scheduleNextCycle, season, seriesName, sizeStr, skipPaths, startBuffering, startTime, stopBuffering, theTvDbToken, time, title, tvDbErrCount, tvPath, tvdbCache, tvdburl, type, usbFilePath, usbFileSize, usbFiles, usbHost, util, writeLine, writeMap;
 
   debug = false;
   FAST_TEST = false;
@@ -67,7 +67,6 @@
   var TV_INPROGRESS_PATH = dataPath('tv-inProgress.json');
   var TV_BLOCKED_PATH = dataPath('tv-blocked.json');
   var TV_MAP_PATH = dataPath('tv-map');
-  var SCAN_LIBRARY_FLAG_PATH = dataPath('scanLibraryFlag');
 
   try {
     fs.mkdirpSync(path.dirname(TV_LOG_PATH));
@@ -876,12 +875,6 @@
 
   // (priority scheduling removed in the new worker_threads + procId model)
 
-  emby = require('./emby.js');
-
-  await emby.init();
-
-  fs.writeFileSync(SCAN_LIBRARY_FLAG_PATH, 'noscan');
-
   downloadTime = Date.now();
 
   filterRegex = null;
@@ -1621,12 +1614,6 @@
     } else {
       log('.... done ....');
       
-      // if downloadCount > 0 
-      //   fs.writeFileSync(SCAN_LIBRARY_FLAG_PATH, 'scan')
-      // else if fs.readFileSync(SCAN_LIBRARY_FLAG_PATH,'utf8') is 'scan'
-      //   log 'scanning library'
-      //   await emby.scanLibrary()
-      //   fs.writeFileSync(SCAN_LIBRARY_FLAG_PATH, 'noscan')
       if ((deleteCount + existsCount + errCount + downloadCount + blockedCount) > 0) {
         log("***********************************************************");
       }

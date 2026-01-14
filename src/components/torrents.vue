@@ -1474,15 +1474,34 @@ export default {
             ? payload.existingProcids
             : (Array.isArray(payload.procids) ? payload.procids : []);
 
-          const errorTitles = Array.isArray(payload.errorTitles)
+          const rawErrorTitles = Array.isArray(payload.errorTitles)
             ? payload.errorTitles
             : [];
+
+          // errorTitles can be either:
+          // - string[] (legacy: filenames)
+          // - { title, procId }[] (new)
+          const errorTitleItems = rawErrorTitles;
+          const errorTitles = rawErrorTitles.map((x) => {
+            if (x && typeof x === 'object' && !Array.isArray(x)) {
+              return x.title ?? x.Title ?? '';
+            }
+            return String(x ?? '');
+          }).map(s => String(s || '').trim()).filter(Boolean);
+
+          const errorProcIds = rawErrorTitles
+            .map((x) => (x && typeof x === 'object' && !Array.isArray(x)
+              ? (x.procId ?? x.procid ?? x.proc_id ?? x.procID ?? null)
+              : null))
+            .filter(v => v !== null && v !== undefined && String(v) !== '');
 
           return {
             ...payload,
             existingTitles,
             existingProcids,
-            errorTitles
+            errorTitles,
+            errorTitleItems,
+            errorProcIds
           };
         };
 
@@ -1515,12 +1534,39 @@ export default {
             }
             if (item && typeof item === 'object') {
               return {
-                title: item.title ?? item.name ?? item.file ?? item.filename ?? item.torrentTitle ?? '',
-                procId: item.procId ?? item.procid ?? item.proc_id ?? item.procID ?? null
+                title: item.title ?? item.Title ?? item.name ?? item.file ?? item.filename ?? item.torrentTitle ?? '',
+                procId: item.procId ?? item.procid ?? item.proc_id ?? item.procID ?? item.pid ?? item.id ?? null,
+                procIds: item.procIds ?? item.procids ?? null
               };
             }
             return { title: '', procId: null };
           }).filter(x => String(x.title || '').trim() || x.procId);
+        };
+
+        const collectProcIdsFromErrorTitles = (wrapper, errorItems) => {
+          const procIds = [];
+
+          const w = (wrapper && typeof wrapper === 'object') ? wrapper : null;
+          const fromNormalized = Array.isArray(w?.errorProcIds) ? w.errorProcIds : [];
+          for (const pid of fromNormalized) procIds.push(pid);
+
+          const fromWrapper = Array.isArray(w?.errorProcIds)
+            ? w.errorProcIds
+            : (Array.isArray(w?.errorProcids) ? w.errorProcids : []);
+          for (const pid of fromWrapper) procIds.push(pid);
+
+          const items = Array.isArray(errorItems) ? errorItems : [];
+          for (const item of items) {
+            if (!item || typeof item !== 'object') continue;
+            if (Array.isArray(item.procIds)) {
+              for (const pid of item.procIds) procIds.push(pid);
+            }
+            if (item.procId !== null && item.procId !== undefined) procIds.push(item.procId);
+          }
+
+          return procIds
+            .filter(v => v !== null && v !== undefined && String(v) !== '')
+            .map(v => v);
         };
 
         let downloadsRes = null;
@@ -1560,17 +1606,22 @@ export default {
 
           const wrapper = normalizeDownloadsWrapper(payload);
           const alreadyTitles = wrapper?.existingTitles;
-          const errorTitlesRaw = wrapper?.errorTitles;
+          const errorTitlesRaw = wrapper?.errorTitleItems ?? wrapper?.errorTitles;
+
+ 
 
           const hadAlreadyTitles = Array.isArray(alreadyTitles) && alreadyTitles.length > 0;
           const procIdsToDelete = new Set();
+          let existingDeleteClicked = false;
+          let errorDeleteClicked = false;
 
           if (hadAlreadyTitles) {
             const confirmed = await this.confirmExistingDownloads(
               formatAlreadyDownloadedDialog(alreadyTitles),
               wrapper
             );
-            if (confirmed) {
+            existingDeleteClicked = Boolean(confirmed);
+            if (existingDeleteClicked) {
               const existing = Array.isArray(wrapper?.existingProcids) ? wrapper.existingProcids : [];
               for (const pid of existing) {
                 if (pid !== null && pid !== undefined && String(pid) !== '') procIdsToDelete.add(pid);
@@ -1587,19 +1638,25 @@ export default {
               formatErrorDownloadsDialog(titlesForDialog),
               wrapper
             );
-            if (confirmed) {
-              const procids = errorItems.map(x => x.procId).filter(v => v !== null && v !== undefined && String(v) !== '');
-              if (procids.length === 0) {
-                this.showError('No procId values were returned for errorTitles; cannot delete.');
-              }
-              for (const pid of procids) procIdsToDelete.add(pid);
+            errorDeleteClicked = Boolean(confirmed);
+            if (errorDeleteClicked) {
+              const errorProcIds = collectProcIdsFromErrorTitles(wrapper, errorItems);
+              for (const pid of errorProcIds) procIdsToDelete.add(pid);
             }
           }
 
-          if (procIdsToDelete.size > 0) {
-            const ok = await this.deleteProcids({ procIds: Array.from(procIdsToDelete) });
-            if (!ok) {
-              // deleteProcids already surfaced the error
+          // Call deleteProcids once if either dialog had Delete clicked.
+          if (existingDeleteClicked || errorDeleteClicked) {
+            if (procIdsToDelete.size > 0) {
+              const ok = await this.deleteProcids({ procIds: Array.from(procIdsToDelete) });
+              if (!ok) {
+                // deleteProcids already surfaced the error
+              }
+            } else {
+              // Only show this if user explicitly requested deletion but we have no IDs.
+              this.showError(
+                'Cannot delete because the server did not return any procId values for these entries.'
+              );
             }
           }
 

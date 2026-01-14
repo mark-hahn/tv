@@ -1,4 +1,7 @@
 
-don't monitor addDir or add file events.  only handle unlink, move, or rename events. tvResync should only  delete entries.
 
-we should only delete finished tv.sqlite entries. never delete an errored entry.
+## in /checkfiles
+
+- in the return object include an additional array tvEntries with an array of all tv.sqlite entries that match the title with no filtering on state or errors.
+
+- if empty array received return normal object with empty existingTitles and existingProcids and tvEntries

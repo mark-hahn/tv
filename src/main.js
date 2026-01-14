@@ -962,6 +962,18 @@
       res.end(JSON.stringify(obj));
     };
 
+    var readBody = function(req, cb) {
+      var body = '';
+      req.on('data', (chunk) => {
+        body += chunk;
+        if (body.length > 1024 * 1024) {
+          req.destroy();
+        }
+      });
+      req.on('end', () => cb(null, body));
+      req.on('error', (e) => cb(e));
+    };
+
     var startProc = function() {
       // When startProc is called do the same as before when arg was blank:
       // - if a cycle is running, restart after the current file finishes
@@ -1045,6 +1057,85 @@
         }
 
         return json(res, 405, {status: 'method not allowed'});
+      }
+
+      // Handle /checkFiles endpoint
+      // POST body: ["..."]
+      // Returns: { existingTitles: ["..."], existingProcids: [123] }
+      if (pathname === '/checkFiles') {
+        if (req.method === 'GET') {
+          try {
+            var q = parsed.query || {};
+            var titles = [];
+            if (q.titles) {
+              try {
+                // Prefer JSON array in the querystring.
+                titles = JSON.parse(q.titles);
+              } catch (e) {
+                // Fallback: comma-separated.
+                titles = String(q.titles).split(',').map(s => s.trim()).filter(Boolean);
+              }
+            } else if (q.title) {
+              titles = [String(q.title)];
+            }
+            var out0 = (tvJson.checkFiles ? tvJson.checkFiles(titles) : {existingTitles: [], existingProcids: []});
+            return json(res, 200, out0);
+          } catch (e) {
+            return json(res, 400, {status: String(e && e.message ? e.message : e)});
+          }
+        }
+
+        if (req.method === 'POST') {
+          return readBody(req, (err1, body) => {
+            if (err1) {
+              return json(res, 400, {status: String(err1 && err1.message ? err1.message : err1)});
+            }
+            try {
+              var titles2 = body ? JSON.parse(body) : [];
+              if (!Array.isArray(titles2)) {
+                return json(res, 400, {status: 'body must be a JSON array of titles'});
+              }
+              var out2 = (tvJson.checkFiles ? tvJson.checkFiles(titles2) : {existingTitles: [], existingProcids: []});
+              return json(res, 200, out2);
+            } catch (e) {
+              return json(res, 400, {status: String(e && e.message ? e.message : e)});
+            }
+          });
+        }
+
+        return json(res, 405, {status: 'method not allowed'});
+      }
+
+      // Handle /deleteProcids endpoint
+      // POST body: { existingTitles: [...], existingProcids: [...] }
+      // Returns: { status: 'ok' } OR { status: 'error', error: '...' }
+      if (pathname === '/deleteProcids') {
+        if (req.method === 'POST') {
+          return readBody(req, (err1, body) => {
+            if (err1) {
+              return json(res, 400, {status: 'error', error: String(err1 && err1.message ? err1.message : err1)});
+            }
+            try {
+              var payload = body ? JSON.parse(body) : {};
+              var procids = payload && payload.existingProcids ? payload.existingProcids : [];
+              if (!Array.isArray(procids)) {
+                return json(res, 400, {status: 'error', error: 'existingProcids must be an array'});
+              }
+              if (!tvJson.deleteProcids) {
+                return json(res, 500, {status: 'error', error: 'deleteProcids not supported'});
+              }
+              var r = tvJson.deleteProcids(procids);
+              if (r && r.ok) {
+                return json(res, 200, {status: 'ok'});
+              }
+              return json(res, 500, {status: 'error', error: (r && r.errors) ? r.errors : 'delete failed'});
+            } catch (e) {
+              return json(res, 400, {status: 'error', error: String(e && e.message ? e.message : e)});
+            }
+          });
+        }
+
+        return json(res, 405, {status: 'error', error: 'method not allowed'});
       }
 
       // No matching endpoint

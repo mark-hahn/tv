@@ -125,6 +125,7 @@ let stmtGetByTitle = null;
 let stmtGetByProcId = null;
 let stmtUpdateByProcId = null;
 let stmtDeleteByTitle = null;
+let stmtDeleteByProcId = null;
 let stmtFindOldestWaitingTitle = null;
 let stmtGetMaxProcId = null;
 let stmtGetDownloads = null;
@@ -229,6 +230,7 @@ const openDb = () => {
     WHERE procId=@procId
   `);
   stmtDeleteByTitle = db.prepare('DELETE FROM tv_entries WHERE title = ?');
+  stmtDeleteByProcId = db.prepare('DELETE FROM tv_entries WHERE procId = ?');
 
   stmtFindOldestWaitingTitle = db.prepare(
     "SELECT title FROM tv_entries WHERE status='waiting' ORDER BY procId ASC LIMIT 1"
@@ -743,6 +745,147 @@ const getTitlesMap = () => {
   }
 };
 
+// Return the subset of titles that are finished and have no error.
+// Used by the HTTP endpoint /checkFiles.
+const checkFiles = (titles) => {
+  try {
+    if (!Array.isArray(titles) || titles.length === 0) return [];
+
+    const cleaned = [];
+    const seen = new Set();
+    for (const t0 of titles) {
+      const t = String(t0 || '').trim();
+      if (!t) continue;
+      if (seen.has(t)) continue;
+      seen.add(t);
+      cleaned.push(t);
+      if (cleaned.length >= 5000) break;
+    }
+
+    if (cleaned.length === 0) return { existingTitles: [], existingProcids: [] };
+
+    openDb();
+    const placeholders = cleaned.map(() => '?').join(',');
+    const sql = `SELECT title, procId FROM tv_entries WHERE title IN (${placeholders}) AND status='finished' AND (error IS NULL OR error=0)`;
+    const rows = db.prepare(sql).all(...cleaned);
+    if (!Array.isArray(rows) || rows.length === 0) return { existingTitles: [], existingProcids: [] };
+
+    const existingTitles = [];
+    const existingProcids = [];
+    for (const r of rows) {
+      if (!r) continue;
+      const t = r.title != null ? String(r.title) : '';
+      if (t) existingTitles.push(t);
+      const pid = (typeof r.procId === 'number') ? r.procId : (r.procId == null ? null : Number(r.procId));
+      if (pid != null && Number.isFinite(pid)) existingProcids.push(pid);
+    }
+    return { existingTitles, existingProcids };
+  } catch {
+    return { existingTitles: [], existingProcids: [] };
+  }
+};
+
+// Delete local files and matching DB rows by procId.
+// Returns { ok:true, deletedProcids:[], skippedProcids:[], errors:[] }
+const deleteProcids = (procIds) => {
+  const result = { ok: true, deletedProcids: [], skippedProcids: [], errors: [] };
+  try {
+    if (!Array.isArray(procIds) || procIds.length === 0) return result;
+    openDb();
+    ensureMapsLoaded();
+
+    const cleaned = [];
+    const seen = new Set();
+    for (const p0 of procIds) {
+      const pid = (typeof p0 === 'number') ? p0 : Number(p0);
+      if (!Number.isFinite(pid)) continue;
+      const pid2 = Math.trunc(pid);
+      if (pid2 < 0) continue;
+      if (seen.has(pid2)) continue;
+      seen.add(pid2);
+      cleaned.push(pid2);
+      if (cleaned.length >= 5000) break;
+    }
+    if (cleaned.length === 0) return result;
+
+    for (const pid of cleaned) {
+      let row;
+      try {
+        row = stmtGetByProcId.get(pid);
+      } catch {
+        row = null;
+      }
+
+      if (!row) {
+        result.skippedProcids.push(pid);
+        continue;
+      }
+
+      const title = row.title != null ? String(row.title) : '';
+      const localPath = row.localPath != null ? String(row.localPath) : '';
+
+      // Compute local file path safely.
+      if (!localPath || !path.isAbsolute(localPath)) {
+        result.ok = false;
+        result.errors.push({ procId: pid, title, error: 'invalid localPath' });
+        continue;
+      }
+      if (!title || path.isAbsolute(title) || title.includes('\0') || title.includes('..')) {
+        result.ok = false;
+        result.errors.push({ procId: pid, title, error: 'invalid title path' });
+        continue;
+      }
+
+      const base = path.resolve(localPath);
+      const filePath = path.resolve(localPath, title);
+      if (!(filePath === base || filePath.startsWith(base + path.sep))) {
+        result.ok = false;
+        result.errors.push({ procId: pid, title, error: 'refuses to delete outside localPath' });
+        continue;
+      }
+
+      // Delete the local file; ENOENT is fine.
+      try {
+        fs.unlinkSync(filePath);
+      } catch (e) {
+        if (!(e && e.code === 'ENOENT')) {
+          result.ok = false;
+          result.errors.push({ procId: pid, title, error: (e && e.message) ? String(e.message) : 'unlink failed' });
+          continue;
+        }
+      }
+
+      // Remove DB row.
+      try {
+        stmtDeleteByProcId.run(pid);
+      } catch (e) {
+        result.ok = false;
+        result.errors.push({ procId: pid, title, error: (e && e.message) ? String(e.message) : 'db delete failed' });
+        continue;
+      }
+
+      // Clear finished/inProgress markers so the title can be re-downloaded.
+      try {
+        if (title && finishedMap && Object.prototype.hasOwnProperty.call(finishedMap, title)) {
+          delete finishedMap[title];
+          writeMap(TV_FINISHED_PATH, finishedMap);
+        }
+      } catch {}
+      try {
+        removeInProgress(title);
+      } catch {}
+
+      result.deletedProcids.push(pid);
+    }
+
+    return result;
+  } catch (e) {
+    result.ok = false;
+    result.errors.push({ error: (e && e.message) ? String(e.message) : String(e) });
+    return result;
+  }
+};
+
 // Prune tv.json entries when their corresponding USB folder has been deleted.
 // existingUsbDirs: Set of relative directory paths under "files/" on the usbHost.
 const pruneMissingUsbDirs = (existingUsbDirs) => {
@@ -794,4 +937,6 @@ module.exports = {
   markError,
   pruneMissingUsbDirs,
   getTitlesMap,
+  checkFiles,
+  deleteProcids,
 };

@@ -1,14 +1,6 @@
 
-=== copilot should ignore this file 
-=== do not use this file for prompts
-=== it is just a scratchpad for editing copilot prompts.
+- change the return value from /checkFiles to a wrapper object with the prop existingTitles:<array returned before> and a prop existingProcids:<existing procids>
 
-- do not read or write or revert misc/gpt.txt
+- add an endpoint deleteProcids(<same wrapper object>) that deletes all local files referenced in the tv.sqlite entries for the existingProcids:<existing procids>.  then delete the matching tv.sqlite entries.
 
-- replace data/tv.json file and the cached version of it in memory with a sqlite db.
-
-- you said "I’m going to inspect how tv.json is loaded/updated today (likely via tvJson.js), then replace that module".  do not replace any module.  
-
-can't sql return the 200 sorted entries directly for /download  instead of loading all into memory?
-
-what data is passed to pruneMissingUsbDirs?
+- return ok or error object

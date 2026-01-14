@@ -1,6 +1,5 @@
 
 todo ...
-  fix tv.log
   lazy-login to thetvdb
   smart check duplicate files on disk - parse title
   

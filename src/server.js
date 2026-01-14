@@ -34,7 +34,11 @@ function formatPstTimestamp(date = new Date()) {
 function appendCallsLog({ endpoint, method, ok, result, error }) {
   try {
     const outPath = path.resolve(__dirname, '..', 'calls.log');
-    const asArray = Array.isArray(result) ? result.map(String) : [];
+    const asArray = Array.isArray(result)
+      ? result.map(String)
+      : (result && typeof result === 'object' && Array.isArray(result.existingTitles))
+        ? result.existingTitles.map(String)
+        : [];
     const last5 = asArray.length > 5 ? asArray.slice(-5) : asArray;
     const payload = {
       ts: formatPstTimestamp(new Date()),
@@ -509,8 +513,11 @@ async function handleDownloadRequest(req, res) {
     const forceDownload = body.forceDownload === true;
     const debug = body.debug === true;
 
+    // Standard wrapper shape returned to the client.
+    const baseWrapper = { existingTitles: [], existingProcids: [] };
+
     if (!torrent) {
-      res.status(400).json({ error: 'Torrent data is required' });
+      res.status(400).json({ ...baseWrapper, success: false, stage: 'validate', error: 'Torrent data is required' });
       return;
     }
 
@@ -518,17 +525,17 @@ async function handleDownloadRequest(req, res) {
     if (!forceDownload) {
       const fetched = await download.fetchTorrentFile(torrent);
       if (!fetched || typeof fetched !== 'object') {
-        res.json({ success: false, stage: 'fetch-torrent', error: 'Unexpected fetchTorrentFile result' });
+        res.json({ ...baseWrapper, success: false, stage: 'fetch-torrent', error: 'Unexpected fetchTorrentFile result' });
         return;
       }
       if (!fetched.success) {
-        res.json(fetched);
+        res.json({ ...baseWrapper, ...fetched });
         return;
       }
 
       const valid = download.validateTorrentBytes(fetched.torrentData);
       if (!valid.success) {
-        res.json(valid);
+        res.json({ ...baseWrapper, ...valid });
         return;
       }
 
@@ -538,7 +545,7 @@ async function handleDownloadRequest(req, res) {
         const parsed = parseTorrent(fetched.torrentData);
         infoHash = String(parsed?.infoHash || '').trim().toLowerCase();
       } catch (e) {
-        res.json({ success: false, stage: 'parse-torrent-hash', error: e?.message || String(e) });
+        res.json({ ...baseWrapper, success: false, stage: 'parse-torrent-hash', error: e?.message || String(e) });
         return;
       }
 
@@ -551,11 +558,11 @@ async function handleDownloadRequest(req, res) {
             const existingName = String(existing?.name || '').trim();
             const fallbackTitle = String(torrent?.raw?.title || torrent?.title || torrent?.clientTitle || '').trim();
             const title = existingName || fallbackTitle || infoHash;
-            res.json({ success: false, stage: 'qbt', error: `QbitTorrent already downloaded ${title}`, hash: infoHash });
+            res.json({ ...baseWrapper, success: false, stage: 'qbt', error: `QbitTorrent already downloaded ${title}`, hash: infoHash });
             return;
           }
         } catch (e) {
-          res.json({ success: false, stage: 'qbt', error: e?.message || String(e), hash: infoHash });
+          res.json({ ...baseWrapper, success: false, stage: 'qbt', error: e?.message || String(e), hash: infoHash });
           return;
         }
       }
@@ -564,64 +571,66 @@ async function handleDownloadRequest(req, res) {
       try {
         titles = download.extractTorrentFileTitles(fetched.torrentData);
       } catch (e) {
-        res.json({ success: false, stage: 'parse-torrent', error: e?.message || String(e) });
+        res.json({ ...baseWrapper, success: false, stage: 'parse-torrent', error: e?.message || String(e) });
         return;
       }
 
-      let alreadyDownloaded = [];
+      let tvProcResult = baseWrapper;
       try {
         appendCallsLog({ endpoint: 'tv-proc:/checkFiles request', method: 'POST', ok: true, result: titles });
-        alreadyDownloaded = await tvProcCheckFiles(titles);
-        appendCallsLog({ endpoint: 'tv-proc:/checkFiles response', method: 'POST', ok: true, result: alreadyDownloaded });
+        tvProcResult = await tvProcCheckFiles(titles);
+        appendCallsLog({ endpoint: 'tv-proc:/checkFiles response', method: 'POST', ok: true, result: tvProcResult });
       } catch (e) {
         appendCallsLog({ endpoint: 'tv-proc:/checkFiles', method: 'POST', ok: false, result: null, error: e });
-        res.json({ success: false, stage: 'tv-proc', error: e?.message || String(e) });
+        res.json({ ...baseWrapper, success: false, stage: 'tv-proc', error: e?.message || String(e) });
         return;
       }
 
       // If any file titles are already present, do NOT send to qBittorrent.
-      if (Array.isArray(alreadyDownloaded) && alreadyDownloaded.length > 0) {
-        res.json(debug ? { titles, alreadyDownloaded } : alreadyDownloaded);
+      const existingTitles = Array.isArray(tvProcResult?.existingTitles) ? tvProcResult.existingTitles : [];
+      if (existingTitles.length > 0) {
+        res.json(tvProcResult);
         return;
       }
 
       const hint = torrent?.raw?.filename || torrent?.raw?.title || 'download.torrent';
       const uploaded = await download.uploadTorrentToWatchFolder(fetched.torrentData, hint);
       if (!uploaded.success) {
-        res.json(uploaded);
+        res.json({ ...tvProcResult, ...uploaded });
         return;
       }
 
-      // In this mode, always return the tv-proc list (empty).
-      res.json(debug ? { titles, alreadyDownloaded: [] } : []);
+      // In this mode, always return the tv-proc wrapper unchanged.
+      res.json(tvProcResult);
       return;
     }
 
-    // Force mode: skip tv-proc only; still validate torrent file naming.
+    // Force mode: skip tv-proc; still validate torrent file naming.
     const fetched = await download.fetchTorrentFile(torrent);
     if (!fetched || typeof fetched !== 'object') {
-      res.json({ success: false, stage: 'fetch-torrent', error: 'Unexpected fetchTorrentFile result' });
+      res.json({ ...baseWrapper, success: false, stage: 'fetch-torrent', error: 'Unexpected fetchTorrentFile result' });
       return;
     }
     if (!fetched.success) {
-      res.json(fetched);
+      res.json({ ...baseWrapper, ...fetched });
       return;
     }
 
     const valid = download.validateTorrentBytes(fetched.torrentData);
     if (!valid.success) {
-      res.json(valid);
+      res.json({ ...baseWrapper, ...valid });
       return;
     }
 
     const hint = torrent?.raw?.filename || torrent?.raw?.title || 'download.torrent';
     const uploaded = await download.uploadTorrentToWatchFolder(fetched.torrentData, hint);
     if (!uploaded.success) {
-      res.json(uploaded);
+      res.json({ ...baseWrapper, ...uploaded });
       return;
     }
 
     res.json({
+      ...baseWrapper,
       success: true,
       provider: fetched.provider,
       method: fetched.method,
@@ -629,10 +638,11 @@ async function handleDownloadRequest(req, res) {
       remotePath: uploaded.remotePath,
       filename: uploaded.filename,
       bytes: fetched.bytes,
+      debug,
     });
   } catch (error) {
     console.error('Download error:', error);
-    res.status(500).json({ error: error?.message || String(error) });
+    res.status(500).json({ existingTitles: [], existingProcids: [], success: false, stage: 'exception', error: error?.message || String(error) });
   }
 }
 

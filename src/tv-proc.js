@@ -46,11 +46,19 @@ export async function checkFiles(titles, { baseUrl, timeoutMs = 5000 } = {}) {
       throw new Error(`tv-proc checkFiles failed: HTTP ${resp.status} ${resp.statusText}${detail ? ` :: ${detail}` : ''}`);
     }
 
-    if (!Array.isArray(data)) {
-      throw new Error(`tv-proc checkFiles expected JSON array, got ${data === null ? 'null' : typeof data}`);
+    // Back-compat: old tv-proc returned a raw array of titles.
+    if (Array.isArray(data)) {
+      return { existingTitles: data.map((t) => String(t)), existingProcids: [] };
     }
 
-    return data.map((t) => String(t));
+    // New shape: { existingTitles: string[], existingProcids: any[] }
+    if (!data || typeof data !== 'object') {
+      throw new Error(`tv-proc checkFiles expected JSON object, got ${data === null ? 'null' : typeof data}`);
+    }
+
+    const existingTitles = Array.isArray(data.existingTitles) ? data.existingTitles.map((t) => String(t)) : [];
+    const existingProcids = Array.isArray(data.existingProcids) ? data.existingProcids : [];
+    return { existingTitles, existingProcids };
   } finally {
     clearTimeout(timer);
   }

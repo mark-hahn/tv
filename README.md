@@ -179,6 +179,17 @@ Search stages/counts and filter reasons are appended to `tor-results.txt` in the
   - Before calling tv-proc, it also checks qBittorrent for an existing torrent with the same infohash and returns an error if found.
   - If `forceDownload:true` is provided, it skips tv-proc and uploads immediately (still validates torrent naming).
 
+#### `/downloads` response shape
+
+`/downloads` now returns the tv-proc wrapper object:
+
+```json
+{ "existingTitles": ["..."], "existingProcids": ["..."] }
+```
+
+- `existingTitles.length > 0` means "already downloaded" and upload is skipped.
+- On force mode or error responses, the same wrapper object is returned with extra fields like `success`, `stage`, `error`, etc.
+
 ### Upload `.torrent` to remote watch folder
 
 Uploads are now triggered server-side via `POST /downloads` (or `/api/download`).

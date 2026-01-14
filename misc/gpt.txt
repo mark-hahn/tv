@@ -1,7 +1,2 @@
 
-
-## in /checkfiles
-
-- in the return object include an additional array tvEntries with an array of all tv.sqlite entries that match the title with no filtering on state or errors.
-
-- if empty array received return normal object with empty existingTitles and existingProcids and tvEntries
+remove emby.js module, scanLibraryFlag, and all “automatic scan when downloads happened” logic 

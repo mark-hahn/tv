@@ -1173,7 +1173,9 @@ const getTitlesMap = () => {
 // Used by the HTTP endpoint /checkFiles.
 const checkFiles = (titles) => {
   try {
-    if (!Array.isArray(titles) || titles.length === 0) return [];
+    if (!Array.isArray(titles) || titles.length === 0) {
+      return { existingTitles: [], existingProcids: [], tvEntries: [] };
+    }
 
     const cleaned = [];
     const seen = new Set();
@@ -1186,13 +1188,25 @@ const checkFiles = (titles) => {
       if (cleaned.length >= 5000) break;
     }
 
-    if (cleaned.length === 0) return { existingTitles: [], existingProcids: [] };
+    if (cleaned.length === 0) return { existingTitles: [], existingProcids: [], tvEntries: [] };
 
     openDb();
     const placeholders = cleaned.map(() => '?').join(',');
+
+    // Unfiltered matches (all states/errors) for UI diagnostics.
+    const sqlAll = `SELECT * FROM tv_entries WHERE title IN (${placeholders})`;
+    const allRows = db.prepare(sqlAll).all(...cleaned);
+    const tvEntries = [];
+    if (Array.isArray(allRows) && allRows.length) {
+      for (const r0 of allRows) {
+        const e0 = rowToEntry(r0);
+        if (e0) tvEntries.push(e0);
+      }
+    }
+
     const sql = `SELECT title, procId FROM tv_entries WHERE title IN (${placeholders}) AND status='finished' AND (error IS NULL OR error=0)`;
     const rows = db.prepare(sql).all(...cleaned);
-    if (!Array.isArray(rows) || rows.length === 0) return { existingTitles: [], existingProcids: [] };
+    if (!Array.isArray(rows) || rows.length === 0) return { existingTitles: [], existingProcids: [], tvEntries };
 
     const existingTitles = [];
     const existingProcids = [];
@@ -1203,9 +1217,9 @@ const checkFiles = (titles) => {
       const pid = (typeof r.procId === 'number') ? r.procId : (r.procId == null ? null : Number(r.procId));
       if (pid != null && Number.isFinite(pid)) existingProcids.push(pid);
     }
-    return { existingTitles, existingProcids };
+    return { existingTitles, existingProcids, tvEntries };
   } catch {
-    return { existingTitles: [], existingProcids: [] };
+    return { existingTitles: [], existingProcids: [], tvEntries: [] };
   }
 };
 

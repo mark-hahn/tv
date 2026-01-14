@@ -1061,7 +1061,7 @@
 
       // Handle /checkFiles endpoint
       // POST body: ["..."]
-      // Returns: { existingTitles: ["..."], existingProcids: [123] }
+      // Returns: { existingTitles: ["..."], existingProcids: [123], tvEntries: [ {...}, ... ] }
       if (pathname === '/checkFiles') {
         if (req.method === 'GET') {
           try {

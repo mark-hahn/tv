@@ -69,31 +69,9 @@ function tvEntryHasError(entry) {
   return v !== 0 && v !== false;
 }
 
-function tvEntryTitle(entry) {
-  if (!entry || typeof entry !== 'object') return '';
-  const candidates = [entry.title, entry.name, entry.filename, entry.file, entry.path];
-  for (const c of candidates) {
-    if (typeof c === 'string') {
-      const s = c.trim();
-      if (s) return s;
-    }
-  }
-  return '';
-}
-
 function tvEntriesErrorTitles(tvEntries) {
   const list = Array.isArray(tvEntries) ? tvEntries : [];
-  const out = [];
-  const seen = new Set();
-  for (const entry of list) {
-    if (!tvEntryHasError(entry)) continue;
-    const t = tvEntryTitle(entry);
-    if (!t) continue;
-    if (seen.has(t)) continue;
-    seen.add(t);
-    out.push(t);
-  }
-  return out;
+  return list.filter(tvEntryHasError);
 }
 
 console.error('[torrents-server] module loaded', {

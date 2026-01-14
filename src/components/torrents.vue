@@ -132,6 +132,13 @@
       div(style="display:flex; gap:10px; justify-content:flex-end;")
         button(@click.stop="closeErrorModal" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;") OK
 
+  #existing-delete-modal(v-if="showExistingDeleteModal" @click.stop="cancelExistingDelete" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:10000;")
+    #modal-content(@click.stop style="background:white; padding:30px; border-radius:10px; max-width:520px; box-shadow:0 4px 20px rgba(0,0,0,0.3);")
+      div(style="font-size:16px; margin-bottom:20px; line-height:1.5; white-space:pre-line;") {{ existingDeleteModalMsg }}
+      div(style="display:flex; gap:10px; justify-content:flex-end;")
+        button(@click.stop="cancelExistingDelete" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;") Cancel
+        button(@click.stop="confirmExistingDelete" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;") Delete
+
 
 </template>
 
@@ -176,6 +183,11 @@ export default {
       showModal: false,  // Show download confirmation modal
       showErrorModal: false,
       errorModalMsg: '',
+
+      showExistingDeleteModal: false,
+      existingDeleteModalMsg: '',
+      existingDeleteWrapper: null,
+      existingDeleteResolve: null,
       clickedTorrents: new Set(),  // Track which torrents have been clicked
       downloadedTorrents: new Set(),  // Track which torrents have been downloaded via Get button
       noTorrentsNeeded: false,  // Flag when needed array is empty
@@ -388,6 +400,70 @@ export default {
     closeErrorModal() {
       this.showErrorModal = false;
       this.errorModalMsg = '';
+    },
+
+    confirmExistingDownloads(msg, wrapper) {
+      this.existingDeleteModalMsg = String(msg || '');
+      this.existingDeleteWrapper = (wrapper && typeof wrapper === 'object') ? wrapper : null;
+      this.showExistingDeleteModal = true;
+      return new Promise((resolve) => {
+        this.existingDeleteResolve = resolve;
+      });
+    },
+
+    cancelExistingDelete() {
+      this.showExistingDeleteModal = false;
+      this.existingDeleteModalMsg = '';
+      this.existingDeleteWrapper = null;
+      const resolve = this.existingDeleteResolve;
+      this.existingDeleteResolve = null;
+      if (typeof resolve === 'function') resolve(false);
+    },
+
+    confirmExistingDelete() {
+      this.showExistingDeleteModal = false;
+      const resolve = this.existingDeleteResolve;
+      this.existingDeleteResolve = null;
+      if (typeof resolve === 'function') resolve(true);
+    },
+
+    async deleteProcids(wrapper) {
+      const payload = (wrapper && typeof wrapper === 'object') ? wrapper : null;
+      if (!payload) return false;
+
+      const url = 'https://hahnca.com/tvproc/deleteProcids';
+      let res;
+      try {
+        res = await this.fetchWithTimeout(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        }, 60000);
+      } catch (e) {
+        this.showError(e?.message || String(e));
+        return false;
+      }
+
+      if (!res?.ok) {
+        let detail = '';
+        try {
+          const ct = (res?.headers?.get?.('content-type') || '').toLowerCase();
+          if (ct.includes('application/json')) {
+            const j = await res.json();
+            detail = j?.error ? String(j.error) : (j?.message ? String(j.message) : JSON.stringify(j));
+          } else {
+            detail = await res.text();
+          }
+        } catch {
+          // ignore
+        }
+        this.showError(detail || `HTTP ${res?.status || ''}: ${res?.statusText || 'delete failed'}`);
+        return false;
+      }
+
+      return true;
     },
     getScroller() {
       return this.$refs.scroller || null;
@@ -1362,17 +1438,37 @@ export default {
               : providerRaw || 'unknown';
 
         // Prefer /downloads if available.
-        // If it returns a non-empty list, those titles were already downloaded and nothing was sent to qBittorrent.
-        const extractAlreadyDownloadedTitles = (payload) => {
-          if (Array.isArray(payload)) return payload.map(v => String(v)).filter(Boolean);
-          if (!payload || typeof payload !== 'object') return [];
-          const candidates =
-            payload.alreadyDownloaded ||
-            payload.alreadyDownloadedTitles ||
-            payload.downloads ||
-            payload.titles ||
-            payload.already;
-          return Array.isArray(candidates) ? candidates.map(v => String(v)).filter(Boolean) : [];
+        // torrents-server /downloads now returns a wrapper:
+        // - existingTitles: array of titles (same as old raw array)
+        // - existingProcids: matching procids
+        // - errors/forced results are additional props
+        const normalizeDownloadsWrapper = (payload) => {
+          if (Array.isArray(payload)) {
+            return { existingTitles: payload, existingProcids: [] };
+          }
+          if (!payload || typeof payload !== 'object') return null;
+
+          const existingTitles = Array.isArray(payload.existingTitles)
+            ? payload.existingTitles
+            : (Array.isArray(payload.alreadyDownloaded)
+              ? payload.alreadyDownloaded
+              : (Array.isArray(payload.alreadyDownloadedTitles)
+                ? payload.alreadyDownloadedTitles
+                : (Array.isArray(payload.downloads)
+                  ? payload.downloads
+                  : (Array.isArray(payload.titles)
+                    ? payload.titles
+                    : (Array.isArray(payload.already) ? payload.already : [])))));
+
+          const existingProcids = Array.isArray(payload.existingProcids)
+            ? payload.existingProcids
+            : (Array.isArray(payload.procids) ? payload.procids : []);
+
+          return {
+            ...payload,
+            existingTitles,
+            existingProcids
+          };
         };
 
         const formatAlreadyDownloadedDialog = (titles) => {
@@ -1381,7 +1477,8 @@ export default {
           );
           return (
             'No torrents sent to qbitTorrent.  these files have already been downloaded\n\n' +
-            unique.join('\n')
+            unique.join('\n') +
+            '\n\nDo you want to delete these files?'
           );
         };
 
@@ -1420,23 +1517,29 @@ export default {
             ? await downloadsRes.json().catch(() => null)
             : await downloadsRes.text().catch(() => '');
 
-          const alreadyTitles = extractAlreadyDownloadedTitles(payload);
-          if (alreadyTitles.length > 0) {
-            this.showError(formatAlreadyDownloadedDialog(alreadyTitles));
+          const wrapper = normalizeDownloadsWrapper(payload);
+          const alreadyTitles = wrapper?.existingTitles;
+          if (Array.isArray(alreadyTitles) && alreadyTitles.length > 0) {
+            const confirmed = await this.confirmExistingDownloads(
+              formatAlreadyDownloadedDialog(alreadyTitles),
+              wrapper
+            );
+            if (confirmed) {
+              const ok = await this.deleteProcids(wrapper);
+              if (!ok) {
+                // deleteProcids already surfaced the error
+              }
+            }
             return { ok: true, message: 'Already downloaded' };
           }
 
-          // If the endpoint returned an empty array, treat as “no already-downloaded titles”.
-          if (Array.isArray(payload)) {
-            return { ok: true, message: '' };
-          }
-
-          if (payload && typeof payload === 'object') {
-            if (payload.success || payload.result === true) {
+          // If the endpoint returned a wrapper with success/result state, honor it.
+          if (wrapper && typeof wrapper === 'object') {
+            if (wrapper.success || wrapper.result === true || wrapper.ok === true) {
               return { ok: true, message: '' };
             }
 
-            const errorMsg = payload.error || payload.message;
+            const errorMsg = wrapper.error || wrapper.message;
             if (errorMsg) {
               if (isAlreadyInQbtMessage(errorMsg)) {
                 this.showError(`QbitTorrent already downloaded the torrent ${torrentTitle}`);

@@ -431,6 +431,15 @@ export default {
       const payload = (wrapper && typeof wrapper === 'object') ? wrapper : null;
       if (!payload) return false;
 
+      const procIds = Array.isArray(payload.procIds)
+        ? payload.procIds
+        : (Array.isArray(payload.procids)
+          ? payload.procids
+          : (Array.isArray(payload.existingProcids) ? payload.existingProcids : []));
+
+      const merged = Array.from(new Set(procIds.filter(v => v !== null && v !== undefined && String(v) !== '')));
+      if (merged.length === 0) return false;
+
       const url = 'https://hahnca.com/tvproc/deleteProcids';
       let res;
       try {
@@ -439,7 +448,7 @@ export default {
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({ procIds: merged })
         }, 60000);
       } catch (e) {
         this.showError(e?.message || String(e));
@@ -1441,6 +1450,7 @@ export default {
         // torrents-server /downloads now returns a wrapper:
         // - existingTitles: array of titles (same as old raw array)
         // - existingProcids: matching procids
+        // - errorTitles: array of titles/objects that had download errors
         // - errors/forced results are additional props
         const normalizeDownloadsWrapper = (payload) => {
           if (Array.isArray(payload)) {
@@ -1464,10 +1474,15 @@ export default {
             ? payload.existingProcids
             : (Array.isArray(payload.procids) ? payload.procids : []);
 
+          const errorTitles = Array.isArray(payload.errorTitles)
+            ? payload.errorTitles
+            : [];
+
           return {
             ...payload,
             existingTitles,
-            existingProcids
+            existingProcids,
+            errorTitles
           };
         };
 
@@ -1480,6 +1495,32 @@ export default {
             unique.join('\n') +
             '\n\nDo you want to delete these files?'
           );
+        };
+
+        const formatErrorDownloadsDialog = (titles) => {
+          const unique = Array.from(
+            new Set((Array.isArray(titles) ? titles : []).map(t => String(t || '').trim()).filter(Boolean))
+          );
+          return (
+            'The following files have download errors.  Click delete to remove the files.\n\n' +
+            unique.join('\n')
+          );
+        };
+
+        const normalizeErrorTitleItems = (items) => {
+          const arr = Array.isArray(items) ? items : [];
+          return arr.map((item) => {
+            if (typeof item === 'string') {
+              return { title: item, procId: null };
+            }
+            if (item && typeof item === 'object') {
+              return {
+                title: item.title ?? item.name ?? item.file ?? item.filename ?? item.torrentTitle ?? '',
+                procId: item.procId ?? item.procid ?? item.proc_id ?? item.procID ?? null
+              };
+            }
+            return { title: '', procId: null };
+          }).filter(x => String(x.title || '').trim() || x.procId);
         };
 
         let downloadsRes = null;
@@ -1519,17 +1560,49 @@ export default {
 
           const wrapper = normalizeDownloadsWrapper(payload);
           const alreadyTitles = wrapper?.existingTitles;
-          if (Array.isArray(alreadyTitles) && alreadyTitles.length > 0) {
+          const errorTitlesRaw = wrapper?.errorTitles;
+
+          const hadAlreadyTitles = Array.isArray(alreadyTitles) && alreadyTitles.length > 0;
+          const procIdsToDelete = new Set();
+
+          if (hadAlreadyTitles) {
             const confirmed = await this.confirmExistingDownloads(
               formatAlreadyDownloadedDialog(alreadyTitles),
               wrapper
             );
             if (confirmed) {
-              const ok = await this.deleteProcids(wrapper);
-              if (!ok) {
-                // deleteProcids already surfaced the error
+              const existing = Array.isArray(wrapper?.existingProcids) ? wrapper.existingProcids : [];
+              for (const pid of existing) {
+                if (pid !== null && pid !== undefined && String(pid) !== '') procIdsToDelete.add(pid);
               }
             }
+          }
+
+          // After checking already-downloaded titles (regardless of deletion), offer to delete any error titles.
+          const errorItems = normalizeErrorTitleItems(errorTitlesRaw);
+          if (errorItems.length > 0) {
+            const titlesForDialog = errorItems.map(x => x.title).filter(Boolean);
+            const confirmed = await this.confirmExistingDownloads(
+              formatErrorDownloadsDialog(titlesForDialog),
+              wrapper
+            );
+            if (confirmed) {
+              const procids = errorItems.map(x => x.procId).filter(v => v !== null && v !== undefined && String(v) !== '');
+              if (procids.length === 0) {
+                this.showError('No procId values were returned for errorTitles; cannot delete.');
+              }
+              for (const pid of procids) procIdsToDelete.add(pid);
+            }
+          }
+
+          if (procIdsToDelete.size > 0) {
+            const ok = await this.deleteProcids({ procIds: Array.from(procIdsToDelete) });
+            if (!ok) {
+              // deleteProcids already surfaced the error
+            }
+          }
+
+          if (hadAlreadyTitles) {
             return { ok: true, message: 'Already downloaded' };
           }
 

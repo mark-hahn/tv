@@ -140,7 +140,7 @@
   var parseTorrentTitle = require('parse-torrent-title').parse;
 
   // --- startProc server state ------------------------------------------------
-  var abortBetweenFiles = false;
+  var cycleRestartNeeded = false;
   var nextCycleTimer = null;
   downloadTime = Date.now();
   log('.... starting tv.coffee v4 ....');
@@ -218,10 +218,10 @@
     };
 
     var startProc = function() {
-      // - if a cycle is running, restart after the current file finishes
+      // - if a cycle is running, restart after the cycle finishes
       // - if nothing is running, start a new cycle immediately
       if (cycleRunning) {
-        abortBetweenFiles = true;
+        cycleRestartNeeded = true;
         return;
       }
       if (nextCycleTimer) {
@@ -706,19 +706,6 @@
     var blkName, cmd, fext, guessItRes, j, len, parts, skipPath, usbLine, usbLineParts;
     tvDbErrCount = 0;
 
-    // If a startProc request came in while processing, finish the current file,
-    // then restart the cycle immediately.
-    if (abortBetweenFiles) {
-      abortBetweenFiles = false;
-      cycleRunning = false;
-      if (nextCycleTimer) {
-        clearTimeout(nextCycleTimer);
-        nextCycleTimer = null;
-      }
-      runCycle();
-      return;
-    }
-
     if (usbLine = usbFiles.shift()) {
       usbLineParts = usbLine.split('-');
       usbFileBytes = parseInt(usbLineParts.pop(), 10);
@@ -782,7 +769,7 @@
         }
       }
       log('not blocked', usbLine);
-      
+
       // file passed all block tests, process it
       currentSeq = ++cycleSeq;
       downloadTime = Date.now();
@@ -791,6 +778,7 @@
       try {
         var parsed = parseTorrentTitle(fname) || {};
         ({title, season, episode} = parsed);
+        type = parsed.type || 'episode';
 
         // Provide a clear reason when the parser can't produce S/E.
         if (!title || !Number.isInteger(season) || !Number.isInteger(episode)) {
@@ -815,8 +803,7 @@
           }
           return;
         }
-        type = 'episode';
-        if (!type === 'episode') {
+        if (type !== 'episode') {
           log('\nskipping non-episode:', fname);
           badFile('non-episode');
           return;
@@ -840,6 +827,17 @@
       }
       cycleRunning = false;
 
+      // If a startProc request came in during this cycle, finish the cycle first,
+      // then restart immediately (do not abort between files).
+      if (cycleRestartNeeded) {
+        cycleRestartNeeded = false;
+        if (nextCycleTimer) {
+          clearTimeout(nextCycleTimer);
+          nextCycleTimer = null;
+        }
+        return process.nextTick(runCycle);
+      }
+
       // In the new model, workers are started only when entries are added
       // and when a worker posts "finished".
       return scheduleNextCycle();
@@ -847,7 +845,6 @@
   };
 
   tvdbCache = {};
-
   tvdburl = '';
 
   chkTvDB = () => {
@@ -878,10 +875,6 @@
       return s;
     };
 
-    // if title.includes('Faraway')
-    //   seriesName = 'Faraway Downs'
-    //   setTimeout checkFileExists, rsyncDelay
-    //   return
     if (tvdbCache[title]) {
       seriesName = tvdbCache[title];
       // process.nextTick checkFileExists

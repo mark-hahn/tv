@@ -7,4 +7,11 @@
 
 - when cycle finishes if cycleRestartNeeded is true then clear cycleRestartNeeded and restart the cycle. 
 
+- is this code valid:
+      type = 'episode';
+        if (!type === 'episode') {
+          log('\nskipping non-episode:', fname);
+          badFile('non-episode');
+          return;
+        }
 

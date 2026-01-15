@@ -1,7 +1,10 @@
 
+## in cycle
 
-- currently:  // After the hourly USB prune command is kicked off, prune tv.json entries whose USB folder no longer exists.
+- do not abort Between Files
 
-- this means some some tv.json entries will not be pruned when the folders will be pruned because the USB prune command is async.
+- If a startProc request comes in while processing set a cycleRestartNeeded flag and finish the cycle. do not restart the cycle immediately Between Files
 
-- don't start pruning tv.json entries until USB prune command is finished.
+- when cycle finishes if cycleRestartNeeded is true then clear cycleRestartNeeded and restart the cycle. 
+
+

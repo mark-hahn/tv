@@ -635,9 +635,7 @@
   // check each remote file, compute series and episode numbers
   usbFilePath = usbFileSize = usbFiles = seriesName = season = episode = fname = title = type = null;
   usbFileBytes = null;
-
   tvDbErrCount = 0;
-
   skipPaths = null;
 
   checkFiles = () => {
@@ -689,8 +687,6 @@
     }).sort((a, b) => a.key.localeCompare(b.key));
 
     usbFiles = usbFiles.map((x) => x.line);
-    // fs.writeFileSync 'tv-files.txt', usbFiles.join('\n')
-    // process.exit 0
     skipPaths = [];
     for (j = 0, len = usbFiles.length; j < len; j++) {
       usbLine = usbFiles[j];
@@ -703,10 +699,6 @@
       log("skipping locked paths", skipPaths);
     }
 
-    // No tv.json pre-population in the new model.
-    // Entries are created only when a file is ready to be queued/downloaded.
-
-    // log usbFiles.join('\n')
     return process.nextTick(checkFile);
   };
 
@@ -790,8 +782,8 @@
         }
       }
       log('not blocked', usbLine);
+      
       // file passed all block tests, process it
-      flushAndGoLive();
       currentSeq = ++cycleSeq;
       downloadTime = Date.now();
       season = 1;

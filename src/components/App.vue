@@ -496,13 +496,13 @@ export default {
         { label: 'Series', key: 'series' },
         { label: 'Map', key: 'map' },
         { label: 'Actors', key: 'actors' },
-        { label: 'Reel', key: 'reel' },
         { label: 'Tor', key: 'torrents' },
+        { label: 'Subs', key: 'subs' },
+        { label: 'Files', key: 'file' },
+        { label: 'Reel', key: 'reel' },
         { label: 'Flex', key: 'flex' },
         { label: 'Qbt', key: 'history' },
         { label: 'Down', key: 'tvproc' },
-        { label: 'Subs', key: 'subs' },
-        { label: 'Files', key: 'file' }
       ];
 
       if (!this.simpleMode) return allTabs;

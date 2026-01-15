@@ -510,18 +510,13 @@
   };
 
   recent = null;
-
   errors = null;
-
   inProgress = null;
 
   // Per-cycle view of current tv.json titles (do not cache across cycles)
   var tvJsonTitles = null;
 
   blocked = null;
-
-  //##########
-  // constants
   map = {};
 
   reloadState = function() {
@@ -556,12 +551,6 @@
     return "'" + str.replace(/\\/g, '\\\\').replace(/'/g, "'\\''") + "'";
   };
 
-  //  .replace(/'|`/g,  "\\'")
-  //  .replace(/\(/g, "\\(")
-  //  .replace(/\)/g, "\\)")
-  //  .replace(/\&/g, "\\&")
-  //  .replace(/\s/g, '\\ ')  
-
   //###############
   // async routines
   getUsbFiles = delOldFiles = checkFiles = checkFile = badFile = checkFileExists = checkFile = chkTvDB = null;
@@ -583,10 +572,6 @@
       return process.exit();
     } else {
       theTvDbToken = body.data.token;
-      // log({theTvDbToken});
-      // process.exit();
-      // log 'tvdb login', {error, response, body}
-      //   process.exit()
       return process.nextTick(runCycle);
     }
   });

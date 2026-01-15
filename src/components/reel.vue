@@ -117,6 +117,7 @@ export default {
     const _titlesPopulated = ref(false);
     const _didStartReel = ref(false);
     const _didInitialVisibleScroll = ref(false);
+    const _startReelPromise = ref(null);
 
     const handleScaledWheel = (event) => {
       if (!event) return;
@@ -226,17 +227,62 @@ export default {
       }
     };
 
+    const ensureReelStarted = async () => {
+      if (_didStartReel.value) return true;
+
+      if (_startReelPromise.value) {
+        try {
+          await _startReelPromise.value;
+        } catch (e) {
+          void e;
+        }
+        return _didStartReel.value;
+      }
+
+      _startReelPromise.value = (async () => {
+        await startReelAndLoadTitles();
+      })().finally(() => {
+        _startReelPromise.value = null;
+      });
+
+      try {
+        await _startReelPromise.value;
+      } catch (e) {
+        void e;
+      }
+      return _didStartReel.value;
+    };
+
     const handleNext = async () => {
       try {
+        if (!_didStartReel.value) {
+          await ensureReelStarted();
+        }
+
         // If the "-- no more titles --" message is showing, do not restart the reel.
         // Just refresh via /api/getreel; this should be a no-op that preserves the current list.
 
-        const res = await fetch(`${config.torrentsApiUrl}/api/getreel`);
-        if (!res.ok) {
-          const txt = await res.text();
-          throw new Error(`HTTP ${res.status}: ${txt}`);
+        const fetchGetReel = async () => {
+          const res = await fetch(`${config.torrentsApiUrl}/api/getreel`);
+          if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(`HTTP ${res.status}: ${txt}`);
+          }
+          return res.json();
+        };
+
+        let data;
+        try {
+          data = await fetchGetReel();
+        } catch (e) {
+          const msg = e?.message || String(e);
+          if (/startreel\s+first/i.test(msg) || /home\s*page\s+not\s+loaded/i.test(msg)) {
+            await ensureReelStarted();
+            data = await fetchGetReel();
+          } else {
+            throw e;
+          }
         }
-        const data = await res.json();
         const added = toTitleArray(data);
 
         // If we get new entries, remove the "no more" sentinel.
@@ -514,6 +560,12 @@ export default {
       if (!Array.isArray(val) || val.length === 0) return;
       void startReelAndLoadTitles();
     }, { deep: true });
+
+    watch(() => props.active, (isActive) => {
+      if (!isActive) return;
+      if (_didStartReel.value) return;
+      void ensureReelStarted();
+    });
 
     return {
       sizing: props.sizing,

@@ -875,6 +875,40 @@
       return s;
     };
 
+    // Choose the best match of `title` from `titleArray`.
+    // Strategy:
+    // 1) exact basic-normalized match
+    // 2) exact aggressive-normalized match
+    // 3) fallback to first candidate
+    var smartTitleMatch = function(title, titleArray) {
+      if (!Array.isArray(titleArray) || titleArray.length === 0) {
+        return null;
+      }
+
+      var wantBasic = normalizeBasic(title);
+      for (var i = 0; i < titleArray.length; i++) {
+        var cand = titleArray[i];
+        if (!cand) continue;
+        if (normalizeBasic(cand) === wantBasic) {
+          return cand;
+        }
+      }
+
+      var wantAgg = normalizeAggressive(title);
+      for (var j = 0; j < titleArray.length; j++) {
+        var cand2 = titleArray[j];
+        if (!cand2) continue;
+        if (normalizeAggressive(cand2) === wantAgg) {
+          return cand2;
+        }
+      }
+
+      for (var k = 0; k < titleArray.length; k++) {
+        if (titleArray[k]) return titleArray[k];
+      }
+      return null;
+    };
+
     if (tvdbCache[title]) {
       seriesName = tvdbCache[title];
       // process.nextTick checkFileExists
@@ -911,33 +945,8 @@
       } else {
         // Prefer a title match across all results (basic normalization first, then aggressive).
         var results = Array.isArray(body && body.data) ? body.data : [];
-        var chosenName = null;
-        var normTitleBasic = normalizeBasic(title);
-        for (var i = 0; i < results.length; i++) {
-          var r = results[i];
-          var nm = r && r.name;
-          if (!nm) continue;
-          if (normalizeBasic(nm) === normTitleBasic) {
-            chosenName = nm;
-            break;
-          }
-        }
-        if (!chosenName) {
-          var normTitleAgg = normalizeAggressive(title);
-          for (var j = 0; j < results.length; j++) {
-            var r2 = results[j];
-            var nm2 = r2 && r2.name;
-            if (!nm2) continue;
-            if (normalizeAggressive(nm2) === normTitleAgg) {
-              chosenName = nm2;
-              break;
-            }
-          }
-        }
-        if (!chosenName && results[0] && results[0].name) {
-          chosenName = results[0].name;
-        }
-        seriesName = chosenName;
+        var names = results.map((r) => r && r.name).filter((nm) => nm);
+        seriesName = smartTitleMatch(title, names);
         log('tvdb got:', {seriesName, title});
         if (map[seriesName]) {
           console.log('Mapping', seriesName, 'to', map[seriesName]);

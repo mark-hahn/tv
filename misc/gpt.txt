@@ -1,17 +1,5 @@
 
-## in cycle
+refactor match choosing logic that compares a title arg against an array of titles arg and returns best match. this is the algorithm that uses basic normalization first, then aggressive.
 
-- do not abort Between Files
-
-- If a startProc request comes in while processing set a cycleRestartNeeded flag and finish the cycle. do not restart the cycle immediately Between Files
-
-- when cycle finishes if cycleRestartNeeded is true then clear cycleRestartNeeded and restart the cycle. 
-
-- is this code valid:
-      type = 'episode';
-        if (!type === 'episode') {
-          log('\nskipping non-episode:', fname);
-          badFile('non-episode');
-          return;
-        }
+call it smartTitleMatch(title, titleArray) that returns chosenName
 

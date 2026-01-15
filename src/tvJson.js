@@ -2,7 +2,7 @@
 
 // tvJson.js
 // - Owns download state and worker lifecycle
-// - Persists state in SQLite (replaces data/tv.json and in-memory tvJsonCache)
+// - Persists state in SQLite
 // - Exports: addEntry(entry), getDownloads(), markError(), pruneMissingUsbDirs()
 
 const fs = require('fs');
@@ -15,10 +15,8 @@ const chokidar = require('chokidar');
 const BASEDIR = path.join(__dirname, '..');
 const DATA_DIR = path.join(BASEDIR, 'data');
 
-// SQLite backing store (replaces data/tv.json)
+// SQLite backing store
 const TV_DB_PATH = path.join(DATA_DIR, 'tv.sqlite');
-// Legacy JSON path (migration-only)
-const TV_JSON_PATH = path.join(DATA_DIR, 'tv.json');
 const TV_FINISHED_PATH = path.join(DATA_DIR, 'tv-finished.json');
 const TV_INPROGRESS_PATH = path.join(DATA_DIR, 'tv-inProgress.json');
 const TV_LOG_PATH = path.join(BASEDIR, 'misc', 'tv.log');
@@ -794,31 +792,6 @@ const loadOnStart = () => {
 
   openDb();
 
-  // One-time migration: import data/tv.json into SQLite if DB is empty.
-  try {
-    const cnt = db.prepare('SELECT COUNT(1) AS n FROM tv_entries').get();
-    const n = cnt && typeof cnt.n === 'number' ? cnt.n : 0;
-    if (n === 0 && fs.existsSync(TV_JSON_PATH)) {
-      const arr = readJson(TV_JSON_PATH, []);
-      if (Array.isArray(arr)) {
-        const insertMany = db.transaction((rows) => {
-          for (const e of rows) {
-            if (!e || typeof e !== 'object') continue;
-            const t = e.title ? String(e.title) : '';
-            if (!t) continue;
-            // Preserve existing procId when present.
-            const clone = { ...e };
-            if (!(typeof clone.procId === 'number' && Number.isInteger(clone.procId))) {
-              clone.procId = nextProcId++;
-            }
-            upsertEntry(clone);
-          }
-        });
-        insertMany(arr);
-      }
-    }
-  } catch {}
-
   // Normalize persisted statuses on restart.
   try {
     db.prepare("UPDATE tv_entries SET status='waiting' WHERE status='future'").run();
@@ -1153,7 +1126,7 @@ const getDownloads = () => {
   }
 };
 
-// For per-cycle de-dupe in main.js (replaces reading data/tv.json).
+// For per-cycle de-dupe in main.js.
 const getTitlesMap = () => {
   try {
     openDb();

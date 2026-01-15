@@ -586,12 +586,13 @@
       log(".... deleting old files in usb ~/files ....");
       PRUNE_DAYS = 60;
       try {
-        // Do not block the cycle on pruning: run remotely in background.
+        // Wait for remote pruning to finish before scanning dirs/pruning DB,
+        // otherwise we may miss entries whose folders are deleted moments later.
         // Suppress all output to keep pm2 logs clean.
         exec(
-          `ssh ${usbHost} "nohup find ~/files -mtime +${PRUNE_DAYS} -exec rm -rf {} \\; >/dev/null 2>&1 &"`,
+          `ssh ${usbHost} "find ~/files -mtime +${PRUNE_DAYS} -exec rm -rf {} \\; >/dev/null 2>&1"`,
           {
-            timeout: 30000
+            timeout: 15 * 60 * 1000
           }
         );
         res = 'prune ok';
@@ -600,7 +601,7 @@
         res = 'prune ok';
       }
 
-      // After the hourly USB prune command is kicked off, prune tv.json entries whose USB folder no longer exists.
+      // After the hourly USB prune command completes, prune queued entries whose USB folder no longer exists.
       // Keep SSH calls small: this is one additional SSH call.
       try {
         var dirsOut = exec(

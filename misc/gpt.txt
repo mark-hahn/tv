@@ -1,0 +1,7 @@
+
+
+- currently:  // After the hourly USB prune command is kicked off, prune tv.json entries whose USB folder no longer exists.
+
+- this means some some tv.json entries will not be pruned when the folders will be pruned because the USB prune command is async.
+
+- don't start pruning tv.json entries until USB prune command is finished.

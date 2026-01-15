@@ -2,12 +2,12 @@
 
   const MAX_WORKERS = 8;
 
-  var FAST_TEST, PROCESS_INTERVAL_MS, appendTvLog, badFile, blocked, blockedCount, buffering, checkFile, checkFileExists, checkFiles, chkCount, chkTvDB, clearBuffer, currentSeq, cycleRunning, cycleSeq, dateStr, debug, delOldFiles, deleteCount, downloadCount, downloadTime, episode, err, errCount, errors, escQuotes, exec, existsCount, fileTimeout, filterRegex, filterRegexTxt, findUsb, flushAndGoLive, flushBuffer, fname, fs, getUsbFiles, inProgress, lastPruneAt, log, logBuffer, map, mkdirp, path, readMap, recent, recentCount, reloadState, request, resetCycleState, rimraf, rsyncDelay, runCycle, scheduleNextCycle, season, seriesName, sizeStr, skipPaths, startBuffering, startTime, stopBuffering, theTvDbToken, time, title, tvDbErrCount, tvPath, tvdbCache, tvdburl, type, usbFilePath, usbFileSize, usbFiles, usbHost, util, writeLine, writeMap;
+  var FAST_TEST, PROCESS_INTERVAL_MS, appendTvLog, badFile, blocked, blockedCount, buffering, checkFile, checkFileExists, checkFiles, chkCount, chkTvDB, clearBuffer, currentSeq, cycleRunning, cycleSeq, dateStr, debug, delOldFiles, deleteCount, downloadCount, downloadTime, episode, err, errCount, errors, escQuotes, exec, existsCount, fileTimeout, findUsb, flushAndGoLive, flushBuffer, fname, fs, getUsbFiles, inProgress, lastPruneAt, log, logBuffer, map, mkdirp, path, readMap, recent, recentCount, reloadState, request, resetCycleState, rimraf, rsyncDelay, runCycle, scheduleNextCycle, season, seriesName, sizeStr, skipPaths, startBuffering, startTime, stopBuffering, theTvDbToken, time, title, tvDbErrCount, tvPath, tvdbCache, tvdburl, type, usbFilePath, usbFileSize, usbFiles, usbHost, util, writeLine, writeMap;
 
   debug = false;
   FAST_TEST = false;
   SKIP_DOWNLOAD = false; // Set to false to resume actual downloading
-  PROCESS_INTERVAL_MS = FAST_TEST ? 30 * 1000 : 2 * 60 * 1000;
+  PROCESS_INTERVAL_MS = FAST_TEST ? 30 * 1000 : 5 * 60 * 1000;
 
   log = (...x) => {
     if (debug) {
@@ -39,21 +39,10 @@
 
   usbHost = "xobtlu@oracle.usbx.me";
 
-  // prune script deletes files older than 30 days
-  // tv-finished.json is authority for which torrents are finished
-  fileTimeout = {
-    timeout: 2 * 60 * 60 * 1000 // 2 hours
-  };
-
   fs = require('fs-plus');
-
   util = require('util');
-
   path = require('path');
 
-  // Project layout:
-  // - Source code in ./src
-  // - Runtime state/logs in ./data
   var BASEDIR = path.join(__dirname, '..');
   var DATA_DIR = path.join(BASEDIR, 'data');
   var dataPath = function(p) {
@@ -79,13 +68,9 @@
     }
   };
 
-  // One-time migration: rename legacy tv-recent.json to tv-finished.json.
-  (function migrateRecentToFinished() {
+  // Ensure state files exist.
+  (function ensureStateFilesExist() {
     try {
-      var oldPath = dataPath('tv-recent.json');
-      if (fs.existsSync(oldPath) && !fs.existsSync(TV_FINISHED_PATH)) {
-        fs.renameSync(oldPath, TV_FINISHED_PATH);
-      }
       if (!fs.existsSync(TV_FINISHED_PATH)) {
         fs.writeFileSync(TV_FINISHED_PATH, '{}');
       }
@@ -142,287 +127,30 @@
         }
       } catch (e) {}
 
-      appendTvLog(`${prefix}==== tv-proc started ${fmt()} ====\n`);
+      appendTvLog(`${prefix}==== tv-proc started ${fmt()} ====`);
     } catch (e) {}
   })();
-
-  // --- tv.json status tracking ----------------------------------------------
-  // tv.json is backed by SharedArrayBuffer storage (tvJsonCache) and only
-  // flushed to disk when:
-  // - a new entry is added
-  // - a worker posts "finished"
-  // (No other writes.)
-  var tvJsonCache = null;
-  var tvShared = null;
-  var nextProcId = 0;
-  var workerCount = 0;
-
-  // Shared storage sizing. procId is the index.
-  var TV_CAPACITY = 10000;
-  var USB_PATH_BYTES = 512;
-  var LOCAL_PATH_BYTES = 512;
-  var TITLE_BYTES = 256;
-  var STATUS_BYTES = 256;
-
-  var TextEncoder_ = global.TextEncoder || require('util').TextEncoder;
-  var TextDecoder_ = global.TextDecoder || require('util').TextDecoder;
-  var encoder = new TextEncoder_();
-  var decoder = new TextDecoder_('utf-8');
-
-  var allocShared = function(capacity) {
-    var sab = {
-      usbPath: new SharedArrayBuffer(capacity * USB_PATH_BYTES),
-      localPath: new SharedArrayBuffer(capacity * LOCAL_PATH_BYTES),
-      title: new SharedArrayBuffer(capacity * TITLE_BYTES),
-      status: new SharedArrayBuffer(capacity * STATUS_BYTES),
-      progress: new SharedArrayBuffer(capacity * Int32Array.BYTES_PER_ELEMENT),
-      eta: new SharedArrayBuffer(capacity * Int32Array.BYTES_PER_ELEMENT),
-      sequence: new SharedArrayBuffer(capacity * Int32Array.BYTES_PER_ELEMENT),
-      season: new SharedArrayBuffer(capacity * Int32Array.BYTES_PER_ELEMENT),
-      episode: new SharedArrayBuffer(capacity * Int32Array.BYTES_PER_ELEMENT),
-      dateStarted: new SharedArrayBuffer(capacity * Int32Array.BYTES_PER_ELEMENT),
-      dateEnded: new SharedArrayBuffer(capacity * Int32Array.BYTES_PER_ELEMENT),
-      fileSize: new SharedArrayBuffer(capacity * BigInt64Array.BYTES_PER_ELEMENT)
-    };
-
-    return {
-      capacity: capacity,
-      sab: sab,
-      usbPathBytes: new Uint8Array(sab.usbPath),
-      localPathBytes: new Uint8Array(sab.localPath),
-      titleBytes: new Uint8Array(sab.title),
-      statusBytes: new Uint8Array(sab.status),
-      progress: new Int32Array(sab.progress),
-      eta: new Int32Array(sab.eta),
-      sequence: new Int32Array(sab.sequence),
-      season: new Int32Array(sab.season),
-      episode: new Int32Array(sab.episode),
-      dateStarted: new Int32Array(sab.dateStarted),
-      dateEnded: new Int32Array(sab.dateEnded),
-      fileSize: new BigInt64Array(sab.fileSize)
-    };
-  };
-
-  var writeFixedString = function(bytesView, idx, stride, s) {
-    var off = idx * stride;
-    bytesView.fill(0, off, off + stride);
-    if (!s) return;
-    var b = encoder.encode(String(s));
-    var n = Math.min(b.length, stride - 1);
-    for (var i = 0; i < n; i++) {
-      bytesView[off + i] = b[i];
-    }
-    bytesView[off + n] = 0;
-  };
-
-  var readFixedString = function(bytesView, idx, stride) {
-    var off = idx * stride;
-    var end = off;
-    var max = off + stride;
-    while (end < max && bytesView[end] !== 0) end++;
-    if (end === off) return '';
-    return decoder.decode(bytesView.subarray(off, end));
-  };
-
-  var getStatus = function(procId) {
-    return readFixedString(tvShared.statusBytes, procId, STATUS_BYTES);
-  };
-
-  var setStatus = function(procId, s) {
-    writeFixedString(tvShared.statusBytes, procId, STATUS_BYTES, s);
-  };
-
-  var materializeEntry = function(procId) {
-    var etaVal = tvShared.eta[procId] || 0;
-    var endedVal = tvShared.dateEnded[procId] || 0;
-    return {
-      procId: procId,
-      usbPath: readFixedString(tvShared.usbPathBytes, procId, USB_PATH_BYTES),
-      localPath: readFixedString(tvShared.localPathBytes, procId, LOCAL_PATH_BYTES),
-      title: readFixedString(tvShared.titleBytes, procId, TITLE_BYTES),
-      status: getStatus(procId) || 'waiting',
-      progress: tvShared.progress[procId] || 0,
-      eta: etaVal ? etaVal : null,
-      sequence: tvShared.sequence[procId] || 0,
-      fileSize: Number(tvShared.fileSize[procId] || 0n),
-      season: tvShared.season[procId] || 0,
-      episode: tvShared.episode[procId] || 0,
-      dateStarted: tvShared.dateStarted[procId] || 0,
-      dateEnded: endedVal ? endedVal : null
-    };
-  };
-
-  // Legacy data/tv.json persistence has been removed.
-
-  // Keep these functions as no-ops for compatibility
-  startBuffering = function() {};
-  stopBuffering = function() {};
-  clearBuffer = function() {};
-  flushBuffer = function() {};
-  flushAndGoLive = function() {};
 
   // ---------------------------------------------------------------------------
   var childProcess = require('child_process');
   exec = childProcess.execSync;
-
-  var workerThreads = require('worker_threads');
-  var Worker = workerThreads.Worker;
-
   mkdirp = require('mkdirp');
-
   request = require('request');
-
   rimraf = require('rimraf');
-
-  // Replace guessit with npm module parse-torrent-title
   var parseTorrentTitle = require('parse-torrent-title').parse;
-
-  // --- worker_threads model -------------------------------------------------
-  var WORKER_SCRIPT = path.join(__dirname, 'worker.js');
-
-  var findOldestFutureProcId = function() {
-    for (var pid = 0; pid < nextProcId; pid++) {
-      if (getStatus(pid) === 'waiting') {
-        return pid;
-      }
-    }
-    return null;
-  };
-
-  var startWorkerForProcId = function(procId) {
-    if (procId == null) return;
-    if (workerCount >= MAX_WORKERS) return;
-    if (!(procId >= 0 && procId < nextProcId)) return;
-
-    // Mark downloading in shared memory.
-    setStatus(procId, 'downloading');
-    tvShared.progress[procId] = 0;
-    tvShared.eta[procId] = 0;
-    tvShared.dateEnded[procId] = 0;
-
-    workerCount++;
-    var finished = false;
-
-    var w = new Worker(WORKER_SCRIPT, {
-      workerData: {
-        procId: procId,
-        usbHost: usbHost,
-        capacity: tvShared.capacity,
-        sizes: {
-          USB_PATH_BYTES: USB_PATH_BYTES,
-          LOCAL_PATH_BYTES: LOCAL_PATH_BYTES,
-          TITLE_BYTES: TITLE_BYTES,
-          STATUS_BYTES: STATUS_BYTES
-        },
-        sab: tvShared.sab
-      }
-    });
-
-    var handleFinish = function(finishedProcId) {
-      try {
-        if (!(finishedProcId >= 0 && finishedProcId < nextProcId)) {
-          return;
-        }
-
-        var entry = materializeEntry(finishedProcId);
-        var title1 = (entry && entry.title) ? String(entry.title) : '';
-        var status1 = (entry && entry.status) ? String(entry.status) : '';
-        if (!title1) {
-          return;
-        }
-
-        // Timestamp value is stored as ms; writeMap() will convert to YYYY/MM/DD-HH:MM:SS.
-        var ts = Date.now();
-
-        if (status1 === 'finished') {
-          if (recent) {
-            recent[title1] = ts;
-          }
-          return;
-        }
-
-        // Any non-finished terminal status is treated as an error message.
-        if (status1 && status1 !== 'downloading' && status1 !== 'waiting') {
-          try {
-            appendTvLog(`${dateStr(ts)} ERROR ${title1}: ${status1}\n`);
-          } catch (e) {}
-          if (errors) {
-            errors[title1] = ts;
-          }
-        }
-      } catch (e) {
-        // non-fatal
-      }
-    };
-
-    var onFinished = function(finishedProcId) {
-      if (finished) return;
-      finished = true;
-      workerCount = Math.max(0, workerCount - 1);
-
-      // Update tv-finished.json for this procId.
-      handleFinish(finishedProcId != null ? finishedProcId : procId);
-
-      // On finished, if there is capacity start the oldest waiting entry.
-      if (workerCount < MAX_WORKERS) {
-        var nextPid = findOldestFutureProcId();
-        if (nextPid != null) {
-          startWorkerForProcId(nextPid);
-        }
-      }
-    };
-
-    w.on('message', function(msg) {
-      if (msg === 'finished') {
-        // Legacy form
-        onFinished(procId);
-        return;
-      }
-      if (msg && typeof msg === 'object' && msg.type === 'finished') {
-        onFinished(typeof msg.procId === 'number' ? msg.procId : procId);
-      }
-    });
-    w.on('error', function() {
-      onFinished(procId);
-    });
-    w.on('exit', function() {
-      // If worker exited without sending "finished", still clean up.
-      onFinished(procId);
-    });
-  };
 
   // --- startProc server state ------------------------------------------------
   var abortBetweenFiles = false;
   var nextCycleTimer = null;
-
-  // (priority scheduling removed in the new worker_threads + procId model)
-
   downloadTime = Date.now();
-
-  filterRegex = null;
-
-  filterRegexTxt = '';
-
-  if (process.argv.length === 3) {
-    filterRegex = process.argv[2];
-    filterRegexTxt = 'filter:' + filterRegex;
-  }
-
-  log(`.... starting tv.coffee v4 ${filterRegexTxt} ....`);
+  log('.... starting tv.coffee v4 ....');
 
   // Declare per-cycle state in outer scope (CoffeeScript scoping is per-function).
   startTime = time = Date.now();
-
   deleteCount = chkCount = recentCount = 0;
-
   existsCount = errCount = downloadCount = blockedCount = 0;
-
   cycleRunning = false;
-
   lastPruneAt = 0;
-
-  // Sequence number for files processed in the current cycle.
-  // Resets on cycle start and increments per file that passes block tests.
   cycleSeq = 0;
   currentSeq = null;
 
@@ -490,7 +218,6 @@
     };
 
     var startProc = function() {
-      // When startProc is called do the same as before when arg was blank:
       // - if a cycle is running, restart after the current file finishes
       // - if nothing is running, start a new cycle immediately
       if (cycleRunning) {
@@ -542,7 +269,6 @@
           });
           req.on('end', () => {
             try {
-              // Accept body for backwards compatibility, but ignore any args.
               if (body) {
                 JSON.parse(body);
               }
@@ -659,10 +385,6 @@
   })();
 
   findUsb = `ssh ${usbHost} \"find files -ignore_readdir_race -type f -printf '%CY-%Cm-%Cd-%P-%s\\\\n' 2>/dev/null\" ` + "| grep -Ev .r[0-9]+-[0-9]+$ | grep -Ev .rar-[0-9]+$ " + "| grep -Ev screen[0-9]+.png-[0-9]+$";
-
-  if (filterRegex) {
-    findUsb += " | grep -i " + filterRegex;
-  }
 
   log({findUsb});
 
@@ -998,8 +720,7 @@
     // No tv.json pre-population in the new model.
     // Entries are created only when a file is ready to be queued/downloaded.
 
-    // if filterRegex
-    //   log usbFiles.join('\n')
+    // log usbFiles.join('\n')
     return process.nextTick(checkFile);
   };
 

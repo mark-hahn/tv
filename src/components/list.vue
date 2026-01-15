@@ -1015,7 +1015,7 @@ export default {
       await this.fltrAction('All');
     },
     onSelectShow(show, scroll = false) {
-      console.log('List: selected show:', show);
+      // console.log('List: selected show:', show);
       this.saveVisShow(show, scroll);
 
       // Clicking a show should generally return to the Series pane.

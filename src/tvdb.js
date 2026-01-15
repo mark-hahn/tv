@@ -217,7 +217,7 @@ const getRemote = async (id, type, showName) => {
 ///////////// get remotes  //////////////
 // use tvdb remotes data to find complete remote data
 
-const getRemotes = async (show, tvdbRemotes, fast = false) => {
+const getRemotes = async (show, tvdbRemotes) => {
   const name          = show.Name;
   const showId        = show.Id;
   const remotes       = [];
@@ -225,12 +225,10 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   if(showId && !showId.startsWith("noemby-")) 
     remotes.push({name:'Emby', url: urls.embyPageUrl(showId)});
 
-  if(!fast) {
-    const rottenRemote = await getRemote(null, 99, name);
-    if(rottenRemote) {
-      if(rottenRemote.ratings) rottenRemote.name += " (" + rottenRemote.ratings + ")";
-      remotes.push(rottenRemote);
-    }
+  const rottenRemote = await getRemote(null, 99, name);
+  if(rottenRemote) {
+    if(rottenRemote.ratings) rottenRemote.name += " (" + rottenRemote.ratings + ")";
+    remotes.push(rottenRemote);
   }
   const encoded = encodeURI(name).replaceAll('&', '%26');
   const url = `https://www.google.com/search` +
@@ -515,12 +513,11 @@ export const setAddToPickupsCallback = (callback) => {
 };
 
 // WebSocket endpoint handler: returns remotes for a show.
-// Expects param JSON: { show: { Name, Id? }, tvdbRemotes: [...], fast?: boolean }
+// Expects param JSON: { show: { Name, Id? }, tvdbRemotes: [...] }
 export const getRemotesCmd = async (id, param, resolve, reject) => {
   const paramObj = util.jParse(param, 'getRemotes');
   const show = paramObj?.show;
   const tvdbRemotes = paramObj?.tvdbRemotes;
-  const fast = !!paramObj?.fast;
 
   if (!show || !tvdbRemotes) {
     reject([id, 'getRemotes: missing show or tvdbRemotes']);
@@ -528,7 +525,7 @@ export const getRemotesCmd = async (id, param, resolve, reject) => {
   }
 
   try {
-    const remotes = await getRemotes(show, tvdbRemotes, fast);
+    const remotes = await getRemotes(show, tvdbRemotes);
     resolve([id, remotes]);
   } catch (err) {
     reject([id, `getRemotes error: ${err.message}`]);

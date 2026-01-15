@@ -137,6 +137,7 @@
   mkdirp = require('mkdirp');
   request = require('request');
   rimraf = require('rimraf');
+  var smartTitleMatch = require('tv-shared').smartTitleMatch;
   var parseTorrentTitle = require('parse-torrent-title').parse;
 
   // --- startProc server state ------------------------------------------------
@@ -848,66 +849,7 @@
   tvdburl = '';
 
   chkTvDB = () => {
-    // Normalization helpers for matching TheTVDB search results to parse-torrent-title output.
-    // Basic normalization:
-    // 1) lowercase 2) trim 3) collapse whitespace
-    var normalizeBasic = function(s) {
-      return String(s || '').toLowerCase().trim().replace(/\s+/g, ' ');
-    };
-
-    // Aggressive normalization:
-    // 1) drop "(" and everything after
-    // 2) lowercase
-    // 3) replace periods with spaces
-    // 4) remove non-alphanumeric except whitespace
-    // 5) trim
-    // 6) collapse whitespace
-    var normalizeAggressive = function(s) {
-      s = String(s || '');
-      var idx = s.indexOf('(');
-      if (idx >= 0) {
-        s = s.slice(0, idx);
-      }
-      s = s.toLowerCase();
-      s = s.replace(/\./g, ' ');
-      s = s.replace(/[^a-z0-9\s]/g, ' ');
-      s = s.trim().replace(/\s+/g, ' ');
-      return s;
-    };
-
-    // Choose the best match of `title` from `titleArray`.
-    // Strategy:
-    // 1) exact basic-normalized match
-    // 2) exact aggressive-normalized match
-    // 3) fallback to first candidate
-    var smartTitleMatch = function(title, titleArray) {
-      if (!Array.isArray(titleArray) || titleArray.length === 0) {
-        return null;
-      }
-
-      var wantBasic = normalizeBasic(title);
-      for (var i = 0; i < titleArray.length; i++) {
-        var cand = titleArray[i];
-        if (!cand) continue;
-        if (normalizeBasic(cand) === wantBasic) {
-          return cand;
-        }
-      }
-
-      var wantAgg = normalizeAggressive(title);
-      for (var j = 0; j < titleArray.length; j++) {
-        var cand2 = titleArray[j];
-        if (!cand2) continue;
-        if (normalizeAggressive(cand2) === wantAgg) {
-          return cand2;
-        }
-      }
-
-      for (var k = 0; k < titleArray.length; k++) {
-        if (titleArray[k]) return titleArray[k];
-      }
-      return null;
-    };
+    // smartTitleMatch() is provided by the shared tv-shared package.
 
     if (tvdbCache[title]) {
       seriesName = tvdbCache[title];

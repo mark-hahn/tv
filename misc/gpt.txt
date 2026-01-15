@@ -1,5 +1,14 @@
 
-refactor match choosing logic that compares a title arg against an array of titles arg and returns best match. this is the algorithm that uses basic normalization first, then aggressive.
+## current setup
 
-call it smartTitleMatch(title, titleArray) that returns chosenName
+- currently i have 3 servers running in pm2 on a remote linux server. all are nodejs. there is a fourth vue/vite web-based project being hosted that server. the vue/vite project calls endpoints on those 3 servers and apis from other web apis.
 
+## monorepo concerns
+
+- each of 3 servers and the vite/vue project currently have their own git repos at github.
+
+- if they are joined as monorepo would there need to be one new git github for all packages or could they stay separate?
+
+- if all were merged into one monorepo could i go back in git history to old commits in separate old github repos?
+
+## make no changes

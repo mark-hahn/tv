@@ -23,6 +23,7 @@
     "mkdirp": "^0.5.1",
     "parse-torrent-title": "^2.0.6",
     "request": "^2.83.0",
-    "rimraf": "^2.6.2"
+    "rimraf": "^2.6.2",
+    "tv-shared": "file:../tv-shared"
   }
 }

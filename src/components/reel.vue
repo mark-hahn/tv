@@ -41,6 +41,10 @@
           @click="handleImdb"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") {{ imdbButtonLabel }}
         button(
+          v-if="rtResult"
+          @click="handleRt"
+          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") {{ rtButtonLabel }}
+        button(
           v-if="googleResult"
           @click="handleGoogle"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Google
@@ -322,6 +326,19 @@ export default {
       return arr.find((r) => r && typeof r.name === 'string' && r.name.toUpperCase().startsWith('IMDB') && r.url) || null;
     });
 
+    const rtResult = computed(() => {
+      const arr = Array.isArray(getRemotesResults.value) ? getRemotesResults.value : [];
+      return arr.find((r) => {
+        const name = String(r?.name || '').trim().toLowerCase();
+        const url = String(r?.url || '').trim().toLowerCase();
+
+        const nameLooksRt = name === 'rotten tomatoes' || name === 'rottentomatoes' || name.includes('rotten') || name.includes('tomatoes');
+        const urlLooksRt = url.includes('rottentomatoes.com');
+
+        return !!(r?.url && (nameLooksRt || urlLooksRt));
+      }) || null;
+    });
+
     const wikiResult = computed(() => {
       const arr = Array.isArray(getRemotesResults.value) ? getRemotesResults.value : [];
       return arr.find((r) => r && r.name === 'Wikipedia' && r.url) || null;
@@ -334,6 +351,10 @@ export default {
 
     const imdbButtonLabel = computed(() => {
       return imdbResult.value?.name || 'Imdb';
+    });
+
+    const rtButtonLabel = computed(() => {
+      return rtResult.value?.name || 'Rotten Tomatoes';
     });
 
     const openUrl = (url) => {
@@ -354,6 +375,10 @@ export default {
       openUrl(imdbResult.value?.url);
     };
 
+    const handleRt = () => {
+      openUrl(rtResult.value?.url);
+    };
+
     const handleWiki = () => {
       openUrl(wikiResult.value?.url);
     };
@@ -363,7 +388,7 @@ export default {
     };
 
     const hasAnyRemoteButton = computed(() => {
-      return !!(imdbResult.value || googleResult.value || wikiResult.value || officialResult.value);
+      return !!(imdbResult.value || rtResult.value || googleResult.value || wikiResult.value || officialResult.value);
     });
 
     const loadRemotesForTvdb = async (tvdb) => {
@@ -392,8 +417,7 @@ export default {
             Name: name,
             TvdbId: tvdbId
           },
-          tvdbRemotes: tvdb.remote_ids,
-          fast: true
+          tvdbRemotes: tvdb.remote_ids
         };
         const res = await srvr.getRemotesCmd(params);
         getRemotesResults.value = Array.isArray(res) ? res : [];
@@ -575,9 +599,11 @@ export default {
       getRemotesResults,
       googleResult,
       imdbResult,
+      rtResult,
       wikiResult,
       officialResult,
       imdbButtonLabel,
+      rtButtonLabel,
       hasAnyRemoteButton,
       titleStrings,
       selectedTitleIdx,
@@ -594,6 +620,7 @@ export default {
       handleLoad,
       handleGoogle,
       handleImdb,
+      handleRt,
       handleWiki,
       handleOfficial
     };

@@ -1,0 +1,153 @@
+session id:  f1fd0596d93fc5ad959006d3cdafcc71
+Device Id:   9f53d43e-e5f7-5161-881a-d91843d0d372
+markUsrId:   894c752d448f45a3a1260ccaabd0adff
+itemId:      
+
+
+---- Services ----
+  ArtistsService CollectionService DeviceService GenresService
+  ImageService LibraryService MediaInfoService PlaystateService
+  RemoteImageService SessionsService SubtitleOptionsService
+  SubtitleService TvShowsService 
+  tested:  SessionsService PlaystateService
+
+
+---- PlaystateService ----
+works:        Stop Seek PlayPause PreviousTrack(home)
+doesn't work: Pause Unpause NextTrack
+exits emby:   Rewind FastForward SeekRelative
+
+works: PlayNow Message
+
+session SupportedCommands
+      "GoHome", "SendString", "GoToSearch", "GoToSettings", "DisplayContent", "DisplayMessage", "SetAudioStreamIndex", "SetSubtitleStreamIndex", "PlayMediaSource", "Mute", "Unmute", "ToggleMute", "VolumeUp", "VolumeDown", "SetVolume", "ToggleOsdMenu"
+
+
+---- stop ---- works ----
+curl -X 'POST'   'https://hahnca.com:8920/emby/Sessions/f1fd0596d93fc5ad959006d3cdafcc71/Playing/Stop?api_key=9863c23d912349599e395950609c84cc'   -H 'accept: */*'   -H 'Content-Type: application/json'   -d '{
+  "Command": "Stop",
+  "SeekPositionTicks": 0,
+  "ControllingUserId": "894c752d448f45a3a1260ccaabd0adff"
+}'
+
+---- seek ---- works ----
+curl -X 'POST'   'https://hahnca.com:8920/emby/Sessions/f1fd0596d93fc5ad959006d3cdafcc71/Playing/Seek?api_key=9863c23d912349599e395950609c84cc'   -H 'accept: */*'   -H 'Content-Type: application/json'   -d '{
+  "Command": "Seek",
+  "SeekPositionTicks": 6000000000,
+  "ControllingUserId": "894c752d448f45a3a1260ccaabd0adff"
+}'
+
+---- FastForward (exits emby) ----
+curl -X 'POST'   'https://hahnca.com:8920/emby/Sessions/f1fd0596d93fc5ad959006d3cdafcc71/Playing/FastForward?api_key=9863c23d912349599e395950609c84cc'   -H 'accept: */*'   -H 'Content-Type: application/json'   -d '{
+  "Command": "FastForward",
+  "SeekPositionTicks": 6000000000,
+  "ControllingUserId": "894c752d448f45a3a1260ccaabd0adff"
+}'
+
+---- Rewind (exits emby) ----
+curl -X 'POST' \
+  'https://hahnca.com:8920/emby/Sessions/f1fd0596d93fc5ad959006d3cdafcc71/Playing/Rewind?api_key=9863c23d912349599e395950609c84cc' \
+  -H 'accept: */*' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "Command": "Rewind",
+  "SeekPositionTicks": 10000,
+  "ControllingUserId": "894c752d448f45a3a1260ccaabd0adff"
+}'
+
+---- SetSubtitleStreamIndex ---- not valid cmd? ----
+curl -X 'POST'   'https://hahnca.com:8920/emby/Sessions/f1fd0596d93fc5ad959006d3cdafcc71/Playing/SetSubtitleStreamIndex?api_key=9863c23d912349599e395950609c84cc'   -H 'accept: */*'   -H 'Content-Type: application/json'   -d '{
+  "Command": "SetSubtitleStreamIndex",
+  "SeekPositionTicks": 6000000000,
+  "ControllingUserId": "894c752d448f45a3a1260ccaabd0adff"
+}'
+
+---- Pause ---- doesn't work  ----
+curl -X 'POST'   'https://hahnca.com:8920/emby/Sessions/f1fd0596d93fc5ad959006d3cdafcc71/Playing/Pause?api_key=9863c23d912349599e395950609c84cc'   -H 'accept: */*'   -H 'Content-Type: application/json'   -d '{
+  "Command": "Pause",
+  "SeekPositionTicks": 6000000000,
+  "ControllingUserId": "894c752d448f45a3a1260ccaabd0adff"
+}'
+
+---- Unpause ---- doesn't work  ----
+curl -X 'POST'   'https://hahnca.com:8920/emby/Sessions/f1fd0596d93fc5ad959006d3cdafcc71/Playing/Unpause?api_key=9863c23d912349599e395950609c84cc'   -H 'accept: */*'   -H 'Content-Type: application/json'   -d '{
+  "Command": "Unpause",
+  "SeekPositionTicks": 6000000000,
+  "ControllingUserId": "894c752d448f45a3a1260ccaabd0adff"
+}'
+
+---- PlayPause ---- works  ----
+curl -X 'POST'   'https://hahnca.com:8920/emby/Sessions/f1fd0596d93fc5ad959006d3cdafcc71/Playing/PlayPause?api_key=9863c23d912349599e395950609c84cc'   -H 'accept: */*'   -H 'Content-Type: application/json'   -d '{
+  "Command": "PlayPause",
+  "SeekPositionTicks": 6000000000,
+  "ControllingUserId": "894c752d448f45a3a1260ccaabd0adff"
+}'
+
+---- NextTrack ---- doesn't work  ----
+curl -X 'POST'   'https://hahnca.com:8920/emby/Sessions/f1fd0596d93fc5ad959006d3cdafcc71/Playing/NextTrack?api_key=9863c23d912349599e395950609c84cc'   -H 'accept: */*'   -H 'Content-Type: application/json'   -d '{
+  "Command": "NextTrack",
+  "SeekPositionTicks": 6000000000,
+  "ControllingUserId": "894c752d448f45a3a1260ccaabd0adff"
+}'
+
+---- PreviousTrack ---- home  ----
+curl -X 'POST'   'https://hahnca.com:8920/emby/Sessions/f1fd0596d93fc5ad959006d3cdafcc71/Playing/PreviousTrack?api_key=9863c23d912349599e395950609c84cc'   -H 'accept: */*'   -H 'Content-Type: application/json'   -d '{
+  "Command": "PreviousTrack",
+  "SeekPositionTicks": 6000000000,
+  "ControllingUserId": "894c752d448f45a3a1260ccaabd0adff"
+}'
+
+---- SeekRelative ---- exit emby  ----
+curl -X 'POST'   'https://hahnca.com:8920/emby/Sessions/f1fd0596d93fc5ad959006d3cdafcc71/Playing/SeekRelative?api_key=9863c23d912349599e395950609c84cc'   -H 'accept: */*'   -H 'Content-Type: application/json'   -d '{
+  "Command": "SeekRelative",
+  "SeekPositionTicks": -6000000000,
+  "ControllingUserId": "894c752d448f45a3a1260ccaabd0adff"
+}'
+
+-----------------------------------------------------------
+
+
+---- Message ---- works ----
+curl -X 'POST' \
+  'https://hahnca.com:8920/emby/Sessions/f1fd0596d93fc5ad959006d3cdafcc71/Message?Text=Hello&Header=World&TimeoutMs=3000&api_key=9863c23d912349599e395950609c84cc' \
+  -H 'accept: */*' \
+  -d ''
+
+---- PlayNow ---- starts MediaSourceId ----
+curl -X 'POST' \
+  'https://hahnca.com:8920/emby/Sessions/f1fd0596d93fc5ad959006d3cdafcc71/Playing?ItemIds=4785434&PlayCommand=PlayNow&api_key=9863c23d912349599e395950609c84cc' \
+  -H 'accept: */*' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "ControllingUserId": "894c752d448f45a3a1260ccaabd0adff",
+  "SubtitleStreamIndex": 2,
+  "AudioStreamIndex": 1,
+  "MediaSourceId": "d32472ba46a0cb977c224d5645307288",
+  "StartIndex": 1
+}'
+
+---- PlayNext ---- starts MediaSourceId ----
+curl -X 'POST' \
+  'https://hahnca.com:8920/emby/Sessions/f1fd0596d93fc5ad959006d3cdafcc71/Playing?ItemIds=4785434&PlayCommand=PlayNext&api_key=9863c23d912349599e395950609c84cc' \
+  -H 'accept: */*' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "ControllingUserId": "894c752d448f45a3a1260ccaabd0adff",
+  "SubtitleStreamIndex": 2,
+  "AudioStreamIndex": 1,
+  "MediaSourceId": "d32472ba46a0cb977c224d5645307288",
+  "StartIndex": 1
+}'
+
+---- PlayLast ---- starts MediaSourceId ----
+curl -X 'POST' \
+  'https://hahnca.com:8920/emby/Sessions/f1fd0596d93fc5ad959006d3cdafcc71/Playing?ItemIds=4785434&PlayCommand=PlayLast&api_key=9863c23d912349599e395950609c84cc' \
+  -H 'accept: */*' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "ControllingUserId": "894c752d448f45a3a1260ccaabd0adff",
+  "SubtitleStreamIndex": 2,
+  "AudioStreamIndex": 1,
+  "MediaSourceId": "d32472ba46a0cb977c224d5645307288",
+  "StartIndex": 1
+}'

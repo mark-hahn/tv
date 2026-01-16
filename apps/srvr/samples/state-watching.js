@@ -1,0 +1,38 @@
+const stateWatching = {
+  deviceName: "lindaTab",
+  deviceState: {
+    PlayState: {
+      PositionTicks: 3101980000,
+      CanSeek: true,
+      IsPaused: false,
+      IsMuted: false,
+      VolumeLevel: 87,
+      AudioStreamIndex: 1,
+      SubtitleStreamIndex: 2,
+      MediaSourceId: "819f1e1d27a0366179db43acc5c60ca1",
+      PlayMethod: "DirectStream",
+      RepeatMode: "RepeatNone",
+      SubtitleOffset: 0,
+      PlaybackRate: 1,
+    },
+    AdditionalUsers: [
+    ],
+    RemoteEndPoint: "192.168.1.137",
+    Protocol: "HTTP/1.1",
+    PlayableMediaTypes: [
+      "Audio",
+      "Video",
+    ],
+    PlaylistIndex: 0,
+    PlaylistLength: 1,
+    Id: "8ca69bb0cb5e91b9efc42866b905f63d",
+    ServerId: "ae3349983dbe45d9aa1d317a7753483e",
+    UserId: "894c752d448f45a3a1260ccaabd0adff",
+    UserName: "mark",
+    Client: "Emby for Android",
+    LastActivityDate: "2025-02-25T22:34:31.1008200Z",
+    DeviceName: "SM-X700",
+    SupportsRemoteControl: true,
+  },
+  showName: "Will Trent",
+}

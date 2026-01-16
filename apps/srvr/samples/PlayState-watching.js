@@ -1,0 +1,15 @@
+    PlayState: {
+      PositionTicks: 3101980000,
+      CanSeek: true,
+      IsPaused: false,
+      IsMuted: false,
+      VolumeLevel: 87,
+      AudioStreamIndex: 1,
+      SubtitleStreamIndex: 2,
+      MediaSourceId: "819f1e1d27a0366179db43acc5c60ca1",
+      PlayMethod: "DirectStream",
+      RepeatMode: "RepeatNone",
+      SubtitleOffset: 0,
+      PlaybackRate: 1,
+    },
+ 

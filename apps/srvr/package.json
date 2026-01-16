@@ -1,0 +1,42 @@
+{
+  "name": "tv-series-srvr",
+  "version": "1.0.0",
+  "description": "server for tv series web app",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mark-hahn/tv-series-srvr.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mark-hahn/tv-series-srvr/issues"
+  },
+  "homepage": "https://github.com/mark-hahn/tv-series-srvr#readme",
+  "dependencies": {
+    "base64-js": "^1.5.1",
+    "date-and-time": "^3.6.0",
+    "dotenv": "^17.2.3",
+    "mailtrap": "^4.3.2",
+    "moment": "^2.29.4",
+    "moviedb-promise": "^4.0.7",
+    "node-fetch": "^3.3.2",
+    "parse-torrent-title": "^2.1.0",
+    "playwright": "^1.57.0",
+    "public-ip": "^7.0.1",
+    "rimraf": "^6.0.1",
+    "ws": "^8.18.0"
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "config/*"
+    ],
+    "delay": 2500,
+    "stdout": true
+  },
+  "keywords": []
+}

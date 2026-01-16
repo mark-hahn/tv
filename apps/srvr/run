@@ -1,0 +1,8 @@
+echo "killing all tv-series-srvr apps"
+kill $(pgrep -f "tv-series-srvr") 2> /dev/null
+cd /root/dev/apps/tv-series-srvr
+pm2 flush  tv-series-srvr
+pm2 delete tv-series-srvr
+pm2 start  index.js --watch index.js -f --name tv-series-srvr
+pm2 save
+pm2 logs tv-series-srvr --time --lines 64 --raw

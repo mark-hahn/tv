@@ -152,18 +152,41 @@ const httpsOptions = {
   cert: fs.readFileSync(path.resolve(__dirname, '..', 'cookies', 'localhost-cert.pem'))
 };
 
-// Allow browser access from localhost dev (Vite) and from the hosted client.
-// This server is behind nginx, but we set CORS here too so direct responses
-// (including errors) are consistently usable.
+// CORS notes:
+// - Public browser traffic hits this service through nginx.
+// - nginx already injects CORS headers on that path.
+// - If we *also* set them here, nginx may forward a second header and some
+//   clients will observe a combined value like "*, *" (invalid), which breaks
+//   browser CORS.
+//
+// So: only emit CORS headers for direct (non-proxied) browser requests.
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  const hasOrigin = typeof req.headers.origin === 'string' && req.headers.origin.length > 0;
+  const disableInternalCors = process.env.DISABLE_INTERNAL_CORS === '1';
+  const behindProxy = Boolean(
+    req.headers['x-forwarded-host'] ||
+    req.headers['x-forwarded-proto'] ||
+    req.headers['x-forwarded-for']
+  );
 
-  if (req.method === 'OPTIONS') {
+  if (hasOrigin && !behindProxy && !disableInternalCors) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+    const reqHeaders = req.headers['access-control-request-headers'];
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      typeof reqHeaders === 'string' && reqHeaders.trim()
+        ? reqHeaders
+        : 'Content-Type, Authorization'
+    );
+  }
+
+  if (req.method === 'OPTIONS' && hasOrigin) {
+    // Preflight: return no-content. If proxied, nginx will attach CORS headers.
     res.sendStatus(204);
     return;
   }
+
   next();
 });
 

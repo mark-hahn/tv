@@ -4,6 +4,7 @@ dist/
 build/
 .output/
 .imports/
+secrets/
 .env
 .env.*
 *.log

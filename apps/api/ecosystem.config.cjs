@@ -10,6 +10,7 @@ module.exports = {
       max_restarts: 10,
       env: {
         NODE_ENV: 'production'
+        ,DISABLE_INTERNAL_CORS: '1'
       }
     }
   ]

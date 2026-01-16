@@ -40,8 +40,12 @@ const noEmbyStr  = readJsonTextOr('data/noemby.json',            []);
 const gapsPath   = 'data/gaps.json';
 const gapsStr    = fs.readFileSync(gapsPath,                      'utf8');
 
-const subsLoginPath = 'secrets/subs-login.txt';
-const subsTokenPath = 'secrets/subs-token.txt';
+// Secrets live at the worktree root (tv-worktree/secrets/*), not under apps/srvr.
+// Hard-wire to that location (no env vars, no searching).
+// This file is ESM; avoid __dirname by anchoring off process.cwd() (PM2 sets cwd=apps/srvr).
+const subsSecretsDir = path.resolve(process.cwd(), '..', '..', 'secrets');
+const subsLoginPath = path.join(subsSecretsDir, 'subs-login.txt');
+const subsTokenPath = path.join(subsSecretsDir, 'subs-token.txt');
 
 // OpenSubtitles requires a real app User-Agent; it will 403 on generic ones (e.g. node-fetch).
 const openSubtitlesUserAgent = 'tv-series-srvr v1.0.0';
@@ -621,6 +625,9 @@ async function persistSubsToken(token) {
   const t = typeof token === 'string' ? token.trim() : '';
   if (!t) throw new Error('subsSearch: empty token');
   subsTokenCache = t;
+  try {
+    fs.mkdirSync(path.dirname(subsTokenPath), { recursive: true });
+  } catch {}
   await util.writeFile(subsTokenPath, t);
 }
 

@@ -45,9 +45,11 @@ module.exports = {
       time: true,
       env: {
         NODE_ENV: 'production',
+        DISABLE_INTERNAL_CORS: '1',
       },
       env_production: {
         NODE_ENV: 'production',
+        DISABLE_INTERNAL_CORS: '1',
       },
     },
     {

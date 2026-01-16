@@ -96,6 +96,9 @@ Package naming uses `@tv/<name>`.
 
 Remote code lives under:
 
+- `hahnca.com:~/dev/apps/tv` (monorepo main checkout)
+- `hahnca.com:~/dev/apps/tv-worktrees/*` (deploy worktrees used by PM2)
+
 - `hahnca.com:~/dev/apps/tv-series-srvr`
 - `hahnca.com:~/dev/apps/tv-proc`
 - `hahnca.com:~/dev/apps/torrents-srvr`
@@ -119,6 +122,10 @@ This repo includes minimal scaffolding for that pattern:
 Example (run on the remote host):
 
 ```bash
+cd ~
+# one-shot bootstrap (clones to ~/dev/apps/tv, ensures node/pnpm/pm2, starts pm2 from a worktree)
+curl -fsSL https://raw.githubusercontent.com/mark-hahn/tv/main/scripts/remote/bootstrap.sh | bash
+
 cd ~/dev/apps/tv   # your "main" checkout of the monorepo
 ./scripts/worktree-add.sh main ~/dev/apps/tv-worktrees/main
 ./scripts/pm2-start-worktree.sh ~/dev/apps/tv-worktrees/main production

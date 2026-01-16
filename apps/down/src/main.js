@@ -137,7 +137,7 @@
   mkdirp = require('mkdirp');
   request = require('request');
   rimraf = require('rimraf');
-  var smartTitleMatch = require('tv-shared').smartTitleMatch;
+  var smartTitleMatch = require('@tv/share').smartTitleMatch;
   var parseTorrentTitle = require('parse-torrent-title').parse;
 
   // --- startProc server state ------------------------------------------------
@@ -849,7 +849,7 @@
   tvdburl = '';
 
   chkTvDB = () => {
-    // smartTitleMatch() is provided by the shared tv-shared package.
+    // smartTitleMatch() is provided by the shared @tv/share package.
 
     if (tvdbCache[title]) {
       seriesName = tvdbCache[title];

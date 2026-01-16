@@ -1,5 +1,5 @@
 {
-  "name": "tv-series-srvr",
+  "name": "@tv/srvr",
   "version": "1.0.0",
   "description": "server for tv series web app",
   "main": "index.js",

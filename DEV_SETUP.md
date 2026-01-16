@@ -88,7 +88,7 @@ Note: the `https://hahnca.com/...` and `wss://hahnca.com/...` URLs are the publi
 - `apps/srvr` → old `tv-series-srvr`
 - `apps/down` → old `tv-proc`
 - `apps/api` → old `torrents-srvr`
-- `packages/share` → old `tv-shared` (no git/GitHub in old world)
+- `packages/share` → shared utilities (formerly `tv-shared`)
 
 Package naming uses `@tv/<name>`.
 
@@ -98,11 +98,6 @@ Remote code lives under:
 
 - `hahnca.com:~/dev/apps/tv` (monorepo main checkout)
 - `hahnca.com:~/dev/apps/tv-worktrees/*` (deploy worktrees used by PM2)
-
-- `hahnca.com:~/dev/apps/tv-series-srvr`
-- `hahnca.com:~/dev/apps/tv-proc`
-- `hahnca.com:~/dev/apps/torrents-srvr`
-- `hahnca.com:~/dev/apps/tv-shared`
 
 The remote dir `tv-series-client` is only for hosting built production files.
 
@@ -134,20 +129,6 @@ cd ~/dev/apps/tv   # your "main" checkout of the monorepo
 ## Importing existing repos
 
 Use [scripts/import-repos.sh](scripts/import-repos.sh) (template) once the GitHub SSH URLs/branches are confirmed.
-
-## Sync tv-shared from remote
-
-The shared module originally lived on the remote server as `tv-shared` (not a GitHub repo). In this monorepo it is represented as `@tv/share` under `packages/share`.
-
-To sync the implementation from the remote server into this repo:
-
-```bash
-cd /root/apps/tv
-./scripts/sync-tv-shared.sh
 ```
 
-By default it pulls from `hahnca.com:/root/dev/apps/tv-shared/index.js`. Override if needed:
-
-- `REMOTE_HOST` (default: `hahnca.com`)
-- `REMOTE_TV_SHARED_DIR` (default: `/root/dev/apps/tv-shared`)
 

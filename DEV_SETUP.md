@@ -64,6 +64,8 @@ TV_ALLOW_LOCAL_SERVERS=1 pnpm dev:all
 
 These are the network endpoints currently hard-coded/assumed by `@tv/client`.
 
+Note: the `https://hahnca.com/...` and `wss://hahnca.com/...` URLs are the public nginx-facing endpoints (443); the “internal port” numbers are just what the services bind to on the host.
+
 - **Torrents API (remote `@tv/api`)**: `https://hahnca.com/torrents-api`
   - Used for most API calls (search/download/qBittorrent UI info, etc).
   - Also used as a TVDB proxy: `https://hahnca.com/torrents-api/api/tvdb/*`.

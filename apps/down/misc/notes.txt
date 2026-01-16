@@ -1,0 +1,4 @@
+
+i undid that change.  i want bits/sec for speed property. 
+
+- for the first ten progress calculations log the raw numbers used for the calculation including logging the progress text from rsync. include times for each progress update.

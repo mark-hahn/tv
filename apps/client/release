@@ -1,0 +1,17 @@
+#!/bin/bash
+echo ""
+echo ">>>> Build in PowerShell (not WSL) to avoid rollup issues"
+powershell.exe -Command "cd C:\Users\mark\apps\tv-series-client; npm run build-vite"
+
+echo ""
+echo ">>>> Deploy client"
+echo ""
+rsync -av --delete \
+      -e "ssh -i $HOME/.ssh/id_rsa -o IdentitiesOnly=yes" \
+      /mnt/c/Users/mark/apps/tv-series-client/shows/       \
+      root@hahnca.com:/root/dev/apps/tv-series-client/shows
+
+echo ""
+echo ">>>> Torrents server"
+echo "Torrents is deployed/managed separately on hahnca.com (/mnt/media/archive/dev/apps/torrents)."
+

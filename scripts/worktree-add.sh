@@ -28,6 +28,16 @@ echo "[worktree] repo=$ROOT_DIR"
 echo "[worktree] ref=$ref"
 echo "[worktree] dir=$worktree_dir"
 
+worktree_add_or_detach() {
+  local checkout_ref="$1"
+  shift
+  if git worktree add "$worktree_dir" "$checkout_ref"; then
+    return 0
+  fi
+  echo "[worktree] branch already in-use; falling back to detached checkout of $checkout_ref" >&2
+  git worktree add --detach "$worktree_dir" "$checkout_ref"
+}
+
 # Keep refs fresh.
 git fetch --all --prune --tags
 
@@ -38,13 +48,17 @@ fi
 
 # If ref is a local branch name, create/reset it to the remote tracking branch if possible.
 if git show-ref --verify --quiet "refs/heads/$ref"; then
-  git worktree add "$worktree_dir" "$ref"
+  worktree_add_or_detach "$ref"
   exit 0
 fi
 
 # If ref is a remote branch (origin/<ref>), create a local branch pointing at it.
 if git show-ref --verify --quiet "refs/remotes/origin/$ref"; then
-  git worktree add -B "$ref" "$worktree_dir" "origin/$ref"
+  if git worktree add -B "$ref" "$worktree_dir" "origin/$ref"; then
+    exit 0
+  fi
+  echo "[worktree] branch already in-use; falling back to detached checkout of origin/$ref" >&2
+  git worktree add --detach "$worktree_dir" "origin/$ref"
   exit 0
 fi
 

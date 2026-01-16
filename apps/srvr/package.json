@@ -5,7 +5,11 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node index.js",
+    "build": "node -e \"console.log('build: @tv/srvr (no build step)')\"",
+    "lint": "node -e \"console.log('lint: @tv/srvr (not configured)')\"",
+    "test": "node -e \"console.log('test: @tv/srvr (not configured)')\"",
+    "clean": "node -e \"console.log('clean: @tv/srvr (not configured)')\""
   },
   "repository": {
     "type": "git",

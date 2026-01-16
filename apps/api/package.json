@@ -5,9 +5,13 @@
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "build": "node -e \"console.log('build: @tv/api (no build step)')\"",
+    "lint": "node -e \"console.log('lint: @tv/api (not configured)')\"",
     "restart": "bash ./run",
     "test": "node torrents.js",
-    "tl-smoke": "node torrents/src/playwright-smoke.js"
+    "tl-smoke": "node torrents/src/playwright-smoke.js",
+    "clean": "node -e \"console.log('clean: @tv/api (not configured)')\""
   },
   "dependencies": {
     "dotenv": "^17.2.3",

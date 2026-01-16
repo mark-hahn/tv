@@ -6,8 +6,12 @@
   "scripts": {
     "serve-vite": "vite",
     "dev": "vite",
+    "build": "pnpm run build-vite",
     "build-vite": "vite build --base=/shows/ --outDir=shows",
-    "preview-vite": "vite preview"
+    "preview-vite": "vite preview",
+    "lint": "node -e \"console.log('lint: @tv/client (not configured)')\"",
+    "test": "node -e \"console.log('test: @tv/client (not configured)')\"",
+    "clean": "node -e \"console.log('clean: @tv/client (not configured)')\""
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^1.2.36",

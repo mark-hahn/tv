@@ -5,10 +5,10 @@
   "type": "commonjs",
   "main": "src/index.js",
   "scripts": {
-    "dev": "node -e \"console.log('dev: @tv/share (placeholder)')\"",
-    "build": "node -e \"console.log('build: @tv/share (placeholder)')\"",
-    "lint": "node -e \"console.log('lint: @tv/share (placeholder)')\"",
-    "test": "node -e \"console.log('test: @tv/share (placeholder)')\"",
-    "clean": "node -e \"console.log('clean: @tv/share (placeholder)')\""
+    "dev": "node -e \"console.log('dev: @tv/share (noop)')\"",
+    "build": "node -e \"console.log('build: @tv/share (noop)')\"",
+    "lint": "node -e \"console.log('lint: @tv/share (noop)')\"",
+    "test": "node -e \"console.log('test: @tv/share (noop)')\"",
+    "clean": "node -e \"console.log('clean: @tv/share (noop)')\""
   }
 }

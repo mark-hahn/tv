@@ -25,6 +25,9 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
       },
+      env_production: {
+        NODE_ENV: 'production',
+      },
     },
     {
       name: 'tv-down',
@@ -35,6 +38,9 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
       },
+      env_production: {
+        NODE_ENV: 'production',
+      },
     },
     {
       name: 'tv-srvr',
@@ -43,6 +49,9 @@ module.exports = {
       interpreter: 'node',
       time: true,
       env: {
+        NODE_ENV: 'production',
+      },
+      env_production: {
         NODE_ENV: 'production',
       },
     },

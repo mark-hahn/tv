@@ -152,9 +152,14 @@ const httpsOptions = {
   cert: fs.readFileSync(path.resolve(__dirname, '..', 'cookies', 'localhost-cert.pem'))
 };
 
-// Handle CORS preflight quickly.
-// CORS response headers are set by nginx (single source of truth).
+// Allow browser access from localhost dev (Vite) and from the hosted client.
+// This server is behind nginx, but we set CORS here too so direct responses
+// (including errors) are consistently usable.
 app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
   if (req.method === 'OPTIONS') {
     res.sendStatus(204);
     return;

@@ -60,6 +60,26 @@ If you ever need to intentionally run all dev tasks locally (not recommended), t
 TV_ALLOW_LOCAL_SERVERS=1 pnpm dev:all
 ```
 
+## Client: expected remote endpoints/ports
+
+These are the network endpoints currently hard-coded/assumed by `@tv/client`.
+
+- **Torrents API (remote `@tv/api`)**: `https://hahnca.com/torrents-api`
+  - Used for most API calls (search/download/qBittorrent UI info, etc).
+  - Also used as a TVDB proxy: `https://hahnca.com/torrents-api/api/tvdb/*`.
+  - Remote internal port is `3001` (typically reverse-proxied behind HTTPS).
+
+- **tv-proc (remote `@tv/down`)**: `https://hahnca.com/tvproc`
+  - Client uses: `/downloads`, `/startProc` (POST), `/deleteProcids` (POST).
+  - Remote internal port is `3003` (typically reverse-proxied behind HTTPS).
+
+- **tv-series-srvr websocket (remote `@tv/srvr`)**: `wss://hahnca.com/tv-series-srvr`
+  - Remote internal websocket port is `8736` (typically reverse-proxied behind WSS).
+
+- **Emby/Jellyfin-style API**: `https://hahnca.com:8920/emby/*` (explicit port `8920`).
+
+- **Show images**: `https://hahnca.com/tv/<Show Name>/(poster.jpg|landscape.jpg|clearlogo.png)`.
+
 ## Repo layout
 
 - `apps/client` → old `tv-series-client`

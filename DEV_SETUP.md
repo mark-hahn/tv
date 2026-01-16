@@ -110,10 +110,19 @@ The intended pattern is:
 - Use Git worktrees for deploy checkouts (per branch/release).
 - PM2 processes set `cwd` to the deployed worktree/app folder.
 
-This repo currently only includes scaffolding; once the old repos are imported we can add:
+This repo includes minimal scaffolding for that pattern:
 
-- `ecosystem.config.cjs` for `@tv/srvr`, `@tv/down`, `@tv/api`
-- `scripts/deploy-remote.sh` to build + rsync only production artifacts
+- [ecosystem.config.cjs](ecosystem.config.cjs) (PM2 config; `cwd` is inside the worktree)
+- [scripts/worktree-add.sh](scripts/worktree-add.sh) (create a worktree checkout)
+- [scripts/pm2-start-worktree.sh](scripts/pm2-start-worktree.sh) (start/restart PM2 from that worktree)
+
+Example (run on the remote host):
+
+```bash
+cd ~/dev/apps/tv   # your "main" checkout of the monorepo
+./scripts/worktree-add.sh main ~/dev/apps/tv-worktrees/main
+./scripts/pm2-start-worktree.sh ~/dev/apps/tv-worktrees/main production
+```
 
 ## Importing existing repos
 

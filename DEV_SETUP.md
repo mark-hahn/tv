@@ -24,7 +24,7 @@ export NVM_DIR="$HOME/.nvm"
 nvm install
 nvm use
 node -v
-```
+
 
 Node version is pinned by [.nvmrc](.nvmrc).
 
@@ -126,9 +126,7 @@ cd ~/dev/apps/tv   # your "main" checkout of the monorepo
 ./scripts/pm2-start-worktree.sh ~/dev/apps/tv-worktrees/main production
 ```
 
-## Importing existing repos
 
-Use [scripts/import-repos.sh](scripts/import-repos.sh) (template) once the GitHub SSH URLs/branches are confirmed.
-```
+<!-- -->
 
 

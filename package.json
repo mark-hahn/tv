@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "TURBO_UI=stream turbo run dev --parallel --filter=@tv/client",
-    "dev:all": "TURBO_UI=stream turbo run dev --parallel",
+    "dev:all": "node -e \"if(process.env.TV_ALLOW_LOCAL_SERVERS!=='1'){console.error('Refusing to start server apps locally. Set TV_ALLOW_LOCAL_SERVERS=1 to override (WSL only).');process.exit(1)}\" && TURBO_UI=stream turbo run dev --parallel",
     "build": "TURBO_UI=stream turbo run build",
     "lint": "TURBO_UI=stream turbo run lint",
     "test": "TURBO_UI=stream turbo run test",

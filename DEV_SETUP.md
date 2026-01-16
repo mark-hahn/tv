@@ -44,6 +44,22 @@ pnpm install
 pnpm dev
 ```
 
+`pnpm dev` starts only `@tv/client` (Vite) by default.
+
+### Remote-only servers
+
+Per project convention, server-side apps run on the remote host (`hahnca.com`) and you should not start them locally:
+
+- `@tv/srvr` (tv-series-srvr)
+- `@tv/down` (tv-proc)
+- `@tv/api` (torrents-srvr)
+
+If you ever need to intentionally run all dev tasks locally (not recommended), the repo includes a guarded command:
+
+```bash
+TV_ALLOW_LOCAL_SERVERS=1 pnpm dev:all
+```
+
 ## Repo layout
 
 - `apps/client` → old `tv-series-client`

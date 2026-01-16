@@ -19,12 +19,24 @@ process.setMaxListeners(50);
 const tvDir = '/mnt/media/tv';
 const exec  = utilNode.promisify(cp.exec);
 
-const headerStr  = fs.readFileSync('config/config1-header.txt',   'utf8');
-const rejectStr  = fs.readFileSync('config/config2-rejects.json', 'utf8');
-const middleStr  = fs.readFileSync('config/config3-middle.txt',   'utf8');
-const pickupStr  = fs.readFileSync('config/config4-pickups.json', 'utf8');
-const footerStr  = fs.readFileSync('config/config5-footer.txt',   'utf8');
-const noEmbyStr  = fs.readFileSync('data/noemby.json',            'utf8');
+function readTextOr(filePath, fallback) {
+  try {
+    return fs.readFileSync(filePath, 'utf8');
+  } catch {
+    return fallback;
+  }
+}
+
+function readJsonTextOr(filePath, fallbackObj) {
+  return readTextOr(filePath, JSON.stringify(fallbackObj));
+}
+
+const headerStr  = readTextOr('config/config1-header.txt',   '');
+const rejectStr  = readJsonTextOr('config/config2-rejects.json', []);
+const middleStr  = readTextOr('config/config3-middle.txt',   '');
+const pickupStr  = readJsonTextOr('config/config4-pickups.json', []);
+const footerStr  = readTextOr('config/config5-footer.txt',   '');
+const noEmbyStr  = readJsonTextOr('data/noemby.json',            []);
 const gapsPath   = 'data/gaps.json';
 const gapsStr    = fs.readFileSync(gapsPath,                      'utf8');
 

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+APP_NAME="torrents-server"
+PM2_CONFIG="ecosystem.config.cjs"
+
+if command -v pm2 >/dev/null 2>&1; then
+  # If the app exists in pm2, restart it. Otherwise, start it.
+  if pm2 jlist | grep -q '"name":"'"$APP_NAME"'"'; then
+    echo "[restart] pm2 restart $APP_NAME"
+    pm2 restart "$APP_NAME"
+  else
+    echo "[restart] pm2 start $PM2_CONFIG --only $APP_NAME"
+    pm2 start "$PM2_CONFIG" --only "$APP_NAME"
+  fi
+
+  echo "[restart] pm2 status"
+  pm2 status "$APP_NAME" || true
+  exit 0
+fi
+
+echo "[restart] pm2 not found; falling back to npm start"
+# If something is already bound to 3001, npm start will fail with EADDRINUSE.
+# In that case, install/use pm2 or stop the other process first.
+exec npm start

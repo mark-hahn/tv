@@ -1,0 +1,13 @@
+curl 'https://www.torrentleech.org/download/241560289/Its.Always.Sunny.in.Philadelphia.S17E03.1080p.WEB.H264-SuccessfulCrab.torrent' \
+  -H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0' \
+  -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' \
+  -H 'Accept-Language: en-US,en;q=0.5' \
+  -H 'Accept-Encoding: gzip, deflate, br, zstd' \
+  -H 'Connection: keep-alive' \
+  -H 'Cookie: lastBrowse1=1766901485; lastBrowse2=1766908416; cf_clearance=6VN00qwjAmalUkpKFJazf.EMXzbKGs7WjP4yiNszezo-1766881058-1.2.1.1-y_tRKj05Qk7fSflgYlKhcwPU.cJlmu9dHZOAmm75n_wwVn8bsFY.uJVvvV8PR2pjFVP4krC9aBiaoUt8JjKHZF8dDg.wYs.H5I07HAJ7p8QUUCKSxJ03kM7NnQZepGDhAihssHBeoiVwWs.b_zae_T1ZLQY52tQ2Zw0rnJWiF5qp0WoLPU27V8I9GZxWDv_BG4BQQERE_wUNw4TYqvzEjvzwYcEmo._plKq9ZC.rCk0; tluid=1781680; tlpass=4b3dced91b1d276cc6da1ceb56e2dc1f96a83ef9; PHPSESSID=vf6udrvcurs982ldov4olkol76' \
+  -H 'Upgrade-Insecure-Requests: 1' \
+  -H 'Sec-Fetch-Dest: document' \
+  -H 'Sec-Fetch-Mode: navigate' \
+  -H 'Sec-Fetch-Site: none' \
+  -H 'Sec-Fetch-User: ?1' \
+  -H 'Priority: u=0, i'

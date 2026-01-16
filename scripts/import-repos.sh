@@ -15,19 +15,14 @@ TV_SERIES_SRVR_URL="${TV_SERIES_SRVR_URL:-}"
 TV_PROC_URL="${TV_PROC_URL:-}"
 TORRENTS_SRVR_URL="${TORRENTS_SRVR_URL:-}"
 
+# Defaults (discovered from GitHub account). Override via env vars if needed.
+TV_SERIES_CLIENT_URL="${TV_SERIES_CLIENT_URL:-git@github.com:mark-hahn/tv-series-client.git}"
+TV_SERIES_SRVR_URL="${TV_SERIES_SRVR_URL:-git@github.com:mark-hahn/tv-series-srvr.git}"
+TV_PROC_URL="${TV_PROC_URL:-git@github.com:mark-hahn/tv-proc.git}"
+TORRENTS_SRVR_URL="${TORRENTS_SRVR_URL:-git@github.com:mark-hahn/torrents-srvr.git}"
+
 if [[ -z "$TV_SERIES_CLIENT_URL" || -z "$TV_SERIES_SRVR_URL" || -z "$TV_PROC_URL" || -z "$TORRENTS_SRVR_URL" ]]; then
-  cat <<'EOF'
-Missing one or more repo URLs.
-
-Set env vars then re-run:
-  export TV_SERIES_CLIENT_URL=git@github.com:<owner>/tv-series-client.git
-  export TV_SERIES_SRVR_URL=git@github.com:<owner>/tv-series-srvr.git
-  export TV_PROC_URL=git@github.com:<owner>/tv-proc.git
-  export TORRENTS_SRVR_URL=git@github.com:<owner>/torrents-srvr.git
-
-Then:
-  ./scripts/import-repos.sh
-EOF
+  echo "Missing one or more repo URLs" >&2
   exit 2
 fi
 

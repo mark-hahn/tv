@@ -1,0 +1,18 @@
+{
+  "name": "tv",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "TURBO_UI=stream turbo run dev --parallel",
+    "build": "TURBO_UI=stream turbo run build",
+    "lint": "TURBO_UI=stream turbo run lint",
+    "test": "TURBO_UI=stream turbo run test",
+    "clean": "TURBO_UI=stream turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0"
+  }
+}

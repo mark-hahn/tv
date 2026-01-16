@@ -1,0 +1,13 @@
+{
+  "name": "@tv/client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "node -e \"console.log('dev: @tv/client (placeholder)')\"",
+    "build": "node -e \"console.log('build: @tv/client (placeholder)')\"",
+    "lint": "node -e \"console.log('lint: @tv/client (placeholder)')\"",
+    "test": "node -e \"console.log('test: @tv/client (placeholder)')\"",
+    "clean": "node -e \"console.log('clean: @tv/client (placeholder)')\""
+  }
+}

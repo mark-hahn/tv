@@ -1,0 +1,13 @@
+{
+  "name": "@tv/srvr",
+  "private": true,
+  "version": "0.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "node -e \"console.log('dev: @tv/srvr (placeholder)')\"",
+    "build": "node -e \"console.log('build: @tv/srvr (placeholder)')\"",
+    "lint": "node -e \"console.log('lint: @tv/srvr (placeholder)')\"",
+    "test": "node -e \"console.log('test: @tv/srvr (placeholder)')\"",
+    "clean": "node -e \"console.log('clean: @tv/srvr (placeholder)')\""
+  }
+}

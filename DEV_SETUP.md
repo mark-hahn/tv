@@ -80,3 +80,20 @@ This repo currently only includes scaffolding; once the old repos are imported w
 ## Importing existing repos
 
 Use [scripts/import-repos.sh](scripts/import-repos.sh) (template) once the GitHub SSH URLs/branches are confirmed.
+
+## Sync tv-shared from remote
+
+The shared module originally lived on the remote server as `tv-shared` (not a GitHub repo). In this monorepo it is represented as `@tv/share` under `packages/share`.
+
+To sync the implementation from the remote server into this repo:
+
+```bash
+cd /root/apps/tv
+./scripts/sync-tv-shared.sh
+```
+
+By default it pulls from `hahnca.com:/root/dev/apps/tv-shared/index.js`. Override if needed:
+
+- `REMOTE_HOST` (default: `hahnca.com`)
+- `REMOTE_TV_SHARED_DIR` (default: `/root/dev/apps/tv-shared`)
+

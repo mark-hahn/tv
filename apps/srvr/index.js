@@ -15,6 +15,32 @@ import { parse as parseTorrentTitle } from 'parse-torrent-title';
 
 const dontupload  = false;
 
+const DEFAULT_TV_DATA_DIR = '/mnt/media/archive/dev/apps/tv-data';
+const TV_DATA_DIR = (typeof process.env.TV_DATA_DIR === 'string' && process.env.TV_DATA_DIR.trim())
+  ? process.env.TV_DATA_DIR.trim()
+  : DEFAULT_TV_DATA_DIR;
+
+const SRVR_DATA_DIR = path.join(TV_DATA_DIR, 'srvr', 'data');
+const SECRETS_DIR = path.join(TV_DATA_DIR, 'secrets');
+
+function ensureDir(dir) {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch {}
+}
+
+function firstExistingPath(paths) {
+  for (const p of paths) {
+    try {
+      if (p && fs.existsSync(p)) return p;
+    } catch {}
+  }
+  return paths && paths[0] ? paths[0] : null;
+}
+
+ensureDir(SRVR_DATA_DIR);
+ensureDir(SECRETS_DIR);
+
 process.setMaxListeners(50);
 const tvDir = '/mnt/media/tv';
 const exec  = utilNode.promisify(cp.exec);
@@ -36,29 +62,54 @@ const rejectStr  = readJsonTextOr('config/config2-rejects.json', []);
 const middleStr  = readTextOr('config/config3-middle.txt',   '');
 const pickupStr  = readJsonTextOr('config/config4-pickups.json', []);
 const footerStr  = readTextOr('config/config5-footer.txt',   '');
-const noEmbyStr  = readJsonTextOr('data/noemby.json',            []);
-const gapsPath   = 'data/gaps.json';
-const gapsStr    = fs.readFileSync(gapsPath,                      'utf8');
 
-// Secrets live at the worktree root (tv-worktree/secrets/*), not under apps/srvr.
-// Hard-wire to that location (no env vars, no searching).
+const noEmbyPath = firstExistingPath([
+  path.join(SRVR_DATA_DIR, 'noemby.json'),
+  'data/noemby.json'
+]);
+const gapsPath   = firstExistingPath([
+  path.join(SRVR_DATA_DIR, 'gaps.json'),
+  'data/gaps.json'
+]);
+
+const noEmbyStr  = readJsonTextOr(noEmbyPath, []);
+let gapsStr = readTextOr(gapsPath, '[]');
+try {
+  // If neither shared nor legacy existed, ensure the shared file exists for future runs.
+  if (!fs.existsSync(gapsPath)) {
+    ensureDir(path.dirname(gapsPath));
+    fs.writeFileSync(gapsPath, gapsStr, 'utf8');
+  }
+} catch {}
+
+// Shared secrets (worktree-independent). Fallback to legacy worktree-root secrets.
 // This file is ESM; avoid __dirname by anchoring off process.cwd() (PM2 sets cwd=apps/srvr).
-const subsSecretsDir = path.resolve(process.cwd(), '..', '..', 'secrets');
-const subsLoginPath = path.join(subsSecretsDir, 'subs-login.txt');
-const subsTokenPath = path.join(subsSecretsDir, 'subs-token.txt');
+const legacySubsSecretsDir = path.resolve(process.cwd(), '..', '..', 'secrets');
+const subsLoginPath = firstExistingPath([
+  path.join(SECRETS_DIR, 'subs-login.txt'),
+  path.join(legacySubsSecretsDir, 'subs-login.txt')
+]);
+const subsTokenReadPath = firstExistingPath([
+  path.join(SECRETS_DIR, 'subs-token.txt'),
+  path.join(legacySubsSecretsDir, 'subs-token.txt')
+]);
+const subsTokenWritePath = path.join(SECRETS_DIR, 'subs-token.txt');
 
 // OpenSubtitles requires a real app User-Agent; it will 403 on generic ones (e.g. node-fetch).
 const openSubtitlesUserAgent = 'tv-series-srvr v1.0.0';
 
 let subsTokenCache = null;
 try {
-  const token = fs.readFileSync(subsTokenPath, 'utf8');
+  const token = fs.readFileSync(subsTokenReadPath, 'utf8');
   subsTokenCache = typeof token === 'string' && token.trim() ? token.trim() : null;
 } catch {
   subsTokenCache = null;
 }
 
-const notesPath = 'data/notes.json';
+const notesPath = firstExistingPath([
+  path.join(SRVR_DATA_DIR, 'notes.json'),
+  'data/notes.json'
+]);
 let notesCache = {};
 try {
   const notesStr = fs.readFileSync(notesPath, 'utf8');
@@ -66,6 +117,7 @@ try {
 } catch (e) {
   // First run or corrupt JSON: create/reset to empty.
   try {
+    ensureDir(path.dirname(notesPath));
     fs.writeFileSync(notesPath, '{}', 'utf8');
   } catch {}
   notesCache = {};
@@ -626,9 +678,9 @@ async function persistSubsToken(token) {
   if (!t) throw new Error('subsSearch: empty token');
   subsTokenCache = t;
   try {
-    fs.mkdirSync(path.dirname(subsTokenPath), { recursive: true });
+    fs.mkdirSync(path.dirname(subsTokenWritePath), { recursive: true });
   } catch {}
-  await util.writeFile(subsTokenPath, t);
+  await util.writeFile(subsTokenWritePath, t);
 }
 
 async function openSubtitlesLogin({ apiKey, username, password }) {
@@ -1200,7 +1252,7 @@ const addNoEmby = async (id, showStr, resolve) => {
   }
   console.log('adding noemby:', name);
   noEmbys.push(show);
-  await util.writeFile('data/noemby.json', noEmbys); 
+  await util.writeFile(noEmbyPath, noEmbys); 
   resolve([id, 'ok']);
 }
 
@@ -1221,7 +1273,7 @@ const delNoEmby = async (id, name, resolve, reject) => {
     resolve([id, 'delNoEmby no match:' + name]);
     return;
   }
-  await util.writeFile('data/noemby.json', noEmbys); 
+  await util.writeFile(noEmbyPath, noEmbys); 
   resolve([id, 'ok']);
 }
 

@@ -13,15 +13,52 @@ const Database = require('better-sqlite3');
 const chokidar = require('chokidar');
 
 const BASEDIR = path.join(__dirname, '..');
-const DATA_DIR = path.join(BASEDIR, 'data');
+
+const DEFAULT_TV_DATA_DIR = '/mnt/media/archive/dev/apps/tv-data';
+const TV_DATA_DIR = (typeof process.env.TV_DATA_DIR === 'string' && process.env.TV_DATA_DIR.trim())
+  ? process.env.TV_DATA_DIR.trim()
+  : DEFAULT_TV_DATA_DIR;
+
+const APP_DIR = path.join(TV_DATA_DIR, 'down');
+const DATA_DIR = path.join(APP_DIR, 'data');
+const MISC_DIR = path.join(APP_DIR, 'misc');
+
+const LEGACY_DATA_DIR = path.join(BASEDIR, 'data');
+const LEGACY_MISC_DIR = path.join(BASEDIR, 'misc');
+
+function ensureDir(dir) {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch {}
+}
+
+function migrateFileIfMissing(destPath, legacyPath) {
+  try {
+    if (fs.existsSync(destPath)) return;
+    if (!fs.existsSync(legacyPath)) return;
+    ensureDir(path.dirname(destPath));
+    fs.copyFileSync(legacyPath, destPath);
+  } catch {}
+}
+
+ensureDir(DATA_DIR);
+ensureDir(MISC_DIR);
 
 // SQLite backing store
 const TV_DB_PATH = path.join(DATA_DIR, 'tv.sqlite');
 const TV_FINISHED_PATH = path.join(DATA_DIR, 'tv-finished.json');
 const TV_INPROGRESS_PATH = path.join(DATA_DIR, 'tv-inProgress.json');
-const TV_LOG_PATH = path.join(BASEDIR, 'misc', 'tv.log');
+const TV_LOG_PATH = path.join(MISC_DIR, 'tv.log');
 
 const TV_DB_BACKUP_PATH = path.join(DATA_DIR, 'tv.sqlite.backup');
+
+// Best-effort migration from legacy per-worktree locations.
+migrateFileIfMissing(TV_FINISHED_PATH, path.join(LEGACY_DATA_DIR, 'tv-finished.json'));
+migrateFileIfMissing(TV_INPROGRESS_PATH, path.join(LEGACY_DATA_DIR, 'tv-inProgress.json'));
+migrateFileIfMissing(TV_DB_PATH, path.join(LEGACY_DATA_DIR, 'tv.sqlite'));
+migrateFileIfMissing(TV_DB_PATH + '-wal', path.join(LEGACY_DATA_DIR, 'tv.sqlite-wal'));
+migrateFileIfMissing(TV_DB_PATH + '-shm', path.join(LEGACY_DATA_DIR, 'tv.sqlite-shm'));
+migrateFileIfMissing(TV_LOG_PATH, path.join(LEGACY_MISC_DIR, 'tv.log'));
 
 // Local TV library root for watcher assignment.
 const TV_ROOT = '/mnt/media/tv';

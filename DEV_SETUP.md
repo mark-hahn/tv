@@ -116,6 +116,19 @@ This repo includes minimal scaffolding for that pattern:
 - [scripts/worktree-add.sh](scripts/worktree-add.sh) (create a worktree checkout)
 - [scripts/pm2-start-worktree.sh](scripts/pm2-start-worktree.sh) (start/restart PM2 from that worktree)
 
+## Shared data/secrets across worktrees
+
+Git worktrees should not each maintain their own `data/` or `secrets/` state, because switching branches/worktrees can clobber or diverge runtime state.
+
+All server-side apps in this repo now support a shared data root via `TV_DATA_DIR` (defaults to `/mnt/media/archive/dev/apps/tv-data`).
+
+Expected layout under `TV_DATA_DIR`:
+
+- `secrets/` (shared secrets)
+- `api/cookies/` (torrents API cookies, creds, local certs)
+- `down/data/` + `down/misc/` (tv-proc state/logs)
+- `srvr/data/` + `srvr/misc/` (tv-series-srvr state/logs)
+
 Example (run on the remote host):
 
 ```bash

@@ -44,17 +44,52 @@
   path = require('path');
 
   var BASEDIR = path.join(__dirname, '..');
-  var DATA_DIR = path.join(BASEDIR, 'data');
+
+  var DEFAULT_TV_DATA_DIR = '/mnt/media/archive/dev/apps/tv-data';
+  var TV_DATA_DIR = (typeof process.env.TV_DATA_DIR === 'string' && process.env.TV_DATA_DIR.trim())
+    ? process.env.TV_DATA_DIR.trim()
+    : DEFAULT_TV_DATA_DIR;
+
+  var APP_DIR = path.join(TV_DATA_DIR, 'down');
+  var DATA_DIR = path.join(APP_DIR, 'data');
+  var MISC_DIR = path.join(APP_DIR, 'misc');
+
+  var LEGACY_DATA_DIR = path.join(BASEDIR, 'data');
+  var LEGACY_MISC_DIR = path.join(BASEDIR, 'misc');
+
+  var ensureDir = function(dir) {
+    try {
+      return fs.mkdirpSync(dir);
+    } catch (e) {}
+  };
+
+  var migrateFileIfMissing = function(destPath, legacyPath) {
+    try {
+      if (fs.existsSync(destPath)) return;
+      if (!fs.existsSync(legacyPath)) return;
+      ensureDir(path.dirname(destPath));
+      return fs.copyFileSync(legacyPath, destPath);
+    } catch (e) {}
+  };
+
+  ensureDir(DATA_DIR);
+  ensureDir(MISC_DIR);
   var dataPath = function(p) {
     return path.join(DATA_DIR, p);
   };
 
-  // tv.log lives under misc/ (BASEDIR/misc/tv.log)
-  var TV_LOG_PATH = path.join(BASEDIR, 'misc', 'tv.log');
+  // tv.log lives under misc/ (shared TV_DATA_DIR/down/misc/tv.log)
+  var TV_LOG_PATH = path.join(MISC_DIR, 'tv.log');
   var TV_FINISHED_PATH = dataPath('tv-finished.json');
   var TV_INPROGRESS_PATH = dataPath('tv-inProgress.json');
   var TV_BLOCKED_PATH = dataPath('tv-blocked.json');
   var TV_MAP_PATH = dataPath('tv-map');
+
+  // Best-effort migration from legacy per-worktree locations.
+  migrateFileIfMissing(TV_FINISHED_PATH, path.join(LEGACY_DATA_DIR, 'tv-finished.json'));
+  migrateFileIfMissing(TV_INPROGRESS_PATH, path.join(LEGACY_DATA_DIR, 'tv-inProgress.json'));
+  migrateFileIfMissing(TV_BLOCKED_PATH, path.join(LEGACY_DATA_DIR, 'tv-blocked.json'));
+  migrateFileIfMissing(TV_LOG_PATH, path.join(LEGACY_MISC_DIR, 'tv.log'));
 
   try {
     fs.mkdirpSync(path.dirname(TV_LOG_PATH));

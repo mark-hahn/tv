@@ -46,10 +46,12 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         DISABLE_INTERNAL_CORS: '1',
+        TV_DATA_DIR: '/mnt/media/archive/dev/apps/tv-data',
       },
       env_production: {
         NODE_ENV: 'production',
         DISABLE_INTERNAL_CORS: '1',
+        TV_DATA_DIR: '/mnt/media/archive/dev/apps/tv-data',
       },
     },
     {
@@ -60,9 +62,11 @@ module.exports = {
       time: true,
       env: {
         NODE_ENV: 'production',
+        TV_DATA_DIR: '/mnt/media/archive/dev/apps/tv-data',
       },
       env_production: {
         NODE_ENV: 'production',
+        TV_DATA_DIR: '/mnt/media/archive/dev/apps/tv-data',
       },
     },
     {
@@ -73,9 +77,11 @@ module.exports = {
       time: true,
       env: {
         NODE_ENV: 'production',
+        TV_DATA_DIR: '/mnt/media/archive/dev/apps/tv-data',
       },
       env_production: {
         NODE_ENV: 'production',
+        TV_DATA_DIR: '/mnt/media/archive/dev/apps/tv-data',
       },
     },
   ],

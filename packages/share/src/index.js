@@ -1,5 +1,74 @@
 'use strict';
 
+var path = require('path');
+var fs = require('fs');
+
+var DEFAULT_TV_DATA_DIR = '/mnt/media/archive/dev/apps/tv-data';
+
+var getTvDataDir = function() {
+  var v = process.env.TV_DATA_DIR;
+  if (typeof v === 'string') {
+    v = v.trim();
+    if (v) return v;
+  }
+  return DEFAULT_TV_DATA_DIR;
+};
+
+var ensureDir = function(dir) {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch (e) {
+    // ignore
+  }
+};
+
+var getTvPaths = function() {
+  var base = getTvDataDir();
+  var secretsDir = path.join(base, 'secrets');
+
+  var apiDir = path.join(base, 'api');
+  var downDir = path.join(base, 'down');
+  var srvrDir = path.join(base, 'srvr');
+
+  return {
+    base: base,
+    secretsDir: secretsDir,
+    api: {
+      baseDir: apiDir,
+      cookiesDir: path.join(apiDir, 'cookies'),
+      miscDir: path.join(apiDir, 'misc'),
+      dataDir: path.join(apiDir, 'data')
+    },
+    down: {
+      baseDir: downDir,
+      dataDir: path.join(downDir, 'data'),
+      miscDir: path.join(downDir, 'misc')
+    },
+    srvr: {
+      baseDir: srvrDir,
+      dataDir: path.join(srvrDir, 'data'),
+      miscDir: path.join(srvrDir, 'misc')
+    }
+  };
+};
+
+var ensureTvDataLayout = function() {
+  var p = getTvPaths();
+  ensureDir(p.base);
+  ensureDir(p.secretsDir);
+  ensureDir(p.api.baseDir);
+  ensureDir(p.api.cookiesDir);
+  ensureDir(p.api.dataDir);
+  ensureDir(p.api.miscDir);
+  ensureDir(p.down.baseDir);
+  ensureDir(p.down.dataDir);
+  ensureDir(p.down.miscDir);
+  ensureDir(p.srvr.baseDir);
+  ensureDir(p.srvr.dataDir);
+  ensureDir(p.srvr.miscDir);
+  return p;
+};
+
 var normalizeBasic = function(s) {
   return String(s || '').toLowerCase().trim().replace(/\s+/g, ' ');
 };
@@ -64,5 +133,8 @@ var smartTitleMatch = function(title, titleArray) {
 module.exports = {
   smartTitleMatch: smartTitleMatch,
   normalizeBasic: normalizeBasic,
-  normalizeAggressive: normalizeAggressive
+  normalizeAggressive: normalizeAggressive,
+  getTvDataDir: getTvDataDir,
+  getTvPaths: getTvPaths,
+  ensureTvDataLayout: ensureTvDataLayout
 };

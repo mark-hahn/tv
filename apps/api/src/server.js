@@ -11,6 +11,12 @@ import { tvdbProxyGet } from './tvdb-proxy.js';
 import { getQbtInfo, delQbtTorrent, spaceAvail, flexgetHistory, addQbtTorrent } from './usb.js';
 import { startReel, getReel } from './reelgood.js';
 import { checkFiles as tvProcCheckFiles } from './tv-proc.js';
+import {
+  getApiCookiesDir,
+  getApiMiscDir,
+  getSecretsDir,
+  preferSharedReadPath,
+} from './tvPaths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,7 +39,7 @@ function formatPstTimestamp(date = new Date()) {
 
 function appendCallsLog({ endpoint, method, ok, result, error }) {
   try {
-    const outPath = path.resolve(__dirname, '..', 'calls.log');
+    const outPath = path.join(getApiMiscDir(), 'calls.log');
     const asArray = Array.isArray(result)
       ? result.map(String)
       : (result && typeof result === 'object' && Array.isArray(result.existingTitles))
@@ -58,7 +64,7 @@ function appendCallsLog({ endpoint, method, ok, result, error }) {
 
 function appendDownloadsRequestLog(reqBody) {
   try {
-    const outPath = path.resolve(__dirname, '..', 'misc', 'temp.txt');
+    const outPath = path.join(getApiMiscDir(), 'temp.txt');
     const body = reqBody && typeof reqBody === 'object' ? reqBody : {};
 
     const hasTl = body.tl != null;
@@ -146,10 +152,20 @@ const FILTER_TORRENTS = false;
 // const FILTER_TORRENTS = {hash:   "629746091b23ec0617405e8cc6f1eee486447629"};
 // const FILTER_TORRENTS = {filter: 'downloading'}
 
-// Load SSL certificate
+// Load SSL certificate (prefer shared cookie store)
 const httpsOptions = {
-  key: fs.readFileSync(path.resolve(__dirname, '..', 'cookies', 'localhost-key.pem')),
-  cert: fs.readFileSync(path.resolve(__dirname, '..', 'cookies', 'localhost-cert.pem'))
+  key: fs.readFileSync(
+    preferSharedReadPath(
+      path.join(getApiCookiesDir(), 'localhost-key.pem'),
+      path.resolve(__dirname, '..', 'cookies', 'localhost-key.pem')
+    )
+  ),
+  cert: fs.readFileSync(
+    preferSharedReadPath(
+      path.join(getApiCookiesDir(), 'localhost-cert.pem'),
+      path.resolve(__dirname, '..', 'cookies', 'localhost-cert.pem')
+    )
+  ),
 };
 
 // CORS notes:
@@ -195,21 +211,33 @@ app.use(express.json());
 const OPENSUBTITLES_BASE_URL = 'https://api.opensubtitles.com/api/v1';
 
 function getRootSecretsDir() {
-  // Back-compat: when torrents lives inside the client repo
-  // torrents/src -> torrents -> repo root -> secrets
+  // Worktree-independent shared secrets directory (created if missing).
+  return getSecretsDir();
+}
+
+function getLegacySecretsDir() {
   const legacy = path.resolve(__dirname, '..', '..', 'secrets');
   if (fs.existsSync(legacy)) return legacy;
-
-  // Standalone: keep secrets alongside the torrents project root
-  // torrents/src -> torrents -> secrets
-  return path.resolve(__dirname, '..', 'secrets');
+  const local = path.resolve(__dirname, '..', 'secrets');
+  if (fs.existsSync(local)) return local;
+  return null;
 }
 
 function getSubsLoginPath() {
-  return path.join(getRootSecretsDir(), 'subs-login.txt');
+  const shared = path.join(getRootSecretsDir(), 'subs-login.txt');
+  const legacyDir = getLegacySecretsDir();
+  const legacy = legacyDir ? path.join(legacyDir, 'subs-login.txt') : null;
+  return preferSharedReadPath(shared, legacy || shared);
 }
 
-function getSubsTokenPath() {
+function getSubsTokenReadPath() {
+  const shared = path.join(getRootSecretsDir(), 'subs-token.txt');
+  const legacyDir = getLegacySecretsDir();
+  const legacy = legacyDir ? path.join(legacyDir, 'subs-token.txt') : null;
+  return preferSharedReadPath(shared, legacy || shared);
+}
+
+function getSubsTokenWritePath() {
   return path.join(getRootSecretsDir(), 'subs-token.txt');
 }
 
@@ -299,7 +327,7 @@ async function osLoginAndPersistToken() {
   if (!token) {
     throw new Error('OpenSubtitles login response missing token');
   }
-  await writeTextFile(getSubsTokenPath(), token);
+  await writeTextFile(getSubsTokenWritePath(), token);
   return { apiKey, token };
 }
 
@@ -315,7 +343,10 @@ async function loadLocalCfClearance(provider) {
   try {
     const p = String(provider || '').trim();
     if (!p) return '';
-    const inPath = path.resolve(__dirname, '..', 'cookies', 'cf-clearance.local.json');
+    const inPath = preferSharedReadPath(
+      path.join(getApiCookiesDir(), 'cf-clearance.local.json'),
+      path.resolve(__dirname, '..', 'cookies', 'cf-clearance.local.json')
+    );
     const raw = await fs.promises.readFile(inPath, 'utf8');
     const j = JSON.parse(raw);
     const v = j && typeof j === 'object' && !Array.isArray(j) ? j[p] : '';
@@ -333,7 +364,7 @@ app.post('/api/cf_clearance', async (req, res) => {
     const ipt = typeof body.ipt_cf === 'string' ? body.ipt_cf.trim() : '';
     const tl = typeof body.tl_cf === 'string' ? body.tl_cf.trim() : '';
 
-    const outPath = path.resolve(__dirname, '..', 'cookies', 'cf-clearance.local.json');
+    const outPath = path.join(getApiCookiesDir(), 'cf-clearance.local.json');
     let current = {};
     try {
       const raw = await fs.promises.readFile(outPath, 'utf8');
@@ -547,7 +578,7 @@ app.get('/api/subs/search', async (req, res) => {
       return res.status(500).json({ error: `Missing apiKey in ${loginPath}` });
     }
 
-    let token = await readTextIfExists(getSubsTokenPath());
+    let token = await readTextIfExists(getSubsTokenReadPath());
 
     const url = new URL(`${OPENSUBTITLES_BASE_URL}/subtitles`);
     if (qRaw) {

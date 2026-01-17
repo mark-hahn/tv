@@ -1,16 +1,49 @@
 import fs             from "fs";
+import * as path      from 'node:path';
 import fetch          from 'node-fetch';
 import * as urls      from "./urls.js";
 import {rottenSearch} from './rotten.js';
 import * as util      from "./util.js";
 const {log, start, end} = util.getLog('tvdb');
 
+const DEFAULT_TV_DATA_DIR = '/mnt/media/archive/dev/apps/tv-data';
+const TV_DATA_DIR = (typeof process.env.TV_DATA_DIR === 'string' && process.env.TV_DATA_DIR.trim())
+  ? process.env.TV_DATA_DIR.trim()
+  : DEFAULT_TV_DATA_DIR;
+
+const SRVR_DATA_DIR = path.join(TV_DATA_DIR, 'srvr', 'data');
+const TVDB_PATH = path.join(SRVR_DATA_DIR, 'tvdb.json');
+const LEGACY_TVDB_PATH = 'data/tvdb.json';
+
+function ensureDir(dir) {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch {}
+}
+
+function tvdbReadPath() {
+  try {
+    if (fs.existsSync(TVDB_PATH)) return TVDB_PATH;
+  } catch {}
+  return LEGACY_TVDB_PATH;
+}
+
+ensureDir(SRVR_DATA_DIR);
+
 const UPDATE_DATA = true;
 
 let addToPickupsCallback = null;
 
-const allTvdb = 
-      util.jParse(fs.readFileSync('data/tvdb.json', 'utf8'));
+let allTvdb = null;
+try {
+  allTvdb = util.jParse(fs.readFileSync(tvdbReadPath(), 'utf8'));
+} catch {
+  allTvdb = {};
+  try {
+    ensureDir(path.dirname(TVDB_PATH));
+    fs.writeFileSync(TVDB_PATH, JSON.stringify(allTvdb), 'utf8');
+  } catch {}
+}
 
 ///////////// get theTvdbToken //////////////
 // this is a duplicate of the client
@@ -405,7 +438,7 @@ const chkTvdbQueue = () => {
     }
     else tvdbData = allTvdb[tvdbData]; // tvdbData is name
     tvdbData.saved = Date.now();
-    util.writeFile('./data/tvdb.json', allTvdb);
+    util.writeFile(TVDB_PATH, allTvdb);
     chkTvdbQueueRunning == false;
     chkTvdbQueue();
   });
@@ -626,6 +659,6 @@ export const setTvdbFields =
     }
   }
   if(!paramObj.dontSave) 
-      await util.writeFile('./data/tvdb.json', allTvdb);
+      await util.writeFile(TVDB_PATH, allTvdb);
   resolve([id, tvdb ?? 'ok']);
 };

@@ -1,6 +1,19 @@
 import fs   from "fs";
 import fsp  from 'fs/promises' 
+import * as path from 'node:path';
 import date from 'date-and-time';
+
+const DEFAULT_TV_DATA_DIR = '/mnt/media/archive/dev/apps/tv-data';
+const TV_DATA_DIR = (typeof process.env.TV_DATA_DIR === 'string' && process.env.TV_DATA_DIR.trim())
+  ? process.env.TV_DATA_DIR.trim()
+  : DEFAULT_TV_DATA_DIR;
+
+const SRVR_MISC_DIR = path.join(TV_DATA_DIR, 'srvr', 'misc');
+const SRVR_LOG_PATH = path.join(SRVR_MISC_DIR, 'srvr.log');
+
+try {
+  fs.mkdirSync(SRVR_MISC_DIR, { recursive: true });
+} catch {}
 
 export const jParse = (str, label) => {
   let obj;
@@ -26,8 +39,16 @@ export const log = (msg, err = false, spacing = false) => {
                          : '    ') + ' ' + msg;
   if(err) console.error(msg);
   else    console.log(msg);
-  if(spacing) fs.appendFileSync('srvr.log', '\n');
-  fs.appendFileSync('srvr.log', msg + '\n');
+  try {
+    if(spacing) fs.appendFileSync(SRVR_LOG_PATH, '\n');
+    fs.appendFileSync(SRVR_LOG_PATH, msg + '\n');
+  } catch {
+    // Fallback to local file if shared path is unavailable.
+    try {
+      if(spacing) fs.appendFileSync('srvr.log', '\n');
+      fs.appendFileSync('srvr.log', msg + '\n');
+    } catch {}
+  }
   repeatCount = 0;
 }
 

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { parseKeyValueFile } from './qb-cred.js';
+import { getApiCookiesDir, preferSharedReadPath } from './tvPaths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,7 +12,10 @@ const __dirname = path.dirname(__filename);
 const execFileAsync = promisify(execFile);
 
 function resolveCredPath() {
-  return path.resolve(__dirname, '..', 'cookies', 'qbt-cred.txt');
+  return preferSharedReadPath(
+    path.join(getApiCookiesDir(), 'qbt-cred.txt'),
+    path.resolve(__dirname, '..', 'cookies', 'qbt-cred.txt')
+  );
 }
 
 async function loadQbtCreds() {

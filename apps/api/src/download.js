@@ -7,6 +7,8 @@ import { loadCreds } from './qb-cred.js';
 import parseTorrent from 'parse-torrent';
 import parseTorrentTitle from 'parse-torrent-title';
 
+import { getApiCookiesDir, getApiMiscDir, preferSharedReadPath } from './tvPaths.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -15,7 +17,7 @@ const DOWNLOAD_USER_AGENT =
 
 function appendTorrentBytesLog({ provider, method, downloadUrl, torrentData }) {
   try {
-    const outPath = path.join(__dirname, '..', 'misc', 'temp.txt');
+    const outPath = path.join(getApiMiscDir(), 'temp.txt');
     const buf = Buffer.isBuffer(torrentData) ? torrentData : Buffer.from(torrentData || []);
 
     let parsed = null;
@@ -167,7 +169,10 @@ async function loadLocalCfClearance(provider) {
   try {
     const p = String(provider || '').trim();
     if (!p) return '';
-    const inPath = path.join(__dirname, '..', 'cookies', 'cf-clearance.local.json');
+    const inPath = preferSharedReadPath(
+      path.join(getApiCookiesDir(), 'cf-clearance.local.json'),
+      path.join(__dirname, '..', 'cookies', 'cf-clearance.local.json')
+    );
     const raw = await fs.promises.readFile(inPath, 'utf8');
     const j = JSON.parse(raw);
     const v = j && typeof j === 'object' && !Array.isArray(j) ? j[p] : '';
@@ -285,7 +290,10 @@ function normalizeProvider(rawProvider, detailUrl) {
 let _cachedCreds;
 async function getCreds() {
   if (_cachedCreds) return _cachedCreds;
-  const credPath = path.join(__dirname, '..', 'cookies', 'download-cred.txt');
+  const credPath = preferSharedReadPath(
+    path.join(getApiCookiesDir(), 'download-cred.txt'),
+    path.join(__dirname, '..', 'cookies', 'download-cred.txt')
+  );
   const { creds } = await loadCreds(credPath);
   _cachedCreds = creds;
   return creds;
@@ -435,7 +443,10 @@ export async function fetchTorrentFile(torrent) {
   let allCookies = [];
   const cookieFile = provider === 'iptorrents' ? 'iptorrents.json' : null;
   if (cookieFile) {
-    const cookiePath = path.join(__dirname, '..', 'cookies', cookieFile);
+    const cookiePath = preferSharedReadPath(
+      path.join(getApiCookiesDir(), cookieFile),
+      path.join(__dirname, '..', 'cookies', cookieFile)
+    );
     try {
       const cookieData = JSON.parse(fs.readFileSync(cookiePath, 'utf8'));
       allCookies = cookieData

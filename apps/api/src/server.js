@@ -155,16 +155,10 @@ const FILTER_TORRENTS = false;
 // Load SSL certificate (prefer shared cookie store)
 const httpsOptions = {
   key: fs.readFileSync(
-    preferSharedReadPath(
-      path.join(getApiCookiesDir(), 'localhost-key.pem'),
-      path.resolve(__dirname, '..', 'cookies', 'localhost-key.pem')
-    )
+    path.join(getApiCookiesDir(), 'localhost-key.pem')
   ),
   cert: fs.readFileSync(
-    preferSharedReadPath(
-      path.join(getApiCookiesDir(), 'localhost-cert.pem'),
-      path.resolve(__dirname, '..', 'cookies', 'localhost-cert.pem')
-    )
+    path.join(getApiCookiesDir(), 'localhost-cert.pem')
   ),
 };
 
@@ -215,26 +209,12 @@ function getRootSecretsDir() {
   return getSecretsDir();
 }
 
-function getLegacySecretsDir() {
-  const legacy = path.resolve(__dirname, '..', '..', 'secrets');
-  if (fs.existsSync(legacy)) return legacy;
-  const local = path.resolve(__dirname, '..', 'secrets');
-  if (fs.existsSync(local)) return local;
-  return null;
-}
-
 function getSubsLoginPath() {
-  const shared = path.join(getRootSecretsDir(), 'subs-login.txt');
-  const legacyDir = getLegacySecretsDir();
-  const legacy = legacyDir ? path.join(legacyDir, 'subs-login.txt') : null;
-  return preferSharedReadPath(shared, legacy || shared);
+  return path.join(getRootSecretsDir(), 'subs-login.txt');
 }
 
 function getSubsTokenReadPath() {
-  const shared = path.join(getRootSecretsDir(), 'subs-token.txt');
-  const legacyDir = getLegacySecretsDir();
-  const legacy = legacyDir ? path.join(legacyDir, 'subs-token.txt') : null;
-  return preferSharedReadPath(shared, legacy || shared);
+  return path.join(getRootSecretsDir(), 'subs-token.txt');
 }
 
 function getSubsTokenWritePath() {
@@ -343,10 +323,7 @@ async function loadLocalCfClearance(provider) {
   try {
     const p = String(provider || '').trim();
     if (!p) return '';
-    const inPath = preferSharedReadPath(
-      path.join(getApiCookiesDir(), 'cf-clearance.local.json'),
-      path.resolve(__dirname, '..', 'cookies', 'cf-clearance.local.json')
-    );
+    const inPath = path.join(getApiCookiesDir(), 'cf-clearance.local.json');
     const raw = await fs.promises.readFile(inPath, 'utf8');
     const j = JSON.parse(raw);
     const v = j && typeof j === 'object' && !Array.isArray(j) ? j[p] : '';

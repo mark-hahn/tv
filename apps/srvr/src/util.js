@@ -42,13 +42,7 @@ export const log = (msg, err = false, spacing = false) => {
   try {
     if(spacing) fs.appendFileSync(SRVR_LOG_PATH, '\n');
     fs.appendFileSync(SRVR_LOG_PATH, msg + '\n');
-  } catch {
-    // Fallback to local file if shared path is unavailable.
-    try {
-      if(spacing) fs.appendFileSync('srvr.log', '\n');
-      fs.appendFileSync('srvr.log', msg + '\n');
-    } catch {}
-  }
+  } catch {}
   repeatCount = 0;
 }
 

@@ -13,7 +13,6 @@ const TV_DATA_DIR = (typeof process.env.TV_DATA_DIR === 'string' && process.env.
 
 const SRVR_DATA_DIR = path.join(TV_DATA_DIR, 'srvr', 'data');
 const TVDB_PATH = path.join(SRVR_DATA_DIR, 'tvdb.json');
-const LEGACY_TVDB_PATH = 'data/tvdb.json';
 
 function ensureDir(dir) {
   try {
@@ -21,14 +20,16 @@ function ensureDir(dir) {
   } catch {}
 }
 
-function tvdbReadPath() {
+function ensureFile(filePath, defaultStr) {
   try {
-    if (fs.existsSync(TVDB_PATH)) return TVDB_PATH;
+    if (fs.existsSync(filePath)) return;
+    ensureDir(path.dirname(filePath));
+    fs.writeFileSync(filePath, defaultStr, 'utf8');
   } catch {}
-  return LEGACY_TVDB_PATH;
 }
 
 ensureDir(SRVR_DATA_DIR);
+ensureFile(TVDB_PATH, '{}');
 
 const UPDATE_DATA = true;
 
@@ -36,7 +37,7 @@ let addToPickupsCallback = null;
 
 let allTvdb = null;
 try {
-  allTvdb = util.jParse(fs.readFileSync(tvdbReadPath(), 'utf8'));
+  allTvdb = util.jParse(fs.readFileSync(TVDB_PATH, 'utf8'));
 } catch {
   allTvdb = {};
   try {

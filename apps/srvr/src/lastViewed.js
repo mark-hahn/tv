@@ -11,7 +11,6 @@ const TV_DATA_DIR = (typeof process.env.TV_DATA_DIR === 'string' && process.env.
 
 const SRVR_DATA_DIR = path.join(TV_DATA_DIR, 'srvr', 'data');
 const LAST_VIEWED_PATH = path.join(SRVR_DATA_DIR, 'lastViewed.json');
-const LEGACY_LAST_VIEWED_PATH = 'data/lastViewed.json';
 
 function ensureDir(dir) {
   try {
@@ -19,18 +18,28 @@ function ensureDir(dir) {
   } catch {}
 }
 
-function lastViewedReadPath() {
-  try {
-    if (fs.existsSync(LAST_VIEWED_PATH)) return LAST_VIEWED_PATH;
-  } catch {}
-  return LEGACY_LAST_VIEWED_PATH;
-}
-
 ensureDir(SRVR_DATA_DIR);
 
-const lastViewedStr =
-            fs.readFileSync(lastViewedReadPath(), 'utf8');
-const lastViewed = jParse(lastViewedStr, 'lastViewed');
+function ensureFile(filePath, defaultStr) {
+  try {
+    if (fs.existsSync(filePath)) return;
+    ensureDir(path.dirname(filePath));
+    fs.writeFileSync(filePath, defaultStr, 'utf8');
+  } catch {}
+}
+
+ensureFile(LAST_VIEWED_PATH, '{}');
+
+let lastViewed = {};
+try {
+  const raw = fs.readFileSync(LAST_VIEWED_PATH, 'utf8');
+  lastViewed = jParse(raw, 'lastViewed') || {};
+} catch {
+  lastViewed = {};
+  try {
+    ensureFile(LAST_VIEWED_PATH, '{}');
+  } catch {}
+}
 
 export const getLastViewed = (id, _param, resolve, _reject) => {
   resolve([id, lastViewed]);

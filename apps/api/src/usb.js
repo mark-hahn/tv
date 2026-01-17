@@ -12,10 +12,7 @@ const __dirname = path.dirname(__filename);
 const execFileAsync = promisify(execFile);
 
 function resolveCredPath() {
-  return preferSharedReadPath(
-    path.join(getApiCookiesDir(), 'qbt-cred.txt'),
-    path.resolve(__dirname, '..', 'cookies', 'qbt-cred.txt')
-  );
+  return path.join(getApiCookiesDir(), 'qbt-cred.txt');
 }
 
 async function loadQbtCreds() {

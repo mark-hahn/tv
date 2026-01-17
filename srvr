@@ -5,6 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SSH_HOST="hahnca.com"
 REMOTE_WORKTREE_BASE="/mnt/media/archive/dev/apps/tv-worktrees"
 
+DEFAULT_TV_DATA_DIR="/mnt/media/archive/dev/apps/tv-data"
+
 # This script deploys the *current working tree* via rsync (no git).
 #
 # By default it deploys to: $REMOTE_WORKTREE_BASE/main
@@ -108,8 +110,15 @@ remote_prepare_runtime_state() {
   # tv-srvr requires this file at startup.
   local project="${1:-all}"
   if [[ "$project" == "all" || "$project" == "srvr" ]]; then
-    echo "[remote] ensure tv-srvr data/lastViewed.json exists"
-    ssh "$SSH_HOST" "cd '$REMOTE_DIR' && mkdir -p 'apps/srvr/data' && [ -f 'apps/srvr/data/lastViewed.json' ] || printf '{}' > 'apps/srvr/data/lastViewed.json'"
+    local tv_data_dir="${TV_DATA_DIR:-$DEFAULT_TV_DATA_DIR}"
+    local srvr_data_dir="$tv_data_dir/srvr/data"
+    echo "[remote] ensure tv-srvr state exists under $srvr_data_dir"
+    ssh "$SSH_HOST" "mkdir -p '$srvr_data_dir' \
+      && [ -f '$srvr_data_dir/lastViewed.json' ] || printf '{}' > '$srvr_data_dir/lastViewed.json' \
+      && [ -f '$srvr_data_dir/notes.json' ]      || printf '{}' > '$srvr_data_dir/notes.json' \
+      && [ -f '$srvr_data_dir/tvdb.json' ]       || printf '{}' > '$srvr_data_dir/tvdb.json' \
+      && [ -f '$srvr_data_dir/noemby.json' ]     || printf '[]' > '$srvr_data_dir/noemby.json' \
+      && [ -f '$srvr_data_dir/gaps.json' ]       || printf '[]' > '$srvr_data_dir/gaps.json'"
   fi
 }
 

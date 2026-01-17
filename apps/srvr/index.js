@@ -29,6 +29,14 @@ function ensureDir(dir) {
   } catch {}
 }
 
+function ensureFile(filePath, defaultStr) {
+  try {
+    if (fs.existsSync(filePath)) return;
+    ensureDir(path.dirname(filePath));
+    fs.writeFileSync(filePath, defaultStr, 'utf8');
+  } catch {}
+}
+
 function firstExistingPath(paths) {
   for (const p of paths) {
     try {
@@ -63,36 +71,19 @@ const middleStr  = readTextOr('config/config3-middle.txt',   '');
 const pickupStr  = readJsonTextOr('config/config4-pickups.json', []);
 const footerStr  = readTextOr('config/config5-footer.txt',   '');
 
-const noEmbyPath = firstExistingPath([
-  path.join(SRVR_DATA_DIR, 'noemby.json'),
-  'data/noemby.json'
-]);
-const gapsPath   = firstExistingPath([
-  path.join(SRVR_DATA_DIR, 'gaps.json'),
-  'data/gaps.json'
-]);
+const noEmbyPath = path.join(SRVR_DATA_DIR, 'noemby.json');
+const gapsPath   = path.join(SRVR_DATA_DIR, 'gaps.json');
+
+// Strict: persisted state must live under TV_DATA_DIR.
+ensureFile(noEmbyPath, '[]');
+ensureFile(gapsPath, '[]');
 
 const noEmbyStr  = readJsonTextOr(noEmbyPath, []);
 let gapsStr = readTextOr(gapsPath, '[]');
-try {
-  // If neither shared nor legacy existed, ensure the shared file exists for future runs.
-  if (!fs.existsSync(gapsPath)) {
-    ensureDir(path.dirname(gapsPath));
-    fs.writeFileSync(gapsPath, gapsStr, 'utf8');
-  }
-} catch {}
 
-// Shared secrets (worktree-independent). Fallback to legacy worktree-root secrets.
-// This file is ESM; avoid __dirname by anchoring off process.cwd() (PM2 sets cwd=apps/srvr).
-const legacySubsSecretsDir = path.resolve(process.cwd(), '..', '..', 'secrets');
-const subsLoginPath = firstExistingPath([
-  path.join(SECRETS_DIR, 'subs-login.txt'),
-  path.join(legacySubsSecretsDir, 'subs-login.txt')
-]);
-const subsTokenReadPath = firstExistingPath([
-  path.join(SECRETS_DIR, 'subs-token.txt'),
-  path.join(legacySubsSecretsDir, 'subs-token.txt')
-]);
+// Strict: shared secrets are worktree-independent under TV_DATA_DIR/secrets.
+const subsLoginPath = path.join(SECRETS_DIR, 'subs-login.txt');
+const subsTokenReadPath = path.join(SECRETS_DIR, 'subs-token.txt');
 const subsTokenWritePath = path.join(SECRETS_DIR, 'subs-token.txt');
 
 // OpenSubtitles requires a real app User-Agent; it will 403 on generic ones (e.g. node-fetch).
@@ -106,10 +97,8 @@ try {
   subsTokenCache = null;
 }
 
-const notesPath = firstExistingPath([
-  path.join(SRVR_DATA_DIR, 'notes.json'),
-  'data/notes.json'
-]);
+const notesPath = path.join(SRVR_DATA_DIR, 'notes.json');
+ensureFile(notesPath, '{}');
 let notesCache = {};
 try {
   const notesStr = fs.readFileSync(notesPath, 'utf8');

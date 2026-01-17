@@ -42,10 +42,7 @@ export function getApiMiscDir() {
 }
 
 export function preferSharedReadPath(sharedPath, legacyPath) {
-  try {
-    if (sharedPath && fs.existsSync(sharedPath)) return sharedPath;
-  } catch {
-    // ignore
-  }
-  return legacyPath;
+  // Strict mode: always use shared TV_DATA_DIR paths.
+  // (Callers should ensure the file exists under TV_DATA_DIR.)
+  return sharedPath;
 }

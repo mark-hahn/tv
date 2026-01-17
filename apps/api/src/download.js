@@ -169,10 +169,7 @@ async function loadLocalCfClearance(provider) {
   try {
     const p = String(provider || '').trim();
     if (!p) return '';
-    const inPath = preferSharedReadPath(
-      path.join(getApiCookiesDir(), 'cf-clearance.local.json'),
-      path.join(__dirname, '..', 'cookies', 'cf-clearance.local.json')
-    );
+    const inPath = path.join(getApiCookiesDir(), 'cf-clearance.local.json');
     const raw = await fs.promises.readFile(inPath, 'utf8');
     const j = JSON.parse(raw);
     const v = j && typeof j === 'object' && !Array.isArray(j) ? j[p] : '';
@@ -290,10 +287,7 @@ function normalizeProvider(rawProvider, detailUrl) {
 let _cachedCreds;
 async function getCreds() {
   if (_cachedCreds) return _cachedCreds;
-  const credPath = preferSharedReadPath(
-    path.join(getApiCookiesDir(), 'download-cred.txt'),
-    path.join(__dirname, '..', 'cookies', 'download-cred.txt')
-  );
+  const credPath = path.join(getApiCookiesDir(), 'download-cred.txt');
   const { creds } = await loadCreds(credPath);
   _cachedCreds = creds;
   return creds;
@@ -443,10 +437,7 @@ export async function fetchTorrentFile(torrent) {
   let allCookies = [];
   const cookieFile = provider === 'iptorrents' ? 'iptorrents.json' : null;
   if (cookieFile) {
-    const cookiePath = preferSharedReadPath(
-      path.join(getApiCookiesDir(), cookieFile),
-      path.join(__dirname, '..', 'cookies', cookieFile)
-    );
+    const cookiePath = path.join(getApiCookiesDir(), cookieFile);
     try {
       const cookieData = JSON.parse(fs.readFileSync(cookiePath, 'utf8'));
       allCookies = cookieData

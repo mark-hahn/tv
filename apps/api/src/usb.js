@@ -17,6 +17,11 @@ function resolveCredPath() {
 
 async function loadQbtCreds() {
   const credPath = resolveCredPath();
+  try {
+    await fs.access(credPath);
+  } catch {
+    throw new Error(`Missing required qBittorrent creds file: ${credPath}`);
+  }
   const text = await fs.readFile(credPath, 'utf8');
   const creds = parseKeyValueFile(text);
 
@@ -48,6 +53,11 @@ async function loadQbtCreds() {
 
 async function loadQbHostForSsh() {
   const credPath = resolveCredPath();
+  try {
+    await fs.access(credPath);
+  } catch {
+    throw new Error(`Missing required qBittorrent creds file: ${credPath}`);
+  }
   const text = await fs.readFile(credPath, 'utf8');
   const creds = parseKeyValueFile(text);
   const qbHost = creds.QB_HOST;

@@ -13,19 +13,15 @@ const SRVR_DATA_DIR = path.join(TV_DATA_DIR, 'srvr', 'data');
 const LAST_VIEWED_PATH = path.join(SRVR_DATA_DIR, 'lastViewed.json');
 
 function ensureDir(dir) {
-  try {
-    fs.mkdirSync(dir, { recursive: true });
-  } catch {}
+  fs.mkdirSync(dir, { recursive: true });
 }
 
 ensureDir(SRVR_DATA_DIR);
 
 function ensureFile(filePath, defaultStr) {
-  try {
-    if (fs.existsSync(filePath)) return;
-    ensureDir(path.dirname(filePath));
-    fs.writeFileSync(filePath, defaultStr, 'utf8');
-  } catch {}
+  if (fs.existsSync(filePath)) return;
+  ensureDir(path.dirname(filePath));
+  fs.writeFileSync(filePath, defaultStr, 'utf8');
 }
 
 ensureFile(LAST_VIEWED_PATH, '{}');
@@ -35,10 +31,10 @@ try {
   const raw = fs.readFileSync(LAST_VIEWED_PATH, 'utf8');
   lastViewed = jParse(raw, 'lastViewed') || {};
 } catch {
-  lastViewed = {};
-  try {
-    ensureFile(LAST_VIEWED_PATH, '{}');
-  } catch {}
+  // Fail fast: lastViewed is required state.
+  ensureFile(LAST_VIEWED_PATH, '{}');
+  const raw = fs.readFileSync(LAST_VIEWED_PATH, 'utf8');
+  lastViewed = jParse(raw, 'lastViewed') || {};
 }
 
 export const getLastViewed = (id, _param, resolve, _reject) => {

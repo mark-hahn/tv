@@ -26,7 +26,10 @@ const SECRETS_DIR = path.join(TV_DATA_DIR, 'secrets');
 function ensureDir(dir) {
   try {
     fs.mkdirSync(dir, { recursive: true });
-  } catch {}
+  } catch (e) {
+    console.error(`[tv-srvr] FATAL: cannot create dir: ${dir}`, e?.message || e);
+    process.exit(1);
+  }
 }
 
 function ensureFile(filePath, defaultStr) {
@@ -34,7 +37,10 @@ function ensureFile(filePath, defaultStr) {
     if (fs.existsSync(filePath)) return;
     ensureDir(path.dirname(filePath));
     fs.writeFileSync(filePath, defaultStr, 'utf8');
-  } catch {}
+  } catch (e) {
+    console.error(`[tv-srvr] FATAL: cannot create required file: ${filePath}`, e?.message || e);
+    process.exit(1);
+  }
 }
 
 function firstExistingPath(paths) {

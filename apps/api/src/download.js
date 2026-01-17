@@ -288,6 +288,13 @@ let _cachedCreds;
 async function getCreds() {
   if (_cachedCreds) return _cachedCreds;
   const credPath = path.join(getApiCookiesDir(), 'download-cred.txt');
+  try {
+    if (!fs.existsSync(credPath)) {
+      throw new Error(`Missing required download credentials: ${credPath}`);
+    }
+  } catch (e) {
+    throw new Error(e?.message || String(e));
+  }
   const { creds } = await loadCreds(credPath);
   _cachedCreds = creds;
   return creds;

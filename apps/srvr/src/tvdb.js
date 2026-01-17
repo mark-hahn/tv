@@ -15,17 +15,13 @@ const SRVR_DATA_DIR = path.join(TV_DATA_DIR, 'srvr', 'data');
 const TVDB_PATH = path.join(SRVR_DATA_DIR, 'tvdb.json');
 
 function ensureDir(dir) {
-  try {
-    fs.mkdirSync(dir, { recursive: true });
-  } catch {}
+  fs.mkdirSync(dir, { recursive: true });
 }
 
 function ensureFile(filePath, defaultStr) {
-  try {
-    if (fs.existsSync(filePath)) return;
-    ensureDir(path.dirname(filePath));
-    fs.writeFileSync(filePath, defaultStr, 'utf8');
-  } catch {}
+  if (fs.existsSync(filePath)) return;
+  ensureDir(path.dirname(filePath));
+  fs.writeFileSync(filePath, defaultStr, 'utf8');
 }
 
 ensureDir(SRVR_DATA_DIR);

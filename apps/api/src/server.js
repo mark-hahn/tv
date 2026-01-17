@@ -144,6 +144,15 @@ console.error('[torrents-server] module loaded', {
   node: process.version,
 });
 
+function readRequiredFile(filePath, label) {
+  try {
+    return fs.readFileSync(filePath);
+  } catch (e) {
+    const msg = e && e.message ? e.message : String(e);
+    throw new Error(`Missing required ${label} at ${filePath}. (${msg})`);
+  }
+}
+
 const app = express();
 
 const QBT_TEST_PORT   = 3001;
@@ -154,12 +163,8 @@ const FILTER_TORRENTS = false;
 
 // Load SSL certificate (prefer shared cookie store)
 const httpsOptions = {
-  key: fs.readFileSync(
-    path.join(getApiCookiesDir(), 'localhost-key.pem')
-  ),
-  cert: fs.readFileSync(
-    path.join(getApiCookiesDir(), 'localhost-cert.pem')
-  ),
+  key: readRequiredFile(path.join(getApiCookiesDir(), 'localhost-key.pem'), 'TLS key (localhost-key.pem)'),
+  cert: readRequiredFile(path.join(getApiCookiesDir(), 'localhost-cert.pem'), 'TLS cert (localhost-cert.pem)'),
 };
 
 // CORS notes:

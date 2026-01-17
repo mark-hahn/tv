@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "/root/apps/tv"
+
+pnpm --filter @tv/client build
+
+rsync -av --delete "/root/apps/tv/apps/client/shows/" "hahnca.com:/root/dev/apps/tv-series-client/shows/"
+
+echo "Release complete: /root/apps/tv/apps/client/shows -> hahnca.com:/root/dev/apps/tv-series-client/shows"

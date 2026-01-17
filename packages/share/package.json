@@ -2,8 +2,9 @@
   "name": "@tv/share",
   "private": true,
   "version": "0.0.0",
-  "type": "commonjs",
-  "main": "src/index.js",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": "./src/index.js",
   "scripts": {
     "dev": "node -e \"console.log('dev: @tv/share (noop)')\"",
     "build": "node -e \"console.log('build: @tv/share (noop)')\"",

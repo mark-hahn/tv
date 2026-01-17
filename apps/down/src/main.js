@@ -105,6 +105,9 @@
   // tvJson.js owns tv.json cache and all worker lifecycle.
   var tvJson = require('./tvJson.js');
 
+  // Shared utils package is ESM; load via dynamic import.
+  var smartTitleMatch = (await import('@tv/share')).smartTitleMatch;
+
   // Startup marker (tv.log only)
   (function writeStartupMarker() {
     try {
@@ -157,7 +160,6 @@
   mkdirp = require('mkdirp');
   request = require('request');
   rimraf = require('rimraf');
-  var smartTitleMatch = require('@tv/share').smartTitleMatch;
   var parseTorrentTitle = require('parse-torrent-title').parse;
 
   // --- startProc server state ------------------------------------------------

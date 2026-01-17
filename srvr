@@ -3,34 +3,26 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SSH_HOST="hahnca.com"
-REMOTE_MAIN_DIR="/root/dev/apps/tv"
 REMOTE_WORKTREE_BASE="/mnt/media/archive/dev/apps/tv-worktrees"
 
-REPO_URL="$(git -C "$ROOT_DIR" remote get-url origin 2>/dev/null || true)"
-if [[ -z "$REPO_URL" ]]; then
-  echo "Error: no git remote 'origin' found (needed for standard deploy)" >&2
+# This script deploys the *current working tree* via rsync (no git).
+#
+# By default it deploys to: $REMOTE_WORKTREE_BASE/main
+# Override with:
+#   TV_DEPLOY_NAME=feature-x ./srvr [srvr|down|api]
+
+DEPLOY_NAME="${TV_DEPLOY_NAME:-main}"
+DEPLOY_NAME="${DEPLOY_NAME//\//__}"
+REMOTE_DIR="$REMOTE_WORKTREE_BASE/$DEPLOY_NAME"
+
+if [[ ! -d "$ROOT_DIR/apps" ]]; then
+  echo "Error: expected monorepo layout under $ROOT_DIR (missing apps/)" >&2
   exit 1
 fi
-
-GIT_BRANCH="$(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-GIT_SHA="$(git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null || true)"
-
-if [[ -z "$GIT_SHA" ]]; then
-  echo "Error: not a git repo: $ROOT_DIR" >&2
-  exit 1
-fi
-
-# Directory name used on the remote filesystem.
-BRANCH_DIR="$GIT_BRANCH"
-if [[ -z "$BRANCH_DIR" || "$BRANCH_DIR" == "HEAD" ]]; then
-  BRANCH_DIR="detached-${GIT_SHA:0:12}"
-fi
-BRANCH_DIR="${BRANCH_DIR//\//__}"
-
-REMOTE_DIR="$REMOTE_WORKTREE_BASE/$BRANCH_DIR"
 
 usage() {
   echo "Usage: $(basename "$0") [srvr|down|api]" >&2
+  echo "Env: TV_DEPLOY_NAME (default: main)" >&2
   exit 1
 }
 
@@ -43,55 +35,72 @@ pm2_name_for_project() {
   esac
 }
 
-push_ref_if_branch() {
-  # Standard deploy pattern: push to origin then have remote update its worktree.
-  # If detached, we can't push; remote will checkout by commit SHA.
-  if [[ -n "$GIT_BRANCH" && "$GIT_BRANCH" != "HEAD" ]]; then
-    if git -C "$ROOT_DIR" remote get-url origin >/dev/null 2>&1; then
-      echo "[git] pushing origin $GIT_BRANCH"
-      git -C "$ROOT_DIR" push -u origin "$GIT_BRANCH"
-    else
-      echo "[git] no origin remote; skipping push" >&2
-    fi
+remote_sync_tree() {
+  echo "[remote] syncing working tree via rsync -> $SSH_HOST:$REMOTE_DIR"
+  ssh "$SSH_HOST" "mkdir -p '$REMOTE_DIR'"
+
+  # Prefer rsync (fast). If remote doesn't have rsync, fall back to tar-over-ssh.
+  if ssh "$SSH_HOST" 'command -v rsync >/dev/null 2>&1'; then
+    rsync -az --delete \
+      --exclude '.git/' \
+      --exclude '.tv-deps.sha' \
+      --exclude 'node_modules/' \
+      --exclude '.turbo/' \
+      --exclude 'dist/' \
+      --exclude 'build/' \
+      --exclude '.output/' \
+      --exclude '.imports/' \
+      --exclude 'apps/**/node_modules/' \
+      --exclude 'apps/**/dist/' \
+      --exclude 'apps/**/build/' \
+      --exclude 'apps/**/.turbo/' \
+      --exclude 'apps/**/.output/' \
+      --exclude 'apps/**/.cache/' \
+      --exclude 'apps/**/.vite/' \
+      --exclude 'apps/**/.nuxt/' \
+      --exclude 'apps/**/.next/' \
+      --exclude 'apps/**/.svelte-kit/' \
+      --exclude 'apps/**/.parcel-cache/' \
+      "$ROOT_DIR/" "$SSH_HOST:$REMOTE_DIR/"
   else
-    echo "[git] detached HEAD ($GIT_SHA); skipping push" >&2
+    echo "[warn] rsync not found on remote; using tar-over-ssh" >&2
+    tar \
+      --exclude='.git' \
+      --exclude='node_modules' \
+      --exclude='.turbo' \
+      --exclude='dist' \
+      --exclude='build' \
+      --exclude='.output' \
+      --exclude='.imports' \
+      -C "$ROOT_DIR" -cf - . \
+      | ssh "$SSH_HOST" "tar -C '$REMOTE_DIR' -xpf -"
   fi
-}
-
-remote_update_worktree() {
-  local ref
-  if [[ -n "$GIT_BRANCH" && "$GIT_BRANCH" != "HEAD" ]]; then
-    ref="$GIT_BRANCH"
-  else
-    ref="$GIT_SHA"
-  fi
-
-  echo "[remote] updating worktree: $REMOTE_DIR (ref=$ref)"
-  ssh "$SSH_HOST" "mkdir -p '$REMOTE_WORKTREE_BASE'"
-
-  # Ensure the remote main repo exists (clone if missing) so we can create proper git worktrees.
-  ssh "$SSH_HOST" "mkdir -p '$(dirname "$REMOTE_MAIN_DIR")'"
-  ssh "$SSH_HOST" "if [ -d '$REMOTE_MAIN_DIR/.git' ]; then echo '[remote] main repo exists: $REMOTE_MAIN_DIR'; else echo '[remote] cloning main repo: $REMOTE_MAIN_DIR'; git clone '$REPO_URL' '$REMOTE_MAIN_DIR'; fi"
-
-  # Keep refs fresh.
-  ssh "$SSH_HOST" "git -C '$REMOTE_MAIN_DIR' fetch --all --prune --tags"
-
-  # If the target directory exists but is not a git worktree (e.g. rsync-deployed), wipe it.
-  ssh "$SSH_HOST" "if [ -e '$REMOTE_DIR' ] && [ ! -e '$REMOTE_DIR/.git' ]; then echo '[remote] removing non-worktree dir: $REMOTE_DIR'; rm -rf '$REMOTE_DIR'; fi"
-
-  # Force-recreate the worktree to guarantee it is correct.
-  ssh "$SSH_HOST" "if [ -e '$REMOTE_DIR/.git' ]; then git -C '$REMOTE_MAIN_DIR' worktree remove -f '$REMOTE_DIR' >/dev/null 2>&1 || true; fi"
-  ssh "$SSH_HOST" "rm -rf '$REMOTE_DIR'"
-  ssh "$SSH_HOST" "git -C '$REMOTE_MAIN_DIR' worktree add -f '$REMOTE_DIR' '$ref'"
 }
 
 remote_install_deps() {
   # Ensure runtime deps exist before starting PM2.
-  echo "[remote] pnpm install: $REMOTE_DIR"
+  # Avoid pnpm install unless lockfiles changed.
+  echo "[remote] deps check: $REMOTE_DIR"
   ssh "$SSH_HOST" "cd '$REMOTE_DIR' && command -v corepack >/dev/null 2>&1 && corepack enable >/dev/null 2>&1 || true"
   ssh "$SSH_HOST" "cd '$REMOTE_DIR' && if ! command -v pnpm >/dev/null 2>&1; then (command -v corepack >/dev/null 2>&1 && corepack prepare pnpm@latest --activate >/dev/null 2>&1) || true; fi"
   ssh "$SSH_HOST" "cd '$REMOTE_DIR' && command -v pnpm >/dev/null 2>&1 || { echo 'pnpm not found on remote PATH' >&2; exit 1; }"
-  ssh "$SSH_HOST" "cd '$REMOTE_DIR' && pnpm install"
+
+  ssh "$SSH_HOST" "cd '$REMOTE_DIR' && \
+    if [ ! -f pnpm-lock.yaml ]; then \
+      echo '[remote] no pnpm-lock.yaml; running pnpm install'; \
+      pnpm install; \
+    else \
+      if command -v sha256sum >/dev/null 2>&1; then H=sha256sum; else H='shasum -a 256'; fi; \
+      NEW=\$( ( (\$H pnpm-lock.yaml pnpm-workspace.yaml 2>/dev/null || \$H pnpm-lock.yaml) | \$H ) | awk '{print \$1}' ); \
+      OLD=\$(cat .tv-deps.sha 2>/dev/null || true); \
+      if [[ -n \"\$NEW\" && \"\$NEW\" == \"\$OLD\" && -d node_modules ]]; then \
+        echo '[remote] lockfiles unchanged; skipping pnpm install'; \
+      else \
+        echo '[remote] lockfiles changed (or missing node_modules); running pnpm install'; \
+        pnpm install; \
+        printf '%s\n' "\$NEW" > .tv-deps.sha; \
+      fi; \
+    fi"
 }
 
 remote_prepare_runtime_state() {
@@ -121,18 +130,31 @@ remote_pm2_start_one() {
   ssh "$SSH_HOST" "cd '$REMOTE_DIR' && pm2 start ecosystem.config.cjs --env production --update-env --only '$pm2_name' && pm2 save"
 }
 
+remote_pm2_restart_one() {
+  local project="$1"
+  local pm2_name
+  pm2_name="$(pm2_name_for_project "$project")"
+  echo "[pm2] restart $pm2_name (fallback to start)"
+  ssh "$SSH_HOST" "pm2 restart '$pm2_name' --update-env >/dev/null 2>&1 || (cd '$REMOTE_DIR' && pm2 start ecosystem.config.cjs --env production --update-env --only '$pm2_name')"
+  ssh "$SSH_HOST" "pm2 save >/dev/null 2>&1 || true"
+}
+
+remote_pm2_restart_all() {
+  echo "[pm2] restart all (fallback to start)"
+  ssh "$SSH_HOST" "pm2 restart tv-api tv-down tv-srvr --update-env >/dev/null 2>&1 || (cd '$REMOTE_DIR' && pm2 start ecosystem.config.cjs --env production --update-env)"
+  ssh "$SSH_HOST" "pm2 save >/dev/null 2>&1 || true"
+}
+
 if [[ "${1:-}" == "" ]]; then
-  push_ref_if_branch
-  remote_update_worktree
+  remote_sync_tree
   remote_install_deps
   remote_prepare_runtime_state all
-  remote_pm2_start_all
+  remote_pm2_restart_all
 elif [[ "${1:-}" == "srvr" || "${1:-}" == "down" || "${1:-}" == "api" ]]; then
-  push_ref_if_branch
-  remote_update_worktree
+  remote_sync_tree
   remote_install_deps
   remote_prepare_runtime_state "$1"
-  remote_pm2_start_one "$1"
+  remote_pm2_restart_one "$1"
 else
   usage
 fi

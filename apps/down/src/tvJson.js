@@ -14,7 +14,7 @@ const chokidar = require('chokidar');
 
 const BASEDIR = path.join(__dirname, '..');
 
-const DEFAULT_TV_DATA_DIR = '/mnt/media/archive/dev/apps/tv-data';
+const DEFAULT_TV_DATA_DIR = '/root/dev/apps/tv-data';
 const TV_DATA_DIR = (typeof process.env.TV_DATA_DIR === 'string' && process.env.TV_DATA_DIR.trim())
   ? process.env.TV_DATA_DIR.trim()
   : DEFAULT_TV_DATA_DIR;

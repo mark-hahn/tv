@@ -13,5 +13,5 @@ rsync -av --delete \
 
 echo ""
 echo ">>>> Torrents server"
-echo "Torrents is deployed/managed separately on hahnca.com (/mnt/media/archive/dev/apps/torrents)."
+echo "Torrents is deployed/managed separately on hahnca.com (/root/dev/apps/torrents)."
 

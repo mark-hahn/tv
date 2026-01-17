@@ -120,7 +120,7 @@ This repo includes minimal scaffolding for that pattern:
 
 Git worktrees should not each maintain their own `data/` or `secrets/` state, because switching branches/worktrees can clobber or diverge runtime state.
 
-All server-side apps in this repo now support a shared data root via `TV_DATA_DIR` (defaults to `/mnt/media/archive/dev/apps/tv-data`).
+All server-side apps in this repo now support a shared data root via `TV_DATA_DIR` (defaults to `/root/dev/apps/tv-data`).
 
 Expected layout under `TV_DATA_DIR`:
 

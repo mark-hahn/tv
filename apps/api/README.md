@@ -39,7 +39,7 @@ pm2 start ecosystem.config.cjs
 pm2 logs torrents-server
 ```
 
-Note: `ecosystem.config.cjs` sets `cwd` to `/mnt/media/archive/dev/apps/torrents`. If you run from a different path, update that field.
+Note: `ecosystem.config.cjs` sets `cwd` to `/root/dev/apps/torrents`. If you run from a different path, update that field.
 
 ## TLS certs (required)
 

@@ -3,9 +3,9 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SSH_HOST="hahnca.com"
-REMOTE_WORKTREE_BASE="/mnt/media/archive/dev/apps/tv-worktrees"
+REMOTE_WORKTREE_BASE="/root/dev/apps/tv-worktrees"
 
-DEFAULT_TV_DATA_DIR="/mnt/media/archive/dev/apps/tv-data"
+DEFAULT_TV_DATA_DIR="/root/dev/apps/tv-data"
 
 # This script deploys the *current working tree* via rsync (no git).
 #

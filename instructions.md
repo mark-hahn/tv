@@ -2,9 +2,9 @@
 
 ## make all these changes to integrate separate repo/projects to a new monorepo.  ask me for any decisions not covered here
 
-- install or make changes to repos, github, pm2, pnpm, corepack,  Turborepo,  worktrees, and any others needed. ensure the  same Node major/minor version is installed on remote server, wsl, and windows. use nvm where possible.  Run all CLI tasks in WSL: pnpm install, pnpm dev, build scripts, git hooks, release scripts.
+- install or make changes to repos, github, pm2, pnpm, corepack,  Turborepo, and any others needed. ensure the same Node major/minor version is installed on remote server, wsl, and windows. use nvm where possible. Run all CLI tasks in WSL: pnpm install, pnpm dev, build scripts, git hooks, release scripts.
 
-- use pnpm,  Turborepo with Local cache, Git worktrees + PM2 cwd
+- use pnpm, Turborepo with Local cache, PM2 with per-app `cwd` inside a single deployed checkout
 
 - Standardize dev tooling to  WSL (Node, pnpm, git, scripts). Open repo via VS Code Remote WSL.  Keep repo project folder under WSL filesystem, not /mnt/c.
 
@@ -18,7 +18,7 @@
 
 - keep tv as a project folder in wsl with only production files going to remote server for hosting
 
-- remote dirs are "hahnca.com:~/dev/apps/<project names>". <project names> are  tv-series-srvr, tv-proc,  torrents-srvr, and tv-shared.  remote dir tv-series-client is only for hosting of production released files.
+- remote deploy dir is "hahnca.com:~/dev/apps/tv" (rsync target). remote dir tv-series-client is only for hosting of production released files.
 
 -  tv-shared is a shared module. tv-shared has no git or github
 

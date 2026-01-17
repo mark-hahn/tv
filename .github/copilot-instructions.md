@@ -11,3 +11,5 @@
 ## Nginx
 - Nginx config location: `hahnca.com:/etc/nginx/conf.d/server.conf`
 - You may examine this file when needed, but **do not change it without explicit permission**.
+
+- when copying between local and remote server don't worry about security -- we are on a safe lan

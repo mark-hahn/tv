@@ -1,7 +1,7 @@
 import fs                  from "fs";
 import * as cp             from 'child_process';
 import * as path           from 'node:path';
-import { WebSocketServer } from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 import {rimraf}            from 'rimraf'
 import * as view           from './src/lastViewed.js';
 import * as utilNode       from "util";
@@ -87,7 +87,7 @@ ensureFile(gapsPath, '[]');
 const noEmbyStr  = readJsonTextOr(noEmbyPath, []);
 let gapsStr = readTextOr(gapsPath, '[]');
 
-// Strict: shared secrets are worktree-independent under TV_DATA_DIR/secrets.
+// Strict: shared secrets are checkout-independent under TV_DATA_DIR/secrets.
 const subsLoginPath = path.join(SECRETS_DIR, 'subs-login.txt');
 const subsTokenReadPath = path.join(SECRETS_DIR, 'subs-token.txt');
 const subsTokenWritePath = path.join(SECRETS_DIR, 'subs-token.txt');
@@ -1914,7 +1914,7 @@ let running = false;
 
 const runOne = () => {
   if(running || queue.length == 0) return;
-  running == true;
+  running = true;
 
   const {ws, id, fname, param} = queue.pop();
   if(ws.readyState !== WebSocket.OPEN) return;
@@ -1934,14 +1934,14 @@ const runOne = () => {
     const [id, result] = idResult;
     // console.log('resolved:', id);
     ws.send(`${id}~~~ok~~~${JSON.stringify(result)}`); 
-    running == false;
+    running = false;
     runOne();
   })
   .catch((idError) => {
     console.error('idResult err:', {idError});
     const [id, error] = idError;
     ws.send(`${id}~~~err~~~${JSON.stringify(error)}`); 
-    running == false;
+    running = false;
     runOne();
   });
 

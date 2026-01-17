@@ -3,12 +3,15 @@ set -euo pipefail
 
 # Create (or update) a git worktree checkout for a branch/tag/commit.
 #
+# Note: the current remote deployment pattern no longer uses worktrees; this
+# script is kept only for optional local/dev workflows.
+#
 # Usage:
 #   ./scripts/worktree-add.sh <ref> [worktree_dir]
 #
 # Examples:
 #   ./scripts/worktree-add.sh main
-#   ./scripts/worktree-add.sh release-2026-01-15 ~/dev/apps/tv-worktrees/release-2026-01-15
+#   ./scripts/worktree-add.sh release-2026-01-15 ~/dev/apps/tv-checkouts/release-2026-01-15
 #   ./scripts/worktree-add.sh v1.2.3
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -20,7 +23,7 @@ if [[ -z "$ref" ]]; then
   exit 2
 fi
 
-worktree_dir="${2:-$ROOT_DIR/../tv-worktrees/$ref}"
+worktree_dir="${2:-$ROOT_DIR/../tv-checkouts/$ref}"
 
 canon_path() {
   if command -v realpath >/dev/null 2>&1; then

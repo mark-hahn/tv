@@ -1,6 +1,7 @@
 import fs             from "fs";
 import * as path      from 'node:path';
 import fetch          from 'node-fetch';
+import WebSocket      from 'ws';
 import * as urls      from "./urls.js";
 import {rottenSearch} from './rotten.js';
 import * as util      from "./util.js";
@@ -418,7 +419,7 @@ let   chkTvdbQueueRunning = false;
 const chkTvdbQueue = () => {
   if(chkTvdbQueueRunning || 
      newTvdbQueue.length == 0) return;
-  chkTvdbQueueRunning == true;
+  chkTvdbQueueRunning = true;
   const {ws, id, paramObj} = newTvdbQueue.pop();
   if(ws && ws.readyState !== WebSocket.OPEN) return;
 
@@ -436,7 +437,7 @@ const chkTvdbQueue = () => {
     else tvdbData = allTvdb[tvdbData]; // tvdbData is name
     tvdbData.saved = Date.now();
     util.writeFile(TVDB_PATH, allTvdb);
-    chkTvdbQueueRunning == false;
+    chkTvdbQueueRunning = false;
     chkTvdbQueue();
   });
   getTvdbData(paramObj, resolve, reject);

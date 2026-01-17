@@ -3,28 +3,25 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SSH_HOST="hahnca.com"
-REMOTE_WORKTREE_BASE="/root/dev/apps/tv-worktrees"
+
+# Legacy flat remote layout (NOT a repo checkout).
+# Example mapping:
+#   local:  $ROOT_DIR/apps/api   -> remote: $TV_REMOTE_BASE/api
+#   local:  $ROOT_DIR/apps/srvr  -> remote: $TV_REMOTE_BASE/srvr
+#   local:  $ROOT_DIR/apps/down  -> remote: $TV_REMOTE_BASE/down
+TV_REMOTE_BASE="${TV_REMOTE_BASE:-/root/dev/apps/tv}"
 
 DEFAULT_TV_DATA_DIR="/root/dev/apps/tv-data"
 
-# This script deploys the *current working tree* via rsync (no git).
-#
-# By default it deploys to: $REMOTE_WORKTREE_BASE/main
-# Override with:
-#   TV_DEPLOY_NAME=feature-x ./srvr [srvr|down|api]
-
-DEPLOY_NAME="${TV_DEPLOY_NAME:-main}"
-DEPLOY_NAME="${DEPLOY_NAME//\//__}"
-REMOTE_DIR="$REMOTE_WORKTREE_BASE/$DEPLOY_NAME"
-
 if [[ ! -d "$ROOT_DIR/apps" ]]; then
-  echo "Error: expected monorepo layout under $ROOT_DIR (missing apps/)" >&2
+  echo "Error: expected layout under $ROOT_DIR (missing apps/)" >&2
   exit 1
 fi
 
 usage() {
-  echo "Usage: $(basename "$0") [srvr|down|api]" >&2
-  echo "Env: TV_DEPLOY_NAME (default: main)" >&2
+  echo "Usage: $(basename "$0") [api|down|srvr|client|share|all]" >&2
+  echo "Env: TV_REMOTE_BASE (default: /root/dev/apps/tv on remote)" >&2
+  echo "Env: TV_DATA_DIR (default: /root/dev/apps/tv-data on remote, used for pm2 env)" >&2
   exit 1
 }
 
@@ -33,80 +30,79 @@ pm2_name_for_project() {
     api)  printf '%s' "tv-api" ;;
     down) printf '%s' "tv-down" ;;
     srvr) printf '%s' "tv-srvr" ;;
+    client) printf '%s' "tv-client" ;;
+    share) printf '%s' "tv-share" ;;
     *) return 1 ;;
   esac
 }
 
-remote_sync_tree() {
-  echo "[remote] syncing working tree via rsync -> $SSH_HOST:$REMOTE_DIR"
-  ssh "$SSH_HOST" "mkdir -p '$REMOTE_DIR'"
+remote_app_dir_for_project() {
+  local project="$1"
+  printf '%s/%s' "$TV_REMOTE_BASE" "$project"
+}
 
-  # Prefer rsync (fast). If remote doesn't have rsync, fall back to tar-over-ssh.
-  if ssh "$SSH_HOST" 'command -v rsync >/dev/null 2>&1'; then
-    rsync -az --delete \
-      --exclude '.git/' \
-      --exclude '.tv-deps.sha' \
-      --exclude 'node_modules/' \
-      --exclude '.turbo/' \
-      --exclude 'dist/' \
-      --exclude 'build/' \
-      --exclude '.output/' \
-      --exclude '.imports/' \
-      --exclude 'apps/**/node_modules/' \
-      --exclude 'apps/**/dist/' \
-      --exclude 'apps/**/build/' \
-      --exclude 'apps/**/.turbo/' \
-      --exclude 'apps/**/.output/' \
-      --exclude 'apps/**/.cache/' \
-      --exclude 'apps/**/.vite/' \
-      --exclude 'apps/**/.nuxt/' \
-      --exclude 'apps/**/.next/' \
-      --exclude 'apps/**/.svelte-kit/' \
-      --exclude 'apps/**/.parcel-cache/' \
-      "$ROOT_DIR/" "$SSH_HOST:$REMOTE_DIR/"
+local_app_dir_for_project() {
+  local project="$1"
+  case "$project" in
+    share) printf '%s/packages/share' "$ROOT_DIR" ;;
+    *) printf '%s/apps/%s' "$ROOT_DIR" "$project" ;;
+  esac
+}
+
+remote_sync_app() {
+  local project="$1"
+  local local_dir
+  local remote_dir
+  local_dir="$(local_app_dir_for_project "$project")"
+  remote_dir="$(remote_app_dir_for_project "$project")"
+
+  if [[ ! -d "$local_dir" ]]; then
+    echo "Error: missing local app dir: $local_dir" >&2
+    exit 1
+  fi
+
+  echo "[remote] rsync apps/$project -> $SSH_HOST:$remote_dir"
+  ssh "$SSH_HOST" "mkdir -p '$remote_dir'"
+
+  # Note: --delete will only delete files under the target app dir.
+  rsync -az --delete \
+    --exclude 'node_modules/' \
+    --exclude '.turbo/' \
+    --exclude 'dist/' \
+    --exclude 'build/' \
+    --exclude '.output/' \
+    --exclude '.cache/' \
+    --exclude '.vite/' \
+    --exclude '.nuxt/' \
+    --exclude '.next/' \
+    --exclude '.svelte-kit/' \
+    --exclude '.parcel-cache/' \
+    "$local_dir/" "$SSH_HOST:$remote_dir/"
+}
+
+remote_install_app_deps() {
+  local project="$1"
+  local remote_dir
+  remote_dir="$(remote_app_dir_for_project "$project")"
+
+  echo "[remote] deps: $remote_dir"
+  # tv-down depends on better-sqlite3 which needs native build scripts.
+  # pnpm on the server may have build scripts gated/disabled; use npm for this app.
+  if [[ "$project" == "down" ]]; then
+    ssh "$SSH_HOST" "cd '$remote_dir' \
+      && if command -v npm >/dev/null 2>&1; then rm -rf node_modules && npm install; \
+         elif command -v pnpm >/dev/null 2>&1; then pnpm install && pnpm rebuild better-sqlite3; \
+         else echo 'Neither npm nor pnpm found on remote PATH' >&2; exit 1; fi"
   else
-    echo "[warn] rsync not found on remote; using tar-over-ssh" >&2
-    tar \
-      --exclude='.git' \
-      --exclude='node_modules' \
-      --exclude='.turbo' \
-      --exclude='dist' \
-      --exclude='build' \
-      --exclude='.output' \
-      --exclude='.imports' \
-      -C "$ROOT_DIR" -cf - . \
-      | ssh "$SSH_HOST" "tar -C '$REMOTE_DIR' -xpf -"
+    ssh "$SSH_HOST" "cd '$remote_dir' \
+      && if command -v pnpm >/dev/null 2>&1; then pnpm install; \
+         elif command -v npm >/dev/null 2>&1; then npm install; \
+         else echo 'Neither pnpm nor npm found on remote PATH' >&2; exit 1; fi"
   fi
 }
 
-remote_install_deps() {
-  # Ensure runtime deps exist before starting PM2.
-  # Avoid pnpm install unless lockfiles changed.
-  echo "[remote] deps check: $REMOTE_DIR"
-  ssh "$SSH_HOST" "cd '$REMOTE_DIR' && command -v corepack >/dev/null 2>&1 && corepack enable >/dev/null 2>&1 || true"
-  ssh "$SSH_HOST" "cd '$REMOTE_DIR' && if ! command -v pnpm >/dev/null 2>&1; then (command -v corepack >/dev/null 2>&1 && corepack prepare pnpm@latest --activate >/dev/null 2>&1) || true; fi"
-  ssh "$SSH_HOST" "cd '$REMOTE_DIR' && command -v pnpm >/dev/null 2>&1 || { echo 'pnpm not found on remote PATH' >&2; exit 1; }"
-
-  ssh "$SSH_HOST" "cd '$REMOTE_DIR' && \
-    if [ ! -f pnpm-lock.yaml ]; then \
-      echo '[remote] no pnpm-lock.yaml; running pnpm install'; \
-      pnpm install; \
-    else \
-      if command -v sha256sum >/dev/null 2>&1; then H=sha256sum; else H='shasum -a 256'; fi; \
-      NEW=\$( ( (\$H pnpm-lock.yaml pnpm-workspace.yaml 2>/dev/null || \$H pnpm-lock.yaml) | \$H ) | awk '{print \$1}' ); \
-      OLD=\$(cat .tv-deps.sha 2>/dev/null || true); \
-      if [[ -n \"\$NEW\" && \"\$NEW\" == \"\$OLD\" && -d node_modules ]]; then \
-        echo '[remote] lockfiles unchanged; skipping pnpm install'; \
-      else \
-        echo '[remote] lockfiles changed (or missing node_modules); running pnpm install'; \
-        pnpm install; \
-        printf '%s\n' "\$NEW" > .tv-deps.sha; \
-      fi; \
-    fi"
-}
-
 remote_prepare_runtime_state() {
-  # A fresh git worktree will not include runtime state files.
+  # A fresh deploy checkout may not include runtime state files.
   # tv-srvr requires this file at startup.
   local project="${1:-all}"
   if [[ "$project" == "all" || "$project" == "srvr" ]]; then
@@ -122,48 +118,66 @@ remote_prepare_runtime_state() {
   fi
 }
 
-remote_pm2_start_all() {
-  echo "[pm2] start all from $REMOTE_DIR"
-  # Ensure PM2 doesn't retain stale exec paths/cwds across redeploys.
-  ssh "$SSH_HOST" "pm2 delete tv-api tv-down tv-srvr >/dev/null 2>&1 || true"
-  ssh "$SSH_HOST" "cd '$REMOTE_DIR' && pm2 start ecosystem.config.cjs --env production --update-env && pm2 save"
-}
-
-remote_pm2_start_one() {
-  local project="$1"
-  local pm2_name
-  pm2_name="$(pm2_name_for_project "$project")"
-
-  echo "[pm2] start $pm2_name from $REMOTE_DIR"
-  ssh "$SSH_HOST" "pm2 delete '$pm2_name' >/dev/null 2>&1 || true"
-  ssh "$SSH_HOST" "cd '$REMOTE_DIR' && pm2 start ecosystem.config.cjs --env production --update-env --only '$pm2_name' && pm2 save"
-}
-
 remote_pm2_restart_one() {
   local project="$1"
   local pm2_name
+  local remote_dir
   pm2_name="$(pm2_name_for_project "$project")"
-  echo "[pm2] restart $pm2_name (fallback to start)"
-  ssh "$SSH_HOST" "pm2 restart '$pm2_name' --update-env >/dev/null 2>&1 || (cd '$REMOTE_DIR' && pm2 start ecosystem.config.cjs --env production --update-env --only '$pm2_name')"
-  ssh "$SSH_HOST" "pm2 save >/dev/null 2>&1 || true"
+  remote_dir="$(remote_app_dir_for_project "$project")"
+
+  local script
+  case "$project" in
+    api) script='src/server.js' ;;
+    down) script='src/main.js' ;;
+    srvr) script='index.js' ;;
+    client)
+      # Client is typically built and served by nginx; no pm2 process here by default.
+      echo "[pm2] client: no pm2 process (deploy-only)"
+      return 0
+      ;;
+    share)
+      # Shared local package for legacy deploy mode; no pm2 process.
+      echo "[pm2] share: no pm2 process (deploy-only)"
+      return 0
+      ;;
+    *)
+      echo "Error: unknown project: $project" >&2
+      exit 1
+      ;;
+  esac
+
+  local tv_data_dir="${TV_DATA_DIR:-$DEFAULT_TV_DATA_DIR}"
+  echo "[pm2] restart $pm2_name (cwd=$remote_dir)"
+  ssh "$SSH_HOST" "cd '$remote_dir' \
+    && pm2 delete '$pm2_name' >/dev/null 2>&1 || true \
+    && NODE_ENV=production TV_DATA_DIR='$tv_data_dir' DISABLE_INTERNAL_CORS=1 pm2 start '$script' --name '$pm2_name' --time \
+    && pm2 save >/dev/null 2>&1 || true"
 }
 
-remote_pm2_restart_all() {
-  echo "[pm2] restart all (fallback to start)"
-  ssh "$SSH_HOST" "pm2 restart tv-api tv-down tv-srvr --update-env >/dev/null 2>&1 || (cd '$REMOTE_DIR' && pm2 start ecosystem.config.cjs --env production --update-env)"
-  ssh "$SSH_HOST" "pm2 save >/dev/null 2>&1 || true"
+remote_deploy_one() {
+  local project="$1"
+  remote_sync_app "$project"
+  remote_install_app_deps "$project"
+  remote_prepare_runtime_state "$project"
+  remote_pm2_restart_one "$project"
 }
 
-if [[ "${1:-}" == "" ]]; then
-  remote_sync_tree
-  remote_install_deps
-  remote_prepare_runtime_state all
-  remote_pm2_restart_all
-elif [[ "${1:-}" == "srvr" || "${1:-}" == "down" || "${1:-}" == "api" ]]; then
-  remote_sync_tree
-  remote_install_deps
-  remote_prepare_runtime_state "$1"
-  remote_pm2_restart_one "$1"
-else
-  usage
-fi
+case "${1:-all}" in
+  api|down|srvr|client|share)
+    remote_deploy_one "$1"
+    ;;
+  all|"" )
+    remote_deploy_one api
+    remote_deploy_one srvr
+    # Legacy flat deploy mode: down depends on @tv/share (file:../share).
+    remote_deploy_one share
+    # apps/down may fail to install in legacy flat deploy mode due to workspace deps.
+    # Deploy it last, and don't block srvr/api deploys if it fails.
+    if ! remote_deploy_one down; then
+      echo "[warn] down deploy failed; api/srvr already deployed" >&2
+    fi
+    ;;
+  *)
+    usage
+    ;;
+esac

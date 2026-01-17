@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Start (or restart) PM2 processes from a specific worktree checkout.
+# Start (or restart) PM2 processes from a specific deploy directory.
 #
 # Usage:
-#   ./scripts/pm2-start-worktree.sh <worktree_dir> [pm2_env]
+#   ./scripts/pm2-start-worktree.sh <deploy_dir> [pm2_env]
 #
 # Example:
-#   ./scripts/pm2-start-worktree.sh ~/dev/apps/tv-worktrees/main production
+#   ./scripts/pm2-start-worktree.sh ~/dev/apps/tv production
 
-worktree_dir="${1:-}"
+deploy_dir="${1:-}"
 pm2_env="${2:-production}"
 
-if [[ -z "$worktree_dir" ]]; then
-  echo "usage: $0 <worktree_dir> [pm2_env]" >&2
+if [[ -z "$deploy_dir" ]]; then
+  echo "usage: $0 <deploy_dir> [pm2_env]" >&2
   exit 2
 fi
 
-cd "$worktree_dir"
+cd "$deploy_dir"
 
 if [[ ! -f ecosystem.config.cjs ]]; then
-  echo "missing ecosystem.config.cjs in $worktree_dir" >&2
+  echo "missing ecosystem.config.cjs in $deploy_dir" >&2
   exit 1
 fi
 
@@ -40,4 +40,4 @@ fi
 pm2 start ecosystem.config.cjs --env "$pm2_env" --update-env
 pm2 save
 
-echo "[pm2] started via $worktree_dir (env=$pm2_env)"
+echo "[pm2] started via $deploy_dir (env=$pm2_env)"

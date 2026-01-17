@@ -210,7 +210,7 @@ app.use(express.json());
 const OPENSUBTITLES_BASE_URL = 'https://api.opensubtitles.com/api/v1';
 
 function getRootSecretsDir() {
-  // Worktree-independent shared secrets directory (created if missing).
+  // Checkout-independent shared secrets directory (created if missing).
   return getSecretsDir();
 }
 

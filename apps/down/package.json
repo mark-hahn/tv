@@ -28,6 +28,6 @@
     "parse-torrent-title": "^2.0.6",
     "request": "^2.83.0",
     "rimraf": "^2.6.2",
-    "@tv/share": "workspace:*"
+    "@tv/share": "file:../share"
   }
 }

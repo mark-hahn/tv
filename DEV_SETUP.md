@@ -1,13 +1,13 @@
 # TV Monorepo (WSL-first) Dev Setup
 
-This repo is the new monorepo named **tv**.
+This project is the monorepo named **tv**.
 
 ## Goals / constraints
 
 - Do all CLI work in WSL (Node/pnpm/git/scripts).
 - Use pnpm + Turborepo (local cache) for orchestration.
-- Windows is only VS Code UI + browser.
-- Keep the repo on the WSL filesystem (not `/mnt/c`).
+- Vite dev server runs in WSL; Windows is typically only VS Code UI + a browser connecting to the WSL dev server.
+- Keep the project directory on the WSL filesystem (not `/mnt/c`).
 - Remote Linux server: `hahnca.com`.
 
 ## Prereqs (WSL)
@@ -96,29 +96,22 @@ Package naming uses `@tv/<name>`.
 
 ## Remote server layout
 
-Remote code lives under:
+The deployed server-side code directory is:
 
-- `hahnca.com:~/dev/apps/tv` (monorepo main checkout)
-- `hahnca.com:~/dev/apps/tv-worktrees/*` (deploy worktrees used by PM2)
+- `hahnca.com:~/dev/apps/tv`
 
 The remote dir `tv-series-client` is only for hosting built production files.
 
-## Worktrees + PM2 (deploy pattern)
+## PM2 (deploy pattern)
 
-The intended pattern is:
+The current pattern is:
 
-- Use Git worktrees for deploy checkouts (per branch/release).
-- PM2 processes set `cwd` to the deployed worktree/app folder.
+- Deploy the repo directly to `~/dev/apps/tv` on the remote host.
+- PM2 processes set `cwd` to the app folder inside that checkout.
 
-This repo includes minimal scaffolding for that pattern:
+## Shared data/secrets across deploys
 
-- [ecosystem.config.cjs](ecosystem.config.cjs) (PM2 config; `cwd` is inside the worktree)
-- [scripts/worktree-add.sh](scripts/worktree-add.sh) (create a worktree checkout)
-- [scripts/pm2-start-worktree.sh](scripts/pm2-start-worktree.sh) (start/restart PM2 from that worktree)
-
-## Shared data/secrets across worktrees
-
-Git worktrees should not each maintain their own `data/` or `secrets/` state, because switching branches/worktrees can clobber or diverge runtime state.
+Deploy directories should not maintain their own `data/` or `secrets/` state, because redeploys can clobber or diverge runtime state.
 
 All server-side apps in this repo now support a shared data root via `TV_DATA_DIR` (defaults to `/root/dev/apps/tv-data`).
 
@@ -129,16 +122,11 @@ Expected layout under `TV_DATA_DIR`:
 - `down/data/` + `down/misc/` (tv-proc state/logs)
 - `srvr/data/` + `srvr/misc/` (tv-series-srvr state/logs)
 
-Example (run on the remote host):
+Example (run from WSL to deploy + restart on the remote host):
 
 ```bash
-cd ~
-# one-shot bootstrap (clones to ~/dev/apps/tv, ensures node/pnpm/pm2, starts pm2 from a worktree)
-curl -fsSL https://raw.githubusercontent.com/mark-hahn/tv/main/scripts/remote/bootstrap.sh | bash
-
-cd ~/dev/apps/tv   # your "main" checkout of the monorepo
-./scripts/worktree-add.sh main ~/dev/apps/tv-worktrees/main
-./scripts/pm2-start-worktree.sh ~/dev/apps/tv-worktrees/main production
+cd /root/apps/tv
+./srvr
 ```
 
 

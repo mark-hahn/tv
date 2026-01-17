@@ -2,11 +2,11 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-// PM2 config intended to be run FROM a deployed git worktree checkout.
-// `cwd` points to the app folder inside that worktree so relative paths and
+// PM2 config intended to be run from the deployed tv directory.
+// `cwd` points to the app folder so relative paths and
 // local files (cookies/secrets/db) resolve consistently.
 //
-// Usage (on remote host, inside the worktree directory):
+// Usage (on remote host, inside the deploy directory):
 //   pm2 start ecosystem.config.cjs --env production
 //   pm2 save
 

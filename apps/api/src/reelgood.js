@@ -3,6 +3,9 @@ import { escape } from 'querystring';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
+
+import { getApiCookiesDir } from './tvPaths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,6 +25,8 @@ const reelShowsPath = path.resolve(__dirname, '..', 'reel-shows.json');
 const reelTitlesPath = path.resolve(__dirname, '..', 'reelgood-titles.json');
 const logPath = path.resolve(__dirname, '..', 'reelgood.log');
 const homePagePath = path.resolve(__dirname, '..', '..', 'samples', 'sample-reelgood', 'homepage.html');
+
+const REELGOOD_PROVIDER = 'reelgood';
 
 // Global cache
 let homeHtml = null;
@@ -115,6 +120,160 @@ function logToFile(message) {
   }
 }
 
+function tryLoadReelgoodCurlProfile() {
+  // Replay browser headers/cookies from req-reelgood.txt (DevTools Copy as cURL (bash)).
+  try {
+    const candidates = [
+      path.join(__dirname, '..', 'req-reelgood.txt'),
+      path.join(__dirname, '..', '..', 'misc', 'req-reelgood.txt'),
+    ];
+    const p = candidates.find((x) => fs.existsSync(x));
+    if (!p) return null;
+    const raw = fs.readFileSync(p, 'utf8');
+
+    const headers = {};
+    let cookieHeader = '';
+    let capturedUrl = '';
+
+    // URL (single or double quoted)
+    const mUrl = raw.match(/\bcurl\s+['\"]([^'\"]+)['\"]/i);
+    if (mUrl) capturedUrl = mUrl[1];
+
+    // -b '...'
+    const mB1 = raw.match(/\s-b\s+'([^']*)'/i);
+    const mB2 = raw.match(/\s-b\s+\"([^\"]*)\"/i);
+    cookieHeader = (mB1?.[1] || mB2?.[1] || '').trim();
+
+    // -H 'k: v' or -H "k: v"
+    const reH1 = /\s-H\s+'([^']+)'/gi;
+    const reH2 = /\s-H\s+\"([^\"]+)\"/gi;
+    const pushHeader = (h) => {
+      const idx = String(h).indexOf(':');
+      if (idx <= 0) return;
+      const k = String(h).slice(0, idx).trim().toLowerCase();
+      const v = String(h).slice(idx + 1).trim();
+      if (!k || !v) return;
+      headers[k] = v;
+    };
+    let mh;
+    while ((mh = reH1.exec(raw))) pushHeader(mh[1]);
+    while ((mh = reH2.exec(raw))) pushHeader(mh[1]);
+
+    // Some exports may include cookies as a header instead of -b.
+    if (!cookieHeader && headers.cookie) {
+      cookieHeader = String(headers.cookie || '').trim();
+      delete headers.cookie;
+    }
+
+    return {
+      path: p,
+      url: capturedUrl,
+      headers,
+      cookieHeader,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function upsertCookieValue(cookieHeader, cookieName, cookieValue) {
+  const name = String(cookieName || '').trim();
+  const value = String(cookieValue || '').trim();
+  if (!name || !value) return String(cookieHeader || '').trim();
+
+  const parts = String(cookieHeader || '')
+    .split(';')
+    .map(s => String(s || '').trim())
+    .filter(Boolean);
+
+  let replaced = false;
+  const out = parts.map(p => {
+    const idx = p.indexOf('=');
+    if (idx <= 0) return p;
+    const k = p.slice(0, idx).trim();
+    if (k !== name) return p;
+    replaced = true;
+    return `${name}=${value}`;
+  });
+
+  if (!replaced) out.push(`${name}=${value}`);
+  return out.join('; ');
+}
+
+async function loadLocalCfClearance(provider) {
+  try {
+    const p = String(provider || '').trim();
+    if (!p) return '';
+    const inPath = path.join(getApiCookiesDir(), 'cf-clearance.local.json');
+    const raw = await fs.promises.readFile(inPath, 'utf8');
+    const j = JSON.parse(raw);
+    const v = j && typeof j === 'object' && !Array.isArray(j) ? j[p] : '';
+    return typeof v === 'string' ? v.trim() : '';
+  } catch {
+    return '';
+  }
+}
+
+async function curlFetchText(targetUrl, { headers = {}, cookieHeader = '' } = {}) {
+  const args = ['-sS', '-L', '--compressed'];
+
+  // Note: intentionally do NOT pass -H 'cookie:'; use -b for cookies.
+  for (const [k, v] of Object.entries(headers || {})) {
+    if (!k) continue;
+    if (String(k).toLowerCase() === 'cookie') continue;
+    if (v == null || String(v).length === 0) continue;
+    args.push('-H', `${k}: ${v}`);
+  }
+  if (cookieHeader) {
+    args.push('-b', cookieHeader);
+  }
+
+  args.push(targetUrl);
+
+  return await new Promise((resolve) => {
+    const child = spawn('curl', args, { windowsHide: true });
+    const stdoutChunks = [];
+    const stderrChunks = [];
+
+    child.stdout.on('data', (d) => stdoutChunks.push(Buffer.from(d)));
+    child.stderr.on('data', (d) => stderrChunks.push(Buffer.from(d)));
+    child.on('error', (err) => {
+      resolve({ ok: false, code: -1, error: err?.message || String(err), stdout: '', stderr: Buffer.concat(stderrChunks).toString('utf8') });
+    });
+    child.on('close', (code) => {
+      const stdout = Buffer.concat(stdoutChunks).toString('utf8');
+      const stderr = Buffer.concat(stderrChunks).toString('utf8');
+      resolve({ ok: code === 0 && stdout.length > 0, code, stdout, stderr });
+    });
+  });
+}
+
+async function fetchReelgoodHtml(url) {
+  const profile = tryLoadReelgoodCurlProfile();
+  const headers = profile?.headers || {};
+  let cookieHeader = profile?.cookieHeader || '';
+
+  // Source of truth: tv-data cookie store (written by client Save Cookies).
+  // req-reelgood.txt is treated as an immutable template; patch an in-memory copy only.
+  const localCf = await loadLocalCfClearance(REELGOOD_PROVIDER);
+  if (localCf) {
+    cookieHeader = upsertCookieValue(cookieHeader, 'cf_clearance', localCf);
+  }
+
+  if (!profile) {
+    // Best-effort fallback to built-in fetch (dev); primary path is req-reelgood.txt.
+    const r = await fetch(url);
+    return await r.text();
+  }
+
+  const r = await curlFetchText(url, { headers, cookieHeader });
+  if (!r.ok) {
+    const details = (r.stderr || '').trim().slice(0, 400);
+    throw new Error(`curl failed (code ${r.code}) for ${url}${details ? `: ${details}` : ''}`);
+  }
+  return r.stdout;
+}
+
 function loadReelShows() {
   try {
     if (fs.existsSync(reelShowsPath)) {
@@ -193,8 +352,7 @@ export async function startReel(showTitlesArg) {
     logToFile(`startReel called (showTitles: ${showTitles.length})`);
 
     console.log('Fetching fresh reelgood home page');
-    const homeData = await fetch(homeUrl);
-    homeHtml = await homeData.text();
+    homeHtml = await fetchReelgoodHtml(homeUrl);
     console.log('Home page loaded into memory');
     
     // Save to samples directory
@@ -273,13 +431,13 @@ export async function getReel() {
 
       let reelData;
       try {
-        reelData = await fetch(showUrl);
+        reelData = await fetchReelgoodHtml(showUrl);
       } catch (e) {
         console.log('Error fetching show page:', e);
         logToFile(`ERROR fetching show page "${title}": ${e.message || String(e)}`);
         continue;
       }
-      const reelHtml = await reelData.text();
+      const reelHtml = String(reelData || '');
 
       const chk = (slug, label) => {
         slug = slug.toLowerCase();

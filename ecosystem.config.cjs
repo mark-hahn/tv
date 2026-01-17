@@ -31,15 +31,15 @@ function resolveNodeInterpreter() {
 
 const nodeInterpreter = resolveNodeInterpreter();
 
-function appCwd(rel) {
-  return path.join(root, rel);
+function appCwd(name) {
+  return path.join(root, 'apps', name);
 }
 
 module.exports = {
   apps: [
     {
       name: 'tv-api',
-      cwd: appCwd('apps/api'),
+      cwd: appCwd('api'),
       script: 'src/server.js',
       interpreter: nodeInterpreter,
       time: true,
@@ -54,7 +54,7 @@ module.exports = {
     },
     {
       name: 'tv-down',
-      cwd: appCwd('apps/down'),
+      cwd: appCwd('down'),
       script: 'src/main.js',
       interpreter: nodeInterpreter,
       time: true,
@@ -67,7 +67,7 @@ module.exports = {
     },
     {
       name: 'tv-srvr',
-      cwd: appCwd('apps/srvr'),
+      cwd: appCwd('srvr'),
       script: 'index.js',
       interpreter: nodeInterpreter,
       time: true,

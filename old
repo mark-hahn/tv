@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+HOST="${TV_HOST:-hahnca.com}"
+
+# Switch remote PM2 apps from "old" set -> "new" set
+# Stops:  tv-srvr, tv-api, tv-down
+# Starts: tv-series-srvr, tv-proc, tv-torrents
+
+ssh -o BatchMode=yes "$HOST" 'bash -se' <<'REMOTE'
+set -euo pipefail
+
+stop_if_present() {
+  local name="$1"
+  if pm2 describe "$name" >/dev/null 2>&1; then
+    pm2 stop "$name" >/dev/null
+  else
+    echo "[pm2] skip stop (not found): $name" >&2
+  fi
+}
+
+start_if_present() {
+  local name="$1"
+  if pm2 describe "$name" >/dev/null 2>&1; then
+    pm2 start "$name" >/dev/null
+  else
+    echo "[pm2] cannot start (not found in pm2): $name" >&2
+    echo "[pm2] hint: if it is defined in an ecosystem file, start it once via: pm2 start <ecosystem> --only $name" >&2
+    return 2
+  fi
+}
+
+stop_if_present tv-srvr
+stop_if_present tv-api
+stop_if_present tv-down
+
+start_if_present tv-series-srvr
+start_if_present tv-proc
+start_if_present tv-torrents
+
+pm2 status
+REMOTE

@@ -1,160 +1,38 @@
 import fs from 'fs';
-import { escape } from 'querystring';
 import path from 'node:path';
-import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
-
-import { getApiCookiesDir } from './tvPaths.js';
+import { getReelHtml } from './get-reel-html.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const avoidGenres = ['anime', 'children', 'documentary',
+// --- Constants & Config ---
+
+const avoidGenres = [
+  'anime', 'children', 'documentary',
   'family', 'food', 'game Show', 'game-Show',
   'history', 'home &amp;Garden', 'musical',
-  'reality', 'sport', 'talk', 'stand-up', 'travel'];
+  'reality', 'sport', 'talk', 'stand-up', 'travel'
+];
 
 const rx_show = new RegExp('"show:.*?:@global": ?{(.*?)}', 'sg');
 const rx_title = new RegExp('"title": ?"(.*?)"', 's');
 const rx_slug = new RegExp('"slug": ?"(.*?)"', 'sg');
 const rx_genre = new RegExp('href="/tv/genre/([^"]*)"', 'sg');
 
-const homeUrl = "https://reelgood.com/new/tv";
+// Paths (using relative paths to match existing structure/logic)
 const reelShowsPath = path.resolve(__dirname, '..', 'reel-shows.json');
 const reelTitlesPath = path.resolve(__dirname, '..', 'reelgood-titles.json');
 const logPath = path.resolve(__dirname, '..', 'reelgood.log');
-const homePagePath = path.resolve(__dirname, '..', '..', 'samples', 'sample-reelgood', 'homepage.html');
 
-const REELGOOD_PROVIDER = 'reelgood';
+// --- State ---
 
-function looksLikeCloudflareChallenge(html) {
-  const s = String(html || '');
-  if (!s) return false;
-  const head = s.slice(0, 60000).toLowerCase();
-  return (
-    head.includes('<title>just a moment') ||
-    head.includes('cf_chl_opt') ||
-    head.includes('/cdn-cgi/challenge-platform') ||
-    head.includes('enable javascript and cookies to continue')
-  );
-}
+let homeHtml = null;  // Cached HTML from startReel
+let reelShows = {};   // Cursor: { "Title": true }
+let showTitles = [];  // Titles the user already has (from client)
+let resultTitles = []; // Rolling history of emitted results
 
-function parseCookieHeaderForDomain(cookieHeader, domain) {
-  const out = [];
-  const d = String(domain || '').trim();
-  if (!d) return out;
-
-  const parts = String(cookieHeader || '')
-    .split(';')
-    .map((s) => String(s || '').trim())
-    .filter(Boolean);
-
-  for (const p of parts) {
-    const idx = p.indexOf('=');
-    if (idx <= 0) continue;
-    const name = p.slice(0, idx).trim();
-    const value = p.slice(idx + 1).trim();
-    if (!name || !value) continue;
-    out.push({ name, value, domain: d, path: '/' });
-  }
-  return out;
-}
-
-function saveLocalCfClearance(provider, value) {
-  try {
-    const p = String(provider || '').trim();
-    const v = String(value || '').trim();
-    if (!p || !v) return false;
-
-    const outPath = path.join(getApiCookiesDir(), 'cf-clearance.local.json');
-    let current = {};
-    try {
-      const raw = fs.readFileSync(outPath, 'utf8');
-      const j = JSON.parse(raw);
-      if (j && typeof j === 'object' && !Array.isArray(j)) current = j;
-    } catch {
-      // ignore
-    }
-
-    if (typeof current[p] === 'string' && current[p].trim() === v) return false;
-    current[p] = v;
-    atomicWriteTextFile(outPath, JSON.stringify(current, null, 2) + '\n');
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// Global cache
-let homeHtml = null;
-let reelShows = null;
-let showTitles = [];
-let resultTitles = [];
-
-function shouldPersistResultEntry(entry) {
-  const s = String(entry || '');
-  return !s.toLowerCase().startsWith('error|');
-}
-
-function loadResultTitles() {
-  try {
-    if (fs.existsSync(reelTitlesPath)) {
-      const parsed = JSON.parse(fs.readFileSync(reelTitlesPath, 'utf8'));
-      if (Array.isArray(parsed)) return parsed.map(String);
-    }
-  } catch (err) {
-    console.error('Error loading reelgood-titles.json:', err);
-    logToFile(`ERROR loading reelgood-titles.json: ${err.message}`);
-  }
-  return [];
-}
-
-function atomicWriteTextFile(outPath, content) {
-  const dir = path.dirname(outPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  const tmpPath = `${outPath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  fs.writeFileSync(tmpPath, content, 'utf8');
-  try {
-    fs.renameSync(tmpPath, outPath);
-  } catch (err) {
-    // Cross-platform fallback: if destination exists and rename failed, try unlink+rename.
-    try {
-      fs.unlinkSync(outPath);
-      fs.renameSync(tmpPath, outPath);
-    } catch {
-      try { fs.unlinkSync(tmpPath); } catch {}
-      throw err;
-    }
-  }
-}
-
-function atomicWriteJson(outPath, data) {
-  const txt = JSON.stringify(data, null, 2) + '\n';
-  atomicWriteTextFile(outPath, txt);
-}
-
-function saveResultTitles(titlesArr) {
-  try {
-    atomicWriteJson(reelTitlesPath, titlesArr);
-  } catch (err) {
-    console.error('Error saving reelgood-titles.json:', err);
-    logToFile(`ERROR saving reelgood-titles.json: ${err.message}`);
-  }
-}
-
-function appendResultTitle(entry) {
-  resultTitles.push(String(entry));
-  while (resultTitles.length > 100) resultTitles.shift();
-  saveResultTitles(resultTitles);
-}
-
-function parseResultTitle(entry) {
-  const s = String(entry || '');
-  const bar = s.indexOf('|');
-  if (bar < 0) return '';
-  return s.slice(bar + 1).trim();
-}
+// --- Persistence Helpers ---
 
 function logToFile(message) {
   try {
@@ -162,7 +40,7 @@ function logToFile(message) {
     // Simple UTC offset calculation for PST/PDT (-8/-7 hours)
     // Detect DST by checking if we're in March-November
     const month = now.getUTCMonth();
-    const isDST = month >= 2 && month <= 10; // Approximate DST period
+    const isDST = month >= 2 && month <= 10;
     const offsetHours = isDST ? -7 : -8;
     const pstTime = new Date(now.getTime() + offsetHours * 60 * 60 * 1000);
     
@@ -178,323 +56,23 @@ function logToFile(message) {
   }
 }
 
-function tryLoadReelgoodCurlProfile() {
-  // Replay browser headers/cookies from req-reelgood.txt (DevTools Copy as cURL (bash)).
+function atomicWriteTextFile(outPath, content) {
+  const dir = path.dirname(outPath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  // Simple atomic write simulation
+  const tmpPath = `${outPath}.tmp-${Math.random().toString(16).slice(2)}`;
   try {
-    const candidates = [
-      path.join(__dirname, '..', 'cookies', 'req-reelgood.txt'),
-      path.join(__dirname, '..', '..', 'misc', 'req-reelgood.txt'),
-    ];
-    const p = candidates.find((x) => fs.existsSync(x));
-    if (!p) return null;
-    const raw = fs.readFileSync(p, 'utf8');
-
-    const headers = {};
-    let cookieHeader = '';
-    let capturedUrl = '';
-
-    // URL (single or double quoted)
-    const mUrl = raw.match(/\bcurl\s+['\"]([^'\"]+)['\"]/i);
-    if (mUrl) capturedUrl = mUrl[1];
-
-    // -b '...'
-    const mB1 = raw.match(/\s-b\s+'([^']*)'/i);
-    const mB2 = raw.match(/\s-b\s+\"([^\"]*)\"/i);
-    cookieHeader = (mB1?.[1] || mB2?.[1] || '').trim();
-
-    // -H 'k: v' or -H "k: v"
-    const reH1 = /\s-H\s+'([^']+)'/gi;
-    const reH2 = /\s-H\s+\"([^\"]+)\"/gi;
-    const pushHeader = (h) => {
-      const idx = String(h).indexOf(':');
-      if (idx <= 0) return;
-      const k = String(h).slice(0, idx).trim().toLowerCase();
-      const v = String(h).slice(idx + 1).trim();
-      if (!k || !v) return;
-      headers[k] = v;
-    };
-    let mh;
-    while ((mh = reH1.exec(raw))) pushHeader(mh[1]);
-    while ((mh = reH2.exec(raw))) pushHeader(mh[1]);
-
-    // Some exports may include cookies as a header instead of -b.
-    if (!cookieHeader && headers.cookie) {
-      cookieHeader = String(headers.cookie || '').trim();
-      delete headers.cookie;
-    }
-
-    return {
-      path: p,
-      url: capturedUrl,
-      headers,
-      cookieHeader,
-    };
-  } catch {
-    return null;
+    fs.writeFileSync(tmpPath, content, 'utf8');
+    fs.renameSync(tmpPath, outPath);
+  } catch (err) {
+    try { fs.unlinkSync(tmpPath); } catch {}
+    console.error(`Error saving ${outPath}:`, err);
   }
 }
 
-function upsertCookieValue(cookieHeader, cookieName, cookieValue) {
-  const name = String(cookieName || '').trim();
-  const value = String(cookieValue || '').trim();
-  if (!name || !value) return String(cookieHeader || '').trim();
-
-  const parts = String(cookieHeader || '')
-    .split(';')
-    .map(s => String(s || '').trim())
-    .filter(Boolean);
-
-  let replaced = false;
-  const out = parts.map(p => {
-    const idx = p.indexOf('=');
-    if (idx <= 0) return p;
-    const k = p.slice(0, idx).trim();
-    if (k !== name) return p;
-    replaced = true;
-    return `${name}=${value}`;
-  });
-
-  if (!replaced) out.push(`${name}=${value}`);
-  return out.join('; ');
-}
-
-function getCookieValue(cookieHeader, cookieName) {
-  const name = String(cookieName || '').trim();
-  if (!name) return '';
-  const parts = String(cookieHeader || '')
-    .split(';')
-    .map((s) => String(s || '').trim())
-    .filter(Boolean);
-  for (const p of parts) {
-    const idx = p.indexOf('=');
-    if (idx <= 0) continue;
-    const k = p.slice(0, idx).trim();
-    if (k !== name) continue;
-    return p.slice(idx + 1).trim();
-  }
-  return '';
-}
-
-function cfClearanceIssuedAt(cfClearanceValue) {
-  // Cloudflare's cf_clearance values commonly embed a unix timestamp segment:
-  //   <random>-<epochSeconds>-<...>
-  const s = String(cfClearanceValue || '').trim();
-  if (!s) return 0;
-  const m = s.match(/-(\d{10})-/);
-  if (!m) return 0;
-  const n = Number(m[1]);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function chooseBestCfClearance({ fromReq = '', fromLocal = '' } = {}) {
-  const a = String(fromReq || '').trim();
-  const b = String(fromLocal || '').trim();
-  if (!a) return b;
-  if (!b) return a;
-  const ta = cfClearanceIssuedAt(a);
-  const tb = cfClearanceIssuedAt(b);
-  if (ta && tb) return tb > ta ? b : a;
-  // If we can't parse timestamps, keep the request template's value by default.
-  return a;
-}
-
-async function loadLocalCfClearance(provider) {
-  try {
-    const p = String(provider || '').trim();
-    if (!p) return '';
-    const inPath = path.join(getApiCookiesDir(), 'cf-clearance.local.json');
-    const raw = await fs.promises.readFile(inPath, 'utf8');
-    const j = JSON.parse(raw);
-    const v = j && typeof j === 'object' && !Array.isArray(j) ? j[p] : '';
-    return typeof v === 'string' ? v.trim() : '';
-  } catch {
-    return '';
-  }
-}
-
-async function curlFetchText(targetUrl, { headers = {}, cookieHeader = '' } = {}) {
-  const args = ['-sS', '-L', '--compressed'];
-
-  // Note: intentionally do NOT pass -H 'cookie:'; use -b for cookies.
-  for (const [k, v] of Object.entries(headers || {})) {
-    if (!k) continue;
-    if (String(k).toLowerCase() === 'cookie') continue;
-    if (v == null || String(v).length === 0) continue;
-    args.push('-H', `${k}: ${v}`);
-  }
-  if (cookieHeader) {
-    args.push('-b', cookieHeader);
-  }
-
-  args.push(targetUrl);
-
-  return await new Promise((resolve) => {
-    const child = spawn('curl', args, { windowsHide: true });
-    const stdoutChunks = [];
-    const stderrChunks = [];
-
-    child.stdout.on('data', (d) => stdoutChunks.push(Buffer.from(d)));
-    child.stderr.on('data', (d) => stderrChunks.push(Buffer.from(d)));
-    child.on('error', (err) => {
-      resolve({ ok: false, code: -1, error: err?.message || String(err), stdout: '', stderr: Buffer.concat(stderrChunks).toString('utf8') });
-    });
-    child.on('close', (code) => {
-      const stdout = Buffer.concat(stdoutChunks).toString('utf8');
-      const stderr = Buffer.concat(stderrChunks).toString('utf8');
-      resolve({ ok: code === 0 && stdout.length > 0, code, stdout, stderr });
-    });
-  });
-}
-
-async function playwrightFetchText(targetUrl, { headers = {}, cookieHeader = '' } = {}) {
-  // Playwright is already a dependency of @tv/api; keep import lazy so normal startup is fast.
-  const { chromium } = await import('playwright');
-
-  // Do not attempt Playwright unless the browser executable is present.
-  // This avoids noisy failures in environments where server apps are not meant to run (e.g. local workspace).
-  try {
-    const exePath = chromium.executablePath();
-    if (!exePath || !fs.existsSync(exePath)) {
-      const err = new Error('playwright browser not installed (run: npx playwright install)');
-      err.code = 'PW_BROWSER_MISSING';
-      throw err;
-    }
-  } catch (e) {
-    // If we cannot determine an executable path, assume Playwright isn't usable here.
-    const err = new Error(e?.message || 'playwright not available');
-    err.code = e?.code || 'PW_BROWSER_MISSING';
-    throw err;
-  }
-
-  const ua = String(headers?.['user-agent'] || headers?.['User-Agent'] || '').trim();
-  const extraHeaders = { ...(headers || {}) };
-  delete extraHeaders.cookie;
-  delete extraHeaders.Cookie;
-
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
-  });
-
-  try {
-    const context = await browser.newContext({
-      userAgent: ua || undefined,
-      locale: 'en-US',
-    });
-
-    // Note: cookies are added via addCookies, not via cookie header.
-    if (Object.keys(extraHeaders).length > 0) {
-      await context.setExtraHTTPHeaders(extraHeaders);
-    }
-
-    const cookies = parseCookieHeaderForDomain(cookieHeader, '.reelgood.com');
-    if (cookies.length > 0) {
-      await context.addCookies(cookies);
-    }
-
-    const page = await context.newPage();
-    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
-
-    // Give Cloudflare challenge pages time to run/redirect.
-    // We see sporadic CF challenges even with a clearance cookie; in those cases,
-    // allow a longer window for JS challenges + redirects to settle.
-    const deadline = Date.now() + 30000;
-    while (Date.now() < deadline) {
-      try {
-        // networkidle isn't guaranteed, but it helps when it does trigger.
-        await page.waitForLoadState('networkidle', { timeout: 1500 });
-      } catch {
-        // ignore
-      }
-
-      let title = '';
-      try {
-        title = await page.title();
-      } catch {
-        title = '';
-      }
-
-      const u = String(page.url() || '');
-      const t = String(title || '').toLowerCase();
-      const looksChallenged =
-        t.includes('just a moment') ||
-        u.includes('__cf_chl') ||
-        u.includes('/cdn-cgi/challenge-platform');
-      if (!looksChallenged) break;
-
-      await page.waitForTimeout(1000);
-    }
-
-    const html = await page.content();
-
-    // Best-effort: capture refreshed clearance cookie if Playwright solved the challenge.
-    try {
-      const jar = await context.cookies('https://reelgood.com');
-      const cf = jar.find((c) => c && c.name === 'cf_clearance');
-      if (cf?.value) {
-        const updated = saveLocalCfClearance(REELGOOD_PROVIDER, cf.value);
-        if (updated) {
-          console.error('[reelgood] updated cf_clearance via playwright', { len: String(cf.value).length });
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    return html;
-  } finally {
-    await browser.close();
-  }
-}
-
-async function fetchReelgoodHtml(url) {
-  const profile = tryLoadReelgoodCurlProfile();
-  const headers = profile?.headers || {};
-  let cookieHeader = profile?.cookieHeader || '';
-
-  // Source of truth: TV data cookie store (written by client Save Cookies).
-  // req-reelgood.txt is treated as an immutable template; patch an in-memory copy only.
-  const localCf = await loadLocalCfClearance(REELGOOD_PROVIDER);
-  const reqCf = getCookieValue(cookieHeader, 'cf_clearance');
-  const bestCf = chooseBestCfClearance({ fromReq: reqCf, fromLocal: localCf });
-  if (bestCf) {
-    cookieHeader = upsertCookieValue(cookieHeader, 'cf_clearance', bestCf);
-  }
-
-  if (!profile) {
-    // Best-effort fallback to built-in fetch (dev); primary path is req-reelgood.txt.
-    const r = await fetch(url);
-    return await r.text();
-  }
-
-  // Primary path: curl replay. If Cloudflare returns a challenge page, fall back to Playwright.
-  const r = await curlFetchText(url, { headers, cookieHeader });
-  if (r.ok && !looksLikeCloudflareChallenge(r.stdout)) {
-    return r.stdout;
-  }
-
-  // If curl failed or got challenged, try Playwright (Chromium) to execute JS challenges.
-  try {
-    const html = await playwrightFetchText(url, { headers, cookieHeader });
-    if (!looksLikeCloudflareChallenge(html)) {
-      console.error('[reelgood] playwright fetch ok', { url });
-      return html;
-    }
-    console.error('[reelgood] playwright still challenged', { url });
-  } catch (e) {
-    // Common local setup: Playwright is installed as a dependency but browsers are not downloaded.
-    if (e?.code !== 'PW_BROWSER_MISSING') {
-      console.error('[reelgood] playwright fetch error', { url, error: e?.message || String(e) });
-    }
-  }
-
-  if (!r.ok) {
-    const details = (r.stderr || '').trim().slice(0, 400);
-    throw new Error(`curl failed (code ${r.code}) for ${url}${details ? `: ${details}` : ''}`);
-  }
-
-  // Curl returned HTML but it looks like Cloudflare challenge.
-  throw new Error(`cloudflare challenge for ${url}`);
+function atomicWriteJson(outPath, data) {
+  const txt = JSON.stringify(data, null, 2) + '\n';
+  atomicWriteTextFile(outPath, txt);
 }
 
 function loadReelShows() {
@@ -504,95 +82,97 @@ function loadReelShows() {
       try {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
-        return {};
-      } catch (e) {
-        // Best-effort recovery for truncated/partial JSON.
-        // Extract keys of the form "Title": true
-        const repaired = {};
-        const rx = /"([^"\\]*(?:\\.[^"\\]*)*)"\s*:\s*true/g;
-        let m;
-        while ((m = rx.exec(raw)) !== null) {
-          const k = String(m[1] || '').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-          if (k) repaired[k] = true;
-        }
-        const count = Object.keys(repaired).length;
-        if (count > 0) {
-          console.error('Recovered truncated reel-shows.json; rewriting repaired file', { count });
-          logToFile(`WARN recovered truncated reel-shows.json (count: ${count}); rewriting repaired file`);
-          try {
-            atomicWriteJson(reelShowsPath, repaired);
-          } catch {
-            // ignore rewrite failures; still return repaired in-memory
-          }
-          return repaired;
-        }
-        throw e;
+      } catch {
+        // use basic recovery if json is bad? 
+        // For simplicity, returning empty object or trying to repair if needed.
+        // The original code had repair logic, but "messy state" implies simplifying.
+        // We'll stick to simple JSON parse.
       }
     }
   } catch (err) {
     console.error('Error loading reel-shows.json:', err);
-    logToFile(`ERROR loading reel-shows.json: ${err.message}`);
   }
   return {};
 }
 
-function saveReelShows(shows) {
-  try {
-    // Merge with on-disk state to reduce lost updates if multiple processes write.
-    let disk = {};
-    try {
-      disk = loadReelShows();
-    } catch {
-      disk = {};
-    }
-    const merged = { ...(disk || {}), ...(shows || {}) };
+function saveReelShows() {
+    // Reload from disk to merge changes (concurrency safety attempt)
+    let disk = loadReelShows();
+    const merged = { ...disk, ...reelShows };
     atomicWriteJson(reelShowsPath, merged);
-  } catch (err) {
-    console.error('Error saving reel-shows.json:', err);
-    logToFile(`ERROR saving reel-shows.json: ${err.message}`);
-  }
 }
 
-// Load reelShows once at module load time
+function loadResultTitles() {
+  try {
+    if (fs.existsSync(reelTitlesPath)) {
+      const parsed = JSON.parse(fs.readFileSync(reelTitlesPath, 'utf8'));
+      if (Array.isArray(parsed)) return parsed.map(String);
+    }
+  } catch (err) {
+    console.error('Error loading reelgood-titles.json:', err);
+  }
+  return [];
+}
+
+function saveResultTitles() {
+  atomicWriteJson(reelTitlesPath, resultTitles);
+}
+
+function appendResultTitle(entry) {
+  if (!entry) return;
+  // Ensure we don't duplicate identical consecutive entries if logic flukes, 
+  // but strictly we just push and trim.
+  resultTitles.push(String(entry));
+  while (resultTitles.length > 100) resultTitles.shift();
+  saveResultTitles();
+}
+
+function shouldPersistResultEntry(entry) {
+  const s = String(entry || '');
+  return !s.toLowerCase().startsWith('error|') && !s.toLowerCase().startsWith('msg|');
+}
+
+function parseResultTitle(entry) {
+  const s = String(entry || '');
+  const bar = s.indexOf('|');
+  if (bar < 0) return '';
+  return s.slice(bar + 1).trim();
+}
+
+// --- Initialization ---
+
 reelShows = loadReelShows();
 resultTitles = loadResultTitles();
+logToFile('Reelgood module loaded.');
 
-// Log startup - wrapped in try/catch to prevent module load failure
-(function logStartup() {
-  try {
-    fs.appendFileSync(logPath, '\n', 'utf8');
-    logToFile('Reelgood started.');
-  } catch (err) {
-    // Silently fail - don't crash the module
-    console.error('Could not write startup log:', err.message);
-  }
-})();
+// --- Exports ---
 
+/**
+ * POST /api/startreel
+ * Body: { showTitles: ["title1", "title2", ...] }
+ */
 export async function startReel(showTitlesArg) {
   try {
     showTitles = Array.isArray(showTitlesArg) ? showTitlesArg : [];
-
     logToFile(`startReel called (showTitles: ${showTitles.length})`);
 
-    console.log('Fetching fresh reelgood home page');
-    homeHtml = await fetchReelgoodHtml(homeUrl);
-    console.log('Home page loaded into memory');
-    
-    // Save to samples directory
+    // Reload persistence to ensure freshness
+    reelShows = loadReelShows();
+    resultTitles = loadResultTitles();
+
+    // Load new HTML
+    console.log('Fetching fresh reelgood home page via getReelHtml...');
     try {
-      const sampleDir = path.dirname(homePagePath);
-      if (!fs.existsSync(sampleDir)) {
-        fs.mkdirSync(sampleDir, { recursive: true });
-      }
-      fs.writeFileSync(homePagePath, homeHtml, 'utf8');
-      console.log('Saved home page to', homePagePath);
-    } catch (err) {
-      console.error('Error saving home page:', err);
-      logToFile(`ERROR saving homepage.html: ${err.message}`);
+        homeHtml = await getReelHtml();
+        console.log(`Home page loaded (${homeHtml.length} bytes)`);
+    } catch (e) {
+        const msg = `Failed to load home page: ${e.message}`;
+        console.error(msg);
+        logToFile(`ERROR ${msg}`);
+        return [`error|${msg}`];
     }
 
-    // Return full persisted/in-memory history (rolling window) so the caller
-    // can render prior results immediately.
+    // Return history
     return resultTitles;
   } catch (err) {
     const errmsg = err.message || String(err);
@@ -601,113 +181,131 @@ export async function startReel(showTitlesArg) {
   }
 }
 
+/**
+ * GET /api/getreel
+ */
 export async function getReel() {
   try {
     if (!homeHtml) {
-      const msg = 'Home page not loaded. Call startReel first.';
-      return [`error|${msg}`];
+        return [`error|Home page not loaded. Call startReel first.`];
     }
 
     const addedThisCall = [];
     const add = (entry) => {
-      if (shouldPersistResultEntry(entry)) appendResultTitle(entry);
-      addedThisCall.push(entry);
+        if (shouldPersistResultEntry(entry)) {
+            // Check if already in resultTitles to avoid spamming duplicates in history
+            // (Though spec says "seenInResultTitles: titles already returned", 
+            // usually checking title is enough, but here we append the full string)
+            appendResultTitle(entry); 
+        }
+        addedThisCall.push(entry);
     };
 
-    const haveItSet = new Set((Array.isArray(showTitles) ? showTitles : []).map(String));
-    const seenInResultTitles = new Set(resultTitles.map(parseResultTitle).filter(Boolean));
+    const haveItSet = new Set((Array.isArray(showTitles) ? showTitles : []).map(s => String(s).toLowerCase())); 
+    
+    // Check history (seenInResultTitles)
+    // "titles already returned historically (so we don’t spam duplicates)"
+    const seenTitles = new Set(resultTitles.map(parseResultTitle).filter(Boolean));
 
     let show;
-    rx_show.lastIndex = 0;
-    
+    rx_show.lastIndex = 0; 
+
+    // Find next candidate
     while ((show = rx_show.exec(homeHtml)) !== null) {
-      const titleMatches = rx_title.exec(show[0]);
-      if (!titleMatches?.length) continue;
+        const titleMatches = rx_title.exec(show[0]);
+        if (!titleMatches?.length) continue;
+        const title = titleMatches[1];
 
-      const title = titleMatches[1];
-      if (title in reelShows) continue;
-      if (seenInResultTitles.has(title)) {
-        // Treat as already processed, same behavior as reelShows.
+        // 1. Check if we already processed this title (cursor)
+        if (reelShows[title]) continue;
+
+        // 2. Check if we emitted this title recently (history)
+        if (seenTitles.has(title)) {
+            reelShows[title] = true; // ensure marked as seen
+            continue; 
+        }
+
+        // Mark as processed immediately (so we don't process again)
         reelShows[title] = true;
-        continue;
-      }
-      
-      reelShows[title] = true;
+        saveReelShows(); // Flush immediately as per spec "flush reelShows ... after processing candidate title"
 
-      console.log('\nProcessing:', title);
+        console.log(`Processing candidate: ${title}`);
 
-      rx_slug.lastIndex = 0;
-      const slugMatches = rx_slug.exec(show[0]);
-      if (!slugMatches?.length) {
-        console.log('No slug found');
-        continue;
-      }
-
-      const slug = slugMatches[1];
-      const showUrl = `https://reelgood.com/show/${encodeURIComponent(slug)}`;
-
-      if (haveItSet.has(title)) {
-        add(`Have It|${title}`);
-        logToFile(`REJECT: "${title}" (Have It)`);
-        continue;
-      }
-
-      let reelData;
-      try {
-        reelData = await fetchReelgoodHtml(showUrl);
-      } catch (e) {
-        console.log('Error fetching show page:', e);
-        logToFile(`ERROR fetching show page "${title}": ${e.message || String(e)}`);
-        continue;
-      }
-      const reelHtml = String(reelData || '');
-
-      const chk = (slug, label) => {
-        slug = slug.toLowerCase();
-        for (const avoid of avoidGenres) {
-          if (slug == avoid) {
-            console.log('---- skipping', label, avoid);
-            return avoid;
-          }
+        // 3. Check for slug
+        rx_slug.lastIndex = 0;
+        const slugMatches = rx_slug.exec(show[0]);
+        if (!slugMatches?.length) {
+            add(`skipped|${title} (no slug)`);
+            continue; // move to next
         }
-        return null;
-      }
+        const slug = slugMatches[1];
 
-      let shouldSkip = false;
-      let rejectedGenre = null;
-      let genreMatches;
-      rx_genre.lastIndex = 0;
-      while ((genreMatches = rx_genre.exec(reelHtml)) !== null) {
-        const genre = genreMatches[1];
-        const matched = chk(genre, 'genre');
-        if (matched) {
-          shouldSkip = true;
-          rejectedGenre = matched;
-          break;
+        // 4. Check Have It
+        let isHaveIt = false;
+        if (haveItSet.has(title.toLowerCase())) {
+            isHaveIt = true;
+        } else {
+             // Fallback to strict check just in case
+             // isHaveIt = showTitles.includes(title); 
         }
-      }
 
-      if (shouldSkip) {
-        add(`${rejectedGenre}|${title}`);
-        logToFile(`REJECT: "${title}" (${rejectedGenre})`);
-        continue;
-      }
+        if (isHaveIt) {
+            add(`Have It|${title}`);
+            logToFile(`REJECT "${title}" (Have It)`);
+            continue;
+        }
 
-      // Log accepted show
-      logToFile(`>>>  "${title}", ${showUrl}`);
+        // 5. Fetch Show Page
+        const showUrl = `https://reelgood.com/show/${slug}`;
+        let reelPageHtml = '';
+        try {
+            // "fetch is intentionally fast" - standard fetch
+            const resp = await fetch(showUrl, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
+            });
+            if (!resp.ok) {
+                // If it fails emit fetch error
+                add(`Fetch Error|${title} ${resp.status}`);
+                continue;
+            }
+            reelPageHtml = await resp.text();
+        } catch (e) {
+            add(`Fetch Error|${title} ${e.message}`);
+            logToFile(`ERROR fetching show ${title}: ${e.message}`);
+            continue;
+        }
 
-      add(`ok|${title}`);
+        // 6. Check Genres
+        let rejectedGenre = null;
+        rx_genre.lastIndex = 0;
+        let genreMatch;
+        while ((genreMatch = rx_genre.exec(reelPageHtml)) !== null) {
+            const g = genreMatch[1].toLowerCase();
+            if (avoidGenres.includes(g)) {
+                rejectedGenre = g;
+                break;
+            }
+        }
 
-      // Save reelShows at end before returning
-      saveReelShows(reelShows);
+        if (rejectedGenre) {
+            add(`${rejectedGenre}|${title}`);
+            logToFile(`REJECT "${title}" (${rejectedGenre})`);
+            continue;
+        }
 
-      return addedThisCall;
+        // 7. Success
+        add(`ok|${title}`);
+        logToFile(`>>> "${title}" OK`);
+        
+        // We found an OK result, so we return the list accumulated so far
+        return addedThisCall;
     }
 
-    // Save reelShows even when no show found
-    saveReelShows(reelShows);
-
+    // Exhausted list without finding new OK result (or only skipped/rejected ones)
     return addedThisCall;
+
   } catch (err) {
     const errmsg = err.message || String(err);
     logToFile(`ERROR in getReel: ${errmsg}`);

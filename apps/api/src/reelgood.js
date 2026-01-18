@@ -327,7 +327,9 @@ async function loadLocalCfClearance(provider) {
 }
 
 async function curlFetchText(targetUrl, { headers = {}, cookieHeader = '' } = {}) {
-  const args = ['-sS', '-L', '--compressed'];
+  // Keep requests bounded so nginx doesn't hit upstream timeouts (504).
+  // Note: values are conservative; Reelgood often responds quickly or fails fast.
+  const args = ['-sS', '-L', '--compressed', '--connect-timeout', '10', '--max-time', '25'];
 
   // Note: intentionally do NOT pass -H 'cookie:'; use -b for cookies.
   for (const [k, v] of Object.entries(headers || {})) {
@@ -370,8 +372,9 @@ async function playwrightFetchText(targetUrl, { headers = {}, cookieHeader = '' 
   delete extraHeaders.cookie;
   delete extraHeaders.Cookie;
 
+  let context;
   try {
-    const context = await browser.newContext({
+    context = await browser.newContext({
       userAgent: ua || undefined,
       locale: 'en-US',
     });
@@ -387,16 +390,17 @@ async function playwrightFetchText(targetUrl, { headers = {}, cookieHeader = '' 
     }
 
     const page = await context.newPage();
-    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    // Keep overall work well under default nginx proxy timeouts.
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
 
     // Give Cloudflare challenge pages time to run/redirect.
     // We see sporadic CF challenges even with a clearance cookie; in those cases,
     // allow a longer window for JS challenges + redirects to settle.
-    const deadline = Date.now() + 30000;
+    const deadline = Date.now() + 10000;
     while (Date.now() < deadline) {
       try {
         // networkidle isn't guaranteed, but it helps when it does trigger.
-        await page.waitForLoadState('networkidle', { timeout: 1500 });
+        await page.waitForLoadState('networkidle', { timeout: 1000 });
       } catch {
         // ignore
       }
@@ -416,7 +420,7 @@ async function playwrightFetchText(targetUrl, { headers = {}, cookieHeader = '' 
         u.includes('/cdn-cgi/challenge-platform');
       if (!looksChallenged) break;
 
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(750);
     }
 
     const html = await page.content();
@@ -440,6 +444,13 @@ async function playwrightFetchText(targetUrl, { headers = {}, cookieHeader = '' 
     try {
       // Close timer is best-effort; browser stays alive briefly for reuse.
       touchSharedPlaywrightBrowser();
+    } catch {
+      // ignore
+    }
+
+    try {
+      // Avoid leaking contexts/pages across calls.
+      await context?.close();
     } catch {
       // ignore
     }
@@ -675,12 +686,15 @@ export async function startReel(showTitlesArg, { reset = false } = {}) {
   }
 }
 
-export async function getReel() {
+export async function getReel({ maxMs = 45000 } = {}) {
   try {
     if (!homeHtml) {
       const msg = 'Home page not loaded. Call startReel first.';
       return [`error|${msg}`];
     }
+
+    const startedAt = Date.now();
+    const deadlineMs = startedAt + (Number.isFinite(maxMs) ? Math.max(1000, maxMs) : 45000);
 
     const addedThisCall = [];
     const add = (entry) => {
@@ -695,6 +709,10 @@ export async function getReel() {
     rx_show.lastIndex = 0;
     
     while ((show = rx_show.exec(homeHtml)) !== null) {
+      if (Date.now() > deadlineMs) {
+        logToFile('getReel timed out before finding a title');
+        break;
+      }
       const titleMatches = rx_title.exec(show[0]);
       if (!titleMatches?.length) continue;
 
@@ -780,6 +798,10 @@ export async function getReel() {
 
     // Save oldShows even when no show found
     saveReelShows(oldShows);
+
+    if (Date.now() > deadlineMs && addedThisCall.length === 0) {
+      return ['error|getReel timed out'];
+    }
 
     return addedThisCall;
   } catch (err) {

@@ -1049,7 +1049,8 @@ app.post('/api/startreel', async (req, res) => {
 
 app.get('/api/getreel', async (req, res) => {
   try {
-    const result = await getReel();
+    // Keep this endpoint responsive; nginx /torrents-api/ uses default timeouts.
+    const result = await getReel({ maxMs: 45000 });
     appendCallsLog({ endpoint: '/api/getreel', method: 'GET', ok: true, result });
     res.json(result);
   } catch (error) {

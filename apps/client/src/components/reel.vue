@@ -239,6 +239,13 @@ export default {
     const ensureReelStarted = async () => {
       if (_didStartReel.value) return true;
 
+      // Don't start until we have the full library available.
+      // Multiple watchers can call ensureReelStarted during boot; this guard prevents
+      // an early start with an empty show list and relies on the promise guard below
+      // to dedupe concurrent calls.
+      const showTitles = getAllShowNames();
+      if (showTitles.length === 0) return false;
+
       if (_startReelPromise.value) {
         try {
           await _startReelPromise.value;
@@ -592,14 +599,14 @@ export default {
     onMounted(() => {
       // Wait until allShows is available so startReel gets the full library.
       if (Array.isArray(props.allShows) && props.allShows.length > 0) {
-        void startReelAndLoadTitles();
+        void ensureReelStarted();
       }
     });
 
     watch(() => props.allShows, (val) => {
       if (_didStartReel.value) return;
       if (!Array.isArray(val) || val.length === 0) return;
-      void startReelAndLoadTitles();
+      void ensureReelStarted();
     }, { deep: true });
 
     watch(() => props.active, (isActive) => {

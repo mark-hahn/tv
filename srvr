@@ -11,7 +11,7 @@ SSH_HOST="hahnca.com"
 #   local:  $ROOT_DIR/apps/down  -> remote: $TV_REMOTE_BASE/down
 TV_REMOTE_BASE="${TV_REMOTE_BASE:-/root/dev/apps/tv}"
 
-DEFAULT_TV_DATA_DIR="/root/dev/apps/tv-data"
+DEFAULT_TV_DATA_DIR="/root/dev/apps/tv/data"
 
 if [[ ! -d "$ROOT_DIR/apps" ]]; then
   echo "Error: expected layout under $ROOT_DIR (missing apps/)" >&2
@@ -21,8 +21,23 @@ fi
 usage() {
   echo "Usage: $(basename "$0") [api|down|srvr|client|share|all]" >&2
   echo "Env: TV_REMOTE_BASE (default: /root/dev/apps/tv on remote)" >&2
-  echo "Env: TV_DATA_DIR (default: /root/dev/apps/tv-data on remote, used for pm2 env)" >&2
+  echo "Env: TV_DATA_DIR (default: /root/dev/apps/tv/data on remote, used for pm2 env)" >&2
   exit 1
+}
+
+normalize_tv_data_dir() {
+  # Legacy path (no longer used): /root/dev/apps/tv-data
+  # Current shared data root:       /root/dev/apps/tv/data
+  local d="${1:-}"
+  if [[ "$d" == "/root/dev/apps/tv-data" ]]; then
+    printf '%s' "/root/dev/apps/tv/data"
+    return 0
+  fi
+  if [[ "$d" == "/root/dev/apps/tv-data/"* ]]; then
+    printf '%s' "/root/dev/apps/tv/data${d#/root/dev/apps/tv-data}"
+    return 0
+  fi
+  printf '%s' "$d"
 }
 
 pm2_name_for_project() {
@@ -106,7 +121,9 @@ remote_prepare_runtime_state() {
   # tv-srvr requires this file at startup.
   local project="${1:-all}"
   if [[ "$project" == "all" || "$project" == "srvr" ]]; then
-    local tv_data_dir="${TV_DATA_DIR:-$DEFAULT_TV_DATA_DIR}"
+    local tv_data_dir
+    tv_data_dir="${TV_DATA_DIR:-$DEFAULT_TV_DATA_DIR}"
+    tv_data_dir="$(normalize_tv_data_dir "$tv_data_dir")"
     local srvr_data_dir="$tv_data_dir/srvr/data"
     echo "[remote] ensure tv-srvr state exists under $srvr_data_dir"
     ssh "$SSH_HOST" "mkdir -p '$srvr_data_dir' \
@@ -146,7 +163,9 @@ remote_pm2_restart_one() {
       ;;
   esac
 
-  local tv_data_dir="${TV_DATA_DIR:-$DEFAULT_TV_DATA_DIR}"
+  local tv_data_dir
+  tv_data_dir="${TV_DATA_DIR:-$DEFAULT_TV_DATA_DIR}"
+  tv_data_dir="$(normalize_tv_data_dir "$tv_data_dir")"
   echo "[pm2] restart $pm2_name (cwd=$remote_dir)"
   ssh "$SSH_HOST" "cd '$remote_dir' \
     && pm2 delete '$pm2_name' >/dev/null 2>&1 || true \

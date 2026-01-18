@@ -32,7 +32,8 @@
         :style="{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '10px', marginTop: '0' }")
         button(
           @click="handleNext"
-          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Next
+          :disabled="isNextLoading"
+          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: isNextLoading ? '#d9d9d9' : '', transition: 'background-color 120ms ease-out', cursor: isNextLoading ? 'default' : 'pointer' }") Next
 
         span(v-if="hasAnyRemoteButton" :style="{ lineHeight: '18px', fontSize: '12px' }")  |
 
@@ -122,6 +123,7 @@ export default {
     const _didStartReel = ref(false);
     const _didInitialVisibleScroll = ref(false);
     const _startReelPromise = ref(null);
+    const isNextLoading = ref(false);
 
     const handleScaledWheel = (event) => {
       if (!event) return;
@@ -258,6 +260,8 @@ export default {
     };
 
     const handleNext = async () => {
+      if (isNextLoading.value) return;
+      isNextLoading.value = true;
       try {
         if (!_didStartReel.value) {
           await ensureReelStarted();
@@ -313,6 +317,8 @@ export default {
         console.log('getReel failed:', msg);
         titleStrings.value = [...titleStrings.value, `error|${msg}`];
         await scrollTitlesToBottom();
+      } finally {
+        isNextLoading.value = false;
       }
     };
 
@@ -617,6 +623,7 @@ export default {
       handleGallerySelect,
       selectTitle,
       handleNext,
+      isNextLoading,
       handleLoad,
       handleGoogle,
       handleImdb,

@@ -123,6 +123,7 @@ export default {
     const _didStartReel = ref(false);
     const _didInitialVisibleScroll = ref(false);
     const _startReelPromise = ref(null);
+    const _didSendPaneLoadReset = ref(false);
     const isNextLoading = ref(false);
 
     const handleScaledWheel = (event) => {
@@ -255,8 +256,13 @@ export default {
         return _didStartReel.value;
       }
 
+      // Per requirement: only send reset:true on initial pane load.
+      // (The other allowed case is Next-click when "no more titles" is showing.)
+      const shouldReset = !_didSendPaneLoadReset.value;
+      _didSendPaneLoadReset.value = true;
+
       _startReelPromise.value = (async () => {
-        await startReelAndLoadTitles();
+        await startReelAndLoadTitles({ reset: shouldReset });
       })().finally(() => {
         _startReelPromise.value = null;
       });

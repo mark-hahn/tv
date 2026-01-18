@@ -9,7 +9,7 @@ import * as search from './search.js';
 import * as download from './download.js';
 import { tvdbProxyGet } from './tvdb-proxy.js';
 import { getQbtInfo, delQbtTorrent, spaceAvail, flexgetHistory, addQbtTorrent } from './usb.js';
-import { startReel, getReel } from './reelgood.js';
+import { startReel, getReel, refreshReelgoodClearance } from './reelgood.js';
 import { checkFiles as tvProcCheckFiles } from './tv-proc.js';
 import {
   getApiCookiesDir,
@@ -206,6 +206,19 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
+
+// Reelgood: force-refresh Cloudflare clearance cookie via Playwright.
+// Returns a small JSON object; useful for manual maintenance and debugging.
+app.get('/api/reelgood/refresh', async (req, res) => {
+  try {
+    const info = await refreshReelgoodClearance({ reason: 'api' });
+    appendCallsLog({ endpoint: '/api/reelgood/refresh', method: 'GET', ok: true, result: [] });
+    res.json({ ok: true, ...info });
+  } catch (e) {
+    appendCallsLog({ endpoint: '/api/reelgood/refresh', method: 'GET', ok: false, result: [], error: e });
+    res.status(500).json({ ok: false, error: e?.message || String(e) });
+  }
+});
 
 const OPENSUBTITLES_BASE_URL = 'https://api.opensubtitles.com/api/v1';
 

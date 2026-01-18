@@ -20,6 +20,129 @@ const rx_title = new RegExp('"title": ?"(.*?)"', 's');
 const rx_slug = new RegExp('"slug": ?"(.*?)"', 'sg');
 const rx_genre = new RegExp('href="/tv/genre/([^"]*)"', 'sg');
 
+function decodeJsonStringFragment(s) {
+  const raw = String(s ?? '');
+  if (!raw) return '';
+  try {
+    // The regex capture is the inside of a JSON string literal.
+    return JSON.parse(`"${raw}"`);
+  } catch {
+    // Best-effort fallback.
+    return raw.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+  }
+}
+
+function extractBalancedJsonObject(s, openBraceIndex, { maxChars = 250000 } = {}) {
+  const str = String(s || '');
+  const start = Number(openBraceIndex);
+  if (!Number.isFinite(start) || start < 0 || start >= str.length) return null;
+  if (str[start] !== '{') return null;
+
+  let depth = 0;
+  let inString = false;
+  let escapeNext = false;
+
+  const limit = Math.min(str.length, start + Math.max(1, Number(maxChars) || 1));
+
+  for (let i = start; i < limit; i++) {
+    const ch = str[i];
+    if (inString) {
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+      if (ch === '\\') {
+        escapeNext = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      escapeNext = false;
+      continue;
+    }
+
+    if (ch === '{') {
+      depth++;
+      continue;
+    }
+
+    if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        return str.slice(start, i + 1);
+      }
+    }
+  }
+
+  return null;
+}
+
+function extractHomeShows(html) {
+  const s = String(html || '');
+  if (!s) return [];
+
+  const out = [];
+  const seen = new Set();
+
+  // Current (2025+) Reelgood bootstrap often contains show entities as:
+  // entities.entries["show:<id>:@global"] = { title: "...", slug: "...", ... }
+  const rxShowKey = /"show:[^\"]+:@global"\s*:\s*\{/g;
+  const rxTitle = /"title"\s*:\s*"((?:\\.|[^"\\])*)"/;
+  const rxSlug = /"slug"\s*:\s*(?:"((?:\\.|[^"\\])*)"|null)/;
+
+  let m;
+  while ((m = rxShowKey.exec(s)) !== null) {
+    // The match ends at the opening '{' of the value object.
+    const openBraceIndex = m.index + m[0].length - 1;
+    const obj = extractBalancedJsonObject(s, openBraceIndex, { maxChars: 250000 });
+    if (!obj) continue;
+
+    const mt = rxTitle.exec(obj);
+    if (!mt?.[1]) continue;
+    const title = decodeJsonStringFragment(mt[1]).trim();
+    if (!title) continue;
+
+    const ms = rxSlug.exec(obj);
+    const slug = ms?.[1] ? decodeJsonStringFragment(ms[1]).trim() : '';
+
+    const key = `${title}|${slug}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ title, slug });
+    if (out.length >= 5000) break;
+  }
+
+  // Back-compat fallback for older homepages: use the previous anchor regex,
+  // but still extract title/slug from a bounded window to avoid brace nesting.
+  if (out.length === 0) {
+    rx_show.lastIndex = 0;
+    let show;
+    while ((show = rx_show.exec(s)) !== null) {
+      const block = show[0];
+      const mt = rxTitle.exec(block);
+      if (!mt?.[1]) continue;
+      const title = decodeJsonStringFragment(mt[1]).trim();
+      if (!title) continue;
+
+      const ms = rxSlug.exec(block);
+      const slug = ms?.[1] ? decodeJsonStringFragment(ms[1]).trim() : '';
+      const key = `${title}|${slug}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ title, slug });
+      if (out.length >= 5000) break;
+    }
+  }
+
+  return out;
+}
+
 const homeUrl = "https://reelgood.com/new/tv";
 const reelShowsPath = path.join(getApiBaseDir(), 'reel-shows.json');
 const reelTitlesPath = path.join(getApiBaseDir(), 'reelgood-titles.json');
@@ -27,6 +150,9 @@ const logPath = path.join(getApiBaseDir(), 'reelgood.log');
 const homePagePath = path.resolve(__dirname, '..', '..', 'samples', 'sample-reelgood', 'homepage.html');
 
 const REELGOOD_PROVIDER = 'reelgood';
+
+const REELGOOD_CF_REFRESH_COOLDOWN_MS = Number(process.env.REELGOOD_CF_REFRESH_COOLDOWN_MS || 10 * 60 * 1000); // default: 10m
+let _reelgoodLastCfRefreshAtMs = 0;
 
 function looksLikeCloudflareChallenge(html) {
   const s = String(html || '');
@@ -79,6 +205,44 @@ function saveLocalCfClearance(provider, value) {
 
     if (typeof current[p] === 'string' && current[p].trim() === v) return false;
     current[p] = v;
+    atomicWriteTextFile(outPath, JSON.stringify(current, null, 2) + '\n');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function saveLocalCookieJar(provider, cookiesObj) {
+  try {
+    const p = String(provider || '').trim();
+    const cookies = cookiesObj && typeof cookiesObj === 'object' && !Array.isArray(cookiesObj) ? cookiesObj : null;
+    if (!p || !cookies) return false;
+
+    const outPath = path.join(getApiCookiesDir(), 'cf-cookies.local.json');
+    let current = {};
+    try {
+      const raw = fs.readFileSync(outPath, 'utf8');
+      const j = JSON.parse(raw);
+      if (j && typeof j === 'object' && !Array.isArray(j)) current = j;
+    } catch {
+      // ignore
+    }
+
+    const prev = current[p] && typeof current[p] === 'object' && !Array.isArray(current[p]) ? current[p] : {};
+    const next = { ...prev };
+    let changed = false;
+    for (const [k, v] of Object.entries(cookies)) {
+      const kk = String(k || '').trim();
+      const vv = String(v || '').trim();
+      if (!kk || !vv) continue;
+      if (next[kk] !== vv) {
+        next[kk] = vv;
+        changed = true;
+      }
+    }
+
+    if (!changed) return false;
+    current[p] = next;
     atomicWriteTextFile(outPath, JSON.stringify(current, null, 2) + '\n');
     return true;
   } catch {
@@ -147,11 +311,11 @@ function saveResultTitles(titlesArr) {
 
 function resetReelState() {
   try {
-    // IMPORTANT: preserve history (reelgood-titles.json). Reset is only meant to
-    // restart the per-homepage processing cursor (reel-shows.json).
-    oldShows = {};
-    saveReelShows(oldShows);
-    logToFile('Reelgood state reset (reel-shows cleared; history preserved)');
+    // IMPORTANT: do NOT clear reel-shows.json.
+    // Reset is meant to refresh in-memory state (e.g. refetch homepage) without
+    // wiping the persistent cursor/history.
+    oldShows = loadReelShows();
+    logToFile('Reelgood state reset (reel-shows preserved; in-memory refreshed)');
   } catch (e) {
     logToFile(`ERROR resetting Reelgood state: ${e?.message || String(e)}`);
   }
@@ -326,6 +490,27 @@ async function loadLocalCfClearance(provider) {
   }
 }
 
+async function loadLocalCookieJar(provider) {
+  try {
+    const p = String(provider || '').trim();
+    if (!p) return {};
+    const inPath = path.join(getApiCookiesDir(), 'cf-cookies.local.json');
+    const raw = await fs.promises.readFile(inPath, 'utf8');
+    const j = JSON.parse(raw);
+    const v = j && typeof j === 'object' && !Array.isArray(j) ? j[p] : null;
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
+    const out = {};
+    for (const [k, val] of Object.entries(v)) {
+      const kk = String(k || '').trim();
+      const vv = typeof val === 'string' ? val.trim() : '';
+      if (kk && vv) out[kk] = vv;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 async function curlFetchText(
   targetUrl,
   { headers = {}, cookieHeader = '', connectTimeoutSec = 10, maxTimeSec = 25 } = {}
@@ -368,40 +553,38 @@ async function curlFetchText(
 }
 
 async function playwrightFetchText(targetUrl, { headers = {}, cookieHeader = '' } = {}) {
-  // Playwright is already a dependency of @tv/api; keep import lazy so normal startup is fast.
-  // Important perf note: launching Chromium is expensive; reuse a shared browser instance.
-  const browser = await getSharedPlaywrightBrowser();
-
   const ua = String(headers?.['user-agent'] || headers?.['User-Agent'] || '').trim();
   const extraHeaders = { ...(headers || {}) };
   delete extraHeaders.cookie;
   delete extraHeaders.Cookie;
 
-  let context;
+  const context = await getSharedPlaywrightContext({ userAgent: ua || undefined });
+  let page;
   try {
-    context = await browser.newContext({
-      userAgent: ua || undefined,
-      locale: 'en-US',
-    });
-
-    // Note: cookies are added via addCookies, not via cookie header.
-    if (Object.keys(extraHeaders).length > 0) {
-      await context.setExtraHTTPHeaders(extraHeaders);
-    }
-
     const cookies = parseCookieHeaderForDomain(cookieHeader, '.reelgood.com');
     if (cookies.length > 0) {
       await context.addCookies(cookies);
     }
 
-    const page = await context.newPage();
-    // Keep overall work well under default nginx proxy timeouts.
-    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    page = await context.newPage();
+
+    // Apply per-call headers at the page level (context is persistent and reused).
+    try {
+      if (Object.keys(extraHeaders).length > 0) {
+        await page.setExtraHTTPHeaders(extraHeaders);
+      }
+    } catch {
+      // ignore
+    }
+
+    // Keep overall work bounded, but give CF a real chance to complete.
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
     // Give Cloudflare challenge pages time to run/redirect.
     // We see sporadic CF challenges even with a clearance cookie; in those cases,
     // allow a longer window for JS challenges + redirects to settle.
-    const deadline = Date.now() + 10000;
+    const deadline = Date.now() + 60000;
+    let attemptedClick = false;
     while (Date.now() < deadline) {
       try {
         // networkidle isn't guaranteed, but it helps when it does trigger.
@@ -425,23 +608,68 @@ async function playwrightFetchText(targetUrl, { headers = {}, cookieHeader = '' 
         u.includes('/cdn-cgi/challenge-platform');
       if (!looksChallenged) break;
 
+      // Best-effort: some CF flows present a checkbox/Turnstile. Try clicking once.
+      if (!attemptedClick) {
+        attemptedClick = true;
+        try {
+          const frames = page.frames();
+          const cfFrame = frames.find((f) => String(f.url() || '').includes('challenges.cloudflare.com'));
+          if (cfFrame) {
+            // Try a couple common checkbox patterns.
+            await cfFrame.click('input[type="checkbox"]', { timeout: 1500 }).catch(() => {});
+            await cfFrame.click('div[role="checkbox"]', { timeout: 1500 }).catch(() => {});
+          } else {
+            await page.click('input[type="checkbox"]', { timeout: 1200 }).catch(() => {});
+            await page.click('div[role="checkbox"]', { timeout: 1200 }).catch(() => {});
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       await page.waitForTimeout(750);
     }
 
     const html = await page.content();
 
-    // Best-effort: capture refreshed clearance cookie if Playwright solved the challenge.
-    try {
-      const jar = await context.cookies('https://reelgood.com');
-      const cf = jar.find((c) => c && c.name === 'cf_clearance');
-      if (cf?.value) {
-        const updated = saveLocalCfClearance(REELGOOD_PROVIDER, cf.value);
-        if (updated) {
-          console.error('[reelgood] updated cf_clearance via playwright', { len: String(cf.value).length });
-        }
+    if (looksLikeCloudflareChallenge(html)) {
+      try {
+        console.error('[reelgood] playwright challenged', {
+          url: targetUrl,
+          pageUrl: String(page.url() || ''),
+          title: String(await page.title() || '').slice(0, 120),
+        });
+      } catch {
+        console.error('[reelgood] playwright challenged', { url: targetUrl });
       }
-    } catch {
-      // ignore
+    }
+
+    // Best-effort: capture refreshed clearance cookie only if we are not still on a challenge page.
+    if (!looksLikeCloudflareChallenge(html)) {
+      try {
+        const jar = await context.cookies('https://reelgood.com');
+        const want = new Set(['cf_clearance', '__cf_bm', '_cfuvid']);
+        const picked = {};
+        for (const c of jar || []) {
+          const name = String(c?.name || '').trim();
+          const value = String(c?.value || '').trim();
+          if (!name || !value) continue;
+          if (!want.has(name)) continue;
+          picked[name] = value;
+        }
+        if (picked.cf_clearance) {
+          const updated = saveLocalCfClearance(REELGOOD_PROVIDER, picked.cf_clearance);
+          if (updated) {
+            console.error('[reelgood] updated cf_clearance via playwright', { len: String(picked.cf_clearance).length });
+          }
+        }
+        const jarUpdated = saveLocalCookieJar(REELGOOD_PROVIDER, picked);
+        if (jarUpdated) {
+          console.error('[reelgood] updated cf cookies via playwright', { keys: Object.keys(picked) });
+        }
+      } catch {
+        // ignore
+      }
     }
 
     return html;
@@ -454,16 +682,41 @@ async function playwrightFetchText(targetUrl, { headers = {}, cookieHeader = '' 
     }
 
     try {
-      // Avoid leaking contexts/pages across calls.
-      await context?.close();
+      await page?.close();
     } catch {
       // ignore
     }
   }
 }
 
+async function refreshReelgoodCfClearanceViaPlaywright({ headers = {}, cookieHeader = '', reason = '', force = false } = {}) {
+  // Avoid hammering Cloudflare / launching Chromium repeatedly.
+  const now = Date.now();
+  if (!force && REELGOOD_CF_REFRESH_COOLDOWN_MS > 0 && (now - (_reelgoodLastCfRefreshAtMs || 0)) < REELGOOD_CF_REFRESH_COOLDOWN_MS) {
+    return { attempted: false, updated: false, reason: 'cooldown' };
+  }
+
+  _reelgoodLastCfRefreshAtMs = now;
+
+  const before = await loadLocalCfClearance(REELGOOD_PROVIDER);
+  try {
+    // Use the home page as a stable target for solving challenges and minting cf_clearance.
+    await playwrightFetchText(homeUrl, { headers, cookieHeader });
+  } catch (e) {
+    return { attempted: true, updated: false, reason: `error: ${e?.message || String(e)}` };
+  }
+  const after = await loadLocalCfClearance(REELGOOD_PROVIDER);
+  const updated = Boolean(after && after !== before);
+  if (updated) {
+    console.error('[reelgood] cf_clearance refreshed', { reason: String(reason || '').slice(0, 120) });
+  }
+  return { attempted: true, updated, reason: updated ? 'updated' : 'nochange' };
+}
+
 let _pwBrowser = null;
 let _pwLaunching = null;
+let _pwContext = null;
+let _pwContextLaunching = null;
 let _pwLastUsedAtMs = 0;
 let _pwCloseTimer = null;
 
@@ -474,9 +727,16 @@ function touchSharedPlaywrightBrowser() {
 
   _pwCloseTimer = setTimeout(async () => {
     try {
-      if (!_pwBrowser) return;
+      if (!_pwBrowser && !_pwContext) return;
       const idleFor = Date.now() - (_pwLastUsedAtMs || 0);
       if (idleFor < REELGOOD_PW_IDLE_CLOSE_MS) return;
+      try {
+        // If we used a persistent context, close it first.
+        await _pwContext?.close();
+      } catch {
+        // ignore
+      }
+      _pwContext = null;
       try {
         await _pwBrowser.close();
       } catch {
@@ -487,6 +747,91 @@ function touchSharedPlaywrightBrowser() {
       _pwCloseTimer = null;
     }
   }, REELGOOD_PW_IDLE_CLOSE_MS + 250);
+}
+
+function getReelgoodPlaywrightProfileDir() {
+  return path.join(getApiCookiesDir(), 'reelgood-pw-profile');
+}
+
+async function getSharedPlaywrightContext({ userAgent } = {}) {
+  if (_pwContext) {
+    touchSharedPlaywrightBrowser();
+    return _pwContext;
+  }
+  if (_pwContextLaunching) return await _pwContextLaunching;
+
+  _pwContextLaunching = (async () => {
+    const { chromium } = await import('playwright');
+
+    // Ensure Playwright browser is installed.
+    try {
+      const exePath = chromium.executablePath();
+      if (!exePath || !fs.existsSync(exePath)) {
+        const err = new Error('playwright browser not installed (run: npx playwright install)');
+        err.code = 'PW_BROWSER_MISSING';
+        throw err;
+      }
+    } catch (e) {
+      const err = new Error(e?.message || 'playwright not available');
+      err.code = e?.code || 'PW_BROWSER_MISSING';
+      throw err;
+    }
+
+    const userDataDir = getReelgoodPlaywrightProfileDir();
+    try {
+      if (!fs.existsSync(userDataDir)) fs.mkdirSync(userDataDir, { recursive: true });
+    } catch {
+      // ignore
+    }
+
+    const ctx = await chromium.launchPersistentContext(userDataDir, {
+      headless: true,
+      locale: 'en-US',
+      userAgent: String(userAgent || '').trim() || undefined,
+      viewport: { width: 1365, height: 768 },
+      args: [
+        '--no-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-blink-features=AutomationControlled',
+      ],
+    });
+
+    // Basic stealth-ish tweaks (best-effort; no external deps).
+    try {
+      await ctx.addInitScript(() => {
+        try {
+          Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        } catch {}
+        try {
+          Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+        } catch {}
+        try {
+          // eslint-disable-next-line no-undef
+          window.chrome = window.chrome || { runtime: {} };
+        } catch {}
+      });
+    } catch {
+      // ignore
+    }
+
+    _pwContext = ctx;
+    try {
+      _pwBrowser = ctx.browser();
+    } catch {
+      // ignore
+    }
+    touchSharedPlaywrightBrowser();
+    return ctx;
+  })().finally(() => {
+    _pwContextLaunching = null;
+  });
+
+  try {
+    return await _pwContextLaunching;
+  } catch (e) {
+    _pwContext = null;
+    throw e;
+  }
 }
 
 async function getSharedPlaywrightBrowser() {
@@ -517,7 +862,11 @@ async function getSharedPlaywrightBrowser() {
 
     const browser = await chromium.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-dev-shm-usage'],
+      args: [
+        '--no-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-blink-features=AutomationControlled',
+      ],
     });
 
     _pwBrowser = browser;
@@ -545,6 +894,12 @@ async function fetchReelgoodHtml(
 
   // Source of truth: TV data cookie store (written by client Save Cookies).
   // req-reelgood.txt is treated as an immutable template; patch an in-memory copy only.
+  const localJar = await loadLocalCookieJar(REELGOOD_PROVIDER);
+  for (const [k, v] of Object.entries(localJar || {})) {
+    if (!k || !v) continue;
+    cookieHeader = upsertCookieValue(cookieHeader, k, v);
+  }
+
   const localCf = await loadLocalCfClearance(REELGOOD_PROVIDER);
   const reqCf = getCookieValue(cookieHeader, 'cf_clearance');
   const bestCf = chooseBestCfClearance({ fromReq: reqCf, fromLocal: localCf });
@@ -573,9 +928,64 @@ async function fetchReelgoodHtml(
     return r.stdout;
   }
 
+  // If Cloudflare challenged curl, try a lightweight refresh (mint cookies via Playwright
+  // on the home page), then retry curl once. This keeps the steady-state path curl-only.
+  try {
+    const did = await refreshReelgoodCfClearanceViaPlaywright({
+      headers,
+      cookieHeader,
+      reason: `curl challenged for ${url}`,
+    });
+    if (did.attempted) {
+      const localCf2 = await loadLocalCfClearance(REELGOOD_PROVIDER);
+      const reqCf2 = getCookieValue(cookieHeader, 'cf_clearance');
+      const bestCf2 = chooseBestCfClearance({ fromReq: reqCf2, fromLocal: localCf2 });
+      const cookieHeader2 = bestCf2 ? upsertCookieValue(cookieHeader, 'cf_clearance', bestCf2) : cookieHeader;
+      const r2 = await curlFetchText(url, {
+        headers,
+        cookieHeader: cookieHeader2,
+        connectTimeoutSec: curlConnectTimeoutSec,
+        maxTimeSec: curlMaxTimeSec,
+      });
+      if (r2.ok && !looksLikeCloudflareChallenge(r2.stdout)) {
+        return r2.stdout;
+      }
+    }
+  } catch {
+    // ignore refresh failures; continue to existing fallback behavior
+  }
+
   // For some call sites (e.g. per-show fetch inside getReel), we prefer to skip quickly
   // rather than pay the cost of solving challenges via Playwright.
   if (!allowPlaywright) {
+    // Even when call sites don't want full Playwright fallback for the *target URL*,
+    // it's still safe and useful to refresh cf_clearance once in a while using
+    // the home page, then retry curl.
+    try {
+      const did = await refreshReelgoodCfClearanceViaPlaywright({
+        headers,
+        cookieHeader,
+        reason: `curl challenged (no-pw) for ${url}`,
+      });
+      if (did.attempted) {
+        const localCf2 = await loadLocalCfClearance(REELGOOD_PROVIDER);
+        const reqCf2 = getCookieValue(cookieHeader, 'cf_clearance');
+        const bestCf2 = chooseBestCfClearance({ fromReq: reqCf2, fromLocal: localCf2 });
+        const cookieHeader2 = bestCf2 ? upsertCookieValue(cookieHeader, 'cf_clearance', bestCf2) : cookieHeader;
+        const r2 = await curlFetchText(url, {
+          headers,
+          cookieHeader: cookieHeader2,
+          connectTimeoutSec: curlConnectTimeoutSec,
+          maxTimeSec: curlMaxTimeSec,
+        });
+        if (r2.ok && !looksLikeCloudflareChallenge(r2.stdout)) {
+          return r2.stdout;
+        }
+      }
+    } catch {
+      // ignore refresh failures; fall through to existing error behavior
+    }
+
     if (!r.ok) {
       const details = (r.stderr || '').trim().slice(0, 400);
       throw new Error(`curl failed (code ${r.code}) for ${url}${details ? `: ${details}` : ''}`);
@@ -605,6 +1015,22 @@ async function fetchReelgoodHtml(
 
   // Curl returned HTML but it looks like Cloudflare challenge.
   throw new Error(`cloudflare challenge for ${url}`);
+}
+
+export async function refreshReelgoodClearance({ reason = '' } = {}) {
+  const profile = tryLoadReelgoodCurlProfile();
+  const headers = profile?.headers || {};
+  const cookieHeader = profile?.cookieHeader || '';
+  const before = await loadLocalCfClearance(REELGOOD_PROVIDER);
+  const r = await refreshReelgoodCfClearanceViaPlaywright({ headers, cookieHeader, reason: reason || 'manual', force: true });
+  const after = await loadLocalCfClearance(REELGOOD_PROVIDER);
+  return {
+    attempted: r.attempted,
+    updated: r.updated,
+    cooldownMs: REELGOOD_CF_REFRESH_COOLDOWN_MS,
+    beforeLen: before ? String(before).length : 0,
+    afterLen: after ? String(after).length : 0,
+  };
 }
 
 function loadReelShows() {
@@ -682,6 +1108,11 @@ export async function startReel(showTitlesArg, { reset = false } = {}) {
   try {
     if (reset) resetReelState();
 
+    // Keep in-memory state aligned with on-disk cursor/history. This prevents
+    // stale in-memory caches from rewriting cleared/edited files.
+    oldShows = loadReelShows();
+    resultTitles = loadResultTitles();
+
     showTitles = Array.isArray(showTitlesArg) ? showTitlesArg : [];
 
     logToFile(`startReel called (showTitles: ${showTitles.length})`);
@@ -738,41 +1169,39 @@ export async function getReel({ maxMs = 45000 } = {}) {
     const haveItSet = new Set((Array.isArray(showTitles) ? showTitles : []).map(String));
     const seenInResultTitles = new Set(resultTitles.map(parseResultTitle).filter(Boolean));
 
-    let show;
-    rx_show.lastIndex = 0;
-    
-    while ((show = rx_show.exec(homeHtml)) !== null) {
+    const homeShows = extractHomeShows(homeHtml);
+    if (homeShows.length === 0) {
+      logToFile('WARN getReel: parsed 0 shows from homeHtml');
+      return ['msg|No shows parsed from home page'];
+    }
+
+    for (const hs of homeShows) {
       if (Date.now() > deadlineMs) {
         logToFile('getReel timed out before finding a title');
         break;
       }
-      const titleMatches = rx_title.exec(show[0]);
-      if (!titleMatches?.length) continue;
-
-      const title = titleMatches[1];
+      const title = String(hs?.title || '').trim();
+      if (!title) continue;
       if (title in oldShows) continue;
       if (seenInResultTitles.has(title)) {
-        // Treat as already processed, same behavior as oldShows.
-        oldShows[title] = true;
+        // Already returned previously (history). Don't persist it to reel-shows.json
+        // just because we scanned it.
         continue;
       }
-      
-      oldShows[title] = true;
 
       console.log('\nProcessing:', title);
 
-      rx_slug.lastIndex = 0;
-      const slugMatches = rx_slug.exec(show[0]);
-      if (!slugMatches?.length) {
+      const slug = String(hs?.slug || '').trim();
+      if (!slug) {
         console.log('No slug found');
+        oldShows[title] = true;
         addSkipped(title);
         continue;
       }
-
-      const slug = slugMatches[1];
       const showUrl = `https://reelgood.com/show/${encodeURIComponent(slug)}`;
 
       if (haveItSet.has(title)) {
+        oldShows[title] = true;
         add(`Have It|${title}`);
         logToFile(`REJECT: "${title}" (Have It)`);
         continue;
@@ -789,7 +1218,12 @@ export async function getReel({ maxMs = 45000 } = {}) {
         });
       } catch (e) {
         console.log('Error fetching show page:', e);
-        logToFile(`ERROR fetching show page "${title}": ${e.message || String(e)}`);
+        const detail = e?.message || String(e);
+        // If we can't fetch the show page (often Cloudflare), treat as skipped.
+        // This preserves the invariant: we only return ok when we've actually
+        // processed the show page (e.g. for genre filtering).
+        logToFile(`WARN show page fetch failed; skipping "${title}": ${detail}`);
+        oldShows[title] = true;
         addSkipped(title);
         continue;
       }
@@ -821,6 +1255,7 @@ export async function getReel({ maxMs = 45000 } = {}) {
       }
 
       if (shouldSkip) {
+        oldShows[title] = true;
         add(`${rejectedGenre}|${title}`);
         logToFile(`REJECT: "${title}" (${rejectedGenre})`);
         continue;
@@ -829,6 +1264,7 @@ export async function getReel({ maxMs = 45000 } = {}) {
       // Log accepted show
       logToFile(`>>>  "${title}", ${showUrl}`);
 
+      oldShows[title] = true;
       add(`ok|${title}`);
 
       // Save oldShows at end before returning

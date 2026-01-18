@@ -88,7 +88,7 @@ function saveLocalCfClearance(provider, value) {
 
 // Global cache
 let homeHtml = null;
-let oldShows = null;
+let reelShows = null;
 let showTitles = [];
 let resultTitles = [];
 
@@ -553,8 +553,8 @@ function saveReelShows(shows) {
   }
 }
 
-// Load oldShows once at module load time
-oldShows = loadReelShows();
+// Load reelShows once at module load time
+reelShows = loadReelShows();
 resultTitles = loadResultTitles();
 
 // Log startup - wrapped in try/catch to prevent module load failure
@@ -625,14 +625,14 @@ export async function getReel() {
       if (!titleMatches?.length) continue;
 
       const title = titleMatches[1];
-      if (title in oldShows) continue;
+      if (title in reelShows) continue;
       if (seenInResultTitles.has(title)) {
-        // Treat as already processed, same behavior as oldShows.
-        oldShows[title] = true;
+        // Treat as already processed, same behavior as reelShows.
+        reelShows[title] = true;
         continue;
       }
       
-      oldShows[title] = true;
+      reelShows[title] = true;
 
       console.log('\nProcessing:', title);
 
@@ -698,14 +698,14 @@ export async function getReel() {
 
       add(`ok|${title}`);
 
-      // Save oldShows at end before returning
-      saveReelShows(oldShows);
+      // Save reelShows at end before returning
+      saveReelShows(reelShows);
 
       return addedThisCall;
     }
 
-    // Save oldShows even when no show found
-    saveReelShows(oldShows);
+    // Save reelShows even when no show found
+    saveReelShows(reelShows);
 
     return addedThisCall;
   } catch (err) {

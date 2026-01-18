@@ -3,14 +3,14 @@ import path from 'path';
 import { spawn } from 'child_process';
 
 // Usage (from workspace root):
-//   node torrents/test/curl-test.js "https://www.torrentleech.org/download/<fid>/<name>.torrent"
+//   node apps/api/test/curl-test.js "https://www.torrentleech.org/download/<fid>/<name>.torrent"
 //
-// Reads:  misc/req-browser.txt  (DevTools “Copy as cURL (bash)” output)
+// Reads:  apps/api/cookies/req-browser.txt  (DevTools “Copy as cURL (bash)” output)
 // Writes: torrents/test/curl-test.torrent
 
 const WORKSPACE_ROOT = path.resolve(process.cwd());
 const REQ_BROWSER_CANDIDATES = [
-  path.join(WORKSPACE_ROOT, 'torrents', 'req-browser.txt'),
+  path.join(WORKSPACE_ROOT, 'apps', 'api', 'cookies', 'req-browser.txt'),
   path.join(WORKSPACE_ROOT, 'misc', 'req-browser.txt'),
 ];
 const OUTPUT_PATH = path.join(WORKSPACE_ROOT, 'torrents', 'test', 'curl-test.torrent');

@@ -182,7 +182,7 @@ function tryLoadReelgoodCurlProfile() {
   // Replay browser headers/cookies from req-reelgood.txt (DevTools Copy as cURL (bash)).
   try {
     const candidates = [
-      path.join(__dirname, '..', 'req-reelgood.txt'),
+      path.join(__dirname, '..', 'cookies', 'req-reelgood.txt'),
       path.join(__dirname, '..', '..', 'misc', 'req-reelgood.txt'),
     ];
     const p = candidates.find((x) => fs.existsSync(x));

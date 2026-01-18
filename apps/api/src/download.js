@@ -84,12 +84,12 @@ function looksLikeCloudflareChallenge(html) {
 }
 
 function tryLoadBrowserCurlProfile() {
-  // Optional best-match replay: if misc/req-browser.txt exists (DevTools Copy as cURL (bash)),
+  // Optional best-match replay: if cookies/req-browser.txt exists (DevTools Copy as cURL (bash)),
   // we can reuse its cookie/header set when invoking curl.
   try {
-    // Prefer torrents/req-browser.txt (user-provided template), fall back to misc/req-browser.txt.
+    // Prefer cookies/req-browser.txt (user-provided template), fall back to misc/req-browser.txt.
     const candidates = [
-      path.join(__dirname, '..', 'req-browser.txt'),
+      path.join(__dirname, '..', 'cookies', 'req-browser.txt'),
       path.join(__dirname, '..', '..', 'misc', 'req-browser.txt'),
     ];
     const p = candidates.find((x) => fs.existsSync(x));

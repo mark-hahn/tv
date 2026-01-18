@@ -1021,7 +1021,8 @@ app.get('/api/startreel', async (req, res) => {
       }
     }
 
-    const result = await startReel(showTitles);
+    const reset = (String(q.reset || '').trim().toLowerCase() === '1') || (String(q.reset || '').trim().toLowerCase() === 'true');
+    const result = await startReel(showTitles, { reset });
     appendCallsLog({ endpoint: '/api/startreel', method: 'GET', ok: true, result });
     res.json(result);
   } catch (error) {
@@ -1035,7 +1036,8 @@ app.post('/api/startreel', async (req, res) => {
   try {
     const body = req.body || {};
     const showTitles = Array.isArray(body.showTitles) ? body.showTitles : [];
-    const result = await startReel(showTitles);
+    const reset = body.reset === true || String(body.reset || '').trim().toLowerCase() === 'true' || String(body.reset || '').trim() === '1';
+    const result = await startReel(showTitles, { reset });
     appendCallsLog({ endpoint: '/api/startreel', method: 'POST', ok: true, result });
     res.json(result);
   } catch (error) {

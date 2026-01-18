@@ -20,7 +20,18 @@ let allTvdb = null;
 export const getAllTvdb = async () => {
   // all data in tvdb.json
   // cached in allTvdb
-  allTvdb ??= await srvr.getAllTvdb();
+  if (!allTvdb) {
+    try {
+      allTvdb = await srvr.getAllTvdb();
+    } catch (e) {
+      // On reload (or transient network issues) the tv-series WebSocket can close.
+      // Treat it as a transient failure and keep the UI functional.
+      const msg = String(e?.message || e?.error || '').toLowerCase();
+      const transient = msg.includes('websocket closed') || msg.includes('websocket disconnected') || msg.includes('websocket error');
+      if (!transient) throw e;
+      allTvdb = {};
+    }
+  }
   return allTvdb;
 }
 

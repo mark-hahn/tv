@@ -17,7 +17,13 @@ let   nextId     = 0;
 let   clint      = null;
 
 const rejectAllPending = (reason) => {
-  const err = reason || { error: 'websocket disconnected' };
+  const r = reason || { error: 'websocket disconnected' };
+  const msg = String(r?.error || r?.message || 'websocket disconnected');
+  const err = new Error(msg);
+  // Preserve legacy fields for callers that might inspect them.
+  if (r && typeof r === 'object') {
+    try { Object.assign(err, r); } catch { /* ignore */ }
+  }
   while (calls.length) {
     const call = calls.shift();
     try {

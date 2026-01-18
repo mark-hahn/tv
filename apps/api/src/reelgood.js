@@ -5,7 +5,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 
-import { getApiCookiesDir } from './tvPaths.js';
+import { getApiBaseDir, getApiCookiesDir } from './tvPaths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,9 +21,9 @@ const rx_slug = new RegExp('"slug": ?"(.*?)"', 'sg');
 const rx_genre = new RegExp('href="/tv/genre/([^"]*)"', 'sg');
 
 const homeUrl = "https://reelgood.com/new/tv";
-const reelShowsPath = path.resolve(__dirname, '..', 'reel-shows.json');
-const reelTitlesPath = path.resolve(__dirname, '..', 'reelgood-titles.json');
-const logPath = path.resolve(__dirname, '..', 'reelgood.log');
+const reelShowsPath = path.join(getApiBaseDir(), 'reel-shows.json');
+const reelTitlesPath = path.join(getApiBaseDir(), 'reelgood-titles.json');
+const logPath = path.join(getApiBaseDir(), 'reelgood.log');
 const homePagePath = path.resolve(__dirname, '..', '..', 'samples', 'sample-reelgood', 'homepage.html');
 
 const REELGOOD_PROVIDER = 'reelgood';
@@ -92,6 +92,8 @@ let oldShows = null;
 let showTitles = [];
 let resultTitles = [];
 
+const REELGOOD_PW_IDLE_CLOSE_MS = Number(process.env.REELGOOD_PW_IDLE_CLOSE_MS || 2 * 60 * 1000); // default: 2m
+
 function shouldPersistResultEntry(entry) {
   const s = String(entry || '');
   return !s.toLowerCase().startsWith('error|');
@@ -140,6 +142,18 @@ function saveResultTitles(titlesArr) {
   } catch (err) {
     console.error('Error saving reelgood-titles.json:', err);
     logToFile(`ERROR saving reelgood-titles.json: ${err.message}`);
+  }
+}
+
+function resetReelState() {
+  try {
+    // IMPORTANT: preserve history (reelgood-titles.json). Reset is only meant to
+    // restart the per-homepage processing cursor (reel-shows.json).
+    oldShows = {};
+    saveReelShows(oldShows);
+    logToFile('Reelgood state reset (reel-shows cleared; history preserved)');
+  } catch (e) {
+    logToFile(`ERROR resetting Reelgood state: ${e?.message || String(e)}`);
   }
 }
 
@@ -348,33 +362,13 @@ async function curlFetchText(targetUrl, { headers = {}, cookieHeader = '' } = {}
 
 async function playwrightFetchText(targetUrl, { headers = {}, cookieHeader = '' } = {}) {
   // Playwright is already a dependency of @tv/api; keep import lazy so normal startup is fast.
-  const { chromium } = await import('playwright');
-
-  // Do not attempt Playwright unless the browser executable is present.
-  // This avoids noisy failures in environments where server apps are not meant to run (e.g. local workspace).
-  try {
-    const exePath = chromium.executablePath();
-    if (!exePath || !fs.existsSync(exePath)) {
-      const err = new Error('playwright browser not installed (run: npx playwright install)');
-      err.code = 'PW_BROWSER_MISSING';
-      throw err;
-    }
-  } catch (e) {
-    // If we cannot determine an executable path, assume Playwright isn't usable here.
-    const err = new Error(e?.message || 'playwright not available');
-    err.code = e?.code || 'PW_BROWSER_MISSING';
-    throw err;
-  }
+  // Important perf note: launching Chromium is expensive; reuse a shared browser instance.
+  const browser = await getSharedPlaywrightBrowser();
 
   const ua = String(headers?.['user-agent'] || headers?.['User-Agent'] || '').trim();
   const extraHeaders = { ...(headers || {}) };
   delete extraHeaders.cookie;
   delete extraHeaders.Cookie;
-
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
-  });
 
   try {
     const context = await browser.newContext({
@@ -443,7 +437,85 @@ async function playwrightFetchText(targetUrl, { headers = {}, cookieHeader = '' 
 
     return html;
   } finally {
-    await browser.close();
+    try {
+      // Close timer is best-effort; browser stays alive briefly for reuse.
+      touchSharedPlaywrightBrowser();
+    } catch {
+      // ignore
+    }
+  }
+}
+
+let _pwBrowser = null;
+let _pwLaunching = null;
+let _pwLastUsedAtMs = 0;
+let _pwCloseTimer = null;
+
+function touchSharedPlaywrightBrowser() {
+  _pwLastUsedAtMs = Date.now();
+  if (_pwCloseTimer) clearTimeout(_pwCloseTimer);
+  if (!Number.isFinite(REELGOOD_PW_IDLE_CLOSE_MS) || REELGOOD_PW_IDLE_CLOSE_MS <= 0) return;
+
+  _pwCloseTimer = setTimeout(async () => {
+    try {
+      if (!_pwBrowser) return;
+      const idleFor = Date.now() - (_pwLastUsedAtMs || 0);
+      if (idleFor < REELGOOD_PW_IDLE_CLOSE_MS) return;
+      try {
+        await _pwBrowser.close();
+      } catch {
+        // ignore
+      }
+      _pwBrowser = null;
+    } finally {
+      _pwCloseTimer = null;
+    }
+  }, REELGOOD_PW_IDLE_CLOSE_MS + 250);
+}
+
+async function getSharedPlaywrightBrowser() {
+  if (_pwBrowser) {
+    touchSharedPlaywrightBrowser();
+    return _pwBrowser;
+  }
+  if (_pwLaunching) return await _pwLaunching;
+
+  _pwLaunching = (async () => {
+    const { chromium } = await import('playwright');
+
+    // Do not attempt Playwright unless the browser executable is present.
+    // This avoids noisy failures in environments where server apps are not meant to run (e.g. local workspace).
+    try {
+      const exePath = chromium.executablePath();
+      if (!exePath || !fs.existsSync(exePath)) {
+        const err = new Error('playwright browser not installed (run: npx playwright install)');
+        err.code = 'PW_BROWSER_MISSING';
+        throw err;
+      }
+    } catch (e) {
+      // If we cannot determine an executable path, assume Playwright isn't usable here.
+      const err = new Error(e?.message || 'playwright not available');
+      err.code = e?.code || 'PW_BROWSER_MISSING';
+      throw err;
+    }
+
+    const browser = await chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-dev-shm-usage'],
+    });
+
+    _pwBrowser = browser;
+    touchSharedPlaywrightBrowser();
+    return browser;
+  })().finally(() => {
+    _pwLaunching = null;
+  });
+
+  try {
+    return await _pwLaunching;
+  } catch (e) {
+    _pwBrowser = null;
+    throw e;
   }
 }
 
@@ -568,8 +640,10 @@ resultTitles = loadResultTitles();
   }
 })();
 
-export async function startReel(showTitlesArg) {
+export async function startReel(showTitlesArg, { reset = false } = {}) {
   try {
+    if (reset) resetReelState();
+
     showTitles = Array.isArray(showTitlesArg) ? showTitlesArg : [];
 
     logToFile(`startReel called (showTitles: ${showTitles.length})`);

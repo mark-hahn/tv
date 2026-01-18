@@ -178,7 +178,7 @@ export default {
       return Array.from(new Set(names));
     };
 
-    const startReelAndLoadTitles = async () => {
+    const startReelAndLoadTitles = async ({ reset = false } = {}) => {
       try {
         const showTitles = getAllShowNames();
         let data;
@@ -186,7 +186,7 @@ export default {
           const res = await fetch(`${config.torrentsApiUrl}/api/startreel`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ showTitles })
+            body: JSON.stringify({ showTitles, reset: !!reset })
           });
           if (!res.ok) {
             const txt = await res.text();
@@ -197,6 +197,7 @@ export default {
           // Fallback for older server versions that only support GET /api/startreel
           const url = new URL(`${config.torrentsApiUrl}/api/startreel`);
           url.searchParams.set('showTitles', JSON.stringify(showTitles));
+          if (reset) url.searchParams.set('reset', '1');
           const res2 = await fetch(url.toString());
           if (!res2.ok) {
             const txt2 = await res2.text();
@@ -211,7 +212,9 @@ export default {
         // If we get new entries, remove the "no more" sentinel and append the new titles.
         if (nextTitles.length > 0) {
           const withoutNoMore = titleStrings.value.filter((s) => String(s) !== NO_MORE_ENTRY);
-          titleStrings.value = [...withoutNoMore, ...nextTitles];
+          const have = new Set(withoutNoMore.map((s) => String(s)));
+          const uniqueIncoming = nextTitles.filter((s) => !have.has(String(s)));
+          titleStrings.value = [...withoutNoMore, ...uniqueIncoming];
         } else if (titleStrings.value.length === 0) {
           titleStrings.value = [NO_MORE_ENTRY];
         } else {
@@ -263,12 +266,20 @@ export default {
       if (isNextLoading.value) return;
       isNextLoading.value = true;
       try {
+        const hasNoMoreCard = titleStrings.value.some((s) => String(s) === NO_MORE_ENTRY);
+        if (hasNoMoreCard) {
+          // Clear the sentinel immediately for snappier UX.
+          titleStrings.value = titleStrings.value.filter((s) => String(s) !== NO_MORE_ENTRY);
+
+          // "No more titles" means we've exhausted the current cached Reelgood home page.
+          // Refresh it via startReel (this is the only place the home page should be loaded),
+          // then immediately request the next title via getReel.
+          await startReelAndLoadTitles({ reset: true });
+        }
+
         if (!_didStartReel.value) {
           await ensureReelStarted();
         }
-
-        // If the "-- no more titles --" message is showing, do not restart the reel.
-        // Just refresh via /api/getreel; this should be a no-op that preserves the current list.
 
         const fetchGetReel = async () => {
           const res = await fetch(`${config.torrentsApiUrl}/api/getreel`);

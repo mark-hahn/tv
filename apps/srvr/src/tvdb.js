@@ -421,7 +421,13 @@ const chkTvdbQueue = () => {
      newTvdbQueue.length == 0) return;
   chkTvdbQueueRunning = true;
   const {ws, id, paramObj} = newTvdbQueue.pop();
-  if(ws && ws.readyState !== WebSocket.OPEN) return;
+  // If the client disconnected, drop this unit of work and keep draining.
+  // (Avoid deadlocking chkTvdbQueueRunning.)
+  if(ws && ws.readyState !== WebSocket.OPEN) {
+    chkTvdbQueueRunning = false;
+    chkTvdbQueue();
+    return;
+  }
 
   let resolve = null;
   let reject  = null;

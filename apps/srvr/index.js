@@ -1917,7 +1917,13 @@ const runOne = () => {
   running = true;
 
   const {ws, id, fname, param} = queue.pop();
-  if(ws.readyState !== WebSocket.OPEN) return;
+  // Don't crash or deadlock if the socket is already closed.
+  // Use numeric readyState (1 = OPEN) to avoid any import/global mismatches.
+  if(!ws || ws.readyState !== 1) {
+    running = false;
+    runOne();
+    return;
+  }
 
   let resolve = null;
   let reject  = null;

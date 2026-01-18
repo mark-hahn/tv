@@ -28,6 +28,64 @@ const homePagePath = path.resolve(__dirname, '..', '..', 'samples', 'sample-reel
 
 const REELGOOD_PROVIDER = 'reelgood';
 
+function looksLikeCloudflareChallenge(html) {
+  const s = String(html || '');
+  if (!s) return false;
+  const head = s.slice(0, 60000).toLowerCase();
+  return (
+    head.includes('<title>just a moment') ||
+    head.includes('cf_chl_opt') ||
+    head.includes('/cdn-cgi/challenge-platform') ||
+    head.includes('enable javascript and cookies to continue')
+  );
+}
+
+function parseCookieHeaderForDomain(cookieHeader, domain) {
+  const out = [];
+  const d = String(domain || '').trim();
+  if (!d) return out;
+
+  const parts = String(cookieHeader || '')
+    .split(';')
+    .map((s) => String(s || '').trim())
+    .filter(Boolean);
+
+  for (const p of parts) {
+    const idx = p.indexOf('=');
+    if (idx <= 0) continue;
+    const name = p.slice(0, idx).trim();
+    const value = p.slice(idx + 1).trim();
+    if (!name || !value) continue;
+    out.push({ name, value, domain: d, path: '/' });
+  }
+  return out;
+}
+
+function saveLocalCfClearance(provider, value) {
+  try {
+    const p = String(provider || '').trim();
+    const v = String(value || '').trim();
+    if (!p || !v) return false;
+
+    const outPath = path.join(getApiCookiesDir(), 'cf-clearance.local.json');
+    let current = {};
+    try {
+      const raw = fs.readFileSync(outPath, 'utf8');
+      const j = JSON.parse(raw);
+      if (j && typeof j === 'object' && !Array.isArray(j)) current = j;
+    } catch {
+      // ignore
+    }
+
+    if (typeof current[p] === 'string' && current[p].trim() === v) return false;
+    current[p] = v;
+    atomicWriteTextFile(outPath, JSON.stringify(current, null, 2) + '\n');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Global cache
 let homeHtml = null;
 let oldShows = null;
@@ -200,6 +258,46 @@ function upsertCookieValue(cookieHeader, cookieName, cookieValue) {
   return out.join('; ');
 }
 
+function getCookieValue(cookieHeader, cookieName) {
+  const name = String(cookieName || '').trim();
+  if (!name) return '';
+  const parts = String(cookieHeader || '')
+    .split(';')
+    .map((s) => String(s || '').trim())
+    .filter(Boolean);
+  for (const p of parts) {
+    const idx = p.indexOf('=');
+    if (idx <= 0) continue;
+    const k = p.slice(0, idx).trim();
+    if (k !== name) continue;
+    return p.slice(idx + 1).trim();
+  }
+  return '';
+}
+
+function cfClearanceIssuedAt(cfClearanceValue) {
+  // Cloudflare's cf_clearance values commonly embed a unix timestamp segment:
+  //   <random>-<epochSeconds>-<...>
+  const s = String(cfClearanceValue || '').trim();
+  if (!s) return 0;
+  const m = s.match(/-(\d{10})-/);
+  if (!m) return 0;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function chooseBestCfClearance({ fromReq = '', fromLocal = '' } = {}) {
+  const a = String(fromReq || '').trim();
+  const b = String(fromLocal || '').trim();
+  if (!a) return b;
+  if (!b) return a;
+  const ta = cfClearanceIssuedAt(a);
+  const tb = cfClearanceIssuedAt(b);
+  if (ta && tb) return tb > ta ? b : a;
+  // If we can't parse timestamps, keep the request template's value by default.
+  return a;
+}
+
 async function loadLocalCfClearance(provider) {
   try {
     const p = String(provider || '').trim();
@@ -248,16 +346,119 @@ async function curlFetchText(targetUrl, { headers = {}, cookieHeader = '' } = {}
   });
 }
 
+async function playwrightFetchText(targetUrl, { headers = {}, cookieHeader = '' } = {}) {
+  // Playwright is already a dependency of @tv/api; keep import lazy so normal startup is fast.
+  const { chromium } = await import('playwright');
+
+  // Do not attempt Playwright unless the browser executable is present.
+  // This avoids noisy failures in environments where server apps are not meant to run (e.g. local workspace).
+  try {
+    const exePath = chromium.executablePath();
+    if (!exePath || !fs.existsSync(exePath)) {
+      const err = new Error('playwright browser not installed (run: npx playwright install)');
+      err.code = 'PW_BROWSER_MISSING';
+      throw err;
+    }
+  } catch (e) {
+    // If we cannot determine an executable path, assume Playwright isn't usable here.
+    const err = new Error(e?.message || 'playwright not available');
+    err.code = e?.code || 'PW_BROWSER_MISSING';
+    throw err;
+  }
+
+  const ua = String(headers?.['user-agent'] || headers?.['User-Agent'] || '').trim();
+  const extraHeaders = { ...(headers || {}) };
+  delete extraHeaders.cookie;
+  delete extraHeaders.Cookie;
+
+  const browser = await chromium.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-dev-shm-usage'],
+  });
+
+  try {
+    const context = await browser.newContext({
+      userAgent: ua || undefined,
+      locale: 'en-US',
+    });
+
+    // Note: cookies are added via addCookies, not via cookie header.
+    if (Object.keys(extraHeaders).length > 0) {
+      await context.setExtraHTTPHeaders(extraHeaders);
+    }
+
+    const cookies = parseCookieHeaderForDomain(cookieHeader, '.reelgood.com');
+    if (cookies.length > 0) {
+      await context.addCookies(cookies);
+    }
+
+    const page = await context.newPage();
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+
+    // Give Cloudflare challenge pages time to run/redirect.
+    // We see sporadic CF challenges even with a clearance cookie; in those cases,
+    // allow a longer window for JS challenges + redirects to settle.
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+      try {
+        // networkidle isn't guaranteed, but it helps when it does trigger.
+        await page.waitForLoadState('networkidle', { timeout: 1500 });
+      } catch {
+        // ignore
+      }
+
+      let title = '';
+      try {
+        title = await page.title();
+      } catch {
+        title = '';
+      }
+
+      const u = String(page.url() || '');
+      const t = String(title || '').toLowerCase();
+      const looksChallenged =
+        t.includes('just a moment') ||
+        u.includes('__cf_chl') ||
+        u.includes('/cdn-cgi/challenge-platform');
+      if (!looksChallenged) break;
+
+      await page.waitForTimeout(1000);
+    }
+
+    const html = await page.content();
+
+    // Best-effort: capture refreshed clearance cookie if Playwright solved the challenge.
+    try {
+      const jar = await context.cookies('https://reelgood.com');
+      const cf = jar.find((c) => c && c.name === 'cf_clearance');
+      if (cf?.value) {
+        const updated = saveLocalCfClearance(REELGOOD_PROVIDER, cf.value);
+        if (updated) {
+          console.error('[reelgood] updated cf_clearance via playwright', { len: String(cf.value).length });
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    return html;
+  } finally {
+    await browser.close();
+  }
+}
+
 async function fetchReelgoodHtml(url) {
   const profile = tryLoadReelgoodCurlProfile();
   const headers = profile?.headers || {};
   let cookieHeader = profile?.cookieHeader || '';
 
-  // Source of truth: tv-data cookie store (written by client Save Cookies).
+  // Source of truth: TV data cookie store (written by client Save Cookies).
   // req-reelgood.txt is treated as an immutable template; patch an in-memory copy only.
   const localCf = await loadLocalCfClearance(REELGOOD_PROVIDER);
-  if (localCf) {
-    cookieHeader = upsertCookieValue(cookieHeader, 'cf_clearance', localCf);
+  const reqCf = getCookieValue(cookieHeader, 'cf_clearance');
+  const bestCf = chooseBestCfClearance({ fromReq: reqCf, fromLocal: localCf });
+  if (bestCf) {
+    cookieHeader = upsertCookieValue(cookieHeader, 'cf_clearance', bestCf);
   }
 
   if (!profile) {
@@ -266,12 +467,34 @@ async function fetchReelgoodHtml(url) {
     return await r.text();
   }
 
+  // Primary path: curl replay. If Cloudflare returns a challenge page, fall back to Playwright.
   const r = await curlFetchText(url, { headers, cookieHeader });
+  if (r.ok && !looksLikeCloudflareChallenge(r.stdout)) {
+    return r.stdout;
+  }
+
+  // If curl failed or got challenged, try Playwright (Chromium) to execute JS challenges.
+  try {
+    const html = await playwrightFetchText(url, { headers, cookieHeader });
+    if (!looksLikeCloudflareChallenge(html)) {
+      console.error('[reelgood] playwright fetch ok', { url });
+      return html;
+    }
+    console.error('[reelgood] playwright still challenged', { url });
+  } catch (e) {
+    // Common local setup: Playwright is installed as a dependency but browsers are not downloaded.
+    if (e?.code !== 'PW_BROWSER_MISSING') {
+      console.error('[reelgood] playwright fetch error', { url, error: e?.message || String(e) });
+    }
+  }
+
   if (!r.ok) {
     const details = (r.stderr || '').trim().slice(0, 400);
     throw new Error(`curl failed (code ${r.code}) for ${url}${details ? `: ${details}` : ''}`);
   }
-  return r.stdout;
+
+  // Curl returned HTML but it looks like Cloudflare challenge.
+  throw new Error(`cloudflare challenge for ${url}`);
 }
 
 function loadReelShows() {

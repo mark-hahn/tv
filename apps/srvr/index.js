@@ -15,7 +15,7 @@ import { parse as parseTorrentTitle } from 'parse-torrent-title';
 
 const dontupload  = false;
 
-const DEFAULT_TV_DATA_DIR = '/root/dev/apps/tv-data';
+const DEFAULT_TV_DATA_DIR = '/root/dev/apps/tv/data';
 const TV_DATA_DIR = (typeof process.env.TV_DATA_DIR === 'string' && process.env.TV_DATA_DIR.trim())
   ? process.env.TV_DATA_DIR.trim()
   : DEFAULT_TV_DATA_DIR;

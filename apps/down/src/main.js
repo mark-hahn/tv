@@ -45,7 +45,7 @@
 
   var BASEDIR = path.join(__dirname, '..');
 
-  var DEFAULT_TV_DATA_DIR = '/root/dev/apps/tv-data';
+  var DEFAULT_TV_DATA_DIR = '/root/dev/apps/tv/data';
   var TV_DATA_DIR = (typeof process.env.TV_DATA_DIR === 'string' && process.env.TV_DATA_DIR.trim())
     ? process.env.TV_DATA_DIR.trim()
     : DEFAULT_TV_DATA_DIR;

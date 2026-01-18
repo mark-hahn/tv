@@ -1,7 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
 
-export const DEFAULT_TV_DATA_DIR = '/root/dev/apps/tv-data';
+export const DEFAULT_TV_DATA_DIR = '/root/dev/apps/tv/data';
 
 export function getTvDataDir() {
   let v = process.env.TV_DATA_DIR;

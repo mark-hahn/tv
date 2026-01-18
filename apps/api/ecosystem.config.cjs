@@ -11,7 +11,7 @@ module.exports = {
       env: {
         NODE_ENV: 'production'
         ,DISABLE_INTERNAL_CORS: '1'
-        ,TV_DATA_DIR: '/root/dev/apps/tv-data'
+        ,TV_DATA_DIR: '/root/dev/apps/tv/data'
       }
     }
   ]

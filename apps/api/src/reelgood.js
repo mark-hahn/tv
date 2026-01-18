@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 const avoidGenres = [
   'anime', 'children', 'documentary',
   'family', 'food', 'game Show', 'game-Show',
-  'history', 'home &amp;Garden', 'musical',
+  'history', 'home &amp; garden', 'musical',
   'reality', 'sport', 'talk', 'stand-up', 'travel'
 ];
 
@@ -161,10 +161,10 @@ export async function startReel(showTitlesArg) {
     resultTitles = loadResultTitles();
 
     // Load new HTML
-    console.log('Fetching fresh reelgood home page via getReelHtml...');
+    logToFile('Fetching fresh reelgood home page via getReelHtml...');
     try {
         homeHtml = await getReelHtml();
-        console.log(`Home page loaded (${homeHtml.length} bytes)`);
+        logToFile(`Home page loaded (${homeHtml.length} bytes)`);
     } catch (e) {
         const msg = `Failed to load home page: ${e.message}`;
         console.error(msg);
@@ -229,7 +229,7 @@ export async function getReel() {
         reelShows[title] = true;
         saveReelShows(); // Flush immediately as per spec "flush reelShows ... after processing candidate title"
 
-        console.log(`Processing candidate: ${title}`);
+        logToFile(`Processing candidate: ${title}`);
 
         // 3. Check for slug
         rx_slug.lastIndex = 0;

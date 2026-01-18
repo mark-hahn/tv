@@ -1,22 +1,22 @@
 
-# REELGOOD specs: END-TO-END FLOW (CLIENT → API → REELGOOD)
+## REELGOOD specs: END-TO-END FLOW (CLIENT → API → SERVER -> REELGOOD)
 
 # client and server environments
 
-- the client is a vite vue app that runs in the browser. it is tested by running vite vue in the wsl project at local /root/apps/tv/apps/client. it is hosted at the remote server in /root/dev/apps/tv-series-client.
+- the client is a vite vue app that runs in the browser. it is tested by running vite vue in the wsl project at local /root/apps/tv/apps/client. it is hosted at the remote /root/dev/apps/tv-series-client.
 
-- the remote server has three directories that have api servers running in pm2. they are /root/dev/apps/tv/api, /root/dev/apps/tv/down, and /root/dev/apps/tv/srvr. the server dirs contain copies of the projects in local /root/apps/tv/apps.
+- the remote server has a directory /root/dev/apps/tv/api that has an api server running in pm2.  the server dir contains a copy of the project in local /root/apps/tv/apps/api.
 
-## Reel Overview
+## Reel UI Overview
 
 - The Reel pane is a UI that shows a stream of “cards” representing show titles from reelgood.com.
 
-- The client gets show titles from the /root/dev/apps/tv/api API server. 
+- The client gets show titles from the api server. 
 
-- The /root/dev/apps/tv/api API fetches show titles from reelgood.com.
+- The api server fetches show titles from reelgood.com.
 
-## resultTitle strings
-- returned by api
+## resultTitle string
+- returned from api
 
 - each resultTitle string begins with a status prefix:
   - `ok|<title>`

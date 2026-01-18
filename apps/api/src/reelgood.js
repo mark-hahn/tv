@@ -326,10 +326,15 @@ async function loadLocalCfClearance(provider) {
   }
 }
 
-async function curlFetchText(targetUrl, { headers = {}, cookieHeader = '' } = {}) {
+async function curlFetchText(
+  targetUrl,
+  { headers = {}, cookieHeader = '', connectTimeoutSec = 10, maxTimeSec = 25 } = {}
+) {
   // Keep requests bounded so nginx doesn't hit upstream timeouts (504).
   // Note: values are conservative; Reelgood often responds quickly or fails fast.
-  const args = ['-sS', '-L', '--compressed', '--connect-timeout', '10', '--max-time', '25'];
+  const ct = Number.isFinite(connectTimeoutSec) ? Math.max(1, Math.floor(connectTimeoutSec)) : 10;
+  const mt = Number.isFinite(maxTimeSec) ? Math.max(2, Math.floor(maxTimeSec)) : 25;
+  const args = ['-sS', '-L', '--compressed', '--connect-timeout', String(ct), '--max-time', String(mt)];
 
   // Note: intentionally do NOT pass -H 'cookie:'; use -b for cookies.
   for (const [k, v] of Object.entries(headers || {})) {
@@ -530,7 +535,10 @@ async function getSharedPlaywrightBrowser() {
   }
 }
 
-async function fetchReelgoodHtml(url) {
+async function fetchReelgoodHtml(
+  url,
+  { allowPlaywright = true, curlConnectTimeoutSec, curlMaxTimeSec } = {}
+) {
   const profile = tryLoadReelgoodCurlProfile();
   const headers = profile?.headers || {};
   let cookieHeader = profile?.cookieHeader || '';
@@ -547,13 +555,32 @@ async function fetchReelgoodHtml(url) {
   if (!profile) {
     // Best-effort fallback to built-in fetch (dev); primary path is req-reelgood.txt.
     const r = await fetch(url);
-    return await r.text();
+    const txt = await r.text();
+    if (looksLikeCloudflareChallenge(txt)) {
+      throw new Error(`cloudflare challenge for ${url} (missing req-reelgood.txt profile)`);
+    }
+    return txt;
   }
 
   // Primary path: curl replay. If Cloudflare returns a challenge page, fall back to Playwright.
-  const r = await curlFetchText(url, { headers, cookieHeader });
+  const r = await curlFetchText(url, {
+    headers,
+    cookieHeader,
+    connectTimeoutSec: curlConnectTimeoutSec,
+    maxTimeSec: curlMaxTimeSec,
+  });
   if (r.ok && !looksLikeCloudflareChallenge(r.stdout)) {
     return r.stdout;
+  }
+
+  // For some call sites (e.g. per-show fetch inside getReel), we prefer to skip quickly
+  // rather than pay the cost of solving challenges via Playwright.
+  if (!allowPlaywright) {
+    if (!r.ok) {
+      const details = (r.stderr || '').trim().slice(0, 400);
+      throw new Error(`curl failed (code ${r.code}) for ${url}${details ? `: ${details}` : ''}`);
+    }
+    throw new Error(`cloudflare challenge for ${url}`);
   }
 
   // If curl failed or got challenged, try Playwright (Chromium) to execute JS challenges.
@@ -702,6 +729,12 @@ export async function getReel({ maxMs = 45000 } = {}) {
       addedThisCall.push(entry);
     };
 
+    const addSkipped = (title) => {
+      const t = String(title || '').trim();
+      if (!t) return;
+      add(`skipped|${t}`);
+    };
+
     const haveItSet = new Set((Array.isArray(showTitles) ? showTitles : []).map(String));
     const seenInResultTitles = new Set(resultTitles.map(parseResultTitle).filter(Boolean));
 
@@ -732,6 +765,7 @@ export async function getReel({ maxMs = 45000 } = {}) {
       const slugMatches = rx_slug.exec(show[0]);
       if (!slugMatches?.length) {
         console.log('No slug found');
+        addSkipped(title);
         continue;
       }
 
@@ -746,10 +780,17 @@ export async function getReel({ maxMs = 45000 } = {}) {
 
       let reelData;
       try {
-        reelData = await fetchReelgoodHtml(showUrl);
+        // Keep per-show page fetches fast: do NOT solve Cloudflare challenges here.
+        // The home page should already be in memory; per-show Playwright work is too slow.
+        reelData = await fetchReelgoodHtml(showUrl, {
+          allowPlaywright: false,
+          curlConnectTimeoutSec: 6,
+          curlMaxTimeSec: 12,
+        });
       } catch (e) {
         console.log('Error fetching show page:', e);
         logToFile(`ERROR fetching show page "${title}": ${e.message || String(e)}`);
+        addSkipped(title);
         continue;
       }
       const reelHtml = String(reelData || '');
@@ -800,7 +841,7 @@ export async function getReel({ maxMs = 45000 } = {}) {
     saveReelShows(oldShows);
 
     if (Date.now() > deadlineMs && addedThisCall.length === 0) {
-      return ['error|getReel timed out'];
+      return ['msg|getReel timed out'];
     }
 
     return addedThisCall;

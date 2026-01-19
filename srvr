@@ -77,6 +77,10 @@ remote_sync_app() {
     --exclude '.next/' \
     --exclude '.svelte-kit/' \
     --exclude '.parcel-cache/' \
+    --exclude 'reel-shows.json' \
+    --exclude 'reelgood-titles.json' \
+    --exclude 'reelgood.log' \
+    --exclude 'calls.log' \
     "$local_dir/" "$SSH_HOST:$remote_dir/"
 }
 

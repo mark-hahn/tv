@@ -104,12 +104,28 @@ function saveReelShows() {
     // Reload from disk to merge changes (concurrency safety attempt)
     let disk = {};
     try {
-        disk = loadReelShows();
+        if (fs.existsSync(reelShowsPath)) {
+            // Check backups?
+            // Just load nicely
+             const raw = fs.readFileSync(reelShowsPath, 'utf8');
+             if (raw.trim()) {
+                disk = JSON.parse(raw);
+             }
+        }
     } catch (e) {
         // If we can't read the disk, we ABORT saving.
         // Overwriting a corrupt/unreadable file with partial memory state means data loss.
         console.error(`saveReelShows aborted: Cannot read ${reelShowsPath}: ${e.message}`);
         return; 
+    }
+
+    // Double check we are not overwriting with empty if we expected data
+    if (Object.keys(disk).length > 0 && Object.keys(reelShows).length === 0) {
+        // Suspicious: disk has data, memory is empty?
+        // This might happen if startup failed.
+        // But startup fail sets reelShows={} and prevented overwrite.
+        // If we are here, reelShows has mutated. 
+        console.warn('saveReelShows: Overwriting non-empty disk with potentially empty memory state?');
     }
 
     const merged = { ...disk, ...reelShows };
@@ -130,18 +146,32 @@ function saveReelShows() {
 }
 
 function loadResultTitles() {
+  if (!fs.existsSync(reelTitlesPath)) {
+      return [];
+  }
   try {
-    if (fs.existsSync(reelTitlesPath)) {
-      const parsed = JSON.parse(fs.readFileSync(reelTitlesPath, 'utf8'));
-      if (Array.isArray(parsed)) return parsed.map(String);
+    const raw = fs.readFileSync(reelTitlesPath, 'utf8');
+    if (!raw || !raw.trim()) {
+        return [];
     }
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.map(String);
+    throw new Error('Invalid JSON content (not an array)');
   } catch (err) {
     console.error('Error loading reelgood-titles.json:', err);
+    // Propagate error to prevent overwrite
+    throw err;
   }
-  return [];
 }
 
 function saveResultTitles() {
+    // Safety check: ensure we can read existin file before overwriting
+    try {
+        loadResultTitles();
+    } catch (e) {
+        console.error(`saveResultTitles aborted: Cannot read ${reelTitlesPath}: ${e.message}`);
+        return;
+    }
   atomicWriteJson(reelTitlesPath, resultTitles);
 }
 
@@ -178,22 +208,19 @@ try {
     reelShows = {};
 }
 
-resultTitles = loadResultTitles();
+try {
+    resultTitles = loadResultTitles();
+} catch (e) {
+   console.error('CRITICAL: Failed to load reelgood-titles.json on startup.', e.message);
+   logToFile(`CRITICAL: Startup load failed (titles): ${e.message}`);
+   resultTitles = [];
+}
 logToFile('Reelgood module loaded.');
 
 // --- Exports ---
 
 /**
- * Ptry {
-        reelShows = loadReelShows();
-    } catch (e) {
-        // If we can't load, keep using in-memory 'reelShows' which might be stale or empty,
-        // but log the error. We shouldn't crash startReel just because of this, 
-        // but we definitely shouldn't overwrite the file later.
-        console.error('startReel: loadReelShows failed:', e.message);
-        logToFile(`WARNING: startReel could not reload reelShows: ${e.message}`);
-    }
-
+ * POST /api/startreel
  * Body: { showTitles: ["title1", "title2", ...] }
  */
 export async function startReel(showTitlesArg) {
@@ -202,8 +229,18 @@ export async function startReel(showTitlesArg) {
     logToFile(`startReel called (showTitles: ${showTitles.length})`);
 
     // Reload persistence to ensure freshness
-    reelShows = loadReelShows();
-    resultTitles = loadResultTitles();
+    try {
+        reelShows = loadReelShows();
+    } catch (e) {
+        console.error('startReel: loadReelShows failed:', e.message);
+        logToFile(`WARNING: startReel could not reload reelShows: ${e.message}`);
+    }
+
+    try {
+       resultTitles = loadResultTitles();
+    } catch (e) {
+        console.error('startReel: loadResultTitles failed:', e.message);
+    }
 
     // Load new HTML
     logToFile('Fetching fresh reelgood home page via getReelHtml...');

@@ -220,6 +220,37 @@ logToFile('Reelgood module loaded.');
 
 // --- Exports ---
 
+function checkReel() {
+  // 1. Sanity Check
+  if (!homeHtml) return false;
+
+  // 2. Candidate Loop
+  // Use local regex to avoid state conflict with getReel (shared rx_show has state)
+  const local_rx_show = new RegExp('"show:.*?:@global": ?{(.*?)}', 'sg');
+  
+  // Re-derive seenTitles logic from getReel
+  const seenTitles = new Set(resultTitles.map(parseResultTitle).filter(Boolean));
+
+  let showMatch;
+  while ((showMatch = local_rx_show.exec(homeHtml)) !== null) {
+      const titleMatches = rx_title.exec(showMatch[0]);
+      if (!titleMatches?.length) continue;
+      const title = titleMatches[1];
+
+      // test 1: "Already Processed" Check
+      if (reelShows[title]) continue;
+
+      // test 2: "Recently Emitted" Check
+      if (seenTitles.has(title)) continue;
+
+      // if it passes the two tests and gets to this point then checkReel should return true
+      return true;
+  }
+
+  // if the Loop Finishes then checkReel should return false
+  return false;
+}
+
 /**
  * POST /api/startreel
  * Body: { showTitles: ["title1", "title2", ...] }
@@ -270,6 +301,12 @@ export async function startReel(showTitlesArg) {
         console.error(msg);
         logToFile(`ERROR ${msg}`);
         return [`error|${msg}`];
+    }
+
+    // Check if we have more titles (uses checkReel)
+    const hasMore = checkReel();
+    if (!hasMore) {
+        return [...resultTitles, 'msg|-- no more titles --'];
     }
 
     // Return history

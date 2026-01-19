@@ -157,7 +157,11 @@ export default {
     const scrollTitlesToBottom = async () => {
       await nextTick();
       if (titleStrings.value.length > 0) {
-        selectTitle(titleStrings.value.length - 1);
+        let idx = titleStrings.value.length - 1;
+        if (titleStrings.value[idx] === NO_MORE_ENTRY && idx > 0) {
+          idx--;
+        }
+        selectTitle(idx);
       }
       await nextTick();
       if (titlesPane.value) {
@@ -636,7 +640,11 @@ export default {
       if (titleStrings.value.length > 0) {
         // Wait for DOM
         await nextTick();
-        selectTitle(titleStrings.value.length - 1);
+        let idx = titleStrings.value.length - 1;
+        if (titleStrings.value[idx] === NO_MORE_ENTRY && idx > 0) {
+          idx--;
+        }
+        selectTitle(idx);
       }
     }, { deep: true });
 

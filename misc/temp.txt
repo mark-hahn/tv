@@ -1,8 +1,0 @@
-
-- switch call.logs path from /root/dev/apps/tv/data/api/misc/calls.log to /root/dev/apps/tv/api/calls.log
-
-- the next button should have a light-gray background from when it is clicked to when the getreel call completes
-
-- the api cookies are in two places: /root/dev/apps/tv/api/cookies and /root/dev/apps/tv/data/api/cookies. which is the one being used?
-
-- two shows are showing the wrong show detail at the top of the reel pane: "reality | Truck Universe" and "reality | Culinary Class Wars". the 7 others are correct.   the show detail at the top of the reel pane is shown when a card in the list is clicked and it consists of  a two-line header and a box of text. add logging to see how the show detail is collected and what is collected.

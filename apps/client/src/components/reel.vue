@@ -628,7 +628,8 @@ export default {
       handleImdb,
       handleRt,
       handleWiki,
-      handleOfficial
+      handleOfficial,
+      isLoadingNext
     };
   }
 };

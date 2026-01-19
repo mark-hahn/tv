@@ -55,9 +55,17 @@ function buildTvdbUrl(tvdbPath, query) {
 export async function tvdbProxyGet(req, res) {
   try {
     const tvdbPath = req.params[0] || '';
+    
+    // Explicitly debug the incoming request data
+    console.log('TVDB Proxy Incoming:', {
+        originalUrl: req.originalUrl,
+        params: req.params,
+        query: req.query
+    });
+
     const url = buildTvdbUrl(tvdbPath, req.query);
 
-    console.log('TVDB proxy request:', url.toString());
+    console.log('TVDB proxy upstream URL:', url.toString());
 
     let token = await getToken();
     let upstream = await fetch(url, {

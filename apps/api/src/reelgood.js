@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getReelHtml, ReelgoodBrowser } from './get-reel.js';
+import { getTvDataDir } from './tvPaths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,10 +21,12 @@ const rx_title = new RegExp('"title": ?"(.*?)"', 's');
 const rx_slug = new RegExp('"slug": ?"(.*?)"', 'sg');
 const rx_genre = new RegExp('href="/tv/genre/([^"]*)"', 'sg');
 
-// Paths (using relative paths to match existing structure/logic)
-const reelShowsPath = path.resolve(__dirname, '..', 'reel-shows.json');
-const reelTitlesPath = path.resolve(__dirname, '..', 'reelgood-titles.json');
-const logPath = path.resolve(__dirname, '..', 'reelgood.log');
+// Paths (using consistent /root/dev/apps/tv/api/... paths)
+const appBase = path.dirname(getTvDataDir()); 
+const apiDir = path.join(appBase, 'api');
+const reelShowsPath = path.join(apiDir, 'reel-shows.json');
+const reelTitlesPath = path.join(apiDir, 'reelgood-titles.json');
+const logPath = path.join(apiDir, 'reelgood.log');
 
 // --- State ---
 
@@ -76,29 +79,53 @@ function atomicWriteJson(outPath, data) {
 }
 
 function loadReelShows() {
-  try {
-    if (fs.existsSync(reelShowsPath)) {
-      const raw = fs.readFileSync(reelShowsPath, 'utf8');
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
-      } catch {
-        // use basic recovery if json is bad? 
-        // For simplicity, returning empty object or trying to repair if needed.
-        // The original code had repair logic, but "messy state" implies simplifying.
-        // We'll stick to simple JSON parse.
-      }
-    }
-  } catch (err) {
-    console.error('Error loading reel-shows.json:', err);
+  if (!fs.existsSync(reelShowsPath)) {
+      return {};
   }
-  return {};
+  try {
+    const raw = fs.readFileSync(reelShowsPath, 'utf8');
+    if (!raw || !raw.trim()) {
+       // Only return empty if it's truly 0 bytes, but maybe safer to throw if we expect data?
+       // If it is 0 bytes, it's already "lost", so returning {} is practically the truth.
+       // However, we shouldn't trigger an overwrite logic here.
+       return {};
+    }
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    throw new Error('Invalid JSON content (not an object)');
+  } catch (err) {
+    // If we fail to read or parse, we MUST NOT return {} as if it's a new file.
+    // Propagate error so callers know disk state is unknown/bad.
+    throw err;
+  }
 }
 
 function saveReelShows() {
     // Reload from disk to merge changes (concurrency safety attempt)
-    let disk = loadReelShows();
+    let disk = {};
+    try {
+        disk = loadReelShows();
+    } catch (e) {
+        // If we can't read the disk, we ABORT saving.
+        // Overwriting a corrupt/unreadable file with partial memory state means data loss.
+        console.error(`saveReelShows aborted: Cannot read ${reelShowsPath}: ${e.message}`);
+        return; 
+    }
+
     const merged = { ...disk, ...reelShows };
+
+    // Create a .bak copy before overwriting, just in case
+    try {
+        if (fs.existsSync(reelShowsPath)) {
+            // Only back up if we have some keys? or always? 
+            // Always is safer.
+            const bakPath = reelShowsPath + '.bak';
+            fs.copyFileSync(reelShowsPath, bakPath);
+        }
+    } catch (e) {
+        console.error('Error creating backup of reel-shows.json:', e);
+    }
+
     atomicWriteJson(reelShowsPath, merged);
 }
 
@@ -141,14 +168,32 @@ function parseResultTitle(entry) {
 
 // --- Initialization ---
 
-reelShows = loadReelShows();
+try {
+    reelShows = loadReelShows();
+} catch (e) {
+    console.error('CRITICAL: Failed to load reel-shows.json on startup.', e.message);
+    logToFile(`CRITICAL: Startup load failed: ${e.message}`);
+    // Fallback to empty memory state, but do NOT overwrite disk immediately.
+    // saveReelShows() will fail to write until disk is readable/fixable.
+    reelShows = {};
+}
+
 resultTitles = loadResultTitles();
 logToFile('Reelgood module loaded.');
 
 // --- Exports ---
 
 /**
- * POST /api/startreel
+ * Ptry {
+        reelShows = loadReelShows();
+    } catch (e) {
+        // If we can't load, keep using in-memory 'reelShows' which might be stale or empty,
+        // but log the error. We shouldn't crash startReel just because of this, 
+        // but we definitely shouldn't overwrite the file later.
+        console.error('startReel: loadReelShows failed:', e.message);
+        logToFile(`WARNING: startReel could not reload reelShows: ${e.message}`);
+    }
+
  * Body: { showTitles: ["title1", "title2", ...] }
  */
 export async function startReel(showTitlesArg) {
@@ -165,6 +210,11 @@ export async function startReel(showTitlesArg) {
     try {
         homeHtml = await getReelHtml();
         logToFile(`Home page loaded (${homeHtml.length} bytes)`);
+
+        // Check regex matches count for debugging "no results"
+        const testRx = new RegExp('"show:.*?:@global": ?{(.*?)}', 'sg');
+        const matchCount = (homeHtml.match(testRx) || []).length;
+        logToFile(`Regex (rx_show) found ${matchCount} matches in homeHtml.`);
 
         // Debug: Save HTML to disk
         try {

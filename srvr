@@ -64,8 +64,7 @@ remote_sync_app() {
   echo "[remote] rsync apps/$project -> $SSH_HOST:$remote_dir"
   ssh "$SSH_HOST" "mkdir -p '$remote_dir'"
 
-  # Note: --delete will only delete files under the target app dir.
-  rsync -az --delete \
+  rsync -az    \
     --exclude 'node_modules/' \
     --exclude '.turbo/' \
     --exclude 'dist/' \

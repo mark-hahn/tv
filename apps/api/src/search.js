@@ -678,6 +678,23 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
         const start = Number(range.startSeason);
         const end = Number(range.endSeason);
         if (!Number.isNaN(start) && !Number.isNaN(end) && end >= start) {
+          // Sanity check: prevent massive loops if someone names a torrent "S01-S9999"
+          // or if year is parsed as season end. Limit range scan to 100 seasons.
+          if (end - start > 100) {
+             // If range is huge, just check if our needed season is in [start, end] arithmetically
+             // instead of iterating string generation.
+             for (const needStr of needed) {
+               if (needStr.startsWith('S')) {
+                 const sNum = parseInt(needStr.slice(1), 10);
+                 if (!Number.isNaN(sNum) && sNum >= start && sNum <= end) {
+                   matchedNeeded.add(needStr);
+                   return true;
+                 }
+               }
+             }
+             return false;
+          }
+
           for (let s = start; s <= end; s++) {
             const seasonStr = `S${String(s).padStart(2, '0')}`;
             if (needed.includes(seasonStr)) {

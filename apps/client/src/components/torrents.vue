@@ -12,6 +12,7 @@
         div(style="display:flex; gap:8px; margin-left:auto;")
           button(v-if="selectedTorrent" @click.stop="continueDownload" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Get
           button(v-if="selectedTorrent" @click.stop="openDetails" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Tab
+          input(v-model="seasonFilter" @keydown.stop @click.stop placeholder="Season" style="width:60px; font-size:13px; padding:4px; border:1px solid #bbb; border-radius:7px;")
           button(@click.stop="searchClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Search
           button(@click.stop="forceClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Force
           button(@click.stop="toggleCookieInputs" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Cookies
@@ -175,6 +176,7 @@ export default {
       hasSearched: false,
       providerWarning: '',
       maxResults: 1000,  // Constant for maximum results to fetch
+      seasonFilter: '',
       iptCfClearance: '',
       tlCfClearance: '',
       currentShow: null,
@@ -235,8 +237,10 @@ export default {
       );
     },
     filteredTorrents() {
-      // Show all results (including 0-seed) so “dead” torrents are still visible.
-      // Sort seeded torrents to the top, but push warning torrents to the bottom.
+      // Use season filter if present
+      const sVal = parseInt(this.seasonFilter, 10);
+      const hasSeasonFilter = !isNaN(sVal) && sVal >= 0 && String(this.seasonFilter).trim() !== '';
+
       const asNumber = (v) => {
         const n = Number(v);
         return Number.isFinite(n) ? n : 0;
@@ -267,7 +271,23 @@ export default {
         return 4; // Other
       };
 
-      return (Array.isArray(this.torrents) ? this.torrents : [])
+      let list = (Array.isArray(this.torrents) ? this.torrents : []);
+
+      if (hasSeasonFilter) {
+        list = list.filter(t => {
+          if (t.seasonRange && t.seasonRange.isRange) {
+            const s = Number(t.seasonRange.startSeason);
+            const e = Number(t.seasonRange.endSeason);
+            return Number.isFinite(s) && Number.isFinite(e) && sVal >= s && sVal <= e;
+          }
+          if (t.parsed && t.parsed.season !== undefined && t.parsed.season !== null) {
+            return Number(t.parsed.season) === sVal;
+          }
+          return false;
+        });
+      }
+
+      return list
         .slice()
         .sort((a, b) => {
           // 1. Highest Priority: Warnings (non-warned items first)
@@ -921,6 +941,19 @@ export default {
       }
 
       if (this.unaired) {
+        return;
+      }
+
+      // Check if season filter is active
+      const sVal = parseInt(this.seasonFilter, 10);
+      const hasSeasonFilter = !isNaN(sVal) && sVal >= 0 && String(this.seasonFilter).trim() !== '';
+
+      if (hasSeasonFilter) {
+        this.noTorrentsNeeded = false;
+        this.providerWarning = '';
+        this.hasSearched = true;
+        // Use force to get all torrents, then client filters by season.
+        await this.loadTorrents(['force']);
         return;
       }
 

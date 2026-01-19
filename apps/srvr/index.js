@@ -713,13 +713,18 @@ async function openSubtitlesLogin({ apiKey, username, password }) {
   return token;
 }
 
-async function openSubtitlesSubtitles({ apiKey, token, imdbDigits, page }) {
+async function openSubtitlesSubtitles({ apiKey, token, imdbDigits, page, season }) {
   const url = new URL('https://api.opensubtitles.com/api/v1/subtitles');
-  url.search = new URLSearchParams({
+  const params = {
     parent_imdb_id: imdbDigits,
     page: String(page),
     languages: 'en',
-  }).toString();
+  };
+  if (season !== undefined && season !== null) {
+    params.season_number = String(season);
+  }
+
+  url.search = new URLSearchParams(params).toString();
 
   const headers = {
     'Api-Key': apiKey,
@@ -801,6 +806,7 @@ const subsSearch = async (id, param, resolve, reject) => {
   const parsed = util.jParse(param, 'subsSearch');
   const imdbDigits = normalizeImdbId(parsed?.imdb_id);
   let page = parsed?.page;
+  const season = parsed?.season;
 
   if (!imdbDigits) {
     reject([id, { error: 'subsSearch: missing imdb_id' }]);
@@ -826,6 +832,7 @@ const subsSearch = async (id, param, resolve, reject) => {
       token: subsTokenCache,
       imdbDigits,
       page,
+      season,
     });
 
     if (resp.ok) {
@@ -843,6 +850,7 @@ const subsSearch = async (id, param, resolve, reject) => {
         token: subsTokenCache,
         imdbDigits,
         page,
+        season,
       });
 
       if (retry.resp.ok) {

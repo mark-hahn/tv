@@ -37,6 +37,7 @@
           button(@click.stop="applyClick" :disabled="!applyEnabled" :style="getApplyButtonStyle()") Apply
           button(@click.stop="deleteClick" :disabled="!deleteEnabled" :style="getDelButtonStyle()") Del
           div(style="width:20px;")
+          input(v-model="seasonFilter" @keydown.stop @click.stop placeholder="Season" style="width:60px; font-size:12px; padding:2px 4px; border:1px solid #bbb; border-radius:4px;")
           button(@click.stop="searchClick" :style="getModeButtonStyle('search')") Search
           button(@click.stop="selectMode('season')" :style="getModeButtonStyle('season')") Season
           button(@click.stop="selectMode('episode')" :style="getModeButtonStyle('episode')") Episode
@@ -122,6 +123,7 @@ export default {
     return {
       items: [],
       searchResults: [],
+      seasonFilter: '',
       showName: '',
       loading: false,
       error: null,
@@ -1547,10 +1549,12 @@ export default {
       scroller.scrollTo({ top: targetTop, behavior: 'smooth' });
     },
 
-    async fetchSubsPage(imdbIdDigits, page) {
+    async fetchSubsPage(imdbIdDigits, page, season) {
       try {
         // WebSocket RPC to tv-series-srvr (no local proxy)
-        return await subsSearch({ imdb_id: imdbIdDigits, page });
+        const params = { imdb_id: imdbIdDigits, page };
+        if (season !== undefined && season !== null) params.season = season;
+        return await subsSearch(params);
       } catch (e) {
         const msg = (() => {
           if (!e) return '';
@@ -1567,11 +1571,11 @@ export default {
       }
     },
 
-    async fetchSubsPageWithRetry(imdbIdDigits, page) {
+    async fetchSubsPageWithRetry(imdbIdDigits, page, season) {
       let lastErr = null;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          return await this.fetchSubsPage(imdbIdDigits, page);
+          return await this.fetchSubsPage(imdbIdDigits, page, season);
         } catch (e) {
           lastErr = e;
           await this.sleep(250 * (attempt + 1) * (attempt + 1));
@@ -1792,7 +1796,10 @@ export default {
 
         const failedPages = [];
 
-        const first = await this.fetchSubsPageWithRetry(imdbIdDigits, 1);
+        const sVal = parseInt(this.seasonFilter, 10);
+        const season = (!isNaN(sVal) && sVal >= 0 && String(this.seasonFilter).trim() !== '') ? sVal : null;
+
+        const first = await this.fetchSubsPageWithRetry(imdbIdDigits, 1, season);
         if (token !== this._searchToken) return;
         const totalPages = Number(first?.total_pages ?? 0);
         const totalCount = Number(first?.total_count ?? 0);
@@ -1808,7 +1815,7 @@ export default {
 
         for (let p = 2; p <= pagesToLoad; p++) {
           try {
-            const next = await this.fetchSubsPageWithRetry(imdbIdDigits, p);
+            const next = await this.fetchSubsPageWithRetry(imdbIdDigits, p, season);
             if (token !== this._searchToken) return;
             if (Array.isArray(next?.data)) allData.push(...next.data);
           } catch (e) {
@@ -1834,7 +1841,12 @@ export default {
         });
 
         this.totalSubsCount = sortable.length;
-        const validOnly = sortable.filter(x => x.season != null && x.episode != null);
+        let validOnly = sortable.filter(x => x.season != null && x.episode != null);
+
+        if (season !== null) {
+          validOnly = validOnly.filter(x => Number(x.season) === season);
+        }
+
         this.validSubsCount = validOnly.length;
 
         this.searchResults = validOnly.map(x => x.entry);

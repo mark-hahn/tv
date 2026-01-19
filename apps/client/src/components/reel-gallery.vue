@@ -83,10 +83,8 @@ export default {
     const loadTvdbData = async () => {
       if (!props.srchStr) return;
       
-      console.log(`ReelGallery: loadTvdbData searching for "${props.srchStr}"`);
       try {
         const data = await srchTvdbData(props.srchStr);
-        console.log(`ReelGallery: found ${data ? data.length : 0} results. First:`, data && data.length ? data[0].name : 'none');
         if (data && data.length > 0) {
           tvdbList.value = data;
           await nextTick();

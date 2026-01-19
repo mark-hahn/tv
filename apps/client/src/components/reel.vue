@@ -589,7 +589,6 @@ export default {
 
     // Handle gallery card selection
     const handleGallerySelect = (tvdb) => {
-      console.log('ReelPane: handleGallerySelect tvdb:', tvdb ? (tvdb.name || tvdb.Name) : 'null');
       curTvdb.value = tvdb;
     };
 
@@ -607,7 +606,6 @@ export default {
       }
       selectedTitleIdx.value = idx;
       const nextTitle = String(item?.titleString || '').trim();
-      console.log(`ReelPane: selectTitle idx=${idx} titleString="${nextTitle}"`);
       curTitle.value = nextTitle;
 
       const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();

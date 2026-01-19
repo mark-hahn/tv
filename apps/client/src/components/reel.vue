@@ -130,6 +130,7 @@ export default {
     const isLoadingNext = ref(false);
     const isLoadingRemotesMsg = ref(false);
     const suppressButtons = ref(false);
+    const lastLoadedTvdbId = ref(null);
 
     const handleScaledWheel = (event) => {
       if (!event) return;
@@ -268,6 +269,12 @@ export default {
     const handleNext = async () => {
       isLoadingNext.value = true;
       suppressButtons.value = true;
+      lastLoadedTvdbId.value = curTvdb.value?.tvdb_id || curTvdb.value?.tvdbId || '-1';
+      
+      // Clear artifacts to prevent flash of old buttons
+      getRemotesResults.value = [];
+      _lastRemotesKey.value = '';
+
       try {
         if (!_didStartReel.value) {
           await ensureReelStarted();
@@ -325,6 +332,7 @@ export default {
         console.log('getReel failed:', msg);
         titleStrings.value = [...titleStrings.value, `error|${msg}`];
         await scrollTitlesToBottom();
+        await nextTick();
         suppressButtons.value = false;
       } finally {
         isLoadingNext.value = false;
@@ -412,21 +420,35 @@ export default {
       if (!tvdb) {
         getRemotesResults.value = [];
         _lastRemotesKey.value = '';
+        await nextTick();
         suppressButtons.value = false;
         return;
       }
 
       const name = String(tvdb.name || '').trim();
       const tvdbId = String(tvdb.tvdb_id || '').trim();
+
+      // If we are suppressing buttons (fetching next show), 
+      // check if this is still the old show.
+      if (suppressButtons.value && lastLoadedTvdbId.value) {
+         const currentId = tvdbId || tvdb.tvdbId;
+         if (String(currentId) === String(lastLoadedTvdbId.value)) {
+            // Still the old show. Don't fetch remotes, don't unsuppress.
+            return;
+         }
+      }
+
       const key = tvdbId || name;
       if (!key) {
         getRemotesResults.value = [];
         _lastRemotesKey.value = '';
+        await nextTick();
         suppressButtons.value = false;
         return;
       }
 
       if (_lastRemotesKey.value === key) {
+        await nextTick();
         suppressButtons.value = false;
         return;
       }
@@ -434,6 +456,9 @@ export default {
 
       getRemotesResults.value = [];
       isLoadingRemotesMsg.value = true;
+      
+      await nextTick();
+      // Only unsuppress if we passed checks
       suppressButtons.value = false;
 
       try {
@@ -569,9 +594,10 @@ export default {
     }, { deep: true });
 
     // Handle title selection
-    const selectTitle = (idx) => {
+    const selectTitle = async (idx) => {
       const item = parsedTitles.value[idx];
       if (item?.rejectStatus === 'msg') {
+        await nextTick();
         suppressButtons.value = false;
         return;
       }
@@ -584,6 +610,7 @@ export default {
       if (norm(nextTitle) !== norm(srchStr.value)) {
         srchStr.value = nextTitle;
       } else {
+        await nextTick();
         suppressButtons.value = false;
       }
     };
@@ -607,6 +634,8 @@ export default {
 
       // Select last item
       if (titleStrings.value.length > 0) {
+        // Wait for DOM
+        await nextTick();
         selectTitle(titleStrings.value.length - 1);
       }
     }, { deep: true });

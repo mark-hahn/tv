@@ -1,0 +1,57 @@
+
+bugs ...
+  Frasier rotten button goes to wrong Frasier
+  dupes in reel
+
+todo both ...
+  put tvdb.json in sqlite
+  in reel get categories from imdb
+  top in viewed sort should refresh
+  show reviews from rotten tomatoes, add ...
+    /s01/reviews/all-critics
+    /s01/reviews/top-critics
+    /s01/reviews/all-audience
+    /s02/reviews/verified-audience
+  show last-watched even for non-emby
+  show episode
+    file details
+    being watched (next up line)
+
+todo non-simple:
+  files
+    open windows file explorer
+    file sizes
+    integrate with sub files
+  subs in a tree
+  in files show show-path in line 2 hdr
+  change show identity
+  delete show should delete ...
+    emby
+    qb torrent & usb directory
+    download entries & local files
+    update library and reload shows
+  add delete option to qb torrent existing dialog
+  add bottom button to down pane
+  usb file system clone of local files pane
+  subs for custom srt script
+  abort qbt downloading
+
+todo simple ...
+  
+tabled ...
+  open torrent detail page from map or files pane
+  shows can be hidden from simple
+  half-hour filter
+  waiting enhancements
+    sort by waiting date
+    filter waiting
+  keep deleted date and watched info forever
+  history of progress for a torrent title
+  add X del button to tvproc cards
+  when library finishes it goes to series
+  delete file from qBittorrent when card deleted from get tab
+  mark get tab card as aborted when file deleted from qBittorrent
+  button: scroll hilighted row to vis 
+  refresh filtered rows when new gap loaded
+  up/dn arrows
+  hover hints over cond icons

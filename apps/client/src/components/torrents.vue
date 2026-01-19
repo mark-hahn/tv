@@ -244,13 +244,62 @@ export default {
 
       const hasWarn = (t) => this.getTorrentWarnings(t).length > 0;
 
+      const getSeason = (t) => {
+        if (t.seasonRange && t.seasonRange.isRange) return asNumber(t.seasonRange.startSeason);
+        if (t.parsed && t.parsed.season !== undefined && t.parsed.season !== null) return asNumber(t.parsed.season);
+        return 999999;
+      };
+
+      const getType = (t) => {
+        // Season Range
+        if (t.seasonRange && t.seasonRange.isRange) return 1;
+
+        // Check for parsed structure
+        if (t.parsed) {
+          // Note: 0 is a valid season/episode, check against undefined/null
+          const hasSeason = t.parsed.season !== undefined && t.parsed.season !== null;
+          const hasEpisode = t.parsed.episode !== undefined && t.parsed.episode !== null;
+
+          if (hasSeason && !hasEpisode) return 2; // Season Pack
+          if (hasSeason && hasEpisode) return 3; // Individual Episode
+        }
+
+        return 4; // Other
+      };
+
       return (Array.isArray(this.torrents) ? this.torrents : [])
         .slice()
         .sort((a, b) => {
+          // 1. Highest Priority: Warnings (non-warned items first)
           const wa = hasWarn(a) ? 1 : 0;
           const wb = hasWarn(b) ? 1 : 0;
           if (wa !== wb) return wa - wb;
 
+          // 2. Second Priority: Season
+          const sA = getSeason(a);
+          const sB = getSeason(b);
+          if (sA !== sB) return sA - sB; // Ascending
+
+          // 3. Third Priority: Type
+          // Season Ranges (1) -> Season Packs (2) -> Individual Episodes (3) -> Other (4)
+          const typeA = getType(a);
+          const typeB = getType(b);
+          if (typeA !== typeB) return typeA - typeB;
+
+          // 4. Type-specific secondary
+          if (typeA === 1) { // Season Range
+            // Then by last in reverse order
+            const s2A = asNumber(a.seasonRange?.endSeason);
+            const s2B = asNumber(b.seasonRange?.endSeason);
+            if (s2A !== s2B) return s2B - s2A; // Descending
+          } else if (typeA === 3) { // Individual Episode
+            // Then by episode
+            const eA = asNumber(a.parsed?.episode);
+            const eB = asNumber(b.parsed?.episode);
+            if (eA !== eB) return eA - eB; // Ascending
+          }
+
+          // 5. Rest of priorities (Seeds -> Title)
           const sd = asNumber(b?.raw?.seeds) - asNumber(a?.raw?.seeds);
           if (sd !== 0) return sd;
 

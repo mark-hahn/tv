@@ -33,37 +33,39 @@
         button(
           @click="handleNext"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: isLoadingNext ? '#d3d3d3' : '' }") Next
+        
+        span(v-if="isLoadingNext" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;loading shows&gt;
 
-        span(v-if="hasAnyRemoteButton" :style="{ lineHeight: '18px', fontSize: '12px' }")  |
+        span(v-if="hasAnyRemoteButton && !isLoadingNext" :style="{ lineHeight: '18px', fontSize: '12px' }")  |
 
         button(
-          v-if="imdbResult"
+          v-if="imdbResult && !isLoadingNext"
           @click="handleImdb"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") {{ imdbButtonLabel }}
         button(
-          v-if="rtResult"
+          v-if="rtResult && !isLoadingNext"
           @click="handleRt"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") {{ rtButtonLabel }}
         button(
-          v-if="googleResult"
+          v-if="googleResult && !isLoadingNext"
           @click="handleGoogle"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Google
         button(
-          v-if="wikiResult"
+          v-if="wikiResult && !isLoadingNext"
           @click="handleWiki"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Wiki
         button(
-          v-if="officialResult"
+          v-if="officialResult && !isLoadingNext"
           @click="handleOfficial"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Official
 
         button(
-          v-if="curTvdb"
+          v-if="curTvdb && !isLoadingNext"
           @click="handleLoad"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Get
         
-        span(v-if="isLoadingRemotesMsg" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;loading remotes&gt;
-        span(v-if="!curTvdb" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;no show info&gt;
+        span(v-if="isLoadingRemotesMsg && !isLoadingNext" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;loading remotes&gt;
+        span(v-if="!curTvdb && !isLoadingNext" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;no show info&gt;
     
     #reelTitles(
       ref="titlesPane"
@@ -269,8 +271,10 @@ export default {
           await ensureReelStarted();
         }
 
-        // If the "-- no more titles --" message is showing, do not restart the reel.
-        // Just refresh via /api/getreel; this should be a no-op that preserves the current list.
+        const hasNoMore = titleStrings.value.some((s) => String(s) === NO_MORE_ENTRY);
+        if (hasNoMore) {
+          await startReelAndLoadTitles();
+        }
 
         const fetchGetReel = async () => {
           const res = await fetch(`${config.torrentsApiUrl}/api/getreel`);

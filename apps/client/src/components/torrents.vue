@@ -108,7 +108,7 @@
         div(v-if="getDownloadStatus(torrent)" :title="getDownloadStatusTooltip(torrent)" style="position:absolute; bottom:8px; right:8px; font-size:11px; color:#666; max-width:70%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;") {{ getDownloadStatusLabel(torrent) }}
         div(v-if="SHOW_TITLE && torrent.raw" style="font-size:14px; font-weight:bold; color:#888; margin-bottom:4px; white-space:normal; overflow-wrap:anywhere; word-break:break-word; font-family:sans-serif;") {{ getDisplayTitleWithProvider(torrent) }}
         div(v-if="getTorrentWarnings(torrent).length > 0" style="font-size:11px; color:#a33; margin-bottom:4px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;")
-          | Warnings: {{ formatTorrentWarnings(torrent) }}
+          | {{ formatTorrentWarnings(torrent) }}
         div(style="margin-top:8px; font-size:13px; font-family:sans-serif; color:#333;") 
           span(style="color:blue !important;") {{ getDisplaySeasonEpisode(torrent) }}
           span(style="color:rgba(0,0,0,0.50) !important;")
@@ -403,6 +403,14 @@ export default {
       const warnings = this.getTorrentWarnings(torrent);
       if (!warnings.length) return '';
 
+      const codes = warnings.map(w => w.code);
+      const lowRes = codes.includes('low_res_480');
+      const noSeeds = codes.includes('zero_seeds');
+
+      if (lowRes && noSeeds) return 'Warning: Low Resolution and No Seeds';
+      if (lowRes) return 'Warning: Low Resolution';
+      if (noSeeds) return 'Warning: No Seeds';
+
       return warnings
         .map(w => {
           const code = String(w?.code || '').trim();
@@ -677,9 +685,7 @@ export default {
 
     getDisplayTitleWithProvider(torrent) {
       const title = String(torrent?.raw?.title || torrent?.title || '').trim();
-      const provider = String(torrent?.raw?.provider || '').trim();
-      if (!provider) return title;
-      return `${title} | ${this.formatProvider(provider)}`;
+      return title;
     },
 
     rememberDownloadedTorrent(torrent) {

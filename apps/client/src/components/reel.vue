@@ -36,36 +36,36 @@
         
         span(v-if="isLoadingNext" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;loading shows&gt;
 
-        span(v-if="hasAnyRemoteButton && !isLoadingNext" :style="{ lineHeight: '18px', fontSize: '12px' }")  |
+        span(v-if="hasAnyRemoteButton && !isLoadingNext && !suppressButtons" :style="{ lineHeight: '18px', fontSize: '12px' }")  |
 
         button(
-          v-if="imdbResult && !isLoadingNext"
+          v-if="imdbResult && !isLoadingNext && !suppressButtons"
           @click="handleImdb"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") {{ imdbButtonLabel }}
         button(
-          v-if="rtResult && !isLoadingNext"
+          v-if="rtResult && !isLoadingNext && !suppressButtons"
           @click="handleRt"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") {{ rtButtonLabel }}
         button(
-          v-if="googleResult && !isLoadingNext"
+          v-if="googleResult && !isLoadingNext && !suppressButtons"
           @click="handleGoogle"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Google
         button(
-          v-if="wikiResult && !isLoadingNext"
+          v-if="wikiResult && !isLoadingNext && !suppressButtons"
           @click="handleWiki"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Wiki
         button(
-          v-if="officialResult && !isLoadingNext"
+          v-if="officialResult && !isLoadingNext && !suppressButtons"
           @click="handleOfficial"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Official
 
         button(
-          v-if="curTvdb && !isLoadingNext"
+          v-if="curTvdb && !isLoadingNext && !suppressButtons"
           @click="handleLoad"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Get
         
         span(v-if="isLoadingRemotesMsg && !isLoadingNext" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;loading remotes&gt;
-        span(v-if="!curTvdb && !isLoadingNext" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;no show info&gt;
+        span(v-if="!curTvdb && !isLoadingNext && !suppressButtons" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;no show info&gt;
     
     #reelTitles(
       ref="titlesPane"
@@ -129,6 +129,7 @@ export default {
     const _startReelPromise = ref(null);
     const isLoadingNext = ref(false);
     const isLoadingRemotesMsg = ref(false);
+    const suppressButtons = ref(false);
 
     const handleScaledWheel = (event) => {
       if (!event) return;
@@ -266,6 +267,7 @@ export default {
 
     const handleNext = async () => {
       isLoadingNext.value = true;
+      suppressButtons.value = true;
       try {
         if (!_didStartReel.value) {
           await ensureReelStarted();
@@ -323,6 +325,7 @@ export default {
         console.log('getReel failed:', msg);
         titleStrings.value = [...titleStrings.value, `error|${msg}`];
         await scrollTitlesToBottom();
+        suppressButtons.value = false;
       } finally {
         isLoadingNext.value = false;
       }
@@ -409,6 +412,7 @@ export default {
       if (!tvdb) {
         getRemotesResults.value = [];
         _lastRemotesKey.value = '';
+        suppressButtons.value = false;
         return;
       }
 
@@ -418,19 +422,19 @@ export default {
       if (!key) {
         getRemotesResults.value = [];
         _lastRemotesKey.value = '';
+        suppressButtons.value = false;
         return;
       }
 
       if (_lastRemotesKey.value === key) {
-        // Even if key is same, if existing results are empty, valid to try again? 
-        // Logic says if key matches, we already did it. 
-        // But if isLoadingRemotesMsg was stuck or something, we should be fine.
+        suppressButtons.value = false;
         return;
       }
       _lastRemotesKey.value = key;
 
       getRemotesResults.value = [];
       isLoadingRemotesMsg.value = true;
+      suppressButtons.value = false;
 
       try {
         const params = {
@@ -567,7 +571,10 @@ export default {
     // Handle title selection
     const selectTitle = (idx) => {
       const item = parsedTitles.value[idx];
-      if (item?.rejectStatus === 'msg') return;
+      if (item?.rejectStatus === 'msg') {
+        suppressButtons.value = false;
+        return;
+      }
       selectedTitleIdx.value = idx;
       const nextTitle = String(item?.titleString || '').trim();
       console.log(`ReelPane: selectTitle idx=${idx} titleString="${nextTitle}"`);
@@ -576,6 +583,8 @@ export default {
       const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
       if (norm(nextTitle) !== norm(srchStr.value)) {
         srchStr.value = nextTitle;
+      } else {
+        suppressButtons.value = false;
       }
     };
 
@@ -655,7 +664,8 @@ export default {
       handleWiki,
       handleOfficial,
       isLoadingNext,
-      isLoadingRemotesMsg
+      isLoadingRemotesMsg,
+      suppressButtons
     };
   }
 };

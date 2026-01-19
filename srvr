@@ -11,7 +11,7 @@ SSH_HOST="hahnca.com"
 #   local:  $ROOT_DIR/apps/down  -> remote: $TV_REMOTE_BASE/down
 TV_REMOTE_BASE="${TV_REMOTE_BASE:-/root/dev/apps/tv}"
 
-DEFAULT_TV_DATA_DIR="/root/dev/apps/tv-data"
+DEFAULT_TV_DATA_DIR="/root/dev/apps/tv/data"
 
 if [[ ! -d "$ROOT_DIR/apps" ]]; then
   echo "Error: expected layout under $ROOT_DIR (missing apps/)" >&2
@@ -101,23 +101,6 @@ remote_install_app_deps() {
   fi
 }
 
-remote_prepare_runtime_state() {
-  # A fresh deploy checkout may not include runtime state files.
-  # tv-srvr requires this file at startup.
-  local project="${1:-all}"
-  if [[ "$project" == "all" || "$project" == "srvr" ]]; then
-    local tv_data_dir="${TV_DATA_DIR:-$DEFAULT_TV_DATA_DIR}"
-    local srvr_data_dir="$tv_data_dir/srvr/data"
-    echo "[remote] ensure tv-srvr state exists under $srvr_data_dir"
-    ssh "$SSH_HOST" "mkdir -p '$srvr_data_dir' \
-      && [ -f '$srvr_data_dir/lastViewed.json' ] || printf '{}' > '$srvr_data_dir/lastViewed.json' \
-      && [ -f '$srvr_data_dir/notes.json' ]      || printf '{}' > '$srvr_data_dir/notes.json' \
-      && [ -f '$srvr_data_dir/tvdb.json' ]       || printf '{}' > '$srvr_data_dir/tvdb.json' \
-      && [ -f '$srvr_data_dir/noemby.json' ]     || printf '[]' > '$srvr_data_dir/noemby.json' \
-      && [ -f '$srvr_data_dir/gaps.json' ]       || printf '[]' > '$srvr_data_dir/gaps.json'"
-  fi
-}
-
 remote_pm2_restart_one() {
   local project="$1"
   local pm2_name
@@ -158,7 +141,6 @@ remote_deploy_one() {
   local project="$1"
   remote_sync_app "$project"
   remote_install_app_deps "$project"
-  remote_prepare_runtime_state "$project"
   remote_pm2_restart_one "$project"
 }
 

@@ -16,6 +16,7 @@ import {
   getApiMiscDir,
   getSecretsDir,
   preferSharedReadPath,
+  getTvDataDir,
 } from './tvPaths.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -39,7 +40,11 @@ function formatPstTimestamp(date = new Date()) {
 
 function appendCallsLog({ endpoint, method, ok, result, error }) {
   try {
-    const outPath = path.join(getApiMiscDir(), 'calls.log');
+    // switch call.logs path from /root/dev/apps/tv/data/api/misc/calls.log to /root/dev/apps/tv/api/calls.log
+    // getTvDataDir() returns /root/dev/apps/tv/data
+    const appBase = path.dirname(getTvDataDir()); 
+    const outPath = path.join(appBase, 'api', 'calls.log');
+    
     const asArray = Array.isArray(result)
       ? result.map(String)
       : (result && typeof result === 'object' && Array.isArray(result.existingTitles))

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getReelHtml } from './get-reel-html.js';
+import { getReelHtml, ReelgoodBrowser } from './get-reel.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -165,6 +165,18 @@ export async function startReel(showTitlesArg) {
     try {
         homeHtml = await getReelHtml();
         logToFile(`Home page loaded (${homeHtml.length} bytes)`);
+
+        // Debug: Save HTML to disk
+        try {
+            const debugPath = '/root/dev/apps/tv/api/test/homepage.html';
+            const debugDir = path.dirname(debugPath);
+            if (!fs.existsSync(debugDir)) fs.mkdirSync(debugDir, { recursive: true });
+            fs.writeFileSync(debugPath, homeHtml, 'utf8');
+            logToFile(`Saved homepage to ${debugPath}`);
+        } catch (e) {
+             console.error('Error saving debug homepage:', e);
+        }
+
     } catch (e) {
         const msg = `Failed to load home page: ${e.message}`;
         console.error(msg);
@@ -187,6 +199,7 @@ export async function startReel(showTitlesArg) {
 export async function getReel() {
   try {
     if (!homeHtml) {
+        logToFile('getReel failed: homeHtml is null/empty. Call startReel first.');
         return [`error|Home page not loaded. Call startReel first.`];
     }
 
@@ -211,96 +224,99 @@ export async function getReel() {
     rx_show.lastIndex = 0; 
 
     // Find next candidate
-    while ((show = rx_show.exec(homeHtml)) !== null) {
-        const titleMatches = rx_title.exec(show[0]);
-        if (!titleMatches?.length) continue;
-        const title = titleMatches[1];
+    const browser = new ReelgoodBrowser();
+    try {
+        while ((show = rx_show.exec(homeHtml)) !== null) {
+            const titleMatches = rx_title.exec(show[0]);
+            if (!titleMatches?.length) continue;
+            const title = titleMatches[1];
 
-        // 1. Check if we already processed this title (cursor)
-        if (reelShows[title]) continue;
+            // 1. Check if we already processed this title (cursor)
+            if (reelShows[title]) continue;
 
-        // 2. Check if we emitted this title recently (history)
-        if (seenTitles.has(title)) {
-            reelShows[title] = true; // ensure marked as seen
-            continue; 
-        }
+            // 2. Check if we emitted this title recently (history)
+            if (seenTitles.has(title)) {
+                reelShows[title] = true; // ensure marked as seen
+                continue; 
+            }
 
-        // Mark as processed immediately (so we don't process again)
-        reelShows[title] = true;
-        saveReelShows(); // Flush immediately as per spec "flush reelShows ... after processing candidate title"
+            // Mark as processed immediately (so we don't process again)
+            reelShows[title] = true;
+            saveReelShows(); // Flush immediately as per spec "flush reelShows ... after processing candidate title"
 
-        logToFile(`Processing candidate: ${title}`);
+            logToFile(`Processing candidate: ${title}`);
 
-        // 3. Check for slug
-        rx_slug.lastIndex = 0;
-        const slugMatches = rx_slug.exec(show[0]);
-        if (!slugMatches?.length) {
-            add(`skipped|${title} (no slug)`);
-            continue; // move to next
-        }
-        const slug = slugMatches[1];
+            // 3. Check for slug
+            rx_slug.lastIndex = 0;
+            const slugMatches = rx_slug.exec(show[0]);
+            if (!slugMatches?.length) {
+                add(`skipped|${title} (no slug)`);
+                continue; // move to next
+            }
+            const slug = slugMatches[1];
 
-        // 4. Check Have It
-        let isHaveIt = false;
-        if (haveItSet.has(title.toLowerCase())) {
-            isHaveIt = true;
-        } else {
-             // Fallback to strict check just in case
-             // isHaveIt = showTitles.includes(title); 
-        }
+            // 4. Check Have It
+            let isHaveIt = false;
+            if (haveItSet.has(title.toLowerCase())) {
+                isHaveIt = true;
+            } else {
+                 // Fallback to strict check just in case
+                 // isHaveIt = showTitles.includes(title); 
+            }
 
-        if (isHaveIt) {
-            add(`Have It|${title}`);
-            logToFile(`REJECT "${title}" (Have It)`);
-            continue;
-        }
-
-        // 5. Fetch Show Page
-        const showUrl = `https://reelgood.com/show/${slug}`;
-        let reelPageHtml = '';
-        try {
-            // "fetch is intentionally fast" - standard fetch
-            const resp = await fetch(showUrl, {
-                headers: {
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                }
-            });
-            if (!resp.ok) {
-                // If it fails emit fetch error
-                add(`Fetch Error|${title} ${resp.status}`);
+            if (isHaveIt) {
+                add(`Have It|${title}`);
+                logToFile(`REJECT "${title}" (Have It)`);
                 continue;
             }
-            reelPageHtml = await resp.text();
-        } catch (e) {
-            add(`Fetch Error|${title} ${e.message}`);
-            logToFile(`ERROR fetching show ${title}: ${e.message}`);
-            continue;
-        }
 
-        // 6. Check Genres
-        let rejectedGenre = null;
-        rx_genre.lastIndex = 0;
-        let genreMatch;
-        while ((genreMatch = rx_genre.exec(reelPageHtml)) !== null) {
-            const g = genreMatch[1].toLowerCase();
-            if (avoidGenres.includes(g)) {
-                rejectedGenre = g;
-                break;
+            // 5. Fetch Show Page
+            const showUrl = `https://reelgood.com/show/${slug}`;
+            let reelPageHtml = '';
+            try {
+                reelPageHtml = await browser.getHtml(showUrl);
+            } catch (e) {
+                // If it fails emit fetch error
+                const msg = e.message || String(e);
+                // Simple status check if error message contains "403" etc
+                if (msg.includes('403')) {
+                     add(`Fetch Error|${title} 403`);
+                } else if (msg.includes('404')) {
+                     add(`Fetch Error|${title} 404`);
+                } else {
+                     add(`Fetch Error|${title} ${msg.slice(0, 50)}`);
+                }
+                logToFile(`ERROR fetching show ${title}: ${msg}`);
+                continue;
             }
-        }
 
-        if (rejectedGenre) {
-            add(`${rejectedGenre}|${title}`);
-            logToFile(`REJECT "${title}" (${rejectedGenre})`);
-            continue;
-        }
+            // 6. Check Genres
+            let rejectedGenre = null;
+            rx_genre.lastIndex = 0;
+            let genreMatch;
+            while ((genreMatch = rx_genre.exec(reelPageHtml)) !== null) {
+                const g = genreMatch[1].toLowerCase();
+                if (avoidGenres.includes(g)) {
+                    rejectedGenre = g;
+                    break;
+                }
+            }
 
-        // 7. Success
-        add(`ok|${title}`);
-        logToFile(`>>> "${title}" OK`);
-        
-        // We found an OK result, so we return the list accumulated so far
-        return addedThisCall;
+            if (rejectedGenre) {
+                add(`${rejectedGenre}|${title}`);
+                logToFile(`REJECT "${title}" (${rejectedGenre})`);
+                continue;
+            }
+
+            // 7. Success
+            add(`ok|${title}`);
+            logToFile(`>>> "${title}" OK`);
+            
+            // We found an OK result, so we return the list accumulated so far
+            return addedThisCall;
+        }
+    } finally {
+        await browser.close();
     }
 
     // Exhausted list without finding new OK result (or only skipped/rejected ones)

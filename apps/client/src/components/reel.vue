@@ -32,7 +32,7 @@
         :style="{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '10px', marginTop: '0' }")
         button(
           @click="handleNext"
-          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Next
+          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: isLoadingNext ? '#d3d3d3' : '' }") Next
 
         span(v-if="hasAnyRemoteButton" :style="{ lineHeight: '18px', fontSize: '12px' }")  |
 
@@ -122,6 +122,7 @@ export default {
     const _didStartReel = ref(false);
     const _didInitialVisibleScroll = ref(false);
     const _startReelPromise = ref(null);
+    const isLoadingNext = ref(false);
 
     const handleScaledWheel = (event) => {
       if (!event) return;
@@ -258,6 +259,7 @@ export default {
     };
 
     const handleNext = async () => {
+      isLoadingNext.value = true;
       try {
         if (!_didStartReel.value) {
           await ensureReelStarted();
@@ -313,6 +315,8 @@ export default {
         console.log('getReel failed:', msg);
         titleStrings.value = [...titleStrings.value, `error|${msg}`];
         await scrollTitlesToBottom();
+      } finally {
+        isLoadingNext.value = false;
       }
     };
 
@@ -527,6 +531,7 @@ export default {
 
     // Handle gallery card selection
     const handleGallerySelect = (tvdb) => {
+      console.log('ReelPane: handleGallerySelect tvdb:', tvdb ? (tvdb.name || tvdb.Name) : 'null');
       curTvdb.value = tvdb;
     };
 
@@ -540,6 +545,7 @@ export default {
       if (item?.rejectStatus === 'msg') return;
       selectedTitleIdx.value = idx;
       const nextTitle = String(item?.titleString || '').trim();
+      console.log(`ReelPane: selectTitle idx=${idx} titleString="${nextTitle}"`);
       curTitle.value = nextTitle;
 
       const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -573,6 +579,7 @@ export default {
 
     // Initialize with test data
     onMounted(() => {
+      console.log('reel.vue mounted. active:', props.active, 'allShows length:', props.allShows?.length);
       // Wait until allShows is available so startReel gets the full library.
       if (Array.isArray(props.allShows) && props.allShows.length > 0) {
         void startReelAndLoadTitles();
@@ -583,10 +590,9 @@ export default {
       if (_didStartReel.value) return;
       if (!Array.isArray(val) || val.length === 0) return;
       void startReelAndLoadTitles();
-    }, { deep: true });
+    });
 
     watch(() => props.active, (isActive) => {
-      if (!isActive) return;
       if (_didStartReel.value) return;
       void ensureReelStarted();
     });

@@ -952,8 +952,8 @@ export default {
         this.noTorrentsNeeded = false;
         this.providerWarning = '';
         this.hasSearched = true;
-        // Use force to get all torrents, then client filters by season.
-        await this.loadTorrents(['force']);
+        const seasonStr = `S${String(sVal).padStart(2, '0')}`;
+        await this.loadTorrents([seasonStr]);
         return;
       }
 

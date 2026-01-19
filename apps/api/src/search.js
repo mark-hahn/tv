@@ -698,10 +698,16 @@ export async function searchTorrents({ showName, limit = 1000, iptCf, tlCf, need
           return true;
         }
       } else {
-        // Episode torrent - check if SxxExx is in needed
+        // Episode torrent - check if SxxExx is in needed, OR if parent season Sxx is in needed
+        const seasonStr = `S${String(season).padStart(2, '0')}`;
         const episodeStr = `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
+        
         if (needed.includes(episodeStr)) {
           matchedNeeded.add(episodeStr);
+          return true;
+        }
+        if (needed.includes(seasonStr)) {
+          matchedNeeded.add(seasonStr);
           return true;
         }
       }

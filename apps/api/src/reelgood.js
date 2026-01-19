@@ -51,7 +51,8 @@ function logToFile(message) {
     const dd = String(pstTime.getUTCDate()).padStart(2, '0');
     const hh = String(pstTime.getUTCHours()).padStart(2, '0');
     const min = String(pstTime.getUTCMinutes()).padStart(2, '0');
-    const timestamp = `${mm}/${dd} ${hh}:${min}`;
+    const sec = String(pstTime.getUTCSeconds()).padStart(2, '0');
+    const timestamp = `${mm}/${dd} ${hh}:${min}:${sec}`;
     
     fs.appendFileSync(logPath, `${timestamp} ${message}\n`, 'utf8');
   } catch (err) {

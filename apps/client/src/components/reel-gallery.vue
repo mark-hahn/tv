@@ -98,6 +98,7 @@ export default {
           emit('select', data[0]);
         } else {
           tvdbList.value = [];
+          emit('select', null);
         }
       } catch (err) {
         console.error('Error loading tvdb data:', err);

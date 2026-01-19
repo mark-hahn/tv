@@ -61,6 +61,9 @@
           v-if="curTvdb"
           @click="handleLoad"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Get
+        
+        span(v-if="isLoadingRemotesMsg" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;loading remotes&gt;
+        span(v-if="!curTvdb" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;no show info&gt;
     
     #reelTitles(
       ref="titlesPane"
@@ -123,6 +126,7 @@ export default {
     const _didInitialVisibleScroll = ref(false);
     const _startReelPromise = ref(null);
     const isLoadingNext = ref(false);
+    const isLoadingRemotesMsg = ref(false);
 
     const handleScaledWheel = (event) => {
       if (!event) return;
@@ -396,6 +400,8 @@ export default {
     });
 
     const loadRemotesForTvdb = async (tvdb) => {
+      isLoadingRemotesMsg.value = false;
+
       if (!tvdb) {
         getRemotesResults.value = [];
         _lastRemotesKey.value = '';
@@ -411,10 +417,17 @@ export default {
         return;
       }
 
-      if (_lastRemotesKey.value === key) return;
+      if (_lastRemotesKey.value === key) {
+        // Even if key is same, if existing results are empty, valid to try again? 
+        // Logic says if key matches, we already did it. 
+        // But if isLoadingRemotesMsg was stuck or something, we should be fine.
+        return;
+      }
       _lastRemotesKey.value = key;
 
       getRemotesResults.value = [];
+      isLoadingRemotesMsg.value = true;
+
       try {
         const params = {
           show: {
@@ -424,10 +437,18 @@ export default {
           tvdbRemotes: tvdb.remote_ids
         };
         const res = await srvr.getRemotesCmd(params);
-        getRemotesResults.value = Array.isArray(res) ? res : [];
+        if (_lastRemotesKey.value === key) {
+          getRemotesResults.value = Array.isArray(res) ? res : [];
+        }
       } catch (e) {
         console.log('getRemotesCmd failed:', e?.message || String(e));
-        getRemotesResults.value = [];
+        if (_lastRemotesKey.value === key) {
+          getRemotesResults.value = [];
+        }
+      } finally {
+        if (_lastRemotesKey.value === key) {
+          isLoadingRemotesMsg.value = false;
+        }
       }
     };
 
@@ -629,7 +650,8 @@ export default {
       handleRt,
       handleWiki,
       handleOfficial,
-      isLoadingNext
+      isLoadingNext,
+      isLoadingRemotesMsg
     };
   }
 };

@@ -104,15 +104,36 @@ const extractImdbRating = (html) => {
 const getUrlAndRatings = async (type, url, name) => {
   // log('getUrlAndRatings', {type, url, name});
 
+  const fetchWithTimeout = async (u, o) => {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 8000);
+    try {
+      return await fetch(u, { ...o, signal: controller.signal });
+    } catch (e) {
+      if (e.name === 'AbortError') throw new Error('Request timed out');
+      throw e;
+    } finally {
+      clearTimeout(id);
+    }
+  };
+
   let html, json;
 
-  if ((type == 18 || type == 7) && cacheName) json = cacheJson;
+  if ((type == 18 || type == 7) && cacheName === name) json = cacheJson;
   else {
     const fetchOpts = (+type === 2)
       ? { headers: imdbFetchHeaders, redirect: 'follow' }
       : undefined;
 
-    let resp = await fetch(url, fetchOpts);
+    let resp;
+    try {
+      resp = await fetchWithTimeout(url, fetchOpts);
+    } catch (e) {
+      log('err', `getUrlAndRatings fetch error: ${
+                    JSON.stringify({type, url, name})}, ${e.message}`);
+      return null;
+    }
+
     if (!resp.ok) {
       log('err', `getUrlAndRatings fetch error: ${
                     JSON.stringify({type, url, name})}, ${resp.status}`);
@@ -124,8 +145,13 @@ const getUrlAndRatings = async (type, url, name) => {
 
       // IMDb bot mitigation can manifest as 202 + empty body.
       if (+type === 2 && (!html || html.length === 0 || resp.status === 202)) {
-        resp = await fetch(url, fetchOpts);
-        html = await resp.text();
+        try {
+          resp = await fetchWithTimeout(url, fetchOpts);
+          html = await resp.text();
+        } catch (e) {
+          log('err', `getUrlAndRatings retry error: ${e.message}`);
+          return null;
+        }
       }
 
       html = (html || '').replaceAll(/\r?\n/gm, "")

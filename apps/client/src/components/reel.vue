@@ -33,6 +33,10 @@
         button(
           @click="handleNext"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: isLoadingNext ? '#d3d3d3' : '' }") Next
+        button(
+          v-if="curTvdb && !isLoadingNext && !suppressButtons"
+          @click="handleLoad"
+          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Get
         
         span(v-if="isLoadingNext" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;loading shows&gt;
 
@@ -59,10 +63,6 @@
           @click="handleOfficial"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Official
 
-        button(
-          v-if="curTvdb && !isLoadingNext && !suppressButtons"
-          @click="handleLoad"
-          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Get
         
         span(v-if="isLoadingRemotesMsg && !isLoadingNext" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;loading remotes&gt;
         span(v-if="!curTvdb && !isLoadingNext && !suppressButtons" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;no show info&gt;
@@ -330,6 +330,16 @@ export default {
           // Always scroll to the bottom even if the msg card already exists;
           // if we just added it, wait for it to render first.
           await scrollTitlesPaneToBottom();
+
+          // If we are not moving to a new show, we need to re-enable the current show.
+          // Since we cleared remotes at the start, we must reload them.
+          lastLoadedTvdbId.value = null;
+          await nextTick();
+          if (curTvdb.value) {
+            void loadRemotesForTvdb(curTvdb.value);
+          } else {
+            suppressButtons.value = false;
+          }
         }
       } catch (e) {
         const msg = e?.message || String(e);

@@ -29,7 +29,7 @@
         div(v-if="curTvdb") {{ curTvdb.overview }}
       
       #reelButtons(
-        :style="{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '10px', marginTop: '0' }")
+        :style="{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '5px', marginTop: '8px', border: '1px solid #808080', borderRadius: '5px', marginBottom: '8px', width: '100%', boxSizing: 'border-box' }")
         button(
           @click="handleNext"
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: isLoadingNext ? '#d3d3d3' : '' }") Next

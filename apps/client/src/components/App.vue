@@ -25,6 +25,10 @@
             :style="{ fontSize:'13px', cursor:'pointer', borderRadius:'7px', padding:'4px 10px', marginLeft:'4px', border:'1px solid #bbb', backgroundColor: (currentPane === t.key ? '#ddd' : 'whitesmoke') }"
           ) {{ t.label }}
 
+          div(style="flex:1;") 
+          div(v-if="!simpleMode && libraryProgressText" style="display:flex; align-items:center; margin-left:10px; padding-right:10px;")
+             div(style="font-size:12px; color:#555; white-space:nowrap; padding-right:8px;") {{ libraryProgressText }}
+
         #tabBody(:style="{ flex:'1 1 auto', minHeight:'0px', position:'relative', width:'100%' }")
           Series(v-show="currentPane === 'series'" style="display:block; width:100%; height:100%;" :simpleMode="simpleMode" :sizing="activeSizing")
           Map(
@@ -143,6 +147,10 @@
           @click.stop="selectTab(t.key)"
           :style="{ fontSize:'13px', cursor:'pointer', borderRadius:'7px', padding:'4px 10px', marginLeft:'4px', border:'1px solid #bbb', backgroundColor: (currentPane === t.key ? '#ddd' : 'whitesmoke') }"
         ) {{ t.label }}
+
+        div(style="flex:1;") 
+        div(v-if="!simpleMode && libraryProgressText" style="display:flex; align-items:center; margin-left:10px; padding-right:10px;")
+            div(style="font-size:12px; color:#555; white-space:nowrap; padding-right:8px;") {{ libraryProgressText }}
 
       #tabBody(:style="{ flex:'1 1 auto', minHeight:'0px', position:'relative', width:'100%' }")
         Series(v-show="currentPane === 'series'" style="display:block; width:100%; height:100%;" :simpleMode="simpleMode" :sizing="activeSizing")
@@ -288,6 +296,7 @@ import TvProc   from './tvproc.vue';
 import FilePane from './file.vue';
 import evtBus   from '../evtBus.js';
 import * as tvdb from '../tvdb.js';
+import * as emby from '../emby.js';
 import { config } from '../config.js';
 
 export default {
@@ -312,6 +321,12 @@ export default {
       mapError: '',
       allShows: [],
       _didRequestNotifications: false,
+
+      // Library Refresh State
+      _libBusy: false,
+      _libTaskId: null,
+      _libPollTimer: null,
+      libraryProgressText: '',
 
       tvdbMismatchOpen: false,
       tvdbMismatchText: '',
@@ -516,8 +531,89 @@ export default {
     if (this._onAppWindowResize) window.removeEventListener('resize', this._onAppWindowResize);
     this.stopQbtPolling();
     this.cancelDownInactiveTimer();
+    this.stopLibraryPolling();
   },
   methods: {
+    async startLibraryRefresh() {
+      if (this._libBusy) return;
+
+      this.stopLibraryPolling();
+      this.libraryProgressText = '';
+      this._libTaskId = null;
+      this._libBusy = true;
+
+      let res = null;
+      try {
+        res = await emby.refreshLib();
+      } catch (e) {
+        this._libBusy = false;
+        this.libraryProgressText = 'error';
+        return;
+      }
+
+      if (res?.status === 'hasTask') {
+        this._libTaskId = res.taskId;
+        this.libraryProgressText = 'Refreshing...';
+        void this.pollLibraryStatus();
+        return;
+      }
+
+      this._libBusy = false;
+      if (res?.status && res.status !== 'notask') {
+        this.libraryProgressText = String(res.status);
+      }
+    },
+
+    stopLibraryPolling() {
+      if (this._libPollTimer) {
+        clearTimeout(this._libPollTimer);
+        this._libPollTimer = null;
+      }
+    },
+
+    async pollLibraryStatus() {
+      if (!this._libTaskId) {
+        this._libBusy = false;
+        return;
+      }
+
+      let res = null;
+      try {
+        res = await emby.taskStatus(this._libTaskId);
+      } catch (e) {
+        this._libBusy = false;
+        this._libTaskId = null;
+        this.libraryProgressText = 'error';
+        return;
+      }
+      if (res?.status === 'refreshing') {
+        if (Number.isFinite(Number(res?.progress))) {
+          this.libraryProgressText = `${Number(res.progress).toFixed(0)}%`;
+        } else if (res?.taskStatus) {
+          this.libraryProgressText = String(res.taskStatus);
+        } else {
+          this.libraryProgressText = 'Refreshing...';
+        }
+
+        this._libPollTimer = setTimeout(() => {
+          void this.pollLibraryStatus();
+        }, 2000);
+        return;
+      }
+
+      this._libBusy = false;
+      this._libTaskId = null;
+      if (res?.status === 'refreshdone') {
+        this.libraryProgressText = '100%';
+        evtBus.emit('library-refresh-complete');
+        
+        // Debounce clearing to avoid flicker
+        setTimeout(() => { if (this.libraryProgressText === '100%') this.libraryProgressText = ''; }, 5000);
+      } else if (res?.status) {
+        this.libraryProgressText = String(res.status);
+      }
+    },
+
     handleTvdbMismatch(payload) {
       if (this.simpleMode) return;
 
@@ -1132,6 +1228,8 @@ export default {
     evtBus.on('showSeriesPane', () => {
       this.handleActorsClose();
     });
+
+    evtBus.on('startLibraryRefresh', this.startLibraryRefresh);
     
     // Close torrents or actors pane when a different show is selected
     evtBus.on('setUpSeries', (show) => {

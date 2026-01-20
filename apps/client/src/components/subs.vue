@@ -32,8 +32,7 @@
       //- Row 2 (all buttons centered)
       div(style="display:flex; justify-content:center; align-items:center; margin-top:6px;")
         div(style="display:flex; gap:8px; align-items:center;")
-          div(v-if="libraryProgressText" style="align-self:center; font-size:12px; color:#555; white-space:nowrap; font-weight:normal; padding-right:8px;") {{ libraryProgressText }}
-          button(@click.stop="startLibraryRefresh" :disabled="_libBusy" :style="getLibraryButtonStyle()") Library
+          button(@click.stop="startLibraryRefresh" :style="getLibraryButtonStyle()") Library
           button(@click.stop="applyClick" :disabled="!applyEnabled" :style="getApplyButtonStyle()") Apply
           button(@click.stop="deleteClick" :disabled="!deleteEnabled" :style="getDelButtonStyle()") Del
           div(style="width:20px;")
@@ -98,7 +97,6 @@
 import parseTorrentTitle from 'parse-torrent-title';
 import { subsSearch, applySubFiles, deleteSubFiles, offsetSubFiles, getSubFileIds } from '../srvr.js';
 import evtBus from '../evtBus.js';
-import * as emby from '../emby.js';
 import * as util from '../util.js';
 
 export default {
@@ -158,11 +156,6 @@ export default {
 
       showApplyFailuresModal: false,
       applyFailures: [],
-
-      _libBusy: false,
-      _libTaskId: null,
-      _libPollTimer: null,
-      libraryProgressText: '',
 
       _lastSearchShowKey: '',
       _validEntries: [],
@@ -564,10 +557,9 @@ export default {
     },
 
     getLibraryButtonStyle() {
-      const enabled = !this._libBusy;
       return {
         fontSize: '12px',
-        cursor: enabled ? 'pointer' : 'not-allowed',
+        cursor: 'pointer',
         borderRadius: '7px',
         padding: '4px 8px',
         border: '1px solid #bbb',
@@ -603,81 +595,8 @@ export default {
       };
     },
 
-    async startLibraryRefresh() {
-      if (this._libBusy) return;
-
-      this.stopLibraryPolling();
-      this.libraryProgressText = '';
-      this._libTaskId = null;
-      this._libBusy = true;
-
-      let res = null;
-      try {
-        res = await emby.refreshLib();
-      } catch (e) {
-        this._libBusy = false;
-        this.libraryProgressText = 'error';
-        return;
-      }
-
-      if (res?.status === 'hasTask') {
-        this._libTaskId = res.taskId;
-        this.libraryProgressText = 'Refreshing...';
-        void this.pollLibraryStatus();
-        return;
-      }
-
-      this._libBusy = false;
-      if (res?.status && res.status !== 'notask') {
-        this.libraryProgressText = String(res.status);
-      }
-    },
-
-    stopLibraryPolling() {
-      if (this._libPollTimer) {
-        clearTimeout(this._libPollTimer);
-        this._libPollTimer = null;
-      }
-    },
-
-    async pollLibraryStatus() {
-      if (!this._libTaskId) {
-        this._libBusy = false;
-        return;
-      }
-
-      let res = null;
-      try {
-        res = await emby.taskStatus(this._libTaskId);
-      } catch (e) {
-        this._libBusy = false;
-        this._libTaskId = null;
-        this.libraryProgressText = 'error';
-        return;
-      }
-      if (res?.status === 'refreshing') {
-        if (Number.isFinite(Number(res?.progress))) {
-          this.libraryProgressText = `${Number(res.progress).toFixed(0)}%`;
-        } else if (res?.taskStatus) {
-          this.libraryProgressText = String(res.taskStatus);
-        } else {
-          this.libraryProgressText = 'Refreshing...';
-        }
-
-        this._libPollTimer = setTimeout(() => {
-          void this.pollLibraryStatus();
-        }, 2000);
-        return;
-      }
-
-      this._libBusy = false;
-      this._libTaskId = null;
-      if (res?.status === 'refreshdone') {
-        this.libraryProgressText = '100%';
-        evtBus.emit('library-refresh-complete');
-      } else if (res?.status) {
-        this.libraryProgressText = String(res.status);
-      }
+    startLibraryRefresh() {
+      evtBus.emit('startLibraryRefresh');
     },
 
     selectMode(mode) {

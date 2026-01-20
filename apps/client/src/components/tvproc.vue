@@ -9,8 +9,7 @@
         span(v-if="totalDownloadingSpeedText" style="margin-left:20px; align-self:center; font-size:13px; color:#555; white-space:nowrap; font-weight:normal;") {{ totalDownloadingSpeedText }}
         span(v-if="avgDownloadingSpeedText" style="margin-left:20px; align-self:center; font-size:13px; color:#555; white-space:nowrap; font-weight:normal;") {{ avgDownloadingSpeedText }}
       div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
-        div(v-if="libraryProgressText" style="align-self:center; font-size:13px; color:#555; white-space:nowrap;") {{ libraryProgressText }}
-        button(@click.stop="startLibraryRefresh" :disabled="_libBusy" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Library
+        button(@click.stop="startLibraryRefresh" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Library
         button(@click.stop="showFirstDownloading" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Show
 
   div(v-if="error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px; white-space:pre-line; padding:0 20px;")
@@ -41,7 +40,6 @@
 <script>
 import evtBus from '../evtBus.js';
 import { config } from '../config.js';
-import * as emby from '../emby.js';
 import * as util from '../util.js';
 
 export default {
@@ -63,10 +61,6 @@ export default {
       items: [],
       error: null,
       _pollTimer: null,
-      _libPollTimer: null,
-      _libBusy: false,
-      _libTaskId: null,
-      libraryProgressText: '',
       _active: false,
       _firstLoad: false,
       _didLoadOnce: false,
@@ -143,12 +137,14 @@ export default {
     evtBus.off('paneChanged', this.onPaneChanged);
     evtBus.off('cycle-started', this.handleCycleStarted);
     this.stopPolling();
-    this.stopLibraryPolling();
     this.items = [];
     this.error = null;
   },
 
   methods: {
+    startLibraryRefresh() {
+       evtBus.emit('startLibraryRefresh');
+    },
     handleScaledWheel(event) {
       if (!event) return;
       const el = event.currentTarget;
@@ -242,69 +238,6 @@ export default {
       if (this._pollTimer) {
         clearTimeout(this._pollTimer);
         this._pollTimer = null;
-      }
-    },
-
-    stopLibraryPolling() {
-      if (this._libPollTimer) {
-        clearTimeout(this._libPollTimer);
-        this._libPollTimer = null;
-      }
-    },
-
-    async startLibraryRefresh() {
-      if (this._libBusy) return;
-
-      this.stopLibraryPolling();
-      this.libraryProgressText = '';
-      this._libTaskId = null;
-      this._libBusy = true;
-
-      const res = await emby.refreshLib();
-      if (res?.status === 'hasTask') {
-        this._libTaskId = res.taskId;
-        this.libraryProgressText = 'Refreshing...';
-        void this.pollLibraryStatus();
-        return;
-      }
-
-      this._libBusy = false;
-      if (res?.status && res.status !== 'notask') {
-        this.libraryProgressText = String(res.status);
-      }
-    },
-
-    async pollLibraryStatus() {
-      if (!this._libTaskId) {
-        this._libBusy = false;
-        return;
-      }
-
-      const res = await emby.taskStatus(this._libTaskId);
-      if (res?.status === 'refreshing') {
-        if (Number.isFinite(Number(res?.progress))) {
-          this.libraryProgressText = `${Number(res.progress).toFixed(0)}%`;
-        } else if (res?.taskStatus) {
-          this.libraryProgressText = String(res.taskStatus);
-        } else {
-          this.libraryProgressText = 'Refreshing...';
-        }
-
-        this._libPollTimer = setTimeout(() => {
-          void this.pollLibraryStatus();
-        }, 2000);
-        return;
-      }
-
-      this._libBusy = false;
-      this._libTaskId = null;
-      if (res?.status === 'refreshdone') {
-        // Always keep a completion indicator; only clear on a fresh pane load.
-        this.libraryProgressText = '100%';
-        // Emit event to trigger show list refresh
-        evtBus.emit('library-refresh-complete');
-      } else if (res?.status) {
-        this.libraryProgressText = String(res.status);
       }
     },
 

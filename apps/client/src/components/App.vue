@@ -55,6 +55,12 @@
             :simpleMode="simpleMode"
             :sizing="activeSizing"
           )
+          Reviews(
+             v-show="currentPane === 'reviews'"
+             style="width:100%; height:100%;"
+             :simpleMode="simpleMode"
+             :sizing="activeSizing"
+          )
           Reel(
             v-if="!simpleMode"
             v-show="currentPane === 'reel'"
@@ -178,6 +184,12 @@
           :simpleMode="simpleMode"
           :sizing="activeSizing"
         )
+        Reviews(
+           v-show="currentPane === 'reviews'"
+           style="width:100%; height:100%;"
+           :simpleMode="simpleMode"
+           :sizing="activeSizing"
+        )
         Reel(
           v-if="!simpleMode"
           v-show="currentPane === 'reel'"
@@ -286,6 +298,7 @@ import List     from './list.vue';
 import Series   from './series.vue';
 import Map      from './map.vue';
 import Actors   from './actors.vue';
+import Reviews  from './reviews.vue';
 import Buttons  from './buttons.vue';
 import Reel     from './reel.vue';
 import Torrents from './torrents.vue';
@@ -301,7 +314,7 @@ import { config } from '../config.js';
 
 export default {
   name: "App",
-  components: { List, Series, Map, Actors, Buttons, Reel, Torrents, Subs, Flex, History, TvProc, FilePane },
+  components: { List, Series, Map, Actors, Reviews, Buttons, Reel, Torrents, Subs, Flex, History, TvProc, FilePane },
   data() { 
     return { 
       // Must be known before first render so non-simple panes never mount in simple mode.
@@ -511,6 +524,7 @@ export default {
         { label: 'Series', key: 'series' },
         { label: 'Map', key: 'map' },
         { label: 'Actors', key: 'actors' },
+        { label: 'Reviews', key: 'reviews' },
         { label: 'Tor', key: 'torrents' },
         { label: 'Subs', key: 'subs' },
         { label: 'Files', key: 'file' },
@@ -521,7 +535,7 @@ export default {
       ];
 
       if (!this.simpleMode) return allTabs;
-      const allowed = new Set(['series', 'map', 'actors']);
+      const allowed = new Set(['series', 'map', 'actors', 'reviews']);
       return allTabs.filter(t => allowed.has(t.key));
     }
   },
@@ -935,7 +949,7 @@ export default {
       if (!k) return;
 
       // In simple mode, only Series/Map/Actors exist.
-      if (this.simpleMode && !['series', 'map', 'actors'].includes(k)) {
+      if (this.simpleMode && !['series', 'map', 'actors', 'reviews'].includes(k)) {
         return;
       }
 
@@ -958,6 +972,12 @@ export default {
 
       if (k === 'actors') {
         this.handleShowActors(false);
+        return;
+      }
+
+      if (k === 'reviews') {
+        this.currentPane = 'reviews';
+        evtBus.emit('paneChanged', this.currentPane);
         return;
       }
 
@@ -1351,6 +1371,7 @@ html, body {
 #series, #series *,
 #map, #map *,
 #actors, #actors *,
+#reviews, #reviews *,
 #torrents, #torrents *,
 #history, #history *,
 #tvproc, #tvproc * {
@@ -1361,6 +1382,7 @@ html, body {
 #series button,
 #map button,
 #actors button,
+#reviews button,
 #torrents button,
 .torrents-container button,
 #history button,

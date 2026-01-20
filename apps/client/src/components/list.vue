@@ -1170,7 +1170,7 @@ export default {
 
     sortClick() {
       this.sortPopped = !this.sortPopped;
-      console.debug("🚀 ~ sortPopped:", sortPopped)
+      console.debug("🚀 ~ sortPopped:", this.sortPopped)
       this.fltrPopped = false;
     },
 

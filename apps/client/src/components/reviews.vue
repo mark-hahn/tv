@@ -240,12 +240,13 @@ export default {
     
     async handleReviewClick(review) {
       if (review.more) {
-        // Dummy implementation
-        // const fullText = await srvr.getRemainingReview(review.reviewId);
-        // review.text += fullText;
-        // review.more = false;
+        // const remainingText = await srvr.getRemainingReview(review.reviewId);
         
-        console.log("Clicked more for review: " + review.reviewId);
+        // Dummy implementation simulating valid return
+        const remainingText = " It really picks up in the second half. The characters develop significantly and the plot twists are unexpected but satisfying. Highly recommended for fans of the genre.";
+        
+        review.text += remainingText;
+        review.more = false;
       }
     },
 

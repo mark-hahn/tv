@@ -132,6 +132,8 @@ export default {
     const loadingRemotesCount = ref(0);
     const suppressButtons = ref(false);
     const lastLoadedTvdbId = ref(null);
+    const remotesCache = new Map();
+    const activeLoadingKeys = new Set();
 
     const handleScaledWheel = (event) => {
       if (!event) return;
@@ -469,8 +471,23 @@ export default {
       }
       _lastRemotesKey.value = key;
 
+      if (remotesCache.has(key)) {
+        getRemotesResults.value = remotesCache.get(key);
+        await nextTick();
+        suppressButtons.value = false;
+        return;
+      }
+
+      if (activeLoadingKeys.has(key)) {
+        isLoadingRemotesMsg.value = true;
+        await nextTick();
+        suppressButtons.value = false;
+        return;
+      }
+
       getRemotesResults.value = [];
       isLoadingRemotesMsg.value = true;
+      activeLoadingKeys.add(key);
       loadingRemotesCount.value++;
       
       await nextTick();
@@ -487,7 +504,9 @@ export default {
         };
         const res = await srvr.getRemotesCmd(params);
         if (_lastRemotesKey.value === key) {
-          getRemotesResults.value = Array.isArray(res) ? res : [];
+          const results = Array.isArray(res) ? res : [];
+          remotesCache.set(key, results);
+          getRemotesResults.value = results;
         }
       } catch (e) {
         console.log('getRemotesCmd failed:', e?.message || String(e));
@@ -496,6 +515,7 @@ export default {
         }
       } finally {
         loadingRemotesCount.value--;
+        activeLoadingKeys.delete(key);
         if (_lastRemotesKey.value === key) {
           isLoadingRemotesMsg.value = false;
         }

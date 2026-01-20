@@ -32,8 +32,10 @@ const logPath = path.join(apiDir, 'reelgood.log');
 
 let homeHtml = null;  // Cached HTML from startReel
 let reelShows = {};   // Cursor: { "Title": true }
+let reelShowsLoaded = false;
 let showTitles = [];  // Titles the user already has (from client)
 let resultTitles = []; // Rolling history of emitted results
+let resultTitlesLoaded = false;
 
 // --- Persistence Helpers ---
 
@@ -102,34 +104,12 @@ function loadReelShows() {
 }
 
 function saveReelShows() {
-    // Reload from disk to merge changes (concurrency safety attempt)
-    let disk = {};
-    try {
-        if (fs.existsSync(reelShowsPath)) {
-            // Check backups?
-            // Just load nicely
-             const raw = fs.readFileSync(reelShowsPath, 'utf8');
-             if (raw.trim()) {
-                disk = JSON.parse(raw);
-             }
-        }
-    } catch (e) {
-        // If we can't read the disk, we ABORT saving.
+    if (!reelShowsLoaded) {
+        // If we can't read the disk (at startup), we ABORT saving.
         // Overwriting a corrupt/unreadable file with partial memory state means data loss.
-        console.error(`saveReelShows aborted: Cannot read ${reelShowsPath}: ${e.message}`);
+        console.error(`saveReelShows aborted: Reel shows not loaded cleanly at startup.`);
         return; 
     }
-
-    // Double check we are not overwriting with empty if we expected data
-    if (Object.keys(disk).length > 0 && Object.keys(reelShows).length === 0) {
-        // Suspicious: disk has data, memory is empty?
-        // This might happen if startup failed.
-        // But startup fail sets reelShows={} and prevented overwrite.
-        // If we are here, reelShows has mutated. 
-        console.warn('saveReelShows: Overwriting non-empty disk with potentially empty memory state?');
-    }
-
-    const merged = { ...disk, ...reelShows };
 
     // Create a .bak copy before overwriting, just in case
     try {
@@ -143,7 +123,7 @@ function saveReelShows() {
         console.error('Error creating backup of reel-shows.json:', e);
     }
 
-    atomicWriteJson(reelShowsPath, merged);
+    atomicWriteJson(reelShowsPath, reelShows);
 }
 
 function loadResultTitles() {
@@ -166,11 +146,8 @@ function loadResultTitles() {
 }
 
 function saveResultTitles() {
-    // Safety check: ensure we can read existin file before overwriting
-    try {
-        loadResultTitles();
-    } catch (e) {
-        console.error(`saveResultTitles aborted: Cannot read ${reelTitlesPath}: ${e.message}`);
+    if (!resultTitlesLoaded) {
+        console.error(`saveResultTitles aborted: Titles not loaded cleanly at startup.`);
         return;
     }
   atomicWriteJson(reelTitlesPath, resultTitles);
@@ -201,6 +178,7 @@ function parseResultTitle(entry) {
 
 try {
     reelShows = loadReelShows();
+    reelShowsLoaded = true;
 } catch (e) {
     console.error('CRITICAL: Failed to load reel-shows.json on startup.', e.message);
     logToFile(`CRITICAL: Startup load failed: ${e.message}`);
@@ -211,6 +189,7 @@ try {
 
 try {
     resultTitles = loadResultTitles();
+    resultTitlesLoaded = true;
 } catch (e) {
    console.error('CRITICAL: Failed to load reelgood-titles.json on startup.', e.message);
    logToFile(`CRITICAL: Startup load failed (titles): ${e.message}`);
@@ -440,6 +419,7 @@ export async function getReel() {
             // We found an OK result, so we return the list accumulated so far
             return addedThisCall;
         }
+        await new Promise(r => setTimeout(r, 10)); // Yield event loop
     } finally {
         await browser.close();
     }

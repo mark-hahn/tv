@@ -1,3 +1,5 @@
 #!/usr/bin/env bash
 
-npm run dev
+cd apps/client
+exec ./node_modules/.bin/vite
+

@@ -64,7 +64,7 @@
           :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Official
 
         
-        span(v-if="isLoadingRemotesMsg && !isLoadingNext" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;loading remotes&gt;
+        span(v-if="loadingRemotesCount > 0 && !isLoadingNext" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;loading remotes ({{ loadingRemotesCount }})&gt;
         span(v-if="!curTvdb && !isLoadingNext && !suppressButtons" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;no show info&gt;
     
     #reelTitles(
@@ -129,6 +129,7 @@ export default {
     const _startReelPromise = ref(null);
     const isLoadingNext = ref(false);
     const isLoadingRemotesMsg = ref(false);
+    const loadingRemotesCount = ref(0);
     const suppressButtons = ref(false);
     const lastLoadedTvdbId = ref(null);
 
@@ -470,6 +471,7 @@ export default {
 
       getRemotesResults.value = [];
       isLoadingRemotesMsg.value = true;
+      loadingRemotesCount.value++;
       
       await nextTick();
       // Only unsuppress if we passed checks
@@ -493,6 +495,7 @@ export default {
           getRemotesResults.value = [];
         }
       } finally {
+        loadingRemotesCount.value--;
         if (_lastRemotesKey.value === key) {
           isLoadingRemotesMsg.value = false;
         }
@@ -710,6 +713,7 @@ export default {
       handleOfficial,
       isLoadingNext,
       isLoadingRemotesMsg,
+      loadingRemotesCount,
       suppressButtons
     };
   }

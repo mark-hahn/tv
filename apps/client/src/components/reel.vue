@@ -318,6 +318,19 @@ export default {
         // If we get new entries, remove the "no more" sentinel.
         if (added.length > 0) {
           titleStrings.value = titleStrings.value.filter((s) => String(s) !== NO_MORE_ENTRY);
+
+          const addedParsed = added.map((str) => {
+            const parts = str.split('|');
+            return parts[1] ? parts[1].trim() : parts[0].trim();
+          });
+
+          // remove any matching title from earlier in the list
+          titleStrings.value = titleStrings.value.filter((s) => {
+            const parts = s.split('|');
+            const title = parts[1] ? parts[1].trim() : parts[0].trim();
+            return !addedParsed.includes(title);
+          });
+
           titleStrings.value = [...titleStrings.value, ...added];
           await scrollTitlesToBottom();
         } else {

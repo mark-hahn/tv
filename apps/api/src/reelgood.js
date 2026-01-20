@@ -155,8 +155,12 @@ function saveResultTitles() {
 
 function appendResultTitle(entry) {
   if (!entry) return;
-  // Ensure we don't duplicate identical consecutive entries if logic flukes, 
-  // but strictly we just push and trim.
+  
+  const newTitle = parseResultTitle(entry);
+  if (newTitle) {
+      resultTitles = resultTitles.filter(existing => parseResultTitle(existing) !== newTitle);
+  }
+
   resultTitles.push(String(entry));
   while (resultTitles.length > 100) resultTitles.shift();
   saveResultTitles();

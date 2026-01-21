@@ -91,8 +91,14 @@ remote_install_app_deps() {
   echo "[remote] deps: $remote_dir"
   # tv-down depends on better-sqlite3 which needs native build scripts.
   # pnpm on the server may have build scripts gated/disabled; use npm for this app.
-  if [[ "$project" == "down" ]]; then
+  # api also seems to have issues with pnpm in this hybrid workspace, so force npm.
+  # srvr also has issues with pnpm finding modules (ws, etc), so force npm.
+  if [[ "$project" == "down" || "$project" == "api" || "$project" == "srvr" ]]; then
+    
+    # Pre-process package.json to replace workspace:* with file: paths for npm
+    # This assumes 'share' is at ../share relative to the app dir
     ssh "$SSH_HOST" "cd '$remote_dir' \
+      && sed -i 's/\"workspace:\*\"/\"file:..\/share\"/g' package.json \
       && if command -v npm >/dev/null 2>&1; then rm -rf node_modules && npm install; \
          elif command -v pnpm >/dev/null 2>&1; then pnpm install && pnpm rebuild better-sqlite3; \
          else echo 'Neither npm nor pnpm found on remote PATH' >&2; exit 1; fi"

@@ -68,6 +68,41 @@ function appendCallsLog({ endpoint, method, ok, result, error }) {
   }
 }
 
+function appendReviewCallsLog({ endpoint, method, event, ok, args, result, error }) {
+  try {
+    const appBase = path.dirname(getTvDataDir());
+    const outPath = path.join(appBase, 'apps', 'api', 'test', 'review-calls.log');
+    
+    const dir = path.dirname(outPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    let logResult = result;
+    if (Array.isArray(result)) {
+      logResult = {
+        count: result.length,
+        reviews: result.slice(0, 4)
+      };
+    }
+
+    const payload = {
+      ts: formatPstTimestamp(new Date()),
+      endpoint,
+      method,
+      event,
+      ok: event === 'START' ? undefined : Boolean(ok),
+      args,
+      result: logResult,
+      error: error ? { message: error?.message || String(error), stack: error?.stack || null } : null,
+    };
+    const txt = `==========\n${JSON.stringify(payload, null, 2)}\n`;
+    fs.appendFileSync(outPath, txt, 'utf8');
+  } catch (err) {
+    console.error('Review logging failed', err);
+  }
+}
+
 function appendDownloadsRequestLog(reqBody) {
   try {
     const outPath = path.join(getApiMiscDir(), 'temp.txt');
@@ -1064,28 +1099,36 @@ app.get('/api/getreel', async (req, res) => {
 });
 
 app.get('/api/reviews/getReviews', async (req, res) => {
+  const rottenUrl = req.query.url;
+  const buttonName = req.query.btn;
+  const args = { rottenUrl, buttonName };
   try {
-    const rottenUrl = req.query.url;
-    const buttonName = req.query.btn;
+    appendReviewCallsLog({ endpoint: '/api/reviews/getReviews', method: 'GET', event: 'START', args });
     const result = await reviews.getReviews(rottenUrl, buttonName);
     appendCallsLog({ endpoint: '/api/reviews/getReviews', method: 'GET', ok: true, result });
+    appendReviewCallsLog({ endpoint: '/api/reviews/getReviews', method: 'GET', event: 'END', ok: true, args, result });
     res.json(result);
   } catch (error) {
     console.error('getReviews error:', error);
     appendCallsLog({ endpoint: '/api/reviews/getReviews', method: 'GET', ok: false, result: null, error });
+    appendReviewCallsLog({ endpoint: '/api/reviews/getReviews', method: 'GET', event: 'END', ok: false, args, result: null, error });
     res.status(500).json({ error: error.message });
   }
 });
 
 app.get('/api/reviews/getRemainingReview', async (req, res) => {
+  const reviewId = req.query.id;
+  const args = { reviewId };
   try {
-    const reviewId = req.query.id;
+    appendReviewCallsLog({ endpoint: '/api/reviews/getRemainingReview', method: 'GET', event: 'START', args });
     const result = await reviews.getRemainingReview(reviewId);
     appendCallsLog({ endpoint: '/api/reviews/getRemainingReview', method: 'GET', ok: true, result });
+    appendReviewCallsLog({ endpoint: '/api/reviews/getRemainingReview', method: 'GET', event: 'END', ok: true, args, result });
     res.json(result);
   } catch (error) {
     console.error('getRemainingReview error:', error);
     appendCallsLog({ endpoint: '/api/reviews/getRemainingReview', method: 'GET', ok: false, result: null, error });
+    appendReviewCallsLog({ endpoint: '/api/reviews/getRemainingReview', method: 'GET', event: 'END', ok: false, args, result: null, error });
     res.status(500).json({ error: error.message });
   }
 });

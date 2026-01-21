@@ -10,6 +10,7 @@ import * as download from './download.js';
 import { tvdbProxyGet } from './tvdb-proxy.js';
 import { getQbtInfo, delQbtTorrent, spaceAvail, flexgetHistory, addQbtTorrent } from './usb.js';
 import { startReel, getReel } from './reelgood.js';
+import * as reviews from './reviews.js';
 import { checkFiles as tvProcCheckFiles } from './tv-proc.js';
 import {
   getApiCookiesDir,
@@ -1058,6 +1059,33 @@ app.get('/api/getreel', async (req, res) => {
   } catch (error) {
     console.error('getReel error:', error);
     appendCallsLog({ endpoint: '/api/getreel', method: 'GET', ok: false, result: null, error });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/reviews/getReviews', async (req, res) => {
+  try {
+    const rottenUrl = req.query.url;
+    const buttonName = req.query.btn;
+    const result = await reviews.getReviews(rottenUrl, buttonName);
+    appendCallsLog({ endpoint: '/api/reviews/getReviews', method: 'GET', ok: true, result });
+    res.json(result);
+  } catch (error) {
+    console.error('getReviews error:', error);
+    appendCallsLog({ endpoint: '/api/reviews/getReviews', method: 'GET', ok: false, result: null, error });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/reviews/getRemainingReview', async (req, res) => {
+  try {
+    const reviewId = req.query.id;
+    const result = await reviews.getRemainingReview(reviewId);
+    appendCallsLog({ endpoint: '/api/reviews/getRemainingReview', method: 'GET', ok: true, result });
+    res.json(result);
+  } catch (error) {
+    console.error('getRemainingReview error:', error);
+    appendCallsLog({ endpoint: '/api/reviews/getRemainingReview', method: 'GET', ok: false, result: null, error });
     res.status(500).json({ error: error.message });
   }
 });

@@ -237,5 +237,6 @@ export default {
       }
       return stars;
     },
+  },
 };
 </script>

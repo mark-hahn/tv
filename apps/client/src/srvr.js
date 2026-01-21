@@ -260,7 +260,7 @@ export async function getReviews(url, buttonName) {
   // Construct the query parameters
   const params = new URLSearchParams({
     url: url || '',
-    buttonName: buttonName || ''
+    btn: buttonName || ''
   });
   
   const response = await fetch('/api/reviews/getReviews?' + params.toString());
@@ -272,7 +272,7 @@ export async function getReviews(url, buttonName) {
 
 export async function getRemainingReview(reviewId) {
   const params = new URLSearchParams({
-    reviewId: String(reviewId)
+    id: String(reviewId)
   });
   
   const response = await fetch('/api/reviews/getRemainingReview?' + params.toString());

@@ -1,7 +1,7 @@
 #!/bin/bash
 echo ""
 echo ">>>> Build in PowerShell (not WSL) to avoid rollup issues"
-powershell.exe -Command "cd C:\Users\mark\apps\tv-series-client; npm run build-vite"
+powershell.exe -Command "cd C:\Users\mark\apps\tv-series-client; pnpm run build-vite"
 
 echo ""
 echo ">>>> Deploy client"

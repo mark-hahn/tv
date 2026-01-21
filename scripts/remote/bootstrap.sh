@@ -90,7 +90,7 @@ fi
 # Ensure pm2
 if ! command -v pm2 >/dev/null 2>&1; then
   echo "[tv] installing pm2"
-  npm install -g pm2
+  pnpm add -g pm2
 fi
 
 if [[ "$START_PM2" == "1" ]]; then

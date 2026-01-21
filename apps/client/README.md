@@ -6,8 +6,8 @@ This client expects a separate "torrents API" service (see the `torrents/` folde
 
 ## Run
 
-- Client (Vite): `npm run dev`
-- Build static output to `shows/`: `npm run build-vite`
+- Client (Vite): `pnpm dev`
+- Build static output to `shows/`: `pnpm build-vite`
 
 ## Torrents API
 

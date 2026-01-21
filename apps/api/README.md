@@ -17,7 +17,7 @@ This repo is intended to run locally behind nginx (nginx sets the CORS headers).
 ## Install
 
 ```bash
-npm install
+pnpm install
 ```
 
 ## Run

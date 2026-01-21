@@ -21,9 +21,9 @@ const rx_title = new RegExp('"title": ?"(.*?)"', 's');
 const rx_slug = new RegExp('"slug": ?"(.*?)"', 'sg');
 const rx_genre = new RegExp('href="/tv/genre/([^"]*)"', 'sg');
 
-// Paths (using consistent /root/dev/apps/tv/api/... paths)
+// Paths (using consistent /root/dev/apps/tv/apps/api/... paths)
 const appBase = path.dirname(getTvDataDir()); 
-const apiDir = path.join(appBase, 'api');
+const apiDir = path.join(appBase, 'apps', 'api');
 const reelShowsPath = path.join(apiDir, 'reel-shows.json');
 const reelTitlesPath = path.join(apiDir, 'reelgood-titles.json');
 const logPath = path.join(apiDir, 'reelgood.log');

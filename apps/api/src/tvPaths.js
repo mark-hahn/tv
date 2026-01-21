@@ -24,10 +24,10 @@ export function getSecretsDir() {
 }
 
 export function getApiBaseDir() {
-  // Should return /root/dev/apps/tv/api
+  // Should return /root/dev/apps/tv/apps/api
   const dataDir = getTvDataDir(); // /root/dev/apps/tv/data
   const appRoot = path.dirname(dataDir); // /root/dev/apps/tv
-  const dirPath = path.join(appRoot, 'api');
+  const dirPath = path.join(appRoot, 'apps', 'api');
   ensureDir(dirPath);
   return dirPath;
 }

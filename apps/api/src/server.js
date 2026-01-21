@@ -41,10 +41,10 @@ function formatPstTimestamp(date = new Date()) {
 
 function appendCallsLog({ endpoint, method, ok, result, error }) {
   try {
-    // switch call.logs path from /root/dev/apps/tv/data/api/misc/calls.log to /root/dev/apps/tv/api/calls.log
+    // switch call.logs path from /root/dev/apps/tv/data/api/misc/calls.log to /root/dev/apps/tv/apps/api/calls.log
     // getTvDataDir() returns /root/dev/apps/tv/data
     const appBase = path.dirname(getTvDataDir()); 
-    const outPath = path.join(appBase, 'api', 'calls.log');
+    const outPath = path.join(appBase, 'apps', 'api', 'calls.log');
     
     const asArray = Array.isArray(result)
       ? result.map(String)

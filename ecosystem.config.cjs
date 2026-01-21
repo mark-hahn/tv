@@ -32,7 +32,9 @@ function resolveNodeInterpreter() {
 const nodeInterpreter = resolveNodeInterpreter();
 
 function appCwd(name) {
-  return path.join(root, 'apps', name);
+  const p = path.join(root, 'apps', name);
+  console.log(`[Config] Cwd for ${name}: ${p}`);
+  return p;
 }
 
 module.exports = {

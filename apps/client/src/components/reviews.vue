@@ -34,8 +34,7 @@
             span(v-if="review.publication" style="color:#666; font-weight:normal;") &nbsp;({{ review.publication }})
           
           div(style="font-size:14px; white-space:nowrap;")
-             template(v-if="review.ratings") {{ review.ratings }}
-             template(v-else)
+             template(v-if="review.numStars !== -1")
                i(v-for="(starClass, idx) in getStarClasses(review.numStars)" :key="idx" :class="starClass" style="color:#FFA500; margin-left:2px; font-size:12px;")
 
         div(style="border-bottom:1px solid #ddd; width:100%; margin-bottom:5px;")
@@ -44,6 +43,11 @@
         div(@click="handleReviewClick(review)" :style="{fontSize:'13px', lineHeight:'1.4', cursor: review.more ? 'pointer' : 'default'}")
           span {{ review.text }}
           span(v-if="review.more" style="color:#0066cc;") ...
+
+        //- Full Review Link
+        div(v-if="review.url" style="margin-top:8px;")
+          a(:href="review.url" target="_blank")
+            button(style="cursor:pointer; padding:4px 8px; border-radius:4px; border:1px solid #bbb; background-color:whitesmoke; font-size:12px;") Full Review
 
     //- Right Column: Descending Sort
     div(style="flex:1; display:flex; flexDirection:column; gap:10px; overflow-y:auto; overflow-x:hidden; height:100%;")
@@ -55,8 +59,7 @@
             span(v-if="review.publication" style="color:#666; font-weight:normal;") &nbsp;({{ review.publication }})
           
           div(style="font-size:14px; white-space:nowrap;")
-             template(v-if="review.ratings") {{ review.ratings }}
-             template(v-else)
+             template(v-if="review.numStars !== -1")
                i(v-for="(starClass, idx) in getStarClasses(review.numStars)" :key="idx" :class="starClass" style="color:#FFA500; margin-left:2px; font-size:12px;")
 
         div(style="border-bottom:1px solid #ddd; width:100%; margin-bottom:5px;")
@@ -65,6 +68,11 @@
         div(@click="handleReviewClick(review)" :style="{fontSize:'13px', lineHeight:'1.4', cursor: review.more ? 'pointer' : 'default'}")
           span {{ review.text }}
           span(v-if="review.more" style="color:#0066cc;") ...
+
+        //- Full Review Link
+        div(v-if="review.url" style="margin-top:8px;")
+          a(:href="review.url" target="_blank")
+            button(style="cursor:pointer; padding:4px 8px; border-radius:4px; border:1px solid #bbb; background-color:whitesmoke; font-size:12px;") Full Review
 
 </template>
 
@@ -104,10 +112,24 @@ export default {
 
   computed: {
     sortedAscReviews() {
-      return [...this.reviews].sort((a, b) => a.sortIdx - b.sortIdx);
+      // Sort by numStars Ascending.
+      // -1 should be at the bottom.
+      const rated = this.reviews.filter(r => r.numStars !== -1);
+      const unrated = this.reviews.filter(r => r.numStars === -1);
+      
+      rated.sort((a, b) => a.numStars - b.numStars);
+      
+      return [...rated, ...unrated];
     },
     sortedDescReviews() {
-      return [...this.reviews].sort((a, b) => b.sortIdx - a.sortIdx);
+      // Sort by numStars Descending.
+      // -1 should be at the bottom.
+      const rated = this.reviews.filter(r => r.numStars !== -1);
+      const unrated = this.reviews.filter(r => r.numStars === -1);
+      
+      rated.sort((a, b) => b.numStars - a.numStars);
+      
+      return [...rated, ...unrated];
     },
     cardStyle() {
       return {
@@ -170,99 +192,41 @@ export default {
     },
 
     async loadReviews(url, buttonName) {
-      // Dummy implementation for now
-      // const reviews = await srvr.getReviews(url, buttonName);
-      
-      // Generating dummy data
-      this.reviews = [
-        {
-          reviewId: 1,
-          sortIdx: 1,
-          author: "John Doe",
-          publication: "The Daily News",
-          numStars: 4,
-          ratings: "",
-          text: "This is a great show! The acting is superb and the storyline is engaging.",
-          more: false
-        },
-        {
-          reviewId: 2,
-          sortIdx: 2,
-          author: "Jane Smith",
-          publication: "Weekly TV Guide",
-          numStars: 3,
-          ratings: "",
-          text: "A bit slow at times, but overall worth watching. I particularly liked the second episode.",
-          more: true
-        },
-        {
-          reviewId: 3,
-          sortIdx: 3,
-          author: "Bob Brown",
-          publication: "Online Reviews",
-          numStars: 2,
-          ratings: "C+",
-          text: "Not my cup of tea. Too much drama and not enough action.",
-          more: false
-        },
-        {
-          reviewId: 4,
-          sortIdx: 4,
-          author: "Alice Green",
-          publication: "",
-          numStars: 5,
-          ratings: "",
-          text: "An absolute masterpiece! Must watch for everyone.",
-          more: false
-        },
-        {
-          reviewId: 5,
-          sortIdx: 5,
-          author: "Charlie White",
-          publication: "Entertainment Weekly",
-          numStars: 3,
-          ratings: "3/5",
-          text: "Solid performance by the cast. The plot twists were predictable though.",
-          more: true
-        },
-         {
-          reviewId: 6,
-          sortIdx: 6,
-          author: "David Black",
-          publication: "Movie Blog",
-          numStars: 1,
-          ratings: "",
-          text: "Terrible. Do not waste your time.",
-          more: false
+      this.reviews = [];
+      try {
+        const reviews = await srvr.getReviews(url, buttonName);
+        if (reviews && Array.isArray(reviews)) {
+          this.reviews = reviews;
         }
-      ];
+      } catch (err) {
+        console.error("Failed to load reviews:", err);
+      }
     },
     
     async handleReviewClick(review) {
       if (review.more) {
-        // const remainingText = await srvr.getRemainingReview(review.reviewId);
-        
-        // Dummy implementation simulating valid return
-        const remainingText = " It really picks up in the second half. The characters develop significantly and the plot twists are unexpected but satisfying. Highly recommended for fans of the genre.";
-        
-        review.text += remainingText;
-        review.more = false;
+        try {
+          const remainingText = await srvr.getRemainingReview(review.reviewId);
+          if (remainingText) {
+             // Replace text logic per requirements (prompt says "replace the text in the card with the returned text")
+             // Wait, the prompt says "remove the elipsies ... from the matching card's text and append the getRemainingReview returned string to that text" in the *first* prompt turn
+             // BUT in the *latest* prompt turn (corrections) it says: "replace the text in the card with the returned text"
+             // I will follow the latest instruction: Replace fully.
+             review.text = remainingText;
+             review.more = false;
+          }
+        } catch(err) {
+          console.error("Failed to fetch full review:", err);
+        }
       }
     },
 
     getStarClasses(numStars) {
-      // numStars is 0 to 4 (representing 0 to 4 full stars visually in a 4-star row? 
-      // Prompt says "row of 4 stars", "standard ratings display of 0 to 4 representing same numStars property"
-      // Wait, 0 to 4 numStars.
-      // 3 font awesome icons available: full, half, empty.
-      
-      // Assuming numStars is integer or half-integer.
-      // Example: 3.5 stars. 3 Full, 1 Half, 0 Empty (if max is 4).
-      
+      // 0 to 5 stars
       const stars = [];
       const val = Number(numStars) || 0;
       
-      for (let i = 1; i <= 4; i++) {
+      for (let i = 1; i <= 5; i++) {
         if (val >= i) {
           stars.push('fa-solid fa-star');
         } else if (val >= i - 0.5) {
@@ -272,7 +236,6 @@ export default {
         }
       }
       return stars;
-    }
-  }
+    },
 };
 </script>

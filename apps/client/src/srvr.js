@@ -253,3 +253,32 @@ export async function getFile(path) {
     throw err;
   }
 }
+
+// Reviews
+export async function getReviews(url, buttonName) {
+  // Use http fetch to call the backend api, not fCall (websocket)
+  // Construct the query parameters
+  const params = new URLSearchParams({
+    url: url || '',
+    buttonName: buttonName || ''
+  });
+  
+  const response = await fetch('/api/reviews/list?' + params.toString());
+  if (!response.ok) {
+    throw new Error(`getReviews failed: ${response.status} ${response.statusText}`);
+  }
+  return await response.json();
+}
+
+export async function getRemainingReview(reviewId) {
+  const params = new URLSearchParams({
+    reviewId: String(reviewId)
+  });
+  
+  const response = await fetch('/api/reviews/remaining?' + params.toString());
+  if (!response.ok) {
+    throw new Error(`getRemainingReview failed: ${response.status} ${response.statusText}`);
+  }
+  const data = await response.json();
+  return data.text || '';
+}

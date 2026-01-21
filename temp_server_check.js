@@ -1069,3 +1069,30 @@ https.createServer(httpsOptions, app).listen(QBT_TEST_PORT, () => {
   process.stderr.write(`=\n`);
 });
 
+app.get('/api/reviews/list', async (req, res) => {
+  try {
+    const url = req.query.url;
+    const buttonName = req.query.buttonName;
+    console.log('[api] getReviews', { url, buttonName });
+    
+    // TODO: Implement actual scraping/fetching logic
+    // For now, return standard empty list or error to indicate it is hit
+    res.json([]); 
+  } catch (error) {
+    console.error('getReviews error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/reviews/remaining', async (req, res) => {
+  try {
+    const reviewId = req.query.reviewId;
+    console.log('[api] getRemainingReview', { reviewId });
+    
+    // TODO: Implement actual logic
+    res.json({ text: '' });
+  } catch (error) {
+    console.error('getRemainingReview error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});

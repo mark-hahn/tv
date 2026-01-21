@@ -82,7 +82,12 @@ function appendReviewCallsLog({ endpoint, method, event, ok, args, result, error
     if (Array.isArray(result)) {
       logResult = {
         count: result.length,
-        reviews: result.slice(0, 4)
+        reviews: result.slice(0, 2)
+      };
+    } else if (result && Array.isArray(result.reviews)) {
+      logResult = {
+        ...result,
+        reviews: result.reviews.slice(0, 2)
       };
     }
 

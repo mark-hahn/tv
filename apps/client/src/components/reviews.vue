@@ -10,7 +10,10 @@
       
       div(v-if="rottenUrl" style="margin-right:10px; flex:'0 0 auto';")
         a(:href="rottenUrl" target="_blank" style="text-decoration:none;")
-          button(style="cursor:pointer; padding:6px 12px; border-radius:7px; background-color:#FA320A; color:white; font-weight:bold; border:1px solid black; font-size:14px;") {{ rottenLabel || 'Rotten' }}
+          button(style="cursor:pointer; padding:6px 12px; border-radius:7px; background-color:#FA320A; color:white; font-weight:normal; border:1px solid black; font-size:14px;") {{ rottenLabel || 'Rotten' }}
+
+      div(v-else-if="checkedRemotes" style="margin-right:10px; flex:'0 0 auto'; font-size:14px; color:#666;")
+        | Show not found at Rotten Tomatoes.
 
     //- Second Row: Filter Radio Buttons
     div(style="width:100%; display:flex; align-items:center; gap:8px; margin-left:10px; flex-wrap:wrap;")
@@ -21,58 +24,63 @@
         :style="getButtonStyle(selectedButton === btn.label)"
       ) {{ btn.label }}
 
+      div(v-if="isLoading" style="font-size:14px; color:#aaa !important; margin-left:8px; font-weight: bold;") &lt;Loading&gt;
+
+      div(v-if="stats && !simpleMode" style="font-size:14px; color:#555; margin-left:auto; margin-right:10px; white-space:nowrap;") {{ reviews.length }}/{{ stats.numChecked }} Eng: {{ stats.notEnglishCount }}, Review: {{ stats.noReviewCount }}, Text: {{ stats.smallTextCount }}
+
   //- Body: Two Scrolling Panes
   #body(style="flex:1 1 auto; min-height:0; display:flex; gap:10px; margin-top:10px;")
     
-    //- Left Column: Ascending Sort
-    div(style="flex:1; display:flex; flexDirection:column; gap:10px; overflow-y:auto; overflow-x:hidden; height:100%;")
-      div(v-for="review in sortedAscReviews" :key="review.reviewId" :style="cardStyle")
-        //- Card Header
-        div(style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:5px;")
-          div(style="font-weight:bold; font-size:14px;")
-            span {{ review.author }}
-            span(v-if="review.publication" style="color:#666; font-weight:normal;") &nbsp;({{ review.publication }})
+    div(v-if="!isLoading && stats && reviews.length === 0" style="width:100%; text-align:center; color:#666; margin-top:50px; font-size:16px;") No reviews found.
+
+    template(v-else)
+      //- Left Column: Descending Sort (High Scores)
+      div(style="flex:1; display:flex; flexDirection:column; gap:10px; overflow-y:auto; overflow-x:hidden; height:100%;")
+        div(v-for="(review, idx) in leftColumnReviews" :key="idx" :style="cardStyle")
+          //- Card Header
+          div(style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:5px;")
+            div(style="font-weight:bold; font-size:14px;")
+              span {{ review.author }}
+              span(v-if="review.publication" style="color:#666; font-weight:normal;") &nbsp;({{ review.publication }})
+            
+            div(style="font-size:14px; white-space:nowrap;")
+              template(v-if="review.numStars !== -1")
+                i(v-for="(starClass, idx) in getStarClasses(review.numStars)" :key="idx" :class="starClass" style="color:#FFA500; margin-left:2px; font-size:12px;")
+
+          div(style="border-bottom:1px solid #ddd; width:100%; margin-bottom:5px;")
           
-          div(style="font-size:14px; white-space:nowrap;")
-             template(v-if="review.numStars !== -1")
-               i(v-for="(starClass, idx) in getStarClasses(review.numStars)" :key="idx" :class="starClass" style="color:#FFA500; margin-left:2px; font-size:12px;")
+          //- Card Text
+          div(:style="{fontSize:'15px', lineHeight:'1.4', cursor: 'default'}")
+            span {{ review.text }}
 
-        div(style="border-bottom:1px solid #ddd; width:100%; margin-bottom:5px;")
-        
-        //- Card Text
-        div(:style="{fontSize:'13px', lineHeight:'1.4', cursor: 'default'}")
-          span {{ review.text }}
-          span(v-if="review.more" style="color:#0066cc;") ...
+          //- Full Review Link
+          div(v-if="review.url" style="margin-top:8px;")
+            a(:href="review.url" target="_blank")
+              button(style="cursor:pointer; padding:4px 8px; border-radius:4px; border:1px solid #bbb; background-color:whitesmoke; font-size:12px;") Full Review
 
-        //- Full Review Link
-        div(v-if="review.url" style="margin-top:8px;")
-          a(:href="review.url" target="_blank")
-            button(style="cursor:pointer; padding:4px 8px; border-radius:4px; border:1px solid #bbb; background-color:whitesmoke; font-size:12px;") Full Review
+      //- Right Column: Ascending Sort (Low Scores)
+      div(style="flex:1; display:flex; flexDirection:column; gap:10px; overflow-y:auto; overflow-x:hidden; height:100%;")
+        div(v-for="(review, idx) in rightColumnReviews" :key="idx" :style="cardStyle")
+          //- Card Header
+          div(style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:5px;")
+            div(style="font-weight:bold; font-size:14px;")
+              span {{ review.author }}
+              span(v-if="review.publication" style="color:#666; font-weight:normal;") &nbsp;({{ review.publication }})
+            
+            div(style="font-size:14px; white-space:nowrap;")
+              template(v-if="review.numStars !== -1")
+                i(v-for="(starClass, idx) in getStarClasses(review.numStars)" :key="idx" :class="starClass" style="color:#FFA500; margin-left:2px; font-size:12px;")
 
-    //- Right Column: Descending Sort
-    div(style="flex:1; display:flex; flexDirection:column; gap:10px; overflow-y:auto; overflow-x:hidden; height:100%;")
-      div(v-for="review in sortedDescReviews" :key="review.reviewId" :style="cardStyle")
-        //- Card Header
-        div(style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:5px;")
-          div(style="font-weight:bold; font-size:14px;")
-            span {{ review.author }}
-            span(v-if="review.publication" style="color:#666; font-weight:normal;") &nbsp;({{ review.publication }})
+          div(style="border-bottom:1px solid #ddd; width:100%; margin-bottom:5px;")
           
-          div(style="font-size:14px; white-space:nowrap;")
-             template(v-if="review.numStars !== -1")
-               i(v-for="(starClass, idx) in getStarClasses(review.numStars)" :key="idx" :class="starClass" style="color:#FFA500; margin-left:2px; font-size:12px;")
+          //- Card Text
+          div(:style="{fontSize:'15px', lineHeight:'1.4', cursor: 'default'}")
+            span {{ review.text }}
 
-        div(style="border-bottom:1px solid #ddd; width:100%; margin-bottom:5px;")
-        
-        //- Card Text
-        div(:style="{fontSize:'13px', lineHeight:'1.4', cursor: 'default'}")
-          span {{ review.text }}
-          span(v-if="review.more" style="color:#0066cc;") ...
-
-        //- Full Review Link
-        div(v-if="review.url" style="margin-top:8px;")
-          a(:href="review.url" target="_blank")
-            button(style="cursor:pointer; padding:4px 8px; border-radius:4px; border:1px solid #bbb; background-color:whitesmoke; font-size:12px;") Full Review
+          //- Full Review Link
+          div(v-if="review.url" style="margin-top:8px;")
+            a(:href="review.url" target="_blank")
+              button(style="cursor:pointer; padding:4px 8px; border-radius:4px; border:1px solid #bbb; background-color:whitesmoke; font-size:12px;") Full Review
 
 </template>
 
@@ -97,39 +105,50 @@ export default {
   data() {
     return {
       reviews: [],
+      stats: null,
       showName: '',
       rottenUrl: '',
       rottenLabel: '',
-      selectedButton: 'All Critics',
+      selectedButton: 'Critics',
+      isLoading: false,
+      checkedRemotes: false,
       filterButtons: [
-        { label: 'All Critics' },
-        { label: 'Top critics' },
-        { label: 'All Audience' },
-        { label: 'Verified Audience' }
+        { label: 'Critics' },
+        { label: 'Audience' }
       ]
     };
   },
 
   computed: {
-    sortedAscReviews() {
-      // Sort by numStars Ascending.
-      // -1 should be at the bottom.
-      const rated = this.reviews.filter(r => r.numStars !== -1);
-      const unrated = this.reviews.filter(r => r.numStars === -1);
+    leftColumnReviews() {
+      // Split list in 2 equal halves.
+      // Put higher scores in left column and sort descending.
+      if (!this.reviews.length) return [];
       
-      rated.sort((a, b) => a.numStars - b.numStars);
+      const all = [...this.reviews];
+      // Sort all by score descending first to identify "higher scores"
+      all.sort((a, b) => b.numStars - a.numStars);
       
-      return [...rated, ...unrated];
+      const mid = Math.ceil(all.length / 2);
+      const left = all.slice(0, mid);
+      
+      // Sort Descending
+      left.sort((a, b) => b.numStars - a.numStars);
+      return left;
     },
-    sortedDescReviews() {
-      // Sort by numStars Descending.
-      // -1 should be at the bottom.
-      const rated = this.reviews.filter(r => r.numStars !== -1);
-      const unrated = this.reviews.filter(r => r.numStars === -1);
+    rightColumnReviews() {
+      // Put lower scores in right column and sort ascending.
+      if (!this.reviews.length) return [];
       
-      rated.sort((a, b) => b.numStars - a.numStars);
+      const all = [...this.reviews];
+      all.sort((a, b) => b.numStars - a.numStars);
       
-      return [...rated, ...unrated];
+      const mid = Math.ceil(all.length / 2);
+      const right = all.slice(mid);
+      
+      // Sort Ascending
+      right.sort((a, b) => a.numStars - b.numStars);
+      return right;
     },
     cardStyle() {
       return {
@@ -147,13 +166,16 @@ export default {
     evtBus.on('setUpSeries', (show) => {
       this.showName = show?.Name || '';
       this.reviews = [];
+      this.stats = null;
       this.rottenUrl = '';
       this.rottenLabel = '';
-      this.selectedButton = 'All Critics';
+      this.selectedButton = 'Critics';
+      this.checkedRemotes = false;
     });
 
     // Listen for TVDB details to get existing Remotes (including Rotten button URL)
     evtBus.on('tvdbDataReady', (data) => {
+      this.checkedRemotes = true;
       const tvdbData = data?.tvdbData;
       if (tvdbData && tvdbData.remotes) {
         const rottenRemote = tvdbData.remotes.find(r => r.name && r.name.toLowerCase().includes('rotten'));
@@ -193,13 +215,28 @@ export default {
 
     async loadReviews(url, buttonName) {
       this.reviews = [];
+      this.stats = null;
+      this.isLoading = true;
       try {
-        const reviews = await srvr.getReviews(url, buttonName);
-        if (reviews && Array.isArray(reviews)) {
-          this.reviews = reviews;
+        const data = await srvr.getReviews(url, buttonName);
+        if (data) {
+          if (data.reviews && Array.isArray(data.reviews)) {
+            this.reviews = data.reviews;
+          } else {
+            this.reviews = [];
+          }
+
+          this.stats = {
+            numChecked: data.numChecked,
+            notEnglishCount: data.notEnglishCount,
+            noReviewCount: data.noReviewCount,
+            smallTextCount: data.smallTextCount
+          };
         }
       } catch (err) {
         console.error("Failed to load reviews:", err);
+      } finally {
+        this.isLoading = false;
       }
     },
     

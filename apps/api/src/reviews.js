@@ -1,4 +1,3 @@
-
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,26 +10,10 @@ const __dirname = path.dirname(__filename);
 // Singleton state
 let browser = null;
 let page = null;
-let textById = new Map();
-
-function hashText(text) {
-  let hash = 0;
-  if (!text || text.length === 0) return hash;
-  for (let i = 0; i < text.length; i++) {
-    const char = text.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return hash;
-}
 
 export async function getReviews(rottenUrl, buttonName) {
-  textById.clear();
-
   let sfxButtonName = 'all-critics';
-  if (buttonName === 'Top critics') sfxButtonName = 'top-critics';
-  else if (buttonName === 'All Audience') sfxButtonName = 'all-audience';
-  else if (buttonName === 'Verified Audience') sfxButtonName = 'verified-audience';
+  if (buttonName === 'Audience') sfxButtonName = 'all-audience';
 
   const cleanUrl = rottenUrl.replace(/\/$/, '');
   const reviewsUrl = `${cleanUrl}/s01/reviews/${sfxButtonName}`;
@@ -56,22 +39,189 @@ export async function getReviews(rottenUrl, buttonName) {
     // Wait for at least one card to appear
     await page.waitForSelector('review-card, .reviews-cards .card-wrap', { timeout: 10000 }).catch(() => {});
   } catch (err) {
+    try { if (browser) await browser.close(); } catch {}
+    browser = null;
+    page = null;
     throw new Error(`Failed to load ${reviewsUrl}: ${err.message}`);
   }
 
-  // Handle Load More
-  try {
-    // Limit iterations to prevent infinite loops (e.g. 50 clicks max)
-    const MAX_CLICKS = 5;
-    for (let i = 0; i < MAX_CLICKS; i++) {
-        // Find button by text "Load More". 
-        // RT buttons are often <button>Load More</button>
-        const loadMoreBtn = page.getByRole('button', { name: 'Load More', exact: true });
+  let finalStats = {
+      numChecked: 0,
+      notEnglishCount: 0,
+      noReviewCount: 0,
+      smallTextCount: 0,
+      reviews: []
+  };
 
+  const MAX_CLICKS = 100; // Cap loop to prevent infinite loops, logical stop is reviews >= 50
+  
+  try {
+    for (let i = 0; i < MAX_CLICKS; i++) {
+        // 1. Extract Reviews
+        const rawReviews = await page.evaluate(() => {
+            const oldCards = Array.from(document.querySelectorAll('.reviews-cards .card-wrap'));
+            const newCards = Array.from(document.querySelectorAll('review-card'));
+            const cards = [...oldCards, ...newCards];
+            const results = [];
+
+            cards.forEach(card => {
+            let author = '';
+            let publication = '';
+            let text = '';
+            let numStars = -1;
+            let urlStr = undefined;
+
+            if (card.tagName.toLowerCase() === 'review-card') {
+                // --- NEW STRUCTURE ---
+                
+                // Author
+                const nameEl = card.querySelector('[slot="name"]');
+                author = nameEl ? nameEl.innerText.trim() : '';
+
+                // Publication
+                const pubEl = card.querySelector('[slot="publication"]');
+                publication = pubEl ? pubEl.innerText.trim() : '';
+
+                // Text
+                const textEl = card.querySelector('[slot="content"]');
+                text = textEl ? textEl.innerText.trim() : '';
+
+                // NumStars
+                const ratingSlot = card.querySelector('[slot="rating"]');
+                if (ratingSlot) {
+                    // Check for 'score' attribute (common in audience reviews)
+                    if (ratingSlot.hasAttribute('score')) {
+                        const val = parseFloat(ratingSlot.getAttribute('score'));
+                        if (!isNaN(val)) numStars = val;
+                    } 
+                    
+                    // Fallback: Try to find text that looks like a score (common in critic reviews)
+                    if (numStars === -1) {
+                        const fullRatingText = ratingSlot.innerText.trim();
+                        if (fullRatingText) {
+                                const parts = fullRatingText.split('/'); 
+                                if (parts.length === 2) {
+                                    const n = parseFloat(parts[0]);
+                                    const d = parseFloat(parts[1]);
+                                    if (!isNaN(n) && !isNaN(d) && d !== 0) {
+                                        numStars = Math.round((n / d) * 10) / 2;
+                                    }
+                                }
+                        }
+                    }
+                }
+
+                // URL
+                const linkEl = card.querySelector('[slot="reviewLink"]');
+                if (linkEl) urlStr = linkEl.href;
+                
+            } else {
+                // --- OLD STRUCTURE ---
+                // Author
+                const authorEl = card.querySelector('.name-wrap');
+                author = authorEl ? authorEl.innerText.trim() : '';
+
+                // Publication
+                const pubEl = card.querySelector('.publication-wrap');
+                publication = pubEl ? pubEl.innerText.trim() : '';
+
+                // Text
+                const spanSlot = card.querySelector('span[slot]');
+                text = spanSlot ? spanSlot.innerText.trim() : '';
+
+                // NumStars
+                const starGroup = card.querySelector('rating-stars-group');
+                if (starGroup && starGroup.hasAttribute('score')) {
+                    const val = parseFloat(starGroup.getAttribute('score'));
+                    if (!isNaN(val)) numStars = val;
+                } 
+                
+                if (numStars === -1) {
+                    const spans = Array.from(card.querySelectorAll('span'));
+                    const ratingSpan = spans.find(s => s.style.marginTop === '1.4px');
+                    if (ratingSpan) {
+                    const content = ratingSpan.innerText.trim();
+                    const parts = content.split('/'); 
+                    if (parts.length === 2) {
+                        const n = parseFloat(parts[0]);
+                        const d = parseFloat(parts[1]);
+                        if (!isNaN(n) && !isNaN(d) && d !== 0) {
+                        numStars = Math.round((n / d) * 10) / 2;
+                        }
+                    }
+                    }
+                }
+
+                // URL
+                const anchors = Array.from(card.querySelectorAll('a'));
+                const fullLink = anchors.find(a => a.innerText.includes('Go to Full Review'));
+                if (fullLink) urlStr = fullLink.href;
+            }
+
+            results.push({
+                author,
+                publication,
+                text,
+                numStars,
+                url: urlStr
+            });
+            });
+            return results;
+        });
+
+        // 2. Filter and Stats
+        let currentStats = {
+            numChecked: 0,
+            notEnglishCount: 0,
+            noReviewCount: 0,
+            smallTextCount: 0,
+            reviews: []
+        };
+
+        for (const r of rawReviews) {
+            currentStats.numChecked++;
+
+            let notEnglish = false;
+            let noReview = false;
+            let smallText = false;
+
+            // Check conditions
+            if (franc(r.text || '') !== 'eng') notEnglish = true;
+            if (r.numStars === -1) noReview = true;
+            if ((r.text || '').length < 100) smallText = true;
+
+            // Increment counts
+            if (notEnglish) currentStats.notEnglishCount++;
+            if (noReview) currentStats.noReviewCount++;
+            if (smallText) currentStats.smallTextCount++;
+
+            // Filter
+            if (!notEnglish && !noReview && !smallText) {
+                currentStats.reviews.push({
+                    author: r.author,
+                    publication: r.publication,
+                    text: r.text,
+                    numStars: r.numStars,
+                    url: r.url
+                });
+            }
+        }
+
+        finalStats = currentStats;
+
+        // Stop condition
+        if (finalStats.reviews.length >= 50) {
+            break;
+        }
+
+        // 3. Load More
+        const loadMoreBtn = page.getByRole('button', { name: 'Load More', exact: true });
+        
         // Force click if obscured by overlays (cookies/GDPR)
         if (await loadMoreBtn.isVisible()) {
-            if (i === 0) console.log(`[reviews] Starting to load more reviews for ${buttonName}...`);
-            process.stdout.write('.'); // progress indicator for user
+            if (i === 0) console.log(`[reviews] Loading more reviews for ${buttonName}...`);
+
+            const previousCount = await page.evaluate(() => document.querySelectorAll('review-card, .reviews-cards .card-wrap').length);
 
             try {
                 // Try force click first
@@ -80,21 +230,36 @@ export async function getReviews(rottenUrl, buttonName) {
                 // If standard click fails, use JS dispatch
                 await loadMoreBtn.dispatchEvent('click');
             }
-            await page.waitForTimeout(1500);
+            
+            // Wait for items to actually be added
+            try {
+                await page.waitForFunction(
+                    prev => document.querySelectorAll('review-card, .reviews-cards .card-wrap').length > prev, 
+                    previousCount, 
+                    { timeout: 5000 }
+                );
+            } catch (e) {
+                // Fallback specific wait if count didn't change (rare but possible if only few new loaded or latency)
+                await page.waitForTimeout(1500); 
+            }
         } else {
+            // No more button
             break;
         }
     }
-    if (MAX_CLICKS > 0) process.stdout.write('\n'); // newline after dots
   } catch (e) {
-    console.error('[reviews] Load More error:', e);
+    console.error('[reviews] Processing error:', e);
+    // Attempt to close/reset potentially bad browser state
+    try { if (browser) await browser.close(); } catch {}
+    browser = null;
+    page = null;
+    throw e;
   }
 
   // Save HTML
   try {
     const html = await page.content();
     // Path: /root/apps/tv/apps/api/test/reviews.html
-    // __dirname is .../apps/api/src
     const outPath = path.resolve(__dirname, '..', 'test', 'reviews.html');
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(outPath, html, 'utf8');
@@ -102,151 +267,10 @@ export async function getReviews(rottenUrl, buttonName) {
     console.error('[reviews] Failed to save HTML:', e);
   }
 
-  // Parse Reviews
-  const reviews = await page.evaluate(() => {
-    const oldCards = Array.from(document.querySelectorAll('.reviews-cards .card-wrap'));
-    const newCards = Array.from(document.querySelectorAll('review-card'));
-    const cards = [...oldCards, ...newCards];
-    const results = [];
+  // If total reviews is less than 2 return empty list
+  if (finalStats.reviews.length < 2) {
+      finalStats.reviews = [];
+  }
 
-    cards.forEach(card => {
-      let author = '';
-      let publication = '';
-      let text = '';
-      let numStars = -1;
-      let urlStr = undefined;
-      let more = false;
-
-      if (card.tagName.toLowerCase() === 'review-card') {
-           // --- NEW STRUCTURE ---
-           
-           // Author
-           const nameEl = card.querySelector('[slot="name"]');
-           author = nameEl ? nameEl.innerText.trim() : '';
-
-           // Publication
-           const pubEl = card.querySelector('[slot="publication"]');
-           publication = pubEl ? pubEl.innerText.trim() : '';
-
-           // Text
-           const textEl = card.querySelector('[slot="content"]');
-           text = textEl ? textEl.innerText.trim() : '';
-
-           // NumStars
-           const ratingSlot = card.querySelector('[slot="rating"]');
-           if (ratingSlot) {
-               // Check for 'score' attribute (common in audience reviews)
-               if (ratingSlot.hasAttribute('score')) {
-                   const val = parseFloat(ratingSlot.getAttribute('score'));
-                   if (!isNaN(val)) numStars = val;
-               } 
-               
-               // Fallback: Try to find text that looks like a score (common in critic reviews)
-               if (numStars === -1) {
-                   const fullRatingText = ratingSlot.innerText.trim();
-                   if (fullRatingText) {
-                        const parts = fullRatingText.split('/'); 
-                        if (parts.length === 2) {
-                            const n = parseFloat(parts[0]);
-                            const d = parseFloat(parts[1]);
-                            if (!isNaN(n) && !isNaN(d) && d !== 0) {
-                                numStars = Math.round((n / d) * 10) / 2;
-                            }
-                        }
-                   }
-               }
-           }
-
-           // URL
-           const linkEl = card.querySelector('[slot="reviewLink"]');
-           if (linkEl) urlStr = linkEl.href;
-
-           // More
-           if (text.endsWith('...') || text.endsWith('…')) more = true;
-           
-      } else {
-          // --- OLD STRUCTURE ---
-          // Author
-          const authorEl = card.querySelector('.name-wrap');
-          author = authorEl ? authorEl.innerText.trim() : '';
-
-          // Publication
-          const pubEl = card.querySelector('.publication-wrap');
-          publication = pubEl ? pubEl.innerText.trim() : '';
-
-          // Text
-          const spanSlot = card.querySelector('span[slot]');
-          text = spanSlot ? spanSlot.innerText.trim() : '';
-
-          // NumStars
-          const starGroup = card.querySelector('rating-stars-group');
-          if (starGroup && starGroup.hasAttribute('score')) {
-            const val = parseFloat(starGroup.getAttribute('score'));
-            if (!isNaN(val)) numStars = val;
-          } 
-          
-          if (numStars === -1) {
-            const spans = Array.from(card.querySelectorAll('span'));
-            const ratingSpan = spans.find(s => s.style.marginTop === '1.4px');
-            if (ratingSpan) {
-              const content = ratingSpan.innerText.trim();
-              const parts = content.split('/'); 
-              if (parts.length === 2) {
-                 const n = parseFloat(parts[0]);
-                 const d = parseFloat(parts[1]);
-                 if (!isNaN(n) && !isNaN(d) && d !== 0) {
-                   numStars = Math.round((n / d) * 10) / 2;
-                 }
-              }
-            }
-          }
-
-          // URL
-          const anchors = Array.from(card.querySelectorAll('a'));
-          const fullLink = anchors.find(a => a.innerText.includes('Go to Full Review'));
-          if (fullLink) urlStr = fullLink.href;
-
-          // More
-          const buttons = Array.from(card.querySelectorAll('button, a')); 
-          const moreBtn = buttons.find(b => b.innerText.includes('See More'));
-          more = !!moreBtn;
-      }
-
-      results.push({
-        author,
-        publication,
-        text,
-        numStars,
-        url: urlStr,
-        more
-      });
-    });
-    return results;
-  });
-
-  // Add IDs and populate textById
-  const processed = reviews.filter(r => {
-    const lang = franc(r.text);
-    return lang === 'eng' || lang === 'und';
-  }).map(r => {
-    // Simple hash
-    let hash = 0;
-    const s = r.text;
-    if (s.length > 0) {
-      for (let i = 0; i < s.length; i++) {
-        const char = s.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; 
-      }
-    }
-    const reviewId = hash;
-    
-    if (r.more) {
-      textById.set(reviewId, r.text);
-    }
-    return { ...r, reviewId };
-  });
-
-  return processed;
+  return finalStats;
 }
-

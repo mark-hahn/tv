@@ -36,17 +36,35 @@ pm2_name_for_project() {
   esac
 }
 
-remote_app_dir_for_project() {
+local_app_path_relative() {
   local project="$1"
-  printf '%s/%s' "$TV_REMOTE_BASE" "$project"
+  case "$project" in
+    share) echo "packages/share" ;;
+    *) echo "apps/$project" ;;
+  esac
 }
 
 local_app_dir_for_project() {
   local project="$1"
-  case "$project" in
-    share) printf '%s/packages/share' "$ROOT_DIR" ;;
-    *) printf '%s/apps/%s' "$ROOT_DIR" "$project" ;;
-  esac
+  echo "$ROOT_DIR/$(local_app_path_relative "$project")"
+}
+
+remote_app_dir_for_project() {
+  local project="$1"
+  echo "$TV_REMOTE_BASE/$(local_app_path_relative "$project")"
+}
+
+sync_monorepo_root() {
+  echo "[remote] sync root files -> $SSH_HOST:$TV_REMOTE_BASE/"
+  ssh "$SSH_HOST" "mkdir -p '$TV_REMOTE_BASE/apps' '$TV_REMOTE_BASE/packages'"
+  
+  rsync -az \
+    "$ROOT_DIR/package.json" \
+    "$ROOT_DIR/pnpm-workspace.yaml" \
+    "$ROOT_DIR/pnpm-lock.yaml" \
+    "$ROOT_DIR/turbo.json" \
+    "$ROOT_DIR/ecosystem.config.cjs" \
+    "$SSH_HOST:$TV_REMOTE_BASE/" 2>/dev/null || true
 }
 
 remote_sync_app() {
@@ -61,8 +79,16 @@ remote_sync_app() {
     exit 1
   fi
 
-  echo "[remote] rsync apps/$project -> $SSH_HOST:$remote_dir"
-  ssh "$SSH_HOST" "mkdir -p '$remote_dir'"
+  # Always sync root config first to ensure workspace is valid
+  sync_monorepo_root
+
+  echo "[remote] rsync $project -> $SSH_HOST:$remote_dir"
+  # Reset remote directory implies we create the parent structure
+  # rsync will create the leaf directory because we use local_dir/
+  # But we need to ensure the PARENT exists.
+  # remote_app_dir_for_project returns full path.
+  # dirname ensures apps/ or packages/ exists.
+  ssh "$SSH_HOST" "mkdir -p '$(dirname "$remote_dir")'"
 
   rsync -az    \
     --exclude 'node_modules/' \
@@ -82,83 +108,71 @@ remote_sync_app() {
     --exclude 'calls.log' \
     --exclude 'package-lock.json' \
     --exclude 'yarn.lock' \
-    "$local_dir/" "$SSH_HOST:$remote_dir/"
+    "$local_dir" "$SSH_HOST:$(dirname "$remote_dir")/"
 }
 
 remote_install_app_deps() {
   local project="$1"
-  local remote_dir
-  remote_dir="$(remote_app_dir_for_project "$project")"
-
-  echo "[remote] deps: $remote_dir"
   
-  # Pre-process package.json to replace workspace:* with file: paths for pnpm in non-workspace remote layout
-  # This assumes 'share' is at ../share relative to the app dir
-  ssh "$SSH_HOST" "cd '$remote_dir' \
-    && sed -i 's/\"workspace:\*\"/\"file:..\/share\"/g' package.json \
+  # For client, we just sync (built locally), no remote install needed.
+  if [[ "$project" == "client" ]]; then return 0; fi
+
+  echo "[remote] pnpm install (workspace root)"
+  # In true monorepo, we install at ROOT.
+  # We assume 'share' is synced if it's needed.
+  
+  ssh "$SSH_HOST" "cd '$TV_REMOTE_BASE' \
     && if command -v pnpm >/dev/null 2>&1; then \
          pnpm install; \
-         if [[ \"$project\" == \"down\" ]]; then pnpm rebuild better-sqlite3; fi; \
+         if [[ \"$project\" == \"down\" ]]; then pnpm rebuild better-sqlite3 --filter @tv/down; fi; \
        else echo 'pnpm not found on remote PATH' >&2; exit 1; fi"
 }
 
-remote_pm2_restart_one() {
-  local project="$1"
-  local pm2_name
-  local remote_dir
-  pm2_name="$(pm2_name_for_project "$project")"
-  remote_dir="$(remote_app_dir_for_project "$project")"
-
-  local script
-  case "$project" in
-    api) script='src/server.js' ;;
-    down) script='src/main.js' ;;
-    srvr) script='index.js' ;;
-    client)
-      # Client is typically built and served by nginx; no pm2 process here by default.
-      echo "[pm2] client: no pm2 process (deploy-only)"
-      return 0
-      ;;
-    share)
-      # Shared local package for legacy deploy mode; no pm2 process.
-      echo "[pm2] share: no pm2 process (deploy-only)"
-      return 0
-      ;;
-    *)
-      echo "Error: unknown project: $project" >&2
-      exit 1
-      ;;
-  esac
-
-  local tv_data_dir="${TV_DATA_DIR:-$DEFAULT_TV_DATA_DIR}"
-  echo "[pm2] restart $pm2_name (cwd=$remote_dir)"
-  ssh "$SSH_HOST" "cd '$remote_dir' \
-    && pm2 delete '$pm2_name' >/dev/null 2>&1 || true \
-    && NODE_ENV=production TV_DATA_DIR='$tv_data_dir' DISABLE_INTERNAL_CORS=1 pm2 start '$script' --name '$pm2_name' --time \
-    && pm2 save >/dev/null 2>&1 || true"
+remote_pm2_restart_all_silent() {
+  echo "[remote] pm2 reload ecosystem..."
+  ssh "$SSH_HOST" "cd '$TV_REMOTE_BASE' \
+    && pm2 start ecosystem.config.cjs --env production >/dev/null 2>&1 \
+    && pm2 save >/dev/null 2>&1"
 }
 
-remote_deploy_one() {
+remote_deploy_one_no_restart() {
   local project="$1"
+
+  # Special handling for client build (local)
+  if [[ "$project" == "client" ]]; then
+    echo "[local] build: $project (vite)"
+    if ! (cd "$(local_app_dir_for_project "$project")" && pnpm run build); then
+      echo "Error: client build failed" >&2
+      exit 1
+    fi
+  fi
+
   remote_sync_app "$project"
-  remote_install_app_deps "$project"
-  remote_pm2_restart_one "$project"
+
+  # Client is static files only; no remote deps needed
+  if [[ "$project" != "client" ]]; then
+    remote_install_app_deps "$project"
+  fi
 }
 
 case "${1:-all}" in
   api|down|srvr|client|share)
-    remote_deploy_one "$1"
+    remote_deploy_one_no_restart "$1"
+    remote_pm2_restart_all_silent
     ;;
   all|"" )
-    remote_deploy_one api
-    remote_deploy_one srvr
-    # Legacy flat deploy mode: down depends on @tv/share (file:../share).
-    remote_deploy_one share
-    # apps/down may fail to install in legacy flat deploy mode due to workspace deps.
-    # Deploy it last, and don't block srvr/api deploys if it fails.
-    if ! remote_deploy_one down; then
+    remote_deploy_one_no_restart api
+    remote_deploy_one_no_restart srvr
+    # Legacy flat deploy mode compabitility (share) - ensures packages are present
+    remote_deploy_one_no_restart share
+    
+    if ! remote_deploy_one_no_restart down; then
       echo "[warn] down deploy failed; api/srvr already deployed" >&2
     fi
+    
+    remote_deploy_one_no_restart client
+    
+    remote_pm2_restart_all_silent
     ;;
   *)
     usage

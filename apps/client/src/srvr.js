@@ -272,15 +272,3 @@ export async function getReviews(url, buttonName) {
   return await response.json();
 }
 
-export async function getRemainingReview(reviewId) {
-  const params = new URLSearchParams({
-    id: String(reviewId)
-  });
-  
-  const response = await fetch(`${config.torrentsApiUrl}/api/reviews/getRemainingReview?` + params.toString());
-  if (!response.ok) {
-    throw new Error(`getRemainingReview failed: ${response.status} ${response.statusText}`);
-  }
-  const data = await response.json();
-  return data.text || '';
-}

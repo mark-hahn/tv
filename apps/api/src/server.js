@@ -1116,23 +1116,6 @@ app.get('/api/reviews/getReviews', async (req, res) => {
   }
 });
 
-app.get('/api/reviews/getRemainingReview', async (req, res) => {
-  const reviewId = req.query.id;
-  const args = { reviewId };
-  try {
-    appendReviewCallsLog({ endpoint: '/api/reviews/getRemainingReview', method: 'GET', event: 'START', args });
-    const result = await reviews.getRemainingReview(reviewId);
-    appendCallsLog({ endpoint: '/api/reviews/getRemainingReview', method: 'GET', ok: true, result });
-    appendReviewCallsLog({ endpoint: '/api/reviews/getRemainingReview', method: 'GET', event: 'END', ok: true, args, result });
-    res.json(result);
-  } catch (error) {
-    console.error('getRemainingReview error:', error);
-    appendCallsLog({ endpoint: '/api/reviews/getRemainingReview', method: 'GET', ok: false, result: null, error });
-    appendReviewCallsLog({ endpoint: '/api/reviews/getRemainingReview', method: 'GET', event: 'END', ok: false, args, result: null, error });
-    res.status(500).json({ error: error.message });
-  }
-});
-
 https.createServer(httpsOptions, app).listen(QBT_TEST_PORT, () => {
   // Always print a startup line, even when TORRENTS_DEBUG disables console.log.
   process.stderr.write(`=\n`);

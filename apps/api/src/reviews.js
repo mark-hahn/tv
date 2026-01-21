@@ -250,39 +250,3 @@ export async function getReviews(rottenUrl, buttonName) {
   return processed;
 }
 
-export async function getRemainingReview(reviewId) {
-  const id = parseInt(reviewId, 10);
-  if (isNaN(id)) return null;
-
-  const storedText = textById.get(id);
-  // textById entry might be missing if server restarted or called logic error
-  if (!storedText) return null;
-
-  if (storedText.startsWith('~~')) {
-    return storedText.substring(2);
-  }
-
-  if (!page) throw new Error('Browser page not initialized. Call getReviews first.');
-
-  // Find card
-  // We locate by the stored text.
-  // Warning: if multiple reviews have identical text, this gets the first.
-  const cardLocator = page.locator('review-card, .reviews-cards .card-wrap').filter({ hasText: storedText }).first();
-  
-  if (await cardLocator.count() === 0) {
-    throw new Error(`Review card not found for id ${id}`);
-  }
-
-  const seeMoreBtn = cardLocator.getByText('See More');
-  if (await seeMoreBtn.isVisible()) {
-    await seeMoreBtn.click();
-    await page.waitForTimeout(500); // Wait for expansion
-  }
-
-  // Get expanded text
-  const textEl = cardLocator.locator('[slot="content"], span[slot]').first();
-  const expandedText = await textEl.innerText();
-
-  textById.set(id, '~~' + expandedText);
-  return expandedText; // User asked to return new expanded text
-}

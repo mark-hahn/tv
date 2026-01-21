@@ -40,7 +40,7 @@
         div(style="border-bottom:1px solid #ddd; width:100%; margin-bottom:5px;")
         
         //- Card Text
-        div(@click="handleReviewClick(review)" :style="{fontSize:'13px', lineHeight:'1.4', cursor: review.more ? 'pointer' : 'default'}")
+        div(:style="{fontSize:'13px', lineHeight:'1.4', cursor: 'default'}")
           span {{ review.text }}
           span(v-if="review.more" style="color:#0066cc;") ...
 
@@ -65,7 +65,7 @@
         div(style="border-bottom:1px solid #ddd; width:100%; margin-bottom:5px;")
         
         //- Card Text
-        div(@click="handleReviewClick(review)" :style="{fontSize:'13px', lineHeight:'1.4', cursor: review.more ? 'pointer' : 'default'}")
+        div(:style="{fontSize:'13px', lineHeight:'1.4', cursor: 'default'}")
           span {{ review.text }}
           span(v-if="review.more" style="color:#0066cc;") ...
 
@@ -203,24 +203,6 @@ export default {
       }
     },
     
-    async handleReviewClick(review) {
-      if (review.more) {
-        try {
-          const remainingText = await srvr.getRemainingReview(review.reviewId);
-          if (remainingText) {
-             // Replace text logic per requirements (prompt says "replace the text in the card with the returned text")
-             // Wait, the prompt says "remove the elipsies ... from the matching card's text and append the getRemainingReview returned string to that text" in the *first* prompt turn
-             // BUT in the *latest* prompt turn (corrections) it says: "replace the text in the card with the returned text"
-             // I will follow the latest instruction: Replace fully.
-             review.text = remainingText;
-             review.more = false;
-          }
-        } catch(err) {
-          console.error("Failed to fetch full review:", err);
-        }
-      }
-    },
-
     getStarClasses(numStars) {
       // 0 to 5 stars
       const stars = [];

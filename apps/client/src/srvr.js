@@ -263,7 +263,7 @@ export async function getReviews(url, buttonName) {
     buttonName: buttonName || ''
   });
   
-  const response = await fetch('/api/reviews/list?' + params.toString());
+  const response = await fetch('/api/reviews/getReviews?' + params.toString());
   if (!response.ok) {
     throw new Error(`getReviews failed: ${response.status} ${response.statusText}`);
   }
@@ -275,7 +275,7 @@ export async function getRemainingReview(reviewId) {
     reviewId: String(reviewId)
   });
   
-  const response = await fetch('/api/reviews/remaining?' + params.toString());
+  const response = await fetch('/api/reviews/getRemainingReview?' + params.toString());
   if (!response.ok) {
     throw new Error(`getRemainingReview failed: ${response.status} ${response.statusText}`);
   }

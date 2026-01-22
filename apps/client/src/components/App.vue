@@ -327,6 +327,12 @@ import * as tvdb from '../tvdb.js';
 import * as emby from '../emby.js';
 import { config } from '../config.js';
 
+// Hardwired split percentages for simple mode.
+// These control the List pane size (and TabArea gets the rest minus divider).
+// Values are percentages (e.g. 50 means 50%).
+const SIMPLE_LANDSCAPE_SPLIT = 50; 
+const SIMPLE_PORTRAIT_SPLIT = 50;
+
 export default {
   name: "App",
   components: { List, Series, Map, Actors, Reviews, Buttons, Reel, Torrents, Subs, Flex, History, TvProc, FilePane, Trailer },
@@ -515,23 +521,37 @@ export default {
 
     tabAreaStyle() {
       if (this.isPortrait) {
+        if (this.simpleMode) {
+          const h = (100 - SIMPLE_PORTRAIT_SPLIT);
+          return { width: '100%', height: `calc(${h}% - 2px)`, flex: '0 0 auto', minWidth: '0px', minHeight: '0px', display: 'flex', flexDirection: 'column', marginRight: '0px', order: 0, boxSizing: 'border-box', paddingLeft: '0px' };
+        }
         return { width: '100%', height: this.tabAreaHeight, flex: '0 0 auto', minWidth: '0px', minHeight: '0px', display: 'flex', flexDirection: 'column', marginRight: '0px', order: 0, boxSizing: 'border-box', paddingLeft: this.simpleMode ? '0px' : '10px' };
+      }
+      if (this.simpleMode) {
+        const w = (100 - SIMPLE_LANDSCAPE_SPLIT);
+        return { width: `calc(${w}% - 2px)`, height: '100%', flex: '0 0 auto', minWidth: '0px', display: 'flex', flexDirection: 'column', marginRight: '0px', order: 2, boxSizing: 'border-box', paddingLeft: '0px' };
       }
       return { width: this.tabAreaWidth, height: '100%', flex: '0 0 auto', minWidth: '0px', display: 'flex', flexDirection: 'column', marginRight: '10px', order: 2, boxSizing: 'border-box', paddingLeft: this.simpleMode ? '0px' : '10px' };
     },
 
     listStyle() {
       if (this.isPortrait) {
+        if (this.simpleMode) {
+          return { height: `calc(${SIMPLE_PORTRAIT_SPLIT}% - 2px)`, width: '100%', flex: '0 0 auto', minHeight: '0px', order: 2 };
+        }
         return { flex: '1 1 auto', minHeight: '0px', width: '100%', order: 2 };
+      }
+      if (this.simpleMode) {
+        return { width: `calc(${SIMPLE_LANDSCAPE_SPLIT}% - 2px)`, flex: '0 0 auto', minWidth: '0px', order: 0 };
       }
       return { flex: '1 1 auto', minWidth: '0px', order: 0 };
     },
 
     paneDividerStyle() {
       if (this.isPortrait) {
-        return { height: '12px', width: '100%', cursor: 'row-resize', backgroundColor: '#ddd', flex: '0 0 auto', order: 1 };
+        return { height: '4px', width: '100%', cursor: 'row-resize', backgroundColor: '#ddd', flex: '0 0 auto', order: 1 };
       }
-      return { width: '12px', cursor: 'col-resize', backgroundColor: '#ddd', flex: '0 0 auto', order: 1 };
+      return { width: '4px', cursor: 'col-resize', backgroundColor: '#ddd', flex: '0 0 auto', order: 1 };
     },
 
     tabs() {

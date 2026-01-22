@@ -417,6 +417,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   // remoteIds come from tvdb
   const remotes = await getRemotes(show, remoteIds);
   const saved = Date.now();
+  const trailers = allTvdb[name]?.trailers;
 
   let tvdbData = {tvdbId, name, originalNetwork,
                   seasonCount, episodeCount, watchedCount,
@@ -424,6 +425,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
                   firstAired, lastAired, averageRuntime,
                   originalCountry, originalLanguage,
                   status, remotes, characters, added, saved};
+  if(trailers) tvdbData.trailers = trailers;
   if(showId !== undefined) 
     tvdbData.showId = showId;
   if(deleted !== undefined)

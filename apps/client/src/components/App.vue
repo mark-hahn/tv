@@ -62,7 +62,6 @@
              :sizing="activeSizing"
           )
           Trailer(
-             v-if="!simpleMode"
              v-show="currentPane === 'trailer'"
              style="width:100%; height:100%;"
              :simpleMode="simpleMode"
@@ -197,6 +196,13 @@
            style="width:100%; height:100%;"
            :simpleMode="simpleMode"
            :sizing="activeSizing"
+        )
+        Trailer(
+           v-show="currentPane === 'trailer'"
+           style="width:100%; height:100%;"
+           :simpleMode="simpleMode"
+           :sizing="activeSizing"
+           :active="currentPane === 'trailer'"
         )
         Reel(
           v-if="!simpleMode"
@@ -545,7 +551,7 @@ export default {
       ];
 
       if (!this.simpleMode) return allTabs;
-      const allowed = new Set(['series', 'map', 'actors', 'reviews']);
+      const allowed = new Set(['series', 'map', 'actors', 'reviews', 'trailer']);
       return allTabs.filter(t => allowed.has(t.key));
     }
   },

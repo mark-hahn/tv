@@ -125,6 +125,7 @@ export default {
     const titlesPane = ref(null);
     const _titlesPopulated = ref(false);
     const _didStartReel = ref(false);
+    const _startedWithShows = ref(false);
     const _didInitialVisibleScroll = ref(false);
     const _startReelPromise = ref(null);
     const isLoadingNext = ref(false);
@@ -235,6 +236,9 @@ export default {
 
         _titlesPopulated.value = true;
         _didStartReel.value = true;
+        if (showTitles.length > 0) {
+          _startedWithShows.value = true;
+        }
         if (props.active) {
           if (nextTitles.length > 0) await scrollTitlesToBottom();
           else await scrollTitlesPaneToBottom();
@@ -702,7 +706,7 @@ export default {
     });
 
     watch(() => props.allShows, (val) => {
-      if (_didStartReel.value) return;
+      if (_startedWithShows.value) return;
       if (!Array.isArray(val) || val.length === 0) return;
       void startReelAndLoadTitles();
     });

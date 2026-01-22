@@ -11,27 +11,27 @@
     input(:value="filterStr" 
           @input="handleFilterInput" 
           placeholder="Filter..."
-          style="width:132px; height:30px !important; margin:5px 10px; padding:5px; border:1.5px solid black; background-color:#eee; box-sizing:border-box; font-size:16px;")
+          :style="{ width: (simpleMode && isWideLandscape ? '100px' : '132px') }"
+          style="height:30px !important; margin:5px 10px; padding:5px; border:1.5px solid black; background-color:#eee; box-sizing:border-box; font-size:16px;")
 
   div(style="display:flex; align-items:center;")
     input(:value="webHistStr"
           @input="$emit('update:webHistStr', $event.target.value)"
           @keyup.enter="$emit('search-click', 'enter')" 
           placeholder="Search..." 
-          style="width:132px; height:30px !important; margin: 5px 10px 5px 10px !important; padding:5px; border:1.5px solid black; background-color:#eee; box-sizing:border-box; font-size:16px;")
+          :style="{ width: (simpleMode && isWideLandscape ? '100px' : '132px') }"
+          style="height:30px !important; margin: 5px 10px 5px 10px !important; padding:5px; border:1.5px solid black; background-color:#eee; box-sizing:border-box; font-size:16px;")
     button(v-if="!simpleMode"
           @click="$emit('search-click', 'hist')"
             style="display:inline-block'; font-size:15px; margin:2px 4px 0 0;backgroundColor:white") Hist
     button(@click="$emit('search-click', 'web')" 
             style="display:inline-block'; font-size:15px; margin:2px 4px 0 10px;backgroundColor:white") 
-      | {{ simpleMode ? 'Search Web' : 'Web' }}
+      | {{ (simpleMode && !isWideLandscape) ? 'Search Web' : 'Web' }}
   button(@click="$emit('watch-click')"
           style="height:29px; background-color:white; fontSize:15px; margin:6px 5px 4px 10px;") 
     | {{ watchingName }}
 
   div(style="flex:1; display:flex; align-items:center; justify-content:flex-end; margin-right:15px;")
-    #count(v-if="simpleMode" style="font-size:14px; color:black;") 
-      | {{showsLength}} Shows
     button(v-if="!simpleMode"
           @click="$emit('send-filters', $event)"
           style="height:29px; background-color:white; fontSize:15px; margin:6px 0 4px 10px;")
@@ -99,6 +99,10 @@ export default {
       default: null
     },
     simpleMode: {
+      type: Boolean,
+      default: false
+    },
+    isWideLandscape: {
       type: Boolean,
       default: false
     }

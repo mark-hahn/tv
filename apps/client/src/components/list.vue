@@ -35,6 +35,7 @@
             :showingSrchList="showingSrchList"
             :searchList="searchList"
             :simpleMode="simpleMode"
+            :isWideLandscape="isWideLandscape"
             @search-click="searchClick"
             @watch-click="watchClick"
             @filter-input="select"
@@ -91,6 +92,7 @@
           :showingSrchList="showingSrchList"
           :searchList="searchList"
           :simpleMode="simpleMode"
+          :isWideLandscape="isWideLandscape"
           @search-click="searchClick"
           @watch-click="watchClick"
           @filter-input="select"
@@ -1494,17 +1496,8 @@ export default {
         this.scrollToSavedShow(true);
         
         // If we have episode info, open actors pane and show episode actors
-        if(this.currentPlayingDevice && 
-           this.currentPlayingDevice.seasonNumber && 
-           this.currentPlayingDevice.episodeNumber) {
-          // Use setTimeout to ensure series pane setup completes first
-          setTimeout(() => {
-            evtBus.emit('showActorsPaneWithEpisode', {
-              seasonNumber: this.currentPlayingDevice.seasonNumber,
-              episodeNumber: this.currentPlayingDevice.episodeNumber
-            });
-          }, 100);
-        }
+        // Changed per user request: go to series pane instead
+        evtBus.emit('showSeriesPane');
       }
     },
 

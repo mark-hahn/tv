@@ -331,7 +331,7 @@ import { config } from '../config.js';
 // These control the List pane size (and TabArea gets the rest minus divider).
 // Values are percentages (e.g. 50 means 50%).
 const SIMPLE_LANDSCAPE_SPLIT = 50; 
-const SIMPLE_PORTRAIT_SPLIT = 50;
+const SIMPLE_PORTRAIT_SPLIT = 35;
 
 export default {
   name: "App",

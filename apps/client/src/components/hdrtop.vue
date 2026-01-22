@@ -11,16 +11,15 @@
     input(:value="filterStr" 
           @input="handleFilterInput" 
           placeholder="Filter..."
-          :style="{ width: (simpleMode && isWideLandscape ? '100px' : '132px') }"
-          style="height:30px !important; margin:5px 10px; padding:5px; border:1.5px solid black; background-color:#eee; box-sizing:border-box; font-size:16px;")
+          style="width: 100px; height:30px !important; margin:5px 10px; padding:5px; border:1.5px solid black; background-color:#eee; box-sizing:border-box; font-size:16px;")
 
   div(style="display:flex; align-items:center;")
     input(:value="webHistStr"
-          @input="$emit('update:webHistStr', $event.target.value)"
+          @input="handleWebHistInput"
+          @keydown="handleWebHistKeyDown"
           @keyup.enter="$emit('search-click', 'enter')" 
           placeholder="Search..." 
-          :style="{ width: (simpleMode && isWideLandscape ? '100px' : '132px') }"
-          style="height:30px !important; margin: 5px 10px 5px 10px !important; padding:5px; border:1.5px solid black; background-color:#eee; box-sizing:border-box; font-size:16px;")
+          style="width: 100px; height:30px !important; margin: 5px 10px 5px 10px !important; padding:5px; border:1.5px solid black; background-color:#eee; box-sizing:border-box; font-size:16px;")
     button(v-if="!simpleMode"
           @click="$emit('search-click', 'hist')"
             style="display:inline-block'; font-size:15px; margin:2px 4px 0 0;backgroundColor:white") Hist
@@ -62,6 +61,8 @@
 </template>
 
 <script>
+import { addSearchHistoryEntry, loadSearchHistory } from '../searchHistory.js';
+
 export default {
   name: "HdrTop",
   
@@ -110,11 +111,87 @@ export default {
 
   emits: ['update:filterStr', 'update:webHistStr', 'search-click', 'watch-click', 'filter-input', 'cancel-srch-list', 'search-action', 'send-filters'],
 
+  data() {
+    return {
+      webHistNavIndex: -1,
+      webHistTypedBeforeNav: null,
+    };
+  },
+
   methods: {
     handleFilterInput(event) {
       this.$emit('update:filterStr', event.target.value);
       this.$emit('filter-input');
-    }
+    },
+
+    handleWebHistInput(event) {
+      this.webHistNavIndex = -1;
+      this.webHistTypedBeforeNav = null;
+      if (this.showingSrchList) this.$emit('cancel-srch-list');
+      this.$emit('update:webHistStr', event.target.value);
+    },
+
+    handleWebHistKeyDown(event) {
+      const isUp = event.code === 'ArrowUp' || event.key === 'ArrowUp' || event.keyCode === 38;
+      const isDown = event.code === 'ArrowDown' || event.key === 'ArrowDown' || event.keyCode === 40;
+      if (!isUp && !isDown) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const typedNow = String(this.webHistStr ?? '');
+      const typedNorm = typedNow.trim();
+      const historyBefore = loadSearchHistory();
+      const newestBefore = historyBefore[0] ?? '';
+      const insertedNewTop = Boolean(typedNorm) && (typedNorm !== newestBefore);
+
+      if (isUp && this.webHistNavIndex < 0) {
+        addSearchHistoryEntry(typedNow);
+      }
+
+      const history = loadSearchHistory();
+      if (!history.length) return;
+
+      if (this.webHistNavIndex < 0) {
+        this.webHistTypedBeforeNav = this.webHistStr;
+      }
+
+      if (isUp) {
+        if (this.webHistNavIndex < 0) {
+          // If Up saved a freshly typed line, treat current input as bottom-of-history,
+          // and show the previous history item instead of echoing the same text.
+          const startIndex = insertedNewTop ? 1 : 0;
+          this.webHistNavIndex = Math.min(startIndex, history.length - 1);
+          if (this.showingSrchList) this.$emit('cancel-srch-list');
+          this.$emit('update:webHistStr', history[this.webHistNavIndex]);
+          return;
+        }
+        this.webHistNavIndex = Math.min(this.webHistNavIndex + 1, history.length - 1);
+        if (this.showingSrchList) this.$emit('cancel-srch-list');
+        this.$emit('update:webHistStr', history[this.webHistNavIndex]);
+        return;
+      }
+
+      // ArrowDown
+      if (this.webHistNavIndex < 0) {
+        // Not currently navigating history; Down should clear and stay cleared.
+        this.webHistTypedBeforeNav = null;
+        if (this.showingSrchList) this.$emit('cancel-srch-list');
+        this.$emit('update:webHistStr', '');
+        return;
+      }
+
+      if (this.webHistNavIndex === 0) {
+        this.webHistNavIndex = -1;
+        this.webHistTypedBeforeNav = null;
+        if (this.showingSrchList) this.$emit('cancel-srch-list');
+        this.$emit('update:webHistStr', '');
+        return;
+      }
+      this.webHistNavIndex = this.webHistNavIndex - 1;
+      if (this.showingSrchList) this.$emit('cancel-srch-list');
+      this.$emit('update:webHistStr', history[this.webHistNavIndex]);
+    },
   }
 };
 </script>

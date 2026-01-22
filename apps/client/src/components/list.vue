@@ -149,6 +149,7 @@ import * as emby from "../emby.js";
 import * as tvdb from "../tvdb.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
+import { addSearchHistoryEntry } from "../searchHistory.js";
 import parseTorrentTitle from 'parse-torrent-title';
 import    evtBus  from '../evtBus.js';
 import    Shows   from './shows.vue';
@@ -779,6 +780,9 @@ export default {
            (this.showingSrchList && (srchListWeb == srcIsWeb));
       this.cancelSrchList();
       if(justClose) return;
+
+      addSearchHistoryEntry(srchTxt);
+
       srchListWeb = srcIsWeb;
       let tvdbSrchData;
       if(srcIsWeb) {

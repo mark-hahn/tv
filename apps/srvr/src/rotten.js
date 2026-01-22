@@ -338,16 +338,18 @@ export async function rottenSearch(query) {
     await timing.time('detail.goto', () => page.goto(detailLink, { waitUntil: "domcontentloaded" }), detailLink);
     await dismissOverlays(page, timing, 'dismissOverlays.detail');
 
-    const criticsScore = await timing.time(
-      'detail.criticsScore',
-      () => page.locator('rt-text[slot="collapsedCriticsScore"]')
-        .evaluate(el => Number((el.textContent || '').match(/\d+/)?.[0] ?? ""))
-    );
-    const audienceScore = await timing.time(
-      'detail.audienceScore',
-      () => page.locator('rt-text[slot="collapsedAudienceScore"]')
-        .evaluate(el => Number((el.textContent || '').match(/\d+/)?.[0] ?? ""))
-    );
+    const getScore = async (slot) => {
+      try {
+        const loc = page.locator(`media-scorecard rt-text[slot="${slot}"]`);
+        await loc.waitFor({ state: 'attached', timeout: 3000 });
+        return await loc.evaluate(el => Number((el.textContent || '').match(/\d+/)?.[0] ?? ""));
+      } catch (e) {
+        return 0;
+      }
+    };
+
+    const criticsScore = await timing.time('detail.criticsScore', () => getScore('criticsScore'));
+    const audienceScore = await timing.time('detail.audienceScore', () => getScore('audienceScore'));
 
     if(debug) log(`rotten: "${query }" => "${show.title
                                  }" ${show.startyear

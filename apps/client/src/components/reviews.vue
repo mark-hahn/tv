@@ -109,12 +109,12 @@ export default {
       showName: '',
       rottenUrl: '',
       rottenLabel: '',
-      selectedButton: 'Critics',
+      selectedButton: 'Audience',
       isLoading: false,
       checkedRemotes: false,
       filterButtons: [
-        { label: 'Critics' },
-        { label: 'Audience' }
+        { label: 'Audience' },
+        { label: 'Critics' }
       ]
     };
   },
@@ -174,7 +174,7 @@ export default {
       this.stats = null;
       this.rottenUrl = '';
       this.rottenLabel = '';
-      this.selectedButton = 'Critics';
+      this.selectedButton = 'Audience';
       this.checkedRemotes = false;
     });
 

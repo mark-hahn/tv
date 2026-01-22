@@ -1140,7 +1140,7 @@ const trySaveConfigYml = async (id, result, resolve, reject) => {
   }
 
   if(errResult) {
-    console.log('trySaveConfigYml error:', errResult);
+    console.error('trySaveConfigYml error:', errResult);
     saving = false;
     return ['err', id, errResult, resolve, reject];
   }

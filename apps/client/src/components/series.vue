@@ -303,6 +303,9 @@ export default {
         // Seed from show.Notes (populated by loadAllShows) before polling refresh.
         this.noteText = String(this.show.Notes ?? '');
         this.lastSavedNoteText = this.noteText;
+      } else {
+        this.noteText = '';
+        this.lastSavedNoteText = '';
       }
 
       try {
@@ -479,7 +482,8 @@ export default {
         const epiCounts = await emby.getEpisodeCounts(show);
         Object.assign(tvdbData, epiCounts);
         const fields = Object.assign({name}, epiCounts);
-        tvdbData = await srvr.setTvdbFields(fields);
+        // don't await, let it fail or succeed in background
+        srvr.setTvdbFields(fields).catch(e => console.error(e));
       }
       else {
         // noemby shows cannot have real watched state from Emby; prevent stale
@@ -571,35 +575,43 @@ export default {
           this.nextUpValTxt = '';
           this.nextUpSuffixTxt = '';
           this.episodeId = '';
-          return;
-        }
-        const seaEpiTxt = `S${(''+seasonNumber) .padStart(2, "0")} ` +
-                          `E${(''+episodeNumber).padStart(2, "0")}`;
-        if (readyToWatch) {
-          this.episodeId = episodeId;
-          this.nextUpValTxt = seaEpiTxt;
-          this.nextUpSuffixTxt = '';
-        }
-        else {
-          const suffix = (status === 'missing') ? 'No File' : 'Unaired';
-          this.nextUpValTxt = seaEpiTxt;
-          this.nextUpSuffixTxt = suffix;
+          // log return but don't forget to timeEnd if we leave? 
+          // actually this is just internal function return, but we should clear spinner if it was running (it's not)
+        } else { // wrap rest in else or just let it flow, but if we return early we missed getDevices
+            const seaEpiTxt = `S${(''+seasonNumber) .padStart(2, "0")} ` +
+                            `E${(''+episodeNumber).padStart(2, "0")}`;
+            if (readyToWatch) {
+            this.episodeId = episodeId;
+            this.nextUpValTxt = seaEpiTxt;
+            this.nextUpSuffixTxt = '';
+            }
+            else {
+            const suffix = (status === 'missing') ? 'No File' : 'Unaired';
+            this.nextUpValTxt = seaEpiTxt;
+            this.nextUpSuffixTxt = suffix;
+            }
         }
       }
       else {
         this.nextUpValTxt = '';
         this.nextUpSuffixTxt = '';
       }
+      this.updateWatchButtons(readyToWatch);
+    },
+
+    async updateWatchButtons(readyToWatch) {
       const watchButtonTxtArr = [];
-      const devices = await srvr.getDevices();
-      for(const device of devices) {
-        if(!device.showName) {
-          if(readyToWatch)
-            watchButtonTxtArr.push(`Play on ${device.deviceName}`);
+      try { // don't crash on device fetch fail
+        const devices = await srvr.getDevices();
+        for(const device of devices) {
+          if(!device.showName) {
+            if(readyToWatch)
+              watchButtonTxtArr.push(`Play on ${device.deviceName}`);
+          }
+          else watchButtonTxtArr.push(`Stop ${device.deviceName}`);
         }
-        else watchButtonTxtArr.push(`Stop ${device.deviceName}`);
-      }
-      this.watchButtonTxtArr = watchButtonTxtArr.sort();
+        this.watchButtonTxtArr = watchButtonTxtArr.sort();
+      } catch(e) { console.error('updateWatchButtons', e); }
     },
 
     setRemotes() {
@@ -636,23 +648,20 @@ export default {
         await this.setNextWatch();
       }, 1000);
     },
-  },
 
-  /////////////////  MOUNTED  /////////////////
-  // series vue component at mounted phase
-  // set everything in html
-  mounted() {
-    evtBus.on('setUpSeries', async (show) => { 
-      allTvdb        = await tvdb.getAllTvdb();
+    async onSetUpSeries(show) {
       this.emailText = ''; // Clear email text when changing shows
       this.show      = show;
       this.showHdr   = true;
       this.seriesReady = false;
 
       // Load persistent note for this show.
-      await this.loadNote(show?.Name);
+      this.loadNote(show?.Name);
 
       // Clear info fields so nothing renders until ready
+      const posterEl = document.getElementById('poster');
+      if (posterEl) posterEl.replaceChildren();
+
       this.dates = '';
       this.statusTxt = '';
       this.seasonsTxt = '';
@@ -678,32 +687,33 @@ export default {
       this.collectionName = collections.join(', ');
       this.collectionCount = collections.length;
       
-      const tvdbData = allTvdb[show.Name];
-      this.currentTvdbData = tvdbData; // Store for actors pane
-      evtBus.emit('tvdbDataReady', { show, tvdbData }); // Send to App.vue
-      await this.setDeleted(tvdbData);
-      await this.setPoster(tvdbData);
-      await this.setDates(tvdbData);
-      await this.setSeasonsTxt(tvdbData);
-      await this.setCntryLangTxt(tvdbData);
-      await this.setNextWatch();
-      await this.setRemotes();
+      setTimeout(async () => {
+        allTvdb = await tvdb.getAllTvdb();
 
-      // Only show the info box (and email input) once everything is populated.
-      this.seriesReady = true;
-    });
+        const tvdbData = allTvdb[show.Name];
+        this.currentTvdbData = tvdbData; // Store for actors pane
+        evtBus.emit('tvdbDataReady', { show, tvdbData }); // Send to App.vue
+        await this.setDeleted(tvdbData);
+        
+        // Don't await poster!
+        this.setPoster(tvdbData);
 
-    // While notes input is NOT focused, refresh note text from server once/sec.
-    // (Keeps the notes display in sync with external edits.)
-    this.notePollTimer = setInterval(() => {
-      if (this.noteFocused) return;
-      if (!this.show?.Name) return;
-      void this.refreshNoteFromServer();
-    }, 1000);
+        await this.setDates(tvdbData);
 
-    // Keep the Series infobox totals in sync with the actual Map grid.
-    // This matters for noemby shows where tvdb.json counts can be stale / mismatched.
-    evtBus.on('seriesMapUpdated', async ({ show, seriesMap }) => {
+        await this.setSeasonsTxt(tvdbData);
+
+        await this.setCntryLangTxt(tvdbData);
+        
+        await this.setNextWatch();
+
+        await this.setRemotes();
+
+        // Only show the info box (and email input) once everything is populated.
+        this.seriesReady = true;
+      }, 10);
+    },
+    
+    async onSeriesMapUpdated({ show, seriesMap }) {
       if (!show || !seriesMap) return;
       if (!this.show || this.show.Name !== show.Name) return;
       if (!this.show.Id?.startsWith('noemby-')) return;
@@ -720,11 +730,33 @@ export default {
       } catch (e) {
         // Non-fatal: UI already corrected.
       }
-    });
+    },
+  },
+
+  /////////////////  MOUNTED  /////////////////
+  // series vue component at mounted phase
+  // set everything in html
+  mounted() {
+    evtBus.on('setUpSeries', this.onSetUpSeries);
+
+    // While notes input is NOT focused, refresh note text from server once/sec.
+    // (Keeps the notes display in sync with external edits.)
+    this.notePollTimer = setInterval(() => {
+      if (this.noteFocused) return;
+      if (!this.show?.Name) return;
+      void this.refreshNoteFromServer();
+    }, 1000);
+
+    // Keep the Series infobox totals in sync with the actual Map grid.
+    // This matters for noemby shows where tvdb.json counts can be stale / mismatched.
+    evtBus.on('seriesMapUpdated', this.onSeriesMapUpdated);
 
   },
 
   beforeUnmount() {
+    evtBus.off('setUpSeries', this.onSetUpSeries);
+    evtBus.off('seriesMapUpdated', this.onSeriesMapUpdated);
+
     if (this.notePollTimer) {
       clearInterval(this.notePollTimer);
       this.notePollTimer = null;

@@ -10,6 +10,22 @@ const toYyyyMmDd = (d) => {
   return `${year}-${month}-${day}`;
 };
 
+const safeGet = async (url, retries = 3) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await axios.get(url);
+    } catch (error) {
+      const msg = error.message || String(error);
+      // Don't retry on 404
+      if (error.response && error.response.status === 404) throw error;
+      
+      console.warn(`safeGet retry ${i+1}/${retries} for ${url} - ${msg}`);
+      if (i === retries - 1) throw error;
+      await new Promise(r => setTimeout(r, 500 * (i + 1))); 
+    }
+  }
+};
+
 const getShowState = async (showId, _showName, showMeta) => {
   // active rows have watched with no watched at end
   // or last epi in last row watched
@@ -41,7 +57,7 @@ const getShowState = async (showId, _showName, showMeta) => {
   try {
     let seasonsRes;
     let url = urls.childrenUrl(cred, showId);
-    try { seasonsRes = await axios.get(url); }
+    try { seasonsRes = await safeGet(url); }
     catch(error) {
       console.error('getShowState axios error', error.message, {url});
       return null;
@@ -63,8 +79,9 @@ const getShowState = async (showId, _showName, showMeta) => {
 
       let unairedRes;
       url = urls.childrenUrl(cred, seasonId, true);
-      try { unairedRes = await axios.get(url); }
+      try { unairedRes = await safeGet(url); }
       catch(error) {
+        // If unaired check fails, we might still proceed, but let's stick to existing logic
         console.error('getShowState axios error', error.message, {url});
         return null;
       }
@@ -76,7 +93,7 @@ const getShowState = async (showId, _showName, showMeta) => {
 
       let episodesRes;
       url = urls.childrenUrl(cred, seasonId);
-      try {episodesRes = await axios.get(url)}
+      try {episodesRes = await safeGet(url)}
       catch(error) {
         console.error('getShowState axios error', error.message, {url});
         return null;

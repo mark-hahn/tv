@@ -12,30 +12,24 @@
   template(v-else)
     div(:style="{ fontWeight:'bold', fontSize:'24px', marginBottom:'15px' }") {{ showName }}
 
-    //- removed v-if !active to keep state
+    //- content wrapper to allow refresh
     div(v-if="!trailers || trailers.length === 0" style="padding:20px; text-align:center; color:#666;") No trailers found.
 
-    div(v-else style="display:flex; flex-direction:column; gap:20px;")
-      div(v-for="t in trailers" :key="t.id || t.url" style="background:white; padding:10px; border:1px solid #ccc; border-radius:5px;")
-        div(:style="{ fontWeight:'bold', marginBottom:'5px' }") {{ t.name }}
+    div(v-else-if="showContent" style="display:flex; flex-direction:column; gap:20px;")
+      div(v-for="(t, idx) in trailers" :key="t.id || t.url" style="background:white; padding:10px; border:1px solid #ccc; border-radius:5px;")
+        div(:style="{ fontWeight:'bold', marginBottom:'5px' }") {{ t.name ? t.name.replace(/Trailer/gi, '').trim() : '' }}
         
         template(v-if="getYoutubeId(t.url)")
-          iframe(
-            width="100%"
-            height="315"
-            :src="`https://www.youtube.com/embed/${getYoutubeId(t.url)}?enablejsapi=1&origin=${getOrigin()}&rel=0&modestbranding=1`"
-            frameborder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowfullscreen
-            style="max-width:560px;"
-          )
+          div(:id="'yt-player-' + idx")
         
         template(v-else-if="isVideoFile(t.url)")
           video(
             controls
+            ref="htmlVideos"
             width="100%"
             style="max-width:560px;"
             :src="t.url"
+            :data-url="t.url"
           )
         
         div(v-else)
@@ -45,6 +39,7 @@
 
 <script>
 import evtBus from '../evtBus.js';
+import { nextTick } from 'vue';
 
 export default {
   name: "Trailer",
@@ -57,15 +52,34 @@ export default {
       showName: '',
       trailers: [],
       err: '',
-      videoStates: new Map(),
-      playingIframes: new Set(),
-      resumeIframes: new Set()
+      showContent: true, // Controls rendering of video list
+      
+      // State tracking
+      ytPlayers: new Map(), // idx -> YT.Player
+      savedTimes: new Map(), // key -> seconds
+      lastPlayingKey: null, // "yt-idx" or "html-url"
     }
   },
   watch: {
     active(val) {
-      if (val) this.resumePlayback();
-      else this.pausePlayback();
+      if (!val) {
+        // Tab hidden: Save state and destroy
+        this.saveState();
+        this.showContent = false;
+      } else {
+        // Tab shown: Re-render and restore
+        this.showContent = true;
+        nextTick(() => {
+          this.initPlayers(); // Re-init YT players
+          this.restoreState();
+        });
+      }
+    },
+    trailers() {
+      // If trailers change while active, init players
+      if (this.active && this.showContent) {
+        nextTick(() => this.initPlayers());
+      }
     }
   },
   errorCaptured(err, vm, info) {
@@ -73,69 +87,109 @@ export default {
     return false; // prevent error from bubbling up further
   },
   methods: {
-    pausePlayback() {
-      if (!this.$el) return;
-      // Pause HTML5 videos
-      const videos = this.$el.querySelectorAll('video');
-      videos.forEach(v => {
-        if (!v.paused) {
-          this.videoStates.set(v, true);
-          v.pause();
-        } else {
-          this.videoStates.set(v, false);
-        }
-      });
-      
-      // Snapshot currently playing iframes for resume
-      this.resumeIframes = new Set(this.playingIframes);
-      
-      // Pause YouTube videos
-      const iframes = this.$el.querySelectorAll('iframe');
-      iframes.forEach(f => {
-         // Pause blindly
-         f.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: '' }), '*');
-      });
-    },
-    resumePlayback() {
-      if (!this.$el) return;
-      // Resume HTML5 videos
-      const videos = this.$el.querySelectorAll('video');
-      videos.forEach(v => {
-        if (this.videoStates.get(v)) {
-          v.play().catch(e => console.log('Resume prevented:', e));
-        }
-      });
-
-      // Resume YouTube videos with a slight delay to ensure tab is ready
-      setTimeout(() => {
-        this.resumeIframes.forEach(source => {
-          try {
-            source.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
-          } catch(e) { console.warn('Failed to resume iframe', e); }
+    saveState() {
+      // Save HTML5
+      if (this.$refs.htmlVideos) {
+        // refs might be single element or array or absent
+        const vids = Array.isArray(this.$refs.htmlVideos) ? this.$refs.htmlVideos : [this.$refs.htmlVideos];
+        vids.forEach(v => {
+          if (!v) return;
+          const url = v.getAttribute('data-url');
+          if (url && !v.paused) {
+            this.savedTimes.set('html-' + url, v.currentTime);
+            this.lastPlayingKey = 'html-' + url;
+          }
         });
-        this.resumeIframes.clear();
-      }, 100);
-    },
-    handleMessage(event) {
-      try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        // console.log('YT Msg:', data);
-        if (data && data.event === 'onStateChange') {
-           // Handle different shapes of info
-           let state = undefined;
-           if (typeof data.info === 'number') state = data.info;
-           else if (data.info && typeof data.info.playerState === 'number') state = data.info.playerState;
-
-           if (state === 1) { // Playing
-             this.playingIframes.add(event.source);
-           } else if (state === 2 || state === 0) { // Paused or Ended
-             this.playingIframes.delete(event.source);
-           }
-        }
-      } catch (e) {
-        // ignore
       }
+      
+      // Save YT
+      this.ytPlayers.forEach((player, idx) => {
+        try {
+          if (player && player.getPlayerState && player.getPlayerState() === 1) { // 1 = playing
+            const time = player.getCurrentTime();
+            this.savedTimes.set('yt-' + idx, time);
+            this.lastPlayingKey = 'yt-' + idx;
+          } else {
+            // Also save paused state position just in case? No, only resume what was playing.
+          }
+          // Destroy player instance to clean up
+          player.destroy();
+        } catch(e) { /* ignore */ }
+      });
+      this.ytPlayers.clear();
     },
+
+    restoreState() {
+      // Restore HTML5
+      if (this.$refs.htmlVideos) {
+        const vids = Array.isArray(this.$refs.htmlVideos) ? this.$refs.htmlVideos : [this.$refs.htmlVideos];
+        vids.forEach(v => {
+           if (!v) return;
+           const url = v.getAttribute('data-url');
+           const key = 'html-' + url;
+           if (key === this.lastPlayingKey && this.savedTimes.has(key)) {
+             v.currentTime = this.savedTimes.get(key);
+             v.play().catch(e => console.log('Resume blocked', e));
+           }
+        });
+      }
+      // YT restoration happens optionally in onPlayerReady or via initialization params
+    },
+
+    initPlayers() {
+      if (!window.YT || !window.YT.Player) return; // Wait for API
+      
+      this.trailers.forEach((t, idx) => {
+        const ytid = this.getYoutubeId(t.url);
+        if (ytid) {
+          const divId = 'yt-player-' + idx;
+          const key = 'yt-' + idx;
+          // Check if we need to resume this one
+          const shouldPlay = (key === this.lastPlayingKey);
+          const startSeconds = shouldPlay ? (this.savedTimes.get(key) || 0) : 0;
+          
+          try {
+             // If player already exists (shouldn't happen with v-if), destroy it (handled in saveState usually)
+             if (document.getElementById(divId)) {
+                
+                const player = new window.YT.Player(divId, {
+                  height: '315',
+                  width: '100%',
+                  videoId: ytid,
+                  playerVars: {
+                    'playsinline': 1,
+                    'start': Math.floor(startSeconds),
+                    'autoplay': shouldPlay ? 1 : 0,
+                    'origin': window.location.origin
+                  },
+                });
+                this.ytPlayers.set(idx, player);
+                
+                // Style fix for the iframe generated by YT API
+                // It replaces the div, but might miss some styles or attributes.
+                // We can style the container or just let it be.
+             }
+          } catch(e) { console.error('YT init error', e); }
+        }
+      });
+    },
+
+    loadYoutubeApi() {
+      if (window.YT && window.YT.Player) {
+        return;
+      }
+      const tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+      
+      window.onYouTubeIframeAPIReady = () => {
+         if (this.active && this.showContent) {
+           this.initPlayers();
+         }
+      };
+    },
+
     getOrigin() {
       return window.location.origin;
     },
@@ -157,9 +211,10 @@ export default {
       this.err = '';
       this.showName = show?.Name || '';
       this.trailers = [];
-      this.videoStates.clear();
-      this.playingIframes.clear();
-      this.resumeIframes.clear();
+      this.savedTimes.clear();
+      this.lastPlayingKey = null;
+      this.ytPlayers.clear();
+      this.showContent = true; // Reset
     },
     onTvdbDataReady(data) {
       this.err = '';
@@ -171,16 +226,15 @@ export default {
       } else {
         this.trailers = [];
       }
+      // trailers watcher will handle init
     }
   },
   mounted() {
-    this.msgHandler = this.handleMessage.bind(this);
-    window.addEventListener('message', this.msgHandler);
+    this.loadYoutubeApi(); // Start loading API
     evtBus.on('setUpSeries', this.onSetUpSeries);
     evtBus.on('tvdbDataReady', this.onTvdbDataReady);
   },
   unmounted() {
-    window.removeEventListener('message', this.msgHandler);
     evtBus.off('setUpSeries', this.onSetUpSeries);
     evtBus.off('tvdbDataReady', this.onTvdbDataReady);
   }

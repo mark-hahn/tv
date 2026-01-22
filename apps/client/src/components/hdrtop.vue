@@ -10,6 +10,7 @@
   div(style="display:flex; justify-content:space-between; margin-bottom:10px;")
     input(:value="filterStr" 
           @input="handleFilterInput" 
+          @keydown="handleFilterKeyDown"
           placeholder="Filter..."
           style="width: 100px; height:30px !important; margin:5px 10px; padding:5px; border:1.5px solid black; background-color:#eee; box-sizing:border-box; font-size:16px;")
 
@@ -121,6 +122,15 @@ export default {
   methods: {
     handleFilterInput(event) {
       this.$emit('update:filterStr', event.target.value);
+      this.$emit('filter-input');
+    },
+
+    handleFilterKeyDown(event) {
+      const isDown = event.code === 'ArrowDown' || event.key === 'ArrowDown' || event.keyCode === 40;
+      if (!isDown) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.$emit('update:filterStr', '');
       this.$emit('filter-input');
     },
 

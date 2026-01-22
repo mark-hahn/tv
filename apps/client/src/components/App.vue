@@ -61,6 +61,14 @@
              :simpleMode="simpleMode"
              :sizing="activeSizing"
           )
+          Trailer(
+             v-if="!simpleMode"
+             v-show="currentPane === 'trailer'"
+             style="width:100%; height:100%;"
+             :simpleMode="simpleMode"
+             :sizing="activeSizing"
+             :active="currentPane === 'trailer'"
+          )
           Reel(
             v-if="!simpleMode"
             v-show="currentPane === 'reel'"
@@ -307,6 +315,7 @@ import Flex     from './flex.vue';
 import History  from './history.vue';
 import TvProc   from './tvproc.vue';
 import FilePane from './file.vue';
+import Trailer  from './trailer.vue';
 import evtBus   from '../evtBus.js';
 import * as tvdb from '../tvdb.js';
 import * as emby from '../emby.js';
@@ -314,7 +323,7 @@ import { config } from '../config.js';
 
 export default {
   name: "App",
-  components: { List, Series, Map, Actors, Reviews, Buttons, Reel, Torrents, Subs, Flex, History, TvProc, FilePane },
+  components: { List, Series, Map, Actors, Reviews, Buttons, Reel, Torrents, Subs, Flex, History, TvProc, FilePane, Trailer },
   data() { 
     return { 
       // Must be known before first render so non-simple panes never mount in simple mode.
@@ -525,6 +534,7 @@ export default {
         { label: 'Map', key: 'map' },
         { label: 'Actors', key: 'actors' },
         { label: 'Reviews', key: 'reviews' },
+        { label: 'Trailer', key: 'trailer' },
         { label: 'Tor', key: 'torrents' },
         { label: 'Subs', key: 'subs' },
         { label: 'Files', key: 'file' },
@@ -977,6 +987,12 @@ export default {
 
       if (k === 'reviews') {
         this.currentPane = 'reviews';
+        evtBus.emit('paneChanged', this.currentPane);
+        return;
+      }
+
+      if (k === 'trailer') {
+        this.currentPane = 'trailer';
         evtBus.emit('paneChanged', this.currentPane);
         return;
       }

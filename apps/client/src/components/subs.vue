@@ -1729,7 +1729,13 @@ export default {
           return;
         }
 
-        const pagesToLoad = (perPage > 0 && totalCount > perPage) ? totalPages : 1;
+        let pagesToLoad = (perPage > 0 && totalCount > perPage) ? totalPages : 1;
+        if (perPage > 0) {
+          // OpenSubtitles API limit: max offset 1000.
+          const maxPages = Math.ceil(1000 / perPage);
+          if (pagesToLoad > maxPages) pagesToLoad = maxPages;
+        }
+
         const allData = Array.isArray(first?.data) ? [...first.data] : [];
 
         for (let p = 2; p <= pagesToLoad; p++) {

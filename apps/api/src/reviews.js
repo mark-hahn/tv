@@ -201,7 +201,7 @@ export async function getReviews(rottenUrl, buttonName) {
                     author: r.author,
                     publication: r.publication,
                     text: r.text,
-                    numStars: noReview ? 2.5 : r.numStars,
+                    numStars: noReview ? -1 : r.numStars,
                     url: r.url
                 });
             }
@@ -256,16 +256,7 @@ export async function getReviews(rottenUrl, buttonName) {
     throw e;
   }
 
-  // Save HTML
-  try {
-    const html = await page.content();
-    // Path: /root/apps/tv/apps/api/test/reviews.html
-    const outPath = path.resolve(__dirname, '..', 'test', 'reviews.html');
-    fs.mkdirSync(path.dirname(outPath), { recursive: true });
-    fs.writeFileSync(outPath, html, 'utf8');
-  } catch (e) {
-    console.error('[reviews] Failed to save HTML:', e);
-  }
+
 
   // If total reviews is less than 2 return empty list
   if (finalStats.reviews.length < 2) {

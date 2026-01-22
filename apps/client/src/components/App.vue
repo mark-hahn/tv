@@ -958,7 +958,6 @@ export default {
       }
     },
     handleAllShows(shows) {
-      console.log('App.vue handleAllShows, count:', Array.isArray(shows) ? shows.length : 'not-array');
       this.allShows = Array.isArray(shows) ? shows : [];
     },
     selectTab(key) {

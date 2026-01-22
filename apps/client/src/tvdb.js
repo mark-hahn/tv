@@ -20,9 +20,7 @@ let allTvdb = null;
 export const getAllTvdb = async () => {
   // all data in tvdb.json
   // cached in allTvdb
-  console.log('tvdb.getAllTvdb calling srvr.getAllTvdb');
   allTvdb ??= await srvr.getAllTvdb();
-  console.log('tvdb.getAllTvdb got result, entries:', allTvdb ? Object.keys(allTvdb).length : 'null');
   return allTvdb;
 }
 

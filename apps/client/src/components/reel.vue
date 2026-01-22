@@ -703,7 +703,7 @@ export default {
     });
 
     const onAllShows = async (val) => {
-      console.log('reel.vue onAllShows:', val?.length, '_startedWithShows:', _startedWithShows.value);
+      // console.log('reel.vue onAllShows:', val?.length, '_startedWithShows:', _startedWithShows.value);
       if (_startedWithShows.value) return;
       if (!Array.isArray(val) || val.length === 0) return;
       await startReelAndLoadTitles();

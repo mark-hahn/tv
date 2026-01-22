@@ -124,30 +124,34 @@ export default {
       // Split list in 2 equal halves.
       // Put higher scores in left column and sort descending.
       if (!this.reviews.length) return [];
+
+      const getVal = (r) => (r.numStars === -1 ? 2.5 : r.numStars);
       
       const all = [...this.reviews];
       // Sort all by score descending first to identify "higher scores"
-      all.sort((a, b) => b.numStars - a.numStars);
+      all.sort((a, b) => getVal(b) - getVal(a));
       
       const mid = Math.ceil(all.length / 2);
       const left = all.slice(0, mid);
       
       // Sort Descending
-      left.sort((a, b) => b.numStars - a.numStars);
+      left.sort((a, b) => getVal(b) - getVal(a));
       return left;
     },
     rightColumnReviews() {
       // Put lower scores in right column and sort ascending.
       if (!this.reviews.length) return [];
+
+      const getVal = (r) => (r.numStars === -1 ? 2.5 : r.numStars);
       
       const all = [...this.reviews];
-      all.sort((a, b) => b.numStars - a.numStars);
+      all.sort((a, b) => getVal(b) - getVal(a));
       
       const mid = Math.ceil(all.length / 2);
       const right = all.slice(mid);
       
       // Sort Ascending
-      right.sort((a, b) => a.numStars - b.numStars);
+      right.sort((a, b) => getVal(a) - getVal(b));
       return right;
     },
     cardStyle() {

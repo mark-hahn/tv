@@ -68,8 +68,6 @@ const fCall = (fname, param) => {
         param = JSON.stringify(param);
   const msg = `${id}~~~${fname}~~~${param}`;
 
-  if (fname === 'getAllTvdb') console.log(`srvr.fCall sending getAllTvdb, id: ${id}`);
-
   if(!haveSocket) waitingSends.push(msg);
   else {
     // console.log("sending:", msg);
@@ -99,8 +97,6 @@ handleMsg = async (msg) => {
     return;
   }
   const call = calls[callIdx];
-  if (call.fname === 'getAllTvdb') console.log(`srvr.handleMsg received response for getAllTvdb, id: ${id}`);
-  
   calls.splice(callIdx, 1);
   const {fname, param, resolve, reject} = call;
   if(status != 'ok') 

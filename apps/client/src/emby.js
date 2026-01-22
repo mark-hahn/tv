@@ -38,9 +38,7 @@ const getToken = async () => {
 }
 
 export async function init() {
-  console.log('emby.init calling getToken');
   await getToken();
-  console.log('emby.init getToken done, token set');
   cred = {markUsrId, token};
   urls.init(cred);
 }
@@ -50,30 +48,24 @@ export const isReject = (name) => rejects.includes(name);
 
 // load all shows from emby and server //////////
 export async function loadAllShows() {
-  console.log('emby.loadAllShows entered. Call tvdb.getAllTvdb next.');
   allTvdb = await tvdb.getAllTvdb();
-  console.log('emby.loadAllShows tvdb.getAllTvdb returned.');
 
   const loadAllShowsStartTime = new Date().getTime();
-  console.log('emby.loadAllShows starting...');
 
-  const logP = (name, p) => p.then(r => { console.log(`emby.loadAllShows ${name} resolved`); return r; }).catch(e => { console.log(`emby.loadAllShows ${name} rejected`, e); throw e; });
-
-  const embyPromise   = logP('emby', axios.get(urls.showListUrl(cred, 0, 10000)));
-  const diskPromise   = logP('disk', srvr.getShowsFromDisk()); 
-  const rejPromise    = logP('rej', srvr.getRejects());
-  const pkupPromise   = logP('pkup', srvr.getPickups());
-  const noEmbyPromise = logP('noEmby', srvr.getNoEmbys());
-  const gapPromise    = logP('gap', srvr.getGaps());
-  const notesPromise  = logP('notes', srvr.getAllNotes());
+  const embyPromise   = axios.get(
+                        urls.showListUrl(cred, 0, 10000));
+  const diskPromise   = srvr.getShowsFromDisk(); 
+  const rejPromise    = srvr.getRejects();
+  const pkupPromise   = srvr.getPickups();
+  const noEmbyPromise = srvr.getNoEmbys();
+  const gapPromise    = srvr.getGaps();
+  const notesPromise  = srvr.getAllNotes();
 
     const [embyShows, diskShows, 
       rejectsIn, pickups, noEmbys, gaps, notesIn] = 
     await Promise.all([embyPromise, diskPromise, 
                        rejPromise, pkupPromise,
           noEmbyPromise, gapPromise, notesPromise]);
-
-  console.log('emby.loadAllShows api calls finished. embyShows items:', embyShows?.data?.Items?.length);
   
   rejects = rejectsIn
   const gapsById = gaps || {};
@@ -395,7 +387,7 @@ export async function loadAllShows() {
 
 //////////  finished loadAllShows ////////////
   const elapsed = new Date().getTime() - loadAllShowsStartTime;
-  console.log('all shows loaded, elapsed ms:', elapsed, 'shows count:', shows.length);
+  console.log('all shows loaded, elapsed ms:', elapsed);
   return shows;
 }
 

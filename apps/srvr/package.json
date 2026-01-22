@@ -24,6 +24,7 @@
   "dependencies": {
     "base64-js": "^1.5.1",
     "date-and-time": "^3.6.0",
+    "@tv/share": "workspace:*",
     "dotenv": "^17.2.3",
     "mailtrap": "^4.3.2",
     "moment": "^2.29.4",

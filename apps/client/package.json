@@ -24,6 +24,8 @@
     "ESLint": "npm:eslint@^9.38.0",
     "fuse.js": "^7.0.0",
     "lodash": "^4.17.21",
+    "marked": "^15.0.7",
+    "dompurify": "^3.2.6",
     "mitt": "^3.0.1",
     "parse-torrent-title": "^2.1.0",
     "sweetalert2": "^11.14.5",

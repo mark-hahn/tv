@@ -1025,8 +1025,8 @@ export default {
       this.saveVisShow(show, scroll);
 
       // Clicking a show should generally return to the Series pane.
-      // Exception: when the user is actively in Map/Actors/Torrents/Subs/Files, do not switch panes.
-      const keepPane = new Set(['map', 'actors', 'torrents', 'subs', 'file']);
+      // Exception: when the user is actively in Map/Actors/Torrents/Subs/Files/Reviews/Trailer/AI, do not switch panes.
+      const keepPane = new Set(['map', 'actors', 'torrents', 'subs', 'file', 'reviews', 'trailer', 'ai']);
       if (!keepPane.has(this.currentPane)) {
         evtBus.emit('showSeriesPane');
       }

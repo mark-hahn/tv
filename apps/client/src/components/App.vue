@@ -68,6 +68,15 @@
              :sizing="activeSizing"
              :active="currentPane === 'trailer'"
           )
+
+          Mistral(
+            v-if="!simpleMode"
+            v-show="currentPane === 'ai'"
+            style="width:100%; height:100%;"
+            :simpleMode="simpleMode"
+            :sizing="activeSizing"
+            :activeShow="currentShow"
+          )
           Reel(
             v-if="!simpleMode"
             v-show="currentPane === 'reel'"
@@ -204,6 +213,15 @@
            :sizing="activeSizing"
            :active="currentPane === 'trailer'"
         )
+
+        Mistral(
+          v-if="!simpleMode"
+          v-show="currentPane === 'ai'"
+          style="width:100%; height:100%;"
+          :simpleMode="simpleMode"
+          :sizing="activeSizing"
+          :activeShow="currentShow"
+        )
         Reel(
           v-if="!simpleMode"
           v-show="currentPane === 'reel'"
@@ -322,6 +340,7 @@ import History  from './history.vue';
 import TvProc   from './tvproc.vue';
 import FilePane from './file.vue';
 import Trailer  from './trailer.vue';
+import Mistral  from './mistral.vue';
 import evtBus   from '../evtBus.js';
 import * as tvdb from '../tvdb.js';
 import * as emby from '../emby.js';
@@ -335,12 +354,12 @@ const SIMPLE_PORTRAIT_SPLIT = 35;
 
 export default {
   name: "App",
-  components: { List, Series, Map, Actors, Reviews, Buttons, Reel, Torrents, Subs, Flex, History, TvProc, FilePane, Trailer },
+  components: { List, Series, Map, Actors, Reviews, Buttons, Reel, Torrents, Subs, Flex, History, TvProc, FilePane, Trailer, Mistral },
   data() { 
     return { 
       // Must be known before first render so non-simple panes never mount in simple mode.
       simpleMode: new URLSearchParams(window.location.search).has('simple'),
-      currentPane: 'series', // 'series', 'map', 'actors', 'torrents', 'subs', 'flex', 'history', 'tvproc', or 'file'
+      currentPane: 'series', // 'series', 'map', 'actors', 'reviews', 'trailer', 'torrents', 'subs', 'flex', 'history', 'tvproc', 'file', 'ai'
       currentTvdbData: null,
       currentShow: null,
       _torrentsInitialized: false,
@@ -561,6 +580,7 @@ export default {
         { label: 'Actors', key: 'actors' },
         { label: 'Reviews', key: 'reviews' },
         { label: 'Trailer', key: 'trailer' },
+        { label: 'AI', key: 'ai' },
         { label: 'Tor', key: 'torrents' },
         { label: 'Subs', key: 'subs' },
         { label: 'Files', key: 'file' },
@@ -1023,6 +1043,13 @@ export default {
         return;
       }
 
+      if (k === 'ai') {
+        if (this.simpleMode) return;
+        this.currentPane = 'ai';
+        evtBus.emit('paneChanged', this.currentPane);
+        return;
+      }
+
       if (k === 'reel') {
         if (this.simpleMode) return;
         this.currentPane = 'reel';
@@ -1347,6 +1374,27 @@ export default {
       // Subs pane is driven by :activeShow and will update for the new show.
       if (prevPane === 'subs') {
         this.currentPane = 'subs';
+        evtBus.emit('paneChanged', this.currentPane);
+        return;
+      }
+
+      // When currently viewing Reviews, stay on Reviews.
+      if (prevPane === 'reviews') {
+        this.currentPane = 'reviews';
+        evtBus.emit('paneChanged', this.currentPane);
+        return;
+      }
+
+      // When currently viewing Trailer, stay on Trailer.
+      if (prevPane === 'trailer') {
+        this.currentPane = 'trailer';
+        evtBus.emit('paneChanged', this.currentPane);
+        return;
+      }
+
+      // When currently viewing AI, stay on AI.
+      if (prevPane === 'ai') {
+        this.currentPane = 'ai';
         evtBus.emit('paneChanged', this.currentPane);
         return;
       }

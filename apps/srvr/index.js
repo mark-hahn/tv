@@ -1925,7 +1925,22 @@ const runOne = () => {
   running = true;
 
   const {ws, id, fname, param} = queue.pop();
-  if(ws.readyState !== WebSocket.OPEN) return;
+
+  if(ws.readyState !== WebSocket.OPEN) {
+    running = false;
+    runOne();
+    return;
+  }
+  
+  if (fname === 'getAllTvdb') {
+    console.log(`[SERVER] runOne processing getAllTvdb, id=${id}`);
+  }
+
+  if(ws.readyState !== WebSocket.OPEN) {
+    running = false;
+    runOne();
+    return;
+  }
 
   let resolve = null;
   let reject  = null;
@@ -2040,6 +2055,12 @@ wss.on('connection', (ws) => {
     }
     if(fname == 'getNewTvdb') {
       tvdb.getNewTvdb(ws, id, param) 
+    }
+    else if(fname == 'getAllTvdb') {
+      tvdb.getAllTvdb(id, param, (res) => {
+         // res is [id, result]
+         ws.send(`${res[0]}~~~ok~~~${JSON.stringify(res[1])}`);
+      }, null);
     }
     else {
       queue.unshift({ws, id, fname, param});

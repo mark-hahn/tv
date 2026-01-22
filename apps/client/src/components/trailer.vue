@@ -3,13 +3,6 @@
   @click.stop
   :style="{ height:'100%', width:'100%', padding:'10px', boxSizing:'border-box', overflowY:'auto', backgroundColor:'#fafafa' }"
 )
-  div(style="background:yellow; color:black; padding:5px; border:1px solid orange; margin-bottom:10px; font-family:monospace; font-size:12px;")
-    div DEBUG INFO
-    div showName: "{{ showName }}" (Type: {{ typeof showName }})
-    div active: {{ active }}
-    div trailers: {{ trailers ? trailers.length : 'null' }}
-    div err: {{ err }}
-
   div(v-if="err" style="color:red; margin:10px; border:1px solid red; padding:10px;")
     b Error:
     pre {{ err }}

@@ -958,6 +958,7 @@ export default {
       }
     },
     handleAllShows(shows) {
+      console.log('App.vue handleAllShows, count:', Array.isArray(shows) ? shows.length : 'not-array');
       this.allShows = Array.isArray(shows) ? shows : [];
     },
     selectTab(key) {
@@ -965,7 +966,7 @@ export default {
       if (!k) return;
 
       // In simple mode, only Series/Map/Actors exist.
-      if (this.simpleMode && !['series', 'map', 'actors', 'reviews'].includes(k)) {
+      if (this.simpleMode && !['series', 'map', 'actors', 'reviews', 'trailer'].includes(k)) {
         return;
       }
 

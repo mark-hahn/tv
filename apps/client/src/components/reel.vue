@@ -698,18 +698,18 @@ export default {
 
     // Initialize with test data
     onMounted(() => {
-      console.log('reel.vue mounted. active:', props.active, 'allShows length:', props.allShows?.length);
-      // Wait until allShows is available so startReel gets the full library.
-      if (Array.isArray(props.allShows) && props.allShows.length > 0) {
-        void startReelAndLoadTitles();
-      }
+      // console.log('reel.vue mounted. active:', props.active, 'allShows length:', props.allShows?.length);
+      // Logic handled by watch(allShows, ..., { immediate:true }) and watch(active)
     });
 
-    watch(() => props.allShows, (val) => {
+    const onAllShows = async (val) => {
+      console.log('reel.vue onAllShows:', val?.length, '_startedWithShows:', _startedWithShows.value);
       if (_startedWithShows.value) return;
       if (!Array.isArray(val) || val.length === 0) return;
-      void startReelAndLoadTitles();
-    });
+      await startReelAndLoadTitles();
+    };
+
+    watch(() => props.allShows, onAllShows, { immediate: true });
 
     watch(() => props.active, (isActive) => {
       if (_didStartReel.value) return;

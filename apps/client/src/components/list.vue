@@ -1578,9 +1578,13 @@ export default {
     },
 
     async newShows(isInitialLoad = false) {
+      console.log('list.vue newShows started, isInitialLoad:', isInitialLoad);
       await emby.init();
-
+      
+      console.log('list.vue calling emby.loadAllShows');
       allShows = await emby.loadAllShows();
+      console.log('list.vue emby.loadAllShows returned, count:', allShows?.length);
+      
       if(!allShows) {
         console.error("No shows from loadAllShows");
         return;

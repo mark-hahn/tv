@@ -196,12 +196,12 @@ export async function getReviews(rottenUrl, buttonName) {
             if (smallText) currentStats.smallTextCount++;
 
             // Filter
-            if (!notEnglish && !noReview && !smallText) {
+            if (!notEnglish && !smallText) {
                 currentStats.reviews.push({
                     author: r.author,
                     publication: r.publication,
                     text: r.text,
-                    numStars: r.numStars,
+                    numStars: noReview ? 2.5 : r.numStars,
                     url: r.url
                 });
             }

@@ -36,7 +36,7 @@
     template(v-else)
       //- Left Column: Descending Sort (High Scores)
       div(style="flex:1; display:flex; flexDirection:column; gap:10px; overflow-y:auto; overflow-x:hidden; height:100%;")
-        div(v-for="(review, idx) in leftColumnReviews" :key="idx" :style="cardStyle")
+        div(v-for="(review, idx) in leftColumnReviews" :key="idx" :style="cardStyle" @click="openReviewsPage")
           //- Card Header
           div(style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:5px;")
             div(style="font-weight:bold; font-size:14px;")
@@ -50,17 +50,17 @@
           div(style="border-bottom:1px solid #ddd; width:100%; margin-bottom:5px;")
           
           //- Card Text
-          div(:style="{fontSize:'15px', lineHeight:'1.4', cursor: 'default'}")
+          div(:style="{fontSize:'15px', lineHeight:'1.4', cursor: 'pointer'}")
             span {{ review.text }}
 
           //- Full Review Link
-          div(v-if="review.url" style="margin-top:8px;")
+          div(v-if="review.url" style="margin-top:8px;" @click.stop)
             a(:href="review.url" target="_blank")
               button(style="cursor:pointer; padding:4px 8px; border-radius:4px; border:1px solid #bbb; background-color:whitesmoke; font-size:12px;") Full Review
 
       //- Right Column: Ascending Sort (Low Scores)
       div(style="flex:1; display:flex; flexDirection:column; gap:10px; overflow-y:auto; overflow-x:hidden; height:100%;")
-        div(v-for="(review, idx) in rightColumnReviews" :key="idx" :style="cardStyle")
+        div(v-for="(review, idx) in rightColumnReviews" :key="idx" :style="cardStyle" @click="openReviewsPage")
           //- Card Header
           div(style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:5px;")
             div(style="font-weight:bold; font-size:14px;")
@@ -74,11 +74,11 @@
           div(style="border-bottom:1px solid #ddd; width:100%; margin-bottom:5px;")
           
           //- Card Text
-          div(:style="{fontSize:'15px', lineHeight:'1.4', cursor: 'default'}")
+          div(:style="{fontSize:'15px', lineHeight:'1.4', cursor: 'pointer'}")
             span {{ review.text }}
 
           //- Full Review Link
-          div(v-if="review.url" style="margin-top:8px;")
+          div(v-if="review.url" style="margin-top:8px;" @click.stop)
             a(:href="review.url" target="_blank")
               button(style="cursor:pointer; padding:4px 8px; border-radius:4px; border:1px solid #bbb; background-color:whitesmoke; font-size:12px;") Full Review
 
@@ -156,7 +156,8 @@ export default {
         border: '1px solid #ccc',
         borderRadius: '5px',
         padding: '10px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+        cursor: 'pointer'
       };
     }
   },
@@ -255,6 +256,15 @@ export default {
         }
       }
       return stars;
+    },
+    
+    openReviewsPage() {
+      if (!this.rottenUrl) return;
+      const base = this.rottenUrl.replace(/\/$/, '');
+      const suffix = (this.selectedButton === 'Audience') ? 'all-audience' : 'all-critics';
+      // Hardcode s01 for now as per server scraper logic
+      const url = `${base}/s01/reviews/${suffix}`;
+      window.open(url, '_blank');
     },
   },
 };

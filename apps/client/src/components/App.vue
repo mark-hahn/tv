@@ -70,7 +70,6 @@
           )
 
           Mistral(
-            v-if="!simpleMode"
             v-show="currentPane === 'ai'"
             style="width:100%; height:100%;"
             :simpleMode="simpleMode"
@@ -215,7 +214,6 @@
         )
 
         Mistral(
-          v-if="!simpleMode"
           v-show="currentPane === 'ai'"
           style="width:100%; height:100%;"
           :simpleMode="simpleMode"
@@ -591,7 +589,7 @@ export default {
       ];
 
       if (!this.simpleMode) return allTabs;
-      const allowed = new Set(['series', 'map', 'actors', 'reviews', 'trailer']);
+      const allowed = new Set(['series', 'map', 'actors', 'reviews', 'trailer', 'ai']);
       return allTabs.filter(t => allowed.has(t.key));
     }
   },
@@ -1005,7 +1003,7 @@ export default {
       if (!k) return;
 
       // In simple mode, only Series/Map/Actors exist.
-      if (this.simpleMode && !['series', 'map', 'actors', 'reviews', 'trailer'].includes(k)) {
+      if (this.simpleMode && !['series', 'map', 'actors', 'reviews', 'trailer', 'ai'].includes(k)) {
         return;
       }
 
@@ -1044,7 +1042,6 @@ export default {
       }
 
       if (k === 'ai') {
-        if (this.simpleMode) return;
         this.currentPane = 'ai';
         evtBus.emit('paneChanged', this.currentPane);
         return;

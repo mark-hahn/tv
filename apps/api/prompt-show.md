@@ -27,6 +27,7 @@
   - other shows they have created in order of popularity
 
 - imdb rating and general popularity
+  - don't shoe IMDb rating "out of". show it as "7.7" not "7.7/10"
 
 - whether the show is continuing with future episodes
 

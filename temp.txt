@@ -1,0 +1,91 @@
+### 1. Rotten Tomatoes Fuzzy Matching (Levenshtein)
+This is the only instance of true fuzzy string matching (calculating edit distance). It compares a query string against candidate show titles to find the one with the smallest Levenshtein distance.
+
+*   **File**: [apps/srvr/src/rotten.js](apps/srvr/src/rotten.js#L138)
+*   **Logic**:
+    *   Defines a local `levenshtein(a, b)` function.
+    *   `chooseShow` function iterates through a list of shows, calculates the distance, and keeps the candidate with the minimum distance (`minDist`).
+
+```javascript
+// apps/srvr/src/rotten.js
+
+function levenshtein(a, b) { ... }
+
+function chooseShow(shows, query) {
+  // ...
+  let minDist  = Infinity;
+  let minShows = [];
+  for(const show of shows) {
+    const dist = levenshtein(query, show.titleTrimmed);
+    // ...
+    if(dist < minDist) {
+      minDist = dist;
+      minShows = [show];
+    }
+  }
+  // ...
+}
+```
+
+### 2. Smart Title Matching (Shared Utility)
+This utility is used to find the best match for a title from a list of candidates by trying two levels of normalization string equality.
+
+*   **File**: [packages/share/src/index.js](packages/share/src/index.js#L101)
+*   **Logic**: 
+    1.  Tries to find a candidate that matches the `normalizeBasic` version of the title.
+    2.  If that fails, tries to find a candidate that matches the `normalizeAggressive` version.
+    3.  Falls back to the first non-empty candidate.
+*   **Usage**: Used in `apps/down/src/main.js`.
+
+```javascript
+// packages/share/src/index.js
+
+export function smartTitleMatch(title, titleArray) {
+  // 1) exact basic-normalized match
+  // ...
+  // 2) exact aggressive-normalized match
+  // ...
+  // 3) fallback to first non-empty candidate
+}
+```
+
+### 3. Torrent Title Normalization & Matching
+This logic normalizes torrent titles to check for matches against a show name. While it doesn't iterate a list to find a single "best" one (it filters a list), it encapsulates the core title comparison strategy for torrents.
+
+*   **File**: [apps/api/src/normalize.js](apps/api/src/normalize.js#L93)
+*   **Logic**:
+    *   Generates multiple variations of the title (stripped of punctuation, parentheses, etc.).
+    *   Checks if any variation of the torrent title strictly equals any variation of the show name.
+*   **Usage**: Used in [apps/api/src/search.js](apps/api/src/search.js#L383) during the `nameMatchStage`.
+
+```javascript
+// apps/api/src/normalize.js
+
+export function normalize(torrent, showName) {
+  // ...
+  const cleanVariations = (title) => { ... };
+  
+  const parsedVariations = cleanVariations(parsed.title);
+  const showNameVariations = cleanVariations(showName);
+  
+  let nameMatch = false;
+  // Checks for exact match between any variation pair
+  // ...
+}
+```
+
+### 4. TMDB Simple Match
+A simpler instance that looks for a case-insensitive exact match in search results.
+
+*   **File**: [apps/srvr/src/tmdb.js](apps/srvr/src/tmdb.js#L57)
+*   **Logic**: Uses assertions of `toLowerCase()` equality against `original_name` or `name`.
+
+```javascript
+// apps/srvr/src/tmdb.js
+
+// Find show with matching original_name
+const matchingShow = res.results?.find(show => 
+  show.original_name?.toLowerCase() === showName.toLowerCase() ||
+  show.name?.toLowerCase() === showName.toLowerCase()
+);
+```

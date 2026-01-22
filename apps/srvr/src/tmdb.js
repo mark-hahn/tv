@@ -1,3 +1,4 @@
+import { smartTitleMatch } from '@tv/share';
 import {MovieDb} from "moviedb-promise";
 const moviedb = new MovieDb('327192a334da700f65b882c7a69cb927');
 
@@ -55,10 +56,7 @@ export async function getTmdb(id, param, resolve, reject) {
     const res = await moviedb.searchTv({ query: showName });
     
     // Find show with matching original_name
-    const matchingShow = res.results?.find(show => 
-      show.original_name?.toLowerCase() === showName.toLowerCase() ||
-      show.name?.toLowerCase() === showName.toLowerCase()
-    );
+    const matchingShow = smartTitleMatch(showName, res.results || []);
 
     const showId = matchingShow?.id;
 

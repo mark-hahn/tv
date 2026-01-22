@@ -1,77 +1,8 @@
-import path from 'node:path';
-import fs from 'node:fs';
-
-export const DEFAULT_TV_DATA_DIR = '/root/dev/apps/tv/data';
-
-export function getTvDataDir() {
-  let v = process.env.TV_DATA_DIR;
-  if (typeof v === 'string') {
-    v = v.trim();
-    if (v) return v;
-  }
-  return DEFAULT_TV_DATA_DIR;
-}
-
-export function ensureDir(dir) {
-  try {
-    fs.mkdirSync(dir, { recursive: true });
-  } catch {
-    // ignore
-  }
-}
-
-export function getTvPaths() {
-  const base = getTvDataDir();
-  const secretsDir = path.join(base, 'secrets');
-
-  const apiDir = path.join(base, 'api');
-  const downDir = path.join(base, 'down');
-  const srvrDir = path.join(base, 'srvr');
-
-  return {
-    base,
-    secretsDir,
-    api: {
-      baseDir: apiDir,
-      cookiesDir: path.join(apiDir, 'cookies'),
-      miscDir: path.join(apiDir, 'misc'),
-      dataDir: path.join(apiDir, 'data'),
-    },
-    down: {
-      baseDir: downDir,
-      dataDir: path.join(downDir, 'data'),
-      miscDir: path.join(downDir, 'misc'),
-    },
-    srvr: {
-      baseDir: srvrDir,
-      dataDir: path.join(srvrDir, 'data'),
-      miscDir: path.join(srvrDir, 'misc'),
-    },
-  };
-}
-
-export function ensureTvDataLayout() {
-  const p = getTvPaths();
-  ensureDir(p.base);
-  ensureDir(p.secretsDir);
-  ensureDir(p.api.baseDir);
-  ensureDir(p.api.cookiesDir);
-  ensureDir(p.api.dataDir);
-  ensureDir(p.api.miscDir);
-  ensureDir(p.down.baseDir);
-  ensureDir(p.down.dataDir);
-  ensureDir(p.down.miscDir);
-  ensureDir(p.srvr.baseDir);
-  ensureDir(p.srvr.dataDir);
-  ensureDir(p.srvr.miscDir);
-  return p;
-}
-
-export function normalizeBasic(s) {
+function normalizeBasic(s) {
   return String(s || '').toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
-export function normalizeAggressive(s) {
+function normalizeAggressive(s) {
   let out = String(s || '');
   const idx = out.indexOf('(');
   if (idx >= 0) {
@@ -97,7 +28,7 @@ function coerceCandidateTitle(x) {
 // Strategy:
 // 1) exact basic-normalized match
 // 2) exact aggressive-normalized match
-// 3) fallback to first non-empty candidate
+// 3) fallback to first candidate
 export function smartTitleMatch(title, titleArray) {
   if (!Array.isArray(titleArray) || titleArray.length === 0) {
     return null;
@@ -121,9 +52,5 @@ export function smartTitleMatch(title, titleArray) {
     }
   }
 
-  for (let k = 0; k < titleArray.length; k += 1) {
-    const cand3 = coerceCandidateTitle(titleArray[k]);
-    if (cand3) return cand3;
-  }
-  return null;
+  return coerceCandidateTitle(titleArray[0]);
 }

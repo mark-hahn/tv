@@ -2,6 +2,7 @@
 
 import { chromium } from "playwright";
 import * as util    from "./util.js";
+import { smartTitleMatch } from "@tv/share";
 const {log, start, end} = util.getLog('rott');
 
 const MAX_STR_DIST = 10;
@@ -134,37 +135,6 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Returns integer edit distance between strings a and b
-function levenshtein(a, b) {
-  if (a === b) return 0;
-  if (a.length === 0) return b.length;
-  if (b.length === 0) return a.length;
-
-  // Ensure 'a' is shorter to keep memory O(min(m,n))
-  if (a.length > b.length) [a, b] = [b, a];
-
-  const m = a.length, n = b.length;
-  let prev = new Uint16Array(m + 1);
-  let curr = new Uint16Array(m + 1);
-
-  for (let i = 0; i <= m; i++) prev[i] = i;
-
-  for (let j = 1; j <= n; j++) {
-    curr[0] = j;
-    const bj = b.charCodeAt(j - 1);
-    for (let i = 1; i <= m; i++) {
-      const cost = (a.charCodeAt(i - 1) === bj) ? 0 : 1;
-      const del = prev[i] + 1;        // deletion
-      const ins = curr[i - 1] + 1;    // insertion
-      const sub = prev[i - 1] + cost; // substitution
-      curr[i] = del < ins ? (del < sub ? del : sub) : (ins < sub ? ins : sub);
-    }
-    // swap buffers (no copy)
-    [prev, curr] = [curr, prev];
-  }
-  return prev[m];
-}
-
 async function dismissOverlays(page, timing, spanName = 'dismissOverlays') {
   timing?.start(spanName);
   const selectors = [
@@ -210,46 +180,24 @@ async function dismissOverlays(page, timing, spanName = 'dismissOverlays') {
   );
 }
 
-function mostRecent(shows) {
-  return shows.reduce((prev, curr) => {
-    return (curr.startyear > prev.startyear) ? curr : prev;
-  });
-}
-
 function chooseShow(shows, query) {
-  if(shows.length === 0) return null;
-  if(shows.length === 1) return shows[0];
-  query           =  query.toLowerCase().trim();
-  const queryYear = (query.match(/[^\d](19|20)\d{2}\)?$/) || [null])[0];
-  query           =  query.replace(/[^\d](19|20)\d{2}\)?$/, '').trim();
-  shows.forEach(s => 
-    s.titleTrimmed = s.title.toLowerCase().trim()
-                      .replace(/[^\d](19|20)\d{2}\)?$/, '').trim());
-  let minDist  = Infinity;
-  let minShows = [];
-  for(const show of shows) {
-    const dist = levenshtein(query, show.titleTrimmed);
-    if(debug) log(
-    `dist: "${query}" ~ "${show.titleTrimmed}" => ${dist}`);
-    if(dist > MAX_STR_DIST) continue;
-    if(dist === minDist) {
-      minShows.push(show);
-    }
-    if(dist < minDist) {
-      minDist = dist;
-      minShows = [show];
-    }
+  const match = query.match(/[^\d](19|20)\d{2}\)?$/);
+  let year = null;
+  if (match) {
+    year = match[0].replace(/[^\d]/g, '');
+    query = query.replace(match[0], '').trim();
   }
-  if(debug) log(`matching shows:`, minShows);
-  if(debug) log(`minDist = ${minDist}`);
-  if(minShows.length === 0) return null;
-  if(minShows.length === 1) return minShows[0];
-  if(queryYear) {
-    for(const show of minShows) {
-      if(show.startyear === queryYear) return show;
-    }
+  
+  if (debug) {
+    log(`smartTitleMatch: query="${query}", year="${year}" against ${shows.length} shows`);
   }
-  return mostRecent(minShows);
+
+  const result = smartTitleMatch(query, shows, year);
+  
+  if (debug && result) {
+    log(`smartTitleMatch selected: "${result.title}" (${result.startyear})`);
+  }
+  return result;
 }
 
 let queryUrl;

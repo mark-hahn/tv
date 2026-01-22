@@ -1,91 +1,57 @@
-### 1. Rotten Tomatoes Fuzzy Matching (Levenshtein)
-This is the only instance of true fuzzy string matching (calculating edit distance). It compares a query string against candidate show titles to find the one with the smallest Levenshtein distance.
+# Ideas for Adding Year Priority to `smartTitleMatch`
 
-*   **File**: [apps/srvr/src/rotten.js](apps/srvr/src/rotten.js#L138)
+## 1. Implicit Extraction & Filtering (Magic)
+*   **Concept**: The function automatically extracts a 4-digit year from the input `title` string (e.g., "The Office (2005)").
+*   **Requirement**: Candidate objects in `titleArray` must have a recognizable year property (e.g., `year`, `startYear`, `releaseDate`) OR contain the year in their string representation.
 *   **Logic**:
-    *   Defines a local `levenshtein(a, b)` function.
-    *   `chooseShow` function iterates through a list of shows, calculates the distance, and keeps the candidate with the minimum distance (`minDist`).
+    1.  Regex extract `(19|20)\d{2}` from the query title.
+    2.  If a year is found, create a "preferred" subset of candidates that match that year.
+    3.  If the preferred subset is not empty, run the name matching logic (Exact -> Levenshtein) ONLY on that subset.
+    4.  If the subset is empty (or no year in query), run logic on the full list.
+*   **Pros**: Backward compatible if implemented carefully; "just works" for strings like "Show (Year)".
+*   **Cons**: Relies on guessing which property holds the year in candidate objects (`.year`? `.startyear`? `.release_date`?).
 
-```javascript
-// apps/srvr/src/rotten.js
-
-function levenshtein(a, b) { ... }
-
-function chooseShow(shows, query) {
-  // ...
-  let minDist  = Infinity;
-  let minShows = [];
-  for(const show of shows) {
-    const dist = levenshtein(query, show.titleTrimmed);
-    // ...
-    if(dist < minDist) {
-      minDist = dist;
-      minShows = [show];
-    }
-  }
-  // ...
-}
-```
-
-### 2. Smart Title Matching (Shared Utility)
-This utility is used to find the best match for a title from a list of candidates by trying two levels of normalization string equality.
-
-*   **File**: [packages/share/src/index.js](packages/share/src/index.js#L101)
-*   **Logic**: 
-    1.  Tries to find a candidate that matches the `normalizeBasic` version of the title.
-    2.  If that fails, tries to find a candidate that matches the `normalizeAggressive` version.
-    3.  Falls back to the first non-empty candidate.
-*   **Usage**: Used in `apps/down/src/main.js`.
-
-```javascript
-// packages/share/src/index.js
-
-export function smartTitleMatch(title, titleArray) {
-  // 1) exact basic-normalized match
-  // ...
-  // 2) exact aggressive-normalized match
-  // ...
-  // 3) fallback to first non-empty candidate
-}
-```
-
-### 3. Torrent Title Normalization & Matching
-This logic normalizes torrent titles to check for matches against a show name. While it doesn't iterate a list to find a single "best" one (it filters a list), it encapsulates the core title comparison strategy for torrents.
-
-*   **File**: [apps/api/src/normalize.js](apps/api/src/normalize.js#L93)
+## 2. Explicit Year Argument (Clear & Robust)
+*   **Concept**: Change signature to `smartTitleMatch(title, titleArray, options)`.
+*   **Usage**: `smartTitleMatch("The Office", candidates, { year: 2005 })`.
 *   **Logic**:
-    *   Generates multiple variations of the title (stripped of punctuation, parentheses, etc.).
-    *   Checks if any variation of the torrent title strictly equals any variation of the show name.
-*   **Usage**: Used in [apps/api/src/search.js](apps/api/src/search.js#L383) during the `nameMatchStage`.
+    *   If `options.year` is present, filtering happens explicitly before name matching.
+*   **Pros**: Deterministic. Callers usually already have the year separated (e.g., from TMDB response or folder structure).
+*   **Cons**: Requires changing call sites to pass the extra data.
 
+## 3. Weighted Scoring System (Fuzzy)
+*   **Concept**: Abandon the "Pass 1, Pass 2" stage approach for a single scoring pass.
+*   **Logic**:
+    *   Assign points for specific criteria:
+        *   Exact Name Match: +100
+        *   Fuzzy Name Match: + (100 - LevenshteinDistance * 5)
+        *   Year Match: +50
+    *   Return the candidate with the highest total score.
+*   **Pros**: Handles nuance better (e.g., "Perfect name match but missing year info" might beat "Wrong name but correct year").
+*   **Cons**: Harder to debug why a match happened; complex to tune weights.
+
+## 4. Standardized Candidate Interface (Clean Code)
+*   **Concept**: Enforce a strict structure for `titleArray`.
+*   **Logic**:
+    *   `titleArray` must contain objects matching `{ title: string, year?: number|string }`.
+    *   Caller is responsible for mapping their data (TMDB, Rotten, etc.) to this format before calling.
+*   **Pros**: Keeps the utility simple and logic-free regarding "how to find the year property".
+*   **Cons**: Adds work for every caller to `.map()` their data first.
+
+## Recommendation
+**Option 2 (Explicit Options)** is likely the best balance. It keeps the function pure but allows the caller to provide the critical disambiguation context without relying on string parsing magic inside the matching utility.
+
+Example wrapper for Option 2:
 ```javascript
-// apps/api/src/normalize.js
-
-export function normalize(torrent, showName) {
-  // ...
-  const cleanVariations = (title) => { ... };
-  
-  const parsedVariations = cleanVariations(parsed.title);
-  const showNameVariations = cleanVariations(showName);
-  
-  let nameMatch = false;
-  // Checks for exact match between any variation pair
-  // ...
+export function smartTitleMatch(title, candidates, { year } = {}) {
+   let pool = candidates;
+   
+   // Optional optimization: Filter pool by year first if provided
+   if (year) {
+      const yearMatches = pool.filter(c => getCandidateYear(c) == year);
+      if (yearMatches.length > 0) pool = yearMatches;
+   }
+   
+   // ... proceed with name matching on `pool` ...
 }
-```
-
-### 4. TMDB Simple Match
-A simpler instance that looks for a case-insensitive exact match in search results.
-
-*   **File**: [apps/srvr/src/tmdb.js](apps/srvr/src/tmdb.js#L57)
-*   **Logic**: Uses assertions of `toLowerCase()` equality against `original_name` or `name`.
-
-```javascript
-// apps/srvr/src/tmdb.js
-
-// Find show with matching original_name
-const matchingShow = res.results?.find(show => 
-  show.original_name?.toLowerCase() === showName.toLowerCase() ||
-  show.name?.toLowerCase() === showName.toLowerCase()
-);
 ```

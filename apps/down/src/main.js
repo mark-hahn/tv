@@ -910,6 +910,9 @@
         // Prefer a title match across all results (basic normalization first, then aggressive).
         var results = Array.isArray(body && body.data) ? body.data : [];
         var names = results.map((r) => r && r.name).filter((nm) => nm);
+        
+        // Pass null for year as we don't have it here, or extract if available
+        // existing code didn't use year, so we pass undefined/null
         seriesName = smartTitleMatch(title, names);
         log('tvdb got:', {seriesName, title});
         if (map[seriesName]) {

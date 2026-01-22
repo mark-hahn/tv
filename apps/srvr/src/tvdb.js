@@ -405,7 +405,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
          overview, remoteIds, averageRuntime,
          originalCountry, originalLanguage, 
          originalNetwork:originalNetworkIn,
-         status:statusIn}      = extResObj.data;
+         status:statusIn, trailers:trailersIn}      = extResObj.data;
   const image = getTvdbImageUrl(extResObj);
   const characters = getTvdbCharacters(extResObj);
   let lastAired = lastAiredIn ?? firstAired;
@@ -417,7 +417,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   // remoteIds come from tvdb
   const remotes = await getRemotes(show, remoteIds);
   const saved = Date.now();
-  const trailers = allTvdb[name]?.trailers;
+  const trailers = trailersIn || allTvdb[name]?.trailers;
 
   let tvdbData = {tvdbId, name, originalNetwork,
                   seasonCount, episodeCount, watchedCount,

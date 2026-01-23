@@ -3,6 +3,7 @@ import fsp from 'fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import https from 'node:https';
+import dns from 'node:dns/promises';
 import { spawn } from 'child_process';
 import axios from 'axios';
 import FormData from 'form-data';
@@ -26,6 +27,49 @@ const minChunkSec = trimSec + overlapSec + trimSec;
 const audioConfig = { rate: 48000, bitrate: '256k' };
 
 const httpsAgent = new https.Agent({ keepAlive: true });
+
+let didLogApiNetInfo = false;
+
+function formatAddrList(addrs) {
+  if (!Array.isArray(addrs) || addrs.length === 0) return 'none';
+  return addrs
+    .map((a) => {
+      const address = a?.address ?? 'unknown';
+      const family = a?.family ?? 'unknown';
+      return `${address} (IPv${family})`;
+    })
+    .join(', ');
+}
+
+async function logApiNetInfoOnce(logger, startMs) {
+  if (!logger || didLogApiNetInfo) return;
+  didLogApiNetInfo = true;
+
+  const httpProxy = process.env.HTTP_PROXY || process.env.http_proxy || '';
+  const httpsProxy = process.env.HTTPS_PROXY || process.env.https_proxy || '';
+  const noProxy = process.env.NO_PROXY || process.env.no_proxy || '';
+  const tlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+
+  logger.log(
+    `[${ts(startMs)}] API net: keepAlive=${httpsAgent?.options?.keepAlive ? '1' : '0'} HTTP_PROXY=${httpProxy ? 'set' : 'unset'} HTTPS_PROXY=${httpsProxy ? 'set' : 'unset'} NO_PROXY=${noProxy ? 'set' : 'unset'} NODE_TLS_REJECT_UNAUTHORIZED=${tlsReject ?? 'unset'}`,
+  );
+
+  try {
+    const addrs = await dns.lookup('api.mistral.ai', { all: true });
+    logger.log(`[${ts(startMs)}] API dns: api.mistral.ai -> ${formatAddrList(addrs)}`);
+  } catch (e) {
+    logger.error(`[${ts(startMs)}] API dns lookup failed: ${e?.message || e}`);
+  }
+}
+
+function previewText(s, maxChars = 2000) {
+  const str = typeof s === 'string' ? s : String(s ?? '');
+  if (str.length <= maxChars) return str;
+  const headLen = Math.max(0, maxChars - 200);
+  const head = str.slice(0, headLen);
+  const tail = str.slice(-200);
+  return `${head}\n...<truncated ${str.length - headLen - 200} chars>...\n${tail}`;
+}
 
 function readPositiveIntEnv(name, fallback) {
   const raw = process.env[name];
@@ -261,6 +305,8 @@ async function callTranscriptionsApi({ apiKey, uploadInfo, signal, logger, start
   const apiStart = Date.now();
   let attempt = 0;
 
+  await logApiNetInfoOnce(logger, startMs);
+
   while (true) {
     attempt++;
 
@@ -277,7 +323,12 @@ async function callTranscriptionsApi({ apiKey, uploadInfo, signal, logger, start
         logger.log(
           `[${ts(startMs)}] API request: attempt ${attempt}/${MAX_RETRIES} timeout=${API_TIMEOUT_MS}ms bytes=${uploadInfo.size}`,
         );
+        logger.log(
+          `[${ts(startMs)}] API call: POST https://api.mistral.ai/v1/audio/transcriptions model=${model} mime=${uploadInfo.mime} filename=${uploadInfo.filename}`,
+        );
       }
+
+      const reqStart = Date.now();
       const response = await axios.post(
         'https://api.mistral.ai/v1/audio/transcriptions',
         form,
@@ -288,6 +339,15 @@ async function callTranscriptionsApi({ apiKey, uploadInfo, signal, logger, start
           httpsAgent,
         },
       );
+
+      if (logger) {
+        const elapsedMs = Date.now() - reqStart;
+        const reqId = response?.headers?.['x-request-id'] || response?.headers?.['request-id'] || response?.headers?.['x-requestid'];
+        const ct = response?.headers?.['content-type'];
+        logger.log(
+          `[${ts(startMs)}] API response: status=${response?.status} elapsedMs=${elapsedMs} requestId=${reqId || 'unknown'} contentType=${ct || 'unknown'}`,
+        );
+      }
 
       if (response?.status === 200) {
         response.data.delay = Date.now() - apiStart;
@@ -303,6 +363,11 @@ async function callTranscriptionsApi({ apiKey, uploadInfo, signal, logger, start
       const body = err?.response?.data || err?.toString();
       if (logger) {
         logger.error(`[${ts(startMs)}] API request failed (attempt ${attempt}): ${status}`);
+        const cfg = err?.config;
+        const reqId = err?.response?.headers?.['x-request-id'] || err?.response?.headers?.['request-id'] || err?.response?.headers?.['x-requestid'];
+        logger.error(
+          `[${ts(startMs)}] API error detail: code=${err?.code || 'unknown'} errno=${err?.errno || 'unknown'} syscall=${err?.syscall || 'unknown'} address=${err?.address || 'unknown'} port=${err?.port || 'unknown'} url=${cfg?.url || 'unknown'} timeout=${cfg?.timeout ?? 'unknown'} requestId=${reqId || 'unknown'}`,
+        );
         if (body) logger.error(JSON.stringify(body));
       }
 
@@ -324,6 +389,8 @@ async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startM
   const base64Audio = buf.toString('base64');
   const apiStart = Date.now();
   let attempt = 0;
+
+  await logApiNetInfoOnce(logger, startMs);
 
   // Keep it deterministic and machine-readable.
   const prompt = [
@@ -359,7 +426,12 @@ async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startM
         logger.log(
           `[${ts(startMs)}] API request: attempt ${attempt}/${MAX_RETRIES} timeout=${API_TIMEOUT_MS}ms bytes=${uploadInfo.size} base64Chars=${base64Audio.length}`,
         );
+        logger.log(
+          `[${ts(startMs)}] API call: POST https://api.mistral.ai/v1/chat/completions model=${model} temp=${apiTemperature} promptChars=${prompt.length}`,
+        );
       }
+
+      const reqStart = Date.now();
       const response = await axios.post(
         'https://api.mistral.ai/v1/chat/completions',
         body,
@@ -373,9 +445,34 @@ async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startM
         },
       );
 
+      if (logger) {
+        const elapsedMs = Date.now() - reqStart;
+        const reqId = response?.headers?.['x-request-id'] || response?.headers?.['request-id'] || response?.headers?.['x-requestid'];
+        const ct = response?.headers?.['content-type'];
+        const finishReason = response?.data?.choices?.[0]?.finish_reason;
+        logger.log(
+          `[${ts(startMs)}] API response: status=${response?.status} elapsedMs=${elapsedMs} requestId=${reqId || 'unknown'} contentType=${ct || 'unknown'} finish_reason=${finishReason || 'unknown'}`,
+        );
+      }
+
       if (response?.status === 200) {
         const content = response?.data?.choices?.[0]?.message?.content;
-        const parsed = typeof content === 'string' ? JSON.parse(content) : content;
+        let parsed;
+        try {
+          parsed = typeof content === 'string' ? JSON.parse(content) : content;
+        } catch (e) {
+          const finishReason = response?.data?.choices?.[0]?.finish_reason;
+          if (logger) {
+            logger.error(
+              `[${ts(startMs)}] API parse failed (attempt ${attempt}): ${e?.message || e}`,
+            );
+            logger.error(
+              `[${ts(startMs)}] API parse context: contentType=${typeof content} contentChars=${typeof content === 'string' ? content.length : 'n/a'} finish_reason=${finishReason || 'unknown'}`,
+            );
+            logger.error(`[${ts(startMs)}] API raw content preview:\n${previewText(content)}`);
+          }
+          throw e;
+        }
         const segs = Array.isArray(parsed?.segments) ? parsed.segments : null;
         if (!segs) throw new Error('Chat response missing segments');
 
@@ -400,6 +497,11 @@ async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startM
       const body = err?.response?.data || err?.toString();
       if (logger) {
         logger.error(`[${ts(startMs)}] API request failed (attempt ${attempt}): ${status}`);
+        const cfg = err?.config;
+        const reqId = err?.response?.headers?.['x-request-id'] || err?.response?.headers?.['request-id'] || err?.response?.headers?.['x-requestid'];
+        logger.error(
+          `[${ts(startMs)}] API error detail: code=${err?.code || 'unknown'} errno=${err?.errno || 'unknown'} syscall=${err?.syscall || 'unknown'} address=${err?.address || 'unknown'} port=${err?.port || 'unknown'} url=${cfg?.url || 'unknown'} timeout=${cfg?.timeout ?? 'unknown'} requestId=${reqId || 'unknown'}`,
+        );
         if (body) logger.error(JSON.stringify(body));
       }
 

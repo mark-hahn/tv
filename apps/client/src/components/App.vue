@@ -69,7 +69,7 @@
              :active="currentPane === 'trailer'"
           )
 
-          Mistral(
+          Ai(
             v-show="currentPane === 'ai'"
             style="width:100%; height:100%;"
             :simpleMode="simpleMode"
@@ -213,7 +213,7 @@
            :active="currentPane === 'trailer'"
         )
 
-        Mistral(
+        Ai(
           v-show="currentPane === 'ai'"
           style="width:100%; height:100%;"
           :simpleMode="simpleMode"
@@ -338,7 +338,7 @@ import History  from './history.vue';
 import TvProc   from './tvproc.vue';
 import FilePane from './file.vue';
 import Trailer  from './trailer.vue';
-import Mistral  from './mistral.vue';
+import Ai       from './ai.vue';
 import evtBus   from '../evtBus.js';
 import * as tvdb from '../tvdb.js';
 import * as emby from '../emby.js';
@@ -352,7 +352,7 @@ const SIMPLE_PORTRAIT_SPLIT = 35;
 
 export default {
   name: "App",
-  components: { List, Series, Map, Actors, Reviews, Buttons, Reel, Torrents, Subs, Flex, History, TvProc, FilePane, Trailer, Mistral },
+  components: { List, Series, Map, Actors, Reviews, Buttons, Reel, Torrents, Subs, Flex, History, TvProc, FilePane, Trailer, Ai },
   data() { 
     return { 
       // Must be known before first render so non-simple panes never mount in simple mode.

@@ -63,7 +63,7 @@ function normalizePrompt(p) {
 }
 
 export default {
-  name: 'Mistral',
+  name: 'Ai',
 
   props: {
     simpleMode: {

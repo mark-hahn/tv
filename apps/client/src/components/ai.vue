@@ -338,15 +338,6 @@ export default {
         return;
       }
 
-      // Debug: always log the fully-filled prompt template.
-      // (Useful even if we early-return due to missing API key.)
-      try {
-        console.log('[AI] Final prompt (filled template):');
-        console.log(prompt);
-      } catch {
-        // ignore
-      }
-
       const apiKey = this.apiKey;
       if (!apiKey) {
         this.errMsg = 'Missing Mistral API key.';

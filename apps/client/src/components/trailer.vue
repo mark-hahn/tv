@@ -105,11 +105,6 @@ export default {
     return false; // prevent error from bubbling up further
   },
   methods: {
-    isEnglishTrailer(t) {
-      const lang = (t?.language || t?.iso_639_1 || t?.lang || '').toString().toLowerCase();
-      if (!lang) return true; // allow legacy entries with no language info
-      return lang === 'eng' || lang === 'en' || lang === 'english' || lang.startsWith('en-') || lang.startsWith('en_');
-    },
     onPreviewMode(active) {
       this.previewMode = !!active;
       if (!this.previewMode) {
@@ -272,7 +267,7 @@ export default {
 
       const tvdbData = data?.tvdbData;
       if (tvdbData && Array.isArray(tvdbData.trailers)) {
-        this.trailers = tvdbData.trailers.filter(this.isEnglishTrailer);
+        this.trailers = tvdbData.trailers;
       } else {
         this.trailers = [];
       }

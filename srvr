@@ -19,7 +19,7 @@ if [[ ! -d "$ROOT_DIR/apps" ]]; then
 fi
 
 usage() {
-  echo "Usage: $(basename "$0") [api|down|srvr|client|share|all]" >&2
+  echo "Usage: $(basename "$0") [api|down|srvr|asr|client|share|all]" >&2
   echo "Env: TV_REMOTE_BASE (default: /root/dev/apps/tv on remote)" >&2
   echo "Env: TV_DATA_DIR (default: /root/dev/apps/tv-data on remote, used for pm2 env)" >&2
   exit 1
@@ -30,6 +30,7 @@ pm2_name_for_project() {
     api)  printf '%s' "tv-api" ;;
     down) printf '%s' "tv-down" ;;
     srvr) printf '%s' "tv-srvr" ;;
+    asr)  printf '%s' "tv-asr" ;;
     client) printf '%s' "tv-client" ;;
     share) printf '%s' "tv-share" ;;
     *) return 1 ;;
@@ -74,6 +75,14 @@ remote_sync_app() {
   local_dir="$(local_app_dir_for_project "$project")"
   remote_dir="$(remote_app_dir_for_project "$project")"
 
+  # Belt-and-suspenders: never overwrite remote secrets for ASR.
+  # Secrets are managed directly on the remote host.
+  local -a extra_excludes=()
+  if [[ "$project" == "asr" ]]; then
+    extra_excludes+=(--exclude 'secrets/')
+    extra_excludes+=(--exclude 'logs/')
+  fi
+
   if [[ ! -d "$local_dir" ]]; then
     echo "Error: missing local app dir: $local_dir" >&2
     exit 1
@@ -91,6 +100,7 @@ remote_sync_app() {
   ssh "$SSH_HOST" "mkdir -p '$(dirname "$remote_dir")'"
 
   rsync -az    \
+    "${extra_excludes[@]}" \
     --exclude 'node_modules/' \
     --exclude '.turbo/' \
     --exclude 'dist/' \
@@ -156,13 +166,14 @@ remote_deploy_one_no_restart() {
 }
 
 case "${1:-all}" in
-  api|down|srvr|client|share)
+  api|down|srvr|asr|client|share)
     remote_deploy_one_no_restart "$1"
     remote_pm2_restart_all_silent
     ;;
   all|"" )
     remote_deploy_one_no_restart api
     remote_deploy_one_no_restart srvr
+    remote_deploy_one_no_restart asr
     # Legacy flat deploy mode compabitility (share) - ensures packages are present
     remote_deploy_one_no_restart share
     

@@ -86,5 +86,22 @@ module.exports = {
         TV_DATA_DIR: '/root/dev/apps/tv/data',
       },
     },
+    {
+      name: 'tv-asr',
+      cwd: appCwd('asr'),
+      script: 'src/server.js',
+      interpreter: nodeInterpreter,
+      time: true,
+      env: {
+        NODE_ENV: 'production',
+        TV_DATA_DIR: '/root/dev/apps/tv/data',
+        PORT: '3407',
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        TV_DATA_DIR: '/root/dev/apps/tv/data',
+        PORT: '3407',
+      },
+    },
   ],
 };

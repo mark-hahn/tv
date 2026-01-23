@@ -69,6 +69,8 @@ export default {
       errMsg: '',
       resultText: '',
 
+      currentTvdbData: null,
+
       previewMode: false,
       previewAddBusy: false,
       previewSrchChoice: null,
@@ -90,6 +92,34 @@ export default {
       if (!s) return '';
       const raw = s?.ProviderIds?.Tvdb ?? s?.TvdbId ?? s?.tvdbId ?? s?.tvdb_id ?? '';
       return String(raw || '').trim();
+    },
+
+    imdbId() {
+      const s = this.activeShow;
+      const rawFromShow = s?.ProviderIds?.Imdb ?? s?.ProviderIds?.IMDb ?? s?.ImdbId ?? s?.imdbId ?? s?.imdb_id ?? '';
+      const fromShow = String(rawFromShow || '').trim();
+      if (fromShow) return fromShow;
+
+      const d = this.currentTvdbData;
+      const rawFromTvdb = d?.imdb_id ?? d?.imdbId ?? d?.imdb ?? d?.ProviderIds?.Imdb ?? d?.ProviderIds?.IMDb ?? '';
+      const fromTvdb = String(rawFromTvdb || '').trim();
+      if (fromTvdb) return fromTvdb;
+
+      // Fallback: parse IMDB id from tvdbData.remotes URL (e.g. https://www.imdb.com/title/tt3846642)
+      try {
+        const remotes = Array.isArray(d?.remotes) ? d.remotes : [];
+        const imdbRemote = remotes.find(r => {
+          const nm = String(r?.name || '').toUpperCase();
+          return nm === 'IMDB' || nm.startsWith('IMDB ');
+        });
+        const url = String(imdbRemote?.url || '').trim();
+        if (!url) return '';
+
+        const m = url.match(/\/title\/(tt\d+)/i) || url.match(/(tt\d{5,})/i);
+        return m ? String(m[1] || m[0]).trim() : '';
+      } catch {
+        return '';
+      }
     },
 
     canRun() {
@@ -147,6 +177,8 @@ export default {
     evtBus.on('previewSrchChoice', this.onPreviewSrchChoice);
     evtBus.on('addPreviewShowDone', this.onAddPreviewShowDone);
 
+    evtBus.on('tvdbDataReady', this.onTvdbDataReady);
+
     // If the component remounts (or the page reloads), restore cached content immediately.
     this.restoreCachedResult();
 
@@ -176,11 +208,33 @@ export default {
     evtBus.off('previewSrchChoice', this.onPreviewSrchChoice);
     evtBus.off('addPreviewShowDone', this.onAddPreviewShowDone);
 
+    evtBus.off('tvdbDataReady', this.onTvdbDataReady);
+
     if (this._autoRunTimer) clearTimeout(this._autoRunTimer);
     this._autoRunTimer = null;
   },
 
   methods: {
+
+    onTvdbDataReady(data) {
+      try {
+        const incomingShow = data?.show || null;
+        if (!incomingShow) return;
+        const incomingId = incomingShow?.Id != null ? String(incomingShow.Id) : '';
+        const incomingName = incomingShow?.Name != null ? String(incomingShow.Name) : '';
+
+        const currentId = this.activeShow?.Id != null ? String(this.activeShow.Id) : '';
+        const currentName = this.activeShow?.Name != null ? String(this.activeShow.Name) : '';
+
+        const sameId = incomingId && currentId && incomingId === currentId;
+        const sameName = !incomingId && !currentId && incomingName && currentName && incomingName === currentName;
+        if (!sameId && !sameName) return;
+
+        this.currentTvdbData = data?.tvdbData ?? null;
+      } catch {
+        // ignore
+      }
+    },
 
     onPreviewMode(active) {
       this.previewMode = !!active;
@@ -266,13 +320,32 @@ export default {
       if (!show) throw new Error('no show selected');
 
       const tvdbId = this.tvdbId;
+      const imdbId = this.imdbId;
       return tmpl
         .split('<tvdb id>').join(tvdbId)
+        .split('<imdb id>').join(imdbId)
         .split('<show name>').join(show);
     },
 
     async runPrompt() {
       if (!this.canRun || this.busy) return;
+
+      let prompt = '';
+      try {
+        prompt = this.buildPrompt();
+      } catch (e) {
+        this.errMsg = e?.message ? String(e.message) : String(e);
+        return;
+      }
+
+      // Debug: always log the fully-filled prompt template.
+      // (Useful even if we early-return due to missing API key.)
+      try {
+        console.log('[AI] Final prompt (filled template):');
+        console.log(prompt);
+      } catch {
+        // ignore
+      }
 
       const apiKey = this.apiKey;
       if (!apiKey) {
@@ -280,7 +353,6 @@ export default {
         return;
       }
 
-      const prompt = this.buildPrompt();
       const token = ++this._runToken;
 
       this.busy = true;

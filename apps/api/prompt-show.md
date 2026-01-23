@@ -1,7 +1,7 @@
 - forget all previous ai context. start a new conversation.
 - follow these instructions exactly. check your output against your requirements.
-- identify a tv show with tvdb id "<tvdb id>" with fallback to "<show name>".
-- don't show header like "Here’s the requested information" or like "The TV show with TVDB ID 408436 is Bad Monkey. Here’s the requested information:"
+- Look up the show using these identifiers in priority order and actually use them in your search queries: first the IMDb title id <imdb id> (search as site:imdb.com/title/<imdb id>); if that fails, use the TVDB series id <tvdb id>; only if all ids fail, search by show name "<show name>".
+- do not say anything about how the show was found or how you looked for it. don't show header like "Here’s the requested information" or like "The TV show with TVDB ID 408436 is Bad Monkey" or "Here’s the requested information:" or like "The show with IMDb ID tt33270420"
 
 - this is extremly important: do not make show names bold after the first occurance.
 

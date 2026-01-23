@@ -2,6 +2,7 @@ import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import https from 'node:https';
 import { spawn } from 'child_process';
 import axios from 'axios';
 import FormData from 'form-data';
@@ -23,6 +24,15 @@ const offsetSec = chunkSec - trimSec - overlapSec - trimSec;
 const minChunkSec = trimSec + overlapSec + trimSec;
 
 const audioConfig = { rate: 48000, bitrate: '256k' };
+
+const httpsAgent = new https.Agent({ keepAlive: true });
+
+function readPositiveIntEnv(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+}
 
 function ts(startMs) {
   const secs = Math.floor((Date.now() - startMs) / 1000);
@@ -238,7 +248,9 @@ async function getFlac(wavPath, tmpDir, { signal, logger } = {}) {
 
 const MAX_RETRIES = 5;
 const BASE_DELAY_MS = 5000;
-const API_TIMEOUT = 120000;
+// Voxtral can take longer than 120s for 120s chunks.
+// Allow override via env for slow/loaded API periods.
+const API_TIMEOUT_MS = readPositiveIntEnv('MISTRAL_ASR_TIMEOUT_MS', 10 * 60 * 1000);
 
 function isVoxtralSmall(modelId) {
   return String(modelId || '').toLowerCase().includes('voxtral-small');
@@ -261,13 +273,19 @@ async function callTranscriptionsApi({ apiKey, uploadInfo, signal, logger, start
     form.append('temperature', String(apiTemperature));
 
     try {
+      if (logger) {
+        logger.log(
+          `[${ts(startMs)}] API request: attempt ${attempt}/${MAX_RETRIES} timeout=${API_TIMEOUT_MS}ms bytes=${uploadInfo.size}`,
+        );
+      }
       const response = await axios.post(
         'https://api.mistral.ai/v1/audio/transcriptions',
         form,
         {
           headers: { Authorization: `Bearer ${apiKey}`, ...form.getHeaders() },
-          timeout: API_TIMEOUT,
+          timeout: API_TIMEOUT_MS,
           signal,
+          httpsAgent,
         },
       );
 
@@ -281,7 +299,7 @@ async function callTranscriptionsApi({ apiKey, uploadInfo, signal, logger, start
     } catch (err) {
       if (signal?.aborted) throw new Error('killed');
 
-      const status = err?.response?.status || err.message || 'unknown';
+      const status = err?.response?.status || err?.code || err.message || 'unknown';
       const body = err?.response?.data || err?.toString();
       if (logger) {
         logger.error(`[${ts(startMs)}] API request failed (attempt ${attempt}): ${status}`);
@@ -293,13 +311,17 @@ async function callTranscriptionsApi({ apiKey, uploadInfo, signal, logger, start
       }
     }
 
-    const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+    const backoff = Math.min(60000, BASE_DELAY_MS * Math.pow(2, attempt - 1));
+    const jitter = Math.floor(Math.random() * 500);
+    const delay = backoff + jitter;
+    if (logger) logger.log(`[${ts(startMs)}] Waiting ${Math.round(delay / 1000)}s before retry...`);
     await new Promise((r) => setTimeout(r, delay));
   }
 }
 
 async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startMs }) {
   const buf = await fsp.readFile(uploadInfo.path);
+  const base64Audio = buf.toString('base64');
   const apiStart = Date.now();
   let attempt = 0;
 
@@ -325,7 +347,7 @@ async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startM
         {
           role: 'user',
           content: [
-            { type: 'input_audio', input_audio: buf.toString('base64') },
+            { type: 'input_audio', input_audio: base64Audio },
             { type: 'text', text: prompt },
           ],
         },
@@ -333,15 +355,21 @@ async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startM
     };
 
     try {
+      if (logger) {
+        logger.log(
+          `[${ts(startMs)}] API request: attempt ${attempt}/${MAX_RETRIES} timeout=${API_TIMEOUT_MS}ms bytes=${uploadInfo.size} base64Chars=${base64Audio.length}`,
+        );
+      }
       const response = await axios.post(
         'https://api.mistral.ai/v1/chat/completions',
         body,
         {
           headers: { Authorization: `Bearer ${apiKey}` },
-          timeout: API_TIMEOUT,
+          timeout: API_TIMEOUT_MS,
           signal,
           maxBodyLength: Infinity,
           maxContentLength: Infinity,
+          httpsAgent,
         },
       );
 
@@ -368,7 +396,7 @@ async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startM
     } catch (err) {
       if (signal?.aborted) throw new Error('killed');
 
-      const status = err?.response?.status || err.message || 'unknown';
+      const status = err?.response?.status || err?.code || err.message || 'unknown';
       const body = err?.response?.data || err?.toString();
       if (logger) {
         logger.error(`[${ts(startMs)}] API request failed (attempt ${attempt}): ${status}`);
@@ -688,6 +716,7 @@ export async function runAsrJob(job, { signal, onProgress, logger } = {}) {
     logger.log(`   Noise Reduction:   true`);
     logger.log(`   API Model:         ${model}`);
     logger.log(`   API Response:      ${apiResponseFormat}`);
+    logger.log(`   API Timeout:       ${Math.round(API_TIMEOUT_MS / 1000)}s`);
     logger.log(`   File Size Limit:   ${(fileLimit / 1024 / 1024).toFixed(1)}MB`);
     logger.log('');
     logger.log(`Found ${files.length} video file(s) to process`);

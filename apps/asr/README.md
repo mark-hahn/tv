@@ -22,6 +22,11 @@ The server uses Mistral's `POST /v1/audio/transcriptions` endpoint.
 - Default model: `voxtral-small-latest`
 - Override with env var: `MISTRAL_ASR_MODEL`
 
+## Timeouts
+
+- Default API timeout: 10 minutes
+- Override with env var: `MISTRAL_ASR_TIMEOUT_MS` (milliseconds)
+
 ## Notes
 
 - Requires `ffmpeg` and `ffprobe` available on the host.

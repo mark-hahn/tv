@@ -15,6 +15,9 @@ import { parse as parseTorrentTitle } from 'parse-torrent-title';
 
 const dontupload  = false;
 
+const SRVR_ROOT_DIR = path.dirname(new URL(import.meta.url).pathname);
+const CONFIG_DIR = path.join(SRVR_ROOT_DIR, 'config');
+
 const DEFAULT_TV_DATA_DIR = '/root/dev/apps/tv/data';
 const TV_DATA_DIR = (typeof process.env.TV_DATA_DIR === 'string' && process.env.TV_DATA_DIR.trim())
   ? process.env.TV_DATA_DIR.trim()
@@ -54,28 +57,60 @@ function firstExistingPath(paths) {
 
 ensureDir(SRVR_DATA_DIR);
 ensureDir(SECRETS_DIR);
+// Config lives alongside this module (not dependent on process.cwd()).
+ensureDir(CONFIG_DIR);
 
 process.setMaxListeners(50);
 const tvDir = '/mnt/media/tv';
 const exec  = utilNode.promisify(cp.exec);
 
-function readTextOr(filePath, fallback) {
-  try {
-    return fs.readFileSync(filePath, 'utf8');
-  } catch {
-    return fallback;
+function readTextOr(filePathOrPaths, fallback) {
+  const paths = Array.isArray(filePathOrPaths) ? filePathOrPaths : [filePathOrPaths];
+  for (const p of paths) {
+    try {
+      return fs.readFileSync(p, 'utf8');
+    } catch {}
   }
+  return fallback;
 }
 
-function readJsonTextOr(filePath, fallbackObj) {
-  return readTextOr(filePath, JSON.stringify(fallbackObj));
+function readJsonTextOr(filePathOrPaths, fallbackObj) {
+  return readTextOr(filePathOrPaths, JSON.stringify(fallbackObj));
 }
 
-const headerStr  = readTextOr('config/config1-header.txt',   '');
-const rejectStr  = readJsonTextOr('config/config2-rejects.json', []);
-const middleStr  = readTextOr('config/config3-middle.txt',   '');
-const pickupStr  = readJsonTextOr('config/config4-pickups.json', []);
-const footerStr  = readTextOr('config/config5-footer.txt',   '');
+function configReadCandidates(relativePath) {
+  // Prefer CWD for backwards compatibility, but fall back to module dir.
+  return [
+    path.join(process.cwd(), relativePath),
+    path.join(SRVR_ROOT_DIR, relativePath),
+  ];
+}
+
+function readTextOrWithChosenPath(filePathOrPaths, fallback) {
+  const paths = Array.isArray(filePathOrPaths) ? filePathOrPaths : [filePathOrPaths];
+  for (const p of paths) {
+    try {
+      return { text: fs.readFileSync(p, 'utf8'), chosenPath: p };
+    } catch {}
+  }
+  return { text: fallback, chosenPath: null };
+}
+
+function configWritePath(fileName) {
+  return path.join(CONFIG_DIR, fileName);
+}
+
+const headerLoad = readTextOrWithChosenPath(configReadCandidates('config/config1-header.txt'), '');
+const rejectLoad = readTextOrWithChosenPath(configReadCandidates('config/config2-rejects.json'), '[]');
+const middleLoad = readTextOrWithChosenPath(configReadCandidates('config/config3-middle.txt'), '');
+const pickupLoad = readTextOrWithChosenPath(configReadCandidates('config/config4-pickups.json'), '[]');
+const footerLoad = readTextOrWithChosenPath(configReadCandidates('config/config5-footer.txt'), '');
+
+const headerStr = headerLoad.text;
+const rejectStr = rejectLoad.text;
+const middleStr = middleLoad.text;
+const pickupStr = pickupLoad.text;
+const footerStr = footerLoad.text;
 
 const noEmbyPath = path.join(SRVR_DATA_DIR, 'noemby.json');
 const gapsPath   = path.join(SRVR_DATA_DIR, 'gaps.json');
@@ -152,6 +187,21 @@ const pickups      = JSON.parse(pickupStr);
 const noEmbys      = JSON.parse(noEmbyStr);
 const gaps         = JSON.parse(gapsStr);
 const notes        = notesCache;
+
+
+
+console.log('[tv-srvr] config paths:', {
+  cwd: process.cwd(),
+  srvrRoot: SRVR_ROOT_DIR,
+  configDir: CONFIG_DIR,
+});
+console.log('[tv-srvr] loaded config:', {
+  header: headerLoad.chosenPath,
+  rejects: { path: rejectLoad.chosenPath, count: Array.isArray(rejects) ? rejects.length : null },
+  pickups: { path: pickupLoad.chosenPath, count: Array.isArray(pickups) ? pickups.length : null },
+  middle: middleLoad.chosenPath,
+  footer: footerLoad.chosenPath,
+});
 
 function encodeFileIdBase32(fileId) {
   // base-32 using RFC4648 alphabet: A-Z then 2-7.
@@ -1068,7 +1118,7 @@ const upload = async () => {
     str += '        - "' + name.replace(/"/g, '') + '"\n';
   str += footerStr;
   console.log('creating config.yml');
-  await util.writeFile('config/config.yml', str);
+  await util.writeFile(configWritePath('config.yml'), str);
 
   if(dontupload) {
     console.log("---- didn't upload config.yml ----");
@@ -1078,8 +1128,8 @@ const upload = async () => {
   console.log('uploading config.yml');
   const timeBeforeUSB = new Date().getTime();
   const {stdout} = await exec(
-          'rsync -av config/config.yml xobtlu@oracle.usbx.me:' +
-          '/home/xobtlu/.config/flexget/config.yml');
+      `rsync -av "${configWritePath('config.yml')}" xobtlu@oracle.usbx.me:` +
+      '/home/xobtlu/.config/flexget/config.yml');
   console.log(
       'upload delay:', new Date().getTime() - timeBeforeUSB);
 
@@ -1127,8 +1177,8 @@ const trySaveConfigYml = async (id, result, resolve, reject) => {
     const bname = b.replace(/The\s/i, '');
     return (aname.toLowerCase() > bname.toLowerCase() ? +1 : -1);
   });
-  await util.writeFile('config/config2-rejects.json', rejects);
-  await util.writeFile('config/config4-pickups.json', pickups);
+  await util.writeFile(configWritePath('config2-rejects.json'), rejects);
+  await util.writeFile(configWritePath('config4-pickups.json'), pickups);
 
   let errResult = null;
 
@@ -1163,27 +1213,88 @@ const saveConfigYml = async (idIn, resultIn, resolveIn, rejectIn) => {
   }
 }
 
+// Synchronize rejects between noEmby.json and config2-rejects.json on startup.
+const startupRejectsSync = () => {
+  let changedRejects = false;
+  let changedNoEmbys = false;
+
+  // Add noEmby rejects to rejects list
+  for (const show of noEmbys) {
+    if (show.Reject) {
+      if (!rejects.some(r => r.toLowerCase() === show.Name.toLowerCase())) {
+        rejects.push(show.Name);
+        console.log('[sync] Added to rejects from noEmby:', show.Name);
+        changedRejects = true;
+      }
+    }
+  }
+
+  // Add keys from rejects list to noEmby shows if they match
+  for (const rName of rejects) {
+    const show = noEmbys.find(s => s.Name.toLowerCase() === rName.toLowerCase());
+    if (show && !show.Reject) {
+      show.Reject = true;
+      console.log('[sync] Set Reject=true on noEmby from rejects list:', show.Name);
+      changedNoEmbys = true;
+    }
+  }
+
+  if (changedRejects) {
+    // Save and upload
+    console.log('[sync] Saving and uploading rejects...');
+    saveConfigYml('startup', 'ok', () => {}, () => {});
+  } else {
+    // Force upload to ensure config.yml matches disk state (cleans up stale entries)
+    console.log('[sync] No logic changes, forcing config.yml upload...');
+    upload();
+  }
+
+  if (changedNoEmbys) {
+    try {
+      fs.writeFileSync(noEmbyPath, JSON.stringify(noEmbys));
+      console.log('[sync] Saved updated noemby.json');
+    } catch (e) { console.error('[sync] failed to save noemby:', e); }
+  }
+}
+// Run sync immediately
+startupRejectsSync();
+
+
 const getRejects = (id, _param, resolve, _reject) => {
   resolve([id, rejects]);
 };
 
 const addReject = (id, name, resolve, reject) => {
   console.log('addReject', id, name);
-  for(const [idx, rejectNameStr] of rejects.entries()) {
-    if(rejectNameStr.toLowerCase() === name.toLowerCase()) {
-      console.log('-- removing old matching reject:', rejectNameStr);
-      rejects.splice(idx, 1);
-      break;
-    }
+  let changed = false;
+  
+  // 1. Ensure it exists in rejects list
+  const existingIdx = rejects.findIndex(r => r.toLowerCase() === name.toLowerCase());
+  if (existingIdx !== -1) {
+    console.log('-- removing old matching reject (case fix):', rejects[existingIdx]);
+    rejects.splice(existingIdx, 1);
   }
+  
   console.log('-- adding reject:', name);
   rejects.push(name);
+  changed = true; // effectively always changed or re-confirmed
+
+  // 2. Sync to noEmbys if present
+  const noEmbyShow = noEmbys.find(s => s.Name.toLowerCase() === name.toLowerCase());
+  if (noEmbyShow && !noEmbyShow.Reject) {
+    noEmbyShow.Reject = true;
+    console.log('-- sync: set Reject=true on noEmby:', noEmbyShow.Name);
+    util.writeFile(noEmbyPath, noEmbys); // fire and forget write
+  }
+
   saveConfigYml(id, 'ok', resolve, reject);
 }
 
 const delReject = (id, name, resolve, reject) => {
   console.log('delReject', id, name);
   let deletedOne = false;
+  
+  // 1. Remove from rejects list
   for(const [idx, rejectNameStr] of rejects.entries()) {
     if(rejectNameStr.toLowerCase() === name.toLowerCase()) {
       console.log('-- deleting reject:', rejectNameStr);
@@ -1192,6 +1303,16 @@ const delReject = (id, name, resolve, reject) => {
       break;
     }
   }
+
+  // 2. Sync to noEmbys: if present, clear the flag
+  const noEmbyShow = noEmbys.find(s => s.Name.toLowerCase() === name.toLowerCase());
+  if (noEmbyShow && noEmbyShow.Reject) {
+    noEmbyShow.Reject = false;
+    console.log('-- sync: cleared Reject on noEmby:', noEmbyShow.Name);
+    util.writeFile(noEmbyPath, noEmbys);
+    deletedOne = true; // Consider it a success if we removed the flag from noEmby too
+  }
+
   if(!deletedOne) {
     console.log('-- reject not deleted -- no match:', name);
     resolve([id, 'delReject not deleted: ' + name]);
@@ -1199,6 +1320,7 @@ const delReject = (id, name, resolve, reject) => {
   }
   saveConfigYml(id, 'ok', resolve, reject);
 }
+
 
 const getPickups = (id, _param, resolve, _reject) => {
   resolve([id, pickups]);
@@ -1253,6 +1375,26 @@ const addNoEmby = async (id, showStr, resolve) => {
       break;
     }
   }
+  
+  // Sync: if this new noEmby has Reject=true, ensure it's in config2-rejects.json
+  if (show.Reject) {
+    if (!rejects.some(r => r.toLowerCase() === name.toLowerCase())) {
+       rejects.push(name);
+       console.log('-- sync: added to rejects list from new noEmby:', name);
+       // Trigger save and upload
+       saveConfigYml('internal-addNoEmby', 'ok', () => {}, () => {});
+    }
+  } else {
+    // If it's NOT rejected, but the global list says it IS, force it to true? 
+    // Usually "global list" is the authority for bans.
+    // "when show is added to either file add it to the other" implies bidirectional sync.
+    // If global list has it, the noEmby show should probably inherit it.
+    if (rejects.some(r => r.toLowerCase() === name.toLowerCase())) {
+       show.Reject = true;
+       console.log('-- sync: inherited Reject=true from global list:', name);
+    }
+  }
+
   console.log('adding noemby:', name);
   noEmbys.push(show);
   await util.writeFile(noEmbyPath, noEmbys); 
@@ -1262,15 +1404,45 @@ const addNoEmby = async (id, showStr, resolve) => {
 const delNoEmby = async (id, name, resolve, reject) => {
   console.log('delNoEmby', id, name);
   let deletedOne = false;
+  let wasRejected = false;
+
   for(const [idx, show] of noEmbys.entries()) {
     if(!show.Name ||
         show.Name.toLowerCase() === name.toLowerCase()) {
       console.log('deleting no-emby because now in emby:', name);
+      if (show.Reject) wasRejected = true;
       noEmbys.splice(idx, 1);
       deletedOne = true;
       break;
     }
   }
+
+  if (wasRejected) {
+    // "when show is removed from either file remove it from the other"
+    // If we delete a noEmby that was rejected, should we unban it globally?
+    // Be careful: removing from "noEmby" usually just means "it was found in Emby now".
+    // It doesn't mean "unban it".
+    // However, if the USER explicitly deleted it via "delNoEmby" (which is rare, usually it's automatic promotion),
+    // we might not want to remove the ban.
+    // But the requirement says: "when show is removed from either file remove it from the other".
+    // If specific `delNoEmby` is called (usually via Delete button or automatic cleanup),
+    // removing the ban might be intended if it's a "Delete Show" action.
+    // Let's check `rejected` presence.
+    
+    // BUT: `delNoEmby` is effectively "Delete Show" for noEmby items.
+    // If I delete the show "Star Trek", I probably don't want to keep a ban floating around?
+    // actually, usually bans persist.
+    // But the user prompt is specific: "when show is removed from either file remove it from the other."
+    
+    const rIdx = rejects.findIndex(r => r.toLowerCase() === name.toLowerCase());
+    if (rIdx !== -1) {
+       console.log('-- sync: removing from rejects because noEmby was deleted:', name);
+       rejects.splice(rIdx, 1);
+       // Trigger save and upload
+       saveConfigYml('internal-delNoEmby', 'ok', () => {}, () => {});
+    }
+  }
+
   if(!deletedOne) {
     console.log('no noembys deleted, no match:', name);
     resolve([id, 'delNoEmby no match:' + name]);
@@ -1279,6 +1451,7 @@ const delNoEmby = async (id, name, resolve, reject) => {
   await util.writeFile(noEmbyPath, noEmbys); 
   resolve([id, 'ok']);
 }
+
 
 const getGaps = (id, _param, resolve, _reject) => {
   resolve([id, gaps]);

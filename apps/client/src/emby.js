@@ -44,7 +44,22 @@ export async function init() {
 }
 
 let rejects = null;
-export const isReject = (name) => rejects.includes(name);
+let rejectsSet = null;
+
+function normShowName(name) {
+  if (name === undefined || name === null) return '';
+  // Collapse any embedded newlines/tabs and extra spaces coming from JSON files.
+  // Keep punctuation as-is (we still want exact-ish matching).
+  return String(name)
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export const isReject = (name) => {
+  if (!rejectsSet) return false;
+  return rejectsSet.has(normShowName(name).toLowerCase());
+};
 
 // load all shows from emby and server //////////
 export async function loadAllShows() {
@@ -66,8 +81,15 @@ export async function loadAllShows() {
     await Promise.all([embyPromise, diskPromise, 
                        rejPromise, pkupPromise,
           noEmbyPromise, gapPromise, notesPromise]);
-  
-  rejects = rejectsIn
+
+    // Normalize rejects so the list works even if the JSON has newlines/extra spaces.
+    // Also build a case-insensitive lookup for matching.
+    if (Array.isArray(rejectsIn)) {
+      rejects = rejectsIn.map(normShowName).filter(Boolean);
+    } else {
+      rejects = [];
+    }
+    rejectsSet = new Set(rejects.map((n) => n.toLowerCase()));
   const gapsById = gaps || {};
     const notesByShowName = (notesIn && typeof notesIn === 'object') ? notesIn : {};
   
@@ -363,10 +385,36 @@ export async function loadAllShows() {
   }
 
 //////////  process rejects for usb ////////////
-  for(let rejectName of rejects) {
-    const matchingShow = 
-          shows.find((show) => show.Name == rejectName);
-    if(matchingShow) matchingShow.Reject = true;
+  {
+    const showsByNormName = new Map();
+    for (const show of shows) {
+      const key = normShowName(show?.Name).toLowerCase();
+      if (!key) continue;
+      // Keep the first match; duplicates are rare but possible.
+      if (!showsByNormName.has(key)) showsByNormName.set(key, show);
+    }
+
+    let matchedCount = 0;
+    const unmatched = [];
+    for (const rejectNameRaw of rejects) {
+      const key = normShowName(rejectNameRaw).toLowerCase();
+      const matchingShow = showsByNormName.get(key);
+      if (matchingShow) {
+        matchingShow.Reject = true;
+        matchedCount++;
+      } else {
+        unmatched.push(rejectNameRaw);
+      }
+    }
+
+    // Optional debug: add ?debugRejects=1 to the URL
+    try {
+      const debugRejects = new URLSearchParams(window.location.search).has('debugRejects');
+      if (debugRejects) {
+        console.log('[rejects] loaded:', { total: rejects.length, matchedCount, unmatchedCount: unmatched.length });
+        if (unmatched.length) console.log('[rejects] unmatched names:', unmatched);
+      }
+    } catch {}
   }
 
 //////////  process pickups for usb ////////////

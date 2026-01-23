@@ -1,11 +1,25 @@
 <template lang="pug">
-#actors(@click.stop :style="{ height:'100%', width:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa' }")
+#actors(@click.stop :style="{ height:'100%', width:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa', position:'relative' }")
+
+  //- Floating preview badge (top-right)
+  div(v-if="previewMode" style="position:absolute; top:-7px; right:10px; z-index:700;")
+    div(style="display:flex; align-items:center; gap:10px; background:#eee; border:1px solid #000; border-radius:10px; padding:6px 10px; box-shadow:0 2px 6px rgba(0,0,0,0.15);")
+      button(
+        @click.stop="addShowFromPreview"
+        :disabled="previewAddBusy || !previewSrchChoice"
+        :style="{ fontSize:'14px', cursor: ((previewAddBusy || !previewSrchChoice) ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', border:'1px solid #000', backgroundColor: (previewAddBusy ? 'lightgray' : 'whitesmoke') }"
+      ) Add Show
+      button(
+        @click.stop="exitPreview"
+        style="font-size:14px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #000; background-color:whitesmoke;"
+      ) Exit Preview
 
   #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', display:'flex', flexDirection:'column', gap:'8px' }")
     div(style="width:100%; display:flex; flex-direction:column; gap:8px;")
       //- Top row: show name (fills), mode label, arrows.
       div(style="width:100%; display:flex; align-items:center; justify-content:space-between;")
-        div(style="margin-left:20px; margin-right:10px; flex:1 1 auto; min-width:0; white-space:normal; overflow-wrap:anywhere; word-break:break-word;") {{ showName }}
+        div(style="margin-left:20px; margin-right:10px; flex:1 1 auto; min-width:0; white-space:normal; overflow-wrap:anywhere; word-break:break-word; display:flex; align-items:center; gap:12px; flex-wrap:wrap;")
+          span {{ showName }}{{ previewMode ? ': Preview Mode.' : '' }}
         div(style="margin-left:20px; margin-right:15px; flex:0 0 auto; display:flex; align-items:center; gap:12px; font-weight:normal;")
           button(@click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:5px;") ◄
           button(@click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ►
@@ -68,6 +82,9 @@ export default {
       seriesActors: [], // Cache of original series actors
       showName: '',
       currentShow: null, // Store full show object for getSeriesMap
+      previewMode: false,
+      previewAddBusy: false,
+      previewSrchChoice: null,
       seasonNum: '',
       episodeNum: '',
       errorMessage: '',
@@ -87,6 +104,34 @@ export default {
   },
 
   methods: {
+
+    onPreviewMode(active) {
+      this.previewMode = !!active;
+      if (!this.previewMode) {
+        this.previewSrchChoice = null;
+        this.previewAddBusy = false;
+      }
+    },
+
+    onPreviewSrchChoice(srchChoice) {
+      this.previewSrchChoice = srchChoice || null;
+    },
+
+    addShowFromPreview() {
+      if (!this.previewSrchChoice) return;
+      if (this.previewAddBusy) return;
+      this.previewAddBusy = true;
+      evtBus.emit('addPreviewShow', { srchChoice: this.previewSrchChoice, fromPreview: true });
+    },
+
+    onAddPreviewShowDone() {
+      this.previewAddBusy = false;
+    },
+
+    exitPreview() {
+      evtBus.emit('exitPreviewMode');
+    },
+
     getActorsModeButtonStyle(isActive) {
       return {
         fontSize: '13px',
@@ -868,12 +913,20 @@ export default {
 
     this._onResetActorsPane = this.resetPane;
     evtBus.on('resetActorsPane', this._onResetActorsPane);
+
+    evtBus.on('previewMode', this.onPreviewMode);
+    evtBus.on('previewSrchChoice', this.onPreviewSrchChoice);
+    evtBus.on('addPreviewShowDone', this.onAddPreviewShowDone);
   },
 
   unmounted() {
     if (this._onShowActors) evtBus.off('showActors', this._onShowActors);
     if (this._onFillAndSelectEpisode) evtBus.off('fillAndSelectEpisode', this._onFillAndSelectEpisode);
     if (this._onResetActorsPane) evtBus.off('resetActorsPane', this._onResetActorsPane);
+
+    evtBus.off('previewMode', this.onPreviewMode);
+    evtBus.off('previewSrchChoice', this.onPreviewSrchChoice);
+    evtBus.off('addPreviewShowDone', this.onAddPreviewShowDone);
   }
 }
 </script>

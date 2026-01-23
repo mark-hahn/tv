@@ -1,5 +1,23 @@
 <template lang="pug">
-#aiPane(:style="{ width:'100%', height:'100%', display:'flex', flexDirection:'column', boxSizing:'border-box', padding:(simpleMode ? '8px' : '12px') }")
+#aiPane(:style="{ width:'100%', height:'100%', display:'flex', flexDirection:'column', boxSizing:'border-box', padding:(simpleMode ? '8px' : '12px'), position:'relative' }")
+  //- Floating preview badge (top-right)
+  div(v-if="previewMode" style="position:absolute; top:-5px; right:10px; z-index:500;")
+    div(style="display:flex; align-items:center; gap:10px; background:#eee; border:1px solid #000; border-radius:10px; padding:6px 10px; box-shadow:0 2px 6px rgba(0,0,0,0.15);")
+      button(
+        @click.stop="addShowFromPreview"
+        :disabled="previewAddBusy || !previewSrchChoice"
+        :style="{ fontSize:'14px', cursor: ((previewAddBusy || !previewSrchChoice) ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', border:'1px solid #000', backgroundColor: (previewAddBusy ? 'lightgray' : 'whitesmoke') }"
+      ) Add Show
+      button(
+        @click.stop="exitPreview"
+        style="font-size:14px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #000; background-color:whitesmoke;"
+      ) Exit Preview
+
+  div(
+    v-if="activeShow && activeShow.Name"
+    :style="{ flex:'0 0 auto', fontWeight:'bold', fontSize:(simpleMode ? '18px' : '22px'), marginBottom:'8px', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap', paddingRight:'180px' }"
+  )
+    span {{ activeShow.Name }}{{ previewMode ? ': Preview Mode.' : '' }}
   // Scroll container
   div(style="flex:1 1 auto; min-height:0; overflow:auto;")
     // Centered column
@@ -68,6 +86,10 @@ export default {
       busy: false,
       errMsg: '',
       resultText: '',
+
+      previewMode: false,
+      previewAddBusy: false,
+      previewSrchChoice: null,
       _lastShowKey: null,
       _runToken: 0,
       _autoRunTimer: null,
@@ -139,6 +161,10 @@ export default {
     };
     evtBus.on('paneChanged', this._onPaneChanged);
 
+    evtBus.on('previewMode', this.onPreviewMode);
+    evtBus.on('previewSrchChoice', this.onPreviewSrchChoice);
+    evtBus.on('addPreviewShowDone', this.onAddPreviewShowDone);
+
     // If the component remounts (or the page reloads), restore cached content immediately.
     this.restoreCachedResult();
 
@@ -163,11 +189,44 @@ export default {
   beforeUnmount() {
     if (this._onPaneChanged) evtBus.off('paneChanged', this._onPaneChanged);
     this._onPaneChanged = null;
+
+    evtBus.off('previewMode', this.onPreviewMode);
+    evtBus.off('previewSrchChoice', this.onPreviewSrchChoice);
+    evtBus.off('addPreviewShowDone', this.onAddPreviewShowDone);
+
     if (this._autoRunTimer) clearTimeout(this._autoRunTimer);
     this._autoRunTimer = null;
   },
 
   methods: {
+
+    onPreviewMode(active) {
+      this.previewMode = !!active;
+      if (!this.previewMode) {
+        this.previewSrchChoice = null;
+        this.previewAddBusy = false;
+      }
+    },
+
+    onPreviewSrchChoice(srchChoice) {
+      this.previewSrchChoice = srchChoice || null;
+    },
+
+    addShowFromPreview() {
+      if (!this.previewSrchChoice) return;
+      if (this.previewAddBusy) return;
+      this.previewAddBusy = true;
+      evtBus.emit('addPreviewShow', { srchChoice: this.previewSrchChoice, fromPreview: true });
+    },
+
+    onAddPreviewShowDone() {
+      this.previewAddBusy = false;
+    },
+
+    exitPreview() {
+      evtBus.emit('exitPreviewMode');
+    },
+
     cacheKey() {
       const k = this.showKey;
       if (!k) return '';

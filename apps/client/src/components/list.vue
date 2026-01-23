@@ -1815,6 +1815,20 @@ export default {
       void this.addSearchChoice(choice, { fromPreview });
     });
 
+    // Any pane can request exit from preview mode.
+    evtBus.on('exitPreviewMode', () => {
+      if (!this.previewMode) return;
+
+      this.setPreviewMode(false);
+
+      // Restore the previously highlighted show into the panes so the UI is consistent.
+      const prevName = this.highlightName;
+      const prevShow = Array.isArray(allShows) ? allShows.find((s) => s?.Name === prevName) : null;
+      if (prevShow) {
+        this.saveVisShow(prevShow, false, { skipHistory: true, forceSetUpSeries: true });
+      }
+    });
+
     evtBus.on('openMap', (show) => {
       console.log('List: openMap event received for show:', show?.Name);
       this.seriesMapAction('open', show);

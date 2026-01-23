@@ -1,8 +1,21 @@
 <template lang="pug">
 #trailer(
   @click.stop
-  :style="{ height:'100%', width:'100%', padding:'10px', boxSizing:'border-box', overflowY:'auto', backgroundColor:'#fafafa' }"
+  :style="{ height:'100%', width:'100%', padding:'10px', boxSizing:'border-box', overflowY:'auto', backgroundColor:'#fafafa', position:'relative' }"
 )
+
+  //- Floating preview badge (top-right)
+  div(v-if="previewMode" style="position:absolute; top:-7px; right:10px; z-index:700;")
+    div(style="display:flex; align-items:center; gap:10px; background:#eee; border:1px solid #000; border-radius:10px; padding:6px 10px; box-shadow:0 2px 6px rgba(0,0,0,0.15);")
+      button(
+        @click.stop="addShowFromPreview"
+        :disabled="previewAddBusy || !previewSrchChoice"
+        :style="{ fontSize:'14px', cursor: ((previewAddBusy || !previewSrchChoice) ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', border:'1px solid #000', backgroundColor: (previewAddBusy ? 'lightgray' : 'whitesmoke') }"
+      ) Add Show
+      button(
+        @click.stop="exitPreview"
+        style="font-size:14px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #000; background-color:whitesmoke;"
+      ) Exit Preview
   div(v-if="err" style="color:red; margin:10px; border:1px solid red; padding:10px;")
     b Error:
     pre {{ err }}
@@ -10,7 +23,8 @@
   div(v-if="!showName" style="padding:20px; text-align:center; color:#666;") No show selected.
   
   template(v-else)
-    div(:style="{ fontWeight:'bold', fontSize:'24px', marginBottom:'15px' }") {{ showName }}
+    div(:style="{ fontWeight:'bold', fontSize:'24px', marginBottom:'15px', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }")
+      span {{ showName }}{{ previewMode ? ': Preview Mode.' : '' }}
 
     //- content wrapper to allow refresh
     div(v-if="!trailers || trailers.length === 0" style="padding:20px; text-align:center; color:#666;") No trailers found.
@@ -53,6 +67,10 @@ export default {
       trailers: [],
       err: '',
       showContent: true, // Controls rendering of video list
+
+      previewMode: false,
+      previewAddBusy: false,
+      previewSrchChoice: null,
       
       // State tracking
       ytPlayers: new Map(), // idx -> YT.Player
@@ -87,6 +105,33 @@ export default {
     return false; // prevent error from bubbling up further
   },
   methods: {
+    onPreviewMode(active) {
+      this.previewMode = !!active;
+      if (!this.previewMode) {
+        this.previewSrchChoice = null;
+        this.previewAddBusy = false;
+      }
+    },
+
+    onPreviewSrchChoice(srchChoice) {
+      this.previewSrchChoice = srchChoice || null;
+    },
+
+    addShowFromPreview() {
+      if (!this.previewSrchChoice) return;
+      if (this.previewAddBusy) return;
+      this.previewAddBusy = true;
+      evtBus.emit('addPreviewShow', { srchChoice: this.previewSrchChoice, fromPreview: true });
+    },
+
+    onAddPreviewShowDone() {
+      this.previewAddBusy = false;
+    },
+
+    exitPreview() {
+      evtBus.emit('exitPreviewMode');
+    },
+
     saveState() {
       // Save HTML5
       if (this.$refs.htmlVideos) {
@@ -233,10 +278,18 @@ export default {
     this.loadYoutubeApi(); // Start loading API
     evtBus.on('setUpSeries', this.onSetUpSeries);
     evtBus.on('tvdbDataReady', this.onTvdbDataReady);
+
+    evtBus.on('previewMode', this.onPreviewMode);
+    evtBus.on('previewSrchChoice', this.onPreviewSrchChoice);
+    evtBus.on('addPreviewShowDone', this.onAddPreviewShowDone);
   },
   unmounted() {
     evtBus.off('setUpSeries', this.onSetUpSeries);
     evtBus.off('tvdbDataReady', this.onTvdbDataReady);
+
+    evtBus.off('previewMode', this.onPreviewMode);
+    evtBus.off('previewSrchChoice', this.onPreviewSrchChoice);
+    evtBus.off('addPreviewShowDone', this.onAddPreviewShowDone);
   }
 }
 </script>

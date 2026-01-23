@@ -1,6 +1,19 @@
 <template lang="pug">
 
-#series(@click="handleSeriesClick" :style="{ height:'100%', width:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box' }")
+#series(@click="handleSeriesClick" :style="{ height:'100%', width:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', position:'relative' }")
+
+  //- Floating preview badge (top-right)
+  div(v-if="previewMode" style="position:absolute; top:-7px; right:10px; z-index:700;")
+    div(style="display:flex; align-items:center; gap:10px; background:#eee; border:1px solid #000; border-radius:10px; padding:6px 10px; box-shadow:0 2px 6px rgba(0,0,0,0.15);")
+      button(
+        @click.stop="addShowFromPreview"
+        :disabled="previewAddBusy || !previewSrchChoice"
+        :style="{ fontSize:'14px', cursor: ((previewAddBusy || !previewSrchChoice) ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', border:'1px solid #000', backgroundColor: (previewAddBusy ? 'lightgray' : 'whitesmoke') }"
+      ) Add Show
+      button(
+        @click.stop="exitPreview"
+        style="font-size:14px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #000; background-color:whitesmoke;"
+      ) Exit Preview
 
   #hdr(v-if="showHdr"
        :style="{ display:'flex', flexDirection:'column', gap:'10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', margin:'0px', marginBottom:'10px' }")
@@ -9,13 +22,6 @@
     )
       div(:style="{ gridColumn:'1 / span 2', marginLeft:'20px', marginRight:'20px', whiteSpace:'normal', overflowWrap:'anywhere', wordBreak:'break-word', display:'flex', alignItems:'center', gap:'12px' }")
         span {{ show.Name }}{{ previewMode ? ': Preview Mode.' : '' }}
-        button(
-          v-if="previewMode"
-          @click.stop="addShowFromPreview"
-          :disabled="previewAddBusy"
-          :style="{ fontSize:'14px', cursor: (previewAddBusy ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', border:'1px solid #000', backgroundColor: (previewAddBusy ? 'lightgray' : 'whitesmoke') }"
-        ) Add Show
-
       //- Simple mode: align left edge of Notes with right edge of image (end of poster column)
       div(v-if="simpleMode" :style="{ gridColumn:'3 / span 3', display:'flex', alignItems:'center', minWidth:'0px', width:'100%' }")
         template(v-if="!previewMode")
@@ -253,6 +259,10 @@ export default {
     onAddPreviewShowDone() {
       // List will exit preview mode; we just reset busy state.
       this.previewAddBusy = false;
+    },
+
+    exitPreview() {
+      evtBus.emit('exitPreviewMode');
     },
 
     onEnterBlur(e) {

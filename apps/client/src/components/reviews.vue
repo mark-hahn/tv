@@ -1,12 +1,26 @@
 <template lang="pug">
-#reviews(@click.stop :style="{ height:'100%', width:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa' }")
+#reviews(@click.stop :style="{ height:'100%', width:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa', position:'relative' }")
+
+  //- Floating preview badge (top-right)
+  div(v-if="previewMode" style="position:absolute; top:-7px; right:10px; z-index:700;")
+    div(style="display:flex; align-items:center; gap:10px; background:#eee; border:1px solid #000; border-radius:10px; padding:6px 10px; box-shadow:0 2px 6px rgba(0,0,0,0.15);")
+      button(
+        @click.stop="addShowFromPreview"
+        :disabled="previewAddBusy || !previewSrchChoice"
+        :style="{ fontSize:'14px', cursor: ((previewAddBusy || !previewSrchChoice) ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', border:'1px solid #000', backgroundColor: (previewAddBusy ? 'lightgray' : 'whitesmoke') }"
+      ) Add Show
+      button(
+        @click.stop="exitPreview"
+        style="font-size:14px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #000; background-color:whitesmoke;"
+      ) Exit Preview
   
   //- Header Section
   #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', display:'flex', flexDirection:'column', gap:'8px', borderBottom:'1px solid #ddd' }")
     
     //- Top Row: Show Title and Rotten Button
     div(style="width:100%; display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;")
-      div(:style="{ fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginLeft:'10px', marginRight:'10px', flex:'1 1 auto', minWidth:0, whiteSpace:'normal', overflowWrap:'anywhere', wordBreak:'break-word' }") {{ showName }}
+      div(:style="{ fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginLeft:'10px', marginRight:'10px', flex:'1 1 auto', minWidth:0, whiteSpace:'normal', overflowWrap:'anywhere', wordBreak:'break-word', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }")
+        span {{ showName }}{{ previewMode ? ': Preview Mode.' : '' }}
       
       div(v-if="rottenUrl" style="margin-right:10px; flex:'0 0 auto';")
         a(:href="rottenUrl" target="_blank" style="text-decoration:none;")
@@ -109,6 +123,9 @@ export default {
       showName: '',
       rottenUrl: '',
       rottenLabel: '',
+      previewMode: false,
+      previewAddBusy: false,
+      previewSrchChoice: null,
       selectedButton: 'Audience',
       isLoading: false,
       checkedRemotes: false,
@@ -194,11 +211,43 @@ export default {
         }
       }
     });
+
+    evtBus.on('previewMode', this.onPreviewMode);
+    evtBus.on('previewSrchChoice', this.onPreviewSrchChoice);
+    evtBus.on('addPreviewShowDone', this.onAddPreviewShowDone);
     
     // Also listen for explicit "showReviews" if added later, but logic above should suffice for now.
   },
 
   methods: {
+
+    onPreviewMode(active) {
+      this.previewMode = !!active;
+      if (!this.previewMode) {
+        this.previewSrchChoice = null;
+        this.previewAddBusy = false;
+      }
+    },
+
+    onPreviewSrchChoice(srchChoice) {
+      this.previewSrchChoice = srchChoice || null;
+    },
+
+    addShowFromPreview() {
+      if (!this.previewSrchChoice) return;
+      if (this.previewAddBusy) return;
+      this.previewAddBusy = true;
+      evtBus.emit('addPreviewShow', { srchChoice: this.previewSrchChoice, fromPreview: true });
+    },
+
+    onAddPreviewShowDone() {
+      this.previewAddBusy = false;
+    },
+
+    exitPreview() {
+      evtBus.emit('exitPreviewMode');
+    },
+
     getButtonStyle(isSelected) {
       return {
         fontSize: '13px',

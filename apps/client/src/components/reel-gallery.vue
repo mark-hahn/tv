@@ -19,6 +19,7 @@
       v-else
       :src="getImageUrl(tvdb)"
       :style="{ width: '101px', margin: '0 auto', height: 'auto', borderRadius: '5px', display: 'block' }"
+      @click.stop="previewCard(idx)"
       @error="handleImageError($event)")
     
     div(:style="{ padding: '2px', fontSize: '12px', textAlign: 'center', fontWeight: 'bold' }")
@@ -38,7 +39,7 @@ export default {
       default: ''
     }
   },
-  emits: ['select'],
+  emits: ['select', 'preview'],
   setup(props, { emit }) {
     const tvdbList = ref([]);
     const selectedIdx = ref(0);
@@ -78,6 +79,13 @@ export default {
     const selectCard = (idx) => {
       selectedIdx.value = idx;
       emit('select', tvdbList.value[idx]);
+    };
+
+    const previewCard = (idx) => {
+      selectedIdx.value = idx;
+      const tvdb = tvdbList.value[idx];
+      emit('select', tvdb);
+      emit('preview', tvdb);
     };
 
     const loadTvdbData = async () => {
@@ -122,11 +130,12 @@ export default {
       tvdbList,
       selectedIdx,
       galleryPane,
+      handleScaledWheel,
       getImageUrl,
       getCardStyle,
       selectCard,
+      previewCard,
       handleImageError,
-      handleScaledWheel
     };
   }
 };

@@ -9,7 +9,8 @@
     reel-gallery(
       :style="{ flex: '1', minHeight: 0 }"
       :srchStr="srchStr"
-      @select="handleGallerySelect")
+      @select="handleGallerySelect"
+      @preview="handleGalleryPreview")
 
   #reelRight(
     :style="{ flex: '1 1 0', minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column', gap: '0' }")
@@ -642,6 +643,12 @@ export default {
       curTvdb.value = tvdb;
     };
 
+    // Clicking the image should immediately preview the show (same flow as "Get").
+    const handleGalleryPreview = (tvdb) => {
+      curTvdb.value = tvdb;
+      handleLoad();
+    };
+
     watch(curTvdb, (val) => {
       void loadRemotesForTvdb(val);
     }, { deep: true });
@@ -740,6 +747,7 @@ export default {
       handleScaledWheel,
       getTitleCardStyle,
       handleGallerySelect,
+      handleGalleryPreview,
       selectTitle,
       handleNext,
       handleLoad,

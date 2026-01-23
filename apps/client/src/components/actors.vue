@@ -838,7 +838,10 @@ export default {
 
       // For noemby shows, start loading the series map immediately so
       // arrow navigation doesn't wait on TVDB later.
-      this.prefetchSeriesMapForArrows();
+      // Allow callers (e.g. ctrl-click preview) to suppress this so the Map pane isn't populated.
+      if (!data?.suppressSeriesMapPrefetch) {
+        this.prefetchSeriesMapForArrows();
+      }
 
       // Reset to series actors view
       this.isGuestMode = false;

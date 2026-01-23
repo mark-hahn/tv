@@ -68,7 +68,7 @@
             style="flex-grow:1;"
             :shows="shows"
             :conds="conds"
-            :highlightName="highlightName"
+            :highlightName="displayHighlightName"
             :getSortDisplayValue="getValBySortChoice"
             :allShowsLength="allShowsLength"
             :showConds="!simpleMode"
@@ -132,7 +132,7 @@
           style="flex-grow:1;"
           :shows="shows"
           :conds="conds"
-          :highlightName="highlightName"
+          :highlightName="displayHighlightName"
           :getSortDisplayValue="getValBySortChoice"
           :allShowsLength="allShowsLength"
           :showConds="!simpleMode"
@@ -370,6 +370,7 @@ export default {
       webHistStr:           "",
       errMsg:               "",
       highlightName:        "",
+      previewMode:          false,
       _pendingSetUpSeriesToken: 0,
       allShowsLength:        0,
       currentPane:       'series',
@@ -466,6 +467,13 @@ export default {
         },
       ],
     };
+  },
+
+  computed: {
+    displayHighlightName() {
+      // While in preview mode, do not highlight any list row.
+      return this.previewMode ? '' : this.highlightName;
+    },
   },
 
   /////////////  METHODS  ////////////
@@ -834,10 +842,21 @@ export default {
       this.showingSrchList = true;
     },
 
-    async searchAction(srchChoice) {
-      const {name, tvdbId, overview} = srchChoice;
+    async searchAction(payload) {
+      const srchChoice = payload?.srchChoice ? payload.srchChoice : payload;
+      const isPreview = !!payload?.ctrlKey;
+      const {name, tvdbId, overview} = srchChoice || {};
       console.log('searchAction:', name);
       this.cancelSrchList();
+
+      // Any non-preview action exits preview mode.
+      if (!isPreview) this.setPreviewMode(false);
+
+      if (isPreview) {
+        await this.previewSearchChoice({ name, tvdbId, overview });
+        return;
+      }
+
       if(!pruneTvdb) {
         const matchShow = allShows.find((s) => s.Name == name);
         if(matchShow) {  
@@ -989,6 +1008,63 @@ export default {
         this.searchingStatus = '';
       }
     },
+
+    async previewSearchChoice({ name, tvdbId, overview }) {
+      const showName = String(name || '').trim();
+      if (!showName) return;
+
+      this.setPreviewMode(true);
+
+      // Always switch to the Series pane for preview.
+      evtBus.emit('showSeriesPane');
+
+      // If the show already exists in the library, just select it (no creation).
+      const matchShow = allShows.find((s) => s?.Name === showName);
+      const show = matchShow || {
+        // Mark as no-Emby so Series doesn't try to query Emby counts.
+        Id: `noemby-preview-${String(tvdbId || showName).replace(/\s+/g, '-')}`,
+        Name: showName,
+        TvdbId: tvdbId,
+        Overview: overview,
+        Reject: emby.isReject(showName),
+      };
+
+      // Do not update Map pane contents on preview.
+      this.saveVisShow(show, false, {
+        skipMapUpdate: true,
+        skipHighlight: true,
+        skipPersist: true,
+        skipHistory: true,
+        forceSetUpSeries: true,
+      });
+
+      // Once Series publishes tvdbDataReady, preload Actors without prefetching series-map.
+      const onTvdbDataReady = (data) => {
+        try {
+          const incomingShow = data?.show;
+          if (!incomingShow) return;
+          const sameName = (incomingShow?.Name && show?.Name && incomingShow.Name === show.Name);
+          if (!sameName) return;
+
+          evtBus.off('tvdbDataReady', onTvdbDataReady);
+
+          // Preload Actors (but suppress series-map prefetch so Map isn't populated).
+          evtBus.emit('showActors', {
+            show,
+            tvdbData: data?.tvdbData ?? null,
+            suppressSeriesMapPrefetch: true,
+          });
+        } catch {
+          // ignore
+        }
+      };
+      evtBus.on('tvdbDataReady', onTvdbDataReady);
+
+      // Fallback cleanup: if tvdbDataReady never arrives, don't leak listeners.
+      setTimeout(() => {
+        try { evtBus.off('tvdbDataReady', onTvdbDataReady); } catch { /* ignore */ }
+      }, 15000);
+    },
     
     cancelSrchList() {
       console.log('closing searchlist');
@@ -1022,7 +1098,15 @@ export default {
     },
     onSelectShow(show, scroll = false) {
       // console.log('List: selected show:', show);
+      const wasPreview = !!this.previewMode;
+      if (wasPreview) this.setPreviewMode(false);
       this.saveVisShow(show, scroll);
+
+      // If we just exited preview mode, always land on Series for the newly selected show.
+      if (wasPreview) {
+        evtBus.emit('showSeriesPane');
+        return;
+      }
 
       // Clicking a show should generally return to the Series pane.
       // Exception: when the user is actively in Map/Actors/Torrents/Subs/Files/Reviews/Trailer/AI, do not switch panes.
@@ -1138,23 +1222,33 @@ export default {
       );
     },
 
-    saveVisShow(show, scroll = false) {
+    saveVisShow(show, scroll = false, opts = null) {
       if(!show) {
         console.error('saveVisShow show param null');
         return;
       }
+      const options = opts && typeof opts === 'object' ? opts : {};
       const showName = show.Name;
-      const showChanged = showName !== this.highlightName;
+
+      const showChanged = options.forceSetUpSeries ? true : (showName !== this.highlightName);
       
-      if(showHistoryPtr == -1 ||
-           showName != showHistory[showHistoryPtr].Name) {
-        // console.log("adding show to history:", showName);
-        showHistory.push(show);
-        showHistoryPtr = showHistory.length - 1;
-        // showHistory = showHistory.slice(0, showHistoryPtr+1);
+      if (!options.skipHistory) {
+        if(showHistoryPtr == -1 ||
+             showName != showHistory[showHistoryPtr].Name) {
+          // console.log("adding show to history:", showName);
+          showHistory.push(show);
+          showHistoryPtr = showHistory.length - 1;
+          // showHistory = showHistory.slice(0, showHistoryPtr+1);
+        }
       }
-      this.highlightName = showName;
-      window.localStorage.setItem("lastVisShow", showName);
+
+      if (!options.skipHighlight) {
+        this.highlightName = showName;
+      }
+
+      if (!options.skipPersist) {
+        window.localStorage.setItem("lastVisShow", showName);
+      }
       if(scroll) this.scrollToSavedShow();
       
       // Only emit setUpSeries if the show selection changed
@@ -1169,9 +1263,16 @@ export default {
       }
       
       // If map pane is currently showing, update it to show the newly selected show
-      if(this.currentPane === 'map' && this.mapShow !== null) {
+      if(!options.skipMapUpdate && this.currentPane === 'map' && this.mapShow !== null) {
         void this.seriesMapAction('open', show);
       }
+    },
+
+    setPreviewMode(active) {
+      const next = !!active;
+      if (this.previewMode === next) return;
+      this.previewMode = next;
+      evtBus.emit('previewMode', next);
     },
 
     sortClick() {

@@ -18,7 +18,7 @@
     input(:value="webHistStr"
           @input="handleWebHistInput"
           @keydown="handleWebHistKeyDown"
-          @keyup.enter="$emit('search-click', 'enter')" 
+          @keyup.enter="$emit('search-click', 'web')" 
           placeholder="Search..." 
           style="width: 100px; height:30px !important; margin: 5px 10px 5px 10px !important; padding:5px; border:1.5px solid black; background-color:#eee; box-sizing:border-box; font-size:16px;")
     button(v-if="!simpleMode"
@@ -47,7 +47,7 @@
             style="width:100px; height:100px; overflow-y:scroll; position:relative; top:20px; left:80px;")
       div(v-for="srchChoice in searchList"
           v-if="searchList !== null"
-          @click="$emit('search-action', srchChoice)"
+          @click="onSearchChoiceClick($event, srchChoice)"
           style="margin:3px 10px; padding:10px; width:230px; background-color:white; text-align:center; border: 1px solid black; display:flex;")
         img(:src="srchChoice.image" 
             style="max-width:80px; max-height:120px;")
@@ -120,6 +120,18 @@ export default {
   },
 
   methods: {
+    onSearchChoiceClick(e, srchChoice) {
+      // Support ctrl/meta-click as an alternate action (e.g. preview / populate panes).
+      // Keep backward compatibility by still sending srchChoice in a stable field.
+      this.$emit('search-action', {
+        srchChoice,
+        ctrlKey: !!(e && (e.ctrlKey || e.metaKey)),
+        metaKey: !!(e && e.metaKey),
+        shiftKey: !!(e && e.shiftKey),
+        altKey: !!(e && e.altKey),
+      });
+    },
+
     handleFilterInput(event) {
       this.$emit('update:filterStr', event.target.value);
       this.$emit('filter-input');

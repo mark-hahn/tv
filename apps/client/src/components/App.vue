@@ -3,6 +3,12 @@
 #all(
   :style="{ width:'100%', height:'97dvh', boxSizing:'border-box', padding:0, margin:0, display:'flex', flexDirection: showSideButtons ? 'row' : (isPortrait ? 'column' : 'row'), alignItems:'stretch' }"
 )
+  //- Preview mode indicator (fixed top-right)
+  div(
+    v-if="previewMode"
+    style="position:fixed; top:38px; right:10px; z-index:25000; font-weight:bold; color:black; background-color:rgba(255,255,255,0.9); padding:4px 10px; border:1px solid #000; border-radius:6px;"
+  ) Preview Mode
+
   template(v-if="showSideButtons")
     //- Simple + portrait: full-height Buttons pane on the left.
     #simpleButtonsPane(:style="{ flex:'0 0 auto', height:'100%', overflow:'hidden', display:'flex', flexDirection:'column', backgroundColor:'#ccc' }")
@@ -358,6 +364,7 @@ export default {
       // Must be known before first render so non-simple panes never mount in simple mode.
       simpleMode: new URLSearchParams(window.location.search).has('simple'),
       currentPane: 'series', // 'series', 'map', 'actors', 'reviews', 'trailer', 'torrents', 'subs', 'flex', 'history', 'tvproc', 'file', 'ai'
+      previewMode: false,
       currentTvdbData: null,
       currentShow: null,
       _torrentsInitialized: false,
@@ -1002,6 +1009,13 @@ export default {
       const k = String(key || '');
       if (!k) return;
 
+      // Preview mode: Map is disabled, and tabs to the right of AI are disabled.
+      if (this.previewMode) {
+        if (k === 'map') return;
+        const disabled = new Set(['reel', 'torrents', 'subs', 'flex', 'history', 'tvproc', 'file']);
+        if (disabled.has(k)) return;
+      }
+
       // In simple mode, only Series/Map/Actors exist.
       if (this.simpleMode && !['series', 'map', 'actors', 'reviews', 'trailer', 'ai'].includes(k)) {
         return;
@@ -1313,6 +1327,19 @@ export default {
 
     evtBus.on('showSeriesPane', () => {
       this.handleActorsClose();
+    });
+
+    // Preview mode: driven by ctrl-click in the web search dropdown.
+    evtBus.on('previewMode', (active) => {
+      this.previewMode = !!active;
+      if (this.previewMode) {
+        // If currently on a disabled pane, snap back to Series.
+        const allowed = new Set(['series', 'actors', 'reviews', 'trailer', 'ai']);
+        if (!allowed.has(this.currentPane)) {
+          this.currentPane = 'series';
+          evtBus.emit('paneChanged', this.currentPane);
+        }
+      }
     });
 
     evtBus.on('startLibraryRefresh', this.startLibraryRefresh);

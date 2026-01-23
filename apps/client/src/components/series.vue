@@ -11,27 +11,28 @@
 
       //- Simple mode: align left edge of Notes with right edge of image (end of poster column)
       div(v-if="simpleMode" :style="{ gridColumn:'3 / span 3', display:'flex', alignItems:'center', minWidth:'0px', width:'100%' }")
-        textarea(
-          v-model="noteText"
-          @click.stop
-          @keydown.stop
-          @keydown.enter.prevent.stop="onEnterBlur"
-          @input="onNoteInput"
-          @focus="onNoteFocus"
-          @blur="onNoteBlur"
-          rows="1"
-          placeholder="Notes"
-          :style="{ width:'125px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
-        )
-        textarea(
-          v-model="emailText"
-          @click.stop
-          @keydown.stop
-          @keydown.enter.prevent.stop="onEnterBlur"
-          rows="1"
-          placeholder="Email Mark"
-          :style="{ width:'125px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
-        )
+        template(v-if="!previewMode")
+          textarea(
+            v-model="noteText"
+            @click.stop
+            @keydown.stop
+            @keydown.enter.prevent.stop="onEnterBlur"
+            @input="onNoteInput"
+            @focus="onNoteFocus"
+            @blur="onNoteBlur"
+            rows="1"
+            placeholder="Notes"
+            :style="{ width:'125px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
+          )
+          textarea(
+            v-model="emailText"
+            @click.stop
+            @keydown.stop
+            @keydown.enter.prevent.stop="onEnterBlur"
+            rows="1"
+            placeholder="Email Mark"
+            :style="{ width:'125px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
+          )
         div(:style="{ display:'flex', alignItems:'center', marginLeft:'auto', minWidth:'0px' }")
           div(v-if="show?.Reject"
             style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; margin-right:10px; white-space:nowrap;") Banned From Download
@@ -40,22 +41,23 @@
       div(v-else :style="{ gridColumn:'4 / span 2', display:'flex', alignItems:'center' }")
         div(v-if="show?.Reject"
             style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; margin-right:10px;") Banned From Download
-        textarea(
-          v-model="noteText"
-          @click.stop
-          @keydown.stop
-          @keydown.enter.prevent.stop="onEnterBlur"
-          @input="onNoteInput"
-          @focus="onNoteFocus"
-          @blur="onNoteBlur"
-          rows="1"
-          placeholder="Notes"
-          :style="{ width:'125px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
-        )
-        button(
-          @click.stop="deleteClick"
-          style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;"
-        ) Delete
+        template(v-if="!previewMode")
+          textarea(
+            v-model="noteText"
+            @click.stop
+            @keydown.stop
+            @keydown.enter.prevent.stop="onEnterBlur"
+            @input="onNoteInput"
+            @focus="onNoteFocus"
+            @blur="onNoteBlur"
+            rows="1"
+            placeholder="Notes"
+            :style="{ width:'125px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
+          )
+          button(
+            @click.stop="deleteClick"
+            style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;"
+          ) Delete
 
   //- Layout: 1/9 whitespace, 1/3 poster, 1/9 whitespace, 1/3 infobox, 1/9 whitespace
   #body(
@@ -93,7 +95,7 @@
           )
           //- Split only between "Watched" and the value; allow wrapping between them
           #watched(
-            v-if="watchedValTxt && String(watchedValTxt).length > 0"
+            v-if="!previewMode && watchedValTxt && String(watchedValTxt).length > 0"
             style="min-height:24px; display:flex; flex-wrap:wrap; justify-content:center; column-gap:8px; row-gap:0px;"
           )
             div(style="white-space:nowrap;") Watched
@@ -130,7 +132,7 @@
           )
             | {{ (collectionCount > 1) ? 'Collections' : 'Collection' }}: {{collectionName}}
 
-          div(v-if="notInEmby" style="font-weight:bold; color:red; font-size:16px; margin-top:8px; white-space:nowrap;") Not In Emby
+          div(v-if="!previewMode && notInEmby" style="font-weight:bold; color:red; font-size:16px; margin-top:8px; white-space:nowrap;") Not In Emby
 
       //- Notes input moved to header (simple + non-simple)
 
@@ -183,6 +185,7 @@ export default {
       show: {Name:''},
       showHdr: false,
       seriesReady: false,
+      previewMode: false,
       emailText: '',
       noteText: '',
       lastSavedNoteText: '',
@@ -217,6 +220,10 @@ export default {
   },
   
   methods: {
+
+    onPreviewMode(active) {
+      this.previewMode = !!active;
+    },
 
     onEnterBlur(e) {
       try { e?.target?.blur?.(); } catch { /* ignore */ }
@@ -690,7 +697,37 @@ export default {
       setTimeout(async () => {
         allTvdb = await tvdb.getAllTvdb();
 
-        const tvdbData = allTvdb[show.Name];
+        let tvdbData = allTvdb[show.Name];
+
+        // Preview / transient shows may not exist in tvdb.json yet.
+        // If we have a TvdbId, fetch tvdbData from the server without creating the show.
+        if (!tvdbData) {
+          const tvdbId = show?.ProviderIds?.Tvdb ?? show?.TvdbId ?? show?.tvdbId ?? show?.tvdb_id;
+          if (tvdbId) {
+            try {
+              const showSeed = {
+                Name: show?.Name,
+                TvdbId: tvdbId,
+                Overview: show?.Overview,
+                Reject: !!show?.Reject,
+              };
+              const paramObj = {
+                show: showSeed,
+                seasonCount: 0,
+                episodeCount: 0,
+                watchedCount: 0,
+              };
+              tvdbData = await srvr.getNewTvdb(paramObj);
+              if (tvdbData) {
+                delete tvdbData.deleted;
+                allTvdb[show.Name] = tvdbData;
+              }
+            } catch (e) {
+              console.error('Series: getNewTvdb failed (preview)', { name: show?.Name, tvdbId, err: e?.message || e });
+            }
+          }
+        }
+
         this.currentTvdbData = tvdbData; // Store for actors pane
         evtBus.emit('tvdbDataReady', { show, tvdbData }); // Send to App.vue
         await this.setDeleted(tvdbData);
@@ -738,6 +775,7 @@ export default {
   // set everything in html
   mounted() {
     evtBus.on('setUpSeries', this.onSetUpSeries);
+    evtBus.on('previewMode', this.onPreviewMode);
 
     // While notes input is NOT focused, refresh note text from server once/sec.
     // (Keeps the notes display in sync with external edits.)
@@ -755,6 +793,7 @@ export default {
 
   beforeUnmount() {
     evtBus.off('setUpSeries', this.onSetUpSeries);
+    evtBus.off('previewMode', this.onPreviewMode);
     evtBus.off('seriesMapUpdated', this.onSeriesMapUpdated);
 
     if (this.notePollTimer) {

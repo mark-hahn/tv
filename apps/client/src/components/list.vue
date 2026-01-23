@@ -844,17 +844,29 @@ export default {
 
     async searchAction(payload) {
       const srchChoice = payload?.srchChoice ? payload.srchChoice : payload;
-      const isPreview = !!payload?.ctrlKey;
+      const action = payload?.action || 'preview';
       const {name, tvdbId, overview} = srchChoice || {};
       console.log('searchAction:', name);
       this.cancelSrchList();
 
-      // Any non-preview action exits preview mode.
-      if (!isPreview) this.setPreviewMode(false);
-
-      if (isPreview) {
+      // Dropdown click now previews by default.
+      if (action === 'preview') {
         await this.previewSearchChoice({ name, tvdbId, overview });
         return;
+      }
+
+      // Fallback: if something explicitly asks to add.
+      await this.addSearchChoice({ name, tvdbId, overview });
+    },
+
+    async addSearchChoice({ name, tvdbId, overview }, opts = null) {
+      // This is the original "web dropdown click" behavior: add/create the show.
+      if (!name) return;
+
+      const options = opts && typeof opts === 'object' ? opts : {};
+      const fromPreview = !!options.fromPreview;
+      if (fromPreview) {
+        evtBus.emit('addPreviewShowStart', { name, tvdbId, overview });
       }
 
       if(!pruneTvdb) {
@@ -865,7 +877,7 @@ export default {
           return;
         }
       }
-      
+
       // Show searching modal
       this.searchingShowName = name;
       this.showSearching = true;
@@ -904,16 +916,13 @@ export default {
         episodeCount: 0,
         watchedCount: 0,
       };
-      // For no-Emby shows, never inherit episode/watched counts from any existing
-      // tvdb.json entry keyed by the same name. Name-collisions (or stale tvdb data)
-      // can otherwise leak watchedCount into a show that cannot be watched in Emby.
       let tvdbData = null;
 
+      let ok = false;
       try {
         setWebAddStatus('Waiting for TVDB data...');
         tvdbData = await withTimeout(srvr.getNewTvdb(paramObj), 60000, 'tvdb data');
 
-        // Derive the season list from the actual series map (episodes), not from seasonCount.
         let seriesMapSeasons = [];
         try {
           setWebAddStatus('Fetching season map...');
@@ -935,8 +944,6 @@ export default {
 
         const hasMapData = !!tvdbData && typeof tvdbData === 'object' && Object.keys(tvdbData).length > 0;
 
-        // Prefer putting the show into Emby by creating the show folder and refreshing
-        // the Emby library so it receives a real Emby Id.
         let createdFolder = false;
         if (!hasMapData) {
           createdFolder = false;
@@ -979,7 +986,6 @@ export default {
           }
         }
 
-        // Fallback: old behavior, track as a no-Emby placeholder.
         if (!show) {
           show = await emby.createNoemby(showSeed);
         }
@@ -988,17 +994,17 @@ export default {
           delete tvdbData.deleted;
           allTvdb[show.Name] = tvdbData;
         }
-        // If the show came from Emby via refresh + reload, it's already in allShows.
-        // Only insert a new row for the no-Emby placeholder case.
+
         const alreadyInAllShows = Array.isArray(allShows) && (allShows.some((s) => s?.Id === show?.Id) || allShows.some((s) => s?.Name === show?.Name));
         if (!alreadyInAllShows) {
           this.addRow(show);
         } else {
-          // Ensure it's selected even if current filters hide it.
           this.saveVisShow(show, true);
         }
         this.sortShows();
         this.saveVisShow(show, true);
+
+        ok = true;
 
       } catch (e) {
         console.error('web add: failed', { name, tvdbId, err: e?.message || e });
@@ -1006,6 +1012,12 @@ export default {
       } finally {
         this.showSearching = false;
         this.searchingStatus = '';
+
+        if (fromPreview) {
+          // Done adding: exit preview mode and notify Series so it can hide the button.
+          evtBus.emit('addPreviewShowDone', { ok, name, tvdbId, overview });
+          this.setPreviewMode(false);
+        }
       }
     },
 
@@ -1017,6 +1029,9 @@ export default {
 
       // Always switch to the Series pane for preview.
       evtBus.emit('showSeriesPane');
+
+      // Let Series know which search choice is being previewed (for Add Show button).
+      evtBus.emit('previewSrchChoice', { name: showName, tvdbId, overview });
 
       // If the show already exists in the library, just select it (no creation).
       const matchShow = allShows.find((s) => s?.Name === showName);
@@ -1790,6 +1805,14 @@ export default {
 
     evtBus.on('reelSearchAction', (srchChoice) => {
       void this.searchAction(srchChoice);
+    });
+
+    // Series pane "Add Show" button while in preview mode.
+    evtBus.on('addPreviewShow', (payload) => {
+      const fromPreview = !!payload?.fromPreview;
+      const sc = payload?.srchChoice ? payload.srchChoice : (payload?.srchChoice === null ? null : payload);
+      const choice = sc?.srchChoice ? sc.srchChoice : sc;
+      void this.addSearchChoice(choice, { fromPreview });
     });
 
     evtBus.on('openMap', (show) => {

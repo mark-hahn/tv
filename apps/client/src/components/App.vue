@@ -3,12 +3,6 @@
 #all(
   :style="{ width:'100%', height:'97dvh', boxSizing:'border-box', padding:0, margin:0, display:'flex', flexDirection: showSideButtons ? 'row' : (isPortrait ? 'column' : 'row'), alignItems:'stretch' }"
 )
-  //- Preview mode indicator (fixed top-right)
-  div(
-    v-if="previewMode"
-    style="position:fixed; top:38px; right:10px; z-index:25000; font-weight:bold; color:black; background-color:rgba(255,255,255,0.9); padding:4px 10px; border:1px solid #000; border-radius:6px;"
-  ) Preview Mode
-
   template(v-if="showSideButtons")
     //- Simple + portrait: full-height Buttons pane on the left.
     #simpleButtonsPane(:style="{ flex:'0 0 auto', height:'100%', overflow:'hidden', display:'flex', flexDirection:'column', backgroundColor:'#ccc' }")

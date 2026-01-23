@@ -7,7 +7,14 @@
     div(
       :style="{ display:'grid', gridTemplateColumns:'1fr 3fr 1fr 3fr 1fr', alignItems:'center', width:'100%' }"
     )
-      div(:style="{ gridColumn:'1 / span 2', marginLeft:'20px', marginRight:'20px', whiteSpace:'normal', overflowWrap:'anywhere', wordBreak:'break-word' }") {{show.Name}}
+      div(:style="{ gridColumn:'1 / span 2', marginLeft:'20px', marginRight:'20px', whiteSpace:'normal', overflowWrap:'anywhere', wordBreak:'break-word', display:'flex', alignItems:'center', gap:'12px' }")
+        span {{ show.Name }}{{ previewMode ? ': Preview Mode.' : '' }}
+        button(
+          v-if="previewMode"
+          @click.stop="addShowFromPreview"
+          :disabled="previewAddBusy"
+          :style="{ fontSize:'14px', cursor: (previewAddBusy ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', border:'1px solid #000', backgroundColor: (previewAddBusy ? 'lightgray' : 'whitesmoke') }"
+        ) Add Show
 
       //- Simple mode: align left edge of Notes with right edge of image (end of poster column)
       div(v-if="simpleMode" :style="{ gridColumn:'3 / span 3', display:'flex', alignItems:'center', minWidth:'0px', width:'100%' }")
@@ -186,6 +193,7 @@ export default {
       showHdr: false,
       seriesReady: false,
       previewMode: false,
+      previewAddBusy: false,
       emailText: '',
       noteText: '',
       lastSavedNoteText: '',
@@ -216,6 +224,8 @@ export default {
       collectionName: '',
       collectionCount: 0,
       currentTvdbData: null
+      ,
+      previewSrchChoice: null
     }
   },
   
@@ -223,6 +233,26 @@ export default {
 
     onPreviewMode(active) {
       this.previewMode = !!active;
+      if (!this.previewMode) {
+        this.previewSrchChoice = null;
+        this.previewAddBusy = false;
+      }
+    },
+
+    onPreviewSrchChoice(srchChoice) {
+      this.previewSrchChoice = srchChoice || null;
+    },
+
+    addShowFromPreview() {
+      if (!this.previewSrchChoice) return;
+      if (this.previewAddBusy) return;
+      this.previewAddBusy = true;
+      evtBus.emit('addPreviewShow', { srchChoice: this.previewSrchChoice, fromPreview: true });
+    },
+
+    onAddPreviewShowDone() {
+      // List will exit preview mode; we just reset busy state.
+      this.previewAddBusy = false;
     },
 
     onEnterBlur(e) {
@@ -776,6 +806,8 @@ export default {
   mounted() {
     evtBus.on('setUpSeries', this.onSetUpSeries);
     evtBus.on('previewMode', this.onPreviewMode);
+    evtBus.on('previewSrchChoice', this.onPreviewSrchChoice);
+    evtBus.on('addPreviewShowDone', this.onAddPreviewShowDone);
 
     // While notes input is NOT focused, refresh note text from server once/sec.
     // (Keeps the notes display in sync with external edits.)
@@ -794,6 +826,8 @@ export default {
   beforeUnmount() {
     evtBus.off('setUpSeries', this.onSetUpSeries);
     evtBus.off('previewMode', this.onPreviewMode);
+    evtBus.off('previewSrchChoice', this.onPreviewSrchChoice);
+    evtBus.off('addPreviewShowDone', this.onAddPreviewShowDone);
     evtBus.off('seriesMapUpdated', this.onSeriesMapUpdated);
 
     if (this.notePollTimer) {

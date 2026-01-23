@@ -121,14 +121,9 @@ export default {
 
   methods: {
     onSearchChoiceClick(e, srchChoice) {
-      // Support ctrl/meta-click as an alternate action (e.g. preview / populate panes).
-      // Keep backward compatibility by still sending srchChoice in a stable field.
       this.$emit('search-action', {
         srchChoice,
-        ctrlKey: !!(e && (e.ctrlKey || e.metaKey)),
-        metaKey: !!(e && e.metaKey),
-        shiftKey: !!(e && e.shiftKey),
-        altKey: !!(e && e.altKey),
+        action: 'preview',
       });
     },
 

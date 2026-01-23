@@ -3,19 +3,6 @@
   @click.stop
   :style="{ height:'100%', width:'100%', padding:'10px', boxSizing:'border-box', overflowY:'auto', backgroundColor:'#fafafa', position:'relative' }"
 )
-
-  //- Floating preview badge (top-right)
-  div(v-if="previewMode" style="position:absolute; top:-7px; right:10px; z-index:700;")
-    div(style="display:flex; align-items:center; gap:10px; background:#eee; border:1px solid #000; border-radius:10px; padding:6px 10px; box-shadow:0 2px 6px rgba(0,0,0,0.15);")
-      button(
-        @click.stop="addShowFromPreview"
-        :disabled="previewAddBusy || !previewSrchChoice"
-        :style="{ fontSize:'14px', cursor: ((previewAddBusy || !previewSrchChoice) ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', border:'1px solid #000', backgroundColor: (previewAddBusy ? 'lightgray' : 'whitesmoke') }"
-      ) Add Show
-      button(
-        @click.stop="exitPreview"
-        style="font-size:14px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #000; background-color:whitesmoke;"
-      ) Exit Preview
   div(v-if="err" style="color:red; margin:10px; border:1px solid red; padding:10px;")
     b Error:
     pre {{ err }}

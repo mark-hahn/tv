@@ -1,18 +1,5 @@
 <template lang="pug">
 #reviews(@click.stop :style="{ height:'100%', width:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa', position:'relative' }")
-
-  //- Floating preview badge (top-right)
-  div(v-if="previewMode" style="position:absolute; top:-7px; right:10px; z-index:700;")
-    div(style="display:flex; align-items:center; gap:10px; background:#eee; border:1px solid #000; border-radius:10px; padding:6px 10px; box-shadow:0 2px 6px rgba(0,0,0,0.15);")
-      button(
-        @click.stop="addShowFromPreview"
-        :disabled="previewAddBusy || !previewSrchChoice"
-        :style="{ fontSize:'14px', cursor: ((previewAddBusy || !previewSrchChoice) ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', border:'1px solid #000', backgroundColor: (previewAddBusy ? 'lightgray' : 'whitesmoke') }"
-      ) Add Show
-      button(
-        @click.stop="exitPreview"
-        style="font-size:14px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #000; background-color:whitesmoke;"
-      ) Exit Preview
   
   //- Header Section
   #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', display:'flex', flexDirection:'column', gap:'8px', borderBottom:'1px solid #ddd' }")

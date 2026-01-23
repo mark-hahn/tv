@@ -25,6 +25,18 @@
             :style="{ fontSize:'13px', cursor:'pointer', borderRadius:'7px', padding:'4px 10px', marginLeft:'4px', border:'1px solid #bbb', backgroundColor: (currentPane === t.key ? '#ddd' : 'whitesmoke') }"
           ) {{ t.label }}
 
+          //- Preview controls: immediately after the rightmost tab button (before progress)
+          template(v-if="previewMode")
+            button(
+              @click.stop="addShowFromPreview"
+              :disabled="previewAddBusy || !previewSrchChoice"
+              :style="{ fontSize:'13px', cursor: ((previewAddBusy || !previewSrchChoice) ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', marginLeft:'20px', border:'1px solid #bbb', backgroundColor: ((previewAddBusy || !previewSrchChoice) ? '#eee' : 'whitesmoke') }"
+            ) Add Show
+            button(
+              @click.stop="exitPreview"
+              :style="{ fontSize:'13px', cursor:'pointer', borderRadius:'7px', padding:'4px 10px', marginLeft:'4px', border:'1px solid #bbb', backgroundColor:'whitesmoke' }"
+            ) Exit Preview
+
           div(style="flex:1;") 
           div(v-if="!simpleMode && libraryProgressText" style="display:flex; align-items:center; margin-left:10px; padding-right:10px;")
              div(style="font-size:12px; color:#555; white-space:nowrap; padding-right:8px;") {{ libraryProgressText }}
@@ -168,6 +180,18 @@
           @click.stop="selectTab(t.key)"
           :style="{ fontSize:'13px', cursor:'pointer', borderRadius:'7px', padding:'4px 10px', marginLeft:'4px', border:'1px solid #bbb', backgroundColor: (currentPane === t.key ? '#ddd' : 'whitesmoke') }"
         ) {{ t.label }}
+
+        //- Preview controls: immediately after the rightmost tab button (before progress)
+        template(v-if="previewMode")
+          button(
+            @click.stop="addShowFromPreview"
+            :disabled="previewAddBusy || !previewSrchChoice"
+            :style="{ fontSize:'13px', cursor: ((previewAddBusy || !previewSrchChoice) ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', marginLeft:'20px', border:'1px solid #bbb', backgroundColor: ((previewAddBusy || !previewSrchChoice) ? '#eee' : 'whitesmoke') }"
+          ) Add Show
+          button(
+            @click.stop="exitPreview"
+            :style="{ fontSize:'13px', cursor:'pointer', borderRadius:'7px', padding:'4px 10px', marginLeft:'4px', border:'1px solid #bbb', backgroundColor:'whitesmoke' }"
+          ) Exit Preview
 
         div(style="flex:1;") 
         div(v-if="!simpleMode && libraryProgressText" style="display:flex; align-items:center; margin-left:10px; padding-right:10px;")
@@ -359,6 +383,8 @@ export default {
       simpleMode: new URLSearchParams(window.location.search).has('simple'),
       currentPane: 'series', // 'series', 'map', 'actors', 'reviews', 'trailer', 'torrents', 'subs', 'flex', 'history', 'tvproc', 'file', 'ai'
       previewMode: false,
+      previewAddBusy: false,
+      previewSrchChoice: null,
       currentTvdbData: null,
       currentShow: null,
       _torrentsInitialized: false,
@@ -597,12 +623,33 @@ export default {
   unmounted() {
     evtBus.off('downActivePart', this.handleDownActivePart);
     evtBus.off('tvdb-mismatch', this.handleTvdbMismatch);
+    evtBus.off('previewSrchChoice', this.onPreviewSrchChoice);
+    evtBus.off('addPreviewShowDone', this.onAddPreviewShowDone);
     if (this._onAppWindowResize) window.removeEventListener('resize', this._onAppWindowResize);
     this.stopQbtPolling();
     this.cancelDownInactiveTimer();
     this.stopLibraryPolling();
   },
   methods: {
+    onPreviewSrchChoice(srchChoice) {
+      this.previewSrchChoice = srchChoice || null;
+    },
+
+    addShowFromPreview() {
+      if (!this.previewSrchChoice) return;
+      if (this.previewAddBusy) return;
+      this.previewAddBusy = true;
+      evtBus.emit('addPreviewShow', { srchChoice: this.previewSrchChoice, fromPreview: true });
+    },
+
+    onAddPreviewShowDone() {
+      this.previewAddBusy = false;
+    },
+
+    exitPreview() {
+      evtBus.emit('exitPreviewMode');
+    },
+
     async startLibraryRefresh() {
       if (this._libBusy) return;
 
@@ -1326,6 +1373,10 @@ export default {
     // Preview mode: driven by ctrl-click in the web search dropdown.
     evtBus.on('previewMode', (active) => {
       this.previewMode = !!active;
+      if (!this.previewMode) {
+        this.previewSrchChoice = null;
+        this.previewAddBusy = false;
+      }
       if (this.previewMode) {
         // If currently on a disabled pane, snap back to Series.
         const allowed = new Set(['series', 'actors', 'reviews', 'trailer', 'ai']);
@@ -1335,6 +1386,9 @@ export default {
         }
       }
     });
+
+    evtBus.on('previewSrchChoice', this.onPreviewSrchChoice);
+    evtBus.on('addPreviewShowDone', this.onAddPreviewShowDone);
 
     evtBus.on('startLibraryRefresh', this.startLibraryRefresh);
     

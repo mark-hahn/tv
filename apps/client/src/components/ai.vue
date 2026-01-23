@@ -1,17 +1,5 @@
 <template lang="pug">
 #aiPane(:style="{ width:'100%', height:'100%', display:'flex', flexDirection:'column', boxSizing:'border-box', padding:(simpleMode ? '8px' : '12px'), position:'relative' }")
-  //- Floating preview badge (top-right)
-  div(v-if="previewMode" style="position:absolute; top:-5px; right:10px; z-index:500;")
-    div(style="display:flex; align-items:center; gap:10px; background:#eee; border:1px solid #000; border-radius:10px; padding:6px 10px; box-shadow:0 2px 6px rgba(0,0,0,0.15);")
-      button(
-        @click.stop="addShowFromPreview"
-        :disabled="previewAddBusy || !previewSrchChoice"
-        :style="{ fontSize:'14px', cursor: ((previewAddBusy || !previewSrchChoice) ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', border:'1px solid #000', backgroundColor: (previewAddBusy ? 'lightgray' : 'whitesmoke') }"
-      ) Add Show
-      button(
-        @click.stop="exitPreview"
-        style="font-size:14px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #000; background-color:whitesmoke;"
-      ) Exit Preview
 
   div(
     v-if="activeShow && activeShow.Name"

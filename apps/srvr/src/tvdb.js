@@ -417,7 +417,17 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   // remoteIds come from tvdb
   const remotes = await getRemotes(show, remoteIds);
   const saved = Date.now();
-  const trailers = trailersIn || allTvdb[name]?.trailers;
+  const trailersRaw = trailersIn || allTvdb[name]?.trailers;
+
+  const isEnglishTrailer = (t) => {
+    const lang = (t?.language || t?.iso_639_1 || t?.lang || '').toString().toLowerCase();
+    if (!lang) return true; // legacy entries sometimes omit language
+    return lang === 'eng' || lang === 'en' || lang === 'english' || lang.startsWith('en-') || lang.startsWith('en_');
+  };
+
+  const trailers = Array.isArray(trailersRaw)
+    ? trailersRaw.filter(isEnglishTrailer)
+    : trailersRaw;
 
   let tvdbData = {tvdbId, name, originalNetwork,
                   seasonCount, episodeCount, watchedCount,

@@ -6,7 +6,7 @@
       //- Top row: show name (fills), mode label, arrows.
       div(style="width:100%; display:flex; align-items:center; justify-content:space-between;")
         div(style="margin-left:20px; margin-right:10px; flex:1 1 auto; min-width:0; white-space:normal; overflow-wrap:anywhere; word-break:break-word; display:flex; align-items:center; gap:12px; flex-wrap:wrap;")
-          span {{ showName }}{{ previewMode ? ': Preview Mode.' : '' }}
+          span {{ showName }}{{ previewMode ? '\u00A0|\u00A0Preview Mode' : '' }}
         div(style="margin-left:20px; margin-right:15px; flex:0 0 auto; display:flex; align-items:center; gap:12px; font-weight:normal;")
           button(@click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:5px;") ◄
           button(@click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ►

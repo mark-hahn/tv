@@ -11,7 +11,7 @@
   
   template(v-else)
     div(:style="{ fontWeight:'bold', fontSize:'24px', marginBottom:'15px', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }")
-      span {{ showName }}{{ previewMode ? ': Preview Mode.' : '' }}
+      span {{ showName }}{{ previewMode ? '\u00A0|\u00A0Preview Mode' : '' }}
 
     //- content wrapper to allow refresh
     div(v-if="!trailers || trailers.length === 0" style="padding:20px; text-align:center; color:#666;") No trailers found.

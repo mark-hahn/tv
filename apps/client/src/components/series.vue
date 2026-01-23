@@ -8,7 +8,7 @@
       :style="{ display:'grid', gridTemplateColumns:'1fr 3fr 1fr 3fr 1fr', alignItems:'center', width:'100%' }"
     )
       div(:style="{ gridColumn:'1 / span 2', marginLeft:'20px', marginRight:'20px', whiteSpace:'normal', overflowWrap:'anywhere', wordBreak:'break-word', display:'flex', alignItems:'center', gap:'12px' }")
-        span {{ show.Name }}{{ previewMode ? ': Preview Mode.' : '' }}
+        span {{ show.Name }}{{ previewMode ? '\u00A0|\u00A0Preview Mode' : '' }}
       //- Simple mode: align left edge of Notes with right edge of image (end of poster column)
       div(v-if="simpleMode" :style="{ gridColumn:'3 / span 3', display:'flex', alignItems:'center', minWidth:'0px', width:'100%' }")
         template(v-if="!previewMode")
@@ -402,6 +402,9 @@ export default {
         await this.sendEmail();
         return;
       }
+
+      // In preview mode, do not open/switch to Map.
+      if (this.previewMode) return;
       
       // Otherwise open the map
       this.openMap(this.show);
@@ -413,6 +416,9 @@ export default {
         await this.sendEmail();
         return;
       }
+
+      // In preview mode, do not open/switch to Map.
+      if (this.previewMode) return;
       
       // Rotate panes: if coming from map, go to actors; otherwise go to map
       // Check if we should go to actors (this will be after map is shown)
@@ -421,6 +427,7 @@ export default {
     },
 
     openMap(show) {
+      if (this.previewMode) return;
       console.log('Series: openMap called with show:', show?.Name);
       if (!show || !show.Name) {
         console.log('Series: No show to open map for');
@@ -689,6 +696,10 @@ export default {
       this.showHdr   = true;
       this.seriesReady = false;
 
+      if (this.previewMode) {
+        evtBus.emit('previewPanesLoading', true);
+      }
+
       // Load persistent note for this show.
       this.loadNote(show?.Name);
 
@@ -722,9 +733,10 @@ export default {
       this.collectionCount = collections.length;
       
       setTimeout(async () => {
-        allTvdb = await tvdb.getAllTvdb();
+        try {
+          allTvdb = await tvdb.getAllTvdb();
 
-        let tvdbData = allTvdb[show.Name];
+          let tvdbData = allTvdb[show.Name];
 
         // Preview / transient shows may not exist in tvdb.json yet.
         // If we have a TvdbId, fetch tvdbData from the server without creating the show.
@@ -755,25 +767,28 @@ export default {
           }
         }
 
-        this.currentTvdbData = tvdbData; // Store for actors pane
-        evtBus.emit('tvdbDataReady', { show, tvdbData }); // Send to App.vue
-        await this.setDeleted(tvdbData);
-        
-        // Don't await poster!
-        this.setPoster(tvdbData);
+          this.currentTvdbData = tvdbData; // Store for actors pane
+          evtBus.emit('tvdbDataReady', { show, tvdbData }); // Send to App.vue
+          await this.setDeleted(tvdbData);
+          
+          // Don't await poster!
+          this.setPoster(tvdbData);
 
-        await this.setDates(tvdbData);
+          await this.setDates(tvdbData);
 
-        await this.setSeasonsTxt(tvdbData);
+          await this.setSeasonsTxt(tvdbData);
 
-        await this.setCntryLangTxt(tvdbData);
-        
-        await this.setNextWatch();
+          await this.setCntryLangTxt(tvdbData);
+          
+          await this.setNextWatch();
 
-        await this.setRemotes();
+          await this.setRemotes();
 
-        // Only show the info box (and email input) once everything is populated.
-        this.seriesReady = true;
+          // Only show the info box (and email input) once everything is populated.
+          this.seriesReady = true;
+        } finally {
+          evtBus.emit('previewPanesLoading', false);
+        }
       }, 10);
     },
     

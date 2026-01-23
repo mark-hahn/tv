@@ -5,7 +5,7 @@
     v-if="activeShow && activeShow.Name"
     :style="{ flex:'0 0 auto', fontWeight:'bold', fontSize:(simpleMode ? '18px' : '22px'), marginBottom:'8px', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap', paddingRight:'180px' }"
   )
-    span {{ activeShow.Name }}{{ previewMode ? ': Preview Mode.' : '' }}
+    span {{ activeShow.Name }}{{ previewMode ? '\u00A0|\u00A0Preview Mode' : '' }}
   // Scroll container
   div(style="flex:1 1 auto; min-height:0; overflow:auto;")
     // Centered column

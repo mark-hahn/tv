@@ -1027,6 +1027,9 @@ export default {
 
       this.setPreviewMode(true);
 
+      // Preview mode: panes will start loading info.
+      evtBus.emit('previewPanesLoading', true);
+
       // Always switch to the Series pane for preview.
       evtBus.emit('showSeriesPane');
 
@@ -1288,6 +1291,10 @@ export default {
       if (this.previewMode === next) return;
       this.previewMode = next;
       evtBus.emit('previewMode', next);
+
+      if (!next) {
+        evtBus.emit('previewPanesLoading', false);
+      }
     },
 
     sortClick() {

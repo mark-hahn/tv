@@ -30,12 +30,16 @@
             button(
               @click.stop="addShowFromPreview"
               :disabled="previewAddBusy || !previewSrchChoice"
-              :style="{ fontSize:'13px', cursor: ((previewAddBusy || !previewSrchChoice) ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', marginLeft:'20px', border:'1px solid #bbb', backgroundColor: ((previewAddBusy || !previewSrchChoice) ? '#eee' : 'whitesmoke') }"
-            ) Add Show
+              :style="{ fontSize:'13px', cursor: ((previewAddBusy || !previewSrchChoice) ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', marginTop:'4px', marginLeft:'20px', border:'1px solid #bbb', backgroundColor: ((previewAddBusy || !previewSrchChoice) ? '#eee' : 'whitesmoke') }"
+            ) Add this show to Emby
             button(
               @click.stop="exitPreview"
-              :style="{ fontSize:'13px', cursor:'pointer', borderRadius:'7px', padding:'4px 10px', marginLeft:'4px', border:'1px solid #bbb', backgroundColor:'whitesmoke' }"
+              :style="{ fontSize:'13px', cursor:'pointer', borderRadius:'7px', padding:'4px 10px', marginTop:'4px', marginLeft:'4px', border:'1px solid #bbb', backgroundColor:'whitesmoke' }"
             ) Exit Preview
+            span(
+              v-if="previewPanesLoading"
+              :style="{ marginLeft:'10px', color:'#aaa', fontWeight:'bold', fontSize:'13px', whiteSpace:'nowrap' }"
+            ) &lt;Loading&gt;
 
           div(style="flex:1;") 
           div(v-if="!simpleMode && libraryProgressText" style="display:flex; align-items:center; margin-left:10px; padding-right:10px;")
@@ -186,12 +190,16 @@
           button(
             @click.stop="addShowFromPreview"
             :disabled="previewAddBusy || !previewSrchChoice"
-            :style="{ fontSize:'13px', cursor: ((previewAddBusy || !previewSrchChoice) ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', marginLeft:'20px', border:'1px solid #bbb', backgroundColor: ((previewAddBusy || !previewSrchChoice) ? '#eee' : 'whitesmoke') }"
-          ) Add Show
+            :style="{ fontSize:'13px', cursor: ((previewAddBusy || !previewSrchChoice) ? 'default' : 'pointer'), borderRadius:'7px', padding:'4px 10px', marginTop:'4px', marginLeft:'20px', border:'1px solid #bbb', backgroundColor: ((previewAddBusy || !previewSrchChoice) ? '#eee' : 'whitesmoke') }"
+          ) Add this show to Emby
           button(
             @click.stop="exitPreview"
-            :style="{ fontSize:'13px', cursor:'pointer', borderRadius:'7px', padding:'4px 10px', marginLeft:'4px', border:'1px solid #bbb', backgroundColor:'whitesmoke' }"
+            :style="{ fontSize:'13px', cursor:'pointer', borderRadius:'7px', padding:'4px 10px', marginTop:'4px', marginLeft:'4px', border:'1px solid #bbb', backgroundColor:'whitesmoke' }"
           ) Exit Preview
+          span(
+            v-if="previewPanesLoading"
+            :style="{ marginLeft:'10px', color:'#aaa', fontWeight:'bold', fontSize:'13px', whiteSpace:'nowrap' }"
+          ) &lt;Loading&gt;
 
         div(style="flex:1;") 
         div(v-if="!simpleMode && libraryProgressText" style="display:flex; align-items:center; margin-left:10px; padding-right:10px;")
@@ -383,6 +391,7 @@ export default {
       simpleMode: new URLSearchParams(window.location.search).has('simple'),
       currentPane: 'series', // 'series', 'map', 'actors', 'reviews', 'trailer', 'torrents', 'subs', 'flex', 'history', 'tvproc', 'file', 'ai'
       previewMode: false,
+      previewPanesLoading: false,
       previewAddBusy: false,
       previewSrchChoice: null,
       currentTvdbData: null,
@@ -625,12 +634,16 @@ export default {
     evtBus.off('tvdb-mismatch', this.handleTvdbMismatch);
     evtBus.off('previewSrchChoice', this.onPreviewSrchChoice);
     evtBus.off('addPreviewShowDone', this.onAddPreviewShowDone);
+    evtBus.off('previewPanesLoading', this.onPreviewPanesLoading);
     if (this._onAppWindowResize) window.removeEventListener('resize', this._onAppWindowResize);
     this.stopQbtPolling();
     this.cancelDownInactiveTimer();
     this.stopLibraryPolling();
   },
   methods: {
+    onPreviewPanesLoading(active) {
+      this.previewPanesLoading = !!active;
+    },
     onPreviewSrchChoice(srchChoice) {
       this.previewSrchChoice = srchChoice || null;
     },
@@ -1376,6 +1389,7 @@ export default {
       if (!this.previewMode) {
         this.previewSrchChoice = null;
         this.previewAddBusy = false;
+        this.previewPanesLoading = false;
       }
       if (this.previewMode) {
         // If currently on a disabled pane, snap back to Series.
@@ -1386,6 +1400,8 @@ export default {
         }
       }
     });
+
+    evtBus.on('previewPanesLoading', this.onPreviewPanesLoading);
 
     evtBus.on('previewSrchChoice', this.onPreviewSrchChoice);
     evtBus.on('addPreviewShowDone', this.onAddPreviewShowDone);

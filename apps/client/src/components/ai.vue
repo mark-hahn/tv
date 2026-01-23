@@ -1,11 +1,5 @@
 <template lang="pug">
 #aiPane(:style="{ width:'100%', height:'100%', display:'flex', flexDirection:'column', boxSizing:'border-box', padding:(simpleMode ? '8px' : '12px'), position:'relative' }")
-
-  div(
-    v-if="activeShow && activeShow.Name"
-    :style="{ flex:'0 0 auto', fontWeight:'bold', fontSize:(simpleMode ? '18px' : '22px'), marginBottom:'8px', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap', paddingRight:'180px' }"
-  )
-    span {{ activeShow.Name }}{{ previewMode ? '\u00A0|\u00A0Preview Mode' : '' }}
   // Scroll container
   div(style="flex:1 1 auto; min-height:0; overflow:auto;")
     // Centered column

@@ -7,7 +7,7 @@
     //- Top Row: Show Title and Rotten Button
     div(style="width:100%; display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;")
       div(:style="{ fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginLeft:'10px', marginRight:'10px', flex:'1 1 auto', minWidth:0, whiteSpace:'normal', overflowWrap:'anywhere', wordBreak:'break-word', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }")
-        span {{ showName }}{{ previewMode ? '\u00A0|\u00A0Preview Mode' : '' }}
+        span {{ showName }}
       
       div(v-if="rottenUrl" style="margin-right:10px; flex:'0 0 auto';")
         a(:href="rottenUrl" target="_blank" style="text-decoration:none;")

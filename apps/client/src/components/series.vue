@@ -8,7 +8,7 @@
       :style="{ display:'grid', gridTemplateColumns:'1fr 3fr 1fr 3fr 1fr', alignItems:'center', width:'100%' }"
     )
       div(:style="{ gridColumn:'1 / span 2', marginLeft:'20px', marginRight:'20px', whiteSpace:'normal', overflowWrap:'anywhere', wordBreak:'break-word', display:'flex', alignItems:'center', gap:'12px' }")
-        span {{ show.Name }}{{ previewMode ? '\u00A0|\u00A0Preview Mode' : '' }}
+        span {{ show.Name }}
       //- Simple mode: align left edge of Notes with right edge of image (end of poster column)
       div(v-if="simpleMode" :style="{ gridColumn:'3 / span 3', display:'flex', alignItems:'center', minWidth:'0px', width:'100%' }")
         template(v-if="!previewMode")

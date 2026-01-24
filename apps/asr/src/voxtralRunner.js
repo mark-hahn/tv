@@ -10,23 +10,29 @@ import FormData from 'form-data';
 
 import { getAsrSecretsDir } from './asrPaths.js';
 
-const allowedExt = new Set(['.mp4', '.mkv', '.avi', '.mov', '.webm', '.m4v']);
-const fileLimit = 19 * 1024 * 1024;
+// ---------------- Hard-wired config ----------------
+const MISTRAL_MODEL = 'voxtral-small-latest';
+const MISTRAL_ASR_TIMEOUT_MS = 60000;
+const API_RESPONSE_FORMAT = 'verbose_json';
+const API_TEMPERATURE = 0;
 
-const model = process.env.MISTRAL_ASR_MODEL || 'voxtral-small-latest';
-const apiResponseFormat = 'verbose_json';
-const apiTemperature = 0;
+const MAX_RETRIES = 5;
+const BASE_DELAY_MS = 5000;
 
-const chunkSec = 120;
-const trimSec = 3;
-const overlapSec = 3;
-const timeMatchMgn = 0.3;
-const offsetSec = chunkSec - trimSec - overlapSec - trimSec;
-const minChunkSec = trimSec + overlapSec + trimSec;
+const CHUNK_SEC = 120;
+const TRIM_SEC = 3;
+const OVERLAP_SEC = 3;
+const TIME_MATCH_MGN = 0.3;
 
-const audioConfig = { rate: 48000, bitrate: '256k' };
+const AUDIO_CONFIG = { rate: 48000, bitrate: '256k' };
 
-const httpsAgent = new https.Agent({ keepAlive: true });
+const FILE_LIMIT_BYTES = 19 * 1024 * 1024;
+const ALLOWED_EXT = new Set(['.mp4', '.mkv', '.avi', '.mov', '.webm', '.m4v']);
+
+const HTTPS_AGENT = new https.Agent({ keepAlive: true });
+
+const OFFSET_SEC = CHUNK_SEC - TRIM_SEC - OVERLAP_SEC - TRIM_SEC;
+const MIN_CHUNK_SEC = TRIM_SEC + OVERLAP_SEC + TRIM_SEC;
 
 let didLogApiNetInfo = false;
 
@@ -45,13 +51,8 @@ async function logApiNetInfoOnce(logger, startMs) {
   if (!logger || didLogApiNetInfo) return;
   didLogApiNetInfo = true;
 
-  const httpProxy = process.env.HTTP_PROXY || process.env.http_proxy || '';
-  const httpsProxy = process.env.HTTPS_PROXY || process.env.https_proxy || '';
-  const noProxy = process.env.NO_PROXY || process.env.no_proxy || '';
-  const tlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-
   logger.log(
-    `[${ts(startMs)}] API net: keepAlive=${httpsAgent?.options?.keepAlive ? '1' : '0'} HTTP_PROXY=${httpProxy ? 'set' : 'unset'} HTTPS_PROXY=${httpsProxy ? 'set' : 'unset'} NO_PROXY=${noProxy ? 'set' : 'unset'} NODE_TLS_REJECT_UNAUTHORIZED=${tlsReject ?? 'unset'}`,
+    `[${ts(startMs)}] API net: keepAlive=${HTTPS_AGENT?.options?.keepAlive ? '1' : '0'} (env disabled)`,
   );
 
   try {
@@ -69,13 +70,6 @@ function previewText(s, maxChars = 2000) {
   const head = str.slice(0, headLen);
   const tail = str.slice(-200);
   return `${head}\n...<truncated ${str.length - headLen - 200} chars>...\n${tail}`;
-}
-
-function readPositiveIntEnv(name, fallback) {
-  const raw = process.env[name];
-  if (raw === undefined) return fallback;
-  const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
 
 function ts(startMs) {
@@ -106,7 +100,7 @@ function vs(secs) {
 }
 
 function isVideoFile(p) {
-  return allowedExt.has(path.extname(p).toLowerCase());
+  return ALLOWED_EXT.has(path.extname(p).toLowerCase());
 }
 
 async function pathExists(p) {
@@ -213,8 +207,8 @@ async function extractAudio(inputVideo, outWav, { signal } = {}) {
   const args = [
     '-y', '-i', inputVideo,
     '-ac', '1',
-    '-ar', String(audioConfig.rate),
-    '-b:a', audioConfig.bitrate,
+    '-ar', String(AUDIO_CONFIG.rate),
+    '-b:a', AUDIO_CONFIG.bitrate,
     '-vn',
     outWav,
   ];
@@ -228,8 +222,8 @@ async function preprocessAudio(inputWav, outputWav, { signal, logger, startMs } 
     '-y', '-i', inputWav,
     '-af', audioFilter,
     '-ac', '1',
-    '-ar', String(audioConfig.rate),
-    '-b:a', audioConfig.bitrate,
+    '-ar', String(AUDIO_CONFIG.rate),
+    '-b:a', AUDIO_CONFIG.bitrate,
     '-f', 'wav',
     outputWav,
   ], { signal });
@@ -238,17 +232,17 @@ async function preprocessAudio(inputWav, outputWav, { signal, logger, startMs } 
 
 async function getChunks(inWav, tmpDir, { signal } = {}) {
   const totalDuration = await getDurationSec(inWav, { signal });
-  const chunkCount = Math.ceil(totalDuration / offsetSec);
+  const chunkCount = Math.ceil(totalDuration / OFFSET_SEC);
   const chunks = [];
   for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-    const chunkStart = chunkIndex * offsetSec;
-    const chunkEnd = Math.min(chunkStart + chunkSec, totalDuration);
-    if ((chunkEnd - chunkStart) < minChunkSec) break;
+    const chunkStart = chunkIndex * OFFSET_SEC;
+    const chunkEnd = Math.min(chunkStart + CHUNK_SEC, totalDuration);
+    if ((chunkEnd - chunkStart) < MIN_CHUNK_SEC) break;
 
-    let trimStart = chunkStart + trimSec;
-    let trimEnd = chunkEnd - trimSec;
-    let overlapStart = trimStart + overlapSec;
-    let overlapEnd = trimEnd - overlapSec;
+    let trimStart = chunkStart + TRIM_SEC;
+    let trimEnd = chunkEnd - TRIM_SEC;
+    let overlapStart = trimStart + OVERLAP_SEC;
+    let overlapEnd = trimEnd - OVERLAP_SEC;
     if (chunkIndex === 0) {
       trimStart = chunkStart;
       overlapStart = chunkStart;
@@ -277,8 +271,8 @@ async function getFlac(wavPath, tmpDir, { signal, logger } = {}) {
   const flacPath = path.join(tmpDir, `${path.basename(wavPath, '.wav')}.flac`);
   await run('ffmpeg', ['-y', '-i', wavPath, '-c:a', 'flac', flacPath], { signal });
   const statSize = (await fsp.stat(flacPath)).size;
-  if (statSize > fileLimit) {
-    const msg = `FLAC file too large: ${statSize} bytes > ${fileLimit} bytes`;
+  if (statSize > FILE_LIMIT_BYTES) {
+    const msg = `FLAC file too large: ${statSize} bytes > ${FILE_LIMIT_BYTES} bytes`;
     if (logger) logger.error(msg);
     throw new Error(msg);
   }
@@ -289,12 +283,6 @@ async function getFlac(wavPath, tmpDir, { signal, logger } = {}) {
     size: statSize,
   };
 }
-
-const MAX_RETRIES = 5;
-const BASE_DELAY_MS = 5000;
-// Voxtral can take longer than 120s for 120s chunks.
-// Allow override via env for slow/loaded API periods.
-const API_TIMEOUT_MS = readPositiveIntEnv('MISTRAL_ASR_TIMEOUT_MS', 10 * 60 * 1000);
 
 function isVoxtralSmall(modelId) {
   return String(modelId || '').toLowerCase().includes('voxtral-small');
@@ -312,19 +300,19 @@ async function callTranscriptionsApi({ apiKey, uploadInfo, signal, logger, start
 
     const form = new FormData();
     form.append('file', buf, { filename: uploadInfo.filename, contentType: uploadInfo.mime });
-    form.append('model', model);
+    form.append('model', MISTRAL_MODEL);
     form.append('return_language', 'false');
     form.append('timestamp_granularities', 'segment');
-    form.append('response_format', apiResponseFormat);
-    form.append('temperature', String(apiTemperature));
+    form.append('response_format', API_RESPONSE_FORMAT);
+    form.append('temperature', String(API_TEMPERATURE));
 
     try {
       if (logger) {
         logger.log(
-          `[${ts(startMs)}] API request: attempt ${attempt}/${MAX_RETRIES} timeout=${API_TIMEOUT_MS}ms bytes=${uploadInfo.size}`,
+          `[${ts(startMs)}] API request: attempt ${attempt}/${MAX_RETRIES} timeout=${MISTRAL_ASR_TIMEOUT_MS}ms bytes=${uploadInfo.size}`,
         );
         logger.log(
-          `[${ts(startMs)}] API call: POST https://api.mistral.ai/v1/audio/transcriptions model=${model} mime=${uploadInfo.mime} filename=${uploadInfo.filename}`,
+          `[${ts(startMs)}] API call: POST https://api.mistral.ai/v1/audio/transcriptions model=${MISTRAL_MODEL} mime=${uploadInfo.mime} filename=${uploadInfo.filename}`,
         );
       }
 
@@ -334,9 +322,9 @@ async function callTranscriptionsApi({ apiKey, uploadInfo, signal, logger, start
         form,
         {
           headers: { Authorization: `Bearer ${apiKey}`, ...form.getHeaders() },
-          timeout: API_TIMEOUT_MS,
+          timeout: MISTRAL_ASR_TIMEOUT_MS,
           signal,
-          httpsAgent,
+          httpsAgent: HTTPS_AGENT,
         },
       );
 
@@ -407,8 +395,8 @@ async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startM
     attempt++;
 
     const body = {
-      model,
-      temperature: apiTemperature,
+      model: MISTRAL_MODEL,
+      temperature: API_TEMPERATURE,
       response_format: { type: 'json_object' },
       messages: [
         {
@@ -424,10 +412,10 @@ async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startM
     try {
       if (logger) {
         logger.log(
-          `[${ts(startMs)}] API request: attempt ${attempt}/${MAX_RETRIES} timeout=${API_TIMEOUT_MS}ms bytes=${uploadInfo.size} base64Chars=${base64Audio.length}`,
+          `[${ts(startMs)}] API request: attempt ${attempt}/${MAX_RETRIES} timeout=${MISTRAL_ASR_TIMEOUT_MS}ms bytes=${uploadInfo.size} base64Chars=${base64Audio.length}`,
         );
         logger.log(
-          `[${ts(startMs)}] API call: POST https://api.mistral.ai/v1/chat/completions model=${model} temp=${apiTemperature} promptChars=${prompt.length}`,
+          `[${ts(startMs)}] API call: POST https://api.mistral.ai/v1/chat/completions model=${MISTRAL_MODEL} temp=${API_TEMPERATURE} promptChars=${prompt.length}`,
         );
       }
 
@@ -437,11 +425,11 @@ async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startM
         body,
         {
           headers: { Authorization: `Bearer ${apiKey}` },
-          timeout: API_TIMEOUT_MS,
+          timeout: MISTRAL_ASR_TIMEOUT_MS,
           signal,
           maxBodyLength: Infinity,
           maxContentLength: Infinity,
-          httpsAgent,
+          httpsAgent: HTTPS_AGENT,
         },
       );
 
@@ -521,10 +509,10 @@ async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startM
 async function callApi({ apiKey, uploadInfo, signal, logger, startMs }) {
   if (logger) {
     logger.log(
-      `[${ts(startMs)}] API: ${isVoxtralSmall(model) ? 'chat/completions (audio)' : 'audio/transcriptions'} model=${model}`,
+      `[${ts(startMs)}] API: ${isVoxtralSmall(MISTRAL_MODEL) ? 'chat/completions (audio)' : 'audio/transcriptions'} model=${MISTRAL_MODEL}`,
     );
   }
-  if (isVoxtralSmall(model)) {
+  if (isVoxtralSmall(MISTRAL_MODEL)) {
     return callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startMs });
   }
   return callTranscriptionsApi({ apiKey, uploadInfo, signal, logger, startMs });
@@ -601,8 +589,8 @@ function writeSrt(segments, outputPath, { logger, startMs } = {}) {
     try {
       skipSeg = true;
       if (text.length === 0) continue;
-      const leftMatch = Math.abs(start - lastStart) < timeMatchMgn;
-      const rightMatch = Math.abs(end - lastEnd) < timeMatchMgn;
+      const leftMatch = Math.abs(start - lastStart) < TIME_MATCH_MGN;
+      const rightMatch = Math.abs(end - lastEnd) < TIME_MATCH_MGN;
       if (leftMatch || rightMatch) {
         hadDuplicate = true;
         if (text === lastText) continue;
@@ -809,17 +797,17 @@ export async function runAsrJob(job, { signal, onProgress, logger } = {}) {
 
   if (logger) {
     logger.log(`\nConfiguration:`);
-    logger.log(`   Chunk Duration:    ${chunkSec}s`);
-    logger.log(`   Trim Duration:     ${trimSec}s`);
-    logger.log(`   Overlap Duration:  ${overlapSec}s`);
-    logger.log(`   Time Match Margin: ${timeMatchMgn}s`);
-    logger.log(`   Audio Quality:     max (${audioConfig.rate}Hz, ${audioConfig.bitrate})`);
+    logger.log(`   Chunk Duration:    ${CHUNK_SEC}s`);
+    logger.log(`   Trim Duration:     ${TRIM_SEC}s`);
+    logger.log(`   Overlap Duration:  ${OVERLAP_SEC}s`);
+    logger.log(`   Time Match Margin: ${TIME_MATCH_MGN}s`);
+    logger.log(`   Audio Quality:     max (${AUDIO_CONFIG.rate}Hz, ${AUDIO_CONFIG.bitrate})`);
     logger.log(`   Preprocessing:     true`);
     logger.log(`   Noise Reduction:   true`);
-    logger.log(`   API Model:         ${model}`);
-    logger.log(`   API Response:      ${apiResponseFormat}`);
-    logger.log(`   API Timeout:       ${Math.round(API_TIMEOUT_MS / 1000)}s`);
-    logger.log(`   File Size Limit:   ${(fileLimit / 1024 / 1024).toFixed(1)}MB`);
+    logger.log(`   API Model:         ${MISTRAL_MODEL}`);
+    logger.log(`   API Response:      ${API_RESPONSE_FORMAT}`);
+    logger.log(`   API Timeout:       ${Math.round(MISTRAL_ASR_TIMEOUT_MS / 1000)}s`);
+    logger.log(`   File Size Limit:   ${(FILE_LIMIT_BYTES / 1024 / 1024).toFixed(1)}MB`);
     logger.log('');
     logger.log(`Found ${files.length} video file(s) to process`);
   }

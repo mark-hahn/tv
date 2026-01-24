@@ -12,7 +12,7 @@ app.get(['/health', '/asr/health'], (req, res) => {
   res.json({ ok: true });
 });
 
-const port = Number(process.env.PORT) || 3407;
+const port = 3407;
 app.listen(port, () => {
   // Intentionally minimal logging.
   console.log(`@tv/asr listening on port ${port}`);

@@ -5,7 +5,8 @@ import path from 'node:path';
 import { createFileLogger } from './logger.js';
 import { elapsedSecsSince, formatYyyyMmDd_HhMmSs } from './time.js';
 import { getAsrLogsDir } from './asrPaths.js';
-import { runAsrJob } from './voxtralRunner.js';
+import { runAsrJob as runVoxtralAsrJob } from './voxtralRunner.js';
+import { runAsrJob as runGptAsrJob } from './gptRunner.js';
 
 let _mgr = null;
 
@@ -117,6 +118,7 @@ class AsrManager {
     const folder = String(args?.folder || '').trim();
     const file = args?.file == null ? null : String(args.file).trim();
     const sfx = String(args?.sfx || '').trim();
+    const provider = String(args?.provider || 'voxtral').trim().toLowerCase();
 
     if (!folder) {
       const r = emptyResult();
@@ -126,6 +128,11 @@ class AsrManager {
     if (!sfx) {
       const r = emptyResult();
       r.error = 'Missing sfx';
+      return r;
+    }
+    if (provider !== 'voxtral' && provider !== 'gpt') {
+      const r = emptyResult();
+      r.error = `Invalid provider: ${provider}`;
       return r;
     }
 
@@ -144,6 +151,7 @@ class AsrManager {
       folder,
       file,
       sfx,
+      provider,
       startedMs,
       startedIso,
       logPath,
@@ -169,7 +177,8 @@ class AsrManager {
   async _run(job) {
     const logger = job._logger;
     try {
-      await runAsrJob(job, {
+      const runner = job.provider === 'gpt' ? runGptAsrJob : runVoxtralAsrJob;
+      await runner(job, {
         signal: job._abortController.signal,
         onProgress: (p) => {
           job.filePath = p.filePath || job.filePath;

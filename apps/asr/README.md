@@ -3,7 +3,7 @@
 ASR server app for the TV monorepo.
 
 - Provides `POST /controlAsr` (and `POST /asr/controlAsr` alias) which accepts an `asrArgs` JSON object.
-- Uses Mistral's Voxtral ASR API to transcribe video files into `.srt` subtitles.
+- Uses an ASR provider to transcribe video files into `.srt` subtitles.
 
 ## Secrets
 
@@ -14,6 +14,25 @@ Place the Mistral ASR API key in:
 On the remote host this becomes:
 
 - `/root/dev/apps/tv/apps/asr/secrets/mistral-asr-key.txt`
+
+For OpenAI GPT-4o-Transcribe, place the OpenAI API key in:
+
+- `apps/asr/secrets/openai-asr-key.txt`
+
+On the remote host this becomes:
+
+- `/root/dev/apps/tv/apps/asr/secrets/openai-asr-key.txt`
+
+## Provider
+
+`POST /controlAsr` accepts a `provider` field:
+
+- `provider: "voxtral"` (default)
+- `provider: "gpt"`
+
+Notes:
+
+- The GPT provider uses OpenAI's `/v1/audio/transcriptions` endpoint with model `gpt-4o-transcribe`.
 
 ## Model
 

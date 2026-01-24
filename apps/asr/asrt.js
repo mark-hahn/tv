@@ -69,6 +69,7 @@ async function main() {
   if (cmd === 'start') {
     asrArgs = {
       command: 'start',
+      provider: 'gpt',
       folder: START_FOLDER,
       file: START_FILE,
       sfx: START_SFX,

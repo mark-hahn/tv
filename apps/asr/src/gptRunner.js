@@ -11,13 +11,12 @@ import FormData from 'form-data';
 import { getAsrSecretsDir } from './asrPaths.js';
 
 // ---------------- Hard-wired config ----------------
-const OPENAI_MODEL = 'gpt-4o-transcribe';
+const OPENAI_MODEL = 'whisper-1';
 const INITIAL_TIMEOUT_MS = 30000;
 const TIMEOUT_BACKOFF_FACTOR = 1.5;
-// gpt-4o-transcribe currently rejects 'verbose_json'; use 'json' (or 'text').
-// We still request segment timestamps; if the API doesn't return segments, we
-// fall back to a single segment spanning the chunk.
-const API_RESPONSE_FORMAT = 'json';
+// whisper-1 supports timestamped verbose output + SRT/VTT output formats.
+// We use verbose_json with segment timestamps so we can generate consistent SRT.
+const API_RESPONSE_FORMAT = 'verbose_json';
 
 const MAX_ATTEMPTS = 6;
 const INITIAL_DELAY_MS = 5000;

@@ -32,7 +32,7 @@ On the remote host this becomes:
 
 Notes:
 
-- The GPT provider uses OpenAI's `/v1/audio/transcriptions` endpoint with model `gpt-4o-transcribe`.
+- The GPT provider uses OpenAI's `/v1/audio/transcriptions` endpoint with model `whisper-1`.
 
 ## Model
 

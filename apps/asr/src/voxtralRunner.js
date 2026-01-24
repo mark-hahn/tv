@@ -11,8 +11,8 @@ import FormData from 'form-data';
 import { getAsrSecretsDir } from './asrPaths.js';
 
 // ---------------- Hard-wired config ----------------
-const MISTRAL_MODEL = 'voxtral-small-latest';
-const MISTRAL_ASR_TIMEOUT_MS = 60000;
+const MISTRAL_MODEL = 'voxtral-small-2507';
+const MISTRAL_ASR_TIMEOUT_MS = 120000;
 const API_RESPONSE_FORMAT = 'verbose_json';
 const API_TEMPERATURE = 0;
 
@@ -288,6 +288,33 @@ function isVoxtralSmall(modelId) {
   return String(modelId || '').toLowerCase().includes('voxtral-small');
 }
 
+function apiUrlForModel(modelId) {
+  return isVoxtralSmall(modelId)
+    ? 'https://api.mistral.ai/v1/chat/completions'
+    : 'https://api.mistral.ai/v1/audio/transcriptions';
+}
+
+function getAxiosSocketInfo(err) {
+  const req = err?.request;
+  const sock = req?.socket;
+  const local = sock?.localAddress || sock?.localIP || '';
+  const localPort = sock?.localPort;
+  const remote = sock?.remoteAddress || '';
+  const remotePort = sock?.remotePort;
+  const reusedSocket = Boolean(req?.reusedSocket ?? sock?.reusedSocket);
+
+  return {
+    hasRequest: Boolean(req),
+    hasSocket: Boolean(sock),
+    reusedSocket,
+    local: local || localPort ? `${local || '?'}:${localPort ?? '?'}` : 'unknown',
+    remote: remote || remotePort ? `${remote || '?'}:${remotePort ?? '?'}` : 'unknown',
+    destroyed: sock ? Boolean(sock.destroyed) : null,
+    bytesWritten: typeof sock?.bytesWritten === 'number' ? sock.bytesWritten : null,
+    bytesRead: typeof sock?.bytesRead === 'number' ? sock.bytesRead : null,
+  };
+}
+
 async function callTranscriptionsApi({ apiKey, uploadInfo, signal, logger, startMs }) {
   const buf = await fsp.readFile(uploadInfo.path);
   const apiStart = Date.now();
@@ -297,6 +324,8 @@ async function callTranscriptionsApi({ apiKey, uploadInfo, signal, logger, start
 
   while (true) {
     attempt++;
+
+    let reqStart = 0;
 
     const form = new FormData();
     form.append('file', buf, { filename: uploadInfo.filename, contentType: uploadInfo.mime });
@@ -316,7 +345,7 @@ async function callTranscriptionsApi({ apiKey, uploadInfo, signal, logger, start
         );
       }
 
-      const reqStart = Date.now();
+      reqStart = Date.now();
       const response = await axios.post(
         'https://api.mistral.ai/v1/audio/transcriptions',
         form,
@@ -350,18 +379,25 @@ async function callTranscriptionsApi({ apiKey, uploadInfo, signal, logger, start
       const status = err?.response?.status || err?.code || err.message || 'unknown';
       const body = err?.response?.data || err?.toString();
       if (logger) {
+        const elapsedMs = reqStart ? (Date.now() - reqStart) : null;
         logger.error(`[${ts(startMs)}] API request failed (attempt ${attempt}): ${status}`);
         const cfg = err?.config;
         const reqId = err?.response?.headers?.['x-request-id'] || err?.response?.headers?.['request-id'] || err?.response?.headers?.['x-requestid'];
+        const sockInfo = getAxiosSocketInfo(err);
         logger.error(
-          `[${ts(startMs)}] API error detail: code=${err?.code || 'unknown'} errno=${err?.errno || 'unknown'} syscall=${err?.syscall || 'unknown'} address=${err?.address || 'unknown'} port=${err?.port || 'unknown'} url=${cfg?.url || 'unknown'} timeout=${cfg?.timeout ?? 'unknown'} requestId=${reqId || 'unknown'}`,
+          `[${ts(startMs)}] API error detail: code=${err?.code || 'unknown'} errno=${err?.errno || 'unknown'} syscall=${err?.syscall || 'unknown'} address=${err?.address || 'unknown'} port=${err?.port || 'unknown'} url=${cfg?.url || 'unknown'} timeout=${cfg?.timeout ?? 'unknown'} elapsedMs=${elapsedMs == null ? 'unknown' : elapsedMs} requestId=${reqId || 'unknown'}`,
+        );
+        logger.error(
+          `[${ts(startMs)}] API socket: hasRequest=${sockInfo.hasRequest ? '1' : '0'} hasSocket=${sockInfo.hasSocket ? '1' : '0'} reusedSocket=${sockInfo.reusedSocket ? '1' : '0'} local=${sockInfo.local} remote=${sockInfo.remote} destroyed=${sockInfo.destroyed == null ? 'unknown' : sockInfo.destroyed ? '1' : '0'} bytesWritten=${sockInfo.bytesWritten == null ? 'unknown' : sockInfo.bytesWritten} bytesRead=${sockInfo.bytesRead == null ? 'unknown' : sockInfo.bytesRead}`,
         );
         if (body) logger.error(JSON.stringify(body));
       }
 
-      if (attempt > MAX_RETRIES) {
-        throw new Error('FATAL: max retries reached');
-      }
+      // handled below (shared retry/backoff path)
+    }
+
+    if (attempt >= MAX_RETRIES) {
+      throw new Error(`FATAL: max retries reached (${MAX_RETRIES})`);
     }
 
     const backoff = Math.min(60000, BASE_DELAY_MS * Math.pow(2, attempt - 1));
@@ -394,6 +430,8 @@ async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startM
   while (true) {
     attempt++;
 
+    let reqStart = 0;
+
     const body = {
       model: MISTRAL_MODEL,
       temperature: API_TEMPERATURE,
@@ -419,7 +457,7 @@ async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startM
         );
       }
 
-      const reqStart = Date.now();
+      reqStart = Date.now();
       const response = await axios.post(
         'https://api.mistral.ai/v1/chat/completions',
         body,
@@ -484,18 +522,25 @@ async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startM
       const status = err?.response?.status || err?.code || err.message || 'unknown';
       const body = err?.response?.data || err?.toString();
       if (logger) {
+        const elapsedMs = reqStart ? (Date.now() - reqStart) : null;
         logger.error(`[${ts(startMs)}] API request failed (attempt ${attempt}): ${status}`);
         const cfg = err?.config;
         const reqId = err?.response?.headers?.['x-request-id'] || err?.response?.headers?.['request-id'] || err?.response?.headers?.['x-requestid'];
+        const sockInfo = getAxiosSocketInfo(err);
         logger.error(
-          `[${ts(startMs)}] API error detail: code=${err?.code || 'unknown'} errno=${err?.errno || 'unknown'} syscall=${err?.syscall || 'unknown'} address=${err?.address || 'unknown'} port=${err?.port || 'unknown'} url=${cfg?.url || 'unknown'} timeout=${cfg?.timeout ?? 'unknown'} requestId=${reqId || 'unknown'}`,
+          `[${ts(startMs)}] API error detail: code=${err?.code || 'unknown'} errno=${err?.errno || 'unknown'} syscall=${err?.syscall || 'unknown'} address=${err?.address || 'unknown'} port=${err?.port || 'unknown'} url=${cfg?.url || 'unknown'} timeout=${cfg?.timeout ?? 'unknown'} elapsedMs=${elapsedMs == null ? 'unknown' : elapsedMs} requestId=${reqId || 'unknown'}`,
+        );
+        logger.error(
+          `[${ts(startMs)}] API socket: hasRequest=${sockInfo.hasRequest ? '1' : '0'} hasSocket=${sockInfo.hasSocket ? '1' : '0'} reusedSocket=${sockInfo.reusedSocket ? '1' : '0'} local=${sockInfo.local} remote=${sockInfo.remote} destroyed=${sockInfo.destroyed == null ? 'unknown' : sockInfo.destroyed ? '1' : '0'} bytesWritten=${sockInfo.bytesWritten == null ? 'unknown' : sockInfo.bytesWritten} bytesRead=${sockInfo.bytesRead == null ? 'unknown' : sockInfo.bytesRead}`,
         );
         if (body) logger.error(JSON.stringify(body));
       }
 
-      if (attempt > MAX_RETRIES) {
-        throw new Error('FATAL: max retries reached');
-      }
+      // handled below (shared retry/backoff path)
+    }
+
+    if (attempt >= MAX_RETRIES) {
+      throw new Error(`FATAL: max retries reached (${MAX_RETRIES})`);
     }
 
     const backoff = Math.min(60000, BASE_DELAY_MS * Math.pow(2, attempt - 1));
@@ -805,6 +850,7 @@ export async function runAsrJob(job, { signal, onProgress, logger } = {}) {
     logger.log(`   Preprocessing:     true`);
     logger.log(`   Noise Reduction:   true`);
     logger.log(`   API Model:         ${MISTRAL_MODEL}`);
+    logger.log(`   API URL:           ${apiUrlForModel(MISTRAL_MODEL)}`);
     logger.log(`   API Response:      ${API_RESPONSE_FORMAT}`);
     logger.log(`   API Timeout:       ${Math.round(MISTRAL_ASR_TIMEOUT_MS / 1000)}s`);
     logger.log(`   File Size Limit:   ${(FILE_LIMIT_BYTES / 1024 / 1024).toFixed(1)}MB`);

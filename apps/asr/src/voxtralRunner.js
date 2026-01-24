@@ -6,18 +6,19 @@ import https from 'node:https';
 import dns from 'node:dns/promises';
 import { spawn } from 'child_process';
 import axios from 'axios';
-import FormData from 'form-data';
 
 import { getAsrSecretsDir } from './asrPaths.js';
 
 // ---------------- Hard-wired config ----------------
 const MISTRAL_MODEL = 'voxtral-small-2507';
-const MISTRAL_ASR_TIMEOUT_MS = 120000;
+const INITIAL_TIMEOUT_MS = 20000;
+const TIMEOUT_BACKOFF_FACTOR = 1.5;
 const API_RESPONSE_FORMAT = 'verbose_json';
 const API_TEMPERATURE = 0;
 
-const MAX_RETRIES = 5;
-const BASE_DELAY_MS = 5000;
+const MAX_ATTEMPTS = 6;
+const INITIAL_DELAY_MS = 5000;
+const DELAY_BACKOFF_FACTOR = 1.5;
 
 const CHUNK_SEC = 120;
 const TRIM_SEC = 3;
@@ -29,12 +30,40 @@ const AUDIO_CONFIG = { rate: 48000, bitrate: '256k' };
 const FILE_LIMIT_BYTES = 19 * 1024 * 1024;
 const ALLOWED_EXT = new Set(['.mp4', '.mkv', '.avi', '.mov', '.webm', '.m4v']);
 
-const HTTPS_AGENT = new https.Agent({ keepAlive: true });
+const AGENT_CACHE = new Map();
+function getHttpsAgent({ keepAlive }) {
+  const ka = keepAlive ? 1 : 0;
+  const key = String(ka);
+  const existing = AGENT_CACHE.get(key);
+  if (existing) return existing;
+
+  const agent = new https.Agent({
+    keepAlive: Boolean(keepAlive),
+  });
+  AGENT_CACHE.set(key, agent);
+  return agent;
+}
 
 const OFFSET_SEC = CHUNK_SEC - TRIM_SEC - OVERLAP_SEC - TRIM_SEC;
 const MIN_CHUNK_SEC = TRIM_SEC + OVERLAP_SEC + TRIM_SEC;
 
 let didLogApiNetInfo = false;
+
+function timeoutMsForAttempt(attempt) {
+  const a = Math.max(1, Number(attempt) || 1);
+  return Math.max(1, Math.round(INITIAL_TIMEOUT_MS * Math.pow(TIMEOUT_BACKOFF_FACTOR, a - 1)));
+}
+
+function maxTimeoutMs() {
+  return timeoutMsForAttempt(MAX_ATTEMPTS);
+}
+
+function delayMsForAttempt(attempt) {
+  const a = Math.max(1, Number(attempt) || 1);
+  const backoff = INITIAL_DELAY_MS * Math.pow(DELAY_BACKOFF_FACTOR, a - 1);
+  const jitter = Math.floor(Math.random() * 500);
+  return Math.min(60000, Math.round(backoff)) + jitter;
+}
 
 function formatAddrList(addrs) {
   if (!Array.isArray(addrs) || addrs.length === 0) return 'none';
@@ -52,7 +81,7 @@ async function logApiNetInfoOnce(logger, startMs) {
   didLogApiNetInfo = true;
 
   logger.log(
-    `[${ts(startMs)}] API net: keepAlive=${HTTPS_AGENT?.options?.keepAlive ? '1' : '0'} (env disabled)`,
+    `[${ts(startMs)}] API net: forcing IPv4 only; varying keepAlive per attempt`,
   );
 
   try {
@@ -294,6 +323,116 @@ function apiUrlForModel(modelId) {
     : 'https://api.mistral.ai/v1/audio/transcriptions';
 }
 
+function netVariantForAttempt(attempt) {
+  // Force IPv4 only on this host; IPv6 is often unreachable (ENETUNREACH).
+  // We still vary keepAlive to avoid getting stuck on a bad connection state.
+  return { keepAlive: (Number(attempt) || 1) % 2 === 1 };
+}
+
+function getRetryAfterMs(err) {
+  const ra = err?.response?.headers?.['retry-after'];
+  if (!ra) return null;
+  const s = Number(String(ra).trim());
+  if (Number.isFinite(s) && s > 0) return Math.round(s * 1000);
+  return null;
+}
+
+async function callChatOnce({ apiKey, base64Audio, uploadInfo, signal, logger, startMs, timeoutMs, httpsAgent, modelId }) {
+  // Keep it deterministic and machine-readable.
+  const prompt = [
+    'Transcribe this audio into subtitle segments.',
+    'Return ONLY valid JSON with this exact shape:',
+    '{"segments":[{"start":0.0,"end":1.23,"text":"..."}, ...]}',
+    'Rules:',
+    '- start/end are seconds from start of THIS audio chunk',
+    '- Use as many segments as needed for good subtitles',
+    '- Keep text clean (no speaker labels)',
+  ].join('\n');
+
+  const body = {
+    model: modelId,
+    temperature: API_TEMPERATURE,
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'input_audio', input_audio: base64Audio },
+          { type: 'text', text: prompt },
+        ],
+      },
+    ],
+  };
+
+  let reqStart = 0;
+  if (logger) {
+    logger.log(
+      `[${ts(startMs)}] API request: timeout=${timeoutMs}ms bytes=${uploadInfo.size} base64Chars=${base64Audio.length}`,
+    );
+    logger.log(
+      `[${ts(startMs)}] API call: POST https://api.mistral.ai/v1/chat/completions model=${modelId} temp=${API_TEMPERATURE} promptChars=${prompt.length}`,
+    );
+  }
+
+  reqStart = Date.now();
+  const response = await axios.post(
+    'https://api.mistral.ai/v1/chat/completions',
+    body,
+    {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      timeout: timeoutMs,
+      signal,
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
+      httpsAgent,
+      family: 4,
+    },
+  );
+
+  if (logger) {
+    const elapsedMs = Date.now() - reqStart;
+    const reqId = response?.headers?.['x-request-id'] || response?.headers?.['request-id'] || response?.headers?.['x-requestid'];
+    const ct = response?.headers?.['content-type'];
+    const finishReason = response?.data?.choices?.[0]?.finish_reason;
+    logger.log(
+      `[${ts(startMs)}] API response: status=${response?.status} elapsedMs=${elapsedMs} requestId=${reqId || 'unknown'} contentType=${ct || 'unknown'} finish_reason=${finishReason || 'unknown'}`,
+    );
+  }
+
+  if (response?.status !== 200) {
+    throw new Error(`API status ${response?.status || 'unknown'}`);
+  }
+
+  const content = response?.data?.choices?.[0]?.message?.content;
+  let parsed;
+  try {
+    parsed = typeof content === 'string' ? JSON.parse(content) : content;
+  } catch (e) {
+    const finishReason = response?.data?.choices?.[0]?.finish_reason;
+    if (logger) {
+      logger.error(`[${ts(startMs)}] API parse failed: ${e?.message || e}`);
+      logger.error(
+        `[${ts(startMs)}] API parse context: contentType=${typeof content} contentChars=${typeof content === 'string' ? content.length : 'n/a'} finish_reason=${finishReason || 'unknown'}`,
+      );
+      logger.error(`[${ts(startMs)}] API raw content preview:\n${previewText(content)}`);
+    }
+    throw e;
+  }
+
+  const segs = Array.isArray(parsed?.segments) ? parsed.segments : null;
+  if (!segs) throw new Error('Chat response missing segments');
+
+  const outSegs = segs
+    .map((s) => ({
+      start: Number(s?.start),
+      end: Number(s?.end),
+      text: String(s?.text ?? '').trim(),
+    }))
+    .filter((s) => Number.isFinite(s.start) && Number.isFinite(s.end) && s.text);
+
+  return { segments: outSegs };
+}
+
 function getAxiosSocketInfo(err) {
   const req = err?.request;
   const sock = req?.socket;
@@ -315,211 +454,45 @@ function getAxiosSocketInfo(err) {
   };
 }
 
-async function callTranscriptionsApi({ apiKey, uploadInfo, signal, logger, startMs }) {
-  const buf = await fsp.readFile(uploadInfo.path);
-  const apiStart = Date.now();
-  let attempt = 0;
-
+async function callApi({ apiKey, uploadInfo, signal, logger, startMs }) {
   await logApiNetInfoOnce(logger, startMs);
 
-  while (true) {
-    attempt++;
-
-    let reqStart = 0;
-
-    const form = new FormData();
-    form.append('file', buf, { filename: uploadInfo.filename, contentType: uploadInfo.mime });
-    form.append('model', MISTRAL_MODEL);
-    form.append('return_language', 'false');
-    form.append('timestamp_granularities', 'segment');
-    form.append('response_format', API_RESPONSE_FORMAT);
-    form.append('temperature', String(API_TEMPERATURE));
-
-    try {
-      if (logger) {
-        logger.log(
-          `[${ts(startMs)}] API request: attempt ${attempt}/${MAX_RETRIES} timeout=${MISTRAL_ASR_TIMEOUT_MS}ms bytes=${uploadInfo.size}`,
-        );
-        logger.log(
-          `[${ts(startMs)}] API call: POST https://api.mistral.ai/v1/audio/transcriptions model=${MISTRAL_MODEL} mime=${uploadInfo.mime} filename=${uploadInfo.filename}`,
-        );
-      }
-
-      reqStart = Date.now();
-      const response = await axios.post(
-        'https://api.mistral.ai/v1/audio/transcriptions',
-        form,
-        {
-          headers: { Authorization: `Bearer ${apiKey}`, ...form.getHeaders() },
-          timeout: MISTRAL_ASR_TIMEOUT_MS,
-          signal,
-          httpsAgent: HTTPS_AGENT,
-        },
-      );
-
-      if (logger) {
-        const elapsedMs = Date.now() - reqStart;
-        const reqId = response?.headers?.['x-request-id'] || response?.headers?.['request-id'] || response?.headers?.['x-requestid'];
-        const ct = response?.headers?.['content-type'];
-        logger.log(
-          `[${ts(startMs)}] API response: status=${response?.status} elapsedMs=${elapsedMs} requestId=${reqId || 'unknown'} contentType=${ct || 'unknown'}`,
-        );
-      }
-
-      if (response?.status === 200) {
-        response.data.delay = Date.now() - apiStart;
-        return response.data;
-      }
-
-      const status = response?.status || 'unknown';
-      if (logger) logger.error(`[${ts(startMs)}] API error: ${status}, retrying`);
-    } catch (err) {
-      if (signal?.aborted) throw new Error('killed');
-
-      const status = err?.response?.status || err?.code || err.message || 'unknown';
-      const body = err?.response?.data || err?.toString();
-      if (logger) {
-        const elapsedMs = reqStart ? (Date.now() - reqStart) : null;
-        logger.error(`[${ts(startMs)}] API request failed (attempt ${attempt}): ${status}`);
-        const cfg = err?.config;
-        const reqId = err?.response?.headers?.['x-request-id'] || err?.response?.headers?.['request-id'] || err?.response?.headers?.['x-requestid'];
-        const sockInfo = getAxiosSocketInfo(err);
-        logger.error(
-          `[${ts(startMs)}] API error detail: code=${err?.code || 'unknown'} errno=${err?.errno || 'unknown'} syscall=${err?.syscall || 'unknown'} address=${err?.address || 'unknown'} port=${err?.port || 'unknown'} url=${cfg?.url || 'unknown'} timeout=${cfg?.timeout ?? 'unknown'} elapsedMs=${elapsedMs == null ? 'unknown' : elapsedMs} requestId=${reqId || 'unknown'}`,
-        );
-        logger.error(
-          `[${ts(startMs)}] API socket: hasRequest=${sockInfo.hasRequest ? '1' : '0'} hasSocket=${sockInfo.hasSocket ? '1' : '0'} reusedSocket=${sockInfo.reusedSocket ? '1' : '0'} local=${sockInfo.local} remote=${sockInfo.remote} destroyed=${sockInfo.destroyed == null ? 'unknown' : sockInfo.destroyed ? '1' : '0'} bytesWritten=${sockInfo.bytesWritten == null ? 'unknown' : sockInfo.bytesWritten} bytesRead=${sockInfo.bytesRead == null ? 'unknown' : sockInfo.bytesRead}`,
-        );
-        if (body) logger.error(JSON.stringify(body));
-      }
-
-      // handled below (shared retry/backoff path)
-    }
-
-    if (attempt >= MAX_RETRIES) {
-      throw new Error(`FATAL: max retries reached (${MAX_RETRIES})`);
-    }
-
-    const backoff = Math.min(60000, BASE_DELAY_MS * Math.pow(2, attempt - 1));
-    const jitter = Math.floor(Math.random() * 500);
-    const delay = backoff + jitter;
-    if (logger) logger.log(`[${ts(startMs)}] Waiting ${Math.round(delay / 1000)}s before retry...`);
-    await new Promise((r) => setTimeout(r, delay));
-  }
-}
-
-async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startMs }) {
   const buf = await fsp.readFile(uploadInfo.path);
   const base64Audio = buf.toString('base64');
-  const apiStart = Date.now();
-  let attempt = 0;
 
-  await logApiNetInfoOnce(logger, startMs);
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    if (signal?.aborted) throw new Error('killed');
 
-  // Keep it deterministic and machine-readable.
-  const prompt = [
-    'Transcribe this audio into subtitle segments.',
-    'Return ONLY valid JSON with this exact shape:',
-    '{"segments":[{"start":0.0,"end":1.23,"text":"..."}, ...]}',
-    'Rules:',
-    '- start/end are seconds from start of THIS audio chunk',
-    '- Use as many segments as needed for good subtitles',
-    '- Keep text clean (no speaker labels)',
-  ].join('\n');
+    const timeoutMs = timeoutMsForAttempt(attempt);
+    const { keepAlive } = netVariantForAttempt(attempt);
+    const httpsAgent = getHttpsAgent({ keepAlive });
 
-  while (true) {
-    attempt++;
+    const apiUrl = 'https://api.mistral.ai/v1/chat/completions';
+
+    if (logger) {
+      logger.log(
+        `[${ts(startMs)}] API: attempt ${attempt}/${MAX_ATTEMPTS} url=${apiUrl} model=${MISTRAL_MODEL} family=4 keepAlive=${keepAlive ? '1' : '0'} timeoutMs=${timeoutMs}`,
+      );
+    }
 
     let reqStart = 0;
-
-    const body = {
-      model: MISTRAL_MODEL,
-      temperature: API_TEMPERATURE,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'input_audio', input_audio: base64Audio },
-            { type: 'text', text: prompt },
-          ],
-        },
-      ],
-    };
-
     try {
-      if (logger) {
-        logger.log(
-          `[${ts(startMs)}] API request: attempt ${attempt}/${MAX_RETRIES} timeout=${MISTRAL_ASR_TIMEOUT_MS}ms bytes=${uploadInfo.size} base64Chars=${base64Audio.length}`,
-        );
-        logger.log(
-          `[${ts(startMs)}] API call: POST https://api.mistral.ai/v1/chat/completions model=${MISTRAL_MODEL} temp=${API_TEMPERATURE} promptChars=${prompt.length}`,
-        );
-      }
-
       reqStart = Date.now();
-      const response = await axios.post(
-        'https://api.mistral.ai/v1/chat/completions',
-        body,
-        {
-          headers: { Authorization: `Bearer ${apiKey}` },
-          timeout: MISTRAL_ASR_TIMEOUT_MS,
-          signal,
-          maxBodyLength: Infinity,
-          maxContentLength: Infinity,
-          httpsAgent: HTTPS_AGENT,
-        },
-      );
-
-      if (logger) {
-        const elapsedMs = Date.now() - reqStart;
-        const reqId = response?.headers?.['x-request-id'] || response?.headers?.['request-id'] || response?.headers?.['x-requestid'];
-        const ct = response?.headers?.['content-type'];
-        const finishReason = response?.data?.choices?.[0]?.finish_reason;
-        logger.log(
-          `[${ts(startMs)}] API response: status=${response?.status} elapsedMs=${elapsedMs} requestId=${reqId || 'unknown'} contentType=${ct || 'unknown'} finish_reason=${finishReason || 'unknown'}`,
-        );
-      }
-
-      if (response?.status === 200) {
-        const content = response?.data?.choices?.[0]?.message?.content;
-        let parsed;
-        try {
-          parsed = typeof content === 'string' ? JSON.parse(content) : content;
-        } catch (e) {
-          const finishReason = response?.data?.choices?.[0]?.finish_reason;
-          if (logger) {
-            logger.error(
-              `[${ts(startMs)}] API parse failed (attempt ${attempt}): ${e?.message || e}`,
-            );
-            logger.error(
-              `[${ts(startMs)}] API parse context: contentType=${typeof content} contentChars=${typeof content === 'string' ? content.length : 'n/a'} finish_reason=${finishReason || 'unknown'}`,
-            );
-            logger.error(`[${ts(startMs)}] API raw content preview:\n${previewText(content)}`);
-          }
-          throw e;
-        }
-        const segs = Array.isArray(parsed?.segments) ? parsed.segments : null;
-        if (!segs) throw new Error('Chat response missing segments');
-
-        const outSegs = segs
-          .map((s) => ({
-            start: Number(s?.start),
-            end: Number(s?.end),
-            text: String(s?.text ?? '').trim(),
-          }))
-          .filter((s) => Number.isFinite(s.start) && Number.isFinite(s.end) && s.text);
-
-        response.data.delay = Date.now() - apiStart;
-        return { segments: outSegs };
-      }
-
-      const status = response?.status || 'unknown';
-      if (logger) logger.error(`[${ts(startMs)}] API error: ${status}, retrying`);
+      return await callChatOnce({
+        apiKey,
+        base64Audio,
+        uploadInfo,
+        signal,
+        logger,
+        startMs,
+        timeoutMs,
+        httpsAgent,
+        modelId: MISTRAL_MODEL,
+      });
     } catch (err) {
       if (signal?.aborted) throw new Error('killed');
 
-      const status = err?.response?.status || err?.code || err.message || 'unknown';
+      const status = err?.response?.status || err?.code || err?.message || 'unknown';
       const body = err?.response?.data || err?.toString();
       if (logger) {
         const elapsedMs = reqStart ? (Date.now() - reqStart) : null;
@@ -528,7 +501,7 @@ async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startM
         const reqId = err?.response?.headers?.['x-request-id'] || err?.response?.headers?.['request-id'] || err?.response?.headers?.['x-requestid'];
         const sockInfo = getAxiosSocketInfo(err);
         logger.error(
-          `[${ts(startMs)}] API error detail: code=${err?.code || 'unknown'} errno=${err?.errno || 'unknown'} syscall=${err?.syscall || 'unknown'} address=${err?.address || 'unknown'} port=${err?.port || 'unknown'} url=${cfg?.url || 'unknown'} timeout=${cfg?.timeout ?? 'unknown'} elapsedMs=${elapsedMs == null ? 'unknown' : elapsedMs} requestId=${reqId || 'unknown'}`,
+          `[${ts(startMs)}] API error detail: code=${err?.code || 'unknown'} errno=${err?.errno || 'unknown'} syscall=${err?.syscall || 'unknown'} address=${err?.address || 'unknown'} port=${err?.port || 'unknown'} url=${cfg?.url || apiUrl || 'unknown'} timeout=${cfg?.timeout ?? timeoutMs} elapsedMs=${elapsedMs == null ? 'unknown' : elapsedMs} requestId=${reqId || 'unknown'}`,
         );
         logger.error(
           `[${ts(startMs)}] API socket: hasRequest=${sockInfo.hasRequest ? '1' : '0'} hasSocket=${sockInfo.hasSocket ? '1' : '0'} reusedSocket=${sockInfo.reusedSocket ? '1' : '0'} local=${sockInfo.local} remote=${sockInfo.remote} destroyed=${sockInfo.destroyed == null ? 'unknown' : sockInfo.destroyed ? '1' : '0'} bytesWritten=${sockInfo.bytesWritten == null ? 'unknown' : sockInfo.bytesWritten} bytesRead=${sockInfo.bytesRead == null ? 'unknown' : sockInfo.bytesRead}`,
@@ -536,31 +509,19 @@ async function callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startM
         if (body) logger.error(JSON.stringify(body));
       }
 
-      // handled below (shared retry/backoff path)
+      if (attempt >= MAX_ATTEMPTS) {
+        throw new Error(`FATAL: max attempts reached (${MAX_ATTEMPTS})`);
+      }
+
+      let delay = delayMsForAttempt(attempt);
+      const ra = getRetryAfterMs(err);
+      if (ra != null) delay = Math.max(delay, ra);
+      if (logger) logger.log(`[${ts(startMs)}] Waiting ${Math.round(delay / 1000)}s before retry...`);
+      await new Promise((r) => setTimeout(r, delay));
     }
-
-    if (attempt >= MAX_RETRIES) {
-      throw new Error(`FATAL: max retries reached (${MAX_RETRIES})`);
-    }
-
-    const backoff = Math.min(60000, BASE_DELAY_MS * Math.pow(2, attempt - 1));
-    const jitter = Math.floor(Math.random() * 500);
-    const delay = backoff + jitter;
-    if (logger) logger.log(`[${ts(startMs)}] Waiting ${Math.round(delay / 1000)}s before retry...`);
-    await new Promise((r) => setTimeout(r, delay));
   }
-}
 
-async function callApi({ apiKey, uploadInfo, signal, logger, startMs }) {
-  if (logger) {
-    logger.log(
-      `[${ts(startMs)}] API: ${isVoxtralSmall(MISTRAL_MODEL) ? 'chat/completions (audio)' : 'audio/transcriptions'} model=${MISTRAL_MODEL}`,
-    );
-  }
-  if (isVoxtralSmall(MISTRAL_MODEL)) {
-    return callChatWithAudioApi({ apiKey, uploadInfo, signal, logger, startMs });
-  }
-  return callTranscriptionsApi({ apiKey, uploadInfo, signal, logger, startMs });
+  throw new Error(`FATAL: max attempts reached (${MAX_ATTEMPTS})`);
 }
 
 function processSegments(segments, chunkInfo, { logger, startMs } = {}) {
@@ -777,10 +738,15 @@ async function processOneVideo(videoPath, { sfx, apiKey, tmpDir, signal, logger,
         const processedSegments = processSegments(apiData.segments, chunkInfo, { logger, startMs });
         allSegments.push(...processedSegments);
       } else {
-        if (logger) logger.log(`[${ts(startMs)}] Chunk ${String(chunkInfo.chunkIndex).padStart(3)}: ${String(chunkInfo.chunkStart).padStart(4)}s ${String(chunkInfo.chunkEnd).padStart(4)}s, Size: ${String(Math.round(uploadInfo.size / 1e6)).padStart(2)}Mb, ⚠️ no segments`);
+        const msg = `Chunk produced no segments: chunk=${chunkInfo.chunkIndex}/${chunks.length} ${chunkInfo.chunkStart.toFixed(0)}s-${chunkInfo.chunkEnd.toFixed(0)}s`;
+        if (logger) logger.error(`[${ts(startMs)}] ${path.basename(videoPath)} | ${msg}`);
+        throw new Error(msg);
       }
     } catch (err) {
-      if (logger) logger.log(`[${ts(startMs)}] ${path.basename(videoPath)} | Chunk ${chunkInfo.chunkIndex}/${chunks.length}: ${chunkInfo.chunkStart.toFixed(0)}s-${chunkInfo.chunkEnd.toFixed(0)}s ❌ ${err.message}`);
+      const baseMsg = err?.message || String(err);
+      const msg = `${path.basename(videoPath)} | Chunk ${chunkInfo.chunkIndex}/${chunks.length}: ${chunkInfo.chunkStart.toFixed(0)}s-${chunkInfo.chunkEnd.toFixed(0)}s ❌ ${baseMsg}`;
+      if (logger) logger.error(`[${ts(startMs)}] ${msg}`);
+      throw new Error(msg);
     }
   }
 
@@ -850,9 +816,10 @@ export async function runAsrJob(job, { signal, onProgress, logger } = {}) {
     logger.log(`   Preprocessing:     true`);
     logger.log(`   Noise Reduction:   true`);
     logger.log(`   API Model:         ${MISTRAL_MODEL}`);
-    logger.log(`   API URL:           ${apiUrlForModel(MISTRAL_MODEL)}`);
+    logger.log(`   API URL:           https://api.mistral.ai/v1/chat/completions`);
     logger.log(`   API Response:      ${API_RESPONSE_FORMAT}`);
-    logger.log(`   API Timeout:       ${Math.round(MISTRAL_ASR_TIMEOUT_MS / 1000)}s`);
+    logger.log(`   API Timeout:       ${Math.round(timeoutMsForAttempt(1) / 1000)}s (x${TIMEOUT_BACKOFF_FACTOR} each retry, max ${Math.round(maxTimeoutMs() / 1000)}s)`);
+    logger.log(`   API Attempts:      ${MAX_ATTEMPTS}`);
     logger.log(`   File Size Limit:   ${(FILE_LIMIT_BYTES / 1024 / 1024).toFixed(1)}MB`);
     logger.log('');
     logger.log(`Found ${files.length} video file(s) to process`);

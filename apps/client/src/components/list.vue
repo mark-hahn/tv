@@ -866,11 +866,14 @@ export default {
         evtBus.emit('addPreviewShowStart', { name, tvdbId, overview });
       }
 
-      if(!pruneTvdb) {
-        const matchShow = allShows.find((s) => s.Name == name);
-        if(matchShow) {  
+      if (!pruneTvdb) {
+        const matchShow = this.findExistingShowForSearchChoice({ name, tvdbId });
+        if (matchShow) {
           console.log(matchShow.Name + ' already exists.');
-          this.saveVisShow(matchShow, true);
+          if (!this.shows.some(sh => sh?.Name === matchShow.Name)) {
+            await this.fltrAction('All');
+          }
+          this.onSelectShow(matchShow, true);
           return;
         }
       }
@@ -1022,6 +1025,17 @@ export default {
       const showName = String(name || '').trim();
       if (!showName) return;
 
+      // If the show already exists, do nothing but select it.
+      // Do not enter preview mode, regardless of emby/noemby/rejected status.
+      const existing = this.findExistingShowForSearchChoice({ name: showName, tvdbId });
+      if (existing) {
+        if (!this.shows.some(sh => sh?.Name === existing.Name)) {
+          await this.fltrAction('All');
+        }
+        this.onSelectShow(existing, true);
+        return;
+      }
+
       this.setPreviewMode(true);
 
       // Preview mode: panes will start loading info.
@@ -1033,9 +1047,7 @@ export default {
       // Let Series know which search choice is being previewed (for Add Show button).
       evtBus.emit('previewSrchChoice', { name: showName, tvdbId, overview });
 
-      // If the show already exists in the library, just select it (no creation).
-      const matchShow = allShows.find((s) => s?.Name === showName);
-      const show = matchShow || {
+      const show = {
         // Mark as no-Emby so Series doesn't try to query Emby counts.
         Id: `noemby-preview-${String(tvdbId || showName).replace(/\s+/g, '-')}`,
         Name: showName,
@@ -1140,6 +1152,35 @@ export default {
         .replace(/\s+/g, ' ')
         .trim()
         .toUpperCase();
+    },
+
+    findExistingShowForSearchChoice({ name, tvdbId }) {
+      if (!Array.isArray(allShows) || allShows.length === 0) return null;
+
+      const nm = String(name || '').trim();
+      const id = (tvdbId == null || tvdbId === '') ? '' : String(tvdbId).trim();
+
+      if (id) {
+        const byId = allShows.find((s) => {
+          const sid = s?.TvdbId ?? s?.TvdbShowId ?? s?.tvdbId ?? null;
+          if (sid == null || sid === '') return false;
+          return String(sid).trim() === id;
+        });
+        if (byId) return byId;
+      }
+
+      if (nm) {
+        // Prefer exact name match first.
+        const exact = allShows.find((s) => s?.Name === nm);
+        if (exact) return exact;
+
+        // Then try a normalized match (handles minor punctuation/spacing differences).
+        const key = this.normalizeForShowMatch(nm);
+        if (!key) return null;
+        return allShows.find((s) => this.normalizeForShowMatch(s?.Name) === key) || null;
+      }
+
+      return null;
     },
 
     stripTitleNoise(raw) {

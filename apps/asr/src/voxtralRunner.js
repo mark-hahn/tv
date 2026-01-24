@@ -30,6 +30,11 @@ const AUDIO_CONFIG = { rate: 48000, bitrate: '256k' };
 const FILE_LIMIT_BYTES = 19 * 1024 * 1024;
 const ALLOWED_EXT = new Set(['.mp4', '.mkv', '.avi', '.mov', '.webm', '.m4v']);
 
+// Experiment: send chunk 0 audio bytes for every chunk request (to test whether
+// certain audio content triggers a model-side hang). This will produce incorrect
+// subtitles; only use for debugging.
+const EXPERIMENT_REPEAT_CHUNK0_AUDIO = false;
+
 const AGENT_CACHE = new Map();
 function getHttpsAgent({ keepAlive }) {
   const ka = keepAlive ? 1 : 0;
@@ -454,11 +459,10 @@ function getAxiosSocketInfo(err) {
   };
 }
 
-async function callApi({ apiKey, uploadInfo, signal, logger, startMs }) {
+async function callApi({ apiKey, uploadInfo, base64AudioOverride, signal, logger, startMs }) {
   await logApiNetInfoOnce(logger, startMs);
 
-  const buf = await fsp.readFile(uploadInfo.path);
-  const base64Audio = buf.toString('base64');
+  const base64Audio = base64AudioOverride ?? (await fsp.readFile(uploadInfo.path)).toString('base64');
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     if (signal?.aborted) throw new Error('killed');
@@ -471,7 +475,7 @@ async function callApi({ apiKey, uploadInfo, signal, logger, startMs }) {
 
     if (logger) {
       logger.log(
-        `[${ts(startMs)}] API: attempt ${attempt}/${MAX_ATTEMPTS} url=${apiUrl} model=${MISTRAL_MODEL} family=4 keepAlive=${keepAlive ? '1' : '0'} timeoutMs=${timeoutMs}`,
+        `[${ts(startMs)}] API: attempt ${attempt}/${MAX_ATTEMPTS} url=${apiUrl} model=${MISTRAL_MODEL} family=4 keepAlive=${keepAlive ? '1' : '0'} timeoutMs=${timeoutMs} audioSource=${base64AudioOverride ? 'chunk0' : 'chunk'}`,
       );
     }
 
@@ -713,6 +717,13 @@ async function processOneVideo(videoPath, { sfx, apiKey, tmpDir, signal, logger,
   const { totalDuration, chunks } = await getChunks(processedWavFile, tmpDir, { signal });
   if (logger) logger.log(`[${ts(startMs)}] Duration: ${totalDuration.toFixed(0)}s, ${chunks.length} chunks`);
 
+  if (logger && EXPERIMENT_REPEAT_CHUNK0_AUDIO) {
+    logger.log(`[${ts(startMs)}] EXPERIMENT: repeating chunk 0 audio data for all chunk requests`);
+  }
+
+  let chunk0UploadInfo = null;
+  let chunk0Base64Audio = null;
+
   const allSegments = [];
   for (const chunkInfo of chunks) {
     if (signal?.aborted) throw new Error('killed');
@@ -732,7 +743,25 @@ async function processOneVideo(videoPath, { sfx, apiKey, tmpDir, signal, logger,
 
     try {
       const uploadInfo = await getFlac(chunkInfo.wavPath, tmpDir, { signal, logger });
-      const apiData = await callApi({ apiKey, uploadInfo, signal, logger, startMs });
+
+      if (EXPERIMENT_REPEAT_CHUNK0_AUDIO && chunk0Base64Audio == null) {
+        chunk0UploadInfo = uploadInfo;
+        chunk0Base64Audio = (await fsp.readFile(uploadInfo.path)).toString('base64');
+      }
+
+      const useChunk0 = Boolean(EXPERIMENT_REPEAT_CHUNK0_AUDIO && chunk0Base64Audio && chunk0UploadInfo);
+      if (logger && useChunk0 && chunkInfo.chunkIndex > 0) {
+        logger.log(`[${ts(startMs)}] EXPERIMENT: chunk ${chunkInfo.chunkIndex} sending chunk 0 audio bytes`);
+      }
+
+      const apiData = await callApi({
+        apiKey,
+        uploadInfo: useChunk0 ? chunk0UploadInfo : uploadInfo,
+        base64AudioOverride: useChunk0 ? chunk0Base64Audio : null,
+        signal,
+        logger,
+        startMs,
+      });
 
       if (apiData?.segments && apiData.segments.length > 0) {
         const processedSegments = processSegments(apiData.segments, chunkInfo, { logger, startMs });
@@ -820,6 +849,7 @@ export async function runAsrJob(job, { signal, onProgress, logger } = {}) {
     logger.log(`   API Response:      ${API_RESPONSE_FORMAT}`);
     logger.log(`   API Timeout:       ${Math.round(timeoutMsForAttempt(1) / 1000)}s (x${TIMEOUT_BACKOFF_FACTOR} each retry, max ${Math.round(maxTimeoutMs() / 1000)}s)`);
     logger.log(`   API Attempts:      ${MAX_ATTEMPTS}`);
+    logger.log(`   Experiment:        repeatChunk0Audio=${EXPERIMENT_REPEAT_CHUNK0_AUDIO ? 'true' : 'false'}`);
     logger.log(`   File Size Limit:   ${(FILE_LIMIT_BYTES / 1024 / 1024).toFixed(1)}MB`);
     logger.log('');
     logger.log(`Found ${files.length} video file(s) to process`);

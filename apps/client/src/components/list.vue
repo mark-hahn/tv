@@ -283,26 +283,23 @@ export default {
 
     const toggleReject = async (show) => {
       this.saveVisShow(show);
-      if(!show.Reject && !show.Id.startsWith('noemby-')) {
-        if (!window.confirm(
-            `Do you really want to delete series ${show.Name}?`)) 
-          return;
-        await emby.deleteShowFromEmby(show);
-        srvr.addReject(show.Name) 
-                .catch((err) => {
-                    console.error("late addReject:", err);
-                });
-        await this.removeRow(show);
+      if (!show.Reject) {
         show.Reject = true;
+        try {
+          await srvr.addReject(show.Name);
+        } catch (err) {
+          console.error("addReject error:", err);
+          show.Reject = false;
+        }
         return;
       }
-      if(show.Reject) {
-        srvr.delReject(show.Name) 
-                .catch((err) => {
-                    console.error("late delReject:", err);
-                });
-        show.Reject = false;
-        return;
+
+      show.Reject = false;
+      try {
+        await srvr.delReject(show.Name);
+      } catch (err) {
+        console.error("delReject error:", err);
+        show.Reject = true;
       }
     };
 

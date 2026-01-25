@@ -11,8 +11,6 @@ SSH_HOST="hahnca.com"
 #   local:  $ROOT_DIR/apps/down  -> remote: $TV_REMOTE_BASE/down
 TV_REMOTE_BASE="${TV_REMOTE_BASE:-/root/dev/apps/tv}"
 
-DEFAULT_TV_DATA_DIR="/root/dev/apps/tv/data"
-
 if [[ ! -d "$ROOT_DIR/apps" ]]; then
   echo "Error: expected layout under $ROOT_DIR (missing apps/)" >&2
   exit 1
@@ -21,7 +19,6 @@ fi
 usage() {
   echo "Usage: $(basename "$0") [api|down|srvr|asr|client|share|all]" >&2
   echo "Env: TV_REMOTE_BASE (default: /root/dev/apps/tv on remote)" >&2
-  echo "Env: TV_DATA_DIR (default: /root/dev/apps/tv-data on remote, used for pm2 env)" >&2
   exit 1
 }
 
@@ -80,7 +77,11 @@ remote_sync_app() {
   local -a extra_excludes=()
   if [[ "$project" == "asr" ]]; then
     extra_excludes+=(--exclude 'secrets/')
-    extra_excludes+=(--exclude 'logs/')
+    extra_excludes+=(--exclude 'data/')
+  elif [[ "$project" == "api" || "$project" == "down" || "$project" == "srvr" ]]; then
+    # Runtime state and credentials live here; never overwrite them during deploy.
+    extra_excludes+=(--exclude 'data/')
+    extra_excludes+=(--exclude 'secrets/')
   fi
 
   if [[ ! -d "$local_dir" ]]; then

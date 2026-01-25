@@ -66,13 +66,10 @@
 
   var BASEDIR = path.join(__dirname, '..');
 
-  var DEFAULT_TV_DATA_DIR = '/root/dev/apps/tv/data';
-  // Never use environment variables in this app.
-  var TV_DATA_DIR = DEFAULT_TV_DATA_DIR;
-
-  var APP_DIR = path.join(TV_DATA_DIR, 'down');
+  // Persisted state/logs live under this app folder.
+  var APP_DIR = BASEDIR;
   var DATA_DIR = path.join(APP_DIR, 'data');
-  var MISC_DIR = path.join(APP_DIR, 'misc');
+  var MISC_DIR = path.join(DATA_DIR, 'misc');
 
   var ensureDir = function(dir) {
     try {
@@ -87,14 +84,14 @@
     return path.join(DATA_DIR, p);
   };
 
-  // tv.log lives under misc/ (shared TV_DATA_DIR/down/misc/tv.log)
+  // tv.log lives under data/misc/
   var TV_LOG_PATH = path.join(MISC_DIR, 'tv.log');
   var TV_FINISHED_PATH = dataPath('tv-finished.json');
   var TV_INPROGRESS_PATH = dataPath('tv-inProgress.json');
   var TV_BLOCKED_PATH = dataPath('tv-blocked.json');
   var TV_MAP_PATH = dataPath('tv-map');
 
-  // Strict: state is always stored under TV_DATA_DIR.
+  // State is stored under apps/down/data.
 
   try {
     fs.mkdirpSync(path.dirname(TV_LOG_PATH));

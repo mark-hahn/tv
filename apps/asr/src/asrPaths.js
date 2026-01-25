@@ -1,11 +1,12 @@
 import fs from 'fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-export const DEFAULT_TV_DATA_DIR = '/root/dev/apps/tv/data';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-export function getTvDataDir() {
-  return DEFAULT_TV_DATA_DIR;
-}
+// apps/asr/src -> apps/asr
+const ASR_ROOT_DIR = path.resolve(__dirname, '..');
 
 export function ensureDir(dirPath) {
   try {
@@ -15,20 +16,20 @@ export function ensureDir(dirPath) {
   }
 }
 
-export function getTvAppRootDir() {
-  // TV_DATA_DIR defaults to /root/dev/apps/tv/data, so app root is /root/dev/apps/tv
-  const dataDir = getTvDataDir();
-  return path.dirname(dataDir);
+export function getAsrBaseDir() {
+  const dirPath = ASR_ROOT_DIR;
+  ensureDir(dirPath);
+  return dirPath;
 }
 
-export function getAsrBaseDir() {
-  const dirPath = path.join(getTvAppRootDir(), 'apps', 'asr');
+export function getAsrDataDir() {
+  const dirPath = path.join(getAsrBaseDir(), 'data');
   ensureDir(dirPath);
   return dirPath;
 }
 
 export function getAsrLogsDir() {
-  const dirPath = path.join(getAsrBaseDir(), 'logs');
+  const dirPath = path.join(getAsrDataDir(), 'logs');
   ensureDir(dirPath);
   return dirPath;
 }

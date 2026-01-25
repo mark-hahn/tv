@@ -6,13 +6,11 @@ yarn-error.log*
 tor-results.txt
 misc
 
-# local cookies/credentials
-cookies/*.json
-cookies/*cred*.txt
-cookies/*token*.txt
+# runtime data (cookies/state/logs)
+data/
 
-# logs/data
-calls.log
-reelgood.log
-reel-shows.json
-reelgood-titles.json
+# credentials/secrets
+secrets/
+
+# legacy locations (no longer used)
+cookies/

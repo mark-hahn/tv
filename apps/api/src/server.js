@@ -15,10 +15,13 @@ import { checkFiles as tvProcCheckFiles } from './tv-proc.js';
 import {
   getApiCookiesDir,
   getApiMiscDir,
+  getApiSecretsDir,
   getSecretsDir,
   preferSharedReadPath,
-  getTvDataDir,
 } from './tvPaths.js';
+
+const MISTRAL_CHAT_URL = 'https://api.mistral.ai/v1/chat/completions';
+const MISTRAL_DEFAULT_MODEL = 'mistral-large-latest';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,10 +44,7 @@ function formatPstTimestamp(date = new Date()) {
 
 function appendCallsLog({ endpoint, method, ok, result, error }) {
   try {
-    // switch call.logs path from /root/dev/apps/tv/data/api/misc/calls.log to /root/dev/apps/tv/apps/api/calls.log
-    // getTvDataDir() returns /root/dev/apps/tv/data
-    const appBase = path.dirname(getTvDataDir()); 
-    const outPath = path.join(appBase, 'apps', 'api', 'calls.log');
+    const outPath = path.join(getApiMiscDir(), 'calls.log');
     
     const asArray = Array.isArray(result)
       ? result.map(String)
@@ -70,8 +70,7 @@ function appendCallsLog({ endpoint, method, ok, result, error }) {
 
 function appendReviewCallsLog({ endpoint, method, event, ok, args, result, error }) {
   try {
-    const appBase = path.dirname(getTvDataDir());
-    const outPath = path.join(appBase, 'apps', 'api', 'test', 'review-calls.log');
+    const outPath = path.join(getApiMiscDir(), 'review-calls.log');
     
     const dir = path.dirname(outPath);
     if (!fs.existsSync(dir)) {
@@ -199,6 +198,19 @@ function readRequiredFile(filePath, label) {
   }
 }
 
+function readRequiredTextFile(filePath, label) {
+  try {
+    return String(fs.readFileSync(filePath, 'utf8') || '').trim();
+  } catch (e) {
+    const msg = e && e.message ? e.message : String(e);
+    throw new Error(`Missing required ${label} at ${filePath}. (${msg})`);
+  }
+}
+
+function readMistralApiKey() {
+  return readRequiredTextFile(path.join(getApiSecretsDir(), 'mistral-key.txt'), 'Mistral API key (mistral-key.txt)');
+}
+
 const app = express();
 
 const QBT_TEST_PORT   = 3001;
@@ -209,8 +221,8 @@ const FILTER_TORRENTS = false;
 
 // Load SSL certificate (prefer shared cookie store)
 const httpsOptions = {
-  key: readRequiredFile(path.join(getApiCookiesDir(), 'localhost-key.pem'), 'TLS key (localhost-key.pem)'),
-  cert: readRequiredFile(path.join(getApiCookiesDir(), 'localhost-cert.pem'), 'TLS cert (localhost-cert.pem)'),
+  key: readRequiredFile(path.join(getApiSecretsDir(), 'localhost-key.pem'), 'TLS key (localhost-key.pem)'),
+  cert: readRequiredFile(path.join(getApiSecretsDir(), 'localhost-cert.pem'), 'TLS cert (localhost-cert.pem)'),
 };
 
 // CORS notes:
@@ -443,6 +455,41 @@ if (FILTER_TORRENTS && typeof FILTER_TORRENTS === 'object' && !Array.isArray(FIL
 
 // API endpoint
 app.get('/api/tvdb/*', tvdbProxyGet);
+
+// Server-side Mistral proxy (avoids exposing API keys in the browser bundle).
+app.post('/api/mistral/chat', async (req, res) => {
+  try {
+    const apiKey = readMistralApiKey();
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+
+    const model = (typeof body.model === 'string' && body.model.trim())
+      ? body.model.trim()
+      : MISTRAL_DEFAULT_MODEL;
+
+    const messages = Array.isArray(body.messages) ? body.messages : null;
+    if (!messages || messages.length === 0) {
+      res.status(400).json({ error: 'messages array required' });
+      return;
+    }
+
+    const upstream = await fetch(MISTRAL_CHAT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({ model, messages }),
+    });
+
+    const upstreamBody = await upstream.text();
+    res.status(upstream.status);
+    res.set('Content-Type', upstream.headers.get('content-type') || 'application/json');
+    res.send(upstreamBody);
+  } catch (error) {
+    console.error('mistral proxy error:', error);
+    res.status(500).json({ error: error?.message || String(error) });
+  }
+});
 
 app.post('/api/tvproc/startProc', async (req, res) => {
   const jsonPath = getTvprocJsonPath();
@@ -1117,7 +1164,16 @@ app.get('/api/reviews/getReviews', async (req, res) => {
     console.error('getReviews error:', error);
     appendCallsLog({ endpoint: '/api/reviews/getReviews', method: 'GET', ok: false, result: null, error });
     appendReviewCallsLog({ endpoint: '/api/reviews/getReviews', method: 'GET', event: 'END', ok: false, args, result: null, error });
-    res.status(500).json({ error: error.message });
+    // Treat scraper errors as non-fatal so the client can keep working.
+    res.json({
+      ok: false,
+      error: error?.message || String(error),
+      numChecked: 0,
+      notEnglishCount: 0,
+      noReviewCount: 0,
+      smallTextCount: 0,
+      reviews: [],
+    });
   }
 });
 

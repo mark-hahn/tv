@@ -12,7 +12,7 @@ This repo is intended to run locally behind nginx (nginx sets the CORS headers).
 
 - Node.js 18+ (uses built-in `fetch`)
 - `curl` available on the host (used to fetch `.torrent` files)
-- qBittorrent Web UI reachable from this server (uses `cookies/qbt-cred.txt`)
+- qBittorrent Web UI reachable from this server (uses `secrets/qbt-cred.txt`)
 
 ## Install
 
@@ -39,14 +39,12 @@ pm2 start ecosystem.config.cjs
 pm2 logs torrents-server
 ```
 
-Note: `ecosystem.config.cjs` sets `cwd` to `/root/dev/apps/torrents`. If you run from a different path, update that field.
-
 ## TLS certs (required)
 
 The server expects these files:
 
-- `cookies/localhost-key.pem`
-- `cookies/localhost-cert.pem`
+- `secrets/localhost-key.pem`
+- `secrets/localhost-cert.pem`
 
 They are typically self-signed for local-only use.
 
@@ -58,18 +56,18 @@ Most secrets are intentionally **not** committed (see `.gitignore`).
 
 These are Playwright-style cookie JSON arrays (each cookie has `{name,value,...}`):
 
-- `cookies/iptorrents.json`
-- `cookies/torrentleech.json`
+- `data/iptorrents.json`
+- `data/torrentleech.json`
 
 Optional Cloudflare bypass values (written by the `/api/cf_clearance` endpoint):
 
-- `cookies/cf-clearance.local.json`
+- `data/cf-clearance.local.json`
 
 ### qBittorrent Web UI creds (and SSH target)
 
 Some endpoints read:
 
-- `cookies/qbt-cred.txt`
+- `secrets/qbt-cred.txt`
 
 Expected keys:
 
@@ -97,10 +95,10 @@ The server will create/update `secrets/subs-token.txt` automatically after loggi
 
 Generated/updated at runtime:
 
-- `reel-shows.json` (map of already-seen show titles)
-- `reelgood-titles.json` (recent results list)
-- `reelgood.log` (reelgood workflow log)
-- `calls.log` (server call log for `/api/startreel` and `/api/getreel`)
+- `data/reel-shows.json` (map of already-seen show titles)
+- `data/reelgood-titles.json` (recent results list)
+- `data/misc/reelgood.log` (reelgood workflow log)
+- `data/misc/calls.log` (server call log for `/api/startreel` and `/api/getreel`)
 
 The Reelgood persistence uses atomic writes to avoid truncated JSON files.
 
@@ -117,7 +115,7 @@ Query params:
 - `show` (required)
 - `limit` (optional, default 100)
 - `needed` (optional JSON array, e.g. `["S01", "S02E03"]`)
-- `ipt_cf`, `tl_cf` (optional cf_clearance overrides; otherwise reads `cookies/cf-clearance.local.json`)
+- `ipt_cf`, `tl_cf` (optional cf_clearance overrides; otherwise reads `data/cf-clearance.local.json`)
 
 Example:
 
@@ -151,6 +149,8 @@ Response fields:
 #### Search logging
 
 Search stages/counts and filter reasons are appended to `tor-results.txt` in the project root.
+
+(`tor-results.txt` now lives at `data/tor-results.txt`.)
 
 ### Download helpers
 
@@ -208,10 +208,10 @@ High-level flow:
 
 ## Troubleshooting
 
-- **Cloudflare blocks / HTML instead of `.torrent`**: update `cookies/cf-clearance.local.json` (via the UI or `POST /api/cf_clearance`).
-- **Missing cookies**: ensure `cookies/iptorrents.json` / `cookies/torrentleech.json` exist and are valid Playwright cookie arrays.
-- **TLS errors**: generate `cookies/localhost-key.pem` + `cookies/localhost-cert.pem`, or terminate TLS at nginx and adjust the server accordingly.
-- **Reel results look stale / repeated**: check `calls.log`, `reelgood.log`, and validate JSON with:
+- **Cloudflare blocks / HTML instead of `.torrent`**: update `data/cf-clearance.local.json` (via the UI or `POST /api/cf_clearance`).
+- **Missing cookies**: ensure `data/iptorrents.json` / `data/torrentleech.json` exist and are valid Playwright cookie arrays.
+- **TLS errors**: generate `secrets/localhost-key.pem` + `secrets/localhost-cert.pem`, or terminate TLS at nginx and adjust the server accordingly.
+- **Reel results look stale / repeated**: check `data/misc/calls.log`, `data/misc/reelgood.log`, and validate JSON with:
 
   ```bash
   node test/reelgood-validate.js

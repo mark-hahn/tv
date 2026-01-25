@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getReelHtml, ReelgoodBrowser } from './get-reel.js';
-import { getTvDataDir } from './tvPaths.js';
+import { getApiDataDir, getApiMiscDir } from './tvPaths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,12 +21,12 @@ const rx_title = new RegExp('"title": ?"(.*?)"', 's');
 const rx_slug = new RegExp('"slug": ?"(.*?)"', 'sg');
 const rx_genre = new RegExp('href="/tv/genre/([^"]*)"', 'sg');
 
-// Paths (using consistent /root/dev/apps/tv/apps/api/... paths)
-const appBase = path.dirname(getTvDataDir()); 
-const apiDir = path.join(appBase, 'apps', 'api');
-const reelShowsPath = path.join(apiDir, 'reel-shows.json');
-const reelTitlesPath = path.join(apiDir, 'reelgood-titles.json');
-const logPath = path.join(apiDir, 'reelgood.log');
+// Paths (per-app persisted state)
+const DATA_DIR = getApiDataDir();
+const MISC_DIR = getApiMiscDir();
+const reelShowsPath = path.join(DATA_DIR, 'reel-shows.json');
+const reelTitlesPath = path.join(DATA_DIR, 'reelgood-titles.json');
+const logPath = path.join(MISC_DIR, 'reelgood.log');
 
 // --- State ---
 

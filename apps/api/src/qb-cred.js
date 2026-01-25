@@ -34,8 +34,8 @@ export function parseKeyValueFile(text) {
 }
 
 function defaultCredPath() {
-  // Default is torrents/qb-cred.txt (sibling of src/)
-  return path.resolve(__dirname, '..', 'qb-cred.txt');
+  // Default is apps/api/secrets/qb-cred.txt (sibling of src/)
+  return path.resolve(__dirname, '..', 'secrets', 'qb-cred.txt');
 }
 
 /**

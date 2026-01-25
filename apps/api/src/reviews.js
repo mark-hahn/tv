@@ -7,25 +7,53 @@ import { franc } from 'franc-min';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Singleton state
+// Singleton browser (contexts/pages are per-request to avoid concurrent navigation issues).
 let browser = null;
-let page = null;
+
+const DEFAULT_UA =
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+async function getBrowser() {
+    try {
+        if (browser && typeof browser.isConnected === 'function' && browser.isConnected()) return browser;
+    } catch {
+        // ignore
+    }
+
+    try {
+        if (browser) await browser.close();
+    } catch {
+        // ignore
+    }
+
+    browser = await chromium.launch({ headless: true });
+    return browser;
+}
 
 export async function getReviews(rottenUrl, buttonName) {
   let sfxButtonName = 'all-critics';
   if (buttonName === 'Audience') sfxButtonName = 'all-audience';
 
+    if (!rottenUrl || typeof rottenUrl !== 'string') {
+        throw new Error('Missing rottenUrl');
+    }
+
   const cleanUrl = rottenUrl.replace(/\/$/, '');
   const reviewsUrl = `${cleanUrl}/s01/reviews/${sfxButtonName}`;
 
-  if (!browser) {
-    browser = await chromium.launch({ headless: true });
-    page = await browser.newPage();
-  }
+    const b = await getBrowser();
+    const context = await b.newContext({
+        userAgent: DEFAULT_UA,
+        locale: 'en-US',
+        extraHTTPHeaders: {
+            'Accept-Language': 'en-US,en;q=0.9',
+        },
+    });
+    const page = await context.newPage();
 
-  // Navigate
-  try {
-    await page.goto(reviewsUrl, { waitUntil: 'domcontentloaded' });
+    // Navigate
+    try {
+        await page.goto(reviewsUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
     
     // Hide known overlays (OneTrust/GDPR, Login prompts) to ensure clicks work
     await page.addStyleTag({ content: `
@@ -38,12 +66,10 @@ export async function getReviews(rottenUrl, buttonName) {
 
     // Wait for at least one card to appear
     await page.waitForSelector('review-card, .reviews-cards .card-wrap', { timeout: 10000 }).catch(() => {});
-  } catch (err) {
-    try { if (browser) await browser.close(); } catch {}
-    browser = null;
-    page = null;
-    throw new Error(`Failed to load ${reviewsUrl}: ${err.message}`);
-  }
+    } catch (err) {
+        try { await context.close(); } catch {}
+        throw new Error(`Failed to load ${reviewsUrl}: ${err.message}`);
+    }
 
   let finalStats = {
       numChecked: 0,
@@ -55,7 +81,7 @@ export async function getReviews(rottenUrl, buttonName) {
 
   const MAX_CLICKS = 100; // Cap loop to prevent infinite loops, logical stop is reviews >= 50
   
-  try {
+    try {
     for (let i = 0; i < MAX_CLICKS; i++) {
         // 1. Extract Reviews
         const rawReviews = await page.evaluate(() => {
@@ -247,14 +273,15 @@ export async function getReviews(rottenUrl, buttonName) {
             break;
         }
     }
-  } catch (e) {
-    console.error('[reviews] Processing error:', e);
-    // Attempt to close/reset potentially bad browser state
-    try { if (browser) await browser.close(); } catch {}
-    browser = null;
-    page = null;
-    throw e;
-  }
+    } catch (e) {
+        console.error('[reviews] Processing error:', e);
+        // If we hit a hard Playwright/browser failure, reset so next request relaunches cleanly.
+        try { if (browser) await browser.close(); } catch {}
+        browser = null;
+        throw e;
+    } finally {
+        try { await context.close(); } catch {}
+    }
 
 
 

@@ -48,7 +48,6 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         DISABLE_INTERNAL_CORS: '1',
-        TV_DATA_DIR: '/root/dev/apps/tv/data',
       },
     },
     {
@@ -59,7 +58,6 @@ module.exports = {
       time: true,
       env: {
         NODE_ENV: 'production',
-        TV_DATA_DIR: '/root/dev/apps/tv/data',
       },
     },
     {
@@ -70,7 +68,6 @@ module.exports = {
       time: true,
       env: {
         NODE_ENV: 'production',
-        TV_DATA_DIR: '/root/dev/apps/tv/data',
       },
     },
     {
@@ -82,7 +79,6 @@ module.exports = {
       env: {
         MISTRAL_ASR_TIMEOUT_MS: '180000',
         NODE_ENV: 'production',
-        TV_DATA_DIR: '/root/dev/apps/tv/data',
         PORT: '3407',
       },
     },

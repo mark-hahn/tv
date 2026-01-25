@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { parseKeyValueFile } from './qb-cred.js';
-import { getApiCookiesDir, preferSharedReadPath } from './tvPaths.js';
+import { getApiSecretsDir, preferSharedReadPath } from './tvPaths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 const execFileAsync = promisify(execFile);
 
 function resolveCredPath() {
-  return path.join(getApiCookiesDir(), 'qbt-cred.txt');
+  return path.join(getApiSecretsDir(), 'qbt-cred.txt');
 }
 
 async function loadQbtCreds() {
@@ -304,7 +304,7 @@ export async function spaceAvail() {
 
 /**
  * Runs `flexget history --limit 1000` on the USB server via ssh.
- * Uses torrents/cookies/qbt-cred.txt QB_HOST (user@host) as the SSH target.
+ * Uses apps/api/secrets/qbt-cred.txt QB_HOST (user@host) as the SSH target.
  * Returns raw stdout (text table).
  */
 export async function flexgetHistory() {
@@ -580,7 +580,7 @@ async function qbLogin({ baseUrl, qbUser, qbPass }) {
 }
 
 /**
- * Query qBittorrent WebUI /api/v2/torrents/info using creds from torrents/cookies/qbt-cred.txt.
+ * Query qBittorrent WebUI /api/v2/torrents/info using creds from apps/api/secrets/qbt-cred.txt.
  *
  * Optional filtering is forwarded to qBittorrent as query params.  see misc/notes.txt for details of input
  *

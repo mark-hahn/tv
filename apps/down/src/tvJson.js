@@ -14,14 +14,9 @@ const chokidar = require('chokidar');
 
 const BASEDIR = path.join(__dirname, '..');
 
-const DEFAULT_TV_DATA_DIR = '/root/dev/apps/tv/data';
-const TV_DATA_DIR = (typeof process.env.TV_DATA_DIR === 'string' && process.env.TV_DATA_DIR.trim())
-  ? process.env.TV_DATA_DIR.trim()
-  : DEFAULT_TV_DATA_DIR;
-
-const APP_DIR = path.join(TV_DATA_DIR, 'down');
+const APP_DIR = BASEDIR;
 const DATA_DIR = path.join(APP_DIR, 'data');
-const MISC_DIR = path.join(APP_DIR, 'misc');
+const MISC_DIR = path.join(DATA_DIR, 'misc');
 
 function ensureDir(dir) {
   try {
@@ -41,7 +36,7 @@ const TV_LOG_PATH = path.join(MISC_DIR, 'tv.log');
 
 const TV_DB_BACKUP_PATH = path.join(DATA_DIR, 'tv.sqlite.backup');
 
-// Strict: state is always stored under TV_DATA_DIR.
+// State is stored under apps/down/data.
 
 // Local TV library root for watcher assignment.
 const TV_ROOT = '/mnt/media/tv';

@@ -41,8 +41,7 @@
             :style="{ opacity: canPanRight ? 1 : 0.35, cursor: canPanRight ? 'pointer' : 'default' }"
             style="font-size:15px; margin:5px; max-height:24px; border-radius:7px;"
           ) →
-          div(v-if="libraryProgressText" style="align-self:center; font-size:13px; color:#555; white-space:nowrap; margin:6px 0 0 6px;") {{ libraryProgressText }}
-          button(v-if="!mapShow?.Id?.startsWith('noemby-')" @click.stop="startLibraryRefresh" :disabled="_libBusy" style="font-size:15px; cursor:pointer; margin:5px 0 5px 5px; max-height:24px; border-radius:7px;") Library
+          button(v-if="!mapShow?.Id?.startsWith('noemby-')" @click.stop="startLibraryRefresh" style="font-size:15px; cursor:pointer; margin:5px 0 5px 5px; max-height:24px; border-radius:7px;") Library
           button(v-if="!mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px 0 5px 5px; max-height:24px; border-radius:7px;") Prune
 
     #maphdr2(style="display:flex; justify-content:flex-start; align-items:center; color:red; margin:0 10px 5px 10px; padding-left:5px; font-size:15px; flex-wrap:wrap;")
@@ -189,11 +188,6 @@ export default {
       mapTouchMoved: false,
       mapTouchMovedDist: 0,
       mapTouchSuppressClickUntil: 0,
-
-      _libBusy: false,
-      _libTaskId: null,
-      _libPollTimer: null,
-      libraryProgressText: ''
     };
   },
 
@@ -282,73 +276,14 @@ export default {
     window.removeEventListener('resize', this.updateMapPanBounds);
     this.stopArrowPan();
     this.stopMapPanLoop();
-    this.stopLibraryPolling();
   },
 
   methods: {
     noop() {},
 
-    stopLibraryPolling() {
-      if (this._libPollTimer) {
-        clearTimeout(this._libPollTimer);
-        this._libPollTimer = null;
-      }
-    },
-
-    async startLibraryRefresh() {
-      if (this._libBusy) return;
-
-      this.stopLibraryPolling();
-      this.libraryProgressText = '';
-      this._libTaskId = null;
-      this._libBusy = true;
-
-      const res = await emby.refreshLib();
-      if (res?.status === 'hasTask') {
-        this._libTaskId = res.taskId;
-        this.libraryProgressText = 'Refreshing...';
-        void this.pollLibraryStatus();
-        return;
-      }
-
-      this._libBusy = false;
-      if (res?.status && res.status !== 'notask') {
-        this.libraryProgressText = String(res.status);
-      }
-    },
-
-    async pollLibraryStatus() {
-      if (!this._libTaskId) {
-        this._libBusy = false;
-        return;
-      }
-
-      const res = await emby.taskStatus(this._libTaskId);
-      if (res?.status === 'refreshing') {
-        if (Number.isFinite(Number(res?.progress))) {
-          this.libraryProgressText = `${Number(res.progress).toFixed(0)}%`;
-        } else if (res?.taskStatus) {
-          this.libraryProgressText = String(res.taskStatus);
-        } else {
-          this.libraryProgressText = 'Refreshing...';
-        }
-
-        this._libPollTimer = setTimeout(() => {
-          void this.pollLibraryStatus();
-        }, 2000);
-        return;
-      }
-
-      this._libBusy = false;
-      this._libTaskId = null;
-      if (res?.status === 'refreshdone') {
-        // Always keep a completion indicator; only clear on a fresh pane load.
-        this.libraryProgressText = '100%';
-        // Emit event to trigger show list refresh
-        evtBus.emit('library-refresh-complete');
-      } else if (res?.status) {
-        this.libraryProgressText = String(res.status);
-      }
+    startLibraryRefresh() {
+      // Delegate to App.vue so progress renders in the global tab bar.
+      evtBus.emit('startLibraryRefresh');
     },
 
     async handleNotInEmbyClick(event) {

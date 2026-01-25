@@ -7,7 +7,7 @@ import { loadCreds } from './qb-cred.js';
 import parseTorrent from 'parse-torrent';
 import parseTorrentTitle from 'parse-torrent-title';
 
-import { getApiCookiesDir, getApiMiscDir, preferSharedReadPath } from './tvPaths.js';
+import { getApiDataDir, getApiMiscDir, getApiSecretsDir, preferSharedReadPath } from './tvPaths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -87,8 +87,9 @@ function tryLoadBrowserCurlProfile() {
   // Optional best-match replay: if cookies/req-browser.txt exists (DevTools Copy as cURL (bash)),
   // we can reuse its cookie/header set when invoking curl.
   try {
-    // Prefer cookies/req-browser.txt (user-provided template), fall back to misc/req-browser.txt.
+    // Prefer data/req-browser.txt (user-provided template), fall back to legacy locations.
     const candidates = [
+      path.join(getApiDataDir(), 'req-browser.txt'),
       path.join(__dirname, '..', 'cookies', 'req-browser.txt'),
       path.join(__dirname, '..', '..', 'misc', 'req-browser.txt'),
     ];
@@ -169,7 +170,7 @@ async function loadLocalCfClearance(provider) {
   try {
     const p = String(provider || '').trim();
     if (!p) return '';
-    const inPath = path.join(getApiCookiesDir(), 'cf-clearance.local.json');
+    const inPath = path.join(getApiDataDir(), 'cf-clearance.local.json');
     const raw = await fs.promises.readFile(inPath, 'utf8');
     const j = JSON.parse(raw);
     const v = j && typeof j === 'object' && !Array.isArray(j) ? j[p] : '';
@@ -287,7 +288,7 @@ function normalizeProvider(rawProvider, detailUrl) {
 let _cachedCreds;
 async function getCreds() {
   if (_cachedCreds) return _cachedCreds;
-  const credPath = path.join(getApiCookiesDir(), 'download-cred.txt');
+  const credPath = path.join(getApiSecretsDir(), 'download-cred.txt');
   try {
     if (!fs.existsSync(credPath)) {
       throw new Error(`Missing required download credentials: ${credPath}`);
@@ -326,7 +327,7 @@ async function getSftpSettings() {
 
   if (!host || !username || !password) {
     throw new Error(
-      'Missing SFTP config. Put SFTP_PASS and either (SFTP_HOST + SFTP_USER) or SSH_TARGET in torrents/cookies/download-cred.txt.'
+      'Missing SFTP config. Put SFTP_PASS and either (SFTP_HOST + SFTP_USER) or SSH_TARGET in apps/api/secrets/download-cred.txt.'
     );
   }
   if (!Number.isInteger(port) || port <= 0 || port > 65535) {
@@ -444,7 +445,7 @@ export async function fetchTorrentFile(torrent) {
   let allCookies = [];
   const cookieFile = provider === 'iptorrents' ? 'iptorrents.json' : null;
   if (cookieFile) {
-    const cookiePath = path.join(getApiCookiesDir(), cookieFile);
+    const cookiePath = path.join(getApiDataDir(), cookieFile);
     try {
       const cookieData = JSON.parse(fs.readFileSync(cookiePath, 'utf8'));
       allCookies = cookieData

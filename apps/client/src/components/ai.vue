@@ -24,21 +24,16 @@
 
 <script>
 import evtBus from '../evtBus.js';
+import { config } from '../config.js';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 
-// NOTE: per user request, the prompt template and API key are imported into the client bundle.
-// This exposes the key to anyone with access to the built client.
+// Prompt template is imported into the client bundle.
 import promptTemplateRaw from '../../../api/prompt-show.md?raw';
-import mistralKeyRaw from '../../../api/cookies/mistral-key.txt?raw';
 
-const MISTRAL_URL = 'https://api.mistral.ai/v1/chat/completions';
+const MISTRAL_PROXY_URL = `${config.torrentsApiUrl}/api/mistral/chat`;
 const MODEL = 'mistral-large-latest';
 const RESULT_CACHE_PREFIX = 'tv.ai.result.v1:';
-
-function normalizeKey(k) {
-  return String(k || '').trim();
-}
 
 function normalizePrompt(p) {
   return String(p || '').trim();
@@ -124,10 +119,6 @@ export default {
 
     canRun() {
       return Boolean(this.showName);
-    },
-
-    apiKey() {
-      return normalizeKey(mistralKeyRaw);
     },
 
     promptTemplate() {
@@ -338,23 +329,16 @@ export default {
         return;
       }
 
-      const apiKey = this.apiKey;
-      if (!apiKey) {
-        this.errMsg = 'Missing Mistral API key.';
-        return;
-      }
-
       const token = ++this._runToken;
 
       this.busy = true;
       this.errMsg = '';
 
       try {
-        const res = await fetch(MISTRAL_URL, {
+        const res = await fetch(MISTRAL_PROXY_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
             model: MODEL,
@@ -372,7 +356,7 @@ export default {
           const msg = isJson
             ? (payload?.error?.message || payload?.message || JSON.stringify(payload))
             : String(payload || '').slice(0, 2000);
-          throw new Error(`Mistral error: ${res.status} ${msg}`.trim());
+          throw new Error(`AI proxy error: ${res.status} ${msg}`.trim());
         }
 
         const txt = payload?.choices?.[0]?.message?.content;

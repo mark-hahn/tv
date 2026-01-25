@@ -3,13 +3,7 @@ import * as fsp  from 'fs/promises';
 import * as path from 'node:path';
 import * as emby from "./emby.js";
 import {jParse}  from "./util.js";
-
-const DEFAULT_TV_DATA_DIR = '/root/dev/apps/tv/data';
-const TV_DATA_DIR = (typeof process.env.TV_DATA_DIR === 'string' && process.env.TV_DATA_DIR.trim())
-  ? process.env.TV_DATA_DIR.trim()
-  : DEFAULT_TV_DATA_DIR;
-
-const SRVR_DATA_DIR = path.join(TV_DATA_DIR, 'srvr', 'data');
+import { SRVR_DATA_DIR } from './srvrPaths.js';
 const LAST_VIEWED_PATH = path.join(SRVR_DATA_DIR, 'lastViewed.json');
 
 function ensureDir(dir) {

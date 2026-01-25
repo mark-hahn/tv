@@ -6,3 +6,4 @@ secrets
 .secrets.txt
 .env
 misc
+data

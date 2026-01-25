@@ -5,14 +5,8 @@ import WebSocket      from 'ws';
 import * as urls      from "./urls.js";
 import {rottenSearch} from './rotten.js';
 import * as util      from "./util.js";
+import { SRVR_DATA_DIR } from './srvrPaths.js';
 const {log, start, end} = util.getLog('tvdb');
-
-const DEFAULT_TV_DATA_DIR = '/root/dev/apps/tv/data';
-const TV_DATA_DIR = (typeof process.env.TV_DATA_DIR === 'string' && process.env.TV_DATA_DIR.trim())
-  ? process.env.TV_DATA_DIR.trim()
-  : DEFAULT_TV_DATA_DIR;
-
-const SRVR_DATA_DIR = path.join(TV_DATA_DIR, 'srvr', 'data');
 const TVDB_PATH = path.join(SRVR_DATA_DIR, 'tvdb.json');
 
 function ensureDir(dir) {

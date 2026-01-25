@@ -1,13 +1,16 @@
 import fs from 'fs';
 import path from 'node:path';
-import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
-export const DEFAULT_TV_DATA_DIR = '/root/dev/apps/tv/data';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-export function getTvDataDir() {
-  const v = typeof process.env.TV_DATA_DIR === 'string' ? process.env.TV_DATA_DIR.trim() : '';
-  return v ? v : DEFAULT_TV_DATA_DIR;
-}
+// apps/api/src -> apps/api
+const API_ROOT_DIR = path.resolve(__dirname, '..');
+
+const API_DATA_DIR = path.join(API_ROOT_DIR, 'data');
+const API_SECRETS_DIR = path.join(API_ROOT_DIR, 'secrets');
+const API_MISC_DIR = path.join(API_DATA_DIR, 'misc');
 
 export function ensureDir(dirPath) {
   try {
@@ -18,34 +21,50 @@ export function ensureDir(dirPath) {
 }
 
 export function getSecretsDir() {
-  const dirPath = path.join(getTvDataDir(), 'secrets');
+  const dirPath = API_SECRETS_DIR;
   ensureDir(dirPath);
   return dirPath;
 }
 
 export function getApiBaseDir() {
-  // Should return /root/dev/apps/tv/apps/api
-  const dataDir = getTvDataDir(); // /root/dev/apps/tv/data
-  const appRoot = path.dirname(dataDir); // /root/dev/apps/tv
-  const dirPath = path.join(appRoot, 'apps', 'api');
+  const dirPath = API_ROOT_DIR;
   ensureDir(dirPath);
   return dirPath;
 }
 
 export function getApiCookiesDir() {
-  const dirPath = path.join(getApiBaseDir(), 'cookies');
+  // Historical name: cookie-related files now live under data/.
+  const dirPath = API_DATA_DIR;
+  ensureDir(dirPath);
+  return dirPath;
+}
+
+export function getApiDataDir() {
+  const dirPath = API_DATA_DIR;
+  ensureDir(dirPath);
+  return dirPath;
+}
+
+export function getApiSecretsDir() {
+  const dirPath = API_SECRETS_DIR;
   ensureDir(dirPath);
   return dirPath;
 }
 
 export function getApiMiscDir() {
-  const dirPath = path.join(getApiBaseDir(), 'misc');
+  const dirPath = API_MISC_DIR;
   ensureDir(dirPath);
   return dirPath;
 }
 
 export function preferSharedReadPath(sharedPath, legacyPath) {
-  // Strict mode: always use shared TV_DATA_DIR paths.
-  // (Callers should ensure the file exists under TV_DATA_DIR.)
+  // Compatibility shim: callers may provide a current-path and an old-path.
+  // Prefer the current-path if present, otherwise fall back.
+  try {
+    if (sharedPath && fs.existsSync(sharedPath)) return sharedPath;
+  } catch {}
+  try {
+    if (legacyPath && fs.existsSync(legacyPath)) return legacyPath;
+  } catch {}
   return sharedPath;
 }

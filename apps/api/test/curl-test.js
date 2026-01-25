@@ -5,7 +5,7 @@ import { spawn } from 'child_process';
 // Usage (from workspace root):
 //   node apps/api/test/curl-test.js "https://www.torrentleech.org/download/<fid>/<name>.torrent"
 //
-// Reads:  apps/api/cookies/req-browser.txt  (DevTools “Copy as cURL (bash)” output)
+// Reads:  apps/api/data/req-browser.txt  (DevTools “Copy as cURL (bash)” output)
 // Writes: torrents/test/curl-test.torrent
 
 const WORKSPACE_ROOT = path.resolve(process.cwd());

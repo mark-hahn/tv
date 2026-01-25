@@ -12,19 +12,12 @@ import * as email          from './src/email.js';
 import * as tmdb           from './src/tmdb.js';
 import fetch               from 'node-fetch';
 import { parse as parseTorrentTitle } from 'parse-torrent-title';
+import { SRVR_ROOT_DIR, SRVR_DATA_DIR, SRVR_SECRETS_DIR } from './src/srvrPaths.js';
 
 const dontupload  = false;
 
-const SRVR_ROOT_DIR = path.dirname(new URL(import.meta.url).pathname);
 const CONFIG_DIR = path.join(SRVR_ROOT_DIR, 'config');
-
-const DEFAULT_TV_DATA_DIR = '/root/dev/apps/tv/data';
-const TV_DATA_DIR = (typeof process.env.TV_DATA_DIR === 'string' && process.env.TV_DATA_DIR.trim())
-  ? process.env.TV_DATA_DIR.trim()
-  : DEFAULT_TV_DATA_DIR;
-
-const SRVR_DATA_DIR = path.join(TV_DATA_DIR, 'srvr', 'data');
-const SECRETS_DIR = path.join(TV_DATA_DIR, 'secrets');
+const SECRETS_DIR = SRVR_SECRETS_DIR;
 
 function ensureDir(dir) {
   try {

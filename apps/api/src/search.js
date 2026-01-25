@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { normalize } from './normalize.js';
-import { getApiBaseDir, getApiCookiesDir } from './tvPaths.js';
+import { getApiDataDir } from './tvPaths.js';
 
 // torrent-search-api is CommonJS, need dynamic import
 const TorrentSearchApi = (await import('torrent-search-api')).default;
@@ -13,10 +13,10 @@ const SAVE_SAMPLE_TORRENTS = false;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const TORRENTS_DIR = getApiBaseDir();
-const COOKIES_DIR = getApiCookiesDir();
-const IPTORRENTS_CUSTOM_PATH = path.join(TORRENTS_DIR, 'iptorrents-custom.json');
-const TOR_RESULTS_LOG_PATH = path.join(TORRENTS_DIR, 'tor-results.txt');
+const DATA_DIR = getApiDataDir();
+const COOKIES_DIR = DATA_DIR;
+const IPTORRENTS_CUSTOM_PATH = path.join(DATA_DIR, 'iptorrents-custom.json');
+const TOR_RESULTS_LOG_PATH = path.join(DATA_DIR, 'tor-results.txt');
 
 function appendTorResultsLog(lines) {
   try {

@@ -1,3 +1,3 @@
 module.exports = {
-  "ignore_watch" : ["config", "misc"]
+  "ignore_watch" : ["config", "data", "secrets"]
 }

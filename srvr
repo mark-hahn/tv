@@ -61,6 +61,7 @@ sync_monorepo_root() {
     "$ROOT_DIR/pnpm-workspace.yaml" \
     "$ROOT_DIR/pnpm-lock.yaml" \
     "$ROOT_DIR/turbo.json" \
+    "$ROOT_DIR/t-pm2" \
     "$ROOT_DIR/ecosystem.config.cjs" \
     "$SSH_HOST:$TV_REMOTE_BASE/" 2>/dev/null || true
 }

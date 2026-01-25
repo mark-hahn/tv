@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DEFAULT_APP="tv-api"
+DEFAULT_LINES="100"
+
+usage() {
+  echo "Usage: $(basename "$0") [pm2_app_name] [lines]" >&2
+  echo "Example: $(basename "$0") tv-api 100" >&2
+  exit 1
+}
+
+APP_NAME="${1:-$DEFAULT_APP}"
+LINES="${2:-$DEFAULT_LINES}"
+
+if [[ "${APP_NAME:-}" == "-h" || "${APP_NAME:-}" == "--help" ]]; then
+  usage
+fi
+
+if [[ -z "$APP_NAME" ]]; then
+  usage
+fi
+
+if ! [[ "$LINES" =~ ^[0-9]+$ ]]; then
+  echo "Error: lines must be a non-negative integer (got: $LINES)" >&2
+  exit 2
+fi
+
+if ! pm2 describe "$APP_NAME" >/dev/null 2>&1; then
+  echo "[pm2] app not found: $APP_NAME" >&2
+  echo "[pm2] hint: start it once via your ecosystem (e.g. pm2 start <ecosystem> --only $APP_NAME)" >&2
+  exit 2
+fi
+
+OUT_LOG=""
+
+# Prefer JSON introspection; it's stable across PM2 versions.
+if command -v node >/dev/null 2>&1; then
+  OUT_LOG="$(pm2 jlist | node -e '
+    const fs = require("fs");
+    const name = process.argv[1];
+    const procs = JSON.parse(fs.readFileSync(0, "utf8"));
+    const p = procs.find(x => x && x.name === name);
+    const v = p && p.pm2_env && p.pm2_env.pm_out_log_path;
+    process.stdout.write(v || "");
+  ' "$APP_NAME" 2>/dev/null || true)"
+fi
+
+# Clear log for this task only.
+# Prefer pm2 flush <name>; fall back to truncating the resolved log files.
+if pm2 flush "$APP_NAME" >/dev/null 2>&1; then
+  :
+else
+  if [[ -n "${OUT_LOG:-}" && -f "$OUT_LOG" ]]; then
+    : >"$OUT_LOG"
+  fi
+fi
+
+# Some PM2 versions flush but don't fully truncate immediately; ensure files are empty.
+if [[ -n "${OUT_LOG:-}" && -f "$OUT_LOG" ]]; then
+  : >"$OUT_LOG"
+fi
+
+pm2 restart "$APP_NAME" >/dev/null
+
+echo "--- last $LINES lines: $APP_NAME ---"
+have_files=false
+if [[ -n "${OUT_LOG:-}" && -f "$OUT_LOG" ]]; then
+  have_files=true
+fi
+
+if [[ "$have_files" == true ]]; then
+  if [[ -n "${OUT_LOG:-}" && -f "$OUT_LOG" ]]; then
+    echo "[out] $OUT_LOG"
+    tail -n "$LINES" "$OUT_LOG" || true
+  fi
+
+  echo "--- tail: $APP_NAME (Ctrl+C to stop) ---"
+  tail -n 0 -F "$OUT_LOG"
+else
+  # Fall back to PM2's log streaming if the underlying log paths aren't available.
+  pm2 logs "$APP_NAME" --out --lines "$LINES" --nostream
+  echo "--- tail: $APP_NAME (Ctrl+C to stop) ---"
+  pm2 logs "$APP_NAME" --out --lines 0
+fi

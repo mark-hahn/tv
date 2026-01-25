@@ -2,6 +2,17 @@
 
   const MAX_WORKERS = 8;
 
+  // If non-blank, emits targeted trace logs for this show name.
+  // If blank, tracing is fully disabled.
+  const DEBUG_SHOW = '';
+
+  // ---------------------------------------------------------------------------
+  // Targeted tracing (hard-wired; no env vars)
+  // Logs only when the show name appears in stage/details/fname/title/paths.
+  var TRACE_ENABLED = Boolean(DEBUG_SHOW && String(DEBUG_SHOW).trim());
+  var TRACE_SHOW = TRACE_ENABLED ? String(DEBUG_SHOW).trim() : '';
+  var TRACE_SHOW_KEY = TRACE_ENABLED ? TRACE_SHOW.toLowerCase() : '';
+
   var FAST_TEST, PROCESS_INTERVAL_MS, appendTvLog, badFile, blocked, blockedCount, buffering, checkFile, checkFileExists, checkFiles, chkCount, chkTvDB, clearBuffer, currentSeq, cycleRunning, cycleSeq, dateStr, debug, delOldFiles, deleteCount, downloadCount, downloadTime, episode, err, errCount, errors, escQuotes, exec, existsCount, fileTimeout, findUsb, flushAndGoLive, flushBuffer, fname, fs, getUsbFiles, inProgress, lastPruneAt, log, logBuffer, map, mkdirp, path, readMap, recent, recentCount, reloadState, request, resetCycleState, rimraf, rsyncDelay, runCycle, scheduleNextCycle, season, seriesName, sizeStr, skipPaths, startBuffering, startTime, stopBuffering, theTvDbToken, time, title, tvDbErrCount, tvPath, tvdbCache, tvdburl, type, usbFilePath, usbFileSize, usbFiles, usbHost, util, writeLine, writeMap;
 
   debug = false;
@@ -39,16 +50,25 @@
 
   usbHost = "xobtlu@oracle.usbx.me";
 
-  fs = require('fs-plus');
+  // Be resilient on the remote raw /root/dev/apps/tv/down directory where
+  // workspace dependencies may not exist.
+  try {
+    fs = require('fs-plus');
+  } catch (e) {
+    fs = require('fs');
+    // Polyfill the subset of fs-plus used by this file.
+    fs.mkdirpSync = function(dir) {
+      return fs.mkdirSync(dir, {recursive: true});
+    };
+  }
   util = require('util');
   path = require('path');
 
   var BASEDIR = path.join(__dirname, '..');
 
   var DEFAULT_TV_DATA_DIR = '/root/dev/apps/tv/data';
-  var TV_DATA_DIR = (typeof process.env.TV_DATA_DIR === 'string' && process.env.TV_DATA_DIR.trim())
-    ? process.env.TV_DATA_DIR.trim()
-    : DEFAULT_TV_DATA_DIR;
+  // Never use environment variables in this app.
+  var TV_DATA_DIR = DEFAULT_TV_DATA_DIR;
 
   var APP_DIR = path.join(TV_DATA_DIR, 'down');
   var DATA_DIR = path.join(APP_DIR, 'data');
@@ -105,8 +125,155 @@
   // tvJson.js owns tv.json cache and all worker lifecycle.
   var tvJson = require('./tvJson.js');
 
-  // Shared utils package is ESM; load via dynamic import.
-  var smartTitleMatch = (await import('@tv/share')).smartTitleMatch;
+  // Targeted trace helper. Only emits when TRACE_SHOW_KEY is present.
+  var safeInspect = function(x) {
+    try {
+      return util.inspect(x, {
+        depth: 4,
+        breakLength: 160,
+        maxArrayLength: 25
+      });
+    } catch (e) {
+      try {
+        return JSON.stringify(x);
+      } catch (e2) {
+        return String(x);
+      }
+    }
+  };
+
+  var trace = function(stage, details) {
+    if (!TRACE_ENABLED) return;
+    var hay = '';
+    try {
+      hay = (
+        String(stage || '') + ' ' +
+        safeInspect(details || {}) + ' ' +
+        String(fname || '') + ' ' +
+        String(title || '') + ' ' +
+        String(seriesName || '') + ' ' +
+        String(usbFilePath || '')
+      ).toLowerCase();
+    } catch (e) {
+      hay = '';
+    }
+    if (hay.indexOf(TRACE_SHOW_KEY) === -1) return;
+
+    var msg = `[TRACE ${TRACE_SHOW}] ${String(stage || '')}`;
+    if (details !== void 0) {
+      msg += ' ' + safeInspect(details);
+    }
+    try {
+      console.log(msg);
+    } catch (e) {}
+    try {
+      appendTvLog(msg + "\n");
+    } catch (e) {}
+  };
+
+  // Shared utils package is ESM; try loading via dynamic import.
+  // Fallback to a local implementation if the workspace package isn't available
+  // on the remote raw directory.
+  var smartTitleMatch = null;
+  try {
+    smartTitleMatch = (await import('@tv/share')).smartTitleMatch;
+  } catch (e) {
+    smartTitleMatch = null;
+  }
+
+  // Local fallback implementation (mirrors @tv/share behavior for string arrays).
+  var normalizeBasic = function(s) {
+    return String(s || '').toLowerCase().trim().replace(/\s+/g, ' ');
+  };
+
+  var normalizeAggressive = function(s) {
+    var out = String(s || '');
+    var idx = out.indexOf('(');
+    if (idx >= 0) {
+      out = out.slice(0, idx);
+    }
+    out = out.toLowerCase();
+    out = out.replace(/\./g, ' ');
+    out = out.replace(/[^a-z0-9\s]/g, ' ');
+    out = out.trim().replace(/\s+/g, ' ');
+    return out;
+  };
+
+  var levenshtein = function(a, b) {
+    if (a === b) return 0;
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+
+    if (a.length > b.length) {
+      var tmp = a;
+      a = b;
+      b = tmp;
+    }
+
+    var m = a.length;
+    var n = b.length;
+    var prev = new Uint16Array(m + 1);
+    var curr = new Uint16Array(m + 1);
+
+    for (var i = 0; i <= m; i++) prev[i] = i;
+
+    for (var j = 1; j <= n; j++) {
+      curr[0] = j;
+      var bj = b.charCodeAt(j - 1);
+      for (var i2 = 1; i2 <= m; i2++) {
+        var cost = (a.charCodeAt(i2 - 1) === bj) ? 0 : 1;
+        var del = prev[i2] + 1;
+        var ins = curr[i2 - 1] + 1;
+        var sub = prev[i2 - 1] + cost;
+        curr[i2] = del < ins ? (del < sub ? del : sub) : (ins < sub ? ins : sub);
+      }
+      var swap = prev;
+      prev = curr;
+      curr = swap;
+    }
+    return prev[m];
+  };
+
+  var localSmartTitleMatch = function(title, titleArray) {
+    if (!Array.isArray(titleArray) || titleArray.length === 0) {
+      return null;
+    }
+
+    var wantBasic = normalizeBasic(title);
+    for (var i = 0; i < titleArray.length; i += 1) {
+      var cand = titleArray[i];
+      if (!cand) continue;
+      if (normalizeBasic(cand) === wantBasic) {
+        return cand;
+      }
+    }
+
+    var wantAgg = normalizeAggressive(title);
+    for (var j = 0; j < titleArray.length; j += 1) {
+      var cand2 = titleArray[j];
+      if (!cand2) continue;
+      if (normalizeAggressive(cand2) === wantAgg) {
+        return cand2;
+      }
+    }
+
+    var bestCand = null;
+    var minDistance = Infinity;
+    for (var k = 0; k < titleArray.length; k += 1) {
+      var cand3 = titleArray[k];
+      if (!cand3) continue;
+      var dist = levenshtein(wantAgg, normalizeAggressive(cand3));
+      if (dist < minDistance) {
+        minDistance = dist;
+        bestCand = cand3;
+      }
+    }
+    return bestCand;
+  };
+
+  if (!smartTitleMatch) {
+    smartTitleMatch = localSmartTitleMatch;
+  }
 
   // Startup marker (tv.log only)
   (function writeStartupMarker() {
@@ -667,6 +834,19 @@
       timeout: 300000
     }).toString().split('\n');
 
+    // Trace if the target show appears anywhere in the USB list.
+    if (TRACE_ENABLED) {
+      try {
+        var traceCandidates = usbFiles.filter((l) => l && l.toLowerCase().indexOf(TRACE_SHOW_KEY) !== -1);
+        if (traceCandidates.length) {
+          trace('checkFiles: found target on USB', {
+            count: traceCandidates.length,
+            examples: traceCandidates.slice(0, 5)
+          });
+        }
+      } catch (e) {}
+    }
+
     // Load finished/inProgress maps once per cycle, immediately after
     // the USB file list is available.
     try {
@@ -738,10 +918,14 @@
         digits: 2,
         suffix: 'B'
       });
+
+      trace('checkFile: considering', {usbFilePath, fname: null, usbFileBytes});
+
       for (j = 0, len = skipPaths.length; j < len; j++) {
         skipPath = skipPaths[j];
         if (usbFilePath.startsWith(skipPath)) {
           log(`skipping locked ${usbFilePath}`);
+          trace('checkFile: skip locked', {usbFilePath, skipPath});
           process.nextTick(checkFile);
           return;
         }
@@ -749,15 +933,20 @@
       chkCount++;
       parts = usbFilePath.split('/');
       fname = parts[parts.length - 1];
+
+      trace('checkFile: filename', {fname, usbFilePath, usbFileBytes});
+
       parts = fname.split('.');
       fext = parts[parts.length - 1];
       if (fext.length === 6 || (fext === 'nfo' || fext === 'idx' || fext === 'sub' || fext === 'txt' || fext === 'jpg' || fext === 'gif' || fext === 'jpeg' || fext === 'part')) {
+        trace('checkFile: skip extension', {fname, fext});
         process.nextTick(checkFile);
         return;
       }
       if (recent && recent[fname]) {
         recentCount++;
         log('------', downloadCount, '/', chkCount, 'SKIPPING RECENT:', fname);
+        trace('checkFile: skip recent', {fname});
         process.nextTick(checkFile);
         return;
       }
@@ -765,6 +954,7 @@
       if (tvJsonTitles && tvJsonTitles[fname] && tvJsonTitles[fname].error) {
         recentCount++;
         log('------', downloadCount, '/', chkCount, 'SKIPPING *ERROR*:', fname);
+        trace('checkFile: skip tvJsonTitles error', {fname});
         process.nextTick(checkFile);
         return;
       }
@@ -772,6 +962,7 @@
       if (tvJsonTitles && tvJsonTitles[fname]) {
         recentCount++;
         log('------', downloadCount, '/', chkCount, 'SKIPPING ALREADY QUEUED:', fname);
+        trace('checkFile: skip already queued', {fname});
         process.nextTick(checkFile);
         return;
       }
@@ -779,6 +970,7 @@
       if (inProgress && inProgress[fname]) {
         recentCount++;
         log('------', downloadCount, '/', chkCount, 'SKIPPING IN-PROGRESS:', fname);
+        trace('checkFile: skip in-progress', {fname});
         process.nextTick(checkFile);
         return;
       }
@@ -787,6 +979,7 @@
         if (fname.indexOf(blkName) > -1) {
           blockedCount++;
           log('-- BLOCKED:', {blkName, fname});
+          trace('checkFile: blocked', {blkName, fname});
           process.nextTick(checkFile);
           return;
         }
@@ -802,6 +995,8 @@
         var parsed = parseTorrentTitle(fname) || {};
         ({title, season, episode} = parsed);
         type = parsed.type || 'episode';
+
+        trace('checkFile: parsed', {fname, title, season, episode, type});
 
         // Provide a clear reason when the parser can't produce S/E.
         if (!title || !Number.isInteger(season) || !Number.isInteger(episode)) {
@@ -828,6 +1023,7 @@
         }
         if (type !== 'episode') {
           log('\nskipping non-episode:', fname);
+          trace('checkFile: skip non-episode', {fname, title, type});
           badFile('non-episode');
           return;
         }
@@ -837,6 +1033,7 @@
         }
       } catch (error1) {
         err('\nerror parsing:' + fname);
+        trace('checkFile: parse-torrent-title threw', {fname, error: (error1 && error1.message) ? error1.message : String(error1)});
         badFile(`parse-torrent-title threw: ${error1 && error1.message ? error1.message : 'unknown'}`);
         return;
       }
@@ -873,8 +1070,11 @@
   chkTvDB = () => {
     // smartTitleMatch() is provided by the shared @tv/share package.
 
+    trace('chkTvDB: start', {fname, title});
+
     if (tvdbCache[title]) {
       seriesName = tvdbCache[title];
+      trace('chkTvDB: cache hit', {title, seriesName});
       // process.nextTick checkFileExists
       setTimeout(checkFileExists, rsyncDelay);
       return;
@@ -891,6 +1091,13 @@
       var ref;
       // log 'thetvdb', {tvdburl, error, response, body}
       if (error || !((ref = body.data) != null ? ref[0] : void 0) || ((response != null ? response.statusCode : void 0) !== 200)) {
+        trace('chkTvDB: tvdb error/no data', {
+          fname,
+          title,
+          tvdburl,
+          statusCode: response && response.statusCode,
+          error: error ? (error.message || String(error)) : null
+        });
         err('no series name found in theTvDB:', {fname, tvdburl});
         err('search error:', error);
         err('search statusCode:', response && response.statusCode);
@@ -914,11 +1121,18 @@
         // Pass null for year as we don't have it here, or extract if available
         // existing code didn't use year, so we pass undefined/null
         seriesName = smartTitleMatch(title, names);
+        trace('chkTvDB: matched series', {
+          title,
+          resultsCount: names.length,
+          topNames: names.slice(0, 10),
+          seriesName
+        });
         log('tvdb got:', {seriesName, title});
         if (map[seriesName]) {
           console.log('Mapping', seriesName, 'to', map[seriesName]);
           seriesName = map[seriesName];
         }
+        trace('chkTvDB: post-map', {title, seriesName});
         tvdbCache[title] = seriesName;
         // process.nextTick checkFileExists
         return setTimeout(checkFileExists, rsyncDelay);
@@ -932,6 +1146,8 @@
     tvFilePath = `${tvSeasonPath}/${fname}`;
     videoPath = `files/${usbFilePath}`;
     var tvLocalDir = `${tvSeasonPath}/`;
+
+    trace('checkFileExists: start', {fname, title, seriesName, season, episode, tvSeasonPath, usbFilePath});
 
     // usbPath is the folder containing the file on the USB host.
     // Example: "~/files/<torrent-folder>/"
@@ -948,12 +1164,14 @@
     
     if (SKIP_DOWNLOAD) {
       // Skip download mode: no-op in the new model.
+      trace('checkFileExists: SKIP_DOWNLOAD true', {fname});
       return process.nextTick(checkFile);
     }
 
     // Finished authority: tv-finished.json (do not create tv.json entries for already-finished).
     if (recent && recent[fname]) {
       existsCount++;
+      trace('checkFileExists: already finished (recent)', {fname});
       return process.nextTick(checkFile);
     }
 
@@ -961,12 +1179,14 @@
     // for files already queued/downloading).
     if (inProgress && inProgress[fname]) {
       existsCount++;
+      trace('checkFileExists: already in-progress', {fname});
       return process.nextTick(checkFile);
     }
 
     // tv.json authority: do not create duplicates for titles already queued.
     if (tvJsonTitles && tvJsonTitles[fname]) {
       existsCount++;
+      trace('checkFileExists: already queued (tv.json)', {fname});
       return process.nextTick(checkFile);
     }
 
@@ -993,8 +1213,20 @@
       if (tvJsonTitles) {
         tvJsonTitles[fname] = {error: false};
       }
+
+      trace('checkFileExists: queued tv.json entry', {
+        fname,
+        seriesName,
+        season,
+        episode,
+        usbPath,
+        localPath: tvLocalDir,
+        sequence: currentSeq || 0,
+        fileSize: usbFileBytes || 0
+      });
     } catch (e) {
       // keep going
+      trace('checkFileExists: addEntry threw', {fname, error: e && e.message ? e.message : String(e)});
     }
 
     return process.nextTick(checkFile);
@@ -1002,6 +1234,14 @@
 
   badFile = (reason) => {
     errCount++;
+    trace('badFile: marking error', {
+      reason: reason || 'unknown',
+      fname,
+      title,
+      season,
+      episode,
+      usbFilePath
+    });
     err('marking tv.json error:', {
       reason: reason || 'unknown',
       fname,

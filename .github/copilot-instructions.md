@@ -16,3 +16,4 @@
 - local apps/api, apps/down, and apps/srvr are copied to their production folders at remote /root/dev/apps/tv/api, /root/dev/apps/tv/down, /root/dev/apps/tv/srvr by the local script srvr at this project root. remote /root/dev/apps/tv/ is not a repo or worktree, it is just a raw directory that pm2 uses.
 - every path  that starts with /root/dev/apps/tv is on the remote server.   
 - every path that starts with /root/apps/tv/ is on the local project.   
+- never use an environment variable -- put hard-wired constant values at the top of the file with uppercase names

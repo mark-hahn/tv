@@ -1,77 +1,240 @@
 <template>
-
-<div id="actors" @click.stop :style="{ height:'100%', width:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa', position:'relative' }">
-  <div id="header" :style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', display:'flex', flexDirection:'column', gap:'8px' }">
-    <div style="width:100%; display:flex; flex-direction:column; gap:8px;">
-      <!-- Top row: show name (fills), mode label, arrows.-->
-      <div style="width:100%; display:flex; align-items:center; justify-content:space-between;">
-        <div style="margin-left:20px; margin-right:10px; flex:1 1 auto; min-width:0; white-space:normal; overflow-wrap:anywhere; word-break:break-word; display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><span>{{ showName }}</span></div>
-        <div style="margin-left:20px; margin-right:15px; flex:0 0 auto; display:flex; align-items:center; gap:12px; font-weight:normal;">
-          <button @click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:5px;">◄</button>
-          <button @click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;">►</button>
+  <div
+    id="actors"
+    @click.stop
+    :style="{
+      height: '100%',
+      width: '100%',
+      padding: '10px',
+      margin: 0,
+      display: 'flex',
+      flexDirection: 'column',
+      overflowY: 'auto',
+      overflowX: 'hidden',
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+      backgroundColor: '#fafafa',
+      position: 'relative',
+    }"
+  >
+    <div
+      id="header"
+      :style="{
+        position: 'sticky',
+        top: '-10px',
+        zIndex: 100,
+        backgroundColor: '#fafafa',
+        paddingTop: '15px',
+        paddingLeft: '10px',
+        paddingRight: '10px',
+        paddingBottom: '15px',
+        marginLeft: '-10px',
+        marginRight: '-10px',
+        marginTop: '-10px',
+        fontWeight: 'bold',
+        fontSize: sizing.seriesFontSize || '25px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+      }"
+    >
+      <div style="width: 100%; display: flex; flex-direction: column; gap: 8px">
+        <!-- Top row: show name (fills), mode label, arrows.-->
+        <div
+          style="
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+          "
+        >
+          <div
+            style="
+              margin-left: 20px;
+              margin-right: 10px;
+              flex: 1 1 auto;
+              min-width: 0;
+              white-space: normal;
+              overflow-wrap: anywhere;
+              word-break: break-word;
+              display: flex;
+              align-items: center;
+              gap: 12px;
+              flex-wrap: wrap;
+            "
+          >
+            <span>{{ showName }}</span>
+          </div>
+          <div
+            style="
+              margin-left: 20px;
+              margin-right: 15px;
+              flex: 0 0 auto;
+              display: flex;
+              align-items: center;
+              gap: 12px;
+              font-weight: normal;
+            "
+          >
+            <button
+              @click.stop="handleLeftArrow"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 5px;
+                padding: 2px 8px;
+                margin-right: 5px;
+              "
+            >
+              ◄
+            </button>
+            <button
+              @click.stop="handleRightArrow"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 5px;
+                padding: 2px 8px;
+              "
+            >
+              ►
+            </button>
+          </div>
+        </div>
+        <!-- Bottom row: buttons and inputs only.-->
+        <div
+          style="
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 12px;
+            margin-right: 20px;
+            margin-left: 20px;
+            font-weight: normal;
+          "
+        >
+          <button
+            @click.stop="handleRegularClick"
+            :style="getRegularButtonStyle()"
+          >
+            Regulars
+          </button>
+          <button
+            @click.stop="handleGuestClick"
+            :style="getGuestsButtonStyle()"
+          >
+            Guests
+          </button>
+          <label style="font-size: 14px; margin-left: 10px">Season</label>
+          <input
+            v-model="seasonNum"
+            @click.stop
+            @keydown.enter.prevent="handleGuestClick"
+            @blur.stop="handleSeasonEpisodeBlur"
+            type="text"
+            maxlength="2"
+            style="
+              width: 30px;
+              padding: 2px 4px;
+              font-size: 14px;
+              text-align: center;
+              border: 1px solid #ccc;
+              border-radius: 3px;
+            "
+          />
+          <label style="font-size: 14px; margin-left: 5px">Episode</label>
+          <input
+            v-model="episodeNum"
+            @click.stop
+            @keydown.enter.prevent="handleGuestClick"
+            @blur.stop="handleSeasonEpisodeBlur"
+            type="text"
+            maxlength="2"
+            style="
+              width: 30px;
+              padding: 2px 4px;
+              font-size: 14px;
+              text-align: center;
+              border: 1px solid #ccc;
+              border-radius: 3px;
+            "
+          />
         </div>
       </div>
-      <!-- Bottom row: buttons and inputs only.-->
-      <div style="width:100%; display:flex; align-items:center; justify-content:flex-start; gap:12px; margin-right:20px; margin-left:20px; font-weight:normal;">
-        <button @click.stop="handleRegularClick" :style="getRegularButtonStyle()">Regulars</button>
-        <button @click.stop="handleGuestClick" :style="getGuestsButtonStyle()">Guests</button>
-        <label style="font-size:14px; margin-left:10px;">Season</label>
-        <input v-model="seasonNum" @click.stop @keydown.enter.prevent="handleGuestClick" @blur.stop="handleSeasonEpisodeBlur" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;">
-        <label style="font-size:14px; margin-left:5px;">Episode</label>
-        <input v-model="episodeNum" @click.stop @keydown.enter.prevent="handleGuestClick" @blur.stop="handleSeasonEpisodeBlur" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;">
-      </div>
+    </div>
+    <div
+      id="error-message"
+      v-if="errorMessage"
+      style="text-align: center; color: red; margin-top: 50px; font-size: 16px"
+    >
+      <div>{{ errorMessage }}</div>
+    </div>
+    <div
+      id="actors-grid"
+      v-else
+      style="
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 10px;
+        padding: 5px;
+      "
+    >
+      <Actor
+        v-for="actor in actors"
+        :key="actor.url"
+        :actor="actor"
+        @actor-click="handleActorClick"
+      ></Actor>
+    </div>
+    <div
+      id="no-actors"
+      v-if="!errorMessage &amp;&amp; !isGuestMode &amp;&amp; showName &amp;&amp; actors.length === 0"
+      style="text-align: center; color: #999; margin-top: 50px; font-size: 16px"
+    >
+      <div style="margin-bottom: 20px">No cast information available</div>
     </div>
   </div>
-  <div id="error-message" v-if="errorMessage" style="text-align:center; color:red; margin-top:50px; font-size:16px;">
-    <div>{{ errorMessage }}</div>
-  </div>
-  <div id="actors-grid" v-else style="display:grid; grid-template-columns:repeat(auto-fill, minmax(110px, 1fr)); gap:10px; padding:5px;">
-    <Actor v-for="actor in actors" :key="actor.url" :actor="actor" @actor-click="handleActorClick"></Actor>
-  </div>
-  <div id="no-actors" v-if="!errorMessage &amp;&amp; !isGuestMode &amp;&amp; showName &amp;&amp; actors.length === 0" style="text-align:center; color:#999; margin-top:50px; font-size:16px;">
-    <div style="margin-bottom:20px;">No cast information available</div>
-  </div>
-</div>
 </template>
 
 <script>
-import Actor from './actor.vue';
-import evtBus from '../evtBus.js';
-import * as emby from '../emby.js';
-import * as tvdb from '../tvdb.js';
-import * as util from '../util.js';
-import * as srvr from '../srvr.js';
+import Actor from "./actor.vue";
+import evtBus from "../evtBus.js";
+import * as emby from "../emby.js";
+import * as tvdb from "../tvdb.js";
+import * as util from "../util.js";
+import * as srvr from "../srvr.js";
 
 const DEBUG_ACTORS_MERGE_LOG = false;
 
 export default {
   name: "Actors",
-  
+
   components: { Actor },
 
   props: {
     simpleMode: {
       type: Boolean,
-      default: false
+      default: false,
     },
     sizing: {
       type: Object,
-      default: () => ({})
-    }
+      default: () => ({}),
+    },
   },
 
   data() {
     return {
       actors: [],
       seriesActors: [], // Cache of original series actors
-      showName: '',
+      showName: "",
       currentShow: null, // Store full show object for getSeriesMap
       previewMode: false,
       previewAddBusy: false,
       previewSrchChoice: null,
-      seasonNum: '',
-      episodeNum: '',
-      errorMessage: '',
+      seasonNum: "",
+      episodeNum: "",
+      errorMessage: "",
       isGuestMode: false,
       showingEpisodeActors: false, // Track if we're showing episode actors
       _seriesMapInForArrows: null,
@@ -79,16 +242,13 @@ export default {
       _seriesMapInForArrowsPromise: null,
       _onShowActors: null,
       _onFillAndSelectEpisode: null,
-      _onResetActorsPane: null
+      _onResetActorsPane: null,
     };
   },
 
-  computed: {
-    
-  },
+  computed: {},
 
   methods: {
-
     onPreviewMode(active) {
       this.previewMode = !!active;
       if (!this.previewMode) {
@@ -105,7 +265,10 @@ export default {
       if (!this.previewSrchChoice) return;
       if (this.previewAddBusy) return;
       this.previewAddBusy = true;
-      evtBus.emit('addPreviewShow', { srchChoice: this.previewSrchChoice, fromPreview: true });
+      evtBus.emit("addPreviewShow", {
+        srchChoice: this.previewSrchChoice,
+        fromPreview: true,
+      });
     },
 
     onAddPreviewShowDone() {
@@ -113,18 +276,18 @@ export default {
     },
 
     exitPreview() {
-      evtBus.emit('exitPreviewMode');
+      evtBus.emit("exitPreviewMode");
     },
 
     getActorsModeButtonStyle(isActive) {
       return {
-        fontSize: '13px',
-        cursor: 'pointer',
-        borderRadius: '5px',
-        padding: '2px 8px',
-        minWidth: '80px',
-        border: '1px solid #bbb',
-        '--btn-bg': isActive ? 'lightgray' : 'whitesmoke',
+        fontSize: "13px",
+        cursor: "pointer",
+        borderRadius: "5px",
+        padding: "2px 8px",
+        minWidth: "80px",
+        border: "1px solid #bbb",
+        "--btn-bg": isActive ? "lightgray" : "whitesmoke",
       };
     },
 
@@ -138,15 +301,15 @@ export default {
 
     async handleSeasonEpisodeBlur() {
       if (!this.isGuestMode) return;
-      const s = String(this.seasonNum || '').trim();
-      const e = String(this.episodeNum || '').trim();
+      const s = String(this.seasonNum || "").trim();
+      const e = String(this.episodeNum || "").trim();
       if (!s || !e) return;
       await this.handleGuestClick();
     },
     async handleActorClick({ event, actor }) {
       const a = actor;
 
-      const name = String(a?.personName || a?.name || '').trim();
+      const name = String(a?.personName || a?.name || "").trim();
       if (!name) return;
 
       if (a?.personName) {
@@ -156,10 +319,10 @@ export default {
     },
 
     normPersonName(v) {
-      return String(v || '')
+      return String(v || "")
         .trim()
         .toLowerCase()
-        .replace(/\s+/g, ' ');
+        .replace(/\s+/g, " ");
     },
 
     hasAnyImage(actor) {
@@ -170,21 +333,21 @@ export default {
       const tmdb = Array.isArray(tmdbIn) ? [...tmdbIn] : [];
       const tvdb = Array.isArray(tvdbIn) ? [...tvdbIn] : [];
       const output = [];
-      
+
       const tmdbBefore = tmdb.length;
       const tvdbBefore = tvdb.length;
 
       // Deduplicate each list by actor name (keep first occurrence)
       const deduplicateByActor = (list) => {
         const seen = new Set();
-        return list.filter(actor => {
+        return list.filter((actor) => {
           const name = this.normPersonName(actor?.personName || actor?.name);
           if (seen.has(name)) return false;
           seen.add(name);
           return true;
         });
       };
-      
+
       const tmdbUnique = deduplicateByActor(tmdb);
       const tvdbUnique = deduplicateByActor(tvdb);
 
@@ -202,16 +365,16 @@ export default {
 
       while (true) {
         if (tmdbUnique.length === 0) {
-          tvdbUnique.forEach(actor => {
-            actor.source = actor.source || 'tvdb';
+          tvdbUnique.forEach((actor) => {
+            actor.source = actor.source || "tvdb";
             actor.actorSort = actor.sort;
           });
           output.push(...tvdbUnique);
           break;
         }
         if (tvdbUnique.length === 0) {
-          tmdbUnique.forEach(actor => {
-            actor.source = actor.source || 'tmdb';
+          tmdbUnique.forEach((actor) => {
+            actor.source = actor.source || "tmdb";
           });
           output.push(...tmdbUnique);
           break;
@@ -231,30 +394,30 @@ export default {
             if (tHasImage) {
               tvdbUnique.shift();
               const actor = tmdbUnique.shift();
-              actor.source = actor.source || 'tmdb';
+              actor.source = actor.source || "tmdb";
               output.push(actor);
             } else {
               tmdbUnique.shift();
               const actor = tvdbUnique.shift();
-              actor.source = actor.source || 'tvdb';
+              actor.source = actor.source || "tvdb";
               actor.actorSort = actor.sort;
               output.push(actor);
             }
           } else {
             tmdbUnique.shift();
             const actor = tvdbUnique.shift();
-            actor.source = actor.source || 'tvdb';
+            actor.source = actor.source || "tvdb";
             actor.actorSort = actor.sort;
             output.push(actor);
           }
         } else {
           if (tName < vName) {
             const actor = tmdbUnique.shift();
-            actor.source = actor.source || 'tmdb';
+            actor.source = actor.source || "tmdb";
             output.push(actor);
           } else {
             const actor = tvdbUnique.shift();
-            actor.source = actor.source || 'tvdb';
+            actor.source = actor.source || "tvdb";
             actor.actorSort = actor.sort;
             output.push(actor);
           }
@@ -264,66 +427,66 @@ export default {
       // Final sort: Actors with images first (highest priority), then actors without images
       // Within each image group: TVDB first (sorted by actorSort), then TMDB (sorted by actorEpiCount descending)
       output.sort((a, b) => {
-        const aSource = a.source || 'unknown';
-        const bSource = b.source || 'unknown';
+        const aSource = a.source || "unknown";
+        const bSource = b.source || "unknown";
         const aHasImage = this.hasAnyImage(a);
         const bHasImage = this.hasAnyImage(b);
-        
+
         // Image presence is highest priority: actors with images come before actors without
         if (aHasImage && !bHasImage) return -1;
         if (!aHasImage && bHasImage) return 1;
-        
+
         // Both have images or both don't have images - sort by source
         // TVDB comes before TMDB
-        if (aSource === 'tvdb' && bSource === 'tmdb') return -1;
-        if (aSource === 'tmdb' && bSource === 'tvdb') return 1;
-        
+        if (aSource === "tvdb" && bSource === "tmdb") return -1;
+        if (aSource === "tmdb" && bSource === "tvdb") return 1;
+
         // Both from same source
-        if (aSource === 'tvdb' && bSource === 'tvdb') {
+        if (aSource === "tvdb" && bSource === "tvdb") {
           // Sort TVDB by actorSort ascending
           const aSort = a.actorSort || a.sort || 0;
           const bSort = b.actorSort || b.sort || 0;
           return aSort - bSort;
         }
-        
-        if (aSource === 'tmdb' && bSource === 'tmdb') {
+
+        if (aSource === "tmdb" && bSource === "tmdb") {
           // Sort TMDB by actorEpiCount descending
           const aCount = a.actorEpiCount || 0;
           const bCount = b.actorEpiCount || 0;
           return bCount - aCount;
         }
-        
+
         return 0;
       });
-      
+
       return { output, tmdbBefore, tvdbBefore };
     },
 
     normPosIntStr(v) {
-      const n = parseInt(String(v ?? '').trim(), 10);
-      if (!Number.isFinite(n) || n <= 0) return '';
+      const n = parseInt(String(v ?? "").trim(), 10);
+      if (!Number.isFinite(n) || n <= 0) return "";
       return String(n);
     },
 
     normNonNegIntStr(v) {
-      const n = parseInt(String(v ?? '').trim(), 10);
-      if (!Number.isFinite(n) || n < 0) return '';
+      const n = parseInt(String(v ?? "").trim(), 10);
+      if (!Number.isFinite(n) || n < 0) return "";
       return String(n);
     },
 
     ensureEpisodeInputs() {
-      if (!String(this.seasonNum || '').trim()) this.seasonNum = '1';
-      if (!String(this.episodeNum || '').trim()) this.episodeNum = '1';
+      if (!String(this.seasonNum || "").trim()) this.seasonNum = "1";
+      if (!String(this.episodeNum || "").trim()) this.episodeNum = "1";
     },
 
     resetPane() {
       this.actors = [];
       this.seriesActors = [];
-      this.showName = '';
+      this.showName = "";
       this.currentShow = null;
-      this.seasonNum = '';
-      this.episodeNum = '';
-      this.errorMessage = '';
+      this.seasonNum = "";
+      this.episodeNum = "";
+      this.errorMessage = "";
       this.isGuestMode = false;
       this.showingEpisodeActors = false;
 
@@ -339,9 +502,12 @@ export default {
       if (!showKey) return;
 
       // Only prefetch for noemby shows to avoid extra load.
-      if (!String(show?.Id || '').startsWith('noemby-')) return;
+      if (!String(show?.Id || "").startsWith("noemby-")) return;
 
-      if (this._seriesMapInForArrowsShowKey === showKey && (this._seriesMapInForArrows || this._seriesMapInForArrowsPromise)) {
+      if (
+        this._seriesMapInForArrowsShowKey === showKey &&
+        (this._seriesMapInForArrows || this._seriesMapInForArrowsPromise)
+      ) {
         return;
       }
 
@@ -367,33 +533,33 @@ export default {
     handleMapButton() {
       const show = this.currentShow;
       if (show) {
-        evtBus.emit('mapAction', { action: 'open', show });
+        evtBus.emit("mapAction", { action: "open", show });
       }
     },
 
     async handleGuestClick() {
-      this.errorMessage = '';
+      this.errorMessage = "";
       this.isGuestMode = true;
-      
+
       // If input boxes are empty, auto-fill from map first
       if (!this.seasonNum || !this.episodeNum) {
         await this.prefillEpisodeInputs();
-        
+
         // Check if prefill worked
         if (!this.seasonNum || !this.episodeNum) {
-          this.errorMessage = 'No unwatched episodes found';
+          this.errorMessage = "No unwatched episodes found";
           return;
         }
       }
-      
+
       const season = parseInt(this.seasonNum);
       const episode = parseInt(this.episodeNum);
-      
+
       if (isNaN(season) || isNaN(episode)) {
-        this.errorMessage = 'Invalid season or episode';
+        this.errorMessage = "Invalid season or episode";
         return;
       }
-      
+
       // Load guests from TMDB
       let tmdbList = [];
       try {
@@ -401,17 +567,17 @@ export default {
           showName: this.showName,
           year: null,
           season: season,
-          episode: episode
+          episode: episode,
         };
-        
+
         const guestActors = await srvr.getTmdb(params);
-        
+
         if (Array.isArray(guestActors) && guestActors.length) {
-          tmdbList = guestActors.map(actor => {
-            const imageUrl = actor.profile_path 
+          tmdbList = guestActors.map((actor) => {
+            const imageUrl = actor.profile_path
               ? `https://image.tmdb.org/t/p/w185${actor.profile_path}`
               : null;
-            
+
             return {
               name: actor.character,
               personName: actor.name,
@@ -419,67 +585,77 @@ export default {
               personImgURL: imageUrl,
               url: null,
               sort: actor.order,
-              isFeatured: false
+              isFeatured: false,
             };
           });
         }
       } catch (error) {
         // Silent error handling
       }
-      
+
       // Load guests from TVDB
       let tvdbList = [];
       try {
-        const tvdbGuests = await tvdb.getEpisodeGuests(this.showName, season, episode);
+        const tvdbGuests = await tvdb.getEpisodeGuests(
+          this.showName,
+          season,
+          episode,
+        );
         if (Array.isArray(tvdbGuests) && tvdbGuests.length) {
           tvdbList = tvdbGuests;
         }
       } catch (error) {
         // Silent error handling
       }
-      
+
       // Remove regulars from both guest lists before merging
       if (this.seriesActors && this.seriesActors.length > 0) {
         const regularNames = new Set(
-          this.seriesActors.map(actor => this.normPersonName(actor?.personName || actor?.name))
+          this.seriesActors.map((actor) =>
+            this.normPersonName(actor?.personName || actor?.name),
+          ),
         );
-        
-        tmdbList = tmdbList.filter(actor => {
-          const actorName = this.normPersonName(actor?.personName || actor?.name);
+
+        tmdbList = tmdbList.filter((actor) => {
+          const actorName = this.normPersonName(
+            actor?.personName || actor?.name,
+          );
           return !regularNames.has(actorName);
         });
-        
-        tvdbList = tvdbList.filter(actor => {
-          const actorName = this.normPersonName(actor?.personName || actor?.name);
+
+        tvdbList = tvdbList.filter((actor) => {
+          const actorName = this.normPersonName(
+            actor?.personName || actor?.name,
+          );
           return !regularNames.has(actorName);
         });
       }
-      
+
       // Merge TMDB and TVDB guest lists
       const mergeResult = this.mergeTmdbTvdbActors(tmdbList, tvdbList);
       this.actors = mergeResult.output;
-      
+
       if (this.actors.length === 0) {
-        this.errorMessage = 'No guest stars found';
+        this.errorMessage = "No guest stars found";
       }
-      
+
       // Mark that we're showing episode actors
       this.showingEpisodeActors = true;
-      
+
       // Log summary with before/after counts
-      const tvdbAfter = this.actors.filter(a => a.source === 'tvdb').length;
-      const tmdbAfter = this.actors.filter(a => a.source === 'tmdb').length;
-      const seasonStr = String(season).padStart(2, '0');
-      const episodeStr = String(episode).padStart(2, '0');
+      const tvdbAfter = this.actors.filter((a) => a.source === "tvdb").length;
+      const tmdbAfter = this.actors.filter((a) => a.source === "tmdb").length;
+      const seasonStr = String(season).padStart(2, "0");
+      const episodeStr = String(episode).padStart(2, "0");
       if (DEBUG_ACTORS_MERGE_LOG) {
         console.debug(
-          `${this.showName} S${seasonStr}E${episodeStr} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`
+          `${this.showName} S${seasonStr}E${episodeStr} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`,
         );
       }
     },
 
     handleRegularClick() {
-      this.errorMessage = '';
+      this.errorMessage = "";
       this.isGuestMode = false;
       this.showingEpisodeActors = false;
       // Restore series actors
@@ -491,13 +667,23 @@ export default {
       const showKey = show?.Id || show?.Name || null;
 
       // Use cached/prefetched TVDB map for noemby.
-      if (String(show?.Id || '').startsWith('noemby-') && showKey && this._seriesMapInForArrowsShowKey === showKey) {
-        if (Array.isArray(this._seriesMapInForArrows) && this._seriesMapInForArrows.length) {
+      if (
+        String(show?.Id || "").startsWith("noemby-") &&
+        showKey &&
+        this._seriesMapInForArrowsShowKey === showKey
+      ) {
+        if (
+          Array.isArray(this._seriesMapInForArrows) &&
+          this._seriesMapInForArrows.length
+        ) {
           return this._seriesMapInForArrows;
         }
         if (this._seriesMapInForArrowsPromise) {
           await this._seriesMapInForArrowsPromise;
-          if (Array.isArray(this._seriesMapInForArrows) && this._seriesMapInForArrows.length) {
+          if (
+            Array.isArray(this._seriesMapInForArrows) &&
+            this._seriesMapInForArrows.length
+          ) {
             return this._seriesMapInForArrows;
           }
         }
@@ -534,7 +720,9 @@ export default {
       if (!this.seasonNum || !this.episodeNum) return;
 
       try {
-        const seriesMapIn = await this.getSeriesMapInForArrows(this.currentShow);
+        const seriesMapIn = await this.getSeriesMapInForArrows(
+          this.currentShow,
+        );
         if (!seriesMapIn || seriesMapIn.length === 0) {
           // Last-resort fallback: decrement episode.
           const curS = Number(this.seasonNum);
@@ -545,37 +733,41 @@ export default {
           if (curE > 1) this.episodeNum = String(curE - 1);
           else {
             this.seasonNum = String(Math.max(0, curS - 1));
-            this.episodeNum = '1';
+            this.episodeNum = "1";
           }
           await this.handleGuestClick();
           return;
         }
-        
+
         const seriesMap = util.buildSeriesMap(seriesMapIn);
         if (!seriesMap) {
           return;
         }
-        
+
         // Build flat list of all episodes in order
         const allEpisodes = [];
-        const seasons = Object.keys(seriesMap).sort((a, b) => Number(a) - Number(b));
-        
+        const seasons = Object.keys(seriesMap).sort(
+          (a, b) => Number(a) - Number(b),
+        );
+
         for (const seasonNum of seasons) {
           const episodes = seriesMap[seasonNum];
-          const episodeNums = Object.keys(episodes).sort((a, b) => Number(a) - Number(b));
-          
+          const episodeNums = Object.keys(episodes).sort(
+            (a, b) => Number(a) - Number(b),
+          );
+
           for (const episodeNum of episodeNums) {
             allEpisodes.push({ season: seasonNum, episode: episodeNum });
           }
         }
-        
+
         // Find current episode index
         const curS = Number(this.seasonNum);
         const curE = Number(this.episodeNum);
         const currentIndex = allEpisodes.findIndex(
-          (ep) => Number(ep.season) === curS && Number(ep.episode) === curE
+          (ep) => Number(ep.season) === curS && Number(ep.episode) === curE,
         );
-        
+
         if (currentIndex > 0) {
           // Go to previous episode
           const prevEpisode = allEpisodes[currentIndex - 1];
@@ -603,7 +795,9 @@ export default {
       if (!this.seasonNum || !this.episodeNum) return;
 
       try {
-        const seriesMapIn = await this.getSeriesMapInForArrows(this.currentShow);
+        const seriesMapIn = await this.getSeriesMapInForArrows(
+          this.currentShow,
+        );
         if (!seriesMapIn || seriesMapIn.length === 0) {
           // Last-resort fallback: increment episode.
           const curS = Number(this.seasonNum);
@@ -614,32 +808,36 @@ export default {
           await this.handleGuestClick();
           return;
         }
-        
+
         const seriesMap = util.buildSeriesMap(seriesMapIn);
         if (!seriesMap) {
           return;
         }
-        
+
         // Build flat list of all episodes in order
         const allEpisodes = [];
-        const seasons = Object.keys(seriesMap).sort((a, b) => Number(a) - Number(b));
-        
+        const seasons = Object.keys(seriesMap).sort(
+          (a, b) => Number(a) - Number(b),
+        );
+
         for (const seasonNum of seasons) {
           const episodes = seriesMap[seasonNum];
-          const episodeNums = Object.keys(episodes).sort((a, b) => Number(a) - Number(b));
-          
+          const episodeNums = Object.keys(episodes).sort(
+            (a, b) => Number(a) - Number(b),
+          );
+
           for (const episodeNum of episodeNums) {
             allEpisodes.push({ season: seasonNum, episode: episodeNum });
           }
         }
-        
+
         // Find current episode index
         const curS = Number(this.seasonNum);
         const curE = Number(this.episodeNum);
         const currentIndex = allEpisodes.findIndex(
-          (ep) => Number(ep.season) === curS && Number(ep.episode) === curE
+          (ep) => Number(ep.season) === curS && Number(ep.episode) === curE,
         );
-        
+
         if (currentIndex >= 0 && currentIndex < allEpisodes.length - 1) {
           // Go to next episode
           const nextEpisode = allEpisodes[currentIndex + 1];
@@ -656,14 +854,20 @@ export default {
       // Strategy 1: Check if currently playing show matches selected show
       try {
         const devices = await srvr.getDevices();
-        
+
         // Find a device playing the current show (prioritize chromecast)
-        let playingDevice = devices.find(d => d.deviceName === 'chromecast' && d.showName === this.showName);
+        let playingDevice = devices.find(
+          (d) => d.deviceName === "chromecast" && d.showName === this.showName,
+        );
         if (!playingDevice) {
-          playingDevice = devices.find(d => d.showName === this.showName);
+          playingDevice = devices.find((d) => d.showName === this.showName);
         }
-        
-        if (playingDevice && playingDevice.seasonNumber && playingDevice.episodeNumber) {
+
+        if (
+          playingDevice &&
+          playingDevice.seasonNumber &&
+          playingDevice.episodeNumber
+        ) {
           this.seasonNum = String(playingDevice.seasonNumber);
           this.episodeNum = String(playingDevice.episodeNumber);
           return;
@@ -671,35 +875,39 @@ export default {
       } catch (error) {
         // Continue to strategy 2
       }
-      
+
       // Strategy 2: Use seriesMap to find first unwatched episode
       try {
         if (!this.currentShow) {
           return;
         }
-        
+
         const seriesMapIn = await emby.getSeriesMap(this.currentShow);
-        
+
         if (!seriesMapIn || seriesMapIn.length === 0) {
           return; // Leave empty (strategy 3)
         }
-        
+
         const seriesMap = util.buildSeriesMap(seriesMapIn);
-        
+
         if (!seriesMap) {
           return; // Leave empty (strategy 3)
         }
-        
+
         // Find first episode that is available and not played
-        const seasons = Object.keys(seriesMap).sort((a, b) => Number(a) - Number(b));
-        
+        const seasons = Object.keys(seriesMap).sort(
+          (a, b) => Number(a) - Number(b),
+        );
+
         for (const seasonNum of seasons) {
           const episodes = seriesMap[seasonNum];
-          const episodeNums = Object.keys(episodes).sort((a, b) => Number(a) - Number(b));
-          
+          const episodeNums = Object.keys(episodes).sort(
+            (a, b) => Number(a) - Number(b),
+          );
+
           for (const episodeNum of episodeNums) {
             const epiObj = episodes[episodeNum];
-            
+
             if (epiObj.avail && !epiObj.played) {
               this.seasonNum = seasonNum;
               this.episodeNum = episodeNum;
@@ -708,15 +916,22 @@ export default {
           }
         }
         // If no "first available + not played" episode exists, default to S1E1.
-        if (!String(this.seasonNum || '').trim() && !String(this.episodeNum || '').trim()) {
-          this.seasonNum = '1';
-          this.episodeNum = '1';
+        if (
+          !String(this.seasonNum || "").trim() &&
+          !String(this.episodeNum || "").trim()
+        ) {
+          this.seasonNum = "1";
+          this.episodeNum = "1";
         }
       } catch (error) {
         // Fall back to S1E1 if we couldn't compute a better default.
-        if (this.currentShow && !String(this.seasonNum || '').trim() && !String(this.episodeNum || '').trim()) {
-          this.seasonNum = '1';
-          this.episodeNum = '1';
+        if (
+          this.currentShow &&
+          !String(this.seasonNum || "").trim() &&
+          !String(this.episodeNum || "").trim()
+        ) {
+          this.seasonNum = "1";
+          this.episodeNum = "1";
         }
       }
     },
@@ -724,7 +939,7 @@ export default {
     async updateActors(data) {
       if (!data) {
         this.actors = [];
-        this.showName = '';
+        this.showName = "";
         this.currentShow = null;
         return;
       }
@@ -732,24 +947,24 @@ export default {
       // Extract show and tvdbData from the data object
       const tvdbData = data.tvdbData || data;
       this.currentShow = data.show || null;
-      
+
       // Handle both formats: direct data or wrapped in response.data
       const actualData = tvdbData.response?.data || tvdbData;
-      this.showName = actualData?.name || this.currentShow?.Name || '';
-      
+      this.showName = actualData?.name || this.currentShow?.Name || "";
+
       const characters = actualData?.characters;
 
       // Load actors from TVDB into a tvdb list
       let tvdbList = [];
       if (Array.isArray(characters) && characters.length) {
-        tvdbList = characters.map(char => ({
+        tvdbList = characters.map((char) => ({
           name: char.character,
           personName: char.actor,
           image: char.image,
           personImgURL: char.image,
           url: char.tvdbUrl,
           sort: char.sortOrder,
-          isFeatured: char.isFeatured
+          isFeatured: char.isFeatured,
         }));
       }
 
@@ -759,34 +974,34 @@ export default {
         // First, get series metadata to extract the series ID
         const seriesParams = {
           showName: this.showName,
-          year: null
+          year: null,
         };
-        
+
         // If we have IMDB ID, add it to the request
         if (this.currentShow?.ProviderIds?.IMDB) {
           seriesParams.imdbId = this.currentShow.ProviderIds.IMDB;
         }
-        
+
         const seriesData = await srvr.getTmdb(seriesParams);
-        
+
         // Check if we got series metadata with an ID
-        if (seriesData && typeof seriesData === 'object' && seriesData.id) {
+        if (seriesData && typeof seriesData === "object" && seriesData.id) {
           const seriesId = seriesData.id;
-          
+
           // Try to get aggregate_credits using the series ID
           // TMDB API: /tv/{series_id}/aggregate_credits returns all cast across all seasons
           const creditsParams = {
             seriesId: seriesId,
-            credits: true
+            credits: true,
           };
-          
+
           // Also include IMDB ID if available, in case server supports that route
           if (this.currentShow?.ProviderIds?.IMDB) {
             creditsParams.imdbId = this.currentShow.ProviderIds.IMDB;
           }
-          
+
           const creditsData = await srvr.getTmdb(creditsParams);
-          
+
           // Check if we got cast array
           let castArray = null;
           if (Array.isArray(creditsData)) {
@@ -794,23 +1009,27 @@ export default {
           } else if (creditsData && Array.isArray(creditsData.cast)) {
             castArray = creditsData.cast;
           }
-          
+
           if (castArray && castArray.length) {
             // Filter to only include series regulars (actors who appeared in multiple episodes)
             // Use binary search to find the minimum episode threshold that gives us < 10 regulars
             const TARGET_MAX_REGULARS = 10;
-            
+
             // Find the max episode count in the data
-            const maxEpisodeCount = Math.max(...castArray.map(a => a.total_episode_count || 0));
-            
+            const maxEpisodeCount = Math.max(
+              ...castArray.map((a) => a.total_episode_count || 0),
+            );
+
             let low = 1;
             let high = maxEpisodeCount;
             let bestThreshold = maxEpisodeCount; // Default to max if we can't get < 10
-            
+
             while (low <= high) {
               const mid = Math.floor((low + high) / 2);
-              const count = castArray.filter(a => (a.total_episode_count || 0) >= mid).length;
-              
+              const count = castArray.filter(
+                (a) => (a.total_episode_count || 0) >= mid,
+              ).length;
+
               if (count < TARGET_MAX_REGULARS) {
                 // Few enough actors, save this threshold and try lower to get more
                 bestThreshold = mid;
@@ -820,17 +1039,17 @@ export default {
                 low = mid + 1;
               }
             }
-            
-            const regularsOnly = castArray.filter(actor => {
+
+            const regularsOnly = castArray.filter((actor) => {
               const episodeCount = actor.total_episode_count || 0;
               return episodeCount >= bestThreshold;
             });
-            
-            tmdbList = regularsOnly.map(actor => {
-              const imageUrl = actor.profile_path 
+
+            tmdbList = regularsOnly.map((actor) => {
+              const imageUrl = actor.profile_path
                 ? `https://image.tmdb.org/t/p/w185${actor.profile_path}`
                 : null;
-              
+
               return {
                 name: actor.character || actor.roles?.[0]?.character,
                 personName: actor.name,
@@ -839,8 +1058,8 @@ export default {
                 url: null,
                 sort: actor.order,
                 isFeatured: false,
-                source: 'tmdb',
-                actorEpiCount: actor.total_episode_count || 0
+                source: "tmdb",
+                actorEpiCount: actor.total_episode_count || 0,
               };
             });
           }
@@ -852,21 +1071,21 @@ export default {
       // Merge TMDB and TVDB lists
       const mergeResult = this.mergeTmdbTvdbActors(tmdbList, tvdbList);
       this.actors = mergeResult.output;
-      
+
       // Cache series actors for restore
       this.seriesActors = [...this.actors];
       this.isGuestMode = false;
       this.showingEpisodeActors = false;
-      
+
       // Log summary with before/after counts
-      const tvdbAfter = this.actors.filter(a => a.source === 'tvdb').length;
-      const tmdbAfter = this.actors.filter(a => a.source === 'tmdb').length;
+      const tvdbAfter = this.actors.filter((a) => a.source === "tvdb").length;
+      const tmdbAfter = this.actors.filter((a) => a.source === "tmdb").length;
       if (DEBUG_ACTORS_MERGE_LOG) {
         console.debug(
-          `${this.showName} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`
+          `${this.showName} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`,
         );
       }
-    }
+    },
   },
 
   mounted() {
@@ -883,7 +1102,7 @@ export default {
       // Reset to series actors view
       this.isGuestMode = false;
       this.showingEpisodeActors = false;
-      this.errorMessage = '';
+      this.errorMessage = "";
 
       // Pre-fill episode inputs after actors are loaded
       void this.$nextTick(async () => {
@@ -893,7 +1112,7 @@ export default {
         this.ensureEpisodeInputs();
       });
     };
-    evtBus.on('showActors', this._onShowActors);
+    evtBus.on("showActors", this._onShowActors);
 
     this._onFillAndSelectEpisode = (episodeInfo) => {
       // Fill the input boxes
@@ -901,37 +1120,39 @@ export default {
       this.episodeNum = String(episodeInfo.episodeNumber);
       // Do not auto-load guest actors; guest mode only when Guest is clicked.
     };
-    evtBus.on('fillAndSelectEpisode', this._onFillAndSelectEpisode);
+    evtBus.on("fillAndSelectEpisode", this._onFillAndSelectEpisode);
 
     this._onResetActorsPane = this.resetPane;
-    evtBus.on('resetActorsPane', this._onResetActorsPane);
+    evtBus.on("resetActorsPane", this._onResetActorsPane);
 
-    evtBus.on('previewMode', this.onPreviewMode);
-    evtBus.on('previewSrchChoice', this.onPreviewSrchChoice);
-    evtBus.on('addPreviewShowDone', this.onAddPreviewShowDone);
+    evtBus.on("previewMode", this.onPreviewMode);
+    evtBus.on("previewSrchChoice", this.onPreviewSrchChoice);
+    evtBus.on("addPreviewShowDone", this.onAddPreviewShowDone);
   },
 
   unmounted() {
-    if (this._onShowActors) evtBus.off('showActors', this._onShowActors);
-    if (this._onFillAndSelectEpisode) evtBus.off('fillAndSelectEpisode', this._onFillAndSelectEpisode);
-    if (this._onResetActorsPane) evtBus.off('resetActorsPane', this._onResetActorsPane);
+    if (this._onShowActors) evtBus.off("showActors", this._onShowActors);
+    if (this._onFillAndSelectEpisode)
+      evtBus.off("fillAndSelectEpisode", this._onFillAndSelectEpisode);
+    if (this._onResetActorsPane)
+      evtBus.off("resetActorsPane", this._onResetActorsPane);
 
-    evtBus.off('previewMode', this.onPreviewMode);
-    evtBus.off('previewSrchChoice', this.onPreviewSrchChoice);
-    evtBus.off('addPreviewShowDone', this.onAddPreviewShowDone);
-  }
-}
+    evtBus.off("previewMode", this.onPreviewMode);
+    evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);
+    evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);
+  },
+};
 </script>
 
 <style>
-  #actors {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
+#actors {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
 
-  #actors::-webkit-scrollbar {
-    width: 0;
-    height: 0;
-    display: none;
-  }
+#actors::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
 </style>

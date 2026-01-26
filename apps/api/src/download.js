@@ -1,24 +1,31 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { spawn } from 'child_process';
-import Client from 'ssh2-sftp-client';
-import { loadCreds } from './qb-cred.js';
-import parseTorrent from 'parse-torrent';
-import parseTorrentTitle from 'parse-torrent-title';
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { spawn } from "child_process";
+import Client from "ssh2-sftp-client";
+import { loadCreds } from "./qb-cred.js";
+import parseTorrent from "parse-torrent";
+import parseTorrentTitle from "parse-torrent-title";
 
-import { getApiDataDir, getApiMiscDir, getApiSecretsDir, preferSharedReadPath } from './tvPaths.js';
+import {
+  getApiDataDir,
+  getApiMiscDir,
+  getApiSecretsDir,
+  preferSharedReadPath,
+} from "./tvPaths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DOWNLOAD_USER_AGENT =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 function appendTorrentBytesLog({ provider, method, downloadUrl, torrentData }) {
   try {
-    const outPath = path.join(getApiMiscDir(), 'temp.txt');
-    const buf = Buffer.isBuffer(torrentData) ? torrentData : Buffer.from(torrentData || []);
+    const outPath = path.join(getApiMiscDir(), "temp.txt");
+    const buf = Buffer.isBuffer(torrentData)
+      ? torrentData
+      : Buffer.from(torrentData || []);
 
     let parsed = null;
     try {
@@ -28,7 +35,7 @@ function appendTorrentBytesLog({ provider, method, downloadUrl, torrentData }) {
     }
 
     const maxBytes = (() => {
-      const raw = String(process.env.TOR_LOG_TORRENT_MAX_BYTES || '').trim();
+      const raw = String(process.env.TOR_LOG_TORRENT_MAX_BYTES || "").trim();
       const n = raw ? Number(raw) : 200_000;
       return Number.isFinite(n) && n > 0 ? Math.floor(n) : 200_000;
     })();
@@ -38,7 +45,7 @@ function appendTorrentBytesLog({ provider, method, downloadUrl, torrentData }) {
 
     const payload = {
       ts: new Date().toISOString(),
-      event: 'torrent-bytes',
+      event: "torrent-bytes",
       provider: provider || undefined,
       method: method || undefined,
       downloadUrl: downloadUrl || undefined,
@@ -47,10 +54,10 @@ function appendTorrentBytesLog({ provider, method, downloadUrl, torrentData }) {
       loggedBytes: slice.length,
       infoHash: parsed?.infoHash || undefined,
       name: parsed?.name || undefined,
-      torrentBase64: slice.toString('base64'),
+      torrentBase64: slice.toString("base64"),
     };
 
-    fs.appendFileSync(outPath, JSON.stringify(payload) + '\n', 'utf8');
+    fs.appendFileSync(outPath, JSON.stringify(payload) + "\n", "utf8");
   } catch {
     // ignore logging failures
   }
@@ -58,12 +65,19 @@ function appendTorrentBytesLog({ provider, method, downloadUrl, torrentData }) {
 
 function safeCookieNames(cookiePairs) {
   return (cookiePairs || [])
-    .map(c => String(c).split('=')[0].trim())
+    .map((c) => String(c).split("=")[0].trim())
     .filter(Boolean);
 }
 
 function fail(stage, reason, extra = {}) {
-  return { success: false, error: reason, message: reason, stage, reason, ...extra };
+  return {
+    success: false,
+    error: reason,
+    message: reason,
+    stage,
+    reason,
+    ...extra,
+  };
 }
 
 function ok(extra = {}) {
@@ -71,15 +85,15 @@ function ok(extra = {}) {
 }
 
 function looksLikeCloudflareChallenge(html) {
-  const s = String(html || '').toLowerCase();
+  const s = String(html || "").toLowerCase();
   return (
-    s.includes('<title>just a moment') ||
-    s.includes('checking your browser') ||
-    s.includes('cf-chl') ||
-    s.includes('cf-ray') ||
-    s.includes('attention required') ||
-    s.includes('enable javascript and cookies') ||
-    s.includes('verify you are human')
+    s.includes("<title>just a moment") ||
+    s.includes("checking your browser") ||
+    s.includes("cf-chl") ||
+    s.includes("cf-ray") ||
+    s.includes("attention required") ||
+    s.includes("enable javascript and cookies") ||
+    s.includes("verify you are human")
   );
 }
 
@@ -89,17 +103,17 @@ function tryLoadBrowserCurlProfile() {
   try {
     // Prefer data/req-browser.txt (user-provided template), fall back to legacy locations.
     const candidates = [
-      path.join(getApiDataDir(), 'req-browser.txt'),
-      path.join(__dirname, '..', 'cookies', 'req-browser.txt'),
-      path.join(__dirname, '..', '..', 'misc', 'req-browser.txt'),
+      path.join(getApiDataDir(), "req-browser.txt"),
+      path.join(__dirname, "..", "cookies", "req-browser.txt"),
+      path.join(__dirname, "..", "..", "misc", "req-browser.txt"),
     ];
     const p = candidates.find((x) => fs.existsSync(x));
     if (!p) return null;
-    const raw = fs.readFileSync(p, 'utf8');
+    const raw = fs.readFileSync(p, "utf8");
 
     const headers = {};
-    let cookieHeader = '';
-    let capturedUrl = '';
+    let cookieHeader = "";
+    let capturedUrl = "";
 
     // URL (single or double quoted)
     const mUrl = raw.match(/\bcurl\s+['"]([^'\"]+)['"]/i);
@@ -108,16 +122,18 @@ function tryLoadBrowserCurlProfile() {
     // -b '...'
     const mB1 = raw.match(/\s-b\s+'([^']*)'/i);
     const mB2 = raw.match(/\s-b\s+"([^\"]*)"/i);
-    cookieHeader = (mB1?.[1] || mB2?.[1] || '').trim();
+    cookieHeader = (mB1?.[1] || mB2?.[1] || "").trim();
 
     // -H 'k: v' or -H "k: v"
     const reH1 = /\s-H\s+'([^']+)'/gi;
     const reH2 = /\s-H\s+"([^\"]+)"/gi;
     const pushHeader = (h) => {
-      const idx = String(h).indexOf(':');
+      const idx = String(h).indexOf(":");
       if (idx <= 0) return;
       const k = String(h).slice(0, idx).trim().toLowerCase();
-      const v = String(h).slice(idx + 1).trim();
+      const v = String(h)
+        .slice(idx + 1)
+        .trim();
       if (!k || !v) return;
       headers[k] = v;
     };
@@ -127,7 +143,7 @@ function tryLoadBrowserCurlProfile() {
 
     // Some exports (notably Firefox) may include cookies as a header instead of -b.
     if (!cookieHeader && headers.cookie) {
-      cookieHeader = String(headers.cookie || '').trim();
+      cookieHeader = String(headers.cookie || "").trim();
       delete headers.cookie;
     }
 
@@ -143,18 +159,18 @@ function tryLoadBrowserCurlProfile() {
 }
 
 function upsertCookieValue(cookieHeader, cookieName, cookieValue) {
-  const name = String(cookieName || '').trim();
-  const value = String(cookieValue || '').trim();
-  if (!name || !value) return String(cookieHeader || '').trim();
+  const name = String(cookieName || "").trim();
+  const value = String(cookieValue || "").trim();
+  if (!name || !value) return String(cookieHeader || "").trim();
 
-  const parts = String(cookieHeader || '')
-    .split(';')
-    .map(s => String(s || '').trim())
+  const parts = String(cookieHeader || "")
+    .split(";")
+    .map((s) => String(s || "").trim())
     .filter(Boolean);
 
   let replaced = false;
-  const out = parts.map(p => {
-    const idx = p.indexOf('=');
+  const out = parts.map((p) => {
+    const idx = p.indexOf("=");
     if (idx <= 0) return p;
     const k = p.slice(0, idx).trim();
     if (k !== name) return p;
@@ -163,50 +179,59 @@ function upsertCookieValue(cookieHeader, cookieName, cookieValue) {
   });
 
   if (!replaced) out.push(`${name}=${value}`);
-  return out.join('; ');
+  return out.join("; ");
 }
 
 async function loadLocalCfClearance(provider) {
   try {
-    const p = String(provider || '').trim();
-    if (!p) return '';
-    const inPath = path.join(getApiDataDir(), 'cf-clearance.local.json');
-    const raw = await fs.promises.readFile(inPath, 'utf8');
+    const p = String(provider || "").trim();
+    if (!p) return "";
+    const inPath = path.join(getApiDataDir(), "cf-clearance.local.json");
+    const raw = await fs.promises.readFile(inPath, "utf8");
     const j = JSON.parse(raw);
-    const v = j && typeof j === 'object' && !Array.isArray(j) ? j[p] : '';
-    return typeof v === 'string' ? v.trim() : '';
+    const v = j && typeof j === "object" && !Array.isArray(j) ? j[p] : "";
+    return typeof v === "string" ? v.trim() : "";
   } catch {
-    return '';
+    return "";
   }
 }
 
-async function curlFetchBinary(targetUrl, { headers = {}, cookieHeader = '' } = {}) {
-  const args = ['-sS', '-L', '--compressed'];
+async function curlFetchBinary(
+  targetUrl,
+  { headers = {}, cookieHeader = "" } = {},
+) {
+  const args = ["-sS", "-L", "--compressed"];
 
   // Note: we intentionally do NOT pass -H 'cookie:'; use -b for cookies.
   for (const [k, v] of Object.entries(headers || {})) {
     if (!k) continue;
-    if (String(k).toLowerCase() === 'cookie') continue;
+    if (String(k).toLowerCase() === "cookie") continue;
     if (v == null || String(v).length === 0) continue;
-    args.push('-H', `${k}: ${v}`);
+    args.push("-H", `${k}: ${v}`);
   }
   if (cookieHeader) {
-    args.push('-b', cookieHeader);
+    args.push("-b", cookieHeader);
   }
 
   args.push(targetUrl);
 
   return await new Promise((resolve) => {
-    const child = spawn('curl', args, { windowsHide: true });
+    const child = spawn("curl", args, { windowsHide: true });
     const stdoutChunks = [];
     const stderrChunks = [];
 
-    child.stdout.on('data', (d) => stdoutChunks.push(Buffer.from(d)));
-    child.stderr.on('data', (d) => stderrChunks.push(Buffer.from(d)));
-    child.on('error', (err) => {
-      resolve({ ok: false, code: -1, error: err?.message || String(err), stdout: Buffer.alloc(0), stderr: Buffer.concat(stderrChunks) });
+    child.stdout.on("data", (d) => stdoutChunks.push(Buffer.from(d)));
+    child.stderr.on("data", (d) => stderrChunks.push(Buffer.from(d)));
+    child.on("error", (err) => {
+      resolve({
+        ok: false,
+        code: -1,
+        error: err?.message || String(err),
+        stdout: Buffer.alloc(0),
+        stderr: Buffer.concat(stderrChunks),
+      });
     });
-    child.on('close', (code) => {
+    child.on("close", (code) => {
       const stdout = Buffer.concat(stdoutChunks);
       const stderr = Buffer.concat(stderrChunks);
       resolve({ ok: code === 0 && stdout.length > 0, code, stdout, stderr });
@@ -215,16 +240,20 @@ async function curlFetchBinary(targetUrl, { headers = {}, cookieHeader = '' } = 
 }
 
 function isVideoFile(filePath) {
-  const p = String(filePath || '');
-  const ext = p.toLowerCase().split('.').pop() || '';
-  return ['mkv', 'mp4', 'avi', 'm4v', 'mov', 'ts'].includes(ext);
+  const p = String(filePath || "");
+  const ext = p.toLowerCase().split(".").pop() || "";
+  return ["mkv", "mp4", "avi", "m4v", "mov", "ts"].includes(ext);
 }
 
 function validateTorrentData(torrentData) {
   try {
     const parsedTorrent = parseTorrent(torrentData);
-    const files = Array.isArray(parsedTorrent?.files) ? parsedTorrent.files : [];
-    const allPaths = files.map(f => String(f?.path || f?.name || '')).filter(Boolean);
+    const files = Array.isArray(parsedTorrent?.files)
+      ? parsedTorrent.files
+      : [];
+    const allPaths = files
+      .map((f) => String(f?.path || f?.name || ""))
+      .filter(Boolean);
 
     // Prefer video files for validation (avoid NFO/SRT triggering false failures).
     const pathsToCheck = allPaths.filter(isVideoFile);
@@ -235,23 +264,27 @@ function validateTorrentData(torrentData) {
 
     for (const p of checkList) {
       const base = path.basename(p);
-      const noExt = base.replace(/\.[^.]+$/, '');
+      const noExt = base.replace(/\.[^.]+$/, "");
       const info = parseTorrentTitle.parse(noExt);
       checkedFiles.push({ file: p, parsed: info });
       if (!info?.season || !info?.episode) missing = true;
     }
 
     if (missing) {
-      return fail('validate-torrent-files', 'Torrent file name is missing a season or episode number.', {
-        fileCount: allPaths.length,
-        checkedCount: checkList.length,
-        checkedFiles,
-      });
+      return fail(
+        "validate-torrent-files",
+        "Torrent file name is missing a season or episode number.",
+        {
+          fileCount: allPaths.length,
+          checkedCount: checkList.length,
+          checkedFiles,
+        },
+      );
     }
 
     return ok();
   } catch (e) {
-    return fail('parse-torrent', e?.message || String(e));
+    return fail("parse-torrent", e?.message || String(e));
   }
 }
 
@@ -264,7 +297,7 @@ export function extractTorrentFileTitles(torrentData) {
   const files = Array.isArray(parsed?.files) ? parsed.files : [];
 
   const allPaths = files
-    .map((f) => String(f?.path || f?.name || ''))
+    .map((f) => String(f?.path || f?.name || ""))
     .filter(Boolean);
 
   // Prefer video files so tv-proc matching is closer to what's actually downloaded.
@@ -277,18 +310,30 @@ export function extractTorrentFileTitles(torrentData) {
 }
 
 function normalizeProvider(rawProvider, detailUrl) {
-  const p = String(rawProvider || '').toLowerCase().trim();
-  const url = String(detailUrl || '').toLowerCase();
+  const p = String(rawProvider || "")
+    .toLowerCase()
+    .trim();
+  const url = String(detailUrl || "").toLowerCase();
 
-  if (p === 'iptorrents' || p.includes('iptorrents') || url.includes('iptorrents')) return 'iptorrents';
-  if (p === 'torrentleech' || p.includes('torrentleech') || url.includes('torrentleech')) return 'torrentleech';
-  return p || 'unknown';
+  if (
+    p === "iptorrents" ||
+    p.includes("iptorrents") ||
+    url.includes("iptorrents")
+  )
+    return "iptorrents";
+  if (
+    p === "torrentleech" ||
+    p.includes("torrentleech") ||
+    url.includes("torrentleech")
+  )
+    return "torrentleech";
+  return p || "unknown";
 }
 
 let _cachedCreds;
 async function getCreds() {
   if (_cachedCreds) return _cachedCreds;
-  const credPath = path.join(getApiSecretsDir(), 'download-cred.txt');
+  const credPath = path.join(getApiSecretsDir(), "download-cred.txt");
   try {
     if (!fs.existsSync(credPath)) {
       throw new Error(`Missing required download credentials: ${credPath}`);
@@ -304,7 +349,7 @@ async function getCreds() {
 function parseSshTarget(sshTarget) {
   // Basic parse for user@host (ignore ports/options)
   if (!sshTarget) return undefined;
-  const at = sshTarget.lastIndexOf('@');
+  const at = sshTarget.lastIndexOf("@");
   if (at === -1) return { host: sshTarget };
   const user = sshTarget.slice(0, at);
   const host = sshTarget.slice(at + 1);
@@ -327,7 +372,7 @@ async function getSftpSettings() {
 
   if (!host || !username || !password) {
     throw new Error(
-      'Missing SFTP config. Put SFTP_PASS and either (SFTP_HOST + SFTP_USER) or SSH_TARGET in apps/api/secrets/download-cred.txt.'
+      "Missing SFTP config. Put SFTP_PASS and either (SFTP_HOST + SFTP_USER) or SSH_TARGET in apps/api/secrets/download-cred.txt.",
     );
   }
   if (!Number.isInteger(port) || port <= 0 || port > 65535) {
@@ -341,22 +386,22 @@ async function getSftpSettings() {
 }
 
 function sanitizeFilenameForWatch(name) {
-  const s = String(name || '').trim();
-  if (!s) return '';
+  const s = String(name || "").trim();
+  if (!s) return "";
   // Keep it simple: drop path separators and weird chars.
   return s
-    .replace(/[\\/]+/g, '_')
-    .replace(/[\x00-\x1F\x7F]+/g, '')
-    .replace(/[^a-zA-Z0-9._\-()\[\] ]+/g, '_')
+    .replace(/[\\/]+/g, "_")
+    .replace(/[\x00-\x1F\x7F]+/g, "")
+    .replace(/[^a-zA-Z0-9._\-()\[\] ]+/g, "_")
     .trim();
 }
 
 function buildTorrentLeechDirectUrlFromSearchResult(torrent) {
   const fid = torrent?.raw?.fid;
   const filename = torrent?.raw?.filename;
-  if (!fid || !filename) return '';
+  if (!fid || !filename) return "";
   const f = String(filename);
-  if (!f.toLowerCase().endsWith('.torrent')) return '';
+  if (!f.toLowerCase().endsWith(".torrent")) return "";
   return `https://www.torrentleech.org/download/${encodeURIComponent(String(fid))}/${encodeURIComponent(f)}`;
 }
 
@@ -365,59 +410,80 @@ function buildTorrentLeechDirectUrlFromSearchResult(torrent) {
  * NOTE: This intentionally avoids detail-page scraping.
  */
 export async function fetchTorrentFileFromSearchResult(torrent) {
-  const provider = normalizeProvider(torrent?.raw?.provider, torrent?.detailUrl);
+  const provider = normalizeProvider(
+    torrent?.raw?.provider,
+    torrent?.detailUrl,
+  );
 
-  if (provider !== 'torrentleech') {
-    return fail('validate', `Direct torrent download not supported for provider: ${provider}`, { provider });
+  if (provider !== "torrentleech") {
+    return fail(
+      "validate",
+      `Direct torrent download not supported for provider: ${provider}`,
+      { provider },
+    );
   }
 
   const downloadUrl = buildTorrentLeechDirectUrlFromSearchResult(torrent);
   if (!downloadUrl) {
-    return fail('validate', 'Missing TorrentLeech fid/filename (or filename not .torrent).', {
-      provider,
-      fid: torrent?.raw?.fid,
-      filename: torrent?.raw?.filename,
-    });
+    return fail(
+      "validate",
+      "Missing TorrentLeech fid/filename (or filename not .torrent).",
+      {
+        provider,
+        fid: torrent?.raw?.fid,
+        filename: torrent?.raw?.filename,
+      },
+    );
   }
 
   const profile = tryLoadBrowserCurlProfile();
   const headers = profile?.headers || {};
-  let cookieHeader = profile?.cookieHeader || '';
+  let cookieHeader = profile?.cookieHeader || "";
 
   // Source of truth: cf-clearance.local.json (written by client Save Cookies).
   // req-browser.txt is treated as an immutable template; we only patch an in-memory copy.
   const localCf = await loadLocalCfClearance(provider);
   if (localCf) {
-    cookieHeader = upsertCookieValue(cookieHeader, 'cf_clearance', localCf);
+    cookieHeader = upsertCookieValue(cookieHeader, "cf_clearance", localCf);
   }
 
   const r = await curlFetchBinary(downloadUrl, { headers, cookieHeader });
-  const headText = r.stdout.slice(0, 600).toString('utf8');
-  const looksHtml = /^\s*</.test(headText) || looksLikeCloudflareChallenge(headText);
+  const headText = r.stdout.slice(0, 600).toString("utf8");
+  const looksHtml =
+    /^\s*</.test(headText) || looksLikeCloudflareChallenge(headText);
 
   if (!r.ok || looksHtml) {
     const isCloudflare = looksLikeCloudflareChallenge(headText);
-    return fail('fetch-torrent', r.error || 'Failed to fetch torrent via curl', {
-      provider,
-      downloadUrl,
-      code: r.code,
-      isCloudflare,
-      bodyHead: headText.slice(0, 300),
-      profilePath: profile?.path,
-      hasProfile: Boolean(profile),
-      hasCookies: Boolean(cookieHeader),
-    });
+    return fail(
+      "fetch-torrent",
+      r.error || "Failed to fetch torrent via curl",
+      {
+        provider,
+        downloadUrl,
+        code: r.code,
+        isCloudflare,
+        bodyHead: headText.slice(0, 300),
+        profilePath: profile?.path,
+        hasProfile: Boolean(profile),
+        hasCookies: Boolean(cookieHeader),
+      },
+    );
   }
 
   // Debug support: persist the fetched torrent bytes (base64; truncated by TOR_LOG_TORRENT_MAX_BYTES).
-  appendTorrentBytesLog({ provider, method: 'curl', downloadUrl, torrentData: r.stdout });
+  appendTorrentBytesLog({
+    provider,
+    method: "curl",
+    downloadUrl,
+    torrentData: r.stdout,
+  });
 
   return ok({
     provider,
     downloadUrl,
     bytes: r.stdout.length,
     torrentData: r.stdout,
-    method: 'curl',
+    method: "curl",
   });
 }
 
@@ -426,31 +492,31 @@ export async function fetchTorrentFileFromSearchResult(torrent) {
  * Returns { success, torrentData, bytes, provider, method, downloadUrl, ... }
  */
 export async function fetchTorrentFile(torrent) {
-  if (!torrent || typeof torrent !== 'object') {
-    return fail('validate', 'Torrent data is required');
+  if (!torrent || typeof torrent !== "object") {
+    return fail("validate", "Torrent data is required");
   }
 
-  const detailUrl = String(torrent?.detailUrl || '').trim();
+  const detailUrl = String(torrent?.detailUrl || "").trim();
   const provider = normalizeProvider(torrent?.raw?.provider, detailUrl);
 
-  if (provider === 'torrentleech') {
+  if (provider === "torrentleech") {
     return await fetchTorrentFileFromSearchResult(torrent);
   }
 
   if (!detailUrl) {
-    return fail('validate', 'No detailUrl available for torrent', { provider });
+    return fail("validate", "No detailUrl available for torrent", { provider });
   }
 
   // Load cookies from provider cookie jar (excluding cf_clearance)
   let allCookies = [];
-  const cookieFile = provider === 'iptorrents' ? 'iptorrents.json' : null;
+  const cookieFile = provider === "iptorrents" ? "iptorrents.json" : null;
   if (cookieFile) {
     const cookiePath = path.join(getApiDataDir(), cookieFile);
     try {
-      const cookieData = JSON.parse(fs.readFileSync(cookiePath, 'utf8'));
+      const cookieData = JSON.parse(fs.readFileSync(cookiePath, "utf8"));
       allCookies = cookieData
-        .filter(c => c && c.name && c.value && c.name !== 'cf_clearance')
-        .map(c => `${c.name}=${c.value}`);
+        .filter((c) => c && c.name && c.value && c.name !== "cf_clearance")
+        .map((c) => `${c.name}=${c.value}`);
     } catch {
       // ignore
     }
@@ -462,74 +528,94 @@ export async function fetchTorrentFile(torrent) {
   if (cfCookie) allCookies.push(`cf_clearance=${cfCookie}`);
 
   const detailOrigin = new URL(detailUrl).origin;
-  const referer = provider === 'iptorrents' ? 'https://iptorrents.com/' : `${detailOrigin}/`;
+  const referer =
+    provider === "iptorrents" ? "https://iptorrents.com/" : `${detailOrigin}/`;
 
   const headers = {
-    'User-Agent': DOWNLOAD_USER_AGENT,
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.5',
-    'Referer': referer,
+    "User-Agent": DOWNLOAD_USER_AGENT,
+    Accept:
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    Referer: referer,
   };
-  if (allCookies.length > 0) headers['Cookie'] = allCookies.join('; ');
+  if (allCookies.length > 0) headers["Cookie"] = allCookies.join("; ");
 
   const torrentHeaders = {
     ...headers,
-    'Accept': 'application/x-bittorrent,application/octet-stream,*/*;q=0.8',
+    Accept: "application/x-bittorrent,application/octet-stream,*/*;q=0.8",
   };
 
   const response = await fetch(detailUrl, { headers });
   if (!response.ok) {
-    const snippet = await response.text().catch(() => '');
+    const snippet = await response.text().catch(() => "");
     const isCloudflare = looksLikeCloudflareChallenge(snippet);
-    return fail('fetch-detail', isCloudflare ? 'Cloudflare challenge page (Just a moment...)' : 'Failed to fetch detail page', {
-      provider,
-      detailUrl,
-      httpStatus: response.status,
-      httpStatusText: response.statusText,
-      cookiesSent: safeCookieNames(allCookies),
-      hasCfClearance: Boolean(cfCookie),
-      isCloudflare,
-      bodySnippet: snippet ? snippet.substring(0, 500) : undefined,
-    });
+    return fail(
+      "fetch-detail",
+      isCloudflare
+        ? "Cloudflare challenge page (Just a moment...)"
+        : "Failed to fetch detail page",
+      {
+        provider,
+        detailUrl,
+        httpStatus: response.status,
+        httpStatusText: response.statusText,
+        cookiesSent: safeCookieNames(allCookies),
+        hasCfClearance: Boolean(cfCookie),
+        isCloudflare,
+        bodySnippet: snippet ? snippet.substring(0, 500) : undefined,
+      },
+    );
   }
 
   const html = await response.text();
   if (looksLikeCloudflareChallenge(html)) {
-    return fail('fetch-detail', 'Cloudflare challenge page (Just a moment...)', {
-      provider,
-      detailUrl,
-      httpStatus: response.status,
-      httpStatusText: response.statusText,
-      cookiesSent: safeCookieNames(allCookies),
-      hasCfClearance: Boolean(cfCookie),
-      isCloudflare: true,
-      bodySnippet: html ? String(html).slice(0, 500) : undefined,
-    });
+    return fail(
+      "fetch-detail",
+      "Cloudflare challenge page (Just a moment...)",
+      {
+        provider,
+        detailUrl,
+        httpStatus: response.status,
+        httpStatusText: response.statusText,
+        cookiesSent: safeCookieNames(allCookies),
+        hasCfClearance: Boolean(cfCookie),
+        isCloudflare: true,
+        bodySnippet: html ? String(html).slice(0, 500) : undefined,
+      },
+    );
   }
 
   // Search for .torrent download link
   const torrentLinkPattern = /<a[^>]*href="([^"]*\.torrent)"[^>]*>/i;
   const match = html.match(torrentLinkPattern);
   if (!match) {
-    return fail('parse-detail', 'No .torrent download link found in HTML', { provider, detailUrl });
+    return fail("parse-detail", "No .torrent download link found in HTML", {
+      provider,
+      detailUrl,
+    });
   }
 
   // Convert relative URL to absolute
   let absoluteDownloadUrl = match[1];
-  if (!absoluteDownloadUrl.startsWith('http://') && !absoluteDownloadUrl.startsWith('https://')) {
+  if (
+    !absoluteDownloadUrl.startsWith("http://") &&
+    !absoluteDownloadUrl.startsWith("https://")
+  ) {
     const baseUrl = new URL(detailUrl);
-    if (absoluteDownloadUrl.startsWith('/')) {
+    if (absoluteDownloadUrl.startsWith("/")) {
       absoluteDownloadUrl = `${baseUrl.protocol}//${baseUrl.host}${absoluteDownloadUrl}`;
     } else {
       absoluteDownloadUrl = `${baseUrl.protocol}//${baseUrl.host}/${absoluteDownloadUrl}`;
     }
   }
 
-  const torrentResponse = await fetch(absoluteDownloadUrl, { headers: torrentHeaders });
+  const torrentResponse = await fetch(absoluteDownloadUrl, {
+    headers: torrentHeaders,
+  });
   if (!torrentResponse.ok) {
-    const snippet = await torrentResponse.text().catch(() => '');
+    const snippet = await torrentResponse.text().catch(() => "");
     const isCloudflare = looksLikeCloudflareChallenge(snippet);
-    return fail('fetch-torrent', 'Failed to download torrent', {
+    return fail("fetch-torrent", "Failed to download torrent", {
       provider,
       downloadUrl: absoluteDownloadUrl,
       httpStatus: torrentResponse.status,
@@ -546,7 +632,7 @@ export async function fetchTorrentFile(torrent) {
 
   return ok({
     provider,
-    method: 'fetch',
+    method: "fetch",
     downloadUrl: absoluteDownloadUrl,
     bytes: torrentData.length,
     torrentData,
@@ -556,15 +642,21 @@ export async function fetchTorrentFile(torrent) {
 /**
  * Upload a .torrent buffer to the configured remote watch folder via SFTP.
  */
-export async function uploadTorrentToWatchFolder(torrentData, filenameHint = '') {
+export async function uploadTorrentToWatchFolder(
+  torrentData,
+  filenameHint = "",
+) {
   if (!Buffer.isBuffer(torrentData) || torrentData.length === 0) {
-    return fail('validate', 'No torrent data provided');
+    return fail("validate", "No torrent data provided");
   }
 
   const hash = Math.random().toString(36).substring(2, 15);
   const hint = sanitizeFilenameForWatch(filenameHint);
-  const base = hint ? hint.replace(/\.torrent$/i, '') : hash;
-  const safeBase = String(base || hash).slice(0, 120).trim() || hash;
+  const base = hint ? hint.replace(/\.torrent$/i, "") : hash;
+  const safeBase =
+    String(base || hash)
+      .slice(0, 120)
+      .trim() || hash;
   const torrentFilename = `${safeBase}-${hash}.torrent`;
 
   let sftpConfig;
@@ -572,7 +664,7 @@ export async function uploadTorrentToWatchFolder(torrentData, filenameHint = '')
   try {
     ({ sftpConfig, remoteWatchDir } = await getSftpSettings());
   } catch (e) {
-    return fail('sftp-config', e?.message || String(e));
+    return fail("sftp-config", e?.message || String(e));
   }
 
   const remotePath = `${remoteWatchDir}/${torrentFilename}`;
@@ -594,11 +686,19 @@ export async function uploadTorrentToWatchFolder(torrentData, filenameHint = '')
     } catch {
       /* ignore */
     }
-    try { await sftp.end(); } catch { /* ignore */ }
-    return fail('sftp-put', e?.message || String(e), { remotePath });
+    try {
+      await sftp.end();
+    } catch {
+      /* ignore */
+    }
+    return fail("sftp-put", e?.message || String(e), { remotePath });
   }
 
-  return ok({ remotePath, bytes: torrentData.length, filename: torrentFilename });
+  return ok({
+    remotePath,
+    bytes: torrentData.length,
+    filename: torrentFilename,
+  });
 }
 
 /**
@@ -607,8 +707,8 @@ export async function uploadTorrentToWatchFolder(torrentData, filenameHint = '')
  * @returns {Promise<{success:boolean, stage?:string, reason?:string, provider?:string, httpStatus?:number, httpStatusText?:string, savedFile?:string, cookiesSent?:string[], hasCfClearance?:boolean, downloadUrl?:string, detailUrl?:string, warning?:string}>}
  */
 export async function download(torrent) {
-  if (!torrent || typeof torrent !== 'object') {
-    return fail('validate', 'Torrent data is required');
+  if (!torrent || typeof torrent !== "object") {
+    return fail("validate", "Torrent data is required");
   }
 
   const fetched = await fetchTorrentFile(torrent);
@@ -617,7 +717,8 @@ export async function download(torrent) {
   const valid = validateTorrentData(fetched.torrentData);
   if (!valid.success) return valid;
 
-  const hint = torrent?.raw?.filename || torrent?.raw?.title || 'download.torrent';
+  const hint =
+    torrent?.raw?.filename || torrent?.raw?.title || "download.torrent";
   const uploaded = await uploadTorrentToWatchFolder(fetched.torrentData, hint);
   if (!uploaded.success) return uploaded;
 
@@ -630,4 +731,3 @@ export async function download(torrent) {
     bytes: fetched.bytes,
   });
 }
-

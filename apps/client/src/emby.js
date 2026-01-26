@@ -1,45 +1,47 @@
-import axios     from "axios"
+import axios from "axios";
 import * as tvdb from "./tvdb.js";
 import * as srvr from "./srvr.js";
 import * as urls from "./urls.js";
 import * as util from "./util.js";
-import    evtBus from "./evtBus.js";
+import evtBus from "./evtBus.js";
 
-const gapWorker = 
-  new Worker(new URL('gap-worker.js', import.meta.url), 
-              {type: 'module'});
+const gapWorker = new Worker(new URL("gap-worker.js", import.meta.url), {
+  type: "module",
+});
 
-const name      = "mark";
-const pwd       = "90-MNBbnmyui";
-const apiKey    = "1c399bd079d549cba8c916244d3add2b"
+const name = "mark";
+const pwd = "90-MNBbnmyui";
+const apiKey = "1c399bd079d549cba8c916244d3add2b";
 const markUsrId = "894c752d448f45a3a1260ccaabd0adff";
-const authHdr   = `UserId="${markUsrId}", `                +
-                  'Client="MyClient", Device="myDevice", ' +
-                  'DeviceId="123456", Version="1.0.0"';
-const pruneTvdb = (window.location.href.slice(-5) == 'prune');
+const authHdr =
+  `UserId="${markUsrId}", ` +
+  'Client="MyClient", Device="myDevice", ' +
+  'DeviceId="123456", Version="1.0.0"';
+const pruneTvdb = window.location.href.slice(-5) == "prune";
 
-let token    = '';
-let cred     = null;
-let allTvdb  = null;
+let token = "";
+let cred = null;
+let allTvdb = null;
 
 ////////////////////////  INIT  ///////////////////////
 
 const getToken = async () => {
   const config = {
-    method: 'post',
-    url: "https://hahnca.com:8920" +
-         "/emby/Users/AuthenticateByName" +
-         `?api_key=${apiKey}`,
+    method: "post",
+    url:
+      "https://hahnca.com:8920" +
+      "/emby/Users/AuthenticateByName" +
+      `?api_key=${apiKey}`,
     headers: { Authorization: authHdr },
     data: { Username: name, Pw: pwd },
   };
   const embyShows = await axios(config);
   token = embyShows.data.AccessToken;
-}
+};
 
 export async function init() {
   await getToken();
-  cred = {markUsrId, token};
+  cred = { markUsrId, token };
   urls.init(cred);
 }
 
@@ -47,12 +49,12 @@ let rejects = null;
 let rejectsSet = null;
 
 function normShowName(name) {
-  if (name === undefined || name === null) return '';
+  if (name === undefined || name === null) return "";
   // Collapse any embedded newlines/tabs and extra spaces coming from JSON files.
   // Keep punctuation as-is (we still want exact-ish matching).
   return String(name)
-    .replace(/[\r\n\t]+/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -67,52 +69,55 @@ export async function loadAllShows() {
 
   const loadAllShowsStartTime = new Date().getTime();
 
-  const embyPromise   = axios.get(
-                        urls.showListUrl(cred, 0, 10000));
-  const diskPromise   = srvr.getShowsFromDisk(); 
-  const rejPromise    = srvr.getRejects();
-  const pkupPromise   = srvr.getPickups();
+  const embyPromise = axios.get(urls.showListUrl(cred, 0, 10000));
+  const diskPromise = srvr.getShowsFromDisk();
+  const rejPromise = srvr.getRejects();
+  const pkupPromise = srvr.getPickups();
   const noEmbyPromise = srvr.getNoEmbys();
-  const gapPromise    = srvr.getGaps();
-  const notesPromise  = srvr.getAllNotes();
+  const gapPromise = srvr.getGaps();
+  const notesPromise = srvr.getAllNotes();
 
-    const [embyShows, diskShows, 
-      rejectsIn, pickups, noEmbys, gaps, notesIn] = 
-    await Promise.all([embyPromise, diskPromise, 
-                       rejPromise, pkupPromise,
-          noEmbyPromise, gapPromise, notesPromise]);
+  const [embyShows, diskShows, rejectsIn, pickups, noEmbys, gaps, notesIn] =
+    await Promise.all([
+      embyPromise,
+      diskPromise,
+      rejPromise,
+      pkupPromise,
+      noEmbyPromise,
+      gapPromise,
+      notesPromise,
+    ]);
 
-    // Normalize rejects so the list works even if the JSON has newlines/extra spaces.
-    // Also build a case-insensitive lookup for matching.
-    if (Array.isArray(rejectsIn)) {
-      rejects = rejectsIn.map(normShowName).filter(Boolean);
-    } else {
-      rejects = [];
-    }
-    rejectsSet = new Set(rejects.map((n) => n.toLowerCase()));
+  // Normalize rejects so the list works even if the JSON has newlines/extra spaces.
+  // Also build a case-insensitive lookup for matching.
+  if (Array.isArray(rejectsIn)) {
+    rejects = rejectsIn.map(normShowName).filter(Boolean);
+  } else {
+    rejects = [];
+  }
+  rejectsSet = new Set(rejects.map((n) => n.toLowerCase()));
   const gapsById = gaps || {};
-    const notesByShowName = (notesIn && typeof notesIn === 'object') ? notesIn : {};
-  
+  const notesByShowName = notesIn && typeof notesIn === "object" ? notesIn : {};
+
   let shows = [];
 
-////////// get shows from emby ////////////
-// includes id, name, dates, haveShows, favorites, gaps, etc.
-  for(let key in embyShows.data.Items) {
+  ////////// get shows from emby ////////////
+  // includes id, name, dates, haveShows, favorites, gaps, etc.
+  for (let key in embyShows.data.Items) {
     let show = embyShows.data.Items[key];
 
     Object.assign(show, show.UserData);
     delete show.UserData;
-    for(const date of ['DateCreated', 'PremiereDate']) {
-      if(show[date]) show[date] = show[date].substring(0, 10);
+    for (const date of ["DateCreated", "PremiereDate"]) {
+      if (show[date]) show[date] = show[date].substring(0, 10);
     }
-    const embyPath     = show.Path.split('/').pop();
+    const embyPath = show.Path.split("/").pop();
     const showDateSize = diskShows[embyPath];
-    if(!showDateSize) {
+    if (!showDateSize) {
       show.NoFiles = true;
-      show.Date = '2017-12-05';
+      show.Date = "2017-12-05";
       show.Size = 0;
-    }
-    else {
+    } else {
       const [date, size] = showDateSize;
       show.Date = date;
       show.Size = size;
@@ -120,35 +125,34 @@ export async function loadAllShows() {
     // if(!show.DateCreated) show.DateCreated = show.Date;
 
     const gapData = gapsById[show.Id];
-    if(gapData) {
+    if (gapData) {
       Object.assign(show, gapData);
       delete gapsById[show.Id];
     }
 
     const tvdbId = show?.ProviderIds?.Tvdb || show?.TvdbId;
-    if(!tvdbId || tvdbId == '0') {
-      console.error(`loadAllShows, no tvdbId:`, show.Name, {show});
+    if (!tvdbId || tvdbId == "0") {
+      console.error(`loadAllShows, no tvdbId:`, show.Name, { show });
       continue;
     }
     show.TvdbId = tvdbId;
     shows.push(show);
-  } 
+  }
 
-//////////  add noemby shows from srvr ////////////
+  //////////  add noemby shows from srvr ////////////
   const prunedNoEmbyIds = [];
-  for(const noEmbyShow of noEmbys) {
-    const idx = shows.findIndex(
-                  (show) => show.Name == noEmbyShow.Name);
-    if(idx != -1) {
+  for (const noEmbyShow of noEmbys) {
+    const idx = shows.findIndex((show) => show.Name == noEmbyShow.Name);
+    if (idx != -1) {
       // If the show now exists in Emby, preserve any collection flags
       // we tracked while it was a noemby show by copying them over and
       // writing them into the real Emby collections before deleting.
       try {
         const embyShow = shows[idx];
-        const wantToTry    = !!noEmbyShow.InToTry;
+        const wantToTry = !!noEmbyShow.InToTry;
         const wantContinue = !!noEmbyShow.InContinue;
-        const wantMark     = !!noEmbyShow.InMark;
-        const wantLinda    = !!noEmbyShow.InLinda;
+        const wantMark = !!noEmbyShow.InMark;
+        const wantLinda = !!noEmbyShow.InLinda;
 
         if (wantToTry) {
           embyShow.InToTry = true;
@@ -167,16 +171,19 @@ export async function loadAllShows() {
           await saveLinda(embyShow.Id, true);
         }
       } catch (e) {
-        console.error('loadAllShows: upgrade noEmby -> Emby flag copy failed', noEmbyShow?.Name, e);
+        console.error(
+          "loadAllShows: upgrade noEmby -> Emby flag copy failed",
+          noEmbyShow?.Name,
+          e,
+        );
       }
 
-      console.log('upgrading noEmby by deleting it:', 
-                    noEmbyShow.Name);
+      console.log("upgrading noEmby by deleting it:", noEmbyShow.Name);
       await srvr.delNoEmby(noEmbyShow.Name);
       prunedNoEmbyIds.push(noEmbyShow.Id);
       continue;
     }
-    
+
     // Check if S01E01 is unaired in TVDB and set WaitStr
     try {
       const seriesMap = await tvdb.getSeriesMap(noEmbyShow);
@@ -189,202 +196,216 @@ export async function loadAllShows() {
           const airDate = e1?.[1]?.aired;
           if (airDate) {
             // Format as {M/DD} matching getWaitStr format
-            const dateStr = airDate.slice(5).replace(/^0/, ' ').trim();
+            const dateStr = airDate.slice(5).replace(/^0/, " ").trim();
             noEmbyShow.WaitStr = `{${dateStr}}`;
           }
         }
       }
     } catch (e) {
-      console.error('loadAllShows: tvdb.getSeriesMap error for noemby', noEmbyShow.Name, e);
+      console.error(
+        "loadAllShows: tvdb.getSeriesMap error for noemby",
+        noEmbyShow.Name,
+        e,
+      );
     }
-    
+
     shows.push(noEmbyShow);
   }
-  for(const prunedNoEmbyId of prunedNoEmbyIds) {
+  for (const prunedNoEmbyId of prunedNoEmbyIds) {
     const idx = noEmbys.findIndex(
-        (noEmbyShow) => noEmbyShow.Id == prunedNoEmbyId);
-    if(idx != -1) noEmbys.splice(idx, 1);
+      (noEmbyShow) => noEmbyShow.Id == prunedNoEmbyId,
+    );
+    if (idx != -1) noEmbys.splice(idx, 1);
   }
 
-//////////  one-time migrate gaps: add showName for debugging ////////////
+  //////////  one-time migrate gaps: add showName for debugging ////////////
   try {
-    const migratedKey = 'gapShowNameMigrated_v1';
-    const alreadyMigrated = window?.localStorage?.getItem(migratedKey) === '1';
+    const migratedKey = "gapShowNameMigrated_v1";
+    const alreadyMigrated = window?.localStorage?.getItem(migratedKey) === "1";
     if (!alreadyMigrated) {
       const entries = Object.entries(gaps || {});
       let pending = [];
       for (const [gapId, gapObj] of entries) {
-        if (!gapId || !gapObj || typeof gapObj !== 'object') continue;
+        if (!gapId || !gapObj || typeof gapObj !== "object") continue;
         const match = shows.find((s) => String(s?.Id) === String(gapId));
         if (!match) continue;
         if (gapObj.showName === match.Name) continue;
-        pending.push([gapId, Object.assign({}, gapObj, { showName: match.Name })]);
+        pending.push([
+          gapId,
+          Object.assign({}, gapObj, { showName: match.Name }),
+        ]);
       }
 
       if (pending.length > 0) {
         for (let i = 0; i < pending.length; i++) {
           const [gapId, gapObj] = pending[i];
-          const save = (i === pending.length - 1);
+          const save = i === pending.length - 1;
           await srvr.addGap([gapId, gapObj, save]);
         }
       }
 
-      window?.localStorage?.setItem(migratedKey, '1');
+      window?.localStorage?.setItem(migratedKey, "1");
     }
   } catch (e) {
-    console.error('loadAllShows: gap showName migration failed', e);
+    console.error("loadAllShows: gap showName migration failed", e);
   }
 
-//////////  mark tvdbs with no show as deleted ////////////
-  for(const tvdb of Object.values(allTvdb)) {
-    if(!tvdb.deleted) {
-      const matchingShow = shows.find(
-            (show) => show.Name == tvdb.name);
-      if(matchingShow && !tvdb.showId) {
-        const name   = matchingShow.Name;
+  //////////  mark tvdbs with no show as deleted ////////////
+  for (const tvdb of Object.values(allTvdb)) {
+    if (!tvdb.deleted) {
+      const matchingShow = shows.find((show) => show.Name == tvdb.name);
+      if (matchingShow && !tvdb.showId) {
+        const name = matchingShow.Name;
         const showId = matchingShow.Id;
-        console.log(
-            `loadAllShows, tvdb has no showid and not deleted:`, 
-               name, {show:matchingShow, tvdb});
-        allTvdb[name] =
-          await srvr.setTvdbFields({name, showId});
+        console.log(`loadAllShows, tvdb has no showid and not deleted:`, name, {
+          show: matchingShow,
+          tvdb,
+        });
+        allTvdb[name] = await srvr.setTvdbFields({ name, showId });
       }
-      if(matchingShow) continue;
-      console.log(`loadAllShows, !tvdb.deleted with no show:`,
-                  tvdb.name, {tvdb});
-      allTvdb[tvdb.name] = await srvr.setTvdbFields(
-          {name:tvdb.name, deleted:util.fmtDate()});
+      if (matchingShow) continue;
+      console.log(`loadAllShows, !tvdb.deleted with no show:`, tvdb.name, {
+        tvdb,
+      });
+      allTvdb[tvdb.name] = await srvr.setTvdbFields({
+        name: tvdb.name,
+        deleted: util.fmtDate(),
+      });
     }
   }
 
-//////////  create tvdbs ////////////
-  if(!pruneTvdb) {
-    for(const show of shows) {
-      if(!show.TvdbId) {
-        console.log(`loadAllShows, no tvdbId:`, show.Name, {show});
+  //////////  create tvdbs ////////////
+  if (!pruneTvdb) {
+    for (const show of shows) {
+      if (!show.TvdbId) {
+        console.log(`loadAllShows, no tvdbId:`, show.Name, { show });
         continue;
       }
       const name = show.Name;
       let tvdb = allTvdb[name];
-      if(!tvdb || tvdb.showId !== show.Id) {
+      if (!tvdb || tvdb.showId !== show.Id) {
         const reason = !tvdb
-          ? 'no existing tvdb entry for show name'
-          : `showId mismatch (tvdb.showId=${tvdb.showId || 'n/a'} != show.Id=${show.Id})`;
+          ? "no existing tvdb entry for show name"
+          : `showId mismatch (tvdb.showId=${tvdb.showId || "n/a"} != show.Id=${show.Id})`;
         const details = {
           name,
           showId: show.Id,
           tvdbId: show.TvdbId,
-          existing: tvdb ? { tvdbId: tvdb.tvdbId, showId: tvdb.showId, deleted: tvdb.deleted } : null
+          existing: tvdb
+            ? {
+                tvdbId: tvdb.tvdbId,
+                showId: tvdb.showId,
+                deleted: tvdb.deleted,
+              }
+            : null,
         };
         console.log(
           `loadAllShows tvdb: creating/updating via getNewTvdb (${reason})`,
-          details
+          details,
         );
 
         // Pop a modal only for true mismatches (a preexisting entry that conflicts)
         // so the user can see the details immediately.
-        if (tvdb && (tvdb.showId !== show.Id || (tvdb.tvdbId && show.TvdbId && String(tvdb.tvdbId) !== String(show.TvdbId)))) {
-          evtBus.emit('tvdb-mismatch', details);
+        if (
+          tvdb &&
+          (tvdb.showId !== show.Id ||
+            (tvdb.tvdbId &&
+              show.TvdbId &&
+              String(tvdb.tvdbId) !== String(show.TvdbId)))
+        ) {
+          evtBus.emit("tvdb-mismatch", details);
         }
         const epicounts = await getEpisodeCounts(show);
-        const param = Object.assign({show}, epicounts);
+        const param = Object.assign({ show }, epicounts);
         tvdb = await srvr.getNewTvdb(param);
       }
       let ratings = 0;
-      for(const remote of tvdb.remotes) {
-        if(remote.ratings) 
-            ratings = remote.ratings;
+      for (const remote of tvdb.remotes) {
+        if (remote.ratings) ratings = remote.ratings;
       }
-      show.DateCreated     = tvdb.added;
-      show.TvdbId          = tvdb.tvdbId;
+      show.DateCreated = tvdb.added;
+      show.TvdbId = tvdb.tvdbId;
       show.OriginalCountry = tvdb.originalCountry;
-      show.Ended           = (tvdb.status == 'Ended');
-      show.Ratings         = ratings;
-      allTvdb[name]        = tvdb;
+      show.Ended = tvdb.status == "Ended";
+      show.Ratings = ratings;
+      allTvdb[name] = tvdb;
     }
   }
 
-//////////  pruneTvdb show tvdbs without a show  ////////////
-  if(pruneTvdb) {
+  //////////  pruneTvdb show tvdbs without a show  ////////////
+  if (pruneTvdb) {
     const showsFromTvdb = [];
-    for(const tvdb of Object.values(allTvdb)) {
-      const showIdx = shows.findIndex(
-                  (show) => show.Name === tvdb.name);
-      if(showIdx !== -1) continue;
+    for (const tvdb of Object.values(allTvdb)) {
+      const showIdx = shows.findIndex((show) => show.Name === tvdb.name);
+      if (showIdx !== -1) continue;
       const show = {
-        Name:            tvdb.name,
-        Id:              'noemby-' + Math.random(),
-        TvdbId:          tvdb.tvdbId,     
+        Name: tvdb.name,
+        Id: "noemby-" + Math.random(),
+        TvdbId: tvdb.tvdbId,
         OriginalCountry: tvdb.originalCountry,
-        Ended:          (tvdb.status == 'Ended'),
-        Ratings:         tvdb.ratings,
-      }
+        Ended: tvdb.status == "Ended",
+        Ratings: tvdb.ratings,
+      };
       showsFromTvdb.push(show);
     }
     shows = showsFromTvdb;
   }
 
-////////  remove gaps with no matching show /////////
+  ////////  remove gaps with no matching show /////////
   let deletedGap = false;
-  for(const gapId in gaps) {
+  for (const gapId in gaps) {
     await srvr.delGap([gapId, false]);
     deletedGap = true;
   }
-  if(deletedGap) await srvr.delGap([null, true]);
+  if (deletedGap) await srvr.delGap([null, true]);
 
-//////////  attach Notes to show objects ////////////
+  //////////  attach Notes to show objects ////////////
   for (const show of shows) {
     const nm = show?.Name;
-    const note = nm ? notesByShowName?.[nm] : '';
-    show.Notes = (note == null) ? '' : String(note);
+    const note = nm ? notesByShowName?.[nm] : "";
+    show.Notes = note == null ? "" : String(note);
   }
 
-//////////  process toTry collection  ////////////
-  const toTryRes = await axios.get(
-        urls.collectionListUrl(cred, toTryCollId));
+  //////////  process toTry collection  ////////////
+  const toTryRes = await axios.get(urls.collectionListUrl(cred, toTryCollId));
   const toTryIds = [];
-  for(let tryEntry of toTryRes.data.Items)
-       toTryIds.push(tryEntry.Id);
-  for(let show of shows) {
+  for (let tryEntry of toTryRes.data.Items) toTryIds.push(tryEntry.Id);
+  for (let show of shows) {
     // noemby shows are not in Emby collections; keep server-stored flags.
-    if (String(show?.Id || '').startsWith('noemby-')) continue;
+    if (String(show?.Id || "").startsWith("noemby-")) continue;
     show.InToTry = toTryIds.includes(show.Id);
   }
 
-//////////  process continue collection  ////////////
+  //////////  process continue collection  ////////////
   const continueRes = await axios.get(
-        urls.collectionListUrl(cred, continueCollId));
+    urls.collectionListUrl(cred, continueCollId),
+  );
   const continueIds = [];
-  for(let tryEntry of continueRes.data.Items)
-       continueIds.push(tryEntry.Id);
-  for(let show of shows) {
-    if (String(show?.Id || '').startsWith('noemby-')) continue;
+  for (let tryEntry of continueRes.data.Items) continueIds.push(tryEntry.Id);
+  for (let show of shows) {
+    if (String(show?.Id || "").startsWith("noemby-")) continue;
     show.InContinue = continueIds.includes(show.Id);
   }
 
-//////////  process mark collection  ////////////
-  const markRes = await axios.get(
-        urls.collectionListUrl(cred, markCollId));
+  //////////  process mark collection  ////////////
+  const markRes = await axios.get(urls.collectionListUrl(cred, markCollId));
   const markIds = [];
-  for(let tryEntry of markRes.data.Items)
-       markIds.push(tryEntry.Id);
-  for(let show of shows) {
-    if (String(show?.Id || '').startsWith('noemby-')) continue;
+  for (let tryEntry of markRes.data.Items) markIds.push(tryEntry.Id);
+  for (let show of shows) {
+    if (String(show?.Id || "").startsWith("noemby-")) continue;
     show.InMark = markIds.includes(show.Id);
   }
 
-//////////  process linda collection  ////////////
-  const lindaRes = await axios.get(
-        urls.collectionListUrl(cred, lindaCollId));
+  //////////  process linda collection  ////////////
+  const lindaRes = await axios.get(urls.collectionListUrl(cred, lindaCollId));
   const lindaIds = [];
-  for(let tryEntry of lindaRes.data.Items)
-       lindaIds.push(tryEntry.Id);
-  for(let show of shows) {
-    if (String(show?.Id || '').startsWith('noemby-')) continue;
+  for (let tryEntry of lindaRes.data.Items) lindaIds.push(tryEntry.Id);
+  for (let show of shows) {
+    if (String(show?.Id || "").startsWith("noemby-")) continue;
     show.InLinda = lindaIds.includes(show.Id);
   }
 
-//////////  process rejects for usb ////////////
+  //////////  process rejects for usb ////////////
   {
     const showsByNormName = new Map();
     for (const show of shows) {
@@ -409,21 +430,28 @@ export async function loadAllShows() {
 
     // Optional debug: add ?debugRejects=1 to the URL
     try {
-      const debugRejects = new URLSearchParams(window.location.search).has('debugRejects');
+      const debugRejects = new URLSearchParams(window.location.search).has(
+        "debugRejects",
+      );
       if (debugRejects) {
-        console.log('[rejects] loaded:', { total: rejects.length, matchedCount, unmatchedCount: unmatched.length });
-        if (unmatched.length) console.log('[rejects] unmatched names:', unmatched);
+        console.log("[rejects] loaded:", {
+          total: rejects.length,
+          matchedCount,
+          unmatchedCount: unmatched.length,
+        });
+        if (unmatched.length)
+          console.log("[rejects] unmatched names:", unmatched);
       }
     } catch {}
   }
 
-//////////  process pickups for usb ////////////
-  for(let pickupName of pickups) {
+  //////////  process pickups for usb ////////////
+  for (let pickupName of pickups) {
     const show = shows.find((show) => show.Name == pickupName);
-    if(show) show.Pickup = true;
+    if (show) show.Pickup = true;
   }
 
-//////////  set WaitStr (waiting indicator) ////////////
+  //////////  set WaitStr (waiting indicator) ////////////
   for (const show of shows) {
     try {
       const waitStr = await tvdb.getWaitStr(show);
@@ -433,9 +461,9 @@ export async function loadAllShows() {
     }
   }
 
-//////////  finished loadAllShows ////////////
+  //////////  finished loadAllShows ////////////
   const elapsed = new Date().getTime() - loadAllShowsStartTime;
-  console.log('all shows loaded, elapsed ms:', elapsed);
+  console.log("all shows loaded, elapsed ms:", elapsed);
   return shows;
 }
 
@@ -443,12 +471,12 @@ export async function loadAllShows() {
 
 export function startGapWorker(allShows, cb) {
   gapWorker.onerror = (err) => {
-    console.error('Worker:', err.message);
-  }
+    console.error("Worker:", err.message);
+  };
   const allShowsIdName = [];
-  for(let show of allShows) {
+  for (let show of allShows) {
     const id = show.Id;
-    if(id.startsWith('noemby-')) {
+    if (id.startsWith("noemby-")) {
       show.NotReady = true;
       continue;
     }
@@ -461,17 +489,17 @@ export function startGapWorker(allShows, cb) {
     });
   }
   gapWorker.onmessage = cb;
-  gapWorker.postMessage({cred, allShowsIdName});
+  gapWorker.postMessage({ cred, allShowsIdName });
 }
 
 export function startUpdateWorker(allShows, cb) {
   gapWorker.onerror = (err) => {
-    console.error('Worker:', err.message);
-  }
+    console.error("Worker:", err.message);
+  };
   const allShowsIdName = [];
-  for(let show of allShows) {
+  for (let show of allShows) {
     const id = show.Id;
-    if(id.startsWith('noemby-')) {
+    if (id.startsWith("noemby-")) {
       show.NotReady = true;
       continue;
     }
@@ -484,163 +512,164 @@ export function startUpdateWorker(allShows, cb) {
     });
   }
   gapWorker.onmessage = cb;
-  gapWorker.postMessage({cred, allShowsIdName});
+  gapWorker.postMessage({ cred, allShowsIdName });
 }
 
-const toTryCollId    = '1468316';
-const continueCollId = '4719143';
-const markCollId     = '4697672';
-const lindaCollId    = '4706186';
+const toTryCollId = "1468316";
+const continueCollId = "4719143";
+const markCollId = "4697672";
+const lindaCollId = "4706186";
 
 export async function deleteShowFromEmby(show) {
   try {
     const url = urls.deleteShowUrl(cred, show.Id);
     const delRes = await axios.delete(url, {
       headers: {
-        'X-Emby-Authorization': authHdr,
-        'X-Emby-Token': cred.token
-      }
+        "X-Emby-Authorization": authHdr,
+        "X-Emby-Token": cred.token,
+      },
     });
     const res = delRes.status;
-    if(res != 204) {
-      const err = 
-        `unable to delete ${show.Name} from emby: ${delRes.data}`;
+    if (res != 204) {
+      const err = `unable to delete ${show.Name} from emby: ${delRes.data}`;
       console.error(err);
       return;
     }
     console.log("deleted show from emby:", show.Name);
   } catch (error) {
-    const errData = error.response?.data || '';
-    if (errData.includes('Directory not empty')) {
+    const errData = error.response?.data || "";
+    if (errData.includes("Directory not empty")) {
       const msg = `Cannot delete "${show.Name}" - directory still has files. Delete files from disk first.`;
       console.error(msg);
       alert(msg);
     } else {
-      console.error('deleteShowFromEmby error:', error);
-      console.error('Response data:', errData);
+      console.error("deleteShowFromEmby error:", error);
+      console.error("Response data:", errData);
     }
     throw error;
   }
 }
 
 const deleteOneFile = async (path) => {
-  if(!path) return;
-  console.log('deleting file:', path);
+  if (!path) return;
+  console.log("deleting file:", path);
   try {
     await srvr.deletePath(path);
-  }
-  catch (e) {
-    console.error('deletePath:', path, e);
+  } catch (e) {
+    console.error("deletePath:", path, e);
     throw e;
   }
-}
+};
 
 // action from click on episode in map
-export const editEpisode = async (seriesId, 
-              seasonNumIn, episodeNumIn, delFile = false, setWatched = null) => {
+export const editEpisode = async (
+  seriesId,
+  seasonNumIn,
+  episodeNumIn,
+  delFile = false,
+  setWatched = null,
+) => {
   let lastWatchedRec = null;
 
   const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
-  for(let key in seasonsRes.data.Items) {
-    let   seasonRec    =  seasonsRes.data.Items[key];
+  for (let key in seasonsRes.data.Items) {
+    let seasonRec = seasonsRes.data.Items[key];
     const seasonNumber = +seasonRec.IndexNumber;
-    if(seasonNumber != seasonNumIn) continue;
+    if (seasonNumber != seasonNumIn) continue;
 
-    const seasonId    =  seasonRec.Id;
+    const seasonId = seasonRec.Id;
     const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
-    for(let key in episodesRes.data.Items) {
-      const episodeRec     = episodesRes.data.Items[key];
-      const episodeNumber  = +episodeRec.IndexNumber;
-      const userData       = episodeRec?.UserData;
-      const watched        = userData?.Played;
+    for (let key in episodesRes.data.Items) {
+      const episodeRec = episodesRes.data.Items[key];
+      const episodeNumber = +episodeRec.IndexNumber;
+      const userData = episodeRec?.UserData;
+      const watched = userData?.Played;
 
-      if(episodeNumber != episodeNumIn) {
-        if(watched) lastWatchedRec = episodeRec;
+      if (episodeNumber != episodeNumIn) {
+        if (watched) lastWatchedRec = episodeRec;
         continue;
       }
 
-      if(delFile) {
+      if (delFile) {
         const path = episodeRec?.MediaSources?.[0]?.Path;
-        try { await srvr.deletePath(path); }
-        catch(e) { 
-          console.error('deleteOneFile:', path, e);
+        try {
+          await srvr.deletePath(path);
+        } catch (e) {
+          console.error("deleteOneFile:", path, e);
           throw e;
-         }
+        }
       }
 
       const episodeId = episodeRec.Id;
       userData.Played = setWatched !== null ? setWatched : !watched;
-      if(!userData.LastPlayedDate)
-          userData.LastPlayedDate = util.fmtDate();
+      if (!userData.LastPlayedDate) userData.LastPlayedDate = util.fmtDate();
       const url = urls.postUserDataUrl(cred, episodeId);
       const setDataRes = await axios({
-        method: 'post',
-        url:     url,
-        data:    userData
+        method: "post",
+        url: url,
+        data: userData,
       });
       // console.log("toggled watched", {
-      //               episode: `S${seasonNumber}E${episodeNumber}`, 
+      //               episode: `S${seasonNumber}E${episodeNumber}`,
       //               post_url: url,
       //               post_res: setDataRes
       //             });
     }
   }
-}
+};
 
 // reset last Watched to first unwatched episode
 export const setLastWatched = async (seriesId) => {
   let seasonNumber;
   let lastWatchedEpisodeRec = null;
   const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
-seasonLoop: 
-  for(let key in seasonsRes.data.Items) {
-    let seasonRec      =  seasonsRes.data.Items[key];
-    seasonNumber       = +seasonRec.IndexNumber;
-    const seasonId     = +seasonRec.Id;
-    const episodesRes  = 
-            await axios.get(urls.childrenUrl(cred, seasonId));
-    for(let key in episodesRes.data.Items) {
+  seasonLoop: for (let key in seasonsRes.data.Items) {
+    let seasonRec = seasonsRes.data.Items[key];
+    seasonNumber = +seasonRec.IndexNumber;
+    const seasonId = +seasonRec.Id;
+    const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
+    for (let key in episodesRes.data.Items) {
       const episodeRec = episodesRes.data.Items[key];
-      const userData   = episodeRec?.UserData;
-      const watched    = userData?.Played;
-      if(watched) lastWatchedEpisodeRec = episodeRec;
-      else 
-        if(lastWatchedEpisodeRec) break seasonLoop;
+      const userData = episodeRec?.UserData;
+      const watched = userData?.Played;
+      if (watched) lastWatchedEpisodeRec = episodeRec;
+      else if (lastWatchedEpisodeRec) break seasonLoop;
     }
   }
-  if(lastWatchedEpisodeRec) {
-    console.log({lastWatchedEpisodeRec});
-    const episodeId     =  lastWatchedEpisodeRec.Id;
+  if (lastWatchedEpisodeRec) {
+    console.log({ lastWatchedEpisodeRec });
+    const episodeId = lastWatchedEpisodeRec.Id;
     const episodeNumber = +lastWatchedEpisodeRec.IndexNumber;
-    const userData      =  lastWatchedEpisodeRec?.UserData;
+    const userData = lastWatchedEpisodeRec?.UserData;
 
     userData.LastPlayedDate = util.fmtDate();
     const url = urls.postUserDataUrl(cred, episodeId);
     const setDateRes = await axios({
-      method: 'post',
-      url:     url,
-      data:    userData
+      method: "post",
+      url: url,
+      data: userData,
     });
     console.log("set lastPlayedDate", {
-                  seasonNumber, episodeNumber,
-                  post_res: setDateRes});
+      seasonNumber,
+      episodeNumber,
+      post_res: setDateRes,
+    });
   }
-}
+};
 
 export const getEpisodeCounts = async (show) => {
   const showId = show.Id;
-  let seasonCount  = 0;
+  let seasonCount = 0;
   let episodeCount = 0;
   let watchedCount = 0;
-  if(show.Id.startsWith('noemby-')) 
-    return {seasonCount, episodeCount, watchedCount};
+  if (show.Id.startsWith("noemby-"))
+    return { seasonCount, episodeCount, watchedCount };
   try {
-    const seasonsRes = 
-          await axios.get(urls.childrenUrl(cred, showId));
+    const seasonsRes = await axios.get(urls.childrenUrl(cred, showId));
     let skippedEpisodeCount = 0;
     const skippedEpisodes = [];
-    for(let key in seasonsRes.data.Items) {
-      const seasonRec   =  seasonsRes.data.Items[key];
+    for (let key in seasonsRes.data.Items) {
+      const seasonRec = seasonsRes.data.Items[key];
       const seasonNumber = Number(seasonRec?.IndexNumber);
 
       // Ignore non-numbered / special seasons for aggregate counts (matches map behavior).
@@ -649,10 +678,9 @@ export const getEpisodeCounts = async (show) => {
       }
 
       seasonCount++;
-      const seasonId    =  seasonRec.Id;
-      const episodesRes = 
-              await axios.get(urls.childrenUrl(cred, seasonId));
-      for(let key in episodesRes.data.Items) {
+      const seasonId = seasonRec.Id;
+      const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
+      for (let key in episodesRes.data.Items) {
         const episodeRec = episodesRes.data.Items[key];
         const episodeNumber = Number(episodeRec?.IndexNumber);
 
@@ -666,125 +694,125 @@ export const getEpisodeCounts = async (show) => {
               seasonNumber,
               indexNumber: episodeRec?.IndexNumber,
               name: episodeRec?.Name,
-              path: episodeRec?.Path
+              path: episodeRec?.Path,
             });
           }
           continue;
         }
 
         episodeCount++;
-        const userData   = episodeRec?.UserData;
-        if(userData?.Played) watchedCount++;
+        const userData = episodeRec?.UserData;
+        if (userData?.Played) watchedCount++;
       }
     }
 
     // Intentionally no logging here; we just skip malformed items.
+  } catch (e) {
+    console.error("getEpisodeCounts error:", e);
+    return { seasonCount: 0, episodeCount: 0, watchedCount: 0 };
   }
-  catch(e) { 
-    console.error('getEpisodeCounts error:', e);
-    return {seasonCount:0, episodeCount:0, watchedCount:0};
-  }
-  return {seasonCount, episodeCount, watchedCount};
-}
+  return { seasonCount, episodeCount, watchedCount };
+};
 
-export const getSeriesMap = async (show, prune = false) => { 
-  const seriesId  = show.Id;
-  
+export const getSeriesMap = async (show, prune = false) => {
+  const seriesId = show.Id;
+
   // If this is a noemby show (from web search), return empty map
-  if (seriesId.startsWith('noemby-')) {
+  if (seriesId.startsWith("noemby-")) {
     return [];
   }
-  
+
   const seriesMap = [];
   let pruning = prune;
-  const seasonsRes = 
-        await axios.get(urls.childrenUrl(cred, seriesId));
-  for(let key in seasonsRes.data.Items) {
-    let   seasonRec    =  seasonsRes.data.Items[key];
-    let   seasonId     =  seasonRec.Id;
+  const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
+  for (let key in seasonsRes.data.Items) {
+    let seasonRec = seasonsRes.data.Items[key];
+    let seasonId = seasonRec.Id;
     const seasonNumber = +seasonRec.IndexNumber;
-    const unairedObj   = {};
-    const unairedRes = 
-          await axios.get(urls.childrenUrl(cred, seasonId, true));
-    for(let key in unairedRes.data.Items) {
-      const episodeRec    = unairedRes.data.Items[key];
+    const unairedObj = {};
+    const unairedRes = await axios.get(urls.childrenUrl(cred, seasonId, true));
+    for (let key in unairedRes.data.Items) {
+      const episodeRec = unairedRes.data.Items[key];
       const episodeNumber = +episodeRec.IndexNumber;
       unairedObj[episodeNumber] = true;
     }
-    const episodes    = [];
-    const episodesRes = 
-          await axios.get(urls.childrenUrl(cred, seasonId));
-    for(let key in episodesRes.data.Items) {
-      let   episodeRec    =  episodesRes.data.Items[key];
+    const episodes = [];
+    const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
+    for (let key in episodesRes.data.Items) {
+      let episodeRec = episodesRes.data.Items[key];
       const episodeNumber = +episodeRec.IndexNumber;
-      if(episodeNumber === undefined) continue;
+      if (episodeNumber === undefined) continue;
 
-      const path    =  episodeRec?.MediaSources?.[0]?.Path;
-      const played  = !!episodeRec?.UserData?.Played;
-      const avail   =   episodeRec?.LocationType != "Virtual";
+      const path = episodeRec?.MediaSources?.[0]?.Path;
+      const played = !!episodeRec?.UserData?.Played;
+      const avail = episodeRec?.LocationType != "Virtual";
       const unaired = !!unairedObj[episodeNumber];
 
-      if(avail && !path) {
-        console.error('avail without path', 
-                 `S${seasonNumber}E${episodeNumber}`);
+      if (avail && !path) {
+        console.error(
+          "avail without path",
+          `S${seasonNumber}E${episodeNumber}`,
+        );
         continue;
       }
 
       let deleted = false;
-      if(pruning) {
-        if(!played && avail) pruning = false;
+      if (pruning) {
+        if (!played && avail) pruning = false;
         else {
           await deleteOneFile(path);
-          deleted = avail;     // set even if error
+          deleted = avail; // set even if error
         }
       }
 
-      const error = 
-          (seasonNumber  == show.WatchGapSeason  &&
-           episodeNumber == show.WatchGapEpisode &&
-                            show.WatchGap) ||
-          (seasonNumber  == show.FileGapSeason  &&
-           episodeNumber == show.FileGapEpisode &&
-              show.FileGap);
+      const error =
+        (seasonNumber == show.WatchGapSeason &&
+          episodeNumber == show.WatchGapEpisode &&
+          show.WatchGap) ||
+        (seasonNumber == show.FileGapSeason &&
+          episodeNumber == show.FileGapEpisode &&
+          show.FileGap);
 
-      const noFileVal = !path;  // noFile is true when there's no path
-      if (show.Name === 'Pluribus' && unaired) {
-        console.log(`Pluribus S${seasonNumber}E${episodeNumber}: path=${path}, unaired=${unaired}, noFile=${noFileVal}, played=${played}, avail=${avail}`);
+      const noFileVal = !path; // noFile is true when there's no path
+      if (show.Name === "Pluribus" && unaired) {
+        console.log(
+          `Pluribus S${seasonNumber}E${episodeNumber}: path=${path}, unaired=${unaired}, noFile=${noFileVal}, played=${played}, avail=${avail}`,
+        );
       }
 
-      episodes.push([episodeNumber, 
-          {error, played, avail, noFile: noFileVal, 
-            unaired, deleted, path}]); 
+      episodes.push([
+        episodeNumber,
+        { error, played, avail, noFile: noFileVal, unaired, deleted, path },
+      ]);
     }
     seriesMap.push([seasonNumber, episodes]);
   }
   return seriesMap;
-}
+};
 
 export async function saveFav(id, fav) {
   const config = {
-    method: (fav ? 'post' : 'delete'),
-    url:     urls.favoriteUrl(cred, id),
+    method: fav ? "post" : "delete",
+    url: urls.favoriteUrl(cred, id),
   };
   let favRes = await axios(config);
-  if(favRes.status != 200) 
-      throw new Error('unable to save favorite');
+  if (favRes.status != 200) throw new Error("unable to save favorite");
 }
 
 export async function saveToTry(id, inToTry) {
   const config = {
-    method: (inToTry ? 'post' : 'delete'),
-    url:     urls.collectionUrl(cred, id, toTryCollId),
+    method: inToTry ? "post" : "delete",
+    url: urls.collectionUrl(cred, id, toTryCollId),
   };
   let toTryRes;
-  try { toTryRes = await axios(config); }
-  catch (e) {  
-    console.error(
-        `saveToTry, id:${id}, inToTry:${inToTry}`);
-    throw e; 
-  } 
-  if(toTryRes.status !== 204) {
-    const err = 'unable to save totry' + toTryRes.data;
+  try {
+    toTryRes = await axios(config);
+  } catch (e) {
+    console.error(`saveToTry, id:${id}, inToTry:${inToTry}`);
+    throw e;
+  }
+  if (toTryRes.status !== 204) {
+    const err = "unable to save totry" + toTryRes.data;
     console.error(err);
     throw new Error(err);
   }
@@ -792,18 +820,18 @@ export async function saveToTry(id, inToTry) {
 
 export async function saveContinue(id, inContinue) {
   const config = {
-    method: (inContinue ? 'post' : 'delete'),
-    url:     urls.collectionUrl(cred, id, continueCollId),
+    method: inContinue ? "post" : "delete",
+    url: urls.collectionUrl(cred, id, continueCollId),
   };
   let continueRes;
-  try { continueRes = await axios(config); }
-  catch (e) {  
-    console.error(
-        `saveContinue, id:${id}, inContinue:${inContinue}`);
-    throw e; 
-  } 
-  if(continueRes.status !== 204) {
-    const err = 'unable to save Continue' + continueRes.data;
+  try {
+    continueRes = await axios(config);
+  } catch (e) {
+    console.error(`saveContinue, id:${id}, inContinue:${inContinue}`);
+    throw e;
+  }
+  if (continueRes.status !== 204) {
+    const err = "unable to save Continue" + continueRes.data;
     console.error(err);
     throw new Error(err);
   }
@@ -811,18 +839,18 @@ export async function saveContinue(id, inContinue) {
 
 export async function saveMark(id, inMark) {
   const config = {
-    method: (inMark ? 'post' : 'delete'),
-    url:     urls.collectionUrl(cred, id, markCollId),
+    method: inMark ? "post" : "delete",
+    url: urls.collectionUrl(cred, id, markCollId),
   };
   let markRes;
-  try { markRes = await axios(config); }
-  catch (e) {  
-    console.error(
-        `saveMark, id:${id}, inMark:${inMark}`);
-    throw e; 
-  } 
-  if(markRes.status !== 204) {
-    const err = 'unable to save Mark ' + markRes.data;
+  try {
+    markRes = await axios(config);
+  } catch (e) {
+    console.error(`saveMark, id:${id}, inMark:${inMark}`);
+    throw e;
+  }
+  if (markRes.status !== 204) {
+    const err = "unable to save Mark " + markRes.data;
     console.error(err);
     throw new Error(err);
   }
@@ -830,18 +858,18 @@ export async function saveMark(id, inMark) {
 
 export async function saveLinda(id, inLinda) {
   const config = {
-    method: (inLinda ? 'post' : 'delete'),
-    url:     urls.collectionUrl(cred, id, lindaCollId),
+    method: inLinda ? "post" : "delete",
+    url: urls.collectionUrl(cred, id, lindaCollId),
   };
   let lindaRes;
-  try { lindaRes = await axios(config); }
-  catch (e) {  
-    console.error(
-        `saveLinda, id:${id}, inLinda:${inLinda}`);
-    throw e; 
-  } 
-  if(lindaRes.status !== 204) {
-    const err = 'unable to save Linda' + lindaRes.data;
+  try {
+    lindaRes = await axios(config);
+  } catch (e) {
+    console.error(`saveLinda, id:${id}, inLinda:${inLinda}`);
+    throw e;
+  }
+  if (lindaRes.status !== 204) {
+    const err = "unable to save Linda" + lindaRes.data;
     console.error(err);
     throw new Error(err);
   }
@@ -851,7 +879,7 @@ export const createNoemby = async (show) => {
   const dateStr = util.fmtDate();
   Object.assign(show, {
     Id: "noemby-" + Math.random(),
-    DateCreated: dateStr, 
+    DateCreated: dateStr,
     Date: dateStr,
     NotReady: true,
     Seasons: [],
@@ -859,116 +887,116 @@ export const createNoemby = async (show) => {
   });
   await srvr.addNoEmby(show);
   return show;
-}
+};
 
 export const deleteNoemby = async (name) => {
-  console.log('deleteNoemby:', name);
+  console.log("deleteNoemby:", name);
   await srvr.delNoEmby(name);
-}
+};
 
 export const startStop = async (show, episodeId, watchButtonTxt) => {
-  console.log('startStop:', show, episodeId, watchButtonTxt);
+  console.log("startStop:", show, episodeId, watchButtonTxt);
   const devices = await srvr.getDevices();
-  for(const device of devices) {
-    const {deviceName, sessionId} = device;
-    if(watchButtonTxt.startsWith('Stop')) {
-      const buttonDeviceName = watchButtonTxt.split(' ')[1];
-      if(buttonDeviceName != deviceName) continue;
-      const {url, body} = urls.stopUrl(sessionId);
-      await axios({method: 'post', url, data: body});
+  for (const device of devices) {
+    const { deviceName, sessionId } = device;
+    if (watchButtonTxt.startsWith("Stop")) {
+      const buttonDeviceName = watchButtonTxt.split(" ")[1];
+      if (buttonDeviceName != deviceName) continue;
+      const { url, body } = urls.stopUrl(sessionId);
+      await axios({ method: "post", url, data: body });
       console.log(`stopped1 ${deviceName}`);
       setTimeout(async () => {
-        await axios({method: 'post', url, data: body});
+        await axios({ method: "post", url, data: body });
         console.log(`stopped2 ${deviceName}`);
       }, 1000);
       return;
-    }
-    else {
-      const buttonDeviceName = watchButtonTxt.split(' ')[2];
-      if(buttonDeviceName != deviceName) continue;
-      const {url, body} = urls.playUrl(sessionId, episodeId);
-      await axios({method: 'post', url, data: body});
+    } else {
+      const buttonDeviceName = watchButtonTxt.split(" ")[2];
+      if (buttonDeviceName != deviceName) continue;
+      const { url, body } = urls.playUrl(sessionId, episodeId);
+      await axios({ method: "post", url, data: body });
       console.log(`playing1 ${show.Name} on  ${deviceName}`);
       setTimeout(async () => {
-        await axios({method: 'post', url, data: body});
+        await axios({ method: "post", url, data: body });
         console.log(`playing2 ${show.Name} on  ${deviceName}`);
       }, 1000);
       return;
     }
   }
-}
+};
 
 export const afterLastWatched = async (showId) => {
-  if(showId.startsWith('noemby-')) 
-    return {status: 'noemby'};
-  const seasonsRes = 
-        await axios.get(urls.childrenUrl(cred, showId));
+  if (showId.startsWith("noemby-")) return { status: "noemby" };
+  const seasonsRes = await axios.get(urls.childrenUrl(cred, showId));
   const seasonItems = seasonsRes.data.Items;
-  for(let key in seasonItems) {
-    let   seasonRec    = seasonItems[key];
+  for (let key in seasonItems) {
+    let seasonRec = seasonItems[key];
     const seasonNumber = Number(seasonRec.IndexNumber);
 
     // Skip non-numbered / special seasons.
     if (!Number.isFinite(seasonNumber) || seasonNumber <= 0) continue;
-    const seasonId     = seasonRec.Id;
+    const seasonId = seasonRec.Id;
     const unairedObj = {};
-    const unairedRes = await axios.get(
-              urls.childrenUrl(cred, seasonId, true));
-    for(let key in unairedRes.data.Items) {
-      const episode       = unairedRes.data.Items[key];
+    const unairedRes = await axios.get(urls.childrenUrl(cred, seasonId, true));
+    for (let key in unairedRes.data.Items) {
+      const episode = unairedRes.data.Items[key];
       const episodeNumber = Number(episode.IndexNumber);
       if (!Number.isFinite(episodeNumber) || episodeNumber <= 0) continue;
       unairedObj[episodeNumber] = true;
     }
-    const episodesRes  = 
-           await axios.get(urls.childrenUrl(cred, seasonId));
+    const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
     const episodeItems = episodesRes.data.Items;
-    for(let key in episodeItems) {
+    for (let key in episodeItems) {
       const episodeRec = episodeItems[key];
-      const userData   = episodeRec.UserData;
-      const watched    = userData.Played;
-      if(watched) continue;
+      const userData = episodeRec.UserData;
+      const watched = userData.Played;
+      if (watched) continue;
 
       // Ignore "episode" items without a numeric index (e.g. S04.EXTRA...)
       const episodeNumber = Number(episodeRec.IndexNumber);
       if (!Number.isFinite(episodeNumber) || episodeNumber <= 0) continue;
-      const episodeId     = episodeRec.Id;
-      const haveFile      = (episodeRec.LocationType != "Virtual");
-      const unaired       = !!unairedObj[episodeNumber];
-      return {seasonNumber, episodeNumber, episodeId, 
-              status: unaired ? 'unaired' :
-                    (haveFile ? 'ok' : 'missing')};
+      const episodeId = episodeRec.Id;
+      const haveFile = episodeRec.LocationType != "Virtual";
+      const unaired = !!unairedObj[episodeNumber];
+      return {
+        seasonNumber,
+        episodeNumber,
+        episodeId,
+        status: unaired ? "unaired" : haveFile ? "ok" : "missing",
+      };
     }
   }
-  return {status: 'allWatched'};
-}
+  return { status: "allWatched" };
+};
 
 export const refreshLib = async () => {
   try {
     await axios({
-      method: 'post',
-      url: `https://hahnca.com:8920/emby/Library/Refresh?api_key=${apiKey}`
+      method: "post",
+      url: `https://hahnca.com:8920/emby/Library/Refresh?api_key=${apiKey}`,
     });
 
     const tasksRes = await axios({
-      method: 'get',
-      url: `https://hahnca.com:8920/emby/ScheduledTasks?api_key=${apiKey}`
+      method: "get",
+      url: `https://hahnca.com:8920/emby/ScheduledTasks?api_key=${apiKey}`,
     });
 
     const tasks = Array.isArray(tasksRes?.data) ? tasksRes.data : [];
     const isLibraryRefreshTask = (t) => {
-      const n = String(t?.Name || '').toLowerCase();
+      const n = String(t?.Name || "").toLowerCase();
       // Emby task names vary a bit across versions/translations.
       // Keep this intentionally broad but scoped to "library" + (scan|refresh).
-      if (!n.includes('library')) return false;
-      if (n.includes('scan') || n.includes('refresh')) return true;
+      if (!n.includes("library")) return false;
+      if (n.includes("scan") || n.includes("refresh")) return true;
       // Common variants seen in some builds.
-      return /scan\s+media\s+library|refresh\s+media\s+library|scan\s+library|refresh\s+library/.test(n);
+      return /scan\s+media\s+library|refresh\s+media\s+library|scan\s+library|refresh\s+library/.test(
+        n,
+      );
     };
 
     const task = tasks.find(isLibraryRefreshTask);
-    if (!task?.Id) return { status: 'notask' };
-    return { status: 'hasTask', taskId: task.Id };
+    if (!task?.Id) return { status: "notask" };
+    return { status: "hasTask", taskId: task.Id };
   } catch (e) {
     return { status: e?.message || String(e) };
   }
@@ -983,12 +1011,16 @@ export const createShowFolderAndRefreshEmby = async ({
   createTimeoutMs = 15000,
   refreshTimeoutMs = 120000,
 } = {}) => {
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+  const sleep = (ms) =>
+    new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
   const withTimeout = async (promise, ms, label) => {
     const timeoutMs = Math.max(0, Number(ms) || 0);
     let t;
     const timeout = new Promise((_, reject) => {
-      t = setTimeout(() => reject(new Error(`timeout waiting for ${label}`)), timeoutMs);
+      t = setTimeout(
+        () => reject(new Error(`timeout waiting for ${label}`)),
+        timeoutMs,
+      );
     });
     try {
       return await Promise.race([promise, timeout]);
@@ -997,9 +1029,12 @@ export const createShowFolderAndRefreshEmby = async ({
     }
   };
 
-  const nameStr = String(showName || '').trim();
-  const tvdbIdStr = String(tvdbId || '').trim();
-  const hasTvdbData = !!tvdbData && typeof tvdbData === 'object' && Object.keys(tvdbData).length > 0;
+  const nameStr = String(showName || "").trim();
+  const tvdbIdStr = String(tvdbId || "").trim();
+  const hasTvdbData =
+    !!tvdbData &&
+    typeof tvdbData === "object" &&
+    Object.keys(tvdbData).length > 0;
   const seasons = Array.isArray(seriesMapSeasons)
     ? seriesMapSeasons
         .map((n) => Number(n))
@@ -1007,72 +1042,88 @@ export const createShowFolderAndRefreshEmby = async ({
         .sort((a, b) => a - b)
     : [];
 
-  if (!nameStr) return { createdFolder: false, status: 'badargs', err: 'missing showName' };
-  if (!tvdbIdStr) return { createdFolder: false, status: 'badargs', err: 'missing tvdbId' };
-  if (!hasTvdbData) return { createdFolder: false, status: 'badargs', err: 'missing tvdbData' };
+  if (!nameStr)
+    return { createdFolder: false, status: "badargs", err: "missing showName" };
+  if (!tvdbIdStr)
+    return { createdFolder: false, status: "badargs", err: "missing tvdbId" };
+  if (!hasTvdbData)
+    return { createdFolder: false, status: "badargs", err: "missing tvdbData" };
 
   let createdFolder = false;
 
   try {
-    if (typeof onStatus === 'function') onStatus('Creating folder...');
+    if (typeof onStatus === "function") onStatus("Creating folder...");
     await withTimeout(
-      srvr.createShowFolder({ showName: nameStr, tvdbId: tvdbIdStr, seriesMapSeasons: seasons, tvdbData }),
+      srvr.createShowFolder({
+        showName: nameStr,
+        tvdbId: tvdbIdStr,
+        seriesMapSeasons: seasons,
+        tvdbData,
+      }),
       createTimeoutMs,
-      'createShowFolder'
+      "createShowFolder",
     );
     createdFolder = true;
   } catch (e) {
-    return { createdFolder: false, status: 'createfailed', err: e?.message || String(e) };
+    return {
+      createdFolder: false,
+      status: "createfailed",
+      err: e?.message || String(e),
+    };
   }
 
   // Refresh Emby so the new folder gets scanned. Ignore refresh errors, but report them.
   let refreshRes = null;
   try {
-    if (typeof onStatus === 'function') onStatus('Refreshing Emby...');
+    if (typeof onStatus === "function") onStatus("Refreshing Emby...");
     refreshRes = await refreshLib();
-    if (refreshRes?.status === 'hasTask' && refreshRes?.taskId) {
+    if (refreshRes?.status === "hasTask" && refreshRes?.taskId) {
       const startMs = Date.now();
       while (Date.now() - startMs < refreshTimeoutMs) {
-        const st = await withTimeout(taskStatus(refreshRes.taskId), 15000, 'emby task status');
-        if (st?.status !== 'refreshing') break;
+        const st = await withTimeout(
+          taskStatus(refreshRes.taskId),
+          15000,
+          "emby task status",
+        );
+        if (st?.status !== "refreshing") break;
         await sleep(2000);
       }
     }
   } catch (e) {
     return {
       createdFolder: true,
-      status: 'refreshfailed',
+      status: "refreshfailed",
       err: e?.message || String(e),
       refreshRes,
     };
   }
 
-  return { createdFolder: true, status: 'ok', refreshRes };
+  return { createdFolder: true, status: "ok", refreshRes };
 };
 
 export const taskStatus = async (taskId) => {
   try {
     const tasksRes = await axios({
-      method: 'get',
-      url: `https://hahnca.com:8920/emby/ScheduledTasks?api_key=${apiKey}`
+      method: "get",
+      url: `https://hahnca.com:8920/emby/ScheduledTasks?api_key=${apiKey}`,
     });
 
     const tasks = Array.isArray(tasksRes?.data) ? tasksRes.data : [];
     const task = tasks.find((t) => String(t?.Id) === String(taskId));
-    if (!task) return { status: 'refreshdone' };
+    if (!task) return { status: "refreshdone" };
 
-    const stateRaw = String(task?.State || task?.Status || '').trim();
+    const stateRaw = String(task?.State || task?.Status || "").trim();
     const state = stateRaw.toLowerCase();
     const progressNum = Number(task?.CurrentProgressPercentage);
     const hasProgress = Number.isFinite(progressNum);
 
-    if (hasProgress && progressNum >= 100) return { status: 'refreshdone' };
-    if (state && state !== 'running') return { status: 'refreshdone' };
+    if (hasProgress && progressNum >= 100) return { status: "refreshdone" };
+    if (state && state !== "running") return { status: "refreshdone" };
 
     return {
-      status: 'refreshing',
+      status: "refreshing",
       taskStatus: stateRaw,
-      progress: hasProgress ? progressNum : undefined
+      progress: hasProgress ? progressNum : undefined,
     };
   } catch (e) {
     return { status: e?.message || String(e) };

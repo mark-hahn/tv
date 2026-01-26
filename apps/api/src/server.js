@@ -1,28 +1,34 @@
-import express from 'express';
-import https from 'https';
-import fs from 'fs';
-import path from 'node:path';
-import process from 'node:process';
-import { fileURLToPath } from 'node:url';
-import parseTorrent from 'parse-torrent';
-import * as search from './search.js';
-import * as download from './download.js';
-import './tvmaze.js';
-import { tvdbProxyGet } from './tvdb-proxy.js';
-import { getQbtInfo, delQbtTorrent, spaceAvail, flexgetHistory, addQbtTorrent } from './usb.js';
-import { startReel, getReel } from './reelgood.js';
-import * as reviews from './reviews.js';
-import { checkFiles as tvProcCheckFiles } from './tv-proc.js';
+import express from "express";
+import https from "https";
+import fs from "fs";
+import path from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
+import parseTorrent from "parse-torrent";
+import * as search from "./search.js";
+import * as download from "./download.js";
+import "./tvmaze.js";
+import { tvdbProxyGet } from "./tvdb-proxy.js";
+import {
+  getQbtInfo,
+  delQbtTorrent,
+  spaceAvail,
+  flexgetHistory,
+  addQbtTorrent,
+} from "./usb.js";
+import { startReel, getReel } from "./reelgood.js";
+import * as reviews from "./reviews.js";
+import { checkFiles as tvProcCheckFiles } from "./tv-proc.js";
 import {
   getApiCookiesDir,
   getApiMiscDir,
   getApiSecretsDir,
   getSecretsDir,
   preferSharedReadPath,
-} from './tvPaths.js';
+} from "./tvPaths.js";
 
-const MISTRAL_CHAT_URL = 'https://api.mistral.ai/v1/chat/completions';
-const MISTRAL_DEFAULT_MODEL = 'mistral-large-latest';
+const MISTRAL_CHAT_URL = "https://api.mistral.ai/v1/chat/completions";
+const MISTRAL_DEFAULT_MODEL = "mistral-large-latest";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,21 +41,23 @@ function formatPstTimestamp(date = new Date()) {
   const offsetHours = isDST ? -7 : -8;
   const pstTime = new Date(now.getTime() + offsetHours * 60 * 60 * 1000);
 
-  const mm = String(pstTime.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(pstTime.getUTCDate()).padStart(2, '0');
-  const hh = String(pstTime.getUTCHours()).padStart(2, '0');
-  const min = String(pstTime.getUTCMinutes()).padStart(2, '0');
-  const ss = String(pstTime.getUTCSeconds()).padStart(2, '0');
+  const mm = String(pstTime.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(pstTime.getUTCDate()).padStart(2, "0");
+  const hh = String(pstTime.getUTCHours()).padStart(2, "0");
+  const min = String(pstTime.getUTCMinutes()).padStart(2, "0");
+  const ss = String(pstTime.getUTCSeconds()).padStart(2, "0");
   return `${mm}-${dd} ${hh}:${min}:${ss}`;
 }
 
 function appendCallsLog({ endpoint, method, ok, result, error }) {
   try {
-    const outPath = path.join(getApiMiscDir(), 'calls.log');
-    
+    const outPath = path.join(getApiMiscDir(), "calls.log");
+
     const asArray = Array.isArray(result)
       ? result.map(String)
-      : (result && typeof result === 'object' && Array.isArray(result.existingTitles))
+      : result &&
+          typeof result === "object" &&
+          Array.isArray(result.existingTitles)
         ? result.existingTitles.map(String)
         : [];
     const last5 = asArray.length > 5 ? asArray.slice(-5) : asArray;
@@ -60,19 +68,32 @@ function appendCallsLog({ endpoint, method, ok, result, error }) {
       ok: Boolean(ok),
       last5,
       count: Array.isArray(result) ? result.length : null,
-      error: error ? { message: error?.message || String(error), stack: error?.stack || null } : null,
+      error: error
+        ? {
+            message: error?.message || String(error),
+            stack: error?.stack || null,
+          }
+        : null,
     };
     const txt = `==========\n${JSON.stringify(payload, null, 2)}\n`;
-    fs.appendFileSync(outPath, txt, 'utf8');
+    fs.appendFileSync(outPath, txt, "utf8");
   } catch {
     // ignore logging failures
   }
 }
 
-function appendReviewCallsLog({ endpoint, method, event, ok, args, result, error }) {
+function appendReviewCallsLog({
+  endpoint,
+  method,
+  event,
+  ok,
+  args,
+  result,
+  error,
+}) {
   try {
-    const outPath = path.join(getApiMiscDir(), 'review-calls.log');
-    
+    const outPath = path.join(getApiMiscDir(), "review-calls.log");
+
     const dir = path.dirname(outPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -82,12 +103,12 @@ function appendReviewCallsLog({ endpoint, method, event, ok, args, result, error
     if (Array.isArray(result)) {
       logResult = {
         count: result.length,
-        reviews: result.slice(0, 2)
+        reviews: result.slice(0, 2),
       };
     } else if (result && Array.isArray(result.reviews)) {
       logResult = {
         ...result,
-        reviews: result.reviews.slice(0, 2)
+        reviews: result.reviews.slice(0, 2),
       };
     }
 
@@ -96,45 +117,56 @@ function appendReviewCallsLog({ endpoint, method, event, ok, args, result, error
       endpoint,
       method,
       event,
-      ok: event === 'START' ? undefined : Boolean(ok),
+      ok: event === "START" ? undefined : Boolean(ok),
       args,
       result: logResult,
-      error: error ? { message: error?.message || String(error), stack: error?.stack || null } : null,
+      error: error
+        ? {
+            message: error?.message || String(error),
+            stack: error?.stack || null,
+          }
+        : null,
     };
     const txt = `==========\n${JSON.stringify(payload, null, 2)}\n`;
-    fs.appendFileSync(outPath, txt, 'utf8');
+    fs.appendFileSync(outPath, txt, "utf8");
   } catch (err) {
-    console.error('Review logging failed', err);
+    console.error("Review logging failed", err);
   }
 }
 
 function appendDownloadsRequestLog(reqBody) {
   try {
-    const outPath = path.join(getApiMiscDir(), 'temp.txt');
-    const body = reqBody && typeof reqBody === 'object' ? reqBody : {};
+    const outPath = path.join(getApiMiscDir(), "temp.txt");
+    const body = reqBody && typeof reqBody === "object" ? reqBody : {};
 
     const hasTl = body.tl != null;
     const tlBody = hasTl ? body.tl : null;
     const torrent = hasTl
-      ? (tlBody && typeof tlBody === 'object' && 'torrent' in tlBody ? tlBody.torrent : tlBody)
+      ? tlBody && typeof tlBody === "object" && "torrent" in tlBody
+        ? tlBody.torrent
+        : tlBody
       : body.torrent;
 
-    const torrentObj = torrent && typeof torrent === 'object' ? torrent : null;
-    const raw = torrentObj && typeof torrentObj.raw === 'object' ? torrentObj.raw : null;
+    const torrentObj = torrent && typeof torrent === "object" ? torrent : null;
+    const raw =
+      torrentObj && typeof torrentObj.raw === "object" ? torrentObj.raw : null;
 
     const safeStr = (v, max = 240) => {
-      const s = v == null ? '' : String(v);
+      const s = v == null ? "" : String(v);
       if (s.length <= max) return s;
       return s.slice(0, max) + `…(+${s.length - max})`;
     };
 
     const payload = {
       ts: new Date().toISOString(),
-      endpoint: '/downloads',
+      endpoint: "/downloads",
       hasTl,
       forceDownload: body.forceDownload === true,
       topKeys: Object.keys(body || {}).slice(0, 50),
-      tlKeys: tlBody && typeof tlBody === 'object' ? Object.keys(tlBody).slice(0, 50) : null,
+      tlKeys:
+        tlBody && typeof tlBody === "object"
+          ? Object.keys(tlBody).slice(0, 50)
+          : null,
       torrentKeys: torrentObj ? Object.keys(torrentObj).slice(0, 50) : null,
       torrent: torrentObj
         ? {
@@ -142,29 +174,31 @@ function appendDownloadsRequestLog(reqBody) {
             rawYear: raw?.year ?? undefined,
             id: raw?.id ?? torrentObj?.id ?? undefined,
             fid: raw?.fid ?? undefined,
-            title: safeStr(raw?.title ?? torrentObj?.title ?? torrentObj?.clientTitle ?? ''),
-            filename: safeStr(raw?.filename ?? ''),
-            detailUrl: safeStr(torrentObj?.detailUrl ?? ''),
+            title: safeStr(
+              raw?.title ?? torrentObj?.title ?? torrentObj?.clientTitle ?? "",
+            ),
+            filename: safeStr(raw?.filename ?? ""),
+            detailUrl: safeStr(torrentObj?.detailUrl ?? ""),
             rawKeys: raw ? Object.keys(raw).slice(0, 50) : null,
           }
         : null,
     };
 
-    fs.appendFileSync(outPath, JSON.stringify(payload) + '\n', 'utf8');
+    fs.appendFileSync(outPath, JSON.stringify(payload) + "\n", "utf8");
   } catch {
     // ignore logging failures
   }
 }
 
 function tvEntryHasError(entry) {
-  if (!entry || typeof entry !== 'object') return false;
-  if (!('error' in entry)) return false;
+  if (!entry || typeof entry !== "object") return false;
+  if (!("error" in entry)) return false;
   const v = entry.error;
   if (v === null || v === undefined) return false;
-  if (typeof v === 'number') return v !== 0;
-  if (typeof v === 'string') {
+  if (typeof v === "number") return v !== 0;
+  if (typeof v === "string") {
     const s = v.trim();
-    return Boolean(s) && s !== '0';
+    return Boolean(s) && s !== "0";
   }
   return v !== 0 && v !== false;
 }
@@ -175,7 +209,7 @@ function tvEntriesErrorTitles(tvEntries) {
 }
 
 function extractYearFromString(s) {
-  const text = String(s || '');
+  const text = String(s || "");
   const m = text.match(/\b(19\d{2}|20\d{2})\b/);
   if (!m) return null;
   const n = Number(m[1]);
@@ -184,7 +218,7 @@ function extractYearFromString(s) {
   return n;
 }
 
-console.error('[tv-api] module loaded', {
+console.error("[tv-api] module loaded", {
   ts: new Date().toISOString(),
   cwd: process.cwd(),
   node: process.version,
@@ -201,7 +235,7 @@ function readRequiredFile(filePath, label) {
 
 function readRequiredTextFile(filePath, label) {
   try {
-    return String(fs.readFileSync(filePath, 'utf8') || '').trim();
+    return String(fs.readFileSync(filePath, "utf8") || "").trim();
   } catch (e) {
     const msg = e && e.message ? e.message : String(e);
     throw new Error(`Missing required ${label} at ${filePath}. (${msg})`);
@@ -209,21 +243,30 @@ function readRequiredTextFile(filePath, label) {
 }
 
 function readMistralApiKey() {
-  return readRequiredTextFile(path.join(getApiSecretsDir(), 'mistral-key.txt'), 'Mistral API key (mistral-key.txt)');
+  return readRequiredTextFile(
+    path.join(getApiSecretsDir(), "mistral-key.txt"),
+    "Mistral API key (mistral-key.txt)",
+  );
 }
 
 const app = express();
 
-const QBT_TEST_PORT   = 3001;
-const DUMP_INFO       = false;
+const QBT_TEST_PORT = 3001;
+const DUMP_INFO = false;
 const FILTER_TORRENTS = false;
 // const FILTER_TORRENTS = {hash:   "629746091b23ec0617405e8cc6f1eee486447629"};
 // const FILTER_TORRENTS = {filter: 'downloading'}
 
 // Load SSL certificate (prefer shared cookie store)
 const httpsOptions = {
-  key: readRequiredFile(path.join(getApiSecretsDir(), 'localhost-key.pem'), 'TLS key (localhost-key.pem)'),
-  cert: readRequiredFile(path.join(getApiSecretsDir(), 'localhost-cert.pem'), 'TLS cert (localhost-cert.pem)'),
+  key: readRequiredFile(
+    path.join(getApiSecretsDir(), "localhost-key.pem"),
+    "TLS key (localhost-key.pem)",
+  ),
+  cert: readRequiredFile(
+    path.join(getApiSecretsDir(), "localhost-cert.pem"),
+    "TLS cert (localhost-cert.pem)",
+  ),
 };
 
 // CORS notes:
@@ -235,27 +278,28 @@ const httpsOptions = {
 //
 // So: only emit CORS headers for direct (non-proxied) browser requests.
 app.use((req, res, next) => {
-  const hasOrigin = typeof req.headers.origin === 'string' && req.headers.origin.length > 0;
-  const disableInternalCors = process.env.DISABLE_INTERNAL_CORS === '1';
+  const hasOrigin =
+    typeof req.headers.origin === "string" && req.headers.origin.length > 0;
+  const disableInternalCors = process.env.DISABLE_INTERNAL_CORS === "1";
   const behindProxy = Boolean(
-    req.headers['x-forwarded-host'] ||
-    req.headers['x-forwarded-proto'] ||
-    req.headers['x-forwarded-for']
+    req.headers["x-forwarded-host"] ||
+    req.headers["x-forwarded-proto"] ||
+    req.headers["x-forwarded-for"],
   );
 
   if (hasOrigin && !behindProxy && !disableInternalCors) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-    const reqHeaders = req.headers['access-control-request-headers'];
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    const reqHeaders = req.headers["access-control-request-headers"];
     res.setHeader(
-      'Access-Control-Allow-Headers',
-      typeof reqHeaders === 'string' && reqHeaders.trim()
+      "Access-Control-Allow-Headers",
+      typeof reqHeaders === "string" && reqHeaders.trim()
         ? reqHeaders
-        : 'Content-Type, Authorization'
+        : "Content-Type, Authorization",
     );
   }
 
-  if (req.method === 'OPTIONS' && hasOrigin) {
+  if (req.method === "OPTIONS" && hasOrigin) {
     // Preflight: return no-content. If proxied, nginx will attach CORS headers.
     res.sendStatus(204);
     return;
@@ -266,7 +310,7 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-const OPENSUBTITLES_BASE_URL = 'https://api.opensubtitles.com/api/v1';
+const OPENSUBTITLES_BASE_URL = "https://api.opensubtitles.com/api/v1";
 
 function getRootSecretsDir() {
   // Checkout-independent shared secrets directory (created if missing).
@@ -274,29 +318,29 @@ function getRootSecretsDir() {
 }
 
 function getSubsLoginPath() {
-  return path.join(getRootSecretsDir(), 'subs-login.txt');
+  return path.join(getRootSecretsDir(), "subs-login.txt");
 }
 
 function getSubsTokenReadPath() {
-  return path.join(getRootSecretsDir(), 'subs-token.txt');
+  return path.join(getRootSecretsDir(), "subs-token.txt");
 }
 
 function getSubsTokenWritePath() {
-  return path.join(getRootSecretsDir(), 'subs-token.txt');
+  return path.join(getRootSecretsDir(), "subs-token.txt");
 }
 
 async function readTextIfExists(filePath) {
   try {
-    const txt = await fs.promises.readFile(filePath, 'utf8');
-    return String(txt || '').trim();
+    const txt = await fs.promises.readFile(filePath, "utf8");
+    return String(txt || "").trim();
   } catch {
-    return '';
+    return "";
   }
 }
 
 async function readJsonIfExists(filePath) {
   try {
-    const txt = await fs.promises.readFile(filePath, 'utf8');
+    const txt = await fs.promises.readFile(filePath, "utf8");
     return JSON.parse(txt);
   } catch {
     return null;
@@ -305,26 +349,29 @@ async function readJsonIfExists(filePath) {
 
 async function writeTextFile(filePath, text) {
   await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.promises.writeFile(filePath, String(text || '') + '\n', 'utf8');
+  await fs.promises.writeFile(filePath, String(text || "") + "\n", "utf8");
 }
 
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function osFetchJson(url, { apiKey, token, method = 'GET', jsonBody } = {}) {
+async function osFetchJson(
+  url,
+  { apiKey, token, method = "GET", jsonBody } = {},
+) {
   const headers = {
-    Accept: 'application/json',
+    Accept: "application/json",
     // Some edge/CDN configurations behave better when a UA is present.
-    'User-Agent': 'tv-series-client/1.0 (torrents-proxy)',
-    'X-User-Agent': 'tv-series-client/1.0 (torrents-proxy)',
+    "User-Agent": "tv-series-client/1.0 (torrents-proxy)",
+    "X-User-Agent": "tv-series-client/1.0 (torrents-proxy)",
   };
-  if (apiKey) headers['Api-Key'] = apiKey;
+  if (apiKey) headers["Api-Key"] = apiKey;
   if (token) headers.Authorization = `Bearer ${token}`;
 
   let body;
   if (jsonBody !== undefined) {
-    headers['Content-Type'] = 'application/json';
+    headers["Content-Type"] = "application/json";
     body = JSON.stringify(jsonBody);
   }
 
@@ -349,68 +396,70 @@ async function osFetchJson(url, { apiKey, token, method = 'GET', jsonBody } = {}
 async function osLoginAndPersistToken() {
   const loginPath = getSubsLoginPath();
   const login = await readJsonIfExists(loginPath);
-  const apiKey = String(login?.apiKey || '').trim();
-  const username = String(login?.username || '').trim();
-  const password = String(login?.password || '').trim();
+  const apiKey = String(login?.apiKey || "").trim();
+  const username = String(login?.username || "").trim();
+  const password = String(login?.password || "").trim();
   if (!apiKey || !username || !password) {
     throw new Error(`Missing apiKey/username/password in ${loginPath}`);
   }
 
   const resp = await osFetchJson(`${OPENSUBTITLES_BASE_URL}/login`, {
     apiKey,
-    method: 'POST',
+    method: "POST",
     jsonBody: { username, password },
   });
 
   if (!resp.ok) {
     const detail = resp.data ? JSON.stringify(resp.data) : resp.text;
-    throw new Error(`OpenSubtitles login failed: HTTP ${resp.status} ${resp.statusText} ${detail}`);
+    throw new Error(
+      `OpenSubtitles login failed: HTTP ${resp.status} ${resp.statusText} ${detail}`,
+    );
   }
 
-  const token = String(resp.data?.token || '').trim();
+  const token = String(resp.data?.token || "").trim();
   if (!token) {
-    throw new Error('OpenSubtitles login response missing token');
+    throw new Error("OpenSubtitles login response missing token");
   }
   await writeTextFile(getSubsTokenWritePath(), token);
   return { apiKey, token };
 }
 
 function normalizeImdbIdToDigits(imdbId) {
-  const raw = String(imdbId || '').trim();
-  if (!raw) return '';
-  const s = raw.toLowerCase().startsWith('tt') ? raw.slice(2) : raw;
-  const digits = s.replace(/\D/g, '');
+  const raw = String(imdbId || "").trim();
+  if (!raw) return "";
+  const s = raw.toLowerCase().startsWith("tt") ? raw.slice(2) : raw;
+  const digits = s.replace(/\D/g, "");
   return digits;
 }
 
 async function loadLocalCfClearance(provider) {
   try {
-    const p = String(provider || '').trim();
-    if (!p) return '';
-    const inPath = path.join(getApiCookiesDir(), 'cf-clearance.local.json');
-    const raw = await fs.promises.readFile(inPath, 'utf8');
+    const p = String(provider || "").trim();
+    if (!p) return "";
+    const inPath = path.join(getApiCookiesDir(), "cf-clearance.local.json");
+    const raw = await fs.promises.readFile(inPath, "utf8");
     const j = JSON.parse(raw);
-    const v = j && typeof j === 'object' && !Array.isArray(j) ? j[p] : '';
-    return typeof v === 'string' ? v.trim() : '';
+    const v = j && typeof j === "object" && !Array.isArray(j) ? j[p] : "";
+    return typeof v === "string" ? v.trim() : "";
   } catch {
-    return '';
+    return "";
   }
 }
 
 // POST /api/cf_clearance - Persist provider cf_clearance values for local tooling
 // Body: { ipt_cf?: string, tl_cf?: string }
-app.post('/api/cf_clearance', async (req, res) => {
+app.post("/api/cf_clearance", async (req, res) => {
   try {
     const body = req.body || {};
-    const ipt = typeof body.ipt_cf === 'string' ? body.ipt_cf.trim() : '';
-    const tl = typeof body.tl_cf === 'string' ? body.tl_cf.trim() : '';
+    const ipt = typeof body.ipt_cf === "string" ? body.ipt_cf.trim() : "";
+    const tl = typeof body.tl_cf === "string" ? body.tl_cf.trim() : "";
 
-    const outPath = path.join(getApiCookiesDir(), 'cf-clearance.local.json');
+    const outPath = path.join(getApiCookiesDir(), "cf-clearance.local.json");
     let current = {};
     try {
-      const raw = await fs.promises.readFile(outPath, 'utf8');
+      const raw = await fs.promises.readFile(outPath, "utf8");
       const j = JSON.parse(raw);
-      if (j && typeof j === 'object' && !Array.isArray(j)) current = j;
+      if (j && typeof j === "object" && !Array.isArray(j)) current = j;
     } catch {
       // ignore
     }
@@ -418,8 +467,12 @@ app.post('/api/cf_clearance', async (req, res) => {
     if (ipt) current.iptorrents = ipt;
     if (tl) current.torrentleech = tl;
 
-    await fs.promises.writeFile(outPath, JSON.stringify(current, null, 2) + '\n', 'utf8');
-    console.error('[cf_clearance] saved', {
+    await fs.promises.writeFile(
+      outPath,
+      JSON.stringify(current, null, 2) + "\n",
+      "utf8",
+    );
+    console.error("[cf_clearance] saved", {
       path: outPath,
       keys: Object.keys(current),
       iptLen: current.iptorrents ? String(current.iptorrents).length : 0,
@@ -428,7 +481,7 @@ app.post('/api/cf_clearance', async (req, res) => {
 
     res.json({ ok: true, path: outPath, keys: Object.keys(current) });
   } catch (error) {
-    console.error('[cf_clearance] error', error);
+    console.error("[cf_clearance] error", error);
     res.status(500).json({ ok: false, error: error?.message || String(error) });
   }
 });
@@ -440,43 +493,57 @@ async function flexget() {
 // Initialize torrent search providers
 search.initializeProviders();
 
-if (FILTER_TORRENTS && typeof FILTER_TORRENTS === 'object' && !Array.isArray(FILTER_TORRENTS)) {
+if (
+  FILTER_TORRENTS &&
+  typeof FILTER_TORRENTS === "object" &&
+  !Array.isArray(FILTER_TORRENTS)
+) {
   (async () => {
     try {
       const info = await getQbtInfo(FILTER_TORRENTS);
-      const outPath = path.resolve(__dirname, '..', '..', 'samples','sample-qbt', 'qbt-info.json');
+      const outPath = path.resolve(
+        __dirname,
+        "..",
+        "..",
+        "samples",
+        "sample-qbt",
+        "qbt-info.json",
+      );
       fs.mkdirSync(path.dirname(outPath), { recursive: true });
-      fs.writeFileSync(outPath, JSON.stringify(info, null, 2), 'utf8');
-      console.log(`qbt startup dump wrote ${Array.isArray(info) ? info.length : 0} torrents -> ${outPath}`);
+      fs.writeFileSync(outPath, JSON.stringify(info, null, 2), "utf8");
+      console.log(
+        `qbt startup dump wrote ${Array.isArray(info) ? info.length : 0} torrents -> ${outPath}`,
+      );
     } catch (e) {
-      console.error('qbt startup dump error:', e);
+      console.error("qbt startup dump error:", e);
     }
   })();
 }
 
 // API endpoint
-app.get('/api/tvdb/*', tvdbProxyGet);
+app.get("/api/tvdb/*", tvdbProxyGet);
 
 // Server-side Mistral proxy (avoids exposing API keys in the browser bundle).
-app.post('/api/mistral/chat', async (req, res) => {
+app.post("/api/mistral/chat", async (req, res) => {
   try {
     const apiKey = readMistralApiKey();
-    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const body = req.body && typeof req.body === "object" ? req.body : {};
 
-    const model = (typeof body.model === 'string' && body.model.trim())
-      ? body.model.trim()
-      : MISTRAL_DEFAULT_MODEL;
+    const model =
+      typeof body.model === "string" && body.model.trim()
+        ? body.model.trim()
+        : MISTRAL_DEFAULT_MODEL;
 
     const messages = Array.isArray(body.messages) ? body.messages : null;
     if (!messages || messages.length === 0) {
-      res.status(400).json({ error: 'messages array required' });
+      res.status(400).json({ error: "messages array required" });
       return;
     }
 
     const upstream = await fetch(MISTRAL_CHAT_URL, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({ model, messages }),
@@ -484,149 +551,178 @@ app.post('/api/mistral/chat', async (req, res) => {
 
     const upstreamBody = await upstream.text();
     res.status(upstream.status);
-    res.set('Content-Type', upstream.headers.get('content-type') || 'application/json');
+    res.set(
+      "Content-Type",
+      upstream.headers.get("content-type") || "application/json",
+    );
     res.send(upstreamBody);
   } catch (error) {
-    console.error('mistral proxy error:', error);
+    console.error("mistral proxy error:", error);
     res.status(500).json({ error: error?.message || String(error) });
   }
 });
 
-app.post('/api/tvproc/startProc', async (req, res) => {
+app.post("/api/tvproc/startProc", async (req, res) => {
   const jsonPath = getTvprocJsonPath();
   try {
-    await fs.promises.writeFile(jsonPath, '[]\n', 'utf8');
+    await fs.promises.writeFile(jsonPath, "[]\n", "utf8");
     res.json({ ok: true, path: jsonPath, cleared: true });
   } catch (error) {
     const code = error?.code;
-    if (code === 'ENOENT') {
+    if (code === "ENOENT") {
       res.json({ ok: true, path: jsonPath, cleared: true });
       return;
     }
-    console.error('tvproc clear error:', error);
-    res.status(500).json({ error: error?.message || String(error), path: jsonPath });
+    console.error("tvproc clear error:", error);
+    res
+      .status(500)
+      .json({ error: error?.message || String(error), path: jsonPath });
   }
 });
 
-app.get('/api/tvproc/startProc', async (req, res) => {
+app.get("/api/tvproc/startProc", async (req, res) => {
   try {
     const title = req.query.title;
     if (!title) {
-      return res.status(400).json({ error: 'title parameter required' });
+      return res.status(400).json({ error: "title parameter required" });
     }
     const url = `https://hahnca.com/tv-down/startProc?title=${encodeURIComponent(title)}`;
     const response = await fetch(url);
     const data = await response.json();
     res.json(data);
   } catch (error) {
-    console.error('startProc proxy error:', error);
+    console.error("startProc proxy error:", error);
     res.status(500).json({ error: error?.message || String(error) });
   }
 });
 
-app.get('/api/qbt/info', async (req, res) => {
+app.get("/api/qbt/info", async (req, res) => {
   try {
     const q = req.query || {};
     const filterObj = {};
-    if (typeof q.hash === 'string' && q.hash) filterObj.hash = q.hash;
-    if (typeof q.category === 'string' && q.category) filterObj.category = q.category;
-    if (typeof q.tag === 'string' && q.tag) filterObj.tag = q.tag;
-    if (typeof q.filter === 'string' && q.filter) filterObj.filter = q.filter;
+    if (typeof q.hash === "string" && q.hash) filterObj.hash = q.hash;
+    if (typeof q.category === "string" && q.category)
+      filterObj.category = q.category;
+    if (typeof q.tag === "string" && q.tag) filterObj.tag = q.tag;
+    if (typeof q.filter === "string" && q.filter) filterObj.filter = q.filter;
 
     const useFilter = Object.keys(filterObj).length > 0 ? filterObj : undefined;
     const info = await getQbtInfo(useFilter);
 
     if (DUMP_INFO) {
       try {
-        const outPath = path.resolve(__dirname, '..', '..', 'samples', 'sample-qbt', 'qbt-info.json');
+        const outPath = path.resolve(
+          __dirname,
+          "..",
+          "..",
+          "samples",
+          "sample-qbt",
+          "qbt-info.json",
+        );
         fs.mkdirSync(path.dirname(outPath), { recursive: true });
-        fs.writeFileSync(outPath, JSON.stringify(info, null, 2), 'utf8');
+        fs.writeFileSync(outPath, JSON.stringify(info, null, 2), "utf8");
       } catch (e) {
-        console.error('qbt info dump error:', e);
+        console.error("qbt info dump error:", e);
       }
     }
 
     res.json(info);
   } catch (error) {
-    console.error('qbt info error:', error);
+    console.error("qbt info error:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // Client helper: delTorrent(<hash>)
 // Deletes torrent in qBittorrent, including files by default.
-app.post('/api/qbt/delTorrent', async (req, res) => {
+app.post("/api/qbt/delTorrent", async (req, res) => {
   try {
     const q = req.query || {};
     const b = req.body || {};
 
-    const hash = (typeof b.hash === 'string' && b.hash)
-      ? b.hash
-      : (typeof q.hash === 'string' && q.hash) ? q.hash : '';
+    const hash =
+      typeof b.hash === "string" && b.hash
+        ? b.hash
+        : typeof q.hash === "string" && q.hash
+          ? q.hash
+          : "";
 
     if (!hash) {
-      res.status(400).json({ error: 'hash required' });
+      res.status(400).json({ error: "hash required" });
       return;
     }
 
-    const deleteFiles = (typeof b.deleteFiles === 'boolean') ? b.deleteFiles : true;
+    const deleteFiles =
+      typeof b.deleteFiles === "boolean" ? b.deleteFiles : true;
     const result = await delQbtTorrent({ hash, deleteFiles });
     res.json(result);
   } catch (error) {
-    console.error('qbt delTorrent error:', error);
+    console.error("qbt delTorrent error:", error);
     res.status(500).json({ error: error?.message || String(error) });
   }
 });
 
-app.get('/api/space/avail', async (req, res) => {
+app.get("/api/space/avail", async (req, res) => {
   try {
     const info = await spaceAvail();
     res.json(info);
   } catch (error) {
-    console.error('spaceAvail error:', error);
+    console.error("spaceAvail error:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/api/flexget', async (req, res) => {
+app.get("/api/flexget", async (req, res) => {
   try {
     const txt = await flexget();
-    res.type('text/plain').send(txt);
+    res.type("text/plain").send(txt);
   } catch (error) {
-    console.error('flexget error:', error);
+    console.error("flexget error:", error);
     res.status(500).json({ error: error?.message || String(error) });
   }
 });
 
-app.get('/api/search', async (req, res) => {
+app.get("/api/search", async (req, res) => {
   const showName = req.query.show;
   const limit = parseInt(req.query.limit) || 100;
   const iptCfRaw = req.query.ipt_cf;
   const tlCfRaw = req.query.tl_cf;
   let needed = [];
-  
+
   // Parse needed array if provided
   if (req.query.needed) {
     try {
       needed = JSON.parse(req.query.needed);
     } catch (err) {
-      console.error('Error parsing needed array:', err);
+      console.error("Error parsing needed array:", err);
     }
   }
-  
+
   if (!showName) {
-    return res.status(400).json({ error: 'Show name is required' });
+    return res.status(400).json({ error: "Show name is required" });
   }
 
   try {
     // If the client doesn't pass cf_clearance values, fall back to the local persisted file.
     // This allows the UI to avoid localStorage for cookies.
-    const iptCf = (typeof iptCfRaw === 'string' && iptCfRaw.trim()) ? iptCfRaw.trim() : await loadLocalCfClearance('iptorrents');
-    const tlCf = (typeof tlCfRaw === 'string' && tlCfRaw.trim()) ? tlCfRaw.trim() : await loadLocalCfClearance('torrentleech');
-    const result = await search.searchTorrents({ showName, limit, iptCf, tlCf, needed });
+    const iptCf =
+      typeof iptCfRaw === "string" && iptCfRaw.trim()
+        ? iptCfRaw.trim()
+        : await loadLocalCfClearance("iptorrents");
+    const tlCf =
+      typeof tlCfRaw === "string" && tlCfRaw.trim()
+        ? tlCfRaw.trim()
+        : await loadLocalCfClearance("torrentleech");
+    const result = await search.searchTorrents({
+      showName,
+      limit,
+      iptCf,
+      tlCf,
+      needed,
+    });
     res.json(result);
   } catch (error) {
-    console.error('Search error:', error);
+    console.error("Search error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -637,19 +733,21 @@ app.get('/api/search', async (req, res) => {
 // - Reads secrets/subs-login.txt (JSON: {apiKey, username, password})
 // - Uses secrets/subs-token.txt (token string)
 // - If not logged in, auto-logins and retries once
-app.get('/api/subs/search', async (req, res) => {
+app.get("/api/subs/search", async (req, res) => {
   try {
-    const qRaw = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const qRaw = typeof req.query.q === "string" ? req.query.q.trim() : "";
     const imdbIdDigits = normalizeImdbIdToDigits(req.query.imdb_id);
     if (!qRaw && !imdbIdDigits) {
-      return res.status(400).json({ error: 'imdb_id or q query parameter required' });
+      return res
+        .status(400)
+        .json({ error: "imdb_id or q query parameter required" });
     }
 
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
 
     const loginPath = getSubsLoginPath();
     const login = await readJsonIfExists(loginPath);
-    const apiKey = String(login?.apiKey || '').trim();
+    const apiKey = String(login?.apiKey || "").trim();
     if (!apiKey) {
       return res.status(500).json({ error: `Missing apiKey in ${loginPath}` });
     }
@@ -658,16 +756,16 @@ app.get('/api/subs/search', async (req, res) => {
 
     const url = new URL(`${OPENSUBTITLES_BASE_URL}/subtitles`);
     if (qRaw) {
-      url.searchParams.set('query', qRaw);
+      url.searchParams.set("query", qRaw);
     } else {
       // For TV shows, OpenSubtitles stores most episode subtitles under the *parent* (series) imdb id.
       // Using imdb_id here often returns only a tiny subset.
-      url.searchParams.set('parent_imdb_id', imdbIdDigits);
+      url.searchParams.set("parent_imdb_id", imdbIdDigits);
     }
-    url.searchParams.set('page', String(page));
+    url.searchParams.set("page", String(page));
 
     // Hint to reduce payload; client still filters.
-    url.searchParams.set('languages', 'en');
+    url.searchParams.set("languages", "en");
 
     const transientStatuses = new Set([429, 500, 502, 503, 504, 520, 522, 524]);
 
@@ -693,9 +791,12 @@ app.get('/api/subs/search', async (req, res) => {
 
     if (!resp.ok) {
       let detail = resp.data || resp.text;
-      if (typeof detail === 'string') {
+      if (typeof detail === "string") {
         const s = detail.trim();
-        if (s.toLowerCase().includes('<!doctype html') || s.toLowerCase().includes('<html')) {
+        if (
+          s.toLowerCase().includes("<!doctype html") ||
+          s.toLowerCase().includes("<html")
+        ) {
           detail = s.slice(0, 1200);
         }
       }
@@ -708,7 +809,7 @@ app.get('/api/subs/search', async (req, res) => {
 
     res.json(resp.data);
   } catch (error) {
-    console.error('[subs] search error:', error);
+    console.error("[subs] search error:", error);
     res.status(500).json({ error: error?.message || String(error) });
   }
 });
@@ -719,7 +820,9 @@ async function handleDownloadRequest(req, res) {
     const hasTl = body.tl != null;
     const tlBody = hasTl ? body.tl : null;
     const torrent = hasTl
-      ? (tlBody && typeof tlBody === 'object' && 'torrent' in tlBody ? tlBody.torrent : tlBody)
+      ? tlBody && typeof tlBody === "object" && "torrent" in tlBody
+        ? tlBody.torrent
+        : tlBody
       : body.torrent;
     const forceDownload = body.forceDownload === true;
     // Temporary: hardwire debug on so we always return/emit extra diagnostics.
@@ -728,7 +831,7 @@ async function handleDownloadRequest(req, res) {
     appendDownloadsRequestLog(body);
 
     if (debug) {
-      console.error('[downloads] request', {
+      console.error("[downloads] request", {
         forceDownload,
         provider: torrent?.provider || torrent?.raw?.provider || undefined,
         id: torrent?.raw?.id || torrent?.id || undefined,
@@ -737,18 +840,35 @@ async function handleDownloadRequest(req, res) {
     }
 
     // Standard wrapper shape returned to the client.
-    const baseWrapper = { existingTitles: [], existingProcids: [], tvEntries: [], errorTitles: [] };
+    const baseWrapper = {
+      existingTitles: [],
+      existingProcids: [],
+      tvEntries: [],
+      errorTitles: [],
+    };
 
     if (!torrent) {
-      res.status(400).json({ ...baseWrapper, success: false, stage: 'validate', error: 'Torrent data is required' });
+      res
+        .status(400)
+        .json({
+          ...baseWrapper,
+          success: false,
+          stage: "validate",
+          error: "Torrent data is required",
+        });
       return;
     }
 
     // Default behavior: consult tv-proc before uploading.
     if (!forceDownload) {
       const fetched = await download.fetchTorrentFile(torrent);
-      if (!fetched || typeof fetched !== 'object') {
-        res.json({ ...baseWrapper, success: false, stage: 'fetch-torrent', error: 'Unexpected fetchTorrentFile result' });
+      if (!fetched || typeof fetched !== "object") {
+        res.json({
+          ...baseWrapper,
+          success: false,
+          stage: "fetch-torrent",
+          error: "Unexpected fetchTorrentFile result",
+        });
         return;
       }
       if (!fetched.success) {
@@ -766,19 +886,28 @@ async function handleDownloadRequest(req, res) {
       // includes a conflicting year, refuse to upload (prevents "wrong show" mismatches).
       try {
         const expectedYear =
-          (Number.isFinite(Number(torrent?.raw?.year)) ? Number(torrent?.raw?.year) : null) ||
-          extractYearFromString(torrent?.raw?.title || torrent?.title || torrent?.clientTitle);
+          (Number.isFinite(Number(torrent?.raw?.year))
+            ? Number(torrent?.raw?.year)
+            : null) ||
+          extractYearFromString(
+            torrent?.raw?.title || torrent?.title || torrent?.clientTitle,
+          );
 
         if (expectedYear && expectedYear >= 1950 && expectedYear <= 2050) {
           const parsed = parseTorrent(fetched.torrentData);
-          const parsedName = String(parsed?.name || '').trim();
+          const parsedName = String(parsed?.name || "").trim();
           const actualYear = extractYearFromString(parsedName);
           if (actualYear && actualYear !== expectedYear) {
-            const requestedTitle = String(torrent?.raw?.title || torrent?.title || torrent?.clientTitle || '').trim();
+            const requestedTitle = String(
+              torrent?.raw?.title ||
+                torrent?.title ||
+                torrent?.clientTitle ||
+                "",
+            ).trim();
             res.json({
               ...baseWrapper,
               success: false,
-              stage: 'validate-torrent-metadata',
+              stage: "validate-torrent-metadata",
               error: `Torrent year mismatch (requested ${expectedYear}, torrent says ${actualYear})`,
               yearError: `${actualYear}|${expectedYear}|${requestedTitle}`,
               expectedYear,
@@ -798,41 +927,93 @@ async function handleDownloadRequest(req, res) {
       try {
         titles = download.extractTorrentFileTitles(fetched.torrentData);
       } catch (e) {
-        res.json({ ...baseWrapper, success: false, stage: 'parse-torrent', error: e?.message || String(e) });
+        res.json({
+          ...baseWrapper,
+          success: false,
+          stage: "parse-torrent",
+          error: e?.message || String(e),
+        });
         return;
       }
 
       let tvProcResult = baseWrapper;
       try {
-        appendCallsLog({ endpoint: 'tv-proc:/checkFiles request', method: 'POST', ok: true, result: titles });
+        appendCallsLog({
+          endpoint: "tv-proc:/checkFiles request",
+          method: "POST",
+          ok: true,
+          result: titles,
+        });
         tvProcResult = await tvProcCheckFiles(titles);
-        appendCallsLog({ endpoint: 'tv-proc:/checkFiles response', method: 'POST', ok: true, result: tvProcResult });
+        appendCallsLog({
+          endpoint: "tv-proc:/checkFiles response",
+          method: "POST",
+          ok: true,
+          result: tvProcResult,
+        });
       } catch (e) {
-        appendCallsLog({ endpoint: 'tv-proc:/checkFiles', method: 'POST', ok: false, result: null, error: e });
-        res.json({ ...baseWrapper, success: false, stage: 'tv-proc', error: e?.message || String(e) });
+        appendCallsLog({
+          endpoint: "tv-proc:/checkFiles",
+          method: "POST",
+          ok: false,
+          result: null,
+          error: e,
+        });
+        res.json({
+          ...baseWrapper,
+          success: false,
+          stage: "tv-proc",
+          error: e?.message || String(e),
+        });
         return;
       }
 
       // If any file titles are already present, do NOT send to qBittorrent.
-      const existingTitles = Array.isArray(tvProcResult?.existingTitles) ? tvProcResult.existingTitles : [];
+      const existingTitles = Array.isArray(tvProcResult?.existingTitles)
+        ? tvProcResult.existingTitles
+        : [];
       const errorTitles = tvEntriesErrorTitles(tvProcResult?.tvEntries);
       if (existingTitles.length > 0 || errorTitles.length > 0) {
-        res.json(errorTitles.length > 0 ? { ...tvProcResult, errorTitles } : tvProcResult);
+        res.json(
+          errorTitles.length > 0
+            ? { ...tvProcResult, errorTitles }
+            : tvProcResult,
+        );
         return;
       }
 
-      const hint = torrent?.raw?.filename || torrent?.raw?.title || 'download.torrent';
+      const hint =
+        torrent?.raw?.filename || torrent?.raw?.title || "download.torrent";
       let addRes;
       const addTag = `tapi_${Date.now()}_${Math.random().toString(16).slice(2)}`;
       try {
-        addRes = await addQbtTorrent({ torrentData: fetched.torrentData, filename: hint, tags: addTag });
+        addRes = await addQbtTorrent({
+          torrentData: fetched.torrentData,
+          filename: hint,
+          tags: addTag,
+        });
       } catch (e) {
-        if (debug) console.error('[downloads] qbt add threw', { addTag, error: e?.message || String(e) });
-        res.json({ ...tvProcResult, success: false, stage: 'qbt-add', error: e?.message || String(e) });
+        if (debug)
+          console.error("[downloads] qbt add threw", {
+            addTag,
+            error: e?.message || String(e),
+          });
+        res.json({
+          ...tvProcResult,
+          success: false,
+          stage: "qbt-add",
+          error: e?.message || String(e),
+        });
         return;
       }
 
-      if (debug) console.error('[downloads] qbt add response', { addTag, ok: addRes.ok, status: addRes.status, text: addRes.text });
+      if (debug)
+        console.error("[downloads] qbt add response", {
+          addTag,
+          ok: addRes.ok,
+          status: addRes.status,
+          text: addRes.text,
+        });
 
       if (!addRes.ok) {
         // qB sometimes returns "Fails." but still adds the torrent. If we can find a torrent
@@ -841,9 +1022,19 @@ async function handleDownloadRequest(req, res) {
           const tagged = await getQbtInfo({ tag: addTag });
           const list = Array.isArray(tagged) ? tagged : [];
           if (list.length > 0) {
-            if (debug) console.error('[downloads] qbt add disambiguated as success via tag', { addTag, count: list.length });
+            if (debug)
+              console.error(
+                "[downloads] qbt add disambiguated as success via tag",
+                { addTag, count: list.length },
+              );
             if (debug) {
-              res.json({ ...tvProcResult, success: true, stage: 'qbt-add', qbAdd: addRes, qbtTag: addTag });
+              res.json({
+                ...tvProcResult,
+                success: true,
+                stage: "qbt-add",
+                qbAdd: addRes,
+                qbtTag: addTag,
+              });
               return;
             }
             res.json(tvProcResult);
@@ -855,10 +1046,12 @@ async function handleDownloadRequest(req, res) {
 
         // qB uses 200 OK with body "Fails." for duplicates and other add failures.
         // Disambiguate by checking whether the torrent exists after the add attempt.
-        let infoHash = '';
+        let infoHash = "";
         try {
           const parsed = parseTorrent(fetched.torrentData);
-          infoHash = String(parsed?.infoHash || '').trim().toLowerCase();
+          infoHash = String(parsed?.infoHash || "")
+            .trim()
+            .toLowerCase();
         } catch {
           // ignore
         }
@@ -869,20 +1062,32 @@ async function handleDownloadRequest(req, res) {
             const list = Array.isArray(qbtInfo) ? qbtInfo : [];
             if (list.length > 0) {
               const existing = list[0] || {};
-              const existingName = String(existing?.name || '').trim();
-              const fallbackTitle = String(torrent?.raw?.title || torrent?.title || torrent?.clientTitle || '').trim();
+              const existingName = String(existing?.name || "").trim();
+              const fallbackTitle = String(
+                torrent?.raw?.title ||
+                  torrent?.title ||
+                  torrent?.clientTitle ||
+                  "",
+              ).trim();
               const title = existingName || fallbackTitle || infoHash;
-              if (debug) console.error('[downloads] qbt add disambiguated as duplicate via hash', { addTag, infoHash, title });
+              if (debug)
+                console.error(
+                  "[downloads] qbt add disambiguated as duplicate via hash",
+                  { addTag, infoHash, title },
+                );
               res.json({
                 ...tvProcResult,
                 success: false,
-                stage: 'qbt',
+                stage: "qbt",
                 error: `QbitTorrent already has torrent ${title}`,
                 hash: infoHash,
                 qbt: {
                   name: existingName || undefined,
                   state: existing?.state || undefined,
-                  progress: typeof existing?.progress === 'number' ? existing.progress : undefined,
+                  progress:
+                    typeof existing?.progress === "number"
+                      ? existing.progress
+                      : undefined,
                 },
               });
               return;
@@ -892,14 +1097,26 @@ async function handleDownloadRequest(req, res) {
           }
         }
 
-        res.json({ ...tvProcResult, success: false, stage: 'qbt-add', error: `qBittorrent add failed: ${addRes.text || 'Fails.'}`, qbAdd: addRes });
+        res.json({
+          ...tvProcResult,
+          success: false,
+          stage: "qbt-add",
+          error: `qBittorrent add failed: ${addRes.text || "Fails."}`,
+          qbAdd: addRes,
+        });
         return;
       }
 
       // In this mode, always return the tv-proc wrapper unchanged.
       if (debug) {
-        console.error('[downloads] qbt add success', { addTag });
-        res.json({ ...tvProcResult, success: true, stage: 'qbt-add', qbAdd: addRes, qbtTag: addTag });
+        console.error("[downloads] qbt add success", { addTag });
+        res.json({
+          ...tvProcResult,
+          success: true,
+          stage: "qbt-add",
+          qbAdd: addRes,
+          qbtTag: addTag,
+        });
         return;
       }
       res.json(tvProcResult);
@@ -908,8 +1125,13 @@ async function handleDownloadRequest(req, res) {
 
     // Force mode: still run tv-proc; skip only the qBittorrent hash pre-check.
     const fetched = await download.fetchTorrentFile(torrent);
-    if (!fetched || typeof fetched !== 'object') {
-      res.json({ ...baseWrapper, success: false, stage: 'fetch-torrent', error: 'Unexpected fetchTorrentFile result' });
+    if (!fetched || typeof fetched !== "object") {
+      res.json({
+        ...baseWrapper,
+        success: false,
+        stage: "fetch-torrent",
+        error: "Unexpected fetchTorrentFile result",
+      });
       return;
     }
     if (!fetched.success) {
@@ -926,19 +1148,25 @@ async function handleDownloadRequest(req, res) {
     // Same guardrail in force mode.
     try {
       const expectedYear =
-        (Number.isFinite(Number(torrent?.raw?.year)) ? Number(torrent?.raw?.year) : null) ||
-        extractYearFromString(torrent?.raw?.title || torrent?.title || torrent?.clientTitle);
+        (Number.isFinite(Number(torrent?.raw?.year))
+          ? Number(torrent?.raw?.year)
+          : null) ||
+        extractYearFromString(
+          torrent?.raw?.title || torrent?.title || torrent?.clientTitle,
+        );
 
       if (expectedYear && expectedYear >= 1950 && expectedYear <= 2050) {
         const parsed = parseTorrent(fetched.torrentData);
-        const parsedName = String(parsed?.name || '').trim();
+        const parsedName = String(parsed?.name || "").trim();
         const actualYear = extractYearFromString(parsedName);
         if (actualYear && actualYear !== expectedYear) {
-          const requestedTitle = String(torrent?.raw?.title || torrent?.title || torrent?.clientTitle || '').trim();
+          const requestedTitle = String(
+            torrent?.raw?.title || torrent?.title || torrent?.clientTitle || "",
+          ).trim();
           res.json({
             ...baseWrapper,
             success: false,
-            stage: 'validate-torrent-metadata',
+            stage: "validate-torrent-metadata",
             error: `Torrent year mismatch (requested ${expectedYear}, torrent says ${actualYear})`,
             yearError: `${actualYear}|${expectedYear}|${requestedTitle}`,
             expectedYear,
@@ -959,42 +1187,94 @@ async function handleDownloadRequest(req, res) {
     try {
       titles = download.extractTorrentFileTitles(fetched.torrentData);
     } catch (e) {
-      res.json({ ...baseWrapper, success: false, stage: 'parse-torrent', error: e?.message || String(e) });
+      res.json({
+        ...baseWrapper,
+        success: false,
+        stage: "parse-torrent",
+        error: e?.message || String(e),
+      });
       return;
     }
 
     let tvProcResult = baseWrapper;
     try {
-      appendCallsLog({ endpoint: 'tv-proc:/checkFiles request', method: 'POST', ok: true, result: titles });
+      appendCallsLog({
+        endpoint: "tv-proc:/checkFiles request",
+        method: "POST",
+        ok: true,
+        result: titles,
+      });
       tvProcResult = await tvProcCheckFiles(titles);
-      appendCallsLog({ endpoint: 'tv-proc:/checkFiles response', method: 'POST', ok: true, result: tvProcResult });
+      appendCallsLog({
+        endpoint: "tv-proc:/checkFiles response",
+        method: "POST",
+        ok: true,
+        result: tvProcResult,
+      });
     } catch (e) {
-      appendCallsLog({ endpoint: 'tv-proc:/checkFiles', method: 'POST', ok: false, result: null, error: e });
+      appendCallsLog({
+        endpoint: "tv-proc:/checkFiles",
+        method: "POST",
+        ok: false,
+        result: null,
+        error: e,
+      });
       // Don't upload if tv-proc fails.
-      res.json({ ...baseWrapper, success: false, stage: 'tv-proc', error: e?.message || String(e) });
+      res.json({
+        ...baseWrapper,
+        success: false,
+        stage: "tv-proc",
+        error: e?.message || String(e),
+      });
       return;
     }
 
     // If any file titles are already present, do NOT send to qBittorrent.
-    const existingTitles = Array.isArray(tvProcResult?.existingTitles) ? tvProcResult.existingTitles : [];
+    const existingTitles = Array.isArray(tvProcResult?.existingTitles)
+      ? tvProcResult.existingTitles
+      : [];
     const errorTitles = tvEntriesErrorTitles(tvProcResult?.tvEntries);
     if (existingTitles.length > 0 || errorTitles.length > 0) {
-      res.json(errorTitles.length > 0 ? { ...tvProcResult, errorTitles } : tvProcResult);
+      res.json(
+        errorTitles.length > 0
+          ? { ...tvProcResult, errorTitles }
+          : tvProcResult,
+      );
       return;
     }
 
-    const hint = torrent?.raw?.filename || torrent?.raw?.title || 'download.torrent';
+    const hint =
+      torrent?.raw?.filename || torrent?.raw?.title || "download.torrent";
     let addRes;
     const addTag = `tapi_${Date.now()}_${Math.random().toString(16).slice(2)}`;
     try {
-      addRes = await addQbtTorrent({ torrentData: fetched.torrentData, filename: hint, tags: addTag });
+      addRes = await addQbtTorrent({
+        torrentData: fetched.torrentData,
+        filename: hint,
+        tags: addTag,
+      });
     } catch (e) {
-      if (debug) console.error('[downloads] qbt add threw (force)', { addTag, error: e?.message || String(e) });
-      res.json({ ...tvProcResult, success: false, stage: 'qbt-add', error: e?.message || String(e) });
+      if (debug)
+        console.error("[downloads] qbt add threw (force)", {
+          addTag,
+          error: e?.message || String(e),
+        });
+      res.json({
+        ...tvProcResult,
+        success: false,
+        stage: "qbt-add",
+        error: e?.message || String(e),
+      });
       return;
     }
 
-    if (debug) console.error('[downloads] qbt add response (force)', { addTag, ok: addRes.ok, status: addRes.status, text: addRes.text });
+    if (debug)
+      console.error("[downloads] qbt add response (force)", {
+        addTag,
+        ok: addRes.ok,
+        status: addRes.status,
+        text: addRes.text,
+      });
 
     if (!addRes.ok) {
       // Same as non-force mode: if the torrent shows up with our unique tag, the add succeeded.
@@ -1002,11 +1282,17 @@ async function handleDownloadRequest(req, res) {
         const tagged = await getQbtInfo({ tag: addTag });
         const list = Array.isArray(tagged) ? tagged : [];
         if (list.length > 0) {
-          if (debug) console.error('[downloads] qbt add disambiguated as success via tag (force)', { addTag, count: list.length });
-          let infoHash = '';
+          if (debug)
+            console.error(
+              "[downloads] qbt add disambiguated as success via tag (force)",
+              { addTag, count: list.length },
+            );
+          let infoHash = "";
           try {
             const parsed = parseTorrent(fetched.torrentData);
-            infoHash = String(parsed?.infoHash || '').trim().toLowerCase();
+            infoHash = String(parsed?.infoHash || "")
+              .trim()
+              .toLowerCase();
           } catch {
             // ignore
           }
@@ -1029,10 +1315,12 @@ async function handleDownloadRequest(req, res) {
         // ignore
       }
 
-      let infoHash = '';
+      let infoHash = "";
       try {
         const parsed = parseTorrent(fetched.torrentData);
-        infoHash = String(parsed?.infoHash || '').trim().toLowerCase();
+        infoHash = String(parsed?.infoHash || "")
+          .trim()
+          .toLowerCase();
       } catch {
         // ignore
       }
@@ -1043,19 +1331,27 @@ async function handleDownloadRequest(req, res) {
           const list = Array.isArray(qbtInfo) ? qbtInfo : [];
           if (list.length > 0) {
             const existing = list[0] || {};
-            const existingName = String(existing?.name || '').trim();
-            const fallbackTitle = String(torrent?.raw?.title || torrent?.title || torrent?.clientTitle || '').trim();
+            const existingName = String(existing?.name || "").trim();
+            const fallbackTitle = String(
+              torrent?.raw?.title ||
+                torrent?.title ||
+                torrent?.clientTitle ||
+                "",
+            ).trim();
             const title = existingName || fallbackTitle || infoHash;
             res.json({
               ...tvProcResult,
               success: false,
-              stage: 'qbt',
+              stage: "qbt",
               error: `QbitTorrent already has torrent ${title}`,
               hash: infoHash,
               qbt: {
                 name: existingName || undefined,
                 state: existing?.state || undefined,
-                progress: typeof existing?.progress === 'number' ? existing.progress : undefined,
+                progress:
+                  typeof existing?.progress === "number"
+                    ? existing.progress
+                    : undefined,
               },
             });
             return;
@@ -1065,16 +1361,22 @@ async function handleDownloadRequest(req, res) {
         }
       }
 
-      res.json({ ...tvProcResult, success: false, stage: 'qbt-add', error: `qBittorrent add failed: ${addRes.text || 'Fails.'}`,
+      res.json({
+        ...tvProcResult,
+        success: false,
+        stage: "qbt-add",
+        error: `qBittorrent add failed: ${addRes.text || "Fails."}`,
         qbAdd: addRes,
       });
       return;
     }
 
-    let infoHash = '';
+    let infoHash = "";
     try {
       const parsed = parseTorrent(fetched.torrentData);
-      infoHash = String(parsed?.infoHash || '').trim().toLowerCase();
+      infoHash = String(parsed?.infoHash || "")
+        .trim()
+        .toLowerCase();
     } catch {
       // ignore
     }
@@ -1091,80 +1393,155 @@ async function handleDownloadRequest(req, res) {
       debug,
     });
   } catch (error) {
-    console.error('Download error:', error);
-    res.status(500).json({ existingTitles: [], existingProcids: [], success: false, stage: 'exception', error: error?.message || String(error) });
+    console.error("Download error:", error);
+    res
+      .status(500)
+      .json({
+        existingTitles: [],
+        existingProcids: [],
+        success: false,
+        stage: "exception",
+        error: error?.message || String(error),
+      });
   }
 }
 
 // POST /api/download - Download a torrent file
-app.post('/api/download', handleDownloadRequest);
+app.post("/api/download", handleDownloadRequest);
 
 // Back-compat alias for older clients/nginx rewrites.
-app.post('/downloads', handleDownloadRequest);
+app.post("/downloads", handleDownloadRequest);
 
-app.get('/api/startreel', async (req, res) => {
+app.get("/api/startreel", async (req, res) => {
   try {
     const q = req.query || {};
     let showTitles = [];
-    if (typeof q.showTitles === 'string' && q.showTitles) {
+    if (typeof q.showTitles === "string" && q.showTitles) {
       try {
         const parsed = JSON.parse(q.showTitles);
         if (Array.isArray(parsed)) showTitles = parsed;
       } catch {
-        showTitles = q.showTitles.split(',').map(s => s.trim()).filter(Boolean);
+        showTitles = q.showTitles
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
       }
     }
 
     const result = await startReel(showTitles);
-    appendCallsLog({ endpoint: '/api/startreel', method: 'GET', ok: true, result });
+    appendCallsLog({
+      endpoint: "/api/startreel",
+      method: "GET",
+      ok: true,
+      result,
+    });
     res.json(result);
   } catch (error) {
-    console.error('startReel error:', error);
-    appendCallsLog({ endpoint: '/api/startreel', method: 'GET', ok: false, result: null, error });
+    console.error("startReel error:", error);
+    appendCallsLog({
+      endpoint: "/api/startreel",
+      method: "GET",
+      ok: false,
+      result: null,
+      error,
+    });
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/startreel', async (req, res) => {
+app.post("/api/startreel", async (req, res) => {
   try {
     const body = req.body || {};
     const showTitles = Array.isArray(body.showTitles) ? body.showTitles : [];
     const result = await startReel(showTitles);
-    appendCallsLog({ endpoint: '/api/startreel', method: 'POST', ok: true, result });
+    appendCallsLog({
+      endpoint: "/api/startreel",
+      method: "POST",
+      ok: true,
+      result,
+    });
     res.json(result);
   } catch (error) {
-    console.error('startReel error:', error);
-    appendCallsLog({ endpoint: '/api/startreel', method: 'POST', ok: false, result: null, error });
+    console.error("startReel error:", error);
+    appendCallsLog({
+      endpoint: "/api/startreel",
+      method: "POST",
+      ok: false,
+      result: null,
+      error,
+    });
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/api/getreel', async (req, res) => {
+app.get("/api/getreel", async (req, res) => {
   try {
     const result = await getReel();
-    appendCallsLog({ endpoint: '/api/getreel', method: 'GET', ok: true, result });
+    appendCallsLog({
+      endpoint: "/api/getreel",
+      method: "GET",
+      ok: true,
+      result,
+    });
     res.json(result);
   } catch (error) {
-    console.error('getReel error:', error);
-    appendCallsLog({ endpoint: '/api/getreel', method: 'GET', ok: false, result: null, error });
+    console.error("getReel error:", error);
+    appendCallsLog({
+      endpoint: "/api/getreel",
+      method: "GET",
+      ok: false,
+      result: null,
+      error,
+    });
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/api/reviews/getReviews', async (req, res) => {
+app.get("/api/reviews/getReviews", async (req, res) => {
   const rottenUrl = req.query.url;
   const buttonName = req.query.btn;
   const args = { rottenUrl, buttonName };
   try {
-    appendReviewCallsLog({ endpoint: '/api/reviews/getReviews', method: 'GET', event: 'START', args });
+    appendReviewCallsLog({
+      endpoint: "/api/reviews/getReviews",
+      method: "GET",
+      event: "START",
+      args,
+    });
     const result = await reviews.getReviews(rottenUrl, buttonName);
-    appendCallsLog({ endpoint: '/api/reviews/getReviews', method: 'GET', ok: true, result });
-    appendReviewCallsLog({ endpoint: '/api/reviews/getReviews', method: 'GET', event: 'END', ok: true, args, result });
+    appendCallsLog({
+      endpoint: "/api/reviews/getReviews",
+      method: "GET",
+      ok: true,
+      result,
+    });
+    appendReviewCallsLog({
+      endpoint: "/api/reviews/getReviews",
+      method: "GET",
+      event: "END",
+      ok: true,
+      args,
+      result,
+    });
     res.json(result);
   } catch (error) {
-    console.error('getReviews error:', error);
-    appendCallsLog({ endpoint: '/api/reviews/getReviews', method: 'GET', ok: false, result: null, error });
-    appendReviewCallsLog({ endpoint: '/api/reviews/getReviews', method: 'GET', event: 'END', ok: false, args, result: null, error });
+    console.error("getReviews error:", error);
+    appendCallsLog({
+      endpoint: "/api/reviews/getReviews",
+      method: "GET",
+      ok: false,
+      result: null,
+      error,
+    });
+    appendReviewCallsLog({
+      endpoint: "/api/reviews/getReviews",
+      method: "GET",
+      event: "END",
+      ok: false,
+      args,
+      result: null,
+      error,
+    });
     // Treat scraper errors as non-fatal so the client can keep working.
     res.json({
       ok: false,
@@ -1181,7 +1558,8 @@ app.get('/api/reviews/getReviews', async (req, res) => {
 https.createServer(httpsOptions, app).listen(QBT_TEST_PORT, () => {
   // Always print a startup line, even when TORRENTS_DEBUG disables console.log.
   process.stderr.write(`=\n`);
-  process.stderr.write(`========== torrents server started on port ${QBT_TEST_PORT} ==========\n`);
+  process.stderr.write(
+    `========== torrents server started on port ${QBT_TEST_PORT} ==========\n`,
+  );
   process.stderr.write(`=\n`);
 });
-

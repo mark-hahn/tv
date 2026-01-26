@@ -1,13 +1,13 @@
-import fs             from "fs";
-import * as path      from 'node:path';
-import fetch          from 'node-fetch';
-import WebSocket      from 'ws';
-import * as urls      from "./urls.js";
-import {rottenSearch} from './rotten.js';
-import * as util      from "./util.js";
-import { SRVR_DATA_DIR } from './srvrPaths.js';
-const {log, start, end} = util.getLog('tvdb');
-const TVDB_PATH = path.join(SRVR_DATA_DIR, 'tvdb.json');
+import fs from "fs";
+import * as path from "node:path";
+import fetch from "node-fetch";
+import WebSocket from "ws";
+import * as urls from "./urls.js";
+import { rottenSearch } from "./rotten.js";
+import * as util from "./util.js";
+import { SRVR_DATA_DIR } from "./srvrPaths.js";
+const { log, start, end } = util.getLog("tvdb");
+const TVDB_PATH = path.join(SRVR_DATA_DIR, "tvdb.json");
 
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -16,11 +16,11 @@ function ensureDir(dir) {
 function ensureFile(filePath, defaultStr) {
   if (fs.existsSync(filePath)) return;
   ensureDir(path.dirname(filePath));
-  fs.writeFileSync(filePath, defaultStr, 'utf8');
+  fs.writeFileSync(filePath, defaultStr, "utf8");
 }
 
 ensureDir(SRVR_DATA_DIR);
-ensureFile(TVDB_PATH, '{}');
+ensureFile(TVDB_PATH, "{}");
 
 const UPDATE_DATA = true;
 
@@ -28,12 +28,12 @@ let addToPickupsCallback = null;
 
 let allTvdb = null;
 try {
-  allTvdb = util.jParse(fs.readFileSync(TVDB_PATH, 'utf8'));
+  allTvdb = util.jParse(fs.readFileSync(TVDB_PATH, "utf8"));
 } catch {
   allTvdb = {};
   try {
     ensureDir(path.dirname(TVDB_PATH));
-    fs.writeFileSync(TVDB_PATH, JSON.stringify(allTvdb), 'utf8');
+    fs.writeFileSync(TVDB_PATH, JSON.stringify(allTvdb), "utf8");
   } catch {}
 }
 
@@ -43,25 +43,22 @@ try {
 let theTvdbToken = null;
 let gotTokenTime = 0;
 const getTheTvdbToken = async () => {
-  const loginResp = await fetch(
-    'https://api4.thetvdb.com/v4/login', 
-    { method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
-            "apikey": "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df",
-            "pin":    "HXEVSDFF"
-        })
-    }
-  );
+  const loginResp = await fetch("https://api4.thetvdb.com/v4/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      apikey: "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df",
+      pin: "HXEVSDFF",
+    }),
+  });
   if (!loginResp.ok) {
-    log('err', `FATAL: TvDbToken Response: ${loginResp.status}`);
+    log("err", `FATAL: TvDbToken Response: ${loginResp.status}`);
     process.exit();
   }
   const loginJSON = await loginResp.json();
   theTvdbToken = loginJSON.data.token;
   gotTokenTime = Date.now();
-}
-
+};
 
 ///////////////////// GET REMOTES ///////////////////////
 
@@ -71,10 +68,10 @@ let cacheJson;
 const imdbFetchHeaders = {
   // IMDb commonly returns HTTP 202 with an empty body to non-browser requests.
   // A realistic UA + accept headers consistently yields normal HTML.
-  'user-agent':
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-  accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  'accept-language': 'en-US,en;q=0.9',
+  "user-agent":
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+  accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "accept-language": "en-US,en;q=0.9",
 };
 
 const extractImdbRating = (html) => {
@@ -85,7 +82,9 @@ const extractImdbRating = (html) => {
   if (m?.[1]) return m[1];
 
   // Fallback: JSON data embedded in the page.
-  m = /"aggregateRating"\s*:\s*\{[^}]*?"ratingValue"\s*:\s*"?([\d.]+)"?/i.exec(html);
+  m = /"aggregateRating"\s*:\s*\{[^}]*?"ratingValue"\s*:\s*"?([\d.]+)"?/i.exec(
+    html,
+  );
   if (m?.[1]) return m[1];
 
   // Last resort: any ratingValue (can be less specific).
@@ -104,7 +103,7 @@ const getUrlAndRatings = async (type, url, name) => {
     try {
       return await fetch(u, { ...o, signal: controller.signal });
     } catch (e) {
-      if (e.name === 'AbortError') throw new Error('Request timed out');
+      if (e.name === "AbortError") throw new Error("Request timed out");
       throw e;
     } finally {
       clearTimeout(id);
@@ -115,22 +114,35 @@ const getUrlAndRatings = async (type, url, name) => {
 
   if ((type == 18 || type == 7) && cacheName === name) json = cacheJson;
   else {
-    const fetchOpts = (+type === 2)
-      ? { headers: imdbFetchHeaders, redirect: 'follow' }
-      : undefined;
+    const fetchOpts =
+      +type === 2
+        ? { headers: imdbFetchHeaders, redirect: "follow" }
+        : undefined;
 
     let resp;
     try {
       resp = await fetchWithTimeout(url, fetchOpts);
     } catch (e) {
-      log('err', `getUrlAndRatings fetch error: ${
-                    JSON.stringify({type, url, name})}, ${e.message}`);
+      log(
+        "err",
+        `getUrlAndRatings fetch error: ${JSON.stringify({
+          type,
+          url,
+          name,
+        })}, ${e.message}`,
+      );
       return null;
     }
 
     if (!resp.ok) {
-      log('err', `getUrlAndRatings fetch error: ${
-                    JSON.stringify({type, url, name})}, ${resp.status}`);
+      log(
+        "err",
+        `getUrlAndRatings fetch error: ${JSON.stringify({
+          type,
+          url,
+          name,
+        })}, ${resp.status}`,
+      );
       return null;
     }
     if (type == 18 || type == 7) json = await resp.json();
@@ -143,87 +155,93 @@ const getUrlAndRatings = async (type, url, name) => {
           resp = await fetchWithTimeout(url, fetchOpts);
           html = await resp.text();
         } catch (e) {
-          log('err', `getUrlAndRatings retry error: ${e.message}`);
+          log("err", `getUrlAndRatings retry error: ${e.message}`);
           return null;
         }
       }
 
-      html = (html || '').replaceAll(/\r?\n/gm, "")
-                         .replaceAll(/\s+/gm, " ");
+      html = (html || "").replaceAll(/\r?\n/gm, "").replaceAll(/\s+/gm, " ");
     }
   }
 
   if (type == 18 || type == 7) {
     cacheName = name;
     cacheJson = json;
-  }
-  else cacheName = null;
+  } else cacheName = null;
 
   let idFnameParam;
   switch (+type) {
-    case 2:  // IMDB
+    case 2: // IMDB
       // log('samples/imdb-page.html');
-      await util.writeFile('samples/imdb-page.html', html);
+      await util.writeFile("samples/imdb-page.html", html);
       {
         const rating = extractImdbRating(html);
         if (!rating) return { ratings: null };
         return { ratings: rating };
       }
 
-    case 7:  // reddit
-      // fs.writeFileSync(`samples/reddit-${name}.json`, 
+    case 7: // reddit
+      // fs.writeFileSync(`samples/reddit-${name}.json`,
       //                   JSON.stringify(json, null, 2));
-      const allItems    = Object.values(json.items || {});
+      const allItems = Object.values(json.items || {});
       const redditItems = allItems.filter(
-                               item => item.displayLink == 'www.reddit.com');
+        (item) => item.displayLink == "www.reddit.com",
+      );
       if (!redditItems || redditItems.length === 0) return null;
       // for(const item of redditItems) {
       //   log("redditItem:", name, item.link);
       // }
-      return {url: redditItems[0].link};
+      return { url: redditItems[0].link };
 
-    case 18:  // wikipedia
-      // fs.writeFileSync(`samples/google-${name}.json`, 
+    case 18: // wikipedia
+      // fs.writeFileSync(`samples/google-${name}.json`,
       //                   JSON.stringify(json, null, 2));
       const items = Object.values(json.items || {});
       const wikiItem = items.find(
-                             item => item.displayLink == 'en.wikipedia.org');
+        (item) => item.displayLink == "en.wikipedia.org",
+      );
       if (!wikiItem) return null;
       // log("wikiItem:", name, wikiItem.link);
-      return {url: wikiItem.link};
+      return { url: wikiItem.link };
 
-    default: return 'getUrlAndRatings invalid type: ' + type;
+    default:
+      return "getUrlAndRatings invalid type: " + type;
   }
-}
-
+};
 
 ///////////// get remote (name, url, & ratings) //////////////
 
 const getRemote = async (id, type, showName) => {
-  let url     = null;  
+  let url = null;
   let ratings = null;
   let urlRatings, name, escShow;
-  
+
   switch (type) {
-    case 2:  
-      name = 'IMDB';
-      url  = `https://www.imdb.com/title/${id}`;
+    case 2:
+      name = "IMDB";
+      url = `https://www.imdb.com/title/${id}`;
       urlRatings = await getUrlAndRatings(2, url, name);
-      ratings    = urlRatings?.ratings;
+      ratings = urlRatings?.ratings;
       break;
 
-    case 4:  name = 'Official Website'; url = id; break;
+    case 4:
+      name = "Official Website";
+      url = id;
+      break;
 
     case 7:
-      name = 'Reddit';
+      name = "Reddit";
       escShow = encodeURIComponent(showName);
-      urlRatings = await getUrlAndRatings(7,
+      urlRatings = await getUrlAndRatings(
+        7,
         `https://www.googleapis.com/customsearch/v1?` +
-        `key=AIzaSyDSdr8Z26vDP4V5J_sEyXCH4s8O56FyfDc&` +
-        `cx=b59f40d0c17b54ff1&q=${escShow}%20tv%20show`, showName);
+          `key=AIzaSyDSdr8Z26vDP4V5J_sEyXCH4s8O56FyfDc&` +
+          `cx=b59f40d0c17b54ff1&q=${escShow}%20tv%20show`,
+        showName,
+      );
       url = urlRatings?.url;
       break;
-      
+
     // case 8:   url = id; name = 'Instagram'; break;
     // case 9:   url = `https://www.instagram.com/${id}`; break;
     // case 11:  url = `https://www.youtube.com/channel/${id}`; break;
@@ -233,105 +251,112 @@ const getRemote = async (id, type, showName) => {
     //          break;
     // case 13: name = 'EIDR'; continue;
 
-    case 18: 
-      name = 'Wikipedia';
-      escShow    = encodeURIComponent(showName);
-      urlRatings = await getUrlAndRatings(18, 
-                    `https://www.googleapis.com/customsearch/v1?`  + 
-                    `key=AIzaSyDSdr8Z26vDP4V5J_sEyXCH4s8O56FyfDc&` + 
-                    `cx=b59f40d0c17b54ff1&q=${escShow}%20tv%20show`, showName);
+    case 18:
+      name = "Wikipedia";
+      escShow = encodeURIComponent(showName);
+      urlRatings = await getUrlAndRatings(
+        18,
+        `https://www.googleapis.com/customsearch/v1?` +
+          `key=AIzaSyDSdr8Z26vDP4V5J_sEyXCH4s8O56FyfDc&` +
+          `cx=b59f40d0c17b54ff1&q=${escShow}%20tv%20show`,
+        showName,
+      );
       url = urlRatings?.url;
       break;
 
     // case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
 
-    case 99:  // rotten tomatoes
-      name = 'Rotten';
+    case 99: // rotten tomatoes
+      name = "Rotten";
       urlRatings = await rottenSearch(showName);
-      if(!urlRatings) return null;
+      if (!urlRatings) return null;
       // log("getRemote rottenSearch:", urlRatings);
-      url     = urlRatings.url;
-      ratings = urlRatings.criticsScore + '/' + urlRatings.audienceScore;
+      url = urlRatings.url;
+      ratings = urlRatings.criticsScore + "/" + urlRatings.audienceScore;
       break;
 
-    default: return null;
+    default:
+      return null;
   }
-  
-  if(!url) {
+
+  if (!url) {
     log(`getRemote, no url: ${name}`);
     return null;
   }
   // log(`getRemote`, {name, url, ratings});
-  return {name, url, ratings};
-}
+  return { name, url, ratings };
+};
 
 ///////////// get remotes  //////////////
 // use tvdb remotes data to find complete remote data
 
 const getRemotes = async (show, tvdbRemotes) => {
-  const name          = show.Name;
-  const showId        = show.Id;
-  const remotes       = [];
+  const name = show.Name;
+  const showId = show.Id;
+  const remotes = [];
 
-  if(showId && !showId.startsWith("noemby-")) 
-    remotes.push({name:'Emby', url: urls.embyPageUrl(showId)});
+  if (showId && !showId.startsWith("noemby-"))
+    remotes.push({ name: "Emby", url: urls.embyPageUrl(showId) });
 
   const rottenRemote = await getRemote(null, 99, name);
-  if(rottenRemote) {
-    if(rottenRemote.ratings) rottenRemote.name += " (" + rottenRemote.ratings + ")";
+  if (rottenRemote) {
+    if (rottenRemote.ratings)
+      rottenRemote.name += " (" + rottenRemote.ratings + ")";
     remotes.push(rottenRemote);
   }
-  const encoded = encodeURI(name).replaceAll('&', '%26');
-  const url = `https://www.google.com/search` +
-              `?q=${encoded}%20tv%20show`;
-  remotes.push({name:'Google', url});
+  const encoded = encodeURI(name).replaceAll("&", "%26");
+  const url = `https://www.google.com/search` + `?q=${encoded}%20tv%20show`;
+  remotes.push({ name: "Google", url });
 
   const wikiRemote = await getRemote(null, 18, name);
-  if (wikiRemote) remotes.push({name: 'Wikipedia', url: wikiRemote.url});
+  if (wikiRemote) remotes.push({ name: "Wikipedia", url: wikiRemote.url });
 
   const redditRemote = await getRemote(null, 7, name);
-  if (redditRemote) remotes.push({name: 'Reddit', url: redditRemote.url});
+  if (redditRemote) remotes.push({ name: "Reddit", url: redditRemote.url });
 
   const remotesByName = {};
-  for(const tvdbRemote of tvdbRemotes) {
-    if(tvdbRemote.type == 18) continue;
+  for (const tvdbRemote of tvdbRemotes) {
+    if (tvdbRemote.type == 18) continue;
     const remote = await getRemote(
-            tvdbRemote.id, tvdbRemote.type, tvdbRemote.sourceName);
-    if(remote && remote.url != "no match") {
-      if(!remote.ratings) delete remote.ratings;
+      tvdbRemote.id,
+      tvdbRemote.type,
+      tvdbRemote.sourceName,
+    );
+    if (remote && remote.url != "no match") {
+      if (!remote.ratings) delete remote.ratings;
       remotesByName[remote.name] = remote;
     }
   }
 
   const imdbRemote = remotesByName["IMDB"];
-  if(imdbRemote) {
-    imdbRemote.name += (imdbRemote.ratings) ?
-                  ' (' + imdbRemote.ratings + ')' : '';
+  if (imdbRemote) {
+    imdbRemote.name += imdbRemote.ratings
+      ? " (" + imdbRemote.ratings + ")"
+      : "";
     remotes.push(imdbRemote);
-  } 
+  }
 
-  for(const [name, remote] of Object.entries(remotesByName)) {
-    if(name !== "IMDB" && name !== "Rotten")
-      remotes.push(remote);
+  for (const [name, remote] of Object.entries(remotesByName)) {
+    if (name !== "IMDB" && name !== "Rotten") remotes.push(remote);
   }
 
   return remotes;
-}
+};
 
 function getTvdbImageUrl(extResObj) {
   // Try to find first English poster in artworks array
   const artworks = extResObj?.data?.artworks;
   if (artworks && Array.isArray(artworks)) {
     const englishPoster = artworks.find(
-      art => art.language === 'eng' && art.type === 2 && art.image
+      (art) => art.language === "eng" && art.type === 2 && art.image,
     );
     if (englishPoster) {
       return englishPoster.image;
     }
   }
-  
+
   // Fallback to main image
-  return extResObj?.data?.image || '';
+  return extResObj?.data?.image || "";
 }
 
 function getTvdbCharacters(extResObj) {
@@ -340,71 +365,86 @@ function getTvdbCharacters(extResObj) {
     return [];
   }
   return characters
-    .filter(char => char.peopleType === 'Actor')
-    .map(char => ({
-      character:  char.name,
-      actor:      char.personName,
-      image:      char.personImgURL,
-      tvdbUrl:    char.url,
-      sortOrder:  char.sort,
-      isFeatured: char.isFeatured
+    .filter((char) => char.peopleType === "Actor")
+    .map((char) => ({
+      character: char.name,
+      actor: char.personName,
+      image: char.personImgURL,
+      tvdbUrl: char.url,
+      sortOrder: char.sort,
+      isFeatured: char.isFeatured,
     }));
 }
 
 //////////// GET TVDB DATA //////////////
 // fetch data from tvdb.com
 // create tvdbData object
- // update allTvdb & tvdb.json
+// update allTvdb & tvdb.json
 const getTvdbData = async (paramObj, resolve, _reject) => {
-  const {show, deleted,
-         seasonCount, episodeCount, watchedCount} = paramObj;
-  const name  = show.Name;
-  const added = allTvdb[name]?.added ?? new Date().toISOString().slice(0,10);
-  if(deleted) {
+  const { show, deleted, seasonCount, episodeCount, watchedCount } = paramObj;
+  const name = show.Name;
+  const added = allTvdb[name]?.added ?? new Date().toISOString().slice(0, 10);
+  if (deleted) {
     // this shouldn't happen, deleteds filter before here
-    log('getTvdbData:', name, 'is deleted, skipping tvDb refresh');
+    log("getTvdbData:", name, "is deleted, skipping tvDb refresh");
     resolve(name);
     return;
   }
   const showId = show.Id;
   const tvdbId = show.TvdbId;
-  if(!tvdbId) {
-    log('err', 'getTvdbData no tvdbId:', show);
+  if (!tvdbId) {
+    log("err", "getTvdbData no tvdbId:", show);
     resolve(name);
     return;
   }
   let extRes, extUrl;
-  try{
-    extUrl = 
-      `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
-    extRes = await fetch(extUrl,
-                  {headers: {
-                      'Content-Type': 'application/json',
-                        Authorization:'Bearer ' + theTvdbToken
-                  }});
+  try {
+    extUrl = `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
+    extRes = await fetch(extUrl, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + theTvdbToken,
+      },
+    });
     if (!extRes.ok) {
-      log('err', `getTvdbData error, extended status:`, 
-                        name, {extUrl}, JSON.stringify(extRes, null, 2));
+      log(
+        "err",
+        `getTvdbData error, extended status:`,
+        name,
+        { extUrl },
+        JSON.stringify(extRes, null, 2),
+      );
       resolve(name);
       return;
     }
-  } catch(err) {  
-    log('err', 'getTvdbData extended catch error:', name, 
-                      {extUrl, extRes, err});
+  } catch (err) {
+    log("err", "getTvdbData extended catch error:", name, {
+      extUrl,
+      extRes,
+      err,
+    });
     resolve(name);
     return;
   }
   const extResObj = await extRes.json();
-  const {firstAired, lastAired:lastAiredIn, score,
-         overview, remoteIds, averageRuntime,
-         originalCountry, originalLanguage, 
-         originalNetwork:originalNetworkIn,
-         status:statusIn, trailers:trailersIn}      = extResObj.data;
+  const {
+    firstAired,
+    lastAired: lastAiredIn,
+    score,
+    overview,
+    remoteIds,
+    averageRuntime,
+    originalCountry,
+    originalLanguage,
+    originalNetwork: originalNetworkIn,
+    status: statusIn,
+    trailers: trailersIn,
+  } = extResObj.data;
   const image = getTvdbImageUrl(extResObj);
   const characters = getTvdbCharacters(extResObj);
   let lastAired = lastAiredIn ?? firstAired;
-  lastAired = lastAired ?? '';
-  let originalNetwork = originalNetworkIn?.name ?? '';
+  lastAired = lastAired ?? "";
+  let originalNetwork = originalNetworkIn?.name ?? "";
   const status = statusIn.name; // e.g. Ended
 
   // get remote data, e.g. IMDB for tvdb record
@@ -414,67 +454,84 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   const trailersRaw = trailersIn || allTvdb[name]?.trailers;
 
   const isEnglishTrailer = (t) => {
-    const lang = (t?.language || t?.iso_639_1 || t?.lang || '').toString().toLowerCase();
+    const lang = (t?.language || t?.iso_639_1 || t?.lang || "")
+      .toString()
+      .toLowerCase();
     if (!lang) return true; // legacy entries sometimes omit language
-    return lang === 'eng' || lang === 'en' || lang === 'english' || lang.startsWith('en-') || lang.startsWith('en_');
+    return (
+      lang === "eng" ||
+      lang === "en" ||
+      lang === "english" ||
+      lang.startsWith("en-") ||
+      lang.startsWith("en_")
+    );
   };
 
   const trailers = Array.isArray(trailersRaw)
     ? trailersRaw.filter(isEnglishTrailer)
     : trailersRaw;
 
-  let tvdbData = {tvdbId, name, originalNetwork,
-                  seasonCount, episodeCount, watchedCount,
-                  image, score, overview,
-                  firstAired, lastAired, averageRuntime,
-                  originalCountry, originalLanguage,
-                  status, remotes, characters, added, saved};
-  if(trailers) tvdbData.trailers = trailers;
-  if(showId !== undefined) 
-    tvdbData.showId = showId;
-  if(deleted !== undefined)
-    tvdbData.deleted = deleted;
+  let tvdbData = {
+    tvdbId,
+    name,
+    originalNetwork,
+    seasonCount,
+    episodeCount,
+    watchedCount,
+    image,
+    score,
+    overview,
+    firstAired,
+    lastAired,
+    averageRuntime,
+    originalCountry,
+    originalLanguage,
+    status,
+    remotes,
+    characters,
+    added,
+    saved,
+  };
+  if (trailers) tvdbData.trailers = trailers;
+  if (showId !== undefined) tvdbData.showId = showId;
+  if (deleted !== undefined) tvdbData.deleted = deleted;
 
   // log('getTvdbData:', tvdbData);
   allTvdb[name] = tvdbData;
   // update allTvdb & tvdb.json
   resolve(tvdbData);
-}
-
+};
 
 /////////  GET/UPDATE TVDB FOR WEB AND LOCAL //////
 // each tvdb request from web waits in queue
 // every result updates json file tvdb.json
 const newTvdbQueue = [];
-let   chkTvdbQueueRunning = false;
+let chkTvdbQueueRunning = false;
 
 const chkTvdbQueue = () => {
-  if(chkTvdbQueueRunning || 
-     newTvdbQueue.length == 0) return;
+  if (chkTvdbQueueRunning || newTvdbQueue.length == 0) return;
   chkTvdbQueueRunning = true;
-  const {ws, id, paramObj} = newTvdbQueue.pop();
-  if(ws && ws.readyState !== WebSocket.OPEN) return;
+  const { ws, id, paramObj } = newTvdbQueue.pop();
+  if (ws && ws.readyState !== WebSocket.OPEN) return;
 
   let resolve = null;
-  let reject  = null;
+  let reject = null;
   const promise = new Promise((resolveIn, rejectIn) => {
-    resolve = resolveIn; 
-    reject  = rejectIn;
+    resolve = resolveIn;
+    reject = rejectIn;
   });
   promise.then((tvdbData) => {
-    if(typeof tvdbData === 'object') {
-      if(ws) ws.send(`${id}~~~ok~~~${JSON.stringify(tvdbData)}`);
+    if (typeof tvdbData === "object") {
+      if (ws) ws.send(`${id}~~~ok~~~${JSON.stringify(tvdbData)}`);
       allTvdb[tvdbData.name] = tvdbData;
-    }
-    else tvdbData = allTvdb[tvdbData]; // tvdbData is name
+    } else tvdbData = allTvdb[tvdbData]; // tvdbData is name
     tvdbData.saved = Date.now();
     util.writeFile(TVDB_PATH, allTvdb);
     chkTvdbQueueRunning = false;
     chkTvdbQueue();
   });
   getTvdbData(paramObj, resolve, reject);
-}
-
+};
 
 //////////// UPDATE TVDB LOOP ////////////////
 // get imdb data continuously to update data
@@ -482,93 +539,94 @@ const chkTvdbQueue = () => {
 // only one sequential request can be busy at a time
 let tryLocalGetTvdbBusy = false;
 const tryLocalGetTvdb = () => {
-  if(tryLocalGetTvdbBusy) return;
+  if (tryLocalGetTvdbBusy) return;
   tryLocalGetTvdbBusy = true;
 
   // find show with oldest save date
   let minSaved = Math.min();
-  let minTvdb  = null;
+  let minTvdb = null;
   try {
     const tvdbs = Object.values(allTvdb);
     tvdbs.forEach((tvdb) => {
-      if(tvdb.deleted) return;
-      if(!tvdb.showId) {
-        log('err', 'tryLocalGetTvdb no showId and not deleted:', 
-                       tvdb.name, {tvdb});
+      if (tvdb.deleted) return;
+      if (!tvdb.showId) {
+        log("err", "tryLocalGetTvdb no showId and not deleted:", tvdb.name, {
+          tvdb,
+        });
         return;
       }
       const saved = tvdb.saved;
-      if(saved === undefined) {
-        log('tryLocalGetTvdb, saved is undefined:', 
-                     tvdb.name);
+      if (saved === undefined) {
+        log("tryLocalGetTvdb, saved is undefined:", tvdb.name);
         minTvdb = tvdb;
         throw true;
       }
-      if(saved < minSaved) {
+      if (saved < minSaved) {
         minSaved = saved;
-        minTvdb  = tvdb;
+        minTvdb = tvdb;
       }
     });
-  }
-  catch(e){};
-  if(minTvdb === null) {
-    log('err', new Date().toTimeString().slice(0,8),
-                   `tryLocalGetTvdbBusy, minTvdb is null`);  
+  } catch (e) {}
+  if (minTvdb === null) {
+    log(
+      "err",
+      new Date().toTimeString().slice(0, 8),
+      `tryLocalGetTvdbBusy, minTvdb is null`,
+    );
     tryLocalGetTvdbBusy = false;
     return;
   }
-  
+
   // Check if show should be added to pickup list:
   // - not in emby (showId starts with 'noemby-' or undefined)
   // - has tvdb data (minTvdb exists)
   // - not deleted
-  if(minTvdb && !minTvdb.deleted) {
+  if (minTvdb && !minTvdb.deleted) {
     const showId = minTvdb.showId;
-    const notInEmby = !showId || showId.startsWith('noemby-');
-    if(notInEmby && addToPickupsCallback) {
+    const notInEmby = !showId || showId.startsWith("noemby-");
+    if (notInEmby && addToPickupsCallback) {
       addToPickupsCallback(minTvdb.name);
     }
   }
-  
+
   // log('------', new Date().toTimeString().slice(0,8),
-  //             `updating tvdb locally:`, minTvdb.name); 
+  //             `updating tvdb locally:`, minTvdb.name);
   const show = {
-    Name:   minTvdb.name,
+    Name: minTvdb.name,
     TvdbId: minTvdb.tvdbId,
-  }; 
-  if(minTvdb.showId) show.Id = minTvdb.showId;
+  };
+  if (minTvdb.showId) show.Id = minTvdb.showId;
   const paramObj = {
     show,
-    seasonCount:  minTvdb.seasonCount  ?? 0, 
-    episodeCount: minTvdb.episodeCount ?? 0, 
-    watchedCount: minTvdb.watchedCount ?? 0, 
-    deleted:      minTvdb.deleted,
+    seasonCount: minTvdb.seasonCount ?? 0,
+    episodeCount: minTvdb.episodeCount ?? 0,
+    watchedCount: minTvdb.watchedCount ?? 0,
+    deleted: minTvdb.deleted,
   };
-  newTvdbQueue.unshift({ws:null, id:null, paramObj});
+  newTvdbQueue.unshift({ ws: null, id: null, paramObj });
   chkTvdbQueue();
   tryLocalGetTvdbBusy = false;
-}
+};
 
 // calls tryLocalGetTvdb every 6 mins
 const updateTvdbLocal = () => {
   // token expires, refresh every 2 weeks
-  if(Date.now() > gotTokenTime + 14*24*60*60*1000) {
+  if (Date.now() > gotTokenTime + 14 * 24 * 60 * 60 * 1000) {
     theTvdbToken = null;
     getTheTvdbToken();
   }
   // wait for token
-  if(!theTvdbToken) {
+  if (!theTvdbToken) {
     setTimeout(updateTvdbLocal, 1000);
     return;
   }
   // only bother tvdb.com every min
   if (UPDATE_DATA) tryLocalGetTvdb();
-  setTimeout(updateTvdbLocal, 6*60*1000); 
-  // log(new Date().toTimeString().slice(0,8), 
+  setTimeout(updateTvdbLocal, 6 * 60 * 1000);
+  // log(new Date().toTimeString().slice(0,8),
   //             'tvdb local update finished', );
-}
+};
 updateTvdbLocal();
-
 
 ///////////////////  FUNCTION CALLS FROM CLIENT  ////////////////////
 export const setAddToPickupsCallback = (callback) => {
@@ -578,12 +636,12 @@ export const setAddToPickupsCallback = (callback) => {
 // WebSocket endpoint handler: returns remotes for a show.
 // Expects param JSON: { show: { Name, Id? }, tvdbRemotes: [...] }
 export const getRemotesCmd = async (id, param, resolve, reject) => {
-  const paramObj = util.jParse(param, 'getRemotes');
+  const paramObj = util.jParse(param, "getRemotes");
   const show = paramObj?.show;
   const tvdbRemotes = paramObj?.tvdbRemotes;
 
   if (!show || !tvdbRemotes) {
-    reject([id, 'getRemotes: missing show or tvdbRemotes']);
+    reject([id, "getRemotes: missing show or tvdbRemotes"]);
     return;
   }
 
@@ -597,52 +655,51 @@ export const getRemotesCmd = async (id, param, resolve, reject) => {
 
 export const getActorPage = async (id, param, resolve, _reject) => {
   const actorName = param;
-  
+
   try {
     // Search IMDb for the actor
     const searchUrl = `https://www.imdb.com/find/?q=${encodeURIComponent(actorName)}&s=nm`;
     const searchResp = await fetch(searchUrl);
-    
+
     if (!searchResp.ok) {
-      log('err', 'getActorPage IMDb search failed:', searchResp.status);
-      const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, '_')}`;
+      log("err", "getActorPage IMDb search failed:", searchResp.status);
+      const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, "_")}`;
       resolve([id, wikiUrl]);
       return;
     }
-    
+
     const html = await searchResp.text();
-    
+
     // Find all matches to check for exact name match
     // IMDb uses format: <a href="/name/nm1234567/?ref_=..."><h3 class="ipc-title__text">Actor Name</h3></a>
     let match;
     const allMatches = [];
     const globalRegex = new RegExp(
       `<a\\s+href="(/name/nm\\d+)/[^"]*"[^>]*>.*?<h3[^>]*>([^<]+)</h3>`,
-      'gis'
+      "gis",
     );
-    
+
     while ((match = globalRegex.exec(html)) !== null) {
       allMatches.push({ url: match[1], name: match[2].trim() });
     }
-    
+
     // Find exact match (case-insensitive)
-    const exactMatch = allMatches.find(m => 
-      m.name.toLowerCase() === actorName.toLowerCase()
+    const exactMatch = allMatches.find(
+      (m) => m.name.toLowerCase() === actorName.toLowerCase(),
     );
-    
+
     if (exactMatch) {
       const actorUrl = `https://www.imdb.com${exactMatch.url}`;
       resolve([id, actorUrl]);
       return;
     }
-    
+
     // No exact match found, return Wikipedia URL
-    const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, '_')}`;
+    const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, "_")}`;
     resolve([id, wikiUrl]);
-    
-  } catch(err) {
-    log('err', 'getActorPage error:', err.message);
-    const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, '_')}`;
+  } catch (err) {
+    log("err", "getActorPage error:", err.message);
+    const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, "_")}`;
     resolve([id, wikiUrl]);
   }
 };
@@ -655,40 +712,35 @@ export const getAllTvdb = (id, _param, resolve, _reject) => {
 
 // if tvdb already exists replace it
 export const getNewTvdb = async (ws, id, param) => {
-  const paramObj = util.jParse(param, 'getNewTvdb');
+  const paramObj = util.jParse(param, "getNewTvdb");
   // log('getNewTvdb:', paramObj.show.Name);
-  newTvdbQueue.unshift({ws, id, paramObj});
+  newTvdbQueue.unshift({ ws, id, paramObj });
   chkTvdbQueue();
-}
+};
 
-export const setTvdbFields = 
-              async (id, param, resolve, _reject) => {
-  const paramObj = util.jParse(param, 'setTvdbFields');
+export const setTvdbFields = async (id, param, resolve, _reject) => {
+  const paramObj = util.jParse(param, "setTvdbFields");
   let tvdb = null;
   const name = paramObj.name;
-  if(name) {
-    if(paramObj.$delTvdb) {
+  if (name) {
+    if (paramObj.$delTvdb) {
       delete allTvdb[name];
-    }
-    else {
+    } else {
       tvdb = allTvdb[name];
-      if(!tvdb) { 
-        log('err', 'setTvdbFields no tvdb for', name);
-        resolve([id, 'no tvdb']); 
-        return; 
+      if (!tvdb) {
+        log("err", "setTvdbFields no tvdb for", name);
+        resolve([id, "no tvdb"]);
+        return;
       }
-      if(paramObj.$delete) {
-        for(const delName of paramObj.$delete) 
-          delete tvdb[delName];
+      if (paramObj.$delete) {
+        for (const delName of paramObj.$delete) delete tvdb[delName];
       }
-      for(const [key, value] of Object.entries(paramObj)) {
-        if(key != 'dontSave' && key != '$delete') 
-          tvdb[key] = value;
+      for (const [key, value] of Object.entries(paramObj)) {
+        if (key != "dontSave" && key != "$delete") tvdb[key] = value;
       }
       // allTvdb[name] = tvdb;
     }
   }
-  if(!paramObj.dontSave) 
-      await util.writeFile(TVDB_PATH, allTvdb);
-  resolve([id, tvdb ?? 'ok']);
+  if (!paramObj.dontSave) await util.writeFile(TVDB_PATH, allTvdb);
+  resolve([id, tvdb ?? "ok"]);
 };

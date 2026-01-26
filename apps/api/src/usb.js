@@ -1,10 +1,10 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import { parseKeyValueFile } from './qb-cred.js';
-import { getApiSecretsDir, preferSharedReadPath } from './tvPaths.js';
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { parseKeyValueFile } from "./qb-cred.js";
+import { getApiSecretsDir, preferSharedReadPath } from "./tvPaths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 const execFileAsync = promisify(execFile);
 
 function resolveCredPath() {
-  return path.join(getApiSecretsDir(), 'qbt-cred.txt');
+  return path.join(getApiSecretsDir(), "qbt-cred.txt");
 }
 
 async function loadQbtCreds() {
@@ -22,7 +22,7 @@ async function loadQbtCreds() {
   } catch {
     throw new Error(`Missing required qBittorrent creds file: ${credPath}`);
   }
-  const text = await fs.readFile(credPath, 'utf8');
+  const text = await fs.readFile(credPath, "utf8");
   const creds = parseKeyValueFile(text);
 
   let qbHost = creds.QB_HOST;
@@ -35,13 +35,16 @@ async function loadQbtCreds() {
   if (!qbPass) throw new Error(`Missing QB_PASS in ${credPath}`);
 
   // If QB_HOST is user@host, derive QB_USER if missing and strip user for HTTP host.
-  if (qbHost.includes('@')) {
-    const [userPart, hostPart] = qbHost.split('@');
+  if (qbHost.includes("@")) {
+    const [userPart, hostPart] = qbHost.split("@");
     if (!qbUser && userPart) qbUser = userPart;
     qbHost = hostPart || qbHost;
   }
 
-  if (!qbUser) throw new Error(`Missing QB_USER in ${credPath} (or set QB_HOST as user@host)`);
+  if (!qbUser)
+    throw new Error(
+      `Missing QB_USER in ${credPath} (or set QB_HOST as user@host)`,
+    );
 
   const qbPort = Number(qbPortRaw);
   if (!Number.isInteger(qbPort) || qbPort <= 0 || qbPort > 65535) {
@@ -58,7 +61,7 @@ async function loadQbHostForSsh() {
   } catch {
     throw new Error(`Missing required qBittorrent creds file: ${credPath}`);
   }
-  const text = await fs.readFile(credPath, 'utf8');
+  const text = await fs.readFile(credPath, "utf8");
   const creds = parseKeyValueFile(text);
   const qbHost = creds.QB_HOST;
   if (!qbHost) throw new Error(`Missing QB_HOST in ${credPath}`);
@@ -67,32 +70,38 @@ async function loadQbHostForSsh() {
 
 async function loadFlexgetOverridesForSsh() {
   const credPath = resolveCredPath();
-  const text = await fs.readFile(credPath, 'utf8');
+  const text = await fs.readFile(credPath, "utf8");
   const creds = parseKeyValueFile(text);
-  const flexgetCmd = (creds.FLEXGET_CMD ?? '').toString().trim();
-  const flexgetBin = (creds.FLEXGET_BIN ?? '').toString().trim();
+  const flexgetCmd = (creds.FLEXGET_CMD ?? "").toString().trim();
+  const flexgetBin = (creds.FLEXGET_BIN ?? "").toString().trim();
   return {
     flexgetCmd: flexgetCmd || null,
     flexgetBin: flexgetBin || null,
-    credPath
+    credPath,
   };
 }
 
 function lastNonEmptyLine(text) {
-  const lines = String(text ?? '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-  return lines.length ? lines[lines.length - 1] : '';
+  const lines = String(text ?? "")
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return lines.length ? lines[lines.length - 1] : "";
 }
 
 function lastLineStartingWithInt(text) {
-  const lines = String(text ?? '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  const lines = String(text ?? "")
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
   for (let i = lines.length - 1; i >= 0; i -= 1) {
     if (/^\d+/.test(lines[i])) return lines[i];
   }
-  return '';
+  return "";
 }
 
 function parseLeadingInt(text) {
-  const line = String(text ?? '').trim();
+  const line = String(text ?? "").trim();
   const m = line.match(/^(\d+)/);
   if (!m) return undefined;
   const n = Number(m[1]);
@@ -100,8 +109,11 @@ function parseLeadingInt(text) {
 }
 
 function parseDfForMount(dfText, mountPoint) {
-  const text = String(dfText ?? '');
-  const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  const text = String(dfText ?? "");
+  const lines = text
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
   if (lines.length < 2) return undefined;
 
   // Skip header; find the row whose mountpoint matches.
@@ -114,19 +126,31 @@ function parseDfForMount(dfText, mountPoint) {
     const total = Number(parts[1]);
     const used = Number(parts[2]);
     const avail = Number(parts[3]);
-    if (!Number.isFinite(total) || !Number.isFinite(used) || !Number.isFinite(avail)) return undefined;
-    return { target, total: Math.trunc(total), used: Math.trunc(used), avail: Math.trunc(avail) };
+    if (
+      !Number.isFinite(total) ||
+      !Number.isFinite(used) ||
+      !Number.isFinite(avail)
+    )
+      return undefined;
+    return {
+      target,
+      total: Math.trunc(total),
+      used: Math.trunc(used),
+      avail: Math.trunc(avail),
+    };
   };
 
   for (const row of rows) {
     const parsed = parseRow(row);
-    if (parsed && parsed.target === mountPoint) return { total: parsed.total, used: parsed.used, avail: parsed.avail };
+    if (parsed && parsed.target === mountPoint)
+      return { total: parsed.total, used: parsed.used, avail: parsed.avail };
   }
 
   // If df only printed a single filesystem line, accept it.
   if (rows.length === 1) {
     const parsed = parseRow(rows[0]);
-    if (parsed) return { total: parsed.total, used: parsed.used, avail: parsed.avail };
+    if (parsed)
+      return { total: parsed.total, used: parsed.used, avail: parsed.avail };
   }
 
   return undefined;
@@ -147,8 +171,11 @@ export async function spaceAvail() {
   let usbSpaceUsed = 0;
 
   const parseDfFirstDataRow = (dfText) => {
-    const text = String(dfText ?? '');
-    const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const text = String(dfText ?? "");
+    const lines = text
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
     if (lines.length < 2) return undefined;
     const row = lines[1];
     const parts = String(row).split(/\s+/);
@@ -156,8 +183,17 @@ export async function spaceAvail() {
     const total = Number(parts[1]);
     const used = Number(parts[2]);
     const avail = Number(parts[3]);
-    if (!Number.isFinite(total) || !Number.isFinite(used) || !Number.isFinite(avail)) return undefined;
-    return { total: Math.trunc(total), used: Math.trunc(used), avail: Math.trunc(avail) };
+    if (
+      !Number.isFinite(total) ||
+      !Number.isFinite(used) ||
+      !Number.isFinite(avail)
+    )
+      return undefined;
+    return {
+      total: Math.trunc(total),
+      used: Math.trunc(used),
+      avail: Math.trunc(avail),
+    };
   };
 
   const dfToTotalUsed = (parsed) => {
@@ -167,7 +203,7 @@ export async function spaceAvail() {
       // Match `df` semantics: Available excludes reserved blocks.
       // Use (used + avail) so client pctUsed and (total-used) match df Use%/Available.
       total: Math.trunc(parsed.used + parsed.avail),
-      used: Math.trunc(parsed.used)
+      used: Math.trunc(parsed.used),
     };
   };
 
@@ -175,37 +211,43 @@ export async function spaceAvail() {
     const qbHost = await loadQbHostForSsh();
 
     const sshBaseArgs = [
-      '-o',
-      'BatchMode=yes',
-      '-o',
-      'ConnectTimeout=10',
-      '-o',
-      'LogLevel=ERROR',
-      '-o',
-      'StrictHostKeyChecking=no',
-      '-o',
-      'UserKnownHostsFile=/dev/null',
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "ConnectTimeout=10",
+      "-o",
+      "LogLevel=ERROR",
+      "-o",
+      "StrictHostKeyChecking=no",
+      "-o",
+      "UserKnownHostsFile=/dev/null",
     ];
 
     // du may exit non-zero if it hits unreadable directories; still emits a usable summary line.
     // Keep command exactly as requested (cd; du -s) and parse stdout even on non-zero exit.
-    const args = [
-      ...sshBaseArgs,
-      qbHost,
-      'cd; du -s'
-    ];
+    const args = [...sshBaseArgs, qbHost, "cd; du -s"];
 
     const runDuOnce = async () => {
       try {
-        const du = await execFileAsync('ssh', args, {
+        const du = await execFileAsync("ssh", args, {
           timeout: 30000,
           maxBuffer: 1024 * 1024,
-          windowsHide: true
+          windowsHide: true,
         });
-        return { stdout: String(du.stdout ?? ''), stderr: String(du.stderr ?? ''), err: null };
+        return {
+          stdout: String(du.stdout ?? ""),
+          stderr: String(du.stderr ?? ""),
+          err: null,
+        };
       } catch (e) {
-        const stdout = (e && typeof e === 'object' && 'stdout' in e) ? String(e.stdout ?? '') : '';
-        const stderr = (e && typeof e === 'object' && 'stderr' in e) ? String(e.stderr ?? '') : '';
+        const stdout =
+          e && typeof e === "object" && "stdout" in e
+            ? String(e.stdout ?? "")
+            : "";
+        const stderr =
+          e && typeof e === "object" && "stderr" in e
+            ? String(e.stderr ?? "")
+            : "";
         return { stdout, stderr, err: e };
       }
     };
@@ -233,17 +275,26 @@ export async function spaceAvail() {
     if (Number.isInteger(duK)) {
       usbSpaceUsed = Math.trunc(duK * 1024);
       if (attempt.err && !attempt.stdout && !attempt.stderr) {
-        console.error('spaceAvail: ssh du failed (no output):', attempt.err);
+        console.error("spaceAvail: ssh du failed (no output):", attempt.err);
       }
     } else {
       if (attempt.err) {
-        console.error('spaceAvail: ssh du failed (unparsable output):', attempt.err);
+        console.error(
+          "spaceAvail: ssh du failed (unparsable output):",
+          attempt.err,
+        );
       }
       // Preserve old log shape (stdout-focused) but include stderr for diagnosis.
-      console.error('spaceAvail: unexpected ssh du output:', attempt.stdout || attempt.stderr);
+      console.error(
+        "spaceAvail: unexpected ssh du output:",
+        attempt.stdout || attempt.stderr,
+      );
     }
   } catch (e) {
-    console.error('spaceAvail: ssh space probing failed (returning usbSpaceUsed=0):', e);
+    console.error(
+      "spaceAvail: ssh space probing failed (returning usbSpaceUsed=0):",
+      e,
+    );
   }
 
   let mediaSpaceTotal = 0;
@@ -253,10 +304,10 @@ export async function spaceAvail() {
     // Prefer the actual mounted paths under /mnt (common on Linux servers) to avoid
     // accidentally measuring the root filesystem when /media exists as a plain directory.
     // Fallback to legacy paths if present.
-    const candidateMounts = ['/mnt/media', '/mnt/m-bkup', '/media', '/m-bkup'];
+    const candidateMounts = ["/mnt/media", "/mnt/m-bkup", "/media", "/m-bkup"];
 
     // In Windows/dev environments, none of these mounts may exist.
-    let mediaMount = '';
+    let mediaMount = "";
     for (const m of candidateMounts) {
       try {
         await fs.access(m);
@@ -272,33 +323,36 @@ export async function spaceAvail() {
         usbSpaceTotal: Math.trunc(usbSpaceTotal),
         usbSpaceUsed: Math.trunc(usbSpaceUsed),
         mediaSpaceTotal: 0,
-        mediaSpaceUsed: 0
+        mediaSpaceUsed: 0,
       };
     }
 
-    const df = await execFileAsync('df', ['-B1', '-P', mediaMount], {
+    const df = await execFileAsync("df", ["-B1", "-P", mediaMount], {
       timeout: 15000,
       maxBuffer: 1024 * 1024,
-      windowsHide: true
+      windowsHide: true,
     });
-    const dfText = String(df.stdout ?? '');
+    const dfText = String(df.stdout ?? "");
     const parsed = parseDfForMount(dfText, mediaMount);
     const tu = dfToTotalUsed(parsed);
     if (tu) {
       mediaSpaceUsed = tu.used;
       mediaSpaceTotal = tu.total;
     } else {
-      console.error('spaceAvail: unexpected df output:', dfText);
+      console.error("spaceAvail: unexpected df output:", dfText);
     }
   } catch (e) {
-    console.error('spaceAvail: df failed (returning mediaSpaceTotal/mediaSpaceUsed=0):', e);
+    console.error(
+      "spaceAvail: df failed (returning mediaSpaceTotal/mediaSpaceUsed=0):",
+      e,
+    );
   }
 
   return {
     usbSpaceTotal: Math.trunc(usbSpaceTotal),
     usbSpaceUsed: Math.trunc(usbSpaceUsed),
     mediaSpaceTotal: Math.trunc(mediaSpaceTotal),
-    mediaSpaceUsed: Math.trunc(mediaSpaceUsed)
+    mediaSpaceUsed: Math.trunc(mediaSpaceUsed),
   };
 }
 
@@ -313,68 +367,84 @@ export async function flexgetHistory() {
   const { flexgetCmd, flexgetBin } = await loadFlexgetOverridesForSsh();
 
   const sshBaseArgs = [
-    '-o',
-    'BatchMode=yes',
-    '-o',
-    'ConnectTimeout=10',
-    '-o',
-    'LogLevel=ERROR',
-    '-o',
-    'StrictHostKeyChecking=no',
-    '-o',
-    'UserKnownHostsFile=/dev/null',
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "ConnectTimeout=10",
+    "-o",
+    "LogLevel=ERROR",
+    "-o",
+    "StrictHostKeyChecking=no",
+    "-o",
+    "UserKnownHostsFile=/dev/null",
   ];
 
   const extractHistoryTable = (text) => {
-    const s = String(text ?? '');
-    if (!s) return { text: '', ok: false };
+    const s = String(text ?? "");
+    if (!s) return { text: "", ok: false };
 
     // FlexGet renders a table using box drawing chars; when we run via an interactive shell
     // we may get MOTD/prompt noise. Strip everything before the header.
     const lines = s.split(/\r?\n/);
     const isHeaderLine = (line) => {
-      const l = String(line ?? '');
-      if (l.includes('│Task│') || l.includes('|Task|')) return true;
+      const l = String(line ?? "");
+      if (l.includes("│Task│") || l.includes("|Task|")) return true;
       // Some installs output without box chars or leading pipes, e.g. "Task   |ipt".
       return /^\s*Task\s*\|/.test(l);
     };
 
     const headerIdx = lines.findIndex(isHeaderLine);
-    if (headerIdx >= 0) return { text: lines.slice(headerIdx).join('\n'), ok: true };
+    if (headerIdx >= 0)
+      return { text: lines.slice(headerIdx).join("\n"), ok: true };
     return { text: s, ok: false };
   };
 
   const runSsh = async (args) => {
     try {
-      const out = await execFileAsync('ssh', args, {
+      const out = await execFileAsync("ssh", args, {
         timeout: 30000,
         maxBuffer: 10 * 1024 * 1024,
-        windowsHide: true
+        windowsHide: true,
       });
-      return { stdout: String(out.stdout ?? ''), stderr: String(out.stderr ?? ''), err: null };
+      return {
+        stdout: String(out.stdout ?? ""),
+        stderr: String(out.stderr ?? ""),
+        err: null,
+      };
     } catch (e) {
-      const stdout = (e && typeof e === 'object' && 'stdout' in e) ? String(e.stdout ?? '') : '';
-      const stderr = (e && typeof e === 'object' && 'stderr' in e) ? String(e.stderr ?? '') : '';
+      const stdout =
+        e && typeof e === "object" && "stdout" in e
+          ? String(e.stdout ?? "")
+          : "";
+      const stderr =
+        e && typeof e === "object" && "stderr" in e
+          ? String(e.stderr ?? "")
+          : "";
       return { stdout, stderr, err: e };
     }
   };
 
   const formatRemoteTail = (stdout, stderr) => {
-    const s = String(stdout ?? '').trim();
-    const e = String(stderr ?? '').trim();
+    const s = String(stdout ?? "").trim();
+    const e = String(stderr ?? "").trim();
     const pickTail = (t) => {
-      const lines = String(t ?? '').split(/\r?\n/).filter(Boolean);
-      return lines.slice(Math.max(0, lines.length - 8)).join('\n');
+      const lines = String(t ?? "")
+        .split(/\r?\n/)
+        .filter(Boolean);
+      return lines.slice(Math.max(0, lines.length - 8)).join("\n");
     };
     const parts = [];
     if (s) parts.push(`stdout tail:\n${pickTail(s)}`);
     if (e) parts.push(`stderr tail:\n${pickTail(e)}`);
-    return parts.join('\n\n');
+    return parts.join("\n\n");
   };
 
   const looksLikeFlexgetNotFound = (stdout, stderr) => {
-    const combined = `${stdout || ''}\n${stderr || ''}`.toLowerCase();
-    return combined.includes('command not found') || combined.includes('flexget not found');
+    const combined = `${stdout || ""}\n${stderr || ""}`.toLowerCase();
+    return (
+      combined.includes("command not found") ||
+      combined.includes("flexget not found")
+    );
   };
 
   // If configured, prefer explicit command or binary path.
@@ -388,9 +458,9 @@ export async function flexgetHistory() {
     const args = [
       ...sshBaseArgs,
       qbHost,
-      'bash',
-      '-lc',
-      `cd "$HOME" || exit 1\n${cmdLine}`
+      "bash",
+      "-lc",
+      `cd "$HOME" || exit 1\n${cmdLine}`,
     ];
 
     const r = await runSsh(args);
@@ -399,7 +469,9 @@ export async function flexgetHistory() {
       if (extracted.ok) return extracted.text;
     }
     if (r.err) throw r.err;
-    throw new Error(`flexget history did not return expected table header.\n${formatRemoteTail(r.stdout, r.stderr)}`);
+    throw new Error(
+      `flexget history did not return expected table header.\n${formatRemoteTail(r.stdout, r.stderr)}`,
+    );
   }
 
   // Try to find flexget in typical locations; fall back to python module.
@@ -409,50 +481,44 @@ export async function flexgetHistory() {
     // Common local install used on this box (often exposed via an alias in interactive shells).
     'if [ -x "$HOME/flexget/bin/flexget" ]; then',
     '  "$HOME/flexget/bin/flexget" history --limit 1000',
-    '  exit $?',
-    'fi',
+    "  exit $?",
+    "fi",
     'FLEXGET_BIN="$(command -v flexget 2>/dev/null || true)"',
     'if [ -n "$FLEXGET_BIN" ] && [ -x "$FLEXGET_BIN" ]; then',
     '  "$FLEXGET_BIN" history --limit 1000',
-    '  exit $?',
-    'fi',
+    "  exit $?",
+    "fi",
     'if [ -x "$HOME/.local/bin/flexget" ]; then',
     '  "$HOME/.local/bin/flexget" history --limit 1000',
-    '  exit $?',
-    'fi',
+    "  exit $?",
+    "fi",
     'if [ -x "/usr/local/bin/flexget" ]; then',
     '  "/usr/local/bin/flexget" history --limit 1000',
-    '  exit $?',
-    'fi',
+    "  exit $?",
+    "fi",
     'if [ -x "/usr/bin/flexget" ]; then',
     '  "/usr/bin/flexget" history --limit 1000',
-    '  exit $?',
-    'fi',
-    'if command -v python3 >/dev/null 2>&1; then',
+    "  exit $?",
+    "fi",
+    "if command -v python3 >/dev/null 2>&1; then",
     '  PY_SCRIPTS="$(python3 -c \'import sysconfig; print(sysconfig.get_path("scripts") or "")\' 2>/dev/null || true)"',
     '  if [ -n "$PY_SCRIPTS" ] && [ -x "$PY_SCRIPTS/flexget" ]; then',
     '    "$PY_SCRIPTS/flexget" history --limit 1000',
-    '    exit $?',
-    '  fi',
+    "    exit $?",
+    "  fi",
     '  PY_USERBASE="$(python3 -c \'import site; print(site.getuserbase() or "")\' 2>/dev/null || true)"',
     '  if [ -n "$PY_USERBASE" ] && [ -x "$PY_USERBASE/bin/flexget" ]; then',
     '    "$PY_USERBASE/bin/flexget" history --limit 1000',
-    '    exit $?',
-    '  fi',
-    'fi',
+    "    exit $?",
+    "  fi",
+    "fi",
     'echo "flexget not found (no flexget executable found)" 1>&2',
-    'exit 127'
-  ].join('\n');
+    "exit 127",
+  ].join("\n");
 
   // First, try a non-interactive login shell (clean output).
   // This will NOT pick up aliases/functions defined only in ~/.bashrc.
-  const argsLogin = [
-    ...sshBaseArgs,
-    qbHost,
-    'bash',
-    '-lc',
-    remoteScript
-  ];
+  const argsLogin = [...sshBaseArgs, qbHost, "bash", "-lc", remoteScript];
   const r1 = await runSsh(argsLogin);
   if (r1.stdout) {
     const extracted = extractHistoryTable(r1.stdout);
@@ -470,21 +536,15 @@ export async function flexgetHistory() {
       'sh="$(getent passwd "$u" 2>/dev/null | cut -d: -f7)"',
       'if [ -z "$sh" ] && [ -r /etc/passwd ]; then',
       '  sh="$(awk -F: -v u="$u" \"$1==u{print $7}\" /etc/passwd 2>/dev/null | head -n 1)"',
-      'fi',
-      'printf "%s" "$sh"'
-    ].join('\n');
+      "fi",
+      'printf "%s" "$sh"',
+    ].join("\n");
 
-    const shellQueryArgs = [
-      ...sshBaseArgs,
-      qbHost,
-      'sh',
-      '-lc',
-      shellQuery
-    ];
+    const shellQueryArgs = [...sshBaseArgs, qbHost, "sh", "-lc", shellQuery];
 
     const shellRes = await runSsh(shellQueryArgs);
-    const shellPath = String(shellRes.stdout ?? '').trim();
-    const shellName = shellPath ? path.posix.basename(shellPath) : 'bash';
+    const shellPath = String(shellRes.stdout ?? "").trim();
+    const shellName = shellPath ? path.posix.basename(shellPath) : "bash";
 
     const interactiveScript = [
       // Suppress prompt/noise as much as possible.
@@ -492,23 +552,24 @@ export async function flexgetHistory() {
       'export PROMPT_COMMAND=""',
       'export PROMPT=""',
       'cd "$HOME" || exit 1',
-      'if [ -x "$HOME/flexget/bin/flexget" ]; then "$HOME/flexget/bin/flexget" history --limit 1000; else flexget history --limit 1000; fi'
-    ].join('\n');
+      'if [ -x "$HOME/flexget/bin/flexget" ]; then "$HOME/flexget/bin/flexget" history --limit 1000; else flexget history --limit 1000; fi',
+    ].join("\n");
 
     // Prefer the user's actual shell if it supports login+interactive modes.
     // For bash/zsh, use -ilc to approximate an actual interactive login session.
-    const shellToRun = shellName || 'bash';
-    const shellArgs = (shellToRun === 'zsh' || shellToRun === 'bash')
-      ? ['-ilc', interactiveScript]
-      : ['-ic', interactiveScript];
+    const shellToRun = shellName || "bash";
+    const shellArgs =
+      shellToRun === "zsh" || shellToRun === "bash"
+        ? ["-ilc", interactiveScript]
+        : ["-ic", interactiveScript];
 
     const argsInteractive = [
       ...sshBaseArgs,
       // Force a pseudo-tty so interactive rc files are loaded and job control warnings are avoided.
-      '-tt',
+      "-tt",
       qbHost,
       shellToRun,
-      ...shellArgs
+      ...shellArgs,
     ];
 
     const r2 = await runSsh(argsInteractive);
@@ -517,47 +578,53 @@ export async function flexgetHistory() {
       if (extracted.ok) return extracted.text;
     }
     if (r2.err) {
-      throw new Error(`flexget history ssh (interactive) failed.\n${formatRemoteTail(r2.stdout, r2.stderr)}`);
+      throw new Error(
+        `flexget history ssh (interactive) failed.\n${formatRemoteTail(r2.stdout, r2.stderr)}`,
+      );
     }
   }
 
   if (r1.err) {
-    throw new Error(`flexget history ssh (login) failed.\n${formatRemoteTail(r1.stdout, r1.stderr)}`);
+    throw new Error(
+      `flexget history ssh (login) failed.\n${formatRemoteTail(r1.stdout, r1.stderr)}`,
+    );
   }
-  throw new Error(`flexget history did not return expected table header.\n${formatRemoteTail(r1.stdout, r1.stderr)}`);
+  throw new Error(
+    `flexget history did not return expected table header.\n${formatRemoteTail(r1.stdout, r1.stderr)}`,
+  );
 }
 
 function getSetCookieHeader(headers) {
   // Node's fetch (undici) supports getSetCookie(); fall back to single header.
   const anyHeaders = /** @type {any} */ (headers);
-  if (typeof anyHeaders.getSetCookie === 'function') {
+  if (typeof anyHeaders.getSetCookie === "function") {
     const arr = anyHeaders.getSetCookie();
     if (Array.isArray(arr)) return arr;
   }
-  const v = headers.get('set-cookie');
+  const v = headers.get("set-cookie");
   return v ? [v] : [];
 }
 
 function pickCookie(setCookieHeaders) {
   // qBittorrent sets SID=<...>; Path=/; HttpOnly
   for (const raw of setCookieHeaders) {
-    const firstPart = String(raw).split(';')[0].trim();
-    if (firstPart.toLowerCase().startsWith('sid=')) return firstPart;
+    const firstPart = String(raw).split(";")[0].trim();
+    if (firstPart.toLowerCase().startsWith("sid=")) return firstPart;
   }
   // Fallback: use first cookie if present.
   if (setCookieHeaders.length > 0) {
-    return String(setCookieHeaders[0]).split(';')[0].trim();
+    return String(setCookieHeaders[0]).split(";")[0].trim();
   }
-  return '';
+  return "";
 }
 
 async function qbLogin({ baseUrl, qbUser, qbPass }) {
   const body = new URLSearchParams({ username: qbUser, password: qbPass });
 
-  const res = await fetch(new URL('/api/v2/auth/login', baseUrl), {
-    method: 'POST',
+  const res = await fetch(new URL("/api/v2/auth/login", baseUrl), {
+    method: "POST",
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      "Content-Type": "application/x-www-form-urlencoded",
       Origin: baseUrl,
       Referer: `${baseUrl}/`,
     },
@@ -565,15 +632,19 @@ async function qbLogin({ baseUrl, qbUser, qbPass }) {
   });
 
   const text = await res.text();
-  if (!res.ok || (text !== 'Ok.' && text !== 'Ok')) {
-    throw new Error(`qBittorrent login failed: ${text || `HTTP ${res.status}`}`);
+  if (!res.ok || (text !== "Ok." && text !== "Ok")) {
+    throw new Error(
+      `qBittorrent login failed: ${text || `HTTP ${res.status}`}`,
+    );
   }
 
   const setCookies = getSetCookieHeader(res.headers);
   const cookie = pickCookie(setCookies);
   if (!cookie) {
     // qB sometimes returns Ok without cookie if something's off.
-    throw new Error('qBittorrent login succeeded but no session cookie was returned');
+    throw new Error(
+      "qBittorrent login succeeded but no session cookie was returned",
+    );
   }
 
   return cookie;
@@ -604,24 +675,24 @@ export async function getQbtInfo(filter) {
 
   const cookie = await qbLogin({ baseUrl, qbUser, qbPass });
 
-  const url = new URL('/api/v2/torrents/info', baseUrl);
+  const url = new URL("/api/v2/torrents/info", baseUrl);
 
-  if (filter && typeof filter === 'object' && !Array.isArray(filter)) {
+  if (filter && typeof filter === "object" && !Array.isArray(filter)) {
     const { hash, category, tag, filter: state } = filter;
 
     if (hash) {
-      const hashes = Array.isArray(hash) ? hash.join('|') : String(hash);
-      if (hashes.trim()) url.searchParams.set('hashes', hashes);
+      const hashes = Array.isArray(hash) ? hash.join("|") : String(hash);
+      if (hashes.trim()) url.searchParams.set("hashes", hashes);
     }
-    if (category) url.searchParams.set('category', String(category));
-    if (tag) url.searchParams.set('tag', String(tag));
-    if (state) url.searchParams.set('filter', String(state));
+    if (category) url.searchParams.set("category", String(category));
+    if (tag) url.searchParams.set("tag", String(tag));
+    if (state) url.searchParams.set("filter", String(state));
   }
 
   const res = await fetch(url, {
-    method: 'GET',
+    method: "GET",
     headers: {
-      Accept: 'application/json',
+      Accept: "application/json",
       Cookie: cookie,
       Origin: baseUrl,
       Referer: `${baseUrl}/`,
@@ -629,8 +700,10 @@ export async function getQbtInfo(filter) {
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`qBittorrent info failed: HTTP ${res.status}${text ? `: ${text}` : ''}`);
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `qBittorrent info failed: HTTP ${res.status}${text ? `: ${text}` : ""}`,
+    );
   }
 
   return res.json();
@@ -650,24 +723,27 @@ export async function delQbtTorrent(input) {
 
   const hashValue = input?.hash;
   const hashesArr = Array.isArray(hashValue)
-    ? hashValue.map(String).map(s => s.trim()).filter(Boolean)
-    : [String(hashValue ?? '').trim()].filter(Boolean);
+    ? hashValue
+        .map(String)
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [String(hashValue ?? "").trim()].filter(Boolean);
 
   if (!hashesArr.length) {
-    throw new Error('delQbtTorrent requires hash');
+    throw new Error("delQbtTorrent requires hash");
   }
 
   const cookie = await qbLogin({ baseUrl, qbUser, qbPass });
 
   const body = new URLSearchParams({
-    hashes: hashesArr.join('|'),
-    deleteFiles: input?.deleteFiles === false ? 'false' : 'true',
+    hashes: hashesArr.join("|"),
+    deleteFiles: input?.deleteFiles === false ? "false" : "true",
   });
 
-  const res = await fetch(new URL('/api/v2/torrents/delete', baseUrl), {
-    method: 'POST',
+  const res = await fetch(new URL("/api/v2/torrents/delete", baseUrl), {
+    method: "POST",
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      "Content-Type": "application/x-www-form-urlencoded",
       Cookie: cookie,
       Origin: baseUrl,
       Referer: `${baseUrl}/`,
@@ -676,8 +752,10 @@ export async function delQbtTorrent(input) {
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`qBittorrent delete failed: HTTP ${res.status}${text ? `: ${text}` : ''}`);
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `qBittorrent delete failed: HTTP ${res.status}${text ? `: ${text}` : ""}`,
+    );
   }
 
   // qB often returns empty body or "Ok."; ignore content.
@@ -696,16 +774,21 @@ export async function delQbtTorrent(input) {
 export async function addQbtTorrent(input) {
   const torrentData = input?.torrentData;
   if (!Buffer.isBuffer(torrentData) || torrentData.length === 0) {
-    throw new Error('addQbtTorrent requires torrentData Buffer');
+    throw new Error("addQbtTorrent requires torrentData Buffer");
   }
 
-  const filenameRaw = String(input?.filename || 'download.torrent').trim() || 'download.torrent';
-  const filename = filenameRaw.replace(/[\\/]+/g, '_');
+  const filenameRaw =
+    String(input?.filename || "download.torrent").trim() || "download.torrent";
+  const filename = filenameRaw.replace(/[\\/]+/g, "_");
 
   const tagsValue = input?.tags;
   const tags = Array.isArray(tagsValue)
-    ? tagsValue.map(String).map(s => s.trim()).filter(Boolean).join(',')
-    : String(tagsValue ?? '').trim();
+    ? tagsValue
+        .map(String)
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .join(",")
+    : String(tagsValue ?? "").trim();
 
   const { qbHost, qbPort, qbUser, qbPass } = await loadQbtCreds();
   const baseUrl = `http://${qbHost}:${qbPort}`;
@@ -713,12 +796,12 @@ export async function addQbtTorrent(input) {
   const cookie = await qbLogin({ baseUrl, qbUser, qbPass });
 
   const form = new FormData();
-  const blob = new Blob([torrentData], { type: 'application/x-bittorrent' });
-  form.append('torrents', blob, filename);
-  if (tags) form.append('tags', tags);
+  const blob = new Blob([torrentData], { type: "application/x-bittorrent" });
+  form.append("torrents", blob, filename);
+  if (tags) form.append("tags", tags);
 
-  const res = await fetch(new URL('/api/v2/torrents/add', baseUrl), {
-    method: 'POST',
+  const res = await fetch(new URL("/api/v2/torrents/add", baseUrl), {
+    method: "POST",
     headers: {
       Cookie: cookie,
       Origin: baseUrl,
@@ -727,13 +810,15 @@ export async function addQbtTorrent(input) {
     body: form,
   });
 
-  const text = await res.text().catch(() => '');
+  const text = await res.text().catch(() => "");
   if (!res.ok) {
-    throw new Error(`qBittorrent add failed: HTTP ${res.status}${text ? `: ${text}` : ''}`);
+    throw new Error(
+      `qBittorrent add failed: HTTP ${res.status}${text ? `: ${text}` : ""}`,
+    );
   }
 
-  const t = String(text || '').trim();
+  const t = String(text || "").trim();
   // qBittorrent often returns "Ok.", but some versions/configs return an empty body on success.
-  const ok = t.length === 0 || t.toLowerCase().startsWith('ok');
+  const ok = t.length === 0 || t.toLowerCase().startsWith("ok");
   return { ok, status: res.status, text: t };
 }

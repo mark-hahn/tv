@@ -1,16 +1,16 @@
-import fs from 'fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import fs from "fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // apps/api/src -> apps/api
-const API_ROOT_DIR = path.resolve(__dirname, '..');
+const API_ROOT_DIR = path.resolve(__dirname, "..");
 
-const API_DATA_DIR = path.join(API_ROOT_DIR, 'data');
-const API_SECRETS_DIR = path.join(API_ROOT_DIR, 'secrets');
-const API_MISC_DIR = path.join(API_DATA_DIR, 'misc');
+const API_DATA_DIR = path.join(API_ROOT_DIR, "data");
+const API_SECRETS_DIR = path.join(API_ROOT_DIR, "secrets");
+const API_MISC_DIR = path.join(API_DATA_DIR, "misc");
 
 export function ensureDir(dirPath) {
   try {

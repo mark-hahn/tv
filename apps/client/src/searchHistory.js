@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'tv.searchHistory.v1';
+const STORAGE_KEY = "tv.searchHistory.v1";
 const MAX_ENTRIES = 50;
 
 function safeParseJson(raw) {
@@ -11,7 +11,7 @@ function safeParseJson(raw) {
 }
 
 function normalizeQuery(query) {
-  return String(query ?? '').trim();
+  return String(query ?? "").trim();
 }
 
 export function isValidSearchQuery(query) {
@@ -26,9 +26,7 @@ export function isValidSearchQuery(query) {
 export function loadSearchHistory() {
   const parsed = safeParseJson(localStorage.getItem(STORAGE_KEY));
   if (!Array.isArray(parsed)) return [];
-  return parsed
-    .map((x) => normalizeQuery(x))
-    .filter((x) => Boolean(x));
+  return parsed.map((x) => normalizeQuery(x)).filter((x) => Boolean(x));
 }
 
 export function saveSearchHistory(entries) {

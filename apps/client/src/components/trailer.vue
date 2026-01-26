@@ -1,58 +1,122 @@
 <template>
-
-<div id="trailer" @click.stop :style="{ height:'100%', width:'100%', padding:'10px', boxSizing:'border-box', overflowY:'auto', backgroundColor:'#fafafa', position:'relative' }">
-  <div v-if="err" style="color:red; margin:10px; border:1px solid red; padding:10px;"><b>Error:</b>
-    <pre>{{ err }}</pre>
-  </div>
-  <div v-if="!showName" style="padding:20px; text-align:center; color:#666;">No show selected.</div>
-  <template v-else>
-    <div :style="{ fontWeight:'bold', fontSize:'24px', marginBottom:'15px', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }"><span>{{ showName }}</span></div>
-    <!-- content wrapper to allow refresh-->
-    <div v-if="!trailers || trailers.length === 0" style="padding:20px; text-align:center; color:#666;">No trailers found.</div>
-    <div v-else-if="showContent" style="display:flex; flex-direction:column; gap:20px;">
-      <div v-for="(t, idx) in trailers" :key="t.id || t.url" style="background:white; padding:10px; border:1px solid #ccc; border-radius:5px;">
-        <div :style="{ fontWeight:'bold', marginBottom:'5px' }">{{ t.name ? t.name.replace(/Trailer/gi, '').trim() : '' }}</div>
-        <template v-if="getYoutubeId(t.url)">
-          <div :id="'yt-player-' + idx"></div>
-        </template>
-        <template v-else-if="isVideoFile(t.url)">
-          <video controls ref="htmlVideos" width="100%" style="max-width:560px;" :src="t.url" :data-url="t.url"></video>
-        </template>
-        <div v-else><a :href="t.url" target="_blank">{{ t.url }}</a></div>
-      </div>
+  <div
+    id="trailer"
+    @click.stop
+    :style="{
+      height: '100%',
+      width: '100%',
+      padding: '10px',
+      boxSizing: 'border-box',
+      overflowY: 'auto',
+      backgroundColor: '#fafafa',
+      position: 'relative',
+    }"
+  >
+    <div
+      v-if="err"
+      style="color: red; margin: 10px; border: 1px solid red; padding: 10px"
+    >
+      <b>Error:</b>
+      <pre>{{ err }}</pre>
     </div>
-  </template>
-</div>
+    <div
+      v-if="!showName"
+      style="padding: 20px; text-align: center; color: #666"
+    >
+      No show selected.
+    </div>
+    <template v-else>
+      <div
+        :style="{
+          fontWeight: 'bold',
+          fontSize: '24px',
+          marginBottom: '15px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          flexWrap: 'wrap',
+        }"
+      >
+        <span>{{ showName }}</span>
+      </div>
+      <!-- content wrapper to allow refresh-->
+      <div
+        v-if="!trailers || trailers.length === 0"
+        style="padding: 20px; text-align: center; color: #666"
+      >
+        No trailers found.
+      </div>
+      <div
+        v-else-if="showContent"
+        style="display: flex; flex-direction: column; gap: 20px"
+      >
+        <div
+          v-for="(t, idx) in trailers"
+          :key="t.id || t.url"
+          style="
+            background: white;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+          "
+        >
+          <div :style="{ fontWeight: 'bold', marginBottom: '5px' }">
+            {{ t.name ? t.name.replace(/Trailer/gi, "").trim() : "" }}
+          </div>
+          <template v-if="getYoutubeId(t.url)">
+            <div :id="'yt-player-' + idx"></div>
+          </template>
+          <template v-else-if="isVideoFile(t.url)">
+            <video
+              controls
+              ref="htmlVideos"
+              width="100%"
+              style="max-width: 560px"
+              :src="t.url"
+              :data-url="t.url"
+            ></video>
+          </template>
+          <div v-else>
+            <a
+              :href="t.url"
+              target="_blank"
+              >{{ t.url }}</a
+            >
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
 </template>
 
 <script>
-import evtBus from '../evtBus.js';
-import { nextTick } from 'vue';
+import evtBus from "../evtBus.js";
+import { nextTick } from "vue";
 
 export default {
   name: "Trailer",
   props: {
     simpleMode: { type: Boolean, default: false },
-    active:     { type: Boolean, default: false },
+    active: { type: Boolean, default: false },
   },
   data() {
     return {
-      showName: '',
+      showName: "",
       trailers: [],
-      err: '',
+      err: "",
       showContent: true, // Controls rendering of video list
 
       previewMode: false,
       previewAddBusy: false,
       previewSrchChoice: null,
-      
+
       // State tracking
       ytPlayers: new Map(), // idx -> YT.Player
       savedTimes: new Map(), // key -> seconds
       lastPlayingKey: null, // "yt-idx" or "html-url"
 
       lastPlayingKey: null, // "yt-idx" or "html-url"
-    }
+    };
   },
   watch: {
     active(val) {
@@ -74,7 +138,7 @@ export default {
       if (this.active && this.showContent) {
         nextTick(() => this.initPlayers());
       }
-    }
+    },
   },
   errorCaptured(err, vm, info) {
     this.err = `${err.toString()}\nInfo: ${info}`;
@@ -97,7 +161,10 @@ export default {
       if (!this.previewSrchChoice) return;
       if (this.previewAddBusy) return;
       this.previewAddBusy = true;
-      evtBus.emit('addPreviewShow', { srchChoice: this.previewSrchChoice, fromPreview: true });
+      evtBus.emit("addPreviewShow", {
+        srchChoice: this.previewSrchChoice,
+        fromPreview: true,
+      });
     },
 
     onAddPreviewShowDone() {
@@ -105,20 +172,22 @@ export default {
     },
 
     exitPreview() {
-      evtBus.emit('exitPreviewMode');
+      evtBus.emit("exitPreviewMode");
     },
 
     saveState() {
       // Save HTML5
       if (this.$refs.htmlVideos) {
         // refs might be single element or array or absent
-        const vids = Array.isArray(this.$refs.htmlVideos) ? this.$refs.htmlVideos : [this.$refs.htmlVideos];
-        vids.forEach(v => {
+        const vids = Array.isArray(this.$refs.htmlVideos)
+          ? this.$refs.htmlVideos
+          : [this.$refs.htmlVideos];
+        vids.forEach((v) => {
           if (!v) return;
-          const url = v.getAttribute('data-url');
+          const url = v.getAttribute("data-url");
           if (url && !v.paused) {
-            this.savedTimes.set('html-' + url, v.currentTime);
-            this.lastPlayingKey = 'html-' + url;
+            this.savedTimes.set("html-" + url, v.currentTime);
+            this.lastPlayingKey = "html-" + url;
           }
         });
       }
@@ -126,16 +195,23 @@ export default {
       // Save YT
       this.ytPlayers.forEach((player, idx) => {
         try {
-          if (player && player.getPlayerState && player.getPlayerState() === 1) { // 1 = playing
+          if (
+            player &&
+            player.getPlayerState &&
+            player.getPlayerState() === 1
+          ) {
+            // 1 = playing
             const time = player.getCurrentTime();
-            this.savedTimes.set('yt-' + idx, time);
-            this.lastPlayingKey = 'yt-' + idx;
+            this.savedTimes.set("yt-" + idx, time);
+            this.lastPlayingKey = "yt-" + idx;
           } else {
             // Also save paused state position just in case? No, only resume what was playing.
           }
           // Destroy player instance to clean up
           player.destroy();
-        } catch(e) { /* ignore */ }
+        } catch (e) {
+          /* ignore */
+        }
       });
       this.ytPlayers.clear();
     },
@@ -143,56 +219,58 @@ export default {
     restoreState() {
       // Restore HTML5
       if (this.$refs.htmlVideos) {
-        const vids = Array.isArray(this.$refs.htmlVideos) ? this.$refs.htmlVideos : [this.$refs.htmlVideos];
-        vids.forEach(v => {
-           if (!v) return;
-           const url = v.getAttribute('data-url');
-           const key = 'html-' + url;
-           if (key === this.lastPlayingKey && this.savedTimes.has(key)) {
-             v.currentTime = this.savedTimes.get(key);
-             v.play().catch(e => console.log('Resume blocked', e));
-           }
+        const vids = Array.isArray(this.$refs.htmlVideos)
+          ? this.$refs.htmlVideos
+          : [this.$refs.htmlVideos];
+        vids.forEach((v) => {
+          if (!v) return;
+          const url = v.getAttribute("data-url");
+          const key = "html-" + url;
+          if (key === this.lastPlayingKey && this.savedTimes.has(key)) {
+            v.currentTime = this.savedTimes.get(key);
+            v.play().catch((e) => console.log("Resume blocked", e));
+          }
         });
       }
-
 
       // YT restoration happens optionally in onPlayerReady or via initialization params
     },
 
     initPlayers() {
       if (!window.YT || !window.YT.Player) return; // Wait for API
-      
+
       this.trailers.forEach((t, idx) => {
         const ytid = this.getYoutubeId(t.url);
         if (ytid) {
-          const divId = 'yt-player-' + idx;
-          const key = 'yt-' + idx;
+          const divId = "yt-player-" + idx;
+          const key = "yt-" + idx;
           // Check if we need to resume this one
-          const shouldPlay = (key === this.lastPlayingKey);
-          const startSeconds = shouldPlay ? (this.savedTimes.get(key) || 0) : 0;
-          
+          const shouldPlay = key === this.lastPlayingKey;
+          const startSeconds = shouldPlay ? this.savedTimes.get(key) || 0 : 0;
+
           try {
-             // If player already exists (shouldn't happen with v-if), destroy it (handled in saveState usually)
-             if (document.getElementById(divId)) {
-                
-                const player = new window.YT.Player(divId, {
-                  height: '315',
-                  width: '100%',
-                  videoId: ytid,
-                  playerVars: {
-                    'playsinline': 1,
-                    'start': Math.floor(startSeconds),
-                    'autoplay': shouldPlay ? 1 : 0,
-                    'origin': window.location.origin
-                  },
-                });
-                this.ytPlayers.set(idx, player);
-                
-                // Style fix for the iframe generated by YT API
-                // It replaces the div, but might miss some styles or attributes.
-                // We can style the container or just let it be.
-             }
-          } catch(e) { console.error('YT init error', e); }
+            // If player already exists (shouldn't happen with v-if), destroy it (handled in saveState usually)
+            if (document.getElementById(divId)) {
+              const player = new window.YT.Player(divId, {
+                height: "315",
+                width: "100%",
+                videoId: ytid,
+                playerVars: {
+                  playsinline: 1,
+                  start: Math.floor(startSeconds),
+                  autoplay: shouldPlay ? 1 : 0,
+                  origin: window.location.origin,
+                },
+              });
+              this.ytPlayers.set(idx, player);
+
+              // Style fix for the iframe generated by YT API
+              // It replaces the div, but might miss some styles or attributes.
+              // We can style the container or just let it be.
+            }
+          } catch (e) {
+            console.error("YT init error", e);
+          }
         }
       });
     },
@@ -201,15 +279,15 @@ export default {
       if (window.YT && window.YT.Player) {
         return;
       }
-      const tag = document.createElement('script');
+      const tag = document.createElement("script");
       tag.src = "https://www.youtube.com/iframe_api";
-      const firstScriptTag = document.getElementsByTagName('script')[0];
+      const firstScriptTag = document.getElementsByTagName("script")[0];
       firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-      
+
       window.onYouTubeIframeAPIReady = () => {
-         if (this.active && this.showContent) {
-           this.initPlayers();
-         }
+        if (this.active && this.showContent) {
+          this.initPlayers();
+        }
       };
     },
 
@@ -219,27 +297,28 @@ export default {
     getYoutubeId(url) {
       if (!url) return null;
       try {
-        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+        const regExp =
+          /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
         const match = url.match(regExp);
-        return (match && match[2].length === 11) ? match[2] : null;
+        return match && match[2].length === 11 ? match[2] : null;
       } catch (e) {
         return null;
       }
     },
     isVideoFile(url) {
-       if (!url) return false;
-       return /\.(mp4|webm|ogg|mov)$/i.test(url);
+      if (!url) return false;
+      return /\.(mp4|webm|ogg|mov)$/i.test(url);
     },
     onSetUpSeries(show) {
-      this.err = '';
-      this.showName = show?.Name || '';
+      this.err = "";
+      this.showName = show?.Name || "";
       this.trailers = [];
       this.savedTimes.clear();
       this.lastPlayingKey = null;
       this.showContent = true; // Reset
     },
     onTvdbDataReady(data) {
-      this.err = '';
+      this.err = "";
       if (this.showName && data?.show?.Name !== this.showName) return;
 
       const tvdbData = data?.tvdbData;
@@ -249,24 +328,24 @@ export default {
         this.trailers = [];
       }
       // trailers watcher will handle init
-    }
+    },
   },
   mounted() {
     this.loadYoutubeApi(); // Start loading API
-    evtBus.on('setUpSeries', this.onSetUpSeries);
-    evtBus.on('tvdbDataReady', this.onTvdbDataReady);
+    evtBus.on("setUpSeries", this.onSetUpSeries);
+    evtBus.on("tvdbDataReady", this.onTvdbDataReady);
 
-    evtBus.on('previewMode', this.onPreviewMode);
-    evtBus.on('previewSrchChoice', this.onPreviewSrchChoice);
-    evtBus.on('addPreviewShowDone', this.onAddPreviewShowDone);
+    evtBus.on("previewMode", this.onPreviewMode);
+    evtBus.on("previewSrchChoice", this.onPreviewSrchChoice);
+    evtBus.on("addPreviewShowDone", this.onAddPreviewShowDone);
   },
   unmounted() {
-    evtBus.off('setUpSeries', this.onSetUpSeries);
-    evtBus.off('tvdbDataReady', this.onTvdbDataReady);
+    evtBus.off("setUpSeries", this.onSetUpSeries);
+    evtBus.off("tvdbDataReady", this.onTvdbDataReady);
 
-    evtBus.off('previewMode', this.onPreviewMode);
-    evtBus.off('previewSrchChoice', this.onPreviewSrchChoice);
-    evtBus.off('addPreviewShowDone', this.onAddPreviewShowDone);
-  }
-}
+    evtBus.off("previewMode", this.onPreviewMode);
+    evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);
+    evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);
+  },
+};
 </script>

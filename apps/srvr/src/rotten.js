@@ -1,13 +1,13 @@
 // node src/rotten.js "rizzoli-and-isles"
 
 import { chromium } from "playwright";
-import * as util    from "./util.js";
+import * as util from "./util.js";
 import { smartTitleMatch } from "@tv/share";
-const {log, start, end} = util.getLog('rott');
+const { log, start, end } = util.getLog("rott");
 
 const MAX_STR_DIST = 10;
-const NAV_TIMEOUT  = 15_000;
-const BASE         = "https://www.rottentomatoes.com";
+const NAV_TIMEOUT = 15_000;
+const BASE = "https://www.rottentomatoes.com";
 const argv = process.argv.slice(2);
 
 const ROTTEN_DEBUG = false;
@@ -17,9 +17,9 @@ const ROTTEN_REUSE = true;
 const ROTTEN_REUSE_PAGE = true;
 const HAS_DISPLAY = !!process.env.DISPLAY;
 
-const debug = argv.includes('--debug') || ROTTEN_DEBUG;
-const headed = argv.includes('--headed') || ROTTEN_HEADED;
-const cliQuery = argv.find(a => !a.startsWith('-'));
+const debug = argv.includes("--debug") || ROTTEN_DEBUG;
+const headed = argv.includes("--headed") || ROTTEN_HEADED;
+const cliQuery = argv.find((a) => !a.startsWith("-"));
 const TIMING_ENABLED = ROTTEN_TIMING;
 const REUSE_BROWSER = ROTTEN_REUSE;
 const REUSE_PAGE = ROTTEN_REUSE_PAGE;
@@ -41,7 +41,9 @@ export async function rottenShutdown() {
   _shared.page = null;
   _shared.initPromise = null;
   if (browser) {
-    try { await browser.close(); } catch {}
+    try {
+      await browser.close();
+    } catch {}
   }
 }
 
@@ -50,12 +52,15 @@ function installShutdownHooks() {
   _shared.hooksInstalled = true;
 
   const onSignal = async (sig) => {
-    try { await rottenShutdown(); }
-    finally { process.exit(0); }
+    try {
+      await rottenShutdown();
+    } finally {
+      process.exit(0);
+    }
   };
 
-  process.once('SIGINT', onSignal);
-  process.once('SIGTERM', onSignal);
+  process.once("SIGINT", onSignal);
+  process.once("SIGTERM", onSignal);
 }
 
 async function getSharedBrowserContext({ headless }) {
@@ -81,7 +86,11 @@ async function getSharedBrowserContext({ headless }) {
 
 async function withSerializedSharedPage(timing, fn) {
   const run = async () => {
-    const page = _shared.page || (_shared.page = await timing.time('context.newPage', () => _shared.context.newPage()));
+    const page =
+      _shared.page ||
+      (_shared.page = await timing.time("context.newPage", () =>
+        _shared.context.newPage(),
+      ));
     return await fn(page);
   };
   _shared.queue = _shared.queue.then(run, run);
@@ -122,9 +131,13 @@ function createTiming(log, enabled, label) {
     if (!enabled) return;
     const totalMs = Number(nowNs() - t0) / 1e6;
     const sorted = [...spans].sort((a, b) => b.ms - a.ms);
-    log(`timings for ${label}: total=${totalMs.toFixed(0)}ms, spans=${spans.length}`);
+    log(
+      `timings for ${label}: total=${totalMs.toFixed(0)}ms, spans=${spans.length}`,
+    );
     for (const s of sorted.slice(0, topN)) {
-      log(`timing: ${String(s.ms.toFixed(0)).padStart(5, ' ')}ms  ${s.name}${s.meta ? '  ' + s.meta : ''}`);
+      log(
+        `timing: ${String(s.ms.toFixed(0)).padStart(5, " ")}ms  ${s.name}${s.meta ? "  " + s.meta : ""}`,
+      );
     }
   };
 
@@ -132,10 +145,10 @@ function createTiming(log, enabled, label) {
 }
 
 function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function dismissOverlays(page, timing, spanName = 'dismissOverlays') {
+async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
   timing?.start(spanName);
   const selectors = [
     'button:has-text("Accept All")',
@@ -154,7 +167,10 @@ async function dismissOverlays(page, timing, spanName = 'dismissOverlays') {
   const tryClickAny = async () => {
     const attempts = selectors.map(async (sel) => {
       const locator = page.locator(sel).first();
-      await locator.waitFor({ state: 'visible', timeout: perSelectorTimeoutMs });
+      await locator.waitFor({
+        state: "visible",
+        timeout: perSelectorTimeoutMs,
+      });
       await locator.click({ timeout: perSelectorTimeoutMs });
       return sel;
     });
@@ -176,7 +192,7 @@ async function dismissOverlays(page, timing, spanName = 'dismissOverlays') {
 
   timing?.end(
     spanName,
-    clickedSelectors.length ? `clicked=${clickedSelectors.join(' | ')}` : ''
+    clickedSelectors.length ? `clicked=${clickedSelectors.join(" | ")}` : "",
   );
 }
 
@@ -184,16 +200,18 @@ function chooseShow(shows, query) {
   const match = query.match(/[^\d](19|20)\d{2}\)?$/);
   let year = null;
   if (match) {
-    year = match[0].replace(/[^\d]/g, '');
-    query = query.replace(match[0], '').trim();
+    year = match[0].replace(/[^\d]/g, "");
+    query = query.replace(match[0], "").trim();
   }
-  
+
   if (debug) {
-    log(`smartTitleMatch: query="${query}", year="${year}" against ${shows.length} shows`);
+    log(
+      `smartTitleMatch: query="${query}", year="${year}" against ${shows.length} shows`,
+    );
   }
 
   const result = smartTitleMatch(query, shows, year);
-  
+
   if (debug && result) {
     log(`smartTitleMatch selected: "${result.title}" (${result.startyear})`);
   }
@@ -203,45 +221,55 @@ function chooseShow(shows, query) {
 let queryUrl;
 
 async function findShows(page, query, timing) {
-  const srchQuery = query.replace(/[^\d](19|20)\d{2}\)?$/, '').trim();
+  const srchQuery = query.replace(/[^\d](19|20)\d{2}\)?$/, "").trim();
   queryUrl = `${BASE}/search?search=${encodeURIComponent(srchQuery)}`;
-  timing?.start('findShows.goto');
-  await page.goto(queryUrl, {waitUntil: "domcontentloaded"});
-  timing?.end('findShows.goto', queryUrl);
+  timing?.start("findShows.goto");
+  await page.goto(queryUrl, { waitUntil: "domcontentloaded" });
+  timing?.end("findShows.goto", queryUrl);
 
-  await dismissOverlays(page, timing, 'dismissOverlays.search');
-  const rows = page.locator('search-page-result[type="tvSeries"] search-page-media-row');
-  timing?.start('findShows.wait.firstRow');
+  await dismissOverlays(page, timing, "dismissOverlays.search");
+  const rows = page.locator(
+    'search-page-result[type="tvSeries"] search-page-media-row',
+  );
+  timing?.start("findShows.wait.firstRow");
   const fastTimeoutMs = 2500;
   const slowTimeoutMs = 15000;
-  const gotFast = await rows.first().waitFor({ state: "attached", timeout: fastTimeoutMs })
+  const gotFast = await rows
+    .first()
+    .waitFor({ state: "attached", timeout: fastTimeoutMs })
     .then(() => true)
     .catch(() => false);
   if (!gotFast) {
-    await rows.first().waitFor({ state: "attached", timeout: slowTimeoutMs }).catch(() => {});
+    await rows
+      .first()
+      .waitFor({ state: "attached", timeout: slowTimeoutMs })
+      .catch(() => {});
   }
-  timing?.end('findShows.wait.firstRow', gotFast ? `fast=${fastTimeoutMs}ms` : `slow=${slowTimeoutMs}ms`);
+  timing?.end(
+    "findShows.wait.firstRow",
+    gotFast ? `fast=${fastTimeoutMs}ms` : `slow=${slowTimeoutMs}ms`,
+  );
 
-  timing?.start('findShows.rows.count');
+  timing?.start("findShows.rows.count");
   const count = await rows.count();
-  timing?.end('findShows.rows.count', `count=${count}`);
-  if(!count || count === 0) return [];
+  timing?.end("findShows.rows.count", `count=${count}`);
+  if (!count || count === 0) return [];
 
-  timing?.start('findShows.rows.evaluateAll');
-  const shows = await rows.evaluateAll(els =>
-    els.map(el => {
+  timing?.start("findShows.rows.evaluateAll");
+  const shows = await rows.evaluateAll((els) =>
+    els.map((el) => {
       const infoName = el.querySelector('[data-qa="info-name"]');
       return {
-        title: (infoName?.textContent                          ?? '').trim(),
-        href:  (infoName?.getAttribute('href')                 ?? '').trim(),
-        releaseyear: (el?.getAttribute('releaseyear')          ?? '').trim(),
-        startyear:   (el?.getAttribute('startyear')            ?? '').trim(),
-        endyear:     (el?.getAttribute('endyear')              ?? '').trim(),
-        sentiment:   (el?.getAttribute('tomatometersentiment') ?? '').trim(),
-      }
-    })
+        title: (infoName?.textContent ?? "").trim(),
+        href: (infoName?.getAttribute("href") ?? "").trim(),
+        releaseyear: (el?.getAttribute("releaseyear") ?? "").trim(),
+        startyear: (el?.getAttribute("startyear") ?? "").trim(),
+        endyear: (el?.getAttribute("endyear") ?? "").trim(),
+        sentiment: (el?.getAttribute("tomatometersentiment") ?? "").trim(),
+      };
+    }),
   );
-  timing?.end('findShows.rows.evaluateAll', `count=${shows?.length ?? 0}`);
+  timing?.end("findShows.rows.evaluateAll", `count=${shows?.length ?? 0}`);
   return shows;
 }
 export async function rottenSearch(query) {
@@ -253,7 +281,7 @@ export async function rottenSearch(query) {
 
   const headless = !headed || !HAS_DISPLAY;
   if (headed && !HAS_DISPLAY) {
-    log('err', 'ROTTEN_HEADED requested but no $DISPLAY; forcing headless');
+    log("err", "ROTTEN_HEADED requested but no $DISPLAY; forcing headless");
   }
   let browser;
   let context;
@@ -261,87 +289,108 @@ export async function rottenSearch(query) {
   const usingShared = REUSE_BROWSER;
 
   if (usingShared) {
-    ({ browser, context } = await timing.time('shared.getBrowserContext', () => getSharedBrowserContext({ headless })));
+    ({ browser, context } = await timing.time("shared.getBrowserContext", () =>
+      getSharedBrowserContext({ headless }),
+    ));
     if (_shared.headless !== null && _shared.headless !== headless) {
-      timing.end('shared.getBrowserContext', `note=headless-mismatch shared=${_shared.headless} requested=${headless}`);
+      timing.end(
+        "shared.getBrowserContext",
+        `note=headless-mismatch shared=${_shared.headless} requested=${headless}`,
+      );
     }
   } else {
-    browser = await timing.time('chromium.launch', () => chromium.launch({ headless }));
+    browser = await timing.time("chromium.launch", () =>
+      chromium.launch({ headless }),
+    );
   }
 
   const runOnce = async (page) => {
     page.setDefaultTimeout(NAV_TIMEOUT);
     page.setDefaultNavigationTimeout(NAV_TIMEOUT);
     // get best show from show rows
-    const shows = await timing.time('findShows', () => findShows(page, query, timing));
-    timing.start('chooseShow');
-    const show  = chooseShow(shows, query);
-    timing.end('chooseShow', `candidates=${shows?.length ?? 0}`);
+    const shows = await timing.time("findShows", () =>
+      findShows(page, query, timing),
+    );
+    timing.start("chooseShow");
+    const show = chooseShow(shows, query);
+    timing.end("chooseShow", `candidates=${shows?.length ?? 0}`);
     if (!show) {
       log(`Rotten: No matching show found for "${query}"`);
       return null;
     }
     const detailLink = show.href;
     // Go to detail page
-    await timing.time('detail.goto', () => page.goto(detailLink, { waitUntil: "domcontentloaded" }), detailLink);
-    await dismissOverlays(page, timing, 'dismissOverlays.detail');
+    await timing.time(
+      "detail.goto",
+      () => page.goto(detailLink, { waitUntil: "domcontentloaded" }),
+      detailLink,
+    );
+    await dismissOverlays(page, timing, "dismissOverlays.detail");
 
     const getScore = async (slot) => {
       try {
         const loc = page.locator(`media-scorecard rt-text[slot="${slot}"]`);
-        await loc.waitFor({ state: 'attached', timeout: 3000 });
-        return await loc.evaluate(el => Number((el.textContent || '').match(/\d+/)?.[0] ?? ""));
+        await loc.waitFor({ state: "attached", timeout: 3000 });
+        return await loc.evaluate((el) =>
+          Number((el.textContent || "").match(/\d+/)?.[0] ?? ""),
+        );
       } catch (e) {
         return 0;
       }
     };
 
-    const criticsScore = await timing.time('detail.criticsScore', () => getScore('criticsScore'));
-    const audienceScore = await timing.time('detail.audienceScore', () => getScore('audienceScore'));
+    const criticsScore = await timing.time("detail.criticsScore", () =>
+      getScore("criticsScore"),
+    );
+    const audienceScore = await timing.time("detail.audienceScore", () =>
+      getScore("audienceScore"),
+    );
 
-    if(debug) log(`rotten: "${query }" => "${show.title
-                                 }" ${show.startyear
-                                  } ${show.endyear
-                                  } ${criticsScore
-                                  }/${audienceScore
-                                  } ${show.sentiment
-                             }\n    ${queryUrl
-                             }\n    ${detailLink}`);
+    if (debug)
+      log(
+        `rotten: "${query}" => "${show.title}" ${show.startyear} ${
+          show.endyear
+        } ${criticsScore}/${audienceScore} ${show.sentiment}\n    ${
+          queryUrl
+        }\n    ${detailLink}`,
+      );
 
-    return { url: detailLink, criticsScore, audienceScore};
+    return { url: detailLink, criticsScore, audienceScore };
   };
 
   try {
     if (usingShared) {
       if (REUSE_PAGE) {
-        return await timing.time('shared.page.serial', () => withSerializedSharedPage(timing, runOnce));
+        return await timing.time("shared.page.serial", () =>
+          withSerializedSharedPage(timing, runOnce),
+        );
       }
-      page = await timing.time('context.newPage', () => context.newPage());
+      page = await timing.time("context.newPage", () => context.newPage());
       return await runOnce(page);
     }
 
-    page = await timing.time('browser.newPage', () => browser.newPage());
+    page = await timing.time("browser.newPage", () => browser.newPage());
     return await runOnce(page);
   } catch (err) {
-    log('err', "rottenSearch error", query, err.message);
+    log("err", "rottenSearch error", query, err.message);
     return null;
   } finally {
     if (page && usingShared && !REUSE_PAGE) {
-      await timing.time('page.close', () => page.close());
+      await timing.time("page.close", () => page.close());
     }
     if (page && !usingShared) {
       // page is closed as part of browser.close
     }
     if (!usingShared && browser) {
-      await timing.time('browser.close', () => browser.close());
+      await timing.time("browser.close", () => browser.close());
     }
-    const elapsed = ((Date.now() - rottenStartTime)/1000).toFixed(0);
+    const elapsed = ((Date.now() - rottenStartTime) / 1000).toFixed(0);
     log(`finished rottenSearch: ${elapsed} secs, "${query}"`);
     timing.report(12);
   }
 }
 
-if ((process.argv[1] || '').endsWith('/src/rotten.js') && cliQuery) {
+if ((process.argv[1] || "").endsWith("/src/rotten.js") && cliQuery) {
   (async () => {
     await rottenSearch(cliQuery);
     await rottenShutdown();

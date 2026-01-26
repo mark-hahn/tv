@@ -1,47 +1,200 @@
 <template>
-
-<div id="files" :style="{ height:'100%', width:'100%', padding:'5px', margin:0, marginLeft:'16px', display:'flex', flexDirection:'column', overflow:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa' }">
-  <div id="header" :style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', margin:0, display:'flex', alignItems:'center' }">
-    <div :style="{ flex:'1 1 auto', minWidth:'0px', fontWeight:'bold', fontSize:'18px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }">{{ showName }}</div>
-    <button @click.stop="collapseToggle" :disabled="busy || !Array.isArray(tree)" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; background-color:whitesmoke; margin-right:20px;">{{ expanded.size === 0 ? 'Expand' : 'Collapse' }}</button>
-    <button @click.stop="toggleVideosOnly" :disabled="busy || !Array.isArray(tree)" :style="{ backgroundColor: videosOnly ? '#ddd' : 'whitesmoke' }" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; margin-right:20px;">Videos</button>
-    <button @click.stop="copyPaneToClipboard" :disabled="busy || !Array.isArray(tree)" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; background-color:whitesmoke; margin-right:20px;">Copy</button>
-    <button @click.stop="refreshContents" :disabled="busy || !rootPath" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; background-color:whitesmoke; margin-right:20px;">Refresh</button>
+  <div
+    id="files"
+    :style="{
+      height: '100%',
+      width: '100%',
+      padding: '5px',
+      margin: 0,
+      marginLeft: '16px',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+      backgroundColor: '#fafafa',
+    }"
+  >
+    <div
+      id="header"
+      :style="{
+        position: 'sticky',
+        top: '0px',
+        zIndex: 100,
+        backgroundColor: '#fafafa',
+        paddingTop: '5px',
+        paddingLeft: '5px',
+        paddingRight: '5px',
+        paddingBottom: '5px',
+        margin: 0,
+        display: 'flex',
+        alignItems: 'center',
+      }"
+    >
+      <div
+        :style="{
+          flex: '1 1 auto',
+          minWidth: '0px',
+          fontWeight: 'bold',
+          fontSize: '18px',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }"
+      >
+        {{ showName }}
+      </div>
+      <button
+        @click.stop="collapseToggle"
+        :disabled="busy || !Array.isArray(tree)"
+        style="
+          font-size: 13px;
+          cursor: pointer;
+          border-radius: 7px;
+          padding: 4px 10px;
+          border: 2px solid #bbb;
+          background-color: whitesmoke;
+          margin-right: 20px;
+        "
+      >
+        {{ expanded.size === 0 ? "Expand" : "Collapse" }}
+      </button>
+      <button
+        @click.stop="toggleVideosOnly"
+        :disabled="busy || !Array.isArray(tree)"
+        :style="{ backgroundColor: videosOnly ? '#ddd' : 'whitesmoke' }"
+        style="
+          font-size: 13px;
+          cursor: pointer;
+          border-radius: 7px;
+          padding: 4px 10px;
+          border: 2px solid #bbb;
+          margin-right: 20px;
+        "
+      >
+        Videos
+      </button>
+      <button
+        @click.stop="copyPaneToClipboard"
+        :disabled="busy || !Array.isArray(tree)"
+        style="
+          font-size: 13px;
+          cursor: pointer;
+          border-radius: 7px;
+          padding: 4px 10px;
+          border: 2px solid #bbb;
+          background-color: whitesmoke;
+          margin-right: 20px;
+        "
+      >
+        Copy
+      </button>
+      <button
+        @click.stop="refreshContents"
+        :disabled="busy || !rootPath"
+        style="
+          font-size: 13px;
+          cursor: pointer;
+          border-radius: 7px;
+          padding: 4px 10px;
+          border: 2px solid #bbb;
+          background-color: whitesmoke;
+          margin-right: 20px;
+        "
+      >
+        Refresh
+      </button>
+    </div>
+    <div
+      v-if="error"
+      style="
+        text-align: left;
+        color: #c00;
+        margin-top: 10px;
+        font-size: 14px;
+        white-space: pre-line;
+        padding: 0 10px;
+      "
+    >
+      <div>Error: {{ error }}</div>
+    </div>
+    <div
+      v-else
+      ref="scroller"
+      @click="clearSelections"
+      :style="{
+        flex: '1 1 auto',
+        margin: '0px',
+        padding: '10px',
+        overflowY: 'auto',
+        overflowX: 'auto',
+        background: '#fff',
+        fontFamily: 'sans-serif',
+        fontSize: '13px',
+        fontWeight: 'normal',
+        lineHeight: '1.56',
+      }"
+    >
+      <div
+        v-if="busy"
+        style="color: #666; padding: 10px"
+      >
+        Loading...
+      </div>
+      <TreeNodes
+        v-else-if="Array.isArray(tree)"
+        :nodes="tree"
+        :parentPath="rootPath"
+        :depth="0"
+        :expanded="expanded"
+        :selectedFiles="selectedFiles"
+        :videosOnly="videosOnly"
+        @dir-click="onDirClick"
+        @file-click="onFileClick"
+        @clear-selections="clearSelections"
+      ></TreeNodes>
+      <div
+        v-else
+        style="color: #666; padding: 10px"
+      >
+        No data.
+      </div>
+    </div>
   </div>
-  <div v-if="error" style="text-align:left; color:#c00; margin-top:10px; font-size:14px; white-space:pre-line; padding:0 10px;">
-    <div>Error: {{ error }}</div>
-  </div>
-  <div v-else ref="scroller" @click="clearSelections" :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'auto', background:'#fff', fontFamily:'sans-serif', fontSize:'13px', fontWeight:'normal', lineHeight:'1.56' }">
-    <div v-if="busy" style="color:#666; padding:10px;">Loading...</div>
-    <TreeNodes v-else-if="Array.isArray(tree)" :nodes="tree" :parentPath="rootPath" :depth="0" :expanded="expanded" :selectedFiles="selectedFiles" :videosOnly="videosOnly" @dir-click="onDirClick" @file-click="onFileClick" @clear-selections="clearSelections"></TreeNodes>
-    <div v-else style="color:#666; padding:10px;">No data.</div>
-  </div>
-</div>
 </template>
 
 <script>
-import { h, nextTick } from 'vue';
-import parseTorrentTitle from 'parse-torrent-title';
-import evtBus from '../evtBus.js';
-import * as srvr from '../srvr.js';
+import { h, nextTick } from "vue";
+import parseTorrentTitle from "parse-torrent-title";
+import evtBus from "../evtBus.js";
+import * as srvr from "../srvr.js";
 
-const BASE = '/mnt/media/tv';
+const BASE = "/mnt/media/tv";
 
 const VIDEO_EXTS = new Set([
-  'mkv', 'avi', 'mp4', 'm4v', 'mov', 'wmv', 'webm',
-  'mpg', 'mpeg', 'ts', 'm2ts'
+  "mkv",
+  "avi",
+  "mp4",
+  "m4v",
+  "mov",
+  "wmv",
+  "webm",
+  "mpg",
+  "mpeg",
+  "ts",
+  "m2ts",
 ]);
 
 const getExt = (name) => {
-  const s = String(name || '');
-  const i = s.lastIndexOf('.');
-  if (i < 0) return '';
+  const s = String(name || "");
+  const i = s.lastIndexOf(".");
+  if (i < 0) return "";
   return s.slice(i + 1).toLowerCase();
 };
 
 const isVideoFileName = (name) => VIDEO_EXTS.has(getExt(name));
 
-const isSrtFileName = (name) => getExt(name) === 'srt';
+const isSrtFileName = (name) => getExt(name) === "srt";
 
 const toNum = (v) => {
   if (v == null) return null;
@@ -52,14 +205,19 @@ const toNum = (v) => {
 
 const parseSeasonEpisode = (name) => {
   try {
-    const s = String(name || '');
-    const parsed = (typeof parseTorrentTitle === 'function')
-      ? parseTorrentTitle(s)
-      : (typeof parseTorrentTitle?.parse === 'function')
+    const s = String(name || "");
+    const parsed =
+      typeof parseTorrentTitle === "function"
+        ? parseTorrentTitle(s)
+        : typeof parseTorrentTitle?.parse === "function"
           ? parseTorrentTitle.parse(s)
           : null;
-    const season = toNum(parsed?.season ?? parsed?.seasonNumber ?? parsed?.seasons);
-    const episode = toNum(parsed?.episode ?? parsed?.episodeNumber ?? parsed?.episodes);
+    const season = toNum(
+      parsed?.season ?? parsed?.seasonNumber ?? parsed?.seasons,
+    );
+    const episode = toNum(
+      parsed?.episode ?? parsed?.episodeNumber ?? parsed?.episodes,
+    );
     return { season, episode };
   } catch (_) {
     return { season: null, episode: null };
@@ -72,7 +230,7 @@ const filterNodesForVideos = (nodes, videosOnly) => {
 
   const out = [];
   for (const node of arr) {
-    if (typeof node === 'string') {
+    if (typeof node === "string") {
       if (isVideoFileName(node)) out.push(node);
       continue;
     }
@@ -100,22 +258,22 @@ const sortDirNodes = (nodes) => {
 
     // Directories: alpha by name.
     if (aDir && bDir) {
-      const an = (dirEntry(aNode)?.name || '').toLowerCase();
-      const bn = (dirEntry(bNode)?.name || '').toLowerCase();
+      const an = (dirEntry(aNode)?.name || "").toLowerCase();
+      const bn = (dirEntry(bNode)?.name || "").toLowerCase();
       const c = an.localeCompare(bn);
-      return c || (a.idx - b.idx);
+      return c || a.idx - b.idx;
     }
 
     // Files.
-    const aName = String(aNode || '');
-    const bName = String(bNode || '');
+    const aName = String(aNode || "");
+    const bName = String(bNode || "");
     const aVideo = isVideoFileName(aName);
     const bVideo = isVideoFileName(bName);
     const aSrt = isSrtFileName(aName);
     const bSrt = isSrtFileName(bName);
 
     // Ordering: video files first, then .srt files, then everything else.
-    const rank = (isVideo, isSrt) => (isVideo ? 0 : (isSrt ? 1 : 2));
+    const rank = (isVideo, isSrt) => (isVideo ? 0 : isSrt ? 1 : 2);
     const aRank = rank(aVideo, aSrt);
     const bRank = rank(bVideo, bSrt);
     if (aRank !== bRank) return aRank - bRank;
@@ -131,45 +289,47 @@ const sortDirNodes = (nodes) => {
     }
 
     const c = aName.toLowerCase().localeCompare(bName.toLowerCase());
-    return c || (a.idx - b.idx);
+    return c || a.idx - b.idx;
   });
 
   return withIdx.map((x) => x.node);
 };
 
-const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
+const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
 
 const sanitizeRelPath = (input) => {
-  let s = String(input || '').trim();
-  if (!s) return '';
+  let s = String(input || "").trim();
+  if (!s) return "";
   // Normalize slashes.
-  s = s.replace(/\\/g, '/');
-    s = s.replace(/\/+/g, '/');
+  s = s.replace(/\\/g, "/");
+  s = s.replace(/\/+/g, "/");
 
   // Strip base prefix if present.
-  if (s === BASE) s = '';
-  else if (s.startsWith(BASE + '/')) s = s.slice((BASE + '/').length);
+  if (s === BASE) s = "";
+  else if (s.startsWith(BASE + "/")) s = s.slice((BASE + "/").length);
 
   // Keep relative.
-  s = s.replace(/^\/+/, '');
+  s = s.replace(/^\/+/, "");
 
   // Collapse '.', '..' segments.
-  const parts = s.split('/').filter(Boolean);
+  const parts = s.split("/").filter(Boolean);
   const out = [];
   for (const part of parts) {
-    if (!part || part === '.') continue;
-    if (part === '..') {
+    if (!part || part === ".") continue;
+    if (part === "..") {
       if (out.length) out.pop();
       continue;
     }
     out.push(part);
   }
-  return out.join('/');
+  return out.join("/");
 };
 
 const joinRel = (baseRel, childName) => {
   const b = sanitizeRelPath(baseRel);
-  const c = String(childName || '').replace(/^\/+/, '').replace(/\/+$/, '');
+  const c = String(childName || "")
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "");
   if (!b) return sanitizeRelPath(c);
   if (!c) return b;
   return sanitizeRelPath(`${b}/${c}`);
@@ -181,10 +341,10 @@ const fullFromRel = (rel) => {
 };
 
 const nodeKey = (node, idx) => {
-  if (typeof node === 'string') return `f:${node}:${idx}`;
+  if (typeof node === "string") return `f:${node}:${idx}`;
   if (isObj(node)) {
     const ks = Object.keys(node);
-    return `d:${ks.join('|')}:${idx}`;
+    return `d:${ks.join("|")}:${idx}`;
   }
   return `n:${idx}`;
 };
@@ -199,32 +359,35 @@ const dirEntry = (node) => {
 };
 
 const TreeNodes = {
-  name: 'TreeNodes',
+  name: "TreeNodes",
   props: {
     nodes: { type: Array, required: true },
     parentPath: { type: String, required: true },
     depth: { type: Number, required: true },
     expanded: { type: Object, required: true },
     selectedFiles: { type: Object, required: true },
-    videosOnly: { type: Boolean, default: false }
+    videosOnly: { type: Boolean, default: false },
   },
-  emits: ['dir-click', 'file-click', 'clear-selections'],
+  emits: ["dir-click", "file-click", "clear-selections"],
   methods: {
     nodeKey,
     isDir(node) {
       return !!dirEntry(node);
     },
     dirName(node) {
-      return dirEntry(node)?.name || '';
+      return dirEntry(node)?.name || "";
     },
     dirChildren(node) {
       return dirEntry(node)?.children || [];
     },
     dirFileCount(node) {
-      const kids = filterNodesForVideos(this.dirChildren(node), this.videosOnly);
+      const kids = filterNodesForVideos(
+        this.dirChildren(node),
+        this.videosOnly,
+      );
       let n = 0;
       for (const child of kids) {
-        if (typeof child === 'string') n++;
+        if (typeof child === "string") n++;
       }
       return n;
     },
@@ -243,19 +406,34 @@ const TreeNodes = {
     onDirNameClick(e, node) {
       e?.stopPropagation?.();
       const p = this.dirPath(node);
-      this.$emit('dir-click', { path: p, alt: !!e?.altKey, ctrl: !!(e?.ctrlKey || e?.metaKey), shift: !!e?.shiftKey, area: 'name' });
+      this.$emit("dir-click", {
+        path: p,
+        alt: !!e?.altKey,
+        ctrl: !!(e?.ctrlKey || e?.metaKey),
+        shift: !!e?.shiftKey,
+        area: "name",
+      });
     },
     onFileNameClick(e, name) {
       e?.stopPropagation?.();
       const p = joinRel(this.parentPath, name);
-      this.$emit('file-click', { path: p, alt: !!e?.altKey, ctrl: !!(e?.ctrlKey || e?.metaKey), shift: !!e?.shiftKey, area: 'name' });
-    }
+      this.$emit("file-click", {
+        path: p,
+        alt: !!e?.altKey,
+        ctrl: !!(e?.ctrlKey || e?.metaKey),
+        shift: !!e?.shiftKey,
+        area: "name",
+      });
+    },
   },
   render() {
-    const nodes = sortDirNodes(filterNodesForVideos(this.nodes, this.videosOnly));
-    const softWrap = (s) => String(s ?? '').replace(/([^A-Za-z0-9\s])/g, '$1\u200B');
+    const nodes = sortDirNodes(
+      filterNodesForVideos(this.nodes, this.videosOnly),
+    );
+    const softWrap = (s) =>
+      String(s ?? "").replace(/([^A-Za-z0-9\s])/g, "$1\u200B");
     const fileRank = (name) => {
-      const n = String(name || '');
+      const n = String(name || "");
       if (isVideoFileName(n)) return 0;
       if (isSrtFileName(n)) return 1;
       return 2;
@@ -270,83 +448,85 @@ const TreeNodes = {
 
       const rowStyleBase = {
         ...this.indentStyle(),
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '0ch',
-        userSelect: 'none'
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "0ch",
+        userSelect: "none",
       };
 
       const twistyStyle = {
-        flex: '0 0 2ch',
-        width: '2ch',
-        textAlign: 'left'
+        flex: "0 0 2ch",
+        width: "2ch",
+        textAlign: "left",
       };
 
       const nameTextStyle = {
-        flex: '1 1 auto',
-        minWidth: '0px',
-        display: 'block',
-        whiteSpace: 'normal',
-        overflowWrap: 'break-word',
-        wordBreak: 'break-word',
+        flex: "1 1 auto",
+        minWidth: "0px",
+        display: "block",
+        whiteSpace: "normal",
+        overflowWrap: "break-word",
+        wordBreak: "break-word",
         // Hanging indent: wrapped lines start 4ch to the right.
-        paddingLeft: '4ch',
-        textIndent: '-4ch'
+        paddingLeft: "4ch",
+        textIndent: "-4ch",
       };
 
-      if (typeof node === 'string') {
+      if (typeof node === "string") {
         const r = fileRank(node);
         if (lastFileRank != null && r !== lastFileRank) {
           children.push(
-            h('div', {
+            h("div", {
               key: `${key}:divider`,
               style: {
                 ...this.indentStyle(),
-                height: '1px',
-                backgroundColor: '#ddd',
-                margin: '4px 0',
-                pointerEvents: 'none'
-              }
-            })
+                height: "1px",
+                backgroundColor: "#ddd",
+                margin: "4px 0",
+                pointerEvents: "none",
+              },
+            }),
           );
         }
         lastFileRank = r;
 
         const filePath = joinRel(this.parentPath, node);
         const isSelected = !!this.selectedFiles?.has?.(filePath);
-        children.push(h(
-          'div',
-          {
-            key,
-            'data-type': 'file',
-            'data-nodepath': filePath,
-            style: {
-              cursor: 'default',
-              ...rowStyleBase,
-              backgroundColor: isSelected ? 'yellow' : ''
-            }
-          },
-          [
-            h('span', { style: twistyStyle }, ''),
-            h(
-              'span',
-              {
-                'data-click': 'name',
-                style: { ...nameTextStyle }
+        children.push(
+          h(
+            "div",
+            {
+              key,
+              "data-type": "file",
+              "data-nodepath": filePath,
+              style: {
+                cursor: "default",
+                ...rowStyleBase,
+                backgroundColor: isSelected ? "yellow" : "",
               },
-              [
-                h(
-                  'span',
-                  {
-                    style: { cursor: 'pointer' },
-                    onClick: (e) => this.onFileNameClick(e, node)
-                  },
-                  softWrap(node)
-                )
-              ]
-            )
-          ]
-        ));
+            },
+            [
+              h("span", { style: twistyStyle }, ""),
+              h(
+                "span",
+                {
+                  "data-click": "name",
+                  style: { ...nameTextStyle },
+                },
+                [
+                  h(
+                    "span",
+                    {
+                      style: { cursor: "pointer" },
+                      onClick: (e) => this.onFileNameClick(e, node),
+                    },
+                    softWrap(node),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
         continue;
       }
 
@@ -359,57 +539,57 @@ const TreeNodes = {
         const fileCount = this.dirFileCount(node);
 
         const header = h(
-          'div',
+          "div",
           {
             key: `${key}:h`,
-            title: 'Click to expand/collapse',
+            title: "Click to expand/collapse",
             onClick: (e) => {
               e?.stopPropagation?.();
-              this.$emit('clear-selections');
+              this.$emit("clear-selections");
             },
             style: {
-              cursor: 'default',
+              cursor: "default",
               ...rowStyleBase,
-              fontWeight: 'bold'
+              fontWeight: "bold",
             },
-            'data-type': 'dir',
-            'data-nodepath': dirPathVal
+            "data-type": "dir",
+            "data-nodepath": dirPathVal,
           },
           [
             h(
-              'span',
+              "span",
               {
-                'data-click': 'name',
-                style: { ...twistyStyle, cursor: 'pointer' },
-                onClick: (e) => this.onDirNameClick(e, node)
+                "data-click": "name",
+                style: { ...twistyStyle, cursor: "pointer" },
+                onClick: (e) => this.onDirNameClick(e, node),
               },
-              isOpen ? '▾' : '▸'
+              isOpen ? "▾" : "▸",
             ),
             h(
-              'span',
+              "span",
               {
-                'data-click': 'name',
-                style: { ...nameTextStyle, fontWeight: 'bold' }
+                "data-click": "name",
+                style: { ...nameTextStyle, fontWeight: "bold" },
               },
               [
                 h(
-                  'span',
+                  "span",
                   {
-                    style: { cursor: 'pointer', fontWeight: 'bold' },
-                    onClick: (e) => this.onDirNameClick(e, node)
+                    style: { cursor: "pointer", fontWeight: "bold" },
+                    onClick: (e) => this.onDirNameClick(e, node),
                   },
-                  softWrap(name)
+                  softWrap(name),
                 ),
                 h(
-                  'span',
+                  "span",
                   {
-                    style: { fontWeight: 'normal' }
+                    style: { fontWeight: "normal" },
                   },
-                  ` (${fileCount})`
-                )
-              ]
-            )
-          ]
+                  ` (${fileCount})`,
+                ),
+              ],
+            ),
+          ],
         );
 
         const body = isOpen
@@ -421,13 +601,13 @@ const TreeNodes = {
               expanded: this.expanded,
               selectedFiles: this.selectedFiles,
               videosOnly: this.videosOnly,
-              onDirClick: (payload) => this.$emit('dir-click', payload),
-              onFileClick: (payload) => this.$emit('file-click', payload),
-              onClearSelections: () => this.$emit('clear-selections')
+              onDirClick: (payload) => this.$emit("dir-click", payload),
+              onFileClick: (payload) => this.$emit("file-click", payload),
+              onClearSelections: () => this.$emit("clear-selections"),
             })
           : null;
 
-        children.push(h('div', { key }, [header, body]));
+        children.push(h("div", { key }, [header, body]));
         continue;
       }
 
@@ -435,44 +615,44 @@ const TreeNodes = {
       continue;
     }
 
-    return h('div', {}, children);
-  }
+    return h("div", {}, children);
+  },
 };
 
 export default {
-  name: 'FilePane',
+  name: "FilePane",
   components: { TreeNodes },
 
   props: {
     simpleMode: { type: Boolean, default: false },
-    sizing: { type: Object, default: () => ({}) }
+    sizing: { type: Object, default: () => ({}) },
   },
 
   data() {
     return {
-      showName: '',
-      rootPath: '',
+      showName: "",
+      rootPath: "",
       tree: null,
       error: null,
       busy: false,
       expanded: new Set(),
       videosOnly: false,
       selectedFiles: new Set(),
-      selectionAnchor: null
+      selectionAnchor: null,
     };
   },
 
   mounted() {
-    evtBus.on('setUpSeries', this.onSetUpSeries);
+    evtBus.on("setUpSeries", this.onSetUpSeries);
   },
 
   unmounted() {
-    evtBus.off('setUpSeries', this.onSetUpSeries);
+    evtBus.off("setUpSeries", this.onSetUpSeries);
   },
 
   methods: {
     onSetUpSeries(show) {
-      this.showName = String(show?.Name || '').trim();
+      this.showName = String(show?.Name || "").trim();
       const rel = sanitizeRelPath(show?.Path);
       void this.openRel(rel);
     },
@@ -493,7 +673,7 @@ export default {
       const walk = (nodes, parentRel) => {
         const arr = filterNodesForVideos(nodes, this.videosOnly);
         for (const node of arr) {
-          if (typeof node === 'string') {
+          if (typeof node === "string") {
             out.push(joinRel(parentRel, node));
             continue;
           }
@@ -541,7 +721,7 @@ export default {
           this.tree = res.children;
         } else {
           this.tree = null;
-          this.error = 'Unexpected response from getFile.';
+          this.error = "Unexpected response from getFile.";
         }
       } catch (e) {
         this.error = e?.err || e?.message || String(e);
@@ -559,15 +739,15 @@ export default {
       const walk = (nodes, depth) => {
         const arr = sortDirNodes(filterNodesForVideos(nodes, this.videosOnly));
         for (const node of arr) {
-          if (typeof node === 'string') {
-            lines.push(`${'  '.repeat(depth)}${node}`);
+          if (typeof node === "string") {
+            lines.push(`${"  ".repeat(depth)}${node}`);
             continue;
           }
           const entry = dirEntry(node);
           if (!entry) continue;
           const kids = filterNodesForVideos(entry.children, this.videosOnly);
-          const fileCount = kids.filter((k) => typeof k === 'string').length;
-          lines.push(`${'  '.repeat(depth)}${entry.name} (${fileCount})`);
+          const fileCount = kids.filter((k) => typeof k === "string").length;
+          lines.push(`${"  ".repeat(depth)}${entry.name} (${fileCount})`);
           walk(entry.children, depth + 1);
         }
       };
@@ -575,7 +755,7 @@ export default {
       walk(this.tree, 0);
 
       try {
-        await navigator.clipboard.writeText(lines.join('\n'));
+        await navigator.clipboard.writeText(lines.join("\n"));
       } catch (e) {
         this.error = e?.message || String(e);
       }
@@ -597,7 +777,7 @@ export default {
           this.tree = res.children;
         } else {
           this.tree = null;
-          this.error = 'Unexpected response from getFile.';
+          this.error = "Unexpected response from getFile.";
         }
       } catch (e) {
         this.error = e?.err || e?.message || String(e);
@@ -610,9 +790,10 @@ export default {
       const paths = Array.isArray(fullPaths) ? fullPaths.filter(Boolean) : [];
       if (paths.length === 0) return;
 
-      const msg = (paths.length === 1)
-        ? `Is it OK to delete ${paths[0]}.`
-        : `Is it OK to delete ${paths.length} files.`;
+      const msg =
+        paths.length === 1
+          ? `Is it OK to delete ${paths[0]}.`
+          : `Is it OK to delete ${paths.length} files.`;
       const ok = window.confirm(msg);
       if (!ok) return;
 
@@ -628,7 +809,8 @@ export default {
 
       await this.openRel(this.rootPath);
 
-      if (didDelete) evtBus.emit('library-refresh-complete', { showReloadDialog: true });
+      if (didDelete)
+        evtBus.emit("library-refresh-complete", { showReloadDialog: true });
     },
 
     async onDirClick(payload) {
@@ -660,34 +842,35 @@ export default {
       const isAlt = !!payload?.alt;
       const isCtrl = !!payload?.ctrl;
       const isShift = !!payload?.shift;
-      const area = String(payload?.area || 'name');
+      const area = String(payload?.area || "name");
       const isSelected = this.selectedFiles.has(rel);
 
       // Alt-click on a selected file name => delete confirmation for selection.
-      if (isAlt && isSelected && area === 'name') {
+      if (isAlt && isSelected && area === "name") {
         const sel = Array.from(this.selectedFiles);
-        const full = sel.map(p => fullFromRel(p));
+        const full = sel.map((p) => fullFromRel(p));
         await this.confirmAndDeletePaths(full);
         return;
       }
 
       // Alt-click on an unselected file name => delete just that file.
-      if (isAlt && !isSelected && area === 'name') {
+      if (isAlt && !isSelected && area === "name") {
         await this.confirmAndDeletePaths([fullFromRel(rel)]);
         return;
       }
 
       const visible = this.getVisibleFilePaths();
       const idx = visible.indexOf(rel);
-      const anchor = this.selectionAnchor && visible.includes(this.selectionAnchor)
-        ? this.selectionAnchor
-        : null;
+      const anchor =
+        this.selectionAnchor && visible.includes(this.selectionAnchor)
+          ? this.selectionAnchor
+          : null;
 
       if (isShift && anchor && idx >= 0) {
         const dirOf = (p) => {
-          const s = String(p || '');
-          const i = s.lastIndexOf('/');
-          return i >= 0 ? s.slice(0, i) : '';
+          const s = String(p || "");
+          const i = s.lastIndexOf("/");
+          return i >= 0 ? s.slice(0, i) : "";
         };
 
         // Shift-click only extends a range within the same directory as the
@@ -698,7 +881,7 @@ export default {
         if (targetDir !== anchorDir) return;
         if (!this.selectedFiles.has(anchor)) return;
 
-        const visibleInDir = visible.filter(p => dirOf(p) === targetDir);
+        const visibleInDir = visible.filter((p) => dirOf(p) === targetDir);
         const aIdx = visibleInDir.indexOf(anchor);
         const tIdx = visibleInDir.indexOf(rel);
         if (aIdx < 0 || tIdx < 0) return;
@@ -731,13 +914,16 @@ export default {
     ensureExpandedDirVisible(dirRel) {
       const sc = this.$refs.scroller;
       if (!sc) return;
-      const esc = (s) => (window?.CSS?.escape ? CSS.escape(String(s || '')) : String(s || '').replace(/"/g, '\\"'));
+      const esc = (s) =>
+        window?.CSS?.escape
+          ? CSS.escape(String(s || ""))
+          : String(s || "").replace(/"/g, '\\"');
 
       const headerSel = `[data-type="dir"][data-nodepath="${esc(dirRel)}"]`;
       const headerEl = sc.querySelector(headerSel);
       if (!headerEl) return;
 
-      const prefix = dirRel.endsWith('/') ? dirRel : `${dirRel}/`;
+      const prefix = dirRel.endsWith("/") ? dirRel : `${dirRel}/`;
       const childSel = `[data-nodepath^="${esc(prefix)}"]`;
       const childEls = sc.querySelectorAll(childSel);
       if (!childEls || childEls.length === 0) return;
@@ -761,7 +947,8 @@ export default {
       const maxScrollForHeaderVisible = sc.scrollTop + maxDeltaDown;
 
       const nextScroll = Math.min(desired, maxScrollForHeaderVisible);
-      if (Number.isFinite(nextScroll) && nextScroll !== sc.scrollTop) sc.scrollTop = nextScroll;
+      if (Number.isFinite(nextScroll) && nextScroll !== sc.scrollTop)
+        sc.scrollTop = nextScroll;
     },
 
     openAll() {
@@ -787,6 +974,6 @@ export default {
     },
 
     // Sel button removed.
-  }
+  },
 };
 </script>

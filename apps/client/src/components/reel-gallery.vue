@@ -1,26 +1,81 @@
 <template>
-
-<div id="reelGallery" ref="galleryPane" :style="{ flex: '1', minHeight: 0, height: '100%', overflowY: 'auto', overflowX: 'hidden', display: 'block', padding: '2px' }" @wheel.stop.prevent="handleScaledWheel">
-  <div v-for="(tvdb, idx) in tvdbList" :key="tvdb.id || idx" @click="selectCard(idx)" :style="getCardStyle(idx)">
-    <div v-if="!getImageUrl(tvdb)" :style="{ width: '101px', margin: '0 auto', backgroundColor: '#e0e0e0', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: '#666', padding: '10px' }">No Image</div><img v-else :src="getImageUrl(tvdb)" :style="{ width: '101px', margin: '0 auto', height: 'auto', borderRadius: '5px', display: 'block' }" @click.stop="previewCard(idx)" @error="handleImageError($event)">
-    <div :style="{ padding: '2px', fontSize: '12px', textAlign: 'center', fontWeight: 'bold' }">{{ tvdb.year }} - {{ tvdb.name }}</div>
+  <div
+    id="reelGallery"
+    ref="galleryPane"
+    :style="{
+      flex: '1',
+      minHeight: 0,
+      height: '100%',
+      overflowY: 'auto',
+      overflowX: 'hidden',
+      display: 'block',
+      padding: '2px',
+    }"
+    @wheel.stop.prevent="handleScaledWheel"
+  >
+    <div
+      v-for="(tvdb, idx) in tvdbList"
+      :key="tvdb.id || idx"
+      @click="selectCard(idx)"
+      :style="getCardStyle(idx)"
+    >
+      <div
+        v-if="!getImageUrl(tvdb)"
+        :style="{
+          width: '101px',
+          margin: '0 auto',
+          backgroundColor: '#e0e0e0',
+          borderRadius: '5px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '12px',
+          color: '#666',
+          padding: '10px',
+        }"
+      >
+        No Image
+      </div>
+      <img
+        v-else
+        :src="getImageUrl(tvdb)"
+        :style="{
+          width: '101px',
+          margin: '0 auto',
+          height: 'auto',
+          borderRadius: '5px',
+          display: 'block',
+        }"
+        @click.stop="previewCard(idx)"
+        @error="handleImageError($event)"
+      />
+      <div
+        :style="{
+          padding: '2px',
+          fontSize: '12px',
+          textAlign: 'center',
+          fontWeight: 'bold',
+        }"
+      >
+        {{ tvdb.year }} - {{ tvdb.name }}
+      </div>
+    </div>
   </div>
-</div>
 </template>
 
 <script>
-import { ref, watch, onMounted, nextTick } from 'vue';
-import { srchTvdbData } from '../tvdb.js';
+import { ref, watch, onMounted, nextTick } from "vue";
+import { srchTvdbData } from "../tvdb.js";
 
 export default {
-  name: 'ReelGallery',
+  name: "ReelGallery",
   props: {
     srchStr: {
       type: String,
-      default: ''
-    }
+      default: "",
+    },
   },
-  emits: ['select', 'preview'],
+  emits: ["select", "preview"],
   setup(props, { emit }) {
     const tvdbList = ref([]);
     const selectedIdx = ref(0);
@@ -30,7 +85,7 @@ export default {
       if (!event) return;
       const el = event.currentTarget;
       if (!el) return;
-      const dy = (event.deltaY || 0);
+      const dy = event.deltaY || 0;
       const scaledDy = dy * 0.125;
       const max = Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0));
       el.scrollTop = Math.max(0, Math.min(max, (el.scrollTop || 0) + scaledDy));
@@ -44,34 +99,34 @@ export default {
 
     const getCardStyle = (idx) => {
       return {
-        cursor: 'pointer',
-        backgroundColor: idx === selectedIdx.value ? '#fffacd' : 'white',
-        border: '1px solid #ccc',
-        borderRadius: '5px',
-        overflow: 'hidden',
-        width: '100%',
-        boxSizing: 'border-box',
-        display: 'block',
-        position: 'relative',
-        marginBottom: '4px'
+        cursor: "pointer",
+        backgroundColor: idx === selectedIdx.value ? "#fffacd" : "white",
+        border: "1px solid #ccc",
+        borderRadius: "5px",
+        overflow: "hidden",
+        width: "100%",
+        boxSizing: "border-box",
+        display: "block",
+        position: "relative",
+        marginBottom: "4px",
       };
     };
 
     const selectCard = (idx) => {
       selectedIdx.value = idx;
-      emit('select', tvdbList.value[idx]);
+      emit("select", tvdbList.value[idx]);
     };
 
     const previewCard = (idx) => {
       selectedIdx.value = idx;
       const tvdb = tvdbList.value[idx];
-      emit('select', tvdb);
-      emit('preview', tvdb);
+      emit("select", tvdb);
+      emit("preview", tvdb);
     };
 
     const loadTvdbData = async () => {
       if (!props.srchStr) return;
-      
+
       try {
         const data = await srchTvdbData(props.srchStr);
         if (data && data.length > 0) {
@@ -82,25 +137,28 @@ export default {
           }
           // Auto-select first card
           selectedIdx.value = 0;
-          emit('select', data[0]);
+          emit("select", data[0]);
         } else {
           tvdbList.value = [];
-          emit('select', null);
+          emit("select", null);
         }
       } catch (err) {
-        console.error('Error loading tvdb data:', err);
+        console.error("Error loading tvdb data:", err);
         tvdbList.value = [];
       }
     };
 
     const handleImageError = (event) => {
-      console.error('Image failed to load:', event.target.src);
+      console.error("Image failed to load:", event.target.src);
     };
 
     // Watch for srchStr changes
-    watch(() => props.srchStr, () => {
-      loadTvdbData();
-    });
+    watch(
+      () => props.srchStr,
+      () => {
+        loadTvdbData();
+      },
+    );
 
     // Load on mount
     onMounted(() => {
@@ -118,7 +176,7 @@ export default {
       previewCard,
       handleImageError,
     };
-  }
+  },
 };
 </script>
 

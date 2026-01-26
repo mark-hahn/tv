@@ -1,10 +1,8 @@
-const DEFAULT_TVPROC_BASE_URL = 'http://localhost:3003';
+const DEFAULT_TVPROC_BASE_URL = "http://localhost:3003";
 
 function normalizeTitles(titles) {
   const arr = Array.isArray(titles) ? titles : [];
-  return arr
-    .map((t) => String(t || '').trim())
-    .filter(Boolean);
+  return arr.map((t) => String(t || "").trim()).filter(Boolean);
 }
 
 /**
@@ -17,7 +15,7 @@ function normalizeTitles(titles) {
  */
 export async function checkFiles(titles, { baseUrl, timeoutMs = 5000 } = {}) {
   const list = normalizeTitles(titles);
-  const root = String(baseUrl || DEFAULT_TVPROC_BASE_URL).replace(/\/+$/, '');
+  const root = String(baseUrl || DEFAULT_TVPROC_BASE_URL).replace(/\/+$/, "");
   const url = `${root}/checkFiles`;
 
   const controller = new AbortController();
@@ -25,10 +23,10 @@ export async function checkFiles(titles, { baseUrl, timeoutMs = 5000 } = {}) {
 
   try {
     const resp = await fetch(url, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(list),
       signal: controller.signal,
@@ -43,22 +41,34 @@ export async function checkFiles(titles, { baseUrl, timeoutMs = 5000 } = {}) {
     }
 
     if (!resp.ok) {
-      const detail = text ? text.slice(0, 500) : '';
-      throw new Error(`tv-proc checkFiles failed: HTTP ${resp.status} ${resp.statusText}${detail ? ` :: ${detail}` : ''}`);
+      const detail = text ? text.slice(0, 500) : "";
+      throw new Error(
+        `tv-proc checkFiles failed: HTTP ${resp.status} ${resp.statusText}${detail ? ` :: ${detail}` : ""}`,
+      );
     }
 
     // Back-compat: old tv-proc returned a raw array of titles.
     if (Array.isArray(data)) {
-      return { existingTitles: data.map((t) => String(t)), existingProcids: [], tvEntries: [] };
+      return {
+        existingTitles: data.map((t) => String(t)),
+        existingProcids: [],
+        tvEntries: [],
+      };
     }
 
     // New shape: { existingTitles: string[], existingProcids: any[] }
-    if (!data || typeof data !== 'object') {
-      throw new Error(`tv-proc checkFiles expected JSON object, got ${data === null ? 'null' : typeof data}`);
+    if (!data || typeof data !== "object") {
+      throw new Error(
+        `tv-proc checkFiles expected JSON object, got ${data === null ? "null" : typeof data}`,
+      );
     }
 
-    const existingTitles = Array.isArray(data.existingTitles) ? data.existingTitles.map((t) => String(t)) : [];
-    const existingProcids = Array.isArray(data.existingProcids) ? data.existingProcids : [];
+    const existingTitles = Array.isArray(data.existingTitles)
+      ? data.existingTitles.map((t) => String(t))
+      : [];
+    const existingProcids = Array.isArray(data.existingProcids)
+      ? data.existingProcids
+      : [];
     const tvEntries = Array.isArray(data.tvEntries) ? data.tvEntries : [];
     return { existingTitles, existingProcids, tvEntries };
   } finally {

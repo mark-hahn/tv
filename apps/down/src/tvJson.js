@@ -3,22 +3,22 @@
 // - Persists state in SQLite
 // - Exports: addEntry(entry), getDownloads(), markError(), pruneMissingUsbDirs()
 
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { Worker } from 'node:worker_threads';
-import { execFile } from 'node:child_process';
-import Database from 'better-sqlite3';
-import chokidar from 'chokidar';
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { Worker } from "node:worker_threads";
+import { execFile } from "node:child_process";
+import Database from "better-sqlite3";
+import chokidar from "chokidar";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const BASEDIR = path.join(__dirname, '..');
+const BASEDIR = path.join(__dirname, "..");
 
 const APP_DIR = BASEDIR;
-const DATA_DIR = path.join(APP_DIR, 'data');
-const MISC_DIR = path.join(DATA_DIR, 'misc');
+const DATA_DIR = path.join(APP_DIR, "data");
+const MISC_DIR = path.join(DATA_DIR, "misc");
 
 function ensureDir(dir) {
   try {
@@ -26,30 +26,29 @@ function ensureDir(dir) {
   } catch {}
 }
 
-
 ensureDir(DATA_DIR);
 ensureDir(MISC_DIR);
 
 // SQLite backing store
-const TV_DB_PATH = path.join(DATA_DIR, 'tv.sqlite');
-const TV_FINISHED_PATH = path.join(DATA_DIR, 'tv-finished.json');
-const TV_INPROGRESS_PATH = path.join(DATA_DIR, 'tv-inProgress.json');
-const TV_LOG_PATH = path.join(MISC_DIR, 'tv.log');
+const TV_DB_PATH = path.join(DATA_DIR, "tv.sqlite");
+const TV_FINISHED_PATH = path.join(DATA_DIR, "tv-finished.json");
+const TV_INPROGRESS_PATH = path.join(DATA_DIR, "tv-inProgress.json");
+const TV_LOG_PATH = path.join(MISC_DIR, "tv.log");
 
-const TV_DB_BACKUP_PATH = path.join(DATA_DIR, 'tv.sqlite.backup');
+const TV_DB_BACKUP_PATH = path.join(DATA_DIR, "tv.sqlite.backup");
 
 // State is stored under apps/down/data.
 
 // Local TV library root for watcher assignment.
-const TV_ROOT = '/mnt/media/tv';
+const TV_ROOT = "/mnt/media/tv";
 
-const WORKER_URL = new URL('./worker.js', import.meta.url);
+const WORKER_URL = new URL("./worker.js", import.meta.url);
 
 const MAX_WORKERS = 8;
-const usbHost = 'xobtlu@oracle.usbx.me';
+const usbHost = "xobtlu@oracle.usbx.me";
 
 // PST/PDT formatting
-const PST_TZ = 'America/Los_Angeles';
+const PST_TZ = "America/Los_Angeles";
 
 const appendTvLog = (line) => {
   try {
@@ -62,7 +61,7 @@ const appendTvLog = (line) => {
 
 const logTvEntryAdded = (title, errorMsg) => {
   try {
-    const t = title ? String(title) : '';
+    const t = title ? String(title) : "";
     if (!t) return;
     const tsStr = dateStr(Date.now());
     if (errorMsg) {
@@ -75,14 +74,14 @@ const logTvEntryAdded = (title, errorMsg) => {
 
 const dateStr = (ms) => {
   try {
-    const dtf = new Intl.DateTimeFormat('en-US', {
+    const dtf = new Intl.DateTimeFormat("en-US", {
       timeZone: PST_TZ,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
       hour12: false,
     });
     const parts = dtf.formatToParts(new Date(ms));
@@ -94,11 +93,11 @@ const dateStr = (ms) => {
   } catch {
     const d = new Date(ms);
     const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    const seconds = String(d.getSeconds()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const hours = String(d.getHours()).padStart(2, "0");
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+    const seconds = String(d.getSeconds()).padStart(2, "0");
     return `${year}/${month}/${day}-${hours}:${minutes}:${seconds}`;
   }
 };
@@ -106,7 +105,7 @@ const dateStr = (ms) => {
 const readJson = (filePath, fallback) => {
   try {
     if (!fs.existsSync(filePath)) return fallback;
-    const raw = fs.readFileSync(filePath, 'utf8');
+    const raw = fs.readFileSync(filePath, "utf8");
     return JSON.parse(raw);
   } catch {
     return fallback;
@@ -116,7 +115,10 @@ const readJson = (filePath, fallback) => {
 const writeJsonAtomic = (filePath, obj) => {
   try {
     const dir = path.dirname(filePath);
-    const tmp = path.join(dir, '.' + path.basename(filePath) + '.tmp.' + process.pid + '.' + Date.now());
+    const tmp = path.join(
+      dir,
+      "." + path.basename(filePath) + ".tmp." + process.pid + "." + Date.now(),
+    );
     fs.writeFileSync(tmp, JSON.stringify(obj));
     fs.renameSync(tmp, filePath);
   } catch {}
@@ -124,7 +126,7 @@ const writeJsonAtomic = (filePath, obj) => {
 
 const readMap = (filePath) => {
   const obj = readJson(filePath, {});
-  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {};
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return {};
   return obj;
 };
 
@@ -182,14 +184,14 @@ const safeIsDir = (p) => {
 
 const toPstParts = (ms) => {
   try {
-    const dtf = new Intl.DateTimeFormat('en-US', {
+    const dtf = new Intl.DateTimeFormat("en-US", {
       timeZone: PST_TZ,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
       hour12: false,
     });
     const parts = dtf.formatToParts(new Date(ms));
@@ -204,17 +206,17 @@ const toPstParts = (ms) => {
   } catch {
     const d = new Date(ms);
     const y = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, '0');
-    const da = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
+    const mo = String(d.getMonth() + 1).padStart(2, "0");
+    const da = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
     return { ymd: `${y}-${mo}-${da}`, hm: `${hh}:${mm}` };
   }
 };
 
 const deleteDbEntryForLocalFilePath = (filePath) => {
   try {
-    const fp = String(filePath || '');
+    const fp = String(filePath || "");
     if (!fp || !path.isAbsolute(fp)) return;
 
     // Derive (localPath, title) from the filesystem event.
@@ -223,8 +225,9 @@ const deleteDbEntryForLocalFilePath = (filePath) => {
     if (!title || !dir) return;
 
     const localPath1 = dir;
-    const localPath2 = dir.endsWith(path.sep) ? dir : (dir + path.sep);
-    const localPath3 = localPath2.replace(/\/+$/g, '/')
+    const localPath2 = dir.endsWith(path.sep) ? dir : dir + path.sep;
+    const localPath3 = localPath2
+      .replace(/\/+$/g, "/")
       .replace(/\\+$/g, path.sep);
 
     openDb();
@@ -233,7 +236,7 @@ const deleteDbEntryForLocalFilePath = (filePath) => {
     // do not touch any other datastore.
     try {
       db.prepare(
-        "DELETE FROM tv_entries WHERE title=? AND status='finished' AND (error IS NULL OR error=0) AND (localPath=? OR localPath=? OR localPath=?)"
+        "DELETE FROM tv_entries WHERE title=? AND status='finished' AND (error IS NULL OR error=0) AND (localPath=? OR localPath=? OR localPath=?)",
       ).run(title, localPath1, localPath2, localPath3);
     } catch {}
   } catch {}
@@ -242,7 +245,7 @@ const deleteDbEntryForLocalFilePath = (filePath) => {
 const walkDirectories = (rootDir) => {
   const out = [];
   try {
-    const root = String(rootDir || '');
+    const root = String(rootDir || "");
     if (!root) return out;
     if (!safeIsDir(root)) return out;
 
@@ -266,10 +269,10 @@ const walkDirectories = (rootDir) => {
 
       for (const ent of ents) {
         if (!ent || !ent.isDirectory()) continue;
-        const name = ent.name != null ? String(ent.name) : '';
+        const name = ent.name != null ? String(ent.name) : "";
         if (!name) continue;
         // Avoid pathological recursion; keep it simple.
-        if (name === '.' || name === '..') continue;
+        if (name === "." || name === "..") continue;
         const child = path.join(dir, name);
         stack.push(child);
       }
@@ -282,7 +285,7 @@ const walkDirectories = (rootDir) => {
 };
 
 const ensureWatcherForDir = (dir) => {
-  const d = String(dir || '');
+  const d = String(dir || "");
   if (!d) return false;
   if (dirWatchers.has(d)) return false;
   if (!safeIsDir(d)) return false;
@@ -295,9 +298,9 @@ const ensureWatcherForDir = (dir) => {
       awaitWriteFinish: false,
     });
 
-    w.on('unlink', (p) => {
+    w.on("unlink", (p) => {
       try {
-        const fp = String(p || '');
+        const fp = String(p || "");
         deleteDbEntryForLocalFilePath(fp);
       } catch {}
     });
@@ -305,16 +308,21 @@ const ensureWatcherForDir = (dir) => {
     // Move/rename events: chokidar doesn't emit a high-level rename event, but it
     // does surface underlying rename/move notifications via `raw`.
     // We do NOT listen to add/addDir.
-    w.on('raw', (eventName, eventPath, details) => {
+    w.on("raw", (eventName, eventPath, details) => {
       try {
-        const ev = String(eventName || '').toLowerCase();
-        const det = details && typeof details === 'object' ? details : {};
-        const detEvent = det && det.event != null ? String(det.event).toLowerCase() : '';
-        const p = String(eventPath || '');
+        const ev = String(eventName || "").toLowerCase();
+        const det = details && typeof details === "object" ? details : {};
+        const detEvent =
+          det && det.event != null ? String(det.event).toLowerCase() : "";
+        const p = String(eventPath || "");
 
         // Only handle move/rename.
         // inotify commonly reports moves/renames as eventName='rename'.
-        if (ev === 'rename' || detEvent.includes('moved') || detEvent.includes('rename')) {
+        if (
+          ev === "rename" ||
+          detEvent.includes("moved") ||
+          detEvent.includes("rename")
+        ) {
           // Best-effort: only resync when it pertains to the watched dir.
           if (!p || p.startsWith(d)) tvResync();
         }
@@ -322,8 +330,8 @@ const ensureWatcherForDir = (dir) => {
     });
 
     // Directory deletes can manifest as unlinkDir; treat as unlink => resync.
-    w.on('unlinkDir', () => tvResync());
-    w.on('error', () => {});
+    w.on("unlinkDir", () => tvResync());
+    w.on("error", () => {});
 
     dirWatchers.set(d, w);
     return true;
@@ -348,7 +356,9 @@ const ensureTvRootWatchers = () => {
     // Drop watchers for directories that no longer exist.
     for (const [d, w] of dirWatchers.entries()) {
       if (set.has(d)) continue;
-      try { w.close(); } catch {}
+      try {
+        w.close();
+      } catch {}
       dirWatchers.delete(d);
       result.removed++;
     }
@@ -378,7 +388,9 @@ const tvResync = () => {
         // Only delete finished rows (never delete errored entries).
         let rows = [];
         try {
-          rows = db.prepare("SELECT title, localPath, status, error FROM tv_entries").all();
+          rows = db
+            .prepare("SELECT title, localPath, status, error FROM tv_entries")
+            .all();
         } catch {
           rows = [];
         }
@@ -386,21 +398,25 @@ const tvResync = () => {
         const toDelete = [];
         for (const r of rows) {
           if (!r) continue;
-          const title = r.title != null ? String(r.title) : '';
-          const localPath = r.localPath != null ? String(r.localPath) : '';
-          const status = r.status != null ? String(r.status) : '';
+          const title = r.title != null ? String(r.title) : "";
+          const localPath = r.localPath != null ? String(r.localPath) : "";
+          const status = r.status != null ? String(r.status) : "";
           const error = r.error == null ? 0 : Number(r.error);
           if (!title) continue;
 
           // Orphan definition for this resync: finished but missing local file.
-          if (status !== 'finished') continue;
+          if (status !== "finished") continue;
           if (Number.isFinite(error) && error !== 0) continue;
 
           if (!localPath || !path.isAbsolute(localPath)) {
             toDelete.push(title);
             continue;
           }
-          if (path.isAbsolute(title) || title.includes('\0') || title.includes('..')) {
+          if (
+            path.isAbsolute(title) ||
+            title.includes("\0") ||
+            title.includes("..")
+          ) {
             toDelete.push(title);
             continue;
           }
@@ -414,7 +430,9 @@ const tvResync = () => {
         if (toDelete.length) {
           const tx = db.transaction((titles) => {
             for (const t of titles) {
-              try { stmtDeleteByTitle.run(t); } catch {}
+              try {
+                stmtDeleteByTitle.run(t);
+              } catch {}
             }
           });
           tx(toDelete);
@@ -441,27 +459,31 @@ const tvResync = () => {
 // existingUsbDirs: Set of relative directory paths under "files/" on the usbHost.
 const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
   try {
-    if (!existingUsbDirs || typeof existingUsbDirs.has !== 'function') {
+    if (!existingUsbDirs || typeof existingUsbDirs.has !== "function") {
       tvResync();
       return;
     }
 
     const normalizeUsbDir = (usbPath) => {
-      let p = String(usbPath || '');
-      p = p.replace(/^~\//, '');
-      p = p.replace(/^\/+/, '');
-      if (p.startsWith('files/')) p = p.slice('files/'.length);
-      if (p.startsWith('~/files/')) p = p.slice('~/files/'.length);
-      p = p.replace(/^files\//, '');
-      p = p.replace(/^\.\/?/, '');
-      p = p.replace(/\/+$/g, '');
+      let p = String(usbPath || "");
+      p = p.replace(/^~\//, "");
+      p = p.replace(/^\/+/, "");
+      if (p.startsWith("files/")) p = p.slice("files/".length);
+      if (p.startsWith("~/files/")) p = p.slice("~/files/".length);
+      p = p.replace(/^files\//, "");
+      p = p.replace(/^\.\/?/, "");
+      p = p.replace(/\/+$/g, "");
       return p;
     };
 
     openDb();
     let rows = [];
     try {
-      rows = db.prepare('SELECT title, usbPath, localPath, status, error FROM tv_entries').all();
+      rows = db
+        .prepare(
+          "SELECT title, usbPath, localPath, status, error FROM tv_entries",
+        )
+        .all();
     } catch {
       rows = [];
     }
@@ -475,13 +497,13 @@ const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
 
     for (const r of rows) {
       if (!r) continue;
-      const title = r.title != null ? String(r.title) : '';
+      const title = r.title != null ? String(r.title) : "";
       if (!title) continue;
 
       // Only delete finished and non-errored entries.
-      const status = r.status != null ? String(r.status) : '';
+      const status = r.status != null ? String(r.status) : "";
       const error = r.error == null ? 0 : Number(r.error);
-      if (status !== 'finished') continue;
+      if (status !== "finished") continue;
       if (Number.isFinite(error) && error !== 0) continue;
 
       // USB-dir pruning (existing behavior)
@@ -493,12 +515,16 @@ const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
       } catch {}
 
       // Orphan pruning: finished but missing local file.
-      const localPath = r.localPath != null ? String(r.localPath) : '';
+      const localPath = r.localPath != null ? String(r.localPath) : "";
       if (!localPath || !path.isAbsolute(localPath)) {
         orphanFinishedTitles.push(title);
         continue;
       }
-      if (path.isAbsolute(title) || title.includes('\0') || title.includes('..')) {
+      if (
+        path.isAbsolute(title) ||
+        title.includes("\0") ||
+        title.includes("..")
+      ) {
         orphanFinishedTitles.push(title);
         continue;
       }
@@ -508,11 +534,15 @@ const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
       }
     }
 
-    const toDelete = Array.from(new Set([...missingUsbTitles, ...orphanFinishedTitles]));
+    const toDelete = Array.from(
+      new Set([...missingUsbTitles, ...orphanFinishedTitles]),
+    );
     if (toDelete.length) {
       const tx = db.transaction((titles) => {
         for (const t of titles) {
-          try { stmtDeleteByTitle.run(t); } catch {}
+          try {
+            stmtDeleteByTitle.run(t);
+          } catch {}
         }
       });
       tx(toDelete);
@@ -528,18 +558,18 @@ const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
 };
 
 // Scheduled SQLite backup at 05:30, 11:30, 17:30, 23:30 PST.
-let lastBackupKey = '';
-const backupTimes = new Set(['05:30', '11:30', '17:30', '23:30']);
+let lastBackupKey = "";
+const backupTimes = new Set(["05:30", "11:30", "17:30", "23:30"]);
 
 const runSqliteBackup = () => {
   try {
     ensureDataDir();
     // Use sqlite3 CLI so backup is consistent even with WAL.
     execFile(
-      'sqlite3',
+      "sqlite3",
       [TV_DB_PATH, `.backup '${TV_DB_BACKUP_PATH}'`],
       { timeout: 5 * 60 * 1000 },
-      () => {}
+      () => {},
     );
   } catch {}
 };
@@ -571,13 +601,13 @@ const openDb = () => {
   db = new Database(TV_DB_PATH);
 
   try {
-    db.pragma('journal_mode = WAL');
+    db.pragma("journal_mode = WAL");
   } catch {}
   try {
-    db.pragma('synchronous = NORMAL');
+    db.pragma("synchronous = NORMAL");
   } catch {}
   try {
-    db.pragma('busy_timeout = 5000');
+    db.pragma("busy_timeout = 5000");
   } catch {}
 
   db.exec(`
@@ -634,8 +664,8 @@ const openDb = () => {
       reason=excluded.reason
   `);
 
-  stmtGetByTitle = db.prepare('SELECT * FROM tv_entries WHERE title = ?');
-  stmtGetByProcId = db.prepare('SELECT * FROM tv_entries WHERE procId = ?');
+  stmtGetByTitle = db.prepare("SELECT * FROM tv_entries WHERE title = ?");
+  stmtGetByProcId = db.prepare("SELECT * FROM tv_entries WHERE procId = ?");
   stmtUpdateByProcId = db.prepare(`
     UPDATE tv_entries SET
       usbPath=@usbPath,
@@ -655,37 +685,79 @@ const openDb = () => {
       reason=@reason
     WHERE procId=@procId
   `);
-  stmtDeleteByTitle = db.prepare('DELETE FROM tv_entries WHERE title = ?');
-  stmtDeleteByProcId = db.prepare('DELETE FROM tv_entries WHERE procId = ?');
+  stmtDeleteByTitle = db.prepare("DELETE FROM tv_entries WHERE title = ?");
+  stmtDeleteByProcId = db.prepare("DELETE FROM tv_entries WHERE procId = ?");
 
   stmtFindOldestWaitingTitle = db.prepare(
-    "SELECT title FROM tv_entries WHERE status='waiting' ORDER BY procId ASC LIMIT 1"
+    "SELECT title FROM tv_entries WHERE status='waiting' ORDER BY procId ASC LIMIT 1",
   );
-  stmtGetMaxProcId = db.prepare('SELECT MAX(procId) AS maxProcId FROM tv_entries');
+  stmtGetMaxProcId = db.prepare(
+    "SELECT MAX(procId) AS maxProcId FROM tv_entries",
+  );
   // Return the newest 200 rows (by procId) but in ascending procId order
   // so callers can display consistently without extra sorting.
   stmtGetDownloads = db.prepare(
-    'SELECT * FROM (SELECT * FROM tv_entries ORDER BY procId DESC LIMIT 200) ORDER BY procId ASC'
+    "SELECT * FROM (SELECT * FROM tv_entries ORDER BY procId DESC LIMIT 200) ORDER BY procId ASC",
   );
-  stmtGetTitles = db.prepare('SELECT title, error FROM tv_entries');
+  stmtGetTitles = db.prepare("SELECT title, error FROM tv_entries");
 };
 
 const rowToEntry = (row) => {
-  if (!row || typeof row !== 'object') return null;
+  if (!row || typeof row !== "object") return null;
   return {
-    procId: (typeof row.procId === 'number') ? row.procId : (row.procId == null ? null : Number(row.procId)),
-    usbPath: row.usbPath || '',
-    localPath: row.localPath || '',
-    title: row.title || '',
-    status: row.status || 'waiting',
-    progress: (typeof row.progress === 'number') ? row.progress : (row.progress == null ? 0 : Number(row.progress)),
+    procId:
+      typeof row.procId === "number"
+        ? row.procId
+        : row.procId == null
+          ? null
+          : Number(row.procId),
+    usbPath: row.usbPath || "",
+    localPath: row.localPath || "",
+    title: row.title || "",
+    status: row.status || "waiting",
+    progress:
+      typeof row.progress === "number"
+        ? row.progress
+        : row.progress == null
+          ? 0
+          : Number(row.progress),
     eta: row.eta == null ? null : Number(row.eta),
-    speed: (typeof row.speed === 'number') ? row.speed : (row.speed == null ? 0 : Number(row.speed)),
-    sequence: (typeof row.sequence === 'number') ? row.sequence : (row.sequence == null ? 0 : Number(row.sequence)),
-    fileSize: (typeof row.fileSize === 'number') ? row.fileSize : (row.fileSize == null ? 0 : Number(row.fileSize)),
-    season: (typeof row.season === 'number') ? row.season : (row.season == null ? 0 : Number(row.season)),
-    episode: (typeof row.episode === 'number') ? row.episode : (row.episode == null ? 0 : Number(row.episode)),
-    dateStarted: (typeof row.dateStarted === 'number') ? row.dateStarted : (row.dateStarted == null ? 0 : Number(row.dateStarted)),
+    speed:
+      typeof row.speed === "number"
+        ? row.speed
+        : row.speed == null
+          ? 0
+          : Number(row.speed),
+    sequence:
+      typeof row.sequence === "number"
+        ? row.sequence
+        : row.sequence == null
+          ? 0
+          : Number(row.sequence),
+    fileSize:
+      typeof row.fileSize === "number"
+        ? row.fileSize
+        : row.fileSize == null
+          ? 0
+          : Number(row.fileSize),
+    season:
+      typeof row.season === "number"
+        ? row.season
+        : row.season == null
+          ? 0
+          : Number(row.season),
+    episode:
+      typeof row.episode === "number"
+        ? row.episode
+        : row.episode == null
+          ? 0
+          : Number(row.episode),
+    dateStarted:
+      typeof row.dateStarted === "number"
+        ? row.dateStarted
+        : row.dateStarted == null
+          ? 0
+          : Number(row.dateStarted),
     dateEnded: row.dateEnded == null ? null : Number(row.dateEnded),
     inProgress: !!row.inProgress,
     error: !!row.error,
@@ -694,31 +766,56 @@ const rowToEntry = (row) => {
 };
 
 const normalizeEntryForDb = (entry) => {
-  const e = entry && typeof entry === 'object' ? entry : {};
-  const title = e.title ? String(e.title) : '';
+  const e = entry && typeof entry === "object" ? entry : {};
+  const title = e.title ? String(e.title) : "";
 
   // Defaults match prior tv.json behavior.
-  const status0 = e.status ? String(e.status) : 'waiting';
-  const status = status0 === 'future' ? 'waiting' : status0;
+  const status0 = e.status ? String(e.status) : "waiting";
+  const status = status0 === "future" ? "waiting" : status0;
 
-  let procId = (typeof e.procId === 'number' && Number.isInteger(e.procId)) ? e.procId : null;
+  let procId =
+    typeof e.procId === "number" && Number.isInteger(e.procId)
+      ? e.procId
+      : null;
   if (procId == null) procId = nextProcId++;
 
-  const progress = (typeof e.progress === 'number' && Number.isFinite(e.progress)) ? Math.trunc(e.progress) : 0;
-  const eta = (e.eta == null) ? null : Math.trunc(Number(e.eta));
-  const speed = (typeof e.speed === 'number' && Number.isFinite(e.speed)) ? Math.trunc(e.speed) : 0;
-  const sequence = (typeof e.sequence === 'number' && Number.isFinite(e.sequence)) ? Math.trunc(e.sequence) : 0;
-  const fileSize = (typeof e.fileSize === 'number' && Number.isFinite(e.fileSize)) ? Math.trunc(e.fileSize) : 0;
-  const season = (typeof e.season === 'number' && Number.isFinite(e.season)) ? Math.trunc(e.season) : 0;
-  const episode = (typeof e.episode === 'number' && Number.isFinite(e.episode)) ? Math.trunc(e.episode) : 0;
-  const dateStarted = (typeof e.dateStarted === 'number' && Number.isFinite(e.dateStarted)) ? Math.trunc(e.dateStarted) : 0;
-  const dateEnded = (e.dateEnded == null) ? null : Math.trunc(Number(e.dateEnded));
+  const progress =
+    typeof e.progress === "number" && Number.isFinite(e.progress)
+      ? Math.trunc(e.progress)
+      : 0;
+  const eta = e.eta == null ? null : Math.trunc(Number(e.eta));
+  const speed =
+    typeof e.speed === "number" && Number.isFinite(e.speed)
+      ? Math.trunc(e.speed)
+      : 0;
+  const sequence =
+    typeof e.sequence === "number" && Number.isFinite(e.sequence)
+      ? Math.trunc(e.sequence)
+      : 0;
+  const fileSize =
+    typeof e.fileSize === "number" && Number.isFinite(e.fileSize)
+      ? Math.trunc(e.fileSize)
+      : 0;
+  const season =
+    typeof e.season === "number" && Number.isFinite(e.season)
+      ? Math.trunc(e.season)
+      : 0;
+  const episode =
+    typeof e.episode === "number" && Number.isFinite(e.episode)
+      ? Math.trunc(e.episode)
+      : 0;
+  const dateStarted =
+    typeof e.dateStarted === "number" && Number.isFinite(e.dateStarted)
+      ? Math.trunc(e.dateStarted)
+      : 0;
+  const dateEnded =
+    e.dateEnded == null ? null : Math.trunc(Number(e.dateEnded));
 
   return {
     title,
     procId,
-    usbPath: e.usbPath ? String(e.usbPath) : '',
-    localPath: e.localPath ? String(e.localPath) : '',
+    usbPath: e.usbPath ? String(e.usbPath) : "",
+    localPath: e.localPath ? String(e.localPath) : "",
     status,
     progress,
     eta,
@@ -731,7 +828,11 @@ const normalizeEntryForDb = (entry) => {
     dateEnded,
     inProgress: e.inProgress ? 1 : 0,
     error: e.error ? 1 : 0,
-    reason: e.reason ? String(e.reason) : (e.status && e.status !== status ? String(e.status) : null),
+    reason: e.reason
+      ? String(e.reason)
+      : e.status && e.status !== status
+        ? String(e.status)
+        : null,
   };
 };
 
@@ -811,10 +912,14 @@ const loadOnStart = () => {
 
   // Normalize persisted statuses on restart.
   try {
-    db.prepare("UPDATE tv_entries SET status='waiting' WHERE status='future'").run();
+    db.prepare(
+      "UPDATE tv_entries SET status='waiting' WHERE status='future'",
+    ).run();
   } catch {}
   try {
-    db.prepare("UPDATE tv_entries SET inProgress=0, status='waiting', progress=0, eta=NULL, speed=0, dateEnded=NULL WHERE inProgress=1 OR status='downloading'").run();
+    db.prepare(
+      "UPDATE tv_entries SET inProgress=0, status='waiting', progress=0, eta=NULL, speed=0, dateEnded=NULL WHERE inProgress=1 OR status='downloading'",
+    ).run();
   } catch {}
 
   // Establish nextProcId from existing entries.
@@ -828,14 +933,20 @@ const loadOnStart = () => {
 
   // Assign procId to any rows missing it.
   try {
-    const rows = db.prepare('SELECT title FROM tv_entries WHERE procId IS NULL ORDER BY rowid ASC').all();
+    const rows = db
+      .prepare(
+        "SELECT title FROM tv_entries WHERE procId IS NULL ORDER BY rowid ASC",
+      )
+      .all();
     if (Array.isArray(rows) && rows.length) {
       const tx = db.transaction((rs) => {
         for (const r of rs) {
-          const t = r && r.title ? String(r.title) : '';
+          const t = r && r.title ? String(r.title) : "";
           if (!t) continue;
           try {
-            db.prepare('UPDATE tv_entries SET procId = ? WHERE title = ? AND procId IS NULL').run(nextProcId++, t);
+            db.prepare(
+              "UPDATE tv_entries SET procId = ? WHERE title = ? AND procId IS NULL",
+            ).run(nextProcId++, t);
           } catch {}
         }
       });
@@ -849,23 +960,25 @@ const loadOnStart = () => {
   // One-time migration: if legacy tv-errors.json exists, mark matching entries as error:true then delete it.
   // Any mismatches are ignored.
   try {
-    const legacyErrorsPath = path.join(DATA_DIR, 'tv-errors.json');
+    const legacyErrorsPath = path.join(DATA_DIR, "tv-errors.json");
     if (fs.existsSync(legacyErrorsPath)) {
       const legacy = readMap(legacyErrorsPath);
       const keys = Object.keys(legacy || {});
       if (keys.length) {
         const tx = db.transaction((titles) => {
           for (const k of titles) {
-            const t = String(k || '');
+            const t = String(k || "");
             if (!t) continue;
             try {
-              db.prepare('UPDATE tv_entries SET error=1 WHERE title=?').run(t);
+              db.prepare("UPDATE tv_entries SET error=1 WHERE title=?").run(t);
             } catch {}
           }
         });
         tx(keys);
       }
-      try { fs.unlinkSync(legacyErrorsPath); } catch {}
+      try {
+        fs.unlinkSync(legacyErrorsPath);
+      } catch {}
     }
   } catch {}
   // On restart/reload, treat all prior in-progress markers as stale.
@@ -897,15 +1010,15 @@ const tryStartNextWorkers = () => {
 };
 
 const replaceByProcId = (entry) => {
-  if (!entry || typeof entry !== 'object') return;
+  if (!entry || typeof entry !== "object") return;
   updateEntryByProcId(entry);
 };
 
 const handleFinish = (entry) => {
   try {
-    if (!entry || typeof entry !== 'object') return;
-    const title = entry.title ? String(entry.title) : '';
-    const status = entry.status ? String(entry.status) : '';
+    if (!entry || typeof entry !== "object") return;
+    const title = entry.title ? String(entry.title) : "";
+    const status = entry.status ? String(entry.status) : "";
     if (!title) return;
 
     ensureMapsLoaded();
@@ -913,20 +1026,20 @@ const handleFinish = (entry) => {
     const ts = Date.now();
     const tsStr = dateStr(ts);
 
-    if (status === 'finished') {
+    if (status === "finished") {
       finishedMap[title] = tsStr;
       writeMap(TV_FINISHED_PATH, finishedMap);
       removeInProgress(title);
       return;
     }
 
-    if (status && status !== 'downloading' && status !== 'waiting') {
+    if (status && status !== "downloading" && status !== "waiting") {
       appendTvLog(`${tsStr} ERROR ${title}: ${status}\n`);
 
       // Mark the entry as error in SQLite.
       try {
         openDb();
-        db.prepare('UPDATE tv_entries SET error=1 WHERE title=?').run(title);
+        db.prepare("UPDATE tv_entries SET error=1 WHERE title=?").run(title);
       } catch {}
       removeInProgress(title);
     }
@@ -937,11 +1050,11 @@ const startWorkerForTitle = (title) => {
   openDb();
   const row = stmtGetByTitle.get(title);
   const entry0 = rowToEntry(row);
-  if (!entry0 || typeof entry0 !== 'object') return;
+  if (!entry0 || typeof entry0 !== "object") return;
 
   // Assign procId on worker creation (spec) if missing.
   const entry = { ...entry0 };
-  if (!(typeof entry.procId === 'number' && Number.isInteger(entry.procId))) {
+  if (!(typeof entry.procId === "number" && Number.isInteger(entry.procId))) {
     entry.procId = nextProcId++;
   }
 
@@ -949,7 +1062,7 @@ const startWorkerForTitle = (title) => {
   entry.inProgress = true;
   addInProgress(entry.title);
 
-  entry.status = 'downloading';
+  entry.status = "downloading";
   entry.progress = 0;
   entry.eta = null;
   entry.speed = 0;
@@ -971,14 +1084,14 @@ const startWorkerForTitle = (title) => {
   let finishedReceived = false;
 
   const onMessage = (msg) => {
-    if (!msg || typeof msg !== 'object') return;
+    if (!msg || typeof msg !== "object") return;
 
-    if (msg.type === 'update' && msg.entry) {
+    if (msg.type === "update" && msg.entry) {
       replaceByProcId(msg.entry);
       return;
     }
 
-    if (msg.type === 'finished' && msg.entry) {
+    if (msg.type === "finished" && msg.entry) {
       finishedReceived = true;
       const doneEntry = { ...msg.entry, inProgress: false };
       replaceByProcId(doneEntry);
@@ -992,10 +1105,16 @@ const startWorkerForTitle = (title) => {
     }
   };
 
-  w.on('message', onMessage);
-  w.on('error', (e) => {
+  w.on("message", onMessage);
+  w.on("error", (e) => {
     // Treat worker error as a finish with an error status.
-    const errEntry = { ...entry, status: (e && e.message) ? String(e.message) : 'worker error', dateEnded: unixNow(), eta: null, inProgress: false };
+    const errEntry = {
+      ...entry,
+      status: e && e.message ? String(e.message) : "worker error",
+      dateEnded: unixNow(),
+      eta: null,
+      inProgress: false,
+    };
     replaceByProcId(errEntry);
     workerCount = Math.max(0, workerCount - 1);
     handleFinish(errEntry);
@@ -1003,10 +1122,16 @@ const startWorkerForTitle = (title) => {
     const nextTitle = findOldestWaitingIndex();
     if (nextTitle) startWorkerForTitle(nextTitle);
   });
-  w.on('exit', () => {
+  w.on("exit", () => {
     // If the worker exits without sending finished, record something actionable.
     if (finishedReceived) return;
-    const errEntry = { ...entry, status: 'worker exited without finished', dateEnded: unixNow(), eta: null, inProgress: false };
+    const errEntry = {
+      ...entry,
+      status: "worker exited without finished",
+      dateEnded: unixNow(),
+      eta: null,
+      inProgress: false,
+    };
     replaceByProcId(errEntry);
     workerCount = Math.max(0, workerCount - 1);
     handleFinish(errEntry);
@@ -1030,7 +1155,7 @@ try {
 // ---- exports ---------------------------------------------------------------
 
 const addEntry = (entry) => {
-  if (!entry || typeof entry !== 'object') return;
+  if (!entry || typeof entry !== "object") return;
 
   openDb();
 
@@ -1038,16 +1163,16 @@ const addEntry = (entry) => {
   const e = { ...entry };
 
   // Assign procId on add so /downloads sorting/capping is deterministic.
-  if (!(typeof e.procId === 'number' && Number.isInteger(e.procId))) {
+  if (!(typeof e.procId === "number" && Number.isInteger(e.procId))) {
     e.procId = nextProcId++;
   }
 
   // Ensure minimal fields exist.
   // Queue status is "waiting" (formerly "future").
-  if (!e.status || e.status === 'future') e.status = 'waiting';
-  if (typeof e.progress !== 'number') e.progress = 0;
+  if (!e.status || e.status === "future") e.status = "waiting";
+  if (typeof e.progress !== "number") e.progress = 0;
   if (e.eta === undefined) e.eta = null;
-  if (typeof e.speed !== 'number') e.speed = 0;
+  if (typeof e.speed !== "number") e.speed = 0;
   if (!e.dateStarted) e.dateStarted = 0;
   if (!e.dateEnded) e.dateEnded = null;
 
@@ -1055,7 +1180,7 @@ const addEntry = (entry) => {
   e.inProgress = false;
   addInProgress(e.title);
 
-  const title = e.title ? String(e.title) : '';
+  const title = e.title ? String(e.title) : "";
   if (!title) return;
 
   let wasExisting = false;
@@ -1071,8 +1196,13 @@ const addEntry = (entry) => {
 
   // If this title already exists and caller didn't provide procId,
   // preserve the existing procId so ordering stays stable.
-  if (wasExisting && existingEntry && typeof existingEntry.procId === 'number' && Number.isInteger(existingEntry.procId)) {
-    if (!(typeof e.procId === 'number' && Number.isInteger(e.procId))) {
+  if (
+    wasExisting &&
+    existingEntry &&
+    typeof existingEntry.procId === "number" &&
+    Number.isInteger(existingEntry.procId)
+  ) {
+    if (!(typeof e.procId === "number" && Number.isInteger(e.procId))) {
       e.procId = existingEntry.procId;
     }
   }
@@ -1082,7 +1212,7 @@ const addEntry = (entry) => {
   // Add a tv.log line for every newly-added tv.json entry.
   if (!wasExisting) {
     const isError = !!e.error;
-    const errorMsg = isError ? (e.reason || e.status || 'error') : null;
+    const errorMsg = isError ? e.reason || e.status || "error" : null;
     logTvEntryAdded(title, errorMsg);
   }
 
@@ -1095,29 +1225,52 @@ const addEntry = (entry) => {
 // Record a non-download (cycle) error directly on tv.json entries.
 const markError = (titleOrEntry, reason) => {
   try {
-    const entry = (titleOrEntry && typeof titleOrEntry === 'object') ? titleOrEntry : null;
-    const t = entry ? String(entry.title || '') : (titleOrEntry ? String(titleOrEntry) : '');
+    const entry =
+      titleOrEntry && typeof titleOrEntry === "object" ? titleOrEntry : null;
+    const t = entry
+      ? String(entry.title || "")
+      : titleOrEntry
+        ? String(titleOrEntry)
+        : "";
     if (!t) return;
     ensureMapsLoaded();
 
     const tsStr = dateStr(Date.now());
-    const msg = entry && entry.reason ? String(entry.reason) : (reason ? String(reason) : 'error');
+    const msg =
+      entry && entry.reason
+        ? String(entry.reason)
+        : reason
+          ? String(reason)
+          : "error";
     appendTvLog(`${tsStr} ERROR ${t}: ${msg}\n`);
 
     openDb();
     const existing = rowToEntry(stmtGetByTitle.get(t));
     const patch = {
       title: t,
-      usbPath: entry && entry.usbPath ? String(entry.usbPath) : (existing && existing.usbPath ? existing.usbPath : ''),
-      localPath: entry && entry.localPath ? String(entry.localPath) : (existing && existing.localPath ? existing.localPath : ''),
-      procId: (existing && typeof existing.procId === 'number') ? existing.procId : nextProcId++,
+      usbPath:
+        entry && entry.usbPath
+          ? String(entry.usbPath)
+          : existing && existing.usbPath
+            ? existing.usbPath
+            : "",
+      localPath:
+        entry && entry.localPath
+          ? String(entry.localPath)
+          : existing && existing.localPath
+            ? existing.localPath
+            : "",
+      procId:
+        existing && typeof existing.procId === "number"
+          ? existing.procId
+          : nextProcId++,
       status: msg,
       error: true,
       inProgress: false,
       progress: 0,
       eta: null,
       speed: 0,
-      dateStarted: (existing && existing.dateStarted) ? existing.dateStarted : 0,
+      dateStarted: existing && existing.dateStarted ? existing.dateStarted : 0,
       dateEnded: unixNow(),
     };
 
@@ -1170,7 +1323,7 @@ const checkFiles = (titles) => {
     const cleaned = [];
     const seen = new Set();
     for (const t0 of titles) {
-      const t = String(t0 || '').trim();
+      const t = String(t0 || "").trim();
       if (!t) continue;
       if (seen.has(t)) continue;
       seen.add(t);
@@ -1178,10 +1331,11 @@ const checkFiles = (titles) => {
       if (cleaned.length >= 5000) break;
     }
 
-    if (cleaned.length === 0) return { existingTitles: [], existingProcids: [], tvEntries: [] };
+    if (cleaned.length === 0)
+      return { existingTitles: [], existingProcids: [], tvEntries: [] };
 
     openDb();
-    const placeholders = cleaned.map(() => '?').join(',');
+    const placeholders = cleaned.map(() => "?").join(",");
 
     // Unfiltered matches (all states/errors) for UI diagnostics.
     const sqlAll = `SELECT * FROM tv_entries WHERE title IN (${placeholders})`;
@@ -1196,15 +1350,21 @@ const checkFiles = (titles) => {
 
     const sql = `SELECT title, procId FROM tv_entries WHERE title IN (${placeholders}) AND status='finished' AND (error IS NULL OR error=0)`;
     const rows = db.prepare(sql).all(...cleaned);
-    if (!Array.isArray(rows) || rows.length === 0) return { existingTitles: [], existingProcids: [], tvEntries };
+    if (!Array.isArray(rows) || rows.length === 0)
+      return { existingTitles: [], existingProcids: [], tvEntries };
 
     const existingTitles = [];
     const existingProcids = [];
     for (const r of rows) {
       if (!r) continue;
-      const t = r.title != null ? String(r.title) : '';
+      const t = r.title != null ? String(r.title) : "";
       if (t) existingTitles.push(t);
-      const pid = (typeof r.procId === 'number') ? r.procId : (r.procId == null ? null : Number(r.procId));
+      const pid =
+        typeof r.procId === "number"
+          ? r.procId
+          : r.procId == null
+            ? null
+            : Number(r.procId);
       if (pid != null && Number.isFinite(pid)) existingProcids.push(pid);
     }
     return { existingTitles, existingProcids, tvEntries };
@@ -1216,7 +1376,12 @@ const checkFiles = (titles) => {
 // Delete local files and matching DB rows by procId.
 // Returns { ok:true, deletedProcids:[], skippedProcids:[], errors:[] }
 const deleteProcids = (procIds) => {
-  const result = { ok: true, deletedProcids: [], skippedProcids: [], errors: [] };
+  const result = {
+    ok: true,
+    deletedProcids: [],
+    skippedProcids: [],
+    errors: [],
+  };
   try {
     if (!Array.isArray(procIds) || procIds.length === 0) return result;
     openDb();
@@ -1225,7 +1390,7 @@ const deleteProcids = (procIds) => {
     const cleaned = [];
     const seen = new Set();
     for (const p0 of procIds) {
-      const pid = (typeof p0 === 'number') ? p0 : Number(p0);
+      const pid = typeof p0 === "number" ? p0 : Number(p0);
       if (!Number.isFinite(pid)) continue;
       const pid2 = Math.trunc(pid);
       if (pid2 < 0) continue;
@@ -1249,18 +1414,23 @@ const deleteProcids = (procIds) => {
         continue;
       }
 
-      const title = row.title != null ? String(row.title) : '';
-      const localPath = row.localPath != null ? String(row.localPath) : '';
+      const title = row.title != null ? String(row.title) : "";
+      const localPath = row.localPath != null ? String(row.localPath) : "";
 
       // Compute local file path safely.
       if (!localPath || !path.isAbsolute(localPath)) {
         result.ok = false;
-        result.errors.push({ procId: pid, title, error: 'invalid localPath' });
+        result.errors.push({ procId: pid, title, error: "invalid localPath" });
         continue;
       }
-      if (!title || path.isAbsolute(title) || title.includes('\0') || title.includes('..')) {
+      if (
+        !title ||
+        path.isAbsolute(title) ||
+        title.includes("\0") ||
+        title.includes("..")
+      ) {
         result.ok = false;
-        result.errors.push({ procId: pid, title, error: 'invalid title path' });
+        result.errors.push({ procId: pid, title, error: "invalid title path" });
         continue;
       }
 
@@ -1268,7 +1438,11 @@ const deleteProcids = (procIds) => {
       const filePath = path.resolve(localPath, title);
       if (!(filePath === base || filePath.startsWith(base + path.sep))) {
         result.ok = false;
-        result.errors.push({ procId: pid, title, error: 'refuses to delete outside localPath' });
+        result.errors.push({
+          procId: pid,
+          title,
+          error: "refuses to delete outside localPath",
+        });
         continue;
       }
 
@@ -1276,9 +1450,13 @@ const deleteProcids = (procIds) => {
       try {
         fs.unlinkSync(filePath);
       } catch (e) {
-        if (!(e && e.code === 'ENOENT')) {
+        if (!(e && e.code === "ENOENT")) {
           result.ok = false;
-          result.errors.push({ procId: pid, title, error: (e && e.message) ? String(e.message) : 'unlink failed' });
+          result.errors.push({
+            procId: pid,
+            title,
+            error: e && e.message ? String(e.message) : "unlink failed",
+          });
           continue;
         }
       }
@@ -1289,13 +1467,21 @@ const deleteProcids = (procIds) => {
         stmtDeleteByTitle.run(title);
       } catch (e) {
         result.ok = false;
-        result.errors.push({ procId: pid, title, error: (e && e.message) ? String(e.message) : 'db delete failed' });
+        result.errors.push({
+          procId: pid,
+          title,
+          error: e && e.message ? String(e.message) : "db delete failed",
+        });
         continue;
       }
 
       // Clear finished/inProgress markers so the title can be re-downloaded.
       try {
-        if (title && finishedMap && Object.prototype.hasOwnProperty.call(finishedMap, title)) {
+        if (
+          title &&
+          finishedMap &&
+          Object.prototype.hasOwnProperty.call(finishedMap, title)
+        ) {
           delete finishedMap[title];
           writeMap(TV_FINISHED_PATH, finishedMap);
         }
@@ -1310,7 +1496,9 @@ const deleteProcids = (procIds) => {
     return result;
   } catch (e) {
     result.ok = false;
-    result.errors.push({ error: (e && e.message) ? String(e.message) : String(e) });
+    result.errors.push({
+      error: e && e.message ? String(e.message) : String(e),
+    });
     return result;
   }
 };
@@ -1319,22 +1507,22 @@ const deleteProcids = (procIds) => {
 // existingUsbDirs: Set of relative directory paths under "files/" on the usbHost.
 const pruneMissingUsbDirs = (existingUsbDirs) => {
   try {
-    if (!existingUsbDirs || typeof existingUsbDirs.has !== 'function') return;
+    if (!existingUsbDirs || typeof existingUsbDirs.has !== "function") return;
 
     const normalizeUsbDir = (usbPath) => {
-      let p = String(usbPath || '');
-      p = p.replace(/^~\//, '');
-      p = p.replace(/^\/+/g, '');
-      if (p.startsWith('files/')) p = p.slice('files/'.length);
-      if (p.startsWith('~/files/')) p = p.slice('~/files/'.length);
-      p = p.replace(/^files\//, '');
-      p = p.replace(/^\.\/?/, '');
-      p = p.replace(/\/+$/g, '');
+      let p = String(usbPath || "");
+      p = p.replace(/^~\//, "");
+      p = p.replace(/^\/+/g, "");
+      if (p.startsWith("files/")) p = p.slice("files/".length);
+      if (p.startsWith("~/files/")) p = p.slice("~/files/".length);
+      p = p.replace(/^files\//, "");
+      p = p.replace(/^\.\/?/, "");
+      p = p.replace(/\/+$/g, "");
       return p;
     };
 
     openDb();
-    const rows = db.prepare('SELECT title, usbPath FROM tv_entries').all();
+    const rows = db.prepare("SELECT title, usbPath FROM tv_entries").all();
     if (!Array.isArray(rows) || !rows.length) return;
 
     const toDelete = [];
@@ -1351,7 +1539,9 @@ const pruneMissingUsbDirs = (existingUsbDirs) => {
 
     const tx = db.transaction((titles) => {
       for (const t of titles) {
-        try { stmtDeleteByTitle.run(t); } catch {}
+        try {
+          stmtDeleteByTitle.run(t);
+        } catch {}
       }
     });
     tx(toDelete);

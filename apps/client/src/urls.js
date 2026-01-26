@@ -7,11 +7,11 @@ https://dev.emby.media/reference/RestAPI.html
 https://dev.emby.media/home/sdk/apiclients/index.html
 */
 
-export function init(credIn) { 
-  cred = credIn; 
+export function init(credIn) {
+  cred = credIn;
 }
 
-export function showListUrl(cred, startIdx=0, limit=10000) {
+export function showListUrl(cred, startIdx = 0, limit = 10000) {
   return `https://hahnca.com:8920 / emby / Users 
           / ${cred.markUsrId} / Items
     ?SortBy=SortName
@@ -32,15 +32,15 @@ export function showListUrl(cred, startIdx=0, limit=10000) {
   `.replace(/\s*/g, "");
 }
 
-export function childrenUrl(cred, parentId='', unAired=false) {
-  if(parentId.startsWith("noemby-")) {
+export function childrenUrl(cred, parentId = "", unAired = false) {
+  if (parentId.startsWith("noemby-")) {
     console.error(`childrenUrl, noemby parentId: ${parentId}`);
-    return '';
+    return "";
   }
   return `https://hahnca.com:8920 / emby / Users 
           / ${cred.markUsrId} / Items /
     ? ParentId=${parentId}
-    ${unAired ? '& IsUnaired = true' : ''}
+    ${unAired ? "& IsUnaired = true" : ""}
     & Fields = MediaSources,DateCreated,Genres,Overview,People,ProviderIds,ExternalUrls,Path,SortName,ProductionYear,Status,UserData,PlayAccess,IsFolder,Type,Tags,PremiereDate
     & X-Emby-Token = ${cred.token}
   `.replace(/\s*/g, "");
@@ -54,14 +54,16 @@ export function postUserDataUrl(cred, id) {
 }
 
 export function favoriteUrl(cred, id) {
-  return encodeURI(`https://hahnca.com:8920 / emby / Users 
+  return encodeURI(
+    `https://hahnca.com:8920 / emby / Users 
           / ${cred.markUsrId} / FavoriteItems / ${id}
     ?X-Emby-Client=Emby Web
     &X-Emby-Device-Name=Chrome
     &X-Emby-Device-Id=f4079adb-6e48-4d54-9185-5d92d3b7176b
     &X-Emby-Client-Version=1.0.0
     &X-Emby-Token=${cred.token}
-  `.replace(/\s*/g, ""));
+  `.replace(/\s*/g, ""),
+  );
 }
 
 export function deleteShowUrl(cred, id) {
@@ -107,37 +109,37 @@ export function collectionUrl(cred, showId, collId) {
     &X-Emby-Token=${cred.token}
   `.replace(/\s*/g, "");
 }
- /////////////////// api key urls ////////////////////////
+/////////////////// api key urls ////////////////////////
 
 const markUsrId = "894c752d448f45a3a1260ccaabd0adff";
-const apiKey    ='9863c23d912349599e395950609c84cc';
-const hahnca    = 'https://hahnca.com:8920/emby/';
+const apiKey = "9863c23d912349599e395950609c84cc";
+const hahnca = "https://hahnca.com:8920/emby/";
 
 export function playUrl(sessionId, episodeId) {
-  return {url: `${hahnca}  Sessions /
+  return {
+    url: `${hahnca}  Sessions /
                 ${sessionId} / Playing
                 ? ItemIds     = ${episodeId} 
                 & PlayCommand = PlayNow
-                & api_key     = ${apiKey} `
-                .replace(/\s*/g, ""),
-          body: {
-            ControllingUserId:   markUsrId,
-            SubtitleStreamIndex: 0,
-            AudioStreamIndex:    0,
-            StartIndex:          0,
-          }
-        };
+                & api_key     = ${apiKey} `.replace(/\s*/g, ""),
+    body: {
+      ControllingUserId: markUsrId,
+      SubtitleStreamIndex: 0,
+      AudioStreamIndex: 0,
+      StartIndex: 0,
+    },
+  };
 }
 
 export function stopUrl(sessionId) {
-  return {url: `${hahnca}  Sessions /
+  return {
+    url: `${hahnca}  Sessions /
                 ${sessionId} / Playing / stop
-                ? api_key = ${apiKey} `
-                .replace(/\s*/g, ""),
-          body: {
-            ControllingUserId:   markUsrId,
-            Command: "Stop",
-            SeekPositionTicks: 0,
-          }
-        };
+                ? api_key = ${apiKey} `.replace(/\s*/g, ""),
+    body: {
+      ControllingUserId: markUsrId,
+      Command: "Stop",
+      SeekPositionTicks: 0,
+    },
+  };
 }

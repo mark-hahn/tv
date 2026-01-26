@@ -1,9 +1,9 @@
 // vue.config.js
 module.exports = {
-  publicPath: '',
+  publicPath: "",
   devServer: {
     watchOptions: {
-      poll: true
+      poll: true,
     },
   },
-}
+};

@@ -1,35 +1,102 @@
 <template>
-
-<div id="qbt" :style="{ height:'100%', width:'100%', padding:'5px', margin:0, marginLeft:'16px', display:'flex', flexDirection:'column', overflow:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa', fontWeight:'bold' }">
-  <div id="scroller" ref="scroller" :style="{ flex:'1 1 auto', minHeight:'0px', overflowY:'auto', overflowX:'hidden' }" @wheel.stop.prevent="handleScaledWheel" @scroll.passive="handleScroll">
-    <div v-if="sortedTorrents.length === 0" style="text-align:center; color:#666; margin-top:50px; font-size:18px;"><span v-if="emptyStateText">{{ emptyStateText }}</span></div>
-    <div v-else style="padding:10px; font-size:14px; font-family:sans-serif; font-weight:normal;">
-      <div v-for="t in sortedTorrents" :key="String(t.hash || t.name || t.added_on)" :style="getCardStyle(t)" @click="handleCardClick($event, t)">
-        <div style="font-size:14px; font-weight:bold; color:#333; word-break:break-word;">{{ t.name || t.hash }}</div>
-        <div style="margin-top:8px; font-size:14px; font-weight:normal; color:rgba(0,0,0,0.50) !important;">{{ infoLine(t) }}</div>
+  <div
+    id="qbt"
+    :style="{
+      height: '100%',
+      width: '100%',
+      padding: '5px',
+      margin: 0,
+      marginLeft: '16px',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+      backgroundColor: '#fafafa',
+      fontWeight: 'bold',
+    }"
+  >
+    <div
+      id="scroller"
+      ref="scroller"
+      :style="{
+        flex: '1 1 auto',
+        minHeight: '0px',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+      }"
+      @wheel.stop.prevent="handleScaledWheel"
+      @scroll.passive="handleScroll"
+    >
+      <div
+        v-if="sortedTorrents.length === 0"
+        style="
+          text-align: center;
+          color: #666;
+          margin-top: 50px;
+          font-size: 18px;
+        "
+      >
+        <span v-if="emptyStateText">{{ emptyStateText }}</span>
+      </div>
+      <div
+        v-else
+        style="
+          padding: 10px;
+          font-size: 14px;
+          font-family: sans-serif;
+          font-weight: normal;
+        "
+      >
+        <div
+          v-for="t in sortedTorrents"
+          :key="String(t.hash || t.name || t.added_on)"
+          :style="getCardStyle(t)"
+          @click="handleCardClick($event, t)"
+        >
+          <div
+            style="
+              font-size: 14px;
+              font-weight: bold;
+              color: #333;
+              word-break: break-word;
+            "
+          >
+            {{ t.name || t.hash }}
+          </div>
+          <div
+            style="
+              margin-top: 8px;
+              font-size: 14px;
+              font-weight: normal;
+              color: rgba(0, 0, 0, 0.5) !important;
+            "
+          >
+            {{ infoLine(t) }}
+          </div>
+        </div>
       </div>
     </div>
   </div>
-</div>
 </template>
 
 <script>
-import evtBus from '../evtBus.js';
-import { config } from '../config.js';
-import * as util from '../util.js';
+import evtBus from "../evtBus.js";
+import { config } from "../config.js";
+import * as util from "../util.js";
 
 export default {
-  name: 'History',
+  name: "History",
 
   props: {
     simpleMode: {
       type: Boolean,
-      default: false
+      default: false,
     },
     sizing: {
       type: Object,
-      default: () => ({})
-    }
+      default: () => ({}),
+    },
   },
 
   data() {
@@ -46,16 +113,16 @@ export default {
       _didLoadOnce: false,
       _inFlight: false,
       _loadingTimer: null,
-      _showLoading: false
+      _showLoading: false,
     };
   },
 
   computed: {
     sortedTorrents() {
       const nowSec = Math.floor(Date.now() / 1000);
-      const cutoff = nowSec - (60 * 24 * 60 * 60);
+      const cutoff = nowSec - 60 * 24 * 60 * 60;
       return [...(this.torrents || [])]
-        .filter(t => {
+        .filter((t) => {
           const added = Number(t?.added_on) || 0;
           return added >= cutoff;
         })
@@ -67,15 +134,15 @@ export default {
     },
 
     emptyStateText() {
-      if (this.sortedTorrents.length > 0) return '';
-      if (this._didLoadOnce) return 'No results.';
-      if (this._showLoading) return 'Loading ...';
-      return '';
-    }
+      if (this.sortedTorrents.length > 0) return "";
+      if (this._didLoadOnce) return "No results.";
+      if (this._showLoading) return "Loading ...";
+      return "";
+    },
   },
 
   mounted() {
-    evtBus.on('paneChanged', this.onPaneChanged);
+    evtBus.on("paneChanged", this.onPaneChanged);
 
     // This component is mounted (v-show) even when not visible.
     // Keep polling in the background so qBittorrent completion can trigger tvproc/startProc
@@ -84,25 +151,25 @@ export default {
   },
 
   unmounted() {
-    evtBus.off('paneChanged', this.onPaneChanged);
+    evtBus.off("paneChanged", this.onPaneChanged);
     this.stopPolling();
     this.torrents = [];
   },
 
   methods: {
-        handleScroll(event) {
-          const el = event?.currentTarget;
-          if (!el) return;
-          // When user scrolls up, stop auto-scrolling on future polls.
-          // When user scrolls back to bottom, re-enable it.
-          this._stickToBottom = this.isAtBottom(el);
-        },
+    handleScroll(event) {
+      const el = event?.currentTarget;
+      if (!el) return;
+      // When user scrolls up, stop auto-scrolling on future polls.
+      // When user scrolls back to bottom, re-enable it.
+      this._stickToBottom = this.isAtBottom(el);
+    },
 
     handleScaledWheel(event) {
       if (!event) return;
       const el = event.currentTarget;
       if (!el) return;
-      const dy = (event.deltaY || 0);
+      const dy = event.deltaY || 0;
       const scaledDy = dy * 0.125;
       const max = Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0));
       el.scrollTop = Math.max(0, Math.min(max, (el.scrollTop || 0) + scaledDy));
@@ -115,7 +182,7 @@ export default {
     isAtBottom(el) {
       if (!el) return false;
       const tolerance = 2;
-      return (el.scrollTop + el.clientHeight) >= (el.scrollHeight - tolerance);
+      return el.scrollTop + el.clientHeight >= el.scrollHeight - tolerance;
     },
 
     scrollToBottom() {
@@ -125,7 +192,7 @@ export default {
     },
 
     onPaneChanged(pane) {
-      this._active = pane === 'qbt';
+      this._active = pane === "qbt";
       if (this._active) {
         if (!this.useStaticSamples) this.startPolling();
 
@@ -174,7 +241,11 @@ export default {
         this._loadingTimer = null;
       }
       this._loadingTimer = setTimeout(() => {
-        if (this._inFlight && this.sortedTorrents.length === 0 && !this._didLoadOnce) {
+        if (
+          this._inFlight &&
+          this.sortedTorrents.length === 0 &&
+          !this._didLoadOnce
+        ) {
           this._showLoading = true;
         }
       }, 2000);
@@ -195,21 +266,25 @@ export default {
         clearTimeout(this._pollTimer);
         this._pollTimer = null;
       }
-      this._pollTimer = setTimeout(async () => {
-        if (!this._polling) return;
-        await this.pollOnce();
-        // Poll again 5 seconds after the last call completed.
-        this.scheduleNextPoll(5000);
-      }, Math.max(0, Number(delayMs) || 0));
+      this._pollTimer = setTimeout(
+        async () => {
+          if (!this._polling) return;
+          await this.pollOnce();
+          // Poll again 5 seconds after the last call completed.
+          this.scheduleNextPoll(5000);
+        },
+        Math.max(0, Number(delayMs) || 0),
+      );
     },
 
     async getQbtInfo(filterObj) {
       const url = new URL(`${config.torrentsApiUrl}/api/qbt/info`);
-      if (filterObj && typeof filterObj === 'object') {
-        if (filterObj.hash) url.searchParams.set('hash', filterObj.hash);
-        if (filterObj.category) url.searchParams.set('category', filterObj.category);
-        if (filterObj.tag) url.searchParams.set('tag', filterObj.tag);
-        if (filterObj.filter) url.searchParams.set('filter', filterObj.filter);
+      if (filterObj && typeof filterObj === "object") {
+        if (filterObj.hash) url.searchParams.set("hash", filterObj.hash);
+        if (filterObj.category)
+          url.searchParams.set("category", filterObj.category);
+        if (filterObj.tag) url.searchParams.set("tag", filterObj.tag);
+        if (filterObj.filter) url.searchParams.set("filter", filterObj.filter);
       }
       const res = await fetch(url.toString());
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -225,9 +300,9 @@ export default {
 
         const torrents = await this.getQbtInfo({});
         if (Array.isArray(torrents)) {
-          const hashOf = (t) => String(t?.hash || '').trim();
+          const hashOf = (t) => String(t?.hash || "").trim();
           const curDownloading = torrents
-            .filter(t => String(t?.state || '').trim() === 'downloading')
+            .filter((t) => String(t?.state || "").trim() === "downloading")
             .map(hashOf)
             .filter(Boolean);
 
@@ -237,12 +312,20 @@ export default {
           } else {
             // On each poll: if any previously-downloading title is no longer downloading,
             // kick tvproc to start the next cycle.
-            const prev = Array.isArray(this.activeDownLoads) ? this.activeDownLoads : [];
-            const missing = prev.filter(h => h && !curDownloading.includes(h));
+            const prev = Array.isArray(this.activeDownLoads)
+              ? this.activeDownLoads
+              : [];
+            const missing = prev.filter(
+              (h) => h && !curDownloading.includes(h),
+            );
             if (missing.length > 0) {
-              console.log('History: download finished, starting tvproc cycle', { finishedHashes: missing });
+              console.log("History: download finished, starting tvproc cycle", {
+                finishedHashes: missing,
+              });
               try {
-                await fetch('https://hahnca.com/tv-down/startProc', { method: 'POST' });
+                await fetch("https://hahnca.com/tv-down/startProc", {
+                  method: "POST",
+                });
               } catch {
                 // ignore
               }
@@ -274,16 +357,16 @@ export default {
 
     sep() {
       // Replace spaces around '|' with two non-breaking spaces.
-      return '\u00A0\u00A0|\u00A0\u00A0';
+      return "\u00A0\u00A0|\u00A0\u00A0";
     },
 
     pad2(n) {
-      return String(n).padStart(2, '0');
+      return String(n).padStart(2, "0");
     },
 
     fmtMmDd_HhMm(epochSeconds) {
       const n = Number(epochSeconds);
-      if (!Number.isFinite(n) || n <= 0) return '??/??.??:??:??';
+      if (!Number.isFinite(n) || n <= 0) return "??/??.??:??:??";
       const d = new Date(Math.floor(n) * 1000);
       const mm = this.pad2(d.getMonth() + 1);
       const dd = this.pad2(d.getDate());
@@ -295,7 +378,7 @@ export default {
 
     fmtCompletionMmDd_HhMm(epochSeconds) {
       const n = Number(epochSeconds);
-      if (!Number.isFinite(n) || n <= 0) return '??/?? ??:??:??';
+      if (!Number.isFinite(n) || n <= 0) return "??/?? ??:??:??";
       const d = new Date(Math.floor(n) * 1000);
       const mm = this.pad2(d.getMonth() + 1);
       const dd = this.pad2(d.getDate());
@@ -306,17 +389,17 @@ export default {
     },
 
     fmtState(state) {
-      const raw = (state === undefined || state === null) ? '' : String(state);
-      if (!raw) return '';
+      const raw = state === undefined || state === null ? "" : String(state);
+      if (!raw) return "";
 
       // Special-case qBittorrent's stalledUP to match requested wording.
-      if (raw === 'stalledUP') return 'Finished';
+      if (raw === "stalledUP") return "Finished";
 
       // Special-case qBittorrent's stalledDL to match requested wording.
-      if (raw.toLowerCase() === 'stalleddl') return 'Stalled';
+      if (raw.toLowerCase() === "stalleddl") return "Stalled";
 
       // Match TvProc wording.
-      if (raw === 'downloading') return 'Getting';
+      if (raw === "downloading") return "Getting";
 
       const lower = raw.toLowerCase();
       return lower.charAt(0).toUpperCase() + lower.slice(1);
@@ -335,8 +418,13 @@ export default {
     fmtElapsedMmSs(startEpoch, endEpoch) {
       const start = Number(startEpoch);
       const end = Number(endEpoch);
-      if (!Number.isFinite(start) || start <= 0 || !Number.isFinite(end) || end <= 0) {
-        return '??:??';
+      if (
+        !Number.isFinite(start) ||
+        start <= 0 ||
+        !Number.isFinite(end) ||
+        end <= 0
+      ) {
+        return "??:??";
       }
       const elapsedSeconds = Math.max(0, end - start);
       const mm = Math.floor(elapsedSeconds / 60);
@@ -356,47 +444,51 @@ export default {
     },
 
     getCardStyle(t) {
-      const isDownloading = t?.state === 'downloading';
+      const isDownloading = t?.state === "downloading";
       return {
-        position: 'relative',
-        background: isDownloading ? '#fffacd' : '#fff',
-        border: '1px solid #ddd',
-        borderRadius: '5px',
-        padding: '10px',
-        cursor: 'pointer'
+        position: "relative",
+        background: isDownloading ? "#fffacd" : "#fff",
+        border: "1px solid #ddd",
+        borderRadius: "5px",
+        padding: "10px",
+        cursor: "pointer",
       };
     },
 
     async deleteTorrentAndFiles(t) {
-      const hash = String(t?.hash || '').trim();
-      if (!hash) throw new Error('Missing torrent hash; cannot delete.');
+      const hash = String(t?.hash || "").trim();
+      if (!hash) throw new Error("Missing torrent hash; cannot delete.");
 
       const url = new URL(`${config.torrentsApiUrl}/api/qbt/delTorrent`);
       const res = await fetch(url.toString(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hash, deleteFiles: true })
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hash, deleteFiles: true }),
       });
 
       if (!res.ok) {
-        let details = '';
+        let details = "";
         try {
           details = await res.text();
         } catch {
           // ignore
         }
-        const suffix = details ? `\n${details}` : '';
-        throw new Error(`qbt delete failed: HTTP ${res.status}: ${res.statusText}${suffix}`);
+        const suffix = details ? `\n${details}` : "";
+        throw new Error(
+          `qbt delete failed: HTTP ${res.status}: ${res.statusText}${suffix}`,
+        );
       }
 
       // Endpoint may return JSON or empty/ok text. Treat both as success.
-      const contentType = String(res.headers.get('content-type') || '').toLowerCase();
-      if (contentType.includes('application/json')) {
+      const contentType = String(
+        res.headers.get("content-type") || "",
+      ).toLowerCase();
+      if (contentType.includes("application/json")) {
         const data = await res.json().catch(() => null);
         if (data?.error) throw new Error(String(data.error));
         return data;
       }
-      return 'ok';
+      return "ok";
     },
 
     async handleCardClick(event, t) {
@@ -409,8 +501,10 @@ export default {
           // ignore
         }
 
-        const title = (t?.name || t?.hash || 'Unknown').toString();
-        const ok = window.confirm(`Is it ok to delete the torrent ${title} from qbittorrent and its files?`);
+        const title = (t?.name || t?.hash || "Unknown").toString();
+        const ok = window.confirm(
+          `Is it ok to delete the torrent ${title} from qbittorrent and its files?`,
+        );
         if (!ok) return;
 
         try {
@@ -423,18 +517,22 @@ export default {
       }
 
       const title = t?.name;
-      if (title) evtBus.emit('selectShowFromCardTitle', title);
+      if (title) evtBus.emit("selectShowFromCardTitle", title);
     },
 
     infoLine(t) {
       const added = this.fmtMmDd_HhMm(t?.added_on);
-      const bytes = (t && (t.size_bytes ?? t.total_size_bytes ?? t.size)) ?? undefined;
-      const size = this.fmtSize(bytes) || this.fmtSize(t?.size) || String(t?.size ?? '');
+      const bytes =
+        (t && (t.size_bytes ?? t.total_size_bytes ?? t.size)) ?? undefined;
+      const size =
+        this.fmtSize(bytes) || this.fmtSize(t?.size) || String(t?.size ?? "");
       const sep = this.sep();
 
-      if (t?.state === 'downloading') {
+      if (t?.state === "downloading") {
         const prog = this.fmtProgPc(t?.completed, t?.size);
-        const seeds = Number.isFinite(Number(t?.num_seeds)) ? Number(t?.num_seeds) : 0;
+        const seeds = Number.isFinite(Number(t?.num_seeds))
+          ? Number(t?.num_seeds)
+          : 0;
         const eta = this.fmtEtaMmSs(t?.eta);
         return `${size}${sep}${added}${sep}${seeds}${sep}${prog}%${sep}${eta}${sep}Getting`;
       }
@@ -445,11 +543,11 @@ export default {
     },
 
     forceFile(title) {
-      console.log('history: forceFile button clicked, title:', title);
+      console.log("history: forceFile button clicked, title:", title);
       if (!title) return;
-      console.log('history: emitting forceFile event');
-      evtBus.emit('forceFile', title);
-    }
-  }
+      console.log("history: emitting forceFile event");
+      evtBus.emit("forceFile", title);
+    },
+  },
 };
 </script>

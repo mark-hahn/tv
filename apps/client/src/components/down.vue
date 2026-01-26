@@ -1,51 +1,241 @@
 <template>
-
-<div id="down" :style="{ height:'100%', width:'100%', padding:'5px', margin:0, marginLeft:'16px', display:'flex', flexDirection:'column', overflow:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa', fontWeight:'bold' }">
-  <div id="header" :style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', marginLeft:'0px', marginRight:'0px', marginTop:'0px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <div style="margin-left:20px; display:flex; align-items:center;"><span>Downloads</span><span v-if="totalDownloadingSpeedText" style="margin-left:20px; align-self:center; font-size:13px; color:#555; white-space:nowrap; font-weight:normal;">{{ totalDownloadingSpeedText }}</span><span v-if="avgDownloadingSpeedText" style="margin-left:20px; align-self:center; font-size:13px; color:#555; white-space:nowrap; font-weight:normal;">{{ avgDownloadingSpeedText }}</span></div>
-      <div style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;">
-        <button @click.stop="startLibraryRefresh" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;">Library</button>
-        <button @click.stop="showFirstDownloading" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;">Show</button>
-        <button @click.stop="scrollToBottomAction" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;">Bottom</button>
+  <div
+    id="down"
+    :style="{
+      height: '100%',
+      width: '100%',
+      padding: '5px',
+      margin: 0,
+      marginLeft: '16px',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+      backgroundColor: '#fafafa',
+      fontWeight: 'bold',
+    }"
+  >
+    <div
+      id="header"
+      :style="{
+        position: 'sticky',
+        top: '0px',
+        zIndex: 100,
+        backgroundColor: '#fafafa',
+        paddingTop: '5px',
+        paddingLeft: '5px',
+        paddingRight: '5px',
+        paddingBottom: '5px',
+        marginLeft: '0px',
+        marginRight: '0px',
+        marginTop: '0px',
+        fontWeight: 'bold',
+        fontSize: sizing.seriesFontSize || '25px',
+        marginBottom: '0px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'stretch',
+      }"
+    >
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <div style="margin-left: 20px; display: flex; align-items: center">
+          <span>Downloads</span
+          ><span
+            v-if="totalDownloadingSpeedText"
+            style="
+              margin-left: 20px;
+              align-self: center;
+              font-size: 13px;
+              color: #555;
+              white-space: nowrap;
+              font-weight: normal;
+            "
+            >{{ totalDownloadingSpeedText }}</span
+          ><span
+            v-if="avgDownloadingSpeedText"
+            style="
+              margin-left: 20px;
+              align-self: center;
+              font-size: 13px;
+              color: #555;
+              white-space: nowrap;
+              font-weight: normal;
+            "
+            >{{ avgDownloadingSpeedText }}</span
+          >
+        </div>
+        <div
+          style="
+            display: flex;
+            gap: 10px;
+            margin-right: 20px;
+            justify-content: flex-end;
+          "
+        >
+          <button
+            @click.stop="startLibraryRefresh"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Library
+          </button>
+          <button
+            @click.stop="showFirstDownloading"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Show
+          </button>
+          <button
+            @click.stop="scrollToBottomAction"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Bottom
+          </button>
+        </div>
       </div>
     </div>
+    <div
+      v-if="error"
+      style="
+        text-align: center;
+        color: #c00;
+        margin-top: 50px;
+        font-size: 16px;
+        white-space: pre-line;
+        padding: 0 20px;
+      "
+    >
+      <div>Error: {{ error }}</div>
+    </div>
+    <div
+      v-else-if="!hasContent"
+      style="text-align: center; color: #666; margin-top: 50px; font-size: 18px"
+    >
+      <div v-if="emptyStateText">{{ emptyStateText }}</div>
+    </div>
+    <div
+      v-else
+      ref="scroller"
+      :style="{
+        flex: '1 1 auto',
+        margin: '0px',
+        padding: '10px',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        background: '#fff',
+        fontFamily: 'sans-serif',
+        fontSize: '14px',
+        fontWeight: 'normal',
+      }"
+      @wheel.stop.prevent="handleScaledWheel"
+    >
+      <template
+        v-for="(it, idx) in orderedItems"
+        :key="idx"
+      >
+        <div
+          v-if="idx &gt; 0 &amp;&amp; Number(it?.sequence) === 1"
+          style="
+            margin: 0;
+            padding: 0;
+            line-height: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            font-family: monospace;
+          "
+        >
+          ====================================================================================================
+        </div>
+        <div
+          :style="getCardStyle(it)"
+          @click="handleCardClick($event, it)"
+          @mouseenter="handleMouseEnter($event, it)"
+          @mouseleave="handleMouseLeave($event)"
+        >
+          <div
+            style="
+              font-weight: bold;
+              font-size: 14px;
+              word-wrap: break-word;
+              overflow-wrap: break-word;
+              font-family: sans-serif;
+            "
+          >
+            <span>{{ it.title || "(no title)" }}</span>
+          </div>
+          <div
+            style="
+              margin-top: 8px;
+              color: #333;
+              font-size: 13px;
+              word-wrap: break-word;
+              overflow-wrap: break-word;
+              font-family: sans-serif;
+            "
+          >
+            <span
+              v-if="line2(it).seasonEpisode"
+              style="color: blue !important"
+              >{{ line2(it).seasonEpisode }}</span
+            ><span
+              v-if="line2(it).rest"
+              style="color: rgba(0, 0, 0, 0.5) !important"
+              ><span v-if="line2(it).seasonEpisode">&nbsp;|&nbsp;</span
+              ><span style="color: rgba(0, 0, 0, 0.5) !important">{{
+                line2(it).rest
+              }}</span></span
+            >
+          </div>
+        </div>
+      </template>
+    </div>
   </div>
-  <div v-if="error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px; white-space:pre-line; padding:0 20px;">
-    <div>Error: {{ error }}</div>
-  </div>
-  <div v-else-if="!hasContent" style="text-align:center; color:#666; margin-top:50px; font-size:18px;">
-    <div v-if="emptyStateText">{{ emptyStateText }}</div>
-  </div>
-  <div v-else ref="scroller" :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'hidden', background:'#fff', fontFamily:'sans-serif', fontSize:'14px', fontWeight:'normal' }" @wheel.stop.prevent="handleScaledWheel">
-    <template v-for="(it, idx) in orderedItems" :key="idx">
-      <div v-if="idx &gt; 0 &amp;&amp; Number(it?.sequence) === 1" style="margin:0; padding:0; line-height:14px; white-space:nowrap; overflow:hidden; font-family:monospace;">====================================================================================================</div>
-      <div :style="getCardStyle(it)" @click="handleCardClick($event, it)" @mouseenter="handleMouseEnter($event, it)" @mouseleave="handleMouseLeave($event)">
-        <div style="font-weight:bold; font-size:14px; word-wrap:break-word; overflow-wrap:break-word; font-family:sans-serif;"><span>{{ it.title || '(no title)' }}</span></div>
-        <div style="margin-top:8px; color:#333; font-size:13px; word-wrap:break-word; overflow-wrap:break-word; font-family:sans-serif;"><span v-if="line2(it).seasonEpisode" style="color:blue !important;">{{ line2(it).seasonEpisode }}</span><span v-if="line2(it).rest" style="color:rgba(0,0,0,0.50) !important;"><span v-if="line2(it).seasonEpisode">&nbsp;|&nbsp;</span><span style="color:rgba(0,0,0,0.50) !important;">{{ line2(it).rest }}</span></span></div>
-      </div>
-    </template>
-  </div>
-</div>
 </template>
 
 <script>
-import evtBus from '../evtBus.js';
-import { config } from '../config.js';
-import * as util from '../util.js';
+import evtBus from "../evtBus.js";
+import { config } from "../config.js";
+import * as util from "../util.js";
 
 export default {
-  name: 'TvProc',
+  name: "TvProc",
 
   props: {
     simpleMode: {
       type: Boolean,
-      default: false
+      default: false,
     },
     sizing: {
       type: Object,
-      default: () => ({})
-    }
+      default: () => ({}),
+    },
   },
 
   data() {
@@ -69,7 +259,7 @@ export default {
       _tvprocInitialized: false,
       _lastStartProcAt: 0,
       _startProcInFlight: false,
-      _startProcPending: false
+      _startProcPending: false,
     };
   },
 
@@ -80,8 +270,13 @@ export default {
 
     totalDownloadingSpeedText() {
       const items = Array.isArray(this.items) ? this.items : [];
-      const downloading = items.filter(it => String(it?.status || '').trim().toLowerCase() === 'downloading');
-      if (downloading.length === 0) return '';
+      const downloading = items.filter(
+        (it) =>
+          String(it?.status || "")
+            .trim()
+            .toLowerCase() === "downloading",
+      );
+      if (downloading.length === 0) return "";
       const totalBitsPerSec = downloading.reduce((sum, it) => {
         const n = Number(it?.speed);
         return sum + (Number.isFinite(n) ? n : 0);
@@ -91,8 +286,13 @@ export default {
 
     avgDownloadingSpeedText() {
       const items = Array.isArray(this.items) ? this.items : [];
-      const downloading = items.filter(it => String(it?.status || '').trim().toLowerCase() === 'downloading');
-      if (downloading.length === 0) return '';
+      const downloading = items.filter(
+        (it) =>
+          String(it?.status || "")
+            .trim()
+            .toLowerCase() === "downloading",
+      );
+      if (downloading.length === 0) return "";
       const totalBitsPerSec = downloading.reduce((sum, it) => {
         const n = Number(it?.speed);
         return sum + (Number.isFinite(n) ? n : 0);
@@ -102,21 +302,21 @@ export default {
     },
 
     emptyStateText() {
-      if (this.hasContent) return '';
-      if (this._didLoadOnce) return 'No results.';
-      if (this._showLoading) return 'Loading ...';
-      return '';
+      if (this.hasContent) return "";
+      if (this._didLoadOnce) return "No results.";
+      if (this._showLoading) return "Loading ...";
+      return "";
     },
 
     orderedItems() {
       // Render in the exact array order returned by /api/tvproc.
       return Array.isArray(this.items) ? this.items : [];
-    }
+    },
   },
 
   mounted() {
-    evtBus.on('paneChanged', this.onPaneChanged);
-    evtBus.on('cycle-started', this.handleCycleStarted);
+    evtBus.on("paneChanged", this.onPaneChanged);
+    evtBus.on("cycle-started", this.handleCycleStarted);
 
     // This component is mounted (v-show) even when not visible.
     // Keep polling in the background so it can react to download completion and kick cycles.
@@ -126,8 +326,8 @@ export default {
   },
 
   unmounted() {
-    evtBus.off('paneChanged', this.onPaneChanged);
-    evtBus.off('cycle-started', this.handleCycleStarted);
+    evtBus.off("paneChanged", this.onPaneChanged);
+    evtBus.off("cycle-started", this.handleCycleStarted);
     this.stopPolling();
     this.items = [];
     this.error = null;
@@ -135,13 +335,13 @@ export default {
 
   methods: {
     startLibraryRefresh() {
-       evtBus.emit('startLibraryRefresh');
+      evtBus.emit("startLibraryRefresh");
     },
     handleScaledWheel(event) {
       if (!event) return;
       const el = event.currentTarget;
       if (!el) return;
-      const dy = (event.deltaY || 0);
+      const dy = event.deltaY || 0;
       const scaledDy = dy * 0.125;
       const max = Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0));
       el.scrollTop = Math.max(0, Math.min(max, (el.scrollTop || 0) + scaledDy));
@@ -149,33 +349,38 @@ export default {
 
     notifyAllUsbFinished(lastTitle) {
       try {
-        if (typeof window === 'undefined') return;
-        if (!('Notification' in window)) return;
+        if (typeof window === "undefined") return;
+        if (!("Notification" in window)) return;
 
-        const title = String(lastTitle || '').trim();
+        const title = String(lastTitle || "").trim();
         const msg = title
           ? `All files have been downloaded from USB, the last is ${title}.`
-          : 'All USB downloads finished.';
+          : "All USB downloads finished.";
 
-        if (Notification.permission === 'granted') {
+        if (Notification.permission === "granted") {
           new Notification(msg);
           return;
         }
 
         // Do not request permission automatically (may require user gesture).
         // If user wants notifications, they can grant it in browser/site settings.
-        console.log('Desktop notification not shown (permission:', Notification.permission + ')');
+        console.log(
+          "Desktop notification not shown (permission:",
+          Notification.permission + ")",
+        );
       } catch (e) {
-        console.log('notifyAllUsbFinished failed:', e?.message || String(e));
+        console.log("notifyAllUsbFinished failed:", e?.message || String(e));
       }
     },
 
     handleCycleStarted() {
       // Start fast polling when a cycle starts
       this._fastPollStartTime = Date.now();
-      this._oldDownloadingCount = this.items.filter(it => {
-        const st = String(it?.status || '').trim().toLowerCase();
-        if (st !== 'downloading') return false;
+      this._oldDownloadingCount = this.items.filter((it) => {
+        const st = String(it?.status || "")
+          .trim()
+          .toLowerCase();
+        if (st !== "downloading") return false;
         const ended = Number(it?.dateEnded);
         return !Number.isFinite(ended) || ended === 0;
       }).length;
@@ -186,7 +391,7 @@ export default {
     },
 
     onPaneChanged(pane) {
-      const active = pane === 'down';
+      const active = pane === "down";
       this._active = active;
       if (active) {
         // Load data when switching to this pane.
@@ -194,7 +399,10 @@ export default {
         // (display:none). Scroll-to-bottom can't reliably take effect while hidden, so force a
         // one-time bottom scroll the first time the pane becomes visible.
         if (!this._didInitialVisibleScroll) {
-          void this.loadTvproc({ isInitialPaneSwitch: true, forceScrollToBottom: true });
+          void this.loadTvproc({
+            isInitialPaneSwitch: true,
+            forceScrollToBottom: true,
+          });
           this._didInitialVisibleScroll = true;
         } else {
           void this.loadTvproc({ isInitialPaneSwitch: true });
@@ -275,12 +483,15 @@ export default {
         }
       }
 
-      this._pollTimer = setTimeout(async () => {
-        await this.loadTvproc();
-        // Default to a 5-second delay after completion; scheduleNextPoll will
-        // override to 1s if the fast window is still active.
-        this.scheduleNextPoll(5000);
-      }, Math.max(0, Number(pollDelay) || 0));
+      this._pollTimer = setTimeout(
+        async () => {
+          await this.loadTvproc();
+          // Default to a 5-second delay after completion; scheduleNextPoll will
+          // override to 1s if the fast window is still active.
+          this.scheduleNextPoll(5000);
+        },
+        Math.max(0, Number(pollDelay) || 0),
+      );
     },
 
     isNearBottom(el) {
@@ -296,33 +507,33 @@ export default {
 
     fmtMdhm(ts) {
       const n = Number(ts);
-      if (!Number.isFinite(n) || n <= 0) return '';
+      if (!Number.isFinite(n) || n <= 0) return "";
 
       // Accept seconds or milliseconds.
       const ms = n > 1e12 ? n : n * 1000;
       const d = new Date(ms);
-      if (Number.isNaN(d.getTime())) return '';
+      if (Number.isNaN(d.getTime())) return "";
 
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const hh = String(d.getHours()).padStart(2, '0');
-      const mm = String(d.getMinutes()).padStart(2, '0');
-      const ss = String(d.getSeconds()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mm = String(d.getMinutes()).padStart(2, "0");
+      const ss = String(d.getSeconds()).padStart(2, "0");
       return `${month}/${day} ${hh}:${mm}:${ss}`;
     },
 
     fmtHhmm(ts) {
       const n = Number(ts);
-      if (!Number.isFinite(n) || n <= 0) return '';
+      if (!Number.isFinite(n) || n <= 0) return "";
 
       // Accept seconds or milliseconds.
       const ms = n > 1e12 ? n : n * 1000;
       const d = new Date(ms);
-      if (Number.isNaN(d.getTime())) return '';
+      if (Number.isNaN(d.getTime())) return "";
 
-      const hh = String(d.getHours()).padStart(2, '0');
-      const mm = String(d.getMinutes()).padStart(2, '0');
-      const ss = String(d.getSeconds()).padStart(2, '0');
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mm = String(d.getMinutes()).padStart(2, "0");
+      const ss = String(d.getSeconds()).padStart(2, "0");
       return `${hh}:${mm}:${ss}`;
     },
 
@@ -333,45 +544,45 @@ export default {
     fmtGbPerSec(bitsPerSec) {
       // Server reports bits/sec. Display as integer megabits/sec with no units.
       const n = Number(bitsPerSec);
-      if (!Number.isFinite(n) || n < 0) return '';
+      if (!Number.isFinite(n) || n < 0) return "";
       const mbps = n / 1e6;
       return `${Math.round(mbps)} mb`;
     },
 
     fmtElapsedMmSs(seconds) {
       const n = Number(seconds);
-      if (!Number.isFinite(n) || n < 0) return '';
+      if (!Number.isFinite(n) || n < 0) return "";
       const mins = Math.floor(n / 60);
       const secs = Math.floor(n % 60);
-      return `${mins}:${String(secs).padStart(2, '0')}`;
+      return `${mins}:${String(secs).padStart(2, "0")}`;
     },
 
     fmtEtaRemaining(eta) {
       const n = Number(eta);
-      if (!Number.isFinite(n) || n <= 0) return '';
-      
+      if (!Number.isFinite(n) || n <= 0) return "";
+
       // If it's a large number (Unix timestamp), calculate remaining time from now
       const now = Math.floor(Date.now() / 1000);
       const remaining = n > 10000000 ? Math.max(0, n - now) : n;
-      
+
       const mins = Math.floor(remaining / 60);
       const secs = Math.floor(remaining % 60);
-      return `${mins}:${String(secs).padStart(2, '0')}`;
+      return `${mins}:${String(secs).padStart(2, "0")}`;
     },
 
     fmtEtaTimestamp(eta) {
       const n = Number(eta);
-      if (!Number.isFinite(n) || n <= 0) return '';
-      
+      if (!Number.isFinite(n) || n <= 0) return "";
+
       // If it's a large number (Unix timestamp), format as time only
       if (n > 10000000) {
         const d = new Date(n * 1000);
-        const hh = String(d.getHours()).padStart(2, '0');
-        const mm = String(d.getMinutes()).padStart(2, '0');
-        const ss = String(d.getSeconds()).padStart(2, '0');
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mm = String(d.getMinutes()).padStart(2, "0");
+        const ss = String(d.getSeconds()).padStart(2, "0");
         return `${hh}:${mm}:${ss}`;
       }
-      return '';
+      return "";
     },
 
     elapsedSeconds(it) {
@@ -384,36 +595,37 @@ export default {
     line2(it) {
       const s = Number(it?.season);
       const e = Number(it?.episode);
-      const seasonEpisode = Number.isFinite(s) && Number.isFinite(e) ? `S${s}:E${e}` : '';
+      const seasonEpisode =
+        Number.isFinite(s) && Number.isFinite(e) ? `S${s}:E${e}` : "";
 
       const size = this.fmtSize(it?.fileSize);
       const started = this.fmtMdhm(it?.dateStarted);
       const speed = this.fmtGbPerSec(it?.speed);
-      const status = String(it?.status || '').trim();
+      const status = String(it?.status || "").trim();
       const statusLower = status.toLowerCase();
       const progress = Number(it?.progress);
 
       // For waiting status (formerly "future"), only show size
-      if (statusLower === 'waiting' || statusLower === 'future') {
+      if (statusLower === "waiting" || statusLower === "future") {
         const parts = [];
         if (size) parts.push(size);
-        parts.push('Waiting');
-        return { seasonEpisode, rest: parts.join(' | ') };
+        parts.push("Waiting");
+        return { seasonEpisode, rest: parts.join(" | ") };
       }
 
       const parts = [];
       if (size) parts.push(size);
       if (started) parts.push(started);
 
-      if (statusLower === 'finished') {
+      if (statusLower === "finished") {
         const elapsed = this.fmtElapsedMmSs(this.elapsedSeconds(it));
         if (elapsed) parts.push(elapsed);
         if (speed) parts.push(speed);
-        parts.push('Finished');
-        return { seasonEpisode, rest: parts.join(' | ') };
+        parts.push("Finished");
+        return { seasonEpisode, rest: parts.join(" | ") };
       }
 
-      if (statusLower === 'downloading') {
+      if (statusLower === "downloading") {
         if (speed) parts.push(speed);
         const eta = this.fmtEtaRemaining(it?.eta);
         if (eta) parts.push(eta);
@@ -422,87 +634,90 @@ export default {
         if (Number.isFinite(progress) && progress >= 0 && progress <= 100) {
           parts.push(`${progress}%`);
         }
-        parts.push('Downloading');
-        return { seasonEpisode, rest: parts.join(' | ') };
+        parts.push("Downloading");
+        return { seasonEpisode, rest: parts.join(" | ") };
       }
 
       if (speed) parts.push(speed);
       if (status) parts.push(status);
-      else parts.push('Unknown');
-      return { seasonEpisode, rest: parts.join(' | ') };
+      else parts.push("Unknown");
+      return { seasonEpisode, rest: parts.join(" | ") };
     },
 
-
     getCardStyle(it) {
-      const status = String(it?.status || '').trim().toLowerCase();
-      const isDownloading = status === 'downloading';
+      const status = String(it?.status || "")
+        .trim()
+        .toLowerCase();
+      const isDownloading = status === "downloading";
       return {
-        position: 'relative',
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        padding: '10px',
-        background: isDownloading ? '#fffacd' : '#fff',
-        cursor: 'pointer'
+        position: "relative",
+        border: "1px solid #ddd",
+        borderRadius: "8px",
+        padding: "10px",
+        background: isDownloading ? "#fffacd" : "#fff",
+        cursor: "pointer",
       };
     },
 
     handleMouseEnter(event, it) {
       void it;
-      event.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+      event.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
     },
 
     handleMouseLeave(event) {
-      event.currentTarget.style.boxShadow = 'none';
+      event.currentTarget.style.boxShadow = "none";
     },
 
     handleCardClick(event, it) {
       void event;
       const clickedTitle = it?.title;
-      if (clickedTitle) evtBus.emit('selectShowFromCardTitle', clickedTitle);
+      if (clickedTitle) evtBus.emit("selectShowFromCardTitle", clickedTitle);
     },
 
-
-
     showFirstDownloading() {
-      const downloading = this.items.find(it => String(it?.status || '').trim() === 'downloading');
+      const downloading = this.items.find(
+        (it) => String(it?.status || "").trim() === "downloading",
+      );
       if (!downloading) return;
-      
+
       const scroller = this.$refs.scroller;
       if (!scroller) return;
-      
+
       // Find the index of the downloading item in orderedItems
-      const idx = this.orderedItems.findIndex(it => it === downloading);
+      const idx = this.orderedItems.findIndex((it) => it === downloading);
       if (idx === -1) return;
-      
+
       // Get all card divs (direct children of the template v-for)
       const allChildren = Array.from(scroller.children);
       // Filter out separator divs (which have === in text)
-      const cards = allChildren.filter(el => !el.textContent.includes('===='));
-      
+      const cards = allChildren.filter(
+        (el) => !el.textContent.includes("===="),
+      );
+
       if (cards[idx]) {
-        cards[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+        cards[idx].scrollIntoView({ behavior: "smooth", block: "start" });
       }
     },
 
     scrollToBottomAction() {
       const el = this.$refs.scroller;
       if (!el) return;
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     },
 
     async trimLog() {
       this.error = null;
       try {
         const res = await fetch(`${config.torrentsApiUrl}/api/tvproc/trim`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ keepLines: 1000 })
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keepLines: 1000 }),
         });
         if (!res.ok) {
-          let detail = '';
+          let detail = "";
           try {
-            const ct = res.headers.get('content-type') || '';
-            if (ct.includes('application/json')) {
+            const ct = res.headers.get("content-type") || "";
+            if (ct.includes("application/json")) {
               const j = await res.json();
               detail = j?.error ? String(j.error) : JSON.stringify(j);
             } else {
@@ -526,15 +741,16 @@ export default {
         const initializing = !this._tvprocInitialized;
         const el = this.$refs.scroller;
         // Only auto-scroll if: 1) explicitly requested, or 2) not initial switch AND near bottom
-        const wasNearBottom = !opts.isInitialPaneSwitch && el && this.isNearBottom(el);
+        const wasNearBottom =
+          !opts.isInitialPaneSwitch && el && this.isNearBottom(el);
         const shouldStick = Boolean(opts.forceScrollToBottom) || wasNearBottom;
 
-        const res = await fetch('https://hahnca.com/tv-down/downloads');
+        const res = await fetch("https://hahnca.com/tv-down/downloads");
         if (!res.ok) {
-          let detail = '';
+          let detail = "";
           try {
-            const ct = res.headers.get('content-type') || '';
-            if (ct.includes('application/json')) {
+            const ct = res.headers.get("content-type") || "";
+            if (ct.includes("application/json")) {
               const j = await res.json();
               detail = j?.error ? String(j.error) : JSON.stringify(j);
             } else {
@@ -550,33 +766,47 @@ export default {
         // downActive: true when any item is downloading or waiting (formerly "future").
         try {
           const active = Array.isArray(arr)
-            ? arr.some(it => {
-                const st = String(it?.status || '').trim().toLowerCase();
-                return st === 'downloading' || st === 'waiting' || st === 'future';
+            ? arr.some((it) => {
+                const st = String(it?.status || "")
+                  .trim()
+                  .toLowerCase();
+                return (
+                  st === "downloading" || st === "waiting" || st === "future"
+                );
               })
             : false;
-          evtBus.emit('downActivePart', { source: 'tvproc', active });
+          evtBus.emit("downActivePart", { source: "tvproc", active });
         } catch {
           // ignore
         }
-        
+
         const isActiveDownloading = (it) => {
-          const st = String(it?.status || '').trim().toLowerCase();
-          if (st !== 'downloading') return false;
+          const st = String(it?.status || "")
+            .trim()
+            .toLowerCase();
+          if (st !== "downloading") return false;
           const ended = Number(it?.dateEnded);
           // Old behavior: treat downloads with no/zero end time as active.
           return !Number.isFinite(ended) || ended === 0;
         };
 
         const isFuture = (it) => {
-          const st = String(it?.status || '').trim().toLowerCase();
-          return st === 'waiting' || st === 'future';
+          const st = String(it?.status || "")
+            .trim()
+            .toLowerCase();
+          return st === "waiting" || st === "future";
         };
 
         // Track status changes for downloading items
-        const oldDownloading = Array.isArray(this.items) ? this.items.filter(isActiveDownloading) : [];
-        const oldFutures = Array.isArray(this.items) ? this.items.filter(isFuture) : [];
-        const newDownloading = Array.isArray(arr) ? arr.filter(isActiveDownloading) : [];
+        const oldDownloading = Array.isArray(this.items)
+          ? this.items.filter(isActiveDownloading)
+          : [];
+        const oldFutures = Array.isArray(this.items)
+          ? this.items.filter(isFuture)
+          : [];
+        const newDownloading = Array.isArray(arr)
+          ? arr.filter(isActiveDownloading)
+          : [];
         const newFutures = Array.isArray(arr) ? arr.filter(isFuture) : [];
 
         // Detect newly-finished items since last poll.
@@ -588,10 +818,11 @@ export default {
         };
         const finishedEndedMax = Array.isArray(arr)
           ? arr
-              .filter(it => String(it?.status || '').trim() === 'finished')
+              .filter((it) => String(it?.status || "").trim() === "finished")
               .reduce((mx, it) => Math.max(mx, toSeconds(it?.dateEnded)), 0)
           : 0;
-        let didFinishSomething = finishedEndedMax > Number(this._lastFinishedEnded || 0);
+        let didFinishSomething =
+          finishedEndedMax > Number(this._lastFinishedEnded || 0);
 
         // On the first successful load, establish a baseline so we don't
         // notify for historical "finished" items already present.
@@ -601,7 +832,7 @@ export default {
           this._lastNotifiedEnded = finishedEndedMax;
           didFinishSomething = false;
         }
-        
+
         // (debug logging removed)
 
         // If we've already asked the server to start downloads, wait until we see the
@@ -623,7 +854,7 @@ export default {
           const canStart =
             !this._startProcInFlight &&
             !this._startProcPending &&
-            (nowMs - Number(this._lastStartProcAt || 0) >= cooldownMs);
+            nowMs - Number(this._lastStartProcAt || 0) >= cooldownMs;
 
           if (canStart) {
             this._lastStartProcAt = nowMs;
@@ -633,7 +864,9 @@ export default {
 
             let ok = false;
             try {
-              const resp = await fetch('https://hahnca.com/tv-down/startProc', { method: 'POST' });
+              const resp = await fetch("https://hahnca.com/tv-down/startProc", {
+                method: "POST",
+              });
               ok = Boolean(resp && resp.ok);
             } catch {
               ok = false;
@@ -646,10 +879,15 @@ export default {
             }
           }
         }
-        
+
         // Notify only once per newly observed finished timestamp, and only when everything is done.
         // With concurrent downloads, this means: no active downloads and no future queue.
-        if (!initializing && newDownloading.length === 0 && newFutures.length === 0 && (oldDownloading.length > 0 || didFinishSomething)) {
+        if (
+          !initializing &&
+          newDownloading.length === 0 &&
+          newFutures.length === 0 &&
+          (oldDownloading.length > 0 || didFinishSomething)
+        ) {
           // Mark the finished item as processed BEFORE emitting cycle-started
           // to avoid re-entrant loadTvproc() calls re-detecting it.
           if (finishedEndedMax > Number(this._lastFinishedEnded || 0)) {
@@ -658,7 +896,9 @@ export default {
 
           if (finishedEndedMax > Number(this._lastNotifiedEnded || 0)) {
             this._lastNotifiedEnded = finishedEndedMax;
-            const lastTitle = String(oldDownloading?.[oldDownloading.length - 1]?.title || '').trim();
+            const lastTitle = String(
+              oldDownloading?.[oldDownloading.length - 1]?.title || "",
+            ).trim();
             this.notifyAllUsbFinished(lastTitle);
           }
 
@@ -669,14 +909,14 @@ export default {
         if (finishedEndedMax > Number(this._lastFinishedEnded || 0)) {
           this._lastFinishedEnded = finishedEndedMax;
         }
-        
+
         this.items = arr;
         const isFirstLoad = !this._didLoadOnce;
         this._didLoadOnce = true;
 
         await this.$nextTick();
         const el2 = this.$refs.scroller;
-        
+
         // Scroll to bottom on very first load ever
         if (isFirstLoad && !this._hasEverMounted) {
           this._hasEverMounted = true;
@@ -691,7 +931,7 @@ export default {
       } finally {
         this.finishLoadingDelay();
       }
-    }
-  }
+    },
+  },
 };
 </script>

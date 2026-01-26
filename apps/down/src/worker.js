@@ -5,14 +5,14 @@
 // - sends {type:"update", entry} to tvJson.js on updates
 // - sends {type:"finished", entry} on completion/error, then exits
 
-import { parentPort, workerData } from 'node:worker_threads';
-import { spawn, execFile } from 'node:child_process';
-import path from 'node:path';
+import { parentPort, workerData } from "node:worker_threads";
+import { spawn, execFile } from "node:child_process";
+import path from "node:path";
 
 const unixNow = () => Math.floor(Date.now() / 1000);
 
 const { entry: entry0, usbHost } = workerData || {};
-let entry = entry0 && typeof entry0 === 'object' ? { ...entry0 } : null;
+let entry = entry0 && typeof entry0 === "object" ? { ...entry0 } : null;
 
 const parseEtaSeconds = (chunk) => {
   // rsync progress2 shows remaining time as MM:SS or HH:MM:SS
@@ -38,34 +38,51 @@ const postUpdate = (type) => {
 };
 
 const summarizeStderr = (stderrText) => {
-  const s = String(stderrText || '').trim();
-  if (!s) return '';
+  const s = String(stderrText || "").trim();
+  if (!s) return "";
   // Keep it single-line and reasonably short for tv.log.
-  const oneLine = s.replace(/[\r\n]+/g, ' | ').replace(/\s+/g, ' ').trim();
+  const oneLine = s
+    .replace(/[\r\n]+/g, " | ")
+    .replace(/\s+/g, " ")
+    .trim();
   if (oneLine.length <= 280) return oneLine;
-  return oneLine.slice(0, 277) + '...';
+  return oneLine.slice(0, 277) + "...";
 };
 
-const escapeForDoubleQuotes = (s) => String(s || '').replace(/([\\"\$`])/g, '\\$1');
+const escapeForDoubleQuotes = (s) =>
+  String(s || "").replace(/([\\"\$`])/g, "\\$1");
 
 const sshExec = (host, remoteCmd, timeoutMs = 15000) => {
   return new Promise((resolve, reject) => {
-    const args = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', host, remoteCmd];
-    execFile('ssh', args, { timeout: timeoutMs, maxBuffer: 1024 * 256 }, (err, stdout, stderr) => {
-      if (err) {
-        err.stdout = stdout;
-        err.stderr = stderr;
-        reject(err);
-        return;
-      }
-      resolve({ stdout: String(stdout || ''), stderr: String(stderr || '') });
-    });
+    const args = [
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "ConnectTimeout=10",
+      host,
+      remoteCmd,
+    ];
+    execFile(
+      "ssh",
+      args,
+      { timeout: timeoutMs, maxBuffer: 1024 * 256 },
+      (err, stdout, stderr) => {
+        if (err) {
+          err.stdout = stdout;
+          err.stderr = stderr;
+          reject(err);
+          return;
+        }
+        resolve({ stdout: String(stdout || ""), stderr: String(stderr || "") });
+      },
+    );
   });
 };
 
 const parseMissingChangeDir = (stderrText) => {
-  const s = String(stderrText || '');
-  if (!/change_dir\s+"[^"]+"\s+failed:\s+No such file or directory/i.test(s)) return null;
+  const s = String(stderrText || "");
+  if (!/change_dir\s+"[^"]+"\s+failed:\s+No such file or directory/i.test(s))
+    return null;
   const m = s.match(/change_dir\s+"([^"]+)"/i);
   return m && m[1] ? m[1] : null;
 };
@@ -76,12 +93,15 @@ const locateUsbPathByTitle = async (usbHost1, title1) => {
   // Using -name for exact match; suppress errors for transient readdir races.
   const cmd = `find files -ignore_readdir_race -type f -name "${escapeForDoubleQuotes(title1)}" -print -quit 2>/dev/null`;
   const res = await sshExec(usbHost1, cmd, 20000);
-  const line = String(res.stdout || '').split(/\r?\n/).map((x) => x.trim()).find(Boolean);
+  const line = String(res.stdout || "")
+    .split(/\r?\n/)
+    .map((x) => x.trim())
+    .find(Boolean);
   if (!line) return null;
-  if (!line.startsWith('files/')) return null;
+  if (!line.startsWith("files/")) return null;
   const dir = path.posix.dirname(line);
-  if (!dir || dir === '.' || dir === 'files') return null;
-  const inside = dir.slice('files/'.length);
+  if (!dir || dir === "." || dir === "files") return null;
+  const inside = dir.slice("files/".length);
   if (!inside) return null;
   return `~/files/${inside}/`;
 };
@@ -89,7 +109,14 @@ const locateUsbPathByTitle = async (usbHost1, title1) => {
 const finish = (statusText) => {
   if (!entry) {
     try {
-      parentPort.postMessage({ type: 'finished', entry: { procId: null, status: statusText || 'error', dateEnded: unixNow() } });
+      parentPort.postMessage({
+        type: "finished",
+        entry: {
+          procId: null,
+          status: statusText || "error",
+          dateEnded: unixNow(),
+        },
+      });
     } catch {}
     try {
       process.exit(0);
@@ -100,7 +127,7 @@ const finish = (statusText) => {
   entry.status = statusText;
   entry.eta = null;
   entry.dateEnded = unixNow();
-  postUpdate('finished');
+  postUpdate("finished");
   try {
     process.exit(0);
   } catch {}
@@ -108,7 +135,7 @@ const finish = (statusText) => {
 
 const main = () => {
   if (!entry || entry.procId == null) {
-    finish('bad procId');
+    finish("bad procId");
     return;
   }
 
@@ -117,11 +144,12 @@ const main = () => {
   const title = entry.title;
 
   if (!usbHost || !usbPath || !localPath || !title) {
-    finish('missing fields');
+    finish("missing fields");
     return;
   }
 
-  const ensureTrailingSlash = (s) => (String(s || '').endsWith('/') ? String(s || '') : `${String(s || '')}/`);
+  const ensureTrailingSlash = (s) =>
+    String(s || "").endsWith("/") ? String(s || "") : `${String(s || "")}/`;
 
   // rsync source/dest per spec
   const makeSrcDst = () => {
@@ -133,22 +161,30 @@ const main = () => {
   };
 
   // Ensure our status starts as downloading
-  entry.status = 'downloading';
+  entry.status = "downloading";
   entry.progress = 0;
   entry.eta = null;
   entry.speed = 0;
   entry.dateEnded = null;
-  postUpdate('update');
+  postUpdate("update");
 
   const startRsync = (attempt) => {
     const { src, dst, usbPath2 } = makeSrcDst();
-    const rsyncArgs = ['-av', '-e', 'ssh', '--timeout=20', '--info=progress2', src, dst];
-    const p = spawn('rsync', rsyncArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const rsyncArgs = [
+      "-av",
+      "-e",
+      "ssh",
+      "--timeout=20",
+      "--info=progress2",
+      src,
+      dst,
+    ];
+    const p = spawn("rsync", rsyncArgs, { stdio: ["ignore", "pipe", "pipe"] });
 
     // Capture rsync stderr so failures can be diagnosed.
     // Keep last N bytes to avoid unbounded memory use.
     const STDERR_MAX = 8192;
-    let stderrBuf = '';
+    let stderrBuf = "";
 
     let lastProgress = entry.progress || 0;
     let lastProgressUpdateTime = 0;
@@ -163,13 +199,13 @@ const main = () => {
       // Typical progress2 lines contain: "   123,456,789  12% ..."
       const m = chunk.match(/\s*([\d,]+)\s+(\d+)%/);
       if (!m) return null;
-      const s = m[1].replace(/,/g, '');
+      const s = m[1].replace(/,/g, "");
       if (!/^\d+$/.test(s)) return null;
       const n = parseInt(s, 10);
       return Number.isFinite(n) ? n : null;
     };
 
-    p.stdout.on('data', (data) => {
+    p.stdout.on("data", (data) => {
       const chunk = data.toString();
       const pm = chunk.match(/(\d+)%/);
       if (!pm) return;
@@ -177,7 +213,10 @@ const main = () => {
       const pct = parseInt(pm[1], 10);
       if (!Number.isFinite(pct)) return;
 
-      if (pct > lastProgress && (Date.now() - lastProgressUpdateTime) >= progressUpdateInterval) {
+      if (
+        pct > lastProgress &&
+        Date.now() - lastProgressUpdateTime >= progressUpdateInterval
+      ) {
         lastProgress = pct;
         lastProgressUpdateTime = Date.now();
         entry.progress = pct;
@@ -187,17 +226,26 @@ const main = () => {
         let etaSec = null;
 
         if (bytes != null) {
-          if (lastBytes != null && lastBytesTimeMs != null && bytes >= lastBytes) {
+          if (
+            lastBytes != null &&
+            lastBytesTimeMs != null &&
+            bytes >= lastBytes
+          ) {
             const dtSec = (nowMs - lastBytesTimeMs) / 1000;
             if (dtSec > 0) {
               const dBytes = bytes - lastBytes;
               const instBitsPerSec = Math.round((dBytes * 8) / dtSec);
-              const inst = Number.isFinite(instBitsPerSec) && instBitsPerSec >= 0 ? instBitsPerSec : 0;
+              const inst =
+                Number.isFinite(instBitsPerSec) && instBitsPerSec >= 0
+                  ? instBitsPerSec
+                  : 0;
 
               speedSamples.push(inst);
               while (speedSamples.length > 3) speedSamples.shift();
               const sum = speedSamples.reduce((a, b) => a + b, 0);
-              entry.speed = speedSamples.length ? Math.round(sum / speedSamples.length) : 0;
+              entry.speed = speedSamples.length
+                ? Math.round(sum / speedSamples.length)
+                : 0;
             }
           }
           lastBytes = bytes;
@@ -209,11 +257,11 @@ const main = () => {
           entry.eta = unixNow() + etaSec;
         }
 
-        postUpdate('update');
+        postUpdate("update");
       }
     });
 
-    p.stderr.on('data', (data) => {
+    p.stderr.on("data", (data) => {
       try {
         stderrBuf += data.toString();
         if (stderrBuf.length > STDERR_MAX) {
@@ -224,7 +272,7 @@ const main = () => {
       }
     });
 
-    p.on('close', async (code) => {
+    p.on("close", async (code) => {
       if (code !== 0) {
         const stderrSummary = summarizeStderr(stderrBuf);
 
@@ -236,11 +284,11 @@ const main = () => {
               const newUsbPath = await locateUsbPathByTitle(usbHost, title);
               if (newUsbPath && newUsbPath !== usbPath2) {
                 entry.usbPath = newUsbPath;
-                entry.status = 'downloading';
+                entry.status = "downloading";
                 entry.progress = 0;
                 entry.eta = null;
                 entry.speed = 0;
-                postUpdate('update');
+                postUpdate("update");
                 startRsync(2);
                 return;
               }
@@ -262,20 +310,22 @@ const main = () => {
             finish(`Missing: remote file not found: ${srcNow}`);
             return;
           }
-          finish(stderrSummary ? `Missing: ${stderrSummary}` : 'Missing');
+          finish(stderrSummary ? `Missing: ${stderrSummary}` : "Missing");
           return;
         }
 
-        const msg = stderrSummary ? `rsync exit code ${code}: ${stderrSummary}` : `rsync exit code ${code}`;
+        const msg = stderrSummary
+          ? `rsync exit code ${code}: ${stderrSummary}`
+          : `rsync exit code ${code}`;
         finish(msg);
         return;
       }
       entry.progress = 100;
-      finish('finished');
+      finish("finished");
     });
 
-    p.on('error', (err) => {
-      finish(err && err.message ? err.message : 'rsync spawn error');
+    p.on("error", (err) => {
+      finish(err && err.message ? err.message : "rsync spawn error");
     });
   };
 

@@ -1,85 +1,508 @@
 <template>
-
-<div id="map" ref="mapScroller" @click="handleMapClick" :style="{ height:'100%', width:'100%', margin:0, display:'flex', flexDirection:'column', backgroundColor:'white', overflow:'hidden', maxWidth:'100%', boxSizing:'border-box' }">
-  <!-- Progress modal (similar to web-add in list.vue)-->
-  <div id="mapWorkingModal" v-if="mapWorking" @click.stop style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background-color:white; padding:30px 40px; border:2px solid black; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.3); z-index:1000; text-align:center;">
-    <div style="font-size:18px; font-weight:bold; margin-bottom:10px;">{{ mapWorkingTitle }}</div>
-    <div style="font-size:20px; color:#0066cc; margin-bottom:15px;">{{ mapWorkingShowName }}</div>
-    <div style="font-size:16px; color:#666; margin-bottom:6px;">{{ mapWorkingStatus || 'Please wait ...' }}</div>
-  </div>
-  <div id="maperr" v-if="mapError &amp;&amp; Object.keys(seriesMap).length === 0" style="display:flex; align-items:center; justify-content:center; height:100%; width:100%; font-size:20px; font-weight:bold; color:red; text-align:center; padding:20px;">{{mapError}}</div>
-  <div id="maphdr" v-else style="position:sticky; top:0px; z-index:50; background-color:white; padding-bottom:5px;">
-    <div id="maphdr1" style="margin:0 5px; display:flex; justify-content:space-between; align-items:center;">
-      <div id="mapshow" :style="{ marginLeft:'15px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px' }">{{mapShow?.Name}} </div>
-      <div style="display:flex; ">
-        <div id="mapbuttons" v-if="!simpleMode" style="display:flex; gap:5px; flex-shrink:0;">
-          <button @click.stop.prevent="noop" @pointerdown.stop.prevent="startArrowPan($event, -1)" @pointerup.stop.prevent="stopArrowPan" @pointercancel.stop.prevent="stopArrowPan" @lostpointercapture.stop.prevent="stopArrowPan" :disabled="!canPanLeft" :style="{ opacity: canPanLeft ? 1 : 0.35, cursor: canPanLeft ? 'pointer' : 'default' }" style="font-size:15px; margin:5px; max-height:24px; border-radius:7px;">←</button>
-          <button @click.stop.prevent="noop" @pointerdown.stop.prevent="startArrowPan($event, 1)" @pointerup.stop.prevent="stopArrowPan" @pointercancel.stop.prevent="stopArrowPan" @lostpointercapture.stop.prevent="stopArrowPan" :disabled="!canPanRight" :style="{ opacity: canPanRight ? 1 : 0.35, cursor: canPanRight ? 'pointer' : 'default' }" style="font-size:15px; margin:5px; max-height:24px; border-radius:7px;">→</button>
-          <button v-if="!mapShow?.Id?.startsWith('noemby-')" @click.stop="startLibraryRefresh" style="font-size:15px; cursor:pointer; margin:5px 0 5px 5px; max-height:24px; border-radius:7px;">Library</button>
-          <button v-if="!mapShow?.Id?.startsWith('noemby-')" @click.stop="$emit('prune', mapShow)" style="font-size:15px; cursor:pointer; margin:5px 0 5px 5px; max-height:24px; border-radius:7px;">Prune</button>
+  <div
+    id="map"
+    ref="mapScroller"
+    @click="handleMapClick"
+    :style="{
+      height: '100%',
+      width: '100%',
+      margin: 0,
+      display: 'flex',
+      flexDirection: 'column',
+      backgroundColor: 'white',
+      overflow: 'hidden',
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+    }"
+  >
+    <!-- Progress modal (similar to web-add in list.vue)-->
+    <div
+      id="mapWorkingModal"
+      v-if="mapWorking"
+      @click.stop
+      style="
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 30px 40px;
+        border: 2px solid black;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+        text-align: center;
+      "
+    >
+      <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px">
+        {{ mapWorkingTitle }}
+      </div>
+      <div style="font-size: 20px; color: #0066cc; margin-bottom: 15px">
+        {{ mapWorkingShowName }}
+      </div>
+      <div style="font-size: 16px; color: #666; margin-bottom: 6px">
+        {{ mapWorkingStatus || "Please wait ..." }}
+      </div>
+    </div>
+    <div
+      id="maperr"
+      v-if="mapError &amp;&amp; Object.keys(seriesMap).length === 0"
+      style="
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        width: 100%;
+        font-size: 20px;
+        font-weight: bold;
+        color: red;
+        text-align: center;
+        padding: 20px;
+      "
+    >
+      {{ mapError }}
+    </div>
+    <div
+      id="maphdr"
+      v-else
+      style="
+        position: sticky;
+        top: 0px;
+        z-index: 50;
+        background-color: white;
+        padding-bottom: 5px;
+      "
+    >
+      <div
+        id="maphdr1"
+        style="
+          margin: 0 5px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <div
+          id="mapshow"
+          :style="{
+            marginLeft: '15px',
+            fontWeight: 'bold',
+            fontSize: sizing.seriesFontSize || '25px',
+          }"
+        >
+          {{ mapShow?.Name }}
+        </div>
+        <div style="display: flex">
+          <div
+            id="mapbuttons"
+            v-if="!simpleMode"
+            style="display: flex; gap: 5px; flex-shrink: 0"
+          >
+            <button
+              @click.stop.prevent="noop"
+              @pointerdown.stop.prevent="startArrowPan($event, -1)"
+              @pointerup.stop.prevent="stopArrowPan"
+              @pointercancel.stop.prevent="stopArrowPan"
+              @lostpointercapture.stop.prevent="stopArrowPan"
+              :disabled="!canPanLeft"
+              :style="{
+                opacity: canPanLeft ? 1 : 0.35,
+                cursor: canPanLeft ? 'pointer' : 'default',
+              }"
+              style="
+                font-size: 15px;
+                margin: 5px;
+                max-height: 24px;
+                border-radius: 7px;
+              "
+            >
+              ←
+            </button>
+            <button
+              @click.stop.prevent="noop"
+              @pointerdown.stop.prevent="startArrowPan($event, 1)"
+              @pointerup.stop.prevent="stopArrowPan"
+              @pointercancel.stop.prevent="stopArrowPan"
+              @lostpointercapture.stop.prevent="stopArrowPan"
+              :disabled="!canPanRight"
+              :style="{
+                opacity: canPanRight ? 1 : 0.35,
+                cursor: canPanRight ? 'pointer' : 'default',
+              }"
+              style="
+                font-size: 15px;
+                margin: 5px;
+                max-height: 24px;
+                border-radius: 7px;
+              "
+            >
+              →
+            </button>
+            <button
+              v-if="!mapShow?.Id?.startsWith('noemby-')"
+              @click.stop="startLibraryRefresh"
+              style="
+                font-size: 15px;
+                cursor: pointer;
+                margin: 5px 0 5px 5px;
+                max-height: 24px;
+                border-radius: 7px;
+              "
+            >
+              Library
+            </button>
+            <button
+              v-if="!mapShow?.Id?.startsWith('noemby-')"
+              @click.stop="$emit('prune', mapShow)"
+              style="
+                font-size: 15px;
+                cursor: pointer;
+                margin: 5px 0 5px 5px;
+                max-height: 24px;
+                border-radius: 7px;
+              "
+            >
+              Prune
+            </button>
+          </div>
+        </div>
+      </div>
+      <div
+        id="maphdr2"
+        style="
+          display: flex;
+          justify-content: flex-start;
+          align-items: center;
+          color: red;
+          margin: 0 10px 5px 10px;
+          padding-left: 5px;
+          font-size: 15px;
+          flex-wrap: wrap;
+        "
+      >
+        <span
+          v-for="(part, idx) in hdr2Parts"
+          :key="idx"
+          style="white-space: nowrap"
+          ><span
+            v-if="idx &gt; 0"
+            style="padding: 0 6px; font-weight: bold"
+            >|</span
+          ><span>{{ part }}</span></span
+        ><span
+          v-if="mapShow?.Id?.startsWith('noemby-')"
+          style="white-space: nowrap"
+          ><span
+            v-if="hdr2Parts &amp;&amp; hdr2Parts.length &gt; 0"
+            style="padding: 0 6px; font-weight: bold"
+            >|</span
+          ><span
+            @click.stop.prevent="handleNotInEmbyClick($event)"
+            style="font-weight: bold; cursor: pointer; white-space: nowrap"
+            >Not In Emby</span
+          ></span
+        >
+      </div>
+    </div>
+    <div
+      id="maptable"
+      v-if="!hideMapBottom"
+      style="
+        flex: 1 1 auto;
+        min-height: 0px;
+        margin-left: 15px;
+        margin-right: 15px;
+        box-sizing: border-box;
+        position: relative;
+        overflow: hidden;
+      "
+    >
+      <!-- No scrollbars: pan the table with arrows (horizontal) and mouse wheel (vertical).-->
+      <div
+        id="maptblpane"
+        ref="mapViewport"
+        @wheel.stop.prevent="handleMapWheel"
+        @pointerdown="handleMapPointerDown"
+        @pointermove="handleMapPointerMove"
+        @pointerup="handleMapPointerUp"
+        @pointercancel="handleMapPointerUp"
+        style="
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          box-sizing: border-box;
+          touch-action: none;
+        "
+      >
+        <!-- Sticky header row: moves horizontally with pan but stays fixed vertically.-->
+        <div
+          ref="mapHeader"
+          style="
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            overflow: hidden;
+            box-sizing: border-box;
+            background-color: white;
+            pointer-events: none;
+          "
+        >
+          <table
+            :style="{
+              fontSize: '16px',
+              borderCollapse: 'collapse',
+              transform: 'translate(' + -mapScrollLeft + 'px,0px)',
+            }"
+          >
+            <tbody>
+              <tr style="font-weight: bold">
+                <td
+                  :style="{
+                    width: '30px',
+                    minWidth: '30px',
+                    maxWidth: '30px',
+                    height: '22px',
+                    minHeight: '22px',
+                    maxHeight: '22px',
+                    lineHeight: '16px',
+                    whiteSpace: 'nowrap',
+                    verticalAlign: 'middle',
+                    textAlign: 'center',
+                    padding: '1px 4px',
+                    border: '1px solid #ccc',
+                    backgroundColor: 'white',
+                  }"
+                >
+                  &nbsp;
+                </td>
+                <td
+                  v-for="episode in seriesMapEpis"
+                  :style="{
+                    width: '30px',
+                    minWidth: '30px',
+                    maxWidth: '30px',
+                    height: '22px',
+                    minHeight: '22px',
+                    maxHeight: '22px',
+                    lineHeight: '16px',
+                    whiteSpace: 'nowrap',
+                    verticalAlign: 'middle',
+                    padding: '1px 4px',
+                    textAlign: 'center',
+                    border: '1px solid #ccc',
+                    backgroundColor: 'white',
+                  }"
+                  :key="episode"
+                >
+                  {{ episode }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Sticky top-left corner cell (covers the moving blank header cell when panning horizontally).-->
+        <div
+          style="
+            position: absolute;
+            left: 0;
+            top: 0;
+            z-index: 6;
+            overflow: hidden;
+            background-color: white;
+            pointer-events: none;
+          "
+        >
+          <table :style="{ fontSize: '16px', borderCollapse: 'collapse' }">
+            <tbody>
+              <tr style="font-weight: bold">
+                <td
+                  :style="{
+                    width: '30px',
+                    minWidth: '30px',
+                    maxWidth: '30px',
+                    height: '22px',
+                    minHeight: '22px',
+                    maxHeight: '22px',
+                    lineHeight: '16px',
+                    whiteSpace: 'nowrap',
+                    verticalAlign: 'middle',
+                    textAlign: 'center',
+                    padding: '1px 4px',
+                    border: '1px solid #ccc',
+                    backgroundColor: 'white',
+                  }"
+                >
+                  &nbsp;
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Body viewport starts below the sticky header.-->
+        <div
+          ref="mapBodyViewport"
+          :style="{
+            position: 'absolute',
+            left: '0',
+            right: '0',
+            top: mapHeaderH + 'px',
+            bottom: '0',
+            overflow: 'hidden',
+            boxSizing: 'border-box',
+          }"
+        >
+          <table
+            ref="mapBodyTable"
+            :style="{
+              fontSize: '16px',
+              borderCollapse: 'collapse',
+              transform:
+                'translate(' + -mapScrollLeft + 'px,' + -mapScrollTop + 'px)',
+            }"
+          >
+            <tbody>
+              <tr
+                v-for="season in seriesMapSeasons"
+                :key="season"
+                style="outline: thin solid"
+              >
+                <td
+                  @click="handleSeasonClick($event, season)"
+                  :style="{
+                    fontWeight: 'bold',
+                    width: '30px',
+                    minWidth: '30px',
+                    maxWidth: '30px',
+                    height: '22px',
+                    minHeight: '22px',
+                    maxHeight: '22px',
+                    lineHeight: '16px',
+                    whiteSpace: 'nowrap',
+                    verticalAlign: 'middle',
+                    textAlign: 'center',
+                    cursor: simpleMode ? 'default' : 'pointer',
+                    padding: '1px 4px',
+                    border: '1px solid #ccc',
+                    backgroundColor: 'white',
+                  }"
+                >
+                  {{ season }}
+                </td>
+                <td
+                  v-for="episode in seriesMapEpis"
+                  :key="season + '.' + episode"
+                  @click="handleEpisodeClick($event, mapShow, season, episode)"
+                  :style="{
+                    cursor: simpleMode ? 'default' : 'pointer',
+                    width: '30px',
+                    minWidth: '30px',
+                    maxWidth: '30px',
+                    height: '22px',
+                    minHeight: '22px',
+                    maxHeight: '22px',
+                    lineHeight: '16px',
+                    whiteSpace: 'nowrap',
+                    verticalAlign: 'middle',
+                    padding: '1px 4px',
+                    textAlign: 'center',
+                    border: '1px solid #ccc',
+                    backgroundColor: seriesMap[season]?.[episode]?.error
+                      ? 'yellow'
+                      : seriesMap[season]?.[episode]?.noFile
+                        ? '#faa'
+                        : 'white',
+                  }"
+                >
+                  <span v-if="seriesMap?.[season]?.[episode]?.played"> w</span
+                  ><span
+                    v-if="seriesMap?.[season]?.[episode]?.avail &amp;&amp; !seriesMap?.[season]?.[episode]?.unaired &amp;&amp; !mapShow?.Id?.startsWith('noemby-')"
+                  >
+                    +</span
+                  ><span
+                    v-if="seriesMap?.[season]?.[episode]?.noFile &amp;&amp; !seriesMap?.[season]?.[episode]?.unaired"
+                  >
+                    -</span
+                  ><span
+                    v-if="seriesMap?.[season]?.[episode]?.unaired &amp;&amp; !seriesMap?.[season]?.[episode]?.played &amp;&amp; seriesMap?.[season]?.[episode]?.noFile"
+                    >u</span
+                  ><span v-if="seriesMap?.[season]?.[episode]?.deleted">d</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Sticky season column (covers the moving season cells when panning horizontally).-->
+        <div
+          @pointerdown="handleMapPointerDown"
+          @pointermove="handleMapPointerMove"
+          @pointerup="handleMapPointerUp"
+          @pointercancel="handleMapPointerUp"
+          :style="{
+            position: 'absolute',
+            left: '0',
+            top: mapHeaderH + 'px',
+            bottom: '0',
+            width: '30px',
+            overflow: 'hidden',
+            zIndex: 5,
+            backgroundColor: 'white',
+            pointerEvents: 'auto',
+            touchAction: 'none',
+          }"
+        >
+          <table
+            :style="{
+              fontSize: '16px',
+              borderCollapse: 'collapse',
+              transform: 'translate(0px,' + -mapScrollTop + 'px)',
+            }"
+          >
+            <tbody>
+              <tr
+                v-for="season in seriesMapSeasons"
+                :key="'sticky-' + season"
+                style="outline: thin solid"
+              >
+                <td
+                  @click="handleSeasonClick($event, season)"
+                  :style="{
+                    fontWeight: 'bold',
+                    width: '30px',
+                    minWidth: '30px',
+                    maxWidth: '30px',
+                    height: '22px',
+                    minHeight: '22px',
+                    maxHeight: '22px',
+                    lineHeight: '16px',
+                    whiteSpace: 'nowrap',
+                    verticalAlign: 'middle',
+                    textAlign: 'center',
+                    cursor: simpleMode ? 'default' : 'pointer',
+                    padding: '1px 4px',
+                    border: '1px solid #ccc',
+                    backgroundColor: 'white',
+                  }"
+                >
+                  {{ season }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
-    <div id="maphdr2" style="display:flex; justify-content:flex-start; align-items:center; color:red; margin:0 10px 5px 10px; padding-left:5px; font-size:15px; flex-wrap:wrap;"><span v-for="(part, idx) in hdr2Parts" :key="idx" style="white-space:nowrap;"><span v-if="idx &gt; 0" style="padding:0 6px; font-weight:bold;">|</span><span>{{part}}</span></span><span v-if="mapShow?.Id?.startsWith('noemby-')" style="white-space:nowrap;"><span v-if="hdr2Parts &amp;&amp; hdr2Parts.length &gt; 0" style="padding:0 6px; font-weight:bold;">|</span><span @click.stop.prevent="handleNotInEmbyClick($event)" style="font-weight:bold; cursor:pointer; white-space:nowrap;">Not In Emby</span></span></div>
   </div>
-  <div id="maptable" v-if="!hideMapBottom" style="flex:1 1 auto; min-height:0px; margin-left:15px; margin-right:15px; box-sizing:border-box; position:relative; overflow:hidden;">
-    <!-- No scrollbars: pan the table with arrows (horizontal) and mouse wheel (vertical).-->
-    <div id="maptblpane" ref="mapViewport" @wheel.stop.prevent="handleMapWheel" @pointerdown="handleMapPointerDown" @pointermove="handleMapPointerMove" @pointerup="handleMapPointerUp" @pointercancel="handleMapPointerUp" style="position:absolute; inset:0; overflow:hidden; box-sizing:border-box; touch-action:none;">
-      <!-- Sticky header row: moves horizontally with pan but stays fixed vertically.-->
-      <div ref="mapHeader" style="position:absolute; left:0; right:0; top:0; overflow:hidden; box-sizing:border-box; background-color:white; pointer-events:none;">
-        <table :style="{ fontSize:'16px', borderCollapse:'collapse', transform: 'translate(' + (-mapScrollLeft) + 'px,0px)' }">
-          <tbody>
-            <tr style="font-weight:bold;">
-              <td :style="{ width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', textAlign:'center', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'white' }">&nbsp;</td>
-              <td v-for="episode in seriesMapEpis" :style="{ width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', padding:'1px 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor:'white' }" :key="episode">{{episode}}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <!-- Sticky top-left corner cell (covers the moving blank header cell when panning horizontally).-->
-      <div style="position:absolute; left:0; top:0; z-index:6; overflow:hidden; background-color:white; pointer-events:none;">
-        <table :style="{ fontSize:'16px', borderCollapse:'collapse' }">
-          <tbody>
-            <tr style="font-weight:bold;">
-              <td :style="{ width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', textAlign:'center', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'white' }">&nbsp;</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <!-- Body viewport starts below the sticky header.-->
-      <div ref="mapBodyViewport" :style="{ position:'absolute', left:'0', right:'0', top: mapHeaderH + 'px', bottom:'0', overflow:'hidden', boxSizing:'border-box' }">
-        <table ref="mapBodyTable" :style="{ fontSize:'16px', borderCollapse:'collapse', transform: 'translate(' + (-mapScrollLeft) + 'px,' + (-mapScrollTop) + 'px)' }">
-          <tbody>
-            <tr v-for="season in seriesMapSeasons" :key="season" style="outline:thin solid;">
-              <td @click="handleSeasonClick($event, season)" :style="{ fontWeight:'bold', width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'white' }">{{season}}</td>
-              <td v-for="episode in seriesMapEpis" :key="season + '.' + episode" @click="handleEpisodeClick($event, mapShow, season, episode)" :style="{ cursor: simpleMode ? 'default' : 'pointer', width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', padding:'1px 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor: (seriesMap[season]?.[episode]?.error) ? 'yellow': (seriesMap[season]?.[episode]?.noFile) ? '#faa' : 'white'}"><span v-if="seriesMap?.[season]?.[episode]?.played"> w</span><span v-if="seriesMap?.[season]?.[episode]?.avail &amp;&amp; !seriesMap?.[season]?.[episode]?.unaired &amp;&amp; !mapShow?.Id?.startsWith('noemby-')">  +</span><span v-if="seriesMap?.[season]?.[episode]?.noFile &amp;&amp; !seriesMap?.[season]?.[episode]?.unaired"> -</span><span v-if="seriesMap?.[season]?.[episode]?.unaired &amp;&amp; !seriesMap?.[season]?.[episode]?.played &amp;&amp; seriesMap?.[season]?.[episode]?.noFile">u</span><span v-if="seriesMap?.[season]?.[episode]?.deleted">d</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <!-- Sticky season column (covers the moving season cells when panning horizontally).-->
-      <div @pointerdown="handleMapPointerDown" @pointermove="handleMapPointerMove" @pointerup="handleMapPointerUp" @pointercancel="handleMapPointerUp" :style="{ position:'absolute', left:'0', top: mapHeaderH + 'px', bottom:'0', width:'30px', overflow:'hidden', zIndex:5, backgroundColor:'white', pointerEvents:'auto', touchAction:'none' }">
-        <table :style="{ fontSize:'16px', borderCollapse:'collapse', transform: 'translate(0px,' + (-mapScrollTop) + 'px)' }">
-          <tbody>
-            <tr v-for="season in seriesMapSeasons" :key="'sticky-' + season" style="outline:thin solid;">
-              <td @click="handleSeasonClick($event, season)" :style="{ fontWeight:'bold', width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'white' }">{{season}}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-</div>
 </template>
 
 <script>
-import * as tvdb from '../tvdb.js';
-import * as emby from '../emby.js';
-import * as srvr from '../srvr.js';
-import    evtBus  from '../evtBus.js';
+import * as tvdb from "../tvdb.js";
+import * as emby from "../emby.js";
+import * as srvr from "../srvr.js";
+import evtBus from "../evtBus.js";
 
 const MAP_ARROW_PAN_PX_PER_SEC = 400;
-const MAP_PAN_SMOOTH_TAU_SEC = 0.10;
+const MAP_PAN_SMOOTH_TAU_SEC = 0.1;
 
 export default {
   name: "Map",
@@ -87,36 +510,36 @@ export default {
   props: {
     mapShow: {
       type: Object,
-      default: null
+      default: null,
     },
     hideMapBottom: {
       type: Boolean,
-      default: true
+      default: true,
     },
     seriesMapSeasons: {
       type: Array,
-      default: () => []
+      default: () => [],
     },
     seriesMapEpis: {
       type: Array,
-      default: () => []
+      default: () => [],
     },
     seriesMap: {
       type: Object,
-      default: () => ({})
+      default: () => ({}),
     },
     mapError: {
       type: String,
-      default: ''
+      default: "",
     },
     simpleMode: {
       type: Boolean,
-      default: false
+      default: false,
     },
     sizing: {
       type: Object,
-      default: () => ({})
-    }
+      default: () => ({}),
+    },
   },
 
   data() {
@@ -124,12 +547,12 @@ export default {
       seasonStates: {}, // Track original state for each season
       tvdbData: null,
       allTvdb: null,
-      nextUpTxt: '',
+      nextUpTxt: "",
 
       mapWorking: false,
-      mapWorkingTitle: '',
-      mapWorkingShowName: '',
-      mapWorkingStatus: '',
+      mapWorkingTitle: "",
+      mapWorkingShowName: "",
+      mapWorkingStatus: "",
 
       mapScrollLeft: 0,
       mapScrollTop: 0,
@@ -154,18 +577,18 @@ export default {
 
   computed: {
     datesLine() {
-      if (!this.tvdbData) return '';
+      if (!this.tvdbData) return "";
       const { firstAired, lastAired, status } = this.tvdbData;
-      return ` ${firstAired || ''} ${lastAired || ''} ${status || ''}`;
+      return ` ${firstAired || ""} ${lastAired || ""} ${status || ""}`;
     },
     firstAiredVal() {
-      return this.tvdbData?.firstAired || '';
+      return this.tvdbData?.firstAired || "";
     },
     lastAiredVal() {
-      return this.tvdbData?.lastAired || '';
+      return this.tvdbData?.lastAired || "";
     },
     statusVal() {
-      return this.tvdbData?.status || '';
+      return this.tvdbData?.status || "";
     },
 
     hdr2Parts() {
@@ -174,15 +597,20 @@ export default {
       const firstAired = this.firstAiredVal;
       const lastAired = this.lastAiredVal;
       if (firstAired || lastAired) {
-        parts.push(firstAired && lastAired ? `${firstAired} / ${lastAired}` : (firstAired || lastAired));
+        parts.push(
+          firstAired && lastAired
+            ? `${firstAired} / ${lastAired}`
+            : firstAired || lastAired,
+        );
       }
 
       const status = this.statusVal;
       if (status) parts.push(status);
 
-      if (this.mapShow?.WatchGap) parts.push('Watch Gap');
-      if (this.mapShow?.FileGap) parts.push('Missing File');
-      if (this.mapShow?.WaitStr?.length) parts.push('Waiting ' + this.mapShow.WaitStr);
+      if (this.mapShow?.WatchGap) parts.push("Watch Gap");
+      if (this.mapShow?.FileGap) parts.push("Missing File");
+      if (this.mapShow?.WaitStr?.length)
+        parts.push("Waiting " + this.mapShow.WaitStr);
 
       return parts;
     },
@@ -195,7 +623,7 @@ export default {
     canPanRight() {
       const eps = 0.5;
       return (this.mapScrollLeft || 0) < (this.mapMaxScrollLeft || 0) - eps;
-    }
+    },
   },
 
   watch: {
@@ -217,10 +645,18 @@ export default {
       this.$nextTick(() => {
         this.updateMapPanBounds();
       });
-    }
+    },
   },
 
-  emits: ['reload-shows', 'prune', 'set-date', 'close', 'episode-click', 'season-delete', 'show-actors'],
+  emits: [
+    "reload-shows",
+    "prune",
+    "set-date",
+    "close",
+    "episode-click",
+    "season-delete",
+    "show-actors",
+  ],
 
   async mounted() {
     if (this.mapShow && this.mapShow.Name) {
@@ -230,11 +666,11 @@ export default {
     this.$nextTick(() => {
       this.updateMapPanBounds();
     });
-    window.addEventListener('resize', this.updateMapPanBounds);
+    window.addEventListener("resize", this.updateMapPanBounds);
   },
 
   beforeUnmount() {
-    window.removeEventListener('resize', this.updateMapPanBounds);
+    window.removeEventListener("resize", this.updateMapPanBounds);
     this.stopArrowPan();
     this.stopMapPanLoop();
   },
@@ -244,15 +680,20 @@ export default {
 
     startLibraryRefresh() {
       // Delegate to App.vue so progress renders in the global tab bar.
-      evtBus.emit('startLibraryRefresh');
+      evtBus.emit("startLibraryRefresh");
     },
 
     async handleNotInEmbyClick(event) {
       // Ctrl-click on "Not In Emby": create the server folder and refresh Emby.
       if (!event?.ctrlKey) return;
 
-      const showName = String(this.mapShow?.Name || '').trim();
-      const tvdbId = String(this.mapShow?.TvdbId || this.tvdbData?.tvdbId || this.tvdbData?.tvdb_id || '').trim();
+      const showName = String(this.mapShow?.Name || "").trim();
+      const tvdbId = String(
+        this.mapShow?.TvdbId ||
+          this.tvdbData?.tvdbId ||
+          this.tvdbData?.tvdb_id ||
+          "",
+      ).trim();
       const seasons = Array.isArray(this.seriesMapSeasons)
         ? this.seriesMapSeasons
             .map((n) => Number(n))
@@ -262,32 +703,52 @@ export default {
 
       if (!showName) return;
       if (!tvdbId) {
-        console.error('Map: Not In Emby ctrl-click missing tvdbId', { mapShow: this.mapShow, tvdbData: this.tvdbData });
-        window.alert('Missing TvdbId; cannot create show folder.');
+        console.error("Map: Not In Emby ctrl-click missing tvdbId", {
+          mapShow: this.mapShow,
+          tvdbData: this.tvdbData,
+        });
+        window.alert("Missing TvdbId; cannot create show folder.");
         return;
       }
-      if (!this.tvdbData || typeof this.tvdbData !== 'object' || Object.keys(this.tvdbData).length === 0) {
+      if (
+        !this.tvdbData ||
+        typeof this.tvdbData !== "object" ||
+        Object.keys(this.tvdbData).length === 0
+      ) {
         await this.loadTvdbData();
       }
-      const hasTvdbData = !!this.tvdbData && typeof this.tvdbData === 'object' && Object.keys(this.tvdbData).length > 0;
+      const hasTvdbData =
+        !!this.tvdbData &&
+        typeof this.tvdbData === "object" &&
+        Object.keys(this.tvdbData).length > 0;
       if (!hasTvdbData) {
-        console.error('Map: Not In Emby ctrl-click missing tvdbData', { showName, tvdbId, tvdbData: this.tvdbData });
-        window.alert('Missing TVDB data; cannot create show folder.');
+        console.error("Map: Not In Emby ctrl-click missing tvdbData", {
+          showName,
+          tvdbId,
+          tvdbData: this.tvdbData,
+        });
+        window.alert("Missing TVDB data; cannot create show folder.");
         return;
       }
 
-      const ok = window.confirm(`Create Emby folder + refresh library for "${showName}"?`);
+      const ok = window.confirm(
+        `Create Emby folder + refresh library for "${showName}"?`,
+      );
       if (!ok) return;
 
-      console.log('Map: Not In Emby ctrl-click', { showName, tvdbId, seasons });
+      console.log("Map: Not In Emby ctrl-click", { showName, tvdbId, seasons });
       this.mapWorking = true;
-      this.mapWorkingTitle = 'Creating show folder and refreshing Emby:';
+      this.mapWorkingTitle = "Creating show folder and refreshing Emby:";
       this.mapWorkingShowName = showName;
-      this.mapWorkingStatus = 'Starting...';
+      this.mapWorkingStatus = "Starting...";
 
       const setStatus = (txt) => {
-        this.mapWorkingStatus = String(txt || '');
-        console.log('Map: Not In Emby progress:', showName, this.mapWorkingStatus);
+        this.mapWorkingStatus = String(txt || "");
+        console.log(
+          "Map: Not In Emby progress:",
+          showName,
+          this.mapWorkingStatus,
+        );
       };
 
       try {
@@ -302,12 +763,16 @@ export default {
         });
 
         if (!res?.createdFolder) {
-          console.error('Map: createShowFolderAndRefreshEmby failed', { showName, tvdbId, res });
-          window.alert(res?.err || 'Failed to create show folder.');
+          console.error("Map: createShowFolderAndRefreshEmby failed", {
+            showName,
+            tvdbId,
+            res,
+          });
+          window.alert(res?.err || "Failed to create show folder.");
           return;
         }
 
-        setStatus('Reloading shows...');
+        setStatus("Reloading shows...");
         // Trigger list reload so the show becomes a real Emby item.
         // Wait for List.newShows() to finish (web-add does this inline).
         await new Promise((resolve) => {
@@ -320,11 +785,13 @@ export default {
 
           const timeoutMs = 60000;
           const t = setTimeout(() => {
-            console.warn('Map: timed out waiting for show reload after library-refresh-complete');
+            console.warn(
+              "Map: timed out waiting for show reload after library-refresh-complete",
+            );
             finish();
           }, timeoutMs);
 
-          evtBus.emit('library-refresh-complete', {
+          evtBus.emit("library-refresh-complete", {
             onDone: () => {
               clearTimeout(t);
               finish();
@@ -333,31 +800,35 @@ export default {
         });
       } finally {
         this.mapWorking = false;
-        this.mapWorkingTitle = '';
-        this.mapWorkingShowName = '';
-        this.mapWorkingStatus = '';
+        this.mapWorkingTitle = "";
+        this.mapWorkingShowName = "";
+        this.mapWorkingStatus = "";
       }
     },
 
     handleMapPointerDown(event) {
       if (!event) return;
       // Only handle touch/pen drag as "scroll". Mouse drag isn't expected UX here.
-      const pt = event.pointerType || '';
-      if (pt !== 'touch' && pt !== 'pen') return;
+      const pt = event.pointerType || "";
+      if (pt !== "touch" && pt !== "pen") return;
 
       this.stopArrowPan();
       this.stopMapPanLoop();
       this.updateMapPanBounds();
 
       this.mapTouchActive = true;
-      this.mapTouchPointerId = (event.pointerId != null) ? event.pointerId : -1;
+      this.mapTouchPointerId = event.pointerId != null ? event.pointerId : -1;
       this.mapTouchLastX = event.clientX || 0;
       this.mapTouchLastY = event.clientY || 0;
       this.mapTouchMoved = false;
       this.mapTouchMovedDist = 0;
 
       try {
-        if (event.currentTarget && typeof event.currentTarget.setPointerCapture === 'function' && event.pointerId != null) {
+        if (
+          event.currentTarget &&
+          typeof event.currentTarget.setPointerCapture === "function" &&
+          event.pointerId != null
+        ) {
           event.currentTarget.setPointerCapture(event.pointerId);
         }
       } catch (_) {
@@ -368,10 +839,19 @@ export default {
     handleMapPointerMove(event) {
       if (!this.mapTouchActive) return;
       if (!event) return;
-      if (this.mapTouchPointerId !== -1 && event.pointerId != null && event.pointerId !== this.mapTouchPointerId) return;
+      if (
+        this.mapTouchPointerId !== -1 &&
+        event.pointerId != null &&
+        event.pointerId !== this.mapTouchPointerId
+      )
+        return;
 
       // Prevent the browser from doing page scroll/gesture handling.
-      try { event.preventDefault(); } catch (_) { /* ignore */ }
+      try {
+        event.preventDefault();
+      } catch (_) {
+        /* ignore */
+      }
 
       this.updateMapPanBounds();
 
@@ -384,19 +864,33 @@ export default {
 
       const movedThis = Math.abs(dx) + Math.abs(dy);
       this.mapTouchMovedDist += movedThis;
-      if (!this.mapTouchMoved && this.mapTouchMovedDist >= 4) this.mapTouchMoved = true;
+      if (!this.mapTouchMoved && this.mapTouchMovedDist >= 4)
+        this.mapTouchMoved = true;
 
       // Native-scroll semantics: finger left => reveal right (scrollLeft increases).
-      this.mapScrollLeft = this.clamp((this.mapScrollLeft || 0) - dx, 0, this.mapMaxScrollLeft || 0);
+      this.mapScrollLeft = this.clamp(
+        (this.mapScrollLeft || 0) - dx,
+        0,
+        this.mapMaxScrollLeft || 0,
+      );
       this.mapDesiredLeft = this.mapScrollLeft;
 
       // Finger up => reveal lower rows (scrollTop increases).
-      this.mapScrollTop = this.clamp((this.mapScrollTop || 0) - dy, 0, this.mapMaxScrollTop || 0);
+      this.mapScrollTop = this.clamp(
+        (this.mapScrollTop || 0) - dy,
+        0,
+        this.mapMaxScrollTop || 0,
+      );
     },
 
     handleMapPointerUp(event) {
       if (!this.mapTouchActive) return;
-      if (event?.pointerId != null && this.mapTouchPointerId !== -1 && event.pointerId !== this.mapTouchPointerId) return;
+      if (
+        event?.pointerId != null &&
+        this.mapTouchPointerId !== -1 &&
+        event.pointerId !== this.mapTouchPointerId
+      )
+        return;
 
       if (this.mapTouchMoved) {
         // A click can fire after touch drag; suppress the close action briefly.
@@ -428,10 +922,22 @@ export default {
       this.mapMaxScrollLeft = Math.max(0, tw - vw);
       this.mapMaxScrollTop = Math.max(0, th - vh);
 
-      this.mapScrollLeft = this.clamp(this.mapScrollLeft, 0, this.mapMaxScrollLeft);
-      this.mapScrollTop = this.clamp(this.mapScrollTop, 0, this.mapMaxScrollTop);
+      this.mapScrollLeft = this.clamp(
+        this.mapScrollLeft,
+        0,
+        this.mapMaxScrollLeft,
+      );
+      this.mapScrollTop = this.clamp(
+        this.mapScrollTop,
+        0,
+        this.mapMaxScrollTop,
+      );
 
-      this.mapDesiredLeft = this.clamp(this.mapDesiredLeft, 0, this.mapMaxScrollLeft);
+      this.mapDesiredLeft = this.clamp(
+        this.mapDesiredLeft,
+        0,
+        this.mapMaxScrollLeft,
+      );
     },
 
     stopMapPanLoop() {
@@ -457,16 +963,20 @@ export default {
           const next = this.mapDesiredLeft + delta;
           if (this.arrowPanDir > 0) {
             this.mapDesiredLeft = Math.min(next, this.arrowPanTargetLeft);
-            if (this.mapDesiredLeft >= this.arrowPanTargetLeft) this.stopArrowPan();
+            if (this.mapDesiredLeft >= this.arrowPanTargetLeft)
+              this.stopArrowPan();
           } else {
             this.mapDesiredLeft = Math.max(next, this.arrowPanTargetLeft);
-            if (this.mapDesiredLeft <= this.arrowPanTargetLeft) this.stopArrowPan();
+            if (this.mapDesiredLeft <= this.arrowPanTargetLeft)
+              this.stopArrowPan();
           }
         }
 
         // Ease current toward desired.
         const alpha = 1 - Math.exp(-dt / MAP_PAN_SMOOTH_TAU_SEC);
-        this.mapScrollLeft = this.mapScrollLeft + (this.mapDesiredLeft - this.mapScrollLeft) * alpha;
+        this.mapScrollLeft =
+          this.mapScrollLeft +
+          (this.mapDesiredLeft - this.mapScrollLeft) * alpha;
 
         const doneX = Math.abs(this.mapDesiredLeft - this.mapScrollLeft) < 0.25;
         if (!this.arrowPanActive && doneX) {
@@ -488,9 +998,13 @@ export default {
       this.updateMapPanBounds();
       // On Windows mouse wheels, one notch often produces a fairly large deltaY.
       // Scale it down so one wheel "click" pans roughly one row.
-      const dy = (event.deltaY || 0);
+      const dy = event.deltaY || 0;
       const scaledDy = dy * 0.125;
-      this.mapScrollTop = this.clamp(this.mapScrollTop + scaledDy, 0, this.mapMaxScrollTop);
+      this.mapScrollTop = this.clamp(
+        this.mapScrollTop + scaledDy,
+        0,
+        this.mapMaxScrollTop,
+      );
     },
 
     startArrowPan(event, dir) {
@@ -504,10 +1018,14 @@ export default {
       this.updateMapPanBounds();
 
       // Sync desired with current before starting a new pan.
-      this.mapDesiredLeft = this.clamp(this.mapDesiredLeft || this.mapScrollLeft, 0, this.mapMaxScrollLeft);
+      this.mapDesiredLeft = this.clamp(
+        this.mapDesiredLeft || this.mapScrollLeft,
+        0,
+        this.mapMaxScrollLeft,
+      );
 
       // Press-and-hold should pan continuously to the edge.
-      const target = (dir > 0) ? (this.mapMaxScrollLeft || 0) : 0;
+      const target = dir > 0 ? this.mapMaxScrollLeft || 0 : 0;
 
       this.arrowPanActive = true;
       this.arrowPanDir = dir;
@@ -515,7 +1033,11 @@ export default {
       this.ensureMapPanLoop();
 
       try {
-        if (event?.currentTarget && typeof event.currentTarget.setPointerCapture === 'function' && event.pointerId != null) {
+        if (
+          event?.currentTarget &&
+          typeof event.currentTarget.setPointerCapture === "function" &&
+          event.pointerId != null
+        ) {
           event.currentTarget.setPointerCapture(event.pointerId);
         }
       } catch (_) {
@@ -547,14 +1069,14 @@ export default {
           this.tvdbData = this.allTvdb[this.mapShow.Name];
         }
       } catch (err) {
-        console.error('loadTvdbData error:', err);
+        console.error("loadTvdbData error:", err);
       }
     },
     handleMapClick(event) {
       if (Date.now() < (this.mapTouchSuppressClickUntil || 0)) return;
       // Background click returns to Series.
       // (In non-simple mode, clicks inside the table stop propagation.)
-      this.$emit('close');
+      this.$emit("close");
     },
     handleEpisodeClick(event, mapShow, season, episode) {
       if (this.simpleMode) {
@@ -562,7 +1084,7 @@ export default {
         return;
       }
       event.stopPropagation(); // Prevent map click handler from switching tabs
-      this.$emit('episode-click', event, mapShow, season, episode);
+      this.$emit("episode-click", event, mapShow, season, episode);
     },
     handleSeasonClick(event, season) {
       if (this.simpleMode) {
@@ -573,26 +1095,26 @@ export default {
 
       // Ctrl-click: delete the entire Season <n> folder.
       if (event?.ctrlKey) {
-        this.$emit('season-delete', event, this.mapShow, season);
+        this.$emit("season-delete", event, this.mapShow, season);
         return;
       }
-      
+
       const seasonEpisodes = this.seriesMap[season];
       if (!seasonEpisodes) return;
 
       // Initialize season state tracking if needed (save original state only once)
       if (!this.seasonStates[season]) {
         const episodeStates = {};
-        Object.keys(seasonEpisodes).forEach(episodeNum => {
+        Object.keys(seasonEpisodes).forEach((episodeNum) => {
           const episode = seasonEpisodes[episodeNum];
           if (episode && !episode.unaired && !episode.deleted) {
             episodeStates[episodeNum] = episode.played || false;
           }
         });
-        
+
         this.seasonStates[season] = {
           original: { ...episodeStates },
-          currentState: 0 // 0=original, 1=all on, 2=all off
+          currentState: 0, // 0=original, 1=all on, 2=all off
         };
       }
 
@@ -611,7 +1133,7 @@ export default {
       state.currentState = targetState;
 
       // Apply the target state
-      Object.keys(state.original).forEach(episodeNum => {
+      Object.keys(state.original).forEach((episodeNum) => {
         let setWatched;
         if (targetState === 0) {
           setWatched = state.original[episodeNum];
@@ -620,38 +1142,45 @@ export default {
         } else {
           setWatched = false;
         }
-        this.$emit('episode-click', event, this.mapShow, season, parseInt(episodeNum), setWatched);
+        this.$emit(
+          "episode-click",
+          event,
+          this.mapShow,
+          season,
+          parseInt(episodeNum),
+          setWatched,
+        );
       });
     },
 
     async setNextWatch() {
       if (!this.mapShow || !this.mapShow.Id) {
-        this.nextUpTxt = '';
+        this.nextUpTxt = "";
         return;
       }
-      
+
       const afterWatched = await emby.afterLastWatched(this.mapShow.Id);
       const status = afterWatched.status;
-      const readyToWatch = (status === 'ok');
-      
-      if (!this.mapShow.Id.startsWith('noemby') && status !== 'allWatched') {
-        const {seasonNumber, episodeNumber} = afterWatched;
-        const seaEpiTxt = `S${(''+seasonNumber).padStart(2, "0")} ` +
-                          `E${(''+episodeNumber).padStart(2, "0")}`;
+      const readyToWatch = status === "ok";
+
+      if (!this.mapShow.Id.startsWith("noemby") && status !== "allWatched") {
+        const { seasonNumber, episodeNumber } = afterWatched;
+        const seaEpiTxt =
+          `S${("" + seasonNumber).padStart(2, "0")} ` +
+          `E${("" + episodeNumber).padStart(2, "0")}`;
         if (readyToWatch) {
           this.nextUpTxt = ` &nbsp; Next Up: ${seaEpiTxt}`;
         } else {
           this.nextUpTxt = ` 
                 &nbsp; Next Up: ${seaEpiTxt} 
-                &nbsp; ${status === 'missing' ? 'No File' : 'Unaired'}`;
+                &nbsp; ${status === "missing" ? "No File" : "Unaired"}`;
         }
       } else {
-        this.nextUpTxt = '';
+        this.nextUpTxt = "";
       }
-    }
-  }
+    },
+  },
 };
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>

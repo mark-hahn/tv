@@ -1,83 +1,388 @@
 <template>
-
-<div id="reelPane" @click="handleBackgroundClick" :style="{ height:'100%', width:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'row', overflowY:'hidden', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', gap: '10px' }">
-  <div id="reelLeft" :style="{ flex: '0 0 125px', height: '100%', display: 'flex', flexDirection: 'column' }">
-    <reel-gallery :style="{ flex: '1', minHeight: 0 }" :srchStr="srchStr" @select="handleGallerySelect" @preview="handleGalleryPreview"></reel-gallery>
-  </div>
-  <div id="reelRight" :style="{ flex: '1 1 0', minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column', gap: '0' }">
-    <div id="reelInfo" :style="{ padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', fontSize: '14px', textTransform: 'none' }">
-      <div v-if="curTvdb" :style="{ fontWeight: 'bold', fontSize: '18px', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }">{{ galleryTitleLine }}</div>
-      <div v-if="curTvdb" :style="{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '10px' }">
-        <div :style="{ flex: '1 1 auto', minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: '15px' }">{{ infoLine }}</div>
-      </div>
+  <div
+    id="reelPane"
+    @click="handleBackgroundClick"
+    :style="{
+      height: '100%',
+      width: '100%',
+      padding: '5px',
+      margin: 0,
+      display: 'flex',
+      flexDirection: 'row',
+      overflowY: 'hidden',
+      overflowX: 'hidden',
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+      gap: '10px',
+    }"
+  >
+    <div
+      id="reelLeft"
+      :style="{
+        flex: '0 0 125px',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+      }"
+    >
+      <reel-gallery
+        :style="{ flex: '1', minHeight: 0 }"
+        :srchStr="srchStr"
+        @select="handleGallerySelect"
+        @preview="handleGalleryPreview"
+      ></reel-gallery>
     </div>
-    <!-- keep zero gap between description and buttons-->
-    <div id="reelDescrButtons" :style="{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: '0' }">
-      <div id="reelDescr" :style="{ flex: '0 0 auto', height: '120px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', overflowY: 'auto', fontSize: '16px', lineHeight: '1.5' }" @wheel.stop.prevent="handleScaledWheel">
-        <div v-if="curTvdb">{{ curTvdb.overview }}</div>
-      </div>
-      <div id="reelButtons" :style="{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '5px', marginTop: '8px', border: '1px solid #808080', borderRadius: '5px', marginBottom: '8px', width: '100%', boxSizing: 'border-box' }">
-        <button @click="handleNext" :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: isLoadingNext ? '#d3d3d3' : '' }">Next</button>
-        <button v-if="curTvdb &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons" @click="handleLoad" :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }">Get</button><span v-if="isLoadingNext" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }">&lt;loading shows&gt;</span><span v-if="hasAnyRemoteButton &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons" :style="{ lineHeight: '18px', fontSize: '12px' }"> |</span>
-        <button v-if="imdbResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons" @click="handleImdb" :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }">{{ imdbButtonLabel }}</button>
-        <button v-if="rtResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons" @click="handleRt" :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }">{{ rtButtonLabel }}</button>
-        <button v-if="googleResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons" @click="handleGoogle" :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }">Google</button>
-        <button v-if="wikiResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons" @click="handleWiki" :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }">Wiki</button>
-        <button v-if="officialResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons" @click="handleOfficial" :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }">Official</button><span v-if="loadingRemotesCount &gt; 0 &amp;&amp; !isLoadingNext" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }">&lt;loading remotes ({{ loadingRemotesCount }})&gt;</span><span v-if="!curTvdb &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }">&lt;no show info&gt;</span>
-      </div>
-    </div>
-    <div id="reelTitles" ref="titlesPane" :style="{ flex: '1', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0' }" @wheel.stop.prevent="handleScaledWheel">
-      <div v-for="(item, idx) in parsedTitles" :key="idx" @click="selectTitle(idx)" :style="getTitleCardStyle(idx)">
-        <template v-if="item.rejectStatus === 'msg'">
-          <div :style="{ width: '100%', textAlign: 'center', color: 'rgba(0,0,0,0.6)' }">{{ item.titleString }}</div>
-        </template>
-        <template v-else-if="item.rejectStatus === 'ok'">
-          <div>{{ item.titleString }}</div>
-        </template>
-        <template v-else>
-          <div :style="{ display: 'flex' }">
-            <div :style="{ width: '80px', flexShrink: 0, backgroundColor: '#ffcccc', padding: '5px' }">{{ item.rejectStatus }}</div>
-            <div :style="{ flex: 1, padding: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }">{{ item.titleString }}</div>
+    <div
+      id="reelRight"
+      :style="{
+        flex: '1 1 0',
+        minWidth: 0,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0',
+      }"
+    >
+      <div
+        id="reelInfo"
+        :style="{
+          padding: '10px',
+          backgroundColor: '#f5f5f5',
+          borderRadius: '5px',
+          fontSize: '14px',
+          textTransform: 'none',
+        }"
+      >
+        <div
+          v-if="curTvdb"
+          :style="{
+            fontWeight: 'bold',
+            fontSize: '18px',
+            marginBottom: '4px',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            minWidth: 0,
+          }"
+        >
+          {{ galleryTitleLine }}
+        </div>
+        <div
+          v-if="curTvdb"
+          :style="{
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'space-between',
+            gap: '10px',
+          }"
+        >
+          <div
+            :style="{
+              flex: '1 1 auto',
+              minWidth: 0,
+              whiteSpace: 'normal',
+              overflowWrap: 'anywhere',
+              wordBreak: 'break-word',
+              fontSize: '15px',
+            }"
+          >
+            {{ infoLine }}
           </div>
-        </template>
+        </div>
+      </div>
+      <!-- keep zero gap between description and buttons-->
+      <div
+        id="reelDescrButtons"
+        :style="{
+          flex: '0 0 auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0',
+        }"
+      >
+        <div
+          id="reelDescr"
+          :style="{
+            flex: '0 0 auto',
+            height: '120px',
+            padding: '10px',
+            backgroundColor: '#f5f5f5',
+            borderRadius: '5px',
+            overflowY: 'auto',
+            fontSize: '16px',
+            lineHeight: '1.5',
+          }"
+          @wheel.stop.prevent="handleScaledWheel"
+        >
+          <div v-if="curTvdb">{{ curTvdb.overview }}</div>
+        </div>
+        <div
+          id="reelButtons"
+          :style="{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '10px',
+            padding: '5px',
+            marginTop: '8px',
+            border: '1px solid #808080',
+            borderRadius: '5px',
+            marginBottom: '8px',
+            width: '100%',
+            boxSizing: 'border-box',
+          }"
+        >
+          <button
+            @click="handleNext"
+            :style="{
+              height: '18px',
+              margin: '0',
+              padding: '0 2px',
+              lineHeight: '18px',
+              fontSize: '16px',
+              boxSizing: 'border-box',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: isLoadingNext ? '#d3d3d3' : '',
+            }"
+          >
+            Next
+          </button>
+          <button
+            v-if="curTvdb &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+            @click="handleLoad"
+            :style="{
+              height: '18px',
+              margin: '0',
+              padding: '0 2px',
+              lineHeight: '18px',
+              fontSize: '16px',
+              boxSizing: 'border-box',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }"
+          >
+            Get</button
+          ><span
+            v-if="isLoadingNext"
+            :style="{
+              marginLeft: '10px',
+              color: '#888',
+              fontStyle: 'italic',
+              display: 'inline-flex',
+              alignItems: 'center',
+            }"
+            >&lt;loading shows&gt;</span
+          ><span
+            v-if="hasAnyRemoteButton &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+            :style="{ lineHeight: '18px', fontSize: '12px' }"
+          >
+            |</span
+          >
+          <button
+            v-if="imdbResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+            @click="handleImdb"
+            :style="{
+              height: '18px',
+              margin: '0',
+              padding: '0 2px',
+              lineHeight: '18px',
+              fontSize: '16px',
+              boxSizing: 'border-box',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }"
+          >
+            {{ imdbButtonLabel }}
+          </button>
+          <button
+            v-if="rtResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+            @click="handleRt"
+            :style="{
+              height: '18px',
+              margin: '0',
+              padding: '0 2px',
+              lineHeight: '18px',
+              fontSize: '16px',
+              boxSizing: 'border-box',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }"
+          >
+            {{ rtButtonLabel }}
+          </button>
+          <button
+            v-if="googleResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+            @click="handleGoogle"
+            :style="{
+              height: '18px',
+              margin: '0',
+              padding: '0 2px',
+              lineHeight: '18px',
+              fontSize: '16px',
+              boxSizing: 'border-box',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }"
+          >
+            Google
+          </button>
+          <button
+            v-if="wikiResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+            @click="handleWiki"
+            :style="{
+              height: '18px',
+              margin: '0',
+              padding: '0 2px',
+              lineHeight: '18px',
+              fontSize: '16px',
+              boxSizing: 'border-box',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }"
+          >
+            Wiki
+          </button>
+          <button
+            v-if="officialResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+            @click="handleOfficial"
+            :style="{
+              height: '18px',
+              margin: '0',
+              padding: '0 2px',
+              lineHeight: '18px',
+              fontSize: '16px',
+              boxSizing: 'border-box',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }"
+          >
+            Official</button
+          ><span
+            v-if="loadingRemotesCount &gt; 0 &amp;&amp; !isLoadingNext"
+            :style="{
+              marginLeft: '10px',
+              color: '#888',
+              fontStyle: 'italic',
+              display: 'inline-flex',
+              alignItems: 'center',
+            }"
+            >&lt;loading remotes ({{ loadingRemotesCount }})&gt;</span
+          ><span
+            v-if="!curTvdb &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+            :style="{
+              marginLeft: '10px',
+              color: '#888',
+              fontStyle: 'italic',
+              display: 'inline-flex',
+              alignItems: 'center',
+            }"
+            >&lt;no show info&gt;</span
+          >
+        </div>
+      </div>
+      <div
+        id="reelTitles"
+        ref="titlesPane"
+        :style="{
+          flex: '1',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0',
+        }"
+        @wheel.stop.prevent="handleScaledWheel"
+      >
+        <div
+          v-for="(item, idx) in parsedTitles"
+          :key="idx"
+          @click="selectTitle(idx)"
+          :style="getTitleCardStyle(idx)"
+        >
+          <template v-if="item.rejectStatus === 'msg'">
+            <div
+              :style="{
+                width: '100%',
+                textAlign: 'center',
+                color: 'rgba(0,0,0,0.6)',
+              }"
+            >
+              {{ item.titleString }}
+            </div>
+          </template>
+          <template v-else-if="item.rejectStatus === 'ok'">
+            <div>{{ item.titleString }}</div>
+          </template>
+          <template v-else>
+            <div :style="{ display: 'flex' }">
+              <div
+                :style="{
+                  width: '80px',
+                  flexShrink: 0,
+                  backgroundColor: '#ffcccc',
+                  padding: '5px',
+                }"
+              >
+                {{ item.rejectStatus }}
+              </div>
+              <div
+                :style="{
+                  flex: 1,
+                  padding: '5px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  minWidth: 0,
+                }"
+              >
+                {{ item.titleString }}
+              </div>
+            </div>
+          </template>
+        </div>
       </div>
     </div>
   </div>
-</div>
 </template>
 
 <script>
-import { ref, computed, watch, onMounted, nextTick } from 'vue';
-import ReelGallery from './reel-gallery.vue';
-import { config } from '../config.js';
-import evtBus from '../evtBus.js';
-import * as srvr from '../srvr.js';
+import { ref, computed, watch, onMounted, nextTick } from "vue";
+import ReelGallery from "./reel-gallery.vue";
+import { config } from "../config.js";
+import evtBus from "../evtBus.js";
+import * as srvr from "../srvr.js";
 
 export default {
-  name: 'ReelPane',
+  name: "ReelPane",
   components: {
-    ReelGallery
+    ReelGallery,
   },
   props: {
     active: {
       type: Boolean,
-      default: false
+      default: false,
     },
     allShows: {
       type: Array,
-      default: () => ([])
+      default: () => [],
     },
     sizing: {
       type: Object,
-      default: () => ({})
-    }
+      default: () => ({}),
+    },
   },
   setup(props) {
-    const srchStr = ref('friends');
-    const curTitle = ref('');
+    const srchStr = ref("friends");
+    const curTitle = ref("");
     const curTvdb = ref(null);
     const getRemotesResults = ref([]);
-    const _lastRemotesKey = ref('');
+    const _lastRemotesKey = ref("");
     const titleStrings = ref([]);
     const selectedTitleIdx = ref(-1);
     const titlesPane = ref(null);
@@ -98,21 +403,22 @@ export default {
       if (!event) return;
       const el = event.currentTarget;
       if (!el) return;
-      const dy = (event.deltaY || 0);
+      const dy = event.deltaY || 0;
       const scaledDy = dy * 0.125;
       const max = Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0));
       el.scrollTop = Math.max(0, Math.min(max, (el.scrollTop || 0) + scaledDy));
     };
 
-    const NO_MORE_ENTRY = 'msg|-- no more titles --';
+    const NO_MORE_ENTRY = "msg|-- no more titles --";
 
     const toTitleArray = (data) => {
       if (Array.isArray(data)) return data.map(String);
-      if (data && typeof data === 'object') {
+      if (data && typeof data === "object") {
         const msg = data.errmsg || data.error || data.message || data.status;
         if (msg) return [`error|${String(msg)}`];
       }
-      if (typeof data === 'string' && data.trim()) return [`error|${data.trim()}`];
+      if (typeof data === "string" && data.trim())
+        return [`error|${data.trim()}`];
       return [];
     };
 
@@ -142,9 +448,11 @@ export default {
       const src = Array.isArray(props.allShows) ? props.allShows : [];
       const names = src
         .map((s) => {
-          if (!s) return '';
-          if (typeof s === 'string') return s;
-          return String(s.Name || s.name || s.title || s.showName || s.seriesName || '');
+          if (!s) return "";
+          if (typeof s === "string") return s;
+          return String(
+            s.Name || s.name || s.title || s.showName || s.seriesName || "",
+          );
         })
         .map((s) => s.trim())
         .filter(Boolean);
@@ -157,9 +465,9 @@ export default {
         let data;
         try {
           const res = await fetch(`${config.torrentsApiUrl}/api/startreel`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ showTitles })
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ showTitles }),
           });
           if (!res.ok) {
             const txt = await res.text();
@@ -169,7 +477,7 @@ export default {
         } catch (e) {
           // Fallback for older server versions that only support GET /api/startreel
           const url = new URL(`${config.torrentsApiUrl}/api/startreel`);
-          url.searchParams.set('showTitles', JSON.stringify(showTitles));
+          url.searchParams.set("showTitles", JSON.stringify(showTitles));
           const res2 = await fetch(url.toString());
           if (!res2.ok) {
             const txt2 = await res2.text();
@@ -183,7 +491,9 @@ export default {
         // Always append: starting/restarting the reel should not wipe what the user already has.
         // If we get new entries, remove the "no more" sentinel and append the new titles.
         if (nextTitles.length > 0) {
-          const withoutNoMore = titleStrings.value.filter((s) => String(s) !== NO_MORE_ENTRY);
+          const withoutNoMore = titleStrings.value.filter(
+            (s) => String(s) !== NO_MORE_ENTRY,
+          );
           titleStrings.value = [...withoutNoMore, ...nextTitles];
         } else if (titleStrings.value.length === 0) {
           titleStrings.value = [NO_MORE_ENTRY];
@@ -203,7 +513,7 @@ export default {
         }
       } catch (e) {
         const msg = e?.message || String(e);
-        console.log('startReel failed:', msg);
+        console.log("startReel failed:", msg);
         titleStrings.value = [...titleStrings.value, `error|${msg}`];
         _titlesPopulated.value = true;
       }
@@ -238,18 +548,21 @@ export default {
     const handleNext = async () => {
       isLoadingNext.value = true;
       suppressButtons.value = true;
-      lastLoadedTvdbId.value = curTvdb.value?.tvdb_id || curTvdb.value?.tvdbId || '-1';
-      
+      lastLoadedTvdbId.value =
+        curTvdb.value?.tvdb_id || curTvdb.value?.tvdbId || "-1";
+
       // Clear artifacts to prevent flash of old buttons
       getRemotesResults.value = [];
-      _lastRemotesKey.value = '';
+      _lastRemotesKey.value = "";
 
       try {
         if (!_didStartReel.value) {
           await ensureReelStarted();
         }
 
-        const hasNoMore = titleStrings.value.some((s) => String(s) === NO_MORE_ENTRY);
+        const hasNoMore = titleStrings.value.some(
+          (s) => String(s) === NO_MORE_ENTRY,
+        );
         if (hasNoMore) {
           await startReelAndLoadTitles();
         }
@@ -268,7 +581,10 @@ export default {
           data = await fetchGetReel();
         } catch (e) {
           const msg = e?.message || String(e);
-          if (/startreel\s+first/i.test(msg) || /home\s*page\s+not\s+loaded/i.test(msg)) {
+          if (
+            /startreel\s+first/i.test(msg) ||
+            /home\s*page\s+not\s+loaded/i.test(msg)
+          ) {
             await ensureReelStarted();
             data = await fetchGetReel();
           } else {
@@ -279,16 +595,18 @@ export default {
 
         // If we get new entries, remove the "no more" sentinel.
         if (added.length > 0) {
-          titleStrings.value = titleStrings.value.filter((s) => String(s) !== NO_MORE_ENTRY);
+          titleStrings.value = titleStrings.value.filter(
+            (s) => String(s) !== NO_MORE_ENTRY,
+          );
 
           const addedParsed = added.map((str) => {
-            const parts = str.split('|');
+            const parts = str.split("|");
             return parts[1] ? parts[1].trim() : parts[0].trim();
           });
 
           // remove any matching title from earlier in the list
           titleStrings.value = titleStrings.value.filter((s) => {
-            const parts = s.split('|');
+            const parts = s.split("|");
             const title = parts[1] ? parts[1].trim() : parts[0].trim();
             return !addedParsed.includes(title);
           });
@@ -297,7 +615,9 @@ export default {
           await scrollTitlesToBottom();
         } else {
           // If none returned, ensure the sentinel exists (once).
-          const hasNoMore = titleStrings.value.some((s) => String(s) === NO_MORE_ENTRY);
+          const hasNoMore = titleStrings.value.some(
+            (s) => String(s) === NO_MORE_ENTRY,
+          );
           if (!hasNoMore) {
             titleStrings.value = [...titleStrings.value, NO_MORE_ENTRY];
           } else {
@@ -321,7 +641,7 @@ export default {
         }
       } catch (e) {
         const msg = e?.message || String(e);
-        console.log('getReel failed:', msg);
+        console.log("getReel failed:", msg);
         titleStrings.value = [...titleStrings.value, `error|${msg}`];
         await scrollTitlesToBottom();
         await nextTick();
@@ -332,53 +652,83 @@ export default {
     };
 
     const googleResult = computed(() => {
-      const arr = Array.isArray(getRemotesResults.value) ? getRemotesResults.value : [];
-      return arr.find((r) => r && r.name === 'Google' && r.url) || null;
+      const arr = Array.isArray(getRemotesResults.value)
+        ? getRemotesResults.value
+        : [];
+      return arr.find((r) => r && r.name === "Google" && r.url) || null;
     });
 
     const imdbResult = computed(() => {
-      const arr = Array.isArray(getRemotesResults.value) ? getRemotesResults.value : [];
-      return arr.find((r) => r && typeof r.name === 'string' && r.name.toUpperCase().startsWith('IMDB') && r.url) || null;
+      const arr = Array.isArray(getRemotesResults.value)
+        ? getRemotesResults.value
+        : [];
+      return (
+        arr.find(
+          (r) =>
+            r &&
+            typeof r.name === "string" &&
+            r.name.toUpperCase().startsWith("IMDB") &&
+            r.url,
+        ) || null
+      );
     });
 
     const rtResult = computed(() => {
-      const arr = Array.isArray(getRemotesResults.value) ? getRemotesResults.value : [];
-      return arr.find((r) => {
-        const name = String(r?.name || '').trim().toLowerCase();
-        const url = String(r?.url || '').trim().toLowerCase();
+      const arr = Array.isArray(getRemotesResults.value)
+        ? getRemotesResults.value
+        : [];
+      return (
+        arr.find((r) => {
+          const name = String(r?.name || "")
+            .trim()
+            .toLowerCase();
+          const url = String(r?.url || "")
+            .trim()
+            .toLowerCase();
 
-        const nameLooksRt = name === 'rotten tomatoes' || name === 'rottentomatoes' || name.includes('rotten') || name.includes('tomatoes');
-        const urlLooksRt = url.includes('rottentomatoes.com');
+          const nameLooksRt =
+            name === "rotten tomatoes" ||
+            name === "rottentomatoes" ||
+            name.includes("rotten") ||
+            name.includes("tomatoes");
+          const urlLooksRt = url.includes("rottentomatoes.com");
 
-        return !!(r?.url && (nameLooksRt || urlLooksRt));
-      }) || null;
+          return !!(r?.url && (nameLooksRt || urlLooksRt));
+        }) || null
+      );
     });
 
     const wikiResult = computed(() => {
-      const arr = Array.isArray(getRemotesResults.value) ? getRemotesResults.value : [];
-      return arr.find((r) => r && r.name === 'Wikipedia' && r.url) || null;
+      const arr = Array.isArray(getRemotesResults.value)
+        ? getRemotesResults.value
+        : [];
+      return arr.find((r) => r && r.name === "Wikipedia" && r.url) || null;
     });
 
     const officialResult = computed(() => {
-      const arr = Array.isArray(getRemotesResults.value) ? getRemotesResults.value : [];
-      return arr.find((r) => r && r.name === 'Official Website' && r.url) || null;
+      const arr = Array.isArray(getRemotesResults.value)
+        ? getRemotesResults.value
+        : [];
+      return (
+        arr.find((r) => r && r.name === "Official Website" && r.url) || null
+      );
     });
 
     const imdbButtonLabel = computed(() => {
-      return imdbResult.value?.name || 'Imdb';
+      return imdbResult.value?.name || "Imdb";
     });
 
     const rtButtonLabel = computed(() => {
-      return rtResult.value?.name || 'Rotten Tomatoes';
+      return rtResult.value?.name || "Rotten Tomatoes";
     });
 
     const openUrl = (url) => {
-      const u = String(url || '').trim();
+      const u = String(url || "").trim();
       if (!u) return;
       try {
-        window.open(u, '_blank');
+        window.open(u, "_blank");
       } catch (e) {
-        console.log('openUrl failed:', e?.message || String(e));
+        console.log("openUrl failed:", e?.message || String(e));
       }
     };
 
@@ -403,7 +753,13 @@ export default {
     };
 
     const hasAnyRemoteButton = computed(() => {
-      return !!(imdbResult.value || rtResult.value || googleResult.value || wikiResult.value || officialResult.value);
+      return !!(
+        imdbResult.value ||
+        rtResult.value ||
+        googleResult.value ||
+        wikiResult.value ||
+        officialResult.value
+      );
     });
 
     const loadRemotesForTvdb = async (tvdb) => {
@@ -411,29 +767,29 @@ export default {
 
       if (!tvdb) {
         getRemotesResults.value = [];
-        _lastRemotesKey.value = '';
+        _lastRemotesKey.value = "";
         await nextTick();
         suppressButtons.value = false;
         return;
       }
 
-      const name = String(tvdb.name || '').trim();
-      const tvdbId = String(tvdb.tvdb_id || '').trim();
+      const name = String(tvdb.name || "").trim();
+      const tvdbId = String(tvdb.tvdb_id || "").trim();
 
-      // If we are suppressing buttons (fetching next show), 
+      // If we are suppressing buttons (fetching next show),
       // check if this is still the old show.
       if (suppressButtons.value && lastLoadedTvdbId.value) {
-         const currentId = tvdbId || tvdb.tvdbId;
-         if (String(currentId) === String(lastLoadedTvdbId.value)) {
-            // Still the old show. Don't fetch remotes, don't unsuppress.
-            return;
-         }
+        const currentId = tvdbId || tvdb.tvdbId;
+        if (String(currentId) === String(lastLoadedTvdbId.value)) {
+          // Still the old show. Don't fetch remotes, don't unsuppress.
+          return;
+        }
       }
 
       const key = tvdbId || name;
       if (!key) {
         getRemotesResults.value = [];
-        _lastRemotesKey.value = '';
+        _lastRemotesKey.value = "";
         await nextTick();
         suppressButtons.value = false;
         return;
@@ -464,7 +820,7 @@ export default {
       isLoadingRemotesMsg.value = true;
       activeLoadingKeys.add(key);
       loadingRemotesCount.value++;
-      
+
       await nextTick();
       // Only unsuppress if we passed checks
       suppressButtons.value = false;
@@ -473,9 +829,9 @@ export default {
         const params = {
           show: {
             Name: name,
-            TvdbId: tvdbId
+            TvdbId: tvdbId,
           },
-          tvdbRemotes: tvdb.remote_ids
+          tvdbRemotes: tvdb.remote_ids,
         };
         const res = await srvr.getRemotesCmd(params);
         if (_lastRemotesKey.value === key) {
@@ -484,7 +840,7 @@ export default {
           getRemotesResults.value = results;
         }
       } catch (e) {
-        console.log('getRemotesCmd failed:', e?.message || String(e));
+        console.log("getRemotesCmd failed:", e?.message || String(e));
         if (_lastRemotesKey.value === key) {
           getRemotesResults.value = [];
         }
@@ -501,52 +857,56 @@ export default {
       const t = curTvdb.value;
       if (!t) return;
 
-      const name = String(t.name || t.Name || '').trim();
+      const name = String(t.name || t.Name || "").trim();
       if (!name) return;
 
       // Route through the exact same flow used by clicking a card in #searchList.
       const srchChoice = {
         name,
-        tvdbId: String(t.tvdbId || t.tvdb_id || '').trim(),
-        overview: t.overview || t.overviewText || t.overview_txt || t.Overview || '',
-        image: t.image || t.image_url || t.thumbnail || '',
-        year: t.year || '',
-        originalCountry: t.originalCountry || t.country || '',
-        searchDtlTxt: t.searchDtlTxt || ''
+        tvdbId: String(t.tvdbId || t.tvdb_id || "").trim(),
+        overview:
+          t.overview || t.overviewText || t.overview_txt || t.Overview || "",
+        image: t.image || t.image_url || t.thumbnail || "",
+        year: t.year || "",
+        originalCountry: t.originalCountry || t.country || "",
+        searchDtlTxt: t.searchDtlTxt || "",
       };
-      evtBus.emit('reelSearchAction', srchChoice);
+      evtBus.emit("reelSearchAction", srchChoice);
     };
 
-    watch(() => props.active, async (isActive) => {
-      if (!isActive) return;
-      if (_didInitialVisibleScroll.value) return;
-      if (!_titlesPopulated.value) return;
-      _didInitialVisibleScroll.value = true;
-      await scrollTitlesToBottom();
-    });
+    watch(
+      () => props.active,
+      async (isActive) => {
+        if (!isActive) return;
+        if (_didInitialVisibleScroll.value) return;
+        if (!_titlesPopulated.value) return;
+        _didInitialVisibleScroll.value = true;
+        await scrollTitlesToBottom();
+      },
+    );
 
     // Parse titleStrings into objects
     const parsedTitles = computed(() => {
-      return titleStrings.value.map(str => {
-        const parts = str.split('|');
+      return titleStrings.value.map((str) => {
+        const parts = str.split("|");
         return {
           rejectStatus: parts[0],
-          titleString: parts[1] || parts[0]
+          titleString: parts[1] || parts[0],
         };
       });
     });
 
     // Format info line from curTvdb
     const infoLine = computed(() => {
-      if (!curTvdb.value) return '';
+      if (!curTvdb.value) return "";
       const t = curTvdb.value;
-      return `${t.year || ''} | ${t.country || ''} | ${t.primary_language || ''} | ${t.network || ''}`;
+      return `${t.year || ""} | ${t.country || ""} | ${t.primary_language || ""} | ${t.network || ""}`;
     });
 
     const galleryTitleLine = computed(() => {
       const t = curTvdb.value;
-      if (!t) return '';
-      return String(t.name || t.Name || t.seriesName || t.title || '').trim();
+      if (!t) return "";
+      return String(t.name || t.Name || t.seriesName || t.title || "").trim();
     });
 
     const handleBackgroundClick = (event) => {
@@ -554,44 +914,46 @@ export default {
       if (!(target instanceof Element)) return;
 
       // Ignore clicks on buttons/interactive controls.
-      if (target.closest('button')) return;
+      if (target.closest("button")) return;
 
       // Ignore clicks in the title card list.
-      if (target.closest('#reelTitles')) return;
+      if (target.closest("#reelTitles")) return;
 
       // Ignore clicks in the left gallery (it has its own selection behavior).
-      if (target.closest('#reelLeft')) return;
+      if (target.closest("#reelLeft")) return;
 
-      const name = String(galleryTitleLine.value || curTitle.value || '').trim();
+      const name = String(
+        galleryTitleLine.value || curTitle.value || "",
+      ).trim();
       if (!name) return;
-      evtBus.emit('selectShowFromCardTitle', name);
+      evtBus.emit("selectShowFromCardTitle", name);
     };
 
     // Get style for title card
     const getTitleCardStyle = (idx) => {
       const item = parsedTitles.value[idx];
-      let backgroundColor = 'white';
-      let cursor = 'pointer';
-      
+      let backgroundColor = "white";
+      let cursor = "pointer";
+
       if (idx === selectedTitleIdx.value) {
-        backgroundColor = '#fffacd'; // light-yellow
-      } else if (item.rejectStatus === 'msg') {
-        backgroundColor = '#f5f5f5';
-        cursor = 'default';
-      } else if (item.rejectStatus === 'ok') {
-        backgroundColor = '#90ee90'; // light-green
+        backgroundColor = "#fffacd"; // light-yellow
+      } else if (item.rejectStatus === "msg") {
+        backgroundColor = "#f5f5f5";
+        cursor = "default";
+      } else if (item.rejectStatus === "ok") {
+        backgroundColor = "#90ee90"; // light-green
       }
-      
+
       return {
-        padding: '2px',
+        padding: "2px",
         cursor,
-        fontSize: '16px',
+        fontSize: "16px",
         backgroundColor,
-        border: '1px solid #808080',
-        borderRadius: '3px',
-        minHeight: '30px',
-        display: 'flex',
-        alignItems: 'center'
+        border: "1px solid #808080",
+        borderRadius: "3px",
+        minHeight: "30px",
+        display: "flex",
+        alignItems: "center",
       };
     };
 
@@ -606,23 +968,31 @@ export default {
       handleLoad();
     };
 
-    watch(curTvdb, (val) => {
-      void loadRemotesForTvdb(val);
-    }, { deep: true });
+    watch(
+      curTvdb,
+      (val) => {
+        void loadRemotesForTvdb(val);
+      },
+      { deep: true },
+    );
 
     // Handle title selection
     const selectTitle = async (idx) => {
       const item = parsedTitles.value[idx];
-      if (item?.rejectStatus === 'msg') {
+      if (item?.rejectStatus === "msg") {
         await nextTick();
         suppressButtons.value = false;
         return;
       }
       selectedTitleIdx.value = idx;
-      const nextTitle = String(item?.titleString || '').trim();
+      const nextTitle = String(item?.titleString || "").trim();
       curTitle.value = nextTitle;
 
-      const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+      const norm = (s) =>
+        String(s || "")
+          .trim()
+          .replace(/\s+/g, " ")
+          .toLowerCase();
       if (norm(nextTitle) !== norm(srchStr.value)) {
         srchStr.value = nextTitle;
       } else {
@@ -632,33 +1002,37 @@ export default {
     };
 
     // Scroll to bottom when titleStrings changes
-    watch(titleStrings, async () => {
-      await nextTick();
-      if (titlesPane.value) {
-        titlesPane.value.scrollTop = titlesPane.value.scrollHeight;
-      }
-
-      // Log parsed title cards for debugging
-      try {
-        parsedTitles.value.forEach((it, i) => {
-          void i;
-          void it;
-        });
-      } catch (e) {
-        void e;
-      }
-
-      // Select last item
-      if (titleStrings.value.length > 0) {
-        // Wait for DOM
+    watch(
+      titleStrings,
+      async () => {
         await nextTick();
-        let idx = titleStrings.value.length - 1;
-        if (titleStrings.value[idx] === NO_MORE_ENTRY && idx > 0) {
-          idx--;
+        if (titlesPane.value) {
+          titlesPane.value.scrollTop = titlesPane.value.scrollHeight;
         }
-        selectTitle(idx);
-      }
-    }, { deep: true });
+
+        // Log parsed title cards for debugging
+        try {
+          parsedTitles.value.forEach((it, i) => {
+            void i;
+            void it;
+          });
+        } catch (e) {
+          void e;
+        }
+
+        // Select last item
+        if (titleStrings.value.length > 0) {
+          // Wait for DOM
+          await nextTick();
+          let idx = titleStrings.value.length - 1;
+          if (titleStrings.value[idx] === NO_MORE_ENTRY && idx > 0) {
+            idx--;
+          }
+          selectTitle(idx);
+        }
+      },
+      { deep: true },
+    );
 
     // Initialize with test data
     onMounted(() => {
@@ -675,10 +1049,13 @@ export default {
 
     watch(() => props.allShows, onAllShows, { immediate: true });
 
-    watch(() => props.active, (isActive) => {
-      if (_didStartReel.value) return;
-      void ensureReelStarted();
-    });
+    watch(
+      () => props.active,
+      (isActive) => {
+        if (_didStartReel.value) return;
+        void ensureReelStarted();
+      },
+    );
 
     return {
       sizing: props.sizing,
@@ -716,9 +1093,9 @@ export default {
       isLoadingNext,
       isLoadingRemotesMsg,
       loadingRemotesCount,
-      suppressButtons
+      suppressButtons,
     };
-  }
+  },
 };
 </script>
 

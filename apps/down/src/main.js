@@ -1,37 +1,112 @@
-import fsNode from 'node:fs';
-import utilNode from 'node:util';
-import pathNode from 'node:path';
-import childProcess from 'node:child_process';
-import httpNode from 'node:http';
-import urlNode from 'node:url';
+import fsNode from "node:fs";
+import utilNode from "node:util";
+import pathNode from "node:path";
+import childProcess from "node:child_process";
+import httpNode from "node:http";
+import urlNode from "node:url";
 
-import mkdirpPkg from 'mkdirp';
-import requestPkg from 'request';
-import rimrafPkg from 'rimraf';
-import parseTorrentTitlePkg from 'parse-torrent-title';
+import mkdirpPkg from "mkdirp";
+import requestPkg from "request";
+import rimrafPkg from "rimraf";
+import parseTorrentTitlePkg from "parse-torrent-title";
 
-import * as tvJsonMod from './tvJson.js';
-import { smartTitleMatch } from '@tv/share';
+import * as tvJsonMod from "./tvJson.js";
+import { smartTitleMatch } from "@tv/share";
 
 const __filename = urlNode.fileURLToPath(import.meta.url);
 const __dirname = pathNode.dirname(__filename);
 
 async function main() {
-
   const MAX_WORKERS = 8;
 
   // If non-blank, emits targeted trace logs for this show name.
   // If blank, tracing is fully disabled.
-  const DEBUG_SHOW = '';
+  const DEBUG_SHOW = "";
 
   // ---------------------------------------------------------------------------
   // Targeted tracing (hard-wired; no env vars)
   // Logs only when the show name appears in stage/details/fname/title/paths.
   var TRACE_ENABLED = Boolean(DEBUG_SHOW && String(DEBUG_SHOW).trim());
-  var TRACE_SHOW = TRACE_ENABLED ? String(DEBUG_SHOW).trim() : '';
-  var TRACE_SHOW_KEY = TRACE_ENABLED ? TRACE_SHOW.toLowerCase() : '';
+  var TRACE_SHOW = TRACE_ENABLED ? String(DEBUG_SHOW).trim() : "";
+  var TRACE_SHOW_KEY = TRACE_ENABLED ? TRACE_SHOW.toLowerCase() : "";
 
-  var FAST_TEST, PROCESS_INTERVAL_MS, SKIP_DOWNLOAD, appendTvLog, badFile, blocked, blockedCount, buffering, checkFile, checkFileExists, checkFiles, chkCount, chkTvDB, clearBuffer, currentSeq, cycleRunning, cycleSeq, dateStr, debug, delOldFiles, deleteCount, downloadCount, downloadTime, episode, err, errCount, errors, escQuotes, exec, existsCount, fileTimeout, findUsb, flushAndGoLive, flushBuffer, fname, fs, getUsbFiles, inProgress, lastPruneAt, log, logBuffer, map, mkdirp, path, readMap, recent, recentCount, reloadState, request, resetCycleState, rimraf, rsyncDelay, runCycle, scheduleNextCycle, season, seriesName, sizeStr, skipPaths, startBuffering, startTime, stopBuffering, theTvDbToken, time, title, tvDbErrCount, tvPath, tvdbCache, tvdburl, type, usbFileBytes, usbFilePath, usbFileSize, usbFiles, usbHost, util, writeLine, writeMap;
+  var FAST_TEST,
+    PROCESS_INTERVAL_MS,
+    SKIP_DOWNLOAD,
+    appendTvLog,
+    badFile,
+    blocked,
+    blockedCount,
+    buffering,
+    checkFile,
+    checkFileExists,
+    checkFiles,
+    chkCount,
+    chkTvDB,
+    clearBuffer,
+    currentSeq,
+    cycleRunning,
+    cycleSeq,
+    dateStr,
+    debug,
+    delOldFiles,
+    deleteCount,
+    downloadCount,
+    downloadTime,
+    episode,
+    err,
+    errCount,
+    errors,
+    escQuotes,
+    exec,
+    existsCount,
+    fileTimeout,
+    findUsb,
+    flushAndGoLive,
+    flushBuffer,
+    fname,
+    fs,
+    getUsbFiles,
+    inProgress,
+    lastPruneAt,
+    log,
+    logBuffer,
+    map,
+    mkdirp,
+    path,
+    readMap,
+    recent,
+    recentCount,
+    reloadState,
+    request,
+    resetCycleState,
+    rimraf,
+    rsyncDelay,
+    runCycle,
+    scheduleNextCycle,
+    season,
+    seriesName,
+    sizeStr,
+    skipPaths,
+    startBuffering,
+    startTime,
+    stopBuffering,
+    theTvDbToken,
+    time,
+    title,
+    tvDbErrCount,
+    tvPath,
+    tvdbCache,
+    tvdburl,
+    type,
+    usbFileBytes,
+    usbFilePath,
+    usbFileSize,
+    usbFiles,
+    usbHost,
+    util,
+    writeLine,
+    writeMap;
 
   debug = false;
   FAST_TEST = false;
@@ -40,15 +115,15 @@ async function main() {
 
   log = (...x) => {
     if (debug) {
-      console.log('\nLOG:', ...x);
+      console.log("\nLOG:", ...x);
     }
   };
 
   err = (...x) => {
-    return console.error('error:', ...x);
+    return console.error("error:", ...x);
   };
 
-  sizeStr = function(n, {digits = 1, base = 1000, suffix = ""} = {}) {
+  sizeStr = function (n, { digits = 1, base = 1000, suffix = "" } = {}) {
     var UNITS, i, num, sign, str;
     UNITS = ["", "K", "M", "G", "T", "P", "E", "Z", "Y"];
     sign = n < 0 ? "-" : "";
@@ -62,45 +137,44 @@ async function main() {
     return `${sign}${str}${UNITS[i]}${suffix}`;
   };
 
-  log('starting....');
+  log("starting....");
 
   rsyncDelay = 3000; // 3 secs
 
   usbHost = "xobtlu@oracle.usbx.me";
 
   fs = fsNode;
-  fs.mkdirpSync = function(dir) {
-    return fs.mkdirSync(dir, {recursive: true});
+  fs.mkdirpSync = function (dir) {
+    return fs.mkdirSync(dir, { recursive: true });
   };
   util = utilNode;
   path = pathNode;
 
-  var BASEDIR = path.join(__dirname, '..');
+  var BASEDIR = path.join(__dirname, "..");
 
   // Persisted state/logs live under this app folder.
   var APP_DIR = BASEDIR;
-  var DATA_DIR = path.join(APP_DIR, 'data');
-  var MISC_DIR = path.join(DATA_DIR, 'misc');
+  var DATA_DIR = path.join(APP_DIR, "data");
+  var MISC_DIR = path.join(DATA_DIR, "misc");
 
-  var ensureDir = function(dir) {
+  var ensureDir = function (dir) {
     try {
       return fs.mkdirpSync(dir);
     } catch (e) {}
   };
 
-
   ensureDir(DATA_DIR);
   ensureDir(MISC_DIR);
-  var dataPath = function(p) {
+  var dataPath = function (p) {
     return path.join(DATA_DIR, p);
   };
 
   // tv.log lives under data/misc/
-  var TV_LOG_PATH = path.join(MISC_DIR, 'tv.log');
-  var TV_FINISHED_PATH = dataPath('tv-finished.json');
-  var TV_INPROGRESS_PATH = dataPath('tv-inProgress.json');
-  var TV_BLOCKED_PATH = dataPath('tv-blocked.json');
-  var TV_MAP_PATH = dataPath('tv-map');
+  var TV_LOG_PATH = path.join(MISC_DIR, "tv.log");
+  var TV_FINISHED_PATH = dataPath("tv-finished.json");
+  var TV_INPROGRESS_PATH = dataPath("tv-inProgress.json");
+  var TV_BLOCKED_PATH = dataPath("tv-blocked.json");
+  var TV_MAP_PATH = dataPath("tv-map");
 
   // State is stored under apps/down/data.
 
@@ -108,22 +182,20 @@ async function main() {
     fs.mkdirpSync(path.dirname(TV_LOG_PATH));
   } catch (e) {}
 
-  appendTvLog = function(line) {
+  appendTvLog = function (line) {
     try {
       return fs.appendFileSync(TV_LOG_PATH, line);
-    } catch (error1) {
-
-    }
+    } catch (error1) {}
   };
 
   // Ensure state files exist.
   (function ensureStateFilesExist() {
     try {
       if (!fs.existsSync(TV_FINISHED_PATH)) {
-        fs.writeFileSync(TV_FINISHED_PATH, '{}');
+        fs.writeFileSync(TV_FINISHED_PATH, "{}");
       }
       if (!fs.existsSync(TV_INPROGRESS_PATH)) {
-        fs.writeFileSync(TV_INPROGRESS_PATH, '{}');
+        fs.writeFileSync(TV_INPROGRESS_PATH, "{}");
       }
     } catch (e) {
       // Non-fatal.
@@ -134,12 +206,12 @@ async function main() {
   const tvJson = tvJsonMod;
 
   // Targeted trace helper. Only emits when TRACE_SHOW_KEY is present.
-  var safeInspect = function(x) {
+  var safeInspect = function (x) {
     try {
       return util.inspect(x, {
         depth: 4,
         breakLength: 160,
-        maxArrayLength: 25
+        maxArrayLength: 25,
       });
     } catch (e) {
       try {
@@ -150,26 +222,31 @@ async function main() {
     }
   };
 
-  var trace = function(stage, details) {
+  var trace = function (stage, details) {
     if (!TRACE_ENABLED) return;
-    var hay = '';
+    var hay = "";
     try {
       hay = (
-        String(stage || '') + ' ' +
-        safeInspect(details || {}) + ' ' +
-        String(fname || '') + ' ' +
-        String(title || '') + ' ' +
-        String(seriesName || '') + ' ' +
-        String(usbFilePath || '')
+        String(stage || "") +
+        " " +
+        safeInspect(details || {}) +
+        " " +
+        String(fname || "") +
+        " " +
+        String(title || "") +
+        " " +
+        String(seriesName || "") +
+        " " +
+        String(usbFilePath || "")
       ).toLowerCase();
     } catch (e) {
-      hay = '';
+      hay = "";
     }
     if (hay.indexOf(TRACE_SHOW_KEY) === -1) return;
 
-    var msg = `[TRACE ${TRACE_SHOW}] ${String(stage || '')}`;
+    var msg = `[TRACE ${TRACE_SHOW}] ${String(stage || "")}`;
     if (details !== void 0) {
-      msg += ' ' + safeInspect(details);
+      msg += " " + safeInspect(details);
     }
     try {
       console.log(msg);
@@ -179,21 +256,20 @@ async function main() {
     } catch (e) {}
   };
 
-
   // Startup marker (tv.log only)
   (function writeStartupMarker() {
     try {
-      var fmt = function() {
+      var fmt = function () {
         try {
-          var dtf = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/Los_Angeles',
-            year: '2-digit',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
+          var dtf = new Intl.DateTimeFormat("en-US", {
+            timeZone: "America/Los_Angeles",
+            year: "2-digit",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false,
           });
           var parts = dtf.formatToParts(new Date());
           var m = {};
@@ -204,21 +280,21 @@ async function main() {
           return `${m.year}/${m.month}/${m.day} ${m.hour}:${m.minute}:${m.second}`;
         } catch (e) {
           var d = new Date();
-          var yy = String(d.getFullYear() % 100).padStart(2, '0');
-          var mm = String(d.getMonth() + 1).padStart(2, '0');
-          var dd = String(d.getDate()).padStart(2, '0');
-          var hh = String(d.getHours()).padStart(2, '0');
-          var mi = String(d.getMinutes()).padStart(2, '0');
-          var ss = String(d.getSeconds()).padStart(2, '0');
+          var yy = String(d.getFullYear() % 100).padStart(2, "0");
+          var mm = String(d.getMonth() + 1).padStart(2, "0");
+          var dd = String(d.getDate()).padStart(2, "0");
+          var hh = String(d.getHours()).padStart(2, "0");
+          var mi = String(d.getMinutes()).padStart(2, "0");
+          var ss = String(d.getSeconds()).padStart(2, "0");
           return `${yy}/${mm}/${dd} ${hh}:${mi}:${ss}`;
         }
       };
 
-      var prefix = '';
+      var prefix = "";
       try {
         if (fs.existsSync(TV_LOG_PATH)) {
           var st = fs.statSync(TV_LOG_PATH);
-          if (st && st.size > 0) prefix = '\n';
+          if (st && st.size > 0) prefix = "\n";
         }
       } catch (e) {}
 
@@ -237,7 +313,7 @@ async function main() {
   var cycleRestartNeeded = false;
   var nextCycleTimer = null;
   downloadTime = Date.now();
-  log('.... starting tv.coffee v4 ....');
+  log(".... starting tv.coffee v4 ....");
 
   // Declare per-cycle state in outer scope (CoffeeScript scoping is per-function).
   startTime = time = Date.now();
@@ -248,7 +324,7 @@ async function main() {
   cycleSeq = 0;
   currentSeq = null;
 
-  resetCycleState = function() {
+  resetCycleState = function () {
     startTime = time = Date.now();
     downloadTime = Date.now();
     deleteCount = chkCount = recentCount = 0;
@@ -257,7 +333,7 @@ async function main() {
     currentSeq = null;
   };
 
-  scheduleNextCycle = function() {
+  scheduleNextCycle = function () {
     if (nextCycleTimer) {
       clearTimeout(nextCycleTimer);
     }
@@ -265,7 +341,7 @@ async function main() {
     return nextCycleTimer;
   };
 
-  runCycle = function() {
+  runCycle = function () {
     if (cycleRunning) {
       return;
     }
@@ -286,32 +362,32 @@ async function main() {
     var http = httpNode;
     var url = urlNode;
 
-    var setCors = function(res) {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    var setCors = function (res) {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     };
 
-    var json = function(res, statusCode, obj) {
+    var json = function (res, statusCode, obj) {
       setCors(res);
       res.statusCode = statusCode;
-      res.setHeader('Content-Type', 'application/json');
+      res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(obj));
     };
 
-    var readBody = function(req, cb) {
-      var body = '';
-      req.on('data', (chunk) => {
+    var readBody = function (req, cb) {
+      var body = "";
+      req.on("data", (chunk) => {
         body += chunk;
         if (body.length > 1024 * 1024) {
           req.destroy();
         }
       });
-      req.on('end', () => cb(null, body));
-      req.on('error', (e) => cb(e));
+      req.on("end", () => cb(null, body));
+      req.on("error", (e) => cb(e));
     };
 
-    var startProc = function() {
+    var startProc = function () {
       // - if a cycle is running, restart after the cycle finishes
       // - if nothing is running, start a new cycle immediately
       if (cycleRunning) {
@@ -325,179 +401,228 @@ async function main() {
       runCycle();
     };
 
-    http.createServer((req, res) => {
-      if (req.method === 'OPTIONS') {
-        setCors(res);
-        res.statusCode = 204;
-        return res.end();
-      }
-
-      var parsed = url.parse(req.url, true);
-      
-      // Strip proxy prefix if present
-      var pathname = parsed.pathname;
-      if (pathname.startsWith('/tv-api/api/tvproc/')) {
-        pathname = pathname.substring('/tv-api/api/tvproc'.length);
-      } else if (pathname.startsWith('/tv-api/')) {
-        pathname = pathname.substring('/tv-api'.length);
-      }
-      
-      // Handle /startProc endpoint
-      if (pathname === '/startProc') {
-        if (req.method === 'GET') {
-          try {
-            startProc();
-            return json(res, 200, {status: 'ok'});
-          } catch (e) {
-            return json(res, 500, {status: String(e && e.message ? e.message : e)});
-          }
+    http
+      .createServer((req, res) => {
+        if (req.method === "OPTIONS") {
+          setCors(res);
+          res.statusCode = 204;
+          return res.end();
         }
 
-        if (req.method === 'POST') {
-          var body = '';
-          req.on('data', (chunk) => {
-            body += chunk;
-            if (body.length > 1024 * 1024) {
-              req.destroy();
-            }
-          });
-          req.on('end', () => {
+        var parsed = url.parse(req.url, true);
+
+        // Strip proxy prefix if present
+        var pathname = parsed.pathname;
+        if (pathname.startsWith("/tv-api/api/tvproc/")) {
+          pathname = pathname.substring("/tv-api/api/tvproc".length);
+        } else if (pathname.startsWith("/tv-api/")) {
+          pathname = pathname.substring("/tv-api".length);
+        }
+
+        // Handle /startProc endpoint
+        if (pathname === "/startProc") {
+          if (req.method === "GET") {
             try {
-              if (body) {
-                JSON.parse(body);
-              }
               startProc();
-              return json(res, 200, {status: 'ok'});
+              return json(res, 200, { status: "ok" });
             } catch (e) {
-              return json(res, 400, {status: String(e && e.message ? e.message : e)});
+              return json(res, 500, {
+                status: String(e && e.message ? e.message : e),
+              });
             }
-          });
-          return;
-        }
-
-        return json(res, 405, {status: 'method not allowed'});
-      }
-
-      // Handle /downloads endpoint
-      if (pathname === '/downloads') {
-        if (req.method === 'GET') {
-          try {
-            setCors(res);
-            res.statusCode = 200;
-            res.setHeader('Content-Type', 'application/json');
-            return res.end(JSON.stringify(tvJson.getDownloads()));
-          } catch (e) {
-            return json(res, 500, {status: String(e && e.message ? e.message : e)});
           }
-        }
 
-        return json(res, 405, {status: 'method not allowed'});
-      }
-
-      // Handle /checkFiles endpoint
-      // POST body: ["..."]
-      // Returns: { existingTitles: ["..."], existingProcids: [123], tvEntries: [ {...}, ... ] }
-      if (pathname === '/checkFiles') {
-        if (req.method === 'GET') {
-          try {
-            var q = parsed.query || {};
-            var titles = [];
-            if (q.titles) {
+          if (req.method === "POST") {
+            var body = "";
+            req.on("data", (chunk) => {
+              body += chunk;
+              if (body.length > 1024 * 1024) {
+                req.destroy();
+              }
+            });
+            req.on("end", () => {
               try {
-                // Prefer JSON array in the querystring.
-                titles = JSON.parse(q.titles);
+                if (body) {
+                  JSON.parse(body);
+                }
+                startProc();
+                return json(res, 200, { status: "ok" });
               } catch (e) {
-                // Fallback: comma-separated.
-                titles = String(q.titles).split(',').map(s => s.trim()).filter(Boolean);
+                return json(res, 400, {
+                  status: String(e && e.message ? e.message : e),
+                });
               }
-            } else if (q.title) {
-              titles = [String(q.title)];
-            }
-            var out0 = (tvJson.checkFiles ? tvJson.checkFiles(titles) : {existingTitles: [], existingProcids: []});
-            return json(res, 200, out0);
-          } catch (e) {
-            return json(res, 400, {status: String(e && e.message ? e.message : e)});
+            });
+            return;
           }
+
+          return json(res, 405, { status: "method not allowed" });
         }
 
-        if (req.method === 'POST') {
-          return readBody(req, (err1, body) => {
-            if (err1) {
-              return json(res, 400, {status: String(err1 && err1.message ? err1.message : err1)});
-            }
+        // Handle /downloads endpoint
+        if (pathname === "/downloads") {
+          if (req.method === "GET") {
             try {
-              var titles2 = body ? JSON.parse(body) : [];
-              if (!Array.isArray(titles2)) {
-                return json(res, 400, {status: 'body must be a JSON array of titles'});
-              }
-              var out2 = (tvJson.checkFiles ? tvJson.checkFiles(titles2) : {existingTitles: [], existingProcids: []});
-              return json(res, 200, out2);
+              setCors(res);
+              res.statusCode = 200;
+              res.setHeader("Content-Type", "application/json");
+              return res.end(JSON.stringify(tvJson.getDownloads()));
             } catch (e) {
-              return json(res, 400, {status: String(e && e.message ? e.message : e)});
+              return json(res, 500, {
+                status: String(e && e.message ? e.message : e),
+              });
             }
+          }
+
+          return json(res, 405, { status: "method not allowed" });
+        }
+
+        // Handle /checkFiles endpoint
+        // POST body: ["..."]
+        // Returns: { existingTitles: ["..."], existingProcids: [123], tvEntries: [ {...}, ... ] }
+        if (pathname === "/checkFiles") {
+          if (req.method === "GET") {
+            try {
+              var q = parsed.query || {};
+              var titles = [];
+              if (q.titles) {
+                try {
+                  // Prefer JSON array in the querystring.
+                  titles = JSON.parse(q.titles);
+                } catch (e) {
+                  // Fallback: comma-separated.
+                  titles = String(q.titles)
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+                }
+              } else if (q.title) {
+                titles = [String(q.title)];
+              }
+              var out0 = tvJson.checkFiles
+                ? tvJson.checkFiles(titles)
+                : { existingTitles: [], existingProcids: [] };
+              return json(res, 200, out0);
+            } catch (e) {
+              return json(res, 400, {
+                status: String(e && e.message ? e.message : e),
+              });
+            }
+          }
+
+          if (req.method === "POST") {
+            return readBody(req, (err1, body) => {
+              if (err1) {
+                return json(res, 400, {
+                  status: String(err1 && err1.message ? err1.message : err1),
+                });
+              }
+              try {
+                var titles2 = body ? JSON.parse(body) : [];
+                if (!Array.isArray(titles2)) {
+                  return json(res, 400, {
+                    status: "body must be a JSON array of titles",
+                  });
+                }
+                var out2 = tvJson.checkFiles
+                  ? tvJson.checkFiles(titles2)
+                  : { existingTitles: [], existingProcids: [] };
+                return json(res, 200, out2);
+              } catch (e) {
+                return json(res, 400, {
+                  status: String(e && e.message ? e.message : e),
+                });
+              }
+            });
+          }
+
+          return json(res, 405, { status: "method not allowed" });
+        }
+
+        // Handle /deleteProcids endpoint
+        // POST body: { procIds: [...] } (legacy alias: existingProcids)
+        // Returns: { status: 'ok' } OR { status: 'error', error: '...' }
+        if (pathname === "/deleteProcids") {
+          if (req.method === "POST") {
+            return readBody(req, (err1, body) => {
+              if (err1) {
+                return json(res, 400, {
+                  status: "error",
+                  error: String(err1 && err1.message ? err1.message : err1),
+                });
+              }
+              try {
+                var payload = body ? JSON.parse(body) : {};
+                var procids =
+                  payload && payload.procIds
+                    ? payload.procIds
+                    : payload && payload.existingProcids
+                      ? payload.existingProcids
+                      : [];
+                if (!Array.isArray(procids)) {
+                  return json(res, 400, {
+                    status: "error",
+                    error: "procIds must be an array",
+                  });
+                }
+                if (!tvJson.deleteProcids) {
+                  return json(res, 500, {
+                    status: "error",
+                    error: "deleteProcids not supported",
+                  });
+                }
+                var r = tvJson.deleteProcids(procids);
+                if (r && r.ok) {
+                  return json(res, 200, { status: "ok" });
+                }
+                return json(res, 500, {
+                  status: "error",
+                  error: r && r.errors ? r.errors : "delete failed",
+                });
+              } catch (e) {
+                return json(res, 400, {
+                  status: "error",
+                  error: String(e && e.message ? e.message : e),
+                });
+              }
+            });
+          }
+
+          return json(res, 405, {
+            status: "error",
+            error: "method not allowed",
           });
         }
 
-        return json(res, 405, {status: 'method not allowed'});
-      }
-
-      // Handle /deleteProcids endpoint
-      // POST body: { procIds: [...] } (legacy alias: existingProcids)
-      // Returns: { status: 'ok' } OR { status: 'error', error: '...' }
-      if (pathname === '/deleteProcids') {
-        if (req.method === 'POST') {
-          return readBody(req, (err1, body) => {
-            if (err1) {
-              return json(res, 400, {status: 'error', error: String(err1 && err1.message ? err1.message : err1)});
-            }
-            try {
-              var payload = body ? JSON.parse(body) : {};
-              var procids = payload && payload.procIds ? payload.procIds : (payload && payload.existingProcids ? payload.existingProcids : []);
-              if (!Array.isArray(procids)) {
-                return json(res, 400, {status: 'error', error: 'procIds must be an array'});
-              }
-              if (!tvJson.deleteProcids) {
-                return json(res, 500, {status: 'error', error: 'deleteProcids not supported'});
-              }
-              var r = tvJson.deleteProcids(procids);
-              if (r && r.ok) {
-                return json(res, 200, {status: 'ok'});
-              }
-              return json(res, 500, {status: 'error', error: (r && r.errors) ? r.errors : 'delete failed'});
-            } catch (e) {
-              return json(res, 400, {status: 'error', error: String(e && e.message ? e.message : e)});
-            }
-          });
-        }
-
-        return json(res, 405, {status: 'error', error: 'method not allowed'});
-      }
-
-      // No matching endpoint
-      return json(res, 404, {status: 'not found'});
-    }).listen(3003, '0.0.0.0');
+        // No matching endpoint
+        return json(res, 404, { status: "not found" });
+      })
+      .listen(3003, "0.0.0.0");
   })();
 
-  findUsb = `ssh ${usbHost} \"find files -ignore_readdir_race -type f -printf '%CY-%Cm-%Cd-%P-%s\\\\n' 2>/dev/null\" ` + "| grep -Ev .r[0-9]+-[0-9]+$ | grep -Ev .rar-[0-9]+$ " + "| grep -Ev screen[0-9]+.png-[0-9]+$";
+  findUsb =
+    `ssh ${usbHost} \"find files -ignore_readdir_race -type f -printf '%CY-%Cm-%Cd-%P-%s\\\\n' 2>/dev/null\" ` +
+    "| grep -Ev .r[0-9]+-[0-9]+$ | grep -Ev .rar-[0-9]+$ " +
+    "| grep -Ev screen[0-9]+.png-[0-9]+$";
 
-  log({findUsb});
+  log({ findUsb });
 
   // Timestamps in tv-finished.json must be PST timezone.
   // Use America/Los_Angeles so DST is handled correctly.
-  var PST_TZ = 'America/Los_Angeles';
+  var PST_TZ = "America/Los_Angeles";
 
   dateStr = (date) => {
     try {
       var d = new Date(date);
-      var dtf = new Intl.DateTimeFormat('en-US', {
+      var dtf = new Intl.DateTimeFormat("en-US", {
         timeZone: PST_TZ,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
       });
       var parts = dtf.formatToParts(d);
       var m = {};
@@ -511,30 +636,30 @@ async function main() {
       var day, hours, minutes, month, seconds, year;
       date = new Date(date);
       year = date.getFullYear();
-      month = (date.getMonth() + 1).toString().padStart(2, '0');
-      day = date.getDate().toString().padStart(2, '0');
-      hours = date.getHours().toString().padStart(2, '0');
-      minutes = date.getMinutes().toString().padStart(2, '0');
-      seconds = date.getSeconds().toString().padStart(2, '0');
+      month = (date.getMonth() + 1).toString().padStart(2, "0");
+      day = date.getDate().toString().padStart(2, "0");
+      hours = date.getHours().toString().padStart(2, "0");
+      minutes = date.getMinutes().toString().padStart(2, "0");
+      seconds = date.getSeconds().toString().padStart(2, "0");
       return `${year}/${month}/${day}-${hours}:${minutes}:${seconds}`;
     }
   };
 
   // Convert a local date/time (YYYY/MM/DD-HH:MM:SS) in PST_TZ to epoch ms.
-  var epochMsFromZonedParts = function(y, mo, d, hh, mi, ss) {
+  var epochMsFromZonedParts = function (y, mo, d, hh, mi, ss) {
     // Initial guess: treat provided components as UTC.
     var t = Date.UTC(y, mo - 1, d, hh, mi, ss);
     // Iteratively adjust to account for timezone offset/DST.
     for (var iter = 0; iter < 3; iter++) {
-      var dtf = new Intl.DateTimeFormat('en-US', {
+      var dtf = new Intl.DateTimeFormat("en-US", {
         timeZone: PST_TZ,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
       });
       var parts = dtf.formatToParts(new Date(t));
       var m = {};
@@ -559,8 +684,8 @@ async function main() {
     return t;
   };
 
-  var parseMapTimestampMs = function(timex) {
-    if (typeof timex !== 'string') {
+  var parseMapTimestampMs = function (timex) {
+    if (typeof timex !== "string") {
       return null;
     }
     var m = timex.match(/^(\d{4})\/(\d{2})\/(\d{2})-(\d{2}):(\d{2}):(\d{2})$/);
@@ -585,7 +710,7 @@ async function main() {
 
   readMap = (fname) => {
     var entry, map, timex;
-    map = JSON.parse(fs.readFileSync(fname, 'utf8'));
+    map = JSON.parse(fs.readFileSync(fname, "utf8"));
     for (entry in map) {
       timex = map[entry];
       map[entry] = parseMapTimestampMs(timex);
@@ -613,20 +738,20 @@ async function main() {
   blocked = null;
   map = {};
 
-  reloadState = function() {
+  reloadState = function () {
     var f, j, len, line, mapLines, mapStr, results, t;
     // Do not cache tv-finished.json / tv-inProgress.json here.
     // Those are loaded once per cycle immediately after the USB file list is fetched.
-    blocked = JSON.parse(fs.readFileSync(TV_BLOCKED_PATH, 'utf8'));
+    blocked = JSON.parse(fs.readFileSync(TV_BLOCKED_PATH, "utf8"));
     map = {};
-    mapStr = fs.readFileSync(TV_MAP_PATH, 'utf8');
-    mapLines = mapStr.split('\n');
+    mapStr = fs.readFileSync(TV_MAP_PATH, "utf8");
+    mapLines = mapStr.split("\n");
     results = [];
     for (j = 0, len = mapLines.length; j < len; j++) {
       line = mapLines[j];
-      [f, t] = line.split(',');
+      [f, t] = line.split(",");
       if (line.length) {
-        results.push(map[f.trim()] = t.trim());
+        results.push((map[f.trim()] = t.trim()));
       } else {
         results.push(void 0);
       }
@@ -639,43 +764,55 @@ async function main() {
   // On load, start the first MAX_WORKERS waiting entries.
   // (disabled) Workers are started by tvJson.js on module load.
 
-  tvPath = '/mnt/media/tv/';
+  tvPath = "/mnt/media/tv/";
 
-  escQuotes = function(str) {
-    return "'" + str.replace(/\\/g, '\\\\').replace(/'/g, "'\\''") + "'";
+  escQuotes = function (str) {
+    return "'" + str.replace(/\\/g, "\\\\").replace(/'/g, "'\\''") + "'";
   };
 
   //###############
   // async routines
-  getUsbFiles = delOldFiles = checkFiles = checkFile = badFile = checkFileExists = checkFile = chkTvDB = null;
+  getUsbFiles =
+    delOldFiles =
+    checkFiles =
+    checkFile =
+    badFile =
+    checkFileExists =
+    checkFile =
+    chkTvDB =
+      null;
 
   //######################################
   // get the api token
   theTvDbToken = null;
 
-  request.post('https://api4.thetvdb.com/v4/login', {
-    json: true,
-    body: {
-      "apikey": "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df",
-      "pin": "HXEVSDFF"
-    }
-  }, (error, response, body) => {
-    if (error || response.statusCode !== 200) {
-      err('theTvDb login error:', error);
-      err('theTvDb statusCode:', response && response.statusCode);
-      return process.exit();
-    } else {
-      theTvDbToken = body.data.token;
-      return process.nextTick(runCycle);
-    }
-  });
+  request.post(
+    "https://api4.thetvdb.com/v4/login",
+    {
+      json: true,
+      body: {
+        apikey: "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df",
+        pin: "HXEVSDFF",
+      },
+    },
+    (error, response, body) => {
+      if (error || response.statusCode !== 200) {
+        err("theTvDb login error:", error);
+        err("theTvDb statusCode:", response && response.statusCode);
+        return process.exit();
+      } else {
+        theTvDbToken = body.data.token;
+        return process.nextTick(runCycle);
+      }
+    },
+  );
 
   //#####################################################
   // delete old files in usb/files
   delOldFiles = () => {
     var PRUNE_DAYS, PRUNE_INTERVAL_MS, res;
     PRUNE_INTERVAL_MS = 60 * 60 * 1000;
-    if ((Date.now() - lastPruneAt) >= PRUNE_INTERVAL_MS) {
+    if (Date.now() - lastPruneAt >= PRUNE_INTERVAL_MS) {
       // Inline prune.sh behavior: delete files older than 60 days on the USB host.
       log(".... deleting old files in usb ~/files ....");
       PRUNE_DAYS = 60;
@@ -686,13 +823,13 @@ async function main() {
         exec(
           `ssh ${usbHost} "find ~/files -mtime +${PRUNE_DAYS} -exec rm -rf {} \\; >/dev/null 2>&1"`,
           {
-            timeout: 15 * 60 * 1000
-          }
+            timeout: 15 * 60 * 1000,
+          },
         );
-        res = 'prune ok';
+        res = "prune ok";
       } catch (e) {
         // Non-fatal; continue cycle even if prune fails.
-        res = 'prune ok';
+        res = "prune ok";
       }
 
       // After the hourly USB prune command completes, prune queued entries whose USB folder no longer exists.
@@ -701,10 +838,13 @@ async function main() {
         var dirsOut = exec(
           `ssh ${usbHost} "find files -ignore_readdir_race -type d -printf '%P\\n' 2>/dev/null"`,
           {
-            timeout: 300000
-          }
+            timeout: 300000,
+          },
         ).toString();
-        var dirs = dirsOut.split('\n').map((s) => String(s || '').trim()).filter((s) => s.length);
+        var dirs = dirsOut
+          .split("\n")
+          .map((s) => String(s || "").trim())
+          .filter((s) => s.length);
         var set = new Set(dirs);
         // Hourly prune: also run tvResync (and combine DB scans when available).
         if (tvJson.hourlyUsbPruneAndTvResync) {
@@ -718,7 +858,7 @@ async function main() {
       }
 
       lastPruneAt = Date.now();
-      if (!res.startsWith('prune ok')) {
+      if (!res.startsWith("prune ok")) {
         err(`Prune error: ${res}`);
       }
     }
@@ -727,7 +867,16 @@ async function main() {
 
   //###########################################################
   // check each remote file, compute series and episode numbers
-  usbFilePath = usbFileSize = usbFiles = seriesName = season = episode = fname = title = type = null;
+  usbFilePath =
+    usbFileSize =
+    usbFiles =
+    seriesName =
+    season =
+    episode =
+    fname =
+    title =
+    type =
+      null;
   usbFileBytes = null;
   tvDbErrCount = 0;
   skipPaths = null;
@@ -735,17 +884,21 @@ async function main() {
   checkFiles = () => {
     var j, len, usbLine;
     usbFiles = exec(findUsb, {
-      timeout: 300000
-    }).toString().split('\n');
+      timeout: 300000,
+    })
+      .toString()
+      .split("\n");
 
     // Trace if the target show appears anywhere in the USB list.
     if (TRACE_ENABLED) {
       try {
-        var traceCandidates = usbFiles.filter((l) => l && l.toLowerCase().indexOf(TRACE_SHOW_KEY) !== -1);
+        var traceCandidates = usbFiles.filter(
+          (l) => l && l.toLowerCase().indexOf(TRACE_SHOW_KEY) !== -1,
+        );
         if (traceCandidates.length) {
-          trace('checkFiles: found target on USB', {
+          trace("checkFiles: found target on USB", {
             count: traceCandidates.length,
-            examples: traceCandidates.slice(0, 5)
+            examples: traceCandidates.slice(0, 5),
           });
         }
       } catch (e) {}
@@ -775,30 +928,32 @@ async function main() {
 
     // Sort files by parsed title before processing.
     usbFiles = usbFiles.filter((l) => l && l.trim().length);
-    usbFiles = usbFiles.map((line) => {
-      var lineNoSize = line.split('-').slice(0, -1).join('-');
-      var filePath = lineNoSize.slice(11);
-      var parts = filePath.split('/');
-      var base = parts[parts.length - 1];
-      var parsed = {};
-      try {
-        parsed = parseTorrentTitle(base) || {};
-      } catch (e) {
-        parsed = {};
-      }
-      var titleKey = (parsed.title || base).toLowerCase();
-      var s = Number.isInteger(parsed.season) ? parsed.season : 0;
-      var e = Number.isInteger(parsed.episode) ? parsed.episode : 0;
-      var key = `${titleKey}\u0000${String(s).padStart(4, '0')}\u0000${String(e).padStart(4, '0')}\u0000${base.toLowerCase()}`;
-      return {line, key, base};
-    }).sort((a, b) => a.key.localeCompare(b.key));
+    usbFiles = usbFiles
+      .map((line) => {
+        var lineNoSize = line.split("-").slice(0, -1).join("-");
+        var filePath = lineNoSize.slice(11);
+        var parts = filePath.split("/");
+        var base = parts[parts.length - 1];
+        var parsed = {};
+        try {
+          parsed = parseTorrentTitle(base) || {};
+        } catch (e) {
+          parsed = {};
+        }
+        var titleKey = (parsed.title || base).toLowerCase();
+        var s = Number.isInteger(parsed.season) ? parsed.season : 0;
+        var e = Number.isInteger(parsed.episode) ? parsed.episode : 0;
+        var key = `${titleKey}\u0000${String(s).padStart(4, "0")}\u0000${String(e).padStart(4, "0")}\u0000${base.toLowerCase()}`;
+        return { line, key, base };
+      })
+      .sort((a, b) => a.key.localeCompare(b.key));
 
     usbFiles = usbFiles.map((x) => x.line);
     skipPaths = [];
     for (j = 0, len = usbFiles.length; j < len; j++) {
       usbLine = usbFiles[j];
-      usbLine = usbLine.split('-').slice(0, -1).join('-');
-      if (usbLine.endsWith('!unrar.lock')) {
+      usbLine = usbLine.split("-").slice(0, -1).join("-");
+      if (usbLine.endsWith("!unrar.lock")) {
         skipPaths.push(usbLine.slice(11, -12));
       }
     }
@@ -810,85 +965,122 @@ async function main() {
   };
 
   checkFile = () => {
-    var blkName, cmd, fext, guessItRes, j, len, parts, skipPath, usbLine, usbLineParts;
+    var blkName,
+      cmd,
+      fext,
+      guessItRes,
+      j,
+      len,
+      parts,
+      skipPath,
+      usbLine,
+      usbLineParts;
     tvDbErrCount = 0;
 
-    if (usbLine = usbFiles.shift()) {
-      usbLineParts = usbLine.split('-');
+    if ((usbLine = usbFiles.shift())) {
+      usbLineParts = usbLine.split("-");
       usbFileBytes = parseInt(usbLineParts.pop(), 10);
-      usbLine = usbLineParts.join('-');
+      usbLine = usbLineParts.join("-");
       usbFilePath = usbLine.slice(11);
       usbFileSize = sizeStr(usbFileBytes, {
         digits: 2,
-        suffix: 'B'
+        suffix: "B",
       });
 
-      trace('checkFile: considering', {usbFilePath, fname: null, usbFileBytes});
+      trace("checkFile: considering", {
+        usbFilePath,
+        fname: null,
+        usbFileBytes,
+      });
 
       for (j = 0, len = skipPaths.length; j < len; j++) {
         skipPath = skipPaths[j];
         if (usbFilePath.startsWith(skipPath)) {
           log(`skipping locked ${usbFilePath}`);
-          trace('checkFile: skip locked', {usbFilePath, skipPath});
+          trace("checkFile: skip locked", { usbFilePath, skipPath });
           process.nextTick(checkFile);
           return;
         }
       }
       chkCount++;
-      parts = usbFilePath.split('/');
+      parts = usbFilePath.split("/");
       fname = parts[parts.length - 1];
 
-      trace('checkFile: filename', {fname, usbFilePath, usbFileBytes});
+      trace("checkFile: filename", { fname, usbFilePath, usbFileBytes });
 
-      parts = fname.split('.');
+      parts = fname.split(".");
       fext = parts[parts.length - 1];
-      if (fext.length === 6 || (fext === 'nfo' || fext === 'idx' || fext === 'sub' || fext === 'txt' || fext === 'jpg' || fext === 'gif' || fext === 'jpeg' || fext === 'part')) {
-        trace('checkFile: skip extension', {fname, fext});
+      if (
+        fext.length === 6 ||
+        fext === "nfo" ||
+        fext === "idx" ||
+        fext === "sub" ||
+        fext === "txt" ||
+        fext === "jpg" ||
+        fext === "gif" ||
+        fext === "jpeg" ||
+        fext === "part"
+      ) {
+        trace("checkFile: skip extension", { fname, fext });
         process.nextTick(checkFile);
         return;
       }
       if (recent && recent[fname]) {
         recentCount++;
-        log('------', downloadCount, '/', chkCount, 'SKIPPING RECENT:', fname);
-        trace('checkFile: skip recent', {fname});
+        log("------", downloadCount, "/", chkCount, "SKIPPING RECENT:", fname);
+        trace("checkFile: skip recent", { fname });
         process.nextTick(checkFile);
         return;
       }
 
       if (tvJsonTitles && tvJsonTitles[fname] && tvJsonTitles[fname].error) {
         recentCount++;
-        log('------', downloadCount, '/', chkCount, 'SKIPPING *ERROR*:', fname);
-        trace('checkFile: skip tvJsonTitles error', {fname});
+        log("------", downloadCount, "/", chkCount, "SKIPPING *ERROR*:", fname);
+        trace("checkFile: skip tvJsonTitles error", { fname });
         process.nextTick(checkFile);
         return;
       }
 
       if (tvJsonTitles && tvJsonTitles[fname]) {
         recentCount++;
-        log('------', downloadCount, '/', chkCount, 'SKIPPING ALREADY QUEUED:', fname);
-        trace('checkFile: skip already queued', {fname});
+        log(
+          "------",
+          downloadCount,
+          "/",
+          chkCount,
+          "SKIPPING ALREADY QUEUED:",
+          fname,
+        );
+        trace("checkFile: skip already queued", { fname });
         process.nextTick(checkFile);
         return;
       }
 
       if (inProgress && inProgress[fname]) {
         recentCount++;
-        log('------', downloadCount, '/', chkCount, 'SKIPPING IN-PROGRESS:', fname);
-        trace('checkFile: skip in-progress', {fname});
+        log(
+          "------",
+          downloadCount,
+          "/",
+          chkCount,
+          "SKIPPING IN-PROGRESS:",
+          fname,
+        );
+        trace("checkFile: skip in-progress", { fname });
         process.nextTick(checkFile);
         return;
       }
-      log('not recent', usbLine);
+      log("not recent", usbLine);
       for (blkName in blocked) {
         if (fname.indexOf(blkName) > -1) {
           blockedCount++;
-          log('-- BLOCKED:', {blkName, fname});
-          trace('checkFile: blocked', {blkName, fname});
+          log("-- BLOCKED:", { blkName, fname });
+          trace("checkFile: blocked", { blkName, fname });
           process.nextTick(checkFile);
           return;
         }
       }
-      log('not blocked', usbLine);
+      log("not blocked", usbLine);
 
       // file passed all block tests, process it
       currentSeq = ++cycleSeq;
@@ -897,10 +1089,10 @@ async function main() {
       episode = 1;
       try {
         var parsed = parseTorrentTitle(fname) || {};
-        ({title, season, episode} = parsed);
-        type = parsed.type || 'episode';
+        ({ title, season, episode } = parsed);
+        type = parsed.type || "episode";
 
-        trace('checkFile: parsed', {fname, title, season, episode, type});
+        trace("checkFile: parsed", { fname, title, season, episode, type });
 
         // Provide a clear reason when the parser can't produce S/E.
         if (!title || !Number.isInteger(season) || !Number.isInteger(episode)) {
@@ -914,39 +1106,62 @@ async function main() {
           if (Number.isInteger(episode)) {
             detailParts.push(`episode=${episode}`);
           }
-          var detail = detailParts.length ? detailParts.join(', ') : 'no usable fields';
+          var detail = detailParts.length
+            ? detailParts.join(", ")
+            : "no usable fields";
 
           if (title && Number.isInteger(season) && !Number.isInteger(episode)) {
-            badFile(`parse-torrent-title: found title+season but no episode (${detail}) → not an episode`);
-          } else if (title && !Number.isInteger(season) && !Number.isInteger(episode)) {
-            badFile(`parse-torrent-title: found title but no season/episode (${detail}) → not an episode`);
+            badFile(
+              `parse-torrent-title: found title+season but no episode (${detail}) → not an episode`,
+            );
+          } else if (
+            title &&
+            !Number.isInteger(season) &&
+            !Number.isInteger(episode)
+          ) {
+            badFile(
+              `parse-torrent-title: found title but no season/episode (${detail}) → not an episode`,
+            );
           } else {
-            badFile(`parse-torrent-title: missing required fields (${detail}) → not an episode`);
+            badFile(
+              `parse-torrent-title: missing required fields (${detail}) → not an episode`,
+            );
           }
           return;
         }
-        if (type !== 'episode') {
-          log('\nskipping non-episode:', fname);
-          trace('checkFile: skip non-episode', {fname, title, type});
-          badFile('non-episode');
+        if (type !== "episode") {
+          log("\nskipping non-episode:", fname);
+          trace("checkFile: skip non-episode", { fname, title, type });
+          badFile("non-episode");
           return;
         }
         if (!Number.isInteger(season)) {
-          err('\nno season integer for ' + usbLine + ', defaulting to season 1', {title, season, type});
+          err(
+            "\nno season integer for " + usbLine + ", defaulting to season 1",
+            { title, season, type },
+          );
           season = 1;
         }
       } catch (error1) {
-        err('\nerror parsing:' + fname);
-        trace('checkFile: parse-torrent-title threw', {fname, error: (error1 && error1.message) ? error1.message : String(error1)});
-        badFile(`parse-torrent-title threw: ${error1 && error1.message ? error1.message : 'unknown'}`);
+        err("\nerror parsing:" + fname);
+        trace("checkFile: parse-torrent-title threw", {
+          fname,
+          error: error1 && error1.message ? error1.message : String(error1),
+        });
+        badFile(
+          `parse-torrent-title threw: ${error1 && error1.message ? error1.message : "unknown"}`,
+        );
         return;
       }
       // (logging moved to workers)
       return process.nextTick(chkTvDB);
     } else {
-      log('.... done ....');
-      
-      if ((deleteCount + existsCount + errCount + downloadCount + blockedCount) > 0) {
+      log(".... done ....");
+
+      if (
+        deleteCount + existsCount + errCount + downloadCount + blockedCount >
+        0
+      ) {
         log("***********************************************************");
       }
       cycleRunning = false;
@@ -969,79 +1184,89 @@ async function main() {
   };
 
   tvdbCache = {};
-  tvdburl = '';
+  tvdburl = "";
 
   chkTvDB = () => {
     // smartTitleMatch() is provided by the shared @tv/share package.
 
-    trace('chkTvDB: start', {fname, title});
+    trace("chkTvDB: start", { fname, title });
 
     if (tvdbCache[title]) {
       seriesName = tvdbCache[title];
-      trace('chkTvDB: cache hit', {title, seriesName});
+      trace("chkTvDB: cache hit", { title, seriesName });
       // process.nextTick checkFileExists
       setTimeout(checkFileExists, rsyncDelay);
       return;
     }
-    log('search:', title);
-    tvdburl = 'https://api4.thetvdb.com/v4/search?type=series&q=' + encodeURIComponent(title);
-    return request(tvdburl, {
-      json: true,
-      timeout: 15000,
-      headers: {
-        Authorization: 'Bearer ' + theTvDbToken
-      }
-    }, (error, response, body) => {
-      var ref;
-      // log 'thetvdb', {tvdburl, error, response, body}
-      if (error || !((ref = body.data) != null ? ref[0] : void 0) || ((response != null ? response.statusCode : void 0) !== 200)) {
-        trace('chkTvDB: tvdb error/no data', {
-          fname,
-          title,
-          tvdburl,
-          statusCode: response && response.statusCode,
-          error: error ? (error.message || String(error)) : null
-        });
-        err('no series name found in theTvDB:', {fname, tvdburl});
-        err('search error:', error);
-        err('search statusCode:', response && response.statusCode);
-        err('search body:', body);
-        if (error) {
-          if (++tvDbErrCount === 15) {
-            err('giving up, downloaded:', downloadCount);
+    log("search:", title);
+    tvdburl =
+      "https://api4.thetvdb.com/v4/search?type=series&q=" +
+      encodeURIComponent(title);
+    return request(
+      tvdburl,
+      {
+        json: true,
+        timeout: 15000,
+        headers: {
+          Authorization: "Bearer " + theTvDbToken,
+        },
+      },
+      (error, response, body) => {
+        var ref;
+        // log 'thetvdb', {tvdburl, error, response, body}
+        if (
+          error ||
+          !((ref = body.data) != null ? ref[0] : void 0) ||
+          (response != null ? response.statusCode : void 0) !== 200
+        ) {
+          trace("chkTvDB: tvdb error/no data", {
+            fname,
+            title,
+            tvdburl,
+            statusCode: response && response.statusCode,
+            error: error ? error.message || String(error) : null,
+          });
+          err("no series name found in theTvDB:", { fname, tvdburl });
+          err("search error:", error);
+          err("search statusCode:", response && response.statusCode);
+          err("search body:", body);
+          if (error) {
+            if (++tvDbErrCount === 15) {
+              err("giving up, downloaded:", downloadCount);
+              return;
+            }
+            err("tvdb err retry, waiting one minute");
+            return setTimeout(chkTvDB, rsyncDelay);
+          } else {
+            badFile("thetvdb: no series match");
             return;
           }
-          err("tvdb err retry, waiting one minute");
-          return setTimeout(chkTvDB, rsyncDelay);
         } else {
-          badFile('thetvdb: no series match');
-          return;
+          // Prefer a title match across all results (basic normalization first, then aggressive).
+          var results = Array.isArray(body && body.data) ? body.data : [];
+          var names = results.map((r) => r && r.name).filter((nm) => nm);
+
+          // Pass null for year as we don't have it here, or extract if available
+          // existing code didn't use year, so we pass undefined/null
+          seriesName = smartTitleMatch(title, names);
+          trace("chkTvDB: matched series", {
+            title,
+            resultsCount: names.length,
+            topNames: names.slice(0, 10),
+            seriesName,
+          });
+          log("tvdb got:", { seriesName, title });
+          if (map[seriesName]) {
+            console.log("Mapping", seriesName, "to", map[seriesName]);
+            seriesName = map[seriesName];
+          }
+          trace("chkTvDB: post-map", { title, seriesName });
+          tvdbCache[title] = seriesName;
+          // process.nextTick checkFileExists
+          return setTimeout(checkFileExists, rsyncDelay);
         }
-      } else {
-        // Prefer a title match across all results (basic normalization first, then aggressive).
-        var results = Array.isArray(body && body.data) ? body.data : [];
-        var names = results.map((r) => r && r.name).filter((nm) => nm);
-        
-        // Pass null for year as we don't have it here, or extract if available
-        // existing code didn't use year, so we pass undefined/null
-        seriesName = smartTitleMatch(title, names);
-        trace('chkTvDB: matched series', {
-          title,
-          resultsCount: names.length,
-          topNames: names.slice(0, 10),
-          seriesName
-        });
-        log('tvdb got:', {seriesName, title});
-        if (map[seriesName]) {
-          console.log('Mapping', seriesName, 'to', map[seriesName]);
-          seriesName = map[seriesName];
-        }
-        trace('chkTvDB: post-map', {title, seriesName});
-        tvdbCache[title] = seriesName;
-        // process.nextTick checkFileExists
-        return setTimeout(checkFileExists, rsyncDelay);
-      }
-    });
+      },
+    );
   };
 
   checkFileExists = () => {
@@ -1051,31 +1276,39 @@ async function main() {
     videoPath = `files/${usbFilePath}`;
     var tvLocalDir = `${tvSeasonPath}/`;
 
-    trace('checkFileExists: start', {fname, title, seriesName, season, episode, tvSeasonPath, usbFilePath});
+    trace("checkFileExists: start", {
+      fname,
+      title,
+      seriesName,
+      season,
+      episode,
+      tvSeasonPath,
+      usbFilePath,
+    });
 
     // usbPath is the folder containing the file on the USB host.
     // Example: "~/files/<torrent-folder>/"
-    var usbDir = '';
+    var usbDir = "";
     try {
       usbDir = path.dirname(usbFilePath);
     } catch (e) {
-      usbDir = '';
+      usbDir = "";
     }
-    if (usbDir === '.' || usbDir === '/') {
-      usbDir = '';
+    if (usbDir === "." || usbDir === "/") {
+      usbDir = "";
     }
-    var usbPath = usbDir ? (`~/files/${usbDir}/`) : '~/files/';
-    
+    var usbPath = usbDir ? `~/files/${usbDir}/` : "~/files/";
+
     if (SKIP_DOWNLOAD) {
       // Skip download mode: no-op in the new model.
-      trace('checkFileExists: SKIP_DOWNLOAD true', {fname});
+      trace("checkFileExists: SKIP_DOWNLOAD true", { fname });
       return process.nextTick(checkFile);
     }
 
     // Finished authority: tv-finished.json (do not create tv.json entries for already-finished).
     if (recent && recent[fname]) {
       existsCount++;
-      trace('checkFileExists: already finished (recent)', {fname});
+      trace("checkFileExists: already finished (recent)", { fname });
       return process.nextTick(checkFile);
     }
 
@@ -1083,14 +1316,14 @@ async function main() {
     // for files already queued/downloading).
     if (inProgress && inProgress[fname]) {
       existsCount++;
-      trace('checkFileExists: already in-progress', {fname});
+      trace("checkFileExists: already in-progress", { fname });
       return process.nextTick(checkFile);
     }
 
     // tv.json authority: do not create duplicates for titles already queued.
     if (tvJsonTitles && tvJsonTitles[fname]) {
       existsCount++;
-      trace('checkFileExists: already queued (tv.json)', {fname});
+      trace("checkFileExists: already queued (tv.json)", { fname });
       return process.nextTick(checkFile);
     }
 
@@ -1101,7 +1334,7 @@ async function main() {
         usbPath: usbPath,
         localPath: tvLocalDir,
         title: fname,
-        status: 'waiting',
+        status: "waiting",
         progress: 0,
         eta: null,
         speed: 0,
@@ -1110,15 +1343,15 @@ async function main() {
         season: season || 0,
         episode: episode || 0,
         dateStarted: 0,
-        dateEnded: null
+        dateEnded: null,
       });
 
       // Update per-cycle view so later files in the same cycle don't re-queue.
       if (tvJsonTitles) {
-        tvJsonTitles[fname] = {error: false};
+        tvJsonTitles[fname] = { error: false };
       }
 
-      trace('checkFileExists: queued tv.json entry', {
+      trace("checkFileExists: queued tv.json entry", {
         fname,
         seriesName,
         season,
@@ -1126,11 +1359,14 @@ async function main() {
         usbPath,
         localPath: tvLocalDir,
         sequence: currentSeq || 0,
-        fileSize: usbFileBytes || 0
+        fileSize: usbFileBytes || 0,
       });
     } catch (e) {
       // keep going
-      trace('checkFileExists: addEntry threw', {fname, error: e && e.message ? e.message : String(e)});
+      trace("checkFileExists: addEntry threw", {
+        fname,
+        error: e && e.message ? e.message : String(e),
+      });
     }
 
     return process.nextTick(checkFile);
@@ -1138,45 +1374,44 @@ async function main() {
 
   badFile = (reason) => {
     errCount++;
-    trace('badFile: marking error', {
-      reason: reason || 'unknown',
+    trace("badFile: marking error", {
+      reason: reason || "unknown",
       fname,
       title,
       season,
       episode,
-      usbFilePath
+      usbFilePath,
     });
-    err('marking tv.json error:', {
-      reason: reason || 'unknown',
+    err("marking tv.json error:", {
+      reason: reason || "unknown",
       fname,
       title,
       season,
       episode,
-      usbFilePath
+      usbFilePath,
     });
     try {
-      var usbDir = '';
+      var usbDir = "";
       try {
         usbDir = path.dirname(usbFilePath);
       } catch (e) {
-        usbDir = '';
+        usbDir = "";
       }
-      if (usbDir === '.' || usbDir === '/') usbDir = '';
-      var usbPath = usbDir ? (`~/files/${usbDir}/`) : '~/files/';
+      if (usbDir === "." || usbDir === "/") usbDir = "";
+      var usbPath = usbDir ? `~/files/${usbDir}/` : "~/files/";
       tvJson.markError({
         title: fname,
         usbPath: usbPath,
-        reason: reason || 'unknown'
+        reason: reason || "unknown",
       });
     } catch (e) {}
     return process.nextTick(checkFile);
   };
-
 }
 
 main().catch((err) => {
   try {
-    console.error('FATAL: apps/down crashed:', err && (err.stack || err));
+    console.error("FATAL: apps/down crashed:", err && (err.stack || err));
   } catch (e) {
     // ignore
   }

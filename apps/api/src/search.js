@@ -216,11 +216,46 @@ function filterWithReasons(items, keepFn, reasonFn) {
 function loadCookiesArray(filename) {
   const filepath = path.join(COOKIES_DIR, filename);
   if (fs.existsSync(filepath)) {
-    const cookiesJson = JSON.parse(fs.readFileSync(filepath, "utf8"));
-    // Convert Playwright cookie format to cookie string array
-    return cookiesJson.map((cookie) => `${cookie.name}=${cookie.value}`);
+    try {
+      const cookiesJson = JSON.parse(fs.readFileSync(filepath, "utf8"));
+      // Convert Playwright cookie format to cookie string array
+      return cookiesJson.map((cookie) => `${cookie.name}=${cookie.value}`);
+    } catch {
+      return null;
+    }
   }
   return null;
+}
+
+function loadCookiesFromCurl(filename) {
+  try {
+    const p = path.join(DATA_DIR, filename);
+    if (!fs.existsSync(p)) return null;
+    const raw = fs.readFileSync(p, "utf8");
+
+    // Match -H 'Cookie: ...' or -H "Cookie: ..." or -b '...'
+    // Note: curl-ipt.txt format seen previously: -H 'Cookie: ...'
+    let cookieStr = "";
+
+    // Try Cookie header
+    const mH = raw.match(/-H\s+['"]Cookie:\s*([^'"]+)['"]/i);
+    if (mH) {
+      cookieStr = mH[1];
+    } else {
+      // Try -b
+      const mB = raw.match(/-b\s+['"]([^'"]+)['"]/i);
+      if (mB) cookieStr = mB[1];
+    }
+
+    if (!cookieStr) return null;
+
+    return cookieStr
+      .split(";")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  } catch {
+    return null;
+  }
 }
 
 // Parse size string to bytes for comparison
@@ -248,13 +283,31 @@ function parseSizeToBytes(sizeStr) {
   return value * (multipliers[unit] || 1);
 }
 
+function getIPTorrentsUserAgent() {
+  // 1. Try curl-ipt.txt. NO FALLBACKS.
+  try {
+    const p = path.join(DATA_DIR, "curl-ipt.txt");
+    if (fs.existsSync(p)) {
+      const raw = fs.readFileSync(p, "utf8");
+      const m = raw.match(/-H\s+['"]User-Agent:\s*([^'"]+)['"]/i);
+      if (m && m[1]) return m[1];
+    }
+  } catch {}
+  return null;
+}
+
 // Initialize providers
 let iptCookies = null;
 let tlCookies = null;
 
 export function initializeProviders() {
-  iptCookies = loadCookiesArray("iptorrents.json");
-  tlCookies = loadCookiesArray("torrentleech.json");
+  // Use authoritative curl files. No fallbacks.
+  iptCookies = loadCookiesFromCurl("curl-ipt.txt");
+  tlCookies = loadCookiesFromCurl("curl-tl.txt");
+
+  // Warn if missing (effectively failing initialization for that provider)
+  if (!iptCookies) console.log("IPTorrents disabled: (curl-ipt.txt missing)");
+  if (!tlCookies) console.log("TorrentLeech disabled: (curl-tl.txt missing)");
 
   if (iptCookies) {
     try {
@@ -264,6 +317,16 @@ export function initializeProviders() {
         const customIptConfig = JSON.parse(
           fs.readFileSync(IPTORRENTS_CUSTOM_PATH, "utf8"),
         );
+
+        // Force User-Agent from curl-ipt.txt if available
+        const ua = getIPTorrentsUserAgent();
+        if (ua) {
+          customIptConfig.headers = {
+            ...(customIptConfig.headers || {}),
+            "User-Agent": ua,
+          };
+        }
+
         TorrentSearchApi.loadProvider(customIptConfig);
       } else {
         console.error(
@@ -332,6 +395,16 @@ export async function searchTorrents({
         const customIptConfig = JSON.parse(
           fs.readFileSync(IPTORRENTS_CUSTOM_PATH, "utf8"),
         );
+
+        // Force User-Agent from curl-ipt.txt if available
+        const ua = getIPTorrentsUserAgent();
+        if (ua) {
+          customIptConfig.headers = {
+            ...(customIptConfig.headers || {}),
+            "User-Agent": ua,
+          };
+        }
+
         TorrentSearchApi.loadProvider(customIptConfig);
       } else {
         console.error(

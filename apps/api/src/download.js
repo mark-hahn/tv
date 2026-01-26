@@ -98,16 +98,9 @@ function looksLikeCloudflareChallenge(html) {
 }
 
 function tryLoadBrowserCurlProfile() {
-  // Optional best-match replay: if cookies/req-browser.txt (or curl-tl.txt) exists,
-  // we can reuse its cookie/header set when invoking curl.
+  // Prefer data/curl-tl.txt (primary). NO FALLBACKS.
   try {
-    // Prefer data/curl-tl.txt (primary), fall back to req-browser.txt (legacy)
-    const candidates = [
-      path.join(getApiDataDir(), "curl-tl.txt"),
-      path.join(getApiDataDir(), "req-browser.txt"),
-      path.join(__dirname, "..", "cookies", "req-browser.txt"),
-      path.join(__dirname, "..", "..", "misc", "req-browser.txt"),
-    ];
+    const candidates = [path.join(getApiDataDir(), "curl-tl.txt")];
     const p = candidates.find((x) => fs.existsSync(x));
     if (!p) return null;
     const raw = fs.readFileSync(p, "utf8");

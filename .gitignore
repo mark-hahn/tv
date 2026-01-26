@@ -8,9 +8,13 @@ secrets/
 .env
 .env.*
 *.log
+nohup.out
+package-lock.json
+temp.txt
 apps/client/shows
 misc
 misc/old-reel-code
 .vscode/bookmarks.json
 **/data/
 **/secrets/
+**/cookies/

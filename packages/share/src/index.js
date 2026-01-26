@@ -124,10 +124,10 @@ export function smartTitleMatch(title, titleArray, year) {
   // Scan in requested priority order:
   // 1) both have years, same year -> basic
   // 2) one doesn't have a year -> basic
-  // 4) both have years, same year -> aggressive
-  // 5) one doesn't have a year -> aggressive
-  // 6) both have years, different years -> basic
-  // 7) both have years, different years -> aggressive
+  // 3) both have years, same year -> aggressive
+  // 4) one doesn't have a year -> aggressive
+  // 5) both have years, different years -> basic
+  // 6) both have years, different years -> aggressive
   const m1 = findExact(normalizeBasic, wantBasic, isSameYear);
   if (m1 != null) return m1;
 

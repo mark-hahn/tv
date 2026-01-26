@@ -15,7 +15,11 @@ const DAILY_SYNC_HOUR_LOCAL = 3;
 const DAILY_SYNC_MINUTE_LOCAL = 0;
 
 const DB_FILENAME = 'tvmaze.sqlite';
-const SYNC_LOG_FILENAME = 'tvmaze-sync.json';
+const SYNC_LOG_FILENAME = 'tvmaze-sync.log';
+const CLEAR_FLAG_BASENAME = 'tvmaze-clear-flag';
+const CLEAR_FLAG_ABSPATH = '/root/dev/apps/tv/apps/api/data/misc/tvmaze-clear-flag';
+const FIRST_PAGE_DUMP_FILENAME = 'tvmaze-page.json';
+const SUMMARY_DUMP_FILENAME = 'tvmaze-sync-summary.json';
 
 let _db = null;
 let _syncInProgress = false;
@@ -30,14 +34,166 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function formatLogTimestamp(date = new Date()) {
+  const d = date instanceof Date ? date : new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  // Requested format: mm/dd-hh/mm
+  return `${mm}/${dd}-${hh}/${min}`;
+}
+
 function appendSyncLog(entry) {
   try {
     const outPath = path.join(getApiMiscDir(), SYNC_LOG_FILENAME);
     const dir = path.dirname(outPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.appendFileSync(outPath, JSON.stringify(entry) + '\n', 'utf8');
+
+    const e = entry && typeof entry === 'object' ? entry : { message: String(entry) };
+    const ts = formatLogTimestamp(new Date());
+    const page = e.page ?? e.last_ok_page ?? e.start_page ?? '-';
+    const count = e.count ?? e.shows_seen ?? 0;
+    const isPageSynced = e.message === 'page synced';
+    const totalLoaded =
+      (e.totals && typeof e.totals === 'object' ? (e.totals.total_loaded ?? e.totals.shows_seen) : null) ??
+      null;
+    const totalInDb =
+      (e.totals && typeof e.totals === 'object' ? e.totals.total_in_db : null) ??
+      null;
+
+    const totalLoadedNum = totalLoaded == null ? NaN : Number(totalLoaded);
+    const totalInDbNum = totalInDb == null ? NaN : Number(totalInDb);
+
+    let msg = '';
+    if (!isPageSynced && typeof e.message === 'string' && e.message.trim()) msg = e.message.trim();
+    if (e.error && typeof e.error === 'object' && e.error.message) {
+      const em = String(e.error.message).replace(/\s+/g, ' ').trim();
+      msg = msg ? `${msg} err=${em}` : `err=${em}`;
+    }
+
+    // Include PID only when explicitly present (e.g. module loaded log).
+    const pid = e?.details?.pid ?? e?.pid ?? null;
+    if (!isPageSynced && pid != null) {
+      msg = msg ? `${msg} pid=${pid}` : `pid=${pid}`;
+    }
+
+    // One line per entry: timestamp with labeled page/shows + optional message
+    const totalsSuffix =
+      Number.isFinite(totalLoadedNum) || Number.isFinite(totalInDbNum)
+        ? ` total-loaded: ${Number.isFinite(totalLoadedNum) ? totalLoadedNum : '-'}, total-in-db: ${Number.isFinite(totalInDbNum) ? totalInDbNum : '-'}`
+        : '';
+    const base = `${ts} page: ${page}, shows: ${count}${totalsSuffix}`;
+    const line = msg ? `${base} ${msg}` : base;
+    fs.appendFileSync(outPath, line + '\n', 'utf8');
   } catch {
     // ignore logging failures
+  }
+}
+
+function appendSyncBlankLine() {
+  try {
+    const outPath = path.join(getApiMiscDir(), SYNC_LOG_FILENAME);
+    const dir = path.dirname(outPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.appendFileSync(outPath, '\n', 'utf8');
+  } catch {
+    // ignore
+  }
+}
+
+// Log module initialization so process restarts are obvious.
+try {
+  const payload = {
+    ts: new Date().toISOString(),
+    level: 'info',
+    message: 'module loaded',
+    details: {
+      pid: process.pid,
+      node: process.version,
+      cwd: process.cwd(),
+    },
+  };
+  console.error('[tvmaze] module loaded', payload);
+  appendSyncBlankLine();
+  appendSyncLog(payload);
+} catch {
+  // ignore
+}
+
+function clearFlagPaths() {
+  // Prefer the app's misc dir, but also honor the explicit absolute path requested.
+  const localPath = path.join(getApiMiscDir(), CLEAR_FLAG_BASENAME);
+  return [localPath, CLEAR_FLAG_ABSPATH];
+}
+
+function fileExists(p) {
+  try {
+    return Boolean(p) && fs.existsSync(p);
+  } catch {
+    return false;
+  }
+}
+
+function tryUnlink(p) {
+  try {
+    fs.unlinkSync(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function clearDbIfFlagExists() {
+  const paths = clearFlagPaths();
+  const hit = paths.find(fileExists);
+  if (!hit) return { cleared: false };
+
+  // If DB is already open in this process, close it before deleting.
+  try {
+    if (_db) {
+      _db.close();
+      _db = null;
+    }
+  } catch {
+    // ignore
+  }
+
+  const dbPath = path.join(getApiDataDir(), DB_FILENAME);
+  const deleted = [];
+  const candidates = [dbPath, `${dbPath}-wal`, `${dbPath}-shm`];
+  for (const p of candidates) {
+    if (fileExists(p) && tryUnlink(p)) deleted.push(p);
+  }
+
+  appendSyncLog({
+    level: 'info',
+    message: 'db cleared (flag found)',
+    details: { flag: hit, deleted, pid: process.pid },
+  });
+  console.error('[tvmaze] db cleared (flag found)', { flag: hit, deleted });
+  return { cleared: true, flag: hit, deleted };
+}
+
+function dumpFirstPageJson(rows) {
+  try {
+    const outPath = path.join(getApiMiscDir(), FIRST_PAGE_DUMP_FILENAME);
+    const dir = path.dirname(outPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(outPath, JSON.stringify(rows, null, 2), 'utf8');
+  } catch {
+    // ignore
+  }
+}
+
+function dumpSyncSummaryJson(summary) {
+  try {
+    const outPath = path.join(getApiMiscDir(), SUMMARY_DUMP_FILENAME);
+    const dir = path.dirname(outPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(outPath, JSON.stringify(summary, null, 2), 'utf8');
+  } catch {
+    // ignore
   }
 }
 
@@ -140,13 +296,30 @@ function openDb() {
     CREATE TABLE IF NOT EXISTS shows (
       tvmaze_id INTEGER PRIMARY KEY,
       tvdb_id INTEGER,
+      imdb_id TEXT,
+      viewed INTEGER,
       tvmaze_updated INTEGER,
       fetched_at INTEGER NOT NULL,
       data_json TEXT NOT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_shows_tvdb_id ON shows(tvdb_id);
+    CREATE INDEX IF NOT EXISTS idx_shows_imdb_id ON shows(imdb_id);
   `);
+
+  // Lightweight migrations for added columns.
+  try {
+    const cols = db.prepare("PRAGMA table_info('shows')").all();
+    const names = Array.isArray(cols) ? cols.map((c) => c.name) : [];
+    if (!names.includes('imdb_id')) {
+      db.exec('ALTER TABLE shows ADD COLUMN imdb_id TEXT');
+    }
+    if (!names.includes('viewed')) {
+      db.exec('ALTER TABLE shows ADD COLUMN viewed INTEGER');
+    }
+  } catch {
+    // ignore migration failures
+  }
 
   // Copy any renamed legacy table into the new schema.
   try {
@@ -181,6 +354,11 @@ function metaSet(db, key, value) {
     String(key),
     String(value)
   );
+}
+
+function countShowsInDb(db) {
+  const row = db.prepare('SELECT COUNT(1) AS n FROM shows').get();
+  return row && row.n != null ? Number(row.n) : 0;
 }
 
 function maxTvmazeId(db) {
@@ -224,6 +402,7 @@ async function syncTvmazeShows(reason = 'startup') {
   }
 
   _syncInProgress = true;
+  appendSyncBlankLine();
   const startedAt = nowMs();
 
   const db = openDb();
@@ -231,12 +410,12 @@ async function syncTvmazeShows(reason = 'startup') {
   const startMaxId = maxTvmazeId(db);
   const startPage = computeStartPage(startMaxId);
 
-  const selectExisting = db.prepare('SELECT tvdb_id, tvmaze_updated, data_json FROM shows WHERE tvmaze_id = ?');
+  const selectExisting = db.prepare('SELECT tvdb_id, imdb_id, tvmaze_updated, data_json FROM shows WHERE tvmaze_id = ?');
   const insertRow = db.prepare(
-    'INSERT INTO shows(tvmaze_id, tvdb_id, tvmaze_updated, fetched_at, data_json) VALUES(?, ?, ?, ?, ?)'
+    'INSERT INTO shows(tvmaze_id, tvdb_id, imdb_id, viewed, tvmaze_updated, fetched_at, data_json) VALUES(?, ?, ?, ?, ?, ?, ?)'
   );
   const updateRow = db.prepare(
-    'UPDATE shows SET tvdb_id = ?, tvmaze_updated = ?, fetched_at = ?, data_json = ? WHERE tvmaze_id = ?'
+    'UPDATE shows SET tvdb_id = ?, imdb_id = ?, tvmaze_updated = ?, fetched_at = ?, data_json = ? WHERE tvmaze_id = ?'
   );
 
   let pagesFetched = 0;
@@ -255,22 +434,25 @@ async function syncTvmazeShows(reason = 'startup') {
       const tvdbId = show?.externals?.thetvdb;
       const tvdbIdNum = tvdbId == null ? null : Number(tvdbId);
       const tvdbIdSafe = Number.isFinite(tvdbIdNum) ? tvdbIdNum : null;
+      const imdbId = show?.externals?.imdb;
+      const imdbIdSafe = typeof imdbId === 'string' && imdbId.trim() ? imdbId.trim() : null;
 
       const tvmazeUpdated = show.updated == null ? null : Number(show.updated);
       const jsonText = JSON.stringify(show);
 
       const existing = selectExisting.get(tvmazeId);
       if (!existing) {
-        insertRow.run(tvmazeId, tvdbIdSafe, tvmazeUpdated, fetchedAt, jsonText);
+        insertRow.run(tvmazeId, tvdbIdSafe, imdbIdSafe, null, tvmazeUpdated, fetchedAt, jsonText);
         inserted++;
       } else {
         const changed =
           (existing.tvdb_id ?? null) !== (tvdbIdSafe ?? null) ||
+          (existing.imdb_id ?? null) !== (imdbIdSafe ?? null) ||
           (existing.tvmaze_updated ?? null) !== (tvmazeUpdated ?? null) ||
           String(existing.data_json || '') !== jsonText;
 
         if (changed) {
-          updateRow.run(tvdbIdSafe, tvmazeUpdated, fetchedAt, jsonText, tvmazeId);
+          updateRow.run(tvdbIdSafe, imdbIdSafe, tvmazeUpdated, fetchedAt, jsonText, tvmazeId);
           updated++;
         }
       }
@@ -300,6 +482,11 @@ async function syncTvmazeShows(reason = 'startup') {
         throw new Error(`Unexpected response for ${url}: expected array`);
       }
 
+      // Debug aid: dump the first fetched page (entire array) for inspection.
+      if (pagesFetched === 0) {
+        dumpFirstPageJson(json);
+      }
+
       const insertedBefore = inserted;
       const updatedBefore = updated;
       const showsSeenBefore = showsSeen;
@@ -312,7 +499,7 @@ async function syncTvmazeShows(reason = 'startup') {
       const pageUpdated = updated - updatedBefore;
       const pageShowsSeen = showsSeen - showsSeenBefore;
       const pageCount = Array.isArray(json) ? json.length : 0;
-      const partial = pageCount > 0 && pageCount < PAGE_SIZE;
+      const totalInDb = countShowsInDb(db);
       appendSyncLog({
         ts: new Date().toISOString(),
         level: 'info',
@@ -322,12 +509,12 @@ async function syncTvmazeShows(reason = 'startup') {
         url,
         count: pageCount,
         shows_seen: pageShowsSeen,
-        partial,
         inserted: pageInserted,
         updated: pageUpdated,
         totals: {
           pages_fetched: pagesFetched,
-          shows_seen: showsSeen,
+          total_loaded: showsSeen,
+          total_in_db: totalInDb,
           inserted,
           updated,
         },
@@ -360,9 +547,14 @@ async function syncTvmazeShows(reason = 'startup') {
       end_404_page: end404Page,
       last_tvmaze_id_seen: lastTvmazeIdSeen,
       duration_ms: endedAt - startedAt,
+      totals: {
+        total_loaded: showsSeen,
+        total_in_db: countShowsInDb(db),
+      },
     };
 
     console.error('[tvmaze] sync summary', summary);
+    dumpSyncSummaryJson(summary);
     appendSyncLog(summary);
 
     return summary;
@@ -396,6 +588,8 @@ async function syncTvmazeShows(reason = 'startup') {
 }
 
 async function start() {
+  clearDbIfFlagExists();
+
   try {
     openDb();
   } catch (e) {

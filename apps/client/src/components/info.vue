@@ -182,9 +182,22 @@
               }"
             ></textarea>
             <button
+              @click.stop="refreshTvdb"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                margin-left: 10px;
+                margin-top: 3px;
+                max-height: 24px;
+                border-radius: 7px;
+              "
+            >
+              Refresh
+            </button>
+            <button
               @click.stop="deleteClick"
               style="
-                font-size: 15px;
+                font-size: 13px;
                 cursor: pointer;
                 margin-left: 10px;
                 margin-top: 3px;
@@ -1068,6 +1081,20 @@ export default {
       setTimeout(async () => {
         await this.setNextWatch();
       }, 1000);
+    },
+
+    async refreshTvdb() {
+      if (!confirm(`Refresh TVDB data for "${this.show.Name}"?`)) return;
+      try {
+        await srvr.setTvdbFields({
+          name: this.show.Name,
+          saved: 0,
+        });
+        alert(`Refreshing "${this.show.Name}" in background. Check back soon.`);
+      } catch (e) {
+        console.error("refreshTvdb error", e);
+        alert("Error requesting refresh: " + e);
+      }
     },
 
     async onSetUpSeries(show) {

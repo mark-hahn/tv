@@ -738,6 +738,7 @@ export const setTvdbFields = async (id, param, resolve, _reject) => {
       for (const [key, value] of Object.entries(paramObj)) {
         if (key != "dontSave" && key != "$delete") tvdb[key] = value;
       }
+      if (tvdb.saved === 0) tryLocalGetTvdb();
       // allTvdb[name] = tvdb;
     }
   }

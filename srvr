@@ -109,6 +109,7 @@ remote_sync_app() {
     --exclude '.svelte-kit/' \
     --exclude '.parcel-cache/' \
     --exclude 'data/' \
+    --exclude 'secrets/' \
     --exclude 'reel-shows.json' \
     --exclude 'reelgood-titles.json' \
     --exclude 'reelgood.log' \

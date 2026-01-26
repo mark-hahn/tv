@@ -28,9 +28,11 @@ async function tvdbFetch(pathStr, _init) {
   return {
     ok: true,
     status: res.status,
-    json: async () => res.data,
-    text: async () =>
-      typeof res.data === "string" ? res.data : JSON.stringify(res.data),
+    json: () => Promise.resolve(res.data),
+    text: () =>
+      Promise.resolve(
+        typeof res.data === "string" ? res.data : JSON.stringify(res.data),
+      ),
   };
 }
 

@@ -235,7 +235,7 @@ const getUrlAndRatings = async (type, url, name) => {
         return { ratings: rating };
       }
 
-    case 7: // reddit
+    case 7: { // reddit
       // fs.writeFileSync(`samples/reddit-${name}.json`,
       //                   JSON.stringify(json, null, 2));
       const allItems = Object.values(json.items || {});
@@ -247,8 +247,9 @@ const getUrlAndRatings = async (type, url, name) => {
       //   log("redditItem:", name, item.link);
       // }
       return { url: redditItems[0].link };
+    }
 
-    case 18: // wikipedia
+    case 18: { // wikipedia
       // fs.writeFileSync(`samples/google-${name}.json`,
       //                   JSON.stringify(json, null, 2));
       const items = Object.values(json.items || {});
@@ -258,6 +259,7 @@ const getUrlAndRatings = async (type, url, name) => {
       if (!wikiItem) return null;
       // log("wikiItem:", name, wikiItem.link);
       return { url: wikiItem.link };
+    }
 
     default:
       return "getUrlAndRatings invalid type: " + type;

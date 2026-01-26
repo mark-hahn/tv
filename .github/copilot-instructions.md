@@ -17,5 +17,5 @@
 - every path  that starts with /root/dev/apps/tv is on the remote server.   
 - every path that starts with /root/apps/tv/ is on the local project.   
 - never use an environment variable -- put hard-wired constant values at the top of the file with uppercase names
-- don't use file missing fallbacks -- if a file is missing then die hard
-- prefer async over sync code
+- don't use file missing fallbacks -- if a file is missing then die fast
+- prefer async over sync code -- avoid using void to fix async/await problems

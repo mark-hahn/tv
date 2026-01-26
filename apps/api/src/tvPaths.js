@@ -51,6 +51,12 @@ export function getApiSecretsDir() {
   return dirPath;
 }
 
+export function getTvprocJsonPath() {
+  const dirPath = API_DATA_DIR;
+  ensureDir(dirPath);
+  return path.join(dirPath, "tvproc.json");
+}
+
 export function getApiMiscDir() {
   const dirPath = API_MISC_DIR;
   ensureDir(dirPath);

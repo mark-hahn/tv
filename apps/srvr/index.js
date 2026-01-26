@@ -766,7 +766,7 @@ function parseSeasonEpisodeFromFilename(fileName) {
 }
 
 function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
 }
 
 function normalizeImdbId(imdbId) {
@@ -1141,6 +1141,7 @@ function safeShowFolderName(rawName) {
 
   // Prevent traversal / invalid names: remove path separators and trailing dots/spaces.
   name = name.replaceAll("/", " ").replaceAll("\\", " ");
+  // eslint-disable-next-line no-control-regex
   name = name.replace(/[\x00-\x1F\x7F]/g, " ");
   name = name.replace(/[\.\s]+$/g, "");
   name = name.replace(/\s{2,}/g, " ").trim();
@@ -1234,7 +1235,7 @@ const getShowsFromDisk = async (id, _param, resolve, reject) => {
     }
   }
   if (errFlg) {
-    reject([id, `getShowsFromDisk: ${dirent}, ${err.message}`]);
+    reject([id, `getShowsFromDisk: Error: ${errFlg.message}`]);
     return;
   } else {
     resolve([id, shows]);

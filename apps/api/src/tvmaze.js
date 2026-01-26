@@ -31,7 +31,7 @@ function nowMs() {
 }
 
 function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
 }
 
 function formatLogTimestamp(date = new Date()) {

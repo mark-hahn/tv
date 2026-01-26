@@ -21,6 +21,7 @@ import * as reviews from "./reviews.js";
 import { checkFiles as tvProcCheckFiles } from "./tv-proc.js";
 import {
   getApiCookiesDir,
+  getTvprocJsonPath,
   getApiMiscDir,
   getApiSecretsDir,
   getSecretsDir,
@@ -353,7 +354,7 @@ async function writeTextFile(filePath, text) {
 }
 
 function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
 }
 
 async function osFetchJson(

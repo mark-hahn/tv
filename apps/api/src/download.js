@@ -385,6 +385,7 @@ function sanitizeFilenameForWatch(name) {
   // Keep it simple: drop path separators and weird chars.
   return s
     .replace(/[\\/]+/g, "_")
+    // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x1F\x7F]+/g, "")
     .replace(/[^a-zA-Z0-9._\-()\[\] ]+/g, "_")
     .trim();

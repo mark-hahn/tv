@@ -98,23 +98,19 @@ function loadReelShows() {
   if (!fs.existsSync(reelShowsPath)) {
     return {};
   }
-  try {
-    const raw = fs.readFileSync(reelShowsPath, "utf8");
-    if (!raw || !raw.trim()) {
-      // Only return empty if it's truly 0 bytes, but maybe safer to throw if we expect data?
-      // If it is 0 bytes, it's already "lost", so returning {} is practically the truth.
-      // However, we shouldn't trigger an overwrite logic here.
-      return {};
-    }
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
-      return parsed;
-    throw new Error("Invalid JSON content (not an object)");
-  } catch (err) {
-    // If we fail to read or parse, we MUST NOT return {} as if it's a new file.
-    // Propagate error so callers know disk state is unknown/bad.
-    throw err;
+  // If we fail to read or parse, we MUST NOT return {} as if it's a new file.
+  // Propagate error so callers know disk state is unknown/bad.
+  const raw = fs.readFileSync(reelShowsPath, "utf8");
+  if (!raw || !raw.trim()) {
+    // Only return empty if it's truly 0 bytes, but maybe safer to throw if we expect data?
+    // If it is 0 bytes, it's already "lost", so returning {} is practically the truth.
+    // However, we shouldn't trigger an overwrite logic here.
+    return {};
   }
+  const parsed = JSON.parse(raw);
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
+    return parsed;
+  throw new Error("Invalid JSON content (not an object)");
 }
 
 function saveReelShows() {
@@ -461,7 +457,7 @@ export async function getReel() {
         // We found an OK result, so we return the list accumulated so far
         return addedThisCall;
       }
-      await new Promise((r) => setTimeout(r, 10)); // Yield event loop
+      await new Promise((r) => { setTimeout(r, 10); }); // Yield event loop
     } finally {
       await browser.close();
     }

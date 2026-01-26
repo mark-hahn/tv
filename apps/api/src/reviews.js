@@ -1,4 +1,5 @@
 import fs from "node:fs";
+/* global document */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";

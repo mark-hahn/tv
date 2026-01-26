@@ -9,6 +9,62 @@ import { SRVR_DATA_DIR } from "./srvrPaths.js";
 const { log, start, end } = util.getLog("tvdb");
 const TVDB_PATH = path.join(SRVR_DATA_DIR, "tvdb.json");
 
+// TVDB API Credentials
+const TVDB_APIKEY = "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df";
+const TVDB_PIN = "HXEVSDFF";
+
+// cache token relative to file scope
+let cachedToken = null;
+let cachedAtMs = 0;
+
+async function fetchJson(url, init) {
+  const res = await fetch(url, init);
+  const text = await res.text();
+  let json;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
+  return { res, text, json };
+}
+
+async function getToken() {
+  const now = Date.now();
+  if (cachedToken && now - cachedAtMs < 20 * 60 * 60 * 1000) return cachedToken;
+
+  const { res, json, text } = await fetchJson(
+    "https://api4.thetvdb.com/v4/login",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apikey: TVDB_APIKEY, pin: TVDB_PIN }),
+    },
+  );
+
+  if (!res.ok) {
+    throw new Error(
+      `TVDB login failed: ${res.status} ${text?.slice(0, 200) || ""}`.trim(),
+    );
+  }
+
+  const token = json?.data?.token;
+  if (!token) throw new Error("TVDB login failed: missing token");
+  cachedToken = token;
+  cachedAtMs = now;
+  return token;
+}
+
+function buildTvdbUrl(tvdbPath, query) {
+  const safePath = String(tvdbPath || "").replace(/^\/+/, "");
+  const url = new URL(`https://api4.thetvdb.com/v4/${safePath}`);
+  for (const [k, v] of Object.entries(query || {})) {
+    if (v === undefined || v === null) continue;
+    url.searchParams.set(k, String(v));
+  }
+  return url;
+}
+
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
 }
@@ -53,25 +109,11 @@ try {
 ///////////// get theTvdbToken //////////////
 // this is a duplicate of the client
 // both access tvdb.com independently
-let theTvdbToken = null;
-let gotTokenTime = 0;
-const getTheTvdbToken = async () => {
-  const loginResp = await fetch("https://api4.thetvdb.com/v4/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      apikey: "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df",
-      pin: "HXEVSDFF",
-    }),
-  });
-  if (!loginResp.ok) {
-    log("err", `FATAL: TvDbToken Response: ${loginResp.status}`);
-    process.exit();
-  }
-  const loginJSON = await loginResp.json();
-  theTvdbToken = loginJSON.data.token;
-  gotTokenTime = Date.now();
-};
+
+// Use shared getToken() instead of maintaining separate theTvdbToken
+// const getTheTvdbToken = async () => {
+//   await getToken();
+// };
 
 ///////////////////// GET REMOTES ///////////////////////
 
@@ -413,12 +455,14 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   let extRes, extUrl;
   try {
     extUrl = `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
+    const token = await getToken();
     extRes = await fetch(extUrl, {
       headers: {
         "Content-Type": "application/json",
-        Authorization: "Bearer " + theTvdbToken,
+        Authorization: "Bearer " + token,
       },
     });
+
     if (!extRes.ok) {
       log(
         "err",
@@ -626,16 +670,9 @@ const tryLocalGetTvdb = () => {
 
 // calls tryLocalGetTvdb every 6 mins
 const updateTvdbLocal = () => {
-  // token expires, refresh every 2 weeks
-  if (Date.now() > gotTokenTime + 14 * 24 * 60 * 60 * 1000) {
-    theTvdbToken = null;
-    getTheTvdbToken();
-  }
   // wait for token
-  if (!theTvdbToken) {
-    setTimeout(updateTvdbLocal, 1000);
-    return;
-  }
+  // only bother tvdb.com every min
+  if (UPDATE_DATA) tryLocalGetTvdb();
   // only bother tvdb.com every min
   if (UPDATE_DATA) tryLocalGetTvdb();
   setTimeout(updateTvdbLocal, 6 * 60 * 1000);
@@ -783,4 +820,54 @@ export const setTvdbFields = async (id, param, resolve, _reject) => {
   }
   if (!paramObj.dontSave) await util.writeFile(TVDB_PATH, allTvdb);
   resolve([id, tvdb ?? "ok"]);
+};
+
+export const accessTvdb = async (id, param, resolve, _reject) => {
+  try {
+    const paramObj = util.jParse(param, "accessTvdb");
+    const { path: tvdbPath, query } = paramObj;
+
+    const url = buildTvdbUrl(tvdbPath, query);
+    let token = await getToken();
+
+    let upstream = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (upstream.status === 401) {
+      cachedToken = null;
+      token = await getToken();
+      upstream = await fetch(url, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    }
+
+    const body = await upstream.text();
+    let data = body;
+    try {
+      if (upstream.headers.get("content-type")?.includes("application/json")) {
+        data = JSON.parse(body);
+      }
+    } catch {}
+
+    resolve([
+      id,
+      {
+        ok: upstream.ok,
+        status: upstream.status,
+        data,
+      },
+    ]);
+  } catch (e) {
+    log("accessTvdb error", e);
+    resolve([id, { ok: false, status: 500, error: e.message }]);
+  }
 };

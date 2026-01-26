@@ -2,18 +2,36 @@ import * as srvr from "./srvr.js";
 import * as util from "./util.js";
 import { config } from "./config.js";
 
-// Route TVDB calls through the local torrents server proxy.
-// This avoids browser-to-TVDB CORS issues (Authorization header).
-const TVDB_PROXY_BASE = `${config.torrentsApiUrl}/api/tvdb`;
+// Route TVDB calls through the local torrents server proxy via WebSocket.
+// This avoids browser-to-TVDB CORS issues (Authorization header) and keeps secrets on server.
 
-async function tvdbFetch(path, init) {
-  const url = `${TVDB_PROXY_BASE}/${String(path).replace(/^\/+/, "")}`;
-  const res = await fetch(url, init);
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`tvdb proxy error: ${res.status} ${text}`.trim());
+async function tvdbFetch(pathStr, _init) {
+  // Parse pathStr into path and query
+  const [pathOnly, queryStr] = String(pathStr).split("?");
+  const query = {};
+  if (queryStr) {
+    const usp = new URLSearchParams(queryStr);
+    for (const [k, v] of usp) query[k] = v;
   }
-  return res;
+
+  // Call server
+  const res = await srvr.accessTvdb({ path: pathOnly, query });
+
+  if (!res.ok) {
+    const errData = res.data || res.error;
+    throw new Error(
+      `tvdb proxy error: ${res.status} ${typeof errData === "string" ? errData : JSON.stringify(errData)}`.trim(),
+    );
+  }
+
+  // Mock a Response-like object for compatibility
+  return {
+    ok: true,
+    status: res.status,
+    json: async () => res.data,
+    text: async () =>
+      typeof res.data === "string" ? res.data : JSON.stringify(res.data),
+  };
 }
 
 let allTvdb = null;

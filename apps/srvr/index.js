@@ -2555,6 +2555,15 @@ wss.on("connection", (ws) => {
     }
     if (fname == "getNewTvdb") {
       tvdb.getNewTvdb(ws, id, param);
+    } else if (fname == "accessTvdb") {
+      tvdb.accessTvdb(
+        id,
+        param,
+        (res) => {
+          ws.send(`${res[0]}~~~ok~~~${JSON.stringify(res[1])}`);
+        },
+        null,
+      );
     } else if (fname == "getAllTvdb") {
       tvdb.getAllTvdb(
         id,

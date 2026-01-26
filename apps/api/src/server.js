@@ -8,7 +8,7 @@ import parseTorrent from "parse-torrent";
 import * as search from "./search.js";
 import * as download from "./download.js";
 import "./tvmaze.js";
-import { tvdbProxyGet } from "./tvdb-proxy.js";
+// import { tvdbProxyGet } from "./tvdb-proxy.js";
 import {
   getQbtInfo,
   delQbtTorrent,
@@ -521,7 +521,7 @@ if (
 }
 
 // API endpoint
-app.get("/api/tvdb/*", tvdbProxyGet);
+// app.get("/api/tvdb/*", tvdbProxyGet);
 
 // Server-side Mistral proxy (avoids exposing API keys in the browser bundle).
 app.post("/api/mistral/chat", async (req, res) => {

@@ -157,6 +157,10 @@ export function updateTvdb() {
   return fCall("updateTvdb");
 }
 
+export function accessTvdb(params) {
+  return fCall("accessTvdb", params);
+}
+
 export function getDevices() {
   return fCall("getDevices");
 }

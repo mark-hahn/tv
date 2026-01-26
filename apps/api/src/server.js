@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import parseTorrent from 'parse-torrent';
 import * as search from './search.js';
 import * as download from './download.js';
+import './tvmaze.js';
 import { tvdbProxyGet } from './tvdb-proxy.js';
 import { getQbtInfo, delQbtTorrent, spaceAvail, flexgetHistory, addQbtTorrent } from './usb.js';
 import { startReel, getReel } from './reelgood.js';

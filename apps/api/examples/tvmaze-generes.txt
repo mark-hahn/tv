@@ -1,0 +1,31 @@
+Anime, Children, DIY, Family, Food, Horror, Legal, Medical, Music, Nature, Sports, Supernatural, Travel, War, Western
+
+all...
+    Action
+    Adult
+    Adventure
+    Anime
+    Children
+    Comedy
+    Crime
+    DIY
+    Drama
+    Espionage
+    Family
+    Fantasy
+    Food
+    History
+    Horror
+    Legal
+    Medical
+    Music
+    Mystery
+    Nature
+    Romance
+    Science-Fiction
+    Sports
+    Supernatural
+    Thriller
+    Travel
+    War
+    Western

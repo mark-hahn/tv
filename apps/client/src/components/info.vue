@@ -1090,7 +1090,11 @@ export default {
           name: this.show.Name,
           saved: 0,
         });
-        alert(`Refreshing "${this.show.Name}" in background. Check back soon.`);
+        alert(`Refresh of "${this.show.Name}" complete.`);
+        tvdb.clearCache();
+        evtBus.emit("library-refresh-complete");
+        // Re-init the current view
+        this.onSetUpSeries(this.show);
       } catch (e) {
         console.error("refreshTvdb error", e);
         alert("Error requesting refresh: " + e);

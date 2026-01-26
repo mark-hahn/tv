@@ -17,6 +17,9 @@ async function tvdbFetch(path, init) {
 }
 
 let allTvdb = null;
+export const clearCache = () => {
+  allTvdb = null;
+};
 export const getAllTvdb = async () => {
   // all data in tvdb.json
   // cached in allTvdb

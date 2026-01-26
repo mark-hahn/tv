@@ -511,7 +511,7 @@ let chkTvdbQueueRunning = false;
 const chkTvdbQueue = () => {
   if (chkTvdbQueueRunning || newTvdbQueue.length == 0) return;
   chkTvdbQueueRunning = true;
-  const { ws, id, paramObj } = newTvdbQueue.pop();
+  const { ws, id, paramObj, resolve: resolveCb } = newTvdbQueue.pop();
   if (ws && ws.readyState !== WebSocket.OPEN) return;
 
   let resolve = null;
@@ -523,6 +523,7 @@ const chkTvdbQueue = () => {
   promise.then((tvdbData) => {
     if (typeof tvdbData === "object") {
       if (ws) ws.send(`${id}~~~ok~~~${JSON.stringify(tvdbData)}`);
+      else if (resolveCb) resolveCb([id, tvdbData]);
       allTvdb[tvdbData.name] = tvdbData;
     } else tvdbData = allTvdb[tvdbData]; // tvdbData is name
     tvdbData.saved = Date.now();
@@ -738,7 +739,29 @@ export const setTvdbFields = async (id, param, resolve, _reject) => {
       for (const [key, value] of Object.entries(paramObj)) {
         if (key != "dontSave" && key != "$delete") tvdb[key] = value;
       }
-      if (tvdb.saved === 0) tryLocalGetTvdb();
+      if (tvdb.saved === 0) {
+        // Queue a refresh for this specific request
+        const show = {
+          Name: tvdb.name,
+          TvdbId: tvdb.tvdbId,
+        };
+        if (tvdb.showId) show.Id = tvdb.showId;
+        const refreshParamObj = {
+          show,
+          seasonCount: tvdb.seasonCount ?? 0,
+          episodeCount: tvdb.episodeCount ?? 0,
+          watchedCount: tvdb.watchedCount ?? 0,
+          deleted: tvdb.deleted,
+        };
+        newTvdbQueue.unshift({
+          ws: null,
+          id: id,
+          paramObj: refreshParamObj,
+          resolve: resolve,
+        });
+        chkTvdbQueue();
+        return; // Wait for callback
+      }
       // allTvdb[name] = tvdb;
     }
   }

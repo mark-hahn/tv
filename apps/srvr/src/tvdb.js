@@ -19,6 +19,19 @@ function ensureFile(filePath, defaultStr) {
   fs.writeFileSync(filePath, defaultStr, "utf8");
 }
 
+function setImdbId(tvdb) {
+  if (!tvdb?.remotes) return;
+  for (const remote of tvdb.remotes) {
+    if (remote.url && remote.url.includes("imdb.com/title/")) {
+      const match = /tt\d+/.exec(remote.url);
+      if (match) {
+        tvdb.imdbId = match[0];
+        return;
+      }
+    }
+  }
+}
+
 ensureDir(SRVR_DATA_DIR);
 ensureFile(TVDB_PATH, "{}");
 
@@ -496,6 +509,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   if (showId !== undefined) tvdbData.showId = showId;
   if (deleted !== undefined) tvdbData.deleted = deleted;
 
+  setImdbId(tvdbData);
+
   // log('getTvdbData:', tvdbData);
   allTvdb[name] = tvdbData;
   // update allTvdb & tvdb.json
@@ -739,6 +754,7 @@ export const setTvdbFields = async (id, param, resolve, _reject) => {
       for (const [key, value] of Object.entries(paramObj)) {
         if (key != "dontSave" && key != "$delete") tvdb[key] = value;
       }
+      setImdbId(tvdb);
       if (tvdb.saved === 0) {
         // Queue a refresh for this specific request
         const show = {

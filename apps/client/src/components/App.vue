@@ -46,7 +46,7 @@
              div(style="font-size:12px; color:#555; white-space:nowrap; padding-right:8px;") {{ libraryProgressText }}
 
         #tabBody(:style="{ flex:'1 1 auto', minHeight:'0px', position:'relative', width:'100%' }")
-          Series(v-show="currentPane === 'series'" style="display:block; width:100%; height:100%;" :simpleMode="simpleMode" :sizing="activeSizing")
+          Info(v-show="currentPane === 'infotyle="display:block; width:100%; height:100%;" :simpleMode="simpleMode" :sizing="activeSizing")
           Map(
             v-show="currentPane === 'map'"
             :mapShow="mapShow"
@@ -101,9 +101,9 @@
             :allShows="allShows"
             :active="currentPane === 'reel'"
           )
-          Torrents(
+          Tor(
             v-if="!simpleMode"
-            v-show="currentPane === 'torrents'"
+            v-show="currentPane === 'tor'"
             style="width:100%; height:100%;"
             :simpleMode="simpleMode"
             :sizing="activeSizing"
@@ -127,25 +127,25 @@
             :sizing="activeSizing"
           )
 
-          History(
+          Qbt(
             v-if="!simpleMode"
-            v-show="currentPane === 'history'"
+            v-show="currentPane === 'qbt'"
             style="width:100%; height:100%;"
             :simpleMode="simpleMode"
             :sizing="activeSizing"
           )
 
-          TvProc(
+          Down(
             v-if="!simpleMode"
-            v-show="currentPane === 'tvproc'"
+            v-show="currentPane === 'down'"
             style="width:100%; height:100%;"
             :simpleMode="simpleMode"
             :sizing="activeSizing"
           )
 
-          FilePane(
+          Files(
             v-if="!simpleMode"
-            v-show="currentPane === 'file'"
+            v-show="currentPane === 'files'"
             style="width:100%; height:100%;"
             :simpleMode="simpleMode"
             :sizing="activeSizing"
@@ -206,7 +206,7 @@
             div(style="font-size:12px; color:#555; white-space:nowrap; padding-right:8px;") {{ libraryProgressText }}
 
       #tabBody(:style="{ flex:'1 1 auto', minHeight:'0px', position:'relative', width:'100%' }")
-        Series(v-show="currentPane === 'series'" style="display:block; width:100%; height:100%;" :simpleMode="simpleMode" :sizing="activeSizing")
+        Info(v-show="currentPane === 'info'" style="display:block; width:100%; height:100%;" :simpleMode="simpleMode" :sizing="activeSizing")
         Map(
           v-show="currentPane === 'map'"
           :mapShow="mapShow"
@@ -261,9 +261,9 @@
           :allShows="allShows"
           :active="currentPane === 'reel'"
         )
-        Torrents(
+        Tor(
           v-if="!simpleMode"
-          v-show="currentPane === 'torrents'"
+          v-show="currentPane === 'tor'"
           style="width:100%; height:100%;"
           :simpleMode="simpleMode"
           :sizing="activeSizing"
@@ -287,25 +287,25 @@
           :sizing="activeSizing"
         )
 
-        History(
+        Qbt(
           v-if="!simpleMode"
-          v-show="currentPane === 'history'"
+          v-show="currentPane === 'qbt'"
           style="width:100%; height:100%;"
           :simpleMode="simpleMode"
           :sizing="activeSizing"
         )
 
-        TvProc(
+        Down(
           v-if="!simpleMode"
-          v-show="currentPane === 'tvproc'"
+          v-show="currentPane === 'down'"
           style="width:100%; height:100%;"
           :simpleMode="simpleMode"
           :sizing="activeSizing"
         )
 
-        FilePane(
+        Files(
           v-if="!simpleMode"
-          v-show="currentPane === 'file'"
+          v-show="currentPane === 'files'"
           style="width:100%; height:100%;"
           :simpleMode="simpleMode"
           :sizing="activeSizing"
@@ -357,18 +357,18 @@
 
 <script>
 import List     from './list.vue';
-import Series   from './series.vue';
+import Info     from './info.vue';
 import Map      from './map.vue';
 import Actors   from './actors.vue';
 import Reviews  from './reviews.vue';
 import Buttons  from './buttons.vue';
 import Reel     from './reel.vue';
-import Torrents from './torrents.vue';
+import Tor      from './tor.vue';
 import Subs     from './subs.vue';
 import Flex     from './flex.vue';
-import History  from './history.vue';
-import TvProc   from './tvproc.vue';
-import FilePane from './file.vue';
+import Qbt      from './qbt.vue';
+import Down     from './down.vue';
+import Files    from './files.vue';
 import Trailer  from './trailer.vue';
 import Ai       from './ai.vue';
 import evtBus   from '../evtBus.js';
@@ -389,7 +389,7 @@ export default {
     return { 
       // Must be known before first render so non-simple panes never mount in simple mode.
       simpleMode: new URLSearchParams(window.location.search).has('simple'),
-      currentPane: 'series', // 'series', 'map', 'actors', 'reviews', 'trailer', 'torrents', 'subs', 'flex', 'history', 'tvproc', 'file', 'ai'
+      currentPane: 'info', // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'subs', 'flex', 'qbt', 'down', 'files', 'ai'
       previewMode: false,
       previewPanesLoading: false,
       previewAddBusy: false,
@@ -609,23 +609,23 @@ export default {
 
     tabs() {
       const allTabs = [
-        { label: 'Info', key: 'series' },
+        { label: 'Info', key: 'info' },
         { label: 'Map', key: 'map' },
         { label: 'Actors', key: 'actors' },
         { label: 'Reviews', key: 'reviews' },
         { label: 'Trailer', key: 'trailer' },
         { label: 'AI', key: 'ai' },
-        { label: 'Tor', key: 'torrents' },
+        { label: 'Tor', key: 'tor' },
         { label: 'Subs', key: 'subs' },
-        { label: 'Files', key: 'file' },
+        { label: 'Files', key: 'files' },
         { label: 'Reel', key: 'reel' },
         { label: 'Flex', key: 'flex' },
-        { label: 'Qbt', key: 'history' },
-        { label: 'Down', key: 'tvproc' },
+        { label: 'Qbt', key: 'qbt' },
+        { label: 'Down', key: 'down' },
       ];
 
       if (!this.simpleMode) return allTabs;
-      const allowed = new Set(['series', 'map', 'actors', 'reviews', 'trailer', 'ai']);
+      const allowed = new Set(['info', 'map', 'actors', 'reviews', 'trailer', 'ai']);
       return allTabs.filter(t => allowed.has(t.key));
     }
   },
@@ -989,7 +989,7 @@ export default {
     handleDownActivePart(payload) {
       const src = payload?.source;
       const active = !!payload?.active;
-      if (src === 'tvproc') {
+      if (src === 'down') {
         this._downActiveDown = active;
         this.recomputeDownActive();
       }
@@ -1066,16 +1066,16 @@ export default {
       // Preview mode: Map is disabled, and tabs to the right of AI are disabled.
       if (this.previewMode) {
         if (k === 'map') return;
-        const disabled = new Set(['reel', 'torrents', 'subs', 'flex', 'history', 'tvproc', 'file']);
+        const disabled = new Set(['reel', 'tor', 'subs', 'flex', 'qbt', 'down', 'files']);
         if (disabled.has(k)) return;
       }
 
       // In simple mode, only Series/Map/Actors exist.
-      if (this.simpleMode && !['series', 'map', 'actors', 'reviews', 'trailer', 'ai'].includes(k)) {
+      if (this.simpleMode && !['info', 'map', 'actors', 'reviews', 'trailer', 'ai'].includes(k)) {
         return;
       }
 
-      if (k === 'series') {
+      if (k === 'info') {
         this.handleActorsClose();
         return;
       }
@@ -1122,10 +1122,10 @@ export default {
         return;
       }
 
-      if (k === 'torrents') {
-        if (this.currentShow) this.handleShowTorrents(this.currentShow);
+      if (k === 'tor') {
+        if (this.currentShow) this.handleShowTor(this.currentShow);
         else {
-          this.currentPane = 'torrents';
+          this.currentPane = 'tor';
           evtBus.emit('paneChanged', this.currentPane);
         }
         return;
@@ -1145,21 +1145,21 @@ export default {
         return;
       }
 
-      if (k === 'history') {
-        this.handleShowHistory();
+      if (k === 'qbt') {
+        this.handleShowQbt();
         return;
       }
 
-      if (k === 'tvproc') {
+      if (k === 'down') {
         // Prompt for desktop notification permission (Firefox requires user gesture).
         this.requestNotificationsOnce();
         this.handleShowTvproc();
         return;
       }
 
-      if (k === 'file') {
+      if (k === 'files') {
         if (this.simpleMode) return;
-        this.currentPane = 'file';
+        this.currentPane = 'files';
         evtBus.emit('paneChanged', this.currentPane);
         return;
       }
@@ -1179,19 +1179,19 @@ export default {
 
       // Only switch to map pane if noSwitch flag is not set
       if (!data.noSwitch) {
-        this.currentPane = data.mapShow !== null ? 'map' : 'series';
+        this.currentPane = data.mapShow !== null ? 'map' : 'info';
         evtBus.emit('paneChanged', this.currentPane);
       }
     },
     handleHideMap() {
-      this.currentPane = 'series';
+      this.currentPane = 'info';
       this.mapShow = null;
       evtBus.emit('paneChanged', this.currentPane);
     },
     handleShowActors(fromMap = false) {
       // If called from map click, show series pane instead
       if (fromMap) {
-        this.currentPane = 'series';
+        this.currentPane = 'info';
         this.mapShow = null;
         evtBus.emit('paneChanged', this.currentPane);
         evtBus.emit('mapAction', { action: 'close', show: null });
@@ -1213,24 +1213,24 @@ export default {
       }
     },
     handleActorsClose() {
-      this.currentPane = 'series';
+      this.currentPane = 'info';
       this.mapShow = null;
       evtBus.emit('paneChanged', this.currentPane);
       // Clear mapShow in list component via event
       evtBus.emit('mapAction', { action: 'close', show: null });
     },
-    handleShowTorrents(show) {
+    handleShowTor(show) {
       if (this.simpleMode) return;
       const showKey = show?.Id || show?.Name || null;
 
       // Switching panes should not restart searching; only restart when show selection changes.
       if (this._torrentsInitialized && this._torrentsShowKey && showKey && this._torrentsShowKey === showKey) {
-        this.currentPane = 'torrents';
+        this.currentPane = 'tor';
         evtBus.emit('paneChanged', this.currentPane);
         return;
       }
 
-      this.currentPane = 'torrents';
+      this.currentPane = 'tor';
       evtBus.emit('paneChanged', this.currentPane);
       // Emit event to torrents component with show data
       evtBus.emit('showTorrents', show);
@@ -1238,37 +1238,37 @@ export default {
       this._torrentsShowKey = showKey;
     },
 
-    handleShowHistory() {
+    handleShowQbt() {
       if (this.simpleMode) return;
-      this.currentPane = 'history';
+      this.currentPane = 'qbt';
       evtBus.emit('paneChanged', this.currentPane);
     },
 
     handleShowTvproc() {
       if (this.simpleMode) return;
-      this.currentPane = 'tvproc';
+      this.currentPane = 'down';
       evtBus.emit('paneChanged', this.currentPane);
     },
 
-    handleHistoryToTorrents() {
+    handleHistoryToTor() {
       // Do not reload/emit showTorrents when just switching panes.
       if (this._torrentsInitialized) {
-        this.currentPane = 'torrents';
+        this.currentPane = 'tor';
         evtBus.emit('paneChanged', this.currentPane);
         return;
       }
 
       // Fallback: if torrents was never initialized, open it with current show.
       if (this.currentShow) {
-        this.handleShowTorrents(this.currentShow);
+        this.handleShowTor(this.currentShow);
       } else {
-        this.currentPane = 'torrents';
+        this.currentPane = 'tor';
         evtBus.emit('paneChanged', this.currentPane);
       }
     },
 
-    handleHistoryToSeries() {
-      this.currentPane = 'series';
+    handleHistoryToInfo() {
+      this.currentPane = 'info';
       this.mapShow = null;
       evtBus.emit('paneChanged', this.currentPane);
       evtBus.emit('mapAction', { action: 'close', show: null });
@@ -1280,28 +1280,28 @@ export default {
       }
     },
 
-    handleTvprocToTorrents() {
+    handleTvprocToTor() {
       if (this._torrentsInitialized) {
-        this.currentPane = 'torrents';
+        this.currentPane = 'tor';
         evtBus.emit('paneChanged', this.currentPane);
         return;
       }
 
       if (this.currentShow) {
-        this.handleShowTorrents(this.currentShow);
+        this.handleShowTor(this.currentShow);
       } else {
-        this.currentPane = 'torrents';
+        this.currentPane = 'tor';
         evtBus.emit('paneChanged', this.currentPane);
       }
     },
 
-    handleTvprocToHistory() {
-      this.currentPane = 'history';
+    handleTvprocToQbt() {
+      this.currentPane = 'qbt';
       evtBus.emit('paneChanged', this.currentPane);
     },
 
-    handleTvprocToSeries() {
-      this.currentPane = 'series';
+    handleTvprocToInfo() {
+      this.currentPane = 'info';
       this.mapShow = null;
       evtBus.emit('paneChanged', this.currentPane);
       evtBus.emit('mapAction', { action: 'close', show: null });
@@ -1313,7 +1313,7 @@ export default {
       }
     },
     handleTorrentsClose() {
-      this.currentPane = 'series';
+      this.currentPane = 'info';
       this.mapShow = null;
       evtBus.emit('paneChanged', this.currentPane);
       // Clear mapShow in list component via event
@@ -1358,8 +1358,8 @@ export default {
     // Refresh space display once on app load.
     this.requestSpaceAvailRefresh('app load');
 
-    if (this.simpleMode && !['series', 'map', 'actors'].includes(this.currentPane)) {
-      this.currentPane = 'series';
+    if (this.simpleMode && !['info', 'map', 'actors'].includes(this.currentPane)) {
+      this.currentPane = 'info';
     }
 
     // Listen for pane navigation events
@@ -1374,7 +1374,7 @@ export default {
     });
     
     evtBus.on('showTorrentsPane', (show) => {
-      this.handleShowTorrents(show);
+      this.handleShowTor(show);
     });
 
     // Map navigation is centralized through list.vue via mapAction('open')
@@ -1393,9 +1393,9 @@ export default {
       }
       if (this.previewMode) {
         // If currently on a disabled pane, snap back to Series.
-        const allowed = new Set(['series', 'actors', 'reviews', 'trailer', 'ai']);
+        const allowed = new Set(['info', 'actors', 'reviews', 'trailer', 'ai']);
         if (!allowed.has(this.currentPane)) {
-          this.currentPane = 'series';
+          this.currentPane = 'info';
           evtBus.emit('paneChanged', this.currentPane);
         }
       }
@@ -1443,14 +1443,14 @@ export default {
 
       // When currently viewing File, stay on File.
       // The File pane listens to setUpSeries and will refresh itself.
-      if (prevPane === 'file') {
+      if (prevPane === 'files') {
         return;
       }
 
       // When currently viewing Torrents, stay on Torrents.
       // A new show selection should restart torrent search for the new show.
-      if (prevPane === 'torrents') {
-        this.currentPane = 'torrents';
+      if (prevPane === 'tor') {
+        this.currentPane = 'tor';
         evtBus.emit('paneChanged', this.currentPane);
         evtBus.emit('showTorrents', this.currentShow);
         this._torrentsInitialized = true;
@@ -1488,7 +1488,7 @@ export default {
       }
 
       // Otherwise, return to the Series pane.
-      this.currentPane = 'series';
+      this.currentPane = 'info';
       this.mapShow = null;
       evtBus.emit('paneChanged', this.currentPane);
     });
@@ -1546,25 +1546,25 @@ html, body {
 }
 
 /* Force black text only in the right-side panes */
-#series, #series *,
+#info, #info *,
 #map, #map *,
 #actors, #actors *,
 #reviews, #reviews *,
-#torrents, #torrents *,
-#history, #history *,
-#tvproc, #tvproc * {
+#tor, #tor *,
+#qbt, #qbt *,
+#down, #down * {
   color: #000 !important;
 }
 
 /* Force light-gray button backgrounds only in the right-side panes */
-#series button,
+#info button,
 #map button,
 #actors button,
 #reviews button,
-#torrents button,
+#tor button,
 .torrents-container button,
-#history button,
-#tvproc button {
+#qbt button,
+#down button {
   background-color: var(--btn-bg, whitesmoke) !important;
 }
 </style>

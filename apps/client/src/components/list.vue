@@ -370,7 +370,7 @@ export default {
       previewMode:          false,
       _pendingSetUpSeriesToken: 0,
       allShowsLength:        0,
-      currentPane:       'series',
+      currentPane:       'info',
       mapShow:            null,
       hideMapBottom:      true,
       seriesMapSeasons:     [],
@@ -1137,7 +1137,7 @@ export default {
 
       // Clicking a show should generally return to the Series pane.
       // Exception: when the user is actively in Map/Actors/Torrents/Subs/Files/Reviews/Trailer/AI, do not switch panes.
-      const keepPane = new Set(['map', 'actors', 'torrents', 'subs', 'file', 'reviews', 'trailer', 'ai']);
+      const keepPane = new Set(['map', 'actors', 'tor', 'subs', 'files', 'reviews', 'trailer', 'ai']);
       if (!keepPane.has(this.currentPane)) {
         evtBus.emit('showSeriesPane');
       }

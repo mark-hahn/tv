@@ -156,13 +156,13 @@ export default {
     watch(
       () => props.srchStr,
       () => {
-        loadTvdbData();
+        void loadTvdbData();
       },
     );
 
     // Load on mount
     onMounted(() => {
-      loadTvdbData();
+      void loadTvdbData();
     });
 
     return {

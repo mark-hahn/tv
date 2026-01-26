@@ -429,7 +429,7 @@ export default {
         if (titleStrings.value[idx] === NO_MORE_ENTRY && idx > 0) {
           idx--;
         }
-        selectTitle(idx);
+        await selectTitle(idx);
       }
       await nextTick();
       if (titlesPane.value) {
@@ -1028,7 +1028,7 @@ export default {
           if (titleStrings.value[idx] === NO_MORE_ENTRY && idx > 0) {
             idx--;
           }
-          selectTitle(idx);
+          await selectTitle(idx);
         }
       },
       { deep: true },

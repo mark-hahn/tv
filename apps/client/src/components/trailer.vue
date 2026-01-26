@@ -127,7 +127,7 @@ export default {
       } else {
         // Tab shown: Re-render and restore
         this.showContent = true;
-        nextTick(() => {
+        void nextTick(() => {
           this.initPlayers(); // Re-init YT players
           this.restoreState();
         });
@@ -136,7 +136,7 @@ export default {
     trailers() {
       // If trailers change while active, init players
       if (this.active && this.showContent) {
-        nextTick(() => this.initPlayers());
+        void nextTick(() => this.initPlayers());
       }
     },
   },

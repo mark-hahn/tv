@@ -15,13 +15,13 @@ module.exports = [
         sourceType: "module",
         extraFileExtensions: [".vue"],
         tsconfigRootDir: __dirname,
-        projectService: true
-      }
+        projectService: true,
+      },
     },
 
     plugins: {
       "@typescript-eslint": require("@typescript-eslint/eslint-plugin"),
-      vue: require("eslint-plugin-vue")
+      vue: require("eslint-plugin-vue"),
     },
 
     rules: {
@@ -34,13 +34,14 @@ module.exports = [
           // /* eslint-disable no-restricted-syntax */
           // await example();
           // /* eslint-enable no-restricted-syntax */
-          "selector":
+          selector:
             "AwaitExpression:not(FunctionDeclaration[async=true] *):not(FunctionExpression[async=true] *):not(ArrowFunctionExpression[async=true] *)",
-          "message": "Use await only inside an async function (or make the function async)."
-        }
+          message:
+            "Use await only inside an async function (or make the function async).",
+        },
       ],
       "@typescript-eslint/no-floating-promises": "error",
-      "@typescript-eslint/require-await": "warn"
-    }
-  }
+      "@typescript-eslint/require-await": "warn",
+    },
+  },
 ];

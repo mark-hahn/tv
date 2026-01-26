@@ -464,7 +464,7 @@ export default {
           this.rottenUrl = rottenRemote.url; // Assuming remote object has { name, url }
           // Load initial reviews if we have a URL
           if (this.rottenUrl) {
-            this.loadReviews(this.rottenUrl, this.selectedButton);
+            void this.loadReviews(this.rottenUrl, this.selectedButton);
           }
         }
       }
@@ -523,7 +523,7 @@ export default {
     handleButtonClick(label) {
       this.selectedButton = label;
       if (this.rottenUrl) {
-        this.loadReviews(this.rottenUrl, this.selectedButton);
+        void this.loadReviews(this.rottenUrl, this.selectedButton);
       }
     },
 

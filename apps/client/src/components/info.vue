@@ -1028,7 +1028,7 @@ export default {
         this.nextUpValTxt = "";
         this.nextUpSuffixTxt = "";
       }
-      this.updateWatchButtons(readyToWatch);
+      this.updateWatchButtons(readyToWatch).catch((e) => console.error(e));
     },
 
     async updateWatchButtons(readyToWatch) {
@@ -1101,7 +1101,7 @@ export default {
       }
     },
 
-    async onSetUpSeries(show) {
+    onSetUpSeries(show) {
       this.emailText = ""; // Clear email text when changing shows
       this.show = show;
       this.showHdr = true;
@@ -1112,7 +1112,7 @@ export default {
       }
 
       // Load persistent note for this show.
-      this.loadNote(show?.Name);
+      void this.loadNote(show?.Name);
 
       // Clear info fields so nothing renders until ready
       const posterEl = document.getElementById("poster");
@@ -1191,7 +1191,7 @@ export default {
           await this.setDeleted(tvdbData);
 
           // Don't await poster!
-          this.setPoster(tvdbData);
+          void this.setPoster(tvdbData);
 
           await this.setDates(tvdbData);
 

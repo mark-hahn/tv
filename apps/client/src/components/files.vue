@@ -1,61 +1,22 @@
-<template lang="pug">
+<template>
 
-#files(:style="{ height:'100%', width:'100%', padding:'5px', margin:0, marginLeft:'16px', display:'flex', flexDirection:'column', overflow:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa' }")
-
-  #header(:style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', margin:0, display:'flex', alignItems:'center' }")
-    div(:style="{ flex:'1 1 auto', minWidth:'0px', fontWeight:'bold', fontSize:'18px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }") {{ showName }}
-
-    button(
-      @click.stop="collapseToggle"
-      :disabled="busy || !Array.isArray(tree)"
-      style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; background-color:whitesmoke; margin-right:20px;"
-    ) {{ expanded.size === 0 ? 'Expand' : 'Collapse' }}
-
-    button(
-      @click.stop="toggleVideosOnly"
-      :disabled="busy || !Array.isArray(tree)"
-      :style="{ backgroundColor: videosOnly ? '#ddd' : 'whitesmoke' }"
-      style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; margin-right:20px;"
-    ) Videos
-
-    button(
-      @click.stop="copyPaneToClipboard"
-      :disabled="busy || !Array.isArray(tree)"
-      style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; background-color:whitesmoke; margin-right:20px;"
-    ) Copy
-
-    button(
-      @click.stop="refreshContents"
-      :disabled="busy || !rootPath"
-      style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; background-color:whitesmoke; margin-right:20px;"
-    ) Refresh
-
-  div(v-if="error" style="text-align:left; color:#c00; margin-top:10px; font-size:14px; white-space:pre-line; padding:0 10px;")
-    div Error: {{ error }}
-
-  div(
-    v-else
-    ref="scroller"
-    @click="clearSelections"
-    :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'auto', background:'#fff', fontFamily:'sans-serif', fontSize:'13px', fontWeight:'normal', lineHeight:'1.56' }"
-  )
-    div(v-if="busy" style="color:#666; padding:10px;") Loading...
-
-    TreeNodes(
-      v-else-if="Array.isArray(tree)"
-      :nodes="tree"
-      :parentPath="rootPath"
-      :depth="0"
-      :expanded="expanded"
-      :selectedFiles="selectedFiles"
-      :videosOnly="videosOnly"
-      @dir-click="onDirClick"
-      @file-click="onFileClick"
-      @clear-selections="clearSelections"
-    )
-
-    div(v-else style="color:#666; padding:10px;") No data.
-
+<div id="files" :style="{ height:'100%', width:'100%', padding:'5px', margin:0, marginLeft:'16px', display:'flex', flexDirection:'column', overflow:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa' }">
+  <div id="header" :style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', margin:0, display:'flex', alignItems:'center' }">
+    <div :style="{ flex:'1 1 auto', minWidth:'0px', fontWeight:'bold', fontSize:'18px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }">{{ showName }}</div>
+    <button @click.stop="collapseToggle" :disabled="busy || !Array.isArray(tree)" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; background-color:whitesmoke; margin-right:20px;">{{ expanded.size === 0 ? 'Expand' : 'Collapse' }}</button>
+    <button @click.stop="toggleVideosOnly" :disabled="busy || !Array.isArray(tree)" :style="{ backgroundColor: videosOnly ? '#ddd' : 'whitesmoke' }" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; margin-right:20px;">Videos</button>
+    <button @click.stop="copyPaneToClipboard" :disabled="busy || !Array.isArray(tree)" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; background-color:whitesmoke; margin-right:20px;">Copy</button>
+    <button @click.stop="refreshContents" :disabled="busy || !rootPath" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:2px solid #bbb; background-color:whitesmoke; margin-right:20px;">Refresh</button>
+  </div>
+  <div v-if="error" style="text-align:left; color:#c00; margin-top:10px; font-size:14px; white-space:pre-line; padding:0 10px;">
+    <div>Error: {{ error }}</div>
+  </div>
+  <div v-else ref="scroller" @click="clearSelections" :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'auto', background:'#fff', fontFamily:'sans-serif', fontSize:'13px', fontWeight:'normal', lineHeight:'1.56' }">
+    <div v-if="busy" style="color:#666; padding:10px;">Loading...</div>
+    <TreeNodes v-else-if="Array.isArray(tree)" :nodes="tree" :parentPath="rootPath" :depth="0" :expanded="expanded" :selectedFiles="selectedFiles" :videosOnly="videosOnly" @dir-click="onDirClick" @file-click="onFileClick" @clear-selections="clearSelections"></TreeNodes>
+    <div v-else style="color:#666; padding:10px;">No data.</div>
+  </div>
+</div>
 </template>
 
 <script>

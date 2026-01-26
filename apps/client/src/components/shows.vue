@@ -1,46 +1,32 @@
-<template lang="pug">
-#shows(
-  style="width:100%; flex-grow: 1; overflow-y:scroll; padding-right:5px; box-sizing:border-box;"
-  @wheel.stop.prevent="handleScaledWheel"
-)
-  div(v-if="shows.length === 0" style="display:flex; justify-content:center; align-items:center; height:100%; font-size:18px; color:#666;") No shows.
-  table(v-else style="width:100%; font-size:18px; border-collapse:collapse; border-spacing:0;")
-    tbody
-      tr(
-        v-for="show in shows"
-        :key="show.Id"
-        :style="{ borderBottom:'1px solid #000', cursor:'default', lineHeight: simpleMode ? '1.6' : '1' }"
-        :id="nameHash(show.Name)"
-      )
-        td(
-          v-if="!simpleMode"
-          style="width:30px; text-align:center;"
-          @click="$emit('copy-name', show, $event)"
-        )
-          font-awesome-icon(id="cpbrd" icon="copy" style="color:#ccc")
+<template>
 
-        td(v-if="!simpleMode" style="width:30px; text-align:center;" )
-          div(v-show="!show.Id.startsWith('noemby-')" @click="$emit('open-map', show)")
-            font-awesome-icon(icon="border-all" style="color:#ccc")
-
-        td(
-          @click="$emit('select-show', show, false)"
-          :style="{maxWidth:'110px', fontSize:'16px', backgroundColor: hilite(show), cursor:'default', textAlign:'center', paddingLeft: simpleMode ? '20px' : '0'}"
-        )
-          | {{ getSortDisplayValue(show) }}
-
-        td(id="showLineText" :style="{display:'flex', padding:'5px', justifyContent:'space-between', backgroundColor: hilite(show)}")
-          div(style="padding:2px; fontSize:16px; font-weight:bold;" @click="$emit('select-show', show, false, true)") {{show.Name}}
-          div(style="padding:2px; flex-grow:1; fontSize:16px; font-weight:bold;" @click="$emit('select-show', show, false, true)" )
-          div(
-            v-if="show.Notes && String(show.Notes).length"
-            :style="{ padding:'2px', fontSize:'14px', color:'rgba(0,0,0,0.5)', marginRight:'15px' }"
-          ) {{ String(show.Notes) }}
-          div(v-if="show.WaitStr?.length" style="padding:2px; color: #00f; fontSize:16px;")
-            | {{show.WaitStr}}
-
-        td(v-if="showConds" v-for="cond in conds" :key="cond.name" style="width:22px; padding:0; text-align:center;" @click="cond.click(show)")
-          font-awesome-icon(:icon="cond.icon" :style="{color:condColor(show, cond)}")
+<div id="shows" style="width:100%; flex-grow: 1; overflow-y:scroll; padding-right:5px; box-sizing:border-box;" @wheel.stop.prevent="handleScaledWheel">
+  <div v-if="shows.length === 0" style="display:flex; justify-content:center; align-items:center; height:100%; font-size:18px; color:#666;">No shows.</div>
+  <table v-else style="width:100%; font-size:18px; border-collapse:collapse; border-spacing:0;">
+    <tbody>
+      <tr v-for="show in shows" :key="show.Id" :style="{ borderBottom:'1px solid #000', cursor:'default', lineHeight: simpleMode ? '1.6' : '1' }" :id="nameHash(show.Name)">
+        <td v-if="!simpleMode" style="width:30px; text-align:center;" @click="$emit('copy-name', show, $event)">
+          <font-awesome-icon id="cpbrd" icon="copy" style="color:#ccc"></font-awesome-icon>
+        </td>
+        <td v-if="!simpleMode" style="width:30px; text-align:center;">
+          <div v-show="!show.Id.startsWith('noemby-')" @click="$emit('open-map', show)">
+            <font-awesome-icon icon="border-all" style="color:#ccc"></font-awesome-icon>
+          </div>
+        </td>
+        <td @click="$emit('select-show', show, false)" :style="{maxWidth:'110px', fontSize:'16px', backgroundColor: hilite(show), cursor:'default', textAlign:'center', paddingLeft: simpleMode ? '20px' : '0'}">{{ getSortDisplayValue(show) }}</td>
+        <td id="showLineText" :style="{display:'flex', padding:'5px', justifyContent:'space-between', backgroundColor: hilite(show)}">
+          <div style="padding:2px; fontSize:16px; font-weight:bold;" @click="$emit('select-show', show, false, true)">{{show.Name}}</div>
+          <div style="padding:2px; flex-grow:1; fontSize:16px; font-weight:bold;" @click="$emit('select-show', show, false, true)"></div>
+          <div v-if="show.Notes &amp;&amp; String(show.Notes).length" :style="{ padding:'2px', fontSize:'14px', color:'rgba(0,0,0,0.5)', marginRight:'15px' }">{{ String(show.Notes) }}</div>
+          <div v-if="show.WaitStr?.length" style="padding:2px; color: #00f; fontSize:16px;">{{show.WaitStr}}</div>
+        </td>
+        <td v-if="showConds" v-for="cond in conds" :key="cond.name" style="width:22px; padding:0; text-align:center;" @click="cond.click(show)">
+          <font-awesome-icon :icon="cond.icon" :style="{color:condColor(show, cond)}"></font-awesome-icon>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 </template>
 
 <script>

@@ -1,54 +1,16 @@
-<template lang="pug">
-#buttons(:style="{ display:'flex', flexDirection:'column', padding: sizing.buttonContainerPadding || '5px', paddingBottom:'0', overflowY:'auto', height:'100%' }")
-  button(
-    @click="$emit('top-click')"
-    :style="{ width:'100%', lineHeight: sizing.buttonHeight || '40px', padding:'0 8px', marginTop: sizing.buttonTopMargin || '10px', marginBottom: sizing.buttonMarginBottom || '8px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }"
-  ) Top
-  
-  div(style="height:2px; background-color:#666; margin:10px 0;")
-  
-  button(
-    v-for="btn in filters"
-    :key="btn"
-    :class="{ active: activeButtons[btn] }"
-    @click="handleButtonClick(btn)"
-    :style="{ width:'100%', lineHeight: sizing.buttonHeight || '40px', padding:'0 8px', marginBottom: sizing.buttonMarginBottom || '8px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }"
-  ) {{ btn }}
-  
-  button(
-    v-for="btn in genres"
-    :key="btn"
-    :class="{ active: activeButtons[btn] }"
-    @click="handleButtonClick(btn)"
-    :style="{ width:'100%', lineHeight: sizing.buttonHeight || '40px', padding:'0 8px', marginBottom: sizing.buttonMarginBottom || '8px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }"
-  ) {{ btn }}
-  
-  div(style="height:2px; background-color:#666; margin:10px 0;")
-  
-  button(
-    v-for="btn in collections"
-    :key="btn"
-    :class="{ active: activeButtons[btn] }"
-    @click="handleButtonClick(btn)"
-    :style="{ width:'100%', lineHeight: sizing.buttonHeight || '40px', padding:'0 8px', marginBottom: sizing.buttonMarginBottom || '8px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }"
-  ) {{ btn }}
+<template>
 
-  button(
-    v-if="hasSharedFilters"
-    :class="{ active: activeButtons['Custom'] }"
-    @click="handleButtonClick('Custom')"
-    :style="{ width:'100%', lineHeight: sizing.buttonHeight || '40px', padding:'0 8px', marginBottom: sizing.buttonMarginBottom || '8px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }"
-  ) Custom
-  
-  div(style="height:2px; background-color:#666; margin:10px 0;")
-  
-  button(
-    v-for="btn in sortOrders"
-    :key="btn"
-    :class="{ active: activeButtons[btn] }"
-    @click="handleButtonClick(btn)"
-    :style="{ width:'100%', lineHeight: sizing.buttonHeight || '40px', padding:'0 8px', marginBottom:'10px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }"
-  ) {{ btn }}
+<div id="buttons" :style="{ display:'flex', flexDirection:'column', padding: sizing.buttonContainerPadding || '5px', paddingBottom:'0', overflowY:'auto', height:'100%' }">
+  <button @click="$emit('top-click')" :style="{ width:'100%', lineHeight: sizing.buttonHeight || '40px', padding:'0 8px', marginTop: sizing.buttonTopMargin || '10px', marginBottom: sizing.buttonMarginBottom || '8px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }">Top</button>
+  <div style="height:2px; background-color:#666; margin:10px 0;"></div>
+  <button v-for="btn in filters" :key="btn" :class="{ active: activeButtons[btn] }" @click="handleButtonClick(btn)" :style="{ width:'100%', lineHeight: sizing.buttonHeight || '40px', padding:'0 8px', marginBottom: sizing.buttonMarginBottom || '8px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }">{{ btn }}</button>
+  <button v-for="btn in genres" :key="btn" :class="{ active: activeButtons[btn] }" @click="handleButtonClick(btn)" :style="{ width:'100%', lineHeight: sizing.buttonHeight || '40px', padding:'0 8px', marginBottom: sizing.buttonMarginBottom || '8px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }">{{ btn }}</button>
+  <div style="height:2px; background-color:#666; margin:10px 0;"></div>
+  <button v-for="btn in collections" :key="btn" :class="{ active: activeButtons[btn] }" @click="handleButtonClick(btn)" :style="{ width:'100%', lineHeight: sizing.buttonHeight || '40px', padding:'0 8px', marginBottom: sizing.buttonMarginBottom || '8px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }">{{ btn }}</button>
+  <button v-if="hasSharedFilters" :class="{ active: activeButtons['Custom'] }" @click="handleButtonClick('Custom')" :style="{ width:'100%', lineHeight: sizing.buttonHeight || '40px', padding:'0 8px', marginBottom: sizing.buttonMarginBottom || '8px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }">Custom</button>
+  <div style="height:2px; background-color:#666; margin:10px 0;"></div>
+  <button v-for="btn in sortOrders" :key="btn" :class="{ active: activeButtons[btn] }" @click="handleButtonClick(btn)" :style="{ width:'100%', lineHeight: sizing.buttonHeight || '40px', padding:'0 8px', marginBottom:'10px', fontSize: sizing.buttonFontSize || '15px', fontWeight:'bold', border:'1px solid #999', borderRadius:'5px', cursor:'pointer', backgroundColor:'#eee', textAlign:'center' }">{{ btn }}</button>
+</div>
 </template>
 
 <script>

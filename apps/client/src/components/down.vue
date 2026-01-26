@@ -1,40 +1,31 @@
-<template lang="pug">
+<template>
 
-#down(:style="{ height:'100%', width:'100%', padding:'5px', margin:0, marginLeft:'16px', display:'flex', flexDirection:'column', overflow:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa', fontWeight:'bold' }")
-
-  #header(:style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', marginLeft:'0px', marginRight:'0px', marginTop:'0px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
-    div(style="display:flex; justify-content:space-between; align-items:center;")
-      div(style="margin-left:20px; display:flex; align-items:center;")
-        span Downloads
-        span(v-if="totalDownloadingSpeedText" style="margin-left:20px; align-self:center; font-size:13px; color:#555; white-space:nowrap; font-weight:normal;") {{ totalDownloadingSpeedText }}
-        span(v-if="avgDownloadingSpeedText" style="margin-left:20px; align-self:center; font-size:13px; color:#555; white-space:nowrap; font-weight:normal;") {{ avgDownloadingSpeedText }}
-      div(style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;")
-        button(@click.stop="startLibraryRefresh" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Library
-        button(@click.stop="showFirstDownloading" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;") Show
-
-  div(v-if="error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px; white-space:pre-line; padding:0 20px;")
-    div Error: {{ error }}
-
-  div(v-else-if="!hasContent" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
-    div(v-if="emptyStateText") {{ emptyStateText }}
-
-  div(
-    v-else
-    ref="scroller"
-    :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'hidden', background:'#fff', fontFamily:'sans-serif', fontSize:'14px', fontWeight:'normal' }"
-    @wheel.stop.prevent="handleScaledWheel"
-  )
-    template(v-for="(it, idx) in orderedItems" :key="idx")
-      div(v-if="idx > 0 && Number(it?.sequence) === 1" style="margin:0; padding:0; line-height:14px; white-space:nowrap; overflow:hidden; font-family:monospace;") ====================================================================================================
-      div(:style="getCardStyle(it)" @click="handleCardClick($event, it)" @mouseenter="handleMouseEnter($event, it)" @mouseleave="handleMouseLeave($event)")
-        div(style="font-weight:bold; font-size:14px; word-wrap:break-word; overflow-wrap:break-word; font-family:sans-serif;")
-          span {{ it.title || '(no title)' }}
-        div(style="margin-top:8px; color:#333; font-size:13px; word-wrap:break-word; overflow-wrap:break-word; font-family:sans-serif;")
-          span(v-if="line2(it).seasonEpisode" style="color:blue !important;") {{ line2(it).seasonEpisode }}
-          span(v-if="line2(it).rest" style="color:rgba(0,0,0,0.50) !important;")
-            span(v-if="line2(it).seasonEpisode") &nbsp;|&nbsp;
-            span(style="color:rgba(0,0,0,0.50) !important;") {{ line2(it).rest }}
-
+<div id="down" :style="{ height:'100%', width:'100%', padding:'5px', margin:0, marginLeft:'16px', display:'flex', flexDirection:'column', overflow:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa', fontWeight:'bold' }">
+  <div id="header" :style="{ position:'sticky', top:'0px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'5px', paddingLeft:'5px', paddingRight:'5px', paddingBottom:'5px', marginLeft:'0px', marginRight:'0px', marginTop:'0px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="margin-left:20px; display:flex; align-items:center;"><span>Downloads</span><span v-if="totalDownloadingSpeedText" style="margin-left:20px; align-self:center; font-size:13px; color:#555; white-space:nowrap; font-weight:normal;">{{ totalDownloadingSpeedText }}</span><span v-if="avgDownloadingSpeedText" style="margin-left:20px; align-self:center; font-size:13px; color:#555; white-space:nowrap; font-weight:normal;">{{ avgDownloadingSpeedText }}</span></div>
+      <div style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;">
+        <button @click.stop="startLibraryRefresh" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;">Library</button>
+        <button @click.stop="showFirstDownloading" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;">Show</button>
+      </div>
+    </div>
+  </div>
+  <div v-if="error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px; white-space:pre-line; padding:0 20px;">
+    <div>Error: {{ error }}</div>
+  </div>
+  <div v-else-if="!hasContent" style="text-align:center; color:#666; margin-top:50px; font-size:18px;">
+    <div v-if="emptyStateText">{{ emptyStateText }}</div>
+  </div>
+  <div v-else ref="scroller" :style="{ flex:'1 1 auto', margin:'0px', padding:'10px', overflowY:'auto', overflowX:'hidden', background:'#fff', fontFamily:'sans-serif', fontSize:'14px', fontWeight:'normal' }" @wheel.stop.prevent="handleScaledWheel">
+    <template v-for="(it, idx) in orderedItems" :key="idx">
+      <div v-if="idx &gt; 0 &amp;&amp; Number(it?.sequence) === 1" style="margin:0; padding:0; line-height:14px; white-space:nowrap; overflow:hidden; font-family:monospace;">====================================================================================================</div>
+      <div :style="getCardStyle(it)" @click="handleCardClick($event, it)" @mouseenter="handleMouseEnter($event, it)" @mouseleave="handleMouseLeave($event)">
+        <div style="font-weight:bold; font-size:14px; word-wrap:break-word; overflow-wrap:break-word; font-family:sans-serif;"><span>{{ it.title || '(no title)' }}</span></div>
+        <div style="margin-top:8px; color:#333; font-size:13px; word-wrap:break-word; overflow-wrap:break-word; font-family:sans-serif;"><span v-if="line2(it).seasonEpisode" style="color:blue !important;">{{ line2(it).seasonEpisode }}</span><span v-if="line2(it).rest" style="color:rgba(0,0,0,0.50) !important;"><span v-if="line2(it).seasonEpisode">&nbsp;|&nbsp;</span><span style="color:rgba(0,0,0,0.50) !important;">{{ line2(it).rest }}</span></span></div>
+      </div>
+    </template>
+  </div>
+</div>
 </template>
 
 <script>

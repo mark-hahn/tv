@@ -1,161 +1,76 @@
-<template lang="pug">
+<template>
 
-#info(@click="handleSeriesClick" :style="{ height:'100%', width:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', position:'relative' }")
-
-  #hdr(v-if="showHdr"
-       :style="{ display:'flex', flexDirection:'column', gap:'10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', margin:'0px', marginBottom:'10px' }")
-    div(
-      :style="{ display:'grid', gridTemplateColumns:'1fr 3fr 1fr 3fr 1fr', alignItems:'center', width:'100%' }"
-    )
-      div(:style="{ gridColumn:'1 / span 2', marginLeft:'20px', marginRight:'20px', whiteSpace:'normal', overflowWrap:'anywhere', wordBreak:'break-word', display:'flex', alignItems:'center', gap:'12px' }")
-        span {{ show.Name }}
-      //- Simple mode: align left edge of Notes with right edge of image (end of poster column)
-      div(v-if="simpleMode" :style="{ gridColumn:'3 / span 3', display:'flex', alignItems:'center', minWidth:'0px', width:'100%' }")
-        template(v-if="!previewMode")
-          textarea(
-            v-model="noteText"
-            @click.stop
-            @keydown.stop
-            @keydown.enter.prevent.stop="onEnterBlur"
-            @input="onNoteInput"
-            @focus="onNoteFocus"
-            @blur="onNoteBlur"
-            rows="1"
-            placeholder="Notes"
-            :style="{ width:'125px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
-          )
-          textarea(
-            v-model="emailText"
-            @click.stop
-            @keydown.stop
-            @keydown.enter.prevent.stop="onEnterBlur"
-            rows="1"
-            placeholder="Email Mark"
-            :style="{ width:'125px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
-          )
-        div(:style="{ display:'flex', alignItems:'center', marginLeft:'auto', minWidth:'0px' }")
-          div(v-if="show?.Reject"
-            style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; margin-right:10px; white-space:nowrap;") Banned From Download
-
-      //- Non-simple mode: align left edge of Notes with left edge of infobox (start of infobox column)
-      div(v-else :style="{ gridColumn:'4 / span 2', display:'flex', alignItems:'center' }")
-        div(v-if="show?.Reject"
-            style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; margin-right:10px;") Banned From Download
-        template(v-if="!previewMode")
-          textarea(
-            v-model="noteText"
-            @click.stop
-            @keydown.stop
-            @keydown.enter.prevent.stop="onEnterBlur"
-            @input="onNoteInput"
-            @focus="onNoteFocus"
-            @blur="onNoteBlur"
-            rows="1"
-            placeholder="Notes"
-            :style="{ width:'125px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"
-          )
-          button(
-            @click.stop="deleteClick"
-            style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;"
-          ) Delete
-
-  //- Layout: 1/9 whitespace, 1/3 poster, 1/9 whitespace, 1/3 infobox, 1/9 whitespace
-  #body(
-    :style="{ display:'grid', cursor:'default', width:'100%', gridTemplateColumns:'1fr 3fr 1fr 3fr 1fr', alignItems:'start' }"
-  )
-    //- Column 2: poster (1/3)
-    #topLeft(
-      @click.stop="handleBodyClick"
-      :style="{ gridColumn:'2', minWidth:'0px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-start', textAlign:'center' }"
-    )
-      #poster(:style="{ width:'100%', display:'flex', justifyContent:'center', alignItems:'flex-start' }")
-
-    //- Column 4: info box (1/3)
-    #topRight(:style="{ gridColumn:'4', minWidth:'0px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-start' }")
-      #infoBox(
-        v-if="seriesReady"
-        @click.stop="handleBodyClick"
-        :style="{ margin:'0px 0 0px 0px', width:'100%', boxSizing:'border-box', overflow:'hidden', fontSize: sizing.seriesInfoFontSize || '20px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column', textAlign:'center', fontWeight:'bold' }"
-      )
-        div(style="border:1px solid #ccc; border-radius:5px; padding:5px; width:100%; box-sizing:border-box;")
-          //- Dates in one div; allow wrapping up to 2 lines
-          #dates(
-            v-if="dates && String(dates).length > 0"
-            style="min-height:24px; white-space:normal; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2;"
-          ) {{ dates }}
-          #status(
-            v-if="statusTxt.length > 0"
-            v-html="statusTxt"
-            style="min-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
-          )
-          #seasons(
-            v-if="seasonsTxt.length > 0"
-            v-html="seasonsTxt"
-            style="min-height:24px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
-          )
-          //- Split only between "Watched" and the value; allow wrapping between them
-          #watched(
-            v-if="!previewMode && watchedValTxt && String(watchedValTxt).length > 0"
-            style="min-height:24px; display:flex; flex-wrap:wrap; justify-content:center; column-gap:8px; row-gap:0px;"
-          )
-            div(style="white-space:nowrap;") Watched
-            div(style="white-space:normal; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2;") {{ watchedValTxt }}
-          #cntrylang(
-            v-if="(cntryLangLeftTxt && cntryLangLeftTxt.length > 0) || (cntryLangRightTxt && cntryLangRightTxt.length > 0)"
-            style="min-height:20px; display:flex; flex-wrap:wrap; justify-content:center; column-gap:8px; row-gap:0px;"
-          )
-            div(
-              v-if="cntryLangLeftTxt && cntryLangLeftTxt.length > 0"
-              style="white-space:nowrap;"
-            ) {{ cntryLangLeftTxt }}
-            div(
-              v-if="cntryLangRightTxt && cntryLangRightTxt.length > 0"
-              style="white-space:normal; overflow-wrap:anywhere; word-break:break-word;"
-            ) {{ cntryLangRightTxt }}
-          #mins(
-            v-if="runtimeTxt.length > 0"
-            v-html="runtimeTxt"
-            style="min-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
-          )
-          //- Next Up: keep episode and suffix on separate lines
-          #nextup(
-            v-if="nextUpValTxt && String(nextUpValTxt).length > 0"
-            style="min-height:32px; display:flex; flex-direction:column; align-items:center; justify-content:center;"
-          )
-            div(style="display:flex; column-gap:8px; justify-content:center;")
-              div(style="white-space:nowrap;") Next Up
-              div(style="white-space:nowrap;") {{ nextUpValTxt }}
-            div(v-if="nextUpSuffixTxt && String(nextUpSuffixTxt).length > 0" style="white-space:nowrap;") {{ nextUpSuffixTxt }}
-          #collection(
-            v-if="collectionName"
-            style="min-height:24px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;"
-          )
-            | {{ (collectionCount > 1) ? 'Collections' : 'Collection' }}: {{collectionName}}
-
-          div(v-if="!previewMode && notInEmby" style="font-weight:bold; color:red; font-size:16px; margin-top:8px; white-space:nowrap;") Not In Emby
-
-      //- Notes input moved to header (simple + non-simple)
-
-
-
-  #allButtons(style="display:flex; flex-direction:column; margin-top:15px; padding:0 10px; width:100%;")
-    div(v-if="showSpinner")
-      img(src="../../loading.gif"
-          style="width:100px; height:100px; position:relative; top:20px; left:45px;")
-    #remoteButtons(
-      v-if="showRemotes"
-        style="display:flex; flex-wrap:wrap; justify-content:flex-start; width:100%; cursor:default;"
-    )
-      div(
-        v-for="remote in remotes"
-        :key="remote.name"
-        @click.stop="remoteClick(remote)"
-        :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit', cursor:'pointer', userSelect:'none' }"
-      )
-        | {{remote.name}}
-  
-  #bot(:style="{ fontSize: sizing.overviewFontSize || '20px', padding:'10px' }") {{show.Overview}}
-
+<div id="info" @click="handleSeriesClick" :style="{ height:'100%', width:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', position:'relative' }">
+  <div id="hdr" v-if="showHdr" :style="{ display:'flex', flexDirection:'column', gap:'10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', margin:'0px', marginBottom:'10px' }">
+    <div :style="{ display:'grid', gridTemplateColumns:'1fr 3fr 1fr 3fr 1fr', alignItems:'center', width:'100%' }">
+      <div :style="{ gridColumn:'1 / span 2', marginLeft:'20px', marginRight:'20px', whiteSpace:'normal', overflowWrap:'anywhere', wordBreak:'break-word', display:'flex', alignItems:'center', gap:'12px' }"><span>{{ show.Name }}</span></div>
+      <!-- Simple mode: align left edge of Notes with right edge of image (end of poster column)-->
+      <div v-if="simpleMode" :style="{ gridColumn:'3 / span 3', display:'flex', alignItems:'center', minWidth:'0px', width:'100%' }">
+        <template v-if="!previewMode">
+          <textarea v-model="noteText" @click.stop @keydown.stop @keydown.enter.prevent.stop="onEnterBlur" @input="onNoteInput" @focus="onNoteFocus" @blur="onNoteBlur" rows="1" placeholder="Notes" :style="{ width:'125px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"></textarea>
+          <textarea v-model="emailText" @click.stop @keydown.stop @keydown.enter.prevent.stop="onEnterBlur" rows="1" placeholder="Email Mark" :style="{ width:'125px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"></textarea>
+        </template>
+        <div :style="{ display:'flex', alignItems:'center', marginLeft:'auto', minWidth:'0px' }">
+          <div v-if="show?.Reject" style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; margin-right:10px; white-space:nowrap;">Banned From Download</div>
+        </div>
+      </div>
+      <!-- Non-simple mode: align left edge of Notes with left edge of infobox (start of infobox column)-->
+      <div v-else :style="{ gridColumn:'4 / span 2', display:'flex', alignItems:'center' }">
+        <div v-if="show?.Reject" style="font-weight:bold; color:red; font-size:18px; margin-top:4px; max-height:24px; margin-right:10px;">Banned From Download</div>
+        <template v-if="!previewMode">
+          <textarea v-model="noteText" @click.stop @keydown.stop @keydown.enter.prevent.stop="onEnterBlur" @input="onNoteInput" @focus="onNoteFocus" @blur="onNoteBlur" rows="1" placeholder="Notes" :style="{ width:'125px', padding:'2px', fontSize:'14px', border:'none', backgroundColor:'#eee', resize:'none', height:'14px', lineHeight:'1.2', marginTop:'4px', marginRight:'10px', marginLeft:'0px' }"></textarea>
+          <button @click.stop="deleteClick" style="font-size:15px; cursor:pointer; margin-left:10px; margin-top:3px; max-height:24px; border-radius: 7px;">Delete</button>
+        </template>
+      </div>
+    </div>
+  </div>
+  <!-- Layout: 1/9 whitespace, 1/3 poster, 1/9 whitespace, 1/3 infobox, 1/9 whitespace-->
+  <div id="body" :style="{ display:'grid', cursor:'default', width:'100%', gridTemplateColumns:'1fr 3fr 1fr 3fr 1fr', alignItems:'start' }">
+    <!-- Column 2: poster (1/3)-->
+    <div id="topLeft" @click.stop="handleBodyClick" :style="{ gridColumn:'2', minWidth:'0px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-start', textAlign:'center' }">
+      <div id="poster" :style="{ width:'100%', display:'flex', justifyContent:'center', alignItems:'flex-start' }"></div>
+    </div>
+    <!-- Column 4: info box (1/3)-->
+    <div id="topRight" :style="{ gridColumn:'4', minWidth:'0px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-start' }">
+      <div id="infoBox" v-if="seriesReady" @click.stop="handleBodyClick" :style="{ margin:'0px 0 0px 0px', width:'100%', boxSizing:'border-box', overflow:'hidden', fontSize: sizing.seriesInfoFontSize || '20px', lineHeight: sizing.infoBoxLineHeight || '1.2', display:'flex', flexDirection:'column', textAlign:'center', fontWeight:'bold' }">
+        <div style="border:1px solid #ccc; border-radius:5px; padding:5px; width:100%; box-sizing:border-box;">
+          <!-- Dates in one div; allow wrapping up to 2 lines-->
+          <div id="dates" v-if="dates &amp;&amp; String(dates).length &gt; 0" style="min-height:24px; white-space:normal; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2;">{{ dates }}</div>
+          <div id="status" v-if="statusTxt.length &gt; 0" v-html="statusTxt" style="min-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+          <div id="seasons" v-if="seasonsTxt.length &gt; 0" v-html="seasonsTxt" style="min-height:24px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+          <!-- Split only between "Watched" and the value; allow wrapping between them-->
+          <div id="watched" v-if="!previewMode &amp;&amp; watchedValTxt &amp;&amp; String(watchedValTxt).length &gt; 0" style="min-height:24px; display:flex; flex-wrap:wrap; justify-content:center; column-gap:8px; row-gap:0px;">
+            <div style="white-space:nowrap;">Watched</div>
+            <div style="white-space:normal; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2;">{{ watchedValTxt }}</div>
+          </div>
+          <div id="cntrylang" v-if="(cntryLangLeftTxt &amp;&amp; cntryLangLeftTxt.length &gt; 0) || (cntryLangRightTxt &amp;&amp; cntryLangRightTxt.length &gt; 0)" style="min-height:20px; display:flex; flex-wrap:wrap; justify-content:center; column-gap:8px; row-gap:0px;">
+            <div v-if="cntryLangLeftTxt &amp;&amp; cntryLangLeftTxt.length &gt; 0" style="white-space:nowrap;">{{ cntryLangLeftTxt }}</div>
+            <div v-if="cntryLangRightTxt &amp;&amp; cntryLangRightTxt.length &gt; 0" style="white-space:normal; overflow-wrap:anywhere; word-break:break-word;">{{ cntryLangRightTxt }}</div>
+          </div>
+          <div id="mins" v-if="runtimeTxt.length &gt; 0" v-html="runtimeTxt" style="min-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+          <!-- Next Up: keep episode and suffix on separate lines-->
+          <div id="nextup" v-if="nextUpValTxt &amp;&amp; String(nextUpValTxt).length &gt; 0" style="min-height:32px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+            <div style="display:flex; column-gap:8px; justify-content:center;">
+              <div style="white-space:nowrap;">Next Up</div>
+              <div style="white-space:nowrap;">{{ nextUpValTxt }}</div>
+            </div>
+            <div v-if="nextUpSuffixTxt &amp;&amp; String(nextUpSuffixTxt).length &gt; 0" style="white-space:nowrap;">{{ nextUpSuffixTxt }}</div>
+          </div>
+          <div id="collection" v-if="collectionName" style="min-height:24px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;">{{ (collectionCount > 1) ? 'Collections' : 'Collection' }}: {{collectionName}}</div>
+          <div v-if="!previewMode &amp;&amp; notInEmby" style="font-weight:bold; color:red; font-size:16px; margin-top:8px; white-space:nowrap;">Not In Emby</div>
+        </div>
+      </div>
+      <!-- Notes input moved to header (simple + non-simple)-->
+    </div>
+  </div>
+  <div id="allButtons" style="display:flex; flex-direction:column; margin-top:15px; padding:0 10px; width:100%;">
+    <div v-if="showSpinner"><img src="../../loading.gif" style="width:100px; height:100px; position:relative; top:20px; left:45px;"></div>
+    <div id="remoteButtons" v-if="showRemotes" style="display:flex; flex-wrap:wrap; justify-content:flex-start; width:100%; cursor:default;">
+      <div v-for="remote in remotes" :key="remote.name" @click.stop="remoteClick(remote)" :style="{ margin:'5px 5px', padding: sizing.remoteButtonPadding || '10px', backgroundColor:'#eee', borderRadius:'7px', textAlign:'center', border:'1px solid black', fontWeight:'bold', fontSize: sizing.remoteFontSize || 'inherit', cursor:'pointer', userSelect:'none' }">{{remote.name}}</div>
+    </div>
+  </div>
+  <div id="bot" :style="{ fontSize: sizing.overviewFontSize || '20px', padding:'10px' }">{{show.Overview}}</div>
+</div>
 </template>
 
 <script>

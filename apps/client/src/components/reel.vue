@@ -1,92 +1,49 @@
-<template lang="pug">
+<template>
 
-#reelPane(
-  @click="handleBackgroundClick"
-  :style="{ height:'100%', width:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'row', overflowY:'hidden', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', gap: '10px' }")
-
-  #reelLeft(
-    :style="{ flex: '0 0 125px', height: '100%', display: 'flex', flexDirection: 'column' }")
-    reel-gallery(
-      :style="{ flex: '1', minHeight: 0 }"
-      :srchStr="srchStr"
-      @select="handleGallerySelect"
-      @preview="handleGalleryPreview")
-
-  #reelRight(
-    :style="{ flex: '1 1 0', minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column', gap: '0' }")
-    
-    #reelInfo(
-      :style="{ padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', fontSize: '14px', textTransform: 'none' }")
-      div(v-if="curTvdb" :style="{ fontWeight: 'bold', fontSize: '18px', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }") {{ galleryTitleLine }}
-      div(v-if="curTvdb" :style="{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '10px' }")
-        div(:style="{ flex: '1 1 auto', minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: '15px' }") {{ infoLine }}
-
-    // keep zero gap between description and buttons
-    #reelDescrButtons(:style="{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: '0' }")
-      #reelDescr(
-        :style="{ flex: '0 0 auto', height: '120px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', overflowY: 'auto', fontSize: '16px', lineHeight: '1.5' }"
-        @wheel.stop.prevent="handleScaledWheel"
-      )
-        div(v-if="curTvdb") {{ curTvdb.overview }}
-      
-      #reelButtons(
-        :style="{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '5px', marginTop: '8px', border: '1px solid #808080', borderRadius: '5px', marginBottom: '8px', width: '100%', boxSizing: 'border-box' }")
-        button(
-          @click="handleNext"
-          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: isLoadingNext ? '#d3d3d3' : '' }") Next
-        button(
-          v-if="curTvdb && !isLoadingNext && !suppressButtons"
-          @click="handleLoad"
-          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Get
-        
-        span(v-if="isLoadingNext" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;loading shows&gt;
-
-        span(v-if="hasAnyRemoteButton && !isLoadingNext && !suppressButtons" :style="{ lineHeight: '18px', fontSize: '12px' }")  |
-
-        button(
-          v-if="imdbResult && !isLoadingNext && !suppressButtons"
-          @click="handleImdb"
-          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") {{ imdbButtonLabel }}
-        button(
-          v-if="rtResult && !isLoadingNext && !suppressButtons"
-          @click="handleRt"
-          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") {{ rtButtonLabel }}
-        button(
-          v-if="googleResult && !isLoadingNext && !suppressButtons"
-          @click="handleGoogle"
-          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Google
-        button(
-          v-if="wikiResult && !isLoadingNext && !suppressButtons"
-          @click="handleWiki"
-          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Wiki
-        button(
-          v-if="officialResult && !isLoadingNext && !suppressButtons"
-          @click="handleOfficial"
-          :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }") Official
-
-        
-        span(v-if="loadingRemotesCount > 0 && !isLoadingNext" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;loading remotes ({{ loadingRemotesCount }})&gt;
-        span(v-if="!curTvdb && !isLoadingNext && !suppressButtons" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }") &lt;no show info&gt;
-    
-    #reelTitles(
-      ref="titlesPane"
-      :style="{ flex: '1', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0' }"
-      @wheel.stop.prevent="handleScaledWheel"
-    )
-      div(
-        v-for="(item, idx) in parsedTitles"
-        :key="idx"
-        @click="selectTitle(idx)"
-        :style="getTitleCardStyle(idx)")
-        template(v-if="item.rejectStatus === 'msg'")
-          div(:style="{ width: '100%', textAlign: 'center', color: 'rgba(0,0,0,0.6)' }") {{ item.titleString }}
-        template(v-else-if="item.rejectStatus === 'ok'")
-          div {{ item.titleString }}
-        template(v-else)
-          div(:style="{ display: 'flex' }")
-            div(:style="{ width: '80px', flexShrink: 0, backgroundColor: '#ffcccc', padding: '5px' }") {{ item.rejectStatus }}
-            div(:style="{ flex: 1, padding: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }") {{ item.titleString }}
-
+<div id="reelPane" @click="handleBackgroundClick" :style="{ height:'100%', width:'100%', padding:'5px', margin:0, display:'flex', flexDirection:'row', overflowY:'hidden', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', gap: '10px' }">
+  <div id="reelLeft" :style="{ flex: '0 0 125px', height: '100%', display: 'flex', flexDirection: 'column' }">
+    <reel-gallery :style="{ flex: '1', minHeight: 0 }" :srchStr="srchStr" @select="handleGallerySelect" @preview="handleGalleryPreview"></reel-gallery>
+  </div>
+  <div id="reelRight" :style="{ flex: '1 1 0', minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column', gap: '0' }">
+    <div id="reelInfo" :style="{ padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', fontSize: '14px', textTransform: 'none' }">
+      <div v-if="curTvdb" :style="{ fontWeight: 'bold', fontSize: '18px', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }">{{ galleryTitleLine }}</div>
+      <div v-if="curTvdb" :style="{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '10px' }">
+        <div :style="{ flex: '1 1 auto', minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: '15px' }">{{ infoLine }}</div>
+      </div>
+    </div>
+    <!-- keep zero gap between description and buttons-->
+    <div id="reelDescrButtons" :style="{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: '0' }">
+      <div id="reelDescr" :style="{ flex: '0 0 auto', height: '120px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', overflowY: 'auto', fontSize: '16px', lineHeight: '1.5' }" @wheel.stop.prevent="handleScaledWheel">
+        <div v-if="curTvdb">{{ curTvdb.overview }}</div>
+      </div>
+      <div id="reelButtons" :style="{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '5px', marginTop: '8px', border: '1px solid #808080', borderRadius: '5px', marginBottom: '8px', width: '100%', boxSizing: 'border-box' }">
+        <button @click="handleNext" :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: isLoadingNext ? '#d3d3d3' : '' }">Next</button>
+        <button v-if="curTvdb &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons" @click="handleLoad" :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }">Get</button><span v-if="isLoadingNext" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }">&lt;loading shows&gt;</span><span v-if="hasAnyRemoteButton &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons" :style="{ lineHeight: '18px', fontSize: '12px' }"> |</span>
+        <button v-if="imdbResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons" @click="handleImdb" :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }">{{ imdbButtonLabel }}</button>
+        <button v-if="rtResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons" @click="handleRt" :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }">{{ rtButtonLabel }}</button>
+        <button v-if="googleResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons" @click="handleGoogle" :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }">Google</button>
+        <button v-if="wikiResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons" @click="handleWiki" :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }">Wiki</button>
+        <button v-if="officialResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons" @click="handleOfficial" :style="{ height: '18px', margin: '0', padding: '0 2px', lineHeight: '18px', fontSize: '16px', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }">Official</button><span v-if="loadingRemotesCount &gt; 0 &amp;&amp; !isLoadingNext" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }">&lt;loading remotes ({{ loadingRemotesCount }})&gt;</span><span v-if="!curTvdb &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons" :style="{ marginLeft: '10px', color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center' }">&lt;no show info&gt;</span>
+      </div>
+    </div>
+    <div id="reelTitles" ref="titlesPane" :style="{ flex: '1', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0' }" @wheel.stop.prevent="handleScaledWheel">
+      <div v-for="(item, idx) in parsedTitles" :key="idx" @click="selectTitle(idx)" :style="getTitleCardStyle(idx)">
+        <template v-if="item.rejectStatus === 'msg'">
+          <div :style="{ width: '100%', textAlign: 'center', color: 'rgba(0,0,0,0.6)' }">{{ item.titleString }}</div>
+        </template>
+        <template v-else-if="item.rejectStatus === 'ok'">
+          <div>{{ item.titleString }}</div>
+        </template>
+        <template v-else>
+          <div :style="{ display: 'flex' }">
+            <div :style="{ width: '80px', flexShrink: 0, backgroundColor: '#ffcccc', padding: '5px' }">{{ item.rejectStatus }}</div>
+            <div :style="{ flex: 1, padding: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }">{{ item.titleString }}</div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+</div>
 </template>
 
 <script>

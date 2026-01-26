@@ -1,30 +1,11 @@
-<template lang="pug">
+<template>
 
-#reelGallery(
-  ref="galleryPane"
-  :style="{ flex: '1', minHeight: 0, height: '100%', overflowY: 'auto', overflowX: 'hidden', display: 'block', padding: '2px' }"
-  @wheel.stop.prevent="handleScaledWheel"
-)
-  
-  div(
-    v-for="(tvdb, idx) in tvdbList"
-    :key="tvdb.id || idx"
-    @click="selectCard(idx)"
-    :style="getCardStyle(idx)")
-
-    div(v-if="!getImageUrl(tvdb)" :style="{ width: '101px', margin: '0 auto', backgroundColor: '#e0e0e0', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: '#666', padding: '10px' }")
-      | No Image
-    
-    img(
-      v-else
-      :src="getImageUrl(tvdb)"
-      :style="{ width: '101px', margin: '0 auto', height: 'auto', borderRadius: '5px', display: 'block' }"
-      @click.stop="previewCard(idx)"
-      @error="handleImageError($event)")
-    
-    div(:style="{ padding: '2px', fontSize: '12px', textAlign: 'center', fontWeight: 'bold' }")
-      | {{ tvdb.year }} - {{ tvdb.name }}
-
+<div id="reelGallery" ref="galleryPane" :style="{ flex: '1', minHeight: 0, height: '100%', overflowY: 'auto', overflowX: 'hidden', display: 'block', padding: '2px' }" @wheel.stop.prevent="handleScaledWheel">
+  <div v-for="(tvdb, idx) in tvdbList" :key="tvdb.id || idx" @click="selectCard(idx)" :style="getCardStyle(idx)">
+    <div v-if="!getImageUrl(tvdb)" :style="{ width: '101px', margin: '0 auto', backgroundColor: '#e0e0e0', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: '#666', padding: '10px' }">No Image</div><img v-else :src="getImageUrl(tvdb)" :style="{ width: '101px', margin: '0 auto', height: 'auto', borderRadius: '5px', display: 'block' }" @click.stop="previewCard(idx)" @error="handleImageError($event)">
+    <div :style="{ padding: '2px', fontSize: '12px', textAlign: 'center', fontWeight: 'bold' }">{{ tvdb.year }} - {{ tvdb.name }}</div>
+  </div>
+</div>
 </template>
 
 <script>

@@ -1,88 +1,65 @@
-<template lang="pug">
-#reviews(@click.stop :style="{ height:'100%', width:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa', position:'relative' }")
-  
-  //- Header Section
-  #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', display:'flex', flexDirection:'column', gap:'8px', borderBottom:'1px solid #ddd' }")
-    
-    //- Top Row: Show Title and Rotten Button
-    div(style="width:100%; display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;")
-      div(:style="{ fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginLeft:'10px', marginRight:'10px', flex:'1 1 auto', minWidth:0, whiteSpace:'normal', overflowWrap:'anywhere', wordBreak:'break-word', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }")
-        span {{ showName }}
-      
-      div(v-if="rottenUrl" style="margin-right:10px; flex:'0 0 auto';")
-        a(:href="rottenUrl" target="_blank" style="text-decoration:none;")
-          button(style="cursor:pointer; padding:6px 12px; border-radius:7px; background-color:#FA320A; color:white; font-weight:normal; border:1px solid black; font-size:14px;") {{ rottenLabel || 'Rotten' }}
+<template>
 
-      div(v-else-if="checkedRemotes" style="margin-right:10px; flex:'0 0 auto'; font-size:14px; color:#666;")
-        | Show not found at Rotten Tomatoes.
-
-    //- Second Row: Filter Radio Buttons
-    div(style="width:100%; display:flex; align-items:center; gap:8px; margin-left:10px; flex-wrap:wrap;")
-      button(
-        v-for="btn in filterButtons" 
-        :key="btn.label"
-        @click="handleButtonClick(btn.label)"
-        :style="getButtonStyle(selectedButton === btn.label)"
-      ) {{ btn.label }}
-
-      div(v-if="isLoading" style="font-size:14px; color:#aaa !important; margin-left:8px; font-weight: bold;") &lt;Loading&gt;
-
-      div(v-if="stats && !simpleMode" style="font-size:14px; color:#555; margin-left:auto; margin-right:10px; white-space:nowrap;") {{ reviews.length }}/{{ stats.numChecked }} Eng: {{ stats.notEnglishCount }}, Review: {{ stats.noReviewCount }}, Text: {{ stats.smallTextCount }}
-
-  //- Body: Two Scrolling Panes
-  #body(style="flex:1 1 auto; min-height:0; display:flex; gap:10px; margin-top:10px;")
-    
-    div(v-if="!isLoading && stats && reviews.length === 0" style="width:100%; text-align:center; color:#666; margin-top:50px; font-size:16px;") No reviews found.
-
-    template(v-else)
-      //- Left Column: Descending Sort (High Scores)
-      div(style="flex:1; display:flex; flexDirection:column; gap:10px; overflow-y:auto; overflow-x:hidden; height:100%;")
-        div(v-for="(review, idx) in leftColumnReviews" :key="idx" :style="cardStyle" @click="openReviewsPage")
-          //- Card Header
-          div(style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:5px;")
-            div(style="font-weight:bold; font-size:14px;")
-              span {{ review.author }}
-              span(v-if="review.publication" style="color:#666; font-weight:normal;") &nbsp;({{ review.publication }})
-            
-            div(style="font-size:14px; white-space:nowrap;")
-              template(v-if="review.numStars !== -1")
-                i(v-for="(starClass, idx) in getStarClasses(review.numStars)" :key="idx" :class="starClass" style="color:#FFA500; margin-left:2px; font-size:12px;")
-
-          div(style="border-bottom:1px solid #ddd; width:100%; margin-bottom:5px;")
-          
-          //- Card Text
-          div(:style="{fontSize:'15px', lineHeight:'1.4', cursor: 'pointer'}")
-            span {{ review.text }}
-
-          //- Full Review Link
-          div(v-if="review.url" style="margin-top:8px;" @click.stop)
-            a(:href="review.url" target="_blank")
-              button(style="cursor:pointer; padding:4px 8px; border-radius:4px; border:1px solid #bbb; background-color:whitesmoke; font-size:12px;") Full Review
-
-      //- Right Column: Ascending Sort (Low Scores)
-      div(style="flex:1; display:flex; flexDirection:column; gap:10px; overflow-y:auto; overflow-x:hidden; height:100%;")
-        div(v-for="(review, idx) in rightColumnReviews" :key="idx" :style="cardStyle" @click="openReviewsPage")
-          //- Card Header
-          div(style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:5px;")
-            div(style="font-weight:bold; font-size:14px;")
-              span {{ review.author }}
-              span(v-if="review.publication" style="color:#666; font-weight:normal;") &nbsp;({{ review.publication }})
-            
-            div(style="font-size:14px; white-space:nowrap;")
-              template(v-if="review.numStars !== -1")
-                i(v-for="(starClass, idx) in getStarClasses(review.numStars)" :key="idx" :class="starClass" style="color:#FFA500; margin-left:2px; font-size:12px;")
-
-          div(style="border-bottom:1px solid #ddd; width:100%; margin-bottom:5px;")
-          
-          //- Card Text
-          div(:style="{fontSize:'15px', lineHeight:'1.4', cursor: 'pointer'}")
-            span {{ review.text }}
-
-          //- Full Review Link
-          div(v-if="review.url" style="margin-top:8px;" @click.stop)
-            a(:href="review.url" target="_blank")
-              button(style="cursor:pointer; padding:4px 8px; border-radius:4px; border:1px solid #bbb; background-color:whitesmoke; font-size:12px;") Full Review
-
+<div id="reviews" @click.stop :style="{ height:'100%', width:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa', position:'relative' }">
+  <!-- Header Section-->
+  <div id="header" :style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', display:'flex', flexDirection:'column', gap:'8px', borderBottom:'1px solid #ddd' }">
+    <!-- Top Row: Show Title and Rotten Button-->
+    <div style="width:100%; display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;">
+      <div :style="{ fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginLeft:'10px', marginRight:'10px', flex:'1 1 auto', minWidth:0, whiteSpace:'normal', overflowWrap:'anywhere', wordBreak:'break-word', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }"><span>{{ showName }}</span></div>
+      <div v-if="rottenUrl" style="margin-right:10px; flex:'0 0 auto';"><a :href="rottenUrl" target="_blank" style="text-decoration:none;">
+          <button style="cursor:pointer; padding:6px 12px; border-radius:7px; background-color:#FA320A; color:white; font-weight:normal; border:1px solid black; font-size:14px;">{{ rottenLabel || 'Rotten' }}</button></a></div>
+      <div v-else-if="checkedRemotes" style="margin-right:10px; flex:'0 0 auto'; font-size:14px; color:#666;">Show not found at Rotten Tomatoes.</div>
+    </div>
+    <!-- Second Row: Filter Radio Buttons-->
+    <div style="width:100%; display:flex; align-items:center; gap:8px; margin-left:10px; flex-wrap:wrap;">
+      <button v-for="btn in filterButtons" :key="btn.label" @click="handleButtonClick(btn.label)" :style="getButtonStyle(selectedButton === btn.label)">{{ btn.label }}</button>
+      <div v-if="isLoading" style="font-size:14px; color:#aaa !important; margin-left:8px; font-weight: bold;">&lt;Loading&gt;</div>
+      <div v-if="stats &amp;&amp; !simpleMode" style="font-size:14px; color:#555; margin-left:auto; margin-right:10px; white-space:nowrap;">{{ reviews.length }}/{{ stats.numChecked }} Eng: {{ stats.notEnglishCount }}, Review: {{ stats.noReviewCount }}, Text: {{ stats.smallTextCount }}</div>
+    </div>
+  </div>
+  <!-- Body: Two Scrolling Panes-->
+  <div id="body" style="flex:1 1 auto; min-height:0; display:flex; gap:10px; margin-top:10px;">
+    <div v-if="!isLoading &amp;&amp; stats &amp;&amp; reviews.length === 0" style="width:100%; text-align:center; color:#666; margin-top:50px; font-size:16px;">No reviews found.</div>
+    <template v-else>
+      <!-- Left Column: Descending Sort (High Scores)-->
+      <div style="flex:1; display:flex; flexDirection:column; gap:10px; overflow-y:auto; overflow-x:hidden; height:100%;">
+        <div v-for="(review, idx) in leftColumnReviews" :key="idx" :style="cardStyle" @click="openReviewsPage">
+          <!-- Card Header-->
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:5px;">
+            <div style="font-weight:bold; font-size:14px;"><span>{{ review.author }}</span><span v-if="review.publication" style="color:#666; font-weight:normal;">&nbsp;({{ review.publication }})</span></div>
+            <div style="font-size:14px; white-space:nowrap;">
+              <template v-if="review.numStars !== -1"><i v-for="(starClass, idx) in getStarClasses(review.numStars)" :key="idx" :class="starClass" style="color:#FFA500; margin-left:2px; font-size:12px;"></i></template>
+            </div>
+          </div>
+          <div style="border-bottom:1px solid #ddd; width:100%; margin-bottom:5px;"></div>
+          <!-- Card Text-->
+          <div :style="{fontSize:'15px', lineHeight:'1.4', cursor: 'pointer'}"><span>{{ review.text }}</span></div>
+          <!-- Full Review Link-->
+          <div v-if="review.url" style="margin-top:8px;" @click.stop><a :href="review.url" target="_blank">
+              <button style="cursor:pointer; padding:4px 8px; border-radius:4px; border:1px solid #bbb; background-color:whitesmoke; font-size:12px;">Full Review</button></a></div>
+        </div>
+      </div>
+      <!-- Right Column: Ascending Sort (Low Scores)-->
+      <div style="flex:1; display:flex; flexDirection:column; gap:10px; overflow-y:auto; overflow-x:hidden; height:100%;">
+        <div v-for="(review, idx) in rightColumnReviews" :key="idx" :style="cardStyle" @click="openReviewsPage">
+          <!-- Card Header-->
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:5px;">
+            <div style="font-weight:bold; font-size:14px;"><span>{{ review.author }}</span><span v-if="review.publication" style="color:#666; font-weight:normal;">&nbsp;({{ review.publication }})</span></div>
+            <div style="font-size:14px; white-space:nowrap;">
+              <template v-if="review.numStars !== -1"><i v-for="(starClass, idx) in getStarClasses(review.numStars)" :key="idx" :class="starClass" style="color:#FFA500; margin-left:2px; font-size:12px;"></i></template>
+            </div>
+          </div>
+          <div style="border-bottom:1px solid #ddd; width:100%; margin-bottom:5px;"></div>
+          <!-- Card Text-->
+          <div :style="{fontSize:'15px', lineHeight:'1.4', cursor: 'pointer'}"><span>{{ review.text }}</span></div>
+          <!-- Full Review Link-->
+          <div v-if="review.url" style="margin-top:8px;" @click.stop><a :href="review.url" target="_blank">
+              <button style="cursor:pointer; padding:4px 8px; border-radius:4px; border:1px solid #bbb; background-color:whitesmoke; font-size:12px;">Full Review</button></a></div>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
 </template>
 
 <script>

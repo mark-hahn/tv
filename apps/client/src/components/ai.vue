@@ -1,25 +1,17 @@
-<template lang="pug">
-#aiPane(:style="{ width:'100%', height:'100%', display:'flex', flexDirection:'column', boxSizing:'border-box', padding:(simpleMode ? '8px' : '12px'), position:'relative' }")
-  // Scroll container
-  div(style="flex:1 1 auto; min-height:0; overflow:auto;")
-    // Centered column
-    div(style="max-width:560px; width:100%; margin:0 auto; padding:12px 44px; box-sizing:border-box;")
-      div(
-        v-if="!canRun"
-        style="min-height:0; display:flex; align-items:center; justify-content:center; color:#bbb; font-size:20px; padding:24px 0;"
-      ) Select a show to ask about.
+<template>
 
-      div(
-        v-else-if="!resultText"
-        style="min-height:0; display:flex; align-items:center; justify-content:center; color:#bbb; font-size:20px; padding:24px 0;"
-      ) Loading ...
-
-      // Result
-      div(
-        v-else
-        style="overflow:auto; margin:0; padding:14px; background:#fafafa; border:none; border-radius:8px; font-size:17px; line-height:1.5;"
-        v-html="renderedHtml"
-      )
+<div id="aiPane" :style="{ width:'100%', height:'100%', display:'flex', flexDirection:'column', boxSizing:'border-box', padding:(simpleMode ? '8px' : '12px'), position:'relative' }">
+  <!-- Scroll container-->
+  <div style="flex:1 1 auto; min-height:0; overflow:auto;">
+    <!-- Centered column-->
+    <div style="max-width:560px; width:100%; margin:0 auto; padding:12px 44px; box-sizing:border-box;">
+      <div v-if="!canRun" style="min-height:0; display:flex; align-items:center; justify-content:center; color:#bbb; font-size:20px; padding:24px 0;">Select a show to ask about.</div>
+      <div v-else-if="!resultText" style="min-height:0; display:flex; align-items:center; justify-content:center; color:#bbb; font-size:20px; padding:24px 0;">Loading ...</div>
+      <!-- Result-->
+      <div v-else style="overflow:auto; margin:0; padding:14px; background:#fafafa; border:none; border-radius:8px; font-size:17px; line-height:1.5;" v-html="renderedHtml"></div>
+    </div>
+  </div>
+</div>
 </template>
 
 <script>

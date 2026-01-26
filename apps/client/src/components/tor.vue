@@ -1,146 +1,140 @@
-<template lang="pug">
-.torrents-container(:style="{ height:'100%', width:'100%', display:'flex', justifyContent:'flex-start' }")
-  #tor(
-    ref="scroller"
-    :style="{ height:'100%', width:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa' }"
-    @wheel.stop.prevent="handleScaledWheel"
-  )
+<template>
 
-    #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'10px', marginLeft:'0px', marginRight:'0px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
-      div(style="display:flex; justify-content:space-between; align-items:center;")
-        div(style="margin-left:20px;") {{ headerShowName }}
-        div(style="display:flex; gap:8px; margin-left:auto;")
-          button(v-if="selectedTorrent" @click.stop="continueDownload" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Get
-          button(v-if="selectedTorrent" @click.stop="openDetails" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Tab
-          input(v-model="seasonFilter" @keydown.stop @click.stop placeholder="Season" style="width:60px; font-size:13px; padding:4px; border:1px solid #bbb; border-radius:7px;")
-          button(@click.stop="searchClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Search
-          button(@click.stop="forceClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Force
-          button(@click.stop="toggleCookieInputs" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Cookies
-          button(@click.stop="toggleDebug" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;") Debug
-
-      div(style="height:1px; width:100%; background-color:#ddd; margin-top:6px;")
-
-      div(style="margin-left:20px; margin-right:20px; margin-top:6px; font-weight:normal; font-size:15px; color:#666; display:block; line-height:1.1; overflow:visible;")
-        div(style="display:flex; align-items:center; justify-content:flex-start; gap:25px; white-space:nowrap;")
-          div(style="display:flex")
-            div() USB:
-            table(style="border-collapse:separate; border-spacing:15px 0;")
-              tbody
-                tr
-                  td(style="text-align:right; padding:0;")
-                    span {{ spaceUsbGb }} GB
-                  td(style="text-align:right; padding:0;")
-                    span {{ spaceUsbPct }}
-          div(style="display:flex;")
-            div() SRVR:
-            table(style="border-collapse:separate; border-spacing:15px 0;")
-              tbody
-                tr
-                  td(style="text-align:right; padding:0;")
-                    span {{ spaceSrvrGb }} GB
-                  td(style="text-align:right; padding:0;")
-                    span {{ spaceSrvrPct }}
-
-    #unaired(v-if="unaired" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
-      div Show not aired yet
-      
-    #cookie-inputs(@click.stop v-if="!loading && ((isCookieRelatedError && !dismissCookieInputs) || showCookieInputs)" style="position:sticky; top:120px; zIndex:120; padding:15px 20px 15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;")
-      div(style="margin-bottom:10px;")
-        label(style="display:block; font-size:12px; font-weight:bold; margin-bottom:3px; color:#555;") IPTorrents cf_clearance:
-        input(v-model="iptCfClearance" type="text" placeholder="Paste cf_clearance cookie value" style="width:100%; padding:6px; font-size:12px; border:1px solid #ccc; border-radius:3px; box-sizing:border-box;")
-      div(style="margin-bottom:10px;")
-        label(style="display:block; font-size:12px; font-weight:bold; margin-bottom:3px; color:#555;") TorrentLeech cf_clearance:
-        input(v-model="tlCfClearance" type="text" placeholder="Paste cf_clearance cookie value" style="width:100%; padding:6px; font-size:12px; border:1px solid #ccc; border-radius:3px; box-sizing:border-box;")
-      div(style="margin-top:10px;")
-        button(@click.stop="saveCookies" :disabled="loading" style="padding:8px 20px; font-size:13px; font-weight:bold; cursor:pointer; border-radius:5px; background:#4CAF50; color:white; border:none; width:100%;") 
-          | Save Cookies
-
-    #debug-panel(@click.stop v-if="!loading && showDebug" style="position:sticky; top:120px; zIndex:119; padding:12px 16px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd; font-weight:normal;")
-      div(style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;")
-        div(style="font-weight:bold; color:#444; font-size:12px;") Debug
-        div(style="display:flex; gap:8px; align-items:center;")
-          button(v-if="lastSearchUrl" @click.stop="copyDebugUrl" style="font-size:12px; cursor:pointer; border-radius:6px; padding:2px 8px; border:1px solid #bbb; background-color:whitesmoke;") Copy URL
-          button(@click.stop="showDebug=false" style="font-size:12px; cursor:pointer; border-radius:6px; padding:2px 8px; border:1px solid #bbb; background-color:whitesmoke;") Close
-      div(style="font-size:12px; color:#555; line-height:1.35; white-space:pre-wrap; overflow-wrap:anywhere;")
-        div(v-if="debugCopyMsg" style="color:#2b6; margin-bottom:6px;") {{ debugCopyMsg }}
-        div(v-if="lastSearchShow")
-          span(style="font-weight:bold;") show:
-          |  {{ lastSearchShow }}
-        div(v-if="lastSearchNeeded")
-          span(style="font-weight:bold;") needed:
-          |  {{ lastSearchNeeded }}
-        div(v-if="lastSearchUrl")
-          span(style="font-weight:bold;") url:
-          |  {{ lastSearchUrl }}
-        div(v-if="lastApiCount !== null")
-          span(style="font-weight:bold;") api count:
-          |  {{ lastApiCount }}
-        div(v-if="lastRawProviderCounts")
-          span(style="font-weight:bold;") rawProviderCounts:
-          |  {{ formatJsonInline(lastRawProviderCounts) }}
-        div(v-if="lastReturnedProviderCounts")
-          span(style="font-weight:bold;") returnedProviderCounts:
-          |  {{ formatJsonInline(lastReturnedProviderCounts) }}
-        div(v-if="lastWarningSummary")
-          span(style="font-weight:bold;") warningSummary:
-          |  {{ formatJsonInline(lastWarningSummary) }}
-
-    
-
-    #loading(v-if="!unaired && loading" style="text-align:center; color:#666; margin-top:50px; font-size:16px;")
-      div Searching for torrents...
-      
-    #error(v-if="!unaired && error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px; white-space:pre-line; padding:0 20px;")
-      div Error: {{ error }}
-    #warning(v-if="!unaired && !error && providerWarning" style="text-align:center; color:#b36b00; margin-top:20px; font-size:14px; white-space:pre-line; padding:0 20px;")
-      div {{ providerWarning }}
-      
-    #no-torrents-needed(v-if="!unaired && noTorrentsNeeded && !loading && !error" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
-      div No torrents needed.
-      
-    #torrents-list(v-if="!unaired && !loading && !noTorrentsNeeded" style="padding:10px; font-size:14px; font-family:sans-serif; font-weight:normal;")
-      div(v-if="!hasSearched && filteredTorrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
-        div Click on Search to find torrents for {{ headerShowName }}.
-      div(v-else-if="hasSearched && filteredTorrents.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
-        div No torrents found.
-      div(v-for="(torrent, index) in filteredTorrents" :key="getTorrentCardKey(torrent, index)" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'")
-        div(v-if="isClicked(torrent)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
-        div(v-if="isDownloadedBefore(torrent)" :style="getDownloadedBeforeIconStyle(torrent)" title="Downloaded before") 🕘
-        div(v-if="getDownloadStatus(torrent)" :title="getDownloadStatusTooltip(torrent)" style="position:absolute; bottom:8px; right:8px; font-size:11px; color:#666; max-width:70%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;") {{ getDownloadStatusLabel(torrent) }}
-        div(v-if="SHOW_TITLE && torrent.raw" style="font-size:14px; font-weight:bold; color:#888; margin-bottom:4px; white-space:normal; overflow-wrap:anywhere; word-break:break-word; font-family:sans-serif;") {{ getDisplayTitleWithProvider(torrent) }}
-        div(v-if="getTorrentWarnings(torrent).length > 0" style="font-size:11px; color:#a33; margin-bottom:4px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;")
-          | {{ formatTorrentWarnings(torrent) }}
-        div(style="margin-top:8px; font-size:13px; font-family:sans-serif; color:#333;") 
-          span(style="color:blue !important;") {{ getDisplaySeasonEpisode(torrent) }}
-          span(style="color:rgba(0,0,0,0.50) !important;")
-            | : {{ fmtSize(torrent.raw?.size) || torrent.raw?.size || 'N/A' }} | {{ torrent.raw?.seeds || 0 }} seeds
-            span(v-if="torrent.raw?.provider" style="color:rgba(0,0,0,0.50) !important;") &nbsp;|&nbsp;{{ formatProvider(torrent.raw.provider) }}
-            span(v-if="torrent.parsed?.resolution" style="color:rgba(0,0,0,0.50) !important;") &nbsp;|&nbsp;{{ torrent.parsed.resolution }}
-            span(v-if="torrent.parsed?.group" style="color:rgba(0,0,0,0.50) !important;") &nbsp;|&nbsp;{{ formatGroup(torrent.parsed.group) }}
-
-  #download-modal(v-if="showModal" @click.stop="showModal = false" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:10000;")
-    #modal-content(@click.stop style="background:white; padding:30px; border-radius:10px; max-width:500px; box-shadow:0 4px 20px rgba(0,0,0,0.3);")
-      div(style="font-size:16px; margin-bottom:20px; line-height:1.5;") Is it OK to download file 
-        span(style="font-weight:bold;") {{ selectedTorrent?.raw?.title || 'Unknown' }}
-        | ?
-      div(style="display:flex; gap:10px; justify-content:flex-end;")
-        button(@click.stop="cancelDownload" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;") Cancel
-        button(@click.stop="continueDownload" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;") OK
-
-  #error-modal(v-if="showErrorModal" @click.stop="closeErrorModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:10000;")
-    #modal-content(@click.stop style="background:white; padding:30px; border-radius:10px; max-width:520px; box-shadow:0 4px 20px rgba(0,0,0,0.3);")
-      div(style="font-size:16px; margin-bottom:20px; line-height:1.5; white-space:pre-line;") {{ errorModalMsg }}
-      div(style="display:flex; gap:10px; justify-content:flex-end;")
-        button(@click.stop="closeErrorModal" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;") OK
-
-  #existing-delete-modal(v-if="showExistingDeleteModal" @click.stop="cancelExistingDelete" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:10000;")
-    #modal-content(@click.stop style="background:white; padding:30px; border-radius:10px; max-width:520px; box-shadow:0 4px 20px rgba(0,0,0,0.3);")
-      div(style="font-size:16px; margin-bottom:20px; line-height:1.5; white-space:pre-line;") {{ existingDeleteModalMsg }}
-      div(style="display:flex; gap:10px; justify-content:flex-end;")
-        button(@click.stop="cancelExistingDelete" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;") Cancel
-        button(@click.stop="confirmExistingDelete" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;") Delete
-
-
+<div class="torrents-container" :style="{ height:'100%', width:'100%', display:'flex', justifyContent:'flex-start' }">
+  <div id="tor" ref="scroller" :style="{ height:'100%', width:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa' }" @wheel.stop.prevent="handleScaledWheel">
+    <div id="header" :style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'10px', marginLeft:'0px', marginRight:'0px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="margin-left:20px;">{{ headerShowName }}</div>
+        <div style="display:flex; gap:8px; margin-left:auto;">
+          <button v-if="selectedTorrent" @click.stop="continueDownload" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;">Get</button>
+          <button v-if="selectedTorrent" @click.stop="openDetails" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;">Tab</button>
+          <input v-model="seasonFilter" @keydown.stop @click.stop placeholder="Season" style="width:60px; font-size:13px; padding:4px; border:1px solid #bbb; border-radius:7px;">
+          <button @click.stop="searchClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;">Search</button>
+          <button @click.stop="forceClick" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;">Force</button>
+          <button @click.stop="toggleCookieInputs" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;">Cookies</button>
+          <button @click.stop="toggleDebug" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px; border:1px solid #bbb; background-color:whitesmoke;">Debug</button>
+        </div>
+      </div>
+      <div style="height:1px; width:100%; background-color:#ddd; margin-top:6px;"></div>
+      <div style="margin-left:20px; margin-right:20px; margin-top:6px; font-weight:normal; font-size:15px; color:#666; display:block; line-height:1.1; overflow:visible;">
+        <div style="display:flex; align-items:center; justify-content:flex-start; gap:25px; white-space:nowrap;">
+          <div style="display:flex">
+            <div>USB:</div>
+            <table style="border-collapse:separate; border-spacing:15px 0;">
+              <tbody>
+                <tr>
+                  <td style="text-align:right; padding:0;"><span>{{ spaceUsbGb }} GB</span></td>
+                  <td style="text-align:right; padding:0;"><span>{{ spaceUsbPct }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="display:flex;">
+            <div>SRVR:</div>
+            <table style="border-collapse:separate; border-spacing:15px 0;">
+              <tbody>
+                <tr>
+                  <td style="text-align:right; padding:0;"><span>{{ spaceSrvrGb }} GB</span></td>
+                  <td style="text-align:right; padding:0;"><span>{{ spaceSrvrPct }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="unaired" v-if="unaired" style="text-align:center; color:#666; margin-top:50px; font-size:18px;">
+      <div>Show not aired yet</div>
+    </div>
+    <div id="cookie-inputs" @click.stop v-if="!loading &amp;&amp; ((isCookieRelatedError &amp;&amp; !dismissCookieInputs) || showCookieInputs)" style="position:sticky; top:120px; zIndex:120; padding:15px 20px 15px 20px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd;">
+      <div style="margin-bottom:10px;">
+        <label style="display:block; font-size:12px; font-weight:bold; margin-bottom:3px; color:#555;">IPTorrents cf_clearance:</label>
+        <input v-model="iptCfClearance" type="text" placeholder="Paste cf_clearance cookie value" style="width:100%; padding:6px; font-size:12px; border:1px solid #ccc; border-radius:3px; box-sizing:border-box;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="display:block; font-size:12px; font-weight:bold; margin-bottom:3px; color:#555;">TorrentLeech cf_clearance:</label>
+        <input v-model="tlCfClearance" type="text" placeholder="Paste cf_clearance cookie value" style="width:100%; padding:6px; font-size:12px; border:1px solid #ccc; border-radius:3px; box-sizing:border-box;">
+      </div>
+      <div style="margin-top:10px;">
+        <button @click.stop="saveCookies" :disabled="loading" style="padding:8px 20px; font-size:13px; font-weight:bold; cursor:pointer; border-radius:5px; background:#4CAF50; color:white; border:none; width:100%;">
+           Save Cookies</button>
+      </div>
+    </div>
+    <div id="debug-panel" @click.stop v-if="!loading &amp;&amp; showDebug" style="position:sticky; top:120px; zIndex:119; padding:12px 16px; margin-bottom:10px; background:#fff; border-radius:5px; border:1px solid #ddd; font-weight:normal;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="font-weight:bold; color:#444; font-size:12px;">Debug</div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button v-if="lastSearchUrl" @click.stop="copyDebugUrl" style="font-size:12px; cursor:pointer; border-radius:6px; padding:2px 8px; border:1px solid #bbb; background-color:whitesmoke;">Copy URL</button>
+          <button @click.stop="showDebug=false" style="font-size:12px; cursor:pointer; border-radius:6px; padding:2px 8px; border:1px solid #bbb; background-color:whitesmoke;">Close</button>
+        </div>
+      </div>
+      <div style="font-size:12px; color:#555; line-height:1.35; white-space:pre-wrap; overflow-wrap:anywhere;">
+        <div v-if="debugCopyMsg" style="color:#2b6; margin-bottom:6px;">{{ debugCopyMsg }}</div>
+        <div v-if="lastSearchShow"><span style="font-weight:bold;">show:</span> {{ lastSearchShow }}</div>
+        <div v-if="lastSearchNeeded"><span style="font-weight:bold;">needed:</span> {{ lastSearchNeeded }}</div>
+        <div v-if="lastSearchUrl"><span style="font-weight:bold;">url:</span> {{ lastSearchUrl }}</div>
+        <div v-if="lastApiCount !== null"><span style="font-weight:bold;">api count:</span> {{ lastApiCount }}</div>
+        <div v-if="lastRawProviderCounts"><span style="font-weight:bold;">rawProviderCounts:</span> {{ formatJsonInline(lastRawProviderCounts) }}</div>
+        <div v-if="lastReturnedProviderCounts"><span style="font-weight:bold;">returnedProviderCounts:</span> {{ formatJsonInline(lastReturnedProviderCounts) }}</div>
+        <div v-if="lastWarningSummary"><span style="font-weight:bold;">warningSummary:</span> {{ formatJsonInline(lastWarningSummary) }}</div>
+      </div>
+    </div>
+    <div id="loading" v-if="!unaired &amp;&amp; loading" style="text-align:center; color:#666; margin-top:50px; font-size:16px;">
+      <div>Searching for torrents...</div>
+    </div>
+    <div id="error" v-if="!unaired &amp;&amp; error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px; white-space:pre-line; padding:0 20px;">
+      <div>Error: {{ error }}</div>
+    </div>
+    <div id="warning" v-if="!unaired &amp;&amp; !error &amp;&amp; providerWarning" style="text-align:center; color:#b36b00; margin-top:20px; font-size:14px; white-space:pre-line; padding:0 20px;">
+      <div>{{ providerWarning }}</div>
+    </div>
+    <div id="no-torrents-needed" v-if="!unaired &amp;&amp; noTorrentsNeeded &amp;&amp; !loading &amp;&amp; !error" style="text-align:center; color:#666; margin-top:50px; font-size:18px;">
+      <div>No torrents needed.</div>
+    </div>
+    <div id="torrents-list" v-if="!unaired &amp;&amp; !loading &amp;&amp; !noTorrentsNeeded" style="padding:10px; font-size:14px; font-family:sans-serif; font-weight:normal;">
+      <div v-if="!hasSearched &amp;&amp; filteredTorrents.length === 0 &amp;&amp; !error" style="text-align:center; color:#999; margin-top:50px;">
+        <div>Click on Search to find torrents for {{ headerShowName }}.</div>
+      </div>
+      <div v-else-if="hasSearched &amp;&amp; filteredTorrents.length === 0 &amp;&amp; !error" style="text-align:center; color:#999; margin-top:50px;">
+        <div>No torrents found.</div>
+      </div>
+      <div v-for="(torrent, index) in filteredTorrents" :key="getTorrentCardKey(torrent, index)" @click="handleTorrentClick($event, torrent)" @click.stop :style="getCardStyle(torrent)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'">
+        <div v-if="isClicked(torrent)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;">✓</div>
+        <div v-if="isDownloadedBefore(torrent)" :style="getDownloadedBeforeIconStyle(torrent)" title="Downloaded before">🕘</div>
+        <div v-if="getDownloadStatus(torrent)" :title="getDownloadStatusTooltip(torrent)" style="position:absolute; bottom:8px; right:8px; font-size:11px; color:#666; max-width:70%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ getDownloadStatusLabel(torrent) }}</div>
+        <div v-if="SHOW_TITLE &amp;&amp; torrent.raw" style="font-size:14px; font-weight:bold; color:#888; margin-bottom:4px; white-space:normal; overflow-wrap:anywhere; word-break:break-word; font-family:sans-serif;">{{ getDisplayTitleWithProvider(torrent) }}</div>
+        <div v-if="getTorrentWarnings(torrent).length &gt; 0" style="font-size:11px; color:#a33; margin-bottom:4px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;">{{ formatTorrentWarnings(torrent) }}</div>
+        <div style="margin-top:8px; font-size:13px; font-family:sans-serif; color:#333;"> <span style="color:blue !important;">{{ getDisplaySeasonEpisode(torrent) }}</span><span style="color:rgba(0,0,0,0.50) !important;">: {{ fmtSize(torrent.raw?.size) || torrent.raw?.size || 'N/A' }} | {{ torrent.raw?.seeds || 0 }} seeds<span v-if="torrent.raw?.provider" style="color:rgba(0,0,0,0.50) !important;">&nbsp;|&nbsp;{{ formatProvider(torrent.raw.provider) }}</span><span v-if="torrent.parsed?.resolution" style="color:rgba(0,0,0,0.50) !important;">&nbsp;|&nbsp;{{ torrent.parsed.resolution }}</span><span v-if="torrent.parsed?.group" style="color:rgba(0,0,0,0.50) !important;">&nbsp;|&nbsp;{{ formatGroup(torrent.parsed.group) }}</span></span></div>
+      </div>
+    </div>
+  </div>
+  <div id="download-modal" v-if="showModal" @click.stop="showModal = false" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:10000;">
+    <div id="modal-content" @click.stop style="background:white; padding:30px; border-radius:10px; max-width:500px; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+      <div style="font-size:16px; margin-bottom:20px; line-height:1.5;">Is it OK to download file <span style="font-weight:bold;">{{ selectedTorrent?.raw?.title || 'Unknown' }}</span>?</div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button @click.stop="cancelDownload" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;">Cancel</button>
+        <button @click.stop="continueDownload" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;">OK</button>
+      </div>
+    </div>
+  </div>
+  <div id="error-modal" v-if="showErrorModal" @click.stop="closeErrorModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:10000;">
+    <div id="modal-content" @click.stop style="background:white; padding:30px; border-radius:10px; max-width:520px; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+      <div style="font-size:16px; margin-bottom:20px; line-height:1.5; white-space:pre-line;">{{ errorModalMsg }}</div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button @click.stop="closeErrorModal" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;">OK</button>
+      </div>
+    </div>
+  </div>
+  <div id="existing-delete-modal" v-if="showExistingDeleteModal" @click.stop="cancelExistingDelete" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:10000;">
+    <div id="modal-content" @click.stop style="background:white; padding:30px; border-radius:10px; max-width:520px; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+      <div style="font-size:16px; margin-bottom:20px; line-height:1.5; white-space:pre-line;">{{ existingDeleteModalMsg }}</div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button @click.stop="cancelExistingDelete" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;">Cancel</button>
+        <button @click.stop="confirmExistingDelete" style="padding:8px 20px; font-size:14px; cursor:pointer; border-radius:5px; border:1px solid #ccc; background:white;">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
 </template>
 
 <script>

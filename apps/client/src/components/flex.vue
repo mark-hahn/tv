@@ -1,20 +1,16 @@
-<template lang="pug">
+<template>
 
-#flex(:style="{ height:'100%', width:'100%', padding:'5px', margin:0, marginLeft:'16px', display:'flex', flexDirection:'column', overflow:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa', fontWeight:'bold' }")
-
-  #scroller(
-    ref="scroller"
-    :style="{ flex:'1 1 auto', minHeight:'0px', overflowY:'auto', overflowX:'hidden' }"
-    @wheel.stop.prevent="handleScaledWheel"
-  )
-    div(v-if="cards.length === 0" style="text-align:center; color:#666; margin-top:50px; font-size:18px;")
-      span(v-if="emptyStateText") {{ emptyStateText }}
-
-    div(v-else style="padding:10px; font-size:14px; font-family:sans-serif; font-weight:normal;")
-      div(v-for="c in cards" :key="c.key" @click="handleCardClick(c)" style="position:relative; background:#fff; border:1px solid #ddd; border-radius:5px; padding:10px; cursor:pointer;")
-        div(style="font-size:14px; font-weight:bold; color:#000; word-break:break-word;") {{ c.title }}
-        div(style="margin-top:8px; font-size:14px; font-weight:normal; color:rgba(0,0,0,0.50) !important; word-break:break-word;") {{ c.subline }}
-
+<div id="flex" :style="{ height:'100%', width:'100%', padding:'5px', margin:0, marginLeft:'16px', display:'flex', flexDirection:'column', overflow:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa', fontWeight:'bold' }">
+  <div id="scroller" ref="scroller" :style="{ flex:'1 1 auto', minHeight:'0px', overflowY:'auto', overflowX:'hidden' }" @wheel.stop.prevent="handleScaledWheel">
+    <div v-if="cards.length === 0" style="text-align:center; color:#666; margin-top:50px; font-size:18px;"><span v-if="emptyStateText">{{ emptyStateText }}</span></div>
+    <div v-else style="padding:10px; font-size:14px; font-family:sans-serif; font-weight:normal;">
+      <div v-for="c in cards" :key="c.key" @click="handleCardClick(c)" style="position:relative; background:#fff; border:1px solid #ddd; border-radius:5px; padding:10px; cursor:pointer;">
+        <div style="font-size:14px; font-weight:bold; color:#000; word-break:break-word;">{{ c.title }}</div>
+        <div style="margin-top:8px; font-size:14px; font-weight:normal; color:rgba(0,0,0,0.50) !important; word-break:break-word;">{{ c.subline }}</div>
+      </div>
+    </div>
+  </div>
+</div>
 </template>
 
 <script>

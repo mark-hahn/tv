@@ -1,8 +1,9 @@
-<template lang="pug">
+<template>
 
-#meta(style="height:95dvh; padding:0; margin:0; display:flex;")
-  div(style="border:0.5px solid gray;") name: {{show.Name}}
-  #poster()
+<div id="meta" style="height:95dvh; padding:0; margin:0; display:flex;">
+  <div style="border:0.5px solid gray;">name: {{show.Name}}</div>
+  <div id="poster"></div>
+</div>
 </template>
 
 <script>

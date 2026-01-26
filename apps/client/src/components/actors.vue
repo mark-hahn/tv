@@ -1,42 +1,37 @@
-<template lang="pug">
-#actors(@click.stop :style="{ height:'100%', width:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa', position:'relative' }")
+<template>
 
-  #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', display:'flex', flexDirection:'column', gap:'8px' }")
-    div(style="width:100%; display:flex; flex-direction:column; gap:8px;")
-      //- Top row: show name (fills), mode label, arrows.
-      div(style="width:100%; display:flex; align-items:center; justify-content:space-between;")
-        div(style="margin-left:20px; margin-right:10px; flex:1 1 auto; min-width:0; white-space:normal; overflow-wrap:anywhere; word-break:break-word; display:flex; align-items:center; gap:12px; flex-wrap:wrap;")
-          span {{ showName }}
-        div(style="margin-left:20px; margin-right:15px; flex:0 0 auto; display:flex; align-items:center; gap:12px; font-weight:normal;")
-          button(@click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:5px;") ◄
-          button(@click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;") ►
-
-      //- Bottom row: buttons and inputs only.
-      div(style="width:100%; display:flex; align-items:center; justify-content:flex-start; gap:12px; margin-right:20px; margin-left:20px; font-weight:normal;")
-        button(@click.stop="handleRegularClick" :style="getRegularButtonStyle()") Regulars
-        button(@click.stop="handleGuestClick" :style="getGuestsButtonStyle()") Guests
-        label(style="font-size:14px; margin-left:10px;") Season
-        input(v-model="seasonNum" @click.stop @keydown.enter.prevent="handleGuestClick" @blur.stop="handleSeasonEpisodeBlur" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
-        label(style="font-size:14px; margin-left:5px;") Episode
-        input(v-model="episodeNum" @click.stop @keydown.enter.prevent="handleGuestClick" @blur.stop="handleSeasonEpisodeBlur" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;")
-  
-  #error-message(v-if="errorMessage"
-                 style="text-align:center; color:red; margin-top:50px; font-size:16px;")
-    div {{ errorMessage }}
-  
-  #actors-grid(v-else style="display:grid; grid-template-columns:repeat(auto-fill, minmax(110px, 1fr)); gap:10px; padding:5px;")
-    Actor(
-      v-for="actor in actors"
-      :key="actor.url"
-      :actor="actor"
-      @actor-click="handleActorClick"
-    )
-
-  #no-actors(v-if="!errorMessage && !isGuestMode && showName && actors.length === 0"
-             style="text-align:center; color:#999; margin-top:50px; font-size:16px;")
-    div(style="margin-bottom:20px;") No cast information available
-
-
+<div id="actors" @click.stop :style="{ height:'100%', width:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa', position:'relative' }">
+  <div id="header" :style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'15px', marginLeft:'-10px', marginRight:'-10px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', display:'flex', flexDirection:'column', gap:'8px' }">
+    <div style="width:100%; display:flex; flex-direction:column; gap:8px;">
+      <!-- Top row: show name (fills), mode label, arrows.-->
+      <div style="width:100%; display:flex; align-items:center; justify-content:space-between;">
+        <div style="margin-left:20px; margin-right:10px; flex:1 1 auto; min-width:0; white-space:normal; overflow-wrap:anywhere; word-break:break-word; display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><span>{{ showName }}</span></div>
+        <div style="margin-left:20px; margin-right:15px; flex:0 0 auto; display:flex; align-items:center; gap:12px; font-weight:normal;">
+          <button @click.stop="handleLeftArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px; margin-right:5px;">◄</button>
+          <button @click.stop="handleRightArrow" style="font-size:13px; cursor:pointer; border-radius:5px; padding:2px 8px;">►</button>
+        </div>
+      </div>
+      <!-- Bottom row: buttons and inputs only.-->
+      <div style="width:100%; display:flex; align-items:center; justify-content:flex-start; gap:12px; margin-right:20px; margin-left:20px; font-weight:normal;">
+        <button @click.stop="handleRegularClick" :style="getRegularButtonStyle()">Regulars</button>
+        <button @click.stop="handleGuestClick" :style="getGuestsButtonStyle()">Guests</button>
+        <label style="font-size:14px; margin-left:10px;">Season</label>
+        <input v-model="seasonNum" @click.stop @keydown.enter.prevent="handleGuestClick" @blur.stop="handleSeasonEpisodeBlur" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;">
+        <label style="font-size:14px; margin-left:5px;">Episode</label>
+        <input v-model="episodeNum" @click.stop @keydown.enter.prevent="handleGuestClick" @blur.stop="handleSeasonEpisodeBlur" type="text" maxlength="2" style="width:30px; padding:2px 4px; font-size:14px; text-align:center; border:1px solid #ccc; border-radius:3px;">
+      </div>
+    </div>
+  </div>
+  <div id="error-message" v-if="errorMessage" style="text-align:center; color:red; margin-top:50px; font-size:16px;">
+    <div>{{ errorMessage }}</div>
+  </div>
+  <div id="actors-grid" v-else style="display:grid; grid-template-columns:repeat(auto-fill, minmax(110px, 1fr)); gap:10px; padding:5px;">
+    <Actor v-for="actor in actors" :key="actor.url" :actor="actor" @actor-click="handleActorClick"></Actor>
+  </div>
+  <div id="no-actors" v-if="!errorMessage &amp;&amp; !isGuestMode &amp;&amp; showName &amp;&amp; actors.length === 0" style="text-align:center; color:#999; margin-top:50px; font-size:16px;">
+    <div style="margin-bottom:20px;">No cast information available</div>
+  </div>
+</div>
 </template>
 
 <script>

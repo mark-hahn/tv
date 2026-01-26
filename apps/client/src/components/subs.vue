@@ -1,96 +1,95 @@
-<template lang="pug">
-.subs-container(:style="{ height:'100%', width:'100%', display:'flex', justifyContent:'flex-start' }")
-  #subs(
-    ref="scroller"
-    :style="{ height:'100%', width:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa' }"
-    @wheel.stop.prevent="handleScaledWheel"
-  )
+<template>
 
-    #header(:style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'10px', marginLeft:'0px', marginRight:'0px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }")
-      //- Row 1
-      div(style="display:flex; justify-content:space-between; align-items:center; position:relative;")
-        div(style="margin-left:20px; display:flex; gap:10px; align-items:baseline;")
-          div {{ headerShowName }}
-          div(v-if="hasSearched && !loading && totalSubsCount > 0" style="font-size:12px; color:#666; font-weight:normal;") {{ validSubsCount }}/{{ totalSubsCount }}
-        div(v-if="fileIdStatusText" style="position:absolute; left:50%; transform:translateX(-50%); font-size:12px; font-weight:normal; color:#c00; text-align:center; pointer-events:none;") {{ fileIdStatusText }}
-        div(style="margin-left:auto; display:flex; align-items:center;")
-          div(style="display:flex; align-items:center; gap:6px;")
-            div(style="font-size:12px; font-weight:normal; color:#555;") Trim
-            input(
-              v-model="trimMsText"
-              @keyup.enter.stop.prevent="acceptTrimMs"
-              style="width:50px; font-size:12px; padding:2px 4px; border:1px solid #bbb; border-radius:4px;"
-            )
-            div(style="font-size:12px; font-weight:normal; color:#555;") FileId
-            input(
-              v-model="fileIdSearch"
-              @keyup.enter.stop.prevent="acceptFileIdSearch"
-              @blur.stop="acceptFileIdSearch"
-              style="width:50px; font-size:12px; padding:2px 4px; border:1px solid #bbb; border-radius:4px;"
-            )
-
-      //- Row 2 (all buttons centered)
-      div(style="display:flex; justify-content:center; align-items:center; margin-top:6px;")
-        div(style="display:flex; gap:8px; align-items:center;")
-          button(@click.stop="startLibraryRefresh" :style="getLibraryButtonStyle()") Library
-          button(@click.stop="applyClick" :disabled="!applyEnabled" :style="getApplyButtonStyle()") Apply
-          button(@click.stop="deleteClick" :disabled="!deleteEnabled" :style="getDelButtonStyle()") Del
-          div(style="width:20px;")
-          input(v-model="seasonFilter" @keydown.stop @click.stop placeholder="Season" style="width:60px; font-size:12px; padding:2px 4px; border:1px solid #bbb; border-radius:4px;")
-          button(@click.stop="searchClick" :style="getModeButtonStyle('search')") Search
-          button(@click.stop="selectMode('season')" :style="getModeButtonStyle('season')") Season
-          button(@click.stop="selectMode('episode')" :style="getModeButtonStyle('episode')") Episode
-          button(@click.stop="selectMode('files')" :style="getModeButtonStyle('files')") Files
-          button(v-if="viewMode === 'search'" @click.stop="scrollGroup(-1)" :disabled="!items || items.length === 0" style="font-size:12px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;") ▲
-          button(v-if="viewMode === 'search'" @click.stop="scrollGroup(1)" :disabled="!items || items.length === 0" style="font-size:12px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;") ▼
-
-      div(style="height:1px; width:100%; background-color:#ddd; margin-top:6px;")
-
-    #loading(v-if="loading" style="text-align:center; color:#666; margin-top:50px; font-size:16px;")
-      div Loading...
-
-    #error(v-if="error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px; white-space:pre-line; padding:0 20px;")
-      div Error: {{ error }}
-
-    //- Apply failures modal
-    div(v-if="showApplyFailuresModal" @click.self.stop="closeApplyFailuresModal" style="position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.35); display:flex; align-items:flex-start; justify-content:center; padding-top:60px;")
-      div(@click.stop style="background:#fff; border:1px solid #bbb; border-radius:8px; padding:12px; width:min(900px, 92vw); max-height:75vh; overflow:auto; box-sizing:border-box;")
-        div(style="display:flex; justify-content:space-between; align-items:center; gap:12px;")
-          div(style="font-weight:bold; font-size:14px;") Apply failures
-          button(@click.stop="closeApplyFailuresModal" style="font-size:12px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;") Close
-        div(style="height:1px; width:100%; background-color:#ddd; margin:8px 0;")
-        div(v-if="!applyFailures || applyFailures.length === 0" style="font-size:12px; color:#666;") No failures.
-        div(v-else style="font-size:12px; color:#333; white-space:pre-wrap; font-family:monospace;")
-          div(v-for="(f, idx) in applyFailures" :key="idx" style="padding:4px 0; border-bottom:1px solid #eee;") {{ formatApplyFailure(f) }}
-
-    #subs-list(v-if="!loading" style="padding:10px; font-size:14px; line-height:1.2;")
-      div(v-if="!hasSearched && items.length === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
-        div Press search to load subtitles.
-      div(v-else-if="hasSearched && totalSubsCount === 0 && !error" style="text-align:center; color:#999; margin-top:50px;")
-        div No subtitles found.
-      template(v-for="(item, index) in items" :key="getItemCardKey(item)")
-        div.se-divider(v-if="shouldShowSeDivider(index)" style="text-align:center; color:#888; font-family:monospace; margin:4px 0;") {{ getSeDividerText(index) }}
-        div(
-          @click="handleItemClick($event, item)"
-          @click.stop
-          :data-card-key="getItemCardKey(item)"
-          :style="getCardStyle(item)"
-          @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'"
-          @mouseleave="$event.currentTarget.style.boxShadow='none'"
-        )
-          div(v-if="shouldShowClickedCheckmark && isClicked(item)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;") ✓
-          div(style="display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:12px; color:#333;")
-            div(:style="{ fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, color: item?.lineColor || '#333' }") {{ item?.line1 || '' }}
-            div(style="color:#666; white-space:nowrap; display:flex; align-items:center; gap:6px; justify-content:flex-end; min-width:0;")
-              template(v-if="viewMode === 'files'")
-                //- Fixed-width provider column so base32 aligns across rows
-                div(style="display:flex; align-items:center; gap:0;")
-                  div(style="width:100px; min-width:100px; max-width:100px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;") {{ item?.uploader || '' }}
-                  div(style="width:45px; min-width:45px; max-width:45px; text-align:right; font-family:monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;") {{ encodeFileIdBase32(item?.file_id) }}
-                div(:style="{ color:'#4CAF50', fontSize:'14px', fontWeight:'bold', marginLeft:'4px', visibility: (isAppliedFile(item) ? 'visible' : 'hidden') }") ✓
-              template(v-else)
-                div {{ item?.uploader || '' }}
-                div(v-if="hasAppliedMark(item)" style="color:#4CAF50; font-size:14px; font-weight:bold;") ✓
+<div class="subs-container" :style="{ height:'100%', width:'100%', display:'flex', justifyContent:'flex-start' }">
+  <div id="subs" ref="scroller" :style="{ height:'100%', width:'100%', padding:'10px', margin:0, display:'flex', flexDirection:'column', overflowY:'auto', overflowX:'hidden', maxWidth:'100%', boxSizing:'border-box', backgroundColor:'#fafafa' }" @wheel.stop.prevent="handleScaledWheel">
+    <div id="header" :style="{ position:'sticky', top:'-10px', zIndex:100, backgroundColor:'#fafafa', paddingTop:'15px', paddingLeft:'10px', paddingRight:'10px', paddingBottom:'10px', marginLeft:'0px', marginRight:'0px', marginTop:'-10px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px', marginBottom:'0px', display:'flex', flexDirection:'column', alignItems:'stretch' }">
+      <!-- Row 1-->
+      <div style="display:flex; justify-content:space-between; align-items:center; position:relative;">
+        <div style="margin-left:20px; display:flex; gap:10px; align-items:baseline;">
+          <div>{{ headerShowName }}</div>
+          <div v-if="hasSearched &amp;&amp; !loading &amp;&amp; totalSubsCount &gt; 0" style="font-size:12px; color:#666; font-weight:normal;">{{ validSubsCount }}/{{ totalSubsCount }}</div>
+        </div>
+        <div v-if="fileIdStatusText" style="position:absolute; left:50%; transform:translateX(-50%); font-size:12px; font-weight:normal; color:#c00; text-align:center; pointer-events:none;">{{ fileIdStatusText }}</div>
+        <div style="margin-left:auto; display:flex; align-items:center;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <div style="font-size:12px; font-weight:normal; color:#555;">Trim</div>
+            <input v-model="trimMsText" @keyup.enter.stop.prevent="acceptTrimMs" style="width:50px; font-size:12px; padding:2px 4px; border:1px solid #bbb; border-radius:4px;">
+            <div style="font-size:12px; font-weight:normal; color:#555;">FileId</div>
+            <input v-model="fileIdSearch" @keyup.enter.stop.prevent="acceptFileIdSearch" @blur.stop="acceptFileIdSearch" style="width:50px; font-size:12px; padding:2px 4px; border:1px solid #bbb; border-radius:4px;">
+          </div>
+        </div>
+      </div>
+      <!-- Row 2 (all buttons centered)-->
+      <div style="display:flex; justify-content:center; align-items:center; margin-top:6px;">
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button @click.stop="startLibraryRefresh" :style="getLibraryButtonStyle()">Library</button>
+          <button @click.stop="applyClick" :disabled="!applyEnabled" :style="getApplyButtonStyle()">Apply</button>
+          <button @click.stop="deleteClick" :disabled="!deleteEnabled" :style="getDelButtonStyle()">Del</button>
+          <div style="width:20px;"></div>
+          <input v-model="seasonFilter" @keydown.stop @click.stop placeholder="Season" style="width:60px; font-size:12px; padding:2px 4px; border:1px solid #bbb; border-radius:4px;">
+          <button @click.stop="searchClick" :style="getModeButtonStyle('search')">Search</button>
+          <button @click.stop="selectMode('season')" :style="getModeButtonStyle('season')">Season</button>
+          <button @click.stop="selectMode('episode')" :style="getModeButtonStyle('episode')">Episode</button>
+          <button @click.stop="selectMode('files')" :style="getModeButtonStyle('files')">Files</button>
+          <button v-if="viewMode === 'search'" @click.stop="scrollGroup(-1)" :disabled="!items || items.length === 0" style="font-size:12px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;">▲</button>
+          <button v-if="viewMode === 'search'" @click.stop="scrollGroup(1)" :disabled="!items || items.length === 0" style="font-size:12px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;">▼</button>
+        </div>
+      </div>
+      <div style="height:1px; width:100%; background-color:#ddd; margin-top:6px;"></div>
+    </div>
+    <div id="loading" v-if="loading" style="text-align:center; color:#666; margin-top:50px; font-size:16px;">
+      <div>Loading...</div>
+    </div>
+    <div id="error" v-if="error" style="text-align:center; color:#c00; margin-top:50px; font-size:16px; white-space:pre-line; padding:0 20px;">
+      <div>Error: {{ error }}</div>
+    </div>
+    <!-- Apply failures modal-->
+    <div v-if="showApplyFailuresModal" @click.self.stop="closeApplyFailuresModal" style="position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.35); display:flex; align-items:flex-start; justify-content:center; padding-top:60px;">
+      <div @click.stop style="background:#fff; border:1px solid #bbb; border-radius:8px; padding:12px; width:min(900px, 92vw); max-height:75vh; overflow:auto; box-sizing:border-box;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+          <div style="font-weight:bold; font-size:14px;">Apply failures</div>
+          <button @click.stop="closeApplyFailuresModal" style="font-size:12px; cursor:pointer; border-radius:7px; padding:4px 8px; border:1px solid #bbb; background-color:whitesmoke;">Close</button>
+        </div>
+        <div style="height:1px; width:100%; background-color:#ddd; margin:8px 0;"></div>
+        <div v-if="!applyFailures || applyFailures.length === 0" style="font-size:12px; color:#666;">No failures.</div>
+        <div v-else style="font-size:12px; color:#333; white-space:pre-wrap; font-family:monospace;">
+          <div v-for="(f, idx) in applyFailures" :key="idx" style="padding:4px 0; border-bottom:1px solid #eee;">{{ formatApplyFailure(f) }}</div>
+        </div>
+      </div>
+    </div>
+    <div id="subs-list" v-if="!loading" style="padding:10px; font-size:14px; line-height:1.2;">
+      <div v-if="!hasSearched &amp;&amp; items.length === 0 &amp;&amp; !error" style="text-align:center; color:#999; margin-top:50px;">
+        <div>Press search to load subtitles.</div>
+      </div>
+      <div v-else-if="hasSearched &amp;&amp; totalSubsCount === 0 &amp;&amp; !error" style="text-align:center; color:#999; margin-top:50px;">
+        <div>No subtitles found.</div>
+      </div>
+      <template v-for="(item, index) in items" :key="getItemCardKey(item)">
+        <div class="se-divider" v-if="shouldShowSeDivider(index)" style="text-align:center; color:#888; font-family:monospace; margin:4px 0;">{{ getSeDividerText(index) }}</div>
+        <div @click="handleItemClick($event, item)" @click.stop :data-card-key="getItemCardKey(item)" :style="getCardStyle(item)" @mouseenter="$event.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" @mouseleave="$event.currentTarget.style.boxShadow='none'">
+          <div v-if="shouldShowClickedCheckmark &amp;&amp; isClicked(item)" style="position:absolute; top:8px; right:8px; color:#4CAF50; font-size:20px; font-weight:bold;">✓</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:12px; color:#333;">
+            <div :style="{ fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, color: item?.lineColor || '#333' }">{{ item?.line1 || '' }}</div>
+            <div style="color:#666; white-space:nowrap; display:flex; align-items:center; gap:6px; justify-content:flex-end; min-width:0;">
+              <template v-if="viewMode === 'files'">
+                <!-- Fixed-width provider column so base32 aligns across rows-->
+                <div style="display:flex; align-items:center; gap:0;">
+                  <div style="width:100px; min-width:100px; max-width:100px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ item?.uploader || '' }}</div>
+                  <div style="width:45px; min-width:45px; max-width:45px; text-align:right; font-family:monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ encodeFileIdBase32(item?.file_id) }}</div>
+                </div>
+                <div :style="{ color:'#4CAF50', fontSize:'14px', fontWeight:'bold', marginLeft:'4px', visibility: (isAppliedFile(item) ? 'visible' : 'hidden') }">✓</div>
+              </template>
+              <template v-else>
+                <div>{{ item?.uploader || '' }}</div>
+                <div v-if="hasAppliedMark(item)" style="color:#4CAF50; font-size:14px; font-weight:bold;">✓</div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+</div>
 </template>
 
 <script>

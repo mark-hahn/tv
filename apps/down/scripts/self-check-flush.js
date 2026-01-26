@@ -37,7 +37,10 @@ const graceMs = Math.max(
   parseInt(getArg("--grace", String(intervalMs * 3)), 10) || intervalMs * 3,
 );
 
-const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
+const sleep = (ms) =>
+  new Promise((r) => {
+    setTimeout(r, ms);
+  });
 
 const statMtimeMs = () => {
   try {

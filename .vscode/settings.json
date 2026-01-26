@@ -21,8 +21,5 @@
   "[javascript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  "eslint.workingDirectories": [
-    "./apps/client",
-    "."
-  ]
+  "eslint.workingDirectories": ["./apps/client", "."]
 }

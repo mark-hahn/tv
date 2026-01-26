@@ -457,7 +457,9 @@ export async function getReel() {
         // We found an OK result, so we return the list accumulated so far
         return addedThisCall;
       }
-      await new Promise((r) => { setTimeout(r, 10); }); // Yield event loop
+      await new Promise((r) => {
+        setTimeout(r, 10);
+      }); // Yield event loop
     } finally {
       await browser.close();
     }

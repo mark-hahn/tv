@@ -1,5 +1,5 @@
 <template lang="pug">
-#map(ref="mapScroller" @click="handleMapClick" :style="{ height:'100%', width:'100%', margin:0, display:'flex', flexDirection:'column', backgroundColor:'#ffe', overflow:'hidden', maxWidth:'100%', boxSizing:'border-box' }")
+#map(ref="mapScroller" @click="handleMapClick" :style="{ height:'100%', width:'100%', margin:0, display:'flex', flexDirection:'column', backgroundColor:'white', overflow:'hidden', maxWidth:'100%', boxSizing:'border-box' }")
 
   //- Progress modal (similar to web-add in list.vue)
   #mapWorkingModal(
@@ -15,7 +15,7 @@
       style="display:flex; align-items:center; justify-content:center; height:100%; width:100%; font-size:20px; font-weight:bold; color:red; text-align:center; padding:20px;")
     | {{mapError}}
 
-  #maphdr(v-else style="position:sticky; top:0px; z-index:50; background-color:#ffe; padding-bottom:5px;")
+  #maphdr(v-else style="position:sticky; top:0px; z-index:50; background-color:white; padding-bottom:5px;")
     #maphdr1(style="margin:0 5px; display:flex; justify-content:space-between; align-items:center;")
       #mapshow(:style="{ marginLeft:'15px', fontWeight:'bold', fontSize: sizing.seriesFontSize || '25px' }")
         | {{mapShow?.Name}} 
@@ -61,21 +61,21 @@
       @pointercancel="handleMapPointerUp"
       style="position:absolute; inset:0; overflow:hidden; box-sizing:border-box; touch-action:none;")
       //- Sticky header row: moves horizontally with pan but stays fixed vertically.
-      div(ref="mapHeader" style="position:absolute; left:0; right:0; top:0; overflow:hidden; box-sizing:border-box; background-color:#ffe; pointer-events:none;")
+      div(ref="mapHeader" style="position:absolute; left:0; right:0; top:0; overflow:hidden; box-sizing:border-box; background-color:white; pointer-events:none;")
         table(:style="{ fontSize:'16px', borderCollapse:'collapse', transform: 'translate(' + (-mapScrollLeft) + 'px,0px)' }")
           tbody
             tr(style="font-weight:bold;")
-              td(:style="{ width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', textAlign:'center', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'#ffe' }") &nbsp;
+              td(:style="{ width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', textAlign:'center', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'white' }") &nbsp;
               td(v-for="episode in seriesMapEpis"
-                :style="{ width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', padding:'1px 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor:'#ffe' }"
+                :style="{ width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', padding:'1px 4px', textAlign:'center', border:'1px solid #ccc', backgroundColor:'white' }"
                 :key="episode") {{episode}}
 
       //- Sticky top-left corner cell (covers the moving blank header cell when panning horizontally).
-      div(style="position:absolute; left:0; top:0; z-index:6; overflow:hidden; background-color:#ffe; pointer-events:none;")
+      div(style="position:absolute; left:0; top:0; z-index:6; overflow:hidden; background-color:white; pointer-events:none;")
         table(:style="{ fontSize:'16px', borderCollapse:'collapse' }")
           tbody
             tr(style="font-weight:bold;")
-              td(:style="{ width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', textAlign:'center', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'#ffe' }") &nbsp;
+              td(:style="{ width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', textAlign:'center', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'white' }") &nbsp;
 
       //- Body viewport starts below the sticky header.
       div(ref="mapBodyViewport" :style="{ position:'absolute', left:'0', right:'0', top: mapHeaderH + 'px', bottom:'0', overflow:'hidden', boxSizing:'border-box' }")
@@ -84,7 +84,7 @@
             tr(v-for="season in seriesMapSeasons" :key="season"
                       style="outline:thin solid;")
               td(@click="handleSeasonClick($event, season)"
-                  :style="{ fontWeight:'bold', width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'#ffe' }")
+                  :style="{ fontWeight:'bold', width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'white' }")
                 | {{season}}
 
               td(v-for="episode in seriesMapEpis" :key="season + '.' + episode"
@@ -102,12 +102,12 @@
         @pointermove="handleMapPointerMove"
         @pointerup="handleMapPointerUp"
         @pointercancel="handleMapPointerUp"
-        :style="{ position:'absolute', left:'0', top: mapHeaderH + 'px', bottom:'0', width:'30px', overflow:'hidden', zIndex:5, backgroundColor:'#ffe', pointerEvents:'auto', touchAction:'none' }")
+        :style="{ position:'absolute', left:'0', top: mapHeaderH + 'px', bottom:'0', width:'30px', overflow:'hidden', zIndex:5, backgroundColor:'white', pointerEvents:'auto', touchAction:'none' }")
         table(:style="{ fontSize:'16px', borderCollapse:'collapse', transform: 'translate(0px,' + (-mapScrollTop) + 'px)' }")
           tbody
             tr(v-for="season in seriesMapSeasons" :key="'sticky-' + season" style="outline:thin solid;")
               td(@click="handleSeasonClick($event, season)"
-                 :style="{ fontWeight:'bold', width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'#ffe' }")
+                 :style="{ fontWeight:'bold', width:'30px', minWidth:'30px', maxWidth:'30px', height:'22px', minHeight:'22px', maxHeight:'22px', lineHeight:'16px', whiteSpace:'nowrap', verticalAlign:'middle', textAlign:'center', cursor: simpleMode ? 'default' : 'pointer', padding:'1px 4px', border:'1px solid #ccc', backgroundColor:'white' }")
                 | {{season}}
 </template>
 

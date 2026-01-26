@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-HOST="${TV_HOST:-hahnca.com}"
+HOST="hahnca.com"
 
-# Switch remote PM2 apps from "new" set -> "old" set
-# Stops:  tv-series-srvr, tv-proc, tv-torrents
-# Starts: tv-srvr, tv-api, tv-down
+# Switch remote PM2 apps to the current set.
+# Stops legacy apps if present: tv-series-srvr, tv-proc, tv-torrents
+# Starts current apps: tv-srvr, tv-api, tv-down
 
 ssh -o BatchMode=yes "$HOST" 'bash -se' <<'REMOTE'
 set -euo pipefail

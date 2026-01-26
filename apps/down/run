@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-APP_NAME="tv-proc"
+APP_NAME="tv-down"
 APP_SCRIPT="src/main.js"
 APP_ARGS=()
 if [ "${1-}" != "" ]; then
@@ -12,14 +12,14 @@ fi
 BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [ -f /mnt/media/nomount ]; then
-  printf "\n---- tv-proc: media drive is not mounted\n"
+  printf "\n---- tv-down: media drive is not mounted\n"
   /root/.nvm/versions/node/v22.18.0/bin/node \
-         ~/dev/apps/mailit/index.js "tv-proc: media drive is not mounted"
+    ~/dev/apps/mailit/index.js "tv-down: media drive is not mounted"
 fi 
 if [ -f /mnt/m-bkup/nomount ]; then
-  printf "\n---- tv-proc: m-bkup drive is not mounted\n"
+  printf "\n---- tv-down: m-bkup drive is not mounted\n"
   /root/.nvm/versions/node/v22.18.0/bin/node \
-         ~/dev/apps/mailit/index.js "tv-proc: m-bkup drive is not mounted"
+    ~/dev/apps/mailit/index.js "tv-down: m-bkup drive is not mounted"
 fi 
 
 

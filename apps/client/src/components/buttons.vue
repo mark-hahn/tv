@@ -119,7 +119,7 @@ export default {
 
   methods: {
     startSharedFiltersPolling() {
-      // Poll tv-series-srvr sharedFilters so Custom button appears/disappears across computers.
+      // Poll tv-srvr sharedFilters so Custom button appears/disappears across computers.
       // When it changes, reset internal filters by emitting current button state
       // (with Custom turned off) so List recomputes from visible buttons.
       this._lastSharedFiltersRaw = '';

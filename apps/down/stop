@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-APP_NAME="tv-proc"
+APP_NAME="tv-down"
 BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$BASEDIR"
 

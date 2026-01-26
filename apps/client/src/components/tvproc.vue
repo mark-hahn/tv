@@ -531,7 +531,7 @@ export default {
         const wasNearBottom = !opts.isInitialPaneSwitch && el && this.isNearBottom(el);
         const shouldStick = Boolean(opts.forceScrollToBottom) || wasNearBottom;
 
-        const res = await fetch('https://hahnca.com/tvproc/downloads');
+        const res = await fetch('https://hahnca.com/tv-down/downloads');
         if (!res.ok) {
           let detail = '';
           try {
@@ -635,7 +635,7 @@ export default {
 
             let ok = false;
             try {
-              const resp = await fetch('https://hahnca.com/tvproc/startProc', { method: 'POST' });
+              const resp = await fetch('https://hahnca.com/tv-down/startProc', { method: 'POST' });
               ok = Boolean(resp && resp.ok);
             } catch {
               ok = false;

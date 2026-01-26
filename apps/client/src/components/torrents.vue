@@ -517,7 +517,7 @@ export default {
       const merged = Array.from(new Set(procIds.filter(v => v !== null && v !== undefined && String(v) !== '')));
       if (merged.length === 0) return false;
 
-      const url = 'https://hahnca.com/tvproc/deleteProcids';
+      const url = 'https://hahnca.com/tv-down/deleteProcids';
       let res;
       try {
         res = await this.fetchWithTimeout(url, {
@@ -1535,7 +1535,7 @@ export default {
               : providerRaw || 'unknown';
 
         // Prefer /downloads if available.
-        // torrents-server /downloads now returns a wrapper:
+        // tv-api /downloads now returns a wrapper:
         // - existingTitles: array of titles (same as old raw array)
         // - existingProcids: matching procids
         // - errorTitles: array of titles/objects that had download errors

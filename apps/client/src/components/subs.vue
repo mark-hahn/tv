@@ -1470,7 +1470,7 @@ export default {
 
     async fetchSubsPage(imdbIdDigits, page, season) {
       try {
-        // WebSocket RPC to tv-series-srvr (no local proxy)
+        // WebSocket RPC to tv-srvr (no local proxy)
         const params = { imdb_id: imdbIdDigits, page };
         if (season !== undefined && season !== null) params.season = season;
         return await subsSearch(params);

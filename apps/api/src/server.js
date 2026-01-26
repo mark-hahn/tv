@@ -184,7 +184,7 @@ function extractYearFromString(s) {
   return n;
 }
 
-console.error('[torrents-server] module loaded', {
+console.error('[tv-api] module loaded', {
   ts: new Date().toISOString(),
   cwd: process.cwd(),
   node: process.version,
@@ -514,7 +514,7 @@ app.get('/api/tvproc/startProc', async (req, res) => {
     if (!title) {
       return res.status(400).json({ error: 'title parameter required' });
     }
-    const url = `https://hahnca.com/tvproc/startProc?title=${encodeURIComponent(title)}`;
+    const url = `https://hahnca.com/tv-down/startProc?title=${encodeURIComponent(title)}`;
     const response = await fetch(url);
     const data = await response.json();
     res.json(data);

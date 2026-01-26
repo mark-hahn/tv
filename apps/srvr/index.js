@@ -121,7 +121,7 @@ const subsTokenReadPath = path.join(SECRETS_DIR, 'subs-token.txt');
 const subsTokenWritePath = path.join(SECRETS_DIR, 'subs-token.txt');
 
 // OpenSubtitles requires a real app User-Agent; it will 403 on generic ones (e.g. node-fetch).
-const openSubtitlesUserAgent = 'tv-series-srvr v1.0.0';
+const openSubtitlesUserAgent = 'tv-srvr v1.0.0';
 
 let subsTokenCache = null;
 try {

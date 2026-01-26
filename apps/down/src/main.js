@@ -222,7 +222,7 @@ async function main() {
         }
       } catch (e) {}
 
-      appendTvLog(`${prefix}==== tv-proc started ${fmt()} ====`);
+      appendTvLog(`${prefix}==== tv-down started ${fmt()} ====`);
     } catch (e) {}
   })();
 
@@ -336,10 +336,10 @@ async function main() {
       
       // Strip proxy prefix if present
       var pathname = parsed.pathname;
-      if (pathname.startsWith('/torrents-api/api/tvproc/')) {
-        pathname = pathname.substring('/torrents-api/api/tvproc'.length);
-      } else if (pathname.startsWith('/torrents-api/')) {
-        pathname = pathname.substring('/torrents-api'.length);
+      if (pathname.startsWith('/tv-api/api/tvproc/')) {
+        pathname = pathname.substring('/tv-api/api/tvproc'.length);
+      } else if (pathname.startsWith('/tv-api/')) {
+        pathname = pathname.substring('/tv-api'.length);
       }
       
       // Handle /startProc endpoint

@@ -1,4 +1,4 @@
-# torrents-server
+# tv-api
 
 Small HTTPS JSON API for:
 
@@ -6,7 +6,7 @@ Small HTTPS JSON API for:
 - Fetching/downloading `.torrent` files and adding them to qBittorrent
 - A few helper/proxy endpoints used by the TV UI (TVDB proxy, OpenSubtitles search, “reel”/Reelgood workflow)
 
-This repo is intended to run locally behind nginx (nginx sets the CORS headers).
+This service is intended to run behind nginx (nginx sets the CORS headers).
 
 ## Requirements
 
@@ -32,11 +32,12 @@ The server listens on **HTTPS port 3001**.
 
 ### PM2 (production-ish)
 
-This repo includes a PM2 config:
+This package includes a legacy PM2 config, but in the monorepo the preferred
+way to run production is the workspace root PM2 ecosystem.
 
 ```bash
 pm2 start ecosystem.config.cjs
-pm2 logs torrents-server
+pm2 logs tv-api
 ```
 
 ## TLS certs (required)
@@ -158,12 +159,12 @@ Search stages/counts and filter reasons are appended to `tor-results.txt` in the
   - IPT-style: JSON body `{ torrent, forceDownload?: true }`
   - TorrentLeech-style: JSON body `{ tl: { torrent: ... } }` (or `{ tl: <torrent> }`)
   - The server fetches the `.torrent`, validates it, extracts file titles, calls `POST http://localhost:3003/checkFiles`, and **skips** the qBittorrent add when any titles were already downloaded.
-  - If tv-proc says nothing exists, the server adds the torrent via qBittorrent WebUI `torrents/add` (duplicates are rejected by qBittorrent).
-  - `forceDownload:true` does not bypass tv-proc; it still blocks upload if tv-proc reports existing titles (and it returns additional metadata on success).
+  - If tv-down says nothing exists, the server adds the torrent via qBittorrent WebUI `torrents/add` (duplicates are rejected by qBittorrent).
+  - `forceDownload:true` does not bypass tv-down; it still blocks upload if tv-down reports existing titles (and it returns additional metadata on success).
 
 #### `/downloads` response shape
 
-`/downloads` now returns the tv-proc wrapper object:
+`/downloads` now returns the tv-down wrapper object:
 
 ```json
 { "existingTitles": ["..."], "existingProcids": ["..."] }

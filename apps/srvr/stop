@@ -1,6 +1,6 @@
-echo "stopping tv-series-srvr pm2"
-pm2 flush   tv-series-srvr
-pm2 delete  tv-series-srvr
+echo "stopping tv-srvr pm2"
+pm2 flush   tv-srvr
+pm2 delete  tv-srvr
 pm2 save
-echo "killing all tv-series-srvr apps"
-kill $(pgrep -f "tv-series-srvr") 2> /dev/null
+echo "killing all tv-srvr apps"
+kill $(pgrep -f "tv-srvr") 2> /dev/null

@@ -248,7 +248,7 @@ export default {
             if (missing.length > 0) {
               console.log('History: download finished, starting tvproc cycle', { finishedHashes: missing });
               try {
-                await fetch('https://hahnca.com/tvproc/startProc', { method: 'POST' });
+                await fetch('https://hahnca.com/tv-down/startProc', { method: 'POST' });
               } catch {
                 // ignore
               }

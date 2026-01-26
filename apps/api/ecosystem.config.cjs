@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'torrents-server',
+      name: 'tv-api',
       script: 'src/server.js',
       cwd: __dirname,
       watch: false,

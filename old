@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-HOST="${TV_HOST:-hahnca.com}"
+HOST="hahnca.com"
 
-# Switch remote PM2 apps from "old" set -> "new" set
-# Stops:  tv-srvr, tv-api, tv-down
-# Starts: tv-series-srvr, tv-proc, tv-torrents
+# Legacy script: the old PM2 apps (tv-series-srvr, tv-proc, tv-torrents)
+# are no longer supported and should be removed from pm2.
+# This script now only stops the current set (tv-srvr, tv-api, tv-down).
 
 ssh -o BatchMode=yes "$HOST" 'bash -se' <<'REMOTE'
 set -euo pipefail
@@ -33,10 +33,6 @@ start_if_present() {
 stop_if_present tv-srvr
 stop_if_present tv-api
 stop_if_present tv-down
-
-start_if_present tv-series-srvr
-start_if_present tv-proc
-start_if_present tv-torrents
 
 pm2 status
 REMOTE

@@ -1,6 +1,6 @@
 import { config } from "./config.js";
 
-const URL = 'wss://hahnca.com/tv-series-srvr';
+const URL = 'wss://hahnca.com/tv-srvr';
 
 let ws;
 const openWs = () => {
@@ -159,7 +159,7 @@ export function getLastViewed()
             {return fCall('getLastViewed')}
 
 // OpenSubtitles (server-side search)
-// tv-series-srvr should implement this endpoint.
+// tv-srvr should implement this endpoint.
 // params: { imdb_id?: string, q?: string, page?: number }
 export function subsSearch(params)
             {return fCall('subsSearch', params)}

@@ -3,7 +3,7 @@
 
 // Self-check: observe persistence activity during downloads.
 //
-// tv-proc now persists downloads in SQLite (data/tv.sqlite). SQLite writes are
+// tv-down now persists downloads in SQLite (data/tv.sqlite). SQLite writes are
 // implemented via a database file plus WAL/SHM sidecars, and multiple logical
 // updates may coalesce into fewer filesystem events.
 //
@@ -16,7 +16,7 @@ const fs = require('fs');
 const path = require('path');
 
 const TV_DB_PATH = path.join(__dirname, '..', 'data', 'tv.sqlite');
-const BASE_URL = process.env.TVPROC_URL || 'http://127.0.0.1:3003';
+const BASE_URL = 'http://127.0.0.1:3003';
 
 const args = process.argv.slice(2);
 const getArg = (name, def) => {

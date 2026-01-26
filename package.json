@@ -1,6 +1,14 @@
 {
   "name": "tv",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mark-hahn/tv.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mark-hahn/tv/issues"
+  },
+  "homepage": "https://github.com/mark-hahn/tv#readme",
   "packageManager": "pnpm@10.28.0",
   "engines": {
     "node": ">=20"

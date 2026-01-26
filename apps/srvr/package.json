@@ -13,14 +13,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mark-hahn/tv-series-srvr.git"
+    "url": "git+https://github.com/mark-hahn/tv.git"
   },
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/mark-hahn/tv-series-srvr/issues"
+    "url": "https://github.com/mark-hahn/tv/issues"
   },
-  "homepage": "https://github.com/mark-hahn/tv-series-srvr#readme",
+  "homepage": "https://github.com/mark-hahn/tv#readme",
   "dependencies": {
     "base64-js": "^1.5.1",
     "date-and-time": "^3.6.0",

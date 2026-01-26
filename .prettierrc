@@ -1,0 +1,11 @@
+{
+  "overrides": [
+    {
+      "files": ["*.html", "*.vue"],
+      "options": {
+        "printWidth": 80,
+        "singleAttributePerLine": true
+      }
+    }
+  ]
+}

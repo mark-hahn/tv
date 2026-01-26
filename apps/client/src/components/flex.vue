@@ -294,7 +294,6 @@ export default {
 
     onPaneChanged(pane) {
       if (pane === 'flex') {
-        this._didInitialScroll = false;
         this.startPolling();
       } else {
         this.stopPolling();

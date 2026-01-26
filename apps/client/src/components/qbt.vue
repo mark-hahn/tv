@@ -125,7 +125,7 @@ export default {
     },
 
     onPaneChanged(pane) {
-      this._active = pane === 'history';
+      this._active = pane === 'qbt';
       if (this._active) {
         if (!this.useStaticSamples) this.startPolling();
 

@@ -7,6 +7,7 @@
       <div style="display:flex; gap:10px; margin-right:20px; justify-content:flex-end;">
         <button @click.stop="startLibraryRefresh" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;">Library</button>
         <button @click.stop="showFirstDownloading" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;">Show</button>
+        <button @click.stop="scrollToBottomAction" style="font-size:13px; cursor:pointer; border-radius:7px; padding:4px 10px; border:1px solid #bbb; background-color:whitesmoke;">Bottom</button>
       </div>
     </div>
   </div>
@@ -185,7 +186,7 @@ export default {
     },
 
     onPaneChanged(pane) {
-      const active = pane === 'tvproc';
+      const active = pane === 'down';
       this._active = active;
       if (active) {
         // Load data when switching to this pane.
@@ -481,6 +482,12 @@ export default {
       if (cards[idx]) {
         cards[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
+    },
+
+    scrollToBottomAction() {
+      const el = this.$refs.scroller;
+      if (!el) return;
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     },
 
     async trimLog() {

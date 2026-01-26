@@ -46,7 +46,7 @@
              div(style="font-size:12px; color:#555; white-space:nowrap; padding-right:8px;") {{ libraryProgressText }}
 
         #tabBody(:style="{ flex:'1 1 auto', minHeight:'0px', position:'relative', width:'100%' }")
-          Info(v-show="currentPane === 'infotyle="display:block; width:100%; height:100%;" :simpleMode="simpleMode" :sizing="activeSizing")
+          Info(v-show="currentPane === 'info'" style="display:block; width:100%; height:100%;" :simpleMode="simpleMode" :sizing="activeSizing")
           Map(
             v-show="currentPane === 'map'"
             :mapShow="mapShow"
@@ -170,7 +170,7 @@
         @show-map="handleShowMap"
         @hide-map="handleHideMap"
         @show-actors="handleShowActors"
-        @show-torrents="handleShowTorrents"
+        @show-tor="handleShowTor"
         @all-shows="handleAllShows"
       )
 
@@ -329,7 +329,7 @@
       @show-map="handleShowMap"
       @hide-map="handleHideMap"
       @show-actors="handleShowActors"
-      @show-torrents="handleShowTorrents"
+      @show-tor="handleShowTor"
       @all-shows="handleAllShows"
     )
 
@@ -384,7 +384,7 @@ const SIMPLE_PORTRAIT_SPLIT = 35;
 
 export default {
   name: "App",
-  components: { List, Series, Map, Actors, Reviews, Buttons, Reel, Torrents, Subs, Flex, History, TvProc, FilePane, Trailer, Ai },
+  components: { List, Info, Map, Actors, Reviews, Buttons, Reel, Tor, Subs, Flex, Qbt, Down, Files, Trailer, Ai },
   data() { 
     return { 
       // Must be known before first render so non-simple panes never mount in simple mode.

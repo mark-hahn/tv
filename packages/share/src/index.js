@@ -80,53 +80,97 @@ export function smartTitleMatch(title, titleArray, year) {
     return null;
   }
 
-  // Filter by year if caller provided one
-  let candidates = titleArray;
-  if (year) {
-    // We treat year simply as a string match for robustness
-    const wantYear = String(year).trim();
-    if (wantYear.match(/^\d{4}$/)) {
-      const yearMatches = titleArray.filter(c => {
-        const cy = getCandidateYear(c);
-        return cy && String(cy).trim() === wantYear;
-      });
-      if (yearMatches.length > 0) {
-        candidates = yearMatches;
-      }
-    }
-  }
-
   const wantBasic = normalizeBasic(title);
-  for (let i = 0; i < candidates.length; i += 1) {
-    const cand = coerceCandidateTitle(candidates[i]);
-    if (!cand) continue;
-    if (normalizeBasic(cand) === wantBasic) {
-      return candidates[i];
-    }
-  }
-
   const wantAgg = normalizeAggressive(title);
-  for (let j = 0; j < candidates.length; j += 1) {
-    const cand2 = coerceCandidateTitle(candidates[j]);
-    if (!cand2) continue;
-    if (normalizeAggressive(cand2) === wantAgg) {
-      return candidates[j];
-    }
-  }
 
+  const wantYearRaw = year != null ? String(year).trim() : '';
+  const wantYear = /^\d{4}$/.test(wantYearRaw) ? wantYearRaw : null;
+
+  const candidateYear = (x) => {
+    const cy = getCandidateYear(x);
+    if (cy == null) return null;
+    const s = String(cy).trim();
+    return /^\d{4}$/.test(s) ? s : null;
+  };
+
+  const isSameYear = (x) => {
+    if (!wantYear) return false;
+    const cy = candidateYear(x);
+    return cy != null && cy === wantYear;
+  };
+
+  const isOneMissingYear = (x) => {
+    if (!wantYear) return true;
+    return candidateYear(x) == null;
+  };
+
+  const isDifferentYear = (x) => {
+    if (!wantYear) return false;
+    const cy = candidateYear(x);
+    return cy != null && cy !== wantYear;
+  };
+
+  const findExact = (normalizeFn, wantNorm, predicate) => {
+    for (let i = 0; i < titleArray.length; i += 1) {
+      const item = titleArray[i];
+      if (!predicate(item)) continue;
+      const candTitle = coerceCandidateTitle(item);
+      if (!candTitle) continue;
+      if (normalizeFn(candTitle) === wantNorm) return item;
+    }
+    return null;
+  };
+
+  // Scan in requested priority order:
+  // 1) both have years, same year -> basic
+  // 2) one doesn't have a year -> basic
+  // 4) both have years, same year -> aggressive
+  // 5) one doesn't have a year -> aggressive
+  // 6) both have years, different years -> basic
+  // 7) both have years, different years -> aggressive
+  const m1 = findExact(normalizeBasic, wantBasic, isSameYear);
+  if (m1 != null) return m1;
+
+  const m2 = findExact(normalizeBasic, wantBasic, isOneMissingYear);
+  if (m2 != null) return m2;
+
+  const m4 = findExact(normalizeAggressive, wantAgg, isSameYear);
+  if (m4 != null) return m4;
+
+  const m5 = findExact(normalizeAggressive, wantAgg, isOneMissingYear);
+  if (m5 != null) return m5;
+
+  const m6 = findExact(normalizeBasic, wantBasic, isDifferentYear);
+  if (m6 != null) return m6;
+
+  const m7 = findExact(normalizeAggressive, wantAgg, isDifferentYear);
+  if (m7 != null) return m7;
+
+  // If none of the above match, use Levenshtein.
   let bestCand = null;
   let minDistance = Infinity;
+  let bestRank = Infinity;
 
-  for (let k = 0; k < candidates.length; k += 1) {
-    const cand3 = coerceCandidateTitle(candidates[k]);
-    if (!cand3) continue;
-    
-    const dist = levenshtein(wantAgg, normalizeAggressive(cand3));
-    if (dist < minDistance) {
+  const yearRank = (x) => {
+    if (isSameYear(x)) return 1;
+    if (isOneMissingYear(x)) return 2;
+    if (isDifferentYear(x)) return 3;
+    return 4;
+  };
+
+  for (let k = 0; k < titleArray.length; k += 1) {
+    const item = titleArray[k];
+    const candTitle = coerceCandidateTitle(item);
+    if (!candTitle) continue;
+
+    const dist = levenshtein(wantAgg, normalizeAggressive(candTitle));
+    const rank = yearRank(item);
+    if (dist < minDistance || (dist === minDistance && rank < bestRank)) {
       minDistance = dist;
-      bestCand = candidates[k]; // return original object
+      bestRank = rank;
+      bestCand = item;
     }
   }
-  
+
   return bestCand;
 }

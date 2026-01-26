@@ -1,5 +1,3 @@
-'use strict';
-
 // worker_threads entrypoint (no shared buffers)
 // - receives a copy of the entry object
 // - runs rsync: <usbHost>:<usbPath><title> -> <localPath><title>
@@ -7,9 +5,9 @@
 // - sends {type:"update", entry} to tvJson.js on updates
 // - sends {type:"finished", entry} on completion/error, then exits
 
-const { parentPort, workerData } = require('worker_threads');
-const { spawn, execFile } = require('child_process');
-const path = require('path');
+import { parentPort, workerData } from 'node:worker_threads';
+import { spawn, execFile } from 'node:child_process';
+import path from 'node:path';
 
 const unixNow = () => Math.floor(Date.now() / 1000);
 

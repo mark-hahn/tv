@@ -5,8 +5,7 @@ import { fileURLToPath } from 'url';
 import { normalize } from './normalize.js';
 import { getApiDataDir } from './tvPaths.js';
 
-// torrent-search-api is CommonJS, need dynamic import
-const TorrentSearchApi = (await import('torrent-search-api')).default;
+import TorrentSearchApi from 'torrent-search-api';
 
 const SAVE_SAMPLE_TORRENTS = false;
 

@@ -70,17 +70,5 @@ module.exports = {
         NODE_ENV: 'production',
       },
     },
-    {
-      name: 'tv-asr',
-      cwd: appCwd('asr'),
-      script: 'src/server.js',
-      interpreter: nodeInterpreter,
-      time: true,
-      env: {
-        MISTRAL_ASR_TIMEOUT_MS: '180000',
-        NODE_ENV: 'production',
-        PORT: '3407',
-      },
-    },
   ],
 };

@@ -1,4 +1,22 @@
-(async function() {
+import fsNode from 'node:fs';
+import utilNode from 'node:util';
+import pathNode from 'node:path';
+import childProcess from 'node:child_process';
+import httpNode from 'node:http';
+import urlNode from 'node:url';
+
+import mkdirpPkg from 'mkdirp';
+import requestPkg from 'request';
+import rimrafPkg from 'rimraf';
+import parseTorrentTitlePkg from 'parse-torrent-title';
+
+import * as tvJsonMod from './tvJson.js';
+import { smartTitleMatch } from '@tv/share';
+
+const __filename = urlNode.fileURLToPath(import.meta.url);
+const __dirname = pathNode.dirname(__filename);
+
+async function main() {
 
   const MAX_WORKERS = 8;
 
@@ -13,7 +31,7 @@
   var TRACE_SHOW = TRACE_ENABLED ? String(DEBUG_SHOW).trim() : '';
   var TRACE_SHOW_KEY = TRACE_ENABLED ? TRACE_SHOW.toLowerCase() : '';
 
-  var FAST_TEST, PROCESS_INTERVAL_MS, appendTvLog, badFile, blocked, blockedCount, buffering, checkFile, checkFileExists, checkFiles, chkCount, chkTvDB, clearBuffer, currentSeq, cycleRunning, cycleSeq, dateStr, debug, delOldFiles, deleteCount, downloadCount, downloadTime, episode, err, errCount, errors, escQuotes, exec, existsCount, fileTimeout, findUsb, flushAndGoLive, flushBuffer, fname, fs, getUsbFiles, inProgress, lastPruneAt, log, logBuffer, map, mkdirp, path, readMap, recent, recentCount, reloadState, request, resetCycleState, rimraf, rsyncDelay, runCycle, scheduleNextCycle, season, seriesName, sizeStr, skipPaths, startBuffering, startTime, stopBuffering, theTvDbToken, time, title, tvDbErrCount, tvPath, tvdbCache, tvdburl, type, usbFilePath, usbFileSize, usbFiles, usbHost, util, writeLine, writeMap;
+  var FAST_TEST, PROCESS_INTERVAL_MS, SKIP_DOWNLOAD, appendTvLog, badFile, blocked, blockedCount, buffering, checkFile, checkFileExists, checkFiles, chkCount, chkTvDB, clearBuffer, currentSeq, cycleRunning, cycleSeq, dateStr, debug, delOldFiles, deleteCount, downloadCount, downloadTime, episode, err, errCount, errors, escQuotes, exec, existsCount, fileTimeout, findUsb, flushAndGoLive, flushBuffer, fname, fs, getUsbFiles, inProgress, lastPruneAt, log, logBuffer, map, mkdirp, path, readMap, recent, recentCount, reloadState, request, resetCycleState, rimraf, rsyncDelay, runCycle, scheduleNextCycle, season, seriesName, sizeStr, skipPaths, startBuffering, startTime, stopBuffering, theTvDbToken, time, title, tvDbErrCount, tvPath, tvdbCache, tvdburl, type, usbFileBytes, usbFilePath, usbFileSize, usbFiles, usbHost, util, writeLine, writeMap;
 
   debug = false;
   FAST_TEST = false;
@@ -50,19 +68,12 @@
 
   usbHost = "xobtlu@oracle.usbx.me";
 
-  // Be resilient on the remote raw /root/dev/apps/tv/down directory where
-  // workspace dependencies may not exist.
-  try {
-    fs = require('fs-plus');
-  } catch (e) {
-    fs = require('fs');
-    // Polyfill the subset of fs-plus used by this file.
-    fs.mkdirpSync = function(dir) {
-      return fs.mkdirSync(dir, {recursive: true});
-    };
-  }
-  util = require('util');
-  path = require('path');
+  fs = fsNode;
+  fs.mkdirpSync = function(dir) {
+    return fs.mkdirSync(dir, {recursive: true});
+  };
+  util = utilNode;
+  path = pathNode;
 
   var BASEDIR = path.join(__dirname, '..');
 
@@ -120,7 +131,7 @@
   })();
 
   // tvJson.js owns tv.json cache and all worker lifecycle.
-  var tvJson = require('./tvJson.js');
+  const tvJson = tvJsonMod;
 
   // Targeted trace helper. Only emits when TRACE_SHOW_KEY is present.
   var safeInspect = function(x) {
@@ -168,109 +179,6 @@
     } catch (e) {}
   };
 
-  // Shared utils package is ESM; try loading via dynamic import.
-  // Fallback to a local implementation if the workspace package isn't available
-  // on the remote raw directory.
-  var smartTitleMatch = null;
-  try {
-    smartTitleMatch = (await import('@tv/share')).smartTitleMatch;
-  } catch (e) {
-    smartTitleMatch = null;
-  }
-
-  // Local fallback implementation (mirrors @tv/share behavior for string arrays).
-  var normalizeBasic = function(s) {
-    return String(s || '').toLowerCase().trim().replace(/\s+/g, ' ');
-  };
-
-  var normalizeAggressive = function(s) {
-    var out = String(s || '');
-    var idx = out.indexOf('(');
-    if (idx >= 0) {
-      out = out.slice(0, idx);
-    }
-    out = out.toLowerCase();
-    out = out.replace(/\./g, ' ');
-    out = out.replace(/[^a-z0-9\s]/g, ' ');
-    out = out.trim().replace(/\s+/g, ' ');
-    return out;
-  };
-
-  var levenshtein = function(a, b) {
-    if (a === b) return 0;
-    if (a.length === 0) return b.length;
-    if (b.length === 0) return a.length;
-
-    if (a.length > b.length) {
-      var tmp = a;
-      a = b;
-      b = tmp;
-    }
-
-    var m = a.length;
-    var n = b.length;
-    var prev = new Uint16Array(m + 1);
-    var curr = new Uint16Array(m + 1);
-
-    for (var i = 0; i <= m; i++) prev[i] = i;
-
-    for (var j = 1; j <= n; j++) {
-      curr[0] = j;
-      var bj = b.charCodeAt(j - 1);
-      for (var i2 = 1; i2 <= m; i2++) {
-        var cost = (a.charCodeAt(i2 - 1) === bj) ? 0 : 1;
-        var del = prev[i2] + 1;
-        var ins = curr[i2 - 1] + 1;
-        var sub = prev[i2 - 1] + cost;
-        curr[i2] = del < ins ? (del < sub ? del : sub) : (ins < sub ? ins : sub);
-      }
-      var swap = prev;
-      prev = curr;
-      curr = swap;
-    }
-    return prev[m];
-  };
-
-  var localSmartTitleMatch = function(title, titleArray) {
-    if (!Array.isArray(titleArray) || titleArray.length === 0) {
-      return null;
-    }
-
-    var wantBasic = normalizeBasic(title);
-    for (var i = 0; i < titleArray.length; i += 1) {
-      var cand = titleArray[i];
-      if (!cand) continue;
-      if (normalizeBasic(cand) === wantBasic) {
-        return cand;
-      }
-    }
-
-    var wantAgg = normalizeAggressive(title);
-    for (var j = 0; j < titleArray.length; j += 1) {
-      var cand2 = titleArray[j];
-      if (!cand2) continue;
-      if (normalizeAggressive(cand2) === wantAgg) {
-        return cand2;
-      }
-    }
-
-    var bestCand = null;
-    var minDistance = Infinity;
-    for (var k = 0; k < titleArray.length; k += 1) {
-      var cand3 = titleArray[k];
-      if (!cand3) continue;
-      var dist = levenshtein(wantAgg, normalizeAggressive(cand3));
-      if (dist < minDistance) {
-        minDistance = dist;
-        bestCand = cand3;
-      }
-    }
-    return bestCand;
-  };
-
-  if (!smartTitleMatch) {
-    smartTitleMatch = localSmartTitleMatch;
-  }
 
   // Startup marker (tv.log only)
   (function writeStartupMarker() {
@@ -319,12 +227,11 @@
   })();
 
   // ---------------------------------------------------------------------------
-  var childProcess = require('child_process');
   exec = childProcess.execSync;
-  mkdirp = require('mkdirp');
-  request = require('request');
-  rimraf = require('rimraf');
-  var parseTorrentTitle = require('parse-torrent-title').parse;
+  mkdirp = mkdirpPkg;
+  request = requestPkg;
+  rimraf = rimrafPkg;
+  var parseTorrentTitle = parseTorrentTitlePkg.parse;
 
   // --- startProc server state ------------------------------------------------
   var cycleRestartNeeded = false;
@@ -376,8 +283,8 @@
   // --- HTTP server /startProc (port 3003) -----------------------------------
   // Called from a browser; handle CORS properly.
   (function startServer() {
-    var http = require('http');
-    var url = require('url');
+    var http = httpNode;
+    var url = urlNode;
 
     var setCors = function(res) {
       res.setHeader('Access-Control-Allow-Origin', '*');
@@ -1265,4 +1172,17 @@
     return process.nextTick(checkFile);
   };
 
-}).call(this);
+}
+
+main().catch((err) => {
+  try {
+    console.error('FATAL: apps/down crashed:', err && (err.stack || err));
+  } catch (e) {
+    // ignore
+  }
+  try {
+    process.exit(1);
+  } catch (e) {
+    // ignore
+  }
+});

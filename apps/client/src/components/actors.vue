@@ -47,6 +47,8 @@ import * as tvdb from '../tvdb.js';
 import * as util from '../util.js';
 import * as srvr from '../srvr.js';
 
+const DEBUG_ACTORS_MERGE_LOG = false;
+
 export default {
   name: "Actors",
   
@@ -474,7 +476,11 @@ export default {
       const tmdbAfter = this.actors.filter(a => a.source === 'tmdb').length;
       const seasonStr = String(season).padStart(2, '0');
       const episodeStr = String(episode).padStart(2, '0');
-      console.log(`${this.showName} S${seasonStr}E${episodeStr} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`);
+      if (DEBUG_ACTORS_MERGE_LOG) {
+        console.debug(
+          `${this.showName} S${seasonStr}E${episodeStr} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`
+        );
+      }
     },
 
     handleRegularClick() {
@@ -860,7 +866,11 @@ export default {
       // Log summary with before/after counts
       const tvdbAfter = this.actors.filter(a => a.source === 'tvdb').length;
       const tmdbAfter = this.actors.filter(a => a.source === 'tmdb').length;
-      console.log(`${this.showName} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`);
+      if (DEBUG_ACTORS_MERGE_LOG) {
+        console.debug(
+          `${this.showName} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`
+        );
+      }
     }
   },
 

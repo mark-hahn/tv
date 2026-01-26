@@ -1,16 +1,18 @@
-'use strict';
-
 // tvJson.js
 // - Owns download state and worker lifecycle
 // - Persists state in SQLite
 // - Exports: addEntry(entry), getDownloads(), markError(), pruneMissingUsbDirs()
 
-const fs = require('fs');
-const path = require('path');
-const { Worker } = require('worker_threads');
-const { execFile } = require('child_process');
-const Database = require('better-sqlite3');
-const chokidar = require('chokidar');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Worker } from 'node:worker_threads';
+import { execFile } from 'node:child_process';
+import Database from 'better-sqlite3';
+import chokidar from 'chokidar';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const BASEDIR = path.join(__dirname, '..');
 
@@ -41,7 +43,7 @@ const TV_DB_BACKUP_PATH = path.join(DATA_DIR, 'tv.sqlite.backup');
 // Local TV library root for watcher assignment.
 const TV_ROOT = '/mnt/media/tv';
 
-const WORKER_SCRIPT = path.join(__dirname, 'worker.js');
+const WORKER_URL = new URL('./worker.js', import.meta.url);
 
 const MAX_WORKERS = 8;
 const usbHost = 'xobtlu@oracle.usbx.me';
@@ -959,7 +961,7 @@ const startWorkerForTitle = (title) => {
 
   workerCount++;
 
-  const w = new Worker(WORKER_SCRIPT, {
+  const w = new Worker(WORKER_URL, {
     workerData: {
       entry,
       usbHost,
@@ -1358,7 +1360,7 @@ const pruneMissingUsbDirs = (existingUsbDirs) => {
   } catch {}
 };
 
-module.exports = {
+export {
   addEntry,
   getDownloads,
   markError,

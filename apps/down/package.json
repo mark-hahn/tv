@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Download from USB and insert files into structured tv folder",
   "main": "src/main.js",
+  "type": "module",
   "scripts": {
     "dev": "node src/main.js",
     "build": "node -e \"console.log('build: @tv/down (no build step)')\"",
@@ -24,11 +25,9 @@
     "better-sqlite3": "^11.8.1",
     "chokidar": "^3.6.0",
     "@tv/share": "workspace:*",
-    "fs-plus": "^3.0.1",
     "mkdirp": "^0.5.1",
     "parse-torrent-title": "^2.0.6",
     "request": "^2.83.0",
-    "rimraf": "^2.6.2",
-    "@tv/share": "workspace:*"
+    "rimraf": "^2.6.2"
   }
 }

@@ -1,0 +1,167 @@
+{
+  "tvdbId": "393155",
+  "name": "Acapulco (2021)",
+  "originalNetwork": "Apple TV",
+  "seasonCount": 4,
+  "episodeCount": 40,
+  "watchedCount": 30,
+  "image": "https://artworks.thetvdb.com/banners/v4/series/393155/posters/63467793dd0e9.jpg",
+  "score": 22048,
+  "overview": "A young Mexican man's dream comes true when he gets the job of a lifetime at the hottest resort in Acapulco. But he soon realizes the job is far more complicated than he ever imagined as all of his beliefs and morals start to be questioned.",
+  "firstAired": "2021-10-08",
+  "lastAired": "2025-09-17",
+  "averageRuntime": 32,
+  "originalCountry": "usa",
+  "originalLanguage": "eng",
+  "status": "Ended",
+  "remotes": [
+    {
+      "name": "Emby",
+      "url": "https://hahnca.com:8920/web/index.html#!/item?id=4759942&serverId=ae3349983dbe45d9aa1d317a7753483e"
+    },
+    {
+      "name": "Rotten (0/85)",
+      "url": "https://www.rottentomatoes.com/tv/acapulco",
+      "ratings": "0/85"
+    },
+    {
+      "name": "Google",
+      "url": "https://www.google.com/search?q=Acapulco%20(2021)%20tv%20show"
+    },
+    {
+      "name": "Wikipedia",
+      "url": "https://en.wikipedia.org/wiki/Acapulco_(2021_TV_series)"
+    },
+    {
+      "name": "Reddit",
+      "url": "https://www.reddit.com/r/appletv/comments/10iivof/acapulco_is_one_of_the_best_comedies_in_years_and/"
+    },
+    {
+      "name": "IMDB (7.8)",
+      "url": "https://www.imdb.com/title/tt13567344",
+      "ratings": "7.8"
+    },
+    {
+      "name": "Official Website",
+      "url": "https://tv.apple.com/show/umc.cmc.8xrkg9zywke7g6a9ahmvpr3l"
+    }
+  ],
+  "characters": [
+    {
+      "character": "Máximo Gallardo (Young)",
+      "actor": "Enrique Arrizon",
+      "image": "https://artworks.thetvdb.com/banners/v4/actor/7890985/photo/6168e0f35ad70.jpg",
+      "tvdbUrl": "https://thetvdb.com/people/7890985-enrique-arrizon",
+      "sortOrder": 2,
+      "isFeatured": true
+    },
+    {
+      "character": "Máximo Gallardo",
+      "actor": "Eugenio Derbez",
+      "image": "https://artworks.thetvdb.com/banners/v4/actor/360750/photo/66a7fe88e0b20.jpg",
+      "tvdbUrl": "https://thetvdb.com/people/360750-eugenio-derbez",
+      "sortOrder": 1,
+      "isFeatured": true
+    },
+    {
+      "character": "Don Pablo",
+      "actor": "Damián Alcázar",
+      "image": "https://artworks.thetvdb.com/banners/v4/actor/299485/photo/64d882ee938b2.jpg",
+      "tvdbUrl": "https://thetvdb.com/people/299485-damian-alcazar",
+      "sortOrder": 5,
+      "isFeatured": true
+    },
+    {
+      "character": "Julia",
+      "actor": "Camila Perez",
+      "image": "https://artworks.thetvdb.com/banners/v4/actor/567486/photo/63f0dceb4dbd9.jpg",
+      "tvdbUrl": "https://thetvdb.com/people/567486-camila-perez",
+      "sortOrder": 3,
+      "isFeatured": true
+    },
+    {
+      "character": "Chad",
+      "actor": "Chord Overstreet",
+      "image": "https://artworks.thetvdb.com/banners/v4/actor/334823/photo/652a0d6e99a3f.jpg",
+      "tvdbUrl": "https://thetvdb.com/people/334823-chord-overstreet",
+      "sortOrder": 6,
+      "isFeatured": true
+    },
+    {
+      "character": "Nora",
+      "actor": "Vanessa Bauche",
+      "image": "https://artworks.thetvdb.com/banners/v4/actor/595437/photo/614cdadc9e541.jpg",
+      "tvdbUrl": "https://thetvdb.com/people/595437-vanessa-bauche",
+      "sortOrder": 8,
+      "isFeatured": true
+    },
+    {
+      "character": "Sara",
+      "actor": "Regina Reynoso",
+      "image": "https://artworks.thetvdb.com/banners/v4/actor/8179617/photo/614cda8a941a7.jpg",
+      "tvdbUrl": "https://thetvdb.com/people/8179617-regina-reynoso",
+      "sortOrder": 10,
+      "isFeatured": true
+    },
+    {
+      "character": "Hugo",
+      "actor": "Raphael Alejandro",
+      "image": "https://artworks.thetvdb.com/banners/v4/actor/549422/photo/660cc512ec87c.jpg",
+      "tvdbUrl": "https://thetvdb.com/people/549422-raphael-alejandro",
+      "sortOrder": 11,
+      "isFeatured": false
+    },
+    {
+      "character": "Diane",
+      "actor": "Jessica Ann Collins",
+      "image": null,
+      "tvdbUrl": "https://thetvdb.com/people/7925107-jessica-collins",
+      "sortOrder": 23,
+      "isFeatured": false
+    },
+    {
+      "character": "Hector",
+      "actor": "Rafael Cebrián",
+      "image": null,
+      "tvdbUrl": "https://thetvdb.com/people/557545-rafael-cebrian",
+      "sortOrder": 9,
+      "isFeatured": true
+    },
+    {
+      "character": "Memo",
+      "actor": "Fernando Carsa",
+      "image": "https://artworks.thetvdb.com/banners/v4/actor/9026427/photo/6184b5d09a1a6.jpg",
+      "tvdbUrl": "https://thetvdb.com/people/9026427-fernando-carsa",
+      "sortOrder": 4,
+      "isFeatured": true
+    },
+    {
+      "character": "Diane",
+      "actor": "Jessica Collins",
+      "image": "https://artworks.thetvdb.com/banners/v4/actor/271229/photo/63373ab3864a5.jpg",
+      "tvdbUrl": "https://thetvdb.com/people/271229-jessica-collins",
+      "sortOrder": 7,
+      "isFeatured": true
+    },
+    {
+      "character": "Esteban",
+      "actor": "Carlos Corona",
+      "image": "https://artworks.thetvdb.com/banners/v4/actor/8251959/photo/6634405a051ae.jpg",
+      "tvdbUrl": "https://thetvdb.com/people/8251959-carlos-corona",
+      "sortOrder": 12,
+      "isFeatured": false
+    }
+  ],
+  "added": "2024-04-17",
+  "saved": 1769398930967,
+  "trailers": [
+    {
+      "id": 140279,
+      "name": "Official Trailer ",
+      "url": "https://www.youtube.com/watch?v=e8YKi_05emo",
+      "language": "eng",
+      "runtime": 123
+    }
+  ],
+  "showId": "4759942"
+}

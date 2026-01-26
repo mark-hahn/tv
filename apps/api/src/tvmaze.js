@@ -18,7 +18,6 @@ const DB_FILENAME = 'tvmaze.sqlite';
 const SYNC_LOG_FILENAME = 'tvmaze-sync.log';
 const CLEAR_FLAG_BASENAME = 'tvmaze-clear-flag';
 const CLEAR_FLAG_ABSPATH = '/root/dev/apps/tv/apps/api/data/misc/tvmaze-clear-flag';
-const FIRST_PAGE_DUMP_FILENAME = 'tvmaze-page.json';
 const SUMMARY_DUMP_FILENAME = 'tvmaze-sync-summary.json';
 
 let _db = null;
@@ -83,7 +82,10 @@ function appendSyncLog(entry) {
       Number.isFinite(totalLoadedNum) || Number.isFinite(totalInDbNum)
         ? ` total-loaded: ${Number.isFinite(totalLoadedNum) ? totalLoadedNum : '-'}, total-in-db: ${Number.isFinite(totalInDbNum) ? totalInDbNum : '-'}`
         : '';
-    const base = `${ts} page: ${page}, shows: ${count}${totalsSuffix}`;
+    const isModuleLoaded = e.message === 'module loaded';
+    const base = isModuleLoaded
+      ? `${ts}${totalsSuffix}`
+      : `${ts} page: ${page}, shows: ${count}${totalsSuffix}`;
     const line = msg ? `${base} ${msg}` : base;
     fs.appendFileSync(outPath, line + '\n', 'utf8');
   } catch {
@@ -173,17 +175,6 @@ function clearDbIfFlagExists() {
   });
   console.error('[tvmaze] db cleared (flag found)', { flag: hit, deleted });
   return { cleared: true, flag: hit, deleted };
-}
-
-function dumpFirstPageJson(rows) {
-  try {
-    const outPath = path.join(getApiMiscDir(), FIRST_PAGE_DUMP_FILENAME);
-    const dir = path.dirname(outPath);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(outPath, JSON.stringify(rows, null, 2), 'utf8');
-  } catch {
-    // ignore
-  }
 }
 
 function dumpSyncSummaryJson(summary) {
@@ -480,11 +471,6 @@ async function syncTvmazeShows(reason = 'startup') {
 
       if (!Array.isArray(json)) {
         throw new Error(`Unexpected response for ${url}: expected array`);
-      }
-
-      // Debug aid: dump the first fetched page (entire array) for inspection.
-      if (pagesFetched === 0) {
-        dumpFirstPageJson(json);
       }
 
       const insertedBefore = inserted;

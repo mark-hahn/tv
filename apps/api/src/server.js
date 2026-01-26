@@ -436,7 +436,7 @@ async function loadLocalCfClearance(provider) {
   try {
     const p = String(provider || "").trim();
     if (!p) return "";
-    const inPath = path.join(getApiCookiesDir(), "cf-clearance.local.json");
+    const inPath = path.join(getApiCookiesDir(), "cf_clearance-cookies.json");
     const raw = await fs.promises.readFile(inPath, "utf8");
     const j = JSON.parse(raw);
     const v = j && typeof j === "object" && !Array.isArray(j) ? j[p] : "";
@@ -454,7 +454,7 @@ app.post("/api/cf_clearance", async (req, res) => {
     const ipt = typeof body.ipt_cf === "string" ? body.ipt_cf.trim() : "";
     const tl = typeof body.tl_cf === "string" ? body.tl_cf.trim() : "";
 
-    const outPath = path.join(getApiCookiesDir(), "cf-clearance.local.json");
+    const outPath = path.join(getApiCookiesDir(), "cf_clearance-cookies.json");
     let current = {};
     try {
       const raw = await fs.promises.readFile(outPath, "utf8");
@@ -848,14 +848,12 @@ async function handleDownloadRequest(req, res) {
     };
 
     if (!torrent) {
-      res
-        .status(400)
-        .json({
-          ...baseWrapper,
-          success: false,
-          stage: "validate",
-          error: "Torrent data is required",
-        });
+      res.status(400).json({
+        ...baseWrapper,
+        success: false,
+        stage: "validate",
+        error: "Torrent data is required",
+      });
       return;
     }
 
@@ -1394,15 +1392,13 @@ async function handleDownloadRequest(req, res) {
     });
   } catch (error) {
     console.error("Download error:", error);
-    res
-      .status(500)
-      .json({
-        existingTitles: [],
-        existingProcids: [],
-        success: false,
-        stage: "exception",
-        error: error?.message || String(error),
-      });
+    res.status(500).json({
+      existingTitles: [],
+      existingProcids: [],
+      success: false,
+      stage: "exception",
+      error: error?.message || String(error),
+    });
   }
 }
 

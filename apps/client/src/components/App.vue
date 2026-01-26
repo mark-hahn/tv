@@ -609,7 +609,7 @@ export default {
 
     tabs() {
       const allTabs = [
-        { label: 'Series', key: 'series' },
+        { label: 'Info', key: 'series' },
         { label: 'Map', key: 'map' },
         { label: 'Actors', key: 'actors' },
         { label: 'Reviews', key: 'reviews' },

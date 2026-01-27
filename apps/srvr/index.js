@@ -1788,7 +1788,10 @@ const getSharedFilters = (id, _param, resolve, _reject) => {
 const getNote = (id, param, resolve, reject) => {
   const showName = rpcParamToString(param).trim();
   if (!showName) {
-    reject([id, { err: "getNote: missing showName" }]);
+    reject([
+      id,
+      { err: "getNote: missing showName", receivedRaw: param, parsed: showName },
+    ]);
     return;
   }
   resolve([id, notesCache[showName] ?? ""]);

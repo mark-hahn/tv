@@ -628,6 +628,8 @@ export default {
       // Must be known before first render so non-simple panes never mount in simple mode.
       simpleMode: new URLSearchParams(window.location.search).has("simple"),
       currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'subs', 'flex', 'qbt', 'down', 'files'
+      savedPane: null,
+      restoringPreviewPane: false,
       previewMode: false,
       previewPanesLoading: false,
       previewAddBusy: false,
@@ -1776,8 +1778,19 @@ export default {
         this.previewSrchChoice = null;
         this.previewAddBusy = false;
         this.previewPanesLoading = false;
+        if (this.savedPane) {
+          this.currentPane = this.savedPane;
+          this.savedPane = null;
+          this.restoringPreviewPane = true;
+          // Prevent setUpSeries from resetting pane to 'info' when list.vue triggers it shortly
+          setTimeout(() => {
+            this.restoringPreviewPane = false;
+          }, 500);
+          evtBus.emit("paneChanged", this.currentPane);
+        }
       }
       if (this.previewMode) {
+        this.savedPane = this.currentPane;
         // If currently on a disabled pane, snap back to Series.
         const allowed = new Set(["info", "actors", "reviews", "trailer"]);
         if (!allowed.has(this.currentPane)) {
@@ -1867,6 +1880,12 @@ export default {
       if (prevPane === "trailer") {
         this.currentPane = "trailer";
         evtBus.emit("paneChanged", this.currentPane);
+        return;
+      }
+
+      // If we are just restoring the previous pane after preview mode, 
+      // do not fallback to 'info' pane.
+      if (this.restoringPreviewPane) {
         return;
       }
 

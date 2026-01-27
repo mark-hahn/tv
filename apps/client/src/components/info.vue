@@ -674,10 +674,16 @@ export default {
         this.noteCacheByShowName[showName] = next;
         this.show.Notes = next;
       } catch (err) {
+        let msg = "";
+        try {
+          msg = err?.message || JSON.stringify(err);
+        } catch {
+          msg = String(err);
+        }
         console.error("Series: refreshNoteFromServer failed", {
           showName,
           err,
-          msg: err?.message || String(err),
+          msg,
         });
       } finally {
         this.notePollInFlight = false;

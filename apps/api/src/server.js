@@ -16,7 +16,7 @@ import {
   flexgetHistory,
   addQbtTorrent,
 } from "./usb.js";
-import { getBrowseShow } from "./browse.js";
+import { getBrowseShow, getAllBrowse } from "./browse.js";
 import * as reviews from "./reviews.js";
 import { checkFiles as tvProcCheckFiles } from "./tv-proc.js";
 import {
@@ -1431,6 +1431,23 @@ app.get("/api/getBrowseShow", async (req, res) => {
       result: null,
       error,
     });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/getAllBrowse", async (req, res) => {
+  try {
+    const result = await getAllBrowse();
+    // Do not log this call to avoid spamming the log if called frequently or on every page load
+    // appendCallsLog({
+    //   endpoint: "/api/getAllBrowse",
+    //   method: "GET",
+    //   ok: true,
+    //   result,
+    // });
+    res.json(result);
+  } catch (error) {
+    console.error("getAllBrowse error:", error);
     res.status(500).json({ error: error.message });
   }
 });

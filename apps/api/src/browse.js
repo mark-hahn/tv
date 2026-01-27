@@ -173,3 +173,7 @@ export async function getBrowseShow() {
   // If we exhausted candidates loop without finding anything, we just return the current list.
   return resultTitles;
 }
+
+export async function getAllBrowse() {
+  return resultTitles;
+}

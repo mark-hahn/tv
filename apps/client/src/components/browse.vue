@@ -463,7 +463,7 @@ export default {
       try {
         let data;
         try {
-          const res = await fetch(`${config.torrentsApiUrl}/api/getBrowseShow`);
+          const res = await fetch(`${config.torrentsApiUrl}/api/getAllBrowse`);
           if (!res.ok) {
             const txt = await res.text();
             throw new Error(`HTTP ${res.status}: ${txt}`);

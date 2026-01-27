@@ -140,7 +140,7 @@ export async function getBrowseShow() {
     }
 
     // Reject if not English
-    if (show.language !== "English") {
+    if (show.language && show.language !== "English") {
       appendResultTitle(`Language|${title}`);
       continue;
     }

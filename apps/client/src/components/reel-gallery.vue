@@ -59,22 +59,6 @@
       >
         {{ tvdb.year }} - {{ tvdb.name }}
       </div>
-      <div
-        v-if="idx === 0 && getPremiereDate(tvdb)"
-        :style="{
-          position: 'absolute',
-          top: '5px',
-          left: '5px',
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          color: 'white',
-          padding: '2px 4px',
-          fontSize: '12px',
-          borderRadius: '3px',
-          pointerEvents: 'none',
-        }"
-      >
-        {{ getPremiereDate(tvdb) }}
-      </div>
     </div>
   </div>
 </template>

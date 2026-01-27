@@ -348,6 +348,24 @@
         </div>
       </div>
     </div>
+    <div
+      v-if="toastMessage"
+      :style="{
+        position: 'fixed',
+        bottom: '20px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        color: 'white',
+        padding: '10px 20px',
+        borderRadius: '5px',
+        zIndex: 10000,
+        pointerEvents: 'none',
+        fontSize: '16px',
+      }"
+    >
+      {{ toastMessage }}
+    </div>
   </div>
 </template>
 
@@ -857,12 +875,40 @@ export default {
       }
     };
 
+    const toastMessage = ref("");
+    let toastTimer = null;
+
+    const showToast = (msg) => {
+      toastMessage.value = msg;
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toastMessage.value = "";
+        toastTimer = null;
+      }, 3000);
+    };
+
     const handleLoad = () => {
       const t = curTvdb.value;
       if (!t) return;
 
       const name = String(t.name || t.Name || "").trim();
       if (!name) return;
+
+      // Check if show already exists
+      const tvdbId = String(t.tvdbId || t.tvdb_id || "").trim();
+      const exists = (props.allShows || []).some((s) => {
+        const sTvdb = String(s.TvdbId || s.tvdbId || s.tvdb_id || "").trim();
+        if (sTvdb && tvdbId && sTvdb === tvdbId) return true;
+        const sName = String(s.Name || s.name || "")
+          .trim()
+          .toLowerCase();
+        return sName === name.toLowerCase();
+      });
+
+      if (exists) {
+        showToast("Show already in show list.");
+        return;
+      }
 
       // Route through the exact same flow used by clicking a card in #searchList.
       const srchChoice = {
@@ -904,7 +950,34 @@ export default {
     const infoLine = computed(() => {
       if (!curTvdb.value) return "";
       const t = curTvdb.value;
-      return `${t.year || ""} | ${t.country || ""} | ${t.primary_language || ""} | ${t.network || ""}`;
+      let line = `${t.year || ""} | ${t.country || ""} | ${t.primary_language || ""} | ${t.network || ""}`;
+
+      // Try multiple possible property names for premiere date
+      const dateStr =
+        t.first_aired ||
+        t.firstAired ||
+        t.premiered ||
+        t.released ||
+        t.first_air_time ||
+        "";
+
+      // console.log("browse infoLine debug:", {
+      //   name: t.name,
+      //   dateStr,
+      //   keys: Object.keys(t),
+      //   t,
+      // });
+
+      if (dateStr) {
+        // Ensure it's a string
+        const s = String(dateStr).trim();
+        const parts = s.split("-");
+        // Expecting YYYY-MM-DD
+        if (parts.length >= 3) {
+          line += ` | ${parts[0]}/${parts[1]}/${parts[2]}`;
+        }
+      }
+      return line;
     });
 
     const galleryTitleLine = computed(() => {
@@ -1098,6 +1171,7 @@ export default {
       isLoadingRemotesMsg,
       loadingRemotesCount,
       suppressButtons,
+      toastMessage,
     };
   },
 };

@@ -677,6 +677,7 @@ export default {
         console.error("Series: refreshNoteFromServer failed", {
           showName,
           err,
+          msg: err?.message || String(err),
         });
       } finally {
         this.notePollInFlight = false;

@@ -59,6 +59,22 @@
       >
         {{ tvdb.year }} - {{ tvdb.name }}
       </div>
+      <div
+        v-if="idx === 0 && getPremiereDate(tvdb)"
+        :style="{
+          position: 'absolute',
+          top: '5px',
+          left: '5px',
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          color: 'white',
+          padding: '2px 4px',
+          fontSize: '12px',
+          borderRadius: '3px',
+          pointerEvents: 'none',
+        }"
+      >
+        {{ getPremiereDate(tvdb) }}
+      </div>
     </div>
   </div>
 </template>
@@ -95,6 +111,22 @@ export default {
       if (!tvdb) return null;
       // TVDB search results use `image_url` (full) and `thumbnail` (smaller)
       return tvdb.image_url || tvdb.thumbnail || tvdb.image || null;
+    };
+
+    const getPremiereDate = (tvdb) => {
+      if (!tvdb) return "";
+      const dateStr =
+        tvdb.first_aired ||
+        tvdb.firstAired ||
+        tvdb.premiered ||
+        tvdb.released ||
+        tvdb.first_air_time ||
+        "";
+      if (!dateStr) return "";
+      // Expecting YYYY-MM-DD
+      const parts = String(dateStr).trim().split("-");
+      if (parts.length < 3) return "";
+      return `${parts[0]}/${parts[1]}/${parts[2]}`;
     };
 
     const getCardStyle = (idx) => {
@@ -171,6 +203,7 @@ export default {
       galleryPane,
       handleScaledWheel,
       getImageUrl,
+      getPremiereDate,
       getCardStyle,
       selectCard,
       previewCard,

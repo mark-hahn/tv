@@ -28,9 +28,6 @@ import {
   preferSharedReadPath,
 } from "./tvPaths.js";
 
-const MISTRAL_CHAT_URL = "https://api.mistral.ai/v1/chat/completions";
-const MISTRAL_DEFAULT_MODEL = "mistral-large-latest";
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -241,13 +238,6 @@ function readRequiredTextFile(filePath, label) {
     const msg = e && e.message ? e.message : String(e);
     throw new Error(`Missing required ${label} at ${filePath}. (${msg})`);
   }
-}
-
-function readMistralApiKey() {
-  return readRequiredTextFile(
-    path.join(getApiSecretsDir(), "mistral-key.txt"),
-    "Mistral API key (mistral-key.txt)",
-  );
 }
 
 const app = express();
@@ -525,45 +515,6 @@ if (
 
 // API endpoint
 // app.get("/api/tvdb/*", tvdbProxyGet);
-
-// Server-side Mistral proxy (avoids exposing API keys in the browser bundle).
-app.post("/api/mistral/chat", async (req, res) => {
-  try {
-    const apiKey = readMistralApiKey();
-    const body = req.body && typeof req.body === "object" ? req.body : {};
-
-    const model =
-      typeof body.model === "string" && body.model.trim()
-        ? body.model.trim()
-        : MISTRAL_DEFAULT_MODEL;
-
-    const messages = Array.isArray(body.messages) ? body.messages : null;
-    if (!messages || messages.length === 0) {
-      res.status(400).json({ error: "messages array required" });
-      return;
-    }
-
-    const upstream = await fetch(MISTRAL_CHAT_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({ model, messages }),
-    });
-
-    const upstreamBody = await upstream.text();
-    res.status(upstream.status);
-    res.set(
-      "Content-Type",
-      upstream.headers.get("content-type") || "application/json",
-    );
-    res.send(upstreamBody);
-  } catch (error) {
-    console.error("mistral proxy error:", error);
-    res.status(500).json({ error: error?.message || String(error) });
-  }
-});
 
 app.post("/api/tvproc/startProc", async (req, res) => {
   const jsonPath = getTvprocJsonPath();

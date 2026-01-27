@@ -201,13 +201,6 @@
               :sizing="activeSizing"
               :active="currentPane === 'trailer'"
             ></Trailer>
-            <Ai
-              v-show="currentPane === 'ai'"
-              style="width: 100%; height: 100%"
-              :simpleMode="simpleMode"
-              :sizing="activeSizing"
-              :activeShow="currentShow"
-            ></Ai>
             <Browse
               v-if="!simpleMode"
               v-show="currentPane === 'browse'"
@@ -443,13 +436,6 @@
             :sizing="activeSizing"
             :active="currentPane === 'trailer'"
           ></Trailer>
-          <Ai
-            v-show="currentPane === 'ai'"
-            style="width: 100%; height: 100%"
-            :simpleMode="simpleMode"
-            :sizing="activeSizing"
-            :activeShow="currentShow"
-          ></Ai>
           <Browse
             v-if="!simpleMode"
             v-show="currentPane === 'browse'"
@@ -608,7 +594,6 @@ import Qbt from "./qbt.vue";
 import Down from "./down.vue";
 import Files from "./files.vue";
 import Trailer from "./trailer.vue";
-import Ai from "./ai.vue";
 import evtBus from "../evtBus.js";
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
@@ -637,13 +622,12 @@ export default {
     Down,
     Files,
     Trailer,
-    Ai,
   },
   data() {
     return {
       // Must be known before first render so non-simple panes never mount in simple mode.
       simpleMode: new URLSearchParams(window.location.search).has("simple"),
-      currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'subs', 'flex', 'qbt', 'down', 'files', 'ai'
+      currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'subs', 'flex', 'qbt', 'down', 'files'
       previewMode: false,
       previewPanesLoading: false,
       previewAddBusy: false,
@@ -947,7 +931,6 @@ export default {
         { label: "Actors", key: "actors" },
         { label: "Reviews", key: "reviews" },
         { label: "Trailer", key: "trailer" },
-        { label: "AI", key: "ai" },
         { label: "Tor", key: "tor" },
         { label: "Subs", key: "subs" },
         { label: "Files", key: "files" },
@@ -958,14 +941,7 @@ export default {
       ];
 
       if (!this.simpleMode) return allTabs;
-      const allowed = new Set([
-        "info",
-        "map",
-        "actors",
-        "reviews",
-        "trailer",
-        "ai",
-      ]);
+      const allowed = new Set(["info", "map", "actors", "reviews", "trailer"]);
       return allTabs.filter((t) => allowed.has(t.key));
     },
   },
@@ -1468,7 +1444,7 @@ export default {
       // In simple mode, only Series/Map/Actors exist.
       if (
         this.simpleMode &&
-        !["info", "map", "actors", "reviews", "trailer", "ai"].includes(k)
+        !["info", "map", "actors", "reviews", "trailer"].includes(k)
       ) {
         return;
       }
@@ -1503,12 +1479,6 @@ export default {
 
       if (k === "trailer") {
         this.currentPane = "trailer";
-        evtBus.emit("paneChanged", this.currentPane);
-        return;
-      }
-
-      if (k === "ai") {
-        this.currentPane = "ai";
         evtBus.emit("paneChanged", this.currentPane);
         return;
       }
@@ -1809,7 +1779,7 @@ export default {
       }
       if (this.previewMode) {
         // If currently on a disabled pane, snap back to Series.
-        const allowed = new Set(["info", "actors", "reviews", "trailer", "ai"]);
+        const allowed = new Set(["info", "actors", "reviews", "trailer"]);
         if (!allowed.has(this.currentPane)) {
           this.currentPane = "info";
           evtBus.emit("paneChanged", this.currentPane);
@@ -1896,13 +1866,6 @@ export default {
       // When currently viewing Trailer, stay on Trailer.
       if (prevPane === "trailer") {
         this.currentPane = "trailer";
-        evtBus.emit("paneChanged", this.currentPane);
-        return;
-      }
-
-      // When currently viewing AI, stay on AI.
-      if (prevPane === "ai") {
-        this.currentPane = "ai";
         evtBus.emit("paneChanged", this.currentPane);
         return;
       }

@@ -704,12 +704,14 @@ export async function runTvmazeSyncNow() {
 export function getCandidateShows(limit = 100) {
   if (!_db) openDb();
   // We use the new premiered column (integer timestamp) to sort by premiered date descending
+  // Filter out "In Development" shows
   const rows = _db
     .prepare(
       `
     SELECT tvmaze_id, data_json 
     FROM shows 
     WHERE (browsed IS NULL OR browsed = 0) 
+      AND (status IS NULL OR status != 'In Development')
     ORDER BY premiered DESC 
     LIMIT ?
   `,

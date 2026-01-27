@@ -132,6 +132,19 @@ export async function getBrowseShow() {
       continue;
     }
 
+    // Reject if not Scripted
+    // "Reality" is used as the generic label for non-scripted in our UI context
+    if (show.type !== "Scripted") {
+      appendResultTitle(`Reality|${title}`);
+      continue;
+    }
+
+    // Reject if not English
+    if (show.language !== "English") {
+      appendResultTitle(`Language|${title}`);
+      continue;
+    }
+
     // Filter Genres
     // Show genres are usually in show.genres (array of strings)
     const genres = Array.isArray(show.genres) ? show.genres : [];

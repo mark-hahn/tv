@@ -305,7 +305,7 @@ function openDb() {
       tvmaze_id INTEGER PRIMARY KEY,
       tvdb_id INTEGER,
       imdb_id TEXT,
-      premiered TEXT,
+      premiered INTEGER,
       status TEXT,
       type TEXT,
       language TEXT,
@@ -326,7 +326,7 @@ function openDb() {
       db.exec("ALTER TABLE shows ADD COLUMN imdb_id TEXT");
     }
     if (!names.includes("premiered")) {
-      db.exec("ALTER TABLE shows ADD COLUMN premiered TEXT");
+      db.exec("ALTER TABLE shows ADD COLUMN premiered INTEGER");
     }
     if (!names.includes("status")) {
       db.exec("ALTER TABLE shows ADD COLUMN status TEXT");
@@ -485,8 +485,13 @@ async function syncTvmazeShows(reason = "startup") {
       const imdbIdSafe =
         typeof imdbId === "string" && imdbId.trim() ? imdbId.trim() : null;
 
+      const premieredMs =
+        typeof show.premiered === "string" ? Date.parse(show.premiered) : null;
       const premiered =
-        typeof show.premiered === "string" ? show.premiered : null;
+        !Number.isNaN(premieredMs) && premieredMs != null
+          ? Math.floor(premieredMs / 1000)
+          : null;
+
       const status = typeof show.status === "string" ? show.status : null;
       const type = typeof show.type === "string" ? show.type : null;
       const language = typeof show.language === "string" ? show.language : null;
@@ -698,15 +703,14 @@ export async function runTvmazeSyncNow() {
 
 export function getCandidateShows(limit = 100) {
   if (!_db) openDb();
-  // We use json_extract to sort by premiered date descending
-  // Premiered format is YYYY-MM-DD
+  // We use the new premiered column (integer timestamp) to sort by premiered date descending
   const rows = _db
     .prepare(
       `
     SELECT tvmaze_id, data_json 
     FROM shows 
     WHERE (browsed IS NULL OR browsed = 0) 
-    ORDER BY json_extract(data_json, '$.premiered') DESC 
+    ORDER BY premiered DESC 
     LIMIT ?
   `,
     )

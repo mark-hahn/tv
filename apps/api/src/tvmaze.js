@@ -43,7 +43,7 @@ function formatLogTimestamp(date = new Date()) {
   const hh = String(d.getHours()).padStart(2, "0");
   const min = String(d.getMinutes()).padStart(2, "0");
   // Requested format: mm/dd-hh/mm
-  return `${mm}/${dd}-${hh}/${min}`;
+  return `${mm}/${dd}-${hh}:${min}`;
 }
 
 function appendSyncLog(entry) {
@@ -325,6 +325,9 @@ function openDb() {
     if (!names.includes("viewed")) {
       db.exec("ALTER TABLE shows ADD COLUMN viewed INTEGER");
     }
+    if (!names.includes("browsed")) {
+      db.exec("ALTER TABLE shows ADD COLUMN browsed INTEGER DEFAULT 0");
+    }
   } catch {
     // ignore migration failures
   }
@@ -437,7 +440,7 @@ async function syncTvmazeShows(reason = "startup") {
     "SELECT tvdb_id, imdb_id, tvmaze_updated, data_json FROM shows WHERE tvmaze_id = ?",
   );
   const insertRow = db.prepare(
-    "INSERT INTO shows(tvmaze_id, tvdb_id, imdb_id, viewed, tvmaze_updated, fetched_at, data_json) VALUES(?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO shows(tvmaze_id, tvdb_id, imdb_id, browsed, tvmaze_updated, fetched_at, data_json) VALUES(?, ?, ?, 0, ?, ?, ?)",
   );
   const updateRow = db.prepare(
     "UPDATE shows SET tvdb_id = ?, imdb_id = ?, tvmaze_updated = ?, fetched_at = ?, data_json = ? WHERE tvmaze_id = ?",
@@ -472,7 +475,6 @@ async function syncTvmazeShows(reason = "startup") {
           tvmazeId,
           tvdbIdSafe,
           imdbIdSafe,
-          null,
           tvmazeUpdated,
           fetchedAt,
           jsonText,
@@ -655,4 +657,38 @@ export function getTvmazeDbPath() {
 
 export async function runTvmazeSyncNow() {
   return syncTvmazeShows("manual");
+}
+
+export function getCandidateShows(limit = 100) {
+  if (!_db) openDb();
+  // We use json_extract to sort by premiered date descending
+  // Premiered format is YYYY-MM-DD
+  const rows = _db
+    .prepare(
+      `
+    SELECT tvmaze_id, data_json 
+    FROM shows 
+    WHERE (browsed IS NULL OR browsed = 0) 
+    ORDER BY json_extract(data_json, '$.premiered') DESC 
+    LIMIT ?
+  `,
+    )
+    .all(limit);
+
+  return rows
+    .map((r) => {
+      try {
+        const d = JSON.parse(r.data_json);
+        d.tvmaze_id = r.tvmaze_id; // ensure ID is passed
+        return d;
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
+export function markShowBrowsed(tvmazeId) {
+  if (!_db) openDb();
+  _db.prepare("UPDATE shows SET browsed = 1 WHERE tvmaze_id = ?").run(tvmazeId);
 }

@@ -1,6 +1,6 @@
 <template>
   <div
-    id="reelPane"
+    id="browsePane"
     @click="handleBackgroundClick"
     :style="{
       height: '100%',
@@ -17,7 +17,7 @@
     }"
   >
     <div
-      id="reelLeft"
+      id="browseLeft"
       :style="{
         flex: '0 0 125px',
         height: '100%',
@@ -33,7 +33,7 @@
       ></reel-gallery>
     </div>
     <div
-      id="reelRight"
+      id="browseRight"
       :style="{
         flex: '1 1 0',
         minWidth: 0,
@@ -44,7 +44,7 @@
       }"
     >
       <div
-        id="reelInfo"
+        id="browseInfo"
         :style="{
           padding: '10px',
           backgroundColor: '#f5f5f5',
@@ -92,7 +92,7 @@
       </div>
       <!-- keep zero gap between description and buttons-->
       <div
-        id="reelDescrButtons"
+        id="browseDescrButtons"
         :style="{
           flex: '0 0 auto',
           display: 'flex',
@@ -101,7 +101,7 @@
         }"
       >
         <div
-          id="reelDescr"
+          id="browseDescr"
           :style="{
             flex: '0 0 auto',
             height: '120px',
@@ -117,7 +117,7 @@
           <div v-if="curTvdb">{{ curTvdb.overview }}</div>
         </div>
         <div
-          id="reelButtons"
+          id="browseButtons"
           :style="{
             display: 'flex',
             flexWrap: 'wrap',
@@ -288,7 +288,7 @@
         </div>
       </div>
       <div
-        id="reelTitles"
+        id="browseTitles"
         ref="titlesPane"
         :style="{
           flex: '1',
@@ -359,7 +359,7 @@ import evtBus from "../evtBus.js";
 import * as srvr from "../srvr.js";
 
 export default {
-  name: "ReelPane",
+  name: "BrowsePane",
   components: {
     ReelGallery,
   },
@@ -387,10 +387,10 @@ export default {
     const selectedTitleIdx = ref(-1);
     const titlesPane = ref(null);
     const _titlesPopulated = ref(false);
-    const _didStartReel = ref(false);
+    const _didStartBrowse = ref(false);
     const _startedWithShows = ref(false);
     const _didInitialVisibleScroll = ref(false);
-    const _startReelPromise = ref(null);
+    const _startBrowsePromise = ref(null);
     const isLoadingNext = ref(false);
     const isLoadingRemotesMsg = ref(false);
     const loadingRemotesCount = ref(0);
@@ -459,31 +459,18 @@ export default {
       return Array.from(new Set(names));
     };
 
-    const startReelAndLoadTitles = async () => {
+    const startBrowseAndLoadTitles = async () => {
       try {
-        const showTitles = getAllShowNames();
         let data;
         try {
-          const res = await fetch(`${config.torrentsApiUrl}/api/startreel`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ showTitles }),
-          });
+          const res = await fetch(`${config.torrentsApiUrl}/api/getBrowseShow`);
           if (!res.ok) {
             const txt = await res.text();
             throw new Error(`HTTP ${res.status}: ${txt}`);
           }
           data = await res.json();
         } catch (e) {
-          // Fallback for older server versions that only support GET /api/startreel
-          const url = new URL(`${config.torrentsApiUrl}/api/startreel`);
-          url.searchParams.set("showTitles", JSON.stringify(showTitles));
-          const res2 = await fetch(url.toString());
-          if (!res2.ok) {
-            const txt2 = await res2.text();
-            throw new Error(`HTTP ${res2.status}: ${txt2}`);
-          }
-          data = await res2.json();
+          throw e;
         }
 
         const nextTitles = toTitleArray(data);
@@ -491,10 +478,24 @@ export default {
         // Always append: starting/restarting the reel should not wipe what the user already has.
         // If we get new entries, remove the "no more" sentinel and append the new titles.
         if (nextTitles.length > 0) {
-          const withoutNoMore = titleStrings.value.filter(
+          let current = titleStrings.value.filter(
             (s) => String(s) !== NO_MORE_ENTRY,
           );
-          titleStrings.value = [...withoutNoMore, ...nextTitles];
+
+          const nextParsed = nextTitles.map((str) => {
+            const parts = str.split("|");
+            return parts[1] ? parts[1].trim() : parts[0].trim();
+          });
+
+          // remove any matching title from earlier in the list to avoid duplication
+          // when receiving full history from server
+          current = current.filter((s) => {
+            const parts = s.split("|");
+            const title = parts[1] ? parts[1].trim() : parts[0].trim();
+            return !nextParsed.includes(title);
+          });
+
+          titleStrings.value = [...current, ...nextTitles];
         } else if (titleStrings.value.length === 0) {
           titleStrings.value = [NO_MORE_ENTRY];
         } else {
@@ -503,46 +504,49 @@ export default {
         }
 
         _titlesPopulated.value = true;
-        _didStartReel.value = true;
-        if (showTitles.length > 0) {
-          _startedWithShows.value = true;
-        }
+        _didStartBrowse.value = true;
+        // if (showTitles.length > 0) {
+        //   _startedWithShows.value = true;
+        // }
+        // always assume started successfully if we got here
+        _startedWithShows.value = true;
+
         if (props.active) {
           if (nextTitles.length > 0) await scrollTitlesToBottom();
           else await scrollTitlesPaneToBottom();
         }
       } catch (e) {
         const msg = e?.message || String(e);
-        console.log("startReel failed:", msg);
+        console.log("startBrowse failed:", msg);
         titleStrings.value = [...titleStrings.value, `error|${msg}`];
         _titlesPopulated.value = true;
       }
     };
 
-    const ensureReelStarted = async () => {
-      if (_didStartReel.value) return true;
+    const ensureBrowseStarted = async () => {
+      if (_didStartBrowse.value) return true;
 
-      if (_startReelPromise.value) {
+      if (_startBrowsePromise.value) {
         try {
-          await _startReelPromise.value;
+          await _startBrowsePromise.value;
         } catch (e) {
           void e;
         }
-        return _didStartReel.value;
+        return _didStartBrowse.value;
       }
 
-      _startReelPromise.value = (async () => {
-        await startReelAndLoadTitles();
+      _startBrowsePromise.value = (async () => {
+        await startBrowseAndLoadTitles();
       })().finally(() => {
-        _startReelPromise.value = null;
+        _startBrowsePromise.value = null;
       });
 
       try {
-        await _startReelPromise.value;
+        await _startBrowsePromise.value;
       } catch (e) {
         void e;
       }
-      return _didStartReel.value;
+      return _didStartBrowse.value;
     };
 
     const handleNext = async () => {
@@ -556,19 +560,19 @@ export default {
       _lastRemotesKey.value = "";
 
       try {
-        if (!_didStartReel.value) {
-          await ensureReelStarted();
+        if (!_didStartBrowse.value) {
+          await ensureBrowseStarted();
         }
 
         const hasNoMore = titleStrings.value.some(
           (s) => String(s) === NO_MORE_ENTRY,
         );
         if (hasNoMore) {
-          await startReelAndLoadTitles();
+          await startBrowseAndLoadTitles();
         }
 
-        const fetchGetReel = async () => {
-          const res = await fetch(`${config.torrentsApiUrl}/api/getreel`);
+        const fetchGetBrowseShow = async () => {
+          const res = await fetch(`${config.torrentsApiUrl}/api/getBrowseShow`);
           if (!res.ok) {
             const txt = await res.text();
             throw new Error(`HTTP ${res.status}: ${txt}`);
@@ -578,15 +582,15 @@ export default {
 
         let data;
         try {
-          data = await fetchGetReel();
+          data = await fetchGetBrowseShow();
         } catch (e) {
           const msg = e?.message || String(e);
           if (
-            /startreel\s+first/i.test(msg) ||
+            /getBrowseShow\s+first/i.test(msg) ||
             /home\s*page\s+not\s+loaded/i.test(msg)
           ) {
-            await ensureReelStarted();
-            data = await fetchGetReel();
+            await ensureBrowseStarted();
+            data = await fetchGetBrowseShow();
           } else {
             throw e;
           }
@@ -641,7 +645,7 @@ export default {
         }
       } catch (e) {
         const msg = e?.message || String(e);
-        console.log("getReel failed:", msg);
+        console.log("getBrowseShow failed:", msg);
         titleStrings.value = [...titleStrings.value, `error|${msg}`];
         await scrollTitlesToBottom();
         await nextTick();
@@ -917,10 +921,10 @@ export default {
       if (target.closest("button")) return;
 
       // Ignore clicks in the title card list.
-      if (target.closest("#reelTitles")) return;
+      if (target.closest("#browseTitles")) return;
 
       // Ignore clicks in the left gallery (it has its own selection behavior).
-      if (target.closest("#reelLeft")) return;
+      if (target.closest("#browseLeft")) return;
 
       const name = String(
         galleryTitleLine.value || curTitle.value || "",
@@ -1044,7 +1048,7 @@ export default {
       // console.log('reel.vue onAllShows:', val?.length, '_startedWithShows:', _startedWithShows.value);
       if (_startedWithShows.value) return;
       if (!Array.isArray(val) || val.length === 0) return;
-      await startReelAndLoadTitles();
+      await startBrowseAndLoadTitles();
     };
 
     watch(() => props.allShows, onAllShows, { immediate: true });
@@ -1052,8 +1056,8 @@ export default {
     watch(
       () => props.active,
       (isActive) => {
-        if (_didStartReel.value) return;
-        void ensureReelStarted();
+        if (_didStartBrowse.value) return;
+        void ensureBrowseStarted();
       },
     );
 

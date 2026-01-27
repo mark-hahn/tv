@@ -208,16 +208,16 @@
               :sizing="activeSizing"
               :activeShow="currentShow"
             ></Ai>
-            <Reel
+            <Browse
               v-if="!simpleMode"
-              v-show="currentPane === 'reel'"
+              v-show="currentPane === 'browse'"
               style="width: 100%; height: 100%"
               :simpleMode="simpleMode"
               :sizing="activeSizing"
               :allShows="allShows"
-              :active="currentPane === 'reel'"
+              :active="currentPane === 'browse'"
             >
-            </Reel>
+            </Browse>
             <Tor
               v-if="!simpleMode"
               v-show="currentPane === 'tor'"
@@ -450,16 +450,16 @@
             :sizing="activeSizing"
             :activeShow="currentShow"
           ></Ai>
-          <Reel
+          <Browse
             v-if="!simpleMode"
-            v-show="currentPane === 'reel'"
+            v-show="currentPane === 'browse'"
             style="width: 100%; height: 100%"
             :simpleMode="simpleMode"
             :sizing="activeSizing"
             :allShows="allShows"
-            :active="currentPane === 'reel'"
+            :active="currentPane === 'browse'"
           >
-          </Reel>
+          </Browse>
           <Tor
             v-if="!simpleMode"
             v-show="currentPane === 'tor'"
@@ -600,7 +600,7 @@ import Map from "./map.vue";
 import Actors from "./actors.vue";
 import Reviews from "./reviews.vue";
 import Buttons from "./buttons.vue";
-import Reel from "./reel.vue";
+import Browse from "./browse.vue";
 import Tor from "./tor.vue";
 import Subs from "./subs.vue";
 import Flex from "./flex.vue";
@@ -629,7 +629,7 @@ export default {
     Actors,
     Reviews,
     Buttons,
-    Reel,
+    Browse,
     Tor,
     Subs,
     Flex,
@@ -951,7 +951,7 @@ export default {
         { label: "Tor", key: "tor" },
         { label: "Subs", key: "subs" },
         { label: "Files", key: "files" },
-        { label: "Reel", key: "reel" },
+        { label: "Browse", key: "browse" },
         { label: "Flex", key: "flex" },
         { label: "Qbt", key: "qbt" },
         { label: "Down", key: "down" },
@@ -1454,7 +1454,7 @@ export default {
       if (this.previewMode) {
         if (k === "map") return;
         const disabled = new Set([
-          "reel",
+          "browse",
           "tor",
           "subs",
           "flex",
@@ -1513,9 +1513,9 @@ export default {
         return;
       }
 
-      if (k === "reel") {
+      if (k === "browse") {
         if (this.simpleMode) return;
-        this.currentPane = "reel";
+        this.currentPane = "browse";
         evtBus.emit("paneChanged", this.currentPane);
         return;
       }

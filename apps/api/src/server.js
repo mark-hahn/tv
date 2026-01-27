@@ -16,7 +16,7 @@ import {
   flexgetHistory,
   addQbtTorrent,
 } from "./usb.js";
-import { startReel, getReel } from "./reelgood.js";
+import { getBrowseShow } from "./browse.js";
 import * as reviews from "./reviews.js";
 import { checkFiles as tvProcCheckFiles } from "./tv-proc.js";
 import {
@@ -1411,34 +1411,21 @@ app.post("/api/download", handleDownloadRequest);
 // Back-compat alias for older clients/nginx rewrites.
 app.post("/downloads", handleDownloadRequest);
 
-app.get("/api/startreel", async (req, res) => {
+// GET /api/getBrowseShow
+app.get("/api/getBrowseShow", async (req, res) => {
   try {
-    const q = req.query || {};
-    let showTitles = [];
-    if (typeof q.showTitles === "string" && q.showTitles) {
-      try {
-        const parsed = JSON.parse(q.showTitles);
-        if (Array.isArray(parsed)) showTitles = parsed;
-      } catch {
-        showTitles = q.showTitles
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-      }
-    }
-
-    const result = await startReel(showTitles);
+    const result = await getBrowseShow();
     appendCallsLog({
-      endpoint: "/api/startreel",
+      endpoint: "/api/getBrowseShow",
       method: "GET",
       ok: true,
       result,
     });
     res.json(result);
   } catch (error) {
-    console.error("startReel error:", error);
+    console.error("getBrowseShow error:", error);
     appendCallsLog({
-      endpoint: "/api/startreel",
+      endpoint: "/api/getBrowseShow",
       method: "GET",
       ok: false,
       result: null,
@@ -1448,46 +1435,22 @@ app.get("/api/startreel", async (req, res) => {
   }
 });
 
-app.post("/api/startreel", async (req, res) => {
+// POST /api/getBrowseShow (for compat if needed, though arguments are ignored now)
+app.post("/api/getBrowseShow", async (req, res) => {
   try {
-    const body = req.body || {};
-    const showTitles = Array.isArray(body.showTitles) ? body.showTitles : [];
-    const result = await startReel(showTitles);
+    const result = await getBrowseShow();
     appendCallsLog({
-      endpoint: "/api/startreel",
+      endpoint: "/api/getBrowseShow",
       method: "POST",
       ok: true,
       result,
     });
     res.json(result);
   } catch (error) {
-    console.error("startReel error:", error);
+    console.error("getBrowseShow error:", error);
     appendCallsLog({
-      endpoint: "/api/startreel",
+      endpoint: "/api/getBrowseShow",
       method: "POST",
-      ok: false,
-      result: null,
-      error,
-    });
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get("/api/getreel", async (req, res) => {
-  try {
-    const result = await getReel();
-    appendCallsLog({
-      endpoint: "/api/getreel",
-      method: "GET",
-      ok: true,
-      result,
-    });
-    res.json(result);
-  } catch (error) {
-    console.error("getReel error:", error);
-    appendCallsLog({
-      endpoint: "/api/getreel",
-      method: "GET",
       ok: false,
       result: null,
       error,

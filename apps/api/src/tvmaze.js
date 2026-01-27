@@ -305,7 +305,10 @@ function openDb() {
       tvmaze_id INTEGER PRIMARY KEY,
       tvdb_id INTEGER,
       imdb_id TEXT,
-      viewed INTEGER,
+      premiered TEXT,
+      status TEXT,
+      type TEXT,
+      language TEXT,
       tvmaze_updated INTEGER,
       fetched_at INTEGER NOT NULL,
       data_json TEXT NOT NULL
@@ -322,8 +325,24 @@ function openDb() {
     if (!names.includes("imdb_id")) {
       db.exec("ALTER TABLE shows ADD COLUMN imdb_id TEXT");
     }
-    if (!names.includes("viewed")) {
-      db.exec("ALTER TABLE shows ADD COLUMN viewed INTEGER");
+    if (!names.includes("premiered")) {
+      db.exec("ALTER TABLE shows ADD COLUMN premiered TEXT");
+    }
+    if (!names.includes("status")) {
+      db.exec("ALTER TABLE shows ADD COLUMN status TEXT");
+    }
+    if (!names.includes("type")) {
+      db.exec("ALTER TABLE shows ADD COLUMN type TEXT");
+    }
+    if (!names.includes("language")) {
+      db.exec("ALTER TABLE shows ADD COLUMN language TEXT");
+    }
+    if (names.includes("viewed")) {
+      try {
+        db.exec("ALTER TABLE shows DROP COLUMN viewed");
+      } catch {
+        // ignore if sqlite version is too old to support drop column
+      }
     }
     if (!names.includes("browsed")) {
       db.exec("ALTER TABLE shows ADD COLUMN browsed INTEGER DEFAULT 0");
@@ -437,13 +456,13 @@ async function syncTvmazeShows(reason = "startup") {
   const startPage = computeStartPage(startMaxId);
 
   const selectExisting = db.prepare(
-    "SELECT tvdb_id, imdb_id, tvmaze_updated, data_json FROM shows WHERE tvmaze_id = ?",
+    "SELECT tvdb_id, imdb_id, premiered, status, type, language, tvmaze_updated, data_json FROM shows WHERE tvmaze_id = ?",
   );
   const insertRow = db.prepare(
-    "INSERT INTO shows(tvmaze_id, tvdb_id, imdb_id, browsed, tvmaze_updated, fetched_at, data_json) VALUES(?, ?, ?, 0, ?, ?, ?)",
+    "INSERT INTO shows(tvmaze_id, tvdb_id, imdb_id, premiered, status, type, language, browsed, tvmaze_updated, fetched_at, data_json) VALUES(?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
   );
   const updateRow = db.prepare(
-    "UPDATE shows SET tvdb_id = ?, imdb_id = ?, tvmaze_updated = ?, fetched_at = ?, data_json = ? WHERE tvmaze_id = ?",
+    "UPDATE shows SET tvdb_id = ?, imdb_id = ?, premiered = ?, status = ?, type = ?, language = ?, tvmaze_updated = ?, fetched_at = ?, data_json = ? WHERE tvmaze_id = ?",
   );
 
   let pagesFetched = 0;
@@ -466,6 +485,12 @@ async function syncTvmazeShows(reason = "startup") {
       const imdbIdSafe =
         typeof imdbId === "string" && imdbId.trim() ? imdbId.trim() : null;
 
+      const premiered =
+        typeof show.premiered === "string" ? show.premiered : null;
+      const status = typeof show.status === "string" ? show.status : null;
+      const type = typeof show.type === "string" ? show.type : null;
+      const language = typeof show.language === "string" ? show.language : null;
+
       const tvmazeUpdated = show.updated == null ? null : Number(show.updated);
       const jsonText = JSON.stringify(show);
 
@@ -475,6 +500,10 @@ async function syncTvmazeShows(reason = "startup") {
           tvmazeId,
           tvdbIdSafe,
           imdbIdSafe,
+          premiered,
+          status,
+          type,
+          language,
           tvmazeUpdated,
           fetchedAt,
           jsonText,
@@ -484,6 +513,10 @@ async function syncTvmazeShows(reason = "startup") {
         const changed =
           (existing.tvdb_id ?? null) !== (tvdbIdSafe ?? null) ||
           (existing.imdb_id ?? null) !== (imdbIdSafe ?? null) ||
+          (existing.premiered ?? null) !== (premiered ?? null) ||
+          (existing.status ?? null) !== (status ?? null) ||
+          (existing.type ?? null) !== (type ?? null) ||
+          (existing.language ?? null) !== (language ?? null) ||
           (existing.tvmaze_updated ?? null) !== (tvmazeUpdated ?? null) ||
           String(existing.data_json || "") !== jsonText;
 
@@ -491,6 +524,10 @@ async function syncTvmazeShows(reason = "startup") {
           updateRow.run(
             tvdbIdSafe,
             imdbIdSafe,
+            premiered,
+            status,
+            type,
+            language,
             tvmazeUpdated,
             fetchedAt,
             jsonText,

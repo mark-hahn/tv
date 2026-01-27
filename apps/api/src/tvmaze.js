@@ -337,6 +337,9 @@ function openDb() {
     if (!names.includes("language")) {
       db.exec("ALTER TABLE shows ADD COLUMN language TEXT");
     }
+    if (!names.includes("name")) {
+      db.exec("ALTER TABLE shows ADD COLUMN name TEXT");
+    }
     if (names.includes("viewed")) {
       try {
         db.exec("ALTER TABLE shows DROP COLUMN viewed");
@@ -456,13 +459,13 @@ async function syncTvmazeShows(reason = "startup") {
   const startPage = computeStartPage(startMaxId);
 
   const selectExisting = db.prepare(
-    "SELECT tvdb_id, imdb_id, premiered, status, type, language, tvmaze_updated, data_json FROM shows WHERE tvmaze_id = ?",
+    "SELECT tvdb_id, imdb_id, premiered, status, type, language, name, tvmaze_updated, data_json FROM shows WHERE tvmaze_id = ?",
   );
   const insertRow = db.prepare(
-    "INSERT INTO shows(tvmaze_id, tvdb_id, imdb_id, premiered, status, type, language, browsed, tvmaze_updated, fetched_at, data_json) VALUES(?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
+    "INSERT INTO shows(tvmaze_id, tvdb_id, imdb_id, premiered, status, type, language, name, browsed, tvmaze_updated, fetched_at, data_json) VALUES(?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
   );
   const updateRow = db.prepare(
-    "UPDATE shows SET tvdb_id = ?, imdb_id = ?, premiered = ?, status = ?, type = ?, language = ?, tvmaze_updated = ?, fetched_at = ?, data_json = ? WHERE tvmaze_id = ?",
+    "UPDATE shows SET tvdb_id = ?, imdb_id = ?, premiered = ?, status = ?, type = ?, language = ?, name = ?, tvmaze_updated = ?, fetched_at = ?, data_json = ? WHERE tvmaze_id = ?",
   );
 
   let pagesFetched = 0;
@@ -495,6 +498,7 @@ async function syncTvmazeShows(reason = "startup") {
       const status = typeof show.status === "string" ? show.status : null;
       const type = typeof show.type === "string" ? show.type : null;
       const language = typeof show.language === "string" ? show.language : null;
+      const name = typeof show.name === "string" ? show.name : null;
 
       const tvmazeUpdated = show.updated == null ? null : Number(show.updated);
       const jsonText = JSON.stringify(show);
@@ -509,6 +513,7 @@ async function syncTvmazeShows(reason = "startup") {
           status,
           type,
           language,
+          name,
           tvmazeUpdated,
           fetchedAt,
           jsonText,
@@ -522,6 +527,7 @@ async function syncTvmazeShows(reason = "startup") {
           (existing.status ?? null) !== (status ?? null) ||
           (existing.type ?? null) !== (type ?? null) ||
           (existing.language ?? null) !== (language ?? null) ||
+          (existing.name ?? null) !== (name ?? null) ||
           (existing.tvmaze_updated ?? null) !== (tvmazeUpdated ?? null) ||
           String(existing.data_json || "") !== jsonText;
 
@@ -533,6 +539,7 @@ async function syncTvmazeShows(reason = "startup") {
             status,
             type,
             language,
+            name,
             tvmazeUpdated,
             fetchedAt,
             jsonText,

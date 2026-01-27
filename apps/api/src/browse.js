@@ -5,6 +5,83 @@ import { getCandidateShows, markShowBrowsed } from "./tvmaze.js";
 
 // --- Constants & Config ---
 
+const IGNORED_LANGUAGES = new Set([
+  "Afrikaans",
+  "Albanian",
+  "Arabic",
+  "Armenian",
+  "Azerbaijani",
+  "Basque",
+  "Belarusian",
+  "Bengali",
+  "Bosnian",
+  "Bulgarian",
+  "Burmese",
+  "Catalan",
+  "Chechen",
+  "Chinese",
+  "Croatian",
+  "Czech",
+  "Divehi",
+  "Dutch",
+  "Estonian",
+  "Fijian",
+  "Finnish",
+  "Galician",
+  "Georgian",
+  "Greek",
+  "Gujarati",
+  "Hebrew",
+  "Hindi",
+  "Hungarian",
+  "Icelandic",
+  "Indonesian",
+  "Irish",
+  "Japanese",
+  "Javanese",
+  "Kannada",
+  "Kazakh",
+  "Kongo",
+  "Korean",
+  "Kyrgyz",
+  "Lao",
+  "Latvian",
+  "Lithuanian",
+  "Luxembourgish",
+  "Malagasy",
+  "Malay",
+  "Malayalam",
+  "Marathi",
+  "Mongolian",
+  "Norwegian",
+  "Panjabi",
+  "Pashto",
+  "Persian",
+  "Polish",
+  "Portuguese",
+  "Romanian",
+  "Russian",
+  "Scottish Gaelic",
+  "Serbian",
+  "Sinhalese",
+  "Slovak",
+  "Slovenian",
+  "Swahili",
+  "Swedish",
+  "Tagalog",
+  "Tamil",
+  "Telugu",
+  "Thai",
+  "Turkish",
+  "Ukrainian",
+  "Urdu",
+  "Uzbek",
+  "Vietnamese",
+  "Wolof",
+  "Yoruba",
+  "Zulu",
+]);
+
 const avoidGenres = [
   "anime",
   "children",
@@ -139,9 +216,16 @@ export async function getBrowseShow() {
       continue;
     }
 
-    // Reject if not English
+    // Reject if language is in ignore list (silent skip)
+    // These are languages we definitely don't want and don't care to see logs for
+    if (IGNORED_LANGUAGES.has(show.language)) {
+      continue;
+    }
+
+    // Reject if not English (verbose rejection)
+    // This catches new/unknown languages not yet in our ignore list
     if (show.language && show.language !== "English") {
-      appendResultTitle(`Language|${title}`);
+      appendResultTitle(`${show.language}|${title}`);
       continue;
     }
 

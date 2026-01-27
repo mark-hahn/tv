@@ -1150,10 +1150,14 @@ export default {
       this.collectionName = collections.join(", ");
       this.collectionCount = collections.length;
 
+      const currentShowName = show.Name;
       setTimeout(async () => {
+        if (this.show.Name !== currentShowName) return;
+
         try {
           allTvdb = await tvdb.getAllTvdb();
 
+          if (this.show.Name !== currentShowName) return;
           let tvdbData = allTvdb[show.Name];
 
           // Preview / transient shows may not exist in tvdb.json yet.

@@ -143,7 +143,11 @@ function loadResultTitles() {
     const raw = fs.readFileSync(resultTitlesPath, "utf8");
     if (!raw || !raw.trim()) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map(String) : [];
+    return Array.isArray(parsed)
+      ? parsed
+          .map(String)
+          .filter((t) => !t.startsWith("Reality|") && !t.startsWith("reality|"))
+      : [];
   } catch (err) {
     console.error("Error loading browse-cards.json:", err);
     return [];
@@ -209,10 +213,8 @@ export async function getBrowseShow() {
       continue;
     }
 
-    // Reject if not Scripted
-    // "Reality" is used as the generic label for non-scripted in our UI context
-    if (show.type !== "Scripted") {
-      appendResultTitle(`Reality|${title}`);
+    // Reject if type is present and not "Scripted" (silent skip)
+    if (show.type && show.type !== "Scripted") {
       continue;
     }
 
@@ -237,6 +239,7 @@ export async function getBrowseShow() {
     const rejected = lowerGenres.find((g) => avoidGenres.includes(g));
 
     if (rejected) {
+      if (rejected === "reality") continue;
       appendResultTitle(`${rejected}|${title}`);
       // "If rejected add ... and continue" to look for next one
       continue;

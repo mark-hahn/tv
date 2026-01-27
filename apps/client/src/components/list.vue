@@ -1241,6 +1241,8 @@ export default {
         if (tvdbData) {
           delete tvdbData.deleted;
           allTvdb[show.Name] = tvdbData;
+          // Clear shared cache so Info/Reviews get fresh data
+          tvdb.clearCache();
         }
 
         const alreadyInAllShows =

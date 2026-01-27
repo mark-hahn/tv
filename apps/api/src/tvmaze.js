@@ -56,7 +56,9 @@ function appendSyncLog(entry) {
       entry && typeof entry === "object" ? entry : { message: String(entry) };
     const ts = formatLogTimestamp(new Date());
     const page = e.page ?? e.last_ok_page ?? e.start_page ?? "-";
-    const count = e.count ?? e.shows_seen ?? 0;
+    // For sync complete & page synced, we want the cumulative inserted count.
+    // We strictly avoid shows_seen fallback to prevent confusion.
+    const count = e.count ?? e.inserted ?? 0;
     const isPageSynced = e.message === "page synced";
     const totalLoaded =
       (e.totals && typeof e.totals === "object"
@@ -85,10 +87,9 @@ function appendSyncLog(entry) {
     }
 
     // One line per entry: timestamp with labeled page/shows + optional message
-    const totalsSuffix =
-      Number.isFinite(totalLoadedNum) || Number.isFinite(totalInDbNum)
-        ? ` total-loaded: ${Number.isFinite(totalLoadedNum) ? totalLoadedNum : "-"}, total-in-db: ${Number.isFinite(totalInDbNum) ? totalInDbNum : "-"}`
-        : "";
+    const totalsSuffix = Number.isFinite(totalInDbNum)
+      ? ` total-in-db: ${totalInDbNum}`
+      : "";
     const isModuleLoaded = e.message === "module loaded";
     const base = isModuleLoaded
       ? `${ts}${totalsSuffix}`
@@ -450,7 +451,6 @@ async function syncTvmazeShows(reason = "startup") {
   }
 
   _syncInProgress = true;
-  appendSyncBlankLine();
   const startedAt = nowMs();
 
   const db = openDb();
@@ -595,7 +595,7 @@ async function syncTvmazeShows(reason = "startup") {
         reason,
         page,
         url,
-        count: pageCount,
+        count: inserted,
         shows_seen: pageShowsSeen,
         inserted: pageInserted,
         updated: pageUpdated,

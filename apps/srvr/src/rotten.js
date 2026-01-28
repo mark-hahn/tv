@@ -7,7 +7,8 @@ import { smartTitleMatch } from "@tv/share";
 const { log, start, end } = util.getLog("rott");
 
 const MAX_STR_DIST = 10;
-const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const NAV_TIMEOUT = 15_000;
 const BASE = "https://www.rottentomatoes.com";
 const argv = process.argv.slice(2);
@@ -79,7 +80,9 @@ async function getSharedBrowserContext({ headless }) {
   _shared.initPromise = (async () => {
     _shared.headless = headless;
     _shared.browser = await chromium.launch({ headless });
-    _shared.context = await _shared.browser.newContext({ userAgent: USER_AGENT });
+    _shared.context = await _shared.browser.newContext({
+      userAgent: USER_AGENT,
+    });
   })();
 
   await _shared.initPromise;
@@ -154,192 +157,244 @@ function delay(ms) {
 
 async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
   timing?.start(spanName);
-  
+
   // Save HTML snapshot before any dismissal attempts
   try {
-     const html = await page.content();
-     fs.writeFileSync('rotten-overlays.html', html);
-     // console.log('Saved page content to rotten-overlays.html');
-  } catch(e) { console.log('Failed to save rotten-overlays.html', e.message); }
+    const html = await page.content();
+    fs.writeFileSync("rotten-overlays.html", html);
+    // console.log('Saved page content to rotten-overlays.html');
+  } catch (e) {
+    console.log("Failed to save rotten-overlays.html", e.message);
+  }
 
   // Specific handling for OneTrust
   try {
-      // 0. NUCLEAR OPTION: Just delete the element from DOM immediately
-      const deleted = await page.evaluate(() => {
-          const ids = ['#onetrust-banner-sdk', '#onetrust-consent-sdk', '.ot-floating-button'];
-          let count = 0;
-          ids.forEach(id => {
-              const el = document.querySelector(id);
-              if (el) { el.remove(); count++; }
-          });
-          document.body.style.overflow = 'auto'; // Restore scrolling
-          return count;
+    // 0. NUCLEAR OPTION: Just delete the element from DOM immediately
+    const deleted = await page.evaluate(() => {
+      const ids = [
+        "#onetrust-banner-sdk",
+        "#onetrust-consent-sdk",
+        ".ot-floating-button",
+      ];
+      let count = 0;
+      ids.forEach((id) => {
+        const el = document.querySelector(id);
+        if (el) {
+          el.remove();
+          count++;
+        }
       });
-      if (deleted > 0) console.log(`[Nuclear] Removed ${deleted} OneTrust elements from DOM.`);
+      document.body.style.overflow = "auto"; // Restore scrolling
+      return count;
+    });
+    if (deleted > 0)
+      console.log(`[Nuclear] Removed ${deleted} OneTrust elements from DOM.`);
 
-      // 1. Try "Reject All" (force click)
-      const reject = page.locator('#onetrust-reject-all-handler');
-      if (await reject.count() > 0) {
-        console.log('Clicking OneTrust Reject All (Force)');
-        await reject.click({ force: true }).catch(() => {});
+    // 1. Try "Reject All" (force click)
+    const reject = page.locator("#onetrust-reject-all-handler");
+    if ((await reject.count()) > 0) {
+      console.log("Clicking OneTrust Reject All (Force)");
+      await reject.click({ force: true }).catch(() => {});
+      await delay(500);
+    }
+    // 2. Try "Accept All" (force click)
+    else {
+      const accept = page.locator("#onetrust-accept-btn-handler");
+      if ((await accept.count()) > 0) {
+        console.log("Clicking OneTrust Accept All (Force)");
+        await accept.click({ force: true }).catch(() => {});
         await delay(500);
-      } 
-      // 2. Try "Accept All" (force click)
-      else {
-          const accept = page.locator('#onetrust-accept-btn-handler');
-          if (await accept.count() > 0) {
-              console.log('Clicking OneTrust Accept All (Force)');
-              await accept.click({ force: true }).catch(() => {});
-              await delay(500);
-          }
       }
-      
-      // 3. Try "X" Close Button (The "X" in the corner)
-      const closeBtn = page.locator('#onetrust-close-btn-container button, .onetrust-close-btn-ui, button[aria-label="Close"], button[title="Close"]');
-      if (await closeBtn.count() > 0) {
-          console.log(`Found Close 'X' button. Clicking (Force)...`);
-          await closeBtn.first().click({ force: true }).catch(() => {});
-          await delay(500);
-      }
-  } catch(e) { console.log('OneTrust click error:', e.message); }
+    }
+
+    // 3. Try "X" Close Button (The "X" in the corner)
+    const closeBtn = page.locator(
+      '#onetrust-close-btn-container button, .onetrust-close-btn-ui, button[aria-label="Close"], button[title="Close"]',
+    );
+    if ((await closeBtn.count()) > 0) {
+      console.log(`Found Close 'X' button. Clicking (Force)...`);
+      await closeBtn
+        .first()
+        .click({ force: true })
+        .catch(() => {});
+      await delay(500);
+    }
+  } catch (e) {
+    console.log("OneTrust click error:", e.message);
+  }
 
   // 4. Polling for the stubborn popup at 853, 160
   // If the element at this coordinate is NO LONGER a Nav/Link, it means the popup has appeared.
   try {
-      console.log('Polling for popup at 853,160...');
-      for (let i = 0; i < 10; i++) { // Poll for 2 seconds
-          const elInfo = await page.evaluate(() => {
-              const el = document.elementFromPoint(853, 160);
-              return el ? { tagName: el.tagName, className: el.className, text: el.textContent?.trim() || '' } : null;
-          });
+    // console.log('Polling for popup at 853,160...');
+    for (let i = 0; i < 10; i++) {
+      // Poll for 2 seconds
+      const elInfo = await page.evaluate(() => {
+        const el = document.elementFromPoint(853, 160);
+        return el
+          ? {
+              tagName: el.tagName,
+              className: el.className,
+              text: el.textContent?.trim() || "",
+            }
+          : null;
+      });
 
-          // If we hit something that is NOT the navbar, assume it's the popup overlay
-          if (elInfo) {
-              const tag = elInfo.tagName.toUpperCase();
-              const cls = (elInfo.className || '').toUpperCase();
-              const txt = elInfo.text;
+      // If we hit something that is NOT the navbar, assume it's the popup overlay
+      if (elInfo) {
+        const tag = elInfo.tagName.toUpperCase();
+        const cls = (elInfo.className || "").toUpperCase();
+        const txt = elInfo.text;
 
-              // SAFEGUARD: Do not delete known page elements
-              if (tag === 'NAV' || 
-                  tag.includes('HEADER') || 
-                  cls.includes('HEADER') || 
-                  tag === 'MEDIA-SCORECARD' || 
-                  tag === 'RT-TEXT' ||
-                  tag === 'SCORE-BOARD' ||
-                  txt === 'TV Shows' || 
-                  txt === 'Movies') {
-                  
-                 // console.log(`[Polling] Hit valid page element (${tag}), ignoring...`);
-                 await delay(200);
-                 continue;
-              }
-
-              console.log(`Potential Popup detected at 853,160 (Tag: ${tag} Cls: ${cls}). Checking if safe to delete...`);
-              
-              const removed = await page.evaluate(() => {
-                   try {
-                       const el = document.elementFromPoint(853, 160);
-                       if (!el) return false;
-                       
-                       let target = el;
-                       let levels = 0;
-                       let isOverlay = false;
-
-                       // Walk up to find if it's actually an overlay
-                       while (target && target.parentElement && target.tagName !== 'BODY' && levels < 20) {
-                           const t = target.tagName.toUpperCase();
-                           const c = (target.className instanceof SVGAnimatedString ? target.className.baseVal : target.className) || '';
-                           const i = (target.id || '').toUpperCase();
-                           const s = window.getComputedStyle(target);
-                           
-                           // SAFEGUARD: Stop climbing if we hit main structural elements
-                           if (t === 'NAV' || t === 'HEADER' || t.startsWith('RT-HEADER') || t === 'MAIN') {
-                               return false;
-                           }
-
-                           // Detection signals
-                           if (s.position === 'fixed' || 
-                               (s.position === 'absolute' && s.zIndex > 100) ||
-                               i.includes('MODAL') || i.includes('BANNER') || i.includes('ONETRUST') ||
-                               c.includes('popup') || c.includes('overlay') || c.includes('modal') ||
-                               t === 'IFRAME') {
-                               isOverlay = true;
-                               break; // Found the wrapper to delete
-                           }
-                           target = target.parentElement;
-                           levels++;
-                       }
-                       
-                       if (isOverlay && target && target.tagName !== 'BODY') {
-                           // confirm it's not the header
-                           const finalTag = target.tagName.toUpperCase();
-                           if (!finalTag.includes('HEADER') && finalTag !== 'NAV') {
-                                console.log('Removing detected overlay:', target.tagName, target.className);
-                                target.remove();
-                                if (document.body) document.body.style.overflow = 'auto';
-                                return true;
-                           }
-                       }
-                   } catch(e) { console.error('Delete script error:', e.message); }
-                   return false;
-              });
-              
-              if (removed) {
-                  console.log('Successfully deleted popup overlay.');
-                  await delay(500); // Wait for DOM to settle
-                  // break; // Don't break, keep polling just in case another one comes up (stacked modals)
-              }
-          }
+        // SAFEGUARD: Do not delete known page elements
+        if (
+          tag === "NAV" ||
+          tag.includes("HEADER") ||
+          cls.includes("HEADER") ||
+          tag === "MEDIA-SCORECARD" ||
+          tag === "RT-TEXT" ||
+          tag === "SCORE-BOARD" ||
+          txt === "TV Shows" ||
+          txt === "Movies"
+        ) {
+          // console.log(`[Polling] Hit valid page element (${tag}), ignoring...`);
           await delay(200);
+          continue;
+        }
+
+        // console.log(`Potential Popup detected at 853,160 (Tag: ${tag} Cls: ${cls}). Checking if safe to delete...`);
+
+        const removed = await page.evaluate(() => {
+          try {
+            const el = document.elementFromPoint(853, 160);
+            if (!el) return false;
+
+            let target = el;
+            let levels = 0;
+            let isOverlay = false;
+
+            // Walk up to find if it's actually an overlay
+            while (
+              target &&
+              target.parentElement &&
+              target.tagName !== "BODY" &&
+              levels < 20
+            ) {
+              const t = target.tagName.toUpperCase();
+              const c =
+                (target.className instanceof SVGAnimatedString
+                  ? target.className.baseVal
+                  : target.className) || "";
+              const i = (target.id || "").toUpperCase();
+              const s = window.getComputedStyle(target);
+
+              // SAFEGUARD: Stop climbing if we hit main structural elements
+              if (
+                t === "NAV" ||
+                t === "HEADER" ||
+                t.startsWith("RT-HEADER") ||
+                t === "MAIN"
+              ) {
+                return false;
+              }
+
+              // Detection signals
+              if (
+                s.position === "fixed" ||
+                (s.position === "absolute" && s.zIndex > 100) ||
+                i.includes("MODAL") ||
+                i.includes("BANNER") ||
+                i.includes("ONETRUST") ||
+                c.includes("popup") ||
+                c.includes("overlay") ||
+                c.includes("modal") ||
+                t === "IFRAME"
+              ) {
+                isOverlay = true;
+                break; // Found the wrapper to delete
+              }
+              target = target.parentElement;
+              levels++;
+            }
+
+            if (isOverlay && target && target.tagName !== "BODY") {
+              // confirm it's not the header
+              const finalTag = target.tagName.toUpperCase();
+              if (!finalTag.includes("HEADER") && finalTag !== "NAV") {
+                // console.log('Removing detected overlay:', target.tagName, target.className);
+                target.remove();
+                if (document.body) document.body.style.overflow = "auto";
+                return true;
+              }
+            }
+          } catch (e) {
+            console.error("Delete script error:", e.message);
+          }
+          return false;
+        });
+
+        if (removed) {
+          // console.log('Successfully deleted popup overlay.');
+          await delay(500); // Wait for DOM to settle
+          // break; // Don't break, keep polling just in case another one comes up (stacked modals)
+        }
       }
-  } catch(err) { console.log('Polling error:', err.message); }
+      await delay(200);
+    }
+  } catch (err) {
+    console.log("Polling error:", err.message);
+  }
 
   // Check if we are incorrectly clicking the navbar
   try {
-     const checkEl = await page.evaluate(() => {
-        const el = document.elementFromPoint(853, 160);
-        return el ? el.tagName : null;
-     });
-     if (checkEl === 'A' || checkEl === 'NAV') {
-         console.log('Skipping forced click at 853,160 because it targets a link/nav element (Popup likely gone).');
-     } else {
-         // Only click if it's NOT a link, assuming it might be the overlay
-         // But since the cookie seems to be working, we'll disable this risky click.
-         // console.log('Clicking user provided coordinates: x=853, y=160');
-         // await page.mouse.click(853, 160);
-         // await delay(500);
-     }
+    const checkEl = await page.evaluate(() => {
+      const el = document.elementFromPoint(853, 160);
+      return el ? el.tagName : null;
+    });
+    if (checkEl === "A" || checkEl === "NAV") {
+      // console.log('Skipping forced click at 853,160 because it targets a link/nav element (Popup likely gone).');
+    } else {
+      // Only click if it's NOT a link, assuming it might be the overlay
+      // But since the cookie seems to be working, we'll disable this risky click.
+      // console.log('Clicking user provided coordinates: x=853, y=160');
+      // await page.mouse.click(853, 160);
+      // await delay(500);
+    }
   } catch {}
 
   // try clicking center of screen if an overlay is detected
   try {
-      const overlayVisible = await page.evaluate(() => !!document.querySelector('#onetrust-banner-sdk, .modal-backdrop'));
-      if (overlayVisible) {
-          const vp = page.viewportSize();
-          if (vp) {
-              await page.mouse.click(vp.width / 2, vp.height / 2);
-              await delay(500);
-          }
+    const overlayVisible = await page.evaluate(
+      () => !!document.querySelector("#onetrust-banner-sdk, .modal-backdrop"),
+    );
+    if (overlayVisible) {
+      const vp = page.viewportSize();
+      if (vp) {
+        await page.mouse.click(vp.width / 2, vp.height / 2);
+        await delay(500);
       }
+    }
   } catch {}
 
   // Try clicking center of screen as requested for stubborn popups
   try {
-      const vp = page.viewportSize();
-      if (vp) {
-          await page.mouse.click(vp.width / 2, vp.height / 2);
-          await delay(500);
-      }
+    const vp = page.viewportSize();
+    if (vp) {
+      await page.mouse.click(vp.width / 2, vp.height / 2);
+      await delay(500);
+    }
   } catch {}
 
   // Try to remove generic modal backdrops that cover the screen
   try {
-     await page.evaluate(() => {
-        const overlays = document.querySelectorAll('.modal-backdrop, .overlay, .popup-overlay, #onetrust-banner-sdk, #onetrust-consent-sdk');
-        overlays.forEach(el => el.remove());
-        // Also ensure body is scrollable in case modal froze it
-        document.body.style.overflow = 'auto';
-     });
+    await page.evaluate(() => {
+      const overlays = document.querySelectorAll(
+        ".modal-backdrop, .overlay, .popup-overlay, #onetrust-banner-sdk, #onetrust-consent-sdk",
+      );
+      overlays.forEach((el) => el.remove());
+      // Also ensure body is scrollable in case modal froze it
+      document.body.style.overflow = "auto";
+    });
   } catch {}
 
   const selectors = [
@@ -358,19 +413,19 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
     '[aria-label="close"]',
     '[aria-label="Close request"]',
     '[aria-label="Close Promo"]',
-    '[aria-label*="Close"]', 
+    '[aria-label*="Close"]',
     '[aria-label*="close"]',
     'button[title="Close"]',
     'svg[name="close"]',
-    '.close',
-    '.close-button',
-    '.modal-close',
-    'button.close',
+    ".close",
+    ".close-button",
+    ".modal-close",
+    "button.close",
     'div[role="button"][aria-label="Close"]',
     'button:text-is("X")',
     'button:text-is("×")',
     'button:text-is("✕")',
-    '#close'
+    "#close",
   ];
 
   const perSelectorTimeoutMs = 350;
@@ -540,14 +595,16 @@ export async function rottenSearch(query) {
       async () => {
         // Prepare cookie to suppress cookie consent banner if possible
         try {
-           const domain = new URL(BASE).hostname;
-           await context.addCookies([{
-             name: 'OptanonAlertBoxClosed',
-             value: new Date().toISOString(),
-             domain: domain.startsWith('www.') ? domain.slice(4) : domain, // .rottentomatoes.com or rottentomatoes.com
-             path: '/',
-             expires: Date.now() / 1000 + 365 * 24 * 3600 // 1 year
-           }]);
+          const domain = new URL(BASE).hostname;
+          await context.addCookies([
+            {
+              name: "OptanonAlertBoxClosed",
+              value: new Date().toISOString(),
+              domain: domain.startsWith("www.") ? domain.slice(4) : domain, // .rottentomatoes.com or rottentomatoes.com
+              path: "/",
+              expires: Date.now() / 1000 + 365 * 24 * 3600, // 1 year
+            },
+          ]);
         } catch {}
 
         for (let i = 1; i <= 3; i++) {
@@ -555,7 +612,9 @@ export async function rottenSearch(query) {
             await page.goto(detailLink, { waitUntil: "domcontentloaded" });
             return;
           } catch (e) {
-            console.log(`rotten detail.goto failed (attempt ${i}): ${e.message}`);
+            console.log(
+              `rotten detail.goto failed (attempt ${i}): ${e.message}`,
+            );
             if (i === 3) throw e;
             await new Promise((r) => setTimeout(r, 1000));
           }
@@ -566,66 +625,97 @@ export async function rottenSearch(query) {
     await dismissOverlays(page, timing, "dismissOverlays.detail");
 
     const getScore = async (slot, retrying = false) => {
+      // Version Marker
+      // console.log(`[Rotten] getScore v2.1 checking ${slot}...`);
+
       try {
+        // Selector variations: camelCase (criticsScore) and kebab-case (critics-score)
+        const slotKebab = slot.replace(/([A-Z])/g, "-$1").toLowerCase();
+
         // Check for media-scorecard or score-board (new layout)
-        const loc = page.locator(`media-scorecard rt-text[slot="${slot}"], score-board rt-text[slot="${slot}"], score-board-m rt-text[slot="${slot}"]`).first();
+        const loc = page
+          .locator(
+            `
+            media-scorecard rt-text[slot="${slot}"], 
+            media-scorecard rt-text[slot="${slotKebab}"],
+            score-board rt-text[slot="${slot}"], 
+            score-board rt-text[slot="${slotKebab}"],
+            score-board-m rt-text[slot="${slot}"],
+            score-board-m rt-text[slot="${slotKebab}"]
+        `,
+          )
+          .first();
+
         await loc.waitFor({ state: "attached", timeout: 3000 });
         const val = await loc.evaluate((el) => {
           // Log what we find inside the element for debugging
           return {
             text: el.textContent || "",
-            html: el.innerHTML || "" 
+            html: el.innerHTML || "",
           };
         });
         const num = Number((val.text || "").match(/\d+/)?.[0] ?? "");
-        console.log(`rotten getScore ${slot}: found text="${val.text}" -> ${num}`);
-        
+        console.log(
+          `rotten getScore ${slot}: found text="${val.text}" -> ${num}`,
+        );
+
         // Take screenshot of the scorecard area
         try {
-          const card = page.locator('media-scorecard');
-          if (await card.count() > 0) {
+          const card = page.locator("media-scorecard");
+          if ((await card.count()) > 0) {
             await card.screenshot({ path: `rotten-scorecard-${slot}.png` });
-            console.log(`Saved screenshot to rotten-scorecard-${slot}.png`);
+            // console.log(`Saved screenshot to rotten-scorecard-${slot}.png`);
           } else {
             // fallback if media-scorecard not found, screenshot whole page
-             await page.screenshot({ path: `rotten-page-${slot}.png` });
-             console.log(`Saved page screenshot to rotten-page-${slot}.png`);
+            await page.screenshot({ path: `rotten-page-${slot}.png` });
+            // console.log(`Saved page screenshot to rotten-page-${slot}.png`);
           }
-        } catch(err) {
-            console.log("rotten screnshot error", err.message);
+        } catch (err) {
+          console.log("rotten screnshot error", err.message);
         }
 
         return num;
       } catch (e) {
         if (!retrying) {
-             console.log(`rotten getScore ${slot} failed, attempting to dismiss overlays and retry.`);
-             await dismissOverlays(page, timing, "dismissOverlays.retry");
-             return getScore(slot, true);
+          console.log(
+            `rotten getScore ${slot} failed, attempting to dismiss overlays and retry.`,
+          );
+          await dismissOverlays(page, timing, "dismissOverlays.retry");
+          return getScore(slot, true);
         }
-        
+
         console.log(`rotten getScore ${slot} error: ${e.message}`);
 
-        // DEBUG: Inspect the DOM to see why we failed
+        // DEBUG: Thorough DOM Inspection
+        /*
         try {
-             const html = await page.evaluate(() => {
+             const debugInfo = await page.evaluate(() => {
                  const card = document.querySelector('media-scorecard, score-board, score-board-m');
-                 return card ? card.outerHTML : 'No scorecard element found';
+                 if (!card) return 'No scorecard element found in DOM';
+                 
+                 // Get all children and their attributes
+                 const children = Array.from(card.children).map(c => {
+                     return `<${c.tagName.toLowerCase()} slot="${c.getAttribute('slot') || ''}" class="${c.className}">`;
+                 }).join('\n');
+                 
+                 return `Tag: ${card.tagName}\nHTML: ${card.innerHTML.substring(0, 1000)}\nChildren:\n${children}`;
              });
-             console.log(`DEBUG STRUCT ${slot}: ${html.substring(0, 500)}`);
-        } catch(dx) {}
+             console.log(`DEBUG STRUCT ${slot}:\n${debugInfo}`);
+        } catch(dx) { console.log('Debug inspect failed:', dx.message); }
+        */
 
         // Capture HTML snapshot on error
         try {
-           const html = await page.content();
-           fs.writeFileSync(`rotten-error-${slot}.html`, html);
-           console.log(`Saved page content to rotten-error-${slot}.html`);
+          const html = await page.content();
+          fs.writeFileSync(`rotten-error-${slot}.html`, html);
+          console.log(`Saved page content to rotten-error-${slot}.html`);
         } catch {}
 
         // Capture screenshot on error too
-         try {
-             await page.screenshot({ path: `rotten-error-${slot}.png` });
-             console.log(`Saved error screenshot to rotten-error-${slot}.png`);
-         } catch {}
+        try {
+          await page.screenshot({ path: `rotten-error-${slot}.png` });
+          console.log(`Saved error screenshot to rotten-error-${slot}.png`);
+        } catch {}
         return 0;
       }
     };
@@ -660,7 +750,9 @@ export async function rottenSearch(query) {
       return await runOnce(page);
     }
 
-    page = await timing.time("browser.newPage", () => browser.newPage({ userAgent: USER_AGENT }));
+    page = await timing.time("browser.newPage", () =>
+      browser.newPage({ userAgent: USER_AGENT }),
+    );
     return await runOnce(page);
   } catch (err) {
     log("err", "rottenSearch error", query, err.message);

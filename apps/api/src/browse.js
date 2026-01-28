@@ -213,11 +213,6 @@ export async function getBrowseShow() {
       continue;
     }
 
-    // Reject if type is present and not "Scripted" (silent skip)
-    if (show.type && show.type !== "Scripted") {
-      continue;
-    }
-
     // Reject if language is in ignore list (silent skip)
     // These are languages we definitely don't want and don't care to see logs for
     if (IGNORED_LANGUAGES.has(show.language)) {

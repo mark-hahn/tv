@@ -296,6 +296,7 @@
           display: 'flex',
           flexDirection: 'column',
           gap: '0',
+          minHeight: '0',
         }"
         @wheel.stop.prevent="handleScaledWheel"
       >

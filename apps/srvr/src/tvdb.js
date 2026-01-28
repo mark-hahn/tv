@@ -351,7 +351,16 @@ const getRemote = async (id, type, showName) => {
 ///////////// get remotes  //////////////
 // use tvdb remotes data to find complete remote data
 
+const remotesCache = new Map();
+
 const getRemotes = async (show, tvdbRemotes) => {
+  const cacheKey =
+    show.Name + "|" + show.Id + "|" + JSON.stringify(tvdbRemotes || {});
+
+  if (remotesCache.has(cacheKey)) {
+    return remotesCache.get(cacheKey);
+  }
+
   const name = show.Name;
   const showId = show.Id;
   const remotes = [];
@@ -402,6 +411,12 @@ const getRemotes = async (show, tvdbRemotes) => {
   }
 
   console.log("getRemotes result:", JSON.stringify(remotes, null, 2));
+
+  remotesCache.set(cacheKey, remotes);
+  if (remotesCache.size > 100) {
+    const firstKey = remotesCache.keys().next().value;
+    remotesCache.delete(firstKey);
+  }
 
   return remotes;
 };

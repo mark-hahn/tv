@@ -106,17 +106,20 @@ function appendSyncLog(entry) {
       : "";
     const isModuleLoaded = e.message === "module loaded";
 
-    let base;
+    let line;
     if (isModuleLoaded) {
-      base = `${ts}${totalsSuffix}`;
-    } else if (isSyncComplete) {
-      // Don't show page: - for sync complete
-      base = `${ts} shows: ${count}${totalsSuffix}`;
+      line = `========= ${ts} module loaded =========`;
     } else {
-      base = `${ts} page: ${page}, shows: ${count}${totalsSuffix}`;
+      let base;
+      if (isSyncComplete) {
+        // Don't show page: - for sync complete
+        base = `${ts} shows: ${count}${totalsSuffix}`;
+      } else {
+        base = `${ts} page: ${page}, shows: ${count}${totalsSuffix}`;
+      }
+      line = msg ? `${base} ${msg}` : base;
     }
 
-    const line = msg ? `${base} ${msg}` : base;
     fs.appendFileSync(outPath, line + "\n", "utf8");
   } catch {
     // ignore logging failures

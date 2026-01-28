@@ -250,8 +250,12 @@ export async function getBrowseShow() {
     }
 
     // Reject if language is not English (silent skip)
-    if (show.language && show.language.toLowerCase() !== "english") {
-      continue;
+    // Accept standard string, or null/undefined
+    if (show.language) {
+      const lang = String(show.language).trim().toLowerCase();
+      if (lang !== "english") {
+        continue;
+      }
     }
 
     // Reject if country is in ignore list

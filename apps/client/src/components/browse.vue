@@ -966,7 +966,7 @@ export default {
     const infoLine = computed(() => {
       if (!curTvdb.value) return "";
       const t = curTvdb.value;
-      let line = `${t.year || ""} | ${t.country || ""} | ${t.primary_language || ""} | ${t.network || ""}`;
+      let line = `${t.country || ""} | ${t.primary_language || ""} | ${t.network || ""}`;
 
       // Try multiple possible property names for premiere date
       const dateStr =

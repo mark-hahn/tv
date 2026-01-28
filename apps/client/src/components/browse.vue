@@ -153,7 +153,7 @@
           </button>
           <button
             v-if="curTvdb &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
-            @click="handleLoad"
+            @click="handlePreview"
             :style="{
               height: '18px',
               margin: '0',
@@ -170,7 +170,7 @@
           </button>
           <button
             v-if="curTvdb &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
-            @click="handleLoad"
+            @click="handleGet"
             :style="{
               height: '18px',
               margin: '0',
@@ -895,7 +895,8 @@ export default {
           getRemotesResults.value = results;
         }
       } catch (e) {
-        console.log("getRemotesCmd failed:", e?.message || String(e));
+        if (e !== "cancelled")
+          console.log("getRemotesCmd failed:", e?.message || String(e));
         if (_lastRemotesKey.value === key) {
           getRemotesResults.value = [];
         }
@@ -954,7 +955,21 @@ export default {
         originalCountry: t.originalCountry || t.country || "",
         searchDtlTxt: t.searchDtlTxt || "",
       };
-      evtBus.emit("reelSearchAction", srchChoice);
+      return srchChoice;
+    };
+
+    const handlePreview = () => {
+      const srchChoice = handleLoad();
+      if (srchChoice) {
+        evtBus.emit("reelSearchAction", { srchChoice, action: "preview" });
+      }
+    };
+
+    const handleGet = () => {
+      const srchChoice = handleLoad();
+      if (srchChoice) {
+        evtBus.emit("reelSearchAction", { srchChoice, action: "add" });
+      }
     };
 
     watch(
@@ -1075,7 +1090,7 @@ export default {
     // Clicking the image should immediately preview the show (same flow as "Get").
     const handleGalleryPreview = (tvdb) => {
       curTvdb.value = tvdb;
-      handleLoad();
+      handlePreview();
     };
 
     watch(
@@ -1207,7 +1222,8 @@ export default {
       handleGalleryPreview,
       selectTitle,
       handleNext,
-      handleLoad,
+      handlePreview,
+      handleGet,
       handleGoogle,
       handleImdb,
       handleRt,

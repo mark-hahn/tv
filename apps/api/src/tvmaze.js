@@ -71,7 +71,8 @@ function appendSyncLog(entry) {
 
     // For sync complete & page synced, we want the cumulative inserted count.
     // We strictly avoid shows_seen fallback to prevent confusion.
-    const count = e.count ?? e.inserted ?? 0;
+    // If e.count is missing check inserted, if inserted missing check updated
+    const count = e.count ?? e.inserted ?? e.updated ?? 0;
 
     const totalLoaded =
       (e.totals && typeof e.totals === "object"
@@ -594,6 +595,16 @@ async function syncTvmazeShows(reason = "startup") {
             inserted++;
             newShows.push({ name: name || "Unknown", id: tvmazeId });
           } else {
+            // Prevent stale page data from overwriting newer local data
+            // (e.g. if we fetched an update via /updates/shows which is newer than the page cache)
+            if (
+              existing.tvmaze_updated != null &&
+              tvmazeUpdated != null &&
+              existing.tvmaze_updated > tvmazeUpdated
+            ) {
+              continue;
+            }
+
             const changed =
               (existing.tvdb_id ?? null) !== (tvdbIdSafe ?? null) ||
               (existing.imdb_id ?? null) !== (imdbIdSafe ?? null) ||
@@ -653,6 +664,13 @@ async function syncTvmazeShows(reason = "startup") {
         metaSet(db, "tvmaze.last_tvmaze_id", String(lastTvmazeIdSeen));
     }
 
+    appendSyncLog({
+      ts: new Date().toISOString(),
+      message: "sync complete",
+      count: inserted,
+      totals: { total_loaded: showsSeen },
+    });
+
     // Update phase: check /updates/shows?since=day for existing shows in DB
     const updatesUrl = `${TVMAZE_BASE_URL}/updates/shows?since=day`;
     let updateCount = 0;
@@ -684,38 +702,11 @@ async function syncTvmazeShows(reason = "startup") {
           }
 
           if (toUpdate.length > 0) {
-            try {
-              const miscDir = getApiMiscDir();
-              const logPath = path.join(miscDir, SYNC_LOG_FILENAME);
-              const dir = path.dirname(logPath);
-              if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-              fs.appendFileSync(
-                logPath,
-                "======== UPDATES ======== \n",
-                "utf8",
-              );
-            } catch {
-              // ignore
-            }
+            let updatesHeaderPrinted = false;
 
-            for (const id of toUpdate) {
-              const showUrl = `${TVMAZE_BASE_URL}/shows/${id}`;
-              try {
-                const { json: showJson } = await fetchJsonWithBackoff(showUrl);
-                // We need to use the transaction logic here too, but perPageTx is gone.
-                // We must inline the update logic or extract a function.
-                // Since this is just ONE item, we can run the SQL directly.
-                // But let's reuse the logic by extracting it or copy-pasting for safety?
-                // DRY is better. Let's create `upsertShow` helper function.
-                // But for now, to be safe, I'll inline the update-only logic since
-                // we know these are Existing shows (from the check above).
-                // Wait, updates endpoint might return IDs for NEW shows too if we missed them?
-                // The check `if (localMap.has(id))` above ensures we only update EXISTING shows.
-                // So we only need UPDATE logic here.
-
-                const fetchedAt = Math.floor(Date.now() / 1000);
-                const show = showJson;
-
+            const updateTx = db.transaction((shows) => {
+              const fetchedAt = Math.floor(Date.now() / 1000);
+              for (const show of shows) {
                 const tvmazeId = show.id;
                 const tvdbId = show?.externals?.thetvdb;
                 const tvdbIdNum = tvdbId == null ? null : Number(tvdbId);
@@ -761,11 +752,58 @@ async function syncTvmazeShows(reason = "startup") {
                   jsonText,
                   tvmazeId,
                 );
+              }
+            });
 
+            for (const id of toUpdate) {
+              const showUrl = `${TVMAZE_BASE_URL}/shows/${id}`;
+              try {
+                const { json: showJson } = await fetchJsonWithBackoff(showUrl);
+
+                // Fix for possible infinite update loop:
+                const remoteTs =
+                  Number(updateMap[id]) || Number(updateMap[String(id)]);
+                const showTs = showJson.updated ? Number(showJson.updated) : 0;
+
+                // Force the higher timestamp into the record we are about to save
+                if (Number.isFinite(remoteTs) && remoteTs > showTs) {
+                  showJson.updated = remoteTs;
+                  console.error(
+                    `[tvmaze] repairing timestamp for ${id}: API=${showTs} -> UpdateAPI=${remoteTs}`,
+                  );
+                }
+
+                // Use a transaction for the single update
+                updateTx([showJson]);
+
+                if (!updatesHeaderPrinted) {
+                  try {
+                    const miscDir = getApiMiscDir();
+                    const logPath = path.join(miscDir, SYNC_LOG_FILENAME);
+                    const dir = path.dirname(logPath);
+                    if (!fs.existsSync(dir))
+                      fs.mkdirSync(dir, { recursive: true });
+                    fs.appendFileSync(
+                      logPath,
+                      "\n======== UPDATES ======== \n",
+                      "utf8",
+                    );
+                    updatesHeaderPrinted = true;
+                  } catch {
+                    // ignore
+                  }
+                }
+
+                // Track stats for summary
+                updated++;
                 updateCount++;
+
+                const msgName = showJson.name || "show update";
+                const msgWithId = `${id}: ${msgName}`;
+
                 appendSyncLog({
                   ts: new Date().toISOString(),
-                  message: showJson.name || "show update",
+                  message: msgWithId,
                   page: "update",
                   count: updateCount,
                 });
@@ -799,6 +837,7 @@ async function syncTvmazeShows(reason = "startup") {
       shows_seen: showsSeen,
       inserted,
       updated,
+      count: inserted + updated, // Ensure log displays total count
       last_ok_page: lastOkPage,
       end_by_404: endBy404,
       end_404_page: end404Page,

@@ -490,7 +490,7 @@ async function syncTvmazeShows(reason = "startup") {
     "INSERT INTO shows(tvmaze_id, tvdb_id, imdb_id, premiered, status, type, language, name, browsed, tvmaze_updated, fetched_at, data_json) VALUES(?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
   );
   const updateRow = db.prepare(
-    "UPDATE shows SET tvdb_id = ?, imdb_id = ?, premiered = ?, status = ?, type = ?, language = ?, name = ?, tvmaze_updated = ?, fetched_at = ?, data_json = ?, browsed = 0 WHERE tvmaze_id = ?",
+    "UPDATE shows SET tvdb_id = ?, imdb_id = ?, premiered = ?, status = ?, type = ?, language = ?, name = ?, tvmaze_updated = ?, fetched_at = ?, data_json = ? WHERE tvmaze_id = ?",
   );
 
   let pagesFetched = 0;

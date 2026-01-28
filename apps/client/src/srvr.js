@@ -65,7 +65,8 @@ const fCall = (fname, param) => {
     calls.push({ id, fname, param, resolve, reject });
   });
   if (typeof param == "object") param = JSON.stringify(param);
-  const msg = `${id}~~~${fname}~~~${param}`;
+  // const msg = `${id}~~~${fname}~~~${param}`;
+  const msg = JSON.stringify({ id, fname, param });
 
   if (!haveSocket) waitingSends.push(msg);
   else {
@@ -81,12 +82,17 @@ handleMsg = async (msg) => {
     msg = text;
   }
   msg = msg.toString();
-  const parts = /^(.*)~~~(.*)~~~(.*)$/.exec(msg);
-  if (!parts) {
+
+  let parts;
+  try {
+    parts = JSON.parse(msg);
+  } catch (e) {
     console.error("skipping bad message:", msg);
     return;
   }
-  const [id, status, result] = parts.slice(1);
+
+  const { id, status, data: result } = parts;
+
   // console.log("handling msg:", id, status);
   if (id == "0") return;
 
@@ -100,6 +106,13 @@ handleMsg = async (msg) => {
   const { fname, param, resolve, reject } = call;
   if (status != "ok")
     console.error("Reject from server:", { id, fname, param, status, result });
+
+  // console.log("parsing ws result:", {id, result});
+  // const res = JSON.parse(result);
+  const res = result;
+  if (status == "ok") resolve(res);
+  else reject(res);
+  /*
   try {
     // console.log("parsing ws result:", {id, result});
     const res = JSON.parse(result);
@@ -110,6 +123,7 @@ handleMsg = async (msg) => {
     console.error(msg, { id, result, err });
     reject(msg);
   }
+  */
 };
 
 export async function deleteShowFromSrvr(show) {

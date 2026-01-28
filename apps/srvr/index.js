@@ -1790,7 +1790,11 @@ const getNote = (id, param, resolve, reject) => {
   if (!showName) {
     reject([
       id,
-      { err: "getNote: missing showName", receivedRaw: param, parsed: showName },
+      {
+        err: "getNote: missing showName",
+        receivedRaw: param,
+        parsed: showName,
+      },
     ]);
     return;
   }
@@ -2389,14 +2393,22 @@ const runOne = () => {
     .then((idResult) => {
       const [id, result] = idResult;
       // console.log('resolved:', id);
-      ws.send(`${id}~~~ok~~~${JSON.stringify(result)}`);
+      try {
+        ws.send(JSON.stringify({ id, status: "ok", data: result }));
+      } catch (e) {
+        console.error("ws.send error (runOne ok):", e);
+      }
       running = false;
       runOne();
     })
     .catch((idError) => {
       console.error("idResult err:", { idError });
       const [id, error] = idError;
-      ws.send(`${id}~~~err~~~${JSON.stringify(error)}`);
+      try {
+        ws.send(JSON.stringify({ id, status: "err", data: error }));
+      } catch (e) {
+        console.error("ws.send error (runOne err):", e);
+      }
       running = false;
       runOne();
     });
@@ -2546,15 +2558,15 @@ wss.on("connection", (ws) => {
 
   ws.on("message", (data) => {
     const msg = data.toString();
-    const firstSep = msg.indexOf("~~~");
-    const secondSep = firstSep >= 0 ? msg.indexOf("~~~", firstSep + 3) : -1;
-    if (firstSep < 0 || secondSep < 0) {
+    let parsed;
+    try {
+      parsed = JSON.parse(msg);
+    } catch (e) {
       console.error("ignoring bad message:", msg);
       return;
     }
-    const id = msg.slice(0, firstSep);
-    const fname = msg.slice(firstSep + 3, secondSep);
-    const param = msg.slice(secondSep + 3);
+    const { id, fname, param } = parsed;
+
     if (socketName != appSocketName) {
       socketName = appSocketName;
       console.log(socketName + " connected");
@@ -2566,7 +2578,11 @@ wss.on("connection", (ws) => {
         id,
         param,
         (res) => {
-          ws.send(`${res[0]}~~~ok~~~${JSON.stringify(res[1])}`);
+          try {
+            ws.send(JSON.stringify({ id: res[0], status: "ok", data: res[1] }));
+          } catch (e) {
+            console.error("ws.send error (accessTvdb):", e);
+          }
         },
         null,
       );
@@ -2576,7 +2592,11 @@ wss.on("connection", (ws) => {
         param,
         (res) => {
           // res is [id, result]
-          ws.send(`${res[0]}~~~ok~~~${JSON.stringify(res[1])}`);
+          try {
+            ws.send(JSON.stringify({ id: res[0], status: "ok", data: res[1] }));
+          } catch (e) {
+            console.error("ws.send error (getAllTvdb):", e);
+          }
         },
         null,
       );

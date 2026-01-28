@@ -584,11 +584,15 @@ const chkTvdbQueue = () => {
     reject = rejectIn;
   });
   promise.then((tvdbData) => {
-    if (typeof tvdbData === "object") {
-      if (ws) ws.send(`${id}~~~ok~~~${JSON.stringify(tvdbData)}`);
-      else if (resolveCb) resolveCb([id, tvdbData]);
-      allTvdb[tvdbData.name] = tvdbData;
-    } else tvdbData = allTvdb[tvdbData]; // tvdbData is name
+    try {
+      if (typeof tvdbData === "object") {
+        if (ws) ws.send(JSON.stringify({ id, status: "ok", data: tvdbData }));
+        else if (resolveCb) resolveCb([id, tvdbData]);
+        allTvdb[tvdbData.name] = tvdbData;
+      } else tvdbData = allTvdb[tvdbData]; // tvdbData is name
+    } catch (e) {
+      console.error("chkTvdbQueue ws.send error:", e);
+    }
     tvdbData.saved = Date.now();
     util.writeFile(TVDB_PATH, allTvdb);
     chkTvdbQueueRunning = false;
@@ -770,6 +774,7 @@ export const getAllTvdb = (id, _param, resolve, _reject) => {
 // if tvdb already exists replace it
 export const getNewTvdb = async (ws, id, param) => {
   const paramObj = util.jParse(param, "getNewTvdb");
+  if (!paramObj) return;
   // log('getNewTvdb:', paramObj.show.Name);
   newTvdbQueue.unshift({ ws, id, paramObj });
   chkTvdbQueue();
@@ -777,6 +782,7 @@ export const getNewTvdb = async (ws, id, param) => {
 
 export const setTvdbFields = async (id, param, resolve, _reject) => {
   const paramObj = util.jParse(param, "setTvdbFields");
+  if (!paramObj) return resolve([id, null]);
   let tvdb = null;
   const name = paramObj.name;
   if (name) {
@@ -829,6 +835,7 @@ export const setTvdbFields = async (id, param, resolve, _reject) => {
 export const accessTvdb = async (id, param, resolve, _reject) => {
   try {
     const paramObj = util.jParse(param, "accessTvdb");
+    if (!paramObj) throw new Error("invalid params");
     const { path: tvdbPath, query } = paramObj;
 
     const url = buildTvdbUrl(tvdbPath, query);

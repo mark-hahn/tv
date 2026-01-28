@@ -306,7 +306,7 @@
         <div
           v-for="(item, idx) in parsedTitles"
           :key="idx"
-          @click="selectTitle(idx)"
+          @click="selectTitle(idx, true)"
           :style="getTitleCardStyle(idx)"
         >
           <template v-if="item.rejectStatus === 'msg'">
@@ -414,6 +414,7 @@ export default {
     const _didInitialVisibleScroll = ref(false);
     const _startBrowsePromise = ref(null);
     const isLoadingNext = ref(false);
+    const justFetchedNext = ref(false);
     const isLoadingRemotesMsg = ref(false);
     const loadingRemotesCount = ref(0);
     const suppressButtons = ref(false);
@@ -583,6 +584,7 @@ export default {
 
     const handleNext = async () => {
       isLoadingNext.value = true;
+      justFetchedNext.value = true;
       suppressButtons.value = true;
       lastLoadedTvdbId.value =
         curTvdb.value?.tvdb_id || curTvdb.value?.tvdbId || "-1";
@@ -1061,14 +1063,27 @@ export default {
 
     watch(
       curTvdb,
-      (val) => {
+      async (val) => {
         void loadRemotesForTvdb(val);
+        await nextTick();
+        if (titlesPane.value) {
+          if (
+            justFetchedNext.value ||
+            selectedTitleIdx.value >= titleStrings.value.length - 2
+          ) {
+            titlesPane.value.scrollTop = titlesPane.value.scrollHeight;
+            justFetchedNext.value = false;
+          }
+        }
       },
       { deep: true },
     );
 
     // Handle title selection
-    const selectTitle = async (idx) => {
+    const selectTitle = async (idx, fromUser = false) => {
+      if (fromUser) {
+        justFetchedNext.value = false;
+      }
       const item = parsedTitles.value[idx];
       if (item?.rejectStatus === "msg") {
         await nextTick();

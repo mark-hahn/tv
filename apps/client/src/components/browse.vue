@@ -37,6 +37,7 @@
       :style="{
         flex: '1 1 0',
         minWidth: 0,
+        minHeight: 0,
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
@@ -129,6 +130,8 @@
             marginBottom: '8px',
             width: '100%',
             boxSizing: 'border-box',
+            pointerEvents: previewMode ? 'none' : 'auto',
+            opacity: previewMode ? 0.5 : 1,
           }"
         >
           <button
@@ -371,7 +374,7 @@
 </template>
 
 <script>
-import { ref, computed, watch, onMounted, nextTick } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
 import ReelGallery from "./reel-gallery.vue";
 import { config } from "../config.js";
 import evtBus from "../evtBus.js";
@@ -414,6 +417,16 @@ export default {
     const isLoadingRemotesMsg = ref(false);
     const loadingRemotesCount = ref(0);
     const suppressButtons = ref(false);
+    const previewMode = ref(false);
+
+    const onPreviewMode = (active) => {
+      previewMode.value = !!active;
+    };
+    evtBus.on("previewMode", onPreviewMode);
+
+    onUnmounted(() => {
+      evtBus.off("previewMode", onPreviewMode);
+    });
     const lastLoadedTvdbId = ref(null);
     const remotesCache = new Map();
     const activeLoadingKeys = new Set();
@@ -1172,6 +1185,7 @@ export default {
       isLoadingRemotesMsg,
       loadingRemotesCount,
       suppressButtons,
+      previewMode,
       toastMessage,
     };
   },

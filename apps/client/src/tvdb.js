@@ -50,7 +50,21 @@ export const getAllTvdb = async () => {
 //////////// search for TvDb Data //////////////
 
 export const srchTvdbData = async (searchStr) => {
-  const srchUrl = "search?type=series&query=" + encodeURIComponent(searchStr);
+  let query = searchStr;
+  let year = "";
+
+  // Check for (YYYY) at the end, as supplied by browse.js
+  const yearMatch = query.match(/\((\d{4})\)$/);
+  if (yearMatch) {
+    year = yearMatch[1];
+    query = query.replace(/\s*\(\d{4}\)$/, "").trim();
+  }
+
+  let srchUrl = "search?type=series&query=" + encodeURIComponent(query);
+  if (year) {
+    srchUrl += "&year=" + encodeURIComponent(year);
+  }
+
   const srchRes = await tvdbFetch(srchUrl);
   const srchResObj = await srchRes.json();
   const data = srchResObj.data;

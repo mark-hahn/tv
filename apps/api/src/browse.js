@@ -82,6 +82,18 @@ const IGNORED_LANGUAGES = new Set([
   "Zulu",
 ]);
 
+const IGNORED_TYPES = new Set([
+  "Award Show",
+  "Documentary",
+  "Game Show",
+  "News",
+  "Panel Show",
+  "Reality",
+  "Sports",
+  "Talk Show",
+  "Variety",
+]);
+
 const avoidGenres = [
   "anime",
   "children",
@@ -202,7 +214,18 @@ export async function getBrowseShow() {
   let foundNew = false;
 
   for (const show of candidates) {
-    const title = (show.name || "Unknown").trim();
+    let title = (show.name || "Unknown").trim();
+
+    // Append year if premiered date is available
+    if (show.premiered) {
+      // premiered is stored as epoch seconds
+      const d = new Date(show.premiered * 1000);
+      const y = d.getUTCFullYear();
+      if (y && !Number.isNaN(y)) {
+        title = `${title} (${y})`;
+      }
+    }
+
     const tvmazeId = show.tvmaze_id;
 
     // Mark as browsed immediately
@@ -210,6 +233,11 @@ export async function getBrowseShow() {
 
     // Check if we've seen this title in our recent resultTitles
     if (resultTitles.some((entry) => parseResultTitle(entry) === title)) {
+      continue;
+    }
+
+    // Reject if type is in ignore list
+    if (show.type && IGNORED_TYPES.has(show.type)) {
       continue;
     }
 

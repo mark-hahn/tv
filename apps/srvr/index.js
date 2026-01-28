@@ -1242,13 +1242,10 @@ const upload = async () => {
     return "ok";
   }
 
-  console.log("uploading config.yml");
-  const timeBeforeUSB = new Date().getTime();
   const { stdout } = await exec(
     `rsync -av "${configWritePath("config.yml")}" xobtlu@oracle.usbx.me:` +
       "/home/xobtlu/.config/flexget/config.yml",
   );
-  console.log("upload delay:", new Date().getTime() - timeBeforeUSB);
 
   const rx = new RegExp("total size is ([0-9,]*)");
   const matches = rx.exec(stdout);
@@ -1256,7 +1253,6 @@ const upload = async () => {
     console.error("\nERROR: config.yml upload failed\n", stdout, "\n");
     return `config.yml upload failed: ${stdout.toString()}`;
   }
-  console.log("uploaded config.yml, size:", matches[1]);
   return "ok";
 };
 

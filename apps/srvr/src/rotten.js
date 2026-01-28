@@ -187,8 +187,7 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
       document.body.style.overflow = "auto"; // Restore scrolling
       return count;
     });
-    if (deleted > 0)
-      console.log(`[Nuclear] Removed ${deleted} OneTrust elements from DOM.`);
+    // if (deleted > 0) console.log(`[Nuclear] Removed ${deleted} OneTrust elements from DOM.`);
 
     // 1. Try "Reject All" (force click)
     const reject = page.locator("#onetrust-reject-all-handler");
@@ -212,7 +211,7 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
       '#onetrust-close-btn-container button, .onetrust-close-btn-ui, button[aria-label="Close"], button[title="Close"]',
     );
     if ((await closeBtn.count()) > 0) {
-      console.log(`Found Close 'X' button. Clicking (Force)...`);
+      // console.log(`Found Close 'X' button. Clicking (Force)...`);
       await closeBtn
         .first()
         .click({ force: true })
@@ -253,7 +252,7 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
           cls.includes("HEADER") ||
           tag === "MEDIA-SCORECARD" ||
           tag === "RT-TEXT" ||
-          tag === "SCORE-BOARD" ||
+          tag.startsWith("SCORE-BOARD") ||
           txt === "TV Shows" ||
           txt === "Movies"
         ) {
@@ -293,7 +292,10 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
                 t === "NAV" ||
                 t === "HEADER" ||
                 t.startsWith("RT-HEADER") ||
-                t === "MAIN"
+                t === "MAIN" ||
+                t === "MEDIA-SCORECARD" ||
+                t.startsWith("SCORE-BOARD") ||
+                t === "SECTION"
               ) {
                 return false;
               }
@@ -655,9 +657,9 @@ export async function rottenSearch(query) {
           };
         });
         const num = Number((val.text || "").match(/\d+/)?.[0] ?? "");
-        console.log(
-          `rotten getScore ${slot}: found text="${val.text}" -> ${num}`,
-        );
+        // console.log(`rotten getScore ${slot}: found text="${val.text}" -> ${num}`);
+
+        // Take screenshot of the scorecard area
 
         // Take screenshot of the scorecard area
         try {
@@ -677,14 +679,12 @@ export async function rottenSearch(query) {
         return num;
       } catch (e) {
         if (!retrying) {
-          console.log(
-            `rotten getScore ${slot} failed, attempting to dismiss overlays and retry.`,
-          );
+          // console.log(`rotten getScore ${slot} failed, attempting to dismiss overlays and retry.`);
           await dismissOverlays(page, timing, "dismissOverlays.retry");
           return getScore(slot, true);
         }
 
-        console.log(`rotten getScore ${slot} error: ${e.message}`);
+        // console.log(`rotten getScore ${slot} error: ${e.message}`);
 
         // DEBUG: Thorough DOM Inspection
         /*
@@ -705,17 +705,20 @@ export async function rottenSearch(query) {
         */
 
         // Capture HTML snapshot on error
+        /*
         try {
           const html = await page.content();
           fs.writeFileSync(`rotten-error-${slot}.html`, html);
           console.log(`Saved page content to rotten-error-${slot}.html`);
         } catch {}
+        */
 
         // Capture screenshot on error too
         try {
           await page.screenshot({ path: `rotten-error-${slot}.png` });
-          console.log(`Saved error screenshot to rotten-error-${slot}.png`);
+          // console.log(`Saved error screenshot to rotten-error-${slot}.png`);
         } catch {}
+
         return 0;
       }
     };

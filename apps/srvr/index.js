@@ -211,25 +211,6 @@ const noEmbys = JSON.parse(noEmbyStr);
 const gaps = JSON.parse(gapsStr);
 const notes = notesCache;
 
-console.log("[tv-srvr] config paths:", {
-  cwd: process.cwd(),
-  srvrRoot: SRVR_ROOT_DIR,
-  configDir: CONFIG_DIR,
-});
-console.log("[tv-srvr] loaded config:", {
-  header: headerLoad.chosenPath,
-  rejects: {
-    path: rejectLoad.chosenPath,
-    count: Array.isArray(rejects) ? rejects.length : null,
-  },
-  pickups: {
-    path: pickupLoad.chosenPath,
-    count: Array.isArray(pickups) ? pickups.length : null,
-  },
-  middle: middleLoad.chosenPath,
-  footer: footerLoad.chosenPath,
-});
-
 function encodeFileIdBase32(fileId) {
   // base-32 using RFC4648 alphabet: A-Z then 2-7.
   // Output is minimal-length (no left padding).
@@ -1250,12 +1231,10 @@ const upload = async () => {
   str += '        - "dummy"\n';
   for (let name of rejects)
     str += '        - "' + name.replace(/"/g, "") + '"\n';
-  console.log({ str });
   str += middleStr;
   for (let name of pickups)
     str += '        - "' + name.replace(/"/g, "") + '"\n';
   str += footerStr;
-  console.log("creating config.yml");
   await util.writeFile(configWritePath("config.yml"), str);
 
   if (dontupload) {
@@ -1397,7 +1376,6 @@ const startupRejectsSync = () => {
     );
   } else {
     // Force upload to ensure config.yml matches disk state (cleans up stale entries)
-    console.log("[sync] No logic changes, forcing config.yml upload...");
     upload();
   }
 

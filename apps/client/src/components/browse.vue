@@ -166,6 +166,23 @@
               justifyContent: 'center',
             }"
           >
+            Preview
+          </button>
+          <button
+            v-if="curTvdb &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+            @click="handleLoad"
+            :style="{
+              height: '18px',
+              margin: '0',
+              padding: '0 2px',
+              lineHeight: '18px',
+              fontSize: '16px',
+              boxSizing: 'border-box',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }"
+          >
             Get</button
           ><span
             v-if="isLoadingNext"

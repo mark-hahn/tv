@@ -46,7 +46,7 @@
           borderRadius: '5px',
           display: 'block',
         }"
-        @click.stop="previewCard(idx)"
+        @click.stop="selectCard(idx)"
         @error="handleImageError($event)"
       />
       <div

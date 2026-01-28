@@ -55,11 +55,24 @@ function appendSyncLog(entry) {
     const e =
       entry && typeof entry === "object" ? entry : { message: String(entry) };
     const ts = formatLogTimestamp(new Date());
-    const page = e.page ?? e.last_ok_page ?? e.start_page ?? "-";
+
+    const isPageSynced = e.message === "page synced";
+    const isSyncComplete =
+      e.message === "sync complete" || e.message === "update complete";
+
+    // Skip "page synced" logs if count is 0
+    if (isPageSynced && (e.count ?? e.inserted ?? 0) === 0) {
+      return;
+    }
+
+    const page = !isSyncComplete
+      ? (e.page ?? e.last_ok_page ?? e.start_page ?? "-")
+      : "-";
+
     // For sync complete & page synced, we want the cumulative inserted count.
     // We strictly avoid shows_seen fallback to prevent confusion.
     const count = e.count ?? e.inserted ?? 0;
-    const isPageSynced = e.message === "page synced";
+
     const totalLoaded =
       (e.totals && typeof e.totals === "object"
         ? (e.totals.total_loaded ?? e.totals.shows_seen)
@@ -91,9 +104,17 @@ function appendSyncLog(entry) {
       ? ` total-in-db: ${totalInDbNum}`
       : "";
     const isModuleLoaded = e.message === "module loaded";
-    const base = isModuleLoaded
-      ? `${ts}${totalsSuffix}`
-      : `${ts} page: ${page}, shows: ${count}${totalsSuffix}`;
+
+    let base;
+    if (isModuleLoaded) {
+      base = `${ts}${totalsSuffix}`;
+    } else if (isSyncComplete) {
+      // Don't show page: - for sync complete
+      base = `${ts} shows: ${count}${totalsSuffix}`;
+    } else {
+      base = `${ts} page: ${page}, shows: ${count}${totalsSuffix}`;
+    }
+
     const line = msg ? `${base} ${msg}` : base;
     fs.appendFileSync(outPath, line + "\n", "utf8");
   } catch {
@@ -465,7 +486,7 @@ async function syncTvmazeShows(reason = "startup") {
     "INSERT INTO shows(tvmaze_id, tvdb_id, imdb_id, premiered, status, type, language, name, browsed, tvmaze_updated, fetched_at, data_json) VALUES(?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
   );
   const updateRow = db.prepare(
-    "UPDATE shows SET tvdb_id = ?, imdb_id = ?, premiered = ?, status = ?, type = ?, language = ?, name = ?, tvmaze_updated = ?, fetched_at = ?, data_json = ? WHERE tvmaze_id = ?",
+    "UPDATE shows SET tvdb_id = ?, imdb_id = ?, premiered = ?, status = ?, type = ?, language = ?, name = ?, tvmaze_updated = ?, fetched_at = ?, data_json = ?, browsed = 0 WHERE tvmaze_id = ?",
   );
 
   let pagesFetched = 0;
@@ -475,87 +496,8 @@ async function syncTvmazeShows(reason = "startup") {
   let lastOkPage = null;
   let lastTvmazeIdSeen = startMaxId ?? null;
 
-  const perPageTx = db.transaction((rows) => {
-    const fetchedAt = Math.floor(Date.now() / 1000);
-    for (const show of rows) {
-      if (!show || typeof show !== "object") continue;
-
-      const tvmazeId = show.id;
-      const tvdbId = show?.externals?.thetvdb;
-      const tvdbIdNum = tvdbId == null ? null : Number(tvdbId);
-      const tvdbIdSafe = Number.isFinite(tvdbIdNum) ? tvdbIdNum : null;
-      const imdbId = show?.externals?.imdb;
-      const imdbIdSafe =
-        typeof imdbId === "string" && imdbId.trim() ? imdbId.trim() : null;
-
-      const premieredMs =
-        typeof show.premiered === "string" ? Date.parse(show.premiered) : null;
-      const premiered =
-        !Number.isNaN(premieredMs) && premieredMs != null
-          ? Math.floor(premieredMs / 1000)
-          : null;
-
-      const status = typeof show.status === "string" ? show.status : null;
-      const type = typeof show.type === "string" ? show.type : null;
-      const language = typeof show.language === "string" ? show.language : null;
-      const name = typeof show.name === "string" ? show.name : null;
-
-      const tvmazeUpdated = show.updated == null ? null : Number(show.updated);
-      const jsonText = JSON.stringify(show);
-
-      const existing = selectExisting.get(tvmazeId);
-      if (!existing) {
-        insertRow.run(
-          tvmazeId,
-          tvdbIdSafe,
-          imdbIdSafe,
-          premiered,
-          status,
-          type,
-          language,
-          name,
-          tvmazeUpdated,
-          fetchedAt,
-          jsonText,
-        );
-        inserted++;
-      } else {
-        const changed =
-          (existing.tvdb_id ?? null) !== (tvdbIdSafe ?? null) ||
-          (existing.imdb_id ?? null) !== (imdbIdSafe ?? null) ||
-          (existing.premiered ?? null) !== (premiered ?? null) ||
-          (existing.status ?? null) !== (status ?? null) ||
-          (existing.type ?? null) !== (type ?? null) ||
-          (existing.language ?? null) !== (language ?? null) ||
-          (existing.name ?? null) !== (name ?? null) ||
-          (existing.tvmaze_updated ?? null) !== (tvmazeUpdated ?? null) ||
-          String(existing.data_json || "") !== jsonText;
-
-        if (changed) {
-          updateRow.run(
-            tvdbIdSafe,
-            imdbIdSafe,
-            premiered,
-            status,
-            type,
-            language,
-            name,
-            tvmazeUpdated,
-            fetchedAt,
-            jsonText,
-            tvmazeId,
-          );
-          updated++;
-        }
-      }
-
-      if (Number.isFinite(tvmazeId)) {
-        if (lastTvmazeIdSeen == null || tvmazeId > lastTvmazeIdSeen)
-          lastTvmazeIdSeen = tvmazeId;
-      }
-      showsSeen++;
-    }
-  });
+  // We are now doing the transaction inline inside the loop to capture new shows correctly
+  // const perPageTx = db.transaction((rows) => { ... }); -- removed
 
   let endBy404 = false;
   let end404Page = null;
@@ -581,37 +523,261 @@ async function syncTvmazeShows(reason = "startup") {
 
       pagesFetched++;
       lastOkPage = page;
-      perPageTx(json);
 
-      const pageInserted = inserted - insertedBefore;
-      const pageUpdated = updated - updatedBefore;
-      const pageShowsSeen = showsSeen - showsSeenBefore;
-      const pageCount = Array.isArray(json) ? json.length : 0;
-      const totalInDb = countShowsInDb(db);
-      appendSyncLog({
-        ts: new Date().toISOString(),
-        level: "info",
-        message: "page synced",
-        reason,
-        page,
-        url,
-        count: inserted,
-        shows_seen: pageShowsSeen,
-        inserted: pageInserted,
-        updated: pageUpdated,
-        totals: {
-          pages_fetched: pagesFetched,
-          total_loaded: showsSeen,
-          total_in_db: totalInDb,
-          inserted,
-          updated,
-        },
+      // We want to log each show added individually.
+      // We capture the "newly inserted" shows by tracking the inserted count
+      // inside perPageTx, but simplest is to modify perPageTx to return the
+      // list of inserted shows. However, perPageTx is a transaction wrapper.
+      // Instead, we can iterate json here to detect new ones, but we need
+      // the Tx for atomicity.
+      //
+      // Modified approach: The user wants "log line for every show added".
+      // We'll hook into perPageTx logic by checking existence before calling it,
+      // or we can just iterate "json" again? No, we need to know what was *actually* inserted.
+      //
+      // Let's modify perPageTx to log directly or return the inserted names.
+      // But perPageTx is defined above. Let's redefine the transaction logic inline
+      // or pass a callback.
+      //
+      // Actually, let's just inspect the logic. The current implementation uses perPageTx.
+      // We will perform the logging *inside* the loop if possible, or collect
+      // loggable items.
+
+      const newShows = [];
+      const _perPageTx = db.transaction((rows) => {
+        const fetchedAt = Math.floor(Date.now() / 1000);
+        for (const show of rows) {
+          if (!show || typeof show !== "object") continue;
+
+          const tvmazeId = show.id;
+          const tvdbId = show?.externals?.thetvdb;
+          const tvdbIdNum = tvdbId == null ? null : Number(tvdbId);
+          const tvdbIdSafe = Number.isFinite(tvdbIdNum) ? tvdbIdNum : null;
+          const imdbId = show?.externals?.imdb;
+          const imdbIdSafe =
+            typeof imdbId === "string" && imdbId.trim() ? imdbId.trim() : null;
+
+          const premieredMs =
+            typeof show.premiered === "string"
+              ? Date.parse(show.premiered)
+              : null;
+          const premiered =
+            !Number.isNaN(premieredMs) && premieredMs != null
+              ? Math.floor(premieredMs / 1000)
+              : null;
+
+          const status = typeof show.status === "string" ? show.status : null;
+          const type = typeof show.type === "string" ? show.type : null;
+          const language =
+            typeof show.language === "string" ? show.language : null;
+          const name = typeof show.name === "string" ? show.name : null;
+
+          const tvmazeUpdated =
+            show.updated == null ? null : Number(show.updated);
+          const jsonText = JSON.stringify(show);
+
+          const existing = selectExisting.get(tvmazeId);
+          if (!existing) {
+            insertRow.run(
+              tvmazeId,
+              tvdbIdSafe,
+              imdbIdSafe,
+              premiered,
+              status,
+              type,
+              language,
+              name,
+              tvmazeUpdated,
+              fetchedAt,
+              jsonText,
+            );
+            inserted++;
+            newShows.push({ name: name || "Unknown", id: tvmazeId });
+          } else {
+            const changed =
+              (existing.tvdb_id ?? null) !== (tvdbIdSafe ?? null) ||
+              (existing.imdb_id ?? null) !== (imdbIdSafe ?? null) ||
+              (existing.premiered ?? null) !== (premiered ?? null) ||
+              (existing.status ?? null) !== (status ?? null) ||
+              (existing.type ?? null) !== (type ?? null) ||
+              (existing.language ?? null) !== (language ?? null) ||
+              (existing.name ?? null) !== (name ?? null) ||
+              (existing.tvmaze_updated ?? null) !== (tvmazeUpdated ?? null) ||
+              String(existing.data_json || "") !== jsonText;
+
+            if (changed) {
+              updateRow.run(
+                tvdbIdSafe,
+                imdbIdSafe,
+                premiered,
+                status,
+                type,
+                language,
+                name,
+                tvmazeUpdated,
+                fetchedAt,
+                jsonText,
+                tvmazeId,
+              );
+              updated++;
+            }
+          }
+
+          if (Number.isFinite(tvmazeId)) {
+            if (lastTvmazeIdSeen == null || tvmazeId > lastTvmazeIdSeen)
+              lastTvmazeIdSeen = tvmazeId;
+          }
+          showsSeen++;
+        }
       });
+
+      _perPageTx(json);
+
+      // Log each new show
+      for (const s of newShows) {
+        appendSyncLog({
+          ts: new Date().toISOString(),
+          level: "info",
+          message: s.name,
+          page,
+          count: inserted, // cumulative count at this point
+          totals: {
+            total_in_db: countShowsInDb(db),
+          },
+        });
+      }
 
       // Persist progress as we go so a crash can resume.
       metaSet(db, "tvmaze.last_ok_page", String(page));
       if (lastTvmazeIdSeen != null)
         metaSet(db, "tvmaze.last_tvmaze_id", String(lastTvmazeIdSeen));
+    }
+
+    // Update phase: check /updates/shows?since=day for existing shows in DB
+    const updatesUrl = `${TVMAZE_BASE_URL}/updates/shows?since=day`;
+    let updateCount = 0;
+    try {
+      const { json: updateMap } = await fetchJsonWithBackoff(updatesUrl);
+      if (updateMap && typeof updateMap === "object") {
+        const idsToCheck = Object.keys(updateMap)
+          .map(Number)
+          .filter((id) => Number.isFinite(id));
+        if (idsToCheck.length > 0) {
+          const allLocal = db
+            .prepare("SELECT tvmaze_id, tvmaze_updated FROM shows")
+            .all();
+          const localMap = new Map();
+          for (const row of allLocal) {
+            localMap.set(row.tvmaze_id, row.tvmaze_updated);
+          }
+
+          const toUpdate = [];
+          for (const id of idsToCheck) {
+            const remoteTs = updateMap[id];
+            const localTs = localMap.get(id);
+            // If local exists AND (localTs is null OR remoteTs > localTs)
+            if (localMap.has(id)) {
+              if (!localTs || remoteTs > localTs) {
+                toUpdate.push(id);
+              }
+            }
+          }
+
+          if (toUpdate.length > 0) {
+            try {
+              const miscDir = getApiMiscDir();
+              const logPath = path.join(miscDir, SYNC_LOG_FILENAME);
+              const dir = path.dirname(logPath);
+              if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+              fs.appendFileSync(
+                logPath,
+                "======== UPDATES ======== \n",
+                "utf8",
+              );
+            } catch {
+              // ignore
+            }
+
+            for (const id of toUpdate) {
+              const showUrl = `${TVMAZE_BASE_URL}/shows/${id}`;
+              try {
+                const { json: showJson } = await fetchJsonWithBackoff(showUrl);
+                // We need to use the transaction logic here too, but perPageTx is gone.
+                // We must inline the update logic or extract a function.
+                // Since this is just ONE item, we can run the SQL directly.
+                // But let's reuse the logic by extracting it or copy-pasting for safety?
+                // DRY is better. Let's create `upsertShow` helper function.
+                // But for now, to be safe, I'll inline the update-only logic since
+                // we know these are Existing shows (from the check above).
+                // Wait, updates endpoint might return IDs for NEW shows too if we missed them?
+                // The check `if (localMap.has(id))` above ensures we only update EXISTING shows.
+                // So we only need UPDATE logic here.
+
+                const fetchedAt = Math.floor(Date.now() / 1000);
+                const show = showJson;
+
+                const tvmazeId = show.id;
+                const tvdbId = show?.externals?.thetvdb;
+                const tvdbIdNum = tvdbId == null ? null : Number(tvdbId);
+                const tvdbIdSafe = Number.isFinite(tvdbIdNum)
+                  ? tvdbIdNum
+                  : null;
+                const imdbId = show?.externals?.imdb;
+                const imdbIdSafe =
+                  typeof imdbId === "string" && imdbId.trim()
+                    ? imdbId.trim()
+                    : null;
+
+                const premieredMs =
+                  typeof show.premiered === "string"
+                    ? Date.parse(show.premiered)
+                    : null;
+                const premiered =
+                  !Number.isNaN(premieredMs) && premieredMs != null
+                    ? Math.floor(premieredMs / 1000)
+                    : null;
+
+                const status =
+                  typeof show.status === "string" ? show.status : null;
+                const type = typeof show.type === "string" ? show.type : null;
+                const language =
+                  typeof show.language === "string" ? show.language : null;
+                const name = typeof show.name === "string" ? show.name : null;
+
+                const tvmazeUpdated =
+                  show.updated == null ? null : Number(show.updated);
+                const jsonText = JSON.stringify(show);
+
+                updateRow.run(
+                  tvdbIdSafe,
+                  imdbIdSafe,
+                  premiered,
+                  status,
+                  type,
+                  language,
+                  name,
+                  tvmazeUpdated,
+                  fetchedAt,
+                  jsonText,
+                  tvmazeId,
+                );
+
+                updateCount++;
+                appendSyncLog({
+                  ts: new Date().toISOString(),
+                  message: showJson.name || "show update",
+                  page: "update",
+                  count: updateCount,
+                });
+              } catch (err) {
+                console.error(`[tvmaze] failed to update show ${id}`, err);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[tvmaze] failed to fetch updates", e);
     }
 
     const endedAt = nowMs();
@@ -625,7 +791,7 @@ async function syncTvmazeShows(reason = "startup") {
     const summary = {
       ts: new Date().toISOString(),
       level: "info",
-      message: "sync complete",
+      message: "update complete",
       reason,
       start_page: startPage,
       start_max_tvmaze_id: startMaxId,
@@ -640,7 +806,7 @@ async function syncTvmazeShows(reason = "startup") {
       duration_ms: endedAt - startedAt,
       totals: {
         total_loaded: showsSeen,
-        total_in_db: countShowsInDb(db),
+        // total_in_db: countShowsInDb(db),
       },
     };
 

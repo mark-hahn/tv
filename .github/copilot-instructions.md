@@ -19,3 +19,4 @@
 - never use an environment variable -- put hard-wired constant values at the top of the file with uppercase names
 - don't use file missing fallbacks -- if a file is missing then die fast
 - prefer async over sync code -- avoid using void to fix async/await problems
+- when done making changes do not run any deployment script. just tell me what files need to be deployed and i will do the deployment.  do not look up how to deploy. i know how to do that.

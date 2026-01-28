@@ -9,6 +9,8 @@ import { SRVR_DATA_DIR } from "./srvrPaths.js";
 const { log, start, end } = util.getLog("tvdb");
 const TVDB_PATH = path.join(SRVR_DATA_DIR, "tvdb.json");
 
+const FAST_UPDATE = false;
+
 // TVDB API Credentials
 const TVDB_APIKEY = "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df";
 const TVDB_PIN = "HXEVSDFF";
@@ -329,7 +331,7 @@ const getRemote = async (id, type, showName) => {
       name = "Rotten";
       urlRatings = await rottenSearch(showName);
       if (!urlRatings) return null;
-      // log("getRemote rottenSearch:", urlRatings);
+      console.log("getRemote rottenSearch:", urlRatings);
       url = urlRatings.url;
       ratings = urlRatings.criticsScore + "/" + urlRatings.audienceScore;
       break;
@@ -342,7 +344,7 @@ const getRemote = async (id, type, showName) => {
     log(`getRemote, no url: ${name}`);
     return null;
   }
-  // log(`getRemote`, {name, url, ratings});
+  console.log(`getRemote`, { name, url, ratings });
   return { name, url, ratings };
 };
 
@@ -398,6 +400,8 @@ const getRemotes = async (show, tvdbRemotes) => {
   for (const [name, remote] of Object.entries(remotesByName)) {
     if (name !== "IMDB" && name !== "Rotten") remotes.push(remote);
   }
+
+  console.log("getRemotes result:", JSON.stringify(remotes, null, 2));
 
   return remotes;
 };
@@ -679,13 +683,9 @@ const tryLocalGetTvdb = () => {
 // calls tryLocalGetTvdb every 6 mins
 const updateTvdbLocal = () => {
   // wait for token
-  // only bother tvdb.com every min
   if (UPDATE_DATA) tryLocalGetTvdb();
-  // only bother tvdb.com every min
-  if (UPDATE_DATA) tryLocalGetTvdb();
-  setTimeout(updateTvdbLocal, 6 * 60 * 1000);
-  // log(new Date().toTimeString().slice(0,8),
-  //             'tvdb local update finished', );
+  const delay = FAST_UPDATE ? 30 * 1000 : 6 * 60 * 1000;
+  setTimeout(updateTvdbLocal, delay);
 };
 updateTvdbLocal();
 

@@ -886,7 +886,7 @@ export default {
             Name: name,
             TvdbId: tvdbId,
           },
-          tvdbRemotes: tvdb.remote_ids,
+          tvdbRemotes: tvdb.remote_ids || [],
         };
         const res = await srvr.getRemotesCmd(params);
         if (_lastRemotesKey.value === key) {

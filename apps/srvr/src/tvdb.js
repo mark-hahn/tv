@@ -714,10 +714,10 @@ export const setAddToPickupsCallback = (callback) => {
 export const getRemotesCmd = async (id, param, resolve, reject) => {
   const paramObj = util.jParse(param, "getRemotes");
   const show = paramObj?.show;
-  const tvdbRemotes = paramObj?.tvdbRemotes;
+  const tvdbRemotes = paramObj?.tvdbRemotes || [];
 
-  if (!show || !tvdbRemotes) {
-    reject([id, "getRemotes: missing show or tvdbRemotes"]);
+  if (!show) {
+    reject([id, "getRemotes: missing show"]);
     return;
   }
 

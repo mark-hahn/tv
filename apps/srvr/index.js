@@ -2575,6 +2575,25 @@ wss.on("connection", (ws) => {
         null,
       );
     } else {
+      if (fname === "getRemotes") {
+        for (let i = queue.length - 1; i >= 0; i--) {
+          if (queue[i].fname === "getRemotes") {
+            const dropped = queue[i];
+            queue.splice(i, 1);
+            try {
+              dropped.ws.send(
+                JSON.stringify({
+                  id: dropped.id,
+                  status: "err",
+                  data: "cancelled",
+                }),
+              );
+            } catch (e) {
+              console.error("ws.send error (cancelled):", e);
+            }
+          }
+        }
+      }
       queue.unshift({ ws, id, fname, param });
       runOne();
     }

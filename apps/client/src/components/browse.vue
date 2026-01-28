@@ -356,9 +356,9 @@
       v-if="toastMessage"
       :style="{
         position: 'fixed',
-        bottom: '20px',
+        top: '50%',
         left: '50%',
-        transform: 'translateX(-50%)',
+        transform: 'translate(-50%, -50%)',
         backgroundColor: 'rgba(0,0,0,0.8)',
         color: 'white',
         padding: '10px 20px',
@@ -900,7 +900,7 @@ export default {
       toastTimer = setTimeout(() => {
         toastMessage.value = "";
         toastTimer = null;
-      }, 3000);
+      }, 5000);
     };
 
     const handleLoad = () => {

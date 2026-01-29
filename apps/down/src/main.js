@@ -145,7 +145,7 @@ async function main() {
 
   log("starting....");
 
-  rsyncDelay = 3000; // 3 secs
+  rsyncDelay = 1000; // 1 sec (was 3 secs)
 
   usbHost = "xobtlu@oracle.usbx.me";
 

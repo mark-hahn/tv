@@ -822,3 +822,101 @@ export async function addQbtTorrent(input) {
   const ok = t.length === 0 || t.toLowerCase().startsWith("ok");
   return { ok, status: res.status, text: t };
 }
+
+/**
+ * Returns a file tree of /home/xobtlu/files from the USB server.
+ */
+export async function getUsbFiles() {
+  const qbHost = await loadQbHostForSsh();
+  const root = "/home/xobtlu/files";
+
+  const sshBaseArgs = [
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "ConnectTimeout=20",
+    "-o",
+    "LogLevel=ERROR",
+    "-o",
+    "StrictHostKeyChecking=no",
+    "-o",
+    "UserKnownHostsFile=/dev/null",
+  ];
+
+  // using find with -printf to get type and path
+  // %y: type (f=file, d=directory)
+  // %P: file's name relative to start point
+  // sort by name? find output is not sorted usually.
+  const cmd = `find ${root} -maxdepth 5 -not -path '*/.*' -printf "%y|%P\\n" | sort`;
+
+  try {
+    const { stdout } = await execFileAsync(
+      "ssh",
+      [...sshBaseArgs, qbHost, cmd],
+      {
+        maxBuffer: 10 * 1024 * 1024, // 10MB
+      },
+    );
+
+    const lines = (stdout || "").split("\n").filter(Boolean);
+    const tree = [];
+
+    // Helper to find or create child node in list
+    const findOrCreate = (list, name, type) => {
+      let node = list.find((n) => n.name === name);
+      if (!node) {
+        node = { name, type, children: [] };
+        // We only mark 'd' type if we explicitly see it or infer it.
+        // Actually find output will have 'd' for directories.
+        // But since we rely on hierarchy, any parent must be a directory.
+        list.push(node);
+      }
+      return node;
+    };
+
+    for (const line of lines) {
+      const parts = line.split("|");
+      if (parts.length < 2) continue;
+      const type = parts[0]; // f or d
+      const relPath = parts[1];
+
+      if (!relPath) continue; // Root itself might show up if not careful, but %P shouldn't show it.
+
+      const segments = relPath.split("/");
+      let currentLevel = tree;
+
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        const isLast = i === segments.length - 1;
+        // if it's the item itself (last segment), we use the type from find.
+        // otherwise it's a directory.
+        const segType = isLast ? (type === "d" ? "folder" : "file") : "folder";
+
+        const node = findOrCreate(currentLevel, seg, segType);
+        if (segType === "folder") {
+          if (!node.children) node.children = [];
+          currentLevel = node.children;
+        }
+      }
+    }
+
+    // Sort tree? linux sort on paths helps, but maybe we want folders first?
+    const sortNodes = (nodes) => {
+      nodes.sort((a, b) => {
+        if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
+        const nameA = a.name.toLowerCase().replace(/^the\s+/, "");
+        const nameB = b.name.toLowerCase().replace(/^the\s+/, "");
+        return nameA.localeCompare(nameB);
+      });
+      nodes.forEach((n) => {
+        if (n.children) sortNodes(n.children);
+      });
+    };
+    sortNodes(tree);
+
+    return tree;
+  } catch (e) {
+    console.error("getUsbFiles failed", e);
+    throw new Error(`Failed to list USB files: ${e.message}`);
+  }
+}

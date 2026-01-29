@@ -15,6 +15,7 @@ import {
   spaceAvail,
   flexgetHistory,
   addQbtTorrent,
+  getUsbFiles,
 } from "./usb.js";
 import { getBrowseShow, getAllBrowse } from "./browse.js";
 import * as reviews from "./reviews.js";
@@ -633,6 +634,15 @@ app.get("/api/flexget", async (req, res) => {
   } catch (error) {
     console.error("flexget error:", error);
     res.status(500).json({ error: error?.message || String(error) });
+  }
+});
+
+app.get("/api/usb/files", async (req, res) => {
+  try {
+    const tree = await getUsbFiles();
+    res.json(tree);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

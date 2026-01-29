@@ -240,6 +240,12 @@
               :simpleMode="simpleMode"
               :sizing="activeSizing"
             ></Qbt>
+            <Usb
+              v-if="!simpleMode"
+              v-show="currentPane === 'usb'"
+              style="width: 100%; height: 100%"
+              :active="currentPane === 'usb'"
+            ></Usb>
             <Down
               v-if="!simpleMode"
               v-show="currentPane === 'down'"
@@ -474,6 +480,12 @@
             :simpleMode="simpleMode"
             :sizing="activeSizing"
           ></Qbt>
+          <Usb
+            v-if="!simpleMode"
+            v-show="currentPane === 'usb'"
+            style="width: 100%; height: 100%"
+            :active="currentPane === 'usb'"
+          ></Usb>
           <Down
             v-if="!simpleMode"
             v-show="currentPane === 'down'"
@@ -590,6 +602,7 @@ import Subs from "./subs.vue";
 import Flex from "./flex.vue";
 import Qbt from "./qbt.vue";
 import Down from "./down.vue";
+import Usb from "./usb.vue";
 import Files from "./files.vue";
 import Trailer from "./trailer.vue";
 import evtBus from "../evtBus.js";
@@ -617,6 +630,7 @@ export default {
     Subs,
     Flex,
     Qbt,
+    Usb,
     Down,
     Files,
     Trailer,
@@ -937,6 +951,7 @@ export default {
         { label: "Browse", key: "browse" },
         { label: "Flex", key: "flex" },
         { label: "Qbt", key: "qbt" },
+        { label: "Usb", key: "usb" },
         { label: "Down", key: "down" },
       ];
 
@@ -1435,6 +1450,7 @@ export default {
           "subs",
           "flex",
           "qbt",
+          "usb",
           "down",
           "files",
         ]);
@@ -1517,6 +1533,13 @@ export default {
 
       if (k === "qbt") {
         this.handleShowQbt();
+        return;
+      }
+
+      if (k === "usb") {
+        if (this.simpleMode) return;
+        this.currentPane = "usb";
+        evtBus.emit("paneChanged", this.currentPane);
         return;
       }
 

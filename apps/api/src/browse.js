@@ -191,7 +191,6 @@ function appendResultTitle(entry) {
   while (resultTitles.length > 200) resultTitles.shift();
   saveResultTitles();
 }
-Cheers.S10.1080p.BluRay.x264-OFT
 function parseResultTitle(entry) {
   const s = String(entry || "");
   const bar = s.indexOf("|");

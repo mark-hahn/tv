@@ -188,7 +188,7 @@ export default {
           } catch (e) {}
           throw new Error(msg);
         }
-        alert("Force download started.");
+        // Force download started - no alert needed.
       } catch (e) {
         alert("Error: " + e.message);
       } finally {

@@ -99,7 +99,6 @@ async function main() {
     tvdbCache,
     tvdburl,
     type,
-    usbFileBytes,
     usbFilePath,
     usbFileSize,
     usbFiles,
@@ -112,6 +111,8 @@ async function main() {
 
   forcedFiles = null;
   processingForced = false;
+
+  var usbFileBytes = null;
 
   debug = false;
   FAST_TEST = false;
@@ -992,6 +993,32 @@ async function main() {
     usbFiles = usbFiles.filter((l) => l && l.trim().length);
     usbFiles = usbFiles
       .map((line) => {
+        // Special handling for forcedFiles format: YYYY-MM-DD-Path-Size
+        if (processingForced) {
+          const parts = line.split("-");
+          const size = parts.pop();
+          const rest = parts.join("-");
+          // rest is YYYY-MM-DD-Path
+          // We need to keep the full line format for checkFile to parse later
+          // But here we just need sorting key
+          // The format passed from client is YYYY-MM-DD-Path-Size.
+          // Standard format is YYYY-MM-DD-Path-Size.
+          // Line slicing below assumes YYYY/MM/DD-Time-Path-Size format from findUsb?
+          // findUsb: %CY-%Cm-%Cd-%P-%s (YYYY-MM-DD-Path-Size).
+
+          // Wait, standard `findUsb` produces: YYYY-MM-DD-Path-Size
+          // checking `findUsb` definition:
+          // findUsb = ... -printf '%CY-%Cm-%Cd-%P-%s\\n' ... matches YYYY-MM-DD-Path-Size
+          // SO format is consistent.
+
+          // However, below logic:
+          // var lineNoSize = line.split("-").slice(0, -1).join("-");
+          // var filePath = lineNoSize.slice(11); // cuts off YYYY-MM-DD- (11 chars)
+
+          // If filePath starts with / or has strange chars it might fail.
+          // Let's assume standard logic works if format is identical.
+        }
+
         var lineNoSize = line.split("-").slice(0, -1).join("-");
         var filePath = lineNoSize.slice(11);
         var parts = filePath.split("/");
@@ -1382,14 +1409,14 @@ async function main() {
 
     // In-progress authority: tv-inProgress.json (do not create duplicate tv.json entries
     // for files already queued/downloading).
-    if (inProgress && inProgress[fname]) {
+    if (!processingForced && inProgress && inProgress[fname]) {
       existsCount++;
       trace("checkFileExists: already in-progress", { fname });
       return process.nextTick(checkFile);
     }
 
     // tv.json authority: do not create duplicates for titles already queued.
-    if (tvJsonTitles && tvJsonTitles[fname]) {
+    if (!processingForced && tvJsonTitles && tvJsonTitles[fname]) {
       existsCount++;
       trace("checkFileExists: already queued (tv.json)", { fname });
       return process.nextTick(checkFile);

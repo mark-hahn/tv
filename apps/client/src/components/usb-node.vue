@@ -71,10 +71,12 @@ export default {
     return {
       expanded: false,
       hover: false,
+      highlighted: false,
     };
   },
   computed: {
     activeBg() {
+      if (this.highlighted) return "#ffcccc";
       if (this.selected) return "lightyellow";
       return this.hover ? "#eee" : "transparent";
     },
@@ -91,6 +93,10 @@ export default {
           navigator.clipboard
             .writeText(this.fullPath)
             .catch((err) => console.error("Copy failed", err));
+          this.highlighted = true;
+          setTimeout(() => {
+            this.highlighted = false;
+          }, 300);
         }
         return;
       }

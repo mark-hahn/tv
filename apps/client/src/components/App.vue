@@ -1430,8 +1430,8 @@ export default {
 
       // Preview mode: Map is disabled, and tabs to the right of AI are disabled.
       if (this.previewMode) {
-        if (k === "map") return;
-        const disabled = new Set([
+        const exitKeys = new Set([
+          "map",
           "browse",
           "tor",
           "subs",
@@ -1440,7 +1440,9 @@ export default {
           "down",
           "files",
         ]);
-        if (disabled.has(k)) return;
+        if (exitKeys.has(k)) {
+          this.exitPreview();
+        }
       }
 
       // In simple mode, only Series/Map/Actors exist.
@@ -1883,7 +1885,7 @@ export default {
         return;
       }
 
-      // If we are just restoring the previous pane after preview mode, 
+      // If we are just restoring the previous pane after preview mode,
       // do not fallback to 'info' pane.
       if (this.restoringPreviewPane) {
         return;

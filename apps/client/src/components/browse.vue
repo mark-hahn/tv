@@ -982,10 +982,38 @@ export default {
     const parsedTitles = computed(() => {
       return titleStrings.value.map((str) => {
         const parts = str.split("|");
-        // parts[2] is the JSON record (ignored for now)
+        // parts[0] is status, parts[1] is title
+        // If there's a JSON record, it's after the second pipe.
+        // But naive split fails if JSON has '|'.
+        // Better parsing:
+        let rejectStatus = "";
+        let titleString = "";
+        let data = null;
+
+        const firstBar = str.indexOf("|");
+        if (firstBar === -1) {
+          rejectStatus = str;
+        } else {
+          rejectStatus = str.slice(0, firstBar);
+          const rest = str.slice(firstBar + 1);
+          const secondBar = rest.indexOf("|");
+          if (secondBar === -1) {
+            titleString = rest;
+          } else {
+            titleString = rest.slice(0, secondBar);
+            const jsonStr = rest.slice(secondBar + 1);
+            try {
+              data = JSON.parse(jsonStr);
+            } catch (e) {
+              // ignore
+            }
+          }
+        }
+
         return {
-          rejectStatus: parts[0],
-          titleString: parts[1] || parts[0],
+          rejectStatus,
+          titleString: titleString || parts[1] || parts[0],
+          data,
         };
       });
     });
@@ -995,6 +1023,15 @@ export default {
       if (!curTvdb.value) return "";
       const t = curTvdb.value;
       let line = `${t.country || ""} | ${t.primary_language || ""} | ${t.network || ""}`;
+
+      // Inject ID from browse record if available
+      const browseItem = parsedTitles.value[selectedTitleIdx.value];
+      if (browseItem?.data) {
+        const id = browseItem.data.tvmaze_id || browseItem.data.id;
+        if (id) {
+          line += ` | ${id}`;
+        }
+      }
 
       // Try multiple possible property names for premiere date
       const dateStr =

@@ -110,7 +110,6 @@ const avoidGenres = [
   "food",
   "game Show",
   "game-show",
-  "history",
   "home & garden",
   "musical",
   "reality",

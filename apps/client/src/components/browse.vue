@@ -55,35 +55,30 @@
         }"
       >
         <div
-          v-if="curTvdb"
-          :style="{
-            fontWeight: 'bold',
-            fontSize: '18px',
-            marginBottom: '4px',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            minWidth: 0,
-          }"
-        >
-          {{ galleryTitleLine }}
-        </div>
-        <div
-          v-if="curTvdb"
           :style="{
             display: 'flex',
-            alignItems: 'flex-end',
+            alignItems: 'baseline',
             justifyContent: 'space-between',
             gap: '10px',
+            minHeight: '27px',
           }"
         >
           <div
             :style="{
-              flex: '1 1 auto',
+              fontWeight: 'bold',
+              fontSize: '18px',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
               minWidth: 0,
-              whiteSpace: 'normal',
-              overflowWrap: 'anywhere',
-              wordBreak: 'break-word',
+              flex: '1 1 auto',
+            }"
+          >
+            {{ galleryTitleLine }}
+          </div>
+          <div
+            :style="{
+              flex: '0 0 auto',
               fontSize: '15px',
             }"
           >
@@ -101,22 +96,6 @@
           gap: '0',
         }"
       >
-        <div
-          id="browseDescr"
-          :style="{
-            flex: '0 0 auto',
-            height: '120px',
-            padding: '10px',
-            backgroundColor: '#f5f5f5',
-            borderRadius: '5px',
-            overflowY: 'auto',
-            fontSize: '16px',
-            lineHeight: '1.5',
-          }"
-          @wheel.stop.prevent="handleScaledWheel"
-        >
-          <div v-if="curTvdb">{{ curTvdb.overview }}</div>
-        </div>
         <div
           id="browseButtons"
           :style="{
@@ -305,6 +284,22 @@
             }"
             >&lt;no show info&gt;</span
           >
+        </div>
+        <div
+          id="browseDescr"
+          :style="{
+            flex: '0 0 auto',
+            height: '140px',
+            padding: '10px',
+            backgroundColor: '#f5f5f5',
+            borderRadius: '5px',
+            overflowY: 'auto',
+            fontSize: '16px',
+            lineHeight: '1.5',
+          }"
+          @wheel.stop.prevent="handleScaledWheel"
+        >
+          <div v-if="curTvdb">{{ curTvdb.overview }}</div>
         </div>
       </div>
       <div

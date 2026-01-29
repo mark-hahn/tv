@@ -1136,7 +1136,7 @@ async function main() {
         return;
       }
 
-      if (tvJsonTitles && tvJsonTitles[fname]) {
+      if (!processingForced && tvJsonTitles && tvJsonTitles[fname]) {
         recentCount++;
         log(
           "------",
@@ -1439,6 +1439,7 @@ async function main() {
         episode: episode || 0,
         dateStarted: 0,
         dateEnded: null,
+        forced: processingForced,
       });
 
       // Update per-cycle view so later files in the same cycle don't re-queue.

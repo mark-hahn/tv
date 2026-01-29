@@ -8,6 +8,7 @@
 import { parentPort, workerData } from "node:worker_threads";
 import { spawn, execFile } from "node:child_process";
 import path from "node:path";
+import fs from "node:fs";
 
 const unixNow = () => Math.floor(Date.now() / 1000);
 
@@ -167,6 +168,17 @@ const main = () => {
   entry.speed = 0;
   entry.dateEnded = null;
   postUpdate("update");
+
+  if (entry.forced) {
+    const { dst } = makeSrcDst();
+    try {
+      if (fs.existsSync(dst)) {
+        fs.unlinkSync(dst);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
 
   const startRsync = (attempt) => {
     const { src, dst, usbPath2 } = makeSrcDst();

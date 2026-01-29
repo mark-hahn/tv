@@ -47,6 +47,8 @@ const WORKER_URL = new URL("./worker.js", import.meta.url);
 const MAX_WORKERS = 8;
 const usbHost = "xobtlu@oracle.usbx.me";
 
+const forcedTitles = new Set();
+
 // PST/PDT formatting
 const PST_TZ = "America/Los_Angeles";
 
@@ -1058,6 +1060,11 @@ const startWorkerForTitle = (title) => {
     entry.procId = nextProcId++;
   }
 
+  if (forcedTitles.has(title)) {
+    entry.forced = true;
+    forcedTitles.delete(title);
+  }
+
   // Mark inProgress before downloading.
   entry.inProgress = true;
   addInProgress(entry.title);
@@ -1175,6 +1182,10 @@ const addEntry = (entry) => {
   if (typeof e.speed !== "number") e.speed = 0;
   if (!e.dateStarted) e.dateStarted = 0;
   if (!e.dateEnded) e.dateEnded = null;
+
+  if (entry.forced) {
+    forcedTitles.add(String(e.title));
+  }
 
   // Record inProgress in the de-dupe map, but only set entry.inProgress=true when worker starts.
   e.inProgress = false;

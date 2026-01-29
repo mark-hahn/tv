@@ -843,11 +843,12 @@ export async function getUsbFiles() {
     "UserKnownHostsFile=/dev/null",
   ];
 
-  // using find with -printf to get type and path
+  // using find with -printf to get type, path, size, and date
   // %y: type (f=file, d=directory)
   // %P: file's name relative to start point
-  // sort by name? find output is not sorted usually.
-  const cmd = `find ${root} -maxdepth 5 -not -path '*/.*' -printf "%y|%P\\n" | sort`;
+  // %s: size in bytes
+  // %CY-%Cm-%Cd: date (YYYY-MM-DD)
+  const cmd = `find ${root} -maxdepth 5 -not -path '*/.*' -printf "%y|%P|%s|%CY-%Cm-%Cd\\n" | sort`;
 
   try {
     const { stdout } = await execFileAsync(
@@ -862,13 +863,14 @@ export async function getUsbFiles() {
     const tree = [];
 
     // Helper to find or create child node in list
-    const findOrCreate = (list, name, type) => {
+    const findOrCreate = (list, name, type, size, date) => {
       let node = list.find((n) => n.name === name);
       if (!node) {
         node = { name, type, children: [] };
-        // We only mark 'd' type if we explicitly see it or infer it.
-        // Actually find output will have 'd' for directories.
-        // But since we rely on hierarchy, any parent must be a directory.
+        if (type === "file") {
+          node.size = size;
+          node.date = date;
+        }
         list.push(node);
       }
       return node;
@@ -876,11 +878,13 @@ export async function getUsbFiles() {
 
     for (const line of lines) {
       const parts = line.split("|");
-      if (parts.length < 2) continue;
+      if (parts.length < 4) continue;
       const type = parts[0]; // f or d
       const relPath = parts[1];
+      const size = parseInt(parts[2], 10) || 0;
+      const date = parts[3];
 
-      if (!relPath) continue; // Root itself might show up if not careful, but %P shouldn't show it.
+      if (!relPath) continue;
 
       const segments = relPath.split("/");
       let currentLevel = tree;
@@ -888,11 +892,9 @@ export async function getUsbFiles() {
       for (let i = 0; i < segments.length; i++) {
         const seg = segments[i];
         const isLast = i === segments.length - 1;
-        // if it's the item itself (last segment), we use the type from find.
-        // otherwise it's a directory.
         const segType = isLast ? (type === "d" ? "folder" : "file") : "folder";
 
-        const node = findOrCreate(currentLevel, seg, segType);
+        const node = findOrCreate(currentLevel, seg, segType, size, date);
         if (segType === "folder") {
           if (!node.children) node.children = [];
           currentLevel = node.children;

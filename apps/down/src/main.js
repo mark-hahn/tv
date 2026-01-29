@@ -106,7 +106,12 @@ async function main() {
     usbHost,
     util,
     writeLine,
-    writeMap;
+    writeMap,
+    forcedFiles,
+    processingForced;
+
+  forcedFiles = null;
+  processingForced = false;
 
   debug = false;
   FAST_TEST = false;
@@ -594,6 +599,54 @@ async function main() {
           });
         }
 
+        // Handle /forceDown endpoint
+        if (pathname === "/forceDown") {
+          if (req.method === "POST") {
+            return readBody(req, (err1, body) => {
+              if (err1) {
+                return json(res, 400, {
+                  status: "error",
+                  error: String(err1 && err1.message ? err1.message : err1),
+                });
+              }
+              try {
+                var files = body ? JSON.parse(body) : [];
+                if (!Array.isArray(files) || files.length === 0) {
+                  return json(res, 400, {
+                    status: "error",
+                    error: "body must be a non-empty JSON array of file paths",
+                  });
+                }
+
+                forcedFiles = files;
+                log("Received forced files:", forcedFiles.length);
+
+                // Start cycle if not running, or restart if running
+                if (cycleRunning) {
+                  cycleRestartNeeded = true;
+                } else {
+                  if (nextCycleTimer) {
+                    clearTimeout(nextCycleTimer);
+                    nextCycleTimer = null;
+                  }
+                  runCycle();
+                }
+
+                return json(res, 200, { status: "ok" });
+              } catch (e) {
+                return json(res, 400, {
+                  status: "error",
+                  error: String(e && e.message ? e.message : e),
+                });
+              }
+            });
+          }
+          return json(res, 405, {
+            status: "error",
+            error: "method not allowed",
+          });
+        }
+
         // No matching endpoint
         return json(res, 404, { status: "not found" });
       })
@@ -883,11 +936,20 @@ async function main() {
 
   checkFiles = () => {
     var j, len, usbLine;
-    usbFiles = exec(findUsb, {
-      timeout: 300000,
-    })
-      .toString()
-      .split("\n");
+
+    if (forcedFiles && forcedFiles.length > 0) {
+      log("checking forced files...", forcedFiles.length);
+      processingForced = true;
+      usbFiles = forcedFiles.filter((l) => l && l.trim().length);
+      forcedFiles = null;
+    } else {
+      processingForced = false;
+      usbFiles = exec(findUsb, {
+        timeout: 300000,
+      })
+        .toString()
+        .split("\n");
+    }
 
     // Trace if the target show appears anywhere in the USB list.
     if (TRACE_ENABLED) {
@@ -1010,6 +1072,7 @@ async function main() {
 
       parts = fname.split(".");
       fext = parts[parts.length - 1];
+
       if (
         fext.length === 6 ||
         fext === "nfo" ||
@@ -1025,7 +1088,7 @@ async function main() {
         process.nextTick(checkFile);
         return;
       }
-      if (recent && recent[fname]) {
+      if (!processingForced && recent && recent[fname]) {
         recentCount++;
         log("------", downloadCount, "/", chkCount, "SKIPPING RECENT:", fname);
         trace("checkFile: skip recent", { fname });
@@ -1033,7 +1096,12 @@ async function main() {
         return;
       }
 
-      if (tvJsonTitles && tvJsonTitles[fname] && tvJsonTitles[fname].error) {
+      if (
+        !processingForced &&
+        tvJsonTitles &&
+        tvJsonTitles[fname] &&
+        tvJsonTitles[fname].error
+      ) {
         recentCount++;
         log("------", downloadCount, "/", chkCount, "SKIPPING *ERROR*:", fname);
         trace("checkFile: skip tvJsonTitles error", { fname });
@@ -1306,7 +1374,7 @@ async function main() {
     }
 
     // Finished authority: tv-finished.json (do not create tv.json entries for already-finished).
-    if (recent && recent[fname]) {
+    if (!processingForced && recent && recent[fname]) {
       existsCount++;
       trace("checkFileExists: already finished (recent)", { fname });
       return process.nextTick(checkFile);

@@ -2,7 +2,7 @@
   <div class="usb-node">
     <div
       class="node-row"
-      @click="handleClick"
+      @click="handleClick($event)"
       :style="{
         paddingLeft: depth * 20 + 'px',
         cursor: 'pointer',
@@ -50,6 +50,7 @@
         :key="child.name"
         :node="child"
         :depth="depth + 1"
+        :path-prefix="fullPath"
         @node-click="$emit('node-click', $event)"
       ></usb-node>
     </div>
@@ -63,6 +64,7 @@ export default {
     node: { type: Object, required: true },
     depth: { type: Number, default: 0 },
     selected: { type: Boolean, default: false },
+    pathPrefix: { type: String, default: "" },
   },
   emits: ["node-click"],
   data() {
@@ -76,9 +78,23 @@ export default {
       if (this.selected) return "lightyellow";
       return this.hover ? "#eee" : "transparent";
     },
+    fullPath() {
+      return this.pathPrefix
+        ? `${this.pathPrefix}/${this.node.name}`
+        : this.node.name;
+    },
   },
   methods: {
-    handleClick() {
+    handleClick(event) {
+      if (event.ctrlKey) {
+        if (this.node.type === "file") {
+          navigator.clipboard
+            .writeText(this.fullPath)
+            .catch((err) => console.error("Copy failed", err));
+        }
+        return;
+      }
+
       if (this.node.type === "folder") {
         this.expanded = !this.expanded;
       }

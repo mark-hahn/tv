@@ -29,6 +29,21 @@
       >
 
       <button
+        @click="forceDown"
+        :disabled="loading || !selectedName"
+        style="
+          cursor: pointer;
+          border-radius: 7px;
+          padding: 4px 10px;
+          border: 1px solid #bbb;
+          background-color: whitesmoke;
+          margin-right: 8px;
+        "
+      >
+        Force Down
+      </button>
+
+      <button
         @click="refresh"
         :disabled="loading"
         style="
@@ -124,6 +139,60 @@ export default {
     handleNodeClick({ node, depth }) {
       if (depth === 0) {
         this.selectedName = node.name;
+      }
+    },
+    collectFiles(node, currentPath) {
+      if (node.type === "file") {
+        // Format as YYYY-MM-DD-Path-Size
+        // Ensure date exists, otherwise fallback to generic/current?
+        // Apps/down expects a date, so let's default if missing (though it shouldn't be).
+        const date = node.date || new Date().toISOString().slice(0, 10);
+        const size = node.size || 0;
+        return [`${date}-${currentPath}-${size}`];
+      }
+      if (node.children) {
+        return node.children.flatMap((child) =>
+          this.collectFiles(child, currentPath + "/" + child.name),
+        );
+      }
+      return [];
+    },
+    async forceDown() {
+      if (!this.selectedName) return;
+
+      const node = this.tree.find((n) => n.name === this.selectedName);
+      if (!node) return;
+
+      const files = this.collectFiles(node, node.name);
+      if (files.length === 0) {
+        alert("No files found to download.");
+        return;
+      }
+
+      if (!confirm(`Force download ${files.length} files from '${node.name}'?`))
+        return;
+
+      this.loading = true;
+      try {
+        const url = `${config.torrentsApiUrl}/api/tvproc/forceDown`;
+        const res = await fetch(url, {
+          method: "POST",
+          body: JSON.stringify(files),
+          headers: { "Content-Type": "application/json" },
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          let msg = txt;
+          try {
+            msg = JSON.parse(txt).error || msg;
+          } catch (e) {}
+          throw new Error(msg);
+        }
+        alert("Force download started.");
+      } catch (e) {
+        alert("Error: " + e.message);
+      } finally {
+        this.loading = false;
       }
     },
   },

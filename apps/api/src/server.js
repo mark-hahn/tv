@@ -551,6 +551,27 @@ app.get("/api/tvproc/startProc", async (req, res) => {
   }
 });
 
+app.post("/api/tvproc/forceDown", async (req, res) => {
+  try {
+    const files = req.body; // already parsed by express.json()
+    const response = await fetch("http://127.0.0.1:3003/forceDown", {
+      method: "POST",
+      body: JSON.stringify(files),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      const txt = await response.text();
+      throw new Error(`HTTP ${response.status}: ${txt}`);
+    }
+    const result = await response.json();
+    res.json(result);
+  } catch (err) {
+    console.error("forceDown proxy error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get("/api/qbt/info", async (req, res) => {
   try {
     const q = req.query || {};

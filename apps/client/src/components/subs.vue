@@ -90,8 +90,8 @@
           </div>
           <div style="margin-left: auto; display: flex; align-items: center">
             <div style="display: flex; align-items: center; gap: 6px">
-              <div style="font-size: 12px; font-weight: normal; color: #555">
-                Trim
+              <div style="font-size: 12px; font-weight: normal; color: #555; margin-right: 4px">
+                {{ cumulativeTrim }} ms
               </div>
               <input
                 v-model="trimMsText"
@@ -553,6 +553,7 @@ export default {
       // Server-provided list of base32 file-id strings for subtitle files present on disk.
       _subFileIdsBase32: [],
 
+      cumulativeTrim: 0,
       trimMsText: "",
       _trimBusy: false,
       fileIdSearch: "",
@@ -657,6 +658,15 @@ export default {
   },
 
   watch: {
+    selectedSeasonKeys() {
+      this.cumulativeTrim = 0;
+    },
+    selectedEpisodeKeys() {
+      this.cumulativeTrim = 0;
+    },
+    selectedFileKeys() {
+      this.cumulativeTrim = 0;
+    },
     activeShow: {
       immediate: true,
       handler(newShow, oldShow) {
@@ -816,6 +826,7 @@ export default {
           this.applyFailures = res.failures;
           this.showApplyFailuresModal = res.failures.length > 0;
           if (!res.failures.length) {
+            this.cumulativeTrim += offset;
             this.setHeaderStatusText("Offset finished", 2000);
           }
         } else if (
@@ -830,6 +841,7 @@ export default {
           );
         } else {
           // String "ok" or object without failures/error.
+          this.cumulativeTrim += offset;
           this.setHeaderStatusText("Offset finished", 2000);
         }
       } catch (e) {

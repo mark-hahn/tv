@@ -195,7 +195,10 @@ function appendResultTitle(entry) {
 function parseResultTitle(entry) {
   const s = String(entry || "");
   const bar = s.indexOf("|");
-  return bar < 0 ? s : s.slice(bar + 1).trim();
+  if (bar < 0) return s;
+  const rest = s.slice(bar + 1);
+  const bar2 = rest.indexOf("|");
+  return (bar2 < 0 ? rest : rest.slice(0, bar2)).trim();
 }
 
 // --- Initialization ---
@@ -277,13 +280,13 @@ export async function getBrowseShow() {
 
     if (rejected) {
       if (rejected === "reality") continue;
-      appendResultTitle(`${rejected}|${title}`);
+      appendResultTitle(`${rejected}|${title}|${JSON.stringify(show)}`);
       // "If rejected add ... and continue" to look for next one
       continue;
     }
 
     // Accepted
-    appendResultTitle(`ok|${title}`);
+    appendResultTitle(`ok|${title}|${JSON.stringify(show)}`);
     foundNew = true;
 
     // "If all checks pass ... return resultTitles"

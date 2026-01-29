@@ -982,6 +982,7 @@ export default {
     const parsedTitles = computed(() => {
       return titleStrings.value.map((str) => {
         const parts = str.split("|");
+        // parts[2] is the JSON record (ignored for now)
         return {
           rejectStatus: parts[0],
           titleString: parts[1] || parts[0],

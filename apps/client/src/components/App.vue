@@ -220,7 +220,6 @@
               :activeShow="currentShow"
             ></Tor>
             <Subs
-              v-if="!simpleMode"
               v-show="currentPane === 'subs'"
               style="width: 100%; height: 100%"
               :simpleMode="simpleMode"
@@ -455,7 +454,6 @@
             :activeShow="currentShow"
           ></Tor>
           <Subs
-            v-if="!simpleMode"
             v-show="currentPane === 'subs'"
             style="width: 100%; height: 100%"
             :simpleMode="simpleMode"

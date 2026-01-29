@@ -90,7 +90,14 @@
           </div>
           <div style="margin-left: auto; display: flex; align-items: center">
             <div style="display: flex; align-items: center; gap: 6px">
-              <div style="font-size: 12px; font-weight: normal; color: #555; margin-right: 4px">
+              <div
+                style="
+                  font-size: 12px;
+                  font-weight: normal;
+                  color: #555;
+                  margin-right: 4px;
+                "
+              >
                 {{ cumulativeTrim }} ms
               </div>
               <input
@@ -680,8 +687,15 @@ export default {
         // Treat any actual show change as requiring a state reset.
         // Keys can be missing/empty during rapid filtering, but we still must not
         // keep displaying previous results.
-        if (newShow !== oldShow && (newKey !== oldKey || newKey || oldKey)) {
+        if (newKey !== oldKey) {
           this.resetSearchState();
+          void this.ensureSeriesMapLoaded();
+        } else if (newShow !== oldShow) {
+          // Same show (key match) but object refreshed (e.g. library refresh).
+          // Force reload of series map (file structure may have changed)
+          // but preserve search/selection state.
+          this._seriesMapObj = null;
+          this._seriesMapLoading = false;
           void this.ensureSeriesMapLoaded();
         }
       },
@@ -2105,6 +2119,16 @@ export default {
     },
 
     rebuildVisibleItems() {
+      const arraysEqual = (a, b) => {
+        if (a === b) return true;
+        if (a == null || b == null) return false;
+        if (a.length !== b.length) return false;
+        for (let i = 0; i < a.length; ++i) {
+          if (a[i] !== b[i]) return false;
+        }
+        return true;
+      };
+
       const validEntries = Array.isArray(this._validEntries)
         ? this._validEntries
         : [];
@@ -2201,10 +2225,15 @@ export default {
           : [];
         const pruned = existing.filter((k) => allowed.has(k));
         if (pruned.length) {
-          this.selectedSeasonKeys = pruned;
+          if (!arraysEqual(this.selectedSeasonKeys, pruned)) {
+            this.selectedSeasonKeys = pruned;
+          }
         } else {
           const s0 = pickFirstSeason();
-          this.selectedSeasonKeys = s0 != null ? [`season-${s0}`] : [];
+          const next = s0 != null ? [`season-${s0}`] : [];
+          if (!arraysEqual(this.selectedSeasonKeys, next)) {
+            this.selectedSeasonKeys = next;
+          }
         }
         const primaryKey =
           this._lastClickedKeyByMode?.season &&
@@ -2235,11 +2264,14 @@ export default {
           : [];
         const pruned = existing.filter((k) => allowed.has(k));
         if (pruned.length) {
-          this.selectedEpisodeKeys = pruned;
+          if (!arraysEqual(this.selectedEpisodeKeys, pruned)) {
+            this.selectedEpisodeKeys = pruned;
+          }
         } else {
-          this.selectedEpisodeKeys = episodeCards.length
-            ? [episodeCards[0].key]
-            : [];
+          const next = episodeCards.length ? [episodeCards[0].key] : [];
+          if (!arraysEqual(this.selectedEpisodeKeys, next)) {
+            this.selectedEpisodeKeys = next;
+          }
         }
 
         const primaryKey =
@@ -2263,8 +2295,11 @@ export default {
             : pickFirstSeason();
           const e0 = s0 != null ? pickFirstEpisode(s0) : null;
           if (s0 != null && e0 != null) pairs = [{ season: s0, episode: e0 }];
-          this.selectedEpisodeKeys =
+          const nextEpKeys =
             s0 != null && e0 != null ? [`episode-${s0}-${e0}`] : [];
+          if (!arraysEqual(this.selectedEpisodeKeys, nextEpKeys)) {
+            this.selectedEpisodeKeys = nextEpKeys;
+          }
         }
 
         const fileCards = this.computeFileCardsForSelectedEpisodes(
@@ -2279,9 +2314,14 @@ export default {
           : [];
         const pruned = existing.filter((k) => allowed.has(k));
         if (pruned.length) {
-          this.selectedFileKeys = pruned;
+          if (!arraysEqual(this.selectedFileKeys, pruned)) {
+            this.selectedFileKeys = pruned;
+          }
         } else {
-          this.selectedFileKeys = fileCards.length ? [fileCards[0].key] : [];
+          const next = fileCards.length ? [fileCards[0].key] : [];
+          if (!arraysEqual(this.selectedFileKeys, next)) {
+            this.selectedFileKeys = next;
+          }
         }
 
         const primaryKey =

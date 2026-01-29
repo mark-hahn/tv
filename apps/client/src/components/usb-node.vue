@@ -2,14 +2,14 @@
   <div class="usb-node">
     <div
       class="node-row"
-      @click="toggle"
+      @click="handleClick"
       :style="{
         paddingLeft: depth * 20 + 'px',
-        cursor: node.type === 'folder' ? 'pointer' : 'default',
+        cursor: 'pointer',
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
-        backgroundColor: hover ? '#eee' : 'transparent',
+        backgroundColor: activeBg,
         paddingTop: '2px',
         paddingBottom: '2px',
         display: 'flex',
@@ -50,6 +50,7 @@
         :key="child.name"
         :node="child"
         :depth="depth + 1"
+        @node-click="$emit('node-click', $event)"
       ></usb-node>
     </div>
   </div>
@@ -61,18 +62,27 @@ export default {
   props: {
     node: { type: Object, required: true },
     depth: { type: Number, default: 0 },
+    selected: { type: Boolean, default: false },
   },
+  emits: ["node-click"],
   data() {
     return {
       expanded: false,
       hover: false,
     };
   },
+  computed: {
+    activeBg() {
+      if (this.selected) return "lightyellow";
+      return this.hover ? "#eee" : "transparent";
+    },
+  },
   methods: {
-    toggle() {
+    handleClick() {
       if (this.node.type === "folder") {
         this.expanded = !this.expanded;
       }
+      this.$emit("node-click", { node: this.node, depth: this.depth });
     },
   },
 };

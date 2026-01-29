@@ -61,6 +61,8 @@
         v-for="node in tree"
         :key="node.name"
         :node="node"
+        :selected="selectedName === node.name"
+        @node-click="handleNodeClick"
       />
     </div>
   </div>
@@ -79,6 +81,7 @@ export default {
   data() {
     return {
       tree: [],
+      selectedName: null,
       loading: false,
       error: null,
       hasLoaded: false,
@@ -117,6 +120,11 @@ export default {
     },
     refresh() {
       this.fetchFiles();
+    },
+    handleNodeClick({ node, depth }) {
+      if (depth === 0) {
+        this.selectedName = node.name;
+      }
     },
   },
 };

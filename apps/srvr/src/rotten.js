@@ -159,12 +159,14 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
   timing?.start(spanName);
 
   // Save HTML snapshot before any dismissal attempts
-  try {
-    const html = await page.content();
-    fs.writeFileSync("rotten-overlays.html", html);
-    // console.log('Saved page content to rotten-overlays.html');
-  } catch (e) {
-    console.log("Failed to save rotten-overlays.html", e.message);
+  if (debug) {
+    try {
+      const html = await page.content();
+      fs.writeFileSync("rotten-overlays.html", html);
+      // console.log('Saved page content to rotten-overlays.html');
+    } catch (e) {
+      console.log("Failed to save rotten-overlays.html", e.message);
+    }
   }
 
   // Specific handling for OneTrust
@@ -194,7 +196,7 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
     if ((await reject.count()) > 0) {
       console.log("Clicking OneTrust Reject All (Force)");
       await reject.click({ force: true }).catch(() => {});
-      await delay(500);
+      await delay(200);
     }
     // 2. Try "Accept All" (force click)
     else {
@@ -202,7 +204,7 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
       if ((await accept.count()) > 0) {
         console.log("Clicking OneTrust Accept All (Force)");
         await accept.click({ force: true }).catch(() => {});
-        await delay(500);
+        await delay(200);
       }
     }
 
@@ -216,7 +218,7 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
         .first()
         .click({ force: true })
         .catch(() => {});
-      await delay(500);
+      await delay(200);
     }
   } catch (e) {
     console.log("OneTrust click error:", e.message);
@@ -226,8 +228,8 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
   // If the element at this coordinate is NO LONGER a Nav/Link, it means the popup has appeared.
   try {
     // console.log('Polling for popup at 853,160...');
-    for (let i = 0; i < 10; i++) {
-      // Poll for 2 seconds
+    for (let i = 0; i < 2; i++) {
+      // Poll for ~200ms (reduced from 2s)
       const elInfo = await page.evaluate(() => {
         const el = document.elementFromPoint(853, 160);
         return el
@@ -373,18 +375,18 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
       const vp = page.viewportSize();
       if (vp) {
         await page.mouse.click(vp.width / 2, vp.height / 2);
-        await delay(500);
+        await delay(200);
       }
     }
   } catch {}
 
   // Try clicking center of screen as requested for stubborn popups
   try {
-    const vp = page.viewportSize();
-    if (vp) {
-      await page.mouse.click(vp.width / 2, vp.height / 2);
-      await delay(500);
-    }
+    // const vp = page.viewportSize();
+    // if (vp) {
+    //   await page.mouse.click(vp.width / 2, vp.height / 2);
+    //   await delay(500);
+    // }
   } catch {}
 
   // Try to remove generic modal backdrops that cover the screen
@@ -662,18 +664,20 @@ export async function rottenSearch(query) {
         // Take screenshot of the scorecard area
 
         // Take screenshot of the scorecard area
-        try {
-          const card = page.locator("media-scorecard");
-          if ((await card.count()) > 0) {
-            await card.screenshot({ path: `rotten-scorecard-${slot}.png` });
-            // console.log(`Saved screenshot to rotten-scorecard-${slot}.png`);
-          } else {
-            // fallback if media-scorecard not found, screenshot whole page
-            await page.screenshot({ path: `rotten-page-${slot}.png` });
-            // console.log(`Saved page screenshot to rotten-page-${slot}.png`);
+        if (debug) {
+          try {
+            const card = page.locator("media-scorecard");
+            if ((await card.count()) > 0) {
+              await card.screenshot({ path: `rotten-scorecard-${slot}.png` });
+              // console.log(`Saved screenshot to rotten-scorecard-${slot}.png`);
+            } else {
+              // fallback if media-scorecard not found, screenshot whole page
+              await page.screenshot({ path: `rotten-page-${slot}.png` });
+              // console.log(`Saved page screenshot to rotten-page-${slot}.png`);
+            }
+          } catch (err) {
+            console.log("rotten screnshot error", err.message);
           }
-        } catch (err) {
-          console.log("rotten screnshot error", err.message);
         }
 
         return num;

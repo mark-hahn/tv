@@ -353,9 +353,15 @@ const getRemote = async (id, type, showName) => {
 
 const remotesCache = new Map();
 
-const getRemotes = async (show, tvdbRemotes) => {
+const getRemotes = async (show, tvdbRemotes, fast = false) => {
   const cacheKey =
-    show.Name + "|" + show.Id + "|" + JSON.stringify(tvdbRemotes || {});
+    show.Name +
+    "|" +
+    show.Id +
+    "|" +
+    JSON.stringify(tvdbRemotes || {}) +
+    "|" +
+    fast;
 
   if (remotesCache.has(cacheKey)) {
     return remotesCache.get(cacheKey);
@@ -368,11 +374,13 @@ const getRemotes = async (show, tvdbRemotes) => {
   if (showId && !showId.startsWith("noemby-"))
     remotes.push({ name: "Emby", url: urls.embyPageUrl(showId) });
 
-  const rottenRemote = await getRemote(null, 99, name);
-  if (rottenRemote) {
-    if (rottenRemote.ratings)
-      rottenRemote.name += " (" + rottenRemote.ratings + ")";
-    remotes.push(rottenRemote);
+  if (!fast) {
+    const rottenRemote = await getRemote(null, 99, name);
+    if (rottenRemote) {
+      if (rottenRemote.ratings)
+        rottenRemote.name += " (" + rottenRemote.ratings + ")";
+      remotes.push(rottenRemote);
+    }
   }
   const encoded = encodeURI(name).replaceAll("&", "%26");
   const url = `https://www.google.com/search` + `?q=${encoded}%20tv%20show`;
@@ -710,11 +718,12 @@ export const setAddToPickupsCallback = (callback) => {
 };
 
 // WebSocket endpoint handler: returns remotes for a show.
-// Expects param JSON: { show: { Name, Id? }, tvdbRemotes: [...] }
+// Expects param JSON: { show: { Name, Id? }, tvdbRemotes: [...], fast: boolean }
 export const getRemotesCmd = async (id, param, resolve, reject) => {
   const paramObj = util.jParse(param, "getRemotes");
   const show = paramObj?.show;
   const tvdbRemotes = paramObj?.tvdbRemotes || [];
+  const fast = !!paramObj?.fast;
 
   if (!show) {
     reject([id, "getRemotes: missing show"]);
@@ -722,7 +731,7 @@ export const getRemotesCmd = async (id, param, resolve, reject) => {
   }
 
   try {
-    const remotes = await getRemotes(show, tvdbRemotes);
+    const remotes = await getRemotes(show, tvdbRemotes, fast);
     resolve([id, remotes]);
   } catch (err) {
     reject([id, `getRemotes error: ${err.message}`]);

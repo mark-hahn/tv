@@ -4,6 +4,10 @@
 - The remote server is **hahnca.com**.
 - Use **SSH** to access the remote server (SSH keys are already available/configured).
 
+## Usb server
+- The usb server is **xobtlu@oracle.usbx.me**.
+- Use **SSH** to access the usb server (SSH keys are already available/configured).
+
 ## Where things run
 - **All server apps run on the remote server**.
 - The only thing that runs locally is **Vite dev**.

@@ -45,7 +45,7 @@
 
       <button
         @click="deleteSelected"
-        :disabled="loading || selectedFiles.size === 0"
+        :disabled="loading || (!selectedName && selectedFiles.size === 0)"
         title="Delete selected files"
         style="
           cursor: pointer;
@@ -351,23 +351,75 @@ export default {
         }
       });
     },
+    countRecursive(node) {
+      if (!node) return 0;
+      if (node.type === "file") return 1;
+      if (node.children) {
+        return node.children.reduce(
+          (acc, c) => acc + this.countRecursive(c),
+          0,
+        );
+      }
+      return 0;
+    },
+    findNodeByPath(relPath) {
+      if (!relPath) return null;
+      const parts = relPath.split("/");
+      let current = this.tree;
+      let node = null;
+      for (const part of parts) {
+        if (!current) return null;
+        node = current.find((n) => n.name === part);
+        if (!node) return null;
+        current = node.children;
+      }
+      return node;
+    },
     async deleteSelected() {
-      if (this.selectedFiles.size === 0) return;
+      if (!this.selectedName && this.selectedFiles.size === 0) return;
 
-      const fileCount = this.selectedFiles.size;
-      const confirmMsg = `Are you sure you want to delete ${fileCount} item(s)?\nThis cannot be undone.`;
+      let fileCount = 0;
+      let pathsToDelete = [];
+
+      if (this.selectedName) {
+        // Top level folder deletion
+        const node = this.tree.find((n) => n.name === this.selectedName);
+        if (node) {
+          fileCount = this.countRecursive(node);
+          pathsToDelete.push(this.selectedName);
+        }
+      } else {
+        // Selected files/folders
+        for (const relPath of this.selectedFiles) {
+          const node = this.findNodeByPath(relPath);
+          if (node) {
+            fileCount += this.countRecursive(node);
+          } else {
+            // If strictly not found, assume 1 (maybe a loose file?) or 0.
+            // But if it's in selectedFiles it should be in the tree presumably.
+            // Fallback to 1 just to be safe in count logic.
+            fileCount += 1;
+          }
+          pathsToDelete.push(relPath);
+        }
+      }
+
+      const itemLabel = pathsToDelete.length === 1 ? "item" : "items";
+      const fileLabel = fileCount === 1 ? "file" : "files";
+      const confirmMsg = `Are you sure you want to delete ${pathsToDelete.length} ${itemLabel} containing ${fileCount} ${fileLabel}?\nThis cannot be undone.`;
 
       if (!confirm(confirmMsg)) return;
 
       this.loading = true;
       try {
         const root = "/mnt/media/tv";
-        for (const relPath of this.selectedFiles) {
+        for (const relPath of pathsToDelete) {
           const fullPath = `${root}/${relPath}`;
           await deletePath(fullPath);
         }
 
         this.selectedFiles.clear();
+        this.selectedName = null; // Clear top level selection too
         this.selectionParentPath = null;
         this.lastSelectedFile = null;
         await this.refresh();

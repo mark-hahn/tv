@@ -17,6 +17,7 @@ import {
   addQbtTorrent,
   getUsbFiles,
 } from "./usb.js";
+import { getLocalFiles } from "./local.js";
 import { getBrowseShow, getAllBrowse } from "./browse.js";
 import * as reviews from "./reviews.js";
 import { checkFiles as tvProcCheckFiles } from "./tv-proc.js";
@@ -661,6 +662,15 @@ app.get("/api/flexget", async (req, res) => {
 app.get("/api/usb/files", async (req, res) => {
   try {
     const tree = await getUsbFiles();
+    res.json(tree);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/local/files", async (req, res) => {
+  try {
+    const tree = await getLocalFiles();
     res.json(tree);
   } catch (err) {
     res.status(500).json({ error: err.message });

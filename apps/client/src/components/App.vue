@@ -246,6 +246,12 @@
               style="width: 100%; height: 100%"
               :active="currentPane === 'usb'"
             ></Usb>
+            <Local
+              v-if="!simpleMode"
+              v-show="currentPane === 'local'"
+              style="width: 100%; height: 100%"
+              :active="currentPane === 'local'"
+            ></Local>
             <Down
               v-if="!simpleMode"
               v-show="currentPane === 'down'"
@@ -480,6 +486,12 @@
             :simpleMode="simpleMode"
             :sizing="activeSizing"
           ></Qbt>
+          <Local
+            v-if="!simpleMode"
+            v-show="currentPane === 'local'"
+            style="width: 100%; height: 100%"
+            :active="currentPane === 'local'"
+          ></Local>
           <Usb
             v-if="!simpleMode"
             v-show="currentPane === 'usb'"
@@ -603,6 +615,7 @@ import Flex from "./flex.vue";
 import Qbt from "./qbt.vue";
 import Down from "./down.vue";
 import Usb from "./usb.vue";
+import Local from "./local.vue";
 import Files from "./files.vue";
 import Trailer from "./trailer.vue";
 import evtBus from "../evtBus.js";
@@ -631,6 +644,7 @@ export default {
     Flex,
     Qbt,
     Usb,
+    Local,
     Down,
     Files,
     Trailer,
@@ -952,6 +966,7 @@ export default {
         { label: "Flex", key: "flex" },
         { label: "Qbt", key: "qbt" },
         { label: "Usb", key: "usb" },
+        { label: "Local", key: "local" },
         { label: "Down", key: "down" },
       ];
 
@@ -1539,6 +1554,13 @@ export default {
       if (k === "usb") {
         if (this.simpleMode) return;
         this.currentPane = "usb";
+        evtBus.emit("paneChanged", this.currentPane);
+        return;
+      }
+
+      if (k === "local") {
+        if (this.simpleMode) return;
+        this.currentPane = "local";
         evtBus.emit("paneChanged", this.currentPane);
         return;
       }

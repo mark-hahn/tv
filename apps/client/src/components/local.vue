@@ -1189,7 +1189,7 @@ export default {
           if (seenIds.has(entry.id)) continue;
 
           const { season, episode } = this.parseSeasonEpisodeFromEntry(entry);
-          
+
           const files = entry.attributes?.files || [];
           const fileId = files.length > 0 ? files[0].file_id : null;
 
@@ -1356,12 +1356,12 @@ export default {
       for (const key of this.selectedSubKeys) {
         const item = this.subsItems.find((i) => i.key === key);
         if (!item) continue;
-        
+
         let fileId = item.file_id;
         if (!fileId) {
-             const entry = item.raw;
-             const files = entry.attributes?.files || [];
-             if (files.length) fileId = files[0].file_id;
+          const entry = item.raw;
+          const files = entry.attributes?.files || [];
+          if (files.length) fileId = files[0].file_id;
         }
         if (!fileId) continue;
 

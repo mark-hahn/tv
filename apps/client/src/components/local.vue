@@ -168,7 +168,28 @@
             >({{ currentShowName }})</span
           >
         </div>
-        <div style="display: flex; gap: 8px">
+        <div style="display: flex; gap: 8px; align-items: center">
+          <div
+            style="
+              font-size: 12px;
+              font-weight: normal;
+              color: #555;
+              margin-right: 4px;
+            "
+          >
+            {{ cumulativeTrim }} ms
+          </div>
+          <input
+            v-model="trimMsText"
+            @keyup.enter.stop.prevent="acceptTrimMs"
+            style="
+              width: 50px;
+              font-size: 12px;
+              padding: 2px 4px;
+              border: 1px solid #bbb;
+              border-radius: 4px;
+            "
+          />
           <button
             @click="openLibrary"
             style="
@@ -316,6 +337,7 @@ import {
   subsSearch,
   applySubFiles,
   getSubFileIds,
+  offsetSubFiles,
 } from "../srvr.js";
 import evtBus from "../evtBus.js";
 import * as util from "../util.js";
@@ -522,6 +544,11 @@ export default {
       totalSubsCount: 0,
       validSubsCount: 0,
       currentShowName: "",
+
+      // Offset
+      cumulativeTrim: 0,
+      trimMsText: "",
+      _trimBusy: false,
     };
   },
   created() {
@@ -1327,6 +1354,94 @@ export default {
         this.selectedSubKeys.add(key);
       }
       this.lastClickedSubKey = key;
+      this.cumulativeTrim = 0;
+    },
+    async acceptTrimMs() {
+      if (this._trimBusy) return;
+      this._trimBusy = true;
+      try {
+        const raw = String(this.trimMsText || "").trim();
+        if (!raw) return;
+        if (!/^[+-]?\d+$/.test(raw)) return;
+        const offset = Number.parseInt(raw, 10);
+        if (!Number.isFinite(offset)) return;
+
+        const ok = window.confirm(`Is it ok to adjust timing by ${offset} ms?`);
+        if (!ok) return;
+
+        // Build Payload
+        const payload = [];
+        for (const key of this.selectedSubKeys) {
+          const item = this.subsItems.find((i) => i.key === key);
+          if (!item) continue;
+
+          let fileId = item.file_id;
+          if (!fileId) {
+            const entry = item.raw;
+            const files = entry.attributes?.files || [];
+            if (files.length) fileId = files[0].file_id;
+          }
+          if (!fileId) continue;
+
+          payload.push({
+            file_id: Number(fileId),
+            showName: this.currentShowName,
+            season: item.season,
+            episode: item.episode,
+          });
+        }
+
+        if (!payload.length) {
+          alert("No valid files found in selection");
+          return;
+        }
+
+        const payloadWithOffset = payload.map((o) => ({ ...o, offset }));
+
+        // Call server
+        const timeoutMs = 120000;
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  `offsetSubFiles: timed out after ${timeoutMs / 1000}s`,
+                ),
+              ),
+            timeoutMs,
+          );
+        });
+        const res = await Promise.race([
+          offsetSubFiles(payloadWithOffset),
+          timeoutPromise,
+        ]);
+
+        if (
+          res &&
+          typeof res === "object" &&
+          res.ok &&
+          Array.isArray(res.failures)
+        ) {
+          this.applyFailures = res.failures;
+          this.showApplyFailuresModal = res.failures.length > 0;
+          if (!res.failures.length) {
+            this.cumulativeTrim += offset;
+          }
+        } else if (
+          res &&
+          typeof res === "object" &&
+          typeof res.error === "string"
+        ) {
+          alert("Error: " + res.error);
+        } else {
+          // String "ok" or object without failures/error.
+          this.cumulativeTrim += offset;
+        }
+      } catch (e) {
+        alert("Error: " + (e.message || e));
+      } finally {
+        this._trimBusy = false;
+      }
     },
     openLibrary() {
       evtBus.emit("startLibraryRefresh");

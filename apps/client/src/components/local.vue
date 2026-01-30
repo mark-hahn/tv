@@ -141,6 +141,28 @@ export default {
     },
     processTree(nodes) {
       if (!nodes) return [];
+
+      // Sort nodes first.
+      // - If nodes match "Season X", use numeric sort (S1 < S2 < S10).
+      // - Otherwise use standard ASCII sort (30 Rock < 3rd Rock).
+      nodes.sort((a, b) => {
+        const seasonRegex = /^Season \s*(\d+)$/i;
+        const ma = seasonRegex.exec(a.name);
+        const mb = seasonRegex.exec(b.name);
+
+        if (ma && mb) {
+          const na = parseInt(ma[1], 10);
+          const nb = parseInt(mb[1], 10);
+          return na - nb;
+        }
+        // Fallback to standard sort (case insensitive? or just standard?)
+        // User wants "30 Rock" < "3rd Rock" which suggests standard string comparison or ASCII.
+        // localeCompare usually handles this "correctly" for languages, but let's check ASCII specific cases.
+        // In ASCII '0' < 'r', so "30 Rock" comes before "3rd Rock".
+        // localeCompare generally respects this.
+        return a.name.localeCompare(b.name, undefined, { numeric: false });
+      });
+
       nodes.forEach((n) => {
         if (n.children) n.children = this.processTree(n.children);
       });

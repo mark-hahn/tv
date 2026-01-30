@@ -232,8 +232,7 @@
                 justify-content: space-between;
                 align-items: center;
                 gap: 10px;
-                font-size: 12px;
-                color: #333;
+                color: #000;
               "
             >
               <div
@@ -243,7 +242,7 @@
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
                   minWidth: 0,
-                  color: item?.lineColor || '#333',
+                  color: '#000',
                 }"
               >
                 {{ item?.line1 || "" }}
@@ -271,6 +270,20 @@
                   "
                 >
                   {{ item?.uploader || "" }}
+                </div>
+                <div
+                  style="
+                    width: 45px;
+                    min-width: 45px;
+                    max-width: 45px;
+                    text-align: right;
+                    font-family: monospace;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                  "
+                >
+                  {{ encodeFileIdBase32(item?.file_id) }}
                 </div>
               </div>
             </div>
@@ -1176,6 +1189,9 @@ export default {
           if (seenIds.has(entry.id)) continue;
 
           const { season, episode } = this.parseSeasonEpisodeFromEntry(entry);
+          
+          const files = entry.attributes?.files || [];
+          const fileId = files.length > 0 ? files[0].file_id : null;
 
           // Filtering Logic:
           // If we have specific needed Episodes (S:E), keep only those.
@@ -1215,6 +1231,7 @@ export default {
             uploader,
             season,
             episode,
+            file_id: fileId,
             raw: entry,
           });
         }
@@ -1314,28 +1331,38 @@ export default {
     openLibrary() {
       evtBus.emit("startLibraryRefresh");
     },
+    encodeFileIdBase32(fileId) {
+      if (fileId == null) return "";
+      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+      let n = Number(fileId);
+      if (!Number.isFinite(n) || n < 0) n = 0;
+      n = Math.floor(n);
+
+      let base32 = "";
+      do {
+        base32 = alphabet[n % 32] + base32;
+        n = Math.floor(n / 32);
+      } while (n > 0);
+
+      return base32;
+    },
     async applySubs() {
       if (this.applyInProgress) return;
       if (this.selectedSubKeys.size === 0) return;
 
       this.applyInProgress = true;
-      // build payload
-      // Needed: [{ file_id, showName, season, episode }]
-      // We have file_id inside item.raw.attributes.files? Or is key the file_id?
-      // In subs.vue, item.key is not always file_id. OpenSubtitles entries have multiple files sometimes.
-      // subs.vue logic uses `buildFileIdObjsPayload`. It looks at `validEntries`.
-      // `subsSearch` returns groupings. `files` attribute contains file_ids.
-
-      // Simplified: Pick the first file of the selected subtitle entry.
       const payload = [];
 
       for (const key of this.selectedSubKeys) {
         const item = this.subsItems.find((i) => i.key === key);
         if (!item) continue;
-        const entry = item.raw;
-        const files = entry.attributes?.files || [];
-        if (!files.length) continue;
-        const fileId = files[0].file_id;
+        
+        let fileId = item.file_id;
+        if (!fileId) {
+             const entry = item.raw;
+             const files = entry.attributes?.files || [];
+             if (files.length) fileId = files[0].file_id;
+        }
         if (!fileId) continue;
 
         payload.push({
@@ -1358,6 +1385,7 @@ export default {
           alert("Error applying subs: " + res.error);
         } else {
           alert("Subs applied successfully");
+          await this.refresh();
         }
       } catch (e) {
         alert("Error applying subs: " + e.message);

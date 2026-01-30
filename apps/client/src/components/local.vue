@@ -29,21 +29,6 @@
       >
 
       <button
-        @click="selectTopLevel"
-        title="Find folder matching current show"
-        style="
-          cursor: pointer;
-          border-radius: 7px;
-          padding: 4px 10px;
-          border: 1px solid #bbb;
-          background-color: whitesmoke;
-          margin-right: 10px;
-        "
-      >
-        From show
-      </button>
-
-      <button
         @click="toShow"
         title="Select show matching selected folder"
         style="
@@ -56,6 +41,21 @@
         "
       >
         To show
+      </button>
+
+      <button
+        @click="selectTopLevel"
+        title="Find folder matching current show"
+        style="
+          cursor: pointer;
+          border-radius: 7px;
+          padding: 4px 10px;
+          border: 1px solid #bbb;
+          background-color: whitesmoke;
+          margin-right: 10px;
+        "
+      >
+        From show
       </button>
 
       <button

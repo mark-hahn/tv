@@ -206,9 +206,17 @@
           {{ subsError }}
         </div>
         <template
-          v-for="item in subsItems"
+          v-for="(item, index) in subsItems"
           :key="item.key"
         >
+          <div
+            v-if="
+              index > 0 &&
+              (item.season !== subsItems[index - 1].season ||
+                item.episode !== subsItems[index - 1].episode)
+            "
+            style="height: 1px; background-color: #000; margin: 4px 0"
+          ></div>
           <div
             @click="handleSubClick($event, item)"
             :style="getSubCardStyle(item)"
@@ -345,6 +353,15 @@ export default {
     show(val) {
       console.log("Local: show prop changed:", val ? val.Name : "null");
     },
+    selectedName() {
+      this.handleSelectionChanged();
+    },
+    selectedFiles: {
+      deep: true,
+      handler() {
+        this.handleSelectionChanged();
+      },
+    },
     active(val) {
       if (val && !this.hasLoaded && !this.loading) {
         this.fetchFiles();
@@ -453,12 +470,30 @@ export default {
           const isVideo = (name) => VIDEO_EXTS.has(getExt(name));
           const isSrt = (name) => getExt(name) === "srt";
 
-          // Current children might already be sorted by name/type from server.
-          // We group files. Keep folders at top? The requirement says "file list inside..."
-          // Assuming children are mix of files and folders (though usually Season folders just contain files)
-          // Let's separate folders out first? Or treat them as "others"?
-          // Typically "Others" implies files.
-          // Let's assume we keep folders at the very top (standard), then grouped files.
+          const getEpisode = (name) => {
+            // Try simple regex first SxxExx
+            let m = name.match(/S\d+E(\d+)/i);
+            if (m) return parseInt(m[1], 10);
+
+            // Try parseTorrentTitle
+            try {
+              const pt = parseTorrentTitle.parse(name);
+              if (pt.episode != null) return pt.episode;
+            } catch (e) {}
+
+            // Fallback to finding digits near end? or let it float to bottom
+            return 999999;
+          };
+
+          const sortByEpisode = (a, b) => {
+            const epA = getEpisode(a.name);
+            const epB = getEpisode(b.name);
+            if (epA !== epB) return epA - epB;
+            return a.name.localeCompare(b.name, undefined, {
+              numeric: true,
+              sensitivity: "base",
+            });
+          };
 
           const folders = (node.children || []).filter(
             (c) => c.type === "folder",
@@ -470,6 +505,10 @@ export default {
             else if (isSrt(f.name)) subs.push(f);
             else others.push(f);
           }
+
+          videos.sort(sortByEpisode);
+          subs.sort(sortByEpisode);
+          others.sort(sortByEpisode);
 
           // Insert separators.
           // How to representation separators in `tree-node`?
@@ -789,36 +828,82 @@ export default {
         this.loadSubs();
       }
     },
+    handleSelectionChanged() {
+      if (this.showSubs) {
+        if (this._subsRefreshTimer) clearTimeout(this._subsRefreshTimer);
+        this._subsRefreshTimer = setTimeout(() => {
+          this.loadSubs();
+        }, 300);
+      }
+    },
     async loadSubs() {
-      // 1. Determine Identity (Show Name + Season)
-      let showName = this.selectedName;
-      let season = null;
+      this.subsItems = [];
+      this.subsError = null; // Don't clear error here? actually we should.
+      this.currentShowName = "";
 
-      if (!showName && this.selectedFiles.size > 0) {
-        // derive from first file
-        const path = [...this.selectedFiles][0];
-        const parts = path.split("/");
-        if (parts.length > 0) showName = parts[0];
-        // check for season in path
-        for (const p of parts) {
-          const m = /^Season\s*(\d+)$/i.exec(p);
-          if (m) {
-            season = parseInt(m[1], 10);
-            break;
-          }
+      let showName = this.selectedName;
+      let targetFiles = [];
+
+      // 1. Collect target files
+      if (showName) {
+        // Find the node in tree
+        const node = this.tree.find((n) => n.name === showName);
+        if (node) {
+          const collect = (n) => {
+            if (n.type === "file") targetFiles.push(n.name);
+            if (n.children) n.children.forEach(collect);
+          };
+          collect(node);
+        }
+      } else if (this.selectedFiles.size > 0) {
+        for (const path of this.selectedFiles) {
+          const parts = path.split("/");
+          if (!showName && parts.length > 0) showName = parts[0];
+          const fileName = parts[parts.length - 1]; // Use filename for S/E parsing
+          targetFiles.push(fileName);
         }
       }
 
       this.currentShowName = showName || "";
-      this.subsItems = [];
-      this.subsError = null;
 
       if (!showName) {
-        this.subsError = "No show selected (folder or files).";
+        this.subsError = "No show selected.";
         return;
       }
 
-      // 2. Find matching show to get IMDb ID
+      // 2. Determine needed seasons/episodes
+      const needed = new Map(); // "S:E" -> true
+      const neededSeasons = new Set();
+      let hasTargetFiles = targetFiles.length > 0;
+
+      const parseFile = (name) => {
+        try {
+          const p = parseTorrentTitle.parse(name);
+          if (p.season != null && p.episode != null)
+            return { s: p.season, e: p.episode };
+          if (p.season != null) return { s: p.season, e: null };
+        } catch (e) {}
+        let m = name.match(/S(\d{1,2})E(\d{1,2})/i);
+        if (m) return { s: parseInt(m[1]), e: parseInt(m[2]) };
+        return null;
+      };
+
+      for (const f of targetFiles) {
+        const se = parseFile(f);
+        if (se && se.s != null) {
+          neededSeasons.add(se.s);
+          if (se.e != null) {
+            needed.set(`${se.s}:${se.e}`, true);
+          }
+        }
+      }
+
+      // If we have files but couldn't detect S/E, what to do?
+      // If we have no files (empty folder?), what to do?
+      // If we have no S/E logic, we can't filter effectively.
+      // But we can fallback to searching without season constraint if set is empty?
+
+      // 3. Find matching show
       const match =
         (this.allShows || []).find((s) => s.Name === showName) ||
         (this.allShows || []).find(
@@ -843,31 +928,99 @@ export default {
 
       const raw = String(imdb).trim();
       const digits = raw.toLowerCase().startsWith("tt") ? raw.slice(2) : raw;
-      const imdbIdDigits = digits.replace(/\D/g, "").replace(/^0+/, ""); // Normalize
+      const imdbIdDigits = digits.replace(/\D/g, "").replace(/^0+/, "");
 
       this.subsLoading = true;
       try {
-        const params = { imdb_id: imdbIdDigits, page: 1 };
-        if (season !== null) params.season = season;
+        const seasonsToFetch =
+          neededSeasons.size > 0 ? Array.from(neededSeasons) : [null];
 
-        const res = await subsSearch(params);
+        const fetchSeason = async (season) => {
+          const results = [];
+          let page = 1;
+          let maxPages = 1;
 
-        // Process results similar to subs.vue
-        // Filter for language 'en', type 'subtitle', feature_type 'Tvshow'|'Episode'
-        const data = Array.isArray(res?.data) ? res.data : [];
-        const filtered = data.filter((d) => {
+          // Fetch pages (limit to reasonable max to prevent flooding)
+          while (page <= maxPages) {
+            const params = { imdb_id: imdbIdDigits, page };
+            if (season !== null) params.season = season;
+
+            let res;
+            try {
+              res = await subsSearch(params);
+            } catch (e) {
+              console.warn(
+                `subsSearch failed for season ${season} page ${page}`,
+                e,
+              );
+              break;
+            }
+
+            if (res && Array.isArray(res.data)) {
+              results.push(...res.data);
+            }
+
+            if (res) {
+              const tp = Number(res.total_pages);
+              if (tp > 0) maxPages = tp;
+              if (maxPages > 5) maxPages = 5; // Safety cap
+            } else {
+              break;
+            }
+            if (page >= maxPages) break;
+            page++;
+          }
+          return results;
+        };
+
+        const promises = seasonsToFetch.map((s) => fetchSeason(s));
+        const resultsArray = await Promise.all(promises);
+        const allSubs = resultsArray.flat();
+
+        // Filter
+        const filtered = allSubs.filter((d) => {
           if (!d || typeof d !== "object") return false;
           if (d.type !== "subtitle") return false;
           if (d.attributes?.language !== "en") return false;
           const ft = d.attributes?.feature_details?.feature_type;
-          if (ft !== "Tvshow" && ft !== "Episode") return false;
-          return true;
+          return ft === "Tvshow" || ft === "Episode";
         });
 
-        this.subsItems = filtered.map((entry) => {
+        const seenIds = new Set();
+        const finalItems = [];
+
+        for (const entry of filtered) {
+          if (seenIds.has(entry.id)) continue;
+
+          const { season, episode } = this.parseSeasonEpisodeFromEntry(entry);
+
+          // Filtering Logic:
+          // If we have specific needed Episodes (S:E), keep only those.
+          // If we have needed Seasons but no Episodes (full season file?), keep all for that season?
+          // If we had input files but couldn't parse S/E (needed empty), maybe show everything?
+          // Current logic: if needed map is not empty, strict match.
+          // BUT: if I have S01E01 locally, I want S01E01 subs.
+          // What if subs result is a "Full Season" pack? It might not have 'episode' in attributes.
+          // parseSeasonEpisodeFromEntry tries to parse release name.
+          // If episode is null, it's likely a whole season pack or unparseable.
+          // Users usually want per-episode subs.
+          // If strict map is populated:
+          if (needed.size > 0) {
+            if (season != null && episode != null) {
+              if (!needed.has(`${season}:${episode}`)) continue;
+            } else if (season != null && episode == null) {
+              // Season pack? Keep it if season is in neededSeasons?
+              if (!neededSeasons.has(season)) continue;
+            } else {
+              // Unknown S/E. Discard if we are targeting specific files.
+              continue;
+            }
+          }
+
+          seenIds.add(entry.id);
+
           const release = entry.attributes?.release || "";
           const uploader = entry.attributes?.uploader?.name || "anonymous";
-          const { season, episode } = this.parseSeasonEpisodeFromEntry(entry);
           const sStr = season != null ? String(season).padStart(2, "0") : "??";
           const eStr =
             episode != null ? String(episode).padStart(2, "0") : "??";
@@ -875,19 +1028,33 @@ export default {
             ? `S${sStr}E${eStr} | ${release}`
             : `S${sStr}E${eStr}`;
 
-          return {
+          finalItems.push({
             key: entry.id,
             line1,
-            line2: "", // Simplification
+            line2: "",
             uploader,
             season,
             episode,
             raw: entry,
-          };
+          });
+        }
+
+        // Sort
+        finalItems.sort((a, b) => {
+          const sa = a.season || 0;
+          const sb = b.season || 0;
+          if (sa !== sb) return sa - sb;
+          const ea = a.episode || 0;
+          const eb = b.episode || 0;
+          if (ea !== eb) return ea - eb;
+          return 0;
         });
 
+        this.subsItems = finalItems;
+
         if (!this.subsItems.length) {
-          this.subsError = "No subtitles found.";
+          // Silent if no files selected?
+          // this.subsError = "No matching subtitles found.";
         }
       } catch (e) {
         this.subsError = e.message || "Error searching subs";

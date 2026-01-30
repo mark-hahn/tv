@@ -156,6 +156,14 @@ export default {
       // - If nodes match "Season X", use numeric sort (S1 < S2 < S10).
       // - Otherwise use standard ASCII sort (30 Rock < 3rd Rock).
       nodes.sort((a, b) => {
+        // Group folders before files
+        const aIsFolder =
+          a.type === "folder" || (a.children && a.children.length > 0);
+        const bIsFolder =
+          b.type === "folder" || (b.children && b.children.length > 0);
+        if (aIsFolder && !bIsFolder) return -1;
+        if (!aIsFolder && bIsFolder) return 1;
+
         const seasonRegex = /^Season \s*(\d+)$/i;
         const ma = seasonRegex.exec(a.name);
         const mb = seasonRegex.exec(b.name);

@@ -129,13 +129,45 @@ export default {
           const txt = await res.text();
           throw new Error(`HTTP ${res.status}: ${txt}`);
         }
-        this.tree = await res.json();
+        const rootTree = await res.json();
+        this.tree = this.processTree(rootTree);
         this.hasLoaded = true;
       } catch (e) {
         this.error = e.message || "Failed to load files";
       } finally {
         this.loading = false;
       }
+    },
+    processTree(nodes) {
+      if (!nodes) return [];
+
+      // Sort nodes first.
+      nodes.sort((a, b) => {
+        // Group folders before files
+        const aIsFolder =
+          a.type === "folder" || (a.children && a.children.length > 0);
+        const bIsFolder =
+          b.type === "folder" || (b.children && b.children.length > 0);
+        if (aIsFolder && !bIsFolder) return -1;
+        if (!aIsFolder && bIsFolder) return 1;
+
+        const seasonRegex = /^Season \s*(\d+)$/i;
+        const ma = seasonRegex.exec(a.name);
+        const mb = seasonRegex.exec(b.name);
+
+        if (ma && mb) {
+          const na = parseInt(ma[1], 10);
+          const nb = parseInt(mb[1], 10);
+          return na - nb;
+        }
+
+        return a.name.localeCompare(b.name, undefined, { numeric: false });
+      });
+
+      nodes.forEach((n) => {
+        if (n.children) n.children = this.processTree(n.children);
+      });
+      return nodes;
     },
     refresh() {
       this.fetchFiles();

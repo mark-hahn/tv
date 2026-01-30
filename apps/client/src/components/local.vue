@@ -44,6 +44,22 @@
       </button>
 
       <button
+        @click="deleteSelected"
+        :disabled="loading || selectedFiles.size === 0"
+        title="Delete selected files"
+        style="
+          cursor: pointer;
+          border-radius: 7px;
+          padding: 4px 10px;
+          border: 1px solid #bbb;
+          background-color: whitesmoke;
+          margin-right: 10px;
+        "
+      >
+        Delete
+      </button>
+
+      <button
         @click="refresh"
         :disabled="loading"
         style="
@@ -88,6 +104,7 @@
 <script>
 import UsbNode from "./usb-node.vue";
 import { config } from "../config.js";
+import { deletePath } from "../srvr.js";
 
 export default {
   name: "Local",
@@ -334,8 +351,36 @@ export default {
         }
       });
     },
+    async deleteSelected() {
+      if (this.selectedFiles.size === 0) return;
+
+      const fileCount = this.selectedFiles.size;
+      const confirmMsg = `Are you sure you want to delete ${fileCount} item(s)?\nThis cannot be undone.`;
+
+      if (!confirm(confirmMsg)) return;
+
+      this.loading = true;
+      try {
+        const root = "/mnt/media/tv";
+        for (const relPath of this.selectedFiles) {
+          const fullPath = `${root}/${relPath}`;
+          await deletePath(fullPath);
+        }
+
+        this.selectedFiles.clear();
+        this.selectionParentPath = null;
+        this.lastSelectedFile = null;
+        await this.refresh();
+      } catch (e) {
+        console.error("Error deleting files:", e);
+        alert(`Error deleting files: ${e.message}`);
+        this.error = e.message;
+      } finally {
+        this.loading = false;
+      }
+    },
     refresh() {
-      this.fetchFiles();
+      return this.fetchFiles();
     },
     handleNodeClick({ node, depth, fullPath, ctrlKey, shiftKey }) {
       // 1. Top-level folder selection

@@ -219,13 +219,6 @@
               :sizing="activeSizing"
               :activeShow="currentShow"
             ></Tor>
-            <Subs
-              v-show="currentPane === 'subs'"
-              style="width: 100%; height: 100%"
-              :simpleMode="simpleMode"
-              :sizing="activeSizing"
-              :activeShow="currentShow"
-            ></Subs>
             <Flex
               v-if="!simpleMode"
               v-show="currentPane === 'flex'"
@@ -461,13 +454,6 @@
             :sizing="activeSizing"
             :activeShow="currentShow"
           ></Tor>
-          <Subs
-            v-show="currentPane === 'subs'"
-            style="width: 100%; height: 100%"
-            :simpleMode="simpleMode"
-            :sizing="activeSizing"
-            :activeShow="currentShow"
-          ></Subs>
           <Flex
             v-if="!simpleMode"
             v-show="currentPane === 'flex'"
@@ -602,7 +588,6 @@ import Reviews from "./reviews.vue";
 import Buttons from "./buttons.vue";
 import Browse from "./browse.vue";
 import Tor from "./tor.vue";
-import Subs from "./subs.vue";
 import Flex from "./flex.vue";
 import Qbt from "./qbt.vue";
 import Down from "./down.vue";
@@ -631,7 +616,6 @@ export default {
     Buttons,
     Browse,
     Tor,
-    Subs,
     Flex,
     Qbt,
     Usb,
@@ -643,7 +627,7 @@ export default {
     return {
       // Must be known before first render so non-simple panes never mount in simple mode.
       simpleMode: new URLSearchParams(window.location.search).has("simple"),
-      currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'subs', 'flex', 'qbt', 'down'
+      currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'flex', 'qbt', 'down'
       savedPane: null,
       restoringPreviewPane: false,
       previewMode: false,
@@ -950,7 +934,6 @@ export default {
         { label: "Reviews", key: "reviews" },
         { label: "Trailer", key: "trailer" },
         { label: "Tor", key: "tor" },
-        { label: "Subs", key: "subs" },
         { label: "Browse", key: "browse" },
         { label: "Flex", key: "flex" },
         { label: "Qbt", key: "qbt" },
@@ -1451,7 +1434,6 @@ export default {
           "map",
           "browse",
           "tor",
-          "subs",
           "flex",
           "qbt",
           "usb",
@@ -1517,13 +1499,6 @@ export default {
           this.currentPane = "tor";
           evtBus.emit("paneChanged", this.currentPane);
         }
-        return;
-      }
-
-      if (k === "subs") {
-        if (this.simpleMode) return;
-        this.currentPane = "subs";
-        evtBus.emit("paneChanged", this.currentPane);
         return;
       }
 
@@ -1889,14 +1864,6 @@ export default {
         this._torrentsInitialized = true;
         this._torrentsShowKey =
           this.currentShow?.Id || this.currentShow?.Name || null;
-        return;
-      }
-
-      // When currently viewing Subs, stay on Subs.
-      // Subs pane is driven by :activeShow and will update for the new show.
-      if (prevPane === "subs") {
-        this.currentPane = "subs";
-        evtBus.emit("paneChanged", this.currentPane);
         return;
       }
 

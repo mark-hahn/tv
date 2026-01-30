@@ -220,7 +220,11 @@ export default {
         // If clicking top-level folder, clear any file selection context
         this.selectedFiles.clear();
         this.selectionParentPath = null;
-        this.selectedName = node.name;
+        if (ctrlKey && this.selectedName === node.name) {
+          this.selectedName = null;
+        } else {
+          this.selectedName = node.name;
+        }
         this.lastSelectedFile = null;
         return;
       }

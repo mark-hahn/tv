@@ -10,11 +10,21 @@
       backgroundColor: '#fafafa',
     }"
   >
-    <!-- Header -->
     <div
+      id="localFiles"
       :style="{
         display: 'flex',
-        alignItems: 'center',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        flex: showSubs ? '0 0 50%' : '1 1 auto',
+        borderBottom: showSubs ? '1px solid #ddd' : 'none',
+      }"
+    >
+      <!-- Header -->
+      <div
+        :style="{
+          display: 'flex',
+          alignItems: 'center',
         padding: '8px',
         borderBottom: '1px solid #ddd',
         flex: '0 0 auto',
@@ -56,6 +66,20 @@
         "
       >
         From show
+      </button>
+
+      <button
+        @click="toggleSubs"
+        :style="{
+          cursor: 'pointer',
+          borderRadius: '7px',
+          padding: '4px 10px',
+          border: '1px solid #bbb',
+          backgroundColor: showSubs ? '#ddd' : 'whitesmoke',
+          marginRight: '10px',
+        }"
+      >
+        Subs
       </button>
 
       <button
@@ -113,13 +137,160 @@
         @node-click="handleNodeClick"
       />
     </div>
+    </div>
+
+    <!-- Subs Pane -->
+    <div
+      id="localSubs"
+      v-if="showSubs"
+      :style="{
+        flex: '1 1 50%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        backgroundColor: '#fafafa',
+      }"
+    >
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          padding: 8px;
+          border-bottom: 1px solid #ddd;
+          flex: 0 0 auto;
+        "
+      >
+        <div style="font-weight: bold; margin-right: auto">
+          Subs files
+          <span
+            v-if="currentShowName"
+            style="font-weight: normal; font-size: 0.9em; color: #666"
+            >({{ currentShowName }})</span
+          >
+        </div>
+        <div style="display: flex; gap: 8px">
+          <button
+            @click="openLibrary"
+            style="
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Library
+          </button>
+          <button
+            @click="applySubs"
+            :disabled="applyInProgress || selectedSubKeys.size === 0"
+            style="
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Apply
+          </button>
+        </div>
+      </div>
+
+      <div style="flex: 1 1 auto; overflow: auto; padding: 10px">
+        <div v-if="subsLoading">Loading...</div>
+        <div v-if="subsError" style="color: red">{{ subsError }}</div>
+        <template v-for="item in subsItems" :key="item.key">
+          <div
+            @click="handleSubClick($event, item)"
+            :style="getSubCardStyle(item)"
+            @mouseenter="
+              $event.currentTarget.style.boxShadow =
+                '0 2px 8px rgba(0,0,0,0.15)'
+            "
+            @mouseleave="$event.currentTarget.style.boxShadow = 'none'"
+          >
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 10px;
+                font-size: 12px;
+                color: #333;
+              "
+            >
+              <div
+                :style="{
+                  fontWeight: 'bold',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  minWidth: 0,
+                  color: item?.lineColor || '#333',
+                }"
+              >
+                {{ item?.line1 || '' }}
+              </div>
+              <div
+                style="
+                  color: #666;
+                  white-space: nowrap;
+                  min-width: 0;
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                  justify-content: flex-end;
+                "
+              >
+                <div
+                  style="
+                    width: 100px;
+                    min-width: 100px;
+                    max-width: 100px;
+                    text-align: center;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                  "
+                >
+                  {{ item?.uploader || '' }}
+                </div>
+              </div>
+            </div>
+            <div
+              v-if="item.line2"
+              style="
+                font-size: 11px;
+                color: #666;
+                margin-top: 2px;
+                white-space: pre-wrap;
+                font-family: monospace;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              "
+            >
+              {{ item.line2 }}
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 import TreeNode from "./tree-node.vue";
 import { config } from "../config.js";
-import { deletePath } from "../srvr.js";
+import {
+  deletePath,
+  subsSearch,
+  applySubFiles,
+  getSubFileIds,
+} from "../srvr.js";
+import evtBus from "../evtBus.js";
+import * as util from "../util.js";
+import parseTorrentTitle from "parse-torrent-title";
 
 export default {
   name: "Local",
@@ -139,6 +310,21 @@ export default {
       loading: false,
       error: null,
       hasLoaded: false,
+
+      // Subs pane state
+      showSubs: false,
+      subsItems: [],
+      subsLoading: false,
+      subsError: null,
+      hasSearchedSubs: false,
+      selectedSubKeys: new Set(),
+      lastClickedSubKey: null,
+      applyInProgress: false,
+      applyFailures: [],
+      showApplyFailuresModal: false,
+      totalSubsCount: 0,
+      validSubsCount: 0,
+      currentShowName: "",
     };
   },
   created() {
@@ -587,6 +773,234 @@ export default {
         if (!current) return [];
       }
       return current.children || [];
+    },
+    // Subtitles logic
+    toggleSubs() {
+      this.showSubs = !this.showSubs;
+      if (this.showSubs) {
+        this.loadSubs();
+      }
+    },
+    async loadSubs() {
+      // 1. Determine Identity (Show Name + Season)
+      let showName = this.selectedName;
+      let season = null;
+
+      if (!showName && this.selectedFiles.size > 0) {
+        // derive from first file
+        const path = [...this.selectedFiles][0];
+        const parts = path.split("/");
+        if (parts.length > 0) showName = parts[0];
+        // check for season in path
+        for (const p of parts) {
+          const m = /^Season\s*(\d+)$/i.exec(p);
+          if (m) {
+            season = parseInt(m[1], 10);
+            break;
+          }
+        }
+      }
+
+      this.currentShowName = showName || "";
+      this.subsItems = [];
+      this.subsError = null;
+
+      if (!showName) {
+        this.subsError = "No show selected (folder or files).";
+        return;
+      }
+
+      // 2. Find matching show to get IMDb ID
+      const match = (this.allShows || []).find((s) => s.Name === showName) || (this.allShows || []).find((s) => s.Name.toLowerCase() === showName.toLowerCase());
+      
+      if (!match) {
+        this.subsError = `Show "${showName}" not found in library.`;
+        return;
+      }
+
+      const imdb =
+        match.ProviderIds?.Imdb ||
+        match.ProviderIds?.imdb ||
+        match.ProviderIds?.IMDb ||
+        match.ProviderIds?.IMDB;
+      
+      if (!imdb) {
+        this.subsError = "Show has no IMDb ID.";
+        return;
+      }
+
+      const raw = String(imdb).trim();
+      const digits = raw.toLowerCase().startsWith("tt") ? raw.slice(2) : raw;
+      const imdbIdDigits = digits.replace(/\D/g, "").replace(/^0+/, ""); // Normalize
+
+       this.subsLoading = true;
+       try {
+           const params = { imdb_id: imdbIdDigits, page: 1 };
+           if (season !== null) params.season = season;
+
+           const res = await subsSearch(params);
+           
+           // Process results similar to subs.vue
+           // Filter for language 'en', type 'subtitle', feature_type 'Tvshow'|'Episode'
+           const data = Array.isArray(res?.data) ? res.data : [];
+           const filtered = data.filter((d) => {
+              if (!d || typeof d !== "object") return false;
+              if (d.type !== "subtitle") return false;
+              if (d.attributes?.language !== "en") return false;
+              const ft = d.attributes?.feature_details?.feature_type;
+              if (ft !== "Tvshow" && ft !== "Episode") return false;
+              return true;
+           });
+
+           this.subsItems = filtered.map(entry => {
+               const release = entry.attributes?.release || "";
+               const uploader = entry.attributes?.uploader?.name || "anonymous";
+               const { season, episode } = this.parseSeasonEpisodeFromEntry(entry);
+                const sStr = season != null ? String(season).padStart(2, "0") : "??";
+                const eStr = episode != null ? String(episode).padStart(2, "0") : "??";
+                const line1 = release ? `S${sStr}E${eStr} | ${release}` : `S${sStr}E${eStr}`;
+                
+                return {
+                    key: entry.id,
+                    line1,
+                    line2: "", // Simplification
+                    uploader,
+                    season,
+                    episode,
+                    raw: entry
+                };
+           });
+           
+           if (!this.subsItems.length) {
+               this.subsError = "No subtitles found.";
+           }
+
+       } catch (e) {
+           this.subsError = e.message || "Error searching subs";
+       } finally {
+           this.subsLoading = false;
+       }
+    },
+    parseSeasonEpisodeFromEntry(entry) {
+        let bestSeason = null;
+        let bestEpisode = null;
+        
+        const tryParse = (txt) => {
+            if (!txt) return;
+            try {
+                const p = parseTorrentTitle.parse(txt);
+                if (p.season != null) bestSeason = p.season;
+                if (p.episode != null) bestEpisode = p.episode;
+            } catch(e) {}
+             
+             // Fallback regex if library fails or returns nothing useful
+            if (bestSeason == null || bestEpisode == null) {
+                let m = txt.match(/S(\d{1,2})E(\d{1,2})/i);
+                if (m) {
+                    if (bestSeason == null) bestSeason = parseInt(m[1]);
+                    if (bestEpisode == null) bestEpisode = parseInt(m[2]);
+                }
+            }
+        };
+
+        tryParse(entry.attributes?.release);
+        if (bestSeason == null || bestEpisode == null) {
+             // Try filename if available
+             const files = entry.attributes?.files || [];
+             if (files.length > 0) tryParse(files[0].file_name);
+        }
+
+        return { season: bestSeason, episode: bestEpisode };
+    },
+    getSubCardStyle(item) {
+        const isSelected = this.selectedSubKeys.has(item.key);
+        return {
+            padding: "8px",
+            background: isSelected ? "#fffacd" : "#fff",
+            borderRadius: "5px",
+            border: "1px solid #ddd",
+            cursor: "pointer",
+            marginBottom: "4px",
+            userSelect: "none"
+        };
+    },
+    handleSubClick(event, item) {
+        const key = item.key;
+        const isCtrl = !!(event.ctrlKey || event.metaKey);
+        const isShift = !!event.shiftKey;
+
+        if (isShift && this.lastClickedSubKey) {
+            // Range select (simplified: index based)
+            const idx1 = this.subsItems.findIndex(i => i.key === this.lastClickedSubKey);
+            const idx2 = this.subsItems.findIndex(i => i.key === key);
+            if (idx1 !== -1 && idx2 !== -1) {
+                const s = Math.min(idx1, idx2);
+                const e = Math.max(idx1, idx2);
+                const range = this.subsItems.slice(s, e + 1);
+                range.forEach(i => this.selectedSubKeys.add(i.key));
+            }
+        } else if (isCtrl) {
+            if (this.selectedSubKeys.has(key)) this.selectedSubKeys.delete(key);
+            else this.selectedSubKeys.add(key);
+        } else {
+            this.selectedSubKeys.clear();
+            this.selectedSubKeys.add(key);
+        }
+        this.lastClickedSubKey = key;
+    },
+    openLibrary() {
+        evtBus.emit("startLibraryRefresh");
+    },
+    async applySubs() {
+         if (this.applyInProgress) return;
+         if (this.selectedSubKeys.size === 0) return;
+         
+         this.applyInProgress = true;
+         // build payload
+         // Needed: [{ file_id, showName, season, episode }]
+         // We have file_id inside item.raw.attributes.files? Or is key the file_id?
+         // In subs.vue, item.key is not always file_id. OpenSubtitles entries have multiple files sometimes.
+         // subs.vue logic uses `buildFileIdObjsPayload`. It looks at `validEntries`.
+         // `subsSearch` returns groupings. `files` attribute contains file_ids.
+         
+         // Simplified: Pick the first file of the selected subtitle entry.
+         const payload = [];
+         
+         for (const key of this.selectedSubKeys) {
+             const item = this.subsItems.find(i => i.key === key);
+             if (!item) continue;
+             const entry = item.raw;
+             const files = entry.attributes?.files || [];
+             if (!files.length) continue;
+             const fileId = files[0].file_id;
+             if (!fileId) continue;
+             
+             payload.push({
+                 file_id: Number(fileId),
+                 showName: this.currentShowName,
+                 season: item.season,
+                 episode: item.episode
+             });
+         }
+         
+         if (!payload.length) {
+             alert("No valid files found in selection");
+             this.applyInProgress = false;
+             return;
+         }
+
+         try {
+             const res = await applySubFiles(payload);
+              if (res && res.error) {
+                 alert("Error applying subs: " + res.error);
+             } else {
+                 alert("Subs applied successfully");
+             }
+         } catch (e) {
+             alert("Error applying subs: " + e.message);
+         } finally {
+             this.applyInProgress = false;
+         }
     },
   },
 };

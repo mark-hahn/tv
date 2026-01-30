@@ -300,22 +300,23 @@ export default {
         return;
       }
 
-      // 2. Fetch local path
-      const localPath = await this.fetchLocalPath(showName);
-      if (!localPath) {
-        console.log("No local path found for show:", showName);
-        return;
+      // 2. Find matching top-level folder
+      let folderName = null;
+      if (this.tree && this.tree.length) {
+        const exact = this.tree.find((n) => n.name === showName);
+        if (exact) {
+          folderName = exact.name;
+        } else {
+          const lower = showName.toLowerCase();
+          const ci = this.tree.find((n) => n.name.toLowerCase() === lower);
+          if (ci) folderName = ci.name;
+        }
       }
 
-      // 3. Find matching top-level folder
-      // Assuming localPath is something like "/mnt/media/tv/ShowName"
-      // and tree nodes are top-level names "ShowName".
-      // We take the basename of localPath.
-      // Note: If localPath has trailing slash, handle it.
-      const p = localPath.replace(/[/\\]+$/, "");
-      const folderName = p.split(/[/\\]/).pop();
-
-      if (!folderName) return;
+      if (!folderName) {
+        console.log(`Folder "${showName}" not found in tree.`);
+        return;
+      }
 
       const nodeIndex = this.tree.findIndex((n) => n.name === folderName);
       if (nodeIndex === -1) {
@@ -535,42 +536,6 @@ export default {
         if (!current) return [];
       }
       return current.children || [];
-    },
-    async fetchLocalPath(showName) {
-      let remotePath = null;
-      try {
-        const res = await fetch("https://hahnca.com/tv-down/checkFiles", {
-          method: "POST",
-          body: JSON.stringify([showName]),
-        });
-        const data = await res.json();
-        const entry =
-          data && data.tvEntries
-            ? data.tvEntries.find((e) => e.title === showName)
-            : null;
-        if (entry && entry.localPath) {
-          console.log("Linked Local Path:", entry.localPath);
-          remotePath = entry.localPath;
-        }
-      } catch (e) {
-        console.error("Failed to link local path", e);
-      }
-
-      if (remotePath) return remotePath;
-
-      // Fallback: search tree
-      if (this.tree && this.tree.length) {
-        // Exact match
-        const exact = this.tree.find((n) => n.name === showName);
-        if (exact) return exact.name;
-
-        // CI match
-        const lower = showName.toLowerCase();
-        const ci = this.tree.find((n) => n.name.toLowerCase() === lower);
-        if (ci) return ci.name;
-      }
-
-      return null;
     },
   },
 };

@@ -30,7 +30,6 @@
 
       <button
         @click="selectTopLevel"
-        :disabled="selectedFiles.size === 0"
         title="Select top-level folder of currently selected file"
         style="
           cursor: pointer;
@@ -77,6 +76,7 @@
         v-for="node in tree"
         :key="node.name"
         :node="node"
+        :ref="(el) => setNodeRef(el, node.name)"
         :selected="selectedName === node.name"
         :selected-files="selectedFiles"
         @node-click="handleNodeClick"
@@ -94,6 +94,7 @@ export default {
   components: { UsbNode },
   props: {
     active: Boolean,
+    show: Object,
   },
   data() {
     return {
@@ -107,7 +108,16 @@ export default {
       hasLoaded: false,
     };
   },
+  created() {
+    this.nodeRefs = new Map();
+  },
+  beforeUpdate() {
+    this.nodeRefs.clear();
+  },
   watch: {
+    show(val) {
+      console.log("Local: show prop changed:", val ? val.Name : "null");
+    },
     active(val) {
       if (val && !this.hasLoaded && !this.loading) {
         this.fetchFiles();
@@ -249,15 +259,64 @@ export default {
         return node;
       });
     },
-    selectTopLevel() {
-      if (this.selectedFiles.size === 0) return;
-      const first = [...this.selectedFiles][0];
-      if (!first) return;
-      const root = first.split("/")[0];
-      this.selectedName = root;
+    setNodeRef(el, name) {
+      if (el) this.nodeRefs.set(name, el);
+    },
+    async selectTopLevel() {
+      // 1. Get current show name
+      const showName = this.show ? this.show.Name : null;
+      console.log("Local.vue selectTopLevel", {
+        showProp: this.show,
+        showName,
+      });
+      if (!showName) {
+        // Fallback or ignore if no show selected
+        console.log("No current show selected.");
+        return;
+      }
+
+      // 2. Fetch local path
+      const localPath = await this.fetchLocalPath(showName);
+      if (!localPath) {
+        console.log("No local path found for show:", showName);
+        return;
+      }
+
+      // 3. Find matching top-level folder
+      // Assuming localPath is something like "/mnt/media/tv/ShowName"
+      // and tree nodes are top-level names "ShowName".
+      // We take the basename of localPath.
+      // Note: If localPath has trailing slash, handle it.
+      const p = localPath.replace(/[/\\]+$/, "");
+      const folderName = p.split(/[/\\]/).pop();
+
+      if (!folderName) return;
+
+      const nodeIndex = this.tree.findIndex((n) => n.name === folderName);
+      if (nodeIndex === -1) {
+        console.log(`Folder "${folderName}" not found in tree.`);
+        return;
+      }
+      const node = this.tree[nodeIndex];
+
+      // 4. Select and expand
+      this.selectedName = node.name;
       this.selectedFiles.clear();
       this.selectionParentPath = null;
       this.lastSelectedFile = null;
+
+      // 5. Scroll to view & Expand
+      this.$nextTick(() => {
+        const cmp = this.nodeRefs.get(folderName);
+        if (cmp) {
+          if (typeof cmp.expand === "function") {
+            cmp.expand();
+          }
+          if (cmp.$el) {
+            cmp.$el.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }
+      });
     },
     refresh() {
       this.fetchFiles();
@@ -363,6 +422,25 @@ export default {
         if (!current) return [];
       }
       return current.children || [];
+    },
+    async fetchLocalPath(showName) {
+      try {
+        const res = await fetch("https://hahnca.com/tv-down/checkFiles", {
+          method: "POST",
+          body: JSON.stringify([showName]),
+        });
+        const data = await res.json();
+        const entry =
+          data && data.tvEntries
+            ? data.tvEntries.find((e) => e.title === showName)
+            : null;
+        if (entry && entry.localPath) {
+          console.log("Linked Local Path:", entry.localPath);
+          return entry.localPath;
+        }
+      } catch (e) {
+        console.error("Failed to link local path", e);
+      }
     },
   },
 };

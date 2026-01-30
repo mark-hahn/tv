@@ -84,6 +84,9 @@ export default {
       highlighted: false,
     };
   },
+  watch: {
+    // "node.expanded" watcher removed as we use explicit expand() method
+  },
   computed: {
     activeBg() {
       if (this.highlighted) return "#ffcccc";
@@ -104,6 +107,9 @@ export default {
     },
   },
   methods: {
+    expand() {
+      this.expanded = true;
+    },
     handleClick(event) {
       if (event.altKey) {
         navigator.clipboard

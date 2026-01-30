@@ -251,6 +251,7 @@
               v-show="currentPane === 'local'"
               style="width: 100%; height: 100%"
               :active="currentPane === 'local'"
+              :show="currentShow"
             ></Local>
             <Down
               v-if="!simpleMode"
@@ -491,6 +492,7 @@
             v-show="currentPane === 'local'"
             style="width: 100%; height: 100%"
             :active="currentPane === 'local'"
+            :show="currentShow"
           ></Local>
           <Usb
             v-if="!simpleMode"
@@ -1854,6 +1856,7 @@ export default {
 
     // Close torrents or actors pane when a different show is selected
     evtBus.on("setUpSeries", (show) => {
+      console.log("App: received setUpSeries", show ? show.Name : "null");
       // Keep currentShow synced to the list selection immediately.
       // tvdbDataReady may arrive later; that's fine.
       this.currentShow = show;

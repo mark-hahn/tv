@@ -1599,11 +1599,13 @@ export default {
 
       // Only emit setUpSeries if the show selection changed
       if (showChanged) {
+        console.log("List: emitting setUpSeries", showName);
         const token = (this._pendingSetUpSeriesToken || 0) + 1;
         this._pendingSetUpSeriesToken = token;
         this.$nextTick(() => {
           // If another selection happened since scheduling, ignore this one.
           if (token !== this._pendingSetUpSeriesToken) return;
+          console.log("List: actually emitting setUpSeries now", showName);
           evtBus.emit("setUpSeries", show);
         });
       }

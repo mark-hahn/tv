@@ -252,6 +252,8 @@
               style="width: 100%; height: 100%"
               :active="currentPane === 'local'"
               :show="currentShow"
+              :allShows="allShows"
+              @select-show="handleLocalSelectShow"
             ></Local>
             <Down
               v-if="!simpleMode"
@@ -486,6 +488,8 @@
             style="width: 100%; height: 100%"
             :active="currentPane === 'local'"
             :show="currentShow"
+            :allShows="allShows"
+            @select-show="handleLocalSelectShow"
           ></Local>
           <Usb
             v-if="!simpleMode"
@@ -1583,6 +1587,11 @@ export default {
       this.mapShow = null;
       evtBus.emit("paneChanged", this.currentPane);
     },
+    handleLocalSelectShow(showName) {
+      if (!showName) return;
+      evtBus.emit("selectShowFromCardTitle", showName);
+    },
+
     handleShowActors(fromMap = false) {
       // If called from map click, show series pane instead
       if (fromMap) {

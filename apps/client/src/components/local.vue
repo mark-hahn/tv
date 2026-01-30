@@ -30,7 +30,7 @@
 
       <button
         @click="selectTopLevel"
-        title="Select top-level folder of currently selected file"
+        title="Find folder matching current show"
         style="
           cursor: pointer;
           border-radius: 7px;
@@ -40,7 +40,22 @@
           margin-right: 10px;
         "
       >
-        Select
+        From show
+      </button>
+
+      <button
+        @click="toShow"
+        title="Select show matching selected folder"
+        style="
+          cursor: pointer;
+          border-radius: 7px;
+          padding: 4px 10px;
+          border: 1px solid #bbb;
+          background-color: whitesmoke;
+          margin-right: 10px;
+        "
+      >
+        To show
       </button>
 
       <button
@@ -112,6 +127,7 @@ export default {
   props: {
     active: Boolean,
     show: Object,
+    allShows: Array,
   },
   data() {
     return {
@@ -286,6 +302,41 @@ export default {
     },
     setNodeRef(el, name) {
       if (el) this.nodeRefs.set(name, el);
+    },
+    toShow() {
+      // 1. Determine selected top-level folder
+      let folderName = this.selectedName;
+      if (!folderName && this.selectedFiles.size > 0) {
+        // Assume first file's root
+        const path = [...this.selectedFiles][0];
+        if (path) {
+          const parts = path.split("/");
+          if (parts.length > 0) folderName = parts[0];
+        }
+      }
+
+      if (!folderName) {
+        alert("Please select a file or folder first.");
+        return;
+      }
+
+      if (!this.allShows || !this.allShows.length) {
+        console.warn("No shows loaded.");
+        return;
+      }
+
+      // 2. Find matching show
+      let match = this.allShows.find((s) => s.Name === folderName);
+      if (!match) {
+        const lower = folderName.toLowerCase();
+        match = this.allShows.find((s) => s.Name.toLowerCase() === lower);
+      }
+
+      if (match) {
+        this.$emit("select-show", match.Name);
+      } else {
+        alert(`No show found matching folder "${folderName}"`);
+      }
     },
     async selectTopLevel() {
       // 1. Get current show name

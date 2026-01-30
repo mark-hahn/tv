@@ -424,6 +424,7 @@ export default {
       return current.children || [];
     },
     async fetchLocalPath(showName) {
+      let remotePath = null;
       try {
         const res = await fetch("https://hahnca.com/tv-down/checkFiles", {
           method: "POST",
@@ -436,11 +437,27 @@ export default {
             : null;
         if (entry && entry.localPath) {
           console.log("Linked Local Path:", entry.localPath);
-          return entry.localPath;
+          remotePath = entry.localPath;
         }
       } catch (e) {
         console.error("Failed to link local path", e);
       }
+
+      if (remotePath) return remotePath;
+
+      // Fallback: search tree
+      if (this.tree && this.tree.length) {
+        // Exact match
+        const exact = this.tree.find((n) => n.name === showName);
+        if (exact) return exact.name;
+
+        // CI match
+        const lower = showName.toLowerCase();
+        const ci = this.tree.find((n) => n.name.toLowerCase() === lower);
+        if (ci) return ci.name;
+      }
+
+      return null;
     },
   },
 };

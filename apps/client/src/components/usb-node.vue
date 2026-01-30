@@ -51,6 +51,8 @@
         :node="child"
         :depth="depth + 1"
         :path-prefix="fullPath"
+        :selected="false"
+        :selected-files="selectedFiles"
         @node-click="$emit('node-click', $event)"
       ></usb-node>
     </div>
@@ -64,6 +66,7 @@ export default {
     node: { type: Object, required: true },
     depth: { type: Number, default: 0 },
     selected: { type: Boolean, default: false },
+    selectedFiles: { type: Object, default: () => new Set() },
     pathPrefix: { type: String, default: "" },
   },
   emits: ["node-click"],
@@ -78,6 +81,13 @@ export default {
     activeBg() {
       if (this.highlighted) return "#ffcccc";
       if (this.selected) return "lightyellow";
+      if (
+        this.node.type === "file" &&
+        this.selectedFiles &&
+        this.selectedFiles.has(this.fullPath)
+      ) {
+        return "lightyellow";
+      }
       return this.hover ? "#eee" : "transparent";
     },
     fullPath() {
@@ -88,7 +98,7 @@ export default {
   },
   methods: {
     handleClick(event) {
-      if (event.ctrlKey) {
+      if (event.altKey) {
         if (this.node.type === "file") {
           navigator.clipboard
             .writeText(this.fullPath)
@@ -104,7 +114,13 @@ export default {
       if (this.node.type === "folder") {
         this.expanded = !this.expanded;
       }
-      this.$emit("node-click", { node: this.node, depth: this.depth });
+      this.$emit("node-click", {
+        node: this.node,
+        depth: this.depth,
+        fullPath: this.fullPath,
+        ctrlKey: event.ctrlKey,
+        shiftKey: event.shiftKey,
+      });
     },
   },
 };

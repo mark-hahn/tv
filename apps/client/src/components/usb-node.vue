@@ -110,6 +110,9 @@ export default {
     expand() {
       this.expanded = true;
     },
+    collapse() {
+      this.expanded = false;
+    },
     handleClick(event) {
       if (event.altKey) {
         navigator.clipboard

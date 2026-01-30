@@ -305,16 +305,24 @@ export default {
       this.selectionParentPath = null;
       this.lastSelectedFile = null;
 
-      // 5. Scroll to view & Expand
-      this.$nextTick(() => {
-        const cmp = this.nodeRefs.get(folderName);
-        if (cmp) {
+      // 5. Expand target & Collapse others
+      this.nodeRefs.forEach((cmp, name) => {
+        if (name !== folderName) {
+          if (typeof cmp.collapse === "function") {
+            cmp.collapse();
+          }
+        } else {
           if (typeof cmp.expand === "function") {
             cmp.expand();
           }
-          if (cmp.$el) {
-            cmp.$el.scrollIntoView({ behavior: "smooth", block: "start" });
-          }
+        }
+      });
+
+      // 6. Wait for DOM updates (collapsing) then Scroll
+      this.$nextTick(() => {
+        const cmp = this.nodeRefs.get(folderName);
+        if (cmp && cmp.$el) {
+          cmp.$el.scrollIntoView({ behavior: "smooth", block: "start" });
         }
       });
     },

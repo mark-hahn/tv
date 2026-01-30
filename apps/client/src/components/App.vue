@@ -260,13 +260,6 @@
               :simpleMode="simpleMode"
               :sizing="activeSizing"
             ></Down>
-            <Files
-              v-if="!simpleMode"
-              v-show="currentPane === 'files'"
-              style="width: 100%; height: 100%"
-              :simpleMode="simpleMode"
-              :sizing="activeSizing"
-            ></Files>
           </div>
         </div>
         <!-- Draggable divider between panes: vertical in landscape, horizontal in portrait.-->
@@ -507,13 +500,6 @@
             :simpleMode="simpleMode"
             :sizing="activeSizing"
           ></Down>
-          <Files
-            v-if="!simpleMode"
-            v-show="currentPane === 'files'"
-            style="width: 100%; height: 100%"
-            :simpleMode="simpleMode"
-            :sizing="activeSizing"
-          ></Files>
         </div>
       </div>
       <!-- Draggable divider between panes: vertical in landscape, horizontal in portrait.-->
@@ -618,7 +604,6 @@ import Qbt from "./qbt.vue";
 import Down from "./down.vue";
 import Usb from "./usb.vue";
 import Local from "./local.vue";
-import Files from "./files.vue";
 import Trailer from "./trailer.vue";
 import evtBus from "../evtBus.js";
 import * as tvdb from "../tvdb.js";
@@ -648,14 +633,13 @@ export default {
     Usb,
     Local,
     Down,
-    Files,
     Trailer,
   },
   data() {
     return {
       // Must be known before first render so non-simple panes never mount in simple mode.
       simpleMode: new URLSearchParams(window.location.search).has("simple"),
-      currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'subs', 'flex', 'qbt', 'down', 'files'
+      currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'subs', 'flex', 'qbt', 'down'
       savedPane: null,
       restoringPreviewPane: false,
       previewMode: false,
@@ -963,13 +947,12 @@ export default {
         { label: "Trailer", key: "trailer" },
         { label: "Tor", key: "tor" },
         { label: "Subs", key: "subs" },
-        { label: "Files", key: "files" },
         { label: "Browse", key: "browse" },
         { label: "Flex", key: "flex" },
         { label: "Qbt", key: "qbt" },
         { label: "Usb", key: "usb" },
-        { label: "Local", key: "local" },
         { label: "Down", key: "down" },
+        { label: "Local", key: "local" },
       ];
 
       if (!this.simpleMode) return allTabs;
@@ -1469,7 +1452,6 @@ export default {
           "qbt",
           "usb",
           "down",
-          "files",
         ]);
         if (exitKeys.has(k)) {
           this.exitPreview();
@@ -1571,13 +1553,6 @@ export default {
         // Prompt for desktop notification permission (Firefox requires user gesture).
         this.requestNotificationsOnce();
         this.handleShowTvproc();
-        return;
-      }
-
-      if (k === "files") {
-        if (this.simpleMode) return;
-        this.currentPane = "files";
-        evtBus.emit("paneChanged", this.currentPane);
         return;
       }
     },
@@ -1888,12 +1863,6 @@ export default {
           show: this.currentShow,
           tvdbData: this.currentTvdbData,
         });
-        return;
-      }
-
-      // When currently viewing File, stay on File.
-      // The File pane listens to setUpSeries and will refresh itself.
-      if (prevPane === "files") {
         return;
       }
 

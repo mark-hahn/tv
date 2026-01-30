@@ -70,6 +70,11 @@ export async function getLocalFiles() {
         if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
         const nameA = a.name.toLowerCase().replace(/^the\s+/, "");
         const nameB = b.name.toLowerCase().replace(/^the\s+/, "");
+
+        // Only use strict sorting (Season 9 before Season 10) for folders
+        if (a.type === "folder" && b.type === "folder") {
+          return nameA.localeCompare(nameB, undefined, { numeric: true });
+        }
         return nameA.localeCompare(nameB);
       });
       nodes.forEach((n) => {

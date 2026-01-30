@@ -114,13 +114,102 @@ export default {
           const txt = await res.text();
           throw new Error(`HTTP ${res.status}: ${txt}`);
         }
-        this.tree = await res.json();
+        const rootTree = await res.json();
+        this.tree = this.processTree(rootTree);
         this.hasLoaded = true;
       } catch (e) {
         this.error = e.message || "Failed to load files";
       } finally {
         this.loading = false;
       }
+    },
+    processTree(nodes) {
+      if (!nodes) return [];
+      nodes.forEach((n) => {
+        if (n.children) n.children = this.processTree(n.children);
+      });
+
+      // For "Season X" folders, we re-structure children into groups (thirds)
+      // Check if current level is inside a "Season X" or if we are iterating "Season X" folders?
+      // Wait, the logic is: "in local pane file list inside every folder named 'Season <season number>' sort the files..."
+      // So if *we* (the list of nodes `nodes`) are children of a Season X folder...
+      // But we don't know who our parent is here easily unless we pass ctx.
+      // Alternatively, we look for folders named "Season ..." and process THEIR children.
+
+      // Actually, standard iteration:
+      // If `n` is a folder and its name matches "Season \d+", then process `n.children`.
+      return nodes.map((node) => {
+        if (node.type === "folder" && /^Season \d+$/i.test(node.name)) {
+          // Re-sort children
+          // Split into video, srt, other.
+          const videos = [];
+          const subs = [];
+          const others = [];
+
+          const VIDEO_EXTS = new Set([
+            "mkv",
+            "avi",
+            "mp4",
+            "m4v",
+            "mov",
+            "wmv",
+            "webm",
+            "mpg",
+            "mpeg",
+            "ts",
+            "m2ts",
+          ]);
+
+          const getExt = (name) => {
+            const s = String(name || "");
+            const i = s.lastIndexOf(".");
+            if (i < 0) return "";
+            return s.slice(i + 1).toLowerCase();
+          };
+
+          const isVideo = (name) => VIDEO_EXTS.has(getExt(name));
+          const isSrt = (name) => getExt(name) === "srt";
+
+          // Current children might already be sorted by name/type from server.
+          // We group files. Keep folders at top? The requirement says "file list inside..."
+          // Assuming children are mix of files and folders (though usually Season folders just contain files)
+          // Let's separate folders out first? Or treat them as "others"?
+          // Typically "Others" implies files.
+          // Let's assume we keep folders at the very top (standard), then grouped files.
+
+          const folders = (node.children || []).filter(
+            (c) => c.type === "folder",
+          );
+          const files = (node.children || []).filter((c) => c.type === "file");
+
+          for (const f of files) {
+            if (isVideo(f.name)) videos.push(f);
+            else if (isSrt(f.name)) subs.push(f);
+            else others.push(f);
+          }
+
+          // Insert separators.
+          // How to representation separators in `usb-node`?
+          // We can add a dummy node with type="separator". We need to update usb-node to render it.
+
+          const newChildren = [...folders];
+          if (videos.length) {
+            newChildren.push(...videos);
+          }
+          if (subs.length) {
+            if (newChildren.length)
+              newChildren.push({ type: "separator", name: "sep1" });
+            newChildren.push(...subs);
+          }
+          if (others.length) {
+            if (newChildren.length)
+              newChildren.push({ type: "separator", name: "sep2" });
+            newChildren.push(...others);
+          }
+          node.children = newChildren;
+        }
+        return node;
+      });
     },
     refresh() {
       this.fetchFiles();

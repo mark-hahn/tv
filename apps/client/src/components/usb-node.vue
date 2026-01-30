@@ -1,5 +1,12 @@
 <template>
-  <div class="usb-node">
+  <div
+    v-if="node.type === 'separator'"
+    style="height: 1px; background-color: #ddd; margin: 4px 0"
+  ></div>
+  <div
+    v-else
+    class="usb-node"
+  >
     <div
       class="node-row"
       @click="handleClick($event)"

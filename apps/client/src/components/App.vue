@@ -1894,6 +1894,11 @@ export default {
         return;
       }
 
+      // When currently viewing Local, stay on Local.
+      if (prevPane === "local") {
+        return;
+      }
+
       // When currently viewing Torrents, stay on Torrents.
       // A new show selection should restart torrent search for the new show.
       if (prevPane === "tor") {

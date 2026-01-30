@@ -1399,7 +1399,7 @@ export default {
       }
 
       // Clicking a show should generally return to the Series pane.
-      // Exception: when the user is actively in Map/Actors/Torrents/Subs/Files/Reviews/Trailer/AI, do not switch panes.
+      // Exception: when the user is actively in Map/Actors/Torrents/Subs/Files/Reviews/Trailer/AI/Local, do not switch panes.
       const keepPane = new Set([
         "map",
         "actors",
@@ -1409,6 +1409,7 @@ export default {
         "reviews",
         "trailer",
         "ai",
+        "local",
       ]);
       if (!keepPane.has(this.currentPane)) {
         evtBus.emit("showSeriesPane");

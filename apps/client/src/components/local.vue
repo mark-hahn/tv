@@ -25,118 +25,118 @@
         :style="{
           display: 'flex',
           alignItems: 'center',
-        padding: '8px',
-        borderBottom: '1px solid #ddd',
-        flex: '0 0 auto',
-      }"
-    >
-      <div style="font-weight: bold; margin-right: auto">Local files</div>
-
-      <span
-        v-if="loading"
-        style="color: lightgray; margin-right: 10px; font-weight: bold"
-        >&lt;Loading...&gt;</span
-      >
-
-      <button
-        @click="toShow"
-        title="Select show matching selected folder"
-        style="
-          cursor: pointer;
-          border-radius: 7px;
-          padding: 4px 10px;
-          border: 1px solid #bbb;
-          background-color: whitesmoke;
-          margin-right: 10px;
-        "
-      >
-        To show
-      </button>
-
-      <button
-        @click="selectTopLevel"
-        title="Find folder matching current show"
-        style="
-          cursor: pointer;
-          border-radius: 7px;
-          padding: 4px 10px;
-          border: 1px solid #bbb;
-          background-color: whitesmoke;
-          margin-right: 10px;
-        "
-      >
-        From show
-      </button>
-
-      <button
-        @click="toggleSubs"
-        :style="{
-          cursor: 'pointer',
-          borderRadius: '7px',
-          padding: '4px 10px',
-          border: '1px solid #bbb',
-          backgroundColor: showSubs ? '#ddd' : 'whitesmoke',
-          marginRight: '10px',
+          padding: '8px',
+          borderBottom: '1px solid #ddd',
+          flex: '0 0 auto',
         }"
       >
-        Subs
-      </button>
+        <div style="font-weight: bold; margin-right: auto">Local files</div>
 
-      <button
-        @click="deleteSelected"
-        :disabled="loading || (!selectedName && selectedFiles.size === 0)"
-        title="Delete selected files"
-        style="
-          cursor: pointer;
-          border-radius: 7px;
-          padding: 4px 10px;
-          border: 1px solid #bbb;
-          background-color: whitesmoke;
-          margin-right: 10px;
-        "
-      >
-        Delete
-      </button>
+        <span
+          v-if="loading"
+          style="color: lightgray; margin-right: 10px; font-weight: bold"
+          >&lt;Loading...&gt;</span
+        >
 
-      <button
-        @click="refresh"
-        :disabled="loading"
-        style="
-          cursor: pointer;
-          border-radius: 7px;
-          padding: 4px 10px;
-          border: 1px solid #bbb;
-          background-color: whitesmoke;
-        "
-      >
-        Refresh
-      </button>
-    </div>
+        <button
+          @click="toShow"
+          title="Select show matching selected folder"
+          style="
+            cursor: pointer;
+            border-radius: 7px;
+            padding: 4px 10px;
+            border: 1px solid #bbb;
+            background-color: whitesmoke;
+            margin-right: 10px;
+          "
+        >
+          To show
+        </button>
 
-    <!-- Tree -->
-    <div
-      :style="{
-        flex: '1 1 auto',
-        overflow: 'auto',
-        padding: '0px 8px',
-      }"
-    >
-      <div
-        v-if="error"
-        style="color: red; margin: 10px 0"
-      >
-        {{ error }}
+        <button
+          @click="selectTopLevel"
+          title="Find folder matching current show"
+          style="
+            cursor: pointer;
+            border-radius: 7px;
+            padding: 4px 10px;
+            border: 1px solid #bbb;
+            background-color: whitesmoke;
+            margin-right: 10px;
+          "
+        >
+          From show
+        </button>
+
+        <button
+          @click="toggleSubs"
+          :style="{
+            cursor: 'pointer',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+            backgroundColor: showSubs ? '#ddd' : 'whitesmoke',
+            marginRight: '10px',
+          }"
+        >
+          Subs
+        </button>
+
+        <button
+          @click="deleteSelected"
+          :disabled="loading || (!selectedName && selectedFiles.size === 0)"
+          title="Delete selected files"
+          style="
+            cursor: pointer;
+            border-radius: 7px;
+            padding: 4px 10px;
+            border: 1px solid #bbb;
+            background-color: whitesmoke;
+            margin-right: 10px;
+          "
+        >
+          Delete
+        </button>
+
+        <button
+          @click="refresh"
+          :disabled="loading"
+          style="
+            cursor: pointer;
+            border-radius: 7px;
+            padding: 4px 10px;
+            border: 1px solid #bbb;
+            background-color: whitesmoke;
+          "
+        >
+          Refresh
+        </button>
       </div>
-      <tree-node
-        v-for="node in tree"
-        :key="node.name"
-        :node="node"
-        :ref="(el) => setNodeRef(el, node.name)"
-        :selected="selectedName === node.name"
-        :selected-files="selectedFiles"
-        @node-click="handleNodeClick"
-      />
-    </div>
+
+      <!-- Tree -->
+      <div
+        :style="{
+          flex: '1 1 auto',
+          overflow: 'auto',
+          padding: '0px 8px',
+        }"
+      >
+        <div
+          v-if="error"
+          style="color: red; margin: 10px 0"
+        >
+          {{ error }}
+        </div>
+        <tree-node
+          v-for="node in tree"
+          :key="node.name"
+          :node="node"
+          :ref="(el) => setNodeRef(el, node.name)"
+          :selected="selectedName === node.name"
+          :selected-files="selectedFiles"
+          @node-click="handleNodeClick"
+        />
+      </div>
     </div>
 
     <!-- Subs Pane -->
@@ -199,8 +199,16 @@
 
       <div style="flex: 1 1 auto; overflow: auto; padding: 10px">
         <div v-if="subsLoading">Loading...</div>
-        <div v-if="subsError" style="color: red">{{ subsError }}</div>
-        <template v-for="item in subsItems" :key="item.key">
+        <div
+          v-if="subsError"
+          style="color: red"
+        >
+          {{ subsError }}
+        </div>
+        <template
+          v-for="item in subsItems"
+          :key="item.key"
+        >
           <div
             @click="handleSubClick($event, item)"
             :style="getSubCardStyle(item)"
@@ -230,7 +238,7 @@
                   color: item?.lineColor || '#333',
                 }"
               >
-                {{ item?.line1 || '' }}
+                {{ item?.line1 || "" }}
               </div>
               <div
                 style="
@@ -254,7 +262,7 @@
                     white-space: nowrap;
                   "
                 >
-                  {{ item?.uploader || '' }}
+                  {{ item?.uploader || "" }}
                 </div>
               </div>
             </div>
@@ -811,8 +819,12 @@ export default {
       }
 
       // 2. Find matching show to get IMDb ID
-      const match = (this.allShows || []).find((s) => s.Name === showName) || (this.allShows || []).find((s) => s.Name.toLowerCase() === showName.toLowerCase());
-      
+      const match =
+        (this.allShows || []).find((s) => s.Name === showName) ||
+        (this.allShows || []).find(
+          (s) => s.Name.toLowerCase() === showName.toLowerCase(),
+        );
+
       if (!match) {
         this.subsError = `Show "${showName}" not found in library.`;
         return;
@@ -823,7 +835,7 @@ export default {
         match.ProviderIds?.imdb ||
         match.ProviderIds?.IMDb ||
         match.ProviderIds?.IMDB;
-      
+
       if (!imdb) {
         this.subsError = "Show has no IMDb ID.";
         return;
@@ -833,174 +845,178 @@ export default {
       const digits = raw.toLowerCase().startsWith("tt") ? raw.slice(2) : raw;
       const imdbIdDigits = digits.replace(/\D/g, "").replace(/^0+/, ""); // Normalize
 
-       this.subsLoading = true;
-       try {
-           const params = { imdb_id: imdbIdDigits, page: 1 };
-           if (season !== null) params.season = season;
+      this.subsLoading = true;
+      try {
+        const params = { imdb_id: imdbIdDigits, page: 1 };
+        if (season !== null) params.season = season;
 
-           const res = await subsSearch(params);
-           
-           // Process results similar to subs.vue
-           // Filter for language 'en', type 'subtitle', feature_type 'Tvshow'|'Episode'
-           const data = Array.isArray(res?.data) ? res.data : [];
-           const filtered = data.filter((d) => {
-              if (!d || typeof d !== "object") return false;
-              if (d.type !== "subtitle") return false;
-              if (d.attributes?.language !== "en") return false;
-              const ft = d.attributes?.feature_details?.feature_type;
-              if (ft !== "Tvshow" && ft !== "Episode") return false;
-              return true;
-           });
+        const res = await subsSearch(params);
 
-           this.subsItems = filtered.map(entry => {
-               const release = entry.attributes?.release || "";
-               const uploader = entry.attributes?.uploader?.name || "anonymous";
-               const { season, episode } = this.parseSeasonEpisodeFromEntry(entry);
-                const sStr = season != null ? String(season).padStart(2, "0") : "??";
-                const eStr = episode != null ? String(episode).padStart(2, "0") : "??";
-                const line1 = release ? `S${sStr}E${eStr} | ${release}` : `S${sStr}E${eStr}`;
-                
-                return {
-                    key: entry.id,
-                    line1,
-                    line2: "", // Simplification
-                    uploader,
-                    season,
-                    episode,
-                    raw: entry
-                };
-           });
-           
-           if (!this.subsItems.length) {
-               this.subsError = "No subtitles found.";
-           }
+        // Process results similar to subs.vue
+        // Filter for language 'en', type 'subtitle', feature_type 'Tvshow'|'Episode'
+        const data = Array.isArray(res?.data) ? res.data : [];
+        const filtered = data.filter((d) => {
+          if (!d || typeof d !== "object") return false;
+          if (d.type !== "subtitle") return false;
+          if (d.attributes?.language !== "en") return false;
+          const ft = d.attributes?.feature_details?.feature_type;
+          if (ft !== "Tvshow" && ft !== "Episode") return false;
+          return true;
+        });
 
-       } catch (e) {
-           this.subsError = e.message || "Error searching subs";
-       } finally {
-           this.subsLoading = false;
-       }
+        this.subsItems = filtered.map((entry) => {
+          const release = entry.attributes?.release || "";
+          const uploader = entry.attributes?.uploader?.name || "anonymous";
+          const { season, episode } = this.parseSeasonEpisodeFromEntry(entry);
+          const sStr = season != null ? String(season).padStart(2, "0") : "??";
+          const eStr =
+            episode != null ? String(episode).padStart(2, "0") : "??";
+          const line1 = release
+            ? `S${sStr}E${eStr} | ${release}`
+            : `S${sStr}E${eStr}`;
+
+          return {
+            key: entry.id,
+            line1,
+            line2: "", // Simplification
+            uploader,
+            season,
+            episode,
+            raw: entry,
+          };
+        });
+
+        if (!this.subsItems.length) {
+          this.subsError = "No subtitles found.";
+        }
+      } catch (e) {
+        this.subsError = e.message || "Error searching subs";
+      } finally {
+        this.subsLoading = false;
+      }
     },
     parseSeasonEpisodeFromEntry(entry) {
-        let bestSeason = null;
-        let bestEpisode = null;
-        
-        const tryParse = (txt) => {
-            if (!txt) return;
-            try {
-                const p = parseTorrentTitle.parse(txt);
-                if (p.season != null) bestSeason = p.season;
-                if (p.episode != null) bestEpisode = p.episode;
-            } catch(e) {}
-             
-             // Fallback regex if library fails or returns nothing useful
-            if (bestSeason == null || bestEpisode == null) {
-                let m = txt.match(/S(\d{1,2})E(\d{1,2})/i);
-                if (m) {
-                    if (bestSeason == null) bestSeason = parseInt(m[1]);
-                    if (bestEpisode == null) bestEpisode = parseInt(m[2]);
-                }
-            }
-        };
+      let bestSeason = null;
+      let bestEpisode = null;
 
-        tryParse(entry.attributes?.release);
+      const tryParse = (txt) => {
+        if (!txt) return;
+        try {
+          const p = parseTorrentTitle.parse(txt);
+          if (p.season != null) bestSeason = p.season;
+          if (p.episode != null) bestEpisode = p.episode;
+        } catch (e) {}
+
+        // Fallback regex if library fails or returns nothing useful
         if (bestSeason == null || bestEpisode == null) {
-             // Try filename if available
-             const files = entry.attributes?.files || [];
-             if (files.length > 0) tryParse(files[0].file_name);
+          let m = txt.match(/S(\d{1,2})E(\d{1,2})/i);
+          if (m) {
+            if (bestSeason == null) bestSeason = parseInt(m[1]);
+            if (bestEpisode == null) bestEpisode = parseInt(m[2]);
+          }
         }
+      };
 
-        return { season: bestSeason, episode: bestEpisode };
+      tryParse(entry.attributes?.release);
+      if (bestSeason == null || bestEpisode == null) {
+        // Try filename if available
+        const files = entry.attributes?.files || [];
+        if (files.length > 0) tryParse(files[0].file_name);
+      }
+
+      return { season: bestSeason, episode: bestEpisode };
     },
     getSubCardStyle(item) {
-        const isSelected = this.selectedSubKeys.has(item.key);
-        return {
-            padding: "8px",
-            background: isSelected ? "#fffacd" : "#fff",
-            borderRadius: "5px",
-            border: "1px solid #ddd",
-            cursor: "pointer",
-            marginBottom: "4px",
-            userSelect: "none"
-        };
+      const isSelected = this.selectedSubKeys.has(item.key);
+      return {
+        padding: "8px",
+        background: isSelected ? "#fffacd" : "#fff",
+        borderRadius: "5px",
+        border: "1px solid #ddd",
+        cursor: "pointer",
+        marginBottom: "4px",
+        userSelect: "none",
+      };
     },
     handleSubClick(event, item) {
-        const key = item.key;
-        const isCtrl = !!(event.ctrlKey || event.metaKey);
-        const isShift = !!event.shiftKey;
+      const key = item.key;
+      const isCtrl = !!(event.ctrlKey || event.metaKey);
+      const isShift = !!event.shiftKey;
 
-        if (isShift && this.lastClickedSubKey) {
-            // Range select (simplified: index based)
-            const idx1 = this.subsItems.findIndex(i => i.key === this.lastClickedSubKey);
-            const idx2 = this.subsItems.findIndex(i => i.key === key);
-            if (idx1 !== -1 && idx2 !== -1) {
-                const s = Math.min(idx1, idx2);
-                const e = Math.max(idx1, idx2);
-                const range = this.subsItems.slice(s, e + 1);
-                range.forEach(i => this.selectedSubKeys.add(i.key));
-            }
-        } else if (isCtrl) {
-            if (this.selectedSubKeys.has(key)) this.selectedSubKeys.delete(key);
-            else this.selectedSubKeys.add(key);
-        } else {
-            this.selectedSubKeys.clear();
-            this.selectedSubKeys.add(key);
+      if (isShift && this.lastClickedSubKey) {
+        // Range select (simplified: index based)
+        const idx1 = this.subsItems.findIndex(
+          (i) => i.key === this.lastClickedSubKey,
+        );
+        const idx2 = this.subsItems.findIndex((i) => i.key === key);
+        if (idx1 !== -1 && idx2 !== -1) {
+          const s = Math.min(idx1, idx2);
+          const e = Math.max(idx1, idx2);
+          const range = this.subsItems.slice(s, e + 1);
+          range.forEach((i) => this.selectedSubKeys.add(i.key));
         }
-        this.lastClickedSubKey = key;
+      } else if (isCtrl) {
+        if (this.selectedSubKeys.has(key)) this.selectedSubKeys.delete(key);
+        else this.selectedSubKeys.add(key);
+      } else {
+        this.selectedSubKeys.clear();
+        this.selectedSubKeys.add(key);
+      }
+      this.lastClickedSubKey = key;
     },
     openLibrary() {
-        evtBus.emit("startLibraryRefresh");
+      evtBus.emit("startLibraryRefresh");
     },
     async applySubs() {
-         if (this.applyInProgress) return;
-         if (this.selectedSubKeys.size === 0) return;
-         
-         this.applyInProgress = true;
-         // build payload
-         // Needed: [{ file_id, showName, season, episode }]
-         // We have file_id inside item.raw.attributes.files? Or is key the file_id?
-         // In subs.vue, item.key is not always file_id. OpenSubtitles entries have multiple files sometimes.
-         // subs.vue logic uses `buildFileIdObjsPayload`. It looks at `validEntries`.
-         // `subsSearch` returns groupings. `files` attribute contains file_ids.
-         
-         // Simplified: Pick the first file of the selected subtitle entry.
-         const payload = [];
-         
-         for (const key of this.selectedSubKeys) {
-             const item = this.subsItems.find(i => i.key === key);
-             if (!item) continue;
-             const entry = item.raw;
-             const files = entry.attributes?.files || [];
-             if (!files.length) continue;
-             const fileId = files[0].file_id;
-             if (!fileId) continue;
-             
-             payload.push({
-                 file_id: Number(fileId),
-                 showName: this.currentShowName,
-                 season: item.season,
-                 episode: item.episode
-             });
-         }
-         
-         if (!payload.length) {
-             alert("No valid files found in selection");
-             this.applyInProgress = false;
-             return;
-         }
+      if (this.applyInProgress) return;
+      if (this.selectedSubKeys.size === 0) return;
 
-         try {
-             const res = await applySubFiles(payload);
-              if (res && res.error) {
-                 alert("Error applying subs: " + res.error);
-             } else {
-                 alert("Subs applied successfully");
-             }
-         } catch (e) {
-             alert("Error applying subs: " + e.message);
-         } finally {
-             this.applyInProgress = false;
-         }
+      this.applyInProgress = true;
+      // build payload
+      // Needed: [{ file_id, showName, season, episode }]
+      // We have file_id inside item.raw.attributes.files? Or is key the file_id?
+      // In subs.vue, item.key is not always file_id. OpenSubtitles entries have multiple files sometimes.
+      // subs.vue logic uses `buildFileIdObjsPayload`. It looks at `validEntries`.
+      // `subsSearch` returns groupings. `files` attribute contains file_ids.
+
+      // Simplified: Pick the first file of the selected subtitle entry.
+      const payload = [];
+
+      for (const key of this.selectedSubKeys) {
+        const item = this.subsItems.find((i) => i.key === key);
+        if (!item) continue;
+        const entry = item.raw;
+        const files = entry.attributes?.files || [];
+        if (!files.length) continue;
+        const fileId = files[0].file_id;
+        if (!fileId) continue;
+
+        payload.push({
+          file_id: Number(fileId),
+          showName: this.currentShowName,
+          season: item.season,
+          episode: item.episode,
+        });
+      }
+
+      if (!payload.length) {
+        alert("No valid files found in selection");
+        this.applyInProgress = false;
+        return;
+      }
+
+      try {
+        const res = await applySubFiles(payload);
+        if (res && res.error) {
+          alert("Error applying subs: " + res.error);
+        } else {
+          alert("Subs applied successfully");
+        }
+      } catch (e) {
+        alert("Error applying subs: " + e.message);
+      } finally {
+        this.applyInProgress = false;
+      }
     },
   },
 };

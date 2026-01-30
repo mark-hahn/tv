@@ -117,8 +117,12 @@ export default {
       }
 
       if (this.node.type === "folder") {
-        this.expanded = !this.expanded;
+        if (!event.ctrlKey && !event.shiftKey) {
+          this.expanded = !this.expanded;
+          return;
+        }
       }
+
       this.$emit("node-click", {
         node: this.node,
         depth: this.depth,

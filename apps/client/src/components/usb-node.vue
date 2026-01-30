@@ -99,15 +99,13 @@ export default {
   methods: {
     handleClick(event) {
       if (event.altKey) {
-        if (this.node.type === "file") {
-          navigator.clipboard
-            .writeText(this.fullPath)
-            .catch((err) => console.error("Copy failed", err));
-          this.highlighted = true;
-          setTimeout(() => {
-            this.highlighted = false;
-          }, 300);
-        }
+        navigator.clipboard
+          .writeText(this.fullPath)
+          .catch((err) => console.error("Copy failed", err));
+        this.highlighted = true;
+        setTimeout(() => {
+          this.highlighted = false;
+        }, 300);
         return;
       }
 

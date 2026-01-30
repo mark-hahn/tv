@@ -169,27 +169,74 @@
           >
         </div>
         <div style="display: flex; gap: 8px; align-items: center">
+          <button
+            @click="adjustOffset(-100)"
+            title="-100ms"
+            :disabled="_trimBusy"
+            style="
+              cursor: pointer;
+              border-radius: 4px;
+              padding: 2px 6px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            ↓
+          </button>
+          <button
+            @click="adjustOffset(-500)"
+            title="-500ms"
+            :disabled="_trimBusy"
+            style="
+              cursor: pointer;
+              border-radius: 4px;
+              padding: 2px 6px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            ↓
+          </button>
           <div
             style="
               font-size: 12px;
               font-weight: normal;
               color: #555;
-              margin-right: 4px;
+              margin: 0 4px;
+              min-width: 60px;
+              text-align: center;
             "
           >
             {{ cumulativeTrim }} ms
           </div>
-          <input
-            v-model="trimMsText"
-            @keyup.enter.stop.prevent="acceptTrimMs"
+          <button
+            @click="adjustOffset(500)"
+            title="+500ms"
+            :disabled="_trimBusy"
             style="
-              width: 50px;
-              font-size: 12px;
-              padding: 2px 4px;
-              border: 1px solid #bbb;
+              cursor: pointer;
               border-radius: 4px;
+              padding: 2px 6px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
             "
-          />
+          >
+            ↑
+          </button>
+          <button
+            @click="adjustOffset(100)"
+            title="+100ms"
+            :disabled="_trimBusy"
+            style="
+              cursor: pointer;
+              border-radius: 4px;
+              padding: 2px 6px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            ↑
+          </button>
           <button
             @click="openLibrary"
             style="
@@ -547,7 +594,6 @@ export default {
 
       // Offset
       cumulativeTrim: 0,
-      trimMsText: "",
       _trimBusy: false,
     };
   },
@@ -1356,19 +1402,11 @@ export default {
       this.lastClickedSubKey = key;
       this.cumulativeTrim = 0;
     },
-    async acceptTrimMs() {
+    async adjustOffset(offset) {
       if (this._trimBusy) return;
       this._trimBusy = true;
       try {
-        const raw = String(this.trimMsText || "").trim();
-        if (!raw) return;
-        if (!/^[+-]?\d+$/.test(raw)) return;
-        const offset = Number.parseInt(raw, 10);
-        if (!Number.isFinite(offset)) return;
-
-        const ok = window.confirm(`Is it ok to adjust timing by ${offset} ms?`);
-        if (!ok) return;
-
+        if (!offset || typeof offset !== "number") return;
         // Build Payload
         const payload = [];
         for (const key of this.selectedSubKeys) {
@@ -1392,7 +1430,7 @@ export default {
         }
 
         if (!payload.length) {
-          alert("No valid files found in selection");
+          // No alert permitted
           return;
         }
 
@@ -1432,13 +1470,13 @@ export default {
           typeof res === "object" &&
           typeof res.error === "string"
         ) {
-          alert("Error: " + res.error);
+          console.error("Error: " + res.error);
         } else {
           // String "ok" or object without failures/error.
           this.cumulativeTrim += offset;
         }
       } catch (e) {
-        alert("Error: " + (e.message || e));
+        console.error("Error: " + (e.message || e));
       } finally {
         this._trimBusy = false;
       }

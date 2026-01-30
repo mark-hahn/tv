@@ -225,27 +225,25 @@ export default {
         return;
       }
 
-      // 2. File selection
-      if (node.type === "file") {
+      // 2. File OR Folder selection
+      // Allow selecting nested folders too
+      if (node.type === "file" || node.type === "folder") {
         const parentPath = fullPath.substring(0, fullPath.lastIndexOf("/"));
 
         // If switching folders, or if a top-level folder was previously selected, reset.
         if (this.selectedName) {
-          // Clearing top-level highlight because we are now selecting files
           this.selectedName = null;
         }
 
         if (
           this.selectionParentPath &&
-          this.selectionParentPath !== parentPath
+          this.selectionParentPath !== parentPath &&
+          !this.selectedFiles.has(fullPath)
         ) {
-          // We are in a different folder.
           this.selectedFiles.clear();
           this.selectionParentPath = null;
-          // Fall through to treat as new selection
         }
 
-        // Set the context if not set
         if (!this.selectionParentPath) {
           this.selectionParentPath = parentPath;
         }
@@ -268,9 +266,8 @@ export default {
               const end = Math.max(idx1, idx2);
               const range = siblings.slice(start, end + 1);
 
-              // Add all into selection
               for (const s of range) {
-                if (s.type === "file") {
+                if (s.type === "file" || s.type === "folder") {
                   this.selectedFiles.add(this.getPath(parentPath, s.name));
                 }
               }

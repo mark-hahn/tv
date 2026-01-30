@@ -30,7 +30,7 @@
 
       <button
         @click="forceDown"
-        :disabled="loading || !selectedName"
+        :disabled="loading || (!selectedName && selectedFiles.size === 0)"
         style="
           cursor: pointer;
           border-radius: 7px;
@@ -152,93 +152,102 @@ export default {
       }
 
       // 2. File selection
-      if (node.type === "file") {
+      if (node.type === "file" || node.type === "folder") {
         const parentPath = fullPath.substring(0, fullPath.lastIndexOf("/"));
-        
+
         // If switching folders, or if a top-level folder was previously selected, reset.
         // Also if we have existing file selection but in a DIFFERENT parent, reset?
         // User requirements: "when files inside folder are selected do not allow any files outside of that folder ... to be selected"
-        
+
         if (this.selectedName) {
-            // Clearing top-level highlight because we are now selecting files
-            this.selectedName = null;
+          // Clearing top-level highlight because we are now selecting files
+          this.selectedName = null;
         }
 
-        if (this.selectionParentPath && this.selectionParentPath !== parentPath) {
-           // We are in a different folder. 
-           // If user tries to add to selection (ctrl/shift), we must block or reset.
-           // Prompt says "do not allow". We'll treat it as a reset (switch context).
-           this.selectedFiles.clear();
-           this.selectionParentPath = null;
-           // Fall through to treat as new selection
+        if (
+          this.selectionParentPath &&
+          this.selectionParentPath !== parentPath
+        ) {
+          // We are in a different folder.
+          // If user tries to add to selection (ctrl/shift), we must block or reset.
+          // Prompt says "do not allow". We'll treat it as a reset (switch context).
+          this.selectedFiles.clear();
+          this.selectionParentPath = null;
+          // Fall through to treat as new selection
         }
 
         // Set the context if not set
         if (!this.selectionParentPath) {
-            this.selectionParentPath = parentPath;
+          this.selectionParentPath = parentPath;
         }
 
-        if (shiftKey && this.lastSelectedFile && this.selectionParentPath === parentPath) {
-            // Handle range selection
-            // We need to find the list of siblings to determine range.
-            // This is tricky without reference to the parent's children array.
-            // But we can traverse `this.tree` to find the parent node.
-            const siblings = this.getSiblings(this.selectionParentPath);
-            if (siblings) {
-                const idx1 = siblings.findIndex(n => this.getPath(parentPath, n.name) === this.lastSelectedFile);
-                const idx2 = siblings.findIndex(n => n.name === node.name);
-                
-                if (idx1 !== -1 && idx2 !== -1) {
-                    const start = Math.min(idx1, idx2);
-                    const end = Math.max(idx1, idx2);
-                    const range = siblings.slice(start, end + 1);
-                    
-                    // Add all into selection
-                    for (const s of range) {
-                        if (s.type === 'file') {
-                            this.selectedFiles.add(this.getPath(parentPath, s.name));
-                        }
-                    }
+        if (
+          shiftKey &&
+          this.lastSelectedFile &&
+          this.selectionParentPath === parentPath
+        ) {
+          // Handle range selection
+          // We need to find the list of siblings to determine range.
+          // This is tricky without reference to the parent's children array.
+          // But we can traverse `this.tree` to find the parent node.
+          const siblings = this.getSiblings(this.selectionParentPath);
+          if (siblings) {
+            const idx1 = siblings.findIndex(
+              (n) => this.getPath(parentPath, n.name) === this.lastSelectedFile,
+            );
+            const idx2 = siblings.findIndex((n) => n.name === node.name);
+
+            if (idx1 !== -1 && idx2 !== -1) {
+              const start = Math.min(idx1, idx2);
+              const end = Math.max(idx1, idx2);
+              const range = siblings.slice(start, end + 1);
+
+              // Add all into selection
+              for (const s of range) {
+                if (s.type === "file" || s.type === "folder") {
+                  this.selectedFiles.add(this.getPath(parentPath, s.name));
                 }
+              }
             }
+          }
         } else if (ctrlKey) {
-            // Toggle
-            if (this.selectedFiles.has(fullPath)) {
-                this.selectedFiles.delete(fullPath);
-                if (this.selectedFiles.size === 0) {
-                    this.selectionParentPath = null;
-                }
-            } else {
-                this.selectedFiles.add(fullPath);
+          // Toggle
+          if (this.selectedFiles.has(fullPath)) {
+            this.selectedFiles.delete(fullPath);
+            if (this.selectedFiles.size === 0) {
+              this.selectionParentPath = null;
             }
-            this.lastSelectedFile = fullPath;
-        } else {
-            // Single select
-            this.selectedFiles.clear();
+          } else {
             this.selectedFiles.add(fullPath);
-            this.selectionParentPath = parentPath;
-            this.lastSelectedFile = fullPath;
+          }
+          this.lastSelectedFile = fullPath;
+        } else {
+          // Single select
+          this.selectedFiles.clear();
+          this.selectedFiles.add(fullPath);
+          this.selectionParentPath = parentPath;
+          this.lastSelectedFile = fullPath;
         }
       }
     },
     getPath(parent, name) {
-        return parent ? `${parent}/${name}` : name;
+      return parent ? `${parent}/${name}` : name;
     },
     getSiblings(parentPath) {
-        // Traverse tree to find the array of children for this path
-        // parentPath e.g. "ShowName/Season 1"
-        if (!parentPath) return []; // Should not happen for files inside folder
-        const parts = parentPath.split('/');
-        // First part is top level
-        let current = this.tree.find(n => n.name === parts[0]);
+      // Traverse tree to find the array of children for this path
+      // parentPath e.g. "ShowName/Season 1"
+      if (!parentPath) return []; // Should not happen for files inside folder
+      const parts = parentPath.split("/");
+      // First part is top level
+      let current = this.tree.find((n) => n.name === parts[0]);
+      if (!current) return [];
+
+      for (let i = 1; i < parts.length; i++) {
+        if (!current.children) return [];
+        current = current.children.find((n) => n.name === parts[i]);
         if (!current) return [];
-        
-        for (let i = 1; i < parts.length; i++) {
-            if (!current.children) return [];
-            current = current.children.find(n => n.name === parts[i]);
-            if (!current) return [];
-        }
-        return current.children || [];
+      }
+      return current.children || [];
     },
     collectFiles(node, currentPath) {
       if (node.type === "file") {
@@ -269,28 +278,41 @@ export default {
         files = this.collectFiles(node, node.name);
         label = `'${node.name}'`;
       } else {
-        // Individual files selected
+        // Top level folders don't have parentPath/siblings logic here easily,
+        // but if selectionParentPath is null, we can check root tree?
+        // Actually, selectionParentPath is set when individual files/subfolders are selected.
+
+        // Individual files OR subfolders selected
         // We need to construct the file entries manually.
         // We know they are all in this.selectionParentPath
         // And we have the full paths in this.selectedFiles
         // We need the date/size info though, which is in the node objects.
-        // So we should re-find them.
+
+        // Problem: getSiblings(selectionParentPath) just gets the immediate children.
+        // If we selected a file deep inside, selectionParentPath is its parent folder.
+        // That works.
+
         const parentPath = this.selectionParentPath;
         const siblings = this.getSiblings(parentPath);
-        
+
         files = [];
         for (const fileFullPath of this.selectedFiles) {
-            const fileName = fileFullPath.split('/').pop();
-            const node = siblings.find(n => n.name === fileName);
-            if (node) {
-                 // Reconstruct format expected by server/apps/down: YYYY-MM-DD-Path-Size
-                 // But wait, the path should be full relative path from root?
-                 // node.name is just filename. currentPath in collectFiles was accumulating.
-                 // fullPath is exactly that accumulated path.
-                 const date = node.date || new Date().toISOString().slice(0, 10);
-                 const size = node.size || 0;
-                 files.push(`${date}-${fileFullPath}-${size}`);
+          const fileName = fileFullPath.split("/").pop();
+          const node = siblings.find((n) => n.name === fileName);
+          if (node) {
+            // If it's a file, add it directly.
+            // If it's a folder, recurse and add all its contents.
+            const date = node.date || new Date().toISOString().slice(0, 10);
+            const size = node.size || 0;
+
+            if (node.type === "file") {
+              files.push(`${date}-${fileFullPath}-${size}`);
+            } else if (node.type === "folder") {
+              // Recurse
+              const childFiles = this.collectFiles(node, fileFullPath);
+              files.push(...childFiles);
             }
+          }
         }
         label = `${files.length} selected files`;
       }
@@ -300,8 +322,7 @@ export default {
         return;
       }
 
-      if (!confirm(`Force download ${label}?`))
-        return;
+      if (!confirm(`Force download ${label}?`)) return;
 
       this.loading = true;
       try {

@@ -89,7 +89,7 @@ export default {
       if (this.highlighted) return "#ffcccc";
       if (this.selected) return "lightyellow";
       if (
-        this.node.type === "file" &&
+        (this.node.type === "file" || this.node.type === "folder") &&
         this.selectedFiles &&
         this.selectedFiles.has(this.fullPath)
       ) {

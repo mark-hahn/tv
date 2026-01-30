@@ -233,7 +233,7 @@
           style="
             height: 1px;
             width: 100%;
-            background-color: #ddd;
+            background-color: #000;
             margin-top: 6px;
           "
         ></div>
@@ -319,7 +319,7 @@
             style="
               height: 1px;
               width: 100%;
-              background-color: #ddd;
+              background-color: #000;
               margin: 8px 0;
             "
           ></div>
@@ -341,7 +341,7 @@
             <div
               v-for="(f, idx) in applyFailures"
               :key="idx"
-              style="padding: 4px 0; border-bottom: 1px solid #eee"
+              style="padding: 4px 0; border-bottom: 1px solid #000"
             >
               {{ formatApplyFailure(f) }}
             </div>

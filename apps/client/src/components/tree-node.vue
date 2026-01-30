@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="node.type === 'separator'"
-    style="height: 1px; background-color: #ddd; margin: 4px 0"
+    style="height: 1px; background-color: #000; margin: 4px 0"
   ></div>
   <div
     v-else

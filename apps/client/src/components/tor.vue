@@ -156,7 +156,7 @@
           style="
             height: 1px;
             width: 100%;
-            background-color: #ddd;
+            background-color: #000;
             margin-top: 6px;
           "
         ></div>

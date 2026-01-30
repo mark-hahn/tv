@@ -864,6 +864,18 @@ export default {
         }
       }
 
+      // Filter non-video files
+      const VIDEO_EXTS = new Set([
+        "mkv", "avi", "mp4", "m4v", "mov", "wmv", 
+        "webm", "mpg", "mpeg", "ts", "m2ts",
+      ]);
+      targetFiles = targetFiles.filter(name => {
+         const i = name.lastIndexOf(".");
+         if (i < 0) return false;
+         const ext = name.slice(i + 1).toLowerCase();
+         return VIDEO_EXTS.has(ext);
+      });
+
       this.currentShowName = showName || "";
 
       if (!showName) {
@@ -890,18 +902,16 @@ export default {
 
       for (const f of targetFiles) {
         const se = parseFile(f);
-        if (se && se.s != null) {
+        if (se && se.s != null && se.e != null) {
           neededSeasons.add(se.s);
-          if (se.e != null) {
-            needed.set(`${se.s}:${se.e}`, true);
-          }
+          needed.set(`${se.s}:${se.e}`, true);
         }
       }
 
-      // If we have files but couldn't detect S/E, what to do?
-      // If we have no files (empty folder?), what to do?
-      // If we have no S/E logic, we can't filter effectively.
-      // But we can fallback to searching without season constraint if set is empty?
+      if (needed.size === 0) {
+        this.subsError = "No valid SxxExx files found in selection.";
+         return;
+      }
 
       // 3. Find matching show
       const match =
@@ -1008,11 +1018,8 @@ export default {
           if (needed.size > 0) {
             if (season != null && episode != null) {
               if (!needed.has(`${season}:${episode}`)) continue;
-            } else if (season != null && episode == null) {
-              // Season pack? Keep it if season is in neededSeasons?
-              if (!neededSeasons.has(season)) continue;
             } else {
-              // Unknown S/E. Discard if we are targeting specific files.
+              // Strict mode: skip if we can't identify the episode
               continue;
             }
           }

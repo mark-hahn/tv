@@ -222,7 +222,7 @@
             </div>
             <div
               style="
-                border-bottom: 1px solid #ddd;
+                border-bottom: 1px solid #000;
                 width: 100%;
                 margin-bottom: 5px;
               "

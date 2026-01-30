@@ -29,6 +29,22 @@
       >
 
       <button
+        @click="selectTopLevel"
+        :disabled="selectedFiles.size === 0"
+        title="Select top-level folder of currently selected file"
+        style="
+          cursor: pointer;
+          border-radius: 7px;
+          padding: 4px 10px;
+          border: 1px solid #bbb;
+          background-color: whitesmoke;
+          margin-right: 10px;
+        "
+      >
+        Select
+      </button>
+
+      <button
         @click="refresh"
         :disabled="loading"
         style="
@@ -210,6 +226,16 @@ export default {
         }
         return node;
       });
+    },
+    selectTopLevel() {
+      if (this.selectedFiles.size === 0) return;
+      const first = [...this.selectedFiles][0];
+      if (!first) return;
+      const root = first.split("/")[0];
+      this.selectedName = root;
+      this.selectedFiles.clear();
+      this.selectionParentPath = null;
+      this.lastSelectedFile = null;
     },
     refresh() {
       this.fetchFiles();

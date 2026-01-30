@@ -88,7 +88,7 @@
       >
         {{ error }}
       </div>
-      <usb-node
+      <tree-node
         v-for="node in tree"
         :key="node.name"
         :node="node"
@@ -102,13 +102,13 @@
 </template>
 
 <script>
-import UsbNode from "./usb-node.vue";
+import TreeNode from "./tree-node.vue";
 import { config } from "../config.js";
 import { deletePath } from "../srvr.js";
 
 export default {
   name: "Local",
-  components: { UsbNode },
+  components: { TreeNode },
   props: {
     active: Boolean,
     show: Object,
@@ -262,8 +262,8 @@ export default {
           }
 
           // Insert separators.
-          // How to representation separators in `usb-node`?
-          // We can add a dummy node with type="separator". We need to update usb-node to render it.
+          // How to representation separators in `tree-node`?
+          // We can add a dummy node with type="separator". We need to update tree-node to render it.
 
           const newChildren = [...folders];
           if (videos.length) {

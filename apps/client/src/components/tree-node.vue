@@ -5,7 +5,7 @@
   ></div>
   <div
     v-else
-    class="usb-node"
+    class="tree-node"
   >
     <div
       class="node-row"
@@ -52,7 +52,7 @@
       >
     </div>
     <div v-if="expanded && node.children && node.children.length">
-      <usb-node
+      <tree-node
         v-for="child in node.children"
         :key="child.name"
         :node="child"
@@ -61,14 +61,14 @@
         :selected="false"
         :selected-files="selectedFiles"
         @node-click="$emit('node-click', $event)"
-      ></usb-node>
+      ></tree-node>
     </div>
   </div>
 </template>
 
 <script>
 export default {
-  name: "UsbNode",
+  name: "TreeNode",
   props: {
     node: { type: Object, required: true },
     depth: { type: Number, default: 0 },

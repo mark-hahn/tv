@@ -72,7 +72,7 @@
       >
         {{ error }}
       </div>
-      <usb-node
+      <tree-node
         v-for="node in tree"
         :key="node.name"
         :node="node"
@@ -85,12 +85,12 @@
 </template>
 
 <script>
-import UsbNode from "./usb-node.vue";
+import TreeNode from "./tree-node.vue";
 import { config } from "../config.js";
 
 export default {
   name: "Usb",
-  components: { UsbNode },
+  components: { TreeNode },
   props: {
     active: Boolean,
   },

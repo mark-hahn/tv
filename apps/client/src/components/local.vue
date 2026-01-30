@@ -179,6 +179,7 @@
               padding: 2px 6px;
               border: 1px solid #bbb;
               background-color: whitesmoke;
+              font-weight: bold;
             "
           >
             ↓
@@ -193,17 +194,14 @@
               padding: 2px 6px;
               border: 1px solid #bbb;
               background-color: whitesmoke;
+              font-weight: bold;
             "
           >
             ↓
           </button>
           <div
             style="
-              font-size: 12px;
-              font-weight: normal;
-              color: #555;
-              margin: 0 4px;
-              min-width: 60px;
+              min-width: 40px;
               text-align: center;
             "
           >
@@ -219,6 +217,7 @@
               padding: 2px 6px;
               border: 1px solid #bbb;
               background-color: whitesmoke;
+              font-weight: bold;
             "
           >
             ↑
@@ -233,6 +232,7 @@
               padding: 2px 6px;
               border: 1px solid #bbb;
               background-color: whitesmoke;
+              font-weight: bold;
             "
           >
             ↑

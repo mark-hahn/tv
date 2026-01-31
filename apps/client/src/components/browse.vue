@@ -158,8 +158,8 @@
               justifyContent: 'center',
             }"
           >
-            Get</button
-          >
+            Get
+          </button>
           <button
             v-if="hasTvdbEntry && !isLoadingNext && !suppressButtons"
             @click="toggleTvdbInfo"
@@ -276,8 +276,8 @@
               justifyContent: 'center',
             }"
           >
-            Official
-          </button><span
+            Official</button
+          ><span
             v-if="loadingRemotesCount &gt; 0 &amp;&amp; !isLoadingNext"
             :style="{
               marginLeft: '10px',

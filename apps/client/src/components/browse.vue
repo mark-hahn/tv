@@ -62,12 +62,45 @@
       >
         <div
           :style="{
-            fontWeight: 'bold',
-            fontSize: '16px',
-            minWidth: 0,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '10px',
           }"
         >
-          {{ galleryTitleLine }}
+          <div
+            :style="{
+              fontWeight: 'bold',
+              fontSize: '16px',
+              minWidth: 0,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }"
+          >
+            {{ galleryTitleLine }}
+          </div>
+          <div
+            :style="{
+              flex: '0 0 auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+            }"
+          >
+            <label for="browseSearch" :style="{ fontWeight: 'bold' }">Search</label>
+            <input
+              id="browseSearch"
+              v-model="manualSearchQuery"
+              @keyup.enter="handleManualSearch"
+              :style="{
+                border: '1px solid #ccc',
+                borderRadius: '3px',
+                padding: '2px 5px',
+                width: '80px',
+              }"
+            />
+          </div>
         </div>
         <div
           :style="{
@@ -91,29 +124,18 @@
             {{ infoLine }}
           </div>
           <div
+            v-if="watchedStatus"
             :style="{
-              flex: '0 0 auto',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
+              fontSize: '14px',
+              backgroundColor: '#dfd',
+              fontWeight: 'bold',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              padding: '2px 5px',
+              borderRadius: '3px',
             }"
           >
-            <label
-              for="browseSearch"
-              :style="{ fontWeight: 'bold' }"
-              >Search</label
-            >
-            <input
-              id="browseSearch"
-              v-model="manualSearchQuery"
-              @keyup.enter="handleManualSearch"
-              :style="{
-                border: '1px solid #ccc',
-                borderRadius: '3px',
-                padding: '2px 5px',
-                width: '80px',
-              }"
-            />
+            {{ watchedStatus }}
           </div>
         </div>
       </div>
@@ -1030,6 +1052,23 @@ export default {
       showTvdbInfo.value = !showTvdbInfo.value;
     };
 
+    const watchedStatus = computed(() => {
+      const data = matchingTvdbEntry.value;
+      if (!data) return "";
+
+      if ((data.episodeCount ?? 0) > 0) {
+        let wCount = data.watchedCount ?? 0;
+        if (data.showId && data.showId.startsWith("noemby-")) wCount = 0;
+        const total = data.episodeCount;
+        if (wCount === total) {
+          return `Watched all ${total} episodes`;
+        } else {
+          return `Watched ${wCount} of ${total}`;
+        }
+      }
+      return "";
+    });
+
     const tvdbInfo = computed(() => {
       const data = matchingTvdbEntry.value;
       if (!data) return {};
@@ -1762,6 +1801,7 @@ export default {
       toggleTvdbInfo,
       tvdbInfo,
       showTvdbInfo,
+      watchedStatus,
       manualSearchQuery,
       handleManualSearch,
       existingShowMatch,

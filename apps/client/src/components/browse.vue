@@ -77,6 +77,7 @@
             :style="{
               flex: '0 0 auto',
               fontSize: '15px',
+              fontWeight: 'bold',
             }"
           >
             {{ infoLine }}
@@ -1021,7 +1022,7 @@ export default {
     const infoLine = computed(() => {
       if (!curTvdb.value) return "";
       const t = curTvdb.value;
-      let line = `${t.country || ""} | ${t.primary_language || ""} | ${t.network || ""}`;
+      let line = `${(t.country || "").toUpperCase()} | ${(t.primary_language || "").toUpperCase()} | ${t.network || ""}`;
 
       // Inject ID from browse record if available
       const browseItem = parsedTitles.value[selectedTitleIdx.value];

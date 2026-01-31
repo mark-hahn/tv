@@ -674,7 +674,7 @@ export default {
 
     const curTitle = ref("");
     const curTvdb = ref(null);
-    const autoNextIfEmpty = ref(false);
+    const shouldAutoAdvance = ref(false);
     const getRemotesResults = ref([]);
     const _lastRemotesKey = ref("");
     const titleStrings = ref([]);
@@ -871,7 +871,7 @@ export default {
     };
 
     const handleNext = async () => {
-      autoNextIfEmpty.value = false;
+      shouldAutoAdvance.value = false;
       if (previewMode.value) {
         evtBus.emit("exitPreviewMode");
       }
@@ -950,15 +950,12 @@ export default {
 
           titleStrings.value = [...titleStrings.value, ...added];
 
-          if (added.length === 1) {
-            autoNextIfEmpty.value = true;
-          } else {
-            autoNextIfEmpty.value = false;
-          }
+          // Auto-advance if we just loaded items and the resulting selection has no info
+          shouldAutoAdvance.value = true;
 
           // await scrollTitlesToBottom(); // allow watcher to handle this
         } else {
-          autoNextIfEmpty.value = false;
+          shouldAutoAdvance.value = false;
           // If none returned, ensure the sentinel exists (once).
           const hasNoMore = titleStrings.value.some(
             (s) => String(s) === NO_MORE_ENTRY,
@@ -1629,8 +1626,8 @@ export default {
     };
 
     const handleSearchComplete = (tvdb) => {
-      if (autoNextIfEmpty.value) {
-        autoNextIfEmpty.value = false;
+      if (shouldAutoAdvance.value) {
+        shouldAutoAdvance.value = false;
         if (!tvdb) {
           void handleNext();
         }
@@ -1666,7 +1663,7 @@ export default {
     const selectTitle = async (idx, fromUser = false) => {
       if (fromUser) {
         justFetchedNext.value = false;
-        autoNextIfEmpty.value = false;
+        shouldAutoAdvance.value = false;
       }
       const item = parsedTitles.value[idx];
       if (item?.rejectStatus === "msg") {
@@ -1687,8 +1684,8 @@ export default {
         srchStr.value = nextTitle;
       } else {
         await nextTick();
-        if (autoNextIfEmpty.value) {
-          autoNextIfEmpty.value = false;
+        if (shouldAutoAdvance.value) {
+          shouldAutoAdvance.value = false;
           if (!curTvdb.value) {
             void handleNext();
           } else {

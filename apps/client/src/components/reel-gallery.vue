@@ -154,7 +154,10 @@ export default {
 
       try {
         const data = await srchTvdbData(currentSrch);
-        if (props.srchStr !== currentSrch) return;
+
+        if (props.srchStr !== currentSrch) {
+          return;
+        }
 
         if (data && data.length > 0) {
           let sorted = [...data];

@@ -84,10 +84,9 @@
       >
         <div
           id="mapshow"
+          class="pane-header-title"
           :style="{
             marginLeft: '15px',
-            fontWeight: 'bold',
-            fontSize: sizing.seriesFontSize || '25px',
           }"
         >
           {{ mapShow?.Name }}

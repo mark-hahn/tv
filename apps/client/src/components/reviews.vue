@@ -49,9 +49,8 @@
         "
       >
         <div
+          class="pane-header-title"
           :style="{
-            fontWeight: 'bold',
-            fontSize: sizing.seriesFontSize || '25px',
             marginLeft: '10px',
             marginRight: '10px',
             flex: '1 1 auto',

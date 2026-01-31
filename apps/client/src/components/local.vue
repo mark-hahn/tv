@@ -30,7 +30,12 @@
           flex: '0 0 auto',
         }"
       >
-        <div style="font-weight: bold; margin-right: auto">Local files</div>
+        <div
+          class="pane-header-title"
+          style="margin-right: auto"
+        >
+          Local files
+        </div>
 
         <span
           v-if="loading"
@@ -160,7 +165,10 @@
           flex: 0 0 auto;
         "
       >
-        <div style="font-weight: bold; margin-right: auto">
+        <div
+          class="pane-header-title"
+          style="margin-right: auto"
+        >
           Subs files
           <span
             v-if="currentShowName"
@@ -199,12 +207,7 @@
           >
             ↓
           </button>
-          <div
-            style="
-              min-width: 40px;
-              text-align: center;
-            "
-          >
+          <div style="min-width: 40px; text-align: center">
             {{ cumulativeTrim }} ms
           </div>
           <button

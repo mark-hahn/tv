@@ -19,12 +19,11 @@
     <div
       id="hdr"
       v-if="showHdr"
+      class="pane-header-title"
       :style="{
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
-        fontWeight: 'bold',
-        fontSize: sizing.seriesFontSize || '25px',
         margin: '0px',
         marginBottom: '10px',
       }"

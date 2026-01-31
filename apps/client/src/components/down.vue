@@ -18,6 +18,7 @@
   >
     <div
       id="header"
+      class="pane-header-title"
       :style="{
         position: 'sticky',
         top: '0px',
@@ -30,8 +31,6 @@
         marginLeft: '0px',
         marginRight: '0px',
         marginTop: '0px',
-        fontWeight: 'bold',
-        fontSize: sizing.seriesFontSize || '25px',
         marginBottom: '0px',
         display: 'flex',
         flexDirection: 'column',

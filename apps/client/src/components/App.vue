@@ -1985,4 +1985,10 @@ body {
 #down button {
   background-color: var(--btn-bg, whitesmoke) !important;
 }
+
+.pane-header-title {
+  color: #000;
+  font-weight: bold;
+  font-size: v-bind('activeSizing.seriesFontSize || "25px"');
+}
 </style>

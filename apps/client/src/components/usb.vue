@@ -20,7 +20,12 @@
         flex: '0 0 auto',
       }"
     >
-      <div style="font-weight: bold; margin-right: auto">USB Files</div>
+      <div
+        class="pane-header-title"
+        style="margin-right: auto"
+      >
+        USB Files
+      </div>
 
       <span
         v-if="loading"

@@ -27,9 +27,8 @@
     </div>
     <template v-else>
       <div
+        class="pane-header-title"
         :style="{
-          fontWeight: 'bold',
-          fontSize: '24px',
           marginBottom: '15px',
           display: 'flex',
           alignItems: 'center',

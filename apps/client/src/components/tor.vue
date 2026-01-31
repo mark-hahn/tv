@@ -40,13 +40,12 @@
           marginLeft: '0px',
           marginRight: '0px',
           marginTop: '-10px',
-          fontWeight: 'bold',
-          fontSize: sizing.seriesFontSize || '25px',
           marginBottom: '0px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'stretch',
         }"
+        class="pane-header-title"
       >
         <div
           style="

@@ -110,7 +110,7 @@
                 border: '1px solid #ccc',
                 borderRadius: '3px',
                 padding: '2px 5px',
-                width: '150px',
+                width: '80px',
               }"
             />
           </div>
@@ -193,7 +193,12 @@
             Get
           </button>
           <button
-            v-if="hasTvdbEntry && !isLoadingNext && !suppressButtons"
+            v-if="
+              hasTvdbEntry &&
+              !existingShowMatch &&
+              !isLoadingNext &&
+              !suppressButtons
+            "
             @click="toggleTvdbInfo"
             :style="{
               height: '18px',
@@ -224,10 +229,10 @@
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: '#90ee90',
+              backgroundColor: '#dfd',
             }"
           >
-            Existing
+            Select
           </button>
           <span
             v-if="isLoadingNext"

@@ -54,12 +54,24 @@
           borderRadius: '5px',
           fontSize: '14px',
           textTransform: 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '2px',
         }"
       >
         <div
           :style="{
+            fontWeight: 'bold',
+            fontSize: '16px',
+            minWidth: 0,
+          }"
+        >
+          {{ galleryTitleLine }}
+        </div>
+        <div
+          :style="{
             display: 'flex',
-            alignItems: 'baseline',
+            alignItems: 'center',
             justifyContent: 'space-between',
             gap: '10px',
             minHeight: '27px',
@@ -67,22 +79,40 @@
         >
           <div
             :style="{
+              flex: '0 1 auto',
+              fontSize: '15px',
               fontWeight: 'bold',
-              fontSize: '16px',
-              minWidth: 0,
-              flex: '1 1 auto',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }"
           >
-            {{ galleryTitleLine }}
+            {{ infoLine }}
           </div>
           <div
             :style="{
               flex: '0 0 auto',
-              fontSize: '15px',
-              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
             }"
           >
-            {{ infoLine }}
+            <label
+              for="browseSearch"
+              :style="{ fontWeight: 'bold' }"
+              >Search</label
+            >
+            <input
+              id="browseSearch"
+              v-model="manualSearchQuery"
+              @keyup.enter="handleManualSearch"
+              :style="{
+                border: '1px solid #ccc',
+                borderRadius: '3px',
+                padding: '2px 5px',
+                width: '150px',
+              }"
+            />
           </div>
         </div>
       </div>
@@ -178,8 +208,28 @@
               backgroundColor: showTvdbInfo ? '#d3d3d3' : '#FFCCCB',
             }"
           >
-            Tvdb</button
-          ><span
+            Tvdb
+          </button>
+          <button
+            v-if="existingShowMatch && !isLoadingNext && !suppressButtons"
+            @click="handleSelectExisting(existingShowMatch.Name)"
+            :style="{
+              height: '18px',
+              margin: '0',
+              marginLeft: '5px',
+              padding: '0 2px',
+              lineHeight: '18px',
+              fontSize: '15px',
+              boxSizing: 'border-box',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#90ee90',
+            }"
+          >
+            Existing
+          </button>
+          <span
             v-if="isLoadingNext"
             :style="{
               marginLeft: '10px',
@@ -567,6 +617,29 @@ export default {
   },
   setup(props) {
     const srchStr = ref("friends");
+    const manualSearchQuery = ref("");
+
+    const handleManualSearch = async () => {
+      const query = manualSearchQuery.value.trim();
+      if (!query) return;
+
+      const nextTitle = query;
+      curTitle.value = nextTitle;
+
+      const norm = (s) =>
+        String(s || "")
+          .trim()
+          .replace(/\s+/g, " ")
+          .toLowerCase();
+      if (norm(nextTitle) !== norm(srchStr.value)) {
+        srchStr.value = nextTitle;
+      } else {
+        await nextTick();
+        suppressButtons.value = false;
+      }
+      selectedTitleIdx.value = -1;
+    };
+
     const curTitle = ref("");
     const curTvdb = ref(null);
     const getRemotesResults = ref([]);
@@ -601,8 +674,14 @@ export default {
     };
     evtBus.on("previewMode", onPreviewMode);
 
+    const onBrowseTabClicked = () => {
+      showTvdbInfo.value = false;
+    };
+    evtBus.on("browseTabClicked", onBrowseTabClicked);
+
     onUnmounted(() => {
       evtBus.off("previewMode", onPreviewMode);
+      evtBus.off("browseTabClicked", onBrowseTabClicked);
     });
     const lastLoadedTvdbId = ref(null);
     const remotesCache = new Map();
@@ -910,6 +989,27 @@ export default {
 
     const hasTvdbEntry = computed(() => !!matchingTvdbEntry.value);
 
+    const existingShowMatch = computed(() => {
+      const t = curTvdb.value;
+      if (!t) return null;
+
+      const tId = String(t.tvdb_id || t.tvdbId || "").trim();
+      const name = String(t.name || t.Name || t.seriesName || t.title || "")
+        .trim()
+        .toLowerCase();
+
+      if (!name && !tId) return null;
+
+      return (props.allShows || []).find((s) => {
+        const sTvdb = String(s.TvdbId || s.tvdbId || s.tvdb_id || "").trim();
+        if (sTvdb && tId && sTvdb === tId) return true;
+        const sName = String(s.Name || s.name || "")
+          .trim()
+          .toLowerCase();
+        return sName === name;
+      });
+    });
+
     const toggleTvdbInfo = () => {
       showTvdbInfo.value = !showTvdbInfo.value;
     };
@@ -1001,18 +1101,9 @@ export default {
 
       const tId = String(tvdb_id || tvdbId || "").trim();
       if (data.name || tId) {
-        const match = (props.allShows || []).find((s) => {
-          const sTvdb = String(s.TvdbId || s.tvdbId || s.tvdb_id || "").trim();
-          if (sTvdb && tId && sTvdb === tId) return true;
-          const sName = String(s.Name || s.name || "")
-            .trim()
-            .toLowerCase();
-          const dName = String(data.name || "")
-            .trim()
-            .toLowerCase();
-          return sName === dName;
-        });
-        if (match) info.existingShowName = match.Name;
+        if (existingShowMatch.value) {
+          info.existingShowName = existingShowMatch.value.Name;
+        }
       }
 
       return info;
@@ -1427,6 +1518,9 @@ export default {
       // Ignore clicks in the left gallery (it has its own selection behavior).
       if (target.closest("#browseLeft")) return;
 
+      // Ignore clicks in the info pane header area
+      if (target.closest("#browseInfo")) return;
+
       const name = String(
         galleryTitleLine.value || curTitle.value || "",
       ).trim();
@@ -1624,6 +1718,9 @@ export default {
       toggleTvdbInfo,
       tvdbInfo,
       showTvdbInfo,
+      manualSearchQuery,
+      handleManualSearch,
+      existingShowMatch,
     };
   },
 };

@@ -1502,6 +1502,7 @@ export default {
         if (this.simpleMode) return;
         this.currentPane = "browse";
         evtBus.emit("paneChanged", this.currentPane);
+        evtBus.emit("browseTabClicked");
         return;
       }
 

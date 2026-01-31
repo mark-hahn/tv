@@ -258,7 +258,26 @@
               justifyContent: 'center',
             }"
           >
-            Official</button
+            Official
+          </button>
+          <button
+            v-if="hasTvdbEntry &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+            @click="toggleTvdbInfo"
+            :style="{
+              height: '18px',
+              margin: '0',
+              marginLeft: '10px',
+              padding: '0 2px',
+              lineHeight: '18px',
+              fontSize: '15px',
+              boxSizing: 'border-box',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: showTvdbInfo ? '#d3d3d3' : '',
+            }"
+          >
+            Tvdb</button
           ><span
             v-if="loadingRemotesCount &gt; 0 &amp;&amp; !isLoadingNext"
             :style="{
@@ -294,8 +313,118 @@
             lineHeight: '1.5',
           }"
           @wheel.stop.prevent="handleScaledWheel"
+          @click.stop
         >
-          <div v-if="curTvdb">{{ curTvdb.overview }}</div>
+          <div
+            v-if="showTvdbInfo && matchingTvdbEntry"
+            :style="{
+              display: 'flex',
+              flexDirection: 'column',
+              textAlign: 'center',
+              fontWeight: 'bold',
+              lineHeight: '1.2',
+            }"
+          >
+            <div
+              :style="{
+                border: '1px solid #ccc',
+                borderRadius: '5px',
+                padding: '5px',
+                width: '100%',
+                boxSizing: 'border-box',
+              }"
+            >
+              <div
+                v-if="tvdbInfo.dates"
+                style="
+                  min-height: 24px;
+                  white-space: normal;
+                  display: -webkit-box;
+                  -webkit-box-orient: vertical;
+                  -webkit-line-clamp: 2;
+                  line-clamp: 2;
+                  overflow: hidden;
+                "
+              >
+                {{ tvdbInfo.dates }}
+              </div>
+              <div
+                v-if="tvdbInfo.status"
+                v-html="tvdbInfo.status"
+                style="
+                  min-height: 20px;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                "
+              ></div>
+              <div
+                v-if="tvdbInfo.seasons"
+                v-html="tvdbInfo.seasons"
+                style="
+                  min-height: 24px;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                  margin-top: 5px;
+                "
+              ></div>
+              <div
+                v-if="tvdbInfo.cntryLangLeft || tvdbInfo.cntryLangRight"
+                style="
+                  min-height: 20px;
+                  display: flex;
+                  flex-wrap: wrap;
+                  justify-content: center;
+                  column-gap: 8px;
+                  margin-top: 5px;
+                "
+              >
+                <div
+                  v-if="tvdbInfo.cntryLangLeft"
+                  style="white-space: nowrap"
+                >
+                  {{ tvdbInfo.cntryLangLeft }}
+                </div>
+                <div
+                  v-if="tvdbInfo.cntryLangRight"
+                  style="
+                    white-space: normal;
+                    overflow-wrap: anywhere;
+                    word-break: break-word;
+                  "
+                >
+                  {{ tvdbInfo.cntryLangRight }}
+                </div>
+              </div>
+              <div
+                v-if="tvdbInfo.runtime"
+                style="
+                  min-height: 20px;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                  margin-top: 5px;
+                "
+              >
+                {{ tvdbInfo.runtime }}
+              </div>
+              <div
+                v-if="tvdbInfo.deleted"
+                style="
+                  min-height: 20px;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                  margin-top: 5px;
+                  color: red;
+                "
+              >
+                Deleted {{ tvdbInfo.deleted }}
+              </div>
+            </div>
+          </div>
+          <div v-else-if="curTvdb">{{ curTvdb.overview }}</div>
         </div>
       </div>
       <div
@@ -387,6 +516,7 @@ import ReelGallery from "./reel-gallery.vue";
 import { config } from "../config.js";
 import evtBus from "../evtBus.js";
 import * as srvr from "../srvr.js";
+import { getAllTvdb } from "../tvdb.js";
 
 export default {
   name: "BrowsePane",
@@ -427,6 +557,16 @@ export default {
     const loadingRemotesCount = ref(0);
     const suppressButtons = ref(false);
     const previewMode = ref(false);
+    const allTvdbData = ref(null);
+    const showTvdbInfo = ref(false);
+
+    onMounted(async () => {
+      try {
+        allTvdbData.value = await getAllTvdb();
+      } catch (e) {
+        console.error("Failed to load allTvdbData:", e);
+      }
+    });
 
     const onPreviewMode = (active) => {
       previewMode.value = !!active;
@@ -722,6 +862,95 @@ export default {
       );
     });
 
+    const matchingTvdbEntry = computed(() => {
+      if (!allTvdbData.value || !curTvdb.value) return null;
+      const name =
+        curTvdb.value.name ||
+        curTvdb.value.Name ||
+        curTvdb.value.seriesName ||
+        curTvdb.value.title;
+      if (!name) return null;
+      return allTvdbData.value[name] || null;
+    });
+
+    const hasTvdbEntry = computed(() => !!matchingTvdbEntry.value);
+
+    const toggleTvdbInfo = () => {
+      showTvdbInfo.value = !showTvdbInfo.value;
+    };
+
+    const tvdbInfo = computed(() => {
+      const data = matchingTvdbEntry.value;
+      if (!data) return {};
+
+      const info = {};
+
+      const {
+        firstAired,
+        lastAired,
+        status,
+        seasonCount,
+        originalCountry,
+        originalLanguage,
+        originalNetwork,
+        averageRuntime,
+        deleted,
+      } = data;
+
+      const fa = firstAired || "";
+      const la = lastAired || "";
+      const st = status || "";
+      if (fa && la) info.dates = `${fa} - ${la}`;
+      else if (fa) info.dates = `${fa}`;
+      else if (la) info.dates = `${la}`;
+
+      info.status = st ? ` &nbsp; ${st}` : "";
+
+      let seasonsTxt = "";
+      switch (seasonCount) {
+        case 0:
+          break;
+        case 1:
+          seasonsTxt = "1 Season";
+          break;
+        default:
+          seasonsTxt = `${seasonCount} Seasons`;
+      }
+      info.seasons = seasonsTxt ? ` &nbsp; ${seasonsTxt}` : "";
+
+      const capWords = (raw) => {
+        const s = String(raw || "").trim();
+        if (!s) return "";
+        if (s === "UK") return "UK";
+        return s
+          .toLowerCase()
+          .split(/\s+/)
+          .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ""))
+          .join(" ");
+      };
+
+      let oc = String(originalCountry || "")
+        .trim()
+        .toUpperCase();
+      if (oc === "GBR" || oc === "gbr") oc = "UK";
+
+      const ol = capWords(originalLanguage);
+      let on = String(originalNetwork || "");
+      if (on.includes("Amazon")) on = "Amazon";
+      if (on.includes("Paramount+")) on = "Paramount+";
+      on = on.trim().toUpperCase();
+
+      const left = `${oc}${oc ? "/" : ""}${ol}`.trim();
+      if (left) info.cntryLangLeft = left;
+      if (on) info.cntryLangRight = on;
+
+      if (averageRuntime) info.runtime = `${averageRuntime} Mins`;
+
+      if (deleted) info.deleted = deleted;
+
+      return info;
+    });
+
     const rtResult = computed(() => {
       const arr = Array.isArray(getRemotesResults.value)
         ? getRemotesResults.value
@@ -873,7 +1102,6 @@ export default {
       await nextTick();
       // Only unsuppress if we passed checks
       suppressButtons.value = false;
-
       try {
         const params = {
           show: {
@@ -970,6 +1198,7 @@ export default {
     watch(
       () => props.active,
       async (isActive) => {
+        if (!isActive) showTvdbInfo.value = false;
         if (!isActive) return;
         if (_didInitialVisibleScroll.value) return;
         if (!_titlesPopulated.value) return;
@@ -1129,6 +1358,7 @@ export default {
     watch(
       curTvdb,
       async (val) => {
+        showTvdbInfo.value = false;
         void loadRemotesForTvdb(val);
         await nextTick();
         if (titlesPane.value) {
@@ -1268,6 +1498,11 @@ export default {
       suppressButtons,
       previewMode,
       toastMessage,
+      matchingTvdbEntry,
+      hasTvdbEntry,
+      toggleTvdbInfo,
+      tvdbInfo,
+      showTvdbInfo,
     };
   },
 };

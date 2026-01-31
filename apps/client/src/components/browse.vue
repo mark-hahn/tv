@@ -106,8 +106,6 @@
             marginBottom: '8px',
             width: '100%',
             boxSizing: 'border-box',
-            pointerEvents: previewMode ? 'none' : 'auto',
-            opacity: previewMode ? 0.5 : 1,
           }"
         >
           <button
@@ -592,6 +590,9 @@ export default {
     };
 
     const handleNext = async () => {
+      if (previewMode.value) {
+        evtBus.emit("exitPreviewMode");
+      }
       isLoadingNext.value = true;
       justFetchedNext.value = true;
       suppressButtons.value = true;

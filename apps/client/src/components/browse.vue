@@ -159,6 +159,24 @@
             }"
           >
             Get</button
+          >
+          <button
+            v-if="hasTvdbEntry && !isLoadingNext && !suppressButtons"
+            @click="toggleTvdbInfo"
+            :style="{
+              height: '18px',
+              margin: '0',
+              padding: '0 2px',
+              lineHeight: '18px',
+              fontSize: '15px',
+              boxSizing: 'border-box',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: showTvdbInfo ? '#d3d3d3' : '#FFCCCB',
+            }"
+          >
+            Tvdb</button
           ><span
             v-if="isLoadingNext"
             :style="{
@@ -259,26 +277,7 @@
             }"
           >
             Official
-          </button>
-          <button
-            v-if="hasTvdbEntry &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
-            @click="toggleTvdbInfo"
-            :style="{
-              height: '18px',
-              margin: '0',
-              marginLeft: '10px',
-              padding: '0 2px',
-              lineHeight: '18px',
-              fontSize: '15px',
-              boxSizing: 'border-box',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: showTvdbInfo ? '#d3d3d3' : '',
-            }"
-          >
-            Tvdb</button
-          ><span
+          </button><span
             v-if="loadingRemotesCount &gt; 0 &amp;&amp; !isLoadingNext"
             :style="{
               marginLeft: '10px',
@@ -421,6 +420,21 @@
                 "
               >
                 Deleted {{ tvdbInfo.deleted }}
+              </div>
+              <div
+                v-if="tvdbInfo.existingShowName"
+                style="
+                  display: flex;
+                  justify-content: flex-start;
+                  margin-top: 5px;
+                "
+              >
+                <button
+                  @click="handleSelectExisting(tvdbInfo.existingShowName)"
+                  style="font-size: 14px; padding: 2px 8px; cursor: pointer"
+                >
+                  Select
+                </button>
               </div>
             </div>
           </div>
@@ -895,6 +909,8 @@ export default {
         originalNetwork,
         averageRuntime,
         deleted,
+        tvdb_id,
+        tvdbId,
       } = data;
 
       const fa = firstAired || "";
@@ -948,8 +964,30 @@ export default {
 
       if (deleted) info.deleted = deleted;
 
+      const tId = String(tvdb_id || tvdbId || "").trim();
+      if (data.name || tId) {
+        const match = (props.allShows || []).find((s) => {
+          const sTvdb = String(s.TvdbId || s.tvdbId || s.tvdb_id || "").trim();
+          if (sTvdb && tId && sTvdb === tId) return true;
+          const sName = String(s.Name || s.name || "")
+            .trim()
+            .toLowerCase();
+          const dName = String(data.name || "")
+            .trim()
+            .toLowerCase();
+          return sName === dName;
+        });
+        if (match) info.existingShowName = match.Name;
+      }
+
       return info;
     });
+
+    const handleSelectExisting = (name) => {
+      if (!name) return;
+      evtBus.emit("selectShowFromCardTitle", name);
+      evtBus.emit("showSeriesPane");
+    };
 
     const rtResult = computed(() => {
       const arr = Array.isArray(getRemotesResults.value)
@@ -1470,6 +1508,7 @@ export default {
       wikiResult,
       officialResult,
       imdbButtonLabel,
+      handleSelectExisting,
       rtButtonLabel,
       hasAnyRemoteButton,
       titleStrings,

@@ -81,10 +81,15 @@
     </div>
     <div
       id="center"
-      :style="{ height:'100%', width: sizing.listWidth || '800px', display:'flex', flexDirection: (simpleMode &amp;&amp; isWideLandscape) ? 'row' : 'column' }"
+      :style="{
+        height: '100%',
+        width: sizing.listWidth || '800px',
+        display: 'flex',
+        flexDirection: simpleMode && isWideLandscape ? 'row' : 'column',
+      }"
     >
       <!-- Wide/landscape simple mode: buttons left column full height; header+shows stacked right.-->
-      <template v-if="simpleMode &amp;&amp; isWideLandscape">
+      <template v-if="simpleMode && isWideLandscape">
         <Buttons
           v-if="!hideButtonsPane"
           style="width: 140px; flex-shrink: 0; height: 100%"
@@ -220,7 +225,7 @@
           style="display: flex; flex-grow: 1; overflow: hidden; min-height: 0"
         >
           <Buttons
-            v-if="simpleMode &amp;&amp; !hideButtonsPane"
+            v-if="simpleMode && !hideButtonsPane"
             style="width: 140px; flex-shrink: 0"
             :sizing="sizing"
             @button-click="handleButtonClick"
@@ -1141,6 +1146,7 @@ export default {
         seasonCount: 0,
         episodeCount: 0,
         watchedCount: 0,
+        clientRequest: true,
       };
       let tvdbData = null;
 

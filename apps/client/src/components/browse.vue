@@ -368,7 +368,7 @@
                   margin-top: 5px;
                 "
               ></div>
-              <div
+              <!-- <div
                 v-if="tvdbInfo.cntryLangLeft || tvdbInfo.cntryLangRight"
                 style="
                   min-height: 20px;
@@ -395,6 +395,18 @@
                 >
                   {{ tvdbInfo.cntryLangRight }}
                 </div>
+              </div> -->
+              <div
+                v-if="tvdbInfo.watched"
+                style="
+                  min-height: 20px;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                  margin-top: 5px;
+                "
+              >
+                {{ tvdbInfo.watched }}
               </div>
               <div
                 v-if="tvdbInfo.runtime"
@@ -956,13 +968,27 @@ export default {
       if (on.includes("Paramount+")) on = "Paramount+";
       on = on.trim().toUpperCase();
 
-      const left = `${oc}${oc ? "/" : ""}${ol}`.trim();
-      if (left) info.cntryLangLeft = left;
-      if (on) info.cntryLangRight = on;
+      // const left = `${oc}${oc ? "/" : ""}${ol}`.trim();
+      // if (left) info.cntryLangLeft = left;
+      // if (on) info.cntryLangRight = on;
 
       if (averageRuntime) info.runtime = `${averageRuntime} Mins`;
 
       if (deleted) info.deleted = deleted;
+
+      if (data.name && allTvdbData.value) {
+        const local = allTvdbData.value[data.name];
+        if (local && (local.episodeCount ?? 0) > 0) {
+          let wCount = local.watchedCount ?? 0;
+          if (local.showId && local.showId.startsWith("noemby-")) wCount = 0;
+          const total = local.episodeCount;
+          if (wCount === total) {
+            info.watched = "All Watched";
+          } else {
+            info.watched = `Watched ${wCount} of ${total}`;
+          }
+        }
+      }
 
       const tId = String(tvdb_id || tvdbId || "").trim();
       if (data.name || tId) {
@@ -1325,6 +1351,23 @@ export default {
           line += ` | ${parts[0]}/${parts[1]}/${parts[2]}`;
         }
       }
+
+      // Add Watched count if available in local data
+      // if (allTvdbData.value && t.name) {
+      //   const local = allTvdbData.value[t.name];
+      //   if (local && (local.episodeCount ?? 0) > 0) {
+      //     let wCount = local.watchedCount ?? 0;
+      //     if (local.showId && local.showId.startsWith("noemby-")) wCount = 0;
+      //     const total = local.episodeCount;
+
+      //     if (wCount === total) {
+      //       line += " | All Watched";
+      //     } else {
+      //       line += ` | Watched ${wCount} of ${total}`;
+      //     }
+      //   }
+      // }
+
       return line;
     });
 

@@ -353,7 +353,12 @@ const getRemote = async (id, type, showName) => {
 
 const remotesCache = new Map();
 
-const getRemotes = async (show, tvdbRemotes, fast = false) => {
+const getRemotes = async (
+  show,
+  tvdbRemotes,
+  fast = false,
+  clientRequest = false,
+) => {
   const cacheKey =
     show.Name +
     "|" +
@@ -361,7 +366,9 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
     "|" +
     JSON.stringify(tvdbRemotes || {}) +
     "|" +
-    fast;
+    fast +
+    "|" +
+    clientRequest;
 
   if (remotesCache.has(cacheKey)) {
     return remotesCache.get(cacheKey);
@@ -375,11 +382,36 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
     remotes.push({ name: "Emby", url: urls.embyPageUrl(showId) });
 
   if (!fast) {
-    const rottenRemote = await getRemote(null, 99, name);
-    if (rottenRemote) {
-      if (rottenRemote.ratings)
-        rottenRemote.name += " (" + rottenRemote.ratings + ")";
-      remotes.push(rottenRemote);
+    if (clientRequest) {
+      let rottenFound = false;
+      const cachedShow = allTvdb ? allTvdb[name] : null;
+      if (cachedShow && cachedShow.remotes) {
+        const cachedRotten = cachedShow.remotes.find(
+          (r) => r.name && r.name.startsWith("Rotten"),
+        );
+        if (cachedRotten) {
+          remotes.push(cachedRotten);
+          rottenFound = true;
+        }
+      }
+
+      if (!rottenFound) {
+        // basic link construction
+        const cleanName = name
+          .trim()
+          .toLowerCase()
+          .replace(/['":.,!]/g, "")
+          .replace(/\s+/g, "_");
+        const url = `https://www.rottentomatoes.com/tv/${cleanName}`;
+        remotes.push({ name: "Rotten", url });
+      }
+    } else {
+      const rottenRemote = await getRemote(null, 99, name);
+      if (rottenRemote) {
+        if (rottenRemote.ratings)
+          rottenRemote.name += " (" + rottenRemote.ratings + ")";
+        remotes.push(rottenRemote);
+      }
     }
   }
   const encoded = encodeURI(name).replaceAll("&", "%26");
@@ -467,7 +499,14 @@ function getTvdbCharacters(extResObj) {
 // create tvdbData object
 // update allTvdb & tvdb.json
 const getTvdbData = async (paramObj, resolve, _reject) => {
-  const { show, deleted, seasonCount, episodeCount, watchedCount } = paramObj;
+  const {
+    show,
+    deleted,
+    seasonCount,
+    episodeCount,
+    watchedCount,
+    clientRequest,
+  } = paramObj;
   const name = show.Name;
   const added = allTvdb[name]?.added ?? new Date().toISOString().slice(0, 10);
   if (deleted) {
@@ -537,7 +576,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   // get remote data, e.g. IMDB for tvdb record
   // remoteIds come from tvdb
-  const remotes = await getRemotes(show, remoteIds);
+  const remotes = await getRemotes(show, remoteIds, false, !!clientRequest);
   const saved = Date.now();
   const trailersRaw = trailersIn || allTvdb[name]?.trailers;
 
@@ -731,7 +770,7 @@ export const getRemotesCmd = async (id, param, resolve, reject) => {
   }
 
   try {
-    const remotes = await getRemotes(show, tvdbRemotes, fast);
+    const remotes = await getRemotes(show, tvdbRemotes, fast, true);
     resolve([id, remotes]);
   } catch (err) {
     reject([id, `getRemotes error: ${err.message}`]);

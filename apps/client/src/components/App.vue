@@ -1430,17 +1430,17 @@ export default {
 
       // Preview mode: Map is disabled, and tabs to the right of AI are disabled.
       if (this.previewMode) {
-        const exitKeys = new Set([
+        const disabledKeys = new Set([
           "map",
-          "browse",
           "tor",
           "flex",
           "qbt",
           "usb",
           "down",
+          "local",
         ]);
-        if (exitKeys.has(k)) {
-          this.exitPreview();
+        if (disabledKeys.has(k)) {
+          return;
         }
       }
 
@@ -1793,12 +1793,22 @@ export default {
             this.restoringPreviewPane = false;
           }, 500);
           evtBus.emit("paneChanged", this.currentPane);
+
+          if (this.currentShow) {
+            evtBus.emit("setUpSeries", this.currentShow);
+          }
         }
       }
       if (this.previewMode) {
         this.savedPane = this.currentPane;
         // If currently on a disabled pane, snap back to Series.
-        const allowed = new Set(["info", "actors", "reviews", "trailer"]);
+        const allowed = new Set([
+          "info",
+          "actors",
+          "reviews",
+          "trailer",
+          "browse",
+        ]);
         if (!allowed.has(this.currentPane)) {
           this.currentPane = "info";
           evtBus.emit("paneChanged", this.currentPane);

@@ -32,6 +32,7 @@
         :tvdbid="curTvdbId"
         @select="handleGallerySelect"
         @preview="handleGalleryPreview"
+        @search-complete="handleSearchComplete"
       ></reel-gallery>
     </div>
     <div
@@ -647,6 +648,7 @@ export default {
 
     const curTitle = ref("");
     const curTvdb = ref(null);
+    const autoNextIfEmpty = ref(false);
     const getRemotesResults = ref([]);
     const _lastRemotesKey = ref("");
     const titleStrings = ref([]);
@@ -843,6 +845,7 @@ export default {
     };
 
     const handleNext = async () => {
+      autoNextIfEmpty.value = false;
       if (previewMode.value) {
         evtBus.emit("exitPreviewMode");
       }
@@ -920,8 +923,16 @@ export default {
           });
 
           titleStrings.value = [...titleStrings.value, ...added];
-          await scrollTitlesToBottom();
+
+          if (added.length === 1) {
+            autoNextIfEmpty.value = true;
+          } else {
+            autoNextIfEmpty.value = false;
+          }
+
+          // await scrollTitlesToBottom(); // allow watcher to handle this
         } else {
+          autoNextIfEmpty.value = false;
           // If none returned, ensure the sentinel exists (once).
           const hasNoMore = titleStrings.value.some(
             (s) => String(s) === NO_MORE_ENTRY,
@@ -1506,8 +1517,16 @@ export default {
 
     const galleryTitleLine = computed(() => {
       const t = curTvdb.value;
-      if (!t) return "";
-      return String(t.name || t.Name || t.seriesName || t.title || "").trim();
+      if (t) {
+        return String(t.name || t.Name || t.seriesName || t.title || "").trim();
+      }
+      if (
+        selectedTitleIdx.value >= 0 &&
+        parsedTitles.value[selectedTitleIdx.value]
+      ) {
+        return parsedTitles.value[selectedTitleIdx.value].titleString;
+      }
+      return "";
     });
 
     const handleBackgroundClick = (event) => {
@@ -1566,6 +1585,15 @@ export default {
       curTvdb.value = tvdb;
     };
 
+    const handleSearchComplete = (tvdb) => {
+      if (autoNextIfEmpty.value) {
+        autoNextIfEmpty.value = false;
+        if (!tvdb) {
+          void handleNext();
+        }
+      }
+    };
+
     // Clicking the image should immediately preview the show (same flow as "Get").
     const handleGalleryPreview = (tvdb) => {
       curTvdb.value = tvdb;
@@ -1595,6 +1623,7 @@ export default {
     const selectTitle = async (idx, fromUser = false) => {
       if (fromUser) {
         justFetchedNext.value = false;
+        autoNextIfEmpty.value = false;
       }
       const item = parsedTitles.value[idx];
       if (item?.rejectStatus === "msg") {
@@ -1615,7 +1644,16 @@ export default {
         srchStr.value = nextTitle;
       } else {
         await nextTick();
-        suppressButtons.value = false;
+        if (autoNextIfEmpty.value) {
+          autoNextIfEmpty.value = false;
+          if (!curTvdb.value) {
+            void handleNext();
+          } else {
+            suppressButtons.value = false;
+          }
+        } else {
+          suppressButtons.value = false;
+        }
       }
     };
 
@@ -1702,6 +1740,7 @@ export default {
       handleScaledWheel,
       getTitleCardStyle,
       handleGallerySelect,
+      handleSearchComplete,
       handleGalleryPreview,
       selectTitle,
       handleNext,

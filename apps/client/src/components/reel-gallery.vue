@@ -83,7 +83,7 @@ export default {
       default: null,
     },
   },
-  emits: ["select", "preview"],
+  emits: ["select", "preview", "search-complete"],
   setup(props, { emit }) {
     const tvdbList = ref([]);
     const selectedIdx = ref(0);
@@ -181,13 +181,16 @@ export default {
           // Auto-select first card
           selectedIdx.value = 0;
           emit("select", sorted[0]);
+          emit("search-complete", sorted[0]);
         } else {
           tvdbList.value = [];
           emit("select", null);
+          emit("search-complete", null);
         }
       } catch (err) {
         console.error("Error loading tvdb data:", err);
         tvdbList.value = [];
+        emit("search-complete", null);
       }
     };
 

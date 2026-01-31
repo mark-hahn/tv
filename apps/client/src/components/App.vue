@@ -99,7 +99,7 @@
                       : 'whitesmoke',
                 }"
               >
-                Add this show to Emby
+                Add show to Emby
               </button>
               <button
                 @click.stop="exitPreview"
@@ -114,9 +114,13 @@
                   backgroundColor: 'whitesmoke',
                 }"
               >
-                Exit Preview</button
+                Exit Preview
+              </button>
+              <span
+                class="pane-header-title"
+                style="margin-left: 10px"
+                >preview mode</span
               >
-              <span class="pane-header-title" style="margin-left: 10px">&lt;Preview Mode&gt;</span>
               <span
                 v-if="previewPanesLoading"
                 :style="{
@@ -336,7 +340,7 @@
                   previewAddBusy || !previewSrchChoice ? '#eee' : 'whitesmoke',
               }"
             >
-              Add this show to Emby
+              Add show to Emby
             </button>
             <button
               @click.stop="exitPreview"
@@ -351,9 +355,13 @@
                 backgroundColor: 'whitesmoke',
               }"
             >
-              Exit Preview</button
+              Exit Preview
+            </button>
+            <span
+              class="pane-header-title"
+              style="margin-left: 10px"
+              >preview mode</span
             >
-            <span class="pane-header-title" style="margin-left: 10px">&lt;Preview Mode&gt;</span>
             <span
               v-if="previewPanesLoading"
               :style="{

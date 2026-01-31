@@ -149,10 +149,13 @@ export default {
     };
 
     const loadTvdbData = async () => {
-      if (!props.srchStr) return;
+      const currentSrch = props.srchStr;
+      if (!currentSrch) return;
 
       try {
-        const data = await srchTvdbData(props.srchStr);
+        const data = await srchTvdbData(currentSrch);
+        if (props.srchStr !== currentSrch) return;
+
         if (data && data.length > 0) {
           let sorted = [...data];
           if (props.tvdbid || props.imdbid) {

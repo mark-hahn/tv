@@ -88,7 +88,11 @@
               gap: '5px',
             }"
           >
-            <label for="browseSearch" :style="{ fontWeight: 'bold' }">Search</label>
+            <label
+              for="browseSearch"
+              :style="{ fontWeight: 'bold' }"
+              >Search</label
+            >
             <input
               id="browseSearch"
               v-model="manualSearchQuery"

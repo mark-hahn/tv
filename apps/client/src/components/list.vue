@@ -120,17 +120,11 @@
               :allShowsLength="allShowsLength"
               :gapPercent="gapPercent"
               v-model:filterStr="filterStr"
-              v-model:webHistStr="webHistStr"
               :watchingName="watchingName"
-              :showingSrchList="showingSrchList"
-              :searchList="searchList"
               :simpleMode="simpleMode"
               :isWideLandscape="isWideLandscape"
-              @search-click="searchClick"
               @watch-click="watchClick"
               @filter-input="select"
-              @cancel-srch-list="cancelSrchList"
-              @search-action="searchAction"
               @send-filters="sendSharedFilters"
             ></HdrTop>
             <HdrBot
@@ -188,17 +182,11 @@
             :allShowsLength="allShowsLength"
             :gapPercent="gapPercent"
             v-model:filterStr="filterStr"
-            v-model:webHistStr="webHistStr"
             :watchingName="watchingName"
-            :showingSrchList="showingSrchList"
-            :searchList="searchList"
             :simpleMode="simpleMode"
             :isWideLandscape="isWideLandscape"
-            @search-click="searchClick"
             @watch-click="watchClick"
             @filter-input="select"
-            @cancel-srch-list="cancelSrchList"
-            @search-action="searchAction"
             @send-filters="sendSharedFilters"
           ></HdrTop>
           <HdrBot
@@ -255,7 +243,6 @@ import * as emby from "../emby.js";
 import * as tvdb from "../tvdb.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
-import { addSearchHistoryEntry } from "../searchHistory.js";
 import parseTorrentTitle from "parse-torrent-title";
 import evtBus from "../evtBus.js";
 import Shows from "./shows.vue";
@@ -315,7 +302,6 @@ let allTvdb = null;
 let allShows = [];
 let showHistory = [];
 let showHistoryPtr = -1;
-let srchListWeb = null;
 let gapWorkerRunning = false;
 const pruneTvdb = window.location.href.slice(-5) == "prune";
 
@@ -493,7 +479,6 @@ export default {
     return {
       shows: [],
       filterStr: "",
-      webHistStr: "",
       errMsg: "",
       highlightName: "",
       previewMode: false,
@@ -512,8 +497,6 @@ export default {
       sortChoice: "Viewed",
       fltrPopped: false,
       fltrChoice: "All",
-      showingSrchList: false,
-      searchList: null,
       showSearching: false,
       searchingShowName: "",
       searchingStatus: "",
@@ -1007,69 +990,11 @@ export default {
       return this.highlightName == show.Name ? "yellow" : "white";
     },
 
-    async searchClick(source) {
-      allTvdb = await tvdb.getAllTvdb();
-      const srchTxt = this.webHistStr;
-      const srcIsWeb = source == "web";
-      if (srcIsWeb && pruneTvdb) return;
-      const justClose =
-        srchTxt.length == 0 ||
-        (this.showingSrchList && srchListWeb == srcIsWeb);
-      this.cancelSrchList();
-      if (justClose) return;
-
-      addSearchHistoryEntry(srchTxt);
-
-      srchListWeb = srcIsWeb;
-      let tvdbSrchData;
-      if (srcIsWeb) {
-        tvdbSrchData = await tvdb.srchTvdbData(srchTxt);
-        if (!tvdbSrchData) {
-          this.cancelSrchList();
-          setTimeout(() => {
-            console.error("No results for web search:", srchTxt);
-            this.webHistStr = "No series.";
-          }, 100);
-          return;
-        }
-      } else {
-        const tvdbDataArr = Object.entries(allTvdb);
-        const srchTvdb = tvdbDataArr.filter((tvdbDataItem) =>
-          tvdbDataItem[0].toLowerCase().includes(srchTxt.toLowerCase()),
-        );
-        if (srchTvdb.length == 0) {
-          this.webHistStr = "-- No Series --";
-          this.cancelSrchList();
-          return;
-        }
-        tvdbSrchData = srchTvdb.sort((a, b) =>
-          a[0].replace(/^the\s/i, "") > b[0].replace(/^the\s/i, "") ? 1 : -1,
-        );
-        tvdbSrchData = tvdbSrchData.map((item) => {
-          const tvdbData = item[1];
-          tvdbData.year = tvdbData.firstAired.substring(0, 4);
-          return tvdbData;
-        });
-      }
-      tvdbSrchData.forEach((tvdbData) => {
-        tvdbData.image = tvdbData.image ?? tvdbData.image_url;
-        delete tvdbData.image_url;
-        if (tvdbData.originalCountry == "gbr") tvdbData.originalCountry = "uk";
-        if (tvdbData.tvdb_id) tvdbData.tvdbId = tvdbData.tvdb_id;
-        tvdbData.searchDtlTxt = ` ${tvdbData.year}, 
-           ${tvdbData.originalCountry?.toUpperCase() || ""}`;
-      });
-      // console.log('searchList:', tvdbData);
-      this.searchList = tvdbSrchData;
-      this.showingSrchList = true;
-    },
-
     async searchAction(payload) {
       const srchChoice = payload?.srchChoice ? payload.srchChoice : payload;
       const action = payload?.action || "preview";
       const { name, tvdbId, overview } = srchChoice || {};
       console.log("searchAction:", name);
-      this.cancelSrchList();
 
       // Dropdown click now previews by default.
       if (action === "preview") {
@@ -1361,13 +1286,6 @@ export default {
           /* ignore */
         }
       }, 15000);
-    },
-
-    cancelSrchList() {
-      console.log("closing searchlist");
-      this.showingSrchList = false;
-      this.searchList = null;
-      srchListWeb = null;
     },
 
     topClick() {

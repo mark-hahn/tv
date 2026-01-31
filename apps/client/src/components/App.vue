@@ -115,7 +115,9 @@
                 }"
               >
                 Exit Preview</button
-              ><span
+              >
+              <span class="pane-header-title" style="margin-left: 10px">&lt;Preview Mode&gt;</span>
+              <span
                 v-if="previewPanesLoading"
                 :style="{
                   marginLeft: '10px',
@@ -350,7 +352,9 @@
               }"
             >
               Exit Preview</button
-            ><span
+            >
+            <span class="pane-header-title" style="margin-left: 10px">&lt;Preview Mode&gt;</span>
+            <span
               v-if="previewPanesLoading"
               :style="{
                 marginLeft: '10px',

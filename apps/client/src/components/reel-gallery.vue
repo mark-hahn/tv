@@ -74,6 +74,14 @@ export default {
       type: String,
       default: "",
     },
+    imdbid: {
+      type: [String, Number],
+      default: null,
+    },
+    tvdbid: {
+      type: [String, Number],
+      default: null,
+    },
   },
   emits: ["select", "preview"],
   setup(props, { emit }) {
@@ -146,14 +154,33 @@ export default {
       try {
         const data = await srchTvdbData(props.srchStr);
         if (data && data.length > 0) {
-          tvdbList.value = data;
+          let sorted = [...data];
+          if (props.tvdbid || props.imdbid) {
+            const tId = String(props.tvdbid);
+            const iId = String(props.imdbid);
+            const idx = sorted.findIndex((d) => {
+              if (tId && (String(d.id) === tId || String(d.tvdb_id) === tId))
+                return true;
+              if (
+                iId &&
+                (String(d.imdb_id) === iId || String(d.imdbId) === iId)
+              )
+                return true;
+              return false;
+            });
+            if (idx > 0) {
+              const [match] = sorted.splice(idx, 1);
+              sorted.unshift(match);
+            }
+          }
+          tvdbList.value = sorted;
           await nextTick();
           if (galleryPane.value) {
             galleryPane.value.scrollTop = 0;
           }
           // Auto-select first card
           selectedIdx.value = 0;
-          emit("select", data[0]);
+          emit("select", sorted[0]);
         } else {
           tvdbList.value = [];
           emit("select", null);

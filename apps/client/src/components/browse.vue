@@ -28,6 +28,8 @@
       <reel-gallery
         :style="{ flex: '1', minHeight: 0 }"
         :srchStr="srchStr"
+        :imdbid="curImdbId"
+        :tvdbid="curTvdbId"
         @select="handleGallerySelect"
         @preview="handleGalleryPreview"
       ></reel-gallery>
@@ -814,15 +816,22 @@ export default {
             (s) => String(s) !== NO_MORE_ENTRY,
           );
 
-          const addedParsed = added.map((str) => {
+          const parseTitleHelper = (str) => {
+            try {
+              if (str.trim().startsWith("{")) {
+                const o = JSON.parse(str);
+                if (o.title) return o.title;
+              }
+            } catch (e) {}
             const parts = str.split("|");
             return parts[1] ? parts[1].trim() : parts[0].trim();
-          });
+          };
+
+          const addedParsed = added.map(parseTitleHelper);
 
           // remove any matching title from earlier in the list
           titleStrings.value = titleStrings.value.filter((s) => {
-            const parts = s.split("|");
-            const title = parts[1] ? parts[1].trim() : parts[0].trim();
+            const title = parseTitleHelper(s);
             return !addedParsed.includes(title);
           });
 
@@ -1274,6 +1283,24 @@ export default {
     // Parse titleStrings into objects
     const parsedTitles = computed(() => {
       return titleStrings.value.map((str) => {
+        // Try new JSON format
+        try {
+          if (str.trim().startsWith("{")) {
+            const o = JSON.parse(str);
+            if (o.status) {
+              return {
+                rejectStatus: o.status,
+                titleString: o.title,
+                data: o.data,
+                imdbid: o.imdbid,
+                tvdbid: o.tvdbid,
+              };
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+
         const parts = str.split("|");
         // parts[0] is status, parts[1] is title
         // If there's a JSON record, it's after the second pipe.
@@ -1309,6 +1336,16 @@ export default {
           data,
         };
       });
+    });
+
+    const curImdbId = computed(() => {
+      if (selectedTitleIdx.value < 0) return null;
+      return parsedTitles.value[selectedTitleIdx.value]?.imdbid || null;
+    });
+
+    const curTvdbId = computed(() => {
+      if (selectedTitleIdx.value < 0) return null;
+      return parsedTitles.value[selectedTitleIdx.value]?.tvdbid || null;
     });
 
     // Format info line from curTvdb
@@ -1557,6 +1594,8 @@ export default {
       titleStrings,
       selectedTitleIdx,
       parsedTitles,
+      curImdbId,
+      curTvdbId,
       infoLine,
       galleryTitleLine,
       titlesPane,

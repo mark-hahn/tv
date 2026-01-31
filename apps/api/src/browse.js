@@ -193,6 +193,12 @@ function appendResultTitle(entry) {
 }
 function parseResultTitle(entry) {
   const s = String(entry || "");
+  try {
+    if (s.trim().startsWith("{")) {
+      const o = JSON.parse(s);
+      if (o.title) return o.title;
+    }
+  } catch {}
   const bar = s.indexOf("|");
   if (bar < 0) return s;
   const rest = s.slice(bar + 1);
@@ -279,13 +285,31 @@ export async function getBrowseShow() {
 
     if (rejected) {
       if (rejected === "reality") continue;
-      appendResultTitle(`${rejected}|${title}|${JSON.stringify(show)}`);
+      // appendResultTitle(`${rejected}|${title}|${JSON.stringify(show)}`);
+      appendResultTitle(
+        JSON.stringify({
+          status: rejected,
+          title,
+          imdbid: show.externals?.imdb,
+          tvdbid: show.externals?.thetvdb,
+          data: show,
+        }),
+      );
       // "If rejected add ... and continue" to look for next one
       continue;
     }
 
     // Accepted
-    appendResultTitle(`ok|${title}|${JSON.stringify(show)}`);
+    // appendResultTitle(`ok|${title}|${JSON.stringify(show)}`);
+    appendResultTitle(
+      JSON.stringify({
+        status: "ok",
+        title,
+        imdbid: show.externals?.imdb,
+        tvdbid: show.externals?.thetvdb,
+        data: show,
+      }),
+    );
     foundNew = true;
 
     // "If all checks pass ... return resultTitles"

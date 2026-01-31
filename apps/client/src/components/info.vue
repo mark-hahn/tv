@@ -934,7 +934,7 @@ export default {
       if (episodeCount > 0) {
         this.watchedValTxt =
           watchedCount === episodeCount
-            ? `All ${episodeCount}`
+            ? `all ${episodeCount} episodes`
             : `${watchedCount} of ${episodeCount}`;
       } else {
         this.watchedValTxt = "";

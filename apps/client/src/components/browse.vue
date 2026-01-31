@@ -992,7 +992,7 @@ export default {
           if (local.showId && local.showId.startsWith("noemby-")) wCount = 0;
           const total = local.episodeCount;
           if (wCount === total) {
-            info.watched = "All Watched";
+            info.watched = `Watched all ${total} episodes`;
           } else {
             info.watched = `Watched ${wCount} of ${total}`;
           }

@@ -331,7 +331,7 @@ const getRemote = async (id, type, showName) => {
       name = "Rotten";
       urlRatings = await rottenSearch(showName);
       if (!urlRatings) return null;
-      console.log("getRemote rottenSearch:", urlRatings);
+      // console.log("getRemote rottenSearch:", urlRatings);
       url = urlRatings.url;
       ratings = urlRatings.criticsScore + "/" + urlRatings.audienceScore;
       break;
@@ -344,7 +344,7 @@ const getRemote = async (id, type, showName) => {
     log(`getRemote, no url: ${name}`);
     return null;
   }
-  console.log(`getRemote`, { name, url, ratings });
+  // console.log(`getRemote`, { name, url, ratings });
   return { name, url, ratings };
 };
 
@@ -450,7 +450,7 @@ const getRemotes = async (
     if (name !== "IMDB" && name !== "Rotten") remotes.push(remote);
   }
 
-  console.log("getRemotes result:", JSON.stringify(remotes, null, 2));
+  // console.log("getRemotes result:", JSON.stringify(remotes, null, 2));
 
   remotesCache.set(cacheKey, remotes);
   if (remotesCache.size > 100) {

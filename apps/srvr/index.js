@@ -10,6 +10,7 @@ import * as tvdb from "./src/tvdb.js";
 import * as util from "./src/util.js";
 import * as email from "./src/email.js";
 import * as tmdb from "./src/tmdb.js";
+import { checkFlexgetStatus } from "../api/src/usb.js";
 import fetch from "node-fetch";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import {
@@ -2609,3 +2610,23 @@ wss.on("connection", (ws) => {
     socketName = "unknown websocket";
   });
 });
+
+const CHECK_INTERVAL_MS = 60 * 60 * 1000;
+
+async function runUsbCheck() {
+  try {
+    await checkFlexgetStatus();
+    // console.log("USB status check passed.");
+  } catch (err) {
+    console.error("USB status check failed:", err.message);
+    try {
+      await email.sendEmail(`USB Status Check Failed:\n${err.message}`);
+    } catch (e) {
+      console.error("Failed to send error email:", e);
+    }
+  }
+}
+
+setInterval(runUsbCheck, CHECK_INTERVAL_MS);
+// Run initial check after 1 minute (allow startup)
+setTimeout(runUsbCheck, 60 * 1000);

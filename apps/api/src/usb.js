@@ -922,3 +922,94 @@ export async function getUsbFiles() {
     throw new Error(`Failed to list USB files: ${e.message}`);
   }
 }
+
+/**
+ * Runs `~/flexget/bin/flexget status` on the USB server via ssh.
+ * Returns raw stdout.
+ */
+export async function flexgetStatus() {
+  const qbHost = await loadQbHostForSsh();
+  // We use the specific path requested by user: ~/flexget/bin/flexget
+  const cmd = "~/flexget/bin/flexget status";
+
+  const sshBaseArgs = [
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "ConnectTimeout=10",
+    "-o",
+    "StrictHostKeyChecking=no",
+    "-o",
+    "UserKnownHostsFile=/dev/null",
+  ];
+
+  const args = [...sshBaseArgs, qbHost, cmd];
+  
+  try {
+    const { stdout, stderr } = await execFileAsync("ssh", args, { 
+      timeout: 30000 
+    });
+    // flexget status might output warnings to stderr but still succeed.
+    // We strictly return stdout. 
+    // If command failed (exit code != 0), execFileAsync naturally throws.
+    return stdout;
+  } catch (error) {
+    // If it's an execution error, we throw it so the caller can catch and email.
+     throw error;
+  }
+}
+
+/**
+ * Checks flexget status and throws an error if tasks are stale or failed.
+ */
+export async function checkFlexgetStatus() {
+  const output = await flexgetStatus();
+  const lines = output.split("\n");
+  const tasks = {};
+
+  for (const line of lines) {
+    if (!line.includes("│")) continue;
+    const parts = line.split("│").map((s) => s.trim());
+    if (parts.length < 8) continue;
+
+    const name = parts[1];
+    if (name === "Task") continue;
+    if (!["ipt", "tl"].includes(name)) continue;
+
+    const lastExec = parts[2];
+    const lastSuccess = parts[3];
+    const failed = parseInt(parts[7], 10);
+
+    tasks[name] = { lastExec, lastSuccess, failed };
+  }
+
+  const now = Date.now();
+  const TWENTY_MINS = 20 * 60 * 1000;
+  const NINE_HOURS = 9 * 60 * 60 * 1000;
+
+  for (const name of ["ipt", "tl"]) {
+    const info = tasks[name];
+    if (!info) throw new Error(`Task ${name} missing from status output`);
+
+    if (info.failed > 0)
+      throw new Error(`Task ${name} has ${info.failed} failed entries`);
+
+    const validateTime = (timeStr, label) => {
+      const dt = new Date(timeStr);
+      if (isNaN(dt.getTime())) throw new Error(`Invalid date ${timeStr}`);
+      // Adjust for timezone difference: Remote (PST) vs USB (Europe ~ +9h)
+      const eventTimePst = dt.getTime() - NINE_HOURS;
+      const age = now - eventTimePst;
+
+      if (age > TWENTY_MINS)
+        throw new Error(
+          `${name} ${label} is too old: ${Math.round(age / 60000)} mins ago`,
+        );
+    };
+
+    validateTime(info.lastExec, "last execution");
+    validateTime(info.lastSuccess, "last success");
+  }
+  
+  return true;
+}

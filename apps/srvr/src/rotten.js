@@ -591,8 +591,8 @@ export async function rottenSearch(query) {
       return null;
     }
     const detailLink = show.href;
-    console.log(`Rotten Search URL: ${queryUrl}`);
-    console.log(`Rotten Detail URL: ${detailLink}`);
+    // console.log(`Rotten Search URL: ${queryUrl}`);
+    // console.log(`Rotten Detail URL: ${detailLink}`);
     // Go to detail page
     await timing.time(
       "detail.goto",

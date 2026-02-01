@@ -947,13 +947,16 @@ export async function flexgetStatus() {
 
   try {
     const { stdout, stderr } = await execFileAsync("ssh", args, {
-      timeout: 30000,
+      timeout: 60000,
     });
     // flexget status might output warnings to stderr but still succeed.
     // We strictly return stdout.
     // If command failed (exit code != 0), execFileAsync naturally throws.
     return stdout;
   } catch (error) {
+    if (error.killed) {
+      throw new Error("Flexget status check timed out after 1 minute");
+    }
     // If it's an execution error, we throw it so the caller can catch and email.
     throw error;
   }

@@ -679,6 +679,11 @@ export default {
       );
       if (!downloading) return;
 
+      const title = downloading.title;
+      if (title) {
+        evtBus.emit("selectShowFromCardTitle", title);
+      }
+
       const scroller = this.$refs.scroller;
       if (!scroller) return;
 

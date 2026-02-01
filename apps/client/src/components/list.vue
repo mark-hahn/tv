@@ -1368,17 +1368,8 @@ export default {
       }
 
       if (nm) {
-        // Prefer exact name match first.
-        const exact = allShows.find((s) => s?.Name === nm);
-        if (exact) return exact;
-
-        // Then try a normalized match (handles minor punctuation/spacing differences).
-        const key = this.normalizeForShowMatch(nm);
-        if (!key) return null;
-        return (
-          allShows.find((s) => this.normalizeForShowMatch(s?.Name) === key) ||
-          null
-        );
+        const match = util.smartTitleMatch(nm, allShows);
+        if (match) return match;
       }
 
       return null;
@@ -1419,57 +1410,16 @@ export default {
         parsed = null;
       }
 
-      const candidates = [];
-      const parsedTitle = String(parsed?.title || "").trim();
-      if (parsedTitle) candidates.push(parsedTitle);
-      if (stripped) candidates.push(stripped);
-      candidates.push(raw);
+      const searchTitle = parsed?.title || stripped || raw;
+      const searchYear = parsed?.year || null;
 
-      const candidateKeys = candidates
-        .map((c) => this.normalizeForShowMatch(c))
-        .filter(Boolean);
+      const match = util.smartTitleMatch(searchTitle, allShows, searchYear);
 
-      const showKeyOf = (show) => this.normalizeForShowMatch(show?.Name);
-
-      // 1) Exact normalized match
-      for (const key of candidateKeys) {
-        const match = allShows.find((s) => showKeyOf(s) === key);
-        if (match) {
-          if (!this.shows.some((sh) => sh?.Name === match.Name)) {
-            await this.fltrAction("All");
-          }
-          this.onSelectShow(match, true);
-          return;
-        }
-      }
-
-      // 2) Prefix/contains heuristic (pick strongest)
-      let best = null;
-      let bestScore = 0;
-      for (const show of allShows) {
-        const sk = showKeyOf(show);
-        if (!sk) continue;
-        for (const ck of candidateKeys) {
-          if (!ck) continue;
-          const isRelated =
-            sk.startsWith(ck) ||
-            ck.startsWith(sk) ||
-            sk.includes(ck) ||
-            ck.includes(sk);
-          if (!isRelated) continue;
-          const score = Math.min(sk.length, ck.length);
-          if (score > bestScore) {
-            bestScore = score;
-            best = show;
-          }
-        }
-      }
-
-      if (best) {
-        if (!this.shows.some((sh) => sh?.Name === best.Name)) {
+      if (match) {
+        if (!this.shows.some((sh) => sh?.Name === match.Name)) {
           await this.fltrAction("All");
         }
-        this.onSelectShow(best, true);
+        this.onSelectShow(match, true);
       }
     },
 

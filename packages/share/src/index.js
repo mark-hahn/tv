@@ -21,6 +21,7 @@ function normalizeAggressive(s) {
 function coerceCandidateTitle(x) {
   if (typeof x === "string") return x;
   if (x && typeof x === "object") {
+    if (typeof x.Name === "string") return x.Name;
     if (typeof x.name === "string") return x.name;
     if (typeof x.title === "string") return x.title;
   }
@@ -29,6 +30,11 @@ function coerceCandidateTitle(x) {
 
 function getCandidateYear(x) {
   if (x && typeof x === "object") {
+    // Custom for TV app: Premiered (YYYY-MM-DD or YYYY)
+    if (x.Premiered) {
+      const s = String(x.Premiered).trim();
+      if (s.length >= 4) return s.substring(0, 4);
+    }
     // Rotten Tomatoes style
     if (x.startyear) return x.startyear;
     // TMDB style

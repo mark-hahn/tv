@@ -395,3 +395,7 @@ export function setCondFltr(cond, fltrChoice) {
     }
   }
 }
+
+import { smartTitleMatch } from "@tv/share";
+
+export { smartTitleMatch };

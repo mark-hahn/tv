@@ -470,13 +470,8 @@ export default {
       await this.removeRow(show);
     };
 
-    evtBus.on("deleteShow", async (show) => {
-      // console.log('evtBus deleteShow', show.Name);
-      if (!show) return;
-      await deleteShow(show);
-    });
-
     return {
+      deleteShow,
       shows: [],
       filterStr: "",
       errMsg: "",
@@ -2033,21 +2028,33 @@ export default {
     window.addEventListener("resize", this._onResizeWideLandscape);
     window.addEventListener("orientationchange", this._onResizeWideLandscape);
 
+    // Setup evtBus listeners cleanup
+    this.evtHandlers = {};
+    const on = (name, fn) => {
+      this.evtHandlers[name] = fn;
+      evtBus.on(name, fn);
+    };
+
+    on("deleteShow", async (show) => {
+      if (!show) return;
+      await this.deleteShow(show);
+    });
+
     // Simple + portrait: Buttons are rendered in App.vue and forward events via evtBus.
-    evtBus.on("simpleModeButtonsClick", (activeButtons) => {
+    on("simpleModeButtonsClick", (activeButtons) => {
       void this.handleButtonClick(activeButtons);
     });
 
-    evtBus.on("simpleModeButtonsTop", () => {
+    on("simpleModeButtonsTop", () => {
       this.topClick();
     });
 
-    evtBus.on("reelSearchAction", (srchChoice) => {
+    on("reelSearchAction", (srchChoice) => {
       void this.searchAction(srchChoice);
     });
 
     // Series pane "Add Show" button while in preview mode.
-    evtBus.on("addPreviewShow", (payload) => {
+    on("addPreviewShow", (payload) => {
       const fromPreview = !!payload?.fromPreview;
       const sc = payload?.srchChoice
         ? payload.srchChoice
@@ -2059,7 +2066,7 @@ export default {
     });
 
     // Any pane can request exit from preview mode.
-    evtBus.on("exitPreviewMode", () => {
+    on("exitPreviewMode", () => {
       if (!this.previewMode) return;
 
       this.setPreviewMode(false);
@@ -2077,31 +2084,30 @@ export default {
       }
     });
 
-    evtBus.on("openMap", (show) => {
+    on("openMap", (show) => {
       console.log("List: openMap event received for show:", show?.Name);
       this.seriesMapAction("open", show);
     });
 
     // Track current pane
-    evtBus.on("paneChanged", (pane) => {
+    on("paneChanged", (pane) => {
       this.currentPane = pane;
     });
 
     // Listen for map actions from App.vue
-    evtBus.on("mapAction", async ({ action, show }) => {
+    on("mapAction", async ({ action, show }) => {
       await this.seriesMapAction(action, show);
     });
 
     // Listen for episode clicks from App.vue
-    evtBus.on(
-      "episodeClick",
+    on("episodeClick",
       async ({ e, show, season, episode, setWatched }) => {
         await this.episodeClick(e, show, season, episode, setWatched);
       },
     );
 
     // Listen for season folder deletes from App.vue (ctrl-click season number in Map)
-    evtBus.on("seasonDelete", async ({ e, show, season }) => {
+    on("seasonDelete", async ({ e, show, season }) => {
       if (this.simpleMode) return;
       if (!e?.ctrlKey) return;
 
@@ -2131,7 +2137,7 @@ export default {
     });
 
     // Listen for library refresh completion to refresh show list
-    evtBus.on("library-refresh-complete", (payload) => {
+    on("library-refresh-complete", (payload) => {
       const onDone =
         payload && typeof payload === "object" ? payload.onDone : null;
       this.showReloadingShows = true;
@@ -2152,11 +2158,11 @@ export default {
     });
 
     // Cross-pane: click a card in Flex/Qbt/Down to select show in list
-    evtBus.on("selectShowFromCardTitle", (rawTitle) => {
+    on("selectShowFromCardTitle", (rawTitle) => {
       void this.selectShowFromCardTitle(rawTitle);
     });
 
-    setInterval(async () => {
+    this.devicePollTimer = setInterval(async () => {
       const devices = await srvr.getDevices();
       let showName = null;
       let playingDevice = null;
@@ -2170,14 +2176,15 @@ export default {
       this.currentPlayingDevice = playingDevice;
     }, 10 * 1000);
 
-    void (async () => {
-      document.addEventListener("keydown", (event) => {
-        if (event.code == "Escape") {
-          this.remotesAction("close");
-          this.seriesMapAction("close");
-        }
-      });
+    this.keydownHandler = (event) => {
+      if (event.code == "Escape") {
+        this.remotesAction("close");
+        this.seriesMapAction("close");
+      }
+    };
+    document.addEventListener("keydown", this.keydownHandler);
 
+    void (async () => {
       try {
         await this.newShows(true);
       } catch (err) {
@@ -2187,6 +2194,23 @@ export default {
   },
 
   beforeUnmount() {
+    if (this.evtHandlers) {
+      for (const [name, fn] of Object.entries(this.evtHandlers)) {
+        evtBus.off(name, fn);
+      }
+      this.evtHandlers = null;
+    }
+
+    if (this.devicePollTimer) {
+      clearInterval(this.devicePollTimer);
+      this.devicePollTimer = null;
+    }
+
+    if (this.keydownHandler) {
+      document.removeEventListener("keydown", this.keydownHandler);
+      this.keydownHandler = null;
+    }
+
     if (this._onResizeWideLandscape) {
       window.removeEventListener("resize", this._onResizeWideLandscape);
       window.removeEventListener(

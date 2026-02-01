@@ -1863,44 +1863,8 @@ export default {
       this._torrentsInitialized = false;
       this._torrentsShowKey = null;
 
-      // When currently viewing Actors, stay on Actors (do not bounce to Series).
-      if (prevPane === "actors") {
-        // Trigger a refresh; tvdbData may be null initially and will be resent on tvdbDataReady.
-        evtBus.emit("showActors", {
-          show: this.currentShow,
-          tvdbData: this.currentTvdbData,
-        });
-        return;
-      }
-
       // When currently viewing Local, stay on Local.
       if (prevPane === "local") {
-        return;
-      }
-
-      // When currently viewing Torrents, stay on Torrents.
-      // A new show selection should restart torrent search for the new show.
-      if (prevPane === "tor") {
-        this.currentPane = "tor";
-        evtBus.emit("paneChanged", this.currentPane);
-        evtBus.emit("showTorrents", this.currentShow);
-        this._torrentsInitialized = true;
-        this._torrentsShowKey =
-          this.currentShow?.Id || this.currentShow?.Name || null;
-        return;
-      }
-
-      // When currently viewing Reviews, stay on Reviews.
-      if (prevPane === "reviews") {
-        this.currentPane = "reviews";
-        evtBus.emit("paneChanged", this.currentPane);
-        return;
-      }
-
-      // When currently viewing Trailer, stay on Trailer.
-      if (prevPane === "trailer") {
-        this.currentPane = "trailer";
-        evtBus.emit("paneChanged", this.currentPane);
         return;
       }
 

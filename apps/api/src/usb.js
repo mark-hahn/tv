@@ -944,18 +944,18 @@ export async function flexgetStatus() {
   ];
 
   const args = [...sshBaseArgs, qbHost, cmd];
-  
+
   try {
-    const { stdout, stderr } = await execFileAsync("ssh", args, { 
-      timeout: 30000 
+    const { stdout, stderr } = await execFileAsync("ssh", args, {
+      timeout: 30000,
     });
     // flexget status might output warnings to stderr but still succeed.
-    // We strictly return stdout. 
+    // We strictly return stdout.
     // If command failed (exit code != 0), execFileAsync naturally throws.
     return stdout;
   } catch (error) {
     // If it's an execution error, we throw it so the caller can catch and email.
-     throw error;
+    throw error;
   }
 }
 
@@ -968,17 +968,44 @@ export async function checkFlexgetStatus() {
   const tasks = {};
 
   for (const line of lines) {
-    if (!line.includes("│")) continue;
-    const parts = line.split("│").map((s) => s.trim());
-    if (parts.length < 8) continue;
+    // Support both box-drawing char │ and simple pipe |
+    const separator = line.includes("│")
+      ? "│"
+      : line.includes("|")
+        ? "|"
+        : null;
+    if (!separator) continue;
 
-    const name = parts[1];
-    if (name === "Task") continue;
+    // Some formats have leading/trailing pipes, some might not.
+    // e.g. "│ ipt │ ..." or "ipt | ..."
+    const parts = line.split(separator).map((s) => s.trim());
+
+    // If splitting by | resulted in empty first/last elements (due to surrounding pipes), remove them if they are empty
+    // But be careful about index matching.
+    // Let's filter out empty strings to find the content.
+    // Expected content columns: Task, Last execution, Last success, Produced, Accepted, Rejected, Failed, Duration
+    // That's 8 columns.
+
+    // Filter out purely empty parts distinct from legitimate empty columns?
+    // Flexget status columns are unlikely to be empty strings.
+    const nonBlankParts = parts.filter((p) => p !== "");
+
+    if (nonBlankParts.length < 8) continue;
+
+    // Map nonBlankParts indices to our needs:
+    // 0: Task Name (ipt)
+    // 1: Last Execution
+    // 2: Last Success
+    // ...
+    // 6: Failed
+
+    const name = nonBlankParts[0];
+    if (name === "Task" || name.startsWith("----")) continue;
     if (!["ipt", "tl"].includes(name)) continue;
 
-    const lastExec = parts[2];
-    const lastSuccess = parts[3];
-    const failed = parseInt(parts[7], 10);
+    const lastExec = nonBlankParts[1];
+    const lastSuccess = nonBlankParts[2];
+    const failed = parseInt(nonBlankParts[6], 10);
 
     tasks[name] = { lastExec, lastSuccess, failed };
   }
@@ -1010,6 +1037,6 @@ export async function checkFlexgetStatus() {
     validateTime(info.lastExec, "last execution");
     validateTime(info.lastSuccess, "last success");
   }
-  
+
   return true;
 }

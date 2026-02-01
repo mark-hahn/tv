@@ -480,7 +480,7 @@
                   {{ tvdbInfo.cntryLangRight }}
                 </div>
               </div> -->
-              <div
+              <!-- <div
                 v-if="tvdbInfo.watched"
                 style="
                   min-height: 20px;
@@ -491,7 +491,7 @@
                 "
               >
                 {{ tvdbInfo.watched }}
-              </div>
+              </div> -->
               <div
                 v-if="tvdbInfo.runtime"
                 style="

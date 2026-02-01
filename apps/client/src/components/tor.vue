@@ -137,7 +137,7 @@
               Cookies
             </button>
             <button
-              @click.stop="toggleDebug"
+              @click.stop="startLibraryRefresh"
               style="
                 font-size: 13px;
                 cursor: pointer;
@@ -147,7 +147,7 @@
                 background-color: whitesmoke;
               "
             >
-              Debug
+              Library
             </button>
           </div>
         </div>
@@ -1031,6 +1031,9 @@ export default {
   },
 
   methods: {
+    startLibraryRefresh() {
+      evtBus.emit("startLibraryRefresh");
+    },
     toggleDebug() {
       this.showDebug = !this.showDebug;
     },

@@ -2283,6 +2283,9 @@ export default {
 
               // Only mark "downloaded" after the server indicates success.
               this.rememberDownloadedTorrent(torrent);
+
+              // Switch to info pane
+              evtBus.emit("showSeriesPane");
             } else {
               const msg = result?.message || `Failed to add: ${torrentTitle}`;
               this.setDownloadStatus(torrent, "error", msg);

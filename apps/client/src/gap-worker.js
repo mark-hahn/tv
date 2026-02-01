@@ -53,6 +53,8 @@ const getShowState = async (showId, _showName, showMeta) => {
   let anyUnaired = false;
   let sawAnyEpisode = false;
   let anyAiredEpisode = false;
+  let fileCount = 0;
+  let firstEpisodeFileUnwatched = false;
 
   try {
     let seasonsRes;
@@ -110,6 +112,12 @@ const getShowState = async (showId, _showName, showMeta) => {
         const userData = episode?.UserData;
         const watched = !!userData?.Played;
         const haveFile = episode.LocationType != "Virtual";
+
+        if (haveFile) fileCount++;
+        if (firstEpisode && haveFile && !watched) {
+          firstEpisodeFileUnwatched = true;
+        }
+
         let unaired = unairedFromHere || !!unairedObj[episodeNumber];
         if (watched) unaired = false;
         else if (unaired) unairedFromHere = true;
@@ -169,7 +177,9 @@ const getShowState = async (showId, _showName, showMeta) => {
         lastWatched = watched;
       }
       if (!seasonNotWatchedNoFiles && fileEndCount > 2) {
-        fileEndError = true;
+        if (!(fileCount === 1 && firstEpisodeFileUnwatched)) {
+          fileEndError = true;
+        }
       }
       if (lastSeasonWatched && !allSeasonWatched && seasonNotWatchedNoFiles)
         seasonWatchedThenNofile = true;

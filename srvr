@@ -16,10 +16,56 @@ if [[ ! -d "$ROOT_DIR/apps" ]]; then
   exit 1
 fi
 
+SSH_CONTROL_PATH="$HOME/.ssh/ctl-%C"
+
+cleanup_ssh() {
+  if [ -e "${SSH_CONTROL_PATH//%C/*}" ]; then
+     # Closing master connection
+     ssh -O exit -S "$SSH_CONTROL_PATH" "$SSH_HOST" 2>/dev/null || true
+  fi
+}
+trap cleanup_ssh EXIT
+
+# Start ControlMaster
+# -M: master mode
+# -N: no remote command (just forward/establish socket)
+# -f: background
+ssh -f -N -M -S "$SSH_CONTROL_PATH" "$SSH_HOST"
+
 usage() {
   echo "Usage: $(basename "$0") [api|down|srvr|client|share|all]" >&2
   echo "Env: TV_REMOTE_BASE (default: /root/dev/apps/tv on remote)" >&2
   exit 1
+}
+
+run_ssh() {
+  local retries=5
+  local count=0
+  until ssh -S "$SSH_CONTROL_PATH" "$@"; do
+    local exit_code=$?
+    count=$((count + 1))
+    if [ $count -lt $retries ]; then
+      echo "[warn] ssh failed with $exit_code, retrying $count/$retries in 3s..." >&2
+      sleep 3
+    else
+      return $exit_code
+    fi
+  done
+}
+
+run_rsync() {
+  local retries=5
+  local count=0
+  until rsync -e "ssh -S '$SSH_CONTROL_PATH'" "$@"; do
+    local exit_code=$?
+    count=$((count + 1))
+    if [ $count -lt $retries ]; then
+      echo "[warn] rsync failed with $exit_code, retrying $count/$retries in 3s..." >&2
+      sleep 3
+    else
+      return $exit_code
+    fi
+  done
 }
 
 pm2_name_for_project() {
@@ -53,9 +99,9 @@ remote_app_dir_for_project() {
 
 sync_monorepo_root() {
   echo "[remote] sync root files -> $SSH_HOST:$TV_REMOTE_BASE/"
-  ssh "$SSH_HOST" "mkdir -p '$TV_REMOTE_BASE/apps' '$TV_REMOTE_BASE/packages'"
+  run_ssh "$SSH_HOST" "mkdir -p '$TV_REMOTE_BASE/apps' '$TV_REMOTE_BASE/packages'"
   
-  rsync -az \
+  run_rsync -az \
     "$ROOT_DIR/package.json" \
     "$ROOT_DIR/pnpm-workspace.yaml" \
     "$ROOT_DIR/pnpm-lock.yaml" \
@@ -93,9 +139,9 @@ remote_sync_app() {
   # But we need to ensure the PARENT exists.
   # remote_app_dir_for_project returns full path.
   # dirname ensures apps/ or packages/ exists.
-  ssh "$SSH_HOST" "mkdir -p '$(dirname "$remote_dir")'"
+  run_ssh "$SSH_HOST" "mkdir -p '$(dirname "$remote_dir")'"
 
-  rsync -az    \
+  run_rsync -az    \
     "${extra_excludes[@]}" \
     --exclude 'node_modules/' \
     --exclude '.turbo/' \
@@ -129,7 +175,7 @@ remote_install_app_deps() {
   # In true monorepo, we install at ROOT.
   # We assume 'share' is synced if it's needed.
   
-  ssh "$SSH_HOST" "cd '$TV_REMOTE_BASE' \
+  run_ssh "$SSH_HOST" "cd '$TV_REMOTE_BASE' \
     && if command -v pnpm >/dev/null 2>&1; then \
          pnpm install; \
          if [[ \"$project\" == \"down\" ]]; then pnpm rebuild better-sqlite3 --filter @tv/down; fi; \
@@ -138,7 +184,7 @@ remote_install_app_deps() {
 
 remote_pm2_restart_all_silent() {
   echo "[remote] pm2 reload ecosystem..."
-  ssh "$SSH_HOST" "cd '$TV_REMOTE_BASE' \
+  run_ssh "$SSH_HOST" "cd '$TV_REMOTE_BASE' \
     && pm2 start ecosystem.config.cjs --env production >/dev/null 2>&1 \
     && pm2 save >/dev/null 2>&1"
 }

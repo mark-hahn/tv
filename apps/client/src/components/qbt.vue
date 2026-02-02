@@ -17,6 +17,61 @@
     }"
   >
     <div
+      id="header"
+      class="pane-header-title"
+      :style="{
+        position: 'sticky',
+        top: '0px',
+        zIndex: 100,
+        backgroundColor: '#fafafa',
+        paddingTop: '5px',
+        paddingLeft: '5px',
+        paddingRight: '5px',
+        paddingBottom: '5px',
+        marginLeft: '0px',
+        marginRight: '0px',
+        marginTop: '0px',
+        marginBottom: '0px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'stretch',
+      }"
+    >
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <div style="margin-left: 20px; display: flex; align-items: center">
+          <span>qBittorrent</span>
+        </div>
+        <div
+          style="
+            display: flex;
+            gap: 10px;
+            margin-right: 20px;
+            justify-content: flex-end;
+          "
+        >
+          <button
+            @click.stop="highlightShow"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            From show
+          </button>
+        </div>
+      </div>
+    </div>
+    <div
       id="scroller"
       ref="scroller"
       :style="{
@@ -81,6 +136,7 @@
 </template>
 
 <script>
+import parseTorrentTitle from "parse-torrent-title";
 import evtBus from "../evtBus.js";
 import { config } from "../config.js";
 import * as util from "../util.js";
@@ -89,6 +145,10 @@ export default {
   name: "History",
 
   props: {
+    show: {
+      type: Object,
+      default: null,
+    },
     simpleMode: {
       type: Boolean,
       default: false,
@@ -114,7 +174,14 @@ export default {
       _inFlight: false,
       _loadingTimer: null,
       _showLoading: false,
+      matchedTitle: null,
     };
+  },
+
+  watch: {
+    show() {
+      this.matchedTitle = null;
+    },
   },
 
   computed: {
@@ -445,13 +512,15 @@ export default {
 
     getCardStyle(t) {
       const isDownloading = t?.state === "downloading";
+      const isMatched = this.matchedTitle && t?.name === this.matchedTitle;
       return {
         position: "relative",
-        background: isDownloading ? "#fffacd" : "#fff",
-        border: "1px solid #ddd",
+        background: isMatched ? "#e6f2ff" : isDownloading ? "#fffacd" : "#fff",
+        border: isMatched ? "3px solid #007bff" : "1px solid #ddd",
         borderRadius: "5px",
         padding: "10px",
         cursor: "pointer",
+        zIndex: isMatched ? 1 : 0,
       };
     },
 
@@ -518,6 +587,103 @@ export default {
 
       const title = t?.name;
       if (title) evtBus.emit("selectShowFromCardTitle", title);
+    },
+
+    highlightShow() {
+      // Find the card that matches the currently selected show (this.show)
+      // and scroll to it.
+
+      if (!this.show) {
+        return;
+      }
+
+      const showName = this.show.Name || this.show.name; // Robustness
+      if (!showName) return;
+
+      const candidates = [this.show];
+      let bestMatch = null;
+
+      // Determine search start index
+      // If we already have a focused match, start strictly AFTER it ("Next" behavior)
+      let startIndex = 0;
+      if (this.matchedTitle) {
+        // sortedTorrents is a computed property, so finding index in it is fine
+        const currentIdx = this.sortedTorrents.findIndex(
+          (t) => t && t.name === this.matchedTitle,
+        );
+        if (currentIdx !== -1) {
+          startIndex = currentIdx + 1;
+        }
+      }
+
+      // Iterate all items to find best match
+      for (let i = startIndex; i < this.sortedTorrents.length; i++) {
+        const t = this.sortedTorrents[i];
+        const rawTitle = t.name || "";
+        if (!rawTitle) continue;
+
+        // Use parseTorrentTitle to extract clean title and year
+        let parsed = null;
+        try {
+          let parser = null;
+          if (typeof parseTorrentTitle === "function") {
+            parser = parseTorrentTitle;
+          } else if (
+            parseTorrentTitle &&
+            typeof parseTorrentTitle.parse === "function"
+          ) {
+            parser = parseTorrentTitle.parse;
+          } else if (
+            parseTorrentTitle &&
+            parseTorrentTitle.default &&
+            typeof parseTorrentTitle.default.parse === "function"
+          ) {
+            parser = parseTorrentTitle.default.parse;
+          }
+
+          parsed = parser ? parser(rawTitle) : null;
+        } catch (e) {
+          // ignore
+        }
+
+        const searchTitle = parsed?.title || rawTitle;
+        const searchYear = parsed?.year || null;
+
+        // Use smartTitleMatch to compare this download item against the current show
+        const match = util.smartTitleMatch(searchTitle, candidates, searchYear);
+        if (match) {
+          bestMatch = t;
+          break; // Found it
+        }
+      }
+
+      if (!bestMatch) {
+        return;
+      }
+
+      // Found the matching card
+      this.matchedTitle = bestMatch.name;
+
+      const scroller = this.$refs.scroller;
+      if (!scroller) return;
+
+      const idx = this.sortedTorrents.findIndex((t) => t === bestMatch);
+      if (idx === -1) return;
+
+      // Scroll logic
+      const allChildren = Array.from(scroller.children);
+
+      if (allChildren.length === 0) return;
+
+      const container = allChildren[0];
+      const itemElements = Array.from(container.children);
+
+      if (itemElements[idx]) {
+        itemElements[idx].scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
     },
 
     infoLine(t) {

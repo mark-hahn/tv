@@ -238,6 +238,7 @@
               style="width: 100%; height: 100%"
               :simpleMode="simpleMode"
               :sizing="activeSizing"
+              :show="currentShow"
             ></Qbt>
             <Usb
               v-if="!simpleMode"
@@ -480,6 +481,7 @@
             style="width: 100%; height: 100%"
             :simpleMode="simpleMode"
             :sizing="activeSizing"
+            :show="currentShow"
           ></Qbt>
           <Local
             v-if="!simpleMode"

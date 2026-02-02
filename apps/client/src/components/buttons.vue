@@ -168,6 +168,7 @@ export default {
         "Viewed Order": false,
         "Ratings Order": false,
         "Notes Order": false,
+        "Ended Order": false,
       },
       filters: ["Ready To Watch"],
       genres: ["Drama", "Comedy"],
@@ -177,6 +178,7 @@ export default {
         "Viewed Order",
         "Ratings Order",
         "Notes Order",
+        "Ended Order",
       ],
     };
   },

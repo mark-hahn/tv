@@ -216,6 +216,7 @@ export default {
 </script>
 
 <style>
+/*
 #shows {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -226,4 +227,5 @@ export default {
   height: 0;
   display: none;
 }
+*/
 </style>

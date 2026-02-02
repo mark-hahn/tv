@@ -813,6 +813,7 @@ export default {
           "Viewed Order": "Viewed",
           "Ratings Order": "Ratings",
           "Notes Order": "Notes",
+          "Ended Order": "Ended",
         };
         let activeSortOrder = null;
         for (const [label, isActive] of Object.entries(activeButtons || {})) {
@@ -868,6 +869,7 @@ export default {
         "Viewed Order": "Viewed",
         "Ratings Order": "Ratings",
         "Notes Order": "Notes",
+        "Ended Order": "Ended",
       };
 
       // Pure state-based: Sync conds to match button states

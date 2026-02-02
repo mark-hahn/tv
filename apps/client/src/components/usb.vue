@@ -34,6 +34,36 @@
       >
 
       <button
+        @click.stop="startLibraryRefresh"
+        :disabled="loading"
+        style="
+          cursor: pointer;
+          border-radius: 7px;
+          padding: 4px 10px;
+          border: 1px solid #bbb;
+          background-color: whitesmoke;
+          margin-right: 8px;
+        "
+      >
+        Library
+      </button>
+
+      <button
+        @click.stop="highlightShow"
+        :disabled="loading"
+        style="
+          cursor: pointer;
+          border-radius: 7px;
+          padding: 4px 10px;
+          border: 1px solid #bbb;
+          background-color: whitesmoke;
+          margin-right: 8px;
+        "
+      >
+        From show
+      </button>
+
+      <button
         @click="forceDown"
         :disabled="loading || (!selectedName && selectedFiles.size === 0)"
         style="
@@ -80,6 +110,7 @@
       <tree-node
         v-for="node in tree"
         :key="node.name"
+        ref="treeNodes"
         :node="node"
         :selected="selectedName === node.name"
         :selected-files="selectedFiles"
@@ -90,14 +121,19 @@
 </template>
 
 <script>
+import parseTorrentTitle from "parse-torrent-title";
 import TreeNode from "./tree-node.vue";
 import { config } from "../config.js";
+import evtBus from "../evtBus.js";
+import * as util from "../util.js";
 
 export default {
   name: "Usb",
   components: { TreeNode },
   props: {
     active: Boolean,
+    show: Object,
+    allShows: Array,
   },
   data() {
     return {
@@ -112,10 +148,22 @@ export default {
     };
   },
   watch: {
-    active(val) {
-      if (val && !this.hasLoaded && !this.loading) {
-        this.fetchFiles();
-      }
+    show: {
+      immediate: true,
+      handler(val) {
+        console.log(
+          "usb: show prop changed:",
+          val ? val.Name || val.name : "null",
+        );
+      },
+    },
+    active: {
+      immediate: true,
+      handler(val) {
+        if (val && !this.hasLoaded && !this.loading) {
+          this.fetchFiles();
+        }
+      },
     },
   },
   mounted() {
@@ -124,10 +172,113 @@ export default {
     }
   },
   methods: {
+    startLibraryRefresh() {
+      evtBus.emit("startLibraryRefresh");
+    },
+    highlightShow() {
+      const targetShow = this.show;
+      if (!targetShow) return;
+
+      const candidates = [targetShow];
+      let bestMatch = null;
+      let parser = null;
+
+      // Resolve parser once
+      try {
+        if (typeof parseTorrentTitle === "function") {
+          parser = parseTorrentTitle;
+        } else if (
+          parseTorrentTitle &&
+          typeof parseTorrentTitle.parse === "function"
+        ) {
+          parser = parseTorrentTitle.parse;
+        } else if (
+          parseTorrentTitle &&
+          parseTorrentTitle.default &&
+          typeof parseTorrentTitle.default.parse === "function"
+        ) {
+          parser = parseTorrentTitle.default.parse;
+        }
+        // console.log("usb: parser resolved:", !!parser);
+      } catch (e) {
+        console.error("usb: parser resolution error:", e);
+      }
+
+      const allMatches = [];
+      for (const node of this.tree) {
+        const rawTitle = node.name || "";
+        if (!rawTitle) continue;
+
+        let parsed = null;
+        try {
+          // If parser is available, use it
+          if (parser) {
+            parsed = parser(rawTitle);
+          }
+        } catch (e) {
+          // console.error("usb: parsing error for", rawTitle, e);
+        }
+
+        const searchTitle = parsed?.title || rawTitle;
+        const searchYear = parsed?.year || null;
+
+        const match = util.smartTitleMatch(searchTitle, candidates, searchYear);
+        if (match) {
+          allMatches.push(node);
+        }
+      }
+
+      if (allMatches.length > 0) {
+        // Determine the next match to select
+        let nextIndex = 0;
+        if (this.selectedName) {
+          const currentIndex = allMatches.findIndex(
+            (m) => m.name === this.selectedName,
+          );
+          if (currentIndex !== -1) {
+            if (currentIndex === allMatches.length - 1) {
+              return;
+            }
+            nextIndex = currentIndex + 1;
+          }
+        }
+        bestMatch = allMatches[nextIndex];
+
+        this.selectedName = bestMatch.name;
+        this.selectedFiles.clear();
+        this.selectionParentPath = null;
+        this.lastSelectedFile = null;
+
+        this.$nextTick(() => {
+          if (this.$refs.treeNodes) {
+            const comp = this.$refs.treeNodes.find((c) => {
+              // Access prop 'node' on component instance.
+              // In Vue 3 Options API Proxy, properties are usually available directly.
+              // Or via $props.
+              const n = c.node || c.$props?.node;
+              return n && n.name === bestMatch.name;
+            });
+
+            if (comp && comp.$el) {
+              comp.$el.scrollIntoView({ behavior: "smooth", block: "center" });
+            } else {
+              console.warn("usb: could not find component ref for match");
+            }
+          } else {
+            console.warn("usb: refs.treeNodes is missing");
+          }
+        });
+      }
+    },
     async fetchFiles() {
+      // If we have a selected show but no tree, we should fetch.
+      // Or if active.
+      if (!this.active && !this.show) return;
+
       this.loading = true;
       this.error = null;
       try {
+        console.log("usb: fetchFiles start");
         const url = `${config.torrentsApiUrl}/api/usb/files`;
         const res = await fetch(url);
         if (!res.ok) {
@@ -137,6 +288,12 @@ export default {
         const rootTree = await res.json();
         this.tree = this.processTree(rootTree);
         this.hasLoaded = true;
+
+        // If we have a show, try to highlight it after load if nothing is selected
+        // Using nextTick to let render settle
+        this.$nextTick(() => {
+          // We could auto-select if we wanted to
+        });
       } catch (e) {
         this.error = e.message || "Failed to load files";
       } finally {

@@ -1325,6 +1325,7 @@ export default {
         "tor",
         "subs",
         "files",
+        "usb",
         "reviews",
         "trailer",
         "ai",

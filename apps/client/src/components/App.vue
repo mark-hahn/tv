@@ -245,6 +245,8 @@
               v-show="currentPane === 'usb'"
               style="width: 100%; height: 100%"
               :active="currentPane === 'usb'"
+              :show="currentShow"
+              :allShows="allShows"
             ></Usb>
             <Local
               v-if="!simpleMode"
@@ -497,6 +499,8 @@
             v-show="currentPane === 'usb'"
             style="width: 100%; height: 100%"
             :active="currentPane === 'usb'"
+            :show="currentShow"
+            :allShows="allShows"
           ></Usb>
           <Down
             v-if="!simpleMode"
@@ -641,6 +645,7 @@ export default {
   },
   data() {
     return {
+      evtHandlers: {}, // Initialize evtHandlers
       // Must be known before first render so non-simple panes never mount in simple mode.
       simpleMode: new URLSearchParams(window.location.search).has("simple"),
       currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'flex', 'qbt', 'down'
@@ -1868,7 +1873,17 @@ export default {
       this._torrentsShowKey = null;
 
       // When currently viewing Local, stay on Local.
-      if (prevPane === "local") {
+      const keepContentPanes = new Set([
+        "local",
+        "usb",
+        "qbt",
+        "down",
+        "tor",
+        "reviews",
+        "trailer",
+        "actors",
+      ]);
+      if (keepContentPanes.has(prevPane)) {
         return;
       }
 

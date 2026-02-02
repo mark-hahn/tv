@@ -325,6 +325,7 @@ export async function loadAllShows() {
     show.TvdbId = tvdb.tvdbId;
     show.OriginalCountry = tvdb.originalCountry;
     show.Ended = tvdb.status == "Ended";
+    show.LastAired = tvdb.lastAired;
     show.Ratings = ratings;
     allTvdb[name] = tvdb;
   }

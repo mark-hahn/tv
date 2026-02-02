@@ -498,7 +498,15 @@ export default {
       showReloadingShows: false,
       showEmbyRefreshing: false,
       isWideLandscape: false,
-      sortChoices: ["Alpha", "Viewed", "Added", "Ratings", "Notes", "Size"],
+      sortChoices: [
+        "Alpha",
+        "Viewed",
+        "Added",
+        "Ratings",
+        "Notes",
+        "Size",
+        "Ended",
+      ],
       fltrChoices: ["All", "Try Drama", "Finished"],
       conds: [
         {
@@ -916,6 +924,8 @@ export default {
           return show.Name.replace(/^the\s*/i, "").toLowerCase();
         case "Added":
           return show.DateCreated;
+        case "Ended":
+          return show.LastAired || "";
         case "Size":
           if (forSort) return show.Size;
           return util.fmtSize(show);

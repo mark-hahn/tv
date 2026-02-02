@@ -105,7 +105,8 @@ function appendSyncLog(entry) {
       ? ` total-in-db: ${totalInDbNum}`
       : "";
     const isModuleLoaded = e.message === "module loaded";
-    const isSyncStarted = e.message === "SYNC STARTED";
+    const isSyncStarted =
+      typeof e.message === "string" && e.message.trim() === "SYNC STARTED";
 
     let line;
     if (isModuleLoaded) {
@@ -124,7 +125,10 @@ function appendSyncLog(entry) {
     }
 
     fs.appendFileSync(outPath, line + "\n", "utf8");
-  } catch {
+  } catch (err) {
+    if (entry === "SYNC STARTED") {
+      console.error("[tvmaze] failed to append SYNC STARTED log", err);
+    }
     // ignore logging failures
   }
 }

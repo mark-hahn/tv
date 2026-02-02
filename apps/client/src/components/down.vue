@@ -669,7 +669,7 @@ export default {
         border: isMatched ? "3px solid #007bff" : "1px solid #ddd",
         borderRadius: "8px",
         padding: "10px",
-        background: isMatched ? "#e6f2ff" : isDownloading ? "#fffacd" : "#fff",
+        background: isDownloading ? "#fffacd" : "#fff",
         cursor: "pointer",
         zIndex: isMatched ? 1 : 0,
       };

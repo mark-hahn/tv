@@ -56,6 +56,19 @@
           "
         >
           <button
+            @click.stop="startLibraryRefresh"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Library
+          </button>
+          <button
             @click.stop="highlightShow"
             style="
               font-size: 13px;
@@ -67,6 +80,19 @@
             "
           >
             From show
+          </button>
+          <button
+            @click.stop="scrollToBottomAction"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Bottom
           </button>
         </div>
       </div>
@@ -224,6 +250,15 @@ export default {
   },
 
   methods: {
+    startLibraryRefresh() {
+      evtBus.emit("startLibraryRefresh");
+    },
+    scrollToBottomAction() {
+      this._stickToBottom = true;
+      const el = this.$refs.scroller;
+      if (!el) return;
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    },
     handleScroll(event) {
       const el = event?.currentTarget;
       if (!el) return;
@@ -259,6 +294,7 @@ export default {
     },
 
     onPaneChanged(pane) {
+      this.matchedTitle = null;
       this._active = pane === "qbt";
       if (this._active) {
         if (!this.useStaticSamples) this.startPolling();
@@ -515,7 +551,7 @@ export default {
       const isMatched = this.matchedTitle && t?.name === this.matchedTitle;
       return {
         position: "relative",
-        background: isMatched ? "#e6f2ff" : isDownloading ? "#fffacd" : "#fff",
+        background: isDownloading ? "#fffacd" : "#fff",
         border: isMatched ? "3px solid #007bff" : "1px solid #ddd",
         borderRadius: "5px",
         padding: "10px",

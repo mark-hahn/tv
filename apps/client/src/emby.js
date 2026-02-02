@@ -131,7 +131,14 @@ export async function loadAllShows() {
 
     const tvdbId = show?.ProviderIds?.Tvdb || show?.TvdbId;
     if (!tvdbId || tvdbId == "0") {
-      console.error(`loadAllShows, no tvdbId:`, show.Name, { show });
+      console.error(`loadAllShows, no tvdbId: ${show.Name} - DELETING FROM EMBY`, {
+        show,
+      });
+      try {
+        await deleteShowFromEmby(show);
+      } catch (e) {
+        // ignore delete error (already logged in deleteShowFromEmby)
+      }
       continue;
     }
     show.TvdbId = tvdbId;

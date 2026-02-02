@@ -1387,16 +1387,13 @@ export default {
     },
 
     async selectShowFromCardTitle(rawTitle) {
-      console.log("selectShowFromCardTitle: raw=", rawTitle);
       const raw = String(rawTitle || "").trim();
       if (!raw) return;
       if (!Array.isArray(allShows) || allShows.length === 0) {
-        console.warn("selectShowFromCardTitle: no shows loaded");
         return;
       }
 
       const stripped = this.stripTitleNoise(raw);
-      console.log("selectShowFromCardTitle: stripped=", stripped);
 
       let parsed = null;
       try {
@@ -1417,37 +1414,14 @@ export default {
         }
 
         parsed = parser ? parser(stripped) : null;
-        console.log("selectShowFromCardTitle: parsed=", parsed);
       } catch (e) {
-        console.warn("selectShowFromCardTitle: parse error", e);
         parsed = null;
       }
 
       const searchTitle = parsed?.title || stripped || raw;
       const searchYear = parsed?.year || null;
-      console.log(
-        "selectShowFromCardTitle: searchTitle=",
-        searchTitle,
-        "searchYear=",
-        searchYear,
-      );
 
       const match = util.smartTitleMatch(searchTitle, allShows, searchYear);
-      console.log(
-        "selectShowFromCardTitle: match=",
-        match ? match.Name : "null",
-      );
-
-      if (!match) {
-        // Debugging: try to find what it SHOULD have matched
-        const candidates = allShows.filter((s) =>
-          s.Name.toLowerCase().includes("funny"),
-        );
-        console.log(
-          "selectShowFromCardTitle: DEBUG candidates for 'funny':",
-          candidates.map((c) => c.Name),
-        );
-      }
 
       if (match) {
         if (!this.shows.some((sh) => sh?.Name === match.Name)) {
@@ -1507,13 +1481,11 @@ export default {
 
       // Only emit setUpSeries if the show selection changed
       if (showChanged) {
-        console.log("List: emitting setUpSeries", showName);
         const token = (this._pendingSetUpSeriesToken || 0) + 1;
         this._pendingSetUpSeriesToken = token;
         this.$nextTick(() => {
           // If another selection happened since scheduling, ignore this one.
           if (token !== this._pendingSetUpSeriesToken) return;
-          console.log("List: actually emitting setUpSeries now", showName);
           evtBus.emit("setUpSeries", show);
         });
       }

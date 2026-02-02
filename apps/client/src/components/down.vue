@@ -770,13 +770,7 @@ export default {
           // We were looking for "next" but found none.
           // Maybe alert "No more matches found"?
           // For now, silently fail as per "only ... below/after"
-        } else {
-          console.log("showFirstDownloading: No match found for", showName);
-        }
-        return;
-      }
 
-      // Found the matching card
       this.matchedTitle = bestMatch.title;
 
       const scroller = this.$refs.scroller;

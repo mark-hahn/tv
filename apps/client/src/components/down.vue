@@ -770,6 +770,9 @@ export default {
           // We were looking for "next" but found none.
           // Maybe alert "No more matches found"?
           // For now, silently fail as per "only ... below/after"
+        }
+        return;
+      }
 
       this.matchedTitle = bestMatch.title;
 

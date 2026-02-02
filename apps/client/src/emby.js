@@ -17,7 +17,6 @@ const authHdr =
   `UserId="${markUsrId}", ` +
   'Client="MyClient", Device="myDevice", ' +
   'DeviceId="123456", Version="1.0.0"';
-const pruneTvdb = window.location.href.slice(-5) == "prune";
 
 let token = "";
 let cred = null;
@@ -275,80 +274,59 @@ export async function loadAllShows() {
   }
 
   //////////  create tvdbs ////////////
-  if (!pruneTvdb) {
-    for (const show of shows) {
-      if (!show.TvdbId) {
-        console.log(`loadAllShows, no tvdbId:`, show.Name, { show });
-        continue;
-      }
-      const name = show.Name;
-      let tvdb = allTvdb[name];
-      if (!tvdb || tvdb.showId !== show.Id) {
-        const reason = !tvdb
-          ? "no existing tvdb entry for show name"
-          : `showId mismatch (tvdb.showId=${tvdb.showId || "n/a"} != show.Id=${show.Id})`;
-        const details = {
-          name,
-          showId: show.Id,
-          tvdbId: show.TvdbId,
-          existing: tvdb
-            ? {
-                tvdbId: tvdb.tvdbId,
-                showId: tvdb.showId,
-                deleted: tvdb.deleted,
-              }
-            : null,
-        };
-        console.log(
-          `loadAllShows tvdb: creating/updating via getNewTvdb (${reason})`,
-          details,
-        );
-
-        // Pop a modal only for true mismatches (a preexisting entry that conflicts)
-        // so the user can see the details immediately.
-        if (
-          tvdb &&
-          (tvdb.showId !== show.Id ||
-            (tvdb.tvdbId &&
-              show.TvdbId &&
-              String(tvdb.tvdbId) !== String(show.TvdbId)))
-        ) {
-          evtBus.emit("tvdb-mismatch", details);
-        }
-        const epicounts = await getEpisodeCounts(show);
-        const param = Object.assign({ show }, epicounts);
-        tvdb = await srvr.getNewTvdb(param);
-      }
-      let ratings = 0;
-      for (const remote of tvdb.remotes) {
-        if (remote.ratings) ratings = remote.ratings;
-      }
-      show.DateCreated = tvdb.added;
-      show.TvdbId = tvdb.tvdbId;
-      show.OriginalCountry = tvdb.originalCountry;
-      show.Ended = tvdb.status == "Ended";
-      show.Ratings = ratings;
-      allTvdb[name] = tvdb;
+  for (const show of shows) {
+    if (!show.TvdbId) {
+      console.log(`loadAllShows, no tvdbId:`, show.Name, { show });
+      continue;
     }
-  }
-
-  //////////  pruneTvdb show tvdbs without a show  ////////////
-  if (pruneTvdb) {
-    const showsFromTvdb = [];
-    for (const tvdb of Object.values(allTvdb)) {
-      const showIdx = shows.findIndex((show) => show.Name === tvdb.name);
-      if (showIdx !== -1) continue;
-      const show = {
-        Name: tvdb.name,
-        Id: "noemby-" + Math.random(),
-        TvdbId: tvdb.tvdbId,
-        OriginalCountry: tvdb.originalCountry,
-        Ended: tvdb.status == "Ended",
-        Ratings: tvdb.ratings,
+    const name = show.Name;
+    let tvdb = allTvdb[name];
+    if (!tvdb || tvdb.showId !== show.Id) {
+      const reason = !tvdb
+        ? "no existing tvdb entry for show name"
+        : `showId mismatch (tvdb.showId=${tvdb.showId || "n/a"} != show.Id=${show.Id})`;
+      const details = {
+        name,
+        showId: show.Id,
+        tvdbId: show.TvdbId,
+        existing: tvdb
+          ? {
+              tvdbId: tvdb.tvdbId,
+              showId: tvdb.showId,
+              deleted: tvdb.deleted,
+            }
+          : null,
       };
-      showsFromTvdb.push(show);
+      console.log(
+        `loadAllShows tvdb: creating/updating via getNewTvdb (${reason})`,
+        details,
+      );
+
+      // Pop a modal only for true mismatches (a preexisting entry that conflicts)
+      // so the user can see the details immediately.
+      if (
+        tvdb &&
+        (tvdb.showId !== show.Id ||
+          (tvdb.tvdbId &&
+            show.TvdbId &&
+            String(tvdb.tvdbId) !== String(show.TvdbId)))
+      ) {
+        evtBus.emit("tvdb-mismatch", details);
+      }
+      const epicounts = await getEpisodeCounts(show);
+      const param = Object.assign({ show }, epicounts);
+      tvdb = await srvr.getNewTvdb(param);
     }
-    shows = showsFromTvdb;
+    let ratings = 0;
+    for (const remote of tvdb.remotes) {
+      if (remote.ratings) ratings = remote.ratings;
+    }
+    show.DateCreated = tvdb.added;
+    show.TvdbId = tvdb.tvdbId;
+    show.OriginalCountry = tvdb.originalCountry;
+    show.Ended = tvdb.status == "Ended";
+    show.Ratings = ratings;
+    allTvdb[name] = tvdb;
   }
 
   ////////  remove gaps with no matching show /////////

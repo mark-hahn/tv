@@ -105,17 +105,20 @@ function appendSyncLog(entry) {
       ? ` total-in-db: ${totalInDbNum}`
       : "";
     const isModuleLoaded = e.message === "module loaded";
+    const isSyncStarted = e.message === "SYNC STARTED";
 
     let line;
     if (isModuleLoaded) {
       line = `========= ${ts} module loaded =========`;
+    } else if (isSyncStarted) {
+      line = `\n======== SYNC STARTED ========`;
     } else {
       let base;
       if (isSyncComplete) {
         // Don't show page: - for sync complete
         base = `${ts} shows: ${count}${totalsSuffix}`;
       } else {
-        base = `${ts} page: ${page}, shows: ${count}${totalsSuffix}`;
+        base = `${ts} page: ${page}${totalsSuffix}`;
       }
       line = msg ? `${base} ${msg}` : base;
     }
@@ -475,6 +478,8 @@ async function syncTvmazeShows(reason = "startup") {
     return { skipped: true };
   }
 
+  appendSyncLog("SYNC STARTED");
+
   _syncInProgress = true;
   const startedAt = nowMs();
 
@@ -648,7 +653,10 @@ async function syncTvmazeShows(reason = "startup") {
       _perPageTx(json);
 
       // Log each new show
-      for (const s of newShows) {
+      const currentTotal = countShowsInDb(db);
+      const startTotal = currentTotal - newShows.length;
+
+      newShows.forEach((s, i) => {
         appendSyncLog({
           ts: new Date().toISOString(),
           level: "info",
@@ -656,10 +664,10 @@ async function syncTvmazeShows(reason = "startup") {
           page,
           count: inserted, // cumulative count at this point
           totals: {
-            total_in_db: countShowsInDb(db),
+            total_in_db: startTotal + i + 1,
           },
         });
-      }
+      });
 
       // Persist progress as we go so a crash can resume.
       metaSet(db, "tvmaze.last_ok_page", String(page));

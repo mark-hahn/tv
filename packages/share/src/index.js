@@ -178,9 +178,9 @@ export function smartTitleMatch(title, titleArray, year) {
 
     const normCand = normalizeAggressive(candTitle);
     const dist = levenshtein(wantAgg, normCand);
-    
+
     // Safety check: ensure distance is reasonable relative to string length
-    // If the distance is more than 50% of the shorter string's length, 
+    // If the distance is more than 50% of the shorter string's length,
     // it's probably not a real match.
     // e.g. "Cheers" (6) vs "Funny Woman" (11) -> distance is huge
     const minLen = Math.min(wantAgg.length, normCand.length);

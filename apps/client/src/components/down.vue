@@ -102,7 +102,7 @@
               background-color: whitesmoke;
             "
           >
-            Show
+            From show
           </button>
           <button
             @click.stop="scrollToBottomAction"
@@ -319,6 +319,12 @@ export default {
     },
   },
 
+  watch: {
+    show() {
+      this.matchedTitle = null;
+    },
+  },
+
   mounted() {
     evtBus.on("paneChanged", this.onPaneChanged);
     evtBus.on("cycle-started", this.handleCycleStarted);
@@ -417,6 +423,9 @@ export default {
           this.scheduleNextPoll(5000);
         }
       } else {
+        // Clear highlight when leaving pane
+        this.matchedTitle = null;
+
         // Store scroll position when leaving
         const el = this.$refs.scroller;
         if (el) {
@@ -660,7 +669,7 @@ export default {
         border: isMatched ? "3px solid #007bff" : "1px solid #ddd",
         borderRadius: "8px",
         padding: "10px",
-        background: isMatched ? "#e6f2ff" : (isDownloading ? "#fffacd" : "#fff"),
+        background: isMatched ? "#e6f2ff" : isDownloading ? "#fffacd" : "#fff",
         cursor: "pointer",
         zIndex: isMatched ? 1 : 0,
       };
@@ -696,10 +705,21 @@ export default {
       const candidates = [this.show];
       let bestMatch = null;
 
+      // Determine search start index
+      // If we already have a focused match, start strictly AFTER it ("Next" behavior)
+      let startIndex = 0;
+      if (this.matchedTitle) {
+        const currentIdx = this.orderedItems.findIndex(
+          (it) => it && it.title === this.matchedTitle,
+        );
+        if (currentIdx !== -1) {
+          startIndex = currentIdx + 1;
+        }
+      }
+
       // Iterate all items to find best match
-      console.log(`showFirstDownloading: Seeking match for '${showName}' among ${this.orderedItems.length} items`);
-      
-      for (const it of this.orderedItems) {
+      for (let i = startIndex; i < this.orderedItems.length; i++) {
+        const it = this.orderedItems[i];
         const rawTitle = it.title || "";
         if (!rawTitle) continue;
 
@@ -733,69 +753,77 @@ export default {
         // Use smartTitleMatch to compare this download item against the current show
         const match = util.smartTitleMatch(searchTitle, candidates, searchYear);
         if (match) {
-          console.log(`showFirstDownloading: MATCH FOUND! Item '${rawTitle}' (search: '${searchTitle}') matched show '${match.Name}'`);
           bestMatch = it;
           break; // Found it
         }
       }
 
+      // If no match found and we started in the middle, wrap around?
+      // User instruction: "search again using only down card panes below/after the highlighted card"
+      // Interpretation: STRICT, do NOT wrap. If nothing found, nothing happens (or maybe clear match?).
+      // However, if nothing is found, we should probably inform user or clear the stale match if desired.
+      // But clearing stale match prevents "staying" on visual context.
+      // If nothing found "next", we just don't move.
+
       if (!bestMatch) {
-        console.log("showFirstDownloading: No match found for", showName);
+        if (startIndex > 0) {
+          // We were looking for "next" but found none.
+          // Maybe alert "No more matches found"?
+          // For now, silently fail as per "only ... below/after"
+        } else {
+          console.log("showFirstDownloading: No match found for", showName);
+        }
         return;
       }
 
       // Found the matching card
       this.matchedTitle = bestMatch.title;
-      
+
       const scroller = this.$refs.scroller;
       if (!scroller) return;
 
       const idx = this.orderedItems.findIndex((it) => it === bestMatch);
       if (idx === -1) return;
 
-      // Calculate scroll position
-      // Account for separator lines?
-      // Simpler to rely on DOM elements if possible, but we don't have refs for all.
-      // We can use the logic from previous implementation or just estimate logic.
-      // Or querySelector?
-      
+      // Calculate scroll position logic...
+
       // Using DOM query since orderedItems maps to children (mostly)
       // Filter out separators from children to find the card index
-       const allChildren = Array.from(scroller.children);
-       // The list contains separators div + card div.
-       // It's safer to find the element that contains the title text? 
-       // Or rely on idx logic properly.
-       
-       // logic from previous read_file seems to try to match array index to child index
-       // but separator divs mess it up.
-       // "v-for" produces divs. Separators are also divs *inside* the template v-for structure?
-       // Let's check the template again.
-       
-       /*
+      const allChildren = Array.from(scroller.children);
+      // The list contains separators div + card div.
+      // It's safer to find the element that contains the title text?
+      // Or rely on idx logic properly.
+
+      // logic from previous read_file seems to try to match array index to child index
+      // but separator divs mess it up.
+      // "v-for" produces divs. Separators are also divs *inside* the template v-for structure?
+      // Let's check the template again.
+
+      /*
        <template v-for="(it, idx) in orderedItems" :key="idx">
          <div v-if="..."> ==== </div>
          <div :style="..."> ... </div>
        </template>
        */
-       
-       // Each item produces 1 or 2 divs. 
-       // If I scan children, I can't easily map idx -> child.
-       // But I can scan children for text?
-       
+
+      // Each item produces 1 or 2 divs.
+      // If I scan children, I can't easily map idx -> child.
+      // But I can scan children for text?
+
       let currentIdx = 0;
       let targetEl = null;
 
       for (let i = 0; i < allChildren.length; i++) {
         const el = allChildren[i];
-         // Skip separator divs (check content or class?)
-         // Separator has "===="
+        // Skip separator divs (check content or class?)
+        // Separator has "===="
         if (el.textContent && el.textContent.includes("====")) {
-             continue;
+          continue;
         }
-        
+
         if (currentIdx === idx) {
-             targetEl = el;
-             break;
+          targetEl = el;
+          break;
         }
         currentIdx++;
       }

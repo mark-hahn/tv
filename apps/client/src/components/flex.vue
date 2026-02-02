@@ -17,6 +17,87 @@
     }"
   >
     <div
+      id="header"
+      class="pane-header-title"
+      :style="{
+        position: 'sticky',
+        top: '0px',
+        zIndex: 100,
+        backgroundColor: '#fafafa',
+        paddingTop: '5px',
+        paddingLeft: '5px',
+        paddingRight: '5px',
+        paddingBottom: '5px',
+        marginLeft: '0px',
+        marginRight: '0px',
+        marginTop: '0px',
+        marginBottom: '0px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'stretch',
+      }"
+    >
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <div style="margin-left: 20px; display: flex; align-items: center">
+          <span>Flexget</span>
+        </div>
+        <div
+          style="
+            display: flex;
+            gap: 10px;
+            margin-right: 20px;
+            justify-content: flex-end;
+          "
+        >
+          <button
+            @click.stop="startLibraryRefresh"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Library
+          </button>
+          <button
+            @click.stop="showFirstDownloading"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            From show
+          </button>
+          <button
+            @click.stop="scrollToBottomAction"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Bottom
+          </button>
+        </div>
+      </div>
+    </div>
+    <div
       id="scroller"
       ref="scroller"
       :style="{
@@ -51,14 +132,7 @@
           v-for="c in cards"
           :key="c.key"
           @click="handleCardClick(c)"
-          style="
-            position: relative;
-            background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 10px;
-            cursor: pointer;
-          "
+          :style="getCardStyle(c)"
         >
           <div
             style="
@@ -90,6 +164,8 @@
 <script>
 import evtBus from "../evtBus.js";
 import { config } from "../config.js";
+import * as util from "../util.js";
+import parseTorrentTitle from "parse-torrent-title";
 
 const FLEX_DISPLAY_TIME_ZONE = "America/Los_Angeles";
 // USB server is in the Netherlands and emits legacy timestamps without TZ info.
@@ -292,6 +368,10 @@ export default {
   name: "Flex",
 
   props: {
+    show: {
+      type: Object,
+      default: null,
+    },
     simpleMode: {
       type: Boolean,
       default: false,
@@ -305,6 +385,7 @@ export default {
   data() {
     return {
       cards: [],
+      matchedTitle: null,
       _pollTimer: null,
       _polling: false,
       _didInitialScroll: false,
@@ -321,6 +402,12 @@ export default {
       if (this._didLoadOnce) return "No results.";
       if (this._showLoading) return "Loading ...";
       return "";
+    },
+  },
+
+  watch: {
+    show() {
+      this.matchedTitle = null;
     },
   },
 
@@ -341,6 +428,19 @@ export default {
   },
 
   methods: {
+    getCardStyle(c) {
+      const isMatched = this.matchedTitle && c?.title === this.matchedTitle;
+      return {
+        position: "relative",
+        background: "#fff",
+        border: isMatched ? "3px solid #007bff" : "1px solid #ddd",
+        borderRadius: "5px",
+        padding: "10px",
+        cursor: "pointer",
+        zIndex: isMatched ? 1 : 0,
+      };
+    },
+
     handleCardClick(c) {
       const title = c?.title;
       if (title) evtBus.emit("selectShowFromCardTitle", title);
@@ -381,6 +481,7 @@ export default {
         this.startPolling();
       } else {
         this.stopPolling();
+        this.matchedTitle = null;
       }
     },
 
@@ -441,6 +542,99 @@ export default {
         },
         Math.max(0, Number(delayMs) || 0),
       );
+    },
+
+    startLibraryRefresh() {
+      evtBus.emit("startLibraryRefresh");
+    },
+
+    scrollToBottomAction() {
+      this.scrollToBottom();
+    },
+
+    showFirstDownloading() {
+      if (!this.show) {
+        console.warn("showFirstDownloading: No show selected context");
+        return;
+      }
+
+      const showName = this.show.Name || this.show.name;
+      if (!showName) return;
+
+      const candidates = [this.show];
+      let bestMatch = null;
+
+      // Determine search start index
+      let startIndex = 0;
+      if (this.matchedTitle) {
+        const currentIdx = this.cards.findIndex(
+          (it) => it && it.title === this.matchedTitle,
+        );
+        if (currentIdx !== -1) {
+          startIndex = currentIdx + 1;
+        }
+      }
+
+      for (let i = startIndex; i < this.cards.length; i++) {
+        const it = this.cards[i];
+        const rawTitle = it.title || "";
+        if (!rawTitle) continue;
+
+        let parsed = null;
+        try {
+          let parser = null;
+          if (typeof parseTorrentTitle === "function") {
+            parser = parseTorrentTitle;
+          } else if (
+            parseTorrentTitle &&
+            typeof parseTorrentTitle.parse === "function"
+          ) {
+            parser = parseTorrentTitle.parse;
+          } else if (
+            parseTorrentTitle &&
+            parseTorrentTitle.default &&
+            typeof parseTorrentTitle.default.parse === "function"
+          ) {
+            parser = parseTorrentTitle.default.parse;
+          }
+
+          parsed = parser ? parser(rawTitle) : null;
+        } catch (e) {
+          // ignore
+        }
+
+        const searchTitle = parsed?.title || rawTitle;
+        const searchYear = parsed?.year || null;
+
+        const match = util.smartTitleMatch(searchTitle, candidates, searchYear);
+        if (match) {
+          bestMatch = it;
+          break;
+        }
+      }
+
+      if (!bestMatch) {
+        return;
+      }
+
+      this.matchedTitle = bestMatch.title;
+
+      const idx = this.cards.findIndex((it) => it === bestMatch);
+      if (idx === -1) return;
+
+      const scroller = this.getScroller();
+      if (!scroller) return;
+
+      // flex template structure: scroller > div (v-else) > divs (cards)
+      // scroller has one child (the wrapper div) when cards exist.
+      // Be careful of comments or whitespace text nodes if using childNodes. children is safer.
+      const wrapper = scroller.children[0];
+      if (!wrapper || !wrapper.children) return;
+
+      const targetEl = wrapper.children[idx];
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
     },
 
     async pollOnce() {

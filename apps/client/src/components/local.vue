@@ -44,6 +44,20 @@
         >
 
         <button
+          @click="startLibraryRefresh"
+          style="
+            cursor: pointer;
+            border-radius: 7px;
+            padding: 4px 10px;
+            border: 1px solid #bbb;
+            background-color: whitesmoke;
+            margin-right: 10px;
+          "
+        >
+          Library
+        </button>
+
+        <button
           @click="toShow"
           title="Select show matching selected folder"
           style="
@@ -465,6 +479,9 @@ export default {
     }
   },
   methods: {
+    startLibraryRefresh() {
+      evtBus.emit("startLibraryRefresh");
+    },
     async fetchFiles() {
       this.loading = true;
       this.error = null;

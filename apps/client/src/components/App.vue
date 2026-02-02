@@ -231,6 +231,7 @@
               style="width: 100%; height: 100%"
               :simpleMode="simpleMode"
               :sizing="activeSizing"
+              :show="currentShow"
             ></Flex>
             <Qbt
               v-if="!simpleMode"
@@ -476,6 +477,7 @@
             style="width: 100%; height: 100%"
             :simpleMode="simpleMode"
             :sizing="activeSizing"
+            :show="currentShow"
           ></Flex>
           <Qbt
             v-if="!simpleMode"

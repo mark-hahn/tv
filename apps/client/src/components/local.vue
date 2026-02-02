@@ -455,9 +455,7 @@ export default {
     this.nodeRefs.clear();
   },
   watch: {
-    show(val) {
-      console.log("Local: show prop changed:", val ? val.Name : "null");
-    },
+    show(val) {},
     selectedName() {
       this.handleSelectionChanged();
     },

@@ -1849,7 +1849,6 @@ export default {
 
     // Close torrents or actors pane when a different show is selected
     evtBus.on("setUpSeries", (show) => {
-      console.log("App: received setUpSeries", show ? show.Name : "null");
       // Keep currentShow synced to the list selection immediately.
       // tvdbDataReady may arrive later; that's fine.
       this.currentShow = show;

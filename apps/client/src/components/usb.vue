@@ -150,12 +150,7 @@ export default {
   watch: {
     show: {
       immediate: true,
-      handler(val) {
-        console.log(
-          "usb: show prop changed:",
-          val ? val.Name || val.name : "null",
-        );
-      },
+      handler(val) {},
     },
     active: {
       immediate: true,

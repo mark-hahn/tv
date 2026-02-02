@@ -395,7 +395,6 @@ import parseTorrentTitle from "parse-torrent-title";
 
 // --- smartTitleMatch Helpers (copied from packages/share) ---
 
-
 export default {
   name: "Local",
   components: { TreeNode },

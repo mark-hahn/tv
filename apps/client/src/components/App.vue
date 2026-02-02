@@ -260,6 +260,7 @@
               style="width: 100%; height: 100%"
               :simpleMode="simpleMode"
               :sizing="activeSizing"
+              :show="currentShow"
             ></Down>
           </div>
         </div>
@@ -501,6 +502,7 @@
             style="width: 100%; height: 100%"
             :simpleMode="simpleMode"
             :sizing="activeSizing"
+            :show="currentShow"
           ></Down>
         </div>
       </div>

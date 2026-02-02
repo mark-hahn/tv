@@ -176,7 +176,18 @@ export function smartTitleMatch(title, titleArray, year) {
     const candTitle = coerceCandidateTitle(item);
     if (!candTitle) continue;
 
-    const dist = levenshtein(wantAgg, normalizeAggressive(candTitle));
+    const normCand = normalizeAggressive(candTitle);
+    const dist = levenshtein(wantAgg, normCand);
+    
+    // Safety check: ensure distance is reasonable relative to string length
+    // If the distance is more than 50% of the shorter string's length, 
+    // it's probably not a real match.
+    // e.g. "Cheers" (6) vs "Funny Woman" (11) -> distance is huge
+    const minLen = Math.min(wantAgg.length, normCand.length);
+    const maxAllowedDist = Math.max(2, Math.floor(minLen * 0.4)); // 40% threshold
+
+    if (dist > maxAllowedDist) continue;
+
     const rank = yearRank(item);
     if (dist < minDistance || (dist === minDistance && rank < bestRank)) {
       minDistance = dist;

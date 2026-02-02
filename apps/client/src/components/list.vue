@@ -1387,28 +1387,67 @@ export default {
     },
 
     async selectShowFromCardTitle(rawTitle) {
+      console.log("selectShowFromCardTitle: raw=", rawTitle);
       const raw = String(rawTitle || "").trim();
       if (!raw) return;
-      if (!Array.isArray(allShows) || allShows.length === 0) return;
+      if (!Array.isArray(allShows) || allShows.length === 0) {
+        console.warn("selectShowFromCardTitle: no shows loaded");
+        return;
+      }
 
       const stripped = this.stripTitleNoise(raw);
+      console.log("selectShowFromCardTitle: stripped=", stripped);
 
       let parsed = null;
       try {
-        const parser = parseTorrentTitle?.parse
-          ? parseTorrentTitle.parse
-          : typeof parseTorrentTitle === "function"
-            ? parseTorrentTitle
-            : null;
+        let parser = null;
+        if (typeof parseTorrentTitle === "function") {
+          parser = parseTorrentTitle;
+        } else if (
+          parseTorrentTitle &&
+          typeof parseTorrentTitle.parse === "function"
+        ) {
+          parser = parseTorrentTitle.parse;
+        } else if (
+          parseTorrentTitle &&
+          parseTorrentTitle.default &&
+          typeof parseTorrentTitle.default.parse === "function"
+        ) {
+          parser = parseTorrentTitle.default.parse;
+        }
+
         parsed = parser ? parser(stripped) : null;
-      } catch {
+        console.log("selectShowFromCardTitle: parsed=", parsed);
+      } catch (e) {
+        console.warn("selectShowFromCardTitle: parse error", e);
         parsed = null;
       }
 
       const searchTitle = parsed?.title || stripped || raw;
       const searchYear = parsed?.year || null;
+      console.log(
+        "selectShowFromCardTitle: searchTitle=",
+        searchTitle,
+        "searchYear=",
+        searchYear,
+      );
 
       const match = util.smartTitleMatch(searchTitle, allShows, searchYear);
+      console.log(
+        "selectShowFromCardTitle: match=",
+        match ? match.Name : "null",
+      );
+
+      if (!match) {
+        // Debugging: try to find what it SHOULD have matched
+        const candidates = allShows.filter((s) =>
+          s.Name.toLowerCase().includes("funny"),
+        );
+        console.log(
+          "selectShowFromCardTitle: DEBUG candidates for 'funny':",
+          candidates.map((c) => c.Name),
+        );
+      }
 
       if (match) {
         if (!this.shows.some((sh) => sh?.Name === match.Name)) {
@@ -2100,11 +2139,9 @@ export default {
     });
 
     // Listen for episode clicks from App.vue
-    on("episodeClick",
-      async ({ e, show, season, episode, setWatched }) => {
-        await this.episodeClick(e, show, season, episode, setWatched);
-      },
-    );
+    on("episodeClick", async ({ e, show, season, episode, setWatched }) => {
+      await this.episodeClick(e, show, season, episode, setWatched);
+    });
 
     // Listen for season folder deletes from App.vue (ctrl-click season number in Map)
     on("seasonDelete", async ({ e, show, season }) => {

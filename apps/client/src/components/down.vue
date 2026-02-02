@@ -219,6 +219,7 @@
 </template>
 
 <script>
+import parseTorrentTitle from "parse-torrent-title";
 import evtBus from "../evtBus.js";
 import { config } from "../config.js";
 import * as util from "../util.js";
@@ -227,6 +228,10 @@ export default {
   name: "TvProc",
 
   props: {
+    show: {
+      type: Object,
+      default: null,
+    },
     simpleMode: {
       type: Boolean,
       default: false,
@@ -259,6 +264,7 @@ export default {
       _lastStartProcAt: 0,
       _startProcInFlight: false,
       _startProcPending: false,
+      matchedTitle: null,
     };
   },
 
@@ -648,13 +654,15 @@ export default {
         .trim()
         .toLowerCase();
       const isDownloading = status === "downloading";
+      const isMatched = this.matchedTitle && it?.title === this.matchedTitle;
       return {
         position: "relative",
-        border: "1px solid #ddd",
+        border: isMatched ? "3px solid #007bff" : "1px solid #ddd",
         borderRadius: "8px",
         padding: "10px",
-        background: isDownloading ? "#fffacd" : "#fff",
+        background: isMatched ? "#e6f2ff" : (isDownloading ? "#fffacd" : "#fff"),
         cursor: "pointer",
+        zIndex: isMatched ? 1 : 0,
       };
     },
 
@@ -674,32 +682,127 @@ export default {
     },
 
     showFirstDownloading() {
-      const downloading = this.items.find(
-        (it) => String(it?.status || "").trim() === "downloading",
-      );
-      if (!downloading) return;
+      // Find the card that matches the currently selected show (this.show)
+      // and scroll to it.
 
-      const title = downloading.title;
-      if (title) {
-        evtBus.emit("selectShowFromCardTitle", title);
+      if (!this.show) {
+        console.warn("showFirstDownloading: No show selected context");
+        return;
       }
 
+      const showName = this.show.Name || this.show.name; // Robustness
+      if (!showName) return;
+
+      const candidates = [this.show];
+      let bestMatch = null;
+
+      // Iterate all items to find best match
+      console.log(`showFirstDownloading: Seeking match for '${showName}' among ${this.orderedItems.length} items`);
+      
+      for (const it of this.orderedItems) {
+        const rawTitle = it.title || "";
+        if (!rawTitle) continue;
+
+        // Use parseTorrentTitle to extract clean title and year
+        let parsed = null;
+        try {
+          let parser = null;
+          if (typeof parseTorrentTitle === "function") {
+            parser = parseTorrentTitle;
+          } else if (
+            parseTorrentTitle &&
+            typeof parseTorrentTitle.parse === "function"
+          ) {
+            parser = parseTorrentTitle.parse;
+          } else if (
+            parseTorrentTitle &&
+            parseTorrentTitle.default &&
+            typeof parseTorrentTitle.default.parse === "function"
+          ) {
+            parser = parseTorrentTitle.default.parse;
+          }
+
+          parsed = parser ? parser(rawTitle) : null;
+        } catch (e) {
+          // ignore
+        }
+
+        const searchTitle = parsed?.title || rawTitle;
+        const searchYear = parsed?.year || null;
+
+        // Use smartTitleMatch to compare this download item against the current show
+        const match = util.smartTitleMatch(searchTitle, candidates, searchYear);
+        if (match) {
+          console.log(`showFirstDownloading: MATCH FOUND! Item '${rawTitle}' (search: '${searchTitle}') matched show '${match.Name}'`);
+          bestMatch = it;
+          break; // Found it
+        }
+      }
+
+      if (!bestMatch) {
+        console.log("showFirstDownloading: No match found for", showName);
+        return;
+      }
+
+      // Found the matching card
+      this.matchedTitle = bestMatch.title;
+      
       const scroller = this.$refs.scroller;
       if (!scroller) return;
 
-      // Find the index of the downloading item in orderedItems
-      const idx = this.orderedItems.findIndex((it) => it === downloading);
+      const idx = this.orderedItems.findIndex((it) => it === bestMatch);
       if (idx === -1) return;
 
-      // Get all card divs (direct children of the template v-for)
-      const allChildren = Array.from(scroller.children);
-      // Filter out separator divs (which have === in text)
-      const cards = allChildren.filter(
-        (el) => !el.textContent.includes("===="),
-      );
+      // Calculate scroll position
+      // Account for separator lines?
+      // Simpler to rely on DOM elements if possible, but we don't have refs for all.
+      // We can use the logic from previous implementation or just estimate logic.
+      // Or querySelector?
+      
+      // Using DOM query since orderedItems maps to children (mostly)
+      // Filter out separators from children to find the card index
+       const allChildren = Array.from(scroller.children);
+       // The list contains separators div + card div.
+       // It's safer to find the element that contains the title text? 
+       // Or rely on idx logic properly.
+       
+       // logic from previous read_file seems to try to match array index to child index
+       // but separator divs mess it up.
+       // "v-for" produces divs. Separators are also divs *inside* the template v-for structure?
+       // Let's check the template again.
+       
+       /*
+       <template v-for="(it, idx) in orderedItems" :key="idx">
+         <div v-if="..."> ==== </div>
+         <div :style="..."> ... </div>
+       </template>
+       */
+       
+       // Each item produces 1 or 2 divs. 
+       // If I scan children, I can't easily map idx -> child.
+       // But I can scan children for text?
+       
+      let currentIdx = 0;
+      let targetEl = null;
 
-      if (cards[idx]) {
-        cards[idx].scrollIntoView({ behavior: "smooth", block: "start" });
+      for (let i = 0; i < allChildren.length; i++) {
+        const el = allChildren[i];
+         // Skip separator divs (check content or class?)
+         // Separator has "===="
+        if (el.textContent && el.textContent.includes("====")) {
+             continue;
+        }
+        
+        if (currentIdx === idx) {
+             targetEl = el;
+             break;
+        }
+        currentIdx++;
+      }
+
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        // Visual highlight is handled by getCardStyle binding to matchedTitle
       }
     },
 

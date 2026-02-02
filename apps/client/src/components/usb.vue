@@ -217,7 +217,13 @@ export default {
         const searchTitle = parsed?.title || rawTitle;
         const searchYear = parsed?.year || null;
 
-        const match = util.smartTitleMatch(searchTitle, candidates, searchYear);
+        // Import Scanning: forceChoice = false
+        const match = util.smartTitleMatch(
+          searchTitle,
+          candidates,
+          searchYear,
+          false,
+        );
         if (match) {
           allMatches.push(node);
         }

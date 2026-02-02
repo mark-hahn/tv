@@ -665,7 +665,13 @@ export default {
       }
 
       // 2. Find matching show
-      const match = util.smartTitleMatch(folderName, this.allShows || []);
+      // Folder -> Show: forceChoice = true
+      const match = util.smartTitleMatch(
+        folderName,
+        this.allShows || [],
+        null,
+        true,
+      );
 
       if (match) {
         this.$emit("select-show", match.Name);
@@ -689,7 +695,8 @@ export default {
       // 2. Find matching top-level folder
       let folderName = null;
       if (this.tree && this.tree.length) {
-        const match = util.smartTitleMatch(showName, this.tree);
+        // Show -> Folder: forceChoice = true
+        const match = util.smartTitleMatch(showName, this.tree, null, true);
         if (match) folderName = match.name;
       }
 
@@ -1029,7 +1036,13 @@ export default {
       }
 
       // 3. Find matching show
-      const match = util.smartTitleMatch(showName, this.allShows || []);
+      // Subtitles: forceChoice = false
+      const match = util.smartTitleMatch(
+        showName,
+        this.allShows || [],
+        null,
+        false,
+      );
 
       if (!match) {
         this.subsError = `Show "${showName}" not found in library.`;

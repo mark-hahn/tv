@@ -606,7 +606,13 @@ export default {
         const searchTitle = parsed?.title || rawTitle;
         const searchYear = parsed?.year || null;
 
-        const match = util.smartTitleMatch(searchTitle, candidates, searchYear);
+        // Task Correlation: forceChoice = false
+        const match = util.smartTitleMatch(
+          searchTitle,
+          candidates,
+          searchYear,
+          false,
+        );
         if (match) {
           bestMatch = it;
           break;

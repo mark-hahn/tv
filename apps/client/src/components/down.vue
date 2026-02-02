@@ -751,7 +751,13 @@ export default {
         const searchYear = parsed?.year || null;
 
         // Use smartTitleMatch to compare this download item against the current show
-        const match = util.smartTitleMatch(searchTitle, candidates, searchYear);
+        // Task Correlation: forceChoice = false
+        const match = util.smartTitleMatch(
+          searchTitle,
+          candidates,
+          searchYear,
+          false,
+        );
         if (match) {
           bestMatch = it;
           break; // Found it

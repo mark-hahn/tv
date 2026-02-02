@@ -1376,7 +1376,8 @@ export default {
       }
 
       if (nm) {
-        const match = util.smartTitleMatch(nm, allShows);
+        // Duplicate Detection: forceChoice = false
+        const match = util.smartTitleMatch(nm, allShows, null, false);
         if (match) return match;
       }
 
@@ -1434,7 +1435,8 @@ export default {
       const searchTitle = parsed?.title || stripped || raw;
       const searchYear = parsed?.year || null;
 
-      const match = util.smartTitleMatch(searchTitle, allShows, searchYear);
+      // Card Navigation: forceChoice = true
+      const match = util.smartTitleMatch(searchTitle, allShows, searchYear, true);
 
       if (match) {
         if (!this.shows.some((sh) => sh?.Name === match.Name)) {

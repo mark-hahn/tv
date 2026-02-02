@@ -88,7 +88,10 @@ function levenshtein(a, b) {
 // Optimized for Objects with Year info:
 // If 'year' (number or string) is provided, we prioritize
 // candidates that match that year.
-export function smartTitleMatch(title, titleArray, year) {
+// forceChoice:
+//   true  -> Always find a match (no early exit, no distance threshold).
+//   false -> Return null if no match found by step 4 (Aggressive + MissingYear).
+export function smartTitleMatch(title, titleArray, year, forceChoice) {
   if (!Array.isArray(titleArray) || titleArray.length === 0) {
     return null;
   }
@@ -153,6 +156,9 @@ export function smartTitleMatch(title, titleArray, year) {
   const m5 = findExact(normalizeAggressive, wantAgg, isOneMissingYear);
   if (m5 != null) return m5;
 
+  // If strict matching is requested (forceChoice=false), we stop here.
+  if (forceChoice !== true) return null;
+
   const m6 = findExact(normalizeBasic, wantBasic, isDifferentYear);
   if (m6 != null) return m6;
 
@@ -186,7 +192,9 @@ export function smartTitleMatch(title, titleArray, year) {
     const minLen = Math.min(wantAgg.length, normCand.length);
     const maxAllowedDist = Math.max(2, Math.floor(minLen * 0.4)); // 40% threshold
 
-    if (dist > maxAllowedDist) continue;
+    // If forceChoice is true, we IGNORE the distance threshold (accepting matches "even if big").
+    // If forceChoice is false, we would enforce it, but we already returned null above.
+    if (!forceChoice && dist > maxAllowedDist) continue;
 
     const rank = yearRank(item);
     if (dist < minDistance || (dist === minDistance && rank < bestRank)) {

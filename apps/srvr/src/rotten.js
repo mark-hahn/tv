@@ -482,7 +482,8 @@ function chooseShow(shows, query) {
     );
   }
 
-  const result = smartTitleMatch(query, shows, year);
+  // Rotten Tomatoes Search: forceChoice = false
+  const result = smartTitleMatch(query, shows, year, false);
 
   if (debug && result) {
     log(`smartTitleMatch selected: "${result.title}" (${result.startyear})`);

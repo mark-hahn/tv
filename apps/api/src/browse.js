@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "node:path";
+import { franc } from "franc-min";
 import { getApiDataDir } from "./tvPaths.js";
 import { getCandidateShows, markShowBrowsed } from "./tvmaze.js";
 
@@ -246,6 +247,11 @@ export async function getBrowseShow() {
     // Mark as browsed immediately
     markShowBrowsed(tvmazeId);
 
+    // Reject if no poster
+    if (!show.image || (!show.image.medium && !show.image.original)) {
+      continue;
+    }
+
     // Check if we've seen this title in our recent resultTitles
     if (resultTitles.some((entry) => parseResultTitle(entry) === title)) {
       continue;
@@ -297,6 +303,17 @@ export async function getBrowseShow() {
       );
       // "If rejected add ... and continue" to look for next one
       continue;
+    }
+
+    // Analyze description language
+    const summary = (show.summary || "").replace(/<[^>]*>/g, " ").trim();
+    if (summary.length > 50) {
+      // High certainty check: only if we have sufficient text
+      const detected = franc(summary);
+      // Skip if detected as non-English (and not 'und'etermined, and allow 'sco' as it is often false positive for English)
+      if (detected !== "eng" && detected !== "und" && detected !== "sco") {
+        continue;
+      }
     }
 
     // Accepted

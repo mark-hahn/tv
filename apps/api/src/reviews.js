@@ -11,6 +11,8 @@ const __dirname = path.dirname(__filename);
 // Singleton browser (contexts/pages are per-request to avoid concurrent navigation issues).
 let browser = null;
 
+const reviewsCache = new Map();
+
 const DEFAULT_UA =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -46,6 +48,12 @@ export async function getReviews(rottenUrl, buttonName) {
 
   const cleanUrl = rottenUrl.replace(/\/$/, "");
   const reviewsUrl = `${cleanUrl}/s01/reviews/${sfxButtonName}`;
+  const cacheKey = reviewsUrl;
+
+  if (reviewsCache.has(cacheKey)) {
+    // console.log("[reviews] returning cached: ", cacheKey);
+    return reviewsCache.get(cacheKey);
+  }
 
   const b = await getBrowser();
   const context = await b.newContext({
@@ -324,6 +332,10 @@ export async function getReviews(rottenUrl, buttonName) {
   if (finalStats.reviews.length < 2) {
     finalStats.reviews = [];
   }
+
+  // Cache strict results only if we have some data, OR if we successfully loaded the page but found none.
+  // We prefer caching emptiness over refetching emptiness.
+  reviewsCache.set(cacheKey, finalStats);
 
   return finalStats;
 }

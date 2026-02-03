@@ -30,6 +30,7 @@
         :srchStr="srchStr"
         :imdbid="curImdbId"
         :tvdbid="curTvdbId"
+        :fallbackImage="curFallbackImage"
         @select="handleGallerySelect"
         @preview="handleGalleryPreview"
         @search-complete="handleSearchComplete"
@@ -1495,6 +1496,14 @@ export default {
       return parsedTitles.value[selectedTitleIdx.value]?.tvdbid || null;
     });
 
+    const curFallbackImage = computed(() => {
+      const item = parsedTitles.value[selectedTitleIdx.value];
+      if (item?.data?.image?.original) {
+        return item.data.image.original;
+      }
+      return null;
+    });
+
     // Format info line from curTvdb
     const infoLine = computed(() => {
       if (!curTvdb.value) return "";
@@ -1806,6 +1815,7 @@ export default {
       manualSearchQuery,
       handleManualSearch,
       existingShowMatch,
+      curFallbackImage,
     };
   },
 };

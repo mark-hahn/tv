@@ -82,6 +82,10 @@ export default {
       type: [String, Number],
       default: null,
     },
+    fallbackImage: {
+      type: String,
+      default: null,
+    },
   },
   emits: ["select", "preview", "search-complete"],
   setup(props, { emit }) {
@@ -148,6 +152,53 @@ export default {
       emit("preview", tvdb);
     };
 
+    const TVDB_MISSING_HASH =
+      "d39797999627a98fea4697543be615c642c205fc98bbf3161ab1a87fd2077768";
+
+    const hashBlob = async (blob) => {
+      try {
+        const arrayBuffer = await blob.arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest("SHA-256", arrayBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+        return hashHex;
+      } catch (e) {
+        return "";
+      }
+    };
+
+    const checkImages = async (items) => {
+      if (!props.fallbackImage) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const url = getImageUrl(item);
+        if (!url || url === props.fallbackImage) continue;
+
+        try {
+          const res = await fetch(url);
+          if (!res.ok) continue;
+          const blob = await res.blob();
+          const hash = await hashBlob(blob);
+
+          if (hash === TVDB_MISSING_HASH) {
+            if (tvdbList.value[i] === item) {
+              // Force update
+              tvdbList.value[i] = {
+                ...item,
+                image_url: props.fallbackImage,
+                thumbnail: props.fallbackImage,
+              };
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+    };
+
     const loadTvdbData = async () => {
       const currentSrch = props.srchStr;
       if (!currentSrch) return;
@@ -180,6 +231,7 @@ export default {
             }
           }
           tvdbList.value = sorted;
+          void checkImages(sorted);
           await nextTick();
           if (galleryPane.value) {
             galleryPane.value.scrollTop = 0;

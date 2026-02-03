@@ -1436,7 +1436,12 @@ export default {
       const searchYear = parsed?.year || null;
 
       // Card Navigation: forceChoice = true
-      const match = util.smartTitleMatch(searchTitle, allShows, searchYear, true);
+      const match = util.smartTitleMatch(
+        searchTitle,
+        allShows,
+        searchYear,
+        true,
+      );
 
       if (match) {
         if (!this.shows.some((sh) => sh?.Name === match.Name)) {

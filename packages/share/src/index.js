@@ -153,11 +153,11 @@ export function smartTitleMatch(title, titleArray, year, forceChoice) {
   const m4 = findExact(normalizeAggressive, wantAgg, isSameYear);
   if (m4 != null) return m4;
 
+  // If forceChoice is explicity false, we stop here (strict matching).
+  if (forceChoice === false) return null;
+
   const m5 = findExact(normalizeAggressive, wantAgg, isOneMissingYear);
   if (m5 != null) return m5;
-
-  // If strict matching is requested (forceChoice=false), we stop here.
-  if (forceChoice !== true) return null;
 
   const m6 = findExact(normalizeBasic, wantBasic, isDifferentYear);
   if (m6 != null) return m6;

@@ -1044,7 +1044,6 @@ export default {
 
       const setWebAddStatus = (txt) => {
         this.searchingStatus = txt;
-        console.log("web add progress:", name, txt);
       };
       const withTimeout = async (promise, ms, label) => {
         const timeoutMs = Math.max(0, Number(ms) || 0);

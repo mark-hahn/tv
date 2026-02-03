@@ -370,7 +370,7 @@ const getRemotes = async (
     "|" +
     clientRequest;
 
-  if (remotesCache.has(cacheKey)) {
+  if (clientRequest && remotesCache.has(cacheKey)) {
     return remotesCache.get(cacheKey);
   }
 

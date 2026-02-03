@@ -78,7 +78,7 @@ export async function getReviews(rottenUrl, buttonName) {
     // Wait for at least one card to appear
     await page
       .waitForSelector("review-card, .reviews-cards .card-wrap", {
-        timeout: 10000,
+        timeout: 4000,
       })
       .catch(() => {});
   } catch (err) {

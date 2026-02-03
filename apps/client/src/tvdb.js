@@ -182,11 +182,6 @@ export const getEpisodeGuests = async (showName, seasonNum, episodeNum) => {
     const episodeData = await getEpisode(showName, seasonNum, episodeNum);
 
     if (!episodeData || !episodeData.characters) {
-      console.log("getEpisodeGuests: no character data for episode:", {
-        showName,
-        seasonNum,
-        episodeNum,
-      });
       return [];
     }
 

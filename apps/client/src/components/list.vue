@@ -1001,7 +1001,6 @@ export default {
       const srchChoice = payload?.srchChoice ? payload.srchChoice : payload;
       const action = payload?.action || "preview";
       const { name, tvdbId, overview } = srchChoice || {};
-      console.log("searchAction:", name);
 
       // Dropdown click now previews by default.
       if (action === "preview") {

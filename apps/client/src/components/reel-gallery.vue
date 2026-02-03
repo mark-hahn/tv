@@ -186,10 +186,12 @@ export default {
           if (hash === TVDB_MISSING_HASH) {
             if (tvdbList.value[i] === item) {
               // Force update
+              const description = item.overview || item.overviewText || "";
               tvdbList.value[i] = {
                 ...item,
                 image_url: props.fallbackImage,
                 thumbnail: props.fallbackImage,
+                overview: description + " [USED FALLBACK IMAGE]",
               };
             }
           }

@@ -16,6 +16,7 @@ import {
   flexgetHistory,
   addQbtTorrent,
   getUsbFiles,
+  renameUsbFile,
 } from "./usb.js";
 import { getLocalFiles } from "./local.js";
 import { getBrowseShow, getAllBrowse } from "./browse.js";
@@ -664,6 +665,20 @@ app.get("/api/usb/files", async (req, res) => {
     const tree = await getUsbFiles();
     res.json(tree);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/usb/rename", async (req, res) => {
+  try {
+    const { oldPath, newName } = req.body;
+    if (!oldPath || !newName) {
+      return res.status(400).json({ error: "Missing oldPath or newName" });
+    }
+    const result = await renameUsbFile(oldPath, newName);
+    res.json(result);
+  } catch (err) {
+    console.error("usb rename error:", err);
     res.status(500).json({ error: err.message });
   }
 });

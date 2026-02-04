@@ -1043,3 +1043,48 @@ export async function checkFlexgetStatus() {
 
   return true;
 }
+
+function shellQuote(s) {
+  if (typeof s !== "string") return "''";
+  return "'" + s.replace(/'/g, "'\\''") + "'";
+}
+
+export async function renameUsbFile(oldPath, newName) {
+  const qbHost = await loadQbHostForSsh();
+  const root = "/home/xobtlu/files";
+
+  if (
+    oldPath.includes("..") ||
+    newName.includes("..") ||
+    newName.includes("/")
+  ) {
+    throw new Error("Invalid path or name");
+  }
+
+  const parts = oldPath.split("/");
+  const fileName = parts.pop();
+  const dirPath = parts.join("/");
+
+  const fullOldPath = dirPath
+    ? `${root}/${dirPath}/${fileName}`
+    : `${root}/${fileName}`;
+  const fullNewPath = dirPath
+    ? `${root}/${dirPath}/${newName}`
+    : `${root}/${newName}`;
+
+  const cmd = `mv ${shellQuote(fullOldPath)} ${shellQuote(fullNewPath)}`;
+
+  const sshBaseArgs = [
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "ConnectTimeout=10",
+    "-o",
+    "StrictHostKeyChecking=no",
+    "-o",
+    "UserKnownHostsFile=/dev/null",
+  ];
+
+  await execFileAsync("ssh", [...sshBaseArgs, qbHost, cmd]);
+  return { success: true };
+}

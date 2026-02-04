@@ -27,6 +27,13 @@
         USB Files
       </div>
 
+      <input
+        v-model="renameInput"
+        @focus="onRenameFocus"
+        @keyup.enter="renameFile"
+        style="width: 250px; margin-right: 8px"
+      />
+
       <span
         v-if="loading"
         style="color: lightgray; margin-right: 10px; font-weight: bold"
@@ -145,6 +152,7 @@ export default {
       loading: false,
       error: null,
       hasLoaded: false,
+      renameInput: "",
     };
   },
   watch: {
@@ -167,6 +175,62 @@ export default {
     }
   },
   methods: {
+    onRenameFocus() {
+      // If input is not empty, assume user is editing and don't overwrite
+      if (this.renameInput) return;
+
+      if (this.selectedFiles.size === 1) {
+        // Get the single file path
+        const fullPath = Array.from(this.selectedFiles)[0];
+        // Extract filename
+        const parts = fullPath.split("/");
+        const fileName = parts.pop();
+        this.renameInput = fileName;
+      }
+    },
+    async renameFile() {
+      if (!this.renameInput) return;
+      if (this.selectedFiles.size !== 1) return;
+
+      const oldPath = Array.from(this.selectedFiles)[0];
+      const newName = this.renameInput.trim();
+
+      if (!newName) return;
+      // No change check
+      const parts = oldPath.split("/");
+      const oldName = parts[parts.length - 1];
+      if (oldName === newName) return;
+
+      this.loading = true;
+      try {
+        const url = `${config.torrentsApiUrl}/api/usb/rename`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ oldPath, newName }),
+        });
+
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt);
+        }
+
+        this.renameInput = "";
+        this.selectedFiles.clear();
+        this.lastSelectedFile = null;
+        await this.fetchFiles();
+      } catch (e) {
+        console.error("Rename failed", e);
+        this.error = e.message || "Rename failed";
+        this.loading = false; // ensure loading is off on error
+      }
+      // fetchFiles sets loading=false in its finally block, but if we await it, it should correspond.
+      // But fetchFiles sets loading=true at start.
+      // Let's rely on fetchFiles for loading state clears?
+      // Wait, fetchFiles sets loading=true then finally loading=false.
+      // If rename works, we await fetchFiles().
+      // If fetchFiles fails, it catches its own error and sets this.error.
+    },
     startLibraryRefresh() {
       evtBus.emit("startLibraryRefresh");
     },
@@ -247,6 +311,7 @@ export default {
 
         this.selectedName = bestMatch.name;
         this.selectedFiles.clear();
+        this.renameInput = "";
         this.selectionParentPath = null;
         this.lastSelectedFile = null;
 
@@ -340,6 +405,7 @@ export default {
       if (depth === 0) {
         // If clicking top-level folder, clear any file selection context
         this.selectedFiles.clear();
+        this.renameInput = "";
         this.selectionParentPath = null;
         if (ctrlKey && this.selectedName === node.name) {
           this.selectedName = null;
@@ -353,6 +419,7 @@ export default {
       // 2. File selection
       if (node.type === "file" || node.type === "folder") {
         const parentPath = fullPath.substring(0, fullPath.lastIndexOf("/"));
+        this.renameInput = "";
 
         // If switching folders, or if a top-level folder was previously selected, reset.
         // Also if we have existing file selection but in a DIFFERENT parent, reset?

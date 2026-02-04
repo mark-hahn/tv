@@ -1170,18 +1170,16 @@ export default {
         // srvr/src/asr.js:check uses execFile. callback returns stdout.
         const res = await handleAsr({ action: "check" });
 
-        if (res && res.data && res.data.stdout) {
-          const out = res.data.stdout;
-          if (out.includes("asr is running")) {
-            this.asrBusy = true;
-            const match = out.match(/Processing: (.+)$/m);
+        if (res && res.running) {
+          this.asrBusy = true;
+          if (res.stdout) {
+            const match = res.stdout.match(/Processing: (.+)$/m);
             if (match) {
               this.activeAsrPath = match[1].trim();
-              // this.showAsr = true; // Auto-open disabled per request
             }
-          } else {
-            this.asrBusy = false;
           }
+        } else {
+          this.asrBusy = false;
         }
 
         // Always start tailing to get persistent log

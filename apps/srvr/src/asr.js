@@ -50,6 +50,9 @@ export function handleAsr(ws, id, param) {
 
     proc.stdout.on("data", (data) => {
       console.log(`[ASR TAIL] data: ${data.length} bytes`);
+      console.log(
+        `[ASR TAIL] content chunk: ${JSON.stringify(data.toString())}`,
+      );
       try {
         ws.send(
           JSON.stringify({

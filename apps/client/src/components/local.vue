@@ -557,6 +557,7 @@ export default {
       asrLogs: "",
       asrBusy: false,
       activeAsrPath: null,
+      ignoreLogs: false,
     };
   },
   created() {
@@ -1101,6 +1102,7 @@ export default {
 
       this.asrBusy = true;
       this.activeAsrPath = startPath;
+      this.ignoreLogs = true;
       this.asrLogs = ""; // clear old text
       this.showAsr = true; // ensure visible
       this.showSubs = false; // close subs
@@ -1108,6 +1110,7 @@ export default {
       try {
         const res = await handleAsr({ action: "start", path: startPath });
         if (res && res.error) {
+          this.ignoreLogs = false;
           this.asrLogs += `Start Error: ${res.error}\nStderr: ${res.stderr || ""}\n`;
           this.asrBusy = false;
           return;
@@ -1125,8 +1128,10 @@ export default {
           console.log("ASR Start stdout:", res.stdout);
         }
         // Start tailing immediately
+        this.ignoreLogs = false;
         await handleAsr({ action: "tail", path: startPath });
       } catch (e) {
+        this.ignoreLogs = false;
         this.asrLogs += `Error starting ASR: ${e.message}\n`;
         this.asrBusy = false;
       }
@@ -1145,7 +1150,10 @@ export default {
       // this.activeAsrPath = null;
     },
     onAsrLog(msg) {
+      if (this.ignoreLogs) return;
       if (!msg) return; // ignore empty
+
+      console.log("onAsrLog received:", JSON.stringify(msg));
 
       const el = this.$refs.asrScroll;
       let atBottom = true;

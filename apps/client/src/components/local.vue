@@ -1113,7 +1113,16 @@ export default {
           return;
         }
         if (res && res.stdout) {
-          this.asrLogs += res.stdout + "\n";
+          // If we attach tailing immediately, stdout from the 'start' call might duplicate
+          // what the 'tail' command picks up if the process logs quickly.
+          // However, start usually just returns wrapper output.
+          // In the duplicate case seen, it seems we get duplicates of everything?
+          // The issue is likely that 'start' returns stdout which contains the first few lines,
+          // AND 'tail' picks up the same lines from the log file.
+          // Let's NOT append stdout from start command to the logs pane,
+          // because we are tailing the log file anyway which should contain everything.
+          // this.asrLogs += res.stdout + "\n";
+          console.log("ASR Start stdout:", res.stdout);
         }
         // Start tailing immediately
         await handleAsr({ action: "tail", path: startPath });

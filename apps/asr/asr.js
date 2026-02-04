@@ -904,7 +904,7 @@ async function processOneVideo(videoPath) {
   const eMin = Math.floor(eSecTotal / 60);
   const eSec = eSecTotal % 60;
   console.log(
-    `Elapsed: ${String(eMin).padStart(2, "0")}:${String(eSec).padStart(2, "0")}\n`,
+    `Elapsed: ${String(eMin).padStart(2, "0")}:${String(eSec).padStart(2, "0")}`,
   );
 }
 

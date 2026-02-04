@@ -232,7 +232,7 @@ setsid bash -c '
 ' &
 
 runner_pid=$!
-# Do not overwrite PID file here; inner script does it authentically.
+echo "$runner_pid" > "$PID_FILE"
 echo "Runner PID (wrapper): $runner_pid"
 echo "asr is RUNNING in: $TARGET_DIR"
 echo "Log file: $LOG_FILE"

@@ -102,6 +102,20 @@
         </button>
 
         <button
+          @click="clickAsr"
+          :style="{
+            cursor: 'pointer',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+            backgroundColor: showAsr ? '#ddd' : 'whitesmoke',
+            marginRight: '10px',
+          }"
+        >
+          Asr
+        </button>
+
+        <button
           @click="deleteSelected"
           :disabled="loading || (!selectedName && selectedFiles.size === 0)"
           title="Delete selected files"
@@ -155,6 +169,39 @@
           :selected-files="selectedFiles"
           @node-click="handleNodeClick"
         />
+      </div>
+    </div>
+
+    <!-- Asr Pane -->
+    <div
+      id="asrPane"
+      v-show="showAsr"
+      :style="{
+        flex: '1 1 50%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        backgroundColor: '#1e1e1e',
+        color: '#f0f0f0',
+        fontFamily: 'monospace',
+        padding: '10px',
+      }"
+    >
+      <div
+        style="
+          flex: 0 0 auto;
+          border-bottom: 1px solid #555;
+          padding-bottom: 5px;
+          margin-bottom: 5px;
+        "
+      >
+        ASR Output <span v-if="asrBusy">(Running...)</span>
+      </div>
+      <div
+        ref="asrScroll"
+        style="flex: 1 1 auto; overflow: auto; white-space: pre-wrap"
+      >
+        {{ asrLogs }}
       </div>
     </div>
 
@@ -402,6 +449,7 @@ import {
   applySubFiles,
   getSubFileIds,
   offsetSubFiles,
+  handleAsr,
 } from "../srvr.js";
 import evtBus from "../evtBus.js";
 import * as util from "../util.js";
@@ -446,6 +494,11 @@ export default {
       // Offset
       cumulativeTrim: 0,
       _trimBusy: false,
+
+      // Asr
+      showAsr: false,
+      asrLogs: "",
+      asrBusy: false,
     };
   },
   created() {
@@ -475,6 +528,10 @@ export default {
     if (this.active && !this.hasLoaded) {
       this.fetchFiles();
     }
+    evtBus.on("asr-log", this.onAsrLog);
+  },
+  unmounted() {
+    evtBus.off("asr-log", this.onAsrLog);
   },
   methods: {
     startLibraryRefresh() {
@@ -925,9 +982,60 @@ export default {
       return current.children || [];
     },
     // Subtitles logic
+    async clickAsr() {
+      let startPath = null;
+      if (!this.asrBusy) {
+        if (this.selectedName) {
+          const node = this.tree.find((n) => n.name === this.selectedName);
+          if (node && node.type === "folder") startPath = node.name;
+        } else if (this.selectedFiles.size === 1) {
+          const relPath = [...this.selectedFiles][0];
+          const node = this.findNodeByPath(relPath);
+          if (node && node.type === "folder") startPath = relPath;
+        }
+      }
+
+      const starting = !!startPath;
+
+      if (starting) {
+        this.asrBusy = true;
+        this.asrLogs = ""; // clear old text
+        this.showAsr = true; // ensure visible
+        this.showSubs = false; // close subs
+
+        // Clear selection
+        this.selectedName = null;
+        this.selectedFiles.clear();
+        this.lastSelectedFile = null;
+
+        try {
+          await handleAsr({ action: "start", path: startPath });
+          // Start tailing immediately
+          await handleAsr({ action: "tail", path: startPath });
+        } catch (e) {
+          this.asrLogs += `Error starting ASR: ${e.message}\n`;
+          this.asrBusy = false;
+        }
+      } else {
+        // Just toggle
+        this.showAsr = !this.showAsr;
+        if (this.showAsr) this.showSubs = false;
+      }
+    },
+    onAsrLog(msg) {
+      this.asrLogs += msg;
+      if (msg.includes("[asr] EXIT")) {
+        this.asrBusy = false;
+      }
+      this.$nextTick(() => {
+        const el = this.$refs.asrScroll;
+        if (el) el.scrollTop = el.scrollHeight;
+      });
+    },
     toggleSubs() {
       this.showSubs = !this.showSubs;
       if (this.showSubs) {
+        this.showAsr = false;
         this.loadSubs();
       }
     },

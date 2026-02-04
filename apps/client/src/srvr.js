@@ -1,4 +1,5 @@
 import { config } from "./config.js";
+import evtBus from "./evtBus.js";
 
 const URL = "wss://hahnca.com/tv-srvr";
 
@@ -94,6 +95,11 @@ handleMsg = async (msg) => {
   const { id, status, data: result } = parts;
 
   // console.log("handling msg:", id, status);
+  if (status === "asr-log") {
+    evtBus.emit("asr-log", result);
+    return;
+  }
+
   if (id == "0") return;
 
   const callIdx = calls.findIndex((call) => call.id == id);
@@ -262,6 +268,10 @@ export function getAllTvdb() {
 }
 export function getNewTvdb(params) {
   return fCall("getNewTvdb", params);
+}
+
+export function handleAsr(params) {
+  return fCall("handleAsr", params);
 }
 export function setTvdbFields(params) {
   return fCall("setTvdbFields", params);

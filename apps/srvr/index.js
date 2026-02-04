@@ -10,6 +10,7 @@ import * as tvdb from "./src/tvdb.js";
 import * as util from "./src/util.js";
 import * as email from "./src/email.js";
 import * as tmdb from "./src/tmdb.js";
+import { handleAsr } from "./src/asr.js";
 import { checkFlexgetStatus } from "../api/src/usb.js";
 import fetch from "node-fetch";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
@@ -2575,6 +2576,8 @@ wss.on("connection", (ws) => {
         },
         null,
       );
+    } else if (fname == "handleAsr") {
+      handleAsr(ws, id, param);
     } else {
       if (fname === "getRemotes") {
         for (let i = queue.length - 1; i >= 0; i--) {

@@ -548,7 +548,7 @@ export default {
           filter: 0,
           icon: ["far", "sad-cry"],
           cond(show) {
-            return show.Genres?.includes("Drama");
+            return !show.Genres?.includes("Comedy");
           },
           click() {},
           name: "drama",

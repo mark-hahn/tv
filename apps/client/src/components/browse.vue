@@ -1545,6 +1545,10 @@ export default {
         }
       }
 
+      if (browseItem?.data?.genres?.length) {
+        line += ` | ${browseItem.data.genres.join(", ")}`;
+      }
+
       // Add Watched count if available in local data
       // if (allTvdbData.value && t.name) {
       //   const local = allTvdbData.value[t.name];

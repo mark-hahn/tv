@@ -49,6 +49,9 @@ export function handleAsr(ws, id, param) {
     ws._asrTailProc = proc;
 
     proc.stdout.on("data", (data) => {
+      // Prevent zombie processes from sending data
+      if (ws._asrTailProc !== proc) return;
+
       console.log(`[ASR TAIL] data: ${data.length} bytes`);
       console.log(
         `[ASR TAIL] content chunk: ${JSON.stringify(data.toString())}`,

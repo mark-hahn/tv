@@ -43,7 +43,7 @@ console.log = function (...args) {
   const msg = util.format(...args);
 
   // DEBUG: Check for duplicates at source
-  originalLog(`[DEBUG-SRC-${RUN_ID}] Raw log call: ${msg.substring(0, 50)}...`);
+  // originalLog(`[DEBUG-SRC-${RUN_ID}] Raw log call: ${msg.substring(0, 50)}...`);
 
   if (!SHOW_RAW) {
     if (msg.includes("RAW:")) return;

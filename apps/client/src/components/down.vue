@@ -105,6 +105,19 @@
             From show
           </button>
           <button
+            @click.stop="startCheck"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Check
+          </button>
+          <button
             @click.stop="scrollToBottomAction"
             style="
               font-size: 13px;
@@ -834,6 +847,16 @@ export default {
       if (targetEl) {
         targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
         // Visual highlight is handled by getCardStyle binding to matchedTitle
+      }
+    },
+
+    async startCheck() {
+      try {
+        await fetch("https://hahnca.com/tv-down/startProc", {
+          method: "POST",
+        });
+      } catch (e) {
+        console.error("startCheck error", e);
       }
     },
 

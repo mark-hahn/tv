@@ -1,7 +1,7 @@
 import { spawn, execFile } from "child_process";
 import * as path from "path";
 
-const ASR_BIN = "/usr/local/bin/asr";
+const ASR_BIN = "/root/dev/apps/tv/apps/asr/asr.sh";
 const MEDIA_ROOT = "/mnt/media/tv";
 
 export function handleAsr(ws, id, param) {

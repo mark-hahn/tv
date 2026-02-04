@@ -5,7 +5,16 @@ const ASR_BIN = "/usr/local/bin/asr";
 const MEDIA_ROOT = "/mnt/media/tv";
 
 export function handleAsr(ws, id, param) {
-  const { action, path: reqPath } = param || {};
+  let parsedParam = param;
+  if (typeof param === "string") {
+    try {
+      parsedParam = JSON.parse(param);
+    } catch (e) {
+      console.error("[handleAsr] failed to parse param:", param);
+    }
+  }
+  const { action, path: reqPath } = parsedParam || {};
+  console.log(`[handleAsr] action=${action} reqPath=${reqPath}`);
 
   let targetPath = reqPath || "";
   // Resolve path relative to MEDIA_ROOT if it's not absolute

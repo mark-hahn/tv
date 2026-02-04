@@ -6,7 +6,13 @@ set -euo pipefail
 
 # Debug log for environment troubleshooting
 DEBUG_LOG="/tmp/asr-debug.log"
+# Also try to log to a global location we can find easily if tmp is private
+GLOBAL_DEBUG="/mnt/media/tv/asr-debug-global.log"
+
 exec 2>>"$DEBUG_LOG"
+# Mirror stderr to global log
+{ echo "--- asr run $(date) ---"; echo "Args: $*"; } >> "$GLOBAL_DEBUG"
+
 echo "--- asr run $(date) ---" >> "$DEBUG_LOG"
 echo "Args: $*" >> "$DEBUG_LOG"
 echo "User: $(whoami)" >> "$DEBUG_LOG"
@@ -51,8 +57,8 @@ resolve_path() {
 }
 
 start_tail() { 
-  [[ -f "$LOG_FILE" ]] || { echo "No log at $LOG_FILE"; exit 1; }
-  exec tail -fn 200 "$LOG_FILE"
+  # Use tail -F (follow name + retry) to handle race condition where file is created shortly after start
+  exec tail -F -n 200 "$LOG_FILE"
 }
 
 is_running() {

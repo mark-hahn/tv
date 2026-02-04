@@ -1087,14 +1087,24 @@ export default {
       }
     },
     onAsrLog(msg) {
+      const el = this.$refs.asrScroll;
+      let atBottom = true;
+      if (el) {
+        atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+      }
+
       this.asrLogs += msg;
       if (msg.includes("[asr] EXIT")) {
         this.asrBusy = false;
       }
-      this.$nextTick(() => {
-        const el = this.$refs.asrScroll;
-        if (el) el.scrollTop = el.scrollHeight;
-      });
+
+      if (atBottom) {
+        this.$nextTick(() => {
+          // re-fetch ref in case of updates
+          const scrollEl = this.$refs.asrScroll;
+          if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight;
+        });
+      }
     },
     toggleSubs() {
       this.showSubs = !this.showSubs;

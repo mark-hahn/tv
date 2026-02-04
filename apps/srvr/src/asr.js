@@ -105,6 +105,12 @@ export function handleAsr(ws, id, param) {
         );
       } catch (e) {}
     });
+  } else if (action === "clear") {
+    execFile(ASR_BIN, ["clear", targetPath], (error, stdout, stderr) => {
+      try {
+        ws.send(JSON.stringify({ id, status: "ok" }));
+      } catch (e) {}
+    });
   } else if (action === "kill") {
     execFile(ASR_BIN, ["kill", targetPath], (error, stdout, stderr) => {
       const result = error ? { error: error.message, stderr } : { stdout };

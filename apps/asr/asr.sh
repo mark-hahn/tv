@@ -58,7 +58,8 @@ resolve_path() {
 
 start_tail() { 
   # Use tail -F (follow name + retry) to handle race condition where file is created shortly after start
-  exec tail -F -n 200 "$LOG_FILE"
+  # -n +1 outputs the whole file starting from line 1
+  exec tail -F -n +1 "$LOG_FILE"
 }
 
 is_running() {
@@ -86,7 +87,7 @@ param=""
 
 if (( $# >= 1 )); then
   case "$1" in
-    tail|kill|status|last|log|help|-h|--help)
+    tail|kill|status|last|log|clear|help|-h|--help)
       subcmd="$1"; shift
       param="${1-}"
       ;;
@@ -130,6 +131,7 @@ usage() {
   echo "       asr kill"
   echo "       asr status"
   echo "       asr log"
+  echo "       asr clear"
   exit 1
 }
 
@@ -155,6 +157,10 @@ case "$subcmd" in
     exit 0 ;; # truncated for brevity, not used here
   log)
     echo "$LOG_FILE"; exit 0 ;;
+  clear)
+    : > "$LOG_FILE"
+    echo "Log cleared."
+    exit 0 ;;
 esac
 
 # ---------- main run ----------
@@ -175,7 +181,8 @@ echo "Writing log to: $LOG_FILE"
 echo "Starting background process..." >> "$DEBUG_LOG"
 
 # Ensure log file exists immediately to avoid race condition with tail
-touch "$LOG_FILE"
+# Create or empty the log file on new run
+: > "$LOG_FILE"
 
 export ASR_MODE ASR_INPUT ASR_NODE_BIN ASR_JS_ENTRY ASR_PID_FILE ORIGINAL_PWD
 ASR_MODE="$MODE"

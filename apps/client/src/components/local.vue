@@ -201,46 +201,51 @@
       >
         <div>
           <strong>ASR Output</strong> <span v-if="asrBusy">(Running...)</span>
+        </div>
+        <div>
           <button
             @click="startAsr"
-            style="
-              cursor: pointer;
-              border-radius: 4px;
-              padding: 2px 8px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-              margin-left: 10px;
-            "
+            :disabled="asrBusy"
+            :style="{
+              cursor: asrBusy ? 'not-allowed' : 'pointer',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              backgroundColor: 'whitesmoke',
+              marginRight: '5px',
+              opacity: asrBusy ? 0.6 : 1,
+            }"
           >
             Start
           </button>
           <button
             @click="clearAsrLog"
-            style="
-              cursor: pointer;
-              border-radius: 4px;
-              padding: 2px 8px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-              margin-left: 5px;
-            "
+            :style="{
+              cursor: 'pointer',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              backgroundColor: 'whitesmoke',
+              marginRight: '5px',
+            }"
           >
             Clear
           </button>
+          <button
+            @click="killAsr"
+            :disabled="!asrBusy"
+            :style="{
+              cursor: !asrBusy ? 'not-allowed' : 'pointer',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              backgroundColor: 'whitesmoke',
+              opacity: !asrBusy ? 0.6 : 1,
+            }"
+          >
+            Kill
+          </button>
         </div>
-        <button
-          @click="killAsr"
-          style="
-            cursor: pointer;
-            border-radius: 4px;
-            padding: 2px 8px;
-            border: 1px solid #bbb;
-            background-color: whitesmoke;
-            font-weight: bold;
-          "
-        >
-          Kill
-        </button>
       </div>
       <div
         ref="asrScroll"
@@ -582,6 +587,8 @@ export default {
       this.fetchFiles();
     }
     evtBus.on("asr-log", this.onAsrLog);
+    this.initAsrState();
+    this.initAsrState();
   },
   unmounted() {
     evtBus.off("asr-log", this.onAsrLog);
@@ -1039,8 +1046,14 @@ export default {
       this.showAsr = !this.showAsr;
       if (this.showAsr) this.showSubs = false;
     },
-    clearAsrLog() {
+    async clearAsrLog() {
       this.asrLogs = "";
+      try {
+        // Send a request to truncate the log file on the server
+        await handleAsr({ action: "clear" });
+      } catch (e) {
+        console.error("Failed to clear remote log", e);
+      }
     },
     async startAsr() {
       let startPath = null;
@@ -1109,6 +1122,8 @@ export default {
       }
     },
     onAsrLog(msg) {
+      if (!msg) return; // ignore empty
+
       const el = this.$refs.asrScroll;
       let atBottom = true;
       if (el) {
@@ -1116,16 +1131,57 @@ export default {
       }
 
       this.asrLogs += msg;
+
+      // Auto-detect running state from logs if we missed initial state
+      if (msg.includes("matches (running)")) {
+        // This matches 'asr is running (PID...)' from status/check
+        this.asrBusy = true;
+      }
+
       if (msg.includes("[asr] EXIT")) {
         this.asrBusy = false;
       }
 
+      // Check for Processing line from status command
+      // "Processing: /mnt/media/..."
+      const match = msg.match(/^Processing: (.+)$/m);
+      if (match) {
+        this.activeAsrPath = match[1].trim();
+      }
+
       if (atBottom) {
         this.$nextTick(() => {
-          // re-fetch ref in case of updates
-          const scrollEl = this.$refs.asrScroll;
-          if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight;
+          if (el) el.scrollTop = el.scrollHeight;
         });
+      }
+    },
+    async initAsrState() {
+      try {
+        // Check status. response will come via handleAsr return AND potential logs?
+        // Actually handleAsr('check') calls 'status' which prints to stdout.
+        // srvr/src/asr.js:check uses execFile. callback returns stdout.
+        const res = await handleAsr({ action: "check" });
+
+        if (res && res.data && res.data.stdout) {
+          const out = res.data.stdout;
+          if (out.includes("asr is running")) {
+            this.asrBusy = true;
+            const match = out.match(/Processing: (.+)$/m);
+            if (match) {
+              this.activeAsrPath = match[1].trim();
+              // this.showAsr = true; // Auto-open disabled per request
+            }
+          } else {
+            this.asrBusy = false;
+          }
+        }
+
+        // Always start tailing to get persistent log
+        // This is safe even if not running; it tails the existing log file.
+        // If running, it tails the live log.
+        await handleAsr({ action: "tail", path: this.activeAsrPath || "" });
+      } catch (e) {
+        console.error("Failed to init Asr State", e);
       }
     },
     toggleSubs() {

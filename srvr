@@ -16,13 +16,11 @@ if [[ ! -d "$ROOT_DIR/apps" ]]; then
   exit 1
 fi
 
-SSH_CONTROL_PATH="$HOME/.ssh/ctl-%C"
+SSH_CONTROL_PATH="$HOME/.ssh/tv-srvr-$$"
 
 cleanup_ssh() {
-  if [ -e "${SSH_CONTROL_PATH//%C/*}" ]; then
-     # Closing master connection
-     ssh -O exit -S "$SSH_CONTROL_PATH" "$SSH_HOST" 2>/dev/null || true
-  fi
+  # Closing master connection
+  ssh -O exit -S "$SSH_CONTROL_PATH" "$SSH_HOST" 2>/dev/null || true
 }
 trap cleanup_ssh EXIT
 

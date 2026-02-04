@@ -380,6 +380,22 @@
               </div>
             </div>
             <div
+              id="genres"
+              v-if="genresTxt &amp;&amp; genresTxt.length > 0"
+              style="
+                min-height: 20px;
+                white-space: normal;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                display: -webkit-box;
+                -webkit-box-orient: vertical;
+                -webkit-line-clamp: 2;
+                line-clamp: 2;
+              "
+            >
+              {{ genresTxt }}
+            </div>
+            <div
               id="mins"
               v-if="runtimeTxt.length &gt; 0"
               v-html="runtimeTxt"
@@ -553,6 +569,7 @@ export default {
       watchedValTxt: "",
       cntryLangLeftTxt: "",
       cntryLangRightTxt: "",
+      genresTxt: "",
       runtimeTxt: "",
       subs: "",
       subsActive: false,
@@ -870,6 +887,30 @@ export default {
       });
 
       posterEl.replaceChildren(img);
+    },
+
+    setGenresTxt(tvdbData) {
+      this.genresTxt = "";
+      let genreArr = [];
+      if (this.previewMode) {
+        if (tvdbData && tvdbData.genres) {
+          genreArr = tvdbData.genres;
+        }
+      } else {
+        if (this.show && this.show.Genres) {
+          genreArr = this.show.Genres;
+        } else if (this.show && this.show.genres) {
+          genreArr = this.show.genres;
+        } else if (tvdbData && tvdbData.genres) {
+          genreArr = tvdbData.genres;
+        }
+      }
+
+      if (Array.isArray(genreArr) && genreArr.length > 0) {
+        this.genresTxt = genreArr.join(", ");
+      } else if (typeof genreArr === "string" && genreArr.length) {
+        this.genresTxt = genreArr;
+      }
     },
 
     setDates(tvdbData) {
@@ -1204,6 +1245,8 @@ export default {
           void this.setPoster(tvdbData);
 
           await this.setDates(tvdbData);
+
+          this.setGenresTxt(tvdbData);
 
           await this.setSeasonsTxt(tvdbData);
 

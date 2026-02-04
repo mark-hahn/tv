@@ -131,9 +131,12 @@ export async function loadAllShows() {
 
     const tvdbId = show?.ProviderIds?.Tvdb || show?.TvdbId;
     if (!tvdbId || tvdbId == "0") {
-      console.error(`loadAllShows, no tvdbId: ${show.Name} - DELETING FROM EMBY`, {
-        show,
-      });
+      console.error(
+        `loadAllShows, no tvdbId: ${show.Name} - DELETING FROM EMBY`,
+        {
+          show,
+        },
+      );
       try {
         await deleteShowFromEmby(show);
       } catch (e) {
@@ -334,6 +337,7 @@ export async function loadAllShows() {
     show.Ended = tvdb.status == "Ended";
     show.LastAired = tvdb.lastAired;
     show.Ratings = ratings;
+    show.averageRuntime = tvdb.averageRuntime;
     allTvdb[name] = tvdb;
   }
 

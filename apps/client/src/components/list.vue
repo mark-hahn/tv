@@ -506,6 +506,7 @@ export default {
         "Notes",
         "Size",
         "Ended",
+        "Length",
       ],
       fltrChoices: ["All", "Try Drama", "Finished"],
       conds: [
@@ -814,6 +815,7 @@ export default {
           "Ratings Order": "Ratings",
           "Notes Order": "Notes",
           "Ended Order": "Ended",
+          "Length Order": "Length",
         };
         let activeSortOrder = null;
         for (const [label, isActive] of Object.entries(activeButtons || {})) {
@@ -870,6 +872,7 @@ export default {
         "Ratings Order": "Ratings",
         "Notes Order": "Notes",
         "Ended Order": "Ended",
+        "Length Order": "Length",
       };
 
       // Pure state-based: Sync conds to match button states
@@ -928,6 +931,8 @@ export default {
           return show.DateCreated;
         case "Ended":
           return show.LastAired || "";
+        case "Length":
+          return show.averageRuntime || 0;
         case "Size":
           if (forSort) return show.Size;
           return util.fmtSize(show);
@@ -1797,7 +1802,8 @@ export default {
         a = this.getValBySortChoice(a, true);
         b = this.getValBySortChoice(b, true);
         if (a == b) return 0;
-        if (this.sortChoice == "Alpha") return a > b ? +1 : -1;
+        if (["Alpha", "Length"].includes(this.sortChoice))
+          return a > b ? +1 : -1;
         return a > b ? -1 : +1;
       });
     },

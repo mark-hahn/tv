@@ -38,6 +38,7 @@ echo "Using Node: $NODE_BIN" >> "$DEBUG_LOG"
 TMPDIR="/tmp"; export TMPDIR TMP="$TMPDIR" TEMP="$TMPDIR"
 ASR_TMPDIR="/tmp/asr-$PPID"; export ASR_TMPDIR
 ASR_SECRETS_DIR="$RUNTIME_DIR/secrets"; export ASR_SECRETS_DIR
+LOCKFILE="/tmp/asr_wrapper.lock"
 
 # ---------- helpers ----------
 resolve_path() {
@@ -164,6 +165,10 @@ case "$subcmd" in
 esac
 
 # ---------- main run ----------
+# Acquire lock to prevent race conditions during startup checks
+exec 200>"$LOCKFILE"
+flock -n 200 || { echo "Another asr startup is in progress. Exiting."; exit 1; }
+
 [[ -f "$ASR_JS_PATH" ]] || { echo "ERROR: asr.js not found at $ASR_JS_PATH"; exit 1; }
 [[ -e "$TARGET_PATH" || -d "$TARGET_DIR" ]] || { echo "ERROR: target not found: $TARGET_PATH"; exit 1; }
 

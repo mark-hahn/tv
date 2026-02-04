@@ -1079,6 +1079,8 @@ export default {
       }
     },
     async startAsr() {
+      if (this.asrBusy) return;
+
       let startPath = null;
       if (this.selectedName) {
         const node = this.tree.find((n) => n.name === this.selectedName);
@@ -1091,7 +1093,10 @@ export default {
 
       if (!startPath) {
         if (this.activeAsrPath) startPath = this.activeAsrPath;
-        else return; // Nothing selected
+        else {
+          this.asrLogs += "\n[Error] No folder selected to start ASR.\n";
+          return;
+        }
       }
 
       this.asrBusy = true;
@@ -1127,7 +1132,8 @@ export default {
         this.asrLogs += `\nError killing ASR: ${e.message}\n`;
       }
       this.asrBusy = false;
-      this.activeAsrPath = null;
+      // Keep activeAsrPath so we can restart the same job easily
+      // this.activeAsrPath = null;
     },
     onAsrLog(msg) {
       if (!msg) return; // ignore empty

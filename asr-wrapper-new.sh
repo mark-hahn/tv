@@ -171,11 +171,13 @@ fi
 
 # Use setsid to detach
 setsid bash -c '
+  exec >/tmp/asr-background.log 2>&1
+  set -x
   set -euo pipefail
   trap "" HUP INT
   trap "st=\$?; echo \"[asr] EXIT \$st\" | tee -a \"\$LOG_FILE\"; rm -f \"\$ASR_PID_FILE\"; exit \$st" EXIT
   
-  exec </dev/null
+  # exec </dev/null
   echo $$ > "$ASR_PID_FILE"
   export TMPDIR="/tmp" TMP="/tmp" TEMP="/tmp"
   cd "'"$RUNTIME_DIR"'"
@@ -190,7 +192,7 @@ setsid bash -c '
     { printf "[asr] exec: "; printf "%q " "$ASR_NODE_BIN" "$ASR_JS_ENTRY" "$ASR_INPUT"; printf "\n"; } | tee -a "$LOG_FILE"
     ( "$ASR_NODE_BIN" "$ASR_JS_ENTRY" "$ASR_INPUT" ) 2>&1 | tee -a "$LOG_FILE"
   fi
-' >/dev/null 2>&1 &
+' &
 
 runner_pid=$!
 echo "$runner_pid" > "$PID_FILE"

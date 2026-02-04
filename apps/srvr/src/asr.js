@@ -1,12 +1,28 @@
 import { spawn, execFile } from "child_process";
+import * as path from "path";
 
 const ASR_BIN = "/usr/local/bin/asr";
+const MEDIA_ROOT = "/mnt/media/tv";
 
 export function handleAsr(ws, id, param) {
-  const { action, path } = param || {};
+  const { action, path: reqPath } = param || {};
+
+  let targetPath = reqPath || "";
+  // Resolve path relative to MEDIA_ROOT if it's not absolute
+  if (targetPath && !path.isAbsolute(targetPath)) {
+    targetPath = path.resolve(MEDIA_ROOT, targetPath);
+  }
+
+  // Security check: ensure we are within MEDIA_ROOT
+  if (targetPath && !targetPath.startsWith(MEDIA_ROOT)) {
+    try {
+      ws.send(JSON.stringify({ id, status: "error", error: "Invalid path" }));
+    } catch (e) {}
+    return;
+  }
 
   if (action === "start") {
-    execFile(ASR_BIN, [path], (error, stdout, stderr) => {
+    execFile(ASR_BIN, [targetPath], (error, stdout, stderr) => {
       const result = error ? { error: error.message, stderr } : { stdout };
       try {
         ws.send(JSON.stringify({ id, status: "ok", data: result }));
@@ -20,10 +36,11 @@ export function handleAsr(ws, id, param) {
       ws._asrTailProc = null;
     }
 
-    const proc = spawn(ASR_BIN, ["tail", path]);
+    const proc = spawn(ASR_BIN, ["tail", targetPath]);
     ws._asrTailProc = proc;
 
     proc.stdout.on("data", (data) => {
+      console.log(`[ASR TAIL] data: ${data.length} bytes`);
       try {
         ws.send(
           JSON.stringify({
@@ -33,11 +50,13 @@ export function handleAsr(ws, id, param) {
           }),
         );
       } catch (e) {
+        console.error("[ASR TAIL] ws send error", e);
         proc.kill();
       }
     });
 
     proc.stderr.on("data", (data) => {
+      console.log(`[ASR TAIL] stderr: ${data}`);
       try {
         ws.send(
           JSON.stringify({
@@ -69,7 +88,7 @@ export function handleAsr(ws, id, param) {
       ws.send(JSON.stringify({ id, status: "ok", data: "tailing" }));
     } catch (e) {}
   } else if (action === "check") {
-    execFile(ASR_BIN, ["status", path], (error, stdout, stderr) => {
+    execFile(ASR_BIN, ["status", targetPath], (error, stdout, stderr) => {
       const running = stdout && stdout.includes("asr is running");
       try {
         ws.send(
@@ -78,7 +97,7 @@ export function handleAsr(ws, id, param) {
       } catch (e) {}
     });
   } else if (action === "kill") {
-    execFile(ASR_BIN, ["kill", path], (error, stdout, stderr) => {
+    execFile(ASR_BIN, ["kill", targetPath], (error, stdout, stderr) => {
       const result = error ? { error: error.message, stderr } : { stdout };
       try {
         ws.send(JSON.stringify({ id, status: "ok", data: result }));

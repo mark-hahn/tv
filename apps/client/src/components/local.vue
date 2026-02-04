@@ -203,16 +203,16 @@
           <strong>ASR Output</strong> <span v-if="asrBusy">(Running...)</span>
         </div>
         <button
-           @click="killAsr"
-           style="
-             cursor: pointer;
-             border-radius: 4px;
-             padding: 2px 8px;
-             border: 1px solid #bbb;
-             background-color: whitesmoke;
-             color: #d00;
-             font-weight: bold;
-           "
+          @click="killAsr"
+          style="
+            cursor: pointer;
+            border-radius: 4px;
+            padding: 2px 8px;
+            border: 1px solid #bbb;
+            background-color: whitesmoke;
+            color: #d00;
+            font-weight: bold;
+          "
         >
           Kill Asr
         </button>
@@ -220,9 +220,9 @@
       <div
         ref="asrScroll"
         style="
-          flex: 1 1 auto; 
-          overflow: auto; 
-          white-space: pre-wrap; 
+          flex: 1 1 auto;
+          overflow: auto;
+          white-space: pre-wrap;
           background-color: #fff;
           border: 1px solid #eee;
           padding: 4px;
@@ -1044,6 +1044,9 @@ export default {
             this.asrBusy = false;
             return;
           }
+          if (res && res.stdout) {
+            this.asrLogs += res.stdout + "\n";
+          }
           // Start tailing immediately
           await handleAsr({ action: "tail", path: startPath });
         } catch (e) {
@@ -1057,31 +1060,31 @@ export default {
       }
     },
     async killAsr() {
-       let targetPath = null;
-       // Try to guess the path if we have selection, or fallback to current running one?
-       // The asr busy state should probably track the path.
-       // For now, if active, we try to kill 'current selection' OR generally the last one?
-       // The 'asr kill' command without param works if run in folder, but we are remote.
-       // We should better store the startPath when we started.
-       if (this.activeAsrPath) {
-           targetPath = this.activeAsrPath;
-       } else if (this.selectedName) {
-           // guess
-           const node = this.tree.find((n) => n.name === this.selectedName);
-           if (node) targetPath = node.name;
-       }
-       
-       // If no path known, maybe prompt? Or just try killing with empty path which implies CWD if server was stateful (it isn't).
-       // Actually startPath in 'clickAsr' is local var. Let's make it data.
-       
-       try {
-           const res = await handleAsr({ action: "kill", path: targetPath });
-           this.asrLogs += `\n[Kill command sent: ${targetPath || 'default'}]\n`;
-           if (res && res.stdout) this.asrLogs += res.stdout;
-           if (res && res.stderr) this.asrLogs += res.stderr;
-       } catch (e) {
-           this.asrLogs += `\nError killing ASR: ${e.message}\n`;
-       }
+      let targetPath = null;
+      // Try to guess the path if we have selection, or fallback to current running one?
+      // The asr busy state should probably track the path.
+      // For now, if active, we try to kill 'current selection' OR generally the last one?
+      // The 'asr kill' command without param works if run in folder, but we are remote.
+      // We should better store the startPath when we started.
+      if (this.activeAsrPath) {
+        targetPath = this.activeAsrPath;
+      } else if (this.selectedName) {
+        // guess
+        const node = this.tree.find((n) => n.name === this.selectedName);
+        if (node) targetPath = node.name;
+      }
+
+      // If no path known, maybe prompt? Or just try killing with empty path which implies CWD if server was stateful (it isn't).
+      // Actually startPath in 'clickAsr' is local var. Let's make it data.
+
+      try {
+        const res = await handleAsr({ action: "kill", path: targetPath });
+        this.asrLogs += `\n[Kill command sent: ${targetPath || "default"}]\n`;
+        if (res && res.stdout) this.asrLogs += res.stdout;
+        if (res && res.stderr) this.asrLogs += res.stderr;
+      } catch (e) {
+        this.asrLogs += `\nError killing ASR: ${e.message}\n`;
+      }
     },
     onAsrLog(msg) {
       this.asrLogs += msg;

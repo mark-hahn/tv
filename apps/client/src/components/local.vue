@@ -201,6 +201,32 @@
       >
         <div>
           <strong>ASR Output</strong> <span v-if="asrBusy">(Running...)</span>
+          <button
+            @click="startAsr"
+            style="
+              cursor: pointer;
+              border-radius: 4px;
+              padding: 2px 8px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+              margin-left: 10px;
+            "
+          >
+            Start
+          </button>
+          <button
+            @click="clearAsrLog"
+            style="
+              cursor: pointer;
+              border-radius: 4px;
+              padding: 2px 8px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+              margin-left: 5px;
+            "
+          >
+            Clear
+          </button>
         </div>
         <button
           @click="killAsr"
@@ -210,11 +236,10 @@
             padding: 2px 8px;
             border: 1px solid #bbb;
             background-color: whitesmoke;
-            color: #d00;
             font-weight: bold;
           "
         >
-          Kill Asr
+          Kill
         </button>
       </div>
       <div
@@ -1010,53 +1035,50 @@ export default {
       return current.children || [];
     },
     // Subtitles logic
-    async clickAsr() {
+    clickAsr() {
+      this.showAsr = !this.showAsr;
+      if (this.showAsr) this.showSubs = false;
+    },
+    clearAsrLog() {
+      this.asrLogs = "";
+    },
+    async startAsr() {
       let startPath = null;
-      if (!this.asrBusy) {
-        if (this.selectedName) {
-          const node = this.tree.find((n) => n.name === this.selectedName);
-          if (node && node.type === "folder") startPath = node.name;
-        } else if (this.selectedFiles.size === 1) {
-          const relPath = [...this.selectedFiles][0];
-          const node = this.findNodeByPath(relPath);
-          if (node && node.type === "folder") startPath = relPath;
-        }
+      if (this.selectedName) {
+        const node = this.tree.find((n) => n.name === this.selectedName);
+        if (node && node.type === "folder") startPath = node.name;
+      } else if (this.selectedFiles.size === 1) {
+        const relPath = [...this.selectedFiles][0];
+        const node = this.findNodeByPath(relPath);
+        if (node && node.type === "folder") startPath = relPath;
       }
 
-      const starting = !!startPath;
+      if (!startPath) {
+        if (this.activeAsrPath) startPath = this.activeAsrPath;
+        else return; // Nothing selected
+      }
 
-      if (starting) {
-        this.asrBusy = true;
-        this.activeAsrPath = startPath;
-        this.asrLogs = ""; // clear old text
-        this.showAsr = true; // ensure visible
-        this.showSubs = false; // close subs
+      this.asrBusy = true;
+      this.activeAsrPath = startPath;
+      this.asrLogs = ""; // clear old text
+      this.showAsr = true; // ensure visible
+      this.showSubs = false; // close subs
 
-        // Clear selection
-        this.selectedName = null;
-        this.selectedFiles.clear();
-        this.lastSelectedFile = null;
-
-        try {
-          const res = await handleAsr({ action: "start", path: startPath });
-          if (res && res.error) {
-            this.asrLogs += `Start Error: ${res.error}\nStderr: ${res.stderr || ""}\n`;
-            this.asrBusy = false;
-            return;
-          }
-          if (res && res.stdout) {
-            this.asrLogs += res.stdout + "\n";
-          }
-          // Start tailing immediately
-          await handleAsr({ action: "tail", path: startPath });
-        } catch (e) {
-          this.asrLogs += `Error starting ASR: ${e.message}\n`;
+      try {
+        const res = await handleAsr({ action: "start", path: startPath });
+        if (res && res.error) {
+          this.asrLogs += `Start Error: ${res.error}\nStderr: ${res.stderr || ""}\n`;
           this.asrBusy = false;
+          return;
         }
-      } else {
-        // Just toggle
-        this.showAsr = !this.showAsr;
-        if (this.showAsr) this.showSubs = false;
+        if (res && res.stdout) {
+          this.asrLogs += res.stdout + "\n";
+        }
+        // Start tailing immediately
+        await handleAsr({ action: "tail", path: startPath });
+      } catch (e) {
+        this.asrLogs += `Error starting ASR: ${e.message}\n`;
+        this.asrBusy = false;
       }
     },
     async killAsr() {

@@ -77,5 +77,12 @@ export function handleAsr(ws, id, param) {
         );
       } catch (e) {}
     });
+  } else if (action === 'kill') {
+    execFile(ASR_BIN, ['kill', path], (error, stdout, stderr) => {
+          const result = error ? { error: error.message, stderr } : { stdout };
+          try {
+              ws.send(JSON.stringify({ id, status: 'ok', data: result }));
+          } catch(e) { console.error('asr kill send error', e); }
+    });
   }
 }

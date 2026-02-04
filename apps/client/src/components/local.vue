@@ -16,8 +16,8 @@
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        flex: showSubs ? '0 0 50%' : '1 1 auto',
-        borderBottom: showSubs ? '1px solid #ddd' : 'none',
+        flex: showSubs || showAsr ? '0 0 50%' : '1 1 auto',
+        borderBottom: showSubs || showAsr ? '1px solid #ddd' : 'none',
       }"
     >
       <!-- Header -->
@@ -181,25 +181,52 @@
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        backgroundColor: '#1e1e1e',
-        color: '#f0f0f0',
+        backgroundColor: '#fafafa',
+        color: '#000',
         fontFamily: 'monospace',
         padding: '10px',
+        borderLeft: '1px solid #ddd',
       }"
     >
       <div
         style="
           flex: 0 0 auto;
-          border-bottom: 1px solid #555;
+          border-bottom: 1px solid #ddd;
           padding-bottom: 5px;
           margin-bottom: 5px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
         "
       >
-        ASR Output <span v-if="asrBusy">(Running...)</span>
+        <div>
+          <strong>ASR Output</strong> <span v-if="asrBusy">(Running...)</span>
+        </div>
+        <button
+           @click="killAsr"
+           style="
+             cursor: pointer;
+             border-radius: 4px;
+             padding: 2px 8px;
+             border: 1px solid #bbb;
+             background-color: whitesmoke;
+             color: #d00;
+             font-weight: bold;
+           "
+        >
+          Kill Asr
+        </button>
       </div>
       <div
         ref="asrScroll"
-        style="flex: 1 1 auto; overflow: auto; white-space: pre-wrap"
+        style="
+          flex: 1 1 auto; 
+          overflow: auto; 
+          white-space: pre-wrap; 
+          background-color: #fff;
+          border: 1px solid #eee;
+          padding: 4px;
+        "
       >
         {{ asrLogs }}
       </div>
@@ -499,6 +526,7 @@ export default {
       showAsr: false,
       asrLogs: "",
       asrBusy: false,
+      activeAsrPath: null,
     };
   },
   created() {
@@ -999,6 +1027,7 @@ export default {
 
       if (starting) {
         this.asrBusy = true;
+        this.activeAsrPath = startPath;
         this.asrLogs = ""; // clear old text
         this.showAsr = true; // ensure visible
         this.showSubs = false; // close subs
@@ -1009,7 +1038,12 @@ export default {
         this.lastSelectedFile = null;
 
         try {
-          await handleAsr({ action: "start", path: startPath });
+          const res = await handleAsr({ action: "start", path: startPath });
+          if (res && res.error) {
+            this.asrLogs += `Start Error: ${res.error}\nStderr: ${res.stderr || ""}\n`;
+            this.asrBusy = false;
+            return;
+          }
           // Start tailing immediately
           await handleAsr({ action: "tail", path: startPath });
         } catch (e) {
@@ -1021,6 +1055,33 @@ export default {
         this.showAsr = !this.showAsr;
         if (this.showAsr) this.showSubs = false;
       }
+    },
+    async killAsr() {
+       let targetPath = null;
+       // Try to guess the path if we have selection, or fallback to current running one?
+       // The asr busy state should probably track the path.
+       // For now, if active, we try to kill 'current selection' OR generally the last one?
+       // The 'asr kill' command without param works if run in folder, but we are remote.
+       // We should better store the startPath when we started.
+       if (this.activeAsrPath) {
+           targetPath = this.activeAsrPath;
+       } else if (this.selectedName) {
+           // guess
+           const node = this.tree.find((n) => n.name === this.selectedName);
+           if (node) targetPath = node.name;
+       }
+       
+       // If no path known, maybe prompt? Or just try killing with empty path which implies CWD if server was stateful (it isn't).
+       // Actually startPath in 'clickAsr' is local var. Let's make it data.
+       
+       try {
+           const res = await handleAsr({ action: "kill", path: targetPath });
+           this.asrLogs += `\n[Kill command sent: ${targetPath || 'default'}]\n`;
+           if (res && res.stdout) this.asrLogs += res.stdout;
+           if (res && res.stderr) this.asrLogs += res.stderr;
+       } catch (e) {
+           this.asrLogs += `\nError killing ASR: ${e.message}\n`;
+       }
     },
     onAsrLog(msg) {
       this.asrLogs += msg;

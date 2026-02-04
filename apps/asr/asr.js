@@ -62,22 +62,14 @@ console.log = function (...args) {
   let prefix = "";
   if (
     cleanMsg.includes("Configuration:") ||
+    cleanMsg.includes("Processing:") ||
+    cleanMsg.includes("Wrote:") ||
     /Found \d+ video file\(s\) to process/.test(cleanMsg)
   ) {
     prefix = "\n";
   }
 
-  if (cleanMsg.trim().startsWith("Wrote ")) {
-    prefix = "\n";
-  }
-
-  // Suffix newline for Wrote
-  let suffix = "";
-  if (cleanMsg.trim().startsWith("Wrote ")) {
-    suffix = "\n";
-  }
-
-  originalLog(`${prefix}[${getTimestamp()}] ${cleanMsg}${suffix}`);
+  originalLog(`${prefix}[${getTimestamp()}] ${cleanMsg}`);
 };
 /* ----------------------------------------------------- */
 

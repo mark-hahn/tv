@@ -3,7 +3,6 @@ import * as path from "path";
 
 const ASR_BIN = "/root/dev/apps/tv/apps/asr/asr.sh";
 const MEDIA_ROOT = "/mnt/media/tv";
-const SHOW_RAW = false;
 
 export function handleAsr(ws, id, param) {
   let parsedParam = param;
@@ -52,35 +51,11 @@ export function handleAsr(ws, id, param) {
     proc.stdout.on("data", (data) => {
       console.log(`[ASR TAIL] data: ${data.length} bytes`);
       try {
-        let textToSend = data.toString();
-        if (!SHOW_RAW) {
-          // Process lines to add timestamps
-          const now = new Date();
-          const timeStr = now.toLocaleTimeString("en-US", { hour12: false });
-          // Split by newline
-          let lines = textToSend.split("\n");
-
-          // Filter out RAW lines if needed
-          lines = lines.filter((line) => {
-            if (!line.trim()) return true; // keep empty lines for now (except trailing handled below)
-            return !line.includes("RAW:");
-          });
-
-          // If the last element is empty string (due to trailing \n), keep it empty.
-          textToSend = lines
-            .map((line, idx) => {
-              if (idx === lines.length - 1 && line === "") return "";
-              if (!line.trim()) return line; // preserve empty lines without timestamp?
-              return `[${timeStr}] ${line}`;
-            })
-            .join("\n");
-        }
-
         ws.send(
           JSON.stringify({
             id: "0",
             status: "asr-log",
-            data: textToSend,
+            data: data.toString(),
           }),
         );
       } catch (e) {

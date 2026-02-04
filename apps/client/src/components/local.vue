@@ -582,9 +582,15 @@ export default {
       }
     },
     asrLogs() {
-      this.$nextTick(() => {
-        this.scrollToAsrBottom();
-      });
+      const el = this.$refs.asrScroll;
+      if (!el) return;
+      // Auto-scroll only if we are already near the bottom
+      const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+      if (isAtBottom) {
+        this.$nextTick(() => {
+          this.scrollToAsrBottom();
+        });
+      }
     },
     showAsr(val) {
       if (val) {

@@ -598,24 +598,32 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     ? trailersRaw.filter(isEnglishTrailer)
     : trailersRaw;
 
+  // Preserve existing non-empty values when API returns empty
+  const existing = allTvdb[name] || {};
+  const preserve = (newVal, existingVal) => {
+    if (newVal !== undefined && newVal !== null && newVal !== "") return newVal;
+    if (existingVal !== undefined && existingVal !== null && existingVal !== "") return existingVal;
+    return newVal;
+  };
+
   let tvdbData = {
     tvdbId,
     name,
-    originalNetwork,
+    originalNetwork: preserve(originalNetwork, existing.originalNetwork),
     seasonCount,
     episodeCount,
     watchedCount,
-    image,
-    score,
-    overview,
-    firstAired,
-    lastAired,
-    averageRuntime,
-    originalCountry,
-    originalLanguage,
-    status,
-    remotes,
-    characters,
+    image: preserve(image, existing.image),
+    score: preserve(score, existing.score),
+    overview: preserve(overview, existing.overview),
+    firstAired: preserve(firstAired, existing.firstAired),
+    lastAired: preserve(lastAired, existing.lastAired),
+    averageRuntime: preserve(averageRuntime, existing.averageRuntime),
+    originalCountry: preserve(originalCountry, existing.originalCountry),
+    originalLanguage: preserve(originalLanguage, existing.originalLanguage),
+    status: preserve(status, existing.status),
+    remotes: preserve(remotes, existing.remotes),
+    characters: preserve(characters, existing.characters),
     added,
     saved,
   };

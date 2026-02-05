@@ -1,11 +1,11 @@
 
 ===== asr pane first run =======
 
-[asr] start Wed Feb  4 04:21:29 PM PST 2026
+[asr] start Wed Feb  4 04:48:58 PM PST 2026
 Node: /usr/bin/node
 [asr] exec: /usr/bin/node /root/dev/apps/tv/apps/asr/asr.js /mnt/media/tv/Let\ Them\ Eat\ Cake/Season\ 1 
 + /usr/bin/node /root/dev/apps/tv/apps/asr/asr.js '/mnt/media/tv/Let Them Eat Cake/Season 1'
 
 [Kill command sent]
-SIGTERM to process-group 946221
+SIGTERM to process-group 948060
 Stopped.

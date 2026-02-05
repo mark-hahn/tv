@@ -3,6 +3,22 @@ import * as path from "path";
 
 const ASR_BIN = "/root/dev/apps/tv/apps/asr/asr.sh";
 const MEDIA_ROOT = "/mnt/media/tv";
+const MAX_ASR_WS_CHUNK = 8 * 1024;
+
+function sendAsrChunks(ws, text) {
+  if (!text) return true;
+  for (let i = 0; i < text.length; i += MAX_ASR_WS_CHUNK) {
+    const chunk = text.slice(i, i + MAX_ASR_WS_CHUNK);
+    ws.send(
+      JSON.stringify({
+        id: "0",
+        status: "asr-log",
+        data: chunk,
+      }),
+    );
+  }
+  return true;
+}
 
 export function handleAsr(ws, id, param) {
   let parsedParam = param;
@@ -52,18 +68,10 @@ export function handleAsr(ws, id, param) {
       // Prevent zombie processes from sending data
       if (ws._asrTailProc !== proc) return;
 
-      console.log(`[ASR TAIL] data: ${data.length} bytes`);
-      console.log(
-        `[ASR TAIL] content chunk: ${JSON.stringify(data.toString())}`,
-      );
+      const text = data.toString();
+      console.log(`[ASR TAIL] data: ${text.length} bytes`);
       try {
-        ws.send(
-          JSON.stringify({
-            id: "0",
-            status: "asr-log",
-            data: data.toString(),
-          }),
-        );
+        sendAsrChunks(ws, text);
       } catch (e) {
         console.error("[ASR TAIL] ws send error", e);
         proc.kill();
@@ -71,15 +79,10 @@ export function handleAsr(ws, id, param) {
     });
 
     proc.stderr.on("data", (data) => {
-      console.log(`[ASR TAIL] stderr: ${data}`);
+      const text = data.toString();
+      console.log(`[ASR TAIL] stderr: ${text.length} bytes`);
       try {
-        ws.send(
-          JSON.stringify({
-            id: "0",
-            status: "asr-log",
-            data: "ERR: " + data.toString(),
-          }),
-        );
+        sendAsrChunks(ws, "ERR: " + text);
       } catch (e) {
         proc.kill();
       }

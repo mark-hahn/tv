@@ -6,16 +6,22 @@ const MEDIA_ROOT = "/mnt/media/tv";
 const MAX_ASR_WS_CHUNK = 8 * 1024;
 
 function sendAsrChunks(ws, text) {
-  if (!text) return true;
+  if (!text) return false;
+  if (!ws || ws.readyState !== 1) return false;
   for (let i = 0; i < text.length; i += MAX_ASR_WS_CHUNK) {
     const chunk = text.slice(i, i + MAX_ASR_WS_CHUNK);
-    ws.send(
-      JSON.stringify({
-        id: "0",
-        status: "asr-log",
-        data: chunk,
-      }),
-    );
+    try {
+      ws.send(
+        JSON.stringify({
+          id: "0",
+          status: "asr-log",
+          data: chunk,
+        }),
+      );
+    } catch (e) {
+      console.error("[ASR TAIL] ws send error", e);
+      return false;
+    }
   }
   return true;
 }
@@ -70,22 +76,13 @@ export function handleAsr(ws, id, param) {
 
       const text = data.toString();
       console.log(`[ASR TAIL] data: ${text.length} bytes`);
-      try {
-        sendAsrChunks(ws, text);
-      } catch (e) {
-        console.error("[ASR TAIL] ws send error", e);
-        proc.kill();
-      }
+      sendAsrChunks(ws, text);
     });
 
     proc.stderr.on("data", (data) => {
       const text = data.toString();
       console.log(`[ASR TAIL] stderr: ${text.length} bytes`);
-      try {
-        sendAsrChunks(ws, "ERR: " + text);
-      } catch (e) {
-        proc.kill();
-      }
+      sendAsrChunks(ws, "ERR: " + text);
     });
 
     proc.on("close", (code) => {

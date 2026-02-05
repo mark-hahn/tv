@@ -181,10 +181,10 @@ remote_install_app_deps() {
 }
 
 remote_pm2_restart_all_silent() {
-  echo "[remote] pm2 reload ecosystem..."
+  echo "[remote] pm2 reload tv apps..."
   run_ssh "$SSH_HOST" "cd '$TV_REMOTE_BASE' \
     && pm2 start ecosystem.config.cjs --env production >/dev/null 2>&1 \
-    && pm2 reload all >/dev/null 2>&1 \
+    && pm2 reload tv-api tv-down tv-srvr >/dev/null 2>&1 \
     && pm2 save >/dev/null 2>&1"
 }
 

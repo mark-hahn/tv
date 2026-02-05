@@ -1153,8 +1153,6 @@ export default {
       if (this.ignoreLogs) return;
       if (!msg) return; // ignore empty
 
-      console.log("onAsrLog received:", JSON.stringify(msg));
-
       const el = this.$refs.asrScroll;
       let atBottom = true;
       if (el) {
@@ -1477,8 +1475,7 @@ export default {
         this.subsItems = finalItems;
 
         if (!this.subsItems.length) {
-          // Silent if no files selected?
-          // this.subsError = "No matching subtitles found.";
+          this.subsError = "No subtitles found";
         }
       } catch (e) {
         this.subsError = e.message || "Error searching subs";

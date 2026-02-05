@@ -521,6 +521,37 @@
     >
       {{ show.Overview }}
     </div>
+
+    <!-- Refreshing overlay -->
+    <div
+      v-if="refreshing"
+      :style="{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+      }"
+    >
+      <div
+        :style="{
+          padding: '20px 40px',
+          backgroundColor: 'white',
+          border: '2px solid #666',
+          borderRadius: '10px',
+          fontSize: '18px',
+          fontWeight: 'bold',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+        }"
+      >
+        Refreshing...
+      </div>
+    </div>
   </div>
 </template>
 
@@ -585,6 +616,7 @@ export default {
       collectionCount: 0,
       currentTvdbData: null,
       previewSrchChoice: null,
+      refreshing: false,
     };
   },
 
@@ -1131,12 +1163,12 @@ export default {
 
     async refreshTvdb() {
       if (!confirm(`Refresh TVDB data for "${this.show.Name}"?`)) return;
+      this.refreshing = true;
       try {
         await srvr.setTvdbFields({
           name: this.show.Name,
           saved: 0,
         });
-        alert(`Refresh of "${this.show.Name}" complete.`);
         tvdb.clearCache();
         evtBus.emit("library-refresh-complete");
         // Re-init the current view
@@ -1144,6 +1176,8 @@ export default {
       } catch (e) {
         console.error("refreshTvdb error", e);
         alert("Error requesting refresh: " + e);
+      } finally {
+        this.refreshing = false;
       }
     },
 

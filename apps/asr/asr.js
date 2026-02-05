@@ -543,12 +543,8 @@ async function callApi(uploadInfo) {
   }
 }
 function processSegments(segments, chunkInfo) {
-  console.log(
-    `[DEBUG-FLOW-${RUN_ID}] processSegments: ${segments ? segments.length : 0} segments for chunk ${chunkInfo.chunkIndex}`,
-  );
   if (!segments || segments.length === 0) return [];
   const processedSegments = [];
-  console.log();
   for (const segment of segments) {
     if (
       segment.start === undefined ||
@@ -565,12 +561,6 @@ function processSegments(segments, chunkInfo) {
     const start = chunkInfo.chunkStart + segment.start;
     const end = chunkInfo.chunkStart + segment.end;
 
-    console.log(
-      `RAW: ${chunkInfo.chunkIndex}, ${vs(
-        start,
-      )}, ${vs(end)}, "${segment.text.trim()}"`,
-    );
-
     const processedSegment = {
       start,
       end,
@@ -580,8 +570,6 @@ function processSegments(segments, chunkInfo) {
     if (start > chunkInfo.trimStart && end < chunkInfo.trimEnd)
       processedSegments.push(processedSegment);
   }
-  // console.log(JSON.stringify(processedSegments, null, 2));
-  console.log();
   return processedSegments;
 }
 

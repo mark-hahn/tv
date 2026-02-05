@@ -1,30 +1,3 @@
 
 ===== client console first run =======
 
-websocket closed, trying open in 2 secs srvr.js:48:13
-Layout was forced before the page was fully loaded. If stylesheets are not yet loaded this may cause a flash of unstyled content. node.js:418:1
-[vite] connecting... client:733:9
-[vite] connected. client:827:12
-opened websocket srvr.js:41:13
-Cookie “__Secure-YEC” has been rejected because it is in a cross-site context and its “SameSite” is “Lax” or “Strict”. iframe_api
-onAsrLog received: "[asr] start Wed Feb  4 04:53:36 PM PST 2026\nNode: /usr/bin/node\n[asr] exec: /usr/bin/node /root/dev/apps/tv/apps/asr/asr.js /mnt/media/tv/Let\\ Them\\ Eat\\ Cake/Season\\ 1 \n+ /usr/bin/node /root/dev/apps/tv/apps/asr/asr.js '/mnt/media/tv/Let Them Eat Cake/Season 1'\n[DEBUG-FLOW-5886] main starting\n\nConfiguration:\n   Test Mode:        OFF\n   Chunk Duration:    120s\n   Trim Duration:     3s\n   Overlap Duration:  3s\n   Time Match Margin: 0.3s\n   Audio Quality:     max (48000Hz, 256k)\n   Preprocessing:     true\n   Noise Reduction:   true\n   API Model:         voxtral-mini-latest\n   API Language:      en\n   API Temperature:   0\n   API Response:      verbose_json\n   API Prompt:        None\n   File Size Limit:   19.0MB\n\nFound 6 video file(s) to process\n[DEBUG-FLOW-5886] Starting loop for Let.Them.Eat.Cake.S01E01.The.Pox.DVDRip.Driveway.avi\n[DEBUG-FLOW-5886] processOneVideo called for /mnt/media/tv/Let Them Eat Cake/Season 1/Let.Them.Eat.Cake.S01E01.The.Pox.DVDRip.Driveway.avi\n\n[00:00:00] Processing: Let.Them.Eat.Cake.S01E01.The.Pox.DVDRip.Driveway.avi\n\nLet.Them.Eat.Cake.S01E01.The.Pox.DVDRip.Driveway: Enhanced SRT already exists, skipping.\n[DEBUG-FLOW-5886] Starting loop for Let.Them.Eat.Cake.S01E02.Murder.DVDRip.Driveway.avi\n[DEBUG-FLOW-5886] processOneVideo called for /mnt/media/tv/Let Them Eat Cake/Season 1/Let.Them.Eat.Cake.S01E02.Murder.DVDRip.Driveway.avi\n\n[00:00:00] Processing: Let.Them.Eat.Cake.S01E02.Murder.DVDRip.Driveway.avi\n\nLet.Them.Eat.Cake.S01E02.Murder.DVDRip.Driveway: Enhanced SRT already exists, skipping.\n[DEBUG-FLOW-5886] Starting loop for Let.Them.Eat.Cake.S01E03.The.Portrait.DVDRip.Driveway.avi\n[DEBUG-FLOW-5886] processOneVideo called for /mnt/media/tv/Let Them Eat Cake/Season 1/Let.Them.Eat.Cake.S01E03.The.Portrait.DVDRip.Driveway.avi\n\n[00:00:00] Processing: Let.Them.Eat.Cake.S01E03.The.Portrait.DVDRip.Driveway.avi\n\nLet.Them.Eat.Cake.S01E03.The.Portrait.DVDRip.Driveway: Enhanced SRT already exists, skipping.\n[DEBUG-FLOW-5886] Starting loop for Let.Them.Eat.Cake.S01E04.Making.Voopee.DVDRip.Driveway.avi\n[DEBUG-FLOW-5886] processOneVideo called for /mnt/media/tv/Let Them Eat Cake/Season 1/Let.Them.Eat.Cake.S01E04.Making.Voopee.DVDRip.Driveway.avi\n\n[00:00:00] Processing: Let.Them.Eat.Cake.S01E04.Making.Voopee.DVDRip.Driveway.avi\n\nLet.Them.Eat.Cake.S01E04.Making.Voopee.DVDRip.Driveway: Enhanced SRT already exists, skipping.\n[DEBUG-FLOW-5886] Starting loop for Let.Them.Eat.Cake.S01E05.A.Marriage.Of.Convenience.DVDRip.Driveway.avi\n[DEBUG-FLOW-5886] processOneVideo called for /mnt/media/tv/Let Them Eat Cake/Season 1/Let.Them.Eat.Cake.S01E05.A.Marriage.Of.Convenience.DVDRip.Driveway.avi\n\n[00:00:00] Processing: Let.Them.Eat.Cake.S01E05.A.Marriage.Of.Convenience.DVDRip.Driveway.avi\n\nLet.Them.Eat.Cake.S01E05.A.Marriage.Of.Convenience.DVDRip.Driveway: Enhanced SRT already exists, skipping.\n[DEBUG-FLOW-5886] Starting loop for Let.Them.Eat.Cake.S01E06.The.Royal.Command.Performance.DVDRip.Driveway.avi\n[DEBUG-FLOW-5886] processOneVideo called for /mnt/media/tv/Let Them Eat Cake/Season 1/Let.Them.Eat.Cake.S01E06.The.Royal.Command.Performance.DVDRip.Driveway.avi\n\n[00:00:00] Processing: Let.Them.Eat.Cake.S01E06.The.Royal.Command.Performance.DVDRip.Driveway.avi\n[DEBUG-FLOW-5886] extractAudio called for Let.Them.Eat.Cake.S01E06.The.Royal.Command.Performance.DVDRip.Driveway.avi\n[00:00:02] Preprocessing audio...\n[DEBUG-FLOW-5886] preprocessAudio called for audio_raw.wav\n{\n  audioFilter: 'highpass=f=80,lowpass=f=8000,dynaudnorm=f=150:g=3:m=3:s=8'\n}\n[DEBUG-FLOW-5886] getDurationSec called for audio_processed.wav\n[DEBUG-FLOW-5886] getChunks called for audio_processed.wav\n[DEBUG-FLOW-5886] getDurationSec called for audio_processed.wav\n[00:00:07] Duration: 1633s, 15 chunks\n[DEBUG-FLOW-5886] Processing chunk 0\n[DEBUG-FLOW-5886] getFlac called for chunk-000.wav\n[DEBUG-FLOW-5886] callApi called for chunk-000.flac\n[asr] EXIT 0\n" local.vue:657:15
-all shows loaded, elapsed ms: 664 emby.js:456:11
-gap-worker started, 292 shows gap-worker.js:249:11
-GET
-http://localhost:5173/favicon.ico
-[HTTP/1.1 404 Not Found 3ms]
-
-Local.vue selectTopLevel 
-Object { showProp: Proxy, showName: "Let Them Eat Cake" }
-local.vue:327:15
-ASR Start stdout: Mode: dir
-Input: /mnt/media/tv/Let Them Eat Cake/Season 1
-Target dir: /mnt/media/tv/Let Them Eat Cake/Season 1
-Writing log to: /root/dev/apps/tv/apps/asr/data/asr.log
-Runner PID (wrapper): 950357
-asr is RUNNING in: /mnt/media/tv/Let Them Eat Cake/Season 1
-Log file: /root/dev/apps/tv/apps/asr/data/asr.log
-local.vue:629:19
-onAsrLog received: "[asr] start Wed Feb  4 04:58:31 PM PST 2026\nNode: /usr/bin/node\n" local.vue:657:15
-onAsrLog received: "[asr] exec: /usr/bin/node /root/dev/apps/tv/apps/asr/asr.js /mnt/media/tv/Let\\ Them\\ Eat\\ Cake/Season\\ 1 \n" local.vue:657:15
-onAsrLog received: "+ /usr/bin/node /root/dev/apps/tv/apps/asr/asr.js '/mnt/media/tv/Let Them Eat Cake/Season 1'\n" local.vue:657:15

@@ -40,26 +40,22 @@ function startTail(ws, targetPath) {
   proc.stdout.on("data", (data) => {
     if (ws._asrTailProc !== proc) return;
     const text = data.toString();
-    console.log(`[ASR TAIL] data: ${text.length} bytes`);
     sendAsrChunks(ws, text);
   });
 
   proc.stderr.on("data", (data) => {
     if (ws._asrTailProc !== proc) return;
     const text = data.toString();
-    console.log(`[ASR TAIL] stderr: ${text.length} bytes`);
     sendAsrChunks(ws, "ERR: " + text);
   });
 
   proc.on("error", (err) => {
-    console.error("[ASR TAIL] process error", err);
   });
 
   proc.on("close", (code, signal) => {
     if (ws._asrTailProc === proc) {
       ws._asrTailProc = null;
     }
-    console.log(`[ASR TAIL] closed code=${code} signal=${signal}`);
     if (ws.readyState === 1 && ws._asrTailPath) {
       setTimeout(() => {
         if (ws.readyState === 1 && !ws._asrTailProc) {

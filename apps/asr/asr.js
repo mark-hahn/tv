@@ -237,9 +237,6 @@ function run(cmd, args, opts = {}) {
 }
 
 async function getDurationSec(file) {
-  console.log(
-    `[DEBUG-FLOW-${RUN_ID}] getDurationSec called for ${path.basename(file)}`,
-  );
   try {
     const { out } = await run("ffprobe", [
       "-v",
@@ -260,9 +257,6 @@ async function getDurationSec(file) {
 
 /* ---------------- Audio processing ---------------- */
 async function extractAudio(inputVideo, outWav) {
-  console.log(
-    `[DEBUG-FLOW-${RUN_ID}] extractAudio called for ${path.basename(inputVideo)}`,
-  );
   const args = [
     "-y",
     "-i",
@@ -330,9 +324,6 @@ async function extractAudio(inputVideo, outWav) {
 let haveDumpedFFmpeg = false;
 
 async function preprocessAudio(inputWav, outputWav) {
-  console.log(
-    `[DEBUG-FLOW-${RUN_ID}] preprocessAudio called for ${path.basename(inputWav)}`,
-  );
   const filters = [];
   if (enableNoiseReduction) {
     filters.push(
@@ -387,9 +378,6 @@ async function preprocessAudio(inputWav, outputWav) {
 //            tttoooCCC
 
 async function getChunks(inWav) {
-  console.log(
-    `[DEBUG-FLOW-${RUN_ID}] getChunks called for ${path.basename(inWav)}`,
-  );
   const totalDuration = await getDurationSec(inWav);
   let chunkCount = Math.ceil(totalDuration / offsetSec);
   const chunks = [];
@@ -443,9 +431,6 @@ async function getChunks(inWav) {
 
 /* ---------------- Transcription ---------------- */
 async function getFlac(wavPath) {
-  console.log(
-    `[DEBUG-FLOW-${RUN_ID}] getFlac called for ${path.basename(wavPath)}`,
-  );
   const flacPath = path.join(tmpDir, path.basename(wavPath, ".wav") + ".flac");
   await run("ffmpeg", ["-y", "-i", wavPath, "-c:a", "flac", flacPath]);
   const statSize = (await fsp.stat(flacPath)).size;
@@ -468,9 +453,6 @@ const BASE_DELAY_MS = 5000;
 const API_TIMEOUT = 120000; // 2 mins
 
 async function callApi(uploadInfo) {
-  console.log(
-    `[DEBUG-FLOW-${RUN_ID}] callApi called for ${uploadInfo.filename}`,
-  );
   const buf = await fsp.readFile(uploadInfo.path);
   const apiStart = Date.now();
   let attempt = 0;
@@ -749,7 +731,6 @@ function writeSRT(segments, outputPath) {
 
 /* ---------------- Main processing function ---------------- */
 async function processOneVideo(videoPath) {
-  console.log(`[DEBUG-FLOW-${RUN_ID}] processOneVideo called for ${videoPath}`);
   const fileStart = Date.now();
   console.log(`\n[${ts()}] Processing: ${path.basename(videoPath)}`);
   const videoName = path.basename(videoPath, path.extname(videoPath));
@@ -775,9 +756,6 @@ async function processOneVideo(videoPath) {
     );
     const allSegments = [];
     for (const chunkInfo of chunks) {
-      console.log(
-        `[DEBUG-FLOW-${RUN_ID}] Processing chunk ${chunkInfo.chunkIndex}`,
-      );
       try {
         const uploadInfo = await getFlac(chunkInfo.wavPath);
         const apiData = await callApi(uploadInfo);
@@ -882,7 +860,6 @@ async function processOneVideo(videoPath) {
 
 /* ---------------- Main execution ---------------- */
 async function main() {
-  console.log(`[DEBUG-FLOW-${RUN_ID}] main starting`);
   console.log(`\nConfiguration:`);
   console.log(
     `   Test Mode:        ${testMins > 0 ? `${testMins} minutes` : "OFF"}`,
@@ -937,9 +914,6 @@ async function main() {
     let processed = 0;
     let failed = 0;
     for (const videoFile of videoFiles) {
-      console.log(
-        `[DEBUG-FLOW-${RUN_ID}] Starting loop for ${path.basename(videoFile)}`,
-      );
       try {
         await processOneVideo(videoFile);
         processed++;

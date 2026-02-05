@@ -6,10 +6,13 @@ import * as urls from "./urls.js";
 import { rottenSearch } from "./rotten.js";
 import * as util from "./util.js";
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
+import { MovieDb } from "moviedb-promise";
 const { log, start, end } = util.getLog("tvdb");
 const TVDB_PATH = path.join(SRVR_DATA_DIR, "tvdb.json");
+const TVDB_TEMPLATE_PATH = path.join(SRVR_DATA_DIR, "tvdbTemplate.json");
 
 const FAST_UPDATE = false;
+const moviedb = new MovieDb("327192a334da700f65b882c7a69cb927");
 
 // TVDB API Credentials
 const TVDB_APIKEY = "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df";
@@ -494,6 +497,75 @@ function getTvdbCharacters(extResObj) {
     }));
 }
 
+// Load TMDB field mapping template
+let tvdbTemplate = null;
+try {
+  tvdbTemplate = JSON.parse(fs.readFileSync(TVDB_TEMPLATE_PATH, "utf8"));
+} catch {
+  tvdbTemplate = null;
+}
+
+// Helper to extract value from object using path notation (e.g., "networks[0].name")
+function getByPath(obj, path) {
+  if (!obj || !path) return undefined;
+  const parts = path.split(/[\.\[\]]+/).filter(Boolean);
+  let current = obj;
+  for (const part of parts) {
+    if (current === undefined || current === null) return undefined;
+    current = current[part];
+  }
+  return current;
+}
+
+// Helper to get TMDB data as fallback for missing TVDB fields
+async function getTmdbFallback(showName) {
+  if (!tvdbTemplate) return null;
+
+  try {
+    const res = await moviedb.searchTv({ query: showName });
+    const match = res.results?.[0];
+    if (!match) return null;
+
+    // Get detailed show info
+    const details = await moviedb.tvInfo({ id: match.id });
+
+    const result = {};
+    const IMAGE_BASE = "https://image.tmdb.org/t/p/original";
+
+    // Map each field using the template
+    for (const [tvdbField, mapping] of Object.entries(tvdbTemplate.fields)) {
+      let value = getByPath(details, mapping.tmdbPath);
+
+      // Apply transforms
+      if (value !== undefined && value !== null && mapping.transform) {
+        switch (mapping.transform) {
+          case "prependImageUrl":
+            value = value ? `${IMAGE_BASE}${value}` : "";
+            break;
+          case "tmdbRatingToScore":
+            value = value ? Math.round(value * 10000) : null;
+            break;
+          case "genresArray":
+            // Keep as-is, already array of {id, name}
+            break;
+          case "creatorsArray":
+          case "companiesArray":
+          case "languagesArray":
+            // Keep as-is, already arrays
+            break;
+        }
+      }
+
+      result[tvdbField] = value ?? "";
+    }
+
+    return result;
+  } catch (err) {
+    log("err", "getTmdbFallback error for", showName, err.message);
+    return null;
+  }
+}
+
 //////////// GET TVDB DATA //////////////
 // fetch data from tvdb.com
 // create tvdbData object
@@ -598,35 +670,107 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     ? trailersRaw.filter(isEnglishTrailer)
     : trailersRaw;
 
+  // Check if we need TMDB fallback for missing fields
+  const needsTmdb = !image || !overview || !firstAired || !status;
+  let tmdbData = null;
+  if (needsTmdb) {
+    log("Fetching TMDB fallback for", name);
+    tmdbData = await getTmdbFallback(name);
+  }
+
   // Preserve existing non-empty values when API returns empty
   const existing = allTvdb[name] || {};
-  const preserve = (newVal, existingVal) => {
+  const preserve = (newVal, existingVal, tmdbVal) => {
     if (newVal !== undefined && newVal !== null && newVal !== "") return newVal;
-    if (existingVal !== undefined && existingVal !== null && existingVal !== "") return existingVal;
+    if (existingVal !== undefined && existingVal !== null && existingVal !== "")
+      return existingVal;
+    if (tmdbVal !== undefined && tmdbVal !== null && tmdbVal !== "")
+      return tmdbVal;
     return newVal;
   };
 
   let tvdbData = {
     tvdbId,
     name,
-    originalNetwork: preserve(originalNetwork, existing.originalNetwork),
+    originalNetwork: preserve(
+      originalNetwork,
+      existing.originalNetwork,
+      tmdbData?.originalNetwork,
+    ),
     seasonCount,
     episodeCount,
     watchedCount,
-    image: preserve(image, existing.image),
-    score: preserve(score, existing.score),
-    overview: preserve(overview, existing.overview),
-    firstAired: preserve(firstAired, existing.firstAired),
-    lastAired: preserve(lastAired, existing.lastAired),
-    averageRuntime: preserve(averageRuntime, existing.averageRuntime),
-    originalCountry: preserve(originalCountry, existing.originalCountry),
-    originalLanguage: preserve(originalLanguage, existing.originalLanguage),
-    status: preserve(status, existing.status),
+    image: preserve(image, existing.image, tmdbData?.image),
+    score: preserve(score, existing.score, tmdbData?.score),
+    overview: preserve(overview, existing.overview, tmdbData?.overview),
+    firstAired: preserve(firstAired, existing.firstAired, tmdbData?.firstAired),
+    lastAired: preserve(lastAired, existing.lastAired, tmdbData?.lastAired),
+    averageRuntime: preserve(
+      averageRuntime,
+      existing.averageRuntime,
+      tmdbData?.averageRuntime,
+    ),
+    originalCountry: preserve(
+      originalCountry,
+      existing.originalCountry,
+      tmdbData?.originalCountry,
+    ),
+    originalLanguage: preserve(
+      originalLanguage,
+      existing.originalLanguage,
+      tmdbData?.originalLanguage,
+    ),
+    status: preserve(status, existing.status, tmdbData?.status),
     remotes: preserve(remotes, existing.remotes),
     characters: preserve(characters, existing.characters),
     added,
     saved,
   };
+
+  // Add optional TMDB-only fields if available
+  if (tmdbData?.backdrop)
+    tvdbData.backdrop = preserve(null, existing.backdrop, tmdbData.backdrop);
+  if (tmdbData?.genres)
+    tvdbData.genres = preserve(null, existing.genres, tmdbData.genres);
+  if (tmdbData?.homepage)
+    tvdbData.homepage = preserve(null, existing.homepage, tmdbData.homepage);
+  if (tmdbData?.tagline)
+    tvdbData.tagline = preserve(null, existing.tagline, tmdbData.tagline);
+  if (tmdbData?.type)
+    tvdbData.type = preserve(null, existing.type, tmdbData.type);
+  if (tmdbData?.numberOfSeasons)
+    tvdbData.numberOfSeasons = preserve(
+      null,
+      existing.numberOfSeasons,
+      tmdbData.numberOfSeasons,
+    );
+  if (tmdbData?.numberOfEpisodes)
+    tvdbData.numberOfEpisodes = preserve(
+      null,
+      existing.numberOfEpisodes,
+      tmdbData.numberOfEpisodes,
+    );
+  if (tmdbData?.inProduction !== undefined)
+    tvdbData.inProduction = preserve(
+      null,
+      existing.inProduction,
+      tmdbData.inProduction,
+    );
+  if (tmdbData?.createdBy)
+    tvdbData.createdBy = preserve(null, existing.createdBy, tmdbData.createdBy);
+  if (tmdbData?.productionCompanies)
+    tvdbData.productionCompanies = preserve(
+      null,
+      existing.productionCompanies,
+      tmdbData.productionCompanies,
+    );
+  if (tmdbData?.spokenLanguages)
+    tvdbData.spokenLanguages = preserve(
+      null,
+      existing.spokenLanguages,
+      tmdbData.spokenLanguages,
+    );
+
   if (trailers) tvdbData.trailers = trailers;
   if (showId !== undefined) tvdbData.showId = showId;
   if (deleted !== undefined) tvdbData.deleted = deleted;

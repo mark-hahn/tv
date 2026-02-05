@@ -4,6 +4,7 @@ import * as path from "path";
 const ASR_BIN = "/root/dev/apps/tv/apps/asr/asr.sh";
 const MEDIA_ROOT = "/mnt/media/tv";
 const MAX_ASR_WS_CHUNK = 8 * 1024;
+const ASR_TAIL_RESTART_MS = 1000;
 
 function sendAsrChunks(ws, text) {
   if (!text) return false;
@@ -24,6 +25,49 @@ function sendAsrChunks(ws, text) {
     }
   }
   return true;
+}
+
+function startTail(ws, targetPath) {
+  if (ws._asrTailProc) {
+    ws._asrTailProc.kill();
+    ws._asrTailProc = null;
+  }
+
+  const proc = spawn(ASR_BIN, ["tail", targetPath]);
+  ws._asrTailProc = proc;
+  ws._asrTailPath = targetPath;
+
+  proc.stdout.on("data", (data) => {
+    if (ws._asrTailProc !== proc) return;
+    const text = data.toString();
+    console.log(`[ASR TAIL] data: ${text.length} bytes`);
+    sendAsrChunks(ws, text);
+  });
+
+  proc.stderr.on("data", (data) => {
+    if (ws._asrTailProc !== proc) return;
+    const text = data.toString();
+    console.log(`[ASR TAIL] stderr: ${text.length} bytes`);
+    sendAsrChunks(ws, "ERR: " + text);
+  });
+
+  proc.on("error", (err) => {
+    console.error("[ASR TAIL] process error", err);
+  });
+
+  proc.on("close", (code, signal) => {
+    if (ws._asrTailProc === proc) {
+      ws._asrTailProc = null;
+    }
+    console.log(`[ASR TAIL] closed code=${code} signal=${signal}`);
+    if (ws.readyState === 1 && ws._asrTailPath) {
+      setTimeout(() => {
+        if (ws.readyState === 1 && !ws._asrTailProc) {
+          startTail(ws, ws._asrTailPath);
+        }
+      }, ASR_TAIL_RESTART_MS);
+    }
+  });
 }
 
 export function handleAsr(ws, id, param) {
@@ -62,32 +106,7 @@ export function handleAsr(ws, id, param) {
       }
     });
   } else if (action === "tail") {
-    if (ws._asrTailProc) {
-      ws._asrTailProc.kill();
-      ws._asrTailProc = null;
-    }
-
-    const proc = spawn(ASR_BIN, ["tail", targetPath]);
-    ws._asrTailProc = proc;
-
-    proc.stdout.on("data", (data) => {
-      // Prevent zombie processes from sending data
-      if (ws._asrTailProc !== proc) return;
-
-      const text = data.toString();
-      console.log(`[ASR TAIL] data: ${text.length} bytes`);
-      sendAsrChunks(ws, text);
-    });
-
-    proc.stderr.on("data", (data) => {
-      const text = data.toString();
-      console.log(`[ASR TAIL] stderr: ${text.length} bytes`);
-      sendAsrChunks(ws, "ERR: " + text);
-    });
-
-    proc.on("close", (code) => {
-      ws._asrTailProc = null;
-    });
+    startTail(ws, targetPath);
 
     if (!ws._asrCleanupAttached) {
       ws.on("close", () => {

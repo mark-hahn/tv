@@ -342,8 +342,8 @@ async function preprocessAudio(inputWav, outputWav) {
 
   audioFilter = "highpass=f=80,lowpass=f=8000,dynaudnorm=f=150:g=3:m=3:s=8";
 
-  if (!haveDumpedFFmpeg) console.log({ audioFilter });
-  haveDumpedFFmpeg = true;
+  // if (!haveDumpedFFmpeg) console.log({ audioFilter });
+  // haveDumpedFFmpeg = true;
 
   await run("ffmpeg", [
     "-y",
@@ -607,14 +607,9 @@ function writeSRT(segments, outputPath) {
       if (leftMatch || rightMatch) {
         hadDuplicate = true;
         if (text === lastText) continue;
-        console.log(`\n[${ts()}] Overlapping segments ...`);
-        console.log(`A ${vs(lastStart)}, ${vs(lastEnd)}, "${lastText}"`);
-        console.log(`B ${vs(start)}, ${vs(end)}, "${text}"`);
         if (text.length > lastText.length) {
-          console.log("Using A");
           continue;
         }
-        console.log("Using B");
         segOut.pop();
       }
       skipSeg = false;

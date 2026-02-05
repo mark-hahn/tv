@@ -153,7 +153,7 @@ export default {
     };
 
     const TVDB_MISSING_HASH =
-      "d39797999627a98fea4697543be615c642c205fc98bbf3161ab1a87fd2077768";
+      "4c59074535f4937221fd78e87a672ad0116a8aa9fb8202fc81dc2d00ab3f3683";
 
     const hashBlob = async (blob) => {
       try {
@@ -183,20 +183,28 @@ export default {
           const blob = await res.blob();
           const hash = await hashBlob(blob);
 
+          console.log(
+            `[checkImages] ${item.name || item.title || "unknown"}: hash=${hash}, expected=${TVDB_MISSING_HASH}, match=${hash === TVDB_MISSING_HASH}`,
+          );
+
           if (hash === TVDB_MISSING_HASH) {
-            if (tvdbList.value[i] === item) {
-              // Force update
-              const description = item.overview || item.overviewText || "";
-              tvdbList.value[i] = {
-                ...item,
-                image_url: props.fallbackImage,
-                thumbnail: props.fallbackImage,
-                overview: description + " [USED FALLBACK IMAGE]",
-              };
-            }
+            console.log(
+              `[checkImages] Replacing TVDB placeholder for "${item.name || item.title}" with fallback:`,
+              props.fallbackImage,
+            );
+            // Force update with Vue reactivity
+            const description = item.overview || item.overviewText || "";
+            const updatedItem = {
+              ...item,
+              image_url: props.fallbackImage,
+              thumbnail: props.fallbackImage,
+              overview: description + " [USED FALLBACK IMAGE]",
+            };
+            tvdbList.value.splice(i, 1, updatedItem);
           }
-        } catch {
-          // ignore
+        } catch (e) {
+          // Log errors for debugging
+          console.error("checkImages error:", e);
         }
       }
     };

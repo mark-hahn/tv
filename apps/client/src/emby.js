@@ -766,6 +766,13 @@ export async function saveFav(id, fav) {
   };
   let favRes = await axios(config);
   if (favRes.status != 200) throw new Error("unable to save favorite");
+  
+  // Phase 4: Update tvdb immediately
+  const show = allShows.find(s => s.Id === id);
+  if (show && allTvdb[show.Name]) {
+    allTvdb[show.Name].emby.isFavorite = fav;
+    await tvdb.setTvdbFields(show.Name, { 'emby.isFavorite': fav });
+  }
 }
 
 export async function saveToTry(id, inToTry) {
@@ -784,6 +791,13 @@ export async function saveToTry(id, inToTry) {
     const err = "unable to save totry" + toTryRes.data;
     console.error(err);
     throw new Error(err);
+  }
+  
+  // Phase 4: Update tvdb immediately
+  const show = allShows.find(s => s.Id === id);
+  if (show && allTvdb[show.Name]) {
+    allTvdb[show.Name].emby.inToTry = inToTry;
+    await tvdb.setTvdbFields(show.Name, { 'emby.inToTry': inToTry });
   }
 }
 
@@ -804,6 +818,13 @@ export async function saveContinue(id, inContinue) {
     console.error(err);
     throw new Error(err);
   }
+  
+  // Phase 4: Update tvdb immediately
+  const show = allShows.find(s => s.Id === id);
+  if (show && allTvdb[show.Name]) {
+    allTvdb[show.Name].emby.inContinue = inContinue;
+    await tvdb.setTvdbFields(show.Name, { 'emby.inContinue': inContinue });
+  }
 }
 
 export async function saveMark(id, inMark) {
@@ -823,6 +844,13 @@ export async function saveMark(id, inMark) {
     console.error(err);
     throw new Error(err);
   }
+  
+  // Phase 4: Update tvdb immediately
+  const show = allShows.find(s => s.Id === id);
+  if (show && allTvdb[show.Name]) {
+    allTvdb[show.Name].emby.inMark = inMark;
+    await tvdb.setTvdbFields(show.Name, { 'emby.inMark': inMark });
+  }
 }
 
 export async function saveLinda(id, inLinda) {
@@ -841,6 +869,13 @@ export async function saveLinda(id, inLinda) {
     const err = "unable to save Linda" + lindaRes.data;
     console.error(err);
     throw new Error(err);
+  }
+  
+  // Phase 4: Update tvdb immediately
+  const show = allShows.find(s => s.Id === id);
+  if (show && allTvdb[show.Name]) {
+    allTvdb[show.Name].emby.inLinda = inLinda;
+    await tvdb.setTvdbFields(show.Name, { 'emby.inLinda': inLinda });
   }
 }
 

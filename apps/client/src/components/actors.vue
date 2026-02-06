@@ -184,6 +184,7 @@
         :key="actor.url"
         :actor="actor"
         @actor-click="handleActorClick"
+        @actor-long-press="handleActorLongPress"
       ></Actor>
     </div>
     <div
@@ -315,6 +316,14 @@ export default {
         const url = await srvr.getActorPage(a.personName);
         if (url) window.open(url);
       }
+    },
+
+    handleActorLongPress({ event, actor }) {
+      const name = String(actor?.personName || actor?.name || "").trim();
+      if (!name) return;
+      
+      // Emit event to list component to filter shows by this actor
+      evtBus.emit("filterByActor", { actorName: name });
     },
 
     normPersonName(v) {

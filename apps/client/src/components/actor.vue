@@ -2,20 +2,26 @@
   <div
     class="actor-card"
     @click.stop="handleClick($event)"
-    style="
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin: 5px;
-      padding: 8px;
-      background-color: #f5f5f5;
-      border-radius: 6px;
-      border: 1px solid #ddd;
-      cursor: pointer;
-      color: black;
-      text-align: center;
-      margin-bottom: 3px;
-    "
+    @touchstart.passive="handleTouchStart($event)"
+    @touchend="handleTouchEnd($event)"
+    @touchmove="handleTouchMove"
+    @mousedown="handleMouseDown($event)"
+    @mouseup="handleMouseUp($event)"
+    @mouseleave="handleMouseLeave"    @contextmenu.prevent    :style="{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      margin: '5px',
+      padding: '8px',
+      backgroundColor: isLongPressing ? '#d0d0ff' : '#f5f5f5',
+      borderRadius: '6px',
+      border: isLongPressing ? '2px solid #4444ff' : '1px solid #ddd',
+      cursor: 'pointer',
+      color: 'black',
+      textAlign: 'center',
+      marginBottom: '3px',
+      transition: 'background-color 0.15s, border 0.15s',
+    }"
   >
     <img
       v-if="actor.image"
@@ -55,7 +61,7 @@ const theMan = Buffer.from("bXJza2lu", "base64").toString();
 export default {
   name: "Actor",
 
-  emits: ["actor-click"],
+  emits: ["actor-click", "actor-long-press"],
 
   props: {
     actor: {
@@ -64,8 +70,20 @@ export default {
     },
   },
 
+  data() {
+    return {
+      longPressTimer: null,
+      isLongPressing: false,
+    };
+  },
+
   methods: {
     handleClick(e) {
+      // Don't perform click action if we just completed a long-press
+      if (this.isLongPressing) {
+        return;
+      }
+
       const name = String(
         this.actor?.personName || this.actor?.name || "",
       ).trim();
@@ -88,6 +106,79 @@ export default {
         e.target.style.display = "none";
       }
     },
+    handleTouchStart(e) {
+      e.preventDefault(); // Prevent context menu on long press
+      this.isLongPressing = false;
+      this.longPressTimer = setTimeout(() => {
+        this.isLongPressing = true;
+        this.triggerLongPress(e);
+      }, 500);
+    },
+    handleTouchEnd(e) {
+      const wasLongPressing = this.isLongPressing;
+      if (this.longPressTimer) {
+        clearTimeout(this.longPressTimer);
+        this.longPressTimer = null;
+      }
+      if (wasLongPressing) {
+        e.preventDefault();
+        e.stopPropagation();
+        // Delay resetting to prevent click from firing
+        setTimeout(() => {
+          this.isLongPressing = false;
+        }, 100);
+      }
+    },
+    handleTouchMove() {
+      if (this.longPressTimer) {
+        clearTimeout(this.longPressTimer);
+        this.longPressTimer = null;
+      }
+      this.isLongPressing = false;
+    },
+    handleMouseDown(e) {
+      this.isLongPressing = false;
+      this.longPressTimer = setTimeout(() => {
+        this.isLongPressing = true;
+        this.triggerLongPress(e);
+      }, 500);
+    },
+    handleMouseUp(e) {
+      const wasLongPressing = this.isLongPressing;
+      if (this.longPressTimer) {
+        clearTimeout(this.longPressTimer);
+        this.longPressTimer = null;
+      }
+      if (wasLongPressing) {
+        e.preventDefault();
+        e.stopPropagation();
+        // Delay resetting to prevent click from firing
+        setTimeout(() => {
+          this.isLongPressing = false;
+        }, 100);
+      }
+    },
+    handleMouseLeave() {
+      if (this.longPressTimer) {
+        clearTimeout(this.longPressTimer);
+        this.longPressTimer = null;
+      }
+      this.isLongPressing = false;
+    },
+    triggerLongPress(e) {
+      const name = String(
+        this.actor?.personName || this.actor?.name || "",
+      ).trim();
+      if (!name) return;
+      
+      this.$emit("actor-long-press", { event: e, actor: this.actor });
+    },
+  },
+  beforeUnmount() {
+    if (this.longPressTimer) {
+      clearTimeout(this.longPressTimer);
+      this.longPressTimer = null;
+    }
   },
 };
 </script>

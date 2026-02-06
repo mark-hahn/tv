@@ -498,6 +498,7 @@ export default {
       showReloadingShows: false,
       showEmbyRefreshing: false,
       isWideLandscape: false,
+      actorFilter: null,
       sortChoices: [
         "Alpha",
         "Viewed",
@@ -1559,6 +1560,7 @@ export default {
 
     async fltrAction(fltrChoice) {
       console.log("fltrAction", fltrChoice);
+      this.actorFilter = null; // Clear actor filter when changing filter
       if (fltrChoice != "fltrClose") {
         this.showAll();
         window.localStorage.setItem("fltrChoice", fltrChoice);
@@ -1757,6 +1759,7 @@ export default {
     },
 
     async condFltrClick(cond, event) {
+      this.actorFilter = null; // Clear actor filter when clicking conditional filters
       this.fltrChoice = "- - - - -";
       if (++cond.filter == 2) cond.filter = -1;
       await this.select();
@@ -1820,6 +1823,12 @@ export default {
     },
 
     async refilter(scroll = true) {
+      // If actor filter is active, maintain it
+      if (this.actorFilter) {
+        await this.filterShowsByActor(this.actorFilter);
+        return;
+      }
+
       // Lightweight version of select(): avoids a full TVDB refresh unless
       // the "Finished" filter needs it.
       let localAllTvdb = null;
@@ -1871,6 +1880,49 @@ export default {
       this.sortShows();
     },
 
+    async filterShowsByActor(actorName) {
+      if (!actorName) return;
+
+      // Normalize actor name for comparison
+      const normName = (name) =>
+        String(name || "")
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, " ");
+
+      const targetActorName = normName(actorName);
+      console.log("Filtering by actor:", actorName, "normalized:", targetActorName);
+
+      // Get TVDB data for all shows to check their actors
+      if (!allTvdb) allTvdb = await tvdb.getAllTvdb();
+
+      const filteredShows = allShows.filter((show) => {
+        const tvdbData = allTvdb?.[show.Name];
+        if (!tvdbData) return false;
+
+        // Handle both data formats (like actors.vue does)
+        const actualData = tvdbData.response?.data || tvdbData;
+        const characters = actualData?.characters;
+        
+        if (!Array.isArray(characters)) return false;
+
+        return characters.some((char) => {
+          const charActorName = normName(char?.actor);
+          return charActorName === targetActorName;
+        });
+      });
+
+      console.log(`Found ${filteredShows.length} shows with actor ${actorName}`);
+
+      // Update the shows list and UI
+      this.shows = filteredShows;
+      this.actorFilter = actorName;
+      this.fltrChoice = "- - - - -";
+
+      this.scrollToSavedShow();
+      this.sortShows();
+    },
+
     watchClick() {
       console.log("watchClick");
       if (this.watchingName !== "---") {
@@ -1888,6 +1940,7 @@ export default {
     showAll(dontClrFilters = false) {
       // if(dontClrFilters?.altKey !== undefined) dontClrFilters = false;
       this.filterStr = "";
+      this.actorFilter = null; // Clear actor filter
       if (!dontClrFilters) {
         for (let cond of this.conds) cond.filter = 0;
       }
@@ -2193,6 +2246,11 @@ export default {
     // Cross-pane: click a card in Flex/Qbt/Down to select show in list
     on("selectShowFromCardTitle", (rawTitle) => {
       void this.selectShowFromCardTitle(rawTitle);
+    });
+
+    // Filter shows by actor (long-press on actor in actors pane)
+    on("filterByActor", async ({ actorName }) => {
+      await this.filterShowsByActor(actorName);
     });
 
     this.devicePollTimer = setInterval(async () => {

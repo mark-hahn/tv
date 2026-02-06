@@ -813,8 +813,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
       tmdbData?.originalLanguage,
     ),
     status: preserve(status, existing.status, tmdbData?.status),
-    remotes: preserve(remotes, existing.remotes),
-    characters: preserve(characters, existing.characters),
+    remotes, // Don't preserve arrays - they accumulate
+    characters, // Don't preserve arrays - they accumulate
     added,
     saved,
   };

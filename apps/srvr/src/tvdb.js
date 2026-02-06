@@ -958,7 +958,7 @@ const chkTvdbQueue = () => {
       console.error("chkTvdbQueue ws.send error:", e);
     }
     tvdbData.saved = Date.now();
-    util.writeFile(TVDB_PATH, allTvdb);
+    // Don't save here - background refresh handles saves
     chkTvdbQueueRunning = false;
     chkTvdbQueue();
   });

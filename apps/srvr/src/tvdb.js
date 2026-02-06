@@ -111,6 +111,98 @@ try {
   } catch {}
 }
 
+// Phase 1: Backward compatibility migration - initialize new fields on existing records
+let migrationNeeded = false;
+for (const [name, tvdb] of Object.entries(allTvdb)) {
+  let recordUpdated = false;
+
+  if (!tvdb.emby) {
+    tvdb.emby = {
+      id: tvdb.showId || null,
+      path: null,
+      dateCreated: tvdb.added || null,
+      premiereDate: null,
+      inToTry: false,
+      inContinue: false,
+      inMark: false,
+      inLinda: false,
+      isFavorite: false,
+      isPlayed: false,
+      playCount: 0,
+      lastPlayedDate: null,
+    };
+    recordUpdated = true;
+  }
+
+  if (!tvdb.disk) {
+    tvdb.disk = { date: null, size: 0, noFiles: false };
+    recordUpdated = true;
+  }
+
+  if (!tvdb.download) {
+    tvdb.download = { status: null, lastCheck: null };
+    recordUpdated = true;
+  }
+
+  if (!tvdb.tvmaze) {
+    tvdb.tvmaze = { id: null, status: null };
+    recordUpdated = true;
+  }
+
+  if (tvdb.gap === undefined) {
+    tvdb.gap = null;
+    recordUpdated = true;
+  }
+
+  if (tvdb.note === undefined) {
+    tvdb.note = "";
+    recordUpdated = true;
+  }
+
+  if (tvdb.reject === undefined) {
+    tvdb.reject = false;
+    recordUpdated = true;
+  }
+
+  if (tvdb.pickup === undefined) {
+    tvdb.pickup = false;
+    recordUpdated = true;
+  }
+
+  if (tvdb.lastViewed === undefined) {
+    tvdb.lastViewed = null;
+    recordUpdated = true;
+  }
+
+  if (tvdb.waitStr === undefined) {
+    tvdb.waitStr = null;
+    recordUpdated = true;
+  }
+
+  if (!tvdb.sync) {
+    tvdb.sync = {
+      lastEmbySync: null,
+      lastDiskCheck: null,
+      lastMetadataUpdate: tvdb.saved || null,
+    };
+    recordUpdated = true;
+  }
+
+  if (recordUpdated) {
+    migrationNeeded = true;
+  }
+}
+
+// Save migrated data if any records were updated
+if (migrationNeeded) {
+  log("Phase 1 migration: Saving updated tvdb.json with new schema fields");
+  try {
+    util.writeFile(TVDB_PATH, allTvdb);
+  } catch (e) {
+    log("err", "Phase 1 migration save failed:", e);
+  }
+}
+
 ///////////// get theTvdbToken //////////////
 // this is a duplicate of the client
 // both access tvdb.com independently
@@ -775,6 +867,60 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   if (showId !== undefined) tvdbData.showId = showId;
   if (deleted !== undefined) tvdbData.deleted = deleted;
 
+  // NEW: Emby-specific data (preserve from paramObj or existing)
+  tvdbData.emby = {
+    id: showId || existing.emby?.id || null,
+    path: paramObj.embyPath || existing.emby?.path || null,
+    dateCreated: paramObj.dateCreated || existing.emby?.dateCreated || null,
+    premiereDate: paramObj.premiereDate || existing.emby?.premiereDate || null,
+    inToTry: paramObj.inToTry ?? existing.emby?.inToTry ?? false,
+    inContinue: paramObj.inContinue ?? existing.emby?.inContinue ?? false,
+    inMark: paramObj.inMark ?? existing.emby?.inMark ?? false,
+    inLinda: paramObj.inLinda ?? existing.emby?.inLinda ?? false,
+    isFavorite: paramObj.isFavorite ?? existing.emby?.isFavorite ?? false,
+    isPlayed: paramObj.isPlayed ?? existing.emby?.isPlayed ?? false,
+    playCount: paramObj.playCount ?? existing.emby?.playCount ?? 0,
+    lastPlayedDate: paramObj.lastPlayedDate || existing.emby?.lastPlayedDate || null,
+  };
+
+  // NEW: Disk/filesystem data (preserve from paramObj or existing)
+  tvdbData.disk = {
+    date: paramObj.diskDate || existing.disk?.date || null,
+    size: paramObj.diskSize ?? existing.disk?.size ?? 0,
+    noFiles: paramObj.noFiles ?? existing.disk?.noFiles ?? false,
+  };
+
+  // NEW: Download tracking summary (preserve from paramObj or existing)
+  tvdbData.download = {
+    status: paramObj.downloadStatus || existing.download?.status || null,
+    lastCheck: paramObj.downloadLastCheck || existing.download?.lastCheck || null,
+  };
+
+  // NEW: TVMaze reference (preserve from paramObj or existing)
+  tvdbData.tvmaze = {
+    id: paramObj.tvmazeId || existing.tvmaze?.id || null,
+    status: paramObj.tvmazeStatus || existing.tvmaze?.status || null,
+  };
+
+  // NEW: Gap tracking (preserve from paramObj or existing)
+  tvdbData.gap = paramObj.gap || existing.gap || null;
+
+  // NEW: Notes (preserve from paramObj or existing)
+  tvdbData.note = paramObj.note ?? existing.note ?? "";
+
+  // NEW: Additional flags (preserve from paramObj or existing)
+  tvdbData.reject = paramObj.reject ?? existing.reject ?? false;
+  tvdbData.pickup = paramObj.pickup ?? existing.pickup ?? false;
+  tvdbData.lastViewed = paramObj.lastViewed || existing.lastViewed || null;
+  tvdbData.waitStr = paramObj.waitStr || existing.waitStr || null;
+
+  // NEW: Sync timestamps (preserve from paramObj or existing)
+  tvdbData.sync = {
+    lastEmbySync: paramObj.lastEmbySync || existing.sync?.lastEmbySync || null,
+    lastDiskCheck: paramObj.lastDiskCheck || existing.sync?.lastDiskCheck || null,
+    lastMetadataUpdate: Date.now(),
+  };
+
   setImdbId(tvdbData);
 
   // log('getTvdbData:', tvdbData);
@@ -1013,8 +1159,43 @@ export const setTvdbFields = async (id, param, resolve, _reject) => {
       if (paramObj.$delete) {
         for (const delName of paramObj.$delete) delete tvdb[delName];
       }
+      
+      // Handle nested field updates for Phase 1 new structure
       for (const [key, value] of Object.entries(paramObj)) {
-        if (key != "dontSave" && key != "$delete") tvdb[key] = value;
+        if (key === "dontSave" || key === "$delete" || key === "name") continue;
+        
+        // Handle nested emby fields (e.g., inToTry, isFavorite)
+        if (key.startsWith("emby") && typeof key === "string") {
+          const embyField = key.replace(/^emby\.?/, "");
+          if (embyField && embyField !== "emby") {
+            tvdb.emby = tvdb.emby || {};
+            tvdb.emby[embyField] = value;
+            continue;
+          }
+        }
+        
+        // Handle nested disk fields
+        if (key.startsWith("disk") && typeof key === "string") {
+          const diskField = key.replace(/^disk\.?/, "");
+          if (diskField && diskField !== "disk") {
+            tvdb.disk = tvdb.disk || {};
+            tvdb.disk[diskField] = value;
+            continue;
+          }
+        }
+        
+        // Handle nested sync fields
+        if (key.startsWith("sync") && typeof key === "string") {
+          const syncField = key.replace(/^sync\.?/, "");
+          if (syncField && syncField !== "sync") {
+            tvdb.sync = tvdb.sync || {};
+            tvdb.sync[syncField] = value;
+            continue;
+          }
+        }
+        
+        // Handle direct assignment for top-level fields and nested objects
+        tvdb[key] = value;
       }
       setImdbId(tvdb);
       if (tvdb.saved === 0) {

@@ -1294,6 +1294,9 @@ const trySaveConfigYml = async (id, result, resolve, reject) => {
   });
   await util.writeFile(configWritePath("config2-rejects.json"), rejects);
   await util.writeFile(configWritePath("config4-pickups.json"), pickups);
+  
+  // Phase 5: Also save tvdb when config is saved (batches reject/pickup updates)
+  await tvdb.saveTvdbSync();
 
   let errResult = null;
 
@@ -1422,7 +1425,7 @@ const addReject = async (id, name, resolve, reject) => {
   
   if (tvdbRecord) {
     tvdbRecord.reject = true;
-    await tvdb.saveTvdbSync();
+    // Save deferred to saveConfigYml below
   }
 
   // Backward compat: update old rejects array
@@ -1466,7 +1469,7 @@ const delReject = async (id, name, resolve, reject) => {
   for (const [recordName, record] of Object.entries(allTvdb)) {
     if (recordName.toLowerCase() === normalizedName && !record.deleted && record.reject) {
       record.reject = false;
-      await tvdb.saveTvdbSync();
+      // Save deferred to saveConfigYml below
       deletedOne = true;
       break;
     }
@@ -1526,7 +1529,7 @@ const addPickup = async (id, name, resolve, reject) => {
   for (const [recordName, record] of Object.entries(allTvdb)) {
     if (recordName.toLowerCase() === normalizedName && !record.deleted) {
       record.pickup = true;
-      await tvdb.saveTvdbSync();
+      // Save deferred to saveConfigYml below
       break;
     }
   }
@@ -1555,7 +1558,7 @@ const delPickup = async (id, name, resolve, reject) => {
   for (const [recordName, record] of Object.entries(allTvdb)) {
     if (recordName.toLowerCase() === normalizedName && !record.deleted && record.pickup) {
       record.pickup = false;
-      await tvdb.saveTvdbSync();
+      // Save deferred to saveConfigYml below
       deletedOne = true;
       break;
     }
@@ -1723,7 +1726,8 @@ const addGap = async (id, gapIdGapSave, resolve, _reject) => {
       } else {
         allTvdb[showName].gap = null;
       }
-      await tvdb.saveTvdbSync();
+      // Only save tvdb when save flag is true
+      if (save) await tvdb.saveTvdbSync();
     }
     
     // Backward compat: also update old gaps object
@@ -1747,7 +1751,8 @@ const delGap = async (id, gapIdSave, resolve, _reject) => {
     for (const [name, record] of Object.entries(allTvdb)) {
       if (record.emby?.id === gapId && !record.deleted) {
         record.gap = null;
-        await tvdb.saveTvdbSync();
+        // Only save tvdb when save flag is true
+        if (save) await tvdb.saveTvdbSync();
         break;
       }
     }
@@ -1989,6 +1994,7 @@ const saveNote = async (id, param, resolve, reject) => {
   }
 
   tvdbRecord.note = noteText;
+  // Notes are always saved immediately (explicit user action)
   await tvdb.saveTvdbSync();
   
   // Backward compat: also update old notesCache

@@ -2771,14 +2771,14 @@ async function syncDiskData() {
 }
 
 // Phase 3: Set up sync timers
-const EMBY_SYNC_INTERVAL = 5 * 60 * 1000;  // 5 minutes
+const EMBY_SYNC_INTERVAL = 20 * 1000;  // 20 seconds (debug mode)
 const DISK_SYNC_INTERVAL = 60 * 60 * 1000; // 1 hour
 
 setInterval(syncEmbyUserData, EMBY_SYNC_INTERVAL);
 setInterval(syncDiskData, DISK_SYNC_INTERVAL);
 
 // Run initial syncs after startup delay
-setTimeout(syncEmbyUserData, 2 * 60 * 1000);  // 2 minutes after start
+setTimeout(syncEmbyUserData, 10 * 1000);  // 10 seconds after start
 setTimeout(syncDiskData, 3 * 60 * 1000);      // 3 minutes after start
 
 setInterval(runUsbCheck, CHECK_INTERVAL_MS);

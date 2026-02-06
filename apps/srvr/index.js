@@ -1999,7 +1999,6 @@ const saveNote = async (id, param, resolve, reject) => {
   } catch (e) {
     // Ignore write errors for deprecated file
   }
-  }
 
   resolve([id, "ok"]);
 };

@@ -1422,7 +1422,7 @@ const addReject = async (id, name, resolve, reject) => {
   
   if (tvdbRecord) {
     tvdbRecord.reject = true;
-    await tvdb.setTvdbFields(name, { reject: true });
+    await tvdb.saveTvdbSync();
   }
 
   // Backward compat: update old rejects array
@@ -1466,7 +1466,7 @@ const delReject = async (id, name, resolve, reject) => {
   for (const [recordName, record] of Object.entries(allTvdb)) {
     if (recordName.toLowerCase() === normalizedName && !record.deleted && record.reject) {
       record.reject = false;
-      await tvdb.setTvdbFields(recordName, { reject: false });
+      await tvdb.saveTvdbSync();
       deletedOne = true;
       break;
     }
@@ -1526,7 +1526,7 @@ const addPickup = async (id, name, resolve, reject) => {
   for (const [recordName, record] of Object.entries(allTvdb)) {
     if (recordName.toLowerCase() === normalizedName && !record.deleted) {
       record.pickup = true;
-      await tvdb.setTvdbFields(recordName, { pickup: true });
+      await tvdb.saveTvdbSync();
       break;
     }
   }
@@ -1555,7 +1555,7 @@ const delPickup = async (id, name, resolve, reject) => {
   for (const [recordName, record] of Object.entries(allTvdb)) {
     if (recordName.toLowerCase() === normalizedName && !record.deleted && record.pickup) {
       record.pickup = false;
-      await tvdb.setTvdbFields(recordName, { pickup: false });
+      await tvdb.saveTvdbSync();
       deletedOne = true;
       break;
     }
@@ -1720,11 +1720,10 @@ const addGap = async (id, gapIdGapSave, resolve, _reject) => {
     if (showName) {
       if (gapEntryHasGap(gap)) {
         allTvdb[showName].gap = gap;
-        await tvdb.setTvdbFields(showName, { gap });
       } else {
         allTvdb[showName].gap = null;
-        await tvdb.setTvdbFields(showName, { gap: null });
       }
+      await tvdb.saveTvdbSync();
     }
     
     // Backward compat: also update old gaps object
@@ -1748,7 +1747,7 @@ const delGap = async (id, gapIdSave, resolve, _reject) => {
     for (const [name, record] of Object.entries(allTvdb)) {
       if (record.emby?.id === gapId && !record.deleted) {
         record.gap = null;
-        await tvdb.setTvdbFields(name, { gap: null });
+        await tvdb.saveTvdbSync();
         break;
       }
     }
@@ -1968,7 +1967,7 @@ const saveNote = async (id, param, resolve, reject) => {
       return;
     }
     tvdbRecord.note = "";
-    await tvdb.setTvdbFields(key, { note: "" });
+    await tvdb.saveTvdbSync();
     
     // Backward compat: also update old notesCache
     if (notesCache[key] !== undefined) {
@@ -1990,7 +1989,7 @@ const saveNote = async (id, param, resolve, reject) => {
   }
 
   tvdbRecord.note = noteText;
-  await tvdb.setTvdbFields(key, { note: noteText });
+  await tvdb.saveTvdbSync();
   
   // Backward compat: also update old notesCache
   notesCache[key] = noteText;

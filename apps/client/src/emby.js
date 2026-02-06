@@ -771,7 +771,7 @@ export async function saveFav(id, fav) {
   const show = allShows.find(s => s.Id === id);
   if (show && allTvdb[show.Name]) {
     allTvdb[show.Name].emby.isFavorite = fav;
-    await tvdb.setTvdbFields(show.Name, { 'emby.isFavorite': fav });
+    await srvr.setTvdbFields(show.Name, { 'emby.isFavorite': fav });
   }
 }
 
@@ -797,7 +797,7 @@ export async function saveToTry(id, inToTry) {
   const show = allShows.find(s => s.Id === id);
   if (show && allTvdb[show.Name]) {
     allTvdb[show.Name].emby.inToTry = inToTry;
-    await tvdb.setTvdbFields(show.Name, { 'emby.inToTry': inToTry });
+    await srvr.setTvdbFields(show.Name, { 'emby.inToTry': inToTry });
   }
 }
 
@@ -823,7 +823,7 @@ export async function saveContinue(id, inContinue) {
   const show = allShows.find(s => s.Id === id);
   if (show && allTvdb[show.Name]) {
     allTvdb[show.Name].emby.inContinue = inContinue;
-    await tvdb.setTvdbFields(show.Name, { 'emby.inContinue': inContinue });
+    await srvr.setTvdbFields(show.Name, { 'emby.inContinue': inContinue });
   }
 }
 
@@ -849,7 +849,7 @@ export async function saveMark(id, inMark) {
   const show = allShows.find(s => s.Id === id);
   if (show && allTvdb[show.Name]) {
     allTvdb[show.Name].emby.inMark = inMark;
-    await tvdb.setTvdbFields(show.Name, { 'emby.inMark': inMark });
+    await srvr.setTvdbFields(show.Name, { 'emby.inMark': inMark });
   }
 }
 
@@ -875,7 +875,7 @@ export async function saveLinda(id, inLinda) {
   const show = allShows.find(s => s.Id === id);
   if (show && allTvdb[show.Name]) {
     allTvdb[show.Name].emby.inLinda = inLinda;
-    await tvdb.setTvdbFields(show.Name, { 'emby.inLinda': inLinda });
+    await srvr.setTvdbFields(show.Name, { 'emby.inLinda': inLinda });
   }
 }
 

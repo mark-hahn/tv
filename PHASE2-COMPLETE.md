@@ -8,6 +8,7 @@
 **After:** ~250 lines with clear separation of concerns
 
 **Key improvements:**
+
 - ✅ Uses tvdb as source of truth (not Emby objects)
 - ✅ Syncs Emby user data INTO tvdb records
 - ✅ Populates new Phase 1 fields (emby, disk, sync)
@@ -25,6 +26,7 @@
 ### 3. Data Flow Changes
 
 **Old flow:**
+
 1. Fetch Emby shows
 2. Merge disk data into shows
 3. Merge gaps into shows
@@ -34,6 +36,7 @@
 7. Return merged show objects
 
 **New flow (Phase 2):**
+
 1. Fetch all data sources in parallel
 2. Get tvdb (source of truth)
 3. Sync Emby + disk data into tvdb records
@@ -45,6 +48,7 @@
 ### 4. Backward Compatibility
 
 **Show objects returned still have old format:**
+
 - `show.Name`, `show.Id`, `show.InToTry`, etc.
 - Clients don't need changes yet
 - Internal reference: `show._tvdb` points to full tvdb record
@@ -61,6 +65,7 @@ cd /root/apps/tv/apps/client
 ```
 
 **Watch console for:**
+
 - `Phase 2: loadAllShows completed in Xms` (should be faster)
 - No errors during load
 - Shows display correctly
@@ -93,6 +98,7 @@ cd /root/apps/tv
 ### Data Sync Process
 
 **Emby → TVDB:**
+
 - Emby user data (watched status, dates) → `tvdb.emby.*`
 - Disk info → `tvdb.disk.*`
 - Gaps → `tvdb.gap`
@@ -104,6 +110,7 @@ cd /root/apps/tv
 ### New Timestamps
 
 Every show now tracks:
+
 - `tvdb.sync.lastEmbySync` - When Emby data was synced
 - `tvdb.sync.lastDiskCheck` - When disk data was checked
 - `tvdb.sync.lastMetadataUpdate` - When TVDB metadata refreshed
@@ -111,6 +118,7 @@ Every show now tracks:
 ### Deleted Show Handling
 
 Shows without matching Emby/noEmby entry are marked:
+
 - `tvdb.deleted = "2026-02-06"` (date deleted)
 - Filtered out from show list
 - Can be undeleted if added back to Emby
@@ -128,6 +136,7 @@ Shows without matching Emby/noEmby entry are marked:
 **None expected** - Logic is equivalent to old version, just reorganized
 
 **If you see issues:**
+
 1. Check browser console for errors
 2. Verify shows load
 3. Check collection flags display
@@ -136,12 +145,14 @@ Shows without matching Emby/noEmby entry are marked:
 ## Next Steps
 
 **After you verify Phase 2:**
+
 1. Test locally with dev client
 2. Deploy with `./srvr` when confident
 3. Monitor for any issues
 4. Move to Phase 3 (incremental syncs)
 
 **Phase 3 will add:**
+
 - Background sync every 5 minutes (Emby user data)
 - Background sync every 1 hour (disk data)
 - Real-time updates without full reload

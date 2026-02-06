@@ -344,6 +344,7 @@ export async function loadAllShows() {
       allTvdb[name] = await srvr.setTvdbFields({
         name,
         deleted: util.fmtDate(),
+        dontSave: true,
       });
     } else if (hasEmby && !tvdbRecord.showId) {
       // Has Emby show but tvdb missing showId - update it
@@ -352,6 +353,7 @@ export async function loadAllShows() {
       allTvdb[name] = await srvr.setTvdbFields({
         name,
         showId: embyShow.Id,
+        dontSave: true,
       });
     }
   }
@@ -766,12 +768,12 @@ export async function saveFav(id, fav) {
   };
   let favRes = await axios(config);
   if (favRes.status != 200) throw new Error("unable to save favorite");
-  
+
   // Phase 4: Update tvdb immediately
-  const show = allShows.find(s => s.Id === id);
+  const show = allShows.find((s) => s.Id === id);
   if (show && allTvdb[show.Name]) {
     allTvdb[show.Name].emby.isFavorite = fav;
-    await srvr.setTvdbFields(show.Name, { 'emby.isFavorite': fav });
+    await srvr.setTvdbFields(show.Name, { "emby.isFavorite": fav });
   }
 }
 
@@ -792,12 +794,12 @@ export async function saveToTry(id, inToTry) {
     console.error(err);
     throw new Error(err);
   }
-  
+
   // Phase 4: Update tvdb immediately
-  const show = allShows.find(s => s.Id === id);
+  const show = allShows.find((s) => s.Id === id);
   if (show && allTvdb[show.Name]) {
     allTvdb[show.Name].emby.inToTry = inToTry;
-    await srvr.setTvdbFields(show.Name, { 'emby.inToTry': inToTry });
+    await srvr.setTvdbFields(show.Name, { "emby.inToTry": inToTry });
   }
 }
 
@@ -818,12 +820,12 @@ export async function saveContinue(id, inContinue) {
     console.error(err);
     throw new Error(err);
   }
-  
+
   // Phase 4: Update tvdb immediately
-  const show = allShows.find(s => s.Id === id);
+  const show = allShows.find((s) => s.Id === id);
   if (show && allTvdb[show.Name]) {
     allTvdb[show.Name].emby.inContinue = inContinue;
-    await srvr.setTvdbFields(show.Name, { 'emby.inContinue': inContinue });
+    await srvr.setTvdbFields(show.Name, { "emby.inContinue": inContinue });
   }
 }
 
@@ -844,12 +846,12 @@ export async function saveMark(id, inMark) {
     console.error(err);
     throw new Error(err);
   }
-  
+
   // Phase 4: Update tvdb immediately
-  const show = allShows.find(s => s.Id === id);
+  const show = allShows.find((s) => s.Id === id);
   if (show && allTvdb[show.Name]) {
     allTvdb[show.Name].emby.inMark = inMark;
-    await srvr.setTvdbFields(show.Name, { 'emby.inMark': inMark });
+    await srvr.setTvdbFields(show.Name, { "emby.inMark": inMark });
   }
 }
 
@@ -870,12 +872,12 @@ export async function saveLinda(id, inLinda) {
     console.error(err);
     throw new Error(err);
   }
-  
+
   // Phase 4: Update tvdb immediately
-  const show = allShows.find(s => s.Id === id);
+  const show = allShows.find((s) => s.Id === id);
   if (show && allTvdb[show.Name]) {
     allTvdb[show.Name].emby.inLinda = inLinda;
-    await srvr.setTvdbFields(show.Name, { 'emby.inLinda': inLinda });
+    await srvr.setTvdbFields(show.Name, { "emby.inLinda": inLinda });
   }
 }
 

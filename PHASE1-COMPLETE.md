@@ -7,6 +7,7 @@
 **Modified `getTvdbData()` function** to include new fields in every tvdb record:
 
 **New nested objects:**
+
 - `emby`: Emby user data (id, path, collections, watched status)
 - `disk`: Filesystem data (date, size, noFiles flag)
 - `download`: Download tracking summary (status, lastCheck)
@@ -14,6 +15,7 @@
 - `sync`: Sync timestamps (lastEmbySync, lastDiskCheck, lastMetadataUpdate)
 
 **New top-level fields:**
+
 - `gap`: Gap tracking data (moved from gaps.json in Phase 5)
 - `note`: Show notes (moved from notes.json in Phase 5)
 - `reject`: Reject flag (moved from rejects in Phase 5)
@@ -24,6 +26,7 @@
 ### 2. Added Backward Compatibility Migration
 
 **On startup**, `apps/srvr/src/tvdb.js` now:
+
 1. Loads existing `tvdb.json`
 2. Checks each record for new fields
 3. Initializes missing fields with defaults
@@ -34,6 +37,7 @@ This ensures existing data continues to work without manual intervention.
 ### 3. Enhanced `setTvdbFields()` Function
 
 Now handles nested field updates:
+
 - Can update `emby.inToTry` instead of requiring full `emby` object
 - Can update `disk.date` individually
 - Can update `sync.lastEmbySync` individually
@@ -93,12 +97,14 @@ console.log('Has sync:', !!show.sync);
 ## What to Expect
 
 **On first srvr startup after Phase 1:**
+
 1. Migration runs automatically
 2. Log message confirms: "Phase 1 migration: Saving updated tvdb.json..."
 3. All shows now have new fields initialized
 4. No data loss - all existing fields preserved
 
 **On subsequent startups:**
+
 - No migration needed
 - Instant load (migration only runs once)
 
@@ -110,12 +116,14 @@ console.log('Has sync:', !!show.sync);
 ## Next Steps
 
 **After you verify Phase 1:**
+
 1. Check that srvr starts successfully
 2. Verify no errors in logs
 3. Confirm shows still load in client
 4. Check that a sample show has the new fields
 
 **Then we move to Phase 2:**
+
 - Refactor `loadAllShows()` to use the new schema
 - Simplify the merge logic
 - Make it populate the new fields from Emby

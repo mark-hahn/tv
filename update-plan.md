@@ -29,12 +29,14 @@ Make `tvdb.json` the single source of truth for all show data by expanding TVDB 
    - You want to adjust the approach
 
 **Your minimal work:**
+
 - Quick review of each phase (5-10 min)
 - Test on your actual data
 - Run the `srvr` deployment script when ready
 - Give feedback if issues arise
 
 **Checkpoints:**
+
 - After Phase 1: Review new schema, test loadAllShows()
 - After Phase 2: Test simplified loadAllShows()
 - After Phase 3-4: Test incremental updates
@@ -49,6 +51,7 @@ Make `tvdb.json` the single source of truth for all show data by expanding TVDB 
 **Yes - here's what we can consolidate:**
 
 ✅ **Consolidate into tvdb.json:**
+
 - `gaps.json` → `tvdb[name].gap` (Phase 5.1) ✓ Already planned
 - `notes.json` → `tvdb[name].note` (Phase 5.2) ✓ Already planned
 - `noemby.json` → `tvdb[name]` with `emby.id = "noemby-{uuid}"` ✓ Should add
@@ -57,6 +60,7 @@ Make `tvdb.json` the single source of truth for all show data by expanding TVDB 
 - `lastViewed.json` → `tvdb[name].lastViewed = timestamp` ✓ Should add
 
 ⚠️ **Keep separate for now:**
+
 - `tv.sqlite` (downloads) - Different domain (torrent tracking), high write frequency
   - Could add summary status to tvdb.json: `tvdb[name].download.status`
   - Keep full download tracking in tv.sqlite
@@ -70,6 +74,7 @@ Make `tvdb.json` the single source of truth for all show data by expanding TVDB 
 **Yes - this is a good idea. Here's why:**
 
 **Current problems with WebSocket RPC:**
+
 - Messy queue in `apps/srvr/index.js` (lines 2300-2600)
 - Everything is serialized (one request at a time)
 - Hard to debug (no HTTP status codes, no browser devtools)
@@ -79,11 +84,13 @@ Make `tvdb.json` the single source of truth for all show data by expanding TVDB 
 **Proposed: Hybrid approach**
 
 **Keep WebSocket for:**
+
 - Real-time notifications (devices on, Emby playback updates)
 - Push updates (when tvdb refreshes, notify all clients)
 - Live progress (download progress, queue updates)
 
 **Move to HTTP for:**
+
 - Data fetching: `GET /api/shows` (returns allTvdb)
 - Updates: `POST /api/shows/:name` (update tvdb fields)
 - Metadata refresh: `POST /api/shows/:name/refresh` (queue tvdb update)
@@ -91,12 +98,14 @@ Make `tvdb.json` the single source of truth for all show data by expanding TVDB 
 - Collections: `POST /api/collections/:type/add` (add to collection)
 
 **Which can be concurrent:**
+
 - ✅ All GET requests (read-only, fully concurrent)
 - ✅ POST to different shows (concurrent updates to different records)
 - ⚠️ POST to same show (serialize updates to same record)
 - ❌ Full tvdb.json writes (needs locking or queue)
 
 **Implementation:**
+
 - Keep current WebSocket server for push notifications
 - Add HTTP endpoints in `apps/srvr/index.js` (use existing http server)
 - Use in-memory locking for concurrent writes (simple Map)
@@ -708,6 +717,7 @@ if (fs.existsSync(noembyPath)) {
 ```
 
 **Update srvr endpoints:**
+
 - Remove `getNoEmbys`, `addNoEmby`, `delNoEmby`
 - Just use regular tvdb operations
 - Filter by `show.emby.id.startsWith("noemby-")` when needed
@@ -779,6 +789,7 @@ if (fs.existsSync(lastViewedPath)) {
 ```
 
 **Result after Phase 5:**
+
 - `tvdb.json` - Contains everything ✓
 - `gaps.json.backup` - Archived
 - `notes.json.backup` - Archived
@@ -920,6 +931,7 @@ computed: {
 **File:** `apps/srvr/index.js` - Lines 2300-2600
 
 **Current problems:**
+
 - Everything serialized through queue
 - No concurrent requests
 - Hard to debug (no HTTP status codes)
@@ -929,6 +941,7 @@ computed: {
 ### 8.2 Proposed Hybrid Architecture
 
 **Keep WebSocket for push notifications:**
+
 - Device status updates
 - Emby playback events
 - Download progress
@@ -974,12 +987,14 @@ async function withShowLock(showName, fn) {
   while (showLocks.has(showName)) {
     await showLocks.get(showName);
   }
-  
+
   // Create new lock
   let releaseLock;
-  const lockPromise = new Promise(resolve => { releaseLock = resolve; });
+  const lockPromise = new Promise((resolve) => {
+    releaseLock = resolve;
+  });
   showLocks.set(showName, lockPromise);
-  
+
   try {
     return await fn();
   } finally {
@@ -989,21 +1004,22 @@ async function withShowLock(showName, fn) {
 }
 
 // Usage:
-app.post('/api/shows/:name', async (req, res) => {
+app.post("/api/shows/:name", async (req, res) => {
   const { name } = req.params;
   const updates = req.body;
-  
+
   await withShowLock(name, async () => {
     const tvdb = allTvdb[name];
     Object.assign(tvdb, updates);
     await util.writeFile(TVDB_PATH, allTvdb);
   });
-  
+
   res.json({ ok: true });
 });
 ```
 
 **For full tvdb.json writes (rare):**
+
 - Use global write lock
 - Or batch writes (write every 10 seconds max)
 

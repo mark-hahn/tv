@@ -1294,7 +1294,7 @@ const trySaveConfigYml = async (id, result, resolve, reject) => {
   });
   await util.writeFile(configWritePath("config2-rejects.json"), rejects);
   await util.writeFile(configWritePath("config4-pickups.json"), pickups);
-  
+
   // Phase 5: Also save tvdb when config is saved (batches reject/pickup updates)
   await tvdb.saveTvdbSync();
 
@@ -1396,13 +1396,13 @@ const getRejects = (id, _param, resolve, _reject) => {
   // Phase 5: Read from tvdb instead of separate rejects array
   const allTvdb = tvdb.getAllTvdbSync();
   const rejectsFromTvdb = [];
-  
+
   for (const [name, record] of Object.entries(allTvdb)) {
     if (record.reject && !record.deleted) {
       rejectsFromTvdb.push(name);
     }
   }
-  
+
   resolve([id, rejectsFromTvdb]);
 };
 
@@ -1414,7 +1414,7 @@ const addReject = async (id, name, resolve, reject) => {
   const allTvdb = tvdb.getAllTvdbSync();
   const normalizedName = name.toLowerCase();
   let tvdbRecord = null;
-  
+
   // Find matching record (case-insensitive)
   for (const [recordName, record] of Object.entries(allTvdb)) {
     if (recordName.toLowerCase() === normalizedName && !record.deleted) {
@@ -1422,7 +1422,7 @@ const addReject = async (id, name, resolve, reject) => {
       break;
     }
   }
-  
+
   if (tvdbRecord) {
     tvdbRecord.reject = true;
     // Save deferred to saveConfigYml below
@@ -1465,9 +1465,13 @@ const delReject = async (id, name, resolve, reject) => {
   // Phase 5: Update tvdb.reject field
   const allTvdb = tvdb.getAllTvdbSync();
   const normalizedName = name.toLowerCase();
-  
+
   for (const [recordName, record] of Object.entries(allTvdb)) {
-    if (recordName.toLowerCase() === normalizedName && !record.deleted && record.reject) {
+    if (
+      recordName.toLowerCase() === normalizedName &&
+      !record.deleted &&
+      record.reject
+    ) {
       record.reject = false;
       // Save deferred to saveConfigYml below
       deletedOne = true;
@@ -1509,23 +1513,23 @@ const getPickups = (id, _param, resolve, _reject) => {
   // Phase 5: Read from tvdb instead of separate pickups array
   const allTvdb = tvdb.getAllTvdbSync();
   const pickupsFromTvdb = [];
-  
+
   for (const [name, record] of Object.entries(allTvdb)) {
     if (record.pickup && !record.deleted) {
       pickupsFromTvdb.push(name);
     }
   }
-  
+
   resolve([id, pickupsFromTvdb]);
 };
 
 const addPickup = async (id, name, resolve, reject) => {
   console.log("addPickup", id, name);
-  
+
   // Phase 5: Update tvdb.pickup field
   const allTvdb = tvdb.getAllTvdbSync();
   const normalizedName = name.toLowerCase();
-  
+
   for (const [recordName, record] of Object.entries(allTvdb)) {
     if (recordName.toLowerCase() === normalizedName && !record.deleted) {
       record.pickup = true;
@@ -1533,7 +1537,7 @@ const addPickup = async (id, name, resolve, reject) => {
       break;
     }
   }
-  
+
   // Backward compat: update old pickups array
   for (const [idx, pickupNameStr] of pickups.entries()) {
     if (pickupNameStr.toLowerCase() === name.toLowerCase()) {
@@ -1550,20 +1554,24 @@ const addPickup = async (id, name, resolve, reject) => {
 const delPickup = async (id, name, resolve, reject) => {
   console.log("delPickup", id, name);
   let deletedOne = false;
-  
+
   // Phase 5: Update tvdb.pickup field
   const allTvdb = tvdb.getAllTvdbSync();
   const normalizedName = name.toLowerCase();
-  
+
   for (const [recordName, record] of Object.entries(allTvdb)) {
-    if (recordName.toLowerCase() === normalizedName && !record.deleted && record.pickup) {
+    if (
+      recordName.toLowerCase() === normalizedName &&
+      !record.deleted &&
+      record.pickup
+    ) {
       record.pickup = false;
       // Save deferred to saveConfigYml below
       deletedOne = true;
       break;
     }
   }
-  
+
   // Backward compat: update old pickups array
   for (const [idx, pickupNameStr] of pickups.entries()) {
     if (pickupNameStr.toLowerCase() === name.toLowerCase()) {
@@ -1692,26 +1700,26 @@ const getGaps = (id, _param, resolve, _reject) => {
   // Phase 5: Read from tvdb instead of separate gaps object
   const allTvdb = tvdb.getAllTvdbSync();
   const gapsFromTvdb = {};
-  
+
   for (const [name, record] of Object.entries(allTvdb)) {
     if (record.gap && record.emby?.id && !record.deleted) {
       gapsFromTvdb[record.emby.id] = record.gap;
     }
   }
-  
+
   resolve([id, gapsFromTvdb]);
 };
 
 const addGap = async (id, gapIdGapSave, resolve, _reject) => {
   const [gapId, gap, save] = JSON.parse(gapIdGapSave);
-  
+
   if (gapId !== null && gapId !== undefined) {
     stripGapTransientFields(gap);
-    
+
     // Phase 5: Update tvdb.gap field
     const allTvdb = tvdb.getAllTvdbSync();
     let showName = null;
-    
+
     // Find show by Emby ID
     for (const [name, record] of Object.entries(allTvdb)) {
       if (record.emby?.id === gapId && !record.deleted) {
@@ -1719,7 +1727,7 @@ const addGap = async (id, gapIdGapSave, resolve, _reject) => {
         break;
       }
     }
-    
+
     if (showName) {
       if (gapEntryHasGap(gap)) {
         allTvdb[showName].gap = gap;
@@ -1729,12 +1737,12 @@ const addGap = async (id, gapIdGapSave, resolve, _reject) => {
       // Only save tvdb when save flag is true
       if (save) await tvdb.saveTvdbSync();
     }
-    
+
     // Backward compat: also update old gaps object
     if (gapEntryHasGap(gap)) gaps[gapId] = gap;
     else delete gaps[gapId];
   }
-  
+
   if (save) await util.writeFile(gapsPath, gaps);
   resolve([id, "ok"]);
 };
@@ -1742,11 +1750,11 @@ const addGap = async (id, gapIdGapSave, resolve, _reject) => {
 const delGap = async (id, gapIdSave, resolve, _reject) => {
   console.log("delGap", id, { gapIdSave });
   const [gapId, save] = JSON.parse(gapIdSave);
-  
+
   if (gapId !== null) {
     // Phase 5: Update tvdb.gap field
     const allTvdb = tvdb.getAllTvdbSync();
-    
+
     // Find show by Emby ID
     for (const [name, record] of Object.entries(allTvdb)) {
       if (record.emby?.id === gapId && !record.deleted) {
@@ -1756,11 +1764,11 @@ const delGap = async (id, gapIdSave, resolve, _reject) => {
         break;
       }
     }
-    
+
     // Backward compat: also update old gaps object
     delete gaps[gapId];
   }
-  
+
   if (save) {
     await util.writeFile(gapsPath, gaps);
   }
@@ -1919,13 +1927,18 @@ const getAllNotes = (id, _param, resolve, _reject) => {
   // Phase 5: Read from tvdb instead of separate notesCache
   const allTvdb = tvdb.getAllTvdbSync();
   const notesFromTvdb = {};
-  
+
   for (const [name, record] of Object.entries(allTvdb)) {
-    if (record.note && typeof record.note === 'string' && record.note.trim() !== '' && !record.deleted) {
+    if (
+      record.note &&
+      typeof record.note === "string" &&
+      record.note.trim() !== "" &&
+      !record.deleted
+    ) {
       notesFromTvdb[name] = record.note;
     }
   }
-  
+
   resolve([id, notesFromTvdb]);
 };
 
@@ -1959,7 +1972,7 @@ const saveNote = async (id, param, resolve, reject) => {
   // Phase 5: Update tvdb.note field
   const allTvdb = tvdb.getAllTvdbSync();
   const tvdbRecord = allTvdb[key];
-  
+
   if (!tvdbRecord) {
     reject([id, { err: `saveNote: show not found in tvdb: ${key}` }]);
     return;
@@ -1973,7 +1986,7 @@ const saveNote = async (id, param, resolve, reject) => {
     }
     tvdbRecord.note = "";
     await tvdb.saveTvdbSync();
-    
+
     // Backward compat: also update old notesCache
     if (notesCache[key] !== undefined) {
       delete notesCache[key];
@@ -1996,7 +2009,7 @@ const saveNote = async (id, param, resolve, reject) => {
   tvdbRecord.note = noteText;
   // Notes are always saved immediately (explicit user action)
   await tvdb.saveTvdbSync();
-  
+
   // Backward compat: also update old notesCache
   notesCache[key] = noteText;
   try {
@@ -2797,28 +2810,32 @@ async function runUsbCheck() {
  */
 async function syncEmbyUserData() {
   try {
-    console.log('[Phase 3] syncEmbyUserData: Starting...');
-    
+    console.log("[Phase 3] syncEmbyUserData: Starting...");
+
     // Get all tvdb records
     const allTvdb = tvdb.getAllTvdbSync();
     if (!allTvdb || Object.keys(allTvdb).length === 0) {
-      console.log('[Phase 3] syncEmbyUserData: No tvdb records to sync');
+      console.log("[Phase 3] syncEmbyUserData: No tvdb records to sync");
       return;
     }
 
     // Get current Emby sessions/user data
     // We'll fetch shows from Emby to get updated UserData
-    const embyUrl = 'https://hahnca.com:8920/emby/Users/894c752d448f45a3a1260ccaabd0adff/Items?api_key=1c399bd079d549cba8c916244d3add2b&IncludeItemTypes=Series&Recursive=true&Fields=UserData&StartIndex=0&Limit=10000';
-    
+    const embyUrl =
+      "https://hahnca.com:8920/emby/Users/894c752d448f45a3a1260ccaabd0adff/Items?api_key=1c399bd079d549cba8c916244d3add2b&IncludeItemTypes=Series&Recursive=true&Fields=UserData&StartIndex=0&Limit=10000";
+
     const resp = await fetch(embyUrl);
     if (!resp.ok) {
-      console.error('[Phase 3] syncEmbyUserData: Emby fetch failed:', resp.status);
+      console.error(
+        "[Phase 3] syncEmbyUserData: Emby fetch failed:",
+        resp.status,
+      );
       return;
     }
 
     const data = await resp.json();
     const embyShows = data.Items || [];
-    
+
     let updatedCount = 0;
     const now = Date.now();
 
@@ -2826,13 +2843,13 @@ async function syncEmbyUserData() {
     for (const embyShow of embyShows) {
       const name = embyShow.Name;
       const tvdbRecord = allTvdb[name];
-      
+
       if (!tvdbRecord || tvdbRecord.deleted) continue;
-      
+
       // Check if user data changed (also check UnplayedItemCount for episode watches)
       const userData = embyShow.UserData || {};
       const unplayedCount = embyShow.UserData?.UnplayedItemCount || 0;
-      const changed = 
+      const changed =
         tvdbRecord.emby?.isPlayed !== userData.Played ||
         tvdbRecord.emby?.playCount !== userData.PlayCount ||
         tvdbRecord.emby?.isFavorite !== userData.IsFavorite ||
@@ -2855,11 +2872,10 @@ async function syncEmbyUserData() {
       await tvdb.saveTvdbSync();
       console.log(`[Phase 3] syncEmbyUserData: Updated ${updatedCount} shows`);
     } else {
-      console.log('[Phase 3] syncEmbyUserData: No changes detected');
+      console.log("[Phase 3] syncEmbyUserData: No changes detected");
     }
-    
   } catch (err) {
-    console.error('[Phase 3] syncEmbyUserData error:', err.message);
+    console.error("[Phase 3] syncEmbyUserData error:", err.message);
   }
 }
 
@@ -2869,18 +2885,23 @@ async function syncEmbyUserData() {
  */
 async function syncDiskData() {
   try {
-    console.log('[Phase 3] syncDiskData: Starting...');
-    
+    console.log("[Phase 3] syncDiskData: Starting...");
+
     // Get all tvdb records
     const allTvdb = tvdb.getAllTvdbSync();
     if (!allTvdb || Object.keys(allTvdb).length === 0) {
-      console.log('[Phase 3] syncDiskData: No tvdb records to sync');
+      console.log("[Phase 3] syncDiskData: No tvdb records to sync");
       return;
     }
 
     // Get disk data
     const diskShows = await new Promise((resolve, reject) => {
-      getShowsFromDisk(null, null, ([_, data]) => resolve(data), ([_, err]) => reject(err));
+      getShowsFromDisk(
+        null,
+        null,
+        ([_, data]) => resolve(data),
+        ([_, err]) => reject(err),
+      );
     });
 
     let updatedCount = 0;
@@ -2889,13 +2910,13 @@ async function syncDiskData() {
     // Update tvdb records with fresh disk data
     for (const [name, tvdbRecord] of Object.entries(allTvdb)) {
       if (tvdbRecord.deleted) continue;
-      
+
       const embyPath = tvdbRecord.emby?.path;
       if (!embyPath) continue;
 
-      const pathPart = embyPath.split('/').pop();
+      const pathPart = embyPath.split("/").pop();
       const diskInfo = diskShows[pathPart];
-      
+
       const newDate = diskInfo ? diskInfo[0] : null;
       const newSize = diskInfo ? diskInfo[1] : 0;
       const newNoFiles = !diskInfo;
@@ -2921,24 +2942,23 @@ async function syncDiskData() {
       await tvdb.saveTvdbSync();
       console.log(`[Phase 3] syncDiskData: Updated ${updatedCount} shows`);
     } else {
-      console.log('[Phase 3] syncDiskData: No changes detected');
+      console.log("[Phase 3] syncDiskData: No changes detected");
     }
-    
   } catch (err) {
-    console.error('[Phase 3] syncDiskData error:', err.message);
+    console.error("[Phase 3] syncDiskData error:", err.message);
   }
 }
 
 // Phase 3: Set up sync timers
-const EMBY_SYNC_INTERVAL = 5 * 60 * 1000;  // 5 minutes
+const EMBY_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const DISK_SYNC_INTERVAL = 60 * 60 * 1000; // 1 hour
 
 setInterval(syncEmbyUserData, EMBY_SYNC_INTERVAL);
 setInterval(syncDiskData, DISK_SYNC_INTERVAL);
 
 // Run initial syncs after startup delay
-setTimeout(syncEmbyUserData, 2 * 60 * 1000);  // 2 minutes after start
-setTimeout(syncDiskData, 3 * 60 * 1000);      // 3 minutes after start
+setTimeout(syncEmbyUserData, 2 * 60 * 1000); // 2 minutes after start
+setTimeout(syncDiskData, 3 * 60 * 1000); // 3 minutes after start
 
 setInterval(runUsbCheck, CHECK_INTERVAL_MS);
 // Run initial check after 1 minute (allow startup)

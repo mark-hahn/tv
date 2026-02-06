@@ -880,7 +880,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     isFavorite: paramObj.isFavorite ?? existing.emby?.isFavorite ?? false,
     isPlayed: paramObj.isPlayed ?? existing.emby?.isPlayed ?? false,
     playCount: paramObj.playCount ?? existing.emby?.playCount ?? 0,
-    lastPlayedDate: paramObj.lastPlayedDate || existing.emby?.lastPlayedDate || null,
+    lastPlayedDate:
+      paramObj.lastPlayedDate || existing.emby?.lastPlayedDate || null,
   };
 
   // NEW: Disk/filesystem data (preserve from paramObj or existing)
@@ -893,7 +894,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   // NEW: Download tracking summary (preserve from paramObj or existing)
   tvdbData.download = {
     status: paramObj.downloadStatus || existing.download?.status || null,
-    lastCheck: paramObj.downloadLastCheck || existing.download?.lastCheck || null,
+    lastCheck:
+      paramObj.downloadLastCheck || existing.download?.lastCheck || null,
   };
 
   // NEW: TVMaze reference (preserve from paramObj or existing)
@@ -917,7 +919,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   // NEW: Sync timestamps (preserve from paramObj or existing)
   tvdbData.sync = {
     lastEmbySync: paramObj.lastEmbySync || existing.sync?.lastEmbySync || null,
-    lastDiskCheck: paramObj.lastDiskCheck || existing.sync?.lastDiskCheck || null,
+    lastDiskCheck:
+      paramObj.lastDiskCheck || existing.sync?.lastDiskCheck || null,
     lastMetadataUpdate: Date.now(),
   };
 
@@ -1137,7 +1140,7 @@ export const getAllTvdbSync = () => allTvdb;
 
 export const saveTvdbSync = async () => {
   return new Promise((resolve, reject) => {
-    fs.writeFile(TVDB_PATH, JSON.stringify(allTvdb, null, 2), (err) => {
+    fs.writeFile(TVDB_PATH, JSON.stringify(allTvdb), (err) => {
       if (err) {
         log("err", "saveTvdbSync error:", err.message);
         reject(err);
@@ -1175,11 +1178,11 @@ export const setTvdbFields = async (id, param, resolve, _reject) => {
       if (paramObj.$delete) {
         for (const delName of paramObj.$delete) delete tvdb[delName];
       }
-      
+
       // Handle nested field updates for Phase 1 new structure
       for (const [key, value] of Object.entries(paramObj)) {
         if (key === "dontSave" || key === "$delete" || key === "name") continue;
-        
+
         // Handle nested emby fields (e.g., inToTry, isFavorite)
         if (key.startsWith("emby") && typeof key === "string") {
           const embyField = key.replace(/^emby\.?/, "");
@@ -1189,7 +1192,7 @@ export const setTvdbFields = async (id, param, resolve, _reject) => {
             continue;
           }
         }
-        
+
         // Handle nested disk fields
         if (key.startsWith("disk") && typeof key === "string") {
           const diskField = key.replace(/^disk\.?/, "");
@@ -1199,7 +1202,7 @@ export const setTvdbFields = async (id, param, resolve, _reject) => {
             continue;
           }
         }
-        
+
         // Handle nested sync fields
         if (key.startsWith("sync") && typeof key === "string") {
           const syncField = key.replace(/^sync\.?/, "");
@@ -1209,7 +1212,7 @@ export const setTvdbFields = async (id, param, resolve, _reject) => {
             continue;
           }
         }
-        
+
         // Handle direct assignment for top-level fields and nested objects
         tvdb[key] = value;
       }

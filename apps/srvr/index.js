@@ -1403,10 +1403,29 @@ const getRejects = (id, _param, resolve, _reject) => {
   resolve([id, rejectsFromTvdb]);
 };
 
-const addReject = (id, name, resolve, reject) => {
+const addReject = async (id, name, resolve, reject) => {
   console.log("addReject", id, name);
   let changed = false;
 
+  // Phase 5: Update tvdb.reject field
+  const allTvdb = tvdb.getAllTvdbSync();
+  const normalizedName = name.toLowerCase();
+  let tvdbRecord = null;
+  
+  // Find matching record (case-insensitive)
+  for (const [recordName, record] of Object.entries(allTvdb)) {
+    if (recordName.toLowerCase() === normalizedName && !record.deleted) {
+      tvdbRecord = record;
+      break;
+    }
+  }
+  
+  if (tvdbRecord) {
+    tvdbRecord.reject = true;
+    await tvdb.setTvdbFields(name, { reject: true });
+  }
+
+  // Backward compat: update old rejects array
   // 1. Ensure it exists in rejects list
   const existingIdx = rejects.findIndex(
     (r) => r.toLowerCase() === name.toLowerCase(),
@@ -1436,10 +1455,24 @@ const addReject = (id, name, resolve, reject) => {
   saveConfigYml(id, "ok", resolve, reject);
 };
 
-const delReject = (id, name, resolve, reject) => {
+const delReject = async (id, name, resolve, reject) => {
   console.log("delReject", id, name);
   let deletedOne = false;
 
+  // Phase 5: Update tvdb.reject field
+  const allTvdb = tvdb.getAllTvdbSync();
+  const normalizedName = name.toLowerCase();
+  
+  for (const [recordName, record] of Object.entries(allTvdb)) {
+    if (recordName.toLowerCase() === normalizedName && !record.deleted && record.reject) {
+      record.reject = false;
+      await tvdb.setTvdbFields(recordName, { reject: false });
+      deletedOne = true;
+      break;
+    }
+  }
+
+  // Backward compat: remove from old rejects array
   // 1. Remove from rejects list
   for (const [idx, rejectNameStr] of rejects.entries()) {
     if (rejectNameStr.toLowerCase() === name.toLowerCase()) {
@@ -1483,8 +1516,22 @@ const getPickups = (id, _param, resolve, _reject) => {
   resolve([id, pickupsFromTvdb]);
 };
 
-const addPickup = (id, name, resolve, reject) => {
+const addPickup = async (id, name, resolve, reject) => {
   console.log("addPickup", id, name);
+  
+  // Phase 5: Update tvdb.pickup field
+  const allTvdb = tvdb.getAllTvdbSync();
+  const normalizedName = name.toLowerCase();
+  
+  for (const [recordName, record] of Object.entries(allTvdb)) {
+    if (recordName.toLowerCase() === normalizedName && !record.deleted) {
+      record.pickup = true;
+      await tvdb.setTvdbFields(recordName, { pickup: true });
+      break;
+    }
+  }
+  
+  // Backward compat: update old pickups array
   for (const [idx, pickupNameStr] of pickups.entries()) {
     if (pickupNameStr.toLowerCase() === name.toLowerCase()) {
       console.log("-- removing old matching pickup:", pickupNameStr);
@@ -1497,9 +1544,24 @@ const addPickup = (id, name, resolve, reject) => {
   saveConfigYml(id, "ok", resolve, reject);
 };
 
-const delPickup = (id, name, resolve, reject) => {
+const delPickup = async (id, name, resolve, reject) => {
   console.log("delPickup", id, name);
   let deletedOne = false;
+  
+  // Phase 5: Update tvdb.pickup field
+  const allTvdb = tvdb.getAllTvdbSync();
+  const normalizedName = name.toLowerCase();
+  
+  for (const [recordName, record] of Object.entries(allTvdb)) {
+    if (recordName.toLowerCase() === normalizedName && !record.deleted && record.pickup) {
+      record.pickup = false;
+      await tvdb.setTvdbFields(recordName, { pickup: false });
+      deletedOne = true;
+      break;
+    }
+  }
+  
+  // Backward compat: update old pickups array
   for (const [idx, pickupNameStr] of pickups.entries()) {
     if (pickupNameStr.toLowerCase() === name.toLowerCase()) {
       console.log("-- deleting pickup:", pickupNameStr);
@@ -1639,12 +1701,37 @@ const getGaps = (id, _param, resolve, _reject) => {
 
 const addGap = async (id, gapIdGapSave, resolve, _reject) => {
   const [gapId, gap, save] = JSON.parse(gapIdGapSave);
-  // console.logapIdGapSaveg('addGap', id, {gapIdGapSave});
+  
   if (gapId !== null && gapId !== undefined) {
     stripGapTransientFields(gap);
+    
+    // Phase 5: Update tvdb.gap field
+    const allTvdb = tvdb.getAllTvdbSync();
+    let showName = null;
+    
+    // Find show by Emby ID
+    for (const [name, record] of Object.entries(allTvdb)) {
+      if (record.emby?.id === gapId && !record.deleted) {
+        showName = name;
+        break;
+      }
+    }
+    
+    if (showName) {
+      if (gapEntryHasGap(gap)) {
+        allTvdb[showName].gap = gap;
+        await tvdb.setTvdbFields(showName, { gap });
+      } else {
+        allTvdb[showName].gap = null;
+        await tvdb.setTvdbFields(showName, { gap: null });
+      }
+    }
+    
+    // Backward compat: also update old gaps object
     if (gapEntryHasGap(gap)) gaps[gapId] = gap;
     else delete gaps[gapId];
   }
+  
   if (save) await util.writeFile(gapsPath, gaps);
   resolve([id, "ok"]);
 };
@@ -1652,7 +1739,24 @@ const addGap = async (id, gapIdGapSave, resolve, _reject) => {
 const delGap = async (id, gapIdSave, resolve, _reject) => {
   console.log("delGap", id, { gapIdSave });
   const [gapId, save] = JSON.parse(gapIdSave);
-  if (gapId !== null) delete gaps[gapId];
+  
+  if (gapId !== null) {
+    // Phase 5: Update tvdb.gap field
+    const allTvdb = tvdb.getAllTvdbSync();
+    
+    // Find show by Emby ID
+    for (const [name, record] of Object.entries(allTvdb)) {
+      if (record.emby?.id === gapId && !record.deleted) {
+        record.gap = null;
+        await tvdb.setTvdbFields(name, { gap: null });
+        break;
+      }
+    }
+    
+    // Backward compat: also update old gaps object
+    delete gaps[gapId];
+  }
+  
   if (save) {
     await util.writeFile(gapsPath, gaps);
   }
@@ -1848,36 +1952,53 @@ const saveNote = async (id, param, resolve, reject) => {
 
   const key = showName.trim();
 
+  // Phase 5: Update tvdb.note field
+  const allTvdb = tvdb.getAllTvdbSync();
+  const tvdbRecord = allTvdb[key];
+  
+  if (!tvdbRecord) {
+    reject([id, { err: `saveNote: show not found in tvdb: ${key}` }]);
+    return;
+  }
+
   // Never store empty notes: treat as delete.
   if (noteText.trim() === "") {
-    if (notesCache[key] === undefined) {
+    if (!tvdbRecord.note) {
       resolve([id, "ok"]);
       return;
     }
-    delete notesCache[key];
-    try {
-      await util.writeFile(notesPath, notesCache);
-    } catch (e) {
-      reject([id, { err: `saveNote: write failed: ${e.message}` }]);
-      return;
+    tvdbRecord.note = "";
+    await tvdb.setTvdbFields(key, { note: "" });
+    
+    // Backward compat: also update old notesCache
+    if (notesCache[key] !== undefined) {
+      delete notesCache[key];
+      try {
+        await util.writeFile(notesPath, notesCache);
+      } catch (e) {
+        // Ignore write errors for deprecated file
+      }
     }
     resolve([id, "ok"]);
     return;
   }
 
-  const prev = notesCache[key];
+  const prev = tvdbRecord.note;
   if (prev === noteText) {
     resolve([id, "ok"]);
     return;
   }
 
+  tvdbRecord.note = noteText;
+  await tvdb.setTvdbFields(key, { note: noteText });
+  
+  // Backward compat: also update old notesCache
   notesCache[key] = noteText;
   try {
-    // Flush to disk on every change.
     await util.writeFile(notesPath, notesCache);
   } catch (e) {
-    reject([id, { err: `saveNote: write failed: ${e.message}` }]);
-    return;
+    // Ignore write errors for deprecated file
+  }
   }
 
   resolve([id, "ok"]);

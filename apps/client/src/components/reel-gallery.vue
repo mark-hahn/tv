@@ -172,7 +172,8 @@ export default {
     const checkImages = async (items) => {
       if (!props.fallbackImage) return;
 
-      for (let i = 0; i < items.length; i++) {
+      // Only check the top image card
+      for (let i = 0; i < items.length && i < 1; i++) {
         const item = items[i];
         const url = getImageUrl(item);
         if (!url || url === props.fallbackImage) continue;

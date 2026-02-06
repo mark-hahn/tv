@@ -1137,7 +1137,7 @@ export const getAllTvdbSync = () => allTvdb;
 
 export const saveTvdbSync = async () => {
   return new Promise((resolve, reject) => {
-    fs.writeFile(TVDB_FILE, JSON.stringify(allTvdb, null, 2), (err) => {
+    fs.writeFile(TVDB_PATH, JSON.stringify(allTvdb, null, 2), (err) => {
       if (err) {
         log("err", "saveTvdbSync error:", err.message);
         reject(err);

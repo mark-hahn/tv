@@ -1390,7 +1390,17 @@ const startupRejectsSync = () => {
 startupRejectsSync();
 
 const getRejects = (id, _param, resolve, _reject) => {
-  resolve([id, rejects]);
+  // Phase 5: Read from tvdb instead of separate rejects array
+  const allTvdb = tvdb.getAllTvdbSync();
+  const rejectsFromTvdb = [];
+  
+  for (const [name, record] of Object.entries(allTvdb)) {
+    if (record.reject && !record.deleted) {
+      rejectsFromTvdb.push(name);
+    }
+  }
+  
+  resolve([id, rejectsFromTvdb]);
 };
 
 const addReject = (id, name, resolve, reject) => {
@@ -1460,7 +1470,17 @@ const delReject = (id, name, resolve, reject) => {
 };
 
 const getPickups = (id, _param, resolve, _reject) => {
-  resolve([id, pickups]);
+  // Phase 5: Read from tvdb instead of separate pickups array
+  const allTvdb = tvdb.getAllTvdbSync();
+  const pickupsFromTvdb = [];
+  
+  for (const [name, record] of Object.entries(allTvdb)) {
+    if (record.pickup && !record.deleted) {
+      pickupsFromTvdb.push(name);
+    }
+  }
+  
+  resolve([id, pickupsFromTvdb]);
 };
 
 const addPickup = (id, name, resolve, reject) => {
@@ -1604,7 +1624,17 @@ const delNoEmby = async (id, name, resolve, reject) => {
 };
 
 const getGaps = (id, _param, resolve, _reject) => {
-  resolve([id, gaps]);
+  // Phase 5: Read from tvdb instead of separate gaps object
+  const allTvdb = tvdb.getAllTvdbSync();
+  const gapsFromTvdb = {};
+  
+  for (const [name, record] of Object.entries(allTvdb)) {
+    if (record.gap && record.emby?.id && !record.deleted) {
+      gapsFromTvdb[record.emby.id] = record.gap;
+    }
+  }
+  
+  resolve([id, gapsFromTvdb]);
 };
 
 const addGap = async (id, gapIdGapSave, resolve, _reject) => {
@@ -1778,13 +1808,17 @@ const getNote = (id, param, resolve, reject) => {
 };
 
 const getAllNotes = (id, _param, resolve, _reject) => {
-  // Return a shallow copy so callers can't mutate server cache by reference.
-  // Also defensively filter empty notes.
-  const out = {};
-  for (const [key, val] of Object.entries(notesCache)) {
-    if (typeof val === "string" && val.trim() !== "") out[key] = val;
+  // Phase 5: Read from tvdb instead of separate notesCache
+  const allTvdb = tvdb.getAllTvdbSync();
+  const notesFromTvdb = {};
+  
+  for (const [name, record] of Object.entries(allTvdb)) {
+    if (record.note && typeof record.note === 'string' && record.note.trim() !== '' && !record.deleted) {
+      notesFromTvdb[name] = record.note;
+    }
   }
-  resolve([id, out]);
+  
+  resolve([id, notesFromTvdb]);
 };
 
 const saveNote = async (id, param, resolve, reject) => {

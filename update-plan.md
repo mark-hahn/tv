@@ -14,6 +14,98 @@ Make `tvdb.json` the single source of truth for all show data by expanding TVDB 
 
 ---
 
+## Collaboration Approach
+
+**How we'll work together:**
+
+1. **I'll implement each phase** - You review/test when it's done
+2. **Per-phase delivery:**
+   - I complete the code changes
+   - I test basic functionality
+   - You do final testing/deployment when ready
+3. **You intervene when:**
+   - Something breaks in testing
+   - You see architectural issues
+   - You want to adjust the approach
+
+**Your minimal work:**
+- Quick review of each phase (5-10 min)
+- Test on your actual data
+- Run the `srvr` deployment script when ready
+- Give feedback if issues arise
+
+**Checkpoints:**
+- After Phase 1: Review new schema, test loadAllShows()
+- After Phase 2: Test simplified loadAllShows()
+- After Phase 3-4: Test incremental updates
+- After Phase 5-6: Full integration test
+
+---
+
+## Architecture Improvements (Bonus)
+
+### Question 1: Can we consolidate files/dbs into tvdb.json?
+
+**Yes - here's what we can consolidate:**
+
+✅ **Consolidate into tvdb.json:**
+- `gaps.json` → `tvdb[name].gap` (Phase 5.1) ✓ Already planned
+- `notes.json` → `tvdb[name].note` (Phase 5.2) ✓ Already planned
+- `noemby.json` → `tvdb[name]` with `emby.id = "noemby-{uuid}"` ✓ Should add
+- `rejects.json` → `tvdb[name].reject = true` ✓ Should add
+- `pickups.json` → `tvdb[name].pickup = true` ✓ Should add
+- `lastViewed.json` → `tvdb[name].lastViewed = timestamp` ✓ Should add
+
+⚠️ **Keep separate for now:**
+- `tv.sqlite` (downloads) - Different domain (torrent tracking), high write frequency
+  - Could add summary status to tvdb.json: `tvdb[name].download.status`
+  - Keep full download tracking in tv.sqlite
+- `tvmaze.sqlite` - 75k+ shows (way more than you track), readonly cache
+  - Just reference it via `tvdb[name].tvmaze.id`
+
+**I'll add consolidation of rejects, pickups, noemby to Phase 5**
+
+### Question 2: Should we replace WebSocket RPC with HTTP endpoints?
+
+**Yes - this is a good idea. Here's why:**
+
+**Current problems with WebSocket RPC:**
+- Messy queue in `apps/srvr/index.js` (lines 2300-2600)
+- Everything is serialized (one request at a time)
+- Hard to debug (no HTTP status codes, no browser devtools)
+- Reconnection complexity
+- Can't use standard HTTP tools (curl, fetch cache, etc.)
+
+**Proposed: Hybrid approach**
+
+**Keep WebSocket for:**
+- Real-time notifications (devices on, Emby playback updates)
+- Push updates (when tvdb refreshes, notify all clients)
+- Live progress (download progress, queue updates)
+
+**Move to HTTP for:**
+- Data fetching: `GET /api/shows` (returns allTvdb)
+- Updates: `POST /api/shows/:name` (update tvdb fields)
+- Metadata refresh: `POST /api/shows/:name/refresh` (queue tvdb update)
+- Queries: `GET /api/shows/:name/episodes` (get episode data)
+- Collections: `POST /api/collections/:type/add` (add to collection)
+
+**Which can be concurrent:**
+- ✅ All GET requests (read-only, fully concurrent)
+- ✅ POST to different shows (concurrent updates to different records)
+- ⚠️ POST to same show (serialize updates to same record)
+- ❌ Full tvdb.json writes (needs locking or queue)
+
+**Implementation:**
+- Keep current WebSocket server for push notifications
+- Add HTTP endpoints in `apps/srvr/index.js` (use existing http server)
+- Use in-memory locking for concurrent writes (simple Map)
+- Phase 8: Add HTTP endpoints (after core refactor is stable)
+
+**I can add this as Phase 8 if you want, or we can do it later**
+
+---
+
 ## Phase 1: Extend TVDB Schema
 
 ### 1.1 Add New Fields to TVDB Records
@@ -575,10 +667,127 @@ if (fs.existsSync(notesPath)) {
 }
 ```
 
-### 5.3 Keep noemby.json Separate (for now)
+### 5.3 Merge noemby.json into tvdb.json
 
-**Reason:** noEmby shows are temporary - they become regular shows when added to Emby
-**Action:** Can merge later if desired, but not critical
+**Current:** `apps/srvr/data/noemby.json` - separate file for shows not in Emby
+**Target:** Just store in tvdb.json with `emby.id = "noemby-{uuid}"`
+
+**File:** `apps/srvr/src/tvdb.js`
+
+**Action:** One-time migration:
+
+```javascript
+const noembyPath = path.join(SRVR_DATA_DIR, "noemby.json");
+if (fs.existsSync(noembyPath)) {
+  const noembys = JSON.parse(fs.readFileSync(noembyPath, "utf8"));
+
+  for (const noembyShow of Object.values(noembys)) {
+    const name = noembyShow.Name;
+    if (!allTvdb[name]) {
+      // Create tvdb entry for noemby show
+      allTvdb[name] = {
+        name,
+        tvdbId: noembyShow.TvdbId,
+        showId: noembyShow.Id, // already has "noemby-" prefix
+        emby: {
+          id: noembyShow.Id,
+          inToTry: noembyShow.InToTry || false,
+          inContinue: noembyShow.InContinue || false,
+          inMark: noembyShow.InMark || false,
+          inLinda: noembyShow.InLinda || false,
+        },
+        added: noembyShow.added || Date.now(),
+        saved: 0, // Will trigger refresh
+      };
+    }
+  }
+
+  fs.renameSync(noembyPath, noembyPath + ".backup");
+  await util.writeFile(TVDB_PATH, allTvdb);
+}
+```
+
+**Update srvr endpoints:**
+- Remove `getNoEmbys`, `addNoEmby`, `delNoEmby`
+- Just use regular tvdb operations
+- Filter by `show.emby.id.startsWith("noemby-")` when needed
+
+### 5.4 Merge rejects.json into tvdb.json
+
+**Current:** `apps/srvr/data/rejects.json` (or wherever it's stored)
+**Target:** Add `tvdb[name].reject = true` flag
+
+**File:** `apps/srvr/src/tvdb.js`
+
+**Action:** One-time migration:
+
+```javascript
+// Rejects might be fetched from srvr endpoint - find the source
+const rejects = await getRejectsFromSource(); // Adjust as needed
+
+for (const rejectName of rejects) {
+  const normalized = normShowName(rejectName);
+  if (allTvdb[normalized]) {
+    allTvdb[normalized].reject = true;
+  }
+}
+```
+
+### 5.5 Merge pickups.json into tvdb.json
+
+**Current:** `apps/srvr/data/pickups.json` (or wherever it's stored)
+**Target:** Add `tvdb[name].pickup = true` flag
+
+**File:** `apps/srvr/src/tvdb.js`
+
+**Action:** One-time migration:
+
+```javascript
+const pickups = await getPickupsFromSource();
+
+for (const pickupName of pickups) {
+  const normalized = normShowName(pickupName);
+  if (allTvdb[normalized]) {
+    allTvdb[normalized].pickup = true;
+  }
+}
+```
+
+### 5.6 Merge lastViewed.json into tvdb.json
+
+**Current:** `apps/srvr/data/lastViewed.json` - tracks last viewed timestamp
+**Target:** Add `tvdb[name].lastViewed = timestamp`
+
+**File:** `apps/srvr/src/tvdb.js`
+
+**Action:** One-time migration:
+
+```javascript
+const lastViewedPath = path.join(SRVR_DATA_DIR, "lastViewed.json");
+if (fs.existsSync(lastViewedPath)) {
+  const lastViewed = JSON.parse(fs.readFileSync(lastViewedPath, "utf8"));
+
+  for (const [showName, timestamp] of Object.entries(lastViewed)) {
+    if (allTvdb[showName]) {
+      allTvdb[showName].lastViewed = timestamp;
+    }
+  }
+
+  fs.renameSync(lastViewedPath, lastViewedPath + ".backup");
+  await util.writeFile(TVDB_PATH, allTvdb);
+}
+```
+
+**Result after Phase 5:**
+- `tvdb.json` - Contains everything ✓
+- `gaps.json.backup` - Archived
+- `notes.json.backup` - Archived
+- `noemby.json.backup` - Archived
+- `rejects.json.backup` - Archived (if exists)
+- `pickups.json.backup` - Archived (if exists)
+- `lastViewed.json.backup` - Archived
+- `tv.sqlite` - Keep (download tracking)
+- `tvmaze.sqlite` - Keep (readonly cache)
 
 ---
 
@@ -690,11 +899,133 @@ computed: {
 - [ ] Phase 4: Add event-driven updates for downloads
 - [ ] Phase 5: Migrate gaps.json into tvdb.json
 - [ ] Phase 5: Migrate notes.json into tvdb.json
+- [ ] Phase 5: Migrate noemby.json into tvdb.json
+- [ ] Phase 5: Migrate rejects into tvdb.json
+- [ ] Phase 5: Migrate pickups into tvdb.json
+- [ ] Phase 5: Migrate lastViewed.json into tvdb.json
 - [ ] Phase 6: Update all client component field references
 - [ ] Phase 6: Update filtering and sorting logic
 - [ ] Phase 7: Test data integrity
 - [ ] Phase 7: Test incremental updates
 - [ ] Phase 7: Performance testing
+
+---
+
+## Phase 8 (Optional): Replace WebSocket RPC with HTTP Endpoints
+
+**Note:** This can be done later after core refactor stabilizes.
+
+### 8.1 Analysis of Current RPC System
+
+**File:** `apps/srvr/index.js` - Lines 2300-2600
+
+**Current problems:**
+- Everything serialized through queue
+- No concurrent requests
+- Hard to debug (no HTTP status codes)
+- Complex reconnection logic
+- Can't use browser devtools network tab
+
+### 8.2 Proposed Hybrid Architecture
+
+**Keep WebSocket for push notifications:**
+- Device status updates
+- Emby playback events
+- Download progress
+- Real-time tvdb refresh notifications
+
+**Move to HTTP REST endpoints:**
+
+```javascript
+// Read operations (fully concurrent)
+GET  /api/shows                    // getAllTvdb()
+GET  /api/shows/:name              // Get single show
+GET  /api/shows/:name/episodes     // getSeriesMap()
+GET  /api/shows/:name/season/:s    // Get season data
+
+// Write operations (concurrent to different shows, serialized per show)
+POST   /api/shows/:name            // Update tvdb fields
+DELETE /api/shows/:name            // Mark deleted
+POST   /api/shows/:name/refresh    // Queue metadata refresh
+
+// Collections
+POST /api/collections/:type/add    // Add to collection (toTry, continue, etc.)
+POST /api/collections/:type/remove
+
+// Downloads
+POST /api/downloads                // Add download
+GET  /api/downloads                // Get download status
+
+// Other
+GET  /api/disk/shows               // Get shows from disk
+GET  /api/emby/devices             // Get on devices
+POST /api/notes/:name              // Update note (now part of tvdb)
+```
+
+### 8.3 Concurrency Strategy
+
+**Use in-memory locking per show:**
+
+```javascript
+const showLocks = new Map(); // showName -> Promise
+
+async function withShowLock(showName, fn) {
+  // Wait for existing operation on this show
+  while (showLocks.has(showName)) {
+    await showLocks.get(showName);
+  }
+  
+  // Create new lock
+  let releaseLock;
+  const lockPromise = new Promise(resolve => { releaseLock = resolve; });
+  showLocks.set(showName, lockPromise);
+  
+  try {
+    return await fn();
+  } finally {
+    showLocks.delete(showName);
+    releaseLock();
+  }
+}
+
+// Usage:
+app.post('/api/shows/:name', async (req, res) => {
+  const { name } = req.params;
+  const updates = req.body;
+  
+  await withShowLock(name, async () => {
+    const tvdb = allTvdb[name];
+    Object.assign(tvdb, updates);
+    await util.writeFile(TVDB_PATH, allTvdb);
+  });
+  
+  res.json({ ok: true });
+});
+```
+
+**For full tvdb.json writes (rare):**
+- Use global write lock
+- Or batch writes (write every 10 seconds max)
+
+### 8.4 Migration Strategy
+
+1. Add HTTP endpoints alongside existing WebSocket
+2. Update client to use HTTP for data operations
+3. Keep WebSocket for notifications
+4. Remove old WebSocket RPC handlers after testing
+5. Keep backwards compatibility for 1 version
+
+### 8.5 Benefits
+
+- ✅ Browser devtools show all requests
+- ✅ Can use fetch() instead of custom RPC
+- ✅ Standard HTTP caching
+- ✅ Concurrent reads (faster)
+- ✅ RESTful, easier to understand
+- ✅ Can use curl for debugging
+- ✅ Standard error codes (404, 500, etc.)
+
+**I recommend doing Phase 8 after Phase 1-7 are stable.**
 
 ---
 

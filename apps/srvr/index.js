@@ -2630,6 +2630,154 @@ async function runUsbCheck() {
   }
 }
 
+// Phase 3: Incremental sync functions
+
+/**
+ * Phase 3.1: Sync Emby user data (watched status, play counts) into tvdb
+ * Runs every 5 minutes to keep user data fresh without full reload
+ */
+async function syncEmbyUserData() {
+  try {
+    console.log('[Phase 3] syncEmbyUserData: Starting...');
+    
+    // Get all tvdb records
+    const allTvdb = tvdb.getAllTvdbSync();
+    if (!allTvdb || Object.keys(allTvdb).length === 0) {
+      console.log('[Phase 3] syncEmbyUserData: No tvdb records to sync');
+      return;
+    }
+
+    // Get current Emby sessions/user data
+    // We'll fetch shows from Emby to get updated UserData
+    const embyUrl = 'https://hahnca.com:8920/emby/Users/894c752d448f45a3a1260ccaabd0adff/Items?api_key=1c399bd079d549cba8c916244d3add2b&IncludeItemTypes=Series&Recursive=true&Fields=UserData&StartIndex=0&Limit=10000';
+    
+    const resp = await fetch(embyUrl);
+    if (!resp.ok) {
+      console.error('[Phase 3] syncEmbyUserData: Emby fetch failed:', resp.status);
+      return;
+    }
+
+    const data = await resp.json();
+    const embyShows = data.Items || [];
+    
+    let updatedCount = 0;
+    const now = Date.now();
+
+    // Update tvdb records with fresh Emby user data
+    for (const embyShow of embyShows) {
+      const name = embyShow.Name;
+      const tvdbRecord = allTvdb[name];
+      
+      if (!tvdbRecord || tvdbRecord.deleted) continue;
+      
+      // Check if user data changed
+      const userData = embyShow.UserData || {};
+      const changed = 
+        tvdbRecord.emby?.isPlayed !== userData.Played ||
+        tvdbRecord.emby?.playCount !== userData.PlayCount ||
+        tvdbRecord.emby?.isFavorite !== userData.IsFavorite;
+
+      if (changed) {
+        tvdbRecord.emby = tvdbRecord.emby || {};
+        tvdbRecord.emby.isPlayed = userData.Played || false;
+        tvdbRecord.emby.playCount = userData.PlayCount || 0;
+        tvdbRecord.emby.isFavorite = userData.IsFavorite || false;
+        tvdbRecord.emby.lastPlayedDate = userData.LastPlayedDate || null;
+        tvdbRecord.sync = tvdbRecord.sync || {};
+        tvdbRecord.sync.lastEmbySync = now;
+        updatedCount++;
+      }
+    }
+
+    if (updatedCount > 0) {
+      await tvdb.saveTvdbSync();
+      console.log(`[Phase 3] syncEmbyUserData: Updated ${updatedCount} shows`);
+    } else {
+      console.log('[Phase 3] syncEmbyUserData: No changes detected');
+    }
+    
+  } catch (err) {
+    console.error('[Phase 3] syncEmbyUserData error:', err.message);
+  }
+}
+
+/**
+ * Phase 3.2: Sync disk filesystem data into tvdb
+ * Runs every hour to update file dates and sizes
+ */
+async function syncDiskData() {
+  try {
+    console.log('[Phase 3] syncDiskData: Starting...');
+    
+    // Get all tvdb records
+    const allTvdb = tvdb.getAllTvdbSync();
+    if (!allTvdb || Object.keys(allTvdb).length === 0) {
+      console.log('[Phase 3] syncDiskData: No tvdb records to sync');
+      return;
+    }
+
+    // Get disk data
+    const diskShows = await new Promise((resolve, reject) => {
+      getShowsFromDisk(null, null, ([_, data]) => resolve(data), ([_, err]) => reject(err));
+    });
+
+    let updatedCount = 0;
+    const now = Date.now();
+
+    // Update tvdb records with fresh disk data
+    for (const [name, tvdbRecord] of Object.entries(allTvdb)) {
+      if (tvdbRecord.deleted) continue;
+      
+      const embyPath = tvdbRecord.emby?.path;
+      if (!embyPath) continue;
+
+      const pathPart = embyPath.split('/').pop();
+      const diskInfo = diskShows[pathPart];
+      
+      const newDate = diskInfo ? diskInfo[0] : null;
+      const newSize = diskInfo ? diskInfo[1] : 0;
+      const newNoFiles = !diskInfo;
+
+      // Check if disk data changed
+      const changed =
+        tvdbRecord.disk?.date !== newDate ||
+        tvdbRecord.disk?.size !== newSize ||
+        tvdbRecord.disk?.noFiles !== newNoFiles;
+
+      if (changed) {
+        tvdbRecord.disk = tvdbRecord.disk || {};
+        tvdbRecord.disk.date = newDate;
+        tvdbRecord.disk.size = newSize;
+        tvdbRecord.disk.noFiles = newNoFiles;
+        tvdbRecord.sync = tvdbRecord.sync || {};
+        tvdbRecord.sync.lastDiskCheck = now;
+        updatedCount++;
+      }
+    }
+
+    if (updatedCount > 0) {
+      await tvdb.saveTvdbSync();
+      console.log(`[Phase 3] syncDiskData: Updated ${updatedCount} shows`);
+    } else {
+      console.log('[Phase 3] syncDiskData: No changes detected');
+    }
+    
+  } catch (err) {
+    console.error('[Phase 3] syncDiskData error:', err.message);
+  }
+}
+
+// Phase 3: Set up sync timers
+const EMBY_SYNC_INTERVAL = 5 * 60 * 1000;  // 5 minutes
+const DISK_SYNC_INTERVAL = 60 * 60 * 1000; // 1 hour
+
+setInterval(syncEmbyUserData, EMBY_SYNC_INTERVAL);
+setInterval(syncDiskData, DISK_SYNC_INTERVAL);
+
+// Run initial syncs after startup delay
+setTimeout(syncEmbyUserData, 2 * 60 * 1000);  // 2 minutes after start
+setTimeout(syncDiskData, 3 * 60 * 1000);      // 3 minutes after start
+
 setInterval(runUsbCheck, CHECK_INTERVAL_MS);
 // Run initial check after 1 minute (allow startup)
 setTimeout(runUsbCheck, 60 * 1000);

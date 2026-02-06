@@ -1132,6 +1132,22 @@ export const getAllTvdb = (id, _param, resolve, _reject) => {
   resolve([id, allTvdb]);
 };
 
+// Synchronous access for background sync functions
+export const getAllTvdbSync = () => allTvdb;
+
+export const saveTvdbSync = async () => {
+  return new Promise((resolve, reject) => {
+    fs.writeFile(TVDB_FILE, JSON.stringify(allTvdb, null, 2), (err) => {
+      if (err) {
+        log("err", "saveTvdbSync error:", err.message);
+        reject(err);
+      } else {
+        resolve();
+      }
+    });
+  });
+};
+
 // if tvdb already exists replace it
 export const getNewTvdb = async (ws, id, param) => {
   const paramObj = util.jParse(param, "getNewTvdb");

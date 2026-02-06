@@ -2670,12 +2670,14 @@ async function syncEmbyUserData() {
       
       if (!tvdbRecord || tvdbRecord.deleted) continue;
       
-      // Check if user data changed
+      // Check if user data changed (also check UnplayedItemCount for episode watches)
       const userData = embyShow.UserData || {};
+      const unplayedCount = embyShow.UserData?.UnplayedItemCount || 0;
       const changed = 
         tvdbRecord.emby?.isPlayed !== userData.Played ||
         tvdbRecord.emby?.playCount !== userData.PlayCount ||
-        tvdbRecord.emby?.isFavorite !== userData.IsFavorite;
+        tvdbRecord.emby?.isFavorite !== userData.IsFavorite ||
+        tvdbRecord.emby?.unplayedCount !== unplayedCount;
 
       if (changed) {
         tvdbRecord.emby = tvdbRecord.emby || {};
@@ -2683,6 +2685,7 @@ async function syncEmbyUserData() {
         tvdbRecord.emby.playCount = userData.PlayCount || 0;
         tvdbRecord.emby.isFavorite = userData.IsFavorite || false;
         tvdbRecord.emby.lastPlayedDate = userData.LastPlayedDate || null;
+        tvdbRecord.emby.unplayedCount = unplayedCount;
         tvdbRecord.sync = tvdbRecord.sync || {};
         tvdbRecord.sync.lastEmbySync = now;
         updatedCount++;

@@ -321,7 +321,7 @@ export default {
     handleActorLongPress({ event, actor }) {
       const name = String(actor?.personName || actor?.name || "").trim();
       if (!name) return;
-      
+
       // Emit event to list component to filter shows by this actor
       evtBus.emit("filterByActor", { actorName: name });
     },

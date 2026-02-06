@@ -1891,7 +1891,12 @@ export default {
           .replace(/\s+/g, " ");
 
       const targetActorName = normName(actorName);
-      console.log("Filtering by actor:", actorName, "normalized:", targetActorName);
+      console.log(
+        "Filtering by actor:",
+        actorName,
+        "normalized:",
+        targetActorName,
+      );
 
       // Get TVDB data for all shows to check their actors
       if (!allTvdb) allTvdb = await tvdb.getAllTvdb();
@@ -1903,7 +1908,7 @@ export default {
         // Handle both data formats (like actors.vue does)
         const actualData = tvdbData.response?.data || tvdbData;
         const characters = actualData?.characters;
-        
+
         if (!Array.isArray(characters)) return false;
 
         return characters.some((char) => {
@@ -1912,7 +1917,9 @@ export default {
         });
       });
 
-      console.log(`Found ${filteredShows.length} shows with actor ${actorName}`);
+      console.log(
+        `Found ${filteredShows.length} shows with actor ${actorName}`,
+      );
 
       // Update the shows list and UI
       this.shows = filteredShows;

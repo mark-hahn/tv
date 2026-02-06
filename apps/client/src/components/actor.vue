@@ -7,7 +7,9 @@
     @touchmove="handleTouchMove"
     @mousedown="handleMouseDown($event)"
     @mouseup="handleMouseUp($event)"
-    @mouseleave="handleMouseLeave"    @contextmenu.prevent    :style="{
+    @mouseleave="handleMouseLeave"
+    @contextmenu.prevent
+    :style="{
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -170,7 +172,7 @@ export default {
         this.actor?.personName || this.actor?.name || "",
       ).trim();
       if (!name) return;
-      
+
       this.$emit("actor-long-press", { event: e, actor: this.actor });
     },
   },

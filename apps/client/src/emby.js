@@ -62,398 +62,375 @@ export const isReject = (name) => {
   return rejectsSet.has(normShowName(name).toLowerCase());
 };
 
-// load all shows from emby and server //////////
+// Phase 2: Helper function to sync collection flags into tvdb
+async function syncCollections(allTvdb) {
+  const [toTryRes, continueRes, markRes, lindaRes] = await Promise.all([
+    axios.get(urls.collectionListUrl(cred, toTryCollId)),
+    axios.get(urls.collectionListUrl(cred, continueCollId)),
+    axios.get(urls.collectionListUrl(cred, markCollId)),
+    axios.get(urls.collectionListUrl(cred, lindaCollId)),
+  ]);
+
+  const toTryIds = new Set(toTryRes.data.Items.map((i) => i.Id));
+  const continueIds = new Set(continueRes.data.Items.map((i) => i.Id));
+  const markIds = new Set(markRes.data.Items.map((i) => i.Id));
+  const lindaIds = new Set(lindaRes.data.Items.map((i) => i.Id));
+
+  for (const tvdb of Object.values(allTvdb)) {
+    if (tvdb.deleted) continue;
+    const embyId = tvdb.emby?.id;
+    if (embyId && !embyId.startsWith("noemby-")) {
+      tvdb.emby.inToTry = toTryIds.has(embyId);
+      tvdb.emby.inContinue = continueIds.has(embyId);
+      tvdb.emby.inMark = markIds.has(embyId);
+      tvdb.emby.inLinda = lindaIds.has(embyId);
+    }
+  }
+}
+
+// Phase 2: Helper function to sync rejects and pickups into tvdb
+function syncRejectsAndPickups(allTvdb, rejectsIn, pickups) {
+  // Build normalized name lookup
+  const showsByNormName = new Map();
+  for (const [name, tvdb] of Object.entries(allTvdb)) {
+    if (!tvdb.deleted) {
+      const key = normShowName(name).toLowerCase();
+      showsByNormName.set(key, tvdb);
+    }
+  }
+
+  // Mark rejects in tvdb
+  const rejectsList = (rejectsIn || []).map(normShowName).filter(Boolean);
+  for (const rejectName of rejectsList) {
+    const key = rejectName.toLowerCase();
+    const tvdb = showsByNormName.get(key);
+    if (tvdb) tvdb.reject = true;
+  }
+
+  // Mark pickups in tvdb
+  for (const pickupName of pickups || []) {
+    const key = normShowName(pickupName).toLowerCase();
+    const tvdb = showsByNormName.get(key);
+    if (tvdb) tvdb.pickup = true;
+  }
+
+  // Update module-level rejects for isReject()
+  rejects = rejectsList;
+  rejectsSet = new Set(rejects.map((n) => n.toLowerCase()));
+}
+
+// Phase 2: Helper function to set wait strings for shows
+async function setWaitStrings(allTvdb) {
+  for (const tvdb of Object.values(allTvdb)) {
+    if (tvdb.deleted) continue;
+    try {
+      const show = { Name: tvdb.name, Id: tvdb.emby?.id };
+      const waitStr = await tvdb.getWaitStr(show);
+      if (waitStr) tvdb.waitStr = waitStr;
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+}
+
+// Phase 2: Refactored loadAllShows - simplified, uses tvdb as source of truth
 export async function loadAllShows() {
-  allTvdb = await tvdb.getAllTvdb();
+  const loadStart = Date.now();
 
-  const loadAllShowsStartTime = new Date().getTime();
-
-  const embyPromise = axios.get(urls.showListUrl(cred, 0, 10000));
-  const diskPromise = srvr.getShowsFromDisk();
-  const rejPromise = srvr.getRejects();
-  const pkupPromise = srvr.getPickups();
-  const noEmbyPromise = srvr.getNoEmbys();
-  const gapPromise = srvr.getGaps();
-  const notesPromise = srvr.getAllNotes();
-
+  // 1. Fetch all data sources in parallel
   const [embyShows, diskShows, rejectsIn, pickups, noEmbys, gaps, notesIn] =
     await Promise.all([
-      embyPromise,
-      diskPromise,
-      rejPromise,
-      pkupPromise,
-      noEmbyPromise,
-      gapPromise,
-      notesPromise,
+      axios.get(urls.showListUrl(cred, 0, 10000)),
+      srvr.getShowsFromDisk(),
+      srvr.getRejects(),
+      srvr.getPickups(),
+      srvr.getNoEmbys(),
+      srvr.getGaps(),
+      srvr.getAllNotes(),
     ]);
 
-  // Normalize rejects so the list works even if the JSON has newlines/extra spaces.
-  // Also build a case-insensitive lookup for matching.
-  if (Array.isArray(rejectsIn)) {
-    rejects = rejectsIn.map(normShowName).filter(Boolean);
-  } else {
-    rejects = [];
-  }
-  rejectsSet = new Set(rejects.map((n) => n.toLowerCase()));
+  // 2. Get authoritative tvdb data (our source of truth)
+  allTvdb = await tvdb.getAllTvdb();
+
   const gapsById = gaps || {};
   const notesByShowName = notesIn && typeof notesIn === "object" ? notesIn : {};
+  const now = Date.now();
 
   let shows = [];
 
-  ////////// get shows from emby ////////////
-  // includes id, name, dates, haveShows, favorites, gaps, etc.
-  for (let key in embyShows.data.Items) {
-    let show = embyShows.data.Items[key];
+  // 3. Sync Emby shows into tvdb (update tvdb records with Emby user data)
+  for (const embyShow of embyShows.data.Items) {
+    const name = embyShow.Name;
+    const tvdbId = embyShow?.ProviderIds?.Tvdb || embyShow?.TvdbId;
 
-    Object.assign(show, show.UserData);
-    delete show.UserData;
-    for (const date of ["DateCreated", "PremiereDate"]) {
-      if (show[date]) show[date] = show[date].substring(0, 10);
-    }
-    const embyPath = show.Path.split("/").pop();
-    const showDateSize = diskShows[embyPath];
-    if (!showDateSize) {
-      show.NoFiles = true;
-      show.Date = "2017-12-05";
-      show.Size = 0;
-    } else {
-      const [date, size] = showDateSize;
-      show.Date = date;
-      show.Size = size;
-    }
-    // if(!show.DateCreated) show.DateCreated = show.Date;
-
-    const gapData = gapsById[show.Id];
-    if (gapData) {
-      Object.assign(show, gapData);
-      delete gapsById[show.Id];
-    }
-
-    const tvdbId = show?.ProviderIds?.Tvdb || show?.TvdbId;
     if (!tvdbId || tvdbId == "0") {
-      console.error(
-        `loadAllShows, no tvdbId: ${show.Name} - DELETING FROM EMBY`,
-        {
-          show,
-        },
-      );
+      console.error(`loadAllShows: no tvdbId for ${name}, deleting from Emby`);
       try {
-        await deleteShowFromEmby(show);
+        await deleteShowFromEmby(embyShow);
       } catch (e) {
-        // ignore delete error (already logged in deleteShowFromEmby)
+        // ignore delete error
       }
       continue;
     }
-    show.TvdbId = tvdbId;
-    shows.push(show);
-  }
 
-  //////////  add noemby shows from srvr ////////////
-  const prunedNoEmbyIds = [];
-  for (const noEmbyShow of noEmbys) {
-    const idx = shows.findIndex((show) => show.Name == noEmbyShow.Name);
-    if (idx != -1) {
-      // If the show now exists in Emby, preserve any collection flags
-      // we tracked while it was a noemby show by copying them over and
-      // writing them into the real Emby collections before deleting.
-      try {
-        const embyShow = shows[idx];
-        const wantToTry = !!noEmbyShow.InToTry;
-        const wantContinue = !!noEmbyShow.InContinue;
-        const wantMark = !!noEmbyShow.InMark;
-        const wantLinda = !!noEmbyShow.InLinda;
+    // Get disk info
+    const embyPath = embyShow.Path.split("/").pop();
+    const diskInfo = diskShows[embyPath];
+    const diskDate = diskInfo ? diskInfo[0] : null;
+    const diskSize = diskInfo ? diskInfo[1] : 0;
+    const noFiles = !diskInfo;
 
-        if (wantToTry) {
-          embyShow.InToTry = true;
-          await saveToTry(embyShow.Id, true);
-        }
-        if (wantContinue) {
-          embyShow.InContinue = true;
-          await saveContinue(embyShow.Id, true);
-        }
-        if (wantMark) {
-          embyShow.InMark = true;
-          await saveMark(embyShow.Id, true);
-        }
-        if (wantLinda) {
-          embyShow.InLinda = true;
-          await saveLinda(embyShow.Id, true);
-        }
-      } catch (e) {
-        console.error(
-          "loadAllShows: upgrade noEmby -> Emby flag copy failed",
-          noEmbyShow?.Name,
-          e,
-        );
+    // Get gap info
+    const gapData = gapsById[embyShow.Id] || null;
+    if (gapData) delete gapsById[embyShow.Id]; // Remove from list
+
+    // Get note
+    const note = notesByShowName?.[name] || "";
+
+    // Build update object with Emby + disk data
+    const updateFields = {
+      name,
+      showId: embyShow.Id,
+      tvdbId,
+      embyPath,
+      dateCreated: embyShow.DateCreated?.substring(0, 10),
+      premiereDate: embyShow.PremiereDate?.substring(0, 10),
+      isFavorite: embyShow.UserData?.IsFavorite || false,
+      isPlayed: embyShow.UserData?.Played || false,
+      playCount: embyShow.UserData?.PlayCount || 0,
+      lastPlayedDate: embyShow.UserData?.LastPlayedDate || null,
+      diskDate,
+      diskSize,
+      noFiles,
+      gap: gapData,
+      note,
+      lastEmbySync: now,
+      lastDiskCheck: now,
+    };
+
+    // Create or update tvdb record
+    let tvdbRecord = allTvdb[name];
+    if (!tvdbRecord || tvdbRecord.showId !== embyShow.Id) {
+      // Need to create/refresh tvdb record
+      const reason = !tvdbRecord
+        ? "no existing tvdb entry"
+        : `showId mismatch (${tvdbRecord.showId} != ${embyShow.Id})`;
+
+      console.log(`loadAllShows: creating/updating tvdb (${reason})`, {
+        name,
+        showId: embyShow.Id,
+        tvdbId,
+      });
+
+      // Check for true mismatches (pop modal for user attention)
+      if (
+        tvdbRecord &&
+        (tvdbRecord.showId !== embyShow.Id ||
+          (tvdbRecord.tvdbId &&
+            tvdbId &&
+            String(tvdbRecord.tvdbId) !== String(tvdbId)))
+      ) {
+        evtBus.emit("tvdb-mismatch", {
+          name,
+          showId: embyShow.Id,
+          tvdbId,
+          existing: {
+            tvdbId: tvdbRecord.tvdbId,
+            showId: tvdbRecord.showId,
+            deleted: tvdbRecord.deleted,
+          },
+        });
       }
 
-      console.log("upgrading noEmby by deleting it:", noEmbyShow.Name);
-      await srvr.delNoEmby(noEmbyShow.Name);
+      const epicounts = await getEpisodeCounts(embyShow);
+      const param = Object.assign({ show: embyShow }, epicounts, updateFields);
+      tvdbRecord = await srvr.getNewTvdb(param);
+      allTvdb[name] = tvdbRecord;
+    } else {
+      // Update existing tvdb record with Emby user data
+      tvdbRecord.emby = tvdbRecord.emby || {};
+      tvdbRecord.disk = tvdbRecord.disk || {};
+      tvdbRecord.sync = tvdbRecord.sync || {};
+
+      tvdbRecord.emby.id = embyShow.Id;
+      tvdbRecord.emby.path = embyPath;
+      tvdbRecord.emby.dateCreated = updateFields.dateCreated;
+      tvdbRecord.emby.premiereDate = updateFields.premiereDate;
+      tvdbRecord.emby.isFavorite = updateFields.isFavorite;
+      tvdbRecord.emby.isPlayed = updateFields.isPlayed;
+      tvdbRecord.emby.playCount = updateFields.playCount;
+      tvdbRecord.emby.lastPlayedDate = updateFields.lastPlayedDate;
+
+      tvdbRecord.disk.date = diskDate;
+      tvdbRecord.disk.size = diskSize;
+      tvdbRecord.disk.noFiles = noFiles;
+
+      tvdbRecord.gap = gapData;
+      tvdbRecord.note = note;
+
+      tvdbRecord.sync.lastEmbySync = now;
+      tvdbRecord.sync.lastDiskCheck = now;
+    }
+  }
+
+  // 4. Process noEmby shows
+  const prunedNoEmbyIds = [];
+  for (const noEmbyShow of noEmbys) {
+    const name = noEmbyShow.Name;
+
+    // Check if show now exists in Emby (upgrade scenario)
+    const tvdbRecord = allTvdb[name];
+    if (tvdbRecord?.emby?.id && !tvdbRecord.emby.id.startsWith("noemby-")) {
+      // Show upgraded to Emby - copy collection flags
+      console.log("upgrading noEmby to Emby:", name);
+
+      try {
+        if (noEmbyShow.InToTry) {
+          await saveToTry(tvdbRecord.emby.id, true);
+          tvdbRecord.emby.inToTry = true;
+        }
+        if (noEmbyShow.InContinue) {
+          await saveContinue(tvdbRecord.emby.id, true);
+          tvdbRecord.emby.inContinue = true;
+        }
+        if (noEmbyShow.InMark) {
+          await saveMark(tvdbRecord.emby.id, true);
+          tvdbRecord.emby.inMark = true;
+        }
+        if (noEmbyShow.InLinda) {
+          await saveLinda(tvdbRecord.emby.id, true);
+          tvdbRecord.emby.inLinda = true;
+        }
+      } catch (e) {
+        console.error("loadAllShows: upgrade noEmby flags failed", name, e);
+      }
+
+      await srvr.delNoEmby(name);
       prunedNoEmbyIds.push(noEmbyShow.Id);
       continue;
     }
 
-    // Check if S01E01 is unaired in TVDB and set WaitStr
+    // Check if S01E01 is unaired (for WaitStr)
     try {
       const seriesMap = await tvdb.getSeriesMap(noEmbyShow);
       const s1 = seriesMap.find(([seasonNumber]) => seasonNumber === 1);
       if (s1) {
         const e1 = s1[1].find(([episodeNumber]) => episodeNumber === 1);
-        const unaired = e1?.[1]?.unaired === true;
-        if (unaired) {
+        if (e1?.[1]?.unaired === true) {
           noEmbyShow.S1E1Unaired = true;
           const airDate = e1?.[1]?.aired;
           if (airDate) {
-            // Format as {M/DD} matching getWaitStr format
             const dateStr = airDate.slice(5).replace(/^0/, " ").trim();
             noEmbyShow.WaitStr = `{${dateStr}}`;
           }
         }
       }
     } catch (e) {
-      console.error(
-        "loadAllShows: tvdb.getSeriesMap error for noemby",
-        noEmbyShow.Name,
-        e,
-      );
+      console.error("loadAllShows: getSeriesMap error for noemby", name, e);
     }
-
-    shows.push(noEmbyShow);
-  }
-  for (const prunedNoEmbyId of prunedNoEmbyIds) {
-    const idx = noEmbys.findIndex(
-      (noEmbyShow) => noEmbyShow.Id == prunedNoEmbyId,
-    );
-    if (idx != -1) noEmbys.splice(idx, 1);
   }
 
-  //////////  one-time migrate gaps: add showName for debugging ////////////
-  try {
-    const migratedKey = "gapShowNameMigrated_v1";
-    const alreadyMigrated = window?.localStorage?.getItem(migratedKey) === "1";
-    if (!alreadyMigrated) {
-      const entries = Object.entries(gaps || {});
-      let pending = [];
-      for (const [gapId, gapObj] of entries) {
-        if (!gapId || !gapObj || typeof gapObj !== "object") continue;
-        const match = shows.find((s) => String(s?.Id) === String(gapId));
-        if (!match) continue;
-        if (gapObj.showName === match.Name) continue;
-        pending.push([
-          gapId,
-          Object.assign({}, gapObj, { showName: match.Name }),
-        ]);
-      }
+  // 5. Mark tvdb records as deleted if no matching show exists
+  for (const [name, tvdbRecord] of Object.entries(allTvdb)) {
+    if (tvdbRecord.deleted) continue;
 
-      if (pending.length > 0) {
-        for (let i = 0; i < pending.length; i++) {
-          const [gapId, gapObj] = pending[i];
-          const save = i === pending.length - 1;
-          await srvr.addGap([gapId, gapObj, save]);
-        }
-      }
+    const hasEmby = embyShows.data.Items.some((s) => s.Name === name);
+    const hasNoEmby = noEmbys.some((s) => s.Name === name);
 
-      window?.localStorage?.setItem(migratedKey, "1");
-    }
-  } catch (e) {
-    console.error("loadAllShows: gap showName migration failed", e);
-  }
-
-  //////////  mark tvdbs with no show as deleted ////////////
-  for (const tvdb of Object.values(allTvdb)) {
-    if (!tvdb.deleted) {
-      const matchingShow = shows.find((show) => show.Name == tvdb.name);
-      if (matchingShow && !tvdb.showId) {
-        const name = matchingShow.Name;
-        const showId = matchingShow.Id;
-        console.log(`loadAllShows, tvdb has no showid and not deleted:`, name, {
-          show: matchingShow,
-          tvdb,
-        });
-        allTvdb[name] = await srvr.setTvdbFields({ name, showId });
-      }
-      if (matchingShow) continue;
-      console.log(`loadAllShows, !tvdb.deleted with no show:`, tvdb.name, {
-        tvdb,
-      });
-      allTvdb[tvdb.name] = await srvr.setTvdbFields({
-        name: tvdb.name,
+    if (!hasEmby && !hasNoEmby) {
+      console.log(`loadAllShows: marking ${name} as deleted (no show found)`);
+      allTvdb[name] = await srvr.setTvdbFields({
+        name,
         deleted: util.fmtDate(),
       });
-    }
-  }
-
-  //////////  create tvdbs ////////////
-  for (const show of shows) {
-    if (!show.TvdbId) {
-      console.log(`loadAllShows, no tvdbId:`, show.Name, { show });
-      continue;
-    }
-    const name = show.Name;
-    let tvdb = allTvdb[name];
-    if (!tvdb || tvdb.showId !== show.Id) {
-      const reason = !tvdb
-        ? "no existing tvdb entry for show name"
-        : `showId mismatch (tvdb.showId=${tvdb.showId || "n/a"} != show.Id=${show.Id})`;
-      const details = {
+    } else if (hasEmby && !tvdbRecord.showId) {
+      // Has Emby show but tvdb missing showId - update it
+      const embyShow = embyShows.data.Items.find((s) => s.Name === name);
+      console.log(`loadAllShows: updating tvdb showId for ${name}`);
+      allTvdb[name] = await srvr.setTvdbFields({
         name,
-        showId: show.Id,
-        tvdbId: show.TvdbId,
-        existing: tvdb
-          ? {
-              tvdbId: tvdb.tvdbId,
-              showId: tvdb.showId,
-              deleted: tvdb.deleted,
-            }
-          : null,
-      };
-      console.log(
-        `loadAllShows tvdb: creating/updating via getNewTvdb (${reason})`,
-        details,
-      );
-
-      // Pop a modal only for true mismatches (a preexisting entry that conflicts)
-      // so the user can see the details immediately.
-      if (
-        tvdb &&
-        (tvdb.showId !== show.Id ||
-          (tvdb.tvdbId &&
-            show.TvdbId &&
-            String(tvdb.tvdbId) !== String(show.TvdbId)))
-      ) {
-        evtBus.emit("tvdb-mismatch", details);
-      }
-      const epicounts = await getEpisodeCounts(show);
-      const param = Object.assign({ show }, epicounts);
-      tvdb = await srvr.getNewTvdb(param);
+        showId: embyShow.Id,
+      });
     }
-    let ratings = 0;
-    for (const remote of tvdb.remotes) {
-      if (remote.ratings) ratings = remote.ratings;
-    }
-    show.DateCreated = tvdb.added;
-    show.TvdbId = tvdb.tvdbId;
-    show.OriginalCountry = tvdb.originalCountry;
-    show.Ended = tvdb.status == "Ended";
-    show.LastAired = tvdb.lastAired;
-    show.Ratings = ratings;
-    show.averageRuntime = tvdb.averageRuntime;
-    allTvdb[name] = tvdb;
   }
 
-  ////////  remove gaps with no matching show /////////
-  let deletedGap = false;
-  for (const gapId in gaps) {
+  // 6. Sync collection flags (toTry, continue, mark, linda)
+  await syncCollections(allTvdb);
+
+  // 7. Sync rejects and pickups
+  syncRejectsAndPickups(allTvdb, rejectsIn, pickups);
+
+  // 8. Set WaitStr for shows with unaired episodes
+  await setWaitStrings(allTvdb);
+
+  // 9. Build show list from tvdb (return tvdb records as shows)
+  // We need to convert back to old "show" format for compatibility with existing client code
+  // In Phase 6, we'll update components to use new structure directly
+  for (const [name, tvdbRecord] of Object.entries(allTvdb)) {
+    if (tvdbRecord.deleted) continue;
+
+    // Build show object in old format (for backward compatibility during transition)
+    const show = {
+      // Core identity
+      Name: tvdbRecord.name,
+      Id: tvdbRecord.emby?.id || `noemby-${tvdbRecord.tvdbId}`,
+      TvdbId: tvdbRecord.tvdbId,
+
+      // Emby data
+      DateCreated: tvdbRecord.emby?.dateCreated || tvdbRecord.added,
+      PremiereDate: tvdbRecord.emby?.premiereDate,
+      IsFavorite: tvdbRecord.emby?.isFavorite,
+      Played: tvdbRecord.emby?.isPlayed,
+      PlayCount: tvdbRecord.emby?.playCount,
+      LastPlayedDate: tvdbRecord.emby?.lastPlayedDate,
+      Path: tvdbRecord.emby?.path,
+
+      // Disk data
+      Date: tvdbRecord.disk?.date || "2017-12-05",
+      Size: tvdbRecord.disk?.size || 0,
+      NoFiles: tvdbRecord.disk?.noFiles || false,
+
+      // TVDB metadata
+      OriginalCountry: tvdbRecord.originalCountry,
+      Ended: tvdbRecord.status === "Ended",
+      LastAired: tvdbRecord.lastAired,
+      Ratings: tvdbRecord.remotes?.find((r) => r.ratings)?.ratings || 0,
+      averageRuntime: tvdbRecord.averageRuntime,
+
+      // Collection flags
+      InToTry: tvdbRecord.emby?.inToTry || false,
+      InContinue: tvdbRecord.emby?.inContinue || false,
+      InMark: tvdbRecord.emby?.inMark || false,
+      InLinda: tvdbRecord.emby?.inLinda || false,
+
+      // Other flags
+      Reject: tvdbRecord.reject || false,
+      Pickup: tvdbRecord.pickup || false,
+      WaitStr: tvdbRecord.waitStr,
+      NotReady: tvdbRecord.emby?.id?.startsWith("noemby-") || false,
+      S1E1Unaired: false, // Will be set for noEmby shows above
+
+      // Gap and notes
+      ...tvdbRecord.gap, // Spread gap data if exists
+      Notes: tvdbRecord.note || "",
+
+      // Keep reference to tvdb record for internal use
+      _tvdb: tvdbRecord,
+    };
+
+    shows.push(show);
+  }
+
+  // 10. Remove orphaned gaps
+  for (const gapId in gapsById) {
     await srvr.delGap([gapId, false]);
-    deletedGap = true;
   }
-  if (deletedGap) await srvr.delGap([null, true]);
-
-  //////////  attach Notes to show objects ////////////
-  for (const show of shows) {
-    const nm = show?.Name;
-    const note = nm ? notesByShowName?.[nm] : "";
-    show.Notes = note == null ? "" : String(note);
+  if (Object.keys(gapsById).length > 0) {
+    await srvr.delGap([null, true]); // Save after all deletes
   }
 
-  //////////  process toTry collection  ////////////
-  const toTryRes = await axios.get(urls.collectionListUrl(cred, toTryCollId));
-  const toTryIds = [];
-  for (let tryEntry of toTryRes.data.Items) toTryIds.push(tryEntry.Id);
-  for (let show of shows) {
-    // noemby shows are not in Emby collections; keep server-stored flags.
-    if (String(show?.Id || "").startsWith("noemby-")) continue;
-    show.InToTry = toTryIds.includes(show.Id);
-  }
-
-  //////////  process continue collection  ////////////
-  const continueRes = await axios.get(
-    urls.collectionListUrl(cred, continueCollId),
-  );
-  const continueIds = [];
-  for (let tryEntry of continueRes.data.Items) continueIds.push(tryEntry.Id);
-  for (let show of shows) {
-    if (String(show?.Id || "").startsWith("noemby-")) continue;
-    show.InContinue = continueIds.includes(show.Id);
-  }
-
-  //////////  process mark collection  ////////////
-  const markRes = await axios.get(urls.collectionListUrl(cred, markCollId));
-  const markIds = [];
-  for (let tryEntry of markRes.data.Items) markIds.push(tryEntry.Id);
-  for (let show of shows) {
-    if (String(show?.Id || "").startsWith("noemby-")) continue;
-    show.InMark = markIds.includes(show.Id);
-  }
-
-  //////////  process linda collection  ////////////
-  const lindaRes = await axios.get(urls.collectionListUrl(cred, lindaCollId));
-  const lindaIds = [];
-  for (let tryEntry of lindaRes.data.Items) lindaIds.push(tryEntry.Id);
-  for (let show of shows) {
-    if (String(show?.Id || "").startsWith("noemby-")) continue;
-    show.InLinda = lindaIds.includes(show.Id);
-  }
-
-  //////////  process rejects for usb ////////////
-  {
-    const showsByNormName = new Map();
-    for (const show of shows) {
-      const key = normShowName(show?.Name).toLowerCase();
-      if (!key) continue;
-      // Keep the first match; duplicates are rare but possible.
-      if (!showsByNormName.has(key)) showsByNormName.set(key, show);
-    }
-
-    let matchedCount = 0;
-    const unmatched = [];
-    for (const rejectNameRaw of rejects) {
-      const key = normShowName(rejectNameRaw).toLowerCase();
-      const matchingShow = showsByNormName.get(key);
-      if (matchingShow) {
-        matchingShow.Reject = true;
-        matchedCount++;
-      } else {
-        unmatched.push(rejectNameRaw);
-      }
-    }
-
-    // Optional debug: add ?debugRejects=1 to the URL
-    try {
-      const debugRejects = new URLSearchParams(window.location.search).has(
-        "debugRejects",
-      );
-      if (debugRejects) {
-        console.log("[rejects] loaded:", {
-          total: rejects.length,
-          matchedCount,
-          unmatchedCount: unmatched.length,
-        });
-        if (unmatched.length)
-          console.log("[rejects] unmatched names:", unmatched);
-      }
-    } catch {}
-  }
-
-  //////////  process pickups for usb ////////////
-  for (let pickupName of pickups) {
-    const show = shows.find((show) => show.Name == pickupName);
-    if (show) show.Pickup = true;
-  }
-
-  //////////  set WaitStr (waiting indicator) ////////////
-  for (const show of shows) {
-    try {
-      const waitStr = await tvdb.getWaitStr(show);
-      if (waitStr) show.WaitStr = waitStr;
-    } catch (e) {
-      // Ignore WaitStr errors; gap/TVDB errors are non-fatal for load.
-    }
-  }
-
-  //////////  finished loadAllShows ////////////
-  const elapsed = new Date().getTime() - loadAllShowsStartTime;
-  console.log("all shows loaded, elapsed ms:", elapsed);
+  const elapsed = Date.now() - loadStart;
+  console.log(`Phase 2: loadAllShows completed in ${elapsed}ms`);
   return shows;
 }
 

@@ -1252,7 +1252,11 @@ export const getRemotesCmd = async (id, param, resolve, reject) => {
 };
 
 export const getActorPage = async (id, param, resolve, _reject) => {
-  const actorName = param;
+  let actorName = param;
+  try {
+    const p = JSON.parse(param);
+    if (p && p.name) actorName = p.name;
+  } catch {}
 
   try {
     // Search IMDb for the actor

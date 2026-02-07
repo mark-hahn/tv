@@ -1335,11 +1335,11 @@ export default {
 
     // While notes input is NOT focused, refresh note text from server once/sec.
     // (Keeps the notes display in sync with external edits.)
-    this.notePollTimer = setInterval(() => {
-      if (this.noteFocused) return;
-      if (!this.show?.Name) return;
-      void this.refreshNoteFromServer();
-    }, 1000);
+    // this.notePollTimer = setInterval(() => {
+    //   if (this.noteFocused) return;
+    //   if (!this.show?.Name) return;
+    //   void this.refreshNoteFromServer();
+    // }, 1000);
 
     // Keep the Series infobox totals in sync with the actual Map grid.
     // This matters for noemby shows where tvdb.json counts can be stale / mismatched.

@@ -312,9 +312,25 @@ export default {
       const name = String(a?.personName || a?.name || "").trim();
       if (!name) return;
 
-      if (a?.personName) {
-        const url = await srvr.getActorPage(a.personName);
-        if (url) window.open(url);
+      // Open window immediately to avoid popup blocker
+      const win = window.open("", "_blank");
+
+      // Get actor page URL and open it
+      const actorName = a?.personName || a?.name;
+      if (actorName) {
+        try {
+          const url = await srvr.getActorPage(actorName);
+          if (url && win && !win.closed) {
+            win.location.href = url;
+          } else {
+            win?.close();
+          }
+        } catch (e) {
+          console.error("handleActorClick error:", e);
+          win?.close();
+        }
+      } else {
+        win?.close();
       }
     },
 

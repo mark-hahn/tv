@@ -1483,6 +1483,59 @@ app.post("/api/getBrowseShow", async (req, res) => {
   }
 });
 
+app.post("/api/getActorPage", async (req, res) => {
+  let actorName = req.body;
+  if (typeof actorName === "object" && actorName !== null && actorName.name) {
+    actorName = actorName.name;
+  }
+  try {
+    // Search IMDb for the actor
+    const searchUrl = `https://www.imdb.com/find/?q=${encodeURIComponent(actorName)}&s=nm`;
+    const searchResp = await fetch(searchUrl);
+
+    if (!searchResp.ok) {
+      console.error("getActorPage IMDb search failed:", searchResp.status);
+      const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, "_")}`;
+      res.json(wikiUrl);
+      return;
+    }
+
+    const html = await searchResp.text();
+
+    // Find all matches to check for exact name match
+    // IMDb uses format: <a href="/name/nm1234567/?ref_=..."><h3 class="ipc-title__text">Actor Name</h3></a>
+    let match;
+    const allMatches = [];
+    const globalRegex = new RegExp(
+      `<a\\s+href="(/name/nm\\d+)/[^"]*"[^>]*>.*?<h3[^>]*>([^<]+)</h3>`,
+      "gis",
+    );
+
+    while ((match = globalRegex.exec(html)) !== null) {
+      allMatches.push({ url: match[1], name: match[2].trim() });
+    }
+
+    // Find exact match (case-insensitive)
+    const exactMatch = allMatches.find(
+      (m) => m.name.toLowerCase() === actorName.toLowerCase(),
+    );
+
+    if (exactMatch) {
+      const actorUrl = `https://www.imdb.com${exactMatch.url}`;
+      res.json(actorUrl);
+      return;
+    }
+
+    // No exact match found, return Wikipedia URL
+    const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, "_")}`;
+    res.json(wikiUrl);
+  } catch (err) {
+    console.error("getActorPage error:", err.message);
+    const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, "_")}`;
+    res.json(wikiUrl);
+  }
+});
+
 app.get("/api/reviews/getReviews", async (req, res) => {
   const rottenUrl = req.query.url;
   const buttonName = req.query.btn;

@@ -137,23 +137,19 @@ async function setWaitStrings(allTvdb) {
 export async function loadAllShows() {
   const loadStart = Date.now();
 
-  // 1. Fetch all data sources in parallel
-  const [embyShows, diskShows, rejectsIn, pickups, noEmbys, gaps, notesIn] =
+  // 1. Fetch all data sources in parallel (HTTP is fast now!)
+  const [embyShows, diskShows, rejectsIn, pickups, allTvdbResult] =
     await Promise.all([
       axios.get(urls.showListUrl(cred, 0, 10000)),
       srvr.getShowsFromDisk(),
       srvr.getRejects(),
       srvr.getPickups(),
-      srvr.getNoEmbys(),
-      srvr.getGaps(),
-      srvr.getAllNotes(),
+      tvdb.getAllTvdb(),
     ]);
 
   // 2. Get authoritative tvdb data (our source of truth)
-  allTvdb = await tvdb.getAllTvdb();
-
-  const gapsById = gaps || {};
-  const notesByShowName = notesIn && typeof notesIn === "object" ? notesIn : {};
+  // Note: gaps, notes, noEmbys now stored in tvdb.json (Phase 5)
+  allTvdb = allTvdbResult;
   const now = Date.now();
 
   let shows = [];
@@ -180,13 +176,6 @@ export async function loadAllShows() {
     const diskSize = diskInfo ? diskInfo[1] : 0;
     const noFiles = !diskInfo;
 
-    // Get gap info
-    const gapData = gapsById[embyShow.Id] || null;
-    if (gapData) delete gapsById[embyShow.Id]; // Remove from list
-
-    // Get note
-    const note = notesByShowName?.[name] || "";
-
     // Build update object with Emby + disk data
     const updateFields = {
       name,
@@ -205,8 +194,6 @@ export async function loadAllShows() {
       diskDate,
       diskSize,
       noFiles,
-      gap: gapData,
-      note,
       lastEmbySync: now,
       lastDiskCheck: now,
     };
@@ -246,7 +233,11 @@ export async function loadAllShows() {
       }
 
       const epicounts = await getEpisodeCounts(embyShow);
-      const param = Object.assign({ show: embyShow }, epicounts, updateFields);
+
+      // Add TvdbId to show object for server request
+      const showWithTvdbId = { ...embyShow, TvdbId: tvdbId };
+      const param = Object.assign({ show: showWithTvdbId }, epicounts, updateFields);
+
       tvdbRecord = await srvr.getNewTvdb(param);
       allTvdb[name] = tvdbRecord;
     } else {
@@ -271,18 +262,21 @@ export async function loadAllShows() {
       tvdbRecord.disk.size = diskSize;
       tvdbRecord.disk.noFiles = noFiles;
 
-      tvdbRecord.gap = gapData;
-      tvdbRecord.note = note;
+      // Note: gap and note already in tvdb (Phase 5), don't overwrite
 
       tvdbRecord.sync.lastEmbySync = now;
       tvdbRecord.sync.lastDiskCheck = now;
     }
   }
 
-  // 4. Process noEmby shows
+  // 4. Process noEmby shows (Phase 5: now stored in tvdb with noemby- IDs)
+  const noEmbys = Object.values(allTvdb).filter((t) =>
+    t.emby?.id?.startsWith("noemby-"),
+  );
   const prunedNoEmbyIds = [];
-  for (const noEmbyShow of noEmbys) {
-    const name = noEmbyShow.Name;
+  
+  await Promise.all(noEmbys.map(async (noEmbyShow) => {
+    const name = noEmbyShow.name;
 
     // Check if show now exists in Emby (upgrade scenario)
     const tvdbRecord = allTvdb[name];
@@ -291,19 +285,19 @@ export async function loadAllShows() {
       console.log("upgrading noEmby to Emby:", name);
 
       try {
-        if (noEmbyShow.InToTry) {
+        if (noEmbyShow.emby.inToTry) {
           await saveToTry(tvdbRecord.emby.id, true);
           tvdbRecord.emby.inToTry = true;
         }
-        if (noEmbyShow.InContinue) {
+        if (noEmbyShow.emby.inContinue) {
           await saveContinue(tvdbRecord.emby.id, true);
           tvdbRecord.emby.inContinue = true;
         }
-        if (noEmbyShow.InMark) {
+        if (noEmbyShow.emby.inMark) {
           await saveMark(tvdbRecord.emby.id, true);
           tvdbRecord.emby.inMark = true;
         }
-        if (noEmbyShow.InLinda) {
+        if (noEmbyShow.emby.inLinda) {
           await saveLinda(tvdbRecord.emby.id, true);
           tvdbRecord.emby.inLinda = true;
         }
@@ -311,9 +305,10 @@ export async function loadAllShows() {
         console.error("loadAllShows: upgrade noEmby flags failed", name, e);
       }
 
-      await srvr.delNoEmby(name);
-      prunedNoEmbyIds.push(noEmbyShow.Id);
-      continue;
+      // Mark as deleted in tvdb (will be cleaned up)
+      noEmbyShow.deleted = true;
+      prunedNoEmbyIds.push(noEmbyShow.emby.id);
+      return;
     }
 
     // Check if S01E01 is unaired (for WaitStr)
@@ -327,21 +322,21 @@ export async function loadAllShows() {
           const airDate = e1?.[1]?.aired;
           if (airDate) {
             const dateStr = airDate.slice(5).replace(/^0/, " ").trim();
-            noEmbyShow.WaitStr = `{${dateStr}}`;
+            noEmbyShow.waitStr = `{${dateStr}}`;
           }
         }
       }
     } catch (e) {
       console.error("loadAllShows: getSeriesMap error for noemby", name, e);
     }
-  }
+  }));
 
   // 5. Mark tvdb records as deleted if no matching show exists
   for (const [name, tvdbRecord] of Object.entries(allTvdb)) {
     if (tvdbRecord.deleted) continue;
 
     const hasEmby = embyShows.data.Items.some((s) => s.Name === name);
-    const hasNoEmby = noEmbys.some((s) => s.Name === name);
+    const hasNoEmby = noEmbys.some((s) => s.name === name);
 
     if (!hasEmby && !hasNoEmby) {
       console.log(`loadAllShows: marking ${name} as deleted (no show found)`);
@@ -432,13 +427,7 @@ export async function loadAllShows() {
     shows.push(show);
   }
 
-  // 10. Remove orphaned gaps
-  for (const gapId in gapsById) {
-    await srvr.delGap([gapId, false]);
-  }
-  if (Object.keys(gapsById).length > 0) {
-    await srvr.delGap([null, true]); // Save after all deletes
-  }
+  // Phase 5: gaps, notes now stored in tvdb.json - no separate cleanup needed
 
   const elapsed = Date.now() - loadStart;
   console.log(`Phase 2: loadAllShows completed in ${elapsed}ms`);

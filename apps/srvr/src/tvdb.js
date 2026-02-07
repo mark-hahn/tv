@@ -203,6 +203,153 @@ if (migrationNeeded) {
   }
 }
 
+// Phase 5: Migrate separate JSON files into tvdb.json
+let phase5MigrationNeeded = false;
+
+// 5.1: Migrate gaps.json
+const gapsPath = path.join(SRVR_DATA_DIR, "gaps.json");
+if (fs.existsSync(gapsPath) && !fs.existsSync(gapsPath + ".backup")) {
+  log("Phase 5.1: Migrating gaps.json into tvdb.json");
+  try {
+    const gaps = util.jParse(fs.readFileSync(gapsPath, "utf8"));
+    let gapCount = 0;
+
+    for (const [embyId, gapData] of Object.entries(gaps)) {
+      const tvdb = Object.values(allTvdb).find((t) => t.emby?.id === embyId);
+      if (tvdb && !tvdb.gap) {
+        tvdb.gap = gapData;
+        gapCount++;
+        phase5MigrationNeeded = true;
+      }
+    }
+
+    log(`Phase 5.1: Migrated ${gapCount} gaps from gaps.json`);
+    fs.renameSync(gapsPath, gapsPath + ".backup");
+  } catch (e) {
+    log("err", "Phase 5.1: gaps.json migration failed:", e);
+  }
+}
+
+// 5.2: Migrate notes.json
+const notesPath = path.join(SRVR_DATA_DIR, "notes.json");
+if (fs.existsSync(notesPath) && !fs.existsSync(notesPath + ".backup")) {
+  log("Phase 5.2: Migrating notes.json into tvdb.json");
+  try {
+    const notes = util.jParse(fs.readFileSync(notesPath, "utf8"));
+    let noteCount = 0;
+
+    for (const [showName, note] of Object.entries(notes)) {
+      if (allTvdb[showName] && !allTvdb[showName].note) {
+        allTvdb[showName].note = note;
+        noteCount++;
+        phase5MigrationNeeded = true;
+      }
+    }
+
+    log(`Phase 5.2: Migrated ${noteCount} notes from notes.json`);
+    fs.renameSync(notesPath, notesPath + ".backup");
+  } catch (e) {
+    log("err", "Phase 5.2: notes.json migration failed:", e);
+  }
+}
+
+// 5.3: Migrate noemby.json
+const noembyPath = path.join(SRVR_DATA_DIR, "noemby.json");
+if (fs.existsSync(noembyPath) && !fs.existsSync(noembyPath + ".backup")) {
+  log("Phase 5.3: Migrating noemby.json into tvdb.json");
+  try {
+    const noembys = util.jParse(fs.readFileSync(noembyPath, "utf8"));
+    let noembyCount = 0;
+
+    for (const noembyShow of Object.values(noembys)) {
+      const name = noembyShow.Name;
+      if (!allTvdb[name]) {
+        allTvdb[name] = {
+          name,
+          tvdbId: noembyShow.TvdbId || null,
+          showId: noembyShow.Id, // already has "noemby-" prefix
+          emby: {
+            id: noembyShow.Id,
+            path: null,
+            dateCreated: noembyShow.added || null,
+            premiereDate: null,
+            inToTry: noembyShow.InToTry || false,
+            inContinue: noembyShow.InContinue || false,
+            inMark: noembyShow.InMark || false,
+            inLinda: noembyShow.InLinda || false,
+            isFavorite: false,
+            isPlayed: false,
+            playCount: 0,
+            lastPlayedDate: null,
+          },
+          disk: { date: null, size: 0, noFiles: false },
+          download: { status: null, lastCheck: null },
+          tvmaze: { id: null, status: null },
+          sync: {
+            lastEmbySync: null,
+            lastDiskCheck: null,
+            lastMetadataUpdate: null,
+          },
+          gap: null,
+          note: "",
+          reject: false,
+          pickup: false,
+          lastViewed: null,
+          waitStr: null,
+          added: noembyShow.added || Date.now(),
+          saved: 0, // Will trigger TVDB refresh
+        };
+        noembyCount++;
+        phase5MigrationNeeded = true;
+      }
+    }
+
+    log(`Phase 5.3: Migrated ${noembyCount} noemby shows into tvdb.json`);
+    fs.renameSync(noembyPath, noembyPath + ".backup");
+  } catch (e) {
+    log("err", "Phase 5.3: noemby.json migration failed:", e);
+  }
+}
+
+// 5.4: Migrate lastViewed.json
+const lastViewedPath = path.join(SRVR_DATA_DIR, "lastViewed.json");
+if (
+  fs.existsSync(lastViewedPath) &&
+  !fs.existsSync(lastViewedPath + ".backup")
+) {
+  log("Phase 5.4: Migrating lastViewed.json into tvdb.json");
+  try {
+    const lastViewed = util.jParse(fs.readFileSync(lastViewedPath, "utf8"));
+    let viewedCount = 0;
+
+    for (const [showName, timestamp] of Object.entries(lastViewed)) {
+      if (allTvdb[showName] && !allTvdb[showName].lastViewed) {
+        allTvdb[showName].lastViewed = timestamp;
+        viewedCount++;
+        phase5MigrationNeeded = true;
+      }
+    }
+
+    log(
+      `Phase 5.4: Migrated ${viewedCount} lastViewed timestamps into tvdb.json`,
+    );
+    fs.renameSync(lastViewedPath, lastViewedPath + ".backup");
+  } catch (e) {
+    log("err", "Phase 5.4: lastViewed.json migration failed:", e);
+  }
+}
+
+// Save Phase 5 migrations
+if (phase5MigrationNeeded) {
+  log("Phase 5: Saving tvdb.json with migrated data from separate files");
+  try {
+    util.writeFile(TVDB_PATH, allTvdb);
+    log("Phase 5: Migration complete - backup files created");
+  } catch (e) {
+    log("err", "Phase 5: Migration save failed:", e);
+  }
+}
+
 ///////////// get theTvdbToken //////////////
 // this is a duplicate of the client
 // both access tvdb.com independently
@@ -672,6 +819,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     clientRequest,
   } = paramObj;
   const name = show.Name;
+  log("getTvdbData: START", { name, clientRequest });
   const added = allTvdb[name]?.added ?? new Date().toISOString().slice(0, 10);
   if (deleted) {
     // this shouldn't happen, deleteds filter before here
@@ -740,7 +888,10 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   // get remote data, e.g. IMDB for tvdb record
   // remoteIds come from tvdb
-  const remotes = await getRemotes(show, remoteIds, false, !!clientRequest);
+  // Skip slow remote fetching for client requests - client will fetch separately if needed
+  const remotes = clientRequest
+    ? []
+    : await getRemotes(show, remoteIds, false, false);
   const saved = Date.now();
   const trailersRaw = trailersIn || allTvdb[name]?.trailers;
 
@@ -929,6 +1080,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   // log('getTvdbData:', tvdbData);
   allTvdb[name] = tvdbData;
   // update allTvdb & tvdb.json
+  log("getTvdbData: END", { name, hasRemotes: !!tvdbData.remotes?.length });
   resolve(tvdbData);
 };
 
@@ -942,7 +1094,19 @@ const chkTvdbQueue = () => {
   if (chkTvdbQueueRunning || newTvdbQueue.length == 0) return;
   chkTvdbQueueRunning = true;
   const { ws, id, paramObj, resolve: resolveCb } = newTvdbQueue.pop();
-  if (ws && ws.readyState !== WebSocket.OPEN) return;
+  const showName = paramObj.show?.Name;
+  log("chkTvdbQueue: processing", {
+    id,
+    showName,
+    queueLength: newTvdbQueue.length,
+  });
+
+  if (ws && ws.readyState !== WebSocket.OPEN) {
+    log("chkTvdbQueue: skipping closed WebSocket", id);
+    chkTvdbQueueRunning = false;
+    chkTvdbQueue();
+    return;
+  }
 
   let resolve = null;
   let reject = null;
@@ -953,6 +1117,7 @@ const chkTvdbQueue = () => {
   promise.then((tvdbData) => {
     try {
       if (typeof tvdbData === "object") {
+        log("chkTvdbQueue: sending response", { id, name: tvdbData.name });
         if (ws) ws.send(JSON.stringify({ id, status: "ok", data: tvdbData }));
         else if (resolveCb) resolveCb([id, tvdbData]);
         allTvdb[tvdbData.name] = tvdbData;
@@ -962,6 +1127,7 @@ const chkTvdbQueue = () => {
     }
     tvdbData.saved = Date.now();
     // Don't save here - background refresh handles saves
+    log("chkTvdbQueue: completed", { id, name: tvdbData.name });
     chkTvdbQueueRunning = false;
     chkTvdbQueue();
   });
@@ -1064,6 +1230,7 @@ export const getRemotesCmd = async (id, param, resolve, reject) => {
   const show = paramObj?.show;
   const tvdbRemotes = paramObj?.tvdbRemotes || [];
   const fast = !!paramObj?.fast;
+  log("getRemotesCmd: START", { id, showName: show?.Name, fast });
 
   if (!show) {
     reject([id, "getRemotes: missing show"]);
@@ -1072,8 +1239,14 @@ export const getRemotesCmd = async (id, param, resolve, reject) => {
 
   try {
     const remotes = await getRemotes(show, tvdbRemotes, fast, true);
+    log("getRemotesCmd: END", {
+      id,
+      showName: show?.Name,
+      remotesCount: remotes?.length,
+    });
     resolve([id, remotes]);
   } catch (err) {
+    log("getRemotesCmd: ERROR", { id, error: err.message });
     reject([id, `getRemotes error: ${err.message}`]);
   }
 };
@@ -1152,11 +1325,54 @@ export const saveTvdbSync = async () => {
 };
 
 // if tvdb already exists replace it
-export const getNewTvdb = async (ws, id, param) => {
+// Supports both WebSocket (ws, id, param) and HTTP callback (id, param, resolve, reject)
+export const getNewTvdb = async (
+  wsOrId,
+  idOrParam,
+  paramOrResolve,
+  rejectCb,
+) => {
+  // Detect signature: WebSocket has ws object, HTTP has id number
+  const isWebSocket = wsOrId && typeof wsOrId === "object";
+
+  let ws, id, param, resolve;
+  if (isWebSocket) {
+    // WebSocket signature: (ws, id, param)
+    ws = wsOrId;
+    id = idOrParam;
+    param = paramOrResolve;
+    resolve = null;
+  } else {
+    // HTTP callback signature: (id, param, resolve, reject)
+    ws = null;
+    id = wsOrId;
+    param = idOrParam;
+    resolve = paramOrResolve;
+  }
+
   const paramObj = util.jParse(param, "getNewTvdb");
-  if (!paramObj) return;
-  // log('getNewTvdb:', paramObj.show.Name);
-  newTvdbQueue.unshift({ ws, id, paramObj });
+  if (!paramObj) {
+    log("getNewTvdb: invalid param", id);
+    if (resolve) resolve([id, null]);
+    return;
+  }
+
+  // HTTP requests are always client requests - mark to skip slow remote fetching
+  if (!isWebSocket) {
+    paramObj.clientRequest = true;
+  }
+
+  const showName = paramObj.show?.Name;
+  log("getNewTvdb called:", {
+    id,
+    showName,
+    queueLength: newTvdbQueue.length,
+    isWebSocket,
+    clientRequest: paramObj.clientRequest,
+  });
+
+  // Queue the request with appropriate callback
+  newTvdbQueue.unshift({ ws, id, paramObj, resolve });
   chkTvdbQueue();
 };
 
@@ -1252,6 +1468,7 @@ export const accessTvdb = async (id, param, resolve, _reject) => {
     const paramObj = util.jParse(param, "accessTvdb");
     if (!paramObj) throw new Error("invalid params");
     const { path: tvdbPath, query } = paramObj;
+    log("accessTvdb: START", { id, tvdbPath });
 
     const url = buildTvdbUrl(tvdbPath, query);
     let token = await getToken();
@@ -1284,6 +1501,7 @@ export const accessTvdb = async (id, param, resolve, _reject) => {
       }
     } catch {}
 
+    log("accessTvdb: END", { id, ok: upstream.ok, status: upstream.status });
     resolve([
       id,
       {

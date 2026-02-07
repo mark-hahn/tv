@@ -35,7 +35,9 @@
         object-fit: cover;
         border-radius: 4px;
         margin-bottom: 5px;
+        cursor: pointer;
       "
+      @click="handleImageClick($event)"
       @error="handleImageError"
     />
     <div
@@ -80,6 +82,20 @@ export default {
   },
 
   methods: {
+    handleImageClick(e) {
+      // Stop event propagation and clear any long-press state
+      e.stopPropagation();
+      e.preventDefault();
+      
+      if (this.longPressTimer) {
+        clearTimeout(this.longPressTimer);
+        this.longPressTimer = null;
+      }
+      this.isLongPressing = false;
+      
+      // Clicking image always opens actor page
+      this.$emit("actor-click", { event: e, actor: this.actor });
+    },
     handleClick(e) {
       // Don't perform click action if we just completed a long-press
       if (this.isLongPressing) {

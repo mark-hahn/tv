@@ -267,10 +267,11 @@ function showNamesMatch(tvdbShowName, searchShowName) {
 }
 
 export const getSeriesMap = async (show) => {
+  const showNameStr = show.Name || show.name;
   // Search for the show on tvdb
-  const searchResults = await srchTvdbData(show.Name);
+  const searchResults = await srchTvdbData(showNameStr);
   if (!searchResults || searchResults.length === 0) {
-    console.error("getSeriesMap: no results found for:", show.Name);
+    console.error("getSeriesMap: no results found for:", showNameStr);
     return [];
   }
 
@@ -278,26 +279,26 @@ export const getSeriesMap = async (show) => {
   let bestMatch = null;
 
   for (const result of searchResults) {
-    if (showNamesMatch(result.name, show.Name)) {
+    if (showNamesMatch(result.name, showNameStr)) {
       // If multiple matches, prefer exact case or first match
       const resultName = result.name.toUpperCase();
-      const showName = show.Name.toUpperCase();
+      const targetName = showNameStr.toUpperCase();
 
-      if (!bestMatch || resultName === showName) {
+      if (!bestMatch || resultName === targetName) {
         bestMatch = result;
-        if (resultName === showName) break; // Stop if exact match found
+        if (resultName === targetName) break; // Stop if exact match found
       }
     }
   }
 
   if (!bestMatch) {
-    console.error("getSeriesMap: no matching show found for:", show.Name);
+    console.error("getSeriesMap: no matching show found for:", showNameStr);
     return [];
   }
 
   const tvdbId = bestMatch.tvdb_id || bestMatch.id;
   if (!tvdbId) {
-    console.error("getSeriesMap: no tvdb_id in best match for:", show.Name);
+    console.error("getSeriesMap: no tvdb_id in best match for:", showNameStr);
     return [];
   }
 

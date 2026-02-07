@@ -1,6 +1,9 @@
 import fs from "fs";
 import * as cp from "child_process";
 import * as path from "node:path";
+import express from "express";
+import cors from "cors";
+import https from "https";
 import WebSocket, { WebSocketServer } from "ws";
 import { rimraf } from "rimraf";
 import * as view from "./src/lastViewed.js";
@@ -137,14 +140,11 @@ const pickupStr = pickupLoad.text;
 const footerStr = footerLoad.text;
 
 const noEmbyPath = path.join(SRVR_DATA_DIR, "noemby.json");
-const gapsPath = path.join(SRVR_DATA_DIR, "gaps.json");
 
 // Strict: persisted state must live under TV_DATA_DIR.
 ensureFile(noEmbyPath, "[]");
-ensureFile(gapsPath, "[]");
 
 const noEmbyStr = readJsonTextOr(noEmbyPath, []);
-let gapsStr = readTextOr(gapsPath, "[]");
 
 // Strict: shared secrets are checkout-independent under TV_DATA_DIR/secrets.
 const subsLoginPath = path.join(SECRETS_DIR, "subs-login.txt");
@@ -210,7 +210,6 @@ try {
 const rejects = JSON.parse(rejectStr);
 const pickups = JSON.parse(pickupStr);
 const noEmbys = JSON.parse(noEmbyStr);
-const gaps = JSON.parse(gapsStr);
 const notes = notesCache;
 
 function encodeFileIdBase32(fileId) {
@@ -1767,13 +1766,8 @@ const addGap = async (id, gapIdGapSave, resolve, _reject) => {
       // Only save tvdb when save flag is true
       if (save) await tvdb.saveTvdbSync();
     }
-
-    // Backward compat: also update old gaps object
-    if (gapEntryHasGap(gap)) gaps[gapId] = gap;
-    else delete gaps[gapId];
   }
 
-  if (save) await util.writeFile(gapsPath, gaps);
   resolve([id, "ok"]);
 };
 
@@ -1794,14 +1788,8 @@ const delGap = async (id, gapIdSave, resolve, _reject) => {
         break;
       }
     }
-
-    // Backward compat: also update old gaps object
-    delete gaps[gapId];
   }
 
-  if (save) {
-    await util.writeFile(gapsPath, gaps);
-  }
   resolve([id, "ok"]);
 };
 
@@ -2530,199 +2518,129 @@ const sendEmailHandler = async (id, bodyText, resolve, reject) => {
   }
 };
 
-//////////////////  CALL FUNCTION SYNCHRONOUSLY  //////////////////
+//////////////////  HTTP REST API  //////////////////
 
-const queue = [];
-let running = false;
+const app = express();
 
-const runOne = () => {
-  if (running || queue.length == 0) return;
-  running = true;
+// Use standard CORS middleware
+app.use(cors());
 
-  const { ws, id, fname, param } = queue.pop();
+// strict: false allows JSON primitives (strings/numbers) as body, not just objects/arrays
+app.use(express.json({ strict: false }));
 
-  if (ws.readyState !== WebSocket.OPEN) {
-    running = false;
-    runOne();
-    return;
-  }
+// Legacy CORS manual headers (just in case, though cors() should handle it)
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  next();
+});
 
-  if (fname === "getAllTvdb") {
-    console.log(`[SERVER] runOne processing getAllTvdb, id=${id}`);
-  }
+// Helper to promisify the callback-based functions
+const promisifyHandler = (handler) => {
+  return (req, res) => {
+    // FIX: For simple string params (like getNote), req.body might be the string itself
+    // if content-type is json, but we need to handle it carefully.
+    // If the rpc function expects a string, and we receive "ShowName", paramStr becomes "\"ShowName\""
+    // which rpcParamToString might strip the quotes from.
+    // But if we receive { name: "foo" }, paramStr becomes "{\"name\":\"foo\"}".
 
-  if (ws.readyState !== WebSocket.OPEN) {
-    running = false;
-    runOne();
-    return;
-  }
+    const param = req.method === "GET" ? req.query : req.body;
+    let paramStr;
 
-  let resolve = null;
-  let reject = null;
+    // IMPORTANT: If req.body is already a string (which happens if we posted JSON "string")
+    // assume it's the direct parameter.
+    // If it's an object/array, we MUST stringify it because the old RPC handlers expect JSON strings.
+    if (typeof param === "string") {
+       paramStr = param;
+    } else {
+       paramStr = JSON.stringify(param);
+       // Optimization/HACK: if paramStr is like "value", stripped the quotes for simplicity?
+       // Actually rpcParamToString handles removal of surrounding quotes if they exist.
+       // BUT: JSON.stringify("foo") -> "\"foo\"". rpcParamToString removes outer quotes -> foo. Correct.
+       // JSON.stringify({a:1}) -> "{\"a\":1}". rpcParamToString sees object -> returns as is. Correct.
+    }
 
-  // param called when promise is resolved or rejected
-  // there is one unique promise for each function call
-  const promise = new Promise((resolveIn, rejectIn) => {
-    resolve = resolveIn;
-    reject = rejectIn;
-  });
-
-  promise
-    .then((idResult) => {
-      const [id, result] = idResult;
-      // console.log('resolved:', id);
-      try {
-        ws.send(JSON.stringify({ id, status: "ok", data: result }));
-      } catch (e) {
-        console.error("ws.send error (runOne ok):", e);
-      }
-      running = false;
-      runOne();
-    })
-    .catch((idError) => {
-      console.error("idResult err:", { idError });
-      const [id, error] = idError;
-      try {
-        ws.send(JSON.stringify({ id, status: "err", data: error }));
-      } catch (e) {
-        console.error("ws.send error (runOne err):", e);
-      }
-      running = false;
-      runOne();
-    });
-
-  // call function fname
-  switch (fname) {
-    case "getShowsFromDisk":
-      getShowsFromDisk(id, "", resolve, reject);
-      break;
-    case "deletePath":
-      deletePath(id, param, resolve, reject);
-      break;
-
-    case "getDevices":
-      emby.getDevices(id, "", resolve, reject);
-      break;
-    case "getLastViewed":
-      view.getLastViewed(id, "", resolve, reject);
-      break;
-
-    case "getRejects":
-      getRejects(id, "", resolve, reject);
-      break;
-    case "addReject":
-      addReject(id, param, resolve, reject);
-      break;
-    case "delReject":
-      delReject(id, param, resolve, reject);
-      break;
-
-    case "getPickups":
-      getPickups(id, "", resolve, reject);
-      break;
-    case "addPickup":
-      addPickup(id, param, resolve, reject);
-      break;
-    case "delPickup":
-      delPickup(id, param, resolve, reject);
-      break;
-
-    case "getNoEmbys":
-      getNoEmbys(id, "", resolve, reject);
-      break;
-    case "addNoEmby":
-      addNoEmby(id, param, resolve, reject);
-      break;
-    case "delNoEmby":
-      delNoEmby(id, param, resolve, reject);
-      break;
-
-    case "getGaps":
-      getGaps(id, "", resolve, reject);
-      break;
-    case "addGap":
-      addGap(id, param, resolve, reject);
-      break;
-    case "delGap":
-      delGap(id, param, resolve, reject);
-      break;
-
-    case "delSeasonFiles":
-      delSeasonFiles(id, param, resolve, reject);
-      break;
-
-    case "getAllTvdb":
-      tvdb.getAllTvdb(id, param, resolve, reject);
-      break;
-    case "getNewTvdb":
-      tvdb.getNewTvdb(id, param, resolve, reject);
-      break;
-    case "setTvdbFields":
-      tvdb.setTvdbFields(id, param, resolve, reject);
-      break;
-    case "getRemotes":
-      tvdb.getRemotesCmd(id, param, resolve, reject);
-      break;
-    case "getActorPage":
-      tvdb.getActorPage(id, param, resolve, reject);
-      break;
-    case "sendEmail":
-      sendEmailHandler(id, param, resolve, reject);
-      break;
-
-    case "getTmdb":
-      tmdb.getTmdb(id, param, resolve, reject);
-      break;
-
-    case "setSharedFilters":
-      setSharedFilters(id, param, resolve, reject);
-      break;
-    case "getSharedFilters":
-      getSharedFilters(id, param, resolve, reject);
-      break;
-
-    case "getNote":
-      getNote(id, param, resolve, reject);
-      break;
-    case "saveNote":
-      saveNote(id, param, resolve, reject);
-      break;
-    case "getAllNotes":
-      getAllNotes(id, param, resolve, reject);
-      break;
-
-    case "getFile":
-      getFile(id, param, resolve, reject);
-      break;
-
-    case "subsSearch":
-      subsSearch(id, param, resolve, reject);
-      break;
-
-    case "applySubFiles":
-      applySubFiles(id, param, resolve, reject);
-      break;
-
-    case "deleteSubFiles":
-      deleteSubFiles(id, param, resolve, reject);
-      break;
-
-    case "getSubFileIds":
-      getSubFileIds(id, param, resolve, reject);
-      break;
-
-    case "offsetSubFiles":
-      offsetSubFiles(id, param, resolve, reject);
-      break;
-
-    case "createShowFolder":
-      createShowFolder(id, param, resolve, reject);
-      break;
-
-    default:
-      reject([id, "unknownfunction: " + fname]);
-  }
+    handler(
+      null, // id not needed for HTTP
+      paramStr,
+      ([_, result]) => res.json(result),
+      ([_, error]) => {
+         console.error(`Error in ${req.url}:`, error);
+         res.status(500).json({ error });
+      },
+    );
+  };
 };
+
+// Data retrieval endpoints
+app.get("/api/getAllTvdb", promisifyHandler(tvdb.getAllTvdb));
+app.get("/api/getShowsFromDisk", promisifyHandler(getShowsFromDisk));
+app.get("/api/getRejects", promisifyHandler(getRejects));
+app.get("/api/getPickups", promisifyHandler(getPickups));
+app.get("/api/getGaps", promisifyHandler(getGaps));
+app.get("/api/getNoEmbys", promisifyHandler(getNoEmbys));
+app.get("/api/getDevices", promisifyHandler(emby.getDevices));
+app.get("/api/getLastViewed", promisifyHandler(view.getLastViewed));
+app.get("/api/getSharedFilters", promisifyHandler(getSharedFilters));
+app.get("/api/getAllNotes", promisifyHandler(getAllNotes));
+
+// Endpoints with parameters
+app.post("/api/getRemotes", promisifyHandler(tvdb.getRemotesCmd));
+app.post("/api/getNewTvdb", promisifyHandler(tvdb.getNewTvdb));
+app.post("/api/getActorPage", promisifyHandler(tvdb.getActorPage));
+app.post("/api/getTmdb", promisifyHandler(tmdb.getTmdb));
+app.post("/api/getNote", promisifyHandler(getNote));
+app.post("/api/getFile", promisifyHandler(getFile));
+app.post("/api/getSubFileIds", promisifyHandler(getSubFileIds));
+app.post("/api/accessTvdb", promisifyHandler(tvdb.accessTvdb));
+
+// CRUD operations
+app.post("/api/addReject", promisifyHandler(addReject));
+app.post("/api/delReject", promisifyHandler(delReject));
+app.post("/api/addPickup", promisifyHandler(addPickup));
+app.post("/api/delPickup", promisifyHandler(delPickup));
+app.post("/api/addNoEmby", promisifyHandler(addNoEmby));
+app.post("/api/delNoEmby", promisifyHandler(delNoEmby));
+app.post("/api/addGap", promisifyHandler(addGap));
+app.post("/api/delGap", promisifyHandler(delGap));
+app.post("/api/setTvdbFields", promisifyHandler(tvdb.setTvdbFields));
+app.post("/api/setSharedFilters", promisifyHandler(setSharedFilters));
+app.post("/api/saveNote", promisifyHandler(saveNote));
+
+// File operations
+app.post("/api/deletePath", promisifyHandler(deletePath));
+app.post("/api/delSeasonFiles", promisifyHandler(delSeasonFiles));
+app.post("/api/createShowFolder", promisifyHandler(createShowFolder));
+
+// Subtitles
+app.post("/api/subsSearch", promisifyHandler(subsSearch));
+app.post("/api/applySubFiles", promisifyHandler(applySubFiles));
+app.post("/api/deleteSubFiles", promisifyHandler(deleteSubFiles));
+app.post("/api/offsetSubFiles", promisifyHandler(offsetSubFiles));
+
+// Email
+app.post("/api/sendEmail", promisifyHandler(sendEmailHandler));
+
+// Background operations
+app.post(
+  "/api/updateTvdb",
+  promisifyHandler((id, param, resolve, reject) => {
+    tvdb.updateTvdb();
+    resolve([id, "ok"]);
+  }),
+);
+
+const HTTP_PORT = 8737;
+
+// HTTPS options - use same certs as API server (located in api/cookies)
+const CERT_DIR = path.join(path.dirname(SRVR_ROOT_DIR), "api", "cookies");
+const httpsOptions = {
+  key: fs.readFileSync(path.join(CERT_DIR, "localhost-key.pem")),
+  cert: fs.readFileSync(path.join(CERT_DIR, "localhost-cert.pem")),
+};
+
+https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
+  console.log(`HTTPS API listening on port ${HTTP_PORT}`);
+});
 
 //////////////////  WEBSOCKET SERVER  //////////////////
 
@@ -2749,9 +2667,12 @@ wss.on("connection", (ws) => {
       socketName = appSocketName;
       console.log(socketName + " connected");
     }
-    if (fname == "getNewTvdb") {
-      tvdb.getNewTvdb(ws, id, param);
+
+    // Only handleAsr uses WebSocket now (for streaming audio)
+    if (fname == "handleAsr") {
+      handleAsr(ws, id, param);
     } else if (fname == "accessTvdb") {
+      // Keep accessTvdb for backward compatibility
       tvdb.accessTvdb(
         id,
         param,
@@ -2764,44 +2685,19 @@ wss.on("connection", (ws) => {
         },
         null,
       );
-    } else if (fname == "getAllTvdb") {
-      tvdb.getAllTvdb(
-        id,
-        param,
-        (res) => {
-          // res is [id, result]
-          try {
-            ws.send(JSON.stringify({ id: res[0], status: "ok", data: res[1] }));
-          } catch (e) {
-            console.error("ws.send error (getAllTvdb):", e);
-          }
-        },
-        null,
-      );
-    } else if (fname == "handleAsr") {
-      handleAsr(ws, id, param);
     } else {
-      if (fname === "getRemotes") {
-        for (let i = queue.length - 1; i >= 0; i--) {
-          if (queue[i].fname === "getRemotes") {
-            const dropped = queue[i];
-            queue.splice(i, 1);
-            try {
-              dropped.ws.send(
-                JSON.stringify({
-                  id: dropped.id,
-                  status: "err",
-                  data: "cancelled",
-                }),
-              );
-            } catch (e) {
-              console.error("ws.send error (cancelled):", e);
-            }
-          }
-        }
+      console.warn("WebSocket function not supported (use HTTP):", fname);
+      try {
+        ws.send(
+          JSON.stringify({
+            id,
+            status: "err",
+            data: "Use HTTP API for non-streaming calls",
+          }),
+        );
+      } catch (e) {
+        console.error("ws.send error:", e);
       }
-      queue.unshift({ ws, id, fname, param });
-      runOne();
     }
   });
 

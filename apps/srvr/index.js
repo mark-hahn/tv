@@ -1431,9 +1431,11 @@ const addReject = async (params) => {
   }
 
   return new Promise((resolve, reject) => {
-    saveConfigYml(null, "ok", 
+    saveConfigYml(
+      null,
+      "ok",
       ([_, result]) => resolve(result),
-      ([_, error]) => reject(new Error(error))
+      ([_, error]) => reject(new Error(error)),
     );
   });
 };
@@ -1486,11 +1488,13 @@ const delReject = async (params) => {
     console.log("-- reject not deleted -- no match:", name);
     return "delReject not deleted: " + name;
   }
-  
+
   return new Promise((resolve, reject) => {
-    saveConfigYml(null, "ok", 
+    saveConfigYml(
+      null,
+      "ok",
       ([_, result]) => resolve(result),
-      ([_, error]) => reject(new Error(error))
+      ([_, error]) => reject(new Error(error)),
     );
   });
 };
@@ -1843,7 +1847,7 @@ const setSharedFilters = async (params) => {
     sharedFilters = null;
     return { ok: true };
   }
-  
+
   // No need to jParse, we expect it to be a JS object already
   sharedFilters = params;
   return { ok: true };
@@ -1891,7 +1895,8 @@ const saveNote = async (params) => {
     throw new Error("saveNote: invalid showName");
   }
 
-  const finalNote = noteText === undefined || noteText === null ? "" : String(noteText);
+  const finalNote =
+    noteText === undefined || noteText === null ? "" : String(noteText);
   const key = showName.trim();
 
   // Phase 5: Update tvdb.note field
@@ -1946,9 +1951,9 @@ const getFile = async (params) => {
   // Param is usually an object { path: "..." }
   let requestedPath = params?.path;
   if (requestedPath === undefined || requestedPath === null) requestedPath = "";
-  
+
   if (typeof requestedPath !== "string") {
-      throw new Error("getFile: path must be string");
+    throw new Error("getFile: path must be string");
   }
 
   const rawPath = requestedPath.trim();
@@ -2110,10 +2115,14 @@ const applySubFiles = async (params) => {
     try {
       const stShow = fs.statSync(localShowPath);
       if (!stShow.isDirectory()) {
-        throw new Error(`Show directory missing: ${entry.localShowPath} (${file_id})`);
+        throw new Error(
+          `Show directory missing: ${entry.localShowPath} (${file_id})`,
+        );
       }
     } catch {
-      throw new Error(`Show directory missing: ${entry.localShowPath} (${file_id})`);
+      throw new Error(
+        `Show directory missing: ${entry.localShowPath} (${file_id})`,
+      );
     }
 
     // If the requested season folder doesn't exist, record a failure but keep going.

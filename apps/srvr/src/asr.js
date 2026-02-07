@@ -49,8 +49,7 @@ function startTail(ws, targetPath) {
     sendAsrChunks(ws, "ERR: " + text);
   });
 
-  proc.on("error", (err) => {
-  });
+  proc.on("error", (err) => {});
 
   proc.on("close", (code, signal) => {
     if (ws._asrTailProc === proc) {

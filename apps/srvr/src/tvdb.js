@@ -601,6 +601,16 @@ const getRemotes = async (
   fast = false,
   clientRequest = false,
 ) => {
+  const is30Rock = show.Name === "30 Rock";
+  if (is30Rock) {
+    console.log("[TVDB.JS] getRemotes called:", {
+      showName: show.Name,
+      showId: show.Id,
+      tvdbRemotesCount: tvdbRemotes?.length,
+      fast,
+      clientRequest
+    });
+  }
   const cacheKey =
     show.Name +
     "|" +
@@ -613,6 +623,7 @@ const getRemotes = async (
     clientRequest;
 
   if (clientRequest && remotesCache.has(cacheKey)) {
+    if (is30Rock) console.log("[TVDB.JS] getRemotes returning cached result");
     return remotesCache.get(cacheKey);
   }
 
@@ -1227,22 +1238,28 @@ export const setAddToPickupsCallback = (callback) => {
 // Expects param JSON: { show: { Name, Id? }, tvdbRemotes: [...], fast: boolean }
 export const getRemotesCmd = async (params) => {
   const show = params?.show;
+  const is30Rock = show?.Name === "30 Rock";
+  if (is30Rock) console.log("[TVDB.JS] getRemotesCmd called with params:", JSON.stringify(params, null, 2));
   const tvdbRemotes = params?.tvdbRemotes || [];
   const fast = !!params?.fast;
   log("getRemotesCmd: START", { showName: show?.Name, fast });
+  if (is30Rock) console.log("[TVDB.JS] getRemotesCmd show:", show?.Name, "tvdbRemotes count:", tvdbRemotes.length, "fast:", fast);
 
   if (!show) {
+    if (is30Rock) console.error("[TVDB.JS] getRemotesCmd: missing show parameter");
     throw new Error("getRemotes: missing show");
   }
 
   try {
     const remotes = await getRemotes(show, tvdbRemotes, fast, true);
+    if (is30Rock) console.log("[TVDB.JS] getRemotesCmd result:", JSON.stringify(remotes, null, 2));
     log("getRemotesCmd: END", {
       showName: show?.Name,
       remotesCount: remotes?.length,
     });
     return remotes;
   } catch (err) {
+    if (is30Rock) console.error("[TVDB.JS] getRemotesCmd error:", err.message, err.stack);
     log("getRemotesCmd: ERROR", { error: err.message });
     throw new Error(`getRemotes error: ${err.message}`);
   }

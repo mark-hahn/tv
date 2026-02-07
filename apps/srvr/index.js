@@ -2405,10 +2405,13 @@ const apiWrapper = (handler) => {
     try {
       // GET requests use query params, POST use body
       const params = req.method === "GET" ? req.query : req.body;
+      const is30Rock = req.url === "/api/getRemotes" && params?.show?.Name === "30 Rock";
+      if (is30Rock) console.log(`[SERVER] ${req.method} ${req.url} params:`, JSON.stringify(params, null, 2));
       const result = await handler(params);
+      if (is30Rock) console.log(`[SERVER] ${req.method} ${req.url} result:`, JSON.stringify(result, null, 2));
       res.json(result);
     } catch (error) {
-      console.error(`Error in ${req.url}:`, error);
+      console.error(`[SERVER] Error in ${req.url}:`, error);
       res.status(500).json({ error: error.message || String(error) });
     }
   };

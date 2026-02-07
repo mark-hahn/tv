@@ -11,7 +11,7 @@ const gapWorker = new Worker(new URL("gap-worker.js", import.meta.url), {
 
 const name = "mark";
 const pwd = "90-MNBbnmyui";
-const apiKey = "1c399bd079d549cba8c916244d3add2b";
+const apiKey = "1112c1f515824d66bf2f8618fdb67312";
 const markUsrId = "894c752d448f45a3a1260ccaabd0adff";
 const authHdr =
   `UserId="${markUsrId}", ` +
@@ -193,6 +193,8 @@ export async function loadAllShows() {
       showId: embyShow.Id,
       tvdbId,
       embyPath,
+      "emby.genres": embyShow.Genres || [],
+      "emby.overview": embyShow.Overview || "",
       dateCreated: embyShow.DateCreated?.substring(0, 10),
       premiereDate: embyShow.PremiereDate?.substring(0, 10),
       isFavorite: embyShow.UserData?.IsFavorite || false,
@@ -255,6 +257,8 @@ export async function loadAllShows() {
 
       tvdbRecord.emby.id = embyShow.Id;
       tvdbRecord.emby.path = embyPath;
+      tvdbRecord.emby.genres = updateFields["emby.genres"];
+      tvdbRecord.emby.overview = updateFields["emby.overview"];
       tvdbRecord.emby.dateCreated = updateFields.dateCreated;
       tvdbRecord.emby.premiereDate = updateFields.premiereDate;
       tvdbRecord.emby.isFavorite = updateFields.isFavorite;
@@ -396,6 +400,9 @@ export async function loadAllShows() {
 
       // TVDB metadata
       OriginalCountry: tvdbRecord.originalCountry,
+      Overview: tvdbRecord.emby?.overview || tvdbRecord.overview || "",
+      Genres:
+        tvdbRecord.emby?.genres || tvdbRecord.genres?.map((g) => g.name) || [],
       Ended: tvdbRecord.status === "Ended",
       LastAired: tvdbRecord.lastAired,
       Ratings: tvdbRecord.remotes?.find((r) => r.ratings)?.ratings || 0,

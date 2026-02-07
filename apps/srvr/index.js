@@ -1389,8 +1389,38 @@ const startupRejectsSync = () => {
     }
   }
 };
+
+// Synchronize pickups from config4-pickups.json to tvdb.json on startup
+const startupPickupsSync = () => {
+  const allTvdb = tvdb.getAllTvdbSync();
+  let changedTvdb = false;
+
+  // Set pickup=true on tvdb records that match the pickups list
+  for (const pickupName of pickups) {
+    const normalizedName = pickupName.toLowerCase();
+    for (const [recordName, record] of Object.entries(allTvdb)) {
+      if (recordName.toLowerCase() === normalizedName && !record.deleted) {
+        if (!record.pickup) {
+          record.pickup = true;
+          console.log("[sync] Set pickup=true on tvdb:", recordName);
+          changedTvdb = true;
+        }
+        break;
+      }
+    }
+  }
+
+  if (changedTvdb) {
+    console.log("[sync] Saving tvdb with updated pickups...");
+    tvdb.saveTvdbSync().catch((err) => {
+      console.error("[sync] failed to save tvdb:", err);
+    });
+  }
+};
+
 // Run sync immediately
 startupRejectsSync();
+startupPickupsSync();
 
 const getRejects = (id, _param, resolve, _reject) => {
   // Phase 5: Read from tvdb instead of separate rejects array

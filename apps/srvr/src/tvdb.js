@@ -470,14 +470,13 @@ const getUrlAndRatings = async (type, url, name) => {
 
   let idFnameParam;
   switch (+type) {
-    case 2: // IMDB
-      // log('samples/imdb-page.html');
-      // await util.writeFile("samples/imdb-page.html", html);
-      {
-        const rating = extractImdbRating(html);
-        if (!rating) return { ratings: null };
-        return { ratings: rating };
-      }
+    case 2: // log('samples/imdb-page.html'); // IMDB
+    // await util.writeFile("samples/imdb-page.html", html);
+    {
+      const rating = extractImdbRating(html);
+      if (!rating) return { ratings: null };
+      return { ratings: rating };
+    }
 
     case 7: {
       // reddit

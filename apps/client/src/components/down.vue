@@ -47,6 +47,17 @@
         <div style="margin-left: 20px; display: flex; align-items: center">
           <span>Downloads</span
           ><span
+            v-if="isChecking"
+            style="
+              margin-left: 10px;
+              align-self: center;
+              font-size: 13px;
+              color: #aaa;
+              white-space: nowrap;
+              font-weight: normal;
+            "
+            >&lt;Checking&gt;</span
+          ><span
             v-if="totalDownloadingSpeedText"
             style="
               margin-left: 20px;
@@ -115,7 +126,7 @@
               background-color: whitesmoke;
             "
           >
-            Check
+            Check Usb Files
           </button>
           <button
             @click.stop="scrollToBottomAction"
@@ -278,6 +289,7 @@ export default {
       _startProcInFlight: false,
       _startProcPending: false,
       matchedTitle: null,
+      isChecking: false,
     };
   },
 
@@ -852,11 +864,17 @@ export default {
 
     async startCheck() {
       try {
+        this.isChecking = true;
         await fetch("https://hahnca.com/tv-down/startProc", {
           method: "POST",
         });
+        // Keep checking indicator for a reasonable time
+        setTimeout(() => {
+          this.isChecking = false;
+        }, 5000);
       } catch (e) {
         console.error("startCheck error", e);
+        this.isChecking = false;
       }
     },
 

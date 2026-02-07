@@ -472,7 +472,7 @@ const getUrlAndRatings = async (type, url, name) => {
   switch (+type) {
     case 2: // IMDB
       // log('samples/imdb-page.html');
-      await util.writeFile("samples/imdb-page.html", html);
+      // await util.writeFile("samples/imdb-page.html", html);
       {
         const rating = extractImdbRating(html);
         if (!rating) return { ratings: null };

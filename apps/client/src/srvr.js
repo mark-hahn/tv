@@ -304,10 +304,7 @@ export function setTvdbFields(params) {
   return httpCall("/api/setTvdbFields", params, "POST");
 }
 export function getRemotesCmd(params) {
-  return httpCall("/api/getRemotes", params, "POST").catch((err) => {
-      if (is30Rock) console.error("[SRVR.JS] getRemotesCmd error:", err);
-      throw err;
-    });
+  return httpCall("/api/getRemotes", params, "POST");
 }
 export function getActorPage(params) {
   return httpCall("/api/getActorPage", { name: params }, "POST");

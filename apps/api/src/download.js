@@ -270,22 +270,22 @@ function validateTorrentData(torrentData) {
         // the middle directory has "Season - 02" but no episode.
         // The filename has "S02.E01".
         const fullInfo = parseTorrentTitle.parse(p);
-        
+
         if (!info.season && fullInfo.season) info.season = fullInfo.season;
-        
+
         // Critically, if filename has "S02.E01", it should have been picked up.
         // If "S02.E01" is parsed as season 2, episode 1, then info.episode should be defined.
-        
+
         // If full path has episode, take it.
         if (!info.episode && fullInfo.episode) info.episode = fullInfo.episode;
 
         // Fallback: Manually check for SxxExx or Sxx.Exx pattern in the basename if the parser failed
         if (!info.episode) {
-             const m = base.match(/S(\d+)[._]?E(\d+)/i);
-             if (m) {
-                 info.season = parseInt(m[1], 10);
-                 info.episode = parseInt(m[2], 10);
-             }
+          const m = base.match(/S(\d+)[._]?E(\d+)/i);
+          if (m) {
+            info.season = parseInt(m[1], 10);
+            info.episode = parseInt(m[2], 10);
+          }
         }
       }
 
@@ -305,8 +305,10 @@ function validateTorrentData(torrentData) {
           JSON.stringify(debugInfo, null, 2),
         );
         try {
-            fs.writeFileSync("/root/dev/apps/tv/temp.torrent", torrentData);
-        } catch (e) { console.error("Failed to dump torrent", e); }
+          fs.writeFileSync("/root/dev/apps/tv/temp.torrent", torrentData);
+        } catch (e) {
+          console.error("Failed to dump torrent", e);
+        }
       } catch (err) {
         console.error("Failed to write debug info to temp.txt", err);
       }

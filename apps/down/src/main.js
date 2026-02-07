@@ -1185,6 +1185,22 @@ async function main() {
       try {
         var parsed = parseTorrentTitle(fname) || {};
         ({ title, season, episode } = parsed);
+
+        // Fallback: If parser fails to find episode (e.g. Sxx.Exx or SxxExx), try manual regex.
+        // This handles cases like "Show - S02.E05 - Title.mkv" where parse-torrent-title might miss the episode.
+        if (!episode && title) {
+          // Look for SxxExx, Sxx.Exx, Sxx_Exx
+          const m = fname.match(/S(\d+)[._ ]?E(\d+)/i);
+          if (m) {
+            season = parseInt(m[1], 10);
+            episode = parseInt(m[2], 10);
+            // Updating local vars is enough as they are used below, 
+            // but let's update 'parsed' too for consistency if used elsewhere (it isn't really used after this destructuring)
+            parsed.season = season;
+            parsed.episode = episode;
+          }
+        }
+
         type = parsed.type || "episode";
 
         trace("checkFile: parsed", { fname, title, season, episode, type });

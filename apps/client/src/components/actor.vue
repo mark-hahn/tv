@@ -83,6 +83,15 @@ export default {
 
   methods: {
     handleImageClick(e) {
+      // Don't perform click action if we just completed a long-press
+      if (this.isLongPressing) {
+        e.stopPropagation();
+        e.preventDefault();
+        return;
+      }
+
+      if (e.ctrlKey) return;
+
       // Stop event propagation and clear any long-press state
       e.stopPropagation();
       e.preventDefault();
@@ -125,7 +134,6 @@ export default {
       }
     },
     handleTouchStart(e) {
-      e.preventDefault(); // Prevent context menu on long press
       this.isLongPressing = false;
       this.longPressTimer = setTimeout(() => {
         this.isLongPressing = true;

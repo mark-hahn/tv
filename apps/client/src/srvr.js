@@ -110,6 +110,7 @@ handleMsg = async (msg) => {
   const call = calls[callIdx];
   calls.splice(callIdx, 1);
   const { fname, param, resolve, reject } = call;
+
   if (status != "ok" && result !== "cancelled")
     console.error("Reject from server:", { id, fname, param, status, result });
 

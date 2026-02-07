@@ -4,11 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SSH_HOST="hahnca.com"
 
-# Legacy flat remote layout (NOT a repo checkout).
-# Example mapping:
-#   local:  $ROOT_DIR/apps/api   -> remote: $TV_REMOTE_BASE/api
-#   local:  $ROOT_DIR/apps/srvr  -> remote: $TV_REMOTE_BASE/srvr
-#   local:  $ROOT_DIR/apps/down  -> remote: $TV_REMOTE_BASE/down
 TV_REMOTE_BASE="${TV_REMOTE_BASE:-/root/dev/apps/tv}"
 
 if [[ ! -d "$ROOT_DIR/apps" ]]; then

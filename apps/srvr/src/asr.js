@@ -66,16 +66,8 @@ function startTail(ws, targetPath) {
   });
 }
 
-export function handleAsr(ws, id, param) {
-  let parsedParam = param;
-  if (typeof param === "string") {
-    try {
-      parsedParam = JSON.parse(param);
-    } catch (e) {
-      console.error("[handleAsr] failed to parse param:", param);
-    }
-  }
-  const { action, path: reqPath } = parsedParam || {};
+export function handleAsr(ws, id, params) {
+  const { action, path: reqPath } = params || {};
   console.log(`[handleAsr] action=${action} reqPath=${reqPath}`);
 
   let targetPath = reqPath || "";

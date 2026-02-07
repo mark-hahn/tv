@@ -266,35 +266,27 @@ function encodeFileIdBase32LegacyAZ05(fileId) {
   return "#" + out;
 }
 
-const deleteSubFiles = async (id, param, resolve, reject) => {
-  if (param === undefined || param === null || param === "") {
-    reject([id, { error: "deleteSubFiles: missing params" }]);
-    return;
+const deleteSubFiles = async (params) => {
+  if (params === undefined || params === null || params === "") {
+    throw new Error("deleteSubFiles: missing params");
   }
 
-  const fileIdObjs = util.jParse(param, "deleteSubFiles");
+  const fileIdObjs = params;
   if (!Array.isArray(fileIdObjs) || fileIdObjs.length === 0) {
-    reject([id, { error: "deleteSubFiles: expected non-empty array" }]);
-    return;
+    throw new Error("deleteSubFiles: expected non-empty array");
   }
 
   const showName =
     typeof fileIdObjs[0]?.showName === "string" ? fileIdObjs[0].showName : "";
   if (!showName || showName.trim() === "") {
-    reject([id, { error: "deleteSubFiles: missing showName" }]);
-    return;
+    throw new Error("deleteSubFiles: missing showName");
   }
   if (showName.includes("/") || showName.includes("\\")) {
-    reject([id, { error: "deleteSubFiles: invalid showName" }]);
-    return;
+    throw new Error("deleteSubFiles: invalid showName");
   }
   for (const entry of fileIdObjs) {
     if (typeof entry?.showName !== "string" || entry.showName !== showName) {
-      reject([
-        id,
-        { error: "deleteSubFiles: all entries must have same showName" },
-      ]);
-      return;
+      throw new Error("deleteSubFiles: all entries must have same showName");
     }
   }
 
@@ -302,12 +294,10 @@ const deleteSubFiles = async (id, param, resolve, reject) => {
   try {
     const st = fs.statSync(localShowPath);
     if (!st.isDirectory()) {
-      reject([id, { error: `Show directory missing: ${localShowPath} (n/a)` }]);
-      return;
+      throw new Error(`Show directory missing: ${localShowPath} (n/a)`);
     }
   } catch {
-    reject([id, { error: `Show directory missing: ${localShowPath} (n/a)` }]);
-    return;
+    throw new Error(`Show directory missing: ${localShowPath} (n/a)`);
   }
 
   const searchTags = new Set();
@@ -316,8 +306,7 @@ const deleteSubFiles = async (id, param, resolve, reject) => {
   for (const entry of fileIdObjs) {
     const file_id = entry?.file_id;
     if (!Number.isFinite(Number(file_id))) {
-      reject([id, { error: "deleteSubFiles: invalid file_id" }]);
-      return;
+      throw new Error("deleteSubFiles: invalid file_id");
     }
     const fid = Number(file_id);
     const tagNew = encodeFileIdBase32(fid);
@@ -387,40 +376,33 @@ const deleteSubFiles = async (id, param, resolve, reject) => {
     if (!deletedFids.has(fid)) notFound.push(fidToNewTag.get(fid));
   }
 
-  resolve([
-    id,
-    {
-      ok: true,
-      applied: Array.from(appliedSet),
-      deletedCount: deleted.length,
-      notFoundCount: notFound.length,
-      notFound,
-      failures,
-    },
-  ]);
+  return {
+    ok: true,
+    applied: Array.from(appliedSet),
+    deletedCount: deleted.length,
+    notFoundCount: notFound.length,
+    notFound,
+    failures,
+  };
 };
 
-const getSubFileIds = async (id, param, resolve, reject) => {
-  const showName = rpcParamToString(param).trim();
+const getSubFileIds = async (params) => {
+  const showName = (params?.showName || "").trim();
   if (!showName) {
-    reject([id, { error: "getSubFileIds: missing showName" }]);
-    return;
+    throw new Error("getSubFileIds: missing showName");
   }
   if (showName.includes("/") || showName.includes("\\")) {
-    reject([id, { error: "getSubFileIds: invalid showName" }]);
-    return;
+    throw new Error("getSubFileIds: invalid showName");
   }
 
   const localShowPath = path.join(tvDir, showName);
   try {
     const st = fs.statSync(localShowPath);
     if (!st.isDirectory()) {
-      reject([id, { error: `Show directory missing: ${localShowPath} (n/a)` }]);
-      return;
+      throw new Error(`Show directory missing: ${localShowPath} (n/a)`);
     }
   } catch {
-    reject([id, { error: `Show directory missing: ${localShowPath} (n/a)` }]);
-    return;
+    throw new Error(`Show directory missing: ${localShowPath} (n/a)`);
   }
 
   // Match current Base32 tag style: .#<A-Z2-7>.srt
@@ -456,7 +438,7 @@ const getSubFileIds = async (id, param, resolve, reject) => {
   };
 
   recurs(localShowPath);
-  resolve([id, found]);
+  return found;
 };
 
 function srtTimeToMs(timeStr) {
@@ -486,35 +468,22 @@ function msToSrtTime(msTotal) {
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
 }
 
-const offsetSubFiles = async (id, param, resolve, reject) => {
-  if (param === undefined || param === null || param === "") {
-    reject([id, { error: "offsetSubFiles: missing params" }]);
-    return;
-  }
-
-  const fileIdObjs = util.jParse(param, "offsetSubFiles");
+const offsetSubFiles = async (fileIdObjs) => {
   if (!Array.isArray(fileIdObjs) || fileIdObjs.length === 0) {
-    reject([id, { error: "offsetSubFiles: expected non-empty array" }]);
-    return;
+    throw new Error("offsetSubFiles: expected non-empty array");
   }
 
   const showName =
     typeof fileIdObjs[0]?.showName === "string" ? fileIdObjs[0].showName : "";
   if (!showName || showName.trim() === "") {
-    reject([id, { error: "offsetSubFiles: missing showName" }]);
-    return;
+    throw new Error("offsetSubFiles: missing showName");
   }
   if (showName.includes("/") || showName.includes("\\")) {
-    reject([id, { error: "offsetSubFiles: invalid showName" }]);
-    return;
+    throw new Error("offsetSubFiles: invalid showName");
   }
   for (const entry of fileIdObjs) {
     if (typeof entry?.showName !== "string" || entry.showName !== showName) {
-      reject([
-        id,
-        { error: "offsetSubFiles: all entries must have same showName" },
-      ]);
-      return;
+      throw new Error("offsetSubFiles: all entries must have same showName");
     }
   }
 
@@ -522,29 +491,22 @@ const offsetSubFiles = async (id, param, resolve, reject) => {
   try {
     const st = fs.statSync(localShowPath);
     if (!st.isDirectory()) {
-      reject([id, { error: `Show directory missing: ${localShowPath} (n/a)` }]);
-      return;
+      throw new Error(`Show directory missing: ${localShowPath} (n/a)`);
     }
   } catch {
-    reject([id, { error: `Show directory missing: ${localShowPath} (n/a)` }]);
-    return;
+    throw new Error(`Show directory missing: ${localShowPath} (n/a)`);
   }
 
   // Validate offset is present on every entry and identical.
   const offsetRaw = fileIdObjs[0]?.offset;
   const offsetMs = Math.trunc(Number(offsetRaw));
   if (!Number.isFinite(offsetMs)) {
-    reject([id, { error: "offsetSubFiles: invalid offset" }]);
-    return;
+    throw new Error("offsetSubFiles: invalid offset");
   }
   for (const entry of fileIdObjs) {
     const o = Math.trunc(Number(entry?.offset));
     if (!Number.isFinite(o) || o !== offsetMs) {
-      reject([
-        id,
-        { error: "offsetSubFiles: offset must be the same on every entry" },
-      ]);
-      return;
+      throw new Error("offsetSubFiles: offset must be the same on every entry");
     }
   }
 
@@ -716,7 +678,7 @@ const offsetSubFiles = async (id, param, resolve, reject) => {
     }
   }
 
-  resolve([id, { ok: true, applied: Array.from(appliedSet), failures }]);
+  return { ok: true, applied: Array.from(appliedSet), failures };
 };
 
 function parseSeasonEpisodeFromFilename(fileName) {
@@ -941,28 +903,20 @@ async function openSubtitlesDownloadWithRetry({
   return last;
 }
 
-const subsSearch = async (id, param, resolve, reject) => {
-  const parsed = util.jParse(param, "subsSearch");
-  const imdbDigits = normalizeImdbId(parsed?.imdb_id);
-  let page = parsed?.page;
-  const season = parsed?.season;
+const subsSearch = async (params) => {
+  const imdbDigits = normalizeImdbId(params?.imdb_id);
+  let page = params?.page;
+  const season = params?.season;
 
   if (!imdbDigits) {
-    reject([id, { error: "subsSearch: missing imdb_id" }]);
-    return;
+    throw new Error("subsSearch: missing imdb_id");
   }
 
   if (page === undefined || page === null || page === "") page = 1;
   page = Number(page);
   if (!Number.isFinite(page) || page < 1) page = 1;
 
-  let login;
-  try {
-    login = loadSubsLogin();
-  } catch (e) {
-    reject([id, { error: e.message }]);
-    return;
-  }
+  const login = loadSubsLogin();
 
   // First attempt with existing token (if any)
   try {
@@ -975,8 +929,7 @@ const subsSearch = async (id, param, resolve, reject) => {
     });
 
     if (resp.ok) {
-      resolve([id, body]);
-      return;
+      return body;
     }
 
     // Refresh token on auth failure and retry once.
@@ -993,26 +946,22 @@ const subsSearch = async (id, param, resolve, reject) => {
       });
 
       if (retry.resp.ok) {
-        resolve([id, retry.body]);
-        return;
+        return retry.body;
       }
 
-      reject([
-        id,
-        {
-          error: `subsSearch: OpenSubtitles HTTP ${retry.resp.status}`,
-          details: retry.body,
-        },
-      ]);
-      return;
+      const err = new Error(
+        `subsSearch: OpenSubtitles HTTP ${retry.resp.status}`,
+      );
+      err.details = retry.body;
+      throw err;
     }
 
-    reject([
-      id,
-      { error: `subsSearch: OpenSubtitles HTTP ${resp.status}`, details: body },
-    ]);
+    const err = new Error(`subsSearch: OpenSubtitles HTTP ${resp.status}`);
+    err.details = body;
+    throw err;
   } catch (e) {
-    reject([id, { error: `subsSearch: ${e.message}` }]);
+    if (e instanceof Error && e.message.startsWith("subsSearch:")) throw e;
+    throw new Error(`subsSearch: ${e.message}`);
   }
 };
 
@@ -1178,7 +1127,7 @@ function fmtDateWithTZ(date, utcOut = false) {
   return `${year}-${month}-${day}`;
 }
 
-const getShowsFromDisk = async (id, _param, resolve, reject) => {
+const getShowsFromDisk = async (_params) => {
   let errFlg = null;
   const shows = {};
 
@@ -1219,11 +1168,9 @@ const getShowsFromDisk = async (id, _param, resolve, reject) => {
     }
   }
   if (errFlg) {
-    reject([id, `getShowsFromDisk: Error: ${errFlg.message}`]);
-    return;
+    throw new Error(`getShowsFromDisk: Error: ${errFlg.message}`);
   } else {
-    resolve([id, shows]);
-    return;
+    return shows;
   }
 };
 
@@ -1326,10 +1273,10 @@ const saveConfigYml = async (idIn, resultIn, resolveIn, rejectIn) => {
       setTimeout(() => saveConfigYml(id, result, resolve, reject), 1000);
       break;
     case "ok":
-      resolve([id, result]);
+      if (resolve) resolve([id, result]);
       break;
     case "err":
-      reject([id, tryRes]);
+      if (reject) reject([id, tryRes]);
       break;
   }
 };
@@ -1421,7 +1368,7 @@ const startupPickupsSync = () => {
 startupRejectsSync();
 startupPickupsSync();
 
-const getRejects = (id, _param, resolve, _reject) => {
+const getRejects = async (_param) => {
   // Phase 5: Read from tvdb instead of separate rejects array
   const allTvdb = tvdb.getAllTvdbSync();
   const rejectsFromTvdb = [];
@@ -1432,12 +1379,12 @@ const getRejects = (id, _param, resolve, _reject) => {
     }
   }
 
-  resolve([id, rejectsFromTvdb]);
+  return rejectsFromTvdb;
 };
 
-const addReject = async (id, name, resolve, reject) => {
-  console.log("addReject", id, name);
-  let changed = false;
+const addReject = async (params) => {
+  const { name } = params;
+  console.log("addReject", name);
 
   // Phase 5: Update tvdb.reject field
   const allTvdb = tvdb.getAllTvdbSync();
@@ -1472,7 +1419,6 @@ const addReject = async (id, name, resolve, reject) => {
 
   console.log("-- adding reject:", name);
   rejects.push(name);
-  changed = true; // effectively always changed or re-confirmed
 
   // 2. Sync to noEmbys if present
   const noEmbyShow = noEmbys.find(
@@ -1484,11 +1430,17 @@ const addReject = async (id, name, resolve, reject) => {
     util.writeFile(noEmbyPath, noEmbys); // fire and forget write
   }
 
-  saveConfigYml(id, "ok", resolve, reject);
+  return new Promise((resolve, reject) => {
+    saveConfigYml(null, "ok", 
+      ([_, result]) => resolve(result),
+      ([_, error]) => reject(new Error(error))
+    );
+  });
 };
 
-const delReject = async (id, name, resolve, reject) => {
-  console.log("delReject", id, name);
+const delReject = async (params) => {
+  const { name } = params;
+  console.log("delReject", name);
   let deletedOne = false;
 
   // Phase 5: Update tvdb.reject field
@@ -1532,13 +1484,18 @@ const delReject = async (id, name, resolve, reject) => {
 
   if (!deletedOne) {
     console.log("-- reject not deleted -- no match:", name);
-    resolve([id, "delReject not deleted: " + name]);
-    return;
+    return "delReject not deleted: " + name;
   }
-  saveConfigYml(id, "ok", resolve, reject);
+  
+  return new Promise((resolve, reject) => {
+    saveConfigYml(null, "ok", 
+      ([_, result]) => resolve(result),
+      ([_, error]) => reject(new Error(error))
+    );
+  });
 };
 
-const getPickups = (id, _param, resolve, _reject) => {
+const getPickups = async (_param) => {
   // Phase 5: Read from tvdb instead of separate pickups array
   const allTvdb = tvdb.getAllTvdbSync();
   const pickupsFromTvdb = [];
@@ -1549,11 +1506,16 @@ const getPickups = (id, _param, resolve, _reject) => {
     }
   }
 
-  resolve([id, pickupsFromTvdb]);
+  return pickupsFromTvdb;
 };
 
-const addPickup = async (id, name, resolve, reject) => {
-  console.log("addPickup", id, name);
+const addPickup = async (params) => {
+  const name = params?.name;
+  console.log("addPickup", name);
+
+  if (!name) {
+    throw new Error("addPickup: missing name");
+  }
 
   // Phase 5: Update tvdb.pickup field
   const allTvdb = tvdb.getAllTvdbSync();
@@ -1577,11 +1539,18 @@ const addPickup = async (id, name, resolve, reject) => {
   }
   console.log("-- adding pickup:", name);
   pickups.push(name);
-  saveConfigYml(id, "ok", resolve, reject);
+  await new Promise((resolve, reject) =>
+    saveConfigYml(null, "ok", resolve, reject),
+  );
+  return "ok";
 };
 
-const delPickup = async (id, name, resolve, reject) => {
-  console.log("delPickup", id, name);
+const delPickup = async (params) => {
+  const name = params?.name;
+  console.log("delPickup", name);
+  if (!name) {
+    throw new Error("delPickup: missing name");
+  }
   let deletedOne = false;
 
   // Phase 5: Update tvdb.pickup field
@@ -1611,22 +1580,25 @@ const delPickup = async (id, name, resolve, reject) => {
     }
   }
   if (!deletedOne) {
-    resolve([id, "delPickup no match: " + name]);
     console.log("pickup not deleted, no match:", name);
-    return;
+    return "delPickup no match: " + name;
   }
-  saveConfigYml(id, "ok", resolve, reject);
+  await new Promise((resolve, reject) =>
+    saveConfigYml(null, "ok", resolve, reject),
+  );
+  return "ok";
 };
 
-const getNoEmbys = (id, _param, resolve, _reject) => {
-  resolve([id, noEmbys]);
+const getNoEmbys = async (_params) => {
+  return noEmbys;
 };
 
-const addNoEmby = async (id, showStr, resolve) => {
-  const show = JSON.parse(showStr);
-  // if(show.Reject) return;
+const addNoEmby = async (params) => {
+  const show = params.show || params;
   const name = show.Name;
-  console.log("addNoEmby", id, name);
+  console.log("addNoEmby", name);
+  if (!name) throw new Error("addNoEmby: missing show Name");
+
   for (const [idx, show] of noEmbys.entries()) {
     if (show.Name.toLowerCase() === name.toLowerCase()) {
       console.log("removing old noemby:", name);
@@ -1662,11 +1634,13 @@ const addNoEmby = async (id, showStr, resolve) => {
   console.log("adding noemby:", name);
   noEmbys.push(show);
   await util.writeFile(noEmbyPath, noEmbys);
-  resolve([id, "ok"]);
+  return "ok";
 };
 
-const delNoEmby = async (id, name, resolve, reject) => {
-  console.log("delNoEmby", id, name);
+const delNoEmby = async (params) => {
+  const name = params?.name;
+  console.log("delNoEmby", name);
+  if (!name) throw new Error("delNoEmby: missing name");
   let deletedOne = false;
   let wasRejected = false;
 
@@ -1682,21 +1656,6 @@ const delNoEmby = async (id, name, resolve, reject) => {
 
   if (wasRejected) {
     // "when show is removed from either file remove it from the other"
-    // If we delete a noEmby that was rejected, should we unban it globally?
-    // Be careful: removing from "noEmby" usually just means "it was found in Emby now".
-    // It doesn't mean "unban it".
-    // However, if the USER explicitly deleted it via "delNoEmby" (which is rare, usually it's automatic promotion),
-    // we might not want to remove the ban.
-    // But the requirement says: "when show is removed from either file remove it from the other".
-    // If specific `delNoEmby` is called (usually via Delete button or automatic cleanup),
-    // removing the ban might be intended if it's a "Delete Show" action.
-    // Let's check `rejected` presence.
-
-    // BUT: `delNoEmby` is effectively "Delete Show" for noEmby items.
-    // If I delete the show "Star Trek", I probably don't want to keep a ban floating around?
-    // actually, usually bans persist.
-    // But the user prompt is specific: "when show is removed from either file remove it from the other."
-
     const rIdx = rejects.findIndex(
       (r) => r.toLowerCase() === name.toLowerCase(),
     );
@@ -1718,14 +1677,13 @@ const delNoEmby = async (id, name, resolve, reject) => {
 
   if (!deletedOne) {
     console.log("no noembys deleted, no match:", name);
-    resolve([id, "delNoEmby no match:" + name]);
-    return;
+    return "delNoEmby no match:" + name;
   }
   await util.writeFile(noEmbyPath, noEmbys);
-  resolve([id, "ok"]);
+  return "ok";
 };
 
-const getGaps = (id, _param, resolve, _reject) => {
+const getGaps = async (_param) => {
   // Phase 5: Read from tvdb instead of separate gaps object
   const allTvdb = tvdb.getAllTvdbSync();
   const gapsFromTvdb = {};
@@ -1736,11 +1694,11 @@ const getGaps = (id, _param, resolve, _reject) => {
     }
   }
 
-  resolve([id, gapsFromTvdb]);
+  return gapsFromTvdb;
 };
 
-const addGap = async (id, gapIdGapSave, resolve, _reject) => {
-  const [gapId, gap, save] = JSON.parse(gapIdGapSave);
+const addGap = async (params) => {
+  const { gapId, gap, save } = params || {};
 
   if (gapId !== null && gapId !== undefined) {
     stripGapTransientFields(gap);
@@ -1768,12 +1726,11 @@ const addGap = async (id, gapIdGapSave, resolve, _reject) => {
     }
   }
 
-  resolve([id, "ok"]);
+  return "ok";
 };
 
-const delGap = async (id, gapIdSave, resolve, _reject) => {
-  console.log("delGap", id, { gapIdSave });
-  const [gapId, save] = JSON.parse(gapIdSave);
+const delGap = async (params) => {
+  const { gapId, save } = params || {};
 
   if (gapId !== null) {
     // Phase 5: Update tvdb.gap field
@@ -1790,37 +1747,30 @@ const delGap = async (id, gapIdSave, resolve, _reject) => {
     }
   }
 
-  resolve([id, "ok"]);
+  return "ok";
 };
 
-const delSeasonFiles = async (id, param, resolve, reject) => {
-  const params = util.jParse(param, "delSeasonFiles");
+const delSeasonFiles = async (params) => {
   const showName = params?.showName;
   const showPath = params?.showPath;
   const season = params?.season;
 
   if (!showName || !showPath || season === undefined || season === null) {
-    reject([
-      id,
-      { err: "delSeasonFiles: requires showName, showPath, season" },
-    ]);
-    return;
+    throw new Error("delSeasonFiles: requires showName, showPath, season");
   }
 
   const seasonDir = path.join(showPath, `Season ${season}`);
   console.log(`[delSeasonFiles] ${showName}: ${seasonDir}`);
 
   if (!fs.existsSync(seasonDir)) {
-    reject([id, { err: `no such dir: ${seasonDir}` }]);
-    return;
+    throw new Error(`no such dir: ${seasonDir}`);
   }
 
   let entries = [];
   try {
     entries = fs.readdirSync(seasonDir);
   } catch (e) {
-    reject([id, { err: `delSeasonFiles: readdir failed: ${e.message}` }]);
-    return;
+    throw new Error(`delSeasonFiles: readdir failed: ${e.message}`);
   }
 
   for (const entry of entries) {
@@ -1829,21 +1779,18 @@ const delSeasonFiles = async (id, param, resolve, reject) => {
     try {
       await rimraf(entryPath);
     } catch (e) {
-      reject([id, { err: `delSeasonFiles: delete failed: ${e.message}` }]);
-      return;
+      throw new Error(`delSeasonFiles: delete failed: ${e.message}`);
     }
   }
 
-  resolve([id, { status: "ok" }]);
+  return { status: "ok" };
 };
 
-const createShowFolder = async (id, param, resolve, reject) => {
-  const params = util.jParse(param, "createShowFolder");
+const createShowFolder = async (params) => {
   const showNameRaw = params?.showName;
   const seriesMapSeasons = params?.seriesMapSeasons;
 
   console.log("[createShowFolder] request", {
-    id,
     showName: showNameRaw,
     tvdbId: params?.tvdbId,
     seriesMapSeasons,
@@ -1852,8 +1799,7 @@ const createShowFolder = async (id, param, resolve, reject) => {
   const showName = safeShowFolderName(showNameRaw);
   if (!showName) {
     console.log("[createShowFolder] invalid showName", { showNameRaw });
-    reject([id, { err: "createShowFolder: invalid showName" }]);
-    return;
+    throw new Error("createShowFolder: invalid showName");
   }
 
   const showPath = path.join(tvDir, showName);
@@ -1863,8 +1809,7 @@ const createShowFolder = async (id, param, resolve, reject) => {
     fs.mkdirSync(showPath, { recursive: true });
     console.log("[createShowFolder] show dir", { showPath, existed });
   } catch (e) {
-    reject([id, { err: `createShowFolder: mkdir failed: ${e.message}` }]);
-    return;
+    throw new Error(`createShowFolder: mkdir failed: ${e.message}`);
   }
 
   if (Array.isArray(seriesMapSeasons)) {
@@ -1876,11 +1821,7 @@ const createShowFolder = async (id, param, resolve, reject) => {
         fs.mkdirSync(seasonPath, { recursive: true });
         console.log("[createShowFolder] season dir", { season, seasonPath });
       } catch (e) {
-        reject([
-          id,
-          { err: `createShowFolder: mkdir season failed: ${e.message}` },
-        ]);
-        return;
+        throw new Error(`createShowFolder: mkdir season failed: ${e.message}`);
       }
     }
   } else if (seriesMapSeasons !== undefined) {
@@ -1892,56 +1833,35 @@ const createShowFolder = async (id, param, resolve, reject) => {
     );
   }
 
-  resolve([id, { ok: true, created: !existed, path: showPath }]);
+  return { ok: true, created: !existed, path: showPath };
 };
 
 let sharedFilters = null;
 
-const setSharedFilters = (id, param, resolve, reject) => {
-  // Client sends JSON.stringify(object) or "null".
-  if (param === "" || param === undefined || param === null) {
+const setSharedFilters = async (params) => {
+  if (params === undefined || params === null || params === "") {
     sharedFilters = null;
-    resolve([id, { ok: true }]);
-    return;
+    return { ok: true };
   }
-
-  const parsed = util.jParse(param, "setSharedFilters");
-  if (parsed === null) {
-    sharedFilters = null;
-    resolve([id, { ok: true }]);
-    return;
-  }
-
-  if (typeof parsed !== "object" || Array.isArray(parsed)) {
-    reject([id, { err: "setSharedFilters: expected object or null" }]);
-    return;
-  }
-
-  sharedFilters = parsed;
-  resolve([id, { ok: true }]);
+  
+  // No need to jParse, we expect it to be a JS object already
+  sharedFilters = params;
+  return { ok: true };
 };
 
-const getSharedFilters = (id, _param, resolve, _reject) => {
-  resolve([id, sharedFilters]);
+const getSharedFilters = async (_params) => {
+  return sharedFilters;
 };
 
-const getNote = (id, param, resolve, reject) => {
-  const showName = rpcParamToString(param).trim();
+const getNote = async (params) => {
+  const showName = (params?.showName || "").trim();
   if (!showName) {
-    reject([
-      id,
-      {
-        err: "getNote: missing showName",
-        receivedRaw: param,
-        parsed: showName,
-      },
-    ]);
-    return;
+    throw new Error("getNote requires showName");
   }
-  resolve([id, notesCache[showName] ?? ""]);
+  return notesCache[showName] ?? "";
 };
 
-const getAllNotes = (id, _param, resolve, _reject) => {
+const getAllNotes = async (_params) => {
   // Phase 5: Read from tvdb instead of separate notesCache
   const allTvdb = tvdb.getAllTvdbSync();
   const notesFromTvdb = {};
@@ -1957,34 +1877,21 @@ const getAllNotes = (id, _param, resolve, _reject) => {
     }
   }
 
-  resolve([id, notesFromTvdb]);
+  return notesFromTvdb;
 };
 
-const saveNote = async (id, param, resolve, reject) => {
-  if (param === undefined || param === null || param === "") {
-    reject([id, { err: "saveNote: missing params" }]);
-    return;
+const saveNote = async (params) => {
+  if (!params) {
+    throw new Error("saveNote: missing params");
   }
 
-  const parsed = util.jParse(param, "saveNote");
-  let showName;
-  let noteText;
-
-  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-    showName = parsed.showName;
-    noteText = parsed.noteText;
-  } else {
-    reject([id, { err: "saveNote: expected { showName, noteText }" }]);
-    return;
-  }
+  const { showName, noteText } = params;
 
   if (typeof showName !== "string" || showName.trim() === "") {
-    reject([id, { err: "saveNote: invalid showName" }]);
-    return;
+    throw new Error("saveNote: invalid showName");
   }
-  if (noteText === undefined || noteText === null) noteText = "";
-  if (typeof noteText !== "string") noteText = String(noteText);
 
+  const finalNote = noteText === undefined || noteText === null ? "" : String(noteText);
   const key = showName.trim();
 
   // Phase 5: Update tvdb.note field
@@ -1992,15 +1899,13 @@ const saveNote = async (id, param, resolve, reject) => {
   const tvdbRecord = allTvdb[key];
 
   if (!tvdbRecord) {
-    reject([id, { err: `saveNote: show not found in tvdb: ${key}` }]);
-    return;
+    throw new Error(`saveNote: show not found in tvdb: ${key}`);
   }
 
   // Never store empty notes: treat as delete.
   if (noteText.trim() === "") {
     if (!tvdbRecord.note) {
-      resolve([id, "ok"]);
-      return;
+      return "ok";
     }
     tvdbRecord.note = "";
     await tvdb.saveTvdbSync();
@@ -2014,55 +1919,36 @@ const saveNote = async (id, param, resolve, reject) => {
         // Ignore write errors for deprecated file
       }
     }
-    resolve([id, "ok"]);
-    return;
+    return "ok";
   }
 
   const prev = tvdbRecord.note;
-  if (prev === noteText) {
-    resolve([id, "ok"]);
-    return;
+  if (prev === finalNote) {
+    return "ok";
   }
 
-  tvdbRecord.note = noteText;
+  tvdbRecord.note = finalNote;
   // Notes are always saved immediately (explicit user action)
   await tvdb.saveTvdbSync();
 
   // Backward compat: also update old notesCache
-  notesCache[key] = noteText;
+  notesCache[key] = finalNote;
   try {
     await util.writeFile(notesPath, notesCache);
   } catch (e) {
     // Ignore write errors for deprecated file
   }
 
-  resolve([id, "ok"]);
+  return "ok";
 };
 
-const getFile = (id, param, resolve, reject) => {
-  // Param is usually a raw string path (per RPC protocol). Allow "" => tvDir.
-  let requestedPath = param;
+const getFile = async (params) => {
+  // Param is usually an object { path: "..." }
+  let requestedPath = params?.path;
   if (requestedPath === undefined || requestedPath === null) requestedPath = "";
-
-  // If someone accidentally JSON.stringified a string, tolerate it.
-  if (typeof requestedPath === "string") {
-    const trimmed = requestedPath.trim();
-    if (
-      (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-      trimmed === "null"
-    ) {
-      try {
-        requestedPath = JSON.parse(trimmed);
-      } catch {
-        // keep as-is
-        requestedPath = param;
-      }
-    }
-  }
-
+  
   if (typeof requestedPath !== "string") {
-    reject([id, { err: "getFile: param must be a string path" }]);
-    return;
+      throw new Error("getFile: path must be string");
   }
 
   const rawPath = requestedPath.trim();
@@ -2075,29 +1961,25 @@ const getFile = (id, param, resolve, reject) => {
     !(targetPath + path.sep).startsWith(allowedRoot) &&
     targetPath !== path.resolve(basePath)
   ) {
-    reject([id, { err: `getFile: path not allowed: ${rawPath}` }]);
-    return;
+    throw new Error(`getFile: path not allowed: ${rawPath}`);
   }
 
   let stat;
   try {
     stat = fs.statSync(targetPath);
   } catch (e) {
-    reject([id, { err: `getFile: stat failed: ${e.message}` }]);
-    return;
+    throw new Error(`getFile: stat failed: ${e.message}`);
   }
 
   if (!stat.isDirectory()) {
-    reject([id, { err: "getFile: path is not a directory" }]);
-    return;
+    throw new Error("getFile: path is not a directory");
   }
 
   let dirents;
   try {
     dirents = fs.readdirSync(targetPath, { withFileTypes: true });
   } catch (e) {
-    reject([id, { err: `getFile: readdir failed: ${e.message}` }]);
-    return;
+    throw new Error(`getFile: readdir failed: ${e.message}`);
   }
 
   const collator = new Intl.Collator(undefined, {
@@ -2130,38 +2012,30 @@ const getFile = (id, param, resolve, reject) => {
     }
   }
 
-  resolve([id, out]);
+  return out;
 };
 
-const applySubFiles = async (id, param, resolve, reject) => {
-  if (param === undefined || param === null || param === "") {
-    reject([id, { error: "applySubFiles: missing params" }]);
-    return;
+const applySubFiles = async (params) => {
+  if (params === undefined || params === null || params === "") {
+    throw new Error("applySubFiles: missing params");
   }
 
-  const fileIdObjs = util.jParse(param, "applySubFiles");
+  const fileIdObjs = params; // Already parsed by Express
   if (!Array.isArray(fileIdObjs) || fileIdObjs.length === 0) {
-    reject([id, { error: "applySubFiles: expected non-empty array" }]);
-    return;
+    throw new Error("applySubFiles: expected non-empty array");
   }
 
   const showName =
     typeof fileIdObjs[0]?.showName === "string" ? fileIdObjs[0].showName : "";
   if (!showName || showName.trim() === "") {
-    reject([id, { error: "applySubFiles: missing showName" }]);
-    return;
+    throw new Error("applySubFiles: missing showName");
   }
   if (showName.includes("/") || showName.includes("\\")) {
-    reject([id, { error: "applySubFiles: invalid showName" }]);
-    return;
+    throw new Error("applySubFiles: invalid showName");
   }
   for (const entry of fileIdObjs) {
     if (typeof entry?.showName !== "string" || entry.showName !== showName) {
-      reject([
-        id,
-        { error: "applySubFiles: all entries must have same showName" },
-      ]);
-      return;
+      throw new Error("applySubFiles: all entries must have same showName");
     }
   }
 
@@ -2169,20 +2043,17 @@ const applySubFiles = async (id, param, resolve, reject) => {
   try {
     const st = fs.statSync(localShowPath);
     if (!st.isDirectory()) {
-      reject([id, { error: `Show directory missing: ${localShowPath} (n/a)` }]);
-      return;
+      throw new Error(`Show directory missing: ${localShowPath} (n/a)`);
     }
   } catch {
-    reject([id, { error: `Show directory missing: ${localShowPath} (n/a)` }]);
-    return;
+    throw new Error(`Show directory missing: ${localShowPath} (n/a)`);
   }
 
   let login;
   try {
     login = loadSubsLogin();
   } catch (e) {
-    reject([id, { error: e.message }]);
-    return;
+    throw new Error(e.message);
   }
 
   const failures = [];
@@ -2224,16 +2095,13 @@ const applySubFiles = async (id, param, resolve, reject) => {
     const episode = entry?.episode;
 
     if (!Number.isFinite(Number(file_id))) {
-      reject([id, { error: "applySubFiles: invalid file_id" }]);
-      return;
+      throw new Error("applySubFiles: invalid file_id");
     }
     if (!Number.isFinite(Number(season))) {
-      reject([id, { error: `applySubFiles: invalid season (${file_id})` }]);
-      return;
+      throw new Error(`applySubFiles: invalid season (${file_id})`);
     }
     if (!Number.isFinite(Number(episode))) {
-      reject([id, { error: `applySubFiles: invalid episode (${file_id})` }]);
-      return;
+      throw new Error(`applySubFiles: invalid episode (${file_id})`);
     }
 
     entry.localShowPath = localShowPath + "/";
@@ -2242,22 +2110,10 @@ const applySubFiles = async (id, param, resolve, reject) => {
     try {
       const stShow = fs.statSync(localShowPath);
       if (!stShow.isDirectory()) {
-        reject([
-          id,
-          {
-            error: `Show directory missing: ${entry.localShowPath} (${file_id})`,
-          },
-        ]);
-        return;
+        throw new Error(`Show directory missing: ${entry.localShowPath} (${file_id})`);
       }
     } catch {
-      reject([
-        id,
-        {
-          error: `Show directory missing: ${entry.localShowPath} (${file_id})`,
-        },
-      ]);
-      return;
+      throw new Error(`Show directory missing: ${entry.localShowPath} (${file_id})`);
     }
 
     // If the requested season folder doesn't exist, record a failure but keep going.
@@ -2290,8 +2146,7 @@ const applySubFiles = async (id, param, resolve, reject) => {
   try {
     await util.writeFile("samples/fileIdObjs.json", fileIdObjs);
   } catch (e) {
-    reject([id, { error: `applySubFiles: write failed: ${e.message}` }]);
-    return;
+    throw new Error(`applySubFiles: write failed: ${e.message}`);
   }
 
   // Build lookup by season/episode.
@@ -2311,8 +2166,7 @@ const applySubFiles = async (id, param, resolve, reject) => {
   try {
     seasonDirents = fs.readdirSync(localShowPath, { withFileTypes: true });
   } catch (e) {
-    reject([id, { error: `applySubFiles: readdir failed: ${e.message}` }]);
-    return;
+    throw new Error(`applySubFiles: readdir failed: ${e.message}`);
   }
 
   const foundKeys = new Set();
@@ -2493,28 +2347,29 @@ const applySubFiles = async (id, param, resolve, reject) => {
     }
   }
 
-  resolve([id, { ok: true, applied: Array.from(appliedSet), failures }]);
+  return { ok: true, applied: Array.from(appliedSet), failures };
 };
 
-const deletePath = async (id, path, resolve, _reject) => {
-  // console.log('deletePath', id, path);
+const deletePath = async (params) => {
+  const { path } = params;
+  // console.log('deletePath', path);
   try {
     await rimraf(path);
   } catch (e) {
     console.log("error removing path:", path, e.message);
-    resolve([id, e.message]);
-    return;
+    return e.message;
   }
-  resolve([id, "ok"]);
+  return "ok";
 };
 
-const sendEmailHandler = async (id, bodyText, resolve, reject) => {
-  console.log("sendEmailHandler", id, bodyText);
+const sendEmailHandler = async (params) => {
+  const { body } = params;
+  console.log("sendEmailHandler", body);
   try {
-    await email.sendEmail(bodyText);
-    resolve([id, "ok"]);
+    await email.sendEmail(body);
+    return "ok";
   } catch (error) {
-    reject([id, error.message]);
+    throw new Error(error.message);
   }
 };
 
@@ -2534,98 +2389,77 @@ app.use((req, res, next) => {
   next();
 });
 
-// Helper to promisify the callback-based functions
-const promisifyHandler = (handler) => {
-  return (req, res) => {
-    // FIX: For simple string params (like getNote), req.body might be the string itself
-    // if content-type is json, but we need to handle it carefully.
-    // If the rpc function expects a string, and we receive "ShowName", paramStr becomes "\"ShowName\""
-    // which rpcParamToString might strip the quotes from.
-    // But if we receive { name: "foo" }, paramStr becomes "{\"name\":\"foo\"}".
-
-    const param = req.method === "GET" ? req.query : req.body;
-    let paramStr;
-
-    // IMPORTANT: If req.body is already a string (which happens if we posted JSON "string")
-    // assume it's the direct parameter.
-    // If it's an object/array, we MUST stringify it because the old RPC handlers expect JSON strings.
-    if (typeof param === "string") {
-      paramStr = param;
-    } else {
-      paramStr = JSON.stringify(param);
-      // Optimization/HACK: if paramStr is like "value", stripped the quotes for simplicity?
-      // Actually rpcParamToString handles removal of surrounding quotes if they exist.
-      // BUT: JSON.stringify("foo") -> "\"foo\"". rpcParamToString removes outer quotes -> foo. Correct.
-      // JSON.stringify({a:1}) -> "{\"a\":1}". rpcParamToString sees object -> returns as is. Correct.
+// Helper to wrap async business logic functions for Express
+// The handler should be: async (params) => result
+const apiWrapper = (handler) => {
+  return async (req, res) => {
+    try {
+      // GET requests use query params, POST use body
+      const params = req.method === "GET" ? req.query : req.body;
+      const result = await handler(params);
+      res.json(result);
+    } catch (error) {
+      console.error(`Error in ${req.url}:`, error);
+      res.status(500).json({ error: error.message || String(error) });
     }
-
-    handler(
-      null, // id not needed for HTTP
-      paramStr,
-      ([_, result]) => res.json(result),
-      ([_, error]) => {
-        console.error(`Error in ${req.url}:`, error);
-        res.status(500).json({ error });
-      },
-    );
   };
 };
 
 // Data retrieval endpoints
-app.get("/api/getAllTvdb", promisifyHandler(tvdb.getAllTvdb));
-app.get("/api/getShowsFromDisk", promisifyHandler(getShowsFromDisk));
-app.get("/api/getRejects", promisifyHandler(getRejects));
-app.get("/api/getPickups", promisifyHandler(getPickups));
-app.get("/api/getGaps", promisifyHandler(getGaps));
-app.get("/api/getNoEmbys", promisifyHandler(getNoEmbys));
-app.get("/api/getDevices", promisifyHandler(emby.getDevices));
-app.get("/api/getLastViewed", promisifyHandler(view.getLastViewed));
-app.get("/api/getSharedFilters", promisifyHandler(getSharedFilters));
-app.get("/api/getAllNotes", promisifyHandler(getAllNotes));
+app.get("/api/getAllTvdb", apiWrapper(tvdb.getAllTvdb));
+app.get("/api/getShowsFromDisk", apiWrapper(getShowsFromDisk));
+app.get("/api/getRejects", apiWrapper(getRejects));
+app.get("/api/getPickups", apiWrapper(getPickups));
+app.get("/api/getGaps", apiWrapper(getGaps));
+app.get("/api/getNoEmbys", apiWrapper(getNoEmbys));
+app.get("/api/getDevices", apiWrapper(emby.getDevices));
+app.get("/api/getLastViewed", apiWrapper(view.getLastViewed));
+app.get("/api/getSharedFilters", apiWrapper(getSharedFilters));
+app.get("/api/getAllNotes", apiWrapper(getAllNotes));
 
 // Endpoints with parameters
-app.post("/api/getRemotes", promisifyHandler(tvdb.getRemotesCmd));
-app.post("/api/getNewTvdb", promisifyHandler(tvdb.getNewTvdb));
-app.post("/api/getActorPage", promisifyHandler(tvdb.getActorPage));
-app.post("/api/getTmdb", promisifyHandler(tmdb.getTmdb));
-app.post("/api/getNote", promisifyHandler(getNote));
-app.post("/api/getFile", promisifyHandler(getFile));
-app.post("/api/getSubFileIds", promisifyHandler(getSubFileIds));
-app.post("/api/accessTvdb", promisifyHandler(tvdb.accessTvdb));
+app.post("/api/getRemotes", apiWrapper(tvdb.getRemotesCmd));
+app.post("/api/getNewTvdb", apiWrapper(tvdb.getNewTvdb));
+app.post("/api/getActorPage", apiWrapper(tvdb.getActorPage));
+app.post("/api/getTmdb", apiWrapper(tmdb.getTmdb));
+app.post("/api/getNote", apiWrapper(getNote));
+app.post("/api/getFile", apiWrapper(getFile));
+app.post("/api/getSubFileIds", apiWrapper(getSubFileIds));
+app.post("/api/accessTvdb", apiWrapper(tvdb.accessTvdb));
 
 // CRUD operations
-app.post("/api/addReject", promisifyHandler(addReject));
-app.post("/api/delReject", promisifyHandler(delReject));
-app.post("/api/addPickup", promisifyHandler(addPickup));
-app.post("/api/delPickup", promisifyHandler(delPickup));
-app.post("/api/addNoEmby", promisifyHandler(addNoEmby));
-app.post("/api/delNoEmby", promisifyHandler(delNoEmby));
-app.post("/api/addGap", promisifyHandler(addGap));
-app.post("/api/delGap", promisifyHandler(delGap));
-app.post("/api/setTvdbFields", promisifyHandler(tvdb.setTvdbFields));
-app.post("/api/setSharedFilters", promisifyHandler(setSharedFilters));
-app.post("/api/saveNote", promisifyHandler(saveNote));
+app.post("/api/addReject", apiWrapper(addReject));
+app.post("/api/delReject", apiWrapper(delReject));
+app.post("/api/addPickup", apiWrapper(addPickup));
+app.post("/api/delPickup", apiWrapper(delPickup));
+app.post("/api/addNoEmby", apiWrapper(addNoEmby));
+app.post("/api/delNoEmby", apiWrapper(delNoEmby));
+app.post("/api/addGap", apiWrapper(addGap));
+app.post("/api/delGap", apiWrapper(delGap));
+app.post("/api/setTvdbFields", apiWrapper(tvdb.setTvdbFields));
+app.post("/api/setSharedFilters", apiWrapper(setSharedFilters));
+app.post("/api/saveNote", apiWrapper(saveNote));
 
 // File operations
-app.post("/api/deletePath", promisifyHandler(deletePath));
-app.post("/api/delSeasonFiles", promisifyHandler(delSeasonFiles));
-app.post("/api/createShowFolder", promisifyHandler(createShowFolder));
+app.post("/api/deletePath", apiWrapper(deletePath));
+app.post("/api/delSeasonFiles", apiWrapper(delSeasonFiles));
+app.post("/api/createShowFolder", apiWrapper(createShowFolder));
 
 // Subtitles
-app.post("/api/subsSearch", promisifyHandler(subsSearch));
-app.post("/api/applySubFiles", promisifyHandler(applySubFiles));
-app.post("/api/deleteSubFiles", promisifyHandler(deleteSubFiles));
-app.post("/api/offsetSubFiles", promisifyHandler(offsetSubFiles));
+app.post("/api/subsSearch", apiWrapper(subsSearch));
+app.post("/api/applySubFiles", apiWrapper(applySubFiles));
+app.post("/api/deleteSubFiles", apiWrapper(deleteSubFiles));
+app.post("/api/offsetSubFiles", apiWrapper(offsetSubFiles));
 
 // Email
-app.post("/api/sendEmail", promisifyHandler(sendEmailHandler));
+app.post("/api/sendEmail", apiWrapper(sendEmailHandler));
 
 // Background operations
 app.post(
   "/api/updateTvdb",
-  promisifyHandler((id, param, resolve, reject) => {
+  apiWrapper(async () => {
     tvdb.updateTvdb();
-    resolve([id, "ok"]);
+    return "ok";
   }),
 );
 
@@ -2671,20 +2505,6 @@ wss.on("connection", (ws) => {
     // Only handleAsr uses WebSocket now (for streaming audio)
     if (fname == "handleAsr") {
       handleAsr(ws, id, param);
-    } else if (fname == "accessTvdb") {
-      // Keep accessTvdb for backward compatibility
-      tvdb.accessTvdb(
-        id,
-        param,
-        (res) => {
-          try {
-            ws.send(JSON.stringify({ id: res[0], status: "ok", data: res[1] }));
-          } catch (e) {
-            console.error("ws.send error (accessTvdb):", e);
-          }
-        },
-        null,
-      );
     } else {
       console.warn("WebSocket function not supported (use HTTP):", fname);
       try {
@@ -2821,14 +2641,7 @@ async function syncDiskData() {
     }
 
     // Get disk data
-    const diskShows = await new Promise((resolve, reject) => {
-      getShowsFromDisk(
-        null,
-        null,
-        ([_, data]) => resolve(data),
-        ([_, err]) => reject(err),
-      );
-    });
+    const diskShows = await getShowsFromDisk({});
 
     let updatedCount = 0;
     const now = Date.now();

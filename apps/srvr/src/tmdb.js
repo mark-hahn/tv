@@ -9,19 +9,9 @@ const moviedb = new MovieDb("327192a334da700f65b882c7a69cb927");
  * @param {Function} resolve - Success callback
  * @param {Function} reject - Error callback
  */
-export async function getTmdb(id, param, resolve, reject) {
+export async function getTmdb(params) {
   try {
-    // Parse JSON string if needed
-    let data = param;
-    if (typeof param === "string") {
-      try {
-        data = JSON.parse(param);
-      } catch (e) {
-        reject([id, `getTmdb: failed to parse JSON: ${e.message}`]);
-        return;
-      }
-    }
-
+    const data = params;
     const { showName, year, season, episode, credits, seriesId, imdbId } = data;
 
     // If requesting series-level cast/credits data
@@ -52,12 +42,10 @@ export async function getTmdb(id, param, resolve, reject) {
         console.log(
           `[tmdb] Got ${creditsData.cast?.length || 0} cast members from aggregate_credits`,
         );
-        resolve([id, creditsData]);
-        return;
+        return creditsData;
       } catch (error) {
         console.error("[tmdb] aggregate_credits error:", error.message);
-        reject([id, `aggregate_credits error: ${error.message}`]);
-        return;
+        throw new Error(`aggregate_credits error: ${error.message}`);
       }
     }
 
@@ -75,8 +63,7 @@ export async function getTmdb(id, param, resolve, reject) {
     const showId = matchingShow?.id;
 
     if (!showId || !season || !episode) {
-      resolve([id, matchingShow || null]);
-      return;
+      return matchingShow || null;
     }
 
     // Get episode information
@@ -110,9 +97,9 @@ export async function getTmdb(id, param, resolve, reject) {
 
     console.log("[tmdb] Guest actor list with images:", guestActorList);
 
-    resolve([id, guestActorList]);
+    return guestActorList;
   } catch (error) {
     console.error("[tmdb] getTmdb error:", error);
-    reject([id, `getTmdb error: ${error.message}`]);
+    throw new Error(`getTmdb error: ${error.message}`);
   }
 }

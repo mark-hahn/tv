@@ -1119,7 +1119,7 @@ const chkTvdbQueue = () => {
       if (typeof tvdbData === "object") {
         log("chkTvdbQueue: sending response", { id, name: tvdbData.name });
         if (ws) ws.send(JSON.stringify({ id, status: "ok", data: tvdbData }));
-        else if (resolveCb) resolveCb([id, tvdbData]);
+        else if (resolveCb) resolveCb(tvdbData);
         allTvdb[tvdbData.name] = tvdbData;
       } else tvdbData = allTvdb[tvdbData]; // tvdbData is name
     } catch (e) {
@@ -1225,38 +1225,36 @@ export const setAddToPickupsCallback = (callback) => {
 
 // WebSocket endpoint handler: returns remotes for a show.
 // Expects param JSON: { show: { Name, Id? }, tvdbRemotes: [...], fast: boolean }
-export const getRemotesCmd = async (id, param, resolve, reject) => {
-  const paramObj = util.jParse(param, "getRemotes");
-  const show = paramObj?.show;
-  const tvdbRemotes = paramObj?.tvdbRemotes || [];
-  const fast = !!paramObj?.fast;
-  log("getRemotesCmd: START", { id, showName: show?.Name, fast });
+export const getRemotesCmd = async (params) => {
+  const show = params?.show;
+  const tvdbRemotes = params?.tvdbRemotes || [];
+  const fast = !!params?.fast;
+  log("getRemotesCmd: START", { showName: show?.Name, fast });
 
   if (!show) {
-    reject([id, "getRemotes: missing show"]);
-    return;
+    throw new Error("getRemotes: missing show");
   }
 
   try {
     const remotes = await getRemotes(show, tvdbRemotes, fast, true);
     log("getRemotesCmd: END", {
-      id,
       showName: show?.Name,
       remotesCount: remotes?.length,
     });
-    resolve([id, remotes]);
+    return remotes;
   } catch (err) {
-    log("getRemotesCmd: ERROR", { id, error: err.message });
-    reject([id, `getRemotes error: ${err.message}`]);
+    log("getRemotesCmd: ERROR", { error: err.message });
+    throw new Error(`getRemotes error: ${err.message}`);
   }
 };
 
-export const getActorPage = async (id, param, resolve, _reject) => {
-  let actorName = param;
-  try {
-    const p = JSON.parse(param);
-    if (p && p.name) actorName = p.name;
-  } catch {}
+export const getActorPage = async (params) => {
+  const actorName = params?.name || "";
+  if (!actorName) {
+    throw new Error("getActorPage: missing name");
+  }
+
+  const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, "_")}`;
 
   try {
     // Search IMDb for the actor
@@ -1265,9 +1263,7 @@ export const getActorPage = async (id, param, resolve, _reject) => {
 
     if (!searchResp.ok) {
       log("err", "getActorPage IMDb search failed:", searchResp.status);
-      const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, "_")}`;
-      resolve([id, wikiUrl]);
-      return;
+      return wikiUrl;
     }
 
     const html = await searchResp.text();
@@ -1292,24 +1288,19 @@ export const getActorPage = async (id, param, resolve, _reject) => {
 
     if (exactMatch) {
       const actorUrl = `https://www.imdb.com${exactMatch.url}`;
-      resolve([id, actorUrl]);
-      return;
+      return actorUrl;
     }
 
     // No exact match found, return Wikipedia URL
-    const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, "_")}`;
-    resolve([id, wikiUrl]);
+    return wikiUrl;
   } catch (err) {
     log("err", "getActorPage error:", err.message);
-    const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, "_")}`;
-    resolve([id, wikiUrl]);
+    return wikiUrl;
   }
 };
 
-export const getAllTvdb = (id, _param, resolve, _reject) => {
-  // log('getAllTvdb', id);
-  // return allTvdb object immediatelty
-  resolve([id, allTvdb]);
+export const getAllTvdb = async (_params) => {
+  return allTvdb;
 };
 
 // Synchronous access for background sync functions
@@ -1329,60 +1320,29 @@ export const saveTvdbSync = async () => {
 };
 
 // if tvdb already exists replace it
-// Supports both WebSocket (ws, id, param) and HTTP callback (id, param, resolve, reject)
-export const getNewTvdb = async (
-  wsOrId,
-  idOrParam,
-  paramOrResolve,
-  rejectCb,
-) => {
-  // Detect signature: WebSocket has ws object, HTTP has id number
-  const isWebSocket = wsOrId && typeof wsOrId === "object";
-
-  let ws, id, param, resolve;
-  if (isWebSocket) {
-    // WebSocket signature: (ws, id, param)
-    ws = wsOrId;
-    id = idOrParam;
-    param = paramOrResolve;
-    resolve = null;
-  } else {
-    // HTTP callback signature: (id, param, resolve, reject)
-    ws = null;
-    id = wsOrId;
-    param = idOrParam;
-    resolve = paramOrResolve;
-  }
-
-  const paramObj = util.jParse(param, "getNewTvdb");
-  if (!paramObj) {
-    log("getNewTvdb: invalid param", id);
-    if (resolve) resolve([id, null]);
-    return;
-  }
+export const getNewTvdb = async (params) => {
+  if (!params) throw new Error("getNewTvdb: missing params");
 
   // HTTP requests are always client requests - mark to skip slow remote fetching
-  if (!isWebSocket) {
-    paramObj.clientRequest = true;
-  }
+  params.clientRequest = true;
 
-  const showName = paramObj.show?.Name;
+  const showName = params.show?.Name;
   log("getNewTvdb called:", {
-    id,
     showName,
     queueLength: newTvdbQueue.length,
-    isWebSocket,
-    clientRequest: paramObj.clientRequest,
+    clientRequest: params.clientRequest,
   });
 
-  // Queue the request with appropriate callback
-  newTvdbQueue.unshift({ ws, id, paramObj, resolve });
-  chkTvdbQueue();
+  return new Promise((resolve, reject) => {
+    // Queue the request with appropriate callback
+    newTvdbQueue.unshift({ ws: null, id: null, paramObj: params, resolve });
+    chkTvdbQueue();
+  });
 };
 
-export const setTvdbFields = async (id, param, resolve, _reject) => {
-  const paramObj = util.jParse(param, "setTvdbFields");
-  if (!paramObj) return resolve([id, null]);
+export const setTvdbFields = async (params) => {
+  const paramObj = params;
+  if (!paramObj) return null;
   let tvdb = null;
   const name = paramObj.name;
   if (name) {
@@ -1392,8 +1352,7 @@ export const setTvdbFields = async (id, param, resolve, _reject) => {
       tvdb = allTvdb[name];
       if (!tvdb) {
         log("err", "setTvdbFields no tvdb for", name);
-        resolve([id, "no tvdb"]);
-        return;
+        return "no tvdb";
       }
       if (paramObj.$delete) {
         for (const delName of paramObj.$delete) delete tvdb[delName];
@@ -1451,28 +1410,29 @@ export const setTvdbFields = async (id, param, resolve, _reject) => {
           watchedCount: tvdb.watchedCount ?? 0,
           deleted: tvdb.deleted,
         };
-        newTvdbQueue.unshift({
-          ws: null,
-          id: id,
-          paramObj: refreshParamObj,
-          resolve: resolve,
+        return new Promise((resolve) => {
+          newTvdbQueue.unshift({
+            ws: null,
+            id: null,
+            paramObj: refreshParamObj,
+            resolve: resolve,
+          });
+          chkTvdbQueue();
         });
-        chkTvdbQueue();
-        return; // Wait for callback
       }
       // allTvdb[name] = tvdb;
     }
   }
   if (!paramObj.dontSave) await util.writeFile(TVDB_PATH, allTvdb);
-  resolve([id, tvdb ?? "ok"]);
+  return tvdb ?? "ok";
 };
 
-export const accessTvdb = async (id, param, resolve, _reject) => {
+export const accessTvdb = async (params) => {
   try {
-    const paramObj = util.jParse(param, "accessTvdb");
+    const paramObj = params;
     if (!paramObj) throw new Error("invalid params");
     const { path: tvdbPath, query } = paramObj;
-    log("accessTvdb: START", { id, tvdbPath });
+    log("accessTvdb: START", { tvdbPath });
 
     const url = buildTvdbUrl(tvdbPath, query);
     let token = await getToken();
@@ -1505,17 +1465,15 @@ export const accessTvdb = async (id, param, resolve, _reject) => {
       }
     } catch {}
 
-    log("accessTvdb: END", { id, ok: upstream.ok, status: upstream.status });
-    resolve([
-      id,
-      {
-        ok: upstream.ok,
-        status: upstream.status,
-        data,
-      },
-    ]);
+    log("accessTvdb: END", { ok: upstream.ok, status: upstream.status });
+    return {
+      ok: upstream.ok,
+      status: upstream.status,
+      data,
+    };
   } catch (e) {
     log("accessTvdb error", e);
-    resolve([id, { ok: false, status: 500, error: e.message }]);
+    // Return error structure for robustness
+    return { ok: false, status: 500, error: e.message };
   }
 };

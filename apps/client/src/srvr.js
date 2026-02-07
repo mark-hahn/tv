@@ -60,7 +60,7 @@ const fCall = (fname, param) => {
   const promise = new Promise((resolve, reject) => {
     calls.push({ id, fname, param, resolve, reject });
   });
-  if (typeof param == "object") param = JSON.stringify(param);
+  // Send object directly as part of JSON message
   const msg = JSON.stringify({ id, fname, param });
 
   if (!haveSocket) {
@@ -156,7 +156,7 @@ handleMsg = async (msg) => {
 };
 
 export async function deleteShowFromSrvr(show) {
-  await delGap([show.Id, true]);
+  await delGap({ gapId: show.Id, save: true });
   if (show.Pickup) await delPickup(show.Name);
   await delNoEmby(show.Name);
   await deletePath(show.Path);
@@ -191,7 +191,7 @@ export function setSharedFilters(sharedFilters) {
 }
 
 export function deletePath(path) {
-  return httpCall("/api/deletePath", path, "POST");
+  return httpCall("/api/deletePath", { path }, "POST");
 }
 export function delSeasonFiles(showName, showPath, season) {
   return httpCall(
@@ -247,27 +247,27 @@ export function offsetSubFiles(fileIdObjs) {
 // showName: string
 // Returns: string[] (e.g. ["ASD2H", "IF8JH"])
 export function getSubFileIds(showName) {
-  return httpCall("/api/getSubFileIds", showName, "POST");
+  return httpCall("/api/getSubFileIds", { showName }, "POST");
 }
 
 export function getRejects() {
   return httpCall("/api/getRejects");
 }
 export function addReject(name) {
-  return httpCall("/api/addReject", name, "POST");
+  return httpCall("/api/addReject", { name }, "POST");
 }
 export function delReject(name) {
-  return httpCall("/api/delReject", name, "POST");
+  return httpCall("/api/delReject", { name }, "POST");
 }
 
 export function getPickups() {
   return httpCall("/api/getPickups");
 }
 export function addPickup(name) {
-  return httpCall("/api/addPickup", name, "POST");
+  return httpCall("/api/addPickup", { name }, "POST");
 }
 export function delPickup(name) {
-  return httpCall("/api/delPickup", name, "POST");
+  return httpCall("/api/delPickup", { name }, "POST");
 }
 
 export function getNoEmbys() {
@@ -277,14 +277,14 @@ export function addNoEmby(show) {
   return httpCall("/api/addNoEmby", show, "POST");
 }
 export function delNoEmby(name) {
-  return httpCall("/api/delNoEmby", name, "POST");
+  return httpCall("/api/delNoEmby", { name }, "POST");
 }
 
 export function getGaps() {
   return httpCall("/api/getGaps");
 }
-export function addGap(gapIdGapSave) {
-  return httpCall("/api/addGap", gapIdGapSave, "POST");
+export function addGap(params) {
+  return httpCall("/api/addGap", params, "POST");
 }
 export function delGap(gapIdSave) {
   return httpCall("/api/delGap", gapIdSave, "POST");
@@ -311,7 +311,7 @@ export function getActorPage(params) {
 }
 
 export function sendEmail(emailData) {
-  return httpCall("/api/sendEmail", emailData, "POST");
+  return httpCall("/api/sendEmail", { body: emailData }, "POST");
 }
 
 export function getTmdb(params) {
@@ -323,7 +323,7 @@ export function saveNote(showName, noteText) {
   return httpCall("/api/saveNote", { showName, noteText }, "POST");
 }
 export function getNote(showName) {
-  return httpCall("/api/getNote", showName, "POST");
+  return httpCall("/api/getNote", { showName }, "POST");
 }
 export function getAllNotes() {
   return httpCall("/api/getAllNotes");
@@ -332,7 +332,7 @@ export function getAllNotes() {
 // File browser
 export async function getFile(path) {
   try {
-    const res = await httpCall("/api/getFile", path, "POST");
+    const res = await httpCall("/api/getFile", { path }, "POST");
     return res;
   } catch (err) {
     console.error("HTTP getFile error:", err);

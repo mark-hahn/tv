@@ -31,8 +31,8 @@ try {
   lastViewed = jParse(raw, "lastViewed") || {};
 }
 
-export const getLastViewed = (id, _param, resolve, _reject) => {
-  resolve([id, lastViewed]);
+export const getLastViewed = async (_params) => {
+  return lastViewed;
 };
 
 let lastShowNameByDeviceName = {};

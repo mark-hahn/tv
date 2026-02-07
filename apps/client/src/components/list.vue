@@ -2009,7 +2009,7 @@ export default {
       if (reactiveShow) Object.assign(reactiveShow, gap);
       if (allShowsShow && allShowsShow !== reactiveShow)
         Object.assign(allShowsShow, gap);
-      await srvr.addGap([show.Id, gap, save]);
+      await srvr.addGap({ gapId: show.Id, gap, save });
 
       // When worker finishes (progress == 100), mark it as not running
       if (progress == 100) {

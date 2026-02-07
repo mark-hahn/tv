@@ -79,9 +79,8 @@ export const getOnDevices = async () => {
   return devicesOn;
 };
 
-export const getDevices = async (id, _param, resolve, _reject) => {
-  const onDevices = await getOnDevices();
-  resolve([id, onDevices]);
+export const getDevices = async () => {
+  return await getOnDevices();
 };
 
 // getCurrentlyWatching().then(console.log);

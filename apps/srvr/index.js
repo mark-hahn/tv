@@ -2550,13 +2550,13 @@ const promisifyHandler = (handler) => {
     // assume it's the direct parameter.
     // If it's an object/array, we MUST stringify it because the old RPC handlers expect JSON strings.
     if (typeof param === "string") {
-       paramStr = param;
+      paramStr = param;
     } else {
-       paramStr = JSON.stringify(param);
-       // Optimization/HACK: if paramStr is like "value", stripped the quotes for simplicity?
-       // Actually rpcParamToString handles removal of surrounding quotes if they exist.
-       // BUT: JSON.stringify("foo") -> "\"foo\"". rpcParamToString removes outer quotes -> foo. Correct.
-       // JSON.stringify({a:1}) -> "{\"a\":1}". rpcParamToString sees object -> returns as is. Correct.
+      paramStr = JSON.stringify(param);
+      // Optimization/HACK: if paramStr is like "value", stripped the quotes for simplicity?
+      // Actually rpcParamToString handles removal of surrounding quotes if they exist.
+      // BUT: JSON.stringify("foo") -> "\"foo\"". rpcParamToString removes outer quotes -> foo. Correct.
+      // JSON.stringify({a:1}) -> "{\"a\":1}". rpcParamToString sees object -> returns as is. Correct.
     }
 
     handler(
@@ -2564,8 +2564,8 @@ const promisifyHandler = (handler) => {
       paramStr,
       ([_, result]) => res.json(result),
       ([_, error]) => {
-         console.error(`Error in ${req.url}:`, error);
-         res.status(500).json({ error });
+        console.error(`Error in ${req.url}:`, error);
+        res.status(500).json({ error });
       },
     );
   };

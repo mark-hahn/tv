@@ -236,7 +236,11 @@ export async function loadAllShows() {
 
       // Add TvdbId to show object for server request
       const showWithTvdbId = { ...embyShow, TvdbId: tvdbId };
-      const param = Object.assign({ show: showWithTvdbId }, epicounts, updateFields);
+      const param = Object.assign(
+        { show: showWithTvdbId },
+        epicounts,
+        updateFields,
+      );
 
       tvdbRecord = await srvr.getNewTvdb(param);
       allTvdb[name] = tvdbRecord;
@@ -274,62 +278,64 @@ export async function loadAllShows() {
     t.emby?.id?.startsWith("noemby-"),
   );
   const prunedNoEmbyIds = [];
-  
-  await Promise.all(noEmbys.map(async (noEmbyShow) => {
-    const name = noEmbyShow.name;
 
-    // Check if show now exists in Emby (upgrade scenario)
-    const tvdbRecord = allTvdb[name];
-    if (tvdbRecord?.emby?.id && !tvdbRecord.emby.id.startsWith("noemby-")) {
-      // Show upgraded to Emby - copy collection flags
-      console.log("upgrading noEmby to Emby:", name);
+  await Promise.all(
+    noEmbys.map(async (noEmbyShow) => {
+      const name = noEmbyShow.name;
 
-      try {
-        if (noEmbyShow.emby.inToTry) {
-          await saveToTry(tvdbRecord.emby.id, true);
-          tvdbRecord.emby.inToTry = true;
+      // Check if show now exists in Emby (upgrade scenario)
+      const tvdbRecord = allTvdb[name];
+      if (tvdbRecord?.emby?.id && !tvdbRecord.emby.id.startsWith("noemby-")) {
+        // Show upgraded to Emby - copy collection flags
+        console.log("upgrading noEmby to Emby:", name);
+
+        try {
+          if (noEmbyShow.emby.inToTry) {
+            await saveToTry(tvdbRecord.emby.id, true);
+            tvdbRecord.emby.inToTry = true;
+          }
+          if (noEmbyShow.emby.inContinue) {
+            await saveContinue(tvdbRecord.emby.id, true);
+            tvdbRecord.emby.inContinue = true;
+          }
+          if (noEmbyShow.emby.inMark) {
+            await saveMark(tvdbRecord.emby.id, true);
+            tvdbRecord.emby.inMark = true;
+          }
+          if (noEmbyShow.emby.inLinda) {
+            await saveLinda(tvdbRecord.emby.id, true);
+            tvdbRecord.emby.inLinda = true;
+          }
+        } catch (e) {
+          console.error("loadAllShows: upgrade noEmby flags failed", name, e);
         }
-        if (noEmbyShow.emby.inContinue) {
-          await saveContinue(tvdbRecord.emby.id, true);
-          tvdbRecord.emby.inContinue = true;
-        }
-        if (noEmbyShow.emby.inMark) {
-          await saveMark(tvdbRecord.emby.id, true);
-          tvdbRecord.emby.inMark = true;
-        }
-        if (noEmbyShow.emby.inLinda) {
-          await saveLinda(tvdbRecord.emby.id, true);
-          tvdbRecord.emby.inLinda = true;
-        }
-      } catch (e) {
-        console.error("loadAllShows: upgrade noEmby flags failed", name, e);
+
+        // Mark as deleted in tvdb (will be cleaned up)
+        noEmbyShow.deleted = true;
+        prunedNoEmbyIds.push(noEmbyShow.emby.id);
+        return;
       }
 
-      // Mark as deleted in tvdb (will be cleaned up)
-      noEmbyShow.deleted = true;
-      prunedNoEmbyIds.push(noEmbyShow.emby.id);
-      return;
-    }
-
-    // Check if S01E01 is unaired (for WaitStr)
-    try {
-      const seriesMap = await tvdb.getSeriesMap(noEmbyShow);
-      const s1 = seriesMap.find(([seasonNumber]) => seasonNumber === 1);
-      if (s1) {
-        const e1 = s1[1].find(([episodeNumber]) => episodeNumber === 1);
-        if (e1?.[1]?.unaired === true) {
-          noEmbyShow.S1E1Unaired = true;
-          const airDate = e1?.[1]?.aired;
-          if (airDate) {
-            const dateStr = airDate.slice(5).replace(/^0/, " ").trim();
-            noEmbyShow.waitStr = `{${dateStr}}`;
+      // Check if S01E01 is unaired (for WaitStr)
+      try {
+        const seriesMap = await tvdb.getSeriesMap(noEmbyShow);
+        const s1 = seriesMap.find(([seasonNumber]) => seasonNumber === 1);
+        if (s1) {
+          const e1 = s1[1].find(([episodeNumber]) => episodeNumber === 1);
+          if (e1?.[1]?.unaired === true) {
+            noEmbyShow.S1E1Unaired = true;
+            const airDate = e1?.[1]?.aired;
+            if (airDate) {
+              const dateStr = airDate.slice(5).replace(/^0/, " ").trim();
+              noEmbyShow.waitStr = `{${dateStr}}`;
+            }
           }
         }
+      } catch (e) {
+        console.error("loadAllShows: getSeriesMap error for noemby", name, e);
       }
-    } catch (e) {
-      console.error("loadAllShows: getSeriesMap error for noemby", name, e);
-    }
-  }));
+    }),
+  );
 
   // 5. Mark tvdb records as deleted if no matching show exists
   for (const [name, tvdbRecord] of Object.entries(allTvdb)) {

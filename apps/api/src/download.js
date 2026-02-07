@@ -260,11 +260,57 @@ function validateTorrentData(torrentData) {
       const base = path.basename(p);
       const noExt = base.replace(/\.[^.]+$/, "");
       const info = parseTorrentTitle.parse(noExt);
+
+      // If basename parsing missed season/episode, try parsing the full path
+      if (!info.season || !info.episode) {
+        // Try parsing the full path, but be careful of directory names confusing the parser
+        // We only want to look at the immediate parent directory + filename if possible,
+        // or just rely on the full path if the parser handles it well.
+        // For "The Cyanide And Happiness Show/The Cyanide And Happiness Show - Season - 02 [2015 - 2016] 1080p ... / filename"
+        // the middle directory has "Season - 02" but no episode.
+        // The filename has "S02.E01".
+        const fullInfo = parseTorrentTitle.parse(p);
+        
+        if (!info.season && fullInfo.season) info.season = fullInfo.season;
+        
+        // Critically, if filename has "S02.E01", it should have been picked up.
+        // If "S02.E01" is parsed as season 2, episode 1, then info.episode should be defined.
+        
+        // If full path has episode, take it.
+        if (!info.episode && fullInfo.episode) info.episode = fullInfo.episode;
+
+        // Fallback: Manually check for SxxExx or Sxx.Exx pattern in the basename if the parser failed
+        if (!info.episode) {
+             const m = base.match(/S(\d+)[._]?E(\d+)/i);
+             if (m) {
+                 info.season = parseInt(m[1], 10);
+                 info.episode = parseInt(m[2], 10);
+             }
+        }
+      }
+
       checkedFiles.push({ file: p, parsed: info });
       if (!info?.season || !info?.episode) missing = true;
     }
 
     if (missing) {
+      try {
+        const debugInfo = {
+          message: "Validation failed",
+          files: allPaths,
+          checkedFiles: checkedFiles,
+        };
+        fs.writeFileSync(
+          "/root/dev/apps/tv/temp.txt",
+          JSON.stringify(debugInfo, null, 2),
+        );
+        try {
+            fs.writeFileSync("/root/dev/apps/tv/temp.torrent", torrentData);
+        } catch (e) { console.error("Failed to dump torrent", e); }
+      } catch (err) {
+        console.error("Failed to write debug info to temp.txt", err);
+      }
+
       return fail(
         "validate-torrent-files",
         "Torrent file name is missing a season or episode number.",

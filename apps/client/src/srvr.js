@@ -74,8 +74,6 @@ const fCall = (fname, param) => {
 // HTTP call - for all non-streaming operations
 const httpCall = async (endpoint, param, method = "GET") => {
   const url = `${HTTP_URL}${endpoint}`;
-  const is30Rock = endpoint === "/api/getRemotes" && param?.show?.Name === "30 Rock";
-  if (is30Rock) console.log(`[SRVR.JS] httpCall ${method} ${endpoint}`, param);
   const options = {
     method,
     headers: { "Content-Type": "application/json" },
@@ -97,12 +95,9 @@ const httpCall = async (endpoint, param, method = "GET") => {
     const error = await response
       .json()
       .catch(() => ({ error: response.statusText }));
-    if (is30Rock) console.error(`[SRVR.JS] httpCall ${method} ${endpoint} error:`, error);
     throw error;
   }
-  const result = await response.json();
-  if (is30Rock) console.log(`[SRVR.JS] httpCall ${method} ${endpoint} success:`, result);
-  return result;
+  return response.json();
 };
 
 handleMsg = async (msg) => {
@@ -309,15 +304,10 @@ export function setTvdbFields(params) {
   return httpCall("/api/setTvdbFields", params, "POST");
 }
 export function getRemotesCmd(params) {
-  const is30Rock = params?.show?.Name === "30 Rock";
-  if (is30Rock) console.log("[SRVR.JS] getRemotesCmd called with params:", JSON.stringify(params, null, 2));
-  return httpCall("/api/getRemotes", params, "POST").then(result => {
-    if (is30Rock) console.log("[SRVR.JS] getRemotesCmd result:", JSON.stringify(result, null, 2));
-    return result;
-  }).catch(err => {
-    if (is30Rock) console.error("[SRVR.JS] getRemotesCmd error:", err);
-    throw err;
-  });
+  return httpCall("/api/getRemotes", params, "POST").catch((err) => {
+      if (is30Rock) console.error("[SRVR.JS] getRemotesCmd error:", err);
+      throw err;
+    });
 }
 export function getActorPage(params) {
   return httpCall("/api/getActorPage", { name: params }, "POST");

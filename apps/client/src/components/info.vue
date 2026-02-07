@@ -1127,8 +1127,6 @@ export default {
     },
 
     setRemotes() {
-      const is30Rock = this.show.Name === "30 Rock";
-      if (is30Rock) console.log("[INFO.VUE] setRemotes called for show:", this.show.Name);
       this.remoteShowName = this.show.Name;
       this.showSpinner = false;
       this.showRemotes = false;
@@ -1139,32 +1137,20 @@ export default {
         delayingSpinner = false;
       }, 1000);
       try {
-        if (is30Rock) {
-          console.log("[INFO.VUE] Looking for remotes in allTvdb for:", this.show.Name);
-          console.log("[INFO.VUE] allTvdb keys:", Object.keys(allTvdb).slice(0, 5));
-        }
         const remotes = allTvdb[this.show.Name]?.remotes;
-        if (is30Rock) console.log("[INFO.VUE] Found remotes:", remotes);
         if (!remotes) {
-          if (is30Rock) console.error("[INFO.VUE] setRemotes: no allTvdb remotes for:", this.show.Name);
+          console.error("setRemotes: no allTvdb:", this.show.Name);
           this.showSpinner = false;
           this.showRemotes = false;
           delayingSpinner = false;
           return;
         }
         this.remotes = remotes;
-        if (is30Rock) console.log("[INFO.VUE] Set this.remotes, count:", remotes.length);
         this.showSpinner = false;
         this.showRemotes = true;
-        if (is30Rock) {
-          console.log("[INFO.VUE] After setting showRemotes=true:");
-          console.log("  - this.showRemotes:", this.showRemotes);
-          console.log("  - this.remotes:", this.remotes);
-          console.log("  - this.remotes.length:", this.remotes.length);
-        }
         delayingSpinner = false;
       } catch (err) {
-        if (is30Rock) console.error("[INFO.VUE] setRemotes error:", err);
+        console.error("setRemotes:", err);
       }
     },
 

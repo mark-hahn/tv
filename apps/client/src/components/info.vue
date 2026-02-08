@@ -49,13 +49,7 @@
             gap: '12px',
           }"
         >
-          <span
-            :style="{
-              backgroundColor: previewMode ? 'yellow' : 'transparent',
-              padding: previewMode ? '5px' : '0',
-            }"
-            >{{ show.Name }}</span
-          >
+          <span>{{ show.Name }}</span>
         </div>
         <!-- Simple mode: align left edge of Notes with right edge of image (end of poster column)-->
         <div

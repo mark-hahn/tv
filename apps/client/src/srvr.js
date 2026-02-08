@@ -88,13 +88,10 @@ const httpCall = async (endpoint, param, method = "GET") => {
     if (param !== undefined) {
       options.body = JSON.stringify(param);
     }
-    console.log(`[SRVR] POST ${endpoint} to ${url}`);
   }
 
   try {
-    console.log(`[SRVR] Fetching ${url}`);
     const response = await fetch(url, options);
-    console.log(`[SRVR] Response status: ${response.status}`);
     if (!response.ok) {
       const error = await response
         .json()
@@ -103,7 +100,6 @@ const httpCall = async (endpoint, param, method = "GET") => {
     }
     return response.json();
   } catch (err) {
-    console.error(`[SRVR] Fetch error for ${endpoint}:`, err);
     throw err;
   }
 };
@@ -301,16 +297,8 @@ export function delGap(gapIdSave) {
 export function getAllTvdb() {
   return httpCall("/api/getAllTvdb");
 }
-export async function getNewTvdb(params) {
-  console.log("[SRVR] getNewTvdb called with:", params);
-  try {
-    const result = await httpCall("/api/getNewTvdb", params, "POST");
-    console.log("[SRVR] getNewTvdb returned:", result);
-    return result;
-  } catch (err) {
-    console.error("[SRVR] getNewTvdb error:", err);
-    throw err;
-  }
+export function getNewTvdb(params) {
+  return httpCall("/api/getNewTvdb", params, "POST");
 }
 
 export function handleAsr(params) {

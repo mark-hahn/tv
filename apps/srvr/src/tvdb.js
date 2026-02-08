@@ -1016,6 +1016,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
       tmdbData.spokenLanguages,
     );
 
+  const inEmby = showId && !showId.startsWith("noemby-");
   if (trailers) tvdbData.trailers = trailers;
   if (showId !== undefined) tvdbData.showId = showId;
   if (inEmby !== undefined) tvdbData.inEmby = inEmby;

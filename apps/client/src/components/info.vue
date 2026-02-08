@@ -1273,6 +1273,12 @@ export default {
 
           this.currentTvdbData = tvdbData; // Store for actors pane
           evtBus.emit("tvdbDataReady", { show, tvdbData }); // Send to App.vue
+
+          if (!tvdbData) {
+            console.warn("Series: no tvdbData available for", show?.Name);
+            return;
+          }
+
           await this.setDeleted(tvdbData);
 
           // Don't await poster!

@@ -445,7 +445,7 @@ export default {
       }
       if (show.inEmby !== false) {
         this.saveVisShow(show);
-        if (!window.confirm(`Do you really want to delete series ${name}?`))
+        if (!window.confirm(`Do you really want to remove ${name} from emby and the disk?`))
           return;
         // Optimistically remove from UI before slow deletes
         this.removeRow(show);

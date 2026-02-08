@@ -1470,7 +1470,7 @@ export default {
       );
     },
 
-    saveVisShow(show, scroll = false, opts = null) {
+    async saveVisShow(show, scroll = false, opts = null) {
       if (!show) {
         console.error("saveVisShow show param null");
         return;
@@ -1484,6 +1484,7 @@ export default {
 
       // Check if hasemby filter would hide this show, and reset if needed
       const hasembyCond = this.conds.find((c) => c?.name === "hasemby");
+      let needsRefilter = false;
       if (hasembyCond && hasembyCond.filter !== 0) {
         const showInEmby = show.inEmby !== false;
         const filterHidesShow =
@@ -1492,7 +1493,13 @@ export default {
         if (filterHidesShow) {
           console.log(`hasemby filter would hide ${showName}, resetting to 0`);
           hasembyCond.filter = 0;
+          needsRefilter = true;
         }
+      }
+
+      // Re-apply filters if hasemby was reset
+      if (needsRefilter) {
+        await this.refilter(false);
       }
 
       if (!options.skipHistory) {
@@ -1590,25 +1597,27 @@ export default {
       this.fltrPopped = false;
     },
 
-    scrollToSavedShow(saveVis = false) {
+    async scrollToSavedShow(saveVis = false) {
       let show = null;
-      this.$nextTick(() => {
-        const name = window.localStorage.getItem("lastVisShow");
-        if (!name) {
-          console.log("scrollToSavedShow: lastVisShow missing, ignoring");
+      const name = window.localStorage.getItem("lastVisShow");
+      if (!name) {
+        console.log("scrollToSavedShow: lastVisShow missing, ignoring");
+        show = allShows[0];
+      } else {
+        show = allShows.find((shw) => shw.Name == name);
+        if (!show) {
+          console.log("scrollToSavedShow: show not found", name);
           show = allShows[0];
-        } else {
-          show = allShows.find((shw) => shw.Name == name);
-          if (!show) {
-            console.log("scrollToSavedShow: show not found", name);
-            show = allShows[0];
-          }
         }
-        if (saveVis) this.saveVisShow(show);
-        const id = this.nameHash(show.Name);
-        const ele = document.getElementById(id);
-        if (ele) ele.scrollIntoView({ block: "center" });
-      });
+      }
+      if (saveVis) await this.saveVisShow(show);
+
+      // Wait for DOM to update after potential refiltering
+      await this.$nextTick();
+
+      const id = this.nameHash(show.Name);
+      const ele = document.getElementById(id);
+      if (ele) ele.scrollIntoView({ block: "center" });
     },
 
     async copyNameToClipboard(show, event) {
@@ -2089,7 +2098,7 @@ export default {
       // On initial load, restore selection from lastVisShow.
       // On subsequent reloads, do not change selection (avoids races where a reload
       // can override an explicit selection made immediately after the reload).
-      this.scrollToSavedShow(!!isInitialLoad);
+      await this.scrollToSavedShow(!!isInitialLoad);
 
       // Update series pane infobox with refreshed data
       if (this.highlightName) {

@@ -55,19 +55,24 @@ const attachWsHandlers = () => {
 openWs();
 
 // WebSocket call - only for ASR streaming
-const fCall = (fname, param) => {
+const fCall = async (fname, param) => {
+  if (!haveSocket) {
+    const start = Date.now();
+    // Wait up to 5 seconds for WebSocket to connect
+    while (!haveSocket && Date.now() - start < 5000) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+
+  if (!haveSocket) throw { error: "websocket closed" };
+
   const id = ++nextId;
   const promise = new Promise((resolve, reject) => {
     calls.push({ id, fname, param, resolve, reject });
   });
   // Send object directly as part of JSON message
   const msg = JSON.stringify({ id, fname, param });
-
-  if (!haveSocket) {
-    setTimeout(() => fCall(fname, param), 100);
-  } else {
-    ws.send(msg);
-  }
+  ws.send(msg);
   return promise;
 };
 

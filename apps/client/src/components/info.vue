@@ -1182,6 +1182,11 @@ export default {
     },
 
     onSetUpSeries(show) {
+      console.log("[INFO.VUE] onSetUpSeries called:", {
+        showName: show?.Name,
+        showId: show?.Id,
+        inEmby: show?.inEmby,
+      });
       this.emailText = ""; // Clear email text when changing shows
       this.show = show;
       this.showHdr = true;
@@ -1228,10 +1233,36 @@ export default {
         if (this.show.Name !== currentShowName) return;
 
         try {
-          allTvdb = await tvdb.getAllTvdb();
+          console.log(
+            "[INFO.VUE] About to fetch allTvdb for:",
+            currentShowName,
+          );
+          // If this is a no-emby show, we need to get ALL tvdb data (hasEmby=0)
+          // because the cache might only have emby shows (hasEmby=1 from loadAllShows)
+          const isNoEmby =
+            show?.inEmby === false || show?.Id?.startsWith("noemby-");
+          console.log("[INFO.VUE] Show type:", {
+            isNoEmby,
+            inEmby: show?.inEmby,
+            Id: show?.Id,
+          });
+
+          // Force load all shows (including no-emby) by passing hasEmby=0
+          // This bypasses the cache if it only contains emby shows
+          allTvdb = await tvdb.getAllTvdb(0);
+          console.log(
+            "[INFO.VUE] allTvdb fetched, keys count:",
+            Object.keys(allTvdb).length,
+          );
 
           if (this.show.Name !== currentShowName) return;
           let tvdbData = allTvdb[show.Name];
+          console.log("[INFO.VUE] tvdbData lookup result:", {
+            showName: show.Name,
+            found: !!tvdbData,
+            hasInEmbyField: tvdbData?.inEmby !== undefined,
+            inEmby: tvdbData?.inEmby,
+          });
 
           // Preview / transient shows may not exist in tvdb.json yet.
           // If we have a TvdbId, fetch tvdbData from the server without creating the show.
@@ -1257,14 +1288,26 @@ export default {
                   clientRequest: true,
                 };
                 console.log(
-                  "[INFO] Calling getNewTvdb for:",
+                  "[INFO.VUE] Calling getNewTvdb for:",
                   show?.Name,
                   "previewMode:",
                   this.previewMode,
-                  "params:",
-                  JSON.stringify(paramObj, null, 2),
+                  "tvdbId:",
+                  tvdbId,
                 );
+                const fetchStart = Date.now();
                 tvdbData = await srvr.getNewTvdb(paramObj);
+                console.log(
+                  "[INFO.VUE] getNewTvdb returned in",
+                  Date.now() - fetchStart,
+                  "ms:",
+                  {
+                    showName: show?.Name,
+                    hasTvdbData: !!tvdbData,
+                    hasImage: !!tvdbData?.image,
+                    hasRemotes: !!tvdbData?.remotes,
+                  },
+                );
                 if (tvdbData) {
                   delete tvdbData.deleted;
                   allTvdb[show.Name] = tvdbData;
@@ -1279,11 +1322,15 @@ export default {
             }
           }
 
+          console.log("[INFO.VUE] About to emit tvdbDataReady:", {
+            showName: show?.Name,
+            hasTvdbData: !!tvdbData,
+          });
           this.currentTvdbData = tvdbData; // Store for actors pane
           evtBus.emit("tvdbDataReady", { show, tvdbData }); // Send to App.vue
 
           if (!tvdbData) {
-            console.warn("Series: no tvdbData available for", show?.Name);
+            console.warn("[INFO.VUE] No tvdbData available for", show?.Name);
             // Still show the infobox even without tvdbData, just with limited info
             this.seriesReady = true;
             return;
@@ -1307,6 +1354,7 @@ export default {
           await this.setRemotes();
 
           // Only show the info box (and email input) once everything is populated.
+          console.log("[INFO.VUE] Setting seriesReady=true for:", show?.Name);
           this.seriesReady = true;
         } finally {
           evtBus.emit("previewPanesLoading", false);

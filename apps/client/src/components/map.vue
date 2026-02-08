@@ -1065,8 +1065,10 @@ export default {
 
     async loadTvdbData() {
       try {
+        // Always load all shows (hasEmby=0) to include no-emby shows
+        // The cache from loadAllShows might only have emby shows (hasEmby=1)
         if (!this.allTvdb) {
-          this.allTvdb = await tvdb.getAllTvdb();
+          this.allTvdb = await tvdb.getAllTvdb(0);
         }
         if (this.mapShow && this.mapShow.Name) {
           this.tvdbData = this.allTvdb[this.mapShow.Name];

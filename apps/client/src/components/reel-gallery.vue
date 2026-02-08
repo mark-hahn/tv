@@ -184,15 +184,7 @@ export default {
           const blob = await res.blob();
           const hash = await hashBlob(blob);
 
-          console.log(
-            `[checkImages] ${item.name || item.title || "unknown"}: hash=${hash}, expected=${TVDB_MISSING_HASH}, match=${hash === TVDB_MISSING_HASH}`,
-          );
-
           if (hash === TVDB_MISSING_HASH) {
-            console.log(
-              `[checkImages] Replacing TVDB placeholder for "${item.name || item.title}" with fallback:`,
-              props.fallbackImage,
-            );
             // Force update with Vue reactivity
             const description = item.overview || item.overviewText || "";
             const updatedItem = {

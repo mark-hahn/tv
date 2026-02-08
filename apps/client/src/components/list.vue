@@ -510,6 +510,7 @@ export default {
       showEmbyRefreshing: false,
       isWideLandscape: false,
       actorFilter: null,
+      hasLoadedAllShows: false, // Track if we've loaded non-inEmby shows
       sortChoices: [
         "Alpha",
         "Viewed",
@@ -1793,6 +1794,35 @@ export default {
       this.actorFilter = null; // Clear actor filter when clicking conditional filters
       this.fltrChoice = "- - - - -";
       if (++cond.filter == 2) cond.filter = -1;
+
+      // If this is the hasemby filter and we're changing to -1 or 0,
+      // and we haven't loaded all shows yet, load them now
+      if (
+        cond.name === "hasemby" &&
+        cond.filter !== 1 &&
+        !this.hasLoadedAllShows
+      ) {
+        console.log("Loading remaining shows (inEmby false)...");
+        this.hasLoadedAllShows = true;
+
+        // Load shows with inEmby false
+        const additionalShows = await tvdb.getAllTvdb(-1);
+
+        // Merge into allTvdb and allShows
+        Object.assign(allTvdb, additionalShows);
+
+        // Convert additional shows to array and merge
+        const additionalShowsArray = Object.values(additionalShows);
+        allShows.push(...additionalShowsArray);
+
+        // Update the full show list
+        this.shows = [...allShows];
+        this.$emit("all-shows", allShows);
+        this.allShowsLength = allShows.length;
+
+        console.log(`Loaded ${additionalShowsArray.length} additional shows`);
+      }
+
       await this.select();
     },
 
@@ -2102,8 +2132,23 @@ export default {
       await this.select(); // Apply filters including ban
       this.sortShows();
 
-      const name = window.localStorage.getItem("lastVisShow");
-      if (!name) window.localStorage.setItem("lastVisShow", allShows[0].Name);
+      let name = window.localStorage.getItem("lastVisShow");
+      if (!name) {
+        window.localStorage.setItem("lastVisShow", allShows[0].Name);
+        name = allShows[0].Name;
+      }
+
+      // Check if the saved show has inEmby false
+      // If so, select the first show instead (since we only loaded inEmby true shows)
+      const savedShow = allShows.find((s) => s.Name === name);
+      if (savedShow && savedShow.inEmby === false) {
+        console.log(
+          "Saved show has inEmby false, selecting first show instead",
+        );
+        name = allShows[0].Name;
+        window.localStorage.setItem("lastVisShow", name);
+      }
+
       // On initial load, restore selection from lastVisShow.
       // On subsequent reloads, do not change selection (avoids races where a reload
       // can override an explicit selection made immediately after the reload).

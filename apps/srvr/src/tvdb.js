@@ -1356,7 +1356,33 @@ export const getActorPage = async (params) => {
   }
 };
 
-export const getAllTvdb = async (_params) => {
+export const getAllTvdb = async (params) => {
+  const hasEmby = params?.hasEmby ?? 0;
+
+  // Filter based on hasEmby parameter
+  if (hasEmby === 0) {
+    // Return all shows
+    return allTvdb;
+  } else if (hasEmby === 1) {
+    // Return only shows with inEmby true (or not false)
+    const filtered = {};
+    for (const [key, show] of Object.entries(allTvdb)) {
+      if (show.inEmby !== false) {
+        filtered[key] = show;
+      }
+    }
+    return filtered;
+  } else if (hasEmby === -1) {
+    // Return only shows with inEmby false
+    const filtered = {};
+    for (const [key, show] of Object.entries(allTvdb)) {
+      if (show.inEmby === false) {
+        filtered[key] = show;
+      }
+    }
+    return filtered;
+  }
+
   return allTvdb;
 };
 

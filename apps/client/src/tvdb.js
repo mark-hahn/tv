@@ -59,11 +59,20 @@ let allTvdb = null;
 export const clearCache = () => {
   allTvdb = null;
 };
-export const getAllTvdb = async () => {
+export const getAllTvdb = async (hasEmby = 0) => {
   // all data in tvdb.json
   // cached in allTvdb
-  allTvdb ??= await srvr.getAllTvdb();
-  return allTvdb;
+  // Only cache if hasEmby === 0 (all shows)
+  if (hasEmby === 0 && allTvdb) return allTvdb;
+
+  const result = await srvr.getAllTvdb(hasEmby);
+
+  // Only update cache if we're loading all shows
+  if (hasEmby === 0) {
+    allTvdb = result;
+  }
+
+  return result;
 };
 
 //////////// search for TvDb Data //////////////

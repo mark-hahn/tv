@@ -346,8 +346,8 @@ export function delGap(gapIdSave) {
   return httpCall("/api/delGap", gapIdSave, "POST");
 }
 
-export function getAllTvdb() {
-  return httpCall("/api/getAllTvdb");
+export function getAllTvdb(hasEmby = 0) {
+  return httpCall(`/api/getAllTvdb?hasEmby=${hasEmby}`);
 }
 export function getNewTvdb(params) {
   return httpCall("/api/getNewTvdb", params, "POST");

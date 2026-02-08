@@ -2436,7 +2436,13 @@ const apiWrapper = (handler) => {
 };
 
 // Data retrieval endpoints
-app.get("/api/getAllTvdb", apiWrapper(tvdb.getAllTvdb));
+app.get(
+  "/api/getAllTvdb",
+  apiWrapper(async (params) => {
+    const hasEmby = params.hasEmby ? parseInt(params.hasEmby) : 0;
+    return await tvdb.getAllTvdb({ hasEmby });
+  }),
+);
 app.get("/api/getShowsFromDisk", apiWrapper(getShowsFromDisk));
 app.get("/api/getRejects", apiWrapper(getRejects));
 app.get("/api/getPickups", apiWrapper(getPickups));

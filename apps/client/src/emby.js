@@ -138,13 +138,15 @@ export async function loadAllShows() {
   const loadStart = Date.now();
 
   // 1. Fetch all data sources in parallel (HTTP is fast now!)
+  // On initial load, only load shows with inEmby: true (hasEmby = 1)
+  // The rest will be loaded when user changes hasemby filter
   const [embyShows, diskShows, rejectsIn, pickups, allTvdbResult] =
     await Promise.all([
       axios.get(urls.showListUrl(cred, 0, 10000)),
       srvr.getShowsFromDisk(),
       srvr.getRejects(),
       srvr.getPickups(),
-      tvdb.getAllTvdb(),
+      tvdb.getAllTvdb(1), // hasEmby = 1: load only shows with inEmby true
     ]);
 
   // 2. Get authoritative tvdb data (our source of truth)
@@ -198,14 +200,19 @@ export async function loadAllShows() {
       `[loadAllShows] Cleaned up ${keysToDelete.length} mismatched keys:`,
       keysToDelete,
     );
-    
+
     // Persist the cleanup by deleting the bad keys from the server
     for (const badKey of keysToDelete) {
       try {
         await srvr.setTvdbFields({ name: badKey, $delTvdb: true });
-        console.log(`[loadAllShows] Deleted key="${badKey}" from server tvdb.json`);
+        console.log(
+          `[loadAllShows] Deleted key="${badKey}" from server tvdb.json`,
+        );
       } catch (e) {
-        console.error(`[loadAllShows] Failed to delete key="${badKey}" from server:`, e);
+        console.error(
+          `[loadAllShows] Failed to delete key="${badKey}" from server:`,
+          e,
+        );
       }
     }
   }

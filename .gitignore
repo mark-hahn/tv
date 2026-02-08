@@ -18,3 +18,5 @@ misc/old-reel-code
 **/data/
 **/secrets/
 **/cookies/
+*cred.js
+*cred.txt

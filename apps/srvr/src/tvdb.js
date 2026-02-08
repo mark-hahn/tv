@@ -470,8 +470,7 @@ const getUrlAndRatings = async (type, url, name) => {
 
   let idFnameParam;
   switch (+type) {
-    case 2: // await util.writeFile("samples/imdb-page.html", html); // log('samples/imdb-page.html'); // IMDB
-    {
+    case 2: { // await util.writeFile("samples/imdb-page.html", html); // log('samples/imdb-page.html'); // IMDB
       const rating = extractImdbRating(html);
       if (!rating) return { ratings: null };
       return { ratings: rating };
@@ -933,6 +932,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   let tvdbData = {
     tvdbId,
     name,
+    Name: name, // Add PascalCase version for compatibility
+    TvdbId: tvdbId, // Add PascalCase version for compatibility
     originalNetwork: preserve(
       originalNetwork,
       existing.originalNetwork,
@@ -1016,62 +1017,106 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   if (showId !== undefined) tvdbData.showId = showId;
   if (inEmby !== undefined) tvdbData.inEmby = inEmby;
 
-  // NEW: Emby-specific data (preserve from paramObj or existing)
-  tvdbData.emby = {
-    id: showId || existing.emby?.id || null,
-    path: paramObj.embyPath || existing.emby?.path || null,
-    dateCreated: paramObj.dateCreated || existing.emby?.dateCreated || null,
-    premiereDate: paramObj.premiereDate || existing.emby?.premiereDate || null,
-    inToTry: paramObj.inToTry ?? existing.emby?.inToTry ?? false,
-    inContinue: paramObj.inContinue ?? existing.emby?.inContinue ?? false,
-    inMark: paramObj.inMark ?? existing.emby?.inMark ?? false,
-    inLinda: paramObj.inLinda ?? existing.emby?.inLinda ?? false,
-    isFavorite: paramObj.isFavorite ?? existing.emby?.isFavorite ?? false,
-    isPlayed: paramObj.isPlayed ?? existing.emby?.isPlayed ?? false,
-    playCount: paramObj.playCount ?? existing.emby?.playCount ?? 0,
-    lastPlayedDate:
-      paramObj.lastPlayedDate || existing.emby?.lastPlayedDate || null,
-  };
+  // Flattened Emby-specific data (no nested object)
+  tvdbData.Id = showId || existing.Id || existing.emby?.id || null;
+  tvdbData.Path =
+    paramObj.embyPath || existing.Path || existing.emby?.path || null;
+  tvdbData.DateCreated =
+    paramObj.dateCreated ||
+    existing.DateCreated ||
+    existing.emby?.dateCreated ||
+    null;
+  tvdbData.PremiereDate =
+    paramObj.premiereDate ||
+    existing.PremiereDate ||
+    existing.emby?.premiereDate ||
+    null;
+  tvdbData.InToTry =
+    paramObj.inToTry ?? existing.InToTry ?? existing.emby?.inToTry ?? false;
+  tvdbData.InContinue =
+    paramObj.inContinue ??
+    existing.InContinue ??
+    existing.emby?.inContinue ??
+    false;
+  tvdbData.InMark =
+    paramObj.inMark ?? existing.InMark ?? existing.emby?.inMark ?? false;
+  tvdbData.InLinda =
+    paramObj.inLinda ?? existing.InLinda ?? existing.emby?.inLinda ?? false;
+  tvdbData.IsFavorite =
+    paramObj.isFavorite ??
+    existing.IsFavorite ??
+    existing.emby?.isFavorite ??
+    false;
+  tvdbData.Played =
+    paramObj.isPlayed ?? existing.Played ?? existing.emby?.isPlayed ?? false;
+  tvdbData.PlayCount =
+    paramObj.playCount ?? existing.PlayCount ?? existing.emby?.playCount ?? 0;
+  tvdbData.LastPlayedDate =
+    paramObj.lastPlayedDate ||
+    existing.LastPlayedDate ||
+    existing.emby?.lastPlayedDate ||
+    null;
 
-  // NEW: Disk/filesystem data (preserve from paramObj or existing)
-  tvdbData.disk = {
-    date: paramObj.diskDate || existing.disk?.date || null,
-    size: paramObj.diskSize ?? existing.disk?.size ?? 0,
-    noFiles: paramObj.noFiles ?? existing.disk?.noFiles ?? false,
-  };
+  // Flattened Disk/filesystem data (no nested object)
+  tvdbData.Date =
+    paramObj.diskDate || existing.Date || existing.disk?.date || null;
+  tvdbData.Size =
+    paramObj.diskSize ?? existing.Size ?? existing.disk?.size ?? 0;
+  tvdbData.NoFiles =
+    paramObj.noFiles ?? existing.NoFiles ?? existing.disk?.noFiles ?? false;
 
-  // NEW: Download tracking summary (preserve from paramObj or existing)
-  tvdbData.download = {
-    status: paramObj.downloadStatus || existing.download?.status || null,
-    lastCheck:
-      paramObj.downloadLastCheck || existing.download?.lastCheck || null,
-  };
+  // Flattened Download tracking (no nested object)
+  tvdbData.downloadStatus =
+    paramObj.downloadStatus ||
+    existing.downloadStatus ||
+    existing.download?.status ||
+    null;
+  tvdbData.downloadLastCheck =
+    paramObj.downloadLastCheck ||
+    existing.downloadLastCheck ||
+    existing.download?.lastCheck ||
+    null;
 
-  // NEW: TVMaze reference (preserve from paramObj or existing)
-  tvdbData.tvmaze = {
-    id: paramObj.tvmazeId || existing.tvmaze?.id || null,
-    status: paramObj.tvmazeStatus || existing.tvmaze?.status || null,
-  };
+  // Flattened TVMaze reference (no nested object)
+  tvdbData.tvmazeId =
+    paramObj.tvmazeId || existing.tvmazeId || existing.tvmaze?.id || null;
+  tvdbData.tvmazeStatus =
+    paramObj.tvmazeStatus ||
+    existing.tvmazeStatus ||
+    existing.tvmaze?.status ||
+    null;
 
-  // NEW: Gap tracking (preserve from paramObj or existing)
-  tvdbData.gap = paramObj.gap || existing.gap || null;
+  // Gap tracking (already flat - spread from gap object if exists)
+  if (paramObj.gap) {
+    Object.assign(tvdbData, paramObj.gap);
+  } else if (existing.gap) {
+    Object.assign(tvdbData, existing.gap);
+  }
 
-  // NEW: Notes (preserve from paramObj or existing)
-  tvdbData.note = paramObj.note ?? existing.note ?? "";
+  // Notes
+  tvdbData.Notes = paramObj.note ?? existing.Notes ?? existing.note ?? "";
 
-  // NEW: Additional flags (preserve from paramObj or existing)
-  tvdbData.reject = paramObj.reject ?? existing.reject ?? false;
-  tvdbData.pickup = paramObj.pickup ?? existing.pickup ?? false;
+  // Additional flags
+  tvdbData.Reject =
+    paramObj.reject ?? existing.Reject ?? existing.reject ?? false;
+  tvdbData.Pickup =
+    paramObj.pickup ?? existing.Pickup ?? existing.pickup ?? false;
   tvdbData.lastViewed = paramObj.lastViewed || existing.lastViewed || null;
-  tvdbData.waitStr = paramObj.waitStr || existing.waitStr || null;
+  tvdbData.WaitStr =
+    paramObj.waitStr || existing.WaitStr || existing.waitStr || null;
 
-  // NEW: Sync timestamps (preserve from paramObj or existing)
-  tvdbData.sync = {
-    lastEmbySync: paramObj.lastEmbySync || existing.sync?.lastEmbySync || null,
-    lastDiskCheck:
-      paramObj.lastDiskCheck || existing.sync?.lastDiskCheck || null,
-    lastMetadataUpdate: Date.now(),
-  };
+  // Flattened Sync timestamps (no nested object)
+  tvdbData.lastEmbySync =
+    paramObj.lastEmbySync ||
+    existing.lastEmbySync ||
+    existing.sync?.lastEmbySync ||
+    null;
+  tvdbData.lastDiskCheck =
+    paramObj.lastDiskCheck ||
+    existing.lastDiskCheck ||
+    existing.sync?.lastDiskCheck ||
+    null;
+  tvdbData.lastMetadataUpdate = Date.now();
 
   setImdbId(tvdbData);
 

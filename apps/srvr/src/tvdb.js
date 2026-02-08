@@ -823,12 +823,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   const name = show.Name;
   log("getTvdbData: START", { name, clientRequest });
   const added = allTvdb[name]?.added ?? new Date().toISOString().slice(0, 10);
-  if (deleted) {
-    // this shouldn't happen, deleteds filter before here
-    log("getTvdbData:", name, "is deleted, skipping tvDb refresh");
-    resolve(name);
-    return;
-  }
   const showId = show.Id;
   const tvdbId = show.TvdbId;
   if (!tvdbId) {
@@ -1206,9 +1200,8 @@ const tryLocalGetTvdb = () => {
   try {
     const tvdbs = Object.values(allTvdb);
     tvdbs.forEach((tvdb) => {
-      if (tvdb.deleted) return;
       if (!tvdb.Id) {
-        log("err", "tryLocalGetTvdb no Id and not deleted:", tvdb.Name, {
+        log("err", "tryLocalGetTvdb no Id:", tvdb.Name, {
           tvdb,
         });
         return;
@@ -1238,8 +1231,7 @@ const tryLocalGetTvdb = () => {
   // Check if show should be added to pickup list:
   // - not in emby (showId starts with 'noemby-' or undefined)
   // - has tvdb data (minTvdb exists)
-  // - not deleted
-  if (minTvdb && !minTvdb.deleted) {
+  if (minTvdb) {
     const showId = minTvdb.Id;
     const notInEmby = !showId || showId.startsWith("noemby-");
     if (notInEmby && addToPickupsCallback) {

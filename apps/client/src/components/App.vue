@@ -1106,10 +1106,6 @@ export default {
           payload?.existing?.tvdbId != null
             ? String(payload.existing.tvdbId)
             : "";
-        const existingDeleted =
-          payload?.existing?.deleted != null
-            ? String(payload.existing.deleted)
-            : "";
 
         const lines = [];
         lines.push("What happened");
@@ -1130,10 +1126,6 @@ export default {
         );
         lines.push(`- Cached showId (tvdb.showId): ${existingShowId}`);
         lines.push(`- Cached tvdbId (tvdb.tvdbId): ${existingTvdbId}`);
-        if (existingDeleted)
-          lines.push(
-            `- Cached deleted flag/date (tvdb.deleted): ${existingDeleted}`,
-          );
         lines.push("");
         lines.push("Raw details");
         try {

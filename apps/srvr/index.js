@@ -1341,18 +1341,28 @@ const startupPickupsSync = () => {
   const allTvdb = tvdb.getAllTvdbSync();
   let changedTvdb = false;
 
+  // Create normalized pickups set for fast lookup
+  const normalizedPickups = new Set(pickups.map((p) => p.toLowerCase()));
+
   // Set pickup=true on tvdb records that match the pickups list
   for (const pickupName of pickups) {
     const normalizedName = pickupName.toLowerCase();
     for (const [recordName, record] of Object.entries(allTvdb)) {
-      if (recordName.toLowerCase() === normalizedName && !record.deleted) {
+      if (recordName.toLowerCase() === normalizedName) {
         if (!record.pickup) {
           record.pickup = true;
-          console.log("[sync] Set pickup=true on tvdb:", recordName);
           changedTvdb = true;
         }
         break;
       }
+    }
+  }
+
+  // Set pickup=false on tvdb records that don't match pickups list
+  for (const [recordName, record] of Object.entries(allTvdb)) {
+    if (record.pickup && !normalizedPickups.has(recordName.toLowerCase())) {
+      record.pickup = false;
+      changedTvdb = true;
     }
   }
 
@@ -1374,7 +1384,7 @@ const getRejects = async (_param) => {
   const rejectsFromTvdb = [];
 
   for (const [name, record] of Object.entries(allTvdb)) {
-    if (record.reject && !record.deleted) {
+    if (record.reject) {
       rejectsFromTvdb.push(name);
     }
   }
@@ -1393,7 +1403,7 @@ const addReject = async (params) => {
 
   // Find matching record (case-insensitive)
   for (const [recordName, record] of Object.entries(allTvdb)) {
-    if (recordName.toLowerCase() === normalizedName && !record.deleted) {
+    if (recordName.toLowerCase() === normalizedName) {
       tvdbRecord = record;
       break;
     }
@@ -1450,11 +1460,7 @@ const delReject = async (params) => {
   const normalizedName = name.toLowerCase();
 
   for (const [recordName, record] of Object.entries(allTvdb)) {
-    if (
-      recordName.toLowerCase() === normalizedName &&
-      !record.deleted &&
-      record.reject
-    ) {
+    if (recordName.toLowerCase() === normalizedName && record.reject) {
       record.reject = false;
       // Save deferred to saveConfigYml below
       deletedOne = true;
@@ -1505,7 +1511,7 @@ const getPickups = async (_param) => {
   const pickupsFromTvdb = [];
 
   for (const [name, record] of Object.entries(allTvdb)) {
-    if (record.pickup && !record.deleted) {
+    if (record.pickup) {
       pickupsFromTvdb.push(name);
     }
   }
@@ -1526,7 +1532,7 @@ const addPickup = async (params) => {
   const normalizedName = name.toLowerCase();
 
   for (const [recordName, record] of Object.entries(allTvdb)) {
-    if (recordName.toLowerCase() === normalizedName && !record.deleted) {
+    if (recordName.toLowerCase() === normalizedName) {
       record.pickup = true;
       // Save deferred to saveConfigYml below
       break;
@@ -1562,11 +1568,7 @@ const delPickup = async (params) => {
   const normalizedName = name.toLowerCase();
 
   for (const [recordName, record] of Object.entries(allTvdb)) {
-    if (
-      recordName.toLowerCase() === normalizedName &&
-      !record.deleted &&
-      record.pickup
-    ) {
+    if (recordName.toLowerCase() === normalizedName && record.pickup) {
       record.pickup = false;
       // Save deferred to saveConfigYml below
       deletedOne = true;
@@ -1693,7 +1695,7 @@ const getGaps = async (_param) => {
   const gapsFromTvdb = {};
 
   for (const [name, record] of Object.entries(allTvdb)) {
-    if (record.gap && record.emby?.id && !record.deleted) {
+    if (record.gap) {
       gapsFromTvdb[record.emby.id] = record.gap;
     }
   }
@@ -1713,7 +1715,7 @@ const addGap = async (params) => {
 
     // Find show by Emby ID
     for (const [name, record] of Object.entries(allTvdb)) {
-      if (record.emby?.id === gapId && !record.deleted) {
+      if (record.emby?.id === gapId && record.inEmby) {
         showName = name;
         break;
       }
@@ -1742,7 +1744,7 @@ const delGap = async (params) => {
 
     // Find show by Emby ID
     for (const [name, record] of Object.entries(allTvdb)) {
-      if (record.emby?.id === gapId && !record.deleted) {
+      if (record.emby?.id === gapId) {
         record.gap = null;
         // Only save tvdb when save flag is true
         if (save) await tvdb.saveTvdbSync();
@@ -1874,9 +1876,7 @@ const getAllNotes = async (_params) => {
     if (
       record.note &&
       typeof record.note === "string" &&
-      record.note.trim() !== "" &&
-      !record.deleted
-    ) {
+      record.note.trim() !== "") {
       notesFromTvdb[name] = record.note;
     }
   }
@@ -2626,7 +2626,7 @@ async function syncEmbyUserData() {
       const name = embyShow.Name;
       const tvdbRecord = allTvdb[name];
 
-      if (!tvdbRecord || tvdbRecord.deleted) continue;
+      if (!tvdbRecord || !tvdbRecord.inEmby) continue;
 
       // Check if user data changed (also check UnplayedItemCount for episode watches)
       const userData = embyShow.UserData || {};
@@ -2684,13 +2684,12 @@ async function syncDiskData() {
 
     // Update tvdb records with fresh disk data
     for (const [name, tvdbRecord] of Object.entries(allTvdb)) {
-      if (tvdbRecord.deleted) continue;
-
       const embyPath = tvdbRecord.emby?.path;
       if (!embyPath) continue;
 
       const pathPart = embyPath.split("/").pop();
       const diskInfo = diskShows[pathPart];
+      if (!diskInfo) continue;
 
       const newDate = diskInfo ? diskInfo[0] : null;
       const newSize = diskInfo ? diskInfo[1] : 0;

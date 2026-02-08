@@ -54,12 +54,13 @@ function normShowName(name) {
   return String(name)
     .replace(/[\r\n\t]+/g, " ")
     .replace(/\s+/g, " ")
-    .trim();
+    .trim()
+    .toLowerCase();
 }
 
 export const isReject = (name) => {
   if (!rejectsSet) return false;
-  return rejectsSet.has(normShowName(name).toLowerCase());
+  return rejectsSet.has(normShowName(name));
 };
 
 // Phase 2: Helper function to sync collection flags into tvdb
@@ -86,33 +87,19 @@ async function syncCollections(allTvdb) {
 
 // Phase 2: Helper function to sync rejects and pickups into tvdb
 function syncRejectsAndPickups(allTvdb, rejectsIn, pickups) {
-  // Build normalized name lookup
-  const showsByNormName = new Map();
-  for (const [name, tvdb] of Object.entries(allTvdb)) {
-    if (!tvdb.deleted) {
-      const key = normShowName(name).toLowerCase();
-      showsByNormName.set(key, tvdb);
-    }
+  // Set reject and pickup flags for all shows
+  for (const tvdb of Object.values(allTvdb)) {
+    const normalizedName = normShowName(tvdb.Name);
+    tvdb.reject = (rejectsIn || []).some(
+      (r) => normShowName(r) === normalizedName,
+    );
+    tvdb.pickup = (pickups || []).some(
+      (p) => normShowName(p) === normalizedName,
+    );
   }
-
-  // Mark rejects in tvdb
-  const rejectsList = (rejectsIn || []).map(normShowName).filter(Boolean);
-  for (const rejectName of rejectsList) {
-    const key = rejectName.toLowerCase();
-    const tvdb = showsByNormName.get(key);
-    if (tvdb) tvdb.reject = true;
-  }
-
-  // Mark pickups in tvdb
-  for (const pickupName of pickups || []) {
-    const key = normShowName(pickupName).toLowerCase();
-    const tvdb = showsByNormName.get(key);
-    if (tvdb) tvdb.pickup = true;
-  }
-
   // Update module-level rejects for isReject()
-  rejects = rejectsList;
-  rejectsSet = new Set(rejects.map((n) => n.toLowerCase()));
+  rejects = (rejectsIn || []).map(normShowName).filter(Boolean);
+  rejectsSet = new Set(rejects);
 }
 
 // Phase 2: Helper function to set wait strings for shows
@@ -301,7 +288,6 @@ export async function loadAllShows() {
           existing: {
             tvdbId: tvdbRecord.tvdbId,
             Id: tvdbRecord.Id,
-            deleted: tvdbRecord.deleted,
           },
         });
       }

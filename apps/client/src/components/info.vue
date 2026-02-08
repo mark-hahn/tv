@@ -885,11 +885,12 @@ export default {
     },
 
     setDeleted(tvdbData) {
-      const deleted = !!tvdbData?.deleted;
-      // console.log('series, setDeleted:', deleted)
-      if (deleted) this.deletedTxt = "Deleted " + tvdbData.deleted;
-      else this.deletedTxt = "";
       this.notInEmby = this.show.inEmby === false;
+      if (this.notInEmby && tvdbData?.leftEmby) {
+        this.deletedTxt = "Deleted " + tvdbData.leftEmby;
+      } else {
+        this.deletedTxt = "";
+      }
     },
 
     async setPoster(tvdbData) {

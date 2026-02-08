@@ -506,7 +506,7 @@
                 {{ tvdbInfo.runtime }}
               </div>
               <div
-                v-if="tvdbInfo.deleted"
+                v-if="tvdbInfo.inEmby === false"
                 style="
                   min-height: 20px;
                   white-space: nowrap;
@@ -516,7 +516,7 @@
                   color: red;
                 "
               >
-                Deleted {{ tvdbInfo.deleted }}
+                Not in Emby
               </div>
               <div
                 v-if="tvdbInfo.existingShowName"
@@ -1086,7 +1086,7 @@ export default {
         originalLanguage,
         originalNetwork,
         averageRuntime,
-        deleted,
+        inEmby,
         tvdb_id,
         tvdbId,
       } = data;
@@ -1140,7 +1140,7 @@ export default {
 
       if (averageRuntime) info.runtime = `${averageRuntime} Mins`;
 
-      if (deleted) info.deleted = deleted;
+      if (inEmby === false) info.inEmby = false;
 
       if (data.name && allTvdbData.value) {
         const local = allTvdbData.value[data.name];

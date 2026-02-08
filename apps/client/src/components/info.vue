@@ -49,7 +49,13 @@
             gap: '12px',
           }"
         >
-          <span>{{ show.Name }}</span>
+          <span
+            :style="{
+              backgroundColor: previewMode ? 'yellow' : 'transparent',
+              padding: previewMode ? '5px' : '0',
+            }"
+            >{{ show.Name }}</span
+          >
         </div>
         <!-- Simple mode: align left edge of Notes with right edge of image (end of poster column)-->
         <div
@@ -1256,6 +1262,14 @@ export default {
                   watchedCount: 0,
                   clientRequest: true,
                 };
+                console.log(
+                  "[INFO] Calling getNewTvdb for:",
+                  show?.Name,
+                  "previewMode:",
+                  this.previewMode,
+                  "params:",
+                  JSON.stringify(paramObj, null, 2),
+                );
                 tvdbData = await srvr.getNewTvdb(paramObj);
                 if (tvdbData) {
                   delete tvdbData.deleted;
@@ -1276,6 +1290,8 @@ export default {
 
           if (!tvdbData) {
             console.warn("Series: no tvdbData available for", show?.Name);
+            // Still show the infobox even without tvdbData, just with limited info
+            this.seriesReady = true;
             return;
           }
 

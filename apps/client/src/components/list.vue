@@ -303,7 +303,6 @@ let allShows = [];
 let showHistory = [];
 let showHistoryPtr = -1;
 let gapWorkerRunning = false;
-const pruneTvdb = window.location.href.slice(-5) == "prune";
 
 export default {
   name: "List",
@@ -438,7 +437,7 @@ export default {
 
     const deleteShow = async (show) => {
       allTvdb = await tvdb.getAllTvdb();
-      const name = show.name;
+      const name = show.Name;
       // console.log('list, deleteShow:', name);
       if (show.reject) {
         alert("Show is banned, ignoring delete");
@@ -453,20 +452,22 @@ export default {
         // Delete files from server first, then from Emby
         await srvr.deleteShowFromSrvr(show);
         await emby.deleteShowFromEmby(show);
-      } else {
-        // Not in Emby: still remove immediately
-        this.removeRow(show);
-        await srvr.deleteShowFromSrvr(show);
-      }
-      const tvdbData = allTvdb[name];
-
-      if (pruneTvdb) {
-        delete allTvdb[name];
-        await srvr.setTvdbFields({ name, $delTvdb: true });
-      } else {
         // Set inEmby to false to mark as deleted
+        const tvdbData = allTvdb[name];
         tvdbData.inEmby = false;
         allTvdb[name] = await srvr.setTvdbFields({ name, inEmby: false });
+      } else {
+        // Not in Emby: permanently delete with confirmation (no files to delete)
+        if (
+          !window.confirm(
+            `Do you want to PERMANENTLY delete the show "${name}"?`,
+          )
+        )
+          return;
+        this.removeRow(show);
+        // Permanently remove from tvdb.json and in-memory lists
+        delete allTvdb[name];
+        await srvr.setTvdbFields({ name, $delTvdb: true });
       }
       await this.removeRow(show);
     };
@@ -1029,19 +1030,17 @@ export default {
         evtBus.emit("addPreviewShowStart", { name, tvdbId, overview });
       }
 
-      if (!pruneTvdb) {
-        const matchShow = this.findExistingShowForSearchChoice({
-          name,
-          tvdbId,
-        });
-        if (matchShow) {
-          console.log(matchShow.Name + " already exists.");
-          if (!this.shows.some((sh) => sh?.Name === matchShow.Name)) {
-            await this.fltrAction("All");
-          }
-          this.onSelectShow(matchShow, true);
-          return;
+      const matchShow = this.findExistingShowForSearchChoice({
+        name,
+        tvdbId,
+      });
+      if (matchShow) {
+        console.log(matchShow.Name + " already exists.");
+        if (!this.shows.some((sh) => sh?.Name === matchShow.Name)) {
+          await this.fltrAction("All");
         }
+        this.onSelectShow(matchShow, true);
+        return;
       }
 
       // Show searching modal
@@ -1491,9 +1490,7 @@ export default {
           (hasembyCond.filter === -1 && showInEmby) ||
           (hasembyCond.filter === +1 && !showInEmby);
         if (filterHidesShow) {
-          console.log(
-            `hasemby filter would hide ${showName}, resetting to 0`,
-          );
+          console.log(`hasemby filter would hide ${showName}, resetting to 0`);
           hasembyCond.filter = 0;
         }
       }
@@ -2051,25 +2048,23 @@ export default {
       // must be set before startWorker
 
       // Handle gap worker restart logic
-      if (!pruneTvdb) {
-        if (isInitialLoad) {
-          // Initial load: start worker immediately
-          gapWorkerRunning = true;
-          emby.startGapWorker(allShows, this.addGapToShow);
-        } else if (gapWorkerRunning) {
-          // Worker is running, wait for it to finish then restart
-          const checkAndRestart = setInterval(() => {
-            if (!gapWorkerRunning) {
-              clearInterval(checkAndRestart);
-              gapWorkerRunning = true;
-              emby.startGapWorker(allShows, this.addGapToShow);
-            }
-          }, 100);
-        } else {
-          // Worker not running, start immediately
-          gapWorkerRunning = true;
-          emby.startGapWorker(allShows, this.addGapToShow);
-        }
+      if (isInitialLoad) {
+        // Initial load: start worker immediately
+        gapWorkerRunning = true;
+        emby.startGapWorker(allShows, this.addGapToShow);
+      } else if (gapWorkerRunning) {
+        // Worker is running, wait for it to finish then restart
+        const checkAndRestart = setInterval(() => {
+          if (!gapWorkerRunning) {
+            clearInterval(checkAndRestart);
+            gapWorkerRunning = true;
+            emby.startGapWorker(allShows, this.addGapToShow);
+          }
+        }, 100);
+      } else {
+        // Worker not running, start immediately
+        gapWorkerRunning = true;
+        emby.startGapWorker(allShows, this.addGapToShow);
       }
 
       // Only set sort properties on initial load

@@ -40,6 +40,7 @@
             borderBottom: '1px solid #000',
             cursor: 'default',
             lineHeight: simpleMode ? '1.6' : '1',
+            backgroundColor: hilite(show),
           }"
           :id="nameHash(show.Name)"
         >
@@ -73,7 +74,6 @@
             :style="{
               maxWidth: '110px',
               fontSize: '16px',
-              backgroundColor: hilite(show),
               cursor: 'default',
               textAlign: 'center',
               paddingLeft: simpleMode ? '20px' : '0',
@@ -87,11 +87,15 @@
               display: 'flex',
               padding: '5px',
               justifyContent: 'space-between',
-              backgroundColor: hilite(show),
+              backgroundColor: highlightName === show.Name ? 'yellow' : 'transparent',
             }"
           >
             <div
-              style="padding: 2px; fontsize: 16px; font-weight: bold"
+              :style="{
+                padding: '2px',
+                fontSize: '16px',
+                fontWeight: 'bold',
+              }"
               @click="$emit('select-show', show, false, true)"
             >
               {{ show.Name }}
@@ -191,7 +195,6 @@ export default {
     },
 
     hilite(show) {
-      if (this.highlightName == show.Name) return "yellow";
       if (show.inEmby === false) return "#fee";
       return "white";
     },

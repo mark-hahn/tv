@@ -1548,23 +1548,6 @@ export default {
       if (browseItem?.data?.genres?.length) {
         line += ` | ${browseItem.data.genres.join(", ")}`;
       }
-
-      // Add Watched count if available in local data
-      // if (allTvdbData.value && t.name) {
-      //   const local = allTvdbData.value[t.name];
-      //   if (local && (local.episodeCount ?? 0) > 0) {
-      //     let wCount = local.watchedCount ?? 0;
-      //     if (local.showId && local.showId.startsWith("noemby-")) wCount = 0;
-      //     const total = local.episodeCount;
-
-      //     if (wCount === total) {
-      //       line += " | All Watched";
-      //     } else {
-      //       line += ` | Watched ${wCount} of ${total}`;
-      //     }
-      //   }
-      // }
-
       return line;
     });
 

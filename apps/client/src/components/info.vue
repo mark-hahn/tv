@@ -967,30 +967,14 @@ export default {
       this.seasonsTxt = "";
       const show = this.show;
       const name = show.Name;
-      if (this.show.inEmby !== false) {
-        const epiCounts = await emby.getEpisodeCounts(show);
-        Object.assign(tvdbData, epiCounts);
-        const fields = Object.assign({ name }, epiCounts);
-        // don't await, let it fail or succeed in background
-        srvr.setTvdbFields(fields).catch((e) => console.error(e));
-      } else {
-        // noemby shows cannot have real watched state from Emby; prevent stale
-        // tvdb.json values (name collisions / prior cached data) from showing up.
-        if ((tvdbData.watchedCount ?? 0) !== 0) {
-          tvdbData.watchedCount = 0;
-          try {
-            await srvr.setTvdbFields({ name, watchedCount: 0 });
-          } catch (e) {
-            // Non-fatal: UI will still display the corrected value.
-          }
-        }
-      }
+      const epiCounts = await emby.getEpisodeCounts(show);
+      Object.assign(tvdbData, epiCounts);
+      const fields = Object.assign({ name }, epiCounts);
+      // don't await, let it fail or succeed in background
+      srvr.setTvdbFields(fields).catch((e) => console.error(e));
       allTvdb[name] = tvdbData;
       let seasonsTxt;
-      const { episodeCount, seasonCount } = tvdbData;
-      const watchedCount = this.show.Id.startsWith("noemby-")
-        ? 0
-        : (tvdbData.watchedCount ?? 0);
+      const { episodeCount, seasonCount, watchedCount } = tvdbData;
       switch (seasonCount) {
         case 0:
           console.error("setSeasonsTxt, no seasonCount:", name);
@@ -1071,10 +1055,10 @@ export default {
     },
 
     async setNextWatch() {
-      const afterWatched = await emby.afterLastWatched(this.show.Id);
+      const afterWatched = await emby.afterLastWatched(this.show);
       const status = afterWatched.status;
       const readyToWatch = status === "ok";
-      if (!this.show.Id.startsWith("noemby") && status !== "allWatched") {
+      if (this.show.inEmby !== false && status !== "allWatched") {
         const { seasonNumber, episodeNumber, episodeId } = afterWatched;
 
         // Defensive: never render "Eundefined" for malformed Emby items (e.g. Sxx.EXTRA).

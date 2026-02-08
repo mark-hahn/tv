@@ -138,7 +138,7 @@
               →
             </button>
             <button
-              v-if="!mapShow?.Id?.startsWith('noemby-')"
+              v-if="mapShow?.inEmby !== false"
               @click.stop="startLibraryRefresh"
               style="
                 font-size: 15px;
@@ -151,7 +151,7 @@
               Library
             </button>
             <button
-              v-if="!mapShow?.Id?.startsWith('noemby-')"
+              v-if="mapShow?.inEmby !== false"
               @click.stop="$emit('prune', mapShow)"
               style="
                 font-size: 15px;
@@ -1164,11 +1164,11 @@ export default {
         return;
       }
 
-      const afterWatched = await emby.afterLastWatched(this.mapShow.Id);
+      const afterWatched = await emby.afterLastWatched(this.mapShow);
       const status = afterWatched.status;
       const readyToWatch = status === "ok";
 
-      if (!this.mapShow.Id.startsWith("noemby") && status !== "allWatched") {
+      if (this.mapShow.inEmby !== false && status !== "allWatched") {
         const { seasonNumber, episodeNumber } = afterWatched;
         const seaEpiTxt =
           `S${("" + seasonNumber).padStart(2, "0")} ` +

@@ -77,14 +77,10 @@ async function syncCollections(allTvdb) {
   const lindaIds = new Set(lindaRes.data.Items.map((i) => i.Id));
 
   for (const tvdb of Object.values(allTvdb)) {
-    if (tvdb.deleted) continue;
-    const embyId = tvdb.Id;
-    if (embyId && !embyId.startsWith("noemby-")) {
-      tvdb.InToTry = toTryIds.has(embyId);
-      tvdb.InContinue = continueIds.has(embyId);
-      tvdb.InMark = markIds.has(embyId);
-      tvdb.InLinda = lindaIds.has(embyId);
-    }
+    tvdb.InToTry = toTryIds.has(embyId);
+    tvdb.InContinue = continueIds.has(embyId);
+    tvdb.InMark = markIds.has(embyId);
+    tvdb.InLinda = lindaIds.has(embyId);
   }
 }
 
@@ -747,8 +743,7 @@ export const getEpisodeCounts = async (show) => {
   let seasonCount = 0;
   let episodeCount = 0;
   let watchedCount = 0;
-  if (show.Id.startsWith("noemby-"))
-    return { seasonCount, episodeCount, watchedCount };
+  if (show.inEmby === false) return { seasonCount, episodeCount, watchedCount };
   try {
     const seasonsRes = await axios.get(urls.childrenUrl(cred, showId));
     let skippedEpisodeCount = 0;
@@ -803,7 +798,7 @@ export const getSeriesMap = async (show, prune = false) => {
   const seriesId = show.Id;
 
   // If this is a noemby show (from web search), return empty map
-  if (seriesId.startsWith("noemby-")) {
+  if (show.inEmby === false) {
     return [];
   }
 
@@ -1045,8 +1040,9 @@ export const startStop = async (show, episodeId, watchButtonTxt) => {
   }
 };
 
-export const afterLastWatched = async (showId) => {
-  if (showId.startsWith("noemby-")) return { status: "noemby" };
+export const afterLastWatched = async (show) => {
+  if (show.inEmby === false) return { status: "noemby" };
+  const showId = show.Id;
   const seasonsRes = await axios.get(urls.childrenUrl(cred, showId));
   const seasonItems = seasonsRes.data.Items;
   for (let key in seasonItems) {

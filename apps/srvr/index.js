@@ -2364,25 +2364,26 @@ const deletePath = async (params) => {
   if (!pathParam) {
     throw new Error("deletePath: missing path parameter");
   }
-  
+
   // If it's just a folder name (no slashes), construct the full path in tvDir
   // Otherwise use the path as-is (for episode file deletions)
-  const fullPath = pathParam.includes("/") || pathParam.includes("\\")
-    ? pathParam
-    : path.join(tvDir, pathParam);
-  
+  const fullPath =
+    pathParam.includes("/") || pathParam.includes("\\")
+      ? pathParam
+      : path.join(tvDir, pathParam);
+
   console.log("deletePath: deleting", fullPath);
-  
+
   try {
     await rimraf(fullPath);
     console.log("deletePath: rimraf completed for:", fullPath);
-    
+
     // Verify the directory/file is actually gone
     if (fs.existsSync(fullPath)) {
       console.error("deletePath: path still exists after rimraf:", fullPath);
       throw new Error(`Path still exists after deletion: ${fullPath}`);
     }
-    
+
     console.log("deletePath success: path confirmed deleted:", fullPath);
   } catch (e) {
     console.error("error removing path:", fullPath, e.message);

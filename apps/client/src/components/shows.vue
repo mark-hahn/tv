@@ -87,7 +87,8 @@
               display: 'flex',
               padding: '5px',
               justifyContent: 'space-between',
-              backgroundColor: highlightName === show.Name ? 'yellow' : 'transparent',
+              backgroundColor:
+                highlightName === show.Name ? 'yellow' : 'transparent',
             }"
           >
             <div

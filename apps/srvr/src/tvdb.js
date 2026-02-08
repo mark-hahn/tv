@@ -111,9 +111,11 @@ try {
   } catch {}
 }
 
-// Phase 1: Backward compatibility migration - initialize new fields on existing records
-let migrationNeeded = false;
-for (const [name, tvdb] of Object.entries(allTvdb)) {
+// Phase 1: DISABLED - migration complete, all records now use flattened structure
+// This migration was creating nested emby/disk/sync objects which conflicts with our flat schema
+let migrationNeeded = false; // Keep variable for compatibility but skip migration
+if (false) { // Disabled migration - entire block skipped
+  for (const [name, tvdb] of Object.entries(allTvdb)) {
   let recordUpdated = false;
 
   if (!tvdb.emby) {
@@ -188,20 +190,11 @@ for (const [name, tvdb] of Object.entries(allTvdb)) {
     recordUpdated = true;
   }
 
-  if (recordUpdated) {
-    migrationNeeded = true;
+    if (recordUpdated) {
+      migrationNeeded = true;
+    }
   }
-}
-
-// Save migrated data if any records were updated
-if (migrationNeeded) {
-  log("Phase 1 migration: Saving updated tvdb.json with new schema fields");
-  try {
-    util.writeFile(TVDB_PATH, allTvdb);
-  } catch (e) {
-    log("err", "Phase 1 migration save failed:", e);
-  }
-}
+} // End of disabled Phase 1 migration
 
 // Phase 5: Migrate separate JSON files into tvdb.json
 let phase5MigrationNeeded = false;
@@ -815,6 +808,14 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     watchedCount,
     clientRequest,
   } = paramObj;
+  
+  // Defensive check - ensure show object exists
+  if (!show || !show.Name) {
+    log("err", "getTvdbData: Invalid paramObj - missing show.Name", { paramObj });
+    if (resolve) resolve(null);
+    return;
+  }
+  
   const name = show.Name;
   log("getTvdbData: START", { name, clientRequest });
   const added = allTvdb[name]?.added ?? new Date().toISOString().slice(0, 10);
@@ -930,10 +931,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   };
 
   let tvdbData = {
-    tvdbId,
-    name,
-    Name: name, // Add PascalCase version for compatibility
-    TvdbId: tvdbId, // Add PascalCase version for compatibility
+    Name: name,
+    TvdbId: tvdbId,
     originalNetwork: preserve(
       originalNetwork,
       existing.originalNetwork,
@@ -1193,15 +1192,15 @@ const tryLocalGetTvdb = () => {
     const tvdbs = Object.values(allTvdb);
     tvdbs.forEach((tvdb) => {
       if (tvdb.deleted) return;
-      if (!tvdb.showId) {
-        log("err", "tryLocalGetTvdb no showId and not deleted:", tvdb.name, {
+      if (!tvdb.Id) {
+        log("err", "tryLocalGetTvdb no Id and not deleted:", tvdb.Name, {
           tvdb,
         });
         return;
       }
       const saved = tvdb.saved;
       if (saved === undefined) {
-        log("tryLocalGetTvdb, saved is undefined:", tvdb.name);
+        log("tryLocalGetTvdb, saved is undefined:", tvdb.Name);
         minTvdb = tvdb;
         throw true;
       }
@@ -1226,20 +1225,20 @@ const tryLocalGetTvdb = () => {
   // - has tvdb data (minTvdb exists)
   // - not deleted
   if (minTvdb && !minTvdb.deleted) {
-    const showId = minTvdb.showId;
+    const showId = minTvdb.Id;
     const notInEmby = !showId || showId.startsWith("noemby-");
     if (notInEmby && addToPickupsCallback) {
-      addToPickupsCallback(minTvdb.name);
+      addToPickupsCallback(minTvdb.Name);
     }
   }
 
   // log('------', new Date().toTimeString().slice(0,8),
-  //             `updating tvdb locally:`, minTvdb.name);
+  //             `updating tvdb locally:`, minTvdb.Name);
   const show = {
-    Name: minTvdb.name,
-    TvdbId: minTvdb.tvdbId,
+    Name: minTvdb.Name,
+    TvdbId: minTvdb.TvdbId,
   };
-  if (minTvdb.showId) show.Id = minTvdb.showId;
+  if (minTvdb.Id) show.Id = minTvdb.Id;
   const paramObj = {
     show,
     seasonCount: minTvdb.seasonCount ?? 0,

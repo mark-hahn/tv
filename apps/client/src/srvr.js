@@ -75,7 +75,7 @@ const fCall = (fname, param) => {
 const httpCall = async (endpoint, param, method = "GET") => {
   const url = `${HTTP_URL}${endpoint}`;
   const TIMEOUT_MS = 30000; // 30 second timeout
-  
+
   const options = {
     method,
     headers: { "Content-Type": "application/json" },
@@ -99,10 +99,7 @@ const httpCall = async (endpoint, param, method = "GET") => {
     });
 
     // Race between fetch and timeout
-    const response = await Promise.race([
-      fetch(url, options),
-      timeoutPromise,
-    ]);
+    const response = await Promise.race([fetch(url, options), timeoutPromise]);
 
     if (!response.ok) {
       const error = await response

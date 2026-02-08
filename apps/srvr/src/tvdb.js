@@ -1486,7 +1486,7 @@ export const accessTvdb = async (params) => {
     const paramObj = params;
     if (!paramObj) throw new Error("invalid params");
     const { path: tvdbPath, query } = paramObj;
-    
+
     url = buildTvdbUrl(tvdbPath, query).toString();
     log("accessTvdb: START", { tvdbPath, url });
 
@@ -1520,15 +1520,18 @@ export const accessTvdb = async (params) => {
         data = JSON.parse(body);
       }
     } catch (parseErr) {
-       log("accessTvdb: JSON parse error", { parseErr, bodyExcerpt: body.substring(0, 100) });
+      log("accessTvdb: JSON parse error", {
+        parseErr,
+        bodyExcerpt: body.substring(0, 100),
+      });
     }
 
     if (!upstream.ok) {
-      log("accessTvdb: UPSTREAM ERROR", { 
-        status: upstream.status, 
+      log("accessTvdb: UPSTREAM ERROR", {
+        status: upstream.status,
         statusText: upstream.statusText,
         url,
-        body 
+        body,
       });
     } else {
       log("accessTvdb: END", { ok: upstream.ok, status: upstream.status });
@@ -1542,6 +1545,10 @@ export const accessTvdb = async (params) => {
   } catch (e) {
     log("accessTvdb error", { error: e.message, stack: e.stack, url });
     // Return error structure for robustness
-    return { ok: false, status: 500, error: `Server error accessing TVDB: ${e.message}` };
+    return {
+      ok: false,
+      status: 500,
+      error: `Server error accessing TVDB: ${e.message}`,
+    };
   }
 };

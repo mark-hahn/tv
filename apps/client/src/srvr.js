@@ -72,9 +72,27 @@ const fCall = (fname, param) => {
 };
 
 // HTTP call - for all non-streaming operations
+const waitForServer = async () => {
+  if (haveSocket) return;
+  const start = Date.now();
+  // Wait up to 5 seconds for WebSocket to connect
+  while (!haveSocket && Date.now() - start < 5000) {
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  // If still no socket, log warning but proceed (HTTP might work independently)
+  if (!haveSocket) {
+    console.warn(
+      "waitForServer: proceeding without WebSocket connection (timeout)",
+    );
+  }
+};
+
 const httpCall = async (endpoint, param, method = "GET") => {
   const url = `${HTTP_URL}${endpoint}`;
   const TIMEOUT_MS = 30000; // 30 second timeout
+
+  // Wait for server readiness to avoid startup errors if server is restarting
+  await waitForServer();
 
   const options = {
     method,

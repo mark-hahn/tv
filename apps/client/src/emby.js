@@ -122,7 +122,7 @@ function syncRejectsAndPickups(allTvdb, rejectsIn, pickups) {
 // Phase 2: Helper function to set wait strings for shows
 async function setWaitStrings(allTvdb) {
   for (const tvdb of Object.values(allTvdb)) {
-    if (tvdb.deleted) continue;
+    if (tvdb.inEmby === false) continue;
     try {
       const show = { Name: tvdb.name, Id: tvdb.emby?.id };
       const waitStr = await tvdb.getWaitStr(show);
@@ -151,8 +151,6 @@ export async function loadAllShows() {
   // Note: gaps, notes, noEmbys now stored in tvdb.json (Phase 5)
   allTvdb = allTvdbResult;
   const now = Date.now();
-
-  let shows = [];
 
   // 3. Sync Emby shows into tvdb (update tvdb records with Emby user data)
   for (const embyShow of embyShows.data.Items) {
@@ -273,10 +271,8 @@ export async function loadAllShows() {
     }
   }
 
-  // 4. Process noEmby shows (Phase 5: now stored in tvdb with noemby- IDs)
-  const noEmbys = Object.values(allTvdb).filter((t) =>
-    t.emby?.id?.startsWith("noemby-"),
-  );
+  // 4. Process shows not in Emby (inEmby === false)
+  const noEmbys = Object.values(allTvdb).filter((t) => t.inEmby === false);
   const prunedNoEmbyIds = [];
 
   await Promise.all(
@@ -285,7 +281,7 @@ export async function loadAllShows() {
 
       // Check if show now exists in Emby (upgrade scenario)
       const tvdbRecord = allTvdb[name];
-      if (tvdbRecord?.emby?.id && !tvdbRecord.emby.id.startsWith("noemby-")) {
+      if (tvdbRecord?.emby?.id && tvdbRecord.inEmby === true) {
         // Show upgraded to Emby - copy collection flags
         console.log("upgrading noEmby to Emby:", name);
 
@@ -310,8 +306,8 @@ export async function loadAllShows() {
           console.error("loadAllShows: upgrade noEmby flags failed", name, e);
         }
 
-        // Mark as deleted in tvdb (will be cleaned up)
-        noEmbyShow.deleted = true;
+        // Mark as not in emby anymore in old record
+        noEmbyShow.inEmby = false;
         prunedNoEmbyIds.push(noEmbyShow.emby.id);
         return;
       }
@@ -337,18 +333,20 @@ export async function loadAllShows() {
     }),
   );
 
-  // 5. Mark tvdb records as deleted if no matching show exists
+  // 5. Update inEmby status if no matching show exists
   for (const [name, tvdbRecord] of Object.entries(allTvdb)) {
-    if (tvdbRecord.deleted) continue;
+    if (tvdbRecord.inEmby === false) continue;
 
     const hasEmby = embyShows.data.Items.some((s) => s.Name === name);
     const hasNoEmby = noEmbys.some((s) => s.name === name);
 
     if (!hasEmby && !hasNoEmby) {
-      console.log(`loadAllShows: marking ${name} as deleted (no show found)`);
+      console.log(
+        `loadAllShows: marking ${name} as not in Emby (no show found)`,
+      );
       allTvdb[name] = await srvr.setTvdbFields({
         name,
-        deleted: util.fmtDate(),
+        inEmby: false,
         dontSave: true,
       });
     } else if (hasEmby && !tvdbRecord.showId) {
@@ -372,72 +370,64 @@ export async function loadAllShows() {
   // 8. Set WaitStr for shows with unaired episodes
   await setWaitStrings(allTvdb);
 
-  // 9. Build show list from tvdb (return tvdb records as shows)
-  // We need to convert back to old "show" format for compatibility with existing client code
-  // In Phase 6, we'll update components to use new structure directly
-  for (const [name, tvdbRecord] of Object.entries(allTvdb)) {
-    if (tvdbRecord.deleted) continue;
+  // 9. Flatten nested properties onto tvdb records for component compatibility
+  // Add emby/gap properties to top level of each tvdb record
+  for (const tvdb of Object.values(allTvdb)) {
+    // Core identity (add PascalCase versions for compatibility)
+    tvdb.Name = tvdb.name;
+    tvdb.TvdbId = tvdb.tvdbId;
+    tvdb.Id = tvdb.emby?.id || `noemby-${tvdb.tvdbId}`;
 
-    // Build show object in old format (for backward compatibility during transition)
-    const show = {
-      // Core identity
-      Name: tvdbRecord.name,
-      Id: tvdbRecord.emby?.id || `noemby-${tvdbRecord.tvdbId}`,
-      TvdbId: tvdbRecord.tvdbId,
+    // Flatten emby data to top level with PascalCase
+    tvdb.DateCreated = tvdb.emby?.dateCreated;
+    tvdb.PremiereDate = tvdb.emby?.premiereDate;
+    tvdb.IsFavorite = tvdb.emby?.isFavorite || false;
+    tvdb.Played = tvdb.emby?.isPlayed || false;
+    tvdb.PlayCount = tvdb.emby?.playCount || 0;
+    tvdb.LastPlayedDate = tvdb.emby?.lastPlayedDate;
+    tvdb.Path = tvdb.emby?.path;
 
-      // Emby data
-      DateCreated: tvdbRecord.emby?.dateCreated || tvdbRecord.added,
-      PremiereDate: tvdbRecord.emby?.premiereDate,
-      IsFavorite: tvdbRecord.emby?.isFavorite,
-      Played: tvdbRecord.emby?.isPlayed,
-      PlayCount: tvdbRecord.emby?.playCount,
-      LastPlayedDate: tvdbRecord.emby?.lastPlayedDate,
-      Path: tvdbRecord.emby?.path,
+    // Flatten collection flags
+    tvdb.InToTry = tvdb.emby?.inToTry || false;
+    tvdb.InContinue = tvdb.emby?.inContinue || false;
+    tvdb.InMark = tvdb.emby?.inMark || false;
+    tvdb.InLinda = tvdb.emby?.inLinda || false;
 
-      // Disk data
-      Date: tvdbRecord.disk?.date || "2017-12-05",
-      Size: tvdbRecord.disk?.size || 0,
-      NoFiles: tvdbRecord.disk?.noFiles || false,
+    // Flatten disk data
+    tvdb.Date = tvdb.disk?.date || "2017-12-05";
+    tvdb.Size = tvdb.disk?.size || 0;
+    tvdb.NoFiles = tvdb.disk?.noFiles || false;
 
-      // TVDB metadata
-      OriginalCountry: tvdbRecord.originalCountry,
-      Overview: tvdbRecord.emby?.overview || tvdbRecord.overview || "",
-      Genres:
-        tvdbRecord.emby?.genres || tvdbRecord.genres?.map((g) => g.name) || [],
-      Ended: tvdbRecord.status === "Ended",
-      LastAired: tvdbRecord.lastAired,
-      Ratings: tvdbRecord.remotes?.find((r) => r.ratings)?.ratings || 0,
-      averageRuntime: tvdbRecord.averageRuntime,
+    // TVDB metadata
+    tvdb.OriginalCountry = tvdb.originalCountry;
+    tvdb.Overview = tvdb.emby?.overview || tvdb.overview || "";
+    tvdb.Genres = tvdb.emby?.genres || tvdb.genres?.map((g) => g.name) || [];
+    tvdb.Ended = tvdb.status === "Ended";
+    tvdb.LastAired = tvdb.lastAired;
+    tvdb.Ratings = tvdb.remotes?.find((r) => r.ratings)?.ratings || 0;
 
-      // Collection flags
-      InToTry: tvdbRecord.emby?.inToTry || false,
-      InContinue: tvdbRecord.emby?.inContinue || false,
-      InMark: tvdbRecord.emby?.inMark || false,
-      InLinda: tvdbRecord.emby?.inLinda || false,
+    // Other flags
+    tvdb.Reject = tvdb.reject || false;
+    tvdb.Pickup = tvdb.pickup || false;
+    tvdb.WaitStr = tvdb.waitStr;
+    tvdb.NotReady = tvdb.inEmby === false || false;
 
-      // Other flags
-      Reject: tvdbRecord.reject || false,
-      Pickup: tvdbRecord.pickup || false,
-      WaitStr: tvdbRecord.waitStr,
-      NotReady: tvdbRecord.emby?.id?.startsWith("noemby-") || false,
-      S1E1Unaired: false, // Will be set for noEmby shows above
+    // Flatten gap properties if they exist
+    if (tvdb.gap) {
+      Object.assign(tvdb, tvdb.gap);
+    }
 
-      // Gap and notes
-      ...tvdbRecord.gap, // Spread gap data if exists
-      Notes: tvdbRecord.note || "",
-
-      // Keep reference to tvdb record for internal use
-      _tvdb: tvdbRecord,
-    };
-
-    shows.push(show);
+    // Notes
+    tvdb.Notes = tvdb.note || "";
   }
 
-  // Phase 5: gaps, notes now stored in tvdb.json - no separate cleanup needed
+  const showRecords = Object.values(allTvdb);
 
   const elapsed = Date.now() - loadStart;
-  console.log(`Phase 2: loadAllShows completed in ${elapsed}ms`);
-  return shows;
+  console.log(
+    `loadAllShows completed in ${elapsed}ms, ${showRecords.length} shows`,
+  );
+  return showRecords;
 }
 
 //////////// misc functions //////////////
@@ -449,7 +439,7 @@ export function startGapWorker(allShows, cb) {
   const allShowsIdName = [];
   for (let show of allShows) {
     const id = show.Id;
-    if (id.startsWith("noemby-")) {
+    if (show.inEmby === false) {
       show.NotReady = true;
       continue;
     }
@@ -472,7 +462,7 @@ export function startUpdateWorker(allShows, cb) {
   const allShowsIdName = [];
   for (let show of allShows) {
     const id = show.Id;
-    if (id.startsWith("noemby-")) {
+    if (show.inEmby === false) {
       show.NotReady = true;
       continue;
     }

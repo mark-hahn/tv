@@ -189,7 +189,7 @@
             >|</span
           ><span>{{ part }}</span></span
         ><span
-          v-if="mapShow?.Id?.startsWith('noemby-')"
+          v-if="mapShow?.inEmby === false"
           style="white-space: nowrap"
           ><span
             v-if="hdr2Parts &amp;&amp; hdr2Parts.length &gt; 0"
@@ -415,7 +415,11 @@
                 >
                   <span v-if="seriesMap?.[season]?.[episode]?.played"> w</span
                   ><span
-                    v-if="seriesMap?.[season]?.[episode]?.avail &amp;&amp; !seriesMap?.[season]?.[episode]?.unaired &amp;&amp; !mapShow?.Id?.startsWith('noemby-')"
+                    v-if="
+                      seriesMap?.[season]?.[episode]?.avail &&
+                      !seriesMap?.[season]?.[episode]?.unaired &&
+                      mapShow?.inEmby !== false
+                    "
                   >
                     +</span
                   ><span

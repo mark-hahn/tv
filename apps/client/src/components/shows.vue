@@ -59,7 +59,7 @@
             style="width: 30px; text-align: center"
           >
             <div
-              v-show="!show.Id.startsWith('noemby-')"
+              v-show="show.inEmby !== false"
               @click="$emit('open-map', show)"
             >
               <font-awesome-icon

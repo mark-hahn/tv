@@ -338,7 +338,7 @@ export default {
     };
 
     const toggleToTry = async (show) => {
-      if (show.Id.startsWith("noemby-")) {
+      if (show.inEmby === false) {
         await toggleNoEmbyFlag(show, "InToTry");
         return;
       }
@@ -351,7 +351,7 @@ export default {
     };
 
     const toggleContinue = async (show) => {
-      if (show.Id.startsWith("noemby-")) {
+      if (show.inEmby === false) {
         await toggleNoEmbyFlag(show, "InContinue");
         return;
       }
@@ -364,7 +364,7 @@ export default {
     };
 
     const toggleMark = async (show) => {
-      if (show.Id.startsWith("noemby-")) {
+      if (show.inEmby === false) {
         await toggleNoEmbyFlag(show, "InMark");
         return;
       }
@@ -377,7 +377,7 @@ export default {
     };
 
     const toggleLinda = async (show) => {
-      if (show.Id.startsWith("noemby-")) {
+      if (show.inEmby === false) {
         await toggleNoEmbyFlag(show, "InLinda");
         return;
       }
@@ -390,7 +390,7 @@ export default {
     };
 
     const toggleFavorite = (show) => {
-      if (show.Id.startsWith("noemby-") && !show.IsFavorite) return;
+      if (show.inEmby === false && !show.emby?.isFavorite) return;
       this.saveVisShow(show);
       show.IsFavorite = !show.IsFavorite;
       emby.saveFav(show.Id, show.IsFavorite).catch((err) => {
@@ -438,13 +438,13 @@ export default {
 
     const deleteShow = async (show) => {
       allTvdb = await tvdb.getAllTvdb();
-      const name = show.Name;
+      const name = show.name;
       // console.log('list, deleteShow:', name);
-      if (show.Reject) {
+      if (show.reject) {
         alert("Show is banned, ignoring delete");
         return;
       }
-      if (!show.Id.startsWith("noemby-")) {
+      if (show.inEmby !== false) {
         this.saveVisShow(show);
         if (!window.confirm(`Do you really want to delete series ${name}?`))
           return;
@@ -454,7 +454,7 @@ export default {
         await srvr.deleteShowFromSrvr(show);
         await emby.deleteShowFromEmby(show);
       } else {
-        // Non-emby: still remove immediately
+        // Not in Emby: still remove immediately
         this.removeRow(show);
         await srvr.deleteShowFromSrvr(show);
       }
@@ -464,8 +464,9 @@ export default {
         delete allTvdb[name];
         await srvr.setTvdbFields({ name, $delTvdb: true });
       } else {
-        const deleted = (tvdbData.deleted = util.fmtDate());
-        allTvdb[name] = await srvr.setTvdbFields({ name, deleted });
+        // Set inEmby to false to mark as deleted
+        tvdbData.inEmby = false;
+        allTvdb[name] = await srvr.setTvdbFields({ name, inEmby: false });
       }
       await this.removeRow(show);
     };
@@ -529,7 +530,7 @@ export default {
             return (
               show.FileGap ||
               show.WatchGap ||
-              (show.Id.startsWith("noemby-") && !show.S1E1Unaired)
+              (show.inEmby === false && !show.S1E1Unaired)
             );
           },
           click() {},
@@ -654,7 +655,7 @@ export default {
           filter: 0,
           icon: ["fas", "tv"],
           cond(show) {
-            return !show.Id.startsWith("noemby-");
+            return show.inEmby !== false;
           },
           async click(show) {
             await deleteShow(show);

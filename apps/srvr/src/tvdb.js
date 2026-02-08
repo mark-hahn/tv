@@ -470,8 +470,7 @@ const getUrlAndRatings = async (type, url, name) => {
 
   let idFnameParam;
   switch (+type) {
-    case 2: // log('samples/imdb-page.html'); // IMDB
-    // await util.writeFile("samples/imdb-page.html", html);
+    case 2: // await util.writeFile("samples/imdb-page.html", html); // log('samples/imdb-page.html'); // IMDB
     {
       const rating = extractImdbRating(html);
       if (!rating) return { ratings: null };
@@ -1015,7 +1014,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   if (trailers) tvdbData.trailers = trailers;
   if (showId !== undefined) tvdbData.showId = showId;
-  if (deleted !== undefined) tvdbData.deleted = deleted;
+  if (inEmby !== undefined) tvdbData.inEmby = inEmby;
 
   // NEW: Emby-specific data (preserve from paramObj or existing)
   tvdbData.emby = {

@@ -889,7 +889,7 @@ export default {
       // console.log('series, setDeleted:', deleted)
       if (deleted) this.deletedTxt = "Deleted " + tvdbData.deleted;
       else this.deletedTxt = "";
-      this.notInEmby = this.show.Id.startsWith("noemby-");
+      this.notInEmby = this.show.inEmby === false;
     },
 
     async setPoster(tvdbData) {
@@ -967,7 +967,7 @@ export default {
       this.seasonsTxt = "";
       const show = this.show;
       const name = show.Name;
-      if (!this.show.Id.startsWith("noemby-")) {
+      if (this.show.inEmby !== false) {
         const epiCounts = await emby.getEpisodeCounts(show);
         Object.assign(tvdbData, epiCounts);
         const fields = Object.assign({ name }, epiCounts);
@@ -1301,7 +1301,7 @@ export default {
     async onSeriesMapUpdated({ show, seriesMap }) {
       if (!show || !seriesMap) return;
       if (!this.show || this.show.Name !== show.Name) return;
-      if (!this.show.Id?.startsWith("noemby-")) return;
+      if (this.show.inEmby !== false) return;
 
       const { seasonCount, episodeCount } = this.getMapCounts(seriesMap);
       if (!episodeCount || !seasonCount) return;

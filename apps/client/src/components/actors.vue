@@ -526,7 +526,7 @@ export default {
       if (!showKey) return;
 
       // Only prefetch for noemby shows to avoid extra load.
-      if (!String(show?.Id || "").startsWith("noemby-")) return;
+      if (show?.inEmby === false) return;
 
       if (
         this._seriesMapInForArrowsShowKey === showKey &&
@@ -692,7 +692,7 @@ export default {
 
       // Use cached/prefetched TVDB map for noemby.
       if (
-        String(show?.Id || "").startsWith("noemby-") &&
+        show?.inEmby === false &&
         showKey &&
         this._seriesMapInForArrowsShowKey === showKey
       ) {

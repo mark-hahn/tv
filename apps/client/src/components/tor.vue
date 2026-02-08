@@ -1723,7 +1723,7 @@ export default {
       const needed = [];
 
       // If not in Emby, return special marker
-      if (!show || !show.Id || show.Id.startsWith("noemby-")) {
+      if (!show || !show.Id || show.inEmby === false) {
         return ["noemby"];
       }
 

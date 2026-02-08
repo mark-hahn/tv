@@ -449,8 +449,11 @@ export default {
           return;
         // Optimistically remove from UI before slow deletes
         this.removeRow(show);
-        // Delete files from server first, then from Emby
+        // Delete files from server first
         await srvr.deleteShowFromSrvr(show);
+        // Refresh Emby library so it knows the files are gone
+        await this.refreshEmbyLibraryWithDialog();
+        // Now delete from Emby (directory should be empty now)
         await emby.deleteShowFromEmby(show);
         // Set inEmby to false to mark as deleted and set leftEmby timestamp
         const tvdbData = allTvdb[name];

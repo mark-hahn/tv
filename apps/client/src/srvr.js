@@ -199,7 +199,16 @@ export async function deleteShowFromSrvr(show) {
   await delGap({ gapId: show.Id, save: true });
   if (show.Pickup) await delPickup(show.Name);
   await delNoEmby(show.Name);
-  await deletePath(show.Path);
+
+  // Delete files from disk first
+  console.log("deleteShowFromSrvr: deleting files for:", show.Name, show.Path);
+  const result = await deletePath(show.Path);
+  console.log("deleteShowFromSrvr: deletePath result:", result);
+
+  if (result !== "ok") {
+    throw new Error(`Failed to delete files: ${result}`);
+  }
+
   // don't ever delete from remotes
   // don't ever delete from rejects
   // don't ever delete from tvdb

@@ -2361,12 +2361,13 @@ const applySubFiles = async (params) => {
 
 const deletePath = async (params) => {
   const { path } = params;
-  // console.log('deletePath', path);
+  console.log("deletePath:", path);
   try {
     await rimraf(path);
+    console.log("deletePath success:", path);
   } catch (e) {
-    console.log("error removing path:", path, e.message);
-    return e.message;
+    console.error("error removing path:", path, e.message);
+    throw new Error(`Failed to delete path: ${e.message}`);
   }
   return "ok";
 };

@@ -114,81 +114,82 @@ try {
 // Phase 1: DISABLED - migration complete, all records now use flattened structure
 // This migration was creating nested emby/disk/sync objects which conflicts with our flat schema
 let migrationNeeded = false; // Keep variable for compatibility but skip migration
-if (false) { // Disabled migration - entire block skipped
+if (false) {
+  // Disabled migration - entire block skipped
   for (const [name, tvdb] of Object.entries(allTvdb)) {
-  let recordUpdated = false;
+    let recordUpdated = false;
 
-  if (!tvdb.emby) {
-    tvdb.emby = {
-      id: tvdb.showId || null,
-      path: null,
-      dateCreated: tvdb.added || null,
-      premiereDate: null,
-      inToTry: false,
-      inContinue: false,
-      inMark: false,
-      inLinda: false,
-      isFavorite: false,
-      isPlayed: false,
-      playCount: 0,
-      lastPlayedDate: null,
-    };
-    recordUpdated = true;
-  }
+    if (!tvdb.emby) {
+      tvdb.emby = {
+        id: tvdb.showId || null,
+        path: null,
+        dateCreated: tvdb.added || null,
+        premiereDate: null,
+        inToTry: false,
+        inContinue: false,
+        inMark: false,
+        inLinda: false,
+        isFavorite: false,
+        isPlayed: false,
+        playCount: 0,
+        lastPlayedDate: null,
+      };
+      recordUpdated = true;
+    }
 
-  if (!tvdb.disk) {
-    tvdb.disk = { date: null, size: 0, noFiles: false };
-    recordUpdated = true;
-  }
+    if (!tvdb.disk) {
+      tvdb.disk = { date: null, size: 0, noFiles: false };
+      recordUpdated = true;
+    }
 
-  if (!tvdb.download) {
-    tvdb.download = { status: null, lastCheck: null };
-    recordUpdated = true;
-  }
+    if (!tvdb.download) {
+      tvdb.download = { status: null, lastCheck: null };
+      recordUpdated = true;
+    }
 
-  if (!tvdb.tvmaze) {
-    tvdb.tvmaze = { id: null, status: null };
-    recordUpdated = true;
-  }
+    if (!tvdb.tvmaze) {
+      tvdb.tvmaze = { id: null, status: null };
+      recordUpdated = true;
+    }
 
-  if (tvdb.gap === undefined) {
-    tvdb.gap = null;
-    recordUpdated = true;
-  }
+    if (tvdb.gap === undefined) {
+      tvdb.gap = null;
+      recordUpdated = true;
+    }
 
-  if (tvdb.note === undefined) {
-    tvdb.note = "";
-    recordUpdated = true;
-  }
+    if (tvdb.note === undefined) {
+      tvdb.note = "";
+      recordUpdated = true;
+    }
 
-  if (tvdb.reject === undefined) {
-    tvdb.reject = false;
-    recordUpdated = true;
-  }
+    if (tvdb.reject === undefined) {
+      tvdb.reject = false;
+      recordUpdated = true;
+    }
 
-  if (tvdb.pickup === undefined) {
-    tvdb.pickup = false;
-    recordUpdated = true;
-  }
+    if (tvdb.pickup === undefined) {
+      tvdb.pickup = false;
+      recordUpdated = true;
+    }
 
-  if (tvdb.lastViewed === undefined) {
-    tvdb.lastViewed = null;
-    recordUpdated = true;
-  }
+    if (tvdb.lastViewed === undefined) {
+      tvdb.lastViewed = null;
+      recordUpdated = true;
+    }
 
-  if (tvdb.waitStr === undefined) {
-    tvdb.waitStr = null;
-    recordUpdated = true;
-  }
+    if (tvdb.waitStr === undefined) {
+      tvdb.waitStr = null;
+      recordUpdated = true;
+    }
 
-  if (!tvdb.sync) {
-    tvdb.sync = {
-      lastEmbySync: null,
-      lastDiskCheck: null,
-      lastMetadataUpdate: tvdb.saved || null,
-    };
-    recordUpdated = true;
-  }
+    if (!tvdb.sync) {
+      tvdb.sync = {
+        lastEmbySync: null,
+        lastDiskCheck: null,
+        lastMetadataUpdate: tvdb.saved || null,
+      };
+      recordUpdated = true;
+    }
 
     if (recordUpdated) {
       migrationNeeded = true;
@@ -463,7 +464,8 @@ const getUrlAndRatings = async (type, url, name) => {
 
   let idFnameParam;
   switch (+type) {
-    case 2: { // await util.writeFile("samples/imdb-page.html", html); // log('samples/imdb-page.html'); // IMDB
+    case 2: {
+      // await util.writeFile("samples/imdb-page.html", html); // log('samples/imdb-page.html'); // IMDB
       const rating = extractImdbRating(html);
       if (!rating) return { ratings: null };
       return { ratings: rating };
@@ -808,14 +810,16 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     watchedCount,
     clientRequest,
   } = paramObj;
-  
+
   // Defensive check - ensure show object exists
   if (!show || !show.Name) {
-    log("err", "getTvdbData: Invalid paramObj - missing show.Name", { paramObj });
+    log("err", "getTvdbData: Invalid paramObj - missing show.Name", {
+      paramObj,
+    });
     if (resolve) resolve(null);
     return;
   }
-  
+
   const name = show.Name;
   log("getTvdbData: START", { name, clientRequest });
   const added = allTvdb[name]?.added ?? new Date().toISOString().slice(0, 10);

@@ -247,9 +247,7 @@ self.onmessage = async (event) => {
   console.log(`gap-worker started, ${allShowsIdName.length} shows`);
   for (let i = 0; i < allShowsIdName.length; i++) {
     const entry = allShowsIdName[i];
-    const showId = Array.isArray(entry)
-      ? entry[0]
-      : (entry?.Id ?? entry?.Id);
+    const showId = Array.isArray(entry) ? entry[0] : (entry?.Id ?? entry?.Id);
     const showName = Array.isArray(entry)
       ? entry[1]
       : (entry?.showName ?? entry?.Name);

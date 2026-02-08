@@ -157,35 +157,47 @@ export async function loadAllShows() {
   for (const [key, show] of Object.entries(allTvdb)) {
     const properName = show.Name;
     if (!properName) {
-      console.error(`[loadAllShows] Show with key="${key}" has no Name property!`, show);
+      console.error(
+        `[loadAllShows] Show with key="${key}" has no Name property!`,
+        show,
+      );
       continue;
     }
-    
+
     if (key !== properName) {
-      console.warn(`[loadAllShows] Key/Name mismatch found - key="${key}" Name="${properName}"`);
-      
+      console.warn(
+        `[loadAllShows] Key/Name mismatch found - key="${key}" Name="${properName}"`,
+      );
+
       // Check if there's already an entry with the correct key
       const correctEntry = allTvdb[properName];
       if (correctEntry && correctEntry !== show) {
         // Both entries exist - prefer the one with the correct key, delete the mismatched one
-        console.warn(`[loadAllShows] Duplicate detected. Deleting mismatched entry with key="${key}"`);
+        console.warn(
+          `[loadAllShows] Duplicate detected. Deleting mismatched entry with key="${key}"`,
+        );
         keysToDelete.push(key);
       } else if (!correctEntry) {
         // No entry with correct key - move this one to the correct key
-        console.warn(`[loadAllShows] Moving entry from key="${key}" to key="${properName}"`);
+        console.warn(
+          `[loadAllShows] Moving entry from key="${key}" to key="${properName}"`,
+        );
         allTvdb[properName] = show;
         keysToDelete.push(key);
       }
     }
   }
-  
+
   // Delete the mismatched keys
   for (const key of keysToDelete) {
     delete allTvdb[key];
   }
-  
+
   if (keysToDelete.length > 0) {
-    console.log(`[loadAllShows] Cleaned up ${keysToDelete.length} mismatched keys:`, keysToDelete);
+    console.log(
+      `[loadAllShows] Cleaned up ${keysToDelete.length} mismatched keys:`,
+      keysToDelete,
+    );
   }
 
   // 3. Sync Emby shows into tvdb (update tvdb records with Emby user data)
@@ -193,10 +205,13 @@ export async function loadAllShows() {
   const embyShowNames = new Map();
   for (const embyShow of embyShows.data.Items) {
     if (embyShowNames.has(embyShow.Name)) {
-      console.warn(`[loadAllShows] DUPLICATE Emby show name detected: "${embyShow.Name}"`, {
-        first: { Id: embyShowNames.get(embyShow.Name), Name: embyShow.Name },
-        second: { Id: embyShow.Id, Name: embyShow.Name },
-      });
+      console.warn(
+        `[loadAllShows] DUPLICATE Emby show name detected: "${embyShow.Name}"`,
+        {
+          first: { Id: embyShowNames.get(embyShow.Name), Name: embyShow.Name },
+          second: { Id: embyShow.Id, Name: embyShow.Name },
+        },
+      );
     }
     embyShowNames.set(embyShow.Name, embyShow.Id);
   }
@@ -395,7 +410,10 @@ export async function loadAllShows() {
       });
       // Diagnostic: check if we just created an undefined key
       if (name === undefined) {
-        console.error(`[loadAllShows] BUG: setTvdbFields called with name=undefined at line 355`, { name, tvdbRecord });
+        console.error(
+          `[loadAllShows] BUG: setTvdbFields called with name=undefined at line 355`,
+          { name, tvdbRecord },
+        );
       }
     } else if (hasEmby && !tvdbRecord.Id) {
       // Has Emby show but tvdb missing Id - update it
@@ -408,7 +426,10 @@ export async function loadAllShows() {
       });
       // Diagnostic: check if we just created an undefined key
       if (name === undefined) {
-        console.error(`[loadAllShows] BUG: setTvdbFields called with name=undefined at line 368`, { name, tvdbRecord, embyShow });
+        console.error(
+          `[loadAllShows] BUG: setTvdbFields called with name=undefined at line 368`,
+          { name, tvdbRecord, embyShow },
+        );
       }
     }
   }
@@ -481,20 +502,27 @@ export async function loadAllShows() {
     nameSet.add(show.Name);
   }
   if (duplicateNames.length > 0) {
-    console.error(`[loadAllShows] DUPLICATE Name properties in showRecords:`, duplicateNames);
+    console.error(
+      `[loadAllShows] DUPLICATE Name properties in showRecords:`,
+      duplicateNames,
+    );
     // Log details of duplicates - find their keys in allTvdb
     for (const dupName of duplicateNames) {
-      const dupes = showRecords.filter(s => s.Name === dupName);
+      const dupes = showRecords.filter((s) => s.Name === dupName);
       console.error(`  "${dupName}" appears ${dupes.length} times:`);
       dupes.forEach((d, i) => {
-        console.error(`    [${i}] Id="${d.Id}" inEmby=${d.inEmby} tvdbId=${d.tvdbId}`);
+        console.error(
+          `    [${i}] Id="${d.Id}" inEmby=${d.inEmby} tvdbId=${d.tvdbId}`,
+        );
       });
-      
+
       // Find which keys in allTvdb have this Name
       console.error(`  Keys in allTvdb with Name="${dupName}":`);
       for (const [key, value] of Object.entries(allTvdb)) {
         if (value.Name === dupName) {
-          console.error(`    key="${key}" Id="${value.Id}" inEmby=${value.inEmby} sameObject=${value === allTvdb[value.Name]}`);
+          console.error(
+            `    key="${key}" Id="${value.Id}" inEmby=${value.inEmby} sameObject=${value === allTvdb[value.Name]}`,
+          );
         }
       }
     }

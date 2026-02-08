@@ -330,7 +330,8 @@ export async function loadAllShows() {
   }
 
   // 4. Process shows not in Emby (inEmby === false)
-  const noEmbys = Object.values(allTvdb).filter((t) => t.inEmby === false);
+  const noEmbys = Object.values(
+          allTvdb).filter((t) => !t?.inEmby);
   const prunedNoEmbyIds = [];
 
   await Promise.all(

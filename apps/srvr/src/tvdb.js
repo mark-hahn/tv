@@ -824,7 +824,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   log("getTvdbData: START", { name, clientRequest });
   const added = allTvdb[name]?.added ?? new Date().toISOString().slice(0, 10);
   const showId = show.Id;
-  const tvdbId = show.TvdbId;
+  const tvdbId = show.tvdbId;
   if (!tvdbId) {
     log("err", "getTvdbData no tvdbId:", show);
     resolve(name);

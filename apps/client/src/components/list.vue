@@ -896,6 +896,13 @@ export default {
           return;
         }
 
+        // Special handling for hasemby: default to 1 (hide trash), Trash button sets to 0 (show all)
+        if (cond.name === "hasemby") {
+          const trashActive = activeButtons["Trash"];
+          cond.filter = trashActive ? 0 : 1;
+          return;
+        }
+
         // Find if any button controls this cond
         let condValue = 0; // Default: off
 
@@ -910,6 +917,24 @@ export default {
 
         cond.filter = condValue;
       });
+
+      // Load additional shows (inEmby:false) if Trash button is on and we haven't loaded them yet
+      if (activeButtons["Trash"] && !this.hasLoadedAllShows) {
+        console.log("Loading remaining shows (inEmby false)...");
+        this.hasLoadedAllShows = true;
+
+        // Load shows with inEmby false
+        const additionalShows = await tvdb.getAllTvdb(-1);
+
+        // Merge into allTvdb and allShows
+        Object.assign(allTvdb, additionalShows);
+
+        // Convert additional shows to array and merge
+        const additionalShowsArray = Object.values(additionalShows);
+        allShows.push(...additionalShowsArray);
+
+        console.log(`Loaded ${additionalShowsArray.length} additional shows`);
+      }
 
       // Pure state-based: Sync sortChoice to match order button states
       let activeSortOrder = null;

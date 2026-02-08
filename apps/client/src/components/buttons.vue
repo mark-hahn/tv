@@ -163,6 +163,7 @@ export default {
         Continue: false,
         Mark: false,
         Linda: false,
+        Trash: false,
         Custom: false,
         "Added Order": false,
         "Viewed Order": false,
@@ -173,7 +174,7 @@ export default {
       },
       filters: ["Ready To Watch"],
       genres: ["Drama", "Comedy"],
-      collections: ["To Try", "Continue", "Mark", "Linda"],
+      collections: ["To Try", "Continue", "Mark", "Linda", "Trash"],
       sortOrders: [
         "Added Order",
         "Viewed Order",

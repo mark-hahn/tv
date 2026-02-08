@@ -1483,6 +1483,21 @@ export default {
         ? true
         : showName !== this.highlightName;
 
+      // Check if hasemby filter would hide this show, and reset if needed
+      const hasembyCond = this.conds.find((c) => c?.name === "hasemby");
+      if (hasembyCond && hasembyCond.filter !== 0) {
+        const showInEmby = show.inEmby !== false;
+        const filterHidesShow =
+          (hasembyCond.filter === -1 && showInEmby) ||
+          (hasembyCond.filter === +1 && !showInEmby);
+        if (filterHidesShow) {
+          console.log(
+            `hasemby filter would hide ${showName}, resetting to 0`,
+          );
+          hasembyCond.filter = 0;
+        }
+      }
+
       if (!options.skipHistory) {
         if (
           showHistoryPtr == -1 ||

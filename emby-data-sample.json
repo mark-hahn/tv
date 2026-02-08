@@ -1,0 +1,235 @@
+{
+  "Name": "30 Rock",
+  "ServerId": "ae3349983dbe45d9aa1d317a7753483e",
+  "Id": "4818956",
+  "DateCreated": "2025-09-16T07:55:39.0000000Z",
+  "PremiereDate": "2006-10-11T07:00:00.0000000Z",
+  "ExternalUrls": [
+    {
+      "Name": "IMDb",
+      "Url": "https://www.imdb.com/title/tt0496424"
+    },
+    {
+      "Name": "MovieDb",
+      "Url": "https://www.themoviedb.org/tv/4608"
+    },
+    {
+      "Name": "TheTVDB",
+      "Url": "https://thetvdb.com/?tab=series&id=79488"
+    },
+    {
+      "Name": "Zap2It",
+      "Url": "http://tvlistings.zap2it.com/overview.html?programSeriesId=EP00848357"
+    },
+    {
+      "Name": "Trakt",
+      "Url": "https://trakt.tv/search/tmdb/4608?id_type=show"
+    }
+  ],
+  "Path": "/mnt/media/tv/30 Rock",
+  "Overview": "Liz Lemon, the head writer of a live variety program's life is turned upside down when brash new network executive Jack Donaghy interferes with her show, bringing the wildly unpredictable Tracy Jordan into the cast. Now its up to Liz to manage the mayhem and still try to have a life.\n",
+  "Genres": [
+    "Comedy"
+  ],
+  "ProviderIds": {
+    "Tvdb": "79488",
+    "IMDB": "tt0496424",
+    "Official Website": "https://www.nbc.com/30-rock",
+    "Tmdb": "4608",
+    "Zap2It": "EP00848357"
+  },
+  "IsFolder": true,
+  "Type": "Series",
+  "People": [
+    {
+      "Name": "Tina Fey",
+      "Id": "4721665",
+      "Role": "Liz Lemon",
+      "Type": "Actor",
+      "PrimaryImageTag": "e658391d579063e32ff4a012e0366515"
+    },
+    {
+      "Name": "Alec Baldwin",
+      "Id": "4781401",
+      "Role": "Jack Donaghy",
+      "Type": "Actor",
+      "PrimaryImageTag": "4be27f37e9e758f5289f49e335492be3"
+    },
+    {
+      "Name": "Tracy Morgan",
+      "Id": "4812980",
+      "Role": "Tracy Jordan",
+      "Type": "Actor",
+      "PrimaryImageTag": "0a6897a471c8942abae96c2827a32c38"
+    },
+    {
+      "Name": "Jack McBrayer",
+      "Id": "4721316",
+      "Role": "Kenneth Parcell",
+      "Type": "Actor",
+      "PrimaryImageTag": "f77c62ccb3ec2f9958a9f4d4a4382611"
+    },
+    {
+      "Name": "Jane Krakowski",
+      "Id": "4820163",
+      "Role": "Jenna Maroney",
+      "Type": "Actor",
+      "PrimaryImageTag": "3660091b1851f560de4fc1efab460570"
+    },
+    {
+      "Name": "Judah Friedlander",
+      "Id": "4781715",
+      "Role": "Frank Rossitano",
+      "Type": "Actor",
+      "PrimaryImageTag": "eeb1f9ff3d5a4f931420912b119f0503"
+    },
+    {
+      "Name": "Scott Adsit",
+      "Id": "9457",
+      "Role": "Pete Hornberger",
+      "Type": "Actor",
+      "PrimaryImageTag": "4c8df26d2b48f469298931a104c7bc96"
+    },
+    {
+      "Name": "Keith Powell",
+      "Id": "4778669",
+      "Role": "James 'Toofer' Spurlock",
+      "Type": "Actor",
+      "PrimaryImageTag": "3cbfa7363b94e09970f1d1f509fb8e2c"
+    },
+    {
+      "Name": "Katrina Bowden",
+      "Id": "4819247",
+      "Role": "Cerie Xerox",
+      "Type": "Actor",
+      "PrimaryImageTag": "42bb48b8bddde5a246206b79c453c284"
+    },
+    {
+      "Name": "Kevin Brown",
+      "Id": "4820164",
+      "Role": "Dotcom",
+      "Type": "Actor",
+      "PrimaryImageTag": "aa5493dca2255e355432212b8b4994c5"
+    },
+    {
+      "Name": "Grizz Chapman",
+      "Id": "4820165",
+      "Role": "Grizz",
+      "Type": "Actor",
+      "PrimaryImageTag": "8a6fc9e5c3699ca323a2030ba48f03f8"
+    },
+    {
+      "Name": "John Lutz",
+      "Id": "4820166",
+      "Role": "J.D. Lutz",
+      "Type": "Actor",
+      "PrimaryImageTag": "5fdd333b9327bc888a4b0a8612c9dde3"
+    },
+    {
+      "Name": "Maulik Pancholy",
+      "Id": "4820167",
+      "Role": "Jonathan",
+      "Type": "Actor",
+      "PrimaryImageTag": "bd5d8a357d20c2db2961d80ba68077b1"
+    },
+    {
+      "Name": "Kristen Schaal",
+      "Id": "4710367",
+      "Role": "Hazel Wassername",
+      "Type": "Actor",
+      "PrimaryImageTag": "04fd9504fc362800191b3ea57f9e1761"
+    },
+    {
+      "Name": "Lonny Ross",
+      "Id": "4820168",
+      "Role": "Josh Girard",
+      "Type": "Actor",
+      "PrimaryImageTag": "fab8e74208d58387fb72204bc016614f"
+    },
+    {
+      "Name": "Chris Parnell",
+      "Id": "4696814",
+      "Role": "Dr. Leo Spaceman",
+      "Type": "Actor",
+      "PrimaryImageTag": "478689363335295f51a18dbabdd39e5d"
+    },
+    {
+      "Name": "Dean Winters",
+      "Id": "4820169",
+      "Role": "Dennis Duffy",
+      "Type": "Actor",
+      "PrimaryImageTag": "47839ecb82ad272181bb4611e5ed7d04"
+    },
+    {
+      "Name": "Elizabeth Banks",
+      "Id": "4820170",
+      "Role": "Avery Jessup",
+      "Type": "Actor",
+      "PrimaryImageTag": "74563e109b1aa1d9bde24fc7ff5ec24c"
+    },
+    {
+      "Name": "James Marsden",
+      "Id": "4800833",
+      "Role": "Criss",
+      "Type": "Actor",
+      "PrimaryImageTag": "01fb6a4f2dbf98a3ba0f4410a526158a"
+    },
+    {
+      "Name": "Will Forte",
+      "Id": "4759793",
+      "Role": "Paul",
+      "Type": "Actor",
+      "PrimaryImageTag": "d526d0d175582f7f095911b01124faff"
+    },
+    {
+      "Name": "Jason Sudeikis",
+      "Id": "4820171",
+      "Role": "Floyd",
+      "Type": "Actor",
+      "PrimaryImageTag": "d687a8398a45cabe329c00ec7e71153f"
+    },
+    {
+      "Name": "Cheyenne Jackson",
+      "Id": "4820172",
+      "Role": "Danny Baker",
+      "Type": "Actor",
+      "PrimaryImageTag": "d50cfeb6f1da77aa739060c4dbaabf2c"
+    },
+    {
+      "Name": "Sherri Shepherd",
+      "Id": "4802295",
+      "Role": "Angie Jordan",
+      "Type": "Actor",
+      "PrimaryImageTag": "71d5a764a3405a9d37159f25200972fd"
+    },
+    {
+      "Name": "Elaine Stritch",
+      "Id": "4812710",
+      "Role": "Colleen Donaghy",
+      "Type": "Actor",
+      "PrimaryImageTag": "f509d8193ed74c34cc4fa1a7eaac5040"
+    }
+  ],
+  "GenreItems": [
+    {
+      "Name": "Comedy",
+      "Id": 8009
+    }
+  ],
+  "UserData": {
+    "UnplayedItemCount": 18,
+    "PlaybackPositionTicks": 0,
+    "PlayCount": 0,
+    "IsFavorite": true,
+    "Played": false
+  },
+  "AirDays": [],
+  "ImageTags": {
+    "Primary": "b2ae2d365c0375abaabea01a1330fbaa",
+    "Logo": "d89cc0a7b27b26f3b9c248e88d23be59",
+    "Thumb": "ce596f974ed69ab59b19f485e3aba158"
+  },
+  "BackdropImageTags": [
+    "f9e079c4ce1981c5facc956ab3260838"
+  ]
+}

@@ -452,10 +452,16 @@ export default {
         // Delete files from server first, then from Emby
         await srvr.deleteShowFromSrvr(show);
         await emby.deleteShowFromEmby(show);
-        // Set inEmby to false to mark as deleted
+        // Set inEmby to false to mark as deleted and set leftEmby timestamp
         const tvdbData = allTvdb[name];
         tvdbData.inEmby = false;
-        allTvdb[name] = await srvr.setTvdbFields({ name, inEmby: false });
+        const leftEmby = new Date().toISOString().slice(0, 10);
+        tvdbData.leftEmby = leftEmby;
+        allTvdb[name] = await srvr.setTvdbFields({
+          name,
+          inEmby: false,
+          leftEmby,
+        });
       } else {
         // Not in Emby: permanently delete with confirmation (no files to delete)
         if (

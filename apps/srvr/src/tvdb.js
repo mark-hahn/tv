@@ -1099,6 +1099,10 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   // Notes
   tvdbData.Notes = paramObj.note ?? existing.Notes ?? existing.note ?? "";
 
+  // leftEmby timestamp (yyyy-mm-dd format) - set when show is removed from Emby
+  tvdbData.leftEmby =
+    paramObj.leftEmby || existing.leftEmby || existing.emby?.leftEmby || null;
+
   // Additional flags
   tvdbData.Reject =
     paramObj.reject ?? existing.Reject ?? existing.reject ?? false;

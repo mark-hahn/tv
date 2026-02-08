@@ -191,7 +191,9 @@ export default {
     },
 
     hilite(show) {
-      return this.highlightName == show.Name ? "yellow" : "white";
+      if (this.highlightName == show.Name) return "yellow";
+      if (show.inEmby === false) return "#fee";
+      return "white";
     },
 
     nameHash(name) {

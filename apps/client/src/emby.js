@@ -198,6 +198,16 @@ export async function loadAllShows() {
       `[loadAllShows] Cleaned up ${keysToDelete.length} mismatched keys:`,
       keysToDelete,
     );
+    
+    // Persist the cleanup by deleting the bad keys from the server
+    for (const badKey of keysToDelete) {
+      try {
+        await srvr.setTvdbFields({ name: badKey, $delTvdb: true });
+        console.log(`[loadAllShows] Deleted key="${badKey}" from server tvdb.json`);
+      } catch (e) {
+        console.error(`[loadAllShows] Failed to delete key="${badKey}" from server:`, e);
+      }
+    }
   }
 
   // 3. Sync Emby shows into tvdb (update tvdb records with Emby user data)

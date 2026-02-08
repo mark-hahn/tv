@@ -5,7 +5,10 @@ import { config } from "./config.js";
 // Route TVDB calls through the local torrents server proxy via WebSocket.
 // This avoids browser-to-TVDB CORS issues (Authorization header) and keeps secrets on server.
 
-async function tvdbFetch(pathStr, _init) {
+async function tvdbFetch(pathStr, _init, retryCount = 0) {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAYS = [1000, 2000, 4000]; // exponential backoff
+
   // Parse pathStr into path and query
   const [pathOnly, queryStr] = String(pathStr).split("?");
   const query = {};
@@ -14,26 +17,42 @@ async function tvdbFetch(pathStr, _init) {
     for (const [k, v] of usp) query[k] = v;
   }
 
-  // Call server
-  const res = await srvr.accessTvdb({ path: pathOnly, query });
+  try {
+    // Call server
+    const res = await srvr.accessTvdb({ path: pathOnly, query });
 
-  if (!res.ok) {
-    const errData = res.data || res.error;
-    throw new Error(
-      `tvdb proxy error: ${res.status} ${typeof errData === "string" ? errData : JSON.stringify(errData)}`.trim(),
-    );
+    if (!res.ok) {
+      const errData = res.data || res.error;
+      throw new Error(
+        `tvdb proxy error: ${res.status} ${typeof errData === "string" ? errData : JSON.stringify(errData)}`.trim(),
+      );
+    }
+
+    // Mock a Response-like object for compatibility
+    return {
+      ok: true,
+      status: res.status,
+      json: () => Promise.resolve(res.data),
+      text: () =>
+        Promise.resolve(
+          typeof res.data === "string" ? res.data : JSON.stringify(res.data),
+        ),
+    };
+  } catch (e) {
+    // Retry on network errors
+    if (retryCount < MAX_RETRIES) {
+      const delay = RETRY_DELAYS[retryCount];
+      console.warn(
+        `tvdbFetch: network error, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES}):`,
+        pathStr,
+        e?.message || e,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return tvdbFetch(pathStr, _init, retryCount + 1);
+    }
+    // Max retries exceeded
+    throw e;
   }
-
-  // Mock a Response-like object for compatibility
-  return {
-    ok: true,
-    status: res.status,
-    json: () => Promise.resolve(res.data),
-    text: () =>
-      Promise.resolve(
-        typeof res.data === "string" ? res.data : JSON.stringify(res.data),
-      ),
-  };
 }
 
 let allTvdb = null;
@@ -326,10 +345,13 @@ export const getSeriesMapByTvdbId = async (tvdbId) => {
     try {
       episodesRes = await tvdbFetch(episodesUrl);
     } catch (e) {
-      console.error("getSeriesMap: failed to fetch episodes:", {
+      console.error("getSeriesMap: failed to fetch episodes. Aborting.", {
         tvdbId,
         page,
-        err: e?.message || e,
+        url: episodesUrl,
+        error: e,
+        message: e.message,
+        // If it's a network error, it might not have status, but if it came from proxy it might
       });
       break;
     }

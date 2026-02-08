@@ -1481,13 +1481,15 @@ export const setTvdbFields = async (params) => {
 };
 
 export const accessTvdb = async (params) => {
+  let url = "unknown";
   try {
     const paramObj = params;
     if (!paramObj) throw new Error("invalid params");
     const { path: tvdbPath, query } = paramObj;
-    log("accessTvdb: START", { tvdbPath });
+    
+    url = buildTvdbUrl(tvdbPath, query).toString();
+    log("accessTvdb: START", { tvdbPath, url });
 
-    const url = buildTvdbUrl(tvdbPath, query);
     let token = await getToken();
 
     let upstream = await fetch(url, {
@@ -1499,6 +1501,7 @@ export const accessTvdb = async (params) => {
     });
 
     if (upstream.status === 401) {
+      log("accessTvdb: 401, refreshing token");
       cachedToken = null;
       token = await getToken();
       upstream = await fetch(url, {
@@ -1516,17 +1519,29 @@ export const accessTvdb = async (params) => {
       if (upstream.headers.get("content-type")?.includes("application/json")) {
         data = JSON.parse(body);
       }
-    } catch {}
+    } catch (parseErr) {
+       log("accessTvdb: JSON parse error", { parseErr, bodyExcerpt: body.substring(0, 100) });
+    }
 
-    log("accessTvdb: END", { ok: upstream.ok, status: upstream.status });
+    if (!upstream.ok) {
+      log("accessTvdb: UPSTREAM ERROR", { 
+        status: upstream.status, 
+        statusText: upstream.statusText,
+        url,
+        body 
+      });
+    } else {
+      log("accessTvdb: END", { ok: upstream.ok, status: upstream.status });
+    }
+
     return {
       ok: upstream.ok,
       status: upstream.status,
       data,
     };
   } catch (e) {
-    log("accessTvdb error", e);
+    log("accessTvdb error", { error: e.message, stack: e.stack, url });
     // Return error structure for robustness
-    return { ok: false, status: 500, error: e.message };
+    return { ok: false, status: 500, error: `Server error accessing TVDB: ${e.message}` };
   }
 };

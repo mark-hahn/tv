@@ -74,6 +74,8 @@ const fCall = (fname, param) => {
 // HTTP call - for all non-streaming operations
 const httpCall = async (endpoint, param, method = "GET") => {
   const url = `${HTTP_URL}${endpoint}`;
+  const TIMEOUT_MS = 30000; // 30 second timeout
+  
   const options = {
     method,
     headers: { "Content-Type": "application/json" },
@@ -91,7 +93,17 @@ const httpCall = async (endpoint, param, method = "GET") => {
   }
 
   try {
-    const response = await fetch(url, options);
+    // Create timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Request timeout")), TIMEOUT_MS);
+    });
+
+    // Race between fetch and timeout
+    const response = await Promise.race([
+      fetch(url, options),
+      timeoutPromise,
+    ]);
+
     if (!response.ok) {
       const error = await response
         .json()
@@ -100,6 +112,10 @@ const httpCall = async (endpoint, param, method = "GET") => {
     }
     return response.json();
   } catch (err) {
+    // Add more context to network errors
+    if (err instanceof TypeError && err.message === "Failed to fetch") {
+      throw new Error(`Network error: Unable to reach server at ${url}`);
+    }
     throw err;
   }
 };

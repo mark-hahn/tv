@@ -200,13 +200,15 @@ export async function deleteShowFromSrvr(show) {
   if (show.Pickup) await delPickup(show.Name);
   await delNoEmby(show.Name);
 
-  // Delete files from disk first
-  console.log("deleteShowFromSrvr: deleting files for:", show.Name, show.Path);
-  const result = await deletePath(show.Path);
+  // Delete entire show folder from disk
+  // Extract just the folder name from the Emby path (e.g., "/tv/ShowName" -> "ShowName")
+  const showFolder = show.Path.split("/").pop();
+  console.log("deleteShowFromSrvr: deleting folder:", showFolder, "for show:", show.Name);
+  const result = await deletePath(showFolder);
   console.log("deleteShowFromSrvr: deletePath result:", result);
 
   if (result !== "ok") {
-    throw new Error(`Failed to delete files: ${result}`);
+    throw new Error(`Failed to delete folder: ${result}`);
   }
 
   // don't ever delete from remotes

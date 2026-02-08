@@ -35,7 +35,7 @@
       <tbody>
         <tr
           v-for="show in shows"
-          :key="show.Id"
+          :key="show.Name"
           :style="{
             borderBottom: '1px solid #000',
             cursor: 'default',

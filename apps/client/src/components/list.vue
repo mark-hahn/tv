@@ -652,10 +652,10 @@ export default {
         },
         {
           color: "#a66",
-          filter: 0,
+          filter: -1,
           icon: ["fas", "tv"],
           cond(show) {
-            return show.inEmby !== false;
+            return show.inEmby === false;
           },
           async click(show) {
             await deleteShow(show);

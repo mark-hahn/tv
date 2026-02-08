@@ -334,7 +334,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.mark = 0;
       tmp.linda = 0;
       tmp.favorite = 0;
-      tmp.ban = -1;
+      tmp.ban = 0;
       tmp.pickup = 0;
       tmp.hasemby = 1; // Filter out shows with inEmby: false by default
       break;

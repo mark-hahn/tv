@@ -78,10 +78,10 @@ async function syncCollections(allTvdb) {
   const lindaIds = new Set(lindaRes.data.Items.map((i) => i.Id));
 
   for (const tvdb of Object.values(allTvdb)) {
-    tvdb.InToTry = toTryIds.has(embyId);
-    tvdb.InContinue = continueIds.has(embyId);
-    tvdb.InMark = markIds.has(embyId);
-    tvdb.InLinda = lindaIds.has(embyId);
+    tvdb.InToTry = toTryIds.has(tvdb.Id);
+    tvdb.InContinue = continueIds.has(tvdb.Id);
+    tvdb.InMark = markIds.has(tvdb.Id);
+    tvdb.InLinda = lindaIds.has(tvdb.Id);
   }
 }
 

@@ -65,7 +65,11 @@ const getShowState = async (showId, _showName, showMeta) => {
       console.error("getShowState axios error", error.message, { url });
       return null;
     }
-    const seasons = seasonsRes.data.Items;
+    const seasons = seasonsRes?.data?.Items;
+    if (!seasons) {
+      console.error("getShowState error: seasons is undefined", { showId });
+      return null;
+    }
     // Once we hit an unaired episode, treat all later episodes as unaired.
     let unairedFromHere = false;
     for (let seasonIdx = 0; seasonIdx < seasons.length; seasonIdx++) {
@@ -247,10 +251,17 @@ self.onmessage = async (event) => {
   console.log(`gap-worker started, ${allShowsIdName.length} shows`);
   for (let i = 0; i < allShowsIdName.length; i++) {
     const entry = allShowsIdName[i];
-    const showId = Array.isArray(entry) ? entry[0] : (entry?.Id ?? entry?.Id);
+    const showId = Array.isArray(entry)
+      ? entry[0]
+      : (entry?.showId ?? entry?.Id);
     const showName = Array.isArray(entry)
       ? entry[1]
       : (entry?.showName ?? entry?.Name);
+    const showState = await getShowState(showId, showName, entry);
+    if (!showState) {
+      console.error(`gap-worker: getShowState returned null for ${showName}`);
+      continue;
+    }
     const {
       notReady,
       anyWatched,
@@ -262,7 +273,7 @@ self.onmessage = async (event) => {
       fileGapSeason,
       fileGapEpisode,
       seasonWatchedThenNofile,
-    } = await getShowState(showId, showName, entry);
+    } = showState;
     const progress = Math.ceil(((i + 1) * 100) / allShowsIdName.length);
 
     self.postMessage({

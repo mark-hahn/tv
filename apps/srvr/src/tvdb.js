@@ -121,7 +121,7 @@ if (false) {
 
     if (!tvdb.emby) {
       tvdb.emby = {
-        id: tvdb.showId || null,
+        id: tvdb.Id || null,
         path: null,
         dateCreated: tvdb.added || null,
         premiereDate: null,
@@ -1018,7 +1018,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   const inEmby = showId && !showId.startsWith("noemby-");
   if (trailers) tvdbData.trailers = trailers;
-  if (showId !== undefined) tvdbData.showId = showId;
   if (inEmby !== undefined) tvdbData.inEmby = inEmby;
 
   // Flattened Emby-specific data (no nested object)
@@ -1456,7 +1455,7 @@ export const setTvdbFields = async (params) => {
           Name: tvdb.name,
           TvdbId: tvdb.tvdbId,
         };
-        if (tvdb.showId) show.Id = tvdb.showId;
+        if (tvdb.Id) show.Id = tvdb.Id;
         const refreshParamObj = {
           show,
           seasonCount: tvdb.seasonCount ?? 0,

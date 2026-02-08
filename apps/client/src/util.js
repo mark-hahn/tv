@@ -175,11 +175,11 @@ export async function fixShowidInTvdbs(allShows) {
       console.log("no show for tvdb:", name, tvdb.deleted);
       return;
     }
-    tvdb.showId = show.Id;
-    await srvr.setTvdbFields({ name, showId: show.Id });
+    tvdb.Id = show.Id;
+    await srvr.setTvdbFields({ name, Id: show.Id });
     count++;
   });
-  console.log(`fixed showId in ${count} tvdbs`);
+  console.log(`fixed Id in ${count} tvdbs`);
 }
 
 ////////// temp one-time mass operation //////////

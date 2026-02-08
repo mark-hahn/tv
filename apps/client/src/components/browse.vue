@@ -1060,7 +1060,7 @@ export default {
 
       if ((data.episodeCount ?? 0) > 0) {
         let wCount = data.watchedCount ?? 0;
-        if (data.showId && data.inEmby === false) wCount = 0;
+        if (data.Id && data.inEmby === false) wCount = 0;
         const total = data.episodeCount;
         if (wCount === total) {
           return `Watched all ${total} episodes`;
@@ -1146,7 +1146,7 @@ export default {
         const local = allTvdbData.value[data.name];
         if (local && (local.episodeCount ?? 0) > 0) {
           let wCount = local.watchedCount ?? 0;
-          if (local.showId && local.inEmby === false) wCount = 0;
+          if (local.Id && local.inEmby === false) wCount = 0;
           const total = local.episodeCount;
           if (wCount === total) {
             info.watched = `Watched all ${total} episodes`;

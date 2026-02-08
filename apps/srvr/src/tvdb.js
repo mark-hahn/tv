@@ -1177,6 +1177,11 @@ const chkTvdbQueue = () => {
     log("chkTvdbQueue: completed", { id, name: tvdbData.name });
     chkTvdbQueueRunning = false;
     chkTvdbQueue();
+  }).catch((err) => {
+    log("err", "chkTvdbQueue: promise rejected", { err });
+    if (resolveCb) resolveCb(null);
+    chkTvdbQueueRunning = false;
+    chkTvdbQueue();
   });
   getTvdbData(paramObj, resolve, reject);
 };

@@ -92,7 +92,6 @@
       }"
     >
       <div
-        id="fltrs"
         v-for="cond in conds"
         :key="cond.name"
         @click="$emit('cond-fltr-click', cond, $event)"

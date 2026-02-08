@@ -1161,28 +1161,30 @@ const chkTvdbQueue = () => {
     resolve = resolveIn;
     reject = rejectIn;
   });
-  promise.then((tvdbData) => {
-    try {
-      if (typeof tvdbData === "object") {
-        log("chkTvdbQueue: sending response", { id, name: tvdbData.name });
-        if (ws) ws.send(JSON.stringify({ id, status: "ok", data: tvdbData }));
-        else if (resolveCb) resolveCb(tvdbData);
-        allTvdb[tvdbData.name] = tvdbData;
-      } else tvdbData = allTvdb[tvdbData]; // tvdbData is name
-    } catch (e) {
-      console.error("chkTvdbQueue ws.send error:", e);
-    }
-    tvdbData.saved = Date.now();
-    // Don't save here - background refresh handles saves
-    log("chkTvdbQueue: completed", { id, name: tvdbData.name });
-    chkTvdbQueueRunning = false;
-    chkTvdbQueue();
-  }).catch((err) => {
-    log("err", "chkTvdbQueue: promise rejected", { err });
-    if (resolveCb) resolveCb(null);
-    chkTvdbQueueRunning = false;
-    chkTvdbQueue();
-  });
+  promise
+    .then((tvdbData) => {
+      try {
+        if (typeof tvdbData === "object") {
+          log("chkTvdbQueue: sending response", { id, name: tvdbData.name });
+          if (ws) ws.send(JSON.stringify({ id, status: "ok", data: tvdbData }));
+          else if (resolveCb) resolveCb(tvdbData);
+          allTvdb[tvdbData.name] = tvdbData;
+        } else tvdbData = allTvdb[tvdbData]; // tvdbData is name
+      } catch (e) {
+        console.error("chkTvdbQueue ws.send error:", e);
+      }
+      tvdbData.saved = Date.now();
+      // Don't save here - background refresh handles saves
+      log("chkTvdbQueue: completed", { id, name: tvdbData.name });
+      chkTvdbQueueRunning = false;
+      chkTvdbQueue();
+    })
+    .catch((err) => {
+      log("err", "chkTvdbQueue: promise rejected", { err });
+      if (resolveCb) resolveCb(null);
+      chkTvdbQueueRunning = false;
+      chkTvdbQueue();
+    });
   getTvdbData(paramObj, resolve, reject);
 };
 

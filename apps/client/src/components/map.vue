@@ -1088,12 +1088,20 @@ export default {
         // Let it bubble to handleMapClick (which returns to Series).
         return;
       }
+      // Block clicking for no-emby shows
+      if (mapShow?.inEmby === false) {
+        return;
+      }
       event.stopPropagation(); // Prevent map click handler from switching tabs
       this.$emit("episode-click", event, mapShow, season, episode);
     },
     handleSeasonClick(event, season) {
       if (this.simpleMode) {
         // Let it bubble to handleMapClick (which returns to Series).
+        return;
+      }
+      // Block clicking for no-emby shows
+      if (this.mapShow?.inEmby === false) {
         return;
       }
       event.stopPropagation();

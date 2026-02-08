@@ -525,9 +525,6 @@ export default {
       const showKey = show?.Id || show?.Name || null;
       if (!showKey) return;
 
-      // Only prefetch for noemby shows to avoid extra load.
-      if (show?.inEmby === false) return;
-
       if (
         this._seriesMapInForArrowsShowKey === showKey &&
         (this._seriesMapInForArrows || this._seriesMapInForArrowsPromise)

@@ -390,7 +390,7 @@ export default {
     };
 
     const toggleFavorite = (show) => {
-      if (show.inEmby === false && !show.emby?.isFavorite) return;
+      if (show.inEmby === false && !show.IsFavorite) return;
       this.saveVisShow(show);
       show.IsFavorite = !show.IsFavorite;
       emby.saveFav(show.Id, show.IsFavorite).catch((err) => {

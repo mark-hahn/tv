@@ -2,25 +2,32 @@
 
 ## Summary of Changes
 
-Major refactoring to merge show objects into tvdb records and replace `deleted` property with `inEmby` boolean.
+Major refactoring to merge show objects into tvdb records, replace `deleted` property with `inEmby` boolean, and flatten all nested objects (emby/gap/disk/sync).
 
 ## Key Changes
 
 1. **Property Structure**
    - Removed show object building layer
-   - Tvdb records now have flattened properties (emby/gap data at top level)
+   - Tvdb records now have ALL properties flattened at top level
    - Replaced `deleted` date string with `inEmby` boolean flag
    - Replaced `Id.startsWith("noemby-")` checks with `inEmby === false` checks
+   - Removed nested `emby`, `gap`, `disk`, and `sync` objects
+   - Removed duplicate `show.name` property (using only `show.Name`)
 
 2. **Data Flow**
    - `loadAllShows()` now returns tvdb records with flattened properties
-   - Components access properties directly from tvdb records
-   - Gap worker results merged into tvdb records at top level
+   - Components access properties directly from tvdb records at top level
+   - All properties use consistent naming: PascalCase for display, camelCase for metadata
 
 3. **Filter Behavior**
    - Default "All" filter now hides shows with `inEmby: false`
    - hasemby condFltr uses `show.inEmby !== false` condition
    - Delete button sets `inEmby: false` instead of `deleted` date
+
+4. **Persistence for Deleted Shows**
+   - Toggle functions (InToTry, InContinue, InMark, InLinda) persist even when `inEmby: false`
+   - SeriesMap persists for deleted shows
+   - Collection flags maintained across delete/restore operations
 
 ## Files Modified (Client)
 
@@ -66,25 +73,42 @@ Major refactoring to merge show objects into tvdb records and replace `deleted` 
     - Replaced `if (deleted !== undefined) tvdbData.deleted = deleted`
     - With `if (inEmby !== undefined) tvdbData.inEmby = inEmby`
 
-## Migration Script (Run Once on Remote)
+## Migration Scripts
+
+### 1. Initial Migration: deleted → inEmby
 
 **Script:** `/root/apps/tv/scripts/migrate-deleted-to-inemby.js`
 
-**Run on remote server:**
+**What it does:**
 
-```bash
-ssh hahnca.com
-cd /root/dev/apps/tv/apps/srvr
-node /root/apps/tv/scripts/migrate-deleted-to-inemby.js
-```
+- Converts `deleted` property to `inEmby` boolean (inverted)
+- Removes `deleted` property
+- Backs up old tvdb.json
+
+**Status:** ✅ Completed
+
+### 2. Flatten Migration: Remove Nested Objects
+
+**Script:** `/root/apps/tv/scripts/flatten-tvdb-records.js`
 
 **What it does:**
 
-- Reads tvdb.json
-- Converts `deleted` property to `inEmby` boolean (inverted)
-- Removes `deleted` property
-- Backs up old tvdb.json to tvdb.json.backup-[timestamp]
-- Writes updated tvdb.json
+- Flattens `emby` object properties to top level (with PascalCase names)
+- Flattens `gap` object properties to top level (already PascalCase)
+- Flattens `disk` object properties to top level (with PascalCase names)
+- Flattens `sync` object properties to top level (camelCase)
+- Removes lowercase `name` property (keeps only `Name`)
+- Removes all nested objects after flattening
+- Backs up tvdb.json before changes
+
+**Status:** ✅ Completed
+
+**Results:**
+
+- Total shows: 1,177
+- Flattened objects: 3,684
+- Removed name properties: 1,177
+- Errors: 0
 
 ## Deployment Steps
 
@@ -115,44 +139,62 @@ node /root/apps/tv/scripts/migrate-deleted-to-inemby.js
 
 ```javascript
 {
-  name: "Show Name",         // original property
-  Name: "Show Name",         // flattened for compatibility
-  tvdbId: 67890,             // original property
-  TvdbId: 67890,             // flattened for compatibility
-  Id: "12345" or "noemby-67890", // computed from emby.id
-  inEmby: true,              // NEW: boolean flag
-  showId: "12345",           // original property
+  // Core identity
+  Name: "Show Name",         // display name (only Name, no lowercase name)
+  TvdbId: 67890,             // tvdb ID
+  tvdbId: 67890,             // legacy property
+  Id: "12345" or "noemby-67890", // emby ID or computed
+  showId: "12345",           // original emby ID property
+  inEmby: true,              // NEW: boolean flag (replaces deleted)
 
-  // Nested emby object (preserved)
-  emby: {
-    id: "12345",
-    inToTry: true,
-    inContinue: false,
-    isFavorite: true,
-    // ...
-  },
+  // Collection flags (flattened from emby object)
+  InToTry: true,
+  InContinue: false,
+  InMark: false,
+  InLinda: false,
+  IsFavorite: true,
 
-  // Flattened for component access
-  InToTry: true,             // from emby.inToTry
-  InContinue: false,         // from emby.inContinue
-  IsFavorite: true,          // from emby.isFavorite
+  // Emby playback data (flattened from emby object)
+  Played: false,
+  PlayCount: 0,
+  LastPlayedDate: "2024-01-15",
+  DateCreated: "2023-12-01",
+  PremiereDate: "2023-11-15",
+  Path: "/media/Shows/Show Name",
 
-  // Nested gap object (preserved)
-  gap: {
-    FileGap: true,
-    WatchGap: false,
-    ShowId: "12345",
-    // ...
-  },
+  // Disk data (flattened from disk object)
+  Date: "2024-01-15",
+  Size: 123456789,
+  NoFiles: false,
 
-  // Flattened gap properties
-  FileGap: true,             // from gap.FileGap
-  WatchGap: false,           // from gap.WatchGap
+  // Gap data (flattened from gap object)
+  FileGap: true,
+  WatchGap: false,
+  ShowId: "12345",           // from gap object
+  NotReady: false,
 
-  note: "some notes",        // original property
-  Notes: "some notes",       // flattened for compatibility
+  // Sync data (flattened from sync object)
+  lastEmbySync: 1704123456789,
+  lastTvdbSync: 1704123456789,
+  lastDiskCheck: 1704123456789,
+
+  // TVDB metadata
+  OriginalCountry: "US",
+  Overview: "Show description...",
+  Genres: ["Drama", "Action"],
+  Ended: false,
+  LastAired: "2024-01-10",
+  Ratings: 8.5,
+
+  // Other flags
+  Reject: false,
+  Pickup: false,
+  WaitStr: "{Jan 15}",
+  Notes: "some notes"
 }
 ```
+
+**Note:** All nested objects (emby, gap, disk, sync) have been flattened to top level. The lowercase `name` property has been removed - only `Name` exists.
 
 ## Testing Checklist
 
@@ -178,7 +220,9 @@ If issues occur:
 ## Notes
 
 - All existing capitalization preserved (no PascalCase→camelCase conversion)
-- Flattened properties added to tvdb records for component compatibility
-- Nested emby/gap/disk objects preserved in tvdb records
-- Components can access both nested (`show.emby.inToTry`) and flattened (`show.InToTry`) properties
+- All nested objects (emby/gap/disk/sync) have been flattened to top level
+- Removed duplicate `name` property - only `Name` exists now
+- Components access all properties directly at top level (no nested access needed)
 - Default filter behavior now hides deleted shows (inEmby:false)
+- Toggle functions and seriesMap persist for deleted shows (inEmby:false)
+- Collection flags maintained across delete/restore operations

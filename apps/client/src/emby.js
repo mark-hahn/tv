@@ -78,12 +78,12 @@ async function syncCollections(allTvdb) {
 
   for (const tvdb of Object.values(allTvdb)) {
     if (tvdb.deleted) continue;
-    const embyId = tvdb.emby?.id;
+    const embyId = tvdb.Id;
     if (embyId && !embyId.startsWith("noemby-")) {
-      tvdb.emby.inToTry = toTryIds.has(embyId);
-      tvdb.emby.inContinue = continueIds.has(embyId);
-      tvdb.emby.inMark = markIds.has(embyId);
-      tvdb.emby.inLinda = lindaIds.has(embyId);
+      tvdb.InToTry = toTryIds.has(embyId);
+      tvdb.InContinue = continueIds.has(embyId);
+      tvdb.InMark = markIds.has(embyId);
+      tvdb.InLinda = lindaIds.has(embyId);
     }
   }
 }
@@ -124,7 +124,7 @@ async function setWaitStrings(allTvdb) {
   for (const tvdb of Object.values(allTvdb)) {
     if (tvdb.inEmby === false) continue;
     try {
-      const show = { Name: tvdb.name, Id: tvdb.emby?.id };
+      const show = { Name: tvdb.Name, Id: tvdb.Id };
       const waitStr = await tvdb.getWaitStr(show);
       if (waitStr) tvdb.waitStr = waitStr;
     } catch (e) {
@@ -243,31 +243,27 @@ export async function loadAllShows() {
       tvdbRecord = await srvr.getNewTvdb(param);
       allTvdb[name] = tvdbRecord;
     } else {
-      // Update existing tvdb record with Emby user data
-      tvdbRecord.emby = tvdbRecord.emby || {};
-      tvdbRecord.disk = tvdbRecord.disk || {};
-      tvdbRecord.sync = tvdbRecord.sync || {};
+      // Update existing tvdb record with Emby user data (flattened)
+      tvdbRecord.Id = embyShow.Id;
+      tvdbRecord.Path = embyPath;
+      tvdbRecord.Genres = updateFields["emby.genres"];
+      tvdbRecord.Overview = updateFields["emby.overview"];
+      tvdbRecord.DateCreated = updateFields.dateCreated;
+      tvdbRecord.PremiereDate = updateFields.premiereDate;
+      tvdbRecord.IsFavorite = updateFields.isFavorite;
+      tvdbRecord.Played = updateFields.isPlayed;
+      tvdbRecord.PlayCount = updateFields.playCount;
+      tvdbRecord.LastPlayedDate = updateFields.lastPlayedDate;
+      tvdbRecord.unplayedCount = updateFields.unplayedCount;
 
-      tvdbRecord.emby.id = embyShow.Id;
-      tvdbRecord.emby.path = embyPath;
-      tvdbRecord.emby.genres = updateFields["emby.genres"];
-      tvdbRecord.emby.overview = updateFields["emby.overview"];
-      tvdbRecord.emby.dateCreated = updateFields.dateCreated;
-      tvdbRecord.emby.premiereDate = updateFields.premiereDate;
-      tvdbRecord.emby.isFavorite = updateFields.isFavorite;
-      tvdbRecord.emby.isPlayed = updateFields.isPlayed;
-      tvdbRecord.emby.playCount = updateFields.playCount;
-      tvdbRecord.emby.lastPlayedDate = updateFields.lastPlayedDate;
-      tvdbRecord.emby.unplayedCount = updateFields.unplayedCount;
-
-      tvdbRecord.disk.date = diskDate;
-      tvdbRecord.disk.size = diskSize;
-      tvdbRecord.disk.noFiles = noFiles;
+      tvdbRecord.Date = diskDate;
+      tvdbRecord.Size = diskSize;
+      tvdbRecord.NoFiles = noFiles;
 
       // Note: gap and note already in tvdb (Phase 5), don't overwrite
 
-      tvdbRecord.sync.lastEmbySync = now;
-      tvdbRecord.sync.lastDiskCheck = now;
+      tvdbRecord.lastEmbySync = now;
+      tvdbRecord.lastDiskCheck = now;
     }
   }
 
@@ -277,30 +273,30 @@ export async function loadAllShows() {
 
   await Promise.all(
     noEmbys.map(async (noEmbyShow) => {
-      const name = noEmbyShow.name;
+      const name = noEmbyShow.Name;
 
       // Check if show now exists in Emby (upgrade scenario)
       const tvdbRecord = allTvdb[name];
-      if (tvdbRecord?.emby?.id && tvdbRecord.inEmby === true) {
+      if (tvdbRecord?.Id && tvdbRecord.inEmby === true) {
         // Show upgraded to Emby - copy collection flags
         console.log("upgrading noEmby to Emby:", name);
 
         try {
-          if (noEmbyShow.emby.inToTry) {
-            await saveToTry(tvdbRecord.emby.id, true);
-            tvdbRecord.emby.inToTry = true;
+          if (noEmbyShow.InToTry) {
+            await saveToTry(tvdbRecord.Id, true);
+            tvdbRecord.InToTry = true;
           }
-          if (noEmbyShow.emby.inContinue) {
-            await saveContinue(tvdbRecord.emby.id, true);
-            tvdbRecord.emby.inContinue = true;
+          if (noEmbyShow.InContinue) {
+            await saveContinue(tvdbRecord.Id, true);
+            tvdbRecord.InContinue = true;
           }
-          if (noEmbyShow.emby.inMark) {
-            await saveMark(tvdbRecord.emby.id, true);
-            tvdbRecord.emby.inMark = true;
+          if (noEmbyShow.InMark) {
+            await saveMark(tvdbRecord.Id, true);
+            tvdbRecord.InMark = true;
           }
-          if (noEmbyShow.emby.inLinda) {
-            await saveLinda(tvdbRecord.emby.id, true);
-            tvdbRecord.emby.inLinda = true;
+          if (noEmbyShow.InLinda) {
+            await saveLinda(tvdbRecord.Id, true);
+            tvdbRecord.InLinda = true;
           }
         } catch (e) {
           console.error("loadAllShows: upgrade noEmby flags failed", name, e);
@@ -308,7 +304,7 @@ export async function loadAllShows() {
 
         // Mark as not in emby anymore in old record
         noEmbyShow.inEmby = false;
-        prunedNoEmbyIds.push(noEmbyShow.emby.id);
+        prunedNoEmbyIds.push(noEmbyShow.Id);
         return;
       }
 
@@ -370,55 +366,51 @@ export async function loadAllShows() {
   // 8. Set WaitStr for shows with unaired episodes
   await setWaitStrings(allTvdb);
 
-  // 9. Flatten nested properties onto tvdb records for component compatibility
-  // Add emby/gap properties to top level of each tvdb record
+  // 9. Ensure computed properties are set (since nested objects are now flattened)
   for (const tvdb of Object.values(allTvdb)) {
-    // Core identity (add PascalCase versions for compatibility)
-    tvdb.Name = tvdb.name;
-    tvdb.TvdbId = tvdb.tvdbId;
-    tvdb.Id = tvdb.emby?.id || `noemby-${tvdb.tvdbId}`;
+    // Ensure Name and TvdbId are set (should already be from migration)
+    if (!tvdb.Name && tvdb.name) tvdb.Name = tvdb.name;
+    if (!tvdb.TvdbId && tvdb.tvdbId) tvdb.TvdbId = tvdb.tvdbId;
 
-    // Flatten emby data to top level with PascalCase
-    tvdb.DateCreated = tvdb.emby?.dateCreated;
-    tvdb.PremiereDate = tvdb.emby?.premiereDate;
-    tvdb.IsFavorite = tvdb.emby?.isFavorite || false;
-    tvdb.Played = tvdb.emby?.isPlayed || false;
-    tvdb.PlayCount = tvdb.emby?.playCount || 0;
-    tvdb.LastPlayedDate = tvdb.emby?.lastPlayedDate;
-    tvdb.Path = tvdb.emby?.path;
-
-    // Flatten collection flags
-    tvdb.InToTry = tvdb.emby?.inToTry || false;
-    tvdb.InContinue = tvdb.emby?.inContinue || false;
-    tvdb.InMark = tvdb.emby?.inMark || false;
-    tvdb.InLinda = tvdb.emby?.inLinda || false;
-
-    // Flatten disk data
-    tvdb.Date = tvdb.disk?.date || "2017-12-05";
-    tvdb.Size = tvdb.disk?.size || 0;
-    tvdb.NoFiles = tvdb.disk?.noFiles || false;
-
-    // TVDB metadata
-    tvdb.OriginalCountry = tvdb.originalCountry;
-    tvdb.Overview = tvdb.emby?.overview || tvdb.overview || "";
-    tvdb.Genres = tvdb.emby?.genres || tvdb.genres?.map((g) => g.name) || [];
-    tvdb.Ended = tvdb.status === "Ended";
-    tvdb.LastAired = tvdb.lastAired;
-    tvdb.Ratings = tvdb.remotes?.find((r) => r.ratings)?.ratings || 0;
-
-    // Other flags
-    tvdb.Reject = tvdb.reject || false;
-    tvdb.Pickup = tvdb.pickup || false;
-    tvdb.WaitStr = tvdb.waitStr;
-    tvdb.NotReady = tvdb.inEmby === false || false;
-
-    // Flatten gap properties if they exist
-    if (tvdb.gap) {
-      Object.assign(tvdb, tvdb.gap);
+    // Compute Id from showId or tvdbId
+    if (!tvdb.Id) {
+      tvdb.Id = tvdb.showId || `noemby-${tvdb.tvdbId || tvdb.TvdbId}`;
     }
 
-    // Notes
-    tvdb.Notes = tvdb.note || "";
+    // Set computed properties
+    if (tvdb.genres && !tvdb.Genres) {
+      tvdb.Genres = tvdb.genres.map((g) =>
+        typeof g === "string" ? g : g.name,
+      );
+    }
+    if (tvdb.status === "Ended") tvdb.Ended = true;
+    if (tvdb.overview && !tvdb.Overview) tvdb.Overview = tvdb.overview;
+    if (tvdb.originalCountry && !tvdb.OriginalCountry) {
+      tvdb.OriginalCountry = tvdb.originalCountry;
+    }
+    if (tvdb.lastAired && !tvdb.LastAired) tvdb.LastAired = tvdb.lastAired;
+    if (!tvdb.Ratings) {
+      tvdb.Ratings = tvdb.remotes?.find((r) => r.ratings)?.ratings || 0;
+    }
+    if (tvdb.reject && !tvdb.Reject) tvdb.Reject = tvdb.reject;
+    if (tvdb.pickup && !tvdb.Pickup) tvdb.Pickup = tvdb.pickup;
+    if (tvdb.waitStr && !tvdb.WaitStr) tvdb.WaitStr = tvdb.waitStr;
+    if (tvdb.note && !tvdb.Notes) tvdb.Notes = tvdb.note;
+
+    // Set NotReady flag
+    tvdb.NotReady = tvdb.inEmby === false;
+
+    // Ensure default values for missing properties
+    if (tvdb.InToTry === undefined) tvdb.InToTry = false;
+    if (tvdb.InContinue === undefined) tvdb.InContinue = false;
+    if (tvdb.InMark === undefined) tvdb.InMark = false;
+    if (tvdb.InLinda === undefined) tvdb.InLinda = false;
+    if (tvdb.IsFavorite === undefined) tvdb.IsFavorite = false;
+    if (tvdb.Played === undefined) tvdb.Played = false;
+    if (tvdb.PlayCount === undefined) tvdb.PlayCount = 0;
+    if (tvdb.Date === undefined) tvdb.Date = "2017-12-05";
+    if (tvdb.Size === undefined) tvdb.Size = 0;
+    if (tvdb.NoFiles === undefined) tvdb.NoFiles = false;
   }
 
   const showRecords = Object.values(allTvdb);
@@ -764,8 +756,8 @@ export async function saveFav(id, fav) {
   // Phase 4: Update tvdb immediately
   const show = allShows.find((s) => s.Id === id);
   if (show && allTvdb[show.Name]) {
-    allTvdb[show.Name].emby.isFavorite = fav;
-    await srvr.setTvdbFields(show.Name, { "emby.isFavorite": fav });
+    allTvdb[show.Name].IsFavorite = fav;
+    await srvr.setTvdbFields(show.Name, { IsFavorite: fav });
   }
 }
 
@@ -790,8 +782,8 @@ export async function saveToTry(id, inToTry) {
   // Phase 4: Update tvdb immediately
   const show = allShows.find((s) => s.Id === id);
   if (show && allTvdb[show.Name]) {
-    allTvdb[show.Name].emby.inToTry = inToTry;
-    await srvr.setTvdbFields(show.Name, { "emby.inToTry": inToTry });
+    allTvdb[show.Name].InToTry = inToTry;
+    await srvr.setTvdbFields(show.Name, { InToTry: inToTry });
   }
 }
 
@@ -816,8 +808,8 @@ export async function saveContinue(id, inContinue) {
   // Phase 4: Update tvdb immediately
   const show = allShows.find((s) => s.Id === id);
   if (show && allTvdb[show.Name]) {
-    allTvdb[show.Name].emby.inContinue = inContinue;
-    await srvr.setTvdbFields(show.Name, { "emby.inContinue": inContinue });
+    allTvdb[show.Name].InContinue = inContinue;
+    await srvr.setTvdbFields(show.Name, { InContinue: inContinue });
   }
 }
 
@@ -842,8 +834,8 @@ export async function saveMark(id, inMark) {
   // Phase 4: Update tvdb immediately
   const show = allShows.find((s) => s.Id === id);
   if (show && allTvdb[show.Name]) {
-    allTvdb[show.Name].emby.inMark = inMark;
-    await srvr.setTvdbFields(show.Name, { "emby.inMark": inMark });
+    allTvdb[show.Name].InMark = inMark;
+    await srvr.setTvdbFields(show.Name, { InMark: inMark });
   }
 }
 
@@ -868,8 +860,8 @@ export async function saveLinda(id, inLinda) {
   // Phase 4: Update tvdb immediately
   const show = allShows.find((s) => s.Id === id);
   if (show && allTvdb[show.Name]) {
-    allTvdb[show.Name].emby.inLinda = inLinda;
-    await srvr.setTvdbFields(show.Name, { "emby.inLinda": inLinda });
+    allTvdb[show.Name].InLinda = inLinda;
+    await srvr.setTvdbFields(show.Name, { InLinda: inLinda });
   }
 }
 

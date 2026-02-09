@@ -965,7 +965,7 @@ async function flexgetStatus() {
 /**
  * Checks flexget status and throws an error if tasks are stale or failed.
  */
-async function checkFlexgetStatus() {
+export async function checkFlexgetStatus() {
   const output = await flexgetStatus();
   const lines = output.split("\n");
   const tasks = {};

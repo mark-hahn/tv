@@ -251,7 +251,7 @@ export async function loadAllShows() {
       isPlayed: embyShow.UserData?.Played || false,
       playCount: embyShow.UserData?.PlayCount || 0,
       lastPlayedDate: embyShow.UserData?.LastPlayedDate || null,
-      UnplayedItemCount: embyShow.UserData?.UnplayedItemCount || 0,
+      unplayedItemCount: embyShow.UserData?.UnplayedItemCount || 0,
       diskDate,
       diskSize,
       noFiles,
@@ -325,7 +325,7 @@ export async function loadAllShows() {
       tvdbRecord.Played = updateFields.isPlayed;
       tvdbRecord.PlayCount = updateFields.playCount;
       tvdbRecord.LastPlayedDate = updateFields.lastPlayedDate;
-      tvdbRecord.UnplayedItemCount = updateFields.UnplayedItemCount;
+      tvdbRecord.UnplayedItemCount = updateFields.unplayedItemCount;
 
       tvdbRecord.Date = diskDate;
       tvdbRecord.Size = diskSize;

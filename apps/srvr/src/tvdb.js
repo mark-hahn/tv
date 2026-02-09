@@ -815,7 +815,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   }
 
   const name = show.Name;
-  log("getTvdbData: START", { name, clientRequest });
+  // log("getTvdbData: START", { name, clientRequest });
   // Use PST (UTC-8) for added date
   const pstDate = new Date(Date.now() - 8 * 60 * 60 * 1000);
   const added = allTvdb[name]?.added ?? pstDate.toISOString().slice(0, 10);
@@ -926,7 +926,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   let tvdbData = {
     Name: name,
-    TvdbId: tvdbId,
+    tvdbId: tvdbId,
     originalNetwork: preserve(
       originalNetwork,
       existing.originalNetwork,
@@ -1119,7 +1119,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   // log('getTvdbData:', tvdbData);
   allTvdb[name] = tvdbData;
   // update allTvdb & tvdb.json
-  log("getTvdbData: END", { name, hasRemotes: !!tvdbData.remotes?.length });
+  // log("getTvdbData: END", { name, hasRemotes: !!tvdbData.remotes?.length });
   resolve(tvdbData);
 };
 
@@ -1134,11 +1134,11 @@ const chkTvdbQueue = () => {
   chkTvdbQueueRunning = true;
   const { ws, id, paramObj, resolve: resolveCb } = newTvdbQueue.pop();
   const showName = paramObj.show?.Name;
-  log("chkTvdbQueue: processing", {
-    id,
-    showName,
-    queueLength: newTvdbQueue.length,
-  });
+  // log("chkTvdbQueue: processing", {
+  //   id,
+  //   showName,
+  //   queueLength: newTvdbQueue.length,
+  // });
 
   if (ws && ws.readyState !== WebSocket.OPEN) {
     log("chkTvdbQueue: skipping closed WebSocket", id);
@@ -1232,7 +1232,7 @@ const tryLocalGetTvdb = () => {
   //             `updating tvdb locally:`, minTvdb.Name);
   const show = {
     Name: minTvdb.Name,
-    TvdbId: minTvdb.TvdbId,
+    TvdbId: minTvdb.tvdbId,
   };
   if (minTvdb.Id) show.Id = minTvdb.Id;
   const paramObj = {
@@ -1266,7 +1266,7 @@ export const getRemotesCmd = async (params) => {
   const show = params?.show;
   const tvdbRemotes = params?.tvdbRemotes || [];
   const fast = !!params?.fast;
-  log("getRemotesCmd: START", { showName: show?.Name, fast });
+  // log("getRemotesCmd: START", { showName: show?.Name, fast });
 
   if (!show) {
     throw new Error("getRemotes: missing show");
@@ -1274,10 +1274,10 @@ export const getRemotesCmd = async (params) => {
 
   try {
     const remotes = await getRemotes(show, tvdbRemotes, fast, true);
-    log("getRemotesCmd: END", {
-      showName: show?.Name,
-      remotesCount: remotes?.length,
-    });
+    // log("getRemotesCmd: END", {
+    //   showName: show?.Name,
+    //   remotesCount: remotes?.length,
+    // });
     return remotes;
   } catch (err) {
     log("getRemotesCmd: ERROR", { error: err.message });
@@ -1468,8 +1468,8 @@ export const setTvdbFields = async (params) => {
       if (tvdb.saved === 0) {
         // Queue a refresh for this specific request
         const show = {
-          Name: tvdb.name,
-          TvdbId: tvdb.tvdbId,
+          Name: tvdb.Name,
+          tvdbId: tvdb.tvdbId,
         };
         if (tvdb.Id) show.Id = tvdb.Id;
         const refreshParamObj = {
@@ -1510,7 +1510,7 @@ export const accessTvdb = async (params) => {
     const { path: tvdbPath, query } = paramObj;
 
     url = buildTvdbUrl(tvdbPath, query).toString();
-    log("accessTvdb: START", { tvdbPath, url });
+    // log("accessTvdb: START", { tvdbPath, url });
 
     let token = await getToken();
 
@@ -1555,9 +1555,10 @@ export const accessTvdb = async (params) => {
         url,
         body,
       });
-    } else {
-      log("accessTvdb: END", { ok: upstream.ok, status: upstream.status });
     }
+    // else {
+    //   log("accessTvdb: END", { ok: upstream.ok, status: upstream.status });
+    // }
 
     return {
       ok: upstream.ok,

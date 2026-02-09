@@ -67,7 +67,7 @@ function startTail(ws, targetPath) {
 
 export function handleAsr(ws, id, params) {
   const { action, path: reqPath } = params || {};
-  console.log(`[handleAsr] action=${action} reqPath=${reqPath}`);
+  // console.log(`[handleAsr] action=${action} reqPath=${reqPath}`);
 
   let targetPath = reqPath || "";
   // Resolve path relative to MEDIA_ROOT if it's not absolute

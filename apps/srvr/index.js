@@ -1291,7 +1291,7 @@ const startupRejectsSync = () => {
     if (show.Reject) {
       if (!rejects.some((r) => r.toLowerCase() === show.Name.toLowerCase())) {
         rejects.push(show.Name);
-        console.log("[sync] Added to rejects from noEmby:", show.Name);
+        // console.log("[sync] Added to rejects from noEmby:", show.Name);
         changedRejects = true;
       }
     }
@@ -1304,17 +1304,17 @@ const startupRejectsSync = () => {
     );
     if (show && !show.Reject) {
       show.Reject = true;
-      console.log(
-        "[sync] Set Reject=true on noEmby from rejects list:",
-        show.Name,
-      );
+      // console.log(
+      //   "[sync] Set Reject=true on noEmby from rejects list:",
+      //   show.Name,
+      // );
       changedNoEmbys = true;
     }
   }
 
   if (changedRejects) {
     // Save and upload
-    console.log("[sync] Saving and uploading rejects...");
+    // console.log("[sync] Saving and uploading rejects...");
     saveConfigYml(
       "startup",
       "ok",
@@ -1329,7 +1329,7 @@ const startupRejectsSync = () => {
   if (changedNoEmbys) {
     try {
       fs.writeFileSync(noEmbyPath, JSON.stringify(noEmbys));
-      console.log("[sync] Saved updated noemby.json");
+      // console.log("[sync] Saved updated noemby.json");
     } catch (e) {
       console.error("[sync] failed to save noemby:", e);
     }
@@ -1367,7 +1367,7 @@ const startupPickupsSync = () => {
   }
 
   if (changedTvdb) {
-    console.log("[sync] Saving tvdb with updated pickups...");
+    // console.log("[sync] Saving tvdb with updated pickups...");
     tvdb.saveTvdbSync().catch((err) => {
       console.error("[sync] failed to save tvdb:", err);
     });

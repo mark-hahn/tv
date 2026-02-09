@@ -2632,16 +2632,28 @@ async function syncEmbyUserData() {
     const embyUrl =
       "https://hahnca.com:8920/emby/Users/894c752d448f45a3a1260ccaabd0adff/Items?api_key=1c399bd079d549cba8c916244d3add2b&IncludeItemTypes=Series&Recursive=true&Fields=UserData&StartIndex=0&Limit=10000";
 
-    const [embyResp, toTryResp, continueResp, markResp, lindaResp] = await Promise.all([
-      fetch(embyUrl),
-      fetch(`https://hahnca.com:8920/emby/Collections/${COLLECTION_IDS.toTry}/Items?api_key=1c399bd079d549cba8c916244d3add2b&Limit=10000`),
-      fetch(`https://hahnca.com:8920/emby/Collections/${COLLECTION_IDS.continue}/Items?api_key=1c399bd079d549cba8c916244d3add2b&Limit=10000`),
-      fetch(`https://hahnca.com:8920/emby/Collections/${COLLECTION_IDS.mark}/Items?api_key=1c399bd079d549cba8c916244d3add2b&Limit=10000`),
-      fetch(`https://hahnca.com:8920/emby/Collections/${COLLECTION_IDS.linda}/Items?api_key=1c399bd079d549cba8c916244d3add2b&Limit=10000`),
-    ]);
+    const [embyResp, toTryResp, continueResp, markResp, lindaResp] =
+      await Promise.all([
+        fetch(embyUrl),
+        fetch(
+          `https://hahnca.com:8920/emby/Collections/${COLLECTION_IDS.toTry}/Items?api_key=1c399bd079d549cba8c916244d3add2b&Limit=10000`,
+        ),
+        fetch(
+          `https://hahnca.com:8920/emby/Collections/${COLLECTION_IDS.continue}/Items?api_key=1c399bd079d549cba8c916244d3add2b&Limit=10000`,
+        ),
+        fetch(
+          `https://hahnca.com:8920/emby/Collections/${COLLECTION_IDS.mark}/Items?api_key=1c399bd079d549cba8c916244d3add2b&Limit=10000`,
+        ),
+        fetch(
+          `https://hahnca.com:8920/emby/Collections/${COLLECTION_IDS.linda}/Items?api_key=1c399bd079d549cba8c916244d3add2b&Limit=10000`,
+        ),
+      ]);
 
     if (!embyResp.ok) {
-      console.error("[Phase 3] syncEmbyUserData: Emby fetch failed:", embyResp.status);
+      console.error(
+        "[Phase 3] syncEmbyUserData: Emby fetch failed:",
+        embyResp.status,
+      );
       return;
     }
 
@@ -2649,10 +2661,18 @@ async function syncEmbyUserData() {
     const embyShows = embyData.Items || [];
 
     // Get collection IDs (handle fetch failures gracefully)
-    const toTryIds = toTryResp.ok ? (await toTryResp.json()).Items?.map(i => i.Id) || [] : [];
-    const continueIds = continueResp.ok ? (await continueResp.json()).Items?.map(i => i.Id) || [] : [];
-    const markIds = markResp.ok ? (await markResp.json()).Items?.map(i => i.Id) || [] : [];
-    const lindaIds = lindaResp.ok ? (await lindaResp.json()).Items?.map(i => i.Id) || [] : [];
+    const toTryIds = toTryResp.ok
+      ? (await toTryResp.json()).Items?.map((i) => i.Id) || []
+      : [];
+    const continueIds = continueResp.ok
+      ? (await continueResp.json()).Items?.map((i) => i.Id) || []
+      : [];
+    const markIds = markResp.ok
+      ? (await markResp.json()).Items?.map((i) => i.Id) || []
+      : [];
+    const lindaIds = lindaResp.ok
+      ? (await lindaResp.json()).Items?.map((i) => i.Id) || []
+      : [];
 
     const toTryIdSet = new Set(toTryIds);
     const continueIdSet = new Set(continueIds);
@@ -2670,7 +2690,7 @@ async function syncEmbyUserData() {
       if (!tvdbRecord || !tvdbRecord.inEmby) continue;
 
       const userData = embyShow.UserData || {};
-      
+
       // Check if user data changed
       const userDataChanged =
         tvdbRecord.Played !== userData.Played ||
@@ -2694,12 +2714,11 @@ async function syncEmbyUserData() {
 
       // Check if reject/pickup flags changed
       const normName = normShowName(name);
-      const newReject = rejects.some(r => normShowName(r) === normName);
-      const newPickup = pickups.some(p => normShowName(p) === normName);
+      const newReject = rejects.some((r) => normShowName(r) === normName);
+      const newPickup = pickups.some((p) => normShowName(p) === normName);
 
       const rejectsPickupsChanged =
-        tvdbRecord.reject !== newReject ||
-        tvdbRecord.pickup !== newPickup;
+        tvdbRecord.reject !== newReject || tvdbRecord.pickup !== newPickup;
 
       if (userDataChanged || collectionsChanged || rejectsPickupsChanged) {
         // Update user data

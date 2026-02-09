@@ -123,13 +123,12 @@ export async function loadAllShows() {
   // 1. Fetch all data sources in parallel (HTTP is fast now!)
   // On initial load, only load shows with inEmby: true (hasEmby = 1)
   // The rest will be loaded when user changes hasemby filter
-  const [embyShows, rejectsIn, pickups, allTvdbResult] =
-    await Promise.all([
-      axios.get(urls.showListUrl(cred, 0, 10000)),
-      srvr.getRejects(),
-      srvr.getPickups(),
-      tvdb.getAllTvdb(1), // hasEmby = 1: load only shows with inEmby true
-    ]);
+  const [embyShows, rejectsIn, pickups, allTvdbResult] = await Promise.all([
+    axios.get(urls.showListUrl(cred, 0, 10000)),
+    srvr.getRejects(),
+    srvr.getPickups(),
+    tvdb.getAllTvdb(1), // hasEmby = 1: load only shows with inEmby true
+  ]);
 
   // 2. Get authoritative tvdb data (our source of truth)
   // Note: gaps, notes, noEmbys now stored in tvdb.json (Phase 5)
@@ -355,8 +354,6 @@ export async function loadAllShows() {
         prunedNoEmbyIds.push(noEmbyShow.Id);
         return;
       }
-
-
     }),
   );
 

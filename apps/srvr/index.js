@@ -1876,7 +1876,8 @@ const getAllNotes = async (_params) => {
     if (
       record.note &&
       typeof record.note === "string" &&
-      record.note.trim() !== "") {
+      record.note.trim() !== ""
+    ) {
       notesFromTvdb[name] = record.note;
     }
   }
@@ -2630,20 +2631,30 @@ async function syncEmbyUserData() {
 
       // Check if user data changed (also check UnplayedItemCount for episode watches)
       const userData = embyShow.UserData || {};
-      const unplayedCount = embyShow.UserData?.UnplayedItemCount || 0;
       const changed =
-        tvdbRecord.emby?.isPlayed !== userData.Played ||
-        tvdbRecord.emby?.playCount !== userData.PlayCount ||
-        tvdbRecord.emby?.isFavorite !== userData.IsFavorite ||
-        tvdbRecord.emby?.unplayedCount !== unplayedCount;
+        tvdbRecord.Played !== userData.Played ||
+        tvdbRecord.PlayCount !== userData.PlayCount ||
+        tvdbRecord.IsFavorite !== userData.IsFavorite ||
+        tvdbRecord.LastPlayedDate !== userData.LastPlayedDate ||
+        tvdbRecord.UnplayedItemCount !== userData.UnplayedItemCount;
 
       if (changed) {
-        tvdbRecord.emby = tvdbRecord.emby || {};
-        tvdbRecord.emby.isPlayed = userData.Played || false;
-        tvdbRecord.emby.playCount = userData.PlayCount || 0;
-        tvdbRecord.emby.isFavorite = userData.IsFavorite || false;
-        tvdbRecord.emby.lastPlayedDate = userData.LastPlayedDate || null;
-        tvdbRecord.emby.unplayedCount = unplayedCount;
+        // Set flattened properties directly on tvdbRecord
+        tvdbRecord.Played = userData.Played || false;
+        tvdbRecord.PlayCount = userData.PlayCount || 0;
+        tvdbRecord.IsFavorite = userData.IsFavorite || false;
+        tvdbRecord.LastPlayedDate = userData.LastPlayedDate || null;
+        tvdbRecord.UnplayedItemCount = userData.UnplayedItemCount || 0;
+
+        // Delete old nested emby properties
+        if (tvdbRecord.emby) {
+          delete tvdbRecord.emby.isPlayed;
+          delete tvdbRecord.emby.playCount;
+          delete tvdbRecord.emby.isFavorite;
+          delete tvdbRecord.emby.lastPlayedDate;
+          delete tvdbRecord.emby.unplayedCount;
+        }
+
         tvdbRecord.sync = tvdbRecord.sync || {};
         tvdbRecord.sync.lastEmbySync = now;
         updatedCount++;

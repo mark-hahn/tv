@@ -822,9 +822,11 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   const name = show.Name;
   log("getTvdbData: START", { name, clientRequest });
-  const added = allTvdb[name]?.added ?? new Date().toISOString().slice(0, 10);
+  // Use PST (UTC-8) for added date
+  const pstDate = new Date(Date.now() - 8 * 60 * 60 * 1000);
+  const added = allTvdb[name]?.added ?? pstDate.toISOString().slice(0, 10);
   const showId = show.Id;
-  const tvdbId = show.tvdbId;
+  const tvdbId = show.TvdbId || show.tvdbId;
   if (!tvdbId) {
     log("err", "getTvdbData no tvdbId:", show);
     resolve(name);
@@ -1122,6 +1124,13 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   setImdbId(tvdbData);
 
   // log('getTvdbData:', tvdbData);
+  log("[SERVER] getTvdbData: storing in allTvdb", {
+    name,
+    hasNameUpper: !!tvdbData.Name,
+    hasNameLower: !!tvdbData.name,
+    keyUsed: name,
+    inEmby: tvdbData.inEmby,
+  });
   allTvdb[name] = tvdbData;
   // update allTvdb & tvdb.json
   log("getTvdbData: END", { name, hasRemotes: !!tvdbData.remotes?.length });
@@ -1162,17 +1171,27 @@ const chkTvdbQueue = () => {
     .then((tvdbData) => {
       try {
         if (typeof tvdbData === "object") {
-          log("chkTvdbQueue: sending response", { id, name: tvdbData.name });
+          const keyName = tvdbData.Name || tvdbData.name;
+          log("[SERVER] chkTvdbQueue: storing record", {
+            id,
+            keyName,
+            hasNameUpper: !!tvdbData.Name,
+            hasNameLower: !!tvdbData.name,
+            actualKey: keyName,
+            inEmby: tvdbData.inEmby,
+          });
           if (ws) ws.send(JSON.stringify({ id, status: "ok", data: tvdbData }));
           else if (resolveCb) resolveCb(tvdbData);
-          allTvdb[tvdbData.name] = tvdbData;
+          allTvdb[keyName] = tvdbData;
+          log("[SERVER] Stored in allTvdb[", keyName, "], allTvdb keys count:", Object.keys(allTvdb).length);
         } else tvdbData = allTvdb[tvdbData]; // tvdbData is name
       } catch (e) {
         console.error("chkTvdbQueue ws.send error:", e);
       }
       tvdbData.saved = Date.now();
       // Don't save here - background refresh handles saves
-      log("chkTvdbQueue: completed", { id, name: tvdbData.name });
+      const keyName = tvdbData.Name || tvdbData.name;
+      log("[SERVER] chkTvdbQueue: completed", { id, name: keyName });
       chkTvdbQueueRunning = false;
       chkTvdbQueue();
     })
@@ -1420,6 +1439,12 @@ export const setTvdbFields = async (params) => {
   if (!paramObj) return null;
   let tvdb = null;
   const name = paramObj.name;
+  log("[SERVER] setTvdbFields called:", {
+    name,
+    hasName: !!name,
+    allTvdbKeysCount: Object.keys(allTvdb).length,
+    hasRecordInAllTvdb: name ? !!allTvdb[name] : false,
+  });
   if (name) {
     if (paramObj.$delTvdb) {
       delete allTvdb[name];
@@ -1498,7 +1523,11 @@ export const setTvdbFields = async (params) => {
       // allTvdb[name] = tvdb;
     }
   }
-  if (!paramObj.dontSave) await util.writeFile(TVDB_PATH, allTvdb);
+  if (!paramObj.dontSave) {
+    log("[SERVER] setTvdbFields: saving to disk, allTvdb keys:", Object.keys(allTvdb).length);
+    await util.writeFile(TVDB_PATH, allTvdb);
+    log("[SERVER] setTvdbFields: saved successfully");
+  }
   return tvdb ?? "ok";
 };
 

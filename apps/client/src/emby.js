@@ -302,7 +302,16 @@ export async function loadAllShows() {
         updateFields,
       );
 
+      console.log(`[CLIENT] Calling getNewTvdb for ${name}`);
       tvdbRecord = await srvr.getNewTvdb(param);
+      console.log(`[CLIENT] getNewTvdb returned:`, {
+        name,
+        hasRecord: !!tvdbRecord,
+        recordName: tvdbRecord?.Name,
+        recordNameLower: tvdbRecord?.name,
+        inEmby: tvdbRecord?.inEmby,
+        keys: tvdbRecord ? Object.keys(tvdbRecord).slice(0, 10) : [],
+      });
       allTvdb[name] = tvdbRecord;
     } else {
       // Update existing tvdb record with Emby user data (flattened)

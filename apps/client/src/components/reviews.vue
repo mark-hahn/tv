@@ -440,7 +440,28 @@ export default {
 
   mounted() {
     // Listen for show changes
-    evtBus.on("setUpSeries", (show) => {
+    evtBus.on("setUpSeries", this.onSetUpSeries);
+
+    // Listen for TVDB details to get existing Remotes (including Rotten button URL)
+    evtBus.on("tvdbDataReady", this.onTvdbDataReady);
+
+    evtBus.on("previewMode", this.onPreviewMode);
+    evtBus.on("previewSrchChoice", this.onPreviewSrchChoice);
+    evtBus.on("addPreviewShowDone", this.onAddPreviewShowDone);
+
+    // Also listen for explicit "showReviews" if added later, but logic above should suffice for now.
+  },
+
+  beforeUnmount() {
+    evtBus.off("setUpSeries", this.onSetUpSeries);
+    evtBus.off("tvdbDataReady", this.onTvdbDataReady);
+    evtBus.off("previewMode", this.onPreviewMode);
+    evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);
+    evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);
+  },
+
+  methods: {
+    onSetUpSeries(show) {
       this.showName = show?.Name || "";
       this.reviews = [];
       this.stats = null;
@@ -448,10 +469,9 @@ export default {
       this.rottenLabel = "";
       this.selectedButton = "Audience";
       this.checkedRemotes = false;
-    });
+    },
 
-    // Listen for TVDB details to get existing Remotes (including Rotten button URL)
-    evtBus.on("tvdbDataReady", (data) => {
+    onTvdbDataReady(data) {
       this.checkedRemotes = true;
       const tvdbData = data?.tvdbData;
       if (tvdbData && tvdbData.remotes) {
@@ -467,16 +487,8 @@ export default {
           }
         }
       }
-    });
+    },
 
-    evtBus.on("previewMode", this.onPreviewMode);
-    evtBus.on("previewSrchChoice", this.onPreviewSrchChoice);
-    evtBus.on("addPreviewShowDone", this.onAddPreviewShowDone);
-
-    // Also listen for explicit "showReviews" if added later, but logic above should suffice for now.
-  },
-
-  methods: {
     onPreviewMode(active) {
       this.previewMode = !!active;
       if (!this.previewMode) {

@@ -1163,9 +1163,9 @@ const getShowsFromDisk = async (_params) => {
     await recurs(showPath);
 
     shows[dirent] = [maxDate, totalSize];
-    if (totalSize == 0) {
-      console.log("empty show:", dirent);
-    }
+    // if (totalSize == 0) {
+    //   console.log("empty show:", dirent);
+    // }
   }
   if (errFlg) {
     throw new Error(`getShowsFromDisk: Error: ${errFlg.message}`);
@@ -2600,12 +2600,12 @@ async function runUsbCheck() {
  */
 async function syncEmbyUserData() {
   try {
-    console.log("[Phase 3] syncEmbyUserData: Starting...");
+    // console.log("[Phase 3] syncEmbyUserData: Starting...");
 
     // Get all tvdb records
     const allTvdb = tvdb.getAllTvdbSync();
     if (!allTvdb || Object.keys(allTvdb).length === 0) {
-      console.log("[Phase 3] syncEmbyUserData: No tvdb records to sync");
+      console.error("[Phase 3] syncEmbyUserData: No tvdb records to sync");
       return;
     }
 
@@ -2754,11 +2754,13 @@ async function syncEmbyUserData() {
 
     if (updatedCount > 0) {
       await tvdb.saveTvdbSync();
-      console.log(`[Phase 3] syncEmbyUserData: Updated ${updatedCount} shows`);
-    } else {
-      console.log("[Phase 3] syncEmbyUserData: No changes detected");
-    }
-  } catch (err) {
+      // console.log(`[Phase 3] syncEmbyUserData: Updated ${updatedCount} shows`);
+    } 
+    // else {
+    //   console.log("[Phase 3] syncEmbyUserData: No changes detected");
+    // }
+  } 
+  catch (err) {
     console.error("[Phase 3] syncEmbyUserData error:", err.message);
   }
 }
@@ -2769,12 +2771,12 @@ async function syncEmbyUserData() {
  */
 async function syncDiskData() {
   try {
-    console.log("[Phase 3] syncDiskData: Starting...");
+    // console.log("[Phase 3] syncDiskData: Starting...");
 
     // Get all tvdb records
     const allTvdb = tvdb.getAllTvdbSync();
     if (!allTvdb || Object.keys(allTvdb).length === 0) {
-      console.log("[Phase 3] syncDiskData: No tvdb records to sync");
+      // console.log("[Phase 3] syncDiskData: No tvdb records to sync");
       return;
     }
 
@@ -2816,10 +2818,11 @@ async function syncDiskData() {
 
     if (updatedCount > 0) {
       await tvdb.saveTvdbSync();
-      console.log(`[Phase 3] syncDiskData: Updated ${updatedCount} shows`);
-    } else {
-      console.log("[Phase 3] syncDiskData: No changes detected");
-    }
+      // console.log(`[Phase 3] syncDiskData: Updated ${updatedCount} shows`);
+    } 
+    // else {
+    //   console.log("[Phase 3] syncDiskData: No changes detected");
+    // }
   } catch (err) {
     console.error("[Phase 3] syncDiskData error:", err.message);
   }

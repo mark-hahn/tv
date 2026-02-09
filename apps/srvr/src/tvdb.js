@@ -1222,11 +1222,11 @@ const tryLocalGetTvdb = () => {
   // Check if show should be added to pickup list:
   // - not in emby (showId starts with 'noemby-' or undefined)
   // - has tvdb data (minTvdb exists)
-  if (minTvdb) {
-    if (!minTvdb.inEmby && addToPickupsCallback) {
-      addToPickupsCallback(minTvdb.Name);
-    }
-  }
+  // if (minTvdb) {
+  //   if (!minTvdb.inEmby && addToPickupsCallback) {
+  //     addToPickupsCallback(minTvdb.Name);
+  //   }
+  // }
 
   // log('------', new Date().toTimeString().slice(0,8),
   //             `updating tvdb locally:`, minTvdb.Name);
@@ -1408,12 +1408,12 @@ export const setTvdbFields = async (params) => {
   if (!paramObj) return null;
   let tvdb = null;
   const name = paramObj.name;
-  log("[SERVER] setTvdbFields called:", {
-    name,
-    hasName: !!name,
-    allTvdbKeysCount: Object.keys(allTvdb).length,
-    hasRecordInAllTvdb: name ? !!allTvdb[name] : false,
-  });
+  // log("[SERVER] setTvdbFields called:", {
+  //   name,
+  //   hasName: !!name,
+  //   allTvdbKeysCount: Object.keys(allTvdb).length,
+  //   hasRecordInAllTvdb: name ? !!allTvdb[name] : false,
+  // });
   if (name) {
     if (paramObj.$delTvdb) {
       delete allTvdb[name];
@@ -1492,12 +1492,12 @@ export const setTvdbFields = async (params) => {
     }
   }
   if (!paramObj.dontSave) {
-    log(
-      "[SERVER] setTvdbFields: saving to disk, allTvdb keys:",
-      Object.keys(allTvdb).length,
-    );
+    // log(
+    //   "[SERVER] setTvdbFields: saving to disk, allTvdb keys:",
+    //   Object.keys(allTvdb).length,
+    // );
     await util.writeFile(TVDB_PATH, allTvdb);
-    log("[SERVER] setTvdbFields: saved successfully");
+    // log("[SERVER] setTvdbFields: saved successfully");
   }
   return tvdb ?? "ok";
 };

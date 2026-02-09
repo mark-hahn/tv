@@ -8,291 +8,39 @@
       padding: 0,
       margin: 0,
       display: 'flex',
-      flexDirection: showSideButtons ? 'row' : isPortrait ? 'column' : 'row',
+      flexDirection: 'row',
       alignItems: 'stretch',
     }"
   >
-    <template v-if="showSideButtons">
-      <!-- Simple + portrait: full-height Buttons pane on the left.-->
-      <div
-        id="simpleButtonsPane"
-        :style="{
-          flex: '0 0 auto',
-          height: '100%',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          backgroundColor: '#ccc',
-        }"
-      >
-        <Buttons
+        <div
+      id="simpleButtonsPane"
+      v-show="showSideButtons"
+      :style="{
+        flex: '0 0 auto',
+        height: '100%',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: '#ccc',
+      }"
+    >
+      <Buttons
           style="width: 105px; flex: 1 1 auto"
           :sizing="sideButtonsSizing"
           @button-click="onSideButtonsClick"
           @top-click="onSideButtonsTop"
         ></Buttons>
-      </div>
-      <!-- Simple + portrait: Series/Map/etc above List to the right.-->
-      <div
-        id="mainStack"
-        :style="{
-          flex: '1 1 auto',
-          minWidth: '0px',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-        }"
-      >
-        <!-- In portrait, put the right-side pane (Series/Map/etc) above the List.-->
-        <div
-          id="tabArea"
-          :style="tabAreaStyle"
-        >
-          <div
-            id="tabBar"
-            :style="{
-              display: 'flex',
-              gap: simpleMode ? '30px' : '0px',
-              padding: simpleMode ? '6px 8px' : '6px 0px',
-              alignItems: 'center',
-              borderBottom: '1px solid #ddd',
-              backgroundColor: '#fafafa',
-              flex: '0 0 auto',
-              flexWrap: 'wrap',
-            }"
-          >
-            <button
-              v-for="t in tabs"
-              :key="t.key"
-              @click.stop="selectTab(t.key)"
-              :style="{
-                fontSize: '13px',
-                cursor: 'pointer',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                marginLeft: '4px',
-                border: '1px solid #bbb',
-                backgroundColor: currentPane === t.key ? '#ddd' : 'whitesmoke',
-              }"
-            >
-              {{ t.label }}
-            </button>
-            <!-- Preview controls: immediately after the rightmost tab button (before progress)-->
-            <template v-if="previewMode">
-              <button
-                @click.stop="addShowFromPreview"
-                :disabled="previewAddBusy || !previewSrchChoice"
-                :style="{
-                  fontSize: '13px',
-                  cursor:
-                    previewAddBusy || !previewSrchChoice
-                      ? 'default'
-                      : 'pointer',
-                  borderRadius: '7px',
-                  padding: '4px 10px',
-                  marginTop: '4px',
-                  marginLeft: '20px',
-                  border: '1px solid #bbb',
-                  backgroundColor:
-                    previewAddBusy || !previewSrchChoice
-                      ? '#eee'
-                      : 'whitesmoke',
-                }"
-              >
-                Add show to Emby
-              </button>
-              <button
-                @click.stop="exitPreview"
-                :style="{
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  borderRadius: '7px',
-                  padding: '4px 10px',
-                  marginTop: '4px',
-                  marginLeft: '4px',
-                  border: '1px solid #bbb',
-                  backgroundColor: 'whitesmoke',
-                }"
-              >
-                Exit Preview
-              </button>
-              <span
-                class="pane-header-title"
-                style="margin-left: 10px"
-                >preview mode</span
-              >
-              <span
-                v-if="previewPanesLoading"
-                :style="{
-                  marginLeft: '10px',
-                  color: '#aaa',
-                  fontWeight: 'bold',
-                  fontSize: '13px',
-                  whiteSpace: 'nowrap',
-                }"
-                >&lt;Loading&gt;</span
-              >
-            </template>
-            <div style="flex: 1"></div>
-            <div
-              v-if="!simpleMode && libraryProgressText"
-              style="
-                display: flex;
-                align-items: center;
-                margin-left: 10px;
-                padding-right: 10px;
-              "
-            >
-              <div
-                style="
-                  font-size: 12px;
-                  color: #555;
-                  white-space: nowrap;
-                  padding-right: 8px;
-                "
-              >
-                {{ libraryProgressText }}
-              </div>
-            </div>
-          </div>
-          <div
-            id="tabBody"
-            :style="{
-              flex: '1 1 auto',
-              minHeight: '0px',
-              position: 'relative',
-              width: '100%',
-            }"
-          >
-            <Info
-              v-show="currentPane === 'info'"
-              style="display: block; width: 100%; height: 100%"
-              :simpleMode="simpleMode"
-              :sizing="activeSizing"
-            ></Info>
-            <Map
-              v-show="currentPane === 'map'"
-              :mapShow="mapShow"
-              :hideMapBottom="hideMapBottom"
-              :seriesMapSeasons="seriesMapSeasons"
-              :seriesMapEpis="seriesMapEpis"
-              :seriesMap="seriesMap"
-              :mapError="mapError"
-              :simpleMode="simpleMode"
-              :sizing="activeSizing"
-              @reload-shows="triggerShowReload"
-              @prune="handleMapAction('prune', $event)"
-              @set-date="handleMapAction('date', $event)"
-              @close="handleMapAction('close')"
-              @show-actors="() => handleShowActors(false)"
-              @episode-click="handleEpisodeClick"
-              @season-delete="handleSeasonDelete"
-            ></Map>
-            <Actors
-              v-show="currentPane === 'actors'"
-              style="width: 100%; height: 100%"
-              :simpleMode="simpleMode"
-              :sizing="activeSizing"
-            ></Actors>
-            <Reviews
-              v-show="currentPane === 'reviews'"
-              style="width: 100%; height: 100%"
-              :simpleMode="simpleMode"
-              :sizing="activeSizing"
-            ></Reviews>
-            <Trailer
-              v-show="currentPane === 'trailer'"
-              style="width: 100%; height: 100%"
-              :simpleMode="simpleMode"
-              :sizing="activeSizing"
-              :active="currentPane === 'trailer'"
-            ></Trailer>
-            <Browse
-              v-if="!simpleMode"
-              v-show="currentPane === 'browse'"
-              style="width: 100%; height: 100%"
-              :simpleMode="simpleMode"
-              :sizing="activeSizing"
-              :allShows="allShows"
-              :active="currentPane === 'browse'"
-            >
-            </Browse>
-            <Tor
-              v-if="!simpleMode"
-              v-show="currentPane === 'tor'"
-              style="width: 100%; height: 100%"
-              :simpleMode="simpleMode"
-              :sizing="activeSizing"
-              :activeShow="currentShow"
-            ></Tor>
-            <Flex
-              v-if="!simpleMode"
-              v-show="currentPane === 'flex'"
-              style="width: 100%; height: 100%"
-              :simpleMode="simpleMode"
-              :sizing="activeSizing"
-              :show="currentShow"
-            ></Flex>
-            <Qbt
-              v-if="!simpleMode"
-              v-show="currentPane === 'qbt'"
-              style="width: 100%; height: 100%"
-              :simpleMode="simpleMode"
-              :sizing="activeSizing"
-              :show="currentShow"
-            ></Qbt>
-            <Usb
-              v-if="!simpleMode"
-              v-show="currentPane === 'usb'"
-              style="width: 100%; height: 100%"
-              :active="currentPane === 'usb'"
-              :show="currentShow"
-              :allShows="allShows"
-            ></Usb>
-            <Local
-              v-if="!simpleMode"
-              v-show="currentPane === 'local'"
-              style="width: 100%; height: 100%"
-              :active="currentPane === 'local'"
-              :show="currentShow"
-              :allShows="allShows"
-              @select-show="handleLocalSelectShow"
-            ></Local>
-            <Down
-              v-if="!simpleMode"
-              v-show="currentPane === 'down'"
-              style="width: 100%; height: 100%"
-              :simpleMode="simpleMode"
-              :sizing="activeSizing"
-              :show="currentShow"
-            ></Down>
-          </div>
-        </div>
-        <!-- Draggable divider between panes: vertical in landscape, horizontal in portrait.-->
-        <div
-          id="paneDivider"
-          @pointerdown.stop.prevent="startPaneResize"
-          @pointermove.stop.prevent="onPaneResizeMove"
-          @pointerup.stop.prevent="stopPaneResize"
-          @pointercancel.stop.prevent="stopPaneResize"
-          @lostpointercapture.stop.prevent="stopPaneResize"
-          :style="paneDividerStyle"
-          title="Drag to resize panes"
-        ></div>
-        <List
-          :style="listStyle"
-          :simpleMode="simpleMode"
-          :sizing="activeSizing"
-          :hideButtonsPane="true"
-          @show-map="handleShowMap"
-          @hide-map="handleHideMap"
-          @show-actors="handleShowActors"
-          @show-tor="handleShowTor"
-          @all-shows="handleAllShows"
-        ></List>
-      </div>
-    </template>
-    <template v-else>
+    </div>
+    <div
+      id="mainStack"
+      :style="{
+        flex: '1 1 auto',
+        minWidth: '0px',
+        height: '100%',
+        display: 'flex',
+        flexDirection: isPortrait ? 'column' : 'row',
+      }"
+    >
       <!-- In portrait, put the right-side pane (Series/Map/etc) above the List.-->
       <div
         id="tabArea"
@@ -415,6 +163,7 @@
             style="display: block; width: 100%; height: 100%"
             :simpleMode="simpleMode"
             :sizing="activeSizing"
+          :hideButtonsPane="showSideButtons"
           ></Info>
           <Map
             v-show="currentPane === 'map'"
@@ -536,7 +285,7 @@
         @all-shows="handleAllShows"
       >
       </List>
-    </template>
+    </div>
     <!-- TVDB mismatch detail modal (OK-only)-->
     <div
       id="tvdbMismatchModal"

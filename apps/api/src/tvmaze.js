@@ -156,7 +156,7 @@ try {
       cwd: process.cwd(),
     },
   };
-  console.error("[tvmaze] module loaded", payload);
+  // console.log("[tvmaze] module loaded", payload);
   appendSyncBlankLine();
   appendSyncLog(payload);
 } catch {
@@ -864,7 +864,7 @@ async function syncTvmazeShows(reason = "startup") {
       },
     };
 
-    console.error("[tvmaze] sync summary", summary);
+    // console.log("[tvmaze] sync summary", summary);
     dumpSyncSummaryJson(summary);
     appendSyncLog(summary);
 

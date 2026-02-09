@@ -1124,13 +1124,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   setImdbId(tvdbData);
 
   // log('getTvdbData:', tvdbData);
-  log("[SERVER] getTvdbData: storing in allTvdb", {
-    name,
-    hasNameUpper: !!tvdbData.Name,
-    hasNameLower: !!tvdbData.name,
-    keyUsed: name,
-    inEmby: tvdbData.inEmby,
-  });
   allTvdb[name] = tvdbData;
   // update allTvdb & tvdb.json
   log("getTvdbData: END", { name, hasRemotes: !!tvdbData.remotes?.length });
@@ -1172,31 +1165,18 @@ const chkTvdbQueue = () => {
       try {
         if (typeof tvdbData === "object") {
           const keyName = tvdbData.Name || tvdbData.name;
-          log("[SERVER] chkTvdbQueue: storing record", {
-            id,
-            keyName,
-            hasNameUpper: !!tvdbData.Name,
-            hasNameLower: !!tvdbData.name,
-            actualKey: keyName,
-            inEmby: tvdbData.inEmby,
-          });
           if (ws) ws.send(JSON.stringify({ id, status: "ok", data: tvdbData }));
           else if (resolveCb) resolveCb(tvdbData);
           allTvdb[keyName] = tvdbData;
-          log(
-            "[SERVER] Stored in allTvdb[",
-            keyName,
-            "], allTvdb keys count:",
-            Object.keys(allTvdb).length,
-          );
         } else tvdbData = allTvdb[tvdbData]; // tvdbData is name
       } catch (e) {
         console.error("chkTvdbQueue ws.send error:", e);
       }
       tvdbData.saved = Date.now();
-      // Don't save here - background refresh handles saves
-      const keyName = tvdbData.Name || tvdbData.name;
-      log("[SERVER] chkTvdbQueue: completed", { id, name: keyName });
+      // Save to disk so timestamp persists across restarts
+      util.writeFile(TVDB_PATH, allTvdb).catch((err) => {
+        log("err", "chkTvdbQueue: save error:", err.message);
+      });
       chkTvdbQueueRunning = false;
       chkTvdbQueue();
     })
@@ -1224,12 +1204,6 @@ const tryLocalGetTvdb = () => {
   try {
     const tvdbs = Object.values(allTvdb);
     tvdbs.forEach((tvdb) => {
-      if (!tvdb.Id) {
-        log("err", "tryLocalGetTvdb no Id:", tvdb.Name, {
-          tvdb,
-        });
-        return;
-      }
       const saved = tvdb.saved;
       if (saved === undefined) {
         log("tryLocalGetTvdb, saved is undefined:", tvdb.Name);

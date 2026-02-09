@@ -278,8 +278,8 @@ export async function getReviews(rottenUrl, buttonName) {
 
       // Force click if obscured by overlays (cookies/GDPR)
       if (await loadMoreBtn.isVisible()) {
-        if (i === 0)
-          console.log(`[reviews] Loading more reviews for ${buttonName}...`);
+        // if (i === 0)
+          // console.log(`[reviews] Loading more reviews for ${buttonName}...`);
 
         const previousCount = await page.evaluate(
           () =>

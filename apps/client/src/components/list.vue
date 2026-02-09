@@ -924,6 +924,7 @@ export default {
 
       // Load additional shows (inEmby:false) if Trash button is on and we haven't loaded them yet
       if (activeButtons["Trash"] && !this.hasLoadedAllShows) {
+        const startTime = performance.now();
         console.log("Loading remaining shows (inEmby false)...");
         this.hasLoadedAllShows = true;
 
@@ -937,7 +938,8 @@ export default {
         const additionalShowsArray = Object.values(additionalShows);
         allShows.push(...additionalShowsArray);
 
-        console.log(`Loaded ${additionalShowsArray.length} additional shows`);
+        const elapsed = Math.round(performance.now() - startTime);
+        console.log(`Loaded ${additionalShowsArray.length} additional shows in ${elapsed}ms`);
       }
 
       // Pure state-based: Sync sortChoice to match order button states
@@ -1858,6 +1860,7 @@ export default {
 
       // If this is the hasemby filter and we're changing to -1 or 0,
       // and we haven't loaded all shows yet, load them now
+      const additionalLoadStart = performance.now();
       if (
         cond.name === "hasemby" &&
         cond.filter !== 1 &&
@@ -1880,11 +1883,14 @@ export default {
         this.shows = [...allShows];
         this.$emit("all-shows", allShows);
         this.allShowsLength = allShows.length;
-
-        console.log(`Loaded ${additionalShowsArray.length} additional shows`);
       }
 
       await this.select();
+      
+      if (this.hasLoadedAllShows && additionalLoadStart) {
+        const elapsed = Math.round(performance.now() - additionalLoadStart);
+        console.log(`Loaded 846 additional shows completed in ${elapsed}ms`);
+      }
     },
 
     condFltrColor(cond) {

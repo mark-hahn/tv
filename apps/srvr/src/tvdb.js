@@ -802,13 +802,8 @@ async function getTmdbFallback(showName) {
 // create tvdbData object
 // update allTvdb & tvdb.json
 const getTvdbData = async (paramObj, resolve, _reject) => {
-  const {
-    show,
-    seasonCount,
-    episodeCount,
-    watchedCount,
-    clientRequest,
-  } = paramObj;
+  const { show, seasonCount, episodeCount, watchedCount, clientRequest } =
+    paramObj;
 
   // Defensive check - ensure show object exists
   if (!show || !show.Name) {

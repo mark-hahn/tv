@@ -123,10 +123,9 @@ export async function loadAllShows() {
   // 1. Fetch all data sources in parallel (HTTP is fast now!)
   // On initial load, only load shows with inEmby: true (hasEmby = 1)
   // The rest will be loaded when user changes hasemby filter
-  const [embyShows, diskShows, rejectsIn, pickups, allTvdbResult] =
+  const [embyShows, rejectsIn, pickups, allTvdbResult] =
     await Promise.all([
       axios.get(urls.showListUrl(cred, 0, 10000)),
-      srvr.getShowsFromDisk(),
       srvr.getRejects(),
       srvr.getPickups(),
       tvdb.getAllTvdb(1), // hasEmby = 1: load only shows with inEmby true
@@ -230,14 +229,10 @@ export async function loadAllShows() {
       continue;
     }
 
-    // Get disk info
+    // Get emby path (used for new record creation)
     const embyPath = embyShow.Path.split("/").pop();
-    const diskInfo = diskShows[embyPath];
-    const diskDate = diskInfo ? diskInfo[0] : null;
-    const diskSize = diskInfo ? diskInfo[1] : 0;
-    const noFiles = !diskInfo;
 
-    // Build update object with Emby + disk data
+    // Build update object with Emby data (for creating NEW records only)
     const updateFields = {
       name,
       showId: embyShow.Id,
@@ -247,16 +242,7 @@ export async function loadAllShows() {
       "emby.overview": embyShow.Overview || "",
       dateCreated: embyShow.DateCreated?.substring(0, 10),
       premiereDate: embyShow.PremiereDate?.substring(0, 10),
-      isFavorite: embyShow.UserData?.IsFavorite || false,
-      isPlayed: embyShow.UserData?.Played || false,
-      playCount: embyShow.UserData?.PlayCount || 0,
-      lastPlayedDate: embyShow.UserData?.LastPlayedDate || null,
-      unplayedItemCount: embyShow.UserData?.UnplayedItemCount || 0,
-      diskDate,
-      diskSize,
-      noFiles,
       lastEmbySync: now,
-      lastDiskCheck: now,
     };
 
     // Create or update tvdb record
@@ -314,27 +300,18 @@ export async function loadAllShows() {
       });
       allTvdb[name] = tvdbRecord;
     } else {
-      // Update existing tvdb record with Emby user data (flattened)
+      // Update existing tvdb record with Emby metadata for new shows only
+      // User data (Played, PlayCount, etc) is synced by background Emby User Data Sync
+      // Disk data (Date, Size) is synced by hourly disk sync
       tvdbRecord.Id = embyShow.Id;
       tvdbRecord.Path = embyPath;
       tvdbRecord.Genres = updateFields["emby.genres"];
       tvdbRecord.Overview = updateFields["emby.overview"];
       tvdbRecord.DateCreated = updateFields.dateCreated;
       tvdbRecord.PremiereDate = updateFields.premiereDate;
-      tvdbRecord.IsFavorite = updateFields.isFavorite;
-      tvdbRecord.Played = updateFields.isPlayed;
-      tvdbRecord.PlayCount = updateFields.playCount;
-      tvdbRecord.LastPlayedDate = updateFields.lastPlayedDate;
-      tvdbRecord.UnplayedItemCount = updateFields.unplayedItemCount;
-
-      tvdbRecord.Date = diskDate;
-      tvdbRecord.Size = diskSize;
-      tvdbRecord.NoFiles = noFiles;
 
       // Note: gap and note already in tvdb (Phase 5), don't overwrite
-
       tvdbRecord.lastEmbySync = now;
-      tvdbRecord.lastDiskCheck = now;
     }
   }
 
@@ -425,16 +402,10 @@ export async function loadAllShows() {
     }
   }
 
-  // 6. Sync collection flags (toTry, continue, mark, linda)
-  await syncCollections(allTvdb);
-
-  // 7. Sync rejects and pickups
-  syncRejectsAndPickups(allTvdb, rejectsIn, pickups);
-
-  // 8. Set WaitStr for shows with unaired episodes
+  // 6. Set WaitStr for shows with unaired episodes
   await setWaitStrings(allTvdb);
 
-  // 9. Ensure computed properties are set (since nested objects are now flattened)
+  // 7. Ensure computed properties are set (since nested objects are now flattened)
   for (const tvdb of Object.values(allTvdb)) {
     // Ensure Name and TvdbId are set (should already be from migration)
     if (!tvdb.Name && tvdb.name) tvdb.Name = tvdb.name;

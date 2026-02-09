@@ -2592,8 +2592,11 @@ async function runUsbCheck() {
 // Phase 3: Incremental sync functions
 
 /**
- * Phase 3.1: Sync Emby user data (watched status, play counts) into tvdb
- * Runs every 5 minutes to keep user data fresh without full reload
+ * Phase 3.1: Sync Emby user data and collections into tvdb
+ * Runs every 5 minutes to keep user data and collection flags fresh without full reload
+ * - Syncs watched status, play counts, favorites
+ * - Syncs collection flags (toTry, continue, mark, linda)
+ * - Syncs reject and pickup flags
  */
 async function syncEmbyUserData() {
   try {
@@ -2606,27 +2609,60 @@ async function syncEmbyUserData() {
       return;
     }
 
-    // Get current Emby sessions/user data
-    // We'll fetch shows from Emby to get updated UserData
+    // Helper function to normalize show names
+    const normShowName = (name) => {
+      if (name === undefined || name === null) return "";
+      return String(name)
+        .replace(/[\r\n\t]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+    };
+
+    // Fetch all data in parallel:
+    // 1. Emby shows (for user data - watched status, play counts)
+    // 2. Collection IDs (for InToTry, InContinue, InMark, InLinda flags)
+    const COLLECTION_IDS = {
+      toTry: "1468316",
+      continue: "4719143",
+      mark: "4697672",
+      linda: "4706186",
+    };
+
     const embyUrl =
       "https://hahnca.com:8920/emby/Users/894c752d448f45a3a1260ccaabd0adff/Items?api_key=1c399bd079d549cba8c916244d3add2b&IncludeItemTypes=Series&Recursive=true&Fields=UserData&StartIndex=0&Limit=10000";
 
-    const resp = await fetch(embyUrl);
-    if (!resp.ok) {
-      console.error(
-        "[Phase 3] syncEmbyUserData: Emby fetch failed:",
-        resp.status,
-      );
+    const [embyResp, toTryResp, continueResp, markResp, lindaResp] = await Promise.all([
+      fetch(embyUrl),
+      fetch(`https://hahnca.com:8920/emby/Collections/${COLLECTION_IDS.toTry}/Items?api_key=1c399bd079d549cba8c916244d3add2b&Limit=10000`),
+      fetch(`https://hahnca.com:8920/emby/Collections/${COLLECTION_IDS.continue}/Items?api_key=1c399bd079d549cba8c916244d3add2b&Limit=10000`),
+      fetch(`https://hahnca.com:8920/emby/Collections/${COLLECTION_IDS.mark}/Items?api_key=1c399bd079d549cba8c916244d3add2b&Limit=10000`),
+      fetch(`https://hahnca.com:8920/emby/Collections/${COLLECTION_IDS.linda}/Items?api_key=1c399bd079d549cba8c916244d3add2b&Limit=10000`),
+    ]);
+
+    if (!embyResp.ok) {
+      console.error("[Phase 3] syncEmbyUserData: Emby fetch failed:", embyResp.status);
       return;
     }
 
-    const data = await resp.json();
-    const embyShows = data.Items || [];
+    const embyData = await embyResp.json();
+    const embyShows = embyData.Items || [];
+
+    // Get collection IDs (handle fetch failures gracefully)
+    const toTryIds = toTryResp.ok ? (await toTryResp.json()).Items?.map(i => i.Id) || [] : [];
+    const continueIds = continueResp.ok ? (await continueResp.json()).Items?.map(i => i.Id) || [] : [];
+    const markIds = markResp.ok ? (await markResp.json()).Items?.map(i => i.Id) || [] : [];
+    const lindaIds = lindaResp.ok ? (await lindaResp.json()).Items?.map(i => i.Id) || [] : [];
+
+    const toTryIdSet = new Set(toTryIds);
+    const continueIdSet = new Set(continueIds);
+    const markIdSet = new Set(markIds);
+    const lindaIdSet = new Set(lindaIds);
 
     let updatedCount = 0;
     const now = Date.now();
 
-    // Update tvdb records with fresh Emby user data
+    // Update tvdb records with fresh Emby user data, collections, rejects, and pickups
     for (const embyShow of embyShows) {
       const name = embyShow.Name;
       const tvdbRecord = allTvdb[name];
@@ -2634,20 +2670,60 @@ async function syncEmbyUserData() {
       if (!tvdbRecord || !tvdbRecord.inEmby) continue;
 
       const userData = embyShow.UserData || {};
-      const changed =
+      
+      // Check if user data changed
+      const userDataChanged =
         tvdbRecord.Played !== userData.Played ||
         tvdbRecord.PlayCount !== userData.PlayCount ||
         tvdbRecord.IsFavorite !== userData.IsFavorite ||
         tvdbRecord.LastPlayedDate !== userData.LastPlayedDate ||
         tvdbRecord.UnplayedItemCount !== userData.UnplayedItemCount;
 
-      if (changed) {
-        // Set flattened properties directly on tvdbRecord
-        tvdbRecord.Played = userData.Played || false;
-        tvdbRecord.PlayCount = userData.PlayCount || 0;
-        tvdbRecord.IsFavorite = userData.IsFavorite || false;
-        tvdbRecord.LastPlayedDate = userData.LastPlayedDate || null;
-        tvdbRecord.UnplayedItemCount = userData.UnplayedItemCount || 0;
+      // Check if collection flags changed
+      const showId = embyShow.Id;
+      const newInToTry = toTryIdSet.has(showId);
+      const newInContinue = continueIdSet.has(showId);
+      const newInMark = markIdSet.has(showId);
+      const newInLinda = lindaIdSet.has(showId);
+
+      const collectionsChanged =
+        tvdbRecord.InToTry !== newInToTry ||
+        tvdbRecord.InContinue !== newInContinue ||
+        tvdbRecord.InMark !== newInMark ||
+        tvdbRecord.InLinda !== newInLinda;
+
+      // Check if reject/pickup flags changed
+      const normName = normShowName(name);
+      const newReject = rejects.some(r => normShowName(r) === normName);
+      const newPickup = pickups.some(p => normShowName(p) === normName);
+
+      const rejectsPickupsChanged =
+        tvdbRecord.reject !== newReject ||
+        tvdbRecord.pickup !== newPickup;
+
+      if (userDataChanged || collectionsChanged || rejectsPickupsChanged) {
+        // Update user data
+        if (userDataChanged) {
+          tvdbRecord.Played = userData.Played || false;
+          tvdbRecord.PlayCount = userData.PlayCount || 0;
+          tvdbRecord.IsFavorite = userData.IsFavorite || false;
+          tvdbRecord.LastPlayedDate = userData.LastPlayedDate || null;
+          tvdbRecord.UnplayedItemCount = userData.UnplayedItemCount || 0;
+        }
+
+        // Update collection flags
+        if (collectionsChanged) {
+          tvdbRecord.InToTry = newInToTry;
+          tvdbRecord.InContinue = newInContinue;
+          tvdbRecord.InMark = newInMark;
+          tvdbRecord.InLinda = newInLinda;
+        }
+
+        // Update reject/pickup flags
+        if (rejectsPickupsChanged) {
+          tvdbRecord.reject = newReject;
+          tvdbRecord.pickup = newPickup;
+        }
 
         delete tvdbRecord.emby;
 

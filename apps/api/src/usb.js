@@ -927,7 +927,7 @@ export async function getUsbFiles() {
  * Runs `~/flexget/bin/flexget status` on the USB server via ssh.
  * Returns raw stdout.
  */
-export async function flexgetStatus() {
+async function flexgetStatus() {
   const qbHost = await loadQbHostForSsh();
   // We use the specific path requested by user: ~/flexget/bin/flexget
   const cmd = "~/flexget/bin/flexget status";
@@ -965,7 +965,7 @@ export async function flexgetStatus() {
 /**
  * Checks flexget status and throws an error if tasks are stale or failed.
  */
-export async function checkFlexgetStatus() {
+async function checkFlexgetStatus() {
   const output = await flexgetStatus();
   const lines = output.split("\n");
   const tasks = {};
@@ -1019,22 +1019,36 @@ export async function checkFlexgetStatus() {
 
   for (const name of ["ipt", "tl"]) {
     const info = tasks[name];
-    if (!info) throw new Error(`Task ${name} missing from status output`);
+    if (!info) {
+      const err = new Error(`Task ${name} missing from status output`);
+      err.fullOutput = output;
+      throw err;
+    }
 
-    if (info.failed > 0)
-      throw new Error(`Task ${name} has ${info.failed} failed entries`);
+    if (info.failed > 0) {
+      const err = new Error(`Task ${name} has ${info.failed} failed entries`);
+      err.fullOutput = output;
+      throw err;
+    }
 
     const validateTime = (timeStr, label) => {
       const dt = new Date(timeStr);
-      if (isNaN(dt.getTime())) throw new Error(`Invalid date ${timeStr}`);
+      if (isNaN(dt.getTime())) {
+        const err = new Error(`Invalid date ${timeStr}`);
+        err.fullOutput = output;
+        throw err;
+      }
       // Adjust for timezone difference: Remote (PST) vs USB (Europe ~ +9h)
       const eventTimePst = dt.getTime() - NINE_HOURS;
       const age = now - eventTimePst;
 
-      if (age > TWENTY_MINS)
-        throw new Error(
+      if (age > TWENTY_MINS) {
+        const err = new Error(
           `${name} ${label} is too old: ${Math.round(age / 60000)} mins ago`,
         );
+        err.fullOutput = output;
+        throw err;
+      }
     };
 
     validateTime(info.lastExec, "last execution");

@@ -2578,7 +2578,11 @@ async function runUsbCheck() {
   } catch (err) {
     console.error("USB status check failed:", err.message);
     try {
-      await email.sendEmail(`USB Status Check Failed:\n${err.message}`);
+      let emailBody = `USB Status Check Failed:\n${err.message}`;
+      if (err.fullOutput) {
+        emailBody += `\n\nFull flexget status output:\n${err.fullOutput}`;
+      }
+      await email.sendEmail(emailBody);
     } catch (e) {
       console.error("Failed to send error email:", e);
     }

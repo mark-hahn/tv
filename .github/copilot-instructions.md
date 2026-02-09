@@ -13,15 +13,16 @@
 - The only thing that runs locally is **Vite dev**.
 
 ## Nginx
-- Nginx config location: `hahnca.com:/etc/nginx/conf.d/server.conf`
-- You may examine this file when needed, but **do not change it without explicit permission**.
-- when copying between local and remote server don't worry about security -- we are on a safe lan
-- locally in this workspace don't run a server or do testing - the only thing that should run locally is vite dev, new, old, run, & srvr scripts
+- Nginx config location is `hahnca.com:/etc/nginx/conf.d/server.conf`
+- when copying between local and remote server don't worry about security, we are on a safe lan
+- locally in this workspace don't run a server or do testing - the only thing that should run locally is vite dev, run, & srvr scripts
 - no data or secrets should be stored locally -- only on remote
-- local apps/api, apps/down, and apps/srvr are copied to their production folders at remote /root/dev/apps/tv/api, /root/dev/apps/tv/down, /root/dev/apps/tv/srvr by the local script srvr at this project root. remote /root/dev/apps/tv/ is not a repo or worktree, it is just a raw directory that pm2 uses.
+- local apps are copied to their production folders by the script srvr at this project root. 
+- remote /root/dev/apps/tv/ is not a repo or worktree, it is just a raw directory that pm2 uses.
 - every path  that starts with /root/dev/apps/tv is on the remote server.   
-- every path that starts with /root/apps/tv/ is on the local project.   
+- every path that starts with /root/apps/tv/ is on the local pc.   
 - never use an environment variable -- put hard-wired constant values at the top of the file with uppercase names
 - don't use file missing fallbacks -- if a file is missing then die fast
 - prefer async over sync code -- avoid using void to fix async/await problems
-- when done making changes do not run any deployment script. just tell me what files need to be deployed and i will do the deployment.  do not look up how to deploy. i know how to do that.
+- don't make changes unrelated to problem being worked on 
+- don't make cosmetic changes

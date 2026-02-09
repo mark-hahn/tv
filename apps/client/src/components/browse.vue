@@ -1080,22 +1080,14 @@ export default {
     });
 
     const toggleTvdbInfo = () => {
-      console.log("toggleTvdbInfo: clicked");
       const t = curTvdb.value;
-      console.log("toggleTvdbInfo: curTvdb:", t);
       if (t) {
         const name = t.name || t.Name || t.seriesName || t.title;
-        console.log("toggleTvdbInfo: extracted name:", name);
         if (name) {
-          console.log(
-            "toggleTvdbInfo: calling handleSelectExisting with:",
-            name,
-          );
           handleSelectExisting(name);
           return;
         }
       }
-      console.log("toggleTvdbInfo: no name found, toggling display");
       showTvdbInfo.value = !showTvdbInfo.value;
     };
 
@@ -1212,21 +1204,16 @@ export default {
     });
 
     const handleSelectExisting = async (name) => {
-      console.log("handleSelectExisting: called with name:", name);
       if (!name) {
-        console.log("handleSelectExisting: no name, returning");
         return;
       }
       loadingShowSelection.value = true;
       loadingShowName.value = name;
-      console.log(
-        "handleSelectExisting: emitting selectShowFromCardTitle event",
-      );
       evtBus.emit("selectShowFromCardTitle", name);
-      
+
       // Wait for the selection to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       loadingShowSelection.value = false;
       loadingShowName.value = "";
     };

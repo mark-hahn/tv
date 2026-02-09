@@ -1445,17 +1445,10 @@ export default {
 
     async selectShowFromCardTitle(rawTitle) {
       const raw = String(rawTitle || "").trim();
-      console.log("selectShowFromCardTitle: raw title:", raw);
       if (!raw) return;
       if (!Array.isArray(allShows) || allShows.length === 0) {
-        console.log("selectShowFromCardTitle: allShows not available");
         return;
       }
-      console.log("selectShowFromCardTitle: allShows.length:", allShows.length);
-      console.log(
-        "selectShowFromCardTitle: hasLoadedAllShows:",
-        this.hasLoadedAllShows,
-      );
 
       const stripped = this.stripTitleNoise(raw);
 
@@ -1484,44 +1477,22 @@ export default {
 
       const searchTitle = parsed?.title || stripped || raw;
       const searchYear = parsed?.year || null;
-      console.log(
-        "selectShowFromCardTitle: searchTitle:",
-        searchTitle,
-        "searchYear:",
-        searchYear,
-      );
 
       // First try exact name match (important for gallery selections)
       let match = allShows.find((s) => s.Name === raw);
-      console.log(
-        "selectShowFromCardTitle: exact match for raw title:",
-        match?.Name,
-      );
 
       if (!match) {
         // Try case-insensitive exact match
         const rawLower = raw.toLowerCase();
         match = allShows.find((s) => s.Name?.toLowerCase() === rawLower);
-        console.log(
-          "selectShowFromCardTitle: case-insensitive match:",
-          match?.Name,
-        );
       }
 
       // If no exact match and we haven't loaded all shows yet, load them now BEFORE fuzzy matching
       if (!match && !this.hasLoadedAllShows) {
-        console.log(
-          "selectShowFromCardTitle: No exact match, loading remaining shows (inEmby false)...",
-        );
         this.hasLoadedAllShows = true;
 
         // Load shows with inEmby false
         const additionalShows = await tvdb.getAllTvdb(-1);
-        console.log(
-          "selectShowFromCardTitle: getAllTvdb(-1) returned:",
-          Object.keys(additionalShows).length,
-          "shows",
-        );
 
         // Merge into allTvdb and allShows
         Object.assign(allTvdb, additionalShows);
@@ -1530,54 +1501,24 @@ export default {
         const additionalShowsArray = Object.values(additionalShows);
         allShows.push(...additionalShowsArray);
 
-        console.log(
-          `selectShowFromCardTitle: Loaded ${additionalShowsArray.length} additional shows, total now: ${allShows.length}`,
-        );
-
         // Try exact match again with the expanded show list
         match = allShows.find((s) => s.Name === raw);
         if (!match) {
           const rawLower = raw.toLowerCase();
           match = allShows.find((s) => s.Name?.toLowerCase() === rawLower);
         }
-        console.log(
-          "selectShowFromCardTitle: after loading, exact match:",
-          match?.Name,
-        );
       }
 
       if (!match) {
         // Fall back to fuzzy matching as last resort
-        console.log(
-          "selectShowFromCardTitle: no exact match found, trying fuzzy smartTitleMatch...",
-        );
         match = util.smartTitleMatch(searchTitle, allShows, searchYear, true);
-        console.log(
-          "selectShowFromCardTitle: smartTitleMatch result:",
-          match?.Name,
-          "inEmby:",
-          match?.inEmby,
-        );
       }
 
       if (match) {
-        console.log(
-          "selectShowFromCardTitle: found match, checking if in filtered list...",
-        );
         if (!this.shows.some((sh) => sh?.Name === match.Name)) {
-          console.log(
-            "selectShowFromCardTitle: show not in filtered list, switching to All",
-          );
           await this.fltrAction("All");
         }
-        console.log(
-          "selectShowFromCardTitle: calling onSelectShow with scroll=true",
-        );
         this.onSelectShow(match, true);
-      } else {
-        console.log(
-          "selectShowFromCardTitle: no match found after all attempts",
-        );
       }
     },
 

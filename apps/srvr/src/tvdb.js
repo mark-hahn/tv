@@ -1183,7 +1183,12 @@ const chkTvdbQueue = () => {
           if (ws) ws.send(JSON.stringify({ id, status: "ok", data: tvdbData }));
           else if (resolveCb) resolveCb(tvdbData);
           allTvdb[keyName] = tvdbData;
-          log("[SERVER] Stored in allTvdb[", keyName, "], allTvdb keys count:", Object.keys(allTvdb).length);
+          log(
+            "[SERVER] Stored in allTvdb[",
+            keyName,
+            "], allTvdb keys count:",
+            Object.keys(allTvdb).length,
+          );
         } else tvdbData = allTvdb[tvdbData]; // tvdbData is name
       } catch (e) {
         console.error("chkTvdbQueue ws.send error:", e);
@@ -1524,7 +1529,10 @@ export const setTvdbFields = async (params) => {
     }
   }
   if (!paramObj.dontSave) {
-    log("[SERVER] setTvdbFields: saving to disk, allTvdb keys:", Object.keys(allTvdb).length);
+    log(
+      "[SERVER] setTvdbFields: saving to disk, allTvdb keys:",
+      Object.keys(allTvdb).length,
+    );
     await util.writeFile(TVDB_PATH, allTvdb);
     log("[SERVER] setTvdbFields: saved successfully");
   }

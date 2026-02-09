@@ -939,7 +939,9 @@ export default {
         allShows.push(...additionalShowsArray);
 
         const elapsed = Math.round(performance.now() - startTime);
-        console.log(`Loaded ${additionalShowsArray.length} additional shows in ${elapsed}ms`);
+        console.log(
+          `Loaded ${additionalShowsArray.length} additional shows in ${elapsed}ms`,
+        );
       }
 
       // Pure state-based: Sync sortChoice to match order button states
@@ -1886,7 +1888,7 @@ export default {
       }
 
       await this.select();
-      
+
       if (this.hasLoadedAllShows && additionalLoadStart) {
         const elapsed = Math.round(performance.now() - additionalLoadStart);
         console.log(`Loaded 846 additional shows completed in ${elapsed}ms`);

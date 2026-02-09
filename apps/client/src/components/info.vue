@@ -977,9 +977,7 @@ export default {
       let seasonsTxt;
       const { episodeCount, seasonCount, watchedCount } = tvdbData;
       switch (seasonCount) {
-        case 0:
-          console.error("setSeasonsTxt, no seasonCount:", name);
-          return;
+        case 0: return;
         case 1:
           seasonsTxt = "1 Season";
           break;

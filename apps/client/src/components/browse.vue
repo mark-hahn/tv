@@ -1051,6 +1051,22 @@ export default {
     });
 
     const toggleTvdbInfo = () => {
+      console.log("toggleTvdbInfo: clicked");
+      const t = curTvdb.value;
+      console.log("toggleTvdbInfo: curTvdb:", t);
+      if (t) {
+        const name = t.name || t.Name || t.seriesName || t.title;
+        console.log("toggleTvdbInfo: extracted name:", name);
+        if (name) {
+          console.log(
+            "toggleTvdbInfo: calling handleSelectExisting with:",
+            name,
+          );
+          handleSelectExisting(name);
+          return;
+        }
+      }
+      console.log("toggleTvdbInfo: no name found, toggling display");
       showTvdbInfo.value = !showTvdbInfo.value;
     };
 
@@ -1167,8 +1183,16 @@ export default {
     });
 
     const handleSelectExisting = (name) => {
-      if (!name) return;
+      console.log("handleSelectExisting: called with name:", name);
+      if (!name) {
+        console.log("handleSelectExisting: no name, returning");
+        return;
+      }
+      console.log(
+        "handleSelectExisting: emitting selectShowFromCardTitle event",
+      );
       evtBus.emit("selectShowFromCardTitle", name);
+      console.log("handleSelectExisting: emitting showSeriesPane event");
       evtBus.emit("showSeriesPane");
     };
 

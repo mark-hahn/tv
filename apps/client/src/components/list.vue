@@ -1290,6 +1290,7 @@ export default {
       const show = {
         // Mark as no-Emby so Series doesn't try to query Emby counts.
         Id: `noemby-preview-${String(tvdbId || showName).replace(/\s+/g, "-")}`,
+        inEmby: false,
         Name: showName,
         TvdbId: tvdbId,
         Overview: overview,

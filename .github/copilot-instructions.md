@@ -26,3 +26,5 @@
 - prefer async over sync code -- avoid using void to fix async/await problems
 - don't make changes unrelated to problem being worked on 
 - don't make cosmetic changes
+- never test whether show id has `noemby-` prefix -- check show.inEmby instead
+- the tvdb record prop `deleted` no longer exists -- it should not be set or used

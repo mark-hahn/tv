@@ -612,7 +612,7 @@ const getRemotes = async (
   const showId = show.Id;
   const remotes = [];
 
-  if (showId && !showId.startsWith("noemby-"))
+  if (show.inEmby)
     remotes.push({ name: "Emby", url: urls.embyPageUrl(showId) });
 
   if (!fast) {
@@ -804,7 +804,6 @@ async function getTmdbFallback(showName) {
 const getTvdbData = async (paramObj, resolve, _reject) => {
   const {
     show,
-    deleted,
     seasonCount,
     episodeCount,
     watchedCount,
@@ -1012,9 +1011,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
       tmdbData.spokenLanguages,
     );
 
-  const inEmby = showId && !showId.startsWith("noemby-");
   if (trailers) tvdbData.trailers = trailers;
-  if (inEmby !== undefined) tvdbData.inEmby = inEmby;
+  tvdbData.inEmby = show.inEmby ?? false;
 
   // Flattened Emby-specific data (no nested object)
   tvdbData.Id = showId || existing.Id || existing.emby?.id || null;
@@ -1230,9 +1228,7 @@ const tryLocalGetTvdb = () => {
   // - not in emby (showId starts with 'noemby-' or undefined)
   // - has tvdb data (minTvdb exists)
   if (minTvdb) {
-    const showId = minTvdb.Id;
-    const notInEmby = !showId || showId.startsWith("noemby-");
-    if (notInEmby && addToPickupsCallback) {
+    if (!minTvdb.inEmby && addToPickupsCallback) {
       addToPickupsCallback(minTvdb.Name);
     }
   }
@@ -1249,7 +1245,6 @@ const tryLocalGetTvdb = () => {
     seasonCount: minTvdb.seasonCount ?? 0,
     episodeCount: minTvdb.episodeCount ?? 0,
     watchedCount: minTvdb.watchedCount ?? 0,
-    deleted: minTvdb.deleted,
   };
   newTvdbQueue.unshift({ ws: null, id: null, paramObj });
   chkTvdbQueue();
@@ -1487,7 +1482,6 @@ export const setTvdbFields = async (params) => {
           seasonCount: tvdb.seasonCount ?? 0,
           episodeCount: tvdb.episodeCount ?? 0,
           watchedCount: tvdb.watchedCount ?? 0,
-          deleted: tvdb.deleted,
         };
         return new Promise((resolve) => {
           newTvdbQueue.unshift({

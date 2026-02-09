@@ -1668,6 +1668,9 @@ export default {
       ) {
         void this.seriesMapAction("open", show);
       }
+
+      // Emit after all work is done so browse pane can hide loading dialog
+      evtBus.emit("showSelected");
     },
 
     setPreviewMode(active) {

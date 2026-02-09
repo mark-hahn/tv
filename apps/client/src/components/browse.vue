@@ -618,6 +618,26 @@
     >
       {{ toastMessage }}
     </div>
+    <div
+      v-if="loadingShowSelection"
+      :style="{
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        backgroundColor: 'white',
+        color: 'black',
+        padding: '20px 30px',
+        borderRadius: '8px',
+        zIndex: 10001,
+        pointerEvents: 'none',
+        fontSize: '18px',
+        fontWeight: 'bold',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+      }"
+    >
+      Loading {{ loadingShowName }}...
+    </div>
   </div>
 </template>
 
@@ -694,6 +714,8 @@ export default {
     const previewMode = ref(false);
     const allTvdbData = ref(null);
     const showTvdbInfo = ref(false);
+    const loadingShowSelection = ref(false);
+    const loadingShowName = ref("");
 
     onMounted(async () => {
       try {
@@ -713,9 +735,16 @@ export default {
     };
     evtBus.on("browseTabClicked", onBrowseTabClicked);
 
+    const onShowSelected = () => {
+      loadingShowSelection.value = false;
+      loadingShowName.value = "";
+    };
+    evtBus.on("showSelected", onShowSelected);
+
     onUnmounted(() => {
       evtBus.off("previewMode", onPreviewMode);
       evtBus.off("browseTabClicked", onBrowseTabClicked);
+      evtBus.off("showSelected", onShowSelected);
     });
     const lastLoadedTvdbId = ref(null);
     const remotesCache = new Map();
@@ -1182,18 +1211,24 @@ export default {
       return info;
     });
 
-    const handleSelectExisting = (name) => {
+    const handleSelectExisting = async (name) => {
       console.log("handleSelectExisting: called with name:", name);
       if (!name) {
         console.log("handleSelectExisting: no name, returning");
         return;
       }
+      loadingShowSelection.value = true;
+      loadingShowName.value = name;
       console.log(
         "handleSelectExisting: emitting selectShowFromCardTitle event",
       );
       evtBus.emit("selectShowFromCardTitle", name);
-      console.log("handleSelectExisting: emitting showSeriesPane event");
-      evtBus.emit("showSeriesPane");
+      
+      // Wait for the selection to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      loadingShowSelection.value = false;
+      loadingShowName.value = "";
     };
 
     const rtResult = computed(() => {
@@ -1817,6 +1852,8 @@ export default {
       suppressButtons,
       previewMode,
       toastMessage,
+      loadingShowSelection,
+      loadingShowName,
       matchingTvdbEntry,
       hasTvdbEntry,
       toggleTvdbInfo,

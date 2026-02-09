@@ -379,24 +379,7 @@ export async function loadAllShows() {
         return;
       }
 
-      // Check if S01E01 is unaired (for WaitStr)
-      try {
-        const seriesMap = await tvdb.getSeriesMap(noEmbyShow);
-        const s1 = seriesMap.find(([seasonNumber]) => seasonNumber === 1);
-        if (s1) {
-          const e1 = s1[1].find(([episodeNumber]) => episodeNumber === 1);
-          if (e1?.[1]?.unaired === true) {
-            noEmbyShow.S1E1Unaired = true;
-            const airDate = e1?.[1]?.aired;
-            if (airDate) {
-              const dateStr = airDate.slice(5).replace(/^0/, " ").trim();
-              noEmbyShow.waitStr = `{${dateStr}}`;
-            }
-          }
-        }
-      } catch (e) {
-        console.error("loadAllShows: getSeriesMap error for noemby", name, e);
-      }
+
     }),
   );
 

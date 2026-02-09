@@ -783,9 +783,9 @@ async function syncTvmazeShows(reason = "startup") {
                 // Force the higher timestamp into the record we are about to save
                 if (Number.isFinite(remoteTs) && remoteTs > showTs) {
                   showJson.updated = remoteTs;
-                  console.error(
-                    `[tvmaze] repairing timestamp for ${id}: API=${showTs} -> UpdateAPI=${remoteTs}`,
-                  );
+                  // console.error(
+                  //   `[tvmaze] repairing timestamp for ${id}: API=${showTs} -> UpdateAPI=${remoteTs}`,
+                  // );
                 }
 
                 // Use a transaction for the single update

@@ -21,6 +21,7 @@ const authHdr =
 let token = "";
 let cred = null;
 let allTvdb = null;
+let allShows = null;
 
 ////////////////////////  INIT  ///////////////////////
 
@@ -491,6 +492,7 @@ export async function loadAllShows() {
   console.log(
     `loadAllShows completed in ${elapsed}ms, ${showRecords.length} shows`,
   );
+  allShows = showRecords;
   return showRecords;
 }
 

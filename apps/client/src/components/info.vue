@@ -609,6 +609,7 @@ export default {
       previewSrchChoice: null,
       refreshing: false,
       remoteFetchMode: "fast", // 'fast' or 'full'
+      settingUpShowName: null, // Track show currently being set up to prevent duplicate calls
     };
   },
 
@@ -1169,18 +1170,26 @@ export default {
     },
 
     async refreshTvdb() {
+      const startTime = Date.now();
+      console.log(`Refresh button clicked for ${this.show.Name}`);
       this.refreshing = true;
       try {
         await srvr.setTvdbFields({
           name: this.show.Name,
           saved: 0,
         });
-        tvdb.clearCache();
-        // Set mode to full fetch for fresh Rotten Tomatoes ratings
-        this.remoteFetchMode = "full";
-        evtBus.emit("library-refresh-complete");
+
+        // Note: setTvdbFields with saved:0 already triggered a full server-side refresh
+        // that scraped Rotten Tomatoes and fetched all remotes (IMDB, Wikipedia, etc.)
         // Re-init the current view and wait for it to complete
         await this.setupSeriesForRefresh(this.show);
+
+        // Don't emit library-refresh-complete for single-show refresh - it's overkill.
+        // The info pane is already updated, and reloading all 344 shows causes
+        // an unnecessary getNewTvdb call due to async file write timing on the server.
+
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        console.log(`Refresh complete for ${this.show.Name} (${elapsed}s)`);
       } catch (e) {
         console.error("refreshTvdb error", e);
         alert("Error requesting refresh: " + e);
@@ -1191,36 +1200,22 @@ export default {
     setupSeriesForRefresh(show) {
       // Wrapper to make onSetUpSeries awaitable for refresh
       return new Promise((resolve) => {
-        // Store the original callback
-        const originalResolve = resolve;
-
-        this.onSetUpSeries(show);
-
-        // Wait for setRemotes to complete (called in setTimeout after 10ms + processing time)
-        // Check every 100ms if remotes are loaded
-        const checkInterval = setInterval(() => {
-          if (
-            this.seriesReady &&
-            (this.showRemotes ||
-              this.remotes.length > 0 ||
-              this.remoteFetchMode === "fast")
-          ) {
-            clearInterval(checkInterval);
-            this.refreshing = false;
-            originalResolve();
-          }
-        }, 100);
-
-        // Fallback timeout to prevent hanging
-        setTimeout(() => {
-          clearInterval(checkInterval);
+        // Pass completion callback to onSetUpSeries
+        this.onSetUpSeries(show, () => {
           this.refreshing = false;
-          originalResolve();
-        }, 10000);
+          resolve();
+        });
       });
     },
 
-    onSetUpSeries(show) {
+    onSetUpSeries(show, onComplete = null) {
+      // Prevent duplicate calls for the same show while already processing
+      if (this.settingUpShowName === show?.Name) {
+        if (onComplete) onComplete();
+        return;
+      }
+
+      this.settingUpShowName = show?.Name;
       this.emailText = ""; // Clear email text when changing shows
       this.show = show;
       this.showHdr = true;
@@ -1264,9 +1259,9 @@ export default {
 
       const currentShowName = show.Name;
       setTimeout(async () => {
-        if (this.show.Name !== currentShowName) return;
-
         try {
+          if (this.show.Name !== currentShowName) return;
+
           // Force load all shows (including no-emby) by passing hasEmby=0
           // The cache from loadAllShows might only contain emby shows (hasEmby=1)
           allTvdb = await tvdb.getAllTvdb(0);
@@ -1342,6 +1337,9 @@ export default {
           this.seriesReady = true;
         } finally {
           evtBus.emit("previewPanesLoading", false);
+          this.settingUpShowName = null; // Clear flag when done
+          // Call completion callback if provided (used by refresh)
+          if (onComplete) onComplete();
         }
       }, 10);
     },

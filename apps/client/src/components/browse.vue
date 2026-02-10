@@ -89,6 +89,21 @@
               gap: '5px',
             }"
           >
+            <button
+              @click="handleDebugClick"
+              :style="{
+                height: '24px',
+                backgroundColor: debugFlash ? '#4CAF50' : 'white',
+                fontSize: '13px',
+                padding: '2px 8px',
+                border: '1px solid #ccc',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s ease',
+              }"
+            >
+              Debug
+            </button>
             <label
               for="browseSearch"
               :style="{ fontWeight: 'bold' }"
@@ -698,6 +713,7 @@ export default {
     const shouldAutoAdvance = ref(false);
     const getRemotesResults = ref([]);
     const _lastRemotesKey = ref("");
+    const debugFlash = ref(false);
     const titleStrings = ref([]);
     const selectedTitleIdx = ref(-1);
     const titlesPane = ref(null);
@@ -1394,6 +1410,39 @@ export default {
       }
     };
 
+    const handleDebugClick = async () => {
+      try {
+        if (!curTvdb.value) {
+          console.log("No show selected in gallery");
+          return;
+        }
+
+        const tvdbId = curTvdb.value.tvdb_id || curTvdb.value.tvdbId;
+        const name = curTvdb.value.name;
+
+        if (!tvdbId) {
+          console.log("Selected show has no TvdbId:", name);
+          return;
+        }
+
+        console.log("Fetching TVDB API data for:", name, "TvdbId:", tvdbId);
+
+        debugFlash.value = true;
+        setTimeout(() => {
+          debugFlash.value = false;
+        }, 300);
+
+        const result = await srvr.debugTvdb({
+          name: name,
+          tvdbId: tvdbId,
+        });
+
+        console.log("Debug result:", result);
+      } catch (e) {
+        console.error("debugClick failed:", e);
+      }
+    };
+
     const toastMessage = ref("");
     let toastTimer = null;
 
@@ -1819,6 +1868,8 @@ export default {
       handleGallerySelect,
       handleSearchComplete,
       handleGalleryPreview,
+      handleDebugClick,
+      debugFlash,
       selectTitle,
       handleNext,
       handlePreview,

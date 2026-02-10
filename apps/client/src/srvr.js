@@ -415,3 +415,7 @@ export async function getReviews(url, buttonName) {
   }
   return await response.json();
 }
+
+export function debugTvdb(params) {
+  return httpCall("/api/debugTvdb", params, "POST");
+}

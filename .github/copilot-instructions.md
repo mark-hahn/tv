@@ -17,7 +17,6 @@
 - when copying between local and remote server don't worry about security, we are on a safe lan
 - locally in this workspace don't run a server or do testing - the only thing that should run locally is vite dev, run, & srvr scripts
 - no data or secrets should be stored locally -- only on remote
-- local apps are copied to their production folders by the script srvr at this project root. 
 - remote /root/dev/apps/tv/ is not a repo or worktree, it is just a raw directory that pm2 uses.
 - every path  that starts with /root/dev/apps/tv is on the remote server.   
 - every path that starts with /root/apps/tv/ is on the local pc.   
@@ -28,3 +27,4 @@
 - don't make cosmetic changes
 - never test whether show id has `noemby-` prefix -- check show.inEmby instead
 - the tvdb record prop `deleted` no longer exists -- it should not be set or used
+- use the script srvr to deploy the server modules and the client to the remote server

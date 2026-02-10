@@ -857,6 +857,13 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     return;
   }
   const extResObj = await extRes.json();
+  
+  // DEBUG: Log remoteIds for debugging
+  if (name.toLowerCase().includes("boomer")) {
+    console.log(`[DEBUG] ${name} - TVDB API remoteIds:`, extResObj.data?.remoteIds);
+    console.log(`[DEBUG] ${name} - Full extResObj.data:`, JSON.stringify(extResObj.data, null, 2));
+  }
+  
   const {
     firstAired,
     lastAired: lastAiredIn,
@@ -1300,6 +1307,60 @@ export const getRemotesCmd = async (params) => {
   } catch (err) {
     log("getRemotesCmd: ERROR", { error: err.message });
     throw new Error(`getRemotes error: ${err.message}`);
+  }
+};
+
+export const debugTvdb = async (params) => {
+  const { name, tvdbId } = params;
+  
+  if (!tvdbId) {
+    throw new Error("debugTvdb: missing tvdbId");
+  }
+
+  try {
+    log("debugTvdb: Fetching API data for", { name, tvdbId });
+    
+    const extUrl = `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
+    const token = await getToken();
+    const extRes = await fetch(extUrl, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + token,
+      },
+    });
+
+    if (!extRes.ok) {
+      throw new Error(`TVDB API returned status ${extRes.status}`);
+    }
+
+    const extResObj = await extRes.json();
+    
+    // Save to remote server at /root/dev/apps/tv/samples/tvdb-from-api.json
+    const samplePath = "/root/dev/apps/tv/samples/tvdb-from-api.json";
+    const sampleDir = path.dirname(samplePath);
+    
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(sampleDir)) {
+      fs.mkdirSync(sampleDir, { recursive: true });
+    }
+    
+    // Write the data
+    fs.writeFileSync(
+      samplePath,
+      JSON.stringify(extResObj, null, 2),
+      "utf8"
+    );
+    
+    log("debugTvdb: Saved API data to", samplePath);
+    
+    return {
+      success: true,
+      message: `Saved TVDB API data for "${name}" to ${samplePath}`,
+      path: samplePath,
+    };
+  } catch (err) {
+    log("err", "debugTvdb: ERROR", { error: err.message });
+    throw new Error(`debugTvdb error: ${err.message}`);
   }
 };
 

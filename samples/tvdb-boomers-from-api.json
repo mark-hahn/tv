@@ -1,0 +1,607 @@
+{
+  "status": "success",
+  "data": {
+    "id": 284677,
+    "name": "Boomers",
+    "slug": "boomers",
+    "image": "https://artworks.thetvdb.com/banners/posters/284677-5.jpg",
+    "nameTranslations": [
+      "eng"
+    ],
+    "overviewTranslations": [
+      "eng",
+      "fra"
+    ],
+    "aliases": [],
+    "firstAired": "2014-08-15",
+    "lastAired": "2016-04-29",
+    "nextAired": "",
+    "score": 497,
+    "status": {
+      "id": 2,
+      "name": "Ended",
+      "recordType": "series",
+      "keepUpdated": false
+    },
+    "originalCountry": "gbr",
+    "originalLanguage": "eng",
+    "defaultSeasonType": 1,
+    "isOrderRandomized": false,
+    "lastUpdated": "2019-11-13 09:50:25",
+    "averageRuntime": 30,
+    "episodes": null,
+    "overview": "Boomers follows the ups and downs of three couples living in Thurnemouth, 'Norfolk's only west-facing resort'.\r\n\r\nThere's Alan and Joyce, who are coming at retirement from very different directions; Alan wants to slow down, Joyce wants to speed up. Alan tries to avoid as many of Joyce's social commitments as possible, but downsizing to a bungalow has meant there are fewer places for him to hide.\r\n\r\nJohn and Maureen, living in their gadget-filled dream house, are adventurous in every aspect of life including the bedroom. For them, 60 is the new 40. However, there's a reminder of what's around the corner with Maureen's ever-present mum Joan.\r\n\r\nAnd finally there's Trevor and Carol, who've got non-communication down to such a fine art that if Carol spent a weekend away, Trevor might not even notice.",
+    "year": "2014",
+    "artworks": [
+      {
+        "id": 1030929,
+        "image": "https://artworks.thetvdb.com/banners/fanart/original/284677-1.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/fanart/original/284677-1_t.jpg",
+        "language": "eng",
+        "type": 3,
+        "score": 100001,
+        "width": 1920,
+        "height": 1080,
+        "includesText": false,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 1030930,
+        "image": "https://artworks.thetvdb.com/banners/fanart/original/284677-2.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/fanart/original/284677-2_t.jpg",
+        "language": "eng",
+        "type": 3,
+        "score": 100001,
+        "width": 1920,
+        "height": 1080,
+        "includesText": false,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 1030931,
+        "image": "https://artworks.thetvdb.com/banners/fanart/original/284677-3.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/fanart/original/284677-3_t.jpg",
+        "language": "eng",
+        "type": 3,
+        "score": 100001,
+        "width": 1920,
+        "height": 1080,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 1032484,
+        "image": "https://artworks.thetvdb.com/banners/fanart/original/284677-4.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/fanart/original/284677-4_t.jpg",
+        "language": "eng",
+        "type": 3,
+        "score": 100001,
+        "width": 1920,
+        "height": 1080,
+        "includesText": false,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 1129553,
+        "image": "https://artworks.thetvdb.com/banners/fanart/original/284677-5.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/fanart/original/284677-5_t.jpg",
+        "language": "eng",
+        "type": 3,
+        "score": 100000,
+        "width": 1280,
+        "height": 720,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 1129554,
+        "image": "https://artworks.thetvdb.com/banners/fanart/original/284677-6.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/fanart/original/284677-6_t.jpg",
+        "language": "eng",
+        "type": 3,
+        "score": 100000,
+        "width": 1280,
+        "height": 720,
+        "includesText": false,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 1128356,
+        "image": "https://artworks.thetvdb.com/banners/posters/284677-5.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/posters/284677-5_t.jpg",
+        "language": "eng",
+        "type": 2,
+        "score": 100000,
+        "width": 680,
+        "height": 1000,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 60740751,
+        "image": "https://artworks.thetvdb.com/banners/seasons/284677-1.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/seasons/284677-1_t.jpg",
+        "language": "eng",
+        "type": 7,
+        "score": 100000,
+        "width": 400,
+        "height": 578,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "seasonId": 593621,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 1032489,
+        "image": "https://artworks.thetvdb.com/banners/graphical/284677-g.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/graphical/284677-g_t.jpg",
+        "language": "eng",
+        "type": 1,
+        "score": 100000,
+        "width": 758,
+        "height": 140,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 1032490,
+        "image": "https://artworks.thetvdb.com/banners/graphical/284677-g2.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/graphical/284677-g2_t.jpg",
+        "language": "eng",
+        "type": 1,
+        "score": 100000,
+        "width": 758,
+        "height": 140,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      },
+      {
+        "id": 60740752,
+        "image": "https://artworks.thetvdb.com/banners/seasonswide/284677-1.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/seasonswide/284677-1_t.jpg",
+        "language": "eng",
+        "type": 6,
+        "score": 100000,
+        "width": 758,
+        "height": 140,
+        "includesText": true,
+        "thumbnailWidth": 0,
+        "thumbnailHeight": 0,
+        "updatedAt": 0,
+        "seasonId": 593621,
+        "status": {
+          "id": 0,
+          "name": null
+        },
+        "tagOptions": null
+      }
+    ],
+    "companies": [
+      {
+        "id": 37,
+        "name": "BBC One",
+        "slug": "bbc-one",
+        "nameTranslations": [
+          "eng"
+        ],
+        "overviewTranslations": [],
+        "aliases": [],
+        "country": "gbr",
+        "primaryCompanyType": 1,
+        "activeDate": null,
+        "inactiveDate": null,
+        "companyType": {
+          "companyTypeId": 1,
+          "companyTypeName": "Network"
+        },
+        "parentCompany": {
+          "id": 956,
+          "name": "BBC",
+          "relation": {
+            "id": null,
+            "typeName": null
+          }
+        },
+        "tagOptions": null
+      }
+    ],
+    "originalNetwork": {
+      "id": 37,
+      "name": "BBC One",
+      "slug": "bbc-one",
+      "nameTranslations": [
+        "eng"
+      ],
+      "overviewTranslations": [],
+      "aliases": [],
+      "country": "gbr",
+      "primaryCompanyType": 1,
+      "activeDate": null,
+      "inactiveDate": null,
+      "companyType": {
+        "companyTypeId": 1,
+        "companyTypeName": "Network"
+      },
+      "parentCompany": {
+        "id": 956,
+        "name": "BBC",
+        "relation": {
+          "id": null,
+          "typeName": null
+        }
+      },
+      "tagOptions": null
+    },
+    "latestNetwork": {
+      "id": 37,
+      "name": "BBC One",
+      "slug": "bbc-one",
+      "nameTranslations": [
+        "eng"
+      ],
+      "overviewTranslations": [],
+      "aliases": [],
+      "country": "gbr",
+      "primaryCompanyType": 1,
+      "activeDate": null,
+      "inactiveDate": null,
+      "companyType": {
+        "companyTypeId": 1,
+        "companyTypeName": "Network"
+      },
+      "parentCompany": {
+        "id": 956,
+        "name": "BBC",
+        "relation": {
+          "id": null,
+          "typeName": null
+        }
+      },
+      "tagOptions": null
+    },
+    "genres": [
+      {
+        "id": 15,
+        "name": "Comedy",
+        "slug": "comedy"
+      }
+    ],
+    "trailers": [],
+    "lists": [],
+    "remoteIds": [
+      {
+        "id": "tt3261308",
+        "type": 2,
+        "sourceName": "IMDB"
+      },
+      {
+        "id": "66029",
+        "type": 12,
+        "sourceName": "TheMovieDB.com"
+      }
+    ],
+    "characters": [
+      {
+        "id": 63440694,
+        "name": "Alan",
+        "peopleId": 258050,
+        "seriesId": 284677,
+        "series": null,
+        "movie": null,
+        "movieId": null,
+        "episodeId": null,
+        "type": 3,
+        "image": null,
+        "sort": 0,
+        "isFeatured": true,
+        "url": "https://thetvdb.com/people/258050-philip-jackson",
+        "nameTranslations": null,
+        "overviewTranslations": null,
+        "aliases": null,
+        "peopleType": "Actor",
+        "personName": "Philip Jackson",
+        "tagOptions": null,
+        "personImgURL": "https://artworks.thetvdb.com/banners/v4/actor/258050/photo/68768c24dd8a0.jpg"
+      },
+      {
+        "id": 63440698,
+        "name": "Joyce",
+        "peopleId": 295104,
+        "seriesId": 284677,
+        "series": null,
+        "movie": null,
+        "movieId": null,
+        "episodeId": null,
+        "type": 3,
+        "image": null,
+        "sort": 0,
+        "isFeatured": true,
+        "url": "https://thetvdb.com/people/295104-alison-steadman",
+        "nameTranslations": null,
+        "overviewTranslations": null,
+        "aliases": null,
+        "peopleType": "Actor",
+        "personName": "Alison Steadman",
+        "tagOptions": null,
+        "personImgURL": "https://artworks.thetvdb.com/banners/v4/actor/295104/photo/660902de776b4.jpg"
+      },
+      {
+        "id": 63440701,
+        "name": "John",
+        "peopleId": 260666,
+        "seriesId": 284677,
+        "series": null,
+        "movie": null,
+        "movieId": null,
+        "episodeId": null,
+        "type": 3,
+        "image": null,
+        "sort": 0,
+        "isFeatured": true,
+        "url": "https://thetvdb.com/people/260666-russ-abbot",
+        "nameTranslations": null,
+        "overviewTranslations": null,
+        "aliases": null,
+        "peopleType": "Actor",
+        "personName": "Russ Abbot",
+        "tagOptions": null,
+        "personImgURL": "https://artworks.thetvdb.com/banners/v4/actor/260666/photo/68ac3140b5db6.jpg"
+      },
+      {
+        "id": 63440705,
+        "name": "Maureen",
+        "peopleId": 268354,
+        "seriesId": 284677,
+        "series": null,
+        "movie": null,
+        "movieId": null,
+        "episodeId": null,
+        "type": 3,
+        "image": null,
+        "sort": 0,
+        "isFeatured": true,
+        "url": "https://thetvdb.com/people/268354-stephanie-beacham",
+        "nameTranslations": null,
+        "overviewTranslations": null,
+        "aliases": null,
+        "peopleType": "Actor",
+        "personName": "Stephanie Beacham",
+        "tagOptions": null,
+        "personImgURL": "https://artworks.thetvdb.com/banners/v4/actor/268354/photo/65e0a621e68e9.jpg"
+      },
+      {
+        "id": 63440709,
+        "name": "Trevor",
+        "peopleId": 325990,
+        "seriesId": 284677,
+        "series": null,
+        "movie": null,
+        "movieId": null,
+        "episodeId": null,
+        "type": 3,
+        "image": null,
+        "sort": 0,
+        "isFeatured": true,
+        "url": "https://thetvdb.com/people/325990-james-smith",
+        "nameTranslations": null,
+        "overviewTranslations": null,
+        "aliases": null,
+        "peopleType": "Actor",
+        "personName": "James Smith",
+        "tagOptions": null,
+        "personImgURL": "https://artworks.thetvdb.com/banners/v4/actor/325990/photo/67cc6f4f0aa32.jpg"
+      },
+      {
+        "id": 63440713,
+        "name": "Carol",
+        "peopleId": 298147,
+        "seriesId": 284677,
+        "series": null,
+        "movie": null,
+        "movieId": null,
+        "episodeId": null,
+        "type": 3,
+        "image": null,
+        "sort": 0,
+        "isFeatured": true,
+        "url": "https://thetvdb.com/people/298147-paula-wilcox",
+        "nameTranslations": null,
+        "overviewTranslations": null,
+        "aliases": null,
+        "peopleType": "Actor",
+        "personName": "Paula Wilcox",
+        "tagOptions": null,
+        "personImgURL": "https://artworks.thetvdb.com/banners/v4/actor/298147/photo/6237a759974f3.jpg"
+      }
+    ],
+    "airsDays": {
+      "sunday": false,
+      "monday": false,
+      "tuesday": false,
+      "wednesday": false,
+      "thursday": false,
+      "friday": true,
+      "saturday": false
+    },
+    "airsTime": null,
+    "seasons": [
+      {
+        "id": 593620,
+        "seriesId": 284677,
+        "type": {
+          "id": 1,
+          "name": "Aired Order",
+          "type": "official",
+          "alternateName": null
+        },
+        "number": 0,
+        "nameTranslations": [],
+        "overviewTranslations": [],
+        "companies": {
+          "studio": null,
+          "network": null,
+          "production": null,
+          "distributor": null,
+          "special_effects": null
+        },
+        "lastUpdated": "2019-11-13 09:50:12"
+      },
+      {
+        "id": 593621,
+        "seriesId": 284677,
+        "type": {
+          "id": 1,
+          "name": "Aired Order",
+          "type": "official",
+          "alternateName": null
+        },
+        "number": 1,
+        "nameTranslations": [],
+        "overviewTranslations": [],
+        "image": "https://artworks.thetvdb.com/banners/seasons/284677-1.jpg",
+        "imageType": 7,
+        "companies": {
+          "studio": null,
+          "network": null,
+          "production": null,
+          "distributor": null,
+          "special_effects": null
+        },
+        "lastUpdated": "2019-11-13 09:50:13"
+      },
+      {
+        "id": 649304,
+        "seriesId": 284677,
+        "type": {
+          "id": 1,
+          "name": "Aired Order",
+          "type": "official",
+          "alternateName": null
+        },
+        "number": 2,
+        "nameTranslations": [],
+        "overviewTranslations": [],
+        "companies": {
+          "studio": null,
+          "network": null,
+          "production": null,
+          "distributor": null,
+          "special_effects": null
+        },
+        "lastUpdated": "2020-10-10 14:43:35"
+      },
+      {
+        "id": 1677690,
+        "seriesId": 284677,
+        "type": {
+          "id": 3,
+          "name": "Absolute Order",
+          "type": "absolute",
+          "alternateName": null
+        },
+        "number": 1,
+        "nameTranslations": [],
+        "overviewTranslations": [],
+        "companies": {
+          "studio": null,
+          "network": null,
+          "production": null,
+          "distributor": null,
+          "special_effects": null
+        },
+        "lastUpdated": "2019-11-13 09:50:12"
+      }
+    ],
+    "tags": null,
+    "contentRatings": [],
+    "seasonTypes": [
+      {
+        "id": 1,
+        "name": "Aired Order",
+        "type": "official",
+        "alternateName": null
+      },
+      {
+        "id": 2,
+        "name": "DVD Order",
+        "type": "dvd",
+        "alternateName": null
+      },
+      {
+        "id": 3,
+        "name": "Absolute Order",
+        "type": "absolute",
+        "alternateName": null
+      }
+    ]
+  }
+}

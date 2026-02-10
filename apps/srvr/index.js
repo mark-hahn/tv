@@ -2456,6 +2456,7 @@ app.get("/api/getAllNotes", apiWrapper(getAllNotes));
 
 // Endpoints with parameters
 app.post("/api/getRemotes", apiWrapper(tvdb.getRemotesCmd));
+app.post("/api/debugTvdb", apiWrapper(tvdb.debugTvdb));
 app.post("/api/getNewTvdb", apiWrapper(tvdb.getNewTvdb));
 app.post("/api/getActorPage", apiWrapper(tvdb.getActorPage));
 app.post("/api/getTmdb", apiWrapper(tmdb.getTmdb));

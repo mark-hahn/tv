@@ -126,6 +126,7 @@
               @watch-click="watchClick"
               @filter-input="select"
               @send-filters="sendSharedFilters"
+              @debug-click="debugClick"
             ></HdrTop>
             <HdrBot
               v-if="!simpleMode"
@@ -188,6 +189,7 @@
             @watch-click="watchClick"
             @filter-input="select"
             @send-filters="sendSharedFilters"
+            @debug-click="debugClick"
           ></HdrTop>
           <HdrBot
             v-if="!simpleMode"
@@ -788,6 +790,38 @@ export default {
         }
       } catch (e) {
         console.error("sendSharedFilters failed:", e);
+      }
+    },
+
+    async debugClick() {
+      try {
+        if (!this.highlightName) {
+          console.log("No show selected");
+          return;
+        }
+
+        const currentShow = allShows.find((s) => s.Name === this.highlightName);
+        if (!currentShow) {
+          console.log("Could not find show:", this.highlightName);
+          return;
+        }
+
+        const tvdbId = currentShow.TvdbId || currentShow.tvdbId;
+        if (!tvdbId) {
+          console.log("Show has no TvdbId:", this.highlightName);
+          return;
+        }
+
+        console.log("Fetching TVDB API data for:", this.highlightName, "TvdbId:", tvdbId);
+        
+        const result = await srvr.debugTvdb({
+          name: currentShow.Name,
+          tvdbId: tvdbId,
+        });
+
+        console.log("Debug result:", result);
+      } catch (e) {
+        console.error("debugClick failed:", e);
       }
     },
 

@@ -71,6 +71,19 @@
     >
       <button
         v-if="!simpleMode"
+        @click="handleDebugClick"
+        :style="{
+          height: '29px',
+          backgroundColor: debugFlash ? '#4CAF50' : 'white',
+          fontsize: '15px',
+          margin: '6px 0 4px 10px',
+          transition: 'background-color 0.15s ease',
+        }"
+      >
+        Debug
+      </button>
+      <button
+        v-if="!simpleMode"
         @click="$emit('send-filters', $event)"
         style="
           height: 29px;
@@ -120,9 +133,22 @@ export default {
     },
   },
 
-  emits: ["update:filterStr", "watch-click", "filter-input", "send-filters"],
+  emits: ["update:filterStr", "watch-click", "filter-input", "send-filters", "debug-click"],
+
+  data() {
+    return {
+      debugFlash: false,
+    };
+  },
 
   methods: {
+    handleDebugClick() {
+      this.debugFlash = true;
+      this.$emit('debug-click');
+      setTimeout(() => {
+        this.debugFlash = false;
+      }, 300);
+    },
     handleFilterInput(event) {
       this.$emit("update:filterStr", event.target.value);
       this.$emit("filter-input");

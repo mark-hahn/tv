@@ -923,7 +923,10 @@ export default {
       justFetchedNext.value = true;
       suppressButtons.value = true;
       lastLoadedTvdbId.value =
-        curTvdb.value?.tvdb_id || curTvdb.value?.tvdbId || "-1";
+        curTvdb.value?.tvdb_id ||
+        curTvdb.value?.tvdbId ||
+        curTvdb.value?.id ||
+        "-1";
 
       // Clear artifacts to prevent flash of old buttons
       getRemotesResults.value = [];
@@ -1076,7 +1079,7 @@ export default {
       const t = curTvdb.value;
       if (!t) return null;
 
-      const tId = String(t.tvdb_id || t.tvdbId || "").trim();
+      const tId = String(t.tvdb_id || t.tvdbId || t.id || "").trim();
       const name = String(t.name || t.Name || t.seriesName || t.title || "")
         .trim()
         .toLowerCase();
@@ -1333,12 +1336,14 @@ export default {
       }
 
       const name = String(tvdb.name || "").trim();
-      const tvdbId = String(tvdb.tvdb_id || "").trim();
+      const tvdbId = String(
+        tvdb.tvdb_id || tvdb.tvdbId || tvdb.id || "",
+      ).trim();
 
       // If we are suppressing buttons (fetching next show),
       // check if this is still the old show.
       if (suppressButtons.value && lastLoadedTvdbId.value) {
-        const currentId = tvdbId || tvdb.tvdbId;
+        const currentId = tvdbId || tvdb.tvdbId || tvdb.id;
         if (String(currentId) === String(lastLoadedTvdbId.value)) {
           // Still the old show. Don't fetch remotes, don't unsuppress.
           return;
@@ -1417,7 +1422,8 @@ export default {
           return;
         }
 
-        const tvdbId = curTvdb.value.tvdb_id || curTvdb.value.tvdbId;
+        const tvdbId =
+          curTvdb.value.tvdb_id || curTvdb.value.tvdbId || curTvdb.value.id;
         const name = curTvdb.value.name;
 
         if (!tvdbId) {
@@ -1463,7 +1469,7 @@ export default {
       if (!name) return;
 
       // Check if show already exists
-      const tvdbId = String(t.tvdbId || t.tvdb_id || "").trim();
+      const tvdbId = String(t.tvdbId || t.tvdb_id || t.id || "").trim();
       const exists = (props.allShows || []).some((s) => {
         const sTvdb = String(s.TvdbId || s.tvdbId || s.tvdb_id || "").trim();
         if (sTvdb && tvdbId && sTvdb === tvdbId) return true;
@@ -1481,7 +1487,7 @@ export default {
       // Route through the exact same flow used by clicking a card in #searchList.
       const srchChoice = {
         name,
-        tvdbId: String(t.tvdbId || t.tvdb_id || "").trim(),
+        tvdbId: String(t.tvdbId || t.tvdb_id || t.id || "").trim(),
         overview:
           t.overview || t.overviewText || t.overview_txt || t.Overview || "",
         image: t.image || t.image_url || t.thumbnail || "",

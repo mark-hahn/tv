@@ -1316,6 +1316,33 @@ export default {
             return;
           }
 
+          // If tvdbData exists but has no image, force a refresh
+          if (!tvdbData.image && show.TvdbId) {
+            const showSeed = {
+              Name: show?.Name,
+              TvdbId: show.TvdbId,
+              Overview: show?.Overview,
+              Reject: !!show?.Reject,
+            };
+            const paramObj = {
+              show: showSeed,
+              seasonCount: 0,
+              episodeCount: 0,
+              watchedCount: 0,
+            };
+            try {
+              const freshTvdbData = await srvr.getNewTvdb(paramObj);
+              if (freshTvdbData) {
+                delete freshTvdbData.deleted;
+                allTvdb[show.Name] = freshTvdbData;
+                tvdbData = freshTvdbData;
+                this.currentTvdbData = freshTvdbData;
+              }
+            } catch (e) {
+              console.error("Series: getNewTvdb image refresh failed:", e);
+            }
+          }
+
           await this.setDeleted(tvdbData);
 
           // Don't await poster!

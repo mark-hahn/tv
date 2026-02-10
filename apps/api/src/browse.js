@@ -114,7 +114,7 @@ const avoidGenres = [
   "home & garden",
   "musical",
   "reality",
-  "sport",
+  "music",
   "talk",
   "stand-up",
   "travel",
@@ -124,7 +124,6 @@ const avoidGenres = [
   "legal",
   "medical",
   "nature",
-  "sports",
   "supernatural",
 ];
 

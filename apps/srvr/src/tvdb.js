@@ -802,8 +802,7 @@ async function getTmdbFallback(showName) {
 // create tvdbData object
 // update allTvdb & tvdb.json
 const getTvdbData = async (paramObj, resolve, _reject) => {
-  const { show, seasonCount, episodeCount, watchedCount, clientRequest } =
-    paramObj;
+  const { show, seasonCount, episodeCount, watchedCount, fast } = paramObj;
 
   // Defensive check - ensure show object exists
   if (!show || !show.Name) {
@@ -815,7 +814,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   }
 
   const name = show.Name;
-  // log("getTvdbData: START", { name, clientRequest });
+  // log("getTvdbData: START", { name, fast });
   // Use PST (UTC-8) for added date
   const pstDate = new Date(Date.now() - 8 * 60 * 60 * 1000);
   const added = allTvdb[name]?.added ?? pstDate.toISOString().slice(0, 10);
@@ -880,9 +879,10 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   // get remote data, e.g. IMDB for tvdb record
   // remoteIds come from tvdb
-  // Skip slow remote fetching for client requests - client will fetch separately if needed
-  const remotes = clientRequest
-    ? []
+  // Skip slow remote fetching for fast requests - client will fetch separately if needed
+  // Preserve existing remotes when skipping fetch (fast: true)
+  const remotes = fast
+    ? existing.remotes || []
     : await getRemotes(show, remoteIds, false, false);
   const saved = Date.now();
   const trailersRaw = trailersIn || allTvdb[name]?.trailers;
@@ -1271,6 +1271,8 @@ export const getRemotesCmd = async (params) => {
   const show = params?.show;
   const tvdbRemotes = params?.tvdbRemotes || [];
   const fast = !!params?.fast;
+  // fast: true = use cache/basic links; fast: false = fetch fresh API data
+  const clientRequest = fast;
   // log("getRemotesCmd: START", { showName: show?.Name, fast });
 
   if (!show) {
@@ -1278,7 +1280,17 @@ export const getRemotesCmd = async (params) => {
   }
 
   try {
-    const remotes = await getRemotes(show, tvdbRemotes, fast, true);
+    const remotes = await getRemotes(show, tvdbRemotes, fast, clientRequest);
+
+    // When fetching fresh data (fast=false), save remotes to tvdb.json
+    if (!fast && show.Name && allTvdb && allTvdb[show.Name]) {
+      allTvdb[show.Name].remotes = remotes;
+      // Save to disk asynchronously without blocking response
+      saveTvdbSync().catch((err) => {
+        log("err", "getRemotesCmd: saveTvdbSync failed:", err.message);
+      });
+    }
+
     // log("getRemotesCmd: END", {
     //   showName: show?.Name,
     //   remotesCount: remotes?.length,
@@ -1391,14 +1403,14 @@ export const saveTvdbSync = async () => {
 export const getNewTvdb = async (params) => {
   if (!params) throw new Error("getNewTvdb: missing params");
 
-  // HTTP requests are always client requests - mark to skip slow remote fetching
-  params.clientRequest = true;
+  // HTTP requests are always fast mode - mark to skip slow remote fetching
+  params.fast = true;
 
   const showName = params.show?.Name;
   log("getNewTvdb called:", {
     showName,
     queueLength: newTvdbQueue.length,
-    clientRequest: params.clientRequest,
+    fast: params.fast,
   });
 
   return new Promise((resolve, reject) => {

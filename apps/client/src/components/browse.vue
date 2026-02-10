@@ -1355,26 +1355,28 @@ export default {
 
       try {
         const remoteIds = tvdb.remote_ids || [];
-        
+
         // Try to find matching show in allShows to get inEmby status and Id
         let showContext = null;
         const matchingShow = (props.allShows || []).find((s) => {
           const sTvdb = String(s.TvdbId || s.tvdbId || s.tvdb_id || "").trim();
           if (sTvdb && tvdbId && sTvdb === tvdbId) return true;
-          const sName = String(s.Name || s.name || "").trim().toLowerCase();
+          const sName = String(s.Name || s.name || "")
+            .trim()
+            .toLowerCase();
           return sName === name.toLowerCase();
         });
-        
+
         if (matchingShow) {
           showContext = {
             inEmby: matchingShow.inEmby,
             Id: matchingShow.Id,
           };
         }
-        
+
         // Use centralized cache function with show context
         const results = await getRemotes(name, tvdbId, remoteIds, showContext);
-        
+
         if (_lastRemotesKey.value === key) {
           getRemotesResults.value = results;
         }

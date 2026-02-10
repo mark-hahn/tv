@@ -526,31 +526,22 @@
     <div
       v-if="refreshing"
       :style="{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        backgroundColor: 'white',
+        color: 'black',
+        padding: '20px 30px',
+        borderRadius: '8px',
+        zIndex: 10001,
+        pointerEvents: 'none',
+        fontSize: '18px',
+        fontWeight: 'bold',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
       }"
     >
-      <div
-        :style="{
-          padding: '20px 40px',
-          backgroundColor: 'white',
-          border: '2px solid #666',
-          borderRadius: '10px',
-          fontSize: '18px',
-          fontWeight: 'bold',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-        }"
-      >
-        Refreshing...
-      </div>
+      Refreshing...
     </div>
   </div>
 </template>
@@ -617,6 +608,7 @@ export default {
       currentTvdbData: null,
       previewSrchChoice: null,
       refreshing: false,
+      remoteFetchMode: "fast", // 'fast' or 'full'
     };
   },
 
@@ -977,7 +969,8 @@ export default {
       let seasonsTxt;
       const { episodeCount, seasonCount, watchedCount } = tvdbData;
       switch (seasonCount) {
-        case 0: return;
+        case 0:
+          return;
         case 1:
           seasonsTxt = "1 Season";
           break;
@@ -1111,12 +1104,16 @@ export default {
 
     async setRemotes() {
       this.remoteShowName = this.show.Name;
-      this.showSpinner = false;
+      // Don't show spinner when refreshing (we have the refreshing overlay)
+      if (!this.refreshing) {
+        this.showSpinner = false;
+      }
       this.showRemotes = false;
       let delayingSpinner = true;
       this.remotes = [];
       const spinnerTimeout = setTimeout(() => {
-        if (delayingSpinner) this.showSpinner = true;
+        // Don't show spinner when refreshing
+        if (delayingSpinner && !this.refreshing) this.showSpinner = true;
         delayingSpinner = false;
       }, 1000);
 
@@ -1134,16 +1131,30 @@ export default {
           inEmby: this.show.inEmby,
           Id: this.show.Id,
         };
-        const results = await tvdb.getRemotes(this.show.Name, tvdbId, remoteIds, showContext);
+        // Use fast mode by default (can be overridden by passing false)
+        const fast = this.remoteFetchMode !== "full";
+        const results = await tvdb.getRemotes(
+          this.show.Name,
+          tvdbId,
+          remoteIds,
+          showContext,
+          fast,
+        );
 
         this.remotes = results;
-        this.showSpinner = false;
+        if (!this.refreshing) {
+          this.showSpinner = false;
+        }
         this.showRemotes = results.length > 0;
         delayingSpinner = false;
         clearTimeout(spinnerTimeout);
+        // Reset fetch mode after use
+        this.remoteFetchMode = "fast";
       } catch (err) {
         console.error("setRemotes:", err);
-        this.showSpinner = false;
+        if (!this.refreshing) {
+          this.showSpinner = false;
+        }
         this.showRemotes = false;
         delayingSpinner = false;
         clearTimeout(spinnerTimeout);
@@ -1158,7 +1169,6 @@ export default {
     },
 
     async refreshTvdb() {
-      if (!confirm(`Refresh TVDB data for "${this.show.Name}"?`)) return;
       this.refreshing = true;
       try {
         await srvr.setTvdbFields({
@@ -1166,15 +1176,48 @@ export default {
           saved: 0,
         });
         tvdb.clearCache();
+        // Set mode to full fetch for fresh Rotten Tomatoes ratings
+        this.remoteFetchMode = "full";
         evtBus.emit("library-refresh-complete");
-        // Re-init the current view
-        this.onSetUpSeries(this.show);
+        // Re-init the current view and wait for it to complete
+        await this.setupSeriesForRefresh(this.show);
       } catch (e) {
         console.error("refreshTvdb error", e);
         alert("Error requesting refresh: " + e);
-      } finally {
         this.refreshing = false;
       }
+    },
+
+    setupSeriesForRefresh(show) {
+      // Wrapper to make onSetUpSeries awaitable for refresh
+      return new Promise((resolve) => {
+        // Store the original callback
+        const originalResolve = resolve;
+
+        this.onSetUpSeries(show);
+
+        // Wait for setRemotes to complete (called in setTimeout after 10ms + processing time)
+        // Check every 100ms if remotes are loaded
+        const checkInterval = setInterval(() => {
+          if (
+            this.seriesReady &&
+            (this.showRemotes ||
+              this.remotes.length > 0 ||
+              this.remoteFetchMode === "fast")
+          ) {
+            clearInterval(checkInterval);
+            this.refreshing = false;
+            originalResolve();
+          }
+        }, 100);
+
+        // Fallback timeout to prevent hanging
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          this.refreshing = false;
+          originalResolve();
+        }, 10000);
+      });
     },
 
     onSetUpSeries(show) {

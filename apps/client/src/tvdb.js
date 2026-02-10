@@ -80,18 +80,30 @@ export const getAllTvdb = async (hasEmby = 0) => {
 const remotesCache = new Map();
 const activeRemotesRequests = new Map();
 
-export const getRemotes = async (showName, tvdbId, remoteIds = [], showContext = null) => {
+export const getRemotes = async (
+  showName,
+  tvdbId,
+  remoteIds = [],
+  showContext = null,
+  fast = true,
+) => {
   // Ensure allTvdb is loaded
   if (!allTvdb) await getAllTvdb();
 
-  // Create cache key
-  const key = tvdbId || showName;
+  // Create cache key (include fast flag to separate fast/full caches)
+  const key = `${tvdbId || showName}|fast:${fast}`;
   if (!key) return [];
 
   // Check if already in allTvdb cache (only use cache if it has results)
   // Don't use cache if showContext indicates inEmby status (need fresh data for Emby button)
-  const useCache = !showContext || showContext.inEmby === undefined;
-  if (useCache && allTvdb[showName]?.remotes && Array.isArray(allTvdb[showName].remotes) && allTvdb[showName].remotes.length > 0) {
+  // Don't use cache for non-fast requests (full refreshes)
+  const useCache = fast && (!showContext || showContext.inEmby === undefined);
+  if (
+    useCache &&
+    allTvdb[showName]?.remotes &&
+    Array.isArray(allTvdb[showName].remotes) &&
+    allTvdb[showName].remotes.length > 0
+  ) {
     return allTvdb[showName].remotes;
   }
 
@@ -108,18 +120,22 @@ export const getRemotes = async (showName, tvdbId, remoteIds = [], showContext =
           Name: showName,
           TvdbId: tvdbId,
           // Include inEmby and Id from showContext if available
-          ...(showContext?.inEmby !== undefined && { inEmby: showContext.inEmby }),
-          ...(showContext?.Id !== undefined && showContext.Id !== null && { Id: showContext.Id }),
+          ...(showContext?.inEmby !== undefined && {
+            inEmby: showContext.inEmby,
+          }),
+          ...(showContext?.Id !== undefined &&
+            showContext.Id !== null && { Id: showContext.Id }),
         },
         tvdbRemotes: remoteIds,
-        fast: true,
+        fast: fast,
       };
 
       const res = await srvr.getRemotesCmd(params);
       const results = Array.isArray(res) ? res : [];
 
       // Store in allTvdb cache if we have a showName and allTvdb entry exists
-      if (showName && allTvdb) {
+      // Only cache fast results (full results may have time-sensitive data)
+      if (fast && showName && allTvdb) {
         if (!allTvdb[showName]) {
           allTvdb[showName] = {};
         }

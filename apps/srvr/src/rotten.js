@@ -482,8 +482,9 @@ function chooseShow(shows, query) {
     );
   }
 
-  // Rotten Tomatoes Search: forceChoice = false
-  const result = smartTitleMatch(query, shows, year, false);
+  // Use forceChoice=true to allow aggressive normalization and Levenshtein matching
+  // This handles cases like "Sensitive Skin (CA)" matching "Sensitive Skin"
+  const result = smartTitleMatch(query, shows, year, true);
 
   if (debug && result) {
     log(`smartTitleMatch selected: "${result.title}" (${result.startyear})`);

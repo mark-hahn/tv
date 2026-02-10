@@ -1109,31 +1109,44 @@ export default {
       }
     },
 
-    setRemotes() {
+    async setRemotes() {
       this.remoteShowName = this.show.Name;
       this.showSpinner = false;
       this.showRemotes = false;
       let delayingSpinner = true;
       this.remotes = [];
-      setTimeout(() => {
+      const spinnerTimeout = setTimeout(() => {
         if (delayingSpinner) this.showSpinner = true;
         delayingSpinner = false;
       }, 1000);
+
       try {
-        const remotes = allTvdb[this.show.Name]?.remotes;
-        if (!remotes) {
-          console.error("setRemotes: no allTvdb:", this.show.Name);
-          this.showSpinner = false;
-          this.showRemotes = false;
-          delayingSpinner = false;
-          return;
-        }
-        this.remotes = remotes;
+        const tvdbId =
+          this.show?.ProviderIds?.Tvdb ??
+          this.show?.TvdbId ??
+          this.show?.tvdbId ??
+          this.show?.tvdb_id;
+        const tvdbData = this.currentTvdbData || allTvdb?.[this.show.Name];
+        const remoteIds = tvdbData?.remote_ids || [];
+
+        // Use centralized cache function, passing show context for inEmby/Id
+        const showContext = {
+          inEmby: this.show.inEmby,
+          Id: this.show.Id,
+        };
+        const results = await tvdb.getRemotes(this.show.Name, tvdbId, remoteIds, showContext);
+
+        this.remotes = results;
         this.showSpinner = false;
-        this.showRemotes = true;
+        this.showRemotes = results.length > 0;
         delayingSpinner = false;
+        clearTimeout(spinnerTimeout);
       } catch (err) {
         console.error("setRemotes:", err);
+        this.showSpinner = false;
+        this.showRemotes = false;
+        delayingSpinner = false;
+        clearTimeout(spinnerTimeout);
       }
     },
 

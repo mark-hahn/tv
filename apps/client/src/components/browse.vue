@@ -647,7 +647,7 @@ import ReelGallery from "./reel-gallery.vue";
 import { config } from "../config.js";
 import evtBus from "../evtBus.js";
 import * as srvr from "../srvr.js";
-import { getAllTvdb } from "../tvdb.js";
+import { getAllTvdb, getRemotes } from "../tvdb.js";
 
 export default {
   name: "BrowsePane",
@@ -747,8 +747,6 @@ export default {
       evtBus.off("showSelected", onShowSelected);
     });
     const lastLoadedTvdbId = ref(null);
-    const remotesCache = new Map();
-    const activeLoadingKeys = new Set();
 
     const handleScaledWheel = (event) => {
       if (!event) return;
@@ -1347,52 +1345,47 @@ export default {
       }
       _lastRemotesKey.value = key;
 
-      if (remotesCache.has(key)) {
-        getRemotesResults.value = remotesCache.get(key);
-        await nextTick();
-        suppressButtons.value = false;
-        return;
-      }
-
-      if (activeLoadingKeys.has(key)) {
-        isLoadingRemotesMsg.value = true;
-        await nextTick();
-        suppressButtons.value = false;
-        return;
-      }
-
       getRemotesResults.value = [];
       isLoadingRemotesMsg.value = true;
-      activeLoadingKeys.add(key);
       loadingRemotesCount.value++;
 
       await nextTick();
       // Only unsuppress if we passed checks
       suppressButtons.value = false;
+
       try {
-        const params = {
-          show: {
-            Name: name,
-            TvdbId: tvdbId,
-          },
-          tvdbRemotes: tvdb.remote_ids || [],
-          fast: true,
-        };
-        const res = await srvr.getRemotesCmd(params);
+        const remoteIds = tvdb.remote_ids || [];
+        
+        // Try to find matching show in allShows to get inEmby status and Id
+        let showContext = null;
+        const matchingShow = (props.allShows || []).find((s) => {
+          const sTvdb = String(s.TvdbId || s.tvdbId || s.tvdb_id || "").trim();
+          if (sTvdb && tvdbId && sTvdb === tvdbId) return true;
+          const sName = String(s.Name || s.name || "").trim().toLowerCase();
+          return sName === name.toLowerCase();
+        });
+        
+        if (matchingShow) {
+          showContext = {
+            inEmby: matchingShow.inEmby,
+            Id: matchingShow.Id,
+          };
+        }
+        
+        // Use centralized cache function with show context
+        const results = await getRemotes(name, tvdbId, remoteIds, showContext);
+        
         if (_lastRemotesKey.value === key) {
-          const results = Array.isArray(res) ? res : [];
-          remotesCache.set(key, results);
           getRemotesResults.value = results;
         }
       } catch (e) {
         if (e !== "cancelled")
-          console.log("getRemotesCmd failed:", e?.message || String(e));
+          console.log("getRemotes failed:", e?.message || String(e));
         if (_lastRemotesKey.value === key) {
           getRemotesResults.value = [];
         }
       } finally {
         loadingRemotesCount.value--;
-        activeLoadingKeys.delete(key);
         if (_lastRemotesKey.value === key) {
           isLoadingRemotesMsg.value = false;
         }

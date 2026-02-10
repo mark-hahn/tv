@@ -779,7 +779,7 @@ export const getSeriesMap = async (show, prune = false) => {
       const played = !!episodeRec?.UserData?.Played;
       const avail = episodeRec?.LocationType != "Virtual";
       // If episode has a file, it can't be unaired (Emby's unaired endpoint is unreliable)
-      const unaired = (avail && path) ? false : !!unairedObj[episodeNumber];
+      const unaired = avail && path ? false : !!unairedObj[episodeNumber];
 
       if (avail && !path) {
         console.error(

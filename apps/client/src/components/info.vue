@@ -471,18 +471,6 @@
         width: 100%;
       "
     >
-      <div v-if="showSpinner">
-        <img
-          src="../../loading.gif"
-          style="
-            width: 100px;
-            height: 100px;
-            position: relative;
-            top: 20px;
-            left: 45px;
-          "
-        />
-      </div>
       <div
         id="remoteButtons"
         v-if="showRemotes"
@@ -595,7 +583,6 @@ export default {
       runtimeTxt: "",
       subs: "",
       subsActive: false,
-      showSpinner: false,
       showRemotes: false,
       nextUpValTxt: "",
       nextUpSuffixTxt: "",
@@ -1105,18 +1092,8 @@ export default {
 
     async setRemotes() {
       this.remoteShowName = this.show.Name;
-      // Don't show spinner when refreshing (we have the refreshing overlay)
-      if (!this.refreshing) {
-        this.showSpinner = false;
-      }
       this.showRemotes = false;
-      let delayingSpinner = true;
       this.remotes = [];
-      const spinnerTimeout = setTimeout(() => {
-        // Don't show spinner when refreshing
-        if (delayingSpinner && !this.refreshing) this.showSpinner = true;
-        delayingSpinner = false;
-      }, 1000);
 
       try {
         const tvdbId =
@@ -1143,22 +1120,12 @@ export default {
         );
 
         this.remotes = results;
-        if (!this.refreshing) {
-          this.showSpinner = false;
-        }
         this.showRemotes = results.length > 0;
-        delayingSpinner = false;
-        clearTimeout(spinnerTimeout);
         // Reset fetch mode after use
         this.remoteFetchMode = "fast";
       } catch (err) {
         console.error("setRemotes:", err);
-        if (!this.refreshing) {
-          this.showSpinner = false;
-        }
         this.showRemotes = false;
-        delayingSpinner = false;
-        clearTimeout(spinnerTimeout);
       }
     },
 

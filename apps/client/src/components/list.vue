@@ -1168,7 +1168,6 @@ export default {
         seasonCount: 0,
         episodeCount: 0,
         watchedCount: 0,
-        clientRequest: true,
       };
       let tvdbData = null;
 

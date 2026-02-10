@@ -587,12 +587,7 @@ const getRemote = async (id, type, showName) => {
 
 const remotesCache = new Map();
 
-const getRemotes = async (
-  show,
-  tvdbRemotes,
-  fast = false,
-  clientRequest = false,
-) => {
+const getRemotes = async (show, tvdbRemotes, fast = false) => {
   const cacheKey =
     show.Name +
     "|" +
@@ -600,11 +595,9 @@ const getRemotes = async (
     "|" +
     JSON.stringify(tvdbRemotes || {}) +
     "|" +
-    fast +
-    "|" +
-    clientRequest;
+    fast;
 
-  if (clientRequest && remotesCache.has(cacheKey)) {
+  if (remotesCache.has(cacheKey)) {
     return remotesCache.get(cacheKey);
   }
 
@@ -615,39 +608,44 @@ const getRemotes = async (
   if (show.inEmby)
     remotes.push({ name: "Emby", url: urls.embyPageUrl(showId) });
 
-  if (!fast) {
-    if (clientRequest) {
-      let rottenFound = false;
-      const cachedShow = allTvdb ? allTvdb[name] : null;
-      if (cachedShow && cachedShow.remotes) {
-        const cachedRotten = cachedShow.remotes.find(
-          (r) => r.name && r.name.startsWith("Rotten"),
-        );
-        if (cachedRotten) {
-          remotes.push(cachedRotten);
-          rottenFound = true;
-        }
-      }
-
-      if (!rottenFound) {
-        // basic link construction
-        const cleanName = name
-          .trim()
-          .toLowerCase()
-          .replace(/['":.,!]/g, "")
-          .replace(/\s+/g, "_");
-        const url = `https://www.rottentomatoes.com/tv/${cleanName}`;
-        remotes.push({ name: "Rotten", url });
-      }
-    } else {
-      const rottenRemote = await getRemote(null, 99, name);
-      if (rottenRemote) {
-        if (rottenRemote.ratings)
-          rottenRemote.name += " (" + rottenRemote.ratings + ")";
-        remotes.push(rottenRemote);
+  // Rotten Tomatoes: controlled by fast parameter
+  // fast=true: use cached or construct basic link (no Playwright scraping)
+  // fast=false: scrape with Playwright for fresh ratings
+  if (fast) {
+    // Try to use cached Rotten Tomatoes data
+    let rottenFound = false;
+    const cachedShow = allTvdb ? allTvdb[name] : null;
+    if (cachedShow && cachedShow.remotes) {
+      const cachedRotten = cachedShow.remotes.find(
+        (r) => r.name && r.name.startsWith("Rotten"),
+      );
+      if (cachedRotten) {
+        remotes.push(cachedRotten);
+        rottenFound = true;
       }
     }
+
+    if (!rottenFound) {
+      // Construct basic link without scraping
+      const cleanName = name
+        .trim()
+        .toLowerCase()
+        .replace(/['":.,!]/g, "")
+        .replace(/\s+/g, "_");
+      const url = `https://www.rottentomatoes.com/tv/${cleanName}`;
+      remotes.push({ name: "Rotten", url });
+    }
+  } else {
+    // Scrape Rotten Tomatoes with Playwright for fresh ratings
+    const rottenRemote = await getRemote(null, 99, name);
+    if (rottenRemote) {
+      if (rottenRemote.ratings)
+        rottenRemote.name += " (" + rottenRemote.ratings + ")";
+      remotes.push(rottenRemote);
+    }
   }
+
+  // Always fetch other remotes (Google, Wikipedia, Reddit, IMDB, etc.)
   const encoded = encodeURI(name).replaceAll("&", "%26");
   const url = `https://www.google.com/search` + `?q=${encoded}%20tv%20show`;
   remotes.push({ name: "Google", url });
@@ -895,11 +893,12 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   // get remote data, e.g. IMDB for tvdb record
   // remoteIds come from tvdb
-  // Skip slow remote fetching for fast requests - client will fetch separately if needed
+  // Skip remote fetching for fast requests - client will fetch separately if needed
   // Preserve existing remotes when skipping fetch (fast: true)
+  // Background updates use fast=false to scrape Rotten Tomatoes with Playwright
   const remotes = fast
     ? existing.remotes || []
-    : await getRemotes(show, remoteIds, false, false);
+    : await getRemotes(show, remoteIds, false);
   const saved = Date.now();
   const trailersRaw = trailersIn || allTvdb[name]?.trailers;
 
@@ -1286,8 +1285,9 @@ export const getRemotesCmd = async (params) => {
   const show = params?.show;
   const tvdbRemotes = params?.tvdbRemotes || [];
   const fast = !!params?.fast;
-  // fast: true = use cache/basic links; fast: false = fetch fresh API data
-  const clientRequest = fast;
+  // fast: true = use cached/basic links (no Rotten Tomatoes scraping)
+  // fast: false = scrape Rotten Tomatoes with Playwright for fresh ratings
+  // All other remotes (IMDB, Wikipedia, etc.) are always fetched
   // log("getRemotesCmd: START", { showName: show?.Name, fast });
 
   if (!show) {
@@ -1295,7 +1295,7 @@ export const getRemotesCmd = async (params) => {
   }
 
   try {
-    const remotes = await getRemotes(show, tvdbRemotes, fast, clientRequest);
+    const remotes = await getRemotes(show, tvdbRemotes, fast);
 
     // When fetching fresh data (fast=false), save remotes to tvdb.json
     if (!fast && show.Name && allTvdb && allTvdb[show.Name]) {

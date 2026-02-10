@@ -1082,7 +1082,7 @@ export default {
         this.nextUpValTxt = "";
         this.nextUpSuffixTxt = "";
       }
-      this.updateWatchButtons(readyToWatch).catch((e) => console.error(e));
+      await this.updateWatchButtons(readyToWatch);
     },
 
     async updateWatchButtons(readyToWatch) {

@@ -934,9 +934,13 @@ export default {
         // Merge into allTvdb and allShows
         Object.assign(allTvdb, additionalShows);
 
-        // Convert additional shows to array and merge
+        // Convert additional shows to array and merge, checking for duplicates
         const additionalShowsArray = Object.values(additionalShows);
-        allShows.push(...additionalShowsArray);
+        const existingNames = new Set(allShows.map((s) => s.Name));
+        const newShows = additionalShowsArray.filter(
+          (s) => !existingNames.has(s.Name),
+        );
+        allShows.push(...newShows);
 
         const elapsed = Math.round(performance.now() - startTime);
         console.log(
@@ -1877,9 +1881,13 @@ export default {
         // Merge into allTvdb and allShows
         Object.assign(allTvdb, additionalShows);
 
-        // Convert additional shows to array and merge
+        // Convert additional shows to array and merge, checking for duplicates
         const additionalShowsArray = Object.values(additionalShows);
-        allShows.push(...additionalShowsArray);
+        const existingNames = new Set(allShows.map((s) => s.Name));
+        const newShows = additionalShowsArray.filter(
+          (s) => !existingNames.has(s.Name),
+        );
+        allShows.push(...newShows);
 
         // Update the full show list
         this.shows = [...allShows];

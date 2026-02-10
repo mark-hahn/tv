@@ -2756,12 +2756,11 @@ async function syncEmbyUserData() {
     if (updatedCount > 0) {
       await tvdb.saveTvdbSync();
       // console.log(`[Phase 3] syncEmbyUserData: Updated ${updatedCount} shows`);
-    } 
+    }
     // else {
     //   console.log("[Phase 3] syncEmbyUserData: No changes detected");
     // }
-  } 
-  catch (err) {
+  } catch (err) {
     console.error("[Phase 3] syncEmbyUserData error:", err.message);
   }
 }
@@ -2820,7 +2819,7 @@ async function syncDiskData() {
     if (updatedCount > 0) {
       await tvdb.saveTvdbSync();
       // console.log(`[Phase 3] syncDiskData: Updated ${updatedCount} shows`);
-    } 
+    }
     // else {
     //   console.log("[Phase 3] syncDiskData: No changes detected");
     // }

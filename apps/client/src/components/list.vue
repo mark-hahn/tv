@@ -812,8 +812,13 @@ export default {
           return;
         }
 
-        console.log("Fetching TVDB API data for:", this.highlightName, "TvdbId:", tvdbId);
-        
+        console.log(
+          "Fetching TVDB API data for:",
+          this.highlightName,
+          "TvdbId:",
+          tvdbId,
+        );
+
         const result = await srvr.debugTvdb({
           name: currentShow.Name,
           tvdbId: tvdbId,

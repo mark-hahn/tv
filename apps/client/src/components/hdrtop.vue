@@ -133,7 +133,13 @@ export default {
     },
   },
 
-  emits: ["update:filterStr", "watch-click", "filter-input", "send-filters", "debug-click"],
+  emits: [
+    "update:filterStr",
+    "watch-click",
+    "filter-input",
+    "send-filters",
+    "debug-click",
+  ],
 
   data() {
     return {
@@ -144,7 +150,7 @@ export default {
   methods: {
     handleDebugClick() {
       this.debugFlash = true;
-      this.$emit('debug-click');
+      this.$emit("debug-click");
       setTimeout(() => {
         this.debugFlash = false;
       }, 300);

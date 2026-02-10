@@ -877,6 +877,9 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   let originalNetwork = originalNetworkIn?.name ?? "";
   const status = statusIn.name; // e.g. Ended
 
+  // Preserve existing non-empty values when API returns empty
+  const existing = allTvdb[name] || {};
+
   // get remote data, e.g. IMDB for tvdb record
   // remoteIds come from tvdb
   // Skip slow remote fetching for fast requests - client will fetch separately if needed
@@ -913,8 +916,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     tmdbData = await getTmdbFallback(name);
   }
 
-  // Preserve existing non-empty values when API returns empty
-  const existing = allTvdb[name] || {};
   const preserve = (newVal, existingVal, tmdbVal) => {
     if (newVal !== undefined && newVal !== null && newVal !== "") return newVal;
     if (existingVal !== undefined && existingVal !== null && existingVal !== "")

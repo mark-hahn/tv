@@ -95,11 +95,9 @@ export const getRemotes = async (
   if (!key) return [];
 
   // Check if already in allTvdb cache (only use cache if it has results)
-  // Don't use cache if showContext indicates inEmby status (need fresh data for Emby button)
-  // Don't use cache for non-fast requests (full refreshes)
-  const useCache = fast && (!showContext || showContext.inEmby === undefined);
+  // Only use cache for fast requests (full refreshes always fetch fresh)
   if (
-    useCache &&
+    fast &&
     allTvdb[showName]?.remotes &&
     Array.isArray(allTvdb[showName].remotes) &&
     allTvdb[showName].remotes.length > 0

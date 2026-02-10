@@ -575,7 +575,7 @@ const getRemote = async (id, type, showName) => {
   }
 
   if (!url) {
-    log(`getRemote, no url: ${name}`);
+    // log(`getRemote, no url: ${name}`);
     return null;
   }
   // console.log(`getRemote`, { name, url, ratings });

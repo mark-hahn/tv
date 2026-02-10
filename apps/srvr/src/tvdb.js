@@ -970,6 +970,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
       tmdbData?.originalLanguage,
     ),
     status: preserve(status, existing.status, tmdbData?.status),
+    remote_ids: remoteIds || [], // Store raw remoteIds from TVDB API
     remotes, // Don't preserve arrays - they accumulate
     characters, // Don't preserve arrays - they accumulate
     added,

@@ -1138,25 +1138,41 @@ export default {
 
     async refreshTvdb() {
       const startTime = Date.now();
-      console.log(`Refresh button clicked for ${this.show.Name}`);
+      const showName = this.show.Name;
+      console.log(`Refresh button clicked for ${showName}`);
       this.refreshing = true;
       try {
         await srvr.setTvdbFields({
-          name: this.show.Name,
+          name: showName,
           saved: 0,
         });
 
         // Note: setTvdbFields with saved:0 already triggered a full server-side refresh
         // that scraped Rotten Tomatoes and fetched all remotes (IMDB, Wikipedia, etc.)
-        // Re-init the current view and wait for it to complete
+
+        // Reload the tvdb data with updated inEmby flag (in case show just appeared in Emby)
+        const updatedTvdb = await tvdb.getAllTvdb(0);
+        const updatedShowData = updatedTvdb[showName];
+
+        if (updatedShowData) {
+          // Merge updated show data into current show object
+          Object.assign(this.show, updatedShowData);
+          console.log(
+            `Refreshed show data for ${showName}, inEmby=${this.show.inEmby}`,
+          );
+        }
+
+        // Re-init the current view with updated show data
         await this.setupSeriesForRefresh(this.show);
 
-        // Don't emit library-refresh-complete for single-show refresh - it's overkill.
-        // The info pane is already updated, and reloading all 344 shows causes
-        // an unnecessary getNewTvdb call due to async file write timing on the server.
+        // Trigger map refresh with updated show data if map is currently showing this show
+        evtBus.emit("refreshMapIfShowing", {
+          showName,
+          updatedShow: this.show,
+        });
 
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-        console.log(`Refresh complete for ${this.show.Name} (${elapsed}s)`);
+        console.log(`Refresh complete for ${showName} (${elapsed}s)`);
       } catch (e) {
         console.error("refreshTvdb error", e);
         alert("Error requesting refresh: " + e);

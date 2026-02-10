@@ -310,6 +310,9 @@ export async function loadAllShows() {
       tvdbRecord.DateCreated = updateFields.dateCreated;
       tvdbRecord.PremiereDate = updateFields.premiereDate;
 
+      // Mark show as being in Emby
+      tvdbRecord.inEmby = true;
+
       // Note: gap and note already in tvdb (Phase 5), don't overwrite
       tvdbRecord.lastEmbySync = now;
     }
@@ -753,6 +756,7 @@ export const getSeriesMap = async (show, prune = false) => {
   const seriesMap = [];
   let pruning = prune;
   const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
+
   for (let key in seasonsRes.data.Items) {
     let seasonRec = seasonsRes.data.Items[key];
     let seasonId = seasonRec.Id;
@@ -774,7 +778,8 @@ export const getSeriesMap = async (show, prune = false) => {
       const path = episodeRec?.MediaSources?.[0]?.Path;
       const played = !!episodeRec?.UserData?.Played;
       const avail = episodeRec?.LocationType != "Virtual";
-      const unaired = !!unairedObj[episodeNumber];
+      // If episode has a file, it can't be unaired (Emby's unaired endpoint is unreliable)
+      const unaired = (avail && path) ? false : !!unairedObj[episodeNumber];
 
       if (avail && !path) {
         console.error(

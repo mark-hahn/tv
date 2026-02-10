@@ -355,9 +355,6 @@ if (phase5MigrationNeeded) {
 
 ///////////////////// GET REMOTES ///////////////////////
 
-let cacheName = null;
-let cacheJson;
-
 const imdbFetchHeaders = {
   // IMDb commonly returns HTTP 202 with an empty body to non-browser requests.
   // A realistic UA + accept headers consistently yields normal HTML.
@@ -405,62 +402,53 @@ const getUrlAndRatings = async (type, url, name) => {
 
   let html, json;
 
-  if ((type == 18 || type == 7) && cacheName === name) json = cacheJson;
-  else {
-    const fetchOpts =
-      +type === 2
-        ? { headers: imdbFetchHeaders, redirect: "follow" }
-        : undefined;
+  const fetchOpts =
+    +type === 2 ? { headers: imdbFetchHeaders, redirect: "follow" } : undefined;
 
-    let resp;
-    try {
-      resp = await fetchWithTimeout(url, fetchOpts);
-    } catch (e) {
-      log(
-        "err",
-        `getUrlAndRatings fetch error: ${JSON.stringify({
-          type,
-          url,
-          name,
-        })}, ${e.message}`,
-      );
-      return null;
-    }
-
-    if (!resp.ok) {
-      log(
-        "err",
-        `getUrlAndRatings fetch error: ${JSON.stringify({
-          type,
-          url,
-          name,
-        })}, ${resp.status}`,
-      );
-      return null;
-    }
-    if (type == 18 || type == 7) json = await resp.json();
-    else {
-      html = await resp.text();
-
-      // IMDb bot mitigation can manifest as 202 + empty body.
-      if (+type === 2 && (!html || html.length === 0 || resp.status === 202)) {
-        try {
-          resp = await fetchWithTimeout(url, fetchOpts);
-          html = await resp.text();
-        } catch (e) {
-          log("err", `getUrlAndRatings retry error: ${e.message}`);
-          return null;
-        }
-      }
-
-      html = (html || "").replaceAll(/\r?\n/gm, "").replaceAll(/\s+/gm, " ");
-    }
+  let resp;
+  try {
+    resp = await fetchWithTimeout(url, fetchOpts);
+  } catch (e) {
+    log(
+      "err",
+      `getUrlAndRatings fetch error: ${JSON.stringify({
+        type,
+        url,
+        name,
+      })}, ${e.message}`,
+    );
+    return null;
   }
 
+  if (!resp.ok) {
+    log(
+      "err",
+      `getUrlAndRatings fetch error: ${JSON.stringify({
+        type,
+        url,
+        name,
+      })}, ${resp.status}`,
+    );
+    return null;
+  }
   if (type == 18 || type == 7) {
-    cacheName = name;
-    cacheJson = json;
-  } else cacheName = null;
+    json = await resp.json();
+  } else {
+    html = await resp.text();
+
+    // IMDb bot mitigation can manifest as 202 + empty body.
+    if (+type === 2 && (!html || html.length === 0 || resp.status === 202)) {
+      try {
+        resp = await fetchWithTimeout(url, fetchOpts);
+        html = await resp.text();
+      } catch (e) {
+        log("err", `getUrlAndRatings retry error: ${e.message}`);
+        return null;
+      }
+    }
+
+    html = (html || "").replaceAll(/\r?\n/gm, "").replaceAll(/\s+/gm, " ");
+  }
 
   let idFnameParam;
   switch (+type) {
@@ -585,22 +573,7 @@ const getRemote = async (id, type, showName) => {
 ///////////// get remotes  //////////////
 // use tvdb remotes data to find complete remote data
 
-const remotesCache = new Map();
-
 const getRemotes = async (show, tvdbRemotes, fast = false) => {
-  const cacheKey =
-    show.Name +
-    "|" +
-    show.Id +
-    "|" +
-    JSON.stringify(tvdbRemotes || {}) +
-    "|" +
-    fast;
-
-  if (remotesCache.has(cacheKey)) {
-    return remotesCache.get(cacheKey);
-  }
-
   const name = show.Name;
   const showId = show.Id;
   const remotes = [];
@@ -683,12 +656,6 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   }
 
   // console.log("getRemotes result:", JSON.stringify(remotes, null, 2));
-
-  remotesCache.set(cacheKey, remotes);
-  if (remotesCache.size > 100) {
-    const firstKey = remotesCache.keys().next().value;
-    remotesCache.delete(firstKey);
-  }
 
   return remotes;
 };

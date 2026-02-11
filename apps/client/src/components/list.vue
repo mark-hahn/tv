@@ -1839,45 +1839,31 @@ export default {
 
       let seriesMapIn = null;
 
-      // Check if we can use cached map data
-      const tvdbRecord = allTvdb?.[show?.Name];
-      const hasCachedMap =
-        tvdbRecord?.map &&
-        Array.isArray(tvdbRecord.map) &&
-        tvdbRecord.map.length > 0;
+      // Fetch fresh data from Emby/TVDB
+      seriesMapIn = await emby.getSeriesMap(show, action == "prune");
 
-      // Use cached data if:
-      // - Show is not in Emby OR preview mode is active
-      // - AND cached map exists
-      if ((show.inEmby === false || this.previewMode) && hasCachedMap) {
-        seriesMapIn = decompressMap(tvdbRecord.map);
-      } else {
-        // Fetch fresh data from Emby/TVDB
-        seriesMapIn = await emby.getSeriesMap(show, action == "prune");
-
-        // If emby has no data, try tvdb as fallback
+      // If emby has no data, try tvdb as fallback
+      if (!seriesMapIn || seriesMapIn.length === 0) {
+        seriesMapIn = await tvdb.getSeriesMap(show);
         if (!seriesMapIn || seriesMapIn.length === 0) {
-          seriesMapIn = await tvdb.getSeriesMap(show);
-          if (!seriesMapIn || seriesMapIn.length === 0) {
-            errorMessage = "Not in emby and show not found in TVDB.";
-            seriesMapIn = []; // Keep empty for error display
-          }
+          errorMessage = "Not in emby and show not found in TVDB.";
+          seriesMapIn = []; // Keep empty for error display
         }
+      }
 
-        // Persist map data to tvdb record (if fetched successfully)
-        if (
-          seriesMapIn &&
-          seriesMapIn.length > 0 &&
-          show.Name &&
-          allTvdb?.[show.Name]
-        ) {
-          const compressedMap = compressMap(seriesMapIn);
-          allTvdb[show.Name].map = compressedMap;
-          await srvr.setTvdbFields({
-            name: show.Name,
-            map: compressedMap,
-          });
-        }
+      // Persist map data to tvdb record (if fetched successfully)
+      if (
+        seriesMapIn &&
+        seriesMapIn.length > 0 &&
+        show.Name &&
+        allTvdb?.[show.Name]
+      ) {
+        const compressedMap = compressMap(seriesMapIn);
+        allTvdb[show.Name].map = compressedMap;
+        await srvr.setTvdbFields({
+          name: show.Name,
+          map: compressedMap,
+        });
       }
 
       for (const season of seriesMapIn) {

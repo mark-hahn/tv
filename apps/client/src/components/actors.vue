@@ -711,20 +711,6 @@ export default {
         }
       }
 
-      // Check if we can use cached map data from tvdb record
-      const tvdbRecord = allTvdb?.[show?.Name];
-      const hasCachedMap =
-        tvdbRecord?.map &&
-        Array.isArray(tvdbRecord.map) &&
-        tvdbRecord.map.length > 0;
-
-      // Use cached data if:
-      // - Show is not in Emby OR preview mode is active
-      // - AND cached map exists
-      if ((show?.inEmby === false || this.previewMode) && hasCachedMap) {
-        return decompressMap(tvdbRecord.map);
-      }
-
       // Prefer Emby when available, but for noemby (and other failures),
       // fall back to TVDB (same strategy as map pane).
       try {

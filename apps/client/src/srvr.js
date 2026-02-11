@@ -34,19 +34,16 @@ const attachWsHandlers = () => {
   };
 
   ws.onopen = () => {
-    console.log("opened websocket (ASR only)");
     haveSocket = true;
   };
 
   ws.onclose = () => {
-    console.log("websocket closed, trying open in 2 secs");
     haveSocket = false;
     rejectAllPending({ error: "websocket closed" });
     setTimeout(openWs, 2000);
   };
 
   ws.onerror = (err) => {
-    console.error(("websocket error:", err));
     haveSocket = false;
     rejectAllPending({ error: "websocket error", details: err });
   };

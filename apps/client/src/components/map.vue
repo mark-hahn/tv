@@ -739,7 +739,6 @@ export default {
       );
       if (!ok) return;
 
-      console.log("Map: Not In Emby ctrl-click", { showName, tvdbId, seasons });
       this.mapWorking = true;
       this.mapWorkingTitle = "Creating show folder and refreshing Emby:";
       this.mapWorkingShowName = showName;

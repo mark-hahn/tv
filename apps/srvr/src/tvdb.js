@@ -1482,12 +1482,6 @@ export const setTvdbFields = async (params) => {
   if (!paramObj) return null;
   let tvdb = null;
   const name = paramObj.name;
-  log("[SERVER] setTvdbFields called:", {
-    name,
-    hasMap: !!paramObj.map,
-    mapLength: paramObj.map ? paramObj.map.length : 0,
-    allKeys: Object.keys(paramObj),
-  });
   if (name) {
     if (paramObj.$delTvdb) {
       delete allTvdb[name];
@@ -1537,12 +1531,6 @@ export const setTvdbFields = async (params) => {
 
         // Handle direct assignment for top-level fields and nested objects
         tvdb[key] = value;
-        if (key === "map") {
-          log(
-            "[SERVER] setTvdbFields: assigned map to tvdb, length:",
-            value?.length,
-          );
-        }
       }
       setImdbId(tvdb);
       if (tvdb.saved === 0) {
@@ -1572,16 +1560,7 @@ export const setTvdbFields = async (params) => {
     }
   }
   if (!paramObj.dontSave) {
-    log(
-      "[SERVER] setTvdbFields: saving to disk, tvdb has map:",
-      !!tvdb?.map,
-      "map length:",
-      tvdb?.map?.length,
-    );
     await util.writeFile(TVDB_PATH, allTvdb);
-    log("[SERVER] setTvdbFields: saved successfully");
-  } else {
-    log("[SERVER] setTvdbFields: dontSave is true, skipping disk write");
   }
   return tvdb ?? "ok";
 };

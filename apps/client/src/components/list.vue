@@ -1872,20 +1872,11 @@ export default {
           allTvdb?.[show.Name]
         ) {
           const compressedMap = compressMap(seriesMapIn);
-          console.log(
-            `[MAP PERSIST] Persisting compressed map for ${show.Name}, seasons:`,
-            seriesMapIn.length,
-          );
           allTvdb[show.Name].map = compressedMap;
-          const result = await srvr.setTvdbFields({
+          await srvr.setTvdbFields({
             name: show.Name,
             map: compressedMap,
           });
-          console.log(`[MAP PERSIST] setTvdbFields result:`, result);
-        } else {
-          console.log(
-            `[MAP PERSIST] Skipping persistence - seriesMapIn.length=${seriesMapIn?.length}, show.Name=${show.Name}, has allTvdb entry=${!!allTvdb?.[show.Name]}`,
-          );
         }
       }
 
@@ -2415,7 +2406,6 @@ export default {
     });
 
     on("openMap", (show) => {
-      console.log("List: openMap event received for show:", show?.Name);
       this.seriesMapAction("open", show);
     });
 

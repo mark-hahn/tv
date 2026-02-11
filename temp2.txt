@@ -1,0 +1,230 @@
+# Gap Detection Logic
+
+## Overview
+
+The gap detection system identifies missing episodes and unwatched content across all TV shows in the Emby library. It runs as a Web Worker (`gap-worker.js`) to avoid blocking the UI thread.
+
+## Gap Types
+
+The system detects several types of gaps:
+
+### 1. **Watch Gap** (`watchGap`)
+
+- **Definition**: Episodes that have been skipped (not watched) after the user started watching a show
+- **Detection Logic**:
+  - Tracks if any episodes have been watched (`watchedShow`)
+  - Marks `unwatchedAfterWatched` when encountering unwatched episodes after watched ones
+  - Sets `watchGap = true` when the pattern changes back to watched (unwatched → watched transition)
+  - Records the first location where this occurs (`watchGapSeason`, `watchGapEpisode`)
+
+### 2. **File Gap** (`fileGap`)
+
+- **Definition**: Episodes that are missing files after the show has started downloading
+- **Detection Logic**:
+  - Tracks if any files exist (`haveFileShow`)
+  - Marks `noFileAfterFile` when encountering missing files after files exist
+  - Sets `fileGap = true` when the pattern changes back to having files (no-file → file transition)
+  - Records the first location where this occurs (`fileGapSeason`, `fileGapEpisode`)
+  - **Special Case**: If a show has NO files at all AND nothing watched AND nothing unaired, treat it as a file gap
+  - **Exception**: If show status is "upcoming" OR all episodes are unaired OR first aired date is in the future, skip file gap detection
+
+### 3. **File End Error** (`fileEndError`)
+
+- **Definition**: Multiple recent episodes missing from the end of a season
+- **Detection Logic**:
+  - Counts consecutive missing episodes at the end of a season (`fileEndCount`)
+  - If more than 2 consecutive episodes are missing AND the season has activity (files/watched), flag as error
+  - Exception: Don't flag if there's only 1 file in the entire show and it's the first episode unwatched
+
+### 4. **Season Watched Then No File** (`seasonWatchedThenNofile`)
+
+- **Definition**: A full season with no files/unwatched/unaired episodes that comes after a season that was fully watched
+- **Detection Logic**:
+  - Tracks if the entire previous season was watched (`lastSeasonWatched`)
+  - For current season, check if it has no activity: `seasonNotWatchedNoFiles` (no files, no watched, no unaired)
+  - If previous season was fully watched AND current season has no activity, flag it
+
+### 5. **Not Ready** (`notReady`)
+
+- **Definition**: The show doesn't have unwatched content available to watch
+- **Detection Logic** (a show is "ready" if):
+  - First episode has file but isn't watched, OR
+  - There's a transition from watched → unwatched with a file available
+- `notReady = !ready`
+
+## Episode Processing Flow
+
+For each show:
+
+1. **Fetch all seasons** from Emby
+2. **For each season**:
+   - **Fetch unaired episodes list**:
+     ```javascript
+     url = urls.childrenUrl(cred, seasonId, true)  // Note: true flag for unaired
+     unairedRes = await safeGet(url)
+     ```
+     - Emby's special "unaired" endpoint returns episodes that haven't aired yet
+     - The `true` parameter tells Emby to include virtual/unaired episodes
+   
+   - **Build `unairedObj` lookup**:
+     ```javascript
+     const unairedObj = {};
+     for (let key in unairedRes.data.Items) {
+       const episode = unairedRes.data.Items[key];
+       const episodeNumber = +episode.IndexNumber;
+       unairedObj[episodeNumber] = true;  // e.g., {5: true, 6: true}
+     }
+     ```
+     - Creates a hash map for O(1) lookups: `unairedObj[5]` quickly checks if episode 5 is unaired
+     - Episode numbers are keys, values are always `true`
+     - This avoids nested loops when processing regular episodes
+   
+   - **Fetch regular episodes list**:
+     ```javascript
+     url = urls.childrenUrl(cred, seasonId)  // No flag = regular episodes only
+     episodesRes = await safeGet(url)
+     const episodes = episodesRes.data.Items
+     ```
+     - Gets all episodes that Emby knows about (both aired and virtual placeholders)
+     - Contains full metadata: watch status, file paths, episode numbers, etc,
+     - This is the main list that drives all gap detection logic
+
+3. **For each episode**:
+   - Extract metadata: `watched` (from UserData), `haveFile` (LocationType != "Virtual")
+   - Determine `unaired` status (from unairedObj OR cascading flag `unairedFromHere`)
+   - **Important**: If an episode is watched, it's NOT unaired (overrides Emby's unaired data)
+   - Once an unaired episode is found, all subsequent episodes are treated as unaired (`unairedFromHere` flag)
+
+4. **Track state changes**:
+   - Watch patterns: watched → unwatched → watched
+   - File patterns: file → no-file → file
+   - Season completion status
+   - End-of-season missing file counts
+
+5. **Apply special rules**:
+   
+   After processing all episodes, determine if file gaps should be suppressed:
+   
+   ```javascript
+   const allEpisodesUnaired = sawAnyEpisode && anyUnaired && !anyAiredEpisode;
+   const showStatus = String(showMeta?.tvdbStatus || "").trim();
+   const firstAired = String(showMeta?.firstAired || "").trim();
+   const today = toYyyyMmDd(new Date());  // Format: "2026-02-10"
+   const startDateInFuture = !!firstAired && firstAired > today;
+   
+   const skipMissingFileGap =
+     allEpisodesUnaired ||
+     startDateInFuture ||
+     showStatus.toLowerCase() === "upcoming";
+   ```
+   
+   **Skip file gaps if:**
+   - **All episodes are unaired** (`allEpisodesUnaired`)
+     - The show exists in Emby with episodes listed
+     - Every single episode is marked as unaired
+     - No aired episodes have been seen yet
+     - Example: A show announced for next month with episode placeholders
+   
+   - **First aired date is in the future** (`startDateInFuture`)
+     - TVDB metadata shows `firstAired` date like "2026-03-15"
+     - String comparison: "2026-03-15" > "2026-02-10" = true
+     - Prevents flagging shows that legitimately haven't started
+   
+   - **Show status is "upcoming"** (from TVDB)
+     - TVDB status field explicitly marks show as not yet aired
+     - Case-insensitive check: "Upcoming", "UPCOMING", "upcoming" all match
+   
+   **Suppression logic:**
+   ```javascript
+   if (skipMissingFileGap) {
+     fileGap = false;
+     fileGapSeason = null;
+     fileGapEpisode = null;
+     fileEndError = false;
+     seasonWatchedThenNofile = false;
+   }
+   ```
+   - Resets ALL file-related gap flags
+   - Prevents false positives for shows that haven't aired
+   - Watch gaps are NOT suppressed (users may selectively watch unaired episodes)
+
+## Key Variables
+
+### Tracking Flags
+
+- `firstEpisode`: True only for the very first episode across all seasons
+- `anyWatched`: True if any episode has been watched
+- `watchedShow`: True after first watched episode (doesn't reset)
+- `haveFileShow`: True after first file found (doesn't reset)
+- `unwatchedAfterWatched`: True when unwatched episode found after watched
+- `noFileAfterFile`: True when missing file found after file exists
+- `anyUnaired`: True if any unaired episodes exist
+- `sawAnyEpisode`: True if at least one episode was processed
+- `anyAiredEpisode`: True if at least one aired episode exists
+
+### Season-Level Tracking
+
+- `allSeasonWatched`: True if all episodes in current season are watched
+- `lastSeasonWatched`: Tracks if previous season was fully watched
+- `seasonNotWatchedNoFiles`: True if current season has no files, no watched, no unaired
+- `fileEndCount`: Count of consecutive missing episodes at end of season
+
+### Gap Location Recording
+
+- `watchGapSeason`, `watchGapEpisode`: First location of watch gap
+- `fileGapSeason`, `fileGapEpisode`: First location of file gap
+- `firstNoFileSeason`, `firstNoFileEpisode`: First aired episode without a file
+
+## Unaired Episode Handling
+
+- **Cascade Behavior**: Once an unaired episode is encountered, ALL subsequent episodes are treated as unaired via `unairedFromHere` flag
+- **Watched Override**: If an episode is watched, it CANNOT be unaired (Emby's unaired data is sometimes unreliable)
+- **Gap Suppression**: Shows with all episodes unaired OR upcoming status do NOT generate file gaps
+
+## Server-Side Validation
+
+On the server (`srvr/index.js`), the function `gapEntryHasGap()` determines if a gap object actually represents a gap condition:
+
+```javascript
+function gapEntryHasGap(gap) {
+  // Boolean flags
+  if (gap.FileGap === true) return true;
+  if (gap.WatchGap === true) return true;
+  if (gap.NotReady === true) return true;
+
+  // Explicit season/episode markers (allow 0)
+  if (gap.FileGapSeason / Episode !== null / undefined) return true;
+  if (gap.WatchGapSeason / Episode !== null / undefined) return true;
+
+  // Non-empty wait string
+  if (typeof gap.WaitStr === "string" && gap.WaitStr.trim() !== "") return true;
+
+  return false;
+}
+```
+
+## Data Flow
+
+1. **Client**: `emby.js` → `startGapWorker()` sends show list to worker
+2. **Worker**: `gap-worker.js` processes each show via `getShowState()`
+3. **Worker**: Posts progress messages back with gap data for each show
+4. **Client**: `list.vue` receives messages and updates UI
+5. **Client**: Calls `srvr.addGap()` to persist gap data to server
+6. **Server**: Stores gaps in `tvdb.json` under each show's `gap` field
+
+## Performance
+
+- Runs as Web Worker to avoid blocking UI
+- Processes all shows sequentially (to avoid overwhelming Emby)
+- Uses retry logic with exponential backoff for failed API calls
+- Reports progress percentage after each show
+- Logs total elapsed time on completion
+
+## UI Integration
+
+Gap detection results drive several UI features:
+
+- **Gap Button/Filter**: Shows with `FileGap` OR `WatchGap` OR (not in Emby AND not upcoming)
+- **Show Status Icons**: Visual indicators for different gap types
+- **Episode Map**: Highlights missing files and unwatched episodes
+- **Download Priority**: Can prioritize shows with file gaps

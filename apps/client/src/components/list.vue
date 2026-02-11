@@ -1862,6 +1862,17 @@ export default {
             seriesMapIn = []; // Keep empty for error display
           }
         }
+
+        // Persist map data to tvdb record (if fetched successfully)
+        if (
+          seriesMapIn &&
+          seriesMapIn.length > 0 &&
+          show.Name &&
+          allTvdb?.[show.Name]
+        ) {
+          allTvdb[show.Name].map = seriesMapIn;
+          await srvr.setTvdbFields(show.Name, { map: seriesMapIn });
+        }
       }
 
       for (const season of seriesMapIn) {

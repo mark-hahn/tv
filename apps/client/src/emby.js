@@ -20,7 +20,6 @@ const authHdr =
 
 let token = "";
 let cred = null;
-let allTvdb = null;
 let allShows = null;
 
 ////////////////////////  INIT  ///////////////////////
@@ -819,12 +818,6 @@ export const getSeriesMap = async (show, prune = false) => {
       ]);
     }
     seriesMap.push([seasonNumber, episodes]);
-  }
-
-  // Cache the map data to tvdb record (except when called from background task)
-  if (show.Name && allTvdb && allTvdb[show.Name] && seriesMap.length > 0) {
-    allTvdb[show.Name].map = seriesMap;
-    await srvr.setTvdbFields(show.Name, { map: seriesMap });
   }
 
   return seriesMap;

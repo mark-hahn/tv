@@ -412,12 +412,6 @@ export const getSeriesMap = async (show) => {
 
   const seriesMap = await getSeriesMapByTvdbId(tvdbId);
 
-  // Cache the map data to tvdb record
-  if (showNameStr && allTvdb && allTvdb[showNameStr] && seriesMap.length > 0) {
-    allTvdb[showNameStr].map = seriesMap;
-    await srvr.setTvdbFields(showNameStr, { map: seriesMap });
-  }
-
   return seriesMap;
 };
 

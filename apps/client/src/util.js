@@ -2,8 +2,6 @@ import * as emby from "./emby.js";
 import * as tvdb from "./tvdb.js";
 import * as srvr from "./srvr.js";
 
-let allTvdb = null;
-
 ////////// Build seriesMap object from seriesMapIn array //////////
 export function buildSeriesMap(seriesMapIn) {
   if (!seriesMapIn || seriesMapIn.length === 0) {

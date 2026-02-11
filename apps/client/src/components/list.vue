@@ -245,6 +245,7 @@ import * as emby from "../emby.js";
 import * as tvdb from "../tvdb.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
+import { compressMap, decompressMap } from "../mapUtil.js";
 import parseTorrentTitle from "parse-torrent-title";
 import evtBus from "../evtBus.js";
 import Shows from "./shows.vue";
@@ -311,7 +312,7 @@ export default {
 
   components: { FontAwesomeIcon, Shows, HdrTop, HdrBot, Buttons },
 
-  emits: ["show-map", "hide-map", "all-shows"],
+  emits: ["show-map", "hide-map", "all-shows", "all-tvdb"],
 
   props: {
     simpleMode: {
@@ -1849,7 +1850,7 @@ export default {
       // - Show is not in Emby OR preview mode is active
       // - AND cached map exists
       if ((show.inEmby === false || this.previewMode) && hasCachedMap) {
-        seriesMapIn = tvdbRecord.map;
+        seriesMapIn = decompressMap(tvdbRecord.map);
       } else {
         // Fetch fresh data from Emby/TVDB
         seriesMapIn = await emby.getSeriesMap(show, action == "prune");
@@ -1870,8 +1871,21 @@ export default {
           show.Name &&
           allTvdb?.[show.Name]
         ) {
-          allTvdb[show.Name].map = seriesMapIn;
-          await srvr.setTvdbFields(show.Name, { map: seriesMapIn });
+          const compressedMap = compressMap(seriesMapIn);
+          console.log(
+            `[MAP PERSIST] Persisting compressed map for ${show.Name}, seasons:`,
+            seriesMapIn.length,
+          );
+          allTvdb[show.Name].map = compressedMap;
+          const result = await srvr.setTvdbFields({
+            name: show.Name,
+            map: compressedMap,
+          });
+          console.log(`[MAP PERSIST] setTvdbFields result:`, result);
+        } else {
+          console.log(
+            `[MAP PERSIST] Skipping persistence - seriesMapIn.length=${seriesMapIn?.length}, show.Name=${show.Name}, has allTvdb entry=${!!allTvdb?.[show.Name]}`,
+          );
         }
       }
 
@@ -2228,7 +2242,9 @@ export default {
     async newShows(isInitialLoad = false) {
       await emby.init();
 
-      allShows = await emby.loadAllShows();
+      const result = await emby.loadAllShows();
+      allShows = result.allShows;
+      allTvdb = result.allTvdb;
 
       if (!allShows) {
         console.error("No shows from loadAllShows");
@@ -2244,20 +2260,20 @@ export default {
       if (isInitialLoad) {
         // Initial load: start worker immediately
         gapWorkerRunning = true;
-        emby.startGapWorker(allShows, this.addGapToShow);
+        emby.startGapWorker(allShows, allTvdb, this.addGapToShow);
       } else if (gapWorkerRunning) {
         // Worker is running, wait for it to finish then restart
         const checkAndRestart = setInterval(() => {
           if (!gapWorkerRunning) {
             clearInterval(checkAndRestart);
             gapWorkerRunning = true;
-            emby.startGapWorker(allShows, this.addGapToShow);
+            emby.startGapWorker(allShows, allTvdb, this.addGapToShow);
           }
         }, 100);
       } else {
         // Worker not running, start immediately
         gapWorkerRunning = true;
-        emby.startGapWorker(allShows, this.addGapToShow);
+        emby.startGapWorker(allShows, allTvdb, this.addGapToShow);
       }
 
       // Only set sort properties on initial load

@@ -132,7 +132,7 @@ export async function loadAllShows() {
 
   // 2. Get authoritative tvdb data (our source of truth)
   // Note: gaps, notes, noEmbys now stored in tvdb.json (Phase 5)
-  allTvdb = allTvdbResult;
+  const allTvdb = allTvdbResult;
   const now = Date.now();
 
   // Diagnostic & Fix: Check for key/Name mismatches and fix them
@@ -495,12 +495,12 @@ export async function loadAllShows() {
     `loadAllShows completed in ${elapsed}ms, ${showRecords.length} shows`,
   );
   allShows = showRecords;
-  return showRecords;
+  return { allShows: showRecords, allTvdb };
 }
 
 //////////// misc functions //////////////
 
-export function startGapWorker(allShows, cb) {
+export function startGapWorker(allShows, allTvdb, cb) {
   gapWorker.onerror = (err) => {
     console.error("Worker:", err.message);
   };
@@ -523,7 +523,7 @@ export function startGapWorker(allShows, cb) {
   gapWorker.postMessage({ cred, allShowsIdName });
 }
 
-export function startUpdateWorker(allShows, cb) {
+export function startUpdateWorker(allShows, allTvdb, cb) {
   gapWorker.onerror = (err) => {
     console.error("Worker:", err.message);
   };
@@ -835,7 +835,7 @@ export async function saveFav(id, fav) {
   const show = allShows.find((s) => s.Id === id);
   if (show && allTvdb[show.Name]) {
     allTvdb[show.Name].IsFavorite = fav;
-    await srvr.setTvdbFields(show.Name, { IsFavorite: fav });
+    await srvr.setTvdbFields({ name: show.Name, IsFavorite: fav });
   }
 }
 
@@ -861,7 +861,7 @@ export async function saveToTry(id, inToTry) {
   const show = allShows.find((s) => s.Id === id);
   if (show && allTvdb[show.Name]) {
     allTvdb[show.Name].InToTry = inToTry;
-    await srvr.setTvdbFields(show.Name, { InToTry: inToTry });
+    await srvr.setTvdbFields({ name: show.Name, InToTry: inToTry });
   }
 }
 
@@ -887,7 +887,7 @@ export async function saveContinue(id, inContinue) {
   const show = allShows.find((s) => s.Id === id);
   if (show && allTvdb[show.Name]) {
     allTvdb[show.Name].InContinue = inContinue;
-    await srvr.setTvdbFields(show.Name, { InContinue: inContinue });
+    await srvr.setTvdbFields({ name: show.Name, InContinue: inContinue });
   }
 }
 
@@ -913,7 +913,7 @@ export async function saveMark(id, inMark) {
   const show = allShows.find((s) => s.Id === id);
   if (show && allTvdb[show.Name]) {
     allTvdb[show.Name].InMark = inMark;
-    await srvr.setTvdbFields(show.Name, { InMark: inMark });
+    await srvr.setTvdbFields({ name: show.Name, InMark: inMark });
   }
 }
 
@@ -939,7 +939,7 @@ export async function saveLinda(id, inLinda) {
   const show = allShows.find((s) => s.Id === id);
   if (show && allTvdb[show.Name]) {
     allTvdb[show.Name].InLinda = inLinda;
-    await srvr.setTvdbFields(show.Name, { InLinda: inLinda });
+    await srvr.setTvdbFields({ name: show.Name, InLinda: inLinda });
   }
 }
 

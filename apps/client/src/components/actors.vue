@@ -204,6 +204,7 @@ import * as emby from "../emby.js";
 import * as tvdb from "../tvdb.js";
 import * as util from "../util.js";
 import * as srvr from "../srvr.js";
+import { decompressMap } from "../mapUtil.js";
 
 const DEBUG_ACTORS_MERGE_LOG = false;
 
@@ -721,7 +722,7 @@ export default {
       // - Show is not in Emby OR preview mode is active
       // - AND cached map exists
       if ((show?.inEmby === false || this.previewMode) && hasCachedMap) {
-        return tvdbRecord.map;
+        return decompressMap(tvdbRecord.map);
       }
 
       // Prefer Emby when available, but for noemby (and other failures),

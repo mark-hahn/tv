@@ -6,6 +6,7 @@ import * as urls from "./urls.js";
 import * as emby from "./emby.js";
 import { rottenSearch } from "./rotten.js";
 import * as util from "./util.js";
+const { getPstDate } = util;
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
 import { MovieDb } from "moviedb-promise";
 const { log, start, end } = util.getLog("tvdb");
@@ -781,9 +782,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   const name = show.Name;
   // log("getTvdbData: START", { name, fast });
-  // Use PST (UTC-8) for added date
-  const pstDate = new Date(Date.now() - 8 * 60 * 60 * 1000);
-  const added = allTvdb[name]?.added ?? pstDate.toISOString().slice(0, 10);
+  // Use PST for added date
+  const added = allTvdb[name]?.added ?? getPstDate();
   const showId = show.Id;
   const tvdbId = show.TvdbId || show.tvdbId;
   if (!tvdbId) {
@@ -1174,7 +1174,7 @@ const chkTvdbQueue = () => {
 // allTvdb is in memory copy of tvdb.json
 // only one sequential request can be busy at a time
 let tryLocalGetTvdbBusy = false;
-const tryLocalGetTvdb = () => {
+const tryLocalGetTvdb = async () => {
   if (tryLocalGetTvdbBusy) return;
   tryLocalGetTvdbBusy = true;
 

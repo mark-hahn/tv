@@ -24,6 +24,15 @@ export function buildSeriesMap(seriesMapIn) {
   return seriesMap;
 }
 
+// Get current date in PST timezone as YYYY-MM-DD string
+export function getPstDate() {
+  return new Date()
+    .toLocaleString("en-CA", {
+      timeZone: "America/Los_Angeles",
+    })
+    .slice(0, 10);
+}
+
 export function dateWithTZ(date = new Date(), utcOut = false) {
   let year, month, day;
   if (utcOut) {

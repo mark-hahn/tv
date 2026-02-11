@@ -22,6 +22,15 @@ export const jParse = (str, label) => {
   return obj;
 };
 
+// Get current date in PST timezone as YYYY-MM-DD string
+export function getPstDate() {
+  return new Date()
+    .toLocaleString("en-CA", {
+      timeZone: "America/Los_Angeles",
+    })
+    .slice(0, 10);
+}
+
 let lastMsg = null;
 let repeatCount = 0;
 export const log = (msg, err = false, spacing = false) => {

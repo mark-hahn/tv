@@ -464,7 +464,7 @@ export default {
         // Set inEmby to false to mark as deleted and set leftEmby timestamp
         const tvdbData = allTvdb[name];
         tvdbData.inEmby = false;
-        const leftEmby = new Date().toISOString().slice(0, 10);
+        const leftEmby = util.getPstDate();
         tvdbData.leftEmby = leftEmby;
         allTvdb[name] = await srvr.setTvdbFields({
           name,

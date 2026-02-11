@@ -520,7 +520,7 @@ export default {
         // Format as YYYY-MM-DD-Path-Size
         // Ensure date exists, otherwise fallback to generic/current?
         // Apps/down expects a date, so let's default if missing (though it shouldn't be).
-        const date = node.date || new Date().toISOString().slice(0, 10);
+        const date = node.date || util.getPstDate();
         const size = node.size || 0;
         return [`${date}-${currentPath}-${size}`];
       }
@@ -568,7 +568,7 @@ export default {
           if (node) {
             // If it's a file, add it directly.
             // If it's a folder, recurse and add all its contents.
-            const date = node.date || new Date().toISOString().slice(0, 10);
+            const date = node.date || util.getPstDate();
             const size = node.size || 0;
 
             if (node.type === "file") {

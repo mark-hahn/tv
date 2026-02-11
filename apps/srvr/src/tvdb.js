@@ -3,6 +3,7 @@ import * as path from "node:path";
 import fetch from "node-fetch";
 import WebSocket from "ws";
 import * as urls from "./urls.js";
+import * as emby from "./emby.js";
 import { rottenSearch } from "./rotten.js";
 import * as util from "./util.js";
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
@@ -1229,6 +1230,30 @@ const tryLocalGetTvdb = () => {
   };
   newTvdbQueue.unshift({ ws: null, id: null, paramObj });
   chkTvdbQueue();
+
+  // Fetch and persist series map data (try Emby first, fallback to TVDB)
+  try {
+    let seriesMap = null;
+
+    // Try Emby if show is in Emby
+    if (minTvdb.inEmby && minTvdb.Id) {
+      seriesMap = await emby.getSeriesMap(show);
+    }
+
+    // Fallback to TVDB if Emby fails or show not in Emby
+    if (!seriesMap && minTvdb.tvdbId) {
+      seriesMap = await getSeriesMap(minTvdb.tvdbId);
+    }
+
+    // Persist map data if fetched successfully
+    if (seriesMap && seriesMap.length > 0) {
+      minTvdb.map = seriesMap;
+      await util.writeFile(TVDB_PATH, allTvdb);
+    }
+  } catch (err) {
+    log("err", "tryLocalGetTvdb map fetch error:", err.message);
+  }
+
   tryLocalGetTvdbBusy = false;
 };
 

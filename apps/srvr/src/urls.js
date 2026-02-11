@@ -23,6 +23,17 @@ export function embyPageUrl(id) {
   `.replace(/\s*/g, "");
 }
 
+export function childrenUrl(parentId = "", unAired = false) {
+  if (!parentId) return "";
+  return `${hahnca} Users
+          / ${markUsrId} / Items /
+    ? ParentId=${parentId}
+    ${unAired ? "& IsUnaired = true" : ""}
+    & Fields = MediaSources,DateCreated,Genres,Overview,People,ProviderIds,ExternalUrls,Path,SortName,ProductionYear,Status,UserData,PlayAccess,IsFolder,Type,Tags,PremiereDate
+    & api_key = ${apiKey}
+  `.replace(/\s*/g, "");
+}
+
 // show all players
 // const url = watchingUrl();
 // let  resp = await fetch(url);

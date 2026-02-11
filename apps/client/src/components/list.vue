@@ -1836,14 +1836,31 @@ export default {
       const seriesMap = {};
       let errorMessage = "";
 
-      let seriesMapIn = await emby.getSeriesMap(show, action == "prune");
+      let seriesMapIn = null;
 
-      // If emby has no data, try tvdb as fallback
-      if (!seriesMapIn || seriesMapIn.length === 0) {
-        seriesMapIn = await tvdb.getSeriesMap(show);
+      // Check if we can use cached map data
+      const tvdbRecord = allTvdb?.[show?.Name];
+      const hasCachedMap =
+        tvdbRecord?.map &&
+        Array.isArray(tvdbRecord.map) &&
+        tvdbRecord.map.length > 0;
+
+      // Use cached data if:
+      // - Show is not in Emby OR preview mode is active
+      // - AND cached map exists
+      if ((show.inEmby === false || this.previewMode) && hasCachedMap) {
+        seriesMapIn = tvdbRecord.map;
+      } else {
+        // Fetch fresh data from Emby/TVDB
+        seriesMapIn = await emby.getSeriesMap(show, action == "prune");
+
+        // If emby has no data, try tvdb as fallback
         if (!seriesMapIn || seriesMapIn.length === 0) {
-          errorMessage = "Not in emby and show not found in TVDB.";
-          seriesMapIn = []; // Keep empty for error display
+          seriesMapIn = await tvdb.getSeriesMap(show);
+          if (!seriesMapIn || seriesMapIn.length === 0) {
+            errorMessage = "Not in emby and show not found in TVDB.";
+            seriesMapIn = []; // Keep empty for error display
+          }
         }
       }
 
@@ -1930,6 +1947,7 @@ export default {
         // Update the full show list
         this.shows = [...allShows];
         this.$emit("all-shows", allShows);
+        this.$emit("all-tvdb", allTvdb);
         this.allShowsLength = allShows.length;
       }
 
@@ -2207,6 +2225,7 @@ export default {
       }
       this.shows = [...allShows];
       this.$emit("all-shows", allShows);
+      this.$emit("all-tvdb", allTvdb);
 
       // must be set before startWorker
 

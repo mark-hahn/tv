@@ -12,7 +12,7 @@
       alignItems: 'stretch',
     }"
   >
-        <div
+    <div
       id="simpleButtonsPane"
       v-show="showSideButtons"
       :style="{
@@ -25,11 +25,11 @@
       }"
     >
       <Buttons
-          style="width: 105px; flex: 1 1 auto"
-          :sizing="sideButtonsSizing"
-          @button-click="onSideButtonsClick"
-          @top-click="onSideButtonsTop"
-        ></Buttons>
+        style="width: 105px; flex: 1 1 auto"
+        :sizing="sideButtonsSizing"
+        @button-click="onSideButtonsClick"
+        @top-click="onSideButtonsTop"
+      ></Buttons>
     </div>
     <div
       id="mainStack"
@@ -63,14 +63,26 @@
             v-for="t in tabs"
             :key="t.key"
             @click.stop="selectTab(t.key)"
+            :disabled="t.key === 'map' && isMapDisabledInPreview"
             :style="{
               fontSize: '13px',
-              cursor: 'pointer',
+              cursor:
+                t.key === 'map' && isMapDisabledInPreview
+                  ? 'not-allowed'
+                  : 'pointer',
               borderRadius: '7px',
               padding: '4px 10px',
               marginLeft: '4px',
               border: '1px solid #bbb',
-              backgroundColor: currentPane === t.key ? '#ddd' : 'whitesmoke',
+              backgroundColor:
+                currentPane === t.key
+                  ? '#ddd'
+                  : t.key === 'map' && isMapDisabledInPreview
+                    ? '#e8e8e8'
+                    : 'whitesmoke',
+              color:
+                t.key === 'map' && isMapDisabledInPreview ? '#999' : 'inherit',
+              opacity: t.key === 'map' && isMapDisabledInPreview ? 0.6 : 1,
             }"
           >
             {{ t.label }}
@@ -163,7 +175,7 @@
             style="display: block; width: 100%; height: 100%"
             :simpleMode="simpleMode"
             :sizing="activeSizing"
-          :hideButtonsPane="showSideButtons"
+            :hideButtonsPane="showSideButtons"
           ></Info>
           <Map
             v-show="currentPane === 'map'"
@@ -283,6 +295,7 @@
         @show-actors="handleShowActors"
         @show-tor="handleShowTor"
         @all-shows="handleAllShows"
+        @all-tvdb="handleAllTvdb"
       >
       </List>
     </div>
@@ -419,6 +432,7 @@ export default {
       seriesMap: {},
       mapError: "",
       allShows: [],
+      allTvdb: {},
       _didRequestNotifications: false,
 
       // Library Refresh State
@@ -717,6 +731,18 @@ export default {
       if (!this.simpleMode) return allTabs;
       const allowed = new Set(["info", "map", "actors", "reviews", "trailer"]);
       return allTabs.filter((t) => allowed.has(t.key));
+    },
+
+    isMapDisabledInPreview() {
+      // Map is disabled in preview mode if there's no cached map data
+      if (!this.previewMode) return false;
+      if (!this.currentShow?.Name) return true;
+      const tvdbRecord = this.allTvdb?.[this.currentShow.Name];
+      const hasCachedMap =
+        tvdbRecord?.map &&
+        Array.isArray(tvdbRecord.map) &&
+        tvdbRecord.map.length > 0;
+      return !hasCachedMap;
     },
   },
   unmounted() {
@@ -1188,12 +1214,20 @@ export default {
     handleAllShows(shows) {
       this.allShows = Array.isArray(shows) ? shows : [];
     },
+    handleAllTvdb(tvdbData) {
+      this.allTvdb = tvdbData || {};
+    },
     selectTab(key) {
       const k = String(key || "");
       if (!k) return;
 
-      // Preview mode: Map is disabled, and tabs to the right of AI are disabled.
+      // Preview mode: Map is disabled if no cached map data, and tabs to the right of AI are disabled.
       if (this.previewMode) {
+        // Special handling for map: disable if no cached map data
+        if (k === "map" && this.isMapDisabledInPreview) {
+          return;
+        }
+
         const disabledKeys = new Set([
           "map",
           "tor",

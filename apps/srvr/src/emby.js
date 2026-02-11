@@ -83,4 +83,73 @@ export const getDevices = async () => {
   return await getOnDevices();
 };
 
+// Fetch series map from Emby server
+export const getSeriesMap = async (show) => {
+  if (!show?.Id) return null;
+
+  const seriesId = show.Id;
+  const seriesMap = [];
+
+  try {
+    const seasonsRes = await fetch(urls.childrenUrl(seriesId));
+    if (seasonsRes.status !== 200) return null;
+    const seasonsData = await seasonsRes.json();
+
+    for (const seasonRec of seasonsData.Items || []) {
+      const seasonId = seasonRec.Id;
+      const seasonNumber = +seasonRec.IndexNumber;
+      if (isNaN(seasonNumber)) continue;
+
+      const unairedObj = {};
+      const unairedRes = await fetch(urls.childrenUrl(seasonId, true));
+      if (unairedRes.status === 200) {
+        const unairedData = await unairedRes.json();
+        for (const episodeRec of unairedData.Items || []) {
+          const episodeNumber = +episodeRec.IndexNumber;
+          if (!isNaN(episodeNumber)) {
+            unairedObj[episodeNumber] = true;
+          }
+        }
+      }
+
+      const episodes = [];
+      const episodesRes = await fetch(urls.childrenUrl(seasonId));
+      if (episodesRes.status !== 200) continue;
+      const episodesData = await episodesRes.json();
+
+      for (const episodeRec of episodesData.Items || []) {
+        const episodeNumber = +episodeRec.IndexNumber;
+        if (isNaN(episodeNumber)) continue;
+
+        const path = episodeRec?.MediaSources?.[0]?.Path;
+        const played = !!episodeRec?.UserData?.Played;
+        const avail = episodeRec?.LocationType !== "Virtual";
+        const unaired = avail && path ? false : !!unairedObj[episodeNumber];
+
+        if (avail && !path) continue;
+
+        const noFileVal = !path;
+        episodes.push([
+          episodeNumber,
+          {
+            error: false,
+            played,
+            avail,
+            noFile: noFileVal,
+            unaired,
+            deleted: false,
+            path,
+          },
+        ]);
+      }
+      seriesMap.push([seasonNumber, episodes]);
+    }
+
+    return seriesMap;
+  } catch (err) {
+    console.error("getSeriesMap error:", err);
+    return null;
+  }
+};
+
 // getCurrentlyWatching().then(console.log);

@@ -1142,21 +1142,34 @@ const chkTvdbQueue = () => {
   });
   promise
     .then((tvdbData) => {
+      let finalData = null;
       try {
-        if (typeof tvdbData === "object") {
-          const keyName = tvdbData.Name || tvdbData.name;
-          if (ws) ws.send(JSON.stringify({ id, status: "ok", data: tvdbData }));
-          else if (resolveCb) resolveCb(tvdbData);
-          allTvdb[keyName] = tvdbData;
-        } else tvdbData = allTvdb[tvdbData]; // tvdbData is name
+        if (tvdbData && typeof tvdbData === "object") {
+          finalData = tvdbData;
+          const keyName = finalData.Name || finalData.name;
+          allTvdb[keyName] = finalData;
+        } else if (typeof tvdbData === "string") {
+          finalData = allTvdb[tvdbData];
+        }
+
+        if (ws) {
+          if (finalData)
+            ws.send(JSON.stringify({ id, status: "ok", data: finalData }));
+        } else if (resolveCb) {
+          resolveCb(finalData || null);
+        }
       } catch (e) {
-        console.error("chkTvdbQueue ws.send error:", e);
+        console.error("chkTvdbQueue processing error:", e);
+        if (resolveCb) resolveCb(null);
       }
-      tvdbData.saved = Date.now();
-      // Save to disk so timestamp persists across restarts
-      util.writeFile(TVDB_PATH, allTvdb).catch((err) => {
-        log("err", "chkTvdbQueue: save error:", err.message);
-      });
+
+      if (finalData) {
+        finalData.saved = Date.now();
+        // Save to disk so timestamp persists across restarts
+        util.writeFile(TVDB_PATH, allTvdb).catch((err) => {
+          log("err", "chkTvdbQueue: save error:", err.message);
+        });
+      }
       chkTvdbQueueRunning = false;
       chkTvdbQueue();
     })

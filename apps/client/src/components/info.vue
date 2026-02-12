@@ -1084,7 +1084,7 @@ export default {
         }
         this.watchButtonTxtArr = watchButtonTxtArr.sort();
       } catch (e) {
-        console.error("updateWatchButtons", e);
+        console.error("updateWatchButtons Error:", e.message || e);
       }
     },
 

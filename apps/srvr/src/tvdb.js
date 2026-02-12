@@ -98,6 +98,228 @@ function setImdbId(tvdb) {
 ensureDir(SRVR_DATA_DIR);
 ensureFile(TVDB_PATH, "{}");
 
+// Helper functions for watchedEpis format
+// watchedEpis format: [[seasonNum, ep1, ep2, ...], [seasonNum, ep1, ep2, ...]]
+// Each entry lists the season number followed by episode numbers that have been played
+
+/**
+ * Extract watchedEpis from seriesMap
+ * @param {Array} seriesMap - Format: [[seasonNum, [[epNum, {played, ...}], ...]], ...]
+ * @returns {Array} watchedEpis - Format: [[seasonNum, ep1, ep2, ...], ...]
+ */
+function seriesMapToWatchedEpis(seriesMap) {
+  if (!seriesMap || !Array.isArray(seriesMap)) return [];
+
+  const watchedEpis = [];
+  for (const [seasonNum, episodes] of seriesMap) {
+    if (!Array.isArray(episodes)) continue;
+
+    const watchedEps = [];
+    for (const [episodeNum, epiObj] of episodes) {
+      if (epiObj?.played) {
+        watchedEps.push(episodeNum);
+      }
+    }
+
+    // Only include seasons that have watched episodes
+    if (watchedEps.length > 0) {
+      watchedEps.sort((a, b) => a - b);
+      watchedEpis.push([seasonNum, ...watchedEps]);
+    }
+  }
+
+  return watchedEpis;
+}
+
+/**
+ * Apply watchedEpis to seriesMap (set played status)
+ * @param {Array} seriesMap - Format: [[seasonNum, [[epNum, {played, ...}], ...]], ...]
+ * @param {Array} watchedEpis - Format: [[seasonNum, ep1, ep2, ...], ...]
+ * @returns {Array} Updated seriesMap with played status
+ */
+function applyWatchedEpisToSeriesMap(seriesMap, watchedEpis) {
+  if (!seriesMap || !Array.isArray(seriesMap)) return seriesMap;
+  if (!watchedEpis || !Array.isArray(watchedEpis)) return seriesMap;
+
+  // Build a Set of watched episodes for quick lookup
+  const watchedSet = new Map();
+  for (const seasonEntry of watchedEpis) {
+    if (!Array.isArray(seasonEntry) || seasonEntry.length < 1) continue;
+    const [seasonNum, ...episodes] = seasonEntry;
+    watchedSet.set(seasonNum, new Set(episodes));
+  }
+
+  // Apply played status to seriesMap
+  const updatedMap = [];
+  for (const [seasonNum, episodes] of seriesMap) {
+    const watched = watchedSet.get(seasonNum);
+    const updatedEpisodes = [];
+
+    for (const [episodeNum, epiObj] of episodes) {
+      const played = watched ? watched.has(episodeNum) : false;
+      updatedEpisodes.push([episodeNum, { ...epiObj, played }]);
+    }
+
+    updatedMap.push([seasonNum, updatedEpisodes]);
+  }
+
+  return updatedMap;
+}
+
+/**
+ * Fetch series map from TVDB API
+ * @param {number} tvdbId - The TVDB ID
+ * @param {Array} watchedEpis - Optional watchedEpis to apply played status
+ * @returns {Array} seriesMap with episode data
+ */
+async function getSeriesMap(tvdbId, watchedEpis = null) {
+  if (!tvdbId) return [];
+
+  const seriesMap = [];
+  let allEpisodes = [];
+  let page = 0;
+  let safety = 0;
+  const seenPages = new Set();
+
+  // Fetch all episodes with pagination
+  while (true) {
+    seenPages.add(page);
+
+    const url = buildTvdbUrl(`series/${tvdbId}/episodes/default`, {
+      page,
+      seasonType: "official",
+      perPage: 100,
+    });
+
+    let res;
+    try {
+      const token = await getToken();
+      res = await fetch(url, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        log("err", "getSeriesMap: failed to fetch episodes", {
+          tvdbId,
+          page,
+          status: res.status,
+        });
+        break;
+      }
+    } catch (e) {
+      log("err", "getSeriesMap: fetch error", {
+        tvdbId,
+        page,
+        error: e.message,
+      });
+      break;
+    }
+
+    const data = await res.json();
+    const episodes = data?.data?.episodes || [];
+    const links = data?.links || {};
+
+    allEpisodes = allEpisodes.concat(episodes);
+
+    // Derive next page
+    let nextPage = null;
+    if (links.next !== undefined && links.next !== null) {
+      if (Number.isFinite(links.next)) {
+        nextPage = links.next;
+      } else if (typeof links.next === "string") {
+        const match = links.next.match(/page=(\d+)/);
+        if (match) nextPage = Number(match[1]);
+      } else if (links.next) {
+        nextPage = page + 1;
+      }
+    }
+
+    if (nextPage === null) break;
+    if (seenPages.has(nextPage)) break;
+    if (safety++ > 50) break;
+    page = nextPage;
+  }
+
+  // Group episodes by season
+  const seasonMap = {};
+  for (const epData of allEpisodes) {
+    const seasonNum =
+      epData.seasonNumber ??
+      epData.airedSeason ??
+      epData.airedSeasonNumber ??
+      epData.season ??
+      (typeof epData.seasonName === "string" && epData.seasonName.match(/\d+/)
+        ? Number(epData.seasonName.match(/\d+/)[0])
+        : undefined);
+
+    const episodeNum =
+      epData.number ?? epData.airedEpisodeNumber ?? epData.episodeNumber;
+
+    if (seasonNum === undefined || seasonNum === null || seasonNum === 0)
+      continue;
+
+    if (!seasonMap[seasonNum]) {
+      seasonMap[seasonNum] = [];
+    }
+
+    let unaired = true;
+    let avail = false;
+    if (epData.aired) {
+      try {
+        const airedDate = new Date(epData.aired);
+        const today = new Date();
+        const airedYMD = new Date(
+          airedDate.getFullYear(),
+          airedDate.getMonth(),
+          airedDate.getDate(),
+        );
+        const todayYMD = new Date(
+          today.getFullYear(),
+          today.getMonth(),
+          today.getDate(),
+        );
+        unaired = airedYMD > todayYMD;
+        avail = !unaired;
+      } catch (e) {
+        unaired = false;
+        avail = true;
+      }
+    }
+
+    seasonMap[seasonNum].push([
+      episodeNum,
+      {
+        error: false,
+        played: false,
+        avail: avail,
+        noFile: true,
+        unaired: unaired,
+        deleted: false,
+        aired: epData.aired || null,
+      },
+    ]);
+  }
+
+  // Convert to seriesMap format
+  const seasonNums = Object.keys(seasonMap)
+    .map(Number)
+    .sort((a, b) => a - b);
+  for (const seasonNum of seasonNums) {
+    seriesMap.push([seasonNum, seasonMap[seasonNum]]);
+  }
+
+  // Apply watchedEpis if provided
+  if (watchedEpis && watchedEpis.length > 0) {
+    return applyWatchedEpisToSeriesMap(seriesMap, watchedEpis);
+  }
+
+  return seriesMap;
+}
+
 const UPDATE_DATA = true;
 
 let addToPickupsCallback = null;
@@ -1247,24 +1469,26 @@ const tryLocalGetTvdb = async () => {
   // Fetch and persist series map data (try Emby first, fallback to TVDB)
   try {
     let seriesMap = null;
+    let watchedEpis = null;
 
     // Try Emby if show is in Emby
     if (minTvdb.inEmby && minTvdb.Id) {
       seriesMap = await emby.getSeriesMap(show);
+      if (seriesMap && seriesMap.length > 0) {
+        // Extract and persist watchedEpis
+        watchedEpis = seriesMapToWatchedEpis(seriesMap);
+        minTvdb.watchedEpis = watchedEpis;
+        await util.writeFile(TVDB_PATH, allTvdb);
+      }
     }
 
     // Fallback to TVDB if Emby fails or show not in Emby
+    // (No watched status from TVDB, but we preserve existing watchedEpis)
     if (!seriesMap && minTvdb.tvdbId) {
-      seriesMap = await getSeriesMap(minTvdb.tvdbId);
-    }
-
-    // Persist map data if fetched successfully
-    if (seriesMap && seriesMap.length > 0) {
-      minTvdb.map = seriesMap;
-      await util.writeFile(TVDB_PATH, allTvdb);
+      seriesMap = await getSeriesMap(minTvdb.tvdbId, minTvdb.watchedEpis);
     }
   } catch (err) {
-    log("err", "tryLocalGetTvdb map fetch error:", err.message);
+    log("err", "tryLocalGetTvdb seriesMap fetch error:", err.message);
   }
 
   tryLocalGetTvdbBusy = false;
@@ -1651,3 +1875,6 @@ export const accessTvdb = async (params) => {
     };
   }
 };
+
+// Export helper functions for migration and external use
+export { seriesMapToWatchedEpis, applyWatchedEpisToSeriesMap, getSeriesMap };

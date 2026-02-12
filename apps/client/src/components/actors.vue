@@ -204,7 +204,6 @@ import * as emby from "../emby.js";
 import * as tvdb from "../tvdb.js";
 import * as util from "../util.js";
 import * as srvr from "../srvr.js";
-import { decompressMap } from "../mapUtil.js";
 
 const DEBUG_ACTORS_MERGE_LOG = false;
 

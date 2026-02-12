@@ -245,7 +245,6 @@ import * as emby from "../emby.js";
 import * as tvdb from "../tvdb.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
-import { compressMap, decompressMap } from "../mapUtil.js";
 import parseTorrentTitle from "parse-torrent-title";
 import evtBus from "../evtBus.js";
 import Shows from "./shows.vue";
@@ -1842,6 +1841,22 @@ export default {
       // Fetch fresh data from Emby/TVDB
       seriesMapIn = await emby.getSeriesMap(show, action == "prune");
 
+      // Persist watchedEpis if we got data from Emby
+      if (
+        seriesMapIn &&
+        seriesMapIn.length > 0 &&
+        show.Name &&
+        show.inEmby !== false &&
+        allTvdb?.[show.Name]
+      ) {
+        const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMapIn);
+        allTvdb[show.Name].watchedEpis = watchedEpis;
+        await srvr.setTvdbFields({
+          name: show.Name,
+          watchedEpis: watchedEpis,
+        });
+      }
+
       // If emby has no data, try tvdb as fallback
       if (!seriesMapIn || seriesMapIn.length === 0) {
         seriesMapIn = await tvdb.getSeriesMap(show);
@@ -1849,21 +1864,6 @@ export default {
           errorMessage = "Not in emby and show not found in TVDB.";
           seriesMapIn = []; // Keep empty for error display
         }
-      }
-
-      // Persist map data to tvdb record (if fetched successfully)
-      if (
-        seriesMapIn &&
-        seriesMapIn.length > 0 &&
-        show.Name &&
-        allTvdb?.[show.Name]
-      ) {
-        const compressedMap = compressMap(seriesMapIn);
-        allTvdb[show.Name].map = compressedMap;
-        await srvr.setTvdbFields({
-          name: show.Name,
-          map: compressedMap,
-        });
       }
 
       for (const season of seriesMapIn) {

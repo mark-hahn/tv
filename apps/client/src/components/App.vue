@@ -734,15 +734,13 @@ export default {
     },
 
     isMapDisabledInPreview() {
-      // Map is disabled in preview mode if there's no cached map data
+      // Map is disabled in preview mode if there's no tvdb data to fetch from
       if (!this.previewMode) return false;
       if (!this.currentShow?.Name) return true;
       const tvdbRecord = this.allTvdb?.[this.currentShow.Name];
-      const hasCachedMap =
-        tvdbRecord?.map &&
-        Array.isArray(tvdbRecord.map) &&
-        tvdbRecord.map.length > 0;
-      return !hasCachedMap;
+      // Can fetch map if we have a tvdbId
+      const canFetchMap = tvdbRecord?.tvdbId;
+      return !canFetchMap;
     },
   },
   unmounted() {

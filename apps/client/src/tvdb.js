@@ -59,6 +59,72 @@ let allTvdb = null;
 export const clearCache = () => {
   allTvdb = null;
 };
+
+// Helper functions for watchedEpis format
+/**
+ * Extract watchedEpis from seriesMap
+ * @param {Array} seriesMap - Format: [[seasonNum, [[epNum, {played, ...}], ...]], ...]
+ * @returns {Array} watchedEpis - Format: [[seasonNum, ep1, ep2, ...], ...]
+ */
+export function seriesMapToWatchedEpis(seriesMap) {
+  if (!seriesMap || !Array.isArray(seriesMap)) return [];
+
+  const watchedEpis = [];
+  for (const [seasonNum, episodes] of seriesMap) {
+    if (!Array.isArray(episodes)) continue;
+
+    const watchedEps = [];
+    for (const [episodeNum, epiObj] of episodes) {
+      if (epiObj?.played) {
+        watchedEps.push(episodeNum);
+      }
+    }
+
+    // Only include seasons that have watched episodes
+    if (watchedEps.length > 0) {
+      watchedEps.sort((a, b) => a - b);
+      watchedEpis.push([seasonNum, ...watchedEps]);
+    }
+  }
+
+  return watchedEpis;
+}
+
+/**
+ * Apply watchedEpis to seriesMap (set played status)
+ * @param {Array} seriesMap - Format: [[seasonNum, [[epNum, {played, ...}], ...]], ...]
+ * @param {Array} watchedEpis - Format: [[seasonNum, ep1, ep2, ...], ...]
+ * @returns {Array} Updated seriesMap with played status
+ */
+function applyWatchedEpisToSeriesMap(seriesMap, watchedEpis) {
+  if (!seriesMap || !Array.isArray(seriesMap)) return seriesMap;
+  if (!watchedEpis || !Array.isArray(watchedEpis)) return seriesMap;
+
+  // Build a Set of watched episodes for quick lookup
+  const watchedSet = new Map();
+  for (const seasonEntry of watchedEpis) {
+    if (!Array.isArray(seasonEntry) || seasonEntry.length < 1) continue;
+    const [seasonNum, ...episodes] = seasonEntry;
+    watchedSet.set(seasonNum, new Set(episodes));
+  }
+
+  // Apply played status to seriesMap
+  const updatedMap = [];
+  for (const [seasonNum, episodes] of seriesMap) {
+    const watched = watchedSet.get(seasonNum);
+    const updatedEpisodes = [];
+
+    for (const [episodeNum, epiObj] of episodes) {
+      const played = watched ? watched.has(episodeNum) : false;
+      updatedEpisodes.push([episodeNum, { ...epiObj, played }]);
+    }
+
+    updatedMap.push([seasonNum, updatedEpisodes]);
+  }
+
+  return updatedMap;
+}
+
 export const getAllTvdb = async (hasEmby = 0) => {
   // all data in tvdb.json
   // cached in allTvdb
@@ -418,6 +484,18 @@ export const getSeriesMap = async (show) => {
 export const getSeriesMapByTvdbId = async (tvdbId) => {
   if (!tvdbId) return [];
 
+  // Try to find watchedEpis from allTvdb if available
+  let watchedEpis = null;
+  if (allTvdb) {
+    // Find the show with this tvdbId
+    for (const [showName, tvdbRecord] of Object.entries(allTvdb)) {
+      if (tvdbRecord.tvdbId === tvdbId && tvdbRecord.watchedEpis) {
+        watchedEpis = tvdbRecord.watchedEpis;
+        break;
+      }
+    }
+  }
+
   // Fetch episodes directly by TVDB id (avoids name-search mismatch).
   const seriesMap = [];
   let allEpisodes = [];
@@ -543,5 +621,11 @@ export const getSeriesMapByTvdbId = async (tvdbId) => {
   for (const seasonNum of seasonNums) {
     seriesMap.push([seasonNum, seasonMap[seasonNum]]);
   }
+
+  // Apply watchedEpis if available
+  if (watchedEpis && watchedEpis.length > 0) {
+    return applyWatchedEpisToSeriesMap(seriesMap, watchedEpis);
+  }
+
   return seriesMap;
 };

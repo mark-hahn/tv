@@ -414,7 +414,7 @@ export async function loadAllShows() {
     }
     if (tvdb.lastAired && !tvdb.LastAired) tvdb.LastAired = tvdb.lastAired;
     if (!tvdb.Ratings) {
-      tvdb.Ratings = tvdb.remotes?.find((r) => r.ratings)?.ratings || 0;
+      tvdb.Ratings = tvdb.remotes?.find((r) => r.ratings)?.ratings || null;
     }
     if (tvdb.reject && !tvdb.Reject) tvdb.Reject = tvdb.reject;
     if (tvdb.pickup && !tvdb.Pickup) tvdb.Pickup = tvdb.pickup;

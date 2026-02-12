@@ -1027,7 +1027,13 @@ export default {
           return util.fmtSize(show);
         case "Ratings":
           ratings = show?.Ratings;
-          return ratings !== undefined ? +ratings : 0;
+          if (forSort)
+            return ratings !== undefined && ratings !== null && ratings !== 0
+              ? +ratings
+              : 0;
+          return ratings !== undefined && ratings !== null && ratings !== 0
+            ? String(ratings)
+            : "";
         case "Notes":
           if (!forSort) return "";
           return String(show?.Notes ?? "")

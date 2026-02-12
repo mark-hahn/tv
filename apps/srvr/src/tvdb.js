@@ -1700,13 +1700,6 @@ export const getNewTvdb = async (params) => {
   // HTTP requests are always fast mode - mark to skip slow remote fetching
   params.fast = true;
 
-  const showName = params.show?.Name;
-  log("getNewTvdb called:", {
-    showName,
-    queueLength: newTvdbQueue.length,
-    fast: params.fast,
-  });
-
   return new Promise((resolve, reject) => {
     // Queue the request with appropriate callback
     newTvdbQueue.unshift({ ws: null, id: null, paramObj: params, resolve });

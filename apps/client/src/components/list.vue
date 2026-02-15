@@ -2315,6 +2315,74 @@ export default {
       // await util.removeDontSavesFromTvdbJson()
       // await util.loadAllRemotes(allShows); // takes many hours
     },
+
+    async updateShowFromDiskChange(showName) {
+      if (!showName) return;
+
+      try {
+        // Get updated tvdb record for this show
+        const updatedTvdb = await tvdb.getAllTvdb(
+          this.hasLoadedAllShows ? 0 : 1,
+        );
+        const tvdbRecord = updatedTvdb[showName];
+
+        if (!tvdbRecord) {
+          console.warn(
+            `[updateShowFromDiskChange] No tvdb record found for ${showName}`,
+          );
+          return;
+        }
+
+        // Update the show in allShows
+        const show = allShows.find((s) => s.Name === showName);
+        if (show) {
+          // Update disk-related fields
+          if (tvdbRecord.diskMaxDate !== undefined) {
+            show.diskMaxDate = tvdbRecord.diskMaxDate;
+          }
+          if (tvdbRecord.diskSize !== undefined) {
+            show.diskSize = tvdbRecord.diskSize;
+          }
+
+          // Update gap-related fields
+          show.notReady = tvdbRecord.notReady;
+          show.anyWatched = tvdbRecord.anyWatched;
+          show.watchGap = tvdbRecord.watchGap;
+          show.watchGapSeason = tvdbRecord.watchGapSeason;
+          show.watchGapEpisode = tvdbRecord.watchGapEpisode;
+          show.fileGap = tvdbRecord.fileGap;
+          show.fileGapSeason = tvdbRecord.fileGapSeason;
+          show.fileGapEpisode = tvdbRecord.fileGapEpisode;
+          show.fileEndError = tvdbRecord.fileEndError;
+          show.seasonWatchedThenNofile = tvdbRecord.seasonWatchedThenNofile;
+
+          // Update computed fields (uppercase properties)
+          show.WatchGap = show.watchGap;
+          show.FileGap =
+            !(show.notReady === false && show.InToTry) &&
+            (show.fileGap || show.fileEndError || show.seasonWatchedThenNofile);
+
+          // Update allTvdb cache
+          allTvdb[showName] = tvdbRecord;
+
+          // If this show is currently displayed on the map, refresh it
+          if (this.mapShow && this.mapShow.Name === showName) {
+            console.log(
+              `[updateShowFromDiskChange] Refreshing map for ${showName}`,
+            );
+            await this.seriesMapAction("refresh", show, null);
+          }
+
+          // Refresh UI to show updated data
+          await this.refilter(false);
+        }
+      } catch (err) {
+        console.error(
+          `[updateShowFromDiskChange] Error updating ${showName}:`,
+          err,
+        );
+      }
+    },
   },
 
   /////////////////  MOUNTED  /////////////////
@@ -2380,6 +2448,30 @@ export default {
         await this.refilter(false);
       } catch (err) {
         console.error("[tvdbUpdated] Failed to reload tvdb:", err);
+      }
+    });
+
+    // Listen for disk changes from chokidar watcher
+    on("showDiskChanged", async (data) => {
+      const { showName, taskId } = data || {};
+      if (!showName) return;
+
+      console.log(
+        `[showDiskChanged] Disk changed for: ${showName}, taskId: ${taskId}`,
+      );
+
+      // If we have a taskId, trigger library refresh dialog and wait for completion
+      if (taskId) {
+        evtBus.emit("diskChangeLibraryRefresh", { showName, taskId });
+        // Wait for library scan to complete before refreshing data
+        return;
+      }
+
+      // No taskId - update immediately (shouldn't happen in normal flow)
+      try {
+        await this.updateShowFromDiskChange(showName);
+      } catch (err) {
+        console.error(`[showDiskChanged] Error updating ${showName}:`, err);
       }
     });
 
@@ -2477,24 +2569,37 @@ export default {
     });
 
     // Listen for library refresh completion to refresh show list
-    on("library-refresh-complete", (payload) => {
+    on("library-refresh-complete", async (payload) => {
       const onDone =
         payload && typeof payload === "object" ? payload.onDone : null;
+      const diskChangeShowName =
+        payload && typeof payload === "object"
+          ? payload.diskChangeShowName
+          : null;
+
       this.showReloadingShows = true;
-      Promise.resolve(this.newShows())
-        .catch((err) => {
-          console.error("library-refresh-complete: newShows failed", err);
-        })
-        .finally(() => {
-          this.showReloadingShows = false;
-          if (typeof onDone === "function") {
-            try {
-              onDone();
-            } catch {
-              /* ignore */
-            }
+      try {
+        await this.newShows();
+
+        // If this was triggered by a disk change, update that specific show
+        if (diskChangeShowName) {
+          console.log(
+            `[library-refresh-complete] Updating show after disk change: ${diskChangeShowName}`,
+          );
+          await this.updateShowFromDiskChange(diskChangeShowName);
+        }
+      } catch (err) {
+        console.error("library-refresh-complete: newShows failed", err);
+      } finally {
+        this.showReloadingShows = false;
+        if (typeof onDone === "function") {
+          try {
+            onDone();
+          } catch {
+            /* ignore */
           }
-        });
+        }
+      }
     });
 
     // Cross-pane: click a card in Flex/Qbt/Down to select show in list

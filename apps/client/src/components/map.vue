@@ -341,6 +341,7 @@
         <!-- Body viewport starts below the sticky header.-->
         <div
           ref="mapBodyViewport"
+          :key="'map-body-' + mapUpdateKey"
           :style="{
             position: 'absolute',
             left: '0',
@@ -363,7 +364,7 @@
             <tbody>
               <tr
                 v-for="season in seriesMapSeasons"
-                :key="season"
+                :key="mapUpdateKey + '-season-' + season"
                 style="outline: thin solid"
               >
                 <td
@@ -390,7 +391,7 @@
                 </td>
                 <td
                   v-for="episode in seriesMapEpis"
-                  :key="season + '.' + episode"
+                  :key="mapUpdateKey + '-' + season + '.' + episode"
                   @click="handleEpisodeClick($event, mapShow, season, episode)"
                   :style="{
                     cursor: simpleMode ? 'default' : 'pointer',
@@ -464,7 +465,7 @@
             <tbody>
               <tr
                 v-for="season in seriesMapSeasons"
-                :key="'sticky-' + season"
+                :key="mapUpdateKey + '-sticky-' + season"
                 style="outline: thin solid"
               >
                 <td
@@ -645,6 +646,14 @@ export default {
       });
     },
     seriesMapEpis() {
+      this.$nextTick(() => {
+        this.updateMapPanBounds();
+      });
+    },
+    seriesMap() {
+      // Triggered when seriesMap reference changes (e.g., from disk change refresh)
+      console.log("[map.vue watcher] seriesMap changed, forcing update");
+      this.mapUpdateKey++; // Increment key to force re-render
       this.$nextTick(() => {
         this.updateMapPanBounds();
       });

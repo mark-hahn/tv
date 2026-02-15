@@ -440,6 +440,7 @@ export default {
       _libBusy: false,
       _libTaskId: null,
       _libPollTimer: null,
+      _diskChangeShowName: null,
       libraryProgressText: "",
 
       tvdbMismatchOpen: false,
@@ -819,6 +820,18 @@ export default {
       }
     },
 
+    handleDiskChangeLibraryRefresh(payload) {
+      if (!payload || !payload.taskId) return;
+      if (this._libBusy) return;
+
+      this.stopLibraryPolling();
+      this._libTaskId = payload.taskId;
+      this._diskChangeShowName = payload.showName || null;
+      this._libBusy = true;
+      this.libraryProgressText = "Scanning...";
+      void this.pollLibraryStatus();
+    },
+
     async pollLibraryStatus() {
       if (!this._libTaskId) {
         this._libBusy = false;
@@ -853,7 +866,14 @@ export default {
       this._libTaskId = null;
       if (res?.status === "refreshdone") {
         this.libraryProgressText = "100%";
-        evtBus.emit("library-refresh-complete");
+        if (this._diskChangeShowName) {
+          evtBus.emit("library-refresh-complete", {
+            diskChangeShowName: this._diskChangeShowName,
+          });
+          this._diskChangeShowName = null;
+        } else {
+          evtBus.emit("library-refresh-complete");
+        }
 
         // Trigger full gap check after library scan completes
         srvr
@@ -1625,6 +1645,7 @@ export default {
     evtBus.on("addPreviewShowDone", this.onAddPreviewShowDone);
 
     evtBus.on("startLibraryRefresh", this.startLibraryRefresh);
+    evtBus.on("diskChangeLibraryRefresh", this.handleDiskChangeLibraryRefresh);
 
     // Close torrents or actors pane when a different show is selected
     evtBus.on("setUpSeries", (show) => {

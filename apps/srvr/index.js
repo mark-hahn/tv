@@ -17,6 +17,7 @@ import { handleAsr } from "./src/asr.js";
 import { checkFlexgetStatus } from "../api/src/usb.js";
 import fetch from "node-fetch";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
+import chokidar from "chokidar";
 import {
   SRVR_ROOT_DIR,
   SRVR_DATA_DIR,
@@ -3285,3 +3286,162 @@ setTimeout(runGapCheckBatch, 4 * 60 * 1000); // 4 minutes after start
 setInterval(runUsbCheck, CHECK_INTERVAL_MS);
 // Run initial check after 1 minute (allow startup)
 setTimeout(runUsbCheck, 60 * 1000);
+
+//////////////////  CHOKIDAR FILE WATCHER  //////////////////
+
+const changedShows = new Map(); // showName -> timeout
+const DISK_CHANGE_DEBOUNCE_MS = 3000; // 3 seconds
+
+/**
+ * Extract show name from file path
+ * Path format: /mnt/media/tv/ShowName/Season 01/episode.mkv
+ */
+function extractShowNameFromPath(filePath) {
+  const relativePath = filePath.replace(tvDir + "/", "");
+  const parts = relativePath.split("/");
+  if (parts.length > 0) {
+    return parts[0]; // First part is show name
+  }
+  return null;
+}
+
+/**
+ * Handle disk change for a show (debounced)
+ */
+async function handleShowDiskChange(showName) {
+  try {
+    console.log(`[chokidar] Processing disk change for: ${showName}`);
+
+    // Update disk info for this show
+    const diskInfo = await getShowDiskInfo(showName);
+    if (diskInfo) {
+      const [maxDate, totalSize] = diskInfo;
+
+      // Update tvdb record with new disk info
+      const allTvdb = tvdb.getAllTvdbSync();
+      const tvdbRecord = allTvdb[showName];
+      if (tvdbRecord) {
+        tvdbRecord.diskMaxDate = maxDate;
+        tvdbRecord.diskSize = totalSize;
+        await tvdb.saveTvdbSync();
+        console.log(
+          `[chokidar] Updated disk info for ${showName}: ${totalSize} bytes, ${maxDate}`,
+        );
+      }
+    }
+
+    // Trigger Emby library refresh so map shows current data
+    console.log(`[chokidar] Triggering Emby library refresh for ${showName}`);
+    let taskId = null;
+    try {
+      const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
+      const refreshRes = await fetch(
+        `https://hahnca.com:8920/emby/Library/Refresh?api_key=${EMBY_API_KEY}`,
+        { method: "POST" },
+      );
+      if (refreshRes.ok) {
+        // Get the task ID
+        const tasksRes = await fetch(
+          `https://hahnca.com:8920/emby/ScheduledTasks?api_key=${EMBY_API_KEY}`,
+        );
+        if (tasksRes.ok) {
+          const tasks = await tasksRes.json();
+          const libraryTask = tasks.find((t) => {
+            const n = String(t?.Name || "").toLowerCase();
+            return (
+              n.includes("library") &&
+              (n.includes("scan") || n.includes("refresh"))
+            );
+          });
+          if (libraryTask?.Id) {
+            taskId = libraryTask.Id;
+            console.log(`[chokidar] Emby refresh triggered, taskId: ${taskId}`);
+          } else {
+            console.log(`[chokidar] Emby refresh triggered, no taskId found`);
+          }
+        }
+      } else {
+        console.error(
+          `[chokidar] Emby refresh failed: ${refreshRes.status} ${refreshRes.statusText}`,
+        );
+      }
+    } catch (refreshErr) {
+      console.error(`[chokidar] Emby refresh error:`, refreshErr.message);
+    }
+
+    // Notify all connected clients immediately with taskId
+    notifyClients("showDiskChanged", { showName, taskId });
+    console.log(
+      `[chokidar] Notified clients about ${showName} with taskId: ${taskId}`,
+    );
+  } catch (err) {
+    console.error(
+      `[chokidar] Error handling disk change for ${showName}:`,
+      err.message,
+    );
+  }
+}
+
+// Start watching TV directory
+const watcher = chokidar.watch(tvDir, {
+  ignored: /(^|[\/\\])\../, // ignore dotfiles
+  persistent: true,
+  ignoreInitial: true, // don't emit events for existing files on startup
+  awaitWriteFinish: {
+    stabilityThreshold: 2000,
+    pollInterval: 100,
+  },
+  depth: 99, // watch all subdirectories
+});
+
+watcher
+  .on("add", (filePath) => {
+    const ext = filePath.split(".").pop();
+    if (!videoFileExtensions.includes(ext)) return;
+
+    const showName = extractShowNameFromPath(filePath);
+    if (!showName) return;
+
+    console.log(`[chokidar] File added: ${showName}`);
+
+    // Debounce: clear existing timeout and set new one
+    if (changedShows.has(showName)) {
+      clearTimeout(changedShows.get(showName));
+    }
+
+    const timeout = setTimeout(() => {
+      changedShows.delete(showName);
+      handleShowDiskChange(showName);
+    }, DISK_CHANGE_DEBOUNCE_MS);
+
+    changedShows.set(showName, timeout);
+  })
+  .on("unlink", (filePath) => {
+    const ext = filePath.split(".").pop();
+    if (!videoFileExtensions.includes(ext)) return;
+
+    const showName = extractShowNameFromPath(filePath);
+    if (!showName) return;
+
+    console.log(`[chokidar] File deleted: ${showName}`);
+
+    // Debounce: clear existing timeout and set new one
+    if (changedShows.has(showName)) {
+      clearTimeout(changedShows.get(showName));
+    }
+
+    const timeout = setTimeout(() => {
+      changedShows.delete(showName);
+      handleShowDiskChange(showName);
+    }, DISK_CHANGE_DEBOUNCE_MS);
+
+    changedShows.set(showName, timeout);
+  })
+  .on("error", (error) => {
+    console.error("[chokidar] Watcher error:", error);
+  })
+  .on("ready", () => {
+    console.log("[chokidar] Initial scan complete. Ready for changes.");
+  });
+
+console.log(`[chokidar] Watching ${tvDir} for file changes...`);

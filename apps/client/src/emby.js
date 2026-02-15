@@ -816,13 +816,6 @@ export async function saveFav(id, fav) {
   };
   let favRes = await axios(config);
   if (favRes.status != 200) throw new Error("unable to save favorite");
-
-  // Phase 4: Update tvdb immediately
-  const show = allShows.find((s) => s.Id === id);
-  if (show && allTvdb[show.Name]) {
-    allTvdb[show.Name].IsFavorite = fav;
-    await srvr.setTvdbFields({ name: show.Name, IsFavorite: fav });
-  }
 }
 
 export async function saveToTry(id, inToTry) {
@@ -830,24 +823,23 @@ export async function saveToTry(id, inToTry) {
     method: inToTry ? "post" : "delete",
     url: urls.collectionUrl(cred, id, toTryCollId),
   };
+  console.log(`saveToTry: ${config.method} ${config.url}`);
   let toTryRes;
   try {
     toTryRes = await axios(config);
+    console.log(`saveToTry response: status=${toTryRes.status}`);
   } catch (e) {
-    console.error(`saveToTry, id:${id}, inToTry:${inToTry}`);
+    console.error(`saveToTry error, id:${id}, inToTry:${inToTry}`, e);
     throw e;
   }
   if (toTryRes.status !== 204) {
-    const err = "unable to save totry" + toTryRes.data;
+    const err =
+      "unable to save totry, status=" +
+      toTryRes.status +
+      ", data=" +
+      JSON.stringify(toTryRes.data);
     console.error(err);
     throw new Error(err);
-  }
-
-  // Phase 4: Update tvdb immediately
-  const show = allShows.find((s) => s.Id === id);
-  if (show && allTvdb[show.Name]) {
-    allTvdb[show.Name].InToTry = inToTry;
-    await srvr.setTvdbFields({ name: show.Name, InToTry: inToTry });
   }
 }
 
@@ -856,24 +848,23 @@ export async function saveContinue(id, inContinue) {
     method: inContinue ? "post" : "delete",
     url: urls.collectionUrl(cred, id, continueCollId),
   };
+  console.log(`saveContinue: ${config.method} ${config.url}`);
   let continueRes;
   try {
     continueRes = await axios(config);
+    console.log(`saveContinue response: status=${continueRes.status}`);
   } catch (e) {
-    console.error(`saveContinue, id:${id}, inContinue:${inContinue}`);
+    console.error(`saveContinue error, id:${id}, inContinue:${inContinue}`, e);
     throw e;
   }
   if (continueRes.status !== 204) {
-    const err = "unable to save Continue" + continueRes.data;
+    const err =
+      "unable to save Continue, status=" +
+      continueRes.status +
+      ", data=" +
+      JSON.stringify(continueRes.data);
     console.error(err);
     throw new Error(err);
-  }
-
-  // Phase 4: Update tvdb immediately
-  const show = allShows.find((s) => s.Id === id);
-  if (show && allTvdb[show.Name]) {
-    allTvdb[show.Name].InContinue = inContinue;
-    await srvr.setTvdbFields({ name: show.Name, InContinue: inContinue });
   }
 }
 
@@ -882,24 +873,23 @@ export async function saveMark(id, inMark) {
     method: inMark ? "post" : "delete",
     url: urls.collectionUrl(cred, id, markCollId),
   };
+  console.log(`saveMark: ${config.method} ${config.url}`);
   let markRes;
   try {
     markRes = await axios(config);
+    console.log(`saveMark response: status=${markRes.status}`);
   } catch (e) {
-    console.error(`saveMark, id:${id}, inMark:${inMark}`);
+    console.error(`saveMark error, id:${id}, inMark:${inMark}`, e);
     throw e;
   }
   if (markRes.status !== 204) {
-    const err = "unable to save Mark " + markRes.data;
+    const err =
+      "unable to save Mark, status=" +
+      markRes.status +
+      ", data=" +
+      JSON.stringify(markRes.data);
     console.error(err);
     throw new Error(err);
-  }
-
-  // Phase 4: Update tvdb immediately
-  const show = allShows.find((s) => s.Id === id);
-  if (show && allTvdb[show.Name]) {
-    allTvdb[show.Name].InMark = inMark;
-    await srvr.setTvdbFields({ name: show.Name, InMark: inMark });
   }
 }
 
@@ -908,24 +898,23 @@ export async function saveLinda(id, inLinda) {
     method: inLinda ? "post" : "delete",
     url: urls.collectionUrl(cred, id, lindaCollId),
   };
+  console.log(`saveLinda: ${config.method} ${config.url}`);
   let lindaRes;
   try {
     lindaRes = await axios(config);
+    console.log(`saveLinda response: status=${lindaRes.status}`);
   } catch (e) {
-    console.error(`saveLinda, id:${id}, inLinda:${inLinda}`);
+    console.error(`saveLinda error, id:${id}, inLinda:${inLinda}`, e);
     throw e;
   }
   if (lindaRes.status !== 204) {
-    const err = "unable to save Linda" + lindaRes.data;
+    const err =
+      "unable to save Linda, status=" +
+      lindaRes.status +
+      ", data=" +
+      JSON.stringify(lindaRes.data);
     console.error(err);
     throw new Error(err);
-  }
-
-  // Phase 4: Update tvdb immediately
-  const show = allShows.find((s) => s.Id === id);
-  if (show && allTvdb[show.Name]) {
-    allTvdb[show.Name].InLinda = inLinda;
-    await srvr.setTvdbFields({ name: show.Name, InLinda: inLinda });
   }
 }
 

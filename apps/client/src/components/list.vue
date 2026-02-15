@@ -344,11 +344,17 @@ export default {
         return;
       }
       this.saveVisShow(show);
+      const originalValue = show.InToTry;
       show.InToTry = !show.InToTry;
-      await emby.saveToTry(show.Id, show.InToTry).catch((err) => {
-        console.error("late toggleToTry error:", err);
-        //- show.InToTry = !show.InToTry;
-      });
+      try {
+        await emby.saveToTry(show.Id, show.InToTry);
+        console.log(
+          `toggleToTry success: ${show.Name}, InToTry=${show.InToTry}`,
+        );
+      } catch (err) {
+        console.error("toggleToTry error:", err);
+        show.InToTry = originalValue; // Revert on error
+      }
     };
 
     const toggleContinue = async (show) => {
@@ -357,11 +363,17 @@ export default {
         return;
       }
       this.saveVisShow(show);
+      const originalValue = show.InContinue;
       show.InContinue = !show.InContinue;
-      emby.saveContinue(show.Id, show.InContinue).catch((err) => {
-        console.error("late saveContinue error:", err);
-        //- show.InContinue = !show.InContinue;
-      });
+      try {
+        await emby.saveContinue(show.Id, show.InContinue);
+        console.log(
+          `toggleContinue success: ${show.Name}, InContinue=${show.InContinue}`,
+        );
+      } catch (err) {
+        console.error("toggleContinue error:", err);
+        show.InContinue = originalValue; // Revert on error
+      }
     };
 
     const toggleMark = async (show) => {
@@ -370,11 +382,15 @@ export default {
         return;
       }
       this.saveVisShow(show);
+      const originalValue = show.InMark;
       show.InMark = !show.InMark;
-      emby.saveMark(show.Id, show.InMark).catch((err) => {
-        console.error("late toggleMark error:", err);
-        //- show.InMark = !show.InMark;
-      });
+      try {
+        await emby.saveMark(show.Id, show.InMark);
+        console.log(`toggleMark success: ${show.Name}, InMark=${show.InMark}`);
+      } catch (err) {
+        console.error("toggleMark error:", err);
+        show.InMark = originalValue; // Revert on error
+      }
     };
 
     const toggleLinda = async (show) => {
@@ -383,11 +399,17 @@ export default {
         return;
       }
       this.saveVisShow(show);
+      const originalValue = show.InLinda;
       show.InLinda = !show.InLinda;
-      emby.saveLinda(show.Id, show.InLinda).catch((err) => {
-        console.error("late toggleLinda error:", err);
-        //- show.InLinda = !show.InLinda;
-      });
+      try {
+        await emby.saveLinda(show.Id, show.InLinda);
+        console.log(
+          `toggleLinda success: ${show.Name}, InLinda=${show.InLinda}`,
+        );
+      } catch (err) {
+        console.error("toggleLinda error:", err);
+        show.InLinda = originalValue; // Revert on error
+      }
     };
 
     const toggleFavorite = (show) => {

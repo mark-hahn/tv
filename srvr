@@ -123,9 +123,6 @@ remote_sync_app() {
     exit 1
   fi
 
-  # Always sync root config first to ensure workspace is valid
-  sync_monorepo_root
-
   echo "[remote] rsync $project -> $SSH_HOST:$remote_dir"
   # Reset remote directory implies we create the parent structure
   # rsync will create the leaf directory because we use local_dir/
@@ -205,10 +202,12 @@ remote_deploy_one_no_restart() {
 
 case "${1:-all}" in
   api|down|srvr|client|share|asr)
+    sync_monorepo_root
     remote_deploy_one_no_restart "$1"
     remote_pm2_restart_all_silent
     ;;
   all|"" )
+    sync_monorepo_root
     remote_deploy_one_no_restart api
     remote_deploy_one_no_restart srvr
     # Legacy flat deploy mode compabitility (share) - ensures packages are present

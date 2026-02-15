@@ -381,6 +381,7 @@ import Trailer from "./trailer.vue";
 import evtBus from "../evtBus.js";
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
+import * as srvr from "../srvr.js";
 import { config } from "../config.js";
 
 // Hardwired split percentages for simple mode.
@@ -853,6 +854,11 @@ export default {
       if (res?.status === "refreshdone") {
         this.libraryProgressText = "100%";
         evtBus.emit("library-refresh-complete");
+
+        // Trigger full gap check after library scan completes
+        srvr
+          .triggerFullGapCheck()
+          .catch((err) => console.error("triggerFullGapCheck failed:", err));
 
         // Debounce clearing to avoid flicker
         setTimeout(() => {

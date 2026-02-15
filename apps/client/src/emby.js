@@ -314,19 +314,19 @@ export async function loadAllShows() {
 
         try {
           if (noEmbyShow.InToTry) {
-            await saveToTry(tvdbRecord.Id, true);
+            await saveToTry(tvdbRecord.Id, true, name);
             tvdbRecord.InToTry = true;
           }
           if (noEmbyShow.InContinue) {
-            await saveContinue(tvdbRecord.Id, true);
+            await saveContinue(tvdbRecord.Id, true, name);
             tvdbRecord.InContinue = true;
           }
           if (noEmbyShow.InMark) {
-            await saveMark(tvdbRecord.Id, true);
+            await saveMark(tvdbRecord.Id, true, name);
             tvdbRecord.InMark = true;
           }
           if (noEmbyShow.InLinda) {
-            await saveLinda(tvdbRecord.Id, true);
+            await saveLinda(tvdbRecord.Id, true, name);
             tvdbRecord.InLinda = true;
           }
         } catch (e) {
@@ -509,6 +509,10 @@ export async function deleteShowFromEmby(show) {
       return;
     }
     console.log("deleted show from emby:", show.Name);
+    // Trigger gap check for deleted show
+    srvr
+      .triggerEmbySync(show.Id, show.Name)
+      .catch((err) => console.error("triggerEmbySync failed:", err));
   } catch (error) {
     const errData = error.response?.data || "";
     if (errData.includes("Directory not empty")) {
@@ -541,6 +545,7 @@ export const editEpisode = async (
   episodeNumIn,
   delFile = false,
   setWatched = null,
+  showName = null,
 ) => {
   let lastWatchedRec = null;
 
@@ -587,6 +592,13 @@ export const editEpisode = async (
       //               post_url: url,
       //               post_res: setDataRes
       //             });
+
+      // Trigger gap check for this show (watched status affects gap calculation)
+      if (showName) {
+        srvr
+          .triggerEmbySync(seriesId, showName)
+          .catch((err) => console.error("triggerEmbySync failed:", err));
+      }
     }
   }
 };
@@ -774,7 +786,7 @@ export async function saveFav(id, fav) {
   if (favRes.status != 200) throw new Error("unable to save favorite");
 }
 
-export async function saveToTry(id, inToTry) {
+export async function saveToTry(id, inToTry, showName) {
   const config = {
     method: inToTry ? "post" : "delete",
     url: urls.collectionUrl(cred, id, toTryCollId),
@@ -795,9 +807,15 @@ export async function saveToTry(id, inToTry) {
     console.error(err);
     throw new Error(err);
   }
+  // Trigger immediate gap check for this show
+  if (showName) {
+    srvr
+      .triggerEmbySync(id, showName)
+      .catch((err) => console.error("triggerEmbySync failed:", err));
+  }
 }
 
-export async function saveContinue(id, inContinue) {
+export async function saveContinue(id, inContinue, showName) {
   const config = {
     method: inContinue ? "post" : "delete",
     url: urls.collectionUrl(cred, id, continueCollId),
@@ -818,9 +836,15 @@ export async function saveContinue(id, inContinue) {
     console.error(err);
     throw new Error(err);
   }
+  // Trigger immediate gap check for this show
+  if (showName) {
+    srvr
+      .triggerEmbySync(id, showName)
+      .catch((err) => console.error("triggerEmbySync failed:", err));
+  }
 }
 
-export async function saveMark(id, inMark) {
+export async function saveMark(id, inMark, showName) {
   const config = {
     method: inMark ? "post" : "delete",
     url: urls.collectionUrl(cred, id, markCollId),
@@ -841,9 +865,15 @@ export async function saveMark(id, inMark) {
     console.error(err);
     throw new Error(err);
   }
+  // Trigger immediate gap check for this show
+  if (showName) {
+    srvr
+      .triggerEmbySync(id, showName)
+      .catch((err) => console.error("triggerEmbySync failed:", err));
+  }
 }
 
-export async function saveLinda(id, inLinda) {
+export async function saveLinda(id, inLinda, showName) {
   const config = {
     method: inLinda ? "post" : "delete",
     url: urls.collectionUrl(cred, id, lindaCollId),
@@ -863,6 +893,12 @@ export async function saveLinda(id, inLinda) {
       JSON.stringify(lindaRes.data);
     console.error(err);
     throw new Error(err);
+  }
+  // Trigger immediate gap check for this show
+  if (showName) {
+    srvr
+      .triggerEmbySync(id, showName)
+      .catch((err) => console.error("triggerEmbySync failed:", err));
   }
 }
 
@@ -988,6 +1024,10 @@ export const refreshLib = async () => {
 
     const task = tasks.find(isLibraryRefreshTask);
     if (!task?.Id) return { status: "notask" };
+
+    // Note: triggerFullGapCheck should be called by the caller if needed
+    // (not all library refreshes require gap checks)
+
     return { status: "hasTask", taskId: task.Id };
   } catch (e) {
     return { status: e?.message || String(e) };

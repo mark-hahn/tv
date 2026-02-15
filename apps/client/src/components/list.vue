@@ -364,7 +364,7 @@ export default {
       const originalValue = show.InToTry;
       show.InToTry = !show.InToTry;
       try {
-        await emby.saveToTry(show.Id, show.InToTry);
+        await emby.saveToTry(show.Id, show.InToTry, show.Name);
       } catch (err) {
         console.error("toggleToTry error:", err);
         show.InToTry = originalValue; // Revert on error
@@ -380,7 +380,7 @@ export default {
       const originalValue = show.InContinue;
       show.InContinue = !show.InContinue;
       try {
-        await emby.saveContinue(show.Id, show.InContinue);
+        await emby.saveContinue(show.Id, show.InContinue, show.Name);
       } catch (err) {
         console.error("toggleContinue error:", err);
         show.InContinue = originalValue; // Revert on error
@@ -396,7 +396,7 @@ export default {
       const originalValue = show.InMark;
       show.InMark = !show.InMark;
       try {
-        await emby.saveMark(show.Id, show.InMark);
+        await emby.saveMark(show.Id, show.InMark, show.Name);
       } catch (err) {
         console.error("toggleMark error:", err);
         show.InMark = originalValue;
@@ -412,7 +412,7 @@ export default {
       const originalValue = show.InLinda;
       show.InLinda = !show.InLinda;
       try {
-        await emby.saveLinda(show.Id, show.InLinda);
+        await emby.saveLinda(show.Id, show.InLinda, show.Name);
       } catch (err) {
         console.error("toggleLinda error:", err);
         show.InLinda = originalValue; // Revert on error
@@ -1287,6 +1287,13 @@ export default {
           try {
             setWebAddStatus("Reloading shows...");
             await this.newShows(false);
+
+            // Trigger full gap check after creating new show and library refresh completes
+            await srvr
+              .triggerFullGapCheck()
+              .catch((err) =>
+                console.error("triggerFullGapCheck failed:", err),
+              );
           } catch {
             // ignore
           }
@@ -1811,6 +1818,11 @@ export default {
         // Emby won't reflect the deletion until the library is refreshed.
         await this.refreshEmbyLibraryWithDialog();
 
+        // Trigger gap check for just this show (not full check like library refresh does)
+        await srvr
+          .triggerEmbySync(show.Id, show.Name)
+          .catch((err) => console.error("triggerEmbySync failed:", err));
+
         // Refresh the Map grid now that Emby has refreshed.
         await this.seriesMapAction("refresh", show, null);
 
@@ -1820,7 +1832,14 @@ export default {
       }
 
       // toggle watched or set to specific value
-      await emby.editEpisode(show.Id, season, episode, false, setWatched);
+      await emby.editEpisode(
+        show.Id,
+        season,
+        episode,
+        false,
+        setWatched,
+        show.Name,
+      );
       await this.seriesMapAction("", show, null);
     },
 

@@ -800,6 +800,11 @@ export default {
             },
           });
         });
+
+        // Trigger full gap check after creating new show and library refresh completes
+        await srvr
+          .triggerFullGapCheck()
+          .catch((err) => console.error("triggerFullGapCheck failed:", err));
       } finally {
         this.mapWorking = false;
         this.mapWorkingTitle = "";

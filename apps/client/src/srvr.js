@@ -343,6 +343,14 @@ export function delNoEmby(name) {
 export function getGaps() {
   return httpCall("/api/getGaps");
 }
+
+export function triggerEmbySync(showId, showName) {
+  return httpCall("/api/triggerEmbySync", { showId, showName }, "POST");
+}
+
+export function triggerFullGapCheck() {
+  return httpCall("/api/triggerFullGapCheck", {}, "POST");
+}
 export function addGap(params) {
   return httpCall("/api/addGap", params, "POST");
 }

@@ -2518,6 +2518,56 @@ app.post("/api/getNote", apiWrapper(getNote));
 app.post("/api/getFile", apiWrapper(getFile));
 app.post("/api/getSubFileIds", apiWrapper(getSubFileIds));
 app.post("/api/accessTvdb", apiWrapper(tvdb.accessTvdb));
+app.post(
+  "/api/triggerEmbySync",
+  apiWrapper(async (params) => {
+    const { showId, showName } = params;
+    if (!showId || !showName) {
+      console.error("[triggerEmbySync] Missing showId or showName");
+      return { success: false };
+    }
+    console.log(`[triggerEmbySync] Client changed: ${showName}`);
+
+    // Run gap check for this show after 3 second delay
+    setTimeout(() => {
+      const allTvdb = tvdb.getAllTvdbSync();
+      const tvdbRecord = allTvdb[showName];
+      if (tvdbRecord) {
+        console.log(`[emby change] Checking 1 show: ${showName}`);
+        runGapCheckForShows([{ showId, showName, tvdbRecord }], true).catch(
+          (err) => {
+            console.error("[triggerEmbySync] gapCheck failed:", err.message);
+          },
+        );
+      } else {
+        console.error(`[triggerEmbySync] Show not found in tvdb: ${showName}`);
+      }
+    }, 3000);
+
+    return { success: true };
+  }),
+);
+
+app.post(
+  "/api/triggerFullGapCheck",
+  apiWrapper(async () => {
+    console.log(
+      "[triggerFullGapCheck] Client requested full gap check after library scan",
+    );
+
+    // Run gap check for all shows after 5 second delay (allow library scan to settle)
+    setTimeout(() => {
+      console.log(
+        "[triggerFullGapCheck] Starting full gap check for all shows",
+      );
+      runGapCheckBatch().catch((err) => {
+        console.error("[triggerFullGapCheck] failed:", err.message);
+      });
+    }, 5000);
+
+    return { success: true };
+  }),
+);
 
 // CRUD operations
 app.post("/api/addReject", apiWrapper(addReject));
@@ -2678,9 +2728,15 @@ async function runUsbCheck() {
  * - Syncs collection flags (toTry, continue, mark, linda)
  * - Syncs reject and pickup flags
  */
+// DEPRECATED: syncEmbyUserData is no longer used
+// Collection changes are now handled by immediate triggers from client:
+// - /api/triggerEmbySync (per-show changes)
+// - /api/triggerFullGapCheck (library scan)
+// This function remains for reference but is not called.
 async function syncEmbyUserData() {
+  console.log("[syncEmbyUserData] CALLED - function executing");
   try {
-    // console.log("[Phase 3] syncEmbyUserData: Starting...");
+    console.log("[syncEmbyUserData] Starting...");
 
     // Get all tvdb records
     const allTvdb = tvdb.getAllTvdbSync();
@@ -2703,32 +2759,27 @@ async function syncEmbyUserData() {
     // Fetch all data in parallel:
     // 1. Emby shows (for user data - watched status, play counts)
     // 2. Collection IDs (for InToTry, InContinue, InMark, InLinda flags)
-    const COLLECTION_IDS = {
-      toTry: "1468316",
-      continue: "4719143",
-      mark: "4697672",
-      linda: "4706186",
-    };
 
-    const embyUrl =
-      "https://hahnca.com:8920/emby/Users/894c752d448f45a3a1260ccaabd0adff/Items?api_key=1c399bd079d549cba8c916244d3add2b&IncludeItemTypes=Series&Recursive=true&Fields=UserData&StartIndex=0&Limit=10000";
+    const embyUrl = `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?api_key=${EMBY_API_KEY}&IncludeItemTypes=Series&Recursive=true&Fields=UserData&StartIndex=0&Limit=10000`;
 
     const [embyResp, toTryResp, continueResp, markResp, lindaResp] =
       await Promise.all([
         fetch(embyUrl),
         fetch(
-          `https://hahnca.com:8920/emby/Collections/${COLLECTION_IDS.toTry}/Items?api_key=1c399bd079d549cba8c916244d3add2b&Limit=10000`,
+          `${EMBY_BASE_URL}/Collections/${COLLECTION_IDS.toTry}/Items?api_key=${EMBY_API_KEY}&Limit=10000`,
         ),
         fetch(
-          `https://hahnca.com:8920/emby/Collections/${COLLECTION_IDS.continue}/Items?api_key=1c399bd079d549cba8c916244d3add2b&Limit=10000`,
+          `${EMBY_BASE_URL}/Collections/${COLLECTION_IDS.continue}/Items?api_key=${EMBY_API_KEY}&Limit=10000`,
         ),
         fetch(
-          `https://hahnca.com:8920/emby/Collections/${COLLECTION_IDS.mark}/Items?api_key=1c399bd079d549cba8c916244d3add2b&Limit=10000`,
+          `${EMBY_BASE_URL}/Collections/${COLLECTION_IDS.mark}/Items?api_key=${EMBY_API_KEY}&Limit=10000`,
         ),
         fetch(
-          `https://hahnca.com:8920/emby/Collections/${COLLECTION_IDS.linda}/Items?api_key=1c399bd079d549cba8c916244d3add2b&Limit=10000`,
+          `${EMBY_BASE_URL}/Collections/${COLLECTION_IDS.linda}/Items?api_key=${EMBY_API_KEY}&Limit=10000`,
         ),
       ]);
+
+    console.log("[syncEmbyUserData] Fetches completed");
 
     if (!embyResp.ok) {
       console.error(
@@ -2742,18 +2793,42 @@ async function syncEmbyUserData() {
     const embyShows = embyData.Items || [];
 
     // Get collection IDs (handle fetch failures gracefully)
-    const toTryIds = toTryResp.ok
-      ? (await toTryResp.json()).Items?.map((i) => i.Id) || []
-      : [];
-    const continueIds = continueResp.ok
-      ? (await continueResp.json()).Items?.map((i) => i.Id) || []
-      : [];
-    const markIds = markResp.ok
-      ? (await markResp.json()).Items?.map((i) => i.Id) || []
-      : [];
-    const lindaIds = lindaResp.ok
-      ? (await lindaResp.json()).Items?.map((i) => i.Id) || []
-      : [];
+    const toTryData = toTryResp.ok ? await toTryResp.json() : null;
+    const continueData = continueResp.ok ? await continueResp.json() : null;
+    const markData = markResp.ok ? await markResp.json() : null;
+    const lindaData = lindaResp.ok ? await lindaResp.json() : null;
+
+    console.log(`[syncEmbyUserData] Collection responses:`, {
+      toTry: {
+        ok: toTryResp.ok,
+        status: toTryResp.status,
+        hasItems: !!toTryData?.Items,
+        count: toTryData?.Items?.length || 0,
+      },
+      continue: {
+        ok: continueResp.ok,
+        status: continueResp.status,
+        hasItems: !!continueData?.Items,
+        count: continueData?.Items?.length || 0,
+      },
+      mark: {
+        ok: markResp.ok,
+        status: markResp.status,
+        hasItems: !!markData?.Items,
+        count: markData?.Items?.length || 0,
+      },
+      linda: {
+        ok: lindaResp.ok,
+        status: lindaResp.status,
+        hasItems: !!lindaData?.Items,
+        count: lindaData?.Items?.length || 0,
+      },
+    });
+
+    const toTryIds = toTryData?.Items?.map((i) => i.Id) || [];
+    const continueIds = continueData?.Items?.map((i) => i.Id) || [];
+    const markIds = markData?.Items?.map((i) => i.Id) || [];
+    const lindaIds = lindaData?.Items?.map((i) => i.Id) || [];
 
     const toTryIdSet = new Set(toTryIds);
     const continueIdSet = new Set(continueIds);
@@ -2762,6 +2837,18 @@ async function syncEmbyUserData() {
 
     let updatedCount = 0;
     const now = Date.now();
+
+    // Debug: track what types of changes are detected
+    let userDataChangeCount = 0;
+    let collectionsChangeCount = 0;
+    let rejectsPickupsChangeCount = 0;
+
+    console.log(
+      `[syncEmbyUserData] About to process ${embyShows.length} shows`,
+    );
+    console.log(
+      `[syncEmbyUserData] Collection sets sizes: toTry=${toTryIdSet.size}, continue=${continueIdSet.size}, mark=${markIdSet.size}, linda=${lindaIdSet.size}`,
+    );
 
     // Update tvdb records with fresh Emby user data, collections, rejects, and pickups
     for (const embyShow of embyShows) {
@@ -2772,13 +2859,55 @@ async function syncEmbyUserData() {
 
       const userData = embyShow.UserData || {};
 
-      // Check if user data changed
+      // Check if user data changed (normalize values for comparison)
+      const oldPlayed = !!tvdbRecord.Played;
+      const newPlayed = !!userData.Played;
+      const oldPlayCount = tvdbRecord.PlayCount || 0;
+      const newPlayCount = userData.PlayCount || 0;
+      const oldFavorite = !!tvdbRecord.IsFavorite;
+      const newFavorite = !!userData.IsFavorite;
+      const oldLastPlayed = tvdbRecord.LastPlayedDate || null;
+      const newLastPlayed = userData.LastPlayedDate || null;
+      const oldUnplayed = tvdbRecord.UnplayedItemCount || 0;
+      const newUnplayed = userData.UnplayedItemCount || 0;
+
       const userDataChanged =
-        tvdbRecord.Played !== userData.Played ||
-        tvdbRecord.PlayCount !== userData.PlayCount ||
-        tvdbRecord.IsFavorite !== userData.IsFavorite ||
-        tvdbRecord.LastPlayedDate !== userData.LastPlayedDate ||
-        tvdbRecord.UnplayedItemCount !== userData.UnplayedItemCount;
+        oldPlayed !== newPlayed ||
+        oldPlayCount !== newPlayCount ||
+        oldFavorite !== newFavorite ||
+        oldLastPlayed !== newLastPlayed ||
+        oldUnplayed !== newUnplayed;
+
+      // Debug first show with changes
+      if (userDataChanged && userDataChangeCount === 0) {
+        console.log(`[DEBUG first userData change] ${name}:`, {
+          played: {
+            old: oldPlayed,
+            new: newPlayed,
+            changed: oldPlayed !== newPlayed,
+          },
+          playCount: {
+            old: oldPlayCount,
+            new: newPlayCount,
+            changed: oldPlayCount !== newPlayCount,
+          },
+          favorite: {
+            old: oldFavorite,
+            new: newFavorite,
+            changed: oldFavorite !== newFavorite,
+          },
+          lastPlayed: {
+            old: oldLastPlayed,
+            new: newLastPlayed,
+            changed: oldLastPlayed !== newLastPlayed,
+          },
+          unplayed: {
+            old: oldUnplayed,
+            new: newUnplayed,
+            changed: oldUnplayed !== newUnplayed,
+          },
+        });
+      }
 
       // Check if collection flags changed
       const showId = embyShow.Id;
@@ -2792,6 +2921,32 @@ async function syncEmbyUserData() {
         tvdbRecord.InContinue !== newInContinue ||
         tvdbRecord.InMark !== newInMark ||
         tvdbRecord.InLinda !== newInLinda;
+
+      // Debug first collection change
+      if (collectionsChanged && collectionsChangeCount === 0) {
+        console.log(`[DEBUG first collection change] ${name}:`, {
+          toTry: {
+            old: tvdbRecord.InToTry,
+            new: newInToTry,
+            changed: tvdbRecord.InToTry !== newInToTry,
+          },
+          continue: {
+            old: tvdbRecord.InContinue,
+            new: newInContinue,
+            changed: tvdbRecord.InContinue !== newInContinue,
+          },
+          mark: {
+            old: tvdbRecord.InMark,
+            new: newInMark,
+            changed: tvdbRecord.InMark !== newInMark,
+          },
+          linda: {
+            old: tvdbRecord.InLinda,
+            new: newInLinda,
+            changed: tvdbRecord.InLinda !== newInLinda,
+          },
+        });
+      }
 
       // Check if reject/pickup flags changed
       const normName = normShowName(name);
@@ -2809,6 +2964,7 @@ async function syncEmbyUserData() {
           tvdbRecord.IsFavorite = userData.IsFavorite || false;
           tvdbRecord.LastPlayedDate = userData.LastPlayedDate || null;
           tvdbRecord.UnplayedItemCount = userData.UnplayedItemCount || 0;
+          userDataChangeCount++;
         }
 
         // Update collection flags
@@ -2817,12 +2973,14 @@ async function syncEmbyUserData() {
           tvdbRecord.InContinue = newInContinue;
           tvdbRecord.InMark = newInMark;
           tvdbRecord.InLinda = newInLinda;
+          collectionsChangeCount++;
         }
 
         // Update reject/pickup flags
         if (rejectsPickupsChanged) {
           tvdbRecord.reject = newReject;
           tvdbRecord.pickup = newPickup;
+          rejectsPickupsChangeCount++;
         }
 
         delete tvdbRecord.emby;
@@ -2836,9 +2994,15 @@ async function syncEmbyUserData() {
       }
     }
 
+    console.log(
+      `[syncEmbyUserData] Loop completed, ${updatedCount} shows changed`,
+    );
+
     if (updatedCount > 0) {
       await tvdb.saveTvdbSync();
-      // console.log(`[Phase 3] syncEmbyUserData: Updated ${updatedCount} shows`);
+      console.log(
+        `[syncEmbyUserData] Changes: ${userDataChangeCount} userData, ${collectionsChangeCount} collections, ${rejectsPickupsChangeCount} rejects/pickups`,
+      );
 
       // Trigger gap check for changed shows after 3 second delay
       // This allows both Emby and disk operations to settle (e.g., delete show + delete folder)
@@ -2963,6 +3127,7 @@ async function syncDiskData() {
 async function runGapCheckForShows(shows, checkDiskFirst = true) {
   if (!shows || shows.length === 0) return;
 
+  const startTime = Date.now();
   try {
     let diskUpdateCount = 0;
 
@@ -3016,6 +3181,9 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
     if (updatedCount > 0) {
       notifyClients("tvdbUpdated");
     }
+
+    const elapsed = Math.round((Date.now() - startTime) / 1000);
+    console.log(`[gap check] finished, ${elapsed} secs, ${shows.length} shows`);
   } catch (err) {
     console.error("[runGapCheckForShows] error:", err.message);
   }
@@ -3071,16 +3239,25 @@ async function runGapCheckBatch() {
 }
 
 // Phase 3: Set up sync timers
-const EMBY_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
+const EMBY_USER_ID = "894c752d448f45a3a1260ccaabd0adff";
+const EMBY_BASE_URL = "https://hahnca.com:8920/emby";
+const COLLECTION_IDS = {
+  toTry: "1468316",
+  continue: "4719143",
+  mark: "4697672",
+  linda: "4706186",
+};
+
 const DISK_SYNC_INTERVAL = 60 * 60 * 1000; // 1 hour (full disk check)
 const GAP_CHECK_INTERVAL = 6 * 60 * 1000; // 6 minutes (processes batch of 10 shows, checks disk per-show)
 
-setInterval(syncEmbyUserData, EMBY_SYNC_INTERVAL);
+// NOTE: syncEmbyUserData periodic sync removed - now using immediate triggers from client
+// Collections and user data changes are handled by /api/triggerEmbySync and /api/triggerFullGapCheck
 setInterval(syncDiskData, DISK_SYNC_INTERVAL); // Full disk check hourly
 setInterval(runGapCheckBatch, GAP_CHECK_INTERVAL);
 
-// Run initial syncs after startup delay
-setTimeout(syncEmbyUserData, 2 * 60 * 1000); // 2 minutes after start
+// Run initial syncs
 setTimeout(syncDiskData, 3 * 60 * 1000); // 3 minutes after start
 setTimeout(runGapCheckBatch, 4 * 60 * 1000); // 4 minutes after start
 

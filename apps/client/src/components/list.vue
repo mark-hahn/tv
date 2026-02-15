@@ -138,7 +138,6 @@
             <HdrTop
               :showsLength="shows.length"
               :allShowsLength="allShowsLength"
-              :gapPercent="gapPercent"
               v-model:filterStr="filterStr"
               :watchingName="watchingName"
               :simpleMode="simpleMode"
@@ -201,7 +200,6 @@
           <HdrTop
             :showsLength="shows.length"
             :allShowsLength="allShowsLength"
-            :gapPercent="gapPercent"
             v-model:filterStr="filterStr"
             :watchingName="watchingName"
             :simpleMode="simpleMode"
@@ -533,7 +531,6 @@ export default {
       seriesMapSeasons: [],
       seriesMapEpis: [],
       seriesMap: {},
-      gapPercent: 0,
       watchingName: "---",
       currentPlayingDevice: null,
       sortPopped: false,
@@ -566,7 +563,7 @@ export default {
           filter: 0,
           icon: ["fas", "plus"],
           cond(show) {
-            return !show.NotReady;
+            return !show.notReady;
           },
           click() {},
           name: "unplayed",

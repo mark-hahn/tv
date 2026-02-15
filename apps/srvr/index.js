@@ -2843,9 +2843,10 @@ async function syncEmbyUserData() {
       // Trigger gap check for changed shows after 3 second delay
       // This allows both Emby and disk operations to settle (e.g., delete show + delete folder)
       if (changedShows.length > 0) {
-        console.log(
-          `[Phase 3] syncEmbyUserData: ${updatedCount} emby changes detected, scheduling gap check in 3 seconds`,
-        );
+        const logMsg = changedShows.length === 1 
+          ? `[emby change] Checking 1 show: ${changedShows[0].showName}`
+          : `[emby change] Checking ${changedShows.length} shows`;
+        console.log(logMsg);
         setTimeout(() => {
           runGapCheckForShows(changedShows, true).catch((err) => {
             console.error(
@@ -2930,9 +2931,10 @@ async function syncDiskData() {
       // Trigger gap check for shows with disk changes after 10 second delay
       // This allows file operations/downloads to settle
       if (changedShows.length > 0) {
-        console.log(
-          `[Phase 3] syncDiskData: Detected ${changedShows.length} disk changes, scheduling gap check in 10 seconds`,
-        );
+        const logMsg = changedShows.length === 1 
+          ? `[disk change] Checking 1 show: ${changedShows[0].showName}`
+          : `[disk change] Checking ${changedShows.length} shows`;
+        console.log(logMsg);
         setTimeout(() => {
           runGapCheckForShows(changedShows, false).catch((err) => {
             console.error(
@@ -3010,9 +3012,6 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
     const updatedCount = await tvdb.updateTvdbWithGapData(gapData);
 
     if (updatedCount > 0) {
-      console.log(
-        `[runGapCheckForShows] Updated gap data for ${updatedCount} of ${shows.length} shows`,
-      );
       notifyClients("tvdbUpdated");
     }
   } catch (err) {
@@ -3060,7 +3059,7 @@ async function runGapCheckBatch() {
 
     if (batch.length > 0) {
       console.log(
-        `[Phase 3] runGapCheckBatch: Processing shows ${batchStart + 1}-${batchStart + batch.length} of ${showsToCheck.length}`,
+        `[10-show batch] Checking ${batch.length} shows (${batchStart + 1}-${batchStart + batch.length} of ${showsToCheck.length})`,
       );
       await runGapCheckForShows(batch, true); // Check disk for each show
     }

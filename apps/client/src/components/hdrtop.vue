@@ -21,12 +21,6 @@
         >
           {{ showsLength + "/" + allShowsLength }}
         </div>
-        <div
-          id="prog"
-          style="display: inline-block; margin: 4px 10px 4px 5px; width: 75px"
-        >
-          {{ gapPercent + "%" }}
-        </div>
       </div>
     </div>
     <div
@@ -110,10 +104,6 @@ export default {
     allShowsLength: {
       type: Number,
       required: true,
-    },
-    gapPercent: {
-      type: Number,
-      default: 0,
     },
     filterStr: {
       type: String,

@@ -2843,9 +2843,10 @@ async function syncEmbyUserData() {
       // Trigger gap check for changed shows after 3 second delay
       // This allows both Emby and disk operations to settle (e.g., delete show + delete folder)
       if (changedShows.length > 0) {
-        const logMsg = changedShows.length === 1 
-          ? `[emby change] Checking 1 show: ${changedShows[0].showName}`
-          : `[emby change] Checking ${changedShows.length} shows`;
+        const logMsg =
+          changedShows.length === 1
+            ? `[emby change] Checking 1 show: ${changedShows[0].showName}`
+            : `[emby change] Checking ${changedShows.length} shows`;
         console.log(logMsg);
         setTimeout(() => {
           runGapCheckForShows(changedShows, true).catch((err) => {
@@ -2931,9 +2932,10 @@ async function syncDiskData() {
       // Trigger gap check for shows with disk changes after 10 second delay
       // This allows file operations/downloads to settle
       if (changedShows.length > 0) {
-        const logMsg = changedShows.length === 1 
-          ? `[disk change] Checking 1 show: ${changedShows[0].showName}`
-          : `[disk change] Checking ${changedShows.length} shows`;
+        const logMsg =
+          changedShows.length === 1
+            ? `[disk change] Checking 1 show: ${changedShows[0].showName}`
+            : `[disk change] Checking ${changedShows.length} shows`;
         console.log(logMsg);
         setTimeout(() => {
           runGapCheckForShows(changedShows, false).catch((err) => {

@@ -152,16 +152,23 @@ handleMsg = async (msg) => {
     return;
   }
 
-  const { id, status, data: result } = parts;
+  const { id, notification, status, data: result } = parts;
 
-  // console.log("handling msg:", id, status);
+  // Handle ASR logs (server->client push)
   if (status === "asr-log") {
     evtBus.emit("asr-log", result);
     return;
   }
 
+  // Handle server->client notifications (id === 0)
+  if (id === 0 && notification) {
+    evtBus.emit(notification, result);
+    return;
+  }
+
   if (id == "0") return;
 
+  // Handle responses to client->server calls
   const callIdx = calls.findIndex((call) => call.id == id);
   if (callIdx < 0) {
     console.error("no matching id from msg:", id);

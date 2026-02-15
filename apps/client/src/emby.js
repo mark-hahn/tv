@@ -5,10 +5,6 @@ import * as urls from "./urls.js";
 import * as util from "./util.js";
 import evtBus from "./evtBus.js";
 
-const gapWorker = new Worker(new URL("gap-worker.js", import.meta.url), {
-  type: "module",
-});
-
 const name = "mark";
 const pwd = "90-MNBbnmyui";
 const apiKey = "1112c1f515824d66bf2f8618fdb67312";
@@ -489,51 +485,8 @@ export async function loadAllShows() {
 
 //////////// misc functions //////////////
 
-export function startGapWorker(allShows, allTvdb, cb) {
-  gapWorker.onerror = (err) => {
-    console.error("Worker:", err.message);
-  };
-  const allShowsIdName = [];
-  for (let show of allShows) {
-    const id = show.Id;
-    if (show.inEmby === false) {
-      show.NotReady = true;
-      continue;
-    }
-    const tvdbData = allTvdb?.[show.Name] || {};
-    allShowsIdName.push({
-      showId: id,
-      showName: show.Name,
-      firstAired: tvdbData.firstAired,
-      tvdbStatus: tvdbData.status,
-    });
-  }
-  gapWorker.onmessage = cb;
-  gapWorker.postMessage({ cred, allShowsIdName });
-}
-
-export function startUpdateWorker(allShows, allTvdb, cb) {
-  gapWorker.onerror = (err) => {
-    console.error("Worker:", err.message);
-  };
-  const allShowsIdName = [];
-  for (let show of allShows) {
-    const id = show.Id;
-    if (show.inEmby === false) {
-      show.NotReady = true;
-      continue;
-    }
-    const tvdbData = allTvdb?.[show.Name] || {};
-    allShowsIdName.push({
-      showId: id,
-      showName: show.Name,
-      firstAired: tvdbData.firstAired,
-      tvdbStatus: tvdbData.status,
-    });
-  }
-  gapWorker.onmessage = cb;
-  gapWorker.postMessage({ cred, allShowsIdName });
-}
+// Gap checking is now done on the server
+// Server will send updated tvdb data via WebSocket RPC
 
 const toTryCollId = "1468316";
 const continueCollId = "4719143";

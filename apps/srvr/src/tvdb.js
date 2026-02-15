@@ -1869,5 +1869,58 @@ export const accessTvdb = async (params) => {
   }
 };
 
+/**
+ * Update tvdb records with gap check data
+ * @param {Object} gapData - Gap data keyed by show Id
+ * @returns {Promise<number>} - Number of shows updated
+ */
+export const updateTvdbWithGapData = async (gapData) => {
+  if (!gapData || typeof gapData !== "object") return 0;
+
+  const allTvdb = getAllTvdbSync();
+  let updatedCount = 0;
+
+  for (const [showName, tvdbRecord] of Object.entries(allTvdb)) {
+    if (!tvdbRecord?.Id) continue;
+
+    const showId = tvdbRecord.Id;
+    const gaps = gapData[showId];
+    if (!gaps) continue;
+
+    const changed =
+      tvdbRecord.notReady !== gaps.notReady ||
+      tvdbRecord.anyWatched !== gaps.anyWatched ||
+      tvdbRecord.watchGap !== gaps.watchGap ||
+      tvdbRecord.watchGapSeason !== gaps.watchGapSeason ||
+      tvdbRecord.watchGapEpisode !== gaps.watchGapEpisode ||
+      tvdbRecord.fileGap !== gaps.fileGap ||
+      tvdbRecord.fileGapSeason !== gaps.fileGapSeason ||
+      tvdbRecord.fileGapEpisode !== gaps.fileGapEpisode ||
+      tvdbRecord.fileEndError !== gaps.fileEndError ||
+      tvdbRecord.seasonWatchedThenNofile !== gaps.seasonWatchedThenNofile;
+
+    if (changed) {
+      tvdbRecord.notReady = gaps.notReady;
+      tvdbRecord.anyWatched = gaps.anyWatched;
+      tvdbRecord.watchGap = gaps.watchGap;
+      tvdbRecord.watchGapSeason = gaps.watchGapSeason;
+      tvdbRecord.watchGapEpisode = gaps.watchGapEpisode;
+      tvdbRecord.fileGap = gaps.fileGap;
+      tvdbRecord.fileGapSeason = gaps.fileGapSeason;
+      tvdbRecord.fileGapEpisode = gaps.fileGapEpisode;
+      tvdbRecord.fileEndError = gaps.fileEndError;
+      tvdbRecord.seasonWatchedThenNofile = gaps.seasonWatchedThenNofile;
+      updatedCount++;
+    }
+  }
+
+  if (updatedCount > 0) {
+    await saveTvdbSync();
+    console.log(`[updateTvdbWithGapData] Updated ${updatedCount} shows`);
+  }
+
+  return updatedCount;
+};
+
 // Export helper functions for migration and external use
 export { seriesMapToWatchedEpis, applyWatchedEpisToSeriesMap, getSeriesMap };

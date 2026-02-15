@@ -324,7 +324,6 @@ let allTvdb = null;
 let allShows = [];
 let showHistory = [];
 let showHistoryPtr = -1;
-let gapWorkerRunning = false;
 
 export default {
   name: "List",
@@ -2202,67 +2201,11 @@ export default {
     },
 
     async addGapToShow(event) {
-      const {
-        showId,
-        progress,
-        notReady,
-        anyWatched,
-        watchGap,
-        watchGapSeason,
-        watchGapEpisode,
-        fileEndError,
-        seasonWatchedThenNofile,
-        fileGap,
-        fileGapSeason,
-        fileGapEpisode,
-      } = event.data;
-      this.gapPercent = progress;
-      const save = progress == 100;
-
-      // Prefer updating the reactive object (this.shows) so the UI repaints.
-      // Keep the backing allShows entry in sync if it differs by reference.
-      const reactiveShow = this.shows.find((s) => s.Id == showId);
-      const allShowsShow = allShows.find((s) => s.Id == showId);
-      const show = reactiveShow || allShowsShow;
-      if (!show) return;
-
-      // if(fileEndError)
-      //   console.log('fileEndError', show.Name);
-
-      if (anyWatched && show.InToTry) {
-        if (reactiveShow) reactiveShow.InToTry = false;
-        if (allShowsShow) allShowsShow.InToTry = false;
-        emby.saveToTry(show.Id, false).catch((err) => {
-          console.error("addGapToShow, late saveToTry error:", err);
-        });
-      }
-
-      const gap = {};
-      gap.ShowId = showId;
-      gap.showName = show.Name;
-      gap.FileGapSeason = fileGapSeason;
-      gap.FileGapEpisode = fileGapEpisode;
-      gap.WatchGapSeason = watchGapSeason;
-      gap.WatchGapEpisode = watchGapEpisode;
-      gap.WatchGap = watchGap;
-      gap.NotReady = notReady;
-      gap.FileGap =
-        !(!notReady && show.InToTry) &&
-        (fileGap || fileEndError || seasonWatchedThenNofile);
-
-      // Apply to reactive show first, but always keep the backing store synced.
-      if (reactiveShow) Object.assign(reactiveShow, gap);
-      if (allShowsShow && allShowsShow !== reactiveShow)
-        Object.assign(allShowsShow, gap);
-      await srvr.addGap({ gapId: show.Id, gap, save });
-
-      // When worker finishes (progress == 100), mark it as not running
-      if (progress == 100) {
-        gapWorkerRunning = false;
-        // Re-run filters/sort once at completion so any gap-driven UI changes
-        // (e.g. Download filter) are reflected immediately.
-        await this.refilter(false);
-      }
+      // Gap data now comes from server-side tvdb records
+      // This method kept for compatibility but deprecated
+      console.warn(
+        "addGapToShow called - gap checking now handled server-side",
+      );
     },
 
     async newShows(isInitialLoad = false) {
@@ -2280,27 +2223,8 @@ export default {
       this.$emit("all-shows", allShows);
       this.$emit("all-tvdb", allTvdb);
 
-      // must be set before startWorker
-
-      // Handle gap worker restart logic
-      if (isInitialLoad) {
-        // Initial load: start worker immediately
-        gapWorkerRunning = true;
-        emby.startGapWorker(allShows, allTvdb, this.addGapToShow);
-      } else if (gapWorkerRunning) {
-        // Worker is running, wait for it to finish then restart
-        const checkAndRestart = setInterval(() => {
-          if (!gapWorkerRunning) {
-            clearInterval(checkAndRestart);
-            gapWorkerRunning = true;
-            emby.startGapWorker(allShows, allTvdb, this.addGapToShow);
-          }
-        }, 100);
-      } else {
-        // Worker not running, start immediately
-        gapWorkerRunning = true;
-        emby.startGapWorker(allShows, allTvdb, this.addGapToShow);
-      }
+      // Gap checking now handled server-side
+      // Server will notify via WebSocket when tvdb data is updated
 
       // Only set sort properties on initial load
       if (isInitialLoad) {
@@ -2394,6 +2318,52 @@ export default {
     on("deleteShow", async (show) => {
       if (!show) return;
       await this.deleteShow(show);
+    });
+
+    // Listen for server notifications about tvdb updates
+    on("tvdbUpdated", async () => {
+      console.log(
+        "[tvdbUpdated] Server notified tvdb data changed, reloading...",
+      );
+      try {
+        // Reload tvdb data from server
+        const updatedTvdb = await tvdb.getAllTvdb(
+          this.hasLoadedAllShows ? 0 : 1,
+        );
+
+        // Merge gap data from updated tvdb into allShows
+        for (const [name, tvdbRecord] of Object.entries(updatedTvdb)) {
+          const show = allShows.find((s) => s.Name === name);
+          if (show && tvdbRecord) {
+            // Copy gap-related fields from tvdb to show
+            show.notReady = tvdbRecord.notReady;
+            show.anyWatched = tvdbRecord.anyWatched;
+            show.watchGap = tvdbRecord.watchGap;
+            show.watchGapSeason = tvdbRecord.watchGapSeason;
+            show.watchGapEpisode = tvdbRecord.watchGapEpisode;
+            show.fileGap = tvdbRecord.fileGap;
+            show.fileGapSeason = tvdbRecord.fileGapSeason;
+            show.fileGapEpisode = tvdbRecord.fileGapEpisode;
+            show.fileEndError = tvdbRecord.fileEndError;
+            show.seasonWatchedThenNofile = tvdbRecord.seasonWatchedThenNofile;
+
+            // Also update FileGap computed field
+            show.FileGap =
+              !(show.notReady === false && show.InToTry) &&
+              (show.fileGap ||
+                show.fileEndError ||
+                show.seasonWatchedThenNofile);
+          }
+        }
+
+        // Update allTvdb reference
+        Object.assign(allTvdb, updatedTvdb);
+
+        // Refresh UI
+        await this.refilter(false);
+      } catch (err) {
+        console.error("[tvdbUpdated] Failed to reload tvdb:", err);
+      }
     });
 
     // Simple + portrait: Buttons are rendered in App.vue and forward events via evtBus.

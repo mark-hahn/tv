@@ -1174,6 +1174,60 @@ const getShowsFromDisk = async (_params) => {
   }
 };
 
+/**
+ * Check disk for a single show folder
+ * @param {string} showFolderName - The show folder name (e.g., "Breaking Bad")
+ * @returns {Promise<[number, number]|null>} - [maxDate, totalSize] or null if not found
+ */
+const getShowDiskInfo = async (showFolderName) => {
+  if (!showFolderName) return null;
+
+  let maxDate = 0;
+  let totalSize = 0;
+  let errFlg = null;
+
+  const recurs = async (path) => {
+    if (errFlg || path == tvDir + "/.stfolder") return;
+    try {
+      const fstat = fs.statSync(path);
+      if (fstat.isDirectory()) {
+        const dir = fs.readdirSync(path);
+        for (const dirent of dir) await recurs(path + "/" + dirent);
+        return;
+      }
+      const sfx = path.split(".").pop();
+      if (videoFileExtensions.includes(sfx)) {
+        const date = fmtDateWithTZ(fstat.mtime);
+        maxDate = Math.max(maxDate, date);
+      }
+      totalSize += fstat.size;
+    } catch (err) {
+      errFlg = err;
+    }
+  };
+
+  try {
+    const showPath = tvDir + "/" + showFolderName;
+    const fstat = fs.statSync(showPath);
+    maxDate = fmtDateWithTZ(fstat.mtime);
+
+    await recurs(showPath);
+
+    if (errFlg) {
+      console.error(
+        `[getShowDiskInfo] Error for ${showFolderName}:`,
+        errFlg.message,
+      );
+      return null;
+    }
+
+    return [maxDate, totalSize];
+  } catch (err) {
+    // Show folder doesn't exist or not accessible
+    return null;
+  }
+};
+
 const upload = async () => {
   let str = headerStr;
   str += '        - "dummy"\n';
@@ -2520,6 +2574,28 @@ const wss = new WebSocketServer({ port: 8736 });
 console.log("wss listening on port 8736");
 
 const appSocketName = "web app websocket";
+const connectedClients = new Set();
+
+// Broadcast notification to all connected clients
+export const notifyClients = (notification, data = null) => {
+  if (connectedClients.size === 0) return;
+
+  const msg = JSON.stringify({
+    id: 0,
+    notification,
+    data,
+  });
+
+  for (const ws of connectedClients) {
+    if (ws.readyState === 1) {
+      try {
+        ws.send(msg);
+      } catch (e) {
+        console.error("[notifyClients] send error:", e.message);
+      }
+    }
+  }
+};
 
 wss.on("connection", (ws) => {
   let socketName = "unknown websocket";
@@ -2537,10 +2613,11 @@ wss.on("connection", (ws) => {
 
     if (socketName != appSocketName) {
       socketName = appSocketName;
+      connectedClients.add(ws);
       console.log(socketName + " connected");
     }
 
-    // Only handleAsr uses WebSocket now (for streaming audio)
+    // Only handleAsr uses WebSocket
     if (fname == "handleAsr") {
       handleAsr(ws, id, param);
     } else {
@@ -2561,11 +2638,13 @@ wss.on("connection", (ws) => {
 
   ws.on("error", (err) => {
     console.error(socketName, "error:", err.message);
+    connectedClients.delete(ws);
     socketName = "unknown websocket";
   });
 
   ws.on("close", () => {
     // log(socketName + ' closed');
+    connectedClients.delete(ws);
     socketName = "unknown websocket";
   });
 });
@@ -2605,6 +2684,7 @@ async function syncEmbyUserData() {
 
     // Get all tvdb records
     const allTvdb = tvdb.getAllTvdbSync();
+    const changedShows = []; // Track which shows changed
     if (!allTvdb || Object.keys(allTvdb).length === 0) {
       console.error("[Phase 3] syncEmbyUserData: No tvdb records to sync");
       return;
@@ -2750,12 +2830,31 @@ async function syncEmbyUserData() {
         tvdbRecord.sync = tvdbRecord.sync || {};
         tvdbRecord.sync.lastEmbySync = now;
         updatedCount++;
+
+        // Track this show for gap checking
+        changedShows.push({ showId: embyShow.Id, showName: name, tvdbRecord });
       }
     }
 
     if (updatedCount > 0) {
       await tvdb.saveTvdbSync();
       // console.log(`[Phase 3] syncEmbyUserData: Updated ${updatedCount} shows`);
+
+      // Trigger gap check for changed shows after 3 second delay
+      // This allows both Emby and disk operations to settle (e.g., delete show + delete folder)
+      if (changedShows.length > 0) {
+        console.log(
+          `[Phase 3] syncEmbyUserData: ${updatedCount} emby changes detected, scheduling gap check in 3 seconds`,
+        );
+        setTimeout(() => {
+          runGapCheckForShows(changedShows, true).catch((err) => {
+            console.error(
+              "[Phase 3] syncEmbyUserData: delayed gapCheck failed:",
+              err.message,
+            );
+          });
+        }, 3000);
+      }
     }
     // else {
     //   console.log("[Phase 3] syncEmbyUserData: No changes detected");
@@ -2775,6 +2874,7 @@ async function syncDiskData() {
 
     // Get all tvdb records
     const allTvdb = tvdb.getAllTvdbSync();
+    const changedShows = []; // Track which shows had disk changes
     if (!allTvdb || Object.keys(allTvdb).length === 0) {
       // console.log("[Phase 3] syncDiskData: No tvdb records to sync");
       return;
@@ -2813,12 +2913,35 @@ async function syncDiskData() {
         tvdbRecord.sync = tvdbRecord.sync || {};
         tvdbRecord.sync.lastDiskCheck = now;
         updatedCount++;
+
+        // Track this show for gap checking (disk changes can affect file gaps)
+        changedShows.push({
+          showId: tvdbRecord.Id,
+          showName: name,
+          tvdbRecord,
+        });
       }
     }
 
     if (updatedCount > 0) {
       await tvdb.saveTvdbSync();
       // console.log(`[Phase 3] syncDiskData: Updated ${updatedCount} shows`);
+
+      // Trigger gap check for shows with disk changes after 10 second delay
+      // This allows file operations/downloads to settle
+      if (changedShows.length > 0) {
+        console.log(
+          `[Phase 3] syncDiskData: Detected ${changedShows.length} disk changes, scheduling gap check in 10 seconds`,
+        );
+        setTimeout(() => {
+          runGapCheckForShows(changedShows, false).catch((err) => {
+            console.error(
+              "[Phase 3] syncDiskData: delayed gapCheck failed:",
+              err.message,
+            );
+          });
+        }, 10000);
+      }
     }
     // else {
     //   console.log("[Phase 3] syncDiskData: No changes detected");
@@ -2828,16 +2951,137 @@ async function syncDiskData() {
   }
 }
 
+/**
+ * Run gap check for specific shows
+ * @param {Array} shows - Array of {showId, showName, tvdbRecord}
+ * @param {boolean} checkDiskFirst - If true, check disk for each show before gap checking
+ */
+async function runGapCheckForShows(shows, checkDiskFirst = true) {
+  if (!shows || shows.length === 0) return;
+
+  try {
+    let diskUpdateCount = 0;
+
+    // Check disk for each show individually if requested
+    if (checkDiskFirst) {
+      for (const { showId, showName, tvdbRecord } of shows) {
+        const embyPath = tvdbRecord.emby?.path;
+        if (!embyPath) continue;
+
+        const pathPart = embyPath.split("/").pop();
+        const diskInfo = await getShowDiskInfo(pathPart);
+
+        if (diskInfo) {
+          const [newDate, newSize] = diskInfo;
+          const changed =
+            tvdbRecord.disk?.date !== newDate ||
+            tvdbRecord.disk?.size !== newSize;
+
+          if (changed) {
+            tvdbRecord.disk = tvdbRecord.disk || {};
+            tvdbRecord.disk.date = newDate;
+            tvdbRecord.disk.size = newSize;
+            tvdbRecord.disk.noFiles = false;
+            diskUpdateCount++;
+          }
+        } else {
+          // Folder doesn't exist or empty
+          const changed = tvdbRecord.disk?.noFiles !== true;
+          if (changed) {
+            tvdbRecord.disk = tvdbRecord.disk || {};
+            tvdbRecord.disk.noFiles = true;
+            tvdbRecord.disk.date = null;
+            tvdbRecord.disk.size = 0;
+            diskUpdateCount++;
+          }
+        }
+      }
+
+      if (diskUpdateCount > 0) {
+        await tvdb.saveTvdbSync();
+        console.log(
+          `[runGapCheckForShows] Updated disk info for ${diskUpdateCount} shows`,
+        );
+      }
+    }
+
+    // Now run gap check with fresh emby and disk data
+    const gapData = await emby.gapCheckBatch(shows);
+    const updatedCount = await tvdb.updateTvdbWithGapData(gapData);
+
+    if (updatedCount > 0) {
+      console.log(
+        `[runGapCheckForShows] Updated gap data for ${updatedCount} of ${shows.length} shows`,
+      );
+      notifyClients("tvdbUpdated");
+    }
+  } catch (err) {
+    console.error("[runGapCheckForShows] error:", err.message);
+  }
+}
+
+/**
+ * Phase 3.3: Background gap check - cycles through shows incrementally
+ * Processes a batch of shows each run (10 per 6 minutes)
+ */
+let gapCheckIndex = 0;
+const GAP_CHECK_BATCH_SIZE = 10;
+
+async function runGapCheckBatch() {
+  try {
+    const allTvdb = tvdb.getAllTvdbSync();
+    if (!allTvdb || Object.keys(allTvdb).length === 0) {
+      return;
+    }
+
+    // Get all shows with inEmby true
+    const showsToCheck = Object.entries(allTvdb)
+      .filter(([_, tvdbRecord]) => tvdbRecord?.inEmby && tvdbRecord?.Id)
+      .map(([showName, tvdbRecord]) => ({
+        showId: tvdbRecord.Id,
+        showName,
+        tvdbRecord,
+      }));
+
+    if (showsToCheck.length === 0) return;
+
+    // Reset index if we've gone past the end
+    if (gapCheckIndex >= showsToCheck.length) {
+      gapCheckIndex = 0;
+    }
+
+    // Get next batch
+    const batch = showsToCheck.slice(
+      gapCheckIndex,
+      gapCheckIndex + GAP_CHECK_BATCH_SIZE,
+    );
+    const batchStart = gapCheckIndex;
+    gapCheckIndex += batch.length;
+
+    if (batch.length > 0) {
+      console.log(
+        `[Phase 3] runGapCheckBatch: Processing shows ${batchStart + 1}-${batchStart + batch.length} of ${showsToCheck.length}`,
+      );
+      await runGapCheckForShows(batch, true); // Check disk for each show
+    }
+  } catch (err) {
+    console.error("[Phase 3] runGapCheckBatch error:", err.message);
+  }
+}
+
 // Phase 3: Set up sync timers
 const EMBY_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
-const DISK_SYNC_INTERVAL = 60 * 60 * 1000; // 1 hour
+const DISK_SYNC_INTERVAL = 60 * 60 * 1000; // 1 hour (full disk check)
+const GAP_CHECK_INTERVAL = 6 * 60 * 1000; // 6 minutes (processes batch of 10 shows, checks disk per-show)
 
 setInterval(syncEmbyUserData, EMBY_SYNC_INTERVAL);
-setInterval(syncDiskData, DISK_SYNC_INTERVAL);
+setInterval(syncDiskData, DISK_SYNC_INTERVAL); // Full disk check hourly
+setInterval(runGapCheckBatch, GAP_CHECK_INTERVAL);
 
 // Run initial syncs after startup delay
 setTimeout(syncEmbyUserData, 2 * 60 * 1000); // 2 minutes after start
 setTimeout(syncDiskData, 3 * 60 * 1000); // 3 minutes after start
+setTimeout(runGapCheckBatch, 4 * 60 * 1000); // 4 minutes after start
 
 setInterval(runUsbCheck, CHECK_INTERVAL_MS);
 // Run initial check after 1 minute (allow startup)

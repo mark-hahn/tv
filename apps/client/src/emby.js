@@ -424,6 +424,14 @@ export async function loadAllShows() {
     // Set NotReady flag
     tvdb.NotReady = tvdb.inEmby === false;
 
+    // Set computed gap properties (uppercase versions for backward compatibility)
+    tvdb.WatchGap = tvdb.watchGap || false;
+    tvdb.WatchGapSeason = tvdb.watchGapSeason;
+    tvdb.WatchGapEpisode = tvdb.watchGapEpisode;
+    tvdb.FileGap =
+      !(tvdb.notReady === false && tvdb.InToTry) &&
+      (tvdb.fileGap || tvdb.fileEndError || tvdb.seasonWatchedThenNofile);
+
     // Ensure default values for missing properties
     if (tvdb.InToTry === undefined) tvdb.InToTry = false;
     if (tvdb.InContinue === undefined) tvdb.InContinue = false;

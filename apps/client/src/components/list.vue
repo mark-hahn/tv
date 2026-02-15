@@ -2363,7 +2363,8 @@ export default {
             show.fileEndError = tvdbRecord.fileEndError;
             show.seasonWatchedThenNofile = tvdbRecord.seasonWatchedThenNofile;
 
-            // Also update FileGap computed field
+            // Also update computed fields (uppercase properties)
+            show.WatchGap = show.watchGap;
             show.FileGap =
               !(show.notReady === false && show.InToTry) &&
               (show.fileGap ||

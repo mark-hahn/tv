@@ -58,6 +58,26 @@
       <div style="font-size: 18px; font-weight: bold">Reloading Shows</div>
     </div>
     <div
+      id="loadingTrashModal"
+      v-if="showLoadingTrash"
+      @click.stop
+      style="
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 30px 40px;
+        border: 2px solid black;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        z-index: 10000;
+        text-align: center;
+      "
+    >
+      <div style="font-size: 18px; font-weight: bold">Loading trash</div>
+    </div>
+    <div
       id="embyRefreshingModal"
       v-if="showEmbyRefreshing"
       @click.stop
@@ -348,9 +368,6 @@ export default {
       show.InToTry = !show.InToTry;
       try {
         await emby.saveToTry(show.Id, show.InToTry);
-        console.log(
-          `toggleToTry success: ${show.Name}, InToTry=${show.InToTry}`,
-        );
       } catch (err) {
         console.error("toggleToTry error:", err);
         show.InToTry = originalValue; // Revert on error
@@ -367,9 +384,6 @@ export default {
       show.InContinue = !show.InContinue;
       try {
         await emby.saveContinue(show.Id, show.InContinue);
-        console.log(
-          `toggleContinue success: ${show.Name}, InContinue=${show.InContinue}`,
-        );
       } catch (err) {
         console.error("toggleContinue error:", err);
         show.InContinue = originalValue; // Revert on error
@@ -386,10 +400,9 @@ export default {
       show.InMark = !show.InMark;
       try {
         await emby.saveMark(show.Id, show.InMark);
-        console.log(`toggleMark success: ${show.Name}, InMark=${show.InMark}`);
       } catch (err) {
         console.error("toggleMark error:", err);
-        show.InMark = originalValue; // Revert on error
+        show.InMark = originalValue;
       }
     };
 
@@ -403,9 +416,6 @@ export default {
       show.InLinda = !show.InLinda;
       try {
         await emby.saveLinda(show.Id, show.InLinda);
-        console.log(
-          `toggleLinda success: ${show.Name}, InLinda=${show.InLinda}`,
-        );
       } catch (err) {
         console.error("toggleLinda error:", err);
         show.InLinda = originalValue; // Revert on error
@@ -535,6 +545,7 @@ export default {
       searchingShowName: "",
       searchingStatus: "",
       showReloadingShows: false,
+      showLoadingTrash: false,
       showEmbyRefreshing: false,
       isWideLandscape: false,
       actorFilter: null,
@@ -985,6 +996,9 @@ export default {
 
       // Load additional shows (inEmby:false) if Trash button is on and we haven't loaded them yet
       if (activeButtons["Trash"] && !this.hasLoadedAllShows) {
+        this.showLoadingTrash = true;
+        await this.$nextTick(); // Ensure dialog renders before blocking operation
+
         const startTime = performance.now();
         console.log("Loading remaining shows (inEmby false)...");
         this.hasLoadedAllShows = true;
@@ -1007,6 +1021,8 @@ export default {
         console.log(
           `Loaded ${additionalShowsArray.length} additional shows in ${elapsed}ms`,
         );
+
+        this.showLoadingTrash = false;
       }
 
       // Pure state-based: Sync sortChoice to match order button states
@@ -1957,6 +1973,9 @@ export default {
         cond.filter !== 1 &&
         !this.hasLoadedAllShows
       ) {
+        this.showLoadingTrash = true;
+        await this.$nextTick(); // Ensure dialog renders before blocking operation
+
         console.log("Loading remaining shows (inEmby false)...");
         this.hasLoadedAllShows = true;
 
@@ -1979,6 +1998,8 @@ export default {
         this.$emit("all-shows", allShows);
         this.$emit("all-tvdb", allTvdb);
         this.allShowsLength = allShows.length;
+
+        this.showLoadingTrash = false;
       }
 
       await this.select();

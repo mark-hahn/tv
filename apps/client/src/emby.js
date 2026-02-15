@@ -390,6 +390,9 @@ export async function loadAllShows() {
   // 6. Set WaitStr for shows with unaired episodes
   await setWaitStrings(allTvdb);
 
+  // 6.5. Sync collection flags from Emby
+  await syncCollections(allTvdb);
+
   // 7. Ensure computed properties are set (since nested objects are now flattened)
   for (const tvdb of Object.values(allTvdb)) {
     // Ensure Name and TvdbId are set (should already be from migration)
@@ -823,11 +826,9 @@ export async function saveToTry(id, inToTry) {
     method: inToTry ? "post" : "delete",
     url: urls.collectionUrl(cred, id, toTryCollId),
   };
-  console.log(`saveToTry: ${config.method} ${config.url}`);
   let toTryRes;
   try {
     toTryRes = await axios(config);
-    console.log(`saveToTry response: status=${toTryRes.status}`);
   } catch (e) {
     console.error(`saveToTry error, id:${id}, inToTry:${inToTry}`, e);
     throw e;
@@ -848,11 +849,9 @@ export async function saveContinue(id, inContinue) {
     method: inContinue ? "post" : "delete",
     url: urls.collectionUrl(cred, id, continueCollId),
   };
-  console.log(`saveContinue: ${config.method} ${config.url}`);
   let continueRes;
   try {
     continueRes = await axios(config);
-    console.log(`saveContinue response: status=${continueRes.status}`);
   } catch (e) {
     console.error(`saveContinue error, id:${id}, inContinue:${inContinue}`, e);
     throw e;
@@ -873,11 +872,9 @@ export async function saveMark(id, inMark) {
     method: inMark ? "post" : "delete",
     url: urls.collectionUrl(cred, id, markCollId),
   };
-  console.log(`saveMark: ${config.method} ${config.url}`);
   let markRes;
   try {
     markRes = await axios(config);
-    console.log(`saveMark response: status=${markRes.status}`);
   } catch (e) {
     console.error(`saveMark error, id:${id}, inMark:${inMark}`, e);
     throw e;
@@ -898,11 +895,9 @@ export async function saveLinda(id, inLinda) {
     method: inLinda ? "post" : "delete",
     url: urls.collectionUrl(cred, id, lindaCollId),
   };
-  console.log(`saveLinda: ${config.method} ${config.url}`);
   let lindaRes;
   try {
     lindaRes = await axios(config);
-    console.log(`saveLinda response: status=${lindaRes.status}`);
   } catch (e) {
     console.error(`saveLinda error, id:${id}, inLinda:${inLinda}`, e);
     throw e;

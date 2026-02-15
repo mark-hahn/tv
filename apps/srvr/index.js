@@ -2528,22 +2528,7 @@ app.post(
     }
     console.log(`[triggerEmbySync] Client changed: ${showName}`);
 
-    // Run gap check for this show after 3 second delay
-    setTimeout(() => {
-      const allTvdb = tvdb.getAllTvdbSync();
-      const tvdbRecord = allTvdb[showName];
-      if (tvdbRecord) {
-        console.log(`[emby change] Checking 1 show: ${showName}`);
-        runGapCheckForShows([{ showId, showName, tvdbRecord }], true).catch(
-          (err) => {
-            console.error("[triggerEmbySync] gapCheck failed:", err.message);
-          },
-        );
-      } else {
-        console.error(`[triggerEmbySync] Show not found in tvdb: ${showName}`);
-      }
-    }, 3000);
-
+    // No gap check on collection changes
     return { success: true };
   }),
 );
@@ -2878,6 +2863,13 @@ async function syncEmbyUserData() {
         oldLastPlayed !== newLastPlayed ||
         oldUnplayed !== newUnplayed;
 
+      // Track watched data changes separately (excludes favorites)
+      const watchedDataChanged =
+        oldPlayed !== newPlayed ||
+        oldPlayCount !== newPlayCount ||
+        oldLastPlayed !== newLastPlayed ||
+        oldUnplayed !== newUnplayed;
+
       // Debug first show with changes
       if (userDataChanged && userDataChangeCount === 0) {
         console.log(`[DEBUG first userData change] ${name}:`, {
@@ -2989,8 +2981,14 @@ async function syncEmbyUserData() {
         tvdbRecord.sync.lastEmbySync = now;
         updatedCount++;
 
-        // Track this show for gap checking
-        changedShows.push({ showId: embyShow.Id, showName: name, tvdbRecord });
+        // Track this show for gap checking (only for watched data changes)
+        if (watchedDataChanged) {
+          changedShows.push({
+            showId: embyShow.Id,
+            showName: name,
+            tvdbRecord,
+          });
+        }
       }
     }
 

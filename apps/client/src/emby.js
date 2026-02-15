@@ -815,12 +815,6 @@ export async function saveToTry(id, inToTry, showName) {
     console.error(err);
     throw new Error(err);
   }
-  // Trigger immediate gap check for this show
-  if (showName) {
-    srvr
-      .triggerEmbySync(id, showName)
-      .catch((err) => console.error("triggerEmbySync failed:", err));
-  }
 }
 
 export async function saveContinue(id, inContinue, showName) {
@@ -843,12 +837,6 @@ export async function saveContinue(id, inContinue, showName) {
       JSON.stringify(continueRes.data);
     console.error(err);
     throw new Error(err);
-  }
-  // Trigger immediate gap check for this show
-  if (showName) {
-    srvr
-      .triggerEmbySync(id, showName)
-      .catch((err) => console.error("triggerEmbySync failed:", err));
   }
 }
 
@@ -873,12 +861,6 @@ export async function saveMark(id, inMark, showName) {
     console.error(err);
     throw new Error(err);
   }
-  // Trigger immediate gap check for this show
-  if (showName) {
-    srvr
-      .triggerEmbySync(id, showName)
-      .catch((err) => console.error("triggerEmbySync failed:", err));
-  }
 }
 
 export async function saveLinda(id, inLinda, showName) {
@@ -901,12 +883,6 @@ export async function saveLinda(id, inLinda, showName) {
       JSON.stringify(lindaRes.data);
     console.error(err);
     throw new Error(err);
-  }
-  // Trigger immediate gap check for this show
-  if (showName) {
-    srvr
-      .triggerEmbySync(id, showName)
-      .catch((err) => console.error("triggerEmbySync failed:", err));
   }
 }
 

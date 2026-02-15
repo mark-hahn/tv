@@ -2430,16 +2430,38 @@ const deletePath = async (params) => {
   console.log("deletePath: deleting", fullPath);
 
   try {
-    await rimraf(fullPath);
-    console.log("deletePath: rimraf completed for:", fullPath);
-
-    // Verify the directory/file is actually gone
-    if (fs.existsSync(fullPath)) {
-      console.error("deletePath: path still exists after rimraf:", fullPath);
-      throw new Error(`Path still exists after deletion: ${fullPath}`);
+    // Check if path exists
+    let stats;
+    try {
+      stats = fs.statSync(fullPath);
+    } catch (e) {
+      console.log("deletePath: path doesn't exist");
+      return "ok";
     }
 
-    console.log("deletePath success: path confirmed deleted:", fullPath);
+    // Use rm -f for files, rimraf for directories
+    if (stats.isFile()) {
+      const rmCmd = `rm -f "${fullPath}"`;
+      cp.execSync(rmCmd);
+    } else {
+      await rimraf(fullPath);
+    }
+
+    // Wait for filesystem to sync
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Verify deletion
+    try {
+      fs.statSync(fullPath);
+      console.error("deletePath: path still exists after deletion:", fullPath);
+      throw new Error(`Path still exists after deletion: ${fullPath}`);
+    } catch (e) {
+      if (e.code !== "ENOENT") {
+        throw e;
+      }
+    }
+
+    console.log("deletePath success:", fullPath);
   } catch (e) {
     console.error("error removing path:", fullPath, e.message);
     throw new Error(`Failed to delete path: ${e.message}`);

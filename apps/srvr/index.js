@@ -3210,7 +3210,8 @@ async function runGapCheckBatch() {
         showId: tvdbRecord.Id,
         showName,
         tvdbRecord,
-      }));
+      }))
+      .sort((a, b) => a.showName.localeCompare(b.showName));
 
     if (showsToCheck.length === 0) return;
 

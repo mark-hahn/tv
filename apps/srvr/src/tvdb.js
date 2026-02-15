@@ -1214,9 +1214,11 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   // Determine inEmby status:
   // - If lastEmbySync is present in params, this is an Emby sync, so inEmby = true
-  // - Otherwise, use show.inEmby value or default to false
+  // - Otherwise, use show.inEmby value or preserve existing value
   const isSyncingFromEmby = !!paramObj.lastEmbySync;
-  tvdbData.inEmby = isSyncingFromEmby ? true : (show.inEmby ?? false);
+  tvdbData.inEmby = isSyncingFromEmby
+    ? true
+    : (show.inEmby ?? existing.inEmby ?? false);
 
   // Flattened Emby-specific data (no nested object)
   tvdbData.Id = showId || existing.Id || existing.emby?.id || null;

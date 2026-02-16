@@ -151,6 +151,7 @@
             style="display: flex; flex-grow: 1; overflow: hidden; min-height: 0"
           >
             <Shows
+              ref="showsComponent"
               style="flex-grow: 1"
               :shows="shows"
               :conds="conds"
@@ -220,6 +221,7 @@
             @top-click="topClick"
           ></Buttons>
           <Shows
+            ref="showsComponent"
             style="flex-grow: 1"
             :shows="shows"
             :conds="conds"
@@ -1776,9 +1778,10 @@ export default {
       // Wait for DOM to update after potential refiltering
       await this.$nextTick();
 
-      const id = this.nameHash(show.Name);
-      const ele = document.getElementById(id);
-      if (ele) ele.scrollIntoView({ block: "center" });
+      // Use RecycleScroller's scrollToItem method
+      if (this.$refs.showsComponent && show) {
+        this.$refs.showsComponent.scrollToShow(show.Name);
+      }
     },
 
     async copyNameToClipboard(show, event) {

@@ -25,6 +25,7 @@
     </div>
     <RecycleScroller
       v-else
+      ref="scroller"
       v-slot="{ item: show }"
       :items="shows"
       :item-size="simpleMode ? 40 : 30"
@@ -32,6 +33,7 @@
       :buffer="400"
       class="scroller"
       :item-class="'virtual-item'"
+      style="overflow-y: scroll !important"
     >
       <div
         class="show-row"
@@ -206,6 +208,17 @@ export default {
   },
 
   methods: {
+    scrollToShow(showName) {
+      const index = this.shows.findIndex(s => s.Name === showName);
+      if (index !== -1 && this.$refs.scroller) {
+        const itemSize = this.simpleMode ? 40 : 30;
+        const scrollerEl = this.$refs.scroller.$el;
+        const viewportHeight = scrollerEl.clientHeight;
+        const targetScroll = (index * itemSize) - (viewportHeight / 2) + (itemSize / 2);
+        this.$refs.scroller.scrollToPosition(Math.max(0, targetScroll));
+      }
+    },
+
     hilite(show) {
       if (show.inEmby === false) return "#fee";
       return "white";
@@ -241,6 +254,32 @@ export default {
 .scroller {
   height: 100%;
   width: 100%;
+}
+
+.scroller :deep(.vue-recycle-scroller__item-view) {
+  overflow-y: scroll !important;
+}
+
+.scroller :deep(*) {
+  scrollbar-width: auto;
+  scrollbar-color: #888 #f1f1f1;
+}
+
+.scroller :deep(*)::-webkit-scrollbar {
+  width: 16px;
+}
+
+.scroller :deep(*)::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.scroller :deep(*)::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 8px;
+}
+
+.scroller :deep(*)::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 
 .scroller :deep(.vue-recycle-scroller__item-wrapper) {

@@ -122,6 +122,7 @@
         flex-direction: column;
         left: 144px;
         top: 75px;
+        z-index: 10000;
       "
     >
       <div
@@ -153,6 +154,7 @@
         flex-direction: column;
         left: 253px;
         top: 75px;
+        z-index: 10000;
       "
     >
       <div

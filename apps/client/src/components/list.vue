@@ -58,46 +58,6 @@
       <div style="font-size: 18px; font-weight: bold">Reloading Shows</div>
     </div>
     <div
-      id="loadingTrashModal"
-      v-if="showLoadingTrash"
-      @click.stop
-      style="
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background-color: white;
-        padding: 30px 40px;
-        border: 2px solid black;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        z-index: 10000;
-        text-align: center;
-      "
-    >
-      <div style="font-size: 18px; font-weight: bold">Loading trash</div>
-    </div>
-    <div
-      id="preparingShowsModal"
-      v-if="showPreparingShows"
-      @click.stop
-      style="
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background-color: white;
-        padding: 30px 40px;
-        border: 2px solid black;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        z-index: 10000;
-        text-align: center;
-      "
-    >
-      <div style="font-size: 18px; font-weight: bold">Preparing shows</div>
-    </div>
-    <div
       id="embyRefreshingModal"
       v-if="showEmbyRefreshing"
       @click.stop
@@ -561,8 +521,6 @@ export default {
       searchingShowName: "",
       searchingStatus: "",
       showReloadingShows: false,
-      showLoadingTrash: false,
-      showPreparingShows: false,
       showEmbyRefreshing: false,
       isWideLandscape: false,
       actorFilter: null,
@@ -750,35 +708,26 @@ export default {
       }
 
       console.log("Loading all shows (non-emby)...");
-      this.showLoadingTrash = true;
 
-      // Give UI time to render the dialog
-      await this.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      this.hasLoadedAllShows = true;
 
-      try {
-        this.hasLoadedAllShows = true;
+      // Load non-emby shows (emby shows are already loaded)
+      const additionalShows = await tvdb.getAllTvdb(-1);
 
-        // Load non-emby shows (emby shows are already loaded)
-        const additionalShows = await tvdb.getAllTvdb(-1);
+      // Merge into allTvdb
+      Object.assign(allTvdb, additionalShows);
 
-        // Merge into allTvdb
-        Object.assign(allTvdb, additionalShows);
+      // Add to allShows array, avoiding duplicates
+      const additionalShowsArray = Object.values(additionalShows);
+      const existingNames = new Set(allShows.map((s) => s.Name));
+      const newShows = additionalShowsArray.filter(
+        (s) => !existingNames.has(s.Name),
+      );
+      allShows.push(...newShows);
 
-        // Add to allShows array, avoiding duplicates
-        const additionalShowsArray = Object.values(additionalShows);
-        const existingNames = new Set(allShows.map((s) => s.Name));
-        const newShows = additionalShowsArray.filter(
-          (s) => !existingNames.has(s.Name),
-        );
-        allShows.push(...newShows);
-
-        console.log(
-          `Added ${newShows.length} non-emby shows (total: ${allShows.length})`,
-        );
-      } finally {
-        this.showLoadingTrash = false;
-      }
+      console.log(
+        `Added ${newShows.length} non-emby shows (total: ${allShows.length})`,
+      );
     },
 
     updateWideLandscape() {
@@ -2038,9 +1987,6 @@ export default {
         cond.filter !== 1 &&
         !this.hasLoadedAllShows
       ) {
-        this.showLoadingTrash = true;
-        await this.$nextTick(); // Ensure dialog renders before blocking operation
-
         console.log("Loading remaining shows (inEmby false)...");
         this.hasLoadedAllShows = true;
 
@@ -2063,8 +2009,6 @@ export default {
         this.$emit("all-shows", allShows);
         this.$emit("all-tvdb", allTvdb);
         this.allShowsLength = allShows.length;
-
-        this.showLoadingTrash = false;
       }
 
       await this.select();
@@ -2162,16 +2106,6 @@ export default {
 
           const filteredShows = allShows.filter(checkShowForActorMatch);
 
-          // Show preparing dialog for large show lists
-          // Skip animation frame waits if dialog is already showing (set by caller)
-          if (filteredShows.length > 500 && !this.showPreparingShows) {
-            this.showPreparingShows = true;
-            await this.$nextTick();
-            // Wait for 2 animation frames to ensure dialog is painted
-            await new Promise((resolve) => requestAnimationFrame(resolve));
-            await new Promise((resolve) => requestAnimationFrame(resolve));
-          }
-
           this.shows = filteredShows;
 
           // Preserve highlightName selection if possible
@@ -2187,12 +2121,6 @@ export default {
 
           if (scroll) this.scrollToSavedShow();
           this.sortShows();
-
-          // Hide preparing dialog
-          if (this.showPreparingShows) {
-            await this.$nextTick();
-            this.showPreparingShows = false;
-          }
 
           return;
         } else {
@@ -2240,16 +2168,6 @@ export default {
         filteredShows.push(show);
       }
 
-      // Show preparing dialog for large show lists (Vue rendering can be slow)
-      // Skip animation frame waits if dialog is already showing (set by caller)
-      if (filteredShows.length > 500 && !this.showPreparingShows) {
-        this.showPreparingShows = true;
-        await this.$nextTick();
-        // Wait for 2 animation frames to ensure dialog is painted
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-      }
-
       this.shows = filteredShows;
       if (this.shows.length === 1) this.saveVisShow(this.shows[0]);
       else if (this.highlightName) {
@@ -2267,12 +2185,6 @@ export default {
       if (scroll) this.scrollToSavedShow();
 
       this.sortShows();
-
-      // Hide preparing dialog after everything is done
-      if (this.showPreparingShows) {
-        await this.$nextTick();
-        this.showPreparingShows = false;
-      }
     },
 
     async filterShowsByActor(actorName) {
@@ -2370,16 +2282,6 @@ export default {
       }
 
       // Step 3: Update the shows list and UI
-      // Show dialog during Vue rendering if we have many shows
-      // Skip animation frame waits if dialog is already showing (set by caller)
-      if (filteredShows.length > 100 && !this.showPreparingShows) {
-        this.showPreparingShows = true;
-        await this.$nextTick();
-        // Wait for 2 animation frames to ensure dialog is painted
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-      }
-
       this.shows = filteredShows;
       this.actorFilter = searchText;
       this.actorSearchParams = { searchWords, matchesSearchTerm }; // Store for refiltering
@@ -2389,12 +2291,6 @@ export default {
       evtBus.emit("actorSearchActive", { searchWords, matchesSearchTerm });
 
       this.sortShows();
-
-      // Hide preparing dialog after Vue finishes rendering
-      if (this.showPreparingShows) {
-        await this.$nextTick();
-        this.showPreparingShows = false;
-      }
 
       // Select first show in the list
       if (this.shows.length > 0) {

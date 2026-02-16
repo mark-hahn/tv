@@ -18,6 +18,7 @@
     "@fortawesome/free-regular-svg-icons": "^5.15.4",
     "@fortawesome/free-solid-svg-icons": "^5.15.4",
     "@fortawesome/vue-fontawesome": "^3.0.0-5",
+    "@tv/share": "workspace:*",
     "ESLint": "npm:eslint@^9.38.0",
     "axios": "^0.24.0",
     "buffer": "^6.0.3",
@@ -29,8 +30,8 @@
     "mitt": "^3.0.1",
     "parse-torrent-title": "^2.1.0",
     "sweetalert2": "^11.14.5",
-    "@tv/share": "workspace:*",
-    "vue": "^3.0.0"
+    "vue": "^3.0.0",
+    "vue3-virtual-scroller": "^0.2.3"
   },
   "devDependencies": {
     "@originjs/vite-plugin-commonjs": "^1.0.1",

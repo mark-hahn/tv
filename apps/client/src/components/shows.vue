@@ -4,11 +4,11 @@
     style="
       width: 100%;
       flex-grow: 1;
-      overflow-y: scroll;
       padding-right: 5px;
       box-sizing: border-box;
+      overflow: hidden;
+      position: relative;
     "
-    @wheel.stop.prevent="handleScaledWheel"
   >
     <div
       v-if="shows.length === 0"
@@ -23,79 +23,87 @@
     >
       No shows.
     </div>
-    <table
+    <RecycleScroller
       v-else
-      style="
-        width: 100%;
-        font-size: 18px;
-        border-collapse: collapse;
-        border-spacing: 0;
-      "
+      v-slot="{ item: show }"
+      :items="shows"
+      :item-size="simpleMode ? 40 : 30"
+      key-field="Name"
+      :buffer="400"
+      class="scroller"
+      :item-class="'virtual-item'"
     >
-      <tbody>
-        <tr
-          v-for="show in shows"
-          :key="show.Name"
-          :style="{
-            borderBottom: '1px solid #000',
-            cursor: 'default',
-            lineHeight: simpleMode ? '1.6' : '1',
-            backgroundColor: hilite(show),
-          }"
-          :id="nameHash(show.Name)"
+      <div
+        class="show-row"
+        :style="{
+          cursor: 'default',
+          backgroundColor: hilite(show),
+        }"
+        :id="nameHash(show.Name)"
+      >
+        <div
+          v-if="!simpleMode"
+          class="show-cell"
+          style="width: 30px; flex-shrink: 0"
+          @click="$emit('copy-name', show, $event)"
         >
-          <td
-            v-if="!simpleMode"
-            style="width: 30px; text-align: center"
-            @click="$emit('copy-name', show, $event)"
+          <font-awesome-icon
+            id="cpbrd"
+            icon="copy"
+            style="color: #ccc"
+          ></font-awesome-icon>
+        </div>
+        <div
+          v-if="!simpleMode"
+          class="show-cell"
+          style="width: 30px; flex-shrink: 0"
+        >
+          <div
+            v-show="show.inEmby !== false"
+            @click="$emit('open-map', show)"
           >
             <font-awesome-icon
-              id="cpbrd"
-              icon="copy"
+              icon="border-all"
               style="color: #ccc"
             ></font-awesome-icon>
-          </td>
-          <td
-            v-if="!simpleMode"
-            style="width: 30px; text-align: center"
-          >
-            <div
-              v-show="show.inEmby !== false"
-              @click="$emit('open-map', show)"
-            >
-              <font-awesome-icon
-                icon="border-all"
-                style="color: #ccc"
-              ></font-awesome-icon>
-            </div>
-          </td>
-          <td
-            @click="$emit('select-show', show, false)"
-            :style="{
-              maxWidth: '110px',
-              fontSize: '16px',
-              cursor: 'default',
-              textAlign: 'center',
-              paddingLeft: simpleMode ? '20px' : '0',
-            }"
-          >
-            {{ getSortDisplayValue(show) }}
-          </td>
-          <td
-            id="showLineText"
-            :style="{
-              display: 'flex',
-              padding: '5px',
-              justifyContent: 'space-between',
-              backgroundColor:
-                highlightName === show.Name ? 'yellow' : 'transparent',
-            }"
-          >
+          </div>
+        </div>
+        <div
+          class="show-cell"
+          @click="$emit('select-show', show, false)"
+          :style="{
+            width: '75px',
+            flexShrink: 0,
+            fontSize: '14px',
+            cursor: 'default',
+            textAlign: 'center',
+            paddingLeft: simpleMode ? '20px' : '0',
+          }"
+        >
+          {{ getSortDisplayValue(show) }}
+        </div>
+        <div
+          id="showLineText"
+          class="show-cell show-name-cell"
+          :style="{
+            padding: '5px',
+            flexGrow: 1,
+            minWidth: 0,
+            backgroundColor:
+              highlightName === show.Name ? 'yellow' : 'transparent',
+          }"
+        >
+          <div style="display: flex; justify-content: flex-start; width: 100%; overflow: hidden; flex-wrap: nowrap">
             <div
               :style="{
                 padding: '2px',
                 fontSize: '16px',
                 fontWeight: 'bold',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                flexShrink: 1,
+                minWidth: 0,
               }"
               @click="$emit('select-show', show, false, true)"
             >
@@ -117,41 +125,54 @@
                 fontSize: '14px',
                 color: 'rgba(0,0,0,0.5)',
                 marginRight: '15px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }"
             >
               {{ String(show.Notes) }}
             </div>
             <div
               v-if="show.WaitStr?.length"
-              style="padding: 2px; color: #00f; fontsize: 16px"
+              :style="{
+                padding: '2px',
+                color: '#00f',
+                fontSize: '16px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }"
             >
               {{ show.WaitStr }}
             </div>
-          </td>
-          <td
-            v-if="showConds"
-            v-for="cond in conds"
-            :key="cond.name"
-            style="width: 22px; padding: 0; text-align: center"
-            @click="cond.click(show)"
-          >
-            <font-awesome-icon
-              :icon="cond.icon"
-              :style="{ color: condColor(show, cond) }"
-            ></font-awesome-icon>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+          </div>
+        </div>
+        <div
+          v-if="showConds"
+          v-for="cond in conds"
+          :key="cond.name"
+          class="show-cell cond-icon"
+          style="width: 22px; flex-shrink: 0"
+          @click="cond.click(show)"
+        >
+          <font-awesome-icon
+            :icon="cond.icon"
+            :style="{ color: condColor(show, cond) }"
+          ></font-awesome-icon>
+        </div>
+      </div>
+    </RecycleScroller>
   </div>
 </template>
 
 <script>
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+import { RecycleScroller } from "vue3-virtual-scroller";
+import "vue3-virtual-scroller/dist/vue3-virtual-scroller.css";
 
 export default {
   name: "Shows",
-  components: { FontAwesomeIcon },
+  components: { FontAwesomeIcon, RecycleScroller },
 
   props: {
     shows: {
@@ -185,16 +206,6 @@ export default {
   },
 
   methods: {
-    handleScaledWheel(event) {
-      if (!event) return;
-      const el = event.currentTarget;
-      if (!el) return;
-      const dy = event.deltaY || 0;
-      const scaledDy = dy * 0.125;
-      const max = Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0));
-      el.scrollTop = Math.max(0, Math.min(max, (el.scrollTop || 0) + scaledDy));
-    },
-
     hilite(show) {
       if (show.inEmby === false) return "#fee";
       return "white";
@@ -221,17 +232,86 @@ export default {
 };
 </script>
 
-<style>
-/*
+<style scoped>
 #shows {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  position: relative;
+  z-index: 1;
 }
 
-#shows::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  display: none;
+.scroller {
+  height: 100%;
+  width: 100%;
 }
-*/
+
+.scroller :deep(.vue-recycle-scroller__item-wrapper) {
+  position: relative;
+  z-index: auto;
+}
+
+.scroller :deep(.vue-recycle-scroller__item-view) {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  box-sizing: border-box !important;
+  align-items: stretch !important;
+}
+
+.scroller :deep(.vue-recycle-scroller__item-view::after) {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: #999;
+  z-index: 1;
+}
+
+.scroller :deep(.virtual-item) {
+  display: flex !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.show-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 18px;
+  box-sizing: border-box;
+  position: relative;
+  z-index: auto;
+  margin: 0;
+  padding: 0;
+  line-height: 1;
+}
+
+.show-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  text-align: center;
+  position: relative;
+  line-height: 1;
+  min-height: 0;
+}
+
+.show-cell svg {
+  display: block;
+}
+
+.show-name-cell {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.cond-icon {
+  width: 22px;
+  flex-shrink: 0;
+  position: relative;
+}
 </style>

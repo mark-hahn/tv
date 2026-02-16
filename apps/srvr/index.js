@@ -2577,6 +2577,47 @@ app.post(
   }),
 );
 
+app.post(
+  "/api/triggerShowGapCheck",
+  apiWrapper(async (params) => {
+    const { showId, showName } = params;
+    if (!showId || !showName) {
+      console.error("[triggerShowGapCheck] Missing showId or showName");
+      return { success: false };
+    }
+    console.log(
+      `[triggerShowGapCheck] Client requested gap check for: ${showName}`,
+    );
+
+    const allTvdb = tvdb.getAllTvdbSync();
+    const tvdbRecord = allTvdb[showName];
+    if (!tvdbRecord) {
+      console.error(`[triggerShowGapCheck] Show not found: ${showName}`);
+      return { success: false };
+    }
+
+    // Run gap check immediately
+    setImmediate(() => {
+      emby
+        .gapCheckOne(showId, showName, tvdbRecord)
+        .then((gapData) => {
+          if (gapData) {
+            Object.assign(tvdbRecord, gapData);
+            return tvdb.saveTvdbSync();
+          }
+        })
+        .catch((err) => {
+          console.error(
+            `[triggerShowGapCheck] Failed for ${showName}:`,
+            err.message,
+          );
+        });
+    });
+
+    return { success: true };
+  }),
+);
+
 // CRUD operations
 app.post("/api/addReject", apiWrapper(addReject));
 app.post("/api/delReject", apiWrapper(delReject));

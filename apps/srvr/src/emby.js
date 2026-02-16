@@ -216,6 +216,22 @@ const getShowState = async (showId, _showName, showMeta) => {
       return null;
     }
 
+    // If show has no seasons/episodes, it's not ready to watch
+    if (seasons.length === 0) {
+      return {
+        notReady: true,
+        anyWatched: false,
+        fileEndError: false,
+        seasonWatchedThenNofile: false,
+        watchGap: false,
+        watchGapSeason: null,
+        watchGapEpisode: null,
+        fileGap: false,
+        fileGapSeason: null,
+        fileGapEpisode: null,
+      };
+    }
+
     // Once we hit an unaired episode, treat all later episodes as unaired.
     let unairedFromHere = false;
     for (let seasonIdx = 0; seasonIdx < seasons.length; seasonIdx++) {

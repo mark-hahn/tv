@@ -351,6 +351,10 @@ export function triggerEmbySync(showId, showName) {
 export function triggerFullGapCheck() {
   return httpCall("/api/triggerFullGapCheck", {}, "POST");
 }
+
+export function triggerShowGapCheck(showId, showName) {
+  return httpCall("/api/triggerShowGapCheck", { showId, showName }, "POST");
+}
 export function addGap(params) {
   return httpCall("/api/addGap", params, "POST");
 }

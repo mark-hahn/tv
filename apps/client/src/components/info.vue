@@ -1251,6 +1251,13 @@ export default {
 
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
         console.log(`Refresh complete for ${showName} (${elapsed}s)`);
+
+        // Trigger gap check for the refreshed show
+        if (this.show?.Id) {
+          await srvr
+            .triggerShowGapCheck(this.show.Id, showName)
+            .catch((err) => console.error("triggerShowGapCheck failed:", err));
+        }
       } catch (e) {
         console.error("refreshTvdb error", e);
         alert("Error requesting refresh: " + e);

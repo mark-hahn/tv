@@ -1288,12 +1288,15 @@ export default {
             setWebAddStatus("Reloading shows...");
             await this.newShows(false);
 
-            // Trigger full gap check after creating new show and library refresh completes
-            await srvr
-              .triggerFullGapCheck()
-              .catch((err) =>
-                console.error("triggerFullGapCheck failed:", err),
-              );
+            // Trigger gap check for the newly added show
+            const newShow = allShows.find((s) => s?.Name === name);
+            if (newShow?.Id) {
+              await srvr
+                .triggerShowGapCheck(newShow.Id, name)
+                .catch((err) =>
+                  console.error("triggerShowGapCheck failed:", err),
+                );
+            }
           } catch {
             // ignore
           }

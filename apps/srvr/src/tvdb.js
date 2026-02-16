@@ -1296,6 +1296,11 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     Object.assign(tvdbData, existing.gap);
   }
 
+  // Ensure notReady has a value - default to true for inEmby shows until gap check runs
+  if (tvdbData.notReady === undefined && tvdbData.inEmby) {
+    tvdbData.notReady = true;
+  }
+
   // Notes
   tvdbData.Notes = paramObj.note ?? existing.Notes ?? existing.note ?? "";
 

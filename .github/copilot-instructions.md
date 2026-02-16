@@ -31,3 +31,4 @@
 - when you've only changed files in one server like srvr, down, asr, or api you should deploy only that server, like `./srsv srvr`
 - never deploy client -- vite does that
 - it is ok for srvr script to deploy client when also deploying multiple servers
+- when i say `no change` i mean everything looks and behaves the same

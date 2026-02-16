@@ -95,7 +95,15 @@
               highlightName === show.Name ? 'yellow' : 'transparent',
           }"
         >
-          <div style="display: flex; justify-content: flex-start; width: 100%; overflow: hidden; flex-wrap: nowrap">
+          <div
+            style="
+              display: flex;
+              justify-content: flex-start;
+              width: 100%;
+              overflow: hidden;
+              flex-wrap: nowrap;
+            "
+          >
             <div
               :style="{
                 padding: '2px',
@@ -209,12 +217,13 @@ export default {
 
   methods: {
     scrollToShow(showName) {
-      const index = this.shows.findIndex(s => s.Name === showName);
+      const index = this.shows.findIndex((s) => s.Name === showName);
       if (index !== -1 && this.$refs.scroller) {
         const itemSize = this.simpleMode ? 40 : 30;
         const scrollerEl = this.$refs.scroller.$el;
         const viewportHeight = scrollerEl.clientHeight;
-        const targetScroll = (index * itemSize) - (viewportHeight / 2) + (itemSize / 2);
+        const targetScroll =
+          index * itemSize - viewportHeight / 2 + itemSize / 2;
         this.$refs.scroller.scrollToPosition(Math.max(0, targetScroll));
       }
     },
@@ -254,31 +263,25 @@ export default {
 .scroller {
   height: 100%;
   width: 100%;
-}
-
-.scroller :deep(.vue-recycle-scroller__item-view) {
-  overflow-y: scroll !important;
-}
-
-.scroller :deep(*) {
+  scrollbar-gutter: stable;
   scrollbar-width: auto;
   scrollbar-color: #888 #f1f1f1;
 }
 
-.scroller :deep(*)::-webkit-scrollbar {
+.scroller::-webkit-scrollbar {
   width: 16px;
 }
 
-.scroller :deep(*)::-webkit-scrollbar-track {
+.scroller::-webkit-scrollbar-track {
   background: #f1f1f1;
 }
 
-.scroller :deep(*)::-webkit-scrollbar-thumb {
+.scroller::-webkit-scrollbar-thumb {
   background: #888;
   border-radius: 8px;
 }
 
-.scroller :deep(*)::-webkit-scrollbar-thumb:hover {
+.scroller::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
 
@@ -296,7 +299,7 @@ export default {
 }
 
 .scroller :deep(.vue-recycle-scroller__item-view::after) {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 0;

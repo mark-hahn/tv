@@ -74,12 +74,13 @@
           class="show-cell"
           @click="$emit('select-show', show, false)"
           :style="{
-            width: '75px',
+            width: sortColumnWidth,
             flexShrink: 0,
             fontSize: '14px',
             cursor: 'default',
             textAlign: 'center',
             paddingLeft: simpleMode ? '20px' : '0',
+            display: sortColumnWidth === '0' ? 'none' : 'flex',
           }"
         >
           {{ getSortDisplayValue(show) }}
@@ -212,6 +213,26 @@ export default {
     simpleMode: {
       type: Boolean,
       default: false,
+    },
+    sortChoice: {
+      type: String,
+      default: "Viewed",
+    },
+  },
+
+  computed: {
+    sortColumnWidth() {
+      const widths = {
+        Alpha: "0",
+        Viewed: "75px",
+        Added: "75px",
+        Ratings: "25px",
+        Notes: "0",
+        Size: "25px",
+        Ended: "75px",
+        Length: "25px",
+      };
+      return widths[this.sortChoice] || "75px";
     },
   },
 

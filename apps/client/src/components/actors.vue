@@ -75,6 +75,20 @@
               font-weight: normal;
             "
           >
+            <input
+              v-model="actorSearchText"
+              @click.stop
+              @keydown.enter.prevent="handleActorSearch"
+              type="text"
+              placeholder="Search actors..."
+              style="
+                width: 120px;
+                padding: 2px 6px;
+                font-size: 13px;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+              "
+            />
             <button
               @click.stop="handleLeftArrow"
               style="
@@ -237,6 +251,7 @@ export default {
       errorMessage: "",
       isGuestMode: false,
       showingEpisodeActors: false, // Track if we're showing episode actors
+      actorSearchText: "",
       _seriesMapInForArrows: null,
       _seriesMapInForArrowsShowKey: null,
       _seriesMapInForArrowsPromise: null,
@@ -277,6 +292,44 @@ export default {
 
     exitPreview() {
       evtBus.emit("exitPreviewMode");
+    },
+
+    normalizeSearchText(text) {
+      // Remove all non-alpha chars except spaces, then lowercase
+      return String(text || "")
+        .replace(/[^a-zA-Z\s]/g, "")
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, " ");
+    },
+
+    matchesSearchTerm(actorName, searchWords) {
+      const normActorName = this.normalizeSearchText(actorName);
+      const actorWords = normActorName.split(" ");
+
+      // Check if any search word matches any actor name word (exact match only)
+      return searchWords.some((searchWord) =>
+        actorWords.some((actorWord) => actorWord === searchWord),
+      );
+    },
+
+    async handleActorSearch() {
+      const searchText = this.actorSearchText.trim();
+      if (!searchText) return;
+
+      console.log("Actor search:", searchText);
+
+      // Normalize search text
+      const normalizedSearch = this.normalizeSearchText(searchText);
+      const searchWords = normalizedSearch.split(" ");
+
+      // Emit event to list component with search details
+      evtBus.emit("searchActors", {
+        searchText: searchText,
+        normalizedSearch: normalizedSearch,
+        searchWords: searchWords,
+        matchesSearchTerm: this.matchesSearchTerm.bind(this),
+      });
     },
 
     getActorsModeButtonStyle(isActive) {
@@ -966,9 +1019,10 @@ export default {
         return;
       }
 
-      // Extract show and tvdbData from the data object
+      // Extract show, tvdbData, and actorSearchParams from the data object
       const tvdbData = data.tvdbData || data;
       this.currentShow = data.show || null;
+      const actorSearchParams = data.actorSearchParams || null;
 
       // Handle both formats: direct data or wrapped in response.data
       const actualData = tvdbData.response?.data || tvdbData;
@@ -1093,6 +1147,27 @@ export default {
       // Merge TMDB and TVDB lists
       const mergeResult = this.mergeTmdbTvdbActors(tmdbList, tvdbList);
       this.actors = mergeResult.output;
+
+      // If actor search is active, sort to prioritize matching actors
+      if (
+        actorSearchParams?.searchWords &&
+        actorSearchParams?.matchesSearchTerm
+      ) {
+        const { searchWords, matchesSearchTerm } = actorSearchParams;
+        this.actors.sort((a, b) => {
+          const aName = a?.personName || a?.name || "";
+          const bName = b?.personName || b?.name || "";
+          const aMatches = matchesSearchTerm(aName, searchWords);
+          const bMatches = matchesSearchTerm(bName, searchWords);
+
+          // Matching actors come first
+          if (aMatches && !bMatches) return -1;
+          if (!aMatches && bMatches) return 1;
+
+          // If both match or both don't match, maintain existing order
+          return 0;
+        });
+      }
 
       // Cache series actors for restore
       this.seriesActors = [...this.actors];

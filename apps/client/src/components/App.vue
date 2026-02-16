@@ -426,6 +426,7 @@ export default {
       _torrentsShowKey: null,
       _actorsInitialized: false,
       _actorsShowKey: null,
+      _actorSearchParams: null, // Store actor search params for sorting
       mapShow: null,
       hideMapBottom: true,
       seriesMapSeasons: [],
@@ -1417,6 +1418,7 @@ export default {
         evtBus.emit("showActors", {
           show: this.currentShow,
           tvdbData: this.currentTvdbData,
+          actorSearchParams: this._actorSearchParams,
         });
         this._actorsInitialized = true;
         this._actorsShowKey = showKey;
@@ -1661,10 +1663,15 @@ export default {
 
       const prevPane = this.currentPane;
 
-      // New show selection should reset Actors state.
-      evtBus.emit("resetActorsPane");
-      this._actorsInitialized = false;
-      this._actorsShowKey = null;
+      // Check if actor search is active - if so, keep actors pane visible
+      const actorSearchActive = !!this._actorSearchParams;
+
+      // New show selection should reset Actors state (unless in actor search mode)
+      if (!actorSearchActive) {
+        evtBus.emit("resetActorsPane");
+        this._actorsInitialized = false;
+        this._actorsShowKey = null;
+      }
 
       // Clear stale TVDB data until the series pane publishes the new show data.
       this.currentTvdbData = null;
@@ -1674,6 +1681,7 @@ export default {
       this._torrentsShowKey = null;
 
       // When currently viewing Local, stay on Local.
+      // When in actor search mode and on actors pane, stay on Actors.
       const keepContentPanes = new Set([
         "local",
         "usb",
@@ -1688,6 +1696,24 @@ export default {
         return;
       }
 
+      // If in actor search mode, switch to actors pane instead of info
+      if (actorSearchActive) {
+        this.currentPane = "actors";
+        evtBus.emit("paneChanged", this.currentPane);
+
+        // Immediately show actors with search params for the new show
+        // This ensures matching actors are sorted to the top right away
+        const showKey = this.currentShow?.Id || this.currentShow?.Name || null;
+        evtBus.emit("showActors", {
+          show: this.currentShow,
+          tvdbData: this.currentTvdbData,
+          actorSearchParams: this._actorSearchParams,
+        });
+        this._actorsInitialized = true;
+        this._actorsShowKey = showKey;
+        return;
+      }
+
       // If we are just restoring the previous pane after preview mode,
       // do not fallback to 'info' pane.
       if (this.restoringPreviewPane) {
@@ -1698,6 +1724,15 @@ export default {
       this.currentPane = "info";
       this.mapShow = null;
       evtBus.emit("paneChanged", this.currentPane);
+    });
+
+    // Store actor search params from list component
+    evtBus.on("actorSearchActive", (searchParams) => {
+      this._actorSearchParams = searchParams;
+    });
+
+    evtBus.on("actorSearchCleared", () => {
+      this._actorSearchParams = null;
     });
 
     // Listen for tvdbData updates from series pane
@@ -1735,6 +1770,7 @@ export default {
         evtBus.emit("showActors", {
           show: this.currentShow,
           tvdbData: this.currentTvdbData,
+          actorSearchParams: this._actorSearchParams,
         });
         this._actorsInitialized = true;
         this._actorsShowKey = showKey;

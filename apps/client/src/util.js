@@ -136,7 +136,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.favorite = 0;
       tmp.ban = 0;
       tmp.pickup = 0;
-      tmp.hasemby = 1; // Filter out shows with inEmby: false by default
+      tmp.hasemby = 0; // Show both emby and non-emby shows by default
       break;
 
     case "Try Drama":

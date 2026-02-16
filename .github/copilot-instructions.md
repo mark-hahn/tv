@@ -28,3 +28,5 @@
 - never test whether show id has `noemby-` prefix -- check show.inEmby instead
 - the tvdb record prop `deleted` no longer exists -- it should not be set or used
 - use the script srvr to deploy the server modules and the client to the remote server
+- when you've only changed files in one server like srvr, down, asr, or api you should deploy only that server, like `./srsv srvr`
+- never deploy client -- vite does that

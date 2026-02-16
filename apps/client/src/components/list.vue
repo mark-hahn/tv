@@ -78,6 +78,26 @@
       <div style="font-size: 18px; font-weight: bold">Loading trash</div>
     </div>
     <div
+      id="preparingShowsModal"
+      v-if="showPreparingShows"
+      @click.stop
+      style="
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 30px 40px;
+        border: 2px solid black;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        z-index: 10000;
+        text-align: center;
+      "
+    >
+      <div style="font-size: 18px; font-weight: bold">Preparing shows</div>
+    </div>
+    <div
       id="embyRefreshingModal"
       v-if="showEmbyRefreshing"
       @click.stop
@@ -542,9 +562,11 @@ export default {
       searchingStatus: "",
       showReloadingShows: false,
       showLoadingTrash: false,
+      showPreparingShows: false,
       showEmbyRefreshing: false,
       isWideLandscape: false,
       actorFilter: null,
+      actorSearchParams: null, // Store search params for word-based actor search
       hasLoadedAllShows: false, // Track if we've loaded non-inEmby shows
       sortChoices: [
         "Alpha",
@@ -721,6 +743,44 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
+    async loadAllShowsWithDialog() {
+      if (this.hasLoadedAllShows) {
+        console.log("All shows already loaded, skipping");
+        return;
+      }
+
+      console.log("Loading all shows (non-emby)...");
+      this.showLoadingTrash = true;
+
+      // Give UI time to render the dialog
+      await this.$nextTick();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      try {
+        this.hasLoadedAllShows = true;
+
+        // Load non-emby shows (emby shows are already loaded)
+        const additionalShows = await tvdb.getAllTvdb(-1);
+
+        // Merge into allTvdb
+        Object.assign(allTvdb, additionalShows);
+
+        // Add to allShows array, avoiding duplicates
+        const additionalShowsArray = Object.values(additionalShows);
+        const existingNames = new Set(allShows.map((s) => s.Name));
+        const newShows = additionalShowsArray.filter(
+          (s) => !existingNames.has(s.Name),
+        );
+        allShows.push(...newShows);
+
+        console.log(
+          `Added ${newShows.length} non-emby shows (total: ${allShows.length})`,
+        );
+      } finally {
+        this.showLoadingTrash = false;
+      }
+    },
+
     updateWideLandscape() {
       // Simple heuristic: treat landscape as "wide".
       // (On desktops, simpleMode is typically off, so this won't affect normal layout.)
@@ -992,33 +1052,7 @@ export default {
 
       // Load additional shows (inEmby:false) if Trash button is on and we haven't loaded them yet
       if (activeButtons["Trash"] && !this.hasLoadedAllShows) {
-        this.showLoadingTrash = true;
-        await this.$nextTick(); // Ensure dialog renders before blocking operation
-
-        const startTime = performance.now();
-        console.log("Loading remaining shows (inEmby false)...");
-        this.hasLoadedAllShows = true;
-
-        // Load shows with inEmby false
-        const additionalShows = await tvdb.getAllTvdb(-1);
-
-        // Merge into allTvdb and allShows
-        Object.assign(allTvdb, additionalShows);
-
-        // Convert additional shows to array and merge, checking for duplicates
-        const additionalShowsArray = Object.values(additionalShows);
-        const existingNames = new Set(allShows.map((s) => s.Name));
-        const newShows = additionalShowsArray.filter(
-          (s) => !existingNames.has(s.Name),
-        );
-        allShows.push(...newShows);
-
-        const elapsed = Math.round(performance.now() - startTime);
-        console.log(
-          `Loaded ${additionalShowsArray.length} additional shows in ${elapsed}ms`,
-        );
-
-        this.showLoadingTrash = false;
+        await this.loadAllShowsWithDialog();
       }
 
       // Pure state-based: Sync sortChoice to match order button states
@@ -1586,19 +1620,9 @@ export default {
 
       // If no exact match and we haven't loaded all shows yet, load them now BEFORE fuzzy matching
       if (!match && !this.hasLoadedAllShows) {
-        this.hasLoadedAllShows = true;
+        await this.loadAllShowsWithDialog();
 
-        // Load shows with inEmby false
-        const additionalShows = await tvdb.getAllTvdb(-1);
-
-        // Merge into allTvdb and allShows
-        Object.assign(allTvdb, additionalShows);
-
-        // Convert additional shows to array and merge
-        const additionalShowsArray = Object.values(additionalShows);
-        allShows.push(...additionalShowsArray);
-
-        // Try exact match again with the expanded show list
+        // Try exact match again with the complete show list
         match = allShows.find((s) => s.Name === raw);
         if (!match) {
           const rawLower = raw.toLowerCase();
@@ -1635,16 +1659,35 @@ export default {
     },
 
     async saveVisShow(show, scroll = false, opts = null) {
+      console.log(
+        "[saveVisShow] Called with show:",
+        show?.Name,
+        "scroll:",
+        scroll,
+        "opts:",
+        opts,
+      );
       if (!show) {
         console.error("saveVisShow show param null");
         return;
       }
       const options = opts && typeof opts === "object" ? opts : {};
       const showName = show.Name;
+      console.log(
+        "[saveVisShow] Current highlightName:",
+        this.highlightName,
+        "-> new:",
+        showName,
+      );
 
       const showChanged = options.forceSetUpSeries
         ? true
         : showName !== this.highlightName;
+
+      // Update highlightName BEFORE checking filters so refilter() can preserve the new selection
+      if (!options.skipHighlight) {
+        this.highlightName = showName;
+      }
 
       // Check if hasemby filter would hide this show, and reset if needed
       const hasembyCond = this.conds.find((c) => c?.name === "hasemby");
@@ -1661,7 +1704,7 @@ export default {
         }
       }
 
-      // Re-apply filters if hasemby was reset
+      // Re-apply filters if hasemby was reset (highlightName now points to new show)
       if (needsRefilter) {
         await this.refilter(false);
       }
@@ -1676,10 +1719,6 @@ export default {
           showHistoryPtr = showHistory.length - 1;
           // showHistory = showHistory.slice(0, showHistoryPtr+1);
         }
-      }
-
-      if (!options.skipHighlight) {
-        this.highlightName = showName;
       }
 
       if (!options.skipPersist) {
@@ -1746,19 +1785,25 @@ export default {
     },
 
     async fltrAction(fltrChoice) {
-      console.log("fltrAction", fltrChoice);
       this.actorFilter = null; // Clear actor filter when changing filter
+      this.actorSearchParams = null;
+      evtBus.emit("actorSearchCleared");
       if (fltrChoice != "fltrClose") {
-        this.showAll();
+        // Set filters first
         window.localStorage.setItem("fltrChoice", fltrChoice);
         this.fltrChoice = fltrChoice;
         this.filterStr = "";
         for (let cond of this.conds) {
           util.setCondFltr(cond, this.fltrChoice);
-          //  console.log('cond:', cond.name, cond.filter);
+          // If non-emby shows not loaded yet, keep hasemby filter at +1
+          if (cond.name === "hasemby" && !this.hasLoadedAllShows) {
+            cond.filter = 1;
+          }
         }
+
         await this.select();
-        this.sortShows();
+
+        // sortShows() already called in refilter(), no need to call again
       }
       this.sortPopped = false;
       this.fltrPopped = false;
@@ -1980,6 +2025,8 @@ export default {
 
     async condFltrClick(cond, event) {
       this.actorFilter = null; // Clear actor filter when clicking conditional filters
+      this.actorSearchParams = null;
+      evtBus.emit("actorSearchCleared");
       this.fltrChoice = "- - - - -";
       if (++cond.filter == 2) cond.filter = -1;
 
@@ -2080,16 +2127,79 @@ export default {
     },
 
     async select(scroll = true) {
-      // Preserve original behavior: always refresh TVDB data here.
-      allTvdb = await tvdb.getAllTvdb();
+      // Skip re-fetching TVDB data if all shows are already loaded
+      if (!this.hasLoadedAllShows) {
+        allTvdb = await tvdb.getAllTvdb();
+      }
       await this.refilter(scroll);
     },
 
     async refilter(scroll = true) {
       // If actor filter is active, maintain it
       if (this.actorFilter) {
-        await this.filterShowsByActor(this.actorFilter);
-        return;
+        // Check if we have search params (word-based search) or just filter (exact match)
+        if (this.actorSearchParams) {
+          // Use word-based search with stored params
+          const { searchWords, matchesSearchTerm } = this.actorSearchParams;
+
+          if (!allTvdb)
+            allTvdb = await tvdb.getAllTvdb(this.hasLoadedAllShows ? 0 : 1);
+
+          const checkShowForActorMatch = (show) => {
+            const tvdbData = allTvdb?.[show.Name];
+            if (!tvdbData) return false;
+
+            const actualData = tvdbData.response?.data || tvdbData;
+            const characters = actualData?.characters;
+
+            if (!Array.isArray(characters)) return false;
+
+            return characters.some((char) => {
+              const actorName = char?.personName || char?.actor || "";
+              return matchesSearchTerm(actorName, searchWords);
+            });
+          };
+
+          const filteredShows = allShows.filter(checkShowForActorMatch);
+
+          // Show preparing dialog for large show lists
+          // Skip animation frame waits if dialog is already showing (set by caller)
+          if (filteredShows.length > 500 && !this.showPreparingShows) {
+            this.showPreparingShows = true;
+            await this.$nextTick();
+            // Wait for 2 animation frames to ensure dialog is painted
+            await new Promise((resolve) => requestAnimationFrame(resolve));
+            await new Promise((resolve) => requestAnimationFrame(resolve));
+          }
+
+          this.shows = filteredShows;
+
+          // Preserve highlightName selection if possible
+          if (this.highlightName && this.shows.length > 0) {
+            const matchingShow = this.shows.find(
+              (show) => show.Name === this.highlightName,
+            );
+            if (matchingShow) {
+              // Update localStorage to ensure consistency
+              window.localStorage.setItem("lastVisShow", this.highlightName);
+            }
+          }
+
+          if (scroll) this.scrollToSavedShow();
+          this.sortShows();
+
+          // Hide preparing dialog
+          if (this.showPreparingShows) {
+            await this.$nextTick();
+            this.showPreparingShows = false;
+          }
+
+          return;
+        } else {
+          // Use exact match filter (original behavior)
+          await this.filterShowsByActor(this.actorFilter);
+          return;
+        }
       }
 
       // Lightweight version of select(): avoids a full TVDB refresh unless
@@ -2130,6 +2240,16 @@ export default {
         filteredShows.push(show);
       }
 
+      // Show preparing dialog for large show lists (Vue rendering can be slow)
+      // Skip animation frame waits if dialog is already showing (set by caller)
+      if (filteredShows.length > 500 && !this.showPreparingShows) {
+        this.showPreparingShows = true;
+        await this.$nextTick();
+        // Wait for 2 animation frames to ensure dialog is painted
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+
       this.shows = filteredShows;
       if (this.shows.length === 1) this.saveVisShow(this.shows[0]);
       else if (this.highlightName) {
@@ -2137,10 +2257,22 @@ export default {
         const showArr = this.shows.filter(
           (show) => show.Name == this.highlightName,
         );
-        if (showArr.length == 0) this.saveVisShow(this.shows[0]);
+        if (showArr.length == 0) {
+          this.saveVisShow(this.shows[0]);
+        } else {
+          // Show is preserved - update localStorage to match
+          window.localStorage.setItem("lastVisShow", this.highlightName);
+        }
       }
       if (scroll) this.scrollToSavedShow();
+
       this.sortShows();
+
+      // Hide preparing dialog after everything is done
+      if (this.showPreparingShows) {
+        await this.$nextTick();
+        this.showPreparingShows = false;
+      }
     },
 
     async filterShowsByActor(actorName) {
@@ -2193,6 +2325,83 @@ export default {
       this.sortShows();
     },
 
+    async searchShowsByActor(searchParams) {
+      const { searchText, searchWords, matchesSearchTerm } = searchParams;
+      if (!searchText || !searchWords || searchWords.length === 0) return;
+
+      // Step 1: Search through currently loaded shows (emby only)
+      if (!allTvdb)
+        allTvdb = await tvdb.getAllTvdb(this.hasLoadedAllShows ? 0 : 1);
+
+      const checkShowForActorMatch = (show) => {
+        const tvdbData = allTvdb?.[show.Name];
+        if (!tvdbData) return false;
+
+        const actualData = tvdbData.response?.data || tvdbData;
+        const characters = actualData?.characters;
+
+        if (!Array.isArray(characters)) return false;
+
+        return characters.some((char) => {
+          const actorName = char?.personName || char?.actor || "";
+          return matchesSearchTerm(actorName, searchWords);
+        });
+      };
+
+      let filteredShows = allShows.filter(checkShowForActorMatch);
+
+      // Step 2: If non-emby shows aren't loaded, check server for matches
+      if (!this.hasLoadedAllShows) {
+        try {
+          const serverMatches = await srvr.searchActorsInNonEmby({
+            searchWords: searchWords,
+          });
+
+          // If server found matches in non-emby shows, load ALL shows at once
+          if (serverMatches && serverMatches.length > 0) {
+            await this.loadAllShowsWithDialog();
+
+            // Re-filter with the complete show list
+            filteredShows = allShows.filter(checkShowForActorMatch);
+          }
+        } catch (error) {
+          console.error("Error searching non-emby shows:", error);
+        }
+      }
+
+      // Step 3: Update the shows list and UI
+      // Show dialog during Vue rendering if we have many shows
+      // Skip animation frame waits if dialog is already showing (set by caller)
+      if (filteredShows.length > 100 && !this.showPreparingShows) {
+        this.showPreparingShows = true;
+        await this.$nextTick();
+        // Wait for 2 animation frames to ensure dialog is painted
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+
+      this.shows = filteredShows;
+      this.actorFilter = searchText;
+      this.actorSearchParams = { searchWords, matchesSearchTerm }; // Store for refiltering
+      this.fltrChoice = "- - - - -";
+
+      // Notify App component that actor search is active
+      evtBus.emit("actorSearchActive", { searchWords, matchesSearchTerm });
+
+      this.sortShows();
+
+      // Hide preparing dialog after Vue finishes rendering
+      if (this.showPreparingShows) {
+        await this.$nextTick();
+        this.showPreparingShows = false;
+      }
+
+      // Select first show in the list
+      if (this.shows.length > 0) {
+        this.saveVisShow(this.shows[0], true);
+      }
+    },
+
     watchClick() {
       console.log("watchClick");
       if (this.watchingName !== "---") {
@@ -2209,14 +2418,17 @@ export default {
 
     showAll(dontClrFilters = false) {
       // if(dontClrFilters?.altKey !== undefined) dontClrFilters = false;
+      // Keep the current selection (highlightName) so refilter() can preserve it
       this.filterStr = "";
       this.actorFilter = null; // Clear actor filter
+      this.actorSearchParams = null;
+      evtBus.emit("actorSearchCleared");
       if (!dontClrFilters) {
         for (let cond of this.conds) cond.filter = 0;
       }
       this.fltrChoice = "All";
       this.shows = [...allShows];
-      // this.select(true);
+      // highlightName is intentionally left unchanged so refilter() can preserve the selection
     },
 
     async addGapToShow(event) {
@@ -2613,6 +2825,11 @@ export default {
     // Filter shows by actor (long-press on actor in actors pane)
     on("filterByActor", async ({ actorName }) => {
       await this.filterShowsByActor(actorName);
+    });
+
+    // Search shows by actor (from search box in actors pane)
+    on("searchActors", async (searchParams) => {
+      await this.searchShowsByActor(searchParams);
     });
 
     this.devicePollTimer = setInterval(async () => {

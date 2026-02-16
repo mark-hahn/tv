@@ -1654,6 +1654,58 @@ export const getActorPage = async (params) => {
   }
 };
 
+export const searchActorsInNonEmby = async (params) => {
+  const searchWords = params?.searchWords || [];
+  if (!Array.isArray(searchWords) || searchWords.length === 0) {
+    return [];
+  }
+
+  // Normalize actor name for matching (lowercase, remove non-alpha except spaces)
+  const normalizeText = (text) => {
+    return String(text || "")
+      .replace(/[^a-zA-Z\s]/g, "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, " ");
+  };
+
+  // Check if actor matches search words
+  const matchesSearchTerm = (actorName, searchWords) => {
+    const normActorName = normalizeText(actorName);
+    const actorWords = normActorName.split(" ");
+
+    // Check if any search word matches any actor name word (exact match only)
+    return searchWords.some((searchWord) =>
+      actorWords.some((actorWord) => actorWord === searchWord),
+    );
+  };
+
+  const matchedShows = [];
+
+  // Search through non-emby shows only
+  for (const [showName, show] of Object.entries(allTvdb)) {
+    if (show.inEmby !== false) continue; // Only check non-emby shows
+
+    const actualData = show.response?.data || show;
+    const characters = actualData?.characters;
+
+    if (!Array.isArray(characters)) continue;
+
+    // Check if any character/actor matches the search
+    const hasMatch = characters.some((char) => {
+      const actorName = char?.personName || char?.actor || "";
+      return matchesSearchTerm(actorName, searchWords);
+    });
+
+    if (hasMatch) {
+      matchedShows.push(showName);
+    }
+  }
+
+  log("inf", `searchActorsInNonEmby found ${matchedShows.length} matches`);
+  return matchedShows;
+};
+
 export const getAllTvdb = async (params) => {
   const hasEmby = params?.hasEmby ?? 0;
 

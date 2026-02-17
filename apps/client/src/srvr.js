@@ -382,6 +382,10 @@ export function getActorPage(params) {
   return httpCall("/api/getActorPage", { name: params }, "POST");
 }
 
+export function getActorCredits(params) {
+  return httpCall("/api/getActorCredits", { name: params }, "POST");
+}
+
 export function searchActorsInNonEmby(params) {
   return httpCall("/api/searchActorsInNonEmby", params, "POST");
 }

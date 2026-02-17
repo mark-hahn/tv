@@ -22,6 +22,7 @@ import { getLocalFiles } from "./local.js";
 import { getBrowseShow, getAllBrowse } from "./browse.js";
 import * as reviews from "./reviews.js";
 import { checkFiles as tvProcCheckFiles } from "./tv-proc.js";
+import { getActorCredits } from "./imdb-credits.js";
 import {
   getApiCookiesDir,
   getTvprocJsonPath,
@@ -1533,6 +1534,24 @@ app.post("/api/getActorPage", async (req, res) => {
     console.error("getActorPage error:", err.message);
     const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, "_")}`;
     res.json(wikiUrl);
+  }
+});
+
+app.post("/api/getActorCredits", async (req, res) => {
+  let actorName = req.body;
+  if (typeof actorName === "object" && actorName !== null && actorName.name) {
+    actorName = actorName.name;
+  }
+  try {
+    console.log(`Fetching credits for actor: ${actorName}`);
+    const credits = await getActorCredits(actorName, {
+      headless: true,
+      verbose: false,
+    });
+    res.json(credits);
+  } catch (err) {
+    console.error("getActorCredits error:", err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

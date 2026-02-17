@@ -37,7 +37,11 @@
         gap: '8px',
       }"
     >
-      <div style="width: 100%; display: flex; flex-direction: column; gap: 8px">
+      <!-- Default header when no actor is selected -->
+      <div
+        v-if="!selectedActor"
+        style="width: 100%; display: flex; flex-direction: column; gap: 8px"
+      >
         <!-- Top row: show name (fills), mode label, arrows.-->
         <div
           style="
@@ -175,6 +179,117 @@
           />
         </div>
       </div>
+
+      <!-- Selected actor header -->
+      <div
+        v-else
+        style="
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        "
+      >
+        <div
+          style="
+            margin-left: 20px;
+            margin-right: 10px;
+            flex: 1 1 auto;
+            min-width: 0;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+          "
+        >
+          <span>{{ selectedActor.personName || selectedActor.name }}</span>
+        </div>
+        <div
+          style="
+            margin-right: 15px;
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: normal;
+          "
+        >
+          <button
+            @click.stop="handleShowsButton"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 5px;
+              padding: 4px 10px;
+            "
+          >
+            Shows
+          </button>
+          <button
+            @click.stop="handleAllCreditsButton"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 5px;
+              padding: 4px 10px;
+            "
+          >
+            All Credits
+          </button>
+          <button
+            @click.stop="handleWikipediaButton"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 5px;
+              padding: 4px 10px;
+            "
+          >
+            Wikipedia
+          </button>
+          <button
+            @click.stop="handleDoneButton"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 5px;
+              padding: 4px 10px;
+            "
+          >
+            Done
+          </button>
+          <button
+            v-if="previewMode"
+            @click.stop="addShowFromPreview"
+            :disabled="previewAddBusy || !previewSrchChoice"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 5px;
+              padding: 4px 10px;
+            "
+          >
+            {{ previewAddBusy ? "Adding..." : "Add Show to Emby" }}
+          </button>
+          <button
+            v-if="previewMode"
+            @click.stop="exitPreview"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 5px;
+              padding: 4px 10px;
+            "
+          >
+            Exit Preview
+          </button>
+          <span
+            v-if="previewMode"
+            style="font-size: 13px; font-weight: normal; color: #666"
+          >
+            preview mode
+          </span>
+        </div>
+      </div>
     </div>
     <div
       id="error-message"
@@ -183,9 +298,119 @@
     >
       <div>{{ errorMessage }}</div>
     </div>
+
+    <!-- Credits list -->
+    <div
+      v-else-if="showingCredits"
+      id="credits-list"
+      style="display: flex; flex-direction: column; gap: 12px; padding: 5px"
+    >
+      <div
+        v-if="creditsLoading"
+        style="
+          text-align: center;
+          color: #666;
+          margin-top: 50px;
+          font-size: 16px;
+        "
+      >
+        Loading credits...
+      </div>
+      <div
+        v-else-if="creditsError"
+        style="
+          text-align: center;
+          color: red;
+          margin-top: 50px;
+          font-size: 16px;
+        "
+      >
+        {{ creditsError }}
+      </div>
+      <div
+        v-else
+        v-for="credit in credits"
+        :key="credit.imdbId"
+        @click.stop="handleCreditCardClick(credit)"
+        style="
+          display: flex;
+          width: 100%;
+          background-color: #f5f5f5;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          padding: 10px;
+          cursor: pointer;
+          transition: background-color 0.15s;
+        "
+        @mouseover="$event.currentTarget.style.backgroundColor = '#e8e8e8'"
+        @mouseout="$event.currentTarget.style.backgroundColor = '#f5f5f5'"
+      >
+        <img
+          v-if="credit.imageUrl"
+          :src="credit.imageUrl"
+          :srcset="credit.imageSrcset"
+          :alt="credit.title"
+          style="
+            width: 80px;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 4px;
+            margin-right: 15px;
+            flex-shrink: 0;
+          "
+        />
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 6px">
+          <div style="font-weight: bold; font-size: 16px">
+            {{ credit.title }}
+          </div>
+          <div
+            v-if="credit.year"
+            style="font-size: 14px; color: #666"
+          >
+            {{ credit.year }}
+          </div>
+          <div
+            v-if="credit.type"
+            style="font-size: 13px; color: #888"
+          >
+            {{ credit.type }}
+          </div>
+          <div
+            v-if="credit.role"
+            style="font-size: 13px; color: #444"
+          >
+            {{ credit.role }}
+          </div>
+          <div
+            v-if="credit.rating"
+            style="font-size: 13px; color: #666"
+          >
+            ⭐ {{ credit.rating }}
+          </div>
+          <div
+            v-if="credit.imdbId"
+            style="font-size: 12px; color: #999"
+          >
+            {{ credit.imdbId }}
+          </div>
+        </div>
+      </div>
+      <div
+        v-if="!creditsLoading && !creditsError && credits.length === 0"
+        style="
+          text-align: center;
+          color: #999;
+          margin-top: 50px;
+          font-size: 16px;
+        "
+      >
+        No credits found
+      </div>
+    </div>
+
     <div
       id="actors-grid"
-      v-else
+      v-else-if="!showingCredits"
       style="
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
@@ -197,8 +422,8 @@
         v-for="actor in actors"
         :key="actor.url"
         :actor="actor"
+        :is-selected="selectedActor === actor"
         @actor-click="handleActorClick"
-        @actor-long-press="handleActorLongPress"
       ></Actor>
     </div>
     <div
@@ -258,6 +483,11 @@ export default {
       _onShowActors: null,
       _onFillAndSelectEpisode: null,
       _onResetActorsPane: null,
+      selectedActor: null, // Currently selected actor
+      showingCredits: false, // Whether we're showing credits list
+      credits: [], // Actor's filmography credits
+      creditsLoading: false, // Loading state for credits
+      creditsError: null, // Error message for credits
     };
   },
 
@@ -360,6 +590,28 @@ export default {
       await this.handleGuestClick();
     },
     async handleActorClick({ event, actor }) {
+      const name = String(actor?.personName || actor?.name || "").trim();
+      if (!name) return;
+
+      // Toggle selection
+      if (this.selectedActor && this.selectedActor === actor) {
+        // Deselect
+        this.selectedActor = null;
+        this.showingCredits = false;
+        this.credits = [];
+        this.creditsError = null;
+      } else {
+        // Select
+        this.selectedActor = actor;
+        this.showingCredits = false;
+        this.credits = [];
+        this.creditsError = null;
+      }
+    },
+
+    // Keep for future use (Wikipedia feature):
+    /*
+    async handleActorClickOpenWikipedia({ event, actor }) {
       const a = actor;
 
       const name = String(a?.personName || a?.name || "").trim();
@@ -386,13 +638,101 @@ export default {
         win?.close();
       }
     },
+    */
 
+    // Keep for future use (filter by actor feature):
+    /*
     handleActorLongPress({ event, actor }) {
       const name = String(actor?.personName || actor?.name || "").trim();
       if (!name) return;
 
       // Emit event to list component to filter shows by this actor
       evtBus.emit("filterByActor", { actorName: name });
+    },
+    */
+
+    async handleShowsButton() {
+      if (!this.selectedActor) return;
+      const name = String(
+        this.selectedActor?.personName || this.selectedActor?.name || "",
+      ).trim();
+      if (!name) return;
+
+      // Emit event to list component to filter shows by this actor
+      evtBus.emit("filterByActor", { actorName: name });
+    },
+
+    async handleAllCreditsButton() {
+      if (!this.selectedActor) return;
+      const name = String(
+        this.selectedActor?.personName || this.selectedActor?.name || "",
+      ).trim();
+      if (!name) return;
+
+      this.showingCredits = true;
+      this.creditsLoading = true;
+      this.creditsError = null;
+      this.credits = [];
+
+      try {
+        const credits = await srvr.getActorCredits(name);
+        this.credits = credits || [];
+        this.creditsLoading = false;
+      } catch (e) {
+        console.error("Failed to load actor credits:", e);
+        this.creditsError = e.message || "Failed to load credits";
+        this.creditsLoading = false;
+      }
+    },
+
+    async handleWikipediaButton() {
+      if (!this.selectedActor) return;
+      const actor = this.selectedActor;
+      const name = String(actor?.personName || actor?.name || "").trim();
+      if (!name) return;
+
+      // Open window immediately to avoid popup blocker
+      const win = window.open("", "_blank");
+
+      // Get actor page URL and open it
+      const actorName = actor?.personName || actor?.name;
+      if (actorName) {
+        try {
+          const url = await srvr.getActorPage(actorName);
+          if (url && win && !win.closed) {
+            win.location.href = url;
+          } else {
+            win?.close();
+          }
+        } catch (e) {
+          console.error("handleWikipediaButton error:", e);
+          win?.close();
+        }
+      } else {
+        win?.close();
+      }
+    },
+
+    handleDoneButton() {
+      this.selectedActor = null;
+      this.showingCredits = false;
+      this.credits = [];
+      this.creditsError = null;
+    },
+
+    handleCreditCardClick(credit) {
+      if (!credit || !credit.imdbId) return;
+
+      // Prepare the search choice data structure for preview mode
+      const srchChoice = {
+        name: credit.title,
+        tvdbId: null, // We only have imdbId, not tvdbId
+        imdbId: credit.imdbId,
+        overview: credit.role ? `Role: ${credit.role}` : null,
+      };
+
+      // Emit event to trigger preview mode (same as browse pane)
+      evtBus.emit("reelSearchAction", { srchChoice, action: "preview" });
     },
 
     normPersonName(v) {

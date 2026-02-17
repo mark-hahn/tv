@@ -2,12 +2,6 @@
   <div
     class="actor-card"
     @click.stop="handleClick($event)"
-    @touchstart.passive="handleTouchStart($event)"
-    @touchend="handleTouchEnd($event)"
-    @touchmove="handleTouchMove"
-    @mousedown="handleMouseDown($event)"
-    @mouseup="handleMouseUp($event)"
-    @mouseleave="handleMouseLeave"
     @contextmenu.prevent
     :style="{
       display: 'flex',
@@ -15,28 +9,28 @@
       alignItems: 'center',
       margin: '5px',
       padding: '8px',
-      backgroundColor: isLongPressing ? '#d0d0ff' : '#f5f5f5',
+      backgroundColor: '#f5f5f5',
       borderRadius: '6px',
-      border: isLongPressing ? '2px solid #4444ff' : '1px solid #ddd',
+      border: isSelected ? '3px solid red' : '1px solid #ddd',
       cursor: 'pointer',
       color: 'black',
       textAlign: 'center',
       marginBottom: '3px',
-      transition: 'background-color 0.15s, border 0.15s',
+      transition: 'border 0.15s',
     }"
   >
     <img
       v-if="actor.image"
       :src="actor.image"
       :alt="actor.name"
-      style="
-        width: 100px;
-        height: 130px;
-        object-fit: cover;
-        border-radius: 4px;
-        margin-bottom: 5px;
-        cursor: pointer;
-      "
+      :style="{
+        width: '100px',
+        height: '130px',
+        objectFit: 'cover',
+        borderRadius: '4px',
+        marginBottom: '5px',
+        cursor: 'pointer',
+      }"
       @click="handleImageClick($event)"
       @error="handleImageError"
     />
@@ -65,52 +59,37 @@ const theMan = Buffer.from("bXJza2lu", "base64").toString();
 export default {
   name: "Actor",
 
-  emits: ["actor-click", "actor-long-press"],
+  emits: ["actor-click"],
 
   props: {
     actor: {
       type: Object,
       required: true,
     },
+    isSelected: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   data() {
     return {
-      longPressTimer: null,
-      isLongPressing: false,
+      // Keep for future use:
+      // longPressTimer: null,
+      // isLongPressing: false,
     };
   },
 
   methods: {
     handleImageClick(e) {
-      // Don't perform click action if we just completed a long-press
-      if (this.isLongPressing) {
-        e.stopPropagation();
-        e.preventDefault();
-        return;
-      }
-
       if (e.ctrlKey) return;
-
-      // Stop event propagation and clear any long-press state
       e.stopPropagation();
       e.preventDefault();
-      
-      if (this.longPressTimer) {
-        clearTimeout(this.longPressTimer);
-        this.longPressTimer = null;
-      }
-      this.isLongPressing = false;
-      
-      // Clicking image always opens actor page
+
+      // Just emit click to select/deselect actor
       this.$emit("actor-click", { event: e, actor: this.actor });
     },
     handleClick(e) {
-      // Don't perform click action if we just completed a long-press
-      if (this.isLongPressing) {
-        return;
-      }
-
       const name = String(
         this.actor?.personName || this.actor?.name || "",
       ).trim();
@@ -133,6 +112,9 @@ export default {
         e.target.style.display = "none";
       }
     },
+
+    // Keep these methods for future use (long-press feature):
+    /*
     handleTouchStart(e) {
       this.isLongPressing = false;
       this.longPressTimer = setTimeout(() => {
@@ -149,7 +131,6 @@ export default {
       if (wasLongPressing) {
         e.preventDefault();
         e.stopPropagation();
-        // Delay resetting to prevent click from firing
         setTimeout(() => {
           this.isLongPressing = false;
         }, 100);
@@ -178,7 +159,6 @@ export default {
       if (wasLongPressing) {
         e.preventDefault();
         e.stopPropagation();
-        // Delay resetting to prevent click from firing
         setTimeout(() => {
           this.isLongPressing = false;
         }, 100);
@@ -199,12 +179,37 @@ export default {
 
       this.$emit("actor-long-press", { event: e, actor: this.actor });
     },
-  },
-  beforeUnmount() {
-    if (this.longPressTimer) {
-      clearTimeout(this.longPressTimer);
-      this.longPressTimer = null;
-    }
+    */
+
+    // Keep for future use (Wikipedia feature):
+    /*
+    async openActorPage(actor) {
+      const name = String(actor?.personName || actor?.name || "").trim();
+      if (!name) return;
+
+      // Open window immediately to avoid popup blocker
+      const win = window.open("", "_blank");
+
+      // Get actor page URL and open it
+      const actorName = actor?.personName || actor?.name;
+      if (actorName) {
+        try {
+          const srvr = await import("../srvr.js");
+          const url = await srvr.getActorPage(actorName);
+          if (url && win && !win.closed) {
+            win.location.href = url;
+          } else {
+            win?.close();
+          }
+        } catch (e) {
+          console.error("openActorPage error:", e);
+          win?.close();
+        }
+      } else {
+        win?.close();
+      }
+    },
+    */
   },
 };
 </script>

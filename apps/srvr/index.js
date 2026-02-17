@@ -3117,8 +3117,8 @@ async function syncDiskData() {
 
     // Update tvdb records with fresh disk data
     for (const [name, tvdbRecord] of Object.entries(allTvdb)) {
-      const embyPath = tvdbRecord.emby?.path;
-      if (!embyPath) continue;
+      // Try Path first, fall back to Name for shows without Path set
+      const embyPath = tvdbRecord.Path || tvdbRecord.emby?.path || name;
 
       const pathPart = embyPath.split("/").pop();
       const diskInfo = diskShows[pathPart];
@@ -3130,15 +3130,14 @@ async function syncDiskData() {
 
       // Check if disk data changed
       const changed =
-        tvdbRecord.disk?.date !== newDate ||
-        tvdbRecord.disk?.size !== newSize ||
-        tvdbRecord.disk?.noFiles !== newNoFiles;
+        tvdbRecord.Date !== newDate ||
+        tvdbRecord.Size !== newSize ||
+        tvdbRecord.NoFiles !== newNoFiles;
 
       if (changed) {
-        tvdbRecord.disk = tvdbRecord.disk || {};
-        tvdbRecord.disk.date = newDate;
-        tvdbRecord.disk.size = newSize;
-        tvdbRecord.disk.noFiles = newNoFiles;
+        tvdbRecord.Date = newDate;
+        tvdbRecord.Size = newSize;
+        tvdbRecord.NoFiles = newNoFiles;
         tvdbRecord.sync = tvdbRecord.sync || {};
         tvdbRecord.sync.lastDiskCheck = now;
         updatedCount++;
@@ -3197,8 +3196,8 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
     // Check disk for each show individually if requested
     if (checkDiskFirst) {
       for (const { showId, showName, tvdbRecord } of shows) {
-        const embyPath = tvdbRecord.emby?.path;
-        if (!embyPath) continue;
+        // Try Path first, fall back to showName for shows without Path set
+        const embyPath = tvdbRecord.Path || tvdbRecord.emby?.path || showName;
 
         const pathPart = embyPath.split("/").pop();
         const diskInfo = await getShowDiskInfo(pathPart);
@@ -3206,24 +3205,21 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
         if (diskInfo) {
           const [newDate, newSize] = diskInfo;
           const changed =
-            tvdbRecord.disk?.date !== newDate ||
-            tvdbRecord.disk?.size !== newSize;
+            tvdbRecord.Date !== newDate || tvdbRecord.Size !== newSize;
 
           if (changed) {
-            tvdbRecord.disk = tvdbRecord.disk || {};
-            tvdbRecord.disk.date = newDate;
-            tvdbRecord.disk.size = newSize;
-            tvdbRecord.disk.noFiles = false;
+            tvdbRecord.Date = newDate;
+            tvdbRecord.Size = newSize;
+            tvdbRecord.NoFiles = false;
             diskUpdateCount++;
           }
         } else {
           // Folder doesn't exist or empty
-          const changed = tvdbRecord.disk?.noFiles !== true;
+          const changed = tvdbRecord.NoFiles !== true;
           if (changed) {
-            tvdbRecord.disk = tvdbRecord.disk || {};
-            tvdbRecord.disk.noFiles = true;
-            tvdbRecord.disk.date = null;
-            tvdbRecord.disk.size = 0;
+            tvdbRecord.NoFiles = true;
+            tvdbRecord.Date = null;
+            tvdbRecord.Size = 0;
             diskUpdateCount++;
           }
         }
@@ -3363,8 +3359,8 @@ async function handleShowDiskChange(showName) {
       const allTvdb = tvdb.getAllTvdbSync();
       const tvdbRecord = allTvdb[showName];
       if (tvdbRecord) {
-        tvdbRecord.diskMaxDate = maxDate;
-        tvdbRecord.diskSize = totalSize;
+        tvdbRecord.Date = maxDate;
+        tvdbRecord.Size = totalSize;
         await tvdb.saveTvdbSync();
         console.log(
           `[chokidar] Updated disk info for ${showName}: ${totalSize} bytes, ${maxDate}`,

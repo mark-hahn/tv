@@ -2037,7 +2037,7 @@ export default {
 
     sortShows() {
       if (this.sortChoice === "Notes") {
-        this.shows.sort((a, b) => {
+        this.shows = [...this.shows].sort((a, b) => {
           const aNoteRaw = String(a?.Notes ?? "").trim();
           const bNoteRaw = String(b?.Notes ?? "").trim();
           const aHas = aNoteRaw.length > 0;
@@ -2060,7 +2060,7 @@ export default {
         return;
       }
 
-      this.shows.sort((a, b) => {
+      this.shows = [...this.shows].sort((a, b) => {
         a = this.getValBySortChoice(a, true);
         b = this.getValBySortChoice(b, true);
         if (a == b) return 0;

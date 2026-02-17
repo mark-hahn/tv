@@ -1750,8 +1750,8 @@ const getGaps = async (_param) => {
   const gapsFromTvdb = {};
 
   for (const [name, record] of Object.entries(allTvdb)) {
-    if (record.gap) {
-      gapsFromTvdb[record.emby.id] = record.gap;
+    if (record.gap && record.Id) {
+      gapsFromTvdb[record.Id] = record.gap;
     }
   }
 

@@ -13,6 +13,9 @@ const FILTER_WORDS = [
   "host",
   "voice",
   "uncredited",
+  "narrated",
+  "various",
+  "writer",
 ];
 
 // Actor name matching logic

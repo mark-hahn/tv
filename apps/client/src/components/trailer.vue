@@ -40,7 +40,7 @@
       </div>
       <!-- content wrapper to allow refresh-->
       <div
-        v-if="!trailers || trailers.length === 0"
+        v-if="(!trailers || trailers.length === 0) && !loadingImdb"
         style="padding: 20px; text-align: center; color: #666"
       >
         No trailers found.
@@ -111,6 +111,21 @@
           </div>
         </div>
       </div>
+      <!-- Loading message for IMDB trailer -->
+      <div
+        v-if="loadingImdb"
+        style="
+          background: white;
+          padding: 10px;
+          border: 1px solid #ccc;
+          border-radius: 5px;
+          text-align: center;
+          color: #444;
+          font-size: 13px;
+        "
+      >
+        Loading IMDB trailer...
+      </div>
     </template>
   </div>
 </template>
@@ -131,6 +146,7 @@ export default {
       trailers: [],
       err: "",
       showContent: true, // Controls rendering of video list
+      loadingImdb: false, // Loading state for IMDB video fetch
 
       previewMode: false,
       previewAddBusy: false,
@@ -346,6 +362,7 @@ export default {
       this.savedTimes.clear();
       this.lastPlayingKey = null;
       this.showContent = true; // Reset
+      this.loadingImdb = false; // Reset loading state
     },
     async onTvdbDataReady(data) {
       this.err = "";
@@ -361,6 +378,7 @@ export default {
       // Check if IMDB video is missing and fetch it
       const hasImdbVideo = this.trailers.some((t) => this.isImdbVideo(t.url));
       if (!hasImdbVideo && data?.show && tvdbData) {
+        this.loadingImdb = true;
         try {
           const srvr = await import("../srvr.js");
           const remotes = await srvr.getRemotesCmd({
@@ -392,6 +410,8 @@ export default {
           }
         } catch (err) {
           console.error("Failed to fetch IMDB video:", err);
+        } finally {
+          this.loadingImdb = false;
         }
       }
       // trailers watcher will handle init

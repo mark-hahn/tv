@@ -183,12 +183,7 @@
       <!-- Selected actor header -->
       <div
         v-else
-        style="
-          width: 100%;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        "
+        style="width: 100%; display: flex; flex-direction: column; gap: 8px"
       >
         <!-- Top row: Actor name and Done button -->
         <div
@@ -222,6 +217,12 @@
               font-weight: normal;
             "
           >
+            <span
+              v-if="showingCredits && credits.length > 0"
+              style="font-size: 13px; color: #666"
+            >
+              {{ credits.length }} credit{{ credits.length !== 1 ? "s" : "" }}
+            </span>
             <button
               @click.stop="handleDoneButton"
               style="
@@ -242,90 +243,98 @@
             width: 100%;
             display: flex;
             align-items: center;
-            justify-content: flex-start;
-            gap: 12px;
-            margin-left: 20px;
-            margin-right: 15px;
             font-weight: normal;
-            flex-wrap: wrap;
           "
         >
-          <button
-            @click.stop="handleShowsButton"
+          <div
             style="
-              font-size: 13px;
-              cursor: pointer;
-              border-radius: 5px;
-              padding: 4px 10px;
+              display: flex;
+              align-items: center;
+              justify-content: flex-end;
+              gap: 12px;
+              margin-right: 15px;
+              flex: 1 1 auto;
+              flex-wrap: wrap;
             "
           >
-            Shows
-          </button>
-          <button
-            @click.stop="handleAllCreditsButton"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              border-radius: 5px;
-              padding: 4px 10px;
-            "
-          >
-            All Credits
-          </button>
-          <button
-            v-if="actorPageUrl"
-            @click.stop="handleImdbButton"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              border-radius: 5px;
-              padding: 4px 10px;
-            "
-          >
-            IMDb
-          </button>
-          <button
-            @click.stop="handleWikipediaButton"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              border-radius: 5px;
-              padding: 4px 10px;
-            "
-          >
-            Wikipedia
-          </button>
-          <button
-            v-if="previewMode"
-            @click.stop="addShowFromPreview"
-            :disabled="previewAddBusy || !previewSrchChoice"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              border-radius: 5px;
-              padding: 4px 10px;
-            "
-          >
-            {{ previewAddBusy ? "Adding..." : "Add Show to Emby" }}
-          </button>
-          <button
-            v-if="previewMode"
-            @click.stop="exitPreview"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              border-radius: 5px;
-              padding: 4px 10px;
-            "
-          >
-            Exit Preview
-          </button>
-          <span
-            v-if="previewMode"
-            style="font-size: 13px; font-weight: normal; color: #666"
-          >
-            preview mode
-          </span>
+            <button
+              @click.stop="handleShowsButton"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 5px;
+                padding: 4px 10px;
+              "
+            >
+              Shows
+            </button>
+            <button
+              @click.stop="handleAllCreditsButton"
+              :disabled="creditsLoading"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 5px;
+                padding: 4px 10px;
+              "
+            >
+              {{ creditsLoading ? "Loading..." : "All Credits" }}
+            </button>
+            <button
+              v-if="actorPageUrl"
+              @click.stop="handleImdbButton"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 5px;
+                padding: 4px 10px;
+              "
+            >
+              IMDb
+            </button>
+            <button
+              @click.stop="handleWikipediaButton"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 5px;
+                padding: 4px 10px;
+              "
+            >
+              Wikipedia
+            </button>
+            <button
+              v-if="previewMode"
+              @click.stop="addShowFromPreview"
+              :disabled="previewAddBusy || !previewSrchChoice"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 5px;
+                padding: 4px 10px;
+              "
+            >
+              {{ previewAddBusy ? "Adding..." : "Add Show to Emby" }}
+            </button>
+            <button
+              v-if="previewMode"
+              @click.stop="exitPreview"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 5px;
+                padding: 4px 10px;
+              "
+            >
+              Exit Preview
+            </button>
+            <span
+              v-if="previewMode"
+              style="font-size: 13px; font-weight: normal; color: #666"
+            >
+              preview mode
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -712,19 +721,32 @@ export default {
     },
 
     async handleAllCreditsButton() {
+      console.log(
+        "[ACTORS] handleAllCreditsButton called",
+        new Date().toISOString(),
+      );
       if (!this.selectedActor) return;
       const name = String(
         this.selectedActor?.personName || this.selectedActor?.name || "",
       ).trim();
       if (!name) return;
+      console.log("[ACTORS] Actor name:", name);
+
+      // Prevent duplicate requests
+      if (this.creditsLoading) {
+        console.log("[ACTORS] Already loading, returning");
+        return;
+      }
 
       // Check cache first
       if (this.creditsCache[name]) {
+        console.log("[ACTORS] Using cached credits");
         this.showingCredits = true;
         this.credits = this.creditsCache[name].credits || [];
         this.actorPageUrl = this.creditsCache[name].actorPageUrl || null;
         return;
       }
+      console.log("[ACTORS] No cache, fetching from server");
 
       this.showingCredits = true;
       this.creditsLoading = true;
@@ -733,7 +755,9 @@ export default {
       this.actorPageUrl = null;
 
       try {
+        console.log("[ACTORS] Calling srvr.getActorCredits...");
         const result = await srvr.getActorCredits(name);
+        console.log("[ACTORS] Received result from srvr.getActorCredits");
         this.credits = result?.credits || [];
         this.actorPageUrl = result?.actorPageUrl || null;
         this.creditsLoading = false;
@@ -794,13 +818,26 @@ export default {
       if (!credit || !credit.imdbId) return;
 
       // Prepare the search choice data structure for preview mode
+      // Include available info as a basic overview
+      let overviewParts = [];
+      if (credit.year) overviewParts.push(credit.year);
+      if (credit.type) overviewParts.push(credit.type);
+      if (credit.role) overviewParts.push(`Role: ${credit.role}`);
+      if (credit.episodeCount)
+        overviewParts.push(`${credit.episodeCount} episodes`);
+
       const srchChoice = {
         name: credit.title,
         tvdbId: null, // We only have imdbId, not tvdbId
         imdbId: credit.imdbId,
-        overview: null, // Remove role from overview
+        overview:
+          overviewParts.length > 0
+            ? overviewParts.join(" • ")
+            : "No description available",
+        // Add image if available
+        imageUrl: credit.imageUrl,
       };
-      
+
       // Emit event to trigger preview mode (same as browse pane)
       evtBus.emit("reelSearchAction", { srchChoice, action: "preview" });
       // Don't deselect actor - keep it selected
@@ -811,7 +848,9 @@ export default {
     },
 
     normPersonName(name) {
-      return String(name || "").trim().toLowerCase();
+      return String(name || "")
+        .trim()
+        .toLowerCase();
     },
 
     mergeTmdbTvdbActors(tmdbIn, tvdbIn) {

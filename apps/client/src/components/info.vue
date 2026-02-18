@@ -884,9 +884,18 @@ export default {
       img.style.objectFit = "contain";
       img.style.display = "block";
 
-      const src = tvdbData?.image || "./question-mark.png";
+      // Use tvdbData image if available, otherwise use show.imageUrl, fallback to placeholder
+      let src = "./question-mark.png";
+      if (tvdbData?.image) {
+        src = tvdbData.image;
+      } else if (this.show?.imageUrl) {
+        src = this.show.imageUrl;
+      }
+
       if (!tvdbData) {
-        console.error("setPoster: tvdbData missing");
+        console.warn(
+          "setPoster: tvdbData missing, using show.imageUrl or placeholder",
+        );
       } else if (!tvdbData.image) {
         console.error("image missing from tvdbData", tvdbData.name);
       }
@@ -1380,6 +1389,8 @@ export default {
           if (!tvdbData) {
             console.warn("Series: no tvdbData available for", show?.Name);
             // Still show the infobox even without tvdbData, just with limited info
+            // Try to set poster from show.imageUrl if available
+            void this.setPoster(null);
             this.seriesReady = true;
             return;
           }

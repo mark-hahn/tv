@@ -386,19 +386,29 @@ export async function getActorPage(params) {
     body: JSON.stringify({ name: params }),
   });
   if (!response.ok) {
-    throw new Error(`getActorPage failed: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `getActorPage failed: ${response.status} ${response.statusText}`,
+    );
   }
   return await response.json();
 }
 
 export async function getActorCredits(params) {
+  console.log(
+    "[SRVR.JS] getActorCredits called with:",
+    params,
+    new Date().toISOString(),
+  );
   const response = await fetch(`${config.torrentsApiUrl}/api/getActorCredits`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name: params }),
   });
+  console.log("[SRVR.JS] fetch completed with status:", response.status);
   if (!response.ok) {
-    throw new Error(`getActorCredits failed: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `getActorCredits failed: ${response.status} ${response.statusText}`,
+    );
   }
   return await response.json();
 }

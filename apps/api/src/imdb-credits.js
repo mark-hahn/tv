@@ -250,7 +250,7 @@ async function getActorCredits(actorName, options = {}) {
     await bestMatchLink.click();
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(1000);
-    
+
     // Capture actor page URL
     const actorPageUrl = page.url();
 

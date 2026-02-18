@@ -1,3 +1,16 @@
+// Auto-restart with xvfb-run if no DISPLAY is set (for Playwright)
+if (!process.env.DISPLAY && !process.env.XVFB_RESTARTED) {
+  console.log("No DISPLAY detected, restarting with xvfb-run...");
+  const { spawn } = await import("child_process");
+  const child = spawn("xvfb-run", ["-a", "node", process.argv[1]], {
+    stdio: "inherit",
+    env: { ...process.env, XVFB_RESTARTED: "1" },
+  });
+  child.on("exit", (code) => process.exit(code || 0));
+  // Exit this process and let the child run
+  await new Promise(() => {});
+}
+
 import express from "express";
 import https from "https";
 import fs from "fs";
@@ -1537,37 +1550,106 @@ app.post("/api/getActorPage", async (req, res) => {
   }
 });
 
+// Browser operation queue to prevent concurrent Playwright instances
+class BrowserQueue {
+  constructor() {
+    this.queue = [];
+    this.running = false;
+  }
+
+  async enqueue(task) {
+    return new Promise((resolve, reject) => {
+      this.queue.push({ task, resolve, reject });
+      this.processQueue();
+    });
+  }
+
+  async processQueue() {
+    if (this.running || this.queue.length === 0) return;
+
+    this.running = true;
+    const { task, resolve, reject } = this.queue.shift();
+
+    try {
+      const result = await task();
+      resolve(result);
+    } catch (error) {
+      reject(error);
+    } finally {
+      this.running = false;
+      this.processQueue(); // Process next item
+    }
+  }
+}
+
+const browserQueue = new BrowserQueue();
+
 // Server-side cache for actor credits (in-memory)
 const actorCreditsCache = new Map();
 const ACTOR_CREDITS_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 
+// In-flight request tracking to prevent concurrent browser launches
+const inFlightRequests = new Map();
+
 app.post("/api/getActorCredits", async (req, res) => {
+  const requestId = Math.random().toString(36).substr(2, 9);
+  console.log(
+    `[SERVER ${requestId}] /api/getActorCredits received at ${new Date().toISOString()}`,
+  );
   let actorName = req.body;
   if (typeof actorName === "object" && actorName !== null && actorName.name) {
     actorName = actorName.name;
   }
+  console.log(`[SERVER ${requestId}] Actor name: ${actorName}`);
   try {
     const cacheKey = actorName.toLowerCase().trim();
     const cached = actorCreditsCache.get(cacheKey);
-    
+
     // Check if cached and not expired
-    if (cached && (Date.now() - cached.timestamp) < ACTOR_CREDITS_CACHE_TTL) {
-      console.log(`Returning cached credits for actor: ${actorName}`);
+    if (cached && Date.now() - cached.timestamp < ACTOR_CREDITS_CACHE_TTL) {
+      console.log(
+        `[SERVER ${requestId}] Returning cached credits for actor: ${actorName}`,
+      );
       return res.json(cached.data);
     }
-    
-    console.log(`Fetching credits for actor: ${actorName}`);
-    const result = await getActorCredits(actorName, {
-      headless: false,
-      verbose: false,
-    });
-    
-    // Cache the result
-    actorCreditsCache.set(cacheKey, {
-      data: result,
-      timestamp: Date.now()
-    });
-    
+
+    // Check if request is already in-flight for this actor
+    if (inFlightRequests.has(cacheKey)) {
+      console.log(
+        `[SERVER ${requestId}] Waiting for in-flight request for actor: ${actorName}`,
+      );
+      const result = await inFlightRequests.get(cacheKey);
+      console.log(`[SERVER ${requestId}] In-flight request completed`);
+      return res.json(result);
+    }
+
+    // Create promise for this request to allow others to wait
+    console.log(
+      `[SERVER ${requestId}] Fetching credits for actor: ${actorName}`,
+    );
+    const fetchPromise = browserQueue
+      .enqueue(() =>
+        getActorCredits(actorName, {
+          headless: false,
+          verbose: false,
+        }),
+      )
+      .then((result) => {
+        // Cache the result
+        actorCreditsCache.set(cacheKey, {
+          data: result,
+          timestamp: Date.now(),
+        });
+        inFlightRequests.delete(cacheKey);
+        return result;
+      })
+      .catch((err) => {
+        inFlightRequests.delete(cacheKey);
+        throw err;
+      });
+
+    inFlightRequests.set(cacheKey, fetchPromise);
+    const result = await fetchPromise;
     res.json(result);
   } catch (err) {
     console.error("getActorCredits error:", err.message);

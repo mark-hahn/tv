@@ -1428,6 +1428,11 @@ export default {
             return;
           }
 
+          // Update show.Overview from tvdbData if available
+          if (tvdbData.overview) {
+            this.show.Overview = tvdbData.overview;
+          }
+
           // If tvdbData exists but has no image, force a refresh
           if (!tvdbData.image && show.TvdbId) {
             const showSeed = {

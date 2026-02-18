@@ -818,22 +818,11 @@ export default {
       if (!credit || !credit.imdbId) return;
 
       // Prepare the search choice data structure for preview mode
-      // Include available info as a basic overview
-      let overviewParts = [];
-      if (credit.year) overviewParts.push(credit.year);
-      if (credit.type) overviewParts.push(credit.type);
-      if (credit.role) overviewParts.push(`Role: ${credit.role}`);
-      if (credit.episodeCount)
-        overviewParts.push(`${credit.episodeCount} episodes`);
-
       const srchChoice = {
         name: credit.title,
         tvdbId: null, // We only have imdbId, not tvdbId
         imdbId: credit.imdbId,
-        overview:
-          overviewParts.length > 0
-            ? overviewParts.join(" • ")
-            : "No description available",
+        overview: null, // Will be filled from TVDB data
         // Add image if available
         imageUrl: credit.imageUrl,
       };

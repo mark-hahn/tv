@@ -91,17 +91,6 @@
             </button></a
           >
         </div>
-        <div
-          v-else-if="checkedRemotes"
-          style="
-            margin-right: 10px;
-            flex: &quot;0 0 auto&quot;;
-            font-size: 14px;
-            color: #666;
-          "
-        >
-          Show not found at Rotten Tomatoes.
-        </div>
       </div>
       <!-- Second Row: Filter Radio Buttons-->
       <div
@@ -161,7 +150,19 @@
       "
     >
       <div
-        v-if="!isLoading &amp;&amp; stats &amp;&amp; reviews.length === 0"
+        v-if="checkedRemotes &amp;&amp; !rottenUrl"
+        style="
+          width: 100%;
+          text-align: center;
+          color: #666;
+          margin-top: 50px;
+          font-size: 16px;
+        "
+      >
+        Show not found at Rotten Tomatoes.
+      </div>
+      <div
+        v-else-if="!isLoading &amp;&amp; stats &amp;&amp; reviews.length === 0"
         style="
           width: 100%;
           text-align: center;

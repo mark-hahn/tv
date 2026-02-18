@@ -349,11 +349,19 @@ export default {
     },
     isVideoFile(url) {
       if (!url) return false;
-      return /\.(mp4|webm|ogg|mov)$/i.test(url);
+      // Include IMDB direct video files
+      return (
+        /\.(mp4|webm|ogg|mov)$/i.test(url) ||
+        /imdb-video\.media-imdb\.com.*\.(mp4|m3u8)/i.test(url)
+      );
     },
     isImdbVideo(url) {
       if (!url) return false;
-      return /imdb\.com\/video\/vi\d+/i.test(url);
+      // Match IMDB page URLs only (not direct video files)
+      return (
+        /imdb\.com\/video\/vi\d+/i.test(url) &&
+        !/imdb-video\.media-imdb\.com/i.test(url)
+      );
     },
     onSetUpSeries(show) {
       this.err = "";

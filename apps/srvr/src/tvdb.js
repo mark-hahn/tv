@@ -611,14 +611,29 @@ const extractImdbRating = (html) => {
 const extractImdbVideo = (html) => {
   if (!html) return null;
 
-  // Look for IMDB video URLs in the page
-  // Pattern: "url":"https://www.imdb.com/video/vi2601106969/"
-  let m = /"url"\s*:\s*"(https:\/\/www\.imdb\.com\/video\/vi\d+\/?)"/.exec(
-    html,
-  );
+  // Try to find direct MP4 video URL
+  let m =
+    /"url"\s*:\s*"(https:\/\/imdb-video\.media-imdb\.com\/[^"]*\.mp4[^"]*)"/i.exec(
+      html,
+    );
+  if (m?.[1]) {
+    return m[1].replace(/\\u0026/g, "&");
+  }
+
+  // Try to find HLS playlist URL
+  m =
+    /"url"\s*:\s*"(https:\/\/imdb-video\.media-imdb\.com\/[^"]*\.m3u8[^"]*)"/i.exec(
+      html,
+    );
+  if (m?.[1]) {
+    return m[1].replace(/\\u0026/g, "&");
+  }
+
+  // Fallback: Look for IMDB video page URL
+  m = /"url"\s*:\s*"(https:\/\/www\.imdb\.com\/video\/vi\d+\/?)"/.exec(html);
   if (m?.[1]) return m[1];
 
-  // Fallback: Look for any video ID and construct URL
+  // Last resort: Look for any video ID and construct URL
   m = /\/video\/(vi\d+)/i.exec(html);
   if (m?.[1]) {
     return `https://www.imdb.com/video/${m[1]}/`;

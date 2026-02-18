@@ -608,6 +608,25 @@ const extractImdbRating = (html) => {
   return null;
 };
 
+const extractImdbVideo = (html) => {
+  if (!html) return null;
+
+  // Look for IMDB video URLs in the page
+  // Pattern: "url":"https://www.imdb.com/video/vi2601106969/"
+  let m = /"url"\s*:\s*"(https:\/\/www\.imdb\.com\/video\/vi\d+\/?)"/.exec(
+    html,
+  );
+  if (m?.[1]) return m[1];
+
+  // Fallback: Look for any video ID and construct URL
+  m = /\/video\/(vi\d+)/i.exec(html);
+  if (m?.[1]) {
+    return `https://www.imdb.com/video/${m[1]}/`;
+  }
+
+  return null;
+};
+
 const getUrlAndRatings = async (type, url, name) => {
   // log('getUrlAndRatings', {type, url, name});
 
@@ -679,8 +698,9 @@ const getUrlAndRatings = async (type, url, name) => {
     case 2: {
       // await util.writeFile("samples/imdb-page.html", html); // log('samples/imdb-page.html'); // IMDB
       const rating = extractImdbRating(html);
-      if (!rating) return { ratings: null };
-      return { ratings: rating };
+      const video = extractImdbVideo(html);
+      if (!rating && !video) return { ratings: null, video: null };
+      return { ratings: rating, video: video };
     }
 
     case 7: {
@@ -721,6 +741,7 @@ const getUrlAndRatings = async (type, url, name) => {
 const getRemote = async (id, type, showName) => {
   let url = null;
   let ratings = null;
+  let video = null;
   let urlRatings, name, escShow;
 
   switch (type) {
@@ -729,6 +750,7 @@ const getRemote = async (id, type, showName) => {
       url = `https://www.imdb.com/title/${id}`;
       urlRatings = await getUrlAndRatings(2, url, name);
       ratings = urlRatings?.ratings;
+      video = urlRatings?.video;
       break;
 
     case 4:
@@ -791,7 +813,7 @@ const getRemote = async (id, type, showName) => {
     return null;
   }
   // console.log(`getRemote`, { name, url, ratings });
-  return { name, url, ratings };
+  return { name, url, ratings, video };
 };
 
 ///////////// get remotes  //////////////
@@ -1083,12 +1105,9 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   // get remote data, e.g. IMDB for tvdb record
   // remoteIds come from tvdb
-  // Skip remote fetching for fast requests - client will fetch separately if needed
-  // Preserve existing remotes when skipping fetch (fast: true)
-  // Background updates use fast=false to scrape Rotten Tomatoes with Playwright
-  const remotes = fast
-    ? existing.remotes || []
-    : await getRemotes(show, remoteIds, false);
+  // Always fetch remotes (to get IMDB video, Wikipedia, Reddit, etc.)
+  // The fast parameter controls whether Rotten Tomatoes is scraped with Playwright
+  const remotes = await getRemotes(show, remoteIds, fast);
   const saved = Date.now();
   const trailersRaw = trailersIn || allTvdb[name]?.trailers;
 
@@ -1109,6 +1128,17 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   const trailers = Array.isArray(trailersRaw)
     ? trailersRaw.filter(isEnglishTrailer)
     : trailersRaw;
+
+  // Add IMDB video to trailers if available
+  let finalTrailers = trailers ? [...trailers] : [];
+  const imdbRemote = remotes.find((r) => r.name && r.name.startsWith("IMDB"));
+  if (imdbRemote?.video) {
+    finalTrailers.push({
+      name: "IMDB Video",
+      url: imdbRemote.video,
+      language: "eng",
+    });
+  }
 
   // Check if we need TMDB fallback for missing fields
   const needsTmdb = !image || !overview || !firstAired || !status;
@@ -1210,7 +1240,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
       tmdbData.spokenLanguages,
     );
 
-  if (trailers) tvdbData.trailers = trailers;
+  if (finalTrailers && finalTrailers.length > 0)
+    tvdbData.trailers = finalTrailers;
 
   // Determine inEmby status:
   // - If lastEmbySync is present in params, this is an Emby sync, so inEmby = true
@@ -1469,6 +1500,7 @@ const tryLocalGetTvdb = async () => {
     seasonCount: minTvdb.seasonCount ?? 0,
     episodeCount: minTvdb.episodeCount ?? 0,
     watchedCount: minTvdb.watchedCount ?? 0,
+    fast: false, // Fetch all remotes including IMDB videos for background refresh
   };
   newTvdbQueue.unshift({ ws: null, id: null, paramObj });
   chkTvdbQueue();

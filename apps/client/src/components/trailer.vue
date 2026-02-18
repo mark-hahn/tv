@@ -59,11 +59,38 @@
             border-radius: 5px;
           "
         >
-          <div :style="{ fontWeight: 'bold', marginBottom: '5px' }">
+          <div
+            v-if="!isImdbVideo(t.url)"
+            :style="{ fontWeight: 'bold', marginBottom: '5px' }"
+          >
             {{ t.name ? t.name.replace(/Trailer/gi, "").trim() : "" }}
           </div>
           <template v-if="getYoutubeId(t.url)">
             <div :id="'yt-player-' + idx"></div>
+          </template>
+          <template v-else-if="isImdbVideo(t.url)">
+            <div style="margin-top: 8px">
+              <a
+                :href="t.url"
+                target="_blank"
+                style="text-decoration: none"
+              >
+                <button
+                  style="
+                    cursor: pointer;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    border: 1px solid #bbb;
+                    background-color: #f5c518;
+                    color: #000;
+                    font-size: 14px;
+                    font-weight: bold;
+                  "
+                >
+                  Watch on IMDB
+                </button>
+              </a>
+            </div>
           </template>
           <template v-else-if="isVideoFile(t.url)">
             <video
@@ -308,6 +335,10 @@ export default {
       if (!url) return false;
       return /\.(mp4|webm|ogg|mov)$/i.test(url);
     },
+    isImdbVideo(url) {
+      if (!url) return false;
+      return /imdb\.com\/video\/vi\d+/i.test(url);
+    },
     onSetUpSeries(show) {
       this.err = "";
       this.showName = show?.Name || "";
@@ -316,7 +347,7 @@ export default {
       this.lastPlayingKey = null;
       this.showContent = true; // Reset
     },
-    onTvdbDataReady(data) {
+    async onTvdbDataReady(data) {
       this.err = "";
       if (this.showName && data?.show?.Name !== this.showName) return;
 
@@ -325,6 +356,43 @@ export default {
         this.trailers = tvdbData.trailers;
       } else {
         this.trailers = [];
+      }
+
+      // Check if IMDB video is missing and fetch it
+      const hasImdbVideo = this.trailers.some((t) => this.isImdbVideo(t.url));
+      if (!hasImdbVideo && data?.show && tvdbData) {
+        try {
+          const srvr = await import("../srvr.js");
+          const remotes = await srvr.getRemotesCmd({
+            show: {
+              Name: data.show.Name,
+              Id: data.show.Id,
+            },
+            tvdbRemotes: tvdbData.remote_ids || [],
+            fast: true,
+          });
+
+          // Find IMDB remote with video
+          const imdbRemote = remotes?.find(
+            (r) => r.name && r.name.startsWith("IMDB"),
+          );
+          if (imdbRemote?.video) {
+            const newTrailer = {
+              name: "IMDB Video",
+              url: imdbRemote.video,
+              language: "eng",
+            };
+            this.trailers.push(newTrailer);
+
+            // Update tvdb record immediately on server
+            await srvr.setTvdbFields({
+              name: data.show.Name,
+              trailers: this.trailers,
+            });
+          }
+        } catch (err) {
+          console.error("Failed to fetch IMDB video:", err);
+        }
       }
       // trailers watcher will handle init
     },

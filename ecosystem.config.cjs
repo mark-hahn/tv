@@ -1,6 +1,6 @@
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
+const path = require("path");
+const fs = require("fs");
+const os = require("os");
 
 // PM2 config intended to be run from the deployed tv directory.
 // `cwd` points to the app folder so relative paths and
@@ -15,24 +15,31 @@ const root = __dirname;
 function resolveNodeInterpreter() {
   // PM2 (especially when started via systemd) may not inherit an nvm-initialized PATH.
   // Force the app interpreter to the Node version pinned by .nvmrc when available.
-  const nvmDir = process.env.NVM_DIR || path.join(os.homedir(), '.nvm');
+  const nvmDir = process.env.NVM_DIR || path.join(os.homedir(), ".nvm");
   let version = null;
   try {
-    version = fs.readFileSync(path.join(root, '.nvmrc'), 'utf8').trim();
+    version = fs.readFileSync(path.join(root, ".nvmrc"), "utf8").trim();
   } catch {
     version = null;
   }
 
-  if (!version) return 'node';
-  const nodePath = path.join(nvmDir, 'versions', 'node', version, 'bin', 'node');
+  if (!version) return "node";
+  const nodePath = path.join(
+    nvmDir,
+    "versions",
+    "node",
+    version,
+    "bin",
+    "node",
+  );
   if (fs.existsSync(nodePath)) return nodePath;
-  return 'node';
+  return "node";
 }
 
 const nodeInterpreter = resolveNodeInterpreter();
 
 function appCwd(name) {
-  const p = path.join(root, 'apps', name);
+  const p = path.join(root, "apps", name);
   console.log(`[Config] Cwd for ${name}: ${p}`);
   return p;
 }
@@ -40,34 +47,34 @@ function appCwd(name) {
 module.exports = {
   apps: [
     {
-      name: 'tv-api',
-      cwd: appCwd('api'),
-      script: 'src/server.js',
+      name: "tv-api",
+      cwd: appCwd("api"),
+      script: "src/server.js",
       interpreter: nodeInterpreter,
       time: true,
       env: {
-        NODE_ENV: 'production',
-        DISABLE_INTERNAL_CORS: '1',
+        NODE_ENV: "production",
+        DISABLE_INTERNAL_CORS: "1",
       },
     },
     {
-      name: 'tv-down',
-      cwd: appCwd('down'),
-      script: 'src/main.js',
+      name: "tv-down",
+      cwd: appCwd("down"),
+      script: "src/main.js",
       interpreter: nodeInterpreter,
       time: true,
       env: {
-        NODE_ENV: 'production',
+        NODE_ENV: "production",
       },
     },
     {
-      name: 'tv-srvr',
-      cwd: appCwd('srvr'),
-      script: 'index.js',
+      name: "tv-srvr",
+      cwd: appCwd("srvr"),
+      script: "index.js",
       interpreter: nodeInterpreter,
       time: true,
       env: {
-        NODE_ENV: 'production',
+        NODE_ENV: "production",
       },
     },
   ],

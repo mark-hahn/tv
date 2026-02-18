@@ -1092,8 +1092,10 @@ export default {
     },
     handleMapClick(event) {
       if (Date.now() < (this.mapTouchSuppressClickUntil || 0)) return;
+      // Only toggle back to info pane in simple mode
+      if (!this.simpleMode) return;
       // Background click returns to Series.
-      // (In non-simple mode, clicks inside the table stop propagation.)
+      // (In simple mode, clicks inside the table bubble up to this handler.)
       this.$emit("close");
     },
     handleEpisodeClick(event, mapShow, season, episode) {

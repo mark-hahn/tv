@@ -816,6 +816,9 @@ export default {
       // In preview mode, do not open/switch to Map.
       if (this.previewMode) return;
 
+      // Only toggle to map in simple mode
+      if (!this.simpleMode) return;
+
       // Otherwise open the map
       this.openMap(this.show);
     },
@@ -833,6 +836,9 @@ export default {
 
       // In preview mode, do not open/switch to Map.
       if (this.previewMode) return;
+
+      // Only toggle to map in simple mode
+      if (!this.simpleMode) return;
 
       // Rotate panes: if coming from map, go to actors; otherwise go to map
       // Check if we should go to actors (this will be after map is shown)

@@ -184,14 +184,14 @@ async function getActorCredits(actorName, options = {}) {
     log("Navigating to IMDb...");
     await page.goto("https://www.imdb.com", {
       waitUntil: "domcontentloaded",
-      timeout: 60000,
+      timeout: 30000,
     });
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000);
 
     // Search for actor
     log("Searching for actor...");
     const searchInput = await page.locator("#suggestion-search");
-    await searchInput.waitFor({ state: "visible", timeout: 10000 });
+    await searchInput.waitFor({ state: "visible", timeout: 30000 });
     await searchInput.fill(actorName);
     await searchInput.press("Enter");
 
@@ -346,11 +346,12 @@ async function getActorCredits(actorName, options = {}) {
       .locator(".ipc-metadata-list-summary-item")
       .all();
 
-    // Filter to only Previous section (accord_2) and parse
+    // Parse all cards (removed accord_2 filter as IMDb structure may have changed)
     const cards = [];
     for (const card of allCards) {
       const html = await card.evaluate((el) => el.outerHTML);
-      if (html.includes("accord_2") && !html.includes("accord_1_unrel")) {
+      // Skip unreleased content
+      if (!html.includes("accord_1_unrel") && !html.includes("In production")) {
         const parsed = parseCard(html);
         if (parsed.imdbId) {
           cards.push(parsed);
@@ -358,7 +359,7 @@ async function getActorCredits(actorName, options = {}) {
       }
     }
 
-    log(`✓ Parsed ${cards.length} cards from Previous section`);
+    log(`✓ Parsed ${cards.length} cards`);
 
     // Filter out non-acting roles
     const actingCredits = cards.filter((card) => {

@@ -1637,7 +1637,8 @@ export default {
       await this.updateActors(data);
 
       // Deselect actor when a new show is selected from the list
-      if (this.selectedActor) {
+      // BUT: preserve credits if we're currently showing them (from getActorCredits)
+      if (this.selectedActor && !this.showingCredits) {
         this.selectedActor = null;
         this.showingCredits = false;
         this.credits = [];

@@ -1121,11 +1121,11 @@ export default {
     async searchAction(payload) {
       const srchChoice = payload?.srchChoice ? payload.srchChoice : payload;
       const action = payload?.action || "preview";
-      const { name, tvdbId, overview } = srchChoice || {};
+      const { name, tvdbId, overview, imageUrl } = srchChoice || {};
 
       // Dropdown click now previews by default.
       if (action === "preview") {
-        await this.previewSearchChoice({ name, tvdbId, overview });
+        await this.previewSearchChoice({ name, tvdbId, overview, imageUrl });
         return;
       }
 
@@ -1341,7 +1341,7 @@ export default {
       }
     },
 
-    async previewSearchChoice({ name, tvdbId, overview }) {
+    async previewSearchChoice({ name, tvdbId, overview, imageUrl }) {
       const showName = String(name || "").trim();
       if (!showName) return;
 
@@ -1377,6 +1377,7 @@ export default {
         Name: showName,
         TvdbId: tvdbId,
         Overview: overview,
+        imageUrl: imageUrl,
         Reject: emby.isReject(showName),
       };
 

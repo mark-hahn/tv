@@ -186,7 +186,7 @@ async function getActorCredits(actorName, options = {}) {
       waitUntil: "domcontentloaded",
       timeout: 60000,
     });
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000);
 
     // Search for actor
     log("Searching for actor...");
@@ -196,11 +196,11 @@ async function getActorCredits(actorName, options = {}) {
     await searchInput.press("Enter");
 
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000);
 
     // Find best matching actor
     log("Finding best actor match...");
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(500);
 
     let actorLinks = await page
       .locator(
@@ -249,7 +249,10 @@ async function getActorCredits(actorName, options = {}) {
     log("Clicking on actor...");
     await bestMatchLink.click();
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000);
+    
+    // Capture actor page URL
+    const actorPageUrl = page.url();
 
     // Find Actor filmography filter button
     log("Looking for Actor filmography filter...");
@@ -286,11 +289,11 @@ async function getActorCredits(actorName, options = {}) {
 
     if (!isAlreadyActive) {
       await actorButton.scrollIntoViewIfNeeded();
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(500);
       await actorButton.evaluate((button) => button.click());
-      await page.waitForTimeout(7000);
+      await page.waitForTimeout(3000);
     } else {
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(1000);
     }
 
     // Click "See all" button to expand full filmography
@@ -304,9 +307,9 @@ async function getActorCredits(actorName, options = {}) {
       if (isVisible) {
         log("✓ Clicking 'See all' button");
         await seeAllButton.scrollIntoViewIfNeeded();
-        await page.waitForTimeout(500);
+        await page.waitForTimeout(300);
         await seeAllButton.click();
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(2000);
       }
     } catch (e) {
       log("  'See all' button not found");
@@ -319,7 +322,7 @@ async function getActorCredits(actorName, options = {}) {
 
     for (let i = 0; i < 100; i++) {
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(500);
 
       const currentCardCount = await page
         .locator(".ipc-metadata-list-summary-item")
@@ -327,7 +330,7 @@ async function getActorCredits(actorName, options = {}) {
 
       if (currentCardCount === previousCardCount) {
         unchangedCount++;
-        if (unchangedCount >= 5) {
+        if (unchangedCount >= 3) {
           log(`✓ Loaded ${currentCardCount} cards`);
           break;
         }
@@ -368,7 +371,7 @@ async function getActorCredits(actorName, options = {}) {
 
     log(`✓ Final count: ${actingCredits.length} acting credits`);
 
-    return actingCredits;
+    return { credits: actingCredits, actorPageUrl };
   } catch (error) {
     console.error("Error scraping IMDb:", error.message);
     throw error;

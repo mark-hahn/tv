@@ -1537,18 +1537,38 @@ app.post("/api/getActorPage", async (req, res) => {
   }
 });
 
+// Server-side cache for actor credits (in-memory)
+const actorCreditsCache = new Map();
+const ACTOR_CREDITS_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+
 app.post("/api/getActorCredits", async (req, res) => {
   let actorName = req.body;
   if (typeof actorName === "object" && actorName !== null && actorName.name) {
     actorName = actorName.name;
   }
   try {
+    const cacheKey = actorName.toLowerCase().trim();
+    const cached = actorCreditsCache.get(cacheKey);
+    
+    // Check if cached and not expired
+    if (cached && (Date.now() - cached.timestamp) < ACTOR_CREDITS_CACHE_TTL) {
+      console.log(`Returning cached credits for actor: ${actorName}`);
+      return res.json(cached.data);
+    }
+    
     console.log(`Fetching credits for actor: ${actorName}`);
-    const credits = await getActorCredits(actorName, {
-      headless: true,
+    const result = await getActorCredits(actorName, {
+      headless: false,
       verbose: false,
     });
-    res.json(credits);
+    
+    // Cache the result
+    actorCreditsCache.set(cacheKey, {
+      data: result,
+      timestamp: Date.now()
+    });
+    
+    res.json(result);
   } catch (err) {
     console.error("getActorCredits error:", err.message);
     res.status(500).json({ error: err.message });

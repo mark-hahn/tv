@@ -378,12 +378,29 @@ export function setTvdbFields(params) {
 export function getRemotesCmd(params) {
   return httpCall("/api/getRemotes", params, "POST");
 }
-export function getActorPage(params) {
-  return httpCall("/api/getActorPage", { name: params }, "POST");
+
+export async function getActorPage(params) {
+  const response = await fetch(`${config.torrentsApiUrl}/api/getActorPage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: params }),
+  });
+  if (!response.ok) {
+    throw new Error(`getActorPage failed: ${response.status} ${response.statusText}`);
+  }
+  return await response.json();
 }
 
-export function getActorCredits(params) {
-  return httpCall("/api/getActorCredits", { name: params }, "POST");
+export async function getActorCredits(params) {
+  const response = await fetch(`${config.torrentsApiUrl}/api/getActorCredits`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: params }),
+  });
+  if (!response.ok) {
+    throw new Error(`getActorCredits failed: ${response.status} ${response.statusText}`);
+  }
+  return await response.json();
 }
 
 export function searchActorsInNonEmby(params) {

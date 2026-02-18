@@ -186,31 +186,68 @@
         style="
           width: 100%;
           display: flex;
-          align-items: center;
-          justify-content: space-between;
+          flex-direction: column;
+          gap: 8px;
         "
       >
+        <!-- Top row: Actor name and Done button -->
         <div
           style="
-            margin-left: 20px;
-            margin-right: 10px;
-            flex: 1 1 auto;
-            min-width: 0;
-            white-space: normal;
-            overflow-wrap: anywhere;
-            word-break: break-word;
-          "
-        >
-          <span>{{ selectedActor.personName || selectedActor.name }}</span>
-        </div>
-        <div
-          style="
-            margin-right: 15px;
-            flex: 0 0 auto;
+            width: 100%;
             display: flex;
             align-items: center;
+            justify-content: space-between;
+          "
+        >
+          <div
+            style="
+              margin-left: 20px;
+              margin-right: 10px;
+              flex: 1 1 auto;
+              min-width: 0;
+              white-space: normal;
+              overflow-wrap: anywhere;
+              word-break: break-word;
+            "
+          >
+            <span>{{ selectedActor.personName || selectedActor.name }}</span>
+          </div>
+          <div
+            style="
+              margin-right: 15px;
+              flex: 0 0 auto;
+              display: flex;
+              align-items: center;
+              gap: 12px;
+              font-weight: normal;
+            "
+          >
+            <button
+              @click.stop="handleDoneButton"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 5px;
+                padding: 4px 10px;
+              "
+            >
+              Done
+            </button>
+          </div>
+        </div>
+
+        <!-- Bottom row: Action buttons and preview controls -->
+        <div
+          style="
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
             gap: 12px;
+            margin-left: 20px;
+            margin-right: 15px;
             font-weight: normal;
+            flex-wrap: wrap;
           "
         >
           <button
@@ -236,6 +273,18 @@
             All Credits
           </button>
           <button
+            v-if="actorPageUrl"
+            @click.stop="handleImdbButton"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 5px;
+              padding: 4px 10px;
+            "
+          >
+            IMDb
+          </button>
+          <button
             @click.stop="handleWikipediaButton"
             style="
               font-size: 13px;
@@ -245,17 +294,6 @@
             "
           >
             Wikipedia
-          </button>
-          <button
-            @click.stop="handleDoneButton"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              border-radius: 5px;
-              padding: 4px 10px;
-            "
-          >
-            Done
           </button>
           <button
             v-if="previewMode"
@@ -303,7 +341,16 @@
     <div
       v-else-if="showingCredits"
       id="credits-list"
-      style="display: flex; flex-direction: column; gap: 12px; padding: 5px"
+      style="
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 5px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        flex: 1;
+        min-height: 0;
+      "
     >
       <div
         v-if="creditsLoading"
@@ -410,7 +457,7 @@
 
     <div
       id="actors-grid"
-      v-else-if="!showingCredits"
+      v-else
       style="
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
@@ -488,6 +535,8 @@ export default {
       credits: [], // Actor's filmography credits
       creditsLoading: false, // Loading state for credits
       creditsError: null, // Error message for credits
+      creditsCache: {}, // Cache for actor credits {actorName: {credits, actorPageUrl}}
+      actorPageUrl: null, // IMDb URL for selected actor
     };
   },
 
@@ -669,15 +718,30 @@ export default {
       ).trim();
       if (!name) return;
 
+      // Check cache first
+      if (this.creditsCache[name]) {
+        this.showingCredits = true;
+        this.credits = this.creditsCache[name].credits || [];
+        this.actorPageUrl = this.creditsCache[name].actorPageUrl || null;
+        return;
+      }
+
       this.showingCredits = true;
       this.creditsLoading = true;
       this.creditsError = null;
       this.credits = [];
+      this.actorPageUrl = null;
 
       try {
-        const credits = await srvr.getActorCredits(name);
-        this.credits = credits || [];
+        const result = await srvr.getActorCredits(name);
+        this.credits = result?.credits || [];
+        this.actorPageUrl = result?.actorPageUrl || null;
         this.creditsLoading = false;
+        // Cache the results
+        this.creditsCache[name] = {
+          credits: this.credits,
+          actorPageUrl: this.actorPageUrl,
+        };
       } catch (e) {
         console.error("Failed to load actor credits:", e);
         this.creditsError = e.message || "Failed to load credits";
@@ -713,11 +777,17 @@ export default {
       }
     },
 
+    handleImdbButton() {
+      if (!this.actorPageUrl) return;
+      window.open(this.actorPageUrl, "_blank");
+    },
+
     handleDoneButton() {
       this.selectedActor = null;
       this.showingCredits = false;
       this.credits = [];
       this.creditsError = null;
+      this.actorPageUrl = null;
     },
 
     handleCreditCardClick(credit) {
@@ -728,22 +798,20 @@ export default {
         name: credit.title,
         tvdbId: null, // We only have imdbId, not tvdbId
         imdbId: credit.imdbId,
-        overview: credit.role ? `Role: ${credit.role}` : null,
+        overview: null, // Remove role from overview
       };
-
+      
       // Emit event to trigger preview mode (same as browse pane)
       evtBus.emit("reelSearchAction", { srchChoice, action: "preview" });
-    },
-
-    normPersonName(v) {
-      return String(v || "")
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, " ");
+      // Don't deselect actor - keep it selected
     },
 
     hasAnyImage(actor) {
       return Boolean(actor?.image || actor?.personImgURL);
+    },
+
+    normPersonName(name) {
+      return String(name || "").trim().toLowerCase();
     },
 
     mergeTmdbTvdbActors(tmdbIn, tvdbIn) {
@@ -1528,6 +1596,15 @@ export default {
   mounted() {
     this._onShowActors = async (data) => {
       await this.updateActors(data);
+
+      // Deselect actor when a new show is selected from the list
+      if (this.selectedActor) {
+        this.selectedActor = null;
+        this.showingCredits = false;
+        this.credits = [];
+        this.creditsError = null;
+        this.actorPageUrl = null;
+      }
 
       // For noemby shows, start loading the series map immediately so
       // arrow navigation doesn't wait on TVDB later.

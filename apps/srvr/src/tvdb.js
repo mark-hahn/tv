@@ -1766,6 +1766,119 @@ export const getNewTvdb = async (params) => {
   });
 };
 
+export const searchTvdbByImdbId = async (params) => {
+  const imdbId = params?.imdbId;
+  if (!imdbId) {
+    log("err", "searchTvdbByImdbId: missing imdbId");
+    return null;
+  }
+
+  // First check local tvdb.json for a match
+  for (const [name, tvdb] of Object.entries(allTvdb)) {
+    if (tvdb.imdbId === imdbId) {
+      log(
+        "inf",
+        `searchTvdbByImdbId: found local match for ${imdbId}: ${name}`,
+      );
+      return tvdb;
+    }
+  }
+
+  // Not found locally, search TVDB API by remote ID
+  try {
+    const url = `https://api4.thetvdb.com/v4/search/remoteid/${imdbId}`;
+    const token = await getToken();
+    const res = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      log(
+        "err",
+        `searchTvdbByImdbId: API search failed for ${imdbId}: ${res.status}`,
+      );
+      return null;
+    }
+
+    const data = await res.json();
+    const series = data?.data?.[0];
+    if (!series) {
+      log("inf", `searchTvdbByImdbId: no results for ${imdbId}`);
+      return null;
+    }
+
+    const tvdbId = series.tvdb_id || series.id;
+    if (!tvdbId) {
+      log("err", `searchTvdbByImdbId: no tvdbId in result for ${imdbId}`);
+      return null;
+    }
+
+    // Fetch full series data using the tvdbId
+    const extUrl = `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
+    const extRes = await fetch(extUrl, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!extRes.ok) {
+      log(
+        "err",
+        `searchTvdbByImdbId: extended fetch failed for ${tvdbId}: ${extRes.status}`,
+      );
+      return null;
+    }
+
+    const extResObj = await extRes.json();
+    const extData = extResObj?.data;
+    if (!extData) {
+      log("err", `searchTvdbByImdbId: no extended data for ${tvdbId}`);
+      return null;
+    }
+
+    // Build a tvdb-like object from the API response
+    const image = getTvdbImageUrl(extResObj);
+    const characters = getTvdbCharacters(extResObj);
+    const firstAired = extData.firstAired || "";
+    const lastAired = extData.lastAired || firstAired || "";
+    const status = extData.status?.name || "";
+    const originalNetwork = extData.originalNetwork?.name || "";
+
+    const tvdbData = {
+      name: extData.name || series.name || "",
+      tvdbId: tvdbId,
+      imdbId: imdbId,
+      image: image,
+      overview: extData.overview || series.overview || "",
+      firstAired: firstAired,
+      lastAired: lastAired,
+      status: status,
+      score: extData.score || null,
+      country: extData.originalCountry || "",
+      language: extData.originalLanguage || "",
+      network: originalNetwork,
+      runtime: extData.averageRuntime || null,
+      genres: extData.genres?.map((g) => g.name) || [],
+      characters: characters,
+      remotes: [], // Don't fetch remotes for preview
+      inEmby: false,
+    };
+
+    log(
+      "inf",
+      `searchTvdbByImdbId: fetched data for ${imdbId}: ${tvdbData.name}`,
+    );
+    return tvdbData;
+  } catch (err) {
+    log("err", `searchTvdbByImdbId: exception for ${imdbId}:`, err.message);
+    return null;
+  }
+};
+
 export const setTvdbFields = async (params) => {
   const paramObj = params;
   if (!paramObj) return null;

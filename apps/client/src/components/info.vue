@@ -1383,6 +1383,39 @@ export default {
             }
           }
 
+          // If still no tvdbData and we have an IMDb ID, try searching by IMDb ID
+          if (!tvdbData) {
+            const imdbId =
+              show?.ProviderIds?.Imdb ??
+              show?.ImdbId ??
+              show?.imdbId ??
+              show?.imdb_id;
+            if (imdbId) {
+              try {
+                console.log("Series: Trying IMDb ID search for", imdbId);
+                tvdbData = await srvr.searchTvdbByImdbId({ imdbId });
+                if (tvdbData) {
+                  console.log(
+                    "Series: Found tvdb data via IMDb ID:",
+                    tvdbData.name,
+                  );
+                  delete tvdbData.deleted;
+                  // Don't cache this in allTvdb since it's not a full record
+                  // But update the show with the tvdbId we found
+                  if (tvdbData.tvdbId && !show.TvdbId) {
+                    show.TvdbId = tvdbData.tvdbId;
+                  }
+                }
+              } catch (e) {
+                console.error("Series: searchTvdbByImdbId failed", {
+                  name: show?.Name,
+                  imdbId,
+                  err: e?.message || e,
+                });
+              }
+            }
+          }
+
           this.currentTvdbData = tvdbData; // Store for actors pane
           evtBus.emit("tvdbDataReady", { show, tvdbData }); // Send to App.vue
 

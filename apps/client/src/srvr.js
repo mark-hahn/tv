@@ -369,6 +369,10 @@ export function getNewTvdb(params) {
   return httpCall("/api/getNewTvdb", params, "POST");
 }
 
+export function searchTvdbByImdbId(params) {
+  return httpCall("/api/searchTvdbByImdbId", params, "POST");
+}
+
 export function handleAsr(params) {
   return fCall("handleAsr", params);
 }

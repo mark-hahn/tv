@@ -2535,6 +2535,7 @@ app.get("/api/getAllNotes", apiWrapper(getAllNotes));
 app.post("/api/getRemotes", apiWrapper(tvdb.getRemotesCmd));
 app.post("/api/debugTvdb", apiWrapper(tvdb.debugTvdb));
 app.post("/api/getNewTvdb", apiWrapper(tvdb.getNewTvdb));
+app.post("/api/searchTvdbByImdbId", apiWrapper(tvdb.searchTvdbByImdbId));
 app.post("/api/getActorPage", apiWrapper(tvdb.getActorPage));
 app.post("/api/searchActorsInNonEmby", apiWrapper(tvdb.searchActorsInNonEmby));
 app.post("/api/getTmdb", apiWrapper(tmdb.getTmdb));

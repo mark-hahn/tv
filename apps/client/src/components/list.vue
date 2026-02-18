@@ -1121,11 +1121,17 @@ export default {
     async searchAction(payload) {
       const srchChoice = payload?.srchChoice ? payload.srchChoice : payload;
       const action = payload?.action || "preview";
-      const { name, tvdbId, overview, imageUrl } = srchChoice || {};
+      const { name, tvdbId, overview, imageUrl, imdbId } = srchChoice || {};
 
       // Dropdown click now previews by default.
       if (action === "preview") {
-        await this.previewSearchChoice({ name, tvdbId, overview, imageUrl });
+        await this.previewSearchChoice({
+          name,
+          tvdbId,
+          overview,
+          imageUrl,
+          imdbId,
+        });
         return;
       }
 
@@ -1341,7 +1347,7 @@ export default {
       }
     },
 
-    async previewSearchChoice({ name, tvdbId, overview, imageUrl }) {
+    async previewSearchChoice({ name, tvdbId, overview, imageUrl, imdbId }) {
       const showName = String(name || "").trim();
       if (!showName) return;
 
@@ -1372,10 +1378,11 @@ export default {
 
       const show = {
         // Mark as no-Emby so Series doesn't try to query Emby counts.
-        Id: `noemby-preview-${String(tvdbId || showName).replace(/\s+/g, "-")}`,
+        Id: `noemby-preview-${String(tvdbId || imdbId || showName).replace(/\s+/g, "-")}`,
         inEmby: false,
         Name: showName,
         TvdbId: tvdbId,
+        ImdbId: imdbId,
         Overview: overview,
         imageUrl: imageUrl,
         Reject: emby.isReject(showName),

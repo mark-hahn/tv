@@ -415,39 +415,36 @@
             flex-shrink: 0;
           "
         />
-        <div style="flex: 1; display: flex; flex-direction: column; gap: 6px">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+          <!-- Line 1: title -->
           <div style="font-weight: bold; font-size: 16px">
             {{ credit.title }}
           </div>
+
+          <!-- Line 2: year -->
           <div
             v-if="credit.year"
             style="font-size: 14px; color: #666"
           >
             {{ credit.year }}
           </div>
+
+          <!-- Line 3: episodeCount -->
           <div
-            v-if="credit.type"
-            style="font-size: 13px; color: #888"
+            v-if="credit.episodeCount"
+            style="font-size: 13px; color: #666"
           >
-            {{ credit.type }}
+            {{ credit.episodeCount }} Episode{{
+              credit.episodeCount !== 1 ? "s" : ""
+            }}
           </div>
-          <div
-            v-if="credit.role"
-            style="font-size: 13px; color: #444"
-          >
-            {{ credit.role }}
-          </div>
+
+          <!-- Line 4: rating -->
           <div
             v-if="credit.rating"
             style="font-size: 13px; color: #666"
           >
             ⭐ {{ credit.rating }}
-          </div>
-          <div
-            v-if="credit.imdbId"
-            style="font-size: 12px; color: #999"
-          >
-            {{ credit.imdbId }}
           </div>
         </div>
       </div>

@@ -418,7 +418,7 @@
         <div style="flex: 1; display: flex; flex-direction: column; gap: 4px">
           <!-- Line 1: title -->
           <div style="font-weight: bold; font-size: 16px">
-            {{ credit.title }}
+            {{ unescapeHtml(credit.title) }}
           </div>
 
           <!-- Line 2: year -->
@@ -549,6 +549,13 @@ export default {
   computed: {},
 
   methods: {
+    unescapeHtml(text) {
+      if (!text) return text;
+      const textarea = document.createElement('textarea');
+      textarea.innerHTML = text;
+      return textarea.value;
+    },
+
     onPreviewMode(active) {
       this.previewMode = !!active;
       if (!this.previewMode) {

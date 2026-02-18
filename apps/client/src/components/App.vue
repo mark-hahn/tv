@@ -290,6 +290,7 @@
         :style="listStyle"
         :simpleMode="simpleMode"
         :sizing="activeSizing"
+        :hideButtonsPane="showSideButtons"
         @show-map="handleShowMap"
         @hide-map="handleHideMap"
         @show-actors="handleShowActors"

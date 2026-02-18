@@ -1620,26 +1620,12 @@ export default {
     },
 
     async saveVisShow(show, scroll = false, opts = null) {
-      console.log(
-        "[saveVisShow] Called with show:",
-        show?.Name,
-        "scroll:",
-        scroll,
-        "opts:",
-        opts,
-      );
       if (!show) {
         console.error("saveVisShow show param null");
         return;
       }
       const options = opts && typeof opts === "object" ? opts : {};
       const showName = show.Name;
-      console.log(
-        "[saveVisShow] Current highlightName:",
-        this.highlightName,
-        "-> new:",
-        showName,
-      );
 
       const showChanged = options.forceSetUpSeries
         ? true
@@ -2046,16 +2032,21 @@ export default {
     sortShows() {
       if (this.sortChoice === "Notes") {
         this.shows = [...this.shows].sort((a, b) => {
-          const aNoteRaw = String(a?.Notes ?? "").trim();
-          const bNoteRaw = String(b?.Notes ?? "").trim();
+          // Get raw note values, handling null/undefined/non-strings more explicitly
+          const aNoteRaw = (a?.Notes != null ? String(a.Notes) : "").trim();
+          const bNoteRaw = (b?.Notes != null ? String(b.Notes) : "").trim();
+          // Check if notes are truly non-empty (not just whitespace)
           const aHas = aNoteRaw.length > 0;
           const bHas = bNoteRaw.length > 0;
-          if (aHas !== bHas) return aHas ? -1 : 1; // notes first
+          // Shows with notes always come before shows without notes
+          if (aHas !== bHas) return aHas ? -1 : 1;
 
+          // Both have notes or both don't - sort alphabetically by note
           const aKey = aNoteRaw.toLowerCase();
           const bKey = bNoteRaw.toLowerCase();
-          if (aKey !== bKey) return aKey > bKey ? 1 : -1; // alphabetical
+          if (aKey !== bKey) return aKey > bKey ? 1 : -1;
 
+          // Notes are equal - sort by show name as tiebreaker
           const aName = String(a?.Name ?? "")
             .replace(/^the\s*/i, "")
             .toLowerCase();

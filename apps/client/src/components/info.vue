@@ -700,7 +700,11 @@ export default {
         this.noteText = next;
         this.lastSavedNoteText = next;
         this.noteCacheByShowName[showName] = next;
-        this.show.Notes = next;
+        // Only update show.Notes if we got data, or if show.Notes was empty
+        // This prevents clearing an existing note when server returns empty
+        if (next || !this.show.Notes) {
+          this.show.Notes = next;
+        }
       } catch (err) {
         let msg = "";
         try {
@@ -745,7 +749,11 @@ export default {
         this.noteText = String(text ?? "");
         this.lastSavedNoteText = this.noteText;
         this.noteCacheByShowName[showName] = this.noteText;
-        this.show.Notes = this.noteText;
+        // Only update show.Notes if we got data, or if show.Notes was empty
+        // This prevents clearing an existing note when server returns empty
+        if (this.noteText || !this.show.Notes) {
+          this.show.Notes = this.noteText;
+        }
       } catch (err) {
         console.error("Series: getNote failed", { showName, err });
         // Keep whatever is currently displayed (cached or user-entered).

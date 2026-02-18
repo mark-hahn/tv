@@ -68,7 +68,7 @@
         </div>
         <div
           v-if="rottenUrl"
-          style="margin-right: 10px; flex: &quot;0 0 auto&quot;"
+          style="margin-right: 10px; flex: 0 0 auto"
         >
           <a
             :href="rottenUrl"

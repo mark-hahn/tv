@@ -215,12 +215,7 @@ export async function loadAllShows() {
     const tvdbId = embyShow?.ProviderIds?.Tvdb || embyShow?.TvdbId;
 
     if (!tvdbId || tvdbId == "0") {
-      console.error(`loadAllShows: no tvdbId for ${name}, deleting from Emby`);
-      try {
-        await deleteShowFromEmby(embyShow);
-      } catch (e) {
-        // ignore delete error
-      }
+      console.warn(`loadAllShows: no tvdbId for ${name}, skipping`);
       continue;
     }
 

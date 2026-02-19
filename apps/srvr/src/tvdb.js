@@ -1300,23 +1300,17 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     ? true
     : (show.inEmby ?? existing.inEmby ?? false);
 
-  // If inEmby is changing, fix Emby button in cached remotes
-  if (
-    existing.inEmby !== newInEmby &&
-    existing.remotes &&
-    Array.isArray(existing.remotes)
-  ) {
-    const hasEmbyButton = existing.remotes.some((r) => r.name === "Emby");
-    if (newInEmby && !hasEmbyButton) {
-      // Add Emby button at the start
-      const embyUrl = urls.embyPageUrl(showId || existing.Id);
-      existing.remotes.unshift({ name: "Emby", url: embyUrl });
-      console.log(`[getTvdbData] Added Emby button to ${name} remotes`);
-    } else if (!newInEmby && hasEmbyButton) {
-      // Remove Emby button
-      existing.remotes = existing.remotes.filter((r) => r.name !== "Emby");
-      console.log(`[getTvdbData] Removed Emby button from ${name} remotes`);
-    }
+  // Ensure Emby button is correct in fresh remotes based on inEmby status
+  const hasEmbyButton = tvdbData.remotes.some((r) => r.name === "Emby");
+  if (newInEmby && !hasEmbyButton) {
+    // Add Emby button at the start
+    const embyUrl = urls.embyPageUrl(showId || tvdbData.Id);
+    tvdbData.remotes.unshift({ name: "Emby", url: embyUrl });
+    console.log(`[getTvdbData] Added Emby button to ${name} remotes`);
+  } else if (!newInEmby && hasEmbyButton) {
+    // Remove Emby button
+    tvdbData.remotes = tvdbData.remotes.filter((r) => r.name !== "Emby");
+    console.log(`[getTvdbData] Removed Emby button from ${name} remotes`);
   }
 
   tvdbData.inEmby = newInEmby;

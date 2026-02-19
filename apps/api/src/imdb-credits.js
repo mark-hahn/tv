@@ -175,44 +175,50 @@ async function getActorCredits(actorName, options = {}) {
 
   log(`Scraping IMDb credits for: ${actorName}`);
 
-  const browser = await chromium.launch({ headless });
-  const context = await browser.newContext();
-  const page = await context.newPage();
-
+  let browser;
   try {
-    // Navigate to IMDb
-    log("Navigating to IMDb...");
-    await page.goto("https://www.imdb.com", {
-      waitUntil: "domcontentloaded",
-      timeout: 30000,
-    });
-    await page.waitForTimeout(2000);
+    browser = await chromium.launch({ headless });
+    const context = await browser.newContext();
+    const page = await context.newPage();
 
-    // Search for actor
-    log("Searching for actor...");
-    const searchInput = await page.locator("#suggestion-search");
-    await searchInput.waitFor({ state: "visible", timeout: 30000 });
-    await searchInput.fill(actorName);
-    await searchInput.press("Enter");
+    try {
+      // Navigate to IMDb
+      log("Navigating to IMDb...");
+      await page.goto("https://www.imdb.com", {
+        waitUntil: "domcontentloaded",
+        timeout: 30000,
+      });
+      await page.waitForTimeout(2000);
 
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(1000);
+      // Search for actor
+      log("Searching for actor...");
+      try {
+        const searchInput = await page.locator("#suggestion-search");
+        await searchInput.waitFor({ state: "visible", timeout: 30000 });
+        await searchInput.fill(actorName);
+        await searchInput.press("Enter");
+      } catch (err) {
+        throw new Error(`Failed to search for actor: ${err.message}`);
+      }
 
-    // Find best matching actor
-    log("Finding best actor match...");
-    await page.waitForTimeout(500);
+      await page.waitForLoadState("domcontentloaded");
+      await page.waitForTimeout(1000);
 
-    let actorLinks = await page
-      .locator(
-        '[data-testid="find-results-section-name"] a.ipc-metadata-list-summary-item__t',
-      )
-      .all();
+      // Find best matching actor
+      log("Finding best actor match...");
+      await page.waitForTimeout(500);
 
-    if (actorLinks.length === 0) {
-      actorLinks = await page
-        .locator('[data-testid="find-results-section-name"] a')
+      let actorLinks = await page
+        .locator(
+          '[data-testid="find-results-section-name"] a.ipc-metadata-list-summary-item__t',
+        )
         .all();
-    }
+
+      if (actorLinks.length === 0) {
+        actorLinks = await page
+          .locator('[data-testid="find-results-section-name"] a')
+          .all();
+      }
 
     let bestMatchLink = null;
     for (const link of actorLinks) {
@@ -224,160 +230,178 @@ async function getActorCredits(actorName, options = {}) {
       }
     }
 
-    if (!bestMatchLink) {
-      const allLinks = await page.locator("a").all();
-      for (const link of allLinks) {
-        const linkText = await link.textContent();
-        if (
-          linkText &&
-          linkText.trim().toLowerCase().includes(actorName.toLowerCase())
-        ) {
-          const href = await link.getAttribute("href");
-          if (href && href.includes("/name/nm")) {
-            bestMatchLink = link;
-            break;
+      if (!bestMatchLink) {
+        const allLinks = await page.locator("a").all();
+        for (const link of allLinks) {
+          const linkText = await link.textContent();
+          if (
+            linkText &&
+            linkText.trim().toLowerCase().includes(actorName.toLowerCase())
+          ) {
+            const href = await link.getAttribute("href");
+            if (href && href.includes("/name/nm")) {
+              bestMatchLink = link;
+              break;
+            }
           }
         }
       }
-    }
 
-    if (!bestMatchLink) {
-      throw new Error("Could not find matching actor");
-    }
+      if (!bestMatchLink) {
+        throw new Error(`Could not find matching actor for: ${actorName}`);
+      }
 
-    // Click on actor name
-    log("Clicking on actor...");
-    await bestMatchLink.click();
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(1000);
+      // Click on actor name
+      log("Clicking on actor...");
+      try {
+        await bestMatchLink.click();
+        await page.waitForLoadState("domcontentloaded");
+        await page.waitForTimeout(1000);
+      } catch (err) {
+        throw new Error(`Failed to click actor link: ${err.message}`);
+      }
 
-    // Capture actor page URL
-    const actorPageUrl = page.url();
+      // Capture actor page URL
+      const actorPageUrl = page.url();
 
-    // Find Actor filmography filter button
-    log("Looking for Actor filmography filter...");
-    const filterButtons = await page
-      .locator('button[id*="imdb.concept.name_credit_category"]')
-      .all();
+      // Find Actor filmography filter button
+      log("Looking for Actor filmography filter...");
+      const filterButtons = await page
+        .locator('button[id*="imdb.concept.name_credit_category"]')
+        .all();
 
-    let actorButton = null;
-    for (const button of filterButtons) {
-      const buttonText = await button.textContent();
-      if (buttonText && buttonText.includes("Actor")) {
-        const buttonClass = await button.getAttribute("class");
-        if (
-          buttonClass &&
-          (buttonClass.includes("selected") || buttonClass.includes("active"))
-        ) {
-          log("✓ Actor filter is already active");
-          actorButton = button;
-          break;
+      // Try to find and click Actor/Actress filter button if available
+      if (filterButtons.length > 0) {
+        let actorButton = null;
+        for (const button of filterButtons) {
+          const buttonText = await button.textContent();
+          // Check for both "Actor" and "Actress" (IMDb uses "Actress" for female actors)
+          if (buttonText && (buttonText.includes("Actor") || buttonText.includes("Actress"))) {
+            const buttonClass = await button.getAttribute("class");
+            if (
+              buttonClass &&
+              (buttonClass.includes("selected") || buttonClass.includes("active"))
+            ) {
+              log("✓ Actor filter is already active");
+              actorButton = button;
+              break;
+            }
+            actorButton = button;
+            break;
+          }
         }
-        actorButton = button;
-        break;
-      }
-    }
 
-    if (!actorButton) {
-      throw new Error("Could not find Actor filter button");
-    }
+        if (actorButton) {
+          const buttonClass = await actorButton.getAttribute("class");
+          const isAlreadyActive =
+            buttonClass &&
+            (buttonClass.includes("selected") || buttonClass.includes("active"));
 
-    const buttonClass = await actorButton.getAttribute("class");
-    const isAlreadyActive =
-      buttonClass &&
-      (buttonClass.includes("selected") || buttonClass.includes("active"));
-
-    if (!isAlreadyActive) {
-      await actorButton.scrollIntoViewIfNeeded();
-      await page.waitForTimeout(500);
-      await actorButton.evaluate((button) => button.click());
-      await page.waitForTimeout(3000);
-    } else {
-      await page.waitForTimeout(1000);
-    }
-
-    // Click "See all" button to expand full filmography
-    log("Looking for 'See all' button...");
-    try {
-      const seeAllButton = await page
-        .locator('button:has-text("See all")')
-        .first();
-      const isVisible = await seeAllButton.isVisible({ timeout: 3000 });
-
-      if (isVisible) {
-        log("✓ Clicking 'See all' button");
-        await seeAllButton.scrollIntoViewIfNeeded();
-        await page.waitForTimeout(300);
-        await seeAllButton.click();
-        await page.waitForTimeout(2000);
-      }
-    } catch (e) {
-      log("  'See all' button not found");
-    }
-
-    // Scroll to load all content
-    log("Scrolling to load all content...");
-    let previousCardCount = 0;
-    let unchangedCount = 0;
-
-    for (let i = 0; i < 100; i++) {
-      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      await page.waitForTimeout(500);
-
-      const currentCardCount = await page
-        .locator(".ipc-metadata-list-summary-item")
-        .count();
-
-      if (currentCardCount === previousCardCount) {
-        unchangedCount++;
-        if (unchangedCount >= 3) {
-          log(`✓ Loaded ${currentCardCount} cards`);
-          break;
+          if (!isAlreadyActive) {
+            await actorButton.scrollIntoViewIfNeeded();
+            await page.waitForTimeout(500);
+            await actorButton.evaluate((button) => button.click());
+            await page.waitForTimeout(3000);
+          } else {
+            await page.waitForTimeout(1000);
+          }
+        } else {
+          log("No Actor/Actress filter found, will scrape all visible credits");
+          await page.waitForTimeout(1000);
         }
       } else {
-        unchangedCount = 0;
+        log("No filter buttons found, will scrape all visible credits");
+        await page.waitForTimeout(1000);
       }
-      previousCardCount = currentCardCount;
-    }
 
-    // Extract cards
-    log("Extracting and parsing cards...");
-    const allCards = await page
-      .locator(".ipc-metadata-list-summary-item")
-      .all();
+      // Click "See all" button to expand full filmography
+      log("Looking for 'See all' button...");
+      try {
+        const seeAllButton = await page
+          .locator('button:has-text("See all")')
+          .first();
+        const isVisible = await seeAllButton.isVisible({ timeout: 3000 });
 
-    // Parse all cards (removed accord_2 filter as IMDb structure may have changed)
-    const cards = [];
-    for (const card of allCards) {
-      const html = await card.evaluate((el) => el.outerHTML);
-      // Skip unreleased content
-      if (!html.includes("accord_1_unrel") && !html.includes("In production")) {
-        const parsed = parseCard(html);
-        if (parsed.imdbId) {
-          cards.push(parsed);
+        if (isVisible) {
+          log("✓ Clicking 'See all' button");
+          await seeAllButton.scrollIntoViewIfNeeded();
+          await page.waitForTimeout(300);
+          await seeAllButton.click();
+          await page.waitForTimeout(2000);
+        }
+      } catch (e) {
+        log("  'See all' button not found");
+      }
+
+      // Scroll to load all content
+      log("Scrolling to load all content...");
+      let previousCardCount = 0;
+      let unchangedCount = 0;
+
+      for (let i = 0; i < 100; i++) {
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        await page.waitForTimeout(500);
+
+        const currentCardCount = await page
+          .locator(".ipc-metadata-list-summary-item")
+          .count();
+
+        if (currentCardCount === previousCardCount) {
+          unchangedCount++;
+          if (unchangedCount >= 3) {
+            log(`✓ Loaded ${currentCardCount} cards`);
+            break;
+          }
+        } else {
+          unchangedCount = 0;
+        }
+        previousCardCount = currentCardCount;
+      }
+
+      // Extract cards
+      log("Extracting and parsing cards...");
+      const allCards = await page
+        .locator(".ipc-metadata-list-summary-item")
+        .all();
+
+      // Parse all cards (removed accord_2 filter as IMDb structure may have changed)
+      const cards = [];
+      for (const card of allCards) {
+        const html = await card.evaluate((el) => el.outerHTML);
+        // Skip unreleased content
+        if (!html.includes("accord_1_unrel") && !html.includes("In production")) {
+          const parsed = parseCard(html);
+          if (parsed.imdbId) {
+            cards.push(parsed);
+          }
         }
       }
+
+      log(`✓ Parsed ${cards.length} cards`);
+
+      // Filter out non-acting roles
+      const actingCredits = cards.filter((card) => {
+        if (!card.role || !shouldFilterOut(card.role)) {
+          return true;
+        }
+        log(`  Filtering out: ${card.title} (${card.role})`);
+        return false;
+      });
+
+      log(`✓ Final count: ${actingCredits.length} acting credits`);
+
+      return { credits: actingCredits, actorPageUrl };
+    } catch (error) {
+      console.error("Error scraping IMDb:", error.message);
+      throw error;
     }
-
-    log(`✓ Parsed ${cards.length} cards`);
-
-    // Filter out non-acting roles
-    const actingCredits = cards.filter((card) => {
-      if (!card.role || !shouldFilterOut(card.role)) {
-        return true;
-      }
-      log(`  Filtering out: ${card.title} (${card.role})`);
-      return false;
-    });
-
-    log(`✓ Final count: ${actingCredits.length} acting credits`);
-
-    return { credits: actingCredits, actorPageUrl };
   } catch (error) {
     console.error("Error scraping IMDb:", error.message);
     throw error;
   } finally {
-    await browser.close();
+    if (browser) {
+      await browser.close();
+    }
   }
 }
 

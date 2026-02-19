@@ -837,29 +837,46 @@ async function main() {
       null;
 
   //######################################
-  // get the api token
+  // get the api token with retry logic
   theTvDbToken = null;
 
-  request.post(
-    "https://api4.thetvdb.com/v4/login",
-    {
-      json: true,
-      body: {
-        apikey: "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df",
-        pin: "HXEVSDFF",
+  const loginToTvDb = (retryCount = 0) => {
+    const MAX_RETRIES = 10;
+    const RETRY_DELAY_MS = Math.min(30000, 5000 * Math.pow(2, retryCount)); // exponential backoff, max 30s
+
+    request.post(
+      "https://api4.thetvdb.com/v4/login",
+      {
+        json: true,
+        body: {
+          apikey: "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df",
+          pin: "HXEVSDFF",
+        },
       },
-    },
-    (error, response, body) => {
-      if (error || response.statusCode !== 200) {
-        err("theTvDb login error:", error);
-        err("theTvDb statusCode:", response && response.statusCode);
-        return process.exit();
-      } else {
-        theTvDbToken = body.data.token;
-        return process.nextTick(runCycle);
-      }
-    },
-  );
+      (error, response, body) => {
+        if (error || response?.statusCode !== 200) {
+          err("theTvDb login error:", error);
+          err("theTvDb statusCode:", response && response.statusCode);
+
+          if (retryCount < MAX_RETRIES) {
+            err(
+              `Retrying in ${RETRY_DELAY_MS}ms (attempt ${retryCount + 1}/${MAX_RETRIES})...`,
+            );
+            setTimeout(() => loginToTvDb(retryCount + 1), RETRY_DELAY_MS);
+          } else {
+            err("Max retries reached. Exiting.");
+            return process.exit();
+          }
+        } else {
+          theTvDbToken = body.data.token;
+          log("TheTVDB login successful");
+          return process.nextTick(runCycle);
+        }
+      },
+    );
+  };
+
+  loginToTvDb();
 
   //#####################################################
   // delete old files in usb/files
@@ -1194,7 +1211,7 @@ async function main() {
           if (m) {
             season = parseInt(m[1], 10);
             episode = parseInt(m[2], 10);
-            // Updating local vars is enough as they are used below, 
+            // Updating local vars is enough as they are used below,
             // but let's update 'parsed' too for consistency if used elsewhere (it isn't really used after this destructuring)
             parsed.season = season;
             parsed.episode = episode;

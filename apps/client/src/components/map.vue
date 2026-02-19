@@ -633,6 +633,7 @@ export default {
   watch: {
     async mapShow(newShow) {
       if (newShow && newShow.Name) {
+        this.seasonStates = {}; // Clear season states when show changes
         await this.loadTvdbData();
         await this.setNextWatch();
         this.$nextTick(() => {
@@ -653,6 +654,7 @@ export default {
     seriesMap() {
       // Triggered when seriesMap reference changes (e.g., from disk change refresh)
       console.log("[map.vue watcher] seriesMap changed, forcing update");
+      this.seasonStates = {}; // Clear season states when map data changes
       this.mapUpdateKey++; // Increment key to force re-render
       this.$nextTick(() => {
         this.updateMapPanBounds();
@@ -1132,9 +1134,25 @@ export default {
           }
         });
 
+        // Determine initial state based on current episode states
+        const episodeValues = Object.values(episodeStates);
+        const allWatched =
+          episodeValues.length > 0 && episodeValues.every((watched) => watched);
+        const noneWatched =
+          episodeValues.length > 0 &&
+          episodeValues.every((watched) => !watched);
+        let initialState;
+        if (allWatched) {
+          initialState = 1; // All watched
+        } else if (noneWatched) {
+          initialState = 2; // All unwatched
+        } else {
+          initialState = 0; // Mixed state
+        }
+
         this.seasonStates[season] = {
           original: { ...episodeStates },
-          currentState: 0, // 0=original, 1=all on, 2=all off
+          currentState: initialState,
         };
       }
 

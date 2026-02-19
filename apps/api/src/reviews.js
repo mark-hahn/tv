@@ -355,161 +355,37 @@ export async function getImdbReviews(imdbId) {
     return imdbReviewsCache.get(cacheKey);
   }
 
-  // Use simple HTTP fetch - IMDB reviews are server-rendered
-  let html;
+  const b = await getBrowser();
+  const context = await b.newContext({
+    userAgent: DEFAULT_UA,
+    locale: "en-US",
+    extraHTTPHeaders: {
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+  });
+  const page = await context.newPage();
+
+  // Navigate
   try {
-    const response = await fetch(reviewsUrl, {
-      headers: {
-        "User-Agent": DEFAULT_UA,
-        "Accept-Language": "en-US,en;q=0.9",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-      },
+    await page.goto(reviewsUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: 20000,
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    html = await response.text();
+    // Wait for at least one review card to appear
+    await page
+      .waitForSelector(".ipc-list-card__content", {
+        timeout: 4000,
+      })
+      .catch(() => {});
   } catch (err) {
+    try {
+      await context.close();
+    } catch {}
     throw new Error(`Failed to load ${reviewsUrl}: ${err.message}`);
   }
 
-  // Log HTML to file for debugging
-  try {
-    await fs.promises.writeFile("/root/dev/apps/tv/temp.txt", html, "utf8");
-    console.log("[IMDB] Logged HTML to /root/dev/apps/tv/temp.txt");
-  } catch (err) {
-    console.error("[IMDB] Failed to write HTML log:", err.message);
-  }
-
-  const rawReviews = [];
-  const debugLog = [];
-
-  debugLog.push(`=== IMDB Review Scraping Debug ===`);
-  debugLog.push(`URL: ${reviewsUrl}`);
-  debugLog.push(`HTML length: ${html.length} chars`);
-  debugLog.push(`\n`);
-
-  // Find all review cards using the ipc-list-card__content class
-  const cardPattern =
-    /<div[^>]*class="[^"]*ipc-list-card__content[^"]*"[^>]*>([\s\S]*?)(?=<div[^>]*class="[^"]*ipc-list-card__content|$)/g;
-
-  debugLog.push(`Pattern: Review Cards`);
-  debugLog.push(`Regex: ${cardPattern.source}`);
-  debugLog.push(`\n`);
-
-  let cardMatch;
-  let cardCount = 0;
-
-  while ((cardMatch = cardPattern.exec(html)) !== null) {
-    cardCount++;
-    const cardContent = cardMatch[1];
-
-    debugLog.push(`--- Card ${cardCount} ---`);
-    debugLog.push(`Card content length: ${cardContent.length}`);
-
-    // Extract rating from ipc-rating-star--rating class
-    const ratingPattern =
-      /<span[^>]*class="[^"]*ipc-rating-star--rating[^"]*"[^>]*>([^<]+)<\/span>/;
-    const ratingMatch = cardContent.match(ratingPattern);
-    const rating = ratingMatch ? parseFloat(ratingMatch[1].trim()) : -1;
-
-    debugLog.push(`Rating pattern: ${ratingPattern.source}`);
-    debugLog.push(`Rating match: ${ratingMatch ? ratingMatch[0] : "none"}`);
-    debugLog.push(`Rating: ${rating}`);
-
-    // Extract title from ipc-title__text class
-    const titlePattern =
-      /<h3[^>]*class="[^"]*ipc-title__text[^"]*"[^>]*>([^<]+)<\/h3>/;
-    const titleMatch = cardContent.match(titlePattern);
-    const title = titleMatch ? titleMatch[1].trim() : "";
-
-    debugLog.push(`Title pattern: ${titlePattern.source}`);
-    debugLog.push(`Title: ${title}`);
-
-    // Extract review text from ipc-html-content-inner-div class
-    const textPattern =
-      /<div[^>]*class="[^"]*ipc-html-content-inner-div[^"]*"[^>]*>([\s\S]*?)<\/div>/;
-    const textMatch = cardContent.match(textPattern);
-    let text = "";
-    if (textMatch) {
-      // Strip HTML tags and decode entities
-      text = textMatch[1]
-        .replace(/<[^>]+>/g, " ")
-        .replace(/&nbsp;/g, " ")
-        .replace(/&amp;/g, "&")
-        .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">")
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/\s+/g, " ")
-        .trim();
-    }
-
-    debugLog.push(`Text pattern: ${textPattern.source}`);
-    debugLog.push(`Text match found: ${!!textMatch}`);
-    debugLog.push(`Text length: ${text.length}`);
-    if (text && text.length > 0) {
-      debugLog.push(`Text preview: ${text.substring(0, 100)}...`);
-    }
-
-    // Extract author from ipc-link ipc-link--base class
-    const authorPattern =
-      /<a[^>]*class="[^"]*ipc-link[^"]*ipc-link--base[^"]*"[^>]*>([^<]+)<\/a>/;
-    const authorMatch = cardContent.match(authorPattern);
-    const author = authorMatch ? authorMatch[1].trim() : "Anonymous";
-
-    debugLog.push(`Author pattern: ${authorPattern.source}`);
-    debugLog.push(`Author: ${author}`);
-
-    // Extract review ID from the card's Permalink link
-    const reviewIdPattern = /\/review\/(rw\d+)\//;
-    const reviewIdMatch = cardContent.match(reviewIdPattern);
-    const reviewId = reviewIdMatch ? reviewIdMatch[1] : `review${cardCount}`;
-
-    debugLog.push(`Review ID: ${reviewId}`);
-    debugLog.push(`\n`);
-
-    if (text && text.length >= 100 && rating !== -1) {
-      rawReviews.push({
-        author,
-        publication: "IMDB User",
-        text,
-        numStars: rating / 2, // Convert 10-point to 5-point scale
-        url: `https://www.imdb.com/review/${reviewId}/`,
-      });
-      debugLog.push(`✓ Added to rawReviews (count: ${rawReviews.length})`);
-    } else {
-      debugLog.push(
-        `✗ Skipped - text too short (${text.length}) or no rating (${rating})`,
-      );
-    }
-    debugLog.push(`\n`);
-
-    // Stop if we have enough reviews
-    if (rawReviews.length >= 60) break;
-  }
-
-  debugLog.push(`\n=== Summary ===`);
-  debugLog.push(`Total cards found: ${cardCount}`);
-  debugLog.push(`Raw reviews extracted: ${rawReviews.length}`);
-
-  // Write debug log to file
-  try {
-    await fs.promises.writeFile(
-      "/root/dev/apps/tv/temp2.txt",
-      debugLog.join("\n"),
-      "utf8",
-    );
-    console.log("[IMDB] Logged debug info to /root/dev/apps/tv/temp2.txt");
-  } catch (err) {
-    console.error("[IMDB] Failed to write debug log:", err.message);
-  }
-
-  // Filter and Stats
-  const finalStats = {
+  let finalStats = {
     numChecked: 0,
     notEnglishCount: 0,
     noReviewCount: 0,
@@ -517,38 +393,160 @@ export async function getImdbReviews(imdbId) {
     reviews: [],
   };
 
-  for (const r of rawReviews) {
-    finalStats.numChecked++;
+  try {
+    // Count reviews before clicking
+    const reviewsBefore = await page.evaluate(() => {
+      return document.querySelectorAll(".ipc-list-card__content").length;
+    });
+    console.log(`[IMDB] Reviews before clicking See all: ${reviewsBefore}`);
 
-    let notEnglish = false;
-    let noReview = false;
-    let smallText = false;
+    // Click "See all" button to load all reviews at once
+    const seeAllBtn = page.locator("button.ipc-see-more__button").first();
+    console.log(
+      "[IMDB] Looking for See all button with selector: button.ipc-see-more__button",
+    );
 
-    // Check conditions
-    if (franc(r.text || "") !== "eng") notEnglish = true;
-    if (r.numStars === -1) noReview = true;
-    if ((r.text || "").length < 100) smallText = true;
+    const btnCount = await page.locator("button.ipc-see-more__button").count();
+    console.log(`[IMDB] Found ${btnCount} buttons matching selector`);
 
-    // Increment counts
-    if (notEnglish) finalStats.notEnglishCount++;
-    if (noReview) finalStats.noReviewCount++;
-    if (smallText) finalStats.smallTextCount++;
-
-    // Filter
-    if (!notEnglish && !smallText) {
-      finalStats.reviews.push({
-        author: r.author,
-        publication: r.publication,
-        text: r.text,
-        numStars: noReview ? -1 : r.numStars,
-        url: r.url,
+    try {
+      // Scroll to button to make it visible
+      console.log("[IMDB] Scrolling to See all button...");
+      await seeAllBtn.scrollIntoViewIfNeeded({ timeout: 5000 }).catch((err) => {
+        console.log("[IMDB] Scroll failed:", err.message);
       });
-    }
-  }
 
-  // Limit to 50 reviews
-  if (finalStats.reviews.length > 50) {
-    finalStats.reviews = finalStats.reviews.slice(0, 50);
+      await page.waitForTimeout(500);
+
+      const isSeeAllVisible = await seeAllBtn.isVisible().catch(() => false);
+      console.log(
+        `[IMDB] See all button visible after scroll: ${isSeeAllVisible}`,
+      );
+
+      console.log("[IMDB] Attempting to click See all button...");
+      await seeAllBtn.click({ timeout: 5000, force: true });
+      console.log("[IMDB] Click succeeded, waiting 3s for reviews to load...");
+
+      // Wait for reviews to load after clicking See all
+      await page.waitForTimeout(3000);
+
+      // Count reviews after clicking
+      const reviewsAfter = await page.evaluate(() => {
+        return document.querySelectorAll(".ipc-list-card__content").length;
+      });
+      console.log(`[IMDB] Reviews after clicking See all: ${reviewsAfter}`);
+    } catch (err) {
+      console.log("[IMDB] Could not click See all button:", err.message);
+      console.log(
+        "[IMDB] Proceeding with initial ${reviewsBefore} reviews only",
+      );
+    }
+
+    // Extract all reviews (now that they're all loaded)
+    const rawReviews = await page.evaluate(() => {
+      const cards = Array.from(
+        document.querySelectorAll(".ipc-list-card__content"),
+      );
+      const results = [];
+
+      cards.forEach((card) => {
+        let author = "";
+        let text = "";
+        let numStars = -1;
+        let reviewId = "";
+
+        // Extract rating from ipc-rating-star--rating class
+        const ratingEl = card.querySelector(".ipc-rating-star--rating");
+        if (ratingEl) {
+          const rating = parseFloat(ratingEl.textContent.trim());
+          if (!isNaN(rating)) {
+            numStars = rating; // Already 10-point scale
+          }
+        }
+
+        // Extract review text from ipc-html-content-inner-div class
+        const textEl = card.querySelector(".ipc-html-content-inner-div");
+        if (textEl) {
+          text = textEl.textContent.trim();
+        }
+
+        // Extract author from ipc-link class (first link is usually author)
+        const authorEl = card.querySelector("a.ipc-link");
+        if (authorEl) {
+          author = authorEl.textContent.trim();
+        }
+
+        // Extract review ID from Permalink link
+        const linkEl = card.querySelector('a[href*="/review/"]');
+        if (linkEl) {
+          const match = linkEl.href.match(/\/review\/(rw\d+)\//);
+          if (match) {
+            reviewId = match[1];
+          }
+        }
+
+        results.push({
+          author,
+          text,
+          numStars,
+          reviewId,
+        });
+      });
+      return results;
+    });
+
+    // Filter and Stats
+    let currentStats = {
+      numChecked: 0,
+      notEnglishCount: 0,
+      noReviewCount: 0,
+      smallTextCount: 0,
+      reviews: [],
+    };
+
+    for (const r of rawReviews) {
+      currentStats.numChecked++;
+
+      let notEnglish = false;
+      let noReview = false;
+      let smallText = false;
+
+      // Check conditions
+      if (franc(r.text || "") !== "eng") notEnglish = true;
+      if (r.numStars === -1) noReview = true;
+      if ((r.text || "").length < 100) smallText = true;
+
+      // Increment counts
+      if (notEnglish) currentStats.notEnglishCount++;
+      if (noReview) currentStats.noReviewCount++;
+      if (smallText) currentStats.smallTextCount++;
+
+      // Filter
+      if (!notEnglish && !smallText) {
+        currentStats.reviews.push({
+          author: r.author || "Anonymous",
+          publication: "IMDB User",
+          text: r.text,
+          numStars: noReview ? -1 : r.numStars / 2, // Convert 10-point to 5-point scale
+          url: r.reviewId
+            ? `https://www.imdb.com/review/${r.reviewId}/`
+            : undefined,
+        });
+      }
+    }
+
+    finalStats = currentStats;
+  } catch (e) {
+    console.error("[imdb reviews] Processing error:", e);
+    try {
+      if (browser) await browser.close();
+    } catch {}
+    browser = null;
+    throw e;
+  } finally {
+    try {
+      await context.close();
+    } catch {}
   }
 
   // If total reviews is less than 2 return empty list

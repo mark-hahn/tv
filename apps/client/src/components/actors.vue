@@ -1696,8 +1696,7 @@ export default {
       evtBus.off("fillAndSelectEpisode", this._onFillAndSelectEpisode);
     if (this._onResetActorsPane)
       evtBus.off("resetActorsPane", this._onResetActorsPane);
-    if (this._onSetUpSeries)
-      evtBus.off("setUpSeries", this._onSetUpSeries);
+    if (this._onSetUpSeries) evtBus.off("setUpSeries", this._onSetUpSeries);
 
     evtBus.off("previewMode", this.onPreviewMode);
     evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);

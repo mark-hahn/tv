@@ -38,13 +38,12 @@
         borderBottom: '1px solid #ddd',
       }"
     >
-      <!-- Top Row: Show Title and Rotten Button-->
+      <!-- Top Row: Show Title-->
       <div
         style="
           width: 100%;
           display: flex;
           align-items: center;
-          justify-content: space-between;
           margin-bottom: 5px;
         "
       >
@@ -65,31 +64,6 @@
           }"
         >
           <span>{{ showName }}</span>
-        </div>
-        <div
-          v-if="rottenUrl"
-          style="margin-right: 10px; flex: 0 0 auto"
-        >
-          <a
-            :href="rottenUrl"
-            target="_blank"
-            style="text-decoration: none"
-          >
-            <button
-              style="
-                cursor: pointer;
-                padding: 6px 12px;
-                border-radius: 7px;
-                background-color: #fa320a;
-                color: white;
-                font-weight: normal;
-                border: 1px solid black;
-                font-size: 14px;
-              "
-            >
-              {{ rottenLabel || "Rotten" }}
-            </button></a
-          >
         </div>
       </div>
       <!-- Second Row: Filter Radio Buttons-->

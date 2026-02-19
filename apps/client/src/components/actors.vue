@@ -1672,6 +1672,19 @@ export default {
     this._onResetActorsPane = this.resetPane;
     evtBus.on("resetActorsPane", this._onResetActorsPane);
 
+    this._onSetUpSeries = () => {
+      // Exit credits mode and deselect actor when show selection changes
+      if (this.showingCredits || this.selectedActor) {
+        this.selectedActor = null;
+        this.showingCredits = false;
+        this.credits = [];
+        this.creditsError = null;
+        this.creditsLoading = false;
+        this.actorPageUrl = null;
+      }
+    };
+    evtBus.on("setUpSeries", this._onSetUpSeries);
+
     evtBus.on("previewMode", this.onPreviewMode);
     evtBus.on("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.on("addPreviewShowDone", this.onAddPreviewShowDone);
@@ -1683,6 +1696,8 @@ export default {
       evtBus.off("fillAndSelectEpisode", this._onFillAndSelectEpisode);
     if (this._onResetActorsPane)
       evtBus.off("resetActorsPane", this._onResetActorsPane);
+    if (this._onSetUpSeries)
+      evtBus.off("setUpSeries", this._onSetUpSeries);
 
     evtBus.off("previewMode", this.onPreviewMode);
     evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);

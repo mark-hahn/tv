@@ -1044,7 +1044,7 @@ const calculateWaitStr = (nextAired, lastAired) => {
     const last = lastAired || "";
     const airDate = next > last ? next : last;
     if (!airDate) return null;
-    
+
     // Check if date is in the future
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     if (airDate >= today) {
@@ -1296,9 +1296,30 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   // - If lastEmbySync is present in params, this is an Emby sync, so inEmby = true
   // - Otherwise, use show.inEmby value or preserve existing value
   const isSyncingFromEmby = !!paramObj.lastEmbySync;
-  tvdbData.inEmby = isSyncingFromEmby
+  const newInEmby = isSyncingFromEmby
     ? true
     : (show.inEmby ?? existing.inEmby ?? false);
+
+  // If inEmby is changing, fix Emby button in cached remotes
+  if (
+    existing.inEmby !== newInEmby &&
+    existing.remotes &&
+    Array.isArray(existing.remotes)
+  ) {
+    const hasEmbyButton = existing.remotes.some((r) => r.name === "Emby");
+    if (newInEmby && !hasEmbyButton) {
+      // Add Emby button at the start
+      const embyUrl = urls.embyPageUrl(showId || existing.Id);
+      existing.remotes.unshift({ name: "Emby", url: embyUrl });
+      console.log(`[getTvdbData] Added Emby button to ${name} remotes`);
+    } else if (!newInEmby && hasEmbyButton) {
+      // Remove Emby button
+      existing.remotes = existing.remotes.filter((r) => r.name !== "Emby");
+      console.log(`[getTvdbData] Removed Emby button from ${name} remotes`);
+    }
+  }
+
+  tvdbData.inEmby = newInEmby;
 
   // Flattened Emby-specific data (no nested object)
   tvdbData.Id = showId || existing.Id || existing.emby?.id || null;
@@ -1394,11 +1415,18 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.Pickup =
     paramObj.pickup ?? existing.Pickup ?? existing.pickup ?? false;
   tvdbData.lastViewed = paramObj.lastViewed || existing.lastViewed || null;
-  
+
   // Calculate waitStr from nextAired and lastAired if available
-  const calculatedWaitStr = calculateWaitStr(tvdbData.nextAired, tvdbData.lastAired);
+  const calculatedWaitStr = calculateWaitStr(
+    tvdbData.nextAired,
+    tvdbData.lastAired,
+  );
   tvdbData.WaitStr =
-    paramObj.waitStr || calculatedWaitStr || existing.WaitStr || existing.waitStr || null;
+    paramObj.waitStr ||
+    calculatedWaitStr ||
+    existing.WaitStr ||
+    existing.waitStr ||
+    null;
 
   // Flattened Sync timestamps (no nested object)
   tvdbData.lastEmbySync =
@@ -1982,6 +2010,25 @@ export const setTvdbFields = async (params) => {
       }
       if (paramObj.$delete) {
         for (const delName of paramObj.$delete) delete tvdb[delName];
+      }
+
+      // Check if inEmby is changing - fix Emby button in cached remotes
+      if (paramObj.inEmby !== undefined && tvdb.inEmby !== paramObj.inEmby) {
+        if (tvdb.remotes && Array.isArray(tvdb.remotes)) {
+          const hasEmbyButton = tvdb.remotes.some((r) => r.name === "Emby");
+          if (paramObj.inEmby && !hasEmbyButton) {
+            // Add Emby button at the start
+            const embyUrl = urls.embyPageUrl(tvdb.Id);
+            tvdb.remotes.unshift({ name: "Emby", url: embyUrl });
+            console.log(`[setTvdbFields] Added Emby button to ${name} remotes`);
+          } else if (!paramObj.inEmby && hasEmbyButton) {
+            // Remove Emby button
+            tvdb.remotes = tvdb.remotes.filter((r) => r.name !== "Emby");
+            console.log(
+              `[setTvdbFields] Removed Emby button from ${name} remotes`,
+            );
+          }
+        }
       }
 
       // Handle nested field updates for Phase 1 new structure

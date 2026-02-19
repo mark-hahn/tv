@@ -471,6 +471,22 @@ export async function getReviews(url, buttonName) {
   return await response.json();
 }
 
+export async function getImdbReviews(imdbId) {
+  const params = new URLSearchParams({
+    imdbId: imdbId || "",
+  });
+
+  const response = await fetch(
+    `${config.torrentsApiUrl}/api/reviews/getImdbReviews?` + params.toString(),
+  );
+  if (!response.ok) {
+    throw new Error(
+      `getImdbReviews failed: ${response.status} ${response.statusText}`,
+    );
+  }
+  return await response.json();
+}
+
 export function debugTvdb(params) {
   return httpCall("/api/debugTvdb", params, "POST");
 }

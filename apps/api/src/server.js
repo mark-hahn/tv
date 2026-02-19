@@ -1715,6 +1715,62 @@ app.get("/api/reviews/getReviews", async (req, res) => {
   }
 });
 
+app.get("/api/reviews/getImdbReviews", async (req, res) => {
+  const imdbId = req.query.imdbId;
+  const args = { imdbId };
+  try {
+    appendReviewCallsLog({
+      endpoint: "/api/reviews/getImdbReviews",
+      method: "GET",
+      event: "START",
+      args,
+    });
+    const result = await reviews.getImdbReviews(imdbId);
+    appendCallsLog({
+      endpoint: "/api/reviews/getImdbReviews",
+      method: "GET",
+      ok: true,
+      result,
+    });
+    appendReviewCallsLog({
+      endpoint: "/api/reviews/getImdbReviews",
+      method: "GET",
+      event: "END",
+      ok: true,
+      args,
+      result,
+    });
+    res.json(result);
+  } catch (error) {
+    console.error("getImdbReviews error:", error);
+    appendCallsLog({
+      endpoint: "/api/reviews/getImdbReviews",
+      method: "GET",
+      ok: false,
+      result: null,
+      error,
+    });
+    appendReviewCallsLog({
+      endpoint: "/api/reviews/getImdbReviews",
+      method: "GET",
+      event: "END",
+      ok: false,
+      args,
+      result: null,
+      error,
+    });
+    res.json({
+      ok: false,
+      error: error?.message || String(error),
+      numChecked: 0,
+      notEnglishCount: 0,
+      noReviewCount: 0,
+      smallTextCount: 0,
+      reviews: [],
+    });
+  }
+});
+
 https.createServer(httpsOptions, app).listen(QBT_TEST_PORT, () => {
   // Always print a startup line, even when TORRENTS_DEBUG disables console.log.
   // process.stderr.write(`=\n`);

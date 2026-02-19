@@ -107,7 +107,8 @@
           v-for="btn in filterButtons"
           :key="btn.label"
           @click="handleButtonClick(btn.label)"
-          :style="getButtonStyle(selectedButton === btn.label)"
+          :style="getButtonStyle(selectedButton === btn.label, btn.label)"
+          :disabled="isButtonDisabled(btn.label)"
         >
           {{ btn.label }}
         </button>
@@ -150,7 +151,7 @@
       "
     >
       <div
-        v-if="checkedRemotes &amp;&amp; !rottenUrl"
+        v-if="checkedRemotes && !rottenUrl && !imdbId"
         style="
           width: 100%;
           text-align: center;
@@ -159,7 +160,7 @@
           font-size: 16px;
         "
       >
-        Show not found at Rotten Tomatoes.
+        Show not found at Rotten Tomatoes or IMDB.
       </div>
       <div
         v-else-if="!isLoading &amp;&amp; stats &amp;&amp; reviews.length === 0"
@@ -190,7 +191,6 @@
             v-for="(review, idx) in leftColumnReviews"
             :key="idx"
             :style="cardStyle"
-            @click="openReviewsPage"
           >
             <!-- Card Header-->
             <div
@@ -202,12 +202,7 @@
               "
             >
               <div style="font-weight: bold; font-size: 14px">
-                <span>{{ review.author }}</span
-                ><span
-                  v-if="review.publication"
-                  style="color: #666; font-weight: normal"
-                  >&nbsp;({{ review.publication }})</span
-                >
+                <span>{{ review.author }}</span>
               </div>
               <div style="font-size: 14px; white-space: nowrap">
                 <template v-if="review.numStars !== -1"
@@ -232,34 +227,9 @@
               :style="{
                 fontSize: '15px',
                 lineHeight: '1.4',
-                cursor: 'pointer',
               }"
             >
               <span>{{ review.text }}</span>
-            </div>
-            <!-- Full Review Link-->
-            <div
-              v-if="review.url"
-              style="margin-top: 8px"
-              @click.stop
-            >
-              <a
-                :href="review.url"
-                target="_blank"
-              >
-                <button
-                  style="
-                    cursor: pointer;
-                    padding: 4px 8px;
-                    border-radius: 4px;
-                    border: 1px solid #bbb;
-                    background-color: whitesmoke;
-                    font-size: 12px;
-                  "
-                >
-                  Full Review
-                </button></a
-              >
             </div>
           </div>
         </div>
@@ -279,7 +249,6 @@
             v-for="(review, idx) in rightColumnReviews"
             :key="idx"
             :style="cardStyle"
-            @click="openReviewsPage"
           >
             <!-- Card Header-->
             <div
@@ -291,12 +260,7 @@
               "
             >
               <div style="font-weight: bold; font-size: 14px">
-                <span>{{ review.author }}</span
-                ><span
-                  v-if="review.publication"
-                  style="color: #666; font-weight: normal"
-                  >&nbsp;({{ review.publication }})</span
-                >
+                <span>{{ review.author }}</span>
               </div>
               <div style="font-size: 14px; white-space: nowrap">
                 <template v-if="review.numStars !== -1"
@@ -321,34 +285,9 @@
               :style="{
                 fontSize: '15px',
                 lineHeight: '1.4',
-                cursor: 'pointer',
               }"
             >
               <span>{{ review.text }}</span>
-            </div>
-            <!-- Full Review Link-->
-            <div
-              v-if="review.url"
-              style="margin-top: 8px"
-              @click.stop
-            >
-              <a
-                :href="review.url"
-                target="_blank"
-              >
-                <button
-                  style="
-                    cursor: pointer;
-                    padding: 4px 8px;
-                    border-radius: 4px;
-                    border: 1px solid #bbb;
-                    background-color: whitesmoke;
-                    font-size: 12px;
-                  "
-                >
-                  Full Review
-                </button></a
-              >
             </div>
           </div>
         </div>
@@ -382,13 +321,15 @@ export default {
       showName: "",
       rottenUrl: "",
       rottenLabel: "",
+      imdbId: "",
+      imdbUrl: "",
       previewMode: false,
       previewAddBusy: false,
       previewSrchChoice: null,
-      selectedButton: "Audience",
+      selectedButton: "Rotten",
       isLoading: false,
       checkedRemotes: false,
-      filterButtons: [{ label: "Audience" }, { label: "Critics" }],
+      filterButtons: [{ label: "IMDB" }, { label: "Rotten" }],
     };
   },
 
@@ -434,7 +375,6 @@ export default {
         borderRadius: "5px",
         padding: "10px",
         boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-        cursor: "pointer",
       };
     },
   },
@@ -468,7 +408,9 @@ export default {
       this.stats = null;
       this.rottenUrl = "";
       this.rottenLabel = "";
-      this.selectedButton = "Audience";
+      this.imdbId = "";
+      this.imdbUrl = "";
+      this.selectedButton = "Rotten";
       this.checkedRemotes = false;
     },
 
@@ -482,10 +424,32 @@ export default {
         if (rottenRemote) {
           this.rottenLabel = rottenRemote.name; // Use the name from remote object which contains ratings
           this.rottenUrl = rottenRemote.url; // Assuming remote object has { name, url }
-          // Load initial reviews if we have a URL
-          if (this.rottenUrl) {
-            void this.loadReviews(this.rottenUrl, this.selectedButton);
+        }
+
+        // Extract IMDB ID from IMDB remote
+        const imdbRemote = tvdbData.remotes.find(
+          (r) =>
+            r.name &&
+            r.name.toLowerCase().includes("imdb") &&
+            r.url &&
+            r.url.includes("imdb.com"),
+        );
+        if (imdbRemote && imdbRemote.url) {
+          this.imdbUrl = imdbRemote.url;
+          // Extract imdbId from URL like https://www.imdb.com/title/tt13567344
+          const match = imdbRemote.url.match(/\/title\/(tt\d+)/);
+          if (match) {
+            this.imdbId = match[1];
           }
+        }
+
+        // Load initial reviews - prioritize IMDB if available, otherwise Rotten Tomatoes
+        if (this.imdbId) {
+          this.selectedButton = "IMDB";
+          void this.loadReviews(this.imdbId, "IMDB");
+        } else if (this.rottenUrl) {
+          this.selectedButton = "Rotten";
+          void this.loadReviews(this.rottenUrl, "Rotten");
         }
       }
     },
@@ -520,31 +484,57 @@ export default {
       evtBus.emit("exitPreviewMode");
     },
 
-    getButtonStyle(isSelected) {
+    getButtonStyle(isSelected, label) {
+      const isDisabled = this.isButtonDisabled(label);
       return {
         fontSize: "13px",
-        cursor: "pointer",
+        cursor: isDisabled ? "not-allowed" : "pointer",
         borderRadius: "5px",
         padding: "4px 12px",
         border: "1px solid #bbb",
         "--btn-bg": isSelected ? "lightgray" : "whitesmoke",
-        color: "black",
+        color: isDisabled ? "#ccc" : "black",
+        opacity: isDisabled ? 0.5 : 1,
       };
+    },
+
+    isButtonDisabled(label) {
+      if (label === "IMDB") {
+        return !this.imdbId;
+      } else {
+        return !this.rottenUrl;
+      }
     },
 
     handleButtonClick(label) {
       this.selectedButton = label;
-      if (this.rottenUrl) {
-        void this.loadReviews(this.rottenUrl, this.selectedButton);
+      if (label === "IMDB") {
+        if (this.imdbId) {
+          void this.loadReviews(this.imdbId, "IMDB");
+        }
+      } else {
+        if (this.rottenUrl) {
+          void this.loadReviews(this.rottenUrl, this.selectedButton);
+        }
       }
     },
 
-    async loadReviews(url, buttonName) {
+    async loadReviews(urlOrId, buttonName) {
       this.reviews = [];
       this.stats = null;
       this.isLoading = true;
       try {
-        const data = await srvr.getReviews(url, buttonName);
+        let data;
+        if (buttonName === "IMDB") {
+          // Call IMDB reviews API
+          data = await srvr.getImdbReviews(urlOrId);
+        } else {
+          // Call Rotten Tomatoes reviews API - map "Rotten" to "Audience"
+          const rtButtonName =
+            buttonName === "Rotten" ? "Audience" : buttonName;
+          data = await srvr.getReviews(urlOrId, rtButtonName);
+        }
+
         if (data) {
           if (data.reviews && Array.isArray(data.reviews)) {
             this.reviews = data.reviews;
@@ -581,16 +571,6 @@ export default {
         }
       }
       return stars;
-    },
-
-    openReviewsPage() {
-      if (!this.rottenUrl) return;
-      const base = this.rottenUrl.replace(/\/$/, "");
-      const suffix =
-        this.selectedButton === "Audience" ? "all-audience" : "all-critics";
-      // Hardcode s01 for now as per server scraper logic
-      const url = `${base}/s01/reviews/${suffix}`;
-      window.open(url, "_blank");
     },
   },
 };

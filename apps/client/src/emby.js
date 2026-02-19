@@ -233,6 +233,11 @@ export async function loadAllShows() {
       dateCreated: embyShow.DateCreated?.substring(0, 10),
       premiereDate: embyShow.PremiereDate?.substring(0, 10),
       lastEmbySync: now,
+      // Include UserData properties for new record creation
+      isFavorite: embyShow.UserData?.IsFavorite || false,
+      isPlayed: embyShow.UserData?.Played || false,
+      playCount: embyShow.UserData?.PlayCount || 0,
+      lastPlayedDate: embyShow.UserData?.LastPlayedDate || null,
     };
 
     // Create or update tvdb record
@@ -284,6 +289,14 @@ export async function loadAllShows() {
       tvdbRecord.Overview = updateFields["emby.overview"];
       tvdbRecord.DateCreated = updateFields.dateCreated;
       tvdbRecord.PremiereDate = updateFields.premiereDate;
+
+      // Sync user data from Emby
+      if (embyShow.UserData) {
+        tvdbRecord.IsFavorite = embyShow.UserData.IsFavorite || false;
+        tvdbRecord.Played = embyShow.UserData.Played || false;
+        tvdbRecord.PlayCount = embyShow.UserData.PlayCount || 0;
+        tvdbRecord.LastPlayedDate = embyShow.UserData.LastPlayedDate || null;
+      }
 
       // Mark show as being in Emby
       tvdbRecord.inEmby = true;

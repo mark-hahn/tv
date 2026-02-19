@@ -1455,11 +1455,19 @@ export default {
     onSelectShow(show, scroll = false) {
       // console.log('List: selected show:', show);
       const wasPreview = !!this.previewMode;
+      const wasAlreadySelected = show?.Name === this.highlightName;
+
       if (wasPreview) this.setPreviewMode(false);
       this.saveVisShow(show, scroll);
 
       // If we just exited preview mode, always land on Series for the newly selected show.
       if (wasPreview) {
+        evtBus.emit("showSeriesPane");
+        return;
+      }
+
+      // If clicking on an already-selected show, always switch to info pane.
+      if (wasAlreadySelected) {
         evtBus.emit("showSeriesPane");
         return;
       }

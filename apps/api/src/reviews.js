@@ -394,52 +394,16 @@ export async function getImdbReviews(imdbId) {
   };
 
   try {
-    // Count reviews before clicking
-    const reviewsBefore = await page.evaluate(() => {
-      return document.querySelectorAll(".ipc-list-card__content").length;
-    });
-    console.log(`[IMDB] Reviews before clicking See all: ${reviewsBefore}`);
-
     // Click "See all" button to load all reviews at once
     const seeAllBtn = page.locator("button.ipc-see-more__button").first();
-    console.log(
-      "[IMDB] Looking for See all button with selector: button.ipc-see-more__button",
-    );
-
-    const btnCount = await page.locator("button.ipc-see-more__button").count();
-    console.log(`[IMDB] Found ${btnCount} buttons matching selector`);
 
     try {
-      // Scroll to button to make it visible
-      console.log("[IMDB] Scrolling to See all button...");
-      await seeAllBtn.scrollIntoViewIfNeeded({ timeout: 5000 }).catch((err) => {
-        console.log("[IMDB] Scroll failed:", err.message);
-      });
-
+      await seeAllBtn.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
       await page.waitForTimeout(500);
-
-      const isSeeAllVisible = await seeAllBtn.isVisible().catch(() => false);
-      console.log(
-        `[IMDB] See all button visible after scroll: ${isSeeAllVisible}`,
-      );
-
-      console.log("[IMDB] Attempting to click See all button...");
       await seeAllBtn.click({ timeout: 5000, force: true });
-      console.log("[IMDB] Click succeeded, waiting 3s for reviews to load...");
-
-      // Wait for reviews to load after clicking See all
       await page.waitForTimeout(3000);
-
-      // Count reviews after clicking
-      const reviewsAfter = await page.evaluate(() => {
-        return document.querySelectorAll(".ipc-list-card__content").length;
-      });
-      console.log(`[IMDB] Reviews after clicking See all: ${reviewsAfter}`);
     } catch (err) {
-      console.log("[IMDB] Could not click See all button:", err.message);
-      console.log(
-        "[IMDB] Proceeding with initial ${reviewsBefore} reviews only",
-      );
+      // Continue with initial reviews if See all button fails
     }
 
     // Extract all reviews (now that they're all loaded)
@@ -464,16 +428,23 @@ export async function getImdbReviews(imdbId) {
           }
         }
 
+        // Extract author from rating star's aria-label
+        // Format: "username's rating: X" or "A_username's rating: X"
+        const ratingStarEl = card.querySelector(".ipc-rating-star[aria-label]");
+        if (ratingStarEl) {
+          const ariaLabel = ratingStarEl.getAttribute("aria-label");
+          if (ariaLabel) {
+            const match = ariaLabel.match(/^(.+?)'s rating:/);
+            if (match) {
+              author = match[1].trim();
+            }
+          }
+        }
+
         // Extract review text from ipc-html-content-inner-div class
         const textEl = card.querySelector(".ipc-html-content-inner-div");
         if (textEl) {
           text = textEl.textContent.trim();
-        }
-
-        // Extract author from ipc-link class (first link is usually author)
-        const authorEl = card.querySelector("a.ipc-link");
-        if (authorEl) {
-          author = authorEl.textContent.trim();
         }
 
         // Extract review ID from Permalink link

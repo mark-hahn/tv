@@ -29,6 +29,6 @@
 - the tvdb record prop `deleted` no longer exists -- it should not be set or used
 - use the script srvr to deploy the server modules and the client to the remote server
 - when you've only changed files in one server like srvr, down, asr, or api you should deploy only that server, like `./srsv srvr`
-- never deploy client -- vite does that
+- never build or deploy client -- vite does that
 - it is ok for srvr script to deploy client when also deploying multiple servers
 - when i say `no change` i mean everything looks and behaves the same

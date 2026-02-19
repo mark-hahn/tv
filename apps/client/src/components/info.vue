@@ -1281,6 +1281,9 @@ export default {
             .triggerShowGapCheck(this.show.Id, showName)
             .catch((err) => console.error("triggerShowGapCheck failed:", err));
         }
+
+        // Trigger list refresh to reload all shows (like library refresh does)
+        evtBus.emit("library-refresh-complete");
       } catch (e) {
         console.error("refreshTvdb error", e);
         alert("Error requesting refresh: " + e);

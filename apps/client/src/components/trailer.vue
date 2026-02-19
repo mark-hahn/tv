@@ -363,6 +363,12 @@ export default {
         !/imdb-video\.media-imdb\.com/i.test(url)
       );
     },
+    hasAnyImdbVideo(trailers) {
+      // Check if any trailer is from IMDB (page URL, direct video, or named "IMDB Video")
+      return trailers.some(
+        (t) => /imdb/i.test(t.url) || (t.name && /imdb/i.test(t.name)),
+      );
+    },
     onSetUpSeries(show) {
       this.err = "";
       this.showName = show?.Name || "";
@@ -384,7 +390,7 @@ export default {
       }
 
       // Check if IMDB video is missing and fetch it
-      const hasImdbVideo = this.trailers.some((t) => this.isImdbVideo(t.url));
+      const hasImdbVideo = this.hasAnyImdbVideo(this.trailers);
       if (!hasImdbVideo && data?.show && tvdbData) {
         this.loadingImdb = true;
         try {

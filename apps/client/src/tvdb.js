@@ -283,14 +283,17 @@ export async function getWaitStr(show) {
   try {
     const tvdbData = await allTvdb[show.Name];
     if (tvdbData) {
-      const lastAired = tvdbData.lastAired;
-      if (!lastAired) return "";
-      const lastAiredDay = lastAired;
-      const lastAiredNoYr = lastAired.slice(5).replace(/^0/, " ").trim();
+      // Use the greater of nextAired and lastAired
+      const nextAired = tvdbData.nextAired || "";
+      const lastAired = tvdbData.lastAired || "";
+      const airDate = nextAired > lastAired ? nextAired : lastAired;
+      if (!airDate) return "";
+      const airDateDay = airDate;
+      const airDateNoYr = airDate.slice(5).replace(/^0/, " ").trim();
       const today = util.fmtDate();
-      if (lastAiredDay >= today) waitStr = `{${lastAiredNoYr}}`;
+      if (airDateDay >= today) waitStr = `{${airDateNoYr}}`;
       // console.log('getWaitStr:', show.Name,
-      //     {waitStr, lastAiredDay, lastAiredNoYr, today});
+      //     {waitStr, airDateDay, airDateNoYr, today});
     }
   } catch (e) {
     console.error("getWaitStr, tvdb data error:", show.Name, e);

@@ -904,6 +904,15 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
     }
   }
 
+  // Fallback: if IMDB remote not found but we have imdbId, fetch it
+  if (!remotesByName["IMDB"] && allTvdb && allTvdb[name]?.imdbId) {
+    const imdbId = allTvdb[name].imdbId;
+    const fallbackRemote = await getRemote(imdbId, 2, name);
+    if (fallbackRemote) {
+      remotesByName["IMDB"] = fallbackRemote;
+    }
+  }
+
   const imdbRemote = remotesByName["IMDB"];
   if (imdbRemote) {
     imdbRemote.name += imdbRemote.ratings
@@ -1027,6 +1036,28 @@ async function getTmdbFallback(showName) {
 // fetch data from tvdb.com
 // create tvdbData object
 // update allTvdb & tvdb.json
+// Calculate waitStr from nextAired and lastAired dates
+const calculateWaitStr = (nextAired, lastAired) => {
+  try {
+    // Use the greater of nextAired and lastAired
+    const next = nextAired || "";
+    const last = lastAired || "";
+    const airDate = next > last ? next : last;
+    if (!airDate) return null;
+    
+    // Check if date is in the future
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    if (airDate >= today) {
+      // Format as {MMM DD} or {Mon DD}
+      const airDateNoYr = airDate.slice(5).replace(/^0/, " ").trim();
+      return `{${airDateNoYr}}`;
+    }
+  } catch (e) {
+    // Silently fail on date calculation errors
+  }
+  return null;
+};
+
 const getTvdbData = async (paramObj, resolve, _reject) => {
   const { show, seasonCount, episodeCount, watchedCount, fast } = paramObj;
 
@@ -1098,6 +1129,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   const {
     firstAired,
     lastAired: lastAiredIn,
+    nextAired: nextAiredIn,
     score,
     overview,
     remoteIds,
@@ -1112,6 +1144,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   const characters = getTvdbCharacters(extResObj);
   let lastAired = lastAiredIn ?? firstAired;
   lastAired = lastAired ?? "";
+  let nextAired = nextAiredIn ?? "";
   let originalNetwork = originalNetworkIn?.name ?? "";
   const status = statusIn.name; // e.g. Ended
 
@@ -1188,6 +1221,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     overview: preserve(overview, existing.overview, tmdbData?.overview),
     firstAired: preserve(firstAired, existing.firstAired, tmdbData?.firstAired),
     lastAired: preserve(lastAired, existing.lastAired, tmdbData?.lastAired),
+    nextAired: preserve(nextAired, existing.nextAired),
     averageRuntime: preserve(
       averageRuntime,
       existing.averageRuntime,
@@ -1360,8 +1394,11 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.Pickup =
     paramObj.pickup ?? existing.Pickup ?? existing.pickup ?? false;
   tvdbData.lastViewed = paramObj.lastViewed || existing.lastViewed || null;
+  
+  // Calculate waitStr from nextAired and lastAired if available
+  const calculatedWaitStr = calculateWaitStr(tvdbData.nextAired, tvdbData.lastAired);
   tvdbData.WaitStr =
-    paramObj.waitStr || existing.WaitStr || existing.waitStr || null;
+    paramObj.waitStr || calculatedWaitStr || existing.WaitStr || existing.waitStr || null;
 
   // Flattened Sync timestamps (no nested object)
   tvdbData.lastEmbySync =
@@ -1892,6 +1929,7 @@ export const searchTvdbByImdbId = async (params) => {
     const characters = getTvdbCharacters(extResObj);
     const firstAired = extData.firstAired || "";
     const lastAired = extData.lastAired || firstAired || "";
+    const nextAired = extData.nextAired || "";
     const status = extData.status?.name || "";
     const originalNetwork = extData.originalNetwork?.name || "";
 
@@ -1903,6 +1941,7 @@ export const searchTvdbByImdbId = async (params) => {
       overview: extData.overview || series.overview || "",
       firstAired: firstAired,
       lastAired: lastAired,
+      nextAired: nextAired,
       status: status,
       score: extData.score || null,
       originalCountry: extData.originalCountry || "",
@@ -1913,6 +1952,7 @@ export const searchTvdbByImdbId = async (params) => {
       characters: characters,
       remotes: [], // Don't fetch remotes for preview
       inEmby: false,
+      WaitStr: calculateWaitStr(nextAired, lastAired),
     };
 
     log(

@@ -17,7 +17,7 @@ const __filename = urlNode.fileURLToPath(import.meta.url);
 const __dirname = pathNode.dirname(__filename);
 
 async function main() {
-  const MAX_WORKERS = 8;
+  const MAX_WORKERS = 10;
 
   // If non-blank, emits targeted trace logs for this show name.
   // If blank, tracing is fully disabled.

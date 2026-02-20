@@ -424,7 +424,7 @@ export default {
         if (score === -1 || score < 0.5) return; // Skip reviews without scores or below 0.5
 
         // Map score to bucket index: 0.5→0, 1.0→1, 1.5→2, ..., 5.0→9
-        const bucketIndex = Math.round((score * 2) - 1);
+        const bucketIndex = Math.round(score * 2 - 1);
         if (bucketIndex >= 0 && bucketIndex < 10) {
           buckets[bucketIndex].count++;
         }

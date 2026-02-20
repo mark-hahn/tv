@@ -1647,6 +1647,9 @@ export default {
 
           if (hiddenByHasemby) {
             hasembyCond.filter = 0;
+            if (!this.hasLoadedAllShows) {
+              await this.loadAllShowsWithDialog();
+            }
             await this.select(false);
           } else {
             await this.fltrAction("All");

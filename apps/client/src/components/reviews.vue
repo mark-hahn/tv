@@ -414,8 +414,8 @@ export default {
       };
     },
     histogramBuckets() {
-      // Create 9 buckets: 0.5-1.0, 1.0-1.5, ..., 4.5-5.0
-      const buckets = Array(9)
+      // Create 10 buckets for discrete scores: 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0
+      const buckets = Array(10)
         .fill(0)
         .map(() => ({ count: 0 }));
 
@@ -423,9 +423,11 @@ export default {
         const score = review.numStars;
         if (score === -1 || score < 0.5) return; // Skip reviews without scores or below 0.5
 
-        // Determine which bucket (0-8)
-        const bucketIndex = Math.min(Math.floor((score - 0.5) / 0.5), 8);
-        buckets[bucketIndex].count++;
+        // Map score to bucket index: 0.5→0, 1.0→1, 1.5→2, ..., 5.0→9
+        const bucketIndex = Math.round((score * 2) - 1);
+        if (bucketIndex >= 0 && bucketIndex < 10) {
+          buckets[bucketIndex].count++;
+        }
       });
 
       // Find max count to scale heights

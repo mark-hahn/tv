@@ -481,7 +481,7 @@
     </div>
     <div
       id="no-actors"
-      v-if="!errorMessage &amp;&amp; !isGuestMode &amp;&amp; showName &amp;&amp; actors.length === 0"
+      v-if="!errorMessage &amp;&amp; !isGuestMode &amp;&amp; showName &amp;&amp; actors.length === 0 &amp;&amp; showNoCastMessage"
       style="text-align: center; color: #999; margin-top: 50px; font-size: 16px"
     >
       <div style="margin-bottom: 20px">No cast information available</div>
@@ -543,6 +543,8 @@ export default {
       creditsError: null, // Error message for credits
       creditsCache: {}, // Cache for actor credits {actorName: {credits, actorPageUrl}}
       actorPageUrl: null, // IMDb URL for selected actor
+      showNoCastMessage: false, // Controls whether to show "no cast info" message after delay
+      noCastMessageTimer: null, // Timer ID for the no cast message delay
     };
   },
 
@@ -1614,6 +1616,17 @@ export default {
       this.isGuestMode = false;
       this.showingEpisodeActors = false;
 
+      // Handle "no cast info" message with 2-second delay
+      if (this.noCastMessageTimer) {
+        clearTimeout(this.noCastMessageTimer);
+      }
+      this.showNoCastMessage = false;
+      if (this.actors.length === 0) {
+        this.noCastMessageTimer = setTimeout(() => {
+          this.showNoCastMessage = true;
+        }, 2000);
+      }
+
       // Log summary with before/after counts
       const tvdbAfter = this.actors.filter((a) => a.source === "tvdb").length;
       const tmdbAfter = this.actors.filter((a) => a.source === "tmdb").length;
@@ -1691,6 +1704,10 @@ export default {
   },
 
   unmounted() {
+    if (this.noCastMessageTimer) {
+      clearTimeout(this.noCastMessageTimer);
+    }
+
     if (this._onShowActors) evtBus.off("showActors", this._onShowActors);
     if (this._onFillAndSelectEpisode)
       evtBus.off("fillAndSelectEpisode", this._onFillAndSelectEpisode);

@@ -2077,6 +2077,10 @@ const getFile = async (params) => {
 };
 
 const applySubFiles = async (params) => {
+  console.log(
+    `[applySubFiles] Called with ${JSON.stringify(params).slice(0, 200)}`,
+  );
+
   if (params === undefined || params === null || params === "") {
     throw new Error("applySubFiles: missing params");
   }
@@ -2207,12 +2211,14 @@ const applySubFiles = async (params) => {
     entry.fileIdBase32 = encodeFileIdBase32(Number(file_id));
   }
 
-  // Persist the augmented request for inspection.
-  try {
-    await util.writeFile("samples/fileIdObjs.json", fileIdObjs);
-  } catch (e) {
-    throw new Error(`applySubFiles: write failed: ${e.message}`);
-  }
+  // Persist the augmented request for inspection (fire and forget - don't wait).
+  util.writeFile("samples/fileIdObjs.json", fileIdObjs).catch((e) => {
+    console.warn(`applySubFiles: debug write failed: ${e.message}`);
+  });
+
+  console.log(
+    `[applySubFiles] Building lookup map for ${fileIdObjs.length} file(s)`,
+  );
 
   // Build lookup by season/episode.
   const byKey = new Map();

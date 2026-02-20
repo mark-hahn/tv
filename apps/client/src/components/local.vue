@@ -1340,7 +1340,8 @@ export default {
         match.ProviderIds?.Imdb ||
         match.ProviderIds?.imdb ||
         match.ProviderIds?.IMDb ||
-        match.ProviderIds?.IMDB;
+        match.ProviderIds?.IMDB ||
+        match.imdbId;
 
       if (!imdb) {
         this.subsError = "Show has no IMDb ID.";

@@ -87,7 +87,7 @@ export async function getReviews(rottenUrl, buttonName) {
     // Wait for at least one card to appear
     await page
       .waitForSelector("review-card, .reviews-cards .card-wrap", {
-        timeout: 4000,
+        timeout: 3000,
       })
       .catch(() => {});
   } catch (err) {
@@ -290,7 +290,7 @@ export async function getReviews(rottenUrl, buttonName) {
 
         try {
           // Try force click first
-          await loadMoreBtn.click({ force: true, timeout: 5000 });
+          await loadMoreBtn.click({ force: true, timeout: 3000 });
         } catch {
           // If standard click fails, use JS dispatch
           await loadMoreBtn.dispatchEvent("click");
@@ -304,11 +304,11 @@ export async function getReviews(rottenUrl, buttonName) {
                 "review-card, .reviews-cards .card-wrap",
               ).length > prev,
             previousCount,
-            { timeout: 5000 },
+            { timeout: 3000 },
           );
         } catch (e) {
-          // Fallback specific wait if count didn't change (rare but possible if only few new loaded or latency)
-          await page.waitForTimeout(1500);
+          // If no new items loaded, break out
+          break;
         }
       } else {
         // No more button
@@ -369,13 +369,13 @@ export async function getImdbReviews(imdbId) {
   try {
     await page.goto(reviewsUrl, {
       waitUntil: "domcontentloaded",
-      timeout: 20000,
+      timeout: 15000,
     });
 
     // Wait for at least one review card to appear
     await page
       .waitForSelector(".ipc-list-card__content", {
-        timeout: 4000,
+        timeout: 3000,
       })
       .catch(() => {});
   } catch (err) {
@@ -398,10 +398,10 @@ export async function getImdbReviews(imdbId) {
     const seeAllBtn = page.locator("button.ipc-see-more__button").first();
 
     try {
-      await seeAllBtn.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
-      await page.waitForTimeout(500);
-      await seeAllBtn.click({ timeout: 5000, force: true });
-      await page.waitForTimeout(3000);
+      await seeAllBtn.scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => {});
+      await page.waitForTimeout(300);
+      await seeAllBtn.click({ timeout: 3000, force: true });
+      await page.waitForTimeout(1500);
     } catch (err) {
       // Continue with initial reviews if See all button fails
     }

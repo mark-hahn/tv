@@ -478,6 +478,7 @@ export default {
     onTvdbDataReady(data) {
       this.checkedRemotes = true;
       const tvdbData = data?.tvdbData;
+
       if (tvdbData && tvdbData.remotes) {
         const rottenRemote = tvdbData.remotes.find(
           (r) => r.name && r.name.toLowerCase().includes("rotten"),

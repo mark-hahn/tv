@@ -1076,24 +1076,25 @@ export default {
 
       const getEntryTvdbId = (entry) =>
         String(
-          entry?.tvdb_id ||
-            entry?.tvdbId ||
-            entry?.TvdbId ||
-            entry?.id ||
-            entry?.Id ||
-            "",
+          entry?.tvdb_id || entry?.tvdbId || entry?.TvdbId || entry?.id || "",
         ).trim();
+
+      const isRealTvdbEntry = (entry) => {
+        if (!entry || typeof entry !== "object") return false;
+        return !!getEntryTvdbId(entry);
+      };
 
       if (currentTvdbId) {
         for (const entry of Object.values(all)) {
           if (!entry || typeof entry !== "object") continue;
+          if (!isRealTvdbEntry(entry)) continue;
           if (getEntryTvdbId(entry) === currentTvdbId) return entry;
         }
       }
 
       if (!currentName) return null;
       const byName = all[currentName] || null;
-      if (!byName) return null;
+      if (!isRealTvdbEntry(byName)) return null;
 
       if (!currentTvdbId) return byName;
       return getEntryTvdbId(byName) === currentTvdbId ? byName : null;

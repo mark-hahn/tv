@@ -66,47 +66,112 @@
           <span>{{ showName }}</span>
         </div>
       </div>
-      <!-- Second Row: Filter Radio Buttons-->
-      <div
-        style="
-          width: 100%;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-left: 10px;
-          flex-wrap: wrap;
-        "
-      >
-        <button
-          v-for="btn in filterButtons"
-          :key="btn.label"
-          @click="handleButtonClick(btn.label)"
-          :style="getButtonStyle(selectedButton === btn.label, btn.label)"
-          :disabled="isButtonDisabled(btn.label)"
-        >
-          {{ btn.label }}
-        </button>
+      <!-- Second Row: Filter Radio Buttons and Histogram-->
+      <div style="width: 100%; display: flex; align-items: stretch; gap: 8px">
+        <!-- Left side: Buttons and Info-->
         <div
-          v-if="isLoading"
           style="
-            font-size: 14px;
-            color: #aaa !important;
-            margin-left: 8px;
-            font-weight: bold;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 10px;
+            flex-wrap: wrap;
           "
         >
-          &lt;Loading&gt;
+          <button
+            v-for="btn in filterButtons"
+            :key="btn.label"
+            @click="handleButtonClick(btn.label)"
+            :style="getButtonStyle(selectedButton === btn.label, btn.label)"
+            :disabled="isButtonDisabled(btn.label)"
+          >
+            {{ btn.label }}
+          </button>
+          <div
+            v-if="isLoading"
+            style="
+              font-size: 14px;
+              color: #aaa !important;
+              margin-left: 8px;
+              font-weight: bold;
+            "
+          >
+            &lt;Loading&gt;
+          </div>
+          <div
+            v-if="stats &amp;&amp; !simpleMode"
+            style="
+              font-size: 14px;
+              color: #555;
+              margin-left: 8px;
+              white-space: nowrap;
+            "
+          >
+            {{ reviews.length }}/{{ stats.numChecked }}
+          </div>
         </div>
+        <!-- Right side: Histogram-->
         <div
-          v-if="stats &amp;&amp; !simpleMode"
+          v-if="reviews.length > 0"
           style="
-            font-size: 14px;
-            color: #555;
-            margin-left: 8px;
-            white-space: nowrap;
+            flex: 0 0 50%;
+            display: flex;
+            align-items: flex-end;
+            padding: 0 10px;
+            height: 60px;
+            border-bottom: 2px solid #333;
+            position: relative;
           "
         >
-          {{ reviews.length }}/{{ stats.numChecked }}
+          <template
+            v-for="(bucket, idx) in histogramBuckets"
+            :key="idx"
+          >
+            <!-- Tick before each bar -->
+            <div
+              style="
+                width: 2px;
+                height: 5px;
+                background-color: #333;
+                flex-shrink: 0;
+                align-self: flex-end;
+                margin-bottom: -2px;
+              "
+            ></div>
+            <!-- Bar -->
+            <div
+              style="
+                flex: 1;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                justify-content: flex-end;
+                align-items: center;
+              "
+            >
+              <div
+                :style="{
+                  width: '100%',
+                  height: bucket.height + '%',
+                  backgroundColor: '#4a90e2',
+                  borderRadius: '2px 2px 0 0',
+                  minHeight: bucket.count > 0 ? '2px' : '0',
+                }"
+              ></div>
+            </div>
+          </template>
+          <!-- Final tick at the right end -->
+          <div
+            style="
+              width: 2px;
+              height: 5px;
+              background-color: #333;
+              flex-shrink: 0;
+              align-self: flex-end;
+              margin-bottom: -2px;
+            "
+          ></div>
         </div>
       </div>
     </div>
@@ -347,6 +412,31 @@ export default {
         padding: "10px",
         boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
       };
+    },
+    histogramBuckets() {
+      // Create 9 buckets: 0.5-1.0, 1.0-1.5, ..., 4.5-5.0
+      const buckets = Array(9)
+        .fill(0)
+        .map(() => ({ count: 0 }));
+
+      this.reviews.forEach((review) => {
+        const score = review.numStars;
+        if (score === -1 || score < 0.5) return; // Skip reviews without scores or below 0.5
+
+        // Determine which bucket (0-8)
+        const bucketIndex = Math.min(Math.floor((score - 0.5) / 0.5), 8);
+        buckets[bucketIndex].count++;
+      });
+
+      // Find max count to scale heights
+      const maxCount = Math.max(...buckets.map((b) => b.count), 1);
+
+      // Calculate height percentages (scale to 90% max to leave some room at top)
+      buckets.forEach((bucket) => {
+        bucket.height = (bucket.count / maxCount) * 90;
+      });
+
+      return buckets;
     },
   },
 

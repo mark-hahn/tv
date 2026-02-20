@@ -738,10 +738,12 @@ export default {
     },
 
     isMapDisabledInPreview() {
-      // Map is disabled in preview mode if there's no tvdb data to fetch from
-      if (!this.previewMode) return false;
-      if (!this.currentShow?.Name) return true;
-      const tvdbRecord = this.allTvdb?.[this.currentShow.Name];
+      // Map is now enabled in preview mode (fetches from TVDB API)
+      return false;
+      // Legacy: Map used to be disabled in preview mode if there's no tvdb data to fetch from
+      // if (!this.previewMode) return false;
+      // if (!this.currentShow?.Name) return true;
+      // const tvdbRecord = this.allTvdb?.[this.currentShow.Name];
       // Can fetch map if we have a tvdbId
       const canFetchMap = tvdbRecord?.tvdbId;
       return !canFetchMap;
@@ -1247,15 +1249,9 @@ export default {
       const k = String(key || "");
       if (!k) return;
 
-      // Preview mode: Map is disabled if no cached map data, and tabs to the right of AI are disabled.
+      // Preview mode: Map is now enabled, but tabs to the right of AI are disabled.
       if (this.previewMode) {
-        // Special handling for map: disable if no cached map data
-        if (k === "map" && this.isMapDisabledInPreview) {
-          return;
-        }
-
         const disabledKeys = new Set([
-          "map",
           "tor",
           "flex",
           "qbt",
@@ -1282,13 +1278,10 @@ export default {
       }
 
       if (k === "map") {
+        this.currentPane = "map";
+        evtBus.emit("paneChanged", this.currentPane);
         if (this.currentShow) {
-          this.currentPane = "map";
-          evtBus.emit("paneChanged", this.currentPane);
           evtBus.emit("mapAction", { action: "open", show: this.currentShow });
-        } else {
-          this.currentPane = "map";
-          evtBus.emit("paneChanged", this.currentPane);
         }
         return;
       }

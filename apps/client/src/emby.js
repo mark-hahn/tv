@@ -717,9 +717,24 @@ export const getEpisodeCounts = async (show) => {
 export const getSeriesMap = async (show, prune = false) => {
   const seriesId = show.Id;
 
-  // If this is a noemby show (from web search), return empty map
+  // If this is a noemby/preview show, fetch from TVDB API
   if (show.inEmby === false) {
-    return [];
+    const tvdbId = show.TvdbId || show.tvdbId;
+    if (!tvdbId) {
+      console.warn("getSeriesMap: Preview show has no tvdbId");
+      return [];
+    }
+    try {
+      const result = await srvr.getSeriesMapFromTvdb({ tvdbId });
+      if (result.success && result.seriesMap) {
+        return result.seriesMap;
+      }
+      console.error("getSeriesMap: Failed to fetch from TVDB:", result.error);
+      return [];
+    } catch (err) {
+      console.error("getSeriesMap: Error fetching from TVDB:", err);
+      return [];
+    }
   }
 
   const seriesMap = [];

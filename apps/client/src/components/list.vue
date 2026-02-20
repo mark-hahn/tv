@@ -1388,9 +1388,8 @@ export default {
         Reject: emby.isReject(showName),
       };
 
-      // Do not update Map pane contents on preview.
+      // Update Map pane contents on preview (map will show TVDB data).
       this.saveVisShow(show, false, {
-        skipMapUpdate: true,
         skipHighlight: true,
         skipPersist: true,
         skipHistory: true,
@@ -1408,11 +1407,10 @@ export default {
 
           evtBus.off("tvdbDataReady", onTvdbDataReady);
 
-          // Preload Actors (but suppress series-map prefetch so Map isn't populated).
+          // Preload Actors in preview mode.
           evtBus.emit("showActors", {
             show,
             tvdbData: data?.tvdbData ?? null,
-            suppressSeriesMapPrefetch: true,
           });
         } catch {
           // ignore

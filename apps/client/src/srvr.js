@@ -373,6 +373,10 @@ export function searchTvdbByImdbId(params) {
   return httpCall("/api/searchTvdbByImdbId", params, "POST");
 }
 
+export function getSeriesMapFromTvdb(params) {
+  return httpCall("/api/getSeriesMapFromTvdb", params, "POST");
+}
+
 export function handleAsr(params) {
   return fCall("handleAsr", params);
 }

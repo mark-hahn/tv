@@ -220,15 +220,15 @@ async function getActorCredits(actorName, options = {}) {
           .all();
       }
 
-    let bestMatchLink = null;
-    for (const link of actorLinks) {
-      const linkText = await link.textContent();
-      if (linkText && linkText.trim() && matchActor(linkText, actorName)) {
-        log(`✓ Found match: ${linkText.trim()}`);
-        bestMatchLink = link;
-        break;
+      let bestMatchLink = null;
+      for (const link of actorLinks) {
+        const linkText = await link.textContent();
+        if (linkText && linkText.trim() && matchActor(linkText, actorName)) {
+          log(`✓ Found match: ${linkText.trim()}`);
+          bestMatchLink = link;
+          break;
+        }
       }
-    }
 
       if (!bestMatchLink) {
         const allLinks = await page.locator("a").all();
@@ -276,11 +276,15 @@ async function getActorCredits(actorName, options = {}) {
         for (const button of filterButtons) {
           const buttonText = await button.textContent();
           // Check for both "Actor" and "Actress" (IMDb uses "Actress" for female actors)
-          if (buttonText && (buttonText.includes("Actor") || buttonText.includes("Actress"))) {
+          if (
+            buttonText &&
+            (buttonText.includes("Actor") || buttonText.includes("Actress"))
+          ) {
             const buttonClass = await button.getAttribute("class");
             if (
               buttonClass &&
-              (buttonClass.includes("selected") || buttonClass.includes("active"))
+              (buttonClass.includes("selected") ||
+                buttonClass.includes("active"))
             ) {
               log("✓ Actor filter is already active");
               actorButton = button;
@@ -295,7 +299,8 @@ async function getActorCredits(actorName, options = {}) {
           const buttonClass = await actorButton.getAttribute("class");
           const isAlreadyActive =
             buttonClass &&
-            (buttonClass.includes("selected") || buttonClass.includes("active"));
+            (buttonClass.includes("selected") ||
+              buttonClass.includes("active"));
 
           if (!isAlreadyActive) {
             await actorButton.scrollIntoViewIfNeeded();
@@ -339,7 +344,9 @@ async function getActorCredits(actorName, options = {}) {
       let unchangedCount = 0;
 
       for (let i = 0; i < 100; i++) {
-        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        await page.evaluate(() =>
+          window.scrollTo(0, document.body.scrollHeight),
+        );
         await page.waitForTimeout(500);
 
         const currentCardCount = await page
@@ -369,7 +376,10 @@ async function getActorCredits(actorName, options = {}) {
       for (const card of allCards) {
         const html = await card.evaluate((el) => el.outerHTML);
         // Skip unreleased content
-        if (!html.includes("accord_1_unrel") && !html.includes("In production")) {
+        if (
+          !html.includes("accord_1_unrel") &&
+          !html.includes("In production")
+        ) {
           const parsed = parseCard(html);
           if (parsed.imdbId) {
             cards.push(parsed);

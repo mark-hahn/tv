@@ -2536,6 +2536,22 @@ app.post("/api/getRemotes", apiWrapper(tvdb.getRemotesCmd));
 app.post("/api/debugTvdb", apiWrapper(tvdb.debugTvdb));
 app.post("/api/getNewTvdb", apiWrapper(tvdb.getNewTvdb));
 app.post("/api/searchTvdbByImdbId", apiWrapper(tvdb.searchTvdbByImdbId));
+app.post(
+  "/api/getSeriesMapFromTvdb",
+  apiWrapper(async (params) => {
+    const { tvdbId, watchedEpis } = params;
+    if (!tvdbId) {
+      return { success: false, error: "Missing tvdbId" };
+    }
+    try {
+      const seriesMap = await tvdb.getSeriesMap(tvdbId, watchedEpis || null);
+      return { success: true, seriesMap };
+    } catch (err) {
+      console.error("[getSeriesMapFromTvdb] error:", err);
+      return { success: false, error: err.message };
+    }
+  }),
+);
 app.post("/api/getActorPage", apiWrapper(tvdb.getActorPage));
 app.post("/api/searchActorsInNonEmby", apiWrapper(tvdb.searchActorsInNonEmby));
 app.post("/api/getTmdb", apiWrapper(tmdb.getTmdb));

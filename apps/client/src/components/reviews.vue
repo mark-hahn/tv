@@ -102,14 +102,11 @@
           style="
             font-size: 14px;
             color: #555;
-            margin-left: auto;
-            margin-right: 10px;
+            margin-left: 8px;
             white-space: nowrap;
           "
         >
-          {{ reviews.length }}/{{ stats.numChecked }} Eng:
-          {{ stats.notEnglishCount }}, Review: {{ stats.noReviewCount }}, Text:
-          {{ stats.smallTextCount }}
+          {{ reviews.length }}/{{ stats.numChecked }}
         </div>
       </div>
     </div>

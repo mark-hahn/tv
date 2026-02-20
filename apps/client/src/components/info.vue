@@ -972,85 +972,37 @@ export default {
       const name = show.Name;
 
       let epiCounts;
-      let watchedEpisIsNull = false;
+      let watchedCountIsNull = false;
       if (show.inEmby === false) {
-        // For non-emby shows, check if watchedEpis is null
-        if (tvdbData.watchedEpis === null) {
-          watchedEpisIsNull = true; // Mark as null since we don't have watch status
-          // Fetch seriesMap from TVDB to get real episode counts
-          const tvdbId = tvdbData.tvdbId;
-          if (tvdbId) {
-            try {
-              const seriesMap = await tvdb.getSeriesMapByTvdbId(tvdbId);
-              if (seriesMap && seriesMap.length > 0) {
-                // seriesMap is array format: [[seasonNum, [[episodeNum, epiObj], ...]], ...]
-                // Count directly from array instead of using getMapCounts
-                const seasonCount = seriesMap.length;
-                let episodeCount = 0;
-                for (const season of seriesMap) {
-                  const episodes = season[1] || [];
-                  episodeCount += episodes.length;
-                }
-                epiCounts = {
-                  seasonCount: seasonCount || 0,
-                  episodeCount: episodeCount || 0,
-                  watchedCount: 0,
-                };
-              } else {
-                epiCounts = {
-                  seasonCount: tvdbData.seasonCount || 0,
-                  episodeCount: tvdbData.episodeCount || 0,
-                  watchedCount: 0,
-                };
-              }
-            } catch (e) {
-              console.error("Failed to fetch seriesMap for episode counts:", e);
-              epiCounts = {
-                seasonCount: tvdbData.seasonCount || 0,
-                episodeCount: tvdbData.episodeCount || 0,
-                watchedCount: 0,
-              };
-            }
-          } else {
-            epiCounts = {
-              seasonCount: tvdbData.seasonCount || 0,
-              episodeCount: tvdbData.episodeCount || 0,
-              watchedCount: 0,
-            };
-          }
-        } else {
-          // Calculate watchedCount from watchedEpis
-          const watchedEpis = tvdbData.watchedEpis || [];
-          let watchedCount = 0;
-          for (const seasonEntry of watchedEpis) {
-            if (Array.isArray(seasonEntry) && seasonEntry.length > 1) {
-              // First element is season number, rest are episode numbers
-              watchedCount += seasonEntry.length - 1;
-            }
-          }
-          epiCounts = {
-            seasonCount: tvdbData.seasonCount || 0,
-            episodeCount: tvdbData.episodeCount || 0,
-            watchedCount: watchedCount,
-          };
-        }
+        // For non-emby shows, use stored watchedCount from tvdb
+        // (watchedCount should be already populated by migration script or previous Emby calculations)
+        const watchedCount = tvdbData.watchedCount;
+        watchedCountIsNull =
+          watchedCount === null || watchedCount === undefined;
+
+        epiCounts = {
+          seasonCount: tvdbData.seasonCount || 0,
+          episodeCount: tvdbData.episodeCount || 0,
+          watchedCount: watchedCountIsNull ? null : watchedCount,
+        };
       } else {
-        // For emby shows, get counts from Emby API
+        // For emby shows, get counts from Emby API and save to tvdb
         epiCounts = await emby.getEpisodeCounts(show);
+
+        // Save the calculated counts back to tvdb if they differ
+        const fields = Object.assign({ name }, epiCounts);
+        srvr.setTvdbFields(fields).catch((e) => console.error(e));
       }
 
       Object.assign(tvdbData, epiCounts);
-      const fields = Object.assign({ name }, epiCounts);
-      // don't await, let it fail or succeed in background
-      srvr.setTvdbFields(fields).catch((e) => console.error(e));
       allTvdb[name] = tvdbData;
       let seasonsTxt;
       const { episodeCount, seasonCount, watchedCount } = tvdbData;
 
       // Set watched text first (before potential early return)
       if (episodeCount > 0) {
-        if (watchedEpisIsNull) {
-          // Show "?" when watchedEpis is null for non-emby shows
+        if (watchedCountIsNull) {
+          // Show "?" when watchedCount is null for non-emby shows
           this.watchedValTxt = `? of ${episodeCount}`;
         } else {
           this.watchedValTxt =
@@ -1060,7 +1012,7 @@ export default {
         }
       } else if (show.inEmby === false) {
         // For non-emby shows with no episode count yet, still show watched status
-        this.watchedValTxt = watchedEpisIsNull ? "?" : "0";
+        this.watchedValTxt = watchedCountIsNull ? "?" : "0";
       } else {
         this.watchedValTxt = "";
       }

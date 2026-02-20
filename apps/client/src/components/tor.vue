@@ -213,6 +213,19 @@
             </div>
           </div>
         </div>
+        <div
+          style="
+            margin-left: 20px;
+            margin-right: 20px;
+            margin-top: 6px;
+            font-weight: normal;
+            font-size: 14px;
+            color: #666;
+            line-height: 1.1;
+          "
+        >
+          {{ headerIdsLine }}
+        </div>
       </div>
       <div
         id="unaired"
@@ -872,6 +885,43 @@ export default {
       return (
         this.showName || this.currentShow?.Name || this.activeShow?.Name || ""
       );
+    },
+    headerIdsLine() {
+      const show = this.currentShow || this.activeShow || {};
+      const providerIds = show.ProviderIds || {};
+
+      const toDisplay = (value) => {
+        const str = String(value ?? "").trim();
+        return str || "-";
+      };
+
+      const tvdbId =
+        show.TvdbId ||
+        show.tvdbId ||
+        show.tvdb_id ||
+        providerIds.Tvdb ||
+        providerIds.TVDB;
+      const imdbId =
+        show.imdbId ||
+        providerIds.Imdb ||
+        providerIds.imdb ||
+        providerIds.IMDB ||
+        providerIds.IMDb;
+      const tmdbId =
+        show.tmdbId ||
+        show.TmdbId ||
+        show.tmdb_id ||
+        providerIds.Tmdb ||
+        providerIds.TMDB;
+      const tvMazeId =
+        show.tvmazeId ||
+        show.tvmaze_id ||
+        show.tvmaze?.id ||
+        providerIds.TvMaze ||
+        providerIds.Tvmaze ||
+        providerIds.TVMAZE;
+
+      return `Tvdb: ${toDisplay(tvdbId)}, Imdb: ${toDisplay(imdbId)}, Tmdb: ${toDisplay(tmdbId)}, TvMaze: ${toDisplay(tvMazeId)}`;
     },
     filteredTorrents() {
       // Use season filter if present

@@ -1542,7 +1542,14 @@ export default {
     },
 
     async selectShowFromCardTitle(rawTitle) {
-      const raw = String(rawTitle || "").trim();
+      const req =
+        rawTitle && typeof rawTitle === "object"
+          ? rawTitle
+          : { rawTitle: rawTitle };
+
+      const raw = String(req.rawTitle || req.title || req.name || "").trim();
+      const reqTvdbId = String(req.tvdbId || "").trim();
+
       if (!raw) return;
       if (!Array.isArray(allShows) || allShows.length === 0) {
         return;
@@ -1576,8 +1583,22 @@ export default {
       const searchTitle = parsed?.title || stripped || raw;
       const searchYear = parsed?.year || null;
 
-      // First try exact name match (important for gallery selections)
-      let match = allShows.find((s) => s.Name === raw);
+      let match = null;
+
+      // First try requested tvdb id if provided (important for TVDB browse selections).
+      if (reqTvdbId) {
+        match = allShows.find((s) => {
+          const sTvdb = String(
+            s?.TvdbId || s?.tvdbId || s?.tvdb_id || "",
+          ).trim();
+          return sTvdb && sTvdb === reqTvdbId;
+        });
+      }
+
+      // Then exact name match (important for gallery selections)
+      if (!match) {
+        match = allShows.find((s) => s.Name === raw);
+      }
 
       if (!match) {
         // Try case-insensitive exact match
@@ -1589,8 +1610,19 @@ export default {
       if (!match && !this.hasLoadedAllShows) {
         await this.loadAllShowsWithDialog();
 
+        if (!match && reqTvdbId) {
+          match = allShows.find((s) => {
+            const sTvdb = String(
+              s?.TvdbId || s?.tvdbId || s?.tvdb_id || "",
+            ).trim();
+            return sTvdb && sTvdb === reqTvdbId;
+          });
+        }
+
         // Try exact match again with the complete show list
-        match = allShows.find((s) => s.Name === raw);
+        if (!match) {
+          match = allShows.find((s) => s.Name === raw);
+        }
         if (!match) {
           const rawLower = raw.toLowerCase();
           match = allShows.find((s) => s.Name?.toLowerCase() === rawLower);
@@ -1603,8 +1635,22 @@ export default {
       }
 
       if (match) {
-        if (!this.shows.some((sh) => sh?.Name === match.Name)) {
-          await this.fltrAction("All");
+        const isVisible = this.shows.some((sh) => sh?.Name === match.Name);
+        if (!isVisible) {
+          const hasembyCond = this.conds.find((c) => c?.name === "hasemby");
+          const showInEmby = match.inEmby !== false;
+          const hiddenByHasemby =
+            !!hasembyCond &&
+            hasembyCond.filter !== 0 &&
+            ((hasembyCond.filter === +1 && !showInEmby) ||
+              (hasembyCond.filter === -1 && showInEmby));
+
+          if (hiddenByHasemby) {
+            hasembyCond.filter = 0;
+            await this.select(false);
+          } else {
+            await this.fltrAction("All");
+          }
         }
         this.onSelectShow(match, true);
       }

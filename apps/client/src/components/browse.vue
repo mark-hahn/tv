@@ -1063,14 +1063,40 @@ export default {
     });
 
     const matchingTvdbEntry = computed(() => {
-      if (!allTvdbData.value || !curTvdb.value) return null;
-      const name =
-        curTvdb.value.name ||
-        curTvdb.value.Name ||
-        curTvdb.value.seriesName ||
-        curTvdb.value.title;
-      if (!name) return null;
-      return allTvdbData.value[name] || null;
+      const all = allTvdbData.value;
+      const t = curTvdb.value;
+      if (!all || !t) return null;
+
+      const currentTvdbId = String(t.tvdb_id || t.tvdbId || t.id || "").trim();
+      const currentName = String(
+        t.name || t.Name || t.seriesName || t.title || "",
+      ).trim();
+
+      if (!currentTvdbId && !currentName) return null;
+
+      const getEntryTvdbId = (entry) =>
+        String(
+          entry?.tvdb_id ||
+            entry?.tvdbId ||
+            entry?.TvdbId ||
+            entry?.id ||
+            entry?.Id ||
+            "",
+        ).trim();
+
+      if (currentTvdbId) {
+        for (const entry of Object.values(all)) {
+          if (!entry || typeof entry !== "object") continue;
+          if (getEntryTvdbId(entry) === currentTvdbId) return entry;
+        }
+      }
+
+      if (!currentName) return null;
+      const byName = all[currentName] || null;
+      if (!byName) return null;
+
+      if (!currentTvdbId) return byName;
+      return getEntryTvdbId(byName) === currentTvdbId ? byName : null;
     });
 
     const hasTvdbEntry = computed(() => !!matchingTvdbEntry.value);
@@ -1101,7 +1127,8 @@ export default {
       if (t) {
         const name = t.name || t.Name || t.seriesName || t.title;
         if (name) {
-          handleSelectExisting(name);
+          const tvdbId = String(t.tvdb_id || t.tvdbId || t.id || "").trim();
+          handleSelectExisting(name, { tvdbId });
           return;
         }
       }
@@ -1220,13 +1247,21 @@ export default {
       return info;
     });
 
-    const handleSelectExisting = async (name) => {
+    const handleSelectExisting = async (name, options = {}) => {
       if (!name) {
         return;
       }
       loadingShowSelection.value = true;
       loadingShowName.value = name;
-      evtBus.emit("selectShowFromCardTitle", name);
+      const tvdbId = String(options?.tvdbId || "").trim();
+      if (tvdbId) {
+        evtBus.emit("selectShowFromCardTitle", {
+          rawTitle: name,
+          tvdbId,
+        });
+      } else {
+        evtBus.emit("selectShowFromCardTitle", name);
+      }
 
       // Wait for the selection to complete
       await new Promise((resolve) => setTimeout(resolve, 100));

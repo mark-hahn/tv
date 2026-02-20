@@ -213,6 +213,7 @@
       <template v-else>
         <!-- Left Column: Descending Sort (High Scores)-->
         <div
+          ref="leftReviewsPane"
           style="
             flex: 1;
             display: flex;
@@ -271,6 +272,7 @@
         </div>
         <!-- Right Column: Ascending Sort (Low Scores)-->
         <div
+          ref="rightReviewsPane"
           style="
             flex: 1;
             display: flex;
@@ -475,6 +477,7 @@ export default {
       this.imdbUrl = "";
       this.selectedButton = "Rotten";
       this.checkedRemotes = false;
+      this.scrollReviewPanesToTop();
     },
 
     onTvdbDataReady(data) {
@@ -583,7 +586,17 @@ export default {
       }
     },
 
+    scrollReviewPanesToTop() {
+      this.$nextTick(() => {
+        const leftPane = this.$refs.leftReviewsPane;
+        const rightPane = this.$refs.rightReviewsPane;
+        if (leftPane) leftPane.scrollTop = 0;
+        if (rightPane) rightPane.scrollTop = 0;
+      });
+    },
+
     async loadReviews(urlOrId, buttonName) {
+      this.scrollReviewPanesToTop();
       this.reviews = [];
       this.stats = null;
       this.isLoading = true;

@@ -711,12 +711,12 @@ export default {
         return;
       }
 
-      console.log("Loading all shows (non-emby)...");
+      console.log("Loading all shows...");
 
       this.hasLoadedAllShows = true;
 
-      // Load non-emby shows (emby shows are already loaded)
-      const additionalShows = await tvdb.getAllTvdb(-1);
+      // Load full dataset
+      const additionalShows = await tvdb.getAllTvdb(0);
 
       // Merge into allTvdb
       Object.assign(allTvdb, additionalShows);
@@ -729,9 +729,7 @@ export default {
       );
       allShows.push(...newShows);
 
-      console.log(
-        `Added ${newShows.length} non-emby shows (total: ${allShows.length})`,
-      );
+      console.log(`Added ${newShows.length} shows (total: ${allShows.length})`);
     },
 
     updateWideLandscape() {
@@ -2041,11 +2039,11 @@ export default {
         cond.filter !== 1 &&
         !this.hasLoadedAllShows
       ) {
-        console.log("Loading remaining shows (inEmby false)...");
+        console.log("Loading full TVDB dataset...");
         this.hasLoadedAllShows = true;
 
-        // Load shows with inEmby false
-        const additionalShows = await tvdb.getAllTvdb(-1);
+        // Load all shows
+        const additionalShows = await tvdb.getAllTvdb(0);
 
         // Merge into allTvdb and allShows
         Object.assign(allTvdb, additionalShows);
@@ -2400,6 +2398,7 @@ export default {
       const result = await emby.loadAllShows();
       allShows = result.allShows;
       allTvdb = result.allTvdb;
+      this.hasLoadedAllShows = true;
 
       if (!allShows) {
         console.error("No shows from loadAllShows");
@@ -2435,8 +2434,7 @@ export default {
         name = allShows[0].Name;
       }
 
-      // Check if the saved show has inEmby false
-      // If so, select the first show instead (since we only loaded inEmby true shows)
+      // Keep initial selection on Emby-visible entries for default UX.
       const savedShow = allShows.find((s) => s.Name === name);
       if (savedShow && savedShow.inEmby === false) {
         console.log(

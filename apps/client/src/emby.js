@@ -54,6 +54,19 @@ function normShowName(name) {
     .toLowerCase();
 }
 
+function isTvdbShowRecord(record) {
+  if (!record || typeof record !== "object" || Array.isArray(record)) {
+    return false;
+  }
+  const recName =
+    typeof record.Name === "string"
+      ? record.Name.trim()
+      : typeof record.name === "string"
+        ? record.name.trim()
+        : "";
+  return !!recName;
+}
+
 export const isReject = (name) => {
   if (!rejectsSet) return false;
   return rejectsSet.has(normShowName(name));
@@ -74,6 +87,7 @@ async function syncCollections(allTvdb) {
   const lindaIds = new Set(lindaRes.data.Items.map((i) => i.Id));
 
   for (const tvdb of Object.values(allTvdb)) {
+    if (!isTvdbShowRecord(tvdb)) continue;
     tvdb.InToTry = toTryIds.has(tvdb.Id);
     tvdb.InContinue = continueIds.has(tvdb.Id);
     tvdb.InMark = markIds.has(tvdb.Id);
@@ -85,6 +99,7 @@ async function syncCollections(allTvdb) {
 function syncRejectsAndPickups(allTvdb, rejectsIn, pickups) {
   // Set reject and pickup flags for all shows
   for (const tvdb of Object.values(allTvdb)) {
+    if (!isTvdbShowRecord(tvdb)) continue;
     const normalizedName = normShowName(tvdb.Name);
     tvdb.reject = (rejectsIn || []).some(
       (r) => normShowName(r) === normalizedName,
@@ -101,6 +116,7 @@ function syncRejectsAndPickups(allTvdb, rejectsIn, pickups) {
 // Phase 2: Helper function to set wait strings for shows
 async function setWaitStrings(allTvdb) {
   for (const tvdb of Object.values(allTvdb)) {
+    if (!isTvdbShowRecord(tvdb)) continue;
     if (tvdb.inEmby === false) continue;
     try {
       const show = { Name: tvdb.Name, Id: tvdb.Id };
@@ -115,6 +131,138 @@ async function setWaitStrings(allTvdb) {
 // Phase 2: Refactored loadAllShows - simplified, uses tvdb as source of truth
 export async function loadAllShows() {
   const loadStart = Date.now();
+
+  const ensureEmbyRemoteUrlMatchesRecordId = async (recordKey, record) => {
+    if (!isTvdbShowRecord(record)) return record;
+    const key = String(recordKey || "").trim();
+    if (!key) return record;
+
+    const recordId = String(record?.Id || "").trim();
+    if (!recordId) return record;
+    if (!Array.isArray(record.remotes)) return record;
+
+    const embyRemoteIndex = record.remotes.findIndex((r) => r?.name === "Emby");
+    if (embyRemoteIndex < 0) return record;
+
+    const expectedUrl = urls.embyPageUrl(recordId);
+    const currentUrl = String(
+      record.remotes[embyRemoteIndex]?.url || "",
+    ).trim();
+    if (currentUrl === expectedUrl) return record;
+
+    record.remotes[embyRemoteIndex] = {
+      ...record.remotes[embyRemoteIndex],
+      url: expectedUrl,
+    };
+    console.warn(
+      `[loadAllShows] Fixed Emby remote URL mismatch for key=\"${key}\": id=${recordId} oldUrl=\"${currentUrl}\" newUrl=\"${expectedUrl}\"`,
+    );
+
+    try {
+      const updated = await srvr.setTvdbFields({
+        name: key,
+        remotes: record.remotes,
+      });
+      if (isTvdbShowRecord(updated)) {
+        allTvdb[key] = updated;
+        return updated;
+      }
+    } catch (e) {
+      console.error(
+        `[loadAllShows] Failed to persist fixed Emby remote URL for key=\"${key}\"`,
+        e,
+      );
+    }
+
+    return record;
+  };
+
+  const findTvdbEntryByTvdbId = (tvdbMap, targetTvdbId) => {
+    const id = String(targetTvdbId || "").trim();
+    if (!id) return null;
+    for (const [key, record] of Object.entries(tvdbMap || {})) {
+      const recId = String(record?.tvdbId || record?.TvdbId || "").trim();
+      if (recId && recId === id) return { key, record };
+    }
+    return null;
+  };
+
+  const embyHasTvdbRecord = (embyItems, tvdbRecord, tvdbKeyName) => {
+    const keyName = String(tvdbKeyName || "").trim();
+    const recordTvdbId = String(
+      tvdbRecord?.tvdbId || tvdbRecord?.TvdbId || "",
+    ).trim();
+    return (embyItems || []).some((s) => {
+      const embyName = String(s?.Name || "").trim();
+      if (keyName && embyName === keyName) return true;
+      if (!recordTvdbId) return false;
+      const embyTvdbId = String(s?.ProviderIds?.Tvdb || s?.TvdbId || "").trim();
+      const matchedByTvdbId = embyTvdbId && embyTvdbId === recordTvdbId;
+      if (matchedByTvdbId && keyName && embyName && embyName !== keyName) {
+        console.info(
+          `[loadAllShows] hasEmby matched by tvdbId=${recordTvdbId} with name variant: emby="${embyName}" cacheKey="${keyName}"`,
+        );
+      }
+      return matchedByTvdbId;
+    });
+  };
+
+  const findLikelySameShowCandidate = (tvdbMap, embyShowName, embyTvdbId) => {
+    const queryName = String(embyShowName || "").trim();
+    if (!queryName) return null;
+
+    const normalizeAggressiveTitle = (name) => {
+      let out = String(name || "");
+      const idx = out.indexOf("(");
+      if (idx >= 0) out = out.slice(0, idx);
+      return out
+        .toLowerCase()
+        .replace(/\./g, " ")
+        .replace(/[^a-z0-9\s]/g, " ")
+        .trim()
+        .replace(/\s+/g, " ");
+    };
+
+    const incomingTvdbId = String(embyTvdbId || "").trim();
+    const normalizedQuery = normalizeAggressiveTitle(queryName);
+    if (!normalizedQuery) return null;
+
+    const variantMatches = [];
+    for (const [key, record] of Object.entries(tvdbMap || {})) {
+      const candidateName = String(record?.Name || record?.name || "").trim();
+      if (!candidateName || candidateName === queryName) continue;
+      if (normalizeAggressiveTitle(candidateName) !== normalizedQuery) continue;
+      variantMatches.push({ key, record, candidateName });
+    }
+
+    if (variantMatches.length === 0) return null;
+
+    // Prefer candidate with same TVDB id when available; otherwise first variant match.
+    let chosen = variantMatches[0];
+    if (incomingTvdbId) {
+      const byTvdbId = variantMatches.find(({ record }) => {
+        const candidateTvdbId = String(
+          record?.tvdbId || record?.TvdbId || "",
+        ).trim();
+        return candidateTvdbId && candidateTvdbId === incomingTvdbId;
+      });
+      if (byTvdbId) chosen = byTvdbId;
+    }
+
+    const chosenTvdbId = String(
+      chosen.record?.tvdbId || chosen.record?.TvdbId || "",
+    ).trim();
+
+    return {
+      key: chosen.key || chosen.candidateName,
+      record: chosen.record,
+      likelyById: !!(
+        incomingTvdbId &&
+        chosenTvdbId &&
+        incomingTvdbId === chosenTvdbId
+      ),
+    };
+  };
 
   // 1. Fetch all data sources in parallel (HTTP is fast now!)
   const [embyShows, rejectsIn, pickups, allTvdbResult] = await Promise.all([
@@ -132,12 +280,16 @@ export async function loadAllShows() {
   // Diagnostic & Fix: Check for key/Name mismatches and fix them
   const keysToDelete = [];
   for (const [key, show] of Object.entries(allTvdb)) {
-    const properName = show.Name;
-    if (!properName) {
-      console.error(
-        `[loadAllShows] Show with key="${key}" has no Name property!`,
+    if (!isTvdbShowRecord(show)) {
+      console.warn(
+        `[loadAllShows] Ignoring non-show TVDB entry at key="${key}"`,
         show,
       );
+      continue;
+    }
+
+    const properName = show.Name;
+    if (!properName) {
       continue;
     }
 
@@ -220,9 +372,27 @@ export async function loadAllShows() {
     // Get emby path (used for new record creation)
     const embyPath = embyShow.Path.split("/").pop();
 
-    // Build update object with Emby data (for creating NEW records only)
+    // Resolve existing tvdb record by exact key first, then by tvdbId.
+    let tvdbKey = name;
+    let tvdbRecord = allTvdb[tvdbKey];
+    if (!tvdbRecord && tvdbId) {
+      const byTvdbId = findTvdbEntryByTvdbId(allTvdb, tvdbId);
+      if (byTvdbId) {
+        tvdbKey = byTvdbId.key;
+        tvdbRecord = byTvdbId.record;
+        if (tvdbKey !== name) {
+          console.info(
+            `[loadAllShows] Name variant matched by tvdbId=${tvdbId}: emby="${name}" cacheKey="${tvdbKey}"`,
+          );
+        }
+      }
+    }
+
+    const canonicalName = tvdbRecord?.Name || name;
+
+    // Build update object with Emby data (for creating/refreshing records)
     const updateFields = {
-      name,
+      name: canonicalName,
       showId: embyShow.Id,
       tvdbId,
       embyPath,
@@ -239,36 +409,127 @@ export async function loadAllShows() {
     };
 
     // Create or update tvdb record
-    let tvdbRecord = allTvdb[name];
     if (!tvdbRecord || tvdbRecord.Id !== embyShow.Id) {
-      // Need to create/refresh tvdb record
-      const reason = !tvdbRecord
-        ? "no existing tvdb entry"
-        : `Id mismatch (${tvdbRecord.Id} != ${embyShow.Id})`;
+      if (!tvdbRecord) {
+        const likelyCandidate = findLikelySameShowCandidate(
+          allTvdb,
+          name,
+          tvdbId,
+        );
+        if (likelyCandidate) {
+          const existing = likelyCandidate.record;
+          console.error(
+            `[loadAllShows] Blocked tvdb record create for emby="${name}"; likely same-show candidate exists: cacheKey="${likelyCandidate.key}"`,
+          );
+          evtBus.emit("tvdb-mismatch", {
+            reason: "likely-same-show-candidate",
+            action: "blocked-create",
+            name,
+            showId: embyShow.Id,
+            tvdbId,
+            existing: {
+              key: likelyCandidate.key,
+              name: existing?.Name || existing?.name || "",
+              tvdbId: existing?.tvdbId || existing?.TvdbId || "",
+              Id: existing?.Id || "",
+              inEmby: existing?.inEmby,
+            },
+            details: {
+              likelyById: likelyCandidate.likelyById,
+            },
+          });
+          continue;
+        }
+      }
 
-      // Check for true mismatches (pop modal for user attention)
-      if (
-        tvdbRecord &&
-        (tvdbRecord.Id !== embyShow.Id ||
-          (tvdbRecord.tvdbId &&
-            tvdbId &&
-            String(tvdbRecord.tvdbId) !== String(tvdbId)))
-      ) {
+      // Check for true mismatches and block creation/update to prevent duplicate or cross-linked records.
+      // Important: missing/empty cached Id means "not linked yet" and should be linkable.
+      const cachedShowId =
+        tvdbRecord?.Id == null ? "" : String(tvdbRecord.Id).trim();
+      const incomingShowId =
+        embyShow?.Id == null ? "" : String(embyShow.Id).trim();
+      const cachedTvdbId =
+        tvdbRecord?.tvdbId == null ? "" : String(tvdbRecord.tvdbId).trim();
+      const incomingTvdbId = tvdbId == null ? "" : String(tvdbId).trim();
+
+      const hasCachedShowId = cachedShowId !== "";
+      const hasCachedTvdbId = cachedTvdbId !== "";
+
+      const showIdMismatch =
+        hasCachedShowId &&
+        incomingShowId !== "" &&
+        cachedShowId !== incomingShowId;
+      const tvdbIdMismatch =
+        hasCachedTvdbId &&
+        incomingTvdbId !== "" &&
+        cachedTvdbId !== incomingTvdbId;
+
+      if (tvdbRecord && (showIdMismatch || tvdbIdMismatch)) {
         evtBus.emit("tvdb-mismatch", {
+          reason: "cache-mismatch-blocked",
+          action: "blocked-create",
           name,
           showId: embyShow.Id,
           tvdbId,
           existing: {
+            key: tvdbKey,
+            name: tvdbRecord?.Name || tvdbKey,
             tvdbId: tvdbRecord.tvdbId,
             Id: tvdbRecord.Id,
+            inEmby: tvdbRecord?.inEmby,
+          },
+          details: {
+            mismatchType: showIdMismatch ? "showId" : "tvdbId",
           },
         });
+        console.error(
+          `[loadAllShows] Blocked create/update on cache mismatch: emby=\"${name}\" cacheKey=\"${tvdbKey}\" embyId=${embyShow.Id} cacheId=${tvdbRecord.Id} embyTvdbId=${tvdbId} cacheTvdbId=${tvdbRecord.tvdbId}`,
+        );
+        continue;
+      }
+
+      // Existing cache record + same tvdbId + missing Id: link/update this record directly.
+      // Do not call getNewTvdb here to avoid create-style behavior.
+      if (tvdbRecord && !hasCachedShowId && incomingShowId !== "") {
+        console.log(
+          `[loadAllShows] Linking existing tvdb record to Emby Id: key=\"${tvdbKey}\" tvdbId=${incomingTvdbId} embyId=${incomingShowId}`,
+        );
+        const linkedRecord = await srvr.setTvdbFields({
+          name: tvdbKey,
+          Id: incomingShowId,
+          tvdbId: incomingTvdbId,
+          inEmby: true,
+          Path: embyPath,
+          Genres: updateFields["emby.genres"],
+          Overview: updateFields["emby.overview"],
+          DateCreated: updateFields.dateCreated,
+          PremiereDate: updateFields.premiereDate,
+          lastEmbySync: now,
+          IsFavorite: updateFields.isFavorite,
+          Played: updateFields.isPlayed,
+          PlayCount: updateFields.playCount,
+          LastPlayedDate: updateFields.lastPlayedDate,
+        });
+        if (isTvdbShowRecord(linkedRecord)) {
+          allTvdb[tvdbKey] = linkedRecord;
+          await ensureEmbyRemoteUrlMatchesRecordId(tvdbKey, linkedRecord);
+        } else {
+          console.warn(
+            `[loadAllShows] setTvdbFields link response was not a show record for key=\"${tvdbKey}\"`,
+            linkedRecord,
+          );
+        }
+        continue;
       }
 
       const epicounts = await getEpisodeCounts(embyShow);
 
       // Add TvdbId to show object for server request
-      const showWithTvdbId = { ...embyShow, TvdbId: tvdbId };
+      const showWithTvdbId = {
+        ...embyShow,
+        Name: canonicalName,
+        TvdbId: tvdbId,
+      };
       const param = Object.assign(
         { show: showWithTvdbId },
         epicounts,
@@ -276,7 +537,22 @@ export async function loadAllShows() {
       );
 
       tvdbRecord = await srvr.getNewTvdb(param);
-      allTvdb[name] = tvdbRecord;
+      const upsertedKey = tvdb.upsertTvdbCacheRecord(
+        allTvdb,
+        tvdbRecord,
+        tvdbKey,
+      );
+      const fixedKey = String(upsertedKey || tvdbKey || "").trim();
+      const fixedRecord = fixedKey ? allTvdb[fixedKey] : tvdbRecord;
+      if (fixedKey && fixedRecord) {
+        const syncedRecord = await ensureEmbyRemoteUrlMatchesRecordId(
+          fixedKey,
+          fixedRecord,
+        );
+        if (isTvdbShowRecord(syncedRecord)) {
+          tvdbRecord = syncedRecord;
+        }
+      }
     } else {
       // Update existing tvdb record with Emby metadata for new shows only
       // User data (Played, PlayCount, etc) is synced by background Emby User Data Sync
@@ -301,11 +577,15 @@ export async function loadAllShows() {
 
       // Note: gap and note already in tvdb (Phase 5), don't overwrite
       tvdbRecord.lastEmbySync = now;
+
+      await ensureEmbyRemoteUrlMatchesRecordId(tvdbKey, tvdbRecord);
     }
   }
 
   // 4. Process shows not in Emby (inEmby === false)
-  const noEmbys = Object.values(allTvdb).filter((t) => !t?.inEmby);
+  const noEmbys = Object.values(allTvdb).filter(
+    (t) => isTvdbShowRecord(t) && !t?.inEmby,
+  );
   const prunedNoEmbyIds = [];
 
   await Promise.all(
@@ -349,20 +629,30 @@ export async function loadAllShows() {
 
   // 5. Update inEmby status if no matching show exists
   for (const [name, tvdbRecord] of Object.entries(allTvdb)) {
+    if (!isTvdbShowRecord(tvdbRecord)) continue;
     if (tvdbRecord.inEmby === false) continue;
 
-    const hasEmby = embyShows.data.Items.some((s) => s.Name === name);
+    const hasEmby = embyHasTvdbRecord(embyShows.data.Items, tvdbRecord, name);
     const hasNoEmby = noEmbys.some((s) => s.name === name);
 
     if (!hasEmby && !hasNoEmby) {
       console.log(
         `loadAllShows: marking ${name} as not in Emby (no show found)`,
       );
-      allTvdb[name] = await srvr.setTvdbFields({
+      const updatedRecord = await srvr.setTvdbFields({
         name,
         inEmby: false,
         dontSave: true,
       });
+      if (isTvdbShowRecord(updatedRecord)) {
+        allTvdb[name] = updatedRecord;
+        await ensureEmbyRemoteUrlMatchesRecordId(name, updatedRecord);
+      } else {
+        console.warn(
+          `[loadAllShows] Ignoring non-show setTvdbFields response while marking not-in-Emby for "${name}"`,
+          updatedRecord,
+        );
+      }
       // Diagnostic: check if we just created an undefined key
       if (name === undefined) {
         console.error(
@@ -372,13 +662,28 @@ export async function loadAllShows() {
       }
     } else if (hasEmby && !tvdbRecord.Id) {
       // Has Emby show but tvdb missing Id - update it
-      const embyShow = embyShows.data.Items.find((s) => s.Name === name);
+      const embyShow = embyShows.data.Items.find((s) => {
+        if (s.Name === name) return true;
+        const sTvdbId = String(s?.ProviderIds?.Tvdb || s?.TvdbId || "").trim();
+        const recTvdbId = String(
+          tvdbRecord?.tvdbId || tvdbRecord?.TvdbId || "",
+        ).trim();
+        return !!(sTvdbId && recTvdbId && sTvdbId === recTvdbId);
+      });
       console.log(`loadAllShows: updating tvdb Id for ${name}`);
-      allTvdb[name] = await srvr.setTvdbFields({
+      const updatedRecord = await srvr.setTvdbFields({
         name,
         Id: embyShow.Id,
         dontSave: true,
       });
+      if (isTvdbShowRecord(updatedRecord)) {
+        allTvdb[name] = updatedRecord;
+      } else {
+        console.warn(
+          `[loadAllShows] Ignoring non-show setTvdbFields response while updating Id for "${name}"`,
+          updatedRecord,
+        );
+      }
       // Diagnostic: check if we just created an undefined key
       if (name === undefined) {
         console.error(
@@ -397,6 +702,7 @@ export async function loadAllShows() {
 
   // 7. Ensure computed properties are set (since nested objects are now flattened)
   for (const tvdb of Object.values(allTvdb)) {
+    if (!isTvdbShowRecord(tvdb)) continue;
     // Ensure Name and TvdbId are set (should already be from migration)
     if (!tvdb.Name && tvdb.name) tvdb.Name = tvdb.name;
     if (!tvdb.TvdbId && tvdb.tvdbId) tvdb.TvdbId = tvdb.tvdbId;
@@ -451,7 +757,7 @@ export async function loadAllShows() {
     if (tvdb.NoFiles === undefined) tvdb.NoFiles = false;
   }
 
-  const showRecords = Object.values(allTvdb);
+  const showRecords = Object.values(allTvdb).filter((r) => isTvdbShowRecord(r));
 
   // Diagnostic: Check for duplicate Name properties in the final showRecords array
   const nameSet = new Set();
@@ -480,6 +786,7 @@ export async function loadAllShows() {
       // Find which keys in allTvdb have this Name
       console.error(`  Keys in allTvdb with Name="${dupName}":`);
       for (const [key, value] of Object.entries(allTvdb)) {
+        if (!isTvdbShowRecord(value)) continue;
         if (value.Name === dupName) {
           console.error(
             `    key="${key}" Id="${value.Id}" inEmby=${value.inEmby} sameObject=${value === allTvdb[value.Name]}`,

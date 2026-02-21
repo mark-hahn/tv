@@ -995,7 +995,11 @@ export default {
       }
 
       Object.assign(tvdbData, epiCounts);
-      allTvdb[name] = tvdbData;
+      tvdb.upsertTvdbCacheRecord(
+        allTvdb,
+        tvdbData,
+        name || this.show?.Name || "",
+      );
       let seasonsTxt;
       const { episodeCount, seasonCount, watchedCount } = tvdbData;
 
@@ -1314,6 +1318,28 @@ export default {
 
           if (this.show.Name !== currentShowName) return;
           let tvdbData = allTvdb[show.Name];
+          const currentTvdbId = String(
+            show?.ProviderIds?.Tvdb ??
+              show?.TvdbId ??
+              show?.tvdbId ??
+              show?.tvdb_id ??
+              "",
+          ).trim();
+
+          if (!tvdbData && currentTvdbId) {
+            for (const [key, rec] of Object.entries(allTvdb || {})) {
+              const recTvdbId = String(rec?.tvdbId || rec?.TvdbId || "").trim();
+              if (recTvdbId && recTvdbId === currentTvdbId) {
+                tvdbData = rec;
+                if (key !== show.Name) {
+                  console.info(
+                    `Series: resolved tvdbData by tvdbId=${currentTvdbId} key=\"${key}\" for show=\"${show.Name}\"`,
+                  );
+                }
+                break;
+              }
+            }
+          }
 
           // Preview / transient shows may not exist in tvdb.json yet.
           // If we have a TvdbId, fetch tvdbData from the server without creating the show.
@@ -1341,7 +1367,7 @@ export default {
                 tvdbData = await srvr.getNewTvdb(paramObj);
                 if (tvdbData) {
                   delete tvdbData.deleted;
-                  allTvdb[show.Name] = tvdbData;
+                  tvdb.upsertTvdbCacheRecord(allTvdb, tvdbData, show?.Name);
                 }
               } catch (e) {
                 console.error("Series: getNewTvdb failed (preview)", {
@@ -1422,7 +1448,7 @@ export default {
               const freshTvdbData = await srvr.getNewTvdb(paramObj);
               if (freshTvdbData) {
                 delete freshTvdbData.deleted;
-                allTvdb[show.Name] = freshTvdbData;
+                tvdb.upsertTvdbCacheRecord(allTvdb, freshTvdbData, show?.Name);
                 tvdbData = freshTvdbData;
                 this.currentTvdbData = freshTvdbData;
               }

@@ -60,6 +60,64 @@ export const clearCache = () => {
   allTvdb = null;
 };
 
+const normalizeTvdbId = (id) => String(id || "").trim();
+
+export const findTvdbKeyById = (tvdbMap, tvdbId) => {
+  const wantedId = normalizeTvdbId(tvdbId);
+  if (!wantedId) return null;
+  for (const [key, rec] of Object.entries(tvdbMap || {})) {
+    const recId = normalizeTvdbId(rec?.tvdbId || rec?.TvdbId);
+    if (recId && recId === wantedId) return key;
+  }
+  return null;
+};
+
+export const getTvdbRecordByNameOrId = (tvdbMap, showName, tvdbId) => {
+  const keyName = String(showName || "").trim();
+  if (keyName && tvdbMap?.[keyName]) {
+    return { key: keyName, record: tvdbMap[keyName] };
+  }
+
+  const idKey = findTvdbKeyById(tvdbMap, tvdbId);
+  if (idKey) {
+    return { key: idKey, record: tvdbMap[idKey] };
+  }
+
+  return { key: null, record: null };
+};
+
+export const upsertTvdbCacheRecord = (tvdbMap, tvdbData, preferredKey = "") => {
+  if (!tvdbMap || !tvdbData || typeof tvdbData !== "object") return null;
+
+  const recordId = normalizeTvdbId(tvdbData.tvdbId || tvdbData.TvdbId);
+  const nameKey = String(tvdbData.Name || tvdbData.name || "").trim();
+  const preferred = String(preferredKey || "").trim();
+
+  let targetKey = nameKey || preferred;
+  if (recordId) {
+    const existingKey = findTvdbKeyById(tvdbMap, recordId);
+    if (existingKey) targetKey = existingKey;
+  }
+
+  if (!targetKey) return null;
+
+  tvdbMap[targetKey] = tvdbData;
+
+  if (recordId) {
+    for (const key of Object.keys(tvdbMap)) {
+      if (key === targetKey) continue;
+      const recId = normalizeTvdbId(
+        tvdbMap[key]?.tvdbId || tvdbMap[key]?.TvdbId,
+      );
+      if (recId && recId === recordId) {
+        delete tvdbMap[key];
+      }
+    }
+  }
+
+  return targetKey;
+};
+
 // Helper functions for watchedEpis format
 /**
  * Extract watchedEpis from seriesMap
@@ -177,11 +235,16 @@ export const getRemotes = async (
   // Only use cache for fast requests (full refreshes always fetch fresh)
   if (
     fast &&
-    allTvdb[showName]?.remotes &&
-    Array.isArray(allTvdb[showName].remotes) &&
-    allTvdb[showName].remotes.length > 0
+    (() => {
+      const found = getTvdbRecordByNameOrId(allTvdb, showName, tvdbId).record;
+      return !!(
+        found?.remotes &&
+        Array.isArray(found.remotes) &&
+        found.remotes.length > 0
+      );
+    })()
   ) {
-    return allTvdb[showName].remotes;
+    return getTvdbRecordByNameOrId(allTvdb, showName, tvdbId).record.remotes;
   }
 
   // Check if in-flight request exists
@@ -213,10 +276,10 @@ export const getRemotes = async (
       // Store in allTvdb cache if we have a showName and allTvdb entry exists
       // Only cache fast results (full results may have time-sensitive data)
       if (fast && showName && allTvdb) {
-        if (!allTvdb[showName]) {
-          allTvdb[showName] = {};
-        }
-        allTvdb[showName].remotes = results;
+        const found = getTvdbRecordByNameOrId(allTvdb, showName, tvdbId);
+        const key = found.key || showName;
+        if (!allTvdb[key]) allTvdb[key] = {};
+        allTvdb[key].remotes = results;
       }
 
       return results;
@@ -281,7 +344,11 @@ export const srchTvdbData = async (searchStr) => {
 export async function getWaitStr(show) {
   let waitStr = "";
   try {
-    const tvdbData = await allTvdb[show.Name];
+    const tvdbData = getTvdbRecordByNameOrId(
+      allTvdb,
+      show?.Name,
+      show?.TvdbId || show?.tvdbId,
+    ).record;
     if (tvdbData) {
       // Use the greater of nextAired and lastAired
       const nextAired = tvdbData.nextAired || "";
@@ -307,7 +374,7 @@ export async function getWaitStr(show) {
 export const getEpisode = async (showName, seasonNum, episodeNum) => {
   // Get series ID from allTvdb
   if (!allTvdb) await getAllTvdb();
-  const tvdbData = allTvdb[showName];
+  const tvdbData = getTvdbRecordByNameOrId(allTvdb, showName, null).record;
 
   if (!tvdbData || !tvdbData.tvdbId) {
     console.error("getEpisode: no tvdbId found for show:", showName);
@@ -348,7 +415,7 @@ export const getEpisodeGuests = async (showName, seasonNum, episodeNum) => {
   try {
     // First check if we have episode data in allTvdb cache
     if (!allTvdb) await getAllTvdb();
-    const tvdbData = allTvdb[showName];
+    const tvdbData = getTvdbRecordByNameOrId(allTvdb, showName, null).record;
 
     if (tvdbData?.seasons?.[seasonNum]?.episodes?.[episodeNum]?.characters) {
       // Episode guest data exists in cache

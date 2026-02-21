@@ -332,7 +332,7 @@
         "
       >
         <div style="font-size: 16px; font-weight: bold; margin-bottom: 10px">
-          TVDB cache mismatch detected
+          {{ tvdbMismatchTitle }}
         </div>
         <pre
           style="
@@ -446,6 +446,7 @@ export default {
       libraryProgressText: "",
 
       tvdbMismatchOpen: false,
+      tvdbMismatchTitle: "TVDB cache mismatch detected",
       tvdbMismatchText: "",
 
       _downActiveQbt: false,
@@ -762,6 +763,19 @@ export default {
     this.stopLibraryPolling();
   },
   methods: {
+    openTvdbMismatchModal(title, text, payload = null) {
+      this.tvdbMismatchTitle = title || "TVDB cache mismatch detected";
+      this.tvdbMismatchText = text == null ? "" : String(text);
+      this.tvdbMismatchOpen = true;
+
+      console.error(
+        `[tvdbMismatchModal] title="${this.tvdbMismatchTitle}"\n${this.tvdbMismatchText}`,
+      );
+      if (payload !== null && payload !== undefined) {
+        console.error("[tvdbMismatchModal] payload:", payload);
+      }
+    },
+
     onPreviewPanesLoading(active) {
       this.previewPanesLoading = !!active;
     },
@@ -897,7 +911,41 @@ export default {
     handleTvdbMismatch(payload) {
       if (this.simpleMode) return;
 
+      this.tvdbMismatchTitle = "TVDB cache mismatch detected";
+
       if (payload && typeof payload === "object") {
+        const reason = payload?.reason != null ? String(payload.reason) : "";
+        const action = payload?.action != null ? String(payload.action) : "";
+
+        if (!reason || !action) {
+          this.tvdbMismatchTitle = "Legacy mismatch payload blocked";
+          const lines = [];
+          lines.push("What happened");
+          lines.push(
+            "- A tvdb-mismatch payload was received without required fields (reason/action).",
+          );
+          lines.push(
+            "- Legacy fallback handling was blocked to avoid unsafe or ambiguous behavior.",
+          );
+          lines.push("");
+          lines.push("Required fields");
+          lines.push(`- reason: ${reason || "<missing>"}`);
+          lines.push(`- action: ${action || "<missing>"}`);
+          lines.push("");
+          lines.push("Raw details");
+          try {
+            lines.push(JSON.stringify(payload, null, 2));
+          } catch {
+            lines.push(String(payload));
+          }
+          this.openTvdbMismatchModal(
+            this.tvdbMismatchTitle,
+            lines.join("\n"),
+            payload,
+          );
+          return;
+        }
+
         const name = payload?.name != null ? String(payload.name) : "";
         const showId = payload?.showId != null ? String(payload.showId) : "";
         const tvdbId = payload?.tvdbId != null ? String(payload.tvdbId) : "";
@@ -909,26 +957,135 @@ export default {
           payload?.existing?.tvdbId != null
             ? String(payload.existing.tvdbId)
             : "";
+        const existingKey =
+          payload?.existing?.key != null ? String(payload.existing.key) : "";
+        const existingName =
+          payload?.existing?.name != null ? String(payload.existing.name) : "";
+        const existingInEmby =
+          payload?.existing?.inEmby != null
+            ? String(payload.existing.inEmby)
+            : "";
+        const likelyById =
+          payload?.details?.likelyById != null
+            ? String(payload.details.likelyById)
+            : "";
 
         const lines = [];
-        lines.push("What happened");
-        lines.push(
-          "- A cached TVDB entry exists for this show name, but it does not match the currently loaded Emby show.",
-        );
-        lines.push(
-          "- The client will rebuild/update the cache entry via getNewTvdb().",
-        );
-        lines.push("");
-        lines.push("Current show (from Emby)");
-        lines.push(`- Show name key (show.Name): ${name}`);
-        lines.push(`- Emby show Id (show.Id): ${showId}`);
-        lines.push(`- TVDB series Id on show (show.TvdbId): ${tvdbId}`);
-        lines.push("");
-        lines.push(
-          "Existing cached entry (from server TVDB cache: allTvdb[show.Name])",
-        );
-        lines.push(`- Cached showId (tvdb.showId): ${existingShowId}`);
-        lines.push(`- Cached tvdbId (tvdb.tvdbId): ${existingTvdbId}`);
+        if (
+          reason === "likely-same-show-candidate" &&
+          action === "blocked-create"
+        ) {
+          this.tvdbMismatchTitle =
+            "Likely same-show candidate (creation blocked)";
+          lines.push("What happened");
+          lines.push(
+            "- A likely same-show candidate already exists in TVDB cache.",
+          );
+          lines.push(
+            "- New record creation was blocked to prevent duplicate entries.",
+          );
+          lines.push("");
+          lines.push("Incoming show (from Emby)");
+          lines.push(`- Show name key (show.Name): ${name}`);
+          lines.push(`- Emby show Id (show.Id): ${showId}`);
+          lines.push(`- TVDB series Id on show (show.TvdbId): ${tvdbId}`);
+          lines.push("");
+          lines.push("Likely same-show candidate (from server TVDB cache)");
+          lines.push(`- Cache key: ${existingKey}`);
+          lines.push(`- Cached name: ${existingName}`);
+          lines.push(`- Cached showId (tvdb.showId): ${existingShowId}`);
+          lines.push(`- Cached tvdbId (tvdb.tvdbId): ${existingTvdbId}`);
+          lines.push(`- Cached inEmby: ${existingInEmby}`);
+          lines.push(`- Matched by TVDB id: ${likelyById}`);
+        } else if (
+          reason === "cache-mismatch-blocked" &&
+          action === "blocked-create"
+        ) {
+          this.tvdbMismatchTitle = "TVDB cache mismatch (creation blocked)";
+          const mismatchType =
+            payload?.details?.mismatchType != null
+              ? String(payload.details.mismatchType)
+              : "";
+          lines.push("What happened");
+          lines.push(
+            "- A cached TVDB record conflicts with the Emby show identity.",
+          );
+          lines.push(
+            "- Creation/update was blocked to prevent duplicate or cross-linked records.",
+          );
+          lines.push("");
+          lines.push("Current show (from Emby)");
+          lines.push(`- Show name key (show.Name): ${name}`);
+          lines.push(`- Emby show Id (show.Id): ${showId}`);
+          lines.push(`- TVDB series Id on show (show.TvdbId): ${tvdbId}`);
+          lines.push("");
+          lines.push("Existing cached record");
+          lines.push(`- Cache key: ${existingKey}`);
+          lines.push(`- Cached name: ${existingName}`);
+          lines.push(`- Cached showId (tvdb.showId): ${existingShowId}`);
+          lines.push(`- Cached tvdbId (tvdb.tvdbId): ${existingTvdbId}`);
+          lines.push(`- Cached inEmby: ${existingInEmby}`);
+          lines.push(`- Mismatch type: ${mismatchType}`);
+        } else if (
+          reason === "add-aborted-no-create" &&
+          action === "blocked-create"
+        ) {
+          this.tvdbMismatchTitle = "Show add blocked (no fallback create)";
+          const hasMapData =
+            payload?.details?.hasMapData != null
+              ? String(payload.details.hasMapData)
+              : "";
+          const createdFolder =
+            payload?.details?.createdFolder != null
+              ? String(payload.details.createdFolder)
+              : "";
+          const seriesMapSeasons = Array.isArray(
+            payload?.details?.seriesMapSeasons,
+          )
+            ? payload.details.seriesMapSeasons.join(", ")
+            : "";
+          lines.push("What happened");
+          lines.push(
+            "- Add flow was blocked because Emby creation/discovery did not complete reliably.",
+          );
+          lines.push("- No no-emby fallback record was created (by design).");
+          lines.push("");
+          lines.push("Requested show");
+          lines.push(`- Show name: ${name}`);
+          lines.push(`- TVDB id: ${tvdbId}`);
+          lines.push(`- Has TVDB map data: ${hasMapData}`);
+          lines.push(`- Emby folder created: ${createdFolder}`);
+          lines.push(`- Seasons from map: ${seriesMapSeasons}`);
+          lines.push("");
+          lines.push("Create result");
+          try {
+            lines.push(
+              JSON.stringify(payload?.details?.createResult ?? {}, null, 2),
+            );
+          } catch {
+            lines.push(String(payload?.details?.createResult ?? ""));
+          }
+        } else {
+          this.tvdbMismatchTitle = "Unknown mismatch payload type blocked";
+          lines.push("What happened");
+          lines.push(
+            "- A tvdb-mismatch payload was received with an unknown reason/action combination.",
+          );
+          lines.push(
+            "- Processing was blocked to avoid unsafe fallback behavior.",
+          );
+          lines.push("");
+          lines.push("Payload fields");
+          lines.push(`- reason: ${reason}`);
+          lines.push(`- action: ${action}`);
+          lines.push(`- name: ${name}`);
+          lines.push(`- showId: ${showId}`);
+          lines.push(`- tvdbId: ${tvdbId}`);
+          lines.push(`- existing.key: ${existingKey}`);
+          lines.push(`- existing.name: ${existingName}`);
+          lines.push(`- existing.showId: ${existingShowId}`);
+          lines.push(`- existing.tvdbId: ${existingTvdbId}`);
+        }
         lines.push("");
         lines.push("Raw details");
         try {
@@ -937,15 +1094,23 @@ export default {
           lines.push(String(payload));
         }
 
-        this.tvdbMismatchText = lines.join("\n");
+        this.openTvdbMismatchModal(
+          this.tvdbMismatchTitle,
+          lines.join("\n"),
+          payload,
+        );
       } else {
-        this.tvdbMismatchText = String(payload);
+        this.openTvdbMismatchModal(
+          this.tvdbMismatchTitle,
+          String(payload),
+          payload,
+        );
       }
-      this.tvdbMismatchOpen = true;
     },
 
     closeTvdbMismatch() {
       this.tvdbMismatchOpen = false;
+      this.tvdbMismatchTitle = "TVDB cache mismatch detected";
     },
 
     triggerShowReload() {

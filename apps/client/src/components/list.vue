@@ -705,6 +705,38 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
+    logModalMessage(modalName, message) {
+      console.error(`[${modalName}] ${String(message ?? "")}`);
+    },
+
+    showSearchingModal(showName, status) {
+      this.searchingShowName = String(showName || "");
+      this.searchingStatus = String(status || "");
+      this.showSearching = true;
+      this.logModalMessage(
+        "searchingModal",
+        [
+          "Searching web for information about show:",
+          this.searchingShowName,
+          this.searchingStatus || "Please wait ...",
+        ].join("\n"),
+      );
+    },
+
+    setSearchingModalStatus(status) {
+      this.searchingStatus = String(status || "");
+      if (this.showSearching) {
+        this.logModalMessage(
+          "searchingModal",
+          [
+            "Searching web for information about show:",
+            this.searchingShowName,
+            this.searchingStatus || "Please wait ...",
+          ].join("\n"),
+        );
+      }
+    },
+
     async loadAllShowsWithDialog() {
       if (this.hasLoadedAllShows) {
         console.log("All shows already loaded, skipping");
@@ -1160,12 +1192,10 @@ export default {
       }
 
       // Show searching modal
-      this.searchingShowName = name;
-      this.showSearching = true;
-      this.searchingStatus = "Starting...";
+      this.showSearchingModal(name, "Starting...");
 
       const setWebAddStatus = (txt) => {
-        this.searchingStatus = txt;
+        this.setSearchingModalStatus(txt);
       };
       const withTimeout = async (promise, ms, label) => {
         const timeoutMs = Math.max(0, Number(ms) || 0);
@@ -1182,6 +1212,19 @@ export default {
           clearTimeout(t);
         }
       };
+
+      const findShowByTvdbIdOrName = () =>
+        Array.isArray(allShows)
+          ? allShows.find((s) => {
+              const sTvdbId = String(
+                s?.TvdbId || s?.tvdbId || s?.tvdb_id || "",
+              ).trim();
+              if (tvdbId && sTvdbId && sTvdbId === String(tvdbId).trim()) {
+                return true;
+              }
+              return s?.Name === name;
+            })
+          : null;
 
       let show = null;
       const reject = emby.isReject(name);
@@ -1241,6 +1284,7 @@ export default {
           Object.keys(tvdbData).length > 0;
 
         let createdFolder = false;
+        let createResult = null;
         if (!hasMapData) {
           createdFolder = false;
           console.error(
@@ -1263,6 +1307,7 @@ export default {
             createTimeoutMs: 15000,
             refreshTimeoutMs: 120000,
           });
+          createResult = res;
           createdFolder = !!res?.createdFolder;
           if (!createdFolder) {
             console.error("web add: createShowFolderAndRefreshEmby failed", {
@@ -1279,7 +1324,17 @@ export default {
             await this.newShows(false);
 
             // Trigger gap check for the newly added show
-            const newShow = allShows.find((s) => s?.Name === name);
+            const newShow = Array.isArray(allShows)
+              ? allShows.find((s) => {
+                  const sTvdbId = String(
+                    s?.TvdbId || s?.tvdbId || s?.tvdb_id || "",
+                  ).trim();
+                  if (tvdbId && sTvdbId && sTvdbId === String(tvdbId).trim()) {
+                    return true;
+                  }
+                  return s?.Name === name;
+                })
+              : null;
             if (newShow?.Id) {
               await srvr
                 .triggerShowGapCheck(newShow.Id, name)
@@ -1291,9 +1346,27 @@ export default {
             // ignore
           }
 
-          show = Array.isArray(allShows)
-            ? allShows.find((s) => s?.Name === name)
-            : null;
+          show = findShowByTvdbIdOrName();
+
+          // Emby created the folder, but the item may not be visible immediately.
+          // Retry discovery; never create a no-emby duplicate in this branch.
+          if (!show) {
+            setWebAddStatus("Waiting for Emby scan...");
+            for (let attempt = 1; attempt <= 4; attempt++) {
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+              await this.newShows(false);
+              show = findShowByTvdbIdOrName();
+              if (show) break;
+              setWebAddStatus(`Waiting for Emby scan... (${attempt}/4)`);
+            }
+          }
+
+          if (!show) {
+            throw new Error(
+              `Created in Emby but not found after refresh: ${name} (tvdbId=${tvdbId})`,
+            );
+          }
+
           if (show) {
             show.TvdbId = tvdbId;
             show.Overview = overview;
@@ -1302,12 +1375,41 @@ export default {
         }
 
         if (!show) {
-          show = await emby.createNoemby(showSeed);
+          console.error("web add: aborted without creating noemby fallback", {
+            name,
+            tvdbId,
+            createdFolder,
+            hasMapData,
+            createResult,
+            seriesMapSeasons,
+          });
+
+          evtBus.emit("tvdb-mismatch", {
+            reason: "add-aborted-no-create",
+            action: "blocked-create",
+            name,
+            showId: "",
+            tvdbId,
+            existing: {
+              key: "",
+              name: "",
+              tvdbId: "",
+              Id: "",
+              inEmby: "",
+            },
+            details: {
+              hasMapData,
+              createdFolder,
+              createResult,
+              seriesMapSeasons,
+            },
+          });
+          return;
         }
 
         if (tvdbData) {
           delete tvdbData.deleted;
-          allTvdb[show.Name] = tvdbData;
+          tvdb.upsertTvdbCacheRecord(allTvdb, tvdbData, show?.Name || name);
           // Clear shared cache so Info/Reviews get fresh data
           tvdb.clearCache();
         }
@@ -1896,6 +1998,7 @@ export default {
         );
 
       this.showEmbyRefreshing = true;
+      this.logModalMessage("embyRefreshingModal", "Emby is being refreshed.");
       try {
         const res = await emby.refreshLib();
         if (res?.status === "hasTask" && res?.taskId) {
@@ -2483,7 +2586,15 @@ export default {
         const updatedTvdb = await tvdb.getAllTvdb(
           this.hasLoadedAllShows ? 0 : 1,
         );
-        const tvdbRecord = updatedTvdb[showName];
+        const show = allShows.find((s) => s.Name === showName);
+        const showTvdbId = String(
+          show?.TvdbId || show?.tvdbId || show?.tvdb_id || "",
+        ).trim();
+        const tvdbRecord = tvdb.getTvdbRecordByNameOrId(
+          updatedTvdb,
+          showName,
+          showTvdbId,
+        ).record;
 
         if (!tvdbRecord) {
           console.warn(
@@ -2493,7 +2604,6 @@ export default {
         }
 
         // Update the show in allShows
-        const show = allShows.find((s) => s.Name === showName);
         if (show) {
           // Update disk-related fields
           if (tvdbRecord.diskMaxDate !== undefined) {
@@ -2522,7 +2632,7 @@ export default {
             (show.fileGap || show.fileEndError || show.seasonWatchedThenNofile);
 
           // Update allTvdb cache
-          allTvdb[showName] = tvdbRecord;
+          tvdb.upsertTvdbCacheRecord(allTvdb, tvdbRecord, showName);
 
           // If this show is currently displayed on the map, refresh it
           if (this.mapShow && this.mapShow.Name === showName) {
@@ -2737,6 +2847,7 @@ export default {
           : null;
 
       this.showReloadingShows = true;
+      this.logModalMessage("reloadingShowsModal", "Reloading Shows");
       try {
         await this.newShows();
 

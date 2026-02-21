@@ -11,6 +11,7 @@ import { SRVR_DATA_DIR } from "./srvrPaths.js";
 import { MovieDb } from "moviedb-promise";
 const { log, start, end } = util.getLog("tvdb");
 const TVDB_PATH = path.join(SRVR_DATA_DIR, "tvdb.json");
+const TVDB_BACKUP_PATH = path.join(SRVR_DATA_DIR, "tvdb.json.bak");
 const TVDB_TEMPLATE_PATH = path.join(SRVR_DATA_DIR, "tvdbTemplate.json");
 
 const FAST_UPDATE = false;
@@ -97,6 +98,40 @@ function setImdbId(tvdb) {
 
 ensureDir(SRVR_DATA_DIR);
 ensureFile(TVDB_PATH, "{}");
+ensureFile(TVDB_BACKUP_PATH, "{}");
+
+const isRecordObject = (v) => v && typeof v === "object" && !Array.isArray(v);
+
+function parseTvdbJson(text, filePath) {
+  const parsed = util.jParse(text, filePath);
+  if (!isRecordObject(parsed)) return null;
+  return parsed;
+}
+
+function loadTvdbAtStartup() {
+  const primaryText = fs.readFileSync(TVDB_PATH, "utf8");
+  const primaryParsed = parseTvdbJson(primaryText, TVDB_PATH);
+  if (primaryParsed) return primaryParsed;
+
+  const backupText = fs.readFileSync(TVDB_BACKUP_PATH, "utf8");
+  const backupParsed = parseTvdbJson(backupText, TVDB_BACKUP_PATH);
+  if (backupParsed) {
+    console.error(
+      `[tvdb] startup recovery: invalid primary JSON at ${TVDB_PATH}; restoring from backup ${TVDB_BACKUP_PATH}`,
+    );
+    fs.writeFileSync(TVDB_PATH, JSON.stringify(backupParsed), "utf8");
+    return backupParsed;
+  }
+
+  throw new Error(
+    `[tvdb] FATAL: invalid JSON in both ${TVDB_PATH} and ${TVDB_BACKUP_PATH}`,
+  );
+}
+
+async function saveTvdbFiles(data) {
+  await util.writeFile(TVDB_PATH, data);
+  await util.writeFile(TVDB_BACKUP_PATH, data);
+}
 
 // Helper functions for watchedEpis format
 // watchedEpis format: [[seasonNum, ep1, ep2, ...], [seasonNum, ep1, ep2, ...]]
@@ -326,13 +361,11 @@ let addToPickupsCallback = null;
 
 let allTvdb = null;
 try {
-  allTvdb = util.jParse(fs.readFileSync(TVDB_PATH, "utf8"));
+  allTvdb = loadTvdbAtStartup();
 } catch {
-  allTvdb = {};
-  try {
-    ensureDir(path.dirname(TVDB_PATH));
-    fs.writeFileSync(TVDB_PATH, JSON.stringify(allTvdb), "utf8");
-  } catch {}
+  throw new Error(
+    `[tvdb] startup aborted: cannot load valid tvdb data from ${TVDB_PATH}`,
+  );
 }
 
 // Phase 5: Migrate separate JSON files into tvdb.json
@@ -416,12 +449,13 @@ if (
 // Save Phase 5 migrations
 if (phase5MigrationNeeded) {
   log("Phase 5: Saving tvdb.json with migrated data from separate files");
-  try {
-    util.writeFile(TVDB_PATH, allTvdb);
-    log("Phase 5: Migration complete - backup files created");
-  } catch (e) {
-    log("err", "Phase 5: Migration save failed:", e);
-  }
+  saveTvdbFiles(allTvdb)
+    .then(() => {
+      log("Phase 5: Migration complete - backup files created");
+    })
+    .catch((e) => {
+      log("err", "Phase 5: Migration save failed:", e);
+    });
 }
 
 ///////////// get theTvdbToken //////////////
@@ -917,17 +951,37 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     return;
   }
 
-  const name = show.Name;
+  const inputName = show.Name;
   // log("getTvdbData: START", { name, fast });
   // Use PST for added date
-  const added = allTvdb[name]?.added ?? getPstDate();
+  const added = allTvdb[inputName]?.added ?? getPstDate();
   const showId = show.Id;
   const tvdbId = show.TvdbId || show.tvdbId;
   if (!tvdbId) {
     log("err", "getTvdbData no tvdbId:", show);
-    resolve(name);
+    resolve(inputName);
     return;
   }
+
+  let canonicalName = inputName;
+  for (const [existingKey, existingRecord] of Object.entries(allTvdb || {})) {
+    if (existingKey === inputName) continue;
+    const existingTvdbId = String(
+      existingRecord?.tvdbId || existingRecord?.TvdbId || "",
+    ).trim();
+    if (existingTvdbId && String(tvdbId).trim() === existingTvdbId) {
+      canonicalName = existingRecord?.Name || existingKey;
+      if (canonicalName !== inputName) {
+        log(
+          "inf",
+          `getTvdbData canonicalized by tvdbId=${tvdbId}: input=\"${inputName}\" canonical=\"${canonicalName}\"`,
+        );
+      }
+      break;
+    }
+  }
+
+  const name = canonicalName;
   let extRes, extUrl;
   try {
     extUrl = `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
@@ -1287,6 +1341,14 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   // log('getTvdbData:', tvdbData);
   if (!paramObj.transient) {
     allTvdb[name] = tvdbData;
+    if (inputName !== name && allTvdb[inputName]) {
+      const inputTvdbId = String(
+        allTvdb[inputName]?.tvdbId || allTvdb[inputName]?.TvdbId || "",
+      ).trim();
+      if (inputTvdbId && inputTvdbId === String(tvdbId).trim()) {
+        delete allTvdb[inputName];
+      }
+    }
   }
   // update allTvdb & tvdb.json
   // log("getTvdbData: END", { name, hasRemotes: !!tvdbData.remotes?.length });
@@ -1351,7 +1413,7 @@ const chkTvdbQueue = () => {
       if (finalData && !paramObj.transient) {
         finalData.saved = Date.now();
         // Save to disk so timestamp persists across restarts
-        util.writeFile(TVDB_PATH, allTvdb).catch((err) => {
+        saveTvdbFiles(allTvdb).catch((err) => {
           log("err", "chkTvdbQueue: save error:", err.message);
         });
       }
@@ -1442,7 +1504,7 @@ const tryLocalGetTvdb = async () => {
         // Extract and persist watchedEpis
         watchedEpis = seriesMapToWatchedEpis(seriesMap);
         minTvdb.watchedEpis = watchedEpis;
-        await util.writeFile(TVDB_PATH, allTvdb);
+        await saveTvdbFiles(allTvdb);
       }
     }
 
@@ -1697,16 +1759,12 @@ export const getAllTvdb = async (params) => {
 export const getAllTvdbSync = () => allTvdb;
 
 export const saveTvdbSync = async () => {
-  return new Promise((resolve, reject) => {
-    fs.writeFile(TVDB_PATH, JSON.stringify(allTvdb), (err) => {
-      if (err) {
-        log("err", "saveTvdbSync error:", err.message);
-        reject(err);
-      } else {
-        resolve();
-      }
-    });
-  });
+  try {
+    await saveTvdbFiles(allTvdb);
+  } catch (err) {
+    log("err", "saveTvdbSync error:", err.message);
+    throw err;
+  }
 };
 
 // if tvdb already exists replace it
@@ -1857,25 +1915,6 @@ export const setTvdbFields = async (params) => {
         for (const delName of paramObj.$delete) delete tvdb[delName];
       }
 
-      // Check if inEmby is changing - fix Emby button in cached remotes
-      if (paramObj.inEmby !== undefined && tvdb.inEmby !== paramObj.inEmby) {
-        if (tvdb.remotes && Array.isArray(tvdb.remotes)) {
-          const hasEmbyButton = tvdb.remotes.some((r) => r.name === "Emby");
-          if (paramObj.inEmby && !hasEmbyButton) {
-            // Add Emby button at the start
-            const embyUrl = urls.embyPageUrl(tvdb.Id);
-            tvdb.remotes.unshift({ name: "Emby", url: embyUrl });
-            console.log(`[setTvdbFields] Added Emby button to ${name} remotes`);
-          } else if (!paramObj.inEmby && hasEmbyButton) {
-            // Remove Emby button
-            tvdb.remotes = tvdb.remotes.filter((r) => r.name !== "Emby");
-            console.log(
-              `[setTvdbFields] Removed Emby button from ${name} remotes`,
-            );
-          }
-        }
-      }
-
       // Handle nested field updates for Phase 1 new structure
       for (const [key, value] of Object.entries(paramObj)) {
         if (key === "dontSave" || key === "$delete" || key === "name") continue;
@@ -1913,6 +1952,26 @@ export const setTvdbFields = async (params) => {
         // Handle direct assignment for top-level fields and nested objects
         tvdb[key] = value;
       }
+
+      // Keep Emby button in sync with final inEmby/Id values (after field updates).
+      if (!Array.isArray(tvdb.remotes)) tvdb.remotes = [];
+      const embyIndex = tvdb.remotes.findIndex((r) => r?.name === "Emby");
+      const hasEmbyButton = embyIndex >= 0;
+      const embyId = tvdb?.Id == null ? "" : String(tvdb.Id).trim();
+      if (tvdb.inEmby && embyId) {
+        const embyUrl = urls.embyPageUrl(embyId);
+        if (!hasEmbyButton) {
+          tvdb.remotes.unshift({ name: "Emby", url: embyUrl });
+          console.log(`[setTvdbFields] Added Emby button to ${name} remotes`);
+        } else if (tvdb.remotes[embyIndex]?.url !== embyUrl) {
+          tvdb.remotes[embyIndex].url = embyUrl;
+          console.log(`[setTvdbFields] Updated Emby button URL for ${name}`);
+        }
+      } else if (hasEmbyButton) {
+        tvdb.remotes = tvdb.remotes.filter((r) => r?.name !== "Emby");
+        console.log(`[setTvdbFields] Removed Emby button from ${name} remotes`);
+      }
+
       setImdbId(tvdb);
       if (tvdb.saved === 0) {
         // Queue a refresh for this specific request
@@ -1941,7 +2000,7 @@ export const setTvdbFields = async (params) => {
     }
   }
   if (!paramObj.dontSave) {
-    await util.writeFile(TVDB_PATH, allTvdb);
+    await saveTvdbFiles(allTvdb);
   }
   return tvdb ?? "ok";
 };

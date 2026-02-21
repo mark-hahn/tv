@@ -197,8 +197,31 @@ try {
   }
 } catch {}
 
-const rejects = JSON.parse(rejectStr);
-const pickups = JSON.parse(pickupStr);
+let rejects;
+try {
+  rejects = JSON.parse(rejectStr);
+  if (!Array.isArray(rejects)) {
+    throw new Error("rejects config is not an array");
+  }
+} catch (e) {
+  console.error(
+    `[tv-srvr] FATAL: invalid JSON in rejects config at ${rejectLoad.chosenPath || "<fallback>"}: ${e.message}`,
+  );
+  process.exit(1);
+}
+
+let pickups;
+try {
+  pickups = JSON.parse(pickupStr);
+  if (!Array.isArray(pickups)) {
+    throw new Error("pickups config is not an array");
+  }
+} catch (e) {
+  console.error(
+    `[tv-srvr] FATAL: invalid JSON in pickups config at ${pickupLoad.chosenPath || "<fallback>"}: ${e.message}`,
+  );
+  process.exit(1);
+}
 const notes = notesCache;
 
 function encodeFileIdBase32(fileId) {
@@ -1327,6 +1350,11 @@ const saveConfigYml = async (idIn, resultIn, resolveIn, rejectIn) => {
 // Synchronize pickups from config4-pickups.json to tvdb.json on startup
 const startupPickupsSync = () => {
   const allTvdb = tvdb.getAllTvdbSync();
+  if (!allTvdb || typeof allTvdb !== "object" || Array.isArray(allTvdb)) {
+    throw new Error(
+      "[tv-srvr] FATAL: startupPickupsSync requires object tvdb cache",
+    );
+  }
   let changedTvdb = false;
 
   // Create normalized pickups set for fast lookup

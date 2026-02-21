@@ -2111,7 +2111,16 @@ export default {
       this.seriesMapEpis = seriesMapEpis.filter((x) => x !== null);
       this.seriesMap = seriesMap;
       this.hideMapBottom = false;
-      this.saveVisShow(show);
+      // In preview mode, don't overwrite highlightName with the preview show.
+      if (this.previewMode) {
+        this.saveVisShow(show, false, {
+          skipHighlight: true,
+          skipPersist: true,
+          skipHistory: true,
+        });
+      } else {
+        this.saveVisShow(show);
+      }
 
       // Emit to App.vue to show map
       this.$emit("show-map", {

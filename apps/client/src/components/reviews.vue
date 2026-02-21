@@ -531,6 +531,7 @@ export default {
 
     onPreviewSrchChoice(srchChoice) {
       this.previewSrchChoice = srchChoice || null;
+      this.scrollReviewPanesToTop();
     },
 
     addShowFromPreview() {

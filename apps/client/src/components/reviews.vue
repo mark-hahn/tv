@@ -588,10 +588,20 @@ export default {
 
     scrollReviewPanesToTop() {
       this.$nextTick(() => {
-        const leftPane = this.$refs.leftReviewsPane;
-        const rightPane = this.$refs.rightReviewsPane;
-        if (leftPane) leftPane.scrollTop = 0;
-        if (rightPane) rightPane.scrollTop = 0;
+        const getPane = (paneRef) => {
+          const pane = this.$refs[paneRef];
+          return Array.isArray(pane) ? pane[0] : pane;
+        };
+
+        const resetBoth = () => {
+          const leftPane = getPane("leftReviewsPane");
+          const rightPane = getPane("rightReviewsPane");
+          if (leftPane) leftPane.scrollTop = 0;
+          if (rightPane) rightPane.scrollTop = 0;
+        };
+
+        resetBoth();
+        requestAnimationFrame(resetBoth);
       });
     },
 

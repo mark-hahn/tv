@@ -215,8 +215,7 @@
             :active="currentPane === 'trailer'"
           ></Trailer>
           <Browse
-            v-if="!simpleMode"
-            v-show="currentPane === 'browse'"
+            v-show="!simpleMode && currentPane === 'browse'"
             style="width: 100%; height: 100%"
             :simpleMode="simpleMode"
             :sizing="activeSizing"
@@ -225,32 +224,28 @@
           >
           </Browse>
           <Tor
-            v-if="!simpleMode"
-            v-show="currentPane === 'tor'"
+            v-show="!simpleMode && currentPane === 'tor'"
             style="width: 100%; height: 100%"
             :simpleMode="simpleMode"
             :sizing="activeSizing"
             :activeShow="currentShow"
           ></Tor>
           <Flex
-            v-if="!simpleMode"
-            v-show="currentPane === 'flex'"
+            v-show="!simpleMode && currentPane === 'flex'"
             style="width: 100%; height: 100%"
             :simpleMode="simpleMode"
             :sizing="activeSizing"
             :show="currentShow"
           ></Flex>
           <Qbt
-            v-if="!simpleMode"
-            v-show="currentPane === 'qbt'"
+            v-show="!simpleMode && currentPane === 'qbt'"
             style="width: 100%; height: 100%"
             :simpleMode="simpleMode"
             :sizing="activeSizing"
             :show="currentShow"
           ></Qbt>
           <Local
-            v-if="!simpleMode"
-            v-show="currentPane === 'local'"
+            v-show="!simpleMode && currentPane === 'local'"
             style="width: 100%; height: 100%"
             :active="currentPane === 'local'"
             :show="currentShow"
@@ -258,16 +253,14 @@
             @select-show="handleLocalSelectShow"
           ></Local>
           <Usb
-            v-if="!simpleMode"
-            v-show="currentPane === 'usb'"
+            v-show="!simpleMode && currentPane === 'usb'"
             style="width: 100%; height: 100%"
             :active="currentPane === 'usb'"
             :show="currentShow"
             :allShows="allShows"
           ></Usb>
           <Down
-            v-if="!simpleMode"
-            v-show="currentPane === 'down'"
+            v-show="!simpleMode && currentPane === 'down'"
             style="width: 100%; height: 100%"
             :simpleMode="simpleMode"
             :sizing="activeSizing"

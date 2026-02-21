@@ -607,7 +607,6 @@ export default {
     },
 
     async loadReviews(urlOrId, buttonName) {
-      this.scrollReviewPanesToTop();
       this.reviews = [];
       this.stats = null;
       this.isLoading = true;
@@ -629,6 +628,7 @@ export default {
           } else {
             this.reviews = [];
           }
+          this.scrollReviewPanesToTop();
 
           this.stats = {
             numChecked: data.numChecked,

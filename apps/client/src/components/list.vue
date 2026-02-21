@@ -698,8 +698,7 @@ export default {
 
   computed: {
     displayHighlightName() {
-      // While in preview mode, do not highlight any list row.
-      return this.previewMode ? "" : this.highlightName;
+      return this.highlightName;
     },
   },
 
@@ -1789,10 +1788,12 @@ export default {
         this.highlightName = showName;
       }
 
-      // Check if hasemby filter would hide this show, and reset if needed
+      // Check if hasemby filter would hide this show, and reset if needed.
+      // Skip in preview mode — the fake preview record has inEmby:false and should
+      // never cause the real filter selection to change.
       const hasembyCond = this.conds.find((c) => c?.name === "hasemby");
       let needsRefilter = false;
-      if (hasembyCond && hasembyCond.filter !== 0) {
+      if (!this.previewMode && hasembyCond && hasembyCond.filter !== 0) {
         const showInEmby = show.inEmby !== false;
         const filterHidesShow =
           (hasembyCond.filter === -1 && showInEmby) ||

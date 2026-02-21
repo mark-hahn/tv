@@ -385,71 +385,13 @@ if (fs.existsSync(notesPath) && !fs.existsSync(notesPath + ".backup")) {
   }
 }
 
-// 5.3: Migrate noemby.json
-const noembyPath = path.join(SRVR_DATA_DIR, "noemby.json");
-if (fs.existsSync(noembyPath) && !fs.existsSync(noembyPath + ".backup")) {
-  log("Phase 5.3: Migrating noemby.json into tvdb.json");
-  try {
-    const noembys = util.jParse(fs.readFileSync(noembyPath, "utf8"));
-    let noembyCount = 0;
-
-    for (const noembyShow of Object.values(noembys)) {
-      const name = noembyShow.Name;
-      if (!allTvdb[name]) {
-        allTvdb[name] = {
-          name,
-          tvdbId: noembyShow.TvdbId || null,
-          showId: noembyShow.Id, // already has "noemby-" prefix
-          emby: {
-            id: noembyShow.Id,
-            path: null,
-            dateCreated: noembyShow.added || null,
-            premiereDate: null,
-            inToTry: noembyShow.InToTry || false,
-            inContinue: noembyShow.InContinue || false,
-            inMark: noembyShow.InMark || false,
-            inLinda: noembyShow.InLinda || false,
-            isFavorite: false,
-            isPlayed: false,
-            playCount: 0,
-            lastPlayedDate: null,
-          },
-          disk: { date: null, size: 0, noFiles: false },
-          download: { status: null, lastCheck: null },
-          tvmaze: { id: null, status: null },
-          sync: {
-            lastEmbySync: null,
-            lastDiskCheck: null,
-            lastMetadataUpdate: null,
-          },
-          gap: null,
-          note: "",
-          reject: false,
-          pickup: false,
-          lastViewed: null,
-          waitStr: null,
-          added: noembyShow.added || Date.now(),
-          saved: 0, // Will trigger TVDB refresh
-        };
-        noembyCount++;
-        phase5MigrationNeeded = true;
-      }
-    }
-
-    log(`Phase 5.3: Migrated ${noembyCount} noemby shows into tvdb.json`);
-    fs.renameSync(noembyPath, noembyPath + ".backup");
-  } catch (e) {
-    log("err", "Phase 5.3: noemby.json migration failed:", e);
-  }
-}
-
-// 5.4: Migrate lastViewed.json
+// 5.3: Migrate lastViewed.json
 const lastViewedPath = path.join(SRVR_DATA_DIR, "lastViewed.json");
 if (
   fs.existsSync(lastViewedPath) &&
   !fs.existsSync(lastViewedPath + ".backup")
 ) {
-  log("Phase 5.4: Migrating lastViewed.json into tvdb.json");
+  log("Phase 5.3: Migrating lastViewed.json into tvdb.json");
   try {
     const lastViewed = util.jParse(fs.readFileSync(lastViewedPath, "utf8"));
     let viewedCount = 0;
@@ -463,11 +405,11 @@ if (
     }
 
     log(
-      `Phase 5.4: Migrated ${viewedCount} lastViewed timestamps into tvdb.json`,
+      `Phase 5.3: Migrated ${viewedCount} lastViewed timestamps into tvdb.json`,
     );
     fs.renameSync(lastViewedPath, lastViewedPath + ".backup");
   } catch (e) {
-    log("err", "Phase 5.4: lastViewed.json migration failed:", e);
+    log("err", "Phase 5.3: lastViewed.json migration failed:", e);
   }
 }
 

@@ -85,10 +85,6 @@ function readTextOr(filePathOrPaths, fallback) {
   return fallback;
 }
 
-function readJsonTextOr(filePathOrPaths, fallbackObj) {
-  return readTextOr(filePathOrPaths, JSON.stringify(fallbackObj));
-}
-
 function configReadCandidates(relativePath) {
   // Prefer CWD for backwards compatibility, but fall back to module dir.
   return [
@@ -139,13 +135,6 @@ const rejectStr = rejectLoad.text;
 const middleStr = middleLoad.text;
 const pickupStr = pickupLoad.text;
 const footerStr = footerLoad.text;
-
-const noEmbyPath = path.join(SRVR_DATA_DIR, "noemby.json");
-
-// Strict: persisted state must live under TV_DATA_DIR.
-ensureFile(noEmbyPath, "[]");
-
-const noEmbyStr = readJsonTextOr(noEmbyPath, []);
 
 // Strict: shared secrets are checkout-independent under TV_DATA_DIR/secrets.
 const subsLoginPath = path.join(SECRETS_DIR, "subs-login.txt");
@@ -210,7 +199,6 @@ try {
 
 const rejects = JSON.parse(rejectStr);
 const pickups = JSON.parse(pickupStr);
-const noEmbys = JSON.parse(noEmbyStr);
 const notes = notesCache;
 
 function encodeFileIdBase32(fileId) {
@@ -1336,61 +1324,6 @@ const saveConfigYml = async (idIn, resultIn, resolveIn, rejectIn) => {
   }
 };
 
-// Synchronize rejects between noEmby.json and config2-rejects.json on startup.
-const startupRejectsSync = () => {
-  let changedRejects = false;
-  let changedNoEmbys = false;
-
-  // Add noEmby rejects to rejects list
-  for (const show of noEmbys) {
-    if (show.Reject) {
-      if (!rejects.some((r) => r.toLowerCase() === show.Name.toLowerCase())) {
-        rejects.push(show.Name);
-        // console.log("[sync] Added to rejects from noEmby:", show.Name);
-        changedRejects = true;
-      }
-    }
-  }
-
-  // Add keys from rejects list to noEmby shows if they match
-  for (const rName of rejects) {
-    const show = noEmbys.find(
-      (s) => s.Name.toLowerCase() === rName.toLowerCase(),
-    );
-    if (show && !show.Reject) {
-      show.Reject = true;
-      // console.log(
-      //   "[sync] Set Reject=true on noEmby from rejects list:",
-      //   show.Name,
-      // );
-      changedNoEmbys = true;
-    }
-  }
-
-  if (changedRejects) {
-    // Save and upload
-    // console.log("[sync] Saving and uploading rejects...");
-    saveConfigYml(
-      "startup",
-      "ok",
-      () => {},
-      () => {},
-    );
-  } else {
-    // Force upload to ensure config.yml matches disk state (cleans up stale entries)
-    upload();
-  }
-
-  if (changedNoEmbys) {
-    try {
-      fs.writeFileSync(noEmbyPath, JSON.stringify(noEmbys));
-      // console.log("[sync] Saved updated noemby.json");
-    } catch (e) {
-      console.error("[sync] failed to save noemby:", e);
-    }
-  }
-};
-
 // Synchronize pickups from config4-pickups.json to tvdb.json on startup
 const startupPickupsSync = () => {
   const allTvdb = tvdb.getAllTvdbSync();
@@ -1430,7 +1363,6 @@ const startupPickupsSync = () => {
 };
 
 // Run sync immediately
-startupRejectsSync();
 startupPickupsSync();
 
 const getRejects = async (_param) => {
@@ -1485,16 +1417,6 @@ const addReject = async (params) => {
   console.log("-- adding reject:", name);
   rejects.push(name);
 
-  // 2. Sync to noEmbys if present
-  const noEmbyShow = noEmbys.find(
-    (s) => s.Name.toLowerCase() === name.toLowerCase(),
-  );
-  if (noEmbyShow && !noEmbyShow.Reject) {
-    noEmbyShow.Reject = true;
-    console.log("-- sync: set Reject=true on noEmby:", noEmbyShow.Name);
-    util.writeFile(noEmbyPath, noEmbys); // fire and forget write
-  }
-
   return new Promise((resolve, reject) => {
     saveConfigYml(
       null,
@@ -1532,17 +1454,6 @@ const delReject = async (params) => {
       deletedOne = true;
       break;
     }
-  }
-
-  // 2. Sync to noEmbys: if present, clear the flag
-  const noEmbyShow = noEmbys.find(
-    (s) => s.Name.toLowerCase() === name.toLowerCase(),
-  );
-  if (noEmbyShow && noEmbyShow.Reject) {
-    noEmbyShow.Reject = false;
-    console.log("-- sync: cleared Reject on noEmby:", noEmbyShow.Name);
-    util.writeFile(noEmbyPath, noEmbys);
-    deletedOne = true; // Consider it a success if we removed the flag from noEmby too
   }
 
   if (!deletedOne) {
@@ -1651,50 +1562,63 @@ const delPickup = async (params) => {
 };
 
 const getNoEmbys = async (_params) => {
-  return noEmbys;
+  const allTvdb = tvdb.getAllTvdbSync();
+  const out = [];
+
+  for (const [recordName, record] of Object.entries(allTvdb)) {
+    if (record?.inEmby === false) {
+      if (!record.Name) record.Name = recordName;
+      out.push(record);
+    }
+  }
+
+  return out;
 };
 
 const addNoEmby = async (params) => {
   const show = params.show || params;
-  const name = show.Name;
+  const name = String(show?.Name || show?.name || "").trim();
   console.log("addNoEmby", name);
   if (!name) throw new Error("addNoEmby: missing show Name");
 
-  for (const [idx, show] of noEmbys.entries()) {
-    if (show.Name.toLowerCase() === name.toLowerCase()) {
-      console.log("removing old noemby:", name);
-      noEmbys.splice(idx, 1);
+  const allTvdb = tvdb.getAllTvdbSync();
+  let existingKey = null;
+  let existing = null;
+
+  for (const [recordName, record] of Object.entries(allTvdb)) {
+    if (recordName.toLowerCase() === name.toLowerCase()) {
+      existingKey = recordName;
+      existing = record;
       break;
     }
   }
 
-  // Sync: if this new noEmby has Reject=true, ensure it's in config2-rejects.json
-  if (show.Reject) {
-    if (!rejects.some((r) => r.toLowerCase() === name.toLowerCase())) {
-      rejects.push(name);
-      console.log("-- sync: added to rejects list from new noEmby:", name);
-      // Trigger save and upload
-      saveConfigYml(
-        "internal-addNoEmby",
-        "ok",
-        () => {},
-        () => {},
-      );
-    }
-  } else {
-    // If it's NOT rejected, but the global list says it IS, force it to true?
-    // Usually "global list" is the authority for bans.
-    // "when show is added to either file add it to the other" implies bidirectional sync.
-    // If global list has it, the noEmby show should probably inherit it.
-    if (rejects.some((r) => r.toLowerCase() === name.toLowerCase())) {
-      show.Reject = true;
-      console.log("-- sync: inherited Reject=true from global list:", name);
-    }
+  const rejectFromList = rejects.some(
+    (r) => r.toLowerCase() === name.toLowerCase(),
+  );
+  const nextRecord = {
+    ...(existing || {}),
+    ...(show || {}),
+    Name: name,
+    Id: show?.Id || existing?.Id || `noemby-${Math.random()}`,
+    inEmby: false,
+    InToTry: show?.InToTry ?? existing?.InToTry ?? false,
+    InContinue: show?.InContinue ?? existing?.InContinue ?? false,
+    InMark: show?.InMark ?? existing?.InMark ?? false,
+    InLinda: show?.InLinda ?? existing?.InLinda ?? false,
+    Reject: show?.Reject ?? existing?.Reject ?? false,
+  };
+
+  if (rejectFromList && !nextRecord.Reject) {
+    nextRecord.Reject = true;
+    console.log("-- sync: inherited Reject=true from global list:", name);
   }
 
-  console.log("adding noemby:", name);
-  noEmbys.push(show);
-  await util.writeFile(noEmbyPath, noEmbys);
+  if (existingKey && existingKey !== name) {
+    delete allTvdb[existingKey];
+  }
+  allTvdb[name] = nextRecord;
+  await tvdb.saveTvdbSync();
   return "ok";
 };
 
@@ -1702,45 +1626,27 @@ const delNoEmby = async (params) => {
   const name = params?.name;
   console.log("delNoEmby", name);
   if (!name) throw new Error("delNoEmby: missing name");
-  let deletedOne = false;
-  let wasRejected = false;
+  let deleteKey = null;
 
-  for (const [idx, show] of noEmbys.entries()) {
-    if (!show.Name || show.Name.toLowerCase() === name.toLowerCase()) {
-      console.log("deleting no-emby because now in emby:", name);
-      if (show.Reject) wasRejected = true;
-      noEmbys.splice(idx, 1);
-      deletedOne = true;
+  const allTvdb = tvdb.getAllTvdbSync();
+  for (const [recordName, record] of Object.entries(allTvdb)) {
+    if (
+      recordName.toLowerCase() === name.toLowerCase() &&
+      record?.inEmby === false
+    ) {
+      deleteKey = recordName;
       break;
     }
   }
 
-  if (wasRejected) {
-    // "when show is removed from either file remove it from the other"
-    const rIdx = rejects.findIndex(
-      (r) => r.toLowerCase() === name.toLowerCase(),
-    );
-    if (rIdx !== -1) {
-      console.log(
-        "-- sync: removing from rejects because noEmby was deleted:",
-        name,
-      );
-      rejects.splice(rIdx, 1);
-      // Trigger save and upload
-      saveConfigYml(
-        "internal-delNoEmby",
-        "ok",
-        () => {},
-        () => {},
-      );
-    }
-  }
-
-  if (!deletedOne) {
+  if (!deleteKey) {
     console.log("no noembys deleted, no match:", name);
     return "delNoEmby no match:" + name;
   }
-  await util.writeFile(noEmbyPath, noEmbys);
+
+  console.log("deleting no-emby record:", deleteKey);
+  delete allTvdb[deleteKey];
+  await tvdb.saveTvdbSync();
   return "ok";
 };
 

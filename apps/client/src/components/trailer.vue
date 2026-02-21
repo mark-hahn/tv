@@ -68,28 +68,14 @@
           <template v-if="getYoutubeId(t.url)">
             <div :id="'yt-player-' + idx"></div>
           </template>
-          <template v-else-if="isImdbVideo(t.url)">
-            <div style="margin-top: 8px">
-              <a
-                :href="t.url"
-                target="_blank"
-                style="text-decoration: none"
-              >
-                <button
-                  style="
-                    cursor: pointer;
-                    padding: 8px 16px;
-                    border-radius: 4px;
-                    border: 1px solid #bbb;
-                    background-color: #f5c518;
-                    color: #000;
-                    font-size: 14px;
-                    font-weight: bold;
-                  "
-                >
-                  Watch on IMDB
-                </button>
-              </a>
+          <template v-else-if="isHlsFile(t.url)">
+            <div style="margin-top: 8px; color: #666">
+              Video cannot be played
+            </div>
+          </template>
+          <template v-else-if="isFailedVideo(t.url)">
+            <div style="margin-top: 8px; color: #666">
+              Video cannot be played
             </div>
           </template>
           <template v-else-if="isVideoFile(t.url)">
@@ -100,6 +86,7 @@
               style="max-width: 560px"
               :src="t.url"
               :data-url="t.url"
+              @error="onHtmlVideoError(t.url)"
             ></video>
           </template>
           <div v-else>
@@ -134,6 +121,8 @@
 import evtBus from "../evtBus.js";
 import { nextTick } from "vue";
 
+const IMDB_URL_EXPIRY_SAFETY_MS = 2 * 60 * 1000;
+
 export default {
   name: "Trailer",
   props: {
@@ -154,9 +143,8 @@ export default {
 
       // State tracking
       ytPlayers: new Map(), // idx -> YT.Player
+      failedVideoUrls: new Set(),
       savedTimes: new Map(), // key -> seconds
-      lastPlayingKey: null, // "yt-idx" or "html-url"
-
       lastPlayingKey: null, // "yt-idx" or "html-url"
     };
   },
@@ -352,8 +340,23 @@ export default {
       // Include IMDB direct video files
       return (
         /\.(mp4|webm|ogg|mov)$/i.test(url) ||
-        /imdb-video\.media-imdb\.com.*\.(mp4|m3u8)/i.test(url)
+        /imdb-video\.media-imdb\.com.*\.(mp4|m3u8)/i.test(url) ||
+        this.isHlsFile(url)
       );
+    },
+    isHlsFile(url) {
+      if (!url) return false;
+      return /\.m3u8(\?|$)/i.test(url);
+    },
+    isFailedVideo(url) {
+      if (!url) return false;
+      return this.failedVideoUrls.has(url);
+    },
+    onHtmlVideoError(url) {
+      if (!url) return;
+      const next = new Set(this.failedVideoUrls);
+      next.add(url);
+      this.failedVideoUrls = next;
     },
     isImdbVideo(url) {
       if (!url) return false;
@@ -363,16 +366,34 @@ export default {
         !/imdb-video\.media-imdb\.com/i.test(url)
       );
     },
+    isExpiredImdbMediaUrl(url) {
+      if (!url || !/imdb-video\.media-imdb\.com/i.test(url)) return false;
+      try {
+        const parsed = new URL(url);
+        const expiresSec = Number(parsed.searchParams.get("Expires") || "");
+        if (!Number.isFinite(expiresSec) || expiresSec <= 0) return false;
+        const expiresMs = expiresSec * 1000;
+        return expiresMs <= Date.now() + IMDB_URL_EXPIRY_SAFETY_MS;
+      } catch {
+        return false;
+      }
+    },
     hasAnyImdbVideo(trailers) {
-      // Check if any trailer is from IMDB (page URL, direct video, or named "IMDB Video")
-      return trailers.some(
-        (t) => /imdb/i.test(t.url) || (t.name && /imdb/i.test(t.name)),
-      );
+      // Check if any trailer is from IMDB
+      return trailers.some((t) => {
+        const url = t?.url || "";
+        if (!url && !(t?.name && /imdb/i.test(t.name))) return false;
+        if (/imdb-video\.media-imdb\.com/i.test(url)) {
+          return !this.isExpiredImdbMediaUrl(url);
+        }
+        return /imdb/i.test(url) || (t?.name && /imdb/i.test(t.name));
+      });
     },
     onSetUpSeries(show) {
       this.err = "";
       this.showName = show?.Name || "";
       this.trailers = [];
+      this.failedVideoUrls = new Set();
       this.savedTimes.clear();
       this.lastPlayingKey = null;
       this.showContent = true; // Reset

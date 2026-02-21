@@ -534,15 +534,6 @@ const extractImdbVideo = (html) => {
     return m[1].replace(/\\u0026/g, "&");
   }
 
-  // Try to find HLS playlist URL
-  m =
-    /"url"\s*:\s*"(https:\/\/imdb-video\.media-imdb\.com\/[^"]*\.m3u8[^"]*)"/i.exec(
-      html,
-    );
-  if (m?.[1]) {
-    return m[1].replace(/\\u0026/g, "&");
-  }
-
   // Fallback: Look for IMDB video page URL
   m = /"url"\s*:\s*"(https:\/\/www\.imdb\.com\/video\/vi\d+\/?)"/.exec(html);
   if (m?.[1]) return m[1];

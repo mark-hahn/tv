@@ -117,7 +117,6 @@ export async function loadAllShows() {
   const loadStart = Date.now();
 
   // 1. Fetch all data sources in parallel (HTTP is fast now!)
-  // On initial load, load full tvdb dataset so non-emby records are available immediately.
   const [embyShows, rejectsIn, pickups, allTvdbResult] = await Promise.all([
     axios.get(urls.showListUrl(cred, 0, 10000)),
     srvr.getRejects(),

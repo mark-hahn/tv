@@ -529,7 +529,7 @@ export default {
       isWideLandscape: false,
       actorFilter: null,
       actorSearchParams: null, // Store search params for word-based actor search
-      hasLoadedAllShows: false, // Track if we've loaded non-inEmby shows
+      hasLoadedAllShows: false,
       sortChoices: [
         "Alpha",
         "Viewed",
@@ -1001,7 +1001,6 @@ export default {
         cond.filter = condValue;
       });
 
-      // Load additional shows (inEmby:false) if Trash button is on and we haven't loaded them yet
       if (activeButtons["Trash"] && !this.hasLoadedAllShows) {
         await this.loadAllShowsWithDialog();
       }
@@ -1604,7 +1603,6 @@ export default {
         match = allShows.find((s) => s.Name?.toLowerCase() === rawLower);
       }
 
-      // If no exact match and we haven't loaded all shows yet, load them now BEFORE fuzzy matching
       if (!match && !this.hasLoadedAllShows) {
         await this.loadAllShowsWithDialog();
 
@@ -1795,7 +1793,6 @@ export default {
         this.filterStr = "";
         for (let cond of this.conds) {
           util.setCondFltr(cond, this.fltrChoice);
-          // If non-emby shows not loaded yet, keep hasemby filter at +1
           if (cond.name === "hasemby" && !this.hasLoadedAllShows) {
             cond.filter = 1;
           }
@@ -2031,8 +2028,6 @@ export default {
       this.fltrChoice = "- - - - -";
       if (++cond.filter == 2) cond.filter = -1;
 
-      // If this is the hasemby filter and we're changing to -1 or 0,
-      // and we haven't loaded all shows yet, load them now
       const additionalLoadStart = performance.now();
       if (
         cond.name === "hasemby" &&
@@ -2298,7 +2293,6 @@ export default {
       const { searchText, searchWords, matchesSearchTerm } = searchParams;
       if (!searchText || !searchWords || searchWords.length === 0) return;
 
-      // Step 1: Search through currently loaded shows (emby only)
       if (!allTvdb)
         allTvdb = await tvdb.getAllTvdb(this.hasLoadedAllShows ? 0 : 1);
 
@@ -2319,18 +2313,15 @@ export default {
 
       let filteredShows = allShows.filter(checkShowForActorMatch);
 
-      // Step 2: If non-emby shows aren't loaded, check server for matches
       if (!this.hasLoadedAllShows) {
         try {
           const serverMatches = await srvr.searchActorsInNonEmby({
             searchWords: searchWords,
           });
 
-          // If server found matches in non-emby shows, load ALL shows at once
           if (serverMatches && serverMatches.length > 0) {
             await this.loadAllShowsWithDialog();
 
-            // Re-filter with the complete show list
             filteredShows = allShows.filter(checkShowForActorMatch);
           }
         } catch (error) {

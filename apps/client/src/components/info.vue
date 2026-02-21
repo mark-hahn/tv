@@ -1336,6 +1336,7 @@ export default {
                   seasonCount: 0,
                   episodeCount: 0,
                   watchedCount: 0,
+                  transient: this.previewMode,
                 };
                 tvdbData = await srvr.getNewTvdb(paramObj);
                 if (tvdbData) {
@@ -1415,6 +1416,7 @@ export default {
               seasonCount: 0,
               episodeCount: 0,
               watchedCount: 0,
+              transient: this.previewMode,
             };
             try {
               const freshTvdbData = await srvr.getNewTvdb(paramObj);

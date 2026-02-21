@@ -1285,7 +1285,9 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   setImdbId(tvdbData);
 
   // log('getTvdbData:', tvdbData);
-  allTvdb[name] = tvdbData;
+  if (!paramObj.transient) {
+    allTvdb[name] = tvdbData;
+  }
   // update allTvdb & tvdb.json
   // log("getTvdbData: END", { name, hasRemotes: !!tvdbData.remotes?.length });
   resolve(tvdbData);
@@ -1327,8 +1329,10 @@ const chkTvdbQueue = () => {
       try {
         if (tvdbData && typeof tvdbData === "object") {
           finalData = tvdbData;
-          const keyName = finalData.Name || finalData.name;
-          allTvdb[keyName] = finalData;
+          if (!paramObj.transient) {
+            const keyName = finalData.Name || finalData.name;
+            allTvdb[keyName] = finalData;
+          }
         } else if (typeof tvdbData === "string") {
           finalData = allTvdb[tvdbData];
         }
@@ -1344,7 +1348,7 @@ const chkTvdbQueue = () => {
         if (resolveCb) resolveCb(null);
       }
 
-      if (finalData) {
+      if (finalData && !paramObj.transient) {
         finalData.saved = Date.now();
         // Save to disk so timestamp persists across restarts
         util.writeFile(TVDB_PATH, allTvdb).catch((err) => {

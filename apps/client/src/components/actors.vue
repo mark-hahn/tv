@@ -37,12 +37,9 @@
         gap: '8px',
       }"
     >
-      <!-- Default header when no actor is selected -->
-      <div
-        v-if="!selectedActor"
-        style="width: 100%; display: flex; flex-direction: column; gap: 8px"
-      >
-        <!-- Top row: show name (fills), mode label, arrows.-->
+      <!-- Single header: top row switches between default and actor-selected state -->
+      <div style="width: 100%; display: flex; flex-direction: column; gap: 8px">
+        <!-- Top row: show name + controls (default) OR actor name + action buttons -->
         <div
           style="
             width: 100%;
@@ -66,9 +63,14 @@
               flex-wrap: wrap;
             "
           >
-            <span>{{ showName }}</span>
+            <span v-if="!selectedActor">{{ showName }}</span>
+            <span v-else>{{
+              selectedActor.personName || selectedActor.name
+            }}</span>
           </div>
+          <!-- Default right: search input + arrows -->
           <div
+            v-if="!selectedActor"
             style="
               margin-left: 20px;
               margin-right: 15px;
@@ -117,104 +119,17 @@
               ►
             </button>
           </div>
-        </div>
-        <!-- Bottom row: buttons and inputs only.-->
-        <div
-          style="
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: flex-start;
-            gap: 12px;
-            margin-right: 20px;
-            margin-left: 20px;
-            font-weight: normal;
-          "
-        >
-          <button
-            @click.stop="handleRegularClick"
-            :style="getRegularButtonStyle()"
-          >
-            Regulars
-          </button>
-          <button
-            @click.stop="handleGuestClick"
-            :style="getGuestsButtonStyle()"
-          >
-            Guests
-          </button>
-          <label style="font-size: 14px; margin-left: 10px">Season</label>
-          <input
-            v-model="seasonNum"
-            @click.stop
-            @keydown.enter.prevent="handleGuestClick"
-            @blur.stop="handleSeasonEpisodeBlur"
-            type="text"
-            maxlength="2"
-            style="
-              width: 30px;
-              padding: 2px 4px;
-              font-size: 14px;
-              text-align: center;
-              border: 1px solid #ccc;
-              border-radius: 3px;
-            "
-          />
-          <label style="font-size: 14px; margin-left: 5px">Episode</label>
-          <input
-            v-model="episodeNum"
-            @click.stop
-            @keydown.enter.prevent="handleGuestClick"
-            @blur.stop="handleSeasonEpisodeBlur"
-            type="text"
-            maxlength="2"
-            style="
-              width: 30px;
-              padding: 2px 4px;
-              font-size: 14px;
-              text-align: center;
-              border: 1px solid #ccc;
-              border-radius: 3px;
-            "
-          />
-        </div>
-      </div>
-
-      <!-- Selected actor header -->
-      <div
-        v-else
-        style="width: 100%; display: flex; flex-direction: column; gap: 8px"
-      >
-        <!-- Top row: Actor name and Done button -->
-        <div
-          style="
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-          "
-        >
+          <!-- Actor-selected right: action buttons + Done -->
           <div
-            style="
-              margin-left: 20px;
-              margin-right: 10px;
-              flex: 1 1 auto;
-              min-width: 0;
-              white-space: normal;
-              overflow-wrap: anywhere;
-              word-break: break-word;
-            "
-          >
-            <span>{{ selectedActor.personName || selectedActor.name }}</span>
-          </div>
-          <div
+            v-else
             style="
               margin-right: 15px;
               flex: 0 0 auto;
               display: flex;
               align-items: center;
-              gap: 12px;
+              gap: 8px;
               font-weight: normal;
+              flex-wrap: wrap;
             "
           >
             <span
@@ -223,40 +138,6 @@
             >
               {{ credits.length }} credit{{ credits.length !== 1 ? "s" : "" }}
             </span>
-            <button
-              @click.stop="handleDoneButton"
-              style="
-                font-size: 13px;
-                cursor: pointer;
-                border-radius: 5px;
-                padding: 4px 10px;
-              "
-            >
-              Done
-            </button>
-          </div>
-        </div>
-
-        <!-- Bottom row: Action buttons and preview controls -->
-        <div
-          style="
-            width: 100%;
-            display: flex;
-            align-items: center;
-            font-weight: normal;
-          "
-        >
-          <div
-            style="
-              display: flex;
-              align-items: center;
-              justify-content: flex-end;
-              gap: 12px;
-              margin-right: 15px;
-              flex: 1 1 auto;
-              flex-wrap: wrap;
-            "
-          >
             <button
               @click.stop="handleShowsButton"
               style="
@@ -334,7 +215,78 @@
             >
               preview mode
             </span>
+            <button
+              @click.stop="handleDoneButton"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 5px;
+                padding: 4px 10px;
+              "
+            >
+              Done
+            </button>
           </div>
+        </div>
+        <!-- Bottom row: always visible -->
+        <div
+          style="
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 12px;
+            margin-right: 20px;
+            margin-left: 20px;
+            font-weight: normal;
+          "
+        >
+          <button
+            @click.stop="handleRegularClick"
+            :style="getRegularButtonStyle()"
+          >
+            Regulars
+          </button>
+          <button
+            @click.stop="handleGuestClick"
+            :style="getGuestsButtonStyle()"
+          >
+            Guests
+          </button>
+          <label style="font-size: 14px; margin-left: 10px">Season</label>
+          <input
+            v-model="seasonNum"
+            @click.stop
+            @keydown.enter.prevent="handleGuestClick"
+            @blur.stop="handleSeasonEpisodeBlur"
+            type="text"
+            maxlength="2"
+            style="
+              width: 30px;
+              padding: 2px 4px;
+              font-size: 14px;
+              text-align: center;
+              border: 1px solid #ccc;
+              border-radius: 3px;
+            "
+          />
+          <label style="font-size: 14px; margin-left: 5px">Episode</label>
+          <input
+            v-model="episodeNum"
+            @click.stop
+            @keydown.enter.prevent="handleGuestClick"
+            @blur.stop="handleSeasonEpisodeBlur"
+            type="text"
+            maxlength="2"
+            style="
+              width: 30px;
+              padding: 2px 4px;
+              font-size: 14px;
+              text-align: center;
+              border: 1px solid #ccc;
+              border-radius: 3px;
+            "
+          />
         </div>
       </div>
     </div>
@@ -1054,6 +1006,7 @@ export default {
     },
 
     async handleGuestClick() {
+      this.selectedActor = null;
       this.errorMessage = "";
       this.isGuestMode = true;
 
@@ -1171,6 +1124,7 @@ export default {
     },
 
     handleRegularClick() {
+      this.selectedActor = null;
       this.errorMessage = "";
       this.isGuestMode = false;
       this.showingEpisodeActors = false;

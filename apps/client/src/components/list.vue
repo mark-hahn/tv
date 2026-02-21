@@ -2465,6 +2465,7 @@ export default {
         return;
       }
       this.shows = [...allShows];
+      this.allShowsLength = allShows.length;
       this.$emit("all-shows", allShows);
       this.$emit("all-tvdb", allTvdb);
 

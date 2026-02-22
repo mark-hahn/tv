@@ -1198,7 +1198,7 @@ export default {
         name,
         tvdbId,
       });
-      if (matchShow) {
+      if (matchShow && matchShow.inEmby !== false) {
         console.log(matchShow.Name + " already exists.");
         if (!this.shows.some((sh) => sh?.Name === matchShow.Name)) {
           await this.fltrAction("All");
@@ -1819,7 +1819,6 @@ export default {
           (hasembyCond.filter === -1 && showInEmby) ||
           (hasembyCond.filter === +1 && !showInEmby);
         if (filterHidesShow) {
-          console.log(`hasemby filter would hide ${showName}, resetting to 0`);
           hasembyCond.filter = 0;
           needsRefilter = true;
         }

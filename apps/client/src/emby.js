@@ -455,10 +455,19 @@ export async function loadAllShows() {
       const hasCachedShowId = cachedShowId !== "";
       const hasCachedTvdbId = cachedTvdbId !== "";
 
+      // If the cached record was not in Emby (inEmby: false) and the tvdbIds agree,
+      // its stored Id is stale/noemby — allow the incoming Emby show to link it.
+      const cachedNotInEmby = tvdbRecord?.inEmby === false;
+      const tvdbIdsAgree =
+        hasCachedTvdbId &&
+        incomingTvdbId !== "" &&
+        cachedTvdbId === incomingTvdbId;
+
       const showIdMismatch =
         hasCachedShowId &&
         incomingShowId !== "" &&
-        cachedShowId !== incomingShowId;
+        cachedShowId !== incomingShowId &&
+        !(cachedNotInEmby && tvdbIdsAgree);
       const tvdbIdMismatch =
         hasCachedTvdbId &&
         incomingTvdbId !== "" &&

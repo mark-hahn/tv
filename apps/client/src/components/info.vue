@@ -181,6 +181,21 @@
               }"
             ></textarea>
             <button
+              v-if="notInEmby"
+              @click.stop="loadIntoEmby"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                margin-left: 10px;
+                margin-top: 3px;
+                max-height: 24px;
+                border-radius: 7px;
+              "
+            >
+              Load
+            </button>
+            <button
+              v-else
               @click.stop="refreshTvdb"
               style="
                 font-size: 13px;
@@ -1191,6 +1206,21 @@ export default {
       setTimeout(async () => {
         await this.setNextWatch();
       }, 1000);
+    },
+
+    loadIntoEmby() {
+      const show = this.show;
+      const name = String(show?.Name || "").trim();
+      if (!name) return;
+      const srchChoice = {
+        name,
+        tvdbId: String(show?.TvdbId || show?.tvdbId || "").trim(),
+        overview: show?.Overview || show?.overview || "",
+        image: show?.image || show?.image_url || "",
+        year: show?.year || "",
+        originalCountry: show?.originalCountry || show?.country || "",
+      };
+      evtBus.emit("reelSearchAction", { srchChoice, action: "add" });
     },
 
     async refreshTvdb() {

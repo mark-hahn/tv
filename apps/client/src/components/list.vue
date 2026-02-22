@@ -901,7 +901,7 @@ export default {
       }
     },
 
-    async handleButtonClick(activeButtons) {
+    async handleButtonClick(activeButtons, clickedLabel) {
       // In simple mode, button states control conds (pure state-based)
       if (!this.simpleMode) return;
 
@@ -966,6 +966,19 @@ export default {
             this.saveVisShow(this.shows[0], false);
           }
         });
+        return;
+      }
+
+      // Trash button: only update hasemby, leave all other conds unchanged
+      if (clickedLabel === "Trash") {
+        const hasembyCond = this.conds.find((c) => c?.name === "hasemby");
+        if (hasembyCond) {
+          hasembyCond.filter = activeButtons["Trash"] ? 0 : 1;
+        }
+        if (activeButtons["Trash"] && !this.hasLoadedAllShows) {
+          await this.loadAllShowsWithDialog();
+        }
+        await this.select();
         return;
       }
 

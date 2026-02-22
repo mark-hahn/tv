@@ -95,6 +95,25 @@
       {{ btn }}
     </button>
     <button
+      :class="{ active: activeButtons['Trash'] }"
+      @click="handleButtonClick('Trash')"
+      :style="{
+        width: '100%',
+        lineHeight: sizing.buttonHeight || '40px',
+        padding: '0 8px',
+        marginBottom: sizing.buttonMarginBottom || '8px',
+        fontSize: sizing.buttonFontSize || '15px',
+        fontWeight: 'bold',
+        border: '1px solid #999',
+        borderRadius: '5px',
+        cursor: 'pointer',
+        backgroundColor: '#eee',
+        textAlign: 'center',
+      }"
+    >
+      Trash
+    </button>
+    <button
       v-if="hasSharedFilters"
       :class="{ active: activeButtons['Custom'] }"
       @click="handleButtonClick('Custom')"
@@ -174,7 +193,7 @@ export default {
       },
       filters: ["Ready To Watch"],
       genres: ["Drama", "Comedy"],
-      collections: ["To Try", "Continue", "Mark", "Linda", "Trash"],
+      collections: ["To Try", "Continue", "Mark", "Linda"],
       sortOrders: [
         "Added Order",
         "Viewed Order",
@@ -262,7 +281,7 @@ export default {
             },
           );
         }
-        this.$emit("button-click", this.activeButtons);
+        this.$emit("button-click", this.activeButtons, label);
         return;
       }
 
@@ -278,7 +297,7 @@ export default {
           this.activeButtons[btn] = false;
         });
         // Emit all active button states
-        this.$emit("button-click", this.activeButtons);
+        this.$emit("button-click", this.activeButtons, label);
         return;
       }
 
@@ -289,7 +308,7 @@ export default {
           this.activeButtons[btn] = false;
         });
         // Emit all active button states
-        this.$emit("button-click", this.activeButtons);
+        this.$emit("button-click", this.activeButtons, label);
         return;
       }
 
@@ -338,7 +357,7 @@ export default {
       }
 
       // Emit all active button states, not just the clicked one
-      this.$emit("button-click", this.activeButtons);
+      this.$emit("button-click", this.activeButtons, label);
     },
   },
 };

@@ -171,6 +171,16 @@
             :style="{ color: condColor(show, cond) }"
           ></font-awesome-icon>
         </div>
+        <div
+          v-if="simpleMode && show.inEmby === false"
+          class="show-cell"
+          style="width: 22px; flex-shrink: 0"
+        >
+          <font-awesome-icon
+            icon="trash"
+            :style="{ color: '#a66' }"
+          ></font-awesome-icon>
+        </div>
       </div>
     </RecycleScroller>
   </div>
@@ -249,8 +259,7 @@ export default {
       }
     },
 
-    hilite(show) {
-      if (show.inEmby === false) return "#fee";
+    hilite(_show) {
       return "white";
     },
 

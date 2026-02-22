@@ -278,6 +278,7 @@ import {
   faVenus,
   faGlobe,
   faTrafficLight,
+  faTrash,
 } from "@fortawesome/free-solid-svg-icons";
 library.add([
   faLaughBeam,
@@ -300,6 +301,7 @@ library.add([
   faVenus,
   faClock,
   faTrafficLight,
+  faTrash,
 ]);
 
 let allTvdb = null;

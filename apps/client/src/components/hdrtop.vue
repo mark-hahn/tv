@@ -10,6 +10,23 @@
     "
   >
     <div style="flex: 1; display: flex; align-items: center">
+      <button
+        v-if="simpleMode"
+        @click="$emit('all-click')"
+        style="
+          height: 29px;
+          padding: 0 8px;
+          margin: 6px 5px 4px 10px;
+          font-size: 15px;
+          font-weight: bold;
+          border: 1px solid #999;
+          border-radius: 5px;
+          background-color: #eee;
+          cursor: pointer;
+        "
+      >
+        All
+      </button>
       <div
         id="nums"
         v-if="!simpleMode"
@@ -129,6 +146,7 @@ export default {
     "filter-input",
     "send-filters",
     "debug-click",
+    "all-click",
   ],
 
   data() {

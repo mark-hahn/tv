@@ -160,6 +160,7 @@
 
 <script>
 import * as srvr from "../srvr.js";
+import evtBus from "../evtBus.js";
 
 export default {
   name: "Buttons",
@@ -210,6 +211,7 @@ export default {
   mounted() {
     void this.refreshHasSharedFilters();
     this.startSharedFiltersPolling();
+    evtBus.on("clearFilterButtons", this.onClearFilterButtons);
   },
 
   beforeUnmount() {
@@ -217,6 +219,7 @@ export default {
       clearInterval(this._sharedFiltersPoll);
       this._sharedFiltersPoll = null;
     }
+    evtBus.off("clearFilterButtons", this.onClearFilterButtons);
   },
 
   methods: {
@@ -263,6 +266,12 @@ export default {
         Object.keys(shared).length > 0;
       this.hasSharedFilters = has;
       if (!has) this.activeButtons["Custom"] = false;
+    },
+
+    onClearFilterButtons() {
+      [...this.filters, ...this.genres, ...this.collections].forEach((btn) => {
+        this.activeButtons[btn] = false;
+      });
     },
 
     handleButtonClick(label) {

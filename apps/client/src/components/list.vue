@@ -126,6 +126,7 @@
               @filter-input="select"
               @send-filters="sendSharedFilters"
               @debug-click="debugClick"
+              @all-click="allClick"
             ></HdrTop>
             <HdrBot
               v-if="!simpleMode"
@@ -190,6 +191,7 @@
             @filter-input="select"
             @send-filters="sendSharedFilters"
             @debug-click="debugClick"
+            @all-click="allClick"
           ></HdrTop>
           <HdrBot
             v-if="!simpleMode"
@@ -1563,6 +1565,7 @@ export default {
     },
 
     async allClick() {
+      evtBus.emit("clearFilterButtons");
       await this.fltrAction("All");
     },
     onSelectShow(show, scroll = false) {

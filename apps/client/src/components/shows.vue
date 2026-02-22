@@ -259,7 +259,8 @@ export default {
       }
     },
 
-    hilite(_show) {
+    hilite(show) {
+      if (!this.simpleMode && show.inEmby === false) return "#fee";
       return "white";
     },
 

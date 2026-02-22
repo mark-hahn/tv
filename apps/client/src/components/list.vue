@@ -551,7 +551,7 @@ export default {
           filter: 0,
           icon: ["fas", "plus"],
           cond(show) {
-            return !show.notReady;
+            return show.notReady === false;
           },
           click() {},
           name: "unplayed",

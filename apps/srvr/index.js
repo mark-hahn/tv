@@ -2558,10 +2558,11 @@ app.post(
     setImmediate(() => {
       emby
         .gapCheckOne(showId, showName, tvdbRecord)
-        .then((gapData) => {
+        .then(async (gapData) => {
           if (gapData) {
             Object.assign(tvdbRecord, gapData);
-            return tvdb.saveTvdbSync();
+            await tvdb.saveTvdbSync();
+            notifyClients("tvdbUpdated");
           }
         })
         .catch((err) => {

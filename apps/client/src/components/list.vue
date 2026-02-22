@@ -1419,11 +1419,9 @@ export default {
             allShows.some((s) => s?.Name === show?.Name));
         if (!alreadyInAllShows) {
           this.addRow(show);
-        } else {
-          this.saveVisShow(show, true);
         }
         this.sortShows();
-        this.saveVisShow(show, true);
+        this.saveVisShow(show, true, { forceSetUpSeries: true });
 
         ok = true;
       } catch (e) {
@@ -1441,6 +1439,10 @@ export default {
           // Done adding: exit preview mode and notify Series so it can hide the button.
           evtBus.emit("addPreviewShowDone", { ok, name, tvdbId, overview });
           this.setPreviewMode(false);
+          // Explicitly switch to info pane so the newly added show is visible.
+          // setPreviewMode(false) restores savedPane (browse) and sets restoringPreviewPane=true,
+          // which would block setUpSeries from switching panes; override that here.
+          if (ok) evtBus.emit("showSeriesPane");
         }
       }
     },
@@ -2112,14 +2114,17 @@ export default {
       this.seriesMap = seriesMap;
       this.hideMapBottom = false;
       // In preview mode, don't overwrite highlightName with the preview show.
-      if (this.previewMode) {
-        this.saveVisShow(show, false, {
-          skipHighlight: true,
-          skipPersist: true,
-          skipHistory: true,
-        });
-      } else {
-        this.saveVisShow(show);
+      // On refresh, skip saveVisShow entirely — it's just a data update, not a selection change.
+      if (!isRefresh) {
+        if (this.previewMode) {
+          this.saveVisShow(show, false, {
+            skipHighlight: true,
+            skipPersist: true,
+            skipHistory: true,
+          });
+        } else {
+          this.saveVisShow(show);
+        }
       }
 
       // Emit to App.vue to show map

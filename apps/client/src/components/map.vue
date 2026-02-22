@@ -635,7 +635,9 @@ export default {
       if (newShow && newShow.Name) {
         this.seasonStates = {}; // Clear season states when show changes
         await this.loadTvdbData();
+        if (!this.mapShow) return;
         await this.setNextWatch();
+        if (!this.mapShow) return;
         this.$nextTick(() => {
           this.updateMapPanBounds();
         });
@@ -1197,11 +1199,14 @@ export default {
         return;
       }
 
-      const afterWatched = await emby.afterLastWatched(this.mapShow);
+      const show = this.mapShow;
+      const afterWatched = await emby.afterLastWatched(show);
       const status = afterWatched.status;
       const readyToWatch = status === "ok";
 
-      if (this.mapShow.inEmby !== false && status !== "allWatched") {
+      if (this.mapShow !== show) return;
+
+      if (show.inEmby !== false && status !== "allWatched") {
         const { seasonNumber, episodeNumber } = afterWatched;
         const seaEpiTxt =
           `S${("" + seasonNumber).padStart(2, "0")} ` +

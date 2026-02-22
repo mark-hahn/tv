@@ -102,17 +102,13 @@
                 transition: 'background-color 0.15s ease',
               }"
             >
-              Debug
+              Save Tvdb
             </button>
-            <label
-              for="browseSearch"
-              :style="{ fontWeight: 'bold' }"
-              >Search</label
-            >
             <input
               id="browseSearch"
               v-model="manualSearchQuery"
               @keyup.enter="handleManualSearch"
+              placeholder="Search"
               :style="{
                 border: '1px solid #ccc',
                 borderRadius: '3px',

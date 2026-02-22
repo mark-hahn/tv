@@ -1597,8 +1597,8 @@ export const debugTvdb = async (params) => {
 
     const extResObj = await extRes.json();
 
-    // Save to remote server at /root/dev/apps/tv/samples/tvdb-from-api.json
-    const samplePath = "/root/dev/apps/tv/samples/tvdb-from-api.json";
+    // Save to remote server at /root/dev/apps/tv/samples/save-tvdb.json
+    const samplePath = "/root/dev/apps/tv/samples/save-tvdb.json";
     const sampleDir = path.dirname(samplePath);
 
     // Create directory if it doesn't exist

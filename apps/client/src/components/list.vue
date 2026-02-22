@@ -2304,6 +2304,7 @@ export default {
       }
 
       this.shows = filteredShows;
+      let selectFirstAfterSort = false;
       if (this.shows.length === 1) this.saveVisShow(this.shows[0]);
       else if (this.highlightName) {
         // Only update selection if highlightName is already set
@@ -2311,15 +2312,17 @@ export default {
           (show) => show.Name == this.highlightName,
         );
         if (showArr.length == 0) {
-          this.saveVisShow(this.shows[0]);
+          selectFirstAfterSort = true;
         } else {
           // Show is preserved - update localStorage to match
           window.localStorage.setItem("lastVisShow", this.highlightName);
         }
       }
-      if (scroll) this.scrollToSavedShow();
-
       this.sortShows();
+      if (selectFirstAfterSort && this.shows.length > 0) {
+        this.saveVisShow(this.shows[0]);
+      }
+      if (scroll) this.scrollToSavedShow();
     },
 
     async filterShowsByActor(actorName) {

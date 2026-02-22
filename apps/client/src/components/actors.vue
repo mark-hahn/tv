@@ -63,7 +63,9 @@
               flex-wrap: wrap;
             "
           >
-            <span v-if="!selectedActor">{{ showName }}</span>
+            <span v-if="!(selectedActor && showingCredits)">{{
+              showName
+            }}</span>
             <span v-else>{{
               selectedActor.personName || selectedActor.name
             }}</span>

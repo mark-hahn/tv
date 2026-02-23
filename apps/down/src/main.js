@@ -465,6 +465,52 @@ async function main() {
           return json(res, 405, { status: "method not allowed" });
         }
 
+        // Handle /retry endpoint
+        // POST body: { title: "..." }
+        if (pathname === "/retry") {
+          if (req.method === "POST") {
+            return readBody(req, (err1, body) => {
+              if (err1) {
+                return json(res, 400, {
+                  status: "error",
+                  error: String(err1 && err1.message ? err1.message : err1),
+                });
+              }
+              try {
+                setCors(res);
+                var parsed2 = body ? JSON.parse(body) : {};
+                var titleToRetry =
+                  parsed2 && parsed2.title ? String(parsed2.title) : "";
+                if (!titleToRetry) {
+                  return json(res, 400, {
+                    status: "error",
+                    error: "title required",
+                  });
+                }
+                var ok = tvJson.retryEntry(titleToRetry);
+                if (!ok) {
+                  return json(res, 404, {
+                    status: "error",
+                    error: "entry not found",
+                  });
+                }
+                return json(res, 200, { status: "ok" });
+              } catch (e) {
+                return json(res, 500, {
+                  status: "error",
+                  error: String(e && e.message ? e.message : e),
+                });
+              }
+            });
+          }
+          if (req.method === "OPTIONS") {
+            setCors(res);
+            res.statusCode = 204;
+            return res.end();
+          }
+          return json(res, 405, { status: "method not allowed" });
+        }
+
         // Handle /downloads endpoint
         if (pathname === "/downloads") {
           if (req.method === "GET") {

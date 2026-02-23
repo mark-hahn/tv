@@ -209,9 +209,31 @@
               word-wrap: break-word;
               overflow-wrap: break-word;
               font-family: sans-serif;
+              display: flex;
+              align-items: flex-start;
+              justify-content: space-between;
+              gap: 8px;
             "
           >
             <span>{{ it.title || "(no title)" }}</span>
+            <button
+              v-if="it.error"
+              :disabled="retryingTitles.has(it.title)"
+              style="
+                flex-shrink: 0;
+                font-size: 11px;
+                padding: 2px 7px;
+                cursor: pointer;
+                border: 1px solid #c00;
+                border-radius: 4px;
+                background: #fff0f0;
+                color: #c00;
+                white-space: nowrap;
+              "
+              @click.stop="retryDownload(it.title)"
+            >
+              Retry
+            </button>
           </div>
           <div
             style="
@@ -270,6 +292,7 @@ export default {
     return {
       items: [],
       error: null,
+      retryingTitles: new Set(),
       _pollTimer: null,
       _active: false,
       _firstLoad: false,
@@ -713,6 +736,24 @@ export default {
       void event;
       const clickedTitle = it?.title;
       if (clickedTitle) evtBus.emit("selectShowFromCardTitle", clickedTitle);
+    },
+
+    async retryDownload(title) {
+      if (!title || this.retryingTitles.has(title)) return;
+      this.retryingTitles = new Set([...this.retryingTitles, title]);
+      try {
+        await fetch("https://hahnca.com/tv-down/retry", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        });
+      } catch (e) {
+        console.error("retryDownload failed:", e);
+      } finally {
+        const s = new Set(this.retryingTitles);
+        s.delete(title);
+        this.retryingTitles = s;
+      }
     },
 
     showFirstDownloading() {

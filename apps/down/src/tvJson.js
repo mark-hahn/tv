@@ -1561,6 +1561,31 @@ const pruneMissingUsbDirs = (existingUsbDirs) => {
   } catch {}
 };
 
+const retryEntry = (title) => {
+  if (!title) return false;
+  const t = String(title);
+  try {
+    openDb();
+    const existing = rowToEntry(stmtGetByTitle.get(t));
+    if (!existing) return false;
+    // Clear error and reset to waiting state.
+    db.prepare(
+      "UPDATE tv_entries SET error=0, status='waiting', progress=0, eta=NULL, speed=0, dateEnded=NULL, inProgress=0 WHERE title=?",
+    ).run(t);
+    // Remove from finished map so the file isn't considered already done.
+    ensureMapsLoaded();
+    if (finishedMap[t]) {
+      delete finishedMap[t];
+      writeMap(TV_FINISHED_PATH, finishedMap);
+    }
+    removeInProgress(t);
+    tryStartNextWorkers();
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export {
   addEntry,
   getDownloads,
@@ -1571,4 +1596,5 @@ export {
   getTitlesMap,
   checkFiles,
   deleteProcids,
+  retryEntry,
 };

@@ -1546,6 +1546,46 @@ export default {
       const mergeResult = this.mergeTmdbTvdbActors(tmdbList, tvdbList);
       this.actors = mergeResult.output;
 
+      // Persist any TMDB-only actors into the TVDB characters array so that
+      // actor-based show filtering (filterShowsByActor) can find them.
+      const showKey = this.currentShow?.Name || this.showName;
+      if (showKey && tmdbList.length > 0) {
+        const existingChars = Array.isArray(characters) ? characters : [];
+        const existingNames = new Set(
+          existingChars.map((c) => this.normPersonName(c.actor)),
+        );
+        const newChars = tmdbList
+          .filter((a) => {
+            const n = this.normPersonName(a.personName || a.name);
+            return n && !existingNames.has(n);
+          })
+          .map((a) => ({
+            character: a.name || null,
+            actor: a.personName || a.name,
+            image: a.image || null,
+            tvdbUrl: null,
+            sortOrder: a.sort ?? 0,
+            isFeatured: false,
+            source: "tmdb",
+          }));
+        if (newChars.length > 0) {
+          try {
+            const updated = await srvr.setTvdbFields({
+              name: showKey,
+              characters: [...existingChars, ...newChars],
+            });
+            if (updated && typeof updated === "object") {
+              evtBus.emit("tvdbRecordPatched", {
+                showName: showKey,
+                record: updated,
+              });
+            }
+          } catch (e) {
+            // silent
+          }
+        }
+      }
+
       // If actor search is active, sort to prioritize matching actors
       if (
         actorSearchParams?.searchWords &&

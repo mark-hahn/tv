@@ -2374,7 +2374,7 @@ export default {
         if (!Array.isArray(characters)) return false;
 
         return characters.some((char) => {
-          const charActorName = normName(char?.actor);
+          const charActorName = normName(char?.personName || char?.actor);
           return charActorName === targetActorName;
         });
       });
@@ -2881,6 +2881,13 @@ export default {
     // Filter shows by actor (long-press on actor in actors pane)
     on("filterByActor", async ({ actorName }) => {
       await this.filterShowsByActor(actorName);
+    });
+
+    // Patch a single tvdb record in the local allTvdb cache (e.g. after TMDB actors are saved)
+    on("tvdbRecordPatched", ({ showName, record }) => {
+      if (showName && record && allTvdb) {
+        allTvdb[showName] = record;
+      }
     });
 
     // Search shows by actor (from search box in actors pane)

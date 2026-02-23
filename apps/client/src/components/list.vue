@@ -2883,6 +2883,15 @@ export default {
       await this.filterShowsByActor(actorName);
     });
 
+    // Clear actor filter when actor is deselected in actors pane
+    on("clearActorFilter", async () => {
+      if (!this.actorFilter && !this.actorSearchParams) return;
+      this.actorFilter = null;
+      this.actorSearchParams = null;
+      evtBus.emit("actorSearchCleared");
+      await this.select();
+    });
+
     // Patch a single tvdb record in the local allTvdb cache (e.g. after TMDB actors are saved)
     on("tvdbRecordPatched", ({ showName, record }) => {
       if (showName && record && allTvdb) {

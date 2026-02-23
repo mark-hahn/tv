@@ -618,6 +618,7 @@ export default {
         this.showingCredits = false;
         this.credits = [];
         this.creditsError = null;
+        evtBus.emit("clearActorFilter");
       } else {
         // Select
         this.selectedActor = actor;

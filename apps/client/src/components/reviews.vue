@@ -454,8 +454,7 @@ export default {
     evtBus.on("previewMode", this.onPreviewMode);
     evtBus.on("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.on("addPreviewShowDone", this.onAddPreviewShowDone);
-
-    // Also listen for explicit "showReviews" if added later, but logic above should suffice for now.
+    evtBus.on("paneChanged", this.onPaneChanged);
   },
 
   beforeUnmount() {
@@ -464,9 +463,14 @@ export default {
     evtBus.off("previewMode", this.onPreviewMode);
     evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);
+    evtBus.off("paneChanged", this.onPaneChanged);
   },
 
   methods: {
+    onPaneChanged(pane) {
+      if (pane === "reviews") this.scrollReviewPanesToTop();
+    },
+
     onSetUpSeries(show) {
       this.showName = show?.Name || "";
       this.reviews = [];

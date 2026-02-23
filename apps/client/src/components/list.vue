@@ -486,10 +486,18 @@ export default {
           inEmby: false,
           leftEmby,
         });
+        // Capture the next visible show before refilter removes this one from the list.
+        const delIdx = this.shows.findIndex((s) => s.Id == show.Id);
+        const nextShow =
+          delIdx >= 0
+            ? this.shows[delIdx + 1] || this.shows[delIdx - 1] || null
+            : null;
         // Update the show object so refilter reflects the new inEmby state.
         // The show stays in allShows so it appears when hasemby condfltr is 0.
         show.inEmby = false;
         await this.refilter(false);
+        // Highlight the next show now that the deleted show has been filtered out.
+        if (nextShow) this.saveVisShow(nextShow, true);
       } else {
         // Not in Emby: permanently delete with confirmation (no files to delete)
         if (

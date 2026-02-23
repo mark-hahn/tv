@@ -1039,7 +1039,9 @@ export const getSeriesMap = async (show, prune = false) => {
       return [];
     }
     try {
-      const result = await srvr.getSeriesMapFromTvdb({ tvdbId });
+      const allTvdbData = await tvdb.getAllTvdb(0);
+      const watchedEpis = allTvdbData?.[show.Name]?.watchedEpis || null;
+      const result = await srvr.getSeriesMapFromTvdb({ tvdbId, watchedEpis });
       if (result.success && result.seriesMap) {
         return result.seriesMap;
       }

@@ -470,8 +470,6 @@ export default {
           )
         )
           return;
-        // Optimistically remove from UI before slow deletes
-        this.removeRow(show);
         // Delete files from server first
         await srvr.deleteShowFromSrvr(show);
         // Refresh Emby library so it knows the files are gone
@@ -488,6 +486,10 @@ export default {
           inEmby: false,
           leftEmby,
         });
+        // Update the show object so refilter reflects the new inEmby state.
+        // The show stays in allShows so it appears when hasemby condfltr is 0.
+        show.inEmby = false;
+        await this.refilter(false);
       } else {
         // Not in Emby: permanently delete with confirmation (no files to delete)
         if (
@@ -501,7 +503,6 @@ export default {
         delete allTvdb[name];
         await srvr.setTvdbFields({ name, $delTvdb: true });
       }
-      await this.removeRow(show);
     };
 
     return {

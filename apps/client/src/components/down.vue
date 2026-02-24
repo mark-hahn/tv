@@ -983,6 +983,49 @@ export default {
         }
         const arr = await res.json();
 
+        try {
+          const toParsedTitle = (rawTitle) => {
+            const raw = String(rawTitle || "").trim();
+            if (!raw) return "";
+            try {
+              let parser = null;
+              if (typeof parseTorrentTitle === "function") {
+                parser = parseTorrentTitle;
+              } else if (
+                parseTorrentTitle &&
+                typeof parseTorrentTitle.parse === "function"
+              ) {
+                parser = parseTorrentTitle.parse;
+              } else if (
+                parseTorrentTitle &&
+                parseTorrentTitle.default &&
+                typeof parseTorrentTitle.default.parse === "function"
+              ) {
+                parser = parseTorrentTitle.default.parse;
+              }
+              const parsed = parser ? parser(raw) : null;
+              return String(parsed?.title || raw).trim();
+            } catch {
+              return raw;
+            }
+          };
+
+          const downloadingTitles = Array.isArray(arr)
+            ? arr
+                .filter((it) => {
+                  const st = String(it?.status || "")
+                    .trim()
+                    .toLowerCase();
+                  return st === "downloading";
+                })
+                .map((it) => toParsedTitle(it?.title))
+                .filter(Boolean)
+            : [];
+          evtBus.emit("activeDownTitles", downloadingTitles);
+        } catch {
+          // ignore
+        }
+
         // downActive: true when any item is downloading or waiting (formerly "future").
         try {
           const active = Array.isArray(arr)

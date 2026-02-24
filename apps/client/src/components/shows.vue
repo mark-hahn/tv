@@ -228,6 +228,10 @@ export default {
       type: String,
       default: "Viewed",
     },
+    activeDownloadShowNames: {
+      type: Array,
+      default: () => [],
+    },
   },
 
   computed: {
@@ -243,6 +247,14 @@ export default {
         Length: "25px",
       };
       return widths[this.sortChoice] || "75px";
+    },
+
+    activeDownloadShowNameSet() {
+      return new Set(
+        Array.isArray(this.activeDownloadShowNames)
+          ? this.activeDownloadShowNames
+          : [],
+      );
     },
   },
 
@@ -260,6 +272,7 @@ export default {
     },
 
     hilite(show) {
+      if (this.activeDownloadShowNameSet.has(show?.Name)) return "#dff5df";
       if (!this.simpleMode && show.inEmby === false) return "#fee";
       return "white";
     },

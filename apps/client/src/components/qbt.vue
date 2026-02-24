@@ -404,6 +404,17 @@ export default {
         const torrents = await this.getQbtInfo({});
         if (Array.isArray(torrents)) {
           const hashOf = (t) => String(t?.hash || "").trim();
+          const downloadingTitles = torrents
+            .filter((t) => {
+              const st = String(t?.state || "")
+                .trim()
+                .toLowerCase();
+              return st === "downloading";
+            })
+            .map((t) => this.toParsedTitle(t?.name))
+            .filter(Boolean);
+          evtBus.emit("activeQbtTitles", downloadingTitles);
+
           const curDownloading = torrents
             .filter((t) => String(t?.state || "").trim() === "downloading")
             .map(hashOf)
@@ -463,13 +474,39 @@ export default {
       return "\u00A0\u00A0|\u00A0\u00A0";
     },
 
+    toParsedTitle(rawTitle) {
+      const raw = String(rawTitle || "").trim();
+      if (!raw) return "";
+      try {
+        let parser = null;
+        if (typeof parseTorrentTitle === "function") {
+          parser = parseTorrentTitle;
+        } else if (
+          parseTorrentTitle &&
+          typeof parseTorrentTitle.parse === "function"
+        ) {
+          parser = parseTorrentTitle.parse;
+        } else if (
+          parseTorrentTitle &&
+          parseTorrentTitle.default &&
+          typeof parseTorrentTitle.default.parse === "function"
+        ) {
+          parser = parseTorrentTitle.default.parse;
+        }
+        const parsed = parser ? parser(raw) : null;
+        return String(parsed?.title || raw).trim();
+      } catch {
+        return raw;
+      }
+    },
+
     pad2(n) {
       return String(n).padStart(2, "0");
     },
 
     fmtMmDd_HhMm(epochSeconds) {
       const n = Number(epochSeconds);
-      if (!Number.isFinite(n) || n <= 0) return "??/??.??:??:??";
+      if (!Number.isFinite(n) || n <= 0) return "??/?? ??:??:??";
       const d = new Date(Math.floor(n) * 1000);
       const mm = this.pad2(d.getMonth() + 1);
       const dd = this.pad2(d.getDate());

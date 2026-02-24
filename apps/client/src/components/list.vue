@@ -234,6 +234,7 @@
             :showConds="!simpleMode"
             :simpleMode="simpleMode"
             :sortChoice="sortChoice"
+            :activeDownloadShowNames="activeDownloadShowNames"
             @copy-name="copyNameToClipboard"
             @open-map="(show) =&gt; seriesMapAction('open', show)"
             @select-show="onSelectShow"
@@ -542,6 +543,8 @@ export default {
       isWideLandscape: false,
       actorFilter: null,
       actorSearchParams: null, // Store search params for word-based actor search
+      qbtActiveShowNames: [],
+      downActiveShowNames: [],
       hasLoadedAllShows: false,
       sortChoices: [
         "Alpha",
@@ -712,6 +715,19 @@ export default {
   computed: {
     displayHighlightName() {
       return this.highlightName;
+    },
+
+    activeDownloadShowNames() {
+      return Array.from(
+        new Set([
+          ...(Array.isArray(this.qbtActiveShowNames)
+            ? this.qbtActiveShowNames
+            : []),
+          ...(Array.isArray(this.downActiveShowNames)
+            ? this.downActiveShowNames
+            : []),
+        ]),
+      );
     },
   },
 
@@ -1663,6 +1679,32 @@ export default {
       );
 
       return s.trim();
+    },
+
+    findShowFromActiveRawTitle(rawTitle) {
+      const raw = String(rawTitle || "").trim();
+      if (!raw) return null;
+      if (!Array.isArray(allShows) || allShows.length === 0) return null;
+      return util.smartTitleMatch(raw, allShows, null, true);
+    },
+
+    updateActiveShowNames(source, rawTitles) {
+      const names = new Set();
+      const list = Array.isArray(rawTitles) ? rawTitles : [];
+
+      for (const rawTitle of list) {
+        const show = this.findShowFromActiveRawTitle(rawTitle);
+        if (show?.Name) names.add(show.Name);
+      }
+
+      const next = Array.from(names);
+      if (source === "qbt") {
+        this.qbtActiveShowNames = next;
+        return;
+      }
+      if (source === "down") {
+        this.downActiveShowNames = next;
+      }
     },
 
     async selectShowFromCardTitle(rawTitle) {
@@ -2882,6 +2924,14 @@ export default {
     // Cross-pane: click a card in Flex/Qbt/Down to select show in list
     on("selectShowFromCardTitle", (rawTitle) => {
       void this.selectShowFromCardTitle(rawTitle);
+    });
+
+    on("activeQbtTitles", (titles) => {
+      this.updateActiveShowNames("qbt", titles);
+    });
+
+    on("activeDownTitles", (titles) => {
+      this.updateActiveShowNames("down", titles);
     });
 
     // Filter shows by actor (long-press on actor in actors pane)

@@ -49,8 +49,9 @@ module.exports = {
     {
       name: "tv-api",
       cwd: appCwd("api"),
-      script: "src/server.js",
-      interpreter: nodeInterpreter,
+      script: "xvfb-run",
+      args: ["-a", nodeInterpreter, "src/server.js"],
+      interpreter: "none",
       time: true,
       env: {
         NODE_ENV: "production",

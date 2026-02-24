@@ -1,16 +1,3 @@
-// Auto-restart with xvfb-run if no DISPLAY is set (for Playwright)
-if (!process.env.DISPLAY && !process.env.XVFB_RESTARTED) {
-  console.log("No DISPLAY detected, restarting with xvfb-run...");
-  const { spawn } = await import("child_process");
-  const child = spawn("xvfb-run", ["-a", "node", process.argv[1]], {
-    stdio: "inherit",
-    env: { ...process.env, XVFB_RESTARTED: "1" },
-  });
-  child.on("exit", (code) => process.exit(code || 0));
-  // Exit this process and let the child run
-  await new Promise(() => {});
-}
-
 import express from "express";
 import https from "https";
 import fs from "fs";
@@ -29,6 +16,8 @@ import {
   flexgetHistory,
   addQbtTorrent,
   getUsbFiles,
+  getUsbPruneStatus,
+  pruneUsbFiles,
   renameUsbFile,
 } from "./usb.js";
 import { getLocalFiles } from "./local.js";
@@ -680,6 +669,26 @@ app.get("/api/usb/files", async (req, res) => {
     res.json(tree);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/usb/prune", async (req, res) => {
+  try {
+    const result = await pruneUsbFiles();
+    res.json(result);
+  } catch (err) {
+    console.error("usb prune error:", err);
+    res.status(500).json({ error: err?.message || String(err) });
+  }
+});
+
+app.get("/api/usb/prune/status", async (req, res) => {
+  try {
+    const status = getUsbPruneStatus();
+    res.json(status);
+  } catch (err) {
+    console.error("usb prune status error:", err);
+    res.status(500).json({ error: err?.message || String(err) });
   }
 });
 

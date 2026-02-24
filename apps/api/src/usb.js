@@ -11,6 +11,38 @@ const __dirname = path.dirname(__filename);
 
 const execFileAsync = promisify(execFile);
 
+const USB_FILES_ROOT = "/home/xobtlu/files";
+const USB_SPACE_TOTAL_BYTES = Math.trunc(2e9 * 1024);
+const PRUNE_DELETE_TARGET_BYTES = 100 * 1_000_000_000;
+const PRUNE_DRY_RUN = true;
+
+const USB_PRUNE_STATE = {
+  running: false,
+  phase: "idle",
+  latestLogLine: "",
+  summaryLine: "",
+  dryRun: PRUNE_DRY_RUN,
+  foldersScanned: 0,
+  deletedCount: 0,
+  runningDeletedBytes: 0,
+  startedAt: 0,
+  finishedAt: 0,
+  updatedAt: Date.now(),
+  error: "",
+};
+
+let usbPruneInFlight = null;
+
+function setUsbPruneState(patch) {
+  Object.assign(USB_PRUNE_STATE, patch, { updatedAt: Date.now() });
+}
+
+export function getUsbPruneStatus() {
+  return {
+    ...USB_PRUNE_STATE,
+  };
+}
+
 function resolveCredPath() {
   return path.join(getApiSecretsDir(), "qbt-cred.txt");
 }
@@ -828,7 +860,7 @@ export async function addQbtTorrent(input) {
  */
 export async function getUsbFiles() {
   const qbHost = await loadQbHostForSsh();
-  const root = "/home/xobtlu/files";
+  const root = USB_FILES_ROOT;
 
   const sshBaseArgs = [
     "-o",
@@ -921,6 +953,245 @@ export async function getUsbFiles() {
     console.error("getUsbFiles failed", e);
     throw new Error(`Failed to list USB files: ${e.message}`);
   }
+}
+
+function fmtIsoMinute(tsMs) {
+  const d = new Date(Number(tsMs) || 0);
+  if (Number.isNaN(d.getTime())) return "1970-01-01-00:00";
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}-${hh}:${min}`;
+}
+
+function fmtGb3(bytes) {
+  const n = Number(bytes);
+  if (!Number.isFinite(n) || n <= 0) return "0.000 GB";
+  return `${(n / 1_000_000_000).toFixed(3)} GB`;
+}
+
+function fmtGbInt(bytes) {
+  const n = Number(bytes);
+  if (!Number.isFinite(n) || n <= 0) return "0 GB";
+  return `${Math.round(n / 1_000_000_000)} GB`;
+}
+
+function fmtGbPad(bytes) {
+  const n = Number(bytes);
+  if (!Number.isFinite(n) || n <= 0) return "  0 GB";
+  const gb = Math.round(n / 1_000_000_000);
+  return `${String(gb).padStart(3, " ")} GB`;
+}
+
+export async function pruneUsbFiles() {
+  if (usbPruneInFlight) {
+    return usbPruneInFlight;
+  }
+
+  usbPruneInFlight = (async () => {
+    const qbHost = await loadQbHostForSsh();
+
+    const sshBaseArgs = [
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "ConnectTimeout=20",
+      "-o",
+      "LogLevel=ERROR",
+      "-o",
+      "StrictHostKeyChecking=no",
+      "-o",
+      "UserKnownHostsFile=/dev/null",
+    ];
+
+    const runUsbSsh = async (cmd, maxBuffer = 16 * 1024 * 1024) => {
+      const out = await execFileAsync("ssh", [...sshBaseArgs, qbHost, cmd], {
+        maxBuffer,
+        timeout: 120000,
+        windowsHide: true,
+      });
+      return String(out?.stdout || "");
+    };
+
+    setUsbPruneState({
+      running: true,
+      phase: "scan",
+      latestLogLine: "",
+      summaryLine: "",
+      foldersScanned: 0,
+      deletedCount: 0,
+      runningDeletedBytes: 0,
+      startedAt: Date.now(),
+      finishedAt: 0,
+      error: "",
+    });
+
+    try {
+      const folders = [];
+      let totalUsedBytes = 0;
+      let usbUsedBeforeBytes = 0;
+
+      const scanScript = `
+set -e
+    du_k="$(cd; du -s | awk 'NR==1{print $1}')"
+    printf '__DUK__|%s\\n' "$du_k"
+cd ${USB_FILES_ROOT}
+find . -mindepth 1 -maxdepth 1 -type d -print0 | sort -z | while IFS= read -r -d '' d; do
+  data="$(find "$d" -type f -printf '%T@|%s\\n')"
+  if [ -n "$data" ]; then
+    newest="$(printf '%s\\n' "$data" | awk -F'|' 'BEGIN{m=0}{if(($1+0)>m)m=$1+0}END{printf "%.3f",m}')"
+    size="$(printf '%s\\n' "$data" | awk -F'|' 'BEGIN{s=0}{s+=($2+0)}END{printf "%.0f",s}')"
+  else
+    newest="$(find "$d" -maxdepth 0 -printf '%T@')"
+    size="0"
+  fi
+  name="\${d#./}"
+  printf '%s|%s|%s\\n' "$name" "$newest" "$size"
+done
+`;
+      const scanCmd = `bash -lc ${shellQuote(scanScript)}`;
+      const scanText = await runUsbSsh(scanCmd, 64 * 1024 * 1024);
+      const scanLines = scanText
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      for (const line of scanLines) {
+        if (line.startsWith("__DUK__|")) {
+          const duKRaw = Number(line.slice("__DUK__|".length));
+          if (Number.isFinite(duKRaw) && duKRaw > 0) {
+            usbUsedBeforeBytes = Math.trunc(duKRaw * 1024);
+          }
+          continue;
+        }
+
+        const [folderNameRaw, tsRaw, sizeRaw] = line.split("|");
+        const folderName = String(folderNameRaw || "").trim();
+        if (!folderName) continue;
+
+        const tsSeconds = Number(tsRaw);
+        const folderSizeIn = Number(sizeRaw);
+        const folderSizeBytes =
+          Number.isFinite(folderSizeIn) && folderSizeIn > 0
+            ? Math.trunc(folderSizeIn)
+            : 0;
+        const folderTimeMs =
+          Number.isFinite(tsSeconds) && tsSeconds > 0
+            ? Math.trunc(tsSeconds * 1000)
+            : 0;
+
+        totalUsedBytes += folderSizeBytes;
+        folders.push({
+          folderName,
+          folderPath: `${USB_FILES_ROOT}/${folderName}`,
+          folderTimeMs,
+          folderSizeBytes,
+        });
+      }
+
+      setUsbPruneState({
+        foldersScanned: folders.length,
+      });
+
+      folders.sort((a, b) => {
+        if (a.folderTimeMs !== b.folderTimeMs)
+          return a.folderTimeMs - b.folderTimeMs;
+        return a.folderName.localeCompare(b.folderName);
+      });
+
+      const deleted = [];
+      let runningDeletedBytes = 0;
+      let usedAfterBytes =
+        usbUsedBeforeBytes > 0 ? usbUsedBeforeBytes : totalUsedBytes;
+      let latestDeletedTimeMs = 0;
+
+      setUsbPruneState({
+        phase: "delete",
+        latestLogLine: "Prune pass starting...",
+      });
+
+      for (const folder of folders) {
+        if (runningDeletedBytes >= PRUNE_DELETE_TARGET_BYTES) break;
+
+        const deleteSizeBytes = folder.folderSizeBytes;
+        runningDeletedBytes += deleteSizeBytes;
+        usedAfterBytes = Math.max(0, usedAfterBytes - deleteSizeBytes);
+
+        const logLine = [
+          fmtIsoMinute(folder.folderTimeMs),
+          fmtGbPad(deleteSizeBytes),
+          fmtGbPad(runningDeletedBytes),
+          folder.folderName,
+        ].join(" | ");
+        console.log(
+          `usb prune ${PRUNE_DRY_RUN ? "[dry-run]" : "[delete]"}: ${logLine}`,
+        );
+
+        if (!PRUNE_DRY_RUN) {
+          const rmCmd = `rm -rf -- ${shellQuote(folder.folderPath)}`;
+          await runUsbSsh(rmCmd);
+        }
+
+        deleted.push({
+          folderName: folder.folderName,
+          folderTime: fmtIsoMinute(folder.folderTimeMs),
+          folderSizeBytes: deleteSizeBytes,
+          runningDeletedBytes,
+        });
+        if (folder.folderTimeMs > latestDeletedTimeMs) {
+          latestDeletedTimeMs = folder.folderTimeMs;
+        }
+
+        setUsbPruneState({
+          latestLogLine: logLine,
+          deletedCount: deleted.length,
+          runningDeletedBytes,
+        });
+      }
+
+      const latestDeletedTimeText =
+        latestDeletedTimeMs > 0 ? fmtIsoMinute(latestDeletedTimeMs) : "none";
+      const summaryLine = `Done ${PRUNE_DRY_RUN ? "dry-run" : "delete"}: ${folders.length} scanned, ${deleted.length} folders, ${fmtGbInt(runningDeletedBytes)}, ${latestDeletedTimeText}`;
+      setUsbPruneState({
+        running: false,
+        phase: "done",
+        summaryLine,
+        latestLogLine: summaryLine,
+        finishedAt: Date.now(),
+      });
+
+      return {
+        ok: true,
+        dryRun: PRUNE_DRY_RUN,
+        deleteTargetBytes: PRUNE_DELETE_TARGET_BYTES,
+        usbSpaceTotal: USB_SPACE_TOTAL_BYTES,
+        usbSpaceUsedBefore:
+          usbUsedBeforeBytes > 0 ? usbUsedBeforeBytes : totalUsedBytes,
+        usbSpaceUsedAfter: usedAfterBytes,
+        foldersScanned: folders.length,
+        deletedCount: deleted.length,
+        deleted,
+      };
+    } catch (e) {
+      const msg = e?.message || String(e);
+      const summaryLine = `Prune failed: ${msg}`;
+      setUsbPruneState({
+        running: false,
+        phase: "error",
+        latestLogLine: summaryLine,
+        summaryLine,
+        error: msg,
+        finishedAt: Date.now(),
+      });
+      throw e;
+    } finally {
+      usbPruneInFlight = null;
+    }
+  })();
+
+  return usbPruneInFlight;
 }
 
 /**

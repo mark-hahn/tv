@@ -932,7 +932,7 @@ async function main() {
     if (Date.now() - lastPruneAt >= PRUNE_INTERVAL_MS) {
       // Inline prune.sh behavior: delete files older than 60 days on the USB host.
       log(".... deleting old files in usb ~/files ....");
-      PRUNE_DAYS = 60;
+      PRUNE_DAYS = 21;
       try {
         // Wait for remote pruning to finish before scanning dirs/pruning DB,
         // otherwise we may miss entries whose folders are deleted moments later.

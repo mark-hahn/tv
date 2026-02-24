@@ -572,7 +572,10 @@ export const getSeriesMapByTvdbId = async (tvdbId) => {
   if (allTvdb) {
     // Find the show with this tvdbId (coerce to string to handle number/string mismatch)
     for (const [showName, tvdbRecord] of Object.entries(allTvdb)) {
-      if (String(tvdbRecord.tvdbId) === String(tvdbId) && tvdbRecord.watchedEpis) {
+      if (
+        String(tvdbRecord.tvdbId) === String(tvdbId) &&
+        tvdbRecord.watchedEpis
+      ) {
         watchedEpis = tvdbRecord.watchedEpis;
         break;
       }

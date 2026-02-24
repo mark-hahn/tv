@@ -1016,7 +1016,9 @@ export default {
                   const st = String(it?.status || "")
                     .trim()
                     .toLowerCase();
-                  return st === "downloading";
+                  return (
+                    st === "downloading" || st === "waiting" || st === "future"
+                  );
                 })
                 .map((it) => toParsedTitle(it?.title))
                 .filter(Boolean)

@@ -3370,6 +3370,44 @@ async function handleShowDiskChange(showName) {
     console.log(
       `[chokidar] Notified clients about ${showName} with taskId: ${taskId}`,
     );
+
+    // After 30s (Emby index time), refresh gap data and watchedEpis for this show
+    setTimeout(async () => {
+      try {
+        const allTvdb = tvdb.getAllTvdbSync();
+        const tvdbRecord = allTvdb[showName];
+        if (!tvdbRecord?.inEmby || !tvdbRecord?.Id) return;
+
+        // Refresh fileGap, watchGap, etc.
+        await runGapCheckForShows(
+          [{ showId: tvdbRecord.Id, showName, tvdbRecord }],
+          false,
+        );
+        console.log(`[chokidar] Gap check refreshed for ${showName}`);
+
+        // Refresh watchedEpis from Emby
+        const show = { Name: showName, Id: tvdbRecord.Id };
+        const seriesMap = await emby.getSeriesMap(show);
+        if (seriesMap && seriesMap.length > 0) {
+          const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMap);
+          const freshRecord = tvdb.getAllTvdbSync()[showName];
+          if (freshRecord) {
+            freshRecord.watchedEpis = watchedEpis;
+            await tvdb.saveTvdbSync();
+            notifyClients("tvdbUpdated");
+            console.log(
+              `[chokidar] watchedEpis refreshed for ${showName}:`,
+              watchedEpis,
+            );
+          }
+        }
+      } catch (err) {
+        console.error(
+          `[chokidar] Post-download refresh error for ${showName}:`,
+          err.message,
+        );
+      }
+    }, 30 * 1000);
   } catch (err) {
     console.error(
       `[chokidar] Error handling disk change for ${showName}:`,

@@ -8,7 +8,6 @@ import { rottenSearch } from "./rotten.js";
 import * as util from "./util.js";
 const { getPstDate } = util;
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
-import { getLastViewedSync } from "./lastViewed.js";
 import { MovieDb } from "moviedb-promise";
 const { log, start, end } = util.getLog("tvdb");
 const TVDB_PATH = path.join(SRVR_DATA_DIR, "tvdb.json");
@@ -1310,10 +1309,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     paramObj.reject ?? existing.Reject ?? existing.reject ?? false;
   tvdbData.Pickup =
     paramObj.pickup ?? existing.Pickup ?? existing.pickup ?? false;
-  const lvSync = getLastViewedSync()[name] || 0;
-  const lvParam = paramObj.lastViewed || 0;
-  const lvExisting = existing.lastViewed || 0;
-  tvdbData.lastViewed = Math.max(lvSync, lvParam, lvExisting) || null;
+  tvdbData.lastWatched = paramObj.lastWatched || existing.lastWatched || null;
 
   // Calculate waitStr from nextAired and lastAired if available
   const calculatedWaitStr = calculateWaitStr(
@@ -1956,11 +1952,6 @@ export const setTvdbFields = async (params) => {
         // Handle direct assignment for top-level fields and nested objects
         tvdb[key] = value;
       }
-
-      // Keep lastViewed current — take max of stored value and current in-memory
-      const lvCurrent = getLastViewedSync()[tvdb.Name] || 0;
-      const lvStored = tvdb.lastViewed || 0;
-      if (lvCurrent > lvStored) tvdb.lastViewed = lvCurrent;
 
       // Keep Emby button in sync with final inEmby/Id values (after field updates).
       if (!Array.isArray(tvdb.remotes)) tvdb.remotes = [];

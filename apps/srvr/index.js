@@ -3193,6 +3193,29 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
       }
     }
 
+    // Update lastWatched for each show in batch (2-call Emby fetch per show)
+    let lastWatchedChanged = 0;
+    for (const { showId, showName, tvdbRecord } of shows) {
+      const t0 = Date.now();
+      try {
+        const date = await fetchLastWatchedDate(showId);
+        const elapsed = Date.now() - t0;
+        if (date && date !== tvdbRecord.lastWatched) {
+          tvdbRecord.lastWatched = date;
+          lastWatchedChanged++;
+          appendWatchgapLog(
+            `  lastWatched updated | ${elapsed}ms | ${showName} -> ${date}`,
+          );
+        }
+      } catch (err) {
+        console.error(`[lastWatched] ${showName}: ${err.message}`);
+      }
+    }
+    if (lastWatchedChanged > 0) {
+      await tvdb.saveTvdbSync();
+      console.log(`[lastWatched] Updated ${lastWatchedChanged} shows`);
+    }
+
     // Now run gap check with fresh emby and disk data
     const gapData = await emby.gapCheckBatch(shows);
     for (const { showId, showName } of shows) {
@@ -3276,6 +3299,22 @@ const COLLECTION_IDS = {
 
 const DISK_SYNC_INTERVAL = 60 * 60 * 1000; // 1 hour (full disk check)
 const GAP_CHECK_INTERVAL = 6 * 60 * 1000; // 6 minutes (processes batch of 10 shows, checks disk per-show)
+
+async function fetchLastWatchedDate(showId) {
+  const epUrl = `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?api_key=${EMBY_API_KEY}&ParentId=${showId}&IncludeItemTypes=Episode&Recursive=true&IsPlayed=true&SortBy=DatePlayed&SortOrder=Descending&Limit=1`;
+  const epResp = await fetch(epUrl);
+  if (!epResp.ok) return null;
+  const epData = await epResp.json();
+  const epId = epData.Items?.[0]?.Id;
+  if (!epId) return null;
+  const detailUrl = `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${epId}?api_key=${EMBY_API_KEY}`;
+  const detailResp = await fetch(detailUrl);
+  if (!detailResp.ok) return null;
+  const detail = await detailResp.json();
+  const utcStr = detail.UserData?.LastPlayedDate;
+  if (!utcStr) return null;
+  return utcStr.substring(0, 10);
+}
 
 // NOTE: syncEmbyUserData periodic sync removed - now using immediate triggers from client
 // Collections and user data changes are handled by /api/triggerEmbySync and /api/triggerFullGapCheck

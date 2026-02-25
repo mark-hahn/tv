@@ -367,7 +367,7 @@
             </div>
             <div
               id="lastwatched"
-              v-if="lastViewedDate"
+              v-if="lastWatchedDate"
               style="
                 min-height: 20px;
                 white-space: nowrap;
@@ -375,7 +375,7 @@
                 text-overflow: ellipsis;
               "
             >
-              Last watched: {{ lastViewedDate }}
+              Last watched: {{ lastWatchedDate }}
             </div>
             <div
               id="cntrylang"
@@ -628,12 +628,16 @@ export default {
   },
 
   computed: {
-    lastViewedDate() {
-      const ms = this.show?.lastViewed;
-      if (!ms) return null;
-      return new Date(ms)
-        .toLocaleString("en-CA", { timeZone: "America/Los_Angeles" })
-        .slice(0, 10);
+    lastWatchedDate() {
+      const d = this.show?.lastWatched;
+      if (!d) return null;
+      // d is YYYY-MM-DD already in LA timezone
+      const [y, m, day] = d.split("-");
+      return new Date(+y, +m - 1, +day).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
     },
   },
 

@@ -1,4 +1,4 @@
-const DEFAULT_TVPROC_BASE_URL = "http://localhost:3003";
+const DEFAULT_TVPROC_BASE_URL = "http://localhost:3004";
 
 function normalizeTitles(titles) {
   const arr = Array.isArray(titles) ? titles : [];

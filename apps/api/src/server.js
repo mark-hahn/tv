@@ -248,7 +248,7 @@ function readRequiredTextFile(filePath, label) {
 
 const app = express();
 
-const QBT_TEST_PORT = 3001;
+const QBT_TEST_PORT = 3002;
 const DUMP_INFO = false;
 const FILTER_TORRENTS = false;
 // const FILTER_TORRENTS = {hash:   "629746091b23ec0617405e8cc6f1eee486447629"};
@@ -546,7 +546,7 @@ app.get("/api/tvproc/startProc", async (req, res) => {
     if (!title) {
       return res.status(400).json({ error: "title parameter required" });
     }
-    const url = `https://hahnca.com/tv-down/startProc?title=${encodeURIComponent(title)}`;
+    const url = `https://hahnca.com/tv-down-dev/startProc?title=${encodeURIComponent(title)}`;
     const response = await fetch(url);
     const data = await response.json();
     res.json(data);
@@ -559,7 +559,7 @@ app.get("/api/tvproc/startProc", async (req, res) => {
 app.post("/api/tvproc/forceDown", async (req, res) => {
   try {
     const files = req.body; // already parsed by express.json()
-    const response = await fetch("http://127.0.0.1:3003/forceDown", {
+    const response = await fetch("http://127.0.0.1:3004/forceDown", {
       method: "POST",
       body: JSON.stringify(files),
       headers: { "Content-Type": "application/json" },

@@ -697,7 +697,7 @@ async function main() {
         // No matching endpoint
         return json(res, 404, { status: "not found" });
       })
-      .listen(3003, "0.0.0.0");
+      .listen(3004, "0.0.0.0");
   })();
 
   findUsb =

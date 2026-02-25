@@ -2556,7 +2556,7 @@ app.post(
   }),
 );
 
-const HTTP_PORT = 8737;
+const HTTP_PORT = 8747;
 
 // HTTPS options - use same certs as API server (located in api/cookies)
 const CERT_DIR = path.join(path.dirname(SRVR_ROOT_DIR), "api", "cookies");
@@ -2571,7 +2571,7 @@ https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
 
 //////////////////  WEBSOCKET SERVER  //////////////////
 
-const wss = new WebSocketServer({ port: 8736 });
+const wss = new WebSocketServer({ port: 8746 });
 console.log("wss listening on port 8736");
 
 const appSocketName = "web app websocket";

@@ -41,6 +41,18 @@ Switch to `main` first, then deploy to prod.
 2. Use prod config.js values (above) for local Vite against prod, OR just stop running Vite
 3. `TV_REMOTE_BASE=/root/dev/apps/tv ./srvr` to deploy main to prod
 
+## One-time setup: seed dev server data from prod (already done)
+If the dev directory is ever re-created from scratch, run on the remote:
+```bash
+rsync -a /root/dev/apps/tv/apps/down/data/  /root/dev/apps/tv-dev/apps/down/data/
+rsync -a /root/dev/apps/tv/apps/api/data/   /root/dev/apps/tv-dev/apps/api/data/
+rsync -a /root/dev/apps/tv/apps/srvr/data/  /root/dev/apps/tv-dev/apps/srvr/data/
+cp -r /root/dev/apps/tv/apps/api/secrets    /root/dev/apps/tv-dev/apps/api/
+cp -r /root/dev/apps/tv/apps/srvr/secrets   /root/dev/apps/tv-dev/apps/srvr/
+cp /root/dev/apps/tv/apps/api/src/qb-cred.js /root/dev/apps/tv-dev/apps/api/src/
+pm2 restart tv-api-dev tv-down-dev tv-srvr-dev && pm2 save
+```
+
 ## Nginx routes (on hahnca.com — already configured, do not change)
 - `/tv-api/`      → prod api (port 3001)
 - `/tv-api-dev/`  → dev api (port 3002)

@@ -2978,7 +2978,8 @@ async function syncEmbyUserData() {
           tvdbRecord.Played = userData.Played || false;
           tvdbRecord.PlayCount = userData.PlayCount || 0;
           tvdbRecord.IsFavorite = userData.IsFavorite || false;
-          tvdbRecord.LastPlayedDate = userData.LastPlayedDate || null;
+          tvdbRecord.LastPlayedDate =
+            userData.LastPlayedDate || tvdbRecord.LastPlayedDate || null;
           tvdbRecord.UnplayedItemCount = userData.UnplayedItemCount || 0;
           userDataChangeCount++;
         }

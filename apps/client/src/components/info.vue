@@ -366,6 +366,18 @@
               </div>
             </div>
             <div
+              id="lastwatched"
+              v-if="lastViewedDate"
+              style="
+                min-height: 20px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              "
+            >
+              Last watched: {{ lastViewedDate }}
+            </div>
+            <div
               id="cntrylang"
               v-if="(cntryLangLeftTxt &amp;&amp; cntryLangLeftTxt.length &gt; 0) || (cntryLangRightTxt &amp;&amp; cntryLangRightTxt.length &gt; 0)"
               style="
@@ -613,6 +625,16 @@ export default {
       remoteFetchMode: "fast", // 'fast' or 'full'
       settingUpShowName: null, // Track show currently being set up to prevent duplicate calls
     };
+  },
+
+  computed: {
+    lastViewedDate() {
+      const ms = this.show?.lastViewed;
+      if (!ms) return null;
+      return new Date(ms)
+        .toLocaleString("en-CA", { timeZone: "America/Los_Angeles" })
+        .slice(0, 10);
+    },
   },
 
   methods: {

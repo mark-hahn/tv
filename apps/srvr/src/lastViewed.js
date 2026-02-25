@@ -35,6 +35,8 @@ export const getLastViewed = async (_params) => {
   return lastViewed;
 };
 
+export const getLastViewedSync = () => lastViewed;
+
 let lastShowNameByDeviceName = {};
 const checkWatch = async () => {
   const onDevices = await emby.getOnDevices();

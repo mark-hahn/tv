@@ -405,7 +405,6 @@ export async function loadAllShows() {
       isFavorite: embyShow.UserData?.IsFavorite || false,
       isPlayed: embyShow.UserData?.Played || false,
       playCount: embyShow.UserData?.PlayCount || 0,
-      lastPlayedDate: embyShow.UserData?.LastPlayedDate || null,
     };
 
     // Create or update tvdb record
@@ -517,7 +516,6 @@ export async function loadAllShows() {
           IsFavorite: updateFields.isFavorite,
           Played: updateFields.isPlayed,
           PlayCount: updateFields.playCount,
-          LastPlayedDate: updateFields.lastPlayedDate,
         });
         if (isTvdbShowRecord(linkedRecord)) {
           allTvdb[tvdbKey] = linkedRecord;
@@ -578,7 +576,6 @@ export async function loadAllShows() {
         tvdbRecord.IsFavorite = embyShow.UserData.IsFavorite || false;
         tvdbRecord.Played = embyShow.UserData.Played || false;
         tvdbRecord.PlayCount = embyShow.UserData.PlayCount || 0;
-        tvdbRecord.LastPlayedDate = embyShow.UserData.LastPlayedDate || null;
       }
 
       // Mark show as being in Emby

@@ -1,8 +1,8 @@
 import { config } from "./config.js";
 import evtBus from "./evtBus.js";
 
-const WS_URL = "wss://hahnca.com/tv-srvr";
-const HTTP_URL = "https://hahnca.com/tv-srvr";
+const HTTP_URL = config.tvSrvrUrl;
+const WS_URL = HTTP_URL.replace(/^https/, "wss");
 
 let ws;
 const openWs = () => {

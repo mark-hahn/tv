@@ -455,7 +455,7 @@ export default {
                 finishedHashes: missing,
               });
               try {
-                await fetch("https://hahnca.com/tv-down/startProc", {
+                await fetch(`${config.tvDownUrl}/startProc`, {
                   method: "POST",
                 });
               } catch {

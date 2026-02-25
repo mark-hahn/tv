@@ -742,7 +742,7 @@ export default {
       if (!title || this.retryingTitles.has(title)) return;
       this.retryingTitles = new Set([...this.retryingTitles, title]);
       try {
-        await fetch("https://hahnca.com/tv-down/retry", {
+        await fetch(`${config.tvDownUrl}/retry`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title }),
@@ -906,7 +906,7 @@ export default {
     async startCheck() {
       try {
         this.isChecking = true;
-        await fetch("https://hahnca.com/tv-down/startProc", {
+        await fetch(`${config.tvDownUrl}/startProc`, {
           method: "POST",
         });
         // Keep checking indicator for a reasonable time
@@ -965,7 +965,7 @@ export default {
           !opts.isInitialPaneSwitch && el && this.isNearBottom(el);
         const shouldStick = Boolean(opts.forceScrollToBottom) || wasNearBottom;
 
-        const res = await fetch("https://hahnca.com/tv-down/downloads");
+        const res = await fetch(`${config.tvDownUrl}/downloads`);
         if (!res.ok) {
           let detail = "";
           try {
@@ -1129,7 +1129,7 @@ export default {
 
             let ok = false;
             try {
-              const resp = await fetch("https://hahnca.com/tv-down/startProc", {
+              const resp = await fetch(`${config.tvDownUrl}/startProc`, {
                 method: "POST",
               });
               ok = Boolean(resp && resp.ok);

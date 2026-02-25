@@ -1234,7 +1234,7 @@ export default {
       );
       if (merged.length === 0) return false;
 
-      const url = "https://hahnca.com/tv-down/deleteProcids";
+      const url = `${config.tvDownUrl}/deleteProcids`;
       let res;
       try {
         res = await this.fetchWithTimeout(

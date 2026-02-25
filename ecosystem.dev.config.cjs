@@ -22,7 +22,14 @@ function resolveNodeInterpreter() {
     version = null;
   }
   if (!version) return "node";
-  const nodePath = path.join(nvmDir, "versions", "node", version, "bin", "node");
+  const nodePath = path.join(
+    nvmDir,
+    "versions",
+    "node",
+    version,
+    "bin",
+    "node",
+  );
   if (fs.existsSync(nodePath)) return nodePath;
   return "node";
 }

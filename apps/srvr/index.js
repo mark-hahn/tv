@@ -2561,6 +2561,7 @@ app.post(
         .then(async (gapData) => {
           if (gapData) {
             Object.assign(tvdbRecord, gapData);
+            tvdbRecord.lastGapCheck = Date.now();
             await tvdb.saveTvdbSync();
             notifyClients("tvdbUpdated");
           }
@@ -3193,6 +3194,16 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
 
     // Now run gap check with fresh emby and disk data
     const gapData = await emby.gapCheckBatch(shows);
+    for (const { showId, showName } of shows) {
+      const g = gapData?.[showId];
+      if (g) {
+        appendWatchgapLog(
+          `  ${showName}: notReady=${g.notReady} fileGap=${g.fileGap} anyWatched=${g.anyWatched}${g.fileEndError ? " fileEndError=true" : ""}${g.seasonWatchedThenNofile ? " sWTNF=true" : ""}`,
+        );
+      } else {
+        appendWatchgapLog(`  ${showName}: no gap data (error or skipped)`);
+      }
+    }
     const updatedCount = await tvdb.updateTvdbWithGapData(gapData);
 
     if (updatedCount > 0) {
@@ -3206,21 +3217,24 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
   }
 }
 
-/**
- * Phase 3.3: Background gap check - cycles through shows incrementally
- * Processes a batch of shows each run (10 per 6 minutes)
- */
-let gapCheckIndex = 0;
 const GAP_CHECK_BATCH_SIZE = 10;
+const WATCHGAP_LOG = path.join(SRVR_DATA_DIR, "watchgap.log");
 
+function appendWatchgapLog(line) {
+  const ts = new Date()
+    .toLocaleString("sv-SE", { timeZone: "America/Los_Angeles" })
+    .slice(0, 19);
+  fs.appendFileSync(WATCHGAP_LOG, `${ts} ${line}\n`);
+}
+
+/**
+ * Phase 3.3: Background gap check - processes shows least-recently-checked first
+ */
 async function runGapCheckBatch() {
   try {
     const allTvdb = tvdb.getAllTvdbSync();
-    if (!allTvdb || Object.keys(allTvdb).length === 0) {
-      return;
-    }
+    if (!allTvdb || Object.keys(allTvdb).length === 0) return;
 
-    // Get all shows with inEmby true
     const showsToCheck = Object.entries(allTvdb)
       .filter(([_, tvdbRecord]) => tvdbRecord?.inEmby && tvdbRecord?.Id)
       .map(([showName, tvdbRecord]) => ({
@@ -3228,29 +3242,21 @@ async function runGapCheckBatch() {
         showName,
         tvdbRecord,
       }))
-      .sort((a, b) => a.showName.localeCompare(b.showName));
+      .sort(
+        (a, b) =>
+          (a.tvdbRecord.lastGapCheck ?? 0) - (b.tvdbRecord.lastGapCheck ?? 0),
+      );
 
     if (showsToCheck.length === 0) return;
 
-    // Reset index if we've gone past the end
-    if (gapCheckIndex >= showsToCheck.length) {
-      gapCheckIndex = 0;
-    }
-
-    // Get next batch
-    const batch = showsToCheck.slice(
-      gapCheckIndex,
-      gapCheckIndex + GAP_CHECK_BATCH_SIZE,
+    const batch = showsToCheck.slice(0, GAP_CHECK_BATCH_SIZE);
+    console.log(
+      `[gap-batch] ${batch.length}/${showsToCheck.length} shows, oldest: ${batch[0].showName}`,
     );
-    const batchStart = gapCheckIndex;
-    gapCheckIndex += batch.length;
-
-    if (batch.length > 0) {
-      console.log(
-        `[10-show batch] Checking ${batch.length} shows (${batchStart + 1}-${batchStart + batch.length} of ${showsToCheck.length})`,
-      );
-      await runGapCheckForShows(batch, true); // Check disk for each show
-    }
+    appendWatchgapLog(
+      `[batch ${batch.length}/${showsToCheck.length}] ${batch.map((s) => s.showName).join(", ")}`,
+    );
+    await runGapCheckForShows(batch, true);
   } catch (err) {
     console.error("[Phase 3] runGapCheckBatch error:", err.message);
   }
@@ -3277,7 +3283,7 @@ setInterval(runGapCheckBatch, GAP_CHECK_INTERVAL);
 
 // Run initial syncs
 setTimeout(syncDiskData, 3 * 60 * 1000); // 3 minutes after start
-setTimeout(runGapCheckBatch, 4 * 60 * 1000); // 4 minutes after start
+setTimeout(runGapCheckBatch, 30 * 1000); // 30 seconds after start
 
 setInterval(runUsbCheck, CHECK_INTERVAL_MS);
 // Run initial check after 1 minute (allow startup)
@@ -3301,10 +3307,20 @@ function extractShowNameFromPath(filePath) {
   return null;
 }
 
+// Tracks shows currently being processed to prevent parallel calls
+const inFlightDiskChanges = new Set();
+const pendingDiskChanges = new Set();
+
 /**
  * Handle disk change for a show (debounced)
  */
 async function handleShowDiskChange(showName) {
+  if (inFlightDiskChanges.has(showName)) {
+    pendingDiskChanges.add(showName);
+    console.log(`[chokidar] ${showName} already in flight, queued retry`);
+    return;
+  }
+  inFlightDiskChanges.add(showName);
   try {
     console.log(`[chokidar] Processing disk change for: ${showName}`);
 
@@ -3330,7 +3346,6 @@ async function handleShowDiskChange(showName) {
     console.log(`[chokidar] Triggering Emby library refresh for ${showName}`);
     let taskId = null;
     try {
-      const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
       const refreshRes = await fetch(
         `https://hahnca.com:8920/emby/Library/Refresh?api_key=${EMBY_API_KEY}`,
         { method: "POST" },
@@ -3371,48 +3386,94 @@ async function handleShowDiskChange(showName) {
       `[chokidar] Notified clients about ${showName} with taskId: ${taskId}`,
     );
 
-    // After 30s (Emby index time), refresh gap data and watchedEpis for this show
-    setTimeout(async () => {
-      try {
-        const allTvdb = tvdb.getAllTvdbSync();
-        const tvdbRecord = allTvdb[showName];
-        if (!tvdbRecord?.inEmby || !tvdbRecord?.Id) return;
-
-        // Refresh fileGap, watchGap, etc.
-        await runGapCheckForShows(
-          [{ showId: tvdbRecord.Id, showName, tvdbRecord }],
-          false,
-        );
-        console.log(`[chokidar] Gap check refreshed for ${showName}`);
-
-        // Refresh watchedEpis from Emby
-        const show = { Name: showName, Id: tvdbRecord.Id };
-        const seriesMap = await emby.getSeriesMap(show);
-        if (seriesMap && seriesMap.length > 0) {
-          const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMap);
-          const freshRecord = tvdb.getAllTvdbSync()[showName];
-          if (freshRecord) {
-            freshRecord.watchedEpis = watchedEpis;
-            await tvdb.saveTvdbSync();
-            notifyClients("tvdbUpdated");
-            console.log(
-              `[chokidar] watchedEpis refreshed for ${showName}:`,
-              watchedEpis,
-            );
+    // Wait for Emby scan to finish before running gap check
+    if (taskId) {
+      const POLL_INTERVAL_MS = 5000;
+      const POLL_TIMEOUT_MS = 5 * 60 * 1000;
+      const pollStart = Date.now();
+      let scanDone = false;
+      console.log(
+        `[chokidar] Polling Emby scan task ${taskId} for ${showName}`,
+      );
+      while (Date.now() - pollStart < POLL_TIMEOUT_MS) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        try {
+          const taskRes = await fetch(
+            `https://hahnca.com:8920/emby/ScheduledTasks/${taskId}?api_key=${EMBY_API_KEY}`,
+          );
+          if (taskRes.ok) {
+            const task = await taskRes.json();
+            if (task.State !== "Running") {
+              console.log(
+                `[chokidar] Emby scan finished (State=${task.State}) for ${showName}`,
+              );
+              scanDone = true;
+              break;
+            }
           }
+        } catch (pollErr) {
+          console.error(`[chokidar] Task poll error:`, pollErr.message);
         }
-      } catch (err) {
-        console.error(
-          `[chokidar] Post-download refresh error for ${showName}:`,
-          err.message,
+      }
+      if (!scanDone) {
+        console.warn(
+          `[chokidar] Emby scan poll timed out for ${showName}, proceeding anyway`,
         );
       }
-    }, 30 * 1000);
+    } else {
+      // No taskId — fall back to fixed wait
+      console.log(
+        `[chokidar] No taskId, waiting 90s for Emby scan for ${showName}`,
+      );
+      await new Promise((r) => setTimeout(r, 90 * 1000));
+    }
+
+    try {
+      const allTvdb = tvdb.getAllTvdbSync();
+      const tvdbRecord = allTvdb[showName];
+      if (!tvdbRecord?.inEmby || !tvdbRecord?.Id) return;
+
+      // Refresh fileGap, watchGap, etc.
+      await runGapCheckForShows(
+        [{ showId: tvdbRecord.Id, showName, tvdbRecord }],
+        false,
+      );
+      console.log(`[chokidar] Gap check refreshed for ${showName}`);
+
+      // Refresh watchedEpis from Emby
+      const show = { Name: showName, Id: tvdbRecord.Id };
+      const seriesMap = await emby.getSeriesMap(show);
+      if (seriesMap && seriesMap.length > 0) {
+        const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMap);
+        const freshRecord = tvdb.getAllTvdbSync()[showName];
+        if (freshRecord) {
+          freshRecord.watchedEpis = watchedEpis;
+          await tvdb.saveTvdbSync();
+          notifyClients("tvdbUpdated");
+          console.log(
+            `[chokidar] watchedEpis refreshed for ${showName}:`,
+            watchedEpis,
+          );
+        }
+      }
+    } catch (err) {
+      console.error(
+        `[chokidar] Post-download refresh error for ${showName}:`,
+        err.message,
+      );
+    }
   } catch (err) {
     console.error(
       `[chokidar] Error handling disk change for ${showName}:`,
       err.message,
     );
+  } finally {
+    inFlightDiskChanges.delete(showName);
+    if (pendingDiskChanges.has(showName)) {
+      pendingDiskChanges.delete(showName);
+      console.log(`[chokidar] Re-running queued disk change for ${showName}`);
+      setTimeout(() => handleShowDiskChange(showName), 1000);
+    }
   }
 }
 

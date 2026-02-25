@@ -241,12 +241,30 @@ export default {
     // Keep polling in the background so qBittorrent completion can trigger tvproc/startProc
     // regardless of which pane is currently shown.
     if (!this.useStaticSamples) this.startPolling();
+
+    // When the browser tab regains focus, poll immediately.
+    // setTimeout is throttled to ~1 minute in background tabs, so without this
+    // a torrent completing while the tab is hidden wouldn't trigger startProc
+    // until the user returns and the next throttled poll fires.
+    this._onVisibilityChange = () => {
+      if (document.visibilityState === "visible" && this._polling) {
+        this.scheduleNextPoll(0);
+      }
+    };
+    document.addEventListener("visibilitychange", this._onVisibilityChange);
   },
 
   unmounted() {
     evtBus.off("paneChanged", this.onPaneChanged);
     this.stopPolling();
     this.torrents = [];
+    if (this._onVisibilityChange) {
+      document.removeEventListener(
+        "visibilitychange",
+        this._onVisibilityChange,
+      );
+      this._onVisibilityChange = null;
+    }
   },
 
   methods: {

@@ -2089,6 +2089,7 @@ export const updateTvdbWithGapData = async (gapData) => {
 
   const allTvdb = getAllTvdbSync();
   let updatedCount = 0;
+  let processedCount = 0;
 
   for (const [showName, tvdbRecord] of Object.entries(allTvdb)) {
     if (!tvdbRecord?.Id) continue;
@@ -2096,6 +2097,9 @@ export const updateTvdbWithGapData = async (gapData) => {
     const showId = tvdbRecord.Id;
     const gaps = gapData[showId];
     if (!gaps) continue;
+
+    tvdbRecord.lastGapCheck = Date.now();
+    processedCount++;
 
     const changed =
       tvdbRecord.notReady !== gaps.notReady ||
@@ -2124,9 +2128,11 @@ export const updateTvdbWithGapData = async (gapData) => {
     }
   }
 
-  if (updatedCount > 0) {
+  if (processedCount > 0) {
     await saveTvdbSync();
-    console.log(`[updateTvdbWithGapData] Updated ${updatedCount} shows`);
+    if (updatedCount > 0) {
+      console.log(`[updateTvdbWithGapData] Updated ${updatedCount} shows`);
+    }
   }
 
   return updatedCount;

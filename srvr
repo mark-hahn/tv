@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SSH_HOST="hahnca.com"
 
-TV_REMOTE_BASE="${TV_REMOTE_BASE:-/root/dev/apps/tv-dev}"
+TV_REMOTE_BASE="${TV_REMOTE_BASE:-/root/dev/apps/tv}"
 
 if [[ ! -d "$ROOT_DIR/apps" ]]; then
   echo "Error: expected layout under $ROOT_DIR (missing apps/)" >&2
@@ -100,7 +100,6 @@ sync_monorepo_root() {
     "$ROOT_DIR/pnpm-lock.yaml" \
     "$ROOT_DIR/turbo.json" \
     "$ROOT_DIR/ecosystem.config.cjs" \
-    "$ROOT_DIR/ecosystem.dev.config.cjs" \
     "$SSH_HOST:$TV_REMOTE_BASE/"
 }
 
@@ -173,10 +172,10 @@ remote_install_app_deps() {
 }
 
 remote_pm2_restart_all_silent() {
-  echo "[remote] pm2 reload tv-dev apps..."
+  echo "[remote] pm2 reload tv apps..."
   run_ssh "$SSH_HOST" "cd '$TV_REMOTE_BASE' \
-    && pm2 start ecosystem.dev.config.cjs --env production >/dev/null 2>&1 \
-    && pm2 reload tv-api-dev tv-down-dev tv-srvr-dev >/dev/null 2>&1 \
+    && pm2 start ecosystem.config.cjs --env production >/dev/null 2>&1 \
+    && pm2 reload tv-api tv-down tv-srvr >/dev/null 2>&1 \
     && pm2 save >/dev/null 2>&1"
 }
 

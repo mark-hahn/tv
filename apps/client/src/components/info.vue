@@ -1593,15 +1593,17 @@ export default {
             : `0 of ${episodeCount}`;
       }
 
-      try {
-        await srvr.setTvdbFields({
-          name: show.Name,
-          seasonCount,
-          episodeCount,
-          watchedCount,
-        });
-      } catch (e) {
-        // Non-fatal: UI already corrected.
+      if (tvdbData && !this.previewMode) {
+        try {
+          await srvr.setTvdbFields({
+            name: show.Name,
+            seasonCount,
+            episodeCount,
+            watchedCount,
+          });
+        } catch (e) {
+          // Non-fatal: UI already corrected.
+        }
       }
     },
   },

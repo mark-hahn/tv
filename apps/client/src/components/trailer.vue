@@ -438,10 +438,12 @@ export default {
             this.trailers.push(newTrailer);
 
             // Update tvdb record immediately on server
-            await srvr.setTvdbFields({
-              name: data.show.Name,
-              trailers: this.trailers,
-            });
+            if (!this.previewMode) {
+              await srvr.setTvdbFields({
+                name: data.show.Name,
+                trailers: this.trailers,
+              });
+            }
           }
         } catch (err) {
           console.error("Failed to fetch IMDB video:", err);

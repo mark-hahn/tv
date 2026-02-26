@@ -1569,7 +1569,7 @@ export default {
             isFeatured: false,
             source: "tmdb",
           }));
-        if (newChars.length > 0) {
+        if (newChars.length > 0 && !this.previewMode) {
           try {
             const updated = await srvr.setTvdbFields({
               name: showKey,

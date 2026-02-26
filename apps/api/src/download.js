@@ -1,8 +1,8 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { spawn } from "child_process";
 import Client from "ssh2-sftp-client";
+import { sshCurlFetch } from "./sshTunnel.js";
 import { loadCreds } from "./qb-cred.js";
 import parseTorrent from "parse-torrent";
 import parseTorrentTitle from "parse-torrent-title";
@@ -197,43 +197,19 @@ async function curlFetchBinary(
   targetUrl,
   { headers = {}, cookieHeader = "" } = {},
 ) {
-  const args = ["-sS", "-L", "--compressed"];
+  return sshCurlFetch(targetUrl, { headers, cookieHeader });
+}
 
-  // Note: we intentionally do NOT pass -H 'cookie:'; use -b for cookies.
-  for (const [k, v] of Object.entries(headers || {})) {
-    if (!k) continue;
-    if (String(k).toLowerCase() === "cookie") continue;
-    if (v == null || String(v).length === 0) continue;
-    args.push("-H", `${k}: ${v}`);
-  }
-  if (cookieHeader) {
-    args.push("-b", cookieHeader);
-  }
-
-  args.push(targetUrl);
-
-  return await new Promise((resolve) => {
-    const child = spawn("curl", args, { windowsHide: true });
-    const stdoutChunks = [];
-    const stderrChunks = [];
-
-    child.stdout.on("data", (d) => stdoutChunks.push(Buffer.from(d)));
-    child.stderr.on("data", (d) => stderrChunks.push(Buffer.from(d)));
-    child.on("error", (err) => {
-      resolve({
-        ok: false,
-        code: -1,
-        error: err?.message || String(err),
-        stdout: Buffer.alloc(0),
-        stderr: Buffer.concat(stderrChunks),
-      });
-    });
-    child.on("close", (code) => {
-      const stdout = Buffer.concat(stdoutChunks);
-      const stderr = Buffer.concat(stderrChunks);
-      resolve({ ok: code === 0 && stdout.length > 0, code, stdout, stderr });
-    });
-  });
+// Thin fetch-compatible wrapper around sshCurlFetch for the IPTorrents download path.
+async function sshFetch(url, { headers = {} } = {}) {
+  const r = await sshCurlFetch(url, { headers });
+  return {
+    ok: r.ok,
+    status: r.ok ? 200 : 0,
+    statusText: r.ok ? "OK" : `curl exit ${r.code}`,
+    text: async () => r.stdout.toString("utf8"),
+    arrayBuffer: async () => r.stdout,
+  };
 }
 
 function isVideoFile(filePath) {
@@ -593,7 +569,7 @@ export async function fetchTorrentFile(torrent) {
     Accept: "application/x-bittorrent,application/octet-stream,*/*;q=0.8",
   };
 
-  const response = await fetch(detailUrl, { headers });
+  const response = await sshFetch(detailUrl, { headers });
   if (!response.ok) {
     const snippet = await response.text().catch(() => "");
     const isCloudflare = looksLikeCloudflareChallenge(snippet);
@@ -657,7 +633,7 @@ export async function fetchTorrentFile(torrent) {
     }
   }
 
-  const torrentResponse = await fetch(absoluteDownloadUrl, {
+  const torrentResponse = await sshFetch(absoluteDownloadUrl, {
     headers: torrentHeaders,
   });
   if (!torrentResponse.ok) {

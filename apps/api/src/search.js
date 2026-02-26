@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { normalize } from "./normalize.js";
 import { getApiDataDir } from "./tvPaths.js";
+import { patchProviderWithSshTunnel } from "./sshTunnel.js";
 
 import TorrentSearchApi from "torrent-search-api";
 
@@ -337,6 +338,7 @@ export function initializeProviders() {
         );
       }
       TorrentSearchApi.enableProvider("IpTorrents", iptCookies);
+      patchProviderWithSshTunnel(TorrentSearchApi.getProvider("IpTorrents"));
     } catch (e) {
       console.error("Failed to enable IPTorrents:", e.message);
     }
@@ -345,6 +347,7 @@ export function initializeProviders() {
   if (tlCookies) {
     try {
       TorrentSearchApi.enableProvider("TorrentLeech", tlCookies);
+      patchProviderWithSshTunnel(TorrentSearchApi.getProvider("TorrentLeech"));
     } catch (e) {
       console.error("Failed to enable TorrentLeech:", e.message);
     }
@@ -415,6 +418,7 @@ export async function searchTorrents({
         );
       }
       TorrentSearchApi.enableProvider("IpTorrents", filtered);
+      patchProviderWithSshTunnel(TorrentSearchApi.getProvider("IpTorrents"));
       console.log("Using provided IPTorrents cf_clearance");
     } catch (e) {
       console.error(
@@ -431,6 +435,7 @@ export async function searchTorrents({
     );
     filtered.push(`cf_clearance=${tlCf}`);
     TorrentSearchApi.enableProvider("TorrentLeech", filtered);
+    patchProviderWithSshTunnel(TorrentSearchApi.getProvider("TorrentLeech"));
     console.log("Using provided TorrentLeech cf_clearance");
   }
 

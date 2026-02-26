@@ -1394,6 +1394,7 @@ export default {
         if (createdFolder) {
           try {
             setWebAddStatus("Reloading shows...");
+            tvdb.clearCache();
             await this.newShows(false);
 
             // Trigger gap check for the newly added show
@@ -1427,6 +1428,7 @@ export default {
             setWebAddStatus("Waiting for Emby scan...");
             for (let attempt = 1; attempt <= 4; attempt++) {
               await new Promise((resolve) => setTimeout(resolve, 2000));
+              tvdb.clearCache();
               await this.newShows(false);
               show = findShowByTvdbIdOrName();
               if (show) break;

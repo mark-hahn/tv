@@ -1570,7 +1570,7 @@ const tryLocalGetTvdb = async () => {
     seasonCount: minTvdb.seasonCount ?? 0,
     episodeCount: minTvdb.episodeCount ?? 0,
     watchedCount: minTvdb.watchedCount ?? 0,
-    fast: false, // Fetch all remotes including IMDB videos for background refresh
+    fast: true, // Skip Rotten Tomatoes scraping here; RT is done separately as push3
   };
   // Await TVDB refresh completion so the updated record is available for further processing
   const tvdbDonePromise = new Promise((res) => {
@@ -1619,6 +1619,33 @@ const tryLocalGetTvdb = async () => {
       await perShowCallback(processRecord.Name, processRecord);
     } catch (e) {
       log("err", "tryLocalGetTvdb perShow:", e.message);
+    }
+  }
+
+  // Push 3: Rotten Tomatoes scrape (slow, runs separately after push1 & push2)
+  if (processRecord.Name && allTvdb[processRecord.Name]) {
+    try {
+      const rottenRemote = await getRemote(null, 99, processRecord.Name);
+      if (rottenRemote) {
+        if (rottenRemote.ratings)
+          rottenRemote.name += " (" + rottenRemote.ratings + ")";
+        const rec = allTvdb[processRecord.Name];
+        const existingRemotes = Array.isArray(rec.remotes) ? rec.remotes : [];
+        // Replace any existing Rotten entry with fresh scraped one
+        rec.remotes = [
+          ...existingRemotes.filter((r) => !r.name?.startsWith("Rotten")),
+          rottenRemote,
+        ];
+        await saveTvdbFiles(allTvdb);
+        log(
+          `tvdb push3 [${processRecord.Name}]: Rotten ${rottenRemote.ratings || "no ratings"}`,
+        );
+        if (notifyCallback) notifyCallback(processRecord.Name, rec);
+      } else {
+        log(`tvdb push3 [${processRecord.Name}]: Rotten no result`);
+      }
+    } catch (e) {
+      log("err", "tryLocalGetTvdb push3 rotten:", e.message);
     }
   }
 

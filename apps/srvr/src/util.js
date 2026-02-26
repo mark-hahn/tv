@@ -3,6 +3,9 @@ import fsp from "fs/promises";
 import * as path from "node:path";
 import date from "date-and-time";
 import { SRVR_MISC_DIR } from "./srvrPaths.js";
+
+const LOG_APPS_SRVR_DATA_MISC_SRVR_LOG = false;
+
 const SRVR_LOG_PATH = path.join(SRVR_MISC_DIR, "srvr.log");
 
 try {
@@ -47,10 +50,11 @@ export const log = (msg, err = false, spacing = false) => {
     msg;
   if (err) console.error(msg);
   else console.log(msg);
-  try {
-    if (spacing) fs.appendFileSync(SRVR_LOG_PATH, "\n");
-    fs.appendFileSync(SRVR_LOG_PATH, msg + "\n");
-  } catch {}
+  if (LOG_APPS_SRVR_DATA_MISC_SRVR_LOG)
+    try {
+      if (spacing) fs.appendFileSync(SRVR_LOG_PATH, "\n");
+      fs.appendFileSync(SRVR_LOG_PATH, msg + "\n");
+    } catch {}
   repeatCount = 0;
 };
 

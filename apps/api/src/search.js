@@ -7,6 +7,8 @@ import { getApiDataDir } from "./tvPaths.js";
 
 import TorrentSearchApi from "torrent-search-api";
 
+const LOG_APPS_API_DATA_TOR_RESULTS_TXT = false;
+
 const SAVE_SAMPLE_TORRENTS = false;
 
 const __filename = fileURLToPath(import.meta.url);
@@ -18,6 +20,7 @@ const IPTORRENTS_CUSTOM_PATH = path.join(DATA_DIR, "iptorrents-custom.json");
 const TOR_RESULTS_LOG_PATH = path.join(DATA_DIR, "tor-results.txt");
 
 function appendTorResultsLog(lines) {
+  if (!LOG_APPS_API_DATA_TOR_RESULTS_TXT) return;
   try {
     const arr = Array.isArray(lines) ? lines : [String(lines || "")];
     const txt =

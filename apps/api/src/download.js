@@ -14,6 +14,8 @@ import {
   preferSharedReadPath,
 } from "./tvPaths.js";
 
+const LOG_APPS_API_DATA_MISC_TEMP_TXT = false;
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -21,6 +23,7 @@ const DOWNLOAD_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 function appendTorrentBytesLog({ provider, method, downloadUrl, torrentData }) {
+  if (!LOG_APPS_API_DATA_MISC_TEMP_TXT) return;
   try {
     const outPath = path.join(getApiMiscDir(), "temp.txt");
     const buf = Buffer.isBuffer(torrentData)

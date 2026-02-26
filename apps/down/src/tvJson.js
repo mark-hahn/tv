@@ -11,6 +11,8 @@ import { execFile } from "node:child_process";
 import Database from "better-sqlite3";
 import chokidar from "chokidar";
 
+const LOG_APPS_DOWN_DATA_MISC_TV_LOG = false;
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -53,6 +55,7 @@ const forcedTitles = new Set();
 const PST_TZ = "America/Los_Angeles";
 
 const appendTvLog = (line) => {
+  if (!LOG_APPS_DOWN_DATA_MISC_TV_LOG) return;
   try {
     fs.mkdirSync(path.dirname(TV_LOG_PATH), { recursive: true });
   } catch {}

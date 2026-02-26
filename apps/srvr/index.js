@@ -1067,7 +1067,7 @@ tvdb.setNotifyCallback((name, record) =>
 );
 tvdb.setEnqueueCallback((name) => notifyClients("showUpdating", { name }));
 tvdb.setQueueDrainCallback(() => notifyClients("showQueueEmpty", {}));
-tvdb.setPerShowCallback(async (showName, tvdbRecord) => {
+tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
   try {
     // Disk check
     const embyPath = tvdbRecord.Path || tvdbRecord.emby?.path || showName;
@@ -1136,14 +1136,20 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord) => {
     const push2Changes = [...diskChanges, ...lastWatchedChanges, ...gapChanges];
     if (push2Changes.length) {
       await tvdb.saveTvdbSync();
-      const pushed = tvdb.getAllTvdbSync()[showName];
-      console.log(`[perShow push2] ${showName}: ${push2Changes.join(" ")}`);
-      notifyClients("tvdbUpdated", { name: showName, record: pushed });
+      if (!options?.suppressNotify) {
+        const pushed = tvdb.getAllTvdbSync()[showName];
+        console.log(`[perShow push2] ${showName}: ${push2Changes.join(" ")}`);
+        notifyClients("tvdbUpdated", { name: showName, record: pushed });
+      }
     } else {
-      console.log(`[perShow push2] ${showName}: no changes`);
+      if (!options?.suppressNotify) {
+        console.log(`[perShow push2] ${showName}: no changes`);
+      }
     }
+    return { hasChanges: push2Changes.length > 0, changes: push2Changes };
   } catch (e) {
     console.error("[perShowCallback] error for", showName, e.message);
+    return { hasChanges: false, changes: [] };
   }
 });
 tvdb.setPreTvdbTickCallback(runEmbyFullSweep);

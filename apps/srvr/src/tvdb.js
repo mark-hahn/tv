@@ -1481,11 +1481,16 @@ const chkTvdbQueue = () => {
             } else {
               tvdbChanges.push(`new record`);
             }
-            log(
-              `tvdb push1 [${keyName}]: ${tvdbChanges.length ? tvdbChanges.join(" ") : "no field changes"}`,
-            );
+            if (!paramObj.suppressNotify) {
+              log(
+                `tvdb push1 [${keyName}]: ${tvdbChanges.length ? tvdbChanges.join(" ") : "no field changes"}`,
+              );
+            }
             allTvdb[keyName] = finalData;
             finalData._hasChanges = tvdbChanges.length > 0;
+            if (paramObj.suppressNotify) {
+              finalData._push1Changes = tvdbChanges;
+            }
           }
         } else if (typeof tvdbData === "string") {
           finalData = allTvdb[tvdbData];
@@ -1509,9 +1514,12 @@ const chkTvdbQueue = () => {
           log("err", "chkTvdbQueue: save error:", err.message);
         });
         // Push updated record to clients only when fields actually changed
-        if (notifyCallback && finalData.Name && finalData._hasChanges)
-          notifyCallback(finalData.Name, finalData);
-        delete finalData._hasChanges;
+        if (!paramObj.suppressNotify) {
+          if (notifyCallback && finalData.Name && finalData._hasChanges)
+            notifyCallback(finalData.Name, finalData);
+          delete finalData._hasChanges;
+        }
+        // When suppressNotify, _hasChanges/_push1Changes are preserved for the caller
       }
       chkTvdbQueueRunning = false;
       chkTvdbQueue();
@@ -1571,6 +1579,7 @@ const tryLocalGetTvdb = async () => {
     episodeCount: minTvdb.episodeCount ?? 0,
     watchedCount: minTvdb.watchedCount ?? 0,
     fast: true, // Skip Rotten Tomatoes scraping here; RT is done separately as push3
+    suppressNotify: true, // Combined push1+push2 notify is sent after perShowCallback
   };
   // Await TVDB refresh completion so the updated record is available for further processing
   const tvdbDonePromise = new Promise((res) => {
@@ -1613,13 +1622,31 @@ const tryLocalGetTvdb = async () => {
     log("err", "tryLocalGetTvdb seriesMap fetch error:", err.message);
   }
 
-  // Run per-show process callback (disk check, gap check, notify) with the up-to-date record
+  // Run per-show process callback (disk check, gap check) with the up-to-date record
+  let push2Result = { hasChanges: false, changes: [] };
   if (perShowCallback) {
     try {
-      await perShowCallback(processRecord.Name, processRecord);
+      const result = await perShowCallback(processRecord.Name, processRecord, {
+        suppressNotify: true,
+      });
+      if (result) push2Result = result;
     } catch (e) {
       log("err", "tryLocalGetTvdb perShow:", e.message);
     }
+  }
+
+  // Combined push1+push2 notify (one notification instead of two)
+  const push1HasChanges = processRecord._hasChanges ?? false;
+  const push1Changes = processRecord._push1Changes ?? [];
+  delete processRecord._hasChanges;
+  delete processRecord._push1Changes;
+  const allPushChanges = [...push1Changes, ...push2Result.changes];
+  if (push1HasChanges || push2Result.hasChanges) {
+    log(`tvdb push [${processRecord.Name}]: ${allPushChanges.join(" ")}`);
+    if (notifyCallback)
+      notifyCallback(processRecord.Name, allTvdb[processRecord.Name]);
+  } else {
+    log(`tvdb push [${processRecord.Name}]: no changes`);
   }
 
   // Push 3: Rotten Tomatoes scrape (slow, runs separately after push1 & push2)

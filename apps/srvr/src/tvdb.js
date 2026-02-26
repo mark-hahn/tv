@@ -1209,7 +1209,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     // Add Emby button at the start
     const embyUrl = urls.embyPageUrl(showId || tvdbData.Id);
     tvdbData.remotes.unshift({ name: "Emby", url: embyUrl });
-    console.log(`[getTvdbData] Added Emby button to ${name} remotes`);
   } else if (!newInEmby && hasEmbyButton) {
     // Remove Emby button
     tvdbData.remotes = tvdbData.remotes.filter((r) => r.name !== "Emby");

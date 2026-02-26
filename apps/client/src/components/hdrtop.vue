@@ -67,6 +67,10 @@
         background-color: white;
         fontsize: 15px;
         margin: 6px 5px 4px 10px;
+        width: 75px;
+        flex-shrink: 0;
+        white-space: nowrap;
+        overflow: hidden;
       "
     >
       {{ watchingName }}

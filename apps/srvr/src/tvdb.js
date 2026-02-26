@@ -14,7 +14,7 @@ const TVDB_PATH = path.join(SRVR_DATA_DIR, "tvdb.json");
 const TVDB_BACKUP_PATH = path.join(SRVR_DATA_DIR, "tvdb.json.bak");
 const TVDB_TEMPLATE_PATH = path.join(SRVR_DATA_DIR, "tvdbTemplate.json");
 
-const FAST_UPDATE = false;
+const FAST_UPDATE = true;
 const moviedb = new MovieDb("327192a334da700f65b882c7a69cb927");
 
 // TVDB API Credentials
@@ -655,6 +655,7 @@ const getRemote = async (id, type, showName) => {
       break;
 
     case 7:
+      if (FAST_UPDATE) return null;
       name = "Reddit";
       escShow = encodeURIComponent(showName);
       urlRatings = await getUrlAndRatings(
@@ -677,6 +678,7 @@ const getRemote = async (id, type, showName) => {
     // case 13: name = 'EIDR'; continue;
 
     case 18:
+      if (FAST_UPDATE) return null;
       name = "Wikipedia";
       escShow = encodeURIComponent(showName);
       urlRatings = await getUrlAndRatings(

@@ -1293,6 +1293,24 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   } else if (existing.gap) {
     Object.assign(tvdbData, existing.gap);
   }
+  // Also preserve any flattened gap fields already on the record (written by perShowCallback)
+  const flatGapFields = [
+    "watchGap",
+    "watchGapSeason",
+    "watchGapEpisode",
+    "fileGap",
+    "fileGapSeason",
+    "fileGapEpisode",
+    "fileEndError",
+    "seasonWatchedThenNofile",
+    "anyWatched",
+    "notReady",
+    "lastGapCheck",
+  ];
+  for (const f of flatGapFields) {
+    if (tvdbData[f] === undefined && existing[f] !== undefined)
+      tvdbData[f] = existing[f];
+  }
 
   // Ensure notReady has a value - default to true for inEmby shows until gap check runs
   if (tvdbData.notReady === undefined && tvdbData.inEmby) {
@@ -1463,6 +1481,7 @@ const chkTvdbQueue = () => {
               `tvdb push1 [${keyName}]: ${tvdbChanges.length ? tvdbChanges.join(" ") : "no field changes"}`,
             );
             allTvdb[keyName] = finalData;
+            finalData._hasChanges = tvdbChanges.length > 0;
           }
         } else if (typeof tvdbData === "string") {
           finalData = allTvdb[tvdbData];
@@ -1485,9 +1504,10 @@ const chkTvdbQueue = () => {
         saveTvdbFiles(allTvdb).catch((err) => {
           log("err", "chkTvdbQueue: save error:", err.message);
         });
-        // Push updated record to clients
-        if (notifyCallback && finalData.Name)
+        // Push updated record to clients only when fields actually changed
+        if (notifyCallback && finalData.Name && finalData._hasChanges)
           notifyCallback(finalData.Name, finalData);
+        delete finalData._hasChanges;
       }
       chkTvdbQueueRunning = false;
       chkTvdbQueue();
@@ -1521,9 +1541,11 @@ const tryLocalGetTvdb = async () => {
 
   // Use a requested show from the process queue first; otherwise pick the stalest
   let minTvdb = null;
+  let selectionReason = "";
   const requestedName = dequeueShowProcess();
   if (requestedName) {
     minTvdb = allTvdb[requestedName] ?? null;
+    selectionReason = `queued`;
   }
   if (!minTvdb) {
     // find show with oldest save date
@@ -1543,6 +1565,8 @@ const tryLocalGetTvdb = async () => {
         }
       });
     } catch (e) {}
+    if (minTvdb)
+      selectionReason = `stalest(saved=${new Date(minSaved).toISOString().slice(11, 19)})`;
   }
 
   if (minTvdb === null) {
@@ -1555,6 +1579,9 @@ const tryLocalGetTvdb = async () => {
     return;
   }
 
+  log(`processing [${minTvdb.Name}] reason=${selectionReason}`);
+  // Notify clients which show is being processed (mirrors showUpdating from enqueueShowProcess)
+  if (enqueueCallback) enqueueCallback(minTvdb.Name);
   const show = {
     Name: minTvdb.Name,
     TvdbId: minTvdb.tvdbId,
@@ -1626,6 +1653,9 @@ const tryLocalGetTvdb = async () => {
     }
   }
 
+  // Always notify clients that background processing finished for this show
+  if (!requestedName && queueDrainCallback) queueDrainCallback();
+  console.log("");
   tryLocalGetTvdbBusy = false;
 };
 
@@ -2112,7 +2142,8 @@ export const setTvdbFields = async (params) => {
     await saveTvdbFiles(allTvdb);
   }
   // Queue a full per-show refresh (disk + gap) for changes that matter
-  if (name && !paramObj.$delTvdb) enqueueShowProcess(name);
+  if (name && !paramObj.$delTvdb && !paramObj.dontEnqueue)
+    enqueueShowProcess(name);
   return tvdb ?? "ok";
 };
 

@@ -1133,13 +1133,15 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord) => {
         tvdbRecord.lastGapCheck = Date.now();
       }
     }
-    await tvdb.saveTvdbSync();
-    const pushed = tvdb.getAllTvdbSync()[showName];
     const push2Changes = [...diskChanges, ...lastWatchedChanges, ...gapChanges];
-    console.log(
-      `[perShow push2] ${showName}: ${push2Changes.length ? push2Changes.join(" ") : "no changes"}`,
-    );
-    notifyClients("tvdbUpdated", { name: showName, record: pushed });
+    if (push2Changes.length) {
+      await tvdb.saveTvdbSync();
+      const pushed = tvdb.getAllTvdbSync()[showName];
+      console.log(`[perShow push2] ${showName}: ${push2Changes.join(" ")}`);
+      notifyClients("tvdbUpdated", { name: showName, record: pushed });
+    } else {
+      console.log(`[perShow push2] ${showName}: no changes`);
+    }
   } catch (e) {
     console.error("[perShowCallback] error for", showName, e.message);
   }
@@ -1295,7 +1297,7 @@ const getShowDiskInfo = async (showFolderName) => {
       const sfx = path.split(".").pop();
       if (videoFileExtensions.includes(sfx)) {
         const date = fmtDateWithTZ(fstat.mtime);
-        maxDate = Math.max(maxDate, date);
+        if (!maxDate || date > maxDate) maxDate = date;
       }
       totalSize += fstat.size;
     } catch (err) {
@@ -3767,13 +3769,14 @@ const watcher = chokidar.watch(tvDir, {
 
 watcher
   .on("add", (filePath) => {
+    console.log(`[chokidar] detected add: ${filePath}`);
     const ext = filePath.split(".").pop();
     if (!videoFileExtensions.includes(ext)) return;
 
     const showName = extractShowNameFromPath(filePath);
     if (!showName) return;
 
-    console.log(`[chokidar] File added: ${showName}`);
+    console.log(`[chokidar] video added: ${showName}`);
 
     // Debounce: clear existing timeout and set new one
     if (changedShows.has(showName)) {
@@ -3788,13 +3791,14 @@ watcher
     changedShows.set(showName, timeout);
   })
   .on("unlink", (filePath) => {
+    console.log(`[chokidar] detected unlink: ${filePath}`);
     const ext = filePath.split(".").pop();
     if (!videoFileExtensions.includes(ext)) return;
 
     const showName = extractShowNameFromPath(filePath);
     if (!showName) return;
 
-    console.log(`[chokidar] File deleted: ${showName}`);
+    console.log(`[chokidar] video deleted: ${showName}`);
 
     // Debounce: clear existing timeout and set new one
     if (changedShows.has(showName)) {

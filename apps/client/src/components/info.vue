@@ -1031,7 +1031,8 @@ export default {
         epiCounts = await emby.getEpisodeCounts(show);
 
         // Save the calculated counts back to tvdb if they differ
-        const fields = Object.assign({ name }, epiCounts);
+        // dontEnqueue: skip triggering a full background refresh just for count updates
+        const fields = Object.assign({ name, dontEnqueue: true }, epiCounts);
         srvr.setTvdbFields(fields).catch((e) => console.error(e));
       }
 

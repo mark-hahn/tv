@@ -143,11 +143,8 @@ export function getLog(module) {
       }
     });
 
-    const timeHdr = date.format(new Date(), "MM/DD HH:mm:ss");
-
     const line =
       (nomodFlag ? "" : "[" + module + "] ") +
-      (notimeFlag ? "" : timeHdr + " ") +
       (errFlag ? " error, " : "") +
       (errMsg != null ? errMsg : "") +
       par.join(" ");

@@ -121,8 +121,6 @@ const avoidGenres = [
   "war",
   "western",
   "diy",
-  "legal",
-  "medical",
   "nature",
   "supernatural",
 ];

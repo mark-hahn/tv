@@ -294,6 +294,7 @@ export default {
       error: null,
       retryingTitles: new Set(),
       _pollTimer: null,
+      _polling: false,
       _active: false,
       _firstLoad: false,
       _didLoadOnce: false,
@@ -377,11 +378,8 @@ export default {
     evtBus.on("paneChanged", this.onPaneChanged);
     evtBus.on("cycle-started", this.handleCycleStarted);
 
-    // This component is mounted (v-show) even when not visible.
-    // Keep polling in the background so it can react to download completion and kick cycles.
-    if (!this._pollTimer) {
-      this.scheduleNextPoll(0);
-    }
+    // Poll once at boot so data is ready before the user opens the pane.
+    void this.loadTvproc();
   },
 
   unmounted() {
@@ -433,6 +431,7 @@ export default {
     },
 
     handleCycleStarted() {
+      if (!this._active) return;
       // Start fast polling when a cycle starts
       this._fastPollStartTime = Date.now();
       this._oldDownloadingCount = this.items.filter((it) => {
@@ -467,6 +466,7 @@ export default {
           void this.loadTvproc({ isInitialPaneSwitch: true });
         }
         // Start polling if not already running
+        this._polling = true;
         if (!this._pollTimer) {
           this.scheduleNextPoll(5000);
         }
@@ -479,11 +479,12 @@ export default {
         if (el) {
           this._lastScrollTop = el.scrollTop;
         }
-        // Don't stop polling - let it continue in background
+        this.stopPolling();
       }
     },
 
     stopPolling() {
+      this._polling = false;
       if (this._pollTimer) {
         clearTimeout(this._pollTimer);
         this._pollTimer = null;
@@ -527,6 +528,7 @@ export default {
     },
 
     scheduleNextPoll(ms) {
+      if (!this._polling) return;
       // Only clear the poll timer; do not reset loading state here.
       // Poll cadence is defined as: wait N ms AFTER the previous poll completes.
       this.clearPollTimer();

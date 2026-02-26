@@ -237,10 +237,8 @@ export default {
   mounted() {
     evtBus.on("paneChanged", this.onPaneChanged);
 
-    // This component is mounted (v-show) even when not visible.
-    // Keep polling in the background so qBittorrent completion can trigger tvproc/startProc
-    // regardless of which pane is currently shown.
-    if (!this.useStaticSamples) this.startPolling();
+    // Poll once at boot so data is ready before the user opens the pane.
+    if (!this.useStaticSamples) void this.pollOnce();
 
     // When the browser tab regains focus, poll immediately.
     // setTimeout is throttled to ~1 minute in background tabs, so without this
@@ -315,8 +313,6 @@ export default {
       this.matchedTitle = null;
       this._active = pane === "qbt";
       if (this._active) {
-        if (!this.useStaticSamples) this.startPolling();
-
         // On first view, force a one-time scroll-to-bottom after the pane becomes visible.
         // This avoids the top->bottom flash that would otherwise wait for the next poll.
         if (!this._didInitialVisibleScroll) {
@@ -328,8 +324,9 @@ export default {
           });
         }
 
-        // Refresh immediately when user switches here.
-        this.scheduleNextPoll(0);
+        if (!this.useStaticSamples) this.startPolling();
+      } else {
+        this.stopPolling();
       }
     },
 

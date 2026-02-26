@@ -414,6 +414,9 @@ export default {
   mounted() {
     evtBus.on("paneChanged", this.onPaneChanged);
 
+    // Poll once at boot so data is ready before the user opens the pane.
+    void this.pollOnce();
+
     // Establish an initial "bottom" baseline on app load.
     // v-show preserves scroll position even when hidden.
     void this.$nextTick(() => {

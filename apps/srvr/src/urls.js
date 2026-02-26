@@ -33,14 +33,3 @@ export function childrenUrl(parentId = "", unAired = false) {
     & api_key = ${apiKey}
   `.replace(/\s*/g, "");
 }
-
-// show all players
-// const url = watchingUrl();
-// let  resp = await fetch(url);
-// if (resp.status !== 200) {
-//   console.error(`error getCurrentlyWatching resp: ${resp.statusText}`);
-// }
-// else {
-//   const dataJson = await resp.json();
-//   console.log({dataJson});
-// };

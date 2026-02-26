@@ -63,27 +63,11 @@ try {
     );
   }
 } catch (e) {
-  // Non-fatal: continue without crashing; appendMistralLog will also guard
+  // Non-fatal: continue without crashing
   console.error(
     `Could not ensure mistral log file ${MISTRAL_LOG}: ${e.message}`,
   );
 }
-
-// function appendMistralLog(obj) {
-//   try {
-//     const line = typeof obj === 'string' ? obj : JSON.stringify(obj);
-//     fs.appendFileSync(MISTRAL_LOG, (new Date()).toISOString() + ' ' + line + '\n', 'utf8');
-//   } catch (e) {
-//     // Don't let logging break the main flow
-//     // If we failed, try falling back to runtime dir once
-//     try {
-//       const fallback = path.join(__dirname, 'mistral.log');
-//       if (fallback !== MISTRAL_LOG) {
-//         fs.appendFileSync(fallback, (new Date()).toISOString() + ' ' + line + '\n', 'utf8');
-//       }
-//     } catch (_) {}
-//   }
-// }
 
 /* ---------------- CLI argument parsing ---------------- */
 const rawArgs = process.argv.slice(2);
@@ -485,7 +469,6 @@ async function callApi(uploadInfo) {
         },
       );
       // Log successful response (trim audio bytes)
-      // appendMistralLog({file: uploadInfo.filename, size: uploadInfo.size, attempt, status: response.status, body: response.data});
     } catch (err) {
       // err may be an AxiosError with response data
       const status = err?.response?.status || err.message || "unknown";
@@ -494,8 +477,6 @@ async function callApi(uploadInfo) {
         `[${ts()}] API request failed (attempt ${attempt}): ${status}`,
       );
       if (body) console.error(JSON.stringify(body));
-      // Append failure to mistral log for offline comparison
-      // appendMistralLog({file: uploadInfo.filename, size: uploadInfo.size, attempt, status, body});
       if (attempt > MAX_RETRIES) {
         console.error(`[${ts()}] FATAL: max retries reached`);
         process.exit(1);

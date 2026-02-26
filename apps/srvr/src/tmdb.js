@@ -16,9 +16,6 @@ export async function getTmdb(params) {
 
     // If requesting series-level cast/credits data
     if (credits === true && seriesId) {
-      // console.log(
-      //   `[tmdb] Fetching aggregate_credits for series ID: ${seriesId}`,
-      // );
       try {
         // Try the moviedb-promise method first
         let creditsData;
@@ -39,9 +36,6 @@ export async function getTmdb(params) {
           }
           creditsData = await response.json();
         }
-        // console.log(
-        //   `[tmdb] Got ${creditsData.cast?.length || 0} cast members from aggregate_credits`,
-        // );
         return creditsData;
       } catch (error) {
         console.error("[tmdb] aggregate_credits error:", error.message);

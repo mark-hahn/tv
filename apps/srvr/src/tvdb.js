@@ -459,13 +459,7 @@ if (phase5MigrationNeeded) {
 }
 
 ///////////// get theTvdbToken //////////////
-// this is a duplicate of the client
-// both access tvdb.com independently
-
 // Use shared getToken() instead of maintaining separate theTvdbToken
-// const getTheTvdbToken = async () => {
-//   await getToken();
-// };
 
 ///////////////////// GET REMOTES ///////////////////////
 

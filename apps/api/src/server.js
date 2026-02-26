@@ -8,7 +8,6 @@ import parseTorrent from "parse-torrent";
 import * as search from "./search.js";
 import * as download from "./download.js";
 import "./tvmaze.js";
-// import { tvdbProxyGet } from "./tvdb-proxy.js";
 import {
   getQbtInfo,
   delQbtTorrent,
@@ -251,8 +250,6 @@ const app = express();
 const QBT_TEST_PORT = 3001;
 const DUMP_INFO = false;
 const FILTER_TORRENTS = false;
-// const FILTER_TORRENTS = {hash:   "629746091b23ec0617405e8cc6f1eee486447629"};
-// const FILTER_TORRENTS = {filter: 'downloading'}
 
 // Load SSL certificate (prefer shared cookie store)
 const httpsOptions = {

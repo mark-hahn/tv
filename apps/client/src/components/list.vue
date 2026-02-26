@@ -488,7 +488,6 @@ export default {
     const deleteShow = async (show) => {
       allTvdb = await tvdb.getAllTvdb();
       const name = show.Name;
-      // console.log('list, deleteShow:', name);
       if (show.reject) {
         alert("Show is banned, ignoring delete");
         return;

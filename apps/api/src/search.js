@@ -1,7 +1,6 @@
 // Torrent search logic
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
 import { normalize } from "./normalize.js";
 import { getApiDataDir } from "./tvPaths.js";
 import { patchProviderWithSshTunnel } from "./sshTunnel.js";
@@ -11,9 +10,6 @@ import TorrentSearchApi from "torrent-search-api";
 const LOG_APPS_API_DATA_TOR_RESULTS_TXT = false;
 
 const SAVE_SAMPLE_TORRENTS = false;
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const DATA_DIR = getApiDataDir();
 const COOKIES_DIR = DATA_DIR;

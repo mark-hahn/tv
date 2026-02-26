@@ -1,12 +1,8 @@
 import fs from "node:fs";
 /* global document */
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { franc } from "franc-min";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Singleton browser (contexts/pages are per-request to avoid concurrent navigation issues).
 let browser = null;

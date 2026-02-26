@@ -72,6 +72,19 @@
       {{ watchingName }}
     </button>
     <div
+      v-if="statusMsg"
+      style="
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        font-size: 12px;
+        color: #555;
+        white-space: nowrap;
+      "
+    >
+      {{ statusMsg }}
+    </div>
+    <div
       style="
         flex: 1;
         display: flex;
@@ -133,6 +146,10 @@ export default {
     simpleMode: {
       type: Boolean,
       default: false,
+    },
+    statusMsg: {
+      type: String,
+      default: "",
     },
     isWideLandscape: {
       type: Boolean,

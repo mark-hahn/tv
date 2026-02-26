@@ -1061,6 +1061,91 @@ tvdb.setAddToPickupsCallback((showName) => {
   }
 });
 
+// Set up callbacks so tvdb.js can call back into index.js without circular imports
+tvdb.setNotifyCallback((name, record) =>
+  notifyClients("tvdbUpdated", { name, record }),
+);
+tvdb.setEnqueueCallback((name) => notifyClients("showUpdating", { name }));
+tvdb.setQueueDrainCallback(() => notifyClients("showQueueEmpty", {}));
+tvdb.setPerShowCallback(async (showName, tvdbRecord) => {
+  try {
+    // Disk check
+    const embyPath = tvdbRecord.Path || tvdbRecord.emby?.path || showName;
+    const pathPart = embyPath.split("/").pop();
+    const diskInfo = await getShowDiskInfo(pathPart);
+    const diskChanges = [];
+    if (diskInfo) {
+      const [newDate, newSize] = diskInfo;
+      if (tvdbRecord.Date !== newDate) {
+        diskChanges.push(`Date:${tvdbRecord.Date}->${newDate}`);
+        tvdbRecord.Date = newDate;
+      }
+      if (tvdbRecord.Size !== newSize) {
+        diskChanges.push(`Size:${tvdbRecord.Size}->${newSize}`);
+        tvdbRecord.Size = newSize;
+      }
+      if (tvdbRecord.NoFiles) {
+        diskChanges.push(`NoFiles:true->false`);
+        tvdbRecord.NoFiles = false;
+      }
+    } else if (!tvdbRecord.NoFiles) {
+      diskChanges.push(`NoFiles:false->true`);
+      tvdbRecord.NoFiles = true;
+      tvdbRecord.Date = null;
+      tvdbRecord.Size = 0;
+    }
+    // lastWatched
+    const lastWatchedChanges = [];
+    if (tvdbRecord.inEmby && tvdbRecord.Id) {
+      try {
+        const date = await fetchLastWatchedDate(tvdbRecord.Id);
+        if (date && date !== tvdbRecord.lastWatched) {
+          lastWatchedChanges.push(
+            `lastWatched:${tvdbRecord.lastWatched}->${date}`,
+          );
+          tvdbRecord.lastWatched = date;
+        }
+      } catch (e) {}
+    }
+    // Gap check
+    let gapChanges = [];
+    if (tvdbRecord.inEmby && tvdbRecord.Id) {
+      const gapData = await emby.gapCheckOne(
+        tvdbRecord.Id,
+        showName,
+        tvdbRecord,
+      );
+      if (gapData) {
+        const gapFields = [
+          "watchGap",
+          "watchGapSeason",
+          "watchGapEpisode",
+          "fileGap",
+          "fileEndError",
+          "seasonWatchedThenNofile",
+          "anyWatched",
+        ];
+        for (const f of gapFields) {
+          if (tvdbRecord[f] !== gapData[f])
+            gapChanges.push(`${f}:${tvdbRecord[f]}->${gapData[f]}`);
+        }
+        Object.assign(tvdbRecord, gapData);
+        tvdbRecord.lastGapCheck = Date.now();
+      }
+    }
+    await tvdb.saveTvdbSync();
+    const pushed = tvdb.getAllTvdbSync()[showName];
+    const push2Changes = [...diskChanges, ...lastWatchedChanges, ...gapChanges];
+    console.log(
+      `[perShow push2] ${showName}: ${push2Changes.length ? push2Changes.join(" ") : "no changes"}`,
+    );
+    notifyClients("tvdbUpdated", { name: showName, record: pushed });
+  } catch (e) {
+    console.error("[perShowCallback] error for", showName, e.message);
+  }
+});
+tvdb.setPreTvdbTickCallback(runEmbyFullSweep);
+
 const videoFileExtensions = [
   "mp4",
   "mkv",
@@ -2450,8 +2535,37 @@ app.post(
       return { success: false };
     }
     console.log(`[triggerEmbySync] Client changed: ${showName}`);
+    tvdb.enqueueShowProcess(showName);
+    return { success: true };
+  }),
+);
 
-    // No gap check on collection changes
+app.post(
+  "/api/refreshEmbyItem",
+  apiWrapper(async (params) => {
+    const { showId, showName } = params;
+    if (!showId) return { success: false, error: "missing showId" };
+    console.log(
+      `[refreshEmbyItem] Refreshing Emby item for ${showName} (${showId})`,
+    );
+    try {
+      const res = await fetch(
+        `${EMBY_BASE_URL}/Items/${showId}/Refresh?Recursive=true&MetadataRefreshMode=Default&api_key=${EMBY_API_KEY}`,
+        { method: "POST" },
+      );
+      if (!res.ok)
+        console.error(
+          `[refreshEmbyItem] Emby returned ${res.status} for ${showName}`,
+        );
+    } catch (e) {
+      console.error(
+        `[refreshEmbyItem] fetch error for ${showName}:`,
+        e.message,
+      );
+    }
+    // Give Emby a moment to process before the client refreshes the map
+    await new Promise((r) => setTimeout(r, 4000));
+    tvdb.enqueueShowProcess(showName);
     return { success: true };
   }),
 );
@@ -2462,17 +2576,11 @@ app.post(
     console.log(
       "[triggerFullGapCheck] Client requested full gap check after library scan",
     );
-
-    // Run gap check for all shows after 5 second delay (allow library scan to settle)
-    setTimeout(() => {
-      console.log(
-        "[triggerFullGapCheck] Starting full gap check for all shows",
-      );
-      runGapCheckBatch().catch((err) => {
-        console.error("[triggerFullGapCheck] failed:", err.message);
-      });
-    }, 5000);
-
+    // Enqueue all in-Emby shows for per-show processing
+    const allTvdb = tvdb.getAllTvdbSync();
+    for (const [name, rec] of Object.entries(allTvdb)) {
+      if (rec?.inEmby && rec?.Id) tvdb.enqueueShowProcess(name);
+    }
     return { success: true };
   }),
 );
@@ -2488,34 +2596,7 @@ app.post(
     console.log(
       `[triggerShowGapCheck] Client requested gap check for: ${showName}`,
     );
-
-    const allTvdb = tvdb.getAllTvdbSync();
-    const tvdbRecord = allTvdb[showName];
-    if (!tvdbRecord) {
-      console.error(`[triggerShowGapCheck] Show not found: ${showName}`);
-      return { success: false };
-    }
-
-    // Run gap check immediately
-    setImmediate(() => {
-      emby
-        .gapCheckOne(showId, showName, tvdbRecord)
-        .then(async (gapData) => {
-          if (gapData) {
-            Object.assign(tvdbRecord, gapData);
-            tvdbRecord.lastGapCheck = Date.now();
-            await tvdb.saveTvdbSync();
-            notifyClients("tvdbUpdated");
-          }
-        })
-        .catch((err) => {
-          console.error(
-            `[triggerShowGapCheck] Failed for ${showName}:`,
-            err.message,
-          );
-        });
-    });
-
+    tvdb.enqueueShowProcess(showName);
     return { success: true };
   }),
 );
@@ -2996,6 +3077,223 @@ async function syncEmbyUserData() {
 }
 
 /**
+ * Background Emby sweep: runs every tick to detect new/removed shows,
+ * sync collections, update metadata. Server-side port of client loadAllShows steps 2-5.
+ */
+async function runEmbyFullSweep() {
+  try {
+    const allTvdb = tvdb.getAllTvdbSync();
+    if (!allTvdb || Object.keys(allTvdb).length === 0) return;
+
+    const now = Date.now();
+    const isTvdbShow = (r) =>
+      !!(
+        r &&
+        typeof r === "object" &&
+        !Array.isArray(r) &&
+        String(r.Name || r.name || "").trim()
+      );
+
+    // Fetch Emby show list + 4 collections in parallel
+    const embyShowUrl =
+      `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?api_key=${EMBY_API_KEY}` +
+      `&IncludeItemTypes=Series&Recursive=true` +
+      `&Fields=Name,Id,DateCreated,Genres,Overview,Path,PremiereDate,ProviderIds,UserData` +
+      `&StartIndex=0&Limit=10000`;
+    const [embyResp, toTryResp, continueResp, markResp, lindaResp] =
+      await Promise.all([
+        fetch(embyShowUrl),
+        fetch(
+          `${EMBY_BASE_URL}/Collections/${COLLECTION_IDS.toTry}/Items?api_key=${EMBY_API_KEY}&Limit=10000`,
+        ),
+        fetch(
+          `${EMBY_BASE_URL}/Collections/${COLLECTION_IDS.continue}/Items?api_key=${EMBY_API_KEY}&Limit=10000`,
+        ),
+        fetch(
+          `${EMBY_BASE_URL}/Collections/${COLLECTION_IDS.mark}/Items?api_key=${EMBY_API_KEY}&Limit=10000`,
+        ),
+        fetch(
+          `${EMBY_BASE_URL}/Collections/${COLLECTION_IDS.linda}/Items?api_key=${EMBY_API_KEY}&Limit=10000`,
+        ),
+      ]);
+    if (!embyResp.ok) {
+      console.error("[runEmbyFullSweep] Emby fetch failed:", embyResp.status);
+      return;
+    }
+    const embyData = await embyResp.json();
+    const embyShows = embyData.Items || [];
+
+    const parseIds = async (resp) =>
+      new Set(
+        (resp.ok ? (await resp.json()).Items || [] : []).map((i) => i.Id),
+      );
+    const [toTryIds, continueIds, markIds, lindaIds] = await Promise.all([
+      parseIds(toTryResp),
+      parseIds(continueResp),
+      parseIds(markResp),
+      parseIds(lindaResp),
+    ]);
+
+    // Helpers (ported from client emby.js)
+    const findByTvdbId = (targetId) => {
+      if (!targetId) return null;
+      const id = String(targetId).trim();
+      for (const [key, rec] of Object.entries(allTvdb)) {
+        if (String(rec?.tvdbId || "").trim() === id)
+          return { key, record: rec };
+      }
+      return null;
+    };
+    const normalizeTitle = (name) => {
+      let out = String(name || "");
+      const idx = out.indexOf("(");
+      if (idx >= 0) out = out.slice(0, idx);
+      return out
+        .toLowerCase()
+        .replace(/\./g, " ")
+        .replace(/[^a-z0-9\s]/g, " ")
+        .trim()
+        .replace(/\s+/g, " ");
+    };
+    const findCandidate = (embyName, embyTvdbId) => {
+      const norm = normalizeTitle(embyName);
+      if (!norm) return null;
+      for (const [key, rec] of Object.entries(allTvdb)) {
+        if (!isTvdbShow(rec)) continue;
+        const candName = String(rec.Name || rec.name || "").trim();
+        if (!candName || candName === embyName) continue;
+        if (normalizeTitle(candName) !== norm) continue;
+        return { key, record: rec };
+      }
+      return null;
+    };
+
+    // Step 1: Key/Name mismatch cleanup
+    const keysToDelete = [];
+    for (const [key, show] of Object.entries(allTvdb)) {
+      if (!isTvdbShow(show) || !show.Name || key === show.Name) continue;
+      if (allTvdb[show.Name] && allTvdb[show.Name] !== show) {
+        keysToDelete.push(key);
+      } else if (!allTvdb[show.Name]) {
+        allTvdb[show.Name] = show;
+        keysToDelete.push(key);
+      }
+    }
+    for (const key of keysToDelete) {
+      delete allTvdb[key];
+      try {
+        await tvdb.setTvdbFields({ name: key, $delTvdb: true });
+      } catch (e) {}
+    }
+
+    // Step 2: Sync Emby shows into tvdb
+    for (const embyShow of embyShows) {
+      const name = embyShow.Name;
+      const tvdbId = embyShow.ProviderIds?.Tvdb || embyShow.TvdbId;
+      if (!tvdbId || tvdbId === "0") continue;
+      const embyPath = embyShow.Path?.split("/").pop() || "";
+      const showId = embyShow.Id;
+
+      let tvdbKey = name;
+      let tvdbRecord = allTvdb[tvdbKey];
+      if (!tvdbRecord) {
+        const byId = findByTvdbId(tvdbId);
+        if (byId) {
+          tvdbKey = byId.key;
+          tvdbRecord = byId.record;
+        }
+      }
+
+      if (!tvdbRecord) {
+        // Block creation if a likely-same-show candidate exists
+        if (findCandidate(name, tvdbId)) {
+          console.warn(
+            `[runEmbyFullSweep] Blocked create for "${name}" — likely candidate exists`,
+          );
+          continue;
+        }
+        const param = {
+          show: { Name: name, Id: showId, TvdbId: tvdbId },
+          seasonCount: 0,
+          episodeCount: 0,
+          watchedCount: 0,
+          name,
+          showId,
+          tvdbId,
+          embyPath,
+          "emby.genres": embyShow.Genres || [],
+          "emby.overview": embyShow.Overview || "",
+          dateCreated: embyShow.DateCreated?.substring(0, 10),
+          premiereDate: embyShow.PremiereDate?.substring(0, 10),
+          lastEmbySync: now,
+          isFavorite: embyShow.UserData?.IsFavorite || false,
+          isPlayed: embyShow.UserData?.Played || false,
+          playCount: embyShow.UserData?.PlayCount || 0,
+        };
+        try {
+          await tvdb.getNewTvdb(param);
+          console.log(`[runEmbyFullSweep] Created tvdb record: ${name}`);
+        } catch (e) {
+          console.error(
+            `[runEmbyFullSweep] getNewTvdb failed for "${name}":`,
+            e.message,
+          );
+        }
+        continue;
+      }
+
+      // Update existing record
+      tvdbRecord.Id = showId;
+      tvdbRecord.Path = embyPath;
+      tvdbRecord.Genres = embyShow.Genres || [];
+      tvdbRecord.Overview = embyShow.Overview || "";
+      tvdbRecord.DateCreated = embyShow.DateCreated?.substring(0, 10);
+      tvdbRecord.PremiereDate = embyShow.PremiereDate?.substring(0, 10);
+      tvdbRecord.IsFavorite = embyShow.UserData?.IsFavorite || false;
+      tvdbRecord.Played = embyShow.UserData?.Played || false;
+      tvdbRecord.PlayCount = embyShow.UserData?.PlayCount || 0;
+      tvdbRecord.InToTry = toTryIds.has(showId);
+      tvdbRecord.InContinue = continueIds.has(showId);
+      tvdbRecord.InMark = markIds.has(showId);
+      tvdbRecord.InLinda = lindaIds.has(showId);
+      tvdbRecord.inEmby = true;
+      tvdbRecord.lastEmbySync = now;
+      // Compute waitStr from nextAired/lastAired (no API call needed)
+      const today = new Date().toISOString().slice(0, 10);
+      const airDate =
+        (tvdbRecord.nextAired || "") > (tvdbRecord.lastAired || "")
+          ? tvdbRecord.nextAired
+          : tvdbRecord.lastAired;
+      if (airDate)
+        tvdbRecord.waitStr =
+          airDate >= today
+            ? `{${airDate.slice(5).replace(/^0/, " ").trim()}}`
+            : "";
+    }
+
+    // Step 3: Detect disappeared shows → mark inEmby=false
+    const embyNameSet = new Set(embyShows.map((s) => s.Name));
+    const embyTvdbIdSet = new Set(
+      embyShows.map((s) => String(s.ProviderIds?.Tvdb || "")).filter(Boolean),
+    );
+    for (const [name, rec] of Object.entries(allTvdb)) {
+      if (!isTvdbShow(rec) || rec.inEmby === false) continue;
+      const stillInEmby =
+        embyNameSet.has(name) ||
+        (rec.tvdbId && embyTvdbIdSet.has(String(rec.tvdbId)));
+      if (!stillInEmby) {
+        console.log(`[runEmbyFullSweep] Marking ${name} as not in Emby`);
+        rec.inEmby = false;
+      }
+    }
+
+    await tvdb.saveTvdbSync();
+  } catch (err) {
+    console.error("[runEmbyFullSweep] error:", err.message);
+  }
+}
+
+/**
  * Phase 3.2: Sync disk filesystem data into tvdb
  * Runs every hour to update file dates and sizes
  */
@@ -3260,12 +3558,8 @@ async function fetchLastWatchedDate(showId) {
 
 // NOTE: syncEmbyUserData periodic sync removed - now using immediate triggers from client
 // Collections and user data changes are handled by /api/triggerEmbySync and /api/triggerFullGapCheck
-setInterval(syncDiskData, DISK_SYNC_INTERVAL); // Full disk check hourly
-setInterval(runGapCheckBatch, GAP_CHECK_INTERVAL);
-
-// Run initial syncs
-setTimeout(syncDiskData, 3 * 60 * 1000); // 3 minutes after start
-setTimeout(runGapCheckBatch, 30 * 1000); // 30 seconds after start
+// NOTE: syncDiskData and runGapCheckBatch periodic timers removed - now handled by tryLocalGetTvdb
+// per-show tick via perShowCallback (disk + gap) and preTvdbTickCallback (Emby sweep)
 
 setInterval(runUsbCheck, CHECK_INTERVAL_MS);
 // Run initial check after 1 minute (allow startup)
@@ -3488,7 +3782,7 @@ watcher
 
     const timeout = setTimeout(() => {
       changedShows.delete(showName);
-      handleShowDiskChange(showName);
+      tvdb.enqueueShowProcess(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);
 
     changedShows.set(showName, timeout);
@@ -3509,7 +3803,7 @@ watcher
 
     const timeout = setTimeout(() => {
       changedShows.delete(showName);
-      handleShowDiskChange(showName);
+      tvdb.enqueueShowProcess(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);
 
     changedShows.set(showName, timeout);

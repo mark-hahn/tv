@@ -348,6 +348,10 @@ export function triggerEmbySync(showId, showName) {
   return httpCall("/api/triggerEmbySync", { showId, showName }, "POST");
 }
 
+export function refreshEmbyItem(showId, showName) {
+  return httpCall("/api/refreshEmbyItem", { showId, showName }, "POST");
+}
+
 export function triggerFullGapCheck() {
   return httpCall("/api/triggerFullGapCheck", {}, "POST");
 }

@@ -1361,6 +1361,44 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 const newTvdbQueue = [];
 let chkTvdbQueueRunning = false;
 
+// Show process queue: shows queued for full per-show refresh (disk + gap + TVDB)
+const showProcessQueue = [];
+export const enqueueShowProcess = (showName) => {
+  if (showName && !showProcessQueue.includes(showName)) {
+    const wasEmpty = showProcessQueue.length === 0;
+    showProcessQueue.push(showName);
+    // Only notify on 0→1 transition to avoid flooding clients on bulk enqueues
+    if (wasEmpty && enqueueCallback) enqueueCallback(showName);
+  }
+};
+const dequeueShowProcess = () => showProcessQueue.shift() ?? null;
+
+// Callbacks set by index.js to avoid circular imports
+let notifyCallback = null;
+export const setNotifyCallback = (fn) => {
+  notifyCallback = fn;
+};
+
+let enqueueCallback = null;
+export const setEnqueueCallback = (fn) => {
+  enqueueCallback = fn;
+};
+
+let queueDrainCallback = null;
+export const setQueueDrainCallback = (fn) => {
+  queueDrainCallback = fn;
+};
+
+let perShowCallback = null;
+export const setPerShowCallback = (fn) => {
+  perShowCallback = fn;
+};
+
+let preTvdbTickCallback = null;
+export const setPreTvdbTickCallback = (fn) => {
+  preTvdbTickCallback = fn;
+};
+
 const chkTvdbQueue = () => {
   if (chkTvdbQueueRunning || newTvdbQueue.length == 0) return;
   chkTvdbQueueRunning = true;
@@ -1393,6 +1431,35 @@ const chkTvdbQueue = () => {
           finalData = tvdbData;
           if (!paramObj.transient) {
             const keyName = finalData.Name || finalData.name;
+            const prev = allTvdb[keyName];
+            const tvdbChanges = [];
+            if (prev) {
+              if (prev.lastAired !== finalData.lastAired)
+                tvdbChanges.push(
+                  `lastAired:${prev.lastAired}->${finalData.lastAired}`,
+                );
+              if (prev.status !== finalData.status)
+                tvdbChanges.push(`status:${prev.status}->${finalData.status}`);
+              if (
+                (prev.seasons?.length ?? 0) !== (finalData.seasons?.length ?? 0)
+              )
+                tvdbChanges.push(
+                  `seasons:${prev.seasons?.length ?? 0}->${finalData.seasons?.length ?? 0}`,
+                );
+              if (
+                (prev.remotes?.length ?? 0) !== (finalData.remotes?.length ?? 0)
+              )
+                tvdbChanges.push(
+                  `remotes:${prev.remotes?.length ?? 0}->${finalData.remotes?.length ?? 0}`,
+                );
+              if (prev.overview !== finalData.overview)
+                tvdbChanges.push(`overview:changed`);
+            } else {
+              tvdbChanges.push(`new record`);
+            }
+            log(
+              `tvdb push1 [${keyName}]: ${tvdbChanges.length ? tvdbChanges.join(" ") : "no field changes"}`,
+            );
             allTvdb[keyName] = finalData;
           }
         } else if (typeof tvdbData === "string") {
@@ -1416,6 +1483,9 @@ const chkTvdbQueue = () => {
         saveTvdbFiles(allTvdb).catch((err) => {
           log("err", "chkTvdbQueue: save error:", err.message);
         });
+        // Push updated record to clients
+        if (notifyCallback && finalData.Name)
+          notifyCallback(finalData.Name, finalData);
       }
       chkTvdbQueueRunning = false;
       chkTvdbQueue();
@@ -1438,45 +1508,51 @@ const tryLocalGetTvdb = async () => {
   if (tryLocalGetTvdbBusy) return;
   tryLocalGetTvdbBusy = true;
 
-  // find show with oldest save date
-  let minSaved = Math.min();
+  // Run pre-tick callback (e.g. full Emby sweep for new/removed shows)
+  if (preTvdbTickCallback) {
+    try {
+      await preTvdbTickCallback();
+    } catch (e) {
+      log("err", "tryLocalGetTvdb preTick:", e.message);
+    }
+  }
+
+  // Use a requested show from the process queue first; otherwise pick the stalest
   let minTvdb = null;
-  try {
-    const tvdbs = Object.values(allTvdb);
-    tvdbs.forEach((tvdb) => {
-      const saved = tvdb.saved;
-      if (saved === undefined) {
-        log("tryLocalGetTvdb, saved is undefined:", tvdb.Name);
-        minTvdb = tvdb;
-        throw true;
-      }
-      if (saved < minSaved) {
-        minSaved = saved;
-        minTvdb = tvdb;
-      }
-    });
-  } catch (e) {}
+  const requestedName = dequeueShowProcess();
+  if (requestedName) {
+    minTvdb = allTvdb[requestedName] ?? null;
+  }
+  if (!minTvdb) {
+    // find show with oldest save date
+    let minSaved = Math.min();
+    try {
+      const tvdbs = Object.values(allTvdb);
+      tvdbs.forEach((tvdb) => {
+        const saved = tvdb.saved;
+        if (saved === undefined) {
+          log("tryLocalGetTvdb, saved is undefined:", tvdb.Name);
+          minTvdb = tvdb;
+          throw true;
+        }
+        if (saved < minSaved) {
+          minSaved = saved;
+          minTvdb = tvdb;
+        }
+      });
+    } catch (e) {}
+  }
+
   if (minTvdb === null) {
     log(
       "err",
       new Date().toTimeString().slice(0, 8),
-      `tryLocalGetTvdbBusy, minTvdb is null`,
+      `tryLocalGetTvdb: minTvdb is null`,
     );
     tryLocalGetTvdbBusy = false;
     return;
   }
 
-  // Check if show should be added to pickup list:
-  // - not in emby (showId starts with 'noemby-' or undefined)
-  // - has tvdb data (minTvdb exists)
-  // if (minTvdb) {
-  //   if (!minTvdb.inEmby && addToPickupsCallback) {
-  //     addToPickupsCallback(minTvdb.Name);
-  //   }
-  // }
-
-  // log('------', new Date().toTimeString().slice(0,8),
-  //             `updating tvdb locally:`, minTvdb.Name);
   const show = {
     Name: minTvdb.Name,
     TvdbId: minTvdb.tvdbId,
@@ -1489,32 +1565,63 @@ const tryLocalGetTvdb = async () => {
     watchedCount: minTvdb.watchedCount ?? 0,
     fast: false, // Fetch all remotes including IMDB videos for background refresh
   };
-  newTvdbQueue.unshift({ ws: null, id: null, paramObj });
+  // Await TVDB refresh completion so the updated record is available for further processing
+  const tvdbDonePromise = new Promise((res) => {
+    newTvdbQueue.unshift({ ws: null, id: null, paramObj, resolve: res });
+  });
   chkTvdbQueue();
+  let updatedRecord = null;
+  try {
+    updatedRecord = await tvdbDonePromise;
+  } catch (e) {
+    log("err", "tryLocalGetTvdb: tvdb update failed:", e?.message);
+  }
+  const processRecord = updatedRecord || allTvdb[minTvdb.Name] || minTvdb;
 
-  // Fetch and persist series map data (try Emby first, fallback to TVDB)
+  // Fetch and persist series map data using the fresh record (try Emby first, fallback to TVDB)
   try {
     let seriesMap = null;
-    let watchedEpis = null;
 
     // Try Emby if show is in Emby
-    if (minTvdb.inEmby && minTvdb.Id) {
-      seriesMap = await emby.getSeriesMap(show);
+    if (processRecord.inEmby && processRecord.Id) {
+      seriesMap = await emby.getSeriesMap({
+        Name: processRecord.Name,
+        TvdbId: processRecord.tvdbId,
+        Id: processRecord.Id,
+      });
       if (seriesMap && seriesMap.length > 0) {
-        // Extract and persist watchedEpis
-        watchedEpis = seriesMapToWatchedEpis(seriesMap);
-        minTvdb.watchedEpis = watchedEpis;
+        processRecord.watchedEpis = seriesMapToWatchedEpis(seriesMap);
         await saveTvdbFiles(allTvdb);
       }
     }
 
     // Fallback to TVDB if Emby fails or show not in Emby
-    // (No watched status from TVDB, but we preserve existing watchedEpis)
-    if (!seriesMap && minTvdb.tvdbId) {
-      seriesMap = await getSeriesMap(minTvdb.tvdbId, minTvdb.watchedEpis);
+    if (!seriesMap && processRecord.tvdbId) {
+      seriesMap = await getSeriesMap(
+        processRecord.tvdbId,
+        processRecord.watchedEpis,
+      );
     }
   } catch (err) {
     log("err", "tryLocalGetTvdb seriesMap fetch error:", err.message);
+  }
+
+  // Run per-show process callback (disk check, gap check, notify) with the up-to-date record
+  if (perShowCallback) {
+    try {
+      await perShowCallback(processRecord.Name, processRecord);
+    } catch (e) {
+      log("err", "tryLocalGetTvdb perShow:", e.message);
+    }
+  }
+
+  // If we processed a requested show and the queue is now empty, notify clients
+  if (requestedName && showProcessQueue.length === 0 && queueDrainCallback) {
+    try {
+      queueDrainCallback();
+    } catch (e) {
+      log("err", "tryLocalGetTvdb queueDrain:", e.message);
+    }
   }
 
   tryLocalGetTvdbBusy = false;
@@ -2002,6 +2109,8 @@ export const setTvdbFields = async (params) => {
   if (!paramObj.dontSave) {
     await saveTvdbFiles(allTvdb);
   }
+  // Queue a full per-show refresh (disk + gap) for changes that matter
+  if (name && !paramObj.$delTvdb) enqueueShowProcess(name);
   return tvdb ?? "ok";
 };
 

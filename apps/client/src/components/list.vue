@@ -122,6 +122,7 @@
               :watchingName="watchingName"
               :simpleMode="simpleMode"
               :isWideLandscape="isWideLandscape"
+              :statusMsg="updatingMsg"
               @watch-click="watchClick"
               @filter-input="select"
               @send-filters="sendSharedFilters"
@@ -187,6 +188,7 @@
             :watchingName="watchingName"
             :simpleMode="simpleMode"
             :isWideLandscape="isWideLandscape"
+            :statusMsg="updatingMsg"
             @watch-click="watchClick"
             @filter-input="select"
             @send-filters="sendSharedFilters"
@@ -501,9 +503,7 @@ export default {
           return;
         // Delete files from server first
         await srvr.deleteShowFromSrvr(show);
-        // Refresh Emby library so it knows the files are gone
-        await this.refreshEmbyLibraryWithDialog();
-        // Now delete from Emby (directory should be empty now)
+        // Now delete from Emby (DELETE /Items/{id} removes it directly, no library scan needed)
         await emby.deleteShowFromEmby(show);
         // Set inEmby to false to mark as deleted and set leftEmby timestamp
         const tvdbData = allTvdb[name];
@@ -544,6 +544,7 @@ export default {
 
     return {
       deleteShow,
+      updatingMsg: "",
       shows: [],
       filterStr: "",
       errMsg: "",
@@ -761,6 +762,24 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
+    markShowUpdating(showName) {
+      if (!showName) return;
+      if (!this._updatingShows) this._updatingShows = new Set();
+      this._updatingShows.add(showName);
+      this.updatingMsg = `Updating ${showName}...`;
+    },
+
+    clearShowUpdating(showName) {
+      if (!this._updatingShows || !showName) return;
+      this._updatingShows.delete(showName);
+      if (this._updatingShows.size === 0) {
+        this.updatingMsg = "";
+      } else {
+        const remaining = [...this._updatingShows];
+        this.updatingMsg = `Updating ${remaining[remaining.length - 1]}...`;
+      }
+    },
+
     logModalMessage(modalName, message) {
       console.error(`[${modalName}] ${String(message ?? "")}`);
     },
@@ -2044,19 +2063,14 @@ export default {
           return;
         }
 
-        // Emby won't reflect the deletion until the library is refreshed.
-        await this.refreshEmbyLibraryWithDialog();
-
-        // Trigger gap check for just this show (not full check like library refresh does)
+        // Refresh just this show in Emby so the episode is removed from its list
+        this.markShowUpdating(show.Name);
         await srvr
-          .triggerEmbySync(show.Id, show.Name)
-          .catch((err) => console.error("triggerEmbySync failed:", err));
+          .refreshEmbyItem(show.Id, show.Name)
+          .catch((err) => console.error("refreshEmbyItem failed:", err));
 
-        // Refresh the Map grid now that Emby has refreshed.
+        // Refresh the Map grid now that Emby has updated.
         await this.seriesMapAction("refresh", show, null);
-
-        // Reload show list (shows the Reloading Shows dialog).
-        evtBus.emit("library-refresh-complete");
         return;
       }
 
@@ -2766,50 +2780,67 @@ export default {
     });
 
     // Listen for server notifications about tvdb updates
-    on("tvdbUpdated", async () => {
-      console.log(
-        "[tvdbUpdated] Server notified tvdb data changed, reloading...",
-      );
+    on("tvdbUpdated", async (data) => {
+      const { name, record } = data || {};
+      if (!name || !record) {
+        console.warn("[tvdbUpdated] Missing name or record in push data");
+        return;
+      }
+      if (!allTvdb || !allShows) return; // loadAllShows not yet complete, ignore early push
       try {
-        // Reload tvdb data from server
-        const updatedTvdb = await tvdb.getAllTvdb(
-          this.hasLoadedAllShows ? 0 : 1,
-        );
+        // Apply computed props to the pushed record
+        record.WatchGap = record.watchGap || false;
+        record.WatchGapSeason = record.watchGapSeason;
+        record.WatchGapEpisode = record.watchGapEpisode;
+        record.FileGap =
+          !(record.notReady === false && record.InToTry) &&
+          (record.fileGap ||
+            record.fileEndError ||
+            record.seasonWatchedThenNofile);
+        record.NotReady = record.inEmby === false;
 
-        // Merge gap data from updated tvdb into allShows
-        for (const [name, tvdbRecord] of Object.entries(updatedTvdb)) {
-          const show = allShows.find((s) => s.Name === name);
-          if (show && tvdbRecord) {
-            // Copy gap-related fields from tvdb to show
-            show.notReady = tvdbRecord.notReady;
-            show.anyWatched = tvdbRecord.anyWatched;
-            show.watchGap = tvdbRecord.watchGap;
-            show.watchGapSeason = tvdbRecord.watchGapSeason;
-            show.watchGapEpisode = tvdbRecord.watchGapEpisode;
-            show.fileGap = tvdbRecord.fileGap;
-            show.fileGapSeason = tvdbRecord.fileGapSeason;
-            show.fileGapEpisode = tvdbRecord.fileGapEpisode;
-            show.fileEndError = tvdbRecord.fileEndError;
-            show.seasonWatchedThenNofile = tvdbRecord.seasonWatchedThenNofile;
-
-            // Also update computed fields (uppercase properties)
-            show.WatchGap = show.watchGap;
-            show.FileGap =
-              !(show.notReady === false && show.InToTry) &&
-              (show.fileGap ||
-                show.fileEndError ||
-                show.seasonWatchedThenNofile);
-          }
+        // Merge fields into the existing show in allShows
+        const show = allShows.find((s) => s.Name === name);
+        if (show) {
+          show.notReady = record.notReady;
+          show.anyWatched = record.anyWatched;
+          show.watchGap = record.watchGap;
+          show.watchGapSeason = record.watchGapSeason;
+          show.watchGapEpisode = record.watchGapEpisode;
+          show.fileGap = record.fileGap;
+          show.fileGapSeason = record.fileGapSeason;
+          show.fileGapEpisode = record.fileGapEpisode;
+          show.fileEndError = record.fileEndError;
+          show.seasonWatchedThenNofile = record.seasonWatchedThenNofile;
+          show.WatchGap = record.WatchGap;
+          show.WatchGapSeason = record.WatchGapSeason;
+          show.WatchGapEpisode = record.WatchGapEpisode;
+          show.FileGap = record.FileGap;
+          show.NotReady = record.NotReady;
+          show.Date = record.Date ?? show.Date;
+          show.Size = record.Size ?? show.Size;
+          show.NoFiles = record.NoFiles ?? show.NoFiles;
+          show.WaitStr = record.waitStr ?? record.WaitStr ?? show.WaitStr;
+          show.waitStr = record.waitStr ?? show.waitStr;
         }
 
         // Update allTvdb reference
-        Object.assign(allTvdb, updatedTvdb);
+        allTvdb[name] = record;
 
         // Refresh UI
         await this.refilter(false);
       } catch (err) {
-        console.error("[tvdbUpdated] Failed to reload tvdb:", err);
+        console.error("[tvdbUpdated] Failed to handle tvdb push:", err);
       }
+    });
+
+    on("showUpdating", ({ name } = {}) => {
+      if (name) this.markShowUpdating(name);
+    });
+
+    on("showQueueEmpty", () => {
+      if (this._updatingShows) this._updatingShows.clear();
+      this.updatingMsg = "";
     });
 
     // Listen for disk changes from chokidar watcher
@@ -2924,9 +2955,12 @@ export default {
         return;
       }
 
-      await this.refreshEmbyLibraryWithDialog();
+      // Refresh just this show in Emby so the season folder is removed from its list
+      this.markShowUpdating(show.Name);
+      await srvr
+        .refreshEmbyItem(show.Id, show.Name)
+        .catch((err) => console.error("refreshEmbyItem failed:", err));
       await this.seriesMapAction("refresh", show, null);
-      evtBus.emit("library-refresh-complete");
     });
 
     // Listen for library refresh completion to refresh show list

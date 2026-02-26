@@ -138,8 +138,61 @@ async function setWaitStrings(allTvdb) {
   }
 }
 
-// Phase 2: Refactored loadAllShows - simplified, uses tvdb as source of truth
+// Thin loadAllShows - fetches tvdb from server, applies computed props
 export async function loadAllShows() {
+  const loadStart = Date.now();
+  const allTvdb = await tvdb.getAllTvdb(0);
+
+  // Ensure computed properties are set
+  for (const rec of Object.values(allTvdb)) {
+    if (!isTvdbShowRecord(rec)) continue;
+    if (!rec.Name && rec.name) rec.Name = rec.name;
+    if (!rec.TvdbId && rec.tvdbId) rec.TvdbId = rec.tvdbId;
+    if (!rec.Id) rec.Id = `noemby-${rec.tvdbId || rec.TvdbId}`;
+    if (rec.genres && !rec.Genres)
+      rec.Genres = rec.genres.map((g) => (typeof g === "string" ? g : g.name));
+    if (rec.status === "Ended") rec.Ended = true;
+    if (rec.overview && !rec.Overview) rec.Overview = rec.overview;
+    if (rec.originalCountry && !rec.OriginalCountry)
+      rec.OriginalCountry = rec.originalCountry;
+    if (rec.lastAired && !rec.LastAired) rec.LastAired = rec.lastAired;
+    if (!rec.Ratings)
+      rec.Ratings =
+        rec.remotes?.find((r) => r.name?.startsWith("IMDB"))?.ratings || null;
+    if (rec.reject && !rec.Reject) rec.Reject = rec.reject;
+    if (rec.pickup && !rec.Pickup) rec.Pickup = rec.pickup;
+    if (rec.waitStr && !rec.WaitStr) rec.WaitStr = rec.waitStr;
+    if (rec.note && !rec.Notes) rec.Notes = rec.note;
+    rec.NotReady = rec.inEmby === false;
+    rec.WatchGap = rec.watchGap || false;
+    rec.WatchGapSeason = rec.watchGapSeason;
+    rec.WatchGapEpisode = rec.watchGapEpisode;
+    rec.FileGap =
+      !(rec.notReady === false && rec.InToTry) &&
+      (rec.fileGap || rec.fileEndError || rec.seasonWatchedThenNofile);
+    if (rec.InToTry === undefined) rec.InToTry = false;
+    if (rec.InContinue === undefined) rec.InContinue = false;
+    if (rec.InMark === undefined) rec.InMark = false;
+    if (rec.InLinda === undefined) rec.InLinda = false;
+    if (rec.IsFavorite === undefined) rec.IsFavorite = false;
+    if (rec.Played === undefined) rec.Played = false;
+    if (rec.PlayCount === undefined) rec.PlayCount = 0;
+    if (rec.Date === undefined) rec.Date = "2017-12-05";
+    if (rec.Size === undefined) rec.Size = 0;
+    if (rec.NoFiles === undefined) rec.NoFiles = false;
+  }
+
+  const showRecords = Object.values(allTvdb).filter((r) => isTvdbShowRecord(r));
+  const elapsed = Date.now() - loadStart;
+  console.log(
+    `loadAllShows completed in ${elapsed}ms, ${showRecords.length} shows`,
+  );
+  allShows = showRecords;
+  return { allShows: showRecords, allTvdb };
+}
+
+// (legacy - no longer called)
+async function _oldLoadAllShows() {
   const loadStart = Date.now();
 
   const ensureEmbyRemoteUrlMatchesRecordId = async (recordKey, record) => {

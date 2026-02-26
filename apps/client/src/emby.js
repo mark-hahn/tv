@@ -1540,6 +1540,16 @@ export const createShowFolderAndRefreshEmby = async ({
     };
   }
 
+  // Run server-side Emby sweep so inEmby status is current before caller reloads
+  try {
+    await srvr.embySync();
+  } catch (e) {
+    console.error(
+      "createShowFolderAndRefreshEmby: embySync failed",
+      e?.message || e,
+    );
+  }
+
   return { createdFolder: true, status: "ok", refreshRes };
 };
 

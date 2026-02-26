@@ -2626,6 +2626,13 @@ app.post("/api/saveNote", apiWrapper(saveNote));
 app.post("/api/deletePath", apiWrapper(deletePath));
 app.post("/api/delSeasonFiles", apiWrapper(delSeasonFiles));
 app.post("/api/createShowFolder", apiWrapper(createShowFolder));
+app.post(
+  "/api/embySync",
+  apiWrapper(async () => {
+    await runEmbyFullSweep();
+    return { ok: true };
+  }),
+);
 
 // Subtitles
 app.post("/api/subsSearch", apiWrapper(subsSearch));

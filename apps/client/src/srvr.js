@@ -241,6 +241,9 @@ export function getShowsFromDisk() {
 export function createShowFolder(params) {
   return httpCall("/api/createShowFolder", params, "POST");
 }
+export function embySync() {
+  return httpCall("/api/embySync", {}, "POST");
+}
 
 // Shared filters (cross-computer)
 export function getSharedFilters() {

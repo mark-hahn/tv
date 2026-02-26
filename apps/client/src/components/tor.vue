@@ -486,13 +486,7 @@
         "
       >
         <div
-          v-if="!hasSearched &amp;&amp; filteredTorrents.length === 0 &amp;&amp; !error"
-          style="text-align: center; color: #999; margin-top: 50px"
-        >
-          <div>Click on Search to find torrents for {{ headerShowName }}.</div>
-        </div>
-        <div
-          v-else-if="hasSearched &amp;&amp; filteredTorrents.length === 0 &amp;&amp; !error"
+          v-if="hasSearched &amp;&amp; filteredTorrents.length === 0 &amp;&amp; !error"
           style="text-align: center; color: #999; margin-top: 50px"
         >
           <div>No torrents found.</div>
@@ -862,6 +856,8 @@ export default {
 
       _didInitialScroll: false,
 
+      lastAutoSearchedShowId: null,
+
       // Debug: last search request/response metadata
       showDebug: false,
       lastSearchUrl: "",
@@ -1163,9 +1159,15 @@ export default {
     },
 
     onPaneChanged(pane) {
-      if (pane === "torrents") {
+      if (pane === "tor") {
         // Keep space info fresh whenever Tor pane is shown.
         void this.updateSpaceAvail();
+        // Auto-search when pane becomes active, but only once per show.
+        const showId = this.activeShow?.Id || null;
+        if (showId && showId !== this.lastAutoSearchedShowId) {
+          this.lastAutoSearchedShowId = showId;
+          void this.searchClick();
+        }
       }
     },
 
@@ -1518,6 +1520,7 @@ export default {
       this.tlCfClearance = "";
 
       this._didInitialScroll = false;
+      this.lastAutoSearchedShowId = null;
     },
 
     handleClose() {
@@ -1692,8 +1695,6 @@ export default {
         this.noTorrentsNeeded = true;
         return;
       }
-
-      // Do not search automatically; wait for Search button.
     },
 
     async searchClick() {

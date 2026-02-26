@@ -1030,10 +1030,17 @@ export default {
         // For emby shows, get counts from Emby API and save to tvdb
         epiCounts = await emby.getEpisodeCounts(show);
 
-        // Save the calculated counts back to tvdb if they differ
+        // Save the calculated counts back to tvdb only if they changed
         // dontEnqueue: skip triggering a full background refresh just for count updates
-        const fields = Object.assign({ name, dontEnqueue: true }, epiCounts);
-        srvr.setTvdbFields(fields).catch((e) => console.error(e));
+        const prev = tvdbData;
+        if (
+          epiCounts.seasonCount !== prev.seasonCount ||
+          epiCounts.episodeCount !== prev.episodeCount ||
+          epiCounts.watchedCount !== prev.watchedCount
+        ) {
+          const fields = Object.assign({ name, dontEnqueue: true }, epiCounts);
+          srvr.setTvdbFields(fields).catch((e) => console.error(e));
+        }
       }
 
       Object.assign(tvdbData, epiCounts);

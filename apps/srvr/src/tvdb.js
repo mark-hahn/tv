@@ -1383,12 +1383,16 @@ let chkTvdbQueueRunning = false;
 
 // Show process queue: shows queued for full per-show refresh (disk + gap + TVDB)
 const showProcessQueue = [];
+// Set after tryLocalGetTvdb is defined so enqueueShowProcess can kick processing immediately
+let _kickProcessQueue = null;
 export const enqueueShowProcess = (showName) => {
   if (showName && !showProcessQueue.includes(showName)) {
     const wasEmpty = showProcessQueue.length === 0;
     showProcessQueue.push(showName);
     // Only notify on 0→1 transition to avoid flooding clients on bulk enqueues
     if (wasEmpty && enqueueCallback) enqueueCallback(showName);
+    // Kick processing immediately (no-op if already busy)
+    if (_kickProcessQueue) setTimeout(_kickProcessQueue, 0);
   }
 };
 const dequeueShowProcess = () => showProcessQueue.shift() ?? null;
@@ -1528,6 +1532,7 @@ const chkTvdbQueue = () => {
 let tryLocalGetTvdbBusy = false;
 const tryLocalGetTvdb = async () => {
   if (tryLocalGetTvdbBusy) return;
+  if (showProcessQueue.length === 0) return;
   tryLocalGetTvdbBusy = true;
 
   // Run pre-tick callback (e.g. full Emby sweep for new/removed shows)
@@ -1539,48 +1544,21 @@ const tryLocalGetTvdb = async () => {
     }
   }
 
-  // Use a requested show from the process queue first; otherwise pick the stalest
-  let minTvdb = null;
-  let selectionReason = "";
   const requestedName = dequeueShowProcess();
-  if (requestedName) {
-    minTvdb = allTvdb[requestedName] ?? null;
-    selectionReason = `queued`;
-  }
-  if (!minTvdb) {
-    // find show with oldest save date
-    let minSaved = Math.min();
-    try {
-      const tvdbs = Object.values(allTvdb);
-      tvdbs.forEach((tvdb) => {
-        const saved = tvdb.saved;
-        if (saved === undefined) {
-          log("tryLocalGetTvdb, saved is undefined:", tvdb.Name);
-          minTvdb = tvdb;
-          throw true;
-        }
-        if (saved < minSaved) {
-          minSaved = saved;
-          minTvdb = tvdb;
-        }
-      });
-    } catch (e) {}
-    if (minTvdb)
-      selectionReason = `stalest(saved=${new Date(minSaved).toISOString().slice(11, 19)})`;
-  }
-
-  if (minTvdb === null) {
-    log(
-      "err",
-      new Date().toTimeString().slice(0, 8),
-      `tryLocalGetTvdb: minTvdb is null`,
-    );
+  if (!requestedName) {
     tryLocalGetTvdbBusy = false;
     return;
   }
 
-  log(`processing [${minTvdb.Name}] reason=${selectionReason}`);
-  // Notify clients which show is being processed (mirrors showUpdating from enqueueShowProcess)
+  const minTvdb = allTvdb[requestedName];
+  if (!minTvdb) {
+    log("err", `tryLocalGetTvdb: no record for queued show "${requestedName}"`);
+    tryLocalGetTvdbBusy = false;
+    return;
+  }
+
+  log(`processing [${minTvdb.Name}]`);
+  // Notify clients which show is being processed
   if (enqueueCallback) enqueueCallback(minTvdb.Name);
   const show = {
     Name: minTvdb.Name,
@@ -1644,8 +1622,8 @@ const tryLocalGetTvdb = async () => {
     }
   }
 
-  // If we processed a requested show and the queue is now empty, notify clients
-  if (requestedName && showProcessQueue.length === 0 && queueDrainCallback) {
+  // If queue is now empty, notify clients
+  if (showProcessQueue.length === 0 && queueDrainCallback) {
     try {
       queueDrainCallback();
     } catch (e) {
@@ -1653,19 +1631,43 @@ const tryLocalGetTvdb = async () => {
     }
   }
 
-  // Always notify clients that background processing finished for this show
-  if (!requestedName && queueDrainCallback) queueDrainCallback();
   console.log("");
   tryLocalGetTvdbBusy = false;
+  // If more shows are queued, continue processing without waiting for the next timer tick
+  if (showProcessQueue.length > 0) setTimeout(tryLocalGetTvdb, 0);
 };
 
-// calls tryLocalGetTvdb every 6 mins
+// calls tryLocalGetTvdb every 30s (FAST_UPDATE) or 6 mins, enqueuing the stalest show each tick
 const updateTvdbLocal = () => {
-  // wait for token
-  if (UPDATE_DATA) tryLocalGetTvdb();
+  if (UPDATE_DATA) {
+    // Enqueue the stalest show if the queue is empty (so everything goes through the queue)
+    if (showProcessQueue.length === 0) {
+      let stalest = null;
+      let minSaved = Math.min();
+      try {
+        for (const tvdb of Object.values(allTvdb)) {
+          const saved = tvdb.saved;
+          if (saved === undefined) {
+            stalest = tvdb;
+            break;
+          }
+          if (saved < minSaved) {
+            minSaved = saved;
+            stalest = tvdb;
+          }
+        }
+      } catch (e) {}
+      if (stalest?.Name) {
+        enqueueShowProcess(stalest.Name);
+        log(`timer: enqueued stalest [${stalest.Name}]`);
+      }
+    }
+    tryLocalGetTvdb();
+  }
   const delay = FAST_UPDATE ? 30 * 1000 : 6 * 60 * 1000;
   setTimeout(updateTvdbLocal, delay);
 };
+_kickProcessQueue = tryLocalGetTvdb;
 updateTvdbLocal();
 
 ///////////////////  FUNCTION CALLS FROM CLIENT  ////////////////////

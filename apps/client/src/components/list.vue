@@ -1946,6 +1946,10 @@ export default {
           if (token !== this._pendingSetUpSeriesToken) return;
           evtBus.emit("setUpSeries", show);
         });
+        // Trigger background processing (no Rotten scrape) for the newly selected show
+        if (show.Name) {
+          srvr.triggerShowSelect(show.Name).catch((err) => console.error("triggerShowSelect failed:", err));
+        }
       }
 
       // If map pane is currently showing, update it to show the newly selected show

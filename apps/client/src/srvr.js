@@ -362,6 +362,9 @@ export function triggerFullGapCheck() {
 export function triggerShowGapCheck(showId, showName) {
   return httpCall("/api/triggerShowGapCheck", { showId, showName }, "POST");
 }
+export function triggerShowSelect(showName) {
+  return httpCall("/api/triggerShowSelect", { showName }, "POST");
+}
 export function addGap(params) {
   return httpCall("/api/addGap", params, "POST");
 }

@@ -2668,6 +2668,19 @@ app.post(
   }),
 );
 
+app.post(
+  "/api/triggerShowSelect",
+  apiWrapper(async (params) => {
+    const { showName } = params;
+    if (!showName) {
+      console.error("[triggerShowSelect] Missing showName");
+      return { success: false };
+    }
+    tvdb.enqueueShowProcess(showName, { skipRotten: true });
+    return { success: true };
+  }),
+);
+
 // CRUD operations
 app.post("/api/addReject", apiWrapper(addReject));
 app.post("/api/delReject", apiWrapper(delReject));

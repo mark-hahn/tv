@@ -835,11 +835,12 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   const url = `https://www.google.com/search` + `?q=${encoded}%20tv%20show`;
   remotes.push({ name: "Google", url });
 
-  // Wikipedia: use cached flat prop; only call Google API if not yet set
+  // Wikipedia: use cached flat prop; only fetch externally when creating a new record
+  const isNewRecord = !allTvdb[name];
   const cachedWikiUrl = allTvdb[name]?.wikiUrl;
   if (cachedWikiUrl) {
     remotes.push({ name: "Wikipedia", url: cachedWikiUrl });
-  } else {
+  } else if (isNewRecord) {
     const wikiRemote = await getRemote(null, 18, name);
     if (wikiRemote?.url) {
       remotes.push({ name: "Wikipedia", url: wikiRemote.url });
@@ -847,11 +848,11 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
     }
   }
 
-  // Reddit: use cached flat prop; only call Google API if not yet set
+  // Reddit: use cached flat prop; only fetch externally when creating a new record
   const cachedRedditUrl = allTvdb[name]?.redditUrl;
   if (cachedRedditUrl) {
     remotes.push({ name: "Reddit", url: cachedRedditUrl });
-  } else {
+  } else if (isNewRecord) {
     const redditRemote = await getRemote(null, 7, name);
     if (redditRemote?.url) {
       remotes.push({ name: "Reddit", url: redditRemote.url });

@@ -119,7 +119,7 @@ function parseTvdbJson(text, filePath) {
 function loadTvdbAtStartup() {
   const primaryText = fs.readFileSync(TVDB_PATH, "utf8");
   const primaryParsed = parseTvdbJson(primaryText, TVDB_PATH);
-  if (primaryParsed) return primaryParsed;
+  if (primaryParsed) return migrateRemotesToFlatProps(primaryParsed);
 
   const backupText = fs.readFileSync(TVDB_BACKUP_PATH, "utf8");
   const backupParsed = parseTvdbJson(backupText, TVDB_BACKUP_PATH);
@@ -128,12 +128,48 @@ function loadTvdbAtStartup() {
       `[tvdb] startup recovery: invalid primary JSON at ${TVDB_PATH}; restoring from backup ${TVDB_BACKUP_PATH}`,
     );
     fs.writeFileSync(TVDB_PATH, JSON.stringify(backupParsed), "utf8");
-    return backupParsed;
+    return migrateRemotesToFlatProps(backupParsed);
   }
 
   throw new Error(
     `[tvdb] FATAL: invalid JSON in both ${TVDB_PATH} and ${TVDB_BACKUP_PATH}`,
   );
+}
+
+// One-time migration: extract flat url props from legacy remotes arrays on startup.
+// Safe to run repeatedly — skips records that already have flat props.
+function migrateRemotesToFlatProps(data) {
+  let migrated = 0;
+  for (const rec of Object.values(data)) {
+    if (!rec || typeof rec !== "object" || !Array.isArray(rec.remotes))
+      continue;
+    for (const r of rec.remotes) {
+      if (!r?.name || !r?.url) continue;
+      if (r.name.startsWith("Rotten") && !rec.rottenUrl) {
+        rec.rottenUrl = r.url;
+        // e.g. "Rotten (97/94)" -> "97/94"
+        const m = r.name.match(/\(([^)]+)\)/);
+        if (m) rec.rottenRatings = m[1];
+        migrated++;
+      } else if (r.name.startsWith("IMDB") && !rec.imdbUrl) {
+        rec.imdbUrl = r.url;
+        const m = r.name.match(/\(([^)]+)\)/);
+        if (m) rec.imdbRatings = m[1];
+        migrated++;
+      } else if (r.name === "Wikipedia" && !rec.wikiUrl) {
+        rec.wikiUrl = r.url;
+        migrated++;
+      } else if (r.name === "Reddit" && !rec.redditUrl) {
+        rec.redditUrl = r.url;
+        migrated++;
+      }
+    }
+  }
+  if (migrated > 0)
+    console.log(
+      `[tvdb] migrated flat url props for ${migrated} remote entries`,
+    );
+  return data;
 }
 
 async function saveTvdbFiles(data) {
@@ -1269,15 +1305,16 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     : (show.inEmby ?? existing.inEmby ?? false);
 
   // Ensure Emby button is correct in fresh remotes based on inEmby status
-  const hasEmbyButton = tvdbData.remotes.some((r) => r.name === "Emby");
-  if (newInEmby && !hasEmbyButton) {
-    // Add Emby button at the start
-    const embyUrl = urls.embyPageUrl(showId || tvdbData.Id);
+  const embyBtnIdx = tvdbData.remotes.findIndex((r) => r.name === "Emby");
+  const embyUrl = urls.embyPageUrl(showId || tvdbData.Id);
+  if (embyBtnIdx >= 0) {
+    if (newInEmby) {
+      tvdbData.remotes[embyBtnIdx] = { name: "Emby", url: embyUrl };
+    } else {
+      tvdbData.remotes.splice(embyBtnIdx, 1);
+    }
+  } else if (newInEmby) {
     tvdbData.remotes.unshift({ name: "Emby", url: embyUrl });
-  } else if (!newInEmby && hasEmbyButton) {
-    // Remove Emby button
-    tvdbData.remotes = tvdbData.remotes.filter((r) => r.name !== "Emby");
-    console.log(`[getTvdbData] Removed Emby button from ${name} remotes`);
   }
 
   tvdbData.inEmby = newInEmby;
@@ -2222,20 +2259,16 @@ export const setTvdbFields = async (params) => {
       // Keep Emby button in sync with final inEmby/Id values (after field updates).
       if (!Array.isArray(tvdb.remotes)) tvdb.remotes = [];
       const embyIndex = tvdb.remotes.findIndex((r) => r?.name === "Emby");
-      const hasEmbyButton = embyIndex >= 0;
       const embyId = tvdb?.Id == null ? "" : String(tvdb.Id).trim();
-      if (tvdb.inEmby && embyId) {
-        const embyUrl = urls.embyPageUrl(embyId);
-        if (!hasEmbyButton) {
-          tvdb.remotes.unshift({ name: "Emby", url: embyUrl });
-          console.log(`[setTvdbFields] Added Emby button to ${name} remotes`);
-        } else if (tvdb.remotes[embyIndex]?.url !== embyUrl) {
-          tvdb.remotes[embyIndex].url = embyUrl;
-          console.log(`[setTvdbFields] Updated Emby button URL for ${name}`);
+      const freshEmbyUrl = embyId ? urls.embyPageUrl(embyId) : null;
+      if (tvdb.inEmby && freshEmbyUrl) {
+        if (embyIndex >= 0) {
+          tvdb.remotes[embyIndex] = { name: "Emby", url: freshEmbyUrl };
+        } else {
+          tvdb.remotes.unshift({ name: "Emby", url: freshEmbyUrl });
         }
-      } else if (hasEmbyButton) {
-        tvdb.remotes = tvdb.remotes.filter((r) => r?.name !== "Emby");
-        console.log(`[setTvdbFields] Removed Emby button from ${name} remotes`);
+      } else if (embyIndex >= 0) {
+        tvdb.remotes.splice(embyIndex, 1);
       }
 
       setImdbId(tvdb);

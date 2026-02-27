@@ -681,7 +681,6 @@ const getRemote = async (id, type, showName) => {
       break;
 
     case 7:
-      if (FAST_UPDATE) return null;
       name = "Reddit";
       {
         const escShow = encodeURIComponent(showName);
@@ -721,7 +720,6 @@ const getRemote = async (id, type, showName) => {
     // case 13: name = 'EIDR'; continue;
 
     case 18:
-      if (FAST_UPDATE) return null;
       name = "Wikipedia";
       {
         const escShow = encodeURIComponent(showName + " tv series");
@@ -1796,7 +1794,7 @@ const tryLocalGetTvdb = async () => {
   else setTimeout(tryLocalGetTvdb, 2 * 60 * 1000);
 };
 
-// calls tryLocalGetTvdb every 30s (FAST_UPDATE) or 6 mins, delay from end of one task to beginning of next
+// calls tryLocalGetTvdb every 5s (FAST_UPDATE) or 2 mins, delay from end of one task to beginning of next
 const updateTvdbLocal = async () => {
   if (UPDATE_DATA) {
     // Enqueue the stalest show if the queue is empty (so everything goes through the queue)
@@ -1823,7 +1821,7 @@ const updateTvdbLocal = async () => {
     }
     await tryLocalGetTvdb();
   }
-  const delay = FAST_UPDATE ? 15 * 1000 : 2 * 60 * 1000;
+  const delay = FAST_UPDATE ? 5 * 1000 : 2 * 60 * 1000;
   setTimeout(updateTvdbLocal, delay);
 };
 _kickProcessQueue = tryLocalGetTvdb;

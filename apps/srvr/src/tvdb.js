@@ -1667,6 +1667,7 @@ const tryLocalGetTvdb = async () => {
     return;
   }
 
+  log("");
   log(`processing [${minTvdb.Name}]`);
   // Notify clients which show is being processed
   if (enqueueCallback) enqueueCallback(minTvdb.Name);
@@ -1789,7 +1790,6 @@ const tryLocalGetTvdb = async () => {
     }
   }
 
-  console.log("");
   tryLocalGetTvdbBusy = false;
   // If more shows are queued, continue processing after a short delay; otherwise wait 2 mins
   if (showProcessQueue.length > 0) setTimeout(tryLocalGetTvdb, 1000);

@@ -45,21 +45,6 @@
         />
 
         <button
-          @click.stop="startLibraryRefresh"
-          :disabled="loading"
-          style="
-            cursor: pointer;
-            border-radius: 7px;
-            padding: 4px 10px;
-            border: 1px solid #bbb;
-            background-color: whitesmoke;
-            margin-right: 8px;
-          "
-        >
-          Library
-        </button>
-
-        <button
           @click.stop="highlightShow"
           :disabled="loading"
           style="
@@ -427,9 +412,7 @@ export default {
       // If rename works, we await fetchFiles().
       // If fetchFiles fails, it catches its own error and sets this.error.
     },
-    startLibraryRefresh() {
-      evtBus.emit("startLibraryRefresh");
-    },
+
     highlightShow() {
       const targetShow = this.show;
       if (!targetShow) return;

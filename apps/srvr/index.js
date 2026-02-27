@@ -2556,6 +2556,24 @@ app.post(
     console.log(
       `[refreshEmbyItem] Refreshing Emby item for ${showName} (${showId})`,
     );
+    // Read DateLastRefreshed before triggering so we can detect when it changes
+    let refreshedBefore = null;
+    try {
+      const beforeRes = await fetch(
+        `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${showId}?Fields=DateLastRefreshed&api_key=${EMBY_API_KEY}`,
+      );
+      if (beforeRes.ok) {
+        const beforeData = await beforeRes.json();
+        refreshedBefore = beforeData.DateLastRefreshed || null;
+      }
+    } catch (e) {
+      console.error(
+        `[refreshEmbyItem] pre-fetch error for ${showName}:`,
+        e.message,
+      );
+    }
+
+    const triggerTime = Date.now();
     try {
       const res = await fetch(
         `${EMBY_BASE_URL}/Items/${showId}/Refresh?Recursive=true&MetadataRefreshMode=Default&api_key=${EMBY_API_KEY}`,
@@ -2571,8 +2589,49 @@ app.post(
         e.message,
       );
     }
-    // Give Emby a moment to process before the client refreshes the map
-    await new Promise((r) => setTimeout(r, 4000));
+
+    // Poll DateLastRefreshed until it advances past triggerTime (max 30s, poll every 1s)
+    const POLL_INTERVAL_MS = 1000;
+    const POLL_TIMEOUT_MS = 30 * 1000;
+    const pollStart = Date.now();
+    let refreshDone = false;
+    console.log(
+      `[refreshEmbyItem] Polling for refresh completion of ${showName}`,
+    );
+    while (Date.now() - pollStart < POLL_TIMEOUT_MS) {
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+      try {
+        const pollRes = await fetch(
+          `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${showId}?Fields=DateLastRefreshed&api_key=${EMBY_API_KEY}`,
+        );
+        if (pollRes.ok) {
+          const pollData = await pollRes.json();
+          const refreshedAfter = pollData.DateLastRefreshed || null;
+          if (
+            refreshedAfter &&
+            refreshedAfter !== refreshedBefore &&
+            new Date(refreshedAfter).getTime() >= triggerTime
+          ) {
+            console.log(
+              `[refreshEmbyItem] Refresh complete for ${showName} (DateLastRefreshed=${refreshedAfter})`,
+            );
+            refreshDone = true;
+            break;
+          }
+        }
+      } catch (pollErr) {
+        console.error(
+          `[refreshEmbyItem] poll error for ${showName}:`,
+          pollErr.message,
+        );
+      }
+    }
+    if (!refreshDone) {
+      console.warn(
+        `[refreshEmbyItem] Poll timed out for ${showName}, proceeding anyway`,
+      );
+    }
+
     tvdb.enqueueShowProcess(showName);
     return { success: true };
   }),

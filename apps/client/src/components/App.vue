@@ -140,26 +140,6 @@
             >
           </template>
           <div style="flex: 1"></div>
-          <div
-            v-if="!simpleMode && libraryProgressText"
-            style="
-              display: flex;
-              align-items: center;
-              margin-left: 10px;
-              padding-right: 10px;
-            "
-          >
-            <div
-              style="
-                font-size: 12px;
-                color: #555;
-                white-space: nowrap;
-                padding-right: 8px;
-              "
-            >
-              {{ libraryProgressText }}
-            </div>
-          </div>
         </div>
         <div
           id="tabBody"

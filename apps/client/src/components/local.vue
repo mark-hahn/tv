@@ -44,20 +44,6 @@
         >
 
         <button
-          @click="startLibraryRefresh"
-          style="
-            cursor: pointer;
-            border-radius: 7px;
-            padding: 4px 10px;
-            border: 1px solid #bbb;
-            background-color: whitesmoke;
-            margin-right: 10px;
-          "
-        >
-          Library
-        </button>
-
-        <button
           @click="toShow"
           title="Select show matching selected folder"
           style="
@@ -359,18 +345,6 @@
             ↑
           </button>
           <button
-            @click="openLibrary"
-            style="
-              cursor: pointer;
-              border-radius: 7px;
-              padding: 4px 10px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-            "
-          >
-            Library
-          </button>
-          <button
             @click="applySubs"
             :disabled="applyInProgress || selectedSubKeys.size === 0"
             style="
@@ -617,9 +591,6 @@ export default {
       if (el) {
         el.scrollTop = el.scrollHeight;
       }
-    },
-    startLibraryRefresh() {
-      evtBus.emit("startLibraryRefresh");
     },
     async fetchFiles() {
       this.loading = true;
@@ -1632,9 +1603,6 @@ export default {
       } finally {
         this._trimBusy = false;
       }
-    },
-    openLibrary() {
-      evtBus.emit("startLibraryRefresh");
     },
     encodeFileIdBase32(fileId) {
       if (fileId == null) return "";

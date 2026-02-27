@@ -56,19 +56,6 @@
           "
         >
           <button
-            @click.stop="startLibraryRefresh"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              border-radius: 7px;
-              padding: 4px 10px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-            "
-          >
-            Library
-          </button>
-          <button
             @click.stop="showFirstDownloading"
             style="
               font-size: 13px;
@@ -545,10 +532,6 @@ export default {
         },
         Math.max(0, Number(delayMs) || 0),
       );
-    },
-
-    startLibraryRefresh() {
-      evtBus.emit("startLibraryRefresh");
     },
 
     scrollToBottomAction() {

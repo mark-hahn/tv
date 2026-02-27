@@ -179,7 +179,7 @@ async function loadLocalCfClearance(provider) {
   try {
     const p = String(provider || "").trim();
     if (!p) return "";
-    const inPath = path.join(getApiDataDir(), "cf-clearance.local.json");
+    const inPath = path.join(getApiDataDir(), "cf_clearance-cookies.json");
     const raw = await fs.promises.readFile(inPath, "utf8");
     const j = JSON.parse(raw);
     const v = j && typeof j === "object" && !Array.isArray(j) ? j[p] : "";

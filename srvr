@@ -201,7 +201,6 @@ remote_deploy_one_no_restart() {
 
 case "${1:-all}" in
   api|down|srvr|client|share|asr)
-    sync_monorepo_root
     remote_deploy_one_no_restart "$1"
     remote_pm2_restart_all_silent
     ;;

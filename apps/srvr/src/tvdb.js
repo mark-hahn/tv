@@ -14,7 +14,7 @@ const TVDB_PATH = path.join(SRVR_DATA_DIR, "tvdb.json");
 const TVDB_BACKUP_PATH = path.join(SRVR_DATA_DIR, "tvdb.json.bak");
 const TVDB_TEMPLATE_PATH = path.join(SRVR_DATA_DIR, "tvdbTemplate.json");
 
-const FAST_UPDATE = true;
+const FAST_UPDATE = false;
 const moviedb = new MovieDb("327192a334da700f65b882c7a69cb927");
 
 // TVDB API Credentials
@@ -459,7 +459,13 @@ if (phase5MigrationNeeded) {
 }
 
 ///////////// get theTvdbToken //////////////
+// this is a duplicate of the client
+// both access tvdb.com independently
+
 // Use shared getToken() instead of maintaining separate theTvdbToken
+// const getTheTvdbToken = async () => {
+//   await getToken();
+// };
 
 ///////////////////// GET REMOTES ///////////////////////
 
@@ -1684,8 +1690,8 @@ const tryLocalGetTvdb = async () => {
   if (showProcessQueue.length > 0) setTimeout(tryLocalGetTvdb, 0);
 };
 
-// calls tryLocalGetTvdb every 30s (FAST_UPDATE) or 6 mins, enqueuing the stalest show each tick
-const updateTvdbLocal = () => {
+// calls tryLocalGetTvdb every 30s (FAST_UPDATE) or 6 mins, delay from end of one task to beginning of next
+const updateTvdbLocal = async () => {
   if (UPDATE_DATA) {
     // Enqueue the stalest show if the queue is empty (so everything goes through the queue)
     if (showProcessQueue.length === 0) {
@@ -1709,9 +1715,9 @@ const updateTvdbLocal = () => {
         log(`timer: enqueued stalest [${stalest.Name}]`);
       }
     }
-    tryLocalGetTvdb();
+    await tryLocalGetTvdb();
   }
-  const delay = FAST_UPDATE ? 30 * 1000 : 6 * 60 * 1000;
+  const delay = FAST_UPDATE ? 15 * 1000 : 2 * 60 * 1000;
   setTimeout(updateTvdbLocal, delay);
 };
 _kickProcessQueue = tryLocalGetTvdb;

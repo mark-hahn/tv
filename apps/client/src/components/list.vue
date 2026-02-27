@@ -427,6 +427,34 @@ export default {
         } catch (err) {
           console.error("addReject error:", err);
           show.Reject = false;
+          return;
+        }
+        if (show.inEmby !== false) {
+          try {
+            // Delete files only — do not call deleteShowFromSrvr which would
+            // also call delNoEmby and remove the tvdb record
+            const showFolder = show.Path.split("/").pop();
+            this.showEmbyRefreshing = true;
+            this.logModalMessage("embyRefreshingModal", "Deleting from Emby.");
+            await srvr.deletePath(showFolder);
+            await this.refreshEmbyLibraryWithDialog();
+            await emby.deleteShowFromEmby(show);
+          } catch (err) {
+            console.error("deleteShowFromEmby after reject error:", err);
+            this.showEmbyRefreshing = false;
+          }
+          const tvdbData = allTvdb[show.Name];
+          if (tvdbData) {
+            const leftEmby = util.getPstDate();
+            tvdbData.inEmby = false;
+            tvdbData.leftEmby = leftEmby;
+            allTvdb[show.Name] = await srvr.setTvdbFields({
+              name: show.Name,
+              inEmby: false,
+              leftEmby,
+            });
+          }
+          show.inEmby = false;
         }
         return;
       }
@@ -842,10 +870,6 @@ export default {
             }
           }
 
-          // Always keep ban enabled.
-          const banCond = this.conds.find((c) => c?.name === "ban");
-          if (banCond) banCond.filter = -1;
-
           await this.select();
           this.sortShows();
 
@@ -864,9 +888,6 @@ export default {
           if (!c?.name) return;
           condFilters[c.name] = c.filter;
         });
-
-        // Always keep ban enabled for shared filters.
-        condFilters.ban = -1;
 
         const payload = {
           fltrChoice: this.fltrChoice,
@@ -960,10 +981,6 @@ export default {
           console.error("Custom sharedFilters parse/apply failed:", e);
         }
 
-        // Always keep ban enabled.
-        const banCond = this.conds.find((c) => c?.name === "ban");
-        if (banCond) banCond.filter = -1;
-
         // Preserve current sort unless an order button is active.
         const orderToSortMap = {
           "Added Order": "Added",
@@ -1015,10 +1032,6 @@ export default {
       // linger (but do NOT delete localStorage.sharedFilters; Custom can be used again).
       this.filterStr = "";
       this.fltrChoice = "All";
-
-      // Always keep ban enabled.
-      const banCond = this.conds.find((c) => c?.name === "ban");
-      if (banCond) banCond.filter = -1;
 
       // activeButtons is an object with all button states
       // e.g., { 'Drama': true, 'Mark': true, 'Comedy': false, ... }
@@ -2347,6 +2360,18 @@ export default {
       }
 
       const filteredShows = [];
+      const rejectShows = allShows.filter((s) => s.Reject);
+      const banCond = this.conds.find((c) => c.name === "ban");
+      console.log(
+        "[refilter] allShows:",
+        allShows.length,
+        "Reject=true:",
+        rejectShows.length,
+        "ban.filter:",
+        banCond?.filter,
+        "conds:",
+        this.conds.map((c) => `${c.name}:${c.filter}`).join(" "),
+      );
       fltrLoop: for (const show of allShows) {
         if (this.fltrChoice === "Finished") {
           const tvdbData = localAllTvdb?.[show.Name];
@@ -2363,10 +2388,29 @@ export default {
         }
         for (let cond of this.conds) {
           if (cond.filter === 0) continue;
-          if ((cond.filter === +1) != !!cond.cond(show)) continue fltrLoop;
+          if ((cond.filter === +1) != !!cond.cond(show)) {
+            if (show.Reject)
+              console.log(
+                "[refilter] REJECT show blocked:",
+                show.Name,
+                "by cond:",
+                cond.name,
+                "filter:",
+                cond.filter,
+                "condResult:",
+                !!cond.cond(show),
+              );
+            continue fltrLoop;
+          }
         }
         filteredShows.push(show);
       }
+      console.log(
+        "[refilter] filteredShows:",
+        filteredShows.length,
+        "Reject=true in result:",
+        filteredShows.filter((s) => s.Reject).length,
+      );
 
       this.shows = filteredShows;
       let selectFirstAfterSort = false;
@@ -2561,7 +2605,6 @@ export default {
         this.sortChoice = "Alpha";
       }
 
-      // Initialize ban condition to -1 to filter out rejected shows BEFORE showAll
       const banCond = this.conds.find((c) => c.name === "ban");
       if (banCond) {
         banCond.filter = -1;

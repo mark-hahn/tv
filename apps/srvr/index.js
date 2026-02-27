@@ -1307,15 +1307,25 @@ const trySaveConfigYml = async (id, result, resolve, reject) => {
   await util.writeFile(configWritePath("config2-rejects.json"), rejects);
   await util.writeFile(configWritePath("config4-pickups.json"), pickups);
 
-  // Sync tvdb.pickup from pickups array (config is the authority)
+  // Sync tvdb.pickup and tvdb.reject from config arrays (config is the authority)
   const allTvdbForSync = tvdb.getAllTvdbSync();
   const normalizedPickupsSet = new Set(pickups.map((p) => p.toLowerCase()));
+  const normalizedRejectsSet = new Set(rejects.map((r) => r.toLowerCase()));
   for (const [recordName, record] of Object.entries(allTvdbForSync)) {
-    const isPickup = normalizedPickupsSet.has(recordName.toLowerCase());
+    const norm = recordName.toLowerCase();
+    const isPickup = normalizedPickupsSet.has(norm);
     if (isPickup) {
       record.pickup = true;
     } else if (record.pickup) {
       record.pickup = false;
+    }
+    const isReject = normalizedRejectsSet.has(norm);
+    if (isReject) {
+      record.reject = true;
+      record.Reject = true;
+    } else if (record.reject || record.Reject) {
+      record.reject = false;
+      record.Reject = false;
     }
   }
   await tvdb.saveTvdbSync();
@@ -1357,43 +1367,44 @@ const saveConfigYml = async (idIn, resultIn, resolveIn, rejectIn) => {
   }
 };
 
-// Synchronize pickups from config4-pickups.json to tvdb.json on startup
-const startupPickupsSync = () => {
+// Synchronize pickups and rejects from config files to tvdb.json on startup
+const startupConfigSync = () => {
   const allTvdb = tvdb.getAllTvdbSync();
   if (!allTvdb || typeof allTvdb !== "object" || Array.isArray(allTvdb)) {
     throw new Error(
-      "[tv-srvr] FATAL: startupPickupsSync requires object tvdb cache",
+      "[tv-srvr] FATAL: startupConfigSync requires object tvdb cache",
     );
   }
   let changedTvdb = false;
 
-  // Create normalized pickups set for fast lookup
   const normalizedPickups = new Set(pickups.map((p) => p.toLowerCase()));
+  const normalizedRejects = new Set(rejects.map((r) => r.toLowerCase()));
 
-  // Set pickup=true on tvdb records that match the pickups list
-  for (const pickupName of pickups) {
-    const normalizedName = pickupName.toLowerCase();
-    for (const [recordName, record] of Object.entries(allTvdb)) {
-      if (recordName.toLowerCase() === normalizedName) {
-        if (!record.pickup) {
-          record.pickup = true;
-          changedTvdb = true;
-        }
-        break;
-      }
-    }
-  }
-
-  // Set pickup=false on tvdb records that don't match pickups list
   for (const [recordName, record] of Object.entries(allTvdb)) {
-    if (record.pickup && !normalizedPickups.has(recordName.toLowerCase())) {
+    const norm = recordName.toLowerCase();
+    const shouldPickup = normalizedPickups.has(norm);
+    if (shouldPickup && !record.pickup) {
+      record.pickup = true;
+      changedTvdb = true;
+    }
+    if (!shouldPickup && record.pickup) {
       record.pickup = false;
+      changedTvdb = true;
+    }
+    const shouldReject = normalizedRejects.has(norm);
+    if (shouldReject && (!record.reject || !record.Reject)) {
+      record.reject = true;
+      record.Reject = true;
+      changedTvdb = true;
+    }
+    if (!shouldReject && (record.reject || record.Reject)) {
+      record.reject = false;
+      record.Reject = false;
       changedTvdb = true;
     }
   }
 
   if (changedTvdb) {
-    // console.log("[sync] Saving tvdb with updated pickups...");
     tvdb.saveTvdbSync().catch((err) => {
       console.error("[sync] failed to save tvdb:", err);
     });
@@ -1401,46 +1412,17 @@ const startupPickupsSync = () => {
 };
 
 // Run sync immediately
-startupPickupsSync();
+startupConfigSync();
 
 const getRejects = async (_param) => {
-  // Phase 5: Read from tvdb instead of separate rejects array
-  const allTvdb = tvdb.getAllTvdbSync();
-  const rejectsFromTvdb = [];
-
-  for (const [name, record] of Object.entries(allTvdb)) {
-    if (record.reject) {
-      rejectsFromTvdb.push(name);
-    }
-  }
-
-  return rejectsFromTvdb;
+  return rejects;
 };
 
 const addReject = async (params) => {
   const { name } = params;
   console.log("addReject", name);
 
-  // Phase 5: Update tvdb.reject field
-  const allTvdb = tvdb.getAllTvdbSync();
-  const normalizedName = name.toLowerCase();
-  let tvdbRecord = null;
-
-  // Find matching record (case-insensitive)
-  for (const [recordName, record] of Object.entries(allTvdb)) {
-    if (recordName.toLowerCase() === normalizedName) {
-      tvdbRecord = record;
-      break;
-    }
-  }
-
-  if (tvdbRecord) {
-    tvdbRecord.reject = true;
-    // Save deferred to saveConfigYml below
-  }
-
-  // Backward compat: update old rejects array
-  // 1. Ensure it exists in rejects list
+  // Update rejects array (config is the authority; tvdb synced in trySaveConfigYml)
   const existingIdx = rejects.findIndex(
     (r) => r.toLowerCase() === name.toLowerCase(),
   );
@@ -1451,7 +1433,6 @@ const addReject = async (params) => {
     );
     rejects.splice(existingIdx, 1);
   }
-
   console.log("-- adding reject:", name);
   rejects.push(name);
 
@@ -1470,21 +1451,7 @@ const delReject = async (params) => {
   console.log("delReject", name);
   let deletedOne = false;
 
-  // Phase 5: Update tvdb.reject field
-  const allTvdb = tvdb.getAllTvdbSync();
-  const normalizedName = name.toLowerCase();
-
-  for (const [recordName, record] of Object.entries(allTvdb)) {
-    if (recordName.toLowerCase() === normalizedName && record.reject) {
-      record.reject = false;
-      // Save deferred to saveConfigYml below
-      deletedOne = true;
-      break;
-    }
-  }
-
-  // Backward compat: remove from old rejects array
-  // 1. Remove from rejects list
+  // Update rejects array (config is the authority; tvdb synced in trySaveConfigYml)
   for (const [idx, rejectNameStr] of rejects.entries()) {
     if (rejectNameStr.toLowerCase() === name.toLowerCase()) {
       console.log("-- deleting reject:", rejectNameStr);

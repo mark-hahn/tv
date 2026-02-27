@@ -111,6 +111,16 @@ function syncRejectsAndPickups(allTvdb, rejectsIn, pickups) {
   // Update module-level rejects for isReject()
   rejects = (rejectsIn || []).map(normShowName).filter(Boolean);
   rejectsSet = new Set(rejects);
+  console.log(
+    "[syncRejectsAndPickups] rejectsIn:",
+    (rejectsIn || []).length,
+    "pickups:",
+    (pickups || []).length,
+    "shows with reject=true:",
+    Object.values(allTvdb).filter((t) => t.reject).length,
+    "shows with Reject=true:",
+    Object.values(allTvdb).filter((t) => t.Reject).length,
+  );
 }
 
 // Phase 2: Helper function to set wait strings for shows
@@ -705,6 +715,9 @@ export async function loadAllShows() {
 
   // 6.5. Sync collection flags from Emby
   await syncCollections(allTvdb);
+
+  // 6.6. Sync reject/pickup flags from config arrays (authoritative source)
+  syncRejectsAndPickups(allTvdb, rejectsIn, pickups);
 
   // 7. Ensure computed properties are set (since nested objects are now flattened)
   for (const tvdb of Object.values(allTvdb)) {

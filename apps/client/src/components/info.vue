@@ -1258,56 +1258,12 @@ export default {
     },
 
     async refreshTvdb() {
-      const startTime = Date.now();
       const showName = this.show.Name;
       console.log(`Refresh button clicked for ${showName}`);
-      this.refreshing = true;
-      try {
-        await srvr.setTvdbFields({
-          name: showName,
-          saved: 0,
-        });
-
-        // Note: setTvdbFields with saved:0 already triggered a full server-side refresh
-        // that scraped Rotten Tomatoes and fetched all remotes (IMDB, Wikipedia, etc.)
-
-        // Reload the tvdb data with updated inEmby flag (in case show just appeared in Emby)
-        const updatedTvdb = await tvdb.getAllTvdb(0);
-        const updatedShowData = updatedTvdb[showName];
-
-        if (updatedShowData) {
-          // Merge updated show data into current show object
-          Object.assign(this.show, updatedShowData);
-          console.log(
-            `Refreshed show data for ${showName}, inEmby=${this.show.inEmby}`,
-          );
-        }
-
-        // Re-init the current view with updated show data
-        await this.setupSeriesForRefresh(this.show);
-
-        // Trigger map refresh with updated show data if map is currently showing this show
-        evtBus.emit("refreshMapIfShowing", {
-          showName,
-          updatedShow: this.show,
-        });
-
-        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-        console.log(`Refresh complete for ${showName} (${elapsed}s)`);
-
-        // Trigger gap check for the refreshed show
-        if (this.show?.Id) {
-          await srvr
-            .triggerShowGapCheck(this.show.Id, showName)
-            .catch((err) => console.error("triggerShowGapCheck failed:", err));
-        }
-
-        // Trigger list refresh to reload all shows (like library refresh does)
-        evtBus.emit("library-refresh-complete");
-      } catch (e) {
-        console.error("refreshTvdb error", e);
-        alert("Error requesting refresh: " + e);
-        this.refreshing = false;
+      if (this.show?.Id) {
+        srvr
+          .triggerShowGapCheck(this.show.Id, showName)
+          .catch((err) => console.error("triggerShowGapCheck failed:", err));
       }
     },
 

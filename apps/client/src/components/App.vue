@@ -284,6 +284,7 @@
         :simpleMode="simpleMode"
         :sizing="activeSizing"
         :hideButtonsPane="showSideButtons"
+        :libraryProgressText="libraryProgressText"
         @show-map="handleShowMap"
         @hide-map="handleHideMap"
         @show-actors="handleShowActors"

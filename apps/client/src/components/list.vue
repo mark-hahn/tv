@@ -123,10 +123,11 @@
               :simpleMode="simpleMode"
               :isWideLandscape="isWideLandscape"
               :statusMsg="updatingMsg"
+              :libraryProgressText="libraryProgressText"
               @watch-click="watchClick"
               @filter-input="select"
               @send-filters="sendSharedFilters"
-              @debug-click="debugClick"
+              @library-click="libraryClick"
               @all-click="allClick"
             ></HdrTop>
             <HdrBot
@@ -189,10 +190,11 @@
             :simpleMode="simpleMode"
             :isWideLandscape="isWideLandscape"
             :statusMsg="updatingMsg"
+            :libraryProgressText="libraryProgressText"
             @watch-click="watchClick"
             @filter-input="select"
             @send-filters="sendSharedFilters"
-            @debug-click="debugClick"
+            @library-click="libraryClick"
             @all-click="allClick"
           ></HdrTop>
           <HdrBot
@@ -333,6 +335,10 @@ export default {
     sizing: {
       type: Object,
       default: () => ({}),
+    },
+    libraryProgressText: {
+      type: String,
+      default: "",
     },
   },
 
@@ -852,6 +858,10 @@ export default {
       } catch {
         this.isWideLandscape = false;
       }
+    },
+
+    libraryClick() {
+      evtBus.emit("startLibraryRefresh");
     },
 
     async sendSharedFilters(e) {

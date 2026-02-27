@@ -14,13 +14,13 @@
         v-if="simpleMode"
         @click="$emit('all-click')"
         style="
-          height: 29px;
+          height: 24px;
           padding: 0 8px;
           margin: 6px 5px 4px 10px;
-          font-size: 15px;
+          font-size: 13px;
           font-weight: bold;
           border: 1px solid #999;
-          border-radius: 5px;
+          border-radius: 7px;
           background-color: #eee;
           cursor: pointer;
         "
@@ -63,14 +63,16 @@
     <button
       @click="$emit('watch-click')"
       style="
-        height: 29px;
+        height: 24px;
         background-color: white;
-        fontsize: 15px;
-        margin: 6px 5px 4px 10px;
+        font-size: 13px;
+        cursor: pointer;
+        margin: 8px 5px 0 10px;
         width: 75px;
         flex-shrink: 0;
         white-space: nowrap;
         overflow: hidden;
+        border-radius: 7px;
       "
     >
       {{ watchingName }}
@@ -97,27 +99,41 @@
         margin-right: 15px;
       "
     >
+      <span
+        v-if="libraryProgressText && !simpleMode"
+        style="
+          font-size: 11px;
+          color: #555;
+          white-space: nowrap;
+          margin-right: 6px;
+        "
+      >
+        {{ libraryProgressText }}
+      </span>
       <button
         v-if="!simpleMode"
-        @click="handleDebugClick"
-        :style="{
-          height: '29px',
-          backgroundColor: debugFlash ? '#4CAF50' : 'white',
-          fontsize: '15px',
-          margin: '6px 0 4px 10px',
-          transition: 'background-color 0.15s ease',
-        }"
+        @click="$emit('library-click')"
+        style="
+          height: 24px;
+          background-color: white;
+          font-size: 13px;
+          cursor: pointer;
+          border-radius: 7px;
+          margin: 0 0 0 10px;
+        "
       >
-        Debug
+        Library
       </button>
       <button
         v-if="!simpleMode"
         @click="$emit('send-filters', $event)"
         style="
-          height: 29px;
+          height: 24px;
           background-color: white;
-          fontsize: 15px;
-          margin: 6px 0 4px 10px;
+          font-size: 13px;
+          cursor: pointer;
+          border-radius: 7px;
+          margin: 0 0 0 10px;
         "
       >
         Send
@@ -159,6 +175,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    libraryProgressText: {
+      type: String,
+      default: "",
+    },
   },
 
   emits: [
@@ -166,24 +186,11 @@ export default {
     "watch-click",
     "filter-input",
     "send-filters",
-    "debug-click",
+    "library-click",
     "all-click",
   ],
 
-  data() {
-    return {
-      debugFlash: false,
-    };
-  },
-
   methods: {
-    handleDebugClick() {
-      this.debugFlash = true;
-      this.$emit("debug-click");
-      setTimeout(() => {
-        this.debugFlash = false;
-      }, 300);
-    },
     handleFilterInput(event) {
       this.$emit("update:filterStr", event.target.value);
       this.$emit("filter-input");

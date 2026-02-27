@@ -84,6 +84,14 @@ function ensureFile(filePath, defaultStr) {
 }
 
 function setImdbId(tvdb) {
+  // Prefer flat prop (set when remotes are fetched)
+  if (tvdb?.imdbUrl) {
+    const match = /tt\d+/.exec(tvdb.imdbUrl);
+    if (match) {
+      tvdb.imdbId = match[0];
+      return;
+    }
+  }
   if (!tvdb?.remotes) return;
   for (const remote of tvdb.remotes) {
     if (remote.url && remote.url.includes("imdb.com/title/")) {
@@ -129,8 +137,18 @@ function loadTvdbAtStartup() {
 }
 
 async function saveTvdbFiles(data) {
-  await util.writeFile(TVDB_PATH, data);
-  await util.writeFile(TVDB_BACKUP_PATH, data);
+  // Strip computed runtime prop 'remotes' — rebuilt from flat url props on each refresh
+  const toSave = Object.fromEntries(
+    Object.entries(data).map(([k, v]) => {
+      if (v && typeof v === "object" && !Array.isArray(v) && "remotes" in v) {
+        const { remotes: _, ...rest } = v;
+        return [k, rest];
+      }
+      return [k, v];
+    }),
+  );
+  await util.writeFile(TVDB_PATH, toSave);
+  await util.writeFile(TVDB_BACKUP_PATH, toSave);
 }
 
 // Helper functions for watchedEpis format
@@ -599,34 +617,6 @@ const getUrlAndRatings = async (type, url, name) => {
       return { ratings: rating, video: video };
     }
 
-    case 7: {
-      // reddit
-      // fs.writeFileSync(`samples/reddit-${name}.json`,
-      //                   JSON.stringify(json, null, 2));
-      const allItems = Object.values(json.items || {});
-      const redditItems = allItems.filter(
-        (item) => item.displayLink == "www.reddit.com",
-      );
-      if (!redditItems || redditItems.length === 0) return null;
-      // for(const item of redditItems) {
-      //   log("redditItem:", name, item.link);
-      // }
-      return { url: redditItems[0].link };
-    }
-
-    case 18: {
-      // wikipedia
-      // fs.writeFileSync(`samples/google-${name}.json`,
-      //                   JSON.stringify(json, null, 2));
-      const items = Object.values(json.items || {});
-      const wikiItem = items.find(
-        (item) => item.displayLink == "en.wikipedia.org",
-      );
-      if (!wikiItem) return null;
-      // log("wikiItem:", name, wikiItem.link);
-      return { url: wikiItem.link };
-    }
-
     default:
       return "getUrlAndRatings invalid type: " + type;
   }
@@ -657,15 +647,32 @@ const getRemote = async (id, type, showName) => {
     case 7:
       if (FAST_UPDATE) return null;
       name = "Reddit";
-      escShow = encodeURIComponent(showName);
-      urlRatings = await getUrlAndRatings(
-        7,
-        `https://www.googleapis.com/customsearch/v1?` +
-          `key=AIzaSyDSdr8Z26vDP4V5J_sEyXCH4s8O56FyfDc&` +
-          `cx=b59f40d0c17b54ff1&q=${escShow}%20tv%20show`,
-        showName,
-      );
-      url = urlRatings?.url;
+      {
+        const escShow = encodeURIComponent(showName);
+        const redditApiUrl = `https://www.reddit.com/subreddits/search.json?q=${escShow}&limit=10`;
+        try {
+          const resp = await fetch(redditApiUrl, {
+            headers: { "User-Agent": "tv-app/1.0" },
+            signal: AbortSignal.timeout(8000),
+          });
+          if (!resp.ok) {
+            log("err", `reddit search ${resp.status} for ${showName}`);
+            break;
+          }
+          const json = await resp.json();
+          const subs = json?.data?.children?.map((c) => c.data) ?? [];
+          const clean = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+          const showClean = clean(showName);
+          const match =
+            subs.find((s) => clean(s.display_name) === showClean) ??
+            subs.find((s) => clean(s.title) === showClean) ??
+            subs[0];
+          if (match)
+            url = `https://www.reddit.com${match.url.replace(/\/$/, "")}`;
+        } catch (e) {
+          log("err", `reddit search error for ${showName}: ${e.message}`);
+        }
+      }
       break;
 
     // case 8:   url = id; name = 'Instagram'; break;
@@ -680,15 +687,30 @@ const getRemote = async (id, type, showName) => {
     case 18:
       if (FAST_UPDATE) return null;
       name = "Wikipedia";
-      escShow = encodeURIComponent(showName);
-      urlRatings = await getUrlAndRatings(
-        18,
-        `https://www.googleapis.com/customsearch/v1?` +
-          `key=AIzaSyDSdr8Z26vDP4V5J_sEyXCH4s8O56FyfDc&` +
-          `cx=b59f40d0c17b54ff1&q=${escShow}%20tv%20show`,
-        showName,
-      );
-      url = urlRatings?.url;
+      {
+        const escShow = encodeURIComponent(showName + " tv series");
+        const wikiApiUrl =
+          `https://en.wikipedia.org/w/api.php?action=query&list=search` +
+          `&srsearch=${escShow}&format=json&srlimit=5&origin=*`;
+        try {
+          const resp = await fetch(wikiApiUrl, {
+            headers: { "User-Agent": "tv-app/1.0" },
+            signal: AbortSignal.timeout(8000),
+          });
+          if (!resp.ok) {
+            log("err", `wikipedia search ${resp.status} for ${showName}`);
+            break;
+          }
+          const json = await resp.json();
+          const results = json?.query?.search ?? [];
+          if (results.length > 0) {
+            const title = results[0].title;
+            url = `https://en.wikipedia.org/wiki/${encodeURIComponent(title).replace(/%20/g, "_")}`;
+          }
+        } catch (e) {
+          log("err", `wikipedia search error for ${showName}: ${e.message}`);
+        }
+      }
       break;
 
     // case 19: url = `https://www.tvmaze.com/shows/${id}`; break;
@@ -721,6 +743,7 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   const name = show.Name;
   const showId = show.Id;
   const remotes = [];
+  const flatUrls = {}; // flat url props to persist alongside the computed remotes array
 
   if (show.inEmby)
     remotes.push({ name: "Emby", url: urls.embyPageUrl(showId) });
@@ -732,7 +755,14 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
     // Try to use cached Rotten Tomatoes data
     let rottenFound = false;
     const cachedShow = allTvdb ? allTvdb[name] : null;
-    if (cachedShow && cachedShow.remotes) {
+    if (cachedShow?.rottenUrl) {
+      const rName = cachedShow.rottenRatings
+        ? `Rotten (${cachedShow.rottenRatings})`
+        : "Rotten";
+      remotes.push({ name: rName, url: cachedShow.rottenUrl });
+      rottenFound = true;
+    } else if (cachedShow?.remotes) {
+      // backward-compat: records not yet migrated to flat props
       const cachedRotten = cachedShow.remotes.find(
         (r) => r.name && r.name.startsWith("Rotten"),
       );
@@ -759,6 +789,8 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
       if (rottenRemote.ratings)
         rottenRemote.name += " (" + rottenRemote.ratings + ")";
       remotes.push(rottenRemote);
+      flatUrls.rottenUrl = rottenRemote.url || null;
+      flatUrls.rottenRatings = rottenRemote.ratings || null;
     }
   }
 
@@ -767,11 +799,29 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   const url = `https://www.google.com/search` + `?q=${encoded}%20tv%20show`;
   remotes.push({ name: "Google", url });
 
-  const wikiRemote = await getRemote(null, 18, name);
-  if (wikiRemote) remotes.push({ name: "Wikipedia", url: wikiRemote.url });
+  // Wikipedia: use cached flat prop; only call Google API if not yet set
+  const cachedWikiUrl = allTvdb[name]?.wikiUrl;
+  if (cachedWikiUrl) {
+    remotes.push({ name: "Wikipedia", url: cachedWikiUrl });
+  } else {
+    const wikiRemote = await getRemote(null, 18, name);
+    if (wikiRemote?.url) {
+      remotes.push({ name: "Wikipedia", url: wikiRemote.url });
+      flatUrls.wikiUrl = wikiRemote.url;
+    }
+  }
 
-  const redditRemote = await getRemote(null, 7, name);
-  if (redditRemote) remotes.push({ name: "Reddit", url: redditRemote.url });
+  // Reddit: use cached flat prop; only call Google API if not yet set
+  const cachedRedditUrl = allTvdb[name]?.redditUrl;
+  if (cachedRedditUrl) {
+    remotes.push({ name: "Reddit", url: cachedRedditUrl });
+  } else {
+    const redditRemote = await getRemote(null, 7, name);
+    if (redditRemote?.url) {
+      remotes.push({ name: "Reddit", url: redditRemote.url });
+      flatUrls.redditUrl = redditRemote.url;
+    }
+  }
 
   const remotesByName = {};
   for (const tvdbRemote of tvdbRemotes) {
@@ -801,6 +851,9 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
     imdbRemote.name += imdbRemote.ratings
       ? " (" + imdbRemote.ratings + ")"
       : "";
+    flatUrls.imdbUrl = imdbRemote.url || null;
+    flatUrls.imdbRatings = imdbRemote.ratings || null;
+    flatUrls.imdbVideo = imdbRemote.video || null;
     remotes.push(imdbRemote);
   }
 
@@ -810,7 +863,7 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
 
   // console.log("getRemotes result:", JSON.stringify(remotes, null, 2));
 
-  return remotes;
+  return { remotes, urls: flatUrls };
 };
 
 function getTvdbImageUrl(extResObj) {
@@ -1058,7 +1111,11 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   // remoteIds come from tvdb
   // Always fetch remotes (to get IMDB video, Wikipedia, Reddit, etc.)
   // The fast parameter controls whether Rotten Tomatoes is scraped with Playwright
-  const remotes = await getRemotes(show, remoteIds, fast);
+  const { remotes, urls: fetchedUrls } = await getRemotes(
+    show,
+    remoteIds,
+    fast,
+  );
   const saved = Date.now();
   const trailersRaw = trailersIn || allTvdb[name]?.trailers;
 
@@ -1142,10 +1199,18 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     ),
     status: preserve(status, existing.status, tmdbData?.status),
     remote_ids: remoteIds || [], // Store raw remoteIds from TVDB API
-    remotes, // Don't preserve arrays - they accumulate
+    remotes, // computed display array - not persisted to disk; rebuilt from flat url props
     characters, // Don't preserve arrays - they accumulate
     added,
     saved,
+    // Remote URL flat props — persisted so Google/scrape calls are skipped on subsequent refreshes
+    wikiUrl: fetchedUrls.wikiUrl ?? existing.wikiUrl ?? null,
+    redditUrl: fetchedUrls.redditUrl ?? existing.redditUrl ?? null,
+    imdbUrl: fetchedUrls.imdbUrl ?? existing.imdbUrl ?? null,
+    imdbRatings: fetchedUrls.imdbRatings ?? existing.imdbRatings ?? null,
+    imdbVideo: fetchedUrls.imdbVideo ?? existing.imdbVideo ?? null,
+    rottenUrl: fetchedUrls.rottenUrl ?? existing.rottenUrl ?? null,
+    rottenRatings: fetchedUrls.rottenRatings ?? existing.rottenRatings ?? null,
   };
 
   // Add optional TMDB-only fields if available
@@ -1662,6 +1727,8 @@ const tryLocalGetTvdb = async () => {
           ...existingRemotes.filter((r) => !r.name?.startsWith("Rotten")),
           rottenRemote,
         ];
+        rec.rottenUrl = rottenRemote.url || null;
+        rec.rottenRatings = rottenRemote.ratings || null;
         await saveTvdbFiles(allTvdb);
         log(
           `tvdb push3 [${processRecord.Name}]: Rotten ${rottenRemote.ratings || "no ratings"}`,
@@ -1744,11 +1811,16 @@ export const getRemotesCmd = async (params) => {
   }
 
   try {
-    const remotes = await getRemotes(show, tvdbRemotes, fast);
+    const { remotes, urls: fetchedUrls } = await getRemotes(
+      show,
+      tvdbRemotes,
+      fast,
+    );
 
-    // When fetching fresh data (fast=false), save remotes to tvdb.json
+    // When fetching fresh data (fast=false), save remotes and flat url props
     if (!fast && show.Name && allTvdb && allTvdb[show.Name]) {
       allTvdb[show.Name].remotes = remotes;
+      Object.assign(allTvdb[show.Name], fetchedUrls);
       // Save to disk asynchronously without blocking response
       saveTvdbSync().catch((err) => {
         log("err", "getRemotesCmd: saveTvdbSync failed:", err.message);

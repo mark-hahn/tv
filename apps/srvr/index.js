@@ -1307,7 +1307,17 @@ const trySaveConfigYml = async (id, result, resolve, reject) => {
   await util.writeFile(configWritePath("config2-rejects.json"), rejects);
   await util.writeFile(configWritePath("config4-pickups.json"), pickups);
 
-  // Phase 5: Also save tvdb when config is saved (batches reject/pickup updates)
+  // Sync tvdb.pickup from pickups array (config is the authority)
+  const allTvdbForSync = tvdb.getAllTvdbSync();
+  const normalizedPickupsSet = new Set(pickups.map((p) => p.toLowerCase()));
+  for (const [recordName, record] of Object.entries(allTvdbForSync)) {
+    const isPickup = normalizedPickupsSet.has(recordName.toLowerCase());
+    if (isPickup) {
+      record.pickup = true;
+    } else if (record.pickup) {
+      record.pickup = false;
+    }
+  }
   await tvdb.saveTvdbSync();
 
   let errResult = null;
@@ -1500,17 +1510,7 @@ const delReject = async (params) => {
 };
 
 const getPickups = async (_param) => {
-  // Phase 5: Read from tvdb instead of separate pickups array
-  const allTvdb = tvdb.getAllTvdbSync();
-  const pickupsFromTvdb = [];
-
-  for (const [name, record] of Object.entries(allTvdb)) {
-    if (record.pickup) {
-      pickupsFromTvdb.push(name);
-    }
-  }
-
-  return pickupsFromTvdb;
+  return pickups;
 };
 
 const addPickup = async (params) => {
@@ -1521,19 +1521,7 @@ const addPickup = async (params) => {
     throw new Error("addPickup: missing name");
   }
 
-  // Phase 5: Update tvdb.pickup field
-  const allTvdb = tvdb.getAllTvdbSync();
-  const normalizedName = name.toLowerCase();
-
-  for (const [recordName, record] of Object.entries(allTvdb)) {
-    if (recordName.toLowerCase() === normalizedName) {
-      record.pickup = true;
-      // Save deferred to saveConfigYml below
-      break;
-    }
-  }
-
-  // Backward compat: update old pickups array
+  // Update pickups array (config is the authority; tvdb synced in trySaveConfigYml)
   for (const [idx, pickupNameStr] of pickups.entries()) {
     if (pickupNameStr.toLowerCase() === name.toLowerCase()) {
       console.log("-- removing old matching pickup:", pickupNameStr);
@@ -1557,20 +1545,7 @@ const delPickup = async (params) => {
   }
   let deletedOne = false;
 
-  // Phase 5: Update tvdb.pickup field
-  const allTvdb = tvdb.getAllTvdbSync();
-  const normalizedName = name.toLowerCase();
-
-  for (const [recordName, record] of Object.entries(allTvdb)) {
-    if (recordName.toLowerCase() === normalizedName && record.pickup) {
-      record.pickup = false;
-      // Save deferred to saveConfigYml below
-      deletedOne = true;
-      break;
-    }
-  }
-
-  // Backward compat: update old pickups array
+  // Update pickups array (config is the authority; tvdb synced in trySaveConfigYml)
   for (const [idx, pickupNameStr] of pickups.entries()) {
     if (pickupNameStr.toLowerCase() === name.toLowerCase()) {
       console.log("-- deleting pickup:", pickupNameStr);

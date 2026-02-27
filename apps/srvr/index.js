@@ -2543,7 +2543,7 @@ app.post(
       return { success: false };
     }
     console.log(`[triggerEmbySync] Client changed: ${showName}`);
-    tvdb.enqueueShowProcess(showName);
+    tvdb.enqueueShowProcess(showName, { skipRotten: true });
     return { success: true };
   }),
 );

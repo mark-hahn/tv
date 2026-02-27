@@ -1485,10 +1485,10 @@ let chkTvdbQueueRunning = false;
 const showProcessQueue = [];
 // Set after tryLocalGetTvdb is defined so enqueueShowProcess can kick processing immediately
 let _kickProcessQueue = null;
-export const enqueueShowProcess = (showName) => {
-  if (showName && !showProcessQueue.includes(showName)) {
+export const enqueueShowProcess = (showName, opts = {}) => {
+  if (showName && !showProcessQueue.some((item) => item.name === showName)) {
     const wasEmpty = showProcessQueue.length === 0;
-    showProcessQueue.push(showName);
+    showProcessQueue.push({ name: showName, skipRotten: !!opts.skipRotten });
     // Only notify on 0→1 transition to avoid flooding clients on bulk enqueues
     if (wasEmpty && enqueueCallback) enqueueCallback(showName);
     // Kick processing immediately (no-op if already busy)
@@ -1652,11 +1652,13 @@ const tryLocalGetTvdb = async () => {
     }
   }
 
-  const requestedName = dequeueShowProcess();
-  if (!requestedName) {
+  const dequeued = dequeueShowProcess();
+  if (!dequeued) {
     tryLocalGetTvdbBusy = false;
     return;
   }
+  const requestedName = dequeued.name;
+  const skipRotten = dequeued.skipRotten;
 
   const minTvdb = allTvdb[requestedName];
   if (!minTvdb) {
@@ -1750,7 +1752,7 @@ const tryLocalGetTvdb = async () => {
   }
 
   // Push 3: Rotten Tomatoes scrape (slow, runs separately after push1 & push2)
-  if (processRecord.Name && allTvdb[processRecord.Name]) {
+  if (!skipRotten && processRecord.Name && allTvdb[processRecord.Name]) {
     try {
       const rottenRemote = await getRemote(null, 99, processRecord.Name);
       if (rottenRemote) {

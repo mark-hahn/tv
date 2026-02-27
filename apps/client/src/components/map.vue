@@ -139,19 +139,6 @@
             </button>
             <button
               v-if="mapShow?.inEmby !== false"
-              @click.stop="startLibraryRefresh"
-              style="
-                font-size: 15px;
-                cursor: pointer;
-                margin: 5px 0 5px 5px;
-                max-height: 24px;
-                border-radius: 7px;
-              "
-            >
-              Library
-            </button>
-            <button
-              v-if="mapShow?.inEmby !== false"
               @click.stop="$emit('prune', mapShow)"
               style="
                 font-size: 15px;
@@ -693,11 +680,6 @@ export default {
 
   methods: {
     noop() {},
-
-    startLibraryRefresh() {
-      // Delegate to App.vue so progress renders in the global tab bar.
-      evtBus.emit("startLibraryRefresh");
-    },
 
     async handleNotInEmbyClick(event) {
       // Ctrl-click on "Not In Emby": create the server folder and refresh Emby.

@@ -167,6 +167,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    libraryProgressText: {
+      type: String,
+      default: "",
+    },
     statusMsg: {
       type: String,
       default: "",
@@ -174,10 +178,6 @@ export default {
     isWideLandscape: {
       type: Boolean,
       default: false,
-    },
-    libraryProgressText: {
-      type: String,
-      default: "",
     },
   },
 

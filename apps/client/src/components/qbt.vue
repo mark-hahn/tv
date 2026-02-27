@@ -56,19 +56,6 @@
           "
         >
           <button
-            @click.stop="startLibraryRefresh"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              border-radius: 7px;
-              padding: 4px 10px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-            "
-          >
-            Library
-          </button>
-          <button
             @click.stop="highlightShow"
             style="
               font-size: 13px;
@@ -266,9 +253,6 @@ export default {
   },
 
   methods: {
-    startLibraryRefresh() {
-      evtBus.emit("startLibraryRefresh");
-    },
     scrollToBottomAction() {
       this._stickToBottom = true;
       const el = this.$refs.scroller;

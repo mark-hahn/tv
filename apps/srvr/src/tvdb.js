@@ -1790,8 +1790,9 @@ const tryLocalGetTvdb = async () => {
 
   console.log("");
   tryLocalGetTvdbBusy = false;
-  // If more shows are queued, continue processing without waiting for the next timer tick
-  if (showProcessQueue.length > 0) setTimeout(tryLocalGetTvdb, 0);
+  // If more shows are queued, continue processing after a short delay; otherwise wait 2 mins
+  if (showProcessQueue.length > 0) setTimeout(tryLocalGetTvdb, 1000);
+  else setTimeout(tryLocalGetTvdb, 2 * 60 * 1000);
 };
 
 // calls tryLocalGetTvdb every 30s (FAST_UPDATE) or 6 mins, delay from end of one task to beginning of next

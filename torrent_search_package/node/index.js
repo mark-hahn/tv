@@ -1,4 +1,5 @@
 const TorrentSearchApi = require("torrent-search-api");
+const ptt = require("parse-torrent-title");
 const fs = require("fs");
 const path = require("path");
 
@@ -6,7 +7,7 @@ const TORRENT_LIST_ONLY = true;
 const GET_TORRENT_NOT_MAGNENT = false;
 const CHECK_MATCH = true;
 const EXACT_MATCH_ONLY = true;
-const MAX_RESULTS  = 250;
+const MAX_RESULTS = 250;
 const TEST_SEARCH_QEUERY = "friends";
 
 TorrentSearchApi.enableProvider("ThePirateBay");
@@ -22,19 +23,27 @@ async function searchAndDownload(query) {
       return;
     }
 
-    const normalize = (s) => s.toLowerCase()
-                           // .replace(/[^a-z0-9]+/g, " ")
-                              .trim();
+    const normalize = (s) =>
+      s
+        .toLowerCase()
+        // .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+
+    const getShowTitle = (r) => {
+      const dotted = normalize(r.title).replace(/ /g, ".");
+      const parsed = ptt.parse(dotted);
+      return (parsed.title || "").replace(/\./g, " ").trim();
+    };
 
     const searchLog = path.join(__dirname, "search.log");
-    const logLines = results.map((r) => normalize(r.title));
+    const logLines = results.map((r) => `${r.title}  =>  ${getShowTitle(r)}`);
     fs.writeFileSync(searchLog, logLines.join("\n") + "\n");
 
     const filtered = CHECK_MATCH
       ? results.filter((r) =>
           EXACT_MATCH_ONLY
-            ? normalize(r.title) === normalize(query)
-            : normalize(r.title).includes(normalize(query)),
+            ? getShowTitle(r) === normalize(query)
+            : getShowTitle(r).includes(normalize(query)),
         )
       : results;
     if (!filtered.length) {

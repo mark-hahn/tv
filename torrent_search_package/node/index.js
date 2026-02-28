@@ -1,6 +1,9 @@
 const TorrentSearchApi = require("torrent-search-api");
+const fs = require("fs");
+const path = require("path");
 // const WebTorrent = require('webtorrent');
-// const path = require('path');
+
+const GET_TORRENT = true; // true = download .torrent file; false = get magnet URL
 
 // const client = new WebTorrent();
 
@@ -17,10 +20,58 @@ async function searchAndDownload(query) {
       return;
     }
 
-    const torrent = results[0];
-    const magnet = await TorrentSearchApi.getMagnet(torrent);
+    let torrent = null;
+    let magnet = "";
 
-    console.log("Downloading:", torrent.title);
+    if (GET_TORRENT) {
+      const torrentsDir = path.join(__dirname, "torrents");
+      if (!fs.existsSync(torrentsDir)) fs.mkdirSync(torrentsDir);
+
+      for (const result of results) {
+        try {
+          console.log(`  [${result.title}] fetching .torrent...`);
+          const buf = await TorrentSearchApi.getTorrent(result);
+          if (buf && buf.length) {
+            const safeName = result.title.replace(/[^a-zA-Z0-9._\- ]/g, "_");
+            const outFile = path.join(torrentsDir, `${safeName}.torrent`);
+            fs.writeFileSync(outFile, buf);
+            console.log("Torrent file written to", outFile);
+            torrent = result;
+            break;
+          } else {
+            console.log(`    (empty response)`);
+          }
+        } catch (e) {
+          console.log(`    (error: ${e.message})`);
+        }
+      }
+
+      if (!torrent) {
+        console.log("No torrent file found in any result.");
+        return;
+      }
+    } else {
+      for (const result of results) {
+        const m = await TorrentSearchApi.getMagnet(result);
+        console.log(`  [${result.title}] magnet: ${m || "(empty)"}`);
+        if (m) {
+          torrent = result;
+          magnet = m;
+          break;
+        }
+      }
+
+      if (!magnet) {
+        console.log("No magnet URL found in any result.");
+        return;
+      }
+
+      const outFile = path.join(__dirname, "magnent-url.txt");
+      fs.writeFileSync(outFile, magnet);
+      console.log("Magnet URL written to", outFile);
+    }
+
+    console.log("Found:", torrent.title);
 
     // client.add(magnet, { path: path.resolve('./downloads') }, torrent => {
     //   console.log('Metadata received:', torrent.name);

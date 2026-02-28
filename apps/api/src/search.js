@@ -660,7 +660,11 @@ export async function searchTorrents({
       } else if (provider === "limetorrents") {
         torrent.detailUrl = `https://www.limetorrents.lol/search/tv/${searchQ}/`;
       } else if (provider === "eztv") {
-        torrent.detailUrl = `https://eztv.re/search/${String(showName || "").replace(/\([^)]+\)\s*$/, "").replace(/[?.]+\s*$/g, "").trim().replace(/\s+/g, "+")}`;
+        torrent.detailUrl = `https://eztv.re/search/${String(showName || "")
+          .replace(/\([^)]+\)\s*$/, "")
+          .replace(/[?.]+\s*$/g, "")
+          .trim()
+          .replace(/\s+/g, "+")}`;
       }
     }
   });

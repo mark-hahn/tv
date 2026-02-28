@@ -625,6 +625,7 @@ export default {
         this.showingCredits = false;
         this.credits = [];
         this.creditsError = null;
+        evtBus.emit("actorSelected");
       }
     },
 

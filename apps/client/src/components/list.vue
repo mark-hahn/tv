@@ -3235,6 +3235,17 @@ export default {
       await this.filterShowsByActor(actorName);
     });
 
+    // Clear actorsListMode and actor shows filter when an actor is selected in the actors pane
+    on("actorSelected", async () => {
+      if (this.actorsListMode) this.endActorsListMode();
+      if (this.actorFilter || this.actorSearchParams) {
+        this.actorFilter = null;
+        this.actorSearchParams = null;
+        evtBus.emit("actorSearchCleared");
+        await this.select();
+      }
+    });
+
     // Clear actor filter when actor is deselected in actors pane
     on("clearActorFilter", async () => {
       if (!this.actorFilter && !this.actorSearchParams) return;

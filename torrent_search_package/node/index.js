@@ -10,19 +10,19 @@ const EXACT_MATCH_ONLY = true;
 const MAX_RESULTS = 250;
 const TEST_SEARCH_QEUERY = "friends";
 
-TorrentSearchApi.enableProvider("1337x");
+TorrentSearchApi.enableProvider("ThePirateBay");
 TorrentSearchApi.enableProvider("LimeTorrents");
 TorrentSearchApi.enableProvider("EZTV");
 
 async function searchAndDownload(query) {
   try {
     const [tpb, lim, ezt] = await Promise.all([
-      TorrentSearchApi.search(["1337x"], query, "TV", MAX_RESULTS),
+      TorrentSearchApi.search(["ThePirateBay"], query, "Video", MAX_RESULTS),
       TorrentSearchApi.search(["Limetorrents"], query, "TV", MAX_RESULTS),
       TorrentSearchApi.search(["Eztv"], query, "All", MAX_RESULTS),
     ]);
     const PROVIDER_CODE = {
-      "1337x": "13X",
+      ThePirateBay: "TPB",
       Limetorrents: "LIM",
       Eztv: "EZT",
     };

@@ -468,7 +468,9 @@ export default {
 
     onPaneChanged(pane) {
       if (pane === "flex") {
+        this._didInitialScroll = false;
         this.startPolling();
+        this.$nextTick(() => this.scrollToBottom());
       } else {
         this.stopPolling();
         this.matchedTitle = null;

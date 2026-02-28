@@ -58,6 +58,28 @@
       <div style="font-size: 18px; font-weight: bold">Reloading Shows</div>
     </div>
     <div
+      id="removingFromEmbyModal"
+      v-if="showRemovingFromEmby"
+      @click.stop
+      style="
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 30px 40px;
+        border: 2px solid black;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        z-index: 10000;
+        text-align: center;
+      "
+    >
+      <div style="font-size: 18px; font-weight: bold">
+        Removing show from emby.
+      </div>
+    </div>
+    <div
       id="embyRefreshingModal"
       v-if="showEmbyRefreshing"
       @click.stop
@@ -429,6 +451,11 @@ export default {
     const toggleReject = async (show) => {
       this.saveVisShow(show);
       if (!show.Reject) {
+        if (
+          show.inEmby !== false &&
+          !window.confirm(`Remove ${show.Name} from emby and the disk?`)
+        )
+          return;
         show.Reject = true;
         try {
           await srvr.addReject(show.Name);
@@ -442,13 +469,13 @@ export default {
             // Delete files only — do not call deleteShowFromSrvr which would
             // also call delNoEmby and remove the tvdb record
             const showFolder = show.Path.split("/").pop();
-            this.showEmbyRefreshing = true;
-            this.logModalMessage("embyRefreshingModal", "Deleting from Emby.");
+            this.showRemovingFromEmby = true;
             await srvr.deletePath(showFolder);
             await this.refreshEmbyLibraryWithDialog();
             await emby.deleteShowFromEmby(show);
           } catch (err) {
             console.error("deleteShowFromEmby after reject error:", err);
+            this.showRemovingFromEmby = false;
             this.showEmbyRefreshing = false;
           }
           const tvdbData = allTvdb[show.Name];
@@ -569,6 +596,7 @@ export default {
       searchingShowName: "",
       searchingStatus: "",
       showReloadingShows: false,
+      showRemovingFromEmby: false,
       showEmbyRefreshing: false,
       isWideLandscape: false,
       actorFilter: null,
@@ -2105,6 +2133,7 @@ export default {
           setTimeout(resolve, Math.max(0, Number(ms) || 0)),
         );
 
+      this.showRemovingFromEmby = false;
       this.showEmbyRefreshing = true;
       this.logModalMessage("embyRefreshingModal", "Emby is being refreshed.");
       try {

@@ -1128,10 +1128,8 @@ export default {
         let initialState;
         if (allWatched) {
           initialState = 1; // All watched
-        } else if (noneWatched) {
-          initialState = 2; // All unwatched
         } else {
-          initialState = 0; // Mixed state
+          initialState = 0; // None watched or mixed: first click → all watched
         }
 
         this.seasonStates[season] = {

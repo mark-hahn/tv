@@ -431,7 +431,7 @@
       </div>
       <div
         id="torrents-list"
-        v-if="!unaired &amp;&amp; !loading &amp;&amp; !noTorrentsNeeded"
+        v-if="!unaired &amp;&amp; (!loading || torrents.length > 0) &amp;&amp; !noTorrentsNeeded"
         style="
           padding: 10px;
           font-size: 14px;
@@ -1960,6 +1960,12 @@ export default {
 
         // Set torrents first; some server versions may omit rawProviderCounts.
         this.torrents = data.torrents || [];
+        if (!more) {
+          this.$nextTick(() => {
+            const el = document.getElementById("torrents-list");
+            if (el) el.scrollTop = 0;
+          });
+        }
 
         // Store more-providers state and per-provider stats from response
         this.hasMoreProviders = Boolean(data?.hasMoreProviders);

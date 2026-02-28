@@ -4,7 +4,7 @@ const path = require("path");
 // const WebTorrent = require('webtorrent');
 
 const GET_TORRENT = false; // true = download .torrent file; false = get magnet URL
-const TORRENT_LIST_ONLY = true; // true = just list results to results.txt, no download
+const TORRENT_LIST_ONLY = false; // true = just list results to results.txt, no download
 
 // const client = new WebTorrent();
 
@@ -14,11 +14,7 @@ TorrentSearchApi.enableProvider("EZTV");
 
 async function searchAndDownload(query) {
   try {
-    const results = await TorrentSearchApi.search(
-      query,
-      "TV",
-      TORRENT_LIST_ONLY ? 200 : 5,
-    );
+    const results = await TorrentSearchApi.search( query, "TV", 200 );
 
     if (!results.length) {
       console.log("No results found.");

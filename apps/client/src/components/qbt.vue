@@ -534,6 +534,9 @@ export default {
       // Special-case qBittorrent's stalledUP to match requested wording.
       if (raw === "stalledUP") return "Finished";
 
+      // Treat active seeding the same as finished.
+      if (raw === "uploading") return "Finished";
+
       // Special-case qBittorrent's stalledDL to match requested wording.
       if (raw.toLowerCase() === "stalleddl") return "Stalled";
 

@@ -16,7 +16,17 @@ TorrentSearchApi.enableProvider("EZTV");
 
 async function searchAndDownload(query) {
   try {
-    const results = await TorrentSearchApi.search(query, "All", MAX_RESULTS);
+    const [tpb, lim, ezt] = await Promise.all([
+      TorrentSearchApi.search(["ThePirateBay"], query, "Video", MAX_RESULTS),
+      TorrentSearchApi.search(["Limetorrents"], query, "TV", MAX_RESULTS),
+      TorrentSearchApi.search(["Eztv"], query, "All", MAX_RESULTS),
+    ]);
+    const PROVIDER_CODE = {
+      ThePirateBay: "TPB",
+      Limetorrents: "LIM",
+      Eztv: "EZT",
+    };
+    const results = [...tpb, ...lim, ...ezt];
 
     if (!results.length) {
       console.log("No results found.");
@@ -51,10 +61,11 @@ async function searchAndDownload(query) {
     const pttBlocks = matchingResults.map((r) => {
       const dotted = normalize(r.title).replace(/ /g, ".");
       const parsed = ptt.parse(dotted);
+      const providerCode = PROVIDER_CODE[r.provider] || r.provider;
       const propLines = Object.entries(parsed)
         .filter(([, v]) => v !== null && v !== undefined && v !== "")
         .map(([k, v]) => `  ${k}: ${JSON.stringify(v)}`);
-      return [`title: ${r.title}`, ...propLines].join("\n");
+      return [`[${providerCode}] ${r.title}`, ...propLines].join("\n");
     });
     fs.writeFileSync(pttDump, pttBlocks.join("\n\n") + "\n");
 

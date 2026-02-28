@@ -70,10 +70,15 @@ async function searchAndDownload(query) {
     const providerStats = Object.entries(
       results.reduce((acc, r) => {
         const code = PROVIDER_CODE[r.provider] || r.provider;
-        acc[code] = (acc[code] || 0) + 1;
+        if (!acc[code]) acc[code] = { total: 0, matches: 0 };
+        acc[code].total++;
+        if (CHECK_MATCH && isMatch(r)) acc[code].matches++;
         return acc;
       }, {}),
-    ).map(([code, count]) => `  ${code}: ${count} results`);
+    ).map(
+      ([code, { total, matches }]) =>
+        `  ${code}: ${total} results, ${matches} matches`,
+    );
     const statsBlock = ["--- provider stats ---", ...providerStats].join("\n");
     fs.writeFileSync(
       pttDump,

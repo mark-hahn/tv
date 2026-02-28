@@ -16,7 +16,7 @@ TorrentSearchApi.enableProvider("EZTV");
 
 async function searchAndDownload(query) {
   try {
-    const results = await TorrentSearchApi.search(query, "TV", MAX_RESULTS);
+    const results = await TorrentSearchApi.search(query, "All", MAX_RESULTS);
 
     if (!results.length) {
       console.log("No results found.");

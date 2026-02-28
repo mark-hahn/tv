@@ -3,10 +3,10 @@ const fs = require("fs");
 const path = require("path");
 // const WebTorrent = require('webtorrent');
 
-const GET_TORRENT = false; // true = download .torrent file; false = get magnet URL
-const TORRENT_LIST_ONLY = false; // true = just list results to results.txt, no download
-const TEST_SEARCH_QEUERY = "friends";
+const TORRENT_LIST_ONLY = true;
+const GET_TORRENT_NOT_MAGNENT = false;
 const EXACT_MATCH_ONLY = true;
+const TEST_SEARCH_QEUERY = "friends";
 
 // const client = new WebTorrent();
 
@@ -23,8 +23,13 @@ async function searchAndDownload(query) {
       return;
     }
 
+    const normalize = (s) =>
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
     const filtered = EXACT_MATCH_ONLY
-      ? results.filter((r) => r.title === query)
+      ? results.filter((r) => normalize(r.title) === normalize(query))
       : results;
     if (!filtered.length) {
       console.log("No exact match results found.");
@@ -45,7 +50,7 @@ async function searchAndDownload(query) {
     let torrent = null;
     let magnet = "";
 
-    if (GET_TORRENT) {
+    if (GET_TORRENT_NOT_MAGNENT) {
       const torrentsDir = path.join(__dirname, "torrents");
       if (!fs.existsSync(torrentsDir)) fs.mkdirSync(torrentsDir);
 

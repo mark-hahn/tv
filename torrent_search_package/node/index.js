@@ -5,6 +5,7 @@ const path = require("path");
 
 const TORRENT_LIST_ONLY = true;
 const GET_TORRENT_NOT_MAGNENT = false;
+const CHECK_MATCH = true;
 const EXACT_MATCH_ONLY = true;
 const TEST_SEARCH_QEUERY = "friends";
 
@@ -28,8 +29,17 @@ async function searchAndDownload(query) {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, " ")
         .trim();
-    const filtered = EXACT_MATCH_ONLY
-      ? results.filter((r) => normalize(r.title) === normalize(query))
+
+    const searchLog = path.join(__dirname, "search.log");
+    const logLines = results.map((r) => normalize(r.title));
+    fs.writeFileSync(searchLog, logLines.join("\n") + "\n");
+
+    const filtered = CHECK_MATCH
+      ? results.filter((r) =>
+          EXACT_MATCH_ONLY
+            ? normalize(r.title) === normalize(query)
+            : normalize(r.title).includes(normalize(query)),
+        )
       : results;
     if (!filtered.length) {
       console.log("No exact match results found.");

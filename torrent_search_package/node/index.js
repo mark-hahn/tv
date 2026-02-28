@@ -46,6 +46,18 @@ async function searchAndDownload(query) {
     );
     fs.writeFileSync(searchLog, logLines.join("\n") + "\n");
 
+    const pttDump = path.join(__dirname, "ptt-dump.log");
+    const matchingResults = CHECK_MATCH ? results.filter(isMatch) : results;
+    const pttBlocks = matchingResults.map((r) => {
+      const dotted = normalize(r.title).replace(/ /g, ".");
+      const parsed = ptt.parse(dotted);
+      const propLines = Object.entries(parsed)
+        .filter(([, v]) => v !== null && v !== undefined && v !== "")
+        .map(([k, v]) => `  ${k}: ${JSON.stringify(v)}`);
+      return [`title: ${r.title}`, ...propLines].join("\n");
+    });
+    fs.writeFileSync(pttDump, pttBlocks.join("\n\n") + "\n");
+
     const filtered = CHECK_MATCH ? results.filter(isMatch) : results;
     if (!filtered.length) {
       console.log("No exact match results found.");

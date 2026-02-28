@@ -456,12 +456,14 @@ export default {
           !window.confirm(`Remove ${show.Name} from emby and the disk?`)
         )
           return;
+        if (show.inEmby !== false) this.showRemovingFromEmby = true;
         show.Reject = true;
         try {
           await srvr.addReject(show.Name);
         } catch (err) {
           console.error("addReject error:", err);
           show.Reject = false;
+          this.showRemovingFromEmby = false;
           return;
         }
         if (show.inEmby !== false) {
@@ -469,14 +471,12 @@ export default {
             // Delete files only — do not call deleteShowFromSrvr which would
             // also call delNoEmby and remove the tvdb record
             const showFolder = show.Path.split("/").pop();
-            this.showRemovingFromEmby = true;
             await srvr.deletePath(showFolder);
-            await this.refreshEmbyLibraryWithDialog();
             await emby.deleteShowFromEmby(show);
+            this.showRemovingFromEmby = false;
           } catch (err) {
             console.error("deleteShowFromEmby after reject error:", err);
             this.showRemovingFromEmby = false;
-            this.showEmbyRefreshing = false;
           }
           const tvdbData = allTvdb[show.Name];
           if (tvdbData) {

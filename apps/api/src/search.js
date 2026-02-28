@@ -1161,6 +1161,7 @@ export async function searchTorrents({
       rawProviderCounts,
       providerCounts,
       warningSummary,
+      providerStats,
     })}`,
   );
 

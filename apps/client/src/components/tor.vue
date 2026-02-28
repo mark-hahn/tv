@@ -219,6 +219,19 @@
             </div>
           </div>
         </div>
+        <div
+          v-if="providerStats && Object.keys(providerStats).length > 0"
+          style="
+            margin-left: 20px;
+            margin-right: 20px;
+            margin-top: 4px;
+            font-weight: normal;
+            font-size: 13px;
+            color: #888;
+          "
+        >
+          {{ headerIdsLine }}
+        </div>
       </div>
       <div
         id="unaired"
@@ -870,48 +883,12 @@ export default {
       );
     },
     headerIdsLine() {
-      // Show provider stats when search results are available
       if (this.providerStats && Object.keys(this.providerStats).length > 0) {
         return Object.entries(this.providerStats)
           .map(([code, { filtered, total }]) => `${code}:${filtered}/${total}`)
           .join(", ");
       }
-      // Fall back to show IDs
-      const show = this.currentShow || this.activeShow || {};
-      const providerIds = show.ProviderIds || {};
-
-      const toDisplay = (value) => {
-        const str = String(value ?? "").trim();
-        return str || "-";
-      };
-
-      const tvdbId =
-        show.TvdbId ||
-        show.tvdbId ||
-        show.tvdb_id ||
-        providerIds.Tvdb ||
-        providerIds.TVDB;
-      const imdbId =
-        show.imdbId ||
-        providerIds.Imdb ||
-        providerIds.imdb ||
-        providerIds.IMDB ||
-        providerIds.IMDb;
-      const tmdbId =
-        show.tmdbId ||
-        show.TmdbId ||
-        show.tmdb_id ||
-        providerIds.Tmdb ||
-        providerIds.TMDB;
-      const tvMazeId =
-        show.tvmazeId ||
-        show.tvmaze_id ||
-        show.tvmaze?.id ||
-        providerIds.TvMaze ||
-        providerIds.Tvmaze ||
-        providerIds.TVMAZE;
-
-      return `Tvdb: ${toDisplay(tvdbId)}, Imdb: ${toDisplay(imdbId)}, Tmdb: ${toDisplay(tmdbId)}, TvMaze: ${toDisplay(tvMazeId)}`;
+      return "";
     },
     filteredTorrents() {
       // Use season filter if present
@@ -1967,7 +1944,9 @@ export default {
 
       // Reset more-providers state on each new load
       this.hasMoreProviders = false;
-      this.providerStats = null;
+      if (!more) {
+        this.providerStats = null;
+      }
 
       // Reset debug metadata for this request
       this.lastRawProviderCounts = null;
@@ -2016,12 +1995,20 @@ export default {
 
         // Store more-providers state and per-provider stats from response
         this.hasMoreProviders = Boolean(data?.hasMoreProviders);
-        this.providerStats =
+        if (
           data?.providerStats &&
           typeof data.providerStats === "object" &&
           Object.keys(data.providerStats).length > 0
-            ? data.providerStats
-            : null;
+        ) {
+          // Merge with existing stats (preserves TL/IPT when loading more providers)
+          this.providerStats = Object.assign(
+            {},
+            this.providerStats || {},
+            data.providerStats,
+          );
+        } else if (!more) {
+          this.providerStats = null;
+        }
         this.resultsShowId = this.currentShow?.Id || null;
 
         // (debug logging removed)

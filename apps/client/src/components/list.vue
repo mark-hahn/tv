@@ -494,10 +494,6 @@ export default {
     const deleteShow = async (show) => {
       allTvdb = await tvdb.getAllTvdb();
       const name = show.Name;
-      if (show.reject) {
-        alert("Show is banned, ignoring delete");
-        return;
-      }
       if (show.inEmby !== false) {
         this.saveVisShow(show);
         if (
@@ -1948,7 +1944,9 @@ export default {
         });
         // Trigger background processing (no Rotten scrape) for the newly selected show
         if (show.Name) {
-          srvr.triggerShowSelect(show.Name).catch((err) => console.error("triggerShowSelect failed:", err));
+          srvr
+            .triggerShowSelect(show.Name)
+            .catch((err) => console.error("triggerShowSelect failed:", err));
         }
       }
 

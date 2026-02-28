@@ -3,7 +3,8 @@ const fs = require("fs");
 const path = require("path");
 // const WebTorrent = require('webtorrent');
 
-const GET_TORRENT = true; // true = download .torrent file; false = get magnet URL
+const GET_TORRENT = false; // true = download .torrent file; false = get magnet URL
+const TORRENT_LIST_ONLY = true; // true = just list results to results.txt, no download
 
 // const client = new WebTorrent();
 
@@ -13,10 +14,25 @@ TorrentSearchApi.enableProvider("EZTV");
 
 async function searchAndDownload(query) {
   try {
-    const results = await TorrentSearchApi.search(query, "TV", 5);
+    const results = await TorrentSearchApi.search(
+      query,
+      "TV",
+      TORRENT_LIST_ONLY ? 200 : 5,
+    );
 
     if (!results.length) {
       console.log("No results found.");
+      return;
+    }
+
+    if (TORRENT_LIST_ONLY) {
+      const lines = results.map(
+        (r, i) =>
+          `${i + 1}. [${r.provider}] ${r.title}  size:${r.size || "?"}  seeds:${r.seeds || "?"}  peers:${r.peers || "?"}`,
+      );
+      const outFile = path.join(__dirname, "results.txt");
+      fs.writeFileSync(outFile, lines.join("\n") + "\n");
+      console.log(`${results.length} results written to`, outFile);
       return;
     }
 
@@ -29,17 +45,17 @@ async function searchAndDownload(query) {
 
       for (const result of results) {
         try {
+          const safeName = result.title.replace(/[^a-zA-Z0-9._\- ]/g, "_");
+          const outFile = path.join(torrentsDir, `${safeName}.torrent`);
           console.log(`  [${result.title}] fetching .torrent...`);
-          const buf = await TorrentSearchApi.getTorrent(result);
-          if (buf && buf.length) {
-            const safeName = result.title.replace(/[^a-zA-Z0-9._\- ]/g, "_");
-            const outFile = path.join(torrentsDir, `${safeName}.torrent`);
-            fs.writeFileSync(outFile, buf);
+          await TorrentSearchApi.downloadTorrent(result, outFile);
+          if (fs.existsSync(outFile) && fs.statSync(outFile).size > 0) {
             console.log("Torrent file written to", outFile);
             torrent = result;
             break;
           } else {
             console.log(`    (empty response)`);
+            if (fs.existsSync(outFile)) fs.unlinkSync(outFile);
           }
         } catch (e) {
           console.log(`    (error: ${e.message})`);

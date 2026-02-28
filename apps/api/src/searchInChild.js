@@ -1,0 +1,68 @@
+// Run searchTorrents in a forked child process for crash isolation.
+// If native code inside the worker segfaults, only the child dies;
+// the API server stays alive and this function rejects with an error.
+
+import { fork } from "child_process";
+import { fileURLToPath } from "url";
+import path from "path";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const WORKER_PATH = path.join(__dirname, "search-worker.js");
+const SEARCH_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+
+export async function searchTorrentsInChild(params) {
+  return new Promise((resolve, reject) => {
+    const child = fork(WORKER_PATH, [], {
+      env: process.env,
+      // silent: false so child stdout/stderr flows through to PM2 logs
+      silent: false,
+    });
+
+    let settled = false;
+
+    const settle = (fn) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn();
+    };
+
+    const timer = setTimeout(() => {
+      settle(() => {
+        console.error("searchTorrentsInChild: worker timed out — killing");
+        child.kill("SIGKILL");
+        reject(new Error("search timed out after 3 minutes"));
+      });
+    }, SEARCH_TIMEOUT_MS);
+
+    child.on("message", (msg) => {
+      settle(() => {
+        if (msg?.ok) {
+          resolve(msg.result);
+        } else {
+          reject(new Error(msg?.error || "search worker returned error"));
+        }
+      });
+    });
+
+    child.on("exit", (code, signal) => {
+      settle(() => {
+        console.error(
+          `searchTorrentsInChild: worker exited unexpectedly (code=${code}, signal=${signal})`,
+        );
+        reject(
+          new Error(
+            `search worker crashed (code=${code ?? "null"}, signal=${signal ?? "none"})`,
+          ),
+        );
+      });
+    });
+
+    child.on("error", (err) => {
+      settle(() => reject(err));
+    });
+
+    child.send(params);
+  });
+}

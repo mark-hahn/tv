@@ -6,6 +6,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import parseTorrent from "parse-torrent";
 import * as search from "./search.js";
+import { searchTorrentsInChild } from "./searchInChild.js";
 import * as download from "./download.js";
 import "./tvmaze.js";
 import {
@@ -744,7 +745,7 @@ app.get("/api/search", async (req, res) => {
       typeof tlCfRaw === "string" && tlCfRaw.trim()
         ? tlCfRaw.trim()
         : await loadLocalCfClearance("torrentleech");
-    const result = await search.searchTorrents({
+    const result = await searchTorrentsInChild({
       showName,
       limit,
       iptCf,

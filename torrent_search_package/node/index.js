@@ -1,15 +1,13 @@
 const TorrentSearchApi = require("torrent-search-api");
 const fs = require("fs");
 const path = require("path");
-// const WebTorrent = require('webtorrent');
 
 const TORRENT_LIST_ONLY = true;
 const GET_TORRENT_NOT_MAGNENT = false;
 const CHECK_MATCH = true;
 const EXACT_MATCH_ONLY = true;
+const MAX_RESULTS  = 250;
 const TEST_SEARCH_QEUERY = "friends";
-
-// const client = new WebTorrent();
 
 TorrentSearchApi.enableProvider("ThePirateBay");
 TorrentSearchApi.enableProvider("LimeTorrents");
@@ -17,18 +15,16 @@ TorrentSearchApi.enableProvider("EZTV");
 
 async function searchAndDownload(query) {
   try {
-    const results = await TorrentSearchApi.search(query, "TV", 200);
+    const results = await TorrentSearchApi.search(query, "TV", MAX_RESULTS);
 
     if (!results.length) {
       console.log("No results found.");
       return;
     }
 
-    const normalize = (s) =>
-      s
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, " ")
-        .trim();
+    const normalize = (s) => s.toLowerCase()
+                           // .replace(/[^a-z0-9]+/g, " ")
+                              .trim();
 
     const searchLog = path.join(__dirname, "search.log");
     const logLines = results.map((r) => normalize(r.title));

@@ -67,7 +67,18 @@ async function searchAndDownload(query) {
         .map(([k, v]) => `  ${k}: ${JSON.stringify(v)}`);
       return [`[${providerCode}] ${r.title}`, ...propLines].join("\n");
     });
-    fs.writeFileSync(pttDump, pttBlocks.join("\n\n") + "\n");
+    const providerStats = Object.entries(
+      results.reduce((acc, r) => {
+        const code = PROVIDER_CODE[r.provider] || r.provider;
+        acc[code] = (acc[code] || 0) + 1;
+        return acc;
+      }, {}),
+    ).map(([code, count]) => `  ${code}: ${count} results`);
+    const statsBlock = ["--- provider stats ---", ...providerStats].join("\n");
+    fs.writeFileSync(
+      pttDump,
+      pttBlocks.join("\n\n") + "\n\n" + statsBlock + "\n",
+    );
 
     const filtered = CHECK_MATCH ? results.filter(isMatch) : results;
     if (!filtered.length) {
@@ -76,13 +87,13 @@ async function searchAndDownload(query) {
     }
 
     if (TORRENT_LIST_ONLY) {
-      const lines = filtered.map(
-        (r, i) =>
-          `${i + 1}. [${r.provider}] ${r.title}  size:${r.size || "?"}  seeds:${r.seeds || "?"}  peers:${r.peers || "?"}`,
-      );
+      const lines = results.map((r, i) => {
+        const dottedTitle = r.title.replace(/ /g, ".");
+        return `${i + 1}. [${PROVIDER_CODE[r.provider] || r.provider}] ${dottedTitle}  size:${r.size || "?"}  seeds:${r.seeds || "?"}  peers:${r.peers || "?"}`;
+      });
       const outFile = path.join(__dirname, "results.txt");
       fs.writeFileSync(outFile, lines.join("\n") + "\n");
-      console.log(`${filtered.length} results written to`, outFile);
+      console.log(`${results.length} results written to`, outFile);
       return;
     }
 

@@ -56,6 +56,11 @@
         >
           <div style="margin-left: 20px">{{ headerShowName }}</div>
           <div style="display: flex; gap: 8px; margin-left: auto">
+            <span
+              v-if="loading"
+              style="font-size: 13px; color: #666; align-self: center"
+              >Searching</span
+            >
             <button
               v-if="selectedTorrent"
               @click.stop="continueDownload"
@@ -213,19 +218,6 @@
               </table>
             </div>
           </div>
-        </div>
-        <div
-          style="
-            margin-left: 20px;
-            margin-right: 20px;
-            margin-top: 6px;
-            font-weight: normal;
-            font-size: 14px;
-            color: #666;
-            line-height: 1.1;
-          "
-        >
-          {{ headerIdsLine }}
         </div>
       </div>
       <div
@@ -424,18 +416,7 @@
           </div>
         </div>
       </div>
-      <div
-        id="loading"
-        v-if="!unaired &amp;&amp; loading"
-        style="
-          text-align: center;
-          color: #666;
-          margin-top: 50px;
-          font-size: 16px;
-        "
-      >
-        <div>Searching for torrents...</div>
-      </div>
+
       <div
         id="error"
         v-if="!unaired &amp;&amp; error"

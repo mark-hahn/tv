@@ -167,70 +167,29 @@
         ></div>
         <div
           style="
-            margin-left: 20px;
+            margin-left: 0;
             margin-right: 20px;
             margin-top: 6px;
             font-weight: normal;
             font-size: 15px;
             color: #666;
-            display: block;
             line-height: 1.1;
             overflow: visible;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            white-space: nowrap;
           "
         >
-          <div
-            style="
-              display: flex;
-              align-items: center;
-              justify-content: flex-start;
-              gap: 25px;
-              white-space: nowrap;
-            "
+          <span
+            ><strong>USB</strong>: {{ spaceUsbGb }} GB {{ spaceUsbPct }} |
+            <strong>SRVR</strong>: {{ spaceSrvrGb }} GB {{ spaceSrvrPct }}</span
           >
-            <div style="display: flex">
-              <div>USB:</div>
-              <table style="border-collapse: separate; border-spacing: 15px 0">
-                <tbody>
-                  <tr>
-                    <td style="text-align: right; padding: 0">
-                      <span>{{ spaceUsbGb }} GB</span>
-                    </td>
-                    <td style="text-align: right; padding: 0">
-                      <span>{{ spaceUsbPct }}</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div style="display: flex">
-              <div>SRVR:</div>
-              <table style="border-collapse: separate; border-spacing: 15px 0">
-                <tbody>
-                  <tr>
-                    <td style="text-align: right; padding: 0">
-                      <span>{{ spaceSrvrGb }} GB</span>
-                    </td>
-                    <td style="text-align: right; padding: 0">
-                      <span>{{ spaceSrvrPct }}</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-        <div
-          v-if="providerStats && Object.keys(providerStats).length > 0"
-          style="
-            margin-left: 20px;
-            margin-right: 20px;
-            margin-top: 4px;
-            font-weight: normal;
-            font-size: 13px;
-            color: #888;
-          "
-        >
-          {{ headerIdsLine }}
+          <span
+            v-if="providerStats && Object.keys(providerStats).length > 0"
+            style="color: #888; margin-left: 16px"
+            v-html="headerIdsLine"
+          ></span>
         </div>
       </div>
       <div
@@ -885,8 +844,11 @@ export default {
     headerIdsLine() {
       if (this.providerStats && Object.keys(this.providerStats).length > 0) {
         return Object.entries(this.providerStats)
-          .map(([code, { filtered, total }]) => `${code}:${filtered}/${total}`)
-          .join(", ");
+          .map(
+            ([code, { filtered, total }]) =>
+              `<strong>${code}</strong>: ${filtered}/${total}`,
+          )
+          .join("  |  ");
       }
       return "";
     },

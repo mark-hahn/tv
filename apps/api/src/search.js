@@ -644,11 +644,23 @@ export async function searchTorrents({
   matches.forEach((torrent) => {
     if (torrent.raw) {
       const provider = torrent.raw.provider?.toLowerCase();
+      const searchQ = encodeURIComponent(
+        String(showName || "")
+          .replace(/\([^)]+\)\s*$/, "")
+          .replace(/[?.]+\s*$/g, "")
+          .trim(),
+      );
 
       if (provider === "torrentleech" && torrent.raw.fid) {
         torrent.detailUrl = `https://www.torrentleech.org/torrent/${torrent.raw.fid}#torrentinfo`;
       } else if (provider === "iptorrents" && torrent.raw.desc) {
         torrent.detailUrl = torrent.raw.desc;
+      } else if (provider === "thepiratebay") {
+        torrent.detailUrl = `https://thepiratebay.org/search.php?q=${searchQ}&cat=205`;
+      } else if (provider === "limetorrents") {
+        torrent.detailUrl = `https://www.limetorrents.lol/search/tv/${searchQ}/`;
+      } else if (provider === "eztv") {
+        torrent.detailUrl = `https://eztv.re/search/?q=${searchQ}`;
       }
     }
   });

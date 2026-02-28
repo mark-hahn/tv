@@ -125,6 +125,19 @@
       >
         Send
       </button>
+      <button
+        @click="$emit('actors-click')"
+        :style="{
+          height: '24px',
+          backgroundColor: actorsListMode ? 'lightgray' : 'white',
+          fontSize: '13px',
+          cursor: 'pointer',
+          borderRadius: '7px',
+          margin: '0 0 0 10px',
+        }"
+      >
+        Actors
+      </button>
     </div>
   </div>
 </template>
@@ -166,6 +179,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    actorsListMode: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   emits: [
@@ -175,6 +192,7 @@ export default {
     "send-filters",
     "library-click",
     "all-click",
+    "actors-click",
   ],
 
   methods: {

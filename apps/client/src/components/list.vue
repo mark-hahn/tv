@@ -151,6 +151,8 @@
               @send-filters="sendSharedFilters"
               @library-click="libraryClick"
               @all-click="allClick"
+              :actorsListMode="actorsListMode"
+              @actors-click="startActorsListMode"
             ></HdrTop>
             <HdrBot
               v-if="!simpleMode"
@@ -175,7 +177,28 @@
             id="showsLandscape"
             style="display: flex; flex-grow: 1; overflow: hidden; min-height: 0"
           >
+            <div
+              v-if="actorsListMode"
+              ref="actorsListRef"
+              @click.stop
+              style="flex-grow: 1; overflow-y: auto; background-color: white"
+            >
+              <div
+                v-for="actor in filteredActorsList"
+                :key="actor.name"
+                @click="actorsListItemClick(actor.name)"
+                style="
+                  padding: 8px 12px;
+                  cursor: pointer;
+                  border-bottom: 1px solid #eee;
+                  font-size: 18px;
+                "
+              >
+                {{ actor.displayName }}
+              </div>
+            </div>
             <Shows
+              v-else
               ref="showsComponent"
               style="flex-grow: 1"
               :shows="shows"
@@ -218,6 +241,8 @@
             @send-filters="sendSharedFilters"
             @library-click="libraryClick"
             @all-click="allClick"
+            :actorsListMode="actorsListMode"
+            @actors-click="startActorsListMode"
           ></HdrTop>
           <HdrBot
             v-if="!simpleMode"
@@ -249,7 +274,28 @@
             @button-click="handleButtonClick"
             @top-click="topClick"
           ></Buttons>
+          <div
+            v-if="actorsListMode"
+            ref="actorsListRef"
+            @click.stop
+            style="flex-grow: 1; overflow-y: auto; background-color: white"
+          >
+            <div
+              v-for="actor in filteredActorsList"
+              :key="actor.name"
+              @click="actorsListItemClick(actor.name)"
+              style="
+                padding: 8px 12px;
+                cursor: pointer;
+                border-bottom: 1px solid #eee;
+                font-size: 18px;
+              "
+            >
+              {{ actor.displayName }}
+            </div>
+          </div>
           <Shows
+            v-else
             ref="showsComponent"
             style="flex-grow: 1"
             :shows="shows"
@@ -601,6 +647,8 @@ export default {
       isWideLandscape: false,
       actorFilter: null,
       actorSearchParams: null, // Store search params for word-based actor search
+      actorsListMode: false, // Whether we are in actors list mode
+      actorsList: [], // List of all actors (for actors list mode)
       qbtActiveShowNames: [],
       downActiveShowNames: [],
       hasLoadedAllShows: false,
@@ -785,6 +833,14 @@ export default {
             ? this.downActiveShowNames
             : []),
         ]),
+      );
+    },
+
+    filteredActorsList() {
+      const srch = String(this.filterStr || "").toLowerCase();
+      if (!srch) return this.actorsList;
+      return this.actorsList.filter((a) =>
+        a.displayName.toLowerCase().includes(srch),
       );
     },
   },
@@ -2340,6 +2396,7 @@ export default {
     },
 
     async select(scroll = true) {
+      if (this.actorsListMode) return; // filtering handled by filteredActorsList computed
       // Skip re-fetching TVDB data if all shows are already loaded
       if (!this.hasLoadedAllShows) {
         allTvdb = await tvdb.getAllTvdb();
@@ -2488,6 +2545,80 @@ export default {
         this.saveVisShow(this.shows[0]);
       }
       if (scroll) this.scrollToSavedShow();
+    },
+
+    formatLastFirst(fullName) {
+      const parts = String(fullName || "")
+        .trim()
+        .split(/\s+/);
+      if (parts.length <= 1) return fullName || "";
+      const last = parts[parts.length - 1];
+      const first = parts.slice(0, -1).join(" ");
+      return `${last}, ${first}`;
+    },
+
+    async buildActorsList() {
+      if (!allTvdb) allTvdb = await tvdb.getAllTvdb();
+      const normName = (n) =>
+        String(n || "")
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, " ");
+      const seen = new Set();
+      const actors = [];
+      for (const show of allShows) {
+        const tvdbData = allTvdb?.[show.Name];
+        if (!tvdbData) continue;
+        const actualData = tvdbData.response?.data || tvdbData;
+        const characters = actualData?.characters;
+        if (!Array.isArray(characters)) continue;
+        for (const char of characters) {
+          const name = String(char?.personName || char?.actor || "").trim();
+          if (!name) continue;
+          const key = normName(name);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          actors.push({ name, displayName: this.formatLastFirst(name) });
+        }
+      }
+      actors.sort((a, b) => a.displayName.localeCompare(b.displayName));
+      return actors;
+    },
+
+    async startActorsListMode() {
+      if (this.actorsListMode) {
+        this.endActorsListMode();
+        return;
+      }
+      this.filterStr = "";
+      const actors = await this.buildActorsList();
+      this.actorsList = actors;
+      this.actorsListMode = true;
+      evtBus.emit("showActorsPane");
+      evtBus.emit("clearActorSelection");
+    },
+
+    endActorsListMode() {
+      this.actorsListMode = false;
+      this.filterStr = "";
+      this.actorsList = [];
+    },
+
+    async actorsListItemClick(actorName) {
+      this.actorsListMode = false;
+      this.actorsList = [];
+      await this.filterShowsByActor(actorName);
+      // Sort matched actor to beginning in actors pane on next show selection
+      const normName = (n) =>
+        String(n || "")
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, " ");
+      const targetNorm = normName(actorName);
+      const matchesSearchTerm = (n) => normName(n) === targetNorm;
+      this.actorSearchParams = { searchWords: [], matchesSearchTerm };
+      evtBus.emit("actorSearchActive", { searchWords: [], matchesSearchTerm });
+      if (this.shows.length > 0) this.saveVisShow(this.shows[0], true);
     },
 
     async filterShowsByActor(actorName) {
@@ -2809,6 +2940,24 @@ export default {
     window.addEventListener("resize", this._onResizeWideLandscape);
     window.addEventListener("orientationchange", this._onResizeWideLandscape);
 
+    // Click-outside handler for actors list mode (capture phase to consume the click)
+    this._actorsListClickOutside = (e) => {
+      if (!this.actorsListMode) return;
+      const actorsListEl = this.$refs.actorsListRef;
+      const filterInput = document.querySelector("#hdrtop input");
+      if (
+        (actorsListEl && actorsListEl.contains(e.target)) ||
+        (filterInput && filterInput.contains(e.target))
+      ) {
+        return;
+      }
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      this.endActorsListMode();
+    };
+    document.addEventListener("click", this._actorsListClickOutside, true);
+
     // Setup evtBus listeners cleanup
     this.evtHandlers = {};
     const on = (name, fn) => {
@@ -3126,6 +3275,11 @@ export default {
   },
 
   beforeUnmount() {
+    if (this._actorsListClickOutside) {
+      document.removeEventListener("click", this._actorsListClickOutside, true);
+      this._actorsListClickOutside = null;
+    }
+
     if (this.evtHandlers) {
       for (const [name, fn] of Object.entries(this.evtHandlers)) {
         evtBus.off(name, fn);

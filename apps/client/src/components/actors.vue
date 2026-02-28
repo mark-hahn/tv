@@ -1695,6 +1695,16 @@ export default {
     };
     evtBus.on("setUpSeries", this._onSetUpSeries);
 
+    this._onClearActorSelection = () => {
+      this.selectedActor = null;
+      this.showingCredits = false;
+      this.credits = [];
+      this.creditsError = null;
+      this.creditsLoading = false;
+      this.actorPageUrl = null;
+    };
+    evtBus.on("clearActorSelection", this._onClearActorSelection);
+
     evtBus.on("previewMode", this.onPreviewMode);
     evtBus.on("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.on("addPreviewShowDone", this.onAddPreviewShowDone);
@@ -1711,6 +1721,8 @@ export default {
     if (this._onResetActorsPane)
       evtBus.off("resetActorsPane", this._onResetActorsPane);
     if (this._onSetUpSeries) evtBus.off("setUpSeries", this._onSetUpSeries);
+    if (this._onClearActorSelection)
+      evtBus.off("clearActorSelection", this._onClearActorSelection);
 
     evtBus.off("previewMode", this.onPreviewMode);
     evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);

@@ -1961,8 +1961,9 @@ export default {
         // Set torrents first; some server versions may omit rawProviderCounts.
         this.torrents = data.torrents || [];
         if (!more) {
+          this._didInitialScroll = true;
           this.$nextTick(() => {
-            const el = document.getElementById("torrents-list");
+            const el = this.$refs.scroller;
             if (el) el.scrollTop = 0;
           });
         }

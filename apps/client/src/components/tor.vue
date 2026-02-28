@@ -823,7 +823,7 @@ export default {
       error: null,
       hasSearched: false,
       providerWarning: "",
-      maxResults: 1000, // Constant for maximum results to fetch
+      maxResults: 500, // Constant for maximum results to fetch
       seasonFilter: "",
       iptCfClearance: "",
       tlCfClearance: "",
@@ -1978,7 +1978,9 @@ export default {
       this.loading = true;
       this.error = null;
       this.providerWarning = "";
-      this.torrents = [];
+      if (!more) {
+        this.torrents = [];
+      }
       this.noTorrentsNeeded = false;
       this._didInitialScroll = false;
 
@@ -3023,8 +3025,12 @@ export default {
 
     formatProvider(provider) {
       if (!provider) return "";
-      if (provider.toLowerCase() === "iptorrents") return "IPT";
-      if (provider.toLowerCase() === "torrentleech") return "TL";
+      const p = provider.toLowerCase();
+      if (p === "iptorrents") return "IPT";
+      if (p === "torrentleech") return "TL";
+      if (p === "thepiratebay") return "TPB";
+      if (p === "limetorrents") return "LIM";
+      if (p === "eztv") return "EZT";
       return provider;
     },
 

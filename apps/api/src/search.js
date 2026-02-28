@@ -509,28 +509,23 @@ export async function searchTorrents({
   // Determine which providers to search based on the `more` flag
   let rawCombined = [];
   if (!more) {
-    // Normal search: IPT/TL only (explicit provider list)
-    const iptTlProviders = [];
-    if (iptCookies || iptCf) iptTlProviders.push("IpTorrents");
-    if (tlCookies || tlCf) iptTlProviders.push("TorrentLeech");
-    if (iptTlProviders.length > 0) {
-      const resultsArrays = await Promise.all(
-        uniqueQueries.map(async (q) => {
-          try {
-            const r = await TorrentSearchApi.search(
-              iptTlProviders,
-              q,
-              "TV",
-              limit,
-            );
-            return Array.isArray(r) ? r : [];
-          } catch {
-            return [];
-          }
-        }),
-      );
-      rawCombined = resultsArrays.flat();
-    }
+    // Normal search: IPT/TL only (explicit provider list; they're enabled via initializeProviders)
+    const resultsArrays = await Promise.all(
+      uniqueQueries.map(async (q) => {
+        try {
+          const r = await TorrentSearchApi.search(
+            ["IpTorrents", "TorrentLeech"],
+            q,
+            "TV",
+            limit,
+          );
+          return Array.isArray(r) ? r : [];
+        } catch {
+          return [];
+        }
+      }),
+    );
+    rawCombined = resultsArrays.flat();
   } else {
     // more=true: combine cached IPT/TL results + fresh TPB/LIM/EZT searches
     const cacheKey = showName.toLowerCase();

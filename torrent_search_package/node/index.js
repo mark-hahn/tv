@@ -36,16 +36,17 @@ async function searchAndDownload(query) {
     };
 
     const searchLog = path.join(__dirname, "search.log");
-    const logLines = results.map((r) => `${r.title}  =>  ${getShowTitle(r)}`);
+    const isMatch = (r) =>
+      EXACT_MATCH_ONLY
+        ? getShowTitle(r) === normalize(query)
+        : getShowTitle(r).includes(normalize(query));
+    const logLines = results.map(
+      (r) =>
+        `${CHECK_MATCH && isMatch(r) ? "*** " : "    "}${r.title}  =>  ${getShowTitle(r)}`,
+    );
     fs.writeFileSync(searchLog, logLines.join("\n") + "\n");
 
-    const filtered = CHECK_MATCH
-      ? results.filter((r) =>
-          EXACT_MATCH_ONLY
-            ? getShowTitle(r) === normalize(query)
-            : getShowTitle(r).includes(normalize(query)),
-        )
-      : results;
+    const filtered = CHECK_MATCH ? results.filter(isMatch) : results;
     if (!filtered.length) {
       console.log("No exact match results found.");
       return;

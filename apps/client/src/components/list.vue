@@ -2554,8 +2554,19 @@ export default {
         .trim()
         .split(/\s+/);
       if (parts.length <= 1) return fullName || "";
-      const last = parts[parts.length - 1];
-      const first = parts.slice(0, -1).join(" ");
+      // A "pure" word contains only letters or single quote
+      const isPure = (w) => /^[a-zA-Z']+$/.test(w);
+      // Find rightmost pure word — last name starts there
+      let lastPureIdx = -1;
+      for (let i = parts.length - 1; i >= 0; i--) {
+        if (isPure(parts[i])) {
+          lastPureIdx = i;
+          break;
+        }
+      }
+      if (lastPureIdx <= 0) return fullName || "";
+      const last = parts.slice(lastPureIdx).join(" ");
+      const first = parts.slice(0, lastPureIdx).join(" ");
       return `${last}, ${first}`;
     },
 

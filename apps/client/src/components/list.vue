@@ -192,6 +192,7 @@
                   cursor: pointer;
                   border-bottom: 1px solid #eee;
                   font-size: 18px;
+                  font-weight: bold;
                 "
               >
                 {{ actor.displayName }}
@@ -289,6 +290,7 @@
                 cursor: pointer;
                 border-bottom: 1px solid #eee;
                 font-size: 18px;
+                font-weight: bold;
               "
             >
               {{ actor.displayName }}

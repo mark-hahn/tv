@@ -488,30 +488,47 @@ export default {
       this.checkedRemotes = true;
       const tvdbData = data?.tvdbData;
 
-      if (tvdbData && tvdbData.remotes) {
-        const rottenRemote = tvdbData.remotes.find(
-          (r) => r.name && r.name.toLowerCase().includes("rotten"),
-        );
-        if (rottenRemote) {
-          this.rottenLabel = rottenRemote.name; // Use the name from remote object which contains ratings
-          this.rottenUrl = rottenRemote.url; // Assuming remote object has { name, url }
+      if (tvdbData) {
+        // First try the runtime-built remotes array (populated when show is freshly fetched)
+        if (tvdbData.remotes && tvdbData.remotes.length > 0) {
+          const rottenRemote = tvdbData.remotes.find(
+            (r) => r.name && r.name.toLowerCase().includes("rotten"),
+          );
+          if (rottenRemote) {
+            this.rottenLabel = rottenRemote.name;
+            this.rottenUrl = rottenRemote.url;
+          }
+
+          const imdbRemote = tvdbData.remotes.find(
+            (r) =>
+              r.name &&
+              r.name.toLowerCase().includes("imdb") &&
+              r.url &&
+              r.url.includes("imdb.com"),
+          );
+          if (imdbRemote && imdbRemote.url) {
+            this.imdbUrl = imdbRemote.url;
+            const match = imdbRemote.url.match(/\/title\/(tt\d+)/);
+            if (match) {
+              this.imdbId = match[1];
+            }
+          }
         }
 
-        // Extract IMDB ID from IMDB remote
-        const imdbRemote = tvdbData.remotes.find(
-          (r) =>
-            r.name &&
-            r.name.toLowerCase().includes("imdb") &&
-            r.url &&
-            r.url.includes("imdb.com"),
-        );
-        if (imdbRemote && imdbRemote.url) {
-          this.imdbUrl = imdbRemote.url;
-          // Extract imdbId from URL like https://www.imdb.com/title/tt13567344
-          const match = imdbRemote.url.match(/\/title\/(tt\d+)/);
+        // Fall back to persisted flat url props when remotes array is empty
+        if (!this.rottenUrl && tvdbData.rottenUrl) {
+          this.rottenUrl = tvdbData.rottenUrl;
+          this.rottenLabel = "Rotten Tomatoes";
+        }
+        if (!this.imdbUrl && tvdbData.imdbUrl) {
+          this.imdbUrl = tvdbData.imdbUrl;
+          const match = tvdbData.imdbUrl.match(/\/title\/(tt\d+)/);
           if (match) {
             this.imdbId = match[1];
           }
+        }
+        if (!this.imdbId && tvdbData.imdbId) {
+          this.imdbId = tvdbData.imdbId;
         }
 
         // Load initial reviews - prioritize IMDB if available, otherwise Rotten Tomatoes

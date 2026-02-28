@@ -1,0 +1,12 @@
+
+{
+  "name": "torrent-search-download",
+  "version": "1.0.0",
+  "description": "Search torrents and download via WebTorrent",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "torrent-search-api": "^2.1.0",
+    "webtorrent": "^1.9.7"
+  }
+}

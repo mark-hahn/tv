@@ -717,6 +717,7 @@ app.get("/api/search", async (req, res) => {
   const limit = parseInt(req.query.limit) || 100;
   const iptCfRaw = req.query.ipt_cf;
   const tlCfRaw = req.query.tl_cf;
+  const more = req.query.more === "true";
   let needed = [];
 
   // Parse needed array if provided
@@ -749,6 +750,7 @@ app.get("/api/search", async (req, res) => {
       iptCf,
       tlCf,
       needed,
+      more,
     });
     res.json(result);
   } catch (error) {
@@ -1437,6 +1439,38 @@ app.post("/api/download", handleDownloadRequest);
 
 // Back-compat alias for older clients/nginx rewrites.
 app.post("/downloads", handleDownloadRequest);
+
+// GET /api/torrent-file?show=ShowName
+// Get and upload a torrent file for a show using public providers (TPB/LIM/EZT)
+app.get("/api/torrent-file", async (req, res) => {
+  const showName = req.query.show;
+  if (!showName) {
+    return res.status(400).json({ error: "show query parameter required" });
+  }
+  try {
+    const fileBuffer = await search.getTorrentFile(showName);
+    if (!fileBuffer) {
+      return res.status(404).json({ error: "No torrent file found for show" });
+    }
+    const uploaded = await download.uploadTorrentToWatchFolder(
+      fileBuffer,
+      showName,
+    );
+    if (!uploaded.success) {
+      return res
+        .status(500)
+        .json({ error: uploaded.reason || "Upload failed" });
+    }
+    res.json({
+      success: true,
+      filename: uploaded.filename,
+      bytes: uploaded.bytes,
+    });
+  } catch (err) {
+    console.error("torrent-file error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // GET /api/getBrowseShow
 app.get("/api/getBrowseShow", async (req, res) => {

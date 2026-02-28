@@ -8,7 +8,7 @@ const GET_TORRENT_NOT_MAGNENT = false;
 const CHECK_MATCH = true;
 const EXACT_MATCH_ONLY = true;
 const MAX_RESULTS = 250;
-const TEST_SEARCH_QEUERY = "friends";
+const TEST_SEARCH_QEUERY = "the tick (2011)";
 
 TorrentSearchApi.enableProvider("ThePirateBay");
 TorrentSearchApi.enableProvider("LimeTorrents");

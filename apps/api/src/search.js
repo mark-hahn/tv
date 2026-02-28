@@ -6,6 +6,32 @@ import { getApiDataDir } from "./tvPaths.js";
 import { patchProviderWithSshTunnel } from "./sshTunnel.js";
 
 import TorrentSearchApi from "torrent-search-api";
+import os from "os";
+
+// Provider code mapping for stats display
+const PROVIDER_CODE_MAP = {
+  IpTorrents: "IPT",
+  TorrentLeech: "TL",
+  ThePirateBay: "TPB",
+  Limetorrents: "LIM",
+  Eztv: "EZT",
+};
+
+function getProviderCode(provider) {
+  const raw = String(provider || "").trim();
+  return (
+    PROVIDER_CODE_MAP[raw] ||
+    PROVIDER_CODE_MAP[
+      Object.keys(PROVIDER_CODE_MAP).find(
+        (k) => k.toLowerCase() === raw.toLowerCase(),
+      )
+    ] ||
+    raw
+  );
+}
+
+// In-memory cache: showName (lowercase) -> deduped raw results from last IPT/TL search
+const iptTlSearchCache = new Map();
 
 const LOG_APPS_API_DATA_TOR_RESULTS_TXT = false;
 
@@ -348,6 +374,23 @@ export function initializeProviders() {
       console.error("Failed to enable TorrentLeech:", e.message);
     }
   }
+
+  // Enable public providers (no authentication needed)
+  try {
+    TorrentSearchApi.enableProvider("ThePirateBay");
+  } catch (e) {
+    console.error("Failed to enable ThePirateBay:", e.message);
+  }
+  try {
+    TorrentSearchApi.enableProvider("Limetorrents");
+  } catch (e) {
+    console.error("Failed to enable Limetorrents:", e.message);
+  }
+  try {
+    TorrentSearchApi.enableProvider("Eztv");
+  } catch (e) {
+    console.error("Failed to enable Eztv:", e.message);
+  }
 }
 
 /**
@@ -358,6 +401,7 @@ export function initializeProviders() {
  * @param {string} params.iptCf - Optional IPTorrents cf_clearance override
  * @param {string} params.tlCf - Optional TorrentLeech cf_clearance override
  * @param {Array} params.needed - Optional array of needed episodes (e.g., ["S01", "S02E03"])
+ * @param {boolean} params.more - If true, add TPB/LIM/EZT results on top of cached IPT/TL results
  * @returns {Object} Search results with torrents array
  */
 export async function searchTorrents({
@@ -366,6 +410,7 @@ export async function searchTorrents({
   iptCf,
   tlCf,
   needed = [],
+  more = false,
 }) {
   console.log(`\nSearching for: ${showName} (limit: ${limit})`);
   const activeProvidersRaw = TorrentSearchApi.getActiveProviders();
@@ -461,22 +506,53 @@ export async function searchTorrents({
     uniqueQueries.push(q);
   }
 
-  const resultsArrays = await Promise.all(
-    uniqueQueries.map(async (q) => {
-      try {
-        const r = await TorrentSearchApi.search(q, "TV", limit);
-        return Array.isArray(r) ? r : [];
-      } catch {
-        return [];
-      }
-    }),
-  );
+  // Determine which providers to search based on the `more` flag
+  let rawCombined = [];
+  if (!more) {
+    // Normal search: IPT/TL only (explicit provider list)
+    const iptTlProviders = [];
+    if (iptCookies || iptCf) iptTlProviders.push("IpTorrents");
+    if (tlCookies || tlCf) iptTlProviders.push("TorrentLeech");
+    if (iptTlProviders.length > 0) {
+      const resultsArrays = await Promise.all(
+        uniqueQueries.map(async (q) => {
+          try {
+            const r = await TorrentSearchApi.search(
+              iptTlProviders,
+              q,
+              "TV",
+              limit,
+            );
+            return Array.isArray(r) ? r : [];
+          } catch {
+            return [];
+          }
+        }),
+      );
+      rawCombined = resultsArrays.flat();
+    }
+  } else {
+    // more=true: combine cached IPT/TL results + fresh TPB/LIM/EZT searches
+    const cacheKey = showName.toLowerCase();
+    const cachedIptTl = iptTlSearchCache.get(cacheKey) || [];
+    const moreArrays = await Promise.all(
+      uniqueQueries.flatMap((q) => [
+        TorrentSearchApi.search(["ThePirateBay"], q, "Video", limit).catch(
+          () => [],
+        ),
+        TorrentSearchApi.search(["Limetorrents"], q, "TV", limit).catch(
+          () => [],
+        ),
+        TorrentSearchApi.search(["Eztv"], q, "All", limit).catch(() => []),
+      ]),
+    );
+    rawCombined = [...cachedIptTl, ...moreArrays.flat()];
+  }
 
-  const combined = resultsArrays.flat();
   const seen = new Set();
   const deduped = [];
   const dedupeRemoved = [];
-  for (const t of combined) {
+  for (const t of rawCombined) {
     const key = `${t?.provider}|${t?.title}`;
     if (seen.has(key)) {
       dedupeRemoved.push({ item: t, reason: `duplicate key: ${key}` });
@@ -486,9 +562,15 @@ export async function searchTorrents({
     deduped.push(t);
   }
   torrents = deduped;
+
+  // Cache IPT/TL-only results for subsequent more=true calls (only on more=false)
+  if (!more) {
+    iptTlSearchCache.set(showName.toLowerCase(), deduped);
+  }
+
   logFilterStage(
     "provider-search dedupe",
-    combined.length,
+    rawCombined.length,
     torrents.length,
     dedupeRemoved,
     {
@@ -510,6 +592,13 @@ export async function searchTorrents({
   torLog(
     `[search] rawProviderCounts(provider-search) ${JSON.stringify(rawProviderCounts)}`,
   );
+
+  // Normalized provider code counts (for providerStats in return value)
+  const rawProviderCodeCounts = {};
+  for (const [provider, count] of Object.entries(rawProviderCounts)) {
+    const code = getProviderCode(provider);
+    rawProviderCodeCounts[code] = (rawProviderCodeCounts[code] || 0) + count;
+  }
 
   // Normalize and filter torrents
   const normalized = torrents.map((t) => normalize(t, showName));
@@ -1054,6 +1143,17 @@ export async function searchTorrents({
   });
   torLog(`[search] providerCounts(filtered) ${JSON.stringify(providerCounts)}`);
 
+  // Build providerStats: normalized code -> { filtered, total }
+  const providerStats = {};
+  for (const [code, total] of Object.entries(rawProviderCodeCounts)) {
+    providerStats[code] = { total, filtered: 0 };
+  }
+  for (const [provider, count] of Object.entries(providerCounts)) {
+    const code = getProviderCode(provider);
+    if (!providerStats[code]) providerStats[code] = { total: 0, filtered: 0 };
+    providerStats[code].filtered += count;
+  }
+
   const warningSummary = computeWarningSummary(filtered);
   torLog(`[search] warningSummary(returned) ${JSON.stringify(warningSummary)}`);
 
@@ -1100,5 +1200,59 @@ export async function searchTorrents({
     torrents: filtered,
     rawProviderCounts,
     warningSummary,
+    providerStats,
+    hasMoreProviders: more,
   };
+}
+
+/**
+ * Get a torrent file for a show from public providers (ThePirateBay, LimeTorrents, EZTV).
+ * @param {string} showName - Name of the show to search for
+ * @returns {Promise<Buffer|null>} Torrent file buffer, or null if not found
+ */
+export async function getTorrentFile(showName) {
+  const query = String(showName || "")
+    .replace(/[^a-zA-Z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!query) return null;
+
+  const limit = 20;
+  const [tpb, lim, ezt] = await Promise.all([
+    TorrentSearchApi.search(["ThePirateBay"], query, "Video", limit).catch(
+      () => [],
+    ),
+    TorrentSearchApi.search(["Limetorrents"], query, "TV", limit).catch(
+      () => [],
+    ),
+    TorrentSearchApi.search(["Eztv"], query, "All", limit).catch(() => []),
+  ]);
+  const results = [...tpb, ...lim, ...ezt];
+
+  if (!results.length) return null;
+
+  const tmpDir = os.tmpdir();
+  for (const result of results) {
+    try {
+      const safeName = String(result.title || "torrent")
+        .replace(/[^a-zA-Z0-9._\- ]/g, "_")
+        .slice(0, 80);
+      const outPath = path.join(
+        tmpDir,
+        `tsa-${Date.now()}-${safeName}.torrent`,
+      );
+      await TorrentSearchApi.downloadTorrent(result, outPath);
+      if (fs.existsSync(outPath)) {
+        const data = fs.readFileSync(outPath);
+        try {
+          fs.unlinkSync(outPath);
+        } catch {}
+        if (data.length > 0) return data;
+      }
+    } catch {
+      // try next result
+    }
+  }
+  return null;
 }

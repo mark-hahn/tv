@@ -111,6 +111,20 @@
               Search
             </button>
             <button
+              @click.stop="moreClick"
+              :disabled="hasMoreProviders"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px;
+                border: 1px solid #bbb;
+                background-color: whitesmoke;
+              "
+            >
+              More
+            </button>
+            <button
               @click.stop="forceClick"
               style="
                 font-size: 13px;
@@ -860,6 +874,11 @@ export default {
       downloadQueue: [],
       downloadQueueRunning: false,
       downloadStatus: {},
+
+      // More providers (TPB/LIM/EZT) state
+      hasMoreProviders: false,
+      providerStats: null,
+      resultsShowId: null,
     };
   },
 
@@ -870,6 +889,13 @@ export default {
       );
     },
     headerIdsLine() {
+      // Show provider stats when search results are available
+      if (this.providerStats && Object.keys(this.providerStats).length > 0) {
+        return Object.entries(this.providerStats)
+          .map(([code, { filtered, total }]) => `${code}:${filtered}/${total}`)
+          .join(", ");
+      }
+      // Fall back to show IDs
       const show = this.currentShow || this.activeShow || {};
       const providerIds = show.ProviderIds || {};
 
@@ -1699,6 +1725,16 @@ export default {
         return;
       }
 
+      // If results for the current show are already showing, do nothing
+      const currentShowId = this.currentShow?.Id || null;
+      if (
+        this.torrents.length > 0 &&
+        currentShowId &&
+        this.resultsShowId === currentShowId
+      ) {
+        return;
+      }
+
       // Check if season filter is active
       const sVal = parseInt(this.seasonFilter, 10);
       const hasSeasonFilter =
@@ -1733,6 +1769,29 @@ export default {
       await this.loadTorrents(this.lastNeeded || []);
     },
 
+    async moreClick() {
+      if (this.hasMoreProviders) return; // already showing all providers
+      if (
+        (!this.currentShow || !this.currentShow.Name) &&
+        this.activeShow?.Name
+      ) {
+        this.currentShow = this.activeShow;
+        this.showName = this.activeShow?.Name || this.showName;
+      }
+      if (!this.currentShow?.Name) return;
+      if (this.unaired) return;
+
+      if (!Array.isArray(this.lastNeeded)) {
+        try {
+          this.lastNeeded = await this.calculateNeeded(this.currentShow);
+        } catch {
+          this.lastNeeded = [];
+        }
+      }
+      this.hasSearched = true;
+      await this.loadTorrents(this.lastNeeded || [], true);
+    },
+
     async forceClick() {
       if (
         (!this.currentShow || !this.currentShow.Name) &&
@@ -1751,7 +1810,9 @@ export default {
       this.noTorrentsNeeded = false;
       this.providerWarning = "";
       this.hasSearched = true;
+      // Force search IPT/TL first, then add more providers
       await this.loadTorrents(["force"]);
+      await this.loadTorrents(["force"], true);
     },
 
     async calculateNeeded(show) {
@@ -1908,7 +1969,7 @@ export default {
       return trimmed;
     },
 
-    async loadTorrents(needed = []) {
+    async loadTorrents(needed = [], more = false) {
       if (!this.currentShow || !this.currentShow.Name) {
         this.error = "No show selected";
         return;
@@ -1920,6 +1981,10 @@ export default {
       this.torrents = [];
       this.noTorrentsNeeded = false;
       this._didInitialScroll = false;
+
+      // Reset more-providers state on each new load
+      this.hasMoreProviders = false;
+      this.providerStats = null;
 
       // Reset debug metadata for this request
       this.lastRawProviderCounts = null;
@@ -1936,6 +2001,9 @@ export default {
         let url = `${config.torrentsApiUrl}/api/search?show=${encodeURIComponent(showNameForSearch)}&limit=${this.maxResults}`;
         if (needed.length > 0) {
           url += `&needed=${encodeURIComponent(JSON.stringify(needed))}`;
+        }
+        if (more) {
+          url += `&more=true`;
         }
 
         // Debug info
@@ -1962,6 +2030,16 @@ export default {
 
         // Set torrents first; some server versions may omit rawProviderCounts.
         this.torrents = data.torrents || [];
+
+        // Store more-providers state and per-provider stats from response
+        this.hasMoreProviders = Boolean(data?.hasMoreProviders);
+        this.providerStats =
+          data?.providerStats &&
+          typeof data.providerStats === "object" &&
+          Object.keys(data.providerStats).length > 0
+            ? data.providerStats
+            : null;
+        this.resultsShowId = this.currentShow?.Id || null;
 
         // (debug logging removed)
 
@@ -2361,9 +2439,46 @@ export default {
             : providerRaw.includes("iptorrents") ||
                 detailUrlLower.includes("iptorrents")
               ? "iptorrents"
-              : providerRaw || "unknown";
+              : providerRaw.includes("thepiratebay") ||
+                  providerRaw.includes("piratebay") ||
+                  providerRaw === "thepiratesbay"
+                ? "thepiratebay"
+                : providerRaw.includes("limetorrents")
+                  ? "limetorrents"
+                  : providerRaw.includes("eztv")
+                    ? "eztv"
+                    : providerRaw || "unknown";
 
-        // Prefer /downloads if available.
+        // For public providers (TPB/LIM/EZT), use the /api/torrent-file endpoint
+        const isPublicProvider = [
+          "thepiratebay",
+          "limetorrents",
+          "eztv",
+        ].includes(provider);
+        if (isPublicProvider) {
+          const showName = String(
+            torrent?.raw?.title || this.currentShow?.Name || "",
+          ).trim();
+          const url = `${config.torrentsApiUrl}/api/torrent-file?show=${encodeURIComponent(showName)}`;
+          const res = await this.fetchWithTimeout(url, {}, 60000);
+          if (!res.ok) {
+            let detail = "";
+            try {
+              const ct = res.headers.get("content-type") || "";
+              if (ct.includes("application/json")) {
+                const j = await res.json();
+                detail = j?.error ? String(j.error) : JSON.stringify(j);
+              } else {
+                detail = await res.text();
+              }
+            } catch {} // ignore
+            return {
+              ok: false,
+              message: detail || `HTTP ${res.status}: ${res.statusText}`,
+            };
+          }
+          return { ok: true, message: "" };
+        }
         // tv-api /downloads now returns a wrapper:
         // - existingTitles: array of titles (same as old raw array)
         // - existingProcids: matching procids

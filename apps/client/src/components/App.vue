@@ -1573,12 +1573,10 @@ export default {
         return;
       }
 
-      this.currentPane = "tor";
-      evtBus.emit("paneChanged", this.currentPane);
-      // Emit event to torrents component with show data
-      evtBus.emit("showTorrents", show);
       this._torrentsInitialized = true;
       this._torrentsShowKey = showKey;
+      this.currentPane = "tor";
+      evtBus.emit("paneChanged", this.currentPane);
     },
 
     handleShowQbt() {
@@ -1806,6 +1804,15 @@ export default {
       this._torrentsInitialized = false;
       this._torrentsShowKey = null;
 
+      // If tor pane is visible, start a new search for the new show.
+      if (prevPane === "tor") {
+        const showKey = this.currentShow?.Id || this.currentShow?.Name || null;
+        evtBus.emit("showTorrents", this.currentShow);
+        this._torrentsInitialized = true;
+        this._torrentsShowKey = showKey;
+        return;
+      }
+
       // When currently viewing Local, stay on Local.
       // When in actor search mode and on actors pane, stay on Actors.
       const keepContentPanes = new Set([
@@ -1813,7 +1820,6 @@ export default {
         "usb",
         "qbt",
         "down",
-        "tor",
         "reviews",
         "trailer",
         "actors",

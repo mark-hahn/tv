@@ -1131,10 +1131,10 @@ export default {
         // Keep space info fresh whenever Tor pane is shown.
         void this.updateSpaceAvail();
         // Auto-search when pane becomes active, but only once per show.
-        const showId = this.activeShow?.Id || null;
+        const showId = this.activeShow?.Id || this.activeShow?.Name || null;
         if (showId && showId !== this.lastAutoSearchedShowId) {
           this.lastAutoSearchedShowId = showId;
-          void this.searchClick();
+          void this.searchTorrents(this.activeShow);
         }
       }
     },
@@ -1622,6 +1622,9 @@ export default {
     },
 
     async searchTorrents(show) {
+      // Track this show so onPaneChanged doesn't re-trigger when switching panes.
+      this.lastAutoSearchedShowId = show?.Id || show?.Name || null;
+
       // Reset state when switching shows
       this.torrents = [];
       this.error = null;
@@ -1663,6 +1666,9 @@ export default {
         this.noTorrentsNeeded = true;
         return;
       }
+
+      // Kick off the actual search now that needed is ready.
+      await this.searchClick();
     },
 
     async searchClick() {

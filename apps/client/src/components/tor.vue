@@ -850,9 +850,17 @@ export default {
 
   computed: {
     headerShowName() {
-      return (
-        this.showName || this.currentShow?.Name || this.activeShow?.Name || ""
-      );
+      const name =
+        this.showName || this.currentShow?.Name || this.activeShow?.Name || "";
+      if (!name) return "";
+      const hasYear = /\(\d{4}\)/.test(name);
+      if (!hasYear) {
+        const firstAired =
+          this.currentShow?.firstAired || this.activeShow?.firstAired || "";
+        const year = firstAired ? firstAired.substring(0, 4) : "";
+        if (year) return `${name} (${year})`;
+      }
+      return name;
     },
     headerIdsLine() {
       if (this.providerStats && Object.keys(this.providerStats).length > 0) {

@@ -1664,15 +1664,8 @@ export default {
         return;
       }
 
-      // If results for the current show are already showing, do nothing
-      const currentShowId = this.currentShow?.Id || null;
-      if (
-        this.torrents.length > 0 &&
-        currentShowId &&
-        this.resultsShowId === currentShowId
-      ) {
-        return;
-      }
+      // Reset so a fresh first search is always performed
+      this.lastNeeded = null;
 
       // Check if season filter is active
       const sVal = parseInt(this.seasonFilter, 10);

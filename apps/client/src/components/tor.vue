@@ -1385,9 +1385,9 @@ export default {
 
     getTorrentCardKey(torrent, index) {
       // Stable key to prevent DOM reuse glitches when multiple providers return the same title.
-      return String(
-        torrent?.detailUrl || this.getTorrentNowKey(torrent) || index,
-      );
+      // Always include index as suffix to guarantee uniqueness (detailUrl may be a shared search URL).
+      const base = torrent?.detailUrl || this.getTorrentNowKey(torrent) || "";
+      return `${base}|${index}`;
     },
 
     getDisplayTitleWithProvider(torrent) {

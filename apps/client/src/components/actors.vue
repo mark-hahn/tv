@@ -187,37 +187,6 @@
               Wikipedia
             </button>
             <button
-              v-if="previewMode"
-              @click.stop="addShowFromPreview"
-              :disabled="previewAddBusy || !previewSrchChoice"
-              style="
-                font-size: 13px;
-                cursor: pointer;
-                border-radius: 5px;
-                padding: 4px 10px;
-              "
-            >
-              {{ previewAddBusy ? "Adding..." : "Add Show to Emby" }}
-            </button>
-            <button
-              v-if="previewMode"
-              @click.stop="exitPreview"
-              style="
-                font-size: 13px;
-                cursor: pointer;
-                border-radius: 5px;
-                padding: 4px 10px;
-              "
-            >
-              Exit Preview
-            </button>
-            <span
-              v-if="previewMode"
-              style="font-size: 13px; font-weight: normal; color: #666"
-            >
-              preview mode
-            </span>
-            <button
               @click.stop="handleDoneButton"
               style="
                 font-size: 13px;

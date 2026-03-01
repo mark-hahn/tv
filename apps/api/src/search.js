@@ -40,6 +40,37 @@ function getProviderCode(provider) {
 const iptTlSearchCache = new Map();
 
 const DATA_DIR = getApiDataDir();
+
+function iptTlCacheFilePath(showName) {
+  const safe = String(showName || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "_")
+    .slice(0, 80);
+  return path.join(os.tmpdir(), `tor-iptl-cache-${safe}.json`);
+}
+
+function writeIptTlCache(showName, results) {
+  try {
+    fs.writeFileSync(
+      iptTlCacheFilePath(showName),
+      JSON.stringify(results),
+      "utf8",
+    );
+  } catch {
+    // ignore
+  }
+}
+
+function readIptTlCache(showName) {
+  try {
+    const raw = fs.readFileSync(iptTlCacheFilePath(showName), "utf8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 const COOKIES_DIR = DATA_DIR;
 const IPTORRENTS_CUSTOM_PATH = path.join(DATA_DIR, "iptorrents-custom.json");
 const TOR_RESULTS_LOG_PATH = path.join(DATA_DIR, "tor-results.txt");
@@ -531,7 +562,8 @@ export async function searchTorrents({
   } else {
     // more=true: combine cached IPT/TL results + fresh TPB/LIM/EZT searches
     const cacheKey = showName.toLowerCase();
-    const cachedIptTl = iptTlSearchCache.get(cacheKey) || [];
+    const cachedIptTl =
+      iptTlSearchCache.get(cacheKey) || readIptTlCache(showName);
 
     // Detect a year in the show name (e.g. "Show (2004)" or "Show 2004")
     const yearMatch =
@@ -603,6 +635,7 @@ export async function searchTorrents({
   // Cache IPT/TL-only results for subsequent more=true calls (only on more=false)
   if (!more) {
     iptTlSearchCache.set(showName.toLowerCase(), deduped);
+    writeIptTlCache(showName, deduped);
   }
 
   logFilterStage(

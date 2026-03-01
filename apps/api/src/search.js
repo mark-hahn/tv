@@ -8,6 +8,12 @@ import { patchProviderWithSshTunnel } from "./sshTunnel.js";
 import TorrentSearchApi from "torrent-search-api";
 import os from "os";
 
+// When true and the show name contains a year, TPB/LIM/EZT are first searched with the
+// year included. If that yields >20 results the no-year search is skipped; otherwise
+// both sets of results are combined.
+const ALWAYS_DO_BOTH_SEARCHES = true;
+const LOG_APPS_API_DATA_TOR_RESULTS_TXT = false;
+
 // Provider code mapping for stats display
 const PROVIDER_CODE_MAP = {
   IpTorrents: "IPT",
@@ -32,10 +38,6 @@ function getProviderCode(provider) {
 
 // In-memory cache: showName (lowercase) -> deduped raw results from last IPT/TL search
 const iptTlSearchCache = new Map();
-
-const LOG_APPS_API_DATA_TOR_RESULTS_TXT = false;
-
-const SAVE_SAMPLE_TORRENTS = false;
 
 const DATA_DIR = getApiDataDir();
 const COOKIES_DIR = DATA_DIR;
@@ -530,18 +532,58 @@ export async function searchTorrents({
     // more=true: combine cached IPT/TL results + fresh TPB/LIM/EZT searches
     const cacheKey = showName.toLowerCase();
     const cachedIptTl = iptTlSearchCache.get(cacheKey) || [];
-    const moreArrays = await Promise.all(
-      uniqueQueries.flatMap((q) => [
-        TorrentSearchApi.search(["ThePirateBay"], q, "Video", limit).catch(
-          () => [],
-        ),
-        TorrentSearchApi.search(["Limetorrents"], q, "TV", limit).catch(
-          () => [],
-        ),
-        TorrentSearchApi.search(["Eztv"], q, "All", limit).catch(() => []),
-      ]),
-    );
-    rawCombined = [...cachedIptTl, ...moreArrays.flat()];
+
+    // Detect a year in the show name (e.g. "Show (2004)" or "Show 2004")
+    const yearMatch =
+      ALWAYS_DO_BOTH_SEARCHES &&
+      baseName.match(/\s*\(\d{4}\)\s*$|\s+\d{4}\s*$/);
+
+    const searchTpbLimEzt = async (queries) =>
+      (
+        await Promise.all(
+          queries.flatMap((q) => [
+            TorrentSearchApi.search(["ThePirateBay"], q, "Video", limit).catch(
+              () => [],
+            ),
+            TorrentSearchApi.search(["Limetorrents"], q, "TV", limit).catch(
+              () => [],
+            ),
+            TorrentSearchApi.search(["Eztv"], q, "All", limit).catch(() => []),
+          ]),
+        )
+      ).flat();
+
+    let tpbLimEztResults;
+    if (yearMatch) {
+      // Phase 1: search with year
+      const withYearResults = await searchTpbLimEzt(uniqueQueries);
+      if (withYearResults.length > 20) {
+        // Enough results – skip the no-year search
+        tpbLimEztResults = withYearResults;
+      } else {
+        // Phase 2: also search without year
+        const nameNoYear = baseName
+          .replace(/\s*\(\d{4}\)\s*$/, "")
+          .replace(/\s+\d{4}\s*$/, "")
+          .trim();
+        const sanitizedNoYear = sanitizeForProviderSearch(nameNoYear);
+        const noYearQueries =
+          sanitizedNoYear &&
+          !uniqueQueries.some(
+            (q) => q.toUpperCase() === sanitizedNoYear.toUpperCase(),
+          )
+            ? [sanitizedNoYear]
+            : [];
+        const withoutYearResults = noYearQueries.length
+          ? await searchTpbLimEzt(noYearQueries)
+          : [];
+        tpbLimEztResults = [...withYearResults, ...withoutYearResults];
+      }
+    } else {
+      tpbLimEztResults = await searchTpbLimEzt(uniqueQueries);
+    }
+
+    rawCombined = [...cachedIptTl, ...tpbLimEztResults];
   }
 
   const seen = new Set();

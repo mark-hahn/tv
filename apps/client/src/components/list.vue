@@ -1229,7 +1229,9 @@ export default {
       switch (this.sortChoice) {
         case "Alpha":
           if (!forSort) return "";
-          return show.Name.replace(/^the\s*/i, "").toLowerCase();
+          return show.Name.replace(/^the\s*/i, "")
+            .replace(/[^a-z0-9\s]/gi, "")
+            .toLowerCase();
         case "Added":
           return show.DateCreated;
         case "Ended":
@@ -2372,9 +2374,11 @@ export default {
           // Notes are equal - sort by show name as tiebreaker
           const aName = String(a?.Name ?? "")
             .replace(/^the\s*/i, "")
+            .replace(/[^a-z0-9\s]/gi, "")
             .toLowerCase();
           const bName = String(b?.Name ?? "")
             .replace(/^the\s*/i, "")
+            .replace(/[^a-z0-9\s]/gi, "")
             .toLowerCase();
           if (aName === bName) return 0;
           return aName > bName ? 1 : -1;

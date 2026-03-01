@@ -143,6 +143,19 @@
               Force
             </button>
             <button
+              @click.stop="openTorTabs"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px;
+                border: 1px solid #bbb;
+                background-color: whitesmoke;
+              "
+            >
+              Tabs
+            </button>
+            <button
               @click.stop="toggleCookieInputs"
               style="
                 font-size: 13px;
@@ -1716,6 +1729,24 @@ export default {
       }
       this.hasSearched = true;
       await this.loadTorrents(this.lastNeeded || [], true);
+    },
+
+    openTorTabs() {
+      const name = String(this.currentShow?.Name || "")
+        .replace(/\([^)]+\)\s*$/, "")
+        .replace(/[?.]+\s*$/g, "")
+        .trim();
+      const searchQ = encodeURIComponent(name);
+      const eztQ = name.replace(/\s+/g, "+");
+      window.open(
+        `https://thepiratebay.org/search.php?q=${searchQ}&cat=205`,
+        "_blank",
+      );
+      window.open(
+        `https://www.limetorrents.lol/search/tv/${searchQ}/`,
+        "_blank",
+      );
+      window.open(`https://eztv.re/search/${eztQ}`, "_blank");
     },
 
     async forceClick() {

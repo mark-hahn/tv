@@ -2816,8 +2816,9 @@ export default {
 
       let name = window.localStorage.getItem("lastVisShow");
       if (!name) {
-        window.localStorage.setItem("lastVisShow", allShows[0].Name);
-        name = allShows[0].Name;
+        const firstShow = this.shows[0] || allShows[0];
+        window.localStorage.setItem("lastVisShow", firstShow.Name);
+        name = firstShow.Name;
       }
 
       // Keep initial selection on Emby-visible entries for default UX.
@@ -2826,7 +2827,8 @@ export default {
         console.log(
           "Saved show has inEmby false, selecting first show instead",
         );
-        name = allShows[0].Name;
+        const firstShow = this.shows[0] || allShows[0];
+        name = firstShow.Name;
         window.localStorage.setItem("lastVisShow", name);
       }
 

@@ -1749,7 +1749,7 @@ export default {
       window.open(`https://eztv.re/search/${eztQ}`, "_blank");
       window.open(`https://iptorrents.com/t?q=${searchQ}`, "_blank");
       window.open(
-        `https://www.torrentleech.org/torrents/browse/list/query/${searchQ}`,
+        `https://www.torrentleech.org/torrents/browse/index/query/${searchQ}`,
         "_blank",
       );
     },

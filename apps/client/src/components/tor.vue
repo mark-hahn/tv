@@ -1908,7 +1908,6 @@ export default {
         this.torrents = [];
       }
       this.noTorrentsNeeded = false;
-      this._didInitialScroll = false;
 
       // Reset more-providers state on each new load
       this.hasMoreProviders = false;
@@ -2123,16 +2122,6 @@ export default {
           this.providerWarning = this.providerWarning
             ? `${this.providerWarning}\n\n${cookieWarning}`
             : cookieWarning;
-        }
-
-        await this.$nextTick();
-        if (
-          !this._didInitialScroll &&
-          Array.isArray(this.torrents) &&
-          this.torrents.length > 0
-        ) {
-          this.scrollToBottom();
-          this._didInitialScroll = true;
         }
       } catch (err) {
         // Handle both Error objects and rejected promise values

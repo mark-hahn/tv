@@ -7,10 +7,10 @@ initializeProviders();
 process.once("message", async (params) => {
   try {
     const result = await searchTorrents(params);
-    process.send({ ok: true, result });
+    process.send({ ok: true, result }, () => process.exit(0));
   } catch (err) {
-    process.send({ ok: false, error: err?.message || String(err) });
-  } finally {
-    process.exit(0);
+    process.send({ ok: false, error: err?.message || String(err) }, () =>
+      process.exit(1),
+    );
   }
 });

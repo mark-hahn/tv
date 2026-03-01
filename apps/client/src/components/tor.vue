@@ -1747,6 +1747,11 @@ export default {
         "_blank",
       );
       window.open(`https://eztv.re/search/${eztQ}`, "_blank");
+      window.open(`https://iptorrents.com/t?q=${searchQ}`, "_blank");
+      window.open(
+        `https://www.torrentleech.org/torrents/browse/list/query/${searchQ}`,
+        "_blank",
+      );
     },
 
     async forceClick() {

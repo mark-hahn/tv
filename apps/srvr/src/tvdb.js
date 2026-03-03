@@ -1,19 +1,19 @@
 import fs from "fs";
 import * as path from "node:path";
 import fetch from "node-fetch";
+import { chromium } from "playwright";
 import WebSocket from "ws";
 import * as urls from "./urls.js";
 import * as emby from "./emby.js";
 import { rottenSearch } from "./rotten.js";
 import * as util from "./util.js";
 const { getPstDate } = util;
-import { SRVR_DATA_DIR, SRVR_ROOT_DIR } from "./srvrPaths.js";
+import { SRVR_DATA_DIR } from "./srvrPaths.js";
 import { MovieDb } from "moviedb-promise";
 const { log, start, end } = util.getLog("tvdb");
 const TVDB_PATH = path.join(SRVR_DATA_DIR, "tvdb.json");
 const TVDB_BACKUP_PATH = path.join(SRVR_DATA_DIR, "tvdb.json.bak");
 const TVDB_TEMPLATE_PATH = path.join(SRVR_DATA_DIR, "tvdbTemplate.json");
-const IMDB_FAIL_PATH = path.resolve(SRVR_ROOT_DIR, "..", "..", "imdb-fail.md");
 
 const FAST_UPDATE = false;
 const TVDB_UPDATE_DELAY_MS = FAST_UPDATE ? 5 * 1000 : 2 * 60 * 1000;
@@ -526,67 +526,30 @@ if (phase5MigrationNeeded) {
 ///////////////////// GET REMOTES ///////////////////////
 
 const IMDB_USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36";
-const IMDB_REQUEST_HEADERS = {
-  accept:
-    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-  "accept-language": "en-US,en;q=0.9",
-  pragma: "no-cache",
-  "cache-control": "no-cache",
-  "upgrade-insecure-requests": "1",
-  "sec-fetch-dest": "document",
-  "sec-fetch-mode": "navigate",
-  "sec-fetch-site": "same-origin",
-  "sec-fetch-user": "?1",
-  "user-agent": IMDB_USER_AGENT,
-};
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+let imdbBrowser = null;
 
-function writeImdbFailReportOnce({
-  url,
-  name,
-  status = null,
-  wafAction = null,
-  reason,
-  error = null,
-  htmlLength = null,
-}) {
-  if (fs.existsSync(IMDB_FAIL_PATH)) return;
-  const timestamp = (() => {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Los_Angeles",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).formatToParts(new Date());
-    const val = (t) => parts.find((p) => p.type === t)?.value || "00";
-    return `${val("month")}-${val("day")} ${val("hour")}:${val("minute")}`;
-  })();
-  const report = [
-    "# IMDb Scrape Failure",
-    "",
-    `timestamp: ${timestamp}`,
-    `show: ${name || "unknown"}`,
-    `url: ${url || "unknown"}`,
-    `reason: ${reason || "unspecified"}`,
-    `status: ${status ?? "n/a"}`,
-    `x-amzn-waf-action: ${wafAction || "n/a"}`,
-    `response-bytes: ${htmlLength ?? "n/a"}`,
-    `error: ${error || "n/a"}`,
-    "",
-    "This file is written once (first failure only) to capture why direct IMDb scraping failed in production.",
-  ].join("\n");
+async function getImdbBrowser() {
+  try {
+    if (
+      imdbBrowser &&
+      typeof imdbBrowser.isConnected === "function" &&
+      imdbBrowser.isConnected()
+    ) {
+      return imdbBrowser;
+    }
+  } catch {
+    // ignore
+  }
 
   try {
-    fs.writeFileSync(IMDB_FAIL_PATH, report, "utf8");
-  } catch (e) {
-    log("err", `failed to write imdb fail report: ${e.message}`);
+    if (imdbBrowser) await imdbBrowser.close();
+  } catch {
+    // ignore
   }
-}
 
-function isImdbScrapeDisabled() {
-  return fs.existsSync(IMDB_FAIL_PATH);
+  imdbBrowser = await chromium.launch({ headless: true });
+  return imdbBrowser;
 }
 
 const extractImdbRating = (html) => {
@@ -635,124 +598,171 @@ const extractImdbVideo = (html) => {
 };
 
 const getUrlAndRatings = async (type, url, name) => {
-  // log('getUrlAndRatings', {type, url, name});
-
-  const fetchWithTimeout = async (u, o) => {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), 8000);
-    try {
-      return await fetch(u, { ...o, signal: controller.signal });
-    } catch (e) {
-      if (e.name === "AbortError") throw new Error("Request timed out");
-      throw e;
-    } finally {
-      clearTimeout(id);
-    }
-  };
-
   if (+type === 2) {
-    if (isImdbScrapeDisabled()) {
-      return { ratings: null, video: null };
-    }
-
-    let resp;
+    let context = null;
+    let page = null;
+    let resp = null;
     try {
-      resp = await fetchWithTimeout(url, {
-        headers: IMDB_REQUEST_HEADERS,
-        redirect: "follow",
+      const b = await getImdbBrowser();
+      context = await b.newContext({
+        userAgent: IMDB_USER_AGENT,
+        locale: "en-US",
+        extraHTTPHeaders: {
+          "Accept-Language": "en-US,en;q=0.9",
+        },
       });
+      page = await context.newPage();
+      resp = await page.goto(url, {
+        waitUntil: "domcontentloaded",
+        timeout: 15000,
+      });
+      await page.waitForTimeout(800);
     } catch (e) {
       log(
         "err",
-        `getUrlAndRatings imdb fetch error: ${JSON.stringify({
-          type,
-          url,
-          name,
-        })}, ${e.message}`,
+        `getUrlAndRatings imdb playwright error: ${url}, ${e.message}`,
       );
-      writeImdbFailReportOnce({
-        url,
-        name,
-        reason: "network-error",
-        error: e.message,
-      });
       return { ratings: null, video: null };
     }
 
-    if (!resp.ok) {
-      const wafAction = resp.headers.get("x-amzn-waf-action");
+    if (!resp || !resp.ok()) {
+      const status = resp ? resp.status() : null;
       log(
         "err",
-        `getUrlAndRatings imdb fetch error: ${JSON.stringify({
-          type,
-          url,
-          name,
-          status: resp.status,
-          wafAction,
-        })}`,
+        `getUrlAndRatings imdb fetch error: ${url}, status=${status}`,
       );
-      writeImdbFailReportOnce({
-        url,
-        name,
-        status: resp.status,
-        wafAction,
-        reason: "http-not-ok",
-      });
+      try {
+        await context?.close();
+      } catch {}
       return { ratings: null, video: null };
     }
 
     try {
-      let html = await resp.text();
+      let html = await page.content();
       const compactHtml = (html || "")
         .replaceAll(/\r?\n/gm, "")
         .replaceAll(/\s+/gm, " ");
-      const isChallenge = /verify you are human|captcha|challenge/i.test(
-        compactHtml,
-      );
-      if (isChallenge) {
-        writeImdbFailReportOnce({
-          url,
-          name,
-          status: resp.status,
-          wafAction: resp.headers.get("x-amzn-waf-action"),
-          reason: "challenge-page",
-          htmlLength: html.length,
-        });
+      const hasChallengeMarkers =
+        /verify you are human|please verify you are a human|enter the characters you see below|type the characters you see/i.test(
+          compactHtml,
+        );
+      const hasRatingEvidence =
+        /ipc-rating-star--rating|"aggregateRating"|"ratingValue"/i.test(
+          compactHtml,
+        );
+      if (hasChallengeMarkers && !hasRatingEvidence) {
+        log("err", `getUrlAndRatings imdb challenge page: ${url}`);
+        try {
+          await context?.close();
+        } catch {}
         return { ratings: null, video: null };
       }
 
       html = compactHtml;
-      const rating = extractImdbRating(html);
+      let rating = null;
+      const jsonLdRating = await page
+        .evaluate(() => {
+          const scripts = Array.from(
+            document.querySelectorAll('script[type="application/ld+json"]'),
+          );
+          const visit = (node) => {
+            if (!node) return null;
+            if (Array.isArray(node)) {
+              for (const item of node) {
+                const found = visit(item);
+                if (found !== null) return found;
+              }
+              return null;
+            }
+            if (typeof node !== "object") return null;
+
+            const typeVal = node["@type"];
+            const typeList = Array.isArray(typeVal) ? typeVal : [typeVal];
+            const isTitleType = typeList.some((t) =>
+              ["TVSeries", "Movie", "TVMiniSeries", "TVEpisode"].includes(
+                String(t || ""),
+              ),
+            );
+            if (isTitleType && node.aggregateRating?.ratingValue !== undefined) {
+              const v = parseFloat(String(node.aggregateRating.ratingValue));
+              if (!Number.isNaN(v) && v >= 0 && v <= 10) return v;
+            }
+
+            if (node["@graph"]) {
+              const found = visit(node["@graph"]);
+              if (found !== null) return found;
+            }
+            for (const v of Object.values(node)) {
+              const found = visit(v);
+              if (found !== null) return found;
+            }
+            return null;
+          };
+
+          for (const s of scripts) {
+            try {
+              const parsed = JSON.parse(s.textContent || "");
+              const found = visit(parsed);
+              if (found !== null) return found;
+            } catch {
+              // ignore malformed JSON-LD blocks
+            }
+          }
+          return null;
+        })
+        .catch(() => null);
+      if (
+        typeof jsonLdRating === "number" &&
+        !Number.isNaN(jsonLdRating) &&
+        jsonLdRating >= 0 &&
+        jsonLdRating <= 10
+      ) {
+        rating = String(jsonLdRating);
+      }
+
+      const ratingSelectors = [
+        '[data-testid="hero-rating-bar__aggregate-rating__score"] [data-testid="rating-histogram-star"]',
+        '[data-testid="hero-rating-bar__aggregate-rating"] [data-testid="rating-histogram-star"]',
+        '[data-testid="hero-rating-bar__aggregate-rating"] .ipc-rating-star--rating',
+        '[data-testid="rating-histogram-star"]',
+        ".ipc-rating-star--rating",
+      ];
+      if (!rating) {
+        for (const selector of ratingSelectors) {
+          const ratingText = await page
+            .locator(selector)
+            .first()
+            .textContent({ timeout: 1500 })
+            .catch(() => null);
+          const ratingVal = parseFloat(String(ratingText || "").trim());
+          if (!Number.isNaN(ratingVal) && ratingVal >= 0 && ratingVal <= 10) {
+            rating = String(ratingVal);
+            break;
+          }
+        }
+      }
+      if (!rating) {
+        rating = extractImdbRating(html);
+      }
       const video = extractImdbVideo(html);
       if (!rating && !video) {
-        writeImdbFailReportOnce({
-          url,
-          name,
-          status: resp.status,
-          wafAction: resp.headers.get("x-amzn-waf-action"),
-          reason: "no-rating-or-video",
-          htmlLength: html.length,
-        });
+        try {
+          await context?.close();
+        } catch {}
         return { ratings: null, video: null };
       }
+      try {
+        await context?.close();
+      } catch {}
       return { ratings: rating, video: video };
     } catch (e) {
       log(
         "err",
-        `getUrlAndRatings imdb parse error: ${JSON.stringify({
-          type,
-          url,
-          name,
-        })}, ${e.message}`,
+        `getUrlAndRatings imdb parse error: ${url}, ${e.message}`,
       );
-      writeImdbFailReportOnce({
-        url,
-        name,
-        status: resp?.status ?? null,
-        wafAction: resp?.headers?.get("x-amzn-waf-action") ?? null,
-        reason: "parse-error",
-        error: e.message,
-      });
+      try {
+        await context?.close();
+      } catch {}
       return { ratings: null, video: null };
     }
   }
@@ -1786,7 +1796,7 @@ const tryLocalGetTvdb = async () => {
     seasonCount: minTvdb.seasonCount ?? 0,
     episodeCount: minTvdb.episodeCount ?? 0,
     watchedCount: minTvdb.watchedCount ?? 0,
-    fast: true, // Skip Rotten Tomatoes scraping here; RT is done separately as push3
+    fast: true, // Skip Rotten scrape only; getRemotes still does IMDb Playwright rating/video fetch.
     suppressNotify: true, // Combined push1+push2 notify is sent after perShowCallback
   };
   // Await TVDB refresh completion so the updated record is available for further processing
@@ -2038,10 +2048,6 @@ export const getActorPage = async (params) => {
   }
 
   const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, "_")}`;
-
-  if (isImdbScrapeDisabled()) {
-    return wikiUrl;
-  }
 
   try {
     // Search IMDb for the actor

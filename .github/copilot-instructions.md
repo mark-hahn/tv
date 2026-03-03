@@ -38,3 +38,4 @@
 - the exception is it is ok for srvr script to deploy client when deploying all with `./srvr`
 - when i say `no change` i mean everything looks and behaves the same after the changes were made
 - all timestamps for logging and general debugging should be pst la with format MM-DD HH:mm
+- when node is not installed in the local environment fix the problem and continue

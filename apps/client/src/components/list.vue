@@ -2479,18 +2479,6 @@ export default {
       }
 
       const filteredShows = [];
-      const rejectShows = allShows.filter((s) => s.Reject);
-      const banCond = this.conds.find((c) => c.name === "ban");
-      console.log(
-        "[refilter] allShows:",
-        allShows.length,
-        "Reject=true:",
-        rejectShows.length,
-        "ban.filter:",
-        banCond?.filter,
-        "conds:",
-        this.conds.map((c) => `${c.name}:${c.filter}`).join(" "),
-      );
       fltrLoop: for (const show of allShows) {
         if (this.fltrChoice === "Finished") {
           const tvdbData = localAllTvdb?.[show.Name];
@@ -2508,28 +2496,11 @@ export default {
         for (let cond of this.conds) {
           if (cond.filter === 0) continue;
           if ((cond.filter === +1) != !!cond.cond(show)) {
-            if (show.Reject)
-              console.log(
-                "[refilter] REJECT show blocked:",
-                show.Name,
-                "by cond:",
-                cond.name,
-                "filter:",
-                cond.filter,
-                "condResult:",
-                !!cond.cond(show),
-              );
             continue fltrLoop;
           }
         }
         filteredShows.push(show);
       }
-      console.log(
-        "[refilter] filteredShows:",
-        filteredShows.length,
-        "Reject=true in result:",
-        filteredShows.filter((s) => s.Reject).length,
-      );
 
       this.shows = filteredShows;
       let selectFirstAfterSort = false;

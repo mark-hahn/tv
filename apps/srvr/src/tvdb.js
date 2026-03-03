@@ -16,6 +16,7 @@ const TVDB_TEMPLATE_PATH = path.join(SRVR_DATA_DIR, "tvdbTemplate.json");
 const IMDB_FAIL_PATH = path.resolve(SRVR_ROOT_DIR, "..", "..", "imdb-fail.md");
 
 const FAST_UPDATE = false;
+const TVDB_UPDATE_DELAY_MS = FAST_UPDATE ? 5 * 1000 : 2 * 60 * 1000;
 const moviedb = new MovieDb("327192a334da700f65b882c7a69cb927");
 
 // TVDB API Credentials
@@ -1895,9 +1896,9 @@ const tryLocalGetTvdb = async () => {
   }
 
   tryLocalGetTvdbBusy = false;
-  // If more shows are queued, continue processing after a short delay; otherwise wait 2 mins
+  // If more shows are queued, continue processing after a short delay; otherwise use background cadence.
   if (showProcessQueue.length > 0) setTimeout(tryLocalGetTvdb, 1000);
-  else setTimeout(tryLocalGetTvdb, 2 * 60 * 1000);
+  else setTimeout(tryLocalGetTvdb, TVDB_UPDATE_DELAY_MS);
 };
 
 // calls tryLocalGetTvdb every 5s (FAST_UPDATE) or 2 mins, delay from end of one task to beginning of next
@@ -1927,8 +1928,7 @@ const updateTvdbLocal = async () => {
     }
     await tryLocalGetTvdb();
   }
-  const delay = FAST_UPDATE ? 5 * 1000 : 2 * 60 * 1000;
-  setTimeout(updateTvdbLocal, delay);
+  setTimeout(updateTvdbLocal, TVDB_UPDATE_DELAY_MS);
 };
 _kickProcessQueue = tryLocalGetTvdb;
 updateTvdbLocal();

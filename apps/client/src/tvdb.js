@@ -233,18 +233,25 @@ export const getRemotes = async (
 
   // Check if already in allTvdb cache (only use cache if it has results)
   // Only use cache for fast requests (full refreshes always fetch fresh)
-  if (
-    fast &&
-    (() => {
-      const found = getTvdbRecordByNameOrId(allTvdb, showName, tvdbId).record;
-      return !!(
-        found?.remotes &&
-        Array.isArray(found.remotes) &&
-        found.remotes.length > 0
-      );
-    })()
-  ) {
-    return getTvdbRecordByNameOrId(allTvdb, showName, tvdbId).record.remotes;
+  if (fast) {
+    const found = getTvdbRecordByNameOrId(allTvdb, showName, tvdbId).record;
+    const cachedRemotes = Array.isArray(found?.remotes) ? found.remotes : [];
+    const hasCachedRemotes = cachedRemotes.length > 0;
+
+    if (hasCachedRemotes) {
+      // If caller provides inEmby context, cached remotes must match it.
+      // This avoids stale cache showing no Emby button right after a show is added.
+      const expectedInEmby =
+        showContext?.inEmby === undefined ? null : showContext.inEmby !== false;
+      const hasEmbyRemote = cachedRemotes.some((r) => r?.name === "Emby");
+      const cacheMatchesInEmby =
+        expectedInEmby === null ||
+        (expectedInEmby ? hasEmbyRemote : !hasEmbyRemote);
+
+      if (cacheMatchesInEmby) {
+        return cachedRemotes;
+      }
+    }
   }
 
   // Check if in-flight request exists

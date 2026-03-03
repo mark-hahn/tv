@@ -158,9 +158,11 @@ export async function loadAllShows() {
     if (rec.lastAired && !rec.LastAired) rec.LastAired = rec.lastAired;
     if (!rec.Ratings)
       rec.Ratings =
-        rec.remotes?.find((r) => r.name?.startsWith("IMDB"))?.ratings || null;
-    if (rec.reject && !rec.Reject) rec.Reject = rec.reject;
-    if (rec.pickup && !rec.Pickup) rec.Pickup = rec.pickup;
+        rec.imdbRatings ||
+        rec.remotes?.find((r) => r.name?.startsWith("IMDB"))?.ratings ||
+        null;
+    rec.Reject = !!rec.reject;
+    rec.Pickup = !!rec.pickup;
     if (rec.waitStr && !rec.WaitStr) rec.WaitStr = rec.waitStr;
     if (rec.note && !rec.Notes) rec.Notes = rec.note;
     rec.NotReady = rec.inEmby === false;
@@ -798,7 +800,9 @@ async function _oldLoadAllShows() {
     if (tvdb.lastAired && !tvdb.LastAired) tvdb.LastAired = tvdb.lastAired;
     if (!tvdb.Ratings) {
       tvdb.Ratings =
-        tvdb.remotes?.find((r) => r.name?.startsWith("IMDB"))?.ratings || null;
+        tvdb.imdbRatings ||
+        tvdb.remotes?.find((r) => r.name?.startsWith("IMDB"))?.ratings ||
+        null;
     }
     if (tvdb.reject && !tvdb.Reject) tvdb.Reject = tvdb.reject;
     if (tvdb.pickup && !tvdb.Pickup) tvdb.Pickup = tvdb.pickup;

@@ -1225,7 +1225,23 @@ export default {
           fast,
         );
 
-        this.remotes = results;
+        const normalizeImdbRemoteName = (remote) => {
+          if (!remote || !remote.name || !remote.name.startsWith("IMDB")) {
+            return remote;
+          }
+          // Prefer explicit remote rating, then tvdb flat imdbRatings, then show.Ratings.
+          const rating =
+            remote.ratings ||
+            tvdbData?.imdbRatings ||
+            tvdbData?.Ratings ||
+            this.show?.Ratings ||
+            null;
+          if (!rating) return remote;
+          if (remote.name.includes("(")) return remote;
+          return { ...remote, name: `${remote.name} (${rating})` };
+        };
+
+        this.remotes = results.map(normalizeImdbRemoteName);
         this.showRemotes = results.length > 0;
         // Reset fetch mode after use
         this.remoteFetchMode = "fast";

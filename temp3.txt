@@ -1,0 +1,17 @@
+curl ^"https://www.imdb.com/title/tt34385331^" ^
+  -H ^"accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7^" ^
+  -H ^"accept-language: en-US,en;q=0.9^" ^
+  -H ^"cache-control: no-cache^" ^
+  -b ^"session-id=142-1305466-4401715; session-id-time=2082787201l; ubid-main=132-2821978-4072304; _cc_id=d01cddb7eb6d05c61136ebafaa3670c4; _au_1d=AU1D-0100-001765158880-N95CWWXD-0HCL; _ga=GA1.1.131192055.1765169546; ad-oo=0; _pubcid=ec342981-0dcb-4381-8eba-89064d2622b6; panoramaId_expiry=1773170927336; panoramaId=a909b2a716f8d1a5eba0e1e0f0264945a702e5be14ba4b53aadb1fb3f5e6ef49; panoramaIdType=panoIndiv; _lr_geo_location_state=CA; _lr_geo_location=US; _ga_FVWZ0RM4DH=GS2.1.s1772566159^$o3^$g1^$t1772566515^$j60^$l0^$h0; aws-waf-token=7cafe1a2-bcc6-4d1a-beaf-d65303068bb8:EQoAg6+JOuQ9AAAA:OeCrssZGUy1RPvx1qIJd8CERaTrtDaZDcIrBZlEDX7/JuhuCZn7TGxLNZ/UgYv4Q8cxenyE91tsvLj0TOQxlDuHTG/KrqhFN8TeNk1GJY2ugagPTKdhgc2J1xc3hEsSQoHdz+RrtKOIu6Y70SDx7KZAiynlWk7ltAu/jTrVnZ5Jfn78exlJvxq+tZ08stRU=; session-token=3VZEgrIWn4qBCvNExHvILMMpqs5lwtznr1Rx3+Cgcht2U8JolYH/+1BRpXFPo9uU5X7blz339Z9a2Rfw0ZDDwRyRZf2POtoyONhmJwsKB2Gy1FToRkGgBgZuCbp7ENbXaelPRptUraWbns1kY9hF/z7ja/7P4xkFUxXX+lPkmmOqNUGYrPQmt7d/quM+7gv9BE4xURXN6MVRD4PrlbSflJ6zUn3OwpeJ; csm-hit=tb:s-CH3C07BS76A6M078NX31^|1772566861640^&t:1772566863051^&adb:adblk_no; ci=eyJhZ2VTaWduYWwiOiJBRFVMVCIsImRpc2FibGVDQ0JBIjpmYWxzZSwiaXNHZHByIjpmYWxzZX0; __gads=ID=bb3582d46459cdaa:T=1765158934:RT=1772566864:S=ALNI_MYRPdxn7kg5alqCFa9966q6WmJErg; __gpi=UID=000012d0aec592ec:T=1765158934:RT=1772566864:S=ALNI_Ma8hxcjpU1yNTqcSoKa8AxdBam6qQ; __eoi=ID=12cfd75d0585abf3:T=1765158934:RT=1772566864:S=AA-AfjZSwLqoSkLlm7_msezf9N0o^" ^
+  -H ^"pragma: no-cache^" ^
+  -H ^"priority: u=0, i^" ^
+  -H ^"referer: https://www.imdb.com/title/tt34385331^" ^
+  -H ^"sec-ch-ua: ^\^"Not:A-Brand^\^";v=^\^"99^\^", ^\^"Google Chrome^\^";v=^\^"145^\^", ^\^"Chromium^\^";v=^\^"145^\^"^" ^
+  -H ^"sec-ch-ua-mobile: ?0^" ^
+  -H ^"sec-ch-ua-platform: ^\^"Windows^\^"^" ^
+  -H ^"sec-fetch-dest: document^" ^
+  -H ^"sec-fetch-mode: navigate^" ^
+  -H ^"sec-fetch-site: same-origin^" ^
+  -H ^"sec-fetch-user: ?1^" ^
+  -H ^"upgrade-insecure-requests: 1^" ^
+  -H ^"user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36^"

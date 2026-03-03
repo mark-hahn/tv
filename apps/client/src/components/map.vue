@@ -563,6 +563,7 @@ export default {
       mapTouchMoved: false,
       mapTouchMovedDist: 0,
       mapTouchSuppressClickUntil: 0,
+      mapUpdateKey: 0,
     };
   },
 

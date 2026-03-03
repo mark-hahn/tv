@@ -3037,19 +3037,10 @@ export default {
         // Update allTvdb reference
         allTvdb[name] = record;
 
-        // If this show is currently in the map pane, re-emit show-map with a
-        // fresh shallow copy so Vue detects the new reference and re-renders
-        // gap fields (e.g. FileGap / Missing File message) reactively.
+        // If this show is currently in the map pane, refetch series map so
+        // map cells (noFile/avail/etc.) update after disk/download changes.
         if (this.mapShow && this.mapShow.Name === name && show) {
-          this.mapShow = { ...show };
-          this.$emit("show-map", {
-            mapShow: this.mapShow,
-            hideMapBottom: this.hideMapBottom,
-            seriesMapSeasons: this.seriesMapSeasons,
-            seriesMapEpis: this.seriesMapEpis,
-            seriesMap: this.seriesMap,
-            noSwitch: true,
-          });
+          await this.seriesMapAction("refresh", show, null);
         }
 
         // Refresh UI

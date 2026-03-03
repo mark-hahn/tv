@@ -86,11 +86,8 @@ function readTextOr(filePathOrPaths, fallback) {
 }
 
 function configReadCandidates(relativePath) {
-  // Prefer CWD for backwards compatibility, but fall back to module dir.
-  return [
-    path.join(process.cwd(), relativePath),
-    path.join(SRVR_ROOT_DIR, relativePath),
-  ];
+  // Config is owned by this app under apps/srvr/config.
+  return [path.join(SRVR_ROOT_DIR, relativePath)];
 }
 
 function readTextOrWithChosenPath(filePathOrPaths, fallback) {

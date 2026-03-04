@@ -576,7 +576,10 @@ export async function searchTorrents({
         await Promise.all(
           queries.flatMap((q) => [
             TorrentSearchApi.search(["ThePirateBay"], q, "Video", limit).catch(
-              () => { tpbFailed = true; return []; },
+              () => {
+                tpbFailed = true;
+                return [];
+              },
             ),
             TorrentSearchApi.search(["Limetorrents"], q, "TV", limit).catch(
               () => [],

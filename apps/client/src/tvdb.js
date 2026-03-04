@@ -650,12 +650,15 @@ export const getSeriesMapByTvdbId = async (tvdbId) => {
       seasonMap[seasonNum] = [];
     }
 
-    // Compute unaired/avail using aired date if present
-    let unaired = true;
+    // Unknown air-date should not be treated as unaired.
+    let unaired = false;
     let avail = false;
     if (epData.aired) {
       try {
         const airedDate = new Date(epData.aired);
+        if (Number.isNaN(airedDate.getTime())) {
+          throw new Error("invalid aired date");
+        }
         const today = new Date();
         // Compare by date only (ignore timezones): aired <= today -> not unaired
         const airedYMD = new Date(
@@ -672,7 +675,7 @@ export const getSeriesMapByTvdbId = async (tvdbId) => {
         avail = !unaired;
       } catch (e) {
         unaired = false;
-        avail = true;
+        avail = false;
       }
     }
 

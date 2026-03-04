@@ -357,11 +357,15 @@ async function getSeriesMap(tvdbId, watchedEpis = null) {
       seasonMap[seasonNum] = [];
     }
 
-    let unaired = true;
+    // Unknown air-date should not be treated as unaired.
+    let unaired = false;
     let avail = false;
     if (epData.aired) {
       try {
         const airedDate = new Date(epData.aired);
+        if (Number.isNaN(airedDate.getTime())) {
+          throw new Error("invalid aired date");
+        }
         const today = new Date();
         const airedYMD = new Date(
           airedDate.getFullYear(),
@@ -377,7 +381,7 @@ async function getSeriesMap(tvdbId, watchedEpis = null) {
         avail = !unaired;
       } catch (e) {
         unaired = false;
-        avail = true;
+        avail = false;
       }
     }
 

@@ -271,6 +271,8 @@ async function getSeriesMap(tvdbId, watchedEpis = null) {
   let page = 0;
   let safety = 0;
   const seenPages = new Set();
+  const missingEpisodeNumBySeason = {};
+  const missingEpisodeNumSamples = [];
 
   // Fetch all episodes with pagination
   while (true) {
@@ -357,6 +359,21 @@ async function getSeriesMap(tvdbId, watchedEpis = null) {
       seasonMap[seasonNum] = [];
     }
 
+    const normalizedEpisodeNum = Number(episodeNum);
+    if (!Number.isFinite(normalizedEpisodeNum) || normalizedEpisodeNum <= 0) {
+      missingEpisodeNumBySeason[seasonNum] =
+        (missingEpisodeNumBySeason[seasonNum] || 0) + 1;
+      if (missingEpisodeNumSamples.length < 8) {
+        missingEpisodeNumSamples.push({
+          season: seasonNum,
+          episodeNum,
+          id: epData?.id ?? null,
+          name: epData?.name ?? null,
+          aired: epData?.aired ?? null,
+        });
+      }
+    }
+
     // Unknown air-date should not be treated as unaired.
     let unaired = false;
     let avail = false;
@@ -405,6 +422,14 @@ async function getSeriesMap(tvdbId, watchedEpis = null) {
     .sort((a, b) => a - b);
   for (const seasonNum of seasonNums) {
     seriesMap.push([seasonNum, seasonMap[seasonNum]]);
+  }
+
+  if (missingEpisodeNumSamples.length > 0) {
+    log("warn", "getSeriesMap: episodes missing numeric episode number", {
+      tvdbId,
+      missingEpisodeNumBySeason,
+      sample: missingEpisodeNumSamples,
+    });
   }
 
   // Apply watchedEpis if provided

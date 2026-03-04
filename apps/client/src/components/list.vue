@@ -2308,6 +2308,29 @@ export default {
       this.seriesMapSeasons = seriesMapSeasons.filter((x) => x !== null);
       this.seriesMapEpis = seriesMapEpis.filter((x) => x !== null);
       this.seriesMap = seriesMap;
+
+      // Debug aid: detect cells that will render blank because no episode object exists.
+      const blankCells = [];
+      for (const season of this.seriesMapSeasons) {
+        for (const episode of this.seriesMapEpis) {
+          if (!this.seriesMap?.[season]?.[episode]) {
+            blankCells.push(`S${season}E${episode}`);
+            if (blankCells.length >= 12) break;
+          }
+        }
+        if (blankCells.length >= 12) break;
+      }
+      if (blankCells.length > 0) {
+        console.warn("[map-debug] blank map cells", {
+          show: this.mapShow?.Name,
+          inEmby: this.mapShow?.inEmby !== false,
+          tvdbId: this.mapShow?.TvdbId || this.mapShow?.tvdbId || null,
+          seasons: this.seriesMapSeasons.length,
+          episodes: this.seriesMapEpis.length,
+          sampleBlankCells: blankCells,
+        });
+      }
+
       this.hideMapBottom = false;
       // In preview mode, don't overwrite highlightName with the preview show.
       // On refresh, skip saveVisShow entirely — it's just a data update, not a selection change.

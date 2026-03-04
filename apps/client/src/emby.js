@@ -1123,6 +1123,8 @@ export const getSeriesMap = async (show, prune = false) => {
   const seriesMap = [];
   let pruning = prune;
   const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
+  const missingEpisodeNumbers = [];
+  const emptySeasons = [];
 
   for (let key in seasonsRes.data.Items) {
     let seasonRec = seasonsRes.data.Items[key];
@@ -1140,7 +1142,18 @@ export const getSeriesMap = async (show, prune = false) => {
     for (let key in episodesRes.data.Items) {
       let episodeRec = episodesRes.data.Items[key];
       const episodeNumber = +episodeRec.IndexNumber;
-      if (episodeNumber === undefined) continue;
+      if (!Number.isFinite(episodeNumber)) {
+        if (missingEpisodeNumbers.length < 12) {
+          missingEpisodeNumbers.push({
+            season: seasonNumber,
+            indexNumber: episodeRec?.IndexNumber ?? null,
+            id: episodeRec?.Id ?? null,
+            name: episodeRec?.Name ?? null,
+            locationType: episodeRec?.LocationType ?? null,
+          });
+        }
+        continue;
+      }
 
       const path = episodeRec?.MediaSources?.[0]?.Path;
       const played = !!episodeRec?.UserData?.Played;
@@ -1185,7 +1198,92 @@ export const getSeriesMap = async (show, prune = false) => {
         { error, played, avail, noFile: noFileVal, unaired, deleted, path },
       ]);
     }
+    if (episodes.length === 0) {
+      emptySeasons.push(seasonNumber);
+    }
     seriesMap.push([seasonNumber, episodes]);
+  }
+
+  if (missingEpisodeNumbers.length > 0) {
+    console.warn("[map-debug] episodes missing numeric IndexNumber", {
+      show: show?.Name,
+      showId: seriesId,
+      sample: missingEpisodeNumbers,
+    });
+  }
+
+  // Emby can return empty seasons for some shows even when TVDB has episodes.
+  // Backfill only those empty seasons from TVDB so map cells render as missing files.
+  if (emptySeasons.length > 0) {
+    const tvdbId = show?.TvdbId || show?.tvdbId;
+    if (tvdbId) {
+      try {
+        const allTvdbData = await tvdb.getAllTvdb(0);
+        const watchedEpis = allTvdbData?.[show.Name]?.watchedEpis || null;
+        const fallback = await srvr.getSeriesMapFromTvdb({ tvdbId, watchedEpis });
+        const fallbackMap = new Map((fallback?.seriesMap || []).map((s) => [s[0], s[1]]));
+        for (let i = 0; i < seriesMap.length; i++) {
+          const [seasonNum, episodes] = seriesMap[i];
+          if (episodes.length > 0) continue;
+          const tvdbEpisodes = fallbackMap.get(seasonNum);
+          if (Array.isArray(tvdbEpisodes) && tvdbEpisodes.length > 0) {
+            seriesMap[i] = [seasonNum, tvdbEpisodes];
+          }
+        }
+      } catch (err) {
+        console.warn("[map-debug] failed TVDB fallback for empty Emby seasons", {
+          show: show?.Name,
+          showId: seriesId,
+          tvdbId,
+          emptySeasons,
+          error: err?.message || String(err),
+        });
+      }
+    }
+
+    // If a season is still empty after TVDB fallback, synthesize missing-file cells
+    // using the largest known episode index from other seasons.
+    const maxEpisodeNum = seriesMap.reduce((maxNum, seasonEntry) => {
+      const seasonEpisodes = Array.isArray(seasonEntry?.[1]) ? seasonEntry[1] : [];
+      for (const epEntry of seasonEpisodes) {
+        const epNum = Number(epEntry?.[0]);
+        if (Number.isFinite(epNum) && epNum > maxNum) maxNum = epNum;
+      }
+      return maxNum;
+    }, 0);
+
+    if (maxEpisodeNum > 0) {
+      const synthesized = [];
+      for (let i = 0; i < seriesMap.length; i++) {
+        const [seasonNum, episodes] = seriesMap[i];
+        if (!Array.isArray(episodes) || episodes.length > 0) continue;
+        const syntheticEpisodes = [];
+        for (let epNum = 1; epNum <= maxEpisodeNum; epNum++) {
+          syntheticEpisodes.push([
+            epNum,
+            {
+              error: false,
+              played: false,
+              avail: false,
+              noFile: true,
+              unaired: false,
+              deleted: false,
+              path: null,
+            },
+          ]);
+        }
+        seriesMap[i] = [seasonNum, syntheticEpisodes];
+        synthesized.push(seasonNum);
+      }
+      if (synthesized.length > 0) {
+        console.warn("[map-debug] synthesized episodes for empty seasons", {
+          show: show?.Name,
+          showId: seriesId,
+          seasons: synthesized,
+          inferredEpisodeCount: maxEpisodeNum,
+        });
+      }
+    }
   }
 
   return seriesMap;

@@ -948,12 +948,11 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   const url = `https://www.google.com/search` + `?q=${encoded}%20tv%20show`;
   remotes.push({ name: "Google", url });
 
-  // Wikipedia: use cached flat prop; only fetch externally when creating a new record
-  const isNewRecord = !allTvdb[name];
+  // Wikipedia: use cached flat prop; if missing, fetch and persist it.
   const cachedWikiUrl = allTvdb[name]?.wikiUrl;
   if (cachedWikiUrl) {
     remotes.push({ name: "Wikipedia", url: cachedWikiUrl });
-  } else if (isNewRecord) {
+  } else {
     const wikiRemote = await getRemote(null, 18, name);
     if (wikiRemote?.url) {
       remotes.push({ name: "Wikipedia", url: wikiRemote.url });
@@ -961,11 +960,11 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
     }
   }
 
-  // Reddit: use cached flat prop; only fetch externally when creating a new record
+  // Reddit: use cached flat prop; if missing, fetch and persist it.
   const cachedRedditUrl = allTvdb[name]?.redditUrl;
   if (cachedRedditUrl) {
     remotes.push({ name: "Reddit", url: cachedRedditUrl });
-  } else if (isNewRecord) {
+  } else {
     const redditRemote = await getRemote(null, 7, name);
     if (redditRemote?.url) {
       remotes.push({ name: "Reddit", url: redditRemote.url });
@@ -1144,6 +1143,96 @@ const calculateWaitStr = (nextAired, lastAired) => {
   return null;
 };
 
+const toPositiveInt = (value) => {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
+
+const getApiCounts = (seriesData) => {
+  const defaultSeasonType = Number(seriesData?.defaultSeasonType);
+  const seasonTypeMatches = (itemSeasonType) => {
+    if (!Number.isFinite(defaultSeasonType)) return true;
+    const seasonTypeId =
+      typeof itemSeasonType === "object"
+        ? Number(itemSeasonType?.id)
+        : Number(itemSeasonType);
+    if (!Number.isFinite(seasonTypeId)) return true;
+    return seasonTypeId === defaultSeasonType;
+  };
+
+  const episodeSeasonNums = [];
+  if (Array.isArray(seriesData?.episodes)) {
+    for (const epi of seriesData.episodes) {
+      const seasonNumber = Number(epi?.seasonNumber);
+      if (!Number.isInteger(seasonNumber) || seasonNumber <= 0) continue;
+      if (!seasonTypeMatches(epi?.seasonType)) continue;
+      episodeSeasonNums.push(seasonNumber);
+    }
+  }
+
+  const episodeCountFromEpisodes = toPositiveInt(episodeSeasonNums.length);
+  const seasonCountFromEpisodes = toPositiveInt(
+    new Set(episodeSeasonNums).size,
+  );
+
+  let seasonCountFromSeasons = null;
+  if (Array.isArray(seriesData?.seasons)) {
+    const seasonNums = [];
+    for (const season of seriesData.seasons) {
+      const seasonNumber = Number(season?.number);
+      if (!Number.isInteger(seasonNumber) || seasonNumber <= 0) continue;
+      if (!seasonTypeMatches(season?.type)) continue;
+      seasonNums.push(seasonNumber);
+    }
+    seasonCountFromSeasons = toPositiveInt(new Set(seasonNums).size);
+  }
+
+  return {
+    seasonCount: seasonCountFromEpisodes ?? seasonCountFromSeasons ?? null,
+    episodeCount: episodeCountFromEpisodes ?? null,
+  };
+};
+
+const chooseCount = ({ inputCount, existingCount, apiCount }) => {
+  const inputPositive = toPositiveInt(inputCount);
+  if (inputPositive) return inputPositive;
+  const apiPositive = toPositiveInt(apiCount);
+  if (apiPositive) return apiPositive;
+  const existingPositive = toPositiveInt(existingCount);
+  if (existingPositive) return existingPositive;
+  if (inputCount === 0 || existingCount === 0 || apiCount === 0) return 0;
+  return null;
+};
+
+const getDefaultOrderCounts = async (tvdbId, token) => {
+  try {
+    const url = `https://api4.thetvdb.com/v4/series/${tvdbId}/episodes/default?page=0`;
+    const res = await fetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + token,
+      },
+    });
+    if (!res.ok) return { seasonCount: null, episodeCount: null };
+    const body = await res.json();
+    const episodes = body?.data?.episodes;
+    if (!Array.isArray(episodes)) return { seasonCount: null, episodeCount: null };
+
+    const filtered = episodes.filter((epi) => {
+      const seasonNumber = Number(epi?.seasonNumber);
+      return Number.isInteger(seasonNumber) && seasonNumber > 0;
+    });
+    return {
+      seasonCount: toPositiveInt(
+        new Set(filtered.map((epi) => Number(epi.seasonNumber))).size,
+      ),
+      episodeCount: toPositiveInt(filtered.length),
+    };
+  } catch (_e) {
+    return { seasonCount: null, episodeCount: null };
+  }
+};
+
 const getTvdbData = async (paramObj, resolve, _reject) => {
   const { show, seasonCount, episodeCount, watchedCount, fast } = paramObj;
 
@@ -1187,10 +1276,10 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   }
 
   const name = canonicalName;
-  let extRes, extUrl;
+  let extRes, extUrl, token;
   try {
     extUrl = `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
-    const token = await getToken();
+    token = await getToken();
     extRes = await fetch(extUrl, {
       headers: {
         "Content-Type": "application/json",
@@ -1256,6 +1345,22 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   // Preserve existing non-empty values when API returns empty
   const existing = allTvdb[name] || {};
+  const apiCounts = getApiCounts(extResObj?.data);
+  if (!toPositiveInt(apiCounts.episodeCount)) {
+    const defaultCounts = await getDefaultOrderCounts(tvdbId, token);
+    apiCounts.episodeCount = defaultCounts.episodeCount ?? apiCounts.episodeCount;
+    apiCounts.seasonCount = defaultCounts.seasonCount ?? apiCounts.seasonCount;
+  }
+  const finalSeasonCount = chooseCount({
+    inputCount: seasonCount,
+    existingCount: existing.seasonCount,
+    apiCount: apiCounts.seasonCount,
+  });
+  const finalEpisodeCount = chooseCount({
+    inputCount: episodeCount,
+    existingCount: existing.episodeCount,
+    apiCount: apiCounts.episodeCount,
+  });
 
   // get remote data, e.g. IMDB for tvdb record
   // remoteIds come from tvdb
@@ -1323,8 +1428,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
       existing.originalNetwork,
       tmdbData?.originalNetwork,
     ),
-    seasonCount,
-    episodeCount,
+    seasonCount: finalSeasonCount,
+    episodeCount: finalEpisodeCount,
     watchedCount,
     image: preserve(image, existing.image, tmdbData?.image),
     score: preserve(score, existing.score, tmdbData?.score),

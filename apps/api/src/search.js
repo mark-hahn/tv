@@ -541,6 +541,7 @@ export async function searchTorrents({
 
   // Determine which providers to search based on the `more` flag
   let rawCombined = [];
+  let tpbFailed = false;
   if (!more) {
     // Normal search: IPT/TL only (explicit provider list; they're enabled via initializeProviders)
     const resultsArrays = await Promise.all(
@@ -575,7 +576,7 @@ export async function searchTorrents({
         await Promise.all(
           queries.flatMap((q) => [
             TorrentSearchApi.search(["ThePirateBay"], q, "Video", limit).catch(
-              () => [],
+              () => { tpbFailed = true; return []; },
             ),
             TorrentSearchApi.search(["Limetorrents"], q, "TV", limit).catch(
               () => [],
@@ -1289,6 +1290,7 @@ export async function searchTorrents({
     warningSummary,
     providerStats,
     hasMoreProviders: more,
+    tpbError: more && tpbFailed ? true : undefined,
   };
 }
 

@@ -2006,6 +2006,11 @@ export default {
 
         // Store more-providers state and per-provider stats from response
         this.hasMoreProviders = Boolean(data?.hasMoreProviders);
+        if (data?.tpbError) {
+          this.providerWarning = this.providerWarning
+            ? `${this.providerWarning}\n\nTPB unavailable: apibay.org returned an error (likely down or blocking this server).`
+            : "TPB unavailable: apibay.org returned an error (likely down or blocking this server).";
+        }
         if (
           data?.providerStats &&
           typeof data.providerStats === "object" &&

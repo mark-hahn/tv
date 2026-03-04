@@ -17,8 +17,6 @@ const __filename = urlNode.fileURLToPath(import.meta.url);
 const __dirname = pathNode.dirname(__filename);
 
 async function main() {
-  const MAX_WORKERS = 10;
-
   // If non-blank, emits targeted trace logs for this show name.
   // If blank, tracing is fully disabled.
   const DEBUG_SHOW = "";
@@ -861,8 +859,7 @@ async function main() {
 
   reloadState();
 
-  // On load, start the first MAX_WORKERS waiting entries.
-  // (disabled) Workers are started by tvJson.js on module load.
+  // On load, workers are started by tvJson.js on module load.
 
   tvPath = "/mnt/media/tv/";
 

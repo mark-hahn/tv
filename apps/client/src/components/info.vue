@@ -1506,12 +1506,16 @@ export default {
 
           await this.setCntryLangTxt(tvdbData);
 
-          await this.setNextWatch();
-
-          await this.setRemotes();
-
-          // Only show the info box (and email input) once everything is populated.
-          this.seriesReady = true;
+          if (this.previewMode) {
+            // Preview should render core info immediately; remotes can populate later.
+            this.seriesReady = true;
+            void this.setRemotes();
+          } else {
+            await this.setNextWatch();
+            await this.setRemotes();
+            // Only show the info box (and email input) once everything is populated.
+            this.seriesReady = true;
+          }
         } finally {
           evtBus.emit("previewPanesLoading", false);
           this.settingUpShowName = null; // Clear flag when done

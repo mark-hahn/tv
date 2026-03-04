@@ -1364,13 +1364,15 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   // get remote data, e.g. IMDB for tvdb record
   // remoteIds come from tvdb
-  // Always fetch remotes (to get IMDB video, Wikipedia, Reddit, etc.)
-  // The fast parameter controls whether Rotten Tomatoes is scraped with Playwright
-  const { remotes, urls: fetchedUrls } = await getRemotes(
-    show,
-    remoteIds,
-    fast,
-  );
+  // For transient/preview requests, skip expensive remote scraping so info can render fast.
+  // Remotes can be fetched separately after initial paint.
+  let remotes = [];
+  let fetchedUrls = {};
+  if (!paramObj.transient) {
+    const remoteResult = await getRemotes(show, remoteIds, fast);
+    remotes = remoteResult?.remotes || [];
+    fetchedUrls = remoteResult?.urls || {};
+  }
   const saved = Date.now();
   const trailersRaw = trailersIn || allTvdb[name]?.trailers;
 

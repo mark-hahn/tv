@@ -1379,9 +1379,10 @@ export default {
         }
       };
 
-      const findShowByTvdbIdOrName = () =>
+      const findShowByTvdbIdOrName = ({ requireInEmby = false } = {}) =>
         Array.isArray(allShows)
           ? allShows.find((s) => {
+              if (requireInEmby && s?.inEmby === false) return false;
               const sTvdbId = String(
                 s?.TvdbId || s?.tvdbId || s?.tvdb_id || "",
               ).trim();
@@ -1491,17 +1492,7 @@ export default {
             await this.newShows(false);
 
             // Trigger gap check for the newly added show
-            const newShow = Array.isArray(allShows)
-              ? allShows.find((s) => {
-                  const sTvdbId = String(
-                    s?.TvdbId || s?.tvdbId || s?.tvdb_id || "",
-                  ).trim();
-                  if (tvdbId && sTvdbId && sTvdbId === String(tvdbId).trim()) {
-                    return true;
-                  }
-                  return s?.Name === name;
-                })
-              : null;
+            const newShow = findShowByTvdbIdOrName({ requireInEmby: true });
             if (newShow?.Id) {
               await srvr
                 .triggerShowGapCheck(newShow.Id, name)
@@ -1513,17 +1504,28 @@ export default {
             // ignore
           }
 
-          show = findShowByTvdbIdOrName();
+          show = findShowByTvdbIdOrName({ requireInEmby: true });
 
           // Emby created the folder, but the item may not be visible immediately.
           // Retry discovery; never create a no-emby duplicate in this branch.
           if (!show) {
+            const noEmbyMatch = findShowByTvdbIdOrName({ requireInEmby: false });
+            if (noEmbyMatch && noEmbyMatch.inEmby === false) {
+              console.warn(
+                "web add: found matching no-Emby record after refresh; waiting for Emby-visible item",
+                {
+                  name,
+                  tvdbId,
+                  noEmbyId: noEmbyMatch.Id,
+                },
+              );
+            }
             setWebAddStatus("Waiting for Emby scan...");
             for (let attempt = 1; attempt <= 4; attempt++) {
               await new Promise((resolve) => setTimeout(resolve, 2000));
               tvdb.clearCache();
               await this.newShows(false);
-              show = findShowByTvdbIdOrName();
+              show = findShowByTvdbIdOrName({ requireInEmby: true });
               if (show) break;
               setWebAddStatus(`Waiting for Emby scan... (${attempt}/4)`);
             }

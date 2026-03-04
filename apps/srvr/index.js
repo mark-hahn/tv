@@ -1194,6 +1194,30 @@ function seasonFolderName(season) {
   return `Season ${s}`;
 }
 
+function xmlEsc(str) {
+  return String(str ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
+function buildTvShowNfo(showName, tvdbId) {
+  const cleanName = String(showName || "").trim();
+  const cleanTvdbId = String(tvdbId || "").trim();
+  if (!cleanName || !cleanTvdbId) return "";
+
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    "<tvshow>\n" +
+    `  <title>${xmlEsc(cleanName)}</title>\n` +
+    `  <tvdbid>${xmlEsc(cleanTvdbId)}</tvdbid>\n` +
+    `  <uniqueid type="tvdb" default="true">${xmlEsc(cleanTvdbId)}</uniqueid>\n` +
+    "</tvshow>\n"
+  );
+}
+
 function rpcParamToString(param) {
   // Param is usually a raw string, but tolerate JSON-stringified strings.
   if (param === undefined || param === null) return "";
@@ -1815,6 +1839,7 @@ const delSeasonFiles = async (params) => {
 
 const createShowFolder = async (params) => {
   const showNameRaw = params?.showName;
+  const tvdbId = params?.tvdbId;
   const seriesMapSeasons = params?.seriesMapSeasons;
 
   console.log("[createShowFolder] request", {
@@ -1858,6 +1883,17 @@ const createShowFolder = async (params) => {
         seriesMapSeasonsType: typeof seriesMapSeasons,
       },
     );
+  }
+
+  const nfo = buildTvShowNfo(showName, tvdbId);
+  if (nfo) {
+    const nfoPath = path.join(showPath, "tvshow.nfo");
+    try {
+      fs.writeFileSync(nfoPath, nfo, "utf8");
+      console.log("[createShowFolder] wrote tvshow.nfo", { nfoPath, tvdbId });
+    } catch (e) {
+      throw new Error(`createShowFolder: write nfo failed: ${e.message}`);
+    }
   }
 
   return { ok: true, created: !existed, path: showPath };

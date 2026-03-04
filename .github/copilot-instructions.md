@@ -43,3 +43,4 @@
 - when i say `no change` i mean everything looks and behaves the same after the changes were made
 - all timestamps for logging and general debugging should be pst la with format MM-DD HH:mm
 - when node is not installed in the local environment fix the problem and continue
+- you do not need my permission to ssh to remote server -- just ask for sensitive operations like you would ask for local operations -- you definitely don't need to ask for read-only operations

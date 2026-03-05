@@ -92,7 +92,9 @@
               background-color: whitesmoke;
             "
           >
-            {{ missingFilesCount > 0 ? `Clean (${missingFilesCount})` : 'Clean' }}
+            {{
+              missingFilesCount > 0 ? `Clean (${missingFilesCount})` : "Clean"
+            }}
           </button>
           <button
             @click.stop="scrollToBottomAction"

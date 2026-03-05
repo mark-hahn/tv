@@ -2435,7 +2435,15 @@ export default {
           const showName = String(
             torrent?.raw?.title || this.currentShow?.Name || "",
           ).trim();
-          const url = `${config.torrentsApiUrl}/api/torrent-file?show=${encodeURIComponent(showName)}`;
+          const magnet =
+            torrent?.raw?.magnet ||
+            torrent?.raw?.magnetLink ||
+            torrent?.raw?.link;
+          const magnetParam =
+            typeof magnet === "string" && magnet.startsWith("magnet:")
+              ? `&magnet=${encodeURIComponent(magnet)}`
+              : "";
+          const url = `${config.torrentsApiUrl}/api/torrent-file?show=${encodeURIComponent(showName)}${magnetParam}`;
           const res = await this.fetchWithTimeout(url, {}, 60000);
           if (!res.ok) {
             let detail = "";

@@ -15,6 +15,7 @@ import {
   spaceAvail,
   flexgetHistory,
   addQbtTorrent,
+  addQbtMagnet,
   getUsbFiles,
   getUsbPruneStatus,
   pruneUsbFiles,
@@ -1451,6 +1452,19 @@ app.get("/api/torrent-file", async (req, res) => {
   try {
     const fileBuffer = await search.getTorrentFile(showName);
     if (!fileBuffer) {
+      const magnetUrl = String(req.query.magnet || "").trim();
+      if (magnetUrl.startsWith("magnet:")) {
+        console.log(
+          "[torrent-file] no .torrent found, falling back to magnet for:",
+          showName,
+        );
+        const magRes = await addQbtMagnet({ magnetUrl });
+        if (!magRes.ok)
+          return res
+            .status(500)
+            .json({ error: `Magnet add failed: ${magRes.text}` });
+        return res.json({ success: true, filename: "(magnet)", bytes: 0 });
+      }
       return res.status(404).json({ error: "No torrent file found for show" });
     }
     const uploaded = await download.uploadTorrentToWatchFolder(

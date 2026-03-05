@@ -851,6 +851,51 @@ export async function addQbtTorrent(input) {
   return { ok, status: res.status, text: t };
 }
 
+export async function addQbtMagnet(input) {
+  const magnetUrl = String(input?.magnetUrl || "").trim();
+  if (!magnetUrl.startsWith("magnet:")) {
+    throw new Error("addQbtMagnet requires a magnet URL");
+  }
+
+  const tagsValue = input?.tags;
+  const tags = Array.isArray(tagsValue)
+    ? tagsValue
+        .map(String)
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .join(",")
+    : String(tagsValue ?? "").trim();
+
+  const { qbHost, qbPort, qbUser, qbPass } = await loadQbtCreds();
+  const baseUrl = `http://${qbHost}:${qbPort}`;
+  const cookie = await qbLogin({ baseUrl, qbUser, qbPass });
+
+  const form = new FormData();
+  form.append("urls", magnetUrl);
+  if (tags) form.append("tags", tags);
+
+  const res = await fetch(new URL("/api/v2/torrents/add", baseUrl), {
+    method: "POST",
+    headers: {
+      Cookie: cookie,
+      Origin: baseUrl,
+      Referer: `${baseUrl}/`,
+    },
+    body: form,
+  });
+
+  const text = await res.text().catch(() => "");
+  if (!res.ok) {
+    throw new Error(
+      `qBittorrent magnet add failed: HTTP ${res.status}${text ? `: ${text}` : ""}`,
+    );
+  }
+
+  const t = String(text || "").trim();
+  const ok = t.length === 0 || t.toLowerCase().startsWith("ok");
+  return { ok, status: res.status, text: t };
+}
+
 /**
  * Returns a file tree of /home/xobtlu/files from the USB server.
  */

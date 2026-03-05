@@ -85,8 +85,8 @@
               cursor: 'pointer',
               borderRadius: '7px',
               padding: '4px 10px',
-              border: '1px solid #bbb',
-              backgroundColor: activeOnly ? '#d0d0d0' : 'whitesmoke',
+              border: activeOnly ? '1px solid #888' : '1px solid #bbb',
+              '--btn-bg': activeOnly ? '#ccc' : 'whitesmoke',
             }"
           >
             Active

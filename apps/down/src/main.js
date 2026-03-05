@@ -1254,8 +1254,18 @@ async function main() {
           if (m) {
             season = parseInt(m[1], 10);
             episode = parseInt(m[2], 10);
-            // Updating local vars is enough as they are used below,
-            // but let's update 'parsed' too for consistency if used elsewhere (it isn't really used after this destructuring)
+            parsed.season = season;
+            parsed.episode = episode;
+          }
+        }
+
+        // Fallback: compact NNN notation where first digit is season, last two are episode (e.g. 102 = S01E02).
+        // Only apply when parser still has no season/episode.
+        if (!Number.isInteger(season) && !Number.isInteger(episode) && title) {
+          const m = fname.match(/\b([1-9])(\d{2})\b/);
+          if (m) {
+            season = parseInt(m[1], 10);
+            episode = parseInt(m[2], 10);
             parsed.season = season;
             parsed.episode = episode;
           }

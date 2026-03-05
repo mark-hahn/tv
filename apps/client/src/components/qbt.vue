@@ -69,6 +69,19 @@
             From show
           </button>
           <button
+            @click.stop="activeOnly = !activeOnly"
+            :style="{
+              fontSize: '13px',
+              cursor: 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              backgroundColor: activeOnly ? '#d0d0d0' : 'whitesmoke',
+            }"
+          >
+            Active
+          </button>
+          <button
             @click.stop="scrollToBottomAction"
             style="
               font-size: 13px;
@@ -188,6 +201,7 @@ export default {
       _loadingTimer: null,
       _showLoading: false,
       matchedTitle: null,
+      activeOnly: false,
     };
   },
 
@@ -204,7 +218,10 @@ export default {
       return [...(this.torrents || [])]
         .filter((t) => {
           const added = Number(t?.added_on) || 0;
-          return added >= cutoff;
+          if (added < cutoff) return false;
+          if (this.activeOnly && this.fmtState(t?.state) === "Finished")
+            return false;
+          return true;
         })
         .sort((a, b) => {
           const aa = Number(a?.added_on) || 0;
@@ -774,6 +791,15 @@ export default {
       const size =
         this.fmtSize(bytes) || this.fmtSize(t?.size) || String(t?.size ?? "");
       const sep = this.sep();
+      const remBytes =
+        Number.isFinite(Number(bytes)) && Number.isFinite(Number(t?.completed))
+          ? Number(bytes) - Number(t.completed)
+          : NaN;
+      const remaining = Number.isFinite(remBytes)
+        ? remBytes <= 0
+          ? "0"
+          : this.fmtSize(remBytes)
+        : "";
 
       if (t?.state === "downloading") {
         const prog = this.fmtProgPc(t?.completed, t?.size);
@@ -781,12 +807,12 @@ export default {
           ? Number(t?.num_seeds)
           : 0;
         const eta = this.fmtEtaMmSs(t?.eta);
-        return `${size}${sep}${added}${sep}${seeds}${sep}${prog}%${sep}${eta}${sep}Getting`;
+        return `${size}${sep}${remaining}${sep}${added}${sep}${seeds}${sep}${prog}%${sep}${eta}${sep}Getting`;
       }
 
       const elapsed = this.fmtElapsedMmSs(t?.added_on, t?.completion_on);
       const state = this.fmtState(t?.state);
-      return `${size}${sep}${added}${sep}${elapsed}${sep}${state}`;
+      return `${size}${sep}${remaining}${sep}${added}${sep}${elapsed}${sep}${state}`;
     },
 
     forceFile(title) {

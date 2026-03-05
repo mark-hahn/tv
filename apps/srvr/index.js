@@ -690,29 +690,71 @@ const offsetSubFiles = async (fileIdObjs) => {
   return { ok: true, applied: Array.from(appliedSet), failures };
 };
 
-function parseSeasonEpisodeFromFilename(fileName) {
-  // Uses parse-torrent-title. Returns { season, episode } or null.
+function parseSeasonEpisodeFromFilename(fileName, folderName) {
+  // Returns { season, episode } or null.
   if (!fileName) return null;
   const base = String(fileName);
 
-  let parsed;
-  try {
-    parsed = parseTorrentTitle(base);
-  } catch {
-    parsed = null;
-  }
-  if (!parsed || typeof parsed !== "object") return null;
+  let season = NaN;
+  let episode = NaN;
 
-  const season = Number.isFinite(Number(parsed.season))
-    ? Number(parsed.season)
-    : Array.isArray(parsed.seasons) && parsed.seasons.length
-      ? Number(parsed.seasons[0])
-      : NaN;
-  const episode = Number.isFinite(Number(parsed.episode))
-    ? Number(parsed.episode)
-    : Array.isArray(parsed.episodes) && parsed.episodes.length
-      ? Number(parsed.episodes[0])
-      : NaN;
+  // parseTorrentTitle first
+  try {
+    const parsed = parseTorrentTitle(base);
+    if (parsed && typeof parsed === "object") {
+      season = Number.isFinite(Number(parsed.season))
+        ? Number(parsed.season)
+        : Array.isArray(parsed.seasons) && parsed.seasons.length
+          ? Number(parsed.seasons[0])
+          : NaN;
+      episode = Number.isFinite(Number(parsed.episode))
+        ? Number(parsed.episode)
+        : Array.isArray(parsed.episodes) && parsed.episodes.length
+          ? Number(parsed.episodes[0])
+          : NaN;
+    }
+  } catch {}
+
+  // Fallback: SxxExx / Sxx.Exx in filename
+  if (!Number.isFinite(season) || !Number.isFinite(episode)) {
+    const m = base.match(/S(\d{1,2})[._ ]?E(\d{1,2})/i);
+    if (m) {
+      season = parseInt(m[1], 10);
+      episode = parseInt(m[2], 10);
+    }
+  }
+
+  // Fallback: "Season N" text in filename
+  if (!Number.isFinite(season)) {
+    const m = base.match(/Season\s+(\d+)/i);
+    if (m) season = parseInt(m[1], 10);
+  }
+
+  // Fallback: "Episode N" text in filename
+  if (!Number.isFinite(episode)) {
+    const m = base.match(/Episode\s+(\d+)/i);
+    if (m) episode = parseInt(m[1], 10);
+  }
+
+  // Fallback: season from folder name (e.g. "Season 1", "S01", release folder)
+  if (!Number.isFinite(season) && folderName) {
+    const fn = String(folderName);
+    const m1 = fn.match(/Season\s+(\d+)/i);
+    if (m1) {
+      season = parseInt(m1[1], 10);
+    } else {
+      const m2 = fn.match(/S(\d{1,2})(?!\d)/i);
+      if (m2) {
+        season = parseInt(m2[1], 10);
+      } else {
+        try {
+          const fp = parseTorrentTitle(fn);
+          if (fp && Number.isFinite(Number(fp.season)))
+            season = Number(fp.season);
+        } catch {}
+      }
+    }
+  }
 
   if (!Number.isFinite(season) || !Number.isFinite(episode)) return null;
   return { season, episode };
@@ -2263,7 +2305,7 @@ const applySubFiles = async (params) => {
         : "";
       if (!videoFileExtensions.includes(ext)) continue;
 
-      const parsed = parseSeasonEpisodeFromFilename(fileName);
+      const parsed = parseSeasonEpisodeFromFilename(fileName, dirent.name);
       if (!parsed) continue;
 
       const key = `${parsed.season}-${parsed.episode}`;

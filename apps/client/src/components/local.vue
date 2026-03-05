@@ -1205,16 +1205,17 @@ export default {
       let showName = this.selectedName;
       let targetFiles = [];
 
-      // 1. Collect target files
-      const collect = (n) => {
-        if (n.type === "file") targetFiles.push(n.name);
-        if (n.children) n.children.forEach(collect);
+      // 1. Collect target files (as full paths so parseFile can use parent folder for season)
+      const collect = (n, pathPrefix) => {
+        const fullPath = pathPrefix ? `${pathPrefix}/${n.name}` : n.name;
+        if (n.type === "file") targetFiles.push(fullPath);
+        if (n.children) n.children.forEach((child) => collect(child, fullPath));
       };
 
       if (showName) {
         // Find the node in tree
         const node = this.tree.find((n) => n.name === showName);
-        if (node) collect(node);
+        if (node) collect(node, null);
       } else if (this.selectedFiles.size > 0) {
         for (const path of this.selectedFiles) {
           const parts = path.split("/");
@@ -1231,7 +1232,8 @@ export default {
             }
           }
 
-          if (current) collect(current);
+          if (current)
+            collect(current, parts.slice(0, parts.length - 1).join("/"));
         }
       }
 
@@ -1268,15 +1270,59 @@ export default {
       const neededSeasons = new Set();
       let hasTargetFiles = targetFiles.length > 0;
 
-      const parseFile = (name) => {
+      const parseFile = (fullPath) => {
+        const pathParts = fullPath.split("/");
+        const name = pathParts[pathParts.length - 1];
+        const folderName =
+          pathParts.length >= 2 ? pathParts[pathParts.length - 2] : "";
+
+        let s = null,
+          e = null;
+        // parseTorrentTitle first
         try {
           const p = parseTorrentTitle.parse(name);
-          if (p.season != null && p.episode != null)
-            return { s: p.season, e: p.episode };
-          if (p.season != null) return { s: p.season, e: null };
-        } catch (e) {}
-        let m = name.match(/S(\d{1,2})E(\d{1,2})/i);
-        if (m) return { s: parseInt(m[1]), e: parseInt(m[2]) };
+          if (p.season != null) s = p.season;
+          if (p.episode != null) e = p.episode;
+          if (s != null && e != null) return { s, e };
+        } catch (ex) {}
+        // SxxExx / Sxx.Exx in filename
+        if (s == null || e == null) {
+          const m = name.match(/S(\d{1,2})[._ ]?E(\d{1,2})/i);
+          if (m) {
+            s = parseInt(m[1], 10);
+            e = parseInt(m[2], 10);
+          }
+        }
+        // "Season N" text in filename
+        if (s == null) {
+          const m = name.match(/Season\s+(\d+)/i);
+          if (m) s = parseInt(m[1], 10);
+        }
+        // "Episode N" text in filename
+        if (e == null) {
+          const m = name.match(/Episode\s+(\d+)/i);
+          if (m) e = parseInt(m[1], 10);
+        }
+        // Season from parent folder name
+        if (s == null && folderName) {
+          const m1 = folderName.match(/Season\s+(\d+)/i);
+          if (m1) {
+            s = parseInt(m1[1], 10);
+          } else {
+            const m2 = folderName.match(/S(\d{1,2})(?!\d)/i);
+            if (m2) {
+              s = parseInt(m2[1], 10);
+            } else {
+              try {
+                const fp = parseTorrentTitle.parse(folderName) || {};
+                if (fp.season != null) s = fp.season;
+              } catch (ex) {}
+            }
+          }
+        }
+
+        if (s != null && e != null) return { s, e };
+        if (s != null) return { s, e: null };
         return null;
       };
 

@@ -49,6 +49,15 @@
       <span
         :style="{ fontWeight: node.type === 'folder' ? 'bold' : 'normal' }"
         >{{ node.name }}</span
+      ><span
+        v-if="node.parseError"
+        style="
+          color: #b00;
+          font-size: 11px;
+          margin-left: 5px;
+          font-weight: normal;
+        "
+        >({{ node.parseError }})</span
       >
     </div>
     <div v-if="expanded && node.children && node.children.length">

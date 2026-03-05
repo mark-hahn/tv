@@ -1246,6 +1246,20 @@ async function main() {
         var parsed = parseTorrentTitle(fname) || {};
         ({ title, season, episode } = parsed);
 
+        // Title regex fallback: e.g. "Snuff Box - Episode 6 - The Wedding.mkv" → "Snuff Box"
+        if (!title) {
+          var noExt = fname.replace(/\.[^.]+$/, "");
+          var titleMatch = noExt.match(
+            /^(.*?)(?:\s+-\s+(?:Season|Episode)\s+\d+|\s+S\d{1,2}E\d+|\s+\d+x\d+)/i,
+          );
+          if (titleMatch && titleMatch[1].trim()) {
+            title = titleMatch[1].trim();
+          } else {
+            var dashIdx = noExt.indexOf(" - ");
+            if (dashIdx > 0) title = noExt.slice(0, dashIdx).trim();
+          }
+        }
+
         // Fallback: If parser fails to find episode (e.g. Sxx.Exx or SxxExx), try manual regex.
         // This handles cases like "Show - S02.E05 - Title.mkv" where parse-torrent-title might miss the episode.
         if (!episode && title) {
@@ -1268,6 +1282,55 @@ async function main() {
             episode = parseInt(m[2], 10);
             parsed.season = season;
             parsed.episode = episode;
+          }
+        }
+
+        // Fallback: "Season N" text in filename
+        if (!Number.isInteger(season) && title) {
+          const m = fname.match(/Season\s+(\d+)/i);
+          if (m) {
+            season = parseInt(m[1], 10);
+            parsed.season = season;
+          }
+        }
+
+        // Fallback: "Episode N" text in filename
+        if (!Number.isInteger(episode) && title) {
+          const m = fname.match(/Episode\s+(\d+)/i);
+          if (m) {
+            episode = parseInt(m[1], 10);
+            parsed.episode = episode;
+          }
+        }
+
+        // Fallback: title and episode found but no season.
+        // Try to extract season number from the parent folder name in the file path.
+        if (title && Number.isInteger(episode) && !Number.isInteger(season)) {
+          const pathParts = usbFilePath.split("/");
+          if (pathParts.length >= 2) {
+            const folderName = pathParts[pathParts.length - 2];
+            // "Season N" text (e.g. folder named "Season 1")
+            const m1 = folderName.match(/Season\s+(\d+)/i);
+            if (m1) {
+              season = parseInt(m1[1], 10);
+              parsed.season = season;
+            } else {
+              // S## pattern (e.g. "Snuff.Box.S01.2006.x264.DVDRip-Zuich32")
+              const m2 = folderName.match(/S(\d{1,2})(?!\d)/i);
+              if (m2) {
+                season = parseInt(m2[1], 10);
+                parsed.season = season;
+              } else {
+                // parseTorrentTitle on folder name as last resort
+                try {
+                  const fp = parseTorrentTitle(folderName) || {};
+                  if (Number.isInteger(fp.season)) {
+                    season = fp.season;
+                    parsed.season = season;
+                  }
+                } catch (e) {}
+              }
+            }
           }
         }
 

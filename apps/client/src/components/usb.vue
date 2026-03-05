@@ -546,7 +546,7 @@ export default {
         this.loading = false;
       }
     },
-    processTree(nodes) {
+    processTree(nodes, parentFolderName = "") {
       if (!nodes) return [];
 
       // Sort nodes first.
@@ -573,9 +573,103 @@ export default {
       });
 
       nodes.forEach((n) => {
-        if (n.children) n.children = this.processTree(n.children);
+        if (n.children) {
+          n.children = this.processTree(n.children, n.name);
+        } else if (n.type === "file") {
+          n.parseError =
+            this.computeFileError(n.name, parentFolderName) || null;
+        }
       });
       return nodes;
+    },
+    computeFileError(fname, folderName) {
+      const videoExts = new Set([
+        "mkv",
+        "mp4",
+        "avi",
+        "mov",
+        "wmv",
+        "m4v",
+        "mpg",
+        "mpeg",
+        "ts",
+      ]);
+      const ext = (fname.split(".").pop() || "").toLowerCase();
+      if (!videoExts.has(ext)) return null;
+
+      let title = null,
+        season = null,
+        episode = null;
+
+      // --- Manual regex (primary) ---
+      // SxxExx / Sxx.Exx / Sxx_Exx
+      const seMatch = fname.match(/S(\d+)[._ ]?E(\d+)/i);
+      if (seMatch) {
+        season = parseInt(seMatch[1], 10);
+        episode = parseInt(seMatch[2], 10);
+      }
+      // "Season N" text in filename
+      if (!Number.isInteger(season)) {
+        const m = fname.match(/Season\s+(\d+)/i);
+        if (m) season = parseInt(m[1], 10);
+      }
+      // "Episode N" text in filename
+      if (!Number.isInteger(episode)) {
+        const m = fname.match(/Episode\s+(\d+)/i);
+        if (m) episode = parseInt(m[1], 10);
+      }
+
+      // --- parseTorrentTitle (primary for title; fallback for season/episode) ---
+      let parsed = {};
+      try {
+        parsed = parseTorrentTitle(fname) || {};
+      } catch (e) {}
+      title = parsed.title || null;
+      if (!Number.isInteger(season) && Number.isInteger(parsed.season))
+        season = parsed.season;
+      if (!Number.isInteger(episode) && Number.isInteger(parsed.episode))
+        episode = parsed.episode;
+
+      // --- Title regex fallback ---
+      // e.g. "Snuff Box - Episode 6 - The Wedding.mkv" → "Snuff Box"
+      if (!title) {
+        const noExt = fname.replace(/\.[^.]+$/, "");
+        const m = noExt.match(
+          /^(.*?)(?:\s+-\s+(?:Season|Episode)\s+\d+|\s+S\d{1,2}E\d+|\s+\d+x\d+)/i,
+        );
+        if (m && m[1].trim()) {
+          title = m[1].trim();
+        } else {
+          const dashIdx = noExt.indexOf(" - ");
+          if (dashIdx > 0) title = noExt.slice(0, dashIdx).trim();
+        }
+      }
+
+      // --- Folder name for season (if still missing) ---
+      if (!Number.isInteger(season) && folderName) {
+        // "Season N" text
+        const m1 = folderName.match(/Season\s+(\d+)/i);
+        if (m1) {
+          season = parseInt(m1[1], 10);
+        } else {
+          // S## pattern (e.g. S01 in release folder name)
+          const m2 = folderName.match(/S(\d{1,2})(?!\d)/i);
+          if (m2) {
+            season = parseInt(m2[1], 10);
+          } else {
+            // parseTorrentTitle on folder name as last resort
+            try {
+              const fp = parseTorrentTitle(folderName) || {};
+              if (Number.isInteger(fp.season)) season = fp.season;
+            } catch (e) {}
+          }
+        }
+      }
+
+      if (!title) return "no title";
+      if (!Number.isInteger(season)) return "no season";
+      if (!Number.isInteger(episode)) return "no episode";
+      return null;
     },
     refresh() {
       this.fetchFiles();
@@ -765,6 +859,26 @@ export default {
 
       if (files.length === 0) {
         alert("No files found to download.");
+        return;
+      }
+
+      // Validate each file can be parsed (title + season + episode).
+      const parseErrors = [];
+      for (const fileEntry of files) {
+        const parts = fileEntry.split("-");
+        parts.pop(); // remove size
+        const filePath = parts.join("-").slice(11); // strip YYYY-MM-DD-
+        const pathParts = filePath.split("/");
+        const fname = pathParts[pathParts.length - 1];
+        const folderName =
+          pathParts.length >= 2 ? pathParts[pathParts.length - 2] : "";
+        const err = this.computeFileError(fname, folderName);
+        if (err) parseErrors.push(`${fname} (${err})`);
+      }
+      if (parseErrors.length > 0) {
+        alert(
+          "Cannot force download — parse error:\n\n" + parseErrors.join("\n"),
+        );
         return;
       }
 

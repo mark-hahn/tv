@@ -161,8 +161,8 @@ export async function loadAllShows() {
         rec.imdbRatings ||
         rec.remotes?.find((r) => r.name?.startsWith("IMDB"))?.ratings ||
         null;
-    rec.Reject = !!rec.reject;
-    rec.Pickup = !!rec.pickup;
+    rec.Reject = !!(rec.reject || rec.Reject);
+    rec.Pickup = !!(rec.pickup || rec.Pickup);
     if (rec.waitStr && !rec.WaitStr) rec.WaitStr = rec.waitStr;
     if (rec.note && !rec.Notes) rec.Notes = rec.note;
     rec.NotReady = rec.inEmby === false;
@@ -1220,8 +1220,13 @@ export const getSeriesMap = async (show, prune = false) => {
       try {
         const allTvdbData = await tvdb.getAllTvdb(0);
         const watchedEpis = allTvdbData?.[show.Name]?.watchedEpis || null;
-        const fallback = await srvr.getSeriesMapFromTvdb({ tvdbId, watchedEpis });
-        const fallbackMap = new Map((fallback?.seriesMap || []).map((s) => [s[0], s[1]]));
+        const fallback = await srvr.getSeriesMapFromTvdb({
+          tvdbId,
+          watchedEpis,
+        });
+        const fallbackMap = new Map(
+          (fallback?.seriesMap || []).map((s) => [s[0], s[1]]),
+        );
         for (let i = 0; i < seriesMap.length; i++) {
           const [seasonNum, episodes] = seriesMap[i];
           if (episodes.length > 0) continue;
@@ -1231,20 +1236,25 @@ export const getSeriesMap = async (show, prune = false) => {
           }
         }
       } catch (err) {
-        console.warn("[map-debug] failed TVDB fallback for empty Emby seasons", {
-          show: show?.Name,
-          showId: seriesId,
-          tvdbId,
-          emptySeasons,
-          error: err?.message || String(err),
-        });
+        console.warn(
+          "[map-debug] failed TVDB fallback for empty Emby seasons",
+          {
+            show: show?.Name,
+            showId: seriesId,
+            tvdbId,
+            emptySeasons,
+            error: err?.message || String(err),
+          },
+        );
       }
     }
 
     // If a season is still empty after TVDB fallback, synthesize missing-file cells
     // using the largest known episode index from other seasons.
     const maxEpisodeNum = seriesMap.reduce((maxNum, seasonEntry) => {
-      const seasonEpisodes = Array.isArray(seasonEntry?.[1]) ? seasonEntry[1] : [];
+      const seasonEpisodes = Array.isArray(seasonEntry?.[1])
+        ? seasonEntry[1]
+        : [];
       for (const epEntry of seasonEpisodes) {
         const epNum = Number(epEntry?.[0]);
         if (Number.isFinite(epNum) && epNum > maxNum) maxNum = epNum;

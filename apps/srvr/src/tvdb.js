@@ -656,10 +656,7 @@ const getUrlAndRatings = async (type, url, name) => {
 
     if (!resp || !resp.ok()) {
       const status = resp ? resp.status() : null;
-      log(
-        "err",
-        `getUrlAndRatings imdb fetch error: ${url}, status=${status}`,
-      );
+      log("err", `getUrlAndRatings imdb fetch error: ${url}, status=${status}`);
       try {
         await context?.close();
       } catch {}
@@ -712,7 +709,10 @@ const getUrlAndRatings = async (type, url, name) => {
                 String(t || ""),
               ),
             );
-            if (isTitleType && node.aggregateRating?.ratingValue !== undefined) {
+            if (
+              isTitleType &&
+              node.aggregateRating?.ratingValue !== undefined
+            ) {
               const v = parseFloat(String(node.aggregateRating.ratingValue));
               if (!Number.isNaN(v) && v >= 0 && v <= 10) return v;
             }
@@ -785,10 +785,7 @@ const getUrlAndRatings = async (type, url, name) => {
       } catch {}
       return { ratings: rating, video: video };
     } catch (e) {
-      log(
-        "err",
-        `getUrlAndRatings imdb parse error: ${url}, ${e.message}`,
-      );
+      log("err", `getUrlAndRatings imdb parse error: ${url}, ${e.message}`);
       try {
         await context?.close();
       } catch {}
@@ -1245,7 +1242,8 @@ const getDefaultOrderCounts = async (tvdbId, token) => {
     if (!res.ok) return { seasonCount: null, episodeCount: null };
     const body = await res.json();
     const episodes = body?.data?.episodes;
-    if (!Array.isArray(episodes)) return { seasonCount: null, episodeCount: null };
+    if (!Array.isArray(episodes))
+      return { seasonCount: null, episodeCount: null };
 
     const filtered = episodes.filter((epi) => {
       const seasonNumber = Number(epi?.seasonNumber);
@@ -1377,7 +1375,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   const apiCounts = getApiCounts(extResObj?.data);
   if (!toPositiveInt(apiCounts.episodeCount)) {
     const defaultCounts = await getDefaultOrderCounts(tvdbId, token);
-    apiCounts.episodeCount = defaultCounts.episodeCount ?? apiCounts.episodeCount;
+    apiCounts.episodeCount =
+      defaultCounts.episodeCount ?? apiCounts.episodeCount;
     apiCounts.seasonCount = defaultCounts.seasonCount ?? apiCounts.seasonCount;
   }
   const finalSeasonCount = chooseCount({
@@ -1678,8 +1677,10 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   // Additional flags
   tvdbData.Reject =
     paramObj.reject ?? existing.Reject ?? existing.reject ?? false;
+  tvdbData.reject = tvdbData.Reject; // keep lowercase in sync
   tvdbData.Pickup =
     paramObj.pickup ?? existing.Pickup ?? existing.pickup ?? false;
+  tvdbData.pickup = tvdbData.Pickup; // keep lowercase in sync
   tvdbData.lastWatched = paramObj.lastWatched || existing.lastWatched || null;
 
   // Calculate waitStr from nextAired and lastAired if available

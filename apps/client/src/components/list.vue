@@ -1509,7 +1509,9 @@ export default {
           // Emby created the folder, but the item may not be visible immediately.
           // Retry discovery; never create a no-emby duplicate in this branch.
           if (!show) {
-            const noEmbyMatch = findShowByTvdbIdOrName({ requireInEmby: false });
+            const noEmbyMatch = findShowByTvdbIdOrName({
+              requireInEmby: false,
+            });
             if (noEmbyMatch && noEmbyMatch.inEmby === false) {
               console.warn(
                 "web add: found matching no-Emby record after refresh; waiting for Emby-visible item",

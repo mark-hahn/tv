@@ -55,6 +55,16 @@
             justify-content: flex-end;
           "
         >
+          <span
+            v-if="stoppedCount > 0"
+            style="
+              font-size: 13px;
+              color: #b05000;
+              align-self: center;
+              white-space: nowrap;
+            "
+            >{{ stoppedCount }} titles stopped.</span
+          >
           <button
             @click.stop="highlightShow"
             style="
@@ -217,7 +227,6 @@ export default {
       _showLoading: false,
       matchedTitle: null,
       activeOnly: false,
-      missingFilesCount: 0,
     };
   },
 
@@ -244,6 +253,19 @@ export default {
           const bb = Number(b?.added_on) || 0;
           return aa - bb;
         });
+    },
+
+    missingFilesCount() {
+      return (this.torrents || []).filter(
+        (t) => String(t?.state || "").trim() === "missingFiles",
+      ).length;
+    },
+
+    stoppedCount() {
+      return (this.torrents || []).filter((t) => {
+        const st = String(t?.state || "").trim();
+        return st === "stoppedDL" || st === "stoppedUP";
+      }).length;
     },
 
     emptyStateText() {
@@ -481,9 +503,6 @@ export default {
           }
 
           this.torrents = torrents;
-          this.missingFilesCount = torrents.filter(
-            (t) => String(t?.state || "").trim() === "missingFiles",
-          ).length;
           this._didLoadOnce = true;
 
           await this.$nextTick();
@@ -572,6 +591,7 @@ export default {
 
       // Treat active seeding the same as finished.
       if (raw === "uploading") return "Finished";
+      if (raw === "stoppedUP") return "Finished";
 
       // Special-case qBittorrent's stalledDL to match requested wording.
       if (raw.toLowerCase() === "stalleddl") return "Stalled";

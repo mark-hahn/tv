@@ -563,6 +563,22 @@
               ></span
             >
           </div>
+          <div
+            v-if="
+              getDownloadStatus(torrent)?.status === 'error' &&
+              getDownloadStatus(torrent)?.message
+            "
+            style="
+              margin-top: 6px;
+              font-size: 11px;
+              color: #c00;
+              white-space: normal;
+              overflow-wrap: anywhere;
+              word-break: break-word;
+            "
+          >
+            {{ getDownloadStatus(torrent).message }}
+          </div>
         </div>
       </div>
     </div>

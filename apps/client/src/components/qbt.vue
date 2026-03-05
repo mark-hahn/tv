@@ -82,6 +82,19 @@
             Active
           </button>
           <button
+            @click.stop="cleanMissingFiles"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            {{ missingFilesCount > 0 ? `Clean (${missingFilesCount})` : 'Clean' }}
+          </button>
+          <button
             @click.stop="scrollToBottomAction"
             style="
               font-size: 13px;
@@ -202,6 +215,7 @@ export default {
       _showLoading: false,
       matchedTitle: null,
       activeOnly: false,
+      missingFilesCount: 0,
     };
   },
 
@@ -465,6 +479,9 @@ export default {
           }
 
           this.torrents = torrents;
+          this.missingFilesCount = torrents.filter(
+            (t) => String(t?.state || "").trim() === "missingFiles",
+          ).length;
           this._didLoadOnce = true;
 
           await this.$nextTick();
@@ -614,6 +631,35 @@ export default {
         cursor: "pointer",
         zIndex: isMatched ? 1 : 0,
       };
+    },
+
+    async cleanMissingFiles() {
+      let all;
+      try {
+        all = await this.getQbtInfo({});
+      } catch {
+        return;
+      }
+      if (!Array.isArray(all)) return;
+      const missing = all.filter(
+        (t) => String(t?.state || "").trim() === "missingFiles",
+      );
+      if (missing.length === 0) {
+        alert("No titles with missing files found.");
+        return;
+      }
+      const confirmed = confirm(
+        `Delete ${missing.length} titles with no files?`,
+      );
+      if (!confirmed) return;
+      for (const t of missing) {
+        try {
+          await this.deleteTorrentAndFiles(t);
+        } catch {
+          // ignore individual failures
+        }
+      }
+      await this.pollOnce();
     },
 
     async deleteTorrentAndFiles(t) {

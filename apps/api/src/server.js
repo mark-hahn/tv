@@ -910,6 +910,21 @@ async function handleDownloadRequest(req, res) {
 
       const valid = download.validateTorrentBytes(fetched.torrentData);
       if (!valid.success) {
+        try {
+          const rawTitle = String(
+            torrent?.raw?.title ||
+              torrent?.title ||
+              torrent?.clientTitle ||
+              "unknown",
+          ).trim();
+          const safeTitle = rawTitle
+            .replace(/[^a-zA-Z0-9._-]/g, "_")
+            .slice(0, 80);
+          const badPath = `/root/dev/apps/tv/bad-torrent-${safeTitle}.txt`;
+          fs.writeFileSync(badPath, fetched.torrentData);
+        } catch (e) {
+          console.error("[downloads] failed to save bad torrent file", e);
+        }
         res.json({ ...baseWrapper, ...valid });
         return;
       }

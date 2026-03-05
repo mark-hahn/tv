@@ -214,6 +214,14 @@ function isVideoFile(filePath) {
   return ["mkv", "mp4", "avi", "m4v", "mov", "ts"].includes(ext);
 }
 
+// Directories that typically contain non-episode bonus content.
+const EXTRAS_DIR_RE =
+  /(?:^|[/\\])(?:featurettes?|extras?|bonus|behind[_\s-]the[_\s-]scenes|interviews?|deleted[_\s-]scenes?|trailers?|specials?|sample)[/\\]/i;
+
+function isExtrasPath(filePath) {
+  return EXTRAS_DIR_RE.test(String(filePath || ""));
+}
+
 function validateTorrentData(torrentData) {
   try {
     const parsedTorrent = parseTorrent(torrentData);
@@ -225,11 +233,18 @@ function validateTorrentData(torrentData) {
       .filter(Boolean);
 
     // Prefer video files for validation (avoid NFO/SRT triggering false failures).
-    const pathsToCheck = allPaths.filter(isVideoFile);
-    const checkList = pathsToCheck.length > 0 ? pathsToCheck : allPaths;
+    // Also exclude well-known extras/bonus directories so featurettes don't cause failures.
+    const videoFiles = allPaths.filter(isVideoFile);
+    const mainVideos = videoFiles.filter((p) => !isExtrasPath(p));
+    const checkList =
+      mainVideos.length > 0
+        ? mainVideos
+        : videoFiles.length > 0
+          ? videoFiles
+          : allPaths;
 
-    let missing = false;
     const checkedFiles = [];
+    let anyHasSE = false;
 
     for (const p of checkList) {
       const base = path.basename(p);
@@ -265,10 +280,10 @@ function validateTorrentData(torrentData) {
       }
 
       checkedFiles.push({ file: p, parsed: info });
-      if (!info?.season || !info?.episode) missing = true;
+      if (info?.season && info?.episode) anyHasSE = true;
     }
 
-    if (missing) {
+    if (!anyHasSE) {
       try {
         const debugInfo = {
           message: "Validation failed",

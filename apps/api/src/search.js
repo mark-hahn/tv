@@ -389,6 +389,7 @@ function loadCookiesFromCurl(filename) {
 // Parse size string to bytes for comparison
 function parseSizeToBytes(sizeStr) {
   if (!sizeStr) return 0;
+  if (typeof sizeStr === "number") return sizeStr;
 
   const match = sizeStr.match(/^([\d.]+)\s*(B|KB|MB|GB|GiB|MiB|KiB|TB|TiB)?$/i);
   if (!match) return 0;

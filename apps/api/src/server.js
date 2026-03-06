@@ -1465,21 +1465,21 @@ app.get("/api/torrent-file", async (req, res) => {
     return res.status(400).json({ error: "show query parameter required" });
   }
   try {
+    // If the client sent a specific magnet (the user selected a specific result),
+    // use it directly instead of doing a fresh search that may return the wrong torrent.
+    const magnetUrl = String(req.query.magnet || "").trim();
+    if (magnetUrl.startsWith("magnet:")) {
+      console.log("[torrent-file] using provided magnet for:", showName);
+      const magRes = await addQbtMagnet({ magnetUrl });
+      if (!magRes.ok)
+        return res
+          .status(500)
+          .json({ error: `Magnet add failed: ${magRes.text}` });
+      return res.json({ success: true, filename: "(magnet)", bytes: 0 });
+    }
+
     const fileBuffer = await search.getTorrentFile(showName);
     if (!fileBuffer) {
-      const magnetUrl = String(req.query.magnet || "").trim();
-      if (magnetUrl.startsWith("magnet:")) {
-        console.log(
-          "[torrent-file] no .torrent found, falling back to magnet for:",
-          showName,
-        );
-        const magRes = await addQbtMagnet({ magnetUrl });
-        if (!magRes.ok)
-          return res
-            .status(500)
-            .json({ error: `Magnet add failed: ${magRes.text}` });
-        return res.json({ success: true, filename: "(magnet)", bytes: 0 });
-      }
       return res.status(404).json({ error: "No torrent file found for show" });
     }
     const uploaded = await download.uploadTorrentToWatchFolder(

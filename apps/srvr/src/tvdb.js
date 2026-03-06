@@ -642,10 +642,10 @@ const getUrlAndRatings = async (type, url, name) => {
       });
       page = await context.newPage();
       resp = await page.goto(url, {
-        waitUntil: "domcontentloaded",
-        timeout: 15000,
+        waitUntil: "load",
+        timeout: 20000,
       });
-      await page.waitForTimeout(800);
+      await page.waitForTimeout(500);
     } catch (e) {
       log(
         "err",
@@ -664,7 +664,12 @@ const getUrlAndRatings = async (type, url, name) => {
     }
 
     try {
-      let html = await page.content();
+      await page
+        .waitForLoadState("networkidle", { timeout: 5000 })
+        .catch(() => {});
+      let html = await page
+        .evaluate(() => document.documentElement.outerHTML)
+        .catch(() => null);
       const compactHtml = (html || "")
         .replaceAll(/\r?\n/gm, "")
         .replaceAll(/\s+/gm, " ");

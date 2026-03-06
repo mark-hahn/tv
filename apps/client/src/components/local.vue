@@ -689,17 +689,12 @@ export default {
           const isSrt = (name) => getExt(name) === "srt";
 
           const getEpisode = (name) => {
-            // Try simple regex first SxxExx
-            let m = name.match(/S\d+E(\d+)/i);
-            if (m) return parseInt(m[1], 10);
-
-            // Try parseTorrentTitle
+            let parsedPtt = null;
             try {
-              const pt = parseTorrentTitle.parse(name);
-              if (pt.episode != null) return pt.episode;
+              parsedPtt = parseTorrentTitle.parse(name);
             } catch (e) {}
-
-            // Fallback to finding digits near end? or let it float to bottom
+            const se = util.parseFileSeasonEpisode(name, "", parsedPtt, null);
+            if (se && se.episode != null) return se.episode;
             return 999999;
           };
 
@@ -1276,54 +1271,23 @@ export default {
         const folderName =
           pathParts.length >= 2 ? pathParts[pathParts.length - 2] : "";
 
-        let s = null,
-          e = null;
-        // parseTorrentTitle first
+        let parsedPtt = null;
+        let parsedPttFolder = null;
         try {
-          const p = parseTorrentTitle.parse(name);
-          if (p.season != null) s = p.season;
-          if (p.episode != null) e = p.episode;
-          if (s != null && e != null) return { s, e };
+          parsedPtt = parseTorrentTitle.parse(name);
         } catch (ex) {}
-        // SxxExx / Sxx.Exx in filename
-        if (s == null || e == null) {
-          const m = name.match(/S(\d{1,2})[._ ]?E(\d{1,2})/i);
-          if (m) {
-            s = parseInt(m[1], 10);
-            e = parseInt(m[2], 10);
-          }
-        }
-        // "Season N" text in filename
-        if (s == null) {
-          const m = name.match(/Season\s+(\d+)/i);
-          if (m) s = parseInt(m[1], 10);
-        }
-        // "Episode N" text in filename
-        if (e == null) {
-          const m = name.match(/Episode\s+(\d+)/i);
-          if (m) e = parseInt(m[1], 10);
-        }
-        // Season from parent folder name
-        if (s == null && folderName) {
-          const m1 = folderName.match(/Season\s+(\d+)/i);
-          if (m1) {
-            s = parseInt(m1[1], 10);
-          } else {
-            const m2 = folderName.match(/S(\d{1,2})(?!\d)/i);
-            if (m2) {
-              s = parseInt(m2[1], 10);
-            } else {
-              try {
-                const fp = parseTorrentTitle.parse(folderName) || {};
-                if (fp.season != null) s = fp.season;
-              } catch (ex) {}
-            }
-          }
-        }
+        try {
+          parsedPttFolder = parseTorrentTitle.parse(folderName);
+        } catch (ex) {}
 
-        if (s != null && e != null) return { s, e };
-        if (s != null) return { s, e: null };
-        return null;
+        const se = util.parseFileSeasonEpisode(
+          name,
+          folderName,
+          parsedPtt,
+          parsedPttFolder,
+        );
+        if (!se) return null;
+        return { s: se.season, e: se.episode };
       };
 
       for (const f of targetFiles) {

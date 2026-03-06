@@ -207,3 +207,90 @@ export function smartTitleMatch(title, titleArray, year, forceChoice) {
 
   return bestCand;
 }
+
+// parseFileSeasonEpisode(fname, folderName, parsedPtt, parsedPttFolder) => { season, episode } | null
+//
+// Shared cascade for extracting season/episode from a video filename.
+// parsedPtt / parsedPttFolder are optional pre-computed results from parse-torrent-title
+// (passing them in keeps this package free of that dependency).
+//
+// Steps:
+//  1. Seed from parsedPtt if provided
+//  2. Clamp episode > 99 → clear both (compact NNN code misread as episode)
+//  3. Clamp episode > 50 → clear episode only
+//  4. SxxExx / Sxx.Exx regex
+//  5. Compact NNN code (e.g. "101" → S1E01)
+//  6. "Season N" / "Episode N" text in filename
+//  7. Folder name fallbacks (Season text, S## pattern, parsedPttFolder)
+//
+// Returns null if nothing was found.
+export function parseFileSeasonEpisode(
+  fname,
+  folderName,
+  parsedPtt,
+  parsedPttFolder,
+) {
+  let season = parsedPtt != null ? parsedPtt.season : undefined;
+  let episode = parsedPtt != null ? parsedPtt.episode : undefined;
+
+  // Step 2: episode > 99 means parse-torrent-title read a compact NNN code (e.g. 101)
+  // as a raw episode number; it also derives season from the leading digit — clear both.
+  if (Number.isInteger(episode) && episode > 99) {
+    season = undefined;
+    episode = undefined;
+  } else if (Number.isInteger(episode) && episode > 50) {
+    // Step 3: implausibly large 2-digit episode — just clear episode, season may be valid.
+    episode = undefined;
+  }
+
+  // Step 4: SxxExx / Sxx.Exx / Sxx_Exx
+  if (!Number.isInteger(season) || !Number.isInteger(episode)) {
+    const m = fname.match(/S(\d{1,2})[._ ]?E(\d{1,2})/i);
+    if (m) {
+      season = parseInt(m[1], 10);
+      episode = parseInt(m[2], 10);
+    }
+  }
+
+  // Step 5: compact NNN (first digit = season, last two = episode; e.g. 101 → S1E01)
+  if (!Number.isInteger(season) && !Number.isInteger(episode)) {
+    const m = fname.match(/\b([1-9])(\d{2})\b/);
+    if (m) {
+      season = parseInt(m[1], 10);
+      episode = parseInt(m[2], 10);
+    }
+  }
+
+  // Step 6a: "Season N" text in filename
+  if (!Number.isInteger(season)) {
+    const m = fname.match(/Season\s+(\d+)/i);
+    if (m) season = parseInt(m[1], 10);
+  }
+
+  // Step 6b: "Episode N" text in filename
+  if (!Number.isInteger(episode)) {
+    const m = fname.match(/Episode\s+(\d+)/i);
+    if (m) episode = parseInt(m[1], 10);
+  }
+
+  // Step 7: folder name fallbacks
+  if (!Number.isInteger(season) && folderName) {
+    const m1 = (folderName || "").match(/Season\s+(\d+)/i);
+    if (m1) {
+      season = parseInt(m1[1], 10);
+    } else {
+      const m2 = (folderName || "").match(/S(\d{1,2})(?!\d)/i);
+      if (m2) {
+        season = parseInt(m2[1], 10);
+      } else if (parsedPttFolder && parsedPttFolder.season != null) {
+        season = parsedPttFolder.season;
+      }
+    }
+  }
+
+  if (!Number.isInteger(season) && !Number.isInteger(episode)) return null;
+  return {
+    season: Number.isInteger(season) ? season : null,
+    episode: Number.isInteger(episode) ? episode : null,
+  };
+}

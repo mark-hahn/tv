@@ -282,21 +282,6 @@
         </div>
         <div style="display: flex; gap: 8px; align-items: center">
           <button
-            @click="adjustOffset(-100)"
-            title="-100ms"
-            :disabled="_trimBusy"
-            style="
-              cursor: pointer;
-              border-radius: 4px;
-              padding: 2px 6px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-              font-weight: bold;
-            "
-          >
-            ↓
-          </button>
-          <button
             @click="adjustOffset(-500)"
             title="-500ms"
             :disabled="_trimBusy"
@@ -311,12 +296,27 @@
           >
             ↓
           </button>
-          <div style="min-width: 40px; text-align: center">
+          <button
+            @click="adjustOffset(-100)"
+            title="-100ms"
+            :disabled="_trimBusy"
+            style="
+              cursor: pointer;
+              border-radius: 4px;
+              padding: 2px 6px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+              font-weight: bold;
+            "
+          >
+            ↓
+          </button>
+          <div style="width: 64px; text-align: center">
             {{ cumulativeTrim }} ms
           </div>
           <button
-            @click="adjustOffset(500)"
-            title="+500ms"
+            @click="adjustOffset(100)"
+            title="+100ms"
             :disabled="_trimBusy"
             style="
               cursor: pointer;
@@ -330,8 +330,8 @@
             ↑
           </button>
           <button
-            @click="adjustOffset(100)"
-            title="+100ms"
+            @click="adjustOffset(500)"
+            title="+500ms"
             :disabled="_trimBusy"
             style="
               cursor: pointer;

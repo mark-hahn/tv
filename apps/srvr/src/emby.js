@@ -364,6 +364,25 @@ const getShowState = async (showId, _showName, showMeta) => {
       fileGap = true;
     }
 
+    // If we found the first unwatched episode (after watched ones) and it has
+    // no file, flag it as a file gap even if fileEndCount is below threshold.
+    if (
+      !skipMissingFileGap &&
+      checkedReady &&
+      !ready &&
+      anyWatched &&
+      !watchGap &&
+      !fileGap &&
+      !fileEndError &&
+      !seasonWatchedThenNofile
+    ) {
+      if (fileGapSeason === null && firstNoFileSeason !== null) {
+        fileGapSeason = firstNoFileSeason;
+        fileGapEpisode = firstNoFileEpisode;
+      }
+      fileGap = true;
+    }
+
     // List/Map treat any of these as "Missing File". If user said skip it,
     // suppress all file-missing related signals.
     if (skipMissingFileGap) {

@@ -49,12 +49,14 @@ async function main() {
     debug,
     delOldFiles,
     deleteCount,
+    deleteErrorRecords,
     downloadCount,
     downloadTime,
     episode,
     err,
     errCount,
     errors,
+    deleteErrors,
     escQuotes,
     exec,
     existsCount,
@@ -638,6 +640,38 @@ async function main() {
             });
           }
 
+          return json(res, 405, {
+            status: "error",
+            error: "method not allowed",
+          });
+        }
+
+        // Handle /deleteErrors endpoint – deletes all error records from the DB
+        if (pathname === "/deleteErrors") {
+          if (req.method === "POST") {
+            try {
+              setCors(res);
+              var delResult = tvJson.deleteErrorRecords();
+              if (delResult && delResult.ok) {
+                return json(res, 200, {
+                  status: "ok",
+                  deleted: delResult.deleted,
+                });
+              }
+              return json(res, 500, {
+                status: "error",
+                error:
+                  delResult && delResult.error
+                    ? delResult.error
+                    : "delete failed",
+              });
+            } catch (e) {
+              return json(res, 500, {
+                status: "error",
+                error: String(e && e.message ? e.message : e),
+              });
+            }
+          }
           return json(res, 405, {
             status: "error",
             error: "method not allowed",

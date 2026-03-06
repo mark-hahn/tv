@@ -116,6 +116,32 @@
             Check Usb Files
           </button>
           <button
+            @click.stop="toggleErrs"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+            "
+            :style="{ '--btn-bg': errsButtonBg }"
+          >
+            Errs
+          </button>
+          <button
+            @click.stop="clearErrorRecords"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Clr
+          </button>
+          <button
             @click.stop="scrollToBottomAction"
             style="
               font-size: 13px;
@@ -167,7 +193,7 @@
       @wheel.stop.prevent="handleScaledWheel"
     >
       <template
-        v-for="(it, idx) in orderedItems"
+        v-for="(it, idx) in displayedItems"
         :key="idx"
       >
         <div
@@ -301,6 +327,7 @@ export default {
       _startProcPending: false,
       matchedTitle: null,
       isChecking: false,
+      showErrs: false,
     };
   },
 
@@ -352,6 +379,19 @@ export default {
     orderedItems() {
       // Render in the exact array order returned by /api/tvproc.
       return Array.isArray(this.items) ? this.items : [];
+    },
+
+    displayedItems() {
+      if (!this.showErrs) return this.orderedItems;
+      return this.orderedItems.filter((it) => it && it.error);
+    },
+
+    errorItems() {
+      return this.orderedItems.filter((it) => it && it.error);
+    },
+
+    errsButtonBg() {
+      return this.showErrs ? "#aaa" : "whitesmoke";
     },
   },
 
@@ -739,6 +779,30 @@ export default {
         const s = new Set(this.retryingTitles);
         s.delete(title);
         this.retryingTitles = s;
+      }
+    },
+
+    toggleErrs() {
+      this.showErrs = !this.showErrs;
+    },
+
+    async clearErrorRecords() {
+      const errItems = this.errorItems;
+      const count = errItems.length;
+      const confirmed = window.confirm(
+        `Do you want to delete ${count} files with download errors`,
+      );
+      this.showErrs = false;
+      if (!confirmed) return;
+      try {
+        await fetch(`${config.tvDownUrl}/deleteErrors`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+        await this.loadTvproc();
+      } catch (e) {
+        console.error("clearErrorRecords failed:", e);
       }
     },
 

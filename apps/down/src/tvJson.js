@@ -1589,6 +1589,18 @@ const retryEntry = (title) => {
   }
 };
 
+const deleteErrorRecords = () => {
+  try {
+    openDb();
+    const info = db
+      .prepare("DELETE FROM tv_entries WHERE error IS NOT NULL AND error != 0")
+      .run();
+    return { ok: true, deleted: info.changes };
+  } catch (e) {
+    return { ok: false, error: e && e.message ? String(e.message) : String(e) };
+  }
+};
+
 export {
   addEntry,
   getDownloads,
@@ -1600,4 +1612,5 @@ export {
   checkFiles,
   deleteProcids,
   retryEntry,
+  deleteErrorRecords,
 };

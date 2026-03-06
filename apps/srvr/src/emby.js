@@ -321,6 +321,9 @@ const getShowState = async (showId, _showName, showMeta) => {
             fileGapSeason = seasonNumber;
             fileGapEpisode = episodeNumber;
           }
+          console.log(
+            `[getShowState] fileGap set for ${showName} S${seasonNumber}E${episodeNumber}`,
+          );
           fileGap = true;
         }
         seasonNotWatchedNoFiles &&= !(haveFile || unaired || watched);
@@ -329,6 +332,9 @@ const getShowState = async (showId, _showName, showMeta) => {
       }
       if (!seasonNotWatchedNoFiles && fileEndCount > 2) {
         if (!(fileCount === 1 && firstEpisodeFileUnwatched)) {
+          console.log(
+            `[getShowState] fileEndError set for ${showName} S${seasonNumber}: fileEndCount=${fileEndCount} fileCount=${fileCount} firstEpisodeFileUnwatched=${firstEpisodeFileUnwatched}`,
+          );
           fileEndError = true;
         }
       }
@@ -395,6 +401,11 @@ const getShowState = async (showId, _showName, showMeta) => {
   } catch (error) {
     console.error("getShowState error:", error.message);
     return null;
+  }
+  if (fileEndError || fileGap || seasonWatchedThenNofile) {
+    console.log(
+      `[getShowState] ${showName} result: fileEndError=${fileEndError} fileGap=${fileGap} seasonWatchedThenNofile=${seasonWatchedThenNofile} fileGapSeason=${fileGapSeason} fileGapEpisode=${fileGapEpisode}`,
+    );
   }
   return {
     notReady: !ready,

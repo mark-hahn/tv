@@ -1280,6 +1280,14 @@ async function main() {
         var parsed = parseTorrentTitle(fname) || {};
         ({ title, season, episode } = parsed);
 
+        // Discard implausibly large episode numbers — parse-torrent-title misreads compact
+        // NNN codes (e.g. "101" in "Jam and Jerusalem 101") as a plain episode number.
+        // Dropping values > 50 lets the Step 4 compact-NNN fallback handle them correctly.
+        if (Number.isInteger(episode) && episode > 50) {
+          episode = undefined;
+          parsed.episode = undefined;
+        }
+
         // Title regex fallback: e.g. "Snuff Box - Episode 6 - The Wedding.mkv" → "Snuff Box"
         if (!title) {
           var noExt = fname.replace(/\.[^.]+$/, "");

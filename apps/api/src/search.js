@@ -15,7 +15,7 @@ const ALWAYS_DO_BOTH_SEARCHES = true;
 const LOG_APPS_API_DATA_TOR_RESULTS_TXT = false;
 
 // Per-provider fetch timeout for public providers
-const PROVIDER_TIMEOUT_MS = 30_000;
+const PROVIDER_TIMEOUT_MS = 90_000;
 
 // TV category codes returned by apibay (205=SD, 207=SD-episodes, 208=HD-TV, 212=UHD)
 const TPB_TV_CATEGORIES = new Set(["202", "205", "207", "208", "212"]);

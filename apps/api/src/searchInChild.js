@@ -9,7 +9,7 @@ import path from "path";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const WORKER_PATH = path.join(__dirname, "search-worker.js");
-const SEARCH_TIMEOUT_MS = 90 * 1000; // 90 seconds (providers each have 30s timeouts)
+const SEARCH_TIMEOUT_MS = 300 * 1000; // 300 seconds (providers each have 90s timeouts; more=true can do two phases)
 
 export async function searchTorrentsInChild(params) {
   return new Promise((resolve, reject) => {

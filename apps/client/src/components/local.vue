@@ -346,7 +346,9 @@
           </button>
           <button
             @click="applySubs"
-            :disabled="applyInProgress || selectedSubKeys.size === 0"
+            :disabled="
+              applyInProgress || Object.keys(selectedSubKeys).length === 0
+            "
             style="
               cursor: pointer;
               border-radius: 7px;
@@ -513,7 +515,7 @@ export default {
       subsLoading: false,
       subsError: null,
       hasSearchedSubs: false,
-      selectedSubKeys: new Set(),
+      selectedSubKeys: {},
       lastClickedSubKey: null,
       applyInProgress: false,
       applyFailures: [],
@@ -1497,7 +1499,7 @@ export default {
       return { season: bestSeason, episode: bestEpisode };
     },
     getSubCardStyle(item) {
-      const isSelected = this.selectedSubKeys.has(item.key);
+      const isSelected = item.key in this.selectedSubKeys;
       return {
         padding: "8px",
         background: isSelected ? "#fffacd" : "#fff",
@@ -1523,14 +1525,14 @@ export default {
           const s = Math.min(idx1, idx2);
           const e = Math.max(idx1, idx2);
           const range = this.subsItems.slice(s, e + 1);
-          range.forEach((i) => this.selectedSubKeys.add(i.key));
+          range.forEach((i) => (this.selectedSubKeys[i.key] = true));
         }
       } else if (isCtrl) {
-        if (this.selectedSubKeys.has(key)) this.selectedSubKeys.delete(key);
-        else this.selectedSubKeys.add(key);
+        if (key in this.selectedSubKeys) delete this.selectedSubKeys[key];
+        else this.selectedSubKeys[key] = true;
       } else {
-        this.selectedSubKeys.clear();
-        this.selectedSubKeys.add(key);
+        this.selectedSubKeys = {};
+        this.selectedSubKeys[key] = true;
       }
       this.lastClickedSubKey = key;
       this.cumulativeTrim = 0;
@@ -1542,7 +1544,7 @@ export default {
         if (!offset || typeof offset !== "number") return;
         // Build Payload
         const payload = [];
-        for (const key of this.selectedSubKeys) {
+        for (const key of Object.keys(this.selectedSubKeys)) {
           const item = this.subsItems.find((i) => i.key === key);
           if (!item) continue;
 
@@ -1631,12 +1633,12 @@ export default {
     },
     async applySubs() {
       if (this.applyInProgress) return;
-      if (this.selectedSubKeys.size === 0) return;
+      if (Object.keys(this.selectedSubKeys).length === 0) return;
 
       this.applyInProgress = true;
       const payload = [];
 
-      for (const key of this.selectedSubKeys) {
+      for (const key of Object.keys(this.selectedSubKeys)) {
         const item = this.subsItems.find((i) => i.key === key);
         if (!item) continue;
 

@@ -1571,10 +1571,11 @@ const retryEntry = (title) => {
     openDb();
     const existing = rowToEntry(stmtGetByTitle.get(t));
     if (!existing) return false;
-    // Clear error and reset to waiting state.
-    db.prepare(
-      "UPDATE tv_entries SET error=0, status='waiting', progress=0, eta=NULL, speed=0, dateEnded=NULL, inProgress=0 WHERE title=?",
-    ).run(t);
+    // Delete the row entirely so the next USB scan cycle re-parses and re-adds it
+    // from scratch. Resetting status='waiting' while keeping the row causes the
+    // scan to skip it as "already queued" (getTitlesMap returns any row, not just
+    // error rows), so the parse never re-runs.
+    db.prepare("DELETE FROM tv_entries WHERE title=?").run(t);
     // Remove from finished map so the file isn't considered already done.
     ensureMapsLoaded();
     if (finishedMap[t]) {
@@ -1582,7 +1583,6 @@ const retryEntry = (title) => {
       writeMap(TV_FINISHED_PATH, finishedMap);
     }
     removeInProgress(t);
-    tryStartNextWorkers();
     return true;
   } catch {
     return false;

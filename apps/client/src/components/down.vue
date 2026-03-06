@@ -229,23 +229,30 @@
             "
           >
             <span>{{ it.title || "(no title)" }}</span>
+            <!-- NOTE: never mix static style= and dynamic :style= on the same element for
+                 properties you want to toggle — static style always wins and blocks :style changes.
+                 Put ALL style properties in a single :style object instead.
+                 NOTE: do not use :disabled for state-toggled buttons — the browser's disabled
+                 styling overrides background/color, making the change invisible. Guard in the
+                 click handler instead. -->
             <button
               v-if="it.error"
-              :disabled="retryingTitles.has(it.title)"
-              style="
-                flex-shrink: 0;
-                font-size: 11px;
-                padding: 2px 7px;
-                cursor: pointer;
-                border: 1px solid #c00;
-                border-radius: 4px;
-                background: #fff0f0;
-                color: #c00;
-                white-space: nowrap;
-              "
+              :style="{
+                flexShrink: 0,
+                fontSize: '11px',
+                padding: '2px 7px',
+                cursor: retryingTitles[it.title] ? 'default' : 'pointer',
+                border: retryingTitles[it.title]
+                  ? '1px solid #aaa'
+                  : '1px solid #c00',
+                borderRadius: '4px',
+                background: retryingTitles[it.title] ? '#eee' : '#fff0f0',
+                color: retryingTitles[it.title] ? '#999' : '#c00',
+                whiteSpace: 'nowrap',
+              }"
               @click.stop="retryDownload(it.title)"
             >
-              Retry
+              {{ retryingTitles[it.title] ? "..." : "Retry" }}
             </button>
           </div>
           <div
@@ -305,7 +312,7 @@ export default {
     return {
       items: [],
       error: null,
-      retryingTitles: new Set(),
+      retryingTitles: {},
       _pollTimer: null,
       _polling: false,
       _active: false,
@@ -765,8 +772,12 @@ export default {
     },
 
     async retryDownload(title) {
-      if (!title || this.retryingTitles.has(title)) return;
-      this.retryingTitles = new Set([...this.retryingTitles, title]);
+      if (!title) return;
+      if (this.retryingTitles[title] != null) return;
+      // Store the current dateEnded — any re-processing (success or re-error) produces a new one.
+      const currentItem = this.items.find((x) => x && x.title === title);
+      this.retryingTitles[title] =
+        currentItem && currentItem.dateEnded ? currentItem.dateEnded : -1;
       try {
         await fetch(`${config.tvDownUrl}/retry`, {
           method: "POST",
@@ -775,10 +786,7 @@ export default {
         });
       } catch (e) {
         console.error("retryDownload failed:", e);
-      } finally {
-        const s = new Set(this.retryingTitles);
-        s.delete(title);
-        this.retryingTitles = s;
+        delete this.retryingTitles[title];
       }
     },
 
@@ -1225,7 +1233,16 @@ export default {
           this._lastFinishedEnded = finishedEndedMax;
         }
 
+        // Clear busy indicator for any retrying title where processing completed.
+        // Clears when: item gone, error resolved, or dateEnded changed (re-errored with new attempt).
+        for (const t of Object.keys(this.retryingTitles)) {
+          const item = arr.find((x) => x && x.title === t);
+          if (!item || !item.error || item.dateEnded !== this.retryingTitles[t])
+            delete this.retryingTitles[t];
+        }
+
         this.items = arr;
+
         const isFirstLoad = !this._didLoadOnce;
         this._didLoadOnce = true;
 

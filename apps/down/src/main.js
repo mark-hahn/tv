@@ -494,6 +494,8 @@ async function main() {
                     error: "entry not found",
                   });
                 }
+                // Kick off a new USB scan so the file is re-processed immediately.
+                startProc();
                 return json(res, 200, { status: "ok" });
               } catch (e) {
                 return json(res, 500, {
@@ -1282,11 +1284,27 @@ async function main() {
 
         // Discard implausibly large episode numbers — parse-torrent-title misreads compact
         // NNN codes (e.g. "101" in "Jam and Jerusalem 101") as a plain episode number.
-        // Dropping values > 50 lets the Step 4 compact-NNN fallback handle them correctly.
-        if (Number.isInteger(episode) && episode > 50) {
+        // For 3-digit values (> 99) the library also derives season from the leading digit,
+        // so clear both to let the Step 4 compact-NNN fallback handle the whole thing.
+        // For 2-digit values > 50 just clear episode (season may be legitimately set).
+        const _rawEpisode = parsed.episode;
+        const _rawSeason = parsed.season;
+        if (Number.isInteger(episode) && episode > 99) {
+          episode = undefined;
+          parsed.episode = undefined;
+          season = undefined;
+          parsed.season = undefined;
+        } else if (Number.isInteger(episode) && episode > 50) {
           episode = undefined;
           parsed.episode = undefined;
         }
+        trace("checkFile: after-clamp", {
+          fname,
+          rawSeason: _rawSeason,
+          rawEpisode: _rawEpisode,
+          season,
+          episode,
+        });
 
         // Title regex fallback: e.g. "Snuff Box - Episode 6 - The Wedding.mkv" → "Snuff Box"
         if (!title) {
@@ -1324,6 +1342,14 @@ async function main() {
             episode = parseInt(m[2], 10);
             parsed.season = season;
             parsed.episode = episode;
+            // parse-torrent-title may have left the NNN code (and trailing date/junk) in
+            // the title string.  Strip it so TVDB gets a clean series name.
+            // e.g. "Jam and Jerusalem 101 (11-24-06)." → "Jam and Jerusalem"
+            const stripped = title
+              .replace(new RegExp("\\s+" + m[0] + "\\b.*$"), "")
+              .replace(/\s*\.\s*$/, "")
+              .trim();
+            if (stripped && stripped.length >= 2) title = stripped;
           }
         }
 
@@ -1485,74 +1511,101 @@ async function main() {
       return;
     }
     log("search:", title);
-    tvdburl =
-      "https://api4.thetvdb.com/v4/search?type=series&q=" +
-      encodeURIComponent(title);
-    return request(
-      tvdburl,
-      {
-        json: true,
-        timeout: 15000,
-        headers: {
-          Authorization: "Bearer " + theTvDbToken,
+
+    // Some shows use "&" on TVDB where the filename has "and" (e.g. "Jam & Jerusalem").
+    // Build a list of query variants to try in order.
+    var tvdbQueryVariants = [title];
+    if (/ and /i.test(title)) {
+      tvdbQueryVariants.push(title.replace(/ and /gi, " & "));
+    }
+
+    var tryTvdbQuery = (variants) => {
+      var query = variants[0];
+      var remaining = variants.slice(1);
+      tvdburl =
+        "https://api4.thetvdb.com/v4/search?type=series&q=" +
+        encodeURIComponent(query);
+      return request(
+        tvdburl,
+        {
+          json: true,
+          timeout: 15000,
+          headers: {
+            Authorization: "Bearer " + theTvDbToken,
+          },
         },
-      },
-      (error, response, body) => {
-        var ref;
-        // log 'thetvdb', {tvdburl, error, response, body}
-        if (
-          error ||
-          !((ref = body.data) != null ? ref[0] : void 0) ||
-          (response != null ? response.statusCode : void 0) !== 200
-        ) {
-          trace("chkTvDB: tvdb error/no data", {
-            fname,
-            title,
-            tvdburl,
-            statusCode: response && response.statusCode,
-            error: error ? error.message || String(error) : null,
-          });
-          err("no series name found in theTvDB:", { fname, tvdburl });
-          err("search error:", error);
-          err("search statusCode:", response && response.statusCode);
-          err("search body:", body);
-          if (error) {
-            if (++tvDbErrCount === 15) {
-              err("giving up, downloaded:", downloadCount);
+        (error, response, body) => {
+          var ref;
+          var noResults =
+            !error &&
+            !((ref = body && body.data) != null ? ref[0] : void 0) &&
+            (response != null ? response.statusCode : void 0) === 200;
+
+          // If no results and we have a variant to try, retry with the next variant.
+          if (noResults && remaining.length > 0) {
+            trace("chkTvDB: no results, trying variant", {
+              query,
+              next: remaining[0],
+            });
+            return tryTvdbQuery(remaining);
+          }
+
+          if (
+            error ||
+            !((ref = body && body.data) != null ? ref[0] : void 0) ||
+            (response != null ? response.statusCode : void 0) !== 200
+          ) {
+            trace("chkTvDB: tvdb error/no data", {
+              fname,
+              title,
+              tvdburl,
+              statusCode: response && response.statusCode,
+              error: error ? error.message || String(error) : null,
+            });
+            err("no series name found in theTvDB:", { fname, tvdburl });
+            err("search error:", error);
+            err("search statusCode:", response && response.statusCode);
+            err("search body:", body);
+            if (error) {
+              if (++tvDbErrCount === 15) {
+                err("giving up, downloaded:", downloadCount);
+                return;
+              }
+              err("tvdb err retry, waiting one minute");
+              return setTimeout(chkTvDB, rsyncDelay);
+            } else {
+              badFile("thetvdb: no series match");
               return;
             }
-            err("tvdb err retry, waiting one minute");
-            return setTimeout(chkTvDB, rsyncDelay);
           } else {
-            badFile("thetvdb: no series match");
-            return;
-          }
-        } else {
-          // Prefer a title match across all results (basic normalization first, then aggressive).
-          var results = Array.isArray(body && body.data) ? body.data : [];
-          var names = results.map((r) => r && r.name).filter((nm) => nm);
+            // Prefer a title match across all results (basic normalization first, then aggressive).
+            var results = Array.isArray(body && body.data) ? body.data : [];
+            var names = results.map((r) => r && r.name).filter((nm) => nm);
 
-          // Pass null for year as we don't have it here, or extract if available
-          // existing code didn't use year, so we pass undefined/null
-          seriesName = smartTitleMatch(title, names);
-          trace("chkTvDB: matched series", {
-            title,
-            resultsCount: names.length,
-            topNames: names.slice(0, 10),
-            seriesName,
-          });
-          log("tvdb got:", { seriesName, title });
-          if (map[seriesName]) {
-            console.log("Mapping", seriesName, "to", map[seriesName]);
-            seriesName = map[seriesName];
+            // Pass null for year as we don't have it here, or extract if available
+            // existing code didn't use year, so we pass undefined/null
+            seriesName = smartTitleMatch(title, names);
+            trace("chkTvDB: matched series", {
+              title,
+              resultsCount: names.length,
+              topNames: names.slice(0, 10),
+              seriesName,
+            });
+            log("tvdb got:", { seriesName, title });
+            if (map[seriesName]) {
+              console.log("Mapping", seriesName, "to", map[seriesName]);
+              seriesName = map[seriesName];
+            }
+            trace("chkTvDB: post-map", { title, seriesName });
+            tvdbCache[title] = seriesName;
+            // process.nextTick checkFileExists
+            return setTimeout(checkFileExists, rsyncDelay);
           }
-          trace("chkTvDB: post-map", { title, seriesName });
-          tvdbCache[title] = seriesName;
-          // process.nextTick checkFileExists
-          return setTimeout(checkFileExists, rsyncDelay);
-        }
-      },
-    );
+        },
+      );
+    };
+
+    return tryTvdbQuery(tvdbQueryVariants);
   };
 
   checkFileExists = () => {

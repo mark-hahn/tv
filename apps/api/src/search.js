@@ -14,6 +14,75 @@ import os from "os";
 const ALWAYS_DO_BOTH_SEARCHES = true;
 const LOG_APPS_API_DATA_TOR_RESULTS_TXT = false;
 
+// Per-provider fetch timeout for public providers
+const PROVIDER_TIMEOUT_MS = 30_000;
+
+// TV category codes returned by apibay (205=SD, 207=SD-episodes, 208=HD-TV, 212=UHD)
+const TPB_TV_CATEGORIES = new Set(["202", "205", "207", "208", "212"]);
+
+// Race a promise against a timeout; rejects with a descriptive error on timeout
+function withTimeout(promise, ms, label) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms / 1000}s`)),
+      ms,
+    );
+    promise.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
+
+async function searchTpbDirect(query, limit = 100) {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
+    const res = await fetch(
+      `https://apibay.org/q.php?q=${encodeURIComponent(query)}`,
+      { signal: controller.signal },
+    );
+    clearTimeout(timer);
+    if (!res.ok) {
+      console.warn(
+        `[searchTpbDirect] apibay HTTP ${res.status} for "${query}"`,
+      );
+      return [];
+    }
+    const data = await res.json().catch(() => null);
+    if (!Array.isArray(data)) {
+      console.warn(
+        `[searchTpbDirect] apibay non-array response for "${query}"`,
+      );
+      return [];
+    }
+    const real = data.filter((r) => String(r.id) !== "0");
+    const tv = real.filter((r) =>
+      TPB_TV_CATEGORIES.has(String(r.category ?? "")),
+    );
+    return tv.slice(0, limit).map((r) => ({
+      provider: "ThePirateBay",
+      id: r.id,
+      title: r.name,
+      size: Number(r.size),
+      seeds: Number(r.seeders),
+      peers: Number(r.leechers),
+      time: new Date(Number(r.added) * 1000).toISOString(),
+      magnet: `magnet:?xt=urn:btih:${r.info_hash}&dn=${encodeURIComponent(r.name)}&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce`,
+      category: r.category,
+    }));
+  } catch (e) {
+    console.warn(`[searchTpbDirect] failed for "${query}": ${e.message}`);
+    return [];
+  }
+}
+
 // Provider code mapping for stats display
 const PROVIDER_CODE_MAP = {
   IpTorrents: "IPT",
@@ -445,9 +514,9 @@ export async function searchTorrents({
   needed = [],
   more = false,
 }) {
-  console.log(`\nSearching for: ${showName} (limit: ${limit})`);
   const activeProvidersRaw = TorrentSearchApi.getActiveProviders();
   const activeProviders = formatActiveProviders(activeProvidersRaw);
+  console.log(`\nSearching for: ${showName} (limit: ${limit})`);
   console.log("Enabled providers:", activeProviders.join(", "));
 
   torLog(`========== search: ${showName} (limit=${limit}) ==========`);
@@ -547,14 +616,19 @@ export async function searchTorrents({
     const resultsArrays = await Promise.all(
       uniqueQueries.map(async (q) => {
         try {
-          const r = await TorrentSearchApi.search(
-            ["IpTorrents", "TorrentLeech"],
-            q,
-            "TV",
-            limit,
+          const r = await withTimeout(
+            TorrentSearchApi.search(
+              ["IpTorrents", "TorrentLeech"],
+              q,
+              "TV",
+              limit,
+            ),
+            PROVIDER_TIMEOUT_MS,
+            "IpTorrents/TorrentLeech",
           );
           return Array.isArray(r) ? r : [];
-        } catch {
+        } catch (e) {
+          console.warn(`[search] IpTorrents/TorrentLeech: ${e.message}`);
           return [];
         }
       }),
@@ -575,16 +649,23 @@ export async function searchTorrents({
       (
         await Promise.all(
           queries.flatMap((q) => [
-            TorrentSearchApi.search(["ThePirateBay"], q, "Video", limit).catch(
-              () => {
-                tpbFailed = true;
-                return [];
-              },
-            ),
-            TorrentSearchApi.search(["Limetorrents"], q, "TV", limit).catch(
-              () => [],
-            ),
-            TorrentSearchApi.search(["Eztv"], q, "All", limit).catch(() => []),
+            searchTpbDirect(q, limit),
+            withTimeout(
+              TorrentSearchApi.search(["Limetorrents"], q, "TV", limit),
+              PROVIDER_TIMEOUT_MS,
+              "Limetorrents",
+            ).catch((e) => {
+              console.warn(`[searchTpbLimEzt] Limetorrents: ${e.message}`);
+              return [];
+            }),
+            withTimeout(
+              TorrentSearchApi.search(["Eztv"], q, "All", limit),
+              PROVIDER_TIMEOUT_MS,
+              "Eztv",
+            ).catch((e) => {
+              console.warn(`[searchTpbLimEzt] Eztv: ${e.message}`);
+              return [];
+            }),
           ]),
         )
       ).flat();
@@ -1312,13 +1393,23 @@ export async function getTorrentFile(showName) {
 
   const limit = 20;
   const [tpb, lim, ezt] = await Promise.all([
-    TorrentSearchApi.search(["ThePirateBay"], query, "Video", limit).catch(
-      () => [],
-    ),
-    TorrentSearchApi.search(["Limetorrents"], query, "TV", limit).catch(
-      () => [],
-    ),
-    TorrentSearchApi.search(["Eztv"], query, "All", limit).catch(() => []),
+    searchTpbDirect(query, limit),
+    withTimeout(
+      TorrentSearchApi.search(["Limetorrents"], query, "TV", limit),
+      PROVIDER_TIMEOUT_MS,
+      "Limetorrents",
+    ).catch((e) => {
+      console.warn(`[getTorrentFile] Limetorrents: ${e.message}`);
+      return [];
+    }),
+    withTimeout(
+      TorrentSearchApi.search(["Eztv"], query, "All", limit),
+      PROVIDER_TIMEOUT_MS,
+      "Eztv",
+    ).catch((e) => {
+      console.warn(`[getTorrentFile] Eztv: ${e.message}`);
+      return [];
+    }),
   ]);
   const results = [...tpb, ...lim, ...ezt];
 

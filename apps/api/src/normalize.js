@@ -190,6 +190,16 @@ export function normalize(torrent, showName) {
     if (nameMatch) break;
   }
 
+  // Fallback: match if the first 2 words of the parsed title match the first 2 words of the show name
+  if (!nameMatch) {
+    const firstTwo = (s) => s.split(/\s+/).slice(0, 2).join(" ");
+    const parsedFirst2 = firstTwo(applyBase(parsed.title || ""));
+    const showFirst2 = firstTwo(applyBase(showName || ""));
+    if (parsedFirst2.length > 0 && parsedFirst2 === showFirst2) {
+      nameMatch = true;
+    }
+  }
+
   return {
     parsed,
     seasonRange,

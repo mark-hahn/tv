@@ -755,6 +755,13 @@ export async function searchTorrents({
     const code = getProviderCode(provider);
     rawProviderCodeCounts[code] = (rawProviderCodeCounts[code] || 0) + count;
   }
+  // Always include all expected providers so stats show even when a provider returns 0
+  const expectedProviderCodes = more
+    ? ["IPT", "TL", "TPB", "LIM", "EZT"]
+    : ["IPT", "TL"];
+  for (const code of expectedProviderCodes) {
+    if (!(code in rawProviderCodeCounts)) rawProviderCodeCounts[code] = 0;
+  }
 
   // Normalize and filter torrents
   const normalized = torrents.map((t) => normalize(t, showName));

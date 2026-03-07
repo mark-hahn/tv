@@ -1755,20 +1755,22 @@ export default {
         .trim();
       const searchQ = encodeURIComponent(name);
       const eztQ = name.replace(/\s+/g, "+");
-      window.open(
+      const urls = [
         `https://thepiratebay.org/search.php?q=${searchQ}&cat=205`,
-        "_blank",
-      );
-      window.open(
         `https://www.limetorrents.lol/search/tv/${searchQ}/`,
-        "_blank",
-      );
-      window.open(`https://eztv.re/search/${eztQ}`, "_blank");
-      window.open(`https://iptorrents.com/tv?q=${searchQ}`, "_blank");
-      window.open(
+        `https://eztvx.to/search/${eztQ}`,
+        `https://iptorrents.com/tv?q=${searchQ}`,
         `https://www.torrentleech.org/torrents/browse/index/query/${searchQ}`,
-        "_blank",
-      );
+      ];
+      for (const url of urls) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
     },
 
     async forceClick() {

@@ -828,7 +828,7 @@ export async function searchTorrents({
       } else if (provider === "limetorrents") {
         torrent.detailUrl = `https://www.limetorrents.lol/search/tv/${searchQ}/`;
       } else if (provider === "eztv") {
-        torrent.detailUrl = `https://eztv.re/search/${String(showName || "")
+        torrent.detailUrl = `https://eztvx.to/search/${String(showName || "")
           .replace(/\([^)]+\)\s*$/, "")
           .replace(/[?.]+\s*$/g, "")
           .trim()

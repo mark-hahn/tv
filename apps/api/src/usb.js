@@ -185,55 +185,13 @@ function parseDfForMount(dfText, mountPoint) {
 }
 
 /**
- * Returns four integers describing free space.
- *
- * Units:
- * - usbSpaceTotal/usbSpaceUsed are bytes derived from `du -s` output (1K blocks)
- * - mediaSpaceTotal/mediaSpaceUsed are bytes (from `df -B1`)
+ * Returns USB seed-box space: { usbSpaceTotal, usbSpaceUsed } in bytes.
+ * Uses ssh `du -s .` on the USB server home directory; may take several seconds.
  */
-export async function spaceAvail() {
-  // Seed box (USB server): use ssh `du -s` as requested.
-  // Total is a fixed-size assumption used for percent calculations.
+export async function spaceAvailUsb() {
   const usbSpaceTotalKFallback = 2e9;
   const usbSpaceTotal = Math.trunc(usbSpaceTotalKFallback * 1024);
   let usbSpaceUsed = 0;
-
-  const parseDfFirstDataRow = (dfText) => {
-    const text = String(dfText ?? "");
-    const lines = text
-      .split(/\r?\n/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (lines.length < 2) return undefined;
-    const row = lines[1];
-    const parts = String(row).split(/\s+/);
-    if (parts.length < 6) return undefined;
-    const total = Number(parts[1]);
-    const used = Number(parts[2]);
-    const avail = Number(parts[3]);
-    if (
-      !Number.isFinite(total) ||
-      !Number.isFinite(used) ||
-      !Number.isFinite(avail)
-    )
-      return undefined;
-    return {
-      total: Math.trunc(total),
-      used: Math.trunc(used),
-      avail: Math.trunc(avail),
-    };
-  };
-
-  const dfToTotalUsed = (parsed) => {
-    if (!parsed) return undefined;
-    if (parsed.used < 0 || parsed.avail < 0) return undefined;
-    return {
-      // Match `df` semantics: Available excludes reserved blocks.
-      // Use (used + avail) so client pctUsed and (total-used) match df Use%/Available.
-      total: Math.trunc(parsed.used + parsed.avail),
-      used: Math.trunc(parsed.used),
-    };
-  };
 
   try {
     const qbHost = await loadQbHostForSsh();
@@ -251,9 +209,9 @@ export async function spaceAvail() {
       "UserKnownHostsFile=/dev/null",
     ];
 
-    // du may exit non-zero if it hits unreadable directories; still emits a usable summary line.
-    // Keep command exactly as requested (cd; du -s) and parse stdout even on non-zero exit.
-    const args = [...sshBaseArgs, qbHost, "cd; du -s"];
+    // du may exit non-zero if it hits unreadable directories (permission denied); still emits a usable summary line.
+    // Measure home dir (.) after cd; permission denied errors go to stderr and are ignored.
+    const args = [...sshBaseArgs, qbHost, "cd; du -s ."];
 
     const runDuOnce = async () => {
       try {
@@ -303,27 +261,48 @@ export async function spaceAvail() {
     if (Number.isInteger(duK)) {
       usbSpaceUsed = Math.trunc(duK * 1024);
       if (attempt.err && !attempt.stdout && !attempt.stderr) {
-        console.error("spaceAvail: ssh du failed (no output):", attempt.err);
+        console.error("spaceAvailUsb: ssh du failed (no output):", attempt.err);
       }
     } else {
       if (attempt.err) {
         console.error(
-          "spaceAvail: ssh du failed (unparsable output):",
+          "spaceAvailUsb: ssh du failed (unparsable output):",
           attempt.err,
         );
       }
-      // Preserve old log shape (stdout-focused) but include stderr for diagnosis.
       console.error(
-        "spaceAvail: unexpected ssh du output:",
+        "spaceAvailUsb: unexpected ssh du output:",
         attempt.stdout || attempt.stderr,
       );
     }
   } catch (e) {
     console.error(
-      "spaceAvail: ssh space probing failed (returning usbSpaceUsed=0):",
+      "spaceAvailUsb: ssh space probing failed (returning usbSpaceUsed=0):",
       e,
     );
   }
+
+  return {
+    usbSpaceTotal: Math.trunc(usbSpaceTotal),
+    usbSpaceUsed: Math.trunc(usbSpaceUsed),
+  };
+}
+
+/**
+ * Returns local media server space: { mediaSpaceTotal, mediaSpaceUsed } in bytes.
+ * Uses `df -B1` on the local media mount; fast (local disk).
+ */
+export async function spaceAvailMedia() {
+  const dfToTotalUsed = (parsed) => {
+    if (!parsed) return undefined;
+    if (parsed.used < 0 || parsed.avail < 0) return undefined;
+    return {
+      // Match `df` semantics: Available excludes reserved blocks.
+      // Use (used + avail) so client pctUsed and (total-used) match df Use%/Available.
+      total: Math.trunc(parsed.used + parsed.avail),
+      used: Math.trunc(parsed.used),
+    };
+  };
 
   let mediaSpaceTotal = 0;
   let mediaSpaceUsed = 0;
@@ -346,42 +325,44 @@ export async function spaceAvail() {
       }
     }
 
-    if (!mediaMount) {
-      return {
-        usbSpaceTotal: Math.trunc(usbSpaceTotal),
-        usbSpaceUsed: Math.trunc(usbSpaceUsed),
-        mediaSpaceTotal: 0,
-        mediaSpaceUsed: 0,
-      };
-    }
-
-    const df = await execFileAsync("df", ["-B1", "-P", mediaMount], {
-      timeout: 15000,
-      maxBuffer: 1024 * 1024,
-      windowsHide: true,
-    });
-    const dfText = String(df.stdout ?? "");
-    const parsed = parseDfForMount(dfText, mediaMount);
-    const tu = dfToTotalUsed(parsed);
-    if (tu) {
-      mediaSpaceUsed = tu.used;
-      mediaSpaceTotal = tu.total;
-    } else {
-      console.error("spaceAvail: unexpected df output:", dfText);
+    if (mediaMount) {
+      const df = await execFileAsync("df", ["-B1", "-P", mediaMount], {
+        timeout: 15000,
+        maxBuffer: 1024 * 1024,
+        windowsHide: true,
+      });
+      const dfText = String(df.stdout ?? "");
+      const parsed = parseDfForMount(dfText, mediaMount);
+      const tu = dfToTotalUsed(parsed);
+      if (tu) {
+        mediaSpaceUsed = tu.used;
+        mediaSpaceTotal = tu.total;
+      } else {
+        console.error("spaceAvailMedia: unexpected df output:", dfText);
+      }
     }
   } catch (e) {
     console.error(
-      "spaceAvail: df failed (returning mediaSpaceTotal/mediaSpaceUsed=0):",
+      "spaceAvailMedia: df failed (returning mediaSpaceTotal/mediaSpaceUsed=0):",
       e,
     );
   }
 
   return {
-    usbSpaceTotal: Math.trunc(usbSpaceTotal),
-    usbSpaceUsed: Math.trunc(usbSpaceUsed),
     mediaSpaceTotal: Math.trunc(mediaSpaceTotal),
     mediaSpaceUsed: Math.trunc(mediaSpaceUsed),
   };
+}
+
+/**
+ * Returns all four space integers by running USB and media probes concurrently.
+ * Units:
+ * - usbSpaceTotal/usbSpaceUsed are bytes derived from `du -s` output (1K blocks)
+ * - mediaSpaceTotal/mediaSpaceUsed are bytes (from `df -B1`)
+ */
+export async function spaceAvail() {
+  const [usb, media] = await Promise.all([spaceAvailUsb(), spaceAvailMedia()]);
+  return { ...usb, ...media };
 }
 
 /**

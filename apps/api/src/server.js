@@ -13,6 +13,8 @@ import {
   getQbtInfo,
   delQbtTorrent,
   spaceAvail,
+  spaceAvailUsb,
+  spaceAvailMedia,
   flexgetHistory,
   addQbtTorrent,
   addQbtMagnet,
@@ -648,6 +650,26 @@ app.get("/api/space/avail", async (req, res) => {
     res.json(info);
   } catch (error) {
     console.error("spaceAvail error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/space/usb", async (req, res) => {
+  try {
+    const info = await spaceAvailUsb();
+    res.json(info);
+  } catch (error) {
+    console.error("spaceAvailUsb error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/space/srvr", async (req, res) => {
+  try {
+    const info = await spaceAvailMedia();
+    res.json(info);
+  } catch (error) {
+    console.error("spaceAvailMedia error:", error);
     res.status(500).json({ error: error.message });
   }
 });

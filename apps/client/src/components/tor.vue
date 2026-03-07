@@ -1516,6 +1516,20 @@ export default {
       return res.json();
     },
 
+    async getSpaceUsb() {
+      const url = new URL(`${config.torrentsApiUrl}/api/space/usb`);
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+
+    async getSpaceSrvr() {
+      const url = new URL(`${config.torrentsApiUrl}/api/space/srvr`);
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+
     pctUsed(total, used) {
       const t = Number(total);
       const u = Number(used);
@@ -1544,39 +1558,49 @@ export default {
     },
 
     async updateSpaceAvail() {
-      try {
-        const s = await this.getSpaceAvail();
+      const hasAnyDigits = (txt) => /\d/.test(String(txt || ""));
 
-        const hasUsb =
+      const applyUsb = (s) => {
+        if (
           Number.isFinite(Number(s?.usbSpaceTotal)) &&
-          Number.isFinite(Number(s?.usbSpaceUsed));
-        const hasSrvr =
-          Number.isFinite(Number(s?.mediaSpaceTotal)) &&
-          Number.isFinite(Number(s?.mediaSpaceUsed));
-        if (!hasUsb && !hasSrvr) return;
-
-        if (hasUsb) {
-          this.spaceUsbPct = this.pctAvail(s?.usbSpaceTotal, s?.usbSpaceUsed);
-          this.spaceUsbGb = this.fmtAvailGb(s?.usbSpaceTotal, s?.usbSpaceUsed);
+          Number.isFinite(Number(s?.usbSpaceUsed))
+        ) {
+          this.spaceUsbPct = this.pctAvail(s.usbSpaceTotal, s.usbSpaceUsed);
+          this.spaceUsbGb = this.fmtAvailGb(s.usbSpaceTotal, s.usbSpaceUsed);
         }
-        if (hasSrvr) {
+      };
+
+      const applySrvr = (s) => {
+        if (
+          Number.isFinite(Number(s?.mediaSpaceTotal)) &&
+          Number.isFinite(Number(s?.mediaSpaceUsed))
+        ) {
           this.spaceSrvrPct = this.pctAvail(
-            s?.mediaSpaceTotal,
-            s?.mediaSpaceUsed,
+            s.mediaSpaceTotal,
+            s.mediaSpaceUsed,
           );
           this.spaceSrvrGb = this.fmtAvailGb(
-            s?.mediaSpaceTotal,
-            s?.mediaSpaceUsed,
+            s.mediaSpaceTotal,
+            s.mediaSpaceUsed,
           );
         }
-      } catch (e) {
-        // On failure, show unknown placeholders, but don't clobber last-known-good values.
-        const hasAnyDigits = (txt) => /\d/.test(String(txt || ""));
-        if (!hasAnyDigits(this.spaceUsbGb)) this.spaceUsbGb = "???";
-        if (!hasAnyDigits(this.spaceUsbPct)) this.spaceUsbPct = "???%";
-        if (!hasAnyDigits(this.spaceSrvrGb)) this.spaceSrvrGb = "???";
-        if (!hasAnyDigits(this.spaceSrvrPct)) this.spaceSrvrPct = "???%";
-      }
+      };
+
+      const usbPromise = this.getSpaceUsb()
+        .then(applyUsb)
+        .catch(() => {
+          if (!hasAnyDigits(this.spaceUsbGb)) this.spaceUsbGb = "???";
+          if (!hasAnyDigits(this.spaceUsbPct)) this.spaceUsbPct = "???%";
+        });
+
+      const srvrPromise = this.getSpaceSrvr()
+        .then(applySrvr)
+        .catch(() => {
+          if (!hasAnyDigits(this.spaceSrvrGb)) this.spaceSrvrGb = "???";
+          if (!hasAnyDigits(this.spaceSrvrPct)) this.spaceSrvrPct = "???%";
+        });
+
+      await Promise.all([usbPromise, srvrPromise]);
     },
 
     saveCookies() {

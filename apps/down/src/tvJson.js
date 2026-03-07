@@ -1578,8 +1578,34 @@ const deleteErrorRecords = () => {
   }
 };
 
+// Mark a title as finished in the DB without running a worker.
+// Used when the file is already present on disk.
+const markFinished = (title) => {
+  if (!title) return;
+  const t = String(title);
+  try {
+    openDb();
+    const now = Math.floor(Date.now() / 1000);
+    const existing = stmtGetByTitle.get(t);
+    if (existing) {
+      db.prepare(
+        "UPDATE tv_entries SET status='finished', inProgress=0, progress=100, dateEnded=? WHERE title=?",
+      ).run(now, t);
+    } else {
+      db.prepare(
+        `INSERT INTO tv_entries (title, procId, status, inProgress, progress, dateEnded, error)
+         VALUES (?, ?, 'finished', 0, 100, ?, 0)`,
+      ).run(t, nextProcId++, now);
+    }
+    removeInProgress(t);
+  } catch {
+    // non-fatal
+  }
+};
+
 export {
   addEntry,
+  markFinished,
   getDownloads,
   markError,
   pruneMissingUsbDirs,

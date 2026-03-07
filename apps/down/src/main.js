@@ -106,7 +106,8 @@ async function main() {
     writeLine,
     writeMap,
     forcedFiles,
-    processingForced;
+    processingForced,
+    embyMap;
 
   forcedFiles = null;
   processingForced = false;
@@ -179,6 +180,7 @@ async function main() {
   var TV_INPROGRESS_PATH = dataPath("tv-inProgress.json");
   var TV_BLOCKED_PATH = dataPath("tv-blocked.json");
   var TV_MAP_PATH = dataPath("tv-map");
+  var TVDB_JSON_PATH = path.join(APP_DIR, "..", "srvr", "data", "tvdb.json");
 
   // State is stored under apps/down/data.
 
@@ -1074,6 +1076,14 @@ async function main() {
       tvJsonTitles = {};
     }
 
+    // Load Emby membership map from srvr's tvdb.json once per cycle.
+    // Keys are series names; value.inEmby is true if the show is in Emby.
+    try {
+      embyMap = JSON.parse(fs.readFileSync(TVDB_JSON_PATH, "utf8"));
+    } catch (e) {
+      embyMap = null;
+    }
+
     // Sort files by parsed title before processing.
     usbFiles = usbFiles.filter((l) => l && l.trim().length);
     usbFiles = usbFiles
@@ -1624,6 +1634,20 @@ async function main() {
       return process.nextTick(checkFile);
     }
 
+    // Disk check first: if the file is already on disk, mark finished and skip.
+    // This must run before the tvJsonTitles guard so files that were previously
+    // queued as 'waiting' (before disk-check was added) also get caught.
+    if (fs.existsSync(`${tvSeasonPath}/${fname}`)) {
+      existsCount++;
+      log("------", downloadCount, "/", chkCount, "ALREADY ON DISK:", fname);
+      trace("checkFileExists: already on disk", { fname, tvSeasonPath });
+      try {
+        tvJson.markFinished(fname);
+      } catch (e) {}
+      if (tvJsonTitles) tvJsonTitles[fname] = { error: false };
+      return process.nextTick(checkFile);
+    }
+
     // In-progress authority: tv-inProgress.json (do not create duplicate tv.json entries
     // for files already queued/downloading).
     if (!processingForced && inProgress && inProgress[fname]) {
@@ -1637,6 +1661,26 @@ async function main() {
       existsCount++;
       trace("checkFileExists: already queued (tv.json)", { fname });
       return process.nextTick(checkFile);
+    }
+
+    // Emby filter: only download shows that are in Emby.
+    if (embyMap && seriesName) {
+      const embyEntry = embyMap[seriesName];
+      if (!embyEntry || !embyEntry.inEmby) {
+        log(
+          "------",
+          downloadCount,
+          "/",
+          chkCount,
+          "NOT IN EMBY, SKIPPING:",
+          fname,
+          "(",
+          seriesName,
+          ")",
+        );
+        trace("checkFileExists: not in emby", { fname, seriesName });
+        return process.nextTick(checkFile);
+      }
     }
 
     mkdirp.sync(tvSeasonPath);

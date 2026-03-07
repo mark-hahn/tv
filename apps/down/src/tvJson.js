@@ -33,7 +33,6 @@ ensureDir(MISC_DIR);
 
 // SQLite backing store
 const TV_DB_PATH = path.join(DATA_DIR, "tv.sqlite");
-const TV_FINISHED_PATH = path.join(DATA_DIR, "tv-finished.json");
 const TV_INPROGRESS_PATH = path.join(DATA_DIR, "tv-inProgress.json");
 const TV_LOG_PATH = path.join(MISC_DIR, "tv.log");
 
@@ -146,7 +145,6 @@ let db = null;
 let workerCount = 0;
 let nextProcId = 0;
 
-let finishedMap = null;
 let inProgressCache = null;
 
 let stmtUpsertByTitle = null;
@@ -884,7 +882,6 @@ const ensureMapFileExists = (filePath, defaultObj) => {
 };
 
 const ensureMapsLoaded = () => {
-  if (!finishedMap) finishedMap = readMap(TV_FINISHED_PATH);
   if (!inProgressCache) inProgressCache = readMap(TV_INPROGRESS_PATH);
 };
 
@@ -910,7 +907,6 @@ const removeInProgress = (title) => {
 };
 
 const loadOnStart = () => {
-  ensureMapFileExists(TV_FINISHED_PATH, {});
   ensureMapFileExists(TV_INPROGRESS_PATH, {});
 
   openDb();
@@ -958,9 +954,6 @@ const loadOnStart = () => {
       tx(rows);
     }
   } catch {}
-
-  // Load finished/errors/inProgress maps for immediate updates.
-  finishedMap = readMap(TV_FINISHED_PATH);
 
   // One-time migration: if legacy tv-errors.json exists, mark matching entries as error:true then delete it.
   // Any mismatches are ignored.
@@ -1032,8 +1025,6 @@ const handleFinish = (entry) => {
     const tsStr = dateStr(ts);
 
     if (status === "finished") {
-      finishedMap[title] = tsStr;
-      writeMap(TV_FINISHED_PATH, finishedMap);
       removeInProgress(title);
       return;
     }
@@ -1489,17 +1480,7 @@ const deleteProcids = (procIds) => {
         continue;
       }
 
-      // Clear finished/inProgress markers so the title can be re-downloaded.
-      try {
-        if (
-          title &&
-          finishedMap &&
-          Object.prototype.hasOwnProperty.call(finishedMap, title)
-        ) {
-          delete finishedMap[title];
-          writeMap(TV_FINISHED_PATH, finishedMap);
-        }
-      } catch {}
+      // Clear inProgress marker so the title can be re-downloaded.
       try {
         removeInProgress(title);
       } catch {}
@@ -1578,10 +1559,6 @@ const retryEntry = (title) => {
     db.prepare("DELETE FROM tv_entries WHERE title=?").run(t);
     // Remove from finished map so the file isn't considered already done.
     ensureMapsLoaded();
-    if (finishedMap[t]) {
-      delete finishedMap[t];
-      writeMap(TV_FINISHED_PATH, finishedMap);
-    }
     removeInProgress(t);
     return true;
   } catch {

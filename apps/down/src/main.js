@@ -75,7 +75,6 @@ async function main() {
     mkdirp,
     path,
     readMap,
-    recent,
     recentCount,
     reloadState,
     request,
@@ -177,7 +176,6 @@ async function main() {
 
   // tv.log lives under data/misc/
   var TV_LOG_PATH = path.join(MISC_DIR, "tv.log");
-  var TV_FINISHED_PATH = dataPath("tv-finished.json");
   var TV_INPROGRESS_PATH = dataPath("tv-inProgress.json");
   var TV_BLOCKED_PATH = dataPath("tv-blocked.json");
   var TV_MAP_PATH = dataPath("tv-map");
@@ -197,9 +195,6 @@ async function main() {
   // Ensure state files exist.
   (function ensureStateFilesExist() {
     try {
-      if (!fs.existsSync(TV_FINISHED_PATH)) {
-        fs.writeFileSync(TV_FINISHED_PATH, "{}");
-      }
       if (!fs.existsSync(TV_INPROGRESS_PATH)) {
         fs.writeFileSync(TV_INPROGRESS_PATH, "{}");
       }
@@ -862,7 +857,6 @@ async function main() {
     return fs.writeFileSync(fname, JSON.stringify(out));
   };
 
-  recent = null;
   errors = null;
   inProgress = null;
 
@@ -1063,13 +1057,8 @@ async function main() {
       } catch (e) {}
     }
 
-    // Load finished/inProgress maps once per cycle, immediately after
+    // Load inProgress map once per cycle, immediately after
     // the USB file list is available.
-    try {
-      recent = readMap(TV_FINISHED_PATH);
-    } catch (e) {
-      recent = {};
-    }
     try {
       inProgress = readMap(TV_INPROGRESS_PATH);
     } catch (e) {
@@ -1211,14 +1200,6 @@ async function main() {
         process.nextTick(checkFile);
         return;
       }
-      if (!processingForced && recent && recent[fname]) {
-        recentCount++;
-        log("------", downloadCount, "/", chkCount, "SKIPPING RECENT:", fname);
-        trace("checkFile: skip recent", { fname });
-        process.nextTick(checkFile);
-        return;
-      }
-
       if (
         !processingForced &&
         tvJsonTitles &&
@@ -1261,7 +1242,6 @@ async function main() {
         process.nextTick(checkFile);
         return;
       }
-      log("not recent", usbLine);
       for (blkName in blocked) {
         if (fname.indexOf(blkName) > -1) {
           blockedCount++;
@@ -1641,13 +1621,6 @@ async function main() {
     if (SKIP_DOWNLOAD) {
       // Skip download mode: no-op in the new model.
       trace("checkFileExists: SKIP_DOWNLOAD true", { fname });
-      return process.nextTick(checkFile);
-    }
-
-    // Finished authority: tv-finished.json (do not create tv.json entries for already-finished).
-    if (!processingForced && recent && recent[fname]) {
-      existsCount++;
-      trace("checkFileExists: already finished (recent)", { fname });
       return process.nextTick(checkFile);
     }
 

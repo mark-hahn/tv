@@ -472,6 +472,7 @@ export default {
     },
 
     onSetUpSeries(show) {
+      console.log("[reviews] onSetUpSeries", show?.Name);
       this.showName = show?.Name || "";
       this.reviews = [];
       this.stats = null;
@@ -487,6 +488,13 @@ export default {
     onTvdbDataReady(data) {
       this.checkedRemotes = true;
       const tvdbData = data?.tvdbData;
+      console.log("[reviews] onTvdbDataReady", {
+        hasData: !!tvdbData,
+        imdbUrl: tvdbData?.imdbUrl,
+        imdbId: tvdbData?.imdbId,
+        rottenUrl: tvdbData?.rottenUrl,
+        remotesLen: tvdbData?.remotes?.length,
+      });
 
       if (tvdbData) {
         // First try the runtime-built remotes array (populated when show is freshly fetched)
@@ -533,11 +541,23 @@ export default {
 
         // Load initial reviews - prioritize IMDB if available, otherwise Rotten Tomatoes
         if (this.imdbId) {
+          console.log(
+            "[reviews] onTvdbDataReady -> loadReviews IMDB",
+            this.imdbId,
+          );
           this.selectedButton = "IMDB";
           void this.loadReviews(this.imdbId, "IMDB");
         } else if (this.rottenUrl) {
+          console.log(
+            "[reviews] onTvdbDataReady -> loadReviews Rotten",
+            this.rottenUrl,
+          );
           this.selectedButton = "Rotten";
           void this.loadReviews(this.rottenUrl, "Rotten");
+        } else {
+          console.log(
+            "[reviews] onTvdbDataReady -> no imdbId or rottenUrl, showing not-found",
+          );
         }
       }
     },
@@ -628,6 +648,7 @@ export default {
     },
 
     async loadReviews(urlOrId, buttonName) {
+      console.log("[reviews] loadReviews START", { urlOrId, buttonName });
       this.reviews = [];
       this.stats = null;
       this.isLoading = true;
@@ -642,6 +663,10 @@ export default {
             buttonName === "Rotten" ? "Audience" : buttonName;
           data = await srvr.getReviews(urlOrId, rtButtonName);
         }
+        console.log("[reviews] loadReviews DONE", {
+          reviewCount: data?.reviews?.length,
+          numChecked: data?.numChecked,
+        });
 
         if (data) {
           if (data.reviews && Array.isArray(data.reviews)) {

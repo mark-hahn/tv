@@ -1405,6 +1405,15 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     const remoteResult = await getRemotes(show, remoteIds, fast);
     remotes = remoteResult?.remotes || [];
     fetchedUrls = remoteResult?.urls || {};
+  } else {
+    // For transient/preview, extract IMDB URL directly from remoteIds (no network calls)
+    // so that the reviews pane can load IMDB reviews.
+    const imdbRemoteId = Array.isArray(remoteIds)
+      ? remoteIds.find((r) => r.type === 2)
+      : null;
+    if (imdbRemoteId?.id) {
+      fetchedUrls.imdbUrl = `https://www.imdb.com/title/${imdbRemoteId.id}`;
+    }
   }
   const saved = Date.now();
   const trailersRaw = trailersIn || allTvdb[name]?.trailers;

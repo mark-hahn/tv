@@ -893,6 +893,34 @@ export async function addQbtMagnet(input) {
 
   const t = String(text || "").trim();
   const ok = t.length === 0 || t.toLowerCase().startsWith("ok");
+
+  // When qBittorrent returns "Fails." check if it's a duplicate infohash
+  if (!ok && t.toLowerCase() === "fails.") {
+    const xtMatch = magnetUrl.match(
+      /xt=urn:btih:([a-fA-F0-9]{40}|[a-zA-Z2-7]{32})/i,
+    );
+    if (xtMatch) {
+      const hash = xtMatch[1].toLowerCase();
+      try {
+        const infoRes = await fetch(
+          new URL(`/api/v2/torrents/info?hashes=${hash}`, baseUrl),
+          { headers: { Cookie: cookie } },
+        );
+        const torrents = await infoRes.json().catch(() => []);
+        if (Array.isArray(torrents) && torrents.length > 0) {
+          const tor = torrents[0];
+          return {
+            ok: false,
+            status: res.status,
+            text: `Duplicate: "${tor.name}" already in qBittorrent (state: ${tor.state})`,
+          };
+        }
+      } catch {
+        // ignore — fall through to generic error
+      }
+    }
+  }
+
   return { ok, status: res.status, text: t };
 }
 

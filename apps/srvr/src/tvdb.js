@@ -993,6 +993,7 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   const remotesByName = {};
   for (const tvdbRemote of tvdbRemotes) {
     if (tvdbRemote.type == 18) continue;
+    if (tvdbRemote.type == 7) continue; // Reddit handled separately above
     if (tvdbRemote.type == 2) continue; // IMDB handled separately below
     const remote = await getRemote(
       tvdbRemote.id,

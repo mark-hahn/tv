@@ -69,7 +69,12 @@ const chkWriteFile = async () => {
     busyByPath[path] = true;
     let data = dataByPath[path];
     if (typeof data != "string") data = JSON.stringify(data);
-    await fsp.writeFile(path, data);
+    // Atomic write: write to a temp file in the same directory, then rename.
+    // fs.rename() on Linux is a single syscall — if the process is killed
+    // mid-write the original file is untouched.
+    const tmpPath = path + ".tmp";
+    await fsp.writeFile(tmpPath, data);
+    await fsp.rename(tmpPath, path);
     resolvesByPath[path].forEach((resolve) => resolve());
     resolvesByPath[path] = [];
     delete dataByPath[path];

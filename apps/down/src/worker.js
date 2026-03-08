@@ -184,6 +184,7 @@ const main = () => {
     const { src, dst, usbPath2 } = makeSrcDst();
     const rsyncArgs = [
       "-av",
+      "--protect-args",
       "-e",
       "ssh",
       "--timeout=20",

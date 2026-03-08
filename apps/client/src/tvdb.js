@@ -109,6 +109,17 @@ export const upsertTvdbCacheRecord = (tvdbMap, tvdbData, preferredKey = "") => {
 
   if (!targetKey) return null;
 
+  const existing = tvdbMap[targetKey];
+  // Preserve cached remotes if the incoming record has none (e.g. transient fetch skips getRemotes).
+  if (
+    existing &&
+    (!tvdbData.remotes || tvdbData.remotes.length === 0) &&
+    Array.isArray(existing.remotes) &&
+    existing.remotes.length > 0
+  ) {
+    tvdbData = { ...tvdbData, remotes: existing.remotes };
+  }
+
   tvdbMap[targetKey] = tvdbData;
 
   if (recordId) {

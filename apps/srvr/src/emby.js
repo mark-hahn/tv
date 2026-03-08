@@ -296,11 +296,6 @@ const getShowState = async (showId, _showName, showMeta) => {
           watchedShow = true;
           watchedSeason = true;
         }
-        if (episodeIdx == episodes.length - 1) {
-          // last epi in season
-          watchedLastEpiLastSea = watched;
-        }
-
         if (watchedShow && !watched) unwatchedAfterWatched = true;
         if (!watchGap && unwatchedAfterWatched && watched) {
           if (watchGapSeason === null) {

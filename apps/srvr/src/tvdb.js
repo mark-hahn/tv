@@ -1006,6 +1006,8 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   const remotesByName = {};
   for (const tvdbRemote of tvdbRemotes) {
     if (tvdbRemote.type == 18) continue;
+    // When fast, skip live IMDB scrape — use cached data below instead
+    if (fast && tvdbRemote.type == 2) continue;
     const remote = await getRemote(
       tvdbRemote.id,
       tvdbRemote.type,
@@ -1017,12 +1019,23 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
     }
   }
 
-  // Fallback: if IMDB remote not found but we have imdbId, fetch it
-  if (!remotesByName["IMDB"] && allTvdb && allTvdb[name]?.imdbId) {
-    const imdbId = allTvdb[name].imdbId;
-    const fallbackRemote = await getRemote(imdbId, 2, name);
-    if (fallbackRemote) {
-      remotesByName["IMDB"] = fallbackRemote;
+  // IMDB: when fast, use cached flat props; otherwise scrape live
+  if (fast) {
+    const cachedShow = allTvdb ? allTvdb[name] : null;
+    if (cachedShow?.imdbUrl) {
+      const imdbEntry = { name: "IMDB", url: cachedShow.imdbUrl };
+      if (cachedShow.imdbRatings) imdbEntry.ratings = cachedShow.imdbRatings;
+      if (cachedShow.imdbVideo) imdbEntry.video = cachedShow.imdbVideo;
+      remotesByName["IMDB"] = imdbEntry;
+    }
+  } else {
+    // Fallback: if IMDB remote not found but we have imdbId, fetch it
+    if (!remotesByName["IMDB"] && allTvdb && allTvdb[name]?.imdbId) {
+      const imdbId = allTvdb[name].imdbId;
+      const fallbackRemote = await getRemote(imdbId, 2, name);
+      if (fallbackRemote) {
+        remotesByName["IMDB"] = fallbackRemote;
+      }
     }
   }
 
@@ -1947,7 +1960,7 @@ const tryLocalGetTvdb = async () => {
     seasonCount: minTvdb.seasonCount ?? 0,
     episodeCount: minTvdb.episodeCount ?? 0,
     watchedCount: minTvdb.watchedCount ?? 0,
-    fast: true, // Skip Rotten scrape only; getRemotes still does IMDb Playwright rating/video fetch.
+    fast: false, // Background loop: scrape Rotten and IMDB to refresh tvdb.json cache.
     suppressNotify: true, // Combined push1+push2 notify is sent after perShowCallback
   };
   // Await TVDB refresh completion so the updated record is available for further processing
@@ -2105,9 +2118,8 @@ export const getRemotesCmd = async (params) => {
   const show = params?.show;
   const tvdbRemotes = params?.tvdbRemotes || [];
   const fast = !!params?.fast;
-  // fast: true = use cached/basic links (no Rotten Tomatoes scraping)
-  // fast: false = scrape Rotten Tomatoes with Playwright for fresh ratings
-  // All other remotes (IMDB, Wikipedia, etc.) are always fetched
+  // fast: true = use cached data (no Rotten Tomatoes or IMDB scraping)
+  // fast: false = scrape Rotten Tomatoes and IMDB with Playwright for fresh ratings
   // log("getRemotesCmd: START", { showName: show?.Name, fast });
 
   if (!show) {

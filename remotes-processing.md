@@ -166,7 +166,7 @@ Runs continuously: timer fires `TVDB_UPDATE_DELAY_MS` (2 minutes by default) aft
 **Phase 3 (Push 3) — Delayed Rotten Tomatoes:**
 
 - If `skipRotten=false` (which it is for timer-driven processing):
-  - **Second Playwright Rotten scrape**: `getRemote(null, 99, processRecord.Name)` called again.
+  - **Playwright Rotten scrape**: `getRemote(null, 99, processRecord.Name)` called.
   - `allTvdb[name].rottenUrl` and `allTvdb[name].rottenRatings` updated.
   - `tvdb.json` saved again.
   - Separate `notifyCallback` sent to clients specifically with fresh Rotten scores.

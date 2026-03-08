@@ -658,7 +658,7 @@ import ReelGallery from "./reel-gallery.vue";
 import { config } from "../config.js";
 import evtBus from "../evtBus.js";
 import * as srvr from "../srvr.js";
-import { getAllTvdb, getRemotes } from "../tvdb.js";
+import { getAllTvdb, getRemotes, applyTvdbPush } from "../tvdb.js";
 
 export default {
   name: "BrowsePane",
@@ -753,10 +753,28 @@ export default {
     };
     evtBus.on("showSelected", onShowSelected);
 
+    const onTvdbUpdated = async (data) => {
+      const { name, record } = data || {};
+      if (!name || !record) return;
+      applyTvdbPush(name, record);
+      const cur = curTvdb.value;
+      if (!cur) return;
+      const curName = String(cur.name || cur.Name || "").trim();
+      const curId = String(cur.tvdb_id || cur.tvdbId || cur.id || "").trim();
+      const recordId = String(record.tvdbId || record.tvdb_id || "").trim();
+      const matches =
+        name === curName || (curId && recordId && curId === recordId);
+      if (!matches) return;
+      _lastRemotesKey.value = "";
+      await loadRemotesForTvdb(cur);
+    };
+    evtBus.on("tvdbUpdated", onTvdbUpdated);
+
     onUnmounted(() => {
       evtBus.off("previewMode", onPreviewMode);
       evtBus.off("browseTabClicked", onBrowseTabClicked);
       evtBus.off("showSelected", onShowSelected);
+      evtBus.off("tvdbUpdated", onTvdbUpdated);
     });
     const lastLoadedTvdbId = ref(null);
 

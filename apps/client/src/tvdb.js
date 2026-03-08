@@ -56,6 +56,14 @@ async function tvdbFetch(pathStr, _init, retryCount = 0) {
 }
 
 let allTvdb = null;
+
+// Apply a server-pushed tvdb record into the client allTvdb cache.
+// Called by components that listen for tvdbUpdated socket events.
+export const applyTvdbPush = (name, record) => {
+  if (!allTvdb || !name || !record) return;
+  allTvdb[name] = record;
+};
+
 export const clearCache = () => {
   allTvdb = null;
 };

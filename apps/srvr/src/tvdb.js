@@ -15,7 +15,7 @@ const TVDB_PATH = path.join(SRVR_DATA_DIR, "tvdb.json");
 const TVDB_BACKUP_PATH = path.join(SRVR_DATA_DIR, "tvdb.json.bak");
 const TVDB_TEMPLATE_PATH = path.join(SRVR_DATA_DIR, "tvdbTemplate.json");
 
-const FAST_UPDATE = false;
+const FAST_UPDATE = true;
 const TVDB_UPDATE_DELAY_MS = FAST_UPDATE ? 5 * 1000 : 2 * 60 * 1000;
 const moviedb = new MovieDb("327192a334da700f65b882c7a69cb927");
 

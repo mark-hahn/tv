@@ -928,11 +928,8 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   if (show.inEmby)
     remotes.push({ name: "Emby", url: urls.embyPageUrl(showId) });
 
-  // Rotten Tomatoes: controlled by fast parameter
-  // fast=true: use cached or construct basic link (no Playwright scraping)
-  // fast=false: scrape with Playwright for fresh ratings
-  if (fast) {
-    // Try to use cached Rotten Tomatoes data
+  // Rotten Tomatoes: always use cached URL; scraping only happens in push3 of background task
+  {
     let rottenFound = false;
     const cachedShow = allTvdb ? allTvdb[name] : null;
     if (cachedShow?.rottenUrl) {
@@ -961,16 +958,6 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
         .replace(/\s+/g, "_");
       const url = `https://www.rottentomatoes.com/tv/${cleanName}`;
       remotes.push({ name: "Rotten", url });
-    }
-  } else {
-    // Scrape Rotten Tomatoes with Playwright for fresh ratings
-    const rottenRemote = await getRemote(null, 99, name);
-    if (rottenRemote) {
-      if (rottenRemote.ratings)
-        rottenRemote.name += " (" + rottenRemote.ratings + ")";
-      remotes.push(rottenRemote);
-      flatUrls.rottenUrl = rottenRemote.url || null;
-      flatUrls.rottenRatings = rottenRemote.ratings || null;
     }
   }
 
@@ -1006,8 +993,7 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   const remotesByName = {};
   for (const tvdbRemote of tvdbRemotes) {
     if (tvdbRemote.type == 18) continue;
-    // When fast, skip live IMDB scrape — use cached data below instead
-    if (fast && tvdbRemote.type == 2) continue;
+    if (tvdbRemote.type == 2) continue; // IMDB handled separately below
     const remote = await getRemote(
       tvdbRemote.id,
       tvdbRemote.type,
@@ -1019,22 +1005,36 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
     }
   }
 
-  // IMDB: when fast, use cached flat props; otherwise scrape live
-  if (fast) {
+  // IMDB: use cache if score is present; scrape live if score is missing (regardless of fast flag)
+  {
     const cachedShow = allTvdb ? allTvdb[name] : null;
-    if (cachedShow?.imdbUrl) {
+    if (cachedShow?.imdbUrl && cachedShow?.imdbRatings) {
+      // Cached score present — use it, no scraping needed
       const imdbEntry = { name: "IMDB", url: cachedShow.imdbUrl };
-      if (cachedShow.imdbRatings) imdbEntry.ratings = cachedShow.imdbRatings;
+      imdbEntry.ratings = cachedShow.imdbRatings;
       if (cachedShow.imdbVideo) imdbEntry.video = cachedShow.imdbVideo;
       remotesByName["IMDB"] = imdbEntry;
-    }
-  } else {
-    // Fallback: if IMDB remote not found but we have imdbId, fetch it
-    if (!remotesByName["IMDB"] && allTvdb && allTvdb[name]?.imdbId) {
-      const imdbId = allTvdb[name].imdbId;
-      const fallbackRemote = await getRemote(imdbId, 2, name);
-      if (fallbackRemote) {
-        remotesByName["IMDB"] = fallbackRemote;
+    } else {
+      // No cached score — scrape live regardless of fast flag
+      // Try tvdb remoteId type=2 first
+      const imdbTvdbRemote = tvdbRemotes.find((r) => r.type === 2);
+      if (imdbTvdbRemote) {
+        const remote = await getRemote(
+          imdbTvdbRemote.id,
+          2,
+          imdbTvdbRemote.sourceName,
+        );
+        if (remote && remote.url !== "no match") {
+          if (!remote.ratings) delete remote.ratings;
+          remotesByName["IMDB"] = remote;
+        }
+      }
+      // Fallback: use imdbId from tvdb record
+      if (!remotesByName["IMDB"] && cachedShow?.imdbId) {
+        const fallbackRemote = await getRemote(cachedShow.imdbId, 2, name);
+        if (fallbackRemote) {
+          remotesByName["IMDB"] = fallbackRemote;
+        }
       }
     }
   }

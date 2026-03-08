@@ -208,3 +208,52 @@ It is explicitly deferred until after:
 Only then does push3 do the Rotten Playwright scrape and send its own separate notification.
 
 This ordering lets clients receive the main data update (episode counts, dates, IMDB scores, series map) promptly without waiting for Rotten's Playwright browser automation, which is the slowest scrape. Rotten's fresh scores then arrive as a follow-on push.
+
+---
+
+## How Push2 and Push3 Update the Client UI
+
+Both push2 (combined push1+2 notification after `perShowCallback`) and push3 (Rotten scrape notification) use the same WebSocket event: `notifyClients("tvdbUpdated", { name, record })`. The full updated `allTvdb` record for the show is included in the payload. What each UI location does with it:
+
+---
+
+### List Pane (list.vue)
+
+Both push2 and push3 are handled by the `tvdbUpdated` listener:
+
+- Merges gap/disk fields (`watchGap`, `fileGap`, `Date`, `Size`, `NoFiles`, etc.) into the matching entry in `allShows`.
+- Replaces `allTvdb[name]` with the full pushed record (so future remotes fetches from other components will see fresh `imdbUrl`, `imdbRatings`, `rottenUrl`, `remotes`, etc.).
+- Calls `refilter` to re-render the show list (badges, gap indicators, etc.).
+- If the map pane is showing this show, triggers a series map refresh.
+
+---
+
+### Info Pane — Normal Mode (info.vue)
+
+Has a `tvdbUpdated` listener:
+
+- Calls `tvdb.applyTvdbPush(name, record)` — writes the pushed record into the client `allTvdb` cache.
+- If `this.show.Name` matches and `seriesReady` is true: calls `setRemotes()` again.
+- `setRemotes()` calls `getRemotes(fast=true)` — the cache now has the fresh record so the updated buttons render immediately with no server round-trip.
+- push2 brings fresh IMDB URL/rating; push3 brings fresh Rotten URL/score.
+
+---
+
+### Info Pane — Preview Mode (info.vue)
+
+Same listener as normal mode — `tvdbUpdated` fires `setRemotes()` if the show name matches and `seriesReady` is true.
+
+Note: for shows not yet in `tvdb.json`, the `triggerShowSelect` background task will fail immediately with a "no record" error (the show has no entry in `allTvdb` yet), so push2 is never sent for those shows.
+
+---
+
+### Browse Pane (browse.vue)
+
+Has a `tvdbUpdated` listener added to handle exactly this case:
+
+- Calls `applyTvdbPush(name, record)` — writes the pushed record into the client's `allTvdb` cache (same as list.vue does).
+- Checks whether `name`/`tvdbId` matches the currently displayed show in the browse pane.
+- If it matches: clears `_lastRemotesKey` (invalidates the "already loaded" guard) and calls `loadRemotesForTvdb` again.
+- `loadRemotesForTvdb` re-calls `getRemotes(fast=true)` — this time the client cache has the fresh record including `imdbUrl`, `imdbRatings`, `rottenUrl`, and `remotes`, so the buttons update immediately without a server round-trip.
+
+**Result:** When a show without prior IMDB data is selected in the browse pane, the IMDB button (and Rotten button, if push3 fires) will appear automatically once the background task completes, without any user action.

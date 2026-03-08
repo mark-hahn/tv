@@ -1604,6 +1604,14 @@ export default {
     // Keep the Series infobox totals in sync with the actual Map grid.
     // This matters for noemby shows where tvdb.json counts can be stale / mismatched.
     evtBus.on("seriesMapUpdated", this.onSeriesMapUpdated);
+
+    // Refresh remotes/buttons when server pushes updated tvdb data (push2 or push3).
+    this.onTvdbUpdated = async ({ name, record } = {}) => {
+      if (!name || !record || this.show?.Name !== name) return;
+      tvdb.applyTvdbPush(name, record);
+      if (this.seriesReady) void this.setRemotes();
+    };
+    evtBus.on("tvdbUpdated", this.onTvdbUpdated);
   },
 
   beforeUnmount() {
@@ -1612,6 +1620,7 @@ export default {
     evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);
     evtBus.off("seriesMapUpdated", this.onSeriesMapUpdated);
+    if (this.onTvdbUpdated) evtBus.off("tvdbUpdated", this.onTvdbUpdated);
 
     if (this.notePollTimer) {
       clearInterval(this.notePollTimer);

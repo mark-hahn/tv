@@ -1412,6 +1412,34 @@ async function main() {
             ? detailParts.join(", ")
             : "no usable fields";
 
+          // If embyMap is loaded, check whether the parsed title matches a known
+          // show before creating an error entry.  Files that don't resemble any
+          // Emby show (music videos, movies, etc.) are silently skipped so they
+          // don't clutter the UI with error entries.
+          if (embyMap && title) {
+            var embyShowNames = Object.keys(embyMap).filter(
+              (k) => embyMap[k] && embyMap[k].inEmby,
+            );
+            var matchesEmby = smartTitleMatch(
+              title,
+              embyShowNames,
+              null,
+              false,
+            );
+            if (!matchesEmby) {
+              log(
+                "------",
+                downloadCount,
+                "/",
+                chkCount,
+                "NOT A TV SHOW, SKIPPING:",
+                fname,
+              );
+              trace("checkFile: not a tv show, skipping", { fname, title });
+              return process.nextTick(checkFile);
+            }
+          }
+
           if (title && Number.isInteger(season) && !Number.isInteger(episode)) {
             badFile(
               `parse-torrent-title: found title+season but no episode (${detail}) → not an episode`,

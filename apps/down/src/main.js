@@ -1592,6 +1592,30 @@ async function main() {
               err("tvdb err retry, waiting one minute");
               return setTimeout(chkTvDB, rsyncDelay);
             } else {
+              var embyShowNamesForTvdb = embyMap
+                ? Object.keys(embyMap).filter(
+                    (k) => embyMap[k] && embyMap[k].inEmby,
+                  )
+                : [];
+              var tvdbMatchesEmby =
+                embyShowNamesForTvdb.length > 0
+                  ? smartTitleMatch(title, embyShowNamesForTvdb, null, false)
+                  : null;
+              if (!tvdbMatchesEmby) {
+                log(
+                  "------",
+                  downloadCount,
+                  "/",
+                  chkCount,
+                  "NOT A TV SHOW, SKIPPING:",
+                  fname,
+                );
+                trace("chkTvDB: no series match, not in emby, skipping", {
+                  fname,
+                  title,
+                });
+                return process.nextTick(checkFile);
+              }
               badFile("thetvdb: no series match");
               return;
             }

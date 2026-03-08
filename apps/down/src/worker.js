@@ -104,7 +104,7 @@ const locateUsbPathByTitle = async (usbHost1, title1) => {
   if (!dir || dir === "." || dir === "files") return null;
   const inside = dir.slice("files/".length);
   if (!inside) return null;
-  return `~/files/${inside}/`;
+  return `files/${inside}/`;
 };
 
 const finish = (statusText) => {
@@ -154,7 +154,13 @@ const main = () => {
 
   // rsync source/dest per spec
   const makeSrcDst = () => {
-    const usbPath2 = ensureTrailingSlash(entry.usbPath);
+    // Strip leading ~/ so --protect-args doesn't break tilde expansion.
+    // rsync over SSH defaults the remote cwd to the user's home, so
+    // "files/foo/" is equivalent to "~/files/foo/".
+    const rawUsbPath = ensureTrailingSlash(entry.usbPath);
+    const usbPath2 = rawUsbPath.startsWith("~/")
+      ? rawUsbPath.slice(2)
+      : rawUsbPath;
     const localPath2 = ensureTrailingSlash(localPath);
     const src = `${usbHost}:${usbPath2}${title}`;
     const dst = `${localPath2}${title}`;

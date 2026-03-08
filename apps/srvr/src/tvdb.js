@@ -1005,18 +1005,20 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
     }
   }
 
-  // IMDB: use cache if score is present; scrape live if score is missing (regardless of fast flag)
+  // IMDB:
+  // fast=true (info pane / gallery): use cache if imdbUrl+imdbRatings present; scrape live if score missing
+  // fast=false (background task): always scrape live for fresh ratings
   {
     const cachedShow = allTvdb ? allTvdb[name] : null;
-    if (cachedShow?.imdbUrl && cachedShow?.imdbRatings) {
-      // Cached score present — use it, no scraping needed
+    const useCachedImdb =
+      fast && cachedShow?.imdbUrl && cachedShow?.imdbRatings;
+    if (useCachedImdb) {
       const imdbEntry = { name: "IMDB", url: cachedShow.imdbUrl };
       imdbEntry.ratings = cachedShow.imdbRatings;
       if (cachedShow.imdbVideo) imdbEntry.video = cachedShow.imdbVideo;
       remotesByName["IMDB"] = imdbEntry;
     } else {
-      // No cached score — scrape live regardless of fast flag
-      // Try tvdb remoteId type=2 first
+      // Scrape live: try tvdb remoteId type=2 first
       const imdbTvdbRemote = tvdbRemotes.find((r) => r.type === 2);
       if (imdbTvdbRemote) {
         const remote = await getRemote(

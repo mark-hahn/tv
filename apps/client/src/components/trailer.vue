@@ -425,6 +425,9 @@ export default {
             fast: true,
           });
 
+          // Bail out if the user switched shows while we were awaiting
+          if (this.showName && data.show.Name !== this.showName) return;
+
           // Find IMDB remote with video
           const imdbRemote = remotes?.find(
             (r) => r.name && r.name.startsWith("IMDB"),
@@ -436,12 +439,14 @@ export default {
               language: "eng",
             };
             this.trailers.push(newTrailer);
+            // Snapshot trailers now so a later show-switch can't corrupt the save
+            const trailersSnapshot = [...this.trailers];
 
             // Update tvdb record immediately on server
             if (!this.previewMode) {
               await srvr.setTvdbFields({
                 name: data.show.Name,
-                trailers: this.trailers,
+                trailers: trailersSnapshot,
               });
             }
           }

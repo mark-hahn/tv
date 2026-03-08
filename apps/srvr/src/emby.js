@@ -184,7 +184,6 @@ const getShowState = async (showId, _showName, showMeta) => {
   let anyWatched = false;
   let lastWatched = false;
   let watchedShow = false;
-  let watchedLastEpiLastSea = true;
   let unwatchedAfterWatched = false;
   let watchGap = false;
   let haveFileShow = false;

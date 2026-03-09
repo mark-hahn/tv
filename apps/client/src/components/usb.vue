@@ -620,9 +620,29 @@ export default {
       }
 
       // --- parseTorrentTitle (primary for title; fallback for season/episode) ---
+      // Resolve the parser defensively — Vite may expose the module as an object
+      // with a .parse method rather than a plain function.
+      let _pttParser = null;
+      try {
+        if (typeof parseTorrentTitle === "function") {
+          _pttParser = parseTorrentTitle;
+        } else if (
+          parseTorrentTitle &&
+          typeof parseTorrentTitle.parse === "function"
+        ) {
+          _pttParser = parseTorrentTitle.parse;
+        } else if (
+          parseTorrentTitle &&
+          parseTorrentTitle.default &&
+          typeof parseTorrentTitle.default.parse === "function"
+        ) {
+          _pttParser = parseTorrentTitle.default.parse;
+        }
+      } catch (e) {}
+
       let parsed = {};
       try {
-        parsed = parseTorrentTitle(fname) || {};
+        if (_pttParser) parsed = _pttParser(fname) || {};
       } catch (e) {}
       title = parsed.title || null;
       if (!Number.isInteger(season) && Number.isInteger(parsed.season))
@@ -630,7 +650,7 @@ export default {
       if (!Number.isInteger(episode) && Number.isInteger(parsed.episode))
         episode = parsed.episode;
 
-      // --- Title regex fallback ---
+      // --- Title regex fallback (space-separated) ---
       // e.g. "Snuff Box - Episode 6 - The Wedding.mkv" → "Snuff Box"
       if (!title) {
         const noExt = fname.replace(/\.[^.]+$/, "");
@@ -643,6 +663,17 @@ export default {
           const dashIdx = noExt.indexOf(" - ");
           if (dashIdx > 0) title = noExt.slice(0, dashIdx).trim();
         }
+      }
+
+      // --- Title fallback for dot-separated filenames (e.g. Show.Year.SxxExx...) ---
+      // Handles: Paradise.2025.S02E05.1080p.WEB.h264-ETHEL.mkv → "Paradise"
+      if (!title && seMatch) {
+        const beforeSE = fname.slice(0, fname.search(/S\d+[._]?E\d+/i));
+        const words = beforeSE
+          .split(/[._]+/)
+          .map((w) => w.trim())
+          .filter((w) => w && !/^\d{4}$/.test(w)); // strip year tokens
+        if (words.length) title = words.join(" ");
       }
 
       // --- Folder name for season (if still missing) ---
@@ -659,8 +690,10 @@ export default {
           } else {
             // parseTorrentTitle on folder name as last resort
             try {
-              const fp = parseTorrentTitle(folderName) || {};
-              if (Number.isInteger(fp.season)) season = fp.season;
+              if (_pttParser) {
+                const fp = _pttParser(folderName) || {};
+                if (Number.isInteger(fp.season)) season = fp.season;
+              }
             } catch (e) {}
           }
         }

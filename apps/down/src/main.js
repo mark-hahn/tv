@@ -1731,6 +1731,15 @@ async function main() {
           ")",
         );
         trace("checkFileExists: not in emby", { fname, seriesName });
+        errCount++;
+        try {
+          tvJson.markError({
+            title: fname,
+            usbPath: usbPath,
+            reason: "Not in emby",
+          });
+        } catch (e) {}
+        if (tvJsonTitles) tvJsonTitles[fname] = { error: true };
         return process.nextTick(checkFile);
       }
     }

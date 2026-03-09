@@ -2445,13 +2445,9 @@ const deletePath = async (params) => {
       return "ok";
     }
 
-    // Use rm -f for files, rimraf for directories
-    if (stats.isFile()) {
-      const rmCmd = `rm -f "${fullPath}"`;
-      cp.execSync(rmCmd);
-    } else {
-      await rimraf(fullPath);
-    }
+    // Use rm -rf for both files and directories
+    const rmCmd = `rm -rf "${fullPath}"`;
+    cp.execSync(rmCmd);
 
     // Wait for filesystem to sync
     await new Promise((resolve) => setTimeout(resolve, 1000));

@@ -154,6 +154,19 @@
           >
             Bottom
           </button>
+          <button
+            @click.stop="togglePolling"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+            "
+            :style="{ backgroundColor: pollingStopped ? '#f66' : 'whitesmoke' }"
+          >
+            {{ pollingStopped ? "Resume" : "Stop" }}
+          </button>
         </div>
       </div>
     </div>
@@ -335,6 +348,7 @@ export default {
       matchedTitle: null,
       isChecking: false,
       showErrs: false,
+      pollingStopped: false,
     };
   },
 
@@ -463,6 +477,7 @@ export default {
 
     handleCycleStarted() {
       if (!this._active) return;
+      if (this.pollingStopped) return;
       // Start fast polling when a cycle starts
       this._fastPollStartTime = Date.now();
       this._oldDownloadingCount = this.items.filter((it) => {
@@ -497,9 +512,11 @@ export default {
           void this.loadTvproc({ isInitialPaneSwitch: true });
         }
         // Start polling if not already running
-        this._polling = true;
-        if (!this._pollTimer) {
-          this.scheduleNextPoll(5000);
+        if (!this.pollingStopped) {
+          this._polling = true;
+          if (!this._pollTimer) {
+            this.scheduleNextPoll(5000);
+          }
         }
       } else {
         // Clear highlight when leaving pane
@@ -510,6 +527,21 @@ export default {
         if (el) {
           this._lastScrollTop = el.scrollTop;
         }
+        this.stopPolling();
+      }
+    },
+
+    togglePolling() {
+      if (this.pollingStopped) {
+        this.pollingStopped = false;
+        if (this._active) {
+          this._polling = true;
+          if (!this._pollTimer) {
+            this.scheduleNextPoll(5000);
+          }
+        }
+      } else {
+        this.pollingStopped = true;
         this.stopPolling();
       }
     },

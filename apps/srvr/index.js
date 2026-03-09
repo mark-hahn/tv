@@ -3402,6 +3402,7 @@ async function runEmbyFullSweep() {
       if (!stillInEmby) {
         console.log(`[runEmbyFullSweep] Marking ${name} as not in Emby`);
         rec.inEmby = false;
+        rec.notReady = true;
       }
     }
 

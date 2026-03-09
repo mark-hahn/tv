@@ -531,10 +531,12 @@ export default {
             const leftEmby = util.getPstDate();
             tvdbData.inEmby = false;
             tvdbData.leftEmby = leftEmby;
+            tvdbData.notReady = true;
             allTvdb[show.Name] = await srvr.setTvdbFields({
               name: show.Name,
               inEmby: false,
               leftEmby,
+              notReady: true,
             });
           }
           show.inEmby = false;
@@ -586,10 +588,12 @@ export default {
         tvdbData.inEmby = false;
         const leftEmby = util.getPstDate();
         tvdbData.leftEmby = leftEmby;
+        tvdbData.notReady = true;
         allTvdb[name] = await srvr.setTvdbFields({
           name,
           inEmby: false,
           leftEmby,
+          notReady: true,
         });
         // Capture the next visible show before refilter removes this one from the list.
         const delIdx = this.shows.findIndex((s) => s.Id == show.Id);

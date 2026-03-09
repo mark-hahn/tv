@@ -3642,7 +3642,7 @@ async function runGapCheckBatch() {
 // Phase 3: Set up sync timers
 const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
 const EMBY_USER_ID = "894c752d448f45a3a1260ccaabd0adff";
-const EMBY_BASE_URL = "http://localhost:8096/emby";
+const EMBY_BASE_URL = "https://hahnca.com:8920/emby";
 const COLLECTION_IDS = {
   toTry: "1468316",
   continue: "4719143",

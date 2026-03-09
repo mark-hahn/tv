@@ -2,7 +2,7 @@
 // copied from client urls.js
 
 const apiKey = "9863c23d912349599e395950609c84cc";
-const hahnca = "http://localhost:8096/emby/";
+const hahnca = "https://hahnca.com:8920/emby/";
 const markUsrId = "894c752d448f45a3a1260ccaabd0adff";
 
 export function watchingUrl() {

@@ -1109,6 +1109,11 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         showName,
         tvdbRecord,
       );
+      if (showName === "Swiss Toni") {
+        console.log(
+          `[DEBUG Swiss Toni perShow] gapData=${JSON.stringify(gapData)} tvdbRecord.notReady=${tvdbRecord.notReady}`,
+        );
+      }
       if (gapData) {
         const gapFields = [
           "watchGap",
@@ -3573,6 +3578,11 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
     const gapData = await emby.gapCheckBatch(shows);
     for (const { showId, showName } of shows) {
       const g = gapData?.[showId];
+      if (showName === "Swiss Toni") {
+        console.log(
+          `[DEBUG Swiss Toni batch] showId=${showId} g=${JSON.stringify(g)}`,
+        );
+      }
       if (g) {
         appendWatchgapLog(
           `  ${showName}: notReady=${g.notReady} fileGap=${g.fileGap} anyWatched=${g.anyWatched}${g.fileEndError ? " fileEndError=true" : ""}${g.seasonWatchedThenNofile ? " sWTNF=true" : ""}`,

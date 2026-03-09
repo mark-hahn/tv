@@ -182,6 +182,20 @@ export async function loadAllShows() {
     if (rec.Date === undefined) rec.Date = "2017-12-05";
     if (rec.Size === undefined) rec.Size = 0;
     if (rec.NoFiles === undefined) rec.NoFiles = false;
+
+    // DEBUG Swiss Toni
+    if (rec.Name === "Swiss Toni") {
+      console.log("[DEBUG Swiss Toni] after computed props:", {
+        notReady: rec.notReady,
+        inEmby: rec.inEmby,
+        fileGap: rec.fileGap,
+        fileEndError: rec.fileEndError,
+        seasonWatchedThenNofile: rec.seasonWatchedThenNofile,
+        FileGap: rec.FileGap,
+        NotReady: rec.NotReady,
+        InToTry: rec.InToTry,
+      });
+    }
   }
 
   const showRecords = Object.values(allTvdb).filter((r) => isTvdbShowRecord(r));

@@ -2313,6 +2313,19 @@ export const searchActorsInNonEmby = async (params) => {
 export const getAllTvdb = async (params) => {
   const hasEmby = params?.hasEmby ?? 0;
 
+  // DEBUG Swiss Toni
+  const swissToni = allTvdb["Swiss Toni"];
+  if (swissToni) {
+    console.log("[DEBUG getAllTvdb] Swiss Toni:", {
+      notReady: swissToni.notReady,
+      inEmby: swissToni.inEmby,
+      fileGap: swissToni.fileGap,
+      fileEndError: swissToni.fileEndError,
+    });
+  } else {
+    console.log("[DEBUG getAllTvdb] Swiss Toni NOT FOUND in allTvdb");
+  }
+
   // Filter based on hasEmby parameter
   if (hasEmby === 0) {
     // Return all shows

@@ -3697,8 +3697,6 @@ async function fetchLastWatchedDate(showId) {
 // per-show tick via perShowCallback (disk + gap) and preTvdbTickCallback (Emby sweep)
 
 setInterval(runUsbCheck, CHECK_INTERVAL_MS);
-// Run initial check after 1 minute (allow startup)
-setTimeout(runUsbCheck, 60 * 1000);
 
 //////////////////  CHOKIDAR FILE WATCHER  //////////////////
 

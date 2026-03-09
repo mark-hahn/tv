@@ -58,18 +58,17 @@
       >
         <button
           @click="$emit('sort-click')"
-          :style="{ fontSize: '15px', margin: '4px', whiteSpace: 'nowrap' }"
+          :style="{ fontSize: '15px', margin: '4px', whiteSpace: 'nowrap', width: '100px' }"
         >
           {{ selectedSortNbsp }}
         </button>
         <button
           @click="$emit('filter-click')"
-          :style="{ fontSize: '15px', margin: '4px', whiteSpace: 'nowrap' }"
+          :style="{ fontSize: '15px', margin: '4px', whiteSpace: 'nowrap', width: '100px' }"
         >
           {{ selectedFilterNbsp }}
         </button>
         <button
-          v-if="showAllButton"
           @click="$emit('all-click')"
           :style="{
             fontSize: '15px',
@@ -220,14 +219,6 @@ export default {
     },
     selectedFilterNbsp() {
       return String(this.selectedFilter || "").replace(/ /g, "\u00A0");
-    },
-    showAllButton() {
-      // Hide the All button when the Filter button already shows "All".
-      const label = String(this.selectedFilter || "")
-        .replace(/\u00A0/g, " ")
-        .trim()
-        .toLowerCase();
-      return label !== "all";
     },
   },
 

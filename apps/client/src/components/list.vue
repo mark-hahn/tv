@@ -1420,6 +1420,11 @@ export default {
           "tvdb data",
         );
 
+        // If tvdbId was empty (e.g. load from info pane), resolve it from the returned tvdbData.
+        if (!tvdbId && tvdbData?.tvdbId) {
+          tvdbId = String(tvdbData.tvdbId).trim();
+        }
+
         let seriesMapSeasons = [];
         try {
           setWebAddStatus("Fetching season map...");

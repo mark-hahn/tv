@@ -279,7 +279,7 @@
       id="tvdbMismatchModal"
       v-if="tvdbMismatchOpen"
       @click.stop.prevent
-      @pointerdown.stop.prevent
+      @pointerdown.stop
       style="
         position: fixed;
         inset: 0;
@@ -293,7 +293,7 @@
       <div
         id="tvdbMismatchBox"
         @click.stop.prevent
-        @pointerdown.stop.prevent
+        @pointerdown.stop
         style="
           background-color: white;
           border: 2px solid black;

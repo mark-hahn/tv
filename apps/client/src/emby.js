@@ -1457,6 +1457,20 @@ export const deleteNoemby = async (name) => {
   await srvr.delNoEmby(name);
 };
 
+export const getTvdbIdFromEmbyItem = async (embyId) => {
+  const idStr = String(embyId || "").trim();
+  if (!idStr || idStr.startsWith("noemby-")) return "";
+  try {
+    const url =
+      `https://hahnca.com:8920/emby/Users/${markUsrId}/Items/${idStr}` +
+      `?Fields=ProviderIds&api_key=${apiKey}`;
+    const res = await axios({ method: "get", url });
+    return String(res.data?.ProviderIds?.Tvdb || "").trim();
+  } catch {
+    return "";
+  }
+};
+
 export const startStop = async (show, episodeId, watchButtonTxt) => {
   console.log("startStop:", show, episodeId, watchButtonTxt);
   const devices = await srvr.getDevices();

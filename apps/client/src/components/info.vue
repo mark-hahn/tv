@@ -1258,13 +1258,42 @@ export default {
       }, 1000);
     },
 
-    loadIntoEmby() {
+    async loadIntoEmby() {
       const show = this.show;
       const name = String(show?.Name || "").trim();
       if (!name) return;
+      let tvdbId = String(show?.TvdbId || show?.tvdbId || "").trim();
+      if (!tvdbId && show?.Id) {
+        tvdbId = await emby.getTvdbIdFromEmbyItem(show.Id);
+        if (tvdbId)
+          console.log(
+            `loadIntoEmby: resolved tvdbId ${tvdbId} from Emby for "${name}"`,
+          );
+      }
+      if (!tvdbId) {
+        try {
+          const results = await tvdb.srchTvdbData(name);
+          if (Array.isArray(results) && results.length > 0) {
+            const nameUpper = name.toUpperCase();
+            const match =
+              results.find(
+                (r) => String(r.name || "").toUpperCase() === nameUpper,
+              ) || results[0];
+            const candidate = String(match?.tvdb_id || match?.id || "").trim();
+            if (candidate) {
+              tvdbId = candidate;
+              console.log(
+                `loadIntoEmby: resolved tvdbId ${tvdbId} from TVDB search for "${name}"`,
+              );
+            }
+          }
+        } catch (e) {
+          console.error(`loadIntoEmby: TVDB search failed for "${name}":`, e);
+        }
+      }
       const srchChoice = {
         name,
-        tvdbId: String(show?.TvdbId || show?.tvdbId || "").trim(),
+        tvdbId,
         overview: show?.Overview || show?.overview || "",
         image: show?.image || show?.image_url || "",
         year: show?.year || "",

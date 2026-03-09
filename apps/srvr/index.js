@@ -2694,6 +2694,17 @@ app.post(
     console.log(
       `[triggerShowGapCheck] Client requested gap check for: ${showName}`,
     );
+    const tvdbRecord = tvdb.getAllTvdbSync()[showName];
+    if (tvdbRecord && tvdbRecord.inEmby === false) {
+      if (tvdbRecord.notReady !== true) {
+        console.log(
+          `[triggerShowGapCheck] ${showName} not in Emby, resetting notReady=true`,
+        );
+        tvdbRecord.notReady = true;
+        await tvdb.saveTvdbSync();
+      }
+      return { success: true };
+    }
     tvdb.enqueueShowProcess(showName);
     return { success: true };
   }),

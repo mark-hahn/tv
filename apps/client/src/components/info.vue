@@ -195,7 +195,6 @@
               Load
             </button>
             <button
-              v-else
               @click.stop="refreshTvdb"
               style="
                 font-size: 13px;
@@ -1305,11 +1304,9 @@ export default {
     async refreshTvdb() {
       const showName = this.show.Name;
       console.log(`Refresh button clicked for ${showName}`);
-      if (this.show?.Id) {
-        srvr
-          .triggerShowGapCheck(this.show.Id, showName)
-          .catch((err) => console.error("triggerShowGapCheck failed:", err));
-      }
+      srvr
+        .triggerShowGapCheck(this.show.Id || showName, showName)
+        .catch((err) => console.error("triggerShowGapCheck failed:", err));
     },
 
     setupSeriesForRefresh(show) {

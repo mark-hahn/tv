@@ -58,13 +58,23 @@
       >
         <button
           @click="$emit('sort-click')"
-          :style="{ fontSize: '15px', margin: '4px', whiteSpace: 'nowrap', width: '100px' }"
+          :style="{
+            fontSize: '15px',
+            margin: '4px',
+            whiteSpace: 'nowrap',
+            width: '100px',
+          }"
         >
           {{ selectedSortNbsp }}
         </button>
         <button
           @click="$emit('filter-click')"
-          :style="{ fontSize: '15px', margin: '4px', whiteSpace: 'nowrap', width: '100px' }"
+          :style="{
+            fontSize: '15px',
+            margin: '4px',
+            whiteSpace: 'nowrap',
+            width: '100px',
+          }"
         >
           {{ selectedFilterNbsp }}
         </button>

@@ -92,7 +92,6 @@ function levenshtein(a, b) {
 //   true  -> Always find a match (no early exit, no distance threshold).
 //   false -> Return null if no match found by step 4 (Aggressive + MissingYear).
 export function smartTitleMatch(title, titleArray, year, forceChoice) {
-  console.log("[smartTitleMatch] title:", title);
   if (!Array.isArray(titleArray) || titleArray.length === 0) {
     return null;
   }

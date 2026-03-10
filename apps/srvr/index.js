@@ -3440,6 +3440,14 @@ async function runEmbyFullSweep() {
       }
     }
 
+    // Step 4: Fix any pre-existing inEmby=false records with stale notReady=false
+    for (const [name, rec] of Object.entries(allTvdb)) {
+      if (isTvdbShow(rec) && rec.inEmby === false && rec.notReady === false) {
+        console.log(`[runEmbyFullSweep] Fixing stale notReady for ${name}`);
+        rec.notReady = true;
+      }
+    }
+
     await tvdb.saveTvdbSync();
   } catch (err) {
     console.error("[runEmbyFullSweep] error:", err.message);

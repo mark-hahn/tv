@@ -277,6 +277,15 @@ function validateTorrentData(torrentData) {
             info.episode = parseInt(m[2], 10);
           }
         }
+
+        // Fallback: handle NNN-Title format where first digit is season, next two are episode (e.g. 101-, 207-)
+        if (!info.episode) {
+          const m = base.match(/^(\d)(\d{2})[-\s]/);
+          if (m) {
+            info.season = parseInt(m[1], 10);
+            info.episode = parseInt(m[2], 10);
+          }
+        }
       }
 
       checkedFiles.push({ file: p, parsed: info });

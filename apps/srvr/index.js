@@ -1131,6 +1131,18 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         Object.assign(tvdbRecord, gapData);
         tvdbRecord.lastGapCheck = Date.now();
       }
+      // Compute full: all aired episodes have a file
+      const newFull = !!(
+        tvdbRecord.inEmby &&
+        !tvdbRecord.fileGap &&
+        !tvdbRecord.fileEndError &&
+        !tvdbRecord.seasonWatchedThenNofile &&
+        !tvdbRecord.NoFiles
+      );
+      if (tvdbRecord.full !== newFull) {
+        gapChanges.push(`full:${tvdbRecord.full}->${newFull}`);
+        tvdbRecord.full = newFull;
+      }
     }
     const push2Changes = [...diskChanges, ...lastWatchedChanges, ...gapChanges];
     if (push2Changes.length) {

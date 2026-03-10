@@ -345,6 +345,7 @@ import {
   faMinus,
   faArrowDown,
   faArrowRight,
+  faArrowUp,
   faTv,
   faSearch,
   faQuestion,
@@ -374,6 +375,7 @@ library.add([
   faBan,
   faBorderAll,
   faArrowRight,
+  faArrowUp,
   faMars,
   faVenus,
   faClock,
@@ -679,6 +681,16 @@ export default {
           },
           click() {},
           name: "unplayed",
+        },
+        {
+          color: "#0cf",
+          filter: 0,
+          icon: ["fas", "arrow-up"],
+          cond(show) {
+            return !!show.full;
+          },
+          click() {},
+          name: "full",
         },
         {
           color: "#f88",
@@ -2944,6 +2956,7 @@ export default {
           show.FileGap =
             !(show.notReady === false && show.InToTry) &&
             (show.fileGap || show.fileEndError || show.seasonWatchedThenNofile);
+          show.full = tvdbRecord.full ?? false;
 
           // Update allTvdb cache
           tvdb.upsertTvdbCacheRecord(allTvdb, tvdbRecord, showName);
@@ -3045,6 +3058,7 @@ export default {
           show.WatchGapSeason = record.WatchGapSeason;
           show.WatchGapEpisode = record.WatchGapEpisode;
           show.FileGap = record.FileGap;
+          show.full = record.full ?? false;
           show.NotReady = record.NotReady;
           show.Date = record.Date ?? show.Date;
           show.Size = record.Size ?? show.Size;

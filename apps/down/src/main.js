@@ -181,6 +181,7 @@ async function main() {
 
   // tv.log lives under data/misc/
   var TV_LOG_PATH = path.join(MISC_DIR, "tv.log");
+  var REJECT_LOG_PATH = dataPath("reject.log");
   var TV_INPROGRESS_PATH = dataPath("tv-inProgress.json");
   var TV_BLOCKED_PATH = dataPath("tv-blocked.json");
   var TV_MAP_PATH = dataPath("tv-map");
@@ -196,6 +197,42 @@ async function main() {
     try {
       return fs.appendFileSync(TV_LOG_PATH, line);
     } catch (error1) {}
+  };
+
+  var writeRejectLog = function (rejectFname, reason) {
+    try {
+      var now = Date.now();
+      var ts = dateStr(now);
+      var line =
+        ts + " | " + (rejectFname || "") + " | " + (reason || "") + "\n";
+      fs.appendFileSync(REJECT_LOG_PATH, line);
+      // Trim to last 24 hours.
+      var cutoff = now - 24 * 60 * 60 * 1000;
+      var raw = "";
+      try {
+        raw = fs.readFileSync(REJECT_LOG_PATH, "utf8");
+      } catch (e) {
+        return;
+      }
+      var kept = raw.split("\n").filter(function (l) {
+        if (!l.trim()) return false;
+        // Parse MM-DD HH:mm from start of line.
+        var m = l.match(/^(\d{2})-(\d{2}) (\d{2}):(\d{2})/);
+        if (!m) return true;
+        var month = parseInt(m[1], 10) - 1;
+        var day = parseInt(m[2], 10);
+        var hour = parseInt(m[3], 10);
+        var min = parseInt(m[4], 10);
+        var year = new Date().getFullYear();
+        var d = new Date(year, month, day, hour, min);
+        if (d.getTime() > now) d.setFullYear(year - 1);
+        return d.getTime() >= cutoff;
+      });
+      fs.writeFileSync(
+        REJECT_LOG_PATH,
+        kept.join("\n") + (kept.length ? "\n" : ""),
+      );
+    } catch (e) {}
   };
 
   // Ensure state files exist.
@@ -1612,7 +1649,8 @@ async function main() {
     // Disk check first: if the file is already on disk, mark finished and skip.
     // This must run before the tvJsonTitles guard so files that were previously
     // queued as 'waiting' (before disk-check was added) also get caught.
-    if (fs.existsSync(`${tvSeasonPath}/${fname}`)) {
+    // Skip this check for forced downloads — the worker will delete and re-fetch.
+    if (!processingForced && fs.existsSync(`${tvSeasonPath}/${fname}`)) {
       existsCount++;
       log("------", downloadCount, "/", chkCount, "ALREADY ON DISK:", fname);
       trace("checkFileExists: already on disk", { fname, tvSeasonPath });
@@ -1706,6 +1744,7 @@ async function main() {
 
   badFile = (reason) => {
     errCount++;
+    writeRejectLog(fname, reason);
     trace("badFile: marking error", {
       reason: reason || "unknown",
       fname,

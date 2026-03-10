@@ -242,9 +242,9 @@ export function parseFileSeasonEpisode(
     episode = undefined;
   }
 
-  // Step 4: SxxExx / Sxx.Exx / Sxx_Exx
+  // Step 4: SxxExx / Sxx.Exx / Sxx_Exx / Sxx - Exx
   if (!Number.isInteger(season) || !Number.isInteger(episode)) {
-    const m = fname.match(/S(\d{1,2})[._ ]?E(\d{1,2})/i);
+    const m = fname.match(/S(\d{1,2})(?:[._ ]?|-\s*|\s+-\s*)E(\d{1,2})/i);
     if (m) {
       season = parseInt(m[1], 10);
       episode = parseInt(m[2], 10);

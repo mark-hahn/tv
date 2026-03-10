@@ -203,6 +203,7 @@ const getShowState = async (showId, _showName, showMeta) => {
   let anyAiredEpisode = false;
   let fileCount = 0;
   let firstEpisodeFileUnwatched = false;
+  let anyEpisodeNoFile = false;
 
   try {
     const seasonsRes = await safeGet(urls.childrenUrl(showId));
@@ -262,8 +263,10 @@ const getShowState = async (showId, _showName, showMeta) => {
         const userData = episode?.UserData;
         const watched = !!userData?.Played;
         const haveFile = episode.LocationType != "Virtual";
+        const hasPath = !!episode.Path;
 
         if (haveFile) fileCount++;
+        if (!hasPath) anyEpisodeNoFile = true;
         if (firstEpisode && haveFile && !watched) {
           firstEpisodeFileUnwatched = true;
         }
@@ -412,6 +415,7 @@ const getShowState = async (showId, _showName, showMeta) => {
     fileGap,
     fileGapSeason,
     fileGapEpisode,
+    allAiredHaveFile: sawAnyEpisode && !anyEpisodeNoFile,
   };
 };
 
@@ -443,6 +447,7 @@ export const gapCheckOne = async (showId, showName, tvdbRecord) => {
     fileGapSeason,
     fileGapEpisode,
     seasonWatchedThenNofile,
+    allAiredHaveFile,
   } = showState;
 
   return {
@@ -456,6 +461,7 @@ export const gapCheckOne = async (showId, showName, tvdbRecord) => {
     fileGapEpisode,
     fileEndError,
     seasonWatchedThenNofile,
+    allAiredHaveFile,
   };
 };
 

@@ -1612,7 +1612,11 @@ async function main() {
 
   checkFileExists = () => {
     var e, tvFilePath, tvSeasonPath, usbLongPath, videoPath;
-    tvSeasonPath = `${tvPath}${seriesName}/Season ${season}`;
+    const embyFolderName =
+      embyMap && seriesName && embyMap[seriesName]?.Path
+        ? embyMap[seriesName].Path
+        : seriesName;
+    tvSeasonPath = `${tvPath}${embyFolderName}/Season ${season}`;
     tvFilePath = `${tvSeasonPath}/${fname}`;
     videoPath = `files/${usbFilePath}`;
     var tvLocalDir = `${tvSeasonPath}/`;

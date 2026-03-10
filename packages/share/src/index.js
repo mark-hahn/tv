@@ -310,6 +310,12 @@ export function parseFileSeasonEpisode(
 export function parseTitleFromFilename(fname, folderName, parsedPtt) {
   let title = parsedPtt != null && parsedPtt.title ? parsedPtt.title : null;
 
+  // If ptt produced a title that starts with a NNN-prefix (e.g. "101-Lets Meet Mike and Euan.")
+  // it's an episode title, not a series name — null it out so the folder fallback runs.
+  if (title && /^\d{3}[\s\-]/.test(title)) {
+    title = null;
+  }
+
   // When parsedPtt found a compact NNN episode (episode > 99), it spliced the
   // NNN code into the title string — strip it.
   if (
@@ -327,11 +333,18 @@ export function parseTitleFromFilename(fname, folderName, parsedPtt) {
           : "",
       );
     if (nnn.length === 3) {
-      const stripped = title
-        .replace(new RegExp("\\s+" + nnn + "\\b.*$"), "")
-        .replace(/\s*\.\s*$/, "")
-        .trim();
-      if (stripped && stripped.length >= 2) title = stripped;
+      if (title.startsWith(nnn)) {
+        // NNN at start: "101-Episode Name" — this is an episode title, not a series name
+        // Null it out so the folder-name fallback can provide the series name instead
+        title = null;
+      } else {
+        // NNN at end: "Jam and Jerusalem 101 ..." → "Jam and Jerusalem"
+        const stripped = title
+          .replace(new RegExp("\\s+" + nnn + "\\b.*$"), "")
+          .replace(/\s*\.\s*$/, "")
+          .trim();
+        if (stripped && stripped.length >= 2) title = stripped;
+      }
     }
   }
 
@@ -360,6 +373,21 @@ export function parseTitleFromFilename(fname, folderName, parsedPtt) {
         .filter((w) => w && !/^\d{4}$/.test(w));
       if (words.length) title = words.join(" ");
     }
+  }
+
+  // Folder-name fallback: if still no title, try to extract series name from
+  // the folder (e.g. "Off.Centre.S01-S02.webrip.mixed" → "Off Centre")
+  if (!title && folderName) {
+    const folderNoExt = folderName.replace(/\.[^.]+$/, "");
+    // Strip after SxxExx or S01-S02 style markers
+    const folderClean = folderNoExt
+      .replace(/[._]/g, " ")
+      .replace(/\s+S\d{1,2}[-–]\s*S?\d{1,2}.*/i, "")
+      .replace(/\s+S\d{1,2}[._]?E\d{1,2}.*/i, "")
+      .replace(/\s+Season\s+\d+.*/i, "")
+      .replace(/\s+\d{4}($|\s).*/, "")
+      .trim();
+    if (folderClean && folderClean.length >= 2) title = folderClean;
   }
 
   return title || null;

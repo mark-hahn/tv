@@ -229,6 +229,18 @@
           @mouseleave="handleMouseLeave($event)"
         >
           <div
+            v-if="showName(it)"
+            style="
+              font-size: 13px;
+              font-weight: bold;
+              color: #555;
+              font-family: sans-serif;
+              margin-bottom: 4px;
+            "
+          >
+            {{ showName(it) }}
+          </div>
+          <div
             style="
               font-weight: bold;
               font-size: 14px;
@@ -302,6 +314,7 @@ import parseTorrentTitle from "parse-torrent-title";
 import evtBus from "../evtBus.js";
 import { config } from "../config.js";
 import * as util from "../util.js";
+import { parseTitleFromFilename } from "../util.js";
 
 export default {
   name: "TvProc",
@@ -719,6 +732,28 @@ export default {
       return Math.max(0, ended - started);
     },
 
+    showName(it) {
+      const fname = it?.title || "";
+      const usbPath = it?.usbPath || "";
+      // Extract folder name from usbPath (the last non-empty path segment)
+      const parts = usbPath.replace(/[\\/]+$/, "").split(/[\\/]/);
+      const folderName = parts[parts.length - 1] || "";
+
+      let _pttParser = null;
+      try {
+        if (typeof parseTorrentTitle === "function")
+          _pttParser = parseTorrentTitle;
+        else if (parseTorrentTitle?.parse) _pttParser = parseTorrentTitle.parse;
+        else if (parseTorrentTitle?.default?.parse)
+          _pttParser = parseTorrentTitle.default.parse;
+      } catch (e) {}
+      let parsedPtt = {};
+      try {
+        if (_pttParser) parsedPtt = _pttParser(fname) || {};
+      } catch (e) {}
+
+      return parseTitleFromFilename(fname, folderName, parsedPtt) || "";
+    },
     line2(it) {
       const s = Number(it?.season);
       const e = Number(it?.episode);

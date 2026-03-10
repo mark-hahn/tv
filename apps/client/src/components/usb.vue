@@ -641,7 +641,7 @@ export default {
       const season = se && se.season != null ? se.season : null;
       const episode = se && se.episode != null ? se.episode : null;
 
-      if (!title) return "no title";
+      if (!title && !folderName) return "no title";
       if (!Number.isInteger(season)) return "no season";
       if (!Number.isInteger(episode)) return "no episode";
       return null;

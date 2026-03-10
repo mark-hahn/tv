@@ -3412,6 +3412,29 @@ async function runEmbyFullSweep() {
         (rec.tvdbId && embyTvdbIdSet.has(String(rec.tvdbId)));
       if (!stillInEmby) {
         console.log(`[runEmbyFullSweep] Marking ${name} as not in Emby`);
+        // Delete show folder from disk so Emby cannot re-add it on next scan
+        const folderName =
+          typeof rec.Path === "string" &&
+          rec.Path &&
+          !rec.Path.includes("/") &&
+          !rec.Path.includes("\\")
+            ? rec.Path
+            : name;
+        const folderPath = path.join(tvDir, folderName);
+        try {
+          const st = fs.statSync(folderPath);
+          if (st.isDirectory()) {
+            cp.execSync(`rm -rf "${folderPath}"`);
+            console.log(`[runEmbyFullSweep] Deleted folder: ${folderPath}`);
+          }
+        } catch (e) {
+          if (e.code !== "ENOENT") {
+            console.error(
+              `[runEmbyFullSweep] Failed to delete folder ${folderPath}:`,
+              e.message,
+            );
+          }
+        }
         rec.inEmby = false;
         rec.notReady = true;
       }

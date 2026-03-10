@@ -1639,6 +1639,21 @@ async function main() {
               seriesName = map[seriesName];
             }
             trace("chkTvDB: post-map", { title, seriesName });
+            if (!seriesName) {
+              log(
+                "------",
+                downloadCount,
+                "/",
+                chkCount,
+                "NO SERIES MATCH, SKIPPING:",
+                fname,
+              );
+              trace("chkTvDB: smartTitleMatch returned null, skipping", {
+                fname,
+                title,
+              });
+              return process.nextTick(checkFile);
+            }
             tvdbCache[title] = seriesName;
             // process.nextTick checkFileExists
             return setTimeout(checkFileExists, rsyncDelay);

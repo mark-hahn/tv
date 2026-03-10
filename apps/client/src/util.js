@@ -196,6 +196,10 @@ export function setCondFltr(cond, fltrChoice) {
   }
 }
 
-import { smartTitleMatch, parseFileSeasonEpisode } from "@tv/share";
+import {
+  smartTitleMatch,
+  parseFileSeasonEpisode,
+  parseTitleFromFilename,
+} from "@tv/share";
 
-export { smartTitleMatch, parseFileSeasonEpisode };
+export { smartTitleMatch, parseFileSeasonEpisode, parseTitleFromFilename };

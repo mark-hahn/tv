@@ -293,3 +293,74 @@ export function parseFileSeasonEpisode(
     episode: Number.isInteger(episode) ? episode : null,
   };
 }
+
+// parseTitleFromFilename(fname, folderName, parsedPtt) => string | null
+//
+// Extracts the series title from a video filename.
+// parsedPtt is an optional pre-computed result from parse-torrent-title.
+//
+// Cascade:
+//  1. Use parsedPtt.title if available
+//  2. Space-separated regex: text before SxxExx / "Season N" / "NxNN" / " - "
+//  3. Dot-separated fallback: tokens before SxxExx pattern, strip year tokens
+//  4. Returns null if nothing usable was found
+//
+// NNN compact-code titles (e.g. "Jam and Jerusalem 101") are stripped of the
+// code so the caller gets a clean series name.
+export function parseTitleFromFilename(fname, folderName, parsedPtt) {
+  let title = parsedPtt != null && parsedPtt.title ? parsedPtt.title : null;
+
+  // When parsedPtt found a compact NNN episode (episode > 99), it spliced the
+  // NNN code into the title string — strip it.
+  if (
+    title &&
+    parsedPtt != null &&
+    Number.isInteger(parsedPtt.episode) &&
+    parsedPtt.episode > 99
+  ) {
+    // e.g. "Jam and Jerusalem 101 (11-24-06)." → "Jam and Jerusalem"
+    const nnn =
+      String(parsedPtt.season || "") +
+      String(
+        parsedPtt.episode != null
+          ? String(parsedPtt.episode).padStart(2, "0")
+          : "",
+      );
+    if (nnn.length === 3) {
+      const stripped = title
+        .replace(new RegExp("\\s+" + nnn + "\\b.*$"), "")
+        .replace(/\s*\.\s*$/, "")
+        .trim();
+      if (stripped && stripped.length >= 2) title = stripped;
+    }
+  }
+
+  // Space-separated fallback: extract text before episode marker
+  if (!title) {
+    const noExt = fname.replace(/\.[^.]+$/, "");
+    const m = noExt.match(
+      /^(.*?)(?:\s+-\s+(?:Season|Episode)\s+\d+|\s+S\d{1,2}[._]?E\d+|\s+\d+x\d+)/i,
+    );
+    if (m && m[1].trim()) {
+      title = m[1].trim();
+    } else {
+      const dashIdx = noExt.indexOf(" - ");
+      if (dashIdx > 0) title = noExt.slice(0, dashIdx).trim();
+    }
+  }
+
+  // Dot-separated fallback: e.g. "Paradise.2025.S02E05.1080p..." → "Paradise"
+  if (!title) {
+    const seIdx = fname.search(/S\d{1,2}[._]?E\d{1,2}/i);
+    if (seIdx > 0) {
+      const before = fname.slice(0, seIdx);
+      const words = before
+        .split(/[._]+/)
+        .map((w) => w.trim())
+        .filter((w) => w && !/^\d{4}$/.test(w));
+      if (words.length) title = words.join(" ");
+    }
+  }
+
+  return title || null;
+}

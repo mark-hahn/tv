@@ -173,6 +173,11 @@ import TreeNode from "./tree-node.vue";
 import { config } from "../config.js";
 import evtBus from "../evtBus.js";
 import * as util from "../util.js";
+import {
+  smartTitleMatch,
+  parseFileSeasonEpisode,
+  parseTitleFromFilename,
+} from "../util.js";
 
 export default {
   name: "Usb",
@@ -597,31 +602,7 @@ export default {
       const ext = (fname.split(".").pop() || "").toLowerCase();
       if (!videoExts.has(ext)) return null;
 
-      let title = null,
-        season = null,
-        episode = null;
-
-      // --- Manual regex (primary) ---
-      // SxxExx / Sxx.Exx / Sxx_Exx
-      const seMatch = fname.match(/S(\d+)[._ ]?E(\d+)/i);
-      if (seMatch) {
-        season = parseInt(seMatch[1], 10);
-        episode = parseInt(seMatch[2], 10);
-      }
-      // "Season N" text in filename
-      if (!Number.isInteger(season)) {
-        const m = fname.match(/Season\s+(\d+)/i);
-        if (m) season = parseInt(m[1], 10);
-      }
-      // "Episode N" text in filename
-      if (!Number.isInteger(episode)) {
-        const m = fname.match(/Episode\s+(\d+)/i);
-        if (m) episode = parseInt(m[1], 10);
-      }
-
-      // --- parseTorrentTitle (primary for title; fallback for season/episode) ---
-      // Resolve the parser defensively — Vite may expose the module as an object
-      // with a .parse method rather than a plain function.
+      // Resolve the ptt parser defensively (Vite may expose it as an object)
       let _pttParser = null;
       try {
         if (typeof parseTorrentTitle === "function") {
@@ -632,72 +613,33 @@ export default {
         ) {
           _pttParser = parseTorrentTitle.parse;
         } else if (
-          parseTorrentTitle &&
-          parseTorrentTitle.default &&
+          parseTorrentTitle?.default &&
           typeof parseTorrentTitle.default.parse === "function"
         ) {
           _pttParser = parseTorrentTitle.default.parse;
         }
       } catch (e) {}
 
-      let parsed = {};
+      let parsedPtt = {};
       try {
-        if (_pttParser) parsed = _pttParser(fname) || {};
+        if (_pttParser) parsedPtt = _pttParser(fname) || {};
       } catch (e) {}
-      title = parsed.title || null;
-      if (!Number.isInteger(season) && Number.isInteger(parsed.season))
-        season = parsed.season;
-      if (!Number.isInteger(episode) && Number.isInteger(parsed.episode))
-        episode = parsed.episode;
 
-      // --- Title regex fallback (space-separated) ---
-      // e.g. "Snuff Box - Episode 6 - The Wedding.mkv" → "Snuff Box"
-      if (!title) {
-        const noExt = fname.replace(/\.[^.]+$/, "");
-        const m = noExt.match(
-          /^(.*?)(?:\s+-\s+(?:Season|Episode)\s+\d+|\s+S\d{1,2}E\d+|\s+\d+x\d+)/i,
-        );
-        if (m && m[1].trim()) {
-          title = m[1].trim();
-        } else {
-          const dashIdx = noExt.indexOf(" - ");
-          if (dashIdx > 0) title = noExt.slice(0, dashIdx).trim();
-        }
-      }
+      let parsedFolder = {};
+      try {
+        if (_pttParser && folderName)
+          parsedFolder = _pttParser(folderName) || {};
+      } catch (e) {}
 
-      // --- Title fallback for dot-separated filenames (e.g. Show.Year.SxxExx...) ---
-      // Handles: Paradise.2025.S02E05.1080p.WEB.h264-ETHEL.mkv → "Paradise"
-      if (!title && seMatch) {
-        const beforeSE = fname.slice(0, fname.search(/S\d+[._]?E\d+/i));
-        const words = beforeSE
-          .split(/[._]+/)
-          .map((w) => w.trim())
-          .filter((w) => w && !/^\d{4}$/.test(w)); // strip year tokens
-        if (words.length) title = words.join(" ");
-      }
-
-      // --- Folder name for season (if still missing) ---
-      if (!Number.isInteger(season) && folderName) {
-        // "Season N" text
-        const m1 = folderName.match(/Season\s+(\d+)/i);
-        if (m1) {
-          season = parseInt(m1[1], 10);
-        } else {
-          // S## pattern (e.g. S01 in release folder name)
-          const m2 = folderName.match(/S(\d{1,2})(?!\d)/i);
-          if (m2) {
-            season = parseInt(m2[1], 10);
-          } else {
-            // parseTorrentTitle on folder name as last resort
-            try {
-              if (_pttParser) {
-                const fp = _pttParser(folderName) || {};
-                if (Number.isInteger(fp.season)) season = fp.season;
-              }
-            } catch (e) {}
-          }
-        }
-      }
+      const title = parseTitleFromFilename(fname, folderName, parsedPtt);
+      const se = parseFileSeasonEpisode(
+        fname,
+        folderName,
+        parsedPtt,
+        parsedFolder,
+      );
+      const season = se && se.season != null ? se.season : null;
+      const episode = se && se.episode != null ? se.episode : null;
 
       if (!title) return "no title";
       if (!Number.isInteger(season)) return "no season";
@@ -895,6 +837,35 @@ export default {
         return;
       }
 
+      // Filter out files the server would skip (same logic as checkFile in main.js).
+      const shouldSkipExt = (ext) =>
+        ext.length === 6 ||
+        ext === "nfo" ||
+        ext === "idx" ||
+        ext === "sub" ||
+        ext === "txt" ||
+        ext === "jpg" ||
+        ext === "gif" ||
+        ext === "jpeg" ||
+        ext === "part";
+      const skippedFiles = files.filter((fe) => {
+        const fn =
+          fe.split("-").slice(0, -1).join("-").slice(11).split("/").pop() || "";
+        return shouldSkipExt((fn.split(".").pop() || "").toLowerCase());
+      });
+      files = files.filter((fe) => {
+        const fn =
+          fe.split("-").slice(0, -1).join("-").slice(11).split("/").pop() || "";
+        return !shouldSkipExt((fn.split(".").pop() || "").toLowerCase());
+      });
+      if (skippedFiles.length > 0) {
+        const skippedNames = skippedFiles.map((fe) =>
+          fe.split("-").slice(0, -1).join("-").slice(11).split("/").pop(),
+        );
+        alert("These files ignored:\n\n" + skippedNames.join("\n"));
+      }
+      if (files.length === 0) return;
+
       // Validate each file can be parsed (title + season + episode).
       const parseErrors = [];
       for (const fileEntry of files) {
@@ -913,6 +884,49 @@ export default {
           "Cannot force download — parse error:\n\n" + parseErrors.join("\n"),
         );
         return;
+      }
+
+      // Emby check: all files must belong to a show that is in Emby.
+      if (Array.isArray(this.allShows) && this.allShows.length > 0) {
+        const embyShows = this.allShows.filter((s) => s && s.inEmby);
+        const notInEmby = [];
+        for (const fileEntry of files) {
+          const parts2 = fileEntry.split("-");
+          parts2.pop();
+          const filePath2 = parts2.join("-").slice(11);
+          const pathParts2 = filePath2.split("/");
+          const fname2 = pathParts2[pathParts2.length - 1];
+          const folderName2 =
+            pathParts2.length >= 2 ? pathParts2[pathParts2.length - 2] : "";
+
+          let _pttParser = null;
+          try {
+            if (typeof parseTorrentTitle === "function")
+              _pttParser = parseTorrentTitle;
+            else if (parseTorrentTitle?.parse)
+              _pttParser = parseTorrentTitle.parse;
+            else if (parseTorrentTitle?.default?.parse)
+              _pttParser = parseTorrentTitle.default.parse;
+          } catch (e) {}
+          let parsedPtt2 = {};
+          try {
+            if (_pttParser) parsedPtt2 = _pttParser(fname2) || {};
+          } catch (e) {}
+
+          const title2 = parseTitleFromFilename(
+            fname2,
+            folderName2,
+            parsedPtt2,
+          );
+          if (title2) {
+            const match = smartTitleMatch(title2, embyShows, null, false);
+            if (!match) notInEmby.push(title2);
+          }
+        }
+        if (notInEmby.length > 0) {
+          alert("Show not in emby:\n\n" + [...new Set(notInEmby)].join("\n"));
+          return;
+        }
       }
 
       if (!confirm(`Force download ${label}?`)) return;

@@ -11,7 +11,11 @@ import rimrafPkg from "rimraf";
 import parseTorrentTitlePkg from "parse-torrent-title";
 
 import * as tvJsonMod from "./tvJson.js";
-import { smartTitleMatch } from "@tv/share";
+import {
+  smartTitleMatch,
+  parseFileSeasonEpisode,
+  parseTitleFromFilename,
+} from "@tv/share";
 
 const __filename = urlNode.fileURLToPath(import.meta.url);
 const __dirname = pathNode.dirname(__filename);
@@ -1270,127 +1274,31 @@ async function main() {
       episode = 1;
       try {
         var parsed = parseTorrentTitle(fname) || {};
-        ({ title, season, episode } = parsed);
 
-        // Discard implausibly large episode numbers — parse-torrent-title misreads compact
-        // NNN codes (e.g. "101" in "Jam and Jerusalem 101") as a plain episode number.
-        // For 3-digit values (> 99) the library also derives season from the leading digit,
-        // so clear both to let the Step 4 compact-NNN fallback handle the whole thing.
-        // For 2-digit values > 50 just clear episode (season may be legitimately set).
-        const _rawEpisode = parsed.episode;
-        const _rawSeason = parsed.season;
-        if (Number.isInteger(episode) && episode > 99) {
-          episode = undefined;
-          parsed.episode = undefined;
-          season = undefined;
-          parsed.season = undefined;
-        } else if (Number.isInteger(episode) && episode > 50) {
-          episode = undefined;
-          parsed.episode = undefined;
-        }
-        trace("checkFile: after-clamp", {
+        const pathParts2 = usbFilePath.split("/");
+        const folderName2 =
+          pathParts2.length >= 2 ? pathParts2[pathParts2.length - 2] : "";
+        var parsedFolder = {};
+        try {
+          if (folderName2) parsedFolder = parseTorrentTitle(folderName2) || {};
+        } catch (e) {}
+
+        // Use shared title extractor
+        title = parseTitleFromFilename(fname, folderName2, parsed);
+
+        // Use shared season/episode extractor
+        const se = parseFileSeasonEpisode(
           fname,
-          rawSeason: _rawSeason,
-          rawEpisode: _rawEpisode,
-          season,
-          episode,
-        });
+          folderName2,
+          parsed,
+          parsedFolder,
+        );
+        season = se && se.season != null ? se.season : undefined;
+        episode = se && se.episode != null ? se.episode : undefined;
 
-        // Title regex fallback: e.g. "Snuff Box - Episode 6 - The Wedding.mkv" → "Snuff Box"
-        if (!title) {
-          var noExt = fname.replace(/\.[^.]+$/, "");
-          var titleMatch = noExt.match(
-            /^(.*?)(?:\s+-\s+(?:Season|Episode)\s+\d+|\s+S\d{1,2}E\d+|\s+\d+x\d+)/i,
-          );
-          if (titleMatch && titleMatch[1].trim()) {
-            title = titleMatch[1].trim();
-          } else {
-            var dashIdx = noExt.indexOf(" - ");
-            if (dashIdx > 0) title = noExt.slice(0, dashIdx).trim();
-          }
-        }
-
-        // Fallback: If parser fails to find episode (e.g. Sxx.Exx or SxxExx), try manual regex.
-        // This handles cases like "Show - S02.E05 - Title.mkv" where parse-torrent-title might miss the episode.
-        if (!episode && title) {
-          // Look for SxxExx, Sxx.Exx, Sxx_Exx
-          const m = fname.match(/S(\d+)[._ ]?E(\d+)/i);
-          if (m) {
-            season = parseInt(m[1], 10);
-            episode = parseInt(m[2], 10);
-            parsed.season = season;
-            parsed.episode = episode;
-          }
-        }
-
-        // Fallback: compact NNN notation where first digit is season, last two are episode (e.g. 102 = S01E02).
-        // Only apply when parser still has no season/episode.
-        if (!Number.isInteger(season) && !Number.isInteger(episode) && title) {
-          const m = fname.match(/\b([1-9])(\d{2})\b/);
-          if (m) {
-            season = parseInt(m[1], 10);
-            episode = parseInt(m[2], 10);
-            parsed.season = season;
-            parsed.episode = episode;
-            // parse-torrent-title may have left the NNN code (and trailing date/junk) in
-            // the title string.  Strip it so TVDB gets a clean series name.
-            // e.g. "Jam and Jerusalem 101 (11-24-06)." → "Jam and Jerusalem"
-            const stripped = title
-              .replace(new RegExp("\\s+" + m[0] + "\\b.*$"), "")
-              .replace(/\s*\.\s*$/, "")
-              .trim();
-            if (stripped && stripped.length >= 2) title = stripped;
-          }
-        }
-
-        // Fallback: "Season N" text in filename
-        if (!Number.isInteger(season) && title) {
-          const m = fname.match(/Season\s+(\d+)/i);
-          if (m) {
-            season = parseInt(m[1], 10);
-            parsed.season = season;
-          }
-        }
-
-        // Fallback: "Episode N" text in filename
-        if (!Number.isInteger(episode) && title) {
-          const m = fname.match(/Episode\s+(\d+)/i);
-          if (m) {
-            episode = parseInt(m[1], 10);
-            parsed.episode = episode;
-          }
-        }
-
-        // Fallback: title and episode found but no season.
-        // Try to extract season number from the parent folder name in the file path.
-        if (title && Number.isInteger(episode) && !Number.isInteger(season)) {
-          const pathParts = usbFilePath.split("/");
-          if (pathParts.length >= 2) {
-            const folderName = pathParts[pathParts.length - 2];
-            // "Season N" text (e.g. folder named "Season 1")
-            const m1 = folderName.match(/Season\s+(\d+)/i);
-            if (m1) {
-              season = parseInt(m1[1], 10);
-              parsed.season = season;
-            } else {
-              // S## pattern (e.g. "Snuff.Box.S01.2006.x264.DVDRip-Zuich32")
-              const m2 = folderName.match(/S(\d{1,2})(?!\d)/i);
-              if (m2) {
-                season = parseInt(m2[1], 10);
-                parsed.season = season;
-              } else {
-                // parseTorrentTitle on folder name as last resort
-                try {
-                  const fp = parseTorrentTitle(folderName) || {};
-                  if (Number.isInteger(fp.season)) {
-                    season = fp.season;
-                    parsed.season = season;
-                  }
-                } catch (e) {}
-              }
-            }
-          }
-        }
+        // When parsedPtt had a compact NNN episode (>99) the title from
+        // parseTorrentTitle may contain trailing junk — parseTitleFromFilename
+        // already stripped it, but re-assign season/episode from se (already clean).
 
         type = parsed.type || "episode";
 
@@ -1746,15 +1654,6 @@ async function main() {
           ")",
         );
         trace("checkFileExists: not in emby", { fname, seriesName });
-        errCount++;
-        try {
-          tvJson.markError({
-            title: fname,
-            usbPath: usbPath,
-            reason: "Not in emby",
-          });
-        } catch (e) {}
-        if (tvJsonTitles) tvJsonTitles[fname] = { error: true };
         return process.nextTick(checkFile);
       }
     }

@@ -196,14 +196,15 @@
             </button>
             <button
               @click.stop="refreshTvdb"
-              style="
-                font-size: 13px;
-                cursor: pointer;
-                margin-left: 10px;
-                margin-top: 3px;
-                max-height: 24px;
-                border-radius: 7px;
-              "
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                marginLeft: '10px',
+                marginTop: '3px',
+                maxHeight: '24px',
+                borderRadius: '7px',
+                '--btn-bg': refreshBtnBg,
+              }"
             >
               Refresh
             </button>
@@ -535,28 +536,6 @@
     >
       {{ show.Overview }}
     </div>
-
-    <!-- Refreshing overlay -->
-    <div
-      v-if="refreshing"
-      :style="{
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        backgroundColor: 'white',
-        color: 'black',
-        padding: '20px 30px',
-        borderRadius: '8px',
-        zIndex: 10001,
-        pointerEvents: 'none',
-        fontSize: '18px',
-        fontWeight: 'bold',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-      }"
-    >
-      Refreshing...
-    </div>
   </div>
 </template>
 
@@ -621,6 +600,7 @@ export default {
       currentTvdbData: null,
       previewSrchChoice: null,
       refreshing: false,
+      refreshBtnBg: "",
       remoteFetchMode: "fast", // 'fast' or 'full'
       settingUpShowName: null, // Track show currently being set up to prevent duplicate calls
     };
@@ -1304,6 +1284,7 @@ export default {
     async refreshTvdb() {
       const showName = this.show.Name;
       console.log(`Refresh button clicked for ${showName}`);
+      this.refreshBtnBg = "lightgray";
       srvr
         .triggerShowGapCheck(this.show.Id || showName, showName)
         .catch((err) => console.error("triggerShowGapCheck failed:", err));
@@ -1635,6 +1616,7 @@ export default {
     this.onTvdbUpdated = async ({ name, record } = {}) => {
       if (!name || !record || this.show?.Name !== name) return;
       tvdb.applyTvdbPush(name, record);
+      this.refreshBtnBg = "";
       if (this.seriesReady) void this.setRemotes();
     };
     evtBus.on("tvdbUpdated", this.onTvdbUpdated);

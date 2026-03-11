@@ -46,7 +46,7 @@
 
         <button
           @click.stop="highlightShow"
-          :disabled="loading"
+          :disabled="!show"
           style="
             cursor: pointer;
             border-radius: 7px;
@@ -540,11 +540,11 @@ export default {
         this.hasLoaded = true;
         await this.updateUsbSpaceAvail();
 
-        // If we have a show, try to highlight it after load if nothing is selected
-        // Using nextTick to let render settle
-        this.$nextTick(() => {
-          // We could auto-select if we wanted to
-        });
+        if (this.show && !this.selectedName) {
+          this.$nextTick(() => {
+            this.highlightShow();
+          });
+        }
       } catch (e) {
         this.error = e.message || "Failed to load files";
       } finally {

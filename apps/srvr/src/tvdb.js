@@ -642,8 +642,8 @@ const getUrlAndRatings = async (type, url, name) => {
       });
       page = await context.newPage();
       resp = await page.goto(url, {
-        waitUntil: "load",
-        timeout: 20000,
+        waitUntil: "domcontentloaded",
+        timeout: 30000,
       });
       await page.waitForTimeout(500);
     } catch (e) {
@@ -1767,8 +1767,14 @@ let chkTvdbQueueRunning = false;
 const showProcessQueue = [];
 // Set after tryLocalGetTvdb is defined so enqueueShowProcess can kick processing immediately
 let _kickProcessQueue = null;
+// Name of the show currently being processed (dequeued but not yet finished)
+let currentlyProcessingShow = null;
 export const enqueueShowProcess = (showName, opts = {}) => {
-  if (showName && !showProcessQueue.some((item) => item.name === showName)) {
+  if (
+    showName &&
+    showName !== currentlyProcessingShow &&
+    !showProcessQueue.some((item) => item.name === showName)
+  ) {
     const wasEmpty = showProcessQueue.length === 0;
     showProcessQueue.push({ name: showName, skipRotten: !!opts.skipRotten });
     // Only notify on 0→1 transition to avoid flooding clients on bulk enqueues
@@ -1941,10 +1947,12 @@ const tryLocalGetTvdb = async () => {
   }
   const requestedName = dequeued.name;
   const skipRotten = dequeued.skipRotten;
+  currentlyProcessingShow = requestedName;
 
   const minTvdb = allTvdb[requestedName];
   if (!minTvdb) {
     log("err", `tryLocalGetTvdb: no record for queued show "${requestedName}"`);
+    currentlyProcessingShow = null;
     tryLocalGetTvdbBusy = false;
     return;
   }
@@ -2072,6 +2080,7 @@ const tryLocalGetTvdb = async () => {
     }
   }
 
+  currentlyProcessingShow = null;
   tryLocalGetTvdbBusy = false;
   // If more shows are queued, continue processing after a short delay; otherwise use background cadence.
   if (showProcessQueue.length > 0) setTimeout(tryLocalGetTvdb, 1000);

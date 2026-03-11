@@ -642,16 +642,19 @@ const openDb = () => {
   try {
     db.prepare("ALTER TABLE tv_entries ADD COLUMN seriesName TEXT").run();
   } catch {}
+  try {
+    db.prepare("ALTER TABLE tv_entries ADD COLUMN destTitle TEXT").run();
+  } catch {}
 
   stmtUpsertByTitle = db.prepare(`
     INSERT INTO tv_entries (
       title, procId, usbPath, localPath, status, progress, eta, speed,
       sequence, fileSize, season, episode, dateStarted, dateEnded,
-      inProgress, error, reason, seriesName
+      inProgress, error, reason, seriesName, destTitle
     ) VALUES (
       @title, @procId, @usbPath, @localPath, @status, @progress, @eta, @speed,
       @sequence, @fileSize, @season, @episode, @dateStarted, @dateEnded,
-      @inProgress, @error, @reason, @seriesName
+      @inProgress, @error, @reason, @seriesName, @destTitle
     )
     ON CONFLICT(title) DO UPDATE SET
       procId=excluded.procId,
@@ -670,7 +673,8 @@ const openDb = () => {
       inProgress=excluded.inProgress,
       error=excluded.error,
       reason=excluded.reason,
-      seriesName=excluded.seriesName
+      seriesName=excluded.seriesName,
+      destTitle=excluded.destTitle
   `);
 
   stmtGetByTitle = db.prepare("SELECT * FROM tv_entries WHERE title = ?");
@@ -772,6 +776,7 @@ const rowToEntry = (row) => {
     inProgress: !!row.inProgress,
     error: !!row.error,
     reason: row.reason || undefined,
+    destTitle: row.destTitle || undefined,
   };
 };
 
@@ -844,6 +849,7 @@ const normalizeEntryForDb = (entry) => {
         ? String(e.status)
         : null,
     seriesName: e.seriesName ? String(e.seriesName) : null,
+    destTitle: e.destTitle ? String(e.destTitle) : null,
   };
 };
 

@@ -112,7 +112,8 @@ async function main() {
     writeMap,
     forcedFiles,
     processingForced,
-    embyMap;
+    embyMap,
+    destTitle;
 
   forcedFiles = null;
   processingForced = false;
@@ -1043,6 +1044,7 @@ async function main() {
     title =
     folderTitle =
     type =
+    destTitle =
       null;
   usbFileBytes = null;
   tvDbErrCount = 0;
@@ -1296,8 +1298,9 @@ async function main() {
         var parsed = parseTorrentTitle(fname) || {};
 
         const pathParts2 = usbFilePath.split("/");
-        const folderName2 =
-          pathParts2.length >= 2 ? pathParts2[pathParts2.length - 2] : "";
+        // Use the topmost folder as the show folder name, regardless of nesting depth.
+        // e.g. "Off Centre (2001)/Season 1/101-Title.avi" → folderName2 = "Off Centre (2001)"
+        const folderName2 = pathParts2.length >= 2 ? pathParts2[0] : "";
         var parsedFolder = {};
         try {
           if (folderName2) parsedFolder = parseTorrentTitle(folderName2) || {};
@@ -1349,7 +1352,7 @@ async function main() {
           // show before creating an error entry.  Files that don't resemble any
           // Emby show (music videos, movies, etc.) are silently skipped so they
           // don't clutter the UI with error entries.
-          if (embyMap && title) {
+          if (!processingForced && embyMap && title) {
             var embyShowNames = Object.keys(embyMap).filter(
               (k) => embyMap[k] && embyMap[k].inEmby,
             );
@@ -1415,6 +1418,31 @@ async function main() {
           `parse-torrent-title threw: ${error1 && error1.message ? error1.message : "unknown"}`,
         );
         return;
+      }
+      // If file uses compact NNN naming (e.g. 101-Title.avi or Show.101.Title.avi = S01E01),
+      // rename to SxxExx format so Emby can match it to the correct episode.
+      destTitle = null;
+      {
+        const dotIdx = fname.lastIndexOf(".");
+        const fbase = dotIdx >= 0 ? fname.slice(0, dotIdx) : fname;
+        const fext = dotIdx >= 0 ? fname.slice(dotIdx) : "";
+        const nnn = `${season}${String(episode).padStart(2, "0")}`;
+        const seStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
+        // Case 1: NNN prefix (e.g. "101-Title.avi" or "101 Title.avi")
+        const prefixMatch = fbase.match(new RegExp(`^${nnn}[-_ ]+(.*)`));
+        if (prefixMatch) {
+          const rest = prefixMatch[1].trim();
+          destTitle = rest ? `${seStr} - ${rest}${fext}` : `${seStr}${fext}`;
+        } else {
+          // Case 2: NNN surrounded by dots/spaces inside the name (e.g. "Show.101.Title.avi")
+          const innerMatch = fbase.match(
+            new RegExp(`[. _]${nnn}(?:[. _]+(.*)|$)`),
+          );
+          if (innerMatch) {
+            const rest = (innerMatch[1] || "").trim();
+            destTitle = rest ? `${seStr} - ${rest}${fext}` : `${seStr}${fext}`;
+          }
+        }
       }
       // (logging moved to workers)
       return process.nextTick(chkTvDB);
@@ -1550,16 +1578,17 @@ async function main() {
               return setTimeout(chkTvDB, rsyncDelay);
             } else {
               err(`tvdb no results: fname: ${fname} | url: ${tvdburl}`);
-              var embyShowNamesForTvdb = embyMap
-                ? Object.keys(embyMap).filter(
-                    (k) => embyMap[k] && embyMap[k].inEmby,
-                  )
-                : [];
+              var embyShowNamesForTvdb =
+                !processingForced && embyMap
+                  ? Object.keys(embyMap).filter(
+                      (k) => embyMap[k] && embyMap[k].inEmby,
+                    )
+                  : [];
               var tvdbMatchesEmby =
                 embyShowNamesForTvdb.length > 0
                   ? smartTitleMatch(title, embyShowNamesForTvdb, null, false)
                   : null;
-              if (!tvdbMatchesEmby) {
+              if (!processingForced && !tvdbMatchesEmby) {
                 // If the filename gave an abbreviated title (e.g. "tmaws"), retry with
                 // the folder-derived title before giving up.
                 if (folderTitle && folderTitle !== title) {
@@ -1706,7 +1735,11 @@ async function main() {
     // This must run before the tvJsonTitles guard so files that were previously
     // queued as 'waiting' (before disk-check was added) also get caught.
     // Skip this check for forced downloads — the worker will delete and re-fetch.
-    if (!processingForced && fs.existsSync(`${tvSeasonPath}/${fname}`)) {
+    if (
+      !processingForced &&
+      (fs.existsSync(`${tvSeasonPath}/${destTitle || fname}`) ||
+        (destTitle && fs.existsSync(`${tvSeasonPath}/${fname}`)))
+    ) {
       existsCount++;
       log("------", downloadCount, "/", chkCount, "ALREADY ON DISK:", fname);
       trace("checkFileExists: already on disk", { fname, tvSeasonPath });
@@ -1733,7 +1766,7 @@ async function main() {
     }
 
     // Emby filter: only download shows that are in Emby.
-    if (embyMap && seriesName) {
+    if (!processingForced && embyMap && seriesName) {
       const embyKey =
         smartTitleMatch(seriesName, Object.keys(embyMap), null, false) ||
         seriesName;
@@ -1762,6 +1795,7 @@ async function main() {
         usbPath: usbPath,
         localPath: tvLocalDir,
         title: fname,
+        destTitle: destTitle || undefined,
         seriesName: seriesName || undefined,
         status: "waiting",
         progress: 0,

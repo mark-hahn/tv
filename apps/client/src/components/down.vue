@@ -835,7 +835,7 @@ export default {
 
     handleCardClick(event, it) {
       void event;
-      const clickedTitle = it?.title;
+      const clickedTitle = it?.seriesName || it?.title;
       if (clickedTitle) evtBus.emit("selectShowFromCardTitle", clickedTitle);
     },
 

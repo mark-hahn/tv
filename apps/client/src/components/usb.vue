@@ -888,7 +888,10 @@ export default {
 
       // Emby check: all files must belong to a show that is in Emby.
       if (Array.isArray(this.allShows) && this.allShows.length > 0) {
-        const embyShows = this.allShows.filter((s) => s && s.inEmby);
+        const embyShows = this.allShows
+          .filter((s) => s && s.inEmby)
+          .map((s) => s.Name || s.name)
+          .filter(Boolean);
         const notInEmby = [];
         for (const fileEntry of files) {
           const parts2 = fileEntry.split("-");
@@ -899,18 +902,12 @@ export default {
           const folderName2 =
             pathParts2.length >= 2 ? pathParts2[pathParts2.length - 2] : "";
 
-          let _pttParser = null;
-          try {
-            if (typeof parseTorrentTitle === "function")
-              _pttParser = parseTorrentTitle;
-            else if (parseTorrentTitle?.parse)
-              _pttParser = parseTorrentTitle.parse;
-            else if (parseTorrentTitle?.default?.parse)
-              _pttParser = parseTorrentTitle.default.parse;
-          } catch (e) {}
           let parsedPtt2 = {};
           try {
-            if (_pttParser) parsedPtt2 = _pttParser(fname2) || {};
+            if (typeof parseTorrentTitle === "function")
+              parsedPtt2 = parseTorrentTitle(fname2) || {};
+            else if (parseTorrentTitle?.parse)
+              parsedPtt2 = parseTorrentTitle.parse(fname2) || {};
           } catch (e) {}
 
           const title2 = parseTitleFromFilename(

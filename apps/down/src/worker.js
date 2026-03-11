@@ -163,7 +163,7 @@ const main = () => {
       : rawUsbPath;
     const localPath2 = ensureTrailingSlash(localPath);
     const src = `${usbHost}:${usbPath2}${title}`;
-    const dst = `${localPath2}${title}`;
+    const dst = `${localPath2}${entry.destTitle || title}`;
     return { src, dst, usbPath2, localPath2 };
   };
 

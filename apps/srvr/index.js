@@ -1061,6 +1061,112 @@ tvdb.setNotifyCallback((name, record) =>
 );
 tvdb.setEnqueueCallback((name) => notifyClients("showUpdating", { name }));
 tvdb.setQueueDrainCallback(() => notifyClients("showQueueEmpty", {}));
+
+// Detect and fix the "compact NNN" mis-indexing: Emby reads a filename like
+// "101-Title.avi" in Season 1 as episode 101 instead of S1E01. This leaves the
+// real TVDB-sourced virtual stubs (E1-E21) un-linked. We rename the files to
+// SxxExx format so the next Emby scan matches them correctly.
+const fixCompactEpisodeNaming = async (showId, showName) => {
+  let anyFixed = false;
+  try {
+    const seasonsRes = await fetch(
+      `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?ParentId=${showId}&Fields=MediaSources,Path,LocationType&api_key=${EMBY_API_KEY}`,
+    );
+    if (!seasonsRes.ok) return false;
+    const seasonsData = await seasonsRes.json();
+    const seasons = seasonsData?.Items || [];
+
+    for (const season of seasons) {
+      const seasonId = season.Id;
+      const seasonNumber = season.IndexNumber;
+      if (!Number.isFinite(seasonNumber) || seasonNumber < 1) continue;
+
+      const epsRes = await fetch(
+        `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?ParentId=${seasonId}&Fields=MediaSources,Path,LocationType&api_key=${EMBY_API_KEY}`,
+      );
+      if (!epsRes.ok) continue;
+      const epsData = await epsRes.json();
+      const episodes = epsData?.Items || [];
+
+      let hasVirtual = false;
+      const compactFileEps = [];
+      for (const ep of episodes) {
+        const epNum = ep.IndexNumber;
+        if (!Number.isFinite(epNum)) continue;
+        const path = ep?.MediaSources?.[0]?.Path || ep?.Path || "";
+        const isVirtual = ep.LocationType === "Virtual" || !path;
+        if (epNum >= 1 && epNum <= 99 && isVirtual) {
+          hasVirtual = true;
+        } else if (epNum >= 100) {
+          // Check compact NNN: first digit(s) = season, last two = episode
+          const compactSeason = Math.floor(epNum / 100);
+          const compactEp = epNum % 100;
+          if (compactSeason === seasonNumber && compactEp >= 1 && path) {
+            compactFileEps.push({ epNum, path, compactEp });
+          }
+        }
+      }
+
+      if (!hasVirtual || compactFileEps.length === 0) continue;
+
+      console.log(
+        `[fixCompactEpisodeNaming] ${showName} S${seasonNumber}: renaming ${compactFileEps.length} compact-NNN files`,
+      );
+      for (const { path: oldPath, compactEp } of compactFileEps) {
+        const dir = oldPath.substring(0, oldPath.lastIndexOf("/"));
+        const filename = oldPath.substring(oldPath.lastIndexOf("/") + 1);
+        const ext = filename.substring(filename.lastIndexOf("."));
+        // Strip leading NNN- prefix from title
+        const titlePart = filename
+          .replace(/^\d{3}[-\s]/, "")
+          .replace(/\.[^.]+$/, "");
+        const sStr = String(seasonNumber).padStart(2, "0");
+        const eStr = String(compactEp).padStart(2, "0");
+        const newFilename = `S${sStr}E${eStr} - ${titlePart}${ext}`;
+        const newPath = `${dir}/${newFilename}`;
+        if (oldPath === newPath) continue;
+        try {
+          fs.renameSync(oldPath, newPath);
+          console.log(
+            `[fixCompactEpisodeNaming] Renamed: ${filename} → ${newFilename}`,
+          );
+          anyFixed = true;
+        } catch (e) {
+          console.error(
+            `[fixCompactEpisodeNaming] Rename failed for ${oldPath}:`,
+            e.message,
+          );
+        }
+      }
+    }
+
+    if (anyFixed) {
+      console.log(
+        `[fixCompactEpisodeNaming] Triggering Emby refresh for ${showName}`,
+      );
+      try {
+        await fetch(
+          `${EMBY_BASE_URL}/Items/${showId}/Refresh?Recursive=true&MetadataRefreshMode=Default&ImageRefreshMode=Default&api_key=${EMBY_API_KEY}`,
+          { method: "POST" },
+        );
+      } catch (e) {
+        console.error(
+          `[fixCompactEpisodeNaming] Emby refresh error:`,
+          e.message,
+        );
+      }
+      // Give Emby time to process before gap check reads updated data
+      await new Promise((r) => setTimeout(r, 8000));
+    }
+  } catch (e) {
+    console.error(
+      `[fixCompactEpisodeNaming] Error for ${showName}:`,
+      e.message,
+    );
+  }
+  return anyFixed;
+};
+
 tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
   try {
     // Disk check
@@ -1100,6 +1206,10 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
           tvdbRecord.lastWatched = date;
         }
       } catch (e) {}
+    }
+    // Fix compact-NNN episode mis-indexing (e.g. "101-Title.avi" parsed as E101)
+    if (tvdbRecord.inEmby && tvdbRecord.Id) {
+      await fixCompactEpisodeNaming(tvdbRecord.Id, showName);
     }
     // Gap check
     let gapChanges = [];

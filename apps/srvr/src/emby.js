@@ -175,7 +175,7 @@ const safeGet = async (url, retries = 3) => {
   }
 };
 
-const getShowState = async (showId, _showName, showMeta) => {
+const getShowState = async (showId, showName, showMeta) => {
   // active rows have watched with no watched at end
   // or last epi in last row watched
   let firstEpisode = true;

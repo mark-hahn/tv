@@ -1711,7 +1711,7 @@ async function main() {
       log("------", downloadCount, "/", chkCount, "ALREADY ON DISK:", fname);
       trace("checkFileExists: already on disk", { fname, tvSeasonPath });
       try {
-        tvJson.markFinished(fname);
+        tvJson.markFinished(fname, tvLocalDir);
       } catch (e) {}
       if (tvJsonTitles) tvJsonTitles[fname] = { error: false };
       return process.nextTick(checkFile);

@@ -266,7 +266,7 @@ const getShowState = async (showId, showName, showMeta) => {
         const hasPath = !!episode.Path;
 
         if (haveFile) fileCount++;
-        if (!hasPath) anyEpisodeNoFile = true;
+        if (!hasPath && !watched) anyEpisodeNoFile = true;
         if (firstEpisode && haveFile && !watched) {
           firstEpisodeFileUnwatched = true;
         }

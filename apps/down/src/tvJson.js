@@ -638,15 +638,20 @@ const openDb = () => {
     CREATE INDEX IF NOT EXISTS idx_tv_entries_status_procId ON tv_entries(status, procId);
   `);
 
+  // Add seriesName column if it doesn't exist yet (schema migration).
+  try {
+    db.prepare("ALTER TABLE tv_entries ADD COLUMN seriesName TEXT").run();
+  } catch {}
+
   stmtUpsertByTitle = db.prepare(`
     INSERT INTO tv_entries (
       title, procId, usbPath, localPath, status, progress, eta, speed,
       sequence, fileSize, season, episode, dateStarted, dateEnded,
-      inProgress, error, reason
+      inProgress, error, reason, seriesName
     ) VALUES (
       @title, @procId, @usbPath, @localPath, @status, @progress, @eta, @speed,
       @sequence, @fileSize, @season, @episode, @dateStarted, @dateEnded,
-      @inProgress, @error, @reason
+      @inProgress, @error, @reason, @seriesName
     )
     ON CONFLICT(title) DO UPDATE SET
       procId=excluded.procId,
@@ -664,7 +669,8 @@ const openDb = () => {
       dateEnded=excluded.dateEnded,
       inProgress=excluded.inProgress,
       error=excluded.error,
-      reason=excluded.reason
+      reason=excluded.reason,
+      seriesName=excluded.seriesName
   `);
 
   stmtGetByTitle = db.prepare("SELECT * FROM tv_entries WHERE title = ?");
@@ -717,6 +723,7 @@ const rowToEntry = (row) => {
     usbPath: row.usbPath || "",
     localPath: row.localPath || "",
     title: row.title || "",
+    seriesName: row.seriesName || undefined,
     status: row.status || "waiting",
     progress:
       typeof row.progress === "number"
@@ -836,6 +843,7 @@ const normalizeEntryForDb = (entry) => {
       : e.status && e.status !== status
         ? String(e.status)
         : null,
+    seriesName: e.seriesName ? String(e.seriesName) : null,
   };
 };
 

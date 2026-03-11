@@ -69,6 +69,7 @@ async function main() {
     flushAndGoLive,
     flushBuffer,
     fname,
+    folderTitle,
     fs,
     getUsbFiles,
     inProgress,
@@ -201,37 +202,10 @@ async function main() {
 
   var writeRejectLog = function (rejectFname, reason) {
     try {
-      var now = Date.now();
-      var ts = dateStr(now);
+      var ts = dateStr(Date.now());
       var line =
         ts + " | " + (rejectFname || "") + " | " + (reason || "") + "\n";
       fs.appendFileSync(REJECT_LOG_PATH, line);
-      // Trim to last 24 hours.
-      var cutoff = now - 24 * 60 * 60 * 1000;
-      var raw = "";
-      try {
-        raw = fs.readFileSync(REJECT_LOG_PATH, "utf8");
-      } catch (e) {
-        return;
-      }
-      var kept = raw.split("\n").filter(function (l) {
-        if (!l.trim()) return false;
-        // Parse MM-DD HH:mm from start of line.
-        var m = l.match(/^(\d{2})-(\d{2}) (\d{2}):(\d{2})/);
-        if (!m) return true;
-        var month = parseInt(m[1], 10) - 1;
-        var day = parseInt(m[2], 10);
-        var hour = parseInt(m[3], 10);
-        var min = parseInt(m[4], 10);
-        var year = new Date().getFullYear();
-        var d = new Date(year, month, day, hour, min);
-        if (d.getTime() > now) d.setFullYear(year - 1);
-        return d.getTime() >= cutoff;
-      });
-      fs.writeFileSync(
-        REJECT_LOG_PATH,
-        kept.join("\n") + (kept.length ? "\n" : ""),
-      );
     } catch (e) {}
   };
 
@@ -375,6 +349,10 @@ async function main() {
     existsCount = errCount = downloadCount = blockedCount = 0;
     cycleSeq = 0;
     currentSeq = null;
+    // Clear reject log at the start of each cycle so it always reflects the current cycle only.
+    try {
+      fs.writeFileSync(REJECT_LOG_PATH, "");
+    } catch (e) {}
   };
 
   scheduleNextCycle = function () {
@@ -775,7 +753,8 @@ async function main() {
   findUsb =
     `ssh ${usbHost} \"find files -ignore_readdir_race -type f -printf '%CY-%Cm-%Cd-%P-%s\\\\n' 2>/dev/null\" ` +
     "| grep -Ev .r[0-9]+-[0-9]+$ | grep -Ev .rar-[0-9]+$ " +
-    "| grep -Ev screen[0-9]+.png-[0-9]+$";
+    "| grep -Ev screen[0-9]+.png-[0-9]+$" +
+    "| grep -Ev '\\.(srr|sfv|nfo|nzb|jpg|jpeg|png|txt|sub|idx|srt)-[0-9]+$'";
 
   log({ findUsb });
 
@@ -1062,6 +1041,7 @@ async function main() {
     episode =
     fname =
     title =
+    folderTitle =
     type =
       null;
   usbFileBytes = null;
@@ -1124,6 +1104,9 @@ async function main() {
     } catch (e) {
       embyMap = null;
     }
+
+    // Reset TVDB cache each cycle so embyMap changes (inEmby toggled) take effect.
+    tvdbCache = {};
 
     // Sort files by parsed title before processing.
     usbFiles = usbFiles.filter((l) => l && l.trim().length);
@@ -1322,6 +1305,11 @@ async function main() {
 
         // Use shared title extractor
         title = parseTitleFromFilename(fname, folderName2, parsed);
+        // Also derive a title from the folder alone (fallback for abbreviation filenames)
+        folderTitle = folderName2
+          ? parseTitleFromFilename(folderName2, "", parsedFolder)
+          : null;
+        if (folderTitle === title) folderTitle = null; // no point retrying with the same title
 
         // Use shared season/episode extractor
         const se = parseFileSeasonEpisode(
@@ -1458,7 +1446,6 @@ async function main() {
     }
   };
 
-  tvdbCache = {};
   tvdburl = "";
 
   chkTvDB = () => {
@@ -1466,13 +1453,39 @@ async function main() {
 
     trace("chkTvDB: start", { fname, title });
 
-    if (tvdbCache[title]) {
+    if (title in tvdbCache) {
+      if (tvdbCache[title] === null) {
+        // Previously determined this title is not resolvable — skip without hitting TVDB.
+        return process.nextTick(checkFile);
+      }
       seriesName = tvdbCache[title];
       trace("chkTvDB: cache hit", { title, seriesName });
       // process.nextTick checkFileExists
       setTimeout(checkFileExists, rsyncDelay);
       return;
     }
+
+    // If the episode-specific title isn't cached but the folder title already is,
+    // use the folder result directly without making a TVDB call for the episode title.
+    if (folderTitle && folderTitle in tvdbCache) {
+      if (tvdbCache[folderTitle] === null) {
+        tvdbCache[title] = null;
+        return process.nextTick(checkFile);
+      }
+      seriesName = tvdbCache[folderTitle];
+      tvdbCache[title] = seriesName;
+      trace("chkTvDB: folderTitle cache hit", {
+        title,
+        folderTitle,
+        seriesName,
+      });
+      setTimeout(checkFileExists, rsyncDelay);
+      return;
+    }
+
+    // Remember the title we started with so we can cache it after a folderTitle retry.
+    var titleBeforeRetry = title;
+
     log("search:", title);
 
     // Some shows use "&" on TVDB where the filename has "and" (e.g. "Jam & Jerusalem").
@@ -1525,11 +1538,10 @@ async function main() {
               statusCode: response && response.statusCode,
               error: error ? error.message || String(error) : null,
             });
-            err("no series name found in theTvDB:", { fname, tvdburl });
-            err("search error:", error);
-            err("search statusCode:", response && response.statusCode);
-            err("search body:", body);
             if (error) {
+              err(
+                `tvdb search error: ${error && error.message ? error.message : error} | status: ${response && response.statusCode} | fname: ${fname}`,
+              );
               if (++tvDbErrCount === 15) {
                 err("giving up, downloaded:", downloadCount);
                 return;
@@ -1537,6 +1549,7 @@ async function main() {
               err("tvdb err retry, waiting one minute");
               return setTimeout(chkTvDB, rsyncDelay);
             } else {
+              err(`tvdb no results: fname: ${fname} | url: ${tvdburl}`);
               var embyShowNamesForTvdb = embyMap
                 ? Object.keys(embyMap).filter(
                     (k) => embyMap[k] && embyMap[k].inEmby,
@@ -1547,6 +1560,17 @@ async function main() {
                   ? smartTitleMatch(title, embyShowNamesForTvdb, null, false)
                   : null;
               if (!tvdbMatchesEmby) {
+                // If the filename gave an abbreviated title (e.g. "tmaws"), retry with
+                // the folder-derived title before giving up.
+                if (folderTitle && folderTitle !== title) {
+                  trace("chkTvDB: retrying with folderTitle", {
+                    title,
+                    folderTitle,
+                  });
+                  title = folderTitle;
+                  folderTitle = null;
+                  return process.nextTick(chkTvDB);
+                }
                 log(
                   "------",
                   downloadCount,
@@ -1559,6 +1583,10 @@ async function main() {
                   fname,
                   title,
                 });
+                // Cache null so remaining episodes from the same folder skip TVDB this cycle.
+                tvdbCache[title] = null;
+                if (titleBeforeRetry && titleBeforeRetry !== title)
+                  tvdbCache[titleBeforeRetry] = null;
                 return process.nextTick(checkFile);
               }
               badFile("thetvdb: no series match");
@@ -1585,6 +1613,16 @@ async function main() {
             }
             trace("chkTvDB: post-map", { title, seriesName });
             if (!seriesName) {
+              // If the filename gave an abbreviated title, retry with the folder-derived title.
+              if (folderTitle && folderTitle !== title) {
+                trace("chkTvDB: no TVDB match, retrying with folderTitle", {
+                  title,
+                  folderTitle,
+                });
+                title = folderTitle;
+                folderTitle = null;
+                return process.nextTick(chkTvDB);
+              }
               log(
                 "------",
                 downloadCount,
@@ -1597,9 +1635,18 @@ async function main() {
                 fname,
                 title,
               });
+              // Cache null so remaining episodes from the same folder skip TVDB this cycle.
+              tvdbCache[title] = null;
+              if (titleBeforeRetry && titleBeforeRetry !== title)
+                tvdbCache[titleBeforeRetry] = null;
               return process.nextTick(checkFile);
             }
             tvdbCache[title] = seriesName;
+            // Also cache the original title (before any folderTitle retry) so
+            // subsequent episodes with the same abbreviated filename skip TVDB entirely.
+            if (titleBeforeRetry && titleBeforeRetry !== title) {
+              tvdbCache[titleBeforeRetry] = seriesName;
+            }
             // process.nextTick checkFileExists
             return setTimeout(checkFileExists, rsyncDelay);
           }
@@ -1715,6 +1762,7 @@ async function main() {
         usbPath: usbPath,
         localPath: tvLocalDir,
         title: fname,
+        seriesName: seriesName || undefined,
         status: "waiting",
         progress: 0,
         eta: null,

@@ -733,6 +733,7 @@ export default {
     },
 
     showName(it) {
+      if (it?.seriesName) return it.seriesName;
       const fname = it?.title || "";
       const usbPath = it?.usbPath || "";
       // Extract folder name from usbPath (the last non-empty path segment)

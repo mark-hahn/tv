@@ -1362,6 +1362,15 @@ async function main() {
               null,
               false,
             );
+            if (!matchesEmby && folderTitle) {
+              matchesEmby = smartTitleMatch(
+                folderTitle,
+                embyShowNames,
+                null,
+                false,
+              );
+              if (matchesEmby) title = folderTitle;
+            }
             if (!matchesEmby) {
               log(
                 "------",

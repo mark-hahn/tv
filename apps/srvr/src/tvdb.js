@@ -1866,6 +1866,14 @@ const chkTvdbQueue = () => {
                 );
               if (prev.overview !== finalData.overview)
                 tvdbChanges.push(`overview:changed`);
+              if (prev.imdbRatings !== finalData.imdbRatings)
+                tvdbChanges.push(
+                  `imdb:${prev.imdbRatings ?? "none"}->${finalData.imdbRatings ?? "none"}`,
+                );
+              if (prev.rottenRatings !== finalData.rottenRatings)
+                tvdbChanges.push(
+                  `rotten:${prev.rottenRatings ?? "none"}->${finalData.rottenRatings ?? "none"}`,
+                );
             } else {
               tvdbChanges.push(`new record`);
             }

@@ -1242,9 +1242,9 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         tvdbRecord.lastGapCheck = Date.now();
         delete tvdbRecord.allAiredHaveFile;
       }
-      // Compute full: all aired episodes have a file
+      // Compute full: all aired episodes have a file or have been watched
       const newFull = !!(tvdbRecord.inEmby && gapData.allAiredHaveFile);
-      if (tvdbRecord.full !== newFull) {
+      if (!!tvdbRecord.full !== newFull) {
         gapChanges.push(`full:${tvdbRecord.full}->${newFull}`);
         tvdbRecord.full = newFull;
       }
